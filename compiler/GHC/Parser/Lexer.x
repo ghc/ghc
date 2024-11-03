@@ -122,9 +122,10 @@ import GHC.Utils.Misc ( readSignificandExponentPair, readHexSignificandExponentP
 
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
-import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..))
-import GHC.Hs.Doc
 
+import GHC.Hs.Extension(GhcPs)
+import GHC.Hs.Doc
+import GHC.Hs.InlinePragma(InlineSpec(..), RuleMatchInfo(..))
 import GHC.Parser.CharClass
 
 import GHC.Parser.Annotation
@@ -835,7 +836,7 @@ data Token
   | ITrequires
 
   -- Pragmas, see Note [Pragma source text] in "GHC.Types.SourceText"
-  | ITinline_prag       SourceText InlineSpec RuleMatchInfo
+  | ITinline_prag       SourceText (InlineSpec GhcPs) RuleMatchInfo
   | ITopaque_prag       SourceText
   | ITspec_prag         SourceText                -- SPECIALISE
   | ITspec_inline_prag  SourceText Bool    -- SPECIALISE INLINE (or NOINLINE)

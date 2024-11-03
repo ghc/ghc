@@ -79,8 +79,6 @@ import GHC.Types.Unique.Set
 import GHC.Types.TyThing
 import qualified GHC.LanguageExtensions as LangExt
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import Control.Monad
 
 {-

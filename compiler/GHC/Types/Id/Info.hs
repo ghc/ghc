@@ -116,6 +116,9 @@ import GHC.Utils.Panic
 import GHC.Stg.EnforceEpt.TagSig
 import GHC.StgToCmm.Types (LambdaFormInfo)
 
+import GHC.Hs.InlinePragma (InlinePragma(..), defaultInlinePragma)
+import GHC.Hs.Extension (GhcTc)
+
 import Data.Data ( Data )
 import Data.Word
 import Data.List as List( partition )
@@ -442,7 +445,7 @@ data IdInfo
         -- See Note [Specialisations and RULES in IdInfo]
         realUnfoldingInfo   :: Unfolding,
         -- ^ The 'Id's unfolding
-        inlinePragInfo  :: InlinePragma,
+        inlinePragInfo  :: InlinePragma GhcTc,
         -- ^ Any inline pragma attached to the 'Id'
         occInfo         :: OccInfo,
         -- ^ How the 'Id' occurs in the program
@@ -555,7 +558,7 @@ tagSigInfo = tagSig
 
 setRuleInfo :: IdInfo -> RuleInfo -> IdInfo
 setRuleInfo       info sp = sp `seq` info { ruleInfo = sp }
-setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
+setInlinePragInfo :: IdInfo -> InlinePragma GhcTc -> IdInfo
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setOccInfo :: IdInfo -> OccInfo -> IdInfo
 setOccInfo        info oc = oc `seq` info { occInfo = oc }

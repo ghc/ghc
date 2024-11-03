@@ -100,8 +100,10 @@ GHC.Hs.DocString
 GHC.Hs.Expr
 GHC.Hs.Extension
 GHC.Hs.ImpExp
+GHC.Hs.InlinePragma
 GHC.Hs.Instances
 GHC.Hs.Lit
+GHC.Hs.OverlapPragma
 GHC.Hs.Pat
 GHC.Hs.Specificity
 GHC.Hs.Type
@@ -239,8 +241,10 @@ Language.Haskell.Syntax.Decls
 Language.Haskell.Syntax.Expr
 Language.Haskell.Syntax.Extension
 Language.Haskell.Syntax.ImpExp
+Language.Haskell.Syntax.InlinePragma
 Language.Haskell.Syntax.Lit
 Language.Haskell.Syntax.Module.Name
+Language.Haskell.Syntax.OverlapPragma
 Language.Haskell.Syntax.Pat
 Language.Haskell.Syntax.Specificity
 Language.Haskell.Syntax.Type

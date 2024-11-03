@@ -57,6 +57,9 @@ import GHC.Types.Var.Env
 import GHC.Types.Var
 import GHC.Types.Demand ( argOneShots, argsOneShots, isDeadEndSig )
 
+import GHC.Hs.InlinePragma
+import GHC.Hs.Extension(GhcTc)
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -84,7 +87,7 @@ occurAnalyseExpr expr = expr'
 
 occurAnalysePgm :: Module         -- Used only in debug output
                 -> (Id -> Bool)         -- Active unfoldings
-                -> (Activation -> Bool) -- Active rules
+                -> (Activation GhcTc -> Bool) -- Active rules
                 -> [CoreRule]           -- Local rules for imported Ids
                 -> CoreProgram -> CoreProgram
 occurAnalysePgm this_mod active_unf active_rule imp_rules binds
@@ -143,7 +146,7 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
 *                                                                      *
 ********************************************************************* -}
 
-type ImpRuleEdges = IdEnv [(Activation, VarSet)]
+type ImpRuleEdges = IdEnv [(Activation GhcTc, VarSet)]
     -- Mapping from a local Id 'f' to info about its IMP-RULES,
     -- i.e. /local/ rules for an imported Id that mention 'f' on the LHS
     -- We record (a) its Activation and (b) the RHS free vars
@@ -152,13 +155,13 @@ type ImpRuleEdges = IdEnv [(Activation, VarSet)]
 noImpRuleEdges :: ImpRuleEdges
 noImpRuleEdges = emptyVarEnv
 
-lookupImpRules :: ImpRuleEdges -> Id -> [(Activation,VarSet)]
+lookupImpRules :: ImpRuleEdges -> Id -> [(Activation GhcTc, VarSet)]
 lookupImpRules imp_rule_edges bndr
   = case lookupVarEnv imp_rule_edges bndr of
       Nothing -> []
       Just vs -> vs
 
-impRulesScopeUsage :: [(Activation,VarSet)] -> UsageDetails
+impRulesScopeUsage :: [(Activation GhcTc, VarSet)] -> UsageDetails
 -- Variable mentioned in RHS of an IMP-RULE for the bndr,
 -- whether active or not
 impRulesScopeUsage imp_rules_info
@@ -166,8 +169,8 @@ impRulesScopeUsage imp_rules_info
   where
     add (_,vs) usage = addManyOccs usage vs
 
-impRulesActiveFvs :: (Activation -> Bool) -> VarSet
-                  -> [(Activation,VarSet)] -> VarSet
+impRulesActiveFvs :: (Activation GhcTc -> Bool) -> VarSet
+                  -> [(Activation GhcTc, VarSet)] -> VarSet
 impRulesActiveFvs is_active bndr_set vs
   = foldr add emptyVarSet vs `intersectVarSet` bndr_set
   where
@@ -1759,7 +1762,7 @@ makeNode !env imp_rule_edges bndr_set (bndr, rhs)
       -- of Note [Join arity prediction based on joinRhsArity]
 
     --------- IMP-RULES --------
-    is_active     = occ_rule_act env :: Activation -> Bool
+    is_active     = occ_rule_act env :: Activation GhcTc -> Bool
     imp_rule_info = lookupImpRules imp_rule_edges bndr
     imp_rule_uds  = impRulesScopeUsage imp_rule_info
     imp_rule_fvs  = impRulesActiveFvs is_active bndr_set imp_rule_info
@@ -2683,7 +2686,7 @@ occAnalApp env (Var fun_id, args, ticks)
                             | otherwise      -> NotInteresting
 
     !is_exp     = isExpandableApp fun_id n_val_args
-        -- See Note [CONLIKE pragma] in GHC.Types.Basic
+        -- See Note [CONLIKE pragma] in GHC.Hs.InlinePragma
         -- The definition of is_exp should match that in GHC.Core.Opt.Simplify.prepareRhs
 
     one_shots  = argsOneShots (idDmdSig fun_id) guaranteed_val_args
@@ -2817,7 +2820,7 @@ data OccEnv
   = OccEnv { occ_encl       :: !OccEncl      -- Enclosing context information
            , occ_one_shots  :: !OneShots     -- See Note [OneShots]
            , occ_unf_act    :: Id -> Bool          -- Which Id unfoldings are active
-           , occ_rule_act   :: Activation -> Bool  -- Which rules are active
+           , occ_rule_act   :: Activation GhcTc -> Bool  -- Which rules are active
              -- See Note [Finding rule RHS free vars]
 
            -- See Note [The binder-swap substitution]

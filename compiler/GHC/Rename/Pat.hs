@@ -96,7 +96,6 @@ import Control.Monad.Trans.Reader
 import Data.Functor ((<&>))
 import GHC.Rename.Doc (rnLHsDoc)
 import GHC.Types.Hint
-import GHC.Types.Fixity (LexicalFixity(..))
 import Data.Coerce
 
 {-

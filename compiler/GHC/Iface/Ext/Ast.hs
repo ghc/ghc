@@ -1644,7 +1644,7 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
 
 instance ToHie (LocatedA (FamilyDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
-      FamilyDecl _ info _ name vars _ sig inj ->
+      FamilyDecl _ info name vars _ sig inj ->
         [ toHie $ C (Decl FamDec $ getRealSpanA span) name
         , toHie $ TS (ResolvedScopes [rhsSpan]) vars
         , toHie info
@@ -1742,7 +1742,7 @@ instance ToHie (RScoped (LocatedAn NoEpAnns (DerivStrategy GhcRn))) where
       NewtypeStrategy _ -> []
       ViaStrategy s -> [ toHie (TS (ResolvedScopes [sc]) s) ]
 
-instance ToHie (LocatedP OverlapMode) where
+instance ToHie (LocatedP (OverlapMode (GhcPass p))) where
   toHie (L span _) = locOnly (locA span)
 
 instance ToHie a => ToHie (HsScaled GhcRn a) where

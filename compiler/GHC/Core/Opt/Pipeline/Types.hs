@@ -10,7 +10,7 @@ import GHC.Core ( CoreProgram )
 import GHC.Core.Opt.Monad ( CoreM, FloatOutSwitches )
 import GHC.Core.Opt.Simplify ( SimplifyOpts(..) )
 
-import GHC.Types.Basic  ( CompilerPhase(..) )
+import GHC.Hs.InlinePragma  ( CompilerPhase(..) )
 import GHC.Unit.Module.ModGuts
 import GHC.Utils.Outputable as Outputable
 

@@ -23,7 +23,6 @@ import GHC.Builtin.Uniques
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
 
-import GHC.Types.Basic
 import GHC.Types.Cpr
 import GHC.Types.Demand
 import GHC.Types.Id
@@ -37,6 +36,7 @@ import GHC.Types.Var.Set
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType ( ConcreteTvOrigin(..), ConcreteTyVars, TcType )
 
+import GHC.Hs.InlinePragma(neverInlinePragma)
 import GHC.Data.SmallArray
 
 import Data.Maybe ( mapMaybe, listToMaybe, catMaybes, maybeToList )

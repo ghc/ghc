@@ -29,11 +29,12 @@ import GHC.Core.FVs( exprFreeIds )
 import GHC.Types.Id
 import GHC.Types.Var.Env( InScopeSet, lookupInScope )
 import GHC.Types.Var.Set
-import GHC.Types.Basic  ( Arity, RecFlag(..), isActive )
+import GHC.Types.Basic  ( Arity, RecFlag(..) )
 import GHC.Utils.Logger
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Types.Name
+import GHC.Hs.InlinePragma(isActive)
 
 import Data.List (isPrefixOf)
 

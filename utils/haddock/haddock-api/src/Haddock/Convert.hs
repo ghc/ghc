@@ -59,7 +59,6 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Hs
 import GHC.Types.Basic (DefMethSpec (..), TopLevelFlag (..), TupleSort (..))
-import GHC.Types.Fixity (LexicalFixity (..))
 import GHC.Types.Id (idType, setIdType)
 import GHC.Types.Name
 import GHC.Types.Name.Reader (mkVarUnqual)
@@ -79,7 +78,6 @@ import GHC.Utils.Misc
   , filterOut
   )
 import GHC.Utils.Panic.Plain (assert)
-import Language.Haskell.Syntax.Basic (FieldLabelString (..))
 
 import Haddock.GhcUtils (defaultRuntimeRepVars, mkEmptySigType, orderedFVs)
 import Haddock.Interface.RenameType
@@ -317,9 +315,8 @@ synifyTyCon _prr _coax tc
       return $
         FamDecl noExtField $
           FamilyDecl
-            { fdExt = noAnn
+            { fdExt = (noAnn, TopLevel)
             , fdInfo = i
-            , fdTopLevel = TopLevel
             , fdLName = synifyNameN tc
             , fdTyVars = synifyTyVars (tyConVisibleTyVars tc)
             , fdFixity = synifyFixity tc

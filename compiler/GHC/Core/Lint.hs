@@ -79,6 +79,7 @@ import GHC.Types.Unique.FM ( isNullUFM, sizeUFM )
 import GHC.Types.RepType
 import GHC.Types.Basic
 import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
+import GHC.Hs.InlinePragma   (isInlinePragma)
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim

@@ -74,8 +74,6 @@ import GHC.Data.Maybe          ( orElse, mapMaybe )
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import Control.Monad
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
@@ -1121,7 +1119,7 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
                      TopSigCtxt {} -> lookupLocatedOccRn v
                      _             -> lookupSigOccRnN ctxt sig v
         ; (new_ty, fvs) <- foldM do_one ([],emptyFVs) tys
-        ; return (SpecSig noAnn new_v new_ty inl, fvs) }
+        ; return (SpecSig noAnn new_v new_ty (convertInlinePragma inl), fvs) }
   where
     ty_ctxt = GenericCtx (text "a SPECIALISE signature for"
                           <+> quotes (ppr v))
@@ -1131,7 +1129,7 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
 
 renameSig ctxt sig@(InlineSig _ v s)
   = do  { new_v <- lookupSigOccRnN ctxt sig v
-        ; return (InlineSig noAnn new_v s, emptyFVs) }
+        ; return (InlineSig noAnn new_v (convertInlinePragma s), emptyFVs) }
 
 renameSig ctxt (FixSig _ fsig)
   = do  { new_fsig <- rnSrcFixityDecl ctxt fsig

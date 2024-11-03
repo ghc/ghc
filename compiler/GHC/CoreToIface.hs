@@ -41,6 +41,12 @@ module GHC.CoreToIface
     , toIfaceCon
     , toIfaceApp
     , toIfaceVar
+    -- * Pragmas
+    , toIfaceOverlapFlag
+    , toIfaceOverlapMode
+    , toIfaceActivation
+    , toIfaceInlineSpec
+    , toIfaceInlinePragma
       -- * Other stuff
     , toIfaceLFInfo
     , toIfaceBooleanFormula
@@ -86,11 +92,15 @@ import GHC.Types.Demand ( isNopSig )
 import GHC.Types.Cpr ( topCprSig )
 import GHC.Types.SrcLoc (unLoc)
 
+import GHC.Hs.Extension ( GhcPass, GhcRn )
+import GHC.Hs.InlinePragma
+import GHC.Hs.OverlapPragma
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
-import GHC.Hs.Extension (GhcRn)
+import Language.Haskell.Syntax.Extension(dataConCantHappen)
 
 import Data.Maybe ( isNothing, catMaybes )
 
@@ -506,7 +516,7 @@ toIfaceIdInfo id_info
     ------------  Inline prag  --------------
     inline_prag = inlinePragInfo id_info
     inline_hsinfo | isDefaultInlinePragma inline_prag = Nothing
-                  | otherwise = Just (HsInline inline_prag)
+                  | otherwise = Just (HsInline $ toIfaceInlinePragma inline_prag)
 
 --------------------------
 toIfUnfolding :: Bool -> Unfolding -> Maybe IfaceInfoItem
@@ -675,7 +685,45 @@ toIfaceVar v
     noinline_id | isConstraintKind (typeKind ty) = noinlineConstraintIdName
                 | otherwise                      = noinlineIdName
 
+{-
+************************************************************************
+*                                                                      *
+        Conversion of Pragmas
+*                                                                      *
+************************************************************************
+-}
 
+toIfaceInlinePragma :: InlinePragma (GhcPass p) -> IfaceInlinePragma
+toIfaceInlinePragma (InlinePragma s a b c)
+  = IfInlinePragma (inl_txt s) (toIfaceInlineSpec a) (inl_arr s) (toIfaceActivation b) c
+
+toIfaceInlineSpec :: InlineSpec (GhcPass p) -> IfaceInlineSpec
+toIfaceInlineSpec (Inline    src)          = IfInline    src
+toIfaceInlineSpec (Inlinable src)          = IfInlinable src
+toIfaceInlineSpec (NoInline  src)          = IfNoInline  src
+toIfaceInlineSpec (Opaque    src)          = IfOpaque    src
+toIfaceInlineSpec (NoUserInlinePrag _)     = IfNoUserInlinePrag
+toIfaceInlineSpec (XInlineSpec impossible) = dataConCantHappen impossible
+
+toIfaceActivation :: Activation (GhcPass p) -> IfaceActivation
+toIfaceActivation (AlwaysActive _         ) = IfAlwaysActive
+toIfaceActivation (ActiveBefore src phase ) = IfActiveBefore src phase
+toIfaceActivation (ActiveAfter  src phase)  = IfActiveAfter src phase
+toIfaceActivation (FinalActive  _         ) = IfFinalActive
+toIfaceActivation (NeverActive  _         ) = IfNeverActive
+toIfaceActivation (XActivation  impossible) = dataConCantHappen impossible
+
+toIfaceOverlapFlag :: OverlapFlag -> IfaceOverlapFlag
+toIfaceOverlapFlag (OverlapFlag overlap safe)
+  = IfOverlapFlag (toIfaceOverlapMode overlap) safe
+
+toIfaceOverlapMode :: OverlapMode (GhcPass p) -> IfaceOverlapMode
+toIfaceOverlapMode (NoOverlap sourceText)                   = IfNoOverlap sourceText
+toIfaceOverlapMode (Overlappable sourceText)                = IfOverlappable sourceText
+toIfaceOverlapMode (Overlapping sourceText)                 = IfOverlapping sourceText
+toIfaceOverlapMode (Overlaps sourceText)                    = IfOverlaps sourceText
+toIfaceOverlapMode (Incoherent sourceText)                  = IfIncoherent sourceText
+toIfaceOverlapMode (XOverlapMode (NonCanonical sourceText)) = IfNonCanonical sourceText
 
 ---------------------
 toIfaceLFInfo :: Name -> LambdaFormInfo -> IfaceLFInfo

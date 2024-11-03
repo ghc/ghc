@@ -311,24 +311,26 @@
      (FamDecl
       (NoExtField)
       (FamilyDecl
-       (AnnFamilyDecl
-        []
-        []
-        (EpTok
-         (EpaSpan { DumpParsedAst.hs:10:1-4 }))
-        (NoEpTok)
-        (EpTok
-         (EpaSpan { DumpParsedAst.hs:10:6-11 }))
-        (EpUniTok
-         (EpaSpan { DumpParsedAst.hs:10:32-33 })
-         (NormalSyntax))
-        (NoEpTok)
-        (NoEpTok)
-        (EpTok
-         (EpaSpan { DumpParsedAst.hs:10:41-45 }))
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok))
+       ((,)
+        (AnnFamilyDecl
+         []
+         []
+         (EpTok
+          (EpaSpan { DumpParsedAst.hs:10:1-4 }))
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { DumpParsedAst.hs:10:6-11 }))
+         (EpUniTok
+          (EpaSpan { DumpParsedAst.hs:10:32-33 })
+          (NormalSyntax))
+         (NoEpTok)
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { DumpParsedAst.hs:10:41-45 }))
+         (NoEpTok)
+         (NoEpTok)
+         (NoEpTok))
+        (TopLevel))
        (ClosedTypeFamily
         (Just
          [(L
@@ -579,7 +581,6 @@
                  []))
                (Unqual
                 {OccName: Zero}))))))]))
-       (TopLevel)
        (L
         (EpAnn
          (EpaSpan { DumpParsedAst.hs:10:13-18 })
@@ -1071,24 +1072,26 @@
      (FamDecl
       (NoExtField)
       (FamilyDecl
-       (AnnFamilyDecl
-        []
-        []
-        (EpTok
-         (EpaSpan { DumpParsedAst.hs:18:1-4 }))
-        (NoEpTok)
-        (EpTok
-         (EpaSpan { DumpParsedAst.hs:18:6-11 }))
-        (EpUniTok
-         (EpaSpan { DumpParsedAst.hs:18:42-43 })
-         (NormalSyntax))
-        (NoEpTok)
-        (NoEpTok)
-        (EpTok
-         (EpaSpan { DumpParsedAst.hs:18:50-54 }))
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok))
+       ((,)
+        (AnnFamilyDecl
+         []
+         []
+         (EpTok
+          (EpaSpan { DumpParsedAst.hs:18:1-4 }))
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { DumpParsedAst.hs:18:6-11 }))
+         (EpUniTok
+          (EpaSpan { DumpParsedAst.hs:18:42-43 })
+          (NormalSyntax))
+         (NoEpTok)
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { DumpParsedAst.hs:18:50-54 }))
+         (NoEpTok)
+         (NoEpTok)
+         (NoEpTok))
+        (TopLevel))
        (ClosedTypeFamily
         (Just
          [(L
@@ -1284,7 +1287,6 @@
                    []))
                  (Unqual
                   {OccName: a}))))))))]))
-       (TopLevel)
        (L
         (EpAnn
          (EpaSpan { DumpParsedAst.hs:18:13-14 })
@@ -1467,25 +1469,26 @@
      (FamDecl
       (NoExtField)
       (FamilyDecl
-       (AnnFamilyDecl
-        []
-        []
-        (NoEpTok)
-        (EpTok
-         (EpaSpan { DumpParsedAst.hs:21:1-4 }))
-        (EpTok
-         (EpaSpan { DumpParsedAst.hs:21:6-11 }))
-        (EpUniTok
-         (EpaSpan { DumpParsedAst.hs:21:17-18 })
-         (NormalSyntax))
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok))
+       ((,)
+        (AnnFamilyDecl
+         []
+         []
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { DumpParsedAst.hs:21:1-4 }))
+         (EpTok
+          (EpaSpan { DumpParsedAst.hs:21:6-11 }))
+         (EpUniTok
+          (EpaSpan { DumpParsedAst.hs:21:17-18 })
+          (NormalSyntax))
+         (NoEpTok)
+         (NoEpTok)
+         (NoEpTok)
+         (NoEpTok)
+         (NoEpTok)
+         (NoEpTok))
+        (TopLevel))
        (DataFamily)
-       (TopLevel)
        (L
         (EpAnn
          (EpaSpan { DumpParsedAst.hs:21:13-15 })

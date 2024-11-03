@@ -34,7 +34,7 @@ import GHC.Core.Predicate
 import GHC.Types.Id
 import GHC.Types.Var( EvVar, tyVarName )
 import GHC.Types.Var.Set
-import GHC.Types.Basic ( RuleName, NonStandardDefaultingStrategy(..) )
+import GHC.Types.Basic ( NonStandardDefaultingStrategy(..) )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -195,7 +195,7 @@ tcRule (HsRule { rd_ext  = ext
         else
           return . Just $ HsRule { rd_ext = ext
                          , rd_name = rname
-                         , rd_act = act
+                         , rd_act  = convertActivation act
                          , rd_tyvs = ty_bndrs -- preserved for ppr-ing
                          , rd_tmvs = map (noLocA . RuleBndr noAnn . noLocA)
                                          (qtkvs ++ tpl_ids)

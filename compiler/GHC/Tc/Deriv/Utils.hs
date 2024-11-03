@@ -120,7 +120,7 @@ mkDerivOrigin standalone_wildcard
 -- determining what its @EarlyDerivSpec@ should be.
 -- See @Note [DerivEnv and DerivSpecMechanism]@.
 data DerivEnv = DerivEnv
-  { denv_overlap_mode :: Maybe OverlapMode
+  { denv_overlap_mode :: Maybe (OverlapMode GhcTc)
     -- ^ Is this an overlapping instance?
   , denv_tvs          :: [TyVar]
     -- ^ Universally quantified type variables in the instance. If the
@@ -175,7 +175,7 @@ data DerivSpec theta = DS { ds_loc                 :: SrcSpan
                           , ds_tys                 :: [Type]
                           , ds_skol_info           :: SkolemInfo
                           , ds_user_ctxt           :: UserTypeCtxt
-                          , ds_overlap             :: Maybe OverlapMode
+                          , ds_overlap             :: Maybe (OverlapMode GhcTc)
                           , ds_standalone_wildcard :: Maybe SrcSpan
                               -- See Note [Inferring the instance context]
                               -- in GHC.Tc.Deriv.Infer

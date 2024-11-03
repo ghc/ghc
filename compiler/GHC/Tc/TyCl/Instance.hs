@@ -70,7 +70,6 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Data.Bag
 import GHC.Types.Basic
-import GHC.Types.Fixity
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Utils.Logger
@@ -543,7 +542,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
                 -- Dfun location is that of instance *header*
 
         ; let warn = fmap unLoc lwarn
-        ; ispec <- newClsInst (fmap unLoc overlap_mode) dfun_name
+        ; ispec <- newClsInst (fmap (convertOverlapMode . unLoc) overlap_mode) dfun_name
                               tyvars theta clas inst_tys warn
 
         ; let inst_binds = InstBindings
@@ -1379,7 +1378,7 @@ addDFunPrags :: DFunId -> [Id] -> DFunId
 addDFunPrags dfun_id sc_meth_ids
  | is_newtype
   = dfun_id `setIdUnfolding`  mkInlineUnfoldingWithArity defaultSimpleOpts StableSystemSrc 0 con_app
-            `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
+            `setInlinePragma` (alwaysInlinePragma `setInlinePragmaArity` Just 0)
  | otherwise
  = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_bndrs dict_con dict_args
            `setInlinePragma` dfunInlinePragma
@@ -2207,7 +2206,7 @@ mkDefMethBind loc dfun_id clas sel_id dm_name dm_spec
         ; dm_id <- tcLookupId dm_name
         ; let inline_prag = idInlinePragma dm_id
               inline_prags | isAnyInlinePragma inline_prag
-                           = [noLocA (InlineSig noAnn fn inline_prag)]
+                           = [noLocA (InlineSig noAnn fn $ convertInlinePragma inline_prag)]
                            | otherwise
                            = []
                  -- Copy the inline pragma (if any) from the default method

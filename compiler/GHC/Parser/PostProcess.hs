@@ -131,7 +131,7 @@ import GHC.Hs           -- Lots of it
 import GHC.Core.TyCon          ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
 import GHC.Core.DataCon        ( DataCon, dataConTyCon, dataConName )
 import GHC.Core.ConLike        ( ConLike(..) )
-import GHC.Core.Coercion.Axiom ( Role, fsFromRole )
+import GHC.Core.Coercion.Axiom ( fsFromRole )
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Basic
@@ -166,9 +166,6 @@ import qualified Data.Semigroup as Semi
 import GHC.Unit.Module.Warnings
 import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
@@ -369,8 +366,7 @@ mkFamDecl loc info topLevel lhs ksig injAnn annsIn
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
        ; let anns' = annsIn { afd_openp = ops, afd_closep = cps }
        ; return (L loc' (FamDecl noExtField (FamilyDecl
-                                           { fdExt       = anns'
-                                           , fdTopLevel  = topLevel
+                                           { fdExt       = (anns', topLevel)
                                            , fdInfo      = info, fdLName = tc
                                            , fdTyVars    = tyvars
                                            , fdFixity    = fixity
@@ -2957,14 +2953,13 @@ mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs GhcP
 mk_rec_upd_field (HsFieldBind noAnn (L loc (FieldOcc _ rdr)) arg pun)
   = HsFieldBind noAnn (L loc (FieldOcc noExtField rdr)) arg pun
 
-mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
-               -> InlinePragma
+mkInlinePragma :: SourceText -> (InlineSpec GhcPs, RuleMatchInfo) -> Maybe (Activation GhcPs)
+               -> InlinePragma GhcPs
 -- The (Maybe Activation) is because the user can omit
 -- the activation spec (and usually does)
 mkInlinePragma src (inl, match_info) mb_act
-  = InlinePragma { inl_src = src -- See Note [Pragma source text] in "GHC.Types.SourceText"
+  = InlinePragma { inl_ext = InlExt src Nothing-- See Note [Pragma source text] in "GHC.Types.SourceText"
                  , inl_inline = inl
-                 , inl_sat    = Nothing
                  , inl_act    = act
                  , inl_rule   = match_info }
   where
@@ -2972,20 +2967,19 @@ mkInlinePragma src (inl, match_info) mb_act
             Just act -> act
             Nothing  -> -- No phase specified
                         case inl of
-                          NoInline _  -> NeverActive
-                          Opaque _    -> NeverActive
-                          _other      -> AlwaysActive
+                          NoInline _  -> NeverActive noExtField
+                          Opaque _    -> NeverActive noExtField
+                          _other      -> AlwaysActive noExtField
 
-mkOpaquePragma :: SourceText -> InlinePragma
+mkOpaquePragma :: SourceText -> InlinePragma GhcPs
 mkOpaquePragma src
-  = InlinePragma { inl_src    = src
+  = InlinePragma { inl_ext    = InlExt src Nothing
                  , inl_inline = Opaque src
-                 , inl_sat    = Nothing
                  -- By marking the OPAQUE pragma NeverActive we stop
                  -- (constructor) specialisation on OPAQUE things.
                  --
                  -- See Note [OPAQUE pragma]
-                 , inl_act    = NeverActive
+                 , inl_act    = NeverActive noExtField
                  , inl_rule   = FunLike
                  }
 

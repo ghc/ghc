@@ -57,7 +57,6 @@ import GHC.Data.BooleanFormula (BooleanFormula)
 import GHC.Driver.Session (Language)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.InstEnv (is_dfun_name)
-import GHC.Types.Fixity (Fixity (..))
 import GHC.Types.Name (stableNameCmp)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (RdrName (..))
@@ -974,6 +973,15 @@ type instance XCInjectivityAnn DocNameI = NoExtField
 type instance XCFunDep DocNameI = NoExtField
 
 type instance XCTyFamInstDecl DocNameI = NoExtField
+
+type instance Anno (OverlapMode DocNameI) = SrcSpanAnnP
+type instance XNoOverlap    DocNameI = NoExtField
+type instance XOverlappable DocNameI = NoExtField
+type instance XOverlapping  DocNameI = NoExtField
+type instance XOverlaps     DocNameI = NoExtField
+type instance XIncoherent   DocNameI = NoExtField
+type instance XXOverlapMode DocNameI = NonCanon
+data NonCanon = NonCanon -- no longer need the source text :relieved:
 
 -----------------------------------------------------------------------------
 

@@ -442,18 +442,20 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding' simpl_opts rhs, rhs)
 
   | otherwise
-  = case inlinePragmaSpec inline_prag of
-          NoUserInlinePrag -> (gbl_id, rhs)
-          NoInline  {}     -> (gbl_id, rhs)
-          Opaque    {}     -> (gbl_id, rhs)
-          Inlinable {}     -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
-          Inline    {}     -> inline_pair
+  = case inline_prag of
+      InlinePragma{inl_inline = spec} -> case spec of
+          NoUserInlinePrag{} -> (gbl_id, rhs)
+          NoInline  {}       -> (gbl_id, rhs)
+          Opaque    {}       -> (gbl_id, rhs)
+          Inlinable {}       -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
+          Inline    {}       -> inline_pair
+          XInlineSpec i      -> dataConCantHappen i
   where
     simpl_opts    = initSimpleOpts dflags
     inline_prag   = idInlinePragma gbl_id
     inlinable_unf = mkInlinableUnfolding simpl_opts StableUserSrc rhs
     inline_pair
-       | Just arity <- inlinePragmaSat inline_prag
+       | Just arity <- inl_sat inline_prag
         -- Add an Unfolding for an INLINE (but not for NOINLINE)
         -- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
        , let real_arity = dict_arity + arity
@@ -892,16 +894,16 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
      -- Get the INLINE pragma from SPECIALISE declaration, or,
      -- failing that, from the original Id
 
-    spec_prag_act = inlinePragmaActivation spec_inl
+    spec_prag_act = inl_act spec_inl
 
     -- See Note [Activation pragmas for SPECIALISE]
     -- no_act_spec is True if the user didn't write an explicit
     -- phase specification in the SPECIALISE pragma
-    no_act_spec = case inlinePragmaSpec spec_inl of
+    no_act_spec = case inl_inline spec_inl of
                     NoInline _   -> isNeverActive  spec_prag_act
                     Opaque _     -> isNeverActive  spec_prag_act
                     _            -> isAlwaysActive spec_prag_act
-    rule_act | no_act_spec = inlinePragmaActivation id_inl   -- Inherit
+    rule_act | no_act_spec = inl_act id_inl   -- Inherit
              | otherwise   = spec_prag_act                   -- Specified by user
 
 

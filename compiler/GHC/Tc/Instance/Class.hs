@@ -63,9 +63,10 @@ import GHC.Unit.Module.Warnings
 
 import GHC.Hs.Extension
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import GHC.Types.Id.Info
 import GHC.Tc.Errors.Types
+
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.Functor
 import Data.Maybe

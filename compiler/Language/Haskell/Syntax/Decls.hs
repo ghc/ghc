@@ -42,7 +42,7 @@ module Language.Haskell.Syntax.Decls (
   FamilyDecl(..), LFamilyDecl,
 
   -- ** Instance declarations
-  InstDecl(..), LInstDecl, FamilyInfo(..), familyInfoTyConFlavour,
+  InstDecl(..), LInstDecl, FamilyInfo(..),
   TyFamInstDecl(..), LTyFamInstDecl,
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
@@ -86,6 +86,7 @@ module Language.Haskell.Syntax.Decls (
   HsGroup(..)
     ) where
 
+
 -- friends:
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   ( HsExpr, HsUntypedSplice )
@@ -94,11 +95,10 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
-import Language.Haskell.Syntax.Basic (Role, LexicalFixity)
+import Language.Haskell.Syntax.Basic (Role, LexicalFixity, RuleName)
 import Language.Haskell.Syntax.Specificity (Specificity)
-
-import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName, Activation
-                       ,TyConFlavour(..), TypeOrData(..))
+import Language.Haskell.Syntax.InlinePragma(Activation)
+import Language.Haskell.Syntax.OverlapPragma(LOverlapMode)
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 
 import GHC.Unit.Module.Warnings (WarningTxt)
@@ -106,7 +106,6 @@ import GHC.Unit.Module.Warnings (WarningTxt)
 import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 
 import Control.Monad
-import Control.Exception (assert)
 import Data.Data        hiding (TyCon, Fixity, Infix)
 import Data.Void
 import Data.Maybe
@@ -741,7 +740,6 @@ type LFamilyDecl pass = XRec pass (FamilyDecl pass)
 data FamilyDecl pass = FamilyDecl
   { fdExt            :: XCFamilyDecl pass
   , fdInfo           :: FamilyInfo pass              -- type/data, closed/open
-  , fdTopLevel       :: TopLevelFlag                 -- used for printing only
   , fdLName          :: LIdP pass                    -- type constructor
   , fdTyVars         :: LHsQTyVars pass              -- type variables
                        -- See Note [TyVar binders for associated decls]
@@ -774,17 +772,6 @@ data FamilyInfo pass
      -- said "type family Foo x where .."
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
 
-familyInfoTyConFlavour
-  :: Maybe tc    -- ^ Just cls <=> this is an associated family of class cls
-  -> FamilyInfo pass
-  -> TyConFlavour tc
-familyInfoTyConFlavour mb_parent_tycon info =
-  case info of
-    DataFamily         -> OpenFamilyFlavour IAmData mb_parent_tycon
-    OpenTypeFamily     -> OpenFamilyFlavour IAmType mb_parent_tycon
-    ClosedTypeFamily _ -> assert (isNothing mb_parent_tycon)
-                          -- See Note [Closed type family mb_parent_tycon]
-                          ClosedTypeFamilyFlavour
 
 {- Note [Closed type family mb_parent_tycon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1279,7 +1266,7 @@ data ClsInstDecl pass
       , cid_sigs          :: [LSig pass]         -- User-supplied pragmatic info
       , cid_tyfam_insts   :: [LTyFamInstDecl pass]   -- Type family instances
       , cid_datafam_insts :: [LDataFamInstDecl pass] -- Data family instances
-      , cid_overlap_mode  :: Maybe (XRec pass OverlapMode)
+      , cid_overlap_mode  :: Maybe (LOverlapMode pass)
       }
   | XClsInstDecl !(XXClsInstDecl pass)
 
@@ -1328,7 +1315,7 @@ data DerivDecl pass = DerivDecl
           -- See Note [Inferring the instance context] in GHC.Tc.Deriv.Infer.
 
         , deriv_strategy     :: Maybe (LDerivStrategy pass)
-        , deriv_overlap_mode :: Maybe (XRec pass OverlapMode)
+        , deriv_overlap_mode :: Maybe (LOverlapMode pass)
         }
   | XDerivDecl !(XXDerivDecl pass)
 
@@ -1484,7 +1471,7 @@ data RuleDecl pass
            -- ^ After renamer, free-vars from the LHS and RHS
        , rd_name :: XRec pass RuleName
            -- ^ Note [Pragma source text] in "GHC.Types.SourceText"
-       , rd_act  :: Activation
+       , rd_act  :: Activation pass
        , rd_tyvs :: Maybe [LHsTyVarBndr () (NoGhcTc pass)]
            -- ^ Forall'd type vars
        , rd_tmvs :: [LRuleBndr pass]

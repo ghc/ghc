@@ -586,10 +586,10 @@ addInlinePragArity ar (L l (InlineSig x nm inl))  = L l (InlineSig x nm (add_inl
 addInlinePragArity ar (L l (SpecSig x nm ty inl)) = L l (SpecSig x nm ty (add_inl_arity ar inl))
 addInlinePragArity _ sig = sig
 
-add_inl_arity :: Arity -> InlinePragma -> InlinePragma
+add_inl_arity :: Arity -> InlinePragma (GhcPass p) -> InlinePragma (GhcPass p)
 add_inl_arity ar prag@(InlinePragma { inl_inline = inl_spec })
   | Inline {} <- inl_spec  -- Add arity only for real INLINE pragmas, not INLINABLE
-  = prag { inl_sat = Just ar }
+  = setInlinePragmaArity prag (Just ar)
   | otherwise
   = prag
 
@@ -609,13 +609,13 @@ addInlinePrags poly_id prags_for_me
   | otherwise
   = return poly_id
   where
-    inl_prags = [L loc prag | L loc (InlineSig _ _ prag) <- prags_for_me]
+    inl_prags = [L loc (convertInlinePragma prag) | L loc (InlineSig _ _ prag) <- prags_for_me]
 
     warn_multiple_inlines _ [] = return ()
 
     warn_multiple_inlines inl1@(L loc prag1) (inl2@(L _ prag2) : inls)
-       | inlinePragmaActivation prag1 == inlinePragmaActivation prag2
-       , noUserInlineSpec (inlinePragmaSpec prag1)
+       | inl_act prag1 == inl_act prag2
+       , noUserInlineSpec (inl_inline prag1)
        =    -- Tiresome: inl1 is put there by virtue of being in a hs-boot loop
             -- and inl2 is a user NOINLINE pragma; we don't want to complain
          warn_multiple_inlines inl2 inls
@@ -797,7 +797,7 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
     tc_one hs_ty
       = do { spec_ty <- tcHsSigType   (FunSigCtxt name NoRRC) hs_ty
            ; wrap    <- tcSpecWrapper (FunSigCtxt name (lhsSigTypeContextSpan hs_ty)) poly_ty spec_ty
-           ; return (SpecPrag poly_id wrap inl) }
+           ; return (SpecPrag poly_id wrap (convertInlinePragma inl)) }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
 

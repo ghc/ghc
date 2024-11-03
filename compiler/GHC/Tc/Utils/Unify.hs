@@ -916,7 +916,7 @@ mkFunTysMsg herald (n_vis_args_in_call, fun_ty) env
  where
   full_herald = pprExpectedFunTyHerald herald
             <+> speakNOf n_vis_args_in_call (text "visible argument")
-             -- What are "visible" arguments? See Note [Visibility and arity] in GHC.Types.Basic
+             -- What are "visible" arguments? See Note [Visibility and arity] in Language.Haskell.Syntax.Basic
 
 
 {- Note [Reporting application arity errors]
@@ -927,7 +927,7 @@ We'd like to get an error like:
 
     • Couldn't match expected type ‘t0 -> t’ with actual type ‘Int’
     • The function ‘f’ is applied to three visible arguments,           -- What are "visible" arguments?
-        but its type ‘Int -> Int -> Int’ has only two                   -- See Note [Visibility and arity] in GHC.Types.Basic
+        but its type ‘Int -> Int -> Int’ has only two                   -- See Note [Visibility and arity] in Language.Haskell.Syntax.Basic
 
 That is what `mkFunTysMsg` tries to do.  But what is the "type of the function".
 Most obviously, we can report its full, polymorphic type; that is simple and

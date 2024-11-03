@@ -45,8 +45,6 @@ import GHC.Iface.Env    ( newGlobalBinder )
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Name.Reader
 import GHC.Types.SourceText
-import GHC.Types.Fixity
-import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set (elemVarSet)
@@ -62,8 +60,6 @@ import GHC.Utils.Misc
 
 import GHC.Driver.DynFlags
 import GHC.Data.FastString
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad (mplus)
 import Data.List (zip4, partition)
@@ -381,7 +377,7 @@ mkBindsRep dflags gk loc dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
                max_fields = maximum $ map dataConSourceArity datacons
 
            inline1 f = L loc'' . InlineSig noAnn (L loc' f)
-                     $ alwaysInlinePragma { inl_act = ActiveAfter NoSourceText 1 }
+                     $ setInlinePragmaActivation alwaysInlinePragma (ActiveAfter NoSourceText 1)
 
         -- The topmost M1 (the datatype metadata) has the exact same type
         -- across all cases of a from/to definition, and can be factored out

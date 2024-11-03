@@ -165,7 +165,7 @@ import GHC.Utils.Binary
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Core.Class
-import GHC.Types.Basic
+import GHC.Hs.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -181,9 +181,9 @@ import GHC.Utils.Misc
 import GHC.Types.Unique.Set
 import GHC.Unit.Module
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.Data as Data
+import GHC.Types.Basic
 
 {-
 -----------------------------------------------

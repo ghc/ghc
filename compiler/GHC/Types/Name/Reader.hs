@@ -114,7 +114,6 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 
 import GHC.Types.Avail
-import GHC.Types.Basic
 import GHC.Types.GREInfo
 import GHC.Types.FieldLabel
 import GHC.Types.Name
@@ -142,6 +141,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import qualified Data.Semigroup as S
 import System.IO.Unsafe ( unsafePerformIO )
+import GHC.Hs.Basic (TyConFlavour, tyConFlavourAssoc_maybe)
 
 {-
 ************************************************************************

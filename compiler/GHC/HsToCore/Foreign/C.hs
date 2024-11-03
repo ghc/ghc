@@ -39,7 +39,6 @@ import GHC.Types.Name
 import GHC.Types.RepType
 import GHC.Types.ForeignCall
 import GHC.Types.Basic
-
 import GHC.Unit.Module
 
 import GHC.Driver.DynFlags
@@ -212,7 +211,7 @@ dsCFExportDynamic id co0 cconv = do
                         , Lam stbl_value ccall_adj
                         ]
 
-        fed = (id `setInlineActivation` NeverActive, Cast io_app co0)
+        fed = (id `setInlineActivation` NeverActive noExtField, Cast io_app co0)
                -- Never inline the f.e.d. function, because the litlit
                -- might not be in scope in other modules.
 

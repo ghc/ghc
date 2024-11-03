@@ -72,15 +72,12 @@ import GHC.Types.FieldLabel
 import GHC.Types.Error
 
 import GHC.Utils.Misc
-import GHC.Types.Fixity ( compareFixity, negateFixity
-                        , Fixity(..), FixityDirection(..), LexicalFixity(..) )
+import GHC.Types.Fixity ( compareFixity, negateFixity )
 import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.List (nubBy, partition)
 import Control.Monad

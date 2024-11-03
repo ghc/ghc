@@ -55,11 +55,11 @@ import GHC.Utils.Panic
 import GHC.Unit.Module.ModGuts
 
 import GHC.Types.Id.Info
-import GHC.Types.Basic
 import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Name.Ppr
 import GHC.Types.Var ( Var )
 
+import GHC.Hs.InlinePragma (CompilerPhase(..))
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.Module
@@ -160,7 +160,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
           , maybe_rule_check phase ]
 
     -- Run GHC's internal simplification phase, after all rules have run.
-    -- See Note [Compiler phases] in GHC.Types.Basic
+    -- See Note [Compiler phases] in GHC.Hs.InlinePragma
     simplify name = simpl_phase FinalPhase name max_iter
 
     -- initial simplify: mk specialiser happy: minimum effort please

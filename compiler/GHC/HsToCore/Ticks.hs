@@ -45,7 +45,6 @@ import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.Tickish
 import GHC.Types.ProfAuto
-
 import Control.Monad
 import Data.List (isSuffixOf, intersperse)
 

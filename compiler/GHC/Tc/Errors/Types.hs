@@ -217,7 +217,7 @@ import GHC.Core.FamInstEnv (FamInst)
 import GHC.Core.InstEnv (LookupInstanceErrReason, ClsInst, DFunId)
 import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate (EqRel, predTypeEqRel)
-import GHC.Core.TyCon (TyCon, Role, FamTyConFlav, AlgTyConRhs)
+import GHC.Core.TyCon (TyCon, FamTyConFlav, AlgTyConRhs)
 import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType, ForAllTyFlag)
 import GHC.Driver.Backend (Backend)
 
@@ -228,8 +228,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.FastString (FastString)
 import GHC.Data.Pair
 import GHC.Exception.Type (SomeException)
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable (Typeable)
@@ -2568,8 +2566,8 @@ data TcRnMessage where
   -}
   TcRnMultipleInlinePragmas
     :: !Id -- ^ Target of the pragmas
-    -> !(LocatedA InlinePragma) -- ^ The first pragma
-    -> !(NE.NonEmpty (LocatedA InlinePragma)) -- ^ Other pragmas
+    -> !(LocatedA (InlinePragma GhcTc)) -- ^ The first pragma
+    -> !(NE.NonEmpty (LocatedA (InlinePragma GhcTc))) -- ^ Other pragmas
     -> TcRnMessage
 
   {-| TcRnUnexpectedPragmas is a warning that occurs when unexpected pragmas appear

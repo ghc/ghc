@@ -63,8 +63,6 @@ module GHC.Rename.Env (
 
 import GHC.Prelude
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import GHC.Iface.Load
 import GHC.Iface.Env
 import GHC.Hs

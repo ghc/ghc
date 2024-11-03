@@ -35,12 +35,10 @@ module ExactPrint
 
 import GHC
 import GHC.Base (NonEmpty(..))
-import GHC.Core.Coercion.Axiom (Role(..))
 import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
 import GHC.TypeLits
 import GHC.Types.Basic hiding (EP)
-import GHC.Types.Fixity
 import GHC.Types.ForeignCall
 import GHC.Types.Name.Reader
 import GHC.Types.PkgQual
@@ -51,8 +49,6 @@ import GHC.Unit.Module.Warnings
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad (forM, when, unless)
 import Control.Monad.Identity (Identity(..))
@@ -2052,13 +2048,13 @@ instance ExactPrint (RuleDecl GhcPs) where
 
 
 markActivationL :: (Monad m, Monoid w)
-  => a -> Lens a ActivationAnn -> Activation -> EP w m a
+  => a -> Lens a ActivationAnn -> Activation GhcPs -> EP w m a
 markActivationL a l act = do
   new <- markActivation (view l a) act
   return (set l new a)
 
 markActivation :: (Monad m, Monoid w)
-  => ActivationAnn -> Activation -> EP w m ActivationAnn
+  => ActivationAnn -> Activation GhcPs -> EP w m ActivationAnn
 markActivation (ActivationAnn o c t v) act = do
   case act of
     ActiveBefore src phase -> do
@@ -2072,7 +2068,7 @@ markActivation (ActivationAnn o c t v) act = do
       v' <- mapM (\val -> printStringAtAA val (toSourceTextWithSuffix src (show phase) "")) v
       c' <- markEpToken c -- ']'
       return (ActivationAnn o' c' t v')
-    NeverActive -> do
+    NeverActive _ -> do
       o' <- markEpToken o --  '['
       t' <- mapM markEpToken t -- ~
       c' <- markEpToken c -- ']'
@@ -2284,7 +2280,7 @@ instance ExactPrint (TyFamInstDecl GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (LocatedP OverlapMode) where
+instance ExactPrint (LocatedP (OverlapMode GhcPs)) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor = setAnchorAn
 
@@ -2314,7 +2310,7 @@ instance ExactPrint (LocatedP OverlapMode) where
     c' <- markEpToken c
     return (L (EpAnn l (AnnPragma o' c' s l1 l2 t m) cs) (Incoherent src))
 
-  exact (L (EpAnn l (AnnPragma o c s l1 l2 t m) cs) (NonCanonical src)) = do
+  exact (L (EpAnn l (AnnPragma o c s l1 l2 t m) cs) (XOverlapMode (NonCanonical src))) = do
     o' <- markAnnOpen'' o src "{-# INCOHERENT"
     c' <- markEpToken c
     return (L (EpAnn l (AnnPragma o' c' s l1 l2 t m) cs) (Incoherent src))
@@ -3688,9 +3684,8 @@ instance ExactPrint (FamilyDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (FamilyDecl { fdExt = AnnFamilyDecl ops cps t d f dc eq vb w oc dd cc
+  exact (FamilyDecl { fdExt = (AnnFamilyDecl ops cps t d f dc eq vb w oc dd cc, top_level)
                     , fdInfo = info
-                    , fdTopLevel = top_level
                     , fdLName = ltycon
                     , fdTyVars = tyvars
                     , fdFixity = fixity
@@ -3726,9 +3721,8 @@ instance ExactPrint (FamilyDecl GhcPs) where
                  cc' <- markEpToken cc
                  return (w',oc',dd',cc', ClosedTypeFamily mb_eqns')
                _ -> return (w,oc,dd,cc, info)
-    return (FamilyDecl { fdExt = AnnFamilyDecl [] [] t' d' f' dc' eq' vb' w' oc' dd' cc'
+    return (FamilyDecl { fdExt = (AnnFamilyDecl [] [] t' d' f' dc' eq' vb' w' oc' dd' cc', top_level)
                        , fdInfo = info'
-                       , fdTopLevel = top_level
                        , fdLName = ltycon'
                        , fdTyVars = tyvars'
                        , fdFixity = fixity

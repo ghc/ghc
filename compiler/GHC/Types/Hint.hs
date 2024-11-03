@@ -33,6 +33,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.Module (ModuleName, Module)
 import GHC.Unit.Module.Imported (ImportedModsVal)
 import GHC.Hs.Extension (GhcTc, GhcRn)
+import GHC.Hs.InlinePragma (Activation)
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv (FamFlavor)
 import GHC.Core.TyCon (TyCon)
@@ -41,7 +42,7 @@ import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name (Name, NameSpace, OccName (occNameFS), isSymOcc, nameOccName)
 import GHC.Types.Name.Reader (RdrName (Unqual), ImpDeclSpec)
 import GHC.Types.SrcLoc (SrcSpan)
-import GHC.Types.Basic (Activation, RuleName)
+import GHC.Types.Basic ( RuleName)
 import GHC.Parser.Errors.Basic
 import GHC.Utils.Outputable
 import GHC.Data.FastString (fsLit, FastString)
@@ -245,7 +246,7 @@ data GhcHint
     -}
   | SuggestBindToWildcard !(LHsExpr GhcTc)
 
-  | SuggestAddInlineOrNoInlinePragma !Var !Activation
+  | SuggestAddInlineOrNoInlinePragma !Var !(Activation GhcTc)
 
   | SuggestAddPhaseToCompetingRule !RuleName
     {-| Suggests adding an identifier to the export list of a signature.

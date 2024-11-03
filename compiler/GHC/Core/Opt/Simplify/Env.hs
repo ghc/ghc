@@ -81,6 +81,8 @@ import GHC.Data.Graph.UnVar
 import GHC.Builtin.Types
 import GHC.Platform ( Platform )
 
+import GHC.Hs.InlinePragma(CompilerPhase)
+
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

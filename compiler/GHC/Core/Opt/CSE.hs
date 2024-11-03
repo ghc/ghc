@@ -23,6 +23,7 @@ import GHC.Types.Tickish
 import GHC.Core.Map.Expr
 import GHC.Utils.Misc   ( filterOut, equalLength )
 import GHC.Utils.Panic
+import GHC.Hs.InlinePragma
 import Data.Functor.Identity ( Identity (..) )
 import Data.List        ( mapAccumL )
 
@@ -512,7 +513,7 @@ noCSE id
    where
      unf = idUnfolding id
      user_activation_control = not (isAlwaysActive (idInlineActivation id))
-                            && not (noUserInlineSpec (inlinePragmaSpec (idInlinePragma id)))
+                            && not (noUserInlineSpec (inl_inline (idInlinePragma id)))
      yes_cse = False
      no_cse  = True
 

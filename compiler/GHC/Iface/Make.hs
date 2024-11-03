@@ -427,7 +427,7 @@ instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
                              , is_warn = warn })
   = assert (cls_name == className cls) $
     IfaceClsInst { ifDFun     = idName dfun_id
-                 , ifOFlag    = oflag
+                 , ifOFlag    = toIfaceOverlapFlag oflag
                  , ifInstCls  = cls_name
                  , ifInstTys  = ifaceRoughMatchTcs $ tail rough_tcs
                    -- N.B. Drop the class name from the rough match template
@@ -465,7 +465,7 @@ coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn,
                             ru_act = act, ru_bndrs = bndrs,
                             ru_args = args, ru_rhs = rhs,
                             ru_orphan = orph, ru_auto = auto })
-  = IfaceRule { ifRuleName  = name, ifActivation = act,
+  = IfaceRule { ifRuleName  = name, ifActivation = toIfaceActivation act,
                 ifRuleBndrs = map toIfaceBndr bndrs,
                 ifRuleHead  = fn,
                 ifRuleArgs  = map do_arg args,

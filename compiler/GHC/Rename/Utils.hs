@@ -53,7 +53,6 @@ import GHC.Tc.Utils.Monad
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Core.DataCon
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.SourceText ( SourceText(..), IntegralLit )

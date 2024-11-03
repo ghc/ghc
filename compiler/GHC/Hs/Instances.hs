@@ -32,9 +32,13 @@ import GHC.Hs.Lit
 import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
+import GHC.Hs.OverlapPragma
+import GHC.Hs.InlinePragma
+
 import GHC.Parser.Annotation
 import GHC.Data.BooleanFormula (BooleanFormula(..))
 import Language.Haskell.Syntax.Extension (Anno)
+--import GHC.Core.InstEnv (ClsInst)
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -113,6 +117,10 @@ deriving instance Data (HsPatSynDir GhcTc)
 deriving instance Data (HsMultAnn GhcPs)
 deriving instance Data (HsMultAnn GhcRn)
 deriving instance Data (HsMultAnn GhcTc)
+
+deriving instance Data TcSpecPrag
+deriving instance Data TcSpecPrags
+
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Decls ----------------------------------
 
@@ -594,4 +602,27 @@ deriving instance Data XViaStrategyPs
 -- ---------------------------------------------------------------------
 
 deriving instance (Typeable p, Data (Anno (IdGhcP p)), Data (IdGhcP p)) => Data (BooleanFormula (GhcPass p))
----------------------------------------------------------------------
+----------------------------------------------------------------------- Data derivations from GHC.Hs.InlinePragma ---------------------------
+
+deriving instance Data (Activation GhcPs)
+deriving instance Data (Activation GhcRn)
+deriving instance Data (Activation GhcTc)
+
+deriving instance Data (InlineSpec GhcPs)
+deriving instance Data (InlineSpec GhcRn)
+deriving instance Data (InlineSpec GhcTc)
+
+deriving instance Data  InlinePragmaExt
+deriving instance Data (InlinePragma GhcPs)
+deriving instance Data (InlinePragma GhcRn)
+deriving instance Data (InlinePragma GhcTc)
+
+deriving instance Data RuleMatchInfo
+
+-- ---------------------------------------------------------------------
+-- Data derivations from GHC.Hs.OverlapPragma --------------------------
+deriving instance Data (OverlapMode GhcPs)
+deriving instance Data (OverlapMode GhcRn)
+deriving instance Data (OverlapMode GhcTc)
+deriving instance Data NonCanonical
+deriving instance Data OverlapFlag

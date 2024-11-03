@@ -81,7 +81,6 @@ import GHC.Types.Id.Info
 import GHC.Types.Id.Make ( mkRepPolyIdConcreteTyVars )
 import GHC.Types.ForeignStubs
 import GHC.Types.Avail
-import GHC.Types.Basic
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile

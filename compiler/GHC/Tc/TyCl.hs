@@ -102,8 +102,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import Control.Monad
 import Data.Foldable ( toList, traverse_ )
 import Data.Functor.Identity

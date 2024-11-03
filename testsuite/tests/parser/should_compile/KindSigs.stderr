@@ -85,22 +85,24 @@
      (FamDecl
       (NoExtField)
       (FamilyDecl
-       (AnnFamilyDecl
-        []
-        []
-        (EpTok
-         (EpaSpan { KindSigs.hs:11:1-4 }))
-        (NoEpTok)
-        (EpTok
-         (EpaSpan { KindSigs.hs:11:6-11 }))
-        (NoEpUniTok)
-        (NoEpTok)
-        (NoEpTok)
-        (EpTok
-         (EpaSpan { KindSigs.hs:11:19-23 }))
-        (NoEpTok)
-        (NoEpTok)
-        (NoEpTok))
+       ((,)
+        (AnnFamilyDecl
+         []
+         []
+         (EpTok
+          (EpaSpan { KindSigs.hs:11:1-4 }))
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { KindSigs.hs:11:6-11 }))
+         (NoEpUniTok)
+         (NoEpTok)
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { KindSigs.hs:11:19-23 }))
+         (NoEpTok)
+         (NoEpTok)
+         (NoEpTok))
+        (TopLevel))
        (ClosedTypeFamily
         (Just
          [(L
@@ -198,7 +200,6 @@
                    []))
                  (Unqual
                   {OccName: Type}))))))))]))
-       (TopLevel)
        (L
         (EpAnn
          (EpaSpan { KindSigs.hs:11:13-15 })

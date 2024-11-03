@@ -150,6 +150,9 @@ import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Core.Multiplicity
 
+import GHC.Hs.InlinePragma
+import GHC.Hs.Extension (GhcTc)
+
 import GHC.Types.RepType
 import GHC.Types.Demand
 import GHC.Types.Cpr
@@ -789,7 +792,7 @@ alwaysActiveUnfoldingFun id
 -- | Returns an unfolding only if
 --   (a) not a strong loop breaker and
 --   (b) active in according to is_active
-whenActiveUnfoldingFun :: (Activation -> Bool) -> IdUnfoldingFun
+whenActiveUnfoldingFun :: (Activation GhcTc -> Bool) -> IdUnfoldingFun
 whenActiveUnfoldingFun is_active id
   | is_active (idInlineActivation id) = idUnfolding id
   | otherwise                         = NoUnfolding
@@ -937,23 +940,23 @@ The inline pragma tells us to be very keen to inline this Id, but it's still
 OK not to if optimisation is switched off.
 -}
 
-idInlinePragma :: Id -> InlinePragma
+idInlinePragma :: Id -> InlinePragma GhcTc
 idInlinePragma id = inlinePragInfo (idInfo id)
 
-setInlinePragma :: Id -> InlinePragma -> Id
+setInlinePragma :: Id -> InlinePragma GhcTc -> Id
 setInlinePragma id prag = modifyIdInfo (`setInlinePragInfo` prag) id
 
-modifyInlinePragma :: Id -> (InlinePragma -> InlinePragma) -> Id
+modifyInlinePragma :: Id -> (InlinePragma GhcTc -> InlinePragma GhcTc) -> Id
 modifyInlinePragma id fn = modifyIdInfo (\info -> info `setInlinePragInfo` (fn (inlinePragInfo info))) id
 
-idInlineActivation :: Id -> Activation
-idInlineActivation id = inlinePragmaActivation (idInlinePragma id)
+idInlineActivation :: Id -> Activation GhcTc
+idInlineActivation id = inl_act (idInlinePragma id)
 
-setInlineActivation :: Id -> Activation -> Id
+setInlineActivation :: Id -> Activation GhcTc -> Id
 setInlineActivation id act = modifyInlinePragma id (\prag -> setInlinePragmaActivation prag act)
 
 idRuleMatchInfo :: Id -> RuleMatchInfo
-idRuleMatchInfo id = inlinePragmaRuleMatchInfo (idInlinePragma id)
+idRuleMatchInfo id = inl_rule (idInlinePragma id)
 
 isConLikeId :: Id -> Bool
 isConLikeId id = isConLike (idRuleMatchInfo id)

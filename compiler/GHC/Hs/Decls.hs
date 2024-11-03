@@ -12,6 +12,7 @@
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -51,7 +52,7 @@ module GHC.Hs.Decls (
   pp_vanilla_decl_head,
 
   -- ** Instance declarations
-  InstDecl(..), LInstDecl, FamilyInfo(..),
+  InstDecl(..), LInstDecl, FamilyInfo(..), familyInfoTyConFlavour,
   TyFamInstDecl(..), LTyFamInstDecl, instDeclDataFamInsts,
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
@@ -117,6 +118,7 @@ import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprUntypedSplice )
 
 import GHC.Hs.Binds
 import GHC.Hs.Type
+import GHC.Hs.Basic
 import GHC.Hs.Doc
 import GHC.Types.Basic
 import GHC.Core.Coercion
@@ -125,7 +127,6 @@ import GHC.Hs.Extension
 import GHC.Parser.Annotation
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Fixity
 
 -- others:
 import GHC.Utils.Misc (count)
@@ -141,6 +142,7 @@ import GHC.Data.Maybe
 import Data.Data (Data)
 import Data.List (concatMap)
 import Data.Foldable (toList)
+import GHC.Hs.OverlapPragma
 
 {-
 ************************************************************************
@@ -432,7 +434,19 @@ data AnnSynDecl
 instance NoAnn AnnSynDecl where
   noAnn = AnnSynDecl noAnn noAnn noAnn noAnn
 
-------------- Pretty printing FamilyDecls -----------
+------------- FamilyInfo -----------
+
+familyInfoTyConFlavour
+  :: Maybe tc    -- ^ Just cls <=> this is an associated family of class cls
+  -> FamilyInfo pass
+  -> TyConFlavour tc
+familyInfoTyConFlavour mb_parent_tycon info =
+  case info of
+    DataFamily         -> OpenFamilyFlavour IAmData mb_parent_tycon
+    OpenTypeFamily     -> OpenFamilyFlavour IAmType mb_parent_tycon
+    ClosedTypeFamily _ -> assert (isNothing mb_parent_tycon)
+                          -- See Note [Closed type family mb_parent_tycon]
+                          ClosedTypeFamilyFlavour
 
 pprFlavour :: FamilyInfo pass -> SDoc
 pprFlavour DataFamily            = text "data"
@@ -617,7 +631,7 @@ type instance XCKindSig         (GhcPass _) = NoExtField
 type instance XTyVarSig         (GhcPass _) = NoExtField
 type instance XXFamilyResultSig (GhcPass _) = DataConCantHappen
 
-type instance XCFamilyDecl    (GhcPass _) = AnnFamilyDecl
+type instance XCFamilyDecl    (GhcPass _) = (AnnFamilyDecl, TopLevelFlag)
 type instance XXFamilyDecl    (GhcPass _) = DataConCantHappen
 
 data AnnFamilyDecl
@@ -668,7 +682,7 @@ type instance XXInjectivityAnn  (GhcPass _) = DataConCantHappen
 instance OutputableBndrId p
        => Outputable (FamilyDecl (GhcPass p)) where
   ppr (FamilyDecl { fdInfo = info, fdLName = ltycon
-                  , fdTopLevel = top_level
+                  , fdExt = (_, top_level)
                   , fdTyVars = tyvars
                   , fdFixity = fixity
                   , fdResultSig = L _ result
@@ -1061,16 +1075,15 @@ ppDerivStrategy mb =
     Nothing       -> empty
     Just (L _ ds) -> ppr ds
 
-ppOverlapPragma :: Maybe (LocatedP OverlapMode) -> SDoc
-ppOverlapPragma mb =
-  case mb of
+ppOverlapPragma :: Maybe (LOverlapMode (GhcPass p)) -> SDoc
+ppOverlapPragma = \case
     Nothing           -> empty
-    Just (L _ (NoOverlap s))    -> maybe_stext s "{-# NO_OVERLAP #-}"
-    Just (L _ (Overlappable s)) -> maybe_stext s "{-# OVERLAPPABLE #-}"
-    Just (L _ (Overlapping s))  -> maybe_stext s "{-# OVERLAPPING #-}"
-    Just (L _ (Overlaps s))     -> maybe_stext s "{-# OVERLAPS #-}"
-    Just (L _ (Incoherent s))   -> maybe_stext s "{-# INCOHERENT #-}"
-    Just (L _ (NonCanonical s)) -> maybe_stext s "{-# INCOHERENT #-}" -- No surface syntax for NONCANONICAL yet
+    Just (L _ (NoOverlap s))                   -> maybe_stext s "{-# NO_OVERLAP #-}"
+    Just (L _ (Overlappable s))                -> maybe_stext s "{-# OVERLAPPABLE #-}"
+    Just (L _ (Overlapping s))                 -> maybe_stext s "{-# OVERLAPPING #-}"
+    Just (L _ (Overlaps s))                    -> maybe_stext s "{-# OVERLAPS #-}"
+    Just (L _ (Incoherent s))                  -> maybe_stext s "{-# INCOHERENT #-}"
+    Just (L _ (XOverlapMode (NonCanonical s))) -> maybe_stext s "{-# INCOHERENT #-}" -- No surface syntax for NONCANONICAL yet
   where
     maybe_stext NoSourceText     alt = text alt
     maybe_stext (SourceText src) _   = ftext src <+> text "#-}"
@@ -1501,7 +1514,7 @@ type instance Anno (ClsInstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (InstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (DocDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (DerivDecl (GhcPass p)) = SrcSpanAnnA
-type instance Anno OverlapMode = SrcSpanAnnP
+type instance Anno (OverlapMode (GhcPass p)) = SrcSpanAnnP
 type instance Anno (DerivStrategy (GhcPass p)) = EpAnnCO
 type instance Anno (DefaultDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (ForeignDecl (GhcPass p)) = SrcSpanAnnA

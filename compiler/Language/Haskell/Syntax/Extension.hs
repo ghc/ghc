@@ -717,6 +717,39 @@ type family XIEType p
 type family XXIEWrappedName p
 
 
+-- -------------------------------------
+-- InlinePragma and allies
+
+-- InlinePragma
+type family XInlinePragma p
+type family XXCInlinePragma p
+
+--InlineSpec
+type family XInline    p
+type family XInlinable p
+type family XNoInline  p
+type family XOpaque    p
+type family XNoUserInlinePrag p
+type family XXInlineSpec   p
+
+-- Activation
+type family XAlwaysActive p
+type family XActiveBefore p
+type family XActiveAfter  p
+type family XFinalActive  p
+type family XNeverActive  p
+type family XXActivation  p
+
+
+-- -------------------------------------
+-- Overlap pragma
+
+type family XNoOverlap p
+type family XOverlappable p
+type family XOverlapping p
+type family XOverlaps p
+type family XIncoherent p
+type family XXOverlapMode p
 
 -- =====================================================================
 -- Misc

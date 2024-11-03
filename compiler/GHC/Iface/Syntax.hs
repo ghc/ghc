@@ -18,7 +18,9 @@ module GHC.Iface.Syntax (
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
         IfaceWarnings(..), IfaceWarningTxt(..), IfaceStringLiteral(..),
         IfaceDefault(..), IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
+        IfaceOverlapFlag(..), IfaceOverlapMode(..),
         IfaceClassBody(..), IfaceBooleanFormula(..),
+        IfaceInlinePragma(..), IfaceInlineSpec(..), IfaceActivation(..),
         IfaceBang(..),
         IfaceSrcBang(..), SrcUnpackedness(..), SrcStrictness(..),
         IfaceAxBranch(..),
@@ -35,6 +37,13 @@ module GHC.Iface.Syntax (
         -- Misc
         ifaceDeclImplicitBndrs, visibleIfConDecls,
         ifaceDeclFingerprints,
+
+        fromIfaceOverlapFlag,
+        fromIfaceOverlapMode,
+        fromIfaceActivation,
+        fromIfaceInlineSpec,
+        fromIfaceInlinePragma,
+        fromIfaceBooleanFormula,
         fromIfaceWarnings,
         fromIfaceWarningTxt,
         -- Free Names
@@ -82,7 +91,11 @@ import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.EnforceEpt.TagSig
 import GHC.Parser.Annotation (noLocA)
-import GHC.Hs.Extension ( GhcRn )
+
+import GHC.Hs.Extension ( GhcRn, GhcPass )
+import GHC.Hs.OverlapPragma
+import GHC.Hs.InlinePragma
+
 import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )
 
 import GHC.Utils.Lexeme (isLexSym)
@@ -95,6 +108,7 @@ import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        seqList, zipWithEqual )
 
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
+import Language.Haskell.Syntax.Extension(noExtField)
 
 import Control.Monad
 import System.IO.Unsafe
@@ -330,7 +344,7 @@ data IfaceClsInst
   = IfaceClsInst { ifInstCls  :: IfExtName,                -- See comments with
                    ifInstTys  :: [Maybe IfaceTyCon],       -- the defn of ClsInst
                    ifDFun     :: IfExtName,                -- The dfun
-                   ifOFlag    :: OverlapFlag,              -- Overlap flag
+                   ifOFlag    :: IfaceOverlapFlag,              -- Overlap flag
                    ifInstOrph :: IsOrphan,                 -- See Note [Orphans] in GHC.Core.InstEnv
                    ifInstWarn :: Maybe IfaceWarningTxt }
                      -- Warning emitted when the instance is used
@@ -343,6 +357,33 @@ data IfaceClsInst
         -- If this instance decl is *used*, we'll record a usage on the dfun;
         -- and if the head does not change it won't be used if it wasn't before
 
+
+
+data IfaceOverlapFlag
+  = IfOverlapFlag { ifOverlapMode   :: IfaceOverlapMode
+                     , ifisSafeOverlap :: Bool
+                     }
+
+fromIfaceOverlapFlag :: IfaceOverlapFlag -> OverlapFlag
+fromIfaceOverlapFlag (IfOverlapFlag overlap safe)
+  = OverlapFlag (fromIfaceOverlapMode overlap) safe
+
+data IfaceOverlapMode
+  = IfNoOverlap SourceText
+  | IfOverlappable SourceText
+  | IfOverlapping SourceText
+  | IfOverlaps SourceText
+  | IfIncoherent SourceText
+  | IfNonCanonical SourceText
+
+fromIfaceOverlapMode :: IfaceOverlapMode -> OverlapMode (GhcPass p)
+fromIfaceOverlapMode (IfNoOverlap sourceText)    = NoOverlap sourceText
+fromIfaceOverlapMode (IfOverlappable sourceText) = Overlappable sourceText
+fromIfaceOverlapMode (IfOverlapping sourceText)  = Overlapping sourceText
+fromIfaceOverlapMode (IfOverlaps sourceText)     = Overlaps sourceText
+fromIfaceOverlapMode (IfIncoherent sourceText)   = Incoherent sourceText
+fromIfaceOverlapMode (IfNonCanonical sourceText) = XOverlapMode (NonCanonical sourceText)
+
 -- The ifFamInstTys field of IfaceFamInst contains a list of the rough
 -- match types
 data IfaceFamInst
@@ -352,10 +393,24 @@ data IfaceFamInst
                  , ifFamInstOrph     :: IsOrphan             -- Just like IfaceClsInst
                  }
 
+data IfaceActivation
+  = IfAlwaysActive
+  | IfActiveBefore SourceText PhaseNum
+  | IfActiveAfter  SourceText PhaseNum
+  | IfFinalActive
+  | IfNeverActive
+
+fromIfaceActivation :: IfaceActivation -> Activation (GhcPass p)
+fromIfaceActivation  IfAlwaysActive            = AlwaysActive noExtField
+fromIfaceActivation (IfActiveBefore src phase) = ActiveBefore src phase
+fromIfaceActivation (IfActiveAfter src phase ) = ActiveAfter  src phase
+fromIfaceActivation  IfFinalActive             = FinalActive  noExtField
+fromIfaceActivation  IfNeverActive             = NeverActive  noExtField
+
 data IfaceRule
   = IfaceRule {
         ifRuleName   :: RuleName,
-        ifActivation :: Activation,
+        ifActivation :: IfaceActivation,
         ifRuleBndrs  :: [IfaceBndr],    -- Tyvars and term vars
         ifRuleHead   :: IfExtName,      -- Head of lhs
         ifRuleArgs   :: [IfaceExpr],    -- Args of LHS
@@ -403,11 +458,38 @@ instance Outputable IfaceCompleteMatch where
 
 type IfaceIdInfo = [IfaceInfoItem]
 
+data IfaceInlineSpec
+  = IfInline    SourceText
+  | IfInlinable SourceText
+  | IfNoInline  SourceText
+  | IfOpaque    SourceText
+  | IfNoUserInlinePrag
+
+fromIfaceInlineSpec :: IfaceInlineSpec -> InlineSpec (GhcPass p)
+fromIfaceInlineSpec (IfInline    src)  = Inline    src
+fromIfaceInlineSpec (IfInlinable src)  = Inlinable src
+fromIfaceInlineSpec (IfNoInline  src)  = NoInline  src
+fromIfaceInlineSpec (IfOpaque    src)  = Opaque    src
+fromIfaceInlineSpec IfNoUserInlinePrag = NoUserInlinePrag noExtField
+
+data IfaceInlinePragma
+  = IfInlinePragma
+      { ifinl_src    :: SourceText
+      , ifinl_inline :: IfaceInlineSpec
+      , ifinl_sat    :: Maybe Arity
+      , ifinl_act    :: IfaceActivation
+      , ifinl_rule   :: RuleMatchInfo
+    }
+
+fromIfaceInlinePragma :: IfaceInlinePragma -> InlinePragma (GhcPass p)
+fromIfaceInlinePragma (IfInlinePragma s a b c d)
+  = InlinePragma (InlExt s b) (fromIfaceInlineSpec a) (fromIfaceActivation c) d
+
 data IfaceInfoItem
   = HsArity         Arity
   | HsDmdSig        DmdSig
   | HsCprSig        CprSig
-  | HsInline        InlinePragma
+  | HsInline        IfaceInlinePragma
   | HsUnfold        Bool             -- True <=> isStrongLoopBreaker is true
                     IfaceUnfolding   -- See Note [Expose recursive functions]
   | HsNoCafRefs
@@ -1431,7 +1513,7 @@ instance Outputable IfaceClsInst where
   ppr (IfaceClsInst { ifDFun = dfun_id, ifOFlag = flag
                     , ifInstCls = cls, ifInstTys = mb_tcs
                     , ifInstOrph = orph })
-    = hang (text "instance" <+> ppr flag
+    = hang (text "instance" <+> ppr (fromIfaceOverlapFlag flag)
               <+> (if isOrphan orph then text "[orphan]" else Outputable.empty)
               <+> ppr cls <+> brackets (pprWithCommas ppr_rough mb_tcs))
          2 (equals <+> ppr dfun_id)
@@ -1614,6 +1696,83 @@ instance Outputable IfaceUnfolding where
 instance Outputable IfGuidance where
   ppr IfNoGuidance   = empty
   ppr (IfWhen a u b) = angleBrackets (ppr a <> comma <> ppr u <> ppr b)
+
+------------------
+instance Binary IfaceActivation where
+    put_ bh IfNeverActive =
+            putByte bh 0
+    put_ bh IfFinalActive =
+            putByte bh 1
+    put_ bh IfAlwaysActive =
+            putByte bh 2
+    put_ bh (IfActiveBefore src aa) = do
+            putByte bh 3
+            put_ bh src
+            put_ bh aa
+    put_ bh (IfActiveAfter src ab) = do
+            putByte bh 4
+            put_ bh src
+            put_ bh ab
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> return IfNeverActive
+              1 -> return IfFinalActive
+              2 -> return IfAlwaysActive
+              3 -> do src <- get bh
+                      aa <- get bh
+                      return (IfActiveBefore src aa)
+              _ -> do src <- get bh
+                      ab <- get bh
+                      return (IfActiveAfter src ab)
+
+instance Binary IfaceInlineSpec where
+    put_ bh  IfNoUserInlinePrag  = putByte bh 0
+    put_ bh (IfInline s)         = do putByte bh 1
+                                      put_ bh s
+    put_ bh (IfInlinable s)      = do putByte bh 2
+                                      put_ bh s
+    put_ bh (IfNoInline s)       = do putByte bh 3
+                                      put_ bh s
+    put_ bh (IfOpaque s)         = do putByte bh 4
+                                      put_ bh s
+
+    get bh = do h <- getByte bh
+                case h of
+                  0 -> return IfNoUserInlinePrag
+                  1 -> do
+                        s <- get bh
+                        return (IfInline s)
+                  2 -> do
+                        s <- get bh
+                        return (IfInlinable s)
+                  3 -> do
+                        s <- get bh
+                        return (IfNoInline s)
+                  _ -> do
+                        s <- get bh
+                        return (IfOpaque s)
+
+instance Binary IfaceInlinePragma where
+    put_ bh (IfInlinePragma s a b c d) = do
+            put_ bh s
+            put_ bh a
+            put_ bh b
+            put_ bh c
+            put_ bh d
+    get bh = do
+           s <- get bh
+           a <- get bh
+           b <- get bh
+           c <- get bh
+           d <- get bh
+           return (IfInlinePragma s a b c d)
+
+instance Outputable IfaceInlinePragma where
+  ppr = ppr . fromIfaceInlinePragma
+
+instance Outputable IfaceActivation where
+  ppr = ppr . fromIfaceActivation
 
 {-
 ************************************************************************
@@ -2330,6 +2489,34 @@ instance Binary IfaceClsInst where
         orph <- get bh
         warn <- get bh
         return (IfaceClsInst cls tys dfun flag orph warn)
+
+instance Binary IfaceOverlapFlag where
+    put_ bh flag = do put_ bh (ifOverlapMode flag)
+                      put_ bh (ifisSafeOverlap flag)
+    get bh = do
+        h <- get bh
+        b <- get bh
+        return IfOverlapFlag { ifOverlapMode = h, ifisSafeOverlap = b }
+
+instance Binary IfaceOverlapMode where
+    put_ bh (IfNoOverlap    s) = putByte bh 0 >> put_ bh s
+    put_ bh (IfOverlaps     s) = putByte bh 1 >> put_ bh s
+    put_ bh (IfIncoherent   s) = putByte bh 2 >> put_ bh s
+    put_ bh (IfOverlapping  s) = putByte bh 3 >> put_ bh s
+    put_ bh (IfOverlappable s) = putByte bh 4 >> put_ bh s
+    put_ bh (IfNonCanonical s) = putByte bh 5 >> put_ bh s
+    get bh = do
+        h <- getByte bh
+        case h of
+            0 -> (get bh) >>= \s -> return $ IfNoOverlap s
+            1 -> (get bh) >>= \s -> return $ IfOverlaps s
+            2 -> (get bh) >>= \s -> return $ IfIncoherent s
+            3 -> (get bh) >>= \s -> return $ IfOverlapping s
+            4 -> (get bh) >>= \s -> return $ IfOverlappable s
+            5 -> (get bh) >>= \s -> return $ IfNonCanonical s
+            _ -> panic ("get OverlapMode" ++ show h)
+
+
 
 instance Binary IfaceFamInst where
     put_ bh (IfaceFamInst fam tys name orph) = do

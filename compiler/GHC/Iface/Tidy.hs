@@ -90,6 +90,8 @@ import GHC.Types.Tickish
 import GHC.Types.TypeEnv
 import GHC.Tc.Utils.TcType (tcSplitNestedSigmaTys)
 
+import GHC.Hs.InlinePragma(isNeverActive, InlinePragma(..))
+
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModDetails
@@ -801,7 +803,7 @@ addExternal opts id
     idinfo         = idInfo id
     unfolding      = realUnfoldingInfo idinfo
     show_unfold    = show_unfolding unfolding
-    never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
+    never_active   = isNeverActive (inl_act (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
     -- bottoming_fn: don't inline bottoming functions, unless the
     -- RHS is very small or trivial (UnfWhen), in which case we

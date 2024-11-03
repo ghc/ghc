@@ -22,6 +22,7 @@ therefore, is almost nothing but re-exporting.
 
 module GHC.Hs (
         module Language.Haskell.Syntax,
+        module GHC.Hs.Basic,
         module GHC.Hs.Binds,
         module GHC.Hs.Decls,
         module GHC.Hs.Expr,
@@ -32,8 +33,9 @@ module GHC.Hs (
         module GHC.Hs.Utils,
         module GHC.Hs.Doc,
         module GHC.Hs.Extension,
+        module GHC.Hs.InlinePragma,
+        module GHC.Hs.OverlapPragma,
         module GHC.Parser.Annotation,
-        Fixity,
 
         HsModule(..), AnnsModule(..),
         HsParsedModule(..), XModulePs(..)
@@ -42,6 +44,7 @@ module GHC.Hs (
 -- friends:
 import GHC.Prelude
 
+import GHC.Hs.Basic
 import GHC.Hs.Decls
 import GHC.Hs.Binds
 import GHC.Hs.Expr
@@ -54,11 +57,12 @@ import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Hs.Utils
 import GHC.Hs.Doc
+import GHC.Hs.InlinePragma
+import GHC.Hs.OverlapPragma
 import GHC.Hs.Instances () -- For Data instances
 
 -- others:
 import GHC.Utils.Outputable
-import GHC.Types.Fixity         ( Fixity )
 import GHC.Types.SrcLoc
 import GHC.Unit.Module.Warnings
 

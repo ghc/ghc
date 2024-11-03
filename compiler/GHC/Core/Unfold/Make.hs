@@ -32,6 +32,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand ( DmdSig, isDeadEndSig )
 
+import GHC.Hs.InlinePragma(isNoInlinePragma)
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic

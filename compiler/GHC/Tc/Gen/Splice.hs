@@ -2535,12 +2535,12 @@ reifyClassInstance is_poly_tvs i
      cls_tc   = classTyCon cls
      dfun     = instanceDFunId i
      over     = case overlapMode (is_flag i) of
-                  NoOverlap _     -> Nothing
-                  Overlappable _  -> Just TH.Overlappable
-                  Overlapping _   -> Just TH.Overlapping
-                  Overlaps _      -> Just TH.Overlaps
-                  Incoherent _    -> Just TH.Incoherent
-                  NonCanonical _  -> Just TH.Incoherent
+                  NoOverlap _                    -> Nothing
+                  Overlappable _                 -> Just TH.Overlappable
+                  Overlapping _                  -> Just TH.Overlapping
+                  Overlaps _                     -> Just TH.Overlaps
+                  Incoherent _                   -> Just TH.Incoherent
+                  XOverlapMode (NonCanonical _)  -> Just TH.Incoherent
 
 ------------------------------
 reifyFamilyInstances :: TyCon -> [FamInst] -> TcM [TH.Dec]

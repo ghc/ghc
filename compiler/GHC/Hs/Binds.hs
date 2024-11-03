@@ -13,6 +13,8 @@
                                       -- in module Language.Haskell.Syntax.Extension
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -39,6 +41,7 @@ import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
 import GHC.Data.BooleanFormula ( LBooleanFormula, pprBooleanFormulaNormal )
 import GHC.Types.Tickish
 import GHC.Hs.Extension
+import GHC.Hs.InlinePragma
 import GHC.Parser.Annotation
 import GHC.Hs.Type
 import GHC.Tc.Types.Evidence
@@ -822,7 +825,6 @@ data TcSpecPrags
   = IsDefaultMethod     -- ^ Super-specialised: a default method should
                         -- be macro-expanded at every call site
   | SpecPrags [LTcSpecPrag]
-  deriving Data
 
 -- | Located Type checker Specification Pragmas
 type LTcSpecPrag = Located TcSpecPrag
@@ -832,10 +834,9 @@ data TcSpecPrag
   = SpecPrag
         Id
         HsWrapper
-        InlinePragma
+        (InlinePragma GhcTc)
   -- ^ The Id to be specialised, a wrapper that specialises the
   -- polymorphic function, and inlining spec for the specialised function
-  deriving Data
 
 noSpecPrags :: TcSpecPrags
 noSpecPrags = SpecPrags []
@@ -863,9 +864,9 @@ ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_inline = spec }))
                                              (interpp'SP ty) inl)
     where
       pragmaSrc = case spec of
-        NoUserInlinePrag -> "{-# " ++ extractSpecPragName (inl_src inl)
-        _                -> "{-# " ++ extractSpecPragName (inl_src inl)  ++ "_INLINE"
-ppr_sig (InlineSig _ var inl)
+        NoUserInlinePrag _ -> "{-# " ++ extractSpecPragName (inl_src inl)
+        _                  -> "{-# " ++ extractSpecPragName (inl_src inl)  ++ "_INLINE"
+ppr_sig (InlineSig _ var inl@(InlinePragma{}))
   = ppr_pfx <+> pprInline inl <+> pprPrefixOcc (unLoc var) <+> text "#-}"
     where
       ppr_pfx = case inlinePragmaSource inl of
@@ -904,8 +905,8 @@ hsSigDoc (PatSynSig {})         = text "pattern synonym signature"
 hsSigDoc (ClassOpSig _ is_deflt _ _)
  | is_deflt                     = text "default type signature"
  | otherwise                    = text "class method signature"
-hsSigDoc (SpecSig _ _ _ inl)    = (inlinePragmaName . inl_inline $ inl) <+> text "pragma"
-hsSigDoc (InlineSig _ _ prag)   = (inlinePragmaName . inl_inline $ prag) <+> text "pragma"
+hsSigDoc (SpecSig _ _ _ (InlinePragma{inl_inline = spec}))   = inlinePragmaName spec <+> text "pragma"
+hsSigDoc (InlineSig _ _ (InlinePragma{inl_inline = spec}))   = inlinePragmaName spec <+> text "pragma"
 -- Using the 'inlinePragmaName' function ensures that the pragma name for any
 -- one of the INLINE/INLINABLE/NOINLINE pragmas are printed after being extracted
 -- from the InlineSpec field of the pragma.
@@ -954,7 +955,7 @@ pprVarSig vars pp_ty = sep [pprvars <+> dcolon, nest 2 pp_ty]
   where
     pprvars = hsep $ punctuate comma (map pprPrefixOcc vars)
 
-pprSpec :: (OutputableBndr id) => id -> SDoc -> InlinePragma -> SDoc
+pprSpec :: (OutputableBndr id) => id -> SDoc -> InlinePragma (GhcPass p) -> SDoc
 pprSpec var pp_ty inl = pp_inl <+> pprVarSig [var] pp_ty
   where
     pp_inl | isDefaultInlinePragma inl = empty

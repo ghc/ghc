@@ -632,7 +632,8 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
        ; return (ClsInstDecl { cid_ext = inst_warn_rn
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
-                             , cid_overlap_mode = oflag
+                             , cid_overlap_mode = fmap (fmap convertOverlapMode) oflag
+                                  --double fmap to pierce through the Maybe and the Located wrapper
                              , cid_datafam_insts = adts' },
                  all_fvs) }
              -- We return the renamed associated data type declarations so
@@ -1139,7 +1140,9 @@ rnSrcDerivDecl (DerivDecl (inst_warn_ps, ann) ty mds overlap)
            NFC_StandaloneDerivedInstanceHead
            (getLHsInstDeclHead $ dropWildCards ty')
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
-       ; return (DerivDecl (inst_warn_rn, ann) ty' mds' overlap, fvs) }
+       ; return (DerivDecl (inst_warn_rn, ann) ty' mds' (fmap (fmap convertOverlapMode) overlap), fvs) }
+                                         --double fmap to pierce through the Maybe and the Located wrapper
+
   where
     ctxt    = DerivDeclCtx
     nowc_ty = dropWildCards ty
@@ -1179,7 +1182,7 @@ rnHsRuleDecl (HsRule { rd_ext  = (_, st)
        ; checkValidRule (unLoc rule_name) names lhs' fv_lhs'
        ; return (HsRule { rd_ext  = (HsRuleRn fv_lhs' fv_rhs', st)
                         , rd_name = rule_name
-                        , rd_act  = act
+                        , rd_act  = convertActivation act
                         , rd_tyvs = tyvs'
                         , rd_tmvs = tmvs'
                         , rd_lhs  = lhs'
@@ -2209,7 +2212,7 @@ rnFamDecl :: Maybe (Name, [Name])
           -> FamilyDecl GhcPs
           -> RnM (FamilyDecl GhcRn, FreeVars)
 rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
-                             , fdTopLevel = toplevel
+                             , fdExt = (_, toplevel)
                              , fdFixity = fixity
                              , fdInfo = info, fdResultSig = res_sig
                              , fdInjectivityAnn = injectivity })
@@ -2222,9 +2225,8 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                                           injectivity
                ; return ( (tyvars', res_sig', injectivity') , fv_kind ) }
        ; (info', fv2) <- rn_info info
-       ; return (FamilyDecl { fdExt = noAnn
+       ; return (FamilyDecl { fdExt = (noAnn, toplevel)
                             , fdLName = tycon', fdTyVars = tyvars'
-                            , fdTopLevel = toplevel
                             , fdFixity = fixity
                             , fdInfo = info', fdResultSig = res_sig'
                             , fdInjectivityAnn = injectivity' }

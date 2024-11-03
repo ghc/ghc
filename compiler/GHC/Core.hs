@@ -113,9 +113,13 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import GHC.Hs.InlinePragma (Activation(..))
+import GHC.Hs.Extension (GhcTc)
+
 import Data.Data hiding (TyCon)
 import Data.Int
 import Data.Word
+import Language.Haskell.Syntax.Extension (noExtField)
 
 infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`, `App`, `mkCoApps`
 -- Left associative, so that we can say (f `mkTyApps` xs `mkVarApps` ys)
@@ -1258,7 +1262,7 @@ representation.
 data CoreRule
   = Rule {
         ru_name :: RuleName,            -- ^ Name of the rule, for communication with the user
-        ru_act  :: Activation,          -- ^ When the rule is active
+        ru_act  :: Activation GhcTc,    -- ^ When the rule is active
 
         -- Rough-matching stuff
         -- see comments with InstEnv.ClsInst( is_cls, is_rough )
@@ -1345,8 +1349,8 @@ ruleModule :: CoreRule -> Maybe Module
 ruleModule Rule { ru_origin } = Just ru_origin
 ruleModule BuiltinRule {} = Nothing
 
-ruleActivation :: CoreRule -> Activation
-ruleActivation (BuiltinRule { })       = AlwaysActive
+ruleActivation :: CoreRule -> Activation GhcTc
+ruleActivation (BuiltinRule { })       = AlwaysActive noExtField
 ruleActivation (Rule { ru_act = act }) = act
 
 -- | The 'Name' of the 'GHC.Types.Id.Id' at the head of the rule left hand side

@@ -65,6 +65,8 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique.FM
 import GHC.Types.Unique( hasKey )
 
+import GHC.Hs.InlinePragma(isNeverActive)
+
 import GHC.Data.Maybe     ( orElse, catMaybes, isJust, isNothing )
 import GHC.Data.FastString
 

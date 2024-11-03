@@ -891,22 +891,23 @@
          (EpaComments
           []))
         (FamilyDecl
-         (AnnFamilyDecl
-          []
-          []
-          (NoEpTok)
-          (EpTok
-           (EpaSpan { T17544.hs:22:20-23 }))
-          (NoEpTok)
-          (NoEpUniTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok))
+         ((,)
+          (AnnFamilyDecl
+           []
+           []
+           (NoEpTok)
+           (EpTok
+            (EpaSpan { T17544.hs:22:20-23 }))
+           (NoEpTok)
+           (NoEpUniTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok))
+          (NotTopLevel))
          (DataFamily)
-         (NotTopLevel)
          (L
           (EpAnn
            (EpaSpan { T17544.hs:22:25-26 })
@@ -1273,22 +1274,23 @@
          (EpaComments
           []))
         (FamilyDecl
-         (AnnFamilyDecl
-          []
-          []
-          (NoEpTok)
-          (EpTok
-           (EpaSpan { T17544.hs:28:20-23 }))
-          (NoEpTok)
-          (NoEpUniTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok))
+         ((,)
+          (AnnFamilyDecl
+           []
+           []
+           (NoEpTok)
+           (EpTok
+            (EpaSpan { T17544.hs:28:20-23 }))
+           (NoEpTok)
+           (NoEpUniTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok))
+          (NotTopLevel))
          (DataFamily)
-         (NotTopLevel)
          (L
           (EpAnn
            (EpaSpan { T17544.hs:28:25-26 })
@@ -1655,22 +1657,23 @@
          (EpaComments
           []))
         (FamilyDecl
-         (AnnFamilyDecl
-          []
-          []
-          (NoEpTok)
-          (EpTok
-           (EpaSpan { T17544.hs:34:20-23 }))
-          (NoEpTok)
-          (NoEpUniTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok))
+         ((,)
+          (AnnFamilyDecl
+           []
+           []
+           (NoEpTok)
+           (EpTok
+            (EpaSpan { T17544.hs:34:20-23 }))
+           (NoEpTok)
+           (NoEpUniTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok))
+          (NotTopLevel))
          (DataFamily)
-         (NotTopLevel)
          (L
           (EpAnn
            (EpaSpan { T17544.hs:34:25-26 })
@@ -2037,22 +2040,23 @@
          (EpaComments
           []))
         (FamilyDecl
-         (AnnFamilyDecl
-          []
-          []
-          (NoEpTok)
-          (EpTok
-           (EpaSpan { T17544.hs:40:20-23 }))
-          (NoEpTok)
-          (NoEpUniTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok))
+         ((,)
+          (AnnFamilyDecl
+           []
+           []
+           (NoEpTok)
+           (EpTok
+            (EpaSpan { T17544.hs:40:20-23 }))
+           (NoEpTok)
+           (NoEpUniTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok))
+          (NotTopLevel))
          (DataFamily)
-         (NotTopLevel)
          (L
           (EpAnn
            (EpaSpan { T17544.hs:40:25-26 })
@@ -2419,22 +2423,23 @@
          (EpaComments
           []))
         (FamilyDecl
-         (AnnFamilyDecl
-          []
-          []
-          (NoEpTok)
-          (EpTok
-           (EpaSpan { T17544.hs:46:20-23 }))
-          (NoEpTok)
-          (NoEpUniTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok))
+         ((,)
+          (AnnFamilyDecl
+           []
+           []
+           (NoEpTok)
+           (EpTok
+            (EpaSpan { T17544.hs:46:20-23 }))
+           (NoEpTok)
+           (NoEpUniTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok))
+          (NotTopLevel))
          (DataFamily)
-         (NotTopLevel)
          (L
           (EpAnn
            (EpaSpan { T17544.hs:46:25-26 })
@@ -2801,22 +2806,23 @@
          (EpaComments
           []))
         (FamilyDecl
-         (AnnFamilyDecl
-          []
-          []
-          (NoEpTok)
-          (EpTok
-           (EpaSpan { T17544.hs:52:21-24 }))
-          (NoEpTok)
-          (NoEpUniTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok)
-          (NoEpTok))
+         ((,)
+          (AnnFamilyDecl
+           []
+           []
+           (NoEpTok)
+           (EpTok
+            (EpaSpan { T17544.hs:52:21-24 }))
+           (NoEpTok)
+           (NoEpUniTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok)
+           (NoEpTok))
+          (NotTopLevel))
          (DataFamily)
-         (NotTopLevel)
          (L
           (EpAnn
            (EpaSpan { T17544.hs:52:26-28 })

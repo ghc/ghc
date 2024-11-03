@@ -59,7 +59,6 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import GHC.Builtin.Names
-import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Driver.DynFlags
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
@@ -73,8 +72,6 @@ import GHC.Data.FastString
 import qualified Data.List.NonEmpty as NE
 
 import GHC.Data.List.SetOps ( getNth )
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import Data.List( partition )
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class

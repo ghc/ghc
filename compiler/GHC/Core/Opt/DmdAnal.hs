@@ -46,6 +46,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 
+import GHC.Hs.InlinePragma(isOpaquePragma)
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable

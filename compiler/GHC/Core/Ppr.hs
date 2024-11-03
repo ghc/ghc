@@ -49,6 +49,9 @@ import GHC.Utils.Outputable
 import GHC.Types.SrcLoc ( pprUserRealSpan )
 import GHC.Types.Tickish
 
+import GHC.Hs.InlinePragma (isDefaultInlinePragma, pprInlineDebug)
+
+
 {-
 ************************************************************************
 *                                                                      *

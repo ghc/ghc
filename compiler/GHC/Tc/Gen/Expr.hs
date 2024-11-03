@@ -27,8 +27,6 @@ module GHC.Tc.Gen.Expr
 
 import GHC.Prelude
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import {-# SOURCE #-} GHC.Tc.Gen.Splice
   ( tcTypedSplice, tcTypedBracket, tcUntypedBracket, getUntypedSpliceBody )
 

@@ -1639,7 +1639,7 @@ expansion.  Specifically:
 
 * True of constructor applications (K a b)
 
-* True of applications of a "CONLIKE" Id; see Note [CONLIKE pragma] in GHC.Types.Basic.
+* True of applications of a "CONLIKE" Id; see Note [CONLIKE pragma] in GHC.Hs.InlinePragma.
   (NB: exprIsCheap might not be true of this)
 
 * False of case-expressions.  If we have

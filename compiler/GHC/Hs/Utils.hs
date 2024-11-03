@@ -124,6 +124,7 @@ import GHC.Hs.Lit
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
+import GHC.Hs.Basic
 import GHC.Parser.Annotation
 
 import GHC.Tc.Types.Evidence
@@ -145,7 +146,6 @@ import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
-import GHC.Types.Fixity
 import GHC.Types.SourceText
 
 import GHC.Data.FastString
