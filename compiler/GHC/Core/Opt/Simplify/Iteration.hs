@@ -1889,7 +1889,7 @@ simpl_lam env bndr body (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
   = do { tick (BetaReduction bndr)
        ; (floats1, env1)  <- completeTyVarBindX env bndr arg_ty
        ; (floats2, expr') <- simplLam env1 body cont
-       ; return (floats1 `addFloats` floats2, expr') } 
+       ; return (floats1 `addFloats` floats2, expr') }
 
 -- Coercion beta-reduction
 simpl_lam env bndr body (ApplyToVal { sc_arg = Coercion arg_co, sc_env = arg_se
