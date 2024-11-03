@@ -4,9 +4,10 @@ module GHC.Internal.Data.List.NonEmpty
   ( NonEmpty(..)
   , zip
   , zipWith
+  , map
   ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Data.NonEmpty (NonEmpty (..), map)
 import qualified GHC.Internal.Data.List as List
 
 -- | The 'zip' function takes two streams and returns a stream of

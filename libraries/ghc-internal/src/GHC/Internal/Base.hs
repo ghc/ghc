@@ -17,7 +17,7 @@ GHC.Prim        Has no implementation.  It defines built-in things, and
                 copied to make GHC.Prim.hi
 
 GHC.Internal.Base        Classes: Eq, Ord, Functor, Monad
-                Types:   List, (), Int, Bool, Ordering, Char, String
+                Types:   List, (), Int, Bool, Ordering, Char, String, NonEmpty
 
 GHC.Internal.Data.Tuple      Types: tuples, plus instances for GHC.Internal.Base classes
 
@@ -28,6 +28,13 @@ GHC.Internal.Enum        Class: Enum,  plus instances for GHC.Base/GHC.Tup types
 GHC.Internal.Data.Maybe      Type: Maybe, plus instances for GHC.Internal.Base classes
 
 GHC.Internal.List        List functions
+
+GHC.Internal.Data.NonEmpty   Orphan instances for GHC.Internal.Base.NonEmpty of
+                             GHC.Internal.Base classes (other than Eq and Ord)
+                             plus function map
+
+GHC.Internal.Data.List.NonEmpty   Re-export GHC.Internal.Data.NonEmpty plus
+                                  functions zip and zipWith
 
 GHC.Internal.Num         Class: Num, plus instances for Int
                 Type:  Integer, plus instances for all classes so far (Eq, Ord, Num, Show)
@@ -752,12 +759,6 @@ benefit, as described in compiler/GHC/HsToCore/ListComp.hs: if optimizations
 needed to make foldr/build forms efficient are turned off, we'll get reasonably
 efficient translations anyway.
 -}
-
--- | @since base-4.9.0.0
-instance Semigroup (NonEmpty a) where
-        (a :| as) <> bs = a :| (as ++ toList bs)
-          where
-            toList (c :| cs) = c : cs
 
 -- | @since base-4.9.0.0
 instance Semigroup b => Semigroup (a -> b) where
@@ -1708,27 +1709,6 @@ data NonEmpty a = a :| [a]
   deriving ( Eq  -- ^ @since base-4.9.0.0
            , Ord -- ^ @since base-4.9.0.0
            )
-
--- | @since base-4.9.0.0
-instance Functor NonEmpty where
-  fmap f (a :| as) = f a :| fmap f as
-  b <$ (_ :| as)   = b   :| (b <$ as)
-
--- | @since base-4.9.0.0
-instance Applicative NonEmpty where
-  pure a = a :| []
-  (<*>) = ap
-  liftA2 = liftM2
-
--- | @since base-4.9.0.0
-instance Monad NonEmpty where
-  (a :| as) >>= f =
-    case f a of
-      b :| bs -> b :| (bs ++ bs')
-    where
-      bs' = as >>= toList . f
-      toList (c :| cs) = c : cs
-
 
 ----------------------------------------------
 -- The list type

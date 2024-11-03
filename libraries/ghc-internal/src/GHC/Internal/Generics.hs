@@ -1879,4 +1879,3 @@ instance SingKind DecidedStrictness where
   fromSing SDecidedLazy   = DecidedLazy
   fromSing SDecidedStrict = DecidedStrict
   fromSing SDecidedUnpack = DecidedUnpack
-

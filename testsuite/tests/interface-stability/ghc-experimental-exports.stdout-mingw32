@@ -10651,7 +10651,6 @@ instance GHC.Internal.Base.Applicative GHC.Internal.Data.Ord.Down -- Defined in 
 instance GHC.Internal.Base.Applicative GHC.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Applicative [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Applicative GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
-instance GHC.Internal.Base.Applicative GHC.Internal.Base.NonEmpty -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Applicative Solo -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Applicative ((,) a) -- Defined in ‘GHC.Internal.Base’
 instance forall a b. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b) => GHC.Internal.Base.Applicative ((,,) a b) -- Defined in ‘GHC.Internal.Base’
@@ -10660,7 +10659,6 @@ instance GHC.Internal.Base.Functor GHC.Internal.Data.Ord.Down -- Defined in ‘G
 instance GHC.Internal.Base.Functor GHC.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Functor [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Functor GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
-instance GHC.Internal.Base.Functor GHC.Internal.Base.NonEmpty -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Functor Solo -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Functor ((,) a) -- Defined in ‘GHC.Internal.Base’
 instance forall a b. GHC.Internal.Base.Functor ((,,) a b) -- Defined in ‘GHC.Internal.Base’
@@ -10672,7 +10670,6 @@ instance GHC.Internal.Base.Monad GHC.Internal.Data.Ord.Down -- Defined in ‘GHC
 instance GHC.Internal.Base.Monad GHC.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Monad [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Monad GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
-instance GHC.Internal.Base.Monad GHC.Internal.Base.NonEmpty -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Monad Solo -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monad ((,) a) -- Defined in ‘GHC.Internal.Base’
 instance forall a b. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b) => GHC.Internal.Base.Monad ((,,) a b) -- Defined in ‘GHC.Internal.Base’
@@ -10695,7 +10692,6 @@ instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup 
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Types.IO a) -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Semigroup [a] -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Maybe.Maybe a) -- Defined in ‘GHC.Internal.Base’
-instance forall a. GHC.Internal.Base.Semigroup (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Semigroup GHC.Types.Ordering -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (Solo a) -- Defined in ‘GHC.Internal.Base’
 instance forall a b. (GHC.Internal.Base.Semigroup a, GHC.Internal.Base.Semigroup b) => GHC.Internal.Base.Semigroup (a, b) -- Defined in ‘GHC.Internal.Base’

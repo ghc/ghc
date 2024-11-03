@@ -123,7 +123,7 @@ import qualified GHC.Internal.Data.Foldable       as Foldable
 import           GHC.Internal.Data.Function       (on)
 import           GHC.Internal.Data.Ord            (comparing)
 import           GHC.Internal.Stack.Types     (HasCallStack)
-import           GHC.Internal.Data.List.NonEmpty
+import           GHC.Internal.Data.List.NonEmpty (NonEmpty (..), map, zip, zipWith)
 
 infixr 5 <|
 
@@ -289,10 +289,6 @@ toList (a :| as) = a : as
 -- this will raise an error.
 lift :: Foldable f => ([a] -> [b]) -> f a -> NonEmpty b
 lift f = fromList . f . Foldable.toList
-
--- | Map a function over a 'NonEmpty' stream.
-map :: (a -> b) -> NonEmpty a -> NonEmpty b
-map f (a :| as) = f a :| fmap f as
 
 -- | The 'inits' function takes a stream @xs@ and returns all the
 -- finite prefixes of @xs@, starting with the shortest. The result is

@@ -22,9 +22,9 @@ import GHC.Internal.Control.Monad (liftM, liftM2, Monad(..))
 import GHC.Internal.Data.Functor.Identity
 import qualified GHC.Internal.Data.Functor
 import GHC.Internal.Data.Monoid
+import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Data.Ord ( Down(..) )
 import GHC.Internal.Data.Proxy
-import GHC.Internal.Base (NonEmpty(..))
 --import qualified Data.List.NonEmpty as NE
 import GHC.Internal.Generics
 import qualified GHC.Internal.Data.List.NonEmpty as NE

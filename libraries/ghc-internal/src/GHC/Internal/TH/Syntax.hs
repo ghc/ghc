@@ -50,8 +50,9 @@ import Foreign.C.String
 import Foreign.C.Types
 import GHC.Types        (TYPE, RuntimeRep(..))
 #else
-import GHC.Internal.Base hiding (Type, Module, sequence)
+import GHC.Internal.Base hiding (NonEmpty(..),Type, Module, sequence)
 import GHC.Internal.Data.Data hiding (Fixity(..))
+import GHC.Internal.Data.NonEmpty (NonEmpty(..))
 import GHC.Internal.Data.Traversable
 import GHC.Internal.Word
 import GHC.Internal.Generics (Generic)

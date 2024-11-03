@@ -11052,7 +11052,6 @@ instance forall (m :: * -> *). GHC.Internal.Base.Monad m => GHC.Internal.Base.Ap
 instance GHC.Internal.Base.Applicative GHC.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Applicative [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Applicative GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
-instance GHC.Internal.Base.Applicative GHC.Internal.Base.NonEmpty -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Applicative Solo -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Applicative ((,) a) -- Defined in ‘GHC.Internal.Base’
 instance forall a b. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b) => GHC.Internal.Base.Applicative ((,,) a b) -- Defined in ‘GHC.Internal.Base’
@@ -11066,6 +11065,7 @@ instance forall s. GHC.Internal.Base.Applicative (GHC.Internal.Control.Monad.ST.
 instance GHC.Internal.Base.Applicative Data.Complex.Complex -- Defined in ‘Data.Complex’
 instance forall e. GHC.Internal.Base.Applicative (GHC.Internal.Data.Either.Either e) -- Defined in ‘GHC.Internal.Data.Either’
 instance GHC.Internal.Base.Applicative GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘GHC.Internal.Data.Functor.Identity’
+instance GHC.Internal.Base.Applicative GHC.Internal.Base.NonEmpty -- Defined in ‘GHC.Internal.Data.NonEmpty’
 instance GHC.Internal.Base.Applicative GHC.Internal.Data.Semigroup.Internal.Dual -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance GHC.Internal.Base.Applicative GHC.Internal.Data.Semigroup.Internal.Product -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance GHC.Internal.Base.Applicative GHC.Internal.Data.Semigroup.Internal.Sum -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
@@ -11086,7 +11086,6 @@ instance forall (m :: * -> *). GHC.Internal.Base.Monad m => GHC.Internal.Base.Fu
 instance GHC.Internal.Base.Functor GHC.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Functor [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Functor GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
-instance GHC.Internal.Base.Functor GHC.Internal.Base.NonEmpty -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Functor Solo -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Functor ((,) a) -- Defined in ‘GHC.Internal.Base’
 instance forall a b. GHC.Internal.Base.Functor ((,,) a b) -- Defined in ‘GHC.Internal.Base’
@@ -11104,6 +11103,7 @@ instance forall s. GHC.Internal.Base.Functor (GHC.Internal.Control.Monad.ST.Lazy
 instance GHC.Internal.Base.Functor Data.Complex.Complex -- Defined in ‘Data.Complex’
 instance forall a. GHC.Internal.Base.Functor (GHC.Internal.Data.Either.Either a) -- Defined in ‘GHC.Internal.Data.Either’
 instance GHC.Internal.Base.Functor GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘GHC.Internal.Data.Functor.Identity’
+instance GHC.Internal.Base.Functor GHC.Internal.Base.NonEmpty -- Defined in ‘GHC.Internal.Data.NonEmpty’
 instance GHC.Internal.Base.Functor GHC.Internal.Data.Semigroup.Internal.Dual -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance GHC.Internal.Base.Functor GHC.Internal.Data.Semigroup.Internal.Product -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance GHC.Internal.Base.Functor GHC.Internal.Data.Semigroup.Internal.Sum -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
@@ -11128,7 +11128,6 @@ instance forall (m :: * -> *). GHC.Internal.Base.Monad m => GHC.Internal.Base.Mo
 instance GHC.Internal.Base.Monad GHC.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Monad [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Monad GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
-instance GHC.Internal.Base.Monad GHC.Internal.Base.NonEmpty -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Monad Solo -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monad ((,) a) -- Defined in ‘GHC.Internal.Base’
 instance forall a b. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b) => GHC.Internal.Base.Monad ((,,) a b) -- Defined in ‘GHC.Internal.Base’
@@ -11141,6 +11140,7 @@ instance forall s. GHC.Internal.Base.Monad (GHC.Internal.Control.Monad.ST.Lazy.I
 instance GHC.Internal.Base.Monad Data.Complex.Complex -- Defined in ‘Data.Complex’
 instance forall e. GHC.Internal.Base.Monad (GHC.Internal.Data.Either.Either e) -- Defined in ‘GHC.Internal.Data.Either’
 instance GHC.Internal.Base.Monad GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘GHC.Internal.Data.Functor.Identity’
+instance GHC.Internal.Base.Monad GHC.Internal.Base.NonEmpty -- Defined in ‘GHC.Internal.Data.NonEmpty’
 instance GHC.Internal.Base.Monad GHC.Internal.Data.Semigroup.Internal.Dual -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance GHC.Internal.Base.Monad GHC.Internal.Data.Semigroup.Internal.Product -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance GHC.Internal.Base.Monad GHC.Internal.Data.Semigroup.Internal.Sum -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
@@ -11218,7 +11218,6 @@ instance forall k (p :: k). GHC.Internal.Base.Monoid (GHC.Internal.Generics.U1 p
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Types.IO a) -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Semigroup [a] -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Maybe.Maybe a) -- Defined in ‘GHC.Internal.Base’
-instance forall a. GHC.Internal.Base.Semigroup (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Semigroup GHC.Types.Ordering -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (Solo a) -- Defined in ‘GHC.Internal.Base’
 instance forall a b. (GHC.Internal.Base.Semigroup a, GHC.Internal.Base.Semigroup b) => GHC.Internal.Base.Semigroup (a, b) -- Defined in ‘GHC.Internal.Base’
@@ -11248,6 +11247,7 @@ instance forall a b. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigrou
 instance forall a. GHC.Internal.Base.Semigroup (Data.Functor.Contravariant.Predicate a) -- Defined in ‘Data.Functor.Contravariant’
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance [safe] forall k (f :: k -> *) (a :: k) (g :: k -> *). (GHC.Internal.Base.Semigroup (f a), GHC.Internal.Base.Semigroup (g a)) => GHC.Internal.Base.Semigroup (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
+instance forall a. GHC.Internal.Base.Semigroup (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Data.NonEmpty’
 instance GHC.Internal.Base.Semigroup GHC.Internal.Data.Semigroup.Internal.All -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance GHC.Internal.Base.Semigroup GHC.Internal.Data.Semigroup.Internal.Any -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Data.Semigroup.Internal.Dual a) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’

@@ -138,7 +138,8 @@ module GHC.Base
     , divModInt#, divModInt8#, divModInt16#, divModInt32#
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base hiding ( NonEmpty(..) )
+import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Prim hiding
   (
   -- Hide dataToTag# ops because they are expected to break for

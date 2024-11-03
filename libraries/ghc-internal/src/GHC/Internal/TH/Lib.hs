@@ -30,10 +30,11 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 import GHC.Exts (TYPE)
 import Prelude hiding (Applicative(..))
 #else
-import GHC.Internal.Base hiding (Type, Module, inline)
+import GHC.Internal.Base hiding (NonEmpty (..), Type, Module, inline)
 import GHC.Internal.Data.Foldable
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.Maybe
+import GHC.Internal.Data.NonEmpty (NonEmpty(..))
 import GHC.Internal.Data.Traversable (traverse, sequenceA)
 import GHC.Internal.Integer
 import GHC.Internal.List (zip)

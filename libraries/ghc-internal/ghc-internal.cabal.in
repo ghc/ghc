@@ -152,6 +152,7 @@ Library
         GHC.Internal.Data.List.NonEmpty
         GHC.Internal.Data.Maybe
         GHC.Internal.Data.Monoid
+        GHC.Internal.Data.NonEmpty
         GHC.Internal.Data.OldList
         GHC.Internal.Data.Ord
         GHC.Internal.Data.Proxy

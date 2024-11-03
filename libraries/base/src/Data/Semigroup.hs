@@ -105,7 +105,7 @@ module Data.Semigroup (
   , ArgMax
   ) where
 
-import           GHC.Internal.Base hiding (Any)
+import           GHC.Internal.Base hiding (Any, NonEmpty(..))
 import           GHC.Internal.Enum
 import           GHC.Internal.Show
 import           GHC.Internal.Read
@@ -116,6 +116,7 @@ import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
 import           GHC.Internal.Data.Foldable
+import           GHC.Internal.Data.NonEmpty (NonEmpty(..))
 import           GHC.Internal.Data.Traversable
 import           GHC.Internal.Data.Semigroup.Internal
 import           GHC.Internal.Control.Monad.Fix

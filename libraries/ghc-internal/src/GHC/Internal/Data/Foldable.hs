@@ -1529,4 +1529,3 @@ the number of elements combined).  The `mconcat` implementations for `Text` and
 `ByteString` preallocate the required storage, and then combine all the list
 elements in a single pass.
 -}
-

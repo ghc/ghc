@@ -10,12 +10,14 @@
 
 
 ==================== Grand total simplifier statistics ====================
-Total ticks:     12
+Total ticks:     13
 
 2 PreInlineUnconditionally
   1 f
   1 ds
-1 UnfoldingDone 1 Roman.bar
+2 UnfoldingDone
+  1 GHC.Internal.Base.id
+  1 Roman.bar
 1 RuleFired 1 foo/bar
 1 LetFloatFromLet 1
 7 BetaReduction
@@ -27,5 +29,3 @@ Total ticks:     12
   1 m
   1 ds
 8 SimplifierDone 8
-
-

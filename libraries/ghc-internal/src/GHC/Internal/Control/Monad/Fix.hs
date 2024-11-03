@@ -32,9 +32,10 @@ import GHC.Internal.Data.Function ( fix )
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Monoid ( Monoid, Dual(..), Sum(..), Product(..)
                    , First(..), Last(..), Alt(..), Ap(..) )
+import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Data.Ord ( Down(..) )
 import GHC.Internal.Data.Tuple ( Solo(..), snd )
-import GHC.Internal.Base ( Monad, NonEmpty(..), errorWithoutStackTrace, (.) )
+import GHC.Internal.Base ( Monad, errorWithoutStackTrace, (.) )
 import GHC.Internal.Generics
 import GHC.Internal.List ( head, drop )
 import GHC.Internal.Control.Monad.ST.Imp

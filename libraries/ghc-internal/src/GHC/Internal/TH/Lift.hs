@@ -50,8 +50,9 @@ import GHC.Internal.Lexeme ( startsVarSym, startsVarId )
 import GHC.Internal.Data.Either
 import GHC.Internal.Type.Reflection
 import GHC.Internal.Data.Bool
-import GHC.Internal.Base hiding (Type, Module, inline)
+import GHC.Internal.Base hiding (NonEmpty(..), Type, Module, inline)
 import GHC.Internal.Data.Foldable
+import GHC.Internal.Data.NonEmpty (NonEmpty(..))
 import GHC.Internal.Integer
 import GHC.Internal.Real
 import GHC.Internal.Word

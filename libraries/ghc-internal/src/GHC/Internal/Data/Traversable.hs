@@ -486,4 +486,3 @@ foldMapDefault :: forall t m a . (Traversable t, Monoid m)
 {-# INLINE foldMapDefault #-}
 -- See Note [Function coercion] in Data.Functor.Utils.
 foldMapDefault = coerce (traverse @t @(Const m) @a @())
-
