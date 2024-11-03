@@ -1133,7 +1133,7 @@ substIdBndr env bndr
 --                = extendVarEnv tv_subst old_tv (DoneId new_tv)
 --                | otherwise
 --                = delVarEnv tv_subst old_tv
--- 
+--
 --     !new_in_scope = in_scope `extendInScopeSet` new_tv
 
 ---------------
