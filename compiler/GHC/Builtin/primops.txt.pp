@@ -2663,18 +2663,45 @@ primop  CasMutVarOp "casMutVar#" GenPrimOp
 section "Exceptions"
 ------------------------------------------------------------------------
 
--- Note [Strictness for mask/unmask/catch]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Note [Strict IO wrappers]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Consider this example, which comes from GHC.IO.Handle.Internals:
---    wantReadableHandle3 f ma b st
+--    wantReadableHandle3 f mv b st
 --      = case ... of
---          DEFAULT -> case ma of MVar a -> ...
---          0#      -> maskAsyncExceptions# (\st -> case ma of MVar a -> ...)
+--          DEFAULT -> case mv of MVar a -> ...
+--          0#      -> maskAsyncExceptions# (\st -> case mv of MVar a -> ...)
 -- The outer case just decides whether to mask exceptions, but we don't want
--- thereby to hide the strictness in 'ma'!  Hence the use of strictOnceApply1Dmd
--- in mask and unmask. But catch really is lazy in its first argument, see
--- #11555. So for IO actions 'ma' we often use a wrapper around it that is
--- head-strict in 'ma': GHC.IO.catchException.
+-- thereby to hide the strictness in `mv`!  Hence the use of strictOnceApply1Dmd
+-- in mask#, unmask# and atomically# (where we use strictManyApply1Dmd to respect
+-- that it potentially calls its action multiple times).
+--
+-- Note [Strictness for catch-style primops]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The catch#-style primops always call their action, just like outlined
+-- in Note [Strict IO wrappers].
+-- However, it is important that we give their first arg lazyApply1Dmd and not
+-- strictOnceApply1Dmd, like for mask#. Here is why. Consider a call
+--
+--   catch# act handler s
+--
+-- If `act = raiseIO# ...`, using strictOnceApply1Dmd for `act` would mean that
+-- the call forwards the dead-end flag from `act` (see Note [Dead ends] and
+-- Note [Precise exceptions and strictness analysis]).
+-- This would cause dead code elimination to discard the continuation of the
+-- catch# call, among other things. This first came up in #11555.
+--
+-- Hence catch# uses lazyApply1Dmd in order /not/ to forward the dead-end flag
+-- from `act`. (This is a bit brutal, but the language of strictness types is
+-- not expressive enough to give it a more precise semantics that is still
+-- sound.)
+-- For perf reasons we often (but not always) choose to use a wrapper around
+-- catch# that is head-strict in `act`: GHC.IO.catchException.
+--
+-- A similar caveat applies to prompt#, which can be seen as a
+-- generalisation of catch# as explained in GHC.Prim#continuations#.
+-- The reason is that even if `act` appears dead-ending (e.g., looping)
+-- `prompt# tag ma s` might return alright due to a (higher-order) use of
+-- `control0#` in `act`. This came up in #25439.
 
 primop  CatchOp "catch#" GenPrimOp
           (State# RealWorld -> (# State# RealWorld, a_reppoly #) )
@@ -2691,7 +2718,7 @@ primop  CatchOp "catch#" GenPrimOp
    strictness  = { \ _arity -> mkClosedDmdSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
                                                  , topDmd] topDiv }
-                 -- See Note [Strictness for mask/unmask/catch]
+                 -- See Note [Strictness for catch-style primops]
    out_of_line = True
    effect = ReadWriteEffect
    -- Either inner computation might potentially raise an unchecked exception,
@@ -2757,7 +2784,7 @@ primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
      in continuation-style primops\" for details. }
    with
    strictness  = { \ _arity -> mkClosedDmdSig [strictOnceApply1Dmd,topDmd] topDiv }
-                 -- See Note [Strictness for mask/unmask/catch]
+                 -- See Note [Strict IO wrappers]
    out_of_line = True
    effect = ReadWriteEffect
 
@@ -2772,6 +2799,7 @@ primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
      in continuation-style primops\" for details. }
    with
    strictness  = { \ _arity -> mkClosedDmdSig [strictOnceApply1Dmd,topDmd] topDiv }
+                 -- See Note [Strict IO wrappers]
    out_of_line = True
    effect = ReadWriteEffect
 
@@ -2786,7 +2814,7 @@ primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
      in continuation-style primops\" for details. }
    with
    strictness  = { \ _arity -> mkClosedDmdSig [strictOnceApply1Dmd,topDmd] topDiv }
-                 -- See Note [Strictness for mask/unmask/catch]
+                 -- See Note [Strict IO wrappers]
    out_of_line = True
    effect = ReadWriteEffect
 
@@ -2972,7 +3000,8 @@ primop  PromptOp "prompt#" GenPrimOp
      -> State# RealWorld -> (# State# RealWorld, a #)
    { See "GHC.Prim#continuations". }
    with
-   strictness = { \ _arity -> mkClosedDmdSig [topDmd, strictOnceApply1Dmd, topDmd] topDiv }
+   strictness = { \ _arity -> mkClosedDmdSig [topDmd, lazyApply1Dmd, topDmd] topDiv }
+                 -- See Note [Strictness for catch-style primops]
    out_of_line = True
    effect = ReadWriteEffect
 
@@ -3000,7 +3029,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
    -> State# RealWorld -> (# State# RealWorld, a_levpoly #)
    with
    strictness  = { \ _arity -> mkClosedDmdSig [strictManyApply1Dmd,topDmd] topDiv }
-                 -- See Note [Strictness for mask/unmask/catch]
+                 -- See Note [Strict IO wrappers]
    out_of_line = True
    effect = ReadWriteEffect
 
@@ -3029,7 +3058,7 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
    strictness  = { \ _arity -> mkClosedDmdSig [ lazyApply1Dmd
                                                  , lazyApply1Dmd
                                                  , topDmd ] topDiv }
-                 -- See Note [Strictness for mask/unmask/catch]
+                 -- See Note [Strictness for catch-style primops]
    out_of_line = True
    effect = ReadWriteEffect
 
@@ -3041,7 +3070,7 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    strictness  = { \ _arity -> mkClosedDmdSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
                                                  , topDmd ] topDiv }
-                 -- See Note [Strictness for mask/unmask/catch]
+                 -- See Note [Strictness for catch-style primops]
    out_of_line = True
    effect = ReadWriteEffect
 
@@ -3731,6 +3760,7 @@ primop KeepAliveOp "keepAlive#" GenPrimOp
    with
    out_of_line = True
    strictness = { \ _arity -> mkClosedDmdSig [topDmd, topDmd, strictOnceApply1Dmd] topDiv }
+                 -- See Note [Strict IO wrappers]
    effect = ReadWriteEffect
    -- The invoked computation may have side effects
 
