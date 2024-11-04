@@ -166,7 +166,7 @@ module GHC.Tc.Utils.TcType (
   TvSubstEnv, emptySubst, mkEmptySubst,
   zipTvSubst,
   mkTvSubstPrs, notElemSubst, unionSubst,
-  getTvSubstEnv, getSubstInScope, extendSubstInScope,
+  getTvSubstEnv, substInScopeSet, extendSubstInScope,
   extendSubstInScopeList, extendSubstInScopeSet, extendTvSubstAndInScope,
   Type.lookupTyVar, Type.extendTCvSubst, Type.substTyVarBndr,
   Type.extendTvSubst,

@@ -15,7 +15,7 @@ module GHC.Core.TyCo.Subst
         emptySubst, mkEmptySubst, isEmptyTCvSubst, isEmptySubst,
         mkTCvSubst, mkTvSubst, mkCvSubst, mkIdSubst,
         getTvSubstEnv, getIdSubstEnv,
-        getCvSubstEnv, getSubstInScope, setInScope, getSubstRangeTyCoFVs,
+        getCvSubstEnv, substInScopeSet, setInScope, getSubstRangeTyCoFVs,
         isInScope, elemSubst, notElemSubst, zapSubst,
         extendSubstInScope, extendSubstInScopeList, extendSubstInScopeSet,
         extendTCvSubst, extendTCvSubstWithClone,
@@ -104,9 +104,9 @@ import Data.List (mapAccumL)
 data Subst
   = Subst InScopeSet  -- Variables in scope (both Ids and TyVars) /after/
                       -- applying the substitution
-          IdSubstEnv  -- Substitution from NcIds to CoreExprs
-          TvSubstEnv  -- Substitution from TyVars to Types
-          CvSubstEnv  -- Substitution from CoVars to Coercions
+          IdSubstEnv  -- Substitution from InId    to OutExpr
+          TvSubstEnv  -- Substitution from InTyVar to OutType
+          CvSubstEnv  -- Substitution from InCoVar to OutCoercion
 
         -- INVARIANT 1: See Note [The substitution invariant]
         -- This is what lets us deal with name capture properly
@@ -115,7 +115,7 @@ data Subst
         --              see Note [Substitutions apply only once]
         --
         -- INVARIANT 3: See Note [Extending the IdSubstEnv] in "GHC.Core.Subst"
-        -- and Note [Extending the TvSubstEnv and CvSubstEnv]
+        -- and              Note [Extending the TvSubstEnv and CvSubstEnv]
         --
         -- INVARIANT 4: See Note [Substituting types, coercions, and expressions]
 
@@ -183,8 +183,10 @@ A TCvSubst is not idempotent, but, unlike the non-idempotent substitution
 we use during unifications, it must not be repeatedly applied.
 
 Note [Extending the TvSubstEnv and CvSubstEnv]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See #tcvsubst_invariant# for the invariants that must hold.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The TvSubstEnv and CvSubstEnv have a binding for each TyCoVar
+  - whose unique has changed, OR
+  - whose kind has changed
 
 This invariant allows a short-cut when the subst envs are empty:
 if the TvSubstEnv and CvSubstEnv are empty --- i.e. (isEmptyTCvSubst subst)
@@ -207,7 +209,7 @@ This invariant has several crucial consequences:
 * In substTy, substTheta, we can short-circuit when the TvSubstEnv is empty
 
 Note [Substituting types, coercions, and expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Types and coercions are mutually recursive, and either may have variables
 "belonging" to the other. Thus, every time we wish to substitute in a
 type, we may also need to substitute in a coercion, and vice versa.
@@ -295,8 +297,8 @@ getCvSubstEnv :: Subst -> CvSubstEnv
 getCvSubstEnv (Subst _ _ _ cenv) = cenv
 
 -- | Find the in-scope set: see Note [The substitution invariant]
-getSubstInScope :: Subst -> InScopeSet
-getSubstInScope (Subst in_scope _ _ _) = in_scope
+substInScopeSet :: Subst -> InScopeSet
+substInScopeSet (Subst in_scope _ _ _) = in_scope
 
 setInScope :: Subst -> InScopeSet -> Subst
 setInScope (Subst _ ids tvs cvs) in_scope = Subst in_scope ids tvs cvs

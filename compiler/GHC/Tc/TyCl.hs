@@ -4232,7 +4232,7 @@ mkGADTVars tmpl_tvs dc_tvs subst
   = choose [] [] empty_subst empty_subst tmpl_tvs
   where
     in_scope = mkInScopeSet (mkVarSet tmpl_tvs `unionVarSet` mkVarSet dc_tvs)
-               `unionInScope` getSubstInScope subst
+               `unionInScope` substInScopeSet subst
     empty_subst = mkEmptySubst in_scope
 
     choose :: [TyVar]        -- accumulator of univ tvs, reversed
