@@ -2283,7 +2283,7 @@ liftCoSubstTyVarBndrUsing view_co fun lc@(LC subst cenv) old_var
     stuff    = fun lc old_kind
     eta      = view_co stuff
     k1       = coercionLKind eta
-    new_var  = uniqAway (getSubstInScope subst) (setVarType old_var k1)
+    new_var  = uniqAway (substInScopeSet subst) (setVarType old_var k1)
 
     lifted   = mkGReflRightCo Nominal (TyVarTy new_var) eta
                -- :: new_var ~ new_var |> eta
@@ -2303,7 +2303,7 @@ liftCoSubstCoVarBndrUsing view_co fun lc@(LC subst cenv) old_var
     stuff    = fun lc old_kind
     eta      = view_co stuff
     k1       = coercionLKind eta
-    new_var  = uniqAway (getSubstInScope subst) (setVarType old_var k1)
+    new_var  = uniqAway (substInScopeSet subst) (setVarType old_var k1)
 
     -- old_var :: s1  ~r s2
     -- eta     :: (s1' ~r s2') ~N (t1 ~r t2)
@@ -2387,7 +2387,7 @@ lcLookupCoVar (LC subst _) cv = lookupCoVar subst cv
 
 -- | Get the 'InScopeSet' from a 'LiftingContext'
 lcInScopeSet :: LiftingContext -> InScopeSet
-lcInScopeSet (LC subst _) = getSubstInScope subst
+lcInScopeSet (LC subst _) = substInScopeSet subst
 
 {-
 %************************************************************************

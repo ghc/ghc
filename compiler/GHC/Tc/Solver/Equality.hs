@@ -516,7 +516,7 @@ can_eq_nc_forall ev eq_rel s1 s2
 
             go _ _ _ _ _ = panic "can_eq_nc_forall"  -- case (s:ss) []
 
-            init_subst2 = mkEmptySubst (getSubstInScope subst1)
+            init_subst2 = mkEmptySubst (substInScopeSet subst1)
 
       -- Generate the constraints that live in the body of the implication
       -- See (SF5) in Note [Solving forall equalities]
