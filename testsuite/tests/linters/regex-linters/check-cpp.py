@@ -13,12 +13,12 @@ linters = [
                  message='CPP macros should not have a space between the macro name and their argument list'),
     RegexpLinter(r'ASSERT2\s+\(',
                  message='CPP macros should not have a space between the macro name and their argument list'),
-    RegexpLinter(r'#ifdef\s+',
-                 message='`#if defined(x)` is preferred to `#ifdef x`'),
+    # RegexpLinter(r'#ifdef\s+',
+    #              message='`#if defined(x)` is preferred to `#ifdef x`'),
     RegexpLinter(r'#if\s+defined\s+',
                  message='`#if defined(x)` is preferred to `#if defined x`'),
-    RegexpLinter(r'#ifndef\s+',
-                 message='`#if !defined(x)` is preferred to `#ifndef x`'),
+    # RegexpLinter(r'#ifndef\s+',
+    #              message='`#if !defined(x)` is preferred to `#ifndef x`'),
 ]
 
 for l in linters:

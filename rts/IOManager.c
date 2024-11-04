@@ -364,7 +364,7 @@ void initIOManager(void)
              * TODO: rationalise this into one entry point, that internally
              * can do different things in the two cases.
              */
-#if defined (THREADED_RTS)
+#if defined(THREADED_RTS)
             /* Win32 implementation in win32/ThrIOManager.c
              */
             ioManagerStart();

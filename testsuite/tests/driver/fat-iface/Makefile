@@ -55,5 +55,5 @@ T22807: clean
 
 T22807_ghci: clean
 	"$(TEST_HC)" $(TEST_HC_OPTS) T22807_ghci.hs -fno-full-laziness -fhide-source-paths -fwrite-if-simplified-core -O2 -dynamic -v0
-	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --interactive -fhide-source-paths -fno-full-laziness < T22807_ghci.script
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -fhide-source-paths -fno-full-laziness < T22807_ghci.script
 
