@@ -606,6 +606,38 @@ genCase ctx bnd e at alts l
              , ExprInline
              )
 
+  -- The latter has a faster decoding loop.
+  --
+  --    case "some string"# of b {
+  --      DEFAULT -> unpackCString# b
+  --    }
+  --
+  -- + Utf8 version below
+  | StgLit (LitString bs) <- e
+  , [GenStgAlt DEFAULT _ rhs] <- alts
+  , StgApp i args <- rhs
+  , idName i == unpackCStringName
+  , [StgVarArg b'] <- args
+  , bnd == b'
+  , Just d <- decodeModifiedUTF8 bs
+  , [top] <- concatMap typex_expr (ctxTarget ctx)
+  = return
+      ( top |= app "h$toHsStringA" [toJExpr d]
+      , ExprInline
+      )
+  | StgLit (LitString bs) <- e
+  , [GenStgAlt DEFAULT _ rhs] <- alts
+  , StgApp i args <- rhs
+  , idName i == unpackCStringUtf8Name
+  , [StgVarArg b'] <- args
+  , bnd == b'
+  , Just d <- decodeModifiedUTF8 bs
+  , [top] <- concatMap typex_expr (ctxTarget ctx)
+  = return
+      ( top |= app "h$toHsString" [toJExpr d]
+      , ExprInline
+      )
+
   | isInlineExpr e = do
       bndi <- identsForId bnd
       let ctx' = ctxSetTop bnd

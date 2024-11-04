@@ -157,6 +157,28 @@ genApp ctx i args
                , ExprInline
                )
 
+    -- Case: unpackCString# "some string"#
+    --
+    -- Generates h$toHsString("some string"), which has a faster
+    -- decoding loop.
+    -- + Utf8 version below
+    | [StgLitArg (LitString bs)] <- args
+    , Just d <- decodeModifiedUTF8 bs
+    , idName i == unpackCStringName
+    , [top] <- concatMap typex_expr (ctxTarget ctx)
+    = return
+        ( top |= app "h$toHsStringA" [toJExpr d]
+        , ExprInline
+        )
+    | [StgLitArg (LitString bs)] <- args
+    , Just d <- decodeModifiedUTF8 bs
+    , idName i == unpackCStringUtf8Name
+    , [top] <- concatMap typex_expr (ctxTarget ctx)
+    = return
+        ( top |= app "h$toHsString" [toJExpr d]
+        , ExprInline
+        )
+
     -- let-no-escape
     | Just n <- ctxLneBindingStackSize ctx i
     = do
