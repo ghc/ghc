@@ -12,13 +12,18 @@ setTestOpts(
   , when(unregisterised(), skip)
   , when(arch('wasm32'), skip)
   , js_skip
+  ])
 
-  # Ensure we set the CPU features we have available.
-  #
-  # This is especially important with the LLVM backend, as LLVM can otherwise
-  # produce ABI-incompatible code, e.g. when compiling usage of YMM registers
-  # with or without -mavx2.
-  , when(have_cpu_feature('sse4_1'), extra_hc_opts('-msse4'))
+test('simd_insert_baseline', [], compile_and_run, [''])
+test('simd_insert_array_baseline', [], compile_and_run, [''])
+
+# Ensure we set the CPU features we have available.
+#
+# This is especially important with the LLVM backend, as LLVM can otherwise
+# produce ABI-incompatible code, e.g. when compiling usage of YMM registers
+# with or without -mavx2.
+setTestOpts(
+  [ when(have_cpu_feature('sse4_1'), extra_hc_opts('-msse4'))
   , when(have_cpu_feature('avx'), extra_hc_opts('-mavx'))
   , when(have_cpu_feature('avx2'), extra_hc_opts('-mavx2'))
   , when(have_cpu_feature('avx512f'), extra_hc_opts('-mavx512f'))
@@ -54,6 +59,9 @@ test('simd014',
         # of the XMM4 register, which may not be mapped to a real machine
         # register on non-x86 architectures.
      compile_and_run, ['simd014Cmm.cmm'])
+
+test('simd_insert', [], compile_and_run, [''])
+test('simd_insert_array', [], compile_and_run, [''])
 
 test('T22187', [],compile,[''])
 test('T22187_run', [],compile_and_run,[''])

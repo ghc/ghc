@@ -1041,6 +1041,8 @@ pprInstr platform i = case i of
 
    MOVHLPS format from to
      -> pprOpReg (text "movhlps") format (OpReg from) to
+   UNPCKL format src dst
+     -> pprFormatOpReg (text "unpckl") format src dst
    PUNPCKLQDQ format from to
      -> pprOpReg (text "punpcklqdq") format from to
 

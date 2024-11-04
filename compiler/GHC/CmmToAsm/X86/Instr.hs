@@ -325,6 +325,7 @@ data Instr
         -- | Move two 32-bit floats from the high part of an xmm register
         -- to the low part of another xmm register.
         | MOVHLPS    Format Reg Reg
+        | UNPCKL     Format Operand Reg
         | PUNPCKLQDQ Format Operand Reg
 
         -- Shift
@@ -524,6 +525,8 @@ regUsageOfInstr platform instr
 
     MOVHLPS    fmt src dst
       -> mkRU [mk fmt src] [mk fmt dst]
+    UNPCKL fmt src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PUNPCKLQDQ fmt src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
@@ -765,6 +768,8 @@ patchRegsOfInstr platform instr env
 
     MOVHLPS    fmt src dst
       -> MOVHLPS fmt (env src) (env dst)
+    UNPCKL fmt src dst
+      -> UNPCKL fmt (patchOp src) (env dst)
     PUNPCKLQDQ fmt src dst
       -> PUNPCKLQDQ fmt (patchOp src) (env dst)
 
