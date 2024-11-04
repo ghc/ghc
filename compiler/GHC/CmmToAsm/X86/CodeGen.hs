@@ -971,7 +971,6 @@ getRegister' _ _ (CmmMachOp mop []) =
   pprPanic "getRegister(x86): nullary MachOp" (text $ show mop)
 
 getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
-    sse4_1 <- sse4_1Enabled
     avx    <- avxEnabled
     case mop of
       MO_F_Neg w  -> sse2NegCode w x
@@ -1068,10 +1067,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
         | avx
         -> vector_float_broadcast_avx l w x
         | otherwise
-        -> case w of
-            W32 | not sse4_1
-              -> sorry "32-bit float broadcast requires -msse4 or -fllvm."
-            _ -> vector_float_broadcast_sse l w x
+        -> vector_float_broadcast_sse l w x
       MO_V_Broadcast l w
         -> vector_int_broadcast l w x
 
@@ -1217,6 +1213,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
 
         -----------------------
 
+        -- TODO: we could use VBROADCASTSS/SD when AVX2 is available.
         vector_float_broadcast_avx :: Length
                                    -> Width
                                    -> CmmExpr
@@ -1224,11 +1221,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
         vector_float_broadcast_avx len w expr = do
           (dst, exp) <- getSomeReg expr
           let fmt = VecFormat len (floatScalarFormat w)
-              code = case w of
-                W64 -> unitOL $ VSHUF fmt (ImmInt 0) (OpReg dst) dst dst
-                _   -> toOL [ INSERTPS fmt (ImmInt 0b00_10_0000) (OpReg dst) dst
-                            , VSHUF fmt (ImmInt 0) (OpReg dst) dst dst ]
-          return $ Fixed fmt dst (exp `appOL` code)
+              code = VSHUF fmt (ImmInt 0) (OpReg dst) dst dst
+          return $ Fixed fmt dst (exp `snocOL` code)
 
         vector_float_broadcast_sse :: Length
                                    -> Width
@@ -1237,11 +1231,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
         vector_float_broadcast_sse len w expr = do
           (dst, exp) <- getSomeReg expr
           let fmt = VecFormat len (floatScalarFormat w)
-              code = case w of
-                W64 -> unitOL $ SHUF fmt (ImmInt 0) (OpReg dst) dst
-                _   -> toOL [ INSERTPS fmt (ImmInt 0b00_10_0000) (OpReg dst) dst
-                            , SHUF fmt (ImmInt 0) (OpReg dst) dst ]
-          return $ Fixed fmt dst (exp `appOL` code)
+              code = SHUF fmt (ImmInt 0) (OpReg dst) dst
+          return $ Fixed fmt dst (exp `snocOL` code)
 
         vector_int_broadcast :: Length
                              -> Width
@@ -1801,9 +1792,12 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
         -> genFMA3Code l w var x y z
 
       -- Ternary vector operations
-      MO_VF_Insert l W32  | sse4_1 -> vector_float_insert_sse l x y z
-                          | otherwise
-                          -> sorry "FloatX4# operations require either -msse4 or -fllvm"
+      MO_VF_Insert l W32  | l == 4 -> vector_floatx4_insert_sse sse4_1 x y z
+                          | otherwise ->
+         sorry $ "FloatX" ++ show l ++ "# insert operations require -fllvm"
+           -- SIMD NCG TODO:
+           --
+           --   - add support for FloatX8, FloatX16.
       MO_VF_Insert l W64  -> vector_double_insert avx l x y z
       MO_V_Insert l W64   -> vector_int_insert_sse l W64 x y z
 
@@ -1814,31 +1808,59 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
     -- SIMD NCG TODO:
     --
     --   - add support for FloatX8, FloatX16.
-    vector_float_insert_sse :: Length
-                            -> CmmExpr
-                            -> CmmExpr
-                            -> CmmExpr
-                            -> NatM Register
-    -- FloatX4
-    vector_float_insert_sse len@4 vecExpr valExpr (CmmLit (CmmInt offset _))
-      = do
-      (r, exp)    <- getNonClobberedReg valExpr
-      fn          <- getAnyReg vecExpr
-      let fmt      = VecFormat len FmtFloat
-          imm      = litToImm (CmmInt (offset `shiftL` 4) W32)
-          code dst = exp `appOL`
-                     (fn dst) `snocOL`
-                     (INSERTPS fmt imm (OpReg r) dst)
-       in return $ Any fmt code
-    vector_float_insert_sse len _ _ offset
+    vector_floatx4_insert_sse :: Bool
+                              -> CmmExpr
+                              -> CmmExpr
+                              -> CmmExpr
+                              -> NatM Register
+    vector_floatx4_insert_sse sse4_1 vecExpr valExpr (CmmLit (CmmInt offset _))
+      | sse4_1 = do
+        (r, exp)    <- getNonClobberedReg valExpr
+        fn          <- getAnyReg vecExpr
+        let fmt      = VecFormat 4 FmtFloat
+            imm      = litToImm (CmmInt (offset `shiftL` 4) W32)
+            code dst = exp `appOL`
+                      (fn dst) `snocOL`
+                      (INSERTPS fmt imm (OpReg r) dst)
+         in return $ Any fmt code
+      | otherwise = do -- SSE <= 3
+        (r, exp)    <- getNonClobberedReg valExpr
+        fn          <- getAnyReg vecExpr
+        let fmt      = VecFormat 4 FmtFloat
+        tmp <- getNewRegNat fmt
+        let code dst
+              = case offset of
+                  0 -> exp `appOL`
+                      (fn dst) `snocOL`
+                      -- The following MOV compiles to MOVSS instruction and merges two vectors
+                      (MOV fmt (OpReg r) (OpReg dst))  -- dst <- (r[0],dst[1],dst[2],dst[3])
+                  1 -> exp `appOL`
+                      (fn dst) `snocOL`
+                      (MOVU fmt (OpReg dst) (OpReg tmp)) `snocOL`  -- tmp <- dst
+                      (UNPCKL fmt (OpReg r) dst) `snocOL`          -- dst <- (dst[0],r[0],dst[1],r[1])
+                      (SHUF fmt (ImmInt 0xe4) (OpReg tmp) dst)     -- dst <- (dst[0],dst[1],tmp[2],tmp[3])
+                  2 -> exp `appOL`
+                       (fn dst) `snocOL`
+                       (MOVU fmt (OpReg dst) (OpReg tmp)) `snocOL`  -- tmp <- dst
+                       (MOV fmt (OpReg r) (OpReg tmp)) `snocOL`     -- tmp <- (r[0],tmp[1],tmp[2],tmp[3]) with MOVSS
+                       (SHUF fmt (ImmInt 0xc4) (OpReg tmp) dst)     -- dst <- (dst[0],dst[1],tmp[0],tmp[3])
+                  3 -> exp `appOL`
+                       (fn dst) `snocOL`
+                       (MOVU fmt (OpReg dst) (OpReg tmp)) `snocOL`  -- tmp <- dst
+                       (MOV fmt (OpReg r) (OpReg tmp)) `snocOL`     -- tmp <- (r[0],tmp[1],tmp[2],tmp[3]) with MOVSS
+                       (SHUF fmt (ImmInt 0x24) (OpReg tmp) dst)     -- dst <- (dst[0],dst[1],tmp[2],tmp[0])
+                  _ -> panic "MO_VF_Insert FloatX4: unsupported offset"
+         in return $ Any fmt code
+    vector_floatx4_insert_sse _ _ _ offset
       = pprPanic "Unsupported vector insert operation" $
           vcat
-            [ text "FloatX" <> ppr len <> text "#"
+            [ text "FloatX4#"
             , text "offset:" <+> pdoc platform offset ]
+
 
     -- SIMD NCG TODO:
     --
-    --   - add support for FloatX8, FloatX16.
+    --   - add support for DoubleX4#, DoubleX8#.
     vector_double_insert :: Bool
                          -> Length
                          -> CmmExpr
@@ -1857,6 +1879,7 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
                   CmmInt 0 _ -> valExp `appOL`
                                 vecExp `snocOL`
                                 (movu (VecFormat 2 FmtDouble) (OpReg vecReg) (OpReg dst)) `snocOL`
+                                -- The following MOV compiles to MOVSD instruction and merges two vectors
                                 (MOV (VecFormat 2 FmtDouble) (OpReg valReg) (OpReg dst))
                   CmmInt 1 _ -> valExp `appOL`
                                 vecExp `snocOL`
