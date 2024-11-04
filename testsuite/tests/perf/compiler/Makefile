@@ -21,7 +21,7 @@ MultiModulesRecomp:
 # containing core expressions, aka `mi_extra_decls` are populated.
 MultiModulesRecompDefsWithCore:
 	./genMultiLayerModulesCore
-	'$(TEST_HC)' --interactive $(TEST_HC_OPTS) -e "" -fwrite-if-simplified-core MultiLayerModules
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -e "" -fwrite-if-simplified-core MultiLayerModules
 
 MultiModulesDefsWithCore:
 	./genMultiLayerModulesCore

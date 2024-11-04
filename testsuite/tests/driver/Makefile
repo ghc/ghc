@@ -788,7 +788,7 @@ T22044:
 
 .PHONY: T22669
 T22669:
-	echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS) -v0 --interactive T22669
+	echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) T22669
 	! test -f T22669.o-boot
 
 

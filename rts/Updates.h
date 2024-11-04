@@ -9,8 +9,8 @@
 #pragma once
 
 #if !defined(CMINUSMINUS)
-#include "BeginPrivate.h"
 #include "RtsFlags.h"
+#include "BeginPrivate.h"
 #endif
 
 
