@@ -28,7 +28,7 @@ module GHC.Tc.Gen.Head
        , nonBidirectionalErr
 
        , pprArgInst
-       , addHeadCtxt, addExprCtxt, addStmtCtxt, addFunResCtxt ) where
+       , addHeadCtxt, addThingCtxt, addExprCtxt, addStmtCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
@@ -1254,6 +1254,11 @@ mis-match in the number of value arguments.
 *                                                                      *
 ********************************************************************* -}
 
+addThingCtxt :: HsThingRn -> TcRn a -> TcRn a
+addThingCtxt (OrigExpr e) thing_inside = addExprCtxt e thing_inside
+addThingCtxt (OrigStmt (L loc stmt) flav) thing_inside = setSrcSpanA loc $ addStmtCtxt stmt flav $ setInGeneratedCode $ thing_inside
+addThingCtxt _ thing_inside = thing_inside
+
 addStmtCtxt :: ExprStmt GhcRn -> HsDoFlavour -> TcRn a -> TcRn a
 addStmtCtxt stmt flav thing_inside
   = do let err_doc = pprStmtInCtxt (HsDoStmt flav) stmt
@@ -1269,7 +1274,7 @@ addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside
   = case e of
       HsUnboundVar {} -> thing_inside
-      XExpr (PopErrCtxt (L _ e)) -> addExprCtxt e $ thing_inside
+      XExpr (PopErrCtxt (L loc e)) -> setSrcSpanA loc $ addExprCtxt e $ thing_inside
       XExpr (ExpandedThingRn (OrigStmt stmt flav) _) -> addStmtCtxt (unLoc stmt) flav thing_inside
       _ -> addErrCtxt (exprCtxt e) thing_inside
    -- The HsUnboundVar special case addresses situations like

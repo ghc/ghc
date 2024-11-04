@@ -93,7 +93,7 @@ expand_do_stmts doFlavour (stmt@(L _loc (LetStmt _ bs)) : lstmts) =
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (3) below
 --                      stmts ~~> stmts'
 --    ------------------------------------------------
---       let x = e ; stmts ~~> let x = e in stmts'
+--       let x = e ; stmts ~~> let x = e in stmts'xo
   do expand_stmts <- expand_do_stmts doFlavour lstmts
      let expansion = genHsLet bs (genPopErrCtxtExpr expand_stmts)
      return $ mkExpandedStmtAt stmt doFlavour expansion
@@ -575,5 +575,5 @@ mkExpandedStmtAt
   -> HsDoFlavour          -- ^ the flavour of the statement
   -> HsExpr GhcRn         -- ^ expanded expression
   -> LHsExpr GhcRn        -- ^ suitably wrapped located 'XXExprGhcRn'
-mkExpandedStmtAt oStmt@(L loc _) flav eExpr
-  = L loc $ mkExpandedStmt oStmt flav eExpr
+mkExpandedStmtAt oStmt flav eExpr
+  = wrapGenSpan $ mkExpandedStmt oStmt flav eExpr

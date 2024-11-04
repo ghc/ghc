@@ -713,6 +713,10 @@ tcXExpr (PopErrCtxt (L loc e)) res_ty
   = popErrCtxt $ -- See Part 3 of Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
       setSrcSpanA loc $
       tcExpr e res_ty
+
+tcXExpr (ExpandedThingRn o e) res_ty
+   = addThingCtxt o $
+      tcExpr e res_ty
 {-
 tcXExpr xe@(ExpandedThingRn o e') res_ty
   | OrigStmt ls@(L loc s) flav <- o
@@ -734,7 +738,9 @@ tcXExpr xe@(ExpandedThingRn o e') res_ty
   = setSrcSpanA loc $
     mkExpandedStmtTc ls flav <$> tcApp (XExpr xe) res_ty
 -}
+-- For record selection
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
+
 
 {-
 ************************************************************************

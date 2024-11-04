@@ -402,14 +402,14 @@ tcApp rn_expr exp_res_ty
        -- Step 2: Infer the type of `fun`, the head of the application
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
        ; let tc_head = (tc_fun, fun_ctxt)
-
+       ; traceTc "tcApp 1" (ppr rn_fun)
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
        ; (inst_args, app_res_rho)
               <- setQLInstLevel do_ql $  -- See (TCAPP1) and (TCAPP2) in
                                          -- Note [tcApp: typechecking applications]
                  tcInstFun do_ql True tc_head fun_sigma rn_args
-
+       ; traceTc "tcApp 2" (ppr rn_fun)
        ; case do_ql of
             NoQL -> do { traceTc "tcApp:NoQL" (ppr rn_fun $$ ppr app_res_rho)
 
@@ -417,6 +417,7 @@ tcApp rn_expr exp_res_ty
                          -- See Note [Unify with expected type before typechecking arguments]
                        ; res_wrap <- checkResultTy rn_expr tc_head inst_args
                                                    app_res_rho exp_res_ty
+                       ; traceTc "tcApp valArgs" (ppr inst_args)
                          -- Step 4.2: typecheck the  arguments
                        ; tc_args <- tcValArgs NoQL inst_args
                          -- Step 4.3: wrap up
@@ -538,12 +539,7 @@ tcValArg do_ql (EValArg { ea_ctxt   = ctxt
                         , ea_arg    = larg@(L arg_loc arg)
                         , ea_arg_ty = sc_arg_ty })
   = addArgCtxt ctxt larg $
-    do { traceTc "tcValArg" $
-         vcat [ ppr ctxt
-              , text "arg type:" <+> ppr sc_arg_ty
-              , text "arg:" <+> ppr larg ]
-
-         -- Crucial step: expose QL results before checking exp_arg_ty
+    do { -- Crucial step: expose QL results before checking exp_arg_ty
          -- So far as the paper is concerned, this step applies
          -- the poly-substitution Theta, learned by QL, so that we
          -- "see" the polymorphism in that argument type. E.g.
@@ -552,14 +548,21 @@ tcValArg do_ql (EValArg { ea_ctxt   = ctxt
          -- Then Theta = [p :-> forall a. a->a], and we want
          -- to check 'e' with expected type (forall a. a->a)
          -- See Note [Instantiation variables are short lived]
-       ; Scaled mult exp_arg_ty <- case do_ql of
+         Scaled mult exp_arg_ty <- case do_ql of
               DoQL -> liftZonkM $ zonkScaledTcType sc_arg_ty
               NoQL -> return sc_arg_ty
+       ; traceTc "tcValArg {" $
+         vcat [ text "ctxt:" <+> ppr ctxt
+              , text "sigma_type" <+> ppr (mkCheckExpType exp_arg_ty)
+              , text "arg:" <+> ppr larg
+              ]
+
 
          -- Now check the argument
        ; arg' <- tcScalingUsage mult $
                  tcPolyExpr arg (mkCheckExpType exp_arg_ty)
-
+       ; traceTc "tcValArg" $ vcat [ ppr arg'
+                                   , text "}" ]
        ; return (EValArg { ea_ctxt = ctxt
                          , ea_arg = L arg_loc arg'
                          , ea_arg_ty = noExtField }) }
@@ -897,6 +900,9 @@ addArgCtxt :: AppCtxt -> LHsExpr GhcRn
 -- whether the piece of code is a `do`-expanded code or some other expanded code.
 addArgCtxt ctxt (L arg_loc arg) thing_inside
   = do { in_generated_code <- inGeneratedCode
+       ; traceTc "addArgCtxt" (vcat [ text "generated:" <+> ppr in_generated_code
+                                    , text "arg: " <+> ppr arg
+                                    , text "arg_loc" <+> ppr arg_loc])
        ; case ctxt of
            VACall fun arg_no _ | not in_generated_code
              -> do setSrcSpanA arg_loc                    $

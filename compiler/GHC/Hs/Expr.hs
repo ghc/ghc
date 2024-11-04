@@ -897,7 +897,7 @@ instance Outputable HsThingRn where
     = case thing of
         OrigExpr x     -> ppr_builder "<OrigExpr>:" x
         OrigStmt x _   -> ppr_builder "<OrigStmt>:" x
-        OrigPat  x _   -> ifPprDebug (braces (text "<OrigPat>:" <+> parens (ppr x))) (ppr x)
+        OrigPat  x _   -> ppr_builder "<OrigPat>:"  x
     where ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens (ppr x))) (ppr x)
 
 instance Outputable XXExprGhcRn where
