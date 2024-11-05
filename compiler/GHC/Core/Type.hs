@@ -3450,5 +3450,5 @@ typeOrConstraintKind TypeLike       rep = mkTYPEapp       rep
 typeOrConstraintKind ConstraintLike rep = mkCONSTRAINTapp rep
 
 liftedTypeOrConstraintKind :: TypeOrConstraint -> Kind
-liftedTypeOrConstraintKind TypeLike       = typeKind
+liftedTypeOrConstraintKind TypeLike       = liftedTypeKind
 liftedTypeOrConstraintKind ConstraintLike = constraintKind

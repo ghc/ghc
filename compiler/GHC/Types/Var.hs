@@ -40,8 +40,8 @@ module GHC.Types.Var (
         TyVar, TcTyVar, TypeVar, KindVar, TKVar, TyCoVar,
 
         -- * In and Out variants
-        InVar,  InCoVar,  InId,  InTyVar,
-        OutVar, OutCoVar, OutId, OutTyVar,
+        InVar,  InCoVar,  InId,  InTyVar,  InTyCoVar,
+        OutVar, OutCoVar, OutId, OutTyVar, OutTyCoVar,
 
         -- ** Taking 'Var's apart
         varName, varUnique, varType,
@@ -205,10 +205,12 @@ type TyCoVar = Id       -- Type, *or* coercion variable
 type InVar      = Var
 type InTyVar    = TyVar
 type InCoVar    = CoVar
+type InTyCoVar  = TyCoVar
 type InId       = Id
 type OutVar     = Var
 type OutTyVar   = TyVar
 type OutCoVar   = CoVar
+type OutTyCoVar = TyCoVar
 type OutId      = Id
 
 
