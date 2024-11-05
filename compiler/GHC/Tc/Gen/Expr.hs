@@ -714,9 +714,9 @@ tcXExpr (PopErrCtxt (L loc e)) res_ty
       setSrcSpanA loc $
       tcExpr e res_ty
 
-tcXExpr (ExpandedThingRn o e) res_ty
+tcXExpr (ExpandedThingRn o@(OrigStmt stmt flav) e) res_ty
    = addThingCtxt o $
-      tcExpr e res_ty
+      mkExpandedStmtTc stmt flav <$> tcExpr e res_ty
 {-
 tcXExpr xe@(ExpandedThingRn o e') res_ty
   | OrigStmt ls@(L loc s) flav <- o

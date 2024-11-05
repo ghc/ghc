@@ -73,13 +73,13 @@ expand_do_stmts _ (stmt@(L _ (ParStmt {})):_) =
 
 expand_do_stmts _ [] = pprPanic "expand_do_stmts: impossible happened. Empty stmts" empty
 
-expand_do_stmts flav [stmt@(L _ (LastStmt _ (L body_loc body) _ ret_expr))]
+expand_do_stmts flav [stmt@(L loc (LastStmt _ (L body_loc body) _ ret_expr))]
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (5) below
 -- last statement of a list comprehension, needs to explicitly return it
 -- See `checkLastStmt` and `Syntax.Expr.StmtLR.LastStmt`
    | NoSyntaxExprRn <- ret_expr
    -- Last statement is just body if we are not in ListComp context. See Syntax.Expr.LastStmt
-   = return $ mkExpandedStmtAt stmt flav body
+   = return $ mkExpandedStmtAt loc stmt flav body
 
    | SyntaxExprRn ret <- ret_expr
    --
@@ -87,16 +87,16 @@ expand_do_stmts flav [stmt@(L _ (LastStmt _ (L body_loc body) _ ret_expr))]
    --               return e  ~~> return e
    -- to make T18324 work
    = do let expansion = genHsApp ret (L body_loc body)
-        return $ mkExpandedStmtAt stmt flav expansion
+        return $ mkExpandedStmtAt body_loc stmt flav expansion
 
-expand_do_stmts doFlavour (stmt@(L _loc (LetStmt _ bs)) : lstmts) =
+expand_do_stmts doFlavour (stmt@(L _ (LetStmt _ bs)) : lstmts) =
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (3) below
 --                      stmts ~~> stmts'
 --    ------------------------------------------------
 --       let x = e ; stmts ~~> let x = e in stmts'xo
   do expand_stmts <- expand_do_stmts doFlavour lstmts
      let expansion = genHsLet bs (genPopErrCtxtExpr expand_stmts)
-     return $ mkExpandedStmtAt stmt doFlavour expansion
+     return $ mkExpandedStmtAt (noAnnSrcSpan generatedSrcSpan) stmt doFlavour expansion
 
 expand_do_stmts doFlavour (stmt@(L _loc (BindStmt xbsrn pat e)): lstmts)
   | SyntaxExprRn bind_op <- xbsrn_bindOp xbsrn
@@ -112,7 +112,7 @@ expand_do_stmts doFlavour (stmt@(L _loc (BindStmt xbsrn pat e)): lstmts)
        let expansion = genHsExpApps bind_op  -- (>>=)
                        [ e
                        , failable_expr ]
-       return $ mkExpandedStmtAt stmt doFlavour expansion
+       return $ mkExpandedStmtAt (noAnnSrcSpan generatedSrcSpan) stmt doFlavour expansion
 
   | otherwise
   = pprPanic "expand_do_stmts: The impossible happened, missing bind operator from renamer" (text "stmt" <+> ppr  stmt)
@@ -127,7 +127,7 @@ expand_do_stmts doFlavour (stmt@(L _loc (BodyStmt _ e (SyntaxExprRn then_op) _))
      let expansion = genHsExpApps then_op  -- (>>)
                      [ e
                      , genPopErrCtxtExpr expand_stmts_expr ]
-     return $ mkExpandedStmtAt stmt doFlavour expansion
+     return $ mkExpandedStmtAt (noAnnSrcSpan generatedSrcSpan) stmt doFlavour expansion
 
 expand_do_stmts doFlavour
        ((L loc (RecStmt { recS_stmts = L stmts_loc rec_stmts
@@ -216,7 +216,7 @@ expand_do_stmts doFlavour ((L _ (XStmtLR (ApplicativeStmt _ args mb_join))): lst
             { xarg_app_arg_one = mb_fail_op
             , app_arg_pattern = pat
             , arg_expr        = (L rhs_loc rhs) }) =
-      do let xx_expr = mkExpandedStmtAt stmt doFlavour rhs
+      do let xx_expr = mkExpandedStmtAt rhs_loc stmt doFlavour rhs
          traceTc "do_arg" (text "OneArg" <+> vcat [ppr pat, ppr xx_expr])
          return ((pat, mb_fail_op)
                 , xx_expr)
@@ -243,19 +243,19 @@ expand_do_stmts _ stmts = pprPanic "expand_do_stmts: impossible happened" $ (ppr
 
 -- checks the pattern `pat` for irrefutability which decides if we need to wrap it with a fail block
 mk_failable_expr :: HsDoFlavour -> LPat GhcRn -> LHsExpr GhcRn -> FailOperator GhcRn -> TcM (LHsExpr GhcRn)
-mk_failable_expr doFlav lpat@(L loc pat) expr@(L _exprloc _) fail_op =
+mk_failable_expr doFlav lpat expr@(L _exprloc _) fail_op =
   do { is_strict <- xoptM LangExt.Strict
      ; hscEnv <- getTopEnv
      ; rdrEnv <- getGlobalRdrEnv
      ; comps <- getCompleteMatchesTcM
      ; let irrf_pat = isIrrefutableHsPat is_strict (irrefutableConLikeRn hscEnv rdrEnv comps) lpat
-     ; traceTc "mk_failable_expr" (vcat [ text "pat:" <+> ppr pat
+     ; traceTc "mk_failable_expr" (vcat [ text "pat:" <+> ppr lpat
                                         , text "isIrrefutable:" <+> ppr irrf_pat
                                         ])
      ; if irrf_pat -- don't wrap with fail block if
                    -- the pattern is irrefutable
        then return $ genHsLamDoExp doFlav [lpat] expr
-       else L loc <$> mk_fail_block doFlav lpat expr fail_op
+       else wrapGenSpan <$> mk_fail_block doFlav lpat expr fail_op
      }
 
 -- makes the fail block with a given fail_op
@@ -571,9 +571,10 @@ genPopErrCtxtExpr a = wrapGenSpan $ mkPopErrCtxtExpr a
 --   and the two components of the expansion: original do stmt and
 --   expanded expression and associate it with a provided location
 mkExpandedStmtAt
-  :: ExprLStmt GhcRn      -- ^ source statement
+  :: SrcSpanAnnA
+  -> ExprLStmt GhcRn      -- ^ source statement
   -> HsDoFlavour          -- ^ the flavour of the statement
   -> HsExpr GhcRn         -- ^ expanded expression
   -> LHsExpr GhcRn        -- ^ suitably wrapped located 'XXExprGhcRn'
-mkExpandedStmtAt oStmt flav eExpr
-  = wrapGenSpan $ mkExpandedStmt oStmt flav eExpr
+mkExpandedStmtAt loc oStmt flav eExpr
+  = L loc $ mkExpandedStmt oStmt flav eExpr
