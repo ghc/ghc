@@ -14,9 +14,10 @@ module GHC.Core (
 
         -- * In/Out type synonyms
         InId, InBind, InExpr, InAlt, InArg, InType, InKind,
-               InBndr, InVar, InCoercion, InTyVar, InCoVar,
+               InBndr, InVar, InCoercion, InTyVar, InCoVar, InTyCoVar,
         OutId, OutBind, OutExpr, OutAlt, OutArg, OutType, OutKind,
-               OutBndr, OutVar, OutCoercion, OutTyVar, OutCoVar, MOutCoercion,
+               OutBndr, OutVar, OutCoercion, OutTyVar, OutCoVar,
+               OutTyCoVar, MOutCoercion,
 
         -- ** 'Expr' construction
         mkLet, mkLets, mkLetNonRec, mkLetRec, mkLams,
