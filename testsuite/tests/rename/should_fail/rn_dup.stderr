@@ -1,4 +1,3 @@
-
 rn_dup.hs:9:10: error: [GHC-29916]
     Multiple declarations of ‘MkT’
     Declared at: rn_dup.hs:7:16
@@ -16,6 +15,8 @@ rn_dup.hs:12:16: error: [GHC-29916]
     Multiple declarations of ‘rf’
     Declared at: rn_dup.hs:11:27
                  rn_dup.hs:12:16
+    Suggested fix:
+      Perhaps you intended to use the ‘DuplicateRecordFields’ extension
 
 rn_dup.hs:17:3: error: [GHC-29916]
     Multiple declarations of ‘CT’
@@ -26,3 +27,4 @@ rn_dup.hs:18:3: error: [GHC-29916]
     Multiple declarations of ‘f’
     Declared at: rn_dup.hs:16:3
                  rn_dup.hs:18:3
+

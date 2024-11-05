@@ -1,5 +1,7 @@
-
 NFSDuplicate.hs:8:16: error: [GHC-29916]
     Multiple declarations of ‘foo’
     Declared at: NFSDuplicate.hs:7:16
                  NFSDuplicate.hs:8:16
+    Suggested fix:
+      Perhaps you intended to use the ‘DuplicateRecordFields’ extension
+

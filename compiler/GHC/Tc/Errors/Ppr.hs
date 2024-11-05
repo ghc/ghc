@@ -3253,8 +3253,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnusedImport{}
       -> noHints
-    TcRnDuplicateDecls{}
-      -> noHints
+    TcRnDuplicateDecls _ fs
+      -> [suggestExtension LangExt.DuplicateRecordFields | all isFieldName fs]
     TcRnPackageImportsDisabled
       -> [suggestExtension LangExt.PackageImports]
     TcRnIllegalDataCon{}
