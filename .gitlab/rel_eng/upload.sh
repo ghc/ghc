@@ -79,6 +79,7 @@ function hash_files() {
          -iname '*.xz' \
       -o -iname '*.gz' \
       -o -iname '*.lz' \
+      -o -iname '*.gz' \
       -o -iname '*.bz2' \
       -o -iname '*.zip' \
     )
