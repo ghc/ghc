@@ -24,7 +24,7 @@ usage :
 	tmp="$$(mktemp -d tmp.XXX)" && \
 		tar -C "$$tmp" -xf $< && \
 		cd "$$tmp" && \
-		zip -9 -r $@ * && \
+		zip -9 -r ../$@ * && \
 		cd .. && \
 		rm -R "$$tmp"
 
