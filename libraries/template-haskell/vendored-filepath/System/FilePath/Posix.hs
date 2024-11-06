@@ -1,6 +1,7 @@
 -- Vendored from filepath v1.4.2.2
 
 {-# LANGUAGE PatternGuards #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 -- This template expects CPP definitions for:
 --     MODULE_NAME = Posix | Windows

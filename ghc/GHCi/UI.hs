@@ -145,7 +145,7 @@ import Data.Time.LocalTime ( getZonedTime )
 import Data.Time.Format ( formatTime, defaultTimeLocale )
 import Data.Version ( showVersion )
 import qualified Data.Semigroup as S
-import Prelude hiding ((<>))
+import GHC.Prelude
 
 import GHC.Utils.Exception as Exception hiding (catch, mask, handle)
 import Foreign hiding (void)

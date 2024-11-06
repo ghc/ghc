@@ -755,10 +755,14 @@ ppHtmlIndex
         divAlphabet
           << unordList
             ( map (\str -> anchor ! [href (subIndexHtmlFile str)] << str) $
-                [ [c] | c <- initialChars, any ((== c) . toUpper . head . fst) index
+                [ [c] | c <- initialChars, any (indexStartsWith c) index
                 ]
                   ++ [merged_name]
             )
+
+      indexStartsWith :: Char -> (String, t) -> Bool
+      indexStartsWith c (indexChar1 : _, _) = toUpper indexChar1 == c
+      indexStartsWith _ _ = False
 
       -- todo: what about names/operators that start with Unicode
       -- characters?
@@ -772,7 +776,7 @@ ppHtmlIndex
           writeUtf8File (joinPath [odir, subIndexHtmlFile [c]]) (renderToString debug html)
         where
           html = indexPage True (Just c) index_part
-          index_part = [(n, stuff) | (n, stuff) <- this_ix, toUpper (head n) == c]
+          index_part = [(n, stuff) | (n@(headN : _), stuff) <- this_ix, toUpper headN == c]
 
       index :: [(String, Map GHC.Name [(Module, Bool)])]
       index = sortBy cmp (Map.toAscList full_index)

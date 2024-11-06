@@ -72,7 +72,11 @@ ghcWarningsArgs = do
         , package terminfo     ? pure [ "-Wno-unused-imports", "-Wno-deriving-typeable" ]
         , package stm          ? pure [ "-Wno-deriving-typeable" ]
         , package osString     ? pure [ "-Wno-deriving-typeable", "-Wno-unused-imports" ]
-        , package parsec       ? pure [ "-Wno-deriving-typeable" ]
+        , package parsec       ? pure [ "-Wno-deriving-typeable"
+                                      , "-Wno-x-partial"
+                                      ]
+
+        , package filepath     ? pure [ "-Wno-x-partial" ]
 
         , package cabal        ? pure [ "-Wno-deriving-typeable", "-Wno-incomplete-record-selectors" ]
              -- The -Wno-incomplete-record-selectors is due to

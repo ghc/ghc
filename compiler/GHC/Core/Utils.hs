@@ -115,7 +115,6 @@ import GHC.Utils.Misc
 import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
 import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
-import qualified Data.List as Partial ( init, last )
 import Data.Ord            ( comparing )
 import Control.Monad       ( guard )
 import qualified Data.Set as Set
@@ -1896,10 +1895,10 @@ app_ok fun_ok primop_ok fun args
 
       PrimOpId op _
         | primOpIsDiv op
-        , Lit divisor <- Partial.last args
+        , Lit divisor <- last args
             -- there can be 2 args (most div primops) or 3 args
             -- (WordQuotRem2Op), hence the use of last/init
-        -> not (isZeroLit divisor) && all (expr_ok fun_ok primop_ok) (Partial.init args)
+        -> not (isZeroLit divisor) && all (expr_ok fun_ok primop_ok) (init args)
               -- Special case for dividing operations that fail
               -- In general they are NOT ok-for-speculation
               -- (which primop_ok will catch), but they ARE OK

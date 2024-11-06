@@ -39,7 +39,7 @@ import System.FilePath
 import Control.Monad
 import Data.List ( partition, (\\) )
 import qualified Data.Set as Set
-import Prelude
+import GHC.Prelude
 import GHC.ResponseFile (expandResponse)
 import Data.Bifunctor
 import GHC.Data.Graph.Directed

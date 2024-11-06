@@ -14,6 +14,7 @@ module GHC.Toolchain.Utils
 import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
+import Data.List (unsnoc)
 import System.Directory
 import System.FilePath
 import System.IO.Error
@@ -67,5 +68,4 @@ isSuccess = \case
   ExitFailure _ -> False
 
 lastLine :: String -> String
-lastLine "" = ""
-lastLine s  = last $ lines s
+lastLine = maybe "" snd . unsnoc . lines

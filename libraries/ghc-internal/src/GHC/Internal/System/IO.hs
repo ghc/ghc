@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, CApiFFI #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 -----------------------------------------------------------------------------
 -- |

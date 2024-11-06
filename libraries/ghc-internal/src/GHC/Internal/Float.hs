@@ -13,6 +13,9 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
+-- For init in formatRealFloatAlt
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Float
