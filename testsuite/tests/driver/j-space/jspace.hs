@@ -7,7 +7,7 @@ import System.Environment
 import GHC.Driver.Env.Types
 import GHC.Profiling
 import System.Mem
-import Data.List (isPrefixOf)
+import Data.List (isPrefixOf, unsnoc)
 import Control.Monad
 import System.Exit
 import GHC.Platform
@@ -41,7 +41,9 @@ initGhcM xs = do
       requestHeapCensus
       performGC
       [ys] <- filter (isPrefixOf (ghcUnitId <> ":GHC.Unit.Module.ModDetails.ModDetails")) . lines <$> readFile "jspace.hp"
-      let (n :: Int) = read (last (words ys))
+      let (n :: Int) = case unsnoc (words ys) of
+            Nothing -> error "input is unexpectedly empty"
+            Just (_, lst) -> read lst
       -- The output should be 50 * 8 * word_size (i.e. 3600, or 1600 on 32-bit architectures):
       -- the test contains DEPTH + WIDTH + 2 = 50 modules J, H_0, .., H_DEPTH, W_1, .., W_WIDTH,
       -- and each ModDetails contains 1 (info table) + 8 word-sized fields.

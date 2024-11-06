@@ -2,8 +2,8 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# OPTIONS_GHC -O2 #-} -- See Note [-O2 Prelude]
 
--- See Note [Proxies for head and tail]
-{-# OPTIONS_GHC -Wno-unrecognised-warning-flags -Wno-x-partial #-}
+-- See Note [Proxies for partial list functions]
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 -- | Custom minimal GHC "Prelude"
 --
@@ -24,7 +24,7 @@ module GHC.Prelude.Basic
   , bit
   , shiftL, shiftR
   , setBit, clearBit
-  , head, tail, unzip
+  , head, tail, init, last, unzip
 
   , strictGenericLength
   ) where
@@ -59,7 +59,7 @@ NoImplicitPrelude. There are two motivations for this:
 -}
 
 import qualified Prelude
-import Prelude as X hiding ((<>), Applicative(..), Foldable(..), head, tail, unzip)
+import Prelude as X hiding ((<>), Applicative(..), Foldable(..), head, tail, init, last, unzip)
 import Control.Applicative (Applicative(..))
 import Data.Foldable as X (Foldable (elem, foldMap, foldl, foldl', foldr, length, null, product, sum))
 import Data.Foldable1 as X hiding (head, last)
@@ -118,23 +118,34 @@ setBit = \ x i -> x Bits..|. bit i
 clearBit :: (Num a, Bits.Bits a) => a -> Int -> a
 clearBit = \ x i -> x Bits..&. Bits.complement (bit i)
 
-{- Note [Proxies for head and tail]
+{- Note [Proxies for partial list functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Prelude.head and Prelude.tail have recently acquired {-# WARNING in "x-partial" #-},
+Prelude.head, Prelude.tail, Prelude.init and Prelude.last
+have recently acquired {-# WARNING in "x-partial" #-},
 but the GHC codebase uses them fairly extensively and insists on building warning-free.
 Thus, instead of adding {-# OPTIONS_GHC -Wno-x-partial #-} to every module which
 employs them, we define warning-less proxies and export them from GHC.Prelude.
 -}
 
--- See Note [Proxies for head and tail]
+-- See Note [Proxies for partial list functions]
 head :: HasCallStack => [a] -> a
 head = Prelude.head
 {-# INLINE head #-}
 
--- See Note [Proxies for head and tail]
+-- See Note [Proxies for partial list functions]
 tail :: HasCallStack => [a] -> [a]
 tail = Prelude.tail
 {-# INLINE tail #-}
+
+-- See Note [Proxies for partial list functions]
+init :: HasCallStack => [a] -> [a]
+init = Prelude.init
+{-# INLINE init #-}
+
+-- See Note [Proxies for partial list functions]
+last :: HasCallStack => [a] -> a
+last = Prelude.last
+{-# INLINE last #-}
 
 {- |
 The 'genericLength' function defined in base can't be specialised due to the
