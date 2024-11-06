@@ -285,7 +285,7 @@ no_anon_wc_ty lty = go lty
       HsBangTy _ _ ty                -> go ty
       HsRecTy _ flds                 -> gos $ map (cd_fld_type . unLoc) flds
       HsExplicitListTy _ _ tys       -> gos tys
-      HsExplicitTupleTy _ tys        -> gos tys
+      HsExplicitTupleTy _ _ tys      -> gos tys
       HsForAllTy { hst_tele = tele
                  , hst_body = ty } -> no_anon_wc_tele tele
                                         && go ty

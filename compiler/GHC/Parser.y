@@ -2316,7 +2316,7 @@ atype :: { LHsType GhcPs }
         : ntgtycon                       {% amsA' (sL1 $1 (HsTyVar noAnn NotPromoted $1)) }      -- Not including unit tuples
         -- See Note [%shift: atype -> tyvar]
         | tyvar %shift                   {% amsA' (sL1 $1 (HsTyVar noAnn NotPromoted $1)) }      -- (See Note [Unit tuples])
-        | '_'   %shift                   { sL1a $1 $ mkAnonWildCardTy }
+        | '_'   %shift                   { sL1a $1 $ mkAnonWildCardTy (epTok $1) }
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1a $1 (HsStarTy noExtField (isUnicode $1)) } }
 
@@ -2342,14 +2342,14 @@ atype :: { LHsType GhcPs }
         | '(' ktype ')'               {% amsA' (sLL $1 $> $ HsParTy (epTok $1, epTok $3) $2) }
                                       -- see Note [Promotion] for the followings
         | SIMPLEQUOTE '(' ')'         {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
-                                            ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1,epTok $2,epTok $3) []) }}
+                                            ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1,epTok $2,epTok $3) IsPromoted []) }}
         | SIMPLEQUOTE gen_qcon {% amsA' (sLL $1 $> $ HsTyVar (epTok $1) IsPromoted $2) }
         | SIMPLEQUOTE sysdcon_nolist {% do { requireLTPuns PEP_QuoteDisambiguation $1 (reLoc $>)
                                            ; amsA' (sLL $1 $> $ HsTyVar (epTok $1) IsPromoted (L (getLoc $2) $ nameRdrName (dataConName (unLoc $2)))) }}
         | SIMPLEQUOTE  '(' ktype ',' comma_types1 ')'
                              {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
                                    ; h <- addTrailingCommaA $3 (epTok $4)
-                                   ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1,epTok $2,epTok $6) (h : $5)) }}
+                                   ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1,epTok $2,epTok $6) IsPromoted (h : $5)) }}
         | '[' ']'               {% withCombinedComments $1 $> (mkListSyntaxTy0 (epTok $1) (epTok $2)) }
         | SIMPLEQUOTE  '[' comma_types0 ']'     {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
                                                       ; amsA' (sLL $1 $> $ HsExplicitListTy (epTok $1, epTok $2, epTok $4) IsPromoted $3) }}
@@ -2435,7 +2435,7 @@ tv_bndr_no_braces :: { LHsTyVarBndr Specificity GhcPs }
 
 tyvar_wc :: { Located (HsBndrVar GhcPs) }
         : tyvar                         { sL1 $1 (HsBndrVar noExtField $1) }
-        | '_'                           { sL1 $1 (HsBndrWildCard noExtField) }
+        | '_'                           { sL1 $1 (HsBndrWildCard (epTok $1)) }
 
 fds :: { Located (EpToken "|",[LHsFunDep GhcPs]) }
         : {- empty -}                   { noLoc (NoEpTok,[]) }

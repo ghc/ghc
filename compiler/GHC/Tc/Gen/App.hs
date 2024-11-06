@@ -1027,7 +1027,7 @@ expr_to_type earg =
       | isBoxed boxity
       , Just es <- tupArgsPresent_maybe tup_args
       = do { ts <- traverse go es
-           ; return (L l (HsExplicitTupleTy noExtField ts)) }
+           ; return (L l (HsExplicitTupleTy noExtField NotPromoted ts)) }
     go (L l (ExplicitList _ es)) =
       do { ts <- traverse go es
          ; return (L l (HsExplicitListTy noExtField NotPromoted ts)) }
