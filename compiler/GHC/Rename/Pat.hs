@@ -1374,10 +1374,10 @@ rn_ty_pat ty@(HsExplicitListTy _ prom tys) = do
   tys' <- mapM rn_lty_pat tys
   pure (HsExplicitListTy noExtField prom tys')
 
-rn_ty_pat ty@(HsExplicitTupleTy _ tys) = do
+rn_ty_pat ty@(HsExplicitTupleTy _ prom tys) = do
   check_data_kinds ty
   tys' <- mapM rn_lty_pat tys
-  pure (HsExplicitTupleTy noExtField tys')
+  pure (HsExplicitTupleTy noExtField prom tys')
 
 rn_ty_pat tyLit@(HsTyLit src t) = do
   check_data_kinds tyLit

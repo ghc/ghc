@@ -980,8 +980,8 @@ checkTyVars pp_what equals_or_where tc tparms
     match_bndr_var :: HsType GhcPs -> Maybe (EpToken "'", HsBndrVar GhcPs)
     match_bndr_var (HsTyVar ann _ tv) | isRdrTyVar (unLoc tv)
       = Just (ann, HsBndrVar noExtField tv)
-    match_bndr_var (HsWildCardTy _)
-      = Just (noAnn, HsBndrWildCard noExtField)
+    match_bndr_var (HsWildCardTy tok)
+      = Just (noAnn, HsBndrWildCard tok)
     match_bndr_var _ = Nothing
 
     -- Return a EpaLocation for use in widenLocatedAnL.
@@ -1159,7 +1159,7 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
   -- With NoListTuplePuns, contexts are parsed as data constructors, which causes failure
   -- downstream.
   -- This converts them just like when they are parsed as types in the punned case.
-  check (oparens,cparens,cs) (L _l (HsExplicitTupleTy (q,o,c) ts))
+  check (oparens,cparens,cs) (L _l (HsExplicitTupleTy (q,o,c) _ ts))
     = punsAllowed >>= \case
       True -> unprocessed
       False -> do
@@ -3622,7 +3622,7 @@ mkTupleSyntaxTy parOpen args parClose =
     enabled =
       HsTupleTy annParen HsBoxedOrConstraintTuple args
     disabled =
-      HsExplicitTupleTy annsKeyword args
+      HsExplicitTupleTy annsKeyword NotPromoted args
 
     annParen = AnnParens parOpen parClose
     annsKeyword = (NoEpTok, parOpen, parClose)

@@ -361,7 +361,11 @@ type instance XBndrNoKind (GhcPass p) = NoExtField
 type instance XXBndrKind  (GhcPass p) = DataConCantHappen
 
 type instance XBndrVar (GhcPass p) = NoExtField
-type instance XBndrWildCard (GhcPass p) = NoExtField
+
+type instance XBndrWildCard GhcPs = EpToken "_"
+type instance XBndrWildCard GhcRn = NoExtField
+type instance XBndrWildCard GhcTc = NoExtField
+
 type instance XXBndrVar (GhcPass p) = DataConCantHappen
 
 data AnnTyVarBndr
@@ -487,7 +491,9 @@ type instance XExplicitTupleTy GhcTc = [Kind]
 
 type instance XTyLit           (GhcPass _) = NoExtField
 
-type instance XWildCardTy      (GhcPass _) = NoExtField
+type instance XWildCardTy      GhcPs = EpToken "_"
+type instance XWildCardTy      GhcRn = NoExtField
+type instance XWildCardTy      GhcTc = NoExtField
 
 type instance XXType         (GhcPass _) = HsCoreTy
 
@@ -670,8 +676,8 @@ ignoreParens ty                   = ty
 ************************************************************************
 -}
 
-mkAnonWildCardTy :: HsType GhcPs
-mkAnonWildCardTy = HsWildCardTy noExtField
+mkAnonWildCardTy :: EpToken "_" -> HsType GhcPs
+mkAnonWildCardTy tok = HsWildCardTy tok
 
 mkHsOpTy :: (Anno (IdGhcP p) ~ SrcSpanAnnN)
          => PromotionFlag
@@ -1408,13 +1414,13 @@ ppr_mono_ty (HsSpliceTy ext s)    =
 ppr_mono_ty (HsExplicitListTy _ prom tys)
   | isPromoted prom = quote $ brackets (maybeAddSpace tys $ interpp'SP tys)
   | otherwise       = brackets (interpp'SP tys)
-ppr_mono_ty (HsExplicitTupleTy _ tys)
+ppr_mono_ty (HsExplicitTupleTy _ prom tys)
     -- Special-case unary boxed tuples so that they are pretty-printed as
     -- `'MkSolo x`, not `'(x)`
   | [ty] <- tys
-  = quoteIfPunsEnabled $ sep [text (mkTupleStr Boxed dataName 1), ppr_mono_lty ty]
+  = quote_tuple prom $ sep [text (mkTupleStr Boxed dataName 1), ppr_mono_lty ty]
   | otherwise
-  = quoteIfPunsEnabled $ parens (maybeAddSpace tys $ interpp'SP tys)
+  = quote_tuple prom $ parens (maybeAddSpace tys $ interpp'SP tys)
 ppr_mono_ty (HsTyLit _ t)       = ppr t
 ppr_mono_ty (HsWildCardTy {})   = char '_'
 
@@ -1448,6 +1454,10 @@ ppr_fun_ty mult ty1 ty2
     in
     sep [p1, arr <+> p2]
 
+quote_tuple :: PromotionFlag -> SDoc -> SDoc
+quote_tuple IsPromoted  doc = quote doc
+quote_tuple NotPromoted doc = doc
+
 --------------------------
 -- | @'hsTypeNeedsParens' p t@ returns 'True' if the type @t@ needs parentheses
 -- under precedence @p@.
@@ -1477,7 +1487,7 @@ hsTypeNeedsParens p = go_hs_ty
     -- Special-case unary boxed tuple applications so that they are
     -- parenthesized as `Proxy ('MkSolo x)`, not `Proxy 'MkSolo x` (#18612)
     -- See Note [One-tuples] in GHC.Builtin.Types
-    go_hs_ty (HsExplicitTupleTy _ [_])
+    go_hs_ty (HsExplicitTupleTy _ _ [_])
                                       = p >= appPrec
     go_hs_ty (HsExplicitTupleTy{})    = False
     go_hs_ty (HsTyLit{})              = False
