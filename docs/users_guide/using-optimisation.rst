@@ -405,6 +405,55 @@ as such you shouldn't need to set any of them explicitly. A flag
     intermediate language, where it is able to common up some subexpressions
     that differ in their types, but not their representation.
 
+.. ghc-flag:: -fspec-eval
+    :shortdesc: Enables speculative evaluation.
+    :type: dynamic
+    :category:
+    :reverse: -fno-spec-eval
+
+    :default: on
+    :since: 9.14.1
+
+    Enables speculative evaluation which usually results in fewer allocations.
+    Enabling speculative evaluation should not cause performance regressions.
+    If you encounter any, please open a ticket.
+
+    Note that disabling this flag will switch off speculative evaluation
+    completely, causing :ghc-flag:`-fspec-eval-dictfun` to have
+    no effect.
+
+.. ghc-flag:: -fspec-eval-dictfun
+    :shortdesc: Enables speculative evaluation of dictionary functions.
+    :type: dynamic
+    :category:
+    :reverse: -fno-spec-eval-dictfun
+
+    :default: on
+    :since: 9.14.1
+
+    Enables speculative (strict) evaluation of dictionary functions.
+
+    This is best explained with an example ::
+
+        instance C a => D a where ...
+
+        g :: D a => a -> Int
+        g x = ...
+
+        f :: C a => a -> Int
+        f x = g x
+
+    Function `f` has to pass a `D a` dictionary to `g`, and uses a dictionary
+    function `C a => D a` to compute it. If speculative evaluation for
+    dictionary functions is enabled, this dictionary is computed
+    strictly.
+
+    Speculative evalation of dictionary functions can lead to slightly better
+    performance, because a thunk is avoided. However, it results in unnecessary
+    computation and allocation if the dictionary goes unused. This causes
+    a significant increase in allocation if the dictionary is large.
+    See (:ghc-ticket:`25284`).
+
 .. ghc-flag:: -fdicts-cheap
     :shortdesc: Make dictionary-valued expressions seem cheap to the optimiser.
     :type: dynamic

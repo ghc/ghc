@@ -2544,6 +2544,8 @@ fFlagsDeps = [
   flagSpec "num-constant-folding"             Opt_NumConstantFolding,
   flagSpec "core-constant-folding"            Opt_CoreConstantFolding,
   flagSpec "fast-pap-calls"                   Opt_FastPAPCalls,
+  flagSpec "spec-eval"                        Opt_SpecEval,
+  flagSpec "spec-eval-dictfun"                Opt_SpecEvalDictFun,
   flagSpec "cmm-control-flow"                 Opt_CmmControlFlow,
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
