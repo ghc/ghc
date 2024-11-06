@@ -2218,6 +2218,7 @@ mkNonRecFloat env is_unlifted bndr rhs
     is_hnf      = exprIsHNF rhs
     dmd         = idDemandInfo bndr
     is_strict   = isStrUsedDmd dmd
+
     ok_for_spec = exprOkForSpecEval call_ok_for_spec rhs
     -- See Note [Controlling Speculative Evaluation]
     call_ok_for_spec x
