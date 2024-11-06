@@ -72,7 +72,10 @@ ghcWarningsArgs = do
         , package terminfo     ? pure [ "-Wno-unused-imports", "-Wno-deriving-typeable" ]
         , package stm          ? pure [ "-Wno-deriving-typeable" ]
         , package osString     ? pure [ "-Wno-deriving-typeable", "-Wno-unused-imports" ]
-        , package parsec       ? pure [ "-Wno-deriving-typeable" ]
+        , package parsec       ? pure [ "-Wno-deriving-typeable"
+                                      , "-Wno-x-partial"
+                                      -- https://github.com/haskell/parsec/issues/194
+                                      ]
 
         , package cabal        ? pure [ "-Wno-deriving-typeable", "-Wno-incomplete-record-selectors" ]
              -- The -Wno-incomplete-record-selectors is due to
@@ -80,7 +83,9 @@ ghcWarningsArgs = do
              -- If that ticket is fixed, bwe can remove the flag again
 
         , package cabalSyntax  ? pure [ "-Wno-deriving-typeable" ]
-        , package time         ? pure [ "-Wno-deriving-typeable" ]
+        , package time         ? pure [ "-Wno-deriving-typeable"
+                                      , "-Wno-x-partial" -- Awaiting time-1.15 release
+                                      ]
         , package transformers ? pure [ "-Wno-unused-matches"
                                       , "-Wno-unused-imports"
                                       , "-Wno-redundant-constraints"
