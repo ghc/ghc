@@ -1300,6 +1300,8 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 --   RegsGraph suffers performance regression. See #7679
 --  , ([2],     Opt_StaticArgumentTransformation)
 --   Static Argument Transformation needs investigation. See #9374
+    , ([0,1,2], Opt_SpecEval)
+    , ([0,1,2], Opt_SpecEvalDictFun)
     ]
 
 type TurnOnFlag = Bool   -- True  <=> we are turning the flag on

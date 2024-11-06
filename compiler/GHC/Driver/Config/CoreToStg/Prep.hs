@@ -24,6 +24,8 @@ initCorePrepConfig hsc_env = do
       , cp_arityOpts = if gopt Opt_DoCleverArgEtaExpansion dflags
                        then Just (initArityOpts dflags)
                        else Nothing
+      , cp_specEval  = gopt Opt_SpecEval dflags
+      , cp_specEvalDFun = gopt Opt_SpecEvalDictFun dflags
       }
 
 initCorePrepPgmConfig :: DynFlags -> [Var] -> CorePrepPgmConfig

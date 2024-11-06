@@ -1904,6 +1904,16 @@ conceptually.
 See also Note [Floats and FloatDecision] for how we maintain whole groups of
 floats and how far they go.
 
+Note [Controlling Speculative Evaluation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Most of the time, speculative evaluation has a positive effect on performance,
+but we have found a case where speculative evaluation of dictionary functions
+leads to a performance regression #25284.
+
+Therefore we have some flags to control it. See the optimization section in
+the User's Guide for the description of these flags and when to use them.
+
 Note [Floats and FloatDecision]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We have a special datatype `Floats` for modelling a telescope of `FloatingBind`
@@ -2078,7 +2088,15 @@ mkNonRecFloat env dmd is_unlifted bndr rhs
     is_lifted   = not is_unlifted
     is_hnf      = exprIsHNF rhs
     is_strict   = isStrUsedDmd dmd
-    ok_for_spec = exprOkForSpecEval (not . is_rec_call) rhs
+    cfg         = cpe_config env
+
+    ok_for_spec = exprOkForSpecEval call_ok_for_spec rhs
+    -- See Note [Controlling Speculative Evaluation]
+    call_ok_for_spec x
+      | is_rec_call x                           = False
+      | not (cp_specEval cfg)                   = False
+      | not (cp_specEvalDFun cfg) && isDFunId x = False
+      | otherwise                               = True
     is_rec_call = (`elemUnVarSet` cpe_rec_ids env)
     is_data_con = isJust . isDataConId_maybe
 
@@ -2309,6 +2327,11 @@ data CorePrepConfig = CorePrepConfig
   -- ^ Configuration for arity analysis ('exprEtaExpandArity').
   -- See Note [Eta expansion of arguments in CorePrep]
   -- When 'Nothing' (e.g., -O0, -O1), use the cheaper 'exprArity' instead
+  , cp_specEval                :: !Bool
+  -- ^ Whether to perform speculative evaluation
+  -- See Note [Controlling Speculative Evaluation]
+  , cp_specEvalDFun            :: !Bool
+  -- ^ Whether to perform speculative evaluation on DFuns
   }
 
 data CorePrepEnv
