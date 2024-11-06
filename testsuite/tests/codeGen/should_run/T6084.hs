@@ -1,4 +1,8 @@
 {-# LANGUAGE MagicHash, BangPatterns #-}
+
+-- For last in main
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module Main where
 
 import GHC.Exts
@@ -25,4 +29,3 @@ main = do
   putStrLn (f r)    -- slow call: function but wrong arity
   let g = last [q 1#]
   putStrLn (f g)    -- slow call: thunk
-

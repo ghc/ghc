@@ -1,6 +1,9 @@
 {-# language DeriveAnyClass #-}
 {-# language DefaultSignatures #-}
 
+-- For last in main
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module Main where
 
 import TestUtils
@@ -26,10 +29,10 @@ h = show (MkT True)
 --   ^ this is point'
 
 point :: (Int, Int)
-point = (21,6)
+point = (24,6)
 
 point' :: (Int, Int)
-point' = (25,6)
+point' = (28,6)
 
 selectPoint' :: HieFile -> (Int,Int) -> HieAST Int
 selectPoint' hf loc =
@@ -71,4 +74,3 @@ main = do
   if isMember
   then putStrLn "$dShow was found in the definition of $fToJSONT"
   else putStrLn "ERROR: $dShow was NOT found in the definition of $fToJSONT"
-

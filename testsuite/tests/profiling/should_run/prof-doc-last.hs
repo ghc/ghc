@@ -1,3 +1,6 @@
+-- For init and last in main
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 main :: IO ()
 main = do let xs = [1..1000000]
           let ys = [1..2000000]

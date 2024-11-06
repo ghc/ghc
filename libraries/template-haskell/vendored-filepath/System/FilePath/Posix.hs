@@ -2,6 +2,9 @@
 
 {-# LANGUAGE PatternGuards #-}
 
+-- For init and/or last in splitSearchPath, splitExtension and normalise
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 -- This template expects CPP definitions for:
 --     MODULE_NAME = Posix | Windows
 --     IS_WINDOWS  = False | True

@@ -39,6 +39,7 @@ import Control.Exception.Base (FixIOException (..))
 import Control.Concurrent.MVar (newEmptyMVar, readMVar, putMVar)
 import System.IO        ( hPutStrLn, stderr )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper )
+import Data.List        ( unsnoc )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Word
 import qualified Data.Kind as Kind (Type)
@@ -54,6 +55,7 @@ import GHC.Internal.Base hiding (NonEmpty(..),Type, Module, sequence)
 import GHC.Internal.Data.Data hiding (Fixity(..))
 import GHC.Internal.Data.NonEmpty (NonEmpty(..))
 import GHC.Internal.Data.Traversable
+import GHC.Internal.List (unsnoc)
 import GHC.Internal.Word
 import GHC.Internal.Generics (Generic)
 import GHC.Internal.IORef
@@ -73,7 +75,7 @@ import GHC.Internal.Control.Monad.Fix
 import GHC.Internal.Control.Exception
 import GHC.Internal.Num
 import GHC.Internal.IO.Unsafe
-import GHC.Internal.List (dropWhile, break, replicate, reverse, last)
+import GHC.Internal.List (dropWhile, break, replicate, reverse)
 import GHC.Internal.MVar
 import GHC.Internal.IO.Exception
 import GHC.Internal.Unicode
@@ -1296,7 +1298,7 @@ mkName str
     --   (i.e. non-empty, starts with capital, all alpha)
     is_rev_mod_name rev_mod_str
       | (compt, rest) <- break (== '.') rev_mod_str
-      , not (null compt), isUpper (last compt), all is_mod_char compt
+      , Just (_, lastCompt) <- unsnoc compt, isUpper lastCompt, all is_mod_char compt
       = case rest of
           []             -> True
           (_dot : rest') -> is_rev_mod_name rest'

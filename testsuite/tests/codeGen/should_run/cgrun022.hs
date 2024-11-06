@@ -1,3 +1,6 @@
+-- For last in f
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 -- !!! tests stack stubbing: if "f" doesn't stub "ns",
 -- !!! the program has a space leak.
 

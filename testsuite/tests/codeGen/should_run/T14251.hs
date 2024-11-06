@@ -1,4 +1,8 @@
 {-# LANGUAGE MagicHash, BangPatterns #-}
+
+-- For last in main
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module Main where
 
 import GHC.Exts

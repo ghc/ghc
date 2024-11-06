@@ -48,6 +48,9 @@ ghcWarningsArgs = do
                                       , "-Wno-deprecations" -- https://gitlab.haskell.org/ghc/ghc/-/issues/24240
                                       ]
         , package fileio       ? pure [ "-Wno-unused-imports" ] -- https://github.com/haskell/file-io/issues/30
+        , package filepath     ? pure [ "-Wno-x-partial" ]
+             -- The -Wno-x-partial is due to
+             -- filepath's System.FilePath.Internal using init and last.
         , package ghc          ? pure [ "-Wcpp-undef"
                                       , "-Wincomplete-uni-patterns"
                                       , "-Wincomplete-record-updates"
@@ -62,25 +65,42 @@ ghcWarningsArgs = do
                                       , "-Wno-redundant-constraints"
                                       , "-Wno-simplifiable-class-constraints"
                                       , "-Wno-deriving-typeable" ]
+        , package hsc2hs       ? pure [ "-Wno-x-partial" ]
+             -- The -Wno-x-partial is due to
+             -- hsc2hs's Main using init and last.
+        , package hpcBin       ? pure [ "-Wno-x-partial" ]
+             -- The -Wno-x-partial is due to
+             -- hpc's Trace.Hpc.Utils using init and last.
         , package pretty       ? pure [ "-Wno-unused-imports" ]
         , package primitive    ? pure [ "-Wno-unused-imports"
                                       , "-Wno-deprecations" ]
         , package rts          ? pure [ "-Wcpp-undef" ]
         , package text         ? pure [ "-Wno-deprecations"
                                       , "-Wno-deriving-typeable"
-                                      , "-Wno-unused-imports" ]
+                                      , "-Wno-unused-imports"
+                                      , "-Wno-x-partial" ]
+             -- The -Wno-x-partial is due to
+             -- text's Data.Text.Lazy.Builder.RealFloat using init.
         , package terminfo     ? pure [ "-Wno-unused-imports", "-Wno-deriving-typeable" ]
         , package stm          ? pure [ "-Wno-deriving-typeable" ]
         , package osString     ? pure [ "-Wno-deriving-typeable", "-Wno-unused-imports" ]
-        , package parsec       ? pure [ "-Wno-deriving-typeable" ]
-
-        , package cabal        ? pure [ "-Wno-deriving-typeable", "-Wno-incomplete-record-selectors" ]
+        , package parsec       ? pure [ "-Wno-deriving-typeable"
+                                      , "-Wno-x-partial" ]
+             -- The -Wno-x-partial is due to
+             -- parsec's Text.Parse.Error using init and last.
+        , package cabal        ? pure [ "-Wno-deriving-typeable"
+                                      , "-Wno-incomplete-record-selectors"
+                                      , "-Wno-x-partial" ]
              -- The -Wno-incomplete-record-selectors is due to
              -- https://github.com/haskell/cabal/issues/10402
              -- If that ticket is fixed, bwe can remove the flag again
-
+             -- The -Wno-x-partial is due to
+             -- Cabal's Distribution.Compat.Internal.TempFile using last.
         , package cabalSyntax  ? pure [ "-Wno-deriving-typeable" ]
-        , package time         ? pure [ "-Wno-deriving-typeable" ]
+        , package time         ? pure [ "-Wno-deriving-typeable"
+                                      , "-Wno-x-partial" ]
+             -- The -Wno-x-partial is due to
+             -- time's Data.Format using init and last.
         , package transformers ? pure [ "-Wno-unused-matches"
                                       , "-Wno-unused-imports"
                                       , "-Wno-redundant-constraints"

@@ -1,3 +1,6 @@
+-- For last in main
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 -- !!! this test exposed a bug in the take/putMVar implementation in
 -- !!! GHC 5.00.  It involves multiple blocking takes & puts on the
 -- !!! same MVar.

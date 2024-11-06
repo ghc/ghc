@@ -2,6 +2,9 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE LambdaCase #-}
 
+-- For last in buildRangeTree
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module Generator.RangeSwitch
   ( rangeCases,
     RangeTree (..),

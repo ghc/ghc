@@ -190,12 +190,18 @@ tail                    :: HasCallStack => [a] -> [a]
 tail (_:xs)             =  xs
 tail []                 =  errorEmptyList "tail"
 
-{-# WARNING in "x-partial" tail "This is a partial function, it throws an error on empty lists. Replace it with 'drop' 1, or use pattern matching or 'GHC.Internal.Data.List.uncons' instead. Consider refactoring to use \"Data.List.NonEmpty\"." #-}
+{-# WARNING in "x-partial" tail "This is a partial function, it throws an error on empty lists. Replace it with 'drop' 1, or use pattern matching or 'Data.List.uncons' instead. Consider refactoring to use \"Data.List.NonEmpty\"." #-}
 
 -- | \(\mathcal{O}(n)\). Extract the last element of a list, which must be
 -- finite and non-empty.
 --
--- WARNING: This function is partial. Consider using 'unsnoc' instead.
+-- To disable the warning about partiality put
+-- @{-# OPTIONS_GHC -Wno-x-partial -Wno-unrecognised-warning-flags #-}@
+-- at the top of the file. To disable it throughout a package put the same
+-- options into @ghc-options@ section of Cabal file. To disable it in GHCi
+-- put @:set -Wno-x-partial -Wno-unrecognised-warning-flags@ into @~/.ghci@
+-- config file. See also the
+-- [migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/warning-for-init-and-last.md).
 --
 -- ==== __Examples__
 --
@@ -218,10 +224,18 @@ last xs = foldl (\_ x -> x) lastError xs
 lastError :: HasCallStack => a
 lastError = errorEmptyList "last"
 
+{-# WARNING in "x-partial" last "This is a partial function, it throws an error on empty lists. Use 'Data.List.unsnoc' instead. Consider refactoring to use \"Data.List.NonEmpty\"." #-}
+
 -- | \(\mathcal{O}(n)\). Return all the elements of a list except the last one.
 -- The list must be non-empty.
 --
--- WARNING: This function is partial. Consider using 'unsnoc' instead.
+-- To disable the warning about partiality put
+-- @{-# OPTIONS_GHC -Wno-x-partial -Wno-unrecognised-warning-flags #-}@
+-- at the top of the file. To disable it throughout a package put the same
+-- options into @ghc-options@ section of Cabal file. To disable it in GHCi
+-- put @:set -Wno-x-partial -Wno-unrecognised-warning-flags@ into  @~/.ghci@
+-- config file. See also the
+-- [migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/warning-for-init-and-last.md).
 --
 -- ==== __Examples__
 --
@@ -239,6 +253,8 @@ init []                 =  errorEmptyList "init"
 init (x:xs)             =  init' x xs
   where init' _ []     = []
         init' y (z:zs) = y : init' z zs
+
+{-# WARNING in "x-partial" init "This is a partial function, it throws an error on empty lists. Use 'Data.List.unsnoc' instead. Consider refactoring to use \"Data.List.NonEmpty\"." #-}
 
 -- | \(\mathcal{O}(1)\). Test whether a list is empty.
 --

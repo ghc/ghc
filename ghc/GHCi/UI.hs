@@ -132,7 +132,7 @@ import Data.Char
 import Data.Function
 import qualified Data.Foldable as Foldable
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
-import Data.List ( find, intercalate, intersperse,
+import Data.List ( find, intercalate, intersperse, unsnoc,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
@@ -2370,9 +2370,9 @@ setContextAfterLoad keep_ctxt (Just graph) = do
         []    ->
           let graph' = flattenSCCs $ filterToposortToModules $
                 GHC.topSortModuleGraph True (GHC.mkModuleGraph loaded_graph) Nothing
-          in case graph' of
-              [] -> setContextKeepingPackageModules keep_ctxt []
-              xs -> load_this (last xs)
+          in case unsnoc graph' of
+              Nothing -> setContextKeepingPackageModules keep_ctxt []
+              Just (_, lst) -> load_this lst
         (m:_) ->
           load_this m
  where

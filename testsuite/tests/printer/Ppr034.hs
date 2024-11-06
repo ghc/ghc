@@ -1,4 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
+-- For last in sumNestedCommutative and _sumNestedCommutative
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module Algebra.Additive (
     -- * Class
     C,

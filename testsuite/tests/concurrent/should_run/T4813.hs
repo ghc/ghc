@@ -1,3 +1,6 @@
+-- For init in main
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 import Control.Concurrent
 import Control.Monad
 import Control.Exception

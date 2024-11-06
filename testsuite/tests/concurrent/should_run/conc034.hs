@@ -1,4 +1,8 @@
 {-# LANGUAGE CPP #-}
+
+-- For last in main
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 import Control.Concurrent
 import Control.Exception
 import Foreign
@@ -27,4 +31,3 @@ main = do
         -- get sent the NonTermination exception first.
   r <- Control.Exception.try (print b)
   print (r :: Either NonTermination ())
-

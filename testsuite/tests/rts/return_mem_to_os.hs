@@ -1,3 +1,5 @@
+-- For last in doIter
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 import Control.Concurrent
 import System.IO
@@ -18,4 +20,3 @@ doIter n = do putStrLn ("Iteration " ++ show n)
               putStrLn "GC 2 start"
               performGC
               putStrLn "GC 2 done"
-

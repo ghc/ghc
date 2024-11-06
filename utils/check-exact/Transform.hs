@@ -8,6 +8,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
+
+-- For last in captureTypeSigSpacing and setEntryDP
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Language.Haskell.GHC.ExactPrint.Transform

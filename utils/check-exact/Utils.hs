@@ -5,6 +5,9 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- For last in glast
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module Utils
   -- (
   --  -- * Manipulating Positons

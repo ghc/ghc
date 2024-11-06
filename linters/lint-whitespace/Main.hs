@@ -4,6 +4,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 
+-- For last in lintBlob
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module Main where
 

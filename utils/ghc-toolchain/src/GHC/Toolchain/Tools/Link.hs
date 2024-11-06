@@ -378,4 +378,3 @@ linkRequiresNoWarnDuplicateLibraries archOs cc ccLink
       let ccLink' = over (_ccLinkProgram % _prgFlags) (++["-Wl,-no_warn_duplicate_libraries"]) ccLink
        in (ccLink' <$ checkLinkWorks cc (ccLinkProgram ccLink')) <|> return ccLink
   | otherwise = return ccLink
-

@@ -7,6 +7,9 @@
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
+-- For init and/or last in rmDecl2, addHiding2
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 import Data.Data
 import Data.List (intercalate)
 import GHC hiding (moduleName)

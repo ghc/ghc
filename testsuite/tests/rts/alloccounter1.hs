@@ -1,3 +1,6 @@
+-- For last in main
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module Main where
 
 import Control.Exception

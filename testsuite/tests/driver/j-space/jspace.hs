@@ -1,3 +1,6 @@
+-- For last in initGhcM
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module Main where
 
 import GHC
@@ -56,5 +59,3 @@ initGhcM xs = do
         readFile "jspace.hp" >>= putStrLn
         exitFailure
     return ()
-
-

@@ -3,6 +3,9 @@
 -- free software under the license in the file "LICENSE",
 -- which is included in the distribution.
 
+-- For last in cmpI
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module Interval
     ( IList
     , Intersection

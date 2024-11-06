@@ -825,11 +825,12 @@ output_flags = std_flags
 
       where
         -- XXX bits copied from System.FilePath, since that's not available here
-        combine a b
-                  | null b = a
-                  | null a = b
-                  | pathSeparator [last a] = a ++ b
-                  | otherwise = a ++ [pathSeparatorChar] ++ b
+        combine a [] = a
+        combine a b = case unsnoc a of
+            Nothing -> b
+            Just (_, lastA)
+                | pathSeparator [lastA] -> a ++ b
+                | otherwise -> a ++ [pathSeparatorChar] ++ b
 
 tempCounter :: IORef Int
 tempCounter = unsafePerformIO $ newIORef 0

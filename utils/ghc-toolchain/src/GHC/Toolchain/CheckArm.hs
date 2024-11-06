@@ -1,3 +1,6 @@
+-- For last in lastLine
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module GHC.Toolchain.CheckArm ( findArmIsa ) where
 
 import Data.List (isInfixOf)

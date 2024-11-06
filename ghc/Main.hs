@@ -88,7 +88,7 @@ import System.Exit
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
-import Data.List ( isPrefixOf, partition, intercalate )
+import Data.List ( isPrefixOf, partition, intercalate, unsnoc )
 import Prelude
 import qualified Data.List.NonEmpty as NE
 
@@ -115,8 +115,7 @@ main = do
     argv0 <- getArgs
 
     let (minusB_args, argv1) = partition ("-B" `isPrefixOf`) argv0
-        mbMinusB | null minusB_args = Nothing
-                 | otherwise = Just (drop 2 (last minusB_args))
+        mbMinusB = drop 2 . snd <$> unsnoc minusB_args
 
     let argv2 = map (mkGeneralLocated "on the commandline") argv1
 

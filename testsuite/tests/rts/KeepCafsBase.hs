@@ -1,3 +1,6 @@
+-- For last in x
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module KeepCafsBase (x) where
 
 x :: Int

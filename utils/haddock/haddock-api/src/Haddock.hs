@@ -5,6 +5,10 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
+-- For last in getHaddockLibDir
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock
@@ -842,4 +846,3 @@ getPrologue parserOpts flags =
 rightOrThrowE :: Either String b -> IO b
 rightOrThrowE (Left msg) = throwE msg
 rightOrThrowE (Right x) = pure x
-

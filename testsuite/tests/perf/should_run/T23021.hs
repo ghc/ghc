@@ -1,3 +1,6 @@
+-- For last in main
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 -- The direct implementation of drop and dropWhile operates in O(1) space.
 -- This regression test asserts that potential fusion rules for dropWhile/drop
 -- maintain that property for the fused pipelines in dropWhile2 and drop2 (which

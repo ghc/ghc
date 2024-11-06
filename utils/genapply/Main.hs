@@ -4,6 +4,9 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
+-- For last in genMkPAP
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module Main (main) where
 
 import Prelude hiding ((<>))

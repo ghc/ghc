@@ -1,4 +1,8 @@
 {-# LANGUAGE MagicHash #-}
+
+-- For last in main
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 import System.Mem
 import GHC.Base
 

@@ -1,3 +1,5 @@
+-- For last in getSpan
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module T3972A (Expr(..), Token(..), spanning, getSpan) where
 

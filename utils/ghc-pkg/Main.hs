@@ -10,6 +10,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
+-- For init and last in runit and other functions
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 -- Fine if this comes from make/Hadrian or the pre-built base.
 #include <ghcplatform.h>
 

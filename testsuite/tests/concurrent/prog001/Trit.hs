@@ -1,3 +1,6 @@
+-- For init and last in shiftRight
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module Trit (Trit, rationalToTrit, getIntegral, getFraction, getFraction',
                 neg, addTrits, subTrits, shiftLeft, shiftRight, multiply
                 ) where
@@ -107,6 +110,3 @@ zo = 1:(-1):zero
      where zero = 0:zero
 
 start1 = take 30 (average (rationalToStream (1%2)) (negate' (rationalToStream (1%4))))
-
-
-
