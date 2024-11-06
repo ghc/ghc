@@ -919,6 +919,7 @@ data HsType pass
 
   | HsExplicitTupleTy      -- A promoted explicit tuple
         (XExplicitTupleTy pass)
+        PromotionFlag      -- whether explicitly promoted, for pretty printer
         [LHsType pass]
 
   | HsTyLit (XTyLit pass) (HsTyLit pass)      -- A promoted numeric literal.

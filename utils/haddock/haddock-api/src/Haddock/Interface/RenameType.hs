@@ -116,8 +116,8 @@ renameType t@(HsRecTy _ _) = pure t
 renameType t@(XHsType _) = pure t
 renameType (HsExplicitListTy x ip ltys) =
   HsExplicitListTy x ip <$> renameLTypes ltys
-renameType (HsExplicitTupleTy x ltys) =
-  HsExplicitTupleTy x <$> renameLTypes ltys
+renameType (HsExplicitTupleTy x ip ltys) =
+  HsExplicitTupleTy x ip <$> renameLTypes ltys
 renameType t@(HsTyLit _ _) = pure t
 renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
 

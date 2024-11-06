@@ -418,7 +418,7 @@ reparenTypePrec = go
     go _ (HsRecTy x flds) = HsRecTy x (map (mapXRec @a reparenConDeclField) flds)
     go p (HsDocTy x ty d) = HsDocTy x (goL p ty) d
     go _ (HsExplicitListTy x p tys) = HsExplicitListTy x p (map reparenLType tys)
-    go _ (HsExplicitTupleTy x tys) = HsExplicitTupleTy x (map reparenLType tys)
+    go _ (HsExplicitTupleTy x p tys) = HsExplicitTupleTy x p (map reparenLType tys)
     go p (HsKindSig x ty kind) =
       paren p PREC_SIG $ HsKindSig x (goL PREC_SIG ty) (goL PREC_SIG kind)
     go p (HsIParamTy x n ty) =

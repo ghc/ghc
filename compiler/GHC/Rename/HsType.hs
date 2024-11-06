@@ -684,10 +684,10 @@ rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
            addDiagnostic (TcRnUntickedPromotedThing $ UntickedExplicitList)
        ; return (HsExplicitListTy noExtField ip tys', fvs) }
 
-rnHsTyKi env ty@(HsExplicitTupleTy _ tys)
+rnHsTyKi env ty@(HsExplicitTupleTy _ ip tys)
   = do { checkDataKinds env ty
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
-       ; return (HsExplicitTupleTy noExtField tys', fvs) }
+       ; return (HsExplicitTupleTy noExtField ip tys', fvs) }
 
 rnHsTyKi env (HsWildCardTy _)
   = do { checkAnonWildCard env
@@ -955,9 +955,10 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
     get_bndr_loc (L l tvb) =
       combineSrcSpans
         (case hsBndrVar tvb of
-          HsBndrWildCard _ ->
-            locA l -- this should rather be the location of the wildcard,
-                   -- but we don't have it
+          HsBndrWildCard tok ->
+            case tok of
+              NoEpTok   -> locA l
+              EpTok loc -> locA loc
           HsBndrVar _ ln   -> getLocA ln)
         (case hsBndrKind tvb of
           HsBndrNoKind _ -> noSrcSpan
@@ -2083,7 +2084,7 @@ extract_lty (L _ ty) acc
       HsSpliceTy {}               -> acc  -- Type splices mention no tvs
       HsDocTy _ ty _              -> extract_lty ty acc
       HsExplicitListTy _ _ tys    -> extract_ltys tys acc
-      HsExplicitTupleTy _ tys     -> extract_ltys tys acc
+      HsExplicitTupleTy _ _ tys   -> extract_ltys tys acc
       HsTyLit _ _                 -> acc
       HsStarTy _ _                -> acc
       HsKindSig _ ty ki           -> extract_kind_sig ty ki acc

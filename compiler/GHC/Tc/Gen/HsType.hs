@@ -1214,7 +1214,7 @@ tcHsType mode rn_ty@(HsExplicitListTy _ _ tys) exp_kind
     mk_cons k a b = mkTyConApp (promoteDataCon consDataCon) [k, a, b]
     mk_nil  k     = mkTyConApp (promoteDataCon nilDataCon) [k]
 
-tcHsType mode rn_ty@(HsExplicitTupleTy _ tys) exp_kind
+tcHsType mode rn_ty@(HsExplicitTupleTy _ _ tys) exp_kind
   -- using newMetaKindVar means that we force instantiations of any polykinded
   -- types. At first, I just used tc_infer_lhs_type, but that led to #11255.
   = do { ks   <- replicateM arity newMetaKindVar

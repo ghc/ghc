@@ -3935,9 +3935,9 @@ instance ExactPrint (HsBndrVar GhcPs) where
   exact (HsBndrVar x n) = do
     n' <- markAnnotated n
     return (HsBndrVar x n')
-  exact (HsBndrWildCard x) = do
-    printStringAdvance "_"
-    return (HsBndrWildCard x)
+  exact (HsBndrWildCard t) = do
+    t' <- markEpToken t
+    return (HsBndrWildCard t')
 
 -- ---------------------------------------------------------------------
 
@@ -4046,12 +4046,14 @@ instance ExactPrint (HsType GhcPs) where
     tys' <- markAnnotated tys
     c' <- markEpToken c
     return (HsExplicitListTy (sq',o',c') prom tys')
-  exact (HsExplicitTupleTy (sq, o, c) tys) = do
-    sq' <- markEpToken sq
+  exact (HsExplicitTupleTy (sq, o, c) prom tys) = do
+    sq' <- if (isPromoted prom)
+              then markEpToken sq
+              else return sq
     o' <- markEpToken o
     tys' <- markAnnotated tys
     c' <- markEpToken c
-    return (HsExplicitTupleTy (sq', o', c') tys')
+    return (HsExplicitTupleTy (sq', o', c') prom tys')
   exact (HsTyLit a lit) = do
     case lit of
       (HsNumTy src v) -> printSourceText src (show v)
