@@ -1711,6 +1711,17 @@ of the very function whose termination properties we are exploiting.
 It is also similar to Note [Do not strictify a DFun's parameter dictionaries],
 where marking recursive DFuns (of undecidable *instances*) strict in dictionary
 *parameters* leads to quite the same change in termination as above.
+
+Note [Controlling Speculative Evaluation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Most of the time, speculative evaluation has a positive effect on performance,
+but we have found a case where speculative evaluation of dictionary functions
+leads to a performance regression #25284.
+
+Therefore we have some flags to control it. See the optimization section in
+the User's Guide for the description of these flags and when to use them.
+
 -}
 
 data FloatingBind
@@ -1785,7 +1796,15 @@ mkFloat env dmd is_unlifted bndr rhs
   where
     is_hnf      = exprIsHNF rhs
     is_strict   = isStrUsedDmd dmd
-    ok_for_spec = exprOkForSpecEval (not . is_rec_call) rhs
+    cfg         = cpe_config env
+
+    ok_for_spec = exprOkForSpecEval call_ok_for_spec rhs
+    -- See Note [Controlling Speculative Evaluation]
+    call_ok_for_spec x
+      | is_rec_call x                           = False
+      | not (cp_specEval cfg)                   = False
+      | not (cp_specEvalDFun cfg) && isDFunId x = False
+      | otherwise                               = True
     is_rec_call = (`elemUnVarSet` cpe_rec_ids env)
 
 emptyFloats :: Floats
@@ -1973,6 +1992,12 @@ data CorePrepConfig = CorePrepConfig
   , cp_convertNumLit           :: !(LitNumType -> Integer -> Maybe CoreExpr)
   -- ^ Convert some numeric literals (Integer, Natural) into their final
   -- Core form.
+
+  , cp_specEval                :: !Bool
+  -- ^ Whether to perform speculative evaluation
+  -- See Note [Controlling Speculative Evaluation]
+  , cp_specEvalDFun            :: !Bool
+  -- ^ Whether to perform speculative evaluation on DFuns
   }
 
 data CorePrepEnv

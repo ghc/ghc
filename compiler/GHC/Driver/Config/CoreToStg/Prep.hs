@@ -25,6 +25,8 @@ initCorePrepConfig hsc_env = do
    return $ CorePrepConfig
       { cp_catchNonexhaustiveCases = gopt Opt_CatchNonexhaustiveCases $ hsc_dflags hsc_env
       , cp_convertNumLit = convertNumLit
+      , cp_specEval = gopt Opt_SpecEval $ hsc_dflags hsc_env
+      , cp_specEvalDFun = gopt Opt_SpecEvalDictFun $ hsc_dflags hsc_env
       }
 
 initCorePrepPgmConfig :: DynFlags -> [Var] -> CorePrepPgmConfig
