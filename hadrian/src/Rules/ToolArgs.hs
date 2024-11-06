@@ -146,6 +146,7 @@ mkToolTarget es p = do
 toolTargets :: [Package]
 toolTargets = [ cabalSyntax
               , cabal
+              , checkExact
               , compiler
               , directory
               , process
