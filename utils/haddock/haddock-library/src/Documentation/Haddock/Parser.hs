@@ -30,7 +30,7 @@ import Control.Arrow (first)
 import Control.Monad
 import Data.Char (chr, isAlpha, isSpace, isUpper)
 import Data.Functor (($>))
-import Data.List (elemIndex, intercalate, intersperse, unfoldr)
+import Data.List (elemIndex, intercalate, intersperse, unfoldr, unsnoc)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Monoid
 import qualified Data.Set as Set
@@ -870,10 +870,10 @@ codeblock =
   DocCodeBlock . parseParagraph . dropSpaces
     <$> ("@" *> skipHorizontalSpace *> "\n" *> block' <* "@")
   where
-    dropSpaces xs =
-      case splitByNl xs of
-        [] -> xs
-        ys -> case T.uncons (last ys) of
+    dropSpaces xs = let ys = splitByNl xs in
+      case unsnoc ys of
+        Nothing -> xs
+        Just (_, lastYs) -> case T.uncons lastYs of
           Just (' ', _) -> case mapM dropSpace ys of
             Nothing -> xs
             Just zs -> T.intercalate "\n" zs
