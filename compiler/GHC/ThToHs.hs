@@ -1756,7 +1756,7 @@ cvtTypeKind typeOrKind ty
              -> mk_apps (HsTyLit noExtField (cvtTyLit lit)) tys'
 
            WildCardT
-             -> mk_apps mkAnonWildCardTy tys'
+             -> mk_apps (mkAnonWildCardTy noAnn) tys'
 
            InfixT t1 s t2
              -> do { s'  <- tconName s
@@ -1805,7 +1805,7 @@ cvtTypeKind typeOrKind ty
            PromotedTupleT n
               | Just normals <- m_normals
               , normals `lengthIs` n   -- Saturated
-              -> returnLA (HsExplicitTupleTy noAnn normals)
+              -> returnLA (HsExplicitTupleTy noAnn IsPromoted normals)
               | otherwise
               -> do { tuple_tc <- returnLA $ getRdrName $ tupleDataCon Boxed n
                     ; mk_apps (HsTyVar noAnn IsPromoted tuple_tc) tys' }

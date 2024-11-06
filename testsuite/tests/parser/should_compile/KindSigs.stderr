@@ -1418,6 +1418,7 @@
           (EpaSpan { KindSigs.hs:28:17 }))
          (EpTok
           (EpaSpan { KindSigs.hs:28:44 })))
+        (IsPromoted)
         [(L
           (EpAnn
            (EpaSpan { KindSigs.hs:28:19-39 })

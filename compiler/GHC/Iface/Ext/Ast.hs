@@ -1952,7 +1952,7 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsExplicitListTy _ _ tys ->
         [ toHie tys
         ]
-      HsExplicitTupleTy _ tys ->
+      HsExplicitTupleTy _ _ tys ->
         [ toHie tys
         ]
       HsTyLit _ _ -> []
