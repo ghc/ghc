@@ -755,7 +755,7 @@ ppHtmlIndex
         divAlphabet
           << unordList
             ( map (\str -> anchor ! [href (subIndexHtmlFile str)] << str) $
-                [ [c] | c <- initialChars, any ((== c) . toUpper . head . fst) index
+                [ [c] | c <- initialChars, any (maybe False ((== c) . toUpper . fst) . List.uncons . fst) index
                 ]
                   ++ [merged_name]
             )
@@ -772,7 +772,7 @@ ppHtmlIndex
           writeUtf8File (joinPath [odir, subIndexHtmlFile [c]]) (renderToString debug html)
         where
           html = indexPage True (Just c) index_part
-          index_part = [(n, stuff) | (n, stuff) <- this_ix, toUpper (head n) == c]
+          index_part = [(n, stuff) | (n@(headN : _), stuff) <- this_ix, toUpper headN == c]
 
       index :: [(String, Map GHC.Name [(Module, Bool)])]
       index = sortBy cmp (Map.toAscList full_index)
