@@ -1,6 +1,6 @@
 module GHC.Toolchain.CheckArm ( findArmIsa ) where
 
-import Data.List (isInfixOf)
+import Data.List (isInfixOf, unsnoc)
 import Data.Maybe (catMaybes)
 import Control.Monad.IO.Class
 import System.Process
@@ -76,8 +76,7 @@ findArmIsa cc = do
           _ -> throwE $ "unexpected output from test program: " ++ out
 
 lastLine :: String -> String
-lastLine "" = ""
-lastLine s  = last $ lines s
+lastLine = maybe "" snd . unsnoc . lines
 
 -- | Raspbian unfortunately makes some extremely questionable packaging
 -- decisions, configuring gcc to compile for ARMv6 despite the fact that the

@@ -51,6 +51,7 @@ import GHC.Internal.Base hiding (NonEmpty(..),Type, Module, sequence)
 import GHC.Internal.Data.Data hiding (Fixity(..))
 import GHC.Internal.Data.NonEmpty (NonEmpty(..))
 import GHC.Internal.Data.Traversable
+import GHC.Internal.List (unsnoc)
 import GHC.Internal.Word
 import GHC.Internal.Generics (Generic)
 import GHC.Internal.IORef
@@ -70,7 +71,7 @@ import GHC.Internal.Control.Monad.Fix
 import GHC.Internal.Control.Exception
 import GHC.Internal.Num
 import GHC.Internal.IO.Unsafe
-import GHC.Internal.List (dropWhile, break, replicate, reverse, last)
+import GHC.Internal.List (dropWhile, break, replicate, reverse)
 import GHC.Internal.MVar
 import GHC.Internal.IO.Exception
 import GHC.Internal.Unicode
@@ -78,6 +79,16 @@ import qualified GHC.Internal.Types as Kind (Type)
 #endif
 import GHC.Internal.ForeignSrcLang
 import GHC.Internal.LanguageExtensions
+
+#ifdef BOOTSTRAP_TH
+#if MIN_VERSION_base(4,19,0)
+import Data.List (unsnoc)
+#else
+import Data.Maybe (maybe)
+unsnoc :: [a] -> Maybe ([a], a)
+unsnoc = foldr (\x -> Just . maybe ([], x) (\(~(a, b)) -> (x : a, b))) Nothing
+#endif
+#endif
 
 -----------------------------------------------------
 --
@@ -1287,7 +1298,7 @@ mkName str
     --   (i.e. non-empty, starts with capital, all alpha)
     is_rev_mod_name rev_mod_str
       | (compt, rest) <- break (== '.') rev_mod_str
-      , not (null compt), isUpper (last compt), all is_mod_char compt
+      , Just (_, lastCompt) <- unsnoc compt, isUpper lastCompt, all is_mod_char compt
       = case rest of
           []             -> True
           (_dot : rest') -> is_rev_mod_name rest'
