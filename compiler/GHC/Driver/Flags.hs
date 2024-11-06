@@ -664,6 +664,9 @@ data GeneralFlag
    | Opt_NumConstantFolding
    | Opt_CoreConstantFolding
    | Opt_FastPAPCalls                  -- #6084
+   | Opt_SpecEval
+   | Opt_SpecEvalDictFun   -- See Note [Controlling Speculative Evaluation]
+
 
    -- Inference flags
    | Opt_DoTagInferenceChecks
@@ -902,6 +905,8 @@ optimisationFlags = EnumSet.fromList
    , Opt_WorkerWrapper
    , Opt_WorkerWrapperUnlift
    , Opt_SolveConstantDicts
+   , Opt_SpecEval
+   , Opt_SpecEvalDictFun
    ]
 
 -- | The set of flags which affect code generation and can change a program's
