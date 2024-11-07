@@ -922,7 +922,8 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
          -- Now lint the binder
        ; lintBinder LetBind bndr $ \bndr' ->
     do { lintLetBind NotTopLevel NonRecursive bndr' rhs rhs_ty
-       ; addAliasUE bndr let_ue (lintLetBody (BodyOfLet bndr') [bndr'] body) } }
+       ; addAliasUE bndr' let_ue $
+         lintLetBody (BodyOfLet bndr') [bndr'] body } }
 
   | otherwise
   = failWithL (mkLetErr bndr rhs)       -- Not quite accurate
@@ -1007,7 +1008,7 @@ lintCoreExpr (Type ty)
 lintCoreExpr (Coercion co)
   -- See Note [Coercions in terms]
   = do { (_co', role, lty, rty) <- addLoc (InCo co) $
-                                  lintCoercion co
+                                   lintCoercion co
        ; return (mkCoercionType role lty rty, zeroUE) }
 
 ----------------------
@@ -1343,13 +1344,14 @@ concreteTyVarPositions fun_id conc_tvs
 
 -- Check that the usage of var is consistent with var itself, and pop the var
 -- from the usage environment (this is important because of shadowing).
-checkLinearity :: UsageEnv -> Var -> LintM UsageEnv
+checkLinearity :: UsageEnv -> OutVar -> LintM UsageEnv
 checkLinearity body_ue lam_var =
   case varMultMaybe lam_var of
     Just mult -> do
       let (lhs, body_ue') = popUE body_ue lam_var
-          err_msg = text "Linearity failure in lambda:" <+> ppr lam_var
-                    $$ ppr lhs <+> text "⊈" <+> ppr mult
+          err_msg = vcat [ text "Linearity failure in lambda:" <+> ppr lam_var
+                         , ppr lhs <+> text "⊈" <+> ppr mult
+                         , ppr body_ue ]
       ensureSubUsage lhs mult err_msg
       return body_ue'
     Nothing    -> return body_ue -- A type variable
@@ -1622,86 +1624,92 @@ lintTyKind tyvar (arg_ty,arg_kind)
 ************************************************************************
 -}
 
-lintCaseExpr :: CoreExpr -> Id -> Type -> [CoreAlt] -> LintM (OutType, UsageEnv)
-lintCaseExpr scrut var alt_ty alts =
-  do { let e = Case scrut var alt_ty alts   -- Just for error messages
+lintCaseExpr :: CoreExpr -> InId -> InType -> [CoreAlt] -> LintM (OutType, UsageEnv)
+lintCaseExpr scrut case_bndr alt_ty alts
+  = do { let e = Case scrut case_bndr alt_ty alts   -- Just for error messages
 
-     -- Check the scrutinee
-     ; (scrut_ty, scrut_ue) <- markAllJoinsBad $ lintCoreExpr scrut
-          -- See Note [Join points are less general than the paper]
-          -- in GHC.Core
-     ; let scrut_mult = idMult var
+       -- Check the scrutinee
+       ; (scrut_ty', scrut_ue) <- markAllJoinsBad $ lintCoreExpr scrut
+            -- See Note [Join points are less general than the paper]
+            -- in GHC.Core
 
-     ; alt_ty <- addLoc (CaseTy scrut) $
-                 lintValueType alt_ty
-     ; var_ty <- addLoc (IdTy var) $
-                 lintValueType (idType var)
+       ; alt_ty' <- addLoc (CaseTy scrut) $ lintValueType alt_ty
 
-     -- We used to try to check whether a case expression with no
-     -- alternatives was legitimate, but this didn't work.
-     -- See Note [No alternatives lint check] for details.
+       ; checkCaseAlts e scrut scrut_ty' alts
 
-     -- Check that the scrutinee is not a floating-point type
-     -- if there are any literal alternatives
-     -- See GHC.Core Note [Case expression invariants] item (5)
-     -- See Note [Rules for floating-point comparisons] in GHC.Core.Opt.ConstantFold
-     ; let isLitPat (Alt (LitAlt _) _  _) = True
-           isLitPat _                     = False
-     ; checkL (not $ isFloatingPrimTy scrut_ty && any isLitPat alts)
-         (text "Lint warning: Scrutinising floating-point expression with literal pattern in case analysis (see #9238)."
-          $$ text "scrut" <+> ppr scrut)
+       -- Lint the case-binder. Must do this after linting the scrutinee
+       -- because the case-binder isn't in scope in the scrutineex
+       ; lintBinder CaseBind case_bndr $ \case_bndr' ->
+      -- Don't use lintIdBndr on case_bndr, because unboxed tuple is legitimate
 
-     ; case tyConAppTyCon_maybe (idType var) of
-         Just tycon
-              | debugIsOn
-              , isAlgTyCon tycon
-              , not (isAbstractTyCon tycon)
-              , null (tyConDataCons tycon)
-              , not (exprIsDeadEnd scrut)
-              -> pprTrace "Lint warning: case binder's type has no constructors" (ppr var <+> ppr (idType var))
-                        -- This can legitimately happen for type families
-                      $ return ()
-         _otherwise -> return ()
+    do { let case_bndr_ty' = idType case_bndr'
+             scrut_mult    = idMult case_bndr'
 
-        -- Don't use lintIdBndr on var, because unboxed tuple is legitimate
+       ; ensureEqTys case_bndr_ty' scrut_ty' (mkScrutMsg case_bndr case_bndr_ty' scrut_ty')
+         -- See GHC.Core Note [Case expression invariants] item (7)
 
-     ; subst <- getSubst
-     ; ensureEqTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
-       -- See GHC.Core Note [Case expression invariants] item (7)
+       ; -- Check the alternatives
+       ; alt_ues <- mapM (lintCoreAlt case_bndr' scrut_ty' scrut_mult alt_ty') alts
+       ; let case_ue = (scaleUE scrut_mult scrut_ue) `addUE` supUEs alt_ues
+       ; return (alt_ty', case_ue) } }
 
-     ; lintBinder CaseBind var $ \_ ->
-       do { -- Check the alternatives
-          ; alt_ues <- mapM (lintCoreAlt var scrut_ty scrut_mult alt_ty) alts
-          ; let case_ue = (scaleUE scrut_mult scrut_ue) `addUE` supUEs alt_ues
-          ; checkCaseAlts e scrut_ty alts
-          ; return (alt_ty, case_ue) } }
-
-checkCaseAlts :: CoreExpr -> OutType -> [CoreAlt] -> LintM ()
+checkCaseAlts :: InExpr -> InExpr -> OutType -> [CoreAlt] -> LintM ()
 -- a) Check that the alts are non-empty
 -- b1) Check that the DEFAULT comes first, if it exists
 -- b2) Check that the others are in increasing order
 -- c) Check that there's a default for infinite types
+-- d) Check that the scrutinee is not a floating-point type
+--    if there are any literal alternatives
+-- e) Check if the scrutinee type has no constructors
+--
+-- We used to try to check whether a case expression with no
+-- alternatives was legitimate, but this didn't work.
+-- See Note [No alternatives lint check] for details.
+--
 -- NB: Algebraic cases are not necessarily exhaustive, because
 --     the simplifier correctly eliminates case that can't
 --     possibly match.
+checkCaseAlts e scrut scrut_ty alts
+  = do { checkL (all non_deflt con_alts) (mkNonDefltMsg e)
+           -- See GHC.Core Note [Case expression invariants] item (2)
 
-checkCaseAlts e ty alts =
-  do { checkL (all non_deflt con_alts) (mkNonDefltMsg e)
-         -- See GHC.Core Note [Case expression invariants] item (2)
+       ; checkL (increasing_tag con_alts) (mkNonIncreasingAltsMsg e)
+           -- See GHC.Core Note [Case expression invariants] item (3)
 
-     ; checkL (increasing_tag con_alts) (mkNonIncreasingAltsMsg e)
-         -- See GHC.Core Note [Case expression invariants] item (3)
+            -- For types Int#, Word# with an infinite (well, large!) number of
+            -- possible values, there should usually be a DEFAULT case
+            -- But (see Note [Empty case alternatives] in GHC.Core) it's ok to
+            -- have *no* case alternatives.
+            -- In effect, this is a kind of partial test. I suppose it's possible
+            -- that we might *know* that 'x' was 1 or 2, in which case
+            --   case x of { 1 -> e1; 2 -> e2 }
+            -- would be fine.
+       ; checkL (isJust maybe_deflt || not is_infinite_ty || null alts)
+                (nonExhaustiveAltsMsg e)
 
-          -- For types Int#, Word# with an infinite (well, large!) number of
-          -- possible values, there should usually be a DEFAULT case
-          -- But (see Note [Empty case alternatives] in GHC.Core) it's ok to
-          -- have *no* case alternatives.
-          -- In effect, this is a kind of partial test. I suppose it's possible
-          -- that we might *know* that 'x' was 1 or 2, in which case
-          --   case x of { 1 -> e1; 2 -> e2 }
-          -- would be fine.
-     ; checkL (isJust maybe_deflt || not is_infinite_ty || null alts)
-              (nonExhaustiveAltsMsg e) }
+       -- Check that the scrutinee is not a floating-point type
+       -- if there are any literal alternatives
+       -- See GHC.Core Note [Case expression invariants] item (5)
+       -- See Note [Rules for floating-point comparisons] in GHC.Core.Opt.ConstantFold
+       ; checkL (not $ isFloatingPrimTy scrut_ty && any is_lit_alt alts)
+           (text "Lint warning: Scrutinising floating-point expression with literal pattern in case analysis (see #9238)."
+            $$ text "scrut" <+> ppr scrut)
+
+       -- Check if scrutinee type has no constructors
+       -- Just a trace message for now
+       ; case tyConAppTyCon_maybe scrut_ty of
+           Just tycon
+                | debugIsOn
+                , isAlgTyCon tycon
+                , not (isAbstractTyCon tycon)
+                , null (tyConDataCons tycon)
+                , not (exprIsDeadEnd scrut)
+                -> pprTrace "Lint warning: case scrutinee type has no constructors"
+                        (ppr scrut_ty)
+                          -- This can legitimately happen for type families
+                        $ return ()
+           _otherwise -> return ()
+        }
   where
     (con_alts, maybe_deflt) = findDefault alts
 
@@ -1712,7 +1720,10 @@ checkCaseAlts e ty alts =
     non_deflt (Alt DEFAULT _ _) = False
     non_deflt _                 = True
 
-    is_infinite_ty = case tyConAppTyCon_maybe ty of
+    is_lit_alt (Alt (LitAlt _) _  _) = True
+    is_lit_alt _                     = False
+
+    is_infinite_ty = case tyConAppTyCon_maybe scrut_ty of
                         Nothing    -> False
                         Just tycon -> isPrimTyCon tycon
 
@@ -1723,9 +1734,9 @@ lintAltExpr expr ann_ty
        ; return ue }
          -- See GHC.Core Note [Case expression invariants] item (6)
 
-lintCoreAlt :: Var              -- Case binder
+lintCoreAlt :: OutId         -- Case binder
             -> OutType       -- Type of scrutinee
-            -> Mult             -- Multiplicity of scrutinee
+            -> Mult          -- Multiplicity of scrutinee
             -> OutType       -- Type of the alternative
             -> CoreAlt
             -> LintM UsageEnv
@@ -1735,8 +1746,8 @@ lintCoreAlt case_bndr _ scrut_mult alt_ty (Alt DEFAULT args rhs) =
   do { lintL (null args) (mkDefaultArgsMsg args)
      ; rhs_ue <- lintAltExpr rhs alt_ty
      ; let (case_bndr_usage, rhs_ue') = popUE rhs_ue case_bndr
-           err_msg = text "Linearity failure in the DEFAULT clause:" <+> ppr case_bndr
-                     $$ ppr case_bndr_usage <+> text "⊈" <+> ppr scrut_mult
+           err_msg = vcat [ text "Linearity failure in the DEFAULT clause:" <+> ppr case_bndr
+                          , ppr case_bndr_usage <+> text "⊈" <+> ppr scrut_mult ]
      ; ensureSubUsage case_bndr_usage scrut_mult err_msg
      ; return rhs_ue' }
 
@@ -1999,10 +2010,13 @@ lintType ty@(AppTy t1 t2)
   | TyConApp {} <- t1
   = failWithL $ text "TyConApp to the left of AppTy:" <+> ppr ty
   | otherwise
-  = do { (t1', k1) <- lintType t1
-       ; pr@(t2', _) <- lintType t2
-       ; res_k <- lint_ty_app ty k1 [pr]
-       ; return (AppTy t1' t2', res_k) }
+  = do { let (fun_ty, arg_tys) = collect t1 [t2]
+       ; (fun_ty', fun_kind) <- lintType fun_ty
+       ; (arg_tys', res_k)   <- lint_ty_app ty fun_kind arg_tys
+       ; return (foldl AppTy fun_ty' arg_tys', res_k) }
+  where
+    collect (AppTy f a) as = collect f (a:as)
+    collect fun         as = (fun, as)
 
 lintType ty@(TyConApp tc tys)
   | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
@@ -2017,9 +2031,8 @@ lintType ty@(TyConApp tc tys)
 
   | otherwise  -- Data types, data families, primitive types
   = do { checkTyCon tc
-       ; prs <- mapM lintType tys
-       ; res_k <- lint_ty_app ty (tyConKind tc) prs
-       ; return (TyConApp tc (map fst prs), res_k) }
+       ; (tys', res_k) <- lint_ty_app ty (tyConKind tc) tys
+       ; return (TyConApp tc tys', res_k) }
 
 -- arrows can related *unlifted* kinds, so this has to be separate from
 -- a dependent forall.
@@ -2039,7 +2052,7 @@ lintType ty@(FunTy af tw t1 t2)
 
 lintType ty@(ForAllTy (Bndr tcv vis) body_ty)
   | not (isTyCoVar tcv)
-  = failWithL (text "Non-Tyvar or Non-Covar bound in type:" <+> ppr ty)
+  = failWithL (text "Non-TyVar or Non-CoVar bound in type:" <+> ppr ty)
   | otherwise
   = lintTyCoBndr tcv $ \tcv' ->
     do { pr@(body_ty', _) <- lintType body_ty
@@ -2097,22 +2110,20 @@ lintTySynFamApp report_unsat ty tc tys
   -- Deal with type synonyms
   | ExpandsSyn tenv rhs tys' <- expandSynTyCon_maybe tc tys
   , let expanded_ty = mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
-  = do { -- Kind-check the argument types, but without reporting
+  = do { when report_unsat $ do { _ <- lintType expanded_ty
+                                ; return () }
+
+       ; -- Kind-check the argument types, but without reporting
          -- un-saturated type families/synonyms
-         prs <- setReportUnsat False (mapM lintType tys)
+       ; (tys', res_k) <- setReportUnsat False $
+                          lint_ty_app ty (tyConKind tc) tys
 
-       ; when report_unsat $
-         do { _ <- lintType expanded_ty
-            ; return () }
-
-       ; res_k <- lint_ty_app ty (tyConKind tc) prs
-       ; return (TyConApp tc (map fst prs), res_k) }
+       ; return (TyConApp tc tys', res_k) }
 
   -- Otherwise this must be a type family
   | otherwise
-  = do { prs   <- mapM lintType tys
-       ; res_k <- lint_ty_app ty (tyConKind tc) prs
-       ; return (TyConApp tc (map fst prs), res_k) }
+  = do { (tys', res_k) <- lint_ty_app ty (tyConKind tc) tys
+       ; return (TyConApp tc tys', res_k) }
 
 -----------------
 -- Confirms that a kind is really TYPE r or Constraint
@@ -2149,10 +2160,13 @@ lintTyLit (StrTyLit _) = return ()
 lintTyLit (CharTyLit _) = return ()
 
 -----------------
-lint_ty_app :: Type -> OutKind -> [(OutType, OutKind)] -> LintM OutKind
-lint_ty_app msg_ty k prs
+lint_ty_app :: InType -> OutKind -> [InType] -> LintM ([OutType], OutKind)
+lint_ty_app msg_ty fun_kind arg_tys
     -- See Note [Avoiding compiler perf traps when constructing error messages.]
-  = lint_app (\msg_ty -> text "type" <+> quotes (ppr msg_ty)) msg_ty k prs
+  = do { prs <- mapM lintType arg_tys
+       ; res_k <- lint_app (\msg_ty -> text "type" <+> quotes (ppr msg_ty)) msg_ty
+                           fun_kind prs
+       ; return (map fst prs, res_k) }
 
 ----------------
 lint_co_app :: Coercion -> OutKind -> [OutType] -> LintM ()
@@ -2639,6 +2653,8 @@ lintCoercion orig_co@(InstCo co arg)
                             where
 
     -------------
+    go_args :: (Subst, OutType) -> (Subst,OutType) -> [InCoercion]
+           -> LintM (OutType, OutType, [OutCoercion])
     go_args (lsubst,lty) (rsubst,rty) []
       = return (substTy lsubst lty, substTy rsubst rty, [])
     go_args lty rty (arg:args)
@@ -2647,6 +2663,8 @@ lintCoercion orig_co@(InstCo co arg)
            ; return (lty', rty', arg':args') }
 
     -------------
+    go_arg :: (Subst, OutType) -> (Subst,OutType) -> InCoercion
+           -> LintM ((Subst,OutType), (Subst,OutType), OutCoercion)
     go_arg (lsubst,lty) (rsubst,rty) arg
       = do { (arg', arg_role, arg_lty, arg_rty) <- lintCoercion arg
            ; lintRole arg Nominal arg_role
@@ -2654,13 +2672,21 @@ lintCoercion orig_co@(InstCo co arg)
            ; case (splitForAllTyCoVar_maybe lty, splitForAllTyCoVar_maybe rty) of
               -- forall over tvar
                 (Just (ltv,lty1), Just (rtv,rty1))
-                  | typeKind arg_lty `eqType` tyVarKind ltv
-                  , typeKind arg_rty `eqType` tyVarKind rtv
+                  | typeKind arg_lty `eqType` substTy lsubst (tyVarKind ltv)
+                  , typeKind arg_rty `eqType` substTy rsubst (tyVarKind rtv)
                   -> return ( (extendTCvSubst lsubst ltv arg_lty, lty1)
                             , (extendTCvSubst rsubst rtv arg_rty, rty1)
                             , arg' )
                   | otherwise
-                  -> failWithL (text "Kind mis-match in inst coercion1" <+> ppr orig_co)
+                  -> failWithL (hang (text "Kind mis-match in inst coercion")
+                                   2 (vcat [ text "arg"  <+> ppr arg
+                                           , text "arg'" <+> ppr arg'
+                                           , text "lty"  <+> ppr lty <+> dcolon <+> ppr (typeKind lty)
+                                           , text "rty"  <+> ppr rty <+> dcolon <+> ppr (typeKind rty)
+                                           , text "arg_lty" <+> ppr arg_lty <+> dcolon <+> ppr (typeKind arg_lty)
+                                           , text "arg_rty" <+> ppr arg_rty <+> dcolon <+> ppr (typeKind arg_rty)
+                                           , text "ltv" <+> ppr ltv <+> dcolon <+> ppr (tyVarKind ltv)
+                                           , text "rtv" <+> ppr rtv <+> dcolon <+> ppr (tyVarKind rtv) ]))
 
                 _ -> failWithL (text "Bad argument of inst" <+> ppr orig_co) }
 
@@ -2992,9 +3018,10 @@ data LintEnv
                                -- A subset of the InScopeSet in le_subst
                                -- See Note [Join points]
 
-       , le_ue_aliases :: NameEnv UsageEnv -- Assigns usage environments to the
-                                           -- alias-like binders, as found in
-                                           -- non-recursive lets.
+       , le_ue_aliases :: NameEnv UsageEnv
+             -- Assigns usage environments to the alias-like binders,
+             -- as found in non-recursive lets.
+             -- Domain is OutIds
 
        , le_platform   :: Platform         -- ^ Target platform
        , le_diagOpts   :: DiagOpts         -- ^ Target platform
@@ -3508,14 +3535,14 @@ lookupJoinId id
             Just id' -> return (idJoinPointHood id')
             Nothing  -> return NotJoinPoint }
 
-addAliasUE :: Id -> UsageEnv -> LintM a -> LintM a
+addAliasUE :: OutId -> UsageEnv -> LintM a -> LintM a
 addAliasUE id ue thing_inside = LintM $ \ env errs ->
   let new_ue_aliases =
         extendNameEnv (le_ue_aliases env) (getName id) ue
   in
     unLintM thing_inside (env { le_ue_aliases = new_ue_aliases }) errs
 
-varCallSiteUsage :: Id -> LintM UsageEnv
+varCallSiteUsage :: OutId -> LintM UsageEnv
 varCallSiteUsage id =
   do m <- getUEAliases
      return $ case lookupNameEnv m (getName id) of
@@ -3671,12 +3698,11 @@ mkCaseAltMsg e ty1 ty2
                    text "Annotation on case:" <+> ppr ty2,
                    text "Alt Rhs:" <+> ppr e ])
 
-mkScrutMsg :: Id -> Type -> Type -> Subst -> SDoc
-mkScrutMsg var var_ty scrut_ty subst
+mkScrutMsg :: Id -> Type -> Type -> SDoc
+mkScrutMsg var var_ty scrut_ty
   = vcat [text "Result binder in case doesn't match scrutinee:" <+> ppr var,
           text "Result binder type:" <+> ppr var_ty,--(idType var),
-          text "Scrutinee type:" <+> ppr scrut_ty,
-     hsep [text "Current TCv subst", ppr subst]]
+          text "Scrutinee type:" <+> ppr scrut_ty]
 
 mkNonDefltMsg, mkNonIncreasingAltsMsg :: CoreExpr -> SDoc
 mkNonDefltMsg e
