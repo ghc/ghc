@@ -302,8 +302,8 @@ deriving instance Data EpLayout
 
 data EpaComment =
   EpaComment
-    { ac_tok :: EpaCommentTok
-    , ac_prior_tok :: RealSrcSpan
+    { ac_tok :: !EpaCommentTok
+    , ac_prior_tok :: !RealSrcSpan
     -- ^ The location of the prior token, used in exact printing.  The
     -- 'EpaComment' appears as an 'LEpaComment' containing its
     -- location.  The difference between the end of the prior token
@@ -314,10 +314,10 @@ data EpaComment =
 
 data EpaCommentTok =
   -- Documentation annotations
-    EpaDocComment      HsDocString -- ^ a docstring that can be pretty printed using pprHsDocString
-  | EpaDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
-  | EpaLineComment     String     -- ^ comment starting by "--"
-  | EpaBlockComment    String     -- ^ comment in {- -}
+    EpaDocComment      !HsDocString -- ^ a docstring that can be pretty printed using pprHsDocString
+  | EpaDocOptions      String       -- ^ doc options (prune, ignore-exports, etc)
+  | EpaLineComment     String       -- ^ comment starting by "--"
+  | EpaBlockComment    String       -- ^ comment in {- -}
     deriving (Eq, Data, Show)
 -- Note: these are based on the Token versions, but the Token type is
 -- defined in GHC.Parser.Lexer and bringing it in here would create a loop
@@ -420,10 +420,10 @@ noSpanAnchor =  EpaDelta noSrcSpan (SameLine 0) noAnn
 -- following it.  The 'EpaCommentsBalanced' constructor is used to do
 -- this. The GHC parser will only insert the 'EpaComments' form.
 data EpAnnComments = EpaComments
-                        { priorComments :: ![LEpaComment] }
+                        { priorComments :: [LEpaComment] }
                     | EpaCommentsBalanced
-                        { priorComments :: ![LEpaComment]
-                        , followingComments :: ![LEpaComment] }
+                        { priorComments :: [LEpaComment]
+                        , followingComments :: [LEpaComment] }
         deriving (Data, Eq)
 
 type LEpaComment = GenLocated NoCommentsLocation EpaComment
@@ -504,10 +504,10 @@ meaning we can have type LocatedN RdrName
 -- | Captures the location of punctuation occurring between items,
 -- normally in a list.  It is captured as a trailing annotation.
 data TrailingAnn
-  = AddSemiAnn    (EpToken ";") -- ^ Trailing ';'
-  | AddCommaAnn   (EpToken ",") -- ^ Trailing ','
-  | AddVbarAnn    (EpToken "|") -- ^ Trailing '|'
-  | AddDarrowAnn  TokDarrow     -- ^ Trailing '=>' / '⇒'
+  = AddSemiAnn    !(EpToken ";") -- ^ Trailing ';'
+  | AddCommaAnn   !(EpToken ",") -- ^ Trailing ','
+  | AddVbarAnn    !(EpToken "|") -- ^ Trailing '|'
+  | AddDarrowAnn  !TokDarrow     -- ^ Trailing '=>' / '⇒'
   deriving (Data, Eq)
 
 ta_location :: TrailingAnn -> EpaLocation
@@ -544,16 +544,16 @@ data AnnList a
       al_brackets  :: !AnnListBrackets,
       al_semis     :: [EpToken ";"], -- decls
       al_rest      :: !a,
-      al_trailing  :: ![TrailingAnn] -- ^ items appearing after the
-                                     -- list, such as '=>' for a
-                                     -- context
+      al_trailing  :: [TrailingAnn] -- ^ items appearing after the
+                                    -- list, such as '=>' for a
+                                    -- context
       } deriving (Data,Eq)
 
 data AnnListBrackets
-  = ListParens (EpToken "(")         (EpToken ")")
-  | ListBraces (EpToken "{")         (EpToken "}")
-  | ListSquare (EpToken "[")         (EpToken "]")
-  | ListBanana (EpUniToken "(|" "⦇") (EpUniToken "|)"  "⦈")
+  = ListParens !(EpToken "(")         !(EpToken ")")
+  | ListBraces !(EpToken "{")         !(EpToken "}")
+  | ListSquare !(EpToken "[")         !(EpToken "]")
+  | ListBanana !(EpUniToken "(|" "⦇") !(EpUniToken "|)"  "⦈")
   | ListNone
   deriving (Data,Eq)
 
@@ -564,9 +564,9 @@ data AnnListBrackets
 -- | exact print annotation for an item having surrounding "brackets", such as
 -- tuples or lists
 data AnnParen
-  = AnnParens       (EpToken "(")  (EpToken ")")  -- ^ '(', ')'
-  | AnnParensHash   (EpToken "(#") (EpToken "#)") -- ^ '(#', '#)'
-  | AnnParensSquare (EpToken "[")  (EpToken "]")  -- ^ '[', ']'
+  = AnnParens       !(EpToken "(")  !(EpToken ")")  -- ^ '(', ')'
+  | AnnParensHash   !(EpToken "(#") !(EpToken "#)") -- ^ '(#', '#)'
+  | AnnParensSquare !(EpToken "[")  !(EpToken "]")  -- ^ '[', ']'
   deriving Data
 
 -- ---------------------------------------------------------------------
@@ -574,7 +574,7 @@ data AnnParen
 -- | Exact print annotation for the 'Context' data type.
 data AnnContext
   = AnnContext {
-      ac_darrow    :: Maybe TokDarrow,
+      ac_darrow    :: !(Maybe TokDarrow),
                       -- ^ location of the '=>', if present.
       ac_open      :: [EpToken "("], -- ^ zero or more opening parentheses.
       ac_close     :: [EpToken ")"]  -- ^ zero or more closing parentheses.
@@ -591,39 +591,39 @@ data AnnContext
 data NameAnn
   -- | Used for a name with an adornment, so '`foo`', '(bar)'
   = NameAnn {
-      nann_adornment :: NameAdornment,
-      nann_name      :: EpaLocation,
+      nann_adornment :: !NameAdornment,
+      nann_name      :: !EpaLocation,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @(,,,)@, or @(#,,,#)@
   | NameAnnCommas {
-      nann_adornment :: NameAdornment,
+      nann_adornment :: !NameAdornment,
       nann_commas    :: [EpToken ","],
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @(# | | #)@
   | NameAnnBars {
-      nann_parensh   :: (EpToken "(#", EpToken "#)"),
+      nann_parensh   :: !(EpToken "(#", EpToken "#)"),
       nann_bars      :: [EpToken "|"],
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @()@, @(##)@, @[]@
   | NameAnnOnly {
-      nann_adornment :: NameAdornment,
+      nann_adornment :: !NameAdornment,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @->@, as an identifier
   | NameAnnRArrow {
-      nann_mopen     :: Maybe (EpToken "("),
-      nann_arrow     :: TokRarrow,
-      nann_mclose    :: Maybe (EpToken ")"),
+      nann_mopen     :: !(Maybe (EpToken "(")),
+      nann_arrow     :: !TokRarrow,
+      nann_mclose    :: !(Maybe (EpToken ")")),
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for an item with a leading @'@. The annotation for
   -- unquoted item is stored in 'nann_quoted'.
   | NameAnnQuote {
-      nann_quote     :: EpToken "'",
-      nann_quoted    :: SrcSpanAnnN,
+      nann_quote     :: !(EpToken "'"),
+      nann_quoted    :: !SrcSpanAnnN,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used when adding a 'TrailingAnn' to an existing 'LocatedN'
@@ -637,10 +637,10 @@ data NameAnn
 -- such as parens or backquotes. This data type identifies what
 -- particular pair are being used.
 data NameAdornment
-  = NameParens     (EpToken "(")  (EpToken ")")
-  | NameParensHash (EpToken "(#") (EpToken "#)")
-  | NameBackquotes (EpToken "`")  (EpToken "`")
-  | NameSquare     (EpToken "[")  (EpToken "]")
+  = NameParens     !(EpToken "(")  !(EpToken ")")
+  | NameParensHash !(EpToken "(#") !(EpToken "#)")
+  | NameBackquotes !(EpToken "`")  !(EpToken "`")
+  | NameSquare     !(EpToken "[")  !(EpToken "]")
   | NameNoAdornment
   deriving (Eq, Data)
 
@@ -651,13 +651,13 @@ data NameAdornment
 -- annotations in pragmas.
 data AnnPragma
   = AnnPragma {
-      apr_open      :: EpaLocation,
-      apr_close     :: EpToken "#-}",
-      apr_squares   :: (EpToken "[", EpToken "]"),
-      apr_loc1      :: EpaLocation,
-      apr_loc2      :: EpaLocation,
-      apr_type      :: EpToken "type",
-      apr_module    :: EpToken "module"
+      apr_open      :: !EpaLocation,
+      apr_close     :: !(EpToken "#-}"),
+      apr_squares   :: !(EpToken "[", EpToken "]"),
+      apr_loc1      :: !EpaLocation,
+      apr_loc2      :: !EpaLocation,
+      apr_type      :: !(EpToken "type"),
+      apr_module    :: !(EpToken "module")
       } deriving (Data,Eq)
 
 -- ---------------------------------------------------------------------

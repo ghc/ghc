@@ -88,11 +88,11 @@ deriving instance Data (HsModule GhcPs)
 
 data AnnsModule
   = AnnsModule {
-    am_sig :: EpToken "signature",
-    am_mod :: EpToken "module",
-    am_where :: EpToken "where",
+    am_sig   :: !(EpToken "signature"),
+    am_mod   :: !(EpToken "module"),
+    am_where :: !(EpToken "where"),
     am_decls :: [TrailingAnn],                 -- ^ Semis before the start of top decls
-    am_cs :: [LEpaComment],                    -- ^ Comments before start of top decl,
+    am_cs    :: [LEpaComment],                 -- ^ Comments before start of top decl,
                                                --   used in exact printing only
     am_eof :: Maybe (RealSrcSpan, RealSrcSpan) -- ^ End of file and end of prior token
     } deriving (Data, Eq)

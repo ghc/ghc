@@ -154,11 +154,11 @@ type instance XXMultAnn  (GhcPass _) = DataConCantHappen
 
 data AnnPSB
   = AnnPSB {
-      ap_pattern :: EpToken "pattern",
-      ap_openc   :: Maybe (EpToken "{"),
-      ap_closec  :: Maybe (EpToken "}"),
-      ap_larrow  :: Maybe (EpUniToken "<-" "←"),
-      ap_equal   :: Maybe (EpToken "=")
+      ap_pattern :: !(EpToken "pattern"),
+      ap_openc   :: !(Maybe (EpToken "{")),
+      ap_closec  :: !(Maybe (EpToken "}")),
+      ap_larrow  :: !(Maybe (EpUniToken "<-" "←")),
+      ap_equal   :: !(Maybe (EpToken "="))
     } deriving Data
 
 instance NoAnn AnnPSB where
@@ -736,10 +736,10 @@ type instance XXFixitySig (GhcPass p) = DataConCantHappen
 
 data AnnSpecSig
   = AnnSpecSig {
-      ass_open   :: EpaLocation,
-      ass_close  :: EpToken "#-}",
-      ass_dcolon :: TokDcolon,
-      ass_act    :: ActivationAnn
+      ass_open   :: !EpaLocation,
+      ass_close  :: !(EpToken "#-}"),
+      ass_dcolon :: !TokDcolon,
+      ass_act    :: !ActivationAnn
     } deriving Data
 
 instance NoAnn AnnSpecSig where
@@ -747,10 +747,10 @@ instance NoAnn AnnSpecSig where
 
 data ActivationAnn
   = ActivationAnn {
-      aa_openc  :: EpToken "[",
-      aa_closec :: EpToken "]",
-      aa_tilde  :: Maybe (EpToken "~"),
-      aa_val    :: Maybe EpaLocation
+      aa_openc  :: !(EpToken "["),
+      aa_closec :: !(EpToken "]"),
+      aa_tilde  :: !(Maybe (EpToken "~")),
+      aa_val    :: !(Maybe EpaLocation)
     } deriving (Data, Eq)
 
 instance NoAnn ActivationAnn where
@@ -807,9 +807,9 @@ newtype IdSig = IdSig { unIdSig :: Id }
 
 data AnnSig
   = AnnSig {
-      asDcolon  :: EpUniToken "::" "∷",
-      asPattern :: Maybe (EpToken "pattern"),
-      asDefault :: Maybe (EpToken "default")
+      asDcolon  :: !(EpUniToken "::" "∷"),
+      asPattern :: !(Maybe (EpToken "pattern")),
+      asDefault :: !(Maybe (EpToken "default"))
       } deriving Data
 
 instance NoAnn AnnSig where

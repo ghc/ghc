@@ -392,15 +392,15 @@ data AnnDataDefn
   = AnnDataDefn {
       andd_openp    :: [EpToken "("],
       andd_closep   :: [EpToken ")"],
-      andd_type     :: EpToken "type",
-      andd_newtype  :: EpToken "newtype",
-      andd_data     :: EpToken "data",
-      andd_instance :: EpToken "instance",
-      andd_dcolon   :: TokDcolon,
-      andd_where    :: EpToken "where",
-      andd_openc    :: EpToken "{",
-      andd_closec   :: EpToken "}",
-      andd_equal    :: EpToken "="
+      andd_type     :: !(EpToken "type"),
+      andd_newtype  :: !(EpToken "newtype"),
+      andd_data     :: !(EpToken "data"),
+      andd_instance :: !(EpToken "instance"),
+      andd_dcolon   :: !TokDcolon,
+      andd_where    :: !(EpToken "where"),
+      andd_openc    :: !(EpToken "{"),
+      andd_closec   :: !(EpToken "}"),
+      andd_equal    :: !(EpToken "=")
   } deriving Data
 
 instance NoAnn AnnDataDefn where
@@ -408,13 +408,13 @@ instance NoAnn AnnDataDefn where
 
 data AnnClassDecl
   = AnnClassDecl {
-      acd_class  :: EpToken "class",
+      acd_class  :: !(EpToken "class"),
       acd_openp  :: [EpToken "("],
       acd_closep :: [EpToken ")"],
-      acd_vbar   :: EpToken "|",
-      acd_where  :: EpToken "where",
-      acd_openc  :: EpToken "{",
-      acd_closec :: EpToken "}",
+      acd_vbar   :: !(EpToken "|"),
+      acd_where  :: !(EpToken "where"),
+      acd_openc  :: !(EpToken "{"),
+      acd_closec :: !(EpToken "}"),
       acd_semis  :: [EpToken ";"]
   } deriving Data
 
@@ -425,8 +425,8 @@ data AnnSynDecl
   = AnnSynDecl {
     asd_opens  :: [EpToken "("],
     asd_closes :: [EpToken ")"],
-    asd_type   :: EpToken "type",
-    asd_equal  :: EpToken "="
+    asd_type   :: !(EpToken "type"),
+    asd_equal  :: !(EpToken "=")
   } deriving Data
 
 instance NoAnn AnnSynDecl where
@@ -624,16 +624,16 @@ data AnnFamilyDecl
   = AnnFamilyDecl {
       afd_openp  :: [EpToken "("],
       afd_closep :: [EpToken ")"],
-      afd_type   :: EpToken "type",
-      afd_data   :: EpToken "data",
-      afd_family :: EpToken "family",
-      afd_dcolon :: TokDcolon,
-      afd_equal  :: EpToken "=",
-      afd_vbar   :: EpToken "|",
-      afd_where  :: EpToken "where",
-      afd_openc  :: EpToken "{",
-      afd_dotdot :: EpToken "..",
-      afd_closec :: EpToken "}"
+      afd_type   :: !(EpToken "type"),
+      afd_data   :: !(EpToken "data"),
+      afd_family :: !(EpToken "family"),
+      afd_dcolon :: !TokDcolon,
+      afd_equal  :: !(EpToken "="),
+      afd_vbar   :: !(EpToken "|"),
+      afd_where  :: !(EpToken "where"),
+      afd_openc  :: !(EpToken "{"),
+      afd_dotdot :: !(EpToken ".."),
+      afd_closec :: !(EpToken "}")
   } deriving Data
 
 instance NoAnn AnnFamilyDecl where
@@ -774,9 +774,9 @@ type instance XXConDeclGADTDetails (GhcPass _) = DataConCantHappen
 
 data AnnConDeclH98
   = AnnConDeclH98 {
-    acdh_forall  :: TokForall,
-    acdh_dot :: EpToken ".",
-    acdh_darrow :: TokDarrow
+    acdh_forall :: !TokForall,
+    acdh_dot    :: !(EpToken "."),
+    acdh_darrow :: !TokDarrow
   } deriving Data
 
 instance NoAnn AnnConDeclH98 where
@@ -786,7 +786,7 @@ data AnnConDeclGADT
   = AnnConDeclGADT {
     acdg_openp  :: [EpToken "("],
     acdg_closep :: [EpToken ")"],
-    acdg_dcolon :: TokDcolon
+    acdg_dcolon :: !TokDcolon
   } deriving Data
 
 instance NoAnn AnnConDeclGADT where
@@ -950,11 +950,11 @@ type instance XXInstDecl    (GhcPass _) = DataConCantHappen
 
 data AnnClsInstDecl
   = AnnClsInstDecl {
-    acid_instance :: EpToken "instance",
-    acid_where    :: EpToken "where",
-    acid_openc    :: EpToken "{",
+    acid_instance :: !(EpToken "instance"),
+    acid_where    :: !(EpToken "where"),
+    acid_openc    :: !(EpToken "{"),
     acid_semis    :: [EpToken ";"],
-    acid_closec   :: EpToken "}"
+    acid_closec   :: !(EpToken "}")
   } deriving Data
 
 instance NoAnn AnnClsInstDecl where

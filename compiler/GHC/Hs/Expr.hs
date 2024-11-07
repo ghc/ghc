@@ -418,10 +418,10 @@ arrowToHsExpr = expandHsArrow (HsVar noExtField)
 
 data AnnExplicitSum
   = AnnExplicitSum {
-      aesOpen       :: EpaLocation,
+      aesOpen       :: !EpaLocation,
       aesBarsBefore :: [EpToken "|"],
       aesBarsAfter  :: [EpToken "|"],
-      aesClose      :: EpaLocation
+      aesClose      :: !EpaLocation
       } deriving Data
 
 instance NoAnn AnnExplicitSum where
@@ -429,7 +429,7 @@ instance NoAnn AnnExplicitSum where
 
 data AnnFieldLabel
   = AnnFieldLabel {
-      afDot :: Maybe (EpToken ".")
+      afDot :: !(Maybe (EpToken "."))
       } deriving Data
 
 instance NoAnn AnnFieldLabel where
@@ -437,8 +437,8 @@ instance NoAnn AnnFieldLabel where
 
 data AnnProjection
   = AnnProjection {
-      apOpen  :: EpToken "(",
-      apClose :: EpToken ")"
+      apOpen  :: !(EpToken "("),
+      apClose :: !(EpToken ")")
       } deriving Data
 
 instance NoAnn AnnProjection where
@@ -446,10 +446,10 @@ instance NoAnn AnnProjection where
 
 data AnnArithSeq
   = AnnArithSeq {
-      aas_open   :: EpToken "[",
-      aas_comma  :: Maybe (EpToken ","),
-      aas_dotdot :: EpToken "..",
-      aas_close  :: EpToken "]"
+      aas_open   :: !(EpToken "["),
+      aas_comma  :: !(Maybe (EpToken ")")),
+      aas_dotdot :: !(EpToken ".."),
+      aas_close  :: !(EpToken "]")
       } deriving Data
 
 instance NoAnn AnnArithSeq where
@@ -457,11 +457,11 @@ instance NoAnn AnnArithSeq where
 
 data AnnsIf
   = AnnsIf {
-      aiIf       :: EpToken "if",
-      aiThen     :: EpToken "then",
-      aiElse     :: EpToken "else",
-      aiThenSemi :: Maybe (EpToken ";"),
-      aiElseSemi :: Maybe (EpToken ";")
+      aiIf       :: !(EpToken "if"),
+      aiThen     :: !(EpToken "then"),
+      aiElse     :: !(EpToken "else"),
+      aiThenSemi :: !(Maybe (EpToken ";")),
+      aiElseSemi :: !(Maybe (EpToken ";"))
       } deriving Data
 
 instance NoAnn AnnsIf where
@@ -469,7 +469,7 @@ instance NoAnn AnnsIf where
 
 data AnnFunRhs
   = AnnFunRhs {
-       afr_strict :: EpToken "!",
+       afr_strict :: !(EpToken "!"),
        afr_opens  :: [EpToken "("],
        afr_closes :: [EpToken ")"]
   } deriving Data
@@ -1791,10 +1791,10 @@ type instance XXStmtLR         (GhcPass x) GhcTc b = ApplicativeStmt (GhcPass x)
 
 data AnnTransStmt
   = AnnTransStmt {
-      ats_then  :: EpToken "then",
-      ats_group :: Maybe (EpToken "group"),
-      ats_by    :: Maybe (EpToken "by"),
-      ats_using :: Maybe (EpToken "using")
+      ats_then  :: !(EpToken "then"),
+      ats_group :: !(Maybe (EpToken "group")),
+      ats_by    :: !(Maybe (EpToken "by")),
+      ats_using :: !(Maybe (EpToken "using"))
       } deriving Data
 
 instance NoAnn AnnTransStmt where

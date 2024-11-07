@@ -372,8 +372,8 @@ data AnnTyVarBndr
   = AnnTyVarBndr {
     atv_opens  :: [EpaLocation], -- all "(" or all "{"
     atv_closes :: [EpaLocation], -- all ")" or all "}"
-    atv_tv     :: EpToken "'",
-    atv_dcolon :: TokDcolon
+    atv_tv     :: !(EpToken "'"),
+    atv_dcolon :: !TokDcolon
   } deriving Data
 
 instance NoAnn AnnTyVarBndr where
