@@ -265,7 +265,7 @@ threadWaitRead fd
   -- fdReady does the right thing, but we have to call it in a
   -- separate thread, otherwise threadWaitRead won't be interruptible,
   -- and this only works with -threaded.
-  | threaded  = withThread (waitFd fd False)
+  | threaded  = withThread "threadWaitRead worker" (waitFd fd False)
   | otherwise = case fd of
                   0 -> do _ <- hWaitForInput stdin (-1)
                           return ()
@@ -286,7 +286,7 @@ threadWaitRead fd
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite fd
 #if defined(mingw32_HOST_OS)
-  | threaded  = withThread (waitFd fd True)
+  | threaded  = withThread "threadWaitWrite worker" (waitFd fd True)
   | otherwise = errorWithoutStackTrace "threadWaitWrite requires -threaded on Windows"
 #else
   = Conc.threadWaitWrite fd
@@ -302,8 +302,11 @@ threadWaitReadSTM :: Fd -> IO (STM (), IO ())
 threadWaitReadSTM fd
 #if defined(mingw32_HOST_OS)
   | threaded = do v <- newTVarIO Nothing
-                  mask_ $ void $ forkIO $ do result <- try (waitFd fd False)
-                                             atomically (writeTVar v $ Just result)
+                  mask_ $ void $ forkIO $ do
+                    tid <- myThreadId
+                    labelThread tid "threadWaitReadSTM worker"
+                    result <- try (waitFd fd False)
+                    atomically (writeTVar v $ Just result)
                   let waitAction = do result <- readTVar v
                                       case result of
                                         Nothing         -> retry
@@ -326,8 +329,11 @@ threadWaitWriteSTM :: Fd -> IO (STM (), IO ())
 threadWaitWriteSTM fd
 #if defined(mingw32_HOST_OS)
   | threaded = do v <- newTVarIO Nothing
-                  mask_ $ void $ forkIO $ do result <- try (waitFd fd True)
-                                             atomically (writeTVar v $ Just result)
+                  mask_ $ void $ forkIO $ do
+                    tid <- myThreadId
+                    labelThread tid "threadWaitWriteSTM worker"
+                    result <- try (waitFd fd True)
+                    atomically (writeTVar v $ Just result)
                   let waitAction = do result <- readTVar v
                                       case result of
                                         Nothing         -> retry
@@ -343,10 +349,14 @@ threadWaitWriteSTM fd
 #if defined(mingw32_HOST_OS)
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 
-withThread :: IO a -> IO a
-withThread io = do
+withThread :: String -> IO a -> IO a
+withThread label io = do
   m <- newEmptyMVar
-  _ <- mask_ $ forkIO $ try io >>= putMVar m
+  _ <- mask_ $ forkIO $ do
+    tid <- myThreadId
+    labelThread tid label
+    result <- try io
+    putMVar m result
   x <- takeMVar m
   case x of
     Right a -> return a
