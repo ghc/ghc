@@ -45,7 +45,6 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Stats ( coreBindsStats )
-import GHC.Core.Subst ( lookupIdSubst )
 import GHC.Core.DataCon
 import GHC.Core.Ppr
 import GHC.Core.Coercion
@@ -96,15 +95,17 @@ import GHC.Utils.Error
 import qualified GHC.Utils.Error as Err
 import GHC.Utils.Logger
 
+import GHC.Data.Pair
+import GHC.Data.Maybe( orElse )
+import GHC.Base (oneShot)
+import GHC.Data.Unboxed
+
 import Control.Monad
 import Data.Foldable      ( for_, toList )
 import Data.List.NonEmpty ( NonEmpty(..), groupWith )
 import Data.Maybe
 import Data.IntMap.Strict ( IntMap )
 import qualified Data.IntMap.Strict as IntMap ( lookup, keys, empty, fromList )
-import GHC.Data.Pair
-import GHC.Base (oneShot)
-import GHC.Data.Unboxed
 
 {-
 Note [Core Lint guarantee]
@@ -1011,12 +1012,12 @@ lintCoreExpr (Coercion co)
        ; return (mkCoercionType role lty rty, zeroUE) }
 
 ----------------------
-lintIdOcc :: Var -> Int -- Number of arguments (type or value) being passed
+lintIdOcc :: InId -> Int -- Number of arguments (type or value) being passed
           -> LintM (OutType, UsageEnv) -- returns type of the *variable*
-lintIdOcc var nargs
-  = addLoc (OccOf var) $
-    do  { checkL (isNonCoVarId var)
-                 (text "Non term variable" <+> ppr var)
+lintIdOcc in_id nargs
+  = addLoc (OccOf in_id) $
+    do  { checkL (isNonCoVarId in_id)
+                 (text "Non term variable" <+> ppr in_id)
                  -- See GHC.Core Note [Variable occurrences in Core]
 
         -- Check that the type of the occurrence is the same
@@ -1030,28 +1031,27 @@ lintIdOcc var nargs
         -- (Maybe a) from the binding site with bogus (Maybe a1) from
         -- the occurrence site.  Comparing un-substituted types finesses
         -- this altogether
-        ; lintVarOcc var
+        ; lintVarOcc in_id
 
           -- Check for a nested occurrence of the StaticPtr constructor.
           -- See Note [Checking StaticPtrs].
         ; lf <- getLintFlags
         ; when (nargs /= 0 && lf_check_static_ptrs lf /= AllowAnywhere) $
-            checkL (idName var /= makeStaticName) $
+            checkL (idName in_id /= makeStaticName) $
               text "Found makeStatic nested in an expression"
 
-        ; checkDeadIdOcc var
+        ; checkDeadIdOcc in_id
 
-        ; case isDataConId_maybe var of
+        ; case isDataConId_maybe in_id of
              Nothing -> return ()
              Just dc -> checkTypeDataConOcc "expression" dc
 
 
         -- lintVarOcc has already checked that the Id is in scope
-        ; subst <- getSubst
-        ; let out_id = case lookupIdSubst subst var of
-                         Var out_id -> out_id
-                         e          -> pprPanic "lintIdOcc" (ppr var $$ ppr e)
-                         -- The Id substitution is just for freshening
+        ; in_scope <- getInScope
+        ; let out_id = lookupInScope in_scope in_id `orElse` in_id
+             -- It might not be there at all if the freshening
+             -- substitution is empty
 
         ; check_bad_global out_id
         ; checkJoinOcc out_id nargs
@@ -1070,11 +1070,11 @@ lintIdOcc var nargs
        --     wired-in Ids after worker/wrapper
        --     So we simply disable the test in this case
     check_bad_global out_id_bndr
-      | isGlobalId var
+      | isGlobalId in_id
       , isLocalId out_id_bndr
-      , not (isWiredIn var)
+      , not (isWiredIn in_id)
       = failWithL $ hang (text "Occurrence is GlobalId, but binding is LocalId")
-                       2 (vcat [ hang (text "occurrence:") 2 $ pprBndr LetBind var
+                       2 (vcat [ hang (text "occurrence:") 2 $ pprBndr LetBind in_id
                                , hang (text "binder    :") 2 $ pprBndr LetBind out_id_bndr ])
       | otherwise
       = return ()
@@ -1858,20 +1858,7 @@ lintTyCoBndr tcv thing_inside
               lintL (isCoVarType tcv_type') $
               text "CoVar with non-coercion type:" <+> pprTyVar tcv
 
-       ; subst <- getSubst
-       ; let (subst', tcv') = subst_bndr subst tcv tcv_type'
-       ; updateSubst subst'    $
-         addInScopeTyCoVar tcv $
-         thing_inside tcv' }
-  where
-    subst_bndr subst tcv tcv_type'
-      | isEmptyTCvSubst subst                -- No change in kind
-      , not (tcv `elemInScopeSet` in_scope)  -- No change in unique
-      = (subst `extendSubstInScope` tcv, tcv)
-      | let tcv' = uniqAway in_scope (setVarType tcv tcv_type')
-      = (extendTCvSubstWithClone subst tcv tcv', tcv')
-      where
-        in_scope = substInScopeSet subst
+       ; addInScopeTyCoVar tcv tcv_type' thing_inside }
 
 lintIdBndrs :: forall a. TopLevelFlag -> [InId] -> ([OutId] -> LintM a) -> LintM a
 lintIdBndrs top_lvl ids thing_inside
@@ -1924,13 +1911,9 @@ lintIdBndr top_lvl bind_site id thing_inside
        ; lintL (not (bind_site == LambdaBind && isEvaldUnfolding (idUnfolding id)))
                 (text "Lambda binder with value or OtherCon unfolding.")
 
-       ; linted_ty <- addLoc (IdTy id) (lintValueType id_ty)
+       ; out_ty <- addLoc (IdTy id) (lintValueType id_ty)
 
-       ; subst <- getSubst
-       ; let (subst', id') = subst_id subst (setIdType id linted_ty)
-       ; updateSubst subst'   $
-         addInScopeId id  id' $
-         thing_inside id' }
+       ; addInScopeId id out_ty thing_inside }
   where
     id_ty = idType id
 
@@ -1938,18 +1921,6 @@ lintIdBndr top_lvl bind_site id thing_inside
     is_let_bind = case bind_site of
                     LetBind -> True
                     _       -> False
-
-    -- Extend the in-scope set, and perhaps the substitution
-    subst_id (Subst in_scope id_env tvs cvs) id
-      | not (id `elemInScopeSet` in_scope)
-      = (Subst (in_scope `extendInScopeSet` id) id_env tvs cvs, id)
-      | otherwise
-      = ( Subst (in_scope `extendInScopeSet` id')
-                (extendVarEnv id_env id (Var id'))
-                tvs cvs
-        , id' )
-      where
-        id' = uniqAway in_scope id
 
 {-
 %************************************************************************
@@ -1985,8 +1956,13 @@ checkTyCoVarInScope subst tcv
 
 -------------------
 lintType :: InType -> LintM OutType
--- The OutType is just the substitution applied to the InType;
--- the OutKind is the OutType's kind
+-- The OutType is just the substitution applied to the InType
+--
+-- I experimented with returning the kind along with the type,
+-- to avoid a number of calls to typeKind, which might in principle be quadratic
+-- (as we recurse over the type).  But in fact returning both seems to slow
+-- down Lint -- it certainly allocates a lot more.  And the code is simpler
+-- this way too.
 
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
@@ -3006,15 +2982,15 @@ data LintEnv
        , le_subst   :: Subst  -- Current freshening substitution
 
        , le_in_vars :: VarEnv InVar  -- Domain is InVar; all in-scope variables are here
-                                     -- Maps an InVar (unique) to its binding InVar
+                                     -- Maps an InVar (i.e. its unique) to its binding InVar
 
 
        , le_joins :: IdSet     -- Join points in scope that are valid
-                               -- A set of OutIds
                                -- A subset of the InScopeSet in le_subst
                                -- See Note [Join points]
 
        , le_ue_aliases :: NameEnv UsageEnv
+             -- See Note [Linting linearity]
              -- Assigns usage environments to the alias-like binders,
              -- as found in non-recursive lets.
              -- Domain is OutIds
@@ -3148,16 +3124,22 @@ Note [Linting linearity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Lint ignores linearity unless `-dlinear-core-lint` is set.  For why, see below.
 
-But first, "ignore linearity" specifically means two things. When ignoring linearity:
+* When do we /check linearity/ in Lint?  That is, when is `-dlinear-core-lint`
+  lint set?  Answer: we check linearity in the output of the desugarer, shortly
+  after type checking.
+
+* When so we /not/ check linearity in Lint?  On all passes after desugaring.  Why?
+  Because optimisation passes are not (yet) guaranteed to maintain linearity.
+  They should do so semantically (GHC is careful not to duplicate computation)
+  but it is much harder to ensure that the statically-checkable constraints of
+  Linear Core are maintained. See examples below.
+
+The current Linear Core is described in the wiki at:
+https://gitlab.haskell.org/ghc/ghc/-/wikis/linear-types/implementation.
+
+Concretely, "ignore linearity in Lint" specifically means two things:
 * In `ensureEqTypes`, use `eqTypeIgnoringMultiplicity`
 * In `ensureSubMult`, do nothing
-
-But why make `-dcore-lint` ignore linearity?  Because optimisation passes are
-not (yet) guaranteed to maintain linearity.  They should do so semantically (GHC
-is careful not to duplicate computation) but it is much harder to ensure that
-the statically-checkable constraints of Linear Core are maintained. The current
-Linear Core is described in the wiki at:
-https://gitlab.haskell.org/ghc/ghc/-/wikis/linear-types/implementation.
 
 Here are some examples of how the optimiser can break linearity checking.  Other
 examples are documented in the linear-type implementation wiki page
@@ -3448,26 +3430,51 @@ inCasePat = LintM $ \ env errs -> fromBoxedLResult (Just (is_case_pat env), errs
     is_case_pat (LE { le_loc = CasePat {} : _ }) = True
     is_case_pat _other                           = False
 
-addInScopeId :: InId -> OutId -> LintM a -> LintM a
-addInScopeId in_id out_id m
-  = LintM $ \ env@(LE { le_in_vars = id_vars, le_joins = join_set, le_ue_aliases = aliases }) errs ->
-    unLintM m (env { le_in_vars    = extendVarEnv id_vars in_id in_id
-                   , le_joins      = add_joins join_set
-                   , le_ue_aliases = delFromNameEnv aliases (idName out_id) }) errs
-                   -- When shadowing an alias, we need to make sure the Id is no longer
-                   -- classified as such. E.g. in
-                   -- let x = <e1> in case x of x { _DEFAULT -> <e2> }
-                   -- Occurrences of 'x' in e2 shouldn't count as occurrences of e1.
-  where
-    add_joins join_set
-      | isJoinId out_id = extendVarSet join_set out_id -- Overwrite with new arity
-      | otherwise       = delVarSet    join_set out_id -- Remove any existing binding
-
-addInScopeTyCoVar :: InTyCoVar -> LintM a -> LintM a
-addInScopeTyCoVar v thing_inside
+addInScopeId :: InId -> OutType -> (OutId -> LintM a) -> LintM a
+addInScopeId in_id out_ty thing_inside
   = LintM $ \ env errs ->
-    unLintM thing_inside
-        (env { le_in_vars = extendVarEnv (le_in_vars env) v v }) errs
+    let !(out_id, env') = add env
+    in unLintM (thing_inside out_id) env' errs
+
+  where
+    add env@(LE { le_in_vars = id_vars, le_joins = join_set
+                , le_ue_aliases = aliases, le_subst = subst })
+      | isEmptyTCvSubst subst = (in_id,  env1)
+      | otherwise             = (out_id, env1 { le_subst = subst' })
+        -- isEmptyTCvSubst: short-cut when the types of in_id and out_id are identical
+      where
+        env1 = env { le_in_vars = in_vars', le_joins = join_set', le_ue_aliases = aliases' }
+
+        in_vars' = extendVarEnv id_vars in_id in_id
+        aliases' = delFromNameEnv aliases (idName in_id)
+           -- aliases': when shadowing an alias, we need to make sure the
+           -- Id is no longer classified as such. E.g.
+           --   let x = <e1> in case x of x { _DEFAULT -> <e2> }
+           -- Occurrences of 'x' in e2 shouldn't count as occurrences of e1.
+
+        out_id = setIdType in_id out_ty
+        subst' = subst `extendSubstInScope` out_id
+
+        join_set'
+          | isJoinId out_id = extendVarSet join_set in_id -- Overwrite with new arity
+          | otherwise       = delVarSet    join_set in_id -- Remove any existing binding
+
+addInScopeTyCoVar :: InTyCoVar -> OutType -> (OutTyCoVar -> LintM a) -> LintM a
+addInScopeTyCoVar tcv tcv_type' thing_inside
+  = LintM $ \ env@(LE { le_in_vars = in_vars, le_subst = subst }) errs ->
+    let (tcv', subst') = subst_bndr subst tcv tcv_type'
+        env' = env { le_in_vars = extendVarEnv in_vars tcv tcv
+                   , le_subst = subst' }
+    in unLintM (thing_inside tcv') env' errs
+  where
+    subst_bndr subst tcv tcv_type'
+      | isEmptyTCvSubst subst                -- No change in kind
+      , not (tcv `elemInScopeSet` in_scope)  -- No change in unique
+      = (tcv, subst `extendSubstInScope` tcv)
+      | let tcv' = uniqAway in_scope (setVarType tcv tcv_type')
+      = (tcv', extendTCvSubstWithClone subst tcv tcv')
+      where
+        in_scope = substInScopeSet subst
 
 getInVarEnv :: LintM (VarEnv InId)
 getInVarEnv = LintM (\env errs -> fromBoxedLResult (Just (le_in_vars env), errs))
@@ -3476,10 +3483,6 @@ extendTvSubstL :: TyVar -> Type -> LintM a -> LintM a
 extendTvSubstL tv ty m
   = LintM $ \ env errs ->
     unLintM m (env { le_subst = Type.extendTvSubst (le_subst env) tv ty }) errs
-
-updateSubst :: Subst -> LintM a -> LintM a
-updateSubst subst' m
-  = LintM $ \ env errs -> unLintM m (env { le_subst = subst' }) errs
 
 markAllJoinsBad :: LintM a -> LintM a
 markAllJoinsBad m
