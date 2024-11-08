@@ -89,3 +89,4 @@ test('T25062_V64'
     , [''])
 
 test('T25169', [], compile_and_run, [''])
+test('T25455', [], compile_and_run, [''])
