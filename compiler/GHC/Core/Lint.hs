@@ -3439,8 +3439,8 @@ addInScopeId in_id out_ty thing_inside
   where
     add env@(LE { le_in_vars = id_vars, le_joins = join_set
                 , le_ue_aliases = aliases, le_subst = subst })
-      | isEmptyTCvSubst subst = (in_id,  env1)
-      | otherwise             = (out_id, env1 { le_subst = subst' })
+      | isEmptyTCvSubst subst = (in_id,  env1 { le_subst = subst `delSubstInScope` in_id })
+      | otherwise             = (out_id, env1 { le_subst = subst `extendSubstInScope` out_id})
         -- isEmptyTCvSubst: short-cut when the types of in_id and out_id are identical
       where
         env1 = env { le_in_vars = in_vars', le_joins = join_set', le_ue_aliases = aliases' }
@@ -3453,7 +3453,6 @@ addInScopeId in_id out_ty thing_inside
            -- Occurrences of 'x' in e2 shouldn't count as occurrences of e1.
 
         out_id = setIdType in_id out_ty
-        subst' = subst `extendSubstInScope` out_id
 
         join_set'
           | isJoinId out_id = extendVarSet join_set in_id -- Overwrite with new arity
