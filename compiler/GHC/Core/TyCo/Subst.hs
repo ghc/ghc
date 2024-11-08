@@ -17,7 +17,7 @@ module GHC.Core.TyCo.Subst
         getTvSubstEnv, getIdSubstEnv,
         getCvSubstEnv, substInScopeSet, setInScope, getSubstRangeTyCoFVs,
         isInScope, elemSubst, notElemSubst, zapSubst,
-        extendSubstInScope, extendSubstInScopeList, extendSubstInScopeSet,
+        extendSubstInScope, extendSubstInScopeList, extendSubstInScopeSet, delSubstInScope,
         extendTCvSubst, extendTCvSubstWithClone,
         extendCvSubst, extendCvSubstWithClone,
         extendTvSubst, extendTvSubstWithClone,
@@ -337,6 +337,11 @@ zapSubst (Subst in_scope _ _ _) = Subst in_scope emptyVarEnv emptyVarEnv emptyVa
 extendSubstInScope :: Subst -> Var -> Subst
 extendSubstInScope (Subst in_scope ids tvs cvs) v
   = Subst (in_scope `extendInScopeSet` v)
+          ids tvs cvs
+
+delSubstInScope  :: Subst -> Var -> Subst
+delSubstInScope (Subst in_scope ids tvs cvs) v
+  = Subst (in_scope `delInScopeSet` v)
           ids tvs cvs
 
 -- | Add the 'Var's to the in-scope set: see also 'extendInScope'
