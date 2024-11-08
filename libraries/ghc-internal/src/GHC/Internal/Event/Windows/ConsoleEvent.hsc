@@ -53,7 +53,10 @@ start_console_handler :: Word32 -> IO ()
 start_console_handler r =
   case toWin32ConsoleEvent r of
     Just x  -> withMVar win32ConsoleHandler $ \handler -> do
-                 _ <- forkIO (handler x)
+                 _ <- forkIO $ do
+                     tid <- myThreadId
+                     labelThread tid "console event handler"
+                     handler x
                  return ()
     Nothing -> return ()
 
