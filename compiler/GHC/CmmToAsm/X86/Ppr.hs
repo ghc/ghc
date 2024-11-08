@@ -1345,9 +1345,11 @@ pprInstr platform i = case i of
        ]
      where
       mem = case fmt of
+        FF32 -> text "vxorps"
+        FF64 -> text "vxorpd"
         VecFormat _ FmtFloat -> text "vxorps"
         VecFormat _ FmtDouble -> text "vxorpd"
-        _ -> pprPanic "GHC.CmmToAsm.X86.Ppr.pprVxor: elementy type must be Float or Double"
+        _ -> pprPanic "GHC.CmmToAsm.X86.Ppr.pprVxor: element type must be Float or Double"
               (ppr fmt)
 
    pprInsert :: Line doc -> Format -> Imm -> Operand -> Reg -> doc
