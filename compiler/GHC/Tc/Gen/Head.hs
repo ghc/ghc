@@ -1260,6 +1260,9 @@ addThingCtxt (OrigStmt (L loc stmt) flav) thing_inside = do
   gen <- inGeneratedCode
   if gen
     then setSrcSpanA loc $ addStmtCtxt stmt flav $ setInGeneratedCode $ thing_inside
+         -- If we are in generated code, we need to set the error context at the correct
+         -- location and then switch context back into generated code to do the thing_inside
+         -- See Note [Rebindable syntax and XXExprGhcRn]
     else addStmtCtxt stmt flav $ thing_inside
 addThingCtxt _ thing_inside = thing_inside
 
@@ -1278,6 +1281,7 @@ addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside
   = case e of
       HsUnboundVar {} -> thing_inside
+      XExpr (ExpandedThingRn (OrigStmt{}) _) -> thing_inside
       _ -> addErrCtxt (exprCtxt e) thing_inside
    -- The HsUnboundVar special case addresses situations like
    --    f x = _
