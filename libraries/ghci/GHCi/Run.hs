@@ -226,7 +226,10 @@ sandboxIO opts io = do
     let runIt = measureAlloc $ tryEval $ rethrow opts $ clearCCS io
     if useSandboxThread opts
        then do
-         tid <- forkIO $ do unsafeUnmask runIt >>= putMVar statusMVar
+         tid <- forkIO $ do
+           tid <- myThreadId
+           labelThread tid "GHCi sandbox"
+           unsafeUnmask runIt >>= putMVar statusMVar
                                 -- empty: can't block
          redirectInterrupts tid $ unsafeUnmask $ takeMVar statusMVar
        else
