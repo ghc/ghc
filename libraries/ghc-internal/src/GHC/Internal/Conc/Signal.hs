@@ -19,7 +19,7 @@ import GHC.Internal.Foreign.Ptr (Ptr, castPtr)
 import GHC.Internal.Foreign.Marshal.Alloc (finalizerFree)
 import GHC.Internal.Arr (inRange)
 import GHC.Internal.Base
-import GHC.Internal.Conc.Sync (forkIO)
+import GHC.Internal.Conc.Sync (myThreadId, labelThread, forkIO)
 import GHC.Internal.IO (mask_, unsafePerformIO)
 import GHC.Internal.IOArray (IOArray, boundsIOArray, newIOArray,
                     unsafeReadIOArray, unsafeWriteIOArray)
@@ -69,7 +69,10 @@ runHandlers p_info sig = do
       else do handler <- unsafeReadIOArray arr int
               case handler of
                 Nothing -> return ()
-                Just (f,_)  -> do _ <- forkIO (f p_info)
+                Just (f,_)  -> do _ <- forkIO $ do
+                                    tid <- myThreadId
+                                    labelThread tid "signal handler"
+                                    f p_info
                                   return ()
 
 -- It is our responsibility to free the memory buffer, so we create a
