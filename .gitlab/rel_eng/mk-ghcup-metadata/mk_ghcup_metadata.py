@@ -198,6 +198,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     ubuntu1804 = mk(ubuntu("18_04"))
     ubuntu2004 = mk(ubuntu("20_04"))
     ubuntu2204 = mk(ubuntu("22_04"))
+    ubuntu2404 = mk(ubuntu("24_04"))
     rocky8 = mk(rocky("8"))
     fedora33 = mk(fedora(33))
     darwin_x86 = mk(darwin("x86_64"))
@@ -230,7 +231,8 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
                              , "( >= 16 && < 18 )": deb9
                              , "( >= 18 && < 19 )": ubuntu1804
                              , "( >= 19 && < 21 )": ubuntu2004
-                             , "( >= 21 )": ubuntu2204
+                             , "( >= 21 && < 24 )": ubuntu2204
+                             , "( >= 24 )": ubuntu2404
                              }
           , "Linux_Mint"   : { "< 20": ubuntu1804
                              , ">= 20": ubuntu2004
@@ -367,4 +369,3 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
-
