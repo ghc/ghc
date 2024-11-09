@@ -96,7 +96,6 @@ import qualified GHC.Utils.Error as Err
 import GHC.Utils.Logger
 
 import GHC.Data.Pair
-import GHC.Data.Maybe( orElse )
 import GHC.Base (oneShot)
 import GHC.Data.Unboxed
 
@@ -108,6 +107,14 @@ import Data.IntMap.Strict ( IntMap )
 import qualified Data.IntMap.Strict as IntMap ( lookup, keys, empty, fromList )
 
 {-
+
+ToDo: notes
+
+* We do not bother to clone non-CoVar Ids at all
+* The Subst deals only in TyCoVars; Non-CoVarIds do not even live in the InScope set
+* For Ids, the le_in_vars envt gives the OutType of the Id
+
+
 Note [Core Lint guarantee]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Core Lint is the type-checker for Core. Using it, we get the following guarantee:
@@ -1031,7 +1038,7 @@ lintIdOcc in_id nargs
         -- (Maybe a) from the binding site with bogus (Maybe a1) from
         -- the occurrence site.  Comparing un-substituted types finesses
         -- this altogether
-        ; lintVarOcc in_id
+        ; out_ty <- lintVarOcc in_id
 
           -- Check for a nested occurrence of the StaticPtr constructor.
           -- See Note [Checking StaticPtrs].
@@ -1046,38 +1053,11 @@ lintIdOcc in_id nargs
              Nothing -> return ()
              Just dc -> checkTypeDataConOcc "expression" dc
 
+        ; checkJoinOcc in_id nargs
+        ; usage <- varCallSiteUsage in_id
 
-        -- lintVarOcc has already checked that the Id is in scope
-        ; in_scope <- getInScope
-        ; let out_id = lookupInScope in_scope in_id `orElse` in_id
-             -- It might not be there at all if the freshening
-             -- substitution is empty
+        ; return (out_ty, usage) }
 
-        ; check_bad_global out_id
-        ; checkJoinOcc out_id nargs
-
-        ; usage <- varCallSiteUsage out_id
-        ; return (idType out_id, usage) }
-
-  where
-       -- 'check_bad_global' checks for the case where an /occurrence/ is
-       -- a GlobalId, but there is an enclosing binding fora a LocalId.
-       -- NB: the in-scope variables are mostly LocalIds, checked by lintIdBndr,
-       --     but GHCi adds GlobalIds from the interactive context.  These
-       --     are fine; hence the test (isLocalId id == isLocalId v)
-       -- NB: when compiling Control.Exception.Base, things like absentError
-       --     are defined locally, but appear in expressions as (global)
-       --     wired-in Ids after worker/wrapper
-       --     So we simply disable the test in this case
-    check_bad_global out_id_bndr
-      | isGlobalId in_id
-      , isLocalId out_id_bndr
-      , not (isWiredIn in_id)
-      = failWithL $ hang (text "Occurrence is GlobalId, but binding is LocalId")
-                       2 (vcat [ hang (text "occurrence:") 2 $ pprBndr LetBind in_id
-                               , hang (text "binder    :") 2 $ pprBndr LetBind out_id_bndr ])
-      | otherwise
-      = return ()
 
 
 lintCoreFun :: CoreExpr
@@ -1948,13 +1928,6 @@ checkTyCon tc
   = checkL (not (isTcTyCon tc)) (text "Found TcTyCon:" <+> ppr tc)
 
 -------------------
-checkTyCoVarInScope :: Subst -> TyCoVar -> LintM ()
-checkTyCoVarInScope subst tcv
-  = checkL (tcv `isInScope` subst) $
-    hang (text "The type or coercion variable" <+> pprBndr LetBind tcv)
-       2 (text "is out of scope")
-
--------------------
 lintType :: InType -> LintM OutType
 -- The OutType is just the substitution applied to the InType
 --
@@ -1971,7 +1944,7 @@ lintType (TyVarTy tv)
   = failWithL (mkBadTyVarMsg tv)
 
   | otherwise
-  = do { lintVarOcc tv
+  = do { _ <- lintVarOcc tv
            -- In GHCi we may lint an expression with a free
            -- type variable.  Then it won't be in the
            -- substitution, but it should be in scope
@@ -2359,15 +2332,14 @@ lintCoercion (CoVarCo cv)
                   2 (text "With offending type:" <+> ppr (varType cv)))
 
   | otherwise  -- C.f. lintType (TyVarTy tv), which has better docs
-  = do { lintVarOcc cv
+  = do { _ <- lintVarOcc cv
        ; subst <- getSubst
        ; case lookupCoVar subst cv of
            Just linted_co -> return (linted_co, role, lty, rty)
               where
                 (Pair lty rty, role) = coercionKindRole linted_co
 
-           Nothing -> do { checkTyCoVarInScope subst cv
-                         ; return (CoVarCo cv, role, lty, rty) }
+           Nothing -> return (CoVarCo cv, role, lty, rty)
               where
                 (lty, rty, role) = coVarTypesRole cv
      }
@@ -2980,9 +2952,13 @@ data LintEnv
        , le_loc   :: [LintLocInfo]   -- Locations
 
        , le_subst   :: Subst  -- Current freshening substitution
+                              -- for TyCoVars only.  Non-CoVar Ids don't
+                              -- appear in here, not even in the InScopeSet
 
-       , le_in_vars :: VarEnv InVar  -- Domain is InVar; all in-scope variables are here
-                                     -- Maps an InVar (i.e. its unique) to its binding InVar
+       , le_in_vars :: VarEnv (InVar, OutType)
+                    -- Domain is InVar; all in-scope variables are here
+                    -- Maps an InVar (i.e. its unique) to its binding InVar
+                    --  and to its OutType
 
 
        , le_joins :: IdSet     -- Join points in scope that are valid
@@ -3346,7 +3322,7 @@ initL cfg m
     vars = l_vars cfg
     env = LE { le_flags   = l_flags cfg
              , le_subst   = mkEmptySubst (mkInScopeSetList vars)
-             , le_in_vars = mkVarEnv [ (v,v) | v <- vars ]
+             , le_in_vars = mkVarEnv [ (v,(v, varType v)) | v <- vars ]
              , le_joins   = emptyVarSet
              , le_loc     = []
              , le_ue_aliases = emptyNameEnv
@@ -3439,20 +3415,21 @@ addInScopeId in_id out_ty thing_inside
   where
     add env@(LE { le_in_vars = id_vars, le_joins = join_set
                 , le_ue_aliases = aliases, le_subst = subst })
-      | isEmptyTCvSubst subst = (in_id,  env1 { le_subst = subst `delSubstInScope` in_id })
-      | otherwise             = (out_id, env1 { le_subst = subst `extendSubstInScope` out_id})
-        -- isEmptyTCvSubst: short-cut when the types of in_id and out_id are identical
+      = (out_id, env1)
       where
         env1 = env { le_in_vars = in_vars', le_joins = join_set', le_ue_aliases = aliases' }
 
-        in_vars' = extendVarEnv id_vars in_id in_id
+        in_vars' = extendVarEnv id_vars in_id (in_id, out_ty)
         aliases' = delFromNameEnv aliases (idName in_id)
            -- aliases': when shadowing an alias, we need to make sure the
            -- Id is no longer classified as such. E.g.
            --   let x = <e1> in case x of x { _DEFAULT -> <e2> }
            -- Occurrences of 'x' in e2 shouldn't count as occurrences of e1.
 
-        out_id = setIdType in_id out_ty
+        -- A very tiny optimisation, not sure if it's really worth it
+        -- Short-cut when the substitution is a no-op
+        out_id | isEmptyTCvSubst subst = in_id
+               | otherwise             = setIdType in_id out_ty
 
         join_set'
           | isJoinId out_id = extendVarSet join_set in_id -- Overwrite with new arity
@@ -3462,7 +3439,7 @@ addInScopeTyCoVar :: InTyCoVar -> OutType -> (OutTyCoVar -> LintM a) -> LintM a
 addInScopeTyCoVar tcv tcv_type' thing_inside
   = LintM $ \ env@(LE { le_in_vars = in_vars, le_subst = subst }) errs ->
     let (tcv', subst') = subst_bndr subst tcv tcv_type'
-        env' = env { le_in_vars = extendVarEnv in_vars tcv tcv
+        env' = env { le_in_vars = extendVarEnv in_vars tcv (tcv, tcv_type')
                    , le_subst = subst' }
     in unLintM (thing_inside tcv') env' errs
   where
@@ -3475,7 +3452,7 @@ addInScopeTyCoVar tcv tcv_type' thing_inside
       where
         in_scope = substInScopeSet subst
 
-getInVarEnv :: LintM (VarEnv InId)
+getInVarEnv :: LintM (VarEnv (InId, OutType))
 getInVarEnv = LintM (\env errs -> fromBoxedLResult (Just (le_in_vars env), errs))
 
 extendTvSubstL :: TyVar -> Type -> LintM a -> LintM a
@@ -3503,19 +3480,19 @@ getUEAliases = LintM (\ env errs -> fromBoxedLResult (Just (le_ue_aliases env), 
 getInScope :: LintM InScopeSet
 getInScope = LintM (\ env errs -> fromBoxedLResult (Just (substInScopeSet $ le_subst env), errs))
 
-lintVarOcc :: InVar -> LintM ()
+lintVarOcc :: InVar -> LintM OutType
 -- Checks two things:
 -- a) that it is in scope
 -- b) that the type at the ocurrences matches the type at the binding site
 lintVarOcc v_occ
-  | isGlobalId v_occ
-  = return ()
-  | otherwise
   = do { in_var_env <- getInVarEnv
        ; case lookupVarEnv in_var_env v_occ of
-           Nothing -> failWithL (text pp_what <+> quotes (ppr v_occ) <+> text "is out of scope")
-           Just v_bndr -> ensureEqTys occ_ty bndr_ty $
-                          mkBndrOccTypeMismatchMsg v_occ bndr_ty occ_ty
+           Nothing | isGlobalId v_occ -> return (idType v_occ)
+                   | otherwise        -> failWithL (text pp_what <+> quotes (ppr v_occ) <+> text "is out of scope")
+           Just (v_bndr, out_ty) -> do { check_bad_global v_bndr
+                                       ; ensureEqTys occ_ty bndr_ty $
+                                         mkBndrOccTypeMismatchMsg v_occ bndr_ty occ_ty
+                                       ; return out_ty }
              where
                occ_ty  = varType v_occ
                bndr_ty = varType v_bndr }
@@ -3523,6 +3500,25 @@ lintVarOcc v_occ
     pp_what | isTyVar v_occ = "The type variable"
             | isCoVar v_occ = "The coercion variable"
             | otherwise     = "The value variable"
+
+       -- 'check_bad_global' checks for the case where an /occurrence/ is
+       -- a GlobalId, but there is an enclosing binding fora a LocalId.
+       -- NB: the in-scope variables are mostly LocalIds, checked by lintIdBndr,
+       --     but GHCi adds GlobalIds from the interactive context.  These
+       --     are fine; hence the test (isLocalId id == isLocalId v)
+       -- NB: when compiling Control.Exception.Base, things like absentError
+       --     are defined locally, but appear in expressions as (global)
+       --     wired-in Ids after worker/wrapper
+       --     So we simply disable the test in this case
+    check_bad_global v_bndr
+      | isGlobalId v_occ
+      , isLocalId v_bndr
+      , not (isWiredIn v_occ)
+      = failWithL $ hang (text "Occurrence is GlobalId, but binding is LocalId")
+                       2 (vcat [ hang (text "occurrence:") 2 $ pprBndr LetBind v_occ
+                               , hang (text "binder    :") 2 $ pprBndr LetBind v_bndr ])
+      | otherwise
+      = return ()
 
 lookupJoinId :: Id -> LintM JoinPointHood
 -- Look up an Id which should be a join point, valid here
