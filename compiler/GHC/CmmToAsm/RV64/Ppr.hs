@@ -59,7 +59,6 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
               -- elimination, it might be the target of a goto.
               ( if platformHasSubsectionsViaSymbols platform
                   then -- See Note [Subsections Via Symbols]
-
                     line
                       $ text "\t.long "
                       <+> pprAsmLabel platform info_lbl
@@ -655,9 +654,12 @@ pprInstr platform instr = case instr of
   STR II64 o1 o2 -> op2 (text "\tsd") o1 o2
   STR FF32 o1 o2 -> op2 (text "\tfsw") o1 o2
   STR FF64 o1 o2 -> op2 (text "\tfsd") o1 o2
-  STR (VecFormat _ FmtFloat) o1 o2@(OpAddr _) -> op2 (text "\tvse32.v") o1 o2
-  STR (VecFormat _ FmtDouble) o1 o2@(OpAddr _) -> op2 (text "\tvse64.v") o1 o2
-  STR f o1 o2 -> pprPanic "Unsupported store" ((text . show) f <+> pprOp platform o1 <+> pprOp platform o2)
+  STR fmt@(VecFormat _ FmtInt8) o1 o2 -> configVec fmt $$ op2 (text "\tvse8.v") o1 o2
+  STR fmt@(VecFormat _ FmtInt16) o1 o2 -> configVec fmt $$ op2 (text "\tvse16.v") o1 o2
+  STR fmt@(VecFormat _ FmtInt32) o1 o2 -> configVec fmt $$ op2 (text "\tvse32.v") o1 o2
+  STR fmt@(VecFormat _ FmtInt64) o1 o2 -> configVec fmt $$ op2 (text "\tvse64.v") o1 o2
+  STR fmt@(VecFormat _ FmtFloat) o1 o2 -> configVec fmt $$ op2 (text "\tvse32.v") o1 o2
+  STR fmt@(VecFormat _ FmtDouble) o1 o2 -> configVec fmt $$ op2 (text "\tvse64.v") o1 o2
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
     lines_
       [ text "\tla" <+> pprOp platform o1 <> comma <+> pprAsmLabel platform lbl,
@@ -671,6 +673,12 @@ pprInstr platform instr = case instr of
   LDR II64 o1 o2 -> op2 (text "\tld") o1 o2
   LDR FF32 o1 o2 -> op2 (text "\tflw") o1 o2
   LDR FF64 o1 o2 -> op2 (text "\tfld") o1 o2
+  LDR fmt@(VecFormat _ FmtInt8) o1 o2 -> configVec fmt $$ op2 (text "\tvle8.v") o1 o2
+  LDR fmt@(VecFormat _ FmtInt16) o1 o2 -> configVec fmt $$ op2 (text "\tvle16.v") o1 o2
+  LDR fmt@(VecFormat _ FmtInt32) o1 o2 -> configVec fmt $$ op2 (text "\tvle32.v") o1 o2
+  LDR fmt@(VecFormat _ FmtInt64) o1 o2 -> configVec fmt $$ op2 (text "\tvle64.v") o1 o2
+  LDR fmt@(VecFormat _ FmtFloat) o1 o2 -> configVec fmt $$ op2 (text "\tvle32.v") o1 o2
+  LDR fmt@(VecFormat _ FmtDouble) o1 o2 -> configVec fmt $$ op2 (text "\tvle64.v") o1 o2
   LDRU II8 o1 o2 -> op2 (text "\tlbu") o1 o2
   LDRU II16 o1 o2 -> op2 (text "\tlhu") o1 o2
   LDRU II32 o1 o2 -> op2 (text "\tlwu") o1 o2
@@ -681,8 +689,12 @@ pprInstr platform instr = case instr of
   LDRU FF64 o1 o2@(OpAddr (AddrReg _)) -> op2 (text "\tfld") o1 o2
   LDRU FF64 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tfld") o1 o2
   -- vectors
-  LDRU (VecFormat _ FmtFloat) o1 o2 -> op2 (text "\tvle32.v") o1 o2
-  LDRU (VecFormat _ FmtDouble) o1 o2 -> op2 (text "\tvle64.v") o1 o2
+  LDRU fmt@(VecFormat _ FmtInt8) o1 o2 -> configVec fmt $$ op2 (text "\tvle8.v") o1 o2
+  LDRU fmt@(VecFormat _ FmtInt16) o1 o2 -> configVec fmt $$ op2 (text "\tvle16.v") o1 o2
+  LDRU fmt@(VecFormat _ FmtInt32) o1 o2 -> configVec fmt $$ op2 (text "\tvle32.v") o1 o2
+  LDRU fmt@(VecFormat _ FmtInt64) o1 o2 -> configVec fmt $$ op2 (text "\tvle64.v") o1 o2
+  LDRU fmt@(VecFormat _ FmtFloat) o1 o2 -> configVec fmt $$ op2 (text "\tvle32.v") o1 o2
+  LDRU fmt@(VecFormat _ FmtDouble) o1 o2 -> configVec fmt $$ op2 (text "\tvle64.v") o1 o2
   LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text . show) f <+> pprOp platform o1 <+> pprOp platform o2)
   FENCE r w -> line $ text "\tfence" <+> pprFenceType r <> char ',' <+> pprFenceType w
   FCVT FloatToFloat o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.d") o1 o2
@@ -706,10 +718,12 @@ pprInstr platform instr = case instr of
       $ line (pprOp platform o1 <> text "->" <> pprOp platform o2)
   FABS o1 o2 | isSingleOp o2 -> op2 (text "\tfabs.s") o1 o2
   FABS o1 o2 | isDoubleOp o2 -> op2 (text "\tfabs.d") o1 o2
-  FMIN o1 o2 o3 | isSingleOp o1 -> op3 (text "\tfmin.s") o1 o2 o3
-                | isDoubleOp o2 -> op3 (text "\tfmin.d") o1 o2 o3
-  FMAX o1 o2 o3 | isSingleOp o1 -> op3 (text "\tfmax.s") o1 o2 o3
-                | isDoubleOp o2 -> op3 (text "\tfmax.d") o1 o2 o3
+  FMIN o1 o2 o3
+    | isSingleOp o1 -> op3 (text "\tfmin.s") o1 o2 o3
+    | isDoubleOp o2 -> op3 (text "\tfmin.d") o1 o2 o3
+  FMAX o1 o2 o3
+    | isSingleOp o1 -> op3 (text "\tfmax.s") o1 o2 o3
+    | isDoubleOp o2 -> op3 (text "\tfmax.d") o1 o2 o3
   FMA variant d r1 r2 r3 ->
     let fma = case variant of
           FMAdd -> text "\tfmadd" <> dot <> floatPrecission d
@@ -717,32 +731,44 @@ pprInstr platform instr = case instr of
           FNMAdd -> text "\tfnmadd" <> dot <> floatPrecission d
           FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
      in op4 fma d r1 r2 r3
-
-  VMV o1@(OpReg w _) o2 | isFloatOp o1 && isVectorOp o2 -> op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
-  VMV o1@(OpReg _w _) o2 | isFloatOp o2 -> op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "f") o1 o2
-  VMV o1 o2 -> op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> opToVInstrSuffix o2) o1 o2
+  VMV fmt o1@(OpReg w _) o2 | isFloatOp o1 && isVectorOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
+  VMV fmt o1@(OpReg _w _) o2 | isFloatOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "f") o1 o2
+  VMV fmt o1 o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> opToVInstrSuffix o2) o1 o2
   -- TODO: Remove o2 from constructor
-  VID o1 _o2 -> op1 (text "\tvid.v") o1
+  VID fmt o1 _o2 -> configVec fmt $$ op1 (text "\tvid.v") o1
   -- TODO: This expects int register as third operand: Generalize by calculating
   -- the instruction suffix (".vx")
-  VMSEQ o1 o2 o3 -> op3 (text "\tvmseq.vx") o1 o2 o3
+  VMSEQ fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvmseq.vx") o1 o2 o3
   -- TODO: All operands need to be vector registers. Make this more general or
   -- validate this constraint.
-  VMERGE o1 o2 o3 o4 -> op4 (text "\tvmerge.vvm") o1 o2 o3 o4
-  VSLIDEDOWN o1 o2 o3 -> op3 (text "\tvslidedown.vx") o1 o2 o3
-  VSETIVLI dst len width grouping ta ma -> line $
-    text "\tvsetivli" <+> pprReg W64 dst <> comma <+> (text.show) len <> comma <+> pprVWidth width <> comma <+> pprGrouping grouping <> comma <+> pprTA ta <> comma <+> pprMasking ma
-  VNEG o1 o2 -> op2 (text "\tvfneg.v") o1 o2
-  VADD o1 o2 o3 -> op3 (text "\tvfadd.vv") o1 o2 o3
-  VSUB o1 o2 o3 -> op3 (text "\tvfsub.vv") o1 o2 o3
-  VMUL o1 o2 o3 -> op3 (text "\tvfmul.vv") o1 o2 o3
-  VQUOT o1 o2 o3 -> op3 (text "\tvfdiv.vv") o1 o2 o3
-  VSMIN o1 o2 o3 -> op3 (text "\tvmin.vv") o1 o2 o3
-  VSMAX o1 o2 o3 -> op3 (text "\tvmax.vv") o1 o2 o3
-  VUMIN o1 o2 o3 -> op3 (text "\tvminu.vv") o1 o2 o3
-  VUMAX o1 o2 o3 -> op3 (text "\tvmaxu.vv") o1 o2 o3
-  VFMIN o1 o2 o3 -> op3 (text "\tvfmin.vv") o1 o2 o3
-  VFMAX o1 o2 o3 -> op3 (text "\tvfmax.vv") o1 o2 o3
+  VMERGE fmt o1 o2 o3 o4 -> configVec fmt $$ op4 (text "\tvmerge.vvm") o1 o2 o3 o4
+  VSLIDEDOWN fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvslidedown.vx") o1 o2 o3
+  -- TODO: Use configVec, adjust VSETIVLI to contain only format?
+  VSETIVLI dst len width grouping ta ma ->
+    line
+      $ text "\tvsetivli"
+      <+> pprReg W64 dst
+      <> comma
+      <+> (text . show) len
+      <> comma
+      <+> pprVWidth width
+      <> comma
+      <+> pprGrouping grouping
+      <> comma
+      <+> pprTA ta
+      <> comma
+      <+> pprMasking ma
+  VNEG fmt o1 o2 -> configVec fmt $$ op2 (text "\tvfneg.v") o1 o2
+  VADD fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvfadd.vv") o1 o2 o3
+  VSUB fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvfsub.vv") o1 o2 o3
+  VMUL fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvfmul.vv") o1 o2 o3
+  VQUOT fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvfdiv.vv") o1 o2 o3
+  VSMIN fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvmin.vv") o1 o2 o3
+  VSMAX fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvmax.vv") o1 o2 o3
+  VUMIN fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvminu.vv") o1 o2 o3
+  VUMAX fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvmaxu.vv") o1 o2 o3
+  VFMIN fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvfmin.vv") o1 o2 o3
+  VFMAX fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvfmax.vv") o1 o2 o3
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
   where
     op1 op o1 = line $ op <+> pprOp platform o1
@@ -760,7 +786,7 @@ pprInstr platform instr = case instr of
     pprTA TA = text "ta"
     pprTA TU = text "tu"
 
-    pprVWidth :: IsLine doc => Width -> doc
+    pprVWidth :: (IsLine doc) => Width -> doc
     pprVWidth W8 = text "e8"
     pprVWidth W16 = text "e16"
     pprVWidth W32 = text "e32"
@@ -778,16 +804,21 @@ pprInstr platform instr = case instr of
     pprMasking MA = text "ma"
     pprMasking MU = text "mu"
 
-    opToVInstrSuffix :: IsLine doc => Operand -> doc
+    opToVInstrSuffix :: (IsLine doc) => Operand -> doc
     opToVInstrSuffix op | isIntOp op = text "x"
     opToVInstrSuffix op | isFloatOp op = text "f"
     opToVInstrSuffix op | isVectorOp op = text "v"
     opToVInstrSuffix op = pprPanic "Unsupported operand for vector instruction" (pprOp platform op)
 
-    floatWidthSuffix :: IsLine doc => Width -> doc
+    floatWidthSuffix :: (IsLine doc) => Width -> doc
     floatWidthSuffix W32 = text "s"
     floatWidthSuffix W64 = text "d"
     floatWidthSuffix w = pprPanic "Unsupported floating point vector operation width" (ppr w)
+
+    configVec :: (IsDoc doc) => Format -> doc
+    configVec (VecFormat length fmt) =
+      pprInstr platform (VSETIVLI zeroReg (fromIntegral length) ((formatToWidth . scalarFormatFormat) fmt) M1 TA MA)
+    configVec fmt = pprPanic "Unsupported vector configuration" ((text . show) fmt)
 
 floatOpPrecision :: Platform -> Operand -> Operand -> String
 floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isSingleOp l && isSingleOp r = "s" -- single precision
