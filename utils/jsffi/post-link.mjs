@@ -62,7 +62,7 @@ export async function postLink(mod) {
   // Keep this in sync with dyld.mjs!
   src = `${src}\nexport default (__exports) => {`;
   src = `${src}\nconst __ghc_wasm_jsffi_jsval_manager = new JSValManager();`;
-  src = `${src}\nconst __ghc_wasm_jsffi_finalization_registry = new FinalizationRegistry(sp => __exports.rts_freeStablePtr(sp));`;
+  src = `${src}\nconst __ghc_wasm_jsffi_finalization_registry = globalThis.FinalizationRegistry ? new FinalizationRegistry(sp => __exports.rts_freeStablePtr(sp)) : { register: () => {}, unregister: () => true };`;
   src = `${src}\nreturn {`;
   src = `${src}\nnewJSVal: (v) => __ghc_wasm_jsffi_jsval_manager.newJSVal(v),`;
   src = `${src}\ngetJSVal: (k) => __ghc_wasm_jsffi_jsval_manager.getJSVal(k),`;
