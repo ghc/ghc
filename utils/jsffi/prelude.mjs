@@ -51,6 +51,10 @@ export class JSValManager {
 
 // The actual setImmediate() to be used. This is a ESM module top
 // level binding and doesn't pollute the globalThis namespace.
+//
+// To benchmark different setImmediate() implementations in the
+// browser, use https://github.com/jphpsf/setImmediate-shim-demo as a
+// starting point.
 const setImmediate = await (async () => {
   // node, bun, or other scripts might have set this up in the browser
   if (globalThis.setImmediate) {
@@ -67,30 +71,35 @@ const setImmediate = await (async () => {
     return (cb, ...args) => scheduler.postTask(() => cb(...args));
   }
 
-  // A simple & fast setImmediate() implementation for browsers. It's
-  // not a drop-in replacement for node.js setImmediate() because:
-  // 1. There's no clearImmediate(), and setImmediate() doesn't return
-  //    anything
-  // 2. There's no guarantee that callbacks scheduled by setImmediate()
-  //    are executed in the same order (in fact it's the opposite lol),
-  //    but you are never supposed to rely on this assumption anyway
-  class SetImmediate {
-    #fs = [];
-    #mc = new MessageChannel();
+  // Cloudflare workers doesn't support MessageChannel
+  if (globalThis.MessageChannel) {
+    // A simple & fast setImmediate() implementation for browsers. It's
+    // not a drop-in replacement for node.js setImmediate() because:
+    // 1. There's no clearImmediate(), and setImmediate() doesn't return
+    //    anything
+    // 2. There's no guarantee that callbacks scheduled by setImmediate()
+    //    are executed in the same order (in fact it's the opposite lol),
+    //    but you are never supposed to rely on this assumption anyway
+    class SetImmediate {
+      #fs = [];
+      #mc = new MessageChannel();
 
-    constructor() {
-      this.#mc.port1.addEventListener("message", () => {
-        this.#fs.pop()();
-      });
-      this.#mc.port1.start();
+      constructor() {
+        this.#mc.port1.addEventListener("message", () => {
+          this.#fs.pop()();
+        });
+        this.#mc.port1.start();
+      }
+
+      setImmediate(cb, ...args) {
+        this.#fs.push(() => cb(...args));
+        this.#mc.port2.postMessage(undefined);
+      }
     }
 
-    setImmediate(cb, ...args) {
-      this.#fs.push(() => cb(...args));
-      this.#mc.port2.postMessage(undefined);
-    }
+    const sm = new SetImmediate();
+    return (cb, ...args) => sm.setImmediate(cb, ...args);
   }
 
-  const sm = new SetImmediate();
-  return (cb, ...args) => sm.setImmediate(cb, ...args);
+  return (cb, ...args) => setTimeout(cb, 0, ...args);
 })();
