@@ -109,23 +109,24 @@ regUsageOfInstr platform instr = case instr of
   FABS dst src -> usage (regOp src, regOp dst)
   FMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VMV dst src1 -> usage (regOp src1, regOp dst)
-  VID dst src1 -> usage (regOp src1, regOp dst)
-  VMSEQ dst src op -> usage (regOp src ++ regOp op, regOp dst)
-  VMERGE dst op1 op2 opm -> usage (regOp op1 ++ regOp op2 ++ regOp opm, regOp dst)
-  VSLIDEDOWN dst op1 op2 -> usage (regOp op1 ++ regOp op2, regOp dst)
+  VMV fmt dst src1 -> usage (regOp src1, regOp dst)
+  VID fmt dst src1 -> usage (regOp src1, regOp dst)
+  VMSEQ fmt dst src op -> usage (regOp src ++ regOp op, regOp dst)
+  VMERGE fmt dst op1 op2 opm -> usage (regOp op1 ++ regOp op2 ++ regOp opm, regOp dst)
+  VSLIDEDOWN fmt dst op1 op2 -> usage (regOp op1 ++ regOp op2, regOp dst)
+  -- WARNING: VSETIVLI is a special case. It changes the interpretation of all vector registers!
   VSETIVLI dst _ _ _ _ _ -> usage ([], [dst])
-  VNEG dst src1 -> usage (regOp src1, regOp dst)
-  VADD dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VSUB dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VMUL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VQUOT dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VSMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VSMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VUMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VUMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VFMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VFMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VNEG fmt dst src1 -> usage (regOp src1, regOp dst)
+  VADD fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VSUB fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VMUL fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VQUOT fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VSMIN fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VSMAX fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VUMIN fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VUMAX fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VFMIN fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VFMAX fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
@@ -227,23 +228,23 @@ patchRegsOfInstr instr env = case instr of
   FABS o1 o2 -> FABS (patchOp o1) (patchOp o2)
   FMIN o1 o2 o3 -> FMIN (patchOp o1) (patchOp o2) (patchOp o3)
   FMAX o1 o2 o3 -> FMAX (patchOp o1) (patchOp o2) (patchOp o3)
-  VMV o1 o2 -> VMV (patchOp o1) (patchOp o2)
-  VID o1 o2 -> VID (patchOp o1) (patchOp o2)
-  VMSEQ o1 o2 o3 -> VMSEQ (patchOp o1) (patchOp o2) (patchOp o3)
-  VMERGE o1 o2 o3 o4 -> VMERGE (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
-  VSLIDEDOWN o1 o2 o3 -> VSLIDEDOWN (patchOp o1) (patchOp o2) (patchOp o3)
+  VMV fmt o1 o2 -> VMV fmt (patchOp o1) (patchOp o2)
+  VID fmt o1 o2 -> VID fmt (patchOp o1) (patchOp o2)
+  VMSEQ fmt o1 o2 o3 -> VMSEQ fmt (patchOp o1) (patchOp o2) (patchOp o3)
+  VMERGE fmt o1 o2 o3 o4 -> VMERGE fmt (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
+  VSLIDEDOWN fmt o1 o2 o3 -> VSLIDEDOWN fmt (patchOp o1) (patchOp o2) (patchOp o3)
   VSETIVLI o1 o2 o3 o4 o5 o6 -> VSETIVLI (env o1) o2 o3 o4 o5 o6
-  VNEG o1 o2 -> VNEG (patchOp o1) (patchOp o2)
-  VADD o1 o2 o3 -> VADD (patchOp o1) (patchOp o2) (patchOp o3)
-  VSUB o1 o2 o3 -> VSUB (patchOp o1) (patchOp o2) (patchOp o3)
-  VMUL o1 o2 o3 -> VMUL (patchOp o1) (patchOp o2) (patchOp o3)
-  VQUOT o1 o2 o3 -> VQUOT (patchOp o1) (patchOp o2) (patchOp o3)
-  VSMIN o1 o2 o3 -> VSMIN (patchOp o1) (patchOp o2) (patchOp o3)
-  VSMAX o1 o2 o3 -> VSMAX (patchOp o1) (patchOp o2) (patchOp o3)
-  VUMIN o1 o2 o3 -> VUMIN (patchOp o1) (patchOp o2) (patchOp o3)
-  VUMAX o1 o2 o3 -> VUMAX (patchOp o1) (patchOp o2) (patchOp o3)
-  VFMIN o1 o2 o3 -> VFMIN (patchOp o1) (patchOp o2) (patchOp o3)
-  VFMAX o1 o2 o3 -> VFMAX (patchOp o1) (patchOp o2) (patchOp o3)
+  VNEG fmt o1 o2 -> VNEG fmt (patchOp o1) (patchOp o2)
+  VADD fmt o1 o2 o3 -> VADD fmt (patchOp o1) (patchOp o2) (patchOp o3)
+  VSUB fmt o1 o2 o3 -> VSUB fmt (patchOp o1) (patchOp o2) (patchOp o3)
+  VMUL fmt o1 o2 o3 -> VMUL fmt (patchOp o1) (patchOp o2) (patchOp o3)
+  VQUOT fmt o1 o2 o3 -> VQUOT fmt (patchOp o1) (patchOp o2) (patchOp o3)
+  VSMIN fmt o1 o2 o3 -> VSMIN fmt (patchOp o1) (patchOp o2) (patchOp o3)
+  VSMAX fmt o1 o2 o3 -> VSMAX fmt (patchOp o1) (patchOp o2) (patchOp o3)
+  VUMIN fmt o1 o2 o3 -> VUMIN fmt (patchOp o1) (patchOp o2) (patchOp o3)
+  VUMAX fmt o1 o2 o3 -> VUMAX fmt (patchOp o1) (patchOp o2) (patchOp o3)
+  VFMIN fmt o1 o2 o3 -> VFMIN fmt (patchOp o1) (patchOp o2) (patchOp o3)
+  VFMAX fmt o1 o2 o3 -> VFMAX fmt (patchOp o1) (patchOp o2) (patchOp o3)
   FMA s o1 o2 o3 o4 ->
     FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
   _ -> panic $ "patchRegsOfInstr: " ++ instrCon instr
@@ -341,21 +342,23 @@ mkSpillInstr ::
   -- | spill slot to use
   Int ->
   [Instr]
-mkSpillInstr _config (RegWithFormat reg _fmt) delta slot =
+mkSpillInstr _config (RegWithFormat reg fmt) delta slot =
   case off - delta of
-    imm | fitsIn12bitImm imm -> [mkStrSpImm imm]
+    imm | fitsIn12bitImm imm && not (isVecFormat fmt) -> [mkStrSpImm imm]
     imm ->
       [ movImmToTmp imm,
         addSpToTmp,
         mkStrTmp
       ]
   where
-    fmt = case reg of
-      RegReal (RealRegSingle n) | n < d0RegNo -> II64
-      _ -> FF64
+    fmt'
+      | isVecFormat fmt
+      = fmt
+      | otherwise
+      = scalarMoveFormat fmt
     mkStrSpImm imm =
       ANN (text "Spill@" <> int (off - delta))
-        $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
+        $ STR fmt' (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
     movImmToTmp imm =
       ANN (text "Spill: TMP <- " <> int imm)
         $ MOV tmp (OpImm (ImmInt imm))
@@ -364,7 +367,7 @@ mkSpillInstr _config (RegWithFormat reg _fmt) delta slot =
         $ ADD tmp tmp sp
     mkStrTmp =
       ANN (text "Spill@" <> int (off - delta))
-        $ STR fmt (OpReg W64 reg) (OpAddr (AddrReg tmpReg))
+        $ STR fmt' (OpReg W64 reg) (OpAddr (AddrReg tmpReg))
 
     off = spillSlotToOffset slot
 
@@ -378,21 +381,23 @@ mkLoadInstr ::
   -- | spill slot to use
   Int ->
   [Instr]
-mkLoadInstr _config (RegWithFormat reg _fmt) delta slot =
+mkLoadInstr _config (RegWithFormat reg fmt) delta slot =
   case off - delta of
-    imm | fitsIn12bitImm imm -> [mkLdrSpImm imm]
+    imm | fitsIn12bitImm imm && not (isVecFormat fmt) -> [mkLdrSpImm imm]
     imm ->
       [ movImmToTmp imm,
         addSpToTmp,
         mkLdrTmp
       ]
   where
-    fmt = case reg of
-      RegReal (RealRegSingle n) | n < d0RegNo -> II64
-      _ -> FF64
+    fmt'
+      | isVecFormat fmt
+      = fmt
+      | otherwise
+      = scalarMoveFormat fmt
     mkLdrSpImm imm =
       ANN (text "Reload@" <> int (off - delta))
-        $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
+        $ LDR fmt' (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
     movImmToTmp imm =
       ANN (text "Reload: TMP <- " <> int imm)
         $ MOV tmp (OpImm (ImmInt imm))
@@ -401,9 +406,15 @@ mkLoadInstr _config (RegWithFormat reg _fmt) delta slot =
         $ ADD tmp tmp sp
     mkLdrTmp =
       ANN (text "Reload@" <> int (off - delta))
-        $ LDR fmt (OpReg W64 reg) (OpAddr (AddrReg tmpReg))
+        $ LDR fmt' (OpReg W64 reg) (OpAddr (AddrReg tmpReg))
 
     off = spillSlotToOffset slot
+
+scalarMoveFormat :: Format -> Format
+scalarMoveFormat fmt
+  | isFloatFormat fmt = FF64
+  | otherwise = II64
+
 
 -- | See if this instruction is telling us the current C stack delta
 takeDeltaInstr :: Instr -> Maybe Int
@@ -660,23 +671,23 @@ data Instr
     FMA FMASign Operand Operand Operand Operand
 
   -- TODO: Care about the variants (<instr>.x.y) -> sum type
-  | VMV Operand Operand
-  | VID Operand Operand
-  | VMSEQ Operand Operand Operand
-  | VMERGE Operand Operand Operand Operand
-  | VSLIDEDOWN Operand Operand Operand
+  | VMV Format Operand Operand
+  | VID Format Operand Operand
+  | VMSEQ Format Operand Operand Operand
+  | VMERGE Format Operand Operand Operand Operand
+  | VSLIDEDOWN Format Operand Operand Operand
   | VSETIVLI Reg Word Width VectorGrouping TailAgnosticFlag MaskAgnosticFlag
-  | VNEG Operand Operand
-  | VADD Operand Operand Operand
-  | VSUB Operand Operand Operand
-  | VMUL Operand Operand Operand
-  | VQUOT Operand Operand Operand
-  | VSMIN Operand Operand Operand
-  | VSMAX Operand Operand Operand
-  | VUMIN Operand Operand Operand
-  | VUMAX Operand Operand Operand
-  | VFMIN Operand Operand Operand
-  | VFMAX Operand Operand Operand
+  | VNEG Format Operand Operand
+  | VADD Format Operand Operand Operand
+  | VSUB Format Operand Operand Operand
+  | VMUL Format Operand Operand Operand
+  | VQUOT Format Operand Operand Operand
+  | VSMIN Format Operand Operand Operand
+  | VSMAX Format Operand Operand Operand
+  | VUMIN Format Operand Operand Operand
+  | VUMAX Format Operand Operand Operand
+  | VFMIN Format Operand Operand Operand
+  | VFMAX Format Operand Operand Operand
 
 -- | Operand of a FENCE instruction (@r@, @w@ or @rw@)
 data FenceType = FenceRead | FenceWrite | FenceReadWrite
@@ -769,6 +780,7 @@ data Target
   = TBlock BlockId
   | TReg Reg
 
+-- TODO: OpReg should carry the format, not only the width. This would unify OpReg and OpVecReg.
 data Operand
   = -- | register
     OpReg Width Reg

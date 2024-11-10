@@ -144,6 +144,10 @@ allGpArgRegs = map regSingle [a0RegNo .. a7RegNo]
 allFpArgRegs :: [Reg]
 allFpArgRegs = map regSingle [fa0RegNo .. fa7RegNo]
 
+-- | Literally all general vector registers (no status registers)
+allVecRegs :: [Reg]
+allVecRegs = map regSingle [v0RegNo .. v31RegNo]
+
 -- * Addressing modes
 
 -- | Addressing modes

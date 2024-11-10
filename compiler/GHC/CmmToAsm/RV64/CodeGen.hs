@@ -659,8 +659,20 @@ getRegister' config plat expr =
           width = typeWidth rep
       Amode addr addr_code <- getAmode plat width mem
       case (width, format) of
+        (_w, f)
+          | VecFormat l vf <- f ->
+              pure
+                ( Any
+                    format
+                    ( \dst ->
+                        unitOL (COMMENT (text "XXX here")) `appOL`
+                        addr_code `snocOL`
+                          annExpr expr
+                            (LDRU format (OpReg width dst) (OpAddr addr))
+                    )
+                )
         (w, _f)
-          | (w <= W64) ->
+          | w <= W64 ->
               -- Load without sign-extension. See Note [Signed arithmetic on RISCV64]
               pure
                 ( Any
@@ -668,17 +680,6 @@ getRegister' config plat expr =
                     ( \dst ->
                         addr_code
                           `snocOL` LDRU format (OpReg width dst) (OpAddr addr)
-                    )
-                )
-        (_w, f)
-          | VecFormat l vf <- f ->
-              pure
-                ( Any
-                    format
-                    ( \dst ->
-                        addr_code `snocOL`
-                          annExpr expr (VSETIVLI zeroReg (fromIntegral l) ((formatToWidth . scalarFormatFormat) vf) M1 TA MA) `snocOL`
-                          LDRU format (OpReg width dst) (OpAddr addr)
                     )
                 )
         -- TODO: Load vector - instructions VLW, VLB, VLH, ... Encode in ppr of LDRU?
@@ -839,16 +840,16 @@ getRegister' config plat expr =
           let w_val = formatToWidth format_val
           pure $ Any (intFormat w) $ \dst ->
             code_val `snocOL`
-            annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `snocOL`
-            VMV (OpReg w dst) (OpReg w_val reg_val)
+            annExpr expr
+              (VMV (VecFormat length (intScalarFormat w)) (OpReg w dst) (OpReg w_val reg_val))
 
         MO_VF_Broadcast length w -> do
           (reg_val, format_val, code_val) <- getSomeReg e
           let w_val = formatToWidth format_val
           pure $ Any (vecFormat (cmmVec length (cmmFloat w))) $ \dst ->
             code_val `snocOL`
-            annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `snocOL`
-            VMV (OpReg w dst) (OpReg w_val reg_val)
+            annExpr expr
+              (VMV (VecFormat length (floatScalarFormat w)) (OpReg w dst) (OpReg w_val reg_val))
 
         -- TODO: NO MO_V_Neg? Why?
         MO_VF_Neg length w -> do
@@ -856,8 +857,8 @@ getRegister' config plat expr =
           let w_v = formatToWidth format_v
           pure $ Any (vecFormat (cmmVec length (cmmFloat w))) $ \dst ->
             code_v `snocOL`
-            annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `snocOL`
-            VNEG (OpReg w dst) (OpReg w_v reg_v)
+            annExpr expr
+              (VNEG (VecFormat length (floatScalarFormat w))(OpReg w dst) (OpReg w_v reg_v))
 
         x -> pprPanic ("getRegister' (monadic CmmMachOp): " ++ show x) (pdoc plat expr)
       where
@@ -1147,8 +1148,8 @@ getRegister' config plat expr =
             pure $ Any (vecFormat (cmmVec length (cmmFloat w))) $ \dst ->
               code_x `appOL`
               code_y `snocOL`
-              annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `appOL`
-              op (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)
+              annExpr expr
+                (op (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y))
 
       case op of
         -- Integer operations
@@ -1212,27 +1213,26 @@ getRegister' config plat expr =
             code_v `appOL`
             code_idx `snocOL`
             -- Setup
-            -- vsetivli zero, 1, e32, m1, ta, ma
             -- TODO: Use width
-            annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `snocOL`
+            annExpr expr
             -- Move selected element to index 0
             -- vslidedown.vi v8, v9, 2
-            VSLIDEDOWN (OpReg width_v tmp) (OpReg width_v reg_v) (OpReg (formatToWidth format_idx) reg_idx) `snocOL`
+              (VSLIDEDOWN (VecFormat length (floatScalarFormat w)) (OpReg width_v tmp) (OpReg width_v reg_v) (OpReg (formatToWidth format_idx) reg_idx)) `snocOL`
             -- Move to float register
             -- vmv.x.s a0, v8
-            VMV (OpReg w dst) (OpReg (formatToWidth tmpFormat) tmp)
-        MO_VF_Add  length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VADD d x y))
-        MO_VF_Sub  length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VSUB d x y))
-        MO_VF_Mul  length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VMUL d x y))
-        MO_VF_Quot length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VQUOT d x y))
+            VMV (VecFormat length (floatScalarFormat w))(OpReg w dst) (OpReg (formatToWidth tmpFormat) tmp)
+        MO_VF_Add  length w -> vecOp length w (\d x y -> (VADD (VecFormat length (floatScalarFormat w)) d x y))
+        MO_VF_Sub  length w -> vecOp length w (\d x y -> (VSUB (VecFormat length (floatScalarFormat w)) d x y))
+        MO_VF_Mul  length w -> vecOp length w (\d x y -> (VMUL (VecFormat length (floatScalarFormat w)) d x y))
+        MO_VF_Quot length w -> vecOp length w (\d x y -> (VQUOT (VecFormat length (floatScalarFormat w)) d x y))
 
         -- See https://godbolt.org/z/PvcWKMKoW
-        MO_VS_Min length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VSMIN d x y))
-        MO_VS_Max length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VSMAX d x y))
-        MO_VU_Min length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VUMIN d x y))
-        MO_VU_Max length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VUMAX d x y))
-        MO_VF_Min length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VFMIN d x y))
-        MO_VF_Max length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VFMAX d x y))
+        MO_VS_Min length w -> vecOp length w (\d x y -> (VSMIN (VecFormat length (intScalarFormat w)) d x y))
+        MO_VS_Max length w -> vecOp length w (\d x y -> (VSMAX (VecFormat length (intScalarFormat w)) d x y))
+        MO_VU_Min length w -> vecOp length w (\d x y -> (VUMIN (VecFormat length (intScalarFormat w)) d x y))
+        MO_VU_Max length w -> vecOp length w (\d x y -> (VUMAX (VecFormat length (intScalarFormat w)) d x y))
+        MO_VF_Min length w -> vecOp length w (\d x y -> (VFMIN (VecFormat length (floatScalarFormat w)) d x y))
+        MO_VF_Max length w -> vecOp length w (\d x y -> (VFMAX (VecFormat length (floatScalarFormat w)) d x y))
 
 
         _e -> panic $ "Missing operation " ++ show expr
@@ -1305,16 +1305,16 @@ getRegister' config plat expr =
               code_f `appOL`
               code_idx `appOL`
               code_l `snocOL`
-              annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `snocOL`
+              annExpr expr
               -- Build mask for index
               -- 1. fill elements with index numbers
               -- TODO: The Width is made up
-              VID (OpReg W8 v0Reg) (OpReg (formatToWidth format_l) reg_l) `snocOL`
+               (VID (VecFormat length (intScalarFormat w)) (OpReg W8 v0Reg) (OpReg (formatToWidth format_l) reg_l)) `snocOL`
               -- 2. Splat value into tmp vector
-              VMV (OpReg w tmp) (OpReg (formatToWidth format_f) reg_f) `snocOL`
+              VMV (VecFormat length (floatScalarFormat w)) (OpReg w tmp) (OpReg (formatToWidth format_f) reg_f) `snocOL`
               -- 3. Merge with mask -> set element at index
-              VMSEQ (OpReg W8 v0Reg) (OpReg W8 v0Reg) (OpReg (formatToWidth format_idx) reg_idx) `snocOL`
-              VMERGE (OpReg w dst) (OpReg (formatToWidth format_v) reg_v)  (OpReg w tmp) (OpReg W8 v0Reg)
+              VMSEQ (VecFormat length (floatScalarFormat w)) (OpReg W8 v0Reg) (OpReg W8 v0Reg) (OpReg (formatToWidth format_idx) reg_idx) `snocOL`
+              VMERGE (VecFormat length (floatScalarFormat w)) (OpReg w dst) (OpReg (formatToWidth format_v) reg_v)  (OpReg w tmp) (OpReg W8 v0Reg)
 
         _ ->
           pprPanic "getRegister' (unhandled ternary CmmMachOp): "
@@ -1573,18 +1573,18 @@ getAmode _platform _ (CmmMachOp (MO_Add _w) [expr, CmmLit (CmmInt off _w')])
   | fitsIn12bitImm off =
       do
         (reg, _format, code) <- getSomeReg expr
-        return $ Amode (AddrRegImm reg (ImmInteger off)) code
+        return $ Amode (AddrRegImm reg (ImmInteger off)) $ COMMENT (text "getAmode generic" <+> (text . show)  expr) `consOL` code
 getAmode _platform _ (CmmMachOp (MO_Sub _w) [expr, CmmLit (CmmInt off _w')])
   | fitsIn12bitImm (-off) =
       do
         (reg, _format, code) <- getSomeReg expr
-        return $ Amode (AddrRegImm reg (ImmInteger (-off))) code
+        return $ Amode (AddrRegImm reg (ImmInteger (-off))) $ COMMENT (text "getAmode generic" <+> (text . show)  expr) `consOL` code
 
 -- Generic case
 getAmode _platform _ expr =
   do
     (reg, _format, code) <- getSomeReg expr
-    return $ Amode (AddrReg reg) code
+    return $ Amode (AddrReg reg) $ COMMENT (text "getAmode generic" <+> (text . show)  expr) `consOL` code
 
 -- -----------------------------------------------------------------------------
 -- Generating assignments
@@ -1608,16 +1608,8 @@ assignMem rep addrE srcE =
     return $ COMMENT (text "CmmStore" <+> parens (text (show addrE)) <+> parens (text (show srcE)))
       `consOL` ( code
                    `appOL` addr_code
-                   `appOL` init_vector_code
                    `snocOL` STR rep (OpReg w src_reg) (OpAddr addr)
                )
-  where
-    init_vector_code :: InstrBlock
-    init_vector_code | VecFormat l w <- rep = toOL [
-                         COMMENT (text "Init vector state"),
-                         VSETIVLI zeroReg (fromIntegral l) ((formatToWidth . scalarFormatFormat) w) M1 TA MA
-                         ]
-                      | otherwise = nilOL
 
 assignReg :: Format -> CmmReg -> CmmExpr -> NatM InstrBlock
 assignReg _ reg src =
@@ -2377,30 +2369,30 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       CSET {} -> 2
       STR {} -> 1
       LDR {} -> 3
-      LDRU {} -> 1
+      LDRU {} -> 2
       FENCE {} -> 1
       FCVT {} -> 1
       FABS {} -> 1
       FMIN {} -> 1
       FMAX {} -> 1
       FMA {} -> 1
-      VMV {} -> 1
-      VID {} -> 1
-      VMSEQ {} -> 1
-      VMERGE {} -> 1
-      VSLIDEDOWN {} -> 1
+      VMV {} -> 2
+      VID {} -> 2
+      VMSEQ {} -> 2
+      VMERGE {} -> 2
+      VSLIDEDOWN {} -> 2
       VSETIVLI {} -> 1
-      VNEG {} -> 1
-      VADD {} -> 1
-      VSUB {} -> 1
-      VMUL {} -> 1
-      VQUOT {} -> 1
-      VSMIN {} -> 1
-      VSMAX {} -> 1
-      VUMIN {} -> 1
-      VUMAX {} -> 1
-      VFMIN {} -> 1
-      VFMAX {} -> 1
+      VNEG {} -> 2
+      VADD {} -> 2
+      VSUB {} -> 2
+      VMUL {} -> 2
+      VQUOT {} -> 2
+      VSMIN {} -> 2
+      VSMAX {} -> 2
+      VUMIN {} -> 2
+      VUMAX {} -> 2
+      VFMIN {} -> 2
+      VFMAX {} -> 2
       -- estimate the subsituted size for jumps to lables
       -- jumps to registers have size 1
       BCOND {} -> long_bc_jump_size
