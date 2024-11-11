@@ -213,10 +213,11 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_buil
  -- "../../testsuite/tests/printer/Test16279.hs" Nothing
  -- "../../testsuite/tests/printer/HsDocTy.hs" Nothing
  -- "../../testsuite/tests/printer/Test21355.hs" Nothing
---  "../../testsuite/tests/printer/Test22765.hs" Nothing
+ --  "../../testsuite/tests/printer/Test22765.hs" Nothing
  -- "../../testsuite/tests/printer/Test22771.hs" Nothing
  -- "../../testsuite/tests/printer/Test23465.hs" Nothing
- "../../testsuite/tests/printer/Test25454.hs" Nothing
+ -- "../../testsuite/tests/printer/Test25454.hs" Nothing
+ "../../testsuite/tests/printer/Test25467.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 
