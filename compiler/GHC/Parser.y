@@ -1853,7 +1853,7 @@ where_inst :: { Located ((EpToken "where", (EpToken "{", EpToken "}", [EpToken "
 --
 decls   :: { Located (EpaLocation, [EpToken ";"], OrdList (LHsDecl GhcPs)) }
         : decls ';' decl    {% if isNilOL (thdOf3 $ unLoc $1)
-                                 then return (sLL $1 $> (glEE $2 $3, (sndOf3 $ unLoc $1) ++ (msemiA $2)
+                                 then return (sLL $2 $> (glR $3, (sndOf3 $ unLoc $1) ++ (msemiA $2)
                                                         , unitOL $3))
                                  else case (thdOf3 $ unLoc $1) of
                                    SnocOL hs t -> do
@@ -1862,7 +1862,7 @@ decls   :: { Located (EpaLocation, [EpToken ";"], OrdList (LHsDecl GhcPs)) }
                                             rest = snocOL hs t';
                                             these = rest `appOL` this }
                                       return (rest `seq` this `seq` these `seq`
-                                                 (sLL $1 $> (glEE $1 $3, sndOf3 $ unLoc $1, these))) }
+                                                 (sLL $1 $> (glEE (fstOf3 $ unLoc $1) $3, sndOf3 $ unLoc $1, these))) }
         | decls ';'          {% if isNilOL (thdOf3 $ unLoc $1)
                                   then return (sLZ $1 $> (glR $2, (sndOf3 $ unLoc $1) ++ (msemiA $2)
                                                           ,thdOf3 $ unLoc $1))
@@ -1876,7 +1876,7 @@ decls   :: { Located (EpaLocation, [EpToken ";"], OrdList (LHsDecl GhcPs)) }
 decllist :: { Located (AnnList (),Located (OrdList (LHsDecl GhcPs))) }
         : '{'            decls '}'     { sLL $1 $> (AnnList (Just (fstOf3 $ unLoc $2)) (ListBraces (epTok $1) (epTok $3)) (sndOf3 $ unLoc $2) noAnn []
                                                    ,sL1 $2 $ thdOf3 $ unLoc $2) }
-        |     vocurly    decls close   { L (getHasLoc $ fstOf3 $ unLoc $2) (AnnList (Just (glR $2)) ListNone (sndOf3 $ unLoc $2) noAnn []
+        |     vocurly    decls close   { sL1 $2    (AnnList (Just (fstOf3 $ unLoc $2)) ListNone (sndOf3 $ unLoc $2) noAnn []
                                                    ,sL1 $2 $ thdOf3 $ unLoc $2) }
 
 -- Binding groups other than those of class and instance declarations
