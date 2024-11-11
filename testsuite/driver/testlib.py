@@ -2857,7 +2857,7 @@ def normalise_whitespace(s: str) -> str:
     # Merge contiguous whitespace characters into a single space.
     return ' '.join(s.split())
 
-callSite_re = re.compile(r', called at (.+):[\d]+:[\d]+ in [\w\-\.]+:')
+callSite_re = re.compile(r', called at (.+):[\d]+:[\d]+ in [<>\w\-\.]+:')
 
 def normalise_callstacks(s: str) -> str:
     opts = getTestOpts()
