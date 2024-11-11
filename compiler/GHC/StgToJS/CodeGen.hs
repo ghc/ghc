@@ -48,6 +48,7 @@ import GHC.Types.ForeignStubs (ForeignStubs (..), getCHeader, getCStub)
 import GHC.Types.RepType
 import GHC.Types.Id
 import GHC.Types.Unique
+import GHC.Types.Unique.FM (nonDetEltsUFM)
 
 import GHC.Data.FastString
 import GHC.Utils.Encoding
@@ -60,6 +61,7 @@ import GHC.Utils.Outputable hiding ((<>))
 
 import qualified Data.Set as S
 import Data.Monoid
+import Data.List (sortBy)
 import Control.Monad
 import System.Directory
 import System.FilePath
@@ -327,10 +329,12 @@ genToplevelRhs i rhs = case rhs of
     eid  <- identForEntryId i
     idt  <- identFS <$> identForId i
     body <- genBody (initExprCtx i) R2 args body typ
-    global_occs <- globalOccs body
+    occs <- globalOccs body
+    let lids = global_id <$> (sortBy cmp_cnt $ nonDetEltsUFM occs)
+    -- Regenerate idents from lids to restore right order of representatives.
+    -- Representatives have occurrence order which can be mixed.
+    lidents <- concat <$> traverse identsForId lids
     let eidt = identFS eid
-    let lidents = map global_ident global_occs
-    let lids    = map global_id    global_occs
     let lidents' = map identFS lidents
     CIStaticRefs sr0 <- genStaticRefsRhs rhs
     let sri = filter (`notElem` lidents') sr0
@@ -361,3 +365,6 @@ genToplevelRhs i rhs = case rhs of
     ccId <- costCentreStackLbl cc
     emitStatic idt (StaticApp appK eidt $ map StaticObjArg lidents') ccId
     return $ (FuncStat eid [] (ll <> upd <> setcc <> body))
+    where
+      cmp_cnt :: GlobalOcc -> GlobalOcc -> Ordering
+      cmp_cnt g1 g2 = compare (global_count g1) (global_count g2)

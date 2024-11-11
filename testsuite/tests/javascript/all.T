@@ -23,5 +23,5 @@ test('T22455', normal, compile_and_run, ['-ddisable-js-minifier'])
 test('T23565', normal, compile_and_run, [''])
 test('T24495', normal, makefile_test, ['T24495'])
 
-test('T23479_1', normal, makefile_test, ['T23479_1'])
-test('T23479_2', normal, makefile_test, ['T23479_2'])
+test('T23479', normal, makefile_test, ['T23479'])
+test('T24744', normal, makefile_test, ['T24744'])

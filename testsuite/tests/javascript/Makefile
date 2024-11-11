@@ -13,20 +13,21 @@ T24495:
 	# check that the optimization occurred for -02 1 time (1 for unfloated lits)
 	grep -c appendToHsStringA T24495.dump-js
 
-T23479_1:
-	'$(TEST_HC)' $(TEST_HC_OPTS) T23479_1.hs -v0 -O2 -dsuppress-uniques -ddump-js -ddump-to-file
-	./T23479_1
+T23479:
+	'$(TEST_HC)' $(TEST_HC_OPTS) T23479.hs -v0 -O2 -dsuppress-uniques -ddump-js -ddump-to-file
+	./T23479
 	# check that the optimization occurred
-	grep -c "h\$$r1 = \"test_val_1\"" T23479_1.dump-js
-	grep -c "h\$$r1 = \"test_val_2\"" T23479_1.dump-js
-	grep -c "h\$$r1 = \"test_val_3\"" T23479_1.dump-js
-	grep -c "h\$$r1 = \"test_val_80_local" T23479_1.dump-js
-	grep -c "h\$$r1 = \"test_val_80_global" T23479_1.dump-js || true
+	grep -c "h\$$r1 = \"test_val_1\"" T23479.dump-js
+	grep -c "h\$$r1 = \"test_val_2\"" T23479.dump-js
+	grep -c "h\$$r1 = \"test_val_3\"" T23479.dump-js
+	grep -c "h\$$r1 = \"test_val_80_local" T23479.dump-js
+	grep -c "h\$$r1 = \"test_val_80_global" T23479.dump-js || true
 
-T23479_2:
-	'$(TEST_HC)' $(TEST_HC_OPTS) T23479_2.hs -v0 -O2 -dsuppress-uniques -ddump-js -ddump-to-file
-	./T23479_2
-	grep -c "h\$$r1 = \"test_val_1\"" T23479_2.dump-js
-	grep -c "h\$$r1 = \"test_val_80_local_once" T23479_2.dump-js
+T24744:
+	'$(TEST_HC)' $(TEST_HC_OPTS) T24744.hs -v0 -O2 -dsuppress-uniques -ddump-js -ddump-to-file
+	./T24744
+	grep -c "h\$$r1 = \"test_val_1\"" T24744.dump-js
+	grep -c "h\$$r1 = \"test_val_80_local_once" T24744.dump-js
 	# check that the optimization occurred
-	grep -c "h\$$r1 = h\$$decodeUtf8z" T23479_2.dump-js
+	grep -c "h\$$r1 = h\$$decodeUtf8z" T24744.dump-js
+	grep -c "h\$$stc(h\$$mainZCMainzitestzuvalzu80zulocal,h\$$mainZCMainzitestzuvalzu80zulocal_e,\[h\$$ghczmprimZCGHCziCStringziunpackCStringzh,h\$$mainZCMainzimain7_1,h\$$mainZCMainzimain7_2\])" T24744.jsexe/out.js

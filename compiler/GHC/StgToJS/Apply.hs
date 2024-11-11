@@ -100,7 +100,7 @@ genApp
   -> [StgArg]
   -> G (JStgStat, ExprResult)
 genApp ctx i args
-    -- Test case T23479_2
+    -- Test case moved to T24744
     -- See: https://github.com/ghcjs/ghcjs/blob/b7711fbca7c3f43a61f1dba526e6f2a2656ef44c/src/Gen2/Generator.hs#L876
     -- Comment by Luite Stegeman <luite.stegeman@iohk.io>
     -- Special cases for JSString literals.
@@ -119,7 +119,7 @@ genApp ctx i args
     , [top] <- concatMap typex_expr (ctxTarget ctx)
     = (,ExprInline) . (|=) top . app hdDecodeUtf8Z <$> varsForId v
 
-    -- Test case T23479_1
+    -- Test case T23479
     | [StgLitArg (LitString bs)] <- args
     , Just d <- decodeModifiedUTF8 bs
     , idName i == unsafeUnpackJSStringUtf8ShShName

@@ -155,7 +155,7 @@ cachedIdentForId i mi id_type = do
 
   -- Now update the GlobalId cache, if required
 
-  let update_global_cache = isGlobalId i && isNothing mi && id_type == IdPlain
+  let update_global_cache = isGlobalId i && id_type == IdPlain
       -- fixme also allow caching entries for lifting?
 
   when (update_global_cache) $ do

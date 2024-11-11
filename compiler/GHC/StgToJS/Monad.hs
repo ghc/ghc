@@ -45,7 +45,6 @@ import GHC.Data.FastMutInt
 
 import qualified Data.Map  as M
 import qualified Data.Set  as S
-import qualified Data.List as L
 
 runG :: StgToJSConfig -> Module -> UniqFM Id CgStgExpr -> G a -> IO a
 runG config m unfloat action = State.evalStateT action =<< initState config m unfloat
@@ -153,32 +152,30 @@ getGlobalIdCache = State.gets (ggsGlobalIdCache . gsGroup)
 setGlobalIdCache :: GlobalIdCache -> G ()
 setGlobalIdCache v = State.modify (\s -> s { gsGroup = (gsGroup s) { ggsGlobalIdCache = v}})
 
-
 data GlobalOcc = GlobalOcc
-  { global_ident :: !Ident
-  , global_id    :: !Id
+  { global_id    :: !Id
   , global_count :: !Word
   }
 
 instance Outputable GlobalOcc where
   ppr g = hang (text "GlobalOcc") 2 $ vcat
-            [ hcat [text "Ident: ", ppr (global_ident g)]
-            , hcat [text "Id:", ppr (global_id g)]
+            [ hcat [text "Id:", ppr (global_id g)]
             , hcat [text "Count:", ppr (global_count g)]
             ]
 
--- | Return number of occurrences of every global id used in the given JStgStat.
+-- | Return occurrences of every global id used in the given JStgStat.
 -- Sort by increasing occurrence count.
-globalOccs :: JStgStat -> G [GlobalOcc]
+globalOccs :: JStgStat -> G (UniqFM Id GlobalOcc)
 globalOccs jst = do
   GlobalIdCache gidc <- getGlobalIdCache
-  -- build a map form Ident Unique to (Ident, Id, Count)
+  -- build a map form Ident Unique to (Id, Count)
+  -- Note that different Idents can map to the same Id (e.g. string payload and string offset idents)
   let
-    cmp_cnt g1 g2 = compare (global_count g1) (global_count g2)
     inc g1 g2 = g1 { global_count = global_count g1 + global_count g2 }
+
+    go :: UniqFM Id GlobalOcc -> [Ident] -> UniqFM Id GlobalOcc
     go gids = \case
-        []     -> -- return global Ids used locally sorted by increased use
-                  L.sortBy cmp_cnt $ nonDetEltsUFM gids
+        []     -> gids
         (i:is) ->
           -- check if the Id is global
           case lookupUFM gidc i of
@@ -186,7 +183,7 @@ globalOccs jst = do
             Just (_k,gid) ->
               -- add it to the list of already found global ids. Increasing
               -- count by 1
-              let g = GlobalOcc i gid 1
-              in go (addToUFM_C inc gids i g) is
+              let g = GlobalOcc gid 1
+              in go (addToUFM_C inc gids gid g) is
 
-  pure $ go emptyUFM (identsS jst)
+  pure $ go emptyUFM $ identsS jst
