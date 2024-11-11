@@ -6,6 +6,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds #-}
 
+{-# OPTIONS_GHC -fno-specialise #-}
+   -- Don't do type-class specialisation; it goes mad in this module
+   -- See #25463
+
 -- | Contains a debug function to dump parts of the GHC.Hs AST. It uses a syb
 -- traversal which falls back to displaying based on the constructor name, so
 -- can be used to dump anything having a @Data.Data@ instance.

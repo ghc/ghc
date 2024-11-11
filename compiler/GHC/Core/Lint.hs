@@ -3016,6 +3016,12 @@ type WarnsAndErrs = (Bag SDoc, Bag SDoc)
 
 -- Using a unboxed tuple here reduced allocations for a lint heavy
 -- file by ~6%. Using MaybeUB reduced them further by another ~12%.
+--
+-- Warning: if you don't inline the matcher for JustUB etc, Lint becomes
+-- /tremendously/ inefficient, and compiling GHC.Tc.Errors.Types (which
+-- contains gigantic types) is very very slow indeed. Conclusion: make
+-- sure unfoldings are expose in GHC.Data.Unboxed, and that you compile
+-- Lint.hs with optimistation on.
 type LResult a = (# MaybeUB a, WarnsAndErrs #)
 
 pattern LResult :: MaybeUB a -> WarnsAndErrs -> LResult a
