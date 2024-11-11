@@ -888,7 +888,8 @@ lintCoreExpr (Cast expr co)
   = do { (expr_ty, ue) <- markAllJoinsBad (lintCoreExpr expr)
             -- markAllJoinsBad: see Note [Join points and casts]
 
-       ; (co', role, from_ty, to_ty) <- lintCoercion co
+       ; co' <- lintCoercion co
+       ; let (Pair from_ty to_ty, role) = coercionKindRole co'
        ; checkValueType (typeKind to_ty) $
          text "target of cast" <+> quotes (ppr co')
        ; lintRole co' Representational role
@@ -1014,9 +1015,8 @@ lintCoreExpr (Type ty)
 
 lintCoreExpr (Coercion co)
   -- See Note [Coercions in terms]
-  = do { (_co', role, lty, rty) <- addLoc (InCo co) $
-                                   lintCoercion co
-       ; return (mkCoercionType role lty rty, zeroUE) }
+  = do { co' <- addLoc (InCo co) $ lintCoercion co
+       ; return (coercionType co', zeroUE) }
 
 ----------------------
 lintIdOcc :: InId -> Int -- Number of arguments (type or value) being passed
@@ -1468,9 +1468,9 @@ lintCoreArg (fun_ty, ue) (Type arg_ty)
 
 -- Coercion argument
 lintCoreArg (fun_ty, ue) (Coercion co)
-  = do { (co', r, lty, rty) <- addLoc (InCo co) $
-                               lintCoercion co
-       ; res <- lintCoApp fun_ty (co', mkCoercionType r lty rty)
+  = do { co' <- addLoc (InCo co) $
+                lintCoercion co
+       ; res <- lintCoApp fun_ty co'
        ; return (res, ue) }
 
 -- Other value argument
@@ -1550,8 +1550,8 @@ lintTyApp fun_ty arg_ty
   = failWithL (mkTyAppMsg fun_ty arg_ty)
 
 -----------------
-lintCoApp :: OutType -> (OutCoercion, OutType) -> LintM OutType
-lintCoApp fun_ty (co, co_ty)
+lintCoApp :: OutType -> OutCoercion -> LintM OutType
+lintCoApp fun_ty co
   | Just (cv,body_ty) <- splitForAllCoVar_maybe fun_ty
   , let cv_ty = idType cv
   , cv_ty `eqType` co_ty
@@ -1566,6 +1566,9 @@ lintCoApp fun_ty (co, co_ty)
 
   | otherwise
   = failWithL (mkCoAppMsg fun_ty co)
+
+  where
+    co_ty = coercionType co
 
 -----------------
 
@@ -2016,12 +2019,12 @@ lintType ty@(LitTy l)
 lintType (CastTy ty co)
   = do { ty' <- lintType ty
        ; let ty_kind = typeKind ty'
-       ; (co', co_lk, _co_rk) <- lintStarCoercion co
+       ; (co', co_lk) <- lintStarCoercion co
        ; ensureEqTys ty_kind co_lk (mkCastTyErr ty co ty_kind co_lk)
        ; return (CastTy ty' co') }
 
 lintType (CoercionTy co)
-  = do { (co', _, _, _) <- lintCoercion co
+  = do { co' <- lintCoercion co
        ; return (CoercionTy co') }
 
 -----------------
@@ -2312,17 +2315,19 @@ which is what used to happen.   But that proved tricky and error prone
 -}
 
 
--- lints a coercion, confirming that its lh kind and its rh kind are both *
--- also ensures that the role is Nominal
-lintStarCoercion :: InCoercion -> LintM (OutCoercion, OutType, OutType)
+-- lintStarCoercion lints a coercion, confirming that its lh kind and
+-- its rh kind are both *; also ensures that the role is Nominal
+-- Returns the lh kind
+lintStarCoercion :: InCoercion -> LintM (OutCoercion, OutType)
 lintStarCoercion g
-  = do { (g', role, t1, t2) <- lintCoercion g
+  = do { g' <- lintCoercion g
+       ; let Pair t1 t2 = coercionKind g'
        ; checkValueType (typeKind t1) (text "the kind of the left type in" <+> ppr g)
        ; checkValueType (typeKind t2) (text "the kind of the right type in" <+> ppr g)
-       ; lintRole g Nominal role
-       ; return (g', t1, t2) }
+       ; lintRole g Nominal (coercionRole g')
+       ; return (g', t1) }
 
-lintCoercion :: InCoercion -> LintM (OutCoercion, Role, OutType, OutType)
+lintCoercion :: InCoercion -> LintM OutCoercion
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 
@@ -2335,32 +2340,28 @@ lintCoercion (CoVarCo cv)
   = do { _ <- lintVarOcc cv
        ; subst <- getSubst
        ; case lookupCoVar subst cv of
-           Just linted_co -> return (linted_co, role, lty, rty)
-              where
-                (Pair lty rty, role) = coercionKindRole linted_co
-
-           Nothing -> return (CoVarCo cv, role, lty, rty)
-              where
-                (lty, rty, role) = coVarTypesRole cv
+           Just linted_co -> return linted_co
+           Nothing        -> return (CoVarCo cv)
      }
-
 
 lintCoercion (Refl ty)
   = do { ty' <- lintType ty
-       ; return (Refl ty', Nominal, ty', ty') }
+       ; return (Refl ty') }
 
 lintCoercion (GRefl r ty MRefl)
   = do { ty' <- lintType ty
-       ; return (GRefl r ty' MRefl, r, ty', ty') }
+       ; return (GRefl r ty' MRefl) }
 
 lintCoercion (GRefl r ty (MCo co))
   = do { ty' <- lintType ty
-       ; (co', role, lk, _rk) <- lintCoercion co
-       ; ensureEqTys (typeKind ty') lk $
+       ; co' <- lintCoercion co
+       ; let tk = typeKind ty'
+             tl = coercionLKind co'
+       ; ensureEqTys tk tl $
          hang (text "GRefl coercion kind mis-match:" <+> ppr co)
-            2 (vcat [ppr ty', ppr ty', ppr lk])
-       ; lintRole co' Nominal role
-       ; return (GRefl r ty' (MCo co'), r, ty', mkCastTy ty' co') }
+            2 (vcat [ppr ty', ppr tk, ppr tl])
+       ; lintRole co' Nominal (coercionRole co')
+       ; return (GRefl r ty' (MCo co')) }
 
 lintCoercion co@(TyConAppCo r tc cos)
   | Just {} <- tyConAppFunCo_maybe r tc cos
@@ -2373,11 +2374,11 @@ lintCoercion co@(TyConAppCo r tc cos)
 
   | otherwise
   = do { checkTyCon tc
-       ; (cos', co_roles, ltys, rtys) <- mapAndUnzip4M lintCoercion cos
-       ; lint_co_app co (tyConKind tc) ltys
-       ; lint_co_app co (tyConKind tc) rtys
-       ; zipWithM_ (lintRole co) (tyConRoleListX r tc) co_roles
-       ; return (TyConAppCo r tc cos', r, mkTyConApp tc ltys, mkTyConApp tc rtys) }
+       ; cos' <- mapM lintCoercion cos
+       ; lint_co_app co (tyConKind tc) (map coercionLKind cos')
+       ; lint_co_app co (tyConKind tc) (map coercionRKind cos')
+       ; zipWithM_ (lintRole co) (tyConRoleListX r tc) (map coercionRole cos')
+       ; return (TyConAppCo r tc cos') }
 
 lintCoercion co@(AppCo co1 co2)
   | TyConAppCo {} <- co1
@@ -2385,18 +2386,19 @@ lintCoercion co@(AppCo co1 co2)
   | Just (TyConApp {}, _) <- isReflCo_maybe co1
   = failWithL (text "Refl (TyConApp ...) to the left of AppCo:" <+> ppr co)
   | otherwise
-  = do { (co1', r1, lk1, rk1) <- lintCoercion co1
-       ; (co2', r2, lk2, rk2) <- lintCoercion co2
-       ; lint_co_app co (typeKind lk1) [lk2]
-       ; lint_co_app co (typeKind rk1) [rk2]
+  = do { co1' <- lintCoercion co1
+       ; co2' <- lintCoercion co2
+       ; lint_co_app co (typeKind (coercionLKind co1')) [coercionLKind co2']
+       ; lint_co_app co (typeKind (coercionRKind co1')) [coercionRKind co2']
 
-       ; if r1 == Phantom
+       ; let r2 = coercionRole co2'
+       ; if coercionRole co1' == Phantom
          then lintL (r2 == Phantom || r2 == Nominal)
                      (text "Second argument in AppCo cannot be R:" $$
                       ppr co)
          else lintRole co Nominal r2
 
-       ; return (AppCo co1' co2', r1, mkAppTy lk1 lk2, mkAppTy rk1 rk2) }
+       ; return (AppCo co1' co2') }
 
 ----------
 lintCoercion co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
@@ -2408,10 +2410,10 @@ lintCoercion co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
   = failWithL (text "Non tyco binder in ForAllCo:" <+> ppr co)
 
   | otherwise
-  = do { (kind_co', lkind, _rkind) <- lintStarCoercion kind_co
+  = do { (kind_co', lk) <- lintStarCoercion kind_co
        ; lintTyCoBndr tcv $ \tcv' ->
-    do { (body_co', body_role, lty, rty) <- lintCoercion body_co
-       ; ensureEqTys (varType tcv') lkind $
+    do { body_co' <- lintCoercion body_co
+       ; ensureEqTys (varType tcv') lk $
          text "Kind mis-match in ForallCo" <+> ppr co
 
        -- Assuming kind_co :: k1 ~ k2
@@ -2420,6 +2422,7 @@ lintCoercion co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
        --    (forall (tcv:k2). rty[(tcv:k2) |> sym kind_co/tcv])
        -- are both well formed.  Easiest way is to call lintForAllBody
        -- for each; there is actually no need to do the funky substitution
+       ; let (Pair lty rty, body_role) = coercionKindRole body_co'
        ; lintForAllBody tcv' lty
        ; lintForAllBody tcv' rty
 
@@ -2436,28 +2439,25 @@ lintCoercion co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
          lintL (visL `eqForAllVis` visR) $
          text "Nominal ForAllCo has mismatched visibilities: " <+> ppr co
 
-       ; let co'  = co { fco_tcv = tcv', fco_kind = kind_co', fco_body = body_co' }
-             lty' = mkTyCoForAllTy tcv' visL lty
-             rty' = coercionRKind co'  -- Too complicated to inline!
-       ; return ( co', body_role, lty', rty') } }
+       ; return (co { fco_tcv = tcv', fco_kind = kind_co', fco_body = body_co' }) } }
 
 lintCoercion co@(FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
                        , fco_mult = cow, fco_arg = co1, fco_res = co2 })
-  = do { (co1', r1, lt1, rt1) <- lintCoercion co1
-       ; (co2', r2, lt2, rt2) <- lintCoercion co2
-       ; (cow', rw, ltw, rtw) <- lintCoercion cow
+  = do { co1' <- lintCoercion co1
+       ; co2' <- lintCoercion co2
+       ; cow' <- lintCoercion cow
+       ; let Pair lt1 rt1 = coercionKind co1'
+             Pair lt2 rt2 = coercionKind co2'
+             Pair ltw rtw = coercionKind cow'
        ; lintArrow (bad_co_msg "arrowl") afl lt1 lt2 ltw
        ; lintArrow (bad_co_msg "arrowr") afr rt1 rt2 rtw
-       ; lintRole co1 r r1
-       ; lintRole co2 r r2
+       ; lintRole co1 r (coercionRole co1')
+       ; lintRole co2 r (coercionRole co2')
        ; let expected_mult_role = case r of
                                     Phantom -> Phantom
                                     _ -> Nominal
-       ; lintRole cow expected_mult_role rw
-       ; return ( co { fco_mult = cow', fco_arg = co1', fco_res = co2' }
-                , r
-                , FunTy { ft_af = afl, ft_mult = ltw, ft_arg = lt1, ft_res = lt2 }
-                , FunTy { ft_af = afr, ft_mult = rtw, ft_arg = rt1, ft_res = rt2 } ) }
+       ; lintRole cow expected_mult_role (coercionRole cow')
+       ; return ( co { fco_mult = cow', fco_arg = co1', fco_res = co2' }) }
   where
     bad_co_msg s = hang (text "Bad coercion" <+> parens (text s))
                       2 (vcat [ text "afl:" <+> ppr afl
@@ -2482,10 +2482,9 @@ lintCoercion co@(UnivCo { uco_role = r, uco_prov = prov
               (checkTypes ty1 ty2)
 
        -- Check the coercions on which this UnivCo depends
-       ; (deps', _, _, _) <- mapAndUnzip4M lintCoercion deps
+       ; deps' <- mapM lintCoercion deps
 
-       ; return ( co { uco_lty = ty1', uco_rty = ty2', uco_deps = deps' }
-                , r, ty1', ty2' ) }
+       ; return (co { uco_lty = ty1', uco_rty = ty2', uco_deps = deps' }) }
    where
      report s = hang (text $ "Unsafe coercion: " ++ s)
                      2 (vcat [ text "From:" <+> ppr ty1
@@ -2529,20 +2528,22 @@ lintCoercion co@(UnivCo { uco_role = r, uco_prov = prov
             }
 
 lintCoercion (SymCo co)
-  = do { (co', r, lty, rty) <- lintCoercion co
-       ; return (SymCo co', r, rty, lty) }
+  = do { co' <- lintCoercion co
+       ; return (SymCo co') }
 
 lintCoercion co@(TransCo co1 co2)
-  = do { (co1', r1, lty1, rty1) <- lintCoercion co1
-       ; (co2', r2, lty2, rty2) <- lintCoercion co2
-       ; ensureEqTys rty1 lty2
+  = do { co1' <- lintCoercion co1
+       ; co2' <- lintCoercion co2
+       ; ensureEqTys (coercionRKind co1') (coercionLKind co2')
                (hang (text "Trans coercion mis-match:" <+> ppr co)
                    2 (vcat [ppr (coercionKind co1'), ppr (coercionKind co2')]))
-       ; lintRole co r1 r2
-       ; return (TransCo co1' co2', r1, lty1, rty2) }
+       ; lintRole co (coercionRole co1') (coercionRole co2')
+       ; return (TransCo co1' co2') }
 
 lintCoercion the_co@(SelCo cs co)
-  = do { (co', co_role, s, t) <- lintCoercion co
+  = do { co' <- lintCoercion co
+       ; let (Pair s t, co_role) = coercionKindRole co'
+
        ; if -- forall (both TyVar and CoVar)
             | Just _ <- splitForAllTyCoVar_maybe s
             , Just _ <- splitForAllTyCoVar_maybe t
@@ -2573,44 +2574,45 @@ lintCoercion the_co@(SelCo cs co)
             -> failWithL (hang (text "Bad SelCo:")
                              2 (ppr the_co $$ ppr s $$ ppr t))
 
-       ; return ( SelCo cs co', mkSelCoResRole cs co_role
-                , selectFromType cs s, selectFromType cs t) }
+       ; return (SelCo cs co') }
 
 lintCoercion the_co@(LRCo lr co)
-  = do { (co', r, s, t) <- lintCoercion co
+  = do { co' <- lintCoercion co
+       ; let (Pair s t, r) = coercionKindRole co'
        ; lintRole co Nominal r
-       ; (lty, rty) <- case (splitAppTy_maybe s, splitAppTy_maybe t) of
-           (Just (s1,s2), Just (t1,t2)) -> return (pickLR lr ((s1,t1),(s2,t2)))
+       ; case (splitAppTy_maybe s, splitAppTy_maybe t) of
+           (Just {}, Just {}) -> return ()
            _ -> failWithL (hang (text "Bad LRCo:")
                               2 (ppr the_co $$ ppr s $$ ppr t))
-       ; return (LRCo lr co', Nominal, lty, rty) }
+       ; return (LRCo lr co') }
 
 lintCoercion orig_co@(InstCo co arg)
   = go co [arg]
   where
     go (InstCo co arg) args = go co (arg:args)
-    go co              args = do { (co', fun_role, lty, rty) <- lintCoercion co
+    go co              args = do { co' <- lintCoercion co
+                                 ; let Pair lty rty = coercionKind co'
                                  ; in_scope <- getInScope
                                  ; let subst = mkEmptySubst in_scope
-                                 ; (lty', rty', args') <- go_args (subst, lty) (subst,rty) args
-                                 ; return (foldl InstCo co' args', fun_role, lty', rty') }
-                            where
+                                 ; args' <- go_args (subst, lty) (subst,rty) args
+                                 ; return (foldl InstCo co' args') }
 
     -------------
     go_args :: (Subst, OutType) -> (Subst,OutType) -> [InCoercion]
-           -> LintM (OutType, OutType, [OutCoercion])
-    go_args (lsubst,lty) (rsubst,rty) []
-      = return (substTy lsubst lty, substTy rsubst rty, [])
+           -> LintM [OutCoercion]
+    go_args _ _ []
+      = return []
     go_args lty rty (arg:args)
       = do { (lty1, rty1, arg')  <- go_arg lty rty arg
-           ; (lty', rty', args') <- go_args lty1 rty1 args
-           ; return (lty', rty', arg':args') }
+           ; args' <- go_args lty1 rty1 args
+           ; return (arg':args') }
 
     -------------
     go_arg :: (Subst, OutType) -> (Subst,OutType) -> InCoercion
            -> LintM ((Subst,OutType), (Subst,OutType), OutCoercion)
     go_arg (lsubst,lty) (rsubst,rty) arg
-      = do { (arg', arg_role, arg_lty, arg_rty) <- lintCoercion arg
+      = do { arg' <- lintCoercion arg
+           ; let (Pair arg_lty arg_rty, arg_role) = coercionKindRole arg'
            ; lintRole arg Nominal arg_role
 
            ; case (splitForAllTyCoVar_maybe lty, splitForAllTyCoVar_maybe rty) of
@@ -2635,15 +2637,11 @@ lintCoercion orig_co@(InstCo co arg)
                 _ -> failWithL (text "Bad argument of inst" <+> ppr orig_co) }
 
 lintCoercion this_co@(AxiomCo ax cos)
-  = do { (cos', arg_roles, ltys, rtys) <- mapAndUnzip4M lintCoercion cos
-       ; lint_roles 0 (coAxiomRuleArgRoles ax) arg_roles
-       ; lint_ax ax (zipWith Pair ltys rtys)
-       ; let co' = AxiomCo ax cos'
-       ; return ( co', coAxiomRuleRole ax
-                , coercionLKind co', coercionRKind co'
-                  -- The kind of a AxiomCo is a bit tricky,
-                  -- so bale out into coercionLKind etc
-         ) }
+  = do { cos' <- mapM lintCoercion cos
+       ; lint_roles 0 (coAxiomRuleArgRoles ax) cos'
+       ; lint_ax ax (map coercionKind cos')
+       ; return (AxiomCo ax cos') }
+
   where
     lint_ax :: CoAxiomRule -> [Pair Type] -> LintM ()
     lint_ax (BuiltInFamRew  bif) prs
@@ -2666,13 +2664,13 @@ lintCoercion this_co@(AxiomCo ax cos)
     err m xs  = failWithL $
                 hang (text m) 2 $ vcat (text "Rule:" <+> ppr ax : xs)
 
-    lint_roles n (e : es) (arg_role:arg_roles)
-      | e == arg_role
-      = lint_roles (n+1) es arg_roles
+    lint_roles n (e : es) (co:cos)
+      | e == coercionRole co
+      = lint_roles (n+1) es cos
       | otherwise = err "Argument roles mismatch"
                         [ text "In argument:" <+> int (n+1)
                         , text "Expected:" <+> ppr e
-                        , text "Found:" <+> ppr arg_role ]
+                        , text "Found:" <+> ppr (coercionRole co) ]
     lint_roles _ [] []  = return ()
     lint_roles n [] rs  = err "Too many coercion arguments"
                             [ text "Expected:" <+> int n
@@ -2683,13 +2681,13 @@ lintCoercion this_co@(AxiomCo ax cos)
                             , text "Provided:" <+> int n ]
 
 lintCoercion (KindCo co)
-  = do { (co', _r, lty, rty) <- lintCoercion co
-       ; return (KindCo co', Nominal, typeKind lty, typeKind rty) }
+  = do { co' <- lintCoercion co
+       ; return (KindCo co') }
 
 lintCoercion (SubCo co')
-  = do { (co', r, lty, rty) <- lintCoercion co'
-       ; lintRole co' Nominal r
-       ; return (SubCo co', Representational, lty, rty) }
+  = do { co' <- lintCoercion co'
+       ; lintRole co' Nominal (coercionRole co')
+       ; return (SubCo co') }
 
 lintCoercion (HoleCo h)
   = failWithL (text "Unfilled coercion hole:" <+> ppr h)
