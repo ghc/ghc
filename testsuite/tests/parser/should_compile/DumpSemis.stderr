@@ -1971,7 +1971,7 @@
                    (EpaSpan { DumpSemis.hs:34:13-31 })
                    (AnnList
                     (Just
-                     (EpaSpan { DumpSemis.hs:34:14-30 }))
+                     (EpaSpan { DumpSemis.hs:34:18-30 }))
                     (ListBraces
                      (EpTok (EpaSpan { DumpSemis.hs:34:13 }))
                      (EpTok (EpaSpan { DumpSemis.hs:34:31 })))
