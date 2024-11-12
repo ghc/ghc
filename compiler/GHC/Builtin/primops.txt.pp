@@ -1095,10 +1095,18 @@ primop   DoubleLeOp "<=##"   Compare   Double# -> Double# -> Int#
 
 primop   DoubleMinOp   "minDouble#"      GenPrimOp
    Double# -> Double# -> Double#
+   {Return the minimum of the arguments.
+   When the arguments are numerically equal (e.g. @0.0##@ and @-0.0##@)
+   or one of the arguments is not-a-number (NaN),
+   it is unspecified which one is returned.}
    with commutable = True
 
 primop   DoubleMaxOp   "maxDouble#"      GenPrimOp
    Double# -> Double# -> Double#
+   {Return the maximum of the arguments.
+   When the arguments are numerically equal (e.g. @0.0##@ and @-0.0##@)
+   or one of the arguments is not-a-number (NaN),
+   it is unspecified which one is returned.}
    with commutable = True
 
 primop   DoubleAddOp   "+##"   GenPrimOp
@@ -1269,10 +1277,18 @@ primop   FloatLeOp  "leFloat#"   Compare   Float# -> Float# -> Int#
 
 primop   FloatMinOp   "minFloat#"      GenPrimOp
    Float# -> Float# -> Float#
+   {Return the minimum of the arguments.
+   When the arguments are numerically equal (e.g. @0.0#@ and @-0.0#@)
+   or one of the arguments is not-a-number (NaN),
+   it is unspecified which one is returned.}
    with commutable = True
 
 primop   FloatMaxOp   "maxFloat#"      GenPrimOp
    Float# -> Float# -> Float#
+   {Return the maximum of the arguments.
+   When the arguments are numerically equal (e.g. @0.0#@ and @-0.0#@)
+   or one of the arguments is not-a-number (NaN),
+   it is unspecified which one is returned.}
    with commutable = True
 
 primop   FloatAddOp   "plusFloat#"      GenPrimOp
@@ -4109,12 +4125,13 @@ primop VecPackOp "pack#" GenPrimOp
 
 primop VecUnpackOp "unpack#" GenPrimOp
    VECTOR -> VECTUPLE
-   { Unpack the elements of a vector into an unboxed tuple. #}
+   { Unpack the elements of a vector into an unboxed tuple. }
    with vector = ALL_VECTOR_TYPES
 
 primop VecInsertOp "insert#" GenPrimOp
    VECTOR -> SCALAR -> Int# -> VECTOR
-   { Insert a scalar at the given position in a vector. }
+   { Insert a scalar at the given position in a vector.
+     The position must be a compile-time constant. }
    with effect = CanFail
         vector = ALL_VECTOR_TYPES
 
@@ -4160,40 +4177,43 @@ primop VecNegOp "negate#" GenPrimOp
 
 primop VecIndexByteArrayOp "indexArray#" GenPrimOp
    ByteArray# -> Int# -> VECTOR
-   { Read a vector from specified index of immutable array. }
+   { Read a vector from the specified index of an immutable array.
+     The index is counted in units of SIMD vectors (not scalar elements). }
    with effect = CanFail
         vector = ALL_VECTOR_TYPES
 
 primop VecReadByteArrayOp "readArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, VECTOR #)
-   { Read a vector from specified index of mutable array. }
+   { Read a vector from the specified index of a mutable array.
+     The index is counted in units of SIMD vectors (not scalar elements). }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteByteArrayOp "writeArray#" GenPrimOp
    MutableByteArray# s -> Int# -> VECTOR -> State# s -> State# s
-   { Write a vector to specified index of mutable array. }
+   { Write a vector to the specified index of a mutable array.
+     The index is counted in units of SIMD vectors (not scalar elements). }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
         vector = ALL_VECTOR_TYPES
 
 primop VecIndexOffAddrOp "indexOffAddr#" GenPrimOp
    Addr# -> Int# -> VECTOR
-   { Reads vector; offset in bytes. }
+   { Reads vector; offset in units of SIMD vectors (not scalar elements). }
    with effect = CanFail
         vector = ALL_VECTOR_TYPES
 
 primop VecReadOffAddrOp "readOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, VECTOR #)
-   { Reads vector; offset in bytes. }
+   { Reads vector; offset in units of SIMD vectors (not scalar elements). }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteOffAddrOp "writeOffAddr#" GenPrimOp
    Addr# -> Int# -> VECTOR -> State# s -> State# s
-   { Write vector; offset in bytes. }
+   { Write vector; offset in units of SIMD vectors (not scalar elements). }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
         vector = ALL_VECTOR_TYPES
@@ -4263,7 +4283,7 @@ primop   VecFNMSub   "fnmsub#" GenPrimOp
 primop VecShuffleOp "shuffle#" GenPrimOp
   VECTOR -> VECTOR -> INTVECTUPLE -> VECTOR
   {Shuffle elements of the concatenation of the input two vectors
-  into the result vector.}
+  into the result vector. The indices must be compile-time constants.}
    with vector = ALL_VECTOR_TYPES
 
 primop VecMinOp "min#" GenPrimOp

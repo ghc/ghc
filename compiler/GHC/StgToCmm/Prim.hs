@@ -2713,7 +2713,7 @@ doShuffleOp ty (v1:v2:idxs) res
         -> emitAssign (CmmLocal res) (CmmMachOp (mo is) [v1,v2])
         | otherwise
         -> pprPanic "doShuffleOp" $
-             vcat [ text "shuffle indices must be literals, 0 <= i <" <+> ppr len ]
+             vcat [ text "shuffle indices must be literals, 0 <= i <" <+> ppr (2 * len) ]
   | otherwise
   = pprPanic "doShuffleOp" $
         vcat [ text "non-vector argument type:" <+> ppr ty ]
