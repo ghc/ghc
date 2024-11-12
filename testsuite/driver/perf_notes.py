@@ -43,7 +43,7 @@ def inside_git_repo() -> bool:
 
 # Check if the worktree is dirty.
 def is_worktree_dirty() -> bool:
-    return subprocess.check_output(['git', 'status', '--porcelain']) != b''
+    return subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no']) != b''
 
 # Get length of abbreviated git commit hash
 def get_abbrev_hash_length() -> int:
