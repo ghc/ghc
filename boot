@@ -66,9 +66,6 @@ def autoreconf():
     for dir_ in ['.', 'rts'] + glob.glob('libraries/*/'):
         if os.path.isfile(os.path.join(dir_, 'configure.ac')):
             print("Booting %s" % dir_)
-            # Update config.sub in submodules
-            if dir_ != '.' and os.path.isfile(os.path.join(dir_, 'config.sub')):
-                shutil.copyfile('config.sub', os.path.join(dir_, 'config.sub'))
             processes[dir_] = subprocess.Popen(['sh', '-c', reconf_cmd], cwd=dir_)
 
     # Wait for all child processes to finish.
