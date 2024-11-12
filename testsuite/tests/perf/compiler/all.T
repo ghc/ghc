@@ -1,6 +1,6 @@
 # Tests that call 'collect_compiler_stats' are skipped when debugging is on.
 # See testsuite/driver/testlib.py.
-setTestOpts(no_lint)
+# setTestOpts(no_lint)
 
 test('T1969',
      [# expect_broken(12437),
