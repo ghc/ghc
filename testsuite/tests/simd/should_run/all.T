@@ -16,6 +16,14 @@ setTestOpts(
 
 test('simd_insert_baseline', [], compile_and_run, [''])
 test('simd_insert_array_baseline', [], compile_and_run, [''])
+test('int8x16_basic_baseline', [], compile_and_run, [''])
+test('int16x8_basic_baseline', [], compile_and_run, [''])
+test('int32x4_basic_baseline', [], compile_and_run, [''])
+test('int64x2_basic_baseline', [], compile_and_run, [''])
+test('word8x16_basic_baseline', [], compile_and_run, [''])
+test('word16x8_basic_baseline', [], compile_and_run, [''])
+test('word32x4_basic_baseline', [], compile_and_run, [''])
+test('word64x2_basic_baseline', [], compile_and_run, [''])
 
 # Ensure we set the CPU features we have available.
 #
@@ -62,6 +70,14 @@ test('simd014',
 
 test('simd_insert', [], compile_and_run, [''])
 test('simd_insert_array', [], compile_and_run, [''])
+test('int8x16_basic', [], compile_and_run, [''])
+test('int16x8_basic', [], compile_and_run, [''])
+test('int32x4_basic', [], compile_and_run, [''])
+test('int64x2_basic', [], compile_and_run, [''])
+test('word8x16_basic', [], compile_and_run, [''])
+test('word16x8_basic', [], compile_and_run, [''])
+test('word32x4_basic', [], compile_and_run, [''])
+test('word64x2_basic', [], compile_and_run, [''])
 
 test('T22187', [],compile,[''])
 test('T22187_run', [],compile_and_run,[''])

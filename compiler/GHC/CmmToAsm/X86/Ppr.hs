@@ -461,7 +461,7 @@ pprFormat x = case x of
   -- TODO: this is shady because it only works for certain instructions
   VecFormat _ FmtInt8   -> text "b"
   VecFormat _ FmtInt16  -> text "w"
-  VecFormat _ FmtInt32  -> text "l"
+  VecFormat _ FmtInt32  -> text "d"
   VecFormat _ FmtInt64  -> text "q"
 
 pprFormat_x87 :: IsLine doc => Format -> doc
@@ -990,8 +990,12 @@ pprInstr platform i = case i of
      -> pprFormatOpRegReg (text "vmul") format s1 s2 dst
    VDIV format s1 s2 dst
      -> pprFormatOpRegReg (text "vdiv") format s1 s2 dst
-   VBROADCAST format from to
-     -> pprBroadcast (text "vbroadcast") format from to
+   VBROADCAST format@(VecFormat _ sFmt) from to
+     -> pprBroadcast (text "vbroadcast") (scalarFormatFormat sFmt) format from to
+   VBROADCAST format _ _
+     -> pprPanic "VBROADCAST: expected vector format" (ppr format)
+   VPBROADCAST scalarFormat format from to
+     -> pprBroadcast (text "vpbroadcast") scalarFormat format from to
    VMOVU format from to
      -> pprFormatOpOp (text "vmovu") format from to
    MOVU format from to
@@ -1021,6 +1025,10 @@ pprInstr platform i = case i of
      -> pprFormatImmRegOp (text "vextract") format offset from to
    INSERTPS format offset addr dst
      -> pprInsert (text "insertps") format offset addr dst
+   PINSR scalarFormat vectorFormat offset src dst
+     -> pprPinsr (text "pinsr") scalarFormat vectorFormat offset src dst
+   PEXTR scalarFormat vectorFormat offset src dst
+     -> pprPextr (text "pextr") scalarFormat vectorFormat offset src dst
 
    SHUF format offset src dst
      -> pprShuf (text "shuf" <> pprFormat format) format offset src dst
@@ -1042,6 +1050,10 @@ pprInstr platform i = case i of
      -> pprFormatOpReg (text "unpckl") format src dst
    PUNPCKLQDQ format from to
      -> pprOpReg (text "punpcklqdq") format from to
+   PUNPCKLWD format from to
+     -> pprOpReg (text "punpcklwd") format from to
+   PUNPCKLBW format from to
+     -> pprOpReg (text "punpcklbw") format from to
 
    MINMAX minMax ty fmt src dst
      -> pprMinMax False minMax ty fmt [src, dst]
@@ -1299,16 +1311,14 @@ pprInstr platform i = case i of
    -- Custom pretty printers
    -- These instructions currently don't follow a uniform suffix pattern
    -- in their names, so we have custom pretty printers for them.
-   pprBroadcast :: Line doc -> Format -> Operand -> Reg -> doc
-   pprBroadcast name fmt@(VecFormat _ sFmt) op dst
+   pprBroadcast :: Line doc -> Format -> Format -> Operand -> Reg -> doc
+   pprBroadcast name scalarFormat vectorFormat op dst
      = line $ hcat [
-           pprBroadcastMnemonic name fmt,
-           pprOperand platform (scalarFormatFormat sFmt) op,
+           pprBroadcastMnemonic name vectorFormat,
+           pprOperand platform scalarFormat op,
            comma,
-           pprReg platform fmt dst
+           pprReg platform vectorFormat dst
        ]
-   pprBroadcast _ fmt _ _ =
-     pprPanic "pprBroadcast: expected vector format" (ppr fmt)
 
    pprXor :: Line doc -> Format -> Reg -> Reg -> Reg -> doc
    pprXor name format reg1 reg2 reg3
@@ -1358,6 +1368,28 @@ pprInstr platform i = case i of
            pprOperand platform format src,
            comma,
            pprReg platform format dst
+       ]
+
+   pprPinsr :: Line doc -> Format -> Format -> Imm -> Operand -> Reg -> doc
+   pprPinsr name scalarFormat vectorFormat imm src dst
+     = line $ hcat [
+           pprMnemonic name vectorFormat,
+           pprDollImm imm,
+           comma,
+           pprOperand platform scalarFormat src,
+           comma,
+           pprReg platform vectorFormat dst
+       ]
+
+   pprPextr :: Line doc -> Format -> Format -> Imm -> Reg -> Operand -> doc
+   pprPextr name scalarFormat vectorFormat imm src dst
+     = line $ hcat [
+           pprMnemonic name vectorFormat,
+           pprDollImm imm,
+           comma,
+           pprReg platform vectorFormat src,
+           comma,
+           pprOperand platform scalarFormat dst
        ]
 
    pprShuf :: Line doc -> Format -> Imm -> Operand -> Reg -> doc

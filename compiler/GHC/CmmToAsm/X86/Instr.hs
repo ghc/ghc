@@ -288,8 +288,11 @@ data Instr
         -- NOTE: Instructions follow the AT&T syntax
         -- Constructors and deconstructors
         | VBROADCAST  Format Operand Reg
+        | VPBROADCAST Format Format Operand Reg -- scalar format, vector format, source, destination
         | VEXTRACT    Format Imm Reg Operand
         | INSERTPS    Format Imm Operand Reg
+        | PINSR       Format Format Imm Operand Reg -- scalar format, vector format, offset, scalar src, vector
+        | PEXTR       Format Format Imm Reg Operand -- scalar format, vector format, offset, vector src, scalar dst
 
         -- move operations
 
@@ -327,6 +330,8 @@ data Instr
         | MOVHLPS    Format Reg Reg
         | UNPCKL     Format Operand Reg
         | PUNPCKLQDQ Format Operand Reg
+        | PUNPCKLWD  Format Operand Reg
+        | PUNPCKLBW  Format Operand Reg
 
         -- Shift
         | PSLLDQ     Format Operand Reg
@@ -476,6 +481,7 @@ regUsageOfInstr platform instr
 
     -- vector instructions
     VBROADCAST fmt src dst   -> mkRU (use_R fmt src []) [mk fmt dst]
+    VPBROADCAST sFmt vFmt src dst -> mkRU (use_R sFmt src []) [mk vFmt dst]
     VEXTRACT     fmt _off src dst -> usageRW fmt (OpReg src) dst
     INSERTPS     fmt (ImmInt off) src dst
       -> mkRU ((use_R fmt src []) ++ [mk fmt dst | not doesNotReadDst]) [mk fmt dst]
@@ -488,6 +494,10 @@ regUsageOfInstr platform instr
             where pos = ( off `shiftR` 4 ) .&. 0b11
     INSERTPS fmt _off src dst
       -> mkRU ((use_R fmt src []) ++ [mk fmt dst]) [mk fmt dst]
+    PINSR sFmt vFmt _off src dst
+      -> mkRU (use_R sFmt src [mk vFmt dst]) [mk vFmt dst]
+    PEXTR sFmt vFmt _off src dst
+      -> usageRW' vFmt sFmt (OpReg src) dst
 
     VMOVU        fmt src dst   -> usageRW fmt src dst
     MOVU         fmt src dst   -> usageRW fmt src dst
@@ -529,6 +539,10 @@ regUsageOfInstr platform instr
     UNPCKL fmt src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PUNPCKLQDQ fmt src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PUNPCKLWD fmt src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PUNPCKLBW fmt src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
     MINMAX _ _ fmt src dst
@@ -739,10 +753,16 @@ patchRegsOfInstr platform instr env
 
     -- vector instructions
     VBROADCAST   fmt src dst   -> VBROADCAST fmt (patchOp src) (env dst)
+    VPBROADCAST  fmt1 fmt2 src dst
+      -> VPBROADCAST fmt1 fmt2 (patchOp src) (env dst)
     VEXTRACT     fmt off src dst
       -> VEXTRACT fmt off (env src) (patchOp dst)
     INSERTPS    fmt off src dst
       -> INSERTPS fmt off (patchOp src) (env dst)
+    PINSR       fmt1 fmt2 off src dst
+      -> PINSR fmt1 fmt2 off (patchOp src) (env dst)
+    PEXTR       fmt1 fmt2 off src dst
+      -> PEXTR fmt1 fmt2 off (env src) (patchOp dst)
 
     VMOVU      fmt src dst   -> VMOVU fmt (patchOp src) (patchOp dst)
     MOVU       fmt src dst   -> MOVU  fmt (patchOp src) (patchOp dst)
@@ -779,6 +799,10 @@ patchRegsOfInstr platform instr env
       -> UNPCKL fmt (patchOp src) (env dst)
     PUNPCKLQDQ fmt src dst
       -> PUNPCKLQDQ fmt (patchOp src) (env dst)
+    PUNPCKLWD fmt src dst
+      -> PUNPCKLWD fmt (patchOp src) (env dst)
+    PUNPCKLBW fmt src dst
+      -> PUNPCKLBW fmt (patchOp src) (env dst)
 
     MINMAX minMax ty fmt src dst
       -> MINMAX minMax ty fmt (patchOp src) (patchOp dst)

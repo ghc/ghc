@@ -120,6 +120,11 @@ avxEnabled = do
   config <- getConfig
   return (ncgAvxEnabled config)
 
+avx2Enabled :: NatM Bool
+avx2Enabled = do
+  config <- getConfig
+  return (ncgAvx2Enabled config)
+
 cmmTopCodeGen
         :: RawCmmDecl
         -> NatM [NatCmmDecl (Alignment, RawCmmStatics) Instr]
@@ -972,6 +977,7 @@ getRegister' _ _ (CmmMachOp mop []) =
 
 getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
     avx    <- avxEnabled
+    avx2   <- avx2Enabled
     case mop of
       MO_F_Neg w  -> sse2NegCode w x
 
@@ -1069,7 +1075,14 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
         | otherwise
         -> vector_float_broadcast_sse l w x
       MO_V_Broadcast l w
-        -> vector_int_broadcast l w x
+        | avx2, l * widthInBits w `elem` [128, 256] -- AVX-512 is not supported for now
+        -> vector_int_broadcast_avx2 l w x
+      MO_V_Broadcast 16 W8 -> vector_int8x16_broadcast x
+      MO_V_Broadcast 8 W16 -> vector_int16x8_broadcast x
+      MO_V_Broadcast 4 W32 -> vector_int32x4_broadcast x
+      MO_V_Broadcast 2 W64 -> vector_int64x2_broadcast x
+      MO_V_Broadcast {}
+        -> pprPanic "Unsupported integer vector broadcast operation for: " (pdoc platform x)
 
       -- Binary MachOps
       MO_Add {}    -> incorrectOperands
@@ -1234,29 +1247,70 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
               code = SHUF fmt (ImmInt 0) (OpReg dst) dst
           return $ Fixed fmt dst (exp `snocOL` code)
 
-        vector_int_broadcast :: Length
-                             -> Width
-                             -> CmmExpr
-                             -> NatM Register
-        vector_int_broadcast len W64 expr = do
+        vector_int_broadcast_avx2 :: Length
+                                  -> Width
+                                  -> CmmExpr
+                                  -> NatM Register
+        vector_int_broadcast_avx2 len w expr = do
           (reg, exp) <- getNonClobberedReg expr
-          let fmt = VecFormat len FmtInt64
+          let (movFormat, fmt) = case w of
+                W8  -> (II32, VecFormat len FmtInt8)
+                W16 -> (II32, VecFormat len FmtInt16)
+                W32 -> (II32, VecFormat len FmtInt32)
+                W64 -> (II64, VecFormat len FmtInt64)
+                _   -> pprPanic "Broadcast not supported for: " (pdoc platform expr)
+              code dst = exp `snocOL`
+                         -- VPBROADCAST from GPR requires AVX-512,
+                         -- so we use an additional MOVD.
+                         (MOVD movFormat (OpReg reg) (OpReg dst)) `snocOL`
+                         (VPBROADCAST fmt fmt (OpReg dst) dst)
+          return $ Any fmt code
+
+        vector_int8x16_broadcast :: CmmExpr
+                                 -> NatM Register
+        vector_int8x16_broadcast expr = do
+          (reg, exp) <- getNonClobberedReg expr
+          let fmt = VecFormat 16 FmtInt8
           return $ Any fmt (\dst -> exp `snocOL`
-                                    (MOVD II64 (OpReg reg) (OpReg dst)) `snocOL`
-                                    (PUNPCKLQDQ fmt (OpReg dst) dst)
+                                    (MOVD II32 (OpReg reg) (OpReg dst)) `snocOL`
+                                    (PUNPCKLBW fmt (OpReg dst) dst) `snocOL`
+                                    (PUNPCKLWD (VecFormat 8 FmtInt16) (OpReg dst) dst) `snocOL`
+                                    (PSHUFD fmt (ImmInt 0x00) (OpReg dst) dst)
                                     )
-        vector_int_broadcast len W32 expr = do
+
+        vector_int16x8_broadcast :: CmmExpr
+                                 -> NatM Register
+        vector_int16x8_broadcast expr = do
           (reg, exp) <- getNonClobberedReg expr
-          let fmt = VecFormat len FmtInt32
+          let fmt = VecFormat 8 FmtInt16
+          return $ Any fmt (\dst -> exp `snocOL`
+                                    (MOVD II32 (OpReg reg) (OpReg dst)) `snocOL`
+                                    (PUNPCKLWD fmt (OpReg dst) dst) `snocOL`
+                                    (PSHUFD fmt (ImmInt 0x00) (OpReg dst) dst)
+                                    )
+
+        vector_int32x4_broadcast :: CmmExpr
+                                 -> NatM Register
+        vector_int32x4_broadcast expr = do
+          (reg, exp) <- getNonClobberedReg expr
+          let fmt = VecFormat 4 FmtInt32
           return $ Any fmt (\dst -> exp `snocOL`
                                     (MOVD II32 (OpReg reg) (OpReg dst)) `snocOL`
                                     (PSHUFD fmt (ImmInt 0x00) (OpReg dst) dst)
                                     )
-        vector_int_broadcast _ _ _ =
-          sorry "Unsupported Integer vector broadcast operation; please use -fllvm."
 
+        vector_int64x2_broadcast :: CmmExpr
+                                 -> NatM Register
+        vector_int64x2_broadcast expr = do
+          (reg, exp) <- getNonClobberedReg expr
+          let fmt = VecFormat 2 FmtInt64
+          return $ Any fmt (\dst -> exp `snocOL`
+                                    (MOVD II64 (OpReg reg) (OpReg dst)) `snocOL`
+                                    (PUNPCKLQDQ fmt (OpReg dst) dst)
+                                    )
 
 getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
+  sse4_1 <- sse4_1Enabled
   avx <- avxEnabled
   case mop of
       MO_F_Eq _ -> condFltReg is32Bit EQQ x y
@@ -1327,8 +1381,14 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_VF_Extract l W64               -> vector_float_extract l W64 x y
       MO_VF_Extract {} -> incorrectOperands
 
-      MO_V_Extract l W64                -> vector_int_extract_sse l W64 x y
-      -- SIMD NCG TODO: W32, W16, W8
+      MO_V_Extract 16 W8 | sse4_1 -> vector_int_extract_pextr 16 W8 x y
+                         | otherwise -> vector_int8x16_extract_sse2 x y
+      MO_V_Extract 8 W16 -> vector_int_extract_pextr 8 W16 x y -- PEXTRW (SSE2)
+      MO_V_Extract 4 W32 | sse4_1 -> vector_int_extract_pextr 4 W32 x y
+                         | otherwise -> vector_int32x4_extract_sse2 x y
+      MO_V_Extract 2 W64 | sse4_1 -> vector_int_extract_pextr 2 W64 x y
+                         | otherwise -> vector_int64x2_extract_sse2 x y
+      -- SIMD NCG TODO: 256/512-bit vector
       MO_V_Extract {} -> needLlvm mop
 
       MO_VF_Add l w         | avx       -> vector_float_op_avx VA_Add l w x y
@@ -1680,15 +1740,80 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       = pprPanic "Unsupported SSE floating-point vector extract" (pdoc platform c $$ pdoc platform e $$ ppr w)
     -----------------------
 
-    vector_int_extract_sse :: Length
-                           -> Width
-                           -> CmmExpr
-                           -> CmmExpr
-                           -> NatM Register
-    vector_int_extract_sse l@2 W64 expr (CmmLit lit)
+    -- PEXTRW ("to GPR" variant) is an SSE2 instruction,
+    -- whereas PEXTR{B,D,Q} and PEXTRW ("to memory" variant) require SSE4.1.
+    vector_int_extract_pextr :: Length
+                             -> Width
+                             -> CmmExpr
+                             -> CmmExpr
+                             -> NatM Register
+    vector_int_extract_pextr l w expr (CmmLit (CmmInt i _))
+      | 0 <= i, i < toInteger l
+      = do
+      (r, exp) <- getSomeReg expr -- vector registers are never clobbered by an instruction
+      let (scalarFormat, vectorFormat) = case w of
+            W8 -> (II32, VecFormat l FmtInt8)
+            W16 -> (II32, VecFormat l FmtInt16)
+            W32 -> (II32, VecFormat l FmtInt32)
+            W64 -> (II64, VecFormat l FmtInt64)
+            _ -> sorry "Unsupported vector format"
+          code dst = exp `snocOL`
+                     (PEXTR scalarFormat vectorFormat (ImmInteger i) r (OpReg dst))
+      return (Any scalarFormat code)
+    vector_int_extract_pextr _ _ _ i
+      = pprPanic "Unsupported offset" (pdoc platform i)
+
+    vector_int8x16_extract_sse2 :: CmmExpr
+                                -> CmmExpr
+                                -> NatM Register
+    vector_int8x16_extract_sse2 expr (CmmLit (CmmInt i _))
+      | 0 <= i, i < 16
       = do
       (r, exp) <- getSomeReg expr
-      let fmt = VecFormat l FmtInt64
+      let code dst =
+            case i `quotRem` 2 of
+              (j, 0) -> exp `snocOL`
+                        (PEXTR II32 (VecFormat 8 FmtInt16) (ImmInteger j) r (OpReg dst)) -- PEXTRW
+              (j, _) -> exp `snocOL`
+                        (PEXTR II32 (VecFormat 8 FmtInt16) (ImmInteger j) r (OpReg dst)) `snocOL` -- PEXTRW
+                        (SHR II32 (OpImm (ImmInt 8)) (OpReg dst))
+      return (Any II8 code)
+    vector_int8x16_extract_sse2 _ offset
+      = pprPanic "Unsupported offset" (pdoc platform offset)
+
+    vector_int32x4_extract_sse2 :: CmmExpr
+                                -> CmmExpr
+                                -> NatM Register
+    vector_int32x4_extract_sse2 expr (CmmLit (CmmInt i _))
+      | 0 <= i, i < 4
+      = do
+      (r, exp) <- getSomeReg expr
+      let fmt = VecFormat 4 FmtInt32
+      tmp <- getNewRegNat fmt
+      let code dst =
+            case i of
+              0 -> exp `snocOL`
+                   (MOVD FF32 (OpReg r) (OpReg dst))
+              1 -> exp `snocOL`
+                   (PSHUFD fmt (ImmInt 0b01_01_01_01) (OpReg r) tmp) `snocOL` -- tmp <- (r[1],r[1],r[1],r[1])
+                   (MOVD FF32 (OpReg tmp) (OpReg dst))
+              2 -> exp `snocOL`
+                   (PSHUFD fmt (ImmInt 0b11_10_11_10) (OpReg r) tmp) `snocOL` -- tmp <- (r[2],r[3],r[2],r[3])
+                   (MOVD FF32 (OpReg tmp) (OpReg dst))
+              _ -> exp `snocOL`
+                   (PSHUFD fmt (ImmInt 0b11_11_11_11) (OpReg r) tmp) `snocOL` -- tmp <- (r[3],r[3],r[3],r[3])
+                   (MOVD FF32 (OpReg tmp) (OpReg dst))
+      return (Any II32 code)
+    vector_int32x4_extract_sse2 _ offset
+      = pprPanic "Unsupported offset" (pdoc platform offset)
+
+    vector_int64x2_extract_sse2 :: CmmExpr
+                                -> CmmExpr
+                                -> NatM Register
+    vector_int64x2_extract_sse2 expr (CmmLit lit)
+      = do
+      (r, exp) <- getSomeReg expr
+      let fmt = VecFormat 2 FmtInt64
       tmp <- getNewRegNat fmt
       let code dst =
             case lit of
@@ -1699,8 +1824,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                             (MOVD II64 (OpReg tmp) (OpReg dst))
               _          -> panic "Error in offset while unpacking"
       return (Any II64 code)
-    vector_int_extract_sse _ w c e
-      = pprPanic "Unsupported SSE floating-point vector extract" (pdoc platform c $$ pdoc platform e $$ ppr w)
+    vector_int64x2_extract_sse2 _ offset
+      = pprPanic "Unsupported offset" (pdoc platform offset)
 
     vector_shuffle_float :: Length -> Width -> CmmExpr -> CmmExpr -> [Int] -> NatM Register
     vector_shuffle_float l w v1 v2 is = do
@@ -1799,7 +1924,14 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
            --
            --   - add support for FloatX8, FloatX16.
       MO_VF_Insert l W64  -> vector_double_insert avx l x y z
-      MO_V_Insert l W64   -> vector_int_insert_sse l W64 x y z
+      MO_V_Insert 16 W8 | sse4_1 -> vector_int_insert_pinsr 16 W8 x y z
+                        | otherwise -> vector_int8x16_insert_sse2 x y z
+      MO_V_Insert 8 W16 -> vector_int_insert_pinsr 8 W16 x y z -- PINSRW (SSE2)
+      MO_V_Insert 4 W32 | sse4_1 -> vector_int_insert_pinsr 4 W32 x y z
+                        | otherwise -> vector_int32x4_insert_sse2 x y z
+      MO_V_Insert 2 W64 | sse4_1 -> vector_int_insert_pinsr 2 W64 x y z
+                        | otherwise -> vector_int64x2_insert_sse2 x y z
+      MO_V_Insert _ _ -> sorry "Unsupported integer vector insert operation; please use -fllvm"
 
       _other -> pprPanic "getRegister(x86) - ternary CmmMachOp (1)"
                   (pprMachOp mop)
@@ -1894,20 +2026,113 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
 
     -- SIMD NCG TODO:
     --
-    --   - only supports Int64X2, add support for everything else:
-    --     (Int32X{4,2}, Int16X{8,4,2}, Int8X{16,8,4,2})
-    vector_int_insert_sse :: HasCallStack => Length
-                          -> Width
-                          -> CmmExpr
-                          -> CmmExpr
-                          -> CmmExpr
-                          -> NatM Register
-    -- Int64X2
-    vector_int_insert_sse len@2 W64 vecExpr valExpr (CmmLit offset)
+    --   - only supports 128-bit vector types (Int64X2, Int32X4, Int16X8, Int8X16),
+    --     add support for 256-bit and 512-bit vector types.
+
+    -- PINSRW is an SSE2 instruction, whereas PINSR{B,D,Q} require SSE4.1.
+    vector_int_insert_pinsr :: HasCallStack => Length
+                            -> Width
+                            -> CmmExpr
+                            -> CmmExpr
+                            -> CmmExpr
+                            -> NatM Register
+    vector_int_insert_pinsr len w vecExpr valExpr (CmmLit (CmmInt offset _))
+      | 0 <= offset, offset < toInteger len
+      = do
+        (valReg, valExp) <- getNonClobberedReg valExpr
+        vecCode <- getAnyReg vecExpr
+        let (scalarFormat, vectorFormat) = case w of
+              W8 -> (II32, VecFormat len FmtInt8)
+              W16 -> (II32, VecFormat len FmtInt16)
+              W32 -> (II32, VecFormat len FmtInt32)
+              W64 -> (II64, VecFormat len FmtInt64)
+              _ -> sorry "Unsupported vector format"
+            code dst = valExp `appOL`
+                       (vecCode dst) `snocOL`
+                       (PINSR scalarFormat vectorFormat (ImmInteger offset) (OpReg valReg) dst)
+        return $ Any vectorFormat code
+    vector_int_insert_pinsr _ _ _ _ offset = pprPanic "MO_V_Insert: unsupported offset" (pdoc platform offset)
+
+    vector_int8x16_insert_sse2 :: CmmExpr
+                               -> CmmExpr
+                               -> CmmExpr
+                               -> NatM Register
+    vector_int8x16_insert_sse2 vecExpr valExpr (CmmLit (CmmInt offset _))
+      | 0 <= offset, offset < 16
+      = do
+        (valReg, valExp) <- getNonClobberedReg valExpr
+        vecCode <- getAnyReg vecExpr
+        tmp <- getNewRegNat II32
+        let vectorFormat = VecFormat 16 FmtInt8
+            code dst
+              = case offset `quotRem` 2 of
+                  (j, 0) -> valExp `appOL`
+                            (vecCode dst) `snocOL`
+                            (PEXTR II32 (VecFormat 8 FmtInt16) (ImmInteger j) dst (OpReg tmp)) `snocOL` -- PEXTRW
+                            (AND II32 (OpImm (ImmInt 0xff00)) (OpReg tmp)) `snocOL`
+                            (MOVZxL II8 (OpReg valReg) (OpReg valReg)) `snocOL`
+                            (OR II32 (OpReg valReg) (OpReg tmp)) `snocOL`
+                            (PINSR II32 (VecFormat 8 FmtInt16) (ImmInteger j) (OpReg tmp) dst) -- PINSRW
+                  (j, _) -> valExp `appOL`
+                            (vecCode dst) `snocOL`
+                            (PEXTR II32 (VecFormat 8 FmtInt16) (ImmInteger j) dst (OpReg tmp)) `snocOL` -- PEXTRW
+                            (MOVZxL II8 (OpReg tmp) (OpReg tmp)) `snocOL`
+                            (SHL II32 (OpImm (ImmInt 8)) (OpReg valReg)) `snocOL`
+                            (OR II32 (OpReg valReg) (OpReg tmp)) `snocOL`
+                            (PINSR II32 (VecFormat 8 FmtInt16) (ImmInteger j) (OpReg tmp) dst) -- PINSRW
+        return $ Any vectorFormat code
+    vector_int8x16_insert_sse2 _ _ offset = pprPanic "MO_V_Insert: unsupported offset" (pdoc platform offset)
+
+    vector_int32x4_insert_sse2 :: CmmExpr
+                               -> CmmExpr
+                               -> CmmExpr
+                               -> NatM Register
+    vector_int32x4_insert_sse2 vecExpr valExpr (CmmLit (CmmInt offset _))
+      | 0 <= offset, offset < 4
+      = do
+        (valReg, valExp) <- getNonClobberedReg valExpr
+        vecCode <- getAnyReg vecExpr
+        -- Since SSE2 does not have an integer vector instruction to achieve this,
+        -- we are forced to either use floating-point vector instructions
+        -- or lots of integer vector instructions. (sigh)
+        let floatVectorFormat = VecFormat 4 FmtFloat
+        tmp1 <- getNewRegNat floatVectorFormat
+        tmp2 <- getNewRegNat floatVectorFormat
+        let vectorFormat = VecFormat 4 FmtInt32
+            code dst
+              = case offset of
+                  0 -> valExp `appOL`
+                       (vecCode dst) `snocOL`
+                       (MOVD II32 (OpReg valReg) (OpReg tmp1)) `snocOL`
+                       (MOV floatVectorFormat (OpReg tmp1) (OpReg dst)) -- MOVSS; dst <- (tmp1[0],dst[1],dst[2],dst[3])
+                  1 -> valExp `appOL`
+                       (vecCode tmp1) `snocOL`
+                       (MOVD II32 (OpReg valReg) (OpReg dst)) `snocOL` -- dst <- (val,0,0,0)
+                       (PUNPCKLQDQ vectorFormat (OpReg tmp1) dst) `snocOL` -- dst <- (dst[0],dst[1],tmp1[0],tmp1[1])
+                       (SHUF floatVectorFormat (ImmInt 0b11_10_00_10) (OpReg tmp1) dst) -- SHUFPS; dst <- (dst[2],dst[0],tmp1[2],tmp1[3])
+                  2 -> valExp `appOL`
+                       (vecCode dst) `snocOL`
+                       (MOVD II32 (OpReg valReg) (OpReg tmp1)) `snocOL` -- tmp1 <- (val,0,0,0)
+                       (MOVU floatVectorFormat (OpReg dst) (OpReg tmp2)) `snocOL` -- MOVUPS; tmp2 <- dst
+                       (SHUF floatVectorFormat (ImmInt 0b01_00_01_11) (OpReg tmp1) tmp2) `snocOL` -- SHUFPS; tmp2 <- (tmp2[3],tmp2[1],tmp1[0],tmp1[1])
+                       (SHUF floatVectorFormat (ImmInt 0b00_10_01_00) (OpReg tmp2) dst) -- SHUFPS; dst <- (dst[0],dst[1],tmp2[2],tmp2[0])
+                  _ -> valExp `appOL`
+                       (vecCode dst) `snocOL`
+                       (MOVD II32 (OpReg valReg) (OpReg tmp1)) `snocOL` -- tmp1 <- (val,0,0,0)
+                       (SHUF floatVectorFormat (ImmInt 0b11_10_01_00) (OpReg dst) tmp1) `snocOL` -- SHUFPS; tmp1 <- (tmp1[0],tmp1[1],dst[2],dst[3])
+                       (SHUF floatVectorFormat (ImmInt 0b00_10_01_00) (OpReg tmp1) dst) -- SHUFPS; dst <- (dst[0],dst[1],tmp1[2],tmp1[0])
+        return $ Any vectorFormat code
+    vector_int32x4_insert_sse2 _ _ offset = pprPanic "MO_V_Insert: unsupported offset" (pdoc platform offset)
+
+    vector_int64x2_insert_sse2 :: CmmExpr
+                               -> CmmExpr
+                               -> CmmExpr
+                               -> NatM Register
+    vector_int64x2_insert_sse2 vecExpr valExpr (CmmLit offset)
       = do
         (valReg, valExp) <- getNonClobberedReg valExpr
         (vecReg, vecExp) <- getSomeReg vecExpr -- NB: vector regs never clobbered by instruction
-        let fmt = VecFormat len FmtInt64
+        let fmt = VecFormat 2 FmtInt64
         tmp <- getNewRegNat fmt
         let code dst
               = case offset of
@@ -1923,8 +2148,7 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
                                 (PUNPCKLQDQ fmt (OpReg tmp) dst)
                   _ -> pprPanic "MO_V_Insert Int64X2: unsupported offset" (ppr offset)
          in return $ Any fmt code
-    vector_int_insert_sse _ _ _ _ _ =
-      sorry "Unsupported integer vector insert operation; please use -fllvm"
+    vector_int64x2_insert_sse2 _ _ offset = pprPanic "MO_V_Insert Int64X2: unsupported offset" (pdoc platform offset)
 
 getRegister' _ _ (CmmMachOp mop (_:_:_:_:_)) =
   pprPanic "getRegister(x86): MachOp with >= 4 arguments" (text $ show mop)
