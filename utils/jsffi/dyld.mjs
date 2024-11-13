@@ -293,9 +293,13 @@ class DyLD {
   #loadedSos = new Set();
 
   // Mapping from export names to export funcs. It's also passed as
-  // __exports in JSFFI code, hence the "memory" special field. __dyld
-  // is used by ghci to call into here.
-  exportFuncs = { memory: this.#memory, __dyld: this };
+  // __exports in JSFFI code, hence the "memory" special field.
+  exportFuncs = { memory: this.#memory };
+
+  // The FinalizationRegistry used by JSFFI.
+  #finalizationRegistry = new FinalizationRegistry((sp) =>
+    this.exportFuncs.rts_freeStablePtr(sp)
+  );
 
   // The GOT.func table.
   #gotFunc = {};
@@ -623,17 +627,22 @@ class DyLD {
 
       const mod = await modp;
 
-      // Fulfill the ghc_wasm_jsffi imports
+      // Fulfill the ghc_wasm_jsffi imports. Use new Function()
+      // instead of eval() to prevent bindings in this local scope to
+      // be accessed by JSFFI code snippets.
       Object.assign(
         import_obj.ghc_wasm_jsffi,
         new Function(
-          "return (__exports) => ({".concat(
+          "__exports",
+          "__ghc_wasm_jsffi_dyld",
+          "__ghc_wasm_jsffi_finalization_registry",
+          "return {".concat(
             ...parseSections(mod).map(
               (rec) => `${rec[0]}: ${parseRecord(rec)}, `
             ),
-            "});"
+            "};"
           )
-        )()(this.exportFuncs)
+        )(this.exportFuncs, this, this.#finalizationRegistry)
       );
 
       // Fulfill the rest of the imports

@@ -76,7 +76,7 @@ loadDLL f =
       evaluate =<< js_loadDLL (toJSString f)
       pure $ Right nullPtr
 
-foreign import javascript safe "__exports.__dyld.loadDLL($1)"
+foreign import javascript safe "__ghc_wasm_jsffi_dyld.loadDLL($1)"
   js_loadDLL :: JSString -> IO ()
 
 loadArchive :: String -> IO ()
@@ -96,7 +96,7 @@ lookupSymbol sym = do
   r <- js_lookupSymbol $ toJSString sym
   evaluate $ if r == nullPtr then Nothing else Just r
 
-foreign import javascript unsafe "__exports.__dyld.lookupSymbol($1)"
+foreign import javascript unsafe "__ghc_wasm_jsffi_dyld.lookupSymbol($1)"
   js_lookupSymbol :: JSString -> IO (Ptr a)
 
 lookupSymbolInDLL :: Ptr LoadedDLL -> String -> IO (Maybe (Ptr a))
@@ -114,7 +114,7 @@ addLibrarySearchPath p = do
   evaluate =<< js_addLibrarySearchPath (toJSString p)
   pure nullPtr
 
-foreign import javascript safe "__exports.__dyld.addLibrarySearchPath($1)"
+foreign import javascript safe "__ghc_wasm_jsffi_dyld.addLibrarySearchPath($1)"
   js_addLibrarySearchPath :: JSString -> IO ()
 
 removeLibrarySearchPath :: Ptr () -> IO Bool
@@ -128,7 +128,7 @@ findSystemLibrary f = m `catch` \(_ :: JSException) -> pure Nothing
       p <- evaluate $ fromJSString p'
       pure $ Just p
 
-foreign import javascript safe "__exports.__dyld.findSystemLibrary($1)"
+foreign import javascript safe "__ghc_wasm_jsffi_dyld.findSystemLibrary($1)"
   js_findSystemLibrary :: JSString -> IO JSString
 
 #else
