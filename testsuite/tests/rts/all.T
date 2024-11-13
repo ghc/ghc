@@ -587,6 +587,10 @@ test('decodeMyStack_emptyListForMissingFlag',
   , js_broken(22261) # cloneMyStack# not yet implemented
   ], compile_and_run, [''])
 
+# Tests RTS flag parsing. Skipped on JS as it uses a distinct RTS.
+test('T20201a', [js_skip, exit_code(1)], compile_and_run, ['-with-rtsopts -AturtlesM'])
+test('T20201b', [js_skip, exit_code(1)], compile_and_run, ['-with-rtsopts -A64z'])
+
 test('T22012', [js_skip, extra_ways(['ghci'])], compile_and_run, ['T22012_c.c'])
 
 # Skip for JS platform as the JS RTS is always single threaded
