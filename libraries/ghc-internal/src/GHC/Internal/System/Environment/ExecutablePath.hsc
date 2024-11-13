@@ -73,7 +73,6 @@ import GHC.Internal.Control.Exception (catch, throw)
 import GHC.Internal.Data.Functor
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.Error
-import GHC.Internal.Foreign.C.String
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Marshal.Array
 import GHC.Internal.Foreign.Ptr
