@@ -892,8 +892,6 @@ extractSubTerms :: (Type -> ForeignHValue -> TcM Term)
                 -> GenClosure ForeignHValue -> [Type] -> TcM [Term]
 extractSubTerms recurse clos = liftM thdOf3 . go 0 0
   where
-    array = dataArgs clos
-
     go ptr_i arr_i [] = return (ptr_i, arr_i, [])
     go ptr_i arr_i (ty:tys)
       | Just (tc, elem_tys) <- tcSplitTyConApp_maybe ty
@@ -944,7 +942,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
                  | otherwise =
                      let (q, r) = size_b `quotRem` word_size
                      in assert (r == 0 )
-                        [ array!!i
+                        [ dataArgs clos !! i
                         | o <- [0.. q - 1]
                         , let i = (aligned_idx `quot` word_size) + o
                         ]
@@ -967,7 +965,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
       LittleEndian -> (word `shiftR` moveBits) `shiftL` zeroOutBits `shiftR` zeroOutBits
      where
       (q, r) = aligned_idx `quotRem` word_size
-      word = array!!q
+      word = dataArgs clos !! q
       moveBits = r * 8
       zeroOutBits = (word_size - size_b) * 8
 
