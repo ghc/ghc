@@ -105,12 +105,12 @@
  */
 
 #if defined(freebsd_HOST_OS)
-extern void iconvctl();
-extern void iconv_open_into();
-extern void iconv_open();
-extern void iconv_close();
-extern void iconv_canonicalize();
-extern void iconv();
+extern void iconvctl(void);
+extern void iconv_open_into(void);
+extern void iconv_open(void);
+extern void iconv_close(void);
+extern void iconv_canonicalize(void);
+extern void iconv(void);
 #endif
 
 /*
