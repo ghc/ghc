@@ -59,7 +59,7 @@ extern SpinLock gc_alloc_block_sync;
 struct mblock_address_range {
     W_ begin, end;
     W_ padding[6];  // ensure nothing else inhabits this cache line
-} ATTRIBUTE_ALIGNED(64);
+} ATTRIBUTE_ALIGNED(CACHELINE_SIZE);
 extern struct mblock_address_range mblock_address_space;
 
 # define HEAP_ALLOCED(p)        ((W_)(p) >= mblock_address_space.begin && \
