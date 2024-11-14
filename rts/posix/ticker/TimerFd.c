@@ -115,7 +115,7 @@ static void *itimer_thread_func(void *_handle_tick)
             // While the RTS attempts to mask signals, some foreign libraries
             // may rely on signal delivery may unmask them. Consequently we may
             // see EINTR. See #24610.
-            if (errno != -EINTR) {
+            if (errno != EINTR) {
                 sysErrorBelch("Ticker: poll failed: %s", strerror(errno));
             }
         }
