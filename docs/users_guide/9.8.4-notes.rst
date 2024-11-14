@@ -16,6 +16,8 @@ Compiler
 
 - :ghc-flag:`-Wmissing-home-modules` now behaves correctly when multiple units
   have expose the same module name (:ghc-ticket:`25122`).
+- Adjust the demand signature of the ``prompt#`` to avoid invalid optimisation of
+  non-terminating programs (:ghc-ticket:`25439`).
 
 Packaging
 ---------
