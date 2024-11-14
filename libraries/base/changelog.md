@@ -39,6 +39,17 @@
       `onException`, such as `base`, or the `exceptions` package.
   * Move `Lift ByteArray` and `Lift Fixed` instances into `base` from `template-haskell`. See [CLC proposal #287](https://github.com/haskell/core-libraries-committee/issues/287).
   * Make `Debug.Trace.{traceEventIO,traceMarkerIO}` faster when tracing is disabled. See [CLC proposal #291](https://github.com/haskell/core-libraries-committee/issues/291).
+  * The exception messages were improved according to [CLC proposal #285](https://github.com/haskell/core-libraries-committee/issues/285). In particular:
+      * Improve the message of the uncaught exception handler
+      * Make `displayException (SomeException e) = displayException e`. The
+          additional information that is printed when exceptions are surfaced to
+          the top-level is added by `uncaughtExceptionHandler`.
+      * Get rid of the HasCallStack mechanism manually propagated by `ErrorCall`
+          in favour of the more general HasCallStack exception backtrace
+          mechanism, to remove duplicate call stacks for uncaught exceptions.
+      * Freeze the callstack of `error`, `undefined`, `throwIO`, `ioException`,
+          `ioError` to prevent leaking the implementation of these error functions
+          into the callstack.
 
 ## 4.20.0.0 May 2024
   * Shipped with GHC 9.10.1
