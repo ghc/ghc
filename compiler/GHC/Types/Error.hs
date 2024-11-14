@@ -100,19 +100,23 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Hint
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
+
+import GHC.Types.Hint.Ppr () -- Outputable instance
+import GHC.Unit.Module.Warnings (WarningCategory(..))
+
 import GHC.Utils.Json
 import GHC.Utils.Panic
-import GHC.Unit.Module.Warnings (WarningCategory)
+
+import GHC.Version (cProjectVersion)
 import Data.Bifunctor
 import Data.Foldable    ( fold, toList )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.List ( intercalate )
+import Data.Maybe ( maybeToList )
 import Data.Typeable ( Typeable )
 import Numeric.Natural ( Natural )
 import Text.Printf ( printf )
-import GHC.Version (cProjectVersion)
-import GHC.Types.Hint.Ppr () -- Outputtable instance
 
 {- Note [Messages]
 ~~~~~~~~~~~~~~~~~~
@@ -393,10 +397,8 @@ newtype ResolvedDiagnosticReason
 pattern WarningWithFlag :: WarningFlag -> DiagnosticReason
 pattern WarningWithFlag w = WarningWithFlags (w :| [])
 
-{-
-Note [Warnings controlled by multiple flags]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Warnings controlled by multiple flags]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Diagnostics that started life as flag-controlled warnings have a
 'diagnosticReason' of 'WarningWithFlags', giving the flags that control the
 warning. Usually there is only one flag, but in a few cases multiple flags
@@ -563,11 +565,11 @@ instance ToJson DiagnosticCode where
 {- Note [Diagnostic Message JSON Schema]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The below instance of ToJson must conform to the JSON schema
-specified in docs/users_guide/diagnostics-as-json-schema-1_0.json.
+specified in docs/users_guide/diagnostics-as-json-schema-1_1.json.
 When the schema is altered, please bump the version.
 If the content is altered in a backwards compatible way,
 update the minor version (e.g. 1.3 ~> 1.4).
-If the content is breaking, update the major version (e.g. 1.3 ~> 2.3).
+If the content is breaking, update the major version (e.g. 1.3 ~> 2.0).
 When updating the schema, replace the above file and name it appropriately with
 the version appended, and change the documentation of the -fdiagnostics-as-json
 flag to reflect the new schema.
@@ -576,25 +578,41 @@ https://json-schema.org
 -}
 
 schemaVersion :: String
-schemaVersion = "1.0"
+schemaVersion = "1.1"
 -- See Note [Diagnostic Message JSON Schema] before editing!
 instance Diagnostic e => ToJson (MsgEnvelope e) where
-  json m = JSObject [
+  json m = JSObject $ [
     ("version", JSString schemaVersion),
     ("ghcVersion", JSString $ "ghc-" ++ cProjectVersion),
     ("span", json $ errMsgSpan m),
     ("severity", json $ errMsgSeverity m),
     ("code", maybe JSNull json (diagnosticCode diag)),
     ("message", JSArray $ map renderToJSString diagMsg),
-    ("hints", JSArray $ map (renderToJSString . ppr) (diagnosticHints diag) )
-    ]
-    where diag = errMsgDiagnostic m
-          opts = defaultDiagnosticOpts @e
-          style = mkErrStyle (errMsgContext m)
-          ctx = defaultSDocContext {sdocStyle = style }
-          diagMsg = filter (not . isEmpty ctx) (unDecorated (diagnosticMessage (opts) diag))
-          renderToJSString :: SDoc -> JsonDoc
-          renderToJSString = JSString . (renderWithContext ctx)
+    ("hints", JSArray $ map (renderToJSString . ppr) (diagnosticHints diag) ) ]
+    ++ [ ("reason", reasonJson)
+       | reasonJson <- maybeToList $ usefulReasonJson_maybe (errMsgReason m) ]
+    where
+      diag = errMsgDiagnostic m
+      opts = defaultDiagnosticOpts @e
+      style = mkErrStyle (errMsgContext m)
+      ctx = defaultSDocContext {sdocStyle = style }
+      diagMsg = filter (not . isEmpty ctx) (unDecorated (diagnosticMessage (opts) diag))
+      renderToJSString :: SDoc -> JsonDoc
+      renderToJSString = JSString . (renderWithContext ctx)
+
+      usefulReasonJson_maybe :: ResolvedDiagnosticReason -> Maybe JsonDoc
+      usefulReasonJson_maybe (ResolvedDiagnosticReason rea) =
+        case rea of
+          WarningWithoutFlag -> Nothing
+          ErrorWithoutFlag   -> Nothing
+          WarningWithFlags flags ->
+            Just $ JSObject
+              [ ("flags", JSArray $ map (JSString . NE.head . warnFlagNames) (NE.toList flags))
+              ]
+          WarningWithCategory (WarningCategory cat) ->
+            Just $ JSObject
+              [ ("category", JSString $ unpackFS cat)
+              ]
 
 instance Show (MsgEnvelope DiagnosticMessage) where
     show = showMsgEnvelope

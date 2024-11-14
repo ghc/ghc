@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -130,7 +131,8 @@ fromWarningCategory wc = InWarningCategory noAnn NoSourceText (noLocA wc)
 
 -- See Note [Warning categories]
 newtype WarningCategory = WarningCategory FastString
-  deriving (Binary, Data, Eq, Outputable, Show, Uniquable, NFData)
+  deriving stock Data
+  deriving newtype (Binary, Eq, Outputable, Show, Uniquable, NFData)
 
 mkWarningCategory :: FastString -> WarningCategory
 mkWarningCategory = WarningCategory

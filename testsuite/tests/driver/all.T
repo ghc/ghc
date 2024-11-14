@@ -276,7 +276,7 @@ test('T12955', normal, makefile_test, [])
 test('T12971', [when(opsys('mingw32'), fragile(17945)), ignore_stdout], makefile_test, [])
 test('json_dump', normal, compile_fail, ['-ddump-json'])
 test('json', normalise_version('ghc'), compile_fail, ['-fdiagnostics-as-json'])
-test('json_warn', normalise_version('ghc'), compile, ['-fdiagnostics-as-json -Wunused-matches'])
+test('json_warn', normalise_version('ghc'), compile, ['-fdiagnostics-as-json -Wunused-matches -Wx-partial'])
 test('json2', normalise_version('ghc-internal', 'base','ghc-prim'), compile, ['-ddump-types -ddump-json -Wno-unsupported-llvm-version'])
 test('T16167', [normalise_version('ghc'),req_interp,exit_code(1)], run_command,
      ['{compiler} -x hs -e ":set prog T16167.hs" -ddump-json T16167.hs'])
