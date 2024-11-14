@@ -418,6 +418,8 @@ Library
         GHC.Data.Graph.Color
         GHC.Data.Graph.Collapse
         GHC.Data.Graph.Directed
+        GHC.Data.Graph.Directed.Internal
+        GHC.Data.Graph.Directed.Reachability
         GHC.Data.Graph.Inductive.Graph
         GHC.Data.Graph.Inductive.PatriciaTree
         GHC.Data.Graph.Ops
