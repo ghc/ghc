@@ -47,6 +47,7 @@ ghcWarningsArgs = do
         , package directory    ? pure [ "-Wno-unused-imports"
                                       , "-Wno-deprecations" -- https://gitlab.haskell.org/ghc/ghc/-/issues/24240
                                       ]
+        , package fileio       ? pure [ "-Wno-unused-imports" ] -- https://github.com/haskell/file-io/issues/30
         , package ghc          ? pure [ "-Wcpp-undef"
                                       , "-Wincomplete-uni-patterns"
                                       , "-Wincomplete-record-updates"
