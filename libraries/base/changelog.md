@@ -35,6 +35,17 @@
   * Modify the implementation of `Control.Exception.throw` to avoid call-sites being inferred as diverging via precise exception.
     ([GHC #25066](https://gitlab.haskell.org/ghc/ghc/-/issues/25066), [CLC proposal #290](https://github.com/haskell/core-libraries-committee/issues/290))
   * Make `Debug.Trace.{traceEventIO,traceMarkerIO}` faster when tracing is disabled. See [CLC proposal #291](https://github.com/haskell/core-libraries-committee/issues/291).
+  * The exception messages were improved according to [CLC proposal #285](https://github.com/haskell/core-libraries-committee/issues/285). In particular:
+      * Improve the message of the uncaught exception handler
+      * Make `displayException (SomeException e) = displayException e`. The
+          additional information that is printed when exceptions are surfaced to
+          the top-level is added by `uncaughtExceptionHandler`.
+      * Get rid of the HasCallStack mechanism manually propagated by `ErrorCall`
+          in favour of the more general HasCallStack exception backtrace
+          mechanism, to remove duplicate call stacks for uncaught exceptions.
+      * Freeze the callstack of `error`, `undefined`, `throwIO`, `ioException`,
+          `ioError` to prevent leaking the implementation of these error functions
+          into the callstack.
 
 ## 4.20.0.0 May 2024
   * Shipped with GHC 9.10.1
