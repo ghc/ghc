@@ -29,11 +29,7 @@
 
 // We never want a Capability to overlap a cache line with
 // anything else, so round it up to a cache line size:
-#if defined(s390x_HOST_ARCH)
-#define CAPABILITY_ALIGNMENT 256
-#else
-#define CAPABILITY_ALIGNMENT 64
-#endif
+#define CAPABILITY_ALIGNMENT CACHELINE_SIZE
 
 /* A forward declaration of the per-capability data structures belonging to
  * the I/O manager. It is opaque and only passed by pointer, so the full

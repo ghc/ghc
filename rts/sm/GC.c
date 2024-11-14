@@ -153,9 +153,9 @@ static Condition gc_exit_arrived_cv;
 static Condition gc_exit_leave_now_cv;
 
 #else // THREADED_RTS
-// Must be aligned to 64-bytes to meet stated 64-byte alignment of gen_workspace
+// Must match the alignment of gen_workspace.
 StgWord8 the_gc_thread[sizeof(gc_thread) + 64 * sizeof(gen_workspace)]
-    ATTRIBUTE_ALIGNED(64);
+    ATTRIBUTE_ALIGNED(GEN_WORKSPACE_ALIGNMENT);
 #endif // THREADED_RTS
 
 /* Note [n_gc_threads]

@@ -82,3 +82,19 @@ code.
 #else
 #define MAX_N_CAPABILITIES 1
 #endif
+
+// The host's cacheline size.
+// We use 128-bytes here on AArch64 as this is the cache-line size of new Apple
+// ARMv8 platforms.
+//
+// At some point we may want to determine this via `configure`.
+#if defined(s390x_HOST_ARCH)
+#define CACHELINE_SIZE 256
+#elif defined(aarch64_HOST_ARCH)
+#define CACHELINE_SIZE 128
+#elif defined(x86_64_HOST_ARCH)
+#define CACHELINE_SIZE 64
+#else
+#define CACHELINE_SIZE 64
+#endif
+
