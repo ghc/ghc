@@ -945,8 +945,10 @@ isNbitEncodeable n i = let shift = n - 1 in (-1 `shiftL` shift) <= i && i < (1 `
 isEncodeableInWidth :: Width -> Integer -> Bool
 isEncodeableInWidth = isNbitEncodeable . widthInBits
 
+-- TODO: is*Op names might be a bit misleading: Rename to is*RegOp or inline pattern matching.
 isIntOp :: Operand -> Bool
-isIntOp o = not (isFloatOp o || isVectorOp o)
+isIntOp (OpReg _ reg) | isIntReg reg = True
+isIntOp _ = False
 
 isFloatOp :: Operand -> Bool
 isFloatOp (OpReg _ reg) | isFloatReg reg = True

@@ -546,11 +546,13 @@ pprInstr platform instr = case instr of
     | isFloatOp o1 && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfmv.s") o1 o2 -- fmv.s rd, rs is pseudo op fsgnj.s rd, rs, rs
     | isFloatOp o1 && isImmZero o2 && isDoubleOp o1 -> op2 (text "\tfcvt.d.w") o1 zero
     | isFloatOp o1 && isImmZero o2 && isSingleOp o1 -> op2 (text "\tfcvt.s.w") o1 zero
-    | isFloatOp o1 && not (isFloatOp o2) && isSingleOp o1 -> op2 (text "\tfmv.w.x") o1 o2
-    | isFloatOp o1 && not (isFloatOp o2) && isDoubleOp o1 -> op2 (text "\tfmv.d.x") o1 o2
-    | not (isFloatOp o1) && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfmv.x.w") o1 o2
-    | not (isFloatOp o1) && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfmv.x.d") o1 o2
+    | isFloatOp o1 && isImmOp o2 -> pprPanic "Unsupported move of immediate to floating point register" (pprOp platform o1 <+> pprOp platform o2)
+    | isFloatOp o1 && isIntOp o2 && isSingleOp o1 -> op2 (text "\tfmv.w.x") o1 o2
+    | isFloatOp o1 && isIntOp o2 && isDoubleOp o1 -> op2 (text "\tfmv.d.x") o1 o2
+    | isIntOp o1 && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfmv.x.w") o1 o2
+    | isIntOp o1 && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfmv.x.d") o1 o2
     -- TODO: Why does this NOP (reg1 == reg2) happen?
+    -- TODO: Vector config missing
     | isVectorOp o1 && isVectorOp o2 -> op2 (text "\tvmv.v.v") o1 o2
     | (OpImm (ImmInteger i)) <- o2,
       fitsIn12bitImm i ->
@@ -733,7 +735,8 @@ pprInstr platform instr = case instr of
      in op4 fma d r1 r2 r3
   VMV fmt o1@(OpReg w _) o2 | isFloatOp o1 && isVectorOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
   VMV fmt o1@(OpReg _w _) o2 | isFloatOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "f") o1 o2
-  VMV fmt o1 o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> opToVInstrSuffix o2) o1 o2
+  VMV fmt o1@(OpReg w _) o2 | isIntOp o1 && isVectorOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> text "x" <> dot <> text "s") o1 o2
+  VMV fmt o1@(OpReg _w _) o2 | isIntOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "x") o1 o2
   -- TODO: Remove o2 from constructor
   VID fmt o1 _o2 -> configVec fmt $$ op1 (text "\tvid.v") o1
   -- TODO: This expects int register as third operand: Generalize by calculating
