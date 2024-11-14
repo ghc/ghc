@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -147,6 +148,7 @@ import GHC.Types.Unique
 import GHC.Iface.Errors.Types
 
 import qualified GHC.Data.Word64Set as W
+import GHC.Data.Graph.Directed.Reachability
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -602,20 +604,20 @@ createBuildPlan mod_graph maybe_top_mod =
               mresolved_cycle = collapseSCC (topSortWithBoot nodes)
           in acyclic ++ [either UnresolvedCycle ResolvedCycle mresolved_cycle] ++ toBuildPlan sccs []
 
-        (mg, lookup_node) = moduleGraphNodes False (mgModSummaries' mod_graph)
-        trans_deps_map = allReachable mg (mkNodeKey . node_payload)
         -- Compute the intermediate modules between a file and its hs-boot file.
         -- See Step 2a in Note [Upsweep]
         boot_path mn uid =
-          map (summaryNodeSummary . expectJust "toNode" . lookup_node) $ Set.toList $
+          Set.toList $
           -- Don't include the boot module itself
-          Set.delete (NodeKey_Module (key IsBoot))  $
+          Set.filter ((/= NodeKey_Module (key IsBoot)) . mkNodeKey)  $
           -- Keep intermediate dependencies: as per Step 2a in Note [Upsweep], these are
           -- the transitive dependencies of the non-boot file which transitively depend
           -- on the boot file.
-          Set.filter (\nk -> nodeKeyUnitId nk == uid  -- Cheap test
-                              && (NodeKey_Module (key IsBoot)) `Set.member` expectJust "dep_on_boot" (M.lookup nk trans_deps_map)) $
-          expectJust "not_boot_dep" (M.lookup (NodeKey_Module (key NotBoot)) trans_deps_map)
+          Set.filter (\(mkNodeKey -> nk) ->
+            nodeKeyUnitId nk == uid  -- Cheap test
+              && mgQuery mod_graph nk (NodeKey_Module (key IsBoot))) $
+          Set.fromList $
+          expectJust "not_boot_dep"  (mgReachable mod_graph (NodeKey_Module (key NotBoot)))
           where
             key ib = ModNodeKeyWithUid (GWIB mn ib) uid
 
@@ -1491,7 +1493,7 @@ topSortModules drop_hs_boot_nodes summaries mb_root_mod
                      = node
                      | otherwise
                      = throwGhcException (ProgramError "module does not exist")
-            in graphFromEdgedVerticesUniq (seq root (reachableG graph root))
+            in graphFromEdgedVerticesUniq (seq root (root:allReachable (graphReachability graph) root))
 
 newtype ModNodeMap a = ModNodeMap { unModNodeMap :: Map.Map ModNodeKey a }
   deriving (Functor, Traversable, Foldable)
@@ -1810,20 +1812,15 @@ checkHomeUnitsClosed ue
     | otherwise = [singleMessage $ mkPlainErrorMsgEnvelope rootLoc $ DriverHomePackagesNotClosed (Set.toList bad_unit_ids)]
   where
     home_id_set = unitEnv_keys $ ue_home_unit_graph ue
-    bad_unit_ids = upwards_closure Set.\\ home_id_set
+    bad_unit_ids = upwards_closure Set.\\ home_id_set {- Remove all home units reached, keep only bad nodes -}
     rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
 
-    graph :: Graph (Node UnitId UnitId)
-    graph = graphFromEdgedVerticesUniq graphNodes
+    downwards_closure :: Graph (Node UnitId UnitId)
+    downwards_closure = graphFromEdgedVerticesUniq graphNodes
 
-    -- downwards closure of graph
-    downwards_closure
-      = graphFromEdgedVerticesUniq [ DigraphNode uid uid (Set.toList deps)
-                                   | (uid, deps) <- M.toList (allReachable graph node_key)]
+    inverse_closure = graphReachability $ transposeG downwards_closure
 
-    inverse_closure = transposeG downwards_closure
-
-    upwards_closure = Set.fromList $ map node_key $ reachablesG inverse_closure [DigraphNode uid uid [] | uid <- Set.toList home_id_set]
+    upwards_closure = Set.fromList $ map node_key $ allReachableMany inverse_closure [DigraphNode uid uid [] | uid <- Set.toList home_id_set]
 
     all_unit_direct_deps :: UniqMap UnitId (Set.Set UnitId)
     all_unit_direct_deps
