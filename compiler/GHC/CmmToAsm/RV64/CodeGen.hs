@@ -835,10 +835,11 @@ getRegister' config plat expr =
 
         --TODO: MO_V_Broadcast with immediate: If the right value is a literal,
         -- it may use vmv.v.i (simpler)
+        -- TODO: Duplication with MO_VF_Broadcast
         MO_V_Broadcast length w -> do
           (reg_val, format_val, code_val) <- getSomeReg e
           let w_val = formatToWidth format_val
-          pure $ Any (intFormat w) $ \dst ->
+          pure $ Any (vecFormat (cmmVec length (cmmFloat w))) $ \dst ->
             code_val `snocOL`
             annExpr expr
               (VMV (VecFormat length (intScalarFormat w)) (OpReg w dst) (OpReg w_val reg_val))
@@ -1221,6 +1222,27 @@ getRegister' config plat expr =
             -- Move to float register
             -- vmv.x.s a0, v8
             VMV (VecFormat length (floatScalarFormat w))(OpReg w dst) (OpReg (formatToWidth tmpFormat) tmp)
+
+        -- TODO: Duplication with MO_VF_Extract
+        MO_V_Extract length w -> do
+          (reg_v, format_v, code_v) <- getSomeReg x
+          (reg_idx, format_idx, code_idx) <- getSomeReg y
+          let tmpFormat = VecFormat length (intScalarFormat w)
+              width_v = formatToWidth format_v
+          tmp <- getNewRegNat tmpFormat
+          pure $ Any (intFormat w) $ \dst ->
+            code_v `appOL`
+            code_idx `snocOL`
+            -- Setup
+            -- TODO: Use width
+            annExpr expr
+            -- Move selected element to index 0
+            -- vslidedown.vi v8, v9, 2
+              (VSLIDEDOWN (VecFormat length (intScalarFormat w)) (OpReg width_v tmp) (OpReg width_v reg_v) (OpReg (formatToWidth format_idx) reg_idx)) `snocOL`
+            -- Move to float register
+            -- vmv.x.s a0, v8
+            VMV (VecFormat length (intScalarFormat w))(OpReg w dst) (OpReg (formatToWidth tmpFormat) tmp)
+
         MO_VF_Add  length w -> vecOp length w (\d x y -> (VADD (VecFormat length (floatScalarFormat w)) d x y))
         MO_VF_Sub  length w -> vecOp length w (\d x y -> (VSUB (VecFormat length (floatScalarFormat w)) d x y))
         MO_VF_Mul  length w -> vecOp length w (\d x y -> (VMUL (VecFormat length (floatScalarFormat w)) d x y))
@@ -1315,6 +1337,30 @@ getRegister' config plat expr =
               -- 3. Merge with mask -> set element at index
               VMSEQ (VecFormat length (floatScalarFormat w)) (OpReg W8 v0Reg) (OpReg W8 v0Reg) (OpReg (formatToWidth format_idx) reg_idx) `snocOL`
               VMERGE (VecFormat length (floatScalarFormat w)) (OpReg w dst) (OpReg (formatToWidth format_v) reg_v)  (OpReg w tmp) (OpReg W8 v0Reg)
+        -- TODO: Duplication with MO_VF_Insert
+        MO_V_Insert length w ->
+          do
+            (reg_v, format_v, code_v) <- getSomeReg x
+            (reg_f, format_f, code_f) <- getSomeReg y
+            (reg_idx, format_idx, code_idx) <- getSomeReg z
+            (reg_l, format_l, code_l) <- getSomeReg (CmmLit (CmmInt (toInteger length) W64))
+            tmp <- getNewRegNat (VecFormat length (intScalarFormat w))
+            let targetFormat = VecFormat length (intScalarFormat w)
+            pure $ Any targetFormat $ \dst ->
+              code_v `appOL`
+              code_f `appOL`
+              code_idx `appOL`
+              code_l `snocOL`
+              annExpr expr
+              -- Build mask for index
+              -- 1. fill elements with index numbers
+              -- TODO: The Width is made up
+               (VID (VecFormat length (intScalarFormat w)) (OpReg W8 v0Reg) (OpReg (formatToWidth format_l) reg_l)) `snocOL`
+              -- 2. Splat value into tmp vector
+              VMV (VecFormat length (intScalarFormat w)) (OpReg w tmp) (OpReg (formatToWidth format_f) reg_f) `snocOL`
+              -- 3. Merge with mask -> set element at index
+              VMSEQ (VecFormat length (intScalarFormat w)) (OpReg W8 v0Reg) (OpReg W8 v0Reg) (OpReg (formatToWidth format_idx) reg_idx) `snocOL`
+              VMERGE (VecFormat length (intScalarFormat w)) (OpReg w dst) (OpReg (formatToWidth format_v) reg_v)  (OpReg w tmp) (OpReg W8 v0Reg)
 
         _ ->
           pprPanic "getRegister' (unhandled ternary CmmMachOp): "
