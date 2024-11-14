@@ -67,6 +67,8 @@ GHC.Data.FastString.Env
 GHC.Data.FiniteMap
 GHC.Data.FlatBag
 GHC.Data.Graph.Directed
+GHC.Data.Graph.Directed.Internal
+GHC.Data.Graph.Directed.Reachability
 GHC.Data.Graph.UnVar
 GHC.Data.List.Infinite
 GHC.Data.List.SetOps

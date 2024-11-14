@@ -51,7 +51,6 @@ import Control.Monad
 import Control.Applicative
 
 import qualified Data.Set as Set
-import qualified Data.Map as M
 import Data.List (isSuffixOf)
 
 import System.FilePath
@@ -166,16 +165,16 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
     make_deps_loop found@(found_units, found_mods) (nk:nexts)
       | NodeKey_Module nk `Set.member` found_mods = make_deps_loop found nexts
       | otherwise =
-        case M.lookup (NodeKey_Module nk) (mgTransDeps mod_graph) of
-            Just trans_deps ->
-              let deps = Set.insert (NodeKey_Module nk) trans_deps
-                  -- See #936 and the ghci.prog007 test for why we have to continue traversing through
-                  -- boot modules.
-                  todo_boot_mods = [ModNodeKeyWithUid (GWIB mn NotBoot) uid | NodeKey_Module (ModNodeKeyWithUid (GWIB mn IsBoot) uid) <- Set.toList trans_deps]
-              in make_deps_loop (found_units, deps `Set.union` found_mods) (todo_boot_mods ++ nexts)
-            Nothing ->
+        case fmap mkNodeKey <$> mgReachable mod_graph (NodeKey_Module nk) of
+          Nothing ->
               let (ModNodeKeyWithUid _ uid) = nk
               in make_deps_loop (addOneToUniqDSet found_units uid, found_mods) nexts
+          Just trans_deps ->
+            let deps = Set.insert (NodeKey_Module nk) (Set.fromList trans_deps)
+                -- See #936 and the ghci.prog007 test for why we have to continue traversing through
+                -- boot modules.
+                todo_boot_mods = [ModNodeKeyWithUid (GWIB mn NotBoot) uid | NodeKey_Module (ModNodeKeyWithUid (GWIB mn IsBoot) uid) <- trans_deps]
+            in make_deps_loop (found_units, deps `Set.union` found_mods) (todo_boot_mods ++ nexts)
 
     mkNk m = ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m)
     (init_pkg_set, all_deps) = make_deps_loop (emptyUniqDSet, Set.empty) $ map mkNk (filterOut isInteractiveModule mods)
