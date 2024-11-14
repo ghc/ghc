@@ -83,6 +83,10 @@ AS_IF([test x"${TargetHasSubsectionsViaSymbols}" = x"YES"],
   [AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
     [Define to 1 if Apple-style dead-stripping is supported.])])
 
+GHC_GNU_NONEXEC_STACK
+AS_IF([test x"$TargetHasGnuNonexecStack" = x"YES"],
+  [AC_DEFINE([HAVE_GNU_NONEXEC_STACK], [1], [Define (to 1) if GNU-style non-executable stack note is supported])])
+
 dnl --------------------------------------------------
 dnl * Platform header file and syscall feature tests
 dnl ### checking the state of the local header files and syscalls ###

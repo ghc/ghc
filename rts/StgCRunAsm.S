@@ -497,6 +497,6 @@ StgReturn:
 #endif /* !USE_MINIINTERPRETER */
 
 /* mark stack as nonexecutable */
-#if defined(__linux__) && defined(__ELF__)
+#if defined(HAVE_GNU_NONEXEC_STACK)
 .section .note.GNU-stack,"",@progbits
 #endif
