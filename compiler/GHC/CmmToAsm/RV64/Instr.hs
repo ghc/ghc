@@ -945,18 +945,33 @@ isNbitEncodeable n i = let shift = n - 1 in (-1 `shiftL` shift) <= i && i < (1 `
 isEncodeableInWidth :: Width -> Integer -> Bool
 isEncodeableInWidth = isNbitEncodeable . widthInBits
 
--- TODO: is*Op names might be a bit misleading: Rename to is*RegOp or inline pattern matching.
+isIntRegOp :: Operand -> Bool
+isIntRegOp (OpReg _ reg) | isIntReg reg = True
+isIntRegOp _ = False
+
+isIntImmOp :: Operand -> Bool
+isIntImmOp (OpImm (ImmInt _)) = True
+isIntImmOp (OpImm (ImmInteger _)) = True
+isIntImmOp _ = False
+
 isIntOp :: Operand -> Bool
-isIntOp (OpReg _ reg) | isIntReg reg = True
-isIntOp _ = False
+isIntOp op = isIntRegOp op || isIntImmOp op
+
+isFloatRegOp :: Operand -> Bool
+isFloatRegOp (OpReg _ reg) | isFloatReg reg = True
+isFloatRegOp _ = False
+
+isFloatImmOp :: Operand -> Bool
+isFloatImmOp (OpImm (ImmFloat _)) = True
+isFloatImmOp (OpImm (ImmDouble _)) = True
+isFloatImmOp _ = False
 
 isFloatOp :: Operand -> Bool
-isFloatOp (OpReg _ reg) | isFloatReg reg = True
-isFloatOp _ = False
+isFloatOp op = isFloatRegOp op || isFloatImmOp op
 
-isVectorOp :: Operand -> Bool
-isVectorOp (OpReg _ reg) | isVectorReg reg = True
-isVectorOp _ = False
+isVectorRegOp :: Operand -> Bool
+isVectorRegOp (OpReg _ reg) | isVectorReg reg = True
+isVectorRegOp _ = False
 
 isFloatReg :: Reg -> Bool
 isFloatReg (RegReal (RealRegSingle i)) | isFloatRegNo i = True

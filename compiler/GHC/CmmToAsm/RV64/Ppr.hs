@@ -547,13 +547,13 @@ pprInstr platform instr = case instr of
     | isFloatOp o1 && isImmZero o2 && isDoubleOp o1 -> op2 (text "\tfcvt.d.w") o1 zero
     | isFloatOp o1 && isImmZero o2 && isSingleOp o1 -> op2 (text "\tfcvt.s.w") o1 zero
     | isFloatOp o1 && isImmOp o2 -> pprPanic "Unsupported move of immediate to floating point register" (pprOp platform o1 <+> pprOp platform o2)
-    | isFloatOp o1 && isIntOp o2 && isSingleOp o1 -> op2 (text "\tfmv.w.x") o1 o2
-    | isFloatOp o1 && isIntOp o2 && isDoubleOp o1 -> op2 (text "\tfmv.d.x") o1 o2
-    | isIntOp o1 && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfmv.x.w") o1 o2
-    | isIntOp o1 && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfmv.x.d") o1 o2
+    | isFloatRegOp o1 && isIntRegOp o2 && isSingleOp o1 -> op2 (text "\tfmv.w.x") o1 o2
+    | isFloatRegOp o1 && isIntRegOp o2 && isDoubleOp o1 -> op2 (text "\tfmv.d.x") o1 o2
+    | isIntRegOp o1 && isFloatRegOp o2 && isSingleOp o2 -> op2 (text "\tfmv.x.w") o1 o2
+    | isIntRegOp o1 && isFloatRegOp o2 && isDoubleOp o2 -> op2 (text "\tfmv.x.d") o1 o2
     -- TODO: Why does this NOP (reg1 == reg2) happen?
     -- TODO: Vector config missing
-    | isVectorOp o1 && isVectorOp o2 -> op2 (text "\tvmv.v.v") o1 o2
+    | isVectorRegOp o1 && isVectorRegOp o2 -> op2 (text "\tvmv.v.v") o1 o2
     | (OpImm (ImmInteger i)) <- o2,
       fitsIn12bitImm i ->
         lines_ [text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform x0 <> comma <+> pprOp platform o2]
@@ -588,14 +588,14 @@ pprInstr platform instr = case instr of
   BCOND _ _ _ (TReg _) -> panic "RV64.ppr: No conditional branching to registers!"
   CSET o l r c -> case c of
     EQ
-      | isIntOp l && isIntOp r ->
+      | isIntRegOp l && isIntOp r ->
           lines_
             [ subFor l r,
               text "\tseqz" <+> pprOp platform o <> comma <+> pprOp platform o
             ]
     EQ | isFloatOp l && isFloatOp r -> line $ binOp ("\tfeq." ++ floatOpPrecision platform l r)
     NE
-      | isIntOp l && isIntOp r ->
+      | isIntRegOp l && isIntOp r ->
           lines_
             [ subFor l r,
               text "\tsnez" <+> pprOp platform o <> comma <+> pprOp platform o
@@ -634,7 +634,7 @@ pprInstr platform instr = case instr of
     FLE | isFloatOp l && isFloatOp r -> line $ binOp ("\tfle." ++ floatOpPrecision platform l r)
     FGT | isFloatOp l && isFloatOp r -> line $ binOp ("\tfgt." ++ floatOpPrecision platform l r)
     FGE | isFloatOp l && isFloatOp r -> line $ binOp ("\tfge." ++ floatOpPrecision platform l r)
-    x -> pprPanic "RV64.ppr: unhandled CSET conditional" (text (show x) <+> pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l)
+    x -> pprPanic "RV64.ppr: unhandled CSET conditional" (text (show x) <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r)
     where
       subFor l r
         | (OpImm _) <- r = text "\taddi" <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform (negOp r)
@@ -733,10 +733,10 @@ pprInstr platform instr = case instr of
           FNMAdd -> text "\tfnmadd" <> dot <> floatPrecission d
           FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
      in op4 fma d r1 r2 r3
-  VMV fmt o1@(OpReg w _) o2 | isFloatOp o1 && isVectorOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
+  VMV fmt o1@(OpReg w _) o2 | isFloatOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
   VMV fmt o1@(OpReg _w _) o2 | isFloatOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "f") o1 o2
-  VMV fmt o1@(OpReg w _) o2 | isIntOp o1 && isVectorOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> text "x" <> dot <> text "s") o1 o2
-  VMV fmt o1@(OpReg _w _) o2 | isIntOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "x") o1 o2
+  VMV fmt o1@(OpReg w _) o2 | isIntRegOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> text "x" <> dot <> text "s") o1 o2
+  VMV fmt o1@(OpReg _w _) o2 | isIntRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "x") o1 o2
   -- TODO: Remove o2 from constructor
   VID fmt o1 _o2 -> configVec fmt $$ op1 (text "\tvid.v") o1
   -- TODO: This expects int register as third operand: Generalize by calculating
@@ -808,9 +808,9 @@ pprInstr platform instr = case instr of
     pprMasking MU = text "mu"
 
     opToVInstrSuffix :: (IsLine doc) => Operand -> doc
-    opToVInstrSuffix op | isIntOp op = text "x"
+    opToVInstrSuffix op | isIntRegOp op = text "x"
     opToVInstrSuffix op | isFloatOp op = text "f"
-    opToVInstrSuffix op | isVectorOp op = text "v"
+    opToVInstrSuffix op | isVectorRegOp op = text "v"
     opToVInstrSuffix op = pprPanic "Unsupported operand for vector instruction" (pprOp platform op)
 
     floatWidthSuffix :: (IsLine doc) => Width -> doc
