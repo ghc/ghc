@@ -1,0 +1,51 @@
+name: CI
+
+# Trigger the workflow on push or pull request, but only for the master branch
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+  push:
+    branches: [master]
+
+jobs:
+  cabal:
+    name: ${{ matrix.os }} / ghc ${{ matrix.ghc }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        ghc: ['9.6.5'] # bootstrapping compiler
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: "recursive"
+
+    - uses: haskell-actions/setup@v2
+      id: setup
+      name: Setup Haskell tools
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        cabal-version: "latest"
+        cabal-update: true
+
+    - name: Install Alex and Happy
+      run: |
+        cabal install alex
+        cabal install happy
+
+    - name: Configure the build
+      run: |
+        ./boot
+        ./configure
+
+    - name: Build Hadrian
+      run: |
+        ./hadrian/build --version
+
+    - name: Build the bindist
+      run: |
+        ./hadrian/build --flavour=release -j binary-dist-dir --docs=none
