@@ -90,7 +90,7 @@ createAdjustor(StgStablePtr hptr, StgFunPtr wptr,
 void
 freeHaskellFunctionPtr(void* ptr)
 {
-    struct AdjustorContext context;
+    struct CCallContext context;
     free_adjustor(ptr, &context);
     freeStablePtr(context.hptr);
 }
