@@ -26,28 +26,28 @@ DECLARE_CSYM(ccall_adjustor)
     // Record a frame pointer. Paired with the `leave` below.
     pushl   %ebp
     movl    %esp, %ebp
-    
+
     subl    FRAME_SIZE_OFF(%eax), %esp
 
     // Save %esi and %edi as we need to clobber them to perform the shuffle
     pushl   %esi
     pushl   %edi
-        
+
     // Shuffle the stack down...
     leal    8(%ebp), %esi
     leal    12(%esp), %edi
     movl    ARGUMENT_WORDS_OFF(%eax), %ecx
     rep
     movsl
-    
+
     // Restore %edi and %esi
     popl    %edi
     popl    %esi
-    
+
     // Perform the call
     pushl   HPTR_OFF(%eax)
     call    *WPTR_OFF(%eax)
-    
+
     leave
     ret
 
