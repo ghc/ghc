@@ -76,6 +76,9 @@ loadDLL f =
       evaluate =<< js_loadDLL (toJSString f)
       pure $ Right nullPtr
 
+-- See Note [Variable passing in JSFFI] for where
+-- __ghc_wasm_jsffi_dyld comes from
+
 foreign import javascript safe "__ghc_wasm_jsffi_dyld.loadDLL($1)"
   js_loadDLL :: JSString -> IO ()
 

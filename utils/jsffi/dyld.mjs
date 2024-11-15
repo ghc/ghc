@@ -629,7 +629,8 @@ class DyLD {
 
       // Fulfill the ghc_wasm_jsffi imports. Use new Function()
       // instead of eval() to prevent bindings in this local scope to
-      // be accessed by JSFFI code snippets.
+      // be accessed by JSFFI code snippets. See Note [Variable passing in JSFFI]
+      // for what's going on here.
       Object.assign(
         import_obj.ghc_wasm_jsffi,
         new Function(
