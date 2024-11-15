@@ -314,18 +314,12 @@ typedef StgWord64 TaskId;
 //
 #if defined(THREADED_RTS)
 INLINE_HEADER TaskId serialiseTaskId (OSThreadId taskID) {
-#if defined(freebsd_HOST_OS) || defined(darwin_HOST_OS)
-    // Here OSThreadId is a pthread_t and pthread_t is a pointer, but within
+    // Here OSThreadId may be a pthread_t and pthread_t is a pointer, but within
     // the process we can still use that pointer value as a unique id.
-    return (TaskId) (size_t) taskID;
-#else
-    // On Windows, Linux and others it's an integral type to start with.
-    return (TaskId) taskID;
-#endif
+    return (TaskId) (uintptr_t) taskID;
 }
 #endif
 
-//
 // Get a serialisable Id for the Task's OS thread
 // Needed mainly for logging since the OSThreadId is an opaque type
 INLINE_HEADER TaskId
@@ -334,7 +328,7 @@ serialisableTaskId (Task *task)
 #if defined(THREADED_RTS)
     return serialiseTaskId(task->id);
 #else
-    return (TaskId) (size_t) task;
+    return (TaskId) (uintptr_t) task;
 #endif
 }
 
