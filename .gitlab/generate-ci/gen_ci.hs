@@ -184,7 +184,8 @@ mkJobFlavour BuildConfig{..} = Flavour buildFlavour opts
            [ThreadSanitiser | threadSanitiser] ++
            [NoSplitSections | noSplitSections, buildFlavour == Release ] ++
            [BootNonmovingGc | validateNonmovingGc ] ++
-           [TextWithSIMDUTF | textWithSIMDUTF]
+           [TextWithSIMDUTF | textWithSIMDUTF] ++
+           [Assertions | withAssertions ]
 
 data Flavour = Flavour BaseFlavour [FlavourTrans]
 
@@ -197,6 +198,7 @@ data FlavourTrans =
     | NoSplitSections
     | BootNonmovingGc
     | TextWithSIMDUTF
+    | Assertions
 
 data BaseFlavour = Release | Validate | SlowValidate deriving Eq
 
@@ -370,6 +372,7 @@ flavourString (Flavour base trans) = base_string base ++ concatMap (("+" ++) . f
     flavour_string NoSplitSections = "no_split_sections"
     flavour_string BootNonmovingGc = "boot_nonmoving_gc"
     flavour_string TextWithSIMDUTF = "text_simdutf"
+    flavour_string Assertions = "assertions"
 
 -- The path to the docker image (just for linux builders)
 dockerImage :: Arch -> Opsys -> Maybe String
@@ -1021,6 +1024,11 @@ validateBuilds a op bc = StandardTriple { v = Just (validate a op bc)
                                         , n = Just (nightly a op bc)
                                         , r = Nothing }
 
+nightlyBuilds :: Arch -> Opsys -> BuildConfig -> JobGroup Job
+nightlyBuilds a op bc = StandardTriple { v = Nothing
+                                       , n = Just (nightly a op bc)
+                                       , r = Nothing }
+
 flattenJobGroup :: JobGroup a -> [(String, a)]
 flattenJobGroup (StandardTriple a b c) = map flattenNamedJob (catMaybes [a,b,c])
 
@@ -1055,6 +1063,8 @@ debian_x86 =
   -- Run the 'perf' profiling nightly job in the release config.
   , perfProfilingJob Amd64 (Linux Debian12) releaseConfig
 
+  , nightlyBuilds Amd64 (Linux Debian12) (releaseConfig { withAssertions = True })
+
   , onlyRule LLVMBackend (validateBuilds Amd64 (Linux validate_debian) llvm)
   , addValidateRule TestPrimops (standardBuilds Amd64 (Linux validate_debian))
 
@@ -1085,6 +1095,7 @@ debian_aarch64 =
    , fastCI (standardBuildsWithConfig AArch64 (Linux Debian12) (splitSectionsBroken vanilla))
    -- LLVM backend bootstrap
    , onlyRule LLVMBackend (validateBuilds AArch64 (Linux Debian12) llvm)
+   , nightlyBuilds AArch64 (Linux Debian10) (releaseConfig { withAssertions = True })
   ]
 
 debian_i386 :: [JobGroup Job]

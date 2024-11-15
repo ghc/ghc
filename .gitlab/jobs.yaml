@@ -570,6 +570,69 @@
       "XZ_OPT": "-9"
     }
   },
+  "nightly-aarch64-linux-deb10-release+assertions": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-aarch64-linux-deb10-release+assertions.tar.xz",
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "aarch64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "aarch64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-release+assertions",
+      "BUILD_FLAVOUR": "release+assertions",
+      "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "RUNTEST_ARGS": "",
+      "TEST_ENV": "aarch64-linux-deb10-release+assertions",
+      "XZ_OPT": "-9"
+    }
+  },
   "nightly-aarch64-linux-deb10-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
@@ -1914,7 +1977,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-deb12-numa-slow-validate": {
+  "nightly-x86_64-linux-deb12-numa-slow-validate+assertions": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -1925,7 +1988,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb12-numa-slow-validate.tar.xz",
+        "ghc-x86_64-linux-deb12-numa-slow-validate+assertions.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1968,13 +2031,76 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-numa-slow-validate",
-      "BUILD_FLAVOUR": "slow-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-numa-slow-validate+assertions",
+      "BUILD_FLAVOUR": "slow-validate+assertions",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "ENABLE_NUMA": "1",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb12-numa-slow-validate",
+      "TEST_ENV": "x86_64-linux-deb12-numa-slow-validate+assertions",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-deb12-release+assertions": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb12-release+assertions.tar.xz",
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "x86_64-linux-deb12-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-release+assertions",
+      "BUILD_FLAVOUR": "release+assertions",
+      "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "RUNTEST_ARGS": "",
+      "TEST_ENV": "x86_64-linux-deb12-release+assertions",
       "XZ_OPT": "-9"
     }
   },
@@ -5976,7 +6102,7 @@
       "TEST_ENV": "x86_64-linux-deb12-no_tntc-validate"
     }
   },
-  "x86_64-linux-deb12-numa-slow-validate": {
+  "x86_64-linux-deb12-numa-slow-validate+assertions": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -5987,7 +6113,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb12-numa-slow-validate.tar.xz",
+        "ghc-x86_64-linux-deb12-numa-slow-validate+assertions.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -6013,7 +6139,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-numa-slow-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-numa-slow-validate\\+assertions(\\s|$).*/)) || (($ONLY_JOBS == null) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -6030,13 +6156,13 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-numa-slow-validate",
-      "BUILD_FLAVOUR": "slow-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-numa-slow-validate+assertions",
+      "BUILD_FLAVOUR": "slow-validate+assertions",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "ENABLE_NUMA": "1",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb12-numa-slow-validate"
+      "TEST_ENV": "x86_64-linux-deb12-numa-slow-validate+assertions"
     }
   },
   "x86_64-linux-deb12-release-perf": {
