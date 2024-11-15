@@ -1,0 +1,75 @@
+name: CI
+
+# Trigger the workflow on push or pull request, but only for the master branch
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+  push:
+    branches: [master]
+
+  workflow_dispatch:
+
+jobs:
+  cabal:
+    name: ${{ matrix.plat }} / ghc ${{ matrix.ghc }}
+    runs-on: "${{ fromJSON('{\"x86_64-linux\": \"ubuntu-24.04\", \"aarch64-linux\": \"ubuntu-24.04-arm\", \"x86_64-darwin\": \"macos-latest\", \"aarch64-darwin\": \"macos-latest\"}')[matrix.plat] }}"
+
+    strategy:
+      fail-fast: false
+      matrix:
+        plat:
+          - x86_64-linux
+          # - aarch64-linux  # disabled: waiting for devx images to be fixed
+          # - x86_64-darwin  # disabled: waiting for devx images to be fixed
+          - aarch64-darwin
+        ghc: ['98'] # bootstrapping compiler
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: "recursive"
+
+    - uses: input-output-hk/actions/devx@latest
+      with:
+        platform: ${{ matrix.plat }}
+        compiler-nix-name: 'ghc98'
+        minimal: true
+        ghc: true
+
+    - name: Update hackage
+      shell: devx {0}
+      run: cabal update
+
+    # The Makefile will run configure (and boot 😞), we also need to create a
+    # synthetic package before running configure.  Once this nuissance is fixed
+    # we can do proper configure + make again. Until then... we have to live
+    # with the hack of running everything from the make target.
+    # - name: Configure the build
+    #   shell: devx {0}
+    #   run: ./configure
+
+    - name: Build the bindist
+      shell: devx {0}
+      run: make CABAL=$PWD/_build/stage0/bin/cabal
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.plat }}-bindist
+        path: _build/bindist
+
+    - name: Run the testsuite
+      shell: devx {0}
+      run: make test CABAL=$PWD/_build/stage0/bin/cabal
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }} # upload test results even if the testsuite failed to pass
+      with:
+        name: ${{ matrix.plat }}-testsuite-results
+        path: |
+          _build/test-perf.csv
+          _build/test-summary.txt
+          _build/test-junit.xml

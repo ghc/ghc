@@ -1,0 +1,62 @@
+packages:
+  -- NOTE: we need rts-headers, because the _newly_ built compiler depends
+  --       on these potentially _new_ headers, we must not rely on those from
+  --       the rts as shipped with the bootstrap compiler. For the stage2
+  --       compiler we have the `rts` available, which would have the correct
+  --       headers around, now it has them through the rts -> rts-headers
+  --       dependency.
+  rts-headers
+  rts-fs
+
+  -- other packages.
+  ghc
+  compiler
+  libraries/directory
+  libraries/file-io
+  libraries/filepath
+  libraries/ghc-platform
+  libraries/ghc-boot
+  libraries/ghc-boot-th
+  libraries/ghc-heap
+  libraries/ghci
+  libraries/os-string
+  libraries/process
+  libraries/semaphore-compat
+  libraries/time
+  libraries/unix
+  libraries/Win32
+  libraries/Cabal/Cabal-syntax
+  libraries/Cabal/Cabal
+  utils/ghc-pkg
+  utils/hsc2hs
+  utils/unlit
+  utils/genprimopcode
+  utils/genapply
+  utils/deriveConstants
+  utils/ghc-toolchain
+  utils/ghc-toolchain/exe
+
+benchmarks: False
+tests: False
+allow-boot-library-installs: True
+
+package *
+  library-vanilla: True
+  shared: False
+  executable-profiling: False
+  executable-dynamic: False
+  executable-static: False
+
+package ghc-boot-th
+  flags: +bootstrap
+
+package hsc2hs
+  flags: +in-ghc-tree
+
+allow-newer: ghc-boot-th
+
+constraints:
+  template-haskell <= 2.22
+
+program-options
+  ghc-options: -fhide-source-paths -j

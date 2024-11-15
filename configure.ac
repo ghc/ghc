@@ -1,18 +1,5 @@
-dnl == autoconf source for the Glasgow FP tools ==
-dnl (run "grep '^dnl \*' configure.ac | sed -e 's/dnl / /g; s/\*\*/   +/g;'"
-dnl  (or some such) to see the outline of this file)
-dnl
-#
-# (c) The University of Glasgow 1994-2012
-#
-# Configure script template for GHC
-#
-# Process with 'autoreconf' to get a working configure script.
-#
-# For the generated configure script, do "./configure --help" to
-# see what flags are available. (Better yet, read the documentation!)
-#
-
+# configure.ac
+AC_PREREQ([2.69])
 AC_INIT([The Glorious Glasgow Haskell Compilation System], [9.14.0], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
     # Version on master must be X.Y (not X.Y.Z) for ProjectVersionMunged variable
     # to be useful (cf #19058). However, the version must have three components
@@ -78,31 +65,37 @@ dnl * We need 2.52 due to the use of AS_TR_CPP and AS_TR_SH.
 dnl * Using autoconf 2.59 started to give nonsense like this
 dnl     #define SIZEOF_CHAR 0
 dnl   recently.
-AC_PREREQ([2.69])
 
-# No, semi-sadly, we don't do `--srcdir'...
-if test x"$srcdir" != 'x.' ; then
-    echo "This configuration does not support the \`--srcdir' option.."
-    exit 1
-fi
+# --- Multi-target Build System Configuration ---
+# Add multi-target specific configuration options
+AC_ARG_WITH([project-version], [AS_HELP_STRING([--with-project-version=VER], [GHC version (default: 9.14)])], [ProjectVersion="$withval"], [ProjectVersion="9.14"])
+AC_ARG_WITH([project-version-int], [AS_HELP_STRING([--with-project-version-int=VER], [GHC version as int (default: 914)])], [ProjectVersionInt="$withval"], [ProjectVersionInt="914"])
+AC_ARG_WITH([project-version-munged], [AS_HELP_STRING([--with-project-version-munged=VER], [GHC version "munged" (default: 9.14)])], [ProjectVersionMunged="$withval"], [ProjectVersionMunged="9.14"])
+AC_ARG_WITH([project-version-for-lib], [AS_HELP_STRING([--with-project-version-for-lib=VER], [GHC version for libraries (default: 9.1400)])], [ProjectVersionForLib="$withval"], [ProjectVersionForLib="9.1400"])
+AC_ARG_WITH([project-patch-level], [AS_HELP_STRING([--with-project-patch-level=VER], [GHC patchlevel version (default: 0)])], [ProjectPatchLevel="$withval"], [ProjectPatchLevel="0"])
+AC_ARG_WITH([project-patch-level1], [AS_HELP_STRING([--with-project-patch-level1=VER], [GHC patchlevel1 version (default: 0)])], [ProjectPatchLevel1="$withval"], [ProjectPatchLevel1="0"])
+AC_ARG_WITH([project-patch-level2], [AS_HELP_STRING([--with-project-patch-level2=VER], [GHC patchlevel2 version (default: 0)])], [ProjectPatchLevel2="$withval"], [ProjectPatchLevel2="0"])
 
-dnl --------------------------------------------------------------
-dnl * Project specific configuration options
-dnl --------------------------------------------------------------
-dnl What follows is a bunch of options that can either be configured
-dnl through command line options to the configure script or by
-dnl supplying defns in the build tree's mk/build.mk. Having the option to
-dnl use either is considered a Feature.
+# Export these variables for substitution by AC_SUBST
+AC_SUBST([ProjectVersion])
+AC_SUBST([ProjectVersionInt])
+AC_SUBST([ProjectVersionMunged])
+AC_SUBST([ProjectVersionForLib])
+AC_SUBST([ProjectPatchLevel])
+AC_SUBST([ProjectPatchLevel1])
+AC_SUBST([ProjectPatchLevel2])
 
-dnl ** What command to use to compile compiler sources ?
-dnl --------------------------------------------------------------
+# For ghc-boot-th.cabal.in
+AC_SUBST([Suffix],[""])
+AC_SUBST([SourceRoot],["."])
 
-AC_ARG_VAR(GHC,[Use as the full path to GHC. [default=autodetect]])
-AC_PATH_PROG([GHC], [ghc])
-AC_ARG_WITH([ghc],
-        AS_HELP_STRING([--with-ghc=PATH], [Use PATH as the full path to ghc (obsolete, use GHC=PATH instead) [default=autodetect]]),
-        AC_MSG_ERROR([--with-ghc=$withval is obsolete (use './configure GHC=$withval' or 'GHC=$withval ./configure' instead)]))
-AC_SUBST(WithGhc,$GHC)
+# --- Define Programs ---
+# We don't need to check for CC, MAKE_SET, and others for now, we only want substitution.
+# AC_PROG_CC
+# AC_PROG_MAKE_SET # To ensure 'set' works in Makefiles for undefined variables
+AC_CHECK_PROGS([PYTHON], [python3 python python2])
+AS_IF([test "x$PYTHON" = x], [AC_MSG_ERROR([Python interpreter not found. Please install Python or set PYTHON environment variable.])])
+AC_SUBST([PYTHON])
 
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
 [AS_HELP_STRING([--enable-bootstrap-with-devel-snapshot],
@@ -995,131 +988,26 @@ AC_CONFIG_FILES(
 dnl Create the VERSION file, satisfying #22322.
 printf "$ProjectVersion" > VERSION
 
+# --- Files to generate ---
+# config.status will create these files by substituting @VAR@ placeholders.
+AC_CONFIG_FILES([
+    ghc/ghc-bin.cabal:ghc/ghc-bin.cabal.in
+    compiler/ghc.cabal:compiler/ghc.cabal.in
+    libraries/ghc-boot/ghc-boot.cabal:libraries/ghc-boot/ghc-boot.cabal.in
+    libraries/ghc-boot-th/ghc-boot-th.cabal:libraries/ghc-boot-th/ghc-boot-th.cabal.in
+    libraries/ghc-heap/ghc-heap.cabal:libraries/ghc-heap/ghc-heap.cabal.in
+    libraries/template-haskell/template-haskell.cabal:libraries/template-haskell/template-haskell.cabal.in
+    libraries/ghci/ghci.cabal:libraries/ghci/ghci.cabal.in
+    utils/ghc-pkg/ghc-pkg.cabal:utils/ghc-pkg/ghc-pkg.cabal.in
+    utils/ghc-iserv/ghc-iserv.cabal:utils/ghc-iserv/ghc-iserv.cabal.in
+    utils/runghc/runghc.cabal:utils/runghc/runghc.cabal.in
+    libraries/ghc-internal/ghc-internal.cabal:libraries/ghc-internal/ghc-internal.cabal.in
+    libraries/ghc-experimental/ghc-experimental.cabal:libraries/ghc-experimental/ghc-experimental.cabal.in
+    libraries/base/base.cabal:libraries/base/base.cabal.in
+    rts/include/ghcversion.h:rts/include/ghcversion.h.in
+])
+
 AC_OUTPUT
-[
-if test "$print_make_warning" = "true"; then
-   echo
-   echo "WARNING: It looks like \"$MakeCmd\" is GNU make 3.80."
-   echo "This version cannot be used to build GHC."
-   echo "Please use GNU make >= 3.81."
-fi
 
-echo "
-----------------------------------------------------------------------
-Configure completed successfully.
-
-   Building GHC version  : $ProjectVersion
-          Git commit id  : $ProjectGitCommitId
-
-   Build platform        : $BuildPlatform
-   Host platform         : $HostPlatform
-   Target platform       : $TargetPlatform
-"
-
-echo "\
-   Bootstrapping using   : $WithGhc
-      which is version   : $GhcVersion
-      with threaded RTS? : $GhcThreadedRts
-"
-
-if test "x$CcLlvmBackend" = "xYES"; then
-    CompilerName="clang        "
-else
-    CompilerName="gcc          "
-fi
-
-echo "\
-   Using (for bootstrapping) : $CC_STAGE0
-   Using $CompilerName       : $CC
-      which is version       : $GccVersion
-      linker options         : $GccUseLdOpt
-   Building a cross compiler : $CrossCompiling
-   Unregisterised            : $Unregisterised
-   TablesNextToCode          : $TablesNextToCode
-   Build GMP in tree         : $GMP_FORCE_INTREE
-   cpp          : $CPPCmd
-   cpp-flags    : $CONF_CPP_OPTS_STAGE2
-   hs-cpp       : $HaskellCPPCmd
-   hs-cpp-flags : $HaskellCPPArgs
-   js-cpp       : $JavaScriptCPPCmd
-   js-cpp-flags : $JavaScriptCPPArgs
-   cmmcpp       : $CmmCPPCmd
-   cmmcpp-flags : $CmmCPPArgs
-   cmmcpp-g0    : $CmmCPPSupportsG0
-   c++          : $CXX
-   ar           : $ArCmd
-   nm           : $NmCmd
-   objdump      : $ObjdumpCmd
-   ranlib       : $RanlibCmd
-   otool        : $OtoolCmd
-   install_name_tool : $InstallNameToolCmd
-   windres      : $WindresCmd
-   genlib       : $GenlibCmd
-   Happy        : $HappyCmd ($HappyVersion)
-   Alex         : $AlexCmd ($AlexVersion)
-   sphinx-build : $SPHINXBUILD
-   xelatex      : $XELATEX
-   makeinfo     : $MAKEINFO
-   git          : $GIT
-   cabal-install : $CABAL
-"
-
-echo "\
-   Using optional dependencies:
-      libnuma : $UseLibNuma
-      libzstd : $UseLibZstd
-         statically linked? : ${UseStaticLibZstd:-N/A}
-      libdw   : $UseLibdw
-
-   Using LLVM tools
-      llc   : $LlcCmd
-      opt   : $OptCmd
-      llvm-as : $LlvmAsCmd"
-
-if test "$HSCOLOUR" = ""; then
-echo "
-   HsColour was not found; documentation will not contain source links
-"
-else
-echo "\
-   HsColour : $HSCOLOUR
-"
-fi
-
-echo "\
-   Tools to build Sphinx HTML documentation available: $BUILD_SPHINX_HTML
-   Tools to build Sphinx PDF documentation available: $BUILD_SPHINX_PDF
-   Tools to build Sphinx INFO documentation available: $BUILD_SPHINX_INFO"
-
-echo "----------------------------------------------------------------------
-"
-
-echo "\
-For a standard build of GHC (fully optimised with profiling), type
-   ./hadrian/build
-
-You can customise the build with flags such as
-   ./hadrian/build -j --flavour=devel2 [--freeze1]
-
-To make changes to the default build configuration, see the file
-   hadrian/src/UserSettings.hs
-
-For more information on how to configure your GHC build, see
-   https://gitlab.haskell.org/ghc/ghc/-/wikis/building/hadrian
-"]
-
-# Currently we don't validate the /host/ GHC toolchain because configure
-# doesn't configure flags and properties for most of the host toolchain
-#
-# In fact, most values in default.host.target are dummy values since they are
-# never used (see default.host.target.in)
-#
-# When we move to configure toolchains by means of ghc-toolchain only, we'll
-# have a correct complete /host/ toolchain rather than an incomplete one, which
-# might further unlock things like canadian cross-compilation
-#
-# VALIDATE_GHC_TOOLCHAIN([default.host.target],[default.host.target.ghc-toolchain])
-
-VALIDATE_GHC_TOOLCHAIN([hadrian/cfg/default.target],[hadrian/cfg/default.target.ghc-toolchain])
-
-rm -Rf acargs acghc-toolchain actmp-ghc-toolchain
+# After running ./configure, the following command can be used to see configured values:
+# ./config.status --config
