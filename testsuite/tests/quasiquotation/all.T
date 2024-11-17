@@ -8,6 +8,5 @@ test('T7918',
 test('T14028',
      [req_interp, req_rts_linker,
       only_ways([config.ghc_th_way]),
-      unless(config.have_ext_interp, skip),
-      when(opsys('freebsd'), expect_broken(19723))],
+      unless(config.have_ext_interp, skip)],
      makefile_test, ['T14028 ghcThWayFlags=' + config.ghc_th_way_flags])
