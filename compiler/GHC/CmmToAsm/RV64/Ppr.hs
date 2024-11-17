@@ -726,17 +726,29 @@ pprInstr platform instr = case instr of
   FMAX o1 o2 o3
     | isSingleOp o1 -> op3 (text "\tfmax.s") o1 o2 o3
     | isDoubleOp o2 -> op3 (text "\tfmax.d") o1 o2 o3
-  FMA variant d r1 r2 r3 ->
+  FMA variant d r1 r2 r3 | isFloatRegOp d ->
     let fma = case variant of
           FMAdd -> text "\tfmadd" <> dot <> floatPrecission d
           FMSub -> text "\tfmsub" <> dot <> floatPrecission d
           FNMAdd -> text "\tfnmadd" <> dot <> floatPrecission d
           FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
      in op4 fma d r1 r2 r3
-  VMV fmt o1@(OpReg w _) o2 | isFloatOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
-  VMV fmt o1@(OpReg _w _) o2 | isFloatOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "f") o1 o2
-  VMV fmt o1@(OpReg w _) o2 | isIntRegOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> text "x" <> dot <> text "s") o1 o2
-  VMV fmt o1@(OpReg _w _) o2 | isIntRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "x") o1 o2
+  VFMA variant fmt o1 o2 o3 | VecFormat l fmt' <- fmt ->
+    let formatString = if (isFloatFormat . scalarFormatFormat) fmt' then text "f" else text ""
+        prefix = text "v" <> formatString
+        suffix = text "vv"
+        fma = case variant of
+            FMAdd -> text "madd"
+            FMSub -> text "msub" -- TODO: Works only for floats!
+            FNMAdd -> text "nmadd" -- TODO: Works only for floats!
+            FNMSub -> text "nmsub"
+     in op3 (tab <> prefix <> fma <> dot <> suffix) o1 o2 o3
+  VMV fmt o1 o2 | isFloatOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
+                | isFloatOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "f") o1 o2
+                | isIntRegOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> text "x" <> dot <> text "s") o1 o2
+                | isIntRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "x") o1 o2
+                | isVectorRegOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "v") o1 o2
+                | True -> pprPanic "RV64.pprInstr - impossible vector move (VMV)" (pprOp platform o1 <+> pprOp platform o2 <+> text "fmt" <> colon <> (text . show) fmt)
   -- TODO: Remove o2 from constructor
   VID fmt o1 _o2 -> configVec fmt $$ op1 (text "\tvid.v") o1
   -- TODO: This expects int register as third operand: Generalize by calculating

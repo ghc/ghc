@@ -129,6 +129,8 @@ regUsageOfInstr platform instr = case instr of
   VFMAX fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
+  VFMA _ _fmt op1 op2 op3 ->
+    usage (regOp op1 ++ regOp op2 ++ regOp op3, regOp op1)
   _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
   where
     -- filtering the usage is necessary, otherwise the register
@@ -247,6 +249,8 @@ patchRegsOfInstr instr env = case instr of
   VFMAX fmt o1 o2 o3 -> VFMAX fmt (patchOp o1) (patchOp o2) (patchOp o3)
   FMA s o1 o2 o3 o4 ->
     FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
+  VFMA s fmt o1 o2 o3 ->
+    VFMA s fmt (patchOp o1) (patchOp o2) (patchOp o3)
   _ -> panic $ "patchRegsOfInstr: " ++ instrCon instr
   where
     patchOp :: Operand -> Operand
@@ -688,6 +692,7 @@ data Instr
   | VUMAX Format Operand Operand Operand
   | VFMIN Format Operand Operand Operand
   | VFMAX Format Operand Operand Operand
+  | VFMA FMASign Format Operand Operand Operand
 
 -- | Operand of a FENCE instruction (@r@, @w@ or @rw@)
 data FenceType = FenceRead | FenceWrite | FenceReadWrite
@@ -775,6 +780,12 @@ instrCon i =
         FMSub -> "FMSUB"
         FNMAdd -> "FNMADD"
         FNMSub -> "FNMSUB"
+    VFMA variant _ _ _ _ ->
+      case variant of
+        FMAdd -> "VFMADD"
+        FMSub -> "VFMSUB"
+        FNMAdd -> "VFNMADD"
+        FNMSub -> "VFNMSUB"
 
 data Target
   = TBlock BlockId
