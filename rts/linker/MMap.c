@@ -345,12 +345,7 @@ mmapInRegion (
         if (result == NULL) {
             // The mapping failed
             return NULL;
-        } else if (result < region->start) {
-            // Uh oh, we assume that mmap() will only give us a
-            // an address at or after the requested address.
-            // Try again.
-            p = (uint8_t *) result + bytes;
-        } else if (result < region->end) {
+        } else if (result >= region->start && result < region->end) {
             // Success!
             region->last = (uint8_t *) result + bytes;
             return result;
@@ -358,17 +353,23 @@ mmapInRegion (
             // We failed to find a suitable mapping
             munmap(result, bytes);
             reportMemoryMap();
-            errorBelch("mmapForLinker: failed to mmap() memory below 2Gb; "
+            errorBelch("mmapForLinker: failed to mmap() memory between %p and %p; "
                        "asked for %zu bytes at %p. "
                        "Try specifying an address with +RTS -xm<addr> -RTS",
-                       bytes, p);
+                       region->start, region->end, bytes, p);
             return NULL;
-        }
+        } else if (result < region->start) {
+            // Uh oh, we assume that mmap() will only give us a
+            // an address at or after the requested address.
+            // Try bump forward by a bit and try again.
+            p = (uint8_t *) p + bytes;
+        } else if (result >= region->end) {
+            // mmap() gave us too high an address; wrap around and try again
+            wrapped = true;
+            p = region->start;
+       }
 
-        // mmap() gave us too high an address; wrap around and try again
         munmap(result, bytes);
-        wrapped = true;
-        p = region->start;
     }
 }
 
