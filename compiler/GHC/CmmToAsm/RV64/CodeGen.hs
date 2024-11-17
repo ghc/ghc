@@ -859,7 +859,7 @@ getRegister' config plat expr =
           pure $ Any (vecFormat (cmmVec length (cmmFloat w))) $ \dst ->
             code_v `snocOL`
             annExpr expr
-              (VNEG (VecFormat length (floatScalarFormat w))(OpReg w dst) (OpReg w_v reg_v))
+              (VNEG (VecFormat length (floatScalarFormat w)) (OpReg w dst) (OpReg w_v reg_v))
 
         x -> pprPanic ("getRegister' (monadic CmmMachOp): " ++ show x) (pdoc plat expr)
       where
@@ -1221,7 +1221,7 @@ getRegister' config plat expr =
               (VSLIDEDOWN (VecFormat length (floatScalarFormat w)) (OpReg width_v tmp) (OpReg width_v reg_v) (OpReg (formatToWidth format_idx) reg_idx)) `snocOL`
             -- Move to float register
             -- vmv.x.s a0, v8
-            VMV (VecFormat length (floatScalarFormat w))(OpReg w dst) (OpReg (formatToWidth tmpFormat) tmp)
+            VMV (VecFormat length (floatScalarFormat w)) (OpReg w dst) (OpReg (formatToWidth tmpFormat) tmp)
 
         -- TODO: Duplication with MO_VF_Extract
         MO_V_Extract length w -> do
@@ -1241,7 +1241,7 @@ getRegister' config plat expr =
               (VSLIDEDOWN (VecFormat length (intScalarFormat w)) (OpReg width_v tmp) (OpReg width_v reg_v) (OpReg (formatToWidth format_idx) reg_idx)) `snocOL`
             -- Move to float register
             -- vmv.x.s a0, v8
-            VMV (VecFormat length (intScalarFormat w))(OpReg w dst) (OpReg (formatToWidth tmpFormat) tmp)
+            VMV (VecFormat length (intScalarFormat w)) (OpReg w dst) (OpReg (formatToWidth tmpFormat) tmp)
 
         MO_VF_Add  length w -> vecOp length w (\d x y -> (VADD (VecFormat length (floatScalarFormat w)) d x y))
         MO_VF_Sub  length w -> vecOp length w (\d x y -> (VSUB (VecFormat length (floatScalarFormat w)) d x y))
@@ -1294,15 +1294,25 @@ getRegister' config plat expr =
         -- x86 fmsub    x * y - z <=> RISCV64 fnmsub: d =   r1 * r2 - r3
         -- x86 fnmadd - x * y + z <=> RISCV64 fmsub : d = - r1 * r2 + r3
         -- x86 fnmsub - x * y - z <=> RISCV64 fnmadd: d = - r1 * r2 - r3
-        MO_FMA var l w
-          | l == 1
-          -> case var of
-                FMAdd -> float3Op w (\d n m a -> unitOL $ FMA FMAdd d n m a)
-                FMSub -> float3Op w (\d n m a -> unitOL $ FMA FMSub d n m a)
-                FNMAdd -> float3Op w (\d n m a -> unitOL $ FMA FNMSub d n m a)
-                FNMSub -> float3Op w (\d n m a -> unitOL $ FMA FNMAdd d n m a)
-          | otherwise
-          -> sorry "The RISCV64 backend does not (yet) support vectors."
+        MO_FMA var length w
+          | length == 1
+          -> float3Op w (\d n m a -> unitOL $ FMA var d n m a)
+          | otherwise -> do
+            (reg_x, format_x, code_x) <- getSomeReg x
+            (reg_y, format_y, code_y) <- getSomeReg y
+            (reg_z, format_z, code_z) <- getSomeReg z
+            let targetFormat = VecFormat length (floatScalarFormat w)
+                width_z = formatToWidth format_z
+                negate_z = if var `elem` [FNMAdd, FNMSub] then unitOL (VNEG format_z (OpReg width_z reg_z) (OpReg width_z reg_z)) else nilOL
+            pure $ Any targetFormat $ \dst ->
+              code_x `appOL`
+              code_y `appOL`
+              code_z `appOL`
+              negate_z `snocOL`
+              annExpr expr
+                (VMV (VecFormat length (floatScalarFormat w)) (OpReg w dst) (OpReg (formatToWidth format_x) reg_x)) `snocOL`
+              VFMA var format_x (OpReg w dst) (OpReg (formatToWidth format_y) reg_y) (OpReg (formatToWidth format_z) reg_z)
+
         -- TODO: Implement length as immediate
 
         -- insert_float_into_vector:
@@ -1982,6 +1992,9 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
             `snocOL` MOV (OpReg w r_dst) (OpReg w gpReg)
             `appOL`
             -- truncate, otherwise an unexpectedly big value might be used in upfollowing calculations
+            -- truncate, otherwise an unexpectedly big value might be used in upfollowing calculations
+            -- truncate, otherwise an unexpectedly big value might be used in upfollowing calculations
+            -- truncate, otherwise an unexpectedly big value might be used in upfollowing calculations
             truncateReg W64 w r_dst
 genCCall (PrimTarget mop) dest_regs arg_regs = do
   case mop of
@@ -2439,6 +2452,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       VUMAX {} -> 2
       VFMIN {} -> 2
       VFMAX {} -> 2
+      VFMA {} -> 3
       -- estimate the subsituted size for jumps to lables
       -- jumps to registers have size 1
       BCOND {} -> long_bc_jump_size
