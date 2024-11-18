@@ -415,6 +415,13 @@ type Variables = MonoidalMap String [String]
 (=:) :: String -> String -> Variables
 a =: b = MonoidalMap (Map.singleton a [b])
 
+type TestName = String
+
+brokenTest :: TestName -- ^ test name
+           -> String -- ^ explanation of breakage
+           -> Variables
+brokenTest test _why = "BROKEN_TESTS" =: test
+
 opsysVariables :: Arch -> Opsys -> Variables
 opsysVariables _ FreeBSD13 = mconcat
   [ -- N.B. we use iconv from ports as I see linker errors when we attempt
@@ -463,13 +470,16 @@ alpineVariables arch = mconcat $
   [ -- Due to #20266
     "CONFIGURE_ARGS" =: "--disable-ld-override"
   , "INSTALL_CONFIGURE_ARGS" =: "--disable-ld-override"
-    -- encoding004: due to lack of locale support
-    -- T10458, ghcilink002: due to #17869
-  , "BROKEN_TESTS" =: "encoding004 T10458"
+  , brokenTest "encoding004" "due to lack of locale support"
+  , brokenTest "T10458" "#17869"
   ] ++
+  [ mconcat [ brokenTest test "#25498" | test <- ["simd009", "T25062_V16", "T25169", "T22187_run"] ]
+  | I386 <- [arch]
+  ] ++
+  [ brokenTest "T22033" "#25497" | I386 <- [arch] ] ++
   [-- Bootstrap compiler has incorrectly configured target triple #25200
     "CONFIGURE_ARGS" =: "--enable-ignore-build-platform-mismatch --build=aarch64-unknown-linux --host=aarch64-unknown-linux --target=aarch64-unknown-linux"
-    |  AArch64 <- [arch]
+  | AArch64 <- [arch]
   ]
 
 
@@ -479,7 +489,7 @@ distroVariables arch Alpine318 = alpineVariables arch
 distroVariables arch Alpine320 = alpineVariables arch
 distroVariables _ Centos7 = mconcat [
     "HADRIAN_ARGS" =: "--docs=no-sphinx"
-  , "BROKEN_TESTS" =: "T22012" -- due to #23979
+  , brokenTest "T22012" "#23979"
   ]
 distroVariables _ Fedora33 = mconcat
   -- LLC/OPT do not work for some reason in our fedora images
