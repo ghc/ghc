@@ -429,7 +429,6 @@ opsysVariables _ FreeBSD14 = mconcat
     -- porting guide [1].
     -- [1] https://www.freebsd.org/doc/en/books/porters-handbook/using-iconv.html)
     "CONFIGURE_ARGS" =:  "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
-  , "HADRIAN_ARGS" =: "--docs=no-sphinx"
   , "GHC_VERSION" =: "9.6.4"
   , "CABAL_INSTALL_VERSION" =: "3.10.3.0"
   ]
