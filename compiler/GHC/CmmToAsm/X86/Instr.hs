@@ -373,8 +373,9 @@ regUsageOfInstr platform instr
       | otherwise
       -> usageRW fmt src dst
     MOVD   fmt src dst    ->
-      -- NB: MOVD/MOVQ always zero any remaining upper part of destination
-      mkRU (use_R fmt src []) (use_R (movdOutFormat fmt) dst [])
+      -- NB: MOVD and MOVQ always zero any remaining upper part of destination,
+      -- so the destination is "written" not "modified".
+      usageRW' fmt (movdOutFormat fmt) src dst
     CMOV _ fmt src dst    -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     MOVZxL fmt src dst    -> usageRW fmt src dst
     MOVSxL fmt src dst    -> usageRW fmt src dst
@@ -475,7 +476,7 @@ regUsageOfInstr platform instr
 
     -- vector instructions
     VBROADCAST fmt src dst   -> mkRU (use_R fmt src []) [mk fmt dst]
-    VEXTRACT     fmt _off src dst -> mkRU [mk fmt src] (use_R fmt dst [])
+    VEXTRACT     fmt _off src dst -> usageRW fmt (OpReg src) dst
     INSERTPS     fmt (ImmInt off) src dst
       -> mkRU ((use_R fmt src []) ++ [mk fmt dst | not doesNotReadDst]) [mk fmt dst]
         where
@@ -488,12 +489,12 @@ regUsageOfInstr platform instr
     INSERTPS fmt _off src dst
       -> mkRU ((use_R fmt src []) ++ [mk fmt dst]) [mk fmt dst]
 
-    VMOVU        fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
-    MOVU         fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
-    MOVL         fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
-    MOVH         fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
-    MOVDQU       fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
-    VMOVDQU      fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
+    VMOVU        fmt src dst   -> usageRW fmt src dst
+    MOVU         fmt src dst   -> usageRW fmt src dst
+    MOVL         fmt src dst   -> usageRM fmt src dst
+    MOVH         fmt src dst   -> usageRM fmt src dst
+    MOVDQU       fmt src dst   -> usageRW fmt src dst
+    VMOVDQU      fmt src dst   -> usageRW fmt src dst
 
     PXOR fmt (OpReg src) dst
       | src == dst
@@ -531,11 +532,12 @@ regUsageOfInstr platform instr
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
     MINMAX _ _ fmt src dst
-      -> mkRU (use_R fmt src $ use_R fmt dst []) (use_R fmt dst [])
+      -> usageRM fmt src dst
     VMINMAX _ _ fmt src1 src2 dst
       -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
     _other              -> panic "regUsage: unrecognised instr"
  where
+
     -- # Definitions
     --
     -- Written: If the operand is a register, it's written. If it's an
@@ -550,6 +552,11 @@ regUsageOfInstr platform instr
     usageRW fmt op (OpReg reg)      = mkRU (use_R fmt op []) [mk fmt reg]
     usageRW fmt op (OpAddr ea)      = mkRUR (use_R fmt op $! use_EA ea [])
     usageRW _ _ _                   = panic "X86.RegInfo.usageRW: no match"
+
+    usageRW' :: HasDebugCallStack => Format -> Format -> Operand -> Operand -> RegUsage
+    usageRW' fmt1 fmt2 op (OpReg reg) = mkRU (use_R fmt1 op []) [mk fmt2 reg]
+    usageRW' fmt1 _    op (OpAddr ea) = mkRUR (use_R fmt1 op $! use_EA ea [])
+    usageRW' _  _ _ _                 = panic "X86.RegInfo.usageRW: no match"
 
     -- 2 operand form; first operand Read; second Modified
     usageRM :: HasDebugCallStack => Format -> Operand -> Operand -> RegUsage
