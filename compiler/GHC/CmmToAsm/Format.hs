@@ -273,6 +273,9 @@ instance Show RegWithFormat where
 instance Uniquable RegWithFormat where
   getUnique = getUnique . regWithFormat_reg
 
+instance Outputable VirtualRegWithFormat where
+  ppr (VirtualRegWithFormat reg fmt) = ppr reg <+> dcolon <+> ppr fmt
+
 instance Outputable RegWithFormat where
   ppr (RegWithFormat reg fmt) = ppr reg <+> dcolon <+> ppr fmt
 
