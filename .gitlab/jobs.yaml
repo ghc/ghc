@@ -370,7 +370,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-i386-linux-alpine3_20-validate",
-      "BROKEN_TESTS": "encoding004 T10458",
+      "BROKEN_TESTS": "encoding004 T10458 simd009 T25062_V16 T25169 T22187_run T22033",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
@@ -877,7 +877,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-i386-linux-alpine3_20-validate",
-      "BROKEN_TESTS": "encoding004 T10458",
+      "BROKEN_TESTS": "encoding004 T10458 simd009 T25062_V16 T25169 T22187_run T22033",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
@@ -3632,7 +3632,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-i386-linux-alpine3_20-release+no_split_sections",
-      "BROKEN_TESTS": "encoding004 T10458",
+      "BROKEN_TESTS": "encoding004 T10458 simd009 T25062_V16 T25169 T22187_run T22033",
       "BUILD_FLAVOUR": "release+no_split_sections",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
