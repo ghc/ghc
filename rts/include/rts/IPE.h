@@ -97,3 +97,7 @@ void formatClosureDescIpe(const InfoProvEnt *ipe_buf, char *str_buf);
 
 // Returns true on success, initializes `out`.
 bool lookupIPE(const StgInfoTable *info, InfoProvEnt *out);
+
+#if defined(DEBUG)
+void printIPE(const StgInfoTable *info);
+#endif
