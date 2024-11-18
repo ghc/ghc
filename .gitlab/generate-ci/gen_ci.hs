@@ -101,7 +101,7 @@ There are two different modes this  script can operate in:
 data Opsys
   = Linux LinuxDistro
   | Darwin
-  | FreeBSD13
+  | FreeBSD14
   | Windows deriving (Eq)
 
 data LinuxDistro
@@ -293,7 +293,7 @@ runnerTag arch (Linux _) =
 runnerTag AArch64 Darwin = "aarch64-darwin"
 runnerTag Amd64 Darwin = "x86_64-darwin-m1"
 runnerTag Amd64 Windows = "new-x86_64-windows"
-runnerTag Amd64 FreeBSD13 = "x86_64-freebsd13"
+runnerTag Amd64 FreeBSD14 = "x86_64-freebsd14"
 runnerTag _ _ = error "Invalid arch/opsys"
 
 tags :: Arch -> Opsys -> BuildConfig -> [String]
@@ -326,7 +326,7 @@ distroName Rocky8     = "rocky8"
 opsysName :: Opsys -> String
 opsysName (Linux distro) = "linux-" ++ distroName distro
 opsysName Darwin = "darwin"
-opsysName FreeBSD13 = "freebsd13"
+opsysName FreeBSD14 = "freebsd14"
 opsysName Windows = "windows"
 
 archName :: Arch -> String
@@ -423,7 +423,7 @@ brokenTest :: TestName -- ^ test name
 brokenTest test _why = "BROKEN_TESTS" =: test
 
 opsysVariables :: Arch -> Opsys -> Variables
-opsysVariables _ FreeBSD13 = mconcat
+opsysVariables _ FreeBSD14 = mconcat
   [ -- N.B. we use iconv from ports as I see linker errors when we attempt
     -- to use the "native" iconv embedded in libc as suggested by the
     -- porting guide [1].
@@ -431,7 +431,7 @@ opsysVariables _ FreeBSD13 = mconcat
     "CONFIGURE_ARGS" =:  "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
   , "HADRIAN_ARGS" =: "--docs=no-sphinx"
   , "GHC_VERSION" =: "9.6.4"
-  , "CABAL_INSTALL_VERSION" =: "3.10.2.0"
+  , "CABAL_INSTALL_VERSION" =: "3.10.3.0"
   ]
 opsysVariables arch (Linux distro) = distroVariables arch distro
 opsysVariables AArch64 (Darwin {}) =
