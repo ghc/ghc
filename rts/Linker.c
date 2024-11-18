@@ -1108,7 +1108,7 @@ freePreloadObjectFile (ObjectCode *oc)
  */
 void freeObjectCode (ObjectCode *oc)
 {
-    IF_DEBUG(linker, ocDebugBelch(oc, "start\n"));
+    IF_DEBUG(linker, ocDebugBelch(oc, "freeObjectCode: start\n"));
 
     // Run finalizers
     if (oc->type == STATIC_OBJECT &&
