@@ -393,12 +393,15 @@ has a number of other effects:
    pragmas is to expose functions in ``f``\'s RHS that have rewrite
    rules, and it's no good if those functions have been optimised away.
 
-   So *GHC guarantees to inline precisely the code that you wrote*, no
-   more and no less. It does this by capturing a copy of the definition
+   So *GHC guarantees to behave precisely as if it inlined the code that you wrote*.
+   It does this by capturing a copy of the definition
    of the function to use for inlining (we call this the "inline-RHS"),
-   which it leaves untouched, while optimising the ordinarily RHS as
-   usual. For externally-visible functions the inline-RHS (not the
-   optimised RHS) is recorded in the interface file.
+   which it only optimizes in ways which don't break this promise.
+   For example if inlining is explicitly delayed through phase control GHC will
+   apply optimizations which happen before the ``INLINE`` pragma becomes
+   active to the inline-RHS while optimising the ordinarily RHS as usual.
+   For externally-visible functions
+   the inline-RHS (not the optimised RHS) is recorded in the interface file.
 
 -  An ``INLINE`` function is not worker/wrappered by strictness analysis.
    It's going to be inlined wholesale instead.
