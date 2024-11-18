@@ -1140,6 +1140,11 @@ darwin =
   , fastCI (standardBuilds AArch64 Darwin)
   ]
 
+freebsd_jobs :: [JobGroup Job]
+freebsd_jobs =
+  [ addValidateRule FreeBSDLabel (standardBuilds Amd64 FreeBSD14)
+  ]
+
 alpine_x86 :: [JobGroup Job]
 alpine_x86 =
   [ -- Fully static build, in theory usable on any linux distribution.
@@ -1213,6 +1218,7 @@ job_groups =
   ++ alpine_x86
   ++ alpine_aarch64
   ++ cross_jobs
+  ++ freebsd_jobs
 
 
 mkPlatform :: Arch -> Opsys -> String
