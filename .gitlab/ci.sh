@@ -326,7 +326,7 @@ function fetch_cabal() {
           local base_url="https://downloads.haskell.org/~cabal/cabal-install-$v/"
           case "$(uname)" in
             Darwin) cabal_url="$base_url/cabal-install-$v-x86_64-apple-darwin17.7.0.tar.xz" ;;
-            FreeBSD) cabal_url="$base_url/cabal-install-$v-x86_64-freebsd13.tar.xz" ;;
+            FreeBSD) cabal_url="$base_url/cabal-install-$v-x86_64-freebsd14.tar.xz" ;;
             *) fail "don't know where to fetch cabal-install for $(uname)"
           esac
           echo "Fetching cabal-install from $cabal_url"
