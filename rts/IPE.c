@@ -277,3 +277,20 @@ void decompressIPEBufferListNodeIfCompressed(IpeBufferListNode *node) {
 
     }
 }
+
+#if defined(DEBUG)
+void printIPE(const StgInfoTable *info) {
+    InfoProvEnt ipe;
+    if (lookupIPE(info, &ipe)) {
+        debugBelch("%p:\n", info);
+        debugBelch("    name:    %s\n", ipe.prov.table_name);
+        debugBelch("    desc:    %" PRIu32 "\n", ipe.prov.closure_desc);
+        debugBelch("    type:    %s\n", ipe.prov.ty_desc);
+        debugBelch("    label:   %s\n", ipe.prov.label);
+        debugBelch("    module:  %s:%s\n", ipe.prov.unit_id, ipe.prov.module);
+        debugBelch("    src loc: %s:%s\n", ipe.prov.src_file, ipe.prov.src_span);
+    } else {
+        debugBelch("%p: no IPE entry\n", info);
+    }
+}
+#endif
