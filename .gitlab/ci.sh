@@ -331,8 +331,14 @@ function fetch_cabal() {
           esac
           echo "Fetching cabal-install from $cabal_url"
           curl "$cabal_url" > cabal.tar.xz
+          tmp="$(tar -tJf cabal.tar.xz | head -n1)"
           $TAR -xJf cabal.tar.xz
-          mv cabal "$toolchain/bin"
+          # Check if the bindist has directory structure
+          if [[ "$tmp" = "cabal" ]]; then
+              mv cabal "$toolchain/bin"
+          else
+              mv "$tmp/cabal" "$toolchain/bin"
+          fi
           ;;
       esac
       end_section "fetch cabal"
