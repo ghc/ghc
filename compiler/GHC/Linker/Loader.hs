@@ -17,7 +17,6 @@ module GHC.Linker.Loader
    , showLoaderState
    , getLoaderState
    -- * Load & Unload
-   , loadExpr
    , loadDecls
    , loadPackages
    , loadModule
@@ -588,52 +587,6 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
           , "Loading static libraries is not supported in this configuration."
           , "Try using a dynamic library instead."
           ]
-
-
-{- **********************************************************************
-
-                        Link a byte-code expression
-
-  ********************************************************************* -}
-
--- | Load a single expression, /including/ first loading packages and
--- modules that this expression depends on.
---
--- Raises an IO exception ('ProgramError') if it can't find a compiled
--- version of the dependents to load.
---
-loadExpr :: Interp -> HscEnv -> SrcSpan -> UnlinkedBCO -> IO ForeignHValue
-loadExpr interp hsc_env span root_ul_bco = do
-  -- Initialise the linker (if it's not been done already)
-  initLoaderState interp hsc_env
-
-  -- Take lock for the actual work.
-  modifyLoaderState interp $ \pls0 -> do
-    -- Load the packages and modules required
-    (pls, ok, _, _) <- loadDependencies interp hsc_env pls0 span needed_mods
-    if failed ok
-      then throwGhcExceptionIO (ProgramError "")
-      else do
-        -- Load the expression itself
-        -- Load the necessary packages and linkables
-        let le = linker_env pls
-            bco_ix = mkNameEnv [(unlinkedBCOName root_ul_bco, 0)]
-        resolved <- linkBCO interp (pkgs_loaded pls) le bco_ix root_ul_bco
-        [root_hvref] <- createBCOs interp [resolved]
-        fhv <- mkFinalizedHValue interp root_hvref
-        return (pls, fhv)
-  where
-     free_names = uniqDSetToList (bcoFreeNames root_ul_bco)
-
-     needed_mods :: [Module]
-     needed_mods = [ nameModule n | n <- free_names,
-                     isExternalName n,      -- Names from other modules
-                     not (isWiredInName n)  -- Exclude wired-in names
-                   ]                        -- (see note below)
-        -- Exclude wired-in names because we may not have read
-        -- their interface files, so getLinkDeps will fail
-        -- All wired-in names are in the base package, which we link
-        -- by default, so we can safely ignore them here.
 
 initLinkDepsOpts :: HscEnv -> LinkDepsOpts
 initLinkDepsOpts hsc_env = opts
