@@ -207,6 +207,12 @@ memoryAccessToProt(MemoryAccess access)
   }
 }
 
+void *
+mmapAnon (size_t bytes)
+{
+  return VirtualAlloc(NULL, bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+}
+
 //
 // Returns NULL on failure.
 //
@@ -408,6 +414,15 @@ mmapForLinker (size_t bytes, MemoryAccess access, uint32_t flags, int fd, int of
     IF_DEBUG(linker_verbose,
              debugBelch("mmapForLinker: done\n"));
     return result;
+}
+
+/*
+ * Map read/write pages anywhere in memory. Returns NULL on failure.
+ */
+void *
+mmapAnon (size_t bytes)
+{
+    return mmapAnywhere(bytes, MEM_READ_WRITE_THEN_READ_EXECUTE, MAP_ANONYMOUS, -1, 0);
 }
 
 /*
