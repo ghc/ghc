@@ -10,7 +10,7 @@
 #include "linker/MMap.h"
 
 ExecPage *allocateExecPage(void) {
-    ExecPage *page = (ExecPage *) mmapAnonForLinker(getPageSize());
+    ExecPage *page = (ExecPage *) mmapAnon(getPageSize());
     return page;
 }
 
