@@ -79,12 +79,15 @@ AC_DEFUN([FIND_LD],[
         dnl See #21712.
         AC_CHECK_TARGET_TOOL([LD], [ld])
         ;;
-    *)
+    *-linux*|*-mingw32)
         if test "x$enable_ld_override" = "xyes"; then
             find_ld
         else
             AC_CHECK_TARGET_TOOL([LD], [ld])
         fi
+        ;;
+    *)
+        AC_CHECK_TARGET_TOOL([LD], [ld])
         ;;
     esac
     CHECK_LD_COPY_BUG([$1])
