@@ -53,7 +53,6 @@ import GHC.Types.Var.Set
 import GHC.Builtin.Types.Prim
 import GHC.Core.TyCo.Ppr ( pprType )
 import GHC.Utils.Error
-import GHC.Types.Unique
 import GHC.Builtin.Uniques
 import GHC.Data.FastString
 import GHC.Utils.Panic
@@ -392,7 +391,6 @@ schemeER_wrk :: StackDepth -> BCEnv -> CgStgExpr -> BcM BCInstrList
 schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs) rhs)
   = do  code <- schemeE d 0 p rhs
         cc_arr <- getCCArray
-        this_mod <- moduleName <$> getCurrentModule
         platform <- profilePlatform <$> getProfile
         let idOffSets = getVarOffSets platform d p fvs
             ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
@@ -405,8 +403,12 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs) rhs)
                , interpreterProfiled interp
                = cc_arr ! tick_no
                | otherwise = toRemotePtr nullPtr
-        let breakInstr = BRK_FUN (fromIntegral tick_no) (getUnique this_mod) cc
-        return $ breakInstr `consOL` code
+        mb_mod_name <- getCurrentModuleName
+        case mb_mod_name of
+          Just mod_ptr -> do
+            let breakInstr = BRK_FUN (fromIntegral tick_no) mod_ptr cc
+            return $ breakInstr `consOL` code
+          Nothing -> return code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
 getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
@@ -2263,8 +2265,8 @@ newBreakInfo :: BreakIndex -> CgBreakInfo -> BcM ()
 newBreakInfo ix info = BcM $ \st ->
   return (st{breakInfo = IntMap.insert ix info (breakInfo st)}, ())
 
-getCurrentModule :: BcM Module
-getCurrentModule = BcM $ \st -> return (st, thisModule st)
+getCurrentModuleName :: BcM (Maybe (RemotePtr ModuleName))
+getCurrentModuleName = BcM $ \st -> return (st, modBreaks_module <$> modBreaks st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"

@@ -325,15 +325,14 @@ handleRunStatus step expr bindings final_ids status history
   | otherwise              = not_tracing
  where
   tracing
-    | EvalBreak is_exception apStack_ref ix mod_uniq resume_ctxt _ccs <- status
+    | EvalBreak is_exception apStack_ref ix mod_name resume_ctxt _ccs <- status
     , not is_exception
     = do
        hsc_env <- getSession
        let interp = hscInterp hsc_env
        let dflags = hsc_dflags hsc_env
        let hmi = expectJust "handleRunStatus" $
-                   lookupHptDirectly (hsc_HPT hsc_env)
-                                     (mkUniqueGrimily mod_uniq)
+                   lookupHpt (hsc_HPT hsc_env) (mkModuleName mod_name)
            modl = mi_module (hm_iface hmi)
            breaks = getModBreaks hmi
 
@@ -358,15 +357,14 @@ handleRunStatus step expr bindings final_ids status history
 
   not_tracing
     -- Hit a breakpoint
-    | EvalBreak is_exception apStack_ref ix mod_uniq resume_ctxt ccs <- status
+    | EvalBreak is_exception apStack_ref ix mod_name resume_ctxt ccs <- status
     = do
          hsc_env <- getSession
          let interp = hscInterp hsc_env
          resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
          apStack_fhv <- liftIO $ mkFinalizedHValue interp apStack_ref
          let hmi = expectJust "handleRunStatus" $
-                     lookupHptDirectly (hsc_HPT hsc_env)
-                                       (mkUniqueGrimily mod_uniq)
+                     lookupHpt (hsc_HPT hsc_env) (mkModuleName mod_name)
              modl = mi_module (hm_iface hmi)
              bp | is_exception = Nothing
                 | otherwise = Just (BreakInfo modl ix)

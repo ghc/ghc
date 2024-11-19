@@ -22,6 +22,7 @@ module GHCi.Message
   , getMessage, putMessage, getTHMessage, putTHMessage
   , Pipe(..), remoteCall, remoteTHCall, readPipe, writePipe
   , LoadedDLL
+  , BreakModule
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
@@ -228,6 +229,12 @@ data Message a where
     :: RemoteRef (ResumeContext ())
     -> Message (EvalStatus ())
 
+  -- | Allocate a string for a breakpoint module name.
+  -- This uses an empty dummy type because @ModuleName@ isn't available here.
+  NewBreakModule
+   :: String
+   -> Message (RemotePtr BreakModule)
+
 deriving instance Show (Message a)
 
 
@@ -382,7 +389,7 @@ data EvalStatus_ a b
   | EvalBreak Bool
        HValueRef{- AP_STACK -}
        Int {- break index -}
-       Int {- uniq of ModuleName -}
+       String {- module name -}
        (RemoteRef (ResumeContext b))
        (RemotePtr CostCentreStack) -- Cost centre stack
   deriving (Generic, Show)
@@ -395,6 +402,10 @@ data EvalResult a
   deriving (Generic, Show)
 
 instance Binary a => Binary (EvalResult a)
+
+-- | A dummy type that tags the pointer to a breakpoint's @ModuleName@, because
+-- that type isn't available here.
+data BreakModule
 
 -- | A dummy type that tags pointers returned by 'LoadDLL'.
 data LoadedDLL
@@ -526,6 +537,7 @@ getMessage = do
       36 -> Msg <$> (Seq <$> get)
       37 -> Msg <$> return RtsRevertCAFs
       38 -> Msg <$> (ResumeSeq <$> get)
+      39 -> Msg <$> (NewBreakModule <$> get)
       40 -> Msg <$> (LookupSymbolInDLL <$> get <*> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
@@ -570,6 +582,7 @@ putMessage m = case m of
   Seq a                       -> putWord8 36 >> put a
   RtsRevertCAFs               -> putWord8 37
   ResumeSeq a                 -> putWord8 38 >> put a
+  NewBreakModule name         -> putWord8 39 >> put name
   LookupSymbolInDLL dll str   -> putWord8 40 >> put dll >> put str
 
 -- -----------------------------------------------------------------------------
