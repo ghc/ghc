@@ -38,6 +38,9 @@ Haskell side.
 
 #include "Adjustor.h"
 
+/* Number of allocated adjustors for accounting purposes. */
+StgWord n_allocd_adjustors = 0;
+
 int totalArgumentSize(const char *typeString)
 {
     int sz = 0;

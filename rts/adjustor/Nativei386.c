@@ -84,6 +84,7 @@ createAdjustor(StgStablePtr hptr, StgFunPtr wptr,
         .frame_size = frame_size,
         .argument_size = sz,
     };
+    atomic_inc(&n_allocd_adjustors, 1);
     return alloc_adjustor(ccall_pool, &context);
 }
 
@@ -93,4 +94,5 @@ freeHaskellFunctionPtr(void* ptr)
     struct CCallContext context;
     free_adjustor(ptr, &context);
     freeStablePtr(context.hptr);
+    atomic_dec(&n_allocd_adjustors, 1);
 }

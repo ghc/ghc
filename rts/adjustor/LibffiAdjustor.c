@@ -124,6 +124,7 @@ freeHaskellFunctionPtr(void* ptr)
     stgFree(cl->cif->arg_types);
     stgFree(cl->cif);
     free_adjustor(ptr);
+    atomic_dec(&n_allocd_adjustors, 1);
 }
 
 static ffi_type * char_to_ffi_type(char c)
@@ -191,5 +192,6 @@ createAdjustor (StgStablePtr hptr,
     SEQ_CST_FENCE();
 #endif
 
+    atomic_inc(&n_allocd_adjustors, 1);
     return (void *)code;
 }

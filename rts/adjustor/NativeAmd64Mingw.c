@@ -52,6 +52,8 @@ createAdjustor(StgStablePtr hptr,
         .wptr = wptr,
     };
 
+    atomic_inc(&n_allocd_adjustors, 1);
+
     /*
       stack at call:
                argn
@@ -106,4 +108,5 @@ void freeHaskellFunctionPtr(void* ptr)
     struct AdjustorContext context;
     free_adjustor(ptr, &context);
     freeStablePtr(context.hptr);
+    atomic_dec(&n_allocd_adjustors, 1);
 }

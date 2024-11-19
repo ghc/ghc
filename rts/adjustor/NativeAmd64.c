@@ -85,6 +85,8 @@ createAdjustor(StgStablePtr hptr,
         }
     }
 
+    atomic_inc(&n_allocd_adjustors, 1);
+
     if (n_int_args < 6) {
         return alloc_adjustor(simple_ccall_pool, &context);
     } else {
@@ -97,4 +99,5 @@ void freeHaskellFunctionPtr(void* ptr)
     struct AdjustorContext context;
     free_adjustor(ptr, &context);
     freeStablePtr(context.hptr);
+    atomic_dec(&n_allocd_adjustors, 1);
 }
