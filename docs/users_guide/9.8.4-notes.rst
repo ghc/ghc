@@ -27,8 +27,10 @@ Packaging
 Other Core Libraries
 --------------------
 
-- The `filepath` library has been upgraded to 1.4.300.2, fixing a potentially
-  exploitable behavior with `splitFileName` on Windows (:ghc-ticket:`24597`).
+- The ``filepath`` library has been upgraded to 1.4.300.2, fixing a potentially
+  exploitable behavior with ``splitFileName`` on Windows (:ghc-ticket:`24597`).
+- ``unix-2.8.6.0`` is included, fixing an `issue
+  <https://github.com/haskell/unix/pull/252>`_ affecting ``musl`` targets.
 
 Included libraries
 ------------------
