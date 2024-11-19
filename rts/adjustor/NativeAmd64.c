@@ -72,24 +72,24 @@ createAdjustor(StgStablePtr hptr,
       pointer inserted just after the 6th integer argument.
     */
 
-        int n_int_args = 0;
+    int n_int_args = 0;
 
-        // determine whether we have 6 or more integer arguments,
-        // and therefore need to flush one to the stack.
-        for (char *c = typeString; *c != '\0'; c++) {
-            if (*c != 'f' && *c != 'd') {
-                n_int_args++;
-            }
-            if (n_int_args == 6) {
-                break;
-            }
+    // determine whether we have 6 or more integer arguments,
+    // and therefore need to flush one to the stack.
+    for (char *c = typeString; *c != '\0'; c++) {
+        if (*c != 'f' && *c != 'd') {
+            n_int_args++;
         }
+        if (n_int_args == 6) {
+            break;
+        }
+    }
 
-        if (n_int_args < 6) {
-            return alloc_adjustor(simple_ccall_pool, &context);
-        } else {
-            return alloc_adjustor(complex_ccall_pool, &context);
-        }
+    if (n_int_args < 6) {
+        return alloc_adjustor(simple_ccall_pool, &context);
+    } else {
+        return alloc_adjustor(complex_ccall_pool, &context);
+    }
 }
 
 void freeHaskellFunctionPtr(void* ptr)

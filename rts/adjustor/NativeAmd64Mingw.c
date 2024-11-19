@@ -80,24 +80,25 @@ createAdjustor(StgStablePtr hptr,
 
       See NativeAmd64MingwAsm.S.
     */
-        // determine whether we have 4 or more integer arguments,
-        // and therefore need to flush one to the stack.
-        if ((typeString[0] == '\0') ||
-            (typeString[1] == '\0') ||
-            (typeString[2] == '\0') ||
-            (typeString[3] == '\0'))
-        {
-            return alloc_adjustor(simple_ccall_pool, &context);
+
+    // determine whether we have 4 or more integer arguments,
+    // and therefore need to flush one to the stack.
+    if ((typeString[0] == '\0') ||
+        (typeString[1] == '\0') ||
+        (typeString[2] == '\0') ||
+        (typeString[3] == '\0'))
+    {
+        return alloc_adjustor(simple_ccall_pool, &context);
+    }
+    else
+    {
+        bool fourthFloating = (typeString[3] == 'f' || typeString[3] == 'd');
+        if (fourthFloating) {
+            return alloc_adjustor(complex_float_ccall_pool, &context);
+        } else {
+            return alloc_adjustor(complex_nofloat_ccall_pool, &context);
         }
-        else
-        {
-            bool fourthFloating = (typeString[3] == 'f' || typeString[3] == 'd');
-            if (fourthFloating) {
-                return alloc_adjustor(complex_float_ccall_pool, &context);
-            } else {
-                return alloc_adjustor(complex_nofloat_ccall_pool, &context);
-            }
-        }
+    }
 }
 
 void freeHaskellFunctionPtr(void* ptr)
