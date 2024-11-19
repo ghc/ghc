@@ -108,6 +108,7 @@ test('T5435_dyn_gcc',
 ######################################
 test('linker_unload',
      [extra_files(['LinkerUnload.hs', 'Test.hs']),
+      when(opsys('freebsd'), expect_broken(25491)),
       req_rts_linker],
      makefile_test, ['linker_unload'])
 
