@@ -62,7 +62,11 @@ typedef enum {
 
 extern void *mmap_32bit_base;
 
-// Map read/write anonymous memory.
+// Map read/write anonymous memory anywhere in memory.
+void *mmapAnon(size_t bytes);
+
+// Map read/write anonymous memory, enforcing the constraint of
+// placing the mapping within 4GB of the executable image.
 void *mmapAnonForLinker (size_t bytes);
 
 // Change protection of previous mapping memory.
