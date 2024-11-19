@@ -221,7 +221,12 @@ cmmMetaLlvmPrelude = do
           case platformArch platform of
             ArchX86_64 | llvmCgAvxEnabled cfg -> [mkStackAlignmentMeta 32]
             _                                 -> []
-  module_flags_metas <- mkModuleFlagsMeta stack_alignment_metas
+  let codel_model_metas =
+          case platformArch platform of
+            -- FIXME: We should not rely on LLVM
+            ArchLoongArch64 -> [mkCodeModelMeta CMMedium]
+            _                                 -> []
+  module_flags_metas <- mkModuleFlagsMeta (stack_alignment_metas ++ codel_model_metas)
   let metas = tbaa_metas ++ module_flags_metas
   cfg <- getConfig
   renderLlvm (ppLlvmMetas cfg metas)
@@ -244,6 +249,15 @@ mkStackAlignmentMeta :: Integer -> ModuleFlag
 mkStackAlignmentMeta alignment =
     ModuleFlag MFBError "override-stack-alignment" (MetaLit $ LMIntLit alignment i32)
 
+-- LLVM's @LLVM::CodeModel::Model@ enumeration
+data CodeModel = CMMedium
+
+-- Pass -mcmodel=medium option to LLVM on LoongArch64
+mkCodeModelMeta :: CodeModel -> ModuleFlag
+mkCodeModelMeta codemodel =
+    ModuleFlag MFBError "Code Model" (MetaLit $ LMIntLit n i32)
+  where
+    n = case codemodel of CMMedium -> 3 -- as of LLVM 8
 
 -- -----------------------------------------------------------------------------
 -- | Marks variables as used where necessary
