@@ -21,6 +21,7 @@ module GHCi.Message
   , QState(..)
   , getMessage, putMessage, getTHMessage, putTHMessage
   , Pipe(..), remoteCall, remoteTHCall, readPipe, writePipe
+  , BreakModule
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
@@ -226,6 +227,12 @@ data Message a where
     :: RemoteRef (ResumeContext ())
     -> Message (EvalStatus ())
 
+  -- | Allocate a string for a breakpoint module name.
+  -- This uses an empty dummy type because @ModuleName@ isn't available here.
+  NewBreakModule
+   :: String
+   -> Message (RemotePtr BreakModule)
+
 deriving instance Show (Message a)
 
 
@@ -380,7 +387,7 @@ data EvalStatus_ a b
   | EvalBreak Bool
        HValueRef{- AP_STACK -}
        Int {- break index -}
-       Int {- uniq of ModuleName -}
+       String {- module name -}
        (RemoteRef (ResumeContext b))
        (RemotePtr CostCentreStack) -- Cost centre stack
   deriving (Generic, Show)
@@ -393,6 +400,10 @@ data EvalResult a
   deriving (Generic, Show)
 
 instance Binary a => Binary (EvalResult a)
+
+-- | A dummy type that tags the pointer to a breakpoint's @ModuleName@, because
+-- that type isn't available here.
+data BreakModule
 
 -- SomeException can't be serialized because it contains dynamic
 -- types.  However, we do very limited things with the exceptions that
@@ -521,6 +532,7 @@ getMessage = do
       36 -> Msg <$> (Seq <$> get)
       37 -> Msg <$> return RtsRevertCAFs
       38 -> Msg <$> (ResumeSeq <$> get)
+      39 -> Msg <$> (NewBreakModule <$> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -564,6 +576,7 @@ putMessage m = case m of
   Seq a                       -> putWord8 36 >> put a
   RtsRevertCAFs               -> putWord8 37
   ResumeSeq a                 -> putWord8 38 >> put a
+  NewBreakModule name         -> putWord8 39 >> put name
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages

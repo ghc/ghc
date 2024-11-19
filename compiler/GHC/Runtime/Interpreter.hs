@@ -24,6 +24,7 @@ module GHC.Runtime.Interpreter
   , mkCostCentres
   , costCentreStackInfo
   , newBreakArray
+  , newModuleName
   , storeBreakpoint
   , breakpointStatus
   , getBreakpointVar
@@ -74,7 +75,6 @@ import GHC.Linker.Types
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
-import GHC.Types.Unique
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
 import GHC.Types.Basic
@@ -375,6 +375,10 @@ newBreakArray interp size = do
   breakArray <- interpCmd interp (NewBreakArray size)
   mkFinalizedHValue interp breakArray
 
+newModuleName :: Interp -> ModuleName -> IO (RemotePtr ModuleName)
+newModuleName interp mod_name =
+  castRemotePtr <$> interpCmd interp (NewBreakModule (moduleNameString mod_name))
+
 storeBreakpoint :: Interp -> ForeignRef BreakArray -> Int -> Int -> IO ()
 storeBreakpoint interp ref ix cnt = do                               -- #19157
   withForeignRef ref $ \breakarray ->
@@ -408,13 +412,12 @@ seqHValue interp unit_env ref =
 handleSeqHValueStatus :: Interp -> UnitEnv -> EvalStatus () -> IO (EvalResult ())
 handleSeqHValueStatus interp unit_env eval_status =
   case eval_status of
-    (EvalBreak is_exception _ ix mod_uniq resume_ctxt _) -> do
+    (EvalBreak is_exception _ ix mod_name resume_ctxt _) -> do
       -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
       let hmi = expectJust "handleRunStatus" $
-                  lookupHptDirectly (ue_hpt unit_env)
-                    (mkUniqueGrimily mod_uniq)
+                  lookupHpt (ue_hpt unit_env) (mkModuleName mod_name)
           modl = mi_module (hm_iface hmi)
           bp | is_exception = Nothing
              | otherwise = Just (BreakInfo modl ix)

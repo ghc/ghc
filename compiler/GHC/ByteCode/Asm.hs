@@ -27,7 +27,6 @@ import GHC.Runtime.Heap.Layout hiding ( WordOff )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Literal
-import GHC.Types.Unique
 import GHC.Types.Unique.DSet
 
 import GHC.Utils.Outputable
@@ -506,11 +505,11 @@ assembleI platform i = case i of
   CCALL off m_addr i       -> do np <- addr m_addr
                                  emit bci_CCALL [SmallOp off, Op np, SmallOp i]
   PRIMCALL                 -> emit bci_PRIMCALL []
-  BRK_FUN index uniq cc    -> do p1 <- ptr BCOPtrBreakArray
-                                 q <- int (getKey uniq)
+  BRK_FUN index mod cc     -> do p1 <- ptr BCOPtrBreakArray
+                                 m <- addr mod
                                  np <- addr cc
                                  emit bci_BRK_FUN [Op p1, SmallOp index,
-                                                   Op q, Op np]
+                                                   Op m, Op np]
 
   where
     literal (LitLabel fs (Just sz) _)

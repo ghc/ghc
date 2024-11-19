@@ -1111,7 +1111,7 @@ run_BCO:
         /* check for a breakpoint on the beginning of a let binding */
         case bci_BRK_FUN:
         {
-            int arg1_brk_array, arg2_array_index, arg3_module_uniq;
+            int arg1_brk_array, arg2_array_index, arg3_module_name;
 #if defined(PROFILING)
             int arg4_cc;
 #endif
@@ -1129,7 +1129,7 @@ run_BCO:
 
             arg1_brk_array      = BCO_GET_LARGE_ARG;
             arg2_array_index    = BCO_NEXT;
-            arg3_module_uniq    = BCO_GET_LARGE_ARG;
+            arg3_module_name    = BCO_GET_LARGE_ARG;
 #if defined(PROFILING)
             arg4_cc             = BCO_GET_LARGE_ARG;
 #else
@@ -1194,7 +1194,7 @@ run_BCO:
                   // continue execution of this BCO when the IO action returns.
                   //
                   // ioAction :: Int#        -- the breakpoint index
-                  //          -> Int#        -- the module uniq
+                  //          -> Addr#       -- the module name
                   //          -> Bool        -- exception?
                   //          -> HValue      -- the AP_STACK, or exception
                   //          -> IO ()
@@ -1208,7 +1208,7 @@ run_BCO:
                   SpW(8)  = (W_)new_aps;
                   SpW(7)  = (W_)False_closure;         // True <=> an exception
                   SpW(6)  = (W_)&stg_ap_ppv_info;
-                  SpW(5)  = (W_)BCO_LIT(arg3_module_uniq);
+                  SpW(5)  = (W_)BCO_LIT(arg3_module_name);
                   SpW(4)  = (W_)&stg_ap_n_info;
                   SpW(3)  = (W_)arg2_array_index;
                   SpW(2)  = (W_)&stg_ap_n_info;
