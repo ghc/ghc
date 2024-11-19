@@ -35,11 +35,11 @@ import GHC.Toolchain.NormaliseTriple (normaliseTriple)
 import Text.Read (readMaybe)
 
 data Opts = Opts
-    { optTriple    :: String
+    { optTriple    :: Maybe String
     , optTargetPrefix :: Maybe String
     , optLocallyExecutable :: Maybe Bool
     , optLlvmTriple :: Maybe String
-    , optOutput    :: String
+    , optOutput    :: Maybe String
     , optCc        :: ProgOpt
     , optCxx       :: ProgOpt
     , optCpp       :: ProgOpt
@@ -82,11 +82,11 @@ emptyFormatOpts = FormatOpts { formatOptInput = error "formatOpts: input"
 
 emptyOpts :: Opts
 emptyOpts = Opts
-    { optTriple    = ""
+    { optTriple    = Nothing
     , optTargetPrefix = Nothing
     , optLocallyExecutable = Nothing
     , optLlvmTriple = Nothing
-    , optOutput    = ""
+    , optOutput    = Nothing
     , optCc        = po0
     , optCxx       = po0
     , optCpp       = po0
@@ -129,13 +129,13 @@ _optMergeObjs = Lens optMergeObjs (\x o -> o {optMergeObjs=x})
 _optWindres = Lens optWindres (\x o -> o {optWindres=x})
 _optLd = Lens optLd (\x o -> o {optLd= x})
 
-_optTriple :: Lens Opts String
+_optTriple :: Lens Opts (Maybe String)
 _optTriple = Lens optTriple (\x o -> o {optTriple=x})
 
 _optLlvmTriple :: Lens Opts (Maybe String)
 _optLlvmTriple = Lens optLlvmTriple (\x o -> o {optLlvmTriple=x})
 
-_optOutput :: Lens Opts String
+_optOutput :: Lens Opts (Maybe String)
 _optOutput = Lens optOutput (\x o -> o {optOutput=x})
 
 _optTargetPrefix :: Lens Opts (Maybe String)
@@ -213,7 +213,7 @@ options =
         , Option [] ["disable-" ++ optName] (NoArg (set lens (Just False))) ("Disable " ++ description)
         ]
 
-    tripleOpt = Option ['t'] ["triple"] (ReqArg (set _optTriple) "TRIPLE") "Target triple"
+    tripleOpt = Option ['t'] ["triple"] (ReqArg (set _optTriple . Just) "TRIPLE") "Target triple"
     llvmTripleOpt = Option [] ["llvm-triple"] (ReqArg (set _optLlvmTriple . Just) "LLVM-TRIPLE") "LLVM Target triple"
 
     targetPrefixOpt = Option ['T'] ["target-prefix"] (ReqArg (set _optTargetPrefix . Just) "PREFIX")
@@ -233,7 +233,7 @@ options =
     keepTempOpt = Option [] ["keep-temp"] (NoArg (set _optKeepTemp True))
         "do not remove temporary files"
 
-    outputOpt = Option ['o'] ["output"] (ReqArg (set _optOutput) "OUTPUT")
+    outputOpt = Option ['o'] ["output"] (ReqArg (set _optOutput . Just) "OUTPUT")
         "The output path for the generated target toolchain configuration"
 
 formatOpts :: [OptDescr (FormatOpts -> FormatOpts)]
@@ -243,6 +243,16 @@ formatOpts = [
     , (Option ['i'] ["input"] (ReqArg (set _formatOptInput) "INPUT")
         "The target file to format")
     ]
+
+validateOpts :: Opts -> [String]
+validateOpts opts = mconcat
+    [ assertJust _optTriple "missing --triple flag"
+    , assertJust _optOutput "missing --output flag"
+    ]
+  where
+    assertJust :: Lens Opts (Maybe a) -> String -> [String]
+    assertJust lens msg =
+      [ msg | Nothing <- pure $ view lens opts ]
 
 main :: IO ()
 main = do
@@ -273,14 +283,14 @@ doFormat args = do
 
 doConfigure :: [String] -> IO ()
 doConfigure args = do
-    let (opts0, _nonopts, errs) = getOpt RequireOrder options args
+    let (opts0, _nonopts, parseErrs) = getOpt RequireOrder options args
     let opts = foldr (.) id opts0 emptyOpts
-    case errs of
+    case parseErrs ++ validateOpts opts of
       [] -> do
           let env = Env { verbosity = optVerbosity opts
                         , targetPrefix = case optTargetPrefix opts of
                                            Just prefix -> Just prefix
-                                           Nothing -> Just $ optTriple opts ++ "-"
+                                           Nothing -> Just $ fromMaybe (error "undefined triple") (optTriple opts) ++ "-"
                         , keepTemp = optKeepTemp opts
                         , canLocallyExecute = fromMaybe True (optLocallyExecutable opts)
                         , logContexts = []
@@ -289,7 +299,7 @@ doConfigure args = do
           case r of
             Left err -> print err >> exitWith (ExitFailure 2)
             Right () -> return ()
-      _  -> do
+      errs -> do
         mapM_ putStrLn errs
         putStrLn $ usageInfo "ghc-toolchain" options
         exitWith (ExitFailure 1)
@@ -298,7 +308,7 @@ run :: Opts -> M ()
 run opts = do
     tgt <- mkTarget opts
     logDebug $ "Final Target: " ++ show tgt
-    let file = optOutput opts
+    let file = fromMaybe (error "undefined --output") (optOutput opts)
     writeFile file (show tgt)
 
 optional :: M a -> M (Maybe a)
@@ -390,7 +400,7 @@ ldOverrideWhitelist a =
 
 mkTarget :: Opts -> M Target
 mkTarget opts = do
-    normalised_triple <- normaliseTriple (optTriple opts)
+    normalised_triple <- normaliseTriple (fromMaybe (error "missing --triple") (optTriple opts))
     -- Use Llvm target if specified, otherwise use triple as llvm target
     let tgtLlvmTarget = fromMaybe normalised_triple (optLlvmTriple opts)
 
