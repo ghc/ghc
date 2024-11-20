@@ -1,5 +1,9 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.24.0.0
+
+  * Introduce `dataToCodeQ` and `liftDataTyped`, typed variants of `dataToExpQ` and `liftData` respectively.
+
 ## 2.23.0.0
 
   * Extend `Exp` with `ForallE`, `ForallVisE`, `ConstraintedE`,

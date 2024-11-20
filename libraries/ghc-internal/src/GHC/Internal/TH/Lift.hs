@@ -26,7 +26,9 @@ module GHC.Internal.TH.Lift
   ( Lift(..)
   -- * Generic Lift implementations
   , dataToQa
+  , dataToCodeQ
   , dataToExpQ
+  , liftDataTyped
   , liftData
   , dataToPatQ
   -- * Wired-in names
@@ -540,6 +542,12 @@ function.  Two complications
   "pack" is defined in a different module than the data type "Text".
   -}
 
+-- | A typed variant of 'dataToExpQ'.
+dataToCodeQ :: (Quote m, Data a)
+            => (forall b . Data b => b -> Maybe (Code m b))
+            ->                       a ->        Code m a
+dataToCodeQ f = unsafeCodeCoerce . dataToExpQ (fmap unTypeCode . f)
+
 -- | 'dataToExpQ' converts a value to a 'Exp' representation of the
 -- same value, in the SYB style. It is generalized to take a function
 -- override type-specific cases; see 'liftData' for a more commonly
@@ -562,6 +570,10 @@ dataToExpQ = dataToQa varOrConE litE (foldl appE)
                            ++ showName s
           appE x y = do { a <- x; b <- y; return (AppE a b)}
           litE c = return (LitE c)
+
+-- | A typed variant of 'liftData'.
+liftDataTyped :: (Quote m, Data a) => a -> Code m a
+liftDataTyped = dataToCodeQ (const Nothing)
 
 -- | 'liftData' is a variant of 'lift' in the 'Lift' type class which
 -- works for any type with a 'Data' instance.
