@@ -86,9 +86,10 @@ multiSetup pkg_s = do
       let rexp m = ["-reexported-module", m]
       let hidir = root </> "interfaces" </> pkgPath p
       writeFile' (resp_file root p) (intercalate "\n" (th_hack arg_list
-                                                      ++  modules cd
+                                                      ++ modules cd
                                                       ++ concatMap rexp (reexportModules cd)
-                                                      ++ ["-outputdir", hidir]))
+                                                      ++ ["-outputdir", hidir,
+                                                          "-this-package-name", pkgName p]))
       return (resp_file root p)
 
 
