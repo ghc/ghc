@@ -26,6 +26,7 @@ ghcWarningsArgs = do
     mconcat
         [ stage0 ? mconcat
         [ libraryPackage       ? pure [ "-fno-warn-deprecated-flags" ]
+        , package filepath     ? pure [ "-fno-warn-unused-imports" ]
         , package terminfo     ? pure [ "-fno-warn-unused-imports" ]
         , package transformers ? pure [ "-fno-warn-unused-matches"
                                       , "-fno-warn-unused-imports" ] ]
@@ -38,6 +39,7 @@ ghcWarningsArgs = do
         , package directory    ? pure [ "-Wno-unused-imports"
                                       , "-Wno-deprecations" -- https://gitlab.haskell.org/ghc/ghc/-/issues/24240
                                       ]
+        , package filepath     ? pure [ "-fno-warn-unused-imports" ]
         , package ghc          ? pure [ "-Wcpp-undef"
                                       , "-Wincomplete-uni-patterns"
                                       , "-Wincomplete-record-updates"
