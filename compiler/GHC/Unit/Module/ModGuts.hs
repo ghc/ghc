@@ -139,7 +139,6 @@ data CgGuts
         cg_foreign_files :: ![(ForeignSrcLang, FilePath)],
         cg_dep_pkgs  :: !(Set UnitId),      -- ^ Dependent packages, used to
                                             -- generate #includes for C code gen
-        cg_hpc_info  :: !HpcInfo,           -- ^ Program coverage tick box information
         cg_modBreaks :: !(Maybe ModBreaks), -- ^ Module breakpoints
         cg_spt_entries :: [SptEntry]
                 -- ^ Static pointer table entries for static forms defined in
