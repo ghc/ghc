@@ -232,6 +232,7 @@ module Control.Exception where
   data Deadlock = Deadlock
   type ErrorCall :: *
   data ErrorCall = ErrorCall GHC.Internal.Base.String
+  pattern ErrorCallWithLocation :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> ErrorCall
   type Exception :: * -> Constraint
   class (ghc-internal-9.1100.0:GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
     toException :: e -> SomeException
@@ -349,6 +350,7 @@ module Control.Exception.Base where
   data Deadlock = Deadlock
   type ErrorCall :: *
   data ErrorCall = ErrorCall GHC.Internal.Base.String
+  pattern ErrorCallWithLocation :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> ErrorCall
   type Exception :: * -> Constraint
   class (ghc-internal-9.1100.0:GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
     toException :: e -> SomeException
@@ -5274,6 +5276,7 @@ module GHC.Exception where
   data CallStack = ...
   type ErrorCall :: *
   data ErrorCall = ErrorCall GHC.Internal.Base.String
+  pattern ErrorCallWithLocation :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> ErrorCall
   type Exception :: * -> Constraint
   class (ghc-internal-9.1100.0:GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
     toException :: e -> SomeException

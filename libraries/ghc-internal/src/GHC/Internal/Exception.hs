@@ -8,6 +8,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -52,7 +53,7 @@ module GHC.Internal.Exception
     , ratioZeroDenomException
     , underflowException
       -- ** 'ErrorCall'
-    , ErrorCall(..)
+    , ErrorCall(.., ErrorCallWithLocation)
     , errorCallException
     , errorCallWithCallStackException
     , toExceptionWithBacktrace
@@ -178,7 +179,11 @@ data ErrorCall = ErrorCall String
              , Ord -- ^ @since base-4.7.0.0
              )
 
-{-# COMPLETE ErrorCall #-}
+{-# DEPRECATED ErrorCallWithLocation "ErrorCallWithLocation has been deprecated in favour of ErrorCall (which does not have a location). Backtraces are now handled by the backtrace exception mechanisms exclusively." #-}
+pattern ErrorCallWithLocation :: String -> String -> ErrorCall
+pattern ErrorCallWithLocation err loc <- ErrorCall ((\err -> (err, error "ErrorCallWithLocation has been deprecated in favour of ErrorCall (which does not have a location). Backtraces are now handled by the backtrace exception mechanisms exclusively.")) -> (err, loc))
+  where ErrorCallWithLocation err _ = ErrorCall err
+{-# COMPLETE ErrorCallWithLocation #-}
 
 -- | @since base-4.0.0.0
 instance Exception ErrorCall
