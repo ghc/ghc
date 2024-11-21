@@ -34,7 +34,6 @@ import GHC.Stg.FVs
 import GHC.Stg.Syntax
 import GHC.StgToCmm (codeGen)
 import GHC.Types.CostCentre (emptyCollectedCCs)
-import GHC.Types.HpcInfo (emptyHpcInfo)
 import GHC.Types.IPE (emptyInfoTableProvMap)
 import GHC.Types.Unique.DSM
 import GHC.Unit.Home
@@ -70,14 +69,12 @@ cmmOfSummary summ = do
       tycons = []
       ccs = emptyCollectedCCs
       stg' = fmap fst (depSortWithAnnotStgPgm (ms_mod summ) stg)
-      hpcinfo = emptyHpcInfo False
       tmpfs = hsc_tmpfs env
-      stg_to_cmm dflags mod = codeGen logger tmpfs (initStgToCmmConfig dflags mod)
   (groups, _infos) <-
       liftIO $ fmap fst $
       runUDSMT (initDUniqSupply 't' 0) $
       collectAll $
-      stg_to_cmm dflags (ms_mod summ) infotable tycons ccs stg' hpcinfo
+      codeGen logger tmpfs (initStgToCmmConfig dflags (ms_mod summ)) infotable tycons ccs stg'
   return groups
 
 frontend :: DynFlags -> HscEnv -> ModSummary -> IO ModGuts

@@ -24,7 +24,6 @@ import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Config
-import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Types (ModuleLFInfos)
 import GHC.StgToCmm.CgUtils (CgStream)
@@ -38,7 +37,6 @@ import GHC.Stg.Syntax
 
 import GHC.Types.CostCentre
 import GHC.Types.IPE
-import GHC.Types.HpcInfo
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.RepType
@@ -52,7 +50,6 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
 
-import GHC.Unit.Module
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -77,13 +74,12 @@ codeGen :: Logger
         -> [TyCon]
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
-        -> HpcInfo
         -> CgStream CmmGroup (ModuleLFInfos, DetUniqFM) -- See Note [Deterministic Uniques in the CG] on CgStream
                                        -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
 codeGen logger tmpfs cfg (InfoTableProvMap denv _ _) data_tycons
-        cost_centre_info stg_binds hpc_info
+        cost_centre_info stg_binds
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
               -- we would need to add a state monad layer which regresses
@@ -118,7 +114,7 @@ codeGen logger tmpfs cfg (InfoTableProvMap denv _ _) data_tycons
                 yield cmm
                 return a
 
-        ; cg (mkModuleInit cost_centre_info (stgToCmmThisModule cfg) hpc_info)
+        ; cg (mkModuleInit cost_centre_info)
 
         ; mapM_ (cg . cgTopBinding logger tmpfs cfg) stg_binds
                 -- Put datatype_stuff after code_stuff, because the
@@ -281,13 +277,10 @@ cgTopRhs cfg rec bndr (StgRhsClosure fvs cc upd_flag args body _typ)
 
 mkModuleInit
         :: CollectedCCs         -- cost centre info
-        -> Module
-        -> HpcInfo
         -> FCode ()
 
-mkModuleInit cost_centre_info this_mod hpc_info
-  = do  { initHpc this_mod hpc_info
-        ; initCostCentres cost_centre_info
+mkModuleInit cost_centre_info
+  = do  { initCostCentres cost_centre_info
         }
 
 
