@@ -48,7 +48,6 @@ import GHC.Types.Basic
 import GHC.Types.CostCentre
 import GHC.Types.IPE
 import GHC.Types.Meta
-import GHC.Types.HpcInfo
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModSummary
@@ -149,7 +148,7 @@ data Hooks = Hooks
                                          -> IO (Either Type (HValue, [Linkable], PkgsLoaded))))
   , createIservProcessHook :: !(Maybe (CreateProcess -> IO ProcessHandle))
   , stgToCmmHook           :: !(Maybe (StgToCmmConfig -> InfoTableProvMap -> [TyCon] -> CollectedCCs
-                                 -> [CgStgTopBinding] -> HpcInfo -> CgStream CmmGroup ModuleLFInfos))
+                                 -> [CgStgTopBinding] -> CgStream CmmGroup ModuleLFInfos))
   , cmmToRawCmmHook        :: !(forall a . Maybe (DynFlags -> Maybe Module -> CgStream CmmGroupSRTs a
                                  -> IO (CgStream RawCmmGroup a)))
   }
