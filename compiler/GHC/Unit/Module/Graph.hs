@@ -74,7 +74,6 @@ import Data.Bifunctor
 import Data.Function
 import Data.List (sort)
 import GHC.Data.List.SetOps
-import GHC.Stack
 
 -- | A '@ModuleGraphNode@' is a node in the '@ModuleGraph@'.
 -- Edges between nodes mark dependencies arising from module imports
@@ -410,7 +409,7 @@ moduleGraphModulesBelow mg uid mn = filtered_mods [ mn | NodeKey_Module mn <- mo
         | otherwise -> r1 : filter_mods (r2:rs)
       rs -> rs
 
-mgReachable :: HasCallStack => ModuleGraph -> NodeKey -> Maybe [ModuleGraphNode]
+mgReachable :: ModuleGraph -> NodeKey -> Maybe [ModuleGraphNode]
 mgReachable mg nk = map summaryNodeSummary <$> modules_below where
   (td_map, lookup_node) = mg_graph mg
   modules_below =
