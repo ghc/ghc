@@ -723,7 +723,6 @@ it's all cool; each signature has distinct type variables from the renamer.)
 
 {- Note [Non-variable pattern bindings aren't linear]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 A fundamental limitation of the typechecking algorithm is that we cannot have a
 binding which, at the same time,
 - is linear in its rhs
@@ -735,17 +734,35 @@ https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0111-linear
 
 To address this we to do a few things
 
-- When a pattern is annotated with a multiplicity annotation `let %q pat = rhs
+- (NVP1) When a pattern is annotated with a multiplicity annotation `let %q pat = rhs
   in body` (note: multiplicity-annotated bindings are always parsed as a
   PatBind, see Note [Multiplicity annotations] in Language.Haskell.Syntax.Binds),
-  then the let is never generalised (we use the NoGen plan).
-- Whenever the typechecker infers an AbsBind *and* the inner binding is a
+  then the let is never generalised (we use the NoGen plan). We do this with a
+  dedicated test in decideGeneralisationPlan.
+- (NVP2) Whenever the typechecker infers an AbsBind *and* the inner binding is a
   non-variable PatBind, then the multiplicity of the binding is inferred to be
-  Many. This is a little infelicitous: sometimes the typechecker infers an
-  AbsBind where it didn't need to. This may cause some programs to be spuriously
-  rejected, when NoMonoLocalBinds is on.
-- LinearLet implies MonoLocalBinds to avoid the AbsBind case altogether.
+  Many. We do this by calling manyIfPats in tcPolyInfer. This is a little
+  infelicitous: sometimes the typechecker infers an AbsBind where it didn't need
+  to. This may cause some programs to be spuriously rejected, when
+  NoMonoLocalBinds is on.
+- (NVP3) LinearLet implies MonoLocalBinds to avoid the AbsBind case altogether.
+- (NVP4) Wrinkle: even when other conditions (including MonoLocalBinds), GHC
+  will generalise some binders, namely so-called closed binding groups. We need
+  to make sure that the test for (NVP1) has priority over the test for closed
+  binders.
+- (NVP5) Wrinkle: Closed binding groups (NVP4) are usually fine to type with
+  multiplicity Many. But there's one exception: when there's no binder at all,
+  the binding group is considered closed. Even if the rhs contains arbitrary
+  variables.
 
+     f :: () %1 -> Bool
+     f x = let !() = x in True
+
+  If we consider `!() = x` as a generalisable group (which does nothing anyway),
+  then (NVP2) will infer the pattern as multiplicity Many, and reject the
+  function. We don't want that, see also #25428. So we take care not to
+  generalise in this case, by excluding the no-binder case from automatic
+  generalisation in decideGeneralisationPlan.
 -}
 
 tcPolyInfer
@@ -762,7 +779,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
        ; apply_mr <- checkMonomorphismRestriction mono_infos bind_list
 
        -- AbsBinds which are PatBinds can't be linear.
-       -- See Note [Non-variable pattern bindings aren't linear]
+       -- See (NVP2) in Note [Non-variable pattern bindings aren't linear]
        ; binds' <- manyIfPats binds'
 
        ; traceTc "tcPolyInfer" (ppr apply_mr $$ ppr (map mbi_sig mono_infos))
@@ -1871,12 +1888,17 @@ decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
         -- See Note [Always generalise top-level bindings]
 
       | has_mult_anns_and_pats = False
-        -- See Note [Non-variable pattern bindings aren't linear]
+        -- See (NVP1) and (NVP4) in Note [Non-variable pattern bindings aren't linear]
 
-      | IsGroupClosed _ True <- closed = True
+      | IsGroupClosed _ True <- closed
+      , not (null binders) = True
         -- The 'True' means that all of the group's
         -- free vars have ClosedTypeId=True; so we can ignore
-        -- -XMonoLocalBinds, and generalise anyway
+        -- -XMonoLocalBinds, and generalise anyway.
+        -- Except if 'fv' is empty: there is no binder to generalise, so
+        -- generalising does nothing. And trying to generalise hurts linear
+        -- types (see #25428). So we don't force it.
+        -- See (NVP5) in Note [Non-variable pattern bindings aren't linear] in GHC.Tc.Gen.Bind.
 
       | has_partial_sigs = True
         -- See Note [Partial type signatures and generalisation]
