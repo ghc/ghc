@@ -339,7 +339,7 @@ impliedXFlags
     , (LangExt.UnliftedDatatypes, turnOn, LangExt.DataKinds)
     , (LangExt.UnliftedDatatypes, turnOn, LangExt.StandaloneKindSignatures)
 
-    -- See Note [Non-variable pattern bindings aren't linear] in GHC.Tc.Gen.Bind
+    -- See (NVP3) in Note [Non-variable pattern bindings aren't linear] in GHC.Tc.Gen.Bind
     , (LangExt.LinearTypes, turnOn, LangExt.MonoLocalBinds)
   ]
 
