@@ -38,7 +38,6 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   -- flags
   , stgToCmmLoopification = gopt Opt_Loopification         dflags
   , stgToCmmAlignCheck    = gopt Opt_AlignmentSanitisation dflags
-  , stgToCmmOptHpc        = gopt Opt_Hpc                   dflags
   , stgToCmmFastPAPCalls  = gopt Opt_FastPAPCalls          dflags
   , stgToCmmSCCProfiling  = sccProfilingEnabled            dflags
   , stgToCmmEagerBlackHole = gopt Opt_EagerBlackHoling     dflags

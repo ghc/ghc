@@ -46,7 +46,6 @@ data StgToCmmConfig = StgToCmmConfig
   ---------------------------------- Flags --------------------------------------
   , stgToCmmLoopification  :: !Bool              -- ^ Loopification enabled (cf @-floopification@)
   , stgToCmmAlignCheck     :: !Bool              -- ^ Insert alignment check (cf @-falignment-sanitisation@)
-  , stgToCmmOptHpc         :: !Bool              -- ^ perform code generation for code coverage
   , stgToCmmFastPAPCalls   :: !Bool              -- ^
   , stgToCmmSCCProfiling   :: !Bool              -- ^ Check if cost-centre profiling is enabled
   , stgToCmmEagerBlackHole :: !Bool              -- ^
