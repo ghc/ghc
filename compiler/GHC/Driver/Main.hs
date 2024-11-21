@@ -248,7 +248,6 @@ import GHC.Types.Name.Cache ( initNameCache )
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Ppr
 import GHC.Types.TyThing
-import GHC.Types.HpcInfo
 import GHC.Types.Unique.Supply (uniqFromTag)
 import GHC.Types.Unique.Set
 
@@ -1858,7 +1857,6 @@ hscGenHardCode hsc_env cgguts location output_filename = do
               cg_foreign       = foreign_stubs0,
               cg_foreign_files = foreign_files,
               cg_dep_pkgs      = dependencies,
-              cg_hpc_info      = hpc_info,
               cg_spt_entries   = spt_entries,
               cg_binds         = late_binds,
               cg_ccs           = late_local_ccs
@@ -1962,7 +1960,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
               cmms <- {-# SCC "StgToCmm" #-}
                 doCodeGen hsc_env this_mod denv data_tycons
                 cost_centre_info
-                stg_binds hpc_info
+                stg_binds
 
               ------------------  Code output -----------------------
               rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
@@ -2160,13 +2158,12 @@ This reduces residency towards the end of the CodeGen phase significantly
 doCodeGen :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
           -> CollectedCCs
           -> [CgStgTopBinding] -- ^ Bindings come already annotated with fvs
-          -> HpcInfo
           -> IO (Stream IO CmmGroupSRTs CmmCgInfos)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
 doCodeGen hsc_env this_mod denv data_tycons
-              cost_centre_info stg_binds_w_fvs hpc_info = do
+              cost_centre_info stg_binds_w_fvs = do
     let dflags     = hsc_dflags hsc_env
         logger     = hsc_logger hsc_env
         hooks      = hsc_hooks  hsc_env
@@ -2184,7 +2181,7 @@ doCodeGen hsc_env this_mod denv data_tycons
     let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
-            stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_binds_w_fvs hpc_info
+            stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_binds_w_fvs
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one
