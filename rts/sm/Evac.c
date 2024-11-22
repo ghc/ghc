@@ -1109,6 +1109,8 @@ evacuate_BLACKHOLE(StgClosure **p)
         return;
     }
 
+    // Note [Black holes in large objects]
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // blackholes *can* be in a large object: when raiseAsync() creates an
     // AP_STACK the payload might be large enough to create a large object.
     // See #14497.
