@@ -124,7 +124,7 @@ primOpRdrName op = getRdrName (primOpId op)
 
 eqClassOpOcc, negateClassOpOcc, minusClassOpOcc, geClassOpOcc, toListClassOpOcc,
   fromListNClassOpOcc, fromListClassOpOcc, fromLabelClassOpOcc,
-  setFieldClassOpOcc, fromStringClassOpOcc :: KnownOcc
+  setFieldClassOpOcc :: KnownOcc
 eqClassOpOcc         = mkVarOcc "=="
 negateClassOpOcc     = mkVarOcc "negate"
 minusClassOpOcc      = mkVarOcc "-"
@@ -134,7 +134,16 @@ fromListNClassOpOcc  = mkVarOcc "fromListN"
 fromListClassOpOcc   = mkVarOcc "fromList"
 fromLabelClassOpOcc  = mkVarOcc "fromLabel"
 setFieldClassOpOcc   = mkVarOcc "setField"
+
+-- Strings
+fromStringClassOpOcc, interpolateRawIdOcc, interpolateValueIdOcc,
+  interpolateAppendIdOcc, interpolateEmptyIdOcc, interpolateFinalizeIdOcc :: KnownOcc
 fromStringClassOpOcc = mkVarOcc "fromString"
+interpolateRawIdOcc = mkVarOcc "interpolateRaw"
+interpolateValueIdOcc = mkVarOcc "interpolateValue"
+interpolateAppendIdOcc = mkVarOcc "interpolateAppend"
+interpolateEmptyIdOcc = mkVarOcc "interpolateEmpty"
+interpolateFinalizeIdOcc = mkVarOcc "interpolateFinalize"
 
 appAIdOcc, arrAIdOcc, firstAIdOcc, composeAIdOcc, choiceAIdOcc, loopAIdOcc :: KnownOcc
 appAIdOcc            = mkVarOcc "app"

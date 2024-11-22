@@ -1,0 +1,5 @@
+section: compiler
+synopsis: Implement -XStringInterpolation
+issues: #27592
+mrs: !16547
+description: GHC now supports string interpolation with s"..." syntax. See the User Guide for more details.

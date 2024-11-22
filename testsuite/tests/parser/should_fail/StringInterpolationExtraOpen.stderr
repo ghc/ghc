@@ -1,0 +1,3 @@
+StringInterpolationExtraOpen.hs:4:37: error: [GHC-58481]
+    parse error on input ‘{’
+

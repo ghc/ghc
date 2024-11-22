@@ -1,4 +1,4 @@
-{-# LANGUAGE NondecreasingIndentation, DataKinds, ViewPatterns #-}
+{-# LANGUAGE NondecreasingIndentation, DataKinds, LambdaCase, ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -582,6 +582,11 @@ addTickHsExpr e@(HsOverLit {})          = return e
 addTickHsExpr e@(HsOverLabel{})         = return e
 addTickHsExpr e@(HsLit {})              = return e
 addTickHsExpr e@(HsQualLit {})          = return e
+addTickHsExpr (HsInterString x ty parts) = do
+  parts' <- forM parts $ \case
+    part@(HsInterStringRaw {}) -> return part
+    HsInterStringExpr x e -> HsInterStringExpr x <$> addTickLHsExpr e
+  return $ HsInterString x ty parts'
 addTickHsExpr e@(HsEmbTy {})            = return e
 addTickHsExpr e@(HsStar {})             = return e
 addTickHsExpr e@(HsHole {})             = return e
