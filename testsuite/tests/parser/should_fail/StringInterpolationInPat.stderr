@@ -1,0 +1,3 @@
+StringInterpolationInPat.hs:4:6: error: [GHC-04584]
+    Expression syntax in pattern: s"hello ${x}"
+

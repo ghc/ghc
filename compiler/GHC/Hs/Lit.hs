@@ -48,6 +48,7 @@ import Language.Haskell.Syntax.Lit
 
 type instance XHsChar       (GhcPass _) = SourceText
 type instance XHsCharPrim   (GhcPass _) = SourceText
+-- | Note: contains quote delimiters
 type instance XHsString     (GhcPass _) = SourceText
 type instance XHsStringPrim (GhcPass _) = SourceText
 type instance XHsInt        (GhcPass _) = NoExtField

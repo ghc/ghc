@@ -1,0 +1,3 @@
+StringInterpolationInType.hs:4:13: error: [GHC-58481]
+    parse error on input ‘s"’
+

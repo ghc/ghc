@@ -1,0 +1,3 @@
+StringInterpolationLineComment.hs:4:51: error: [GHC-21231]
+    lexical error at character '\n'
+

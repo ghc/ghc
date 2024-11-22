@@ -1210,6 +1210,10 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         [ toHie (L mspan o)
         ]
       HsLit _ _ -> []
+      HsInterString _ _ parts ->
+        [ toHie expr
+        | HsInterStringExpr _ expr <- parts
+        ]
       HsLam _ _ mg ->
         [ toHie mg
         ]
