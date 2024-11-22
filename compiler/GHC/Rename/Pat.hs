@@ -579,7 +579,7 @@ rnPatAndThen mk (LitPat x lit)
     normal_lit = do { liftCps (rnLit lit); return (LitPat x (convertLit lit)) }
 
 rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
-  = do { (lit', mb_neg') <- liftCpsFV $ rnOverLit lit
+  = do { (lit', mb_neg') <- liftCpsFV $ rnOverLit' lit
        ; mb_neg' -- See Note [Negative zero]
            <- let negative = do { (neg, fvs) <- lookupSyntax negateName
                                 ; return (Just neg, fvs) }
@@ -594,7 +594,7 @@ rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
 
 rnPatAndThen mk (NPlusKPat _ rdr (L l lit) _ _ _ )
   = do { new_name <- newPatName mk (la2la rdr)
-       ; (lit', _) <- liftCpsFV $ rnOverLit lit -- See Note [Negative zero]
+       ; (lit', _) <- liftCpsFV $ rnOverLit' lit -- See Note [Negative zero]
                                                 -- We skip negateName as
                                                 -- negative zero doesn't make
                                                 -- sense in n + k patterns
@@ -1131,9 +1131,21 @@ in this case return not only literal itself but also negateName so that users
 can apply it explicitly. In this case it stays negative zero.  #13211
 -}
 
-rnOverLit :: (XXOverLit t ~ DataConCantHappen) => HsOverLit t ->
+rnOverLit ::
+     XOverLitE GhcPs
+  -> HsOverLit GhcPs
+  -> RnM (HsExpr GhcRn, FreeVars)
+rnOverLit x lit = do
+  ((lit', mb_neg), fvs) <- rnOverLit' lit -- See Note [Negative zero]
+  let addNeg =
+        case mb_neg of
+          Nothing -> id
+          Just neg -> HsApp noExtField (noLocA neg) . noLocA
+  pure (addNeg $ HsOverLit x lit', fvs)
+
+rnOverLit' :: (XXOverLit t ~ DataConCantHappen) => HsOverLit t ->
              RnM ((HsOverLit GhcRn, Maybe (HsExpr GhcRn)), FreeVars)
-rnOverLit origLit
+rnOverLit' origLit
   = do  { opt_NumDecimals <- xoptM LangExt.NumDecimals
         ; let { lit@(OverLit {ol_val=val})
             | opt_NumDecimals = origLit {ol_val = generalizeOverLitVal (ol_val origLit)}

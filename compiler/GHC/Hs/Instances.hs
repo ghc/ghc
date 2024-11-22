@@ -324,6 +324,11 @@ deriving instance Data (HsTupArg GhcPs)
 deriving instance Data (HsTupArg GhcRn)
 deriving instance Data (HsTupArg GhcTc)
 
+-- deriving instance (DataIdLR p p) => Data (HsInterStringPart p)
+deriving instance Data (HsInterStringPart GhcPs)
+deriving instance Data (HsInterStringPart GhcRn)
+deriving instance Data (HsInterStringPart GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (HsCmd p)
 deriving instance Data (HsCmd GhcPs)
 deriving instance Data (HsCmd GhcRn)

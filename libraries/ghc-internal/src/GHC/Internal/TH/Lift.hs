@@ -443,6 +443,8 @@ deriving instance Lift Info
 deriving instance Lift AnnLookup
 -- | @since template-haskell-2.22.1.0
 deriving instance Lift Extension
+-- | @since template-haskell-2.24.0.0
+deriving instance Lift InterStringPart
 
 -----------------------------------------------------
 --

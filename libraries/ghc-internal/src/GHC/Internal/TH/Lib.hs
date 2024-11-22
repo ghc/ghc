@@ -231,6 +231,16 @@ fromToR x y = do { a <- x; b <- y; pure (FromToR a b) }
 fromThenToR :: Quote m => m Exp -> m Exp -> m Exp -> m Range
 fromThenToR x y z = do { a <- x; b <- y; c <- z;
                          pure (FromThenToR a b c) }
+
+-------------------------------------------------------------------------------
+-- *   Interpolated strings
+
+interStringRaw :: Quote m => String -> m InterStringPart
+interStringRaw = pure . InterStringRaw
+
+interStringExp :: Quote m => m Exp -> m InterStringPart
+interStringExp e = InterStringExp <$> e
+
 -------------------------------------------------------------------------------
 -- *   Body
 
@@ -439,6 +449,9 @@ forallVisE tvars body = ForallVisE <$> sequenceA tvars <*> body
 
 constrainedE :: Quote m => [m Exp] -> m Exp -> m Exp
 constrainedE ctx body = ConstrainedE <$> sequenceA ctx <*> body
+
+interStringE :: Quote m => [m InterStringPart] -> m Exp
+interStringE parts = InterStringE <$> sequenceA parts
 
 -------------------------------------------------------------------------------
 -- *   Dec

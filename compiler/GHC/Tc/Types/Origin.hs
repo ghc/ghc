@@ -541,6 +541,7 @@ data CtOrigin
 
   | LiteralOrigin (HsOverLit GhcRn)     -- Occurrence of a literal
   | NegateOrigin                        -- Occurrence of syntactic negation
+  | InterStringOrigin                   -- Occurrence of an interpolated string
 
   | ArithSeqOrigin (ArithSeqInfo GhcRn) -- [x..], [x..y] etc
   | AssocFamPatOrigin   -- When matching the patterns of an associated
@@ -726,6 +727,7 @@ exprCtOrigin (ExplicitList {})    = ListOrigin
 exprCtOrigin (HsIPVar _ ip)       = IPOccOrigin ip
 exprCtOrigin (HsOverLit _ lit)    = LiteralOrigin lit
 exprCtOrigin (HsLit {})           = Shouldn'tHappenOrigin "concrete literal"
+exprCtOrigin (HsInterString _ _ _) = InterStringOrigin
 exprCtOrigin (HsLam _ _ ms)       = matchesCtOrigin ms
 exprCtOrigin (HsApp _ e1 _)       = lexprCtOrigin e1
 exprCtOrigin (HsAppType _ e1 _)   = lexprCtOrigin e1
@@ -917,6 +919,7 @@ pprCtO PatSigOrigin          = text "a pattern type signature"
 pprCtO PatOrigin             = text "a pattern"
 pprCtO ViewPatOrigin         = text "a view pattern"
 pprCtO (LiteralOrigin lit)   = hsep [text "the literal", quotes (ppr lit)]
+pprCtO InterStringOrigin     = text "an interpolated string"
 pprCtO (ArithSeqOrigin seq)  = hsep [text "the arithmetic sequence", quotes (ppr seq)]
 pprCtO SectionOrigin         = text "an operator section"
 pprCtO (GetFieldOrigin f)    = hsep [text "selecting the field", quotes (ppr f)]

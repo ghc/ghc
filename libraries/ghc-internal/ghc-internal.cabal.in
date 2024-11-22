@@ -164,6 +164,7 @@ Library
         GHC.Internal.Data.STRef
         GHC.Internal.Data.STRef.Strict
         GHC.Internal.Data.String
+        GHC.Internal.Data.String.Interpolate
         GHC.Internal.Data.Traversable
         GHC.Internal.Data.Tuple
         GHC.Internal.Data.Type.Bool

@@ -41,6 +41,7 @@ instance Binary TH.DerivClause
 instance Binary TH.DerivStrategy
 instance Binary TH.Guard
 instance Binary TH.Body
+instance Binary TH.InterStringPart
 instance Binary TH.Match
 instance Binary TH.Fixity
 instance Binary TH.TySynEqn

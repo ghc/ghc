@@ -323,6 +323,11 @@ classify tok =
     ITlabelvarid{} -> TkUnknown
     ITchar{} -> TkChar
     ITstring{} -> TkString
+    ITstringInterBegin{} -> TkSpecial
+    ITstringInterRaw{} -> TkString
+    ITstringInterExpOpen{} -> TkSpecial
+    ITstringInterExpClose{} -> TkSpecial
+    ITstringInterEnd{} -> TkSpecial
     ITinteger{} -> TkNumber
     ITrational{} -> TkNumber
     ITprimchar{} -> TkChar

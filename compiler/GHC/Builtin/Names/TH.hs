@@ -317,7 +317,7 @@ varEName, conEName, litEName, appEName, appTypeEName, infixEName, infixAppName,
     unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
     caseEName, doEName, mdoEName, compEName, staticEName, unboundVarEName,
     labelEName, implicitParamVarEName, getFieldEName, projectionEName, typeEName,
-    forallEName, forallVisEName, constrainedEName :: Name
+    forallEName, forallVisEName, constrainedEName, interStringEName :: Name
 varEName              = libFun (fsLit "varE")              varEIdKey
 conEName              = libFun (fsLit "conE")              conEIdKey
 litEName              = libFun (fsLit "litE")              litEIdKey
@@ -362,6 +362,13 @@ typeEName             = libFun (fsLit "typeE")             typeEIdKey
 forallEName           = libFun (fsLit "forallE")           forallEIdKey
 forallVisEName        = libFun (fsLit "forallVisE")        forallVisEIdKey
 constrainedEName      = libFun (fsLit "constrainedE")      constrainedEIdKey
+interStringEName      = libFun (fsLit "interStringE")      interStringEIdKey
+
+-- data InterStringPart = ...
+interStringPartName, interStringRawName, interStringExpName :: Name
+interStringPartName   = libFun (fsLit "interStringPart")   interStringPartIdKey
+interStringRawName    = libFun (fsLit "interStringRaw")    interStringRawIdKey
+interStringExpName    = libFun (fsLit "interStringExp")    interStringExpIdKey
 
 -- type FieldExp = ...
 fieldExpName :: Name
@@ -893,7 +900,7 @@ varEIdKey, conEIdKey, litEIdKey, appEIdKey, appTypeEIdKey, infixEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey,
     unboundVarEIdKey, labelEIdKey, implicitParamVarEIdKey, mdoEIdKey,
     getFieldEIdKey, projectionEIdKey, typeEIdKey, forallEIdKey,
-    forallVisEIdKey, constrainedEIdKey :: Unique
+    forallVisEIdKey, constrainedEIdKey, interStringEIdKey :: Unique
 varEIdKey              = mkPreludeMiscIdUnique 270
 conEIdKey              = mkPreludeMiscIdUnique 271
 litEIdKey              = mkPreludeMiscIdUnique 272
@@ -934,6 +941,7 @@ typeEIdKey             = mkPreludeMiscIdUnique 306
 forallEIdKey           = mkPreludeMiscIdUnique 802
 forallVisEIdKey        = mkPreludeMiscIdUnique 803
 constrainedEIdKey      = mkPreludeMiscIdUnique 804
+interStringEIdKey      = mkPreludeMiscIdUnique 805
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique
@@ -956,6 +964,12 @@ letSIdKey        = mkPreludeMiscIdUnique 313
 noBindSIdKey     = mkPreludeMiscIdUnique 314
 parSIdKey        = mkPreludeMiscIdUnique 315
 recSIdKey        = mkPreludeMiscIdUnique 316
+
+-- data InterStringPart = ...
+interStringPartIdKey, interStringRawIdKey, interStringExpIdKey :: Unique
+interStringPartIdKey = mkPreludeMiscIdUnique 806
+interStringRawIdKey  = mkPreludeMiscIdUnique 806
+interStringExpIdKey  = mkPreludeMiscIdUnique 808
 
 -- data Dec = ...
 funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey, classDIdKey,

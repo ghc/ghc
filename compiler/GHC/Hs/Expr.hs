@@ -245,6 +245,13 @@ type instance XLitE          (GhcPass _) = NoExtField
 type instance XLam           (GhcPass _) = EpAnnLam
 type instance XApp           (GhcPass _) = NoExtField
 
+type instance XInterString GhcPs = NoExtField
+type instance XInterString GhcRn = NoExtField
+type instance XInterString GhcTc = DataConCantHappen
+-- | Note: does not contain any delimiters
+type instance XInterStringRaw  (GhcPass _) = SourceText
+type instance XInterStringExpr (GhcPass _) = NoExtField
+
 type instance XAppTypeE      GhcPs = EpToken "@"
 type instance XAppTypeE      GhcRn = NoExtField
 type instance XAppTypeE      GhcTc = Type
@@ -860,6 +867,24 @@ ppr_expr (HsOverLabel s l) = case ghcPass @p of
                           SourceText src -> ftext src
 ppr_expr (HsLit _ lit)       = ppr lit
 ppr_expr (HsOverLit _ lit)   = ppr lit
+
+ppr_expr (HsInterString _ strType parts) =
+  char 's' <> delim <> hcat (map pprInterPart parts) <> delim
+  where
+    pprInterPart = \case
+      HsInterStringRaw st s ->
+        case (strType, st) of
+          (HsStringTypeSingle, SourceText src) -> ftext src
+          (HsStringTypeSingle, NoSourceText) -> pprHsString' (unpackFS s)
+          (HsStringTypeMulti, SourceText src) -> vcat $ map text $ split '\n' (unpackFS src)
+          (HsStringTypeMulti, NoSourceText) -> pprHsStringMulti' (unpackFS s)
+      HsInterStringExpr _ expr -> text "${" <> ppr_lexpr expr <> text "}"
+
+    delim =
+      case strType of
+        HsStringTypeSingle -> char '"'
+        HsStringTypeMulti -> text "\"\"\""
+
 ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)
 
 ppr_expr (HsPragE _ prag e) = sep [ppr prag, ppr_lexpr e]
@@ -1174,6 +1199,7 @@ hsExprNeedsParens prec = go
     go (HsOverLabel{})                = False
     go (HsLit _ l)                    = hsLitNeedsParens prec l
     go (HsOverLit _ ol)               = hsOverLitNeedsParens prec ol
+    go (HsInterString{})              = False
     go (HsPar{})                      = False
     go (HsApp{})                      = prec >= appPrec
     go (HsAppType {})                 = prec >= appPrec

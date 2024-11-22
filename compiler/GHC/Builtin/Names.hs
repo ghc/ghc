@@ -285,6 +285,9 @@ basicKnownKeyNames
         -- String stuff
         fromStringName,
 
+        -- Interpolated strings
+        fromBuilderName, toBuilderName, interpolateName,
+
         -- Enum stuff
         enumFromName, enumFromThenName,
         enumFromThenToName, enumFromToName,
@@ -567,7 +570,7 @@ gHC_INTERNAL_NUM_NATURAL            = mkGhcInternalModule (fsLit "GHC.Internal.B
 gHC_INTERNAL_NUM_BIGNAT             = mkGhcInternalModule (fsLit "GHC.Internal.Bignum.BigNat")
 
 gHC_INTERNAL_BASE, gHC_INTERNAL_ENUM,
-    gHC_INTERNAL_GHCI, gHC_INTERNAL_GHCI_HELPERS, gHC_CSTRING, gHC_INTERNAL_DATA_STRING,
+    gHC_INTERNAL_GHCI, gHC_INTERNAL_GHCI_HELPERS, gHC_CSTRING, gHC_INTERNAL_DATA_STRING, gHC_INTERNAL_DATA_STRING_INTERPOLATE,
     gHC_INTERNAL_SHOW, gHC_INTERNAL_READ, gHC_INTERNAL_NUM, gHC_INTERNAL_MAYBE,
     gHC_INTERNAL_LIST, gHC_INTERNAL_TUPLE, gHC_INTERNAL_DATA_EITHER,
     gHC_INTERNAL_DATA_FOLDABLE, gHC_INTERNAL_DATA_TRAVERSABLE,
@@ -593,6 +596,7 @@ gHC_INTERNAL_MAYBE                  = mkGhcInternalModule (fsLit "GHC.Internal.M
 gHC_INTERNAL_LIST                   = mkGhcInternalModule (fsLit "GHC.Internal.List")
 gHC_INTERNAL_DATA_EITHER            = mkGhcInternalModule (fsLit "GHC.Internal.Data.Either")
 gHC_INTERNAL_DATA_STRING            = mkGhcInternalModule (fsLit "GHC.Internal.Data.String")
+gHC_INTERNAL_DATA_STRING_INTERPOLATE = mkGhcInternalModule (fsLit "GHC.Internal.Data.String.Interpolate")
 gHC_INTERNAL_DATA_FOLDABLE          = mkGhcInternalModule (fsLit "GHC.Internal.Data.Foldable")
 gHC_INTERNAL_DATA_TRAVERSABLE       = mkGhcInternalModule (fsLit "GHC.Internal.Data.Traversable")
 gHC_INTERNAL_CONC                   = mkGhcInternalModule (fsLit "GHC.Internal.GHC.Conc")
@@ -1117,6 +1121,12 @@ numClassName      = clsQual gHC_INTERNAL_NUM (fsLit "Num")         numClassKey
 fromIntegerName   = varQual gHC_INTERNAL_NUM (fsLit "fromInteger") fromIntegerClassOpKey
 minusName         = varQual gHC_INTERNAL_NUM (fsLit "-")           minusClassOpKey
 negateName        = varQual gHC_INTERNAL_NUM (fsLit "negate")      negateClassOpKey
+
+-- Module GHC.Internal.Data.String.Interpolate
+toBuilderName, fromBuilderName, interpolateName :: Name
+toBuilderName   = varQual gHC_INTERNAL_DATA_STRING_INTERPOLATE (fsLit "toBuilder") toBuilderKey
+fromBuilderName = varQual gHC_INTERNAL_DATA_STRING_INTERPOLATE (fsLit "fromBuilder") fromBuilderKey
+interpolateName = varQual gHC_INTERNAL_DATA_STRING_INTERPOLATE (fsLit "interpolate") interpolateKey
 
 ---------------------------------
 -- ghc-bignum
@@ -2490,6 +2500,12 @@ toListClassOpKey = mkPreludeMiscIdUnique 501
 
 proxyHashKey :: Unique
 proxyHashKey = mkPreludeMiscIdUnique 502
+
+-- String interpolation
+toBuilderKey, fromBuilderKey, interpolateKey :: Unique
+toBuilderKey   = mkPreludeMiscIdUnique 574
+fromBuilderKey = mkPreludeMiscIdUnique 575
+interpolateKey = mkPreludeMiscIdUnique 576
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES IdUniques 200-499

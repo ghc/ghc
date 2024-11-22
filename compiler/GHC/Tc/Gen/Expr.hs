@@ -313,6 +313,9 @@ tcExpr e@(HsLit x lit) res_ty
   = do { let lit_ty = hsLitType lit
        ; tcWrapResult e (HsLit x (convertLit lit)) lit_ty res_ty }
 
+-- See Note [Desugaring interpolated strings]
+tcExpr (HsInterString {}) ty = pprPanic "tcExpr:HsInterString" (ppr ty)
+
 tcExpr (HsPar x expr) res_ty
   = do { expr' <- tcMonoExprNC expr res_ty
        ; return (HsPar x expr') }

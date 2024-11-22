@@ -339,11 +339,18 @@ data HsExpr p
 
   | HsIPVar   (XIPVar p)
               HsIPName   -- ^ Implicit parameter (not in use after typechecking)
+
   | HsOverLit (XOverLitE p)
               (HsOverLit p)  -- ^ Overloaded literals
 
   | HsLit     (XLitE p)
               (HsLit p)      -- ^ Simple (non-overloaded) literals
+
+  | -- | See Note [Parsing interpolated strings]
+    HsInterString
+      (XInterString p)
+      HsStringType
+      [HsInterStringPart p]
 
   -- | Lambda, Lambda-case, and Lambda-cases
   | HsLam     (XLam p)
@@ -471,7 +478,6 @@ data HsExpr p
   -- | Expression with an explicit type signature. @e :: type@
   | ExprWithTySig
                 (XExprWithTySig p)
-
                 (LHsExpr p)
                 (LHsSigWcType (NoGhcTc p))
 
@@ -578,6 +584,10 @@ data HsLamVariant
   | LamCase    -- ^ `\case pi -> ei `
   | LamCases   -- ^ `\cases psi -> ei`
   deriving (Data, Eq)
+
+data HsInterStringPart p
+  = HsInterStringRaw (XInterStringRaw p) FastString
+  | HsInterStringExpr (XInterStringExpr p) (LHsExpr p)
 
 {-
 Note [Parens in HsSyn]

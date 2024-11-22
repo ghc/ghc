@@ -696,6 +696,7 @@ Library
         GHC.Rename.Names
         GHC.Rename.Pat
         GHC.Rename.Splice
+        GHC.Rename.String
         GHC.Rename.Unbound
         GHC.Rename.Utils
         GHC.Runtime.Context

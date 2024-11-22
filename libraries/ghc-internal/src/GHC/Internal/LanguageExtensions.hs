@@ -165,6 +165,7 @@ data Extension
    | ExtendedLiterals
    | ListTuplePuns
    | MultilineStrings
+   | StringInterpolation
    | ExplicitLevelImports
    | ImplicitStagePersistence
    deriving (Eq, Enum, Show, Generic, Bounded)

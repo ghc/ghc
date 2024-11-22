@@ -1,9 +1,9 @@
 {-# LANGUAGE AllowAmbiguousTypes    #-}
-
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE LambdaCase             #-}
 {-# LANGUAGE MultiWayIf             #-}
 {-# LANGUAGE PatternSynonyms        #-}
 {-# LANGUAGE RankNTypes             #-}
@@ -1576,6 +1576,11 @@ repE (HsOverLabel _ s) = repOverLabel s
         -- HsOverlit can definitely occur
 repE (HsOverLit _ l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit _ l)     = do { a <- repLiteral l;           repLit a }
+repE (HsInterString _ _ parts) = do
+  parts' <- forM parts $ \case
+    HsInterStringRaw _ s -> repInterStringRaw =<< coreStringLit s
+    HsInterStringExpr _ e -> repInterStringExp =<< repLE e
+  repInterString =<< coreListM interStringPartName parts'
 repE (HsLam _ LamSingle (MG { mg_alts = L _ [m] })) = repLambda m
 repE e@(HsLam _ LamSingle (MG { mg_alts = L _ _ })) = pprPanic "repE: HsLam with multiple alternatives" (ppr e)
 repE (HsLam _ LamCase (MG { mg_alts = L _ ms }))
@@ -2656,6 +2661,16 @@ repMatch (MkC p) (MkC bod) (MkC ds) = rep2 matchName [p, bod, ds]
 
 repClause :: Core [(M TH.Pat)] -> Core (M TH.Body) -> Core [(M TH.Dec)] -> MetaM (Core (M TH.Clause))
 repClause (MkC ps) (MkC bod) (MkC ds) = rep2 clauseName [ps, bod, ds]
+
+-------------- Interpolated strings -----------------------------
+repInterString :: Core [M TH.InterStringPart] -> MetaM (Core (M TH.Exp))
+repInterString (MkC parts) = rep2 interStringEName [parts]
+
+repInterStringRaw :: Core String -> MetaM (Core (M TH.InterStringPart))
+repInterStringRaw (MkC s) = rep2 interStringRawName [s]
+
+repInterStringExp :: Core (M TH.Exp) -> MetaM (Core (M TH.InterStringPart))
+repInterStringExp (MkC e) = rep2 interStringExpName [e]
 
 -------------- Dec -----------------------------
 repVal :: Core (M TH.Pat) -> Core (M TH.Body) -> Core [(M TH.Dec)] -> MetaM (Core (M TH.Dec))

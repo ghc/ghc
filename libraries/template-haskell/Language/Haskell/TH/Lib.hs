@@ -45,7 +45,7 @@ module Language.Haskell.TH.Lib (
         lamE, lam1E, lamCaseE, lamCasesE, tupE, unboxedTupE, unboxedSumE, condE,
         multiIfE, letE, caseE, appsE, listE, sigE, recConE, recUpdE, stringE,
         fieldExp, getFieldE, projectionE, typedSpliceE, typedBracketE, typeE,
-        forallE, forallVisE, constrainedE,
+        forallE, forallVisE, constrainedE, interStringE,
 
     -- **** Ranges
     fromE, fromThenE, fromToE, fromThenToE,
@@ -56,6 +56,8 @@ module Language.Haskell.TH.Lib (
     -- **** Statements
     doE, mdoE, compE,
     bindS, letS, noBindS, parS, recS,
+    -- **** Interpolated strings
+    interStringRaw, interStringExp,
 
     -- *** Types
         forallT, forallVisT, varT, conT, appT, appKindT, arrowT, mulArrowT,

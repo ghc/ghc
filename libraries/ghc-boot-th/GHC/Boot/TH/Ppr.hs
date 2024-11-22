@@ -250,6 +250,13 @@ pprExp i (ForallE tvars body) =
 pprExp i (ConstrainedE ctx body) =
   parensIf (i >= funPrec) $ sep [pprCtxWith pprExp ctx, pprExp qualPrec body]
 
+pprExp _ (InterStringE parts) =
+  text "s\""<> hcat (map pprInterStringPart parts) <> text "\""
+  where
+    pprInterStringPart = \case
+      InterStringRaw s -> text s
+      InterStringExp e -> text "${" <> pprExp noPrec e <> text "}"
+
 pprFields :: [(Name,Exp)] -> Doc
 pprFields = sep . punctuate comma . map (\(s,e) -> pprName' Applied s <+> equals <+> ppr e)
 

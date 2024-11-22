@@ -34,3 +34,7 @@ test('MultilineStringsOverloaded', normal, compile_and_run, [''])
 test('T25375', normal, compile_and_run, [''])
 test('T25609', normal, compile_and_run, [''])
 test('T25784', normal, compile_and_run, [''])
+
+# String interpolation
+test('StringInterpolation', normal, compile_and_run, [''])
+test('StringInterpolationOverloaded', normal, compile_and_run, [''])

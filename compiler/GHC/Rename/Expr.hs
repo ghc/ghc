@@ -46,6 +46,7 @@ import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice
                           , rnUntypedSpliceExpr, checkThLocalNameWithLift )
 import GHC.Rename.HsType
 import GHC.Rename.Pat
+import GHC.Rename.String
 
 import GHC.Driver.DynFlags
 import GHC.Builtin.Names
@@ -199,6 +200,8 @@ but several have a little bit of special treatment:
      To understand why is this done in the typechecker and not in the renamer.
      See Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
 
+* HsInterString: See Note [Desugaring interpolated strings]
+
 Note [Overloaded labels]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 For overloaded labels, note that we /only/ apply `fromLabel` to the
@@ -233,6 +236,9 @@ and the reasons for doing so.
   to do so there and then not worry about it in the later stage.
   `-XRebindableSyntax` is used to decide whether we use the `HsIf` or user defined if
 
+  ** `HsInterString` Expansions
+  -----------------------------
+  See Note [Desugaring interpolated strings]
 
   ** `OpApp` Expansions
   ---------------------
@@ -377,12 +383,18 @@ rnExpr (HsLit x lit)
        ; return (HsLit x (convertLit lit), emptyFVs) }
 
 rnExpr (HsOverLit x lit)
-  = do { ((lit', mb_neg), fvs) <- rnOverLit lit -- See Note [Negative zero]
-       ; case mb_neg of
-              Nothing -> return (HsOverLit x lit', fvs)
-              Just neg ->
-                 return (HsApp noExtField (noLocA neg) (noLocA (HsOverLit x lit'))
-                        , fvs ) }
+  = rnOverLit x lit
+
+rnExpr (HsInterString _ strType parts) = do
+  (parts', fvs1) <- unzip <$> mapM rnInterStringPart parts
+  (expr, fvs2) <- rewriteInterString strType parts'
+  pure (expr, plusFVs fvs1 `plusFV` fvs2)
+  where
+    rnInterStringPart = \case
+      HsInterStringRaw x s -> pure (HsInterStringRaw x s, emptyFVs)
+      HsInterStringExpr x expr -> do
+        (expr', fv) <- rnLExpr expr
+        pure (HsInterStringExpr x expr', fv)
 
 rnExpr (HsApp x fun arg)
   = do { (fun',fvFun) <- rnLExpr fun

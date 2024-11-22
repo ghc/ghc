@@ -9,13 +9,14 @@ which we don't want in these contexts.
 module GHC.Parser.Lexer.String (
   AlexReturn (..),
   alexScan,
+  Action (..),
   string_multi_content,
+  string_inter_content,
 ) where
 
 import GHC.Prelude
 
 import GHC.Parser.Lexer.Interface
-import GHC.Utils.Panic (panic)
 }
 
 -- -----------------------------------------------------------------------------
@@ -71,7 +72,8 @@ $hexit     = [$decdigit A-F a-f]
        | "DC1" | "DC2" | "DC3" | "DC4" | "NAK" | "SYN" | "ETB" | "CAN"
        | "EM" | "SUB" | "ESC" | "FS" | "GS" | "RS" | "US" | "SP" | "DEL"
 @escape     = \\ ( $charesc      | @ascii | @decimal | o @octal | x @hexadecimal )
-@stringchar = ($graphic # [\\ \"]) | $space | @escape     | @gap
+@stringchar = ($graphic # [\\ \"])         | $space | @escape     | @gap
+@stringinterchar = ($graphic # [\\ \" \$]) | $space | @escape     | @gap
 
 :-
 
@@ -81,16 +83,47 @@ $hexit     = [$decdigit A-F a-f]
 -- See Note [Lexing multiline strings]
 <string_multi_content> {
   -- Parse as much of the multiline string as possible, except for quotes
-  @stringchar* ($nl ([\  $tab] | @gap)* @stringchar*)* { string_multi_content_action }
+  @stringchar* ($nl ([\  $tab] | @gap)* @stringchar*)* { StringMultiContentAction }
   -- Allow bare quotes if it's not a triple quote
-  (\" | \"\") / ([\n .] # \") { string_multi_content_action }
+  (\" | \"\") / ([\n .] # \") { StringMultiContentAction }
+}
+
+-- Note [Lexing interpolated strings]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Lexing interpolated strings will do the following steps:
+--
+-- 1. Lex `s"` => push `string_inter_content` lex state
+-- 2. Repeatedly invoke the `string_inter_content` lex state in GHC/Parser/Lexer/String.x
+-- 3. When encountering `${`, we do two things:
+--     1. Push the `string_inter` lex state
+--         * This lex state includes all expression-related lexer rules
+--     2. Push the `InterStringLayout` layout context
+--         * This is needed to identify the closing brace in the presence of
+--           nested braces (e.g. `s"Person: ${show Person{name = "Alice"}}")
+-- 4. When encountering `}`, check if `InterStringLayout` is the current layout context.
+--    If so, pop `InterStringLayout` and `string_inter` and go back to invoking
+--    `string_inter_content`
+--
+-- We define `string_inter_content` in GHC/Parser/Lexer/String.x to avoid including
+-- the global rules when we're parsing the string content.
+
+-- See Note [Parsing interpolated strings]
+<string_inter_content> {
+  @stringinterchar+ { StringInterContentRaw }
+  \$ \{             { StringInterContentExpOpen }
+  \"                { StringInterContentEnd }
+
+  -- TODO(bchinn): check for smart quotes
 }
 
 -- -----------------------------------------------------------------------------
 -- Haskell actions
 {
--- | Dummy action that should never be called. Should only be used in lex states
--- that are manually lexed in tok_string_multi.
-string_multi_content_action :: a
-string_multi_content_action = panic "string_multi_content_action unexpectedly invoked"
+data Action
+  = StringMultiContentAction
+  | StringInterContentRaw
+  | StringInterContentExpOpen
+  | StringInterContentEnd
+  deriving (Show)
 }
