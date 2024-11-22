@@ -1,0 +1,5 @@
+****************************************
+Input:
+    let s = "world" :: Text; x = True in s <> s" hello ${s} ${x}" :: Text
+====>
+    "world hello world True"

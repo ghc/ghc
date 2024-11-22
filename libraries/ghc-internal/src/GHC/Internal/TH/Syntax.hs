@@ -904,6 +904,7 @@ data Exp
   | ForallE [TyVarBndr Specificity] Exp -- ^ @forall \<vars\>. \<expr\>@
   | ForallVisE [TyVarBndr ()] Exp      -- ^ @forall \<vars\> -> \<expr\>@
   | ConstrainedE [Exp] Exp             -- ^ @\<ctxt\> => \<expr\>@
+  | InterStringE [InterStringPart]     -- ^ @{ s"Name: ${personName}" }@
   deriving( Show, Eq, Ord, Generic )
 
 -- | A (field name, expression) pair. See 'RecConE' and 'RecUpdE'.
@@ -941,6 +942,11 @@ data Range = FromR Exp               -- ^ @[n ..]@
            | FromToR Exp Exp         -- ^ @[n .. m]@
            | FromThenToR Exp Exp Exp -- ^ @[n, m .. k]@
            deriving( Show, Eq, Ord, Generic )
+
+data InterStringPart
+  = InterStringRaw String
+  | InterStringExp Exp
+  deriving( Show, Eq, Ord, Generic )
 
 -- | A single declaration.
 data Dec

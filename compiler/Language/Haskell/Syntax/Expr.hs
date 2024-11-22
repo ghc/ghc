@@ -21,7 +21,7 @@ import Language.Haskell.Syntax.Module.Name (ModuleName)
 import Language.Haskell.Syntax.Text
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
-
+import Language.Haskell.Syntax.StringMeta (StringMeta)
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -342,6 +342,12 @@ data HsExpr p
   | HsQualLit (XQualLitE p)
               (HsQualLit p)  -- ^ Qualified literals
 
+  | -- | See Note [Parsing interpolated strings]
+    HsInterString
+      (XInterString p)
+      StringMeta
+      [HsInterStringPart p]
+
   -- | Lambda, Lambda-case, and Lambda-cases
   | HsLam     (XLam p)
               HsLamVariant -- ^ Tells whether this is for lambda, \case, or \cases
@@ -468,7 +474,6 @@ data HsExpr p
   -- | Expression with an explicit type signature. @e :: type@
   | ExprWithTySig
                 (XExprWithTySig p)
-
                 (LHsExpr p)
                 (LHsSigWcType (NoGhcTc p))
 
@@ -582,6 +587,10 @@ data HsLamVariant
   | LamCase    -- ^ `\case pi -> ei `
   | LamCases   -- ^ `\cases psi -> ei`
   deriving (Data, Eq)
+
+data HsInterStringPart p
+  = HsInterStringRaw (XInterStringRaw p) FastString
+  | HsInterStringExpr (XInterStringExpr p) (LHsExpr p)
 
 {-
 Note [Parens in HsSyn]

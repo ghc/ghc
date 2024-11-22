@@ -1,4 +1,5 @@
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -54,7 +55,7 @@ import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
 
 import qualified Data.ByteString as BS
-import Control.Monad( unless )
+import Control.Monad( forM, unless )
 import Data.Bifunctor (first)
 import Data.Foldable (for_)
 import Data.List.NonEmpty( NonEmpty (..), nonEmpty )
@@ -69,6 +70,7 @@ import System.IO.Unsafe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict
 
+import Language.Haskell.Syntax.StringMeta (defaultStrMeta)
 import Language.Haskell.Syntax.Text
 
 -------------------------------------------------------------------
@@ -1227,6 +1229,11 @@ cvtl e = wrapLA (cvt e)
          ; let tele = setTelescopeBndrsNameSpace varName $
                       mkHsForAllVisTele noAnn tvs'
          ; return $ HsForAll noExtField tele body' }
+    cvt (InterStringE parts) = do
+      parts' <- forM parts $ \case
+        InterStringRaw s -> pure $ HsInterStringRaw (SourceText $ fsLit s) (fsLit s)
+        InterStringExp e -> HsInterStringExpr noExtField <$> cvtl e
+      return $ HsInterString noExtField defaultStrMeta parts'
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.
 Consider this example:

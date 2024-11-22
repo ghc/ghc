@@ -33,6 +33,11 @@ common warnings
 library
     import:           warnings
     exposed-modules:
+      Data.String.Experimental
+      Data.String.Interpolate.Builder.Experimental
+      Data.String.Interpolate.Class.Experimental
+      Data.String.Interpolate.Default.Experimental
+      Data.String.Interpolate.ShowS.Experimental
       Data.Sum.Experimental
       Data.Tuple.Experimental
       GHC.PrimOps

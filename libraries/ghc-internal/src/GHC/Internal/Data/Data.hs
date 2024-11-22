@@ -1365,6 +1365,7 @@ deriving instance Data TH.Guard
 deriving instance Data TH.Info
 deriving instance Data TH.InjectivityAnn
 deriving instance Data TH.Inline
+deriving instance Data TH.InterStringPart
 deriving instance Data TH.Lit
 deriving instance Data TH.Loc
 deriving instance Data TH.Match

@@ -1,0 +1,3 @@
+StringInterpolationIncompleteExpr.hs:4:26: error: [GHC-58481]
+    parse error on input ‘}’
+
