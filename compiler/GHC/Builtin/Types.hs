@@ -42,7 +42,8 @@ module GHC.Builtin.Types (
 
         -- * Char
         charTyCon, charDataCon, charTyCon_RDR,
-        charTy, stringTy, charTyConName, stringTyCon_RDR,
+        charTy, stringTy, charTyConName,
+        stringTyCon_RDR, stringTyConName,
 
         -- * Double
         doubleTyCon, doubleDataCon, doubleTy, doubleTyConName,

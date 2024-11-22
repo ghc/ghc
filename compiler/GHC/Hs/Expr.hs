@@ -51,6 +51,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
+import GHC.Data.StringMeta (StringMeta (..))
 import GHC.Core.Type
 import GHC.Builtin.Types (mkTupleStr)
 import GHC.Tc.Utils.TcType (TcType)
@@ -235,6 +236,13 @@ type instance XLitE          (GhcPass _) = NoExtField
 type instance XQualLitE      (GhcPass _) = NoExtField
 type instance XLam           (GhcPass _) = EpAnnLam
 type instance XApp           (GhcPass _) = NoExtField
+
+type instance XInterString GhcPs = NoExtField
+type instance XInterString GhcRn = NoExtField
+type instance XInterString GhcTc = DataConCantHappen
+-- | Note: does not contain any delimiters
+type instance XInterStringRaw  (GhcPass _) = SourceText
+type instance XInterStringExpr (GhcPass _) = NoExtField
 
 type instance XAppTypeE      GhcPs = EpToken "@"
 type instance XAppTypeE      GhcRn = NoExtField
@@ -811,6 +819,23 @@ ppr_expr (HsLit _ lit)       = ppr lit
 ppr_expr (HsOverLit _ lit)   = ppr lit
 ppr_expr (HsQualLit _ lit)   = ppr lit
 
+ppr_expr (HsInterString _ meta parts) =
+  char 's' <> delim <> hcat (map pprInterPart parts) <> delim
+  where
+    delim
+      | strMetaMultiline meta = text "\"\"\""
+      | otherwise = char '"'
+    pprInterPart = \case
+      HsInterStringExpr _ expr -> text "${" <> ppr_lexpr expr <> text "}"
+      HsInterStringRaw st s ->
+        case st of
+          SourceText src
+            | strMetaMultiline meta -> vcat $ map text $ split '\n' (unpackFS src)
+            | otherwise -> ftext src
+          NoSourceText
+            | strMetaMultiline meta -> pprHsStringMulti' (unpackFS s)
+            | otherwise -> pprHsString' (unpackFS s)
+
 ppr_expr (HsHole x) = case (ghcPass @p, x) of
   (GhcPs, HoleVar (L _ v)) -> pprPrefixOcc v
   (GhcRn, HoleVar (L _ v)) -> pprPrefixOcc v
@@ -1132,6 +1157,7 @@ hsExprNeedsParens prec = go
     go (HsLit _ l)                    = hsLitNeedsParens prec l
     go (HsOverLit _ ol)               = hsOverLitNeedsParens prec ol
     go (HsQualLit{})                  = False
+    go (HsInterString{})              = False
     go (HsPar{})                      = False
     go (HsApp{})                      = prec >= appPrec
     go (HsAppType {})                 = prec >= appPrec

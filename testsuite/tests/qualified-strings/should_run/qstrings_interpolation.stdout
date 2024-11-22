@@ -1,0 +1,2 @@
+>>> SqlQuery {sqlText = "SELECT * FROM tab WHERE name ILIKE ? AND age > ?", sqlValues = [SqlString "'Robert'; DROP TABLE Students;--",SqlInt 10]}
+SqlQuery

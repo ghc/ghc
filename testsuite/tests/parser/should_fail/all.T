@@ -238,12 +238,6 @@ test('Or1', normal, compile_fail, [''])
 test('OrPatInExprErr', normal, compile_fail, [''])
 test('precOutOfRange', normal, compile_fail, [''])
 test('badRuleMarker', normal, compile_fail, [''])
-
-# Multiline Strings
-test('MultilineStringsError', [normalise_whitespace_fun(lambda s: s)], compile_fail, [''])
-test('MultilineStringsSmartQuotes', normal, compile_fail, [''])
-test('MultilineStringsInnerTab', normal, compile_fail, [''])
-test('MultilineStringsUnterminated', normal, compile_fail, [''])
 test('T25258a', normal, compile_fail, [''])
 test('T25258b', normal, compile_fail, [''])
 test('T25258c', normal, compile_fail, [''])
@@ -254,3 +248,25 @@ test('T12488d', normal, compile_fail, [''])
 test('T26860ppr', normal, compile_fail, [''])
 test('T26860ppr_overloaded', normal, compile_fail, [''])
 test('T26860ppr_tylit', normal, compile_fail, [''])
+
+# ---------- Multiline Strings ---------- #
+test('MultilineStringsError', [normalise_whitespace_fun(lambda s: s)], compile_fail, [''])
+test('MultilineStringsSmartQuotes', normal, compile_fail, [''])
+test('MultilineStringsInnerTab', normal, compile_fail, [''])
+test('MultilineStringsUnterminated', normal, compile_fail, [''])
+test('MultilineStringsEscapeOverflow', normal, compile_fail, [''])
+
+# ---------- Interpolated Strings ---------- #
+test('StringInterpolationEscapeOverflow', normal, compile_fail, [''])
+test('StringInterpolationNoDelimClose', normal, compile_fail, [''])
+test('StringInterpolationNoExprClose', normal, compile_fail, [''])
+test('StringInterpolationNoExpr', normal, compile_fail, [''])
+test('StringInterpolationInvalidExpr', normal, compile_fail, [''])
+test('StringInterpolationIncompleteExpr', normal, compile_fail, [''])
+test('StringInterpolationExtraOpen', normal, compile_fail, [''])
+test('StringInterpolationInPat', normal, compile_fail, [''])
+test('StringInterpolationInType', normal, compile_fail, [''])
+test('StringInterpolationLineComment', normal, compile_fail, [''])
+
+# ---------- END OF FILE ---------- #
+# Don't just place tests at the end here; put in correct section

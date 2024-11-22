@@ -166,6 +166,7 @@ data Extension
    | ExtendedLiterals
    | ListTuplePuns
    | MultilineStrings
+   | StringInterpolation
    | ExplicitLevelImports
    | ImplicitStagePersistence
    | QualifiedStrings
