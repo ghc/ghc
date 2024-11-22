@@ -1,0 +1,3 @@
+StringInterpolationNoExprClose.hs:4:38: error: [GHC-21231]
+    lexical error at character '\n'
+

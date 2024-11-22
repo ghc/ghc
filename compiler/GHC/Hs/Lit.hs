@@ -46,6 +46,7 @@ import Language.Haskell.Syntax.Module.Name (moduleNameString)
 
 type instance XHsChar       (GhcPass _) = SourceText
 type instance XHsCharPrim   (GhcPass _) = SourceText
+-- | Note: contains quote delimiters
 type instance XHsString     (GhcPass _) = SourceText
 type instance XHsStringPrim (GhcPass _) = SourceText
 type instance XHsNatural    (GhcPass _) = NoExtField

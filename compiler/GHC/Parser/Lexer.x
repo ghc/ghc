@@ -173,7 +173,7 @@ $idchar    = [$small $large $digit $uniidchar \']
 
 $unigraphic = \x06 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $graphic   = [$small $large $symbol $digit $idchar $special $unigraphic \"\']
-$charesc   = [a b f n r t v \\ \" \' \&]
+$charesc   = [a b f n r t v \\ \" \' \& \$]
 
 $binit     = 0-1
 $octit     = 0-7
@@ -247,6 +247,11 @@ haskell :-
 
 -- -----------------------------------------------------------------------------
 -- Alex "Rules"
+
+-- See Note [Lexing interpolated strings]
+-- Needs to capture everything + be defined first so that this action takes
+-- precedence over global rules
+<string_inter_content> .* { string_inter_content_action }
 
 -- everywhere: skip whitespace
 ($white_no_nl # \t)+ ;
@@ -421,7 +426,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
 -- "special" symbols
 
-<0> {
+<0, string_inter> {
 
   -- Don't check ThQuotesBit here as the renamer can produce a better
   -- error message than the lexer (see the thQuotesEnabled check in rnBracket).
@@ -454,7 +459,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
     { token (ITcloseQuote UnicodeSyntax) }
 }
 
-<0> {
+<0,string_inter> {
   "(|"
     / { ifExtension ArrowsBit `alexAndPred`
         notFollowedBySymbol }
@@ -475,23 +480,23 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
     { special (ITcparenbar UnicodeSyntax) }
 }
 
-<0> {
+<0,string_inter> {
   \? @varid / { ifExtension IpBit } { skip_one_varid ITdupipvarid }
 }
 
-<0> {
+<0,string_inter> {
   "#" $idchar+ / { ifExtension OverloadedLabelsBit } { skip_one_varid_src ITlabelvarid }
   "#" \" @stringchar* \" / { ifExtension OverloadedLabelsBit } { tok_quoted_label }
 }
 
-<0> {
+<0,string_inter> {
   "(#" / { ifExtension UnboxedParensBit }
          { token IToubxparen }
   "#)" / { ifExtension UnboxedParensBit }
          { token ITcubxparen }
 }
 
-<0,option_prags> {
+<0,option_prags,string_inter> {
   \(                                    { special IToparen }
   \)                                    { special ITcparen }
   \[                                    { special ITobrack }
@@ -504,7 +509,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \}                                    { close_brace }
 }
 
-<0,option_prags> {
+<0,option_prags,string_inter> {
   @qdo                                      { qdo_token ITdo }
   @qmdo    / { ifExtension RecursiveDoBit } { qdo_token ITmdo }
   @qvarid                       { idtoken qvarid }
@@ -513,7 +518,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   @conid                        { idtoken conid }
 }
 
-<0> {
+<0,string_inter> {
   @qvarid "#"+      / { ifExtension MagicHashBit } { idtoken qvarid }
   @qconid "#"+      / { ifExtension MagicHashBit } { idtoken qconid }
   @varid "#"+       / { ifExtension MagicHashBit } { varid }
@@ -522,7 +527,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
 -- ToDo: - move `var` and (sym) into lexical syntax?
 --       - remove backquote from $special?
-<0> {
+<0,string_inter> {
   @qvarsym                                         { idtoken qvarsym }
   @qconsym                                         { idtoken qconsym }
   @varsym                                          { with_op_ws varsym }
@@ -541,7 +546,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 -- that validates the literals.
 -- If extensions are not enabled, check that there are no underscores.
 --
-<0> {
+<0,string_inter> {
   -- Normal integral literals (:: Num a => a, from Integer)
   @decimal                                                      { tok_num positive 0 0 decimal }
   @binarylit                / { ifExtension BinaryLiteralsBit } { tok_num positive 2 2 binary }
@@ -562,7 +567,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
                                            negLitPred }                      { tok_frac 0 tok_hex_float }
 }
 
-<0> {
+<0,string_inter> {
   -- Unboxed ints (:: Int#) and words (:: Word#)
   -- It's simpler (and faster?) to give separate cases to the negatives,
   -- especially considering octal/hexadecimal prefixes.
@@ -608,7 +613,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
 }
 
-<0> {
+<0,string_inter> {
   \"\"\" / { ifExtension MultilineStringsBit }         { tok_string_multi }
   \" @stringchar* \"                                   { tok_string }
   \" @stringchar* \" \# / { ifExtension MagicHashBit } { tok_string }
@@ -629,7 +634,14 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \" @stringchar*    $unigraphic / { isSmartQuote } { smart_quote_error }
 }
 
-<0> {
+-- See Note [Parsing interpolated strings] and Note [Lexing interpolated strings]
+<0,string_inter> {
+  s \" / { ifExtension StringInterpolationBit } { string_inter_begin }
+  -- FIXME(bchinn): interpolated multiline strings
+  -- FIXME(bchinn): qualified interpolated strings
+}
+
+<0,string_inter> {
   \'\' { token ITtyQuote }
 
   -- The normal character match takes precedence over this because it matches
@@ -922,6 +934,14 @@ data Token
 
   | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITstring   SourceText StringMeta FastString -- Note [Literal source text] in "GHC.Types.SourceText"
+
+  -- See Note [Parsing interpolated strings]
+  | ITstringInterBegin    StringMeta
+  | ITstringInterRaw      SourceText RawLexedString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstringInterExpOpen
+  | ITstringInterExpClose
+  | ITstringInterEnd      StringMeta
+
   | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITrational FractionalLit
 
@@ -1670,14 +1690,20 @@ errBrace (AI end _) span =
               (psRealLoc end)
               (\srcLoc -> mkPlainErrorMsgEnvelope srcLoc (PsErrLexer LexUnterminatedComment LexErrKind_EOF))
 
-open_brace, close_brace :: Action
+open_brace, open_brace_string_inter, close_brace :: Action
 open_brace span _str _len _buf2 = do
-  ctx <- getContext
-  setContext (NoLayout:ctx)
+  pushContext NoLayout
   return (L span ITocurly)
-close_brace span _str _len _buf2 = do
-  popContext
-  return (L span ITccurly)
+open_brace_string_inter span _str _len _buf2 = do
+  pushLexState string_inter
+  pushContext InterStringLayout
+  pure (L span ITstringInterExpOpen)
+close_brace span _str _len _buf2 =
+  getContext >>= \case
+    InterStringLayout : _ ->
+      popContext >> popLexState >> pure (L span ITstringInterExpClose)
+    _ ->
+      popContext >> pure (L span ITccurly)
 
 qvarid, qconid :: StringBuffer -> Int -> Token
 qvarid buf len = ITqvarid $! splitQualName buf len False
@@ -2065,7 +2091,7 @@ new_layout_context strict gen_semic tok span _buf len _buf2 = do
                 -- we must generate a {} sequence now.
                 pushLexState layout_left
                 return (L span tok)
-        _ -> do setContext (Layout offset gen_semic : ctx)
+        _ -> do pushContext (Layout offset gen_semic)
                 return (L span tok)
 
 do_layout_left :: Action
@@ -2174,6 +2200,38 @@ tok_string span buf len _buf2 = do
   where
     src = SourceText $ lexemeToFastString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
+
+string_inter_begin :: Action
+string_inter_begin span _ _ _ = do
+  pushLexState string_inter_content
+  pure $ L span (ITstringInterBegin meta)
+  where
+    meta = defaultStrMeta
+
+string_inter_content_action :: Action
+string_inter_content_action span_init buf_init _ _ = go $ AI (psSpanStart span_init) buf_init
+  where
+    go i0@(AI loc0 buf0) =
+      case Lexer.String.alexScan i0 Lexer.String.string_inter_content of
+        Lexer.String.AlexToken i1@(AI loc1 buf1) len action -> do
+            setInput i1
+            let span = mkPsSpan loc0 loc1
+            let bytes = byteDiff buf0 buf1
+            span `seq` setLastToken span bytes
+            case action of
+              Lexer.String.StringInterContentRaw -> do
+                s <- either (throwStringLexError $ AI (psSpanStart span) buf1) pure $ lexStringRaw len buf0
+                let src = SourceText $ lexemeToFastString buf0 len
+                pure $ L span (ITstringInterRaw src s)
+              Lexer.String.StringInterContentExpOpen -> do
+                open_brace_string_inter span buf0 bytes buf1
+              Lexer.String.StringInterContentEnd -> do
+                _ <- popLexState
+                pure $ L span (ITstringInterEnd meta)
+              _ -> panic $ "Unexpected action: " ++ show action
+        Lexer.String.AlexSkip i1 _ -> go i1
+        _ -> setInput i0 >> lexError LexError
+    meta = defaultStrMeta
 
 {- Note [Lexing multiline strings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2433,6 +2491,7 @@ dontGenerateSemic = False
 
 data LayoutContext
   = NoLayout
+  | InterStringLayout -- FIXME(bchinn): is this the best place?
   | Layout !Int !GenSemic
   deriving Show
 
@@ -2825,6 +2884,7 @@ data ExtBits
   | ViewPatternsBit
   | RequiredTypeArgumentsBit
   | MultilineStringsBit
+  | StringInterpolationBit
   | LevelImportsBit
   | QualifiedStringsBit
 
@@ -2911,6 +2971,7 @@ mkParserOpts extensionFlags diag_opts
       .|. ViewPatternsBit             `xoptBit` LangExt.ViewPatterns
       .|. RequiredTypeArgumentsBit    `xoptBit` LangExt.RequiredTypeArguments
       .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
+      .|. StringInterpolationBit      `xoptBit` LangExt.StringInterpolation
       .|. LevelImportsBit             `xoptBit` LangExt.ExplicitLevelImports
       .|. QualifiedStringsBit         `xoptBit` LangExt.QualifiedStrings
     optBits =
@@ -3110,8 +3171,8 @@ getPsMessages p =
 getContext :: P [LayoutContext]
 getContext = P $ \s@PState{context=ctx} -> POk s ctx
 
-setContext :: [LayoutContext] -> P ()
-setContext ctx = P $ \s -> POk s{context=ctx} ()
+pushContext :: LayoutContext -> P ()
+pushContext ctx = P $ \s -> POk s{context = ctx : context s} ()
 
 popContext :: P ()
 popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,

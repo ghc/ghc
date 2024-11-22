@@ -953,6 +953,8 @@ zonkExpr (HsOverLit x lit)
 
 zonkExpr (HsQualLit _ lit) = case lit of
 
+zonkExpr (HsInterString x _ _) = dataConCantHappen x
+
 zonkExpr (HsLam x lam_variant matches)
   = do new_matches <- zonkMatchGroup zonkLExpr matches
        return (HsLam x lam_variant new_matches)

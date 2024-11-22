@@ -37,6 +37,7 @@ where
 -- base
 import Control.Monad      ( unless, liftM, when, (<=<) )
 import GHC.Exts
+import Data.Bifunctor     ( first )
 import Data.Maybe         ( maybeToList )
 import Data.List.NonEmpty ( NonEmpty(..), head, init, last, tail )
 import qualified Data.List.NonEmpty as NE
@@ -87,6 +88,7 @@ import GHC.Parser.HaddockLex
 import GHC.Parser.Annotation
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
+import GHC.Parser.String
 
 import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            tupleTyCon, tupleDataCon, nilDataCon,
@@ -730,6 +732,11 @@ are the most common patterns, rewritten as regular expressions for clarity:
  CHAR           { L _ (ITchar   _ _) }
  QUALSTRING     { L _ (ITstring _ StringMeta{strMetaQualified = Just _} _) }
  STRING         { L _ (ITstring _ _ _) }
+ STRING_INTER_BEGIN       { L _ (ITstringInterBegin _) }
+ STRING_INTER_END         { L _ (ITstringInterEnd   _) }
+ STRING_INTER_RAW         { L _ (ITstringInterRaw _ _) }
+ STRING_INTER_EXP_OPEN    { L _ ITstringInterExpOpen }
+ STRING_INTER_EXP_CLOSE   { L _ ITstringInterExpClose }
  INTEGER        { L _ (ITinteger _) }
  RATIONAL       { L _ (ITrational _) }
 
@@ -3208,6 +3215,7 @@ aexp2   :: { ECP }
 -- into HsOverLit when -XOverloadedStrings is on.
 --      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)
 --                                       (getSTRING $1) noExtField) }
+        | stringInter                   { ecpFromExp $1 }
         | INTEGER   { ECP $ mkHsOverLitPV (sL1a $1 $ mkHsIntegral   (getINTEGER  $1)) }
         | RATIONAL  { ECP $ mkHsOverLitPV (sL1a $1 $ mkHsFractional (getRATIONAL $1)) }
 
@@ -3803,6 +3811,24 @@ overloaded_label :: { Located (SourceText, FastString) }
         : LABELVARID          { sL1 $1 (getLABELVARIDs $1, getLABELVARID $1) }
 
 -----------------------------------------------------------------------------
+-- Interpolated strings
+-- See Note [Parsing interpolated strings] in GHC.Parser.String
+
+stringInter :: { LHsExpr GhcPs }
+        -- FIXME(bchinn): end delimiter must match begin delimiter
+        : STRING_INTER_BEGIN stringInterParts STRING_INTER_END {% processStringInter $1 (fromOL $2) $3 }
+
+stringInterParts :: { OrdList (Either (SourceText, RawLexedString) ECP) }
+        : stringInterParts stringInterPart { $1 `appOL` unitOL $2 }
+        -- The lexer goes into an infinite loop if we allow empty ITstringInterRaw tokens,
+        -- so we have to allow an empty interStringParts production rule instead.
+        | {- empty -}                      { nilOL }
+
+stringInterPart :: { Either (SourceText, RawLexedString) ECP }
+        : STRING_INTER_RAW                                 { Left (getStringInterRaw $1) }
+        | STRING_INTER_EXP_OPEN exp STRING_INTER_EXP_CLOSE { Right $2 }
+
+-----------------------------------------------------------------------------
 -- Warnings and deprecations
 
 name_boolformula_opt :: { LBooleanFormula GhcPs }
@@ -4375,6 +4401,33 @@ getSCC lt = do let s = getSTRING lt
 
 stringLiteralToHsDocWst :: Located StringLiteral -> LocatedE (WithHsDocIdentifiers StringLiteral GhcPs)
 stringLiteralToHsDocWst  sl = reLoc $ lexStringLiteral parseIdentifier sl
+
+getStringInterRaw :: Located Token -> (SourceText, RawLexedString)
+getStringInterRaw (L _ (ITstringInterRaw src s)) = (src, s)
+
+processStringInter ::
+     Located Token
+  -> [Either (SourceText, RawLexedString) ECP]
+  -> Located Token
+  -> P (LHsExpr GhcPs)
+processStringInter tokBegin parts tokEnd = do
+  parts' <- mapM mkInterStringPartPV $ processRawLexedStrings parts
+  ams1 (L (comb2 tokBegin tokEnd) ()) $
+    HsInterString noExtField meta parts'
+  where
+    L _ (ITstringInterBegin meta) = tokBegin
+
+    processRawLexedStrings ::
+      [Either (SourceText, RawLexedString) ECP] ->
+      [Either (SourceText, String        ) ECP]
+    processRawLexedStrings =
+      if strMetaMultiline meta
+        then fromRawLexedStringMulti
+        else map (first (fmap fromRawLexedStringSingle))
+
+    mkInterStringPartPV = \case
+      Left (src, s) -> pure $ HsInterStringRaw src (fsLit s)
+      Right (ECP e) -> HsInterStringExpr noExtField <$> runPV e
 
 -- Utilities for combining source spans
 comb2 :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan

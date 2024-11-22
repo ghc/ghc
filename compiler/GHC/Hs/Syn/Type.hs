@@ -112,6 +112,7 @@ hsExprType (HsIPVar v _) = dataConCantHappen v
 hsExprType (HsOverLit _ lit) = overLitType lit
 hsExprType (HsLit _ lit) = hsLitType lit
 hsExprType (HsQualLit _ lit) = case lit of
+hsExprType (HsInterString _ _ _) = stringTy -- FIXME(bchinn): handle OverloadedStrings
 hsExprType (HsLam _ _ (MG { mg_ext = match_group })) = matchGroupTcType match_group
 hsExprType (HsApp _ f _) = funResultTy $ lhsExprType f
 hsExprType (HsAppType x f _) = piResultTy (lhsExprType f) x
