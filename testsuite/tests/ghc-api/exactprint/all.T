@@ -1,3 +1,5 @@
+setTestOpts(req_hadrian_deps(['test:check-exact']))
+
 test('RenameCase1',   ignore_stderr, makefile_test, ['RenameCase1'])
 test('LayoutLet2',    ignore_stderr, makefile_test, ['LayoutLet2'])
 test('LayoutLet3',    ignore_stderr, makefile_test, ['LayoutLet3'])
