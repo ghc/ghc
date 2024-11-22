@@ -245,13 +245,11 @@ builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = withPipe $ \ (rea
     associateHandle' =<< handleToHANDLE readEnd
 #endif
 
-  chan <- newChan
-
   -- We use a mask here rather than a bracket because we want
   -- to distinguish between cleaning up with and without an
   -- exception. This is to avoid calling terminateProcess
   -- unless an exception was raised.
-  let safely inner = mask $ \restore -> do
+  mask $ \restore -> do
         -- acquire
         -- On Windows due to how exec is emulated the old process will exit and
         -- a new process will be created. This means waiting for termination of
@@ -282,9 +280,9 @@ builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = withPipe $ \ (rea
           getLocaleEncoding >>= hSetEncoding readEnd
           hSetNewlineMode readEnd nativeNewlineMode
           hSetBuffering readEnd LineBuffering
-          let make_reader_proc h = forkIO $ readerProc chan h filter_fn
-          bracketOnError (make_reader_proc readEnd) killThread $ \_ ->
-            inner hProcess
+          messages <- parseBuildMessages . filter_fn . lines <$> hGetContents readEnd
+          mapM_ processBuildMessage messages
+          waitForProcess hProcess
         hClose hStdIn
         case r of
           Left (SomeException e) -> do
@@ -292,70 +290,55 @@ builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = withPipe $ \ (rea
             throw e
           Right s -> do
             return s
-  safely $ \h -> do
-    processBuildMessages chan
-    waitForProcess h
   where
-    processBuildMessages :: Chan BuildMessage -> IO ()
-    processBuildMessages chan = do
-      msg <- readChan chan
+    processBuildMessage :: BuildMessage -> IO ()
+    processBuildMessage msg = do
       case msg of
         BuildMsg msg -> do
           logInfo logger $ withPprStyle defaultUserStyle msg
-          processBuildMessages chan
         BuildError loc msg -> do
           logMsg logger errorDiagnostic (mkSrcSpan loc loc)
               $ withPprStyle defaultUserStyle msg
-          processBuildMessages chan
-        EOF ->
-          return ()
 
-readerProc :: Chan BuildMessage -> Handle -> ([String] -> [String]) -> IO ()
-readerProc chan hdl filter_fn =
-    (do str <- hGetContents hdl
-        loop (filter_fn (lines str)) Nothing)
-    `finally`
-       writeChan chan EOF
-        -- ToDo: check errors more carefully
-        -- ToDo: in the future, the filter should be implemented as
-        -- a stream transformer.
+parseBuildMessages :: [String] -> [BuildMessage]
+parseBuildMessages str = loop str Nothing
     where
-        loop []     Nothing    = return ()
-        loop []     (Just err) = writeChan chan err
+        loop :: [String] -> Maybe BuildMessage -> [BuildMessage]
+        loop []     Nothing    = []
+        loop []     (Just err) = [err]
         loop (l:ls) in_err     =
                 case in_err of
                   Just err@(BuildError srcLoc msg)
                     | leading_whitespace l ->
                         loop ls (Just (BuildError srcLoc (msg $$ text l)))
-                    | otherwise -> do
-                        writeChan chan err
-                        checkError l ls
+                    | otherwise ->
+                        err : checkError l ls
                   Nothing ->
                         checkError l ls
-                  _ -> panic "readerProc/loop"
+                  _ -> panic "parseBuildMessages/loop"
 
+        checkError :: String -> [String] -> [BuildMessage]
         checkError l ls
            = case parseError l of
-                Nothing -> do
-                    writeChan chan (BuildMsg (text l))
-                    loop ls Nothing
-                Just (file, lineNum, colNum, msg) -> do
-                    let srcLoc = mkSrcLoc (mkFastString file) lineNum colNum
+                Nothing ->
+                    BuildMsg (text l) : loop ls Nothing
+                Just (srcLoc, msg) -> do
                     loop ls (Just (BuildError srcLoc (text msg)))
 
+        leading_whitespace :: String -> Bool
         leading_whitespace []    = False
         leading_whitespace (x:_) = isSpace x
 
-parseError :: String -> Maybe (String, Int, Int, String)
+parseError :: String -> Maybe (SrcLoc, String)
 parseError s0 = case breakColon s0 of
                 Just (filename, s1) ->
                     case breakIntColon s1 of
                     Just (lineNum, s2) ->
                         case breakIntColon s2 of
                         Just (columnNum, s3) ->
-                            Just (filename, lineNum, columnNum, s3)
+                            Just (mkSrcLoc (mkFastString filename) lineNum columnNum, s3)
                         Nothing ->
-                            Just (filename, lineNum, 0, s2)
+                            Just (mkSrcLoc (mkFastString filename) lineNum 0, s2)
                     Nothing -> Nothing
                 Nothing -> Nothing
 
@@ -385,4 +368,3 @@ breakIntColon xs = case break (':' ==) xs of
 data BuildMessage
   = BuildMsg   !SDoc
   | BuildError !SrcLoc !SDoc
-  | EOF
