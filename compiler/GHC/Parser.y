@@ -89,6 +89,7 @@ import GHC.Parser.HaddockLex
 import GHC.Parser.Annotation
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
+import GHC.Parser.String (StringType(..))
 
 import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            tupleTyCon, tupleDataCon, nilDataCon,
@@ -730,8 +731,8 @@ are the most common patterns, rewritten as regular expressions for clarity:
  LABELVARID     { L _ (ITlabelvarid _ _) }
 
  CHAR           { L _ (ITchar   _ _) }
- STRING         { L _ (ITstring _ _) }
- STRING_MULTI   { L _ (ITstringMulti _ _) }
+ STRING         { L _ (ITstring _ StringTypeSingle _) }
+ STRING_MULTI   { L _ (ITstring _ StringTypeMulti _) }
  INTEGER        { L _ (ITinteger _) }
  RATIONAL       { L _ (ITrational _) }
 
@@ -4222,8 +4223,8 @@ getQCONSYM        (L _ (ITqconsym  x)) = x
 getIPDUPVARID     (L _ (ITdupipvarid   x)) = x
 getLABELVARID     (L _ (ITlabelvarid _ x)) = x
 getCHAR           (L _ (ITchar   _ x)) = x
-getSTRING         (L _ (ITstring _ x)) = x
-getSTRINGMULTI    (L _ (ITstringMulti _ x)) = x
+getSTRING         (L _ (ITstring _ StringTypeSingle x)) = x
+getSTRINGMULTI    (L _ (ITstring _ StringTypeMulti x)) = x
 getINTEGER        (L _ (ITinteger x))  = x
 getRATIONAL       (L _ (ITrational x)) = x
 getPRIMCHAR       (L _ (ITprimchar _ x)) = x
@@ -4248,8 +4249,8 @@ getVOCURLY        (L (RealSrcSpan l _) ITvocurly) = srcSpanStartCol l
 
 getINTEGERs       (L _ (ITinteger (IL src _ _))) = src
 getCHARs          (L _ (ITchar       src _)) = src
-getSTRINGs        (L _ (ITstring     src _)) = src
-getSTRINGMULTIs   (L _ (ITstringMulti src _)) = src
+getSTRINGs        (L _ (ITstring     src StringTypeSingle _)) = src
+getSTRINGMULTIs   (L _ (ITstring     src StringTypeMulti _)) = src
 getPRIMCHARs      (L _ (ITprimchar   src _)) = src
 getPRIMSTRINGs    (L _ (ITprimstring src _)) = src
 getPRIMINTEGERs   (L _ (ITprimint    src _)) = src

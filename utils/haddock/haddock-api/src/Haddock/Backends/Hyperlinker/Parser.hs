@@ -23,6 +23,7 @@ import GHC.Parser.Lexer as Lexer
   , initParserState
   , lexer
   )
+import GHC.Parser.String (StringType (..))
 import qualified GHC.Types.Error as E
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
@@ -118,7 +119,7 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
             -- Update internal line + file position if this is a LINE pragma
             ITline_prag _ -> tryOrElse (bEnd, inPragDef) $ do
               L _ (ITinteger (IL{il_value = line})) <- tryP wrappedLexer
-              L _ (ITstring _ file) <- tryP wrappedLexer
+              L _ (ITstring _ file StringTypeSingle) <- tryP wrappedLexer
               L spF ITclose_prag <- tryP wrappedLexer
 
               let newLoc = mkRealSrcLoc file (fromIntegral line - 1) (srcSpanEndCol spF)
@@ -322,7 +323,6 @@ classify tok =
     ITlabelvarid{} -> TkUnknown
     ITchar{} -> TkChar
     ITstring{} -> TkString
-    ITstringMulti{} -> TkString
     ITinteger{} -> TkNumber
     ITrational{} -> TkNumber
     ITprimchar{} -> TkChar
