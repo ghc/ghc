@@ -22,16 +22,16 @@ SKIPPED_SELECTOR := 'Tables skipped: [0-9]+'
 # statistics.
 
 ipe_stats:
-	@NoOmit="$$($$TEST_HC $$TEST_HC_OPTS -fforce-recomp -finfo-table-map -dipe-stats Fold.hs)" ; \
+	@NoOmit="$$('$(TEST_HC)' $(TEST_HC_OPTS) -fforce-recomp -finfo-table-map -dipe-stats Fold.hs)" ; \
 	Stack=$$(echo $$NoOmit | grep -Eo $(STACK_SELECTOR) | grep -Eo '[0-9]+$$') ; \
 	Fallback=$$(echo $$NoOmit | grep -Eo $(FALLBACK_SELECTOR) | grep -Eo '[0-9]+$$') ; \
 	Skipped=$$(echo $$NoOmit | grep -Eo $(SKIPPED_SELECTOR) | grep -Eo '[0-9]+$$') ; \
 	Both=$$(expr $$Stack + $$Fallback) ; \
-	OmitStack="$$($$TEST_HC $$TEST_HC_OPTS -fforce-recomp -finfo-table-map -fno-info-table-map-with-stack -dipe-stats Fold.hs)" ; \
+	OmitStack="$$('$(TEST_HC)' $(TEST_HC_OPTS) -fforce-recomp -finfo-table-map -fno-info-table-map-with-stack -dipe-stats Fold.hs)" ; \
 	SkippedStack=$$(echo $$OmitStack | grep -Eo $(SKIPPED_SELECTOR) | grep -Eo '[0-9]+$$') ; \
-	OmitFallback="$$($$TEST_HC $$TEST_HC_OPTS -fforce-recomp -finfo-table-map -fno-info-table-map-with-fallback -dipe-stats Fold.hs)" ; \
+	OmitFallback="$$('$(TEST_HC)' $(TEST_HC_OPTS) -fforce-recomp -finfo-table-map -fno-info-table-map-with-fallback -dipe-stats Fold.hs)" ; \
 	SkippedFallback=$$(echo $$OmitFallback| grep -Eo $(SKIPPED_SELECTOR) | grep -Eo '[0-9]+$$') ; \
-	OmitBoth="$$($$TEST_HC $$TEST_HC_OPTS -fforce-recomp -finfo-table-map -fno-info-table-map-with-stack -fno-info-table-map-with-fallback -dipe-stats Fold.hs)" ; \
+	OmitBoth="$$('$(TEST_HC)' $(TEST_HC_OPTS) -fforce-recomp -finfo-table-map -fno-info-table-map-with-stack -fno-info-table-map-with-fallback -dipe-stats Fold.hs)" ; \
 	SkippedBoth=$$(echo $$OmitBoth| grep -Eo $(SKIPPED_SELECTOR) | grep -Eo '[0-9]+$$') ; \
 	echo "Baseline number of skipped tables: $$Skipped\n" ; \
 	echo "Baseline number of stack tables:                                  $$Stack" ; \
