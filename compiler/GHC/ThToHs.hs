@@ -1459,7 +1459,7 @@ cvtLit (CharL c)       = do { force c; return $ HsChar NoSourceText c }
 cvtLit (CharPrimL c)   = do { force c; return $ HsCharPrim NoSourceText c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }
                             ; force s'
-                            ; return $ HsString (quotedSourceText s) s' }
+                            ; return $ HsString (quotedSourceText s) HsStringTypeSingle s' }
 cvtLit (StringPrimL s) = do { let { !s' = BS.pack s }
                             ; return $ HsStringPrim NoSourceText s' }
 cvtLit (BytesPrimL (Bytes fptr off sz)) = do

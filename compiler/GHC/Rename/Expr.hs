@@ -369,8 +369,7 @@ rnExpr (HsLit x lit) | Just (src, s) <- stringLike lit
             ; return (HsLit x (convertLit lit), emptyFVs) } }
   where
     stringLike = \case
-      HsString src s -> Just (src, s)
-      HsMultilineString src s -> Just (src, s)
+      HsString src _ s -> Just (src, s)
       _ -> Nothing
 
 rnExpr (HsLit x lit)

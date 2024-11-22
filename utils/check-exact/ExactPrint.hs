@@ -4740,8 +4740,7 @@ hsLit2String lit =
   case lit of
     HsChar       src v   -> toSourceTextWithSuffix src v ""
     HsCharPrim   src p   -> toSourceTextWithSuffix src p ""
-    HsString     src v   -> toSourceTextWithSuffix src v ""
-    HsMultilineString src v -> toSourceTextWithSuffix src v ""
+    HsString     src _ v -> toSourceTextWithSuffix src v ""
     HsStringPrim src v   -> toSourceTextWithSuffix src v ""
     HsInt        _ (IL src _ v)   -> toSourceTextWithSuffix src v ""
     HsIntPrim    src v   -> toSourceTextWithSuffix src v ""

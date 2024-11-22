@@ -479,10 +479,10 @@ mkHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
 mkHsOpApp e1 op e2 = OpApp noExtField e1 (noLocA (mkHsVar (noLocA op))) e2
 
 mkHsString :: String -> HsLit (GhcPass p)
-mkHsString s = HsString NoSourceText (mkFastString s)
+mkHsString s = HsString NoSourceText HsStringTypeSingle (mkFastString s)
 
 mkHsStringFS :: FastString -> HsLit (GhcPass p)
-mkHsStringFS s = HsString NoSourceText s
+mkHsStringFS s = HsString NoSourceText HsStringTypeSingle s
 
 mkHsStringPrimLit :: FastString -> HsLit (GhcPass p)
 mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)

@@ -399,8 +399,8 @@ proposal: https://github.com/ghc-proposals/ghc-proposals/pull/569
 
 Multiline string literals are syntax sugar for normal string literals,
 with an extra post processing step. This all happens in the Lexer; that
-is, HsMultilineString will contain the post-processed string. This matches
-the same behavior as HsString, which contains the normalized string
+is, HsString will contain the post-processed string. This matches the same
+behavior as single-line HsString, which contains the normalized string
 (see Note [Literal source text]).
 
 The canonical steps for post processing a multiline string are:

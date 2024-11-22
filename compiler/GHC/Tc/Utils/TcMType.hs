@@ -2385,7 +2385,7 @@ shortCutLit platform val res_ty
             -- is less than 100, which ensures desugaring isn't slow.
 
     go_string src s
-      | isStringTy res_ty = Just (HsLit noExtField (HsString src s))
+      | isStringTy res_ty = Just (HsLit noExtField (HsString src HsStringTypeSingle s))
       | otherwise         = Nothing
 
 mkLit :: DataCon -> HsLit GhcTc -> HsExpr GhcTc
