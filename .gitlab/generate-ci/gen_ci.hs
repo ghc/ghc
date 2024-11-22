@@ -431,6 +431,9 @@ opsysVariables _ FreeBSD14 = mconcat
     "CONFIGURE_ARGS" =: "--with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
   , "CONFIGURE_ARGS" =: "--with-system-libffi --with-ffi-includes=/usr/local/include --with-ffi-libraries=/usr/local/lib"
   , "CONFIGURE_ARGS" =: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib"
+    -- Prefer to use the system's clang-based toolchain and not gcc
+  , "CC" =: "cc"
+  , "CXX" =: "c++"
   , "GHC_VERSION" =: "9.6.4"
   , "CABAL_INSTALL_VERSION" =: "3.10.3.0"
   ]
