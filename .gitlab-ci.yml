@@ -20,6 +20,9 @@ variables:
   # Overridden by individual jobs
   CONFIGURE_WRAPPER: ""
 
+  # Overridden by the pipeline initiator to select a subset of jobs for execution.
+  ONLY_JOBS: ""
+
   GIT_SUBMODULE_STRATEGY: "normal"
 
   # Makes ci.sh isolate CABAL_DIR
