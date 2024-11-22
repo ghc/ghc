@@ -368,11 +368,11 @@ fdToHandle' fdint mb_type is_socket filepath iomode binary = do
   mkHandleFromFD fd fd_type filepath iomode is_socket enc
 
 
--- | Turn an existing file descriptor into a Handle.  This is used by
+-- | Turn an existing file descriptor into a 'Handle'.  This is used by
 -- various external libraries to make Handles.
 --
--- Makes a binary Handle.  This is for historical reasons; it should
--- probably be a text Handle with the default encoding and newline
+-- Makes a binary 'Handle'.  This is for historical reasons; it should
+-- probably be a text 'Handle' with the default encoding and newline
 -- translation instead.
 fdToHandle :: Posix.FD -> IO Handle
 fdToHandle fdint = do
@@ -389,8 +389,8 @@ fdToHandle fdint = do
    mkHandleFromFD fd fd_type fd_str iomode False{-non-block-}
                   Nothing -- bin mode
 
--- | Turn an existing Handle into a file descriptor. This function throws an
--- IOError if the Handle does not reference a file descriptor.
+-- | Turn an existing 'Handle' into a file descriptor. This function throws an
+-- 'IOError' if the 'Handle' does not reference a file descriptor.
 --
 -- @since base-4.10.0.0
 handleToFd :: Handle -> IO FD.FD
