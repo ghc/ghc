@@ -41,12 +41,12 @@ data StringLexError = StringLexError LexErr BufPos
 data StringType = StringTypeSingle | StringTypeMulti deriving (Show)
 
 lexString :: StringType -> Int -> StringBuffer -> Either StringLexError String
-lexString strType = lexStringWith processChars processChars
+lexString strType = lexStringWith processChars
   where
-    processChars :: HasChar c => [c] -> Either (c, LexErr) [c]
+    processChars :: String -> Maybe String
     processChars =
       case strType of
-        StringTypeSingle -> processCharsSingle
+        StringTypeSingle -> fromRight . processCharsSingle
         StringTypeMulti -> processCharsMulti
 
 -- -----------------------------------------------------------------------------
@@ -70,26 +70,27 @@ So what we'll do is do two passes. The first pass is optimistic; just convert
 to a plain String and process it. If this results in an error, we do a second
 pass, this time where each character is annotated with its position. Now, the
 error has all the information it needs.
-
-Ideally, lexStringWith would take a single (forall c. HasChar c => ...) function,
-but to help the specializer, we pass it in twice to concretize it for the two
-types we actually use.
 -}
 
 -- | See Note [Lexing strings]
-lexStringWith ::
-  ([Char] -> Either (Char, LexErr) [Char])
-  -> ([CharPos] -> Either (CharPos, LexErr) [CharPos])
-  -> Int
-  -> StringBuffer
-  -> Either StringLexError String
-lexStringWith processChars processCharsPos len buf =
+lexStringWith :: (String -> Maybe String) -> Int -> StringBuffer -> Either StringLexError String
+lexStringWith processChars len buf =
   case processChars $ bufferChars buf len of
-    Right s -> Right s
-    Left _ ->
-      case processCharsPos $ bufferLocatedChars buf len of
-        Right _ -> panic "expected lex error on second pass"
-        Left ((_, pos), e) -> Left $ StringLexError e pos
+    Just s -> Right s
+    Nothing -> do
+      validateString len buf -- should return Left
+      panic "expected lex error on second pass"
+
+-- | Find any lexical errors in the string.
+--
+-- Can validate both single- and multi-line strings, since multi-line strings
+-- have the same validation logic as single-line strings, and none of the
+-- multi-line string processing steps affect the validity of the string.
+validateString :: Int -> StringBuffer -> Either StringLexError ()
+validateString len buf =
+  case processCharsSingle $ bufferLocatedChars buf len of
+    Right _ -> Right ()
+    Left ((_, pos), e) -> Left $ StringLexError e pos
 
 class HasChar c where
   getChar :: c -> Char
@@ -187,6 +188,9 @@ resolveEscapes = go dlistEmpty
           Right (esc, cs') -> go (acc `dlistSnoc` setChar esc backslash) cs'
           Left (c, e) -> Left (c, e)
       c : cs -> go (acc `dlistSnoc` c) cs
+
+resolveEscapesMaybe :: HasChar c => [c] -> Maybe [c]
+resolveEscapesMaybe = fromRight . resolveEscapes
 
 -- -----------------------------------------------------------------------------
 -- Escape characters
@@ -294,7 +298,7 @@ isSingleSmartQuote = \case
 -- Assumes string is lexically valid. Skips the steps about splitting
 -- and rejoining lines, and instead manually find newline characters,
 -- for performance.
-processCharsMulti :: HasChar c => [c] -> Either (c, LexErr) [c]
+processCharsMulti :: String -> Maybe String
 processCharsMulti =
       collapseGaps             -- Step 1
   >>> normalizeEOL
@@ -303,24 +307,24 @@ processCharsMulti =
   >>> collapseOnlyWsLines      -- Step 5
   >>> rmFirstNewline           -- Step 7a
   >>> rmLastNewline            -- Step 7b
-  >>> resolveEscapes           -- Step 8
+  >>> resolveEscapesMaybe      -- Step 8
 
 -- | Expands all tabs blindly, since the lexer will verify that tabs can only appear
 -- as leading indentation
-expandLeadingTabs :: HasChar c => [c] -> [c]
+expandLeadingTabs :: String -> String
 expandLeadingTabs = go 0
   where
     go !col = \case
-      c@(Char '\t') : cs ->
+      '\t' : cs ->
         let fill = 8 - (col `mod` 8)
-         in replicate fill (setChar ' ' c) ++ go (col + fill) cs
-      c : cs -> c : go (if getChar c == '\n' then 0 else col + 1) cs
+         in replicate fill ' ' ++ go (col + fill) cs
+      c : cs -> c : go (if c == '\n' then 0 else col + 1) cs
       [] -> []
 
 -- Normalize line endings to LF. The spec dictates that lines should be
 -- split on newline characters and rejoined with ``\n``. But because we
 -- aren't actually splitting/rejoining, we'll manually normalize here
-normalizeEOL :: HasChar c => [c] -> [c]
+normalizeEOL :: String -> String
 normalizeEOL = go
   where
     go = \case
@@ -330,20 +334,20 @@ normalizeEOL = go
       c : cs -> c : go cs
       [] -> []
 
-rmCommonWhitespacePrefix :: HasChar c => [c] -> [c]
+rmCommonWhitespacePrefix :: String -> String
 rmCommonWhitespacePrefix cs0 = go cs0
   where
-    commonWSPrefix = getCommonWsPrefix (map getChar cs0)
+    commonWSPrefix = getCommonWsPrefix cs0
 
     go = \case
-      c@(Char '\n') : cs -> c : go (dropLine commonWSPrefix cs)
+      c@'\n' : cs -> c : go (dropLine commonWSPrefix cs)
       c : cs -> c : go cs
       [] -> []
 
     -- drop x characters from the string, or up to a newline, whichever comes first
     dropLine !x = \case
       cs | x <= 0 -> cs
-      cs@(Char '\n' : _) -> cs
+      cs@('\n' : _) -> cs
       _ : cs -> dropLine (x - 1) cs
       [] -> []
 
@@ -361,34 +365,34 @@ getCommonWsPrefix s =
       . drop 1                      -- ignore first line in calculation
       $ lines s
 
-collapseOnlyWsLines :: HasChar c => [c] -> [c]
+collapseOnlyWsLines :: String -> String
 collapseOnlyWsLines = go
   where
     go = \case
-      c@(Char '\n') : cs | Just cs' <- checkAllWs cs -> c : go cs'
+      c@'\n' : cs | Just cs' <- checkAllWs cs -> c : go cs'
       c : cs -> c : go cs
       [] -> []
 
     checkAllWs = \case
       -- got all the way to a newline or the end of the string, return
-      cs@(Char '\n' : _) -> Just cs
+      cs@('\n' : _) -> Just cs
       cs@[] -> Just cs
       -- found whitespace, continue
-      Char c : cs | is_space c -> checkAllWs cs
+      c : cs | is_space c -> checkAllWs cs
       -- anything else, stop
       _ -> Nothing
 
-rmFirstNewline :: HasChar c => [c] -> [c]
+rmFirstNewline :: String -> String
 rmFirstNewline = \case
-  Char '\n' : cs -> cs
+  '\n' : cs -> cs
   cs -> cs
 
-rmLastNewline :: HasChar c => [c] -> [c]
+rmLastNewline :: String -> String
 rmLastNewline = go
   where
     go = \case
       [] -> []
-      [Char '\n'] -> []
+      ['\n'] -> []
       c : cs -> c : go cs
 
 {-
@@ -443,3 +447,9 @@ dlistToList (DList f) = f []
 
 dlistSnoc :: DList a -> a -> DList a
 dlistSnoc (DList f) x = DList (f . (x :))
+
+-- -----------------------------------------------------------------------------
+-- Other utilities
+
+fromRight :: Either e a -> Maybe a
+fromRight = either (const Nothing) Just
