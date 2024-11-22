@@ -423,6 +423,7 @@ data CtOrigin
 
   | LiteralOrigin (HsOverLit GhcRn)     -- Occurrence of a literal
   | QualLiteralOrigin (HsQualLit GhcRn) -- Occurrence of a qualified literal
+  | InterStringOrigin                   -- Occurrence of an interpolated string
   | NegateOrigin                        -- Occurrence of syntactic negation
 
   | ArithSeqOrigin (ArithSeqInfo GhcRn) -- [x..], [x..y] etc
@@ -602,6 +603,7 @@ exprCtOrigin (HsIPVar _ ip)       = IPOccOrigin ip
 exprCtOrigin (HsOverLit _ lit)    = LiteralOrigin lit
 exprCtOrigin (HsLit {})           = Shouldn'tHappenOrigin "concrete literal"
 exprCtOrigin (HsQualLit _ lit)    = QualLiteralOrigin lit
+exprCtOrigin (HsInterString _ _ _) = InterStringOrigin
 exprCtOrigin (HsLam _ _ ms)       = matchesCtOrigin ms
 exprCtOrigin (HsApp _ e1 _)       = lexprCtOrigin e1
 exprCtOrigin (HsAppType _ e1 _)   = lexprCtOrigin e1
@@ -803,6 +805,7 @@ ppr_br PatOrigin             = text "a pattern"
 ppr_br ViewPatOrigin         = text "a view pattern"
 ppr_br (LiteralOrigin lit)   = hsep [text "the literal", quotes (ppr lit)]
 ppr_br (QualLiteralOrigin lit) = hsep [text "the qualified literal", quotes (ppr lit)]
+ppr_br InterStringOrigin     = text "an interpolated string"
 ppr_br (ArithSeqOrigin seq)  = hsep [text "the arithmetic sequence", quotes (ppr seq)]
 ppr_br SectionOrigin         = text "an operator section"
 ppr_br (RecordFieldProjectionOrigin p) = text "the record selector" <+> quotes (ppr p)
@@ -909,6 +912,7 @@ foldMapCtOrigin f = go
         OverLabelOrigin {} -> f orig
         LiteralOrigin {} -> f orig
         QualLiteralOrigin {} -> f orig
+        InterStringOrigin {} -> f orig
         NegateOrigin {} -> f orig
         ArithSeqOrigin {} -> f orig
         AssocFamPatOrigin {} -> f orig

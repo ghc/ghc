@@ -1,4 +1,53 @@
 
+module Data.String.Experimental where
+  -- Safety: Trustworthy
+  type Interpolate :: * -> Constraint
+  class Interpolate a where
+    interpolate :: a -> InterpolateBuilder
+    {-# MINIMAL interpolate #-}
+  type InterpolateBuilder :: *
+  data InterpolateBuilder = InterpolateBuilder {unInterpolateBuilder :: forall s. (GHC.Internal.Data.String.IsString s, GHC.Internal.Base.Monoid s) => s}
+  interpolateAppend :: forall s. GHC.Internal.Base.Monoid s => s -> s -> s
+  interpolateEmpty :: forall s. GHC.Internal.Base.Monoid s => s
+  interpolateFinalize :: (forall s. (GHC.Internal.Data.String.IsString s, GHC.Internal.Base.Monoid s) => s) -> GHC.Internal.Base.String
+  interpolateRaw :: forall s. GHC.Internal.Data.String.IsString s => GHC.Internal.Base.String -> s
+  interpolateValue :: forall a s. (Interpolate a, GHC.Internal.Data.String.IsString s, GHC.Internal.Base.Monoid s) => a -> s
+
+module Data.String.Interpolate.Builder.Experimental where
+  -- Safety: None
+  interpolateAppend :: GHC.Internal.Data.String.Interpolate.InterpolateBuilder -> GHC.Internal.Data.String.Interpolate.InterpolateBuilder -> GHC.Internal.Data.String.Interpolate.InterpolateBuilder
+  interpolateEmpty :: GHC.Internal.Data.String.Interpolate.InterpolateBuilder
+  interpolateFinalize :: (forall s. (GHC.Internal.Data.String.IsString s, GHC.Internal.Base.Monoid s) => s) -> GHC.Internal.Data.String.Interpolate.InterpolateBuilder
+  interpolateRaw :: GHC.Internal.Base.String -> GHC.Internal.Data.String.Interpolate.InterpolateBuilder
+  interpolateValue :: forall a. GHC.Internal.Data.String.Interpolate.Interpolate a => a -> GHC.Internal.Data.String.Interpolate.InterpolateBuilder
+
+module Data.String.Interpolate.Class.Experimental where
+  -- Safety: None
+  type Interpolate :: * -> Constraint
+  class Interpolate a where
+    interpolate :: a -> InterpolateBuilder
+    {-# MINIMAL interpolate #-}
+  type InterpolateBuilder :: *
+  data InterpolateBuilder = InterpolateBuilder {unInterpolateBuilder :: forall s. (GHC.Internal.Data.String.IsString s, GHC.Internal.Base.Monoid s) => s}
+
+module Data.String.Interpolate.Default.Experimental where
+  -- Safety: None
+  interpolateAppend :: forall s. GHC.Internal.Base.Monoid s => s -> s -> s
+  interpolateEmpty :: forall s. GHC.Internal.Base.Monoid s => s
+  interpolateFinalize :: (forall s. (GHC.Internal.Data.String.IsString s, GHC.Internal.Base.Monoid s) => s) -> GHC.Internal.Base.String
+  interpolateRaw :: forall s. GHC.Internal.Data.String.IsString s => GHC.Internal.Base.String -> s
+  interpolateValue :: forall a s. (GHC.Internal.Data.String.Interpolate.Interpolate a, GHC.Internal.Data.String.IsString s, GHC.Internal.Base.Monoid s) => a -> s
+
+module Data.String.Interpolate.ShowS.Experimental where
+  -- Safety: Safe-Inferred
+  type P :: * -> *
+  data P a = P {-# UNPACK #-} !GHC.Internal.Types.Int !a
+  interpolateAppend :: GHC.Internal.Show.ShowS -> GHC.Internal.Show.ShowS -> GHC.Internal.Show.ShowS
+  interpolateEmpty :: GHC.Internal.Show.ShowS
+  interpolateFinalize :: GHC.Internal.Show.ShowS -> GHC.Internal.Show.ShowS
+  interpolateRaw :: GHC.Internal.Base.String -> GHC.Internal.Show.ShowS
+  interpolateValue :: forall a. GHC.Internal.Show.Show a => a -> GHC.Internal.Show.ShowS
+
 module Data.Sum.Experimental where
   -- Safety: Safe
   type Sum# :: forall (reps :: [GHC.Internal.Types.RuntimeRep]). TupleArgKind# reps -> TYPE (GHC.Internal.Types.SumRep reps)
@@ -13692,6 +13741,8 @@ instance forall a b c. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b, 
 instance GHC.Internal.Base.MonadPlus GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.MonadPlus [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.MonadPlus GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
+instance GHC.Internal.Base.Monoid GHC.Internal.Data.String.Interpolate.InterpolateBuilder -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Base.Monoid GHC.Internal.Data.String.Interpolate.StringBuilder -- Defined in ‘GHC.Internal.Data.String.Interpolate’
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall b a. GHC.Internal.Base.Monoid b => GHC.Internal.Base.Monoid (a -> b) -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Types.IO a) -- Defined in ‘GHC.Internal.Base’
@@ -13704,6 +13755,8 @@ instance forall a b c. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b, 
 instance forall a b c d. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b, GHC.Internal.Base.Monoid c, GHC.Internal.Base.Monoid d) => GHC.Internal.Base.Monoid (a, b, c, d) -- Defined in ‘GHC.Internal.Base’
 instance forall a b c d e. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b, GHC.Internal.Base.Monoid c, GHC.Internal.Base.Monoid d, GHC.Internal.Base.Monoid e) => GHC.Internal.Base.Monoid (a, b, c, d, e) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Monoid () -- Defined in ‘GHC.Internal.Base’
+instance GHC.Internal.Base.Semigroup GHC.Internal.Data.String.Interpolate.InterpolateBuilder -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Base.Semigroup GHC.Internal.Data.String.Interpolate.StringBuilder -- Defined in ‘GHC.Internal.Data.String.Interpolate’
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall b a. GHC.Internal.Base.Semigroup b => GHC.Internal.Base.Semigroup (a -> b) -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Types.IO a) -- Defined in ‘GHC.Internal.Base’
@@ -13786,9 +13839,28 @@ instance forall a. GHC.Internal.Classes.Ord (GHC.Internal.Ptr.FunPtr a) -- Defin
 instance forall a. GHC.Internal.Classes.Ord (GHC.Internal.Ptr.Ptr a) -- Defined in ‘GHC.Internal.Ptr’
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Classes.Ord GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Base’
+instance GHC.Internal.Data.String.IsString GHC.Internal.Data.String.Interpolate.InterpolateBuilder -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.IsString GHC.Internal.Data.String.Interpolate.StringBuilder -- Defined in ‘GHC.Internal.Data.String.Interpolate’
 instance forall a k (b :: k). GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.String’
 instance forall a. GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.String’
 instance forall a. (a ~ GHC.Internal.Types.Char) => GHC.Internal.Data.String.IsString [a] -- Defined in ‘GHC.Internal.Data.String’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Types.Bool -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Types.Char -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Types.Int -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Int.Int16 -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Int.Int32 -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Int.Int64 -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Base.String -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Types.Word -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Word.Word16 -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Word.Word32 -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Word.Word64 -- Defined in ‘GHC.Internal.Data.String.Interpolate’
+instance GHC.Internal.Data.String.Interpolate.Interpolate GHC.Internal.Word.Word8 -- Defined in ‘GHC.Internal.Data.String.Interpolate’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. (GHC.Internal.Enum.Enum a, GHC.Internal.Enum.Bounded a, GHC.Internal.Classes.Eq a) => GHC.Internal.Enum.Enum (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoCostCentres -- Defined in ‘GHC.Internal.RTS.Flags’
@@ -13831,6 +13903,7 @@ instance GHC.Internal.Read.Read GHC.Internal.Stats.RTSStats -- Defined in ‘GHC
 instance forall a. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Real.Real a => GHC.Internal.Real.Real (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance [safe] forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (Data.String.Interpolate.ShowS.Experimental.P a) -- Defined in ‘Data.String.Interpolate.ShowS.Experimental’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Show.Show (GHC.Internal.Ptr.FunPtr a) -- Defined in ‘GHC.Internal.Ptr’
 instance forall a. GHC.Internal.Show.Show (GHC.Internal.Ptr.Ptr a) -- Defined in ‘GHC.Internal.Ptr’

@@ -229,6 +229,7 @@ fromToR x y = do { a <- x; b <- y; pure (FromToR a b) }
 fromThenToR :: Quote m => m Exp -> m Exp -> m Exp -> m Range
 fromThenToR x y z = do { a <- x; b <- y; c <- z;
                          pure (FromThenToR a b c) }
+
 -------------------------------------------------------------------------------
 -- *   Body
 

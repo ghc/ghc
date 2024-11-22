@@ -1,4 +1,5 @@
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}

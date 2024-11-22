@@ -1,6 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes    #-}
-
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE LambdaCase             #-}
 {-# LANGUAGE MultiWayIf             #-}
 {-# LANGUAGE PatternSynonyms        #-}
 {-# LANGUAGE TypeFamilies           #-}
@@ -1595,6 +1595,10 @@ repE (HsOverLabel _ s) = repOverLabel (mkFastStringShortText s)
 repE (HsOverLit _ l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit _ l)     = do { a <- repLiteral l;           repLit a }
 repE (HsQualLit _ l) = repQualLit l
+repE e@HsInterString{} =
+  -- Not possible due to elimination in the renamer. See Note
+  -- [Handling overloaded and rebindable constructs]
+  pprPanic "repE: unexpected overloaded record update" $ ppr e
 repE (HsLam _ LamSingle (MG { mg_alts = L _ [m] })) = repLambda m
 repE e@(HsLam _ LamSingle (MG { mg_alts = L _ _ })) = pprPanic "repE: HsLam with multiple alternatives" (ppr e)
 repE (HsLam _ LamCase (MG { mg_alts = L _ ms }))

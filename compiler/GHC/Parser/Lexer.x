@@ -180,7 +180,7 @@ $idchar    = [$small $large $digit $uniidchar \']
 
 $unigraphic = \x06 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $graphic   = [$small $large $symbol $digit $idchar $special $unigraphic \"\']
-$charesc   = [a b f n r t v \\ \" \' \&]
+$charesc   = [a b f n r t v \\ \" \' \& \$]
 
 $binit     = 0-1
 $octit     = 0-7
@@ -254,6 +254,11 @@ haskell :-
 
 -- -----------------------------------------------------------------------------
 -- Alex "Rules"
+
+-- See Note [Lexing interpolated strings]
+-- Needs to capture everything + be defined first so that this action takes
+-- precedence over global rules
+<string_inter_content> .* { string_inter_content_action }
 
 -- everywhere: skip whitespace
 ($white_no_nl # \t)+ ;
@@ -428,7 +433,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
 -- "special" symbols
 
-<0> {
+<0, string_inter> {
 
   -- Don't check ThQuotesBit here as the renamer can produce a better
   -- error message than the lexer (see the thQuotesEnabled check in rnBracket).
@@ -461,7 +466,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
     { token (ITcloseQuote UnicodeSyntax) }
 }
 
-<0> {
+<0,string_inter> {
   "(|"
     / { ifExtension ArrowsBit `alexAndPred`
         notFollowedBySymbol }
@@ -482,23 +487,23 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
     { special (ITcparenbar UnicodeSyntax) }
 }
 
-<0> {
+<0,string_inter> {
   \? @varid / { ifExtension IpBit } { skip_one_varid_text ITdupipvarid }
 }
 
-<0> {
+<0,string_inter> {
   "#" $idchar+ / { ifExtension OverloadedLabelsBit } { skip_one_varid_src_text ITlabelvarid }
   "#" \" @stringchar* \" / { ifExtension OverloadedLabelsBit } { tok_quoted_label }
 }
 
-<0> {
+<0,string_inter> {
   "(#" / { ifExtension UnboxedParensBit }
          { token IToubxparen }
   "#)" / { ifExtension UnboxedParensBit }
          { token ITcubxparen }
 }
 
-<0,option_prags> {
+<0,option_prags,string_inter> {
   \(                                    { special IToparen }
   \)                                    { special ITcparen }
   \[                                    { special ITobrack }
@@ -511,7 +516,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \}                                    { close_brace }
 }
 
-<0,option_prags> {
+<0,option_prags,string_inter> {
   @qdo                                      { qdo_token ITdo }
   @qmdo    / { ifExtension RecursiveDoBit } { qdo_token ITmdo }
   @qvarid                       { idtoken qvarid }
@@ -520,7 +525,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   @conid                        { idtoken conid }
 }
 
-<0> {
+<0,string_inter> {
   @qvarid "#"+      / { ifExtension MagicHashBit } { idtoken qvarid }
   @qconid "#"+      / { ifExtension MagicHashBit } { idtoken qconid }
   @varid "#"+       / { ifExtension MagicHashBit } { varid }
@@ -529,7 +534,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
 -- ToDo: - move `var` and (sym) into lexical syntax?
 --       - remove backquote from $special?
-<0> {
+<0,string_inter> {
   @qvarsym                                         { idtoken qvarsym }
   @qconsym                                         { idtoken qconsym }
   @varsym                                          { with_op_ws varsym }
@@ -548,7 +553,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 -- that validates the literals.
 -- If extensions are not enabled, check that there are no underscores.
 --
-<0> {
+<0,string_inter> {
   -- Normal integral literals (:: Num a => a, from Integer)
   @decimal                                                      { tok_num positive 0 0 decimal }
   @binarylit                / { ifExtension BinaryLiteralsBit } { tok_num positive 2 2 binary }
@@ -569,7 +574,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
                                            negLitPred }                      { tok_frac 0 tok_hex_float }
 }
 
-<0> {
+<0,string_inter> {
   -- Unboxed ints (:: Int#) and words (:: Word#)
   -- It's simpler (and faster?) to give separate cases to the negatives,
   -- especially considering octal/hexadecimal prefixes.
@@ -615,7 +620,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
 }
 
-<0> {
+<0,string_inter> {
   \"\"\" / { ifExtension MultilineStringsBit }         { tok_string_multi }
   \" @stringchar* \"                                   { tok_string }
   \" @stringchar* \" \# / { ifExtension MagicHashBit } { tok_string }
@@ -636,7 +641,25 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \" @stringchar*    $unigraphic / { isSmartQuote } { smart_quote_error }
 }
 
-<0> {
+-- See Note [Parsing interpolated strings] and Note [Lexing interpolated strings]
+<0,string_inter> {
+  s \" / { ifExtension StringInterpolationBit } { tok_string_inter_begin defaultStrMeta }
+  s \" \" \" / {
+    ifExtension StringInterpolationBit `alexAndPred`
+    ifExtension MultilineStringsBit
+  } { tok_string_inter_begin defaultStrMeta{strMetaMultiline=True} }
+  @qual s \" / {
+    ifExtension QualifiedStringsBit `alexAndPred`
+    ifExtension StringInterpolationBit
+  } { tok_string_inter_qual_begin defaultStrMeta }
+  @qual s \" \" \" / {
+    ifExtension QualifiedStringsBit `alexAndPred`
+    ifExtension StringInterpolationBit `alexAndPred`
+    ifExtension MultilineStringsBit
+  } { tok_string_inter_qual_begin defaultStrMeta{strMetaMultiline=True} }
+}
+
+<0,string_inter> {
   \'\' { token ITtyQuote }
 
   -- The normal character match takes precedence over this because it matches
@@ -929,6 +952,14 @@ data Token
 
   | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITstring   SourceText StringMeta HText      -- Note [Literal source text] in "GHC.Types.SourceText"
+
+  -- See Note [Parsing interpolated strings]
+  | ITstringInterBegin    StringMeta
+  | ITstringInterRaw      SourceText RawLexedString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstringInterExpOpen
+  | ITstringInterExpClose
+  | ITstringInterEnd
+
   | ITinteger  (IntegralLit   GhcPs)
   | ITrational (FractionalLit GhcPs)
 
@@ -1686,14 +1717,20 @@ errBrace (AI end _) span =
               (psRealLoc end)
               (\srcLoc -> mkPlainErrorMsgEnvelope srcLoc (PsErrLexer LexUnterminatedComment LexErrKind_EOF))
 
-open_brace, close_brace :: Action
+open_brace, open_brace_string_inter, close_brace :: Action
 open_brace span _str _len _buf2 = do
-  ctx <- getContext
-  setContext (NoLayout:ctx)
+  pushContext NoLayout
   return (L span ITocurly)
-close_brace span _str _len _buf2 = do
-  popContext
-  return (L span ITccurly)
+open_brace_string_inter span _str _len _buf2 = do
+  pushLexState string_inter
+  pushContext InterStringLayout
+  pure (L span ITstringInterExpOpen)
+close_brace span _str _len _buf2 =
+  getContext >>= \case
+    InterStringLayout : _ ->
+      popContext >> popLexState >> pure (L span ITstringInterExpClose)
+    _ ->
+      popContext >> pure (L span ITccurly)
 
 qvarid, qconid :: StringBuffer -> Int -> Token
 qvarid buf len = ITqvarid $! splitQualName buf len False
@@ -2081,7 +2118,7 @@ new_layout_context strict gen_semic tok span _buf len _buf2 = do
                 -- we must generate a {} sequence now.
                 pushLexState layout_left
                 return (L span tok)
-        _ -> do setContext (Layout offset gen_semic : ctx)
+        _ -> do pushContext (Layout offset gen_semic)
                 return (L span tok)
 
 do_layout_left :: Action
@@ -2191,6 +2228,63 @@ tok_string span buf len _buf2 = do
     src = SourceText $ lexemeToFastString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
 
+tok_string_inter_begin :: StringMeta -> Action
+tok_string_inter_begin meta span _ _ _ = do
+  pushLexState string_inter_content
+  pushInterStringState =<< getInput
+  pure $ L span (ITstringInterBegin meta)
+  where
+    pushInterStringState loc = withInterStringStates $ \states -> ((meta, loc) : states, ())
+
+tok_string_inter_qual_begin :: StringMeta -> Action
+tok_string_inter_qual_begin meta span buf len buf2 = do
+  let modName = ModuleName $ lexemeToFastString buf modNameLen
+  let meta' = meta{strMetaQualified = Just modName}
+  tok_string_inter_begin meta' span buf len buf2
+  where
+    -- Module name length = total length minus length of the delimiter
+    modNameLen = len - delimLen
+    -- Length of `.s"` or `.s"""`
+    delimLen = if strMetaMultiline meta then 5 else 3
+
+string_inter_content_action :: Action
+string_inter_content_action span_init buf_init _ _ = go $ AI (psSpanStart span_init) buf_init
+  where
+    go i0@(AI loc0 buf0) = do
+      (meta, startLoc) <- peekInterStringState
+      let code =
+            if strMetaMultiline meta
+              then Lexer.String.string_inter_multi_content
+              else Lexer.String.string_inter_content
+      case Lexer.String.alexScan i0 code of
+        Lexer.String.AlexToken i1@(AI loc1 buf1) len action -> do
+            setInput i1
+            let span = mkPsSpan loc0 loc1
+            let bytes = byteDiff buf0 buf1
+            span `seq` setLastToken span bytes
+            case action of
+              Lexer.String.StringInterContentRaw -> do
+                s <- either (throwStringLexError $ AI (psSpanStart span) buf1) pure $ lexStringRaw len buf0
+                let src = SourceText $ lexemeToFastString buf0 len
+                pure $ L span (ITstringInterRaw src s)
+              Lexer.String.StringInterContentExpOpen -> do
+                open_brace_string_inter span buf0 bytes buf1
+              Lexer.String.StringInterContentEnd -> do
+                popInterStringState
+                _ <- popLexState
+                pure $ L span ITstringInterEnd
+              _ -> panic $ "Unexpected action: " ++ show action
+        Lexer.String.AlexSkip i1 _ -> go i1
+        _ -> do
+          checkSmartQuotes startLoc i0
+          setInput i0 >> lexError LexError
+
+    popInterStringState = withInterStringStates $ \states -> (drop 1 states, ())
+    peekInterStringState = withInterStringStates $ \states ->
+      case NE.nonEmpty states of
+        Nothing -> panic "inter_string_states was unexpectedly empty"
+        Just statesNE -> (states, NE.head statesNE)
+
 {- Note [Lexing multiline strings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Ideally, we would lex multiline strings completely with Alex syntax, like
@@ -2211,9 +2305,8 @@ Implemented in string_multi_content in GHC/Parser/Lexer/String.x
 tok_string_multi :: Action
 tok_string_multi startSpan startBuf _len _buf2 = do
   -- advance to the end of the multiline string
-  let startLoc = psSpanStart startSpan
   let i@(AI _ contentStartBuf) =
-        case lexDelim $ AI startLoc startBuf of
+        case lexDelim startTok of
           Just i -> i
           Nothing -> panic "tok_string_multi did not start with a delimiter"
   (AI _ contentEndBuf, i'@(AI endLoc endBuf)) <- goContent i
@@ -2226,18 +2319,21 @@ tok_string_multi startSpan startBuf _len _buf2 = do
   -- load the content of the multiline string
   let contentLen = byteDiff contentStartBuf contentEndBuf
   s <-
-    either (throwStringLexError (AI startLoc startBuf)) pure $
+    either (throwStringLexError startTok) pure $
       lexMultilineString contentLen contentStartBuf
 
   setInput i'
   let meta = defaultStrMeta{strMetaMultiline = True}
   pure $ L span $ ITstring src meta (packHText s)
   where
+    startLoc = psSpanStart startSpan
+    startTok = AI startLoc startBuf
+
     goContent i0 =
       case Lexer.String.alexScan i0 Lexer.String.string_multi_content of
         Lexer.String.AlexToken i1 len _
           | Just i2 <- lexDelim i1 -> pure (i1, i2)
-          | isEOF i1 -> checkSmartQuotes >> setInput i1 >> lexError LexError
+          | isEOF i1 -> checkSmartQuotes startTok i1 >> setInput i1 >> lexError LexError
           -- Can happen if no patterns match, e.g. an unterminated gap
           | len == 0  -> setInput i1 >> lexError LexError
           | otherwise -> goContent i1
@@ -2252,18 +2348,21 @@ tok_string_multi startSpan startBuf _len _buf2 = do
               _ -> Nothing
        in go (3 :: Int)
 
-    -- See Note [Bare smart quote error]
-    checkSmartQuotes = do
-      let findSmartQuote i0@(AI loc _) =
-            case alexGetChar' i0 of
-              Just ('\\', i1) | Just (_, i2) <- alexGetChar' i1 -> findSmartQuote i2
-              Just (c, i1)
-                | isDoubleSmartQuote c -> Just (c, loc)
-                | otherwise -> findSmartQuote i1
-              _ -> Nothing
-      case findSmartQuote (AI (psSpanStart startSpan) startBuf) of
-        Just (c, loc) -> throwSmartQuoteError c loc
-        Nothing -> pure ()
+-- See Note [Bare smart quote error]
+checkSmartQuotes :: AlexInput -> AlexInput -> P ()
+checkSmartQuotes startTok (AI _ endBuf) =
+  case findSmartQuote startTok of
+    Just (c, loc) -> throwSmartQuoteError c loc
+    Nothing -> pure ()
+  where
+    findSmartQuote i0@(AI loc buf) =
+      case alexGetChar' i0 of
+        _ | cur buf >= cur endBuf -> Nothing
+        Just ('\\', i1) | Just (_, i2) <- alexGetChar' i1 -> findSmartQuote i2
+        Just (c, i1)
+          | isDoubleSmartQuote c -> Just (c, loc)
+          | otherwise -> findSmartQuote i1
+        _ -> Nothing
 
 lex_chars :: (String, String) -> PsSpan -> StringBuffer -> Int -> P String
 lex_chars (startDelim, endDelim) span buf len =
@@ -2416,11 +2515,27 @@ smart_quote_error span _ _ buf2 = do
   let c = prevChar buf2 (panic "smart_quote_error unexpectedly called on beginning of input")
   throwSmartQuoteError c (psSpanStart span)
 
--- Note [Bare smart quote error]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- A smart quote inside of a string is allowed, but if a complete valid string
--- couldn't be lexed, we want to see if there's a smart quote that the user
--- thought ended the string, but in fact didn't.
+{- Note [Bare smart quote error]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A smart quote inside of a string is allowed, but if a complete valid string
+couldn't be lexed, we want to see if there's a smart quote that the user
+thought ended the string, but in fact didn't.
+
+For normal single-line strings, this is checked as a normal Alex regex rule,
+since we can lex the entire single-line string as a single Alex regex.
+
+Multiline strings are lexed by repeatedly invoking the multiline string lexer
+(see Note [Lexing multiline strings]). If we encounter any lexing error, we
+search all the characters from the start of the multiline string and look for
+any smart quotes.
+
+String interpolation requires some more infrastructure, since interpolated
+strings are lexed as multiple tokens. If we encounter a lexing error and want to
+search for smart quotes from the beginning, we don't have any reference to the
+start of the string interpolation. So we store a stack of locations in PState
+that indicate the start of (potentially nested) string interpolation expressions
+in case we need to search for smart quotes.
+-}
 
 -- -----------------------------------------------------------------------------
 -- Warnings
@@ -2451,6 +2566,10 @@ dontGenerateSemic = False
 data LayoutContext
   = NoLayout
   | Layout !Int !GenSemic
+  | InterStringLayout
+    -- ^ The layout context for an expression in an interpolated string.
+    --
+    -- See Note [Lexing interpolated strings]
   deriving Show
 
 -- | The result of running a parser.
@@ -2547,7 +2666,9 @@ data PState = PState {
         -- (BufPos). We use OrdList to get O(1) snoc.
         --
         -- See Note [Adding Haddock comments to the syntax tree] in GHC.Parser.PostProcess.Haddock
-        hdk_comments :: OrdList (PsLocated HdkComment)
+        hdk_comments :: OrdList (PsLocated HdkComment),
+
+        inter_string_states :: [InterStringState]
      }
         -- last_loc and last_len are used when generating error messages,
         -- and in pushCurrentContext only.  Sigh, if only Happy passed the
@@ -2568,6 +2689,11 @@ data ALRLayout = ALRLayoutLet
                | ALRLayoutWhere
                | ALRLayoutOf
                | ALRLayoutDo
+
+type InterStringState =
+  ( StringMeta
+  , AlexInput -- See Note [Bare smart quote error]
+  )
 
 -- | The parsing monad, isomorphic to @StateT PState Maybe@.
 newtype P a = P { unP :: PState -> ParseResult a }
@@ -2655,6 +2781,12 @@ getLastLocIncludingComments = P $ \s@(PState { prev_loc = prev_loc }) -> POk s p
 
 getLastLoc :: P PsSpan
 getLastLoc = P $ \s@(PState { last_loc = last_loc }) -> POk s last_loc
+
+withInterStringStates :: ([InterStringState] -> ([InterStringState], a)) -> P a
+withInterStringStates f =
+  P $ \s@PState{inter_string_states} ->
+  let (states, a) = f inter_string_states
+   in POk s{inter_string_states = states} a
 
 {-# INLINE alexGetChar' #-}
 -- This version does not squash unicode characters, it is used when
@@ -2842,6 +2974,7 @@ data ExtBits
   | ViewPatternsBit
   | RequiredTypeArgumentsBit
   | MultilineStringsBit
+  | StringInterpolationBit
   | LevelImportsBit
   | QualifiedStringsBit
 
@@ -2928,6 +3061,7 @@ mkParserOpts extensionFlags diag_opts
       .|. ViewPatternsBit             `xoptBit` LangExt.ViewPatterns
       .|. RequiredTypeArgumentsBit    `xoptBit` LangExt.RequiredTypeArguments
       .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
+      .|. StringInterpolationBit      `xoptBit` LangExt.StringInterpolation
       .|. LevelImportsBit             `xoptBit` LangExt.ExplicitLevelImports
       .|. QualifiedStringsBit         `xoptBit` LangExt.QualifiedStrings
     optBits =
@@ -2983,7 +3117,8 @@ initParserState options buf loc =
       eof_pos = Strict.Nothing,
       header_comments = Strict.Nothing,
       comment_q = [],
-      hdk_comments = nilOL
+      hdk_comments = nilOL,
+      inter_string_states = []
     }
   where init_loc = PsLoc loc (BufPos 0)
 
@@ -3127,8 +3262,8 @@ getPsMessages p =
 getContext :: P [LayoutContext]
 getContext = P $ \s@PState{context=ctx} -> POk s ctx
 
-setContext :: [LayoutContext] -> P ()
-setContext ctx = P $ \s -> POk s{context=ctx} ()
+pushContext :: LayoutContext -> P ()
+pushContext ctx = P $ \s -> POk s{context = ctx : context s} ()
 
 popContext :: P ()
 popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,

@@ -266,6 +266,7 @@ module Language.Haskell.TH where
     | ExtendedLiterals
     | ListTuplePuns
     | MultilineStrings
+    | StringInterpolation
     | ExplicitLevelImports
     | ImplicitStagePersistence
     | QualifiedStrings
@@ -877,6 +878,7 @@ module Language.Haskell.TH.LanguageExtensions where
     | ExtendedLiterals
     | ListTuplePuns
     | MultilineStrings
+    | StringInterpolation
     | ExplicitLevelImports
     | ImplicitStagePersistence
     | QualifiedStrings
@@ -1623,6 +1625,7 @@ module Language.Haskell.TH.Syntax where
     | ExtendedLiterals
     | ListTuplePuns
     | MultilineStrings
+    | StringInterpolation
     | ExplicitLevelImports
     | ImplicitStagePersistence
     | QualifiedStrings

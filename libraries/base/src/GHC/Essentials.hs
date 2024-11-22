@@ -124,6 +124,13 @@ module GHC.Essentials
     , IsString
     , fromString
 
+    -- String interpolation (default interpolator)
+    , interpolateRaw
+    , interpolateValue
+    , interpolateAppend
+    , interpolateEmpty
+    , interpolateFinalize
+
     -- Records
     , HasField
     , fromLabel, getField, setField
@@ -303,6 +310,10 @@ import GHC.Internal.Enum
 import GHC.Internal.Data.Dynamic( toDyn )
 import GHC.Internal.Data.Data
 import GHC.Internal.Data.String( fromString )
+import GHC.Internal.Data.String.Interpolate
+  ( interpolateRaw, interpolateValue, interpolateAppend
+  , interpolateEmpty, interpolateFinalize
+  )
 import GHC.Internal.Data.Either( Either(..) )
 import GHC.Internal.Data.Foldable( Foldable(..), null, all )
 import GHC.Internal.Data.Traversable( Traversable, traverse )
