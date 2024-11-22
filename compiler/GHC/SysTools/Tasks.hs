@@ -63,8 +63,8 @@ augmentImports dflags ("-include":fp:fps) = "-include" : augmentByWorkingDirecto
 augmentImports dflags (fp1: fp2: fps) = fp1 : augmentImports dflags (fp2:fps)
 
 -- | Discard some harmless warnings from gcc that we can't turn off
-cc_filter :: String -> String
-cc_filter = unlines . doFilter . lines where
+cc_filter :: [String] -> [String]
+cc_filter = doFilter where
   {-
   gcc gives warnings in chunks like so:
       In file included from /foo/bar/baz.h:11,

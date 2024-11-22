@@ -149,7 +149,7 @@ runSomethingResponseFile
   :: Logger
   -> TmpFs
   -> TempDir
-  -> (String->String)
+  -> ([String] -> [String])
   -> String
   -> String
   -> [Option]
@@ -195,7 +195,7 @@ runSomethingResponseFile logger tmpfs tmp_dir filter_fn phase_name pgm args mb_e
         ]
 
 runSomethingFiltered
-  :: Logger -> (String->String) -> String -> String -> [Option]
+  :: Logger -> ([String] -> [String]) -> String -> String -> [Option]
   -> Maybe FilePath -> Maybe [(String,String)] -> IO ()
 
 runSomethingFiltered logger filter_fn phase_name pgm args mb_cwd mb_env =
@@ -235,7 +235,7 @@ withPipe = bracket createPipe $ \ (readEnd, writeEnd) -> do
   hClose readEnd
   hClose writeEnd
 
-builderMainLoop :: Logger -> (String -> String) -> FilePath
+builderMainLoop :: Logger -> ([String] -> [String]) -> FilePath
                 -> [String] -> Maybe FilePath -> Maybe [(String, String)]
                 -> IO ExitCode
 builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = withPipe $ \ (readEnd, writeEnd) -> do
@@ -310,10 +310,10 @@ builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = withPipe $ \ (rea
         EOF ->
           return ()
 
-readerProc :: Chan BuildMessage -> Handle -> (String -> String) -> IO ()
+readerProc :: Chan BuildMessage -> Handle -> ([String] -> [String]) -> IO ()
 readerProc chan hdl filter_fn =
     (do str <- hGetContents hdl
-        loop (lines (filter_fn str)) Nothing)
+        loop (filter_fn (lines str)) Nothing)
     `finally`
        writeChan chan EOF
         -- ToDo: check errors more carefully

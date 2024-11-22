@@ -22,6 +22,6 @@ data LinkerConfig = LinkerConfig
   , linkerOptionsPre  :: [Option]         -- ^ Linker options (before user options)
   , linkerOptionsPost :: [Option]         -- ^ Linker options (after user options)
   , linkerTempDir     :: TempDir          -- ^ Temporary directory to use
-  , linkerFilter      :: String -> String -- ^ Output filter
+  , linkerFilter      :: [String] -> [String] -- ^ Output filter
   }
 

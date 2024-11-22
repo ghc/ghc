@@ -27,9 +27,8 @@ initLinkerConfig dflags =
     ld_filter = case platformOS (targetPlatform dflags) of
                   OSSolaris2 -> sunos_ld_filter
                   _          -> id
-    sunos_ld_filter :: String -> String
-    sunos_ld_filter = unlines . sunos_ld_filter' . lines
-    sunos_ld_filter' x = if (undefined_found x && ld_warning_found x)
+    sunos_ld_filter :: [String] -> [String]
+    sunos_ld_filter x = if (undefined_found x && ld_warning_found x)
                           then (ld_prefix x) ++ (ld_postfix x)
                           else x
     breakStartsWith x y = break (isPrefixOf x) y
