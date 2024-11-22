@@ -22,6 +22,14 @@ import GHC.Utils.CliOption
 import GHC.Types.SrcLoc ( SrcLoc, mkSrcLoc, mkSrcSpan )
 import GHC.Data.FastString
 
+import GHC.IO.Encoding
+
+#if defined(__IO_MANAGER_WINIO__)
+import GHC.IO.SubSystem ((<!>))
+import GHC.IO.Handle.Windows (handleToHANDLE)
+import GHC.Event.Windows (associateHandle')
+#endif
+
 import Control.Concurrent
 import Data.Char
 
@@ -222,11 +230,21 @@ handleProc pgm phase_name proc = do
 
     does_not_exist = throwGhcExceptionIO (InstallationError ("could not execute: " ++ pgm))
 
+withPipe :: ((Handle, Handle) -> IO a) -> IO a
+withPipe = bracket createPipe $ \ (readEnd, writeEnd) -> do
+  hClose readEnd
+  hClose writeEnd
 
 builderMainLoop :: Logger -> (String -> String) -> FilePath
                 -> [String] -> Maybe FilePath -> Maybe [(String, String)]
                 -> IO ExitCode
-builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = do
+builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = withPipe $ \ (readEnd, writeEnd) -> do
+
+#if defined(__IO_MANAGER_WINIO__)
+  return () <!> do
+    associateHandle' =<< handleToHANDLE readEnd
+#endif
+
   chan <- newChan
 
   -- We use a mask here rather than a bracket because we want
@@ -243,63 +261,59 @@ builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = do
         -- finish.
         let procdata =
               enableProcessJobs
-              $ (proc pgm real_args) { cwd = mb_cwd
-                                     , env = mb_env
-                                     , std_in  = CreatePipe
-                                     , std_out = CreatePipe
-                                     , std_err = CreatePipe
-                                     }
-        (Just hStdIn, Just hStdOut, Just hStdErr, hProcess) <- restore $
+              $ (proc pgm real_args) {
+                cwd = mb_cwd
+              , env = mb_env
+              , std_in  = CreatePipe
+
+              -- We used to treat stdout/stderr as separate streams, but this
+              -- was racy (see #25517).  We now treat them as one stream and
+              -- that is fine for our use-case.  We rely on upstream programs
+              -- to serialize writes to the two streams appropriately (note
+              -- that they already need to do that to produce deterministic
+              -- output when used interactively / on the command-line).
+              , std_out = UseHandle writeEnd
+              , std_err = UseHandle writeEnd
+              }
+        (Just hStdIn, Nothing, Nothing, hProcess) <- restore $
           createProcess_ "builderMainLoop" procdata
-        let cleanup_handles = do
-              hClose hStdIn
-              hClose hStdOut
-              hClose hStdErr
+        hClose writeEnd
         r <- try $ restore $ do
-          hSetBuffering hStdOut LineBuffering
-          hSetBuffering hStdErr LineBuffering
+          getLocaleEncoding >>= hSetEncoding readEnd
+          hSetNewlineMode readEnd nativeNewlineMode
+          hSetBuffering readEnd LineBuffering
           let make_reader_proc h = forkIO $ readerProc chan h filter_fn
-          bracketOnError (make_reader_proc hStdOut) killThread $ \_ ->
-            bracketOnError (make_reader_proc hStdErr) killThread $ \_ ->
+          bracketOnError (make_reader_proc readEnd) killThread $ \_ ->
             inner hProcess
+        hClose hStdIn
         case r of
-          -- onException
           Left (SomeException e) -> do
             terminateProcess hProcess
-            cleanup_handles
             throw e
-          -- cleanup when there was no exception
           Right s -> do
-            cleanup_handles
             return s
   safely $ \h -> do
-    -- we don't want to finish until 2 streams have been complete
-    -- (stdout and stderr)
-    log_loop chan (2 :: Integer)
-    -- after that, we wait for the process to finish and return the exit code.
+    processBuildMessages chan
     waitForProcess h
   where
-    -- t starts at the number of streams we're listening to (2) decrements each
-    -- time a reader process sends EOF. We are safe from looping forever if a
-    -- reader thread dies, because they send EOF in a finally handler.
-    log_loop _ 0 = return ()
-    log_loop chan t = do
+    processBuildMessages :: Chan BuildMessage -> IO ()
+    processBuildMessages chan = do
       msg <- readChan chan
       case msg of
         BuildMsg msg -> do
           logInfo logger $ withPprStyle defaultUserStyle msg
-          log_loop chan t
+          processBuildMessages chan
         BuildError loc msg -> do
           logMsg logger errorDiagnostic (mkSrcSpan loc loc)
               $ withPprStyle defaultUserStyle msg
-          log_loop chan t
+          processBuildMessages chan
         EOF ->
-          log_loop chan  (t-1)
+          return ()
 
 readerProc :: Chan BuildMessage -> Handle -> (String -> String) -> IO ()
 readerProc chan hdl filter_fn =
     (do str <- hGetContents hdl
-        loop (linesPlatform (filter_fn str)) Nothing)
+        loop (lines (filter_fn str)) Nothing)
     `finally`
        writeChan chan EOF
         -- ToDo: check errors more carefully
@@ -372,21 +386,3 @@ data BuildMessage
   = BuildMsg   !SDoc
   | BuildError !SrcLoc !SDoc
   | EOF
-
--- Divvy up text stream into lines, taking platform dependent
--- line termination into account.
-linesPlatform :: String -> [String]
-#if !defined(mingw32_HOST_OS)
-linesPlatform ls = lines ls
-#else
-linesPlatform "" = []
-linesPlatform xs =
-  case lineBreak xs of
-    (as,xs1) -> as : linesPlatform xs1
-  where
-   lineBreak "" = ("","")
-   lineBreak ('\r':'\n':xs) = ([],xs)
-   lineBreak ('\n':xs) = ([],xs)
-   lineBreak (x:xs) = let (as,bs) = lineBreak xs in (x:as,bs)
-
-#endif
