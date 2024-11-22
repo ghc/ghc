@@ -8,6 +8,10 @@ module GHC.Parser.String (
   StringType (..),
   lexString,
 
+  -- * Raw strings
+  RawLexedString,
+  lexStringRaw,
+
   -- * Unicode smart quote helpers
   isDoubleSmartQuote,
   isSingleSmartQuote,
@@ -17,8 +21,11 @@ import GHC.Prelude hiding (getChar)
 
 import Control.Arrow ((>>>))
 import Control.Monad (when)
+import Data.Bifunctor (first)
 import Data.Char (chr, ord)
 import qualified Data.Foldable1 as Foldable1
+import Data.Functor.Identity (Identity (..))
+import Data.List (unsnoc)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (listToMaybe, mapMaybe)
 import GHC.Data.StringBuffer (StringBuffer)
@@ -260,6 +267,76 @@ isSingleSmartQuote = \case
   _ -> False
 
 -- -----------------------------------------------------------------------------
+-- Interpolated strings
+
+-- | A string that's been validated to be lexically correct, but still
+-- contains the raw string lexed, without anything resolved.
+newtype RawLexedString = RawLexedString {unRawLexedString :: String}
+  deriving (Foldable, Semigroup, Monoid)
+
+-- | Load and validate the string in the given StringBuffer.
+--
+-- e.g. Lexing "a\nb" will return RawLexedString ['a', '\\', 'n', 'b'].
+lexStringRaw :: Int -> StringBuffer -> Either StringLexError RawLexedString
+lexStringRaw len buf = RawLexedString (bufferChars len buf) <$ validateString len buf
+
+fromRawLexedStringSingle :: RawLexedString -> String
+fromRawLexedStringSingle (RawLexedString s) =
+  case processCharsSingle s of
+    Right s' -> s'
+    Left _ -> panic "Unexpectedly got an error when re-lexing the string"
+
+fromRawLexedStringMulti :: (RawLexedString, [(x, RawLexedString)]) -> (String, [(x, String)])
+fromRawLexedStringMulti s =
+  case processCharsMulti' (to s) of
+    Just s' -> from s'
+    Nothing -> panic "Unexpectedly got an error when re-lexing the string"
+  where
+    to (pre, parts) = InterMultiString pre parts
+    from (InterMultiString pre parts) = (pre, parts)
+
+{-
+Note [Interpolated strings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Interpolated string syntax was accepted in this proposal:
+https://github.com/ghc-proposals/ghc-proposals/pull/570
+
+Interpolated strings are syntax sugar for <TODO(bchinn)>
+
+Interpolated strings are implemented in the following manner:
+
+1. Lexer takes the string as input:
+
+    s"Hello ${Text.toUpper name}!"
+
+  and outputs the following tokens:
+
+    [ ITstringInterBegin    src StringTypeSingle
+    , ITstringInterRaw      src "Hello "
+    , ITstringInterExpOpen  src
+    , ITqvarid                  ("Text.toUpper", "name")
+    , ITvarid                   "name"
+    , ITstringInterExpClose src
+    , ITstringInterRaw      src "!"
+    , ITstringInterEnd      src StringTypeSingle
+    ]
+
+2. The parser will then parse the tokens into the following HsExpr:
+
+    HsInterString ext
+      [ HsInterRaw ext "Hello "
+      , HsInterExp ext $
+          HsApp ext
+            (HsVar ext 'Text.toUpper)
+            (HsVar ext 'name)
+      , HsInterRaw ext "!"
+      ]
+
+3. This will then be desugared into <TODO(bchinn)>
+-}
+
+-- -----------------------------------------------------------------------------
 -- Multiline strings
 
 -- | See Note [Multiline string literals]
@@ -268,20 +345,54 @@ isSingleSmartQuote = \case
 -- and rejoining lines, and instead manually find newline characters,
 -- for performance.
 processCharsMulti :: String -> Maybe String
-processCharsMulti =
-      collapseGaps             -- Step 1
-  >>> normalizeEOL
-  >>> expandLeadingTabs        -- Step 3
-  >>> rmCommonWhitespacePrefix -- Step 4
-  >>> collapseOnlyWsLines      -- Step 5
-  >>> rmFirstNewline           -- Step 7a
-  >>> rmLastNewline            -- Step 7b
-  >>> resolveEscapesMaybe      -- Step 8
+processCharsMulti = fmap from . processCharsMulti' . to
+  where
+    -- Convert a normal multiline string to/from an interpolated multiline string
+    -- with no interpolated expressions.
+    to s = InterMultiString s []
+    from = \case
+      InterMultiString s [] -> s
+      _ -> panic "Got unexpected result when processing characters in multiline string"
+
+-- | An interpolated, multiline string to be processed.
+--
+-- `x` here will only ever be instantiated as `HsExpr`, but we'll leave it general to ensure
+-- we never modify it, we only ever propagate it.
+--
+-- We represent this as a list of (x, String) tuples instead of [Either x String] to guarantee
+-- that we don't have to handle two raw Strings next to each other.
+data InterMultiString x =
+  InterMultiString
+    String        -- ^ beginning of the string before the first interpolated expr
+    [(x, String)] -- ^ (expr, raw string) interleaved groups
+
+-- Run the given function over all raw strings, ignoring expressions
+overRaw :: (String -> String) -> InterMultiString x -> InterMultiString x
+overRaw f = runIdentity . overRawM (Identity . f)
+
+overRawM :: Monad m => (String -> m String) -> InterMultiString x -> m (InterMultiString x)
+overRawM f (InterMultiString pre parts) = InterMultiString <$> f pre <*> (traverse . traverse) f parts
+
+-- | Process multiline characters generally, for both normal multiline strings and interpolated
+-- multiline strings.
+processCharsMulti' :: InterMultiString x -> Maybe (InterMultiString x)
+processCharsMulti' =
+      overRaw collapseGaps         -- Step 1
+  >>> overRaw normalizeEOL
+  >>> expandLeadingTabs            -- Step 3
+  >>> rmCommonWhitespacePrefix     -- Step 4
+  >>> collapseOnlyWsLines          -- Step 5
+  >>> rmFirstNewline               -- Step 7a
+  >>> rmLastNewline                -- Step 7b
+  >>> overRawM resolveEscapesMaybe -- Step 8
 
 -- | Expands all tabs blindly, since the lexer will verify that tabs can only appear
 -- as leading indentation
-expandLeadingTabs :: String -> String
-expandLeadingTabs = go 0
+expandLeadingTabs :: InterMultiString x -> InterMultiString x
+expandLeadingTabs =
+  -- we can expand each raw string part independently, because leading
+  -- indentation will never contain an interpolated expression
+  overRaw $ go 0
   where
     go !col = \case
       c@'\t' : cs ->
@@ -303,21 +414,27 @@ normalizeEOL = go
       c : cs -> c : go cs
       [] -> []
 
-rmCommonWhitespacePrefix :: String -> String
-rmCommonWhitespacePrefix cs0 = go cs0
+rmCommonWhitespacePrefix :: InterMultiString x -> InterMultiString x
+rmCommonWhitespacePrefix s0 =
+  -- Whitespace prefix, by definition, only comes after newline characters, and there can
+  -- never be an interpolated expr within a whitespace prefix (since the expr would end
+  -- the prefix). So we can use a plain `map` to just process the string parts, because
+  -- the "drop prefix" logic will never span over multiple parts.
+  map (first go) parts
   where
-    commonWSPrefix = getCommonWsPrefix cs0
+    -- treat interpolated exprs as a single, non-space character string
+    commonWSPrefix = getCommonWsPrefix $ case s0 of InterMultiString pre parts -> pre ++ concatMap snd parts
 
     go = \case
-      c@'\n' : cs -> c : go (dropLine commonWSPrefix cs)
+      c@'\n' : cs -> c : go (dropPrefix commonWSPrefix cs)
       c : cs -> c : go cs
       [] -> []
 
     -- drop x characters from the string, or up to a newline, whichever comes first
-    dropLine !x = \case
+    dropPrefix !x = \case
       cs | x <= 0 -> cs
       cs@('\n' : _) -> cs
-      _ : cs -> dropLine (x - 1) cs
+      _ : cs -> dropPrefix (x - 1) cs
       [] -> []
 
 -- | See step 4 in Note [Multiline string literals]
@@ -334,30 +451,42 @@ getCommonWsPrefix s =
       . drop 1                      -- ignore first line in calculation
       $ lines s
 
-collapseOnlyWsLines :: String -> String
-collapseOnlyWsLines = go
+collapseOnlyWsLines :: InterMultiString x -> InterMultiString x
+collapseOnlyWsLines (InterMultiString pre parts) =
+  let pre' = go (null parts) pre
+      parts' = [(expr, go isLast s) | ((expr, s), isLast) <- withIsLast parts]
+   in InterMultiString pre' parts'
   where
-    go = \case
-      c@'\n' : cs | Just cs' <- checkAllWs cs -> c : go cs'
+    go isLast = \case
+      c@'\n' : cs | Just cs' <- checkAllWs isLast cs -> c : go cs'
       c : cs -> c : go cs
       [] -> []
 
-    checkAllWs = \case
+    checkAllWs isLast = \case
       -- got all the way to a newline or the end of the string, return
       cs@('\n' : _) -> Just cs
-      cs@[] -> Just cs
+      cs@[] | isLast -> Just cs
       -- found whitespace, continue
       c : cs | is_space c -> checkAllWs cs
       -- anything else, stop
       _ -> Nothing
 
-rmFirstNewline :: String -> String
-rmFirstNewline = \case
-  '\n' : cs -> cs
-  cs -> cs
+    -- annotate every element with a Bool indicating if it's the last element
+    withIsLast :: [a] -> [(a, Bool)]
+    withIsLast xs = zip xs $ (False <$ init xs) ++ [True]
 
-rmLastNewline :: String -> String
-rmLastNewline = go
+rmFirstNewline :: InterMultiString x -> InterMultiString x
+rmFirstNewline = \case
+  InterMultiString ('\n' : pre) parts -> InterMultiString pre parts
+  s -> s
+
+rmLastNewline :: InterMultiString x -> InterMultiString x
+rmLastNewline (InterMultiString pre parts) =
+  case unsnoc parts of
+    Nothing ->
+      InterMultiString (go pre) parts
+    Just (parts0, (x, lastLine)) ->
+      InterMultiString pre (parts0 ++ [(x, go lastLine)])
   where
     go = \case
       [] -> []

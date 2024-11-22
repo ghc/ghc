@@ -170,7 +170,7 @@ $idchar    = [$small $large $digit $uniidchar \']
 
 $unigraphic = \x06 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $graphic   = [$small $large $symbol $digit $idchar $special $unigraphic \"\']
-$charesc   = [a b f n r t v \\ \" \' \&]
+$charesc   = [a b f n r t v \\ \" \' \& \$]
 
 $binit     = 0-1
 $octit     = 0-7
@@ -228,8 +228,9 @@ $docsym    = [\| \^ \* \$]
 -- character sets can be subtracted, not strings
 @escape     = \\ ( $charesc      | @ascii | @decimal | o @octal | x @hexadecimal )
 @escapechar = \\ ( $charesc # \& | @ascii | @decimal | o @octal | x @hexadecimal )
-@stringchar = ($graphic # [\\ \"]) | $space | @escape     | @gap
-@char       = ($graphic # [\\ \']) | $space | @escapechar
+@stringchar = ($graphic # [\\ \"])         | $space | @escape     | @gap
+@char       = ($graphic # [\\ \'])         | $space | @escapechar
+@stringinterchar = ($graphic # [\\ \" \$]) | $space | @escape     | @gap
 
 -- normal signed numerical literals can only be explicitly negative,
 -- not explicitly positive (contrast @exponent)
@@ -629,6 +630,21 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   (\" | \"\") / ([\n .] # \") { tok_string_multi_content }
 }
 
+-- See Note [Interpolated strings]
+<0> {
+  s \" { \span _ _ _ -> pushLexState string_inter_content >> pure (L span (ITstringInterBegin StringTypeSingle)) }
+  -- TODO(bchinn): interpolated multiline strings
+}
+
+-- TODO(bchinn): add string_inter state to all <0> states that can be in an interpolated string
+<string_inter_content> {
+  @stringinterchar* { tok_string_inter_raw }
+  \$ \{             { \span _ _ _ -> pushLexState string_inter >> pure (L span ITstringInterExpOpen) }
+  \"                { \span _ _ _ -> popLexState >> pure (L span (ITstringInterEnd StringTypeSingle)) }
+
+  -- TODO(bchinn): check for smart quotes
+}
+
 <0> {
   \'\' { token ITtyQuote }
 
@@ -922,6 +938,13 @@ data Token
 
   | ITchar   SourceText Char                  -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITstring SourceText StringType FastString -- Note [Literal source text] in "GHC.Types.SourceText"
+
+  -- See Note [Interpolated strings]
+  | ITstringInterBegin    StringType
+  | ITstringInterRaw      SourceText RawLexedString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstringInterExpOpen
+  | ITstringInterExpClose
+  | ITstringInterEnd      StringType
 
   | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITrational FractionalLit
@@ -1672,8 +1695,11 @@ open_brace span _str _len _buf2 = do
   setContext (NoLayout:ctx)
   return (L span ITocurly)
 close_brace span _str _len _buf2 = do
-  popContext
-  return (L span ITccurly)
+  ctx <- getContext
+  sc <- getLexState
+  if null ctx && sc == string_inter
+    then popLexState >> pure (L span ITstringInterExpClose)
+    else popContext >> pure (L span ITccurly)
 
 qvarid, qconid :: StringBuffer -> Int -> Token
 qvarid buf len = ITqvarid $! splitQualName buf len False
@@ -2170,6 +2196,14 @@ tok_string span buf len _buf2 = do
   where
     src = SourceText $ lexemeToFastString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
+
+tok_string_inter_raw :: Action
+tok_string_inter_raw span buf len _ = do
+  s <- either (throwStringLexError i0) pure $ lexStringRaw len buf
+  pure $ L span (ITstringInterRaw src s)
+  where
+    i0 = AI (psSpanStart span) buf
+    src = SourceText $ lexemeToFastString buf len
 
 -- | Ideally, we would define this completely with Alex syntax, like normal strings.
 -- Instead, this is defined as a hybrid solution by manually invoking lex states, which

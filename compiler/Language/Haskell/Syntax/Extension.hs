@@ -410,6 +410,9 @@ type family XOverLabel      x
 type family XIPVar          x
 type family XOverLitE       x
 type family XLitE           x
+type family XInterString    x
+type family XInterStringRaw x
+type family XInterStringExp x
 type family XLam            x
 type family XLamCase        x
 type family XApp            x

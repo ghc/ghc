@@ -390,6 +390,9 @@ rnExpr (HsOverLit x lit)
                  return (HsApp noExtField (noLocA neg) (noLocA (HsOverLit x lit'))
                         , fvs ) }
 
+rnExpr (HsInterString x ty parts)
+  = undefined -- TODO(bchinn)
+
 rnExpr (HsApp x fun arg)
   = do { (fun',fvFun) <- rnLExpr fun
        ; (arg',fvArg) <- rnLExpr arg

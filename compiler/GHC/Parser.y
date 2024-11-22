@@ -730,6 +730,13 @@ are the most common patterns, rewritten as regular expressions for clarity:
  CHAR           { L _ (ITchar   _ _) }
  STRING         { L _ (ITstring _ StringTypeSingle _) }
  STRING_MULTI   { L _ (ITstring _ StringTypeMulti _) }
+ STRING_INTER_BEGIN       { L _ (ITstringInterBegin StringTypeSingle) }
+ STRING_INTER_END         { L _ (ITstringInterEnd   StringTypeSingle) }
+ STRING_INTER_MULTI_BEGIN { L _ (ITstringInterBegin StringTypeMulti) }
+ STRING_INTER_MULTI_END   { L _ (ITstringInterEnd   StringTypeMulti) }
+ STRING_INTER_RAW         { L _ (ITstringInterRaw _ _) }
+ STRING_INTER_EXP_OPEN    { L _ ITstringInterExpOpen }
+ STRING_INTER_EXP_CLOSE   { L _ ITstringInterExpClose }
  INTEGER        { L _ (ITinteger _) }
  RATIONAL       { L _ (ITrational _) }
 
@@ -3114,6 +3121,7 @@ aexp2   :: { ECP }
 -- into HsOverLit when -XOverloadedStrings is on.
 --      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)
 --                                       (getSTRING $1) noExtField) }
+        | stringInter                   { ecpFromExp $1 }
         | INTEGER   { ECP $ mkHsOverLitPV (sL1a $1 $ mkHsIntegral   (getINTEGER  $1)) }
         | RATIONAL  { ECP $ mkHsOverLitPV (sL1a $1 $ mkHsFractional (getRATIONAL $1)) }
 
@@ -3709,6 +3717,22 @@ overloaded_label :: { Located (SourceText, FastString) }
         : LABELVARID          { sL1 $1 (getLABELVARIDs $1, getLABELVARID $1) }
 
 -----------------------------------------------------------------------------
+-- Interpolated strings
+-- See Note [Interpolated strings] in GHC.Parser.String
+
+stringInter :: { LHsExpr GhcPs }
+        : STRING_INTER_BEGIN       stringInterParts STRING_INTER_END       { processStringInter StringTypeSingle $1 $2 $3 }
+        | STRING_INTER_MULTI_BEGIN stringInterParts STRING_INTER_MULTI_END { processStringInter StringTypeMulti  $1 $2 $3 }
+
+stringInterParts :: { [Either (SourceText, RawLexedString) (LHsExpr GhcPs)] }
+        : stringInterPart                  { [$1] }
+        | stringInterPart stringInterParts { $1 : $2 }
+
+stringInterPart :: { Either (SourceText, RawLexedString) (LHsExpr GhcPs) }
+        : STRING_INTER_RAW                                 { Left (getStringInterRaw $1) }
+        | STRING_INTER_EXP_OPEN exp STRING_INTER_EXP_CLOSE { Right $2 }
+
+-----------------------------------------------------------------------------
 -- Warnings and deprecations
 
 name_boolformula_opt :: { LBooleanFormula GhcPs }
@@ -4283,6 +4307,49 @@ getSCC lt = do let s = getSTRING lt
 
 stringLiteralToHsDocWst :: Located StringLiteral -> LocatedE (WithHsDocIdentifiers StringLiteral GhcPs)
 stringLiteralToHsDocWst  sl = reLoc $ lexStringLiteral parseIdentifier sl
+
+getStringInterRaw :: Located Token -> (SourceText, RawLexedString)
+getStringInterRaw (L _ (ITstringInterRaw src s)) = (src, s)
+
+processStringInter ::
+     StringType
+  -> Located Token
+  -> Located Token
+  -> [Either (SourceText, RawLexedString) (LHsExpr GhcPs)]
+  -> LHsExpr GhcPs
+processStringInter strType tokBegin tokEnd rawParts =
+  L (comb2 tokBegin tokEnd) $
+    HsInterString srcTexts strType $ processParts parts
+  where
+    -- Extract out the SourceText from the list of Eithers
+    srcTexts = [src | Left (src, _) <- rawParts]
+    parts = map (first snd) rawParts
+
+    processParts =
+      case strType of
+        StringTypeSingle -> map (first (fsLit . fromRawLexedStringSingle))
+        StringTypeMulti  -> map (first fsLit) . fromAlt . fromRawLexedStringMulti . toAlt
+
+    toAlt :: Monoid s => [Either s x] -> (s, [(x, s)])
+    toAlt =
+      let go = \case
+            [] -> (mempty, [])
+            Left s : [] -> (s, [])
+            Left s1 : Left s2 : rest -> go $ Left (s1 <> s2) : rest
+            Left s : Right x : rest ->
+              let (s', rest') = go rest
+               in (s, (x, s') : rest')
+            Right x : rest ->
+              let (s, rest') = go rest
+               in (mempty, (x, s) : rest')
+       in go
+
+    fromAlt :: Foldable s => (s, [(x, s)]) -> [Either s x]
+    fromAlt (s, xs) =
+      let notEmpty = \case
+            Left s -> null s
+            Right _ -> True
+      in filter notEmpty $ Left s : concatMap (\(x, s') -> [Right x, Left s']) xs
 
 -- Utilities for combining source spans
 comb2 :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan
