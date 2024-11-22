@@ -565,7 +565,7 @@ rnPatAndThen mk (SigPat _ pat sig)
     rnHsPatSigTypeAndThen sig = liftCpsWithCont (rnHsPatSigType AlwaysBind PatCtx sig)
 
 rnPatAndThen mk (LitPat x lit)
-  | HsString src s <- lit
+  | HsString src _ s <- lit
   = do { ovlStr <- liftCps (xoptM LangExt.OverloadedStrings)
        ; if ovlStr
          then rnPatAndThen mk

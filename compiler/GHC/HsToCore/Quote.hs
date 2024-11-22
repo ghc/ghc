@@ -3040,8 +3040,7 @@ repLiteral lit
                  HsDoublePrim _ _ -> Just doublePrimLName
                  HsChar _ _       -> Just charLName
                  HsCharPrim _ _   -> Just charPrimLName
-                 HsString _ _     -> Just stringLName
-                 HsMultilineString _ _ -> Just stringLName
+                 HsString _ _ _   -> Just stringLName
                  _                -> Nothing
 
 mk_integer :: Integer -> MetaM (HsLit GhcTc)
@@ -3052,7 +3051,7 @@ mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ XLit $ HsRat r rat_ty
 
 mk_string :: FastString -> MetaM (HsLit GhcRn)
-mk_string s = return $ HsString NoSourceText s
+mk_string s = return $ HsString NoSourceText HsStringTypeSingle s
 
 mk_char :: Char -> MetaM (HsLit GhcRn)
 mk_char c = return $ HsChar NoSourceText c
