@@ -439,6 +439,13 @@ test('T13894', js_skip, compile_and_run, [''])
 # this test fails with the profasm way on some machines but not others,
 # so we just skip it.
 test('T14497', [omit_ways(['profasm']), multi_cpu_race], compile_and_run, ['-O'])
+# The issue in the above test also happened with compaction enabled.
+test('T14497-compact',
+               [ extra_files(['T14497.hs'])
+               , omit_ways(['profasm'])
+               , multi_cpu_race
+               , extra_run_opts('+RTS -c -RTS')
+               ] , compile_and_run, ['-O'])
 test('T14695', [js_broken(22359), ignore_stderr], makefile_test, ['T14695'])
 test('T14702', [ ignore_stdout
                , when(unregisterised(), skip)
