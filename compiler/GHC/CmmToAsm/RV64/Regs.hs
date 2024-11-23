@@ -75,6 +75,12 @@ fa7RegNo = d17RegNo
 v0RegNo ::RegNo
 v0RegNo = 64
 
+v8RegNo :: RegNo
+v8RegNo = 72
+
+v23RegNo :: RegNo
+v23RegNo = 87
+
 v31RegNo :: RegNo
 v31RegNo = 95
 
@@ -147,6 +153,9 @@ allFpArgRegs = map regSingle [fa0RegNo .. fa7RegNo]
 -- | Literally all general vector registers (no status registers)
 allVecRegs :: [Reg]
 allVecRegs = map regSingle [v0RegNo .. v31RegNo]
+
+allVecArgRegs :: [Reg]
+allVecArgRegs = map regSingle [v8RegNo .. v23RegNo]
 
 -- * Addressing modes
 
