@@ -289,7 +289,7 @@ lint-author:
     - *drafts-can-fail-lint
 
 lint-ci-config:
-  image: nixos/nix:2.14.1
+  image: nixos/nix:2.25.2
   extends: .lint
   # We don't need history/submodules in this job
   variables:
@@ -299,10 +299,16 @@ lint-ci-config:
     - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
     # Note [Nix-in-Docker]
     # ~~~~~~~~~~~~~~~~~~~~
-    # FIXME: This is a workaround for a Nix-in-Docker issue. See
+    # The nixos/nix default config is max-jobs=1 and cores=$(logical
+    # cores num) which doesn't play nice with our $CPUS convention. We
+    # fix it before invoking any nix build to avoid oversubscribing
+    # while allowing a reasonable degree of parallelism.
+    # FIXME: Disabling build-users-group=nixbld is a workaround for a Nix-in-Docker issue. See
     # https://gitlab.haskell.org/ghc/head.hackage/-/issues/38#note_560487 for
     # discussion.
-    - nix-shell -p gnused --run "sed -i -e 's/nixbld//' /etc/nix/nix.conf"
+    - echo "cores = $CPUS" >> /etc/nix/nix.conf
+    - echo "max-jobs = $CPUS" >> /etc/nix/nix.conf
+    - nix run nixpkgs#gnused -- -i -e 's/ nixbld//' /etc/nix/nix.conf
   script:
     - nix run .gitlab/generate-ci#generate-jobs
     # 1 if .gitlab/generate_jobs changed the output of the generated config
@@ -1107,7 +1113,7 @@ project-version:
 
 .ghcup-metadata:
   stage: deploy
-  image: nixos/nix:2.14.1
+  image: nixos/nix:2.25.2
   dependencies: null
   tags:
     - x86_64-linux
@@ -1117,7 +1123,9 @@ project-version:
   before_script:
     - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
     # FIXME: See Note [Nix-in-Docker]
-    - nix-shell -p gnused --run "sed -i -e 's/nixbld//' /etc/nix/nix.conf"
+    - echo "cores = $CPUS" >> /etc/nix/nix.conf
+    - echo "max-jobs = $CPUS" >> /etc/nix/nix.conf
+    - nix run nixpkgs#gnused -- -i -e 's/ nixbld//' /etc/nix/nix.conf
     - nix-channel --update
     - cat version.sh
     # Calculate the project version
@@ -1182,7 +1190,7 @@ ghcup-metadata-nightly:
       artifacts: false
     - job: project-version
   script:
-    - nix shell --extra-experimental-features nix-command -f .gitlab/rel_eng -c ghcup-metadata --metadata ghcup-0.0.7.yaml --date="$(date -d $CI_PIPELINE_CREATED_AT +%Y-%m-%d)" --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
+    - nix shell -f .gitlab/rel_eng -c ghcup-metadata --metadata ghcup-0.0.7.yaml --date="$(date -d $CI_PIPELINE_CREATED_AT +%Y-%m-%d)" --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
   rules:
     - if: $NIGHTLY
 
@@ -1220,7 +1228,7 @@ ghcup-metadata-release:
   # No explicit needs for release pipeline as we assume we need everything and everything will pass.
   extends: .ghcup-metadata
   script:
-    - nix shell --extra-experimental-features nix-command -f .gitlab/rel_eng -c ghcup-metadata --release-mode --metadata ghcup-0.0.7.yaml --date="$(date -d $CI_PIPELINE_CREATED_AT +%Y-%m-%d)" --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
+    - nix shell -f .gitlab/rel_eng -c ghcup-metadata --release-mode --metadata ghcup-0.0.7.yaml --date="$(date -d $CI_PIPELINE_CREATED_AT +%Y-%m-%d)" --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
   rules:
     - if: '$RELEASE_JOB == "yes"'
 
