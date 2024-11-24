@@ -729,16 +729,6 @@ newtype FlushOut = FlushOut (IO ())
 defaultFlushOut :: FlushOut
 defaultFlushOut = FlushOut $ hFlush stdout
 
-
-
-data OnOff a = On a
-             | Off a
-  deriving (Eq, Show)
-
-instance Outputable a => Outputable (OnOff a) where
-  ppr (On x)  = text "On" <+> ppr x
-  ppr (Off x) = text "Off" <+> ppr x
-
 -- OnOffs accumulate in reverse order, so we use foldr in order to
 -- process them in the right order
 flattenExtensionFlags :: Maybe Language -> [OnOff LangExt.Extension] -> EnumSet LangExt.Extension

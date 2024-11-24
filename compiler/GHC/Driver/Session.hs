@@ -2925,12 +2925,17 @@ unSetExtensionFlag f = upd (unSetExtensionFlag' f)
 setExtensionFlag', unSetExtensionFlag' :: LangExt.Extension -> DynFlags -> DynFlags
 setExtensionFlag' f dflags = foldr ($) (xopt_set dflags f) deps
   where
-    deps = [ if turn_on then setExtensionFlag'   d
-                        else unSetExtensionFlag' d
-           | (f', turn_on, d) <- impliedXFlags, f' == f ]
+    deps :: [DynFlags -> DynFlags]
+    deps = [ setExtension d
+           | (f', d) <- impliedXFlags, f' == f ]
         -- When you set f, set the ones it implies
         -- NB: use setExtensionFlag recursively, in case the implied flags
         --     implies further flags
+
+    setExtension :: OnOff LangExt.Extension -> DynFlags -> DynFlags
+    setExtension = \ case
+      On extension -> setExtensionFlag' extension
+      Off extension -> unSetExtensionFlag' extension
 
 unSetExtensionFlag' f dflags = xopt_unset dflags f
    -- When you un-set f, however, we don't un-set the things it implies

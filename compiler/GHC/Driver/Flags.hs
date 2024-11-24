@@ -29,6 +29,7 @@ module GHC.Driver.Flags
    , minusWcompatOpts
    , unusedBindsFlags
 
+   , OnOff(..)
    , TurnOnFlag
    , turnOn
    , turnOff
@@ -76,6 +77,14 @@ instance Binary Language where
 
 instance NFData Language where
   rnf x = x `seq` ()
+
+data OnOff a = On a
+             | Off a
+  deriving (Eq, Show)
+
+instance Outputable a => Outputable (OnOff a) where
+  ppr (On x)  = text "On" <+> ppr x
+  ppr (Off x) = text "Off" <+> ppr x
 
 type TurnOnFlag = Bool   -- True  <=> we are turning the flag on
                          -- False <=> we are turning the flag off
@@ -269,78 +278,77 @@ extensionNames ext = mk (extensionDeprecation ext)     (extensionName ext : exte
                   ++ mk (ExtensionDeprecatedFor [ext]) (extensionDeprecatedNames ext)
   where mk depr = map (\name -> (depr, name))
 
-
-impliedXFlags :: [(LangExt.Extension, TurnOnFlag, LangExt.Extension)]
+impliedXFlags :: [(LangExt.Extension, OnOff LangExt.Extension)]
 impliedXFlags
 -- See Note [Updating flag description in the User's Guide]
-  = [ (LangExt.RankNTypes,                turnOn, LangExt.ExplicitForAll)
-    , (LangExt.QuantifiedConstraints,     turnOn, LangExt.ExplicitForAll)
-    , (LangExt.ScopedTypeVariables,       turnOn, LangExt.ExplicitForAll)
-    , (LangExt.LiberalTypeSynonyms,       turnOn, LangExt.ExplicitForAll)
-    , (LangExt.ExistentialQuantification, turnOn, LangExt.ExplicitForAll)
-    , (LangExt.FlexibleInstances,         turnOn, LangExt.TypeSynonymInstances)
-    , (LangExt.FunctionalDependencies,    turnOn, LangExt.MultiParamTypeClasses)
-    , (LangExt.MultiParamTypeClasses,     turnOn, LangExt.ConstrainedClassMethods)  -- c.f. #7854
-    , (LangExt.TypeFamilyDependencies,    turnOn, LangExt.TypeFamilies)
+  = [ (LangExt.RankNTypes,                On LangExt.ExplicitForAll)
+    , (LangExt.QuantifiedConstraints,     On LangExt.ExplicitForAll)
+    , (LangExt.ScopedTypeVariables,       On LangExt.ExplicitForAll)
+    , (LangExt.LiberalTypeSynonyms,       On LangExt.ExplicitForAll)
+    , (LangExt.ExistentialQuantification, On LangExt.ExplicitForAll)
+    , (LangExt.FlexibleInstances,         On LangExt.TypeSynonymInstances)
+    , (LangExt.FunctionalDependencies,    On LangExt.MultiParamTypeClasses)
+    , (LangExt.MultiParamTypeClasses,     On LangExt.ConstrainedClassMethods)  -- c.f. #7854
+    , (LangExt.TypeFamilyDependencies,    On LangExt.TypeFamilies)
 
-    , (LangExt.RebindableSyntax, turnOff, LangExt.ImplicitPrelude)      -- NB: turn off!
+    , (LangExt.RebindableSyntax, Off LangExt.ImplicitPrelude)      -- NB: turn off!
 
-    , (LangExt.DerivingVia, turnOn, LangExt.DerivingStrategies)
+    , (LangExt.DerivingVia, On LangExt.DerivingStrategies)
 
-    , (LangExt.GADTs,            turnOn, LangExt.GADTSyntax)
-    , (LangExt.GADTs,            turnOn, LangExt.MonoLocalBinds)
-    , (LangExt.TypeFamilies,     turnOn, LangExt.MonoLocalBinds)
+    , (LangExt.GADTs,            On LangExt.GADTSyntax)
+    , (LangExt.GADTs,            On LangExt.MonoLocalBinds)
+    , (LangExt.TypeFamilies,     On LangExt.MonoLocalBinds)
 
-    , (LangExt.TypeFamilies,     turnOn, LangExt.KindSignatures)  -- Type families use kind signatures
-    , (LangExt.PolyKinds,        turnOn, LangExt.KindSignatures)  -- Ditto polymorphic kinds
+    , (LangExt.TypeFamilies,     On LangExt.KindSignatures)  -- Type families use kind signatures
+    , (LangExt.PolyKinds,        On LangExt.KindSignatures)  -- Ditto polymorphic kinds
 
     -- TypeInType is now just a synonym for a couple of other extensions.
-    , (LangExt.TypeInType,       turnOn, LangExt.DataKinds)
-    , (LangExt.TypeInType,       turnOn, LangExt.PolyKinds)
-    , (LangExt.TypeInType,       turnOn, LangExt.KindSignatures)
+    , (LangExt.TypeInType,       On LangExt.DataKinds)
+    , (LangExt.TypeInType,       On LangExt.PolyKinds)
+    , (LangExt.TypeInType,       On LangExt.KindSignatures)
 
     -- Standalone kind signatures are a replacement for CUSKs.
-    , (LangExt.StandaloneKindSignatures, turnOff, LangExt.CUSKs)
+    , (LangExt.StandaloneKindSignatures, Off LangExt.CUSKs)
 
     -- AutoDeriveTypeable is not very useful without DeriveDataTypeable
-    , (LangExt.AutoDeriveTypeable, turnOn, LangExt.DeriveDataTypeable)
+    , (LangExt.AutoDeriveTypeable, On LangExt.DeriveDataTypeable)
 
     -- We turn this on so that we can export associated type
     -- type synonyms in subordinates (e.g. MyClass(type AssocType))
-    , (LangExt.TypeFamilies,     turnOn, LangExt.ExplicitNamespaces)
-    , (LangExt.TypeOperators, turnOn, LangExt.ExplicitNamespaces)
+    , (LangExt.TypeFamilies,     On LangExt.ExplicitNamespaces)
+    , (LangExt.TypeOperators, On LangExt.ExplicitNamespaces)
 
-    , (LangExt.ImpredicativeTypes,  turnOn, LangExt.RankNTypes)
+    , (LangExt.ImpredicativeTypes,  On LangExt.RankNTypes)
 
         -- Record wild-cards implies field disambiguation
         -- Otherwise if you write (C {..}) you may well get
         -- stuff like " 'a' not in scope ", which is a bit silly
         -- if the compiler has just filled in field 'a' of constructor 'C'
-    , (LangExt.RecordWildCards,     turnOn, LangExt.DisambiguateRecordFields)
+    , (LangExt.RecordWildCards,     On LangExt.DisambiguateRecordFields)
 
-    , (LangExt.ParallelArrays, turnOn, LangExt.ParallelListComp)
+    , (LangExt.ParallelArrays, On LangExt.ParallelListComp)
 
-    , (LangExt.JavaScriptFFI, turnOn, LangExt.InterruptibleFFI)
+    , (LangExt.JavaScriptFFI, On LangExt.InterruptibleFFI)
 
-    , (LangExt.DeriveTraversable, turnOn, LangExt.DeriveFunctor)
-    , (LangExt.DeriveTraversable, turnOn, LangExt.DeriveFoldable)
+    , (LangExt.DeriveTraversable, On LangExt.DeriveFunctor)
+    , (LangExt.DeriveTraversable, On LangExt.DeriveFoldable)
 
     -- Duplicate record fields require field disambiguation
-    , (LangExt.DuplicateRecordFields, turnOn, LangExt.DisambiguateRecordFields)
+    , (LangExt.DuplicateRecordFields, On LangExt.DisambiguateRecordFields)
 
-    , (LangExt.TemplateHaskell, turnOn, LangExt.TemplateHaskellQuotes)
-    , (LangExt.Strict, turnOn, LangExt.StrictData)
+    , (LangExt.TemplateHaskell, On LangExt.TemplateHaskellQuotes)
+    , (LangExt.Strict, On LangExt.StrictData)
 
     -- Historically only UnboxedTuples was required for unboxed sums to work.
     -- To avoid breaking code, we make UnboxedTuples imply UnboxedSums.
-    , (LangExt.UnboxedTuples, turnOn, LangExt.UnboxedSums)
+    , (LangExt.UnboxedTuples, On LangExt.UnboxedSums)
 
     -- The extensions needed to declare an H98 unlifted data type
-    , (LangExt.UnliftedDatatypes, turnOn, LangExt.DataKinds)
-    , (LangExt.UnliftedDatatypes, turnOn, LangExt.StandaloneKindSignatures)
+    , (LangExt.UnliftedDatatypes, On LangExt.DataKinds)
+    , (LangExt.UnliftedDatatypes, On LangExt.StandaloneKindSignatures)
 
     -- See Note [Non-variable pattern bindings aren't linear] in GHC.Tc.Gen.Bind
-    , (LangExt.LinearTypes, turnOn, LangExt.MonoLocalBinds)
+    , (LangExt.LinearTypes, On LangExt.MonoLocalBinds)
   ]
 
 

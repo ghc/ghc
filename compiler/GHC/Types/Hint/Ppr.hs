@@ -403,9 +403,7 @@ pprImpliedExtensions extension = case implied of
     xs -> parens $ "implied by" <+> unquotedListWith "and" xs
   where implied = map (quotes . ppr)
                 . filter (\ext -> extensionDeprecation ext == ExtensionNotDeprecated)
-                . map (\(impl, _, _) -> impl)
-                . filter (\(_, t, orig) -> orig == extension && t == turnOn)
-                $ impliedXFlags
+                $ [impl | (impl, On orig) <- impliedXFlags, orig == extension]
 
 pprPrefixUnqual :: Name -> SDoc
 pprPrefixUnqual name =
