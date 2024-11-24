@@ -638,6 +638,8 @@ hackage-doc-tarball:
 
 source-tarball:
   stage: full-build
+  needs:
+    - hadrian-ghc-in-ghci
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
@@ -659,6 +661,8 @@ source-tarball:
 
 generate-hadrian-bootstrap-sources:
   stage: full-build
+  needs:
+    - hadrian-ghc-in-ghci
   tags:
     - x86_64-linux
   image: "$DOCKER_IMAGE"
