@@ -1453,7 +1453,7 @@ oneShotMsg logger recomp =
 batchMsg :: Messager
 batchMsg = batchMsgWith (\_ _ _ _ -> empty)
 batchMultiMsg :: Messager
-batchMultiMsg = batchMsgWith (\_ _ _ node -> brackets (ppr (moduleGraphNodeUnitId node)))
+batchMultiMsg = batchMsgWith (\_ _ _ node -> brackets (ppr (mgNodeUnitId node)))
 
 batchMsgWith :: (HscEnv -> (Int, Int) -> RecompileRequired -> ModuleGraphNode -> SDoc) -> Messager
 batchMsgWith extra hsc_env_start mod_index recomp node =
@@ -1469,7 +1469,7 @@ batchMsgWith extra hsc_env_start mod_index recomp node =
                     LinkNode {} -> "Linking"
                     InstantiationNode {} -> "Instantiating"
                     ModuleNode {} -> "Compiling"
-        hsc_env = hscSetActiveUnitId (moduleGraphNodeUnitId node) hsc_env_start
+        hsc_env = hscSetActiveUnitId (mgNodeUnitId node) hsc_env_start
         dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
         state  = hsc_units hsc_env

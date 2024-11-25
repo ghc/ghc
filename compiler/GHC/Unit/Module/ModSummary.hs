@@ -24,12 +24,14 @@ module GHC.Unit.Module.ModSummary
    , msDynObjFileOsPath
    , msDeps
    , isBootSummary
+   , isTemplateHaskellOrQQNonBoot
    , findTarget
    )
 where
 
 import GHC.Prelude
 
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.Hs
 
 import GHC.Driver.DynFlags
@@ -163,6 +165,12 @@ msDynObjFileOsPath ms = ml_dyn_obj_file_ospath (ms_location ms)
 isBootSummary :: ModSummary -> IsBootInterface
 isBootSummary ms = if ms_hsc_src ms == HsBootFile then IsBoot else NotBoot
 
+isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
+isTemplateHaskellOrQQNonBoot ms =
+  (xopt LangExt.TemplateHaskell (ms_hspp_opts ms)
+    || xopt LangExt.QuasiQuotes (ms_hspp_opts ms)) &&
+  (isBootSummary ms == NotBoot)
+
 ms_mnwib :: ModSummary -> ModuleNameWithIsBoot
 ms_mnwib ms = GWIB (ms_mod_name ms) (isBootSummary ms)
 
@@ -205,5 +213,4 @@ findTarget ms ts =
         = f == f'  && ms_unitid summary == unitid
     _ `matches` _
         = False
-
 
