@@ -279,7 +279,7 @@ basicKnownKeyNames
         -- Dynamic
         toDynName,
 
-        -- GHC.Internal.Numeric stuff
+        -- Numeric stuff
         negateName, minusName, geName, eqName,
         mkRationalBase2Name, mkRationalBase10Name,
 

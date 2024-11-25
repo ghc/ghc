@@ -2355,7 +2355,7 @@ getTag :: forall {lev :: Levity} (a :: TYPE (BoxedRep lev))
 getTag = dataToTag#
 
 ----------------------------------------------
--- GHC.Internal.Numeric primops
+-- Numeric primops
 ----------------------------------------------
 
 -- Definitions of the boxed PrimOps; these will be
