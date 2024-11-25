@@ -9,7 +9,7 @@
 //
 // The CPP is thus about the RTS version GHC is linked against, and not the
 // version of the GHC being built.
-#if !MIN_VERSION_GLASGOW_HASKELL(9,7,0,0)
+#if !MIN_VERSION_GLASGOW_HASKELL(9,8,4,0)
 HsWord64 ghc_unique_counter64 = 0;
 #endif
 #if !MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
