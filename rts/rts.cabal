@@ -332,8 +332,6 @@ library
 
       if os(osx)
         ld-options: "-Wl,-search_paths_first"
-                    -- See Note [fd_set_overflow]
-                    "-Wl,-U,___darwin_check_fd_set_overflow"
                     -- See Note [Undefined symbols in the RTS]
                     "-Wl,-undefined,dynamic_lookup"
         if !arch(x86_64) && !arch(aarch64)
@@ -548,48 +546,6 @@ library
                     -- ticker/*.c
                     -- We don't want to compile posix/ticker/*.c, these will be #included
                     -- from Ticker.c
-
-
--- Note [fd_set_overflow]
--- ~~~~~~~~~~~~~~~~~~~~~~
--- In this note is the very sad tale of __darwin_fd_set_overflow.
--- The 8.10.5 release was broken because it was built in an environment
--- where the libraries were provided by XCode 12.*, these libraries introduced
--- a reference to __darwin_fd_set_overflow via the FD_SET macro which is used in
--- Select.c. Unfortunately, this symbol is not available with XCode 11.* which
--- led to a linker error when trying to link anything. This is almost certainly
--- a bug in XCode but we still have to work around it.
-
--- Undefined symbols for architecture x86_64:
---  "___darwin_check_fd_set_overflow", referenced from:
---      _awaitEvent in libHSrts.a(Select.o)
--- ld: symbol(s) not found for architecture x86_64
-
--- One way to fix this is to upgrade your version of xcode, but this would
--- force the upgrade on users prematurely. Fortunately it also seems safe to pass
--- the linker option "-Wl,-U,___darwin_check_fd_set_overflow" because the usage of
--- the symbol is guarded by a guard to check if it's defined.
-
--- __header_always_inline int
--- __darwin_check_fd_set(int _a, const void *_b)
--- {
---    if ((uintptr_t)&__darwin_check_fd_set_overflow != (uintptr_t) 0) {
---#if defined(_DARWIN_UNLIMITED_SELECT) || defined(_DARWIN_C_SOURCE)
---        return __darwin_check_fd_set_overflow(_a, _b, 1);
---#else
---        return __darwin_check_fd_set_overflow(_a, _b, 0);
---#endif
---    } else {
---        return 1;
---    }
---}
-
--- Across the internet there are many other reports of this issue
---  See: https://github.com/mono/mono/issues/19393
---     , https://github.com/sitsofe/fio/commit/b6a1e63a1ff607692a3caf3c2db2c3d575ba2320
-
--- The issue was originally reported in #19950
-
 
 -- Note [Undefined symbols in the RTS]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

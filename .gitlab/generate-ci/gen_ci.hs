@@ -444,7 +444,7 @@ opsysVariables AArch64 (Darwin {}) =
           ]
 opsysVariables Amd64 (Darwin {}) =
   mconcat [ "NIX_SYSTEM" =: "x86_64-darwin"
-          , "MACOSX_DEPLOYMENT_TARGET" =: "10.13"
+          , "MACOSX_DEPLOYMENT_TARGET" =: "11.0"
           -- "# Only Sierra and onwards supports clock_gettime. See #12858"
           , "ac_cv_func_clock_gettime" =: "no"
           -- # Only newer OS Xs support utimensat. See #17895
