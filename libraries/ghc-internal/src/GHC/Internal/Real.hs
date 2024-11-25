@@ -360,7 +360,7 @@ numericEnumFrom         :: (Fractional a) => a -> [a]
 {-# INLINE numericEnumFrom #-}  -- See Note [Inline Enum method helpers] in GHC.Internal.Enum
 numericEnumFrom n       = go 0
   where
-    -- See Note [GHC.Internal.Numeric Stability of Enumerating Floating Numbers]
+    -- See Note [Numeric Stability of Enumerating Floating Numbers]
     go !k = let !n' = n + k
              in n' : go (k + 1)
 
@@ -369,7 +369,7 @@ numericEnumFromThen     :: (Fractional a) => a -> a -> [a]
 numericEnumFromThen n m = go 0
   where
     step = m - n
-    -- See Note [GHC.Internal.Numeric Stability of Enumerating Floating Numbers]
+    -- See Note [Numeric Stability of Enumerating Floating Numbers]
     go !k = let !n' = n + k * step
              in n' : go (k + 1)
 
@@ -386,7 +386,7 @@ numericEnumFromThenTo e1 e2 !e3
                                  !predicate | e2 >= e1  = (<= e3 + mid)
                                             | otherwise = (>= e3 + mid)
 
-{- Note [GHC.Internal.Numeric Stability of Enumerating Floating Numbers]
+{- Note [Numeric Stability of Enumerating Floating Numbers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When enumerate floating numbers, we could add the increment to the last number
 at every run (as what we did previously):
