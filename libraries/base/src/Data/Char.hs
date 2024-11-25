@@ -42,7 +42,7 @@ module Data.Char
     , digitToInt
     , intToDigit
 
-    -- * GHC.Internal.Numeric representations
+    -- * Numeric representations
     , ord
     , chr
 

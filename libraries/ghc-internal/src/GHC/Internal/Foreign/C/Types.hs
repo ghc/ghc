@@ -47,7 +47,7 @@ module GHC.Internal.Foreign.C.Types
         , CLLong(..),   CULLong(..), CBool(..)
         , CIntPtr(..),  CUIntPtr(..), CIntMax(..),   CUIntMax(..)
 
-          -- ** GHC.Internal.Numeric types
+          -- ** Numeric types
           -- | These types are represented as @newtype@s of basic
           -- foreign types, and are instances of
           -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',

@@ -89,7 +89,7 @@ module Data.Semigroup (
   , First(..)
   , Last(..)
   , WrappedMonoid(..)
-  -- * Re-exported monoids from GHC.Internal.Data.Monoid
+  -- * Re-exported monoids
   , Dual(..)
   , Endo(..)
   , All(..)
