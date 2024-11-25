@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE LambdaCase        #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface
@@ -70,6 +71,7 @@ import GHC.Types.Error (mkUnknownDiagnostic)
 import GHC.Types.Name.Occurrence (emptyOccEnv)
 import GHC.Unit.Finder (findImportedModule, FindResult(Found))
 import GHC.Unit.Home.ModInfo
+import GHC.Unit.Home.PackageTable
 import GHC.Unit.Module.Graph (ModuleGraphNode (..))
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModIface (mi_semantic_module, mi_boot)
@@ -278,14 +280,15 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
 
   (mod_iface, insts) <- if Flag_NoCompilation `elem` flags
     then liftIO $ loadHiFile hsc_env doc $ ms_mod modSummary
-    else
-      let hmi = case lookupHpt (hsc_HPT hsc_env) (moduleName $ ms_mod modSummary) of
-            Nothing -> error "processModule: All modules should be loaded into the HPT by this point"
-            Just x -> x
-          cls_insts = instEnvElts . md_insts $ hm_details hmi
+    else do
+      hmi <- liftIO $ lookupHpt (hsc_HPT hsc_env) (moduleName $ ms_mod modSummary) >>= \case
+          Nothing -> error "processModule: All modules should be loaded into the HPT by this point"
+          Just x -> return x
+
+      let cls_insts = instEnvElts . md_insts $ hm_details hmi
           fam_insts = md_fam_insts $ hm_details hmi
 
-      in pure (hm_iface hmi, (cls_insts, fam_insts))
+      pure (hm_iface hmi, (cls_insts, fam_insts))
 
   !interface <- do
     logger <- getLogger

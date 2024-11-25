@@ -13,6 +13,7 @@ Type checking of type signatures in interface files
 {-# LANGUAGE RecursiveDo #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -79,12 +80,12 @@ import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Ppr
 
-import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.Module
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Home.ModInfo
+import qualified GHC.Unit.Home.Graph as HUG
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -609,10 +610,11 @@ tcHiBootIface hsc_src mod
                 -- And that's fine, because if M's ModInfo is in the HPT, then
                 -- it's been compiled once, and we don't need to check the boot iface
           then do { (_, hug) <- getEpsAndHug
-                 ; case lookupHugByModule mod hug  of
+                  ; liftIO $
+                    HUG.lookupHugByModule mod hug >>= pure . \case
                       Just info | mi_boot (hm_iface info) == IsBoot
-                                -> return $ SelfBoot { sb_mds = hm_details info }
-                      _ -> return NoSelfBoot }
+                                -> SelfBoot { sb_mds = hm_details info }
+                      _ -> NoSelfBoot }
           else do
 
         -- OK, so we're in one-shot mode.

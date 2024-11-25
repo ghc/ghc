@@ -78,7 +78,7 @@ attachInstances expInfo ifaces instIfaceMap isOneShot = do
   --
   -- See https://github.com/haskell/haddock/issues/469.
   env <- getSession
-  let mod_to_pkg_conf = moduleNameProvidersMap $ ue_units $ hsc_unit_env env
+  let mod_to_pkg_conf = moduleNameProvidersMap $ ue_homeUnitState $ hsc_unit_env env
       mods =
         mkModuleSet
           [ m

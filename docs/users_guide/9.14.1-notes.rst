@@ -79,6 +79,21 @@ Cmm
   value-level argument used for existential wrapping of the hints of the inner
   diagnostic.
 
+* Changes to the HPT and HUG interface:
+
+  - `addToHpt` and `addListToHPT` were moved from `GHC.Unit.Home.ModInfo` to `GHC.Unit.Home.PackageTable` and deprecated in favour of `addHomeModInfoToHpt` and `addHomeModInfosToHpt`.
+  - `UnitEnvGraph` and operations `unitEnv_lookup_maybe`, `unitEnv_foldWithKey, `unitEnv_singleton`, `unitEnv_adjust`, `unitEnv_insert`, `unitEnv_new` were moved from `GHC.Unit.Env` to `GHC.Unit.Home.Graph`.
+  - The HomePackageTable (HPT) is now exported from `GHC.Unit.Home.PackageTable`,
+    and is now backed by an IORef to avoid by construction very bad memory leaks.
+    This means the API to the HPT now is for the most part in IO. For instance,
+    `emptyHomePackageTable` and `addHomeModInfoToHpt` are now in IO.
+  - `mkHomeUnitEnv` was moved to `GHC.Unit.Home.PackageTable`, and now takes two
+    extra explicit arguments. To restore previous behaviour, pass `emptyUnitState`
+    and `Nothing` as the first two arguments additionally.
+  - `hugElts` was removed. Users should prefer `allUnits` to get the keys of the
+    HUG (the typical use case), or `traverse` or `unitEnv_foldWithKey` in other
+    cases.
+
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
 

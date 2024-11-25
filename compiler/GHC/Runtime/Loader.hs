@@ -215,7 +215,7 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
         ; case eith_plugin of
             Left actual_type ->
                 throwGhcExceptionIO (CmdLineError $
-                    showSDocForUser dflags (ue_units (hsc_unit_env hsc_env))
+                    showSDocForUser dflags (ue_homeUnitState (hsc_unit_env hsc_env))
                       alwaysQualify $ hsep
                           [ text "The value", ppr name
                           , text "with type", ppr actual_type
@@ -346,7 +346,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     let fopts      = initFinderOpts dflags
     let fc         = hsc_FC hsc_env
     let unit_env   = hsc_unit_env hsc_env
-    let unit_state = ue_units unit_env
+    let unit_state = ue_homeUnitState unit_env
     let mhome_unit = hsc_home_unit_maybe hsc_env
     -- First find the unit the module resides in by searching exposed units and home modules
     found_module <- findPluginModule fc fopts unit_state mhome_unit mod_name

@@ -166,7 +166,7 @@ spawnJSInterp cfg = do
 
   -- get the unit-id of the ghci package. We need this to load the
   -- interpreter code.
-  ghci_unit_id <- case lookupPackageName (ue_units unit_env) (PackageName (fsLit "ghci")) of
+  ghci_unit_id <- case lookupPackageName (ue_homeUnitState unit_env) (PackageName (fsLit "ghci")) of
     Nothing -> cmdLineErrorIO "JS interpreter: couldn't find \"ghci\" package"
     Just i  -> pure i
 
@@ -265,7 +265,7 @@ jsLinkInterp logger tmpfs tmp_dir cfg unit_env inst = do
   let ghci_unit_id = instGhciUnitId (instExtra inst)
 
   -- compute unit dependencies of ghc_unit_id
-  let unit_map = unitInfoMap (ue_units unit_env)
+  let unit_map = unitInfoMap (ue_homeUnitState unit_env)
   dep_units <- mayThrowUnitErr $ closeUnitDeps unit_map [(ghci_unit_id,Nothing)]
   let units = dep_units ++ [ghci_unit_id]
 
@@ -304,7 +304,7 @@ jsLinkObjects logger tmpfs tmp_dir cfg unit_env inst objs is_root = do
         , lcLinkCsources    = True  -- enable C sources, if any
         }
 
-  let units = preloadUnits (ue_units unit_env)
+  let units = preloadUnits (ue_homeUnitState unit_env)
 
   -- compute dependencies
   let link_spec = LinkSpec

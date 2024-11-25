@@ -125,12 +125,10 @@ import qualified Control.Monad.Catch as MC
 import Data.IORef
 import Data.Maybe
 import Data.Time
-import Data.Function
-import Data.List (sortOn, unfoldr, sortBy)
+import Data.List (sortOn, unfoldr, groupBy, sortBy)
 import Data.Bifunctor (first)
 import System.Directory
 import System.FilePath
-import System.IO        ( fixIO )
 
 import GHC.Conc ( getNumProcessors, getNumCapabilities, setNumCapabilities )
 import Control.Monad.IO.Class
@@ -146,12 +144,12 @@ import Control.Monad.Trans.Maybe
 import GHC.Runtime.Loader
 import GHC.Rename.Names
 import GHC.Utils.Constants
-import GHC.Types.Unique.DFM (udfmRestrictKeysSet)
-import GHC.Types.Unique
 import GHC.Iface.Errors.Types
+import Data.Function
 
-import qualified GHC.Data.Word64Set as W
 import GHC.Data.Graph.Directed.Reachability
+import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Home.PackageTable
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -205,7 +203,7 @@ depanalE diag_wrapper msg excluded_mods allow_dup_roots = do
                           `unionMessages` unused_pkg_err
                           `unionMessages` unknown_module_err
 
-        all_errs <- liftIO $ unitEnv_foldWithKey one_unit_messages (return emptyMessages) (hsc_HUG hsc_env)
+        all_errs <- liftIO $ HUG.unitEnv_foldWithKey one_unit_messages (return emptyMessages) (hsc_HUG hsc_env)
         logDiagnostics (GhcDriverMessage <$> all_errs)
         setSession hsc_env { hsc_mod_graph = mod_graph }
         pure (emptyMessages, mod_graph)
@@ -771,8 +769,12 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
     -- interactive context around pointing to dead bindings.  Also,
     -- write an empty HPT to allow the old HPT to be GC'd.
 
-    let pruneHomeUnitEnv hme = hme { homeUnitEnv_hpt = emptyHomePackageTable }
-    setSession $ discardIC $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
+    let pruneHomeUnitEnv hme = do
+          emptyHPT <- liftIO emptyHomePackageTable
+          pure $! hme{ homeUnitEnv_hpt = emptyHPT }
+    hug' <- traverse pruneHomeUnitEnv (ue_home_unit_graph $ hsc_unit_env hsc_env)
+    let ue' = (hsc_unit_env hsc_env){ ue_home_unit_graph = hug' }
+    setSession $ discardIC hsc_env{hsc_unit_env = ue' }
     hsc_env <- getSession
 
     -- Unload everything
@@ -786,7 +788,10 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
     (upsweep_ok, new_deps) <- withDeferredDiagnostics $ do
       hsc_env <- getSession
       liftIO $ upsweep worker_limit hsc_env mhmi_cache diag_wrapper mHscMessage (toCache pruned_cache) build_plan
-    modifySession (addDepsToHscEnv new_deps)
+
+    -- At this point, all the HPT variables will be populated, but we don't want
+    -- to leak the contents of a failed session.
+    liftIO $ restrictDepsHscEnv new_deps hsc_env
     case upsweep_ok of
       Failed -> loadFinish upsweep_ok
       Succeeded -> do
@@ -811,7 +816,7 @@ guessOutputFile = modifySession $ \env ->
     -- Force mod_graph to avoid leaking env
     let !mod_graph = hsc_mod_graph env
         new_home_graph =
-          flip unitEnv_map (hsc_HUG env) $ \hue ->
+          flip fmap (hsc_HUG env) $ \hue ->
             let dflags = homeUnitEnv_dflags hue
                 platform = targetPlatform dflags
                 mainModuleSrcPath :: Maybe String
@@ -1023,7 +1028,7 @@ waitResult :: ResultVar a -> MaybeT IO a
 waitResult (ResultVar f var) = MaybeT (fmap f <$> readMVar var)
 
 data BuildResult = BuildResult { _resultOrigin :: ResultOrigin
-                               , resultVar    :: ResultVar (Maybe HomeModInfo, ModuleNameSet)
+                               , resultVar    :: ResultVar (Maybe HomeModInfo)
                                }
 
 -- The origin of this result var, useful for debugging
@@ -1031,7 +1036,7 @@ data ResultOrigin = NoLoop | Loop ResultLoopOrigin deriving (Show)
 
 data ResultLoopOrigin = Initialise | Rehydrated | Finalised deriving (Show)
 
-mkBuildResult :: ResultOrigin -> ResultVar (Maybe HomeModInfo, ModuleNameSet) -> BuildResult
+mkBuildResult :: ResultOrigin -> ResultVar (Maybe HomeModInfo) -> BuildResult
 mkBuildResult = BuildResult
 
 
@@ -1040,9 +1045,6 @@ data BuildLoopState = BuildLoopState { buildDep :: M.Map NodeKey BuildResult
                                           -- the appropriate result of compiling a module  but with
                                           -- cycles there can be additional indirection and can point to the result of typechecking a loop
                                      , nNODE :: Int
-                                     , hug_var :: MVar HomeUnitGraph
-                                     -- A global variable which is incrementally updated with the result
-                                     -- of compiling modules.
                                      }
 
 nodeId :: BuildM Int
@@ -1096,14 +1098,13 @@ interpretBuildPlan :: HomeUnitGraph
                          , [MakeAction] -- Actions we need to run in order to build everything
                          , IO [Maybe (Maybe HomeModInfo)]) -- An action to query to get all the built modules at the end.
 interpretBuildPlan hug mhmi_cache old_hpt plan = do
-  hug_var <- newMVar hug
-  ((mcycle, plans), build_map) <- runStateT (buildLoop plan) (BuildLoopState M.empty 1 hug_var)
+  ((mcycle, plans), build_map) <- runStateT (buildLoop plan) (BuildLoopState M.empty 1)
   let wait = collect_results (buildDep build_map)
   return (mcycle, plans, wait)
 
   where
     collect_results build_map =
-      sequence (map (\br -> collect_result (fst <$> resultVar br)) (M.elems build_map))
+      sequence (map (\br -> collect_result (resultVar br)) (M.elems build_map))
       where
         collect_result res_var = runMaybeT (waitResult res_var)
 
@@ -1148,7 +1149,6 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
                       -> BuildM MakeAction
     buildSingleModule rehydrate_nodes origin mod = do
       !build_map <- getBuildMap
-      hug_var <- gets hug_var
       -- 1. Get the direct dependencies of this module
       let direct_deps = mgNodeDependencies False mod
           -- It's really important to force build_deps, or the whole buildMap is retained,
@@ -1160,30 +1160,29 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
               InstantiationNode uid iu -> do
                 mod_idx <- nodeId
                 return $ withCurrentUnit (mgNodeUnitId mod) $ do
-                  (hug, deps) <- wait_deps_hug hug_var build_deps
+                  !_ <- wait_deps build_deps
                   executeInstantiationNode mod_idx n_mods hug uid iu
-                  return (Nothing, deps)
+                  return Nothing
               ModuleNode _build_deps ms -> do
                 let !old_hmi = M.lookup (msKey ms) old_hpt
                     rehydrate_mods = mapMaybe nodeKeyModName <$> rehydrate_nodes
                 mod_idx <- nodeId
                 return $ withCurrentUnit (mgNodeUnitId mod) $ do
-                     (hug, deps) <- wait_deps_hug hug_var build_deps
+                     !_ <- wait_deps build_deps
                      hmi <- executeCompileNode mod_idx n_mods old_hmi hug rehydrate_mods ms
                      -- Write the HMI to an external cache (if one exists)
                      -- See Note [Caching HomeModInfo]
                      liftIO $ forM mhmi_cache $ \hmi_cache -> addHmiToCache hmi_cache hmi
-                     -- This global MVar is incrementally modified in order to avoid having to
-                     -- recreate the HPT before compiling each module which leads to a quadratic amount of work.
-                     liftIO $ modifyMVar_ hug_var (return . addHomeModInfoToHug hmi)
-                     return (Just hmi, addToModuleNameSet (mgNodeUnitId mod) (ms_mod_name ms) deps )
+                     -- Make sure the result is written to the HPT var
+                     liftIO $ HUG.addHomeModInfoToHug hmi hug
+                     return (Just hmi)
               LinkNode _nks uid -> do
                   mod_idx <- nodeId
                   return $ withCurrentUnit (mgNodeUnitId mod) $ do
-                    (hug, deps) <- wait_deps_hug hug_var build_deps
+                    !_ <- wait_deps build_deps
                     executeLinkNode hug (mod_idx, n_mods) uid direct_deps
-                    return (Nothing, deps)
-              UnitNode {} -> return $ return (Nothing, mempty)
+                    return Nothing
+              UnitNode {} -> return $ return Nothing
 
 
       res_var <- liftIO newEmptyMVar
@@ -1215,28 +1214,26 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
     -- An action which rehydrates the given keys
     rehydrateAction :: ResultLoopOrigin -> [GenWithIsBoot NodeKey] -> BuildM MakeAction
     rehydrateAction origin deps = do
-      hug_var <- gets hug_var
       !build_map <- getBuildMap
       res_var <- liftIO newEmptyMVar
       let loop_unit :: UnitId
           !loop_unit = nodeKeyUnitId (gwib_mod (head deps))
           !build_deps = getDependencies (map gwib_mod deps) build_map
       let loop_action = withCurrentUnit loop_unit $ do
-            (hug, tdeps) <- wait_deps_hug hug_var build_deps
+            !_ <- wait_deps build_deps
             hsc_env <- asks hsc_env
-            let new_hsc = setHUG hug hsc_env
-                mns :: [ModuleName]
+            let mns :: [ModuleName]
                 mns = mapMaybe (nodeKeyModName . gwib_mod) deps
 
-            hmis' <- liftIO $ rehydrateAfter new_hsc mns
+            hmis' <- liftIO $ rehydrateAfter hsc_env mns
 
             checkRehydrationInvariant hmis' deps
 
             -- Add hydrated interfaces to global variable
-            liftIO $ modifyMVar_ hug_var (\hug -> return $ foldr addHomeModInfoToHug hug hmis')
-            return (hmis', tdeps)
+            liftIO $ mapM_ (\hmi -> HUG.addHomeModInfoToHug hmi hug) hmis'
+            return hmis'
 
-      let fanout i = first (Just . (!! i)) <$> mkResultVar res_var
+      let fanout i = Just . (!! i) <$> mkResultVar res_var
       -- From outside the module loop, anyone must wait for the loop to finish and then
       -- use the result of the rehydrated iface. This makes sure that things not in the
       -- module loop will see the updated interfaces for all the identifiers in the loop.
@@ -1332,7 +1329,8 @@ upsweep_mod hsc_env mHscMessage old_hmi summary mod_index nmods =  do
   -- used to only happen with the bytecode backend, but with
   -- @-fprefer-byte-code@, @HomeModInfo@ has bytecode even when generating
   -- object code, see #25230.
-  addSptEntries (hscUpdateHPT (\hpt -> addToHpt hpt (ms_mod_name summary) hmi) hsc_env)
+  hscInsertHPT hmi hsc_env
+  addSptEntries (hsc_env)
                 (homeModInfoByteCode hmi)
 
   return hmi
@@ -1648,7 +1646,7 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
            downsweep_errs = lefts $ concat $ M.elems map0
            downsweep_nodes = M.elems deps'
 
-           (other_errs, unit_nodes) = partitionEithers $ unitEnv_foldWithKey (\nodes uid hue -> nodes ++ unitModuleNodes downsweep_nodes uid hue) [] (hsc_HUG hsc_env)
+           (other_errs, unit_nodes) = partitionEithers $ HUG.unitEnv_foldWithKey (\nodes uid hue -> nodes ++ unitModuleNodes downsweep_nodes uid hue) [] (hsc_HUG hsc_env)
            all_nodes = downsweep_nodes ++ unit_nodes
            all_errs  = all_root_errs ++  downsweep_errs ++ other_errs
            all_root_errs =  closure_errs ++ map snd root_errs
@@ -1663,7 +1661,7 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
          else pure $ (all_root_errs, emptyMG)
      where
         getHomeUnitInstantiations :: HscEnv -> [(UnitId, InstantiatedUnit)]
-        getHomeUnitInstantiations hsc_env = unitEnv_foldWithKey (\nodes uid hue -> nodes ++  instantiationNodes uid (homeUnitEnv_units hue)) [] (hsc_HUG hsc_env)
+        getHomeUnitInstantiations hsc_env = HUG.unitEnv_foldWithKey (\nodes uid hue -> nodes ++  instantiationNodes uid (homeUnitEnv_units hue)) [] (hsc_HUG hsc_env)
 
         -- Dependencies arising on a unit (backpack and module linking deps)
         unitModuleNodes :: [ModuleGraphNode] -> UnitId -> HomeUnitEnv -> [Either (Messages DriverMessage) ModuleGraphNode]
@@ -1891,7 +1889,7 @@ checkHomeUnitsClosed ue
     | Set.null bad_unit_ids = []
     | otherwise = [singleMessage $ mkPlainErrorMsgEnvelope rootLoc $ DriverHomePackagesNotClosed (Set.toList bad_unit_ids)]
   where
-    home_id_set = unitEnv_keys $ ue_home_unit_graph ue
+    home_id_set = HUG.allUnits $ ue_home_unit_graph ue
     bad_unit_ids = upwards_closure Set.\\ home_id_set {- Remove all home units reached, keep only bad nodes -}
     rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
 
@@ -1904,7 +1902,7 @@ checkHomeUnitsClosed ue
 
     all_unit_direct_deps :: UniqMap UnitId (Set.Set UnitId)
     all_unit_direct_deps
-      = unitEnv_foldWithKey go emptyUniqMap $ ue_home_unit_graph ue
+      = HUG.unitEnv_foldWithKey go emptyUniqMap $ ue_home_unit_graph ue
       where
         go rest this this_uis =
            plusUniqMap_C Set.union
@@ -2558,13 +2556,19 @@ cleanCurrentModuleTempFilesMaybe logger tmpfs dflags =
     else liftIO $ cleanCurrentModuleTempFiles logger tmpfs
 
 
-addDepsToHscEnv ::  [HomeModInfo] -> HscEnv -> HscEnv
-addDepsToHscEnv deps hsc_env =
-  hscUpdateHUG (\hug -> foldr addHomeModInfoToHug hug deps) hsc_env
+-- | Thin each HPT variable to only contain keys from the given dependencies.
+-- This is used at the end of upsweep to make sure that only completely successfully loaded
+-- modules are visible for subsequent operations.
+restrictDepsHscEnv :: [HomeModInfo] -> HscEnv -> IO ()
+restrictDepsHscEnv deps hsc_env =
+  let deps_with_unit = map (\xs -> (fst (head xs), map snd xs)) $ groupBy ((==) `on` fst) (sortOn fst (map go deps))
+      hug = ue_home_unit_graph $ hsc_unit_env hsc_env
+      go hmi = (hmi_unit, hmi)
+        where
+          hmi_mod  = mi_module (hm_iface hmi)
+          hmi_unit = toUnitId (moduleUnit hmi_mod)
+  in HUG.restrictHug deps_with_unit hug
 
-setHPT ::  HomePackageTable -> HscEnv -> HscEnv
-setHPT deps hsc_env =
-  hscUpdateHPT (const $ deps) hsc_env
 
 setHUG ::  HomeUnitGraph -> HscEnv -> HscEnv
 setHUG deps hsc_env =
@@ -2646,18 +2650,18 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mod = do
   me@MakeEnv{..} <- ask
   -- Rehydrate any dependencies if this module had a boot file or is a signature file.
   lift $ MaybeT (withAbstractSem compile_sem $ withLoggerHsc k me $ \hsc_env -> do
-     hydrated_hsc_env <- liftIO $ maybeRehydrateBefore (setHUG hug hsc_env) mod fixed_mrehydrate_mods
+     hsc_env' <- liftIO $ maybeRehydrateBefore (setHUG hug hsc_env) mod fixed_mrehydrate_mods
      let -- Use the cached DynFlags which includes OPTIONS_GHC pragmas
          lcl_dynflags = ms_hspp_opts mod
      let lcl_hsc_env =
              -- Localise the hsc_env to use the cached flags
              hscSetFlags lcl_dynflags $
-             hydrated_hsc_env
+             hsc_env'
      -- Compile the module, locking with a semaphore to avoid too many modules
      -- being compiled at the same time leading to high memory usage.
      wrapAction diag_wrapper lcl_hsc_env $ do
       res <- upsweep_mod lcl_hsc_env env_messager old_hmi mod k n
-      cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env) (hsc_tmpfs hsc_env) lcl_dynflags
+      cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env') (hsc_tmpfs hsc_env') lcl_dynflags
       return res)
 
   where
@@ -2673,27 +2677,25 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mod = do
 
 rehydrate :: HscEnv        -- ^ The HPT in this HscEnv needs rehydrating.
           -> [HomeModInfo] -- ^ These are the modules we want to rehydrate.
-          -> IO HscEnv
+          -> IO [HomeModInfo]
 rehydrate hsc_env hmis = do
   debugTraceMsg logger 2 $ (
      text "Re-hydrating loop: " <+> (ppr (map (mi_module . hm_iface) hmis)))
-  new_mods <- fixIO $ \new_mods -> do
-      let new_hpt = addListToHpt old_hpt new_mods
-      let new_hsc_env = hscUpdateHPT_lazy (const new_hpt) hsc_env
-      mds <- initIfaceCheck (text "rehydrate") new_hsc_env $
-                mapM (typecheckIface . hm_iface) hmis
-      let new_mods = [ (mn,hmi{ hm_details = details })
-                     | (hmi,details) <- zip hmis mds
-                     , let mn = moduleName (mi_module (hm_iface hmi)) ]
-      return new_mods
-  return $ setHPT (foldl' (\old (mn, hmi) -> addToHpt old mn hmi) old_hpt new_mods) hsc_env
+  -- When the HPT was pure we had to tie a knot to update the ModDetails in the
+  -- HPT required to update those ModDetails, but since it was made an IORef we
+  -- just have to make sure the new ModDetails are "reset" so that the new
+  -- modules are looked up in HPT when it is forced. If we didn't "reset" the
+  -- ModDetails, modules in a loop would refer the wrong (hs-boot) definitions
+  -- (as explained in Note [Rehydrating Modules]).
+  mds <- initIfaceCheck (text "rehydrate") hsc_env $
+            mapM (typecheckIface . hm_iface) hmis
+  let new_mods = [ hmi{ hm_details = details }
+                 | (hmi,details) <- zip hmis mds
+                 ]
+  return new_mods
 
   where
-    logger  = hsc_logger hsc_env
-    to_delete =  (map (moduleName . mi_module . hm_iface) hmis)
-    -- Filter out old modules before tying the knot, otherwise we can end
-    -- up with a thunk which keeps reference to the old HomeModInfo.
-    !old_hpt = foldl' delFromHpt (hsc_HPT hsc_env) to_delete
+    logger = hsc_logger hsc_env
 
 -- If needed, then rehydrate the necessary modules with a suitable KnotVars for the
 -- module currently being compiled.
@@ -2701,8 +2703,11 @@ maybeRehydrateBefore :: HscEnv -> ModSummary -> Maybe [ModuleName] -> IO HscEnv
 maybeRehydrateBefore hsc_env _ Nothing = return hsc_env
 maybeRehydrateBefore hsc_env mod (Just mns) = do
   knot_var <- initialise_knot_var hsc_env
-  let hmis = map (expectJust "mr" . lookupHpt (hsc_HPT hsc_env)) mns
-  rehydrate (hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }) hmis
+  let hsc_env' = hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }
+  hmis <- mapM (fmap (expectJust "mr") . lookupHpt (hsc_HPT hsc_env')) mns
+  hmis' <- rehydrate hsc_env' hmis
+  mapM_ (\hmi -> HUG.addHomeModInfoToHug hmi (hsc_HUG hsc_env')) hmis'
+  return hsc_env'
 
   where
    initialise_knot_var hsc_env = liftIO $
@@ -2712,11 +2717,10 @@ maybeRehydrateBefore hsc_env mod (Just mns) = do
 rehydrateAfter :: HscEnv
   -> [ModuleName]
   -> IO [HomeModInfo]
-rehydrateAfter new_hsc mns = do
-  let new_hpt = hsc_HPT new_hsc
-      hmis = map (expectJust "mrAfter" . lookupHpt new_hpt) mns
-  hsc_env <- rehydrate (new_hsc { hsc_type_env_vars = emptyKnotVars }) hmis
-  return $ map (\mn -> expectJust "rehydrate" $ lookupHpt (hsc_HPT hsc_env) mn) mns
+rehydrateAfter hsc mns = do
+  let hpt = hsc_HPT hsc
+  hmis <- mapM (fmap (expectJust "mrAfter") . lookupHpt hpt) mns
+  rehydrate (hsc { hsc_type_env_vars = emptyKnotVars }) hmis
 
 {-
 Note [Hydrating Modules]
@@ -2910,73 +2914,15 @@ executeLinkNode hug kn uid deps = do
       Failed -> fail "Link Failed"
       Succeeded -> return ()
 
-{-
-Note [ModuleNameSet, efficiency and space leaks]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-During upsweep, the results of compiling modules are placed into a MVar. When we need
-to compute the right compilation environment for a module, we consult this MVar and
-set the HomeUnitGraph accordingly. This is done to avoid having to precisely track
-module dependencies and recreating the HUG from scratch each time, which is very expensive.
-
-In serial mode (-j1), this all works out fine: a module can only be compiled
-after its dependencies have finished compiling, and compilation can't be
-interleaved with the compilation of other module loops. This ensures that
-the HUG only ever contains finalised interfaces.
-
-In parallel mode, we have to be more careful: the HUG variable can contain non-finalised
-interfaces, which have been started by another thread. In order to avoid a space leak
-in which a finalised interface is compiled against a HPT which contains a non-finalised
-interface, we have to restrict the HUG to only contain the visible modules.
-
-The collection of visible modules explains which transitive modules are visible
-from a certain point. It is recorded in the ModuleNameSet.
-Before a module is compiled, we use this set to restrict the HUG to the visible
-modules only, avoiding this tricky space leak.
-
-Efficiency of the ModuleNameSet is of utmost importance, because a union occurs for
-each edge in the module graph. To achieve this, the set is represented directly as an IntSet,
-which provides suitable performance – even using a UniqSet (which is backed by an IntMap) is
-too slow. The crucial test of performance here is the time taken to a do a no-op build in --make mode.
-
-See test "jspace" for an example which used to trigger this problem.
-
--}
-
--- See Note [ModuleNameSet, efficiency and space leaks]
-type ModuleNameSet = M.Map UnitId W.Word64Set
-
-addToModuleNameSet :: UnitId -> ModuleName -> ModuleNameSet -> ModuleNameSet
-addToModuleNameSet uid mn s =
-  let k = (getKey $ getUnique $ mn)
-  in M.insertWith (W.union) uid (W.singleton k) s
-
--- | Wait for some dependencies to finish and then read from the given MVar.
-wait_deps_hug :: MVar HomeUnitGraph -> [BuildResult] -> ReaderT MakeEnv (MaybeT IO) (HomeUnitGraph, ModuleNameSet)
-wait_deps_hug hug_var deps = do
-  (_, module_deps) <- wait_deps deps
-  hug <- liftIO $ readMVar hug_var
-  let pruneHomeUnitEnv uid hme =
-        let -- Restrict to things which are in the transitive closure to avoid retaining
-            -- reference to loop modules which have already been compiled by other threads.
-            -- See Note [ModuleNameSet, efficiency and space leaks]
-            !new = udfmRestrictKeysSet (homeUnitEnv_hpt hme) (fromMaybe W.empty $ M.lookup  uid module_deps)
-        in hme { homeUnitEnv_hpt = new }
-  return (unitEnv_mapWithKey pruneHomeUnitEnv hug, module_deps)
-
 -- | Wait for dependencies to finish, and then return their results.
-wait_deps :: [BuildResult] -> RunMakeM ([HomeModInfo], ModuleNameSet)
-wait_deps [] = return ([], M.empty)
+wait_deps :: [BuildResult] -> RunMakeM [HomeModInfo]
+wait_deps [] = return []
 wait_deps (x:xs) = do
-  (res, deps) <- lift $ waitResult (resultVar x)
-  (hmis, all_deps) <- wait_deps xs
-  let !new_deps = deps `unionModuleNameSet` all_deps
+  res <- lift $ waitResult (resultVar x)
+  hmis <- wait_deps xs
   case res of
-    Nothing -> return (hmis, new_deps)
-    Just hmi -> return (hmi:hmis, new_deps)
-  where
-    unionModuleNameSet = M.unionWith W.union
-
+    Nothing -> return hmis
+    Just hmi -> return (hmi:hmis)
 
 -- Executing the pipelines
 
@@ -3160,6 +3106,4 @@ which can be checked easily using ghc-debug.
 5. At the end of a successful upsweep, the number of live ModDetails equals the
    number of non-boot Modules.
    Why? Each module has a HomeModInfo which contains a ModDetails from that module.
-   Where? See Note [ModuleNameSet, efficiency and space leaks], a variety of places
-          in the driver are responsible.
 -}

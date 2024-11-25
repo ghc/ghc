@@ -105,11 +105,10 @@ import GHC.Types.SourceError
 import GHC.Unit
 import GHC.Unit.Env
 import GHC.Unit.Finder
---import GHC.Unit.State
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.Deps
 import GHC.Unit.Home.ModInfo
+import GHC.Unit.Home.PackageTable
 
 import System.Directory
 import System.FilePath
@@ -403,18 +402,16 @@ link' logger tmpfs fc dflags unit_env batch_attempt_linking mHscMessager hpt
                           LinkStaticLib -> True
                           _ -> False
 
-            home_mod_infos = eltsHpt hpt
+        -- the packages we depend on
+        pkg_deps <- Set.toList <$> hptCollectDependencies hpt
 
-            -- the packages we depend on
-            pkg_deps  = Set.toList
-                          $ Set.unions
-                          $ fmap (dep_direct_pkgs . mi_deps . hm_iface)
-                          $ home_mod_infos
+        -- the linkables to link
+        linkables <- hptCollectObjects hpt
 
-            -- the linkables to link
-            linkables = map (expectJust "link". homeModInfoObject) home_mod_infos
+        -- the home modules, for tracing
+        home_modules <- hptCollectModules hpt
 
-        debugTraceMsg logger 3 (text "link: hmi ..." $$ vcat (map (ppr . mi_module . hm_iface) home_mod_infos))
+        debugTraceMsg logger 3 (text "link: hmi ..." $$ vcat (map ppr home_modules))
         debugTraceMsg logger 3 (text "link: linkables are ..." $$ vcat (map ppr linkables))
         debugTraceMsg logger 3 (text "link: pkg deps are ..." $$ vcat (map ppr pkg_deps))
 
@@ -472,7 +469,7 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         -- modification times on all of the objects and libraries, then omit
         -- linking (unless the -fforce-recomp flag was given).
   let platform   = ue_platform unit_env
-      unit_state = ue_units unit_env
+      unit_state = ue_homeUnitState unit_env
       arch_os    = platformArchOS platform
       exe_file   = exeFileName arch_os staticLink (outputFile_ dflags)
   e_exe_time <- tryIO $ getModificationUTCTime exe_file

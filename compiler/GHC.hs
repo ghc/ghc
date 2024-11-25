@@ -4,6 +4,7 @@
 {-# LANGUAGE TupleSections, NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -422,7 +423,7 @@ import GHC.Types.PkgQual
 import GHC.Types.Unique.FM
 
 import GHC.Unit
-import GHC.Unit.Env
+import GHC.Unit.Env as UnitEnv
 import GHC.Unit.External
 import GHC.Unit.Finder
 import GHC.Unit.Module.ModIface
@@ -431,6 +432,7 @@ import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Graph
 import GHC.Unit.Home.ModInfo
+import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Settings
 
 import Control.Applicative ((<|>))
@@ -453,6 +455,7 @@ import System.Environment ( getEnv, getProgName )
 import System.Exit      ( exitWith, ExitCode(..) )
 import System.FilePath
 import System.IO.Error  ( isDoesNotExistError )
+import GHC.Unit.Home.PackageTable
 
 -- %************************************************************************
 -- %*                                                                      *
@@ -666,7 +669,7 @@ setUnitDynFlagsNoCheck uid dflags1 = do
           , homeUnitEnv_home_unit = Just home_unit
           }
 
-  let unit_env = ue_updateHomeUnitEnv upd uid (hsc_unit_env hsc_env)
+  let unit_env = UnitEnv.ue_updateHomeUnitEnv upd uid (hsc_unit_env hsc_env)
 
   let dflags = updated_dflags
 
@@ -684,7 +687,7 @@ setUnitDynFlagsNoCheck uid dflags1 = do
   let !unit_env1 =
         if homeUnitId_ dflags /= uid
           then
-            ue_renameUnitId
+            UnitEnv.renameUnitId
                   uid
                   (homeUnitId_ dflags)
                   unit_env0
@@ -731,7 +734,7 @@ setTopSessionDynFlags dflags = do
                   wasmInterpTargetPlatform = targetPlatform dflags,
                   wasmInterpProfiled = profiled,
                   wasmInterpHsSoSuffix = way_tag ++ dynLibSuffix (ghcNameVersion dflags),
-                  wasmInterpUnitState = ue_units $ hsc_unit_env hsc_env
+                  wasmInterpUnitState = ue_homeUnitState $ hsc_unit_env hsc_env
                 }
         pure $ Just $ Interp (ExternalInterp $ ExtWasm $ ExtInterpState cfg s) loader lookup_cache
 
@@ -825,7 +828,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
           let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
               dflags = homeUnitEnv_dflags homeUnitEnv
               old_hpt = homeUnitEnv_hpt homeUnitEnv
-              home_units = unitEnv_keys (ue_home_unit_graph old_unit_env)
+              home_units = HUG.allUnits (ue_home_unit_graph old_unit_env)
 
           (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags cached_unit_dbs home_units
 
@@ -838,7 +841,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
             , homeUnitEnv_home_unit = Just home_unit
             }
 
-        let dflags1 = homeUnitEnv_dflags $ unitEnv_lookup (ue_currentUnit old_unit_env) home_unit_graph
+        let dflags1 = homeUnitEnv_dflags $ HUG.unitEnv_lookup (ue_currentUnit old_unit_env) home_unit_graph
         let unit_env = UnitEnv
               { ue_platform        = targetPlatform dflags1
               , ue_namever         = ghcNameVersion dflags1
@@ -1419,12 +1422,14 @@ getModuleGraph = liftM hsc_mod_graph getSession
 
 -- | Return @True@ \<==> module is loaded.
 isLoaded :: GhcMonad m => ModuleName -> m Bool
-isLoaded m = withSession $ \hsc_env ->
-  return $! isJust (lookupHpt (hsc_HPT hsc_env) m)
+isLoaded m = withSession $ \hsc_env -> liftIO $ do
+  hmi <- lookupHpt (hsc_HPT hsc_env) m
+  return $! isJust hmi
 
 isLoadedModule :: GhcMonad m => UnitId -> ModuleName -> m Bool
-isLoadedModule uid m = withSession $ \hsc_env ->
-  return $! isJust (lookupHug (hsc_HUG hsc_env) uid m)
+isLoadedModule uid m = withSession $ \hsc_env -> liftIO $ do
+  hmi <- HUG.lookupHug (hsc_HUG hsc_env) uid m
+  return $! isJust hmi
 
 -- | Return the bindings for the current interactive session.
 getBindings :: GhcMonad m => m [TyThing]
@@ -1495,7 +1500,7 @@ availsToGlobalRdrEnv hsc_env mod avails
 
 getHomeModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 getHomeModuleInfo hsc_env mdl =
-  case lookupHugByModule mdl (hsc_HUG hsc_env) of
+  HUG.lookupHugByModule mdl (hsc_HUG hsc_env) >>= \case
     Nothing  -> return Nothing
     Just hmi -> do
       let details  = hm_details hmi
@@ -1806,9 +1811,9 @@ lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
 lookupQualifiedModule pkgqual mod_name = findQualifiedModule pkgqual mod_name
 
 lookupLoadedHomeModule :: GhcMonad m => UnitId -> ModuleName -> m (Maybe Module)
-lookupLoadedHomeModule uid mod_name = withSession $ \hsc_env -> do
-  liftIO $ trace_if (hsc_logger hsc_env) (text "lookupLoadedHomeModule" <+> ppr mod_name <+> ppr uid)
-  case lookupHug  (hsc_HUG hsc_env) uid mod_name  of
+lookupLoadedHomeModule uid mod_name = withSession $ \hsc_env -> liftIO $ do
+  trace_if (hsc_logger hsc_env) (text "lookupLoadedHomeModule" <+> ppr mod_name <+> ppr uid)
+  HUG.lookupHug (hsc_HUG hsc_env) uid mod_name >>= \case
     Just mod_info      -> return (Just (mi_module (hm_iface mod_info)))
     _not_a_home_module -> return Nothing
 
@@ -1842,8 +1847,7 @@ getGHCiMonad :: GhcMonad m => m Name
 getGHCiMonad = fmap (ic_monad . hsc_IC) getSession
 
 getHistorySpan :: GhcMonad m => History -> m SrcSpan
-getHistorySpan h = withSession $ \hsc_env ->
-    return $ GHC.Runtime.Eval.getHistorySpan hsc_env h
+getHistorySpan h = withSession $ \hsc_env -> liftIO $ GHC.Runtime.Eval.getHistorySpan hsc_env h
 
 obtainTermFromVal :: GhcMonad m => Int ->  Bool -> Type -> a -> m Term
 obtainTermFromVal bound force ty a = withSession $ \hsc_env ->

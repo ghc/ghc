@@ -106,7 +106,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 import GHC.Unit.State
 import GHC.Unit.Home
-import GHC.Unit.Home.ModInfo
+import GHC.Unit.Home.PackageTable
 import GHC.Unit.Finder
 import GHC.Unit.Env
 import GHC.Unit.Module.External.Graph
@@ -123,6 +123,7 @@ import GHC.Iface.Errors.Types
 import Data.Function ((&))
 import qualified Data.Set as Set
 import GHC.Unit.Module.Graph
+import qualified GHC.Unit.Home.Graph as HUG
 
 {-
 ************************************************************************
@@ -553,7 +554,7 @@ loadInterface doc_str mod from
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
         ; let mhome_unit = ue_homeUnit (hsc_unit_env hsc_env)
-        ; case lookupIfaceByModule hug (eps_PIT eps) mod of {
+        ; liftIO (lookupIfaceByModule hug (eps_PIT eps) mod) >>= \case {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
             _ -> do {
@@ -615,7 +616,7 @@ loadInterface doc_str mod from
               ((isOneShot (ghcMode (hsc_dflags hsc_env)))
                 || moduleUnitId mod `notElem` hsc_all_home_unit_ids hsc_env
                 || mod == gHC_PRIM)
-                (text "Attempting to load home package interface into the EPS" $$ ppr hug $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod))
+                (text "Attempting to load home package interface into the EPS" $$ ppr (HUG.allUnits hug) $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod))
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
         ; new_eps_decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
         ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
@@ -773,38 +774,52 @@ dontLeakTheHUG thing_inside = do
       | otherwise = gbl_env { if_rec_types = emptyKnotVars }
     cleanTopEnv hsc_env =
 
-       let
-         !maybe_type_vars | inOneShot = Just (hsc_type_env_vars env)
-                          | otherwise = Nothing
-         -- wrinkle: when we're typechecking in --backpack mode, the
-         -- instantiation of a signature might reside in the HPT, so
-         -- this case breaks the assumption that EPS interfaces only
-         -- refer to other EPS interfaces.
-         -- As a temporary (MP Oct 2021 #20509) we only keep the HPT if it
-         -- contains any hole modules.
-         -- Quite a few tests in testsuite/tests/backpack break without this
-         -- tweak.
-         old_unit_env = hsc_unit_env hsc_env
-         keepFor20509 hmi
-          | isHoleModule (mi_semantic_module (hm_iface hmi)) = True
-          | otherwise = False
-         pruneHomeUnitEnv hme = hme { homeUnitEnv_hpt = emptyHomePackageTable }
-         !unit_env
-          = old_unit_env
-             { ue_home_unit_graph = if anyHpt keepFor20509 (ue_hpt old_unit_env) then ue_home_unit_graph old_unit_env
-                                                                                 else unitEnv_map pruneHomeUnitEnv (ue_home_unit_graph old_unit_env)
-             }
-       in
-       hsc_env {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
-               ,  hsc_mod_graph    = panic "cleanTopEnv: hsc_mod_graph"
-               ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
-               ,  hsc_type_env_vars = case maybe_type_vars of
-                                          Just vars -> vars
-                                          Nothing -> panic "cleanTopEnv: hsc_type_env_vars"
-               ,  hsc_unit_env     = unit_env
-               }
+      let
+        !maybe_type_vars | inOneShot = Just (hsc_type_env_vars env)
+                         | otherwise = Nothing
+        -- wrinkle: when we're typechecking in --backpack mode, the
+        -- instantiation of a signature might reside in the HPT, so
+        -- this case breaks the assumption that EPS interfaces only
+        -- refer to other EPS interfaces.
+        -- As a temporary (MP Oct 2021 #20509) we only keep the HPT if it
+        -- contains any hole modules.
+        -- Quite a few tests in testsuite/tests/backpack break without this
+        -- tweak.
+        old_unit_env = hsc_unit_env hsc_env
+        keepFor20509
+         | mgHasHoles (hsc_mod_graph hsc_env) = True
+         | otherwise = False
+        pruneHomeUnitEnv hme = do
+          -- NB: These are empty HPTs because Iface/Load first consults the HPT
+          emptyHPT <- liftIO emptyHomePackageTable
+          return $! hme{ homeUnitEnv_hpt = emptyHPT }
+        unit_env_io
+          | keepFor20509
+          = return old_unit_env
+          | otherwise
+          = do
+            hug' <- traverse pruneHomeUnitEnv (ue_home_unit_graph old_unit_env)
+            return old_unit_env
+              { ue_home_unit_graph = hug'
+              }
+      in do
+        !unit_env <- unit_env_io
+        -- mg_has_holes will be checked again, but nothing else about the module graph
+        let !new_mod_graph = emptyMG { mg_mss = panic "cleanTopEnv: mg_mss"
+                                     , mg_graph = panic "cleanTopEnv: mg_graph"
+                                     , mg_has_holes = keepFor20509 }
+        pure $
+          hsc_env
+                {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
+                ,  hsc_mod_graph    = new_mod_graph
+                ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
+                ,  hsc_type_env_vars = case maybe_type_vars of
+                                           Just vars -> vars
+                                           Nothing -> panic "cleanTopEnv: hsc_type_env_vars"
+                ,  hsc_unit_env     = unit_env
+                }
 
-  updTopEnv cleanTopEnv $ updGblEnv cleanGblEnv $ do
+  updTopEnvIO cleanTopEnv $ updGblEnv cleanGblEnv $ do
   !_ <- getTopEnv        -- force the updTopEnv
   !_ <- getGblEnv
   thing_inside
@@ -879,13 +894,14 @@ moduleFreeHolesPrecise doc_str mod
         liftIO $ trace_if logger (text "Considering whether to load" <+> ppr mod <+>
                  text "to compute precise free module holes")
         (eps, hpt) <- getEpsAndHug
-        case tryEpsAndHpt eps hpt `firstJust` tryDepsCache eps imod insts of
-            Just r -> return (Succeeded r)
-            Nothing -> readAndCache imod insts
+        result <- tryEpsAndHpt eps hpt
+        case result `firstJust` tryDepsCache eps imod insts of
+          Just r -> return (Succeeded r)
+          Nothing -> readAndCache imod insts
     (_, Nothing) -> return (Succeeded emptyUniqDSet)
   where
     tryEpsAndHpt eps hpt =
-        fmap mi_free_holes (lookupIfaceByModule hpt (eps_PIT eps) mod)
+        fmap mi_free_holes <$> liftIO (lookupIfaceByModule hpt (eps_PIT eps) mod)
     tryDepsCache eps imod insts =
         case lookupInstalledModuleEnv (eps_free_holes eps) imod of
             Just ifhs  -> Just (renameFreeHoles ifhs insts)

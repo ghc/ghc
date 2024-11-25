@@ -45,11 +45,12 @@ import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings
 import GHC.Runtime.Loader   ( loadFrontendPlugin, initializeSessionPlugins )
 
 import GHC.Unit.Env
-import GHC.Unit (UnitId, homeUnitDepends)
-import GHC.Unit.Home.ModInfo (emptyHomePackageTable)
+import GHC.Unit (UnitId)
+import GHC.Unit.Home.PackageTable
+import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Module ( ModuleName, mkModuleName )
 import GHC.Unit.Module.ModIface
-import GHC.Unit.State  ( pprUnits, pprUnitsSimple )
+import GHC.Unit.State  ( pprUnits, pprUnitsSimple, emptyUnitState )
 import GHC.Unit.Finder ( findImportedModule, FindResult(..) )
 import qualified GHC.Unit.State as State
 import GHC.Unit.Types  ( IsBootInterface(..) )
@@ -74,6 +75,7 @@ import GHC.Settings.IO
 
 import GHC.HandleEncoding
 import GHC.Data.FastString
+import GHC.Data.Maybe
 import GHC.SysTools.BaseDir
 
 import GHC.Iface.Load
@@ -93,8 +95,6 @@ import Control.Monad.Trans.Except (throwE, runExceptT)
 import Data.Char
 import Data.List ( isPrefixOf, partition, intercalate, (\\) )
 import qualified Data.Set as Set
-import qualified Data.Map as Map
-import Data.Maybe
 import Prelude
 import GHC.ResponseFile (expandResponse)
 import Data.Bifunctor
@@ -842,8 +842,8 @@ initMulti unitArgsFiles  = do
 
   checkDuplicateUnits initial_dflags (NE.toList (NE.zip unitArgsFiles unitDflags))
 
-  let (initial_home_graph, mainUnitId) = createUnitEnvFromFlags unitDflags
-      home_units = unitEnv_keys initial_home_graph
+  (initial_home_graph, mainUnitId) <- liftIO $ createUnitEnvFromFlags unitDflags
+  let home_units = HUG.allUnits initial_home_graph
 
   home_unit_graph <- forM initial_home_graph $ \homeUnitEnv -> do
     let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
@@ -852,17 +852,18 @@ initMulti unitArgsFiles  = do
     (dbs,unit_state,home_unit,mconstants) <- liftIO $ State.initUnits logger hue_flags cached_unit_dbs home_units
 
     updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
+    emptyHpt <- liftIO $ emptyHomePackageTable
     pure $ HomeUnitEnv
       { homeUnitEnv_units = unit_state
       , homeUnitEnv_unit_dbs = Just dbs
       , homeUnitEnv_dflags = updated_dflags
-      , homeUnitEnv_hpt = emptyHomePackageTable
+      , homeUnitEnv_hpt = emptyHpt
       , homeUnitEnv_home_unit = Just home_unit
       }
 
   checkUnitCycles initial_dflags home_unit_graph
 
-  let dflags = homeUnitEnv_dflags $ unitEnv_lookup mainUnitId home_unit_graph
+  let dflags = homeUnitEnv_dflags $ HUG.unitEnv_lookup mainUnitId home_unit_graph
   unitEnv <- assertUnitEnvInvariant <$> (liftIO $ initUnitEnv mainUnitId home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags))
   let final_hsc_env = hsc_env { hsc_unit_env = unitEnv }
 
@@ -891,16 +892,9 @@ initMulti unitArgsFiles  = do
   --                                  ++ ldInputs dflags }
   return $ concat hs_srcs
 
--- | Check that we don't have multiple units with the same UnitId.
-
-checkUnitCycles :: DynFlags -> UnitEnvGraph HomeUnitEnv -> Ghc ()
-checkUnitCycles dflags graph = processSCCs sccs
+checkUnitCycles :: DynFlags -> HUG.HomeUnitGraph -> Ghc ()
+checkUnitCycles dflags graph = processSCCs (HUG.hugSCCs graph)
   where
-    mkNode :: (UnitId, HomeUnitEnv) -> Node UnitId UnitId
-    mkNode (uid, hue) = DigraphNode uid uid (homeUnitDepends (homeUnitEnv_units hue))
-    nodes = map mkNode (unitEnv_elts graph)
-
-    sccs = stronglyConnCompFromEdgedVerticesOrd nodes
 
     processSCCs [] = return ()
     processSCCs (AcyclicSCC _: other_sccs) = processSCCs other_sccs
@@ -919,6 +913,7 @@ checkUnitCycles dflags graph = processSCCs sccs
         start = init uids
         final = last uids
 
+-- | Check that we don't have multiple units with the same UnitId.
 checkDuplicateUnits :: DynFlags -> [(FilePath, DynFlags)] -> Ghc ()
 checkDuplicateUnits dflags flags =
   unless (null duplicate_ids)
@@ -956,14 +951,15 @@ offsetDynFlags dflags =
               | otherwise = f
 
 
-createUnitEnvFromFlags :: NE.NonEmpty DynFlags -> (HomeUnitGraph, UnitId)
-createUnitEnvFromFlags unitDflags =
-  let
-    newInternalUnitEnv dflags = mkHomeUnitEnv dflags emptyHomePackageTable Nothing
-    unitEnvList = NE.map (\dflags -> (homeUnitId_ dflags, newInternalUnitEnv dflags)) unitDflags
-    activeUnit = fst $ NE.head unitEnvList
-  in
-    (unitEnv_new (Map.fromList (NE.toList (unitEnvList))), activeUnit)
+createUnitEnvFromFlags :: NE.NonEmpty DynFlags -> IO (HomeUnitGraph, UnitId)
+createUnitEnvFromFlags unitDflags = do
+  unitEnvList <- forM unitDflags $ \dflags -> do
+    emptyHpt <- emptyHomePackageTable
+    let newInternalUnitEnv =
+          HUG.mkHomeUnitEnv emptyUnitState Nothing dflags emptyHpt Nothing
+    return (homeUnitId_ dflags, newInternalUnitEnv)
+  let activeUnit = fst $ NE.head unitEnvList
+  return (HUG.hugFromList (NE.toList unitEnvList), activeUnit)
 
 -- ---------------------------------------------------------------------------
 -- Various banners and verbosity output.

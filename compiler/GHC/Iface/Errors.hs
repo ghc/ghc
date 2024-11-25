@@ -87,7 +87,7 @@ cannotFindModule hsc_env = cannotFindModule'
 cannotFindModule' :: UnitEnv -> Profile -> ModuleName -> FindResult
                   -> MissingInterfaceError
 cannotFindModule' unit_env profile mod res =
-  CantFindErr (ue_units unit_env) FindingModule $
+  CantFindErr (ue_homeUnitState unit_env) FindingModule $
   cantFindErr unit_env
               profile
               mod
@@ -131,7 +131,7 @@ cantFindErr unit_env profile mod_name find_result
 
                 | otherwise
                 -> GenericMissing
-                    (map ((\uid -> (uid, lookupUnit (ue_units unit_env) uid))) pkg_hiddens)
+                    (map ((\uid -> (uid, lookupUnit (ue_homeUnitState unit_env) uid))) pkg_hiddens)
                     mod_hiddens unusables files
             _ -> panic "cantFindErr"
 

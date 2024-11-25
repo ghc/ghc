@@ -22,7 +22,7 @@ import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core
 import GHC.Core.Opt.CSE  ( cseProgram )
-import GHC.Core.Rules   ( RuleBase, mkRuleBase, ruleCheckProgram, getRules )
+import GHC.Core.Rules   ( RuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( lintAnnots )
@@ -76,7 +76,8 @@ core2core :: HscEnv -> ModGuts -> IO ModGuts
 core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_loc     = loc
                                 , mg_rdr_env = rdr_env })
-  = do { let builtin_passes = getCoreToDo dflags hpt_rule_base extra_vars
+  = do { hpt_rule_base <- home_pkg_rules
+       ; let builtin_passes = getCoreToDo dflags hpt_rule_base extra_vars
              uniq_tag = 's'
 
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_tag mod
@@ -97,9 +98,8 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
     dflags         = hsc_dflags hsc_env
     logger         = hsc_logger hsc_env
     extra_vars     = interactiveInScope (hsc_IC hsc_env)
-    home_pkg_rules = hptRules hsc_env (moduleUnitId mod) (GWIB { gwib_mod = moduleName mod
-                                                               , gwib_isBoot = NotBoot })
-    hpt_rule_base  = mkRuleBase home_pkg_rules
+    home_pkg_rules = hugRulesBelow hsc_env (moduleUnitId mod)
+                      (GWIB { gwib_mod = moduleName mod, gwib_isBoot = NotBoot })
     name_ppr_ctx   = mkNamePprCtx ptc (hsc_unit_env hsc_env) rdr_env
     ptc            = initPromotionTickContext dflags
     -- mod: get the module out of the current HscEnv so we can retrieve it from the monad.
