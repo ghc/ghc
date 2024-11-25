@@ -60,7 +60,11 @@ main = do
     -- using the 'location' parameter we'd end up using the old location of
     -- the "B" module in this test. Make sure that doesn't happen.
 
+<<<<<<< HEAD
     hPrint stderr $ sort (map (ml_hs_file . ms_location) (mapMaybe moduleGraphNodeModSum nodes))
+=======
+    hPrint stderr $ sort (map (ml_hs_file . ms_location) (mgModSummaries nodes))
+>>>>>>> 77917f22dd (driver: Store the HomePackageTable in a mutable reference)
 
 writeMod :: [String] -> IO ()
 writeMod src@(head -> stripPrefix "module " -> Just (takeWhile (/=' ') -> mod))

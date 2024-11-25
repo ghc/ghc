@@ -300,7 +300,9 @@ import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Cmm.Config (CmmConfig)
-
+import Data.Bifunctor
+import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Home.PackageTable
 
 {- **********************************************************************
 %*                                                                      *
@@ -309,11 +311,13 @@ import GHC.Cmm.Config (CmmConfig)
 %********************************************************************* -}
 
 newHscEnv :: FilePath -> DynFlags -> IO HscEnv
-newHscEnv top_dir dflags = newHscEnvWithHUG top_dir dflags (homeUnitId_ dflags) home_unit_graph
+newHscEnv top_dir dflags = do
+  hpt <- emptyHomePackageTable
+  newHscEnvWithHUG top_dir dflags (homeUnitId_ dflags) (home_unit_graph hpt)
   where
-    home_unit_graph = unitEnv_singleton
+    home_unit_graph hpt = HUG.unitEnv_singleton
                         (homeUnitId_ dflags)
-                        (mkHomeUnitEnv dflags emptyHomePackageTable Nothing)
+                        (HUG.mkHomeUnitEnv emptyUnitState Nothing dflags hpt Nothing)
 
 newHscEnvWithHUG :: FilePath -> DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
 newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
@@ -321,7 +325,7 @@ newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
     fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs
-    let dflags = homeUnitEnv_dflags $ unitEnv_lookup cur_unit home_unit_graph
+    let dflags = homeUnitEnv_dflags $ HUG.unitEnv_lookup cur_unit home_unit_graph
     unit_env <- initUnitEnv cur_unit home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags)
     llvm_config <- initLlvmConfigCache top_dir
     return HscEnv { hsc_dflags         = top_dynflags
@@ -967,23 +971,22 @@ loadByteCode iface mod_sum = do
 -- Compilers
 --------------------------------------------------------------
 
+add_iface_to_hpt :: ModIface -> ModDetails -> HscEnv -> IO ()
+add_iface_to_hpt iface details = do
+  let !iface' = set_mi_extra_decls Nothing iface
+  hscInsertHPT (HomeModInfo iface' details emptyHomeModInfoLinkable)
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
 initModDetails :: HscEnv -> ModIface -> IO ModDetails
 initModDetails hsc_env iface =
   fixIO $ \details' -> do
-    let -- For memory efficiency, HPT is not populated with serialized core bindings.
-        act hpt  =
-          let iface' = set_mi_extra_decls Nothing iface
-          in addToHpt hpt (moduleName $ mi_module iface')
-                          (HomeModInfo iface' details' emptyHomeModInfoLinkable)
-    let !hsc_env' = hscUpdateHPT act hsc_env
+    add_iface_to_hpt iface details' hsc_env
     -- NB: This result is actually not that useful
     -- in one-shot mode, since we're not going to do
     -- any further typechecking.  It's much more useful
     -- in make mode, since this HMI will go into the HPT.
-    genModDetails hsc_env' iface
+    genModDetails hsc_env iface
 
 -- Hydrate any WholeCoreBindings linkables into BCOs
 initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
@@ -1001,14 +1004,10 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = do
   pure $ LM utc_time this_mod $ {- stub_uls ++ -} bytecode_uls
   where
     go (CoreBindings fi) = do
-        let act hpt  =
-              -- For memory efficiency, HPT is not populated with serialized core bindings.
-              let mod_iface' = set_mi_extra_decls Nothing mod_iface
-               in addToHpt hpt (moduleName $ mi_module mod_iface')
-                               (HomeModInfo mod_iface' details emptyHomeModInfoLinkable)
         types_var <- newIORef (md_types details)
         let kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
-        let hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
+        let hsc_env' = hsc_env { hsc_type_env_vars = kv }
+        add_iface_to_hpt mod_iface details hsc_env'
         -- The bytecode generation itself is lazy because otherwise even when doing
         -- recompilation checking the bytecode will be generated (which slows things down a lot)
         -- the laziness is OK because generateByteCode just depends on things already loaded
@@ -1642,7 +1641,7 @@ hscCheckSafe' m l = do
         hsc_eps <- liftIO $ hscEPS hsc_env
         let pkgIfaceT = eps_PIT hsc_eps
             hug       = hsc_HUG hsc_env
-            iface     = lookupIfaceByModule hug pkgIfaceT m
+        iface <- liftIO $ lookupIfaceByModule hug pkgIfaceT m
         -- the 'lookupIfaceByModule' method will always fail when calling from GHCi
         -- as the compiler hasn't filled in the various module tables
         -- so we need to call 'getModuleInterface' to load from disk

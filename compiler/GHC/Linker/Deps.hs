@@ -46,6 +46,7 @@ import GHC.Iface.Errors.Ppr
 
 import GHC.Utils.Misc
 import GHC.Unit.Home
+import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Data.Maybe
 
 import Control.Applicative
@@ -59,6 +60,7 @@ import System.Directory
 import GHC.Driver.Env
 import {-# SOURCE #-} GHC.Driver.Main
 import Data.Time.Clock
+import GHC.Unit.Home.Graph
 
 
 data LinkDepsOpts = LinkDepsOpts
@@ -188,7 +190,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
     all_home_mods = [with_uid | NodeKey_Module with_uid <- Set.toList all_deps]
 
     get_mod_info (ModNodeKeyWithUid gwib uid) =
-      case lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) of
+      lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) >>= \case
         Just hmi -> do
           let iface = hm_iface hmi
           case mi_hsc_src iface of
@@ -234,6 +236,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                 return lnk{ linkableUnlinked=new_uls }
         | otherwise =
                 return lnk
+
 
     adjust_ul new_osuf (DotO file) = do
         -- file may already has new_osuf suffix. One example

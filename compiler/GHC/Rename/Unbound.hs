@@ -305,6 +305,8 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
       = [ (SimilarRdrName (mkRdrQual (is_as ispec) (greOccName gre)) (Just $ ImportedBy ispec))
         | i <- bagToList is, let ispec = is_decl i, is_qual ispec ]
 
+type HomePackageTable = ()
+
 
 -- | Generate errors and helpful suggestions if a qualified name Mod.foo is not in scope.
 importSuggestions :: LookingFor

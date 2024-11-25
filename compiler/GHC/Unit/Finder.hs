@@ -47,6 +47,8 @@ import GHC.Unit.Env
 import GHC.Unit.Types
 import GHC.Unit.Module
 import GHC.Unit.Home
+import GHC.Unit.Home.Graph (UnitEnvGraph)
+import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.State
 import GHC.Unit.Finder.Types
 
@@ -221,8 +223,8 @@ findImportedModuleNoHsc fc fopts ue query home_module_map mhome_unit mod_name mb
                     findExposedPackageModule fc fopts units query mod_name NoPkgQual
 
     units     = case mhome_unit of
-                  Nothing -> ue_units ue
-                  Just home_unit -> homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
+                  Nothing -> ue_homeUnitState ue
+                  Just home_unit -> HUG.homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
     hpt_deps :: Set.Set UnitId
     hpt_deps  = homeUnitDepends units
     dep_providers = Set.intersection module_home_units hpt_deps
@@ -263,7 +265,7 @@ findExactModule fc fopts other_fopts unit_state mhome_unit mod = do
     Just home_unit
      | isHomeInstalledModule home_unit mod
         -> findInstalledHomeModule fc fopts (homeUnitId home_unit) (moduleName mod)
-     | Just home_fopts <- unitEnv_lookup_maybe (moduleUnit mod) other_fopts
+     | Just home_fopts <- HUG.unitEnv_lookup_maybe (moduleUnit mod) other_fopts
         -> findInstalledHomeModule fc home_fopts (moduleUnit mod) (moduleName mod)
     _ -> findPackageModule fc unit_state fopts mod
 

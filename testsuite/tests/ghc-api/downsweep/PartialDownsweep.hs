@@ -170,7 +170,11 @@ go label mods cnd =
     hsc_env <- getSession
     (_, nodes) <- liftIO $ downsweep hsc_env [] [] False
 
+<<<<<<< HEAD
     it label $ cnd (mapMaybe moduleGraphNodeModSum nodes)
+=======
+    it label $ cnd (mgModSummaries nodes)
+>>>>>>> 77917f22dd (driver: Store the HomePackageTable in a mutable reference)
 
 
 writeMod :: [String] -> IO ()
