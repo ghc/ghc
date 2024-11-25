@@ -41,6 +41,8 @@ where
 
 import GHC.Prelude
 
+import GHC.Builtin.Names ( gHC_PRIM )
+
 import GHC.Driver.DynFlags
 import GHC.Driver.Errors ( printOrThrowDiagnostics )
 import GHC.Driver.Errors.Types ( GhcMessage )
@@ -69,8 +71,6 @@ import GHC.Types.Error ( emptyMessages, Messages )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.TyThing
-
-import GHC.Builtin.Names ( gHC_PRIM )
 
 import GHC.Data.Maybe
 
@@ -274,9 +274,11 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
         mg  = hsc_mod_graph hsc_env
     in
     [ thing
-    |
-    -- Find each non-hi-boot module below me
-      (ModNodeKeyWithUid (GWIB { gwib_mod = mod, gwib_isBoot = is_boot }) mod_uid) <- Set.toList (moduleGraphModulesBelow mg uid mn)
+      -- "Finding each non-hi-boot module below me" maybe could be cached in the module
+      -- graph to avoid filtering the boots out of the transitive closure out
+      -- every time this is called
+    | (ModNodeKeyWithUid (GWIB { gwib_mod = mod, gwib_isBoot = is_boot }) mod_uid)
+          <- Set.toList (moduleGraphModulesBelow mg uid mn)
     , include_hi_boot || (is_boot == NotBoot)
 
         -- unsavoury: when compiling the base package with --make, we

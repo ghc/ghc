@@ -250,11 +250,9 @@ depanalPartial diag_wrapper msg excluded_mods allow_dup_roots = do
     -- cached finder data.
     liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_unit_env hsc_env)
 
-    (errs, graph_nodes) <- liftIO $ downsweep
+    (errs, mod_graph) <- liftIO $ downsweep
       hsc_env diag_wrapper msg (mgModSummaries old_graph)
       excluded_mods allow_dup_roots
-    let
-      mod_graph = mkModuleGraph graph_nodes
     return (unionManyMessages errs, mod_graph)
 
 -- | Collect the instantiations of dependencies to create 'InstantiationNode' work graph nodes.
@@ -289,7 +287,7 @@ linkNodes summaries uid hue =
       ofile = outputFile_ dflags
 
       unit_nodes :: [NodeKey]
-      unit_nodes = map mkNodeKey (filter ((== uid) . moduleGraphNodeUnitId) summaries)
+      unit_nodes = map mkNodeKey (filter ((== uid) . mgNodeUnitId) summaries)
   -- Issue a warning for the confusing case where the user
   -- said '-o foo' but we're not going to do any linking.
   -- We attempt linking if either (a) one of the modules is
@@ -632,13 +630,18 @@ createBuildPlan mod_graph maybe_top_mod =
 
         -- An environment mapping a module to its hs-boot file and all nodes on the path between the two, if one exists
         boot_modules = mkModuleEnv
-          [ (ms_mod ms, (m, boot_path (ms_mod_name ms) (ms_unitid ms))) | m@(ModuleNode _ ms) <- (mgModSummaries' mod_graph), isBootSummary ms == IsBoot]
+          [ (ms_mod ms, (m, boot_path (ms_mod_name ms) (ms_unitid ms)))
+            | m@(ModuleNode _ ms) <- mgModSummaries' mod_graph
+            , isBootSummary ms == IsBoot]
 
         select_boot_modules :: [ModuleGraphNode] -> [ModuleGraphNode]
         select_boot_modules = mapMaybe (fmap fst . get_boot_module)
 
         get_boot_module :: ModuleGraphNode -> Maybe (ModuleGraphNode, [ModuleGraphNode])
-        get_boot_module m = case m of ModuleNode _ ms | HsSrcFile <- ms_hsc_src ms -> lookupModuleEnv boot_modules (ms_mod ms); _ -> Nothing
+        get_boot_module (ModuleNode _ ms)
+          | HsSrcFile <- ms_hsc_src ms
+          = lookupModuleEnv boot_modules (ms_mod ms)
+        get_boot_module _ = Nothing
 
         -- Any cycles should be resolved now
         collapseSCC :: [SCC ModuleGraphNode] -> Either [ModuleGraphNode] [(Either ModuleGraphNode ModuleGraphNodeWithBootFile)]
@@ -668,8 +671,8 @@ createBuildPlan mod_graph maybe_top_mod =
 
   in
 
-    assertPpr (sum (map countMods build_plan) == length (mgModSummaries' mod_graph))
-              (vcat [text "Build plan missing nodes:", (text "PLAN:" <+> ppr (sum (map countMods build_plan))), (text "GRAPH:" <+> ppr (length (mgModSummaries' mod_graph )))])
+    assertPpr (sum (map countMods build_plan) == lengthMG mod_graph)
+              (vcat [text "Build plan missing nodes:", (text "PLAN:" <+> ppr (sum (map countMods build_plan))), (text "GRAPH:" <+> ppr (lengthMG mod_graph))])
               build_plan
 
 mkWorkerLimit :: DynFlags -> IO WorkerLimit
@@ -1142,7 +1145,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
       !build_map <- getBuildMap
       hug_var <- gets hug_var
       -- 1. Get the direct dependencies of this module
-      let direct_deps = nodeDependencies False mod
+      let direct_deps = mgNodeDependencies False mod
           -- It's really important to force build_deps, or the whole buildMap is retained,
           -- which would retain all the result variables, preventing us from collecting them
           -- after they are no longer used.
@@ -1150,14 +1153,14 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
       let !build_action =
             case mod of
               InstantiationNode uid iu -> do
-                withCurrentUnit (moduleGraphNodeUnitId mod) $ do
+                withCurrentUnit (mgNodeUnitId mod) $ do
                   (hug, deps) <- wait_deps_hug hug_var build_deps
                   executeInstantiationNode mod_idx n_mods hug uid iu
                   return (Nothing, deps)
               ModuleNode _build_deps ms ->
                 let !old_hmi = M.lookup (msKey ms) old_hpt
                     rehydrate_mods = mapMaybe nodeKeyModName <$> rehydrate_nodes
-                in withCurrentUnit (moduleGraphNodeUnitId mod) $ do
+                in withCurrentUnit (mgNodeUnitId mod) $ do
                      (hug, deps) <- wait_deps_hug hug_var build_deps
                      hmi <- executeCompileNode mod_idx n_mods old_hmi hug rehydrate_mods ms
                      -- Write the HMI to an external cache (if one exists)
@@ -1166,9 +1169,9 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
                      -- This global MVar is incrementally modified in order to avoid having to
                      -- recreate the HPT before compiling each module which leads to a quadratic amount of work.
                      liftIO $ modifyMVar_ hug_var (return . addHomeModInfoToHug hmi)
-                     return (Just hmi, addToModuleNameSet (moduleGraphNodeUnitId mod) (ms_mod_name ms) deps )
+                     return (Just hmi, addToModuleNameSet (mgNodeUnitId mod) (ms_mod_name ms) deps )
               LinkNode _nks uid -> do
-                  withCurrentUnit (moduleGraphNodeUnitId mod) $ do
+                  withCurrentUnit (mgNodeUnitId mod) $ do
                     (hug, deps) <- wait_deps_hug hug_var build_deps
                     executeLinkNode hug (mod_idx, n_mods) uid direct_deps
                     return (Nothing, deps)
@@ -1570,7 +1573,7 @@ downsweep :: HscEnv
           -> Bool               -- True <=> allow multiple targets to have
                                 --          the same module name; this is
                                 --          very useful for ghc -M
-          -> IO ([DriverMessages], [ModuleGraphNode])
+          -> IO ([DriverMessages], ModuleGraph)
                 -- The non-error elements of the returned list all have distinct
                 -- (Modules, IsBoot) identifiers, unless the Bool is true in
                 -- which case there can be repeats
@@ -1595,7 +1598,7 @@ downsweep_imports :: HscEnv
                   -> [ModuleName]
                   -> Bool
                   -> ([(UnitId, DriverMessages)], [ModSummary])
-                  -> IO ([DriverMessages], [ModuleGraphNode])
+                  -> IO ([DriverMessages], ModuleGraph)
 downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, rootSummariesOk)
    = do
        let root_map = mkRootMap rootSummariesOk
@@ -1620,7 +1623,7 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
        th_enabled_nodes <- enableCodeGenForTH logger tmpfs unit_env all_nodes
        if null all_root_errs
          then return (all_errs, th_enabled_nodes)
-         else pure $ (all_root_errs, [])
+         else pure $ (all_root_errs, emptyMG)
      where
         -- Dependencies arising on a unit (backpack and module linking deps)
         unitModuleNodes :: [ModuleGraphNode] -> UnitId -> HomeUnitEnv -> [Either (Messages DriverMessage) ModuleGraphNode]
@@ -1870,7 +1873,7 @@ enableCodeGenForTH
   -> TmpFs
   -> UnitEnv
   -> [ModuleGraphNode]
-  -> IO [ModuleGraphNode]
+  -> IO ModuleGraph
 enableCodeGenForTH logger tmpfs unit_env =
   enableCodeGenWhen logger tmpfs TFL_CurrentModule TFL_GhcSession unit_env
 
@@ -1893,19 +1896,19 @@ enableCodeGenWhen
   -> TempFileLifetime
   -> UnitEnv
   -> [ModuleGraphNode]
-  -> IO [ModuleGraphNode]
-enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
-  mapM enable_code_gen mod_graph
+  -> IO ModuleGraph
+enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
+  mgMapM enable_code_gen mg
   where
     defaultBackendOf ms = platformDefaultBackend (targetPlatform $ ue_unitFlags (ms_unitid ms) unit_env)
-    enable_code_gen :: ModuleGraphNode -> IO ModuleGraphNode
-    enable_code_gen n@(ModuleNode deps ms)
+    enable_code_gen :: ModSummary -> IO ModSummary
+    enable_code_gen ms
       | ModSummary
         { ms_location = ms_location
         , ms_hsc_src = HsSrcFile
         , ms_hspp_opts = dflags
         } <- ms
-      , Just enable_spec <- mkNodeKey n `Map.lookup` needs_codegen_map =
+      , Just enable_spec <- needs_codegen_map (NodeKey_Module (msKey ms)) =
       if | nocode_enable ms -> do
                let new_temp_file suf dynsuf = do
                      tn <- newTempName logger tmpfs (tmpDir dflags) staticLife suf
@@ -1937,7 +1940,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
                      , ms_hspp_opts = updOptLevel 0 $ new_dflags
                      }
                -- Recursive call to catch the other cases
-               enable_code_gen (ModuleNode deps ms')
+               enable_code_gen ms'
 
          -- If -fprefer-byte-code then satisfy dependency by enabling bytecode (if normal object not enough)
          -- we only get to this case if the default backend is already generating object files, but we need dynamic
@@ -1947,21 +1950,21 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
                      { ms_hspp_opts = gopt_set (ms_hspp_opts ms) Opt_ByteCodeAndObjectCode
                      }
                -- Recursive call to catch the other cases
-               enable_code_gen (ModuleNode deps ms')
+               enable_code_gen ms'
          | dynamic_too_enable enable_spec ms -> do
                let ms' = ms
                      { ms_hspp_opts = gopt_set (ms_hspp_opts ms) Opt_BuildDynamicToo
                      }
                -- Recursive call to catch the other cases
-               enable_code_gen (ModuleNode deps ms')
+               enable_code_gen ms'
          | ext_interp_enable ms -> do
                let ms' = ms
                      { ms_hspp_opts = gopt_set (ms_hspp_opts ms) Opt_ExternalInterpreter
                      }
                -- Recursive call to catch the other cases
-               enable_code_gen (ModuleNode deps ms')
+               enable_code_gen ms'
 
-         | otherwise -> return n
+         | otherwise -> return ms
 
     enable_code_gen ms = return ms
 
@@ -2018,23 +2021,23 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
        lcl_dflags   = ms_hspp_opts ms
        internalInterpreter = not (gopt Opt_ExternalInterpreter lcl_dflags)
 
-    (mg, lookup_node) = moduleGraphNodes False mod_graph
+    mg = mkModuleGraph mod_graph
 
-    mk_needed_set roots = Set.fromList $ map (mkNodeKey . node_payload) $ reachablesG mg (map (expectJust "needs_th" . lookup_node) roots)
+    needs_obj_set, needs_bc_set :: NodeKey -> Bool
+    needs_obj_set k = mgQueryMany mg need_obj_set k || k `elem` need_obj_set
 
-    needs_obj_set, needs_bc_set :: Set.Set NodeKey
-    needs_obj_set = mk_needed_set need_obj_set
-
-    needs_bc_set = mk_needed_set need_bc_set
+    needs_bc_set k = mgQueryMany mg need_bc_set k || k `elem` need_bc_set
 
     -- A map which tells us how to enable code generation for a NodeKey
-    needs_codegen_map :: Map.Map NodeKey CodeGenEnable
-    needs_codegen_map =
+    needs_codegen_map :: NodeKey -> Maybe CodeGenEnable
+    needs_codegen_map nk =
       -- Another option here would be to just produce object code, rather than both object and
       -- byte code
-      Map.unionWith (\_ _ -> EnableByteCodeAndObject)
-        (Map.fromList $ [(m, EnableObject) | m <- Set.toList needs_obj_set])
-        (Map.fromList $ [(m, EnableByteCode) | m <- Set.toList needs_bc_set])
+      case (needs_obj_set nk, needs_bc_set nk) of
+        (True, True)   -> Just EnableByteCodeAndObject
+        (True, False)  -> Just EnableObject
+        (False, True)  -> Just EnableByteCode
+        (False, False) -> Nothing
 
     -- The direct dependencies of modules which require object code
     need_obj_set =
@@ -2470,14 +2473,14 @@ cyclicModuleErr mss
        Just path -> mkPlainErrorMsgEnvelope src_span $
                     GhcDriverMessage $ DriverModuleGraphCycle path
         where
-          src_span = maybe noSrcSpan (mkFileSrcSpan . ms_location) (moduleGraphNodeModSum (head path))
+          src_span = maybe noSrcSpan (mkFileSrcSpan . ms_location) (mgNodeModSum (head path))
   where
     graph :: [Node NodeKey ModuleGraphNode]
     graph =
       [ DigraphNode
         { node_payload = ms
         , node_key = mkNodeKey ms
-        , node_dependencies = nodeDependencies False ms
+        , node_dependencies = mgNodeDependencies False ms
         }
       | ms <- mss
       ]

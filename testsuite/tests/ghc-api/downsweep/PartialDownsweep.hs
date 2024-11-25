@@ -171,7 +171,7 @@ go label mods cnd =
     hsc_env <- getSession
     (_, nodes) <- liftIO $ downsweep hsc_env mkUnknownDiagnostic Nothing [] [] False
 
-    it label $ cnd (mapMaybe moduleGraphNodeModSum nodes)
+    it label $ cnd (mapMaybe mgNodeModSum $ mgModSummaries' nodes)
 
 
 writeMod :: [String] -> IO ()
