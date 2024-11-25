@@ -55,7 +55,7 @@ import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
 import GHC.Driver.Monad ( modifySession )
 import GHC.Driver.Make ( newIfaceCache, ModIfaceCache(..) )
-import GHC.Driver.Config.Parser (initParserOpts)
+import GHC.Driver.Config.Parser
 import GHC.Driver.Config.Diagnostic
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
@@ -1253,7 +1253,8 @@ enqueueCommands cmds = do
 -- The return value True indicates success, as in `runOneCommand`.
 runStmt :: GhciMonad m => String -> SingleStep -> m (Maybe GHC.ExecResult)
 runStmt input step = do
-  pflags <- initParserOpts <$> GHC.getInteractiveDynFlags
+  dflags <- GHC.getInteractiveDynFlags
+  let pflags = initParserOpts dflags
   -- In GHCi, we disable `-fdefer-type-errors`, as well as `-fdefer-type-holes`
   -- and `-fdefer-out-of-scope-variables` for **naked expressions**. The
   -- declarations and statements are not affected.
@@ -1262,8 +1263,8 @@ runStmt input step = do
   let source = progname st
   let line = line_number st
 
-  -- Add any LANGUAGE/OPTIONS_GHC pragmas we find find.
-  set_pragmas pflags
+  -- Add any LANGUAGE/OPTIONS_GHC pragmas we find.
+  set_pragmas pflags (supportedLanguagePragmas dflags)
 
   if | GHC.isStmt pflags input -> do
          hsc_env <- GHC.getSession
@@ -1298,9 +1299,9 @@ runStmt input step = do
 
     run_imports imports = mapM_ (addImportToContext . unLoc) imports
 
-    set_pragmas pflags =
+    set_pragmas pflags supported =
       let stringbuf = stringToStringBuffer input
-          (_msgs, loc_opts) = Header.getOptions pflags stringbuf "<interactive>"
+          (_msgs, loc_opts) = Header.getOptions pflags supported stringbuf "<interactive>"
           opts = unLoc <$> loc_opts
       in setOptions opts
 

@@ -21,4 +21,4 @@ main = do
         parser_opts = initParserOpts dflags'
     setSessionDynFlags dflags'
     stringBuffer <- liftIO $ hGetStringBuffer filename
-    liftIO $ print (map unLoc (snd $ getOptions parser_opts stringBuffer filename))
+    liftIO $ print (map unLoc (snd $ getOptions parser_opts (supportedLanguagePragmas dflags) stringBuffer filename))

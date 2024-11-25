@@ -348,7 +348,7 @@ initDynFlags file = do
   -- Based on GHC backpack driver doBackPack
   dflags0         <- GHC.getSessionDynFlags
   let parser_opts0 = GHC.initParserOpts dflags0
-  (_, src_opts)   <- GHC.liftIO $ GHC.getOptionsFromFile parser_opts0 file
+  (_, src_opts)   <- GHC.liftIO $ GHC.getOptionsFromFile parser_opts0 (GHC.supportedLanguagePragmas dflags0) file
   (dflags1, _, _) <- GHC.parseDynamicFilePragma dflags0 src_opts
   -- Turn this on last to avoid T10942
   let dflags2 = dflags1 `GHC.gopt_set` GHC.Opt_KeepRawTokenStream
@@ -376,7 +376,7 @@ initDynFlagsPure fp s = do
   -- no reason to use it.
   dflags0 <- GHC.getSessionDynFlags
   let parser_opts0 = GHC.initParserOpts dflags0
-  let (_, pragmaInfo) = GHC.getOptions parser_opts0 (GHC.stringToStringBuffer $ s) fp
+  let (_, pragmaInfo) = GHC.getOptions parser_opts0 (GHC.supportedLanguagePragmas dflags0) (GHC.stringToStringBuffer $ s) fp
   (dflags1, _, _) <- GHC.parseDynamicFilePragma dflags0 pragmaInfo
   -- Turn this on last to avoid T10942
   let dflags2 = dflags1 `GHC.gopt_set` GHC.Opt_KeepRawTokenStream

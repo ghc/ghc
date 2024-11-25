@@ -2419,8 +2419,6 @@ data ParserOpts = ParserOpts
   { pExtsBitmap     :: !ExtsBitmap -- ^ bitmap of permitted extensions
   , pDiagOpts       :: !DiagOpts
     -- ^ Options to construct diagnostic messages.
-  , pSupportedExts  :: [String]
-    -- ^ supported extensions (only used for suggestions in error messages)
   }
 
 pWarningFlags :: ParserOpts -> EnumSet WarningFlag
@@ -2890,7 +2888,6 @@ data ExtBits
 mkParserOpts
   :: EnumSet LangExt.Extension  -- ^ permitted language extensions enabled
   -> DiagOpts                   -- ^ diagnostic options
-  -> [String]                   -- ^ Supported Languages and Extensions
   -> Bool                       -- ^ are safe imports on?
   -> Bool                       -- ^ keeping Haddock comment tokens
   -> Bool                       -- ^ keep regular comment tokens
@@ -2902,12 +2899,11 @@ mkParserOpts
 
   -> ParserOpts
 -- ^ Given exactly the information needed, set up the 'ParserOpts'
-mkParserOpts extensionFlags diag_opts supported
+mkParserOpts extensionFlags diag_opts
   safeImports isHaddock rawTokStream usePosPrags =
     ParserOpts {
       pDiagOpts      = diag_opts
     , pExtsBitmap    = safeHaskellBit .|. langExtBits .|. optBits
-    , pSupportedExts = supported
     }
   where
     safeHaskellBit = SafeHaskellBit `setBitIf` safeImports

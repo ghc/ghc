@@ -24,7 +24,7 @@ import GHC.Driver.Backend
 -- In a separate module because it hooks into the parser.
 import GHC.Driver.Backpack.Syntax
 import GHC.Driver.Config.Finder (initFinderOpts)
-import GHC.Driver.Config.Parser (initParserOpts)
+import GHC.Driver.Config.Parser
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Monad
 import GHC.Driver.Session
@@ -100,7 +100,7 @@ doBackpack [src_filename] = do
     dflags0 <- getDynFlags
     let dflags1 = dflags0
     let parser_opts1 = initParserOpts dflags1
-    (p_warns, src_opts) <- liftIO $ getOptionsFromFile parser_opts1 src_filename
+    (p_warns, src_opts) <- liftIO $ getOptionsFromFile parser_opts1 (supportedLanguagePragmas dflags1) src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
     modifySession (hscSetFlags dflags)
     logger <- getLogger -- Get the logger after having set the session flags,

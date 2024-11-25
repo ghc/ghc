@@ -168,14 +168,15 @@ mkPrelImports this_mod loc implicit_prelude import_decls
 --
 -- Throws a 'SourceError' if flag parsing fails (including unsupported flags.)
 getOptionsFromFile :: ParserOpts
+                   -> [String] -- ^ Supported LANGUAGE pragmas
                    -> FilePath            -- ^ Input file
                    -> IO (Messages PsMessage, [Located String]) -- ^ Parsed options, if any.
-getOptionsFromFile opts filename
+getOptionsFromFile opts supported filename
     = Exception.bracket
               (openBinaryFile filename ReadMode)
               (hClose)
               (\handle -> do
-                  (warns, opts) <- fmap (getOptions' opts)
+                  (warns, opts) <- fmap (getOptions' opts supported)
                                (lazyGetToks opts' filename handle)
                   seqList opts
                     $ seqList (bagToList $ getMessages warns)
@@ -249,20 +250,22 @@ getToks popts filename buf = lexAll pstate
 --
 -- Throws a 'SourceError' if flag parsing fails (including unsupported flags.)
 getOptions :: ParserOpts
+           -> [String] -- ^ Supported LANGUAGE pragmas
            -> StringBuffer -- ^ Input Buffer
            -> FilePath     -- ^ Source filename.  Used for location info.
            -> (Messages PsMessage,[Located String]) -- ^ warnings and parsed options.
-getOptions opts buf filename
-    = getOptions' opts (getToks opts filename buf)
+getOptions opts supported buf filename
+    = getOptions' opts supported (getToks opts filename buf)
 
 -- The token parser is written manually because Happy can't
 -- return a partial result when it encounters a lexer error.
 -- We want to extract options before the buffer is passed through
 -- CPP, so we can't use the same trick as 'getImports'.
 getOptions' :: ParserOpts
+            -> [String]
             -> [Located Token]      -- Input buffer
             -> (Messages PsMessage,[Located String])     -- Options.
-getOptions' opts toks
+getOptions' opts supported toks
     = parseToks toks
     where
           parseToks (open:close:xs)
@@ -296,7 +299,7 @@ getOptions' opts toks
           parseToks xs = (unionManyMessages $ mapMaybe mkMessage xs ,[])
 
           parseLanguage ((L loc (ITconid fs)):rest)
-              = fmap (checkExtension opts (L loc fs) :) $
+              = fmap (checkExtension supported (L loc fs) :) $
                 case rest of
                   (L _loc ITcomma):more -> parseLanguage more
                   (L _loc ITclose_prag):more -> parseToks more
@@ -446,13 +449,13 @@ checkProcessArgsResult flags
 
 -----------------------------------------------------------------------------
 
-checkExtension :: ParserOpts -> Located FastString -> Located String
-checkExtension opts (L l ext)
+checkExtension :: [String] -> Located FastString -> Located String
+checkExtension supported (L l ext)
 -- Checks if a given extension is valid, and if so returns
 -- its corresponding flag. Otherwise it throws an exception.
-  = if ext' `elem` (pSupportedExts opts)
+  = if ext' `elem` supported
     then L l ("-X"++ext')
-    else unsupportedExtnError opts l ext'
+    else unsupportedExtnError supported l ext'
   where
     ext' = unpackFS ext
 
@@ -460,9 +463,9 @@ languagePragParseError :: SrcSpan -> a
 languagePragParseError loc =
     throwErr loc $ PsErrParseLanguagePragma
 
-unsupportedExtnError :: ParserOpts -> SrcSpan -> String -> a
-unsupportedExtnError opts loc unsup =
-    throwErr loc $ PsErrUnsupportedExt unsup (pSupportedExts opts)
+unsupportedExtnError :: [String] -> SrcSpan -> String -> a
+unsupportedExtnError supported loc unsup =
+    throwErr loc $ PsErrUnsupportedExt unsup supported
 
 optionsParseError :: String -> SrcSpan -> a     -- #15053
 optionsParseError str loc =

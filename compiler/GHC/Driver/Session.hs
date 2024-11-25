@@ -3167,7 +3167,7 @@ setMainIs arg = parse parse_main_f arg
 
     -- dummy parser state.
     p_state str = initParserState
-              (mkParserOpts mempty emptyDiagOpts [] False False False True)
+              (mkParserOpts mempty emptyDiagOpts False False False True)
               (stringToStringBuffer str)
               (mkRealSrcLoc (mkFastString []) 1 1)
 

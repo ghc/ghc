@@ -42,8 +42,6 @@ ppHyperlinkedSource
   :: Verbosity
   -> Bool
   -- ^ In one-shot mode
-  -> [String]
-  -- ^ Supported languages and extensions based on architecture and OS
   -> FilePath
   -- ^ Output directory
   -> FilePath
@@ -57,14 +55,14 @@ ppHyperlinkedSource
   -> [Interface]
   -- ^ Interfaces for which we create source
   -> IO ()
-ppHyperlinkedSource verbosity isOneShot languagesAndExtensions  outdir libdir mstyle pretty srcs' ifaces = do
+ppHyperlinkedSource verbosity isOneShot outdir libdir mstyle pretty srcs' ifaces = do
   createDirectoryIfMissing True srcdir
   unless isOneShot $ do
     let cssFile = fromMaybe (defaultCssFile libdir) mstyle
     copyFile cssFile $ srcdir </> srcCssFile
     copyFile (libdir </> "html" </> highlightScript) $
       srcdir </> highlightScript
-  mapM_ (ppHyperlinkedModuleSource verbosity languagesAndExtensions  srcdir pretty srcs) ifaces
+  mapM_ (ppHyperlinkedModuleSource verbosity srcdir pretty srcs) ifaces
   where
     srcdir = outdir </> hypSrcDir
     srcs = (srcs', M.mapKeys moduleName srcs')
@@ -72,14 +70,12 @@ ppHyperlinkedSource verbosity isOneShot languagesAndExtensions  outdir libdir ms
 -- | Generate hyperlinked source for particular interface.
 ppHyperlinkedModuleSource
   :: Verbosity
-  -> [String]
-  -- ^ Supported languages and extensions based on architecture and OS
   -> FilePath
   -> Bool
   -> SrcMaps
   -> Interface
   -> IO ()
-ppHyperlinkedModuleSource verbosity languagesAndExtensions srcdir pretty srcs iface = do
+ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
   -- Parse the GHC-produced HIE file
   nc <- freshNameCache
   HieFile
@@ -128,7 +124,6 @@ ppHyperlinkedModuleSource verbosity languagesAndExtensions srcdir pretty srcs if
       Lexer.mkParserOpts
         (dflags.extensionFlags)
         (initDiagOpts dflags)
-        languagesAndExtensions
         (safeImportsOn dflags)
         False -- lex Haddocks as comment tokens
         True -- produce comment tokens

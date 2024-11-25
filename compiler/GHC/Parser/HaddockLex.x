@@ -175,7 +175,6 @@ validateIdentWith identParser mloc str0 =
       pflags = mkParserOpts
                  (EnumSet.fromList [LangExt.MagicHash])
                  dopts
-                 []
                  False False False False
       dopts = emptyDiagOpts
       buffer = stringBufferFromByteString str0

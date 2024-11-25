@@ -1,5 +1,6 @@
 module GHC.Driver.Config.Parser
   ( initParserOpts
+  , supportedLanguagePragmas
   )
 where
 
@@ -17,9 +18,10 @@ initParserOpts =
   mkParserOpts
     <$> extensionFlags
     <*> initDiagOpts
-    <*> (supportedLanguagesAndExtensions . platformArchOS . targetPlatform)
     <*> safeImportsOn
     <*> gopt Opt_Haddock
     <*> gopt Opt_KeepRawTokenStream
     <*> const True -- use LINE/COLUMN to update the internal location
 
+supportedLanguagePragmas :: DynFlags -> [String]
+supportedLanguagePragmas = supportedLanguagesAndExtensions . platformArchOS . targetPlatform
