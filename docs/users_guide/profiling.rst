@@ -193,6 +193,13 @@ call are aggregated into the caller [2]_.
 Inserting cost centres by hand
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. pragma:: SCC
+
+    :where: any expression
+
+    Instructs GHC to track runtime cost associated with the expression
+    when profiling is enabled.
+
 Cost centres are just program annotations. When you say ``-fprof-auto``
 to the compiler, it automatically inserts a cost centre annotation
 around every binding not marked INLINE in your program, but you are
@@ -361,11 +368,16 @@ Compiler options for profiling
     :category:
 
     To make use of the profiling system *all* modules must be compiled
-    and linked with the :ghc-flag:`-prof` option. Any ``SCC`` annotations you've
+    and linked with the :ghc-flag:`-prof` option. Any :pragma:`SCC` annotations you've
     put in your source will spring to life.
 
-    Without a :ghc-flag:`-prof` option, your ``SCC``\ s are ignored; so you can
+    Without a :ghc-flag:`-prof` option, :pragma:`SCC` annotations are ignored; so you can
     compile ``SCC``-laden code without changing it.
+
+    Since :ghc-flag:`-prof` affects not just code generation but also memory layout at runtime
+    code compiled with and without :ghc-flag:`-prof` is fundamentally incompatible.
+    To get a functional executable a project has to be built
+    either fully with or fully without :ghc-flag:`-prof`.
 
 .. ghc-flag:: -fno-prof-count-entries
     :shortdesc: Do not collect entry counts
