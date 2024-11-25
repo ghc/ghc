@@ -51,6 +51,9 @@ graphReachability (Graph g from to) =
       do_one v = IS.unions (IS.fromList (g ! v) : mapMaybe (flip IM.lookup reachableGraph) (g ! v))
 
 -- | Construct a 'ReachabilityIndex' from a 'Graph' which may have cycles.
+-- If this reachability index is just going to be used once, it may make sense
+-- to use 'reachablesG' instead, which will traverse the reachable nodes without
+-- constructing the index -- which may be faster.
 cyclicGraphReachability :: Graph node -> ReachabilityIndex node
 cyclicGraphReachability (Graph g from to) =
   ReachabilityIndex{index = reachableGraphCyclic, from_vertex = from, to_vertex = to}
