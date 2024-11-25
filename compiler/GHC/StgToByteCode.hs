@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleContexts           #-}
 
@@ -76,7 +77,7 @@ import Control.Monad
 import Data.Char
 
 import GHC.Unit.Module
-import GHC.Unit.Home.ModInfo (lookupHpt)
+import GHC.Unit.Home.PackageTable (lookupHpt)
 
 import Data.Array
 import Data.Coerce (coerce)
@@ -411,7 +412,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs tick_mod) rhs) = do
     -- if we're not generating ModBreaks for this module for some reason, we
     -- can't store breakpoint occurrence information.
     Nothing -> pure code
-    Just current_mod_breaks -> case break_info hsc_env tick_mod current_mod mb_current_mod_breaks of
+    Just current_mod_breaks -> break_info hsc_env tick_mod current_mod mb_current_mod_breaks >>= \case
       Nothing -> pure code
       Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = tick_mod_ptr, modBreaks_ccs = cc_arr} -> do
         platform <- profilePlatform <$> getProfile
@@ -463,14 +464,14 @@ break_info ::
   Module ->
   Module ->
   Maybe ModBreaks ->
-  Maybe ModBreaks
+  BcM (Maybe ModBreaks)
 break_info hsc_env mod current_mod current_mod_breaks
   | mod == current_mod
-  = check_mod_ptr =<< current_mod_breaks
-  | Just hp <- lookupHpt (hsc_HPT hsc_env) (moduleName mod)
-  = check_mod_ptr (getModBreaks hp)
+  = pure $ check_mod_ptr =<< current_mod_breaks
   | otherwise
-  = Nothing
+  = ioToBc (lookupHpt (hsc_HPT hsc_env) (moduleName mod)) >>= \case
+      Just hp -> pure $ check_mod_ptr (getModBreaks hp)
+      Nothing -> pure Nothing
   where
     check_mod_ptr mb
       | mod_ptr <- modBreaks_module mb

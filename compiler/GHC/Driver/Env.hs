@@ -1,4 +1,4 @@
-
+{-# LANGUAGE LambdaCase #-}
 module GHC.Driver.Env
    ( Hsc(..)
    , HscEnv (..)
@@ -13,8 +13,7 @@ module GHC.Driver.Env
    , hsc_all_home_unit_ids
    , hscUpdateLoggerFlags
    , hscUpdateHUG
-   , hscUpdateHPT_lazy
-   , hscUpdateHPT
+   , hscInsertHPT
    , hscSetActiveHomeUnit
    , hscSetActiveUnitId
    , hscActiveUnitId
@@ -24,24 +23,18 @@ module GHC.Driver.Env
    , runInteractiveHsc
    , hscEPS
    , hscInterp
-   , hptCompleteSigs
-   , hptAllInstances
-   , hptInstancesBelow
-   , hptAnns
-   , hptAllThings
-   , hptSomeThingsBelowUs
-   , hptRules
    , prepareAnnotations
    , discardIC
    , lookupType
    , lookupIfaceByModule
    , mainModIs
+
+    -- * Legacy API
+   , hscUpdateHPT
    )
 where
 
 import GHC.Prelude
-
-import GHC.Builtin.Names ( gHC_PRIM )
 
 import GHC.Driver.DynFlags
 import GHC.Driver.Errors ( printOrThrowDiagnostics )
@@ -58,15 +51,12 @@ import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Home.ModInfo
-import GHC.Unit.Env
+import GHC.Unit.Home.PackageTable
+import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Env as UnitEnv
 import GHC.Unit.External
 
-import GHC.Core         ( CoreRule )
-import GHC.Core.FamInstEnv
-import GHC.Core.InstEnv
-
-import GHC.Types.Annotations ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
-import GHC.Types.CompleteMatch
+import GHC.Types.Annotations ( AnnEnv, mkAnnEnv, plusAnnEnv )
 import GHC.Types.Error ( emptyMessages, Messages )
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -83,7 +73,6 @@ import GHC.Utils.Logger
 
 import Data.IORef
 import qualified Data.Set as Set
-import GHC.Unit.Module.Graph
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env hsc = do
@@ -113,10 +102,10 @@ hsc_home_unit :: HscEnv -> HomeUnit
 hsc_home_unit = unsafeGetHomeUnit . hsc_unit_env
 
 hsc_home_unit_maybe :: HscEnv -> Maybe HomeUnit
-hsc_home_unit_maybe = ue_homeUnit . hsc_unit_env
+hsc_home_unit_maybe = homeUnit . hsc_unit_env
 
 hsc_units :: HasDebugCallStack => HscEnv -> UnitState
-hsc_units = ue_units . hsc_unit_env
+hsc_units = homeUnitState . hsc_unit_env
 
 hsc_HPT :: HscEnv -> HomePackageTable
 hsc_HPT = ue_hpt . hsc_unit_env
@@ -128,17 +117,10 @@ hsc_HUG :: HscEnv -> HomeUnitGraph
 hsc_HUG = ue_home_unit_graph . hsc_unit_env
 
 hsc_all_home_unit_ids :: HscEnv -> Set.Set UnitId
-hsc_all_home_unit_ids = unitEnv_keys . hsc_HUG
+hsc_all_home_unit_ids = HUG.allUnits . hsc_HUG
 
-hscUpdateHPT_lazy :: (HomePackageTable -> HomePackageTable) -> HscEnv -> HscEnv
-hscUpdateHPT_lazy f hsc_env =
-  let !res = updateHpt_lazy f (hsc_unit_env hsc_env)
-  in hsc_env { hsc_unit_env = res }
-
-hscUpdateHPT :: (HomePackageTable -> HomePackageTable) -> HscEnv -> HscEnv
-hscUpdateHPT f hsc_env =
-  let !res = updateHpt f (hsc_unit_env hsc_env)
-  in hsc_env { hsc_unit_env = res }
+hscInsertHPT :: HomeModInfo -> HscEnv -> IO ()
+hscInsertHPT hmi hsc_env = UnitEnv.insertHpt hmi (hsc_unit_env hsc_env)
 
 hscUpdateHUG :: (HomeUnitGraph -> HomeUnitGraph) -> HscEnv -> HscEnv
 hscUpdateHUG f hsc_env = hsc_env { hsc_unit_env = updateHug f (hsc_unit_env hsc_env) }
@@ -217,91 +199,6 @@ configured via command-line flags (in `GHC.setSessionDynFlags`).
 hscEPS :: HscEnv -> IO ExternalPackageState
 hscEPS hsc_env = readIORef (euc_eps (ue_eps (hsc_unit_env hsc_env)))
 
-hptCompleteSigs :: HscEnv -> CompleteMatches
-hptCompleteSigs = hptAllThings  (md_complete_matches . hm_details)
-
--- | Find all the instance declarations (of classes and families) from
--- the Home Package Table filtered by the provided predicate function.
--- Used in @tcRnImports@, to select the instances that are in the
--- transitive closure of imports from the currently compiled module.
-hptAllInstances :: HscEnv -> (InstEnv, [FamInst])
-hptAllInstances hsc_env
-  = let (insts, famInsts) = unzip $ flip hptAllThings hsc_env $ \mod_info -> do
-                let details = hm_details mod_info
-                return (md_insts details, md_fam_insts details)
-    in (foldl' unionInstEnv emptyInstEnv insts, concat famInsts)
-
--- | Find instances visible from the given set of imports
-hptInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> (InstEnv, [FamInst])
-hptInstancesBelow hsc_env uid mnwib =
-  let
-    mn = gwib_mod mnwib
-    (insts, famInsts) =
-        unzip $ hptSomeThingsBelowUs (\mod_info ->
-                                     let details = hm_details mod_info
-                                     -- Don't include instances for the current module
-                                     in if moduleName (mi_module (hm_iface mod_info)) == mn
-                                          then []
-                                          else [(md_insts details, md_fam_insts details)])
-                             True -- Include -hi-boot
-                             hsc_env
-                             uid
-                             mnwib
-  in (foldl' unionInstEnv emptyInstEnv insts, concat famInsts)
-
--- | Get rules from modules "below" this one (in the dependency sense)
-hptRules :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> [CoreRule]
-hptRules = hptSomeThingsBelowUs (md_rules . hm_details) False
-
-
--- | Get annotations from modules "below" this one (in the dependency sense)
-hptAnns :: HscEnv -> Maybe (UnitId, ModuleNameWithIsBoot) -> [Annotation]
-hptAnns hsc_env (Just (uid, mn)) = hptSomeThingsBelowUs (md_anns . hm_details) False hsc_env uid mn
-hptAnns hsc_env Nothing = hptAllThings (md_anns . hm_details) hsc_env
-
-hptAllThings :: (HomeModInfo -> [a]) -> HscEnv -> [a]
-hptAllThings extract hsc_env = concatMap (concatHpt extract . homeUnitEnv_hpt . snd)
-                                (hugElts (hsc_HUG hsc_env))
-
--- | Get things from modules "below" this one (in the dependency sense)
--- C.f Inst.hptInstances
-hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> UnitId -> ModuleNameWithIsBoot -> [a]
-hptSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
-  | isOneShot (ghcMode (hsc_dflags hsc_env)) = []
-
-  | otherwise
-  = let hug = hsc_HUG hsc_env
-        mg  = hsc_mod_graph hsc_env
-    in
-    [ thing
-      -- "Finding each non-hi-boot module below me" maybe could be cached in the module
-      -- graph to avoid filtering the boots out of the transitive closure out
-      -- every time this is called
-    | (ModNodeKeyWithUid (GWIB { gwib_mod = mod, gwib_isBoot = is_boot }) mod_uid)
-          <- Set.toList (moduleGraphModulesBelow mg uid mn)
-    , include_hi_boot || (is_boot == NotBoot)
-
-        -- unsavoury: when compiling the base package with --make, we
-        -- sometimes try to look up RULES etc for GHC.Prim. GHC.Prim won't
-        -- be in the HPT, because we never compile it; it's in the EPT
-        -- instead. ToDo: clean up, and remove this slightly bogus filter:
-    , mod /= moduleName gHC_PRIM
-    , not (mod == gwib_mod mn && uid == mod_uid)
-
-        -- Look it up in the HPT
-    , let things = case lookupHug hug mod_uid mod of
-                    Just info -> extract info
-                    Nothing -> pprTrace "WARNING in hptSomeThingsBelowUs" msg mempty
-          msg = vcat [text "missing module" <+> ppr mod,
-                     text "When starting from"  <+> ppr mn,
-                     text "below:" <+> ppr (moduleGraphModulesBelow mg uid mn),
-                      text "Probable cause: out-of-date interface files"]
-                        -- This really shouldn't happen, but see #962
-    , thing <- things
-    ]
-
-
-
 -- | Deal with gathering annotations in from all possible places
 --   and combining them into a single 'AnnEnv'
 prepareAnnotations :: HscEnv -> Maybe ModGuts -> IO AnnEnv
@@ -313,7 +210,10 @@ prepareAnnotations hsc_env mb_guts = do
         -- otherwise load annotations from all home package table
         -- entries regardless of dependency ordering.
         get_mod mg = (moduleUnitId (mg_module mg), GWIB (moduleName (mg_module mg)) NotBoot)
-        home_pkg_anns  = (mkAnnEnv . hptAnns hsc_env) $ fmap get_mod mb_guts
+    home_pkg_anns  <- fromMaybe (hugAllAnns (hsc_unit_env hsc_env))
+                      $ uncurry (hugAnnsBelow (hsc_unit_env hsc_env) (hsc_mod_graph hsc_env))
+                      . get_mod <$> mb_guts
+    let
         other_pkg_anns = eps_ann_env eps
         ann_env        = foldl1' plusAnnEnv $ catMaybes [mb_this_module_anns,
                                                          Just home_pkg_anns,
@@ -329,9 +229,9 @@ lookupType :: HscEnv -> Name -> IO (Maybe TyThing)
 lookupType hsc_env name = do
    eps <- liftIO $ hscEPS hsc_env
    let pte = eps_PTE eps
-   return $ lookupTypeInPTE hsc_env pte name
+   lookupTypeInPTE hsc_env pte name
 
-lookupTypeInPTE :: HscEnv -> PackageTypeEnv -> Name -> Maybe TyThing
+lookupTypeInPTE :: HscEnv -> PackageTypeEnv -> Name -> IO (Maybe TyThing)
 lookupTypeInPTE hsc_env pte name = ty
   where
     hpt = hsc_HUG hsc_env
@@ -340,12 +240,12 @@ lookupTypeInPTE hsc_env pte name = ty
             then mkHomeModule (hsc_home_unit hsc_env) (moduleName (nameModule name))
             else nameModule name
 
-    !ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
+    ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
             -- in one-shot, we don't use the HPT
-            then lookupNameEnv pte name
-            else case lookupHugByModule mod hpt of
-             Just hm -> lookupNameEnv (md_types (hm_details hm)) name
-             Nothing -> lookupNameEnv pte name
+            then return $! lookupNameEnv pte name
+            else HUG.lookupHugByModule mod hpt >>= \case
+             Just hm -> pure $! lookupNameEnv (md_types (hm_details hm)) name
+             Nothing -> pure $! lookupNameEnv pte name
 
 -- | Find the 'ModIface' for a 'Module', searching in both the loaded home
 -- and external package module information
@@ -353,9 +253,9 @@ lookupIfaceByModule
         :: HomeUnitGraph
         -> PackageIfaceTable
         -> Module
-        -> Maybe ModIface
+        -> IO (Maybe ModIface)
 lookupIfaceByModule hug pit mod
-  = case lookupHugByModule mod hug of
+  = HUG.lookupHugByModule mod hug >>= pure . \case
        Just hm -> Just (hm_iface hm)
        Nothing -> lookupModuleEnv pit mod
    -- If the module does come from the home package, why do we look in the PIT as well?
@@ -366,7 +266,7 @@ lookupIfaceByModule hug pit mod
    -- of its own, but it doesn't seem worth the bother.
 
 mainModIs :: HomeUnitEnv -> Module
-mainModIs hue = mkHomeModule (expectJust "mainModIs" $ homeUnitEnv_home_unit  hue) (mainModuleNameIs (homeUnitEnv_dflags hue))
+mainModIs hue = mkHomeModule (expectJust "mainModIs" $ homeUnitEnv_home_unit hue) (mainModuleNameIs (homeUnitEnv_dflags hue))
 
 -- | Retrieve the target code interpreter
 --
@@ -390,7 +290,7 @@ hscUpdateFlags f h = hscSetFlags (f (hsc_dflags h)) h
 hscSetFlags :: HasDebugCallStack => DynFlags -> HscEnv -> HscEnv
 hscSetFlags dflags h =
   hscUpdateLoggerFlags $ h { hsc_dflags = dflags
-                           , hsc_unit_env = ue_setFlags dflags (hsc_unit_env h) }
+                           , hsc_unit_env = setFlags dflags (hsc_unit_env h) }
 
 -- See Note [Multiple Home Units]
 hscSetActiveHomeUnit :: HasDebugCallStack => HomeUnit -> HscEnv -> HscEnv
@@ -399,7 +299,7 @@ hscSetActiveHomeUnit home_unit = hscSetActiveUnitId (homeUnitId home_unit)
 hscSetActiveUnitId :: HasDebugCallStack => UnitId -> HscEnv -> HscEnv
 hscSetActiveUnitId uid e = e
   { hsc_unit_env = ue_setActiveUnit uid (hsc_unit_env e)
-  , hsc_dflags = ue_unitFlags uid (hsc_unit_env e)  }
+  , hsc_dflags = UnitEnv.unitFlags uid (hsc_unit_env e)  }
 
 hscActiveUnitId :: HscEnv -> UnitId
 hscActiveUnitId e = ue_currentUnit (hsc_unit_env e)
@@ -427,3 +327,19 @@ discardIC hsc_env
     where
     home_unit = hsc_home_unit hsc_env
     old_name = ic_name old_ic
+
+
+--------------------------------------------------------------------------------
+-- * The Legacy API, should be removed after enough deprecation cycles
+--------------------------------------------------------------------------------
+
+{-# DEPRECATED hscUpdateHPT "Updating the HPT directly is no longer a supported \
+   \ operation. Instead, the HPT is an insert-only data structure. If you want to \
+   \ overwrite an existing entry, just use 'hscInsertHPT' to insert it again (it \
+   \ will override the existing entry if there is one). See 'GHC.Unit.Home.PackageTable' for more details." #-}
+hscUpdateHPT :: (HomePackageTable -> HomePackageTable) -> HscEnv -> HscEnv
+hscUpdateHPT f hsc_env = hsc_env { hsc_unit_env = updateHug (HUG.unitEnv_adjust upd (ue_currentUnit $ hsc_unit_env hsc_env)) ue }
+  where
+    ue = hsc_unit_env hsc_env
+    upd hue = hue { homeUnitEnv_hpt = f (homeUnitEnv_hpt hue) }
+

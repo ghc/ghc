@@ -45,6 +45,7 @@ import GHC.Iface.Errors.Ppr
 
 import GHC.Utils.Misc
 import GHC.Unit.Home
+import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Data.Maybe
 
 import Control.Monad
@@ -182,7 +183,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
     all_home_mods = [with_uid | NodeKey_Module with_uid <- Set.toList all_deps]
 
     get_mod_info (ModNodeKeyWithUid gwib uid) =
-      case lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) of
+      HUG.lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) >>= \case
         Just hmi ->
           let iface = (hm_iface hmi)
               mmod = case mi_hsc_src iface of
@@ -227,15 +228,15 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                 (_, GWIB m IsBoot)  -> Left m
                 (_, GWIB m NotBoot) -> Right m
 
-            mod_deps' = case ue_homeUnit unit_env of
+            mod_deps' = case homeUnit unit_env of
                           Nothing -> []
                           Just home_unit -> filter (not . (`elementOfUniqDSet` acc_mods)) (map (mkHomeModule home_unit) $ (boot_deps ++ mod_deps))
-            acc_mods'  = case ue_homeUnit unit_env of
+            acc_mods'  = case homeUnit unit_env of
                           Nothing -> acc_mods
                           Just home_unit -> addListToUniqDSet acc_mods (mod : map (mkHomeModule home_unit) mod_deps)
             acc_pkgs'  = addListToUniqDSet acc_pkgs (Set.toList pkg_deps)
 
-          case ue_homeUnit unit_env of
+          case homeUnit unit_env of
             Just home_unit | isHomeUnit home_unit pkg ->  follow_deps (mod_deps' ++ mods)
                                                                       acc_mods' acc_pkgs'
             _ ->  follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
@@ -267,16 +268,16 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         else homeModInfoObject hmi   <|> homeModInfoByteCode hmi
 
     get_linkable osuf mod      -- A home-package module
-        | Just mod_info <- lookupHugByModule mod (ue_home_unit_graph unit_env)
-        = adjust_linkable (expectJust "getLinkDeps" (homeModLinkable mod_info))
-        | otherwise
-        = do    -- It's not in the HPT because we are in one shot mode,
-                -- so use the Finder to get a ModLocation...
-             case ue_homeUnit unit_env of
-              Nothing -> no_obj mod
-              Just home_unit -> do
-                from_bc <- ldLoadByteCode opts mod
-                maybe (fallback_no_bytecode home_unit mod) pure from_bc
+      = HUG.lookupHugByModule mod (ue_home_unit_graph unit_env) >>= \case
+          Just mod_info -> adjust_linkable (expectJust "getLinkDeps" (homeModLinkable mod_info))
+          Nothing -> do
+           -- It's not in the HPT because we are in one shot mode,
+           -- so use the Finder to get a ModLocation...
+           case homeUnit unit_env of
+            Nothing -> no_obj mod
+            Just home_unit -> do
+              from_bc <- ldLoadByteCode opts mod
+              maybe (fallback_no_bytecode home_unit mod) pure from_bc
         where
 
             fallback_no_bytecode home_unit mod = do

@@ -21,7 +21,7 @@ import GHC.Platform.ArchOS
 
 import GHC.SysTools
 
-import GHC.Unit.Env
+import GHC.Unit.Env as UnitEnv
 import GHC.Unit.Info
 import GHC.Unit.State
 import GHC.Unit.Types
@@ -113,7 +113,7 @@ doCpp :: Logger -> TmpFs -> DynFlags -> UnitEnv -> CppOpts -> FilePath -> FilePa
 doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
     let hscpp_opts = picPOpts dflags
     let cmdline_include_paths = offsetIncludePaths dflags (includePaths dflags)
-    let unit_state = ue_units unit_env
+    let unit_state = homeUnitState unit_env
     pkg_include_dirs <- mayThrowUnitErr
                         (collectIncludeDirs <$> preloadUnitsInfo unit_env)
     -- MP: This is not quite right, the headers which are supposed to be installed in
@@ -121,7 +121,7 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
     -- enough approximation for things to work. A proper solution would be to have to declare which paths should
     -- be propagated to dependent packages.
     let home_pkg_deps =
-         [homeUnitEnv_dflags . ue_findHomeUnitEnv uid $ unit_env | uid <- ue_transitiveHomeDeps (ue_currentUnit unit_env) unit_env]
+         [homeUnitEnv_dflags . ue_findHomeUnitEnv uid $ unit_env | uid <- UnitEnv.transitiveHomeDeps (ue_currentUnit unit_env) unit_env]
         dep_pkg_extra_inputs = [offsetIncludePaths fs (includePaths fs) | fs <- home_pkg_deps]
 
     let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
@@ -274,7 +274,7 @@ getGhcVersionPathName dflags unit_env = do
         -- use a wrong file. See #25106 where a globally installed
         -- /usr/include/ghcversion.h file was used instead of the one provided
         -- by the rts.
-        Nothing -> case lookupUnitId (ue_units unit_env) rtsUnitId of
+        Nothing -> case lookupUnitId (homeUnitState unit_env) rtsUnitId of
           Nothing   -> []
           Just info -> (</> "ghcversion.h") <$> collectIncludeDirs [info]
 

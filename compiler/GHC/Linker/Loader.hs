@@ -111,6 +111,7 @@ import System.Win32.Info (getSystemDirectory)
 #endif
 
 import GHC.Utils.Exception
+import GHC.Unit.Home.Graph (unitEnv_foldWithKey)
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~

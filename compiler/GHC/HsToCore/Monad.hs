@@ -275,8 +275,8 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              --
              -- Relevant test case: MultiLayerModulesTH_Make, which regresses
              -- in allocations by ~5% if we don't do this.
-           traverse (lookupCompleteMatch type_env hsc_env) $
-             localAndImportedCompleteMatches (tcg_complete_matches tcg_env) hsc_env eps
+           traverse (lookupCompleteMatch type_env hsc_env) =<<
+             localAndImportedCompleteMatches (tcg_complete_matches tcg_env) (hsc_unit_env hsc_env) eps
        ; return $ mkDsEnvs unit_env this_mod rdr_env type_env fam_inst_env ptc
                            msg_var cc_st_var next_wrapper_num_var ds_complete_matches
        }
@@ -333,8 +333,8 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
              bindsToIds (NonRec v _)   = [v]
              bindsToIds (Rec    binds) = map fst binds
              ids = concatMap bindsToIds binds
-       ; ds_complete_matches <- traverse (lookupCompleteMatch type_env hsc_env) $
-            localAndImportedCompleteMatches local_complete_matches hsc_env eps
+       ; ds_complete_matches <- traverse (lookupCompleteMatch type_env hsc_env) =<<
+            localAndImportedCompleteMatches local_complete_matches (hsc_unit_env hsc_env) eps
        ; let
              envs  = mkDsEnvs unit_env this_mod rdr_env type_env
                               fam_inst_env ptc msg_var cc_st_var

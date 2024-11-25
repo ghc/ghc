@@ -17,7 +17,7 @@ module GHC.Unit.Module.Graph
     -- * Construct a module graph
     --
     -- | A module graph should be constructed once by downsweep and never modified.
-     ModuleGraph
+     ModuleGraph(..)
    , emptyMG
    , mkModuleGraph
 
@@ -49,6 +49,7 @@ module GHC.Unit.Module.Graph
    , mapMG, mgMapM
    , mgModSummaries
    , mgLookupModule
+   , mgHasHoles
 
     -- ** Reachability queries
     --
@@ -109,7 +110,7 @@ import GHC.Data.Graph.Directed.Reachability
 import GHC.Driver.Backend
 import GHC.Driver.DynFlags
 
-import GHC.Types.SourceFile ( hscSourceString )
+import GHC.Types.SourceFile ( hscSourceString, isHsigFile )
 
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
@@ -145,11 +146,15 @@ data ModuleGraph = ModuleGraph
   , mg_graph :: (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
     -- A cached transitive dependency calculation so that a lot of work is not
     -- repeated whenever the transitive dependencies need to be calculated (for example, hptInstances)
+  , mg_has_holes :: !Bool
+  -- Cached computation, whether any of the ModuleGraphNode are isHoleModule,
+  -- This is only used for a hack in GHC.Iface.Load to do with backpack, please
+  -- remove this at the earliest opportunity.
   }
 
 -- | Why do we ever need to construct empty graphs? Is it because of one shot mode?
 emptyMG :: ModuleGraph
-emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing)
+emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing) False
 
 -- | Construct a module graph. This function should be the only entry point for
 -- building a 'ModuleGraph', since it is supposed to be built once and never modified.
@@ -273,6 +278,12 @@ mgLookupModule ModuleGraph{..} m = listToMaybe $ mapMaybe go mg_mss
       , ms_mod ms == m
       = Just ms
     go _ = Nothing
+
+
+-- | A function you should not need to use, or desire to use. Only used
+-- in one place, `GHC.Iface.Load` to facilitate a misimplementation in Backpack.
+mgHasHoles :: ModuleGraph -> Bool
+mgHasHoles ModuleGraph{..} = mg_has_holes
 
 --------------------------------------------------------------------------------
 -- ** Reachability
@@ -532,6 +543,7 @@ extendMG :: ModuleGraph -> [NodeKey] -> ModSummary -> ModuleGraph
 extendMG ModuleGraph{..} deps ms = ModuleGraph
   { mg_mss = ModuleNode deps ms : mg_mss
   , mg_graph = mkTransDeps (ModuleNode deps ms : mg_mss)
+  , mg_has_holes = mg_has_holes || isHsigFile (ms_hsc_src ms)
   }
 
 extendMGInst :: ModuleGraph -> UnitId -> InstantiatedUnit -> ModuleGraph

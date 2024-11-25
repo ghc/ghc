@@ -22,7 +22,7 @@ module GHC.Data.IOEnv (
         IOEnvFailure(..),
 
         -- Getting at the environment
-        getEnv, setEnv, updEnv,
+        getEnv, setEnv, updEnv, updEnvIO,
 
         runIOEnv, unsafeInterleaveM, uninterruptibleMaskM_,
         tryM, tryAllM, tryMostM, fixM,
@@ -253,3 +253,8 @@ setEnv new_env (IOEnv m) = IOEnv (\ _ -> m new_env)
 updEnv :: (env -> env') -> IOEnv env' a -> IOEnv env a
 {-# INLINE updEnv #-}
 updEnv upd (IOEnv m) = IOEnv (\ env -> m (upd env))
+
+-- | Perform a computation with an altered environment
+updEnvIO :: (env -> IO env') -> IOEnv env' a -> IOEnv env a
+{-# INLINE updEnvIO #-}
+updEnvIO upd (IOEnv m) = IOEnv (\ env -> m =<< upd env)
