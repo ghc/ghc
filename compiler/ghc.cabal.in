@@ -935,7 +935,9 @@ Library
         GHC.Unit.Finder
         GHC.Unit.Finder.Types
         GHC.Unit.Home
+        GHC.Unit.Home.Graph
         GHC.Unit.Home.ModInfo
+        GHC.Unit.Home.PackageTable
         GHC.Unit.Info
         GHC.Unit.Module
         GHC.Unit.Module.Deps

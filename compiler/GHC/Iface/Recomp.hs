@@ -1621,7 +1621,7 @@ mkHashFun hsc_env eps name
       orig_mod = nameModule name
       lookup mod = do
         massertPpr (isExternalName name) (ppr name)
-        iface <- case lookupIfaceByModule hpt pit mod of
+        iface <- lookupIfaceByModule hpt pit mod >>= \case
                   Just iface -> return iface
                   Nothing ->
                       -- This can occur when we're writing out ifaces for
