@@ -48,6 +48,7 @@ import GHC.Linker.Types
 import GHC.Unit.Finder
 import GHC.Types.Unique.DFM
 import GHC.Driver.Plugins
+import qualified GHC.Unit.Home.Graph as HUG
 
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -81,11 +82,11 @@ mkUsageInfo uc plugins fc unit_env this_mod dir_imp_mods used_names dependent_fi
   = do
     eps <- liftIO $ readIORef (euc_eps (ue_eps unit_env))
     hashes <- liftIO $ mapM getFileHash dependent_files
-    let hu = unsafeGetHomeUnit unit_env
+    let hu = ue_unsafeHomeUnit unit_env
         hug = ue_home_unit_graph unit_env
     -- Dependencies on object files due to TH and plugins
     object_usages <- liftIO $ mkObjectUsage (eps_PIT eps) plugins fc hug needed_links needed_pkgs
-    let all_home_ids = ue_all_home_unit_ids unit_env
+    let all_home_ids = HUG.allUnits (ue_home_unit_graph unit_env)
     mod_usages <- mk_mod_usage_info uc hu all_home_ids this_mod
                                        dir_imp_mods used_names
     let usages = mod_usages ++ [ UsageFile { usg_file_path = mkFastString f
@@ -184,7 +185,7 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
         Nothing ->  do
           -- This should only happen for home package things but oneshot puts
           -- home package ifaces in the PIT.
-          let miface = lookupIfaceByModule hug pit m
+          miface <- lookupIfaceByModule hug pit m
           case miface of
             Nothing -> pprPanic "mkObjectUsage" (ppr m)
             Just iface ->

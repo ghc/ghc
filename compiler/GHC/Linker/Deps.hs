@@ -39,6 +39,7 @@ import GHC.Unit.Home.ModInfo
 import GHC.Iface.Errors.Types
 
 import GHC.Utils.Misc
+import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Data.Maybe
 
 import Control.Applicative
@@ -152,16 +153,16 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         else homeModInfoObject hmi   <|> homeModInfoByteCode hmi
 
     get_linkable osuf mod      -- A home-package module
-        | Just mod_info <- lookupHugByModule mod (ue_home_unit_graph unit_env)
-        = adjust_linkable (expectJust "getLinkDeps" (homeModLinkable mod_info))
-        | otherwise
-        = do    -- It's not in the HPT because we are in one shot mode,
-                -- so use the Finder to get a ModLocation...
-             case ue_homeUnit unit_env of
-              Nothing -> no_obj mod
-              Just home_unit -> do
-                from_bc <- ldLoadByteCode opts mod
-                maybe (fallback_no_bytecode home_unit mod) pure from_bc
+      = HUG.lookupHugByModule mod (ue_home_unit_graph unit_env) >>= \case
+          Just mod_info -> adjust_linkable (expectJust "getLinkDeps" (homeModLinkable mod_info))
+          Nothing -> do
+           -- It's not in the HPT because we are in one shot mode,
+           -- so use the Finder to get a ModLocation...
+           case ue_homeUnit unit_env of
+            Nothing -> no_obj mod
+            Just home_unit -> do
+              from_bc <- ldLoadByteCode opts mod
+              maybe (fallback_no_bytecode home_unit mod) pure from_bc
         where
 
             fallback_no_bytecode home_unit mod = do

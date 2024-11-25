@@ -41,6 +41,9 @@ data HscBackendAction
           -- changed.
         }
 
+instance Outputable HscRecompStatus where
+  ppr HscUpToDate{} = text "HscUpToDate"
+  ppr HscRecompNeeded{} = text "HscRecompNeeded"
 
 instance Outputable HscBackendAction where
   ppr (HscUpdate mi) = text "Update:" <+> (ppr (mi_module mi))

@@ -61,7 +61,7 @@ main = do
     -- using the 'location' parameter we'd end up using the old location of
     -- the "B" module in this test. Make sure that doesn't happen.
 
-    hPrint stderr $ sort (map (ml_hs_file . ms_location) (mapMaybe mgNodeModSum $ mgModSummaries' nodes))
+    hPrint stderr $ sort (map (ml_hs_file . ms_location) (mgModSummaries nodes))
 
 writeMod :: [String] -> IO ()
 writeMod src@(head -> stripPrefix "module " -> Just (takeWhile (/=' ') -> mod))

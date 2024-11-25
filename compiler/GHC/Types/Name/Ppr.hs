@@ -76,7 +76,7 @@ mkNamePprCtx ptc unit_env env
       (mkQualPackage unit_state)
       (mkPromTick ptc env)
   where
-  unit_state = ue_units unit_env
+  unit_state = ue_homeUnitState unit_env
   home_unit  = ue_homeUnit unit_env
 
 mkQualName :: Outputable info => GlobalRdrEnvX info -> QueryQualifyName

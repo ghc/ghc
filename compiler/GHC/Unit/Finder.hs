@@ -45,6 +45,8 @@ import GHC.Unit.Env
 import GHC.Unit.Types
 import GHC.Unit.Module
 import GHC.Unit.Home
+import GHC.Unit.Home.Graph (UnitEnvGraph)
+import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.State
 import GHC.Unit.Finder.Types
 
@@ -213,8 +215,8 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
                     findExposedPackageModule fc fopts units mod_name NoPkgQual
 
     units     = case mhome_unit of
-                  Nothing -> ue_units ue
-                  Just home_unit -> homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
+                  Nothing -> ue_homeUnitState ue
+                  Just home_unit -> HUG.homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
     hpt_deps :: [UnitId]
     hpt_deps  = homeUnitDepends units
     other_fopts  = map (\uid -> (uid, initFinderOpts (homeUnitEnv_dflags (ue_findHomeUnitEnv uid ue)))) hpt_deps
@@ -236,14 +238,13 @@ findPluginModule fc fopts units Nothing mod_name =
 -- where the files associated with this module live.  It is used when
 -- reading the interface for a module mentioned by another interface,
 -- for example (a "system import").
-
-findExactModule :: FinderCache -> FinderOpts ->  UnitEnvGraph FinderOpts -> UnitState -> Maybe HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
+findExactModule :: FinderCache -> FinderOpts -> UnitEnvGraph FinderOpts -> UnitState -> Maybe HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
 findExactModule fc fopts other_fopts unit_state mhome_unit mod is_boot = do
   res <- case mhome_unit of
     Just home_unit
      | isHomeInstalledModule home_unit mod
         -> findInstalledHomeModule fc fopts (homeUnitId home_unit) (moduleName mod)
-     | Just home_fopts <- unitEnv_lookup_maybe (moduleUnit mod) other_fopts
+     | Just home_fopts <- HUG.unitEnv_lookup_maybe (moduleUnit mod) other_fopts
         -> findInstalledHomeModule fc home_fopts (moduleUnit mod) (moduleName mod)
     _ -> findPackageModule fc unit_state fopts mod
   case (res, is_boot) of

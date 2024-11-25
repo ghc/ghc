@@ -57,7 +57,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Session as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
-import GHC.Driver.Monad ( modifySession )
+import GHC.Driver.Monad ( modifySession, modifySessionM )
 import GHC.Driver.Make ( newIfaceCache, ModIfaceCache(..) )
 import GHC.Driver.Config.Parser
 import GHC.Driver.Config.Diagnostic
@@ -147,7 +147,7 @@ import GHC.Utils.Exception as Exception hiding (catch, mask, handle)
 import Foreign hiding (void)
 import GHC.Stack hiding (SrcLoc(..))
 import GHC.Unit.Env
-import GHC.Unit.Home.ModInfo
+import GHC.Unit.Home.PackageTable
 
 import System.Directory
 import System.Environment
@@ -4467,10 +4467,13 @@ discardInterfaceCache =
 
 clearHPTs :: GhciMonad m => m ()
 clearHPTs = do
-  let pruneHomeUnitEnv hme = hme { homeUnitEnv_hpt = emptyHomePackageTable }
+  let pruneHomeUnitEnv hme = liftIO $ do
+        emptyHpt <- emptyHomePackageTable
+        pure  hme{ homeUnitEnv_hpt = emptyHpt }
       discardMG hsc = hsc { hsc_mod_graph = GHC.emptyMG }
-  modifySession (discardMG . discardIC . hscUpdateHUG (unitEnv_map pruneHomeUnitEnv))
-
+  modifySessionM $ \hsc_env -> do
+    hug' <- traverse pruneHomeUnitEnv $ hsc_HUG hsc_env
+    pure $ discardMG $ discardIC $ hscUpdateHUG (const hug') hsc_env
 
 -- The unused package warning doesn't make sense once the targets get out of
 -- sync with the package flags. See #21110

@@ -301,6 +301,8 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Cmm.Config (CmmConfig)
 import Data.Bifunctor
+import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Home.PackageTable
 
 {- **********************************************************************
 %*                                                                      *
@@ -309,11 +311,13 @@ import Data.Bifunctor
 %********************************************************************* -}
 
 newHscEnv :: FilePath -> DynFlags -> IO HscEnv
-newHscEnv top_dir dflags = newHscEnvWithHUG top_dir dflags (homeUnitId_ dflags) home_unit_graph
+newHscEnv top_dir dflags = do
+  hpt <- emptyHomePackageTable
+  newHscEnvWithHUG top_dir dflags (homeUnitId_ dflags) (home_unit_graph hpt)
   where
-    home_unit_graph = unitEnv_singleton
+    home_unit_graph hpt = HUG.unitEnv_singleton
                         (homeUnitId_ dflags)
-                        (mkHomeUnitEnv dflags emptyHomePackageTable Nothing)
+                        (HUG.mkHomeUnitEnv emptyUnitState Nothing dflags hpt Nothing)
 
 newHscEnvWithHUG :: FilePath -> DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
 newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
@@ -321,7 +325,7 @@ newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
     fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs
-    let dflags = homeUnitEnv_dflags $ unitEnv_lookup cur_unit home_unit_graph
+    let dflags = homeUnitEnv_dflags $ HUG.unitEnv_lookup cur_unit home_unit_graph
     unit_env <- initUnitEnv cur_unit home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags)
     llvm_config <- initLlvmConfigCache top_dir
     return HscEnv { hsc_dflags         = top_dynflags
@@ -976,23 +980,21 @@ loadByteCode iface mod_sum = do
 -- Compilers
 --------------------------------------------------------------
 
-add_iface_to_hpt :: ModIface -> ModDetails -> HscEnv -> HscEnv
+add_iface_to_hpt :: ModIface -> ModDetails -> HscEnv -> IO ()
 add_iface_to_hpt iface details =
-  hscUpdateHPT $ \ hpt ->
-    addToHpt hpt (moduleName (mi_module iface))
-    (HomeModInfo iface details emptyHomeModInfoLinkable)
+  hscInsertHPT (HomeModInfo iface details emptyHomeModInfoLinkable)
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
 initModDetails :: HscEnv -> ModIface -> IO ModDetails
 initModDetails hsc_env iface =
   fixIO $ \details' -> do
-    let !hsc_env' = add_iface_to_hpt iface details' hsc_env
+    add_iface_to_hpt iface details' hsc_env
     -- NB: This result is actually not that useful
     -- in one-shot mode, since we're not going to do
     -- any further typechecking.  It's much more useful
     -- in make mode, since this HMI will go into the HPT.
-    genModDetails hsc_env' iface
+    genModDetails hsc_env iface
 
 -- | Modify flags such that objects are compiled for the interpreter's way.
 -- This is necessary when building foreign objects for Template Haskell, since
@@ -1080,17 +1082,17 @@ initWholeCoreBindings ::
   ModDetails ->
   Linkable ->
   IO Linkable
-initWholeCoreBindings hsc_env iface details (Linkable utc_time this_mod uls) =
-  Linkable utc_time this_mod <$> mapM go uls
+initWholeCoreBindings hsc_env iface details (Linkable utc_time this_mod uls) = do
+  Linkable utc_time this_mod <$> mapM (go hsc_env) uls
   where
-    go = \case
+    go hsc_env' = \case
       CoreBindings wcb -> do
+        add_iface_to_hpt iface details hsc_env
         ~(bco, fos) <- unsafeInterleaveIO $
                        compileWholeCoreBindings hsc_env' type_env wcb
         pure (LazyBCOs bco fos)
       l -> pure l
 
-    hsc_env' = add_iface_to_hpt iface details hsc_env
     type_env = md_types details
 
 -- | Hydrate interface Core bindings and compile them to bytecode.
@@ -1770,7 +1772,7 @@ hscCheckSafe' m l = do
         hsc_eps <- liftIO $ hscEPS hsc_env
         let pkgIfaceT = eps_PIT hsc_eps
             hug       = hsc_HUG hsc_env
-            iface     = lookupIfaceByModule hug pkgIfaceT m
+        iface <- liftIO $ lookupIfaceByModule hug pkgIfaceT m
         -- the 'lookupIfaceByModule' method will always fail when calling from GHCi
         -- as the compiler hasn't filled in the various module tables
         -- so we need to call 'getModuleInterface' to load from disk

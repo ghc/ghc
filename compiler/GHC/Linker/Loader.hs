@@ -118,6 +118,7 @@ import System.Win32.Info (getSystemDirectory)
 #endif
 
 import GHC.Utils.Exception
+import GHC.Unit.Home.Graph (lookupHug, unitEnv_foldWithKey)
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -690,11 +691,10 @@ get_reachable_nodes hsc_env mods
         let mods_s = map mi_module ifaces
         return (mods_s, mkUniqDSet pkgs_s)
 
-    get_mod_info_hug (ModNodeKeyWithUid gwib uid)
-      | Just hmi <- lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib)
-      = return $ Just (hm_iface hmi)
-      | otherwise
-      = moduleNotLoaded "(in HUG)" gwib uid
+    get_mod_info_hug (ModNodeKeyWithUid gwib uid) =
+      lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) >>= \case
+        Just hmi -> return $ Just (hm_iface hmi)
+        Nothing -> moduleNotLoaded "(in HUG)" gwib uid
 
     moduleNotLoaded m gwib uid = throwGhcExceptionIO $ ProgramError $ showSDoc dflags $
       text "getLinkDeps: Home module not loaded" <+> text m <+> ppr (gwib_mod gwib) <+> ppr uid

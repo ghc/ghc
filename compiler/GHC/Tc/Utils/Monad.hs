@@ -15,7 +15,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Simple accessors
   discardResult,
-  getTopEnv, updTopEnv, getGblEnv, updGblEnv,
+  getTopEnv, updTopEnv, updTopEnvIO, getGblEnv, updGblEnv,
   setGblEnv, getLclEnv, updLclEnv, updLclCtxt, setLclEnv, restoreLclEnv,
   updTopFlags,
   getEnvs, setEnvs, updEnvs, restoreEnvs,
@@ -175,7 +175,7 @@ import GHC.Unit
 import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.Module.Warnings
-import GHC.Unit.Home.ModInfo
+import GHC.Unit.Home.PackageTable
 
 import GHC.Core.UsageEnv
 import GHC.Core.Multiplicity
@@ -475,6 +475,11 @@ getTopEnv = do { env <- getEnv; return (env_top env) }
 updTopEnv :: (HscEnv -> HscEnv) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 updTopEnv upd = updEnv (\ env@(Env { env_top = top }) ->
                           env { env_top = upd top })
+
+updTopEnvIO :: (HscEnv -> IO HscEnv) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+updTopEnvIO upd = updEnvIO (\ env@(Env { env_top = top }) ->
+                                upd top >>= \t' ->
+                                pure env{ env_top = t' })
 
 getGblEnv :: TcRnIf gbl lcl gbl
 getGblEnv = do { Env{..} <- getEnv; return env_gbl }
@@ -2339,11 +2344,13 @@ getCompleteMatchesTcM
   = do { hsc_env <- getTopEnv
        ; tcg_env <- getGblEnv
        ; eps <- liftIO $ hscEPS hsc_env
-       ; return $ localAndImportedCompleteMatches (tcg_complete_matches tcg_env) hsc_env eps
+       ; liftIO $ localAndImportedCompleteMatches (tcg_complete_matches tcg_env) (hsc_unit_env hsc_env) eps
        }
 
-localAndImportedCompleteMatches :: CompleteMatches -> HscEnv -> ExternalPackageState -> CompleteMatches
-localAndImportedCompleteMatches tcg_comps hsc_env eps =
-     tcg_comps                -- from the current module
-  ++ hptCompleteSigs hsc_env  -- from the home package
-  ++ eps_complete_matches eps -- from imports
+localAndImportedCompleteMatches :: CompleteMatches -> UnitEnv -> ExternalPackageState -> IO CompleteMatches
+localAndImportedCompleteMatches tcg_comps unit_env eps = do
+  hugCSigs <- hugCompleteSigs unit_env
+  return $
+       tcg_comps                -- from the current module
+    ++ hugCSigs                 -- from the home package
+    ++ eps_complete_matches eps -- from imports
