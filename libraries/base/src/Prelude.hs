@@ -47,11 +47,11 @@ module Prelude (
 
     -- ** Numbers
 
-    -- *** GHC.Internal.Numeric types
+    -- *** Numeric types
     Int, Integer, Float, Double,
     Rational, Word,
 
-    -- *** GHC.Internal.Numeric type classes
+    -- *** Numeric type classes
     Num((+), (-), (*), negate, abs, signum, fromInteger),
     Real(toRational),
     Integral(quot, rem, div, mod, quotRem, divMod, toInteger),
@@ -63,7 +63,7 @@ module Prelude (
               encodeFloat, exponent, significand, scaleFloat, isNaN,
               isInfinite, isDenormalized, isIEEE, isNegativeZero, atan2),
 
-    -- *** GHC.Internal.Numeric functions
+    -- *** Numeric functions
     subtract, even, odd, gcd, lcm, (^), (^^),
     fromIntegral, realToFrac,
 

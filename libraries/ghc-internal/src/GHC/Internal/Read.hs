@@ -551,7 +551,7 @@ instance Read L.Lexeme where
   readList     = readListDefault
 
 --------------------------------------------------------------
--- GHC.Internal.Numeric instances of Read
+-- Numeric instances of Read
 --------------------------------------------------------------
 
 readNumber :: Num a => (L.Lexeme -> ReadPrec a) -> ReadPrec a
