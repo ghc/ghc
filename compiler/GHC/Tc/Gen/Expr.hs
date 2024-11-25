@@ -575,12 +575,7 @@ tcExpr expr@(RecordCon { rcon_con = L loc con_name
         ; checkTc (conLikeHasBuilder con_like) $
           nonBidirectionalErr (conLikeName con_like)
 
-        ; rbinds' <- tcRecordBinds con_like (map scaledThing arg_tys) rbinds
-                   -- It is currently not possible for a record to have
-                   -- multiplicities. When they do, `tcRecordBinds` will take
-                   -- scaled types instead. Meanwhile, it's safe to take
-                   -- `scaledThing` above, as we know all the multiplicities are
-                   -- Many.
+        ; rbinds' <- tcRecordBinds con_like arg_tys rbinds
 
         ; let rcon_tc = mkHsWrap con_wrap con_expr
               expr' = RecordCon { rcon_ext = rcon_tc
@@ -1632,7 +1627,7 @@ This extends OK when the field types are universally quantified.
 
 tcRecordBinds
         :: ConLike
-        -> [TcType]     -- Expected type for each field
+        -> [Scaled TcType]     -- Expected type for each field
         -> HsRecordBinds GhcRn
         -> TcM (HsRecordBinds GhcTc)
 
@@ -1661,18 +1656,18 @@ fieldCtxt :: FieldLabelString -> SDoc
 fieldCtxt field_name
   = text "In the" <+> quotes (ppr field_name) <+> text "field of a record"
 
-tcRecordField :: ConLike -> Assoc Name Type
+tcRecordField :: ConLike -> Assoc Name (Scaled Type)
               -> LFieldOcc GhcRn -> LHsExpr GhcRn
               -> TcM (Maybe (LFieldOcc GhcTc, LHsExpr GhcTc))
 tcRecordField con_like flds_w_tys (L loc (FieldOcc rdr (L l sel_name))) rhs
-  | Just field_ty <- assocMaybe flds_w_tys sel_name
+  | Just (Scaled field_mult field_ty) <- assocMaybe flds_w_tys sel_name
       = addErrCtxt (fieldCtxt field_lbl) $
-        do { rhs' <- tcCheckPolyExprNC rhs field_ty
+        do { rhs' <- tcScalingUsage field_mult $ tcCheckPolyExprNC rhs field_ty
            ; hasFixedRuntimeRep_syntactic (FRRRecordCon rdr (unLoc rhs'))
                 field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
-                                        ManyTy field_ty (locA loc)
+                                        field_mult field_ty (locA loc)
                 -- Yuk: the field_id has the *unique* of the selector Id
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS
