@@ -221,6 +221,7 @@ processDeps _ _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
       GhcDriverMessage $ DriverInstantiationNodeInDependencyGeneration node
 
 processDeps _dflags _ _ _ _ (AcyclicSCC (LinkNode {})) = return ()
+processDeps _dflags _ _ _ _ (AcyclicSCC (UnitNode {})) = return ()
 
 processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ node))
   = do  { let extra_suffixes = depSuffixes dflags

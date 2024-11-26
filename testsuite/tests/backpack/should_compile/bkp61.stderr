@@ -1,15 +1,15 @@
 [1 of 3] Processing p
-  [1 of 2] Compiling H[sig]           ( p\H.hsig, nothing )
-  [2 of 2] Compiling A                ( p\A.hs, nothing )
+  [1 of 2] Compiling H[sig]           ( p/H.hsig, nothing )
+  [2 of 2] Compiling A                ( p/A.hs, nothing )
 [2 of 3] Processing q
   Instantiating q
-  [1 of 1] Compiling H                ( q\H.hs, bkp61.out\q\H.o )
+  [1 of 1] Compiling H                ( q/H.hs, bkp61.out/q/H.o )
 [3 of 3] Processing r
   Instantiating r
   [1 of 2] Including q
   [2 of 2] Including p[H=q:H]
     Instantiating p[H=q:H]
-    [1 of 2] Compiling H[sig]           ( p\H.hsig, bkp61.out\p\p-D5Mg3foBSCrDbQDKH4WGSG\H.o )
-    [2 of 2] Compiling A                ( p\A.hs, bkp61.out\p\p-D5Mg3foBSCrDbQDKH4WGSG\A.o )
-  [1 of 2] Compiling N                ( r\N.hs, bkp61.out\r\N.o )
+    [1 of 2] Compiling H[sig]           ( p/H.hsig, bkp61.out/p/p-D5Mg3foBSCrDbQDKH4WGSG/H.o )
+    [2 of 2] Compiling A                ( p/A.hs, bkp61.out/p/p-D5Mg3foBSCrDbQDKH4WGSG/A.o )
+  [1 of 2] Compiling N                ( r/N.hs, bkp61.out/r/N.o )
   [2 of 2] Instantiating p

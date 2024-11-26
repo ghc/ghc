@@ -8,8 +8,8 @@
   [1 of 6] Compiling Prel[sig]        ( structures/Prel.hsig, nothing )
   [2 of 6] Compiling Array[sig]       ( structures/Array.hsig, nothing )
   [3 of 6] Compiling Graph            ( structures/Graph.hs, nothing )
-  [4 of 6] Compiling Tree             ( structures/Tree.hs, nothing )
-  [5 of 6] Compiling Set              ( structures/Set.hs, nothing )
+  [4 of 6] Compiling Set              ( structures/Set.hs, nothing )
+  [5 of 6] Compiling Tree             ( structures/Tree.hs, nothing )
   [6 of 6] Instantiating arrays-sig
 [ 4 of 11] Processing arrays-a
   [1 of 3] Compiling Prel[sig]        ( arrays-a/Prel.hsig, nothing )

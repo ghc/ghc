@@ -5,10 +5,10 @@
 [3 of 3] Processing r
   [1 of 4] Compiling A[sig]           ( r/A.hsig, nothing )
   [2 of 4] Compiling B                ( r/B.hs, nothing )
-
 bkp47.bkp:19:18: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         either ‘f’ or ‘g’
     • In the instance declaration for ‘C Int’
+
   [3 of 4] Instantiating p
   [4 of 4] Instantiating q

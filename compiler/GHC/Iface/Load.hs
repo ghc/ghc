@@ -25,6 +25,7 @@ module GHC.Iface.Load (
         -- IfM functions
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
+        loadExternalGraphBelow,
         findAndReadIface, readIface, writeIface,
         flagsToIfCompression,
         moduleFreeHolesPrecise,
@@ -108,6 +109,7 @@ import GHC.Unit.Home
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Finder
 import GHC.Unit.Env
+import GHC.Unit.Module.External.Graph
 
 import GHC.Data.Maybe
 
@@ -119,6 +121,8 @@ import GHC.Driver.Env.KnotVars
 import {-# source #-} GHC.Driver.Main (loadIfaceByteCode)
 import GHC.Iface.Errors.Types
 import Data.Function ((&))
+import qualified Data.Set as Set
+import GHC.Unit.Module.Graph
 
 {-
 ************************************************************************
@@ -407,6 +411,112 @@ loadInterfaceWithException doc mod_name where_from
     let ctx = initSDocContext dflags defaultUserStyle
     withIfaceErr ctx (loadInterface doc mod_name where_from)
 
+-- | Load the part of the external module graph which is transitively reachable
+-- from the given modules.
+--
+-- This operation is used just before TH splices are run (in 'getLinkDeps').
+--
+-- A field in the EPS tracks which home modules are already fully loaded, which we use
+-- here to avoid trying to load them a second time.
+--
+-- The function takes a set of keys which are currently in the process of being loaded.
+-- This is used to avoid duplicating work by loading keys twice if they appear along multiple
+-- paths in the transitive closure. Once the interface and all its dependencies are
+-- loaded, the key is added to the "fully loaded" set, so we know that it and it's
+-- transitive closure are present in the graph.
+--
+-- Note that being "in progress" is different from being "fully loaded", consider if there
+-- is an exception during `loadExternalGraphBelow`, then an "in progress" item may fail
+-- to become fully loaded.
+loadExternalGraphBelow :: (Module -> SDoc) -> Maybe HomeUnit {-^ The current home unit -}
+                               -> Set.Set ExternalKey -> [Module] -> IfM lcl (Set.Set ExternalKey)
+loadExternalGraphBelow _ Nothing _ _ = panic "loadExternalGraphBelow: No home unit"
+loadExternalGraphBelow msg (Just home_unit) in_progress mods =
+  foldM (loadExternalGraphModule msg home_unit) in_progress mods
+
+-- | Load the interface for a module, and all its transitive dependencies but
+-- only if we haven't fully loaded the module already or are in the process of fully loading it.
+loadExternalGraphModule :: (Module -> SDoc) -> HomeUnit
+                         -> Set.Set ExternalKey
+                         -> Module
+                         -> IfM lcl (Set.Set ExternalKey)
+loadExternalGraphModule msg home_unit in_progress mod
+  | homeUnitId home_unit /= moduleUnitId mod = do
+      loadExternalPackageBelow in_progress (moduleUnitId mod)
+  | otherwise =  do
+
+      let key = ExternalModuleKey $ ModNodeKeyWithUid (GWIB (moduleName mod) NotBoot) (moduleUnitId mod)
+      graph <- eps_module_graph <$> getEps
+
+      if (not (isFullyLoadedModule key graph || Set.member key in_progress))
+        then actuallyLoadExternalGraphModule msg home_unit in_progress key mod
+        else return in_progress
+
+-- | Load the interface for a module, and all its transitive dependenices.
+actuallyLoadExternalGraphModule
+  :: (Module -> SDoc)
+  -> HomeUnit
+  -> Set.Set ExternalKey
+  -> ExternalKey
+  -> Module
+  -> IOEnv (Env IfGblEnv lcl) (Set.Set ExternalKey)
+actuallyLoadExternalGraphModule msg home_unit in_progress key mod = do
+  dflags <- getDynFlags
+  let ctx = initSDocContext dflags defaultUserStyle
+  iface <- withIfaceErr ctx $
+    loadInterface (msg mod) mod (ImportByUser NotBoot)
+
+  let deps = mi_deps iface
+      mod_deps = dep_direct_mods deps
+      pkg_deps = dep_direct_pkgs deps
+
+  -- Do not attempt to load the same key again when traversing
+  let in_progress' = Set.insert key in_progress
+
+  -- Load all direct dependencies that are in the home package
+  cache_mods <- loadExternalGraphBelow msg (Just home_unit) in_progress'
+    $ map (\(uid, GWIB mn _) -> mkModule (RealUnit (Definite uid)) mn)
+    $ Set.toList mod_deps
+
+  -- Load all the package nodes, and packages beneath them.
+  cache_pkgs <- foldM loadExternalPackageBelow cache_mods (Set.toList pkg_deps)
+
+  registerFullyLoaded key
+  return cache_pkgs
+
+registerFullyLoaded :: ExternalKey -> IfM lcl ()
+registerFullyLoaded key = do
+    -- Update the external graph with this module being fully loaded.
+    logger <- getLogger
+    liftIO $ trace_if logger (text "Fully loaded:" <+> ppr key)
+    updateEps_ $ \eps ->
+      eps{eps_module_graph = setFullyLoadedModule key (eps_module_graph eps)}
+
+loadExternalPackageBelow :: Set.Set ExternalKey -> UnitId ->  IfM lcl (Set.Set ExternalKey)
+loadExternalPackageBelow in_progress uid = do
+    graph <- eps_module_graph <$> getEps
+    us    <- hsc_units <$> getTopEnv
+    let key = ExternalPackageKey uid
+    if not (isFullyLoadedModule key graph || Set.member key in_progress)
+      then do
+        let in_progress' = Set.insert key in_progress
+        case unitDepends <$> lookupUnitId us uid of
+          Just dep_uids -> do
+            loadPackageIntoEPSGraph uid dep_uids
+            final_cache <- foldM loadExternalPackageBelow in_progress' dep_uids
+            registerFullyLoaded key
+            return final_cache
+          Nothing -> pprPanic "loadExternalPackagesBelow: missing" (ppr uid)
+      else
+        return in_progress
+
+loadPackageIntoEPSGraph :: UnitId -> [UnitId] -> IfM lcl ()
+loadPackageIntoEPSGraph uid dep_uids =
+  updateEps_ $ \eps ->
+    eps { eps_module_graph =
+      extendExternalModuleGraph (NodeExternalPackage uid
+        (Set.fromList dep_uids)) (eps_module_graph eps) }
+
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
               -> IfM lcl (MaybeErr MissingInterfaceError ModIface)
@@ -515,6 +625,15 @@ loadInterface doc_str mod from
         ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
         ; purged_hsc_env <- getTopEnv
 
+        ; let direct_deps = map (uncurry (flip ModNodeKeyWithUid)) $ (Set.toList (dep_direct_mods $ mi_deps iface))
+        ; let direct_pkg_deps = Set.toList $ dep_direct_pkgs $ mi_deps iface
+        ; let !module_graph_key =
+                if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env
+                                    --- ^ home unit mods in eps can only happen in oneshot mode
+                  then Just $ NodeHomePackage (miKey iface) (map ExternalModuleKey direct_deps
+                                                            ++ map ExternalPackageKey direct_pkg_deps)
+                  else Nothing
+
         ; let final_iface = iface
                                & set_mi_decls     (panic "No mi_decls in PIT")
                                & set_mi_insts     (panic "No mi_insts in PIT")
@@ -555,6 +674,11 @@ loadInterface doc_str mod from
                   eps_iface_bytecode = add_bytecode (eps_iface_bytecode eps),
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,
+                  eps_module_graph =
+                    let eps_graph'  = case module_graph_key of
+                                       Just k -> extendExternalModuleGraph k (eps_module_graph eps)
+                                       Nothing -> eps_module_graph eps
+                     in eps_graph',
                   eps_complete_matches
                                    = eps_complete_matches eps ++ new_eps_complete_matches,
                   eps_inst_env     = extendInstEnvList (eps_inst_env eps)

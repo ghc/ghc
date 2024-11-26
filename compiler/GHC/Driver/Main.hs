@@ -1469,6 +1469,7 @@ batchMsgWith extra hsc_env_start mod_index recomp node =
                     LinkNode {} -> "Linking"
                     InstantiationNode {} -> "Instantiating"
                     ModuleNode {} -> "Compiling"
+                    UnitNode {} -> "Loading"
         hsc_env = hscSetActiveUnitId (mgNodeUnitId node) hsc_env_start
         dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env

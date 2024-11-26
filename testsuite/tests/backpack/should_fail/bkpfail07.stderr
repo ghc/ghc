@@ -1,14 +1,13 @@
 [1 of 3] Processing p
-  [1 of 1] Compiling H[sig]           ( p\H.hsig, nothing )
+  [1 of 1] Compiling H[sig]           ( p/H.hsig, nothing )
 [2 of 3] Processing h
-  [1 of 3] Compiling T                ( h\T.hs, nothing )
-  [2 of 3] Compiling H                ( h\H.hs, nothing )
-  [3 of 3] Compiling A[sig]           ( h\A.hsig, nothing )
+  [1 of 3] Compiling A[sig]           ( h/A.hsig, nothing )
+  [2 of 3] Compiling T                ( h/T.hs, nothing )
+  [3 of 3] Compiling H                ( h/H.hs, nothing )
 [3 of 3] Processing q
-  [1 of 3] Compiling A[sig]           ( q\A.hsig, nothing )
+  [1 of 3] Compiling A[sig]           ( q/A.hsig, nothing )
   [2 of 3] Instantiating h
   [3 of 3] Instantiating p
-
 bkpfail07.bkp:6:9: error: [GHC-15843]
     • Type constructor ‘T’ has conflicting definitions in the module
       and its hsig file.
@@ -18,3 +17,4 @@ bkpfail07.bkp:6:9: error: [GHC-15843]
                    data T = T GHC.Types.Int
       The constructors do not match: The types for ‘T’ differ.
     • While checking that ‘h[A=<A>]:H’ implements signature ‘H’ in ‘p[H=h[A=<A>]:H]’.
+

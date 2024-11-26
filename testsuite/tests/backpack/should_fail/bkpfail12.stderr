@@ -1,13 +1,12 @@
 [1 of 3] Processing p
-  [1 of 2] Compiling Q[sig]           ( p\Q.hsig, nothing )
-  [2 of 2] Compiling P                ( p\P.hs, nothing )
+  [1 of 2] Compiling P                ( p/P.hs, nothing )
+  [2 of 2] Compiling Q[sig]           ( p/Q.hsig, nothing )
 [2 of 3] Processing q
   Instantiating q
-  [1 of 1] Compiling Q                ( q\Q.hs, bkpfail12.out\q\Q.o )
+  [1 of 1] Compiling Q                ( q/Q.hs, bkpfail12.out/q/Q.o )
 [3 of 3] Processing r
-  [1 of 3] Compiling H[sig]           ( r\H.hsig, nothing )
+  [1 of 3] Compiling H[sig]           ( r/H.hsig, nothing )
   [2 of 3] Instantiating p
-
 bkpfail12.bkp:8:9: error: [GHC-11890]
     • Identifier ‘f’ has conflicting definitions in the module
       and its hsig file.
@@ -15,3 +14,4 @@ bkpfail12.bkp:8:9: error: [GHC-11890]
         Hsig file: f :: GHC.Types.Int
       The two types are different.
     • While checking that ‘Q’ implements signature ‘Q’ in ‘p[Q=Q]’.
+

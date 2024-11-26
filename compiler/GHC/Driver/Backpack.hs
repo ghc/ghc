@@ -589,6 +589,7 @@ mkBackpackMsg = do
               MustCompile -> empty
               RecompBecause reason -> text " [" <> pprWithUnitState state (ppr reason) <> text "]"
         LinkNode _ _ -> showMsg (text "Linking ")  empty
+        UnitNode {} -> showMsg (text "Package ") empty
 
 -- | 'PprStyle' for Backpack messages; here we usually want the module to
 -- be qualified (so we can tell how it was instantiated.) But we try not
@@ -749,8 +750,11 @@ hsunitModuleGraph do_link unit = do
         if Set.member mod_name hsig_set
             then return Nothing
             else fmap Just $ summariseRequirement pn mod_name
-
-    let graph_nodes = nodes ++ req_nodes ++ (instantiationNodes (homeUnitId $ hsc_home_unit hsc_env) (hsc_units hsc_env))
+    let inodes = instantiationNodes (homeUnitId $ hsc_home_unit hsc_env) (hsc_units hsc_env)
+    -- TODO: Backpack mode does not properly support ExternalPackage nodes yet
+    -- Module nodes do not get given package dependencies (see hsModuleToModSummary).
+    let pkg_nodes =  ordNub $ map (\(_, iud) -> UnitNode [] (instUnitInstanceOf iud)) inodes
+    let graph_nodes = nodes ++ req_nodes ++ (map (uncurry InstantiationNode) $ inodes) ++ pkg_nodes
         key_nodes = map mkNodeKey graph_nodes
         all_nodes = graph_nodes ++ [LinkNode key_nodes (homeUnitId $ hsc_home_unit hsc_env) | do_link]
     -- This error message is not very good but .bkp mode is just for testing so

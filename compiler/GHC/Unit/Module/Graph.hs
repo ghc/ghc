@@ -57,8 +57,10 @@ module GHC.Unit.Module.Graph
     -- answer reachability queries -- is X reachable from Y; or, what is the
     -- transitive closure of Z?
    , mgReachable
+   , mgReachableLoop
    , mgQuery
    , mgQueryMany
+   , mgMember
 
     -- ** Other operations
     --
@@ -85,6 +87,7 @@ module GHC.Unit.Module.Graph
    , ModNodeKey
    , ModNodeKeyWithUid(..)
    , msKey
+   , miKey
 
     -- ** Internal node representation
     --
@@ -114,6 +117,7 @@ import GHC.Types.SourceFile ( hscSourceString )
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
 import GHC.Utils.Outputable
+import GHC.Unit.Module.ModIface
 import GHC.Utils.Misc ( partitionWith )
 
 import System.FilePath
@@ -122,6 +126,7 @@ import GHC.Types.Unique.DSet
 import qualified Data.Set as Set
 import Data.Set (Set)
 import GHC.Unit.Module
+import GHC.Unit.Module.ModNodeKey
 import GHC.Linker.Static.Utils
 
 import Data.Bifunctor
@@ -143,13 +148,22 @@ import Control.Monad
 data ModuleGraph = ModuleGraph
   { mg_mss :: [ModuleGraphNode]
   , mg_graph :: (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
-    -- A cached transitive dependency calculation so that a lot of work is not
-    -- repeated whenever the transitive dependencies need to be calculated (for example, hptInstances)
+  , mg_loop_graph :: (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
+
+    -- `mg_graph` and `mg_loop_graph` cached transitive dependency calculations
+    -- so that a lot of work is not repeated whenever the transitive
+    -- dependencies need to be calculated (for example, hptInstances).
+    --
+    --- - `mg_graph` is a reachability index constructed from a module
+    -- graph /with/ boot nodes (which make the graph acyclic), and
+    --
+    --- * `mg_loop_graph` is a reachability index for the graph /without/
+    -- hs-boot nodes, that may be cyclic.
   }
 
 -- | Why do we ever need to construct empty graphs? Is it because of one shot mode?
 emptyMG :: ModuleGraph
-emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing)
+emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing) (graphReachability emptyGraph, const Nothing)
 
 -- | Construct a module graph. This function should be the only entry point for
 -- building a 'ModuleGraph', since it is supposed to be built once and never modified.
@@ -160,7 +174,7 @@ emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing)
 -- modification, perhaps like what is done for building arrays from mutable
 -- arrays.
 mkModuleGraph :: [ModuleGraphNode] -> ModuleGraph
-mkModuleGraph = foldr (flip extendMG') emptyMG
+mkModuleGraph = foldr (flip extendMG) emptyMG
 
 --------------------------------------------------------------------------------
 -- * Module Graph Nodes
@@ -177,6 +191,8 @@ data ModuleGraphNode
   | ModuleNode [NodeKey] ModSummary
   -- | Link nodes are whether are are creating a linked product (ie executable/shared object etc) for a unit.
   | LinkNode [NodeKey] UnitId
+  -- | Package dependency
+  | UnitNode [UnitId] UnitId
 
 -- | Collect the immediate dependencies of a ModuleGraphNode,
 -- optionally avoiding hs-boot dependencies.
@@ -190,9 +206,11 @@ mgNodeDependencies :: Bool -> ModuleGraphNode -> [NodeKey]
 mgNodeDependencies drop_hs_boot_nodes = \case
     LinkNode deps _uid -> deps
     InstantiationNode uid iuid ->
-      NodeKey_Module . (\mod -> ModNodeKeyWithUid (GWIB mod NotBoot) uid)  <$> uniqDSetToList (instUnitHoles iuid)
+      [ NodeKey_Module (ModNodeKeyWithUid (GWIB mod NotBoot) uid) | mod <- uniqDSetToList (instUnitHoles iuid) ]
+      ++ [ NodeKey_ExternalUnit (instUnitInstanceOf iuid) ]
     ModuleNode deps _ms ->
       map drop_hs_boot deps
+    UnitNode deps _ -> map NodeKey_ExternalUnit deps
   where
     -- Drop hs-boot nodes by using HsSrcFile as the key
     hs_boot_key | drop_hs_boot_nodes = NotBoot -- is regular mod or signature
@@ -205,6 +223,7 @@ mgNodeModSum :: ModuleGraphNode -> Maybe ModSummary
 mgNodeModSum (InstantiationNode {}) = Nothing
 mgNodeModSum (LinkNode {})          = Nothing
 mgNodeModSum (ModuleNode _ ms)      = Just ms
+mgNodeModSum (UnitNode {})       = Nothing
 
 mgNodeUnitId :: ModuleGraphNode -> UnitId
 mgNodeUnitId mgn =
@@ -212,12 +231,14 @@ mgNodeUnitId mgn =
     InstantiationNode uid _iud -> uid
     ModuleNode _ ms           -> toUnitId (moduleUnit (ms_mod ms))
     LinkNode _ uid             -> uid
+    UnitNode _ uid          -> uid
 
 instance Outputable ModuleGraphNode where
   ppr = \case
     InstantiationNode _ iuid -> ppr iuid
     ModuleNode nks ms -> ppr (msKey ms) <+> ppr nks
     LinkNode uid _     -> text "LN:" <+> ppr uid
+    UnitNode _ uid  -> text "P:" <+> ppr uid
 
 instance Eq ModuleGraphNode where
   (==) = (==) `on` mkNodeKey
@@ -245,6 +266,7 @@ mapMG f mg@ModuleGraph{..} = mg
       InstantiationNode uid iuid -> InstantiationNode uid iuid
       LinkNode uid nks -> LinkNode uid nks
       ModuleNode deps ms  -> ModuleNode deps (f ms)
+      UnitNode deps uid -> UnitNode deps uid
   }
 
 -- | Map a function 'f' over all the 'ModSummaries', in 'IO'.
@@ -255,6 +277,7 @@ mgMapM f mg@ModuleGraph{..} = do
     InstantiationNode uid iuid -> pure $ InstantiationNode uid iuid
     LinkNode uid nks -> pure $ LinkNode uid nks
     ModuleNode deps ms  -> ModuleNode deps <$> (f ms)
+    UnitNode deps uid -> pure $ UnitNode deps uid
   return mg
     { mg_mss = mss'
     }
@@ -262,9 +285,9 @@ mgMapM f mg@ModuleGraph{..} = do
 mgModSummaries :: ModuleGraph -> [ModSummary]
 mgModSummaries mg = [ m | ModuleNode _ m <- mgModSummaries' mg ]
 
--- | Look up a ModSummary in the ModuleGraph
--- Looks up the non-boot ModSummary
--- Linear in the size of the module graph
+-- | Look up a non-boot ModSummary in the ModuleGraph.
+--
+-- Careful: Linear in the size of the module graph
 mgLookupModule :: ModuleGraph -> Module -> Maybe ModSummary
 mgLookupModule ModuleGraph{..} m = listToMaybe $ mapMaybe go mg_mss
   where
@@ -274,16 +297,28 @@ mgLookupModule ModuleGraph{..} m = listToMaybe $ mapMaybe go mg_mss
       = Just ms
     go _ = Nothing
 
+mgMember :: ModuleGraph -> NodeKey -> Bool
+mgMember graph k = isJust $ snd (mg_graph graph) k
+
 --------------------------------------------------------------------------------
 -- ** Reachability
 --------------------------------------------------------------------------------
 
 -- | Return all nodes reachable from the given 'NodeKey'.
+--
+-- @Nothing@ if the key couldn't be found in the graph.
 mgReachable :: ModuleGraph -> NodeKey -> Maybe [ModuleGraphNode]
 mgReachable mg nk = map summaryNodeSummary <$> modules_below where
   (td_map, lookup_node) = mg_graph mg
   modules_below =
     allReachable td_map <$> lookup_node nk
+
+-- | Things which are reachable if hs-boot files are ignored. Used by 'getLinkDeps'
+mgReachableLoop :: ModuleGraph -> [NodeKey] -> [ModuleGraphNode]
+mgReachableLoop mg nk = map summaryNodeSummary modules_below where
+  (td_map, lookup_node) = mg_loop_graph mg
+  modules_below =
+    allReachableMany td_map (mapMaybe lookup_node nk)
 
 -- | Reachability Query.
 --
@@ -402,9 +437,8 @@ moduleGraphModulesBelow mg uid mn = filtered_mods [ mn | NodeKey_Module mn <- mo
 filterToposortToModules
   :: [SCC ModuleGraphNode] -> [SCC ModSummary]
 filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
-  InstantiationNode _ _ -> Nothing
-  LinkNode{} -> Nothing
   ModuleNode _deps node -> Just node
+  _ -> Nothing
   where
     -- This higher order function is somewhat bogus,
     -- as the definition of "strongly connected component"
@@ -424,37 +458,39 @@ filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
 data NodeKey = NodeKey_Unit {-# UNPACK #-} !InstantiatedUnit
              | NodeKey_Module {-# UNPACK #-} !ModNodeKeyWithUid
              | NodeKey_Link !UnitId
+             | NodeKey_ExternalUnit !UnitId
   deriving (Eq, Ord)
 
 instance Outputable NodeKey where
   ppr (NodeKey_Unit iu)   = ppr iu
   ppr (NodeKey_Module mk) = ppr mk
   ppr (NodeKey_Link uid)  = ppr uid
+  ppr (NodeKey_ExternalUnit uid) = ppr uid
 
 mkNodeKey :: ModuleGraphNode -> NodeKey
 mkNodeKey = \case
   InstantiationNode _ iu -> NodeKey_Unit iu
   ModuleNode _ x -> NodeKey_Module $ msKey x
   LinkNode _ uid   -> NodeKey_Link uid
+  UnitNode _ uid -> NodeKey_ExternalUnit uid
 
 nodeKeyUnitId :: NodeKey -> UnitId
 nodeKeyUnitId (NodeKey_Unit iu)   = instUnitInstanceOf iu
 nodeKeyUnitId (NodeKey_Module mk) = mnkUnitId mk
 nodeKeyUnitId (NodeKey_Link uid)  = uid
+nodeKeyUnitId (NodeKey_ExternalUnit uid) = uid
 
 nodeKeyModName :: NodeKey -> Maybe ModuleName
 nodeKeyModName (NodeKey_Module mk) = Just (gwib_mod $ mnkModuleName mk)
 nodeKeyModName _ = Nothing
 
-type ModNodeKey = ModuleNameWithIsBoot
-data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: !ModuleNameWithIsBoot
-                                           , mnkUnitId     :: !UnitId } deriving (Eq, Ord)
-
-instance Outputable ModNodeKeyWithUid where
-  ppr (ModNodeKeyWithUid mnwib uid) = ppr uid <> colon <> ppr mnwib
-
 msKey :: ModSummary -> ModNodeKeyWithUid
 msKey ms = ModNodeKeyWithUid (ms_mnwib ms) (ms_unitid ms)
+
+miKey :: ModIface -> ModNodeKeyWithUid
+miKey hmi = ModNodeKeyWithUid (mi_mnwib hmi) ((toUnitId $ moduleUnit (mi_module hmi)))
+
+type ModNodeKey = ModuleNameWithIsBoot
 
 --------------------------------------------------------------------------------
 -- ** Internal node representation (exposed)
@@ -482,6 +518,7 @@ showModMsg dflags _ (LinkNode {}) =
           arch_os   = platformArchOS platform
           exe_file  = exeFileName arch_os staticLink (outputFile_ dflags)
       in text exe_file
+showModMsg _ _ (UnitNode _deps uid) = ppr uid
 showModMsg _ _ (InstantiationNode _uid indef_unit) =
   ppr $ instUnitInstanceOf indef_unit
 showModMsg dflags recomp (ModuleNode _ mod_summary) =
@@ -520,25 +557,16 @@ newtype NodeMap a = NodeMap { unNodeMap :: Map.Map NodeKey a }
 mkTransDeps :: [ModuleGraphNode] -> (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
 mkTransDeps = first graphReachability {- module graph is acyclic -} . moduleGraphNodes False
 
-extendMG' :: ModuleGraph -> ModuleGraphNode -> ModuleGraph
-extendMG' mg = \case
-  InstantiationNode uid depUnitId -> extendMGInst mg uid depUnitId
-  ModuleNode deps ms -> extendMG mg deps ms
-  LinkNode deps uid   -> extendMGLink mg uid deps
+mkTransLoopDeps :: [ModuleGraphNode] -> (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
+mkTransLoopDeps = first cyclicGraphReachability . moduleGraphNodes True
 
 -- | Add an ExtendedModSummary to ModuleGraph. Assumes that the new ModSummary is
 -- not an element of the ModuleGraph.
-extendMG :: ModuleGraph -> [NodeKey] -> ModSummary -> ModuleGraph
-extendMG ModuleGraph{..} deps ms = ModuleGraph
-  { mg_mss = ModuleNode deps ms : mg_mss
-  , mg_graph = mkTransDeps (ModuleNode deps ms : mg_mss)
-  }
-
-extendMGInst :: ModuleGraph -> UnitId -> InstantiatedUnit -> ModuleGraph
-extendMGInst mg uid depUnitId = mg
-  { mg_mss = InstantiationNode uid depUnitId : mg_mss mg
-  }
-
-extendMGLink :: ModuleGraph -> UnitId -> [NodeKey] -> ModuleGraph
-extendMGLink mg uid nks = mg { mg_mss = LinkNode nks uid : mg_mss mg }
+extendMG :: ModuleGraph -> ModuleGraphNode -> ModuleGraph
+extendMG ModuleGraph{..} node =
+  ModuleGraph
+    { mg_mss = node : mg_mss
+    , mg_graph =  mkTransDeps (node : mg_mss)
+    , mg_loop_graph = mkTransLoopDeps (node : mg_mss)
+    }
 

@@ -1,8 +1,8 @@
 [1 of 6] Compiling A[a]
 [2 of 6] Compiling B[b]
 [3 of 6] Compiling Main[c]
-[4 of 6] Compiling Main[d]
-[5 of 6] Linking ./c/C[c]
+[4 of 6] Linking ./c/C[c]
+[5 of 6] Compiling Main[d]
 [6 of 6] Linking ./d/D[d]
 unit C compiled successfully
 unit D compiled successfully

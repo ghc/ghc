@@ -125,7 +125,8 @@ import qualified Control.Monad.Catch as MC
 import Data.IORef
 import Data.Maybe
 import Data.Time
-import Data.List (sortOn, unfoldr)
+import Data.Function
+import Data.List (sortOn, unfoldr, sortBy)
 import Data.Bifunctor (first)
 import System.Directory
 import System.FilePath
@@ -259,12 +260,8 @@ depanalPartial diag_wrapper msg excluded_mods allow_dup_roots = do
 -- These are used to represent the type checking that is done after
 -- all the free holes (sigs in current package) relevant to that instantiation
 -- are compiled. This is necessary to catch some instantiation errors.
---
--- In the future, perhaps more of the work of instantiation could be moved here,
--- instead of shoved in with the module compilation nodes. That could simplify
--- backpack, and maybe hs-boot too.
-instantiationNodes :: UnitId -> UnitState -> [ModuleGraphNode]
-instantiationNodes uid unit_state = InstantiationNode uid <$> iuids_to_check
+instantiationNodes :: UnitId -> UnitState -> [(UnitId, InstantiatedUnit)]
+instantiationNodes uid unit_state = map (uid,) iuids_to_check
   where
     iuids_to_check :: [InstantiatedUnit]
     iuids_to_check =
@@ -1110,7 +1107,16 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
       where
         collect_result res_var = runMaybeT (waitResult res_var)
 
-    n_mods = sum (map countMods plan)
+    -- Just used for an assertion
+    count_mods :: BuildPlan -> Int
+    count_mods (SingleModule m) = count_m m
+    count_mods (ResolvedCycle ns) = length ns
+    count_mods (UnresolvedCycle ns) = length ns
+
+    count_m (UnitNode {}) = 0
+    count_m _ = 1
+
+    n_mods = sum (map count_mods plan)
 
     buildLoop :: [BuildPlan]
               -> BuildM (Maybe [ModuleGraphNode], [MakeAction])
@@ -1141,7 +1147,6 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
                       -> ModuleGraphNode          -- The node we are compiling
                       -> BuildM MakeAction
     buildSingleModule rehydrate_nodes origin mod = do
-      mod_idx <- nodeId
       !build_map <- getBuildMap
       hug_var <- gets hug_var
       -- 1. Get the direct dependencies of this module
@@ -1150,17 +1155,19 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
           -- which would retain all the result variables, preventing us from collecting them
           -- after they are no longer used.
           !build_deps = getDependencies direct_deps build_map
-      let !build_action =
+      !build_action <-
             case mod of
               InstantiationNode uid iu -> do
-                withCurrentUnit (mgNodeUnitId mod) $ do
+                mod_idx <- nodeId
+                return $ withCurrentUnit (mgNodeUnitId mod) $ do
                   (hug, deps) <- wait_deps_hug hug_var build_deps
                   executeInstantiationNode mod_idx n_mods hug uid iu
                   return (Nothing, deps)
-              ModuleNode _build_deps ms ->
+              ModuleNode _build_deps ms -> do
                 let !old_hmi = M.lookup (msKey ms) old_hpt
                     rehydrate_mods = mapMaybe nodeKeyModName <$> rehydrate_nodes
-                in withCurrentUnit (mgNodeUnitId mod) $ do
+                mod_idx <- nodeId
+                return $ withCurrentUnit (mgNodeUnitId mod) $ do
                      (hug, deps) <- wait_deps_hug hug_var build_deps
                      hmi <- executeCompileNode mod_idx n_mods old_hmi hug rehydrate_mods ms
                      -- Write the HMI to an external cache (if one exists)
@@ -1171,10 +1178,12 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
                      liftIO $ modifyMVar_ hug_var (return . addHomeModInfoToHug hmi)
                      return (Just hmi, addToModuleNameSet (mgNodeUnitId mod) (ms_mod_name ms) deps )
               LinkNode _nks uid -> do
-                  withCurrentUnit (mgNodeUnitId mod) $ do
+                  mod_idx <- nodeId
+                  return $ withCurrentUnit (mgNodeUnitId mod) $ do
                     (hug, deps) <- wait_deps_hug hug_var build_deps
                     executeLinkNode hug (mod_idx, n_mods) uid direct_deps
                     return (Nothing, deps)
+              UnitNode {} -> return $ return (Nothing, mempty)
 
 
       res_var <- liftIO newEmptyMVar
@@ -1288,8 +1297,6 @@ upsweep n_jobs hsc_env hmi_cache diag_wrapper mHscMessage old_hpt build_plan = d
 toCache :: [HomeModInfo] -> M.Map (ModNodeKeyWithUid) HomeModInfo
 toCache hmis = M.fromList ([(miKey $ hm_iface hmi, hmi) | hmi <- hmis])
 
-miKey :: ModIface -> ModNodeKeyWithUid
-miKey hmi = ModNodeKeyWithUid (mi_mnwib hmi) ((toUnitId $ moduleUnit (mi_module hmi)))
 
 upsweep_inst :: HscEnv
              -> Maybe Messager
@@ -1479,9 +1486,37 @@ topSortModuleGraph
 --              the a source-import of Foo is an import of Foo
 --              The resulting graph has no hi-boot nodes, but can be cyclic
 topSortModuleGraph drop_hs_boot_nodes module_graph mb_root_mod =
-    -- stronglyConnCompG flips the original order, so if we reverse
-    -- the summaries we get a stable topological sort.
-  topSortModules drop_hs_boot_nodes (reverse $ mgModSummaries' module_graph) mb_root_mod
+  topSortModules drop_hs_boot_nodes
+    (sortBy (cmpModuleGraphNodes `on` mkNodeKey) $ mgModSummaries' module_graph)
+    mb_root_mod
+
+
+  where
+    -- In order to get the "right" ordering
+    --    Module nodes must be in reverse lexigraphic order.
+    --    All modules nodes must appear before package nodes.
+    --
+    -- MP: This is just the ordering which the tests needed in Jan 2025, it does
+    --     not arise from nature.
+    --
+    -- Given the current implementation of scc, the result is in
+    -- The order is sensitive to the internal implementation in Data.Graph,
+    -- if it changes in future then this ordering will need to be modified.
+    --
+    -- The SCC algorithm firstly transposes the input graph and then
+    -- performs dfs on the vertices in the order which they are originally given.
+    -- Therefore, if `ExternalUnit` nodes are first, the order returned will
+    -- be determined by the order the dependencies are stored in the transposed graph.
+    moduleGraphNodeRank :: NodeKey -> Int
+    moduleGraphNodeRank k =
+      case k of
+        NodeKey_Unit {}         -> 0
+        NodeKey_Module {}       -> 1
+        NodeKey_Link {}         -> 2
+        NodeKey_ExternalUnit {} -> 3
+
+    cmpModuleGraphNodes k1 k2 = compare (moduleGraphNodeRank k1) (moduleGraphNodeRank k2)
+                                  `mappend` compare k2 k1
 
 topSortModules :: Bool -> [ModuleGraphNode] -> Maybe HomeUnitModule -> [SCC ModuleGraphNode]
 topSortModules drop_hs_boot_nodes summaries mb_root_mod
@@ -1604,12 +1639,14 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
        let root_map = mkRootMap rootSummariesOk
        checkDuplicates root_map
        (deps, map0) <- loopSummaries rootSummariesOk (M.empty, root_map)
+       let all_instantiations =  getHomeUnitInstantiations hsc_env
+       let deps' = loopInstantiations all_instantiations deps
        let closure_errs = checkHomeUnitsClosed unit_env
            unit_env = hsc_unit_env hsc_env
            tmpfs    = hsc_tmpfs    hsc_env
 
            downsweep_errs = lefts $ concat $ M.elems map0
-           downsweep_nodes = M.elems deps
+           downsweep_nodes = M.elems deps'
 
            (other_errs, unit_nodes) = partitionEithers $ unitEnv_foldWithKey (\nodes uid hue -> nodes ++ unitModuleNodes downsweep_nodes uid hue) [] (hsc_HUG hsc_env)
            all_nodes = downsweep_nodes ++ unit_nodes
@@ -1625,12 +1662,13 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
          then return (all_errs, th_enabled_nodes)
          else pure $ (all_root_errs, emptyMG)
      where
+        getHomeUnitInstantiations :: HscEnv -> [(UnitId, InstantiatedUnit)]
+        getHomeUnitInstantiations hsc_env = unitEnv_foldWithKey (\nodes uid hue -> nodes ++  instantiationNodes uid (homeUnitEnv_units hue)) [] (hsc_HUG hsc_env)
+
         -- Dependencies arising on a unit (backpack and module linking deps)
         unitModuleNodes :: [ModuleGraphNode] -> UnitId -> HomeUnitEnv -> [Either (Messages DriverMessage) ModuleGraphNode]
         unitModuleNodes summaries uid hue =
-          let instantiation_nodes = instantiationNodes uid (homeUnitEnv_units hue)
-          in map Right instantiation_nodes
-              ++ maybeToList (linkNodes (instantiation_nodes ++ summaries) uid hue)
+          maybeToList (linkNodes summaries uid hue)
 
         calcDeps ms =
           -- Add a dependency on the HsBoot file if it exists
@@ -1655,6 +1693,20 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
            where
              dup_roots :: [[ModSummary]]        -- Each at least of length 2
              dup_roots = filterOut isSingleton $ map rights (M.elems root_map)
+
+        loopInstantiations :: [(UnitId, InstantiatedUnit)]
+                           -> M.Map NodeKey ModuleGraphNode
+                           -> M.Map NodeKey ModuleGraphNode
+        loopInstantiations [] done = done
+        loopInstantiations ((home_uid, iud) :xs) done =
+          let hsc_env' = hscSetActiveHomeUnit home_unit hsc_env
+              done' = loopUnit hsc_env' done [instUnitInstanceOf iud]
+              payload = InstantiationNode home_uid iud
+          in loopInstantiations xs (M.insert (mkNodeKey payload) payload done')
+
+          where
+            home_unit = ue_unitHomeUnit home_uid (hsc_unit_env hsc_env)
+
 
         -- This loops over all the mod summaries in the dependency graph, accumulates the actual dependencies for each module/unit
         loopSummaries :: [ModSummary]
@@ -1712,9 +1764,13 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
                                        Nothing excl_mods
                case mb_s of
                    NotThere -> loopImports ss done summarised
-                   External _ -> do
-                    (other_deps, done', summarised') <- loopImports ss done summarised
-                    return (other_deps, done', summarised')
+                   External uid -> do
+                    -- Pass an updated hsc_env to loopUnit, as each unit might
+                    -- have a different visible package database.
+                    let hsc_env' = hscSetActiveHomeUnit home_unit hsc_env
+                    let done' = loopUnit hsc_env' done [uid]
+                    (other_deps, done'', summarised') <- loopImports ss done' summarised
+                    return (NodeKey_ExternalUnit uid : other_deps, done'', summarised')
                    FoundInstantiation iud -> do
                     (other_deps, done', summarised') <- loopImports ss done summarised
                     return (NodeKey_Unit iud : other_deps, done', summarised')
@@ -1731,6 +1787,16 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
             home_unit = ue_unitHomeUnit home_uid (hsc_unit_env hsc_env)
             GWIB { gwib_mod = L loc mod, gwib_isBoot = is_boot } = gwib
             wanted_mod = L loc mod
+
+        loopUnit :: HscEnv -> Map.Map NodeKey ModuleGraphNode -> [UnitId] -> Map.Map NodeKey ModuleGraphNode
+        loopUnit _ cache [] = cache
+        loopUnit lcl_hsc_env cache (u:uxs) = do
+           let nk = (NodeKey_ExternalUnit u)
+           case Map.lookup nk cache of
+             Just {} -> loopUnit lcl_hsc_env cache uxs
+             Nothing -> case unitDepends <$> lookupUnitId (hsc_units lcl_hsc_env) u of
+                         Just us -> loopUnit lcl_hsc_env (loopUnit lcl_hsc_env (Map.insert nk (UnitNode us u) cache) us) uxs
+                         Nothing -> pprPanic "loopUnit" (text "Malformed package database, missing " <+> ppr u)
 
 getRootSummary ::
   [ModuleName] ->

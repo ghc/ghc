@@ -1,6 +1,6 @@
 [1 of 4] Compiling Main[c]
-[2 of 4] Compiling Main[d]
-[3 of 4] Linking ./c/C[c]
+[2 of 4] Linking ./c/C[c]
+[3 of 4] Compiling Main[d]
 [4 of 4] Linking ./d/D[d]
 unit C compiled successfully
 unit D compiled successfully

@@ -1,7 +1,7 @@
 [1 of 3] Processing p
   [1 of 3] Compiling H[sig]           ( p/H.hsig, nothing )
-  [2 of 3] Compiling Y[sig]           ( p/Y.hsig, nothing )
-  [3 of 3] Compiling M                ( p/M.hs, nothing )
+  [2 of 3] Compiling M                ( p/M.hs, nothing )
+  [3 of 3] Compiling Y[sig]           ( p/Y.hsig, nothing )
 [2 of 3] Processing impl
   Instantiating impl
   [1 of 2] Compiling F                ( impl/F.hs, bkp14.out/impl/F.o )

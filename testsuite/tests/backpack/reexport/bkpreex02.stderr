@@ -23,8 +23,8 @@
       Instantiating p[H=r-impl:H,T=r-impl:T]
       [1 of 2] Compiling T[sig]           ( p/T.hsig, nothing )
       [2 of 2] Compiling H[sig]           ( p/H.hsig, nothing )
-    [1 of 4] Compiling T[sig]           ( q/T.hsig, nothing )
-    [2 of 4] Compiling H[sig]           ( q/H.hsig, nothing )
-    [3 of 4] Compiling A                ( q/A.hs, nothing )
+    [1 of 4] Compiling H[sig]           ( q/H.hsig, nothing )
+    [2 of 4] Compiling A                ( q/A.hs, nothing )
+    [3 of 4] Compiling T[sig]           ( q/T.hsig, nothing )
     [4 of 4] Instantiating p
   [1 of 1] Instantiating q

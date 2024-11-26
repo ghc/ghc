@@ -1,16 +1,15 @@
 [1 of 3] Processing p
-  [1 of 3] Compiling Q[sig]           ( p\Q.hsig, nothing )
-  [2 of 3] Compiling Q2[sig]          ( p\Q2.hsig, nothing )
-  [3 of 3] Compiling P                ( p\P.hs, nothing )
+  [1 of 3] Compiling P                ( p/P.hs, nothing )
+  [2 of 3] Compiling Q[sig]           ( p/Q.hsig, nothing )
+  [3 of 3] Compiling Q2[sig]          ( p/Q2.hsig, nothing )
 [2 of 3] Processing q
   Instantiating q
-  [1 of 3] Compiling QMe              ( q\QMe.hs, bkpfail14.out\q\QMe.o )
-  [2 of 3] Compiling Q                ( q\Q.hs, bkpfail14.out\q\Q.o )
-  [3 of 3] Compiling Q2               ( q\Q2.hs, bkpfail14.out\q\Q2.o )
+  [1 of 3] Compiling Q                ( q/Q.hs, bkpfail14.out/q/Q.o )
+  [2 of 3] Compiling Q2               ( q/Q2.hs, bkpfail14.out/q/Q2.o )
+  [3 of 3] Compiling QMe              ( q/QMe.hs, bkpfail14.out/q/QMe.o )
 [3 of 3] Processing r
-  [1 of 3] Compiling H[sig]           ( r\H.hsig, nothing )
+  [1 of 3] Compiling H[sig]           ( r/H.hsig, nothing )
   [2 of 3] Instantiating p
-
 bkpfail14.bkp:9:9: error: [GHC-11890]
     • Identifier ‘f’ has conflicting definitions in the module
       and its hsig file.
@@ -18,3 +17,4 @@ bkpfail14.bkp:9:9: error: [GHC-11890]
         Hsig file: f :: GHC.Types.Int
       The two types are different.
     • While checking that ‘QMe’ implements signature ‘Q’ in ‘p[Q=QMe,Q2=Q2]’.
+
