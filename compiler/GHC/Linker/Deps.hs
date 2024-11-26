@@ -122,7 +122,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                               emptyUniqDSet emptyUniqDSet;
             else do
               (pkgs, mmods) <- unzip <$> mapM get_mod_info all_home_mods
-              return (catMaybes mmods, unionManyUniqDSets (init_pkg_set : pkgs))
+              return (catMaybes mmods, unionManyUniqDSets pkgs)
 
       let
         -- 2.  Exclude ones already linked
@@ -177,9 +177,11 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
             in make_deps_loop (found_units, deps `Set.union` found_mods) (todo_boot_mods ++ nexts)
 
     mkNk m = ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m)
-    (init_pkg_set, all_deps) = make_deps_loop (emptyUniqDSet, Set.empty) $ map mkNk (filterOut isInteractiveModule mods)
+    all_deps = mgReachableLoop mod_graph $ map (NodeKey_Module . mkNk) (filterOut isInteractiveModule mods)
+    (init_pkg_set, old_deps) = make_deps_loop (emptyUniqDSet, Set.empty) $ map mkNk (filterOut isInteractiveModule mods)
 
-    all_home_mods = [with_uid | NodeKey_Module with_uid <- Set.toList all_deps]
+
+    all_home_mods = pprTrace "old_deps" (ppr old_deps) $ pprTrace "mods" (ppr mods) $ pprTraceIt "deps" [with_uid | NodeKey_Module with_uid <- map mkNodeKey all_deps]
 
     get_mod_info (ModNodeKeyWithUid gwib uid) =
       case lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) of

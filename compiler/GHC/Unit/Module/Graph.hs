@@ -23,6 +23,7 @@ module GHC.Unit.Module.Graph
    , moduleGraphNodeModSum
    , moduleGraphModulesBelow
    , mgReachable
+   , mgReachableLoop
    , mgQuery
 
    , moduleGraphNodes
@@ -140,6 +141,7 @@ nodeKeyModName _ = Nothing
 data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: !ModuleNameWithIsBoot
                                            , mnkUnitId     :: !UnitId } deriving (Eq, Ord)
 
+
 instance Outputable ModNodeKeyWithUid where
   ppr (ModNodeKeyWithUid mnwib uid) = ppr uid <> colon <> ppr mnwib
 
@@ -157,6 +159,7 @@ instance Outputable ModNodeKeyWithUid where
 data ModuleGraph = ModuleGraph
   { mg_mss :: [ModuleGraphNode]
   , mg_graph :: (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
+  , mg_loop_graph :: (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
     -- A cached transitive dependency calculation so that a lot of work is not
     -- repeated whenever the transitive dependencies need to be calculated (for example, hptInstances)
   }
@@ -177,10 +180,14 @@ unionMG a b =
   in ModuleGraph {
         mg_mss = new_mss
       , mg_graph = mkTransDeps new_mss
+      , mg_loop_graph = mkTransLoopDeps new_mss
       }
 
 mkTransDeps :: [ModuleGraphNode] -> (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
 mkTransDeps = first graphReachability {- module graph is acyclic -} . moduleGraphNodes False
+
+mkTransLoopDeps :: [ModuleGraphNode] -> (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
+mkTransLoopDeps = first cyclicGraphReachability . moduleGraphNodes True
 
 mgModSummaries :: ModuleGraph -> [ModSummary]
 mgModSummaries mg = [ m | ModuleNode _ m <- mgModSummaries' mg ]
@@ -201,7 +208,7 @@ mgLookupModule ModuleGraph{..} m = listToMaybe $ mapMaybe go mg_mss
     go _ = Nothing
 
 emptyMG :: ModuleGraph
-emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing)
+emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing) (graphReachability emptyGraph, const Nothing)
 
 isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
 isTemplateHaskellOrQQNonBoot ms =
@@ -215,6 +222,7 @@ extendMG :: ModuleGraph -> [NodeKey] -> ModSummary -> ModuleGraph
 extendMG ModuleGraph{..} deps ms = ModuleGraph
   { mg_mss = ModuleNode deps ms : mg_mss
   , mg_graph = mkTransDeps (ModuleNode deps ms : mg_mss)
+  , mg_loop_graph = mkTransLoopDeps (ModuleNode deps ms : mg_mss)
   }
 
 extendMGInst :: ModuleGraph -> UnitId -> InstantiatedUnit -> ModuleGraph
@@ -415,6 +423,14 @@ mgReachable mg nk = map summaryNodeSummary <$> modules_below where
   (td_map, lookup_node) = mg_graph mg
   modules_below =
     allReachable td_map <$> lookup_node nk
+
+-- | Things which are reachable if hs-boot files are ignored. Used by 'getLinkDeps'
+mgReachableLoop :: ModuleGraph -> [NodeKey] -> [ModuleGraphNode]
+mgReachableLoop mg nk = map summaryNodeSummary modules_below where
+  (td_map, lookup_node) = mg_loop_graph mg
+  modules_below =
+    allReachableMany td_map (mapMaybe lookup_node nk)
+
 
 -- | Reachability Query. @mgQuery(g, a, b)@ asks: Can we reach @b@ from @a@ in
 -- graph @g@?

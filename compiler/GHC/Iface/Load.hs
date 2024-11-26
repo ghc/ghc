@@ -108,6 +108,7 @@ import GHC.Unit.Home
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Finder
 import GHC.Unit.Env
+import GHC.Unit.Module.External.Graph
 
 import GHC.Data.Maybe
 
@@ -119,6 +120,8 @@ import GHC.Driver.Env.KnotVars
 import {-# source #-} GHC.Driver.Main (loadIfaceByteCode)
 import GHC.Iface.Errors.Types
 import Data.Function ((&))
+import qualified Data.Set as Set
+import GHC.Unit.Module.Graph
 
 {-
 ************************************************************************
@@ -407,6 +410,21 @@ loadInterfaceWithException doc mod_name where_from
     let ctx = initSDocContext dflags defaultUserStyle
     withIfaceErr ctx (loadInterface doc mod_name where_from)
 
+-- | Load all interfaces from the home package, presumes that this operation
+-- can be completed by traversing from the already loaded home packages.
+
+-- This operation is used just before TH splices are run.
+
+-- The first time this is run
+-- A field in the EPS tracks which home modules are fully loaded
+loadHomePackageInterfacesBelow :: ModNodeKeyWithUid -> IfM lcl ()
+loadHomePackageInterfacesBelow mn = do
+  graph <- eps_module_graph <$> getEps
+  let key = ExternalModuleKey mn
+  if isFullyLoadedModule key graph
+    then return ()
+    else return ()
+
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
               -> IfM lcl (MaybeErr MissingInterfaceError ModIface)
@@ -515,6 +533,12 @@ loadInterface doc_str mod from
         ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
         ; purged_hsc_env <- getTopEnv
 
+        ; let direct_deps = map (uncurry (flip ModNodeKeyWithUid)) $ (Set.toList (dep_direct_mods $ mi_deps iface))
+        ; let !module_graph_key =
+                if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env
+                  then Just $ NodeHomePackage (miKey iface) (map ExternalModuleKey direct_deps)
+                  else Nothing
+
         ; let final_iface = iface
                                & set_mi_decls     (panic "No mi_decls in PIT")
                                & set_mi_insts     (panic "No mi_insts in PIT")
@@ -555,6 +579,9 @@ loadInterface doc_str mod from
                   eps_iface_bytecode = add_bytecode (eps_iface_bytecode eps),
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,
+                  eps_module_graph = case module_graph_key of
+                                        Just k -> extendExternalModuleGraph k (eps_module_graph eps)
+                                        Nothing -> eps_module_graph eps,
                   eps_complete_matches
                                    = eps_complete_matches eps ++ new_eps_complete_matches,
                   eps_inst_env     = extendInstEnvList (eps_inst_env eps)

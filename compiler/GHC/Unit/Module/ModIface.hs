@@ -82,6 +82,7 @@ module GHC.Unit.Module.ModIface
    , IfaceImport(..)
    , mi_boot
    , mi_fix
+   , miKey
    , mi_semantic_module
    , mi_free_holes
    , mi_mnwib
@@ -125,6 +126,7 @@ import GHC.Utils.Binary
 
 import Control.DeepSeq
 import Control.Exception
+import GHC.Unit.Module.Graph (ModNodeKeyWithUid(..))
 
 
 {- Note [Interface file stages]
@@ -361,6 +363,9 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- when writing this 'ModIface' to disk, and write this buffer to disk instead.
                 -- See Note [Sharing of ModIface].
      }
+
+miKey :: ModIface -> ModNodeKeyWithUid
+miKey hmi = ModNodeKeyWithUid (mi_mnwib hmi) ((toUnitId $ moduleUnit (mi_module hmi)))
 
 -- Enough information to reconstruct the top level environment for a module
 data IfaceTopEnv

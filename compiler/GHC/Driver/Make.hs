@@ -1285,8 +1285,6 @@ upsweep n_jobs hsc_env hmi_cache diag_wrapper mHscMessage old_hpt build_plan = d
 toCache :: [HomeModInfo] -> M.Map (ModNodeKeyWithUid) HomeModInfo
 toCache hmis = M.fromList ([(miKey $ hm_iface hmi, hmi) | hmi <- hmis])
 
-miKey :: ModIface -> ModNodeKeyWithUid
-miKey hmi = ModNodeKeyWithUid (mi_mnwib hmi) ((toUnitId $ moduleUnit (mi_module hmi)))
 
 upsweep_inst :: HscEnv
              -> Maybe Messager
