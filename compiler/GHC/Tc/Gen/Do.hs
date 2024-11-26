@@ -95,7 +95,7 @@ expand_do_stmts doFlavour (stmt@(L _ (LetStmt _ bs)) : lstmts) =
 --    ------------------------------------------------
 --       let x = e ; stmts ~~> let x = e in stmts'xo
   do expand_stmts <- expand_do_stmts doFlavour lstmts
-     let expansion = genHsLet bs (genPopErrCtxtExpr expand_stmts)
+     let expansion = genHsLet bs (genPopErrCtxtExpr . unLoc $ expand_stmts)
      return $ mkExpandedStmtAt (noAnnSrcSpan generatedSrcSpan) stmt doFlavour expansion
 
 expand_do_stmts doFlavour (stmt@(L _loc (BindStmt xbsrn pat e)): lstmts)
@@ -108,7 +108,7 @@ expand_do_stmts doFlavour (stmt@(L _loc (BindStmt xbsrn pat e)): lstmts)
 --    -------------------------------------------------------
 --       pat <- e ; stmts   ~~> (>>=) e f
   = do expand_stmts <- expand_do_stmts doFlavour lstmts
-       failable_expr <- mk_failable_expr doFlavour pat (genPopErrCtxtExpr expand_stmts) fail_op
+       failable_expr <- mk_failable_expr doFlavour pat (genPopErrCtxtExpr . unLoc $ expand_stmts) fail_op
        let expansion = genHsExpApps bind_op  -- (>>=)
                        [ e
                        , failable_expr ]
@@ -126,7 +126,7 @@ expand_do_stmts doFlavour (stmt@(L _loc (BodyStmt _ e (SyntaxExprRn then_op) _))
   do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
      let expansion = genHsExpApps then_op  -- (>>)
                      [ e
-                     , genPopErrCtxtExpr expand_stmts_expr ]
+                     , genPopErrCtxtExpr . unLoc $ expand_stmts_expr ]
      return $ mkExpandedStmtAt (noAnnSrcSpan generatedSrcSpan) stmt doFlavour expansion
 
 expand_do_stmts doFlavour
@@ -561,10 +561,10 @@ It stores the original statement (with location) and the expanded expression
 
 
 -- | Wrap a located expression with a `PopErrCtxt`
-mkPopErrCtxtExpr :: LHsExpr GhcRn -> HsExpr GhcRn
+mkPopErrCtxtExpr :: HsExpr GhcRn -> HsExpr GhcRn
 mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
 
-genPopErrCtxtExpr :: LHsExpr GhcRn -> LHsExpr GhcRn
+genPopErrCtxtExpr :: HsExpr GhcRn -> LHsExpr GhcRn
 genPopErrCtxtExpr a = wrapGenSpan $ mkPopErrCtxtExpr a
 
 -- | Build an expression using the extension constructor `XExpr`,

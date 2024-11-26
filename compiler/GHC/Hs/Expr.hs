@@ -548,7 +548,7 @@ data XXExprGhcRn
                     }
 
   | PopErrCtxt                                     -- A hint for typechecker to pop
-    {-# UNPACK #-} !(LHsExpr GhcRn)                -- the top of the error context stack
+    {-# UNPACK #-} !(HsExpr GhcRn)                -- the top of the error context stack
                                                    -- Does not presist post renaming phase
                                                    -- See Part 3. of Note [Expanding HsDo with XXExprGhcRn]
                                                    -- in `GHC.Tc.Gen.Do`
@@ -945,7 +945,7 @@ ppr_infix_expr _ = Nothing
 
 ppr_infix_expr_rn :: XXExprGhcRn -> Maybe SDoc
 ppr_infix_expr_rn (ExpandedThingRn thing _) = ppr_infix_hs_expansion thing
-ppr_infix_expr_rn (PopErrCtxt (L _ a)) = ppr_infix_expr a
+ppr_infix_expr_rn (PopErrCtxt a)            = ppr_infix_expr a
 ppr_infix_expr_rn (HsRecSelRn f)            = Just (pprInfixOcc f)
 
 ppr_infix_expr_tc :: XXExprGhcTc -> Maybe SDoc
@@ -1062,7 +1062,7 @@ hsExprNeedsParens prec = go
 
     go_x_rn :: XXExprGhcRn -> Bool
     go_x_rn (ExpandedThingRn thing _ )   = hsExpandedNeedsParens thing
-    go_x_rn (PopErrCtxt (L _ a))         = hsExprNeedsParens prec a
+    go_x_rn (PopErrCtxt a)               = hsExprNeedsParens prec a
     go_x_rn (HsRecSelRn{})               = False
 
     hsExpandedNeedsParens :: HsThingRn -> Bool
@@ -1114,9 +1114,9 @@ isAtomicHsExpr (XExpr x)
     go_x_tc (HsRecSelTc{})            = True
 
     go_x_rn :: XXExprGhcRn -> Bool
-    go_x_rn (ExpandedThingRn thing _)    = isAtomicExpandedThingRn thing
-    go_x_rn (PopErrCtxt (L _ a))         = isAtomicHsExpr a
-    go_x_rn (HsRecSelRn{})            = True
+    go_x_rn (ExpandedThingRn thing _)   = isAtomicExpandedThingRn thing
+    go_x_rn (PopErrCtxt a)              = isAtomicHsExpr a
+    go_x_rn (HsRecSelRn{})              = True
 
     isAtomicExpandedThingRn :: HsThingRn -> Bool
     isAtomicExpandedThingRn (OrigExpr e) = isAtomicHsExpr e

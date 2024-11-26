@@ -402,14 +402,14 @@ tcApp rn_expr exp_res_ty
        -- Step 2: Infer the type of `fun`, the head of the application
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
        ; let tc_head = (tc_fun, fun_ctxt)
-       ; traceTc "tcApp 1" (ppr rn_fun)
+
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
        ; (inst_args, app_res_rho)
               <- setQLInstLevel do_ql $  -- See (TCAPP1) and (TCAPP2) in
                                          -- Note [tcApp: typechecking applications]
                  tcInstFun do_ql True tc_head fun_sigma rn_args
-       ; traceTc "tcApp 2" (ppr rn_fun)
+
        ; case do_ql of
             NoQL -> do { traceTc "tcApp:NoQL" (ppr rn_fun $$ ppr app_res_rho)
 
@@ -417,7 +417,7 @@ tcApp rn_expr exp_res_ty
                          -- See Note [Unify with expected type before typechecking arguments]
                        ; res_wrap <- checkResultTy rn_expr tc_head inst_args
                                                    app_res_rho exp_res_ty
-                       ; traceTc "tcApp valArgs" (ppr inst_args)
+
                          -- Step 4.2: typecheck the  arguments
                        ; tc_args <- tcValArgs NoQL inst_args
                          -- Step 4.3: wrap up

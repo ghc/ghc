@@ -709,35 +709,14 @@ tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
 
 tcXExpr :: XXExprGhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
-tcXExpr (PopErrCtxt (L loc e)) res_ty
+tcXExpr (PopErrCtxt e) res_ty
   = popErrCtxt $ -- See Part 3 of Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
-      setSrcSpanA loc $
       tcExpr e res_ty
 
 tcXExpr (ExpandedThingRn o@(OrigStmt stmt flav) e) res_ty
    = addThingCtxt o $
-      mkExpandedStmtTc stmt flav <$> tcExpr e res_ty
-{-
-tcXExpr xe@(ExpandedThingRn o e') res_ty
-  | OrigStmt ls@(L loc s) flav <- o
-  , HsLet x binds e <- e'
-  =  do { (binds', e') <-  setSrcSpanA loc $
-                           addStmtCtxt s flav $
-                           tcLocalBinds binds $
-                           tcMonoExprNC e res_ty -- NB: Do not call tcMonoExpr here as it adds
-                                                 -- a duplicate error context
-        ; return $ mkExpandedStmtTc ls flav (HsLet x binds' e')
-        }
+       mkExpandedStmtTc stmt flav <$> tcExpr e res_ty
 
-  | OrigStmt s@(L loc LastStmt{}) flav <- o
-  = setSrcSpanA loc $
-    addStmtCtxt (unLoc s) flav $
-    mkExpandedStmtTc s flav <$> tcApp e' res_ty
-
-  | OrigStmt ls@(L loc _) flav <- o
-  = setSrcSpanA loc $
-    mkExpandedStmtTc ls flav <$> tcApp (XExpr xe) res_ty
--}
 -- For record selection
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
 

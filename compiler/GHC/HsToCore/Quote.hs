@@ -1717,7 +1717,7 @@ repE e@(XExpr (ExpandedThingRn o x))
   | otherwise
   = notHandled (ThExpressionForm e)
 
-repE (XExpr (PopErrCtxt (L _ e))) = repE e
+repE (XExpr (PopErrCtxt e)) = repE e
 repE (XExpr (HsRecSelRn (FieldOcc _ (L _ x)))) = repE (HsVar noExtField (noLocA x))
 
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
