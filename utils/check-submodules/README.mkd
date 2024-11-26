@@ -1,0 +1,47 @@
+# check-submodules
+
+`check-submodules` is a utility automating several common tasks encountered
+when check and maintaining GHC's boot library dependencies. It has several
+modes.
+
+
+## `check-versions`
+
+The `check-versions` mode verifies that GHC is up-to-date with each
+library's Hackage releases. Specifically, it checks that:
+
+ * the referenced commits are released on Hackage
+ * that the Hackage version has not been deprecated
+ * that there is not a more recent version in the same major series
+
+
+## `check-tags`
+
+The `check-tags` mode is used to verify that GHC does not differ from the
+upstream releases in non-trivial ways.
+
+Specifically, it compares each submodule's `HEAD` commit against the most
+recent predecessor release tag. If there are non-trivial differences (that is,
+changes outside of dot-files), then the check fails and emits a summary of the
+differing files.
+
+
+## `summarize`
+
+The `summarize` mode produces a convenient summary of the current submodule
+state.
+
+
+## `email`
+
+The `email` mode produces a correctly-formatted email recipient list containing
+the maintainers of all boot libraries.
+
+
+## Usage
+
+The tool can be readily run via the included nix flake from the root of the GHC
+tree:
+```bash
+nix run ./utils/check-submodules# -- check-versions
+```

@@ -1,0 +1,50 @@
+cabal-version:      3.0
+name:               check-submodules
+version:            0.1.0.0
+-- synopsis:
+-- description:
+homepage:           https://gitlab.haskell.org/ghc/ghc
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Ben Gamari
+maintainer:         ben@smart-cactus.org
+copyright:          (c) 2024 Ben Gamari
+category:           Development
+build-type:         Simple
+-- extra-source-files:
+
+common warnings
+    ghc-options: -Wall
+
+executable check-submodules
+    import:           warnings
+    main-is:          Main.hs
+    build-depends:    base,
+                      check-submodules
+    hs-source-dirs:   app
+    default-language: Haskell2010
+
+library
+    import:           warnings
+    exposed-modules:  Git,
+                      Hackage,
+                      CheckVersions,
+                      CheckTags,
+                      Packages,
+                      Package,
+                      Pretty
+    build-depends:    base,
+                      wreq,
+                      aeson,
+                      bytestring,
+                      text,
+                      transformers,
+                      prettyprinter,
+                      prettyprinter-ansi-terminal,
+                      filepath,
+                      microlens,
+                      containers,
+                      typed-process,
+                      Cabal
+    hs-source-dirs:   src
+    default-language: Haskell2010
