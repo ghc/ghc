@@ -121,8 +121,8 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
             then follow_deps (filterOut isInteractiveModule mods)
                               emptyUniqDSet emptyUniqDSet;
             else do
-              (pkgs, mmods) <- unzip <$> mapM get_mod_info all_home_mods
-              return (catMaybes mmods, unionManyUniqDSets (init_pkg_set : pkgs))
+              mmods <- mapM get_mod_info all_home_mods
+              return (catMaybes mmods, mkUniqDSet all_dep_pkgs)
 
       let
         -- 2.  Exclude ones already linked
@@ -152,44 +152,25 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
     mod_graph = ldModuleGraph opts
     unit_env  = ldUnitEnv     opts
 
-    -- This code is used in `--make` mode to calculate the home package and unit dependencies
-    -- for a set of modules.
-    --
-    -- It is significantly more efficient to use the shared transitive dependency
-    -- calculation than to compute the transitive dependency set in the same manner as oneShot mode.
+    mkNk m
+       = let k = NodeKey_Module (ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m))
+         in if mgMember mod_graph k
+              then k
+              else NodeKey_ExternalUnit (moduleUnitId m)
 
-    -- It is also a matter of correctness to use the module graph so that dependencies between home units
-    -- is resolved correctly.
-    make_deps_loop :: (UniqDSet UnitId, Set.Set NodeKey) -> [ModNodeKeyWithUid] -> (UniqDSet UnitId, Set.Set NodeKey)
-    make_deps_loop found [] = found
-    make_deps_loop found@(found_units, found_mods) (nk:nexts)
-      | NodeKey_Module nk `Set.member` found_mods = make_deps_loop found nexts
-      | otherwise =
-        case fmap mkNodeKey <$> mgReachable mod_graph (NodeKey_Module nk) of
-          Nothing ->
-              let (ModNodeKeyWithUid _ uid) = nk
-              in make_deps_loop (addOneToUniqDSet found_units uid, found_mods) nexts
-          Just trans_deps ->
-            let deps = Set.insert (NodeKey_Module nk) (Set.fromList trans_deps)
-                -- See #936 and the ghci.prog007 test for why we have to continue traversing through
-                -- boot modules.
-                todo_boot_mods = [ModNodeKeyWithUid (GWIB mn NotBoot) uid | NodeKey_Module (ModNodeKeyWithUid (GWIB mn IsBoot) uid) <- trans_deps]
-            in make_deps_loop (found_units, deps `Set.union` found_mods) (todo_boot_mods ++ nexts)
+    initial_keys = map mkNk (filterOut isInteractiveModule mods)
+    all_deps = initial_keys ++ map mkNodeKey (mgReachableLoop mod_graph initial_keys)
 
-    mkNk m = ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m)
-    (init_pkg_set, all_deps) = make_deps_loop (emptyUniqDSet, Set.empty) $ map mkNk (filterOut isInteractiveModule mods)
-
-    all_home_mods = [with_uid | NodeKey_Module with_uid <- Set.toList all_deps]
+    all_home_mods = [with_uid | NodeKey_Module with_uid <- all_deps]
+    all_dep_pkgs = [uid | NodeKey_ExternalUnit uid <- all_deps]
 
     get_mod_info (ModNodeKeyWithUid gwib uid) =
       case lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) of
         Just hmi ->
           let iface = (hm_iface hmi)
-              mmod = case mi_hsc_src iface of
-                      HsBootFile -> link_boot_mod_error (mi_module iface)
-                      _          -> return $ Just (mi_module iface)
-
-          in (mkUniqDSet $ Set.toList $ dep_direct_pkgs (mi_deps iface),) <$>  mmod
+          in case mi_hsc_src iface of
+              HsBootFile -> link_boot_mod_error (mi_module iface)
+              _          -> return $ Just (mi_module iface)
         Nothing -> throwProgramError opts $
           text "getLinkDeps: Home module not loaded" <+> ppr (gwib_mod gwib) <+> ppr uid
 
