@@ -1,0 +1,16 @@
+# check-submodules
+
+This is a utilities used in GHC CI to verify the consistency and
+up-to-date-ness of GHC's boot library dependencies. Specifically
+we verify that:
+
+ * the referenced commits are released on Hackage
+ * that the Hackage version has not been deprecated
+ * that there is not a more recent version in the same major series
+
+## Usage
+
+In the GHC tree:
+```bash
+nix run ./utils/check-submodules#
+```
