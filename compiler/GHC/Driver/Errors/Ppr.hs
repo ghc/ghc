@@ -261,6 +261,7 @@ instance Diagnostic DriverMessage where
         ppr_node (ModuleNode _deps m) = text "module" <+> ppr_ms m
         ppr_node (InstantiationNode _uid u) = text "instantiated unit" <+> ppr u
         ppr_node (LinkNode uid _) = pprPanic "LinkNode should not be in a cycle" (ppr uid)
+        ppr_node (PackageNode uid _) = pprPanic "PackageNode should not be in a cycle" (ppr uid)
 
         ppr_ms :: ModSummary -> SDoc
         ppr_ms ms = quotes (ppr (moduleName (ms_mod ms))) <+>

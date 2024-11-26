@@ -589,6 +589,7 @@ mkBackpackMsg = do
               MustCompile -> empty
               RecompBecause reason -> text " [" <> pprWithUnitState state (ppr reason) <> text "]"
         LinkNode _ _ -> showMsg (text "Linking ")  empty
+        PackageNode {} -> showMsg (text "Package ") empty
 
 -- | 'PprStyle' for Backpack messages; here we usually want the module to
 -- be qualified (so we can tell how it was instantiated.) But we try not

@@ -1470,6 +1470,7 @@ batchMsgWith extra hsc_env_start mod_index recomp node =
                     LinkNode {} -> "Linking"
                     InstantiationNode {} -> "Instantiating"
                     ModuleNode {} -> "Compiling"
+                    PackageNode {} -> "Loading"
         hsc_env = hscSetActiveUnitId (moduleGraphNodeUnitId node) hsc_env_start
         dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env

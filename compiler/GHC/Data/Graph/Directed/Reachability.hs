@@ -7,7 +7,7 @@ module GHC.Data.Graph.Directed.Reachability
   , graphReachability, cyclicGraphReachability
 
   -- * Reachability queries
-  , allReachable, allReachableMany
+  , allReachable, allReachableMany, allReachableManyWithRoots
   , isReachable, isReachableMany
   )
   where
@@ -128,6 +128,23 @@ allReachableMany (ReachabilityIndex index from to) roots = map from (IS.toList h
   where roots_i = [ v | Just v <- map to roots ]
         hits = {-# SCC "allReachableMany" #-}
                IS.unions $ map (expectJust "reachablesG" . flip IM.lookup index) roots_i
+
+-- | 'allReachableManyWithRoots' returns all nodes reachable from the many given @roots@.
+--
+-- Properties:
+--  * The list of nodes includes the @roots@ node!
+--  * The list of nodes is deterministically ordered, but according to an
+--     internal order determined by the indices attributed to graph nodes.
+--  * This function has $O(n)$ complexity where $n$ is the number of @roots@.
+--
+-- If you need a topologically sorted list, consider using the functions
+-- exposed from 'GHC.Data.Graph.Directed' on 'Graph' instead ('reachableG').
+allReachableManyWithRoots :: ReachabilityIndex node -> [node] {-^ The @roots@ -} -> [node] {-^ All nodes reachable from all @roots@ -}
+allReachableManyWithRoots (ReachabilityIndex index from to) roots = map from (IS.toList hits)
+  where roots_i = [ v | Just v <- map to roots ]
+        hits = IS.union (IS.fromList roots_i)
+                        (IS.unions $ map (expectJust "reachablesG" . flip IM.lookup index) roots_i)
+
 
 -- | Fast reachability query.
 --

@@ -417,8 +417,8 @@ loadInterfaceWithException doc mod_name where_from
 
 -- The first time this is run
 -- A field in the EPS tracks which home modules are fully loaded
-loadHomePackageInterfacesBelow :: ModNodeKeyWithUid -> IfM lcl ()
-loadHomePackageInterfacesBelow mn = do
+_loadHomePackageInterfacesBelow :: ModNodeKeyWithUid -> IfM lcl ()
+_loadHomePackageInterfacesBelow mn = do
   graph <- eps_module_graph <$> getEps
   let key = ExternalModuleKey mn
   if isFullyLoadedModule key graph

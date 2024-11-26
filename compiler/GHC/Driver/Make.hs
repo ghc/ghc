@@ -1107,7 +1107,16 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
       where
         collect_result res_var = runMaybeT (waitResult res_var)
 
-    n_mods = sum (map countMods plan)
+    -- Just used for an assertion
+    count_mods :: BuildPlan -> Int
+    count_mods (SingleModule m) = count_m m
+    count_mods (ResolvedCycle ns) = length ns
+    count_mods (UnresolvedCycle ns) = length ns
+
+    count_m (PackageNode {}) = 0
+    count_m _ = 1
+
+    n_mods = sum (map count_mods plan)
 
     buildLoop :: [BuildPlan]
               -> BuildM (Maybe [ModuleGraphNode], [MakeAction])
@@ -1138,7 +1147,6 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
                       -> ModuleGraphNode          -- The node we are compiling
                       -> BuildM MakeAction
     buildSingleModule rehydrate_nodes origin mod = do
-      mod_idx <- nodeId
       !build_map <- getBuildMap
       hug_var <- gets hug_var
       -- 1. Get the direct dependencies of this module
@@ -1147,17 +1155,20 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
           -- which would retain all the result variables, preventing us from collecting them
           -- after they are no longer used.
           !build_deps = getDependencies direct_deps build_map
-      let !build_action =
+      !build_action <-
             case mod of
               InstantiationNode uid iu -> do
-                withCurrentUnit (moduleGraphNodeUnitId mod) $ do
+                mod_idx <- nodeId
+                return $ withCurrentUnit (moduleGraphNodeUnitId mod) $ do
                   (hug, deps) <- wait_deps_hug hug_var build_deps
                   executeInstantiationNode mod_idx n_mods hug uid iu
                   return (Nothing, deps)
-              ModuleNode _build_deps ms ->
+              ModuleNode _build_deps ms -> do
                 let !old_hmi = M.lookup (msKey ms) old_hpt
                     rehydrate_mods = mapMaybe nodeKeyModName <$> rehydrate_nodes
-                in withCurrentUnit (moduleGraphNodeUnitId mod) $ do
+                mod_idx <- nodeId
+                return $ withCurrentUnit (moduleGraphNodeUnitId mod) $ do
+
                      (hug, deps) <- wait_deps_hug hug_var build_deps
                      hmi <- executeCompileNode mod_idx n_mods old_hmi hug rehydrate_mods ms
                      -- Write the HMI to an external cache (if one exists)
@@ -1168,10 +1179,12 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
                      liftIO $ modifyMVar_ hug_var (return . addHomeModInfoToHug hmi)
                      return (Just hmi, addToModuleNameSet (moduleGraphNodeUnitId mod) (ms_mod_name ms) deps )
               LinkNode _nks uid -> do
-                  withCurrentUnit (moduleGraphNodeUnitId mod) $ do
+                  mod_idx <- nodeId
+                  return $ withCurrentUnit (moduleGraphNodeUnitId mod) $ do
                     (hug, deps) <- wait_deps_hug hug_var build_deps
                     executeLinkNode hug (mod_idx, n_mods) uid direct_deps
                     return (Nothing, deps)
+              PackageNode {} -> return $ return (Nothing, mempty)
 
 
       res_var <- liftIO newEmptyMVar
@@ -1707,9 +1720,10 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
                                        Nothing excl_mods
                case mb_s of
                    NotThere -> loopImports ss done summarised
-                   External _ -> do
-                    (other_deps, done', summarised') <- loopImports ss done summarised
-                    return (other_deps, done', summarised')
+                   External uid -> do
+                    let done' = loopUnit done [uid]
+                    (other_deps, done'', summarised') <- loopImports ss done' summarised
+                    return (NodeKey_ExternalUnit uid : other_deps, done'', summarised')
                    FoundInstantiation iud -> do
                     (other_deps, done', summarised') <- loopImports ss done summarised
                     return (NodeKey_Unit iud : other_deps, done', summarised')
@@ -1726,6 +1740,16 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
             home_unit = ue_unitHomeUnit home_uid (hsc_unit_env hsc_env)
             GWIB { gwib_mod = L loc mod, gwib_isBoot = is_boot } = gwib
             wanted_mod = L loc mod
+
+        loopUnit :: Map.Map NodeKey ModuleGraphNode -> [UnitId] -> Map.Map NodeKey ModuleGraphNode
+        loopUnit cache [] = cache
+        loopUnit cache (u:uxs) = do
+           let nk = (NodeKey_ExternalUnit u)
+           case Map.lookup nk cache of
+             Just {} -> loopUnit cache uxs
+             Nothing -> case unitDepends <$> lookupUnitId (hsc_units hsc_env) u of
+                         Just us -> loopUnit (loopUnit (Map.insert nk (PackageNode us u) cache) us) uxs
+                         Nothing -> panic "bad"
 
 getRootSummary ::
   [ModuleName] ->

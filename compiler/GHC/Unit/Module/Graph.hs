@@ -9,8 +9,6 @@ module GHC.Unit.Module.Graph
    , emptyMG
    , mkModuleGraph
    , extendMG
-   , extendMGInst
-   , extendMG'
    , unionMG
    , isTemplateHaskellOrQQNonBoot
    , filterToposortToModules
@@ -88,6 +86,8 @@ data ModuleGraphNode
   | ModuleNode [NodeKey] ModSummary
   -- | Link nodes are whether are are creating a linked product (ie executable/shared object etc) for a unit.
   | LinkNode [NodeKey] UnitId
+  -- | Package dependency
+  | PackageNode [UnitId] UnitId
 
 moduleGraphNodeModule :: ModuleGraphNode -> Maybe ModuleName
 moduleGraphNodeModule mgn = ms_mod_name <$> (moduleGraphNodeModSum mgn)
@@ -96,6 +96,7 @@ moduleGraphNodeModSum :: ModuleGraphNode -> Maybe ModSummary
 moduleGraphNodeModSum (InstantiationNode {}) = Nothing
 moduleGraphNodeModSum (LinkNode {})          = Nothing
 moduleGraphNodeModSum (ModuleNode _ ms)      = Just ms
+moduleGraphNodeModSum (PackageNode {})       = Nothing
 
 moduleGraphNodeUnitId :: ModuleGraphNode -> UnitId
 moduleGraphNodeUnitId mgn =
@@ -103,12 +104,14 @@ moduleGraphNodeUnitId mgn =
     InstantiationNode uid _iud -> uid
     ModuleNode _ ms           -> toUnitId (moduleUnit (ms_mod ms))
     LinkNode _ uid             -> uid
+    PackageNode _ uid          -> uid
 
 instance Outputable ModuleGraphNode where
   ppr = \case
     InstantiationNode _ iuid -> ppr iuid
     ModuleNode nks ms -> ppr (msKey ms) <+> ppr nks
     LinkNode uid _     -> text "LN:" <+> ppr uid
+    PackageNode _ uid  -> text "P:" <+> ppr uid
 
 instance Eq ModuleGraphNode where
   (==) = (==) `on` mkNodeKey
@@ -119,6 +122,7 @@ instance Ord ModuleGraphNode where
 data NodeKey = NodeKey_Unit {-# UNPACK #-} !InstantiatedUnit
              | NodeKey_Module {-# UNPACK #-} !ModNodeKeyWithUid
              | NodeKey_Link !UnitId
+             | NodeKey_ExternalUnit !UnitId
   deriving (Eq, Ord)
 
 instance Outputable NodeKey where
@@ -128,11 +132,13 @@ pprNodeKey :: NodeKey -> SDoc
 pprNodeKey (NodeKey_Unit iu) = ppr iu
 pprNodeKey (NodeKey_Module mk) = ppr mk
 pprNodeKey (NodeKey_Link uid)  = ppr uid
+pprNodeKey (NodeKey_ExternalUnit uid) = ppr uid
 
 nodeKeyUnitId :: NodeKey -> UnitId
 nodeKeyUnitId (NodeKey_Unit iu)   = instUnitInstanceOf iu
 nodeKeyUnitId (NodeKey_Module mk) = mnkUnitId mk
 nodeKeyUnitId (NodeKey_Link uid)  = uid
+nodeKeyUnitId (NodeKey_ExternalUnit uid) = uid
 
 nodeKeyModName :: NodeKey -> Maybe ModuleName
 nodeKeyModName (NodeKey_Module mk) = Just (gwib_mod $ mnkModuleName mk)
@@ -172,6 +178,7 @@ mapMG f mg@ModuleGraph{..} = mg
       InstantiationNode uid iuid -> InstantiationNode uid iuid
       LinkNode uid nks -> LinkNode uid nks
       ModuleNode deps ms  -> ModuleNode deps (f ms)
+      PackageNode deps uid -> PackageNode deps uid
   }
 
 unionMG :: ModuleGraph -> ModuleGraph -> ModuleGraph
@@ -218,29 +225,15 @@ isTemplateHaskellOrQQNonBoot ms =
 
 -- | Add an ExtendedModSummary to ModuleGraph. Assumes that the new ModSummary is
 -- not an element of the ModuleGraph.
-extendMG :: ModuleGraph -> [NodeKey] -> ModSummary -> ModuleGraph
-extendMG ModuleGraph{..} deps ms = ModuleGraph
-  { mg_mss = ModuleNode deps ms : mg_mss
-  , mg_graph = mkTransDeps (ModuleNode deps ms : mg_mss)
-  , mg_loop_graph = mkTransLoopDeps (ModuleNode deps ms : mg_mss)
-  }
-
-extendMGInst :: ModuleGraph -> UnitId -> InstantiatedUnit -> ModuleGraph
-extendMGInst mg uid depUnitId = mg
-  { mg_mss = InstantiationNode uid depUnitId : mg_mss mg
-  }
-
-extendMGLink :: ModuleGraph -> UnitId -> [NodeKey] -> ModuleGraph
-extendMGLink mg uid nks = mg { mg_mss = LinkNode nks uid : mg_mss mg }
-
-extendMG' :: ModuleGraph -> ModuleGraphNode -> ModuleGraph
-extendMG' mg = \case
-  InstantiationNode uid depUnitId -> extendMGInst mg uid depUnitId
-  ModuleNode deps ms -> extendMG mg deps ms
-  LinkNode deps uid   -> extendMGLink mg uid deps
+extendMG :: ModuleGraph -> ModuleGraphNode -> ModuleGraph
+extendMG ModuleGraph{..} node = mkModuleGraph (node : mg_mss)
 
 mkModuleGraph :: [ModuleGraphNode] -> ModuleGraph
-mkModuleGraph = foldr (flip extendMG') emptyMG
+mkModuleGraph nodes = ModuleGraph
+  { mg_mss = nodes
+  , mg_graph = mkTransDeps nodes
+  , mg_loop_graph = mkTransLoopDeps nodes
+  }
 
 -- | This function filters out all the instantiation nodes from each SCC of a
 -- topological sort. Use this with care, as the resulting "strongly connected components"
@@ -249,9 +242,8 @@ mkModuleGraph = foldr (flip extendMG') emptyMG
 filterToposortToModules
   :: [SCC ModuleGraphNode] -> [SCC ModSummary]
 filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
-  InstantiationNode _ _ -> Nothing
-  LinkNode{} -> Nothing
   ModuleNode _deps node -> Just node
+  _ -> Nothing
   where
     -- This higher order function is somewhat bogus,
     -- as the definition of "strongly connected component"
@@ -274,6 +266,7 @@ showModMsg dflags _ (LinkNode {}) =
           arch_os   = platformArchOS platform
           exe_file  = exeFileName arch_os staticLink (outputFile_ dflags)
       in text exe_file
+showModMsg _ _ (PackageNode _deps uid) = ppr uid
 showModMsg _ _ (InstantiationNode _uid indef_unit) =
   ppr $ instUnitInstanceOf indef_unit
 showModMsg dflags recomp (ModuleNode _ mod_summary) =
@@ -323,6 +316,7 @@ nodeDependencies drop_hs_boot_nodes = \case
       NodeKey_Module . (\mod -> ModNodeKeyWithUid (GWIB mod NotBoot) uid)  <$> uniqDSetToList (instUnitHoles iuid)
     ModuleNode deps _ms ->
       map drop_hs_boot deps
+    PackageNode deps _ -> map NodeKey_ExternalUnit deps
   where
     -- Drop hs-boot nodes by using HsSrcFile as the key
     hs_boot_key | drop_hs_boot_nodes = NotBoot -- is regular mod or signature
@@ -387,6 +381,7 @@ mkNodeKey = \case
   InstantiationNode _ iu -> NodeKey_Unit iu
   ModuleNode _ x -> NodeKey_Module $ msKey x
   LinkNode _ uid   -> NodeKey_Link uid
+  PackageNode _ uid -> NodeKey_ExternalUnit uid
 
 msKey :: ModSummary -> ModNodeKeyWithUid
 msKey ms = ModNodeKeyWithUid (ms_mnwib ms) (ms_unitid ms)
@@ -429,7 +424,7 @@ mgReachableLoop :: ModuleGraph -> [NodeKey] -> [ModuleGraphNode]
 mgReachableLoop mg nk = map summaryNodeSummary modules_below where
   (td_map, lookup_node) = mg_loop_graph mg
   modules_below =
-    allReachableMany td_map (mapMaybe lookup_node nk)
+    allReachableManyWithRoots td_map (mapMaybe lookup_node nk)
 
 
 -- | Reachability Query. @mgQuery(g, a, b)@ asks: Can we reach @b@ from @a@ in
