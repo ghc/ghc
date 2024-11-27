@@ -1,0 +1,41 @@
+packages:
+  ./_build/stage0/src/ghc-bin/
+  ./_build/stage0/src/libraries/ghc
+  ./_build/stage0/src/libraries/directory/
+  ./_build/stage0/src/libraries/file-io/
+  ./_build/stage0/src/libraries/filepath/
+  ./_build/stage0/src/libraries/ghc-platform/
+  ./_build/stage0/src/libraries/ghc-boot/
+  ./_build/stage0/src/libraries/ghc-boot-th/
+  ./_build/stage0/src/libraries/ghc-heap
+  ./_build/stage0/src/libraries/ghci
+  ./_build/stage0/src/libraries/os-string/
+  ./_build/stage0/src/libraries/process/
+  ./_build/stage0/src/libraries/semaphore-compat
+  ./_build/stage0/src/libraries/time
+  ./_build/stage0/src/libraries/unix/
+  ./_build/stage0/src/libraries/Win32/
+  ./_build/stage0/src/utils/ghc-pkg
+  ./_build/stage0/src/utils/hsc2hs
+  ./_build/stage0/src/utils/unlit
+  ./_build/stage0/src/utils/genprimopcode/
+  ./_build/stage0/src/utils/deriveConstants/
+
+benchmarks: False
+tests: False
+allow-boot-library-installs: True
+
+program-options
+  ghc-options: -fhide-source-paths
+
+package *
+  library-vanilla: True
+  shared: False
+  executable-profiling: False
+  executable-dynamic: False
+  ghc-options: -fhide-source-paths
+
+package ghc-boot-th
+  flags: +bootstrap
+
+allow-newer: ghc-boot-th
