@@ -22,6 +22,9 @@ variables:
 
   GIT_SUBMODULE_STRATEGY: "normal"
 
+  # GitLab recommends using https:, not ssh:, to clone submodules. See #25528.
+  GIT_SUBMODULE_FORCE_HTTPS: 1
+
   # Makes ci.sh isolate CABAL_DIR
   HERMETIC: "YES"
 
