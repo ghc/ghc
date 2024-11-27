@@ -94,6 +94,7 @@ stage0Packages = do
              , ghcPlatform
              , ghcToolchain
              , ghci
+             , haskeline
              , haddockApi
              , haddockLibrary
              , haddock
