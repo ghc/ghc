@@ -77,7 +77,7 @@ library
     ForeignFunctionInterface
 
   build-depends:
-    ghc-prim >= 0.5.1.0 && < 0.12
+    ghc-prim >= 0.5.1.0 && < 0.14
 
   hs-source-dirs: src/
   include-dirs: include/

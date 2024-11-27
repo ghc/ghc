@@ -91,7 +91,7 @@ Library
 
     build-depends:
         rts == 1.0.*,
-        ghc-prim >= 0.11 && < 0.12,
+        ghc-prim >= 0.11 && < 0.14,
         ghc-bignum >= 1.0 && < 2.0
 
     exposed-modules:
