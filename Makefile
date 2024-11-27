@@ -49,4 +49,6 @@ build:
 	mkdir -p _build/stage0/bin/
 	cabal configure --project-file=cabal.project-stage0
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE0)' \
-	  cabal install --project-file=cabal.project-stage0 ghc-bin:ghc -j --builddir=_build/stage0/cabal/ --installdir=_build/stage0/bin --overwrite-policy=always --install-method=copy
+	  cabal install --project-file=cabal.project-stage0 \
+	  ghc-bin:ghc ghc-pkg:ghc-pkg genprimopcode:genprimopcode deriveConstants:deriveConstants \
+	  -j --builddir=_build/stage0/cabal/ --installdir=_build/stage0/bin --overwrite-policy=always --install-method=copy
