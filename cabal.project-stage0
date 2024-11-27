@@ -26,14 +26,15 @@ tests: False
 allow-boot-library-installs: True
 
 program-options
-  ghc-options: -fhide-source-paths
+  ghc-options: -fhide-source-paths -j
 
 package *
   library-vanilla: True
   shared: False
   executable-profiling: False
   executable-dynamic: False
-  ghc-options: -fhide-source-paths
+  executable-static: False
+  ghc-options: -fhide-source-paths -j
 
 package ghc-boot-th
   flags: +bootstrap

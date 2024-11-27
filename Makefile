@@ -1,3 +1,5 @@
+HADRIAN_SETTINGS_STAGE0 := $(shell ghc --info | runghc GenSettings.hs)
+
 
 build:
 	rm -rf _build
@@ -46,5 +48,5 @@ build:
 	mkdir -p _build/stage0/cabal/
 	mkdir -p _build/stage0/bin/
 	cabal configure --project-file=cabal.project-stage0
-	cabal build --project-file=cabal.project-stage0 ghc-bin:ghc -j --builddir=_build/stage0/cabal/
-	cabal install --project-file=cabal.project-stage0 ghc-bin:ghc -j --builddir=_build/stage0/cabal/ --installdir=_build/stage0/bin --overwrite-policy=always --install-method=copy
+	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE0)' \
+	  cabal install --project-file=cabal.project-stage0 ghc-bin:ghc -j --builddir=_build/stage0/cabal/ --installdir=_build/stage0/bin --overwrite-policy=always --install-method=copy
