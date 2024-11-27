@@ -12,7 +12,6 @@ import Settings.Warnings
 import qualified Context as Context
 import Rules.Libffi (libffiName)
 import qualified Data.Set as Set
-import System.Directory
 import Data.Version.Extra
 
 ghcBuilderArgs :: Args

@@ -7,7 +7,7 @@ module Hadrian.Utilities (
     quote, yesNo, parseYesNo, zeroOne,
 
     -- * FilePath manipulation
-    unifyPath, (-/-), makeRelativeNoSysLink,
+    unifyPath, (-/-), makeRelativeNoSysLink, makeAbsolute,
 
     -- * Accessing Shake's type-indexed map
     insertExtra, lookupExtra, userSetting,
@@ -57,6 +57,7 @@ import qualified System.Directory.Extra as IO
 import qualified System.Info.Extra      as IO
 import qualified System.IO              as IO
 import System.IO.Error (isPermissionError)
+import qualified System.FilePath.Posix as Posix
 
 -- | Extract a value from a singleton list, or terminate with an error message
 -- if the list does not contain exactly one value.
@@ -136,7 +137,17 @@ zeroOne True  = "1"
 unifyPath :: FilePath -> FilePath
 unifyPath = toStandard . normaliseEx
 
+{- Note [Absolute paths and MSYS]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When dealing with absolute paths in Hadrian, we opt to always use Unix-style
+forward slashes for separating paths.
+This is because, on Windows, the MSYS toolchain can reliably handle paths such
+as /c/foo, while it occasionally falls over on paths of the form C:\foo.
+-}
+
 -- | Combine paths with a forward slash regardless of platform.
+--
+-- See Note [Absolute paths and MSYS].
 (-/-) :: FilePath -> FilePath -> FilePath
 _  -/- b | isAbsolute b && not (isAbsolute $ tail b) = b
 "" -/- b = b
@@ -145,6 +156,16 @@ a  -/- b
     | otherwise     = a ++ '/' : b
 
 infixr 6 -/-
+
+-- | Like 'System.Directory.makeAbsolute' from @directory@, but always
+-- using forward slashes.
+--
+-- See Note [Absolute paths and MSYS].
+makeAbsolute :: FilePath -> IO FilePath
+makeAbsolute fp = do
+  cwd <- IO.getCurrentDirectory
+  let fp' = cwd -/- fp
+  return $ Posix.normalise fp'
 
 -- | This is like Posix makeRelative, but assumes no sys links in the input
 -- paths. This allows the result to start with possibly many "../"s. Input

@@ -55,10 +55,10 @@ cabalBuildRules = do
         distDir        <- Context.distDir (vanillaContext Stage1 rts)
         let rtsIncludeDir    = distDir -/- "include"
 
-        libdir  <- liftIO . IO.makeAbsolute =<< stageLibPath Stage1
-        work_dir <- liftIO $ IO.makeAbsolute $ root -/- "stage-cabal"
+        libdir  <- liftIO . makeAbsolute =<< stageLibPath Stage1
+        work_dir <- liftIO $ makeAbsolute $ root -/- "stage-cabal"
         let outputDir = work_dir -/- "bin"
-        includeDir <- liftIO $ IO.makeAbsolute rtsIncludeDir
+        includeDir <- liftIO $ makeAbsolute rtsIncludeDir
 
         createDirectory outputDir
 
@@ -95,7 +95,7 @@ cabalBuildRules = do
         -- Just symlink these for now
         -- TODO: build these with cabal as well
         forM_ iserv_targets $ \(_bin_pkg,bin_path') -> do
-            bin_path <- liftIO $ IO.makeAbsolute bin_path'
+            bin_path <- liftIO $ makeAbsolute bin_path'
             let orig_filename = takeFileName bin_path
                 output_file = outputDir -/- orig_filename
             liftIO $ do

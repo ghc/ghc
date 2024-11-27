@@ -195,7 +195,7 @@ testRules = do
         -- get relative path for the given program in the given stage
         let relative_path_stage s p = programPath =<< programContext s p
         let make_absolute rel_path = do
-              abs_path <- liftIO (IO.makeAbsolute rel_path)
+              abs_path <- liftIO (makeAbsolute rel_path)
               fixAbsolutePathOnWindows abs_path
 
         rel_ghc_pkg     <- relative_path_stage Stage1 ghcPkg
