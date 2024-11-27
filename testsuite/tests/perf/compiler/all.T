@@ -692,7 +692,7 @@ test('T22744',
        req_interp,
        pre_cmd('$MAKE -s --no-print-directory T22744'),
        extra_files(['genT22744']),
-       compile_timeout_multiplier(5)
+       skip, # due to #25524
      ],
      multimod_compile,
      ['T22744', '-v0'])
