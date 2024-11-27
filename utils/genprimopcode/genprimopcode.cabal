@@ -31,5 +31,7 @@ Executable genprimopcode
                    AccessOps
     Build-Depends: base       >= 4   && < 5,
                    array
+    default-extensions:
+      UnboxedSums
     if flag(build-tool-depends)
       build-tool-depends: alex:alex >= 3.2.6, happy:happy >= 1.20.0

@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        ghc: ['9.6.5'] # bootstrapping compiler
+        ghc: ['9.8.4'] # bootstrapping compiler
 
     steps:
     - uses: actions/checkout@v4
@@ -32,20 +32,11 @@ jobs:
         cabal-version: "latest"
         cabal-update: true
 
-    - name: Install Alex and Happy
-      run: |
-        cabal install alex
-        cabal install happy
-
     - name: Configure the build
-      run: |
-        ./boot
-        ./configure
+      run: ./boot
 
-    - name: Build Hadrian
-      run: |
-        ./hadrian/build --version
+    - name: Build patched cabal
+      run: make cabal
 
     - name: Build the bindist
-      run: |
-        ./hadrian/build --flavour=release -j binary-dist-dir --docs=none
+      run: make
