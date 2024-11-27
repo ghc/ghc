@@ -361,6 +361,7 @@ usage_text[] = {
 "  -w        Use mark-region for the oldest generation (experimental)",
 #if defined(THREADED_RTS)
 "  -I<sec>   Perform full GC after <sec> idle time (default: 0.3, 0 == off)",
+"  -Iw<sec>  Minimum wait time between idle GC runs (default: 0, 0 == no min wait time)",
 #endif
 "",
 "  -T         Collect GC statistics (useful for in-program statistics access)",
