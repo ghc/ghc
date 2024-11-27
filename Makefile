@@ -1,9 +1,10 @@
-HADRIAN_SETTINGS_STAGE0 := $(shell ghc --info | runghc GenSettings.hs)
+HADRIAN_SETTINGS_STAGE0 := $(shell ghc --info | runghc GenSettings.hs ghc-boot)
+SETTINGS_STAGE1 := $(shell ghc --info | runghc GenSettings.hs stage1)
 
 
 build:
 	rm -rf _build
-	
+
 	# Preparing source files...
 	mkdir -p _build/stage0/src/
 	cp -rf ./libraries   _build/stage0/src/
@@ -49,6 +50,18 @@ build:
 	mkdir -p _build/stage0/bin/
 	cabal configure --project-file=cabal.project-stage0
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE0)' \
+	  cabal build --project-file=cabal.project-stage0 \
+	  ghc-bin:ghc ghc-pkg:ghc-pkg genprimopcode:genprimopcode deriveConstants:deriveConstants \
+	  -j --builddir=_build/stage0/cabal/
+	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE0)' \
 	  cabal install --project-file=cabal.project-stage0 \
 	  ghc-bin:ghc ghc-pkg:ghc-pkg genprimopcode:genprimopcode deriveConstants:deriveConstants \
-	  -j --builddir=_build/stage0/cabal/ --installdir=_build/stage0/bin --overwrite-policy=always --install-method=copy
+	  -j --builddir=_build/stage0/cabal/ \
+	  --installdir=_build/stage0/bin --overwrite-policy=always --install-method=copy
+
+	mkdir -p _build/stage0/lib
+	mkdir -p _build/stage0/pkgs
+	echo '$(SETTINGS_STAGE1)' > _build/stage0/lib/settings
+
+	_build/stage0/bin/ghc --version
+	_build/stage0/bin/ghc --info
