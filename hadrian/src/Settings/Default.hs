@@ -100,6 +100,7 @@ stage0Packages = do
              , ghci
              , ghcPkg
              , haddock
+             , haskeline
              , hsc2hs
              , hpc
              , hpcBin
