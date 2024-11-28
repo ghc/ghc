@@ -115,5 +115,5 @@ stage1_settings input = output
         , keep_fail "Leading underscore"
         , keep_fail "Use LibFFI"
         , keep_fail "RTS expects libdw"
-        , ("Relative Global Package DB", "_build/stage1/pkgs")
+        , ("Relative Global Package DB", "../../stage1/pkgs")
         ]
