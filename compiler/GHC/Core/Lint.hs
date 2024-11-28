@@ -1454,7 +1454,17 @@ subtype of the required type, as one would expect.
 -- Returns the *result* of applying the function to arguments.
 -- e.g. f :: Int -> Bool -> Int would return `Int` as result type.
 lintCoreArgs  :: (OutType, UsageEnv) -> [CoreArg] -> LintM (OutType, UsageEnv)
-lintCoreArgs (fun_ty, fun_ue) args = foldM lintCoreArg (fun_ty, fun_ue) args
+lintCoreArgs (fun_ty, fun_ue) args
+  = do { in_scope <- getInScope
+       ; let init_subst = mkEmptySubst in_scope
+             go subst (fun_ty,fun_ue) []
+               = (substTy subst fun_ty, fun_ue)
+
+
+             go subst (fun_ty, fun_ue) all_args@(Type ty:args)
+               | 
+
+       ; go init_subst (fun_ty, fun_ue) args }
 
 lintCoreArg  :: (OutType, UsageEnv) -> CoreArg -> LintM (OutType, UsageEnv)
 
@@ -1811,7 +1821,7 @@ lintLinearBinder doc actual_usage described_usage
 --  1. Lint var types or kinds (possibly substituting)
 --  2. Add the binder to the in scope set, and if its a coercion var,
 --     we may extend the substitution to reflect its (possibly) new kind
-lintBinders :: BindingSite -> [InVar] -> ([OutVar] -> LintM a) -> LintM a
+lintBinders :: HasDebugCallStack => BindingSite -> [InVar] -> ([OutVar] -> LintM a) -> LintM a
 lintBinders _    []         linterF = linterF []
 lintBinders site (var:vars) linterF = lintBinder site var $ \var' ->
                                       lintBinders site vars $ \ vars' ->
@@ -1819,28 +1829,28 @@ lintBinders site (var:vars) linterF = lintBinder site var $ \var' ->
 
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintBinder :: BindingSite -> InVar -> (OutVar -> LintM a) -> LintM a
+lintBinder :: HasDebugCallStack => BindingSite -> InVar -> (OutVar -> LintM a) -> LintM a
 lintBinder site var linterF
   | isTyCoVar var = lintTyCoBndr var linterF
   | otherwise     = lintIdBndr NotTopLevel site var linterF
 
-lintTyCoBndr :: TyCoVar -> (OutTyCoVar -> LintM a) -> LintM a
+lintTyCoBndr :: HasDebugCallStack => TyCoVar -> (OutTyCoVar -> LintM a) -> LintM a
 lintTyCoBndr tcv thing_inside
   = do { tcv_type' <- lintTypeAndSubst (varType tcv)
-       ; let tcv_kind = typeKind tcv_type'
+       ; let tcv_kind' = typeKind tcv_type'
 
          -- See (FORALL1) and (FORALL2) in GHC.Core.Type
        ; if (isTyVar tcv)
          then -- Check that in (forall (a:ki). blah) we have ki:Type
-              lintL (isLiftedTypeKind tcv_kind) $
+              lintL (isLiftedTypeKind tcv_kind') $
               hang (text "TyVar whose kind does not have kind Type:")
-                 2 (ppr tcv <+> dcolon <+> ppr tcv_type' <+> dcolon <+> ppr (typeKind tcv_kind))
+                 2 (ppr tcv <+> dcolon <+> ppr tcv_type' <+> dcolon <+> ppr tcv_kind')
          else -- Check that in (forall (cv::ty). blah),
               -- then ty looks like (t1 ~# t2)
               lintL (isCoVarType tcv_type') $
               text "CoVar with non-coercion type:" <+> pprTyVar tcv
 
-       ; addInScopeTyCoVar tcv tcv_kind thing_inside }
+       ; addInScopeTyCoVar tcv tcv_type' thing_inside }
 
 lintIdBndrs :: forall a. TopLevelFlag -> [InId] -> ([OutId] -> LintM a) -> LintM a
 lintIdBndrs top_lvl ids thing_inside
@@ -2021,7 +2031,7 @@ lintForAllBody tcv body_ty
          -- See Note [Phantom type variables in kinds] in GHC.Core.Type
          -- The kind of (forall cv. th) is liftedTypeKind, so no
          -- need to check for skolem-escape in the CoVar case
-         body_kind <- substTyM body_ty
+         body_kind <- substTyM (typeKind body_ty)
        ; when (isTyVar tcv) $
          case occCheckExpand [tcv] body_kind of
            Just {} -> return ()
@@ -2149,13 +2159,14 @@ lint_app msg !kfn arg_tys
            ; go_app in_scope kfb tas }
 
     go_app in_scope (ForAllTy (Bndr kv _vis) kfn) (ta:tas)
-      = do { let kv_kind = varType kv
-           ; ka <- substTyM (typeKind ta)
+      = do { ta' <- substTyM ta
+           ; let kv_kind = varType kv
+                 ka = typeKind ta'
            ; unless (ka `eqType` kv_kind) $
              addErrL (lint_app_fail_msg kfn arg_tys msg
                           (text "Forall:" <+> (ppr kv $$ ppr kv_kind $$
-                                               ppr ta <+> dcolon <+> ppr ka)))
-           ; let kind' = substTy (extendTCvSubst (mkEmptySubst in_scope) kv ta) kfn
+                                               ppr ta' <+> dcolon <+> ppr ka)))
+           ; let kind' = substTy (extendTCvSubst (mkEmptySubst in_scope) kv ta') kfn
            ; go_app in_scope kind' tas }
 
     go_app _ kfn ta
@@ -2166,7 +2177,7 @@ lint_app msg !kfn arg_tys
 -- explicitly and don't capture them as free variables. Otherwise this binder might
 -- become a thunk that get's allocated in the hot code path.
 -- See Note [Avoiding compiler perf traps when constructing error messages.]
-lint_app_fail_msg :: (Outputable a1, Outputable a2) => a1 -> a2 -> SDoc -> SDoc -> SDoc
+lint_app_fail_msg :: OutKind -> [InType] -> SDoc -> SDoc -> SDoc
 lint_app_fail_msg kfn arg_tys msg extra
   = vcat [ hang (text "Kind application error in") 2 msg
          , nest 2 (text "Function kind =" <+> ppr kfn)
@@ -2348,8 +2359,9 @@ lintCoercion co@(TyConAppCo r tc cos)
   | otherwise
   = do { checkTyCon tc
        ; mapM_ lintCoercion cos
-       ; lint_co_app co (tyConKind tc) (map coercionLKind cos)
-       ; lint_co_app co (tyConKind tc) (map coercionRKind cos)
+       ; let tc_kind = tyConKind tc
+       ; lint_co_app co tc_kind (map coercionLKind cos)
+       ; lint_co_app co tc_kind (map coercionRKind cos)
        ; zipWithM_ (lintRole co) (tyConRoleListX r tc) (map coercionRole cos) }
 
 
@@ -2361,7 +2373,9 @@ lintCoercion co@(AppCo co1 co2)
   | otherwise
   = do { lintCoercion co1
        ; lintCoercion co2
-       ; Pair lk1 rk1 <- substCoKindM co1
+       ; let !(Pair lt1 rt1) = coercionKind co1
+       ; lk1 <- substTyM (typeKind lt1)
+       ; rk1 <- substTyM (typeKind rt1)
        ; lint_co_app co lk1 [coercionLKind co2]
        ; lint_co_app co rk1 [coercionRKind co2]
 
@@ -3337,10 +3351,10 @@ addErrL msg = LintM $ \ env (warns,errs) ->
 
 addWarnL :: SDoc -> LintM ()
 addWarnL msg = LintM $ \ env (warns,errs) ->
-              fromBoxedLResult (Just (), (addMsg False env warns msg, errs))
+              fromBoxedLResult (Just (), (addMsg True env warns msg, errs))
 
 addMsg :: Bool -> LintEnv ->  Bag SDoc -> SDoc -> Bag SDoc
-addMsg is_error env msgs msg
+addMsg show_context env msgs msg
   = assertPpr (notNull loc_msgs) msg $
     msgs `snocBag` mk_msg msg
   where
@@ -3349,8 +3363,9 @@ addMsg is_error env msgs msg
 
    cxt_doc = vcat [ vcat $ reverse $ map snd loc_msgs
                   , text "Substitution:" <+> ppr (le_subst env) ]
-   context | is_error  = cxt_doc
-           | otherwise = whenPprDebug cxt_doc
+
+   context | show_context  = cxt_doc
+           | otherwise     = whenPprDebug cxt_doc
      -- Print voluminous info for Lint errors
      -- but not for warnings
 
@@ -3403,7 +3418,7 @@ addInScopeId in_id out_ty thing_inside
           | isJoinId out_id = extendVarSet join_set in_id -- Overwrite with new arity
           | otherwise       = delVarSet    join_set in_id -- Remove any existing binding
 
-addInScopeTyCoVar :: InTyCoVar -> OutType -> (OutTyCoVar -> LintM a) -> LintM a
+addInScopeTyCoVar :: HasDebugCallStack => InTyCoVar -> OutType -> (OutTyCoVar -> LintM a) -> LintM a
 addInScopeTyCoVar tcv tcv_kind thing_inside
   = LintM $ \ env@(LE { le_in_vars = in_vars, le_subst = subst }) errs ->
     let (tcv', subst') = subst_bndr subst
@@ -3449,8 +3464,10 @@ getSubst = LintM (\ env errs -> fromBoxedLResult (Just (le_subst env), errs))
 substTyM :: InType -> LintM OutType
 -- Apply the substitution to the type
 -- The substitution is usually empty, so this is usually a no-op
-substTyM ty = LintM $ \ env errs ->
-              fromBoxedLResult (Just (substTy (le_subst env) ty), errs)
+substTyM ty
+  = do { subst <- getSubst
+       ; checkWarnL (isEmptyTCvSubst subst) (ppr subst)
+       ; return (substTy subst ty) }
 
 getUEAliases :: LintM (NameEnv UsageEnv)
 getUEAliases = LintM (\ env errs -> fromBoxedLResult (Just (le_ue_aliases env), errs))
