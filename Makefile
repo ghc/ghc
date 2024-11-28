@@ -155,7 +155,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	  --ghc-options='"-optc=-DTargetVendor=\"FIXME\""' \
 	  --ghc-options='"-optc=-DGhcUnregisterised=\"FIXME\""' \
 	  --ghc-options='"-optc=-DTablesNextToCode=\"FIXME\""' \
-	  --builddir=_build/stage1/cabal/ 
+	  --builddir=_build/stage1/cabal/
 
 clean:
 	rm -rf _build

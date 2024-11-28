@@ -57,6 +57,10 @@ stage1_settings input = output
         Just v  -> (s,v)
       Just v  -> (s,v)
 
+    --FIXME: we default to these flags for Cmm CPP, otherwise CPP fails
+    -- with error: missing '(' after "__has_feature"
+    -- because we pass `-traditional` while compiling Apply.cmm (in TSANUtils.h)
+    default_cpp_flags = "-E"
 
     out_settings =
         [ keep_fail "C compiler command"
@@ -66,13 +70,13 @@ stage1_settings input = output
         , keep_fail "C compiler link flags"
         , keep_fail "C compiler supports -no-pie"
         , keep_or_fail "CPP command" "Haskell CPP command"
-        , keep_or_fail "CPP flags" "Haskell CPP flags"
+        , keep_def "CPP flags" default_cpp_flags
         , keep_fail "Haskell CPP command"
         , keep_fail "Haskell CPP flags"
         , keep_or_fail "JavaScript CPP command" "Haskell CPP command"
         , keep_or_fail "JavaScript CPP flags" "Haskell CPP flags"
         , keep_or_fail "C-- CPP command" "Haskell CPP command"
-        , keep_or_fail "C-- CPP flags"   "Haskell CPP flags"
+        , keep_def "C-- CPP flags"   default_cpp_flags
         , keep_def "C-- CPP supports -g0" "NO"
         , keep_fail "ld supports compact unwind"
         , keep_fail "ld supports filelist"
