@@ -3900,7 +3900,7 @@ continueCmd argLine = withSandboxOnly ":continue" $
     Left sdoc   -> printForUser sdoc
     Right mbCnt -> doContinue' (const True) GHC.RunToCompletion mbCnt
     where
-      contSwitch :: [String] -> Either SDoc (Maybe Int)
+      contSwitch :: [String] -> Either SDoc (Maybe Int64)
       contSwitch [ ] = Right Nothing
       contSwitch [x] = Just <$> getIgnoreCount x
       contSwitch  _  = Left $
@@ -3909,7 +3909,7 @@ continueCmd argLine = withSandboxOnly ":continue" $
 doContinue :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> m ()
 doContinue pre step = doContinue' pre step Nothing
 
-doContinue' :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> Maybe Int -> m ()
+doContinue' :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> Maybe Int64 -> m ()
 doContinue' pre step mbCnt= do
   runResult <- resume pre step mbCnt
   _ <- afterRunStmt pre runResult
@@ -4037,13 +4037,13 @@ ignoreCmd argLine = withSandboxOnly ":ignore" $ do
                   }
         setupBreakpoint bi count
 
-ignoreSwitch :: GhciMonad m => [String] -> m (Either SDoc (BreakLocation, Int))
+ignoreSwitch :: GhciMonad m => [String] -> m (Either SDoc (BreakLocation, Int64))
 ignoreSwitch [break, count] = do
     sdoc_loc <- getBreakLoc break
     pure $ (,) <$> sdoc_loc <*> getIgnoreCount count
 ignoreSwitch _ = pure $ Left $ text "Syntax:  :ignore <breaknum> <count>"
 
-getIgnoreCount :: String -> Either SDoc Int
+getIgnoreCount :: String -> Either SDoc Int64
 getIgnoreCount str =
     case readMaybe str of
       Nothing              -> Left $ sdocIgnore <+> "is not numeric"
@@ -4052,7 +4052,7 @@ getIgnoreCount str =
     where
       sdocIgnore = text "Ignore count" <+> quotes (text str)
 
-setupBreakpoint :: GhciMonad m => GHC.BreakpointId -> Int -> m()
+setupBreakpoint :: GhciMonad m => GHC.BreakpointId -> Int64 -> m()
 setupBreakpoint loc count = do
     hsc_env <- GHC.getSession
     GHC.setupBreakpoint hsc_env loc count

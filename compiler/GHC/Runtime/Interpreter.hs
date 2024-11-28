@@ -373,7 +373,7 @@ newModuleName :: Interp -> ModuleName -> IO (RemotePtr ModuleName)
 newModuleName interp mod_name =
   castRemotePtr <$> interpCmd interp (NewBreakModule (moduleNameString mod_name))
 
-storeBreakpoint :: Interp -> ForeignRef BreakArray -> Int -> Int -> IO ()
+storeBreakpoint :: Interp -> ForeignRef BreakArray -> Int -> Int64 -> IO ()
 storeBreakpoint interp ref ix cnt = do                               -- #19157
   withForeignRef ref $ \breakarray ->
     interpCmd interp (SetupBreakpoint breakarray ix cnt)

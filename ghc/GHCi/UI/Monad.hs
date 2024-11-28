@@ -66,6 +66,7 @@ import GHC.Utils.Exception hiding (uninterruptibleMask, mask, catch)
 import Numeric
 import Data.Array
 import Data.IORef
+import Data.Int
 import Data.Time
 import System.Environment
 import System.IO
@@ -437,7 +438,7 @@ runDecls' decls = do
                   return Nothing)
         (Just <$> GHC.runParsedDecls decls)
 
-resume :: GhciMonad m => (SrcSpan -> Bool) -> GHC.SingleStep -> Maybe Int -> m GHC.ExecResult
+resume :: GhciMonad m => (SrcSpan -> Bool) -> GHC.SingleStep -> Maybe Int64 -> m GHC.ExecResult
 resume canLogSpan step mbIgnoreCnt = do
   st <- getGHCiState
   reifyGHCi $ \x ->

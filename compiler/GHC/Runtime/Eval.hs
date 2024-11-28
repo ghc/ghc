@@ -135,6 +135,7 @@ import Control.Monad
 import Control.Monad.Catch as MC
 import Data.Array
 import Data.Dynamic
+import Data.Int
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.List (find,intercalate)
@@ -400,7 +401,7 @@ handleRunStatus step expr bindings final_ids status history
     = return (ExecComplete (Left (fromSerializableException e)) alloc)
 
 
-resumeExec :: GhcMonad m => (SrcSpan->Bool) -> SingleStep -> Maybe Int
+resumeExec :: GhcMonad m => (SrcSpan->Bool) -> SingleStep -> Maybe Int64
            -> m ExecResult
 resumeExec canLogSpan step mbCnt
  = do
@@ -458,7 +459,7 @@ resumeExec canLogSpan step mbCnt
                                                         fromListBL 50 hist
                 handleRunStatus step expr bindings final_ids status hist'
 
-setupBreakpoint :: GhcMonad m => HscEnv -> BreakpointId -> Int -> m ()   -- #19157
+setupBreakpoint :: GhcMonad m => HscEnv -> BreakpointId -> Int64 -> m ()   -- #19157
 setupBreakpoint hsc_env bi cnt = do
   let modl = bi_tick_mod bi
       breaks hsc_env modl = getModBreaks $ expectJust "setupBreakpoint" $

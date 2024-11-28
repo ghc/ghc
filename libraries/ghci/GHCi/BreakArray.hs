@@ -7,11 +7,11 @@
 --
 -- | Break Arrays
 --
--- An array of words, indexed by a breakpoint number (breakpointId in Tickish)
+-- An array of Int64, indexed by a breakpoint number (breakpointId in Tickish)
 -- containing the ignore count for every breakpoint.
 -- There is one of these arrays per module.
 --
--- For each word with value n:
+-- For each Int64 with value n:
 --   n > 1  : the corresponding breakpoint is enabled. Next time the bp is hit,
 --            GHCi will decrement the ignore count and continue processing.
 --   n == 0 : The breakpoint is enabled, GHCi will stop next time it hits
@@ -37,6 +37,7 @@ import Prelude -- See note [Why do we import Prelude here?]
 import Control.Monad
 
 import GHC.Exts
+import GHC.Int
 import GHC.IO ( IO(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 
@@ -44,7 +45,7 @@ import System.IO.Unsafe ( unsafeDupablePerformIO )
 
 data BreakArray = BA (MutableByteArray# RealWorld)
 
-breakOff, breakOn :: Int
+breakOff, breakOn :: Int64
 breakOn  = 0
 breakOff = -1
 
@@ -55,14 +56,14 @@ showBreakArray array = do
         putStr $ ' ' : show val
     putStr "\n"
 
-setupBreakpoint :: BreakArray -> Int -> Int -> IO Bool
+setupBreakpoint :: BreakArray -> Int -> Int64 -> IO Bool
 setupBreakpoint breakArray ind val
     | safeIndex breakArray ind = do
         writeBreakArray breakArray ind val
         return True
     | otherwise = return False
 
-getBreak :: BreakArray -> Int -> IO (Maybe Int)
+getBreak :: BreakArray -> Int -> IO (Maybe Int64)
 getBreak array index
     | safeIndex array index = do
           val <- readBreakArray array index
@@ -73,7 +74,7 @@ safeIndex :: BreakArray -> Int -> Bool
 safeIndex array index = index < size array && index >= 0
 
 size :: BreakArray -> Int
-size (BA array) = size `div` SIZEOF_HSWORD
+size (BA array) = size `div` SIZEOF_INT64
   where
     -- We want to keep this operation pure. The mutable byte array
     -- is never resized so this is safe.
@@ -91,24 +92,24 @@ allocBA sz# = IO $ \s1 ->
 -- create a new break array and initialise all elements to breakOff.
 newBreakArray :: Int -> IO BreakArray
 newBreakArray (I# sz#) = do
-    BA array <- allocBA (sz# *# SIZEOF_HSWORD#)
+    BA array <- allocBA (sz# *# SIZEOF_INT64#)
     case breakOff of
-        I# off -> do
+        I64# off -> do
            let loop n | isTrue# (n >=# sz#) = return ()
                       | otherwise = do writeBA# array n off; loop (n +# 1#)
            loop 0#
     return $ BA array
 
-writeBA# :: MutableByteArray# RealWorld -> Int# -> Int# -> IO ()
+writeBA# :: MutableByteArray# RealWorld -> Int# -> Int64# -> IO ()
 writeBA# array ind val = IO $ \s ->
-    case writeIntArray# array ind val s of { s -> (# s, () #) }
+    case writeInt64Array# array ind val s of { s -> (# s, () #) }
 
-writeBreakArray :: BreakArray -> Int -> Int -> IO ()
-writeBreakArray (BA array) (I# i) (I# val) = writeBA# array i val
+writeBreakArray :: BreakArray -> Int -> Int64 -> IO ()
+writeBreakArray (BA array) (I# i) (I64# val) = writeBA# array i val
 
-readBA# :: MutableByteArray# RealWorld -> Int# -> IO Int
+readBA# :: MutableByteArray# RealWorld -> Int# -> IO Int64
 readBA# array i = IO $ \s ->
-    case readIntArray# array i s of { (# s, c #) -> (# s, I# c #) }
+    case readInt64Array# array i s of { (# s, c #) -> (# s, I64# c #) }
 
-readBreakArray :: BreakArray -> Int -> IO Int
+readBreakArray :: BreakArray -> Int -> IO Int64
 readBreakArray (BA array) (I# ind# ) = readBA# array ind#

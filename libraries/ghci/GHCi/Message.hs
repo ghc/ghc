@@ -175,7 +175,7 @@ data Message a where
   SetupBreakpoint
    :: RemoteRef BreakArray
    -> Int                           -- breakpoint index
-   -> Int                           -- ignore count to be stored in the BreakArray
+   -> Int64                         -- ignore count to be stored in the BreakArray
                                     -- -1 disable; 0 enable; >= 1 enable, ignore count.
    -> Message ()
 

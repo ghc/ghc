@@ -1161,11 +1161,11 @@ run_BCO:
                // stop the current thread if either the
                // "rts_stop_next_breakpoint" flag is true OR if the
                // ignore count for this particular breakpoint is zero
-               StgInt ignore_count = ((StgInt*)breakPoints->payload)[arg4_tick_index];
+               StgInt64 ignore_count = ((StgInt64*)breakPoints->payload)[arg4_tick_index];
                if (rts_stop_next_breakpoint == false && ignore_count > 0)
                {
                   // decrement and write back ignore count
-                  ((StgInt*)breakPoints->payload)[arg4_tick_index] = --ignore_count;
+                  ((StgInt64*)breakPoints->payload)[arg4_tick_index] = --ignore_count;
                }
                else if (rts_stop_next_breakpoint == true || ignore_count == 0)
                {
