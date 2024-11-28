@@ -25,6 +25,12 @@ variables:
   # GitLab recommends using https:, not ssh:, to clone submodules. See #25528.
   GIT_SUBMODULE_FORCE_HTTPS: 1
 
+  # Perform a blobless clone
+  GIT_FETCH_EXTRA_FLAGS: --filter=blob:none
+
+  # Update all submodules at once, it's brief and non CPU bound so allow a higher count than $CPUS
+  GIT_SUBMODULE_UPDATE_FLAGS: --filter=blob:none --jobs 32
+
   # Makes ci.sh isolate CABAL_DIR
   HERMETIC: "YES"
 

@@ -22,7 +22,7 @@ function pull() {
   # to set a larger http.postBuffer, although this is definitely a workaround.
   # The default should work just fine. The error could be in git, GitLab, or
   # perhaps the networking tube (including all proxies etc) between the two.
-  run git -c http.postBuffer=2097152 fetch -f "$NOTES_ORIGIN" "$ref:$ref"
+  run git -c http.postBuffer=2097152 fetch --filter=blob:none -f "$NOTES_ORIGIN" "$ref:$ref"
   echo "perf notes ref $ref is $(git rev-parse $ref)"
 }
 
@@ -81,4 +81,3 @@ case $1 in
   pull) pull ;;
   *) fail "Invalid mode $1" ;;
 esac
-

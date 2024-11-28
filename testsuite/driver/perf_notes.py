@@ -686,7 +686,7 @@ def main() -> None:
                         Adds N fake metrics to the given commit using the random seed.")
     parser.add_argument("--ci", action='store_true',
                         help="Use ci results. You must fetch these with:\n    " \
-                            + "$ git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/ci/perf")
+                            + "$ git fetch -f https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf")
 
     group = parser.add_argument_group(title='Filtering', description="Select which subset of performance metrics to dump")
     group.add_argument("--test-env",

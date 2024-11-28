@@ -568,7 +568,7 @@ else:
                 ' then check out that commit and run the tests to generate' + \
                 ' the missing metrics. Alternatively, a baseline may be' + \
                 ' recovered from ci results once fetched:\n\n' + \
-                spacing + 'git fetch ' + \
+                spacing + 'git fetch -f ' + \
                   'https://gitlab.haskell.org/ghc/ghc-performance-notes.git' + \
                   ' refs/notes/perf:refs/notes/' + Perf.CiNamespace
         else:
