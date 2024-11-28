@@ -79,10 +79,15 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	
 	# Preparing source files...
 	mkdir -p _build/stage1/src/
-	cp -rf ./libraries   _build/stage1/src/
-	cp -rf ./compiler    _build/stage1/src/libraries/ghc
-	cp -rf ./rts   	     _build/stage1/src/libraries/
-	cp -rf ./ghc   	     _build/stage1/src/ghc-bin
+	cp -rf ./libraries    _build/stage1/src/
+	cp -rf ./compiler     _build/stage1/src/libraries/ghc
+	cp -rf ./rts   	      _build/stage1/src/libraries/
+	cp -rf ./ghc   	      _build/stage1/src/ghc-bin
+	cp -rf ./config.sub   _build/stage1/src/libraries/rts/
+	cp -rf ./config.guess _build/stage1/src/libraries/rts/
+	
+	python rts/gen_event_types.py --event-types-defines _build/stage1/src/libraries/rts/include/rts/EventLogConstants.h
+	python rts/gen_event_types.py --event-types-array   _build/stage1/src/libraries/rts/include/rts/EventTypes.h
 	
 	## Substituting variables
 	cp _build/stage1/src/ghc-bin/ghc-bin.cabal{.in,}
@@ -92,6 +97,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	cp _build/stage1/src/libraries/ghc-boot-th/ghc-boot-th.cabal{.in,}
 	cp _build/stage1/src/libraries/ghc-heap/ghc-heap.cabal{.in,}
 	cp _build/stage1/src/libraries/ghci/ghci.cabal{.in,}
+	cp _build/stage1/src/libraries/rts/include/ghcversion.h{.in,}
 	
 	sed -i 's/@ProjectVersion@/9.13/' _build/stage1/src/ghc-bin/ghc-bin.cabal
 	sed -i 's/@ProjectVersionMunged@/9.13/' _build/stage1/src/ghc-bin/ghc-bin.cabal
@@ -109,6 +115,10 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	sed -i 's/@ProjectVersion@/9.13/' _build/stage1/src/libraries/ghci/ghci.cabal
 	sed -i 's/@ProjectVersionMunged@/9.13/' _build/stage1/src/libraries/ghci/ghci.cabal
 	sed -i 's/@ProjectVersionForLib@/9.13/' _build/stage1/src/libraries/ghci/ghci.cabal
+	sed -i 's/@ProjectVersion@/9.13/' _build/stage1/src/libraries/rts/include/ghcversion.h
+	sed -i 's/@ProjectVersionInt@/913/' _build/stage1/src/libraries/rts/include/ghcversion.h
+	sed -i 's/@ProjectPatchLevel1@/0/' _build/stage1/src/libraries/rts/include/ghcversion.h
+	sed -i 's/@ProjectPatchLevel2@/0/' _build/stage1/src/libraries/rts/include/ghcversion.h
 	
 	sed -i 's/@LlvmMinVersion@/13/' _build/stage1/src/libraries/ghc/GHC/CmmToLlvm/Version/Bounds.hs
 	sed -i 's/@LlvmMaxVersion@/20/' _build/stage1/src/libraries/ghc/GHC/CmmToLlvm/Version/Bounds.hs
@@ -116,12 +126,36 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	# Building boot libraries
 	mkdir -p _build/stage1/cabal/
 	
-	cabal configure --project-file=cabal.project-stage1
+	cabal configure --project-file=cabal.project-stage1 \
+	  --with-compiler=`pwd`/_build/stage0/bin/ghc \
+	  --with-hc-pkg=`pwd`/_build/stage0/bin/ghc-pkg \
+	  --builddir=_build/stage1/cabal/
 	
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE1)' \
 	  cabal build --project-file=cabal.project-stage1 \
 	  rts \
-	  --builddir=_build/stage1/cabal/ -v
+	  --with-compiler=`pwd`/_build/stage0/bin/ghc \
+	  --with-hc-pkg=`pwd`/_build/stage0/bin/ghc-pkg \
+	  --ghc-options="-ghcversion-file=`pwd`/_build/stage1/src/libraries/rts/include/ghcversion.h" \
+	  --ghc-options="-I`pwd`/_build/stage1/src/libraries/rts/include/" \
+	  --ghc-options="-I`pwd`/_build/stage1/src/libraries/rts/" \
+	  --ghc-options='"-optc=-DProjectVersion=\"913\""' \
+	  --ghc-options='"-optc=-DRtsWay=\"FIXME\""' \
+	  --ghc-options='"-optc=-DHostPlatform=\"FIXME\""' \
+	  --ghc-options='"-optc=-DHostArch=\"FIXME\""' \
+	  --ghc-options='"-optc=-DHostOS=\"FIXME\""' \
+	  --ghc-options='"-optc=-DHostVendor=\"FIXME\""' \
+	  --ghc-options='"-optc=-DBuildPlatform=\"FIXME\""' \
+	  --ghc-options='"-optc=-DBuildArch=\"FIXME\""' \
+	  --ghc-options='"-optc=-DBuildOS=\"FIXME\""' \
+	  --ghc-options='"-optc=-DBuildVendor=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTargetPlatform=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTargetArch=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTargetOS=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTargetVendor=\"FIXME\""' \
+	  --ghc-options='"-optc=-DGhcUnregisterised=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTablesNextToCode=\"FIXME\""' \
+	  --builddir=_build/stage1/cabal/ 
 
 clean:
 	rm -rf _build

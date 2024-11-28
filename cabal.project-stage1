@@ -1,5 +1,6 @@
-with-compiler: ./_build/stage0/bin/ghc
-with-hc-pkg: ./_build/stage0/bin/ghc-pkg
+-- for some reason it doesn't work...
+--with-compiler: ./_build/stage0/bin/ghc
+--with-hc-pkg: ./_build/stage0/bin/ghc-pkg
 package-dbs: clear, global
 
 packages:
@@ -19,4 +20,3 @@ package *
   executable-dynamic: False
   executable-static: False
   ghc-options: -fhide-source-paths -j
-
