@@ -9,6 +9,7 @@ packages:
 benchmarks: False
 tests: False
 allow-boot-library-installs: True
+active-repositories: :none
 
 program-options
   ghc-options: -fhide-source-paths -j

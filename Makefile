@@ -49,7 +49,7 @@ _build/stage0/bin/ghc:
 	# Building...
 	mkdir -p _build/stage0/cabal/
 	mkdir -p _build/stage0/bin/
-	cabal configure --project-file=cabal.project-stage0
+	
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE0)' \
 	  cabal build --project-file=cabal.project-stage0 \
 	  ghc-bin:ghc ghc-pkg:ghc-pkg genprimopcode:genprimopcode deriveConstants:deriveConstants \
@@ -125,11 +125,6 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	
 	# Building boot libraries
 	mkdir -p _build/stage1/cabal/
-	
-	cabal configure --project-file=cabal.project-stage1 \
-	  --with-compiler=`pwd`/_build/stage0/bin/ghc \
-	  --with-hc-pkg=`pwd`/_build/stage0/bin/ghc-pkg \
-	  --builddir=_build/stage1/cabal/
 	
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE1)' \
 	  cabal build --project-file=cabal.project-stage1 \
