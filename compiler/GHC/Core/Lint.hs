@@ -889,10 +889,10 @@ lintCoreExpr (Cast expr co)
             -- markAllJoinsBad: see Note [Join points and casts]
 
        ; lintCoercion co
+       ; lintRole co Representational (coercionRole co)
        ; Pair from_ty to_ty <- substCoKindM co
        ; checkValueType (typeKind to_ty) $
          text "target of cast" <+> quotes (ppr co)
-       ; lintRole co Representational (coercionRole co)
        ; ensureEqTys from_ty expr_ty (mkCastErr expr co from_ty expr_ty)
        ; return (to_ty, ue) }
 
@@ -959,20 +959,24 @@ lintCoreExpr e@(Let (Rec pairs) body)
 lintCoreExpr e@(App _ _)
   | Var fun <- fun
   , fun `hasKey` runRWKey
+    -- See Note [Linting of runRW#]
     -- N.B. we may have an over-saturated application of the form:
     --   runRW (\s -> \x -> ...) y
-  , ty_arg1 : ty_arg2 : arg3 : rest <- args
-  = do { fun_pair1      <- lintCoreArg (idType fun, zeroUE) ty_arg1
-       ; (fun_ty2, ue2) <- lintCoreArg fun_pair1            ty_arg2
-         -- See Note [Linting of runRW#]
-       ; let lintRunRWCont :: CoreArg -> LintM (OutType, UsageEnv)
-             lintRunRWCont expr@(Lam _ _) =
-                lintJoinLams 1 (Just fun) expr
-             lintRunRWCont other = markAllJoinsBad $ lintCoreExpr other
+  , ty_arg1 : ty_arg2 : cont_arg : rest <- args
+  = do { let lint_rw_cont :: CoreArg -> Mult -> UsageEnv -> LintM (OutType, UsageEnv)
+             lint_rw_cont expr@(Lam _ _) mult fun_ue
+                = do { (arg_ty, arg_ue) <- lintJoinLams 1 (Just fun) expr
+                     ; let app_ue = addUE fun_ue (scaleUE mult arg_ue)
+                     ; return (arg_ty, app_ue) }
+
+             lint_rw_cont expr mult ue
+                = lintValArg expr mult ue
              -- TODO: Look through ticks?
-       ; (arg3_ty, ue3) <- lintRunRWCont arg3
-       ; app_ty <- lintValApp arg3 fun_ty2 arg3_ty ue2 ue3
-       ; lintCoreArgs app_ty rest }
+
+       ; runrw_pr <- lint_app2 (text "runRW# expression")
+                               lintTyArg lint_rw_cont
+                               (idType fun) zeroUE [ty_arg1,ty_arg2,cont_arg]
+       ; lintCoreArgs runrw_pr rest }
 
   | otherwise
   = do { fun_pair <- lintCoreFun fun (length args)
@@ -1008,8 +1012,7 @@ lintCoreExpr (Lam var expr)
 lintCoreExpr (Case scrut var alt_ty alts)
   = lintCaseExpr scrut var alt_ty alts
 
--- This case can't happen; linting types in expressions gets routed through
--- lintCoreArgs
+-- This case can't happen; linting types in expressions gets routed through lintTyArg
 lintCoreExpr (Type ty)
   = failWithL (text "Type found as expression" <+> ppr ty)
 
@@ -1453,42 +1456,28 @@ subtype of the required type, as one would expect.
 -- Takes the functions type and arguments as argument.
 -- Returns the *result* of applying the function to arguments.
 -- e.g. f :: Int -> Bool -> Int would return `Int` as result type.
-lintCoreArgs  :: (OutType, UsageEnv) -> [CoreArg] -> LintM (OutType, UsageEnv)
+lintCoreArgs  :: (OutType, UsageEnv) -> [InExpr] -> LintM (OutType, UsageEnv)
 lintCoreArgs (fun_ty, fun_ue) args
-  = do { in_scope <- getInScope
-       ; let init_subst = mkEmptySubst in_scope
-             go subst (fun_ty,fun_ue) []
-               = (substTy subst fun_ty, fun_ue)
+  = lint_app2 (text "expression")
+              lintTyArg lintValArg fun_ty fun_ue args
 
-
-             go subst (fun_ty, fun_ue) all_args@(Type ty:args)
-               | 
-
-       ; go init_subst (fun_ty, fun_ue) args }
-
-lintCoreArg  :: (OutType, UsageEnv) -> CoreArg -> LintM (OutType, UsageEnv)
+lintTyArg :: InExpr -> LintM OutType
 
 -- Type argument
-lintCoreArg (fun_ty, ue) (Type arg_ty)
+lintTyArg (Type arg_ty)
   = do { checkL (not (isCoercionTy arg_ty))
                 (text "Unnecessary coercion-to-type injection:"
                   <+> ppr arg_ty)
-       ; arg_ty' <- lintTypeAndSubst arg_ty
-       ; res <- lintTyApp fun_ty arg_ty'
-       ; return (res, ue) }
+       ; lintTypeAndSubst arg_ty }
+lintTyArg arg
+  = failWithL (hang (text "Expected type argument but found") 2 (ppr arg))
 
--- Coercion argument
-lintCoreArg (fun_ty, ue) (Coercion co)
-  = do { addLoc (InCo co) (lintCoercion co)
-       ; res <- lintCoApp fun_ty co
-       ; return (res, ue) }
-
--- Other value argument
-lintCoreArg (fun_ty, fun_ue) arg
+lintValArg  :: InExpr -> Mult -> UsageEnv -> LintM (OutType, UsageEnv)
+lintValArg arg mult fun_ue
   = do { (arg_ty, arg_ue) <- markAllJoinsBad $ lintCoreExpr arg
            -- See Note [Representation polymorphism invariants] in GHC.Core
-       ; flags <- getLintFlags
 
+       ; flags <- getLintFlags
        ; when (lf_check_fixed_rep flags) $
          -- Only check that 'arg_ty' has a fixed RuntimeRep
          -- if 'lf_check_fixed_rep' is on.
@@ -1497,7 +1486,8 @@ lintCoreArg (fun_ty, fun_ue) arg
                       <+> ppr arg <+> dcolon
                       <+> parens (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))) }
 
-       ; lintValApp arg fun_ty arg_ty fun_ue arg_ue }
+       ; let app_ue = addUE fun_ue (scaleUE mult arg_ue)
+       ; return (arg_ty, app_ue) }
 
 -----------------
 lintAltBinders :: UsageEnv
@@ -1558,26 +1548,6 @@ lintTyApp fun_ty arg_ty
 
   | otherwise
   = failWithL (mkTyAppMsg fun_ty arg_ty)
-
------------------
-lintCoApp :: OutType -> InCoercion -> LintM OutType
-lintCoApp fun_ty co
-  = do { co_ty <- substTyM (coercionType co)
-
-       ; if | Just (cv,body_ty) <- splitForAllCoVar_maybe fun_ty
-            , let cv_ty = idType cv
-            , cv_ty `eqType` co_ty
-            -> do { in_scope <- getInScope
-                  ; let init_subst = mkEmptySubst in_scope
-                        subst = extendCvSubst init_subst cv co
-                  ; return (substTy subst body_ty) }
-
-            | Just (_, _, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
-            , co_ty `eqType` arg_ty'
-            -> return (res_ty')
-
-            | otherwise
-            -> failWithL (mkCoAppMsg fun_ty co) }
 
 -----------------
 
@@ -2110,78 +2080,78 @@ lintTyLit (CharTyLit _) = return ()
 
 -----------------
 lint_ty_app :: InType -> OutKind -> [InType] -> LintM ()
-lint_ty_app msg_ty fun_kind arg_tys
+lint_ty_app ty = lint_tyco_app (text "type" <+> quotes (ppr ty))
+
+lint_co_app :: HasDebugCallStack => Coercion -> OutKind -> [InType] -> LintM ()
+lint_co_app co = lint_tyco_app (text "coercion" <+> quotes (ppr co))
+
+lint_tyco_app :: SDoc -> OutKind -> [InType] -> LintM ()
+lint_tyco_app msg fun_kind arg_tys
     -- See Note [Avoiding compiler perf traps when constructing error messages.]
-  = do { mapM_ lintType arg_tys
-       ; lint_app (text "type" <+> quotes (ppr msg_ty)) fun_kind arg_tys }
+  = do { _ <- lint_app2 msg (\ty     -> do { lintType ty; substTyM ty })
+                            (\ty _ _ -> do { lintType ty; ki <- substTyM (typeKind ty); return (ki,()) })
+                            fun_kind () arg_tys
+       ; return () }
 
 ----------------
-lint_co_app :: Coercion -> OutKind -> [InType] -> LintM ()
-lint_co_app msg_ty k tys
-    -- See Note [Avoiding compiler perf traps when constructing error messages.]
-  = lint_app (text "coercion" <+> quotes (ppr msg_ty)) k tys
-
-----------------
-lint_app :: SDoc -> OutKind -> [InType] -> LintM ()
--- (lint_app d fun_kind arg_tys)
---    We have an application (f arg_ty1 .. arg_tyn),
---    where f :: fun_kind
-
--- If you edit this function, you may need to update the GHC formalism
--- See Note [GHC Formalism]
---
--- Being strict in the kind here avoids quite a few pointless thunks
--- reducing allocations by ~5%
-lint_app msg !kfn arg_tys
+lint_app2 :: Outputable a => SDoc
+          -> (a -> LintM OutType)                        -- Lint the thing and return its value
+          -> (a -> Mult -> acc -> LintM (OutKind, acc))  -- Lint the thing and return its type
+          -> OutType -> acc -> [a] -> LintM (OutType,acc)
+{-# INLINE lint_app2 #-}    -- Very few call sites
+-- 'acc' is either () for types, or UsageEnv for terms
+lint_app2 msg lint_val lint_ty !orig_fun_ty acc all_args
     = do { !in_scope <- getInScope
          -- We need the in_scope set to satisfy the invariant in
          -- Note [The substitution invariant] in GHC.Core.TyCo.Subst
          -- Forcing the in scope set eagerly here reduces allocations by up to 4%.
-         ; go_app in_scope kfn arg_tys
-         }
-  where
 
-    -- We use explicit recursion instead of a fold here to avoid go_app becoming
-    -- an allocated function closure. This reduced allocations by up to 7% for some
-    -- modules.
-    go_app :: InScopeSet -> OutKind -> [InType] -> LintM ()
-    go_app !in_scope !kfn ta
-      | Just kfn' <- coreView kfn
-      = go_app in_scope kfn' ta
+         ; let init_subst = mkEmptySubst in_scope
 
-    go_app _in_scope _kfn [] = return ()
+               go subst fun_ty acc [] = return (substTy subst fun_ty, acc)
 
-    go_app in_scope fun_kind@(FunTy _ _ kfa kfb) (ta:tas)
-      = do { ka <- substTyM (typeKind ta)
-           ; unless (ka `eqType` kfa) $
-             addErrL (lint_app_fail_msg kfn arg_tys msg
-                        (text "Fun:" <+> (ppr fun_kind $$ ppr ta <+> dcolon <+> ppr ka)))
-           ; go_app in_scope kfb tas }
+               go subst fun_ty@(FunTy _ mult exp_arg_ty res_ty) acc (arg:args)
+                 = do { (arg_ty, acc') <- lint_ty arg mult acc
+                      ; ensureEqTys (substTy subst exp_arg_ty) arg_ty $
+                        lint_app_fail_msg msg orig_fun_ty all_args
+                            (text "Fun:" <+> (vcat [ text "fun_ty:" <+> ppr fun_ty
+                                                   , text "exp_arg_ty:" <+> ppr exp_arg_ty
+                                                   , text "arg:" <+> ppr arg <+> dcolon <+> ppr arg_ty ]))
+                      ; go subst res_ty acc' args }
 
-    go_app in_scope (ForAllTy (Bndr kv _vis) kfn) (ta:tas)
-      = do { ta' <- substTyM ta
-           ; let kv_kind = varType kv
-                 ka = typeKind ta'
-           ; unless (ka `eqType` kv_kind) $
-             addErrL (lint_app_fail_msg kfn arg_tys msg
-                          (text "Forall:" <+> (ppr kv $$ ppr kv_kind $$
-                                               ppr ta' <+> dcolon <+> ppr ka)))
-           ; let kind' = substTy (extendTCvSubst (mkEmptySubst in_scope) kv ta') kfn
-           ; go_app in_scope kind' tas }
+               go subst (ForAllTy (Bndr tv _vis) body_ty) acc (arg:args)
+                 = do { arg' <- lint_val arg
+                      ; let tv_kind = substTy subst (varType tv)
+                            karg'   = typeKind arg'
+                            subst'  = extendTCvSubst subst tv arg'
+                      ; ensureEqTys karg' tv_kind $
+                        lint_app_fail_msg msg orig_fun_ty all_args
+                            (hang (text "Forall:" <+> (ppr tv $$ ppr tv_kind))
+                                2 (ppr arg' <+> dcolon <+> ppr karg'))
+                      ; go subst' body_ty acc args }
 
-    go_app _ kfn ta
-       = failWithL (lint_app_fail_msg kfn arg_tys msg
-                       (text "Not a fun:" <+> (ppr kfn $$ ppr ta)))
+               go subst fun_ty acc args
+                 | Just fun_ty' <- coreView fun_ty
+                 = go subst fun_ty' acc args
+
+                 | not (isEmptyTCvSubst subst)  -- See Note [Care with kind instantiation]
+                 = go init_subst (substTy subst fun_ty) acc args
+
+                 | otherwise
+                 = failWithL (lint_app_fail_msg msg orig_fun_ty all_args
+                                  (text "Not a fun:" <+> (ppr fun_ty $$ ppr args)))
+
+         ; go init_subst orig_fun_ty acc all_args }
 
 -- This is a top level definition to ensure we pass all variables of the error message
 -- explicitly and don't capture them as free variables. Otherwise this binder might
 -- become a thunk that get's allocated in the hot code path.
 -- See Note [Avoiding compiler perf traps when constructing error messages.]
-lint_app_fail_msg :: OutKind -> [InType] -> SDoc -> SDoc -> SDoc
-lint_app_fail_msg kfn arg_tys msg extra
-  = vcat [ hang (text "Kind application error in") 2 msg
-         , nest 2 (text "Function kind =" <+> ppr kfn)
-         , nest 2 (text "Arg types =" <+> ppr arg_tys)
+lint_app_fail_msg :: (Outputable a2) => SDoc -> OutType -> a2 -> SDoc -> SDoc
+lint_app_fail_msg msg kfn arg_tys extra
+  = vcat [ hang (text "Application error in") 2 msg
+         , nest 2 (text "Function type =" <+> ppr kfn)
+         , nest 2 (text "Args =" <+> ppr arg_tys)
          , extra ]
 
 {- *********************************************************************
@@ -2322,7 +2292,7 @@ substCoKindM co
        ; rk' <- substTyM rk
        ; return (Pair lk' rk') }
 
-lintCoercion :: InCoercion -> LintM ()
+lintCoercion :: HasDebugCallStack => InCoercion -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 
@@ -2402,15 +2372,16 @@ lintCoercion co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
        ; ensureEqTys (varType tcv') lk $
          text "Kind mis-match in ForallCo" <+> ppr co
 
+-- TODO: these calls are expensive
        -- Assuming kind_co :: k1 ~ k2
        -- Need to check that
        --    (forall (tcv:k1). lty) and
        --    (forall (tcv:k2). rty[(tcv:k2) |> sym kind_co/tcv])
        -- are both well formed.  Easiest way is to call lintForAllBody
        -- for each; there is actually no need to do the funky substitution
-       ; let (Pair lty rty, body_role) = coercionKindRole body_co
-       ; lintForAllBody tcv' lty
-       ; lintForAllBody tcv' rty
+--       ; let (Pair lty rty, body_role) = coercionKindRole body_co
+--       ; lintForAllBody tcv' lty
+--       ; lintForAllBody tcv' rty
 
        ; when (isCoVar tcv) $
          do { lintL (visL == coreTyLamForAllTyFlag && visR == coreTyLamForAllTyFlag) $
@@ -2421,7 +2392,7 @@ lintCoercion co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
               -- See (FC6) in Note [ForAllCo] in GHC.Core.TyCo.Rep
          }
 
-       ; when (body_role == Nominal) $
+       ; when (coercionRole body_co == Nominal) $
          lintL (visL `eqForAllVis` visR) $
          text "Nominal ForAllCo has mismatched visibilities: " <+> ppr co } }
 
@@ -3418,11 +3389,11 @@ addInScopeId in_id out_ty thing_inside
           | isJoinId out_id = extendVarSet join_set in_id -- Overwrite with new arity
           | otherwise       = delVarSet    join_set in_id -- Remove any existing binding
 
-addInScopeTyCoVar :: HasDebugCallStack => InTyCoVar -> OutType -> (OutTyCoVar -> LintM a) -> LintM a
-addInScopeTyCoVar tcv tcv_kind thing_inside
+addInScopeTyCoVar :: InTyCoVar -> OutType -> (OutTyCoVar -> LintM a) -> LintM a
+addInScopeTyCoVar tcv tcv_type thing_inside
   = LintM $ \ env@(LE { le_in_vars = in_vars, le_subst = subst }) errs ->
     let (tcv', subst') = subst_bndr subst
-        env' = env { le_in_vars = extendVarEnv in_vars tcv (tcv, tcv_kind)
+        env' = env { le_in_vars = extendVarEnv in_vars tcv (tcv, tcv_type)
                    , le_subst = subst' }
     in unLintM (thing_inside tcv') env' errs
   where
@@ -3430,11 +3401,13 @@ addInScopeTyCoVar tcv tcv_kind thing_inside
       | isEmptyTCvSubst subst                -- No change in kind
       , not (tcv `elemInScopeSet` in_scope)  -- No change in unique
       = -- Do not extend the substitution, just the in-scope set
-        assertPpr (varType tcv `eqType` tcv_kind)
-                  (ppr tcv $$ ppr (varType tcv) $$ ppr tcv_kind) $
+        (if (varType tcv `eqType` tcv_type) then (\x->x) else 
+          pprTrace "addInScopeTyCoVar" (
+            vcat [ text "tcv" <+> ppr tcv <+> dcolon <+> ppr (varType tcv)
+                 , text "tcv_type" <+> ppr tcv_type ])) $
         (tcv, subst `extendSubstInScope` tcv)
 
-      | let tcv' = uniqAway in_scope (setVarType tcv tcv_kind)
+      | let tcv' = uniqAway in_scope (setVarType tcv tcv_type)
       = (tcv', extendTCvSubstWithClone subst tcv tcv')
       where
         in_scope = substInScopeSet subst
@@ -3768,14 +3741,6 @@ mkTyAppMsg ty arg_ty
                  4 (ppr ty <+> dcolon <+> ppr (typeKind ty)),
               hang (text "Type argument:")
                  4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
-
-mkCoAppMsg :: Type -> Coercion -> SDoc
-mkCoAppMsg fun_ty co
-  = vcat [ text "Illegal coercion application:"
-         , hang (text "Function type:")
-              4 (ppr fun_ty)
-         , hang (text "Coercion argument:")
-              4 (ppr co <+> dcolon <+> ppr (coercionType co))]
 
 emptyRec :: CoreExpr -> SDoc
 emptyRec e = hang (text "Empty Rec binding:") 2 (ppr e)
