@@ -1970,19 +1970,27 @@ lintType ty@(FunTy af tw t1 t2)
        ; lintType tw
        ; lintArrow (text "type or kind" <+> quotes (ppr ty)) af t1 t2 tw }
 
-lintType ty@(ForAllTy (Bndr tcv _) body_ty)
-  | not (isTyCoVar tcv)
-  = failWithL (text "Non-TyVar or Non-CoVar bound in type:" <+> ppr ty)
-  | otherwise
-  = lintTyCoBndr tcv $ \tcv' ->
-    do { lintType body_ty
+lintType ty@(ForAllTy {})
+  = go [] ty
+  where
+    go :: [OutTyCoVar] -> InType -> LintM ()
+    go tcvs ty@(ForAllTy (Bndr tcv _) body_ty)
+      | not (isTyCoVar tcv)
+      = failWithL (text "Non-TyVar or Non-CoVar bound in type:" <+> ppr ty)
 
-       ; when (isCoVar tcv) $
-         lintL (tcv `elemVarSet` tyCoVarsOfType body_ty) $
-         text "Covar does not occur in the body:" <+> (ppr tcv $$ ppr body_ty)
-         -- See GHC.Core.TyCo.Rep Note [Unused coercion variable in ForAllTy]
+      | otherwise
+      = lintTyCoBndr tcv $ \tcv' ->
+        do { -- See GHC.Core.TyCo.Rep Note [Unused coercion variable in ForAllTy]
+             -- Suspicious because it works on InTyCoVar; c.f. ForAllCo
+             when (isCoVar tcv) $
+             lintL (anyFreeVarsOfType (== tcv) body_ty) $
+             text "Covar does not occur in the body:" <+> (ppr tcv $$ ppr body_ty)
 
-       ; lintForAllBody tcv' body_ty }
+           ; go (tcv' : tcvs) body_ty }
+
+    go tcvs body_ty
+      = do { lintType body_ty
+           ; lintForAllBody tcvs body_ty }
 
 lintType (CastTy ty co)
   = do { lintType ty
@@ -1994,20 +2002,19 @@ lintType (LitTy l)       = lintTyLit l
 lintType (CoercionTy co) = lintCoercion co
 
 -----------------
-lintForAllBody :: OutTyCoVar -> InType -> LintM ()
+lintForAllBody :: [OutTyCoVar] -> InType -> LintM ()
 -- Do the checks for the body of a forall-type
-lintForAllBody tcv body_ty
+lintForAllBody tcvs body_ty
   = do { -- For type variables, check for skolem escape
          -- See Note [Phantom type variables in kinds] in GHC.Core.Type
          -- The kind of (forall cv. th) is liftedTypeKind, so no
          -- need to check for skolem-escape in the CoVar case
          body_kind <- substTyM (typeKind body_ty)
-       ; when (isTyVar tcv) $
-         case occCheckExpand [tcv] body_kind of
+       ; case occCheckExpand tcvs body_kind of
            Just {} -> return ()
            Nothing -> failWithL $
                       hang (text "Variable escape in forall:")
-                         2 (vcat [ text "tyvar:" <+> ppr tcv
+                         2 (vcat [ text "tycovars (reversed):" <+> ppr tcvs
                                  , text "type:" <+> ppr body_ty
                                  , text "kind:" <+> ppr body_kind ])
        ; checkValueType body_kind (text "the body of forall:" <+> ppr body_ty) }
@@ -2114,9 +2121,9 @@ lint_app2 msg lint_val lint_ty !orig_fun_ty acc all_args
                  = do { (arg_ty, acc') <- lint_ty arg mult acc
                       ; ensureEqTys (substTy subst exp_arg_ty) arg_ty $
                         lint_app_fail_msg msg orig_fun_ty all_args
-                            (text "Fun:" <+> (vcat [ text "fun_ty:" <+> ppr fun_ty
-                                                   , text "exp_arg_ty:" <+> ppr exp_arg_ty
-                                                   , text "arg:" <+> ppr arg <+> dcolon <+> ppr arg_ty ]))
+                            (hang (text "Fun:" <+> ppr fun_ty)
+                                2 (vcat [ text "exp_arg_ty:" <+> ppr exp_arg_ty
+                                        , text "arg:" <+> ppr arg <+> dcolon <+> ppr arg_ty ]))
                       ; go subst res_ty acc' args }
 
                go subst (ForAllTy (Bndr tv _vis) body_ty) acc (arg:args)
@@ -2357,45 +2364,54 @@ lintCoercion co@(AppCo co1 co2)
          else lintRole co Nominal r2 }
 
 ----------
-lintCoercion co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
-                          , fco_kind = kind_co, fco_body = body_co })
+lintCoercion co@(ForAllCo {})
 -- See Note [ForAllCo] in GHC.Core.TyCo.Rep,
 -- including the typing rule for ForAllCo
+  = do { _ <- go [] co; return () }
+  where
+    go :: [OutTyCoVar]   -- Binders in reverse order
+       -> InCoercion -> LintM Role
+    go tcvs co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
+                         , fco_kind = kind_co, fco_body = body_co })
+      | not (isTyCoVar tcv)
+      = failWithL (text "Non tyco binder in ForAllCo:" <+> ppr co)
 
-  | not (isTyCoVar tcv)
-  = failWithL (text "Non tyco binder in ForAllCo:" <+> ppr co)
+      | otherwise
+      = do { lk <- lintStarCoercion kind_co
+           ; lintTyCoBndr tcv $ \tcv' ->
+        do { ensureEqTys (varType tcv') lk $
+             text "Kind mis-match in ForallCo" <+> ppr co
 
-  | otherwise
-  = do { lk <- lintStarCoercion kind_co
-       ; lintTyCoBndr tcv $ \tcv' ->
-    do { lintCoercion body_co
-       ; ensureEqTys (varType tcv') lk $
-         text "Kind mis-match in ForallCo" <+> ppr co
+           -- I'm not very sure about this part, because it traverses body_co
+           -- but at least it's on a cold path (a ForallCo for a CoVar)
+           -- Also it works on InTyCoVar and InCoercion, which is suspect
+           ; when (isCoVar tcv) $
+             do { lintL (visL == coreTyLamForAllTyFlag && visR == coreTyLamForAllTyFlag) $
+                  text "Invalid visibility flags in CoVar ForAllCo" <+> ppr co
+                  -- See (FC7) in Note [ForAllCo] in GHC.Core.TyCo.Rep
+                ; lintL (almostDevoidCoVarOfCo tcv body_co) $
+                  text "Covar can only appear in Refl and GRefl: " <+> ppr co }
+                  -- See (FC6) in Note [ForAllCo] in GHC.Core.TyCo.Rep
 
--- TODO: these calls are expensive
-       -- Assuming kind_co :: k1 ~ k2
-       -- Need to check that
-       --    (forall (tcv:k1). lty) and
-       --    (forall (tcv:k2). rty[(tcv:k2) |> sym kind_co/tcv])
-       -- are both well formed.  Easiest way is to call lintForAllBody
-       -- for each; there is actually no need to do the funky substitution
---       ; let (Pair lty rty, body_role) = coercionKindRole body_co
---       ; lintForAllBody tcv' lty
---       ; lintForAllBody tcv' rty
+           ; role <- go (tcv':tcvs) body_co
 
-       ; when (isCoVar tcv) $
-         do { lintL (visL == coreTyLamForAllTyFlag && visR == coreTyLamForAllTyFlag) $
-              text "Invalid visibility flags in CoVar ForAllCo" <+> ppr co
-              -- See (FC7) in Note [ForAllCo] in GHC.Core.TyCo.Rep
-            ; lintL (almostDevoidCoVarOfCo tcv body_co) $
-              text "Covar can only appear in Refl and GRefl: " <+> ppr co
-              -- See (FC6) in Note [ForAllCo] in GHC.Core.TyCo.Rep
-         }
+           ; when (role == Nominal) $
+             lintL (visL `eqForAllVis` visR) $
+             text "Nominal ForAllCo has mismatched visibilities: " <+> ppr co
 
-       ; when (coercionRole body_co == Nominal) $
-         lintL (visL `eqForAllVis` visR) $
-         text "Nominal ForAllCo has mismatched visibilities: " <+> ppr co } }
+           ; return role } }
 
+    go tcvs body_co
+      = -- Assuming kind_co :: k1 ~ k2
+        -- Need to check that
+        --    (forall (tcv:k1). lty) and
+        --    (forall (tcv:k2). rty[(tcv:k2) |> sym kind_co/tcv])
+        -- are both well formed.  Easiest way is to call lintForAllBody
+        -- for each; there is actually no need to do the funky substitution
+        do { let Pair lty rty = coercionKind body_co
+           ; lintForAllBody tcvs lty
+           ; lintForAllBody tcvs rty
+           ; return (coercionRole body_co) }
 
 
 lintCoercion (FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
@@ -3439,7 +3455,7 @@ substTyM :: InType -> LintM OutType
 -- The substitution is usually empty, so this is usually a no-op
 substTyM ty
   = do { subst <- getSubst
-       ; checkWarnL (isEmptyTCvSubst subst) (ppr subst)
+--       ; checkWarnL (isEmptyTCvSubst subst) (ppr subst)
        ; return (substTy subst ty) }
 
 getUEAliases :: LintM (NameEnv UsageEnv)

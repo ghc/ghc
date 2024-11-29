@@ -2038,8 +2038,8 @@ ppr_special_co ctxt_prec doc cos
                (sep [doc, nest 4 (sep (map pprParendIfaceCoercion cos))])
 
 pprIfAxRule :: IfaceAxiomRule -> SDoc
-pprIfAxRule (IfaceAR_X n)   = ppr n <> text "axx"
-pprIfAxRule (IfaceAR_U n)   = ppr n <> text "axu"
+pprIfAxRule (IfaceAR_X n)   = ppr n
+pprIfAxRule (IfaceAR_U n)   = ppr n
 pprIfAxRule (IfaceAR_B n i) = ppr n <> brackets (int i)
 
 ppr_role :: Role -> SDoc
