@@ -1980,7 +1980,7 @@ ppr_co ctxt_prec (IfaceFunCo r co_mult co1 co2)
     mb_conc _                        = Nothing
 
 ppr_co _         (IfaceTyConAppCo r tc cos)
-  = parens (pprIfaceCoTcApp topPrec tc cos) <> ppr_role r
+  = parens (text "tcapp" <+> pprIfaceCoTcApp topPrec tc cos) <> ppr_role r
 ppr_co ctxt_prec (IfaceAppCo co1 co2)
   = maybeParen ctxt_prec appPrec $
     ppr_co funPrec co1 <+> pprParendIfaceCoercion co2
@@ -2038,8 +2038,8 @@ ppr_special_co ctxt_prec doc cos
                (sep [doc, nest 4 (sep (map pprParendIfaceCoercion cos))])
 
 pprIfAxRule :: IfaceAxiomRule -> SDoc
-pprIfAxRule (IfaceAR_X n)   = ppr n
-pprIfAxRule (IfaceAR_U n)   = ppr n
+pprIfAxRule (IfaceAR_X n)   = ppr n <> text "axx"
+pprIfAxRule (IfaceAR_U n)   = ppr n <> text "axu"
 pprIfAxRule (IfaceAR_B n i) = ppr n <> brackets (int i)
 
 ppr_role :: Role -> SDoc
