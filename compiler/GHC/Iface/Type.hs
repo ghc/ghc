@@ -1980,7 +1980,7 @@ ppr_co ctxt_prec (IfaceFunCo r co_mult co1 co2)
     mb_conc _                        = Nothing
 
 ppr_co _         (IfaceTyConAppCo r tc cos)
-  = parens (text "tcapp" <+> pprIfaceCoTcApp topPrec tc cos) <> ppr_role r
+  = parens (pprIfaceCoTcApp topPrec tc cos) <> ppr_role r
 ppr_co ctxt_prec (IfaceAppCo co1 co2)
   = maybeParen ctxt_prec appPrec $
     ppr_co funPrec co1 <+> pprParendIfaceCoercion co2

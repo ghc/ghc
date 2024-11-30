@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# N_VARS = 100
-# N_BINDS = 50
-
-N_VARS = 600
-# N_VARS = 10
-N_BINDS = 1
+N_VARS = 100
+N_BINDS = 50
 
 tyvars = ' '.join('v{i}'.format(i=i) for i in range(N_VARS))
 
