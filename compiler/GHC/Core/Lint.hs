@@ -2101,13 +2101,14 @@ lint_tyco_app msg fun_kind arg_tys
        ; return () }
 
 ----------------
-lint_app2 :: Outputable a => SDoc
+lint_app2 :: forall a acc. Outputable a =>
+             SDoc
           -> (a -> LintM OutType)                        -- Lint the thing and return its value
           -> (a -> Mult -> acc -> LintM (OutKind, acc))  -- Lint the thing and return its type
           -> OutType -> acc -> [a] -> LintM (OutType,acc)
 {-# INLINE lint_app2 #-}    -- Very few call sites
 -- 'acc' is either () for types, or UsageEnv for terms
-lint_app2 msg lint_val lint_ty !orig_fun_ty acc all_args
+lint_app2 msg lint_forall_arg lint_arrow_arg !orig_fun_ty acc all_args
     = do { !in_scope <- getInScope
          -- We need the in_scope set to satisfy the invariant in
          -- Note [The substitution invariant] in GHC.Core.TyCo.Subst
@@ -2115,10 +2116,12 @@ lint_app2 msg lint_val lint_ty !orig_fun_ty acc all_args
 
          ; let init_subst = mkEmptySubst in_scope
 
+               go :: Subst -> OutType -> acc -> [a] -> LintM (OutType, acc)
+                     -- The Subst applies (only) to the fun_ty
                go subst fun_ty acc [] = return (substTy subst fun_ty, acc)
 
                go subst fun_ty@(FunTy _ mult exp_arg_ty res_ty) acc (arg:args)
-                 = do { (arg_ty, acc') <- lint_ty arg mult acc
+                 = do { (arg_ty, acc') <- lint_arrow_arg arg (substTy subst mult) acc
                       ; ensureEqTys (substTy subst exp_arg_ty) arg_ty $
                         lint_app_fail_msg msg orig_fun_ty all_args
                             (hang (text "Fun:" <+> ppr fun_ty)
@@ -2127,7 +2130,7 @@ lint_app2 msg lint_val lint_ty !orig_fun_ty acc all_args
                       ; go subst res_ty acc' args }
 
                go subst (ForAllTy (Bndr tv _vis) body_ty) acc (arg:args)
-                 = do { arg' <- lint_val arg
+                 = do { arg' <- lint_forall_arg arg
                       ; let tv_kind = substTy subst (varType tv)
                             karg'   = typeKind arg'
                             subst'  = extendTCvSubst subst tv arg'
@@ -3417,7 +3420,7 @@ addInScopeTyCoVar tcv tcv_type thing_inside
       | isEmptyTCvSubst subst                -- No change in kind
       , not (tcv `elemInScopeSet` in_scope)  -- No change in unique
       = -- Do not extend the substitution, just the in-scope set
-        (if (varType tcv `eqType` tcv_type) then (\x->x) else 
+        (if (varType tcv `eqType` tcv_type) then (\x->x) else
           pprTrace "addInScopeTyCoVar" (
             vcat [ text "tcv" <+> ppr tcv <+> dcolon <+> ppr (varType tcv)
                  , text "tcv_type" <+> ppr tcv_type ])) $
