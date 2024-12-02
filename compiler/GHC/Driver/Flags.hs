@@ -664,6 +664,7 @@ data GeneralFlag
    | Opt_NumConstantFolding
    | Opt_CoreConstantFolding
    | Opt_FastPAPCalls                  -- #6084
+   | Opt_DoFastMaybe -- TODO
 
    -- Inference flags
    | Opt_DoTagInferenceChecks

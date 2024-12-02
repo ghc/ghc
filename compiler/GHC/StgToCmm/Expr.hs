@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -----------------------------------------------------------------------------
 --
@@ -58,6 +59,7 @@ import Control.Arrow ( first )
 import Data.List     ( partition )
 import GHC.Stg.InferTags.TagSig (isTaggedSig)
 import GHC.Platform.Profile (profileIsProfiling)
+import GHC.Builtin.Types (justDataConName, maybeTyCon, justDataCon)
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -738,6 +740,12 @@ cgAlts gc_plan bndr (PrimAlt _) alts
         ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt
         ; return AssignedDirectly }
 
+--   -- Unjuicing juiced just constructors
+-- cgCase scrut bndr alt_type alts
+--   | AlgAlt ty_con <- alt_type
+--   , ty_con == maybeTyCon
+--   , pprTrace "Found match on maybe type" (ppr scrut) True
+--                    = False
 cgAlts gc_plan bndr (AlgAlt tycon) alts
   = do  { platform <- getPlatform
 
@@ -751,12 +759,16 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
               (!via_ptr, !via_info) = partition ((< maxpt) . fst) branches'
               !small = isSmallFamily platform fam_sz
 
+
                 -- Is the constructor tag in the node reg?
                 -- See Note [Tagging big families]
         ; if small || null via_info
            then -- Yes, bndr_reg has constructor tag in ls bits
                emitSwitch ptag_expr branches' mb_deflt 1
-                 (if small then fam_sz else maxpt)
+                 (if
+                    | tycon == maybeTyCon -> 3
+                    | small -> fam_sz
+                    | otherwise -> maxpt)
 
            else -- No, the get exact tag from info table when mAX_PTR_TAG
                 -- See Note [Double switching for big families]
@@ -767,6 +779,8 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                     !itag_expr = getConstrTag profile align_check untagged_ptr
                     !info0 = first pred <$> via_info
                 if null via_ptr then
+                  -- If we have a fake just we should never enter here,
+                  -- might be worth checking
                   emitSwitch itag_expr info0 mb_deflt 0 (fam_sz - 1)
                 else do
                   infos_lbl <- newBlockId
@@ -963,26 +977,88 @@ cgAlts _ _ _ _ = panic "cgAlts"
 --
 
 -------------------
+{-# OPAQUE cgAlgAltRhss #-}
+-- Handles regular adts
 cgAlgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
              -> FCode ( Maybe CmmAGraphScoped
                       , [(ConTagZ, CmmAGraphScoped)] )
 cgAlgAltRhss gc_plan bndr alts
-  = do { tagged_cmms <- cgAltRhss gc_plan bndr alts
+  = do { tagged_cmms <- cgAlgAltRhss' gc_plan bndr alts
+
+      --  ; pprTraceM "tagged_cmms_tags" (ppr $ map fst tagged_cmms)
 
        ; let { mb_deflt = case tagged_cmms of
-                           ((DEFAULT,rhs) : _) -> Just rhs
+                           ((Nothing,rhs) : _) -> Just rhs
                            _other              -> Nothing
                             -- DEFAULT is always first, if present
 
-              ; branches = [ (dataConTagZ con, cmm)
-                           | (DataAlt con, cmm) <- tagged_cmms ]
+              ; branches = [ (tag, cmm)
+                           | (Just tag, cmm) <- tagged_cmms ]
               }
 
        ; return (mb_deflt, branches)
        }
 
+cgAlgAltRhss' :: (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
+          -> FCode [(Maybe ConTagZ, CmmAGraphScoped)]
+cgAlgAltRhss' gc_plan bndr alts
+  = do
+    let (just_alts,other_alts) = partition (\alt -> alt_con alt == DataAlt justDataCon) alts
+    platform <- getPlatform
+    just_rhs_lbl <- newBlockId
+    let
+      mb_tag (DataAlt con) = Just $ dataConTagZ con
+      mb_tag _ = Nothing
+      base_reg = idToReg platform bndr
+
+      cg_maybe_alts :: [CgStgAlt] -> FCode [(Maybe ConTagZ, CmmAGraphScoped)]
+      cg_maybe_alts [] = pure []
+      cg_maybe_alts [GenStgAlt{alt_con=just_con, alt_bndrs=[just_bndr], alt_rhs=just_rhs}] = do
+        massert (just_con == DataAlt justDataCon)
+        -- fake_just <-
+        --     getCodeScoped             $
+        --     maybeAltHeapCheck gc_plan $
+        --     do { _ <- bindFakeConArg base_reg (NonVoid just_bndr)
+        --                 -- alt binders are always non-void,
+        --                 -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
+        --       ; emitLabel just_rhs_lbl
+        --       ; emitCommentAlways $ fsLit "fake just - rhs"
+        --       ; _ <- cgExpr just_rhs
+        --       ; return $ Just 2 }
+        actual_just <-
+            getCodeScoped             $
+            maybeAltHeapCheck gc_plan $
+              do { _ <- bindConArgs just_con base_reg (assertNonVoidIds [just_bndr])
+                          -- alt binders are always non-void,
+                          -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
+                ; emitCommentAlways $ fsLit "regular just - goto:rhs"
+                -- ; emit $ mkBranch just_rhs_lbl
+                ; _ <- cgExpr just_rhs
+
+
+                ; return $ mb_tag just_con }
+        pure [
+            -- fake_just,
+             actual_just]
+
+      cg_maybe_alts _ = panic "Found more than one Just alt ?!"
+
+      cg_alt :: CgStgAlt -> FCode (Maybe ConTagZ, CmmAGraphScoped)
+      cg_alt GenStgAlt{alt_con=con, alt_bndrs=bndrs, alt_rhs=rhs}
+        = getCodeScoped             $
+          maybeAltHeapCheck gc_plan $
+          do { _ <- bindConArgs con base_reg (assertNonVoidIds bndrs)
+                      -- alt binders are always non-void,
+                      -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
+            ; _ <- cgExpr rhs
+            ; return $ mb_tag con }
+
+    base_alts <- forkAlts $ (map cg_alt other_alts)
+    just_alts <- cg_maybe_alts just_alts
+    return $ base_alts ++ just_alts
 
 -------------------
+-- Handles primitive alternatives
 cgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
           -> FCode [(AltCon, CmmAGraphScoped)]
 cgAltRhss gc_plan bndr alts = do
@@ -999,6 +1075,7 @@ cgAltRhss gc_plan bndr alts = do
            ; _ <- cgExpr rhs
            ; return con }
   forkAlts (map cg_alt alts)
+
 
 maybeAltHeapCheck :: (GcPlan,ReturnKind) -> FCode a -> FCode a
 maybeAltHeapCheck (NoGcInAlts,_)  code = code

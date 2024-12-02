@@ -62,7 +62,7 @@ module GHC.StgToCmm.Monad (
         CgIdInfo(..),
         getBinds, setBinds,
         -- out of general friendliness, we also export ...
-        StgToCmmConfig(..), CgState(..) -- non-abstract
+        StgToCmmConfig(..), CgState(..), emitCommentAlways -- non-abstract
     ) where
 
 import GHC.Prelude hiding( sequence, succ )
@@ -715,6 +715,10 @@ emitComment :: FastString -> FCode ()
 emitComment s
   | debugIsOn = emitCgStmt (CgStmt (CmmComment s))
   | otherwise = return ()
+
+emitCommentAlways :: FastString -> FCode ()
+emitCommentAlways s
+  = emitCgStmt (CgStmt (CmmComment s))
 
 emitTick :: CmmTickish -> FCode ()
 emitTick = emitCgStmt . CgStmt . CmmTick

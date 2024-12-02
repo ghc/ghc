@@ -12,7 +12,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.StgToCmm.DataCon (
-        cgTopRhsCon, buildDynCon, bindConArgs
+        cgTopRhsCon, buildDynCon, bindConArgs, bindFakeConArg
     ) where
 
 import GHC.Prelude
@@ -53,6 +53,10 @@ import Data.Char
 import GHC.StgToCmm.Config (stgToCmmPlatform)
 import GHC.StgToCmm.TagCheck (checkConArgsStatic, checkConArgsDyn)
 import GHC.Utils.Outputable
+import GHC.Builtin.Types (justDataConName, maybeTyConName, maybeTyCon)
+import GHC.Core.TyCon
+import GHC.Core.Type
+import GHC.Tc.Utils.TcType (isTyFamFree)
 
 ---------------------------------------------------------------
 --      Top-level constructors
@@ -165,13 +169,15 @@ buildDynCon :: Id                 -- Name of the thing to which this constr will
                -- Return details about how to find it and initialization code
 buildDynCon binder mn actually_bound cc con args
     = do cfg <- getStgToCmmConfig
+         platform <- getPlatform
          --   pprTrace "noCodeLocal:" (ppr (binder,con,args,cgInfo)) True
          case precomputedStaticConInfo_maybe cfg binder con args of
            Just cgInfo -> return (cgInfo, return mkNop)
-           Nothing     -> buildDynCon' binder mn actually_bound cc con args
+           Nothing     -> buildDynCon' platform cfg binder mn actually_bound cc con args
 
-
-buildDynCon' :: Id
+buildDynCon' :: Platform
+             -> StgToCmmConfig
+             -> Id
              -> ConstructorNumber
              -> Bool
              -> CostCentreStack
@@ -188,8 +194,48 @@ The reason for having a separate argument, rather than looking at
 the addr modes of the args is that we may be in a "knot", and
 premature looking at the args will cause the compiler to black-hole!
 -}
+-------- buildDynCon': the JUST JUICING case -----------
+buildDynCon' platform conf binder _mn  _actually_bound _ccs con args
+  | stgToCmmFastMaybe conf
+  , dataConName con == justDataConName
+  , [arg] <- args
+  , NonVoid (StgVarArg just_payload) <- arg
+  , mAX_PTR_TAG platform >= 3
+  , isFakeablePayload just_payload
+  , pprTrace "Found a JUST!" (ppr (con,args,stgArgType (fromNonVoid arg))) True
+  = do  { let
+              -- We represent the just as a pointer to *something* so we can't
+              -- us LFCon
+              lf_info = mkLFArgument just_payload
+
+              gen_code reg
+                = do  { modu <- getModuleName
+                      ; cfg  <- getStgToCmmConfig
+                      ; let platform = stgToCmmPlatform cfg
+
+                      ; arg_code <- getArgAmode arg
+                      ; let fake_just_code = mkFakeJust platform reg arg_code
+                      ; return fake_just_code }
+                  where
+
+          ; (id_info, reg) <- rhsIdInfo binder lf_info
+          ; return (id_info, gen_code reg)
+        }
+ where
+  -- We cant fake a Just around a Nothing, so we only fake the just
+  -- if the payload is sure not to be a Maybe a
+  isFakeablePayload just_payload =
+    let ty = idType just_payload
+        tc_mb = tyConAppTyCon_maybe ty
+    in
+    isFunTy ty ||
+    isAlgType ty &&
+    not (tc_mb == Just maybeTyCon)
+
+
+
 -------- buildDynCon': the general case -----------
-buildDynCon' binder mn actually_bound ccs con args
+buildDynCon' platform _conf binder mn actually_bound ccs con args
   = do  { (id_info, reg) <- rhsIdInfo binder lf_info
         ; return (id_info, gen_code reg)
         }
@@ -199,8 +245,7 @@ buildDynCon' binder mn actually_bound ccs con args
   gen_code reg
     = do  { modu <- getModuleName
           ; cfg  <- getStgToCmmConfig
-          ; let platform = stgToCmmPlatform cfg
-                profile  = stgToCmmProfile  cfg
+          ; let profile  = stgToCmmProfile  cfg
                 (tot_wds, ptr_wds, args_w_offsets)
                    = mkVirtConstrOffsets profile (addArgReps args)
                 nonptr_wds = tot_wds - ptr_wds
@@ -401,3 +446,28 @@ bindConArgs (DataAlt con) base args
 
 bindConArgs _other_con _base args
   = assert (null args ) return []
+
+bindFakeConArg :: LocalReg -> NonVoid Id -> FCode (Maybe LocalReg)
+bindFakeConArg base arg
+  | NonVoid b <- arg
+  , isDeadBinder b
+  = return Nothing
+  | otherwise
+  = do profile <- getProfile
+       platform <- getPlatform
+       let
+           -- The binding below forces the masking out of the tag bits
+           -- when accessing the constructor field.
+           bind_arg :: (NonVoid Id) -> FCode (Maybe LocalReg)
+           bind_arg arg@(NonVoid b)
+             | isDeadBinder b  -- See Note [Dead-binder optimisation] in GHC.StgToCmm.Expr
+             = return Nothing
+             | otherwise
+             = do { target_reg <- bindArgToReg arg
+                  ; emitCommentAlways $ fsLit "bindFakeJust"
+                  ; emit $ mkAssign (CmmLocal target_reg)
+                                    (cmmUntag platform (CmmReg $ CmmLocal base))
+                  ; return $ Just target_reg
+                  }
+
+       bind_arg arg

@@ -204,7 +204,7 @@ addArgReps = map (\arg -> let arg' = fromNonVoid arg
 mkLFArgument :: Id -> LambdaFormInfo
 mkLFArgument id
   | isUnliftedType ty      = LFUnlifted
-  | mightBeFunTy ty = LFUnknown True
+  | mightBeFunTy ty        = LFUnknown True
   | otherwise              = LFUnknown False
   where
     ty = idType id

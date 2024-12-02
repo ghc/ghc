@@ -70,6 +70,9 @@ stg_ap_0_fast ( P_ fun )
 
 #if !defined(PROFILING)
 
+    if(GETTAG(fun) != 0) {
+      return(fun);
+    }
     ENTER(fun);
 
 #else

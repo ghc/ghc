@@ -28,7 +28,7 @@ module GHC.Types.Unique (
         -- ** Constructors, destructors and operations on 'Unique's
         hasKey,
 
-        pprUniqueAlways,
+        pprUniqueAlways, showUnique,
 
         mkTag,
         mkUniqueGrimily,

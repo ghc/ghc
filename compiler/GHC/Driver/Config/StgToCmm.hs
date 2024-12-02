@@ -52,6 +52,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmPIE           = gopt Opt_PIE                   dflags
   , stgToCmmExtDynRefs    = gopt Opt_ExternalDynamicRefs   dflags
   , stgToCmmDoBoundsCheck = gopt Opt_DoBoundsChecking      dflags
+  , stgToCmmFastMaybe     = gopt Opt_DoFastMaybe           dflags
   , stgToCmmDoTagCheck    = gopt Opt_DoTagInferenceChecks  dflags
 
   -- backend flags:

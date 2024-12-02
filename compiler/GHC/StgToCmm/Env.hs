@@ -18,7 +18,7 @@ module GHC.StgToCmm.Env (
         bindArgsToRegs, bindToReg, rebindToReg,
         bindArgToReg, idToReg,
         getCgIdInfo, getCgInfo_maybe,
-        maybeLetNoEscape,
+        maybeLetNoEscape, mkFakeJust,
         ) where
 
 import GHC.Prelude
@@ -81,6 +81,11 @@ rhsIdInfo id lf_info
 mkRhsInit :: Platform -> LocalReg -> LambdaFormInfo -> CmmExpr -> CmmAGraph
 mkRhsInit platform reg lf_info expr
   = mkAssign (CmmLocal reg) (addDynTag platform expr (lfDynTag platform lf_info))
+
+mkFakeJust :: Platform -> LocalReg -> CmmExpr -> CmmAGraph
+mkFakeJust platform reg expr
+  = mkAssign (CmmLocal reg)
+             (addDynTag platform (cmmUntag platform expr) 3)
 
 -- | Returns a 'CmmExpr' for the *tagged* pointer
 idInfoToAmode :: CgIdInfo -> CmmExpr

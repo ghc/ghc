@@ -24,6 +24,8 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Block
 
 import Data.Kind
+import GHC.Types.Unique (mkUniqueGrimily)
+import Unsafe.Coerce (unsafeCoerce)
 
 -- | A (possibly empty) collection of closed/closed blocks
 type Body n = LabelMap (Block n C C)
@@ -62,7 +64,7 @@ addBlock block body = mapAlter add lbl body
   where
     lbl = entryLabel block
     add Nothing = Just block
-    add _ = error $ "duplicate label " ++ show lbl ++ " in graph"
+    add _ = error $ "duplicate label " ++ show (lbl, (mkUniqueGrimily $ unsafeCoerce lbl)) ++  " in graph"
 
 
 -- ---------------------------------------------------------------------------
