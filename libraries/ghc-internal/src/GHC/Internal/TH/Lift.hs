@@ -20,7 +20,7 @@
 -- | This module gives the definition of the 'Lift' class.
 --
 -- This is an internal module.
--- Please import "Language.Haskell.TH" or "Language.Haskell.TH.Syntax" instead!
+-- Please import "Language.Haskell.TH.Lift", "Language.Haskell.TH" or "Language.Haskell.TH.Syntax" instead!
 
 module GHC.Internal.TH.Lift
   ( Lift(..)
@@ -70,6 +70,9 @@ import GHC.Internal.ForeignPtr
 -- >   deriving Lift
 --
 -- Representation-polymorphic since /template-haskell-2.16.0.0/.
+--
+-- This is exposed both from the @template-haskell-lift@ and @template-haskell@ packages.
+-- Consider importing it from the more stable @template-haskell-lift@ if you don't need the full breadth of the @template-haskell@ interface.
 class Lift (t :: TYPE r) where
   -- | Turn a value into a Template Haskell expression, suitable for use in
   -- a splice.

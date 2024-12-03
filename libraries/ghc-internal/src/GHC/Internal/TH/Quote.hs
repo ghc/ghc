@@ -30,6 +30,9 @@ import GHC.Internal.Base hiding (Type)
 -- in defining a quasiquoter to be used for expressions, you would
 -- define a 'QuasiQuoter' with only 'quoteExp', and leave the other
 -- fields stubbed out with errors.
+--
+-- This is exposed both from the @template-haskell-quasiquoter@ and @template-haskell@ packages.
+-- Consider importing it from the more stable @template-haskell-quasiquoter@ if you don't need the full breadth of the @template-haskell@ interface.
 data QuasiQuoter = QuasiQuoter {
     -- | Quasi-quoter for expressions, invoked by quotes like @lhs = $[q|...]@
     quoteExp  :: String -> Q Exp,
