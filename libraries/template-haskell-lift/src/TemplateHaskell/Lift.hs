@@ -27,20 +27,25 @@ import GHC.Internal.TH.Syntax
 import Language.Haskell.TH.Syntax
 #endif
 
+
+-- Quote and Code are introduced in GHC-9.1/template-haskell-2.17
+-- If we are using an older version, it is basically synonymous with 'Q'
+#if __GLASGOW_HASKELL__ < 901
+type Quote m = (Q ~ m)
+type Code m a = m (TExp a)
+#endif
+
 -- template-haskell >= 2.17
 #if  __GLASGOW_HASKELL__ >= 901
+defaultLiftTyped :: (Lift a, Quote m) => a -> Code m a
 defaultLiftTyped x = unsafeCodeCoerce (lift x)
 -- template-haskell >= 2.16
 #else
+defaultLiftTyped :: (Lift a, Quote m) => a -> Q (TExp a)
 defaultLiftTyped x = unsafeTExpCoerce (lift x)
 #endif
 
--- Quote is introduced in GHC-9.1/template-haskell-2.17
-#if __GLASGOW_HASKELL__ < 901
-liftAddrCompat :: ForeignPtr Word8 -> Word -> Word -> Q Exp
-#else
 liftAddrCompat :: Quote m => ForeignPtr Word8 -> Word -> Word -> m Exp
-#endif
 liftAddrCompat fptr off len =
 #if  __GLASGOW_HASKELL__ >= 810
      pure $ LitE $ BytesPrimL $ Bytes fptr off len
@@ -55,4 +60,5 @@ liftAddrCompat fptr off len =
        pure $ LitE $ StringPrimL $ words
 #endif
 
+liftIntCompat :: Qoute m => Int -> m Exp
 liftIntCompat n = pure $ AppE (ConE 'I#) (LitE (IntPrimL n))

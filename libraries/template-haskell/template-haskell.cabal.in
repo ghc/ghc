@@ -57,8 +57,6 @@ Library
         -- See: https://gitlab.haskell.org/ghc/ghc/-/issues/25705
         ghc-internal == @ProjectVersionForLib@.*,
         ghc-boot-th == @ProjectVersionMunged@
-        -- template-haskell-lift
-        -- template-haskell-quote
 
     other-modules:
       System.FilePath
