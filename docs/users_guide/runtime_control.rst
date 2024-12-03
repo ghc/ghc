@@ -1391,7 +1391,7 @@ and can be controlled by the following flags.
 
     The default for this flag is currently ``--read-tix-file=yes`` but will change
     to ``-read-tix-file=no`` in a future version of GHC according to the accepted
-    `GHC proposal 612 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0612-fhpc-accumulation.md>`__.
+    `GHC Proposal 612 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0612-fhpc-accumulation.md>`__.
 
 .. rts-flag:: --write-tix-file=<yes|no>
 

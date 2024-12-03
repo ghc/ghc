@@ -528,7 +528,7 @@ that (SPLIT-STRICT) uses a bang-pattern in the ``case`` in the desugared right-h
 
 Note that rule (CASE) applies only when any of the *binders* is unlifted;
 it is irrelevant whether the binding *itself* is unlifted (see
-`GHC proposal #35 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0035-unbanged-strict-patterns.rst>`__).
+`GHC Proposal #35 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0035-unbanged-strict-patterns.rst>`__).
 For example (see :ref:`primitives`)::
 
     let (# a::Int, b::Bool #) = e in body
