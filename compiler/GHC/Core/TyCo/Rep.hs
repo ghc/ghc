@@ -1218,14 +1218,15 @@ because the kinds of the bound tyvars can be different.
 
 The typing rule is:
 
-  kind_co : k1 ~N k2
-  tv1:k1 |- co : t1 ~r t2
+  G |- kind_co : k1 ~N k2
+  tv1 \not\in fv(typeKind(t1),typeKind(t2))  -- Skolem escape
+  G, tv1:k1 |- co : t1 ~r t2
   if r=N, then vis1=vis2
   ------------------------------------
-  ForAllCo (tv1:k1) vis1 vis2 kind_co co
-     : forall (tv1:k1) <vis1>. t1
+  G |- ForAllCo (tv1:k1) vis1 vis2 kind_co co
+         : forall (tv1:k1) <vis1>. t1
               ~r
-       forall (tv1:k2) <vis2>. (t2[tv1 |-> (tv1:k2) |> sym kind_co])
+           forall (tv1:k2) <vis2>. (t2[tv1 |-> (tv1:k2) |> sym kind_co])
 
 Several things to note here
 
