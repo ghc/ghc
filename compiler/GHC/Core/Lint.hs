@@ -107,14 +107,6 @@ import Data.IntMap.Strict ( IntMap )
 import qualified Data.IntMap.Strict as IntMap ( lookup, keys, empty, fromList )
 
 {-
-
-ToDo: notes
-
-* We do not bother to clone non-CoVar Ids at all
-* The Subst deals only in TyCoVars; Non-CoVarIds do not even live in the InScope set
-* For Ids, the le_in_vars envt gives the OutType of the Id
-
-
 Note [Core Lint guarantee]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Core Lint is the type-checker for Core. Using it, we get the following guarantee:
@@ -973,9 +965,9 @@ lintCoreExpr e@(App _ _)
                 = lintValArg expr mult ue
              -- TODO: Look through ticks?
 
-       ; runrw_pr <- lint_app2 (text "runRW# expression")
+       ; runrw_pr <- lintApp (text "runRW# expression")
                                lintTyArg lint_rw_cont
-                               (idType fun) zeroUE [ty_arg1,ty_arg2,cont_arg]
+                               (idType fun) [ty_arg1,ty_arg2,cont_arg] zeroUE
        ; lintCoreArgs runrw_pr rest }
 
   | otherwise
@@ -1458,8 +1450,8 @@ subtype of the required type, as one would expect.
 -- e.g. f :: Int -> Bool -> Int would return `Int` as result type.
 lintCoreArgs  :: (OutType, UsageEnv) -> [InExpr] -> LintM (OutType, UsageEnv)
 lintCoreArgs (fun_ty, fun_ue) args
-  = lint_app2 (text "expression")
-              lintTyArg lintValArg fun_ty fun_ue args
+  = lintApp (text "expression")
+              lintTyArg lintValArg fun_ty args fun_ue
 
 lintTyArg :: InExpr -> LintM OutType
 
@@ -1917,8 +1909,6 @@ lintTypeAndSubst ty = do { lintType ty; substTyM ty }
            -- substitution, but it should be in scope
 
 lintType :: InType -> LintM ()
--- The OutType is just the substitution applied to the InType
---
 -- I experimented with returning the kind along with the type,
 -- to avoid a number of calls to typeKind, which might in principle be quadratic
 -- (as we recurse over the type).  But in fact returning both seems to slow
@@ -1974,6 +1964,7 @@ lintType ty@(ForAllTy {})
   = go [] ty
   where
     go :: [OutTyCoVar] -> InType -> LintM ()
+    -- Loop, collecting the forall-binders
     go tcvs ty@(ForAllTy (Bndr tcv _) body_ty)
       | not (isTyCoVar tcv)
       = failWithL (text "Non-TyVar or Non-CoVar bound in type:" <+> ppr ty)
@@ -2095,20 +2086,37 @@ lint_co_app co = lint_tyco_app (text "coercion" <+> quotes (ppr co))
 lint_tyco_app :: SDoc -> OutKind -> [InType] -> LintM ()
 lint_tyco_app msg fun_kind arg_tys
     -- See Note [Avoiding compiler perf traps when constructing error messages.]
-  = do { _ <- lint_app2 msg (\ty     -> do { lintType ty; substTyM ty })
+  = do { _ <- lintApp msg (\ty     -> do { lintType ty; substTyM ty })
                             (\ty _ _ -> do { lintType ty; ki <- substTyM (typeKind ty); return (ki,()) })
-                            fun_kind () arg_tys
+                            fun_kind arg_tys ()
        ; return () }
 
 ----------------
-lint_app2 :: forall a acc. Outputable a =>
+lintApp :: forall in_a acc. Outputable in_a =>
              SDoc
-          -> (a -> LintM OutType)                        -- Lint the thing and return its value
-          -> (a -> Mult -> acc -> LintM (OutKind, acc))  -- Lint the thing and return its type
-          -> OutType -> acc -> [a] -> LintM (OutType,acc)
-{-# INLINE lint_app2 #-}    -- Very few call sites
--- 'acc' is either () for types, or UsageEnv for terms
-lint_app2 msg lint_forall_arg lint_arrow_arg !orig_fun_ty acc all_args
+          -> (in_a -> LintM OutType)                        -- Lint the thing and return its value
+          -> (in_a -> Mult -> acc -> LintM (OutKind, acc))  -- Lint the thing and return its type
+          -> OutType
+          -> [in_a]                               -- The arguments, always "In" things
+          -> acc                                  -- Used (only) for UsageEnv in /term/ applications
+          -> LintM (OutType,acc)
+-- lintApp is a performance-critical function, which deals with multiple
+-- applications such as  (/\a./\b./\c. expr) @ta @tb @tc
+-- When returning the type of this expression we want to avoid substituting a:=ta,
+-- and /then/ substituting b:=tb, etc.  That's quadratic, and can be a huge
+-- perf hole.  So we gather all the arguments [in_a], and then gather the
+-- substitution incrementally in the `go` loop.
+--
+-- lintApp is used:
+--    * for term applications (lintCoreArgs)
+--    * for type applications (lint_ty_app)
+--    * for coercion application (lint_co_app)
+-- To deal with these cases `lintApp` has two higher order arguments;
+-- but we specialise it for each call site (by inlining)
+{-# INLINE lintApp #-}    -- INLINE: very few call sites;
+                          -- not recursive; specialised at its call sites
+
+lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
     = do { !in_scope <- getInScope
          -- We need the in_scope set to satisfy the invariant in
          -- Note [The substitution invariant] in GHC.Core.TyCo.Subst
@@ -2116,18 +2124,12 @@ lint_app2 msg lint_forall_arg lint_arrow_arg !orig_fun_ty acc all_args
 
          ; let init_subst = mkEmptySubst in_scope
 
-               go :: Subst -> OutType -> acc -> [a] -> LintM (OutType, acc)
+               go :: Subst -> OutType -> acc -> [in_a] -> LintM (OutType, acc)
                      -- The Subst applies (only) to the fun_ty
-               go subst fun_ty acc [] = return (substTy subst fun_ty, acc)
+                     -- c.f. GHC.Core.Type.piResultTys, which has a similar loop
 
-               go subst fun_ty@(FunTy _ mult exp_arg_ty res_ty) acc (arg:args)
-                 = do { (arg_ty, acc') <- lint_arrow_arg arg (substTy subst mult) acc
-                      ; ensureEqTys (substTy subst exp_arg_ty) arg_ty $
-                        lint_app_fail_msg msg orig_fun_ty all_args
-                            (hang (text "Fun:" <+> ppr fun_ty)
-                                2 (vcat [ text "exp_arg_ty:" <+> ppr exp_arg_ty
-                                        , text "arg:" <+> ppr arg <+> dcolon <+> ppr arg_ty ]))
-                      ; go subst res_ty acc' args }
+               go subst fun_ty acc []
+                 = return (substTy subst fun_ty, acc)
 
                go subst (ForAllTy (Bndr tv _vis) body_ty) acc (arg:args)
                  = do { arg' <- lint_forall_arg arg
@@ -2139,6 +2141,15 @@ lint_app2 msg lint_forall_arg lint_arrow_arg !orig_fun_ty acc all_args
                             (hang (text "Forall:" <+> (ppr tv $$ ppr tv_kind))
                                 2 (ppr arg' <+> dcolon <+> ppr karg'))
                       ; go subst' body_ty acc args }
+
+               go subst fun_ty@(FunTy _ mult exp_arg_ty res_ty) acc (arg:args)
+                 = do { (arg_ty, acc') <- lint_arrow_arg arg (substTy subst mult) acc
+                      ; ensureEqTys (substTy subst exp_arg_ty) arg_ty $
+                        lint_app_fail_msg msg orig_fun_ty all_args
+                            (hang (text "Fun:" <+> ppr fun_ty)
+                                2 (vcat [ text "exp_arg_ty:" <+> ppr exp_arg_ty
+                                        , text "arg:" <+> ppr arg <+> dcolon <+> ppr arg_ty ]))
+                      ; go subst res_ty acc' args }
 
                go subst fun_ty acc args
                  | Just fun_ty' <- coreView fun_ty
@@ -2368,8 +2379,7 @@ lintCoercion co@(AppCo co1 co2)
 
 ----------
 lintCoercion co@(ForAllCo {})
--- See Note [ForAllCo] in GHC.Core.TyCo.Rep,
--- including the typing rule for ForAllCo
+-- See Note [ForAllCo] in GHC.Core.TyCo.Rep for the typing rule for ForAllCo
   = do { _ <- go [] co; return () }
   where
     go :: [OutTyCoVar]   -- Binders in reverse order
@@ -2405,15 +2415,17 @@ lintCoercion co@(ForAllCo {})
            ; return role } }
 
     go tcvs body_co
-      = -- Assuming kind_co :: k1 ~ k2
-        -- Need to check that
-        --    (forall (tcv:k1). lty) and
-        --    (forall (tcv:k2). rty[(tcv:k2) |> sym kind_co/tcv])
-        -- are both well formed.  Easiest way is to call lintForAllBody
-        -- for each; there is actually no need to do the funky substitution
-        do { let Pair lty rty = coercionKind body_co
+      = do { lintCoercion body_co
+
+           -- Need to check that
+           --    (forall (tcv:k1). lty) and
+           --    (forall (tcv:k2). rty[(tcv:k2) |> sym kind_co/tcv])
+           -- are both well formed, including the skolem escape check.
+           -- Easiest way is to call lintForAllBody for each
+           ; let Pair lty rty = coercionKind body_co
            ; lintForAllBody tcvs lty
            ; lintForAllBody tcvs rty
+
            ; return (coercionRole body_co) }
 
 
@@ -2917,15 +2929,20 @@ data LintEnv
   = LE { le_flags :: LintFlags       -- Linting the result of this pass
        , le_loc   :: [LintLocInfo]   -- Locations
 
-       , le_subst   :: Subst  -- Current freshening substitution
-                              -- for TyCoVars only.  Non-CoVar Ids don't
-                              -- appear in here, not even in the InScopeSet
+       , le_subst :: Subst
+                  -- Current substitution, for TyCoVars only.
+                  -- Non-CoVar Ids don't appear in here, not even in the InScopeSet
+                  -- Used for (a) cloning to avoid shadowing of TyCoVars,
+                  --              so that eqType works ok
+                  --          (b) substituting for let-bound tyvars, when we have
+                  --              (let @a = Int -> Int in ...)
 
        , le_in_vars :: VarEnv (InVar, OutType)
-                    -- Domain is InVar; all in-scope variables are here
                     -- Maps an InVar (i.e. its unique) to its binding InVar
-                    --  and to its OutType
-
+                    --    and to its OutType
+                    -- /All/ in-scope variables are here (term variables,
+                    --    type variables, and coercion variables)
+                    -- Used at an occurrence of the InVar
 
        , le_joins :: IdSet     -- Join points in scope that are valid
                                -- A subset of the InScopeSet in le_subst
@@ -3380,6 +3397,7 @@ inCasePat = LintM $ \ env errs -> fromBoxedLResult (Just (is_case_pat env), errs
     is_case_pat _other                           = False
 
 addInScopeId :: InId -> OutType -> (OutId -> LintM a) -> LintM a
+-- Unlike addInScopeTyCoVar, this function does no cloning; Ids never get cloned
 addInScopeId in_id out_ty thing_inside
   = LintM $ \ env errs ->
     let !(out_id, env') = add env
@@ -3409,6 +3427,7 @@ addInScopeId in_id out_ty thing_inside
           | otherwise       = delVarSet    join_set in_id -- Remove any existing binding
 
 addInScopeTyCoVar :: InTyCoVar -> OutType -> (OutTyCoVar -> LintM a) -> LintM a
+-- This function clones to avoid shadowing of TyCoVars
 addInScopeTyCoVar tcv tcv_type thing_inside
   = LintM $ \ env@(LE { le_in_vars = in_vars, le_subst = subst }) errs ->
     let (tcv', subst') = subst_bndr subst
@@ -3418,7 +3437,7 @@ addInScopeTyCoVar tcv tcv_type thing_inside
   where
     subst_bndr subst
       | isEmptyTCvSubst subst                -- No change in kind
-      , not (tcv `elemInScopeSet` in_scope)  -- No change in unique
+      , not (tcv `elemInScopeSet` in_scope)  -- Not already in scope
       = -- Do not extend the substitution, just the in-scope set
         (if (varType tcv `eqType` tcv_type) then (\x->x) else
           pprTrace "addInScopeTyCoVar" (
@@ -3426,6 +3445,7 @@ addInScopeTyCoVar tcv tcv_type thing_inside
                  , text "tcv_type" <+> ppr tcv_type ])) $
         (tcv, subst `extendSubstInScope` tcv)
 
+      -- Clone, and extend the substitution
       | let tcv' = uniqAway in_scope (setVarType tcv tcv_type)
       = (tcv', extendTCvSubstWithClone subst tcv tcv')
       where
@@ -3455,10 +3475,9 @@ getSubst = LintM (\ env errs -> fromBoxedLResult (Just (le_subst env), errs))
 
 substTyM :: InType -> LintM OutType
 -- Apply the substitution to the type
--- The substitution is usually empty, so this is usually a no-op
+-- The substitution is often empty, in which case it is a no-op
 substTyM ty
   = do { subst <- getSubst
---       ; checkWarnL (isEmptyTCvSubst subst) (ppr subst)
        ; return (substTy subst ty) }
 
 getUEAliases :: LintM (NameEnv UsageEnv)
@@ -3468,16 +3487,18 @@ getInScope :: LintM InScopeSet
 getInScope = LintM (\ env errs -> fromBoxedLResult (Just (substInScopeSet $ le_subst env), errs))
 
 lintVarOcc :: InVar -> LintM OutType
+-- Used at an occurrence of a variable: term variables, type variables, and coercion variables
 -- Checks two things:
 -- a) that it is in scope
--- b) that the type at the ocurrences matches the type at the binding site
+-- b) that the InType at the ocurrences matches the InType at the binding site
 lintVarOcc v_occ
   = do { in_var_env <- getInVarEnv
        ; case lookupVarEnv in_var_env v_occ of
            Nothing | isGlobalId v_occ -> return (idType v_occ)
-                   | otherwise        -> failWithL (text pp_what <+> quotes (ppr v_occ) <+> text "is out of scope")
+                   | otherwise        -> failWithL (text pp_what <+> quotes (ppr v_occ)
+                                                    <+> text "is out of scope")
            Just (v_bndr, out_ty) -> do { check_bad_global v_bndr
-                                       ; ensureEqTys occ_ty bndr_ty $
+                                       ; ensureEqTys occ_ty bndr_ty $  -- Compares InTypes
                                          mkBndrOccTypeMismatchMsg v_occ bndr_ty occ_ty
                                        ; return out_ty }
              where
