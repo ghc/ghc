@@ -2,7 +2,6 @@ HADRIAN_SETTINGS_STAGE0 := $(shell ghc --info | runghc GenSettings.hs ghc-boot)
 HADRIAN_SETTINGS_STAGE1 := $(shell ghc --info | runghc GenSettings.hs ghc-boot)
 SETTINGS_STAGE1 := $(shell ghc --info | runghc GenSettings.hs stage1)
 
-
 # CABAL := /home/hsyl20/repo/cabal/dist-newstyle/build/x86_64-linux/ghc-9.8.2/cabal-install-3.15.0.0/x/cabal/build/cabal/cabal
 CABAL := cabal
 
@@ -126,10 +125,21 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	
 	sed -i 's/@LlvmMinVersion@/13/' _build/stage1/src/libraries/ghc/GHC/CmmToLlvm/Version/Bounds.hs
 	sed -i 's/@LlvmMaxVersion@/20/' _build/stage1/src/libraries/ghc/GHC/CmmToLlvm/Version/Bounds.hs
+
+	# Generating headers
+	# FIXME: deriveConstants requires ghcautoconf.h and ghcplatform.h
+	mkdir -p _build/stage1/temp/derive_constants
+	_build/stage0/bin/deriveConstants --gen-header -o _build/stage1/src/libraries/rts/include/DerivedConstants.h \
+		--target-os linux \
+		--tmpdir _build/stage1/temp/derive_constants \
+		--gcc-program gcc \
+		--nm-program nm \
+		--objdump-program objdump \
+		--gcc-flag "-I_build/stage1/src/libraries/rts/include"
 	
 	# Building boot libraries
 	mkdir -p _build/stage1/cabal/
-	
+
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE1)' \
 	  $(CABAL) build --project-file=cabal.project-stage1 \
 	  rts \

@@ -399,7 +399,7 @@ library
       if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64) || arch(loongarch64)
         asm-sources: StgCRunAsm.S
 
-      c-sources: Adjustor.c (-O3)
+      c-sources: Adjustor.c
                  adjustor/AdjustorPool.c
                  ExecPage.c
                  Arena.c
