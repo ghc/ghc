@@ -2357,7 +2357,6 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnIncompleteExportWarnings -> warnSpec x
   Opt_WarnIncompleteRecordSelectors -> warnSpec x
   Opt_WarnDataKindsTC -> warnSpec x
-  Opt_WarnDeprecatedTypeAbstractions -> warnSpec x
   Opt_WarnDefaultedExceptionContext -> warnSpec x
   Opt_WarnViewPatternSignatures -> warnSpec x
 

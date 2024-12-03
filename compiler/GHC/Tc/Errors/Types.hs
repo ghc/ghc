@@ -3219,15 +3219,6 @@ data TcRnMessage where
     -> !(LHsTyVarBndr (HsBndrVis GhcRn) GhcRn)
     -> TcRnMessage
 
-  {-| TcRnDeprecatedInvisTyArgInConPat is a warning that triggers on type applications
-      in constructor patterns when the user has not enabled '-XTypeAbstractions'
-      but instead has enabled both '-XScopedTypeVariables' and '-XTypeApplications'.
-
-      This warning is a deprecation mechanism that is scheduled until GHC 9.12.
-  -}
-  TcRnDeprecatedInvisTyArgInConPat
-    :: TcRnMessage
-
   {-| TcRnUnexpectedStandaloneDerivingDecl is an error thrown when a user uses
       standalone deriving without enabling the StandaloneDeriving extension.
 

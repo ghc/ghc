@@ -1,48 +1,48 @@
-
-T22478b.hs:14:14: error: [GHC-10498]
+T22478b.hs:16:14: error: [GHC-10498]
     • Conflicting definitions for ‘k’
-      Bound at: T22478b.hs:14:14-32
-                T22478b.hs:14:31
+      Bound at: T22478b.hs:16:14-32
+                T22478b.hs:16:31
     • In an equation for ‘fOutOfOrder’
 
-T22478b.hs:16:10: error: [GHC-18932]
+T22478b.hs:18:10: error: [GHC-18932]
     • Unexpected strictness annotation: Int
       strictness annotation cannot appear nested inside a type
     • In a type argument in a pattern
 
-T22478b.hs:19:54: error: [GHC-76037]
+T22478b.hs:21:54: error: [GHC-76037]
     Not in scope: type variable ‘a’
 
-T22478b.hs:21:12: error: [GHC-89246]
+T22478b.hs:23:12: error: [GHC-89246]
     • Record syntax is illegal here: {fld :: Int}
     • In a type argument in a pattern
 
-T22478b.hs:23:21: error: [GHC-10498]
+T22478b.hs:25:21: error: [GHC-10498]
     • Conflicting definitions for ‘a’
-      Bound at: T22478b.hs:23:21
-                T22478b.hs:23:23
+      Bound at: T22478b.hs:25:21
+                T22478b.hs:25:23
     • In an equation for ‘fConflict1’
 
-T22478b.hs:24:13: error: [GHC-10498]
+T22478b.hs:26:13: error: [GHC-10498]
     • Conflicting definitions for ‘a’
-      Bound at: T22478b.hs:24:13-18
-                T22478b.hs:24:27
+      Bound at: T22478b.hs:26:13-18
+                T22478b.hs:26:27
     • In an equation for ‘fConflict2’
 
-T22478b.hs:25:18: error: [GHC-10498]
+T22478b.hs:27:18: error: [GHC-10498]
     • Conflicting definitions for ‘a’
-      Bound at: T22478b.hs:25:18
-                T22478b.hs:25:27
+      Bound at: T22478b.hs:27:18
+                T22478b.hs:27:27
     • In an equation for ‘fConflict3’
 
-T22478b.hs:26:18: error: [GHC-10498]
+T22478b.hs:28:18: error: [GHC-10498]
     • Conflicting definitions for ‘a’
-      Bound at: T22478b.hs:26:18
-                T22478b.hs:26:21
+      Bound at: T22478b.hs:28:18
+                T22478b.hs:28:21
     • In an equation for ‘fConflict4’
 
-T22478b.hs:27:18: error: [GHC-10498]
+T22478b.hs:29:18: error: [GHC-10498]
     • Conflicting definitions for ‘_a’
-      Bound at: T22478b.hs:27:18-19
-                T22478b.hs:27:22-23
+      Bound at: T22478b.hs:29:18-19
+                T22478b.hs:29:22-23
     • In an equation for ‘fConflict5’
+

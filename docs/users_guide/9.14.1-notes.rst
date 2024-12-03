@@ -20,6 +20,11 @@ Language
   as serious as a warning about missing patterns from a function definition, perhaps even
   more so, since it is invisible in the source program.
 
+* The combination of :extension:`ScopedTypeVariables` and :extension:`TypeApplications`
+  no longer enables type applications in patterns, which now always requires
+  :extension:`TypeAbstractions`. The warning flag``deprecated-type-abstractions``
+  has also been removed from the compiler.
+
 Compiler
 ~~~~~~~~
 

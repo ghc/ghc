@@ -1,4 +1,5 @@
 {-# LANGUAGE OrPatterns #-}
+{-# LANGUAGE TypeAbstractions #-}
 
 module Or3 where
 

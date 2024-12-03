@@ -1,19 +1,19 @@
-
-T22478c.hs:11:36: error: [GHC-25897]
+T22478c.hs:13:36: error: [GHC-25897]
     • Couldn't match type ‘b’ with ‘a’
       Expected: T a
         Actual: T b
       ‘b’ is a rigid type variable bound by
         the type signature for:
           fShadowing :: forall a b. T a -> T b -> T a
-        at T22478c.hs:10:1-31
+        at T22478c.hs:12:1-31
       ‘a’ is a rigid type variable bound by
         the type signature for:
           fShadowing :: forall a b. T a -> T b -> T a
-        at T22478c.hs:10:1-31
+        at T22478c.hs:12:1-31
     • In the expression: MkT @a
       In the expression: \ (MkT @a) -> MkT @a
       In an equation for ‘fShadowing’:
           fShadowing (MkT @a) = \ (MkT @a) -> MkT @a
     • Relevant bindings include
-        fShadowing :: T a -> T b -> T a (bound at T22478c.hs:11:1)
+        fShadowing :: T a -> T b -> T a (bound at T22478c.hs:13:1)
+

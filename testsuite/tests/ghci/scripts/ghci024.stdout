@@ -17,7 +17,6 @@ other dynamic, non-language, flag settings:
   -fbreak-points
 warning settings:
   -Wimplicit-rhs-quantification
-  -Wdeprecated-type-abstractions
 ~~~~~~~~~~ Testing :set -a
 options currently set: none.
 base language is: GHC2021

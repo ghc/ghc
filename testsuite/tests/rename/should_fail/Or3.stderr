@@ -1,9 +1,9 @@
-
-Or3.hs:6:4: error: [GHC-81303]
+Or3.hs:7:4: error: [GHC-81303]
     An or-pattern may not bind term or type variables such as ‘a’ or ‘b’
 
-Or3.hs:9:8: error: [GHC-81303]
+Or3.hs:10:8: error: [GHC-81303]
     An or-pattern may not bind term or type variables such as ‘x’
 
-Or3.hs:12:4: error: [GHC-81303]
+Or3.hs:13:4: error: [GHC-81303]
     An or-pattern may not bind term or type variables such as ‘y’
+

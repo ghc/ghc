@@ -170,7 +170,6 @@ as ``-Wno-...`` for every individual warning in the group.
         :columns: 3
 
         * :ghc-flag:`-Wimplicit-rhs-quantification`
-        * :ghc-flag:`-Wdeprecated-type-abstractions`
 
 .. ghc-flag:: -w
     :shortdesc: disable all warnings
@@ -2472,37 +2471,6 @@ of ``-W(no-)*``.
       type T1 :: forall a . Maybe a
       type T1    = 'Nothing :: Maybe a      -- old
       type T1 @a = 'Nothing :: Maybe a      -- new
-
-    This warning detects code that will be affected by this breaking change.
-
-.. ghc-flag:: -Wdeprecated-type-abstractions
-    :shortdesc: warn when type abstractions in constructor patterns are used without enabling :extension:`TypeApplications`
-    :type: dynamic
-    :reverse: -Wno-deprecated-type-abstractions
-    :category:
-
-    :since: 9.10.1
-    :default: off
-
-    Type abstractions in constructor patterns allow binding existential type variables: ::
-
-      import Type.Reflection (Typeable, typeRep)
-      data Ex = forall e. (Typeable e, Show e) => MkEx e
-      showEx (MkEx @e a) = show a ++ " :: " ++ show (typeRep @e)
-
-    Note the pattern ``MkEx @e a``, and specifically the ``@e`` binder.
-
-    Support for this feature was added to GHC in version 9.2, but instead of getting
-    its own language extension the feature was enabled by a combination of
-    :extension:`TypeApplications` and :extension:`ScopedTypeVariables`.
-    As per `GHC Proposal #448
-    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0448-type-variable-scoping.rst>`__
-    and its amendment `#604 <https://github.com/ghc-proposals/ghc-proposals/pull/604>`__
-    we are now transitioning towards guarding this feature behind :extension:`TypeAbstractions` instead.
-
-    As a compatibility measure, GHC continues to support old programs that use type abstractions
-    in constructor patterns without enabling the appropriate extension :extension:`TypeAbstractions`,
-    but it will stop doing so in a future release.
 
     This warning detects code that will be affected by this breaking change.
 
