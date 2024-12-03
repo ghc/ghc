@@ -118,3 +118,9 @@
 [submodule "libraries/file-io"]
 	path = libraries/file-io
 	url = https://gitlab.haskell.org/ghc/packages/file-io.git
+[submodule "libraries/template-haskell-lift"]
+	path = libraries/template-haskell-lift
+	url = https://gitlab.haskell.org/ghc/template-haskell-lift.git
+[submodule "libraries/template-haskell-quasiquoter"]
+	path = libraries/template-haskell-quasiquoter
+	url = https://gitlab.haskell.org/ghc/template-haskell-quasiquoter.git
