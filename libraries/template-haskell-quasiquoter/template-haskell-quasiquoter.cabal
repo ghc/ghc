@@ -18,6 +18,10 @@ common warnings
 library
     import:           warnings
     exposed-modules:  TemplateHaskell.Quasiquoter
-    build-depends:    base, ghc-internal
+    build-depends:    base
+    if impl(ghc>=9.12)
+      build-depends: ghc-internal
+    else
+      build-depends: template-haskell
     hs-source-dirs:   src
     default-language: GHC2021
