@@ -35,7 +35,7 @@ module GHC.StgToCmm.Monad (
 
         mkCall, mkCmmCall,
 
-        forkClosureBody, forkLneBody, forkAlts, forkAltPair, codeOnly,
+        forkClosureBody, forkLneBody, forkAlts, forkAltPair, forkAltsWith, codeOnly,
 
         ConTagZ,
 
@@ -359,6 +359,7 @@ initCgState uniqs
 stateIncUsage :: CgState -> CgState -> CgState
 -- stateIncUsage@ e1 e2 incorporates in e1
 -- the heap high water mark found in e2.
+-- Also keeps code from both
 stateIncUsage s1 s2@(MkCgState { cgs_hp_usg = hp_usg })
      = s1 { cgs_hp_usg  = cgs_hp_usg  s1 `maxHpHw`  virtHp hp_usg }
        `addCodeBlocksFrom` s2
@@ -630,7 +631,8 @@ forkAlts branch_fcodes
         ; us    <- newUniqSupply
         ; state <- getState
         ; fstate <- getFCodeState
-        ; let compile us branch
+        ; let compile :: UniqSupply -> FCode a3 -> (UniqSupply, (a3, CgState))
+              compile us branch
                 = (us2, doFCode branch cfg fstate branch_state)
                 where
                   (us1,us2) = splitUniqSupply us
@@ -642,6 +644,31 @@ forkAlts branch_fcodes
         ; setState $ foldl' stateIncUsage state branch_out_states
                 -- NB foldl.  state is the *left* argument to stateIncUsage
         ; return branch_results }
+
+forkAltsWith :: [FCode a] -> [FCode b] -> FCode ([a],[b])
+-- Behaves like forAltPair, but allows differing return types for the actions
+forkAltsWith branch_fcodes additions
+  = do  { cfg   <- getStgToCmmConfig
+        ; us    <- newUniqSupply
+        ; state <- getState
+        ; fstate <- getFCodeState
+        ; let compile :: UniqSupply -> FCode a3 -> (UniqSupply, (a3, CgState))
+              compile us branch
+                = (us2, doFCode branch cfg fstate branch_state)
+                where
+                  (us1,us2) = splitUniqSupply us
+                  branch_state = (initCgState us1) {
+                                        cgs_binds  = cgs_binds state
+                                      , cgs_hp_usg = cgs_hp_usg state }
+              (us1, results) = mapAccumL compile us branch_fcodes
+              (_us2, results2) = mapAccumL compile us1 additions
+
+
+              (branch_results, branch_out_states) = unzip results
+              (branch_results2, branch_out_states2) = unzip results2
+        ; setState $ foldl' stateIncUsage state (branch_out_states ++ branch_out_states2)
+                -- NB foldl.  state is the *left* argument to stateIncUsage
+        ; return (branch_results,branch_results2) }
 
 forkAltPair :: FCode a -> FCode a -> FCode (a,a)
 -- Most common use of 'forkAlts'; having this helper function avoids

@@ -59,7 +59,8 @@ import Control.Arrow ( first )
 import Data.List     ( partition )
 import GHC.Stg.InferTags.TagSig (isTaggedSig)
 import GHC.Platform.Profile (profileIsProfiling)
-import GHC.Builtin.Types (justDataConName, maybeTyCon, justDataCon)
+import GHC.Builtin.Types (justDataConName, maybeTyCon, justDataCon, nothingDataCon)
+import GHC.Data.OrdList
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -746,10 +747,13 @@ cgAlts gc_plan bndr (PrimAlt _) alts
 --   , ty_con == maybeTyCon
 --   , pprTrace "Found match on maybe type" (ppr scrut) True
 --                    = False
+
 cgAlts gc_plan bndr (AlgAlt tycon) alts
   = do  { platform <- getPlatform
 
         ; (mb_deflt, branches) <- cgAlgAltRhss gc_plan bndr alts
+
+        ; pprTraceM "tags" $ ppr (map fst branches)
 
         ; let !fam_sz   = tyConFamilySize tycon
               !bndr_reg = CmmLocal (idToReg platform bndr)
@@ -1002,47 +1006,75 @@ cgAlgAltRhss gc_plan bndr alts
 cgAlgAltRhss' :: (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
           -> FCode [(Maybe ConTagZ, CmmAGraphScoped)]
 cgAlgAltRhss' gc_plan bndr alts
+  -- We got a match on just in there so we do fancy stuff.
+  | any (\alt -> alt_con alt == DataAlt justDataCon) alts
+  , [GenStgAlt{alt_con=(DataAlt nothing_con), alt_bndrs=[], alt_rhs=nothing_rhs}
+    , GenStgAlt{alt_con=(DataAlt just_con), alt_bndrs=[just_bndr], alt_rhs=just_rhs}
+    ] <- alts
   = do
-    let (just_alts,other_alts) = partition (\alt -> alt_con alt == DataAlt justDataCon) alts
+    pprTraceM "cgSpecialAlts" empty
+    massert (nothing_con == nothingDataCon && just_con == justDataCon)
     platform <- getPlatform
     just_rhs_lbl <- newBlockId
+    let
+      mb_tag (con) = Just $ dataConTagZ con
+      base_reg = idToReg platform bndr
+
+      cg_just_rhs :: FCode ()
+      cg_just_rhs = do
+        (_, rhs) <- getCodeScoped $ do
+            emitCommentAlways $ fsLit "shared rhs just"
+            (bindArgToReg (NonVoid just_bndr) >> cgExpr just_rhs)
+        emitOutOfLine just_rhs_lbl rhs
+
+      -- fake_just_code :: FCode (Maybe ConTagZ, CmmAGraphScoped)
+      -- fake_just_code =
+      --     getCodeScoped             $
+      --     maybeAltHeapCheck gc_plan $
+      --           do { _ <- bindFakeConArg base_reg (NonVoid just_bndr)
+      --                       -- alt binders are always non-void,
+      --                       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
+      --             ; emitCommentAlways $ fsLit "fake just - goto:rhs"
+      --             ; emit $ mkBranch just_rhs_lbl
+
+      --             ; return $ ((+1) <$> mb_tag just_con) }
+
+      boxed_just_code :: FCode (Maybe ConTagZ, CmmAGraphScoped)
+      boxed_just_code =
+          getCodeScoped             $
+          maybeAltHeapCheck gc_plan $
+                do { _ <- bindConArgs (DataAlt justDataCon) base_reg (assertNonVoidIds [just_bndr])
+                            -- alt binders are always non-void,
+                            -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
+                  ; emitCommentAlways $ fsLit "regular just - goto:rhs"
+                  ; emit $ mkBranch just_rhs_lbl
+                  -- ; _ <- cgExpr just_rhs
+
+                  ; return $ mb_tag just_con }
+
+      nothing_alt_code :: FCode (Maybe ConTagZ, CmmAGraphScoped)
+      nothing_alt_code =
+          getCodeScoped             $
+          maybeAltHeapCheck gc_plan $
+                do {
+                            -- alt binders are always non-void,
+                            -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
+                  ; emitCommentAlways $ fsLit "regular nothing"
+                  ; _ <- cgExpr nothing_rhs
+                  ; return $ mb_tag nothing_con }
+
+    -- (_,base_alts) <- forkAltsWith [cg_just_rhs] [boxed_just_code, nothing_alt_code, fake_just_code]
+    (_,base_alts) <- forkAltsWith [cg_just_rhs] [boxed_just_code, nothing_alt_code]
+    return $ base_alts
+
+cgAlgAltRhss' gc_plan bndr alts
+  = do
+    platform <- getPlatform
+    massert (not $ any (\alt -> alt_con alt == DataAlt justDataCon) alts)
     let
       mb_tag (DataAlt con) = Just $ dataConTagZ con
       mb_tag _ = Nothing
       base_reg = idToReg platform bndr
-
-      cg_maybe_alts :: [CgStgAlt] -> FCode [(Maybe ConTagZ, CmmAGraphScoped)]
-      cg_maybe_alts [] = pure []
-      cg_maybe_alts [GenStgAlt{alt_con=just_con, alt_bndrs=[just_bndr], alt_rhs=just_rhs}] = do
-        massert (just_con == DataAlt justDataCon)
-        -- fake_just <-
-        --     getCodeScoped             $
-        --     maybeAltHeapCheck gc_plan $
-        --     do { _ <- bindFakeConArg base_reg (NonVoid just_bndr)
-        --                 -- alt binders are always non-void,
-        --                 -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
-        --       ; emitLabel just_rhs_lbl
-        --       ; emitCommentAlways $ fsLit "fake just - rhs"
-        --       ; _ <- cgExpr just_rhs
-        --       ; return $ Just 2 }
-        actual_just <-
-            getCodeScoped             $
-            maybeAltHeapCheck gc_plan $
-              do { _ <- bindConArgs just_con base_reg (assertNonVoidIds [just_bndr])
-                          -- alt binders are always non-void,
-                          -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
-                ; emitCommentAlways $ fsLit "regular just - goto:rhs"
-                -- ; emit $ mkBranch just_rhs_lbl
-                ; _ <- cgExpr just_rhs
-
-
-                ; return $ mb_tag just_con }
-        pure [
-            -- fake_just,
-             actual_just]
-
-      cg_maybe_alts _ = panic "Found more than one Just alt ?!"
-
       cg_alt :: CgStgAlt -> FCode (Maybe ConTagZ, CmmAGraphScoped)
       cg_alt GenStgAlt{alt_con=con, alt_bndrs=bndrs, alt_rhs=rhs}
         = getCodeScoped             $
@@ -1053,9 +1085,8 @@ cgAlgAltRhss' gc_plan bndr alts
             ; _ <- cgExpr rhs
             ; return $ mb_tag con }
 
-    base_alts <- forkAlts $ (map cg_alt other_alts)
-    just_alts <- cg_maybe_alts just_alts
-    return $ base_alts ++ just_alts
+    (base_alts) <- forkAlts $ map cg_alt alts
+    return $ base_alts
 
 -------------------
 -- Handles primitive alternatives

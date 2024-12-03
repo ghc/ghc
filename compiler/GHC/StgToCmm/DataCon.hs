@@ -447,6 +447,7 @@ bindConArgs (DataAlt con) base args
 bindConArgs _other_con _base args
   = assert (null args ) return []
 
+-- reg the base ptr is stored in, id = field
 bindFakeConArg :: LocalReg -> NonVoid Id -> FCode (Maybe LocalReg)
 bindFakeConArg base arg
   | NonVoid b <- arg

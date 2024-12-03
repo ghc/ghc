@@ -180,7 +180,8 @@ cgLookupPanic id
 ------------------------------------------------------------------------
 
 bindToReg :: NonVoid Id -> LambdaFormInfo -> FCode LocalReg
--- Bind an Id to a fresh LocalReg
+-- Bind an Id to a (maybe) fresh LocalReg.
+-- Typically we just make a variable based on the unique of the id
 bindToReg nvid@(NonVoid id) lf_info
   = do platform <- getPlatform
        let reg = idToReg platform nvid
