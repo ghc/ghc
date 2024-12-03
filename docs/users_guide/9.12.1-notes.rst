@@ -131,6 +131,15 @@ Compiler
   specialization rules was added. It was actually added ghc-9.10.1 already but
   mistakenly not mentioned in the 9.10.1 changelog.
 
+- A new flag :ghc-flag:`-fmax-forced-spec-args=⟨n⟩` has been added. When a function
+  with a SPEC argument is specialized GHC now checks the number of arguments the
+  resulting function takes.
+  If the specialized version takes less than `max-forced-spec-args` arguments it is
+  specialized. Otherwise GHC will not specialize the function and emit a warning.
+
+  This avoids edge cases where a SPEC keyword could result in functions being
+  specialized to large static data resulting in functions with thousands of arguments.
+
 - Fixed a bug that caused GHC to panic when using the aarch64 ncg and -fregs-graph
   on certain programs. (#24941)
 
