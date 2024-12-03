@@ -9,7 +9,7 @@ module Packages (
     ghcToolchain, ghcToolchainBin, haddockApi, haddockLibrary, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, mtl, osString, parsec, pretty, primitive, process, remoteIserv, rts,
-    runGhc, semaphoreCompat, stm, templateHaskell, terminfo, text, time, timeout,
+    runGhc, semaphoreCompat, stm, templateHaskell, thLift, thQuasiquoter, terminfo, text, time, timeout,
     transformers, unlit, unix, win32, xhtml,
     lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
     ghcPackages, isGhcPackage,
@@ -39,7 +39,7 @@ ghcPackages =
     , ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim
     , ghcToolchain, ghcToolchainBin, haddockApi, haddockLibrary, haddock, haskeline, hsc2hs
     , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, mtl, osString
-    , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell
+    , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell, thLift, thQuasiquoter
     , terminfo, text, time, transformers, unlit, unix, win32, xhtml, fileio
     , timeout
     , lintersCommon
@@ -56,7 +56,7 @@ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, count
   ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghci, ghcInternal, ghciWrapper, ghcPkg, ghcPrim,
   ghcToolchain, ghcToolchainBin, haddockLibrary, haddockApi, haddock, haskeline, hsc2hs,
   hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy, remoteIserv, libffi, mtl,
-  osString, parsec, pretty, primitive, process, rts, runGhc, semaphoreCompat, stm, templateHaskell,
+  osString, parsec, pretty, primitive, process, rts, runGhc, semaphoreCompat, stm, templateHaskell, thLift, thQuasiquoter,
   terminfo, text, time, transformers, unlit, unix, win32, xhtml,
   timeout,
   lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace
@@ -125,6 +125,8 @@ runGhc              = util "runghc"
 semaphoreCompat     = lib  "semaphore-compat"
 stm                 = lib  "stm"
 templateHaskell     = lib  "template-haskell"
+thLift              = lib  "template-haskell-lift"
+thQuasiquoter       = lib  "template-haskell-quasiquoter"
 terminfo            = lib  "terminfo"
 text                = lib  "text"
 time                = lib  "time"

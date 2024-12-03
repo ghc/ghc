@@ -54,6 +54,8 @@ Library
     build-depends:
         base        >= 4.11 && < 4.22,
         ghc-boot-th == @ProjectVersionMunged@
+        -- template-haskell-lift
+        -- template-haskell-quote
 
     other-modules:
       System.FilePath

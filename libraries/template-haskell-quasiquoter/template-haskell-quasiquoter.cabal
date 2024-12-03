@@ -1,0 +1,23 @@
+cabal-version:      3.0
+name:               template-haskell-quasiquoter
+version:            0.1.0.0
+-- synopsis:
+-- description:
+license:            BSD-2-Clause
+license-file:       LICENSE
+author:             Teo Camarasu
+maintainer:         teofilcamarasu@gmail.com
+-- copyright:
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+-- extra-source-files:
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           warnings
+    exposed-modules:  TemplateHaskell.Quasiquoter
+    build-depends:    base, ghc-internal
+    hs-source-dirs:   src
+    default-language: GHC2021
