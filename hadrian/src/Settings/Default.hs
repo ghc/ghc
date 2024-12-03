@@ -107,6 +107,7 @@ stage0Packages = do
              , runGhc
              , semaphoreCompat -- depends on
              , time -- depends on win32
+             , thLift -- new library not yet present for boot compilers
              , unlit
              , if windowsHost then win32 else unix
              -- We must use the in-tree `Win32` as the version
@@ -168,6 +169,7 @@ stage1Packages = do
         , semaphoreCompat
         , stm
         , templateHaskell
+        , thQuasiquoter
         , text
         , transformers
         , unlit
