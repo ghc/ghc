@@ -3,6 +3,9 @@ HADRIAN_SETTINGS_STAGE1 := $(shell ghc --info | runghc GenSettings.hs ghc-boot)
 SETTINGS_STAGE1 := $(shell ghc --info | runghc GenSettings.hs stage1)
 
 
+# CABAL := /home/hsyl20/repo/cabal/dist-newstyle/build/x86_64-linux/ghc-9.8.2/cabal-install-3.15.0.0/x/cabal/build/cabal/cabal
+CABAL := cabal
+
 all: _build/stage1/bin/ghc
 
 _build/stage0/bin/ghc:
@@ -51,15 +54,15 @@ _build/stage0/bin/ghc:
 	mkdir -p _build/stage0/bin/
 	
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE0)' \
-	  cabal build --project-file=cabal.project-stage0 \
+	  $(CABAL) build --project-file=cabal.project-stage0 \
 	  ghc-bin:ghc ghc-pkg:ghc-pkg genprimopcode:genprimopcode deriveConstants:deriveConstants \
 	  -j --builddir=_build/stage0/cabal/
 	
 	# Installing binaries
-	cp `cabal list-bin --project-file=cabal.project-stage0 --builddir=_build/stage0/cabal/ ghc-bin:ghc` _build/stage0/bin/ghc
-	cp `cabal list-bin --project-file=cabal.project-stage0 --builddir=_build/stage0/cabal/ ghc-pkg:ghc-pkg` _build/stage0/bin/ghc-pkg
-	cp `cabal list-bin --project-file=cabal.project-stage0 --builddir=_build/stage0/cabal/ deriveConstants:deriveConstants` _build/stage0/bin/deriveConstants
-	cp `cabal list-bin --project-file=cabal.project-stage0 --builddir=_build/stage0/cabal/ genprimopcode:genprimopcode` _build/stage0/bin/genprimopcode
+	cp `$(CABAL) list-bin --project-file=cabal.project-stage0 --builddir=_build/stage0/cabal/ ghc-bin:ghc` _build/stage0/bin/ghc
+	cp `$(CABAL) list-bin --project-file=cabal.project-stage0 --builddir=_build/stage0/cabal/ ghc-pkg:ghc-pkg` _build/stage0/bin/ghc-pkg
+	cp `$(CABAL) list-bin --project-file=cabal.project-stage0 --builddir=_build/stage0/cabal/ deriveConstants:deriveConstants` _build/stage0/bin/deriveConstants
+	cp `$(CABAL) list-bin --project-file=cabal.project-stage0 --builddir=_build/stage0/cabal/ genprimopcode:genprimopcode` _build/stage0/bin/genprimopcode
 	
 	# Generate settings
 	mkdir -p _build/stage0/lib
@@ -72,6 +75,7 @@ _build/stage0/bin/ghc:
 _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	rm -rf _build/stage1
 	mkdir -p _build/stage1
+	$(CABAL) --version
 	
 	# Initialize empty package db
 	_build/stage0/bin/ghc-pkg init _build/stage1/pkgs
@@ -127,7 +131,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	mkdir -p _build/stage1/cabal/
 	
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE1)' \
-	  cabal build --project-file=cabal.project-stage1 \
+	  $(CABAL) build --project-file=cabal.project-stage1 \
 	  rts \
 	  --with-compiler=`pwd`/_build/stage0/bin/ghc \
 	  --with-hc-pkg=`pwd`/_build/stage0/bin/ghc-pkg \
@@ -150,7 +154,8 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	  --ghc-options='"-optc=-DTargetVendor=\"FIXME\""' \
 	  --ghc-options='"-optc=-DGhcUnregisterised=\"FIXME\""' \
 	  --ghc-options='"-optc=-DTablesNextToCode=\"FIXME\""' \
-	  --builddir=_build/stage1/cabal/
+	  --ghc-options='-v3' \
+	  --builddir=_build/stage1/cabal/ -v3
 
 clean:
 	rm -rf _build

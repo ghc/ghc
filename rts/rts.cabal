@@ -1,4 +1,4 @@
-cabal-version: 3.0
+cabal-version: 3.4
 name: rts
 version: 1.0.3
 synopsis: The GHC runtime system
@@ -399,7 +399,7 @@ library
       if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64) || arch(loongarch64)
         asm-sources: StgCRunAsm.S
 
-      c-sources: Adjustor.c
+      c-sources: Adjustor.c (-O3)
                  adjustor/AdjustorPool.c
                  ExecPage.c
                  Arena.c
