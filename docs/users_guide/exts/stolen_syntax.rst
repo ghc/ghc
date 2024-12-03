@@ -28,8 +28,8 @@ The following syntax is stolen:
        single: forall
 
     Stolen (in types) by default (see :ref:`infelicities-lexical`). ``forall`` is
-    a reserved keyword and never a type variable, in accordance with `GHC Proposal #43
-    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0043-forall-keyword.rst>`__.
+    a reserved keyword and never a type variable, in accordance with `GHC Proposal #193
+    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0193-forall-keyword.rst>`__.
 
 
 ``mdo``
