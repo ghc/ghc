@@ -1027,17 +1027,20 @@ cgAlgAltRhss' gc_plan bndr alts
             (bindArgToReg (NonVoid just_bndr) >> cgExpr just_rhs)
         emitOutOfLine just_rhs_lbl rhs
 
-      -- fake_just_code :: FCode (Maybe ConTagZ, CmmAGraphScoped)
-      -- fake_just_code =
-      --     getCodeScoped             $
-      --     maybeAltHeapCheck gc_plan $
-      --           do { _ <- bindFakeConArg base_reg (NonVoid just_bndr)
-      --                       -- alt binders are always non-void,
-      --                       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
-      --             ; emitCommentAlways $ fsLit "fake just - goto:rhs"
-      --             ; emit $ mkBranch just_rhs_lbl
+      fake_just_code :: FCode (Maybe ConTagZ, CmmAGraphScoped)
+      fake_just_code =
+          getCodeScoped             $
+          maybeAltHeapCheck gc_plan $
+                do {
+                    -- _ <- bindFakeConArg base_reg (NonVoid just_bndr)
+                    _ <- bindConArgs (DataAlt justDataCon) base_reg (assertNonVoidIds [just_bndr])
+                            -- alt binders are always non-void,
+                            -- see Note [Post-unari sation invariants] in GHC.Stg.Unarise
+                  ; emitCommentAlways $ fsLit "fake just - goto:rhs"
+                  ; emit $ mkBranch just_rhs_lbl
 
-      --             ; return $ ((+1) <$> mb_tag just_con) }
+
+                  ; return $ ((+0) <$> mb_tag justDataCon) }
 
       boxed_just_code :: FCode (Maybe ConTagZ, CmmAGraphScoped)
       boxed_just_code =
@@ -1064,7 +1067,7 @@ cgAlgAltRhss' gc_plan bndr alts
                   ; return $ mb_tag nothing_con }
 
     -- (_,base_alts) <- forkAltsWith [cg_just_rhs] [boxed_just_code, nothing_alt_code, fake_just_code]
-    (_,base_alts) <- forkAltsWith [cg_just_rhs] [boxed_just_code, nothing_alt_code]
+    (_,base_alts) <- forkAltsWith [cg_just_rhs] [nothing_alt_code, boxed_just_code, fake_just_code]
     return $ base_alts
 
 cgAlgAltRhss' gc_plan bndr alts
