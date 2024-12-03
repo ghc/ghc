@@ -1799,7 +1799,6 @@ run_BCO:
         case bci_TESTLT_P: {
             unsigned int discr  = BCO_NEXT;
             int failto = BCO_GET_LARGE_ARG;
-            ASSERT(discr <= TAG_MASK);
             StgClosure* con = UNTAG_CLOSURE((StgClosure*)SpW(0));
             if (GET_TAG(con) >= discr) {
                 bciPtr = failto;
@@ -1810,7 +1809,6 @@ run_BCO:
         case bci_TESTEQ_P: {
             unsigned int discr  = BCO_NEXT;
             int failto = BCO_GET_LARGE_ARG;
-            ASSERT(discr <= TAG_MASK);
             StgClosure* con = UNTAG_CLOSURE((StgClosure*)SpW(0));
             if (GET_TAG(con) != discr) {
                 bciPtr = failto;
