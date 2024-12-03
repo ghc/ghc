@@ -110,7 +110,6 @@ parseIOManagerFlag(const char *iomgrstr, IO_MANAGER_FLAG *flag)
 #else
         return IOManagerUnavailable;
 #endif
-        *flag = IO_MNGR_FLAG_MIO;
     }
     else if (strcmp("winio", iomgrstr) == 0) {
 #if defined(IOMGR_ENABLED_WINIO)
