@@ -322,7 +322,7 @@ Unlifted Newtypes
     Enable the use of newtypes over types with non-lifted runtime representations.
 
 GHC implements an :extension:`UnliftedNewtypes` extension as specified in
-`the GHC proposal #98 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0098-unlifted-newtypes.rst>`_.
+`the GHC Proposal #98 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0098-unlifted-newtypes.rst>`_.
 :extension:`UnliftedNewtypes` relaxes the restrictions around what types can appear inside
 of a ``newtype``. For example, the type ::
 
@@ -397,7 +397,7 @@ Unlifted Datatypes
     result kind.
 
 GHC implements the :extension:`UnliftedDatatypes` extension as specified in
-`the GHC proposal #265 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0265-unlifted-datatypes.rst>`_.
+`the GHC Proposal #265 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0265-unlifted-datatypes.rst>`_.
 :extension:`UnliftedDatatypes` relaxes the restrictions around what result kinds
 are allowed in data declarations. For example, the type ::
 

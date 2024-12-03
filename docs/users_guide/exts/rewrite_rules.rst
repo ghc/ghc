@@ -229,7 +229,7 @@ From a semantic point of view:
    because ``y`` can match against ``0``.
 
 -  GHC implements **higher order matching** as described by
-   `GHC proposal #555 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0555-template-patterns.rst>`_.
+   `GHC Proposal #555 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0555-template-patterns.rst>`_.
    When a pattern variable is applied to distinct locally bound variables it forms
    what we call a **higher order pattern**.
    When matching, higher order patterns are treated like pattern variables, but they are

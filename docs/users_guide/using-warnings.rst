@@ -1546,7 +1546,7 @@ of ``-W(no-)*``.
      The use of ``*`` to denote the kind of inhabited types relies on the
      :extension:`StarIsType` extension, which in a future release will be
      turned off by default and then possibly removed. The reasons for this and
-     the deprecation schedule are described in `GHC proposal #143
+     the deprecation schedule are described in `GHC Proposal #143
      <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0143-remove-star-kind.rst>`__.
 
      This warning allows to detect such uses of ``*`` before the actual

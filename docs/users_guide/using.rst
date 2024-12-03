@@ -752,7 +752,7 @@ search path (see :ref:`search-path`).
 GHC Jobserver Protocol
 ~~~~~~~~~~~~~~~~~~~~~~
 
-The GHC Jobserver Protocol was specified in `GHC proposal #540 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0540-jsem.rst>`__.
+The GHC Jobserver Protocol was specified in `GHC Proposal #540 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0540-jsem.rst>`__.
 
 This protocol allows
 a server to dynamically invoke many instances of a client process,
