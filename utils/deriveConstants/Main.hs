@@ -841,6 +841,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
               = case words line of
                 ('_' : n) : "C" : s : _ -> mkP n s
                 n : "C" : s : _ -> mkP n s
+                n : "B" : _ : s : _ -> mkP n s
                 [n, "D", _, s] -> mkP n s
                 [s, "O", "*COM*", _, n] -> mkP n s
                 _ -> Nothing

@@ -128,6 +128,34 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 
 	# Generating headers
 	# FIXME: deriveConstants requires ghcautoconf.h and ghcplatform.h
+	# Let's run cabal until it fails so that these files are generated...
+	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE1)' \
+	  $(CABAL) build --project-file=cabal.project-stage1 \
+	  rts \
+	  --with-compiler=`pwd`/_build/stage0/bin/ghc \
+	  --with-hc-pkg=`pwd`/_build/stage0/bin/ghc-pkg \
+	  --ghc-options="-ghcversion-file=`pwd`/_build/stage1/src/libraries/rts/include/ghcversion.h" \
+	  --ghc-options="-I`pwd`/_build/stage1/src/libraries/rts/include/" \
+	  --ghc-options="-I`pwd`/_build/stage1/src/libraries/rts/" \
+	  --ghc-options='"-optc=-DProjectVersion=\"913\""' \
+	  --ghc-options='"-optc=-DRtsWay=\"FIXME\""' \
+	  --ghc-options='"-optc=-DHostPlatform=\"FIXME\""' \
+	  --ghc-options='"-optc=-DHostArch=\"FIXME\""' \
+	  --ghc-options='"-optc=-DHostOS=\"FIXME\""' \
+	  --ghc-options='"-optc=-DHostVendor=\"FIXME\""' \
+	  --ghc-options='"-optc=-DBuildPlatform=\"FIXME\""' \
+	  --ghc-options='"-optc=-DBuildArch=\"FIXME\""' \
+	  --ghc-options='"-optc=-DBuildOS=\"FIXME\""' \
+	  --ghc-options='"-optc=-DBuildVendor=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTargetPlatform=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTargetArch=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTargetOS=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTargetVendor=\"FIXME\""' \
+	  --ghc-options='"-optc=-DGhcUnregisterised=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTablesNextToCode=\"FIXME\""' \
+	  --builddir=_build/stage1/cabal/ >/dev/null 2>&1 || true
+
+	# Deriving constants
 	mkdir -p _build/stage1/temp/derive_constants
 	_build/stage0/bin/deriveConstants --gen-header -o _build/stage1/src/libraries/rts/include/DerivedConstants.h \
 		--target-os linux \
@@ -135,7 +163,9 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 		--gcc-program gcc \
 		--nm-program nm \
 		--objdump-program objdump \
-		--gcc-flag "-I_build/stage1/src/libraries/rts/include"
+		--gcc-flag "-I_build/stage1/src/libraries/rts/include" \
+		--gcc-flag "-I_build/stage1/src/libraries/rts" \
+		--gcc-flag "-I_build/stage1/cabal/build/x86_64-linux/ghc-9.13/rts-1.0.2/build/include"
 	
 	# Building boot libraries
 	mkdir -p _build/stage1/cabal/
@@ -164,8 +194,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	  --ghc-options='"-optc=-DTargetVendor=\"FIXME\""' \
 	  --ghc-options='"-optc=-DGhcUnregisterised=\"FIXME\""' \
 	  --ghc-options='"-optc=-DTablesNextToCode=\"FIXME\""' \
-	  --ghc-options='-v3' \
-	  --builddir=_build/stage1/cabal/ -v3
+	  --builddir=_build/stage1/cabal/
 
 clean:
 	rm -rf _build
