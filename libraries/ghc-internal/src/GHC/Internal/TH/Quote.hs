@@ -31,6 +31,9 @@ import GHC.Internal.Base hiding (Type)
 -- @QuasiQuoter@ that is only intended to be used in certain splice
 -- contexts, the unused fields should just 'fail'. This is most easily
 -- accomplished using 'namedefaultQuasiQuoter' or 'defaultQuasiQuoter'.
+--
+-- This is exposed both from the @template-haskell-quasiquoter@ and @template-haskell@ packages.
+-- Consider importing it from the more stable @template-haskell-quasiquoter@ if you don't need the full breadth of the @template-haskell@ interface.
 data QuasiQuoter = QuasiQuoter {
     -- | Quasi-quoter for expressions, invoked by quotes like @lhs = $[q|...]@
     quoteExp  :: String -> Q Exp,
