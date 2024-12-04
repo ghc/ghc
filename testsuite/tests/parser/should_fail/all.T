@@ -231,9 +231,12 @@ test('T17879a', normal, compile_fail, [''])
 test('T17879b', normal, compile_fail, [''])
 test('Or1', normal, compile_fail, [''])
 test('OrPatInExprErr', normal, compile_fail, [''])
+
+# Multiline Strings
 test('MultilineStringsError', [normalise_whitespace_fun(lambda s: s)], compile_fail, [''])
 test('MultilineStringsSmartQuotes', normal, compile_fail, [''])
 test('MultilineStringsInnerTab', normal, compile_fail, [''])
+test('MultilineStringsUnterminated', normal, compile_fail, [''])
 test('T25258a', normal, compile_fail, [''])
 test('T25258b', normal, compile_fail, [''])
 test('T25258c', normal, compile_fail, [''])
