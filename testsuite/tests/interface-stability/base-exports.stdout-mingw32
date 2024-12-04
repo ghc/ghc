@@ -11965,6 +11965,7 @@ instance GHC.Internal.Enum.Enum GHC.Internal.Generics.SourceStrictness -- Define
 instance GHC.Internal.Enum.Enum GHC.Internal.Generics.SourceUnpackedness -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Enum.Enum GHC.Internal.IO.Device.SeekMode -- Defined in ‘GHC.Internal.IO.Device’
 instance GHC.Internal.Enum.Enum GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
+instance GHC.Internal.Enum.Enum GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoCostCentres -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoTrace -- Defined in ‘GHC.Internal.RTS.Flags’
@@ -12797,6 +12798,7 @@ instance GHC.Internal.Show.Show GHC.Internal.IO.Handle.Types.NewlineMode -- Defi
 instance [safe] GHC.Internal.Show.Show ghc-internal-9.1100.0:GHC.Internal.IO.Handle.Lock.Common.FileLockingNotSupported -- Defined in ‘ghc-internal-9.1100.0:GHC.Internal.IO.Handle.Lock.Common’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Handle.HandlePosn -- Defined in ‘GHC.Internal.IO.Handle’
 instance GHC.Internal.Show.Show GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
+instance GHC.Internal.Show.Show GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Windows.Handle.CONSOLE_READCONSOLE_CONTROL -- Defined in ‘GHC.Internal.IO.Windows.Handle’
 instance GHC.Internal.Show.Show (GHC.Internal.IO.Windows.Handle.Io GHC.Internal.IO.Windows.Handle.NativeHandle) -- Defined in ‘GHC.Internal.IO.Windows.Handle’
 instance GHC.Internal.Show.Show (GHC.Internal.IO.Windows.Handle.Io GHC.Internal.IO.Windows.Handle.ConsoleHandle) -- Defined in ‘GHC.Internal.IO.Windows.Handle’
