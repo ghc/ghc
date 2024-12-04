@@ -1039,10 +1039,17 @@ zapTyVarUnfolding tv@(TyVar { tv_unfolding = mb_unf })
   = case mb_unf of
       Nothing -> tv
       Just {} -> tv { tv_unfolding = Nothing }
+zapTyVarUnfolding tv@(TcTyVar {}) = tv
+  -- We can encounter TcTyVars, which hav no unfolding anyway
+  -- Why: because zapTyVarUnfolding is called by substTyBndr during typechecking
 zapTyVarUnfolding v = pprPanic "zapTyVarUnfolding" (ppr v)
 
-setTyVarOccInfo :: TyVar -> OccInfo -> TyVar
-setTyVarOccInfo tv occ_info = assertPpr (isTyVar tv) (ppr tv) $ tv {tv_occ_info = occ_info}
+setTyVarOccInfo :: HasDebugCallStack => TyVar -> OccInfo -> TyVar
+setTyVarOccInfo tv@(TyVar {}) occ_info
+  = tv {tv_occ_info = occ_info}
+setTyVarOccInfo tv            occ_info
+  = pprTrace "setTyVarOccInfo" (ppr tv <+> ppr occ_info $$ callStackDoc) tv
+
 
 updateTyVarKind :: (Kind -> Kind) -> TyVar -> TyVar
 updateTyVarKind update tv = tv {varType = update (tyVarKind tv)}

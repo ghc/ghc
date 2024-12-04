@@ -474,7 +474,7 @@ simple_type_bind env@(SOE { soe_subst = subst })
        -- Very important to extend the substitution to propagate
        -- the unfolding to all the usage sites of the binder
   where
-    subst_for_rhs = setInScope (soe_subst rhs_env) (getSubstInScope subst)
+    subst_for_rhs = setInScope (soe_subst rhs_env) (substInScopeSet subst)
     out_ty        = substTyUnchecked subst_for_rhs in_ty
     bndr_occ      = tyVarOccInfo in_tv
     occurs_once {- syntactically -} = isOneOcc bndr_occ && occ_n_br bndr_occ == 1

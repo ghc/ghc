@@ -3249,6 +3249,6 @@ freshEtaId n subst ty
       = (subst', eta_id')
       where
         Scaled mult' ty' = Type.substScaledTyUnchecked subst ty
-        eta_id' = uniqAway (substInScope subst) $
+        eta_id' = uniqAway (substInScopeSet subst) $
                   mkSysLocal (fsLit "eta") (mkBuiltinUnique n) mult' ty'
         subst'  = extendSubstInScope subst eta_id'
