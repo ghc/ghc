@@ -2204,11 +2204,12 @@ tok_string_multi startSpan startBuf _len _buf2 = do
       case alexScan i0 string_multi_content of
         AlexToken i1 len _
           | Just i2 <- lexDelim i1 -> pure (i1, i2)
-          | -- is the next token a tab character?
-            -- need this explicitly because there's a global rule matching $tab
-            Just ('\t', _) <- alexGetChar' i1 -> setInput i1 >> lexError LexError
           | isEOF i1  -> checkSmartQuotes >> lexError LexError
-          | len == 0  -> panic $ "parsing multiline string got into infinite loop at: " ++ show i0
+          -- is the next token a tab character?
+          -- need this explicitly because there's a global rule matching $tab
+          | Just ('\t', _) <- alexGetChar' i1 -> setInput i1 >> lexError LexError
+          -- Can happen if no patterns match, e.g. an unterminated gap
+          | len == 0  -> setInput i1 >> lexError LexError
           | otherwise -> goContent i1
         AlexSkip i1 _ -> goContent i1
         _ -> lexError LexError
