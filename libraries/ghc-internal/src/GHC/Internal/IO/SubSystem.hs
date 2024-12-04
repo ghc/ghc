@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy       #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -34,6 +35,8 @@ module GHC.Internal.IO.SubSystem (
  ) where
 
 import GHC.Internal.Base
+import GHC.Internal.Show
+import GHC.Internal.Enum
 
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.IO.Unsafe
@@ -54,6 +57,10 @@ data IoSubSystem
               --   same as IoPOSIX, but on Windows this means use the Windows
               --   native APIs for I/O, including IOCP and RIO.
   deriving (Eq)
+
+-- N.B. These are currently unused by GHC but is needed for stability of @base@.
+deriving instance Enum IoSubSystem
+deriving instance Show IoSubSystem
 
 -- | Conditionally execute an action depending on the configured I/O subsystem.
 -- On POSIX systems always execute the first action.
