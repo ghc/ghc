@@ -488,9 +488,9 @@ test('T15471', normal, multimod_compile, ['T15471.hs', '-v0'])
 test('T16180',
      [when(llvm_build(), expect_broken_for(16541, ['ext-interp'])),
       req_asm,
-      # Ideally OpenBSD should have expect_broken_for(14012, ['ext-interp']).
+      # Ideally {Free,Open}BSD should have expect_broken_for(14012, ['ext-interp']).
       # Except the failure is in compilation so skip seems the best we can do.
-      when(opsys('openbsd'), skip),
+      when(opsys('openbsd') or opsys('freebsd'), skip),
       expect_broken_for(16541, ghci_ways)],
      compile_and_run, ['-package ghc'])
 test('T16183', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
