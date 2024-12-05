@@ -506,6 +506,7 @@ traceSDocContext = defaultSDocContext
   , sdocPrintExplicitRuntimeReps    = True
   , sdocPrintExplicitForalls        = True
   , sdocPrintEqualityRelations      = True
+  , sdocPrintTyVarUnfoldings        = True
   }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
