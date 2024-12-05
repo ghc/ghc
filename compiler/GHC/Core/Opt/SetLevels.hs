@@ -1804,16 +1804,23 @@ abstractVars :: Level -> LevelEnv -> DVarSet -> AbsVars
 -- Uniques are not deterministic.
 abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
   =  -- NB: sortQuantVars might not put duplicates next to each other
-    map zap                 $
-    dep_anal                $
-    filter abstract_me      $
-    dVarSetElems            $
-    mapUnionDVarSet close   $
-    substFreeVars subst     $
-    dVarSetElems in_fvs
+    pprTrace "abstractVars"
+      (vcat [ text "r7:" <+> ppr r7
+           , text "r1:" <+> ppr r1
+           , text "r2:" <+> ppr r3
+           , text "r3:" <+> ppr r3
+           , text "subst:" <+> ppr subst ]) r7
+  where
+    r7 = map zap r6
+    r6 = dep_anal r5
+    r5 = filter abstract_me r4
+    r4 = dVarSetElems r3
+    r3 = mapUnionDVarSet close r2
+    r2 = substFreeVars subst r1
+    r1 = dVarSetElems in_fvs
         -- NB: it's important to call abstract_me only on the OutIds the
         -- come from substDVarSet (not on fv, which is an InId)
-  where
+
     abstract_me v = case lookupVarEnv lvl_env v of
                         Just lvl -> dest_lvl `ltLvl` lvl
                         Nothing  -> False
@@ -1830,8 +1837,8 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
     close :: Var -> DVarSet
     close v | Just ty <- tyVarUnfolding_maybe v
             = close_set (tyCoVarsOfTypeDSet ty) `extendDVarSet` v
-            | otherwise
-            = close_set (tyCoVarsOfTypeDSet (varType v)) `extendDVarSet` v
+            | otherwise   -- We have already got the free vars of its kind
+            = unitDVarSet v
 
     dep_anal vs = scopedSort tcvs ++ ids
       where
