@@ -531,7 +531,9 @@ test('InitEventLogging',
      ],
      compile_and_run, ['InitEventLogging_c.c'])
 test('RestartEventLogging',
-     [only_ways(['threaded1','threaded2']), extra_run_opts('+RTS -la -RTS')],
+     [only_ways(['threaded1','threaded2']),
+      extra_run_opts('+RTS -la -RTS'),
+      when(opsys('freebsd'), fragile(19724))],
      compile_and_run, ['RestartEventLogging_c.c'])
 
 test('T17088',
