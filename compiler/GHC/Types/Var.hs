@@ -357,36 +357,39 @@ instance Outputable Var where
       -- don't display debug info with Code style (#25255)
       ppr_code = ppr (varName var)
       ppr_normal sty
-          = sdocOption sdocSuppressVarKinds $ \supp_var_kinds ->
-            getPprDebug $ \debug ->
-            let
-              pp_info = case var of
-                  TyVar { tv_unfolding = Just ty }
-                     | debug
-                     -> brackets (text "unf=" <> ppr ty)
+        = sdocOption sdocSuppressVarKinds $ \supp_var_kinds ->
+          sdocOption sdocPrintTyVarUnfoldings $ \print_tyvar_unf ->
+          getPprDebug $ \debug ->
 
-                  TyVar {}
-                     | debug
-                     -> brackets (text "tv")
+          let add_type_sig doc
+                | debug, not supp_var_kinds
+                = parens (doc <+> dcolon <+> pprKind (varType var))
+                | otherwise
+                = doc
 
-                  TcTyVar {tc_tv_details = d}
-                     | dumpStyle sty || debug
-                     -> brackets (pprTcTyVarDetails d)
+              pp_tv_unf | print_tyvar_unf, Just ty <- tyVarUnfolding_maybe var
+                        = braces (equals <> pprKind ty)
+                        | otherwise
+                        = empty
 
-                  Id { idScope = s, id_details = d }
-                     | debug
-                     -> brackets (ppr_id_scope s <> pprIdDetails d)
+          in case var of
+            TyVar {}
+              -> add_type_sig $
+                 ppr (varName var)
+                   <> ppWhen debug (brackets (text "tv"))
+                   <> pp_tv_unf
 
-                  _  -> empty
-              pp_mult = case varMultMaybe var of
-                          Just m  -> text "mult=" <> ppr m
-                          Nothing -> empty
-            in if
-               |  debug && not supp_var_kinds
-               -> parens (hang (ppr (varName var) <+> pp_info <+> pp_mult)
-                             2 (dcolon <+> pprKind (tyVarKind var)))
-               |  otherwise
-                 -> ppr (varName var) <> pp_info
+            TcTyVar {tc_tv_details = d}
+               -> add_type_sig $
+                  ppr (varName var)
+                    <> ppWhen (debug || dumpStyle sty)
+                              (brackets (pprTcTyVarDetails d))
+
+            Id { idScope = s, id_details = d }
+               -> add_type_sig $
+                  ppr (varName var)
+                    <> ppWhen debug
+                       (brackets (ppr_id_scope s <> pprIdDetails d))
 
 ppr_id_scope :: IdScope -> SDoc
 ppr_id_scope GlobalId              = text "gid"
