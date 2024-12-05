@@ -2984,6 +2984,8 @@ data LintEnv
                     -- /All/ in-scope variables are here (term variables,
                     --    type variables, and coercion variables)
                     -- Used at an occurrence of the InVar
+                    -- We need the binding InVar so Lint can check that the unfolding at an
+                    --   occurrence is equal to the unfolding at the binding site.
 
        , le_joins :: IdSet     -- Join points in scope that are valid
                                -- A subset of the InScopeSet in le_subst
