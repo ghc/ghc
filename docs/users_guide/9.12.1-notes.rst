@@ -11,9 +11,9 @@ for specific guidance on migrating programs to this release.
 Language
 ~~~~~~~~
 
-- New language extension: :extension:`OrPatterns` implements `GHC Proposal #522
-  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0522-or-patterns.rst>`_).
-- GHC Proposal `#569 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0569-multiline-strings.rst>`_
+- New language extension: :extension:`OrPatterns` implements `GHC proposal #522
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0522-or-patterns.rst>`_.
+- GHC proposal `#569 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0569-multiline-strings.rst>`_
   "Multiline string literals" has been implemented.
   The following code is now accepted by GHC::
 
@@ -44,34 +44,34 @@ Language
   to cause significant disruption.
 
 - The built-in ``HasField`` class, used by :extension:`OverloadedRecordDot`, now
-  supports representation polymorphism (implementing part of `GHC Proposal #583
+  supports representation polymorphism (implementing part of `GHC proposal #583
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0583-hasfield-redesign.rst>`_).
   This means that code using :extension:`UnliftedDatatypes` or
   :extension:`UnliftedNewtypes` can now use :extension:`OverloadedRecordDot`.
 
-- Unboxed ``Float#``/``Double#`` literals now support the HexFloatLiterals extension
-  (`#22155 <https://gitlab.haskell.org/ghc/ghc/-/issues/22155>`_).
+- Unboxed ``Float#``/``Double#`` literals now support the :extension:`HexFloatLiterals` extension
+  (:ghc-ticket:`22155`).
 
 - :extension:`UnliftedFFITypes`: GHC will now accept FFI types like: ``(# #) -> T`` where ``(# #)``
   is used as the one and only function argument.
 
 - The venerable ``default`` declarations have been generalized. They can now name a class
   other than ``Num`` and the class defaults can be exported. The functionality is guarded
-  by the new ``NamedDefaults`` language extension. See the `GHC proposal
+  by the new ``NamedDefaults`` language extension. See `GHC proposal #409
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0409-exportable-named-default.rst>`__
   for details.
 
-- GHC now takes COMPLETE pragmas into consideration when deciding whether
+- GHC now takes ``COMPLETE`` pragmas into consideration when deciding whether
   pattern matches in do notation are fallible.
 
-- As part of `GHC Proposal #281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
+- As part of `GHC proposal #281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
   GHC now accepts type syntax in expressions, namely function type arrow ``a -> b``,
   constraint arrow ``a => b``, and ``forall`` telescopes: ::
 
     g = f (forall a. Show a => a -> String)
       where f :: forall a -> ...
 
-- In accordance with `GHC Proposal #425 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0425-decl-invis-binders.rst>`_,
+- In accordance with `GHC proposal #425 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0425-decl-invis-binders.rst>`_,
   GHC now permits wildcard binders in type declarations: ::
 
     type Const a b = a   -- before: the `b` had to be named even if unused on the RHS
@@ -109,7 +109,7 @@ Compiler
   welcome!
 
 - i386 Windows support is now completely removed amid massive cleanup
-  of legacy code to pave way for Arm64 Windows support (`#24883
+  of legacy code to pave way for ARM64 Windows support (`#24883
   <https://gitlab.haskell.org/ghc/ghc/-/issues/24883>`_). Rest
   assured, this does not impact existing support for x86_64 Windows or
   i386 Linux. For end users, the ``stdcall`` C calling convention is
@@ -119,7 +119,7 @@ Compiler
 
 - 32-bit macOS/iOS support has also been completely removed (`#24921
   <https://gitlab.haskell.org/ghc/ghc/-/issues/24921>`_). This does
-  not affect existing support of apple systems on x86_64/aarch64.
+  not affect existing support of Apple systems on x86_64/aarch64.
 
 - The flag :ghc-flag:`-fignore-asserts` will now also enable the
   :extension:`CPP` macro ``__GLASGOW_HASKELL_ASSERTS_IGNORED__`` (`#24967
@@ -140,11 +140,11 @@ Compiler
   This avoids edge cases where a SPEC keyword could result in functions being
   specialized to large static data resulting in functions with thousands of arguments.
 
-- Fixed a bug that caused GHC to panic when using the aarch64 ncg and -fregs-graph
-  on certain programs. (#24941)
+- Fixed a bug that caused GHC to panic when using the aarch64 NCG and :ghc-flag:`-fregs-graph`
+  on certain programs (:ghc-ticket:`22255`).
 
 - A new warning :ghc-flag:`-Wview-pattern-signatures` is introduced to notify users about
-  future changes in parsing of view patterns in combination with pattern signatures
+  future changes in parsing of view patterns in combination with pattern signatures.
 
 - GHC now includes a new experimental flag, :ghc-flag:`-fobject-determinism`,
   which enables deterministic object code generation, with a minor trade-off in
@@ -178,7 +178,7 @@ Runtime system
 - The new runtime flag :rts-flag:`--read-tix-file=\<yes|no\>` allows to modify whether a preexisting .tix file is read in at the beginning of a program run.
   The default is currently ``--read-tix-file=yes`` but will change to ``--read-tix-file=no`` in a future version of GHC.
   For this reason, a warning is emitted if a .tix file is read in implicitly. You can silence this warning by explicitly passing ``--read-tix-file=yes``.
-  Details can be found in `GHC proposal 612 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0612-fhpc-accumulation.md>`__.
+  Details can be found in `GHC proposal #612 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0612-fhpc-accumulation.md>`__.
 
 Cmm
 ~~~
@@ -195,37 +195,38 @@ Cmm
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
-- Propagate HasCallStack from `errorCallWithCallStackException` to exception backtraces, fixing a bug in the implementation of `CLC proposal 164 <https://github.com/haskell/core-libraries-committee/issues/164>`.
+- Improve display of exception stack traces and display more metadata about
+  exceptions in the default top-level uncaught exception handler
+  (``GHC.Conc.Sync.uncaughtExceptionHandler``). See CLC proposals
+  `#231 <https://github.com/haskell/core-libraries-committee/issues/231>`_,
+  `#261 <https://github.com/haskell/core-libraries-committee/issues/261>`_ and
+  `#285 <https://github.com/haskell/core-libraries-committee/issues/285>`_.
 
-- Add exception type metadata to SomeException's displayException and
-  "Exception:" header to the default handler
-  (i.e. ``GHC.Conc.Sync.uncaughtExceptionHandler``):
+- Propagate HasCallStack from ``errorCallWithCallStackException`` to exception backtraces, fixing a bug in the implementation of `CLC proposal #164 <https://github.com/haskell/core-libraries-committee/issues/164>`_.
 
-  https://github.com/haskell/core-libraries-committee/issues/231
-  https://github.com/haskell/core-libraries-committee/issues/261
-
-- The `deprecation process of GHC.Pack <https://gitlab.haskell.org/ghc/ghc/-/issues/21461>` has come its term. The module has now been removed from ``base``.
-
-- Annotate re-thrown exceptions with the backtrace as per `CLC proposal #202 <https://github.com/haskell/core-libraries-committee/issues/202>`
+- Annotate re-thrown exceptions with backtraces as per `CLC proposal #202 <https://github.com/haskell/core-libraries-committee/issues/202>`_.
 
 - Introduced ``catchNoPropagate``, ``rethrowIO`` and ``tryWithContext`` as part of
-  `CLC proposal #202 <https://github.com/haskell/core-libraries-committee/issues/202>` to
+  `CLC proposal #202 <https://github.com/haskell/core-libraries-committee/issues/202>`_ to
   facilitate rethrowing exceptions without adding a ``WhileHandling``
   context -- if rethrowing ``e``, you don't want to add ``WhileHandling e`` to
   the context since it will be redundant. These functions are mostly useful
   for libraries that define exception-handling combinators like ``catch`` and
   ``onException``, such as ``base``, or the ``exceptions`` package.
 
+- The `deprecation process of GHC.Pack <https://gitlab.haskell.org/ghc/ghc/-/issues/21461>`_ has come its term. The module has now been removed from ``base``.
+
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
-- Usage of deprecated primops is now correctly reported (#19629).
-- New primops `isMutableByteArrayWeaklyPinned#` and `isByteArrayWeaklyPinned#`
-  to allow users to avoid copying large arrays safely when dealing with ffi.
-  See the users guide for more details on the different kinds of
+- Usage of deprecated primops is now correctly reported (`#19629 <https://gitlab.haskell.org/ghc/ghc/-/issues/19629>`_).
+- New primops ``isMutableByteArrayWeaklyPinned#`` and ``isByteArrayWeaklyPinned#``
+  to allow users to avoid copying large arrays when dealing with FFI.
+  See :ref:`pinned-byte-arrays` for more details on the different kinds of
   pinned arrays in 9.12.
 
-  This need for this distinction originally surfaced in https://gitlab.haskell.org/ghc/ghc/-/issues/22255
+  This need for this distinction originally surfaced in `#22255 <https://gitlab.haskell.org/ghc/ghc/-/issues/22255>`_.
 
 - New fused multiply-add instructions for vectors of floating-point values,
   such as ``fmaddFloatX4# :: FloatX4# -> FloatX4# -> FloatX4# -> FloatX4#`` and
@@ -241,11 +242,11 @@ Cmm
   and indices ``(# 4#, 3#, 6#, 1# #)``, will return a vector with components
   ``(# 44.1#, 33.1#, 66.1#, 11.1# #)``.
 
-- New instructions for minimum/maximum, such as `minDouble#` and
-  `minFloatX4#`. These instructions compute the minimum/maximum of their inputs,
+- New instructions for minimum/maximum, such as ``minDouble#`` and
+  ``minFloatX4#``. These instructions compute the minimum/maximum of their inputs,
   working component-wise for SIMD vectors. Supported argument types are vector
-  integer values (e.g. `Word16X8#`, `Int32X4#` etc) and both scalar and vector
-  floating point values (e.g. `Float#`, `DoubleX2#`, `FloatX8#` etc).
+  integer values (e.g. ``Word16X8#``, ``Int32X4#`` etc) and both scalar and vector
+  floating point values (e.g. ``Float#``, ``DoubleX2#``, ``FloatX8#`` etc).
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
