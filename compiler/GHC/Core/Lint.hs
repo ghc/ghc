@@ -910,17 +910,21 @@ lintCoreExpr (Tick tickish expr)
       -- context, but soft-scoped and non-scoped ticks simply wrap the result
       -- (see Simplify.simplTick).
 
-lintCoreExpr (Let (NonRec tv (Type ty)) body)
+lintCoreExpr (Let (NonRec tv (Type rhs_ty)) body)
   | isTyVar tv
   =     -- See Note [Linting type lets]
-    do  { ty' <- lintTypeAndSubst ty
+    do  { case tyVarUnfolding_maybe tv of
+             Nothing -> failWithL (text "Let-bound tyvar with no unfolding:" <+> ppr tv)
+             Just unf_ty -> ensureEqTys unf_ty rhs_ty $
+                            hang (text "Let-bound tyvar unfolding not same as RHS:" <+> ppr tv)
+                               2 (vcat [ text "Unfolding:" <+> ppr unf_ty
+                                       , text "RHS:      " <+> ppr rhs_ty ])
+
+        ; rhs_ty' <- lintTypeAndSubst rhs_ty
         ; lintTyCoBndr tv              $ \ tv' ->
-    do  { addLoc (RhsOf tv) $ lintTyKind tv' ty'
-                -- Now extend the substitution so we
-                -- take advantage of it in the body
-        ; extendTvSubstL tv ty' $
-          addLoc (BodyOfLet tv) $
-          lintCoreExpr body } }
+          addTyVarUnfolding tv tv' rhs_ty' $
+          do  { addLoc (RhsOf tv)     $ lintTyKind tv' rhs_ty'
+              ; addLoc (BodyOfLet tv) $ lintCoreExpr body } }
 
 lintCoreExpr (Let (NonRec bndr rhs) body)
   | isId bndr
@@ -1573,8 +1577,8 @@ lintTyKind :: OutTyVar -> OutType -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 lintTyKind tyvar arg_ty
-  = unless (arg_kind `eqType` tyvar_kind) $
-    addErrL (mkKindErrMsg tyvar arg_ty $$ (text "Linted Arg kind:" <+> ppr arg_kind))
+  = ensureEqTys arg_kind tyvar_kind $
+    mkKindErrMsg tyvar arg_ty $$ (text "Linted Arg kind:" <+> ppr arg_kind)
   where
     tyvar_kind = tyVarKind tyvar
     arg_kind   = typeKind arg_ty
@@ -3471,6 +3475,7 @@ addInScopeId in_id out_ty thing_inside
 
 addInScopeTyCoVar :: InTyCoVar -> OutType -> (OutTyCoVar -> LintM a) -> LintM a
 -- This function clones to avoid shadowing of TyCoVars
+-- For a TyVar with an unfolding, it retains the unfolding unchenged
 addInScopeTyCoVar tcv tcv_type thing_inside
   = LintM $ \ env@(LE { le_in_vars = in_vars, le_subst = subst }) errs ->
     let (tcv', subst') = subst_bndr subst
@@ -3490,17 +3495,24 @@ addInScopeTyCoVar tcv tcv_type thing_inside
 
       -- Clone, and extend the substitution
       | let tcv' = uniqAway in_scope (setVarType tcv tcv_type)
-      = (tcv', extendTCvSubstWithClone subst tcv tcv')
+      = (tcv', Type.extendTCvSubstWithClone subst tcv tcv')
       where
         in_scope = substInScopeSet subst
 
 getInVarEnv :: LintM (VarEnv (InId, OutType))
 getInVarEnv = LintM (\env errs -> fromBoxedLResult (Just (le_in_vars env), errs))
 
-extendTvSubstL :: TyVar -> Type -> LintM a -> LintM a
-extendTvSubstL tv ty m
+addTyVarUnfolding :: InTyVar -> OutTyVar -> OutType -> LintM a -> LintM a
+addTyVarUnfolding in_tv out_tv out_ty thing_inside
+  | in_tv == out_tv  -- No cloning, so no need to change the unfolding
+  = assertPpr (isJust (tyVarUnfolding_maybe out_tv)) (ppr in_tv)
+    thing_inside
+  | otherwise
   = LintM $ \ env errs ->
-    unLintM m (env { le_subst = Type.extendTvSubst (le_subst env) tv ty }) errs
+    unLintM thing_inside (env { le_subst = Type.extendTvSubst (le_subst env)
+                                                   in_tv tv_w_unf }) errs
+  where
+    tv_w_unf = mkTyVarTy (setTyVarUnfolding out_tv out_ty)
 
 markAllJoinsBad :: LintM a -> LintM a
 markAllJoinsBad m
@@ -3529,6 +3541,19 @@ getUEAliases = LintM (\ env errs -> fromBoxedLResult (Just (le_ue_aliases env), 
 getInScope :: LintM InScopeSet
 getInScope = LintM (\ env errs -> fromBoxedLResult (Just (substInScopeSet $ le_subst env), errs))
 
+data WhatItIs = IsTyVar | IsCoVar | IsValueVar
+  deriving( Eq )
+
+whatItIs :: Var -> WhatItIs
+whatItIs v | isTyVar v = IsTyVar
+           | isCoVar v = IsCoVar
+           | otherwise = IsValueVar
+
+instance Outputable WhatItIs where
+  ppr IsTyVar    = text "type variable"
+  ppr IsCoVar    = text "coercion variable"
+  ppr IsValueVar = text "value variable"
+
 lintVarOcc :: InVar -> LintM OutType
 -- Used at an occurrence of a variable: term variables, type variables, and coercion variables
 -- Checks two things:
@@ -3538,21 +3563,18 @@ lintVarOcc v_occ
   = do { in_var_env <- getInVarEnv
        ; case lookupVarEnv in_var_env v_occ of
            Nothing | isGlobalId v_occ -> return (idType v_occ)
-                   | otherwise        -> failWithL (text pp_what <+> quotes (ppr v_occ)
+                   | otherwise        -> failWithL (text "The" <+> ppr (whatItIs v_occ)
+                                                    <+> quotes (ppr v_occ)
                                                     <+> text "is out of scope")
-           Just (v_bndr, out_ty) -> do { check_bad_global v_bndr
-                                       ; ensureEqTys occ_ty bndr_ty $  -- Compares InTypes
-                                         mkBndrOccTypeMismatchMsg v_occ bndr_ty occ_ty
-                                       ; return out_ty }
-             where
-               occ_ty  = varType v_occ
-               bndr_ty = varType v_bndr }
-  where
-    pp_what | isTyVar v_occ = "The type variable"
-            | isCoVar v_occ = "The coercion variable"
-            | otherwise     = "The value variable"
+           Just (v_bndr, out_ty) -> do { checkBndrOccCompatibility v_bndr v_occ
+                                       ; return out_ty } }
 
-       -- 'check_bad_global' checks for the case where an /occurrence/ is
+checkBndrOccCompatibility :: InVar -> InVar -> LintM ()
+checkBndrOccCompatibility v_bndr v_occ
+  = do { checkL (occ_is == bndr_is) $
+         bndr_occ_mismatch (ppr bndr_is) (ppr occ_is)
+
+       -- Check for the case where an /occurrence/ is
        -- a GlobalId, but there is an enclosing binding fora a LocalId.
        -- NB: the in-scope variables are mostly LocalIds, checked by lintIdBndr,
        --     but GHCi adds GlobalIds from the interactive context.  These
@@ -3561,15 +3583,45 @@ lintVarOcc v_occ
        --     are defined locally, but appear in expressions as (global)
        --     wired-in Ids after worker/wrapper
        --     So we simply disable the test in this case
-    check_bad_global v_bndr
-      | isGlobalId v_occ
-      , isLocalId v_bndr
-      , not (isWiredIn v_occ)
-      = failWithL $ hang (text "Occurrence is GlobalId, but binding is LocalId")
-                       2 (vcat [ hang (text "occurrence:") 2 $ pprBndr LetBind v_occ
-                               , hang (text "binder    :") 2 $ pprBndr LetBind v_bndr ])
-      | otherwise
-      = return ()
+       ; checkL (not (isGlobalId v_occ && isLocalId v_bndr && not (isWiredIn v_occ))) $
+         bndr_occ_mismatch (text "LocalId") (text "GlobalId")
+
+
+       -- Check that binder and occurrence have same type
+       ;  ensureEqTys occ_ty bndr_ty $  -- Compares InTypes
+          hang (text "Mismatch in type between binder and occurrence")
+             2 extra_info
+
+       ; flags <- getLintFlags
+       ; checkL (sameUnfolding flags v_bndr v_occ) $
+         hang (text "Mismatch in type-let unfolding between binder and occurrence")
+            2 extra_info
+       }
+  where
+    bndr_ty = varType v_bndr
+    occ_ty  = varType v_occ
+    bndr_is = whatItIs v_bndr
+    occ_is  = whatItIs v_occ
+
+    bndr_occ_mismatch bndr_is occ_is
+      = text "Occurrence is a" <+> occ_is <> comma
+         <+> text "but binder is a" <+> bndr_is
+
+    extra_info = vcat [ hang (text "Binder    :") 2 $ pprBndr LetBind v_bndr
+                      , hang (text "Occurrence:") 2 $ pprBndr LetBind v_occ]
+
+sameUnfolding :: LintFlags
+              -> InVar   -- Binder
+              -> InVar   -- Occurrence
+              -> Bool
+-- Check that any unfolding in the /occurence/ is the same as that in the /binder/
+-- An unfolding in the occurrence is optional fo Ids, but compulsory for type-let-boud
+-- TyVars.  Somewhat lazily, we only check the latter.
+sameUnfolding flags v_bndr v_occ
+  = case (tyVarUnfolding_maybe v_bndr, tyVarUnfolding_maybe v_occ) of
+      (Nothing,      Nothing)     -> True
+      (Just bndr_ty, Just occ_ty) -> eq_type flags bndr_ty occ_ty
+      _                           -> False
 
 lookupJoinId :: Id -> LintM JoinPointHood
 -- Look up an Id which should be a join point, valid here
@@ -3937,12 +3989,6 @@ mkJoinBndrOccMismatchMsg bndr join_arity_bndr join_arity_occ
          , text "Var:" <+> ppr bndr
          , text "Arity at binding site:" <+> ppr join_arity_bndr
          , text "Arity at occurrence:  " <+> ppr join_arity_occ ]
-
-mkBndrOccTypeMismatchMsg :: InVar -> InType -> InType -> SDoc
-mkBndrOccTypeMismatchMsg var bndr_ty occ_ty
-  = vcat [ text "Mismatch in type between binder and occurrence"
-         , text "Binder:    " <+> ppr var <+> dcolon <+> ppr bndr_ty
-         , text "Occurrence:" <+> ppr var <+> dcolon <+> ppr occ_ty ]
 
 mkBadJoinPointRuleMsg :: JoinId -> JoinArity -> CoreRule -> SDoc
 mkBadJoinPointRuleMsg bndr join_arity rule
