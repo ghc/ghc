@@ -434,7 +434,9 @@ tcRnImports hsc_env import_decls
         ; let { dir_imp_mods = moduleEnvKeys
                              . imp_mods
                              $ imports }
-        ; checkFamInstConsistency dir_imp_mods
+        ; logger <- getLogger
+        ; withTiming logger (text "ConsistencyCheck"<+>brackets (ppr this_mod)) (const ())
+            $ checkFamInstConsistency dir_imp_mods
         ; traceRn "rn1: } checking family instance consistency" empty
 
         ; getGblEnv } }

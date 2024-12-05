@@ -58,6 +58,7 @@ import Data.Function ( on )
 
 import qualified GHC.LanguageExtensions  as LangExt
 import GHC.Unit.Env (unitEnv_hpts)
+import Data.List (sortOn)
 
 {- Note [The type family instance consistency story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -239,6 +240,49 @@ That situation should be pretty common in practice, there's usually
 a set of utility modules that every module imports directly or indirectly.
 
 This is basically the idea from #13092, comment:14.
+
+Note [Order of type family consistency checks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider a module M which imports modules A, B and C, all defining (open) type
+family instances.
+
+We can waste a lot of work in type family consistency checking depending on the
+order in which the modules are processed.
+
+Suppose for example that C imports A and B. When we compiled C, we will have
+checked A and B for consistency against eachother. This means that, when
+processing the imports of M to check type family instance consistency:
+
+* if C is processed first, then A and B will not need to be checked for
+  consistency against eachother again,
+* if we process A and B before C,then the
+  consistency checks between A and B will be performed again. This is wasted
+  work, as we already performed them for C.
+
+This can make a significant difference. Keeping the nomenclature of the above
+example for illustration, we have observed situations in practice in which the
+compilation time of M goes from 1 second (the "processing A and B first" case)
+down to 80 milliseconds (the "processing C first" case).
+
+Clearly we should engineer that C is checked before B and A, but by what scheme?
+
+A simple one is to observe that if a module M is in the transitive closure of X
+then the size of the consistent family set of M is less than or equal to size
+of the consistent family set of X.
+
+Therefore, by sorting the imports by the size of the consistent family set and
+processing the largest first, we make sure to process modules in topological
+order.
+
+For a particular project, without this change we did 40 million checks and with
+this change we did 22.9 million checks. This is significant as before this change
+type family consistency checks accounted for 26% of total type checker allocations which
+was reduced to 15%.
+
+See tickets #25554 for discussion about this exact issue and #25555 for
+why we still do redundant checks.
+
 -}
 
 -- We don't need to check the current module, this is done in
@@ -267,6 +311,12 @@ checkFamInstConsistency directlyImpMods
                  where
                  deps = dep_finsts . mi_deps . modIface $ mod
 
+             ; debug_consistent_set = map (\x -> (x, length (modConsistent x))) directlyImpMods
+
+             -- Sorting the list by size has the effect of performing a topological sort.
+             -- See Note [Order of type family consistency checks]
+             ; init_consistent_set = reverse (sortOn (length . modConsistent) directlyImpMods)
+
              ; hmiModule     = mi_module . hm_iface
              ; hmiFamInstEnv = extendFamInstEnvList emptyFamInstEnv
                                . md_fam_insts . hm_details
@@ -276,7 +326,8 @@ checkFamInstConsistency directlyImpMods
 
              }
 
-       ; checkMany hpt_fam_insts modConsistent directlyImpMods
+       ; traceTc "init_consistent_set" (ppr debug_consistent_set)
+       ; checkMany hpt_fam_insts modConsistent init_consistent_set
        }
   where
     -- See Note [Checking family instance optimization]
@@ -294,6 +345,11 @@ checkFamInstConsistency directlyImpMods
          -> TcM ()
       go _ _ [] = return ()
       go consistent consistent_set (mod:mods) = do
+        traceTc "checkManySize" (vcat [text "mod:" <+> ppr mod
+                                      , text "m1:" <+> ppr (length to_check_from_mod)
+                                      , text "m2:" <+> ppr (length (to_check_from_consistent))
+                                      , text "product:" <+> ppr (length to_check_from_mod * length to_check_from_consistent)
+                                      ])
         sequence_
           [ check hpt_fam_insts m1 m2
           | m1 <- to_check_from_mod
