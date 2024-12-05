@@ -343,10 +343,10 @@ the "used-here" set:
   the lambda-binders from the body_fvs, because any bindings that
   mention these binders will be dropped here anyway.
 
-* In fiExpr (AnnCase ...). Remember to include the case_bndr in the
-  binders.  Again, no need to delete the alt binders from the rhs
-  free vars, because any bindings mentioning them will be dropped
-  here unconditionally.
+* In fiExpr (AnnCase ...). Remember to include the case_bndr and the free vars
+  of the result type of the case in the binders. Again, no need to delete the
+  alt binders from the rhs free vars, because any bindings mentioning them will
+  be dropped here unconditionally.
 -}
 
 fiExpr platform to_drop lam@(_, AnnLam _ _)
@@ -549,8 +549,8 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
         -- Float into the scrut and alts-considered-together just like App
     (drop_here1, [scrut_drops, alts_drops])
        = sepBindsByDropPoint platform False to_drop
-             all_alt_bndrs [scrut_fvs, all_alt_fvs]
-             -- all_alt_bndrs: see Note [Shadowing and name capture]
+             all_ty_and_alt_bndrs [scrut_fvs, all_alt_fvs]
+             -- all_ty_and_alt_bndrs: see Note [Shadowing and name capture]
 
         -- Float into the alts with the is_case flag set
     (drop_here2, alts_drops_s)
@@ -558,7 +558,8 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
 
     scrut_fvs = freeVarsOf scrut
 
-    all_alt_bndrs = foldr (unionDVarSet . ann_alt_bndrs) (unitDVarSet case_bndr) alts
+    all_ty_and_alt_bndrs = tyCoVarsOfTypeDSet ty `unionDVarSet`         -- occurrences of ty vars
+      foldr (unionDVarSet . ann_alt_bndrs) (unitDVarSet case_bndr) alts -- bound variables
     ann_alt_bndrs (AnnAlt _ bndrs _) = mkDVarSet bndrs
 
     alts_fvs :: [DVarSet]

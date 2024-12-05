@@ -148,7 +148,7 @@ computeCbvInfo fun_id rhs
   | otherwise = fun_id
   where
     mb_join_id  = idJoinPointHood fun_id
-    is_wkr_like = isWorkerLikeId fun_id
+    is_wkr_like = isId fun_id && isWorkerLikeId fun_id
 
     val_args = filter isId lam_bndrs
     -- When computing CbvMarks, we limit the arity of join points to
@@ -315,53 +315,54 @@ tidyIdBndr env@(tidy_env, var_env) id
 
 tidyLetBndr :: TidyEnv         -- Knot-tied version for unfoldings
             -> TidyEnv         -- The one to extend
-            -> Id -> (TidyEnv, Id)
+            -> Var -> (TidyEnv, Var)
 -- Used for local (non-top-level) let(rec)s
 -- Just like tidyIdBndr above, but with more IdInfo
-tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
-  = case tidyOccName tidy_env (getOccName id) of { (tidy_env', occ') ->
-    let
-        ty'      = tidyType env (idType id)
-        mult'    = tidyType env (idMult id)
-        name'    = mkInternalName (idUnique id) occ' noSrcSpan
-        details  = idDetails id
-        id'      = mkLocalVar details name' mult' ty' new_info
-        var_env' = extendVarEnv var_env id id'
+tidyLetBndr rec_tidy_env env@(tidy_env, var_env) v
+  = ((tidy_env', var_env'), v')
+  where
+    !(tidy_env', occ') = tidyOccName tidy_env (getOccName v)
+    ty'      = tidyType env (varType v)
+    name'    = mkInternalName (varUnique v) occ' noSrcSpan
 
-        -- Note [Tidy IdInfo]
-        -- We need to keep around any interesting strictness and
-        -- demand info because later on we may need to use it when
-        -- converting to A-normal form.
-        -- eg.
-        --      f (g x),  where f is strict in its argument, will be converted
-        --      into  case (g x) of z -> f z  by CorePrep, but only if f still
-        --      has its strictness info.
-        --
-        -- Similarly for the demand info - on a let binder, this tells
-        -- CorePrep to turn the let into a case.
-        -- But: Remove the usage demand here
-        --      (See Note [Zapping DmdEnv after Demand Analyzer] in GHC.Core.Opt.WorkWrap)
-        --
-        -- Similarly arity info for eta expansion in CorePrep
-        -- Don't attempt to recompute arity here; this is just tidying!
-        -- Trying to do so led to #17294
-        --
-        -- Set inline-prag info so that we preserve it across
-        -- separate compilation boundaries
-        old_info = idInfo id
-        new_info = vanillaIdInfo
-                    `setOccInfo`        occInfo old_info
-                    `setArityInfo`      arityInfo old_info
-                    `setDmdSigInfo`     zapDmdEnvSig (dmdSigInfo old_info)
-                    `setDemandInfo`     demandInfo old_info
-                    `setInlinePragInfo` inlinePragInfo old_info
-                    `setUnfoldingInfo`  new_unf
+    v' | isId v    = mkLocalVar details name' mult' ty' new_info
+       | otherwise = mkTyVar name' ty'
 
-        old_unf = realUnfoldingInfo old_info
-        new_unf = tidyNestedUnfolding rec_tidy_env old_unf
+    mult'    = tidyType env (idMult v)
+    details  = idDetails v
+    var_env' = extendVarEnv var_env v v'
 
-    in
-    ((tidy_env', var_env'), id') }
+    -- Note [Tidy IdInfo]
+    -- We need to keep around any interesting strictness and
+    -- demand info because later on we may need to use it when
+    -- converting to A-normal form.
+    -- eg.
+    --      f (g x),  where f is strict in its argument, will be converted
+    --      into  case (g x) of z -> f z  by CorePrep, but only if f still
+    --      has its strictness info.
+    --
+    -- Similarly for the demand info - on a let binder, this tells
+    -- CorePrep to turn the let into a case.
+    -- But: Remove the usage demand here
+    --      (See Note [Zapping DmdEnv after Demand Analyzer] in GHC.Core.Opt.WorkWrap)
+    --
+    -- Similarly arity info for eta expansion in CorePrep
+    -- Don't attempt to recompute arity here; this is just tidying!
+    -- Trying to do so led to #17294
+    --
+    -- Set inline-prag info so that we preserve it across
+    -- separate compilation boundaries
+    old_info = idInfo v
+    new_info = vanillaIdInfo
+                `setOccInfo`        occInfo old_info
+                `setArityInfo`      arityInfo old_info
+                `setDmdSigInfo`     zapDmdEnvSig (dmdSigInfo old_info)
+                `setDemandInfo`     demandInfo old_info
+                `setInlinePragInfo` inlinePragInfo old_info
+                `setUnfoldingInfo`  new_unf
+
+    old_unf = realUnfoldingInfo old_info
+    new_unf = tidyNestedUnfolding rec_tidy_env old_unf
 
 ------------ Unfolding  --------------
 tidyNestedUnfolding :: TidyEnv -> Unfolding -> Unfolding

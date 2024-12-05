@@ -1,6 +1,6 @@
-{-# OPTIONS_GHC -O -fmax-simplifier-iterations=0 #-}
+{-# OPTIONS_GHC -O -fno-cse -fmax-simplifier-iterations=0 #-}
 
--- Not running the simplifier leads to type-lets persisting longer
+-- Not running the simplifier and CSE leads to type-lets persisting longer
 
 module T13708 where
 

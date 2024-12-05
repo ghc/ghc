@@ -628,6 +628,11 @@ cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
                    Maybe CoreBind) -- Just bind' <=> returned new bind; no float
                                    -- Nothing <=> added bind' to floats instead
 cpeBind top_lvl env (NonRec bndr rhs)
+  | Type ty <- rhs
+  = do { (env1, bndr1) <- cpCloneBndr env bndr
+       ; let ty1 = cpSubstTy env ty
+       ; return (env1, emptyFloats, Just (NonRec bndr1 (Type ty1))) }
+
   | not (isJoinId bndr)
   = do { (env1, bndr1) <- cpCloneBndr env bndr
        ; let dmd = idDemandInfo bndr

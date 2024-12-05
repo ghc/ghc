@@ -299,6 +299,8 @@ dmdAnalBind
   -> WithDmdType (DmdResult CoreBind a)
 dmdAnalBind top_lvl env dmd bind anal_body = case bind of
   NonRec id rhs
+    | not (isId id)
+    -> dmdAnalBindType            env         id bind anal_body
     | useLetUp top_lvl id
     -> dmdAnalBindLetUp   top_lvl env_rhs     id rhs anal_body
   _ -> dmdAnalBindLetDown top_lvl env_rhs dmd bind   anal_body
@@ -321,6 +323,15 @@ setIdDmdAndBoxSig opts id sig = setIdDmdSig id $
   if dmd_do_boxity opts || isBottomingSig sig
     then sig
     else transferArgBoxityDmdSig (idDmdSig id) sig
+
+dmdAnalBindType :: AnalEnv
+                -> Var
+                -> CoreBind
+                -> (AnalEnv -> WithDmdType a)
+                -> WithDmdType (DmdResult CoreBind a)
+dmdAnalBindType env v bind anal_body
+  | WithDmdType ty a <- anal_body (addInScopeAnalEnv env v)
+  = WithDmdType ty (R bind a)
 
 -- | Let bindings can be processed in two ways:
 -- Down (RHS before body) or Up (body before RHS).
