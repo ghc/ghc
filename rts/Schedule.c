@@ -2288,8 +2288,10 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
     } else if (new_n_capabilities <= 0) {
         errorBelch("setNumCapabilities: Capability count must be positive");
         return;
+    } else if (new_n_capabilities > MAX_N_CAPABILITIES) {
+        errorBelch("Attempt to increase capability count beyond MAX_N_CAPABILITIES\n");
+        return;
     }
-
 
     debugTrace(DEBUG_sched, "changing the number of Capabilities from %d to %d",
                enabled_capabilities, new_n_capabilities);
