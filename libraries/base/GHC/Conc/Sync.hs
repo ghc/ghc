@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RankNTypes #-}
@@ -392,13 +391,14 @@ getNumProcessors :: IO Int
 getNumProcessors = fmap fromIntegral c_getNumberOfProcessors
 
 foreign import ccall unsafe "getNumberOfProcessors"
-  c_getNumberOfProcessors :: IO CUInt
+  c_getNumberOfProcessors :: IO Word32
 
 -- | Returns the number of sparks currently in the local spark pool
 numSparks :: IO Int
 numSparks = IO $ \s -> case numSparks# s of (# s', n #) -> (# s', I# n #)
 
-foreign import ccall "&enabled_capabilities" enabled_capabilities :: Ptr CInt
+foreign import ccall "&enabled_capabilities"
+  enabled_capabilities :: Ptr Word32
 
 childHandler :: SomeException -> IO ()
 childHandler err = catch (real_handler err) childHandler
