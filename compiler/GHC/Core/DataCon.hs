@@ -43,7 +43,7 @@ module GHC.Core.DataCon (
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
         dataConInstOrigArgTys, dataConRepArgTys, dataConResRepTyArgs,
         dataConInstUnivs,
-        dataConFieldLabels, dataConFieldType, dataConFieldType_maybe,
+        dataConFieldLabels, dataConFieldType, dataConFieldType_maybe, dataConOtherFieldsAllMultMany,
         dataConSrcBangs,
         dataConSourceArity, dataConRepArity,
         dataConIsInfix,
@@ -1391,6 +1391,11 @@ dataConFieldType_maybe :: DataCon -> FieldLabelString
                        -> Maybe (FieldLabel, Type)
 dataConFieldType_maybe con label
   = find ((== label) . flLabel . fst) (dcFields con `zip` (scaledThing <$> dcOrigArgTys con))
+
+
+dataConOtherFieldsAllMultMany :: DataCon -> FieldLabelString -> Bool
+dataConOtherFieldsAllMultMany con label
+  = all (\(fld, mult) -> flLabel fld == label || isManyTy mult) (dcFields con `zip` (scaledMult <$> dcOrigArgTys con))
 
 -- | Strictness/unpack annotations, from user; or, for imported
 -- DataCons, from the interface file
