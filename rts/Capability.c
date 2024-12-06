@@ -16,6 +16,7 @@
  *
  * --------------------------------------------------------------------------*/
 
+#include "rts/Config.h"
 #include "rts/PosixSource.h"
 #include "Rts.h"
 
@@ -39,6 +40,9 @@ Capability MainCapability;
 
 uint32_t n_capabilities = 0;
 uint32_t enabled_capabilities = 0;
+
+// Referenced by GHC.Internal.Conc.Sync
+const StgInt maxNumCapabilities = MAX_N_CAPABILITIES;
 
 // The array of Capabilities.  It's important that when we need
 // to allocate more Capabilities we don't have to move the existing

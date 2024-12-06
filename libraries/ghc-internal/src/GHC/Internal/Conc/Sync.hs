@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RankNTypes #-}
@@ -381,8 +380,15 @@ to avoid contention with other processes in the machine.
 -}
 setNumCapabilities :: Int -> IO ()
 setNumCapabilities i
-  | i <= 0    = failIO $ "setNumCapabilities: Capability count ("++show i++") must be positive"
-  | otherwise = c_setNumCapabilities (fromIntegral i)
+  | i <= 0      = failIO $ "setNumCapabilities: Capability count ("++show i++") must be positive"
+  | i > maxCaps = failIO $ "setNumCapabilities: This GHC build only supports up to "++show maxCaps++" capabilities"
+  | otherwise   = c_setNumCapabilities (fromIntegral i)
+
+maxCaps :: Int
+maxCaps = unsafeDupablePerformIO $ peek c_maxNumCapabilities
+
+foreign import ccall safe "&maxNumCapabilities"
+  c_maxNumCapabilities :: Ptr Int
 
 foreign import ccall safe "setNumCapabilities"
   c_setNumCapabilities :: CUInt -> IO ()

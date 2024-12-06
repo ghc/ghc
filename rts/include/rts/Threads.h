@@ -77,6 +77,9 @@ INLINE_HEADER unsigned int getNumCapabilities(void)
 // The number of Capabilities that are not disabled
 extern uint32_t enabled_capabilities;
 
+// The maximum number of Capabilities supported by the RTS.
+extern const StgInt maxNumCapabilities;
+
 #if !IN_STG_CODE
 extern Capability MainCapability;
 #endif
