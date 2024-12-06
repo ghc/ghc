@@ -28,5 +28,8 @@ test('T18757', omit_ghci, compile_and_run, [''])
 # N.B. Sanity check times out due to large list.
 test('T16992', [when(wordsize(32), skip), # Resource limit exceeded on 32-bit
                 high_memory_usage,
+                # This test has extraordinary memory requirement,
+                # skip unless testing slow speed
+                unless(slow(), skip),
                 run_timeout_multiplier(5),
                 omit_ways(['sanity'])], compile_and_run, [''])
