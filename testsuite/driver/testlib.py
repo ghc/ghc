@@ -970,6 +970,9 @@ def tables_next_to_code() -> bool:
 def fast() -> bool:
     return config.speed == 2
 
+def slow() -> bool:
+    return config.speed == 0
+
 def platform( plat: str ) -> bool:
     return config.platform == plat
 
