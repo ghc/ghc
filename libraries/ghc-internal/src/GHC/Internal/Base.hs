@@ -442,7 +442,7 @@ W4:
 
 W5:
   If no explicit "default" declaration is present, the assumed
-  "default (Integer, Double)" creates a dependency on GHC.Num.Integer
+  "default (Integer, Double)" creates a dependency on GHC.Internal.Bignum.Integer
   for the Integer type if defaulting is ever attempted during
   type-checking.  (This doesn't apply to hs-boot files, which can't
   be given "default" declarations anyway.)

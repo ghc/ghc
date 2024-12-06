@@ -10,12 +10,12 @@
 {-# LANGUAGE KindSignatures #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
-module GHC.Num.WordArray where
+module GHC.Internal.Bignum.WordArray where
 
 import GHC.Prim
 import GHC.Magic
 import GHC.Types
-import GHC.Num.Primitives
+import GHC.Internal.Bignum.Primitives
 
 #include "MachDeps.h"
 #include "WordSize.h"

@@ -39,7 +39,7 @@ where
 
 import GHC.Internal.Base hiding ( many )
 import GHC.Internal.Char
-import GHC.Num.Integer
+import GHC.Internal.Bignum.Integer
 import GHC.Internal.Num
 import GHC.Internal.Show
 import GHC.Tuple (Solo (..))

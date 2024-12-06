@@ -33,7 +33,7 @@ module GHC.Internal.TypeNats.Internal
   ) where
 
 import GHC.Internal.Base(Ordering)
-import GHC.Num.Natural(Natural)
+import GHC.Internal.Bignum.Natural(Natural)
 
 -- | Comparison of type-level naturals, as a function.
 --

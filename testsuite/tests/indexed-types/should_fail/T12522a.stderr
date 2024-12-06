@@ -1,4 +1,3 @@
-
 T12522a.hs:23:26: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from a use of ‘show’
       prevents the constraint ‘(Show a0)’ from being solved.
@@ -15,3 +14,4 @@ T12522a.hs:23:26: error: [GHC-39999]
     • In the first argument of ‘(++)’, namely ‘show n’
       In the second argument of ‘($)’, namely ‘show n ++ s’
       In the expression: I $ show n ++ s
+

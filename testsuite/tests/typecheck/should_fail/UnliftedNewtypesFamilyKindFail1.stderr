@@ -1,5 +1,7 @@
-
 UnliftedNewtypesFamilyKindFail1.hs:11:31: error: [GHC-83865]
-    • Expected a type, but ‘5’ has kind ‘GHC.Num.Natural.Natural’
+    • Expected a type,
+      but ‘5’ has kind
+      ‘GHC.Internal.Bignum.Natural.Natural’
     • In the kind ‘5’
       In the data family declaration for ‘DF’
+

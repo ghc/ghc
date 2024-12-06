@@ -1,4 +1,5 @@
-extra-lib-dirs: @ICONV_LIB_DIRS@
-extra-libraries: @EXTRA_LIBS@
-include-dirs: @ICONV_INCLUDE_DIRS@
-install-includes: HsBaseConfig.h EventConfig.h
+extra-lib-dirs: @ICONV_LIB_DIRS@ @GMP_LIB_DIRS@
+extra-libraries: @EXTRA_LIBS@ @GMP_LIBS@
+include-dirs: @ICONV_INCLUDE_DIRS@ @GMP_INCLUDE_DIRS@
+frameworks: @GMP_FRAMEWORK@
+install-includes: HsBaseConfig.h EventConfig.h @GMP_INSTALL_INCLUDES@

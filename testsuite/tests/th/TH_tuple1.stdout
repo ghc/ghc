@@ -1,10 +1,10 @@
-SigE (AppE (AppE (ConE GHC.Tuple.(,)) (LitE (IntegerL 1))) (LitE (IntegerL 2))) (AppT (AppT (ConT GHC.Tuple.Tuple2) (ConT GHC.Num.Integer.Integer)) (ConT GHC.Num.Integer.Integer))
-GHC.Tuple.(,) 1 2 :: GHC.Tuple.Tuple2 GHC.Num.Integer.Integer
-                                      GHC.Num.Integer.Integer
-SigE (AppE (ConE GHC.Tuple.MkSolo) (LitE (IntegerL 1))) (AppT (ConT GHC.Tuple.Solo) (ConT GHC.Num.Integer.Integer))
-GHC.Tuple.MkSolo 1 :: GHC.Tuple.Solo GHC.Num.Integer.Integer
-SigE (AppE (AppE (ConE GHC.Types.(#,#)) (LitE (IntegerL 1))) (LitE (IntegerL 2))) (AppT (AppT (ConT GHC.Types.Tuple2#) (ConT GHC.Num.Integer.Integer)) (ConT GHC.Num.Integer.Integer))
-GHC.Types.(#,#) 1 2 :: GHC.Types.Tuple2# GHC.Num.Integer.Integer
-                                         GHC.Num.Integer.Integer
-SigE (AppE (ConE GHC.Types.MkSolo#) (LitE (IntegerL 1))) (AppT (ConT GHC.Types.Solo#) (ConT GHC.Num.Integer.Integer))
-GHC.Types.MkSolo# 1 :: GHC.Types.Solo# GHC.Num.Integer.Integer
+SigE (AppE (AppE (ConE GHC.Tuple.(,)) (LitE (IntegerL 1))) (LitE (IntegerL 2))) (AppT (AppT (ConT GHC.Tuple.Tuple2) (ConT GHC.Internal.Bignum.Integer.Integer)) (ConT GHC.Internal.Bignum.Integer.Integer))
+GHC.Tuple.(,) 1 2 :: GHC.Tuple.Tuple2 GHC.Internal.Bignum.Integer.Integer
+                                      GHC.Internal.Bignum.Integer.Integer
+SigE (AppE (ConE GHC.Tuple.MkSolo) (LitE (IntegerL 1))) (AppT (ConT GHC.Tuple.Solo) (ConT GHC.Internal.Bignum.Integer.Integer))
+GHC.Tuple.MkSolo 1 :: GHC.Tuple.Solo GHC.Internal.Bignum.Integer.Integer
+SigE (AppE (AppE (ConE GHC.Types.(#,#)) (LitE (IntegerL 1))) (LitE (IntegerL 2))) (AppT (AppT (ConT GHC.Types.Tuple2#) (ConT GHC.Internal.Bignum.Integer.Integer)) (ConT GHC.Internal.Bignum.Integer.Integer))
+GHC.Types.(#,#) 1 2 :: GHC.Types.Tuple2# GHC.Internal.Bignum.Integer.Integer
+                                         GHC.Internal.Bignum.Integer.Integer
+SigE (AppE (ConE GHC.Types.MkSolo#) (LitE (IntegerL 1))) (AppT (ConT GHC.Types.Solo#) (ConT GHC.Internal.Bignum.Integer.Integer))
+GHC.Types.MkSolo# 1 :: GHC.Types.Solo# GHC.Internal.Bignum.Integer.Integer

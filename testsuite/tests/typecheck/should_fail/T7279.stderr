@@ -1,4 +1,3 @@
-
 T7279.hs:6:10: error: [GHC-39999]
     • Could not deduce ‘Show b0’
       from the context: (Eq a, Show b)
@@ -15,3 +14,4 @@ T7279.hs:6:10: error: [GHC-39999]
     • In the ambiguity check for an instance declaration
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the instance declaration for ‘Eq (T a)’
+

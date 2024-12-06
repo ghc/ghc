@@ -76,14 +76,16 @@ $krep1 :: GHC.Types.KindRep
 [GblId, Unf=OtherCon []]
 $krep1
   = GHC.Types.KindRepTyConApp
-      GHC.Num.Integer.$tcInteger (GHC.Types.[] @GHC.Types.KindRep)
+      GHC.Internal.Bignum.Integer.$tcInteger
+      (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 $krep2 :: GHC.Types.KindRep
 [GblId, Unf=OtherCon []]
 $krep2
   = GHC.Types.KindRepTyConApp
-      GHC.Num.Natural.$tcNatural (GHC.Types.[] @GHC.Types.KindRep)
+      GHC.Internal.Bignum.Natural.$tcNatural
+      (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 $krep3 :: GHC.Types.KindRep

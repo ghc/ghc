@@ -48,7 +48,7 @@ configurePackageRules = do
         let pkg = unsafeFindPackageByPath path
         let ctx = Context stage pkg vanilla Inplace
         buildP <- buildPath ctx
-        when (pkg == ghcBignum) $ do
+        when (pkg == ghcInternal) $ do
           isGmp <- (== "gmp") <$> interpretInContext ctx getBignumBackend
           when isGmp $
             need [buildP -/- "include/ghc-gmp.h"]
@@ -174,7 +174,7 @@ buildConfFinal rs context@Context {..} _conf = do
         need headers
 
     -- we need to generate this file for GMP
-    when (package == ghcBignum) $ do
+    when (package == ghcInternal) $ do
         bignum <- interpretInContext context getBignumBackend
         when (bignum == "gmp") $
             need [path -/- "include/ghc-gmp.h"]
@@ -219,7 +219,7 @@ buildConfInplace rs context@Context {..} _conf = do
              ]
 
     -- we need to generate this file for GMP
-    when (package == ghcBignum) $ do
+    when (package == ghcInternal) $ do
         bignum <- interpretInContext context getBignumBackend
         when (bignum == "gmp") $
             need [path -/- "include/ghc-gmp.h"]

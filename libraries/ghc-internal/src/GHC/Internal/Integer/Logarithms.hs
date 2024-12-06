@@ -9,9 +9,9 @@ module GHC.Internal.Integer.Logarithms
    )
 where
 
-import qualified GHC.Num.Primitives as N
-import qualified GHC.Num.Integer    as N
-import GHC.Num.Integer (Integer)
+import qualified GHC.Internal.Bignum.Primitives as N
+import qualified GHC.Internal.Bignum.Integer    as N
+import GHC.Internal.Bignum.Integer (Integer)
 import GHC.Prim
 
 wordLog2# :: Word# -> Int#

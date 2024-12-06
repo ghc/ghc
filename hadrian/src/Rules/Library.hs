@@ -207,10 +207,10 @@ jsObjects context = do
 
 -- | Return extra object files needed to build the given library context. The
 -- resulting list is currently non-empty only when the package from the
--- 'Context' is @ghc-bignum@ built with in-tree GMP backend.
+-- 'Context' is @ghc-internal@ built with in-tree GMP backend.
 extraObjects :: Context -> Action [FilePath]
 extraObjects context
-    | package context == ghcBignum = do
+    | package context == ghcInternal = do
          interpretInContext context getBignumBackend >>= \case
             "gmp" -> gmpObjects (stage context)
             _     -> return []

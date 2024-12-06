@@ -16,19 +16,19 @@
 --
 -- This has been adapted from the legacy `integer-gmp` package written by
 -- Herbert Valerio Riedel.
-module GHC.Num.Backend.GMP where
+module GHC.Internal.Bignum.Backend.GMP where
 
 #include "MachDeps.h"
 #include "WordSize.h"
 
-import GHC.Num.WordArray
-import GHC.Num.Primitives
+import GHC.Internal.Bignum.WordArray
+import GHC.Internal.Bignum.Primitives
 import GHC.Prim
 import GHC.Types
 import GHC.Magic (runRW#)
-import {-# SOURCE #-} GHC.Num.Integer
-import {-# SOURCE #-} GHC.Num.BigNat
-import {-# SOURCE #-} GHC.Num.Natural
+import {-# SOURCE #-} GHC.Internal.Bignum.Integer
+import {-# SOURCE #-} GHC.Internal.Bignum.BigNat
+import {-# SOURCE #-} GHC.Internal.Bignum.Natural
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 -- (This module uses the empty tuple () and string literals.)

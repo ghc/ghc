@@ -220,6 +220,9 @@ Library
         , GHC.MVar
         , GHC.Natural
         , GHC.Num
+        , GHC.Num.Integer
+        , GHC.Num.Natural
+        , GHC.Num.BigNat
         , GHC.OldList
         , GHC.OverloadedLabels
         , GHC.Profiling
@@ -273,11 +276,6 @@ Library
         , Unsafe.Coerce
           -- TODO: remove
         , GHC.IOPort
-
-    reexported-modules:
-          GHC.Num.Integer
-        , GHC.Num.Natural
-        , GHC.Num.BigNat
 
     if os(windows)
         exposed-modules:

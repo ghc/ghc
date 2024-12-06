@@ -13,15 +13,15 @@
 -- that replace bignat foreign calls with calls to the native platform bignat
 -- library (e.g. JavaScript's BigInt). You can also link an extra object
 -- providing the implementation.
-module GHC.Num.Backend.FFI where
+module GHC.Internal.Bignum.Backend.FFI where
 
 import GHC.Prim
 import GHC.Types
-import GHC.Num.WordArray
-import GHC.Num.Primitives
-import qualified GHC.Num.Backend.Native as Native
-import {-# SOURCE #-} GHC.Num.Natural
-import {-# SOURCE #-} GHC.Num.Integer
+import GHC.Internal.Bignum.WordArray
+import GHC.Internal.Bignum.Primitives
+import qualified GHC.Internal.Bignum.Backend.Native as Native
+import {-# SOURCE #-} GHC.Internal.Bignum.Natural
+import {-# SOURCE #-} GHC.Internal.Bignum.Integer
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 -- (This module uses the empty tuple () and string literals.)

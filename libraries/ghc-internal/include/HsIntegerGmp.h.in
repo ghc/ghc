@@ -1,6 +1,6 @@
 #pragma once
 
-/* Whether GMP is embedded into ghc-bignum */
+/* Whether GMP is embedded into ghc-internal */
 #define GHC_GMP_INTREE     @UseIntreeGmp@
 
 /* The following values denote the GMP version used during GHC build-time */

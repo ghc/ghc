@@ -1,12 +1,11 @@
-
 T13242a.hs:10:5: error: [GHC-46956]
     • Couldn't match expected type ‘a0’ with actual type ‘a’
-    • because type variable ‘a’ would escape its scope
-    This (rigid, skolem) type variable is bound by
-      a pattern with constructor: A :: forall a. Eq a => a -> T,
-      in a pattern binding in
-           a 'do' block
-      at T13242a.hs:10:3-5
+        because type variable ‘a’ would escape its scope
+      This (rigid, skolem) type variable is bound by
+        a pattern with constructor: A :: forall a. Eq a => a -> T,
+        in a pattern binding in
+             a 'do' block
+        at T13242a.hs:10:3-5
     • In the expression:
         do A x <- undefined
            _ <- return 'a'
@@ -27,9 +26,9 @@ T13242a.hs:13:13: error: [GHC-39999]
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
         instance Eq Ordering -- Defined in ‘GHC.Classes’
-        instance Eq Integer -- Defined in ‘GHC.Num.Integer’
+        instance Eq Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
         ...plus 23 others
-        ...plus five instances involving out-of-scope types
+        ...plus six instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of a 'do' block: return (x == x)
       In the expression:
@@ -43,3 +42,4 @@ T13242a.hs:13:13: error: [GHC-39999]
                  _ <- return 'a'
                  _ <- return 'b'
                  return (x == x)
+

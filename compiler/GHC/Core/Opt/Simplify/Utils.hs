@@ -872,7 +872,7 @@ wrappers created by CPR, exactly case (4) above.  Without this limitation I
 got too much fruitless inlining, which led to regressions (#22317 is an example).
 
 A good example of a function where this 'small incentive' is important is
-GHC.Num.Integer where we ended up with calls like this:
+GHC.Internal.Bignum.Integer where we ended up with calls like this:
      case (integerSignum a b) of r -> ...
 but were failing to inline integerSignum, even though it always returns
 a single constructor, so it is very helpful to inline it. There is also an
@@ -1068,7 +1068,7 @@ interstingArg returns
    (a) NonTrivArg for an arg with an OtherCon [] unfolding
    (b) ValueArg for an arg with an OtherCon [c1,c2..] unfolding.
 
-Reason for (a): I found (in the GHC.Num.Integer library) that I was
+Reason for (a): I found (in the GHC.Internal.Bignum.Integer module) that I was
 inlining a pretty big function when all we knew was that its arguments
 were evaluated, nothing more.  That in turn make the enclosing function
 too big to inline elsewhere.

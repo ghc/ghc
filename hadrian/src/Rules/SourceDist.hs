@@ -147,7 +147,6 @@ prepareTree dest = do
       , pkgPath rts -/- "ghcautoconf.h.autoconf.in"
       , pkgPath process -/- "include" -/- "HsProcessConfig.h.in"
       , pkgPath process -/- "configure"
-      , pkgPath ghcBignum -/- "configure"
       , pkgPath ghcInternal -/- "configure"
       , pkgPath ghcInternal -/- "include" -/- "HsBaseConfig.h.in"
       , pkgPath directory -/- "configure"

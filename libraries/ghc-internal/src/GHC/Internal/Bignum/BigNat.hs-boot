@@ -2,10 +2,10 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-module GHC.Num.BigNat where
+module GHC.Internal.Bignum.BigNat where
 
-import GHC.Num.WordArray
-import GHC.Num.Primitives
+import GHC.Internal.Bignum.WordArray
+import GHC.Internal.Bignum.Primitives
 import GHC.Prim
 
 type BigNat# = WordArray#

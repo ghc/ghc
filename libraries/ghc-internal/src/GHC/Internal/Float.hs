@@ -176,7 +176,7 @@ import GHC.Internal.Word
 import GHC.Internal.Arr
 import GHC.Internal.Float.RealFracMethods
 import GHC.Internal.Float.ConversionUtils
-import GHC.Num.BigNat
+import GHC.Internal.Bignum.BigNat
 
 infixr 8  **
 
@@ -1796,7 +1796,7 @@ castDoubleToWord64 :: Double -> Word64
 castDoubleToWord64 (D# d#) = W64# (castDoubleToWord64# d#)
 
 -- See Note [Optimising conversions between numeric types]
--- in GHC.Num.Integer
+-- in GHC.Internal.Bignum.Integer
 {-# RULES
 
 "Int# -> Integer -> Float#"

@@ -1,7 +1,6 @@
 [1 of 4] Compiling ExportMonoidProduct ( ExportMonoidProduct.hs, ExportMonoidProduct.o )
 [2 of 4] Compiling ExportMonoidSum  ( ExportMonoidSum.hs, ExportMonoidSum.o )
 [3 of 4] Compiling Main             ( DefaultImportFail02.hs, DefaultImportFail02.o )
-
 DefaultImportFail02.hs:6:8: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from a use of ‘print’
       prevents the constraint ‘(Show a0)’ from being solved.
@@ -29,3 +28,4 @@ DefaultImportFail02.hs:6:14: error: [GHC-39999]
     • In the first argument of ‘print’, namely ‘mempty’
       In the expression: print mempty
       In an equation for ‘main’: main = print mempty
+

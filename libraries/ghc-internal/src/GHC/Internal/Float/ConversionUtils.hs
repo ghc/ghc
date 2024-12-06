@@ -22,7 +22,7 @@
 module GHC.Internal.Float.ConversionUtils ( elimZerosInteger, elimZerosInt# ) where
 
 import GHC.Internal.Base
-import GHC.Num.Integer
+import GHC.Internal.Bignum.Integer
 
 default ()
 

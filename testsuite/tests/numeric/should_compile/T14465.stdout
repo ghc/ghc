@@ -9,7 +9,7 @@ ten :: Natural
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-ten = GHC.Num.Natural.NS 10##
+ten = GHC.Internal.Bignum.Natural.NS 10##
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 M.$trModule4 :: GHC.Prim.Addr#
@@ -67,7 +67,7 @@ twoTimesTwo :: Natural
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-twoTimesTwo = GHC.Num.Natural.NS 4##
+twoTimesTwo = GHC.Internal.Bignum.Natural.NS 4##
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 M.one1 :: Natural
@@ -75,7 +75,7 @@ M.one1 :: Natural
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-M.one1 = GHC.Num.Natural.NS 1##
+M.one1 = GHC.Internal.Bignum.Natural.NS 1##
 
 -- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
 plusOne :: Natural -> Natural

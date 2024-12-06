@@ -9,22 +9,22 @@
 {-# LANGUAGE BinaryLiterals #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
-module GHC.Num.Backend.Native where
+module GHC.Internal.Bignum.Backend.Native where
 
 #include "MachDeps.h"
 #include "WordSize.h"
 
 #if defined(BIGNUM_NATIVE) || defined(BIGNUM_CHECK) || defined(BIGNUM_FFI)
-import {-# SOURCE #-} GHC.Num.BigNat
-import {-# SOURCE #-} GHC.Num.Natural
-import {-# SOURCE #-} GHC.Num.Integer
+import {-# SOURCE #-} GHC.Internal.Bignum.BigNat
+import {-# SOURCE #-} GHC.Internal.Bignum.Natural
+import {-# SOURCE #-} GHC.Internal.Bignum.Integer
 #else
-import GHC.Num.BigNat
-import GHC.Num.Natural
-import GHC.Num.Integer
+import GHC.Internal.Bignum.BigNat
+import GHC.Internal.Bignum.Natural
+import GHC.Internal.Bignum.Integer
 #endif
-import GHC.Num.WordArray
-import GHC.Num.Primitives
+import GHC.Internal.Bignum.WordArray
+import GHC.Internal.Bignum.Primitives
 import GHC.Prim
 import GHC.Types
 
@@ -657,7 +657,7 @@ bignat_gcd_word a b = bignat_gcd_word_word b (bigNatRemWord# a b)
 -- than this simple implementation (basic Euclid algorithm).
 --
 -- Ideally we should make an implementation as fast as GMP's one and put it into
--- GHC.Num.Primitives.
+-- GHC.Internal.Bignum.Primitives.
 bignat_gcd_word_word
    :: Word#
    -> Word#

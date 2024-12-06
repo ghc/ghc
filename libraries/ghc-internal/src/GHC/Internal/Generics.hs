@@ -733,7 +733,7 @@ module GHC.Internal.Generics  (
 import GHC.Internal.Data.Either     ( Either (..) )
 import GHC.Internal.Data.Maybe      ( Maybe(..), fromMaybe )
 import GHC.Internal.Data.Ord        ( Down(..) )
-import GHC.Num.Integer ( Integer, integerToInt )
+import GHC.Internal.Bignum.Integer ( Integer, integerToInt )
 import GHC.Prim        ( Addr#, Char#, Double#, Float#, Int#, Word# )
 import GHC.Internal.Ptr         ( Ptr(..) )
 import GHC.Types

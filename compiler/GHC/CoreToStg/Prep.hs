@@ -2741,7 +2741,7 @@ cpeBigNatLit env i = assert (i >= 0) $ do
   let
     platform = cp_platform (cpe_config env)
 
-    -- Per the documentation in GHC.Num.BigNat, a BigNat# is:
+    -- Per the documentation in GHC.Internal.Bignum.BigNat, a BigNat# is:
     --   "Represented as an array of limbs (Word#) stored in
     --   little-endian order (Word# themselves use machine order)."
     --

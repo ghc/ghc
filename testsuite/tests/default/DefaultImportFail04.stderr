@@ -1,7 +1,6 @@
 [1 of 4] Compiling ExportShowSum    ( ExportShowSum.hs, ExportShowSum.o )
 [2 of 4] Compiling ReExportShowSumModule ( ReExportShowSumModule.hs, ReExportShowSumModule.o )
 [3 of 4] Compiling Main             ( DefaultImportFail04.hs, DefaultImportFail04.o )
-
 DefaultImportFail04.hs:6:8: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from a use of ‘print’
       prevents the constraint ‘(Show a0)’ from being solved.
@@ -29,3 +28,4 @@ DefaultImportFail04.hs:6:14: error: [GHC-39999]
     • In the first argument of ‘print’, namely ‘mempty’
       In the expression: print mempty
       In an equation for ‘main’: main = print mempty
+

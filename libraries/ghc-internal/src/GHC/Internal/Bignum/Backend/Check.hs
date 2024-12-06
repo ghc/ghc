@@ -10,17 +10,17 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | Check Native implementation against another backend
-module GHC.Num.Backend.Check where
+module GHC.Internal.Bignum.Backend.Check where
 
 import GHC.CString
 import GHC.Prim
 import GHC.Types
-import GHC.Num.WordArray
-import GHC.Num.Primitives
-import {-# SOURCE #-} GHC.Num.Integer
-import {-# SOURCE #-} GHC.Num.Natural
-import qualified GHC.Num.Backend.Native   as Native
-import qualified GHC.Num.Backend.Selected as Other
+import GHC.Internal.Bignum.WordArray
+import GHC.Internal.Bignum.Primitives
+import {-# SOURCE #-} GHC.Internal.Bignum.Integer
+import {-# SOURCE #-} GHC.Internal.Bignum.Natural
+import qualified GHC.Internal.Bignum.Backend.Native   as Native
+import qualified GHC.Internal.Bignum.Backend.Selected as Other
 
 #if defined(BIGNUM_NATIVE)
 #error You can't validate Native backend against itself. Choose another backend (e.g. gmp, ffi)

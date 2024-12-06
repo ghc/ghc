@@ -1,4 +1,4 @@
-inside b: GHC.Num.Integer.Integer
+inside b: GHC.Internal.Bignum.Integer.Integer
 inside d: GHC.Types.Bool
 type of c: GHC.Types.Bool
 inside f: GHC.Types.Bool

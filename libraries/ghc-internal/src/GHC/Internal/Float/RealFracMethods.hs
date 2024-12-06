@@ -59,7 +59,7 @@ module GHC.Internal.Float.RealFracMethods
     , int2Float
     ) where
 
-import GHC.Num.Integer
+import GHC.Internal.Bignum.Integer
 
 import GHC.Internal.Base hiding (uncheckedIShiftRA64#, uncheckedIShiftL64#)
 import GHC.Internal.Num () -- instance Num Integer

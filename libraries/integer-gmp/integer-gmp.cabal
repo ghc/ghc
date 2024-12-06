@@ -35,7 +35,6 @@ library
   build-depends:
       base >= 4.11 && < 5
     , ghc-prim
-    , ghc-bignum
     , ghc-internal
 
   exposed-modules:

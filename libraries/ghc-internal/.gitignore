@@ -10,12 +10,12 @@
 # Specific generated files
 /GNUmakefile
 /autom4te.cache/
-/base.buildinfo
+/ghc-internal.buildinfo
 /config.log
 /config.status
 /configure
 /dist-install/
-/ghc.mk
 /include/EventConfig.h
 /include/HsBaseConfig.h
 /include/HsBaseConfig.h.in
+/include/HsIntegerGmp.h

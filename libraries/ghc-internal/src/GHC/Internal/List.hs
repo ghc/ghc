@@ -46,7 +46,7 @@ module GHC.Internal.List (
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Base
 import GHC.Internal.Num (Num(..))
-import GHC.Num.Integer (Integer)
+import GHC.Internal.Bignum.Integer (Integer)
 import GHC.Internal.Stack.Types (HasCallStack)
 
 infixl 9  !?, !!

@@ -574,9 +574,9 @@ gHC_INTERNAL_CONTROL_MONAD_ZIP :: Module
 gHC_INTERNAL_CONTROL_MONAD_ZIP  = mkGhcInternalModule (fsLit "GHC.Internal.Control.Monad.Zip")
 
 gHC_INTERNAL_NUM_INTEGER, gHC_INTERNAL_NUM_NATURAL, gHC_INTERNAL_NUM_BIGNAT :: Module
-gHC_INTERNAL_NUM_INTEGER            = mkBignumModule (fsLit "GHC.Num.Integer")
-gHC_INTERNAL_NUM_NATURAL            = mkBignumModule (fsLit "GHC.Num.Natural")
-gHC_INTERNAL_NUM_BIGNAT             = mkBignumModule (fsLit "GHC.Num.BigNat")
+gHC_INTERNAL_NUM_INTEGER            = mkGhcInternalModule (fsLit "GHC.Internal.Bignum.Integer")
+gHC_INTERNAL_NUM_NATURAL            = mkGhcInternalModule (fsLit "GHC.Internal.Bignum.Natural")
+gHC_INTERNAL_NUM_BIGNAT             = mkGhcInternalModule (fsLit "GHC.Internal.Bignum.BigNat")
 
 gHC_INTERNAL_BASE, gHC_INTERNAL_ENUM,
     gHC_INTERNAL_GHCI, gHC_INTERNAL_GHCI_HELPERS, gHC_CSTRING, gHC_INTERNAL_DATA_STRING,
@@ -685,9 +685,6 @@ mAIN_NAME      = mkModuleNameFS (fsLit "Main")
 
 mkPrimModule :: FastString -> Module
 mkPrimModule m = mkModule primUnit (mkModuleNameFS m)
-
-mkBignumModule :: FastString -> Module
-mkBignumModule m = mkModule bignumUnit (mkModuleNameFS m)
 
 mkGhcInternalModule :: FastString -> Module
 mkGhcInternalModule m = mkGhcInternalModule_ (mkModuleNameFS m)

@@ -39,11 +39,9 @@ packageArgs = do
     mconcat
         --------------------------------- base ---------------------------------
         [ package base ? mconcat
-          [ builder (Cabal Flags) ? notStage0 `cabalFlag` (pkgName ghcBignum)
-
-          -- This fixes the 'unknown symbol stat' issue.
-          -- See: https://github.com/snowleopard/hadrian/issues/259.
-          , builder (Ghc CompileCWithGhc) ? arg "-optc-O2" ]
+          [ -- This fixes the 'unknown symbol stat' issue.
+            -- See: https://github.com/snowleopard/hadrian/issues/259.
+            builder (Ghc CompileCWithGhc) ? arg "-optc-O2" ]
 
         --------------------------------- cabal --------------------------------
         -- Cabal is a large library and slow to compile. Moreover, we build it
@@ -232,8 +230,8 @@ packageArgs = do
         , package hsc2hs ?
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
-        ------------------------------ ghc-bignum ------------------------------
-        , ghcBignumArgs
+        ------------------------------ ghc-internal ------------------------------
+        , ghcInternalArgs
 
         ---------------------------------- rts ---------------------------------
         , package rts ? rtsPackageArgs -- RTS deserves a separate function
@@ -253,8 +251,8 @@ packageArgs = do
 
         ]
 
-ghcBignumArgs :: Args
-ghcBignumArgs = package ghcBignum ? do
+ghcInternalArgs :: Args
+ghcInternalArgs = package ghcInternal ? do
     -- These are only used for non-in-tree builds.
     librariesGmp <- getSetting GmpLibDir
     includesGmp <- getSetting GmpIncludeDir
@@ -263,11 +261,11 @@ ghcBignumArgs = package ghcBignum ? do
     check   <- getBignumCheck
 
     mconcat
-          [ -- select BigNum backend
-            builder (Cabal Flags) ? arg backend
+          [ -- select bignum backend
+            builder (Cabal Flags) ? arg ("bignum-" <> backend)
 
           , -- check the selected backend against native backend
-            builder (Cabal Flags) ? check `cabalFlag` "check"
+            builder (Cabal Flags) ? check `cabalFlag` "bignum-check"
 
             -- backend specific
           , case backend of
@@ -275,7 +273,7 @@ ghcBignumArgs = package ghcBignum ? do
                    [ builder (Cabal Setup) ? mconcat
 
                        -- enable GMP backend: configure script will produce
-                       -- `ghc-bignum.buildinfo` and `include/HsIntegerGmp.h`
+                       -- `ghc-internal.buildinfo` and `include/HsIntegerGmp.h`
                      [ arg "--configure-option=--with-gmp"
 
                        -- enable in-tree support: don't depend on external "gmp"
@@ -286,7 +284,7 @@ ghcBignumArgs = package ghcBignum ? do
                      , flag GmpFrameworkPref ?
                        arg "--configure-option=--with-gmp-framework-preferred"
 
-                       -- Ensure that the ghc-bignum package registration includes
+                       -- Ensure that the ghc-internal package registration includes
                        -- knowledge of the system gmp's library and include directories.
                      , notM (flag GmpInTree) ? cabalExtraDirs includesGmp librariesGmp
                      ]

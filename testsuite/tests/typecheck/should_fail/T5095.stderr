@@ -1,16 +1,16 @@
-
 T5095.hs:9:11: error: [GHC-43085]
     • Overlapping instances for Eq a arising from a use of ‘==’
       Matching instance:
         instance [overlappable] Show a => Eq a -- Defined at T5095.hs:5:31
       Potentially matching instances:
         instance Eq Ordering -- Defined in ‘GHC.Classes’
-        instance Eq Integer -- Defined in ‘GHC.Num.Integer’
+        instance Eq Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
         ...plus 23 others
-        ...plus four instances involving out-of-scope types
+        ...plus five instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
       (The choice depends on the instantiation of ‘a’
        To pick the first instance above, use IncoherentInstances
        when compiling the other instance declarations)
     • In the expression: x == y
       In an equation for ‘f’: f x y = x == y
+
