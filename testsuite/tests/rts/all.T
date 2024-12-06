@@ -571,3 +571,7 @@ test('decodeMyStack_emptyListForMissingFlag',
 test('T22012', [js_skip, extra_ways(['ghci'])], compile_and_run, ['T22012_c.c'])
 test('T17574', [js_skip], compile_and_run, ['-with-rtsopts -T'])
 test('T23400', [], compile_and_run, ['-with-rtsopts -A8k'])
+
+# N.B. This will likely issue a warning on stderr but we merely care that the
+# program doesn't crash.
+test('T25560', [req_c_rts, ignore_stderr], compile_and_run, [''])
