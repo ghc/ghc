@@ -616,3 +616,7 @@ test('T23400', [], compile_and_run, ['-with-rtsopts -A8k'])
 test('IOManager', [js_skip, when(arch('wasm32'), skip), when(opsys('mingw32'), skip),
                    pre_cmd('$MAKE -s --no-print-directory IOManager.hs')],
                   compile_and_run, [''])
+
+# N.B. This will likely issue a warning on stderr but we merely care that the
+# program doesn't crash.
+test('T25560', [req_c_rts, ignore_stderr], compile_and_run, [''])
