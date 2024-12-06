@@ -69,7 +69,7 @@ HsBool rtsSupportsBoundThreads (void);
 // The number of Capabilities.
 // TODO: Ideally we would only provide getNumCapabilities
 // but this is used in compiler/cbits/genSym.c
-extern unsigned int n_capabilities;
+extern uint32_t n_capabilities;
 
 INLINE_HEADER unsigned int getNumCapabilities(void)
 { return RELAXED_LOAD(&n_capabilities); }
