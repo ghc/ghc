@@ -29,6 +29,7 @@ WebAssembly backend
 GHCi
 ~~~~
 
+- When using XDG directories ``.ghci_history`` now uses the ``$XDG_DATA_HOME`` variable as expected. (#24266)
 
 Runtime system
 ~~~~~~~~~~~~~~
