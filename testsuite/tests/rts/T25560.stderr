@@ -1,0 +1,3 @@
+T25560: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:
+
+user error (setNumCapabilities: This GHC build only supports up to 1 capabilities)
