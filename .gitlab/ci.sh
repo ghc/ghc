@@ -954,7 +954,7 @@ if [ "${CI_COMMIT_BRANCH:-}" == "master" ] &&  [ "${CI_PROJECT_PATH:-}" == "ghc/
   fi
 fi
 if [ -n "${IGNORE_PERF_FAILURES:-}" ]; then
-  RUNTEST_ARGS="--ignore-perf-failures=$IGNORE_PERF_FAILURES"
+  RUNTEST_ARGS=( "${RUNTEST_ARGS[@]:-}" "--ignore-perf-failures=$IGNORE_PERF_FAILURES" )
 fi
 
 if [[ -z ${BIGNUM_BACKEND:-} ]]; then BIGNUM_BACKEND=gmp; fi
