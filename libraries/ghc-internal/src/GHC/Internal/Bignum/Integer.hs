@@ -9,7 +9,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 -- |
--- Module      :  GHC.Num.Integer
+-- Module      :  GHC.Internal.Bignum.Integer
 -- Copyright   :  (c) Sylvain Henry 2019,
 --                (c) Herbert Valerio Riedel 2014
 -- License     :  BSD3
@@ -20,7 +20,7 @@
 --
 -- The 'Integer' type.
 
-module GHC.Num.Integer
+module GHC.Internal.Bignum.Integer
     ( Integer(..)
     , integerCheck
     , integerCheck#
@@ -153,10 +153,10 @@ import GHC.Prim
 import GHC.Types
 import GHC.Classes
 import GHC.Magic
-import GHC.Num.Primitives
-import GHC.Num.BigNat
-import GHC.Num.Natural
-import qualified GHC.Num.Backend as Backend
+import GHC.Internal.Bignum.Primitives
+import GHC.Internal.Bignum.BigNat
+import GHC.Internal.Bignum.Natural
+import qualified GHC.Internal.Bignum.Backend as Backend
 
 default ()
 
@@ -920,7 +920,7 @@ integerQuotRem# !n      (IS 1#) = (# n, IS 0# #) -- Note [Bangs in Integer funct
 integerQuotRem# !n     (IS -1#) = let !q = integerNegate n in (# q, (IS 0#) #)
 integerQuotRem# !_      (IS 0#) = case raiseDivZero of
                                     !_ -> (# IS 0#, IS 0# #)
-                                    -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
+                                    -- see Note [ghc-bignum exceptions] in GHC.Internal.Bignum.Primitives
 integerQuotRem# (IS 0#) _       = (# IS 0#, IS 0# #)
 integerQuotRem# (IS n#) (IS d#) = case quotRemInt# n# d# of
     (# q#, r# #) -> (# IS q#, IS r# #)

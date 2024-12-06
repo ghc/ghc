@@ -2945,9 +2945,6 @@ def normalise_errmsg(s: str) -> str:
     s = re.sub('hpc-[0-9.]+', 'hpc', s)
     s = re.sub('ghc-pkg-[0-9.]+', 'ghc-pkg', s)
 
-    # Error messages sometimes contain ghc-bignum implementation package
-    s = re.sub('ghc-bignum-[0-9.]+', 'ghc-bignum-<VERSION>', s)
-
     # Error messages sometimes contain these blurbs which can vary
     # spuriously depending upon build configuration (e.g. based on bignum
     # backend)

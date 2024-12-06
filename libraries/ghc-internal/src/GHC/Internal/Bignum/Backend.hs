@@ -2,14 +2,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 -- | Selected backend
-module GHC.Num.Backend
+module GHC.Internal.Bignum.Backend
    ( module Backend
    )
 where
 
 #if defined(BIGNUM_CHECK)
-import GHC.Num.Backend.Check    as Backend
+import GHC.Internal.Bignum.Backend.Check    as Backend
 #else
-import GHC.Num.Backend.Selected as Backend
+import GHC.Internal.Bignum.Backend.Selected as Backend
 #endif
 

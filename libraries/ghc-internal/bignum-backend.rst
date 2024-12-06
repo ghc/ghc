@@ -1,8 +1,9 @@
-GHC BIGNUM LIBRARY
+GHC Bignum backend
 ==================
 
-This package contains the implementation of the infinite precision integral
-types ("big numbers/bignum"):
+ghc-internal contains the implementation of the infinite precision integral
+types ("big numbers/bignum") that were previously provided by ghc-bignum (and by
+integer-gmp/integer-simple before that):
    
 * BigNat: a positive natural represented as an array of Word# in memory
 * Natural: a positive natural represented either by a Word# or by a BigNat
@@ -59,14 +60,15 @@ as a fall back.
 Avoiding `patError`
 -------------------
 
-ghc-bignum is below `base` package. Hence if we use the natural set of
-definitions for functions, e.g.:
+ghc-bignum used to be below the `base` package and `base` used to provide the
+`patError` wired-in function. Hence if we use the natural set of definitions for
+functions, e.g.:
 
     integerXor (IS x) y      = ...
     integerXor x      (IS y) = ...
     integerXor ...
 
-then GHC may not be smart enough (especially when compiling with -O0)
+then GHC would not be smart enough (especially when compiling with -O0)
 to see that all the cases are handled, and will thus insert calls to
 `base:Control.Exception.Base.patError`. But we are below `base` in the
 package hierarchy, so this causes link failure!
@@ -79,3 +81,6 @@ cases are:
                 IS y -> ...
                 IN y -> ...
        ...
+
+This might not be required anymore now that ghc-bignum has been merged with
+ghc-internal and that `patError` has been moved from `base` to ghc-internal.

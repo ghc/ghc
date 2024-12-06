@@ -1,6 +1,6 @@
 Rule fired: Class op + (BUILTIN)
 Rule fired: Class op fromInteger (BUILTIN)
-Rule fired: Int# -> Integer -> Int# (GHC.Num.Integer)
+Rule fired: Int# -> Integer -> Int# (GHC.Internal.Bignum.Integer)
 Rule fired: USPEC plusTwoRec @Int (T15445a)
 Rule fired: USPEC $fShowList @Int (GHC.Internal.Show)
 Rule fired: Class op >> (BUILTIN)

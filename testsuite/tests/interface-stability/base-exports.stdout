@@ -835,7 +835,7 @@ module Data.Data where
   type Constr :: *
   data Constr = ...
   type ConstrRep :: *
-  data ConstrRep = AlgConstr ConIndex | IntConstr GHC.Num.Integer.Integer | FloatConstr GHC.Internal.Real.Rational | CharConstr GHC.Types.Char
+  data ConstrRep = AlgConstr ConIndex | IntConstr GHC.Internal.Bignum.Integer.Integer | FloatConstr GHC.Internal.Real.Rational | CharConstr GHC.Types.Char
   type Data :: * -> Constraint
   class Typeable a => Data a where
     gfoldl :: forall (c :: * -> *). (forall d b. Data d => c (d -> b) -> d -> c b) -> (forall g. g -> c g) -> a -> c a
@@ -1010,10 +1010,10 @@ module Data.Fixed where
   data E9
   type role Fixed phantom
   type Fixed :: forall k. k -> *
-  newtype Fixed a = MkFixed GHC.Num.Integer.Integer
+  newtype Fixed a = MkFixed GHC.Internal.Bignum.Integer.Integer
   type HasResolution :: forall k. k -> Constraint
   class HasResolution @k a where
-    resolution :: forall (p :: k -> *). p a -> GHC.Num.Integer.Integer
+    resolution :: forall (p :: k -> *). p a -> GHC.Internal.Bignum.Integer.Integer
     {-# MINIMAL resolution #-}
   type Micro :: *
   type Micro = Fixed E6
@@ -1582,7 +1582,7 @@ module Data.Ratio where
   type Ratio :: * -> *
   data Ratio a = ...
   type Rational :: *
-  type Rational = Ratio GHC.Num.Integer.Integer
+  type Rational = Ratio GHC.Internal.Bignum.Integer.Integer
   approxRational :: forall a. GHC.Internal.Real.RealFrac a => a -> a -> Rational
   denominator :: forall a. Ratio a -> a
   numerator :: forall a. Ratio a -> a
@@ -7148,11 +7148,11 @@ module GHC.Float where
     {-# MINIMAL pi, exp, log, sin, cos, asin, acos, atan, sinh, cosh, asinh, acosh, atanh #-}
   type RealFloat :: * -> Constraint
   class (GHC.Internal.Real.RealFrac a, Floating a) => RealFloat a where
-    floatRadix :: a -> GHC.Num.Integer.Integer
+    floatRadix :: a -> GHC.Internal.Bignum.Integer.Integer
     floatDigits :: a -> GHC.Types.Int
     floatRange :: a -> (GHC.Types.Int, GHC.Types.Int)
-    decodeFloat :: a -> (GHC.Num.Integer.Integer, GHC.Types.Int)
-    encodeFloat :: GHC.Num.Integer.Integer -> GHC.Types.Int -> a
+    decodeFloat :: a -> (GHC.Internal.Bignum.Integer.Integer, GHC.Types.Int)
+    encodeFloat :: GHC.Internal.Bignum.Integer.Integer -> GHC.Types.Int -> a
     exponent :: a -> GHC.Types.Int
     significand :: a -> a
     scaleFloat :: GHC.Types.Int -> a -> a
@@ -7200,30 +7200,30 @@ module GHC.Float where
   expFloat :: Float -> Float
   expm1Double :: Double -> Double
   expm1Float :: Float -> Float
-  expt :: GHC.Num.Integer.Integer -> GHC.Types.Int -> GHC.Num.Integer.Integer
-  expts :: GHC.Internal.Arr.Array GHC.Types.Int GHC.Num.Integer.Integer
-  expts10 :: GHC.Internal.Arr.Array GHC.Types.Int GHC.Num.Integer.Integer
+  expt :: GHC.Internal.Bignum.Integer.Integer -> GHC.Types.Int -> GHC.Internal.Bignum.Integer.Integer
+  expts :: GHC.Internal.Arr.Array GHC.Types.Int GHC.Internal.Bignum.Integer.Integer
+  expts10 :: GHC.Internal.Arr.Array GHC.Types.Int GHC.Internal.Bignum.Integer.Integer
   fabsDouble :: Double -> Double
   fabsFloat :: Float -> Float
   float2Double :: Float -> Double
   float2Int :: Float -> GHC.Types.Int
-  floatToDigits :: forall a. RealFloat a => GHC.Num.Integer.Integer -> a -> ([GHC.Types.Int], GHC.Types.Int)
+  floatToDigits :: forall a. RealFloat a => GHC.Internal.Bignum.Integer.Integer -> a -> ([GHC.Types.Int], GHC.Types.Int)
   floorDouble :: forall b. GHC.Internal.Real.Integral b => Double -> b
   floorFloat :: forall b. GHC.Internal.Real.Integral b => Float -> b
   formatRealFloat :: forall a. RealFloat a => FFFormat -> GHC.Internal.Maybe.Maybe GHC.Types.Int -> a -> GHC.Internal.Base.String
   formatRealFloatAlt :: forall a. RealFloat a => FFFormat -> GHC.Internal.Maybe.Maybe GHC.Types.Int -> GHC.Types.Bool -> a -> GHC.Internal.Base.String
   fromRat :: forall a. RealFloat a => GHC.Internal.Real.Rational -> a
   fromRat' :: forall a. RealFloat a => GHC.Internal.Real.Rational -> a
-  fromRat'' :: forall a. RealFloat a => GHC.Types.Int -> GHC.Types.Int -> GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer -> a
+  fromRat'' :: forall a. RealFloat a => GHC.Types.Int -> GHC.Types.Int -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> a
   geDouble :: Double -> Double -> GHC.Types.Bool
   geFloat :: Float -> Float -> GHC.Types.Bool
   gtDouble :: Double -> Double -> GHC.Types.Bool
   gtFloat :: Float -> Float -> GHC.Types.Bool
   int2Double :: GHC.Types.Int -> Double
   int2Float :: GHC.Types.Int -> Float
-  integerToBinaryFloat' :: forall a. RealFloat a => GHC.Num.Integer.Integer -> a
-  integerToDouble# :: GHC.Num.Integer.Integer -> Double#
-  integerToFloat# :: GHC.Num.Integer.Integer -> Float#
+  integerToBinaryFloat' :: forall a. RealFloat a => GHC.Internal.Bignum.Integer.Integer -> a
+  integerToDouble# :: GHC.Internal.Bignum.Integer.Integer -> Double#
+  integerToFloat# :: GHC.Internal.Bignum.Integer.Integer -> Float#
   isDoubleDenormalized :: Double -> GHC.Types.Int
   isDoubleFinite :: Double -> GHC.Types.Int
   isDoubleInfinite :: Double -> GHC.Types.Int
@@ -7248,8 +7248,8 @@ module GHC.Float where
   minExpt :: GHC.Types.Int
   minusDouble :: Double -> Double -> Double
   minusFloat :: Float -> Float -> Float
-  naturalToDouble# :: GHC.Num.Natural.Natural -> Double#
-  naturalToFloat# :: GHC.Num.Natural.Natural -> Float#
+  naturalToDouble# :: GHC.Internal.Bignum.Natural.Natural -> Double#
+  naturalToFloat# :: GHC.Internal.Bignum.Natural.Natural -> Float#
   negateDouble :: Double -> Double
   negateFloat :: Float -> Float
   plusDouble :: Double -> Double -> Double
@@ -7258,12 +7258,12 @@ module GHC.Float where
   powerFloat :: Float -> Float -> Float
   properFractionDouble :: forall b. GHC.Internal.Real.Integral b => Double -> (b, Double)
   properFractionFloat :: forall b. GHC.Internal.Real.Integral b => Float -> (b, Float)
-  rationalToDouble :: GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer -> Double
-  rationalToFloat :: GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer -> Float
+  rationalToDouble :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> Double
+  rationalToFloat :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> Float
   roundDouble :: forall b. GHC.Internal.Real.Integral b => Double -> b
   roundFloat :: forall b. GHC.Internal.Real.Integral b => Float -> b
   roundTo :: GHC.Types.Int -> GHC.Types.Int -> [GHC.Types.Int] -> (GHC.Types.Int, [GHC.Types.Int])
-  roundingMode# :: GHC.Num.Integer.Integer -> GHC.Prim.Int# -> GHC.Prim.Int#
+  roundingMode# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Prim.Int# -> GHC.Prim.Int#
   showFloat :: forall a. RealFloat a => a -> GHC.Internal.Show.ShowS
   showSignedFloat :: forall a. RealFloat a => (a -> GHC.Internal.Show.ShowS) -> GHC.Types.Int -> a -> GHC.Internal.Show.ShowS
   sinDouble :: Double -> Double
@@ -7289,33 +7289,33 @@ module GHC.Float where
 
 module GHC.Float.ConversionUtils where
   -- Safety: Safe
-  elimZerosInt# :: GHC.Prim.Int# -> GHC.Prim.Int# -> (# GHC.Num.Integer.Integer, GHC.Prim.Int# #)
-  elimZerosInteger :: GHC.Num.Integer.Integer -> GHC.Prim.Int# -> (# GHC.Num.Integer.Integer, GHC.Prim.Int# #)
+  elimZerosInt# :: GHC.Prim.Int# -> GHC.Prim.Int# -> (# GHC.Internal.Bignum.Integer.Integer, GHC.Prim.Int# #)
+  elimZerosInteger :: GHC.Internal.Bignum.Integer.Integer -> GHC.Prim.Int# -> (# GHC.Internal.Bignum.Integer.Integer, GHC.Prim.Int# #)
 
 module GHC.Float.RealFracMethods where
   -- Safety: Safe
   ceilingDoubleInt :: GHC.Types.Double -> GHC.Types.Int
-  ceilingDoubleInteger :: GHC.Types.Double -> GHC.Num.Integer.Integer
+  ceilingDoubleInteger :: GHC.Types.Double -> GHC.Internal.Bignum.Integer.Integer
   ceilingFloatInt :: GHC.Types.Float -> GHC.Types.Int
-  ceilingFloatInteger :: GHC.Types.Float -> GHC.Num.Integer.Integer
+  ceilingFloatInteger :: GHC.Types.Float -> GHC.Internal.Bignum.Integer.Integer
   double2Int :: GHC.Types.Double -> GHC.Types.Int
   float2Int :: GHC.Types.Float -> GHC.Types.Int
   floorDoubleInt :: GHC.Types.Double -> GHC.Types.Int
-  floorDoubleInteger :: GHC.Types.Double -> GHC.Num.Integer.Integer
+  floorDoubleInteger :: GHC.Types.Double -> GHC.Internal.Bignum.Integer.Integer
   floorFloatInt :: GHC.Types.Float -> GHC.Types.Int
-  floorFloatInteger :: GHC.Types.Float -> GHC.Num.Integer.Integer
+  floorFloatInteger :: GHC.Types.Float -> GHC.Internal.Bignum.Integer.Integer
   int2Double :: GHC.Types.Int -> GHC.Types.Double
   int2Float :: GHC.Types.Int -> GHC.Types.Float
   properFractionDoubleInt :: GHC.Types.Double -> (GHC.Types.Int, GHC.Types.Double)
-  properFractionDoubleInteger :: GHC.Types.Double -> (GHC.Num.Integer.Integer, GHC.Types.Double)
+  properFractionDoubleInteger :: GHC.Types.Double -> (GHC.Internal.Bignum.Integer.Integer, GHC.Types.Double)
   properFractionFloatInt :: GHC.Types.Float -> (GHC.Types.Int, GHC.Types.Float)
-  properFractionFloatInteger :: GHC.Types.Float -> (GHC.Num.Integer.Integer, GHC.Types.Float)
+  properFractionFloatInteger :: GHC.Types.Float -> (GHC.Internal.Bignum.Integer.Integer, GHC.Types.Float)
   roundDoubleInt :: GHC.Types.Double -> GHC.Types.Int
-  roundDoubleInteger :: GHC.Types.Double -> GHC.Num.Integer.Integer
+  roundDoubleInteger :: GHC.Types.Double -> GHC.Internal.Bignum.Integer.Integer
   roundFloatInt :: GHC.Types.Float -> GHC.Types.Int
-  roundFloatInteger :: GHC.Types.Float -> GHC.Num.Integer.Integer
-  truncateDoubleInteger :: GHC.Types.Double -> GHC.Num.Integer.Integer
-  truncateFloatInteger :: GHC.Types.Float -> GHC.Num.Integer.Integer
+  roundFloatInteger :: GHC.Types.Float -> GHC.Internal.Bignum.Integer.Integer
+  truncateDoubleInteger :: GHC.Types.Double -> GHC.Internal.Bignum.Integer.Integer
+  truncateFloatInteger :: GHC.Types.Float -> GHC.Internal.Bignum.Integer.Integer
 
 module GHC.Foreign where
   -- Safety: Safe
@@ -7613,10 +7613,10 @@ module GHC.IO.Device where
     close :: a -> GHC.Types.IO ()
     isTerminal :: a -> GHC.Types.IO GHC.Types.Bool
     isSeekable :: a -> GHC.Types.IO GHC.Types.Bool
-    seek :: a -> SeekMode -> GHC.Num.Integer.Integer -> GHC.Types.IO GHC.Num.Integer.Integer
-    tell :: a -> GHC.Types.IO GHC.Num.Integer.Integer
-    getSize :: a -> GHC.Types.IO GHC.Num.Integer.Integer
-    setSize :: a -> GHC.Num.Integer.Integer -> GHC.Types.IO ()
+    seek :: a -> SeekMode -> GHC.Internal.Bignum.Integer.Integer -> GHC.Types.IO GHC.Internal.Bignum.Integer.Integer
+    tell :: a -> GHC.Types.IO GHC.Internal.Bignum.Integer.Integer
+    getSize :: a -> GHC.Types.IO GHC.Internal.Bignum.Integer.Integer
+    setSize :: a -> GHC.Internal.Bignum.Integer.Integer -> GHC.Types.IO ()
     setEcho :: a -> GHC.Types.Bool -> GHC.Types.IO ()
     getEcho :: a -> GHC.Types.IO GHC.Types.Bool
     setRaw :: a -> GHC.Types.Bool -> GHC.Types.IO ()
@@ -7844,7 +7844,7 @@ module GHC.IO.Handle where
   type Handle :: *
   data Handle = ...
   type HandlePosition :: *
-  type HandlePosition = GHC.Num.Integer.Integer
+  type HandlePosition = GHC.Internal.Bignum.Integer.Integer
   type HandlePosn :: *
   data HandlePosn = HandlePosn Handle HandlePosition
   type LockMode :: *
@@ -7859,7 +7859,7 @@ module GHC.IO.Handle where
   hClose_help :: GHC.Internal.IO.Handle.Types.Handle__ -> GHC.Types.IO (GHC.Internal.IO.Handle.Types.Handle__, GHC.Internal.Maybe.Maybe GHC.Internal.Exception.Type.SomeException)
   hDuplicate :: Handle -> GHC.Types.IO Handle
   hDuplicateTo :: Handle -> Handle -> GHC.Types.IO ()
-  hFileSize :: Handle -> GHC.Types.IO GHC.Num.Integer.Integer
+  hFileSize :: Handle -> GHC.Types.IO GHC.Internal.Bignum.Integer.Integer
   hFlush :: Handle -> GHC.Types.IO ()
   hFlushAll :: Handle -> GHC.Types.IO ()
   hGetBuf :: forall a. Handle -> GHC.Internal.Ptr.Ptr a -> GHC.Types.Int -> GHC.Types.IO GHC.Types.Int
@@ -7885,16 +7885,16 @@ module GHC.IO.Handle where
   hPutBufNonBlocking :: forall a. Handle -> GHC.Internal.Ptr.Ptr a -> GHC.Types.Int -> GHC.Types.IO GHC.Types.Int
   hPutChar :: Handle -> GHC.Types.Char -> GHC.Types.IO ()
   hPutStr :: Handle -> GHC.Internal.Base.String -> GHC.Types.IO ()
-  hSeek :: Handle -> SeekMode -> GHC.Num.Integer.Integer -> GHC.Types.IO ()
+  hSeek :: Handle -> SeekMode -> GHC.Internal.Bignum.Integer.Integer -> GHC.Types.IO ()
   hSetBinaryMode :: Handle -> GHC.Types.Bool -> GHC.Types.IO ()
   hSetBuffering :: Handle -> BufferMode -> GHC.Types.IO ()
   hSetEcho :: Handle -> GHC.Types.Bool -> GHC.Types.IO ()
   hSetEncoding :: Handle -> GHC.Internal.IO.Encoding.Types.TextEncoding -> GHC.Types.IO ()
-  hSetFileSize :: Handle -> GHC.Num.Integer.Integer -> GHC.Types.IO ()
+  hSetFileSize :: Handle -> GHC.Internal.Bignum.Integer.Integer -> GHC.Types.IO ()
   hSetNewlineMode :: Handle -> NewlineMode -> GHC.Types.IO ()
   hSetPosn :: HandlePosn -> GHC.Types.IO ()
   hShow :: Handle -> GHC.Types.IO GHC.Internal.Base.String
-  hTell :: Handle -> GHC.Types.IO GHC.Num.Integer.Integer
+  hTell :: Handle -> GHC.Types.IO GHC.Internal.Bignum.Integer.Integer
   hTryLock :: Handle -> LockMode -> GHC.Types.IO GHC.Types.Bool
   hWaitForInput :: Handle -> GHC.Types.Int -> GHC.Types.IO GHC.Types.Bool
   isEOF :: GHC.Types.IO GHC.Types.Bool
@@ -8228,8 +8228,8 @@ module GHC.Integer where
 
 module GHC.Integer.Logarithms where
   -- Safety: None
-  integerLog2# :: GHC.Num.Integer.Integer -> GHC.Prim.Int#
-  integerLogBase# :: GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer -> GHC.Prim.Int#
+  integerLog2# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Prim.Int#
+  integerLogBase# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Prim.Int#
   wordLog2# :: GHC.Prim.Word# -> GHC.Prim.Int#
 
 module GHC.IsList where
@@ -8344,7 +8344,7 @@ module GHC.Maybe where
 module GHC.Natural where
   -- Safety: Safe
   type BigNat :: *
-  data BigNat = BN# {unBigNat :: GHC.Num.BigNat.BigNat#}
+  data BigNat = BN# {unBigNat :: GHC.Internal.Bignum.BigNat.BigNat#}
   pattern NatJ# :: BigNat -> Natural
   pattern NatS# :: GHC.Prim.Word# -> Natural
   type Natural :: *
@@ -8357,8 +8357,8 @@ module GHC.Natural where
   minusNatural :: Natural -> Natural -> Natural
   minusNaturalMaybe :: Natural -> Natural -> GHC.Internal.Maybe.Maybe Natural
   mkNatural :: [GHC.Types.Word] -> Natural
-  naturalFromInteger :: GHC.Num.Integer.Integer -> Natural
-  naturalToInteger :: Natural -> GHC.Num.Integer.Integer
+  naturalFromInteger :: GHC.Internal.Bignum.Integer.Integer -> Natural
+  naturalToInteger :: Natural -> GHC.Internal.Bignum.Integer.Integer
   naturalToWord :: Natural -> GHC.Types.Word
   naturalToWordMaybe :: Natural -> GHC.Internal.Maybe.Maybe GHC.Types.Word
   negateNatural :: Natural -> Natural
@@ -8400,7 +8400,7 @@ module GHC.Num where
   integerBit :: GHC.Types.Word -> Integer
   integerBit# :: GHC.Prim.Word# -> Integer
   integerCheck :: Integer -> GHC.Types.Bool
-  integerCheck# :: Integer -> GHC.Num.Primitives.Bool#
+  integerCheck# :: Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerCompare :: Integer -> Integer -> GHC.Types.Ordering
   integerComplement :: Integer -> Integer
   integerDecodeDouble# :: GHC.Prim.Double# -> (# Integer, GHC.Prim.Int# #)
@@ -8411,14 +8411,14 @@ module GHC.Num where
   integerEncodeDouble# :: Integer -> GHC.Prim.Int# -> GHC.Prim.Double#
   integerEncodeFloat# :: Integer -> GHC.Prim.Int# -> GHC.Prim.Float#
   integerEq :: Integer -> Integer -> GHC.Types.Bool
-  integerEq# :: Integer -> Integer -> GHC.Num.Primitives.Bool#
-  integerFromAddr :: GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Types.IO Integer
-  integerFromAddr# :: forall s. GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Integer #)
-  integerFromBigNat# :: GHC.Num.BigNat.BigNat# -> Integer
-  integerFromBigNatNeg# :: GHC.Num.BigNat.BigNat# -> Integer
-  integerFromBigNatSign# :: GHC.Prim.Int# -> GHC.Num.BigNat.BigNat# -> Integer
-  integerFromByteArray :: GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> Integer
-  integerFromByteArray# :: forall s. GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Integer #)
+  integerEq# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
+  integerFromAddr :: GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Types.IO Integer
+  integerFromAddr# :: forall s. GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Integer #)
+  integerFromBigNat# :: GHC.Internal.Bignum.BigNat.BigNat# -> Integer
+  integerFromBigNatNeg# :: GHC.Internal.Bignum.BigNat.BigNat# -> Integer
+  integerFromBigNatSign# :: GHC.Prim.Int# -> GHC.Internal.Bignum.BigNat.BigNat# -> Integer
+  integerFromByteArray :: GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> Integer
+  integerFromByteArray# :: forall s. GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Integer #)
   integerFromInt :: GHC.Types.Int -> Integer
   integerFromInt# :: GHC.Prim.Int# -> Integer
   integerFromInt64# :: GHC.Prim.Int64# -> Integer
@@ -8433,17 +8433,17 @@ module GHC.Num where
   integerGcde :: Integer -> Integer -> (Integer, Integer, Integer)
   integerGcde# :: Integer -> Integer -> (# Integer, Integer, Integer #)
   integerGe :: Integer -> Integer -> GHC.Types.Bool
-  integerGe# :: Integer -> Integer -> GHC.Num.Primitives.Bool#
+  integerGe# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerGt :: Integer -> Integer -> GHC.Types.Bool
-  integerGt# :: Integer -> Integer -> GHC.Num.Primitives.Bool#
+  integerGt# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerIsNegative :: Integer -> GHC.Types.Bool
-  integerIsNegative# :: Integer -> GHC.Num.Primitives.Bool#
+  integerIsNegative# :: Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerIsOne :: Integer -> GHC.Types.Bool
   integerIsPowerOf2# :: Integer -> (# (# #) | GHC.Prim.Word# #)
   integerIsZero :: Integer -> GHC.Types.Bool
   integerLcm :: Integer -> Integer -> Integer
   integerLe :: Integer -> Integer -> GHC.Types.Bool
-  integerLe# :: Integer -> Integer -> GHC.Num.Primitives.Bool#
+  integerLe# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerLog2 :: Integer -> GHC.Types.Word
   integerLog2# :: Integer -> GHC.Prim.Word#
   integerLogBase :: Integer -> Integer -> GHC.Types.Word
@@ -8451,11 +8451,11 @@ module GHC.Num where
   integerLogBaseWord :: GHC.Types.Word -> Integer -> GHC.Types.Word
   integerLogBaseWord# :: GHC.Prim.Word# -> Integer -> GHC.Prim.Word#
   integerLt :: Integer -> Integer -> GHC.Types.Bool
-  integerLt# :: Integer -> Integer -> GHC.Num.Primitives.Bool#
+  integerLt# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerMod :: Integer -> Integer -> Integer
   integerMul :: Integer -> Integer -> Integer
   integerNe :: Integer -> Integer -> GHC.Types.Bool
-  integerNe# :: Integer -> Integer -> GHC.Num.Primitives.Bool#
+  integerNe# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerNegate :: Integer -> Integer
   integerOne :: Integer
   integerOr :: Integer -> Integer -> Integer
@@ -8476,16 +8476,16 @@ module GHC.Num where
   integerSqr :: Integer -> Integer
   integerSub :: Integer -> Integer -> Integer
   integerTestBit :: Integer -> GHC.Types.Word -> GHC.Types.Bool
-  integerTestBit# :: Integer -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool#
-  integerToAddr :: Integer -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
-  integerToAddr# :: forall s. Integer -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
-  integerToBigNatClamp# :: Integer -> GHC.Num.BigNat.BigNat#
-  integerToBigNatSign# :: Integer -> (# GHC.Prim.Int#, GHC.Num.BigNat.BigNat# #)
+  integerTestBit# :: Integer -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  integerToAddr :: Integer -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
+  integerToAddr# :: forall s. Integer -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
+  integerToBigNatClamp# :: Integer -> GHC.Internal.Bignum.BigNat.BigNat#
+  integerToBigNatSign# :: Integer -> (# GHC.Prim.Int#, GHC.Internal.Bignum.BigNat.BigNat# #)
   integerToInt :: Integer -> GHC.Types.Int
   integerToInt# :: Integer -> GHC.Prim.Int#
   integerToInt64# :: Integer -> GHC.Prim.Int64#
-  integerToMutableByteArray :: Integer -> GHC.Prim.MutableByteArray# GHC.Prim.RealWorld -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
-  integerToMutableByteArray# :: forall s. Integer -> GHC.Prim.MutableByteArray# s -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
+  integerToMutableByteArray :: Integer -> GHC.Prim.MutableByteArray# GHC.Prim.RealWorld -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
+  integerToMutableByteArray# :: forall s. Integer -> GHC.Prim.MutableByteArray# s -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
   integerToNatural :: Integer -> Natural
   integerToNaturalClamp :: Integer -> Natural
   integerToNaturalThrow :: Integer -> Natural
@@ -8500,7 +8500,7 @@ module GHC.Num where
   naturalBit :: GHC.Types.Word -> Natural
   naturalBit# :: GHC.Prim.Word# -> Natural
   naturalCheck :: Natural -> GHC.Types.Bool
-  naturalCheck# :: Natural -> GHC.Num.Primitives.Bool#
+  naturalCheck# :: Natural -> GHC.Internal.Bignum.Primitives.Bool#
   naturalClearBit :: Natural -> GHC.Types.Word -> Natural
   naturalClearBit# :: Natural -> GHC.Prim.Word# -> Natural
   naturalCompare :: Natural -> Natural -> GHC.Types.Ordering
@@ -8509,26 +8509,26 @@ module GHC.Num where
   naturalEncodeDouble# :: Natural -> GHC.Prim.Int# -> GHC.Prim.Double#
   naturalEncodeFloat# :: Natural -> GHC.Prim.Int# -> GHC.Prim.Float#
   naturalEq :: Natural -> Natural -> GHC.Types.Bool
-  naturalEq# :: Natural -> Natural -> GHC.Num.Primitives.Bool#
-  naturalFromAddr :: GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Types.IO Natural
-  naturalFromAddr# :: forall s. GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Natural #)
-  naturalFromBigNat# :: GHC.Num.BigNat.BigNat# -> Natural
-  naturalFromByteArray# :: forall s. GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Natural #)
+  naturalEq# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalFromAddr :: GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Types.IO Natural
+  naturalFromAddr# :: forall s. GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Natural #)
+  naturalFromBigNat# :: GHC.Internal.Bignum.BigNat.BigNat# -> Natural
+  naturalFromByteArray# :: forall s. GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Natural #)
   naturalFromWord :: GHC.Types.Word -> Natural
   naturalFromWord# :: GHC.Prim.Word# -> Natural
   naturalFromWord2# :: GHC.Prim.Word# -> GHC.Prim.Word# -> Natural
   naturalFromWordList :: [GHC.Types.Word] -> Natural
   naturalGcd :: Natural -> Natural -> Natural
   naturalGe :: Natural -> Natural -> GHC.Types.Bool
-  naturalGe# :: Natural -> Natural -> GHC.Num.Primitives.Bool#
+  naturalGe# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
   naturalGt :: Natural -> Natural -> GHC.Types.Bool
-  naturalGt# :: Natural -> Natural -> GHC.Num.Primitives.Bool#
+  naturalGt# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
   naturalIsOne :: Natural -> GHC.Types.Bool
   naturalIsPowerOf2# :: Natural -> (# (# #) | GHC.Prim.Word# #)
   naturalIsZero :: Natural -> GHC.Types.Bool
   naturalLcm :: Natural -> Natural -> Natural
   naturalLe :: Natural -> Natural -> GHC.Types.Bool
-  naturalLe# :: Natural -> Natural -> GHC.Num.Primitives.Bool#
+  naturalLe# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
   naturalLog2 :: Natural -> GHC.Types.Word
   naturalLog2# :: Natural -> GHC.Prim.Word#
   naturalLogBase :: Natural -> Natural -> GHC.Types.Word
@@ -8536,10 +8536,10 @@ module GHC.Num where
   naturalLogBaseWord :: GHC.Types.Word -> Natural -> GHC.Types.Word
   naturalLogBaseWord# :: GHC.Prim.Word# -> Natural -> GHC.Prim.Word#
   naturalLt :: Natural -> Natural -> GHC.Types.Bool
-  naturalLt# :: Natural -> Natural -> GHC.Num.Primitives.Bool#
+  naturalLt# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
   naturalMul :: Natural -> Natural -> Natural
   naturalNe :: Natural -> Natural -> GHC.Types.Bool
-  naturalNe# :: Natural -> Natural -> GHC.Num.Primitives.Bool#
+  naturalNe# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
   naturalNegate :: Natural -> Natural
   naturalOne :: Natural
   naturalOr :: Natural -> Natural -> Natural
@@ -8563,11 +8563,11 @@ module GHC.Num where
   naturalSubThrow :: Natural -> Natural -> Natural
   naturalSubUnsafe :: Natural -> Natural -> Natural
   naturalTestBit :: Natural -> GHC.Types.Word -> GHC.Types.Bool
-  naturalTestBit# :: Natural -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool#
-  naturalToAddr :: Natural -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
-  naturalToAddr# :: forall s. Natural -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
-  naturalToBigNat# :: Natural -> GHC.Num.BigNat.BigNat#
-  naturalToMutableByteArray# :: forall s. Natural -> GHC.Prim.MutableByteArray# s -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
+  naturalTestBit# :: Natural -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalToAddr :: Natural -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
+  naturalToAddr# :: forall s. Natural -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
+  naturalToBigNat# :: Natural -> GHC.Internal.Bignum.BigNat.BigNat#
+  naturalToMutableByteArray# :: forall s. Natural -> GHC.Prim.MutableByteArray# s -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
   naturalToWord :: Natural -> GHC.Types.Word
   naturalToWord# :: Natural -> GHC.Prim.Word#
   naturalToWordClamp :: Natural -> GHC.Types.Word
@@ -8583,7 +8583,7 @@ module GHC.Num.BigNat where
   type BigNat :: *
   data BigNat = BN# {unBigNat :: BigNat#}
   type BigNat# :: GHC.Types.UnliftedType
-  type BigNat# = GHC.Num.WordArray.WordArray#
+  type BigNat# = GHC.Internal.Bignum.WordArray.WordArray#
   bigNatAdd :: BigNat# -> BigNat# -> BigNat#
   bigNatAddWord :: BigNat# -> GHC.Types.Word -> BigNat#
   bigNatAddWord# :: BigNat# -> GHC.Prim.Word# -> BigNat#
@@ -8595,7 +8595,7 @@ module GHC.Num.BigNat where
   bigNatBit :: GHC.Types.Word -> BigNat#
   bigNatBit# :: GHC.Prim.Word# -> BigNat#
   bigNatCheck :: BigNat# -> GHC.Types.Bool
-  bigNatCheck# :: BigNat# -> GHC.Num.Primitives.Bool#
+  bigNatCheck# :: BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
   bigNatClearBit# :: BigNat# -> GHC.Prim.Word# -> BigNat#
   bigNatCompare :: BigNat# -> BigNat# -> GHC.Types.Ordering
   bigNatCompareWord :: BigNat# -> GHC.Types.Word -> GHC.Types.Ordering
@@ -8607,48 +8607,48 @@ module GHC.Num.BigNat where
   bigNatCtzWord# :: BigNat# -> GHC.Prim.Word#
   bigNatEncodeDouble# :: BigNat# -> GHC.Prim.Int# -> GHC.Prim.Double#
   bigNatEq :: BigNat# -> BigNat# -> GHC.Types.Bool
-  bigNatEq# :: BigNat# -> BigNat# -> GHC.Num.Primitives.Bool#
-  bigNatEqWord# :: BigNat# -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool#
+  bigNatEq# :: BigNat# -> BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatEqWord# :: BigNat# -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
   bigNatFromAbsInt# :: GHC.Prim.Int# -> BigNat#
-  bigNatFromAddr# :: forall s. GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, BigNat# #)
+  bigNatFromAddr# :: forall s. GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, BigNat# #)
   bigNatFromAddrBE# :: forall s. GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, BigNat# #)
   bigNatFromAddrLE# :: forall s. GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, BigNat# #)
-  bigNatFromByteArray# :: forall s. GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, BigNat# #)
+  bigNatFromByteArray# :: forall s. GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, BigNat# #)
   bigNatFromByteArrayBE# :: forall s. GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, BigNat# #)
   bigNatFromByteArrayLE# :: forall s. GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, BigNat# #)
   bigNatFromWord :: GHC.Types.Word -> BigNat#
   bigNatFromWord# :: GHC.Prim.Word# -> BigNat#
   bigNatFromWord2# :: GHC.Prim.Word# -> GHC.Prim.Word# -> BigNat#
   bigNatFromWord64# :: GHC.Prim.Word64# -> BigNat#
-  bigNatFromWordArray :: GHC.Num.WordArray.WordArray# -> GHC.Prim.Word# -> BigNat
-  bigNatFromWordArray# :: GHC.Num.WordArray.WordArray# -> GHC.Prim.Word# -> BigNat#
+  bigNatFromWordArray :: GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Prim.Word# -> BigNat
+  bigNatFromWordArray# :: GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Prim.Word# -> BigNat#
   bigNatFromWordList :: [GHC.Types.Word] -> BigNat#
-  bigNatFromWordList# :: [GHC.Types.Word] -> GHC.Num.WordArray.WordArray#
+  bigNatFromWordList# :: [GHC.Types.Word] -> GHC.Internal.Bignum.WordArray.WordArray#
   bigNatFromWordListUnsafe :: [GHC.Types.Word] -> BigNat#
   bigNatGcd :: BigNat# -> BigNat# -> BigNat#
   bigNatGcdWord# :: BigNat# -> GHC.Prim.Word# -> GHC.Prim.Word#
   bigNatGe :: BigNat# -> BigNat# -> GHC.Types.Bool
-  bigNatGe# :: BigNat# -> BigNat# -> GHC.Num.Primitives.Bool#
+  bigNatGe# :: BigNat# -> BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
   bigNatGt :: BigNat# -> BigNat# -> GHC.Types.Bool
-  bigNatGt# :: BigNat# -> BigNat# -> GHC.Num.Primitives.Bool#
+  bigNatGt# :: BigNat# -> BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
   bigNatGtWord :: BigNat# -> GHC.Types.Word -> GHC.Types.Bool
-  bigNatGtWord# :: BigNat# -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool#
+  bigNatGtWord# :: BigNat# -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
   bigNatIndex :: BigNat# -> GHC.Prim.Int# -> GHC.Types.Word
   bigNatIndex# :: BigNat# -> GHC.Prim.Int# -> GHC.Prim.Word#
   bigNatIsOne :: BigNat# -> GHC.Types.Bool
-  bigNatIsOne# :: BigNat# -> GHC.Num.Primitives.Bool#
+  bigNatIsOne# :: BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
   bigNatIsPowerOf2# :: BigNat# -> (# (# #) | GHC.Prim.Word# #)
   bigNatIsTwo :: BigNat# -> GHC.Types.Bool
-  bigNatIsTwo# :: BigNat# -> GHC.Num.Primitives.Bool#
+  bigNatIsTwo# :: BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
   bigNatIsZero :: BigNat# -> GHC.Types.Bool
-  bigNatIsZero# :: BigNat# -> GHC.Num.Primitives.Bool#
+  bigNatIsZero# :: BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
   bigNatLcm :: BigNat# -> BigNat# -> BigNat#
   bigNatLcmWord# :: BigNat# -> GHC.Prim.Word# -> BigNat#
   bigNatLcmWordWord# :: GHC.Prim.Word# -> GHC.Prim.Word# -> BigNat#
   bigNatLe :: BigNat# -> BigNat# -> GHC.Types.Bool
-  bigNatLe# :: BigNat# -> BigNat# -> GHC.Num.Primitives.Bool#
+  bigNatLe# :: BigNat# -> BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
   bigNatLeWord :: BigNat# -> GHC.Types.Word -> GHC.Types.Bool
-  bigNatLeWord# :: BigNat# -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool#
+  bigNatLeWord# :: BigNat# -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
   bigNatLog2 :: BigNat# -> GHC.Types.Word
   bigNatLog2# :: BigNat# -> GHC.Prim.Word#
   bigNatLogBase :: BigNat# -> BigNat# -> GHC.Types.Word
@@ -8656,12 +8656,12 @@ module GHC.Num.BigNat where
   bigNatLogBaseWord :: GHC.Types.Word -> BigNat# -> GHC.Types.Word
   bigNatLogBaseWord# :: GHC.Prim.Word# -> BigNat# -> GHC.Prim.Word#
   bigNatLt :: BigNat# -> BigNat# -> GHC.Types.Bool
-  bigNatLt# :: BigNat# -> BigNat# -> GHC.Num.Primitives.Bool#
+  bigNatLt# :: BigNat# -> BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
   bigNatMul :: BigNat# -> BigNat# -> BigNat#
   bigNatMulWord :: BigNat# -> GHC.Types.Word -> BigNat#
   bigNatMulWord# :: BigNat# -> GHC.Prim.Word# -> BigNat#
   bigNatNe :: BigNat# -> BigNat# -> GHC.Types.Bool
-  bigNatNe# :: BigNat# -> BigNat# -> GHC.Num.Primitives.Bool#
+  bigNatNe# :: BigNat# -> BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
   bigNatOne :: BigNat
   bigNatOne# :: (# #) -> BigNat#
   bigNatOr :: BigNat# -> BigNat# -> BigNat#
@@ -8695,14 +8695,14 @@ module GHC.Num.BigNat where
   bigNatSubWordUnsafe :: BigNat# -> GHC.Types.Word -> BigNat#
   bigNatSubWordUnsafe# :: BigNat# -> GHC.Prim.Word# -> BigNat#
   bigNatTestBit :: BigNat# -> GHC.Types.Word -> GHC.Types.Bool
-  bigNatTestBit# :: BigNat# -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool#
-  bigNatToAddr :: BigNat# -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
-  bigNatToAddr# :: forall s. BigNat# -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
+  bigNatTestBit# :: BigNat# -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatToAddr :: BigNat# -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
+  bigNatToAddr# :: forall s. BigNat# -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
   bigNatToAddrBE# :: forall s. BigNat# -> GHC.Prim.Addr# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
   bigNatToAddrLE# :: forall s. BigNat# -> GHC.Prim.Addr# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
   bigNatToInt :: BigNat# -> GHC.Types.Int
   bigNatToInt# :: BigNat# -> GHC.Prim.Int#
-  bigNatToMutableByteArray# :: forall s. BigNat# -> GHC.Prim.MutableByteArray# s -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
+  bigNatToMutableByteArray# :: forall s. BigNat# -> GHC.Prim.MutableByteArray# s -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
   bigNatToMutableByteArrayBE# :: forall s. BigNat# -> GHC.Prim.MutableByteArray# s -> GHC.Prim.Word# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
   bigNatToMutableByteArrayLE# :: forall s. BigNat# -> GHC.Prim.MutableByteArray# s -> GHC.Prim.Word# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
   bigNatToWord :: BigNat# -> GHC.Types.Word
@@ -8731,7 +8731,7 @@ module GHC.Num.Integer where
   integerBit :: GHC.Types.Word -> Integer
   integerBit# :: GHC.Prim.Word# -> Integer
   integerCheck :: Integer -> GHC.Types.Bool
-  integerCheck# :: Integer -> GHC.Num.Primitives.Bool#
+  integerCheck# :: Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerCompare :: Integer -> Integer -> GHC.Types.Ordering
   integerComplement :: Integer -> Integer
   integerDecodeDouble# :: GHC.Prim.Double# -> (# Integer, GHC.Prim.Int# #)
@@ -8742,18 +8742,18 @@ module GHC.Num.Integer where
   integerEncodeDouble# :: Integer -> GHC.Prim.Int# -> GHC.Prim.Double#
   integerEncodeFloat# :: Integer -> GHC.Prim.Int# -> GHC.Prim.Float#
   integerEq :: Integer -> Integer -> GHC.Types.Bool
-  integerEq# :: Integer -> Integer -> GHC.Num.Primitives.Bool#
-  integerFromAddr :: GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Types.IO Integer
-  integerFromAddr# :: forall s. GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Integer #)
-  integerFromBigNat# :: GHC.Num.BigNat.BigNat# -> Integer
-  integerFromBigNatNeg# :: GHC.Num.BigNat.BigNat# -> Integer
-  integerFromBigNatSign# :: GHC.Prim.Int# -> GHC.Num.BigNat.BigNat# -> Integer
-  integerFromByteArray :: GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> Integer
-  integerFromByteArray# :: forall s. GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Integer #)
+  integerEq# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
+  integerFromAddr :: GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Types.IO Integer
+  integerFromAddr# :: forall s. GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Integer #)
+  integerFromBigNat# :: GHC.Internal.Bignum.BigNat.BigNat# -> Integer
+  integerFromBigNatNeg# :: GHC.Internal.Bignum.BigNat.BigNat# -> Integer
+  integerFromBigNatSign# :: GHC.Prim.Int# -> GHC.Internal.Bignum.BigNat.BigNat# -> Integer
+  integerFromByteArray :: GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> Integer
+  integerFromByteArray# :: forall s. GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Integer #)
   integerFromInt :: GHC.Types.Int -> Integer
   integerFromInt# :: GHC.Prim.Int# -> Integer
   integerFromInt64# :: GHC.Prim.Int64# -> Integer
-  integerFromNatural :: GHC.Num.Natural.Natural -> Integer
+  integerFromNatural :: GHC.Internal.Bignum.Natural.Natural -> Integer
   integerFromWord :: GHC.Types.Word -> Integer
   integerFromWord# :: GHC.Prim.Word# -> Integer
   integerFromWord64# :: GHC.Prim.Word64# -> Integer
@@ -8764,17 +8764,17 @@ module GHC.Num.Integer where
   integerGcde :: Integer -> Integer -> (Integer, Integer, Integer)
   integerGcde# :: Integer -> Integer -> (# Integer, Integer, Integer #)
   integerGe :: Integer -> Integer -> GHC.Types.Bool
-  integerGe# :: Integer -> Integer -> GHC.Num.Primitives.Bool#
+  integerGe# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerGt :: Integer -> Integer -> GHC.Types.Bool
-  integerGt# :: Integer -> Integer -> GHC.Num.Primitives.Bool#
+  integerGt# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerIsNegative :: Integer -> GHC.Types.Bool
-  integerIsNegative# :: Integer -> GHC.Num.Primitives.Bool#
+  integerIsNegative# :: Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerIsOne :: Integer -> GHC.Types.Bool
   integerIsPowerOf2# :: Integer -> (# (# #) | GHC.Prim.Word# #)
   integerIsZero :: Integer -> GHC.Types.Bool
   integerLcm :: Integer -> Integer -> Integer
   integerLe :: Integer -> Integer -> GHC.Types.Bool
-  integerLe# :: Integer -> Integer -> GHC.Num.Primitives.Bool#
+  integerLe# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerLog2 :: Integer -> GHC.Types.Word
   integerLog2# :: Integer -> GHC.Prim.Word#
   integerLogBase :: Integer -> Integer -> GHC.Types.Word
@@ -8782,20 +8782,20 @@ module GHC.Num.Integer where
   integerLogBaseWord :: GHC.Types.Word -> Integer -> GHC.Types.Word
   integerLogBaseWord# :: GHC.Prim.Word# -> Integer -> GHC.Prim.Word#
   integerLt :: Integer -> Integer -> GHC.Types.Bool
-  integerLt# :: Integer -> Integer -> GHC.Num.Primitives.Bool#
+  integerLt# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerMod :: Integer -> Integer -> Integer
   integerMul :: Integer -> Integer -> Integer
   integerNe :: Integer -> Integer -> GHC.Types.Bool
-  integerNe# :: Integer -> Integer -> GHC.Num.Primitives.Bool#
+  integerNe# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
   integerNegate :: Integer -> Integer
   integerOne :: Integer
   integerOr :: Integer -> Integer -> Integer
   integerPopCount# :: Integer -> GHC.Prim.Int#
-  integerPowMod# :: Integer -> Integer -> GHC.Num.Natural.Natural -> (# GHC.Num.Natural.Natural | () #)
+  integerPowMod# :: Integer -> Integer -> GHC.Internal.Bignum.Natural.Natural -> (# GHC.Internal.Bignum.Natural.Natural | () #)
   integerQuot :: Integer -> Integer -> Integer
   integerQuotRem :: Integer -> Integer -> (Integer, Integer)
   integerQuotRem# :: Integer -> Integer -> (# Integer, Integer #)
-  integerRecipMod# :: Integer -> GHC.Num.Natural.Natural -> (# GHC.Num.Natural.Natural | () #)
+  integerRecipMod# :: Integer -> GHC.Internal.Bignum.Natural.Natural -> (# GHC.Internal.Bignum.Natural.Natural | () #)
   integerRem :: Integer -> Integer -> Integer
   integerShiftL :: Integer -> GHC.Types.Word -> Integer
   integerShiftL# :: Integer -> GHC.Prim.Word# -> Integer
@@ -8807,19 +8807,19 @@ module GHC.Num.Integer where
   integerSqr :: Integer -> Integer
   integerSub :: Integer -> Integer -> Integer
   integerTestBit :: Integer -> GHC.Types.Word -> GHC.Types.Bool
-  integerTestBit# :: Integer -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool#
-  integerToAddr :: Integer -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
-  integerToAddr# :: forall s. Integer -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
-  integerToBigNatClamp# :: Integer -> GHC.Num.BigNat.BigNat#
-  integerToBigNatSign# :: Integer -> (# GHC.Prim.Int#, GHC.Num.BigNat.BigNat# #)
+  integerTestBit# :: Integer -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  integerToAddr :: Integer -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
+  integerToAddr# :: forall s. Integer -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
+  integerToBigNatClamp# :: Integer -> GHC.Internal.Bignum.BigNat.BigNat#
+  integerToBigNatSign# :: Integer -> (# GHC.Prim.Int#, GHC.Internal.Bignum.BigNat.BigNat# #)
   integerToInt :: Integer -> GHC.Types.Int
   integerToInt# :: Integer -> GHC.Prim.Int#
   integerToInt64# :: Integer -> GHC.Prim.Int64#
-  integerToMutableByteArray :: Integer -> GHC.Prim.MutableByteArray# GHC.Prim.RealWorld -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
-  integerToMutableByteArray# :: forall s. Integer -> GHC.Prim.MutableByteArray# s -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
-  integerToNatural :: Integer -> GHC.Num.Natural.Natural
-  integerToNaturalClamp :: Integer -> GHC.Num.Natural.Natural
-  integerToNaturalThrow :: Integer -> GHC.Num.Natural.Natural
+  integerToMutableByteArray :: Integer -> GHC.Prim.MutableByteArray# GHC.Prim.RealWorld -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
+  integerToMutableByteArray# :: forall s. Integer -> GHC.Prim.MutableByteArray# s -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
+  integerToNatural :: Integer -> GHC.Internal.Bignum.Natural.Natural
+  integerToNaturalClamp :: Integer -> GHC.Internal.Bignum.Natural.Natural
+  integerToNaturalThrow :: Integer -> GHC.Internal.Bignum.Natural.Natural
   integerToWord :: Integer -> GHC.Types.Word
   integerToWord# :: Integer -> GHC.Prim.Word#
   integerToWord64# :: Integer -> GHC.Prim.Word64#
@@ -8836,7 +8836,7 @@ module GHC.Num.Natural where
   naturalBit :: GHC.Types.Word -> Natural
   naturalBit# :: GHC.Prim.Word# -> Natural
   naturalCheck :: Natural -> GHC.Types.Bool
-  naturalCheck# :: Natural -> GHC.Num.Primitives.Bool#
+  naturalCheck# :: Natural -> GHC.Internal.Bignum.Primitives.Bool#
   naturalClearBit :: Natural -> GHC.Types.Word -> Natural
   naturalClearBit# :: Natural -> GHC.Prim.Word# -> Natural
   naturalCompare :: Natural -> Natural -> GHC.Types.Ordering
@@ -8845,26 +8845,26 @@ module GHC.Num.Natural where
   naturalEncodeDouble# :: Natural -> GHC.Prim.Int# -> GHC.Prim.Double#
   naturalEncodeFloat# :: Natural -> GHC.Prim.Int# -> GHC.Prim.Float#
   naturalEq :: Natural -> Natural -> GHC.Types.Bool
-  naturalEq# :: Natural -> Natural -> GHC.Num.Primitives.Bool#
-  naturalFromAddr :: GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Types.IO Natural
-  naturalFromAddr# :: forall s. GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Natural #)
-  naturalFromBigNat# :: GHC.Num.BigNat.BigNat# -> Natural
-  naturalFromByteArray# :: forall s. GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Natural #)
+  naturalEq# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalFromAddr :: GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Types.IO Natural
+  naturalFromAddr# :: forall s. GHC.Prim.Word# -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Natural #)
+  naturalFromBigNat# :: GHC.Internal.Bignum.BigNat.BigNat# -> Natural
+  naturalFromByteArray# :: forall s. GHC.Prim.Word# -> GHC.Prim.ByteArray# -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, Natural #)
   naturalFromWord :: GHC.Types.Word -> Natural
   naturalFromWord# :: GHC.Prim.Word# -> Natural
   naturalFromWord2# :: GHC.Prim.Word# -> GHC.Prim.Word# -> Natural
   naturalFromWordList :: [GHC.Types.Word] -> Natural
   naturalGcd :: Natural -> Natural -> Natural
   naturalGe :: Natural -> Natural -> GHC.Types.Bool
-  naturalGe# :: Natural -> Natural -> GHC.Num.Primitives.Bool#
+  naturalGe# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
   naturalGt :: Natural -> Natural -> GHC.Types.Bool
-  naturalGt# :: Natural -> Natural -> GHC.Num.Primitives.Bool#
+  naturalGt# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
   naturalIsOne :: Natural -> GHC.Types.Bool
   naturalIsPowerOf2# :: Natural -> (# (# #) | GHC.Prim.Word# #)
   naturalIsZero :: Natural -> GHC.Types.Bool
   naturalLcm :: Natural -> Natural -> Natural
   naturalLe :: Natural -> Natural -> GHC.Types.Bool
-  naturalLe# :: Natural -> Natural -> GHC.Num.Primitives.Bool#
+  naturalLe# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
   naturalLog2 :: Natural -> GHC.Types.Word
   naturalLog2# :: Natural -> GHC.Prim.Word#
   naturalLogBase :: Natural -> Natural -> GHC.Types.Word
@@ -8872,10 +8872,10 @@ module GHC.Num.Natural where
   naturalLogBaseWord :: GHC.Types.Word -> Natural -> GHC.Types.Word
   naturalLogBaseWord# :: GHC.Prim.Word# -> Natural -> GHC.Prim.Word#
   naturalLt :: Natural -> Natural -> GHC.Types.Bool
-  naturalLt# :: Natural -> Natural -> GHC.Num.Primitives.Bool#
+  naturalLt# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
   naturalMul :: Natural -> Natural -> Natural
   naturalNe :: Natural -> Natural -> GHC.Types.Bool
-  naturalNe# :: Natural -> Natural -> GHC.Num.Primitives.Bool#
+  naturalNe# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
   naturalNegate :: Natural -> Natural
   naturalOne :: Natural
   naturalOr :: Natural -> Natural -> Natural
@@ -8899,11 +8899,11 @@ module GHC.Num.Natural where
   naturalSubThrow :: Natural -> Natural -> Natural
   naturalSubUnsafe :: Natural -> Natural -> Natural
   naturalTestBit :: Natural -> GHC.Types.Word -> GHC.Types.Bool
-  naturalTestBit# :: Natural -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool#
-  naturalToAddr :: Natural -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
-  naturalToAddr# :: forall s. Natural -> GHC.Prim.Addr# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
-  naturalToBigNat# :: Natural -> GHC.Num.BigNat.BigNat#
-  naturalToMutableByteArray# :: forall s. Natural -> GHC.Prim.MutableByteArray# s -> GHC.Prim.Word# -> GHC.Num.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
+  naturalTestBit# :: Natural -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalToAddr :: Natural -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Types.IO GHC.Types.Word
+  naturalToAddr# :: forall s. Natural -> GHC.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
+  naturalToBigNat# :: Natural -> GHC.Internal.Bignum.BigNat.BigNat#
+  naturalToMutableByteArray# :: forall s. Natural -> GHC.Prim.MutableByteArray# s -> GHC.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Prim.State# s -> (# GHC.Prim.State# s, GHC.Prim.Word# #)
   naturalToWord :: Natural -> GHC.Types.Word
   naturalToWord# :: Natural -> GHC.Prim.Word#
   naturalToWordClamp :: Natural -> GHC.Types.Word
@@ -9210,12 +9210,12 @@ module GHC.Real where
     mod :: a -> a -> a
     quotRem :: a -> a -> (a, a)
     divMod :: a -> a -> (a, a)
-    toInteger :: a -> GHC.Num.Integer.Integer
+    toInteger :: a -> GHC.Internal.Bignum.Integer.Integer
     {-# MINIMAL quotRem, toInteger #-}
   type Ratio :: * -> *
   data Ratio a = !a :% !a
   type Rational :: *
-  type Rational = Ratio GHC.Num.Integer.Integer
+  type Rational = Ratio GHC.Internal.Bignum.Integer.Integer
   type Real :: * -> Constraint
   class (GHC.Internal.Num.Num a, GHC.Classes.Ord a) => Real a where
     toRational :: a -> Rational
@@ -9243,9 +9243,9 @@ module GHC.Real where
   integralEnumFromThenTo :: forall a. Integral a => a -> a -> a -> [a]
   integralEnumFromTo :: forall a. Integral a => a -> a -> [a]
   lcm :: forall a. Integral a => a -> a -> a
-  mkRationalBase10 :: Rational -> GHC.Num.Integer.Integer -> Rational
-  mkRationalBase2 :: Rational -> GHC.Num.Integer.Integer -> Rational
-  mkRationalWithExponentBase :: Rational -> GHC.Num.Integer.Integer -> FractionalExponentBase -> Rational
+  mkRationalBase10 :: Rational -> GHC.Internal.Bignum.Integer.Integer -> Rational
+  mkRationalBase2 :: Rational -> GHC.Internal.Bignum.Integer.Integer -> Rational
+  mkRationalWithExponentBase :: Rational -> GHC.Internal.Bignum.Integer.Integer -> FractionalExponentBase -> Rational
   notANumber :: Rational
   numerator :: forall a. Ratio a -> a
   numericEnumFrom :: forall a. Fractional a => a -> [a]
@@ -9655,15 +9655,15 @@ module GHC.TypeLits where
   decideNat :: forall (a :: Nat) (b :: Nat) (proxy1 :: Nat -> *) (proxy2 :: Nat -> *). (KnownNat a, KnownNat b) => proxy1 a -> proxy2 b -> GHC.Internal.Data.Either.Either ((a GHC.Internal.Data.Type.Equality.:~: b) -> GHC.Internal.Base.Void) (a GHC.Internal.Data.Type.Equality.:~: b)
   decideSymbol :: forall (a :: Symbol) (b :: Symbol) (proxy1 :: Symbol -> *) (proxy2 :: Symbol -> *). (KnownSymbol a, KnownSymbol b) => proxy1 a -> proxy2 b -> GHC.Internal.Data.Either.Either ((a GHC.Internal.Data.Type.Equality.:~: b) -> GHC.Internal.Base.Void) (a GHC.Internal.Data.Type.Equality.:~: b)
   fromSChar :: forall (c :: GHC.Types.Char). SChar c -> GHC.Types.Char
-  fromSNat :: forall (n :: Nat). SNat n -> GHC.Num.Integer.Integer
+  fromSNat :: forall (n :: Nat). SNat n -> GHC.Internal.Bignum.Integer.Integer
   fromSSymbol :: forall (s :: Symbol). SSymbol s -> GHC.Internal.Base.String
-  natVal :: forall (n :: Nat) (proxy :: Nat -> *). KnownNat n => proxy n -> GHC.Num.Integer.Integer
-  natVal' :: forall (n :: Nat). KnownNat n => GHC.Prim.Proxy# n -> GHC.Num.Integer.Integer
+  natVal :: forall (n :: Nat) (proxy :: Nat -> *). KnownNat n => proxy n -> GHC.Internal.Bignum.Integer.Integer
+  natVal' :: forall (n :: Nat). KnownNat n => GHC.Prim.Proxy# n -> GHC.Internal.Bignum.Integer.Integer
   sameChar :: forall (a :: GHC.Types.Char) (b :: GHC.Types.Char) (proxy1 :: GHC.Types.Char -> *) (proxy2 :: GHC.Types.Char -> *). (KnownChar a, KnownChar b) => proxy1 a -> proxy2 b -> GHC.Internal.Maybe.Maybe (a GHC.Internal.Data.Type.Equality.:~: b)
   sameNat :: forall (a :: Nat) (b :: Nat) (proxy1 :: Nat -> *) (proxy2 :: Nat -> *). (KnownNat a, KnownNat b) => proxy1 a -> proxy2 b -> GHC.Internal.Maybe.Maybe (a GHC.Internal.Data.Type.Equality.:~: b)
   sameSymbol :: forall (a :: Symbol) (b :: Symbol) (proxy1 :: Symbol -> *) (proxy2 :: Symbol -> *). (KnownSymbol a, KnownSymbol b) => proxy1 a -> proxy2 b -> GHC.Internal.Maybe.Maybe (a GHC.Internal.Data.Type.Equality.:~: b)
   someCharVal :: GHC.Types.Char -> SomeChar
-  someNatVal :: GHC.Num.Integer.Integer -> GHC.Internal.Maybe.Maybe SomeNat
+  someNatVal :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Maybe.Maybe SomeNat
   someSymbolVal :: GHC.Internal.Base.String -> SomeSymbol
   symbolVal :: forall (n :: Symbol) (proxy :: Symbol -> *). KnownSymbol n => proxy n -> GHC.Internal.Base.String
   symbolVal' :: forall (n :: Symbol). KnownSymbol n => GHC.Prim.Proxy# n -> GHC.Internal.Base.String
@@ -9671,7 +9671,7 @@ module GHC.TypeLits where
   withKnownNat :: forall (n :: Nat) (rep :: GHC.Types.RuntimeRep) (r :: TYPE rep). SNat n -> (KnownNat n => r) -> r
   withKnownSymbol :: forall (s :: Symbol) (rep :: GHC.Types.RuntimeRep) (r :: TYPE rep). SSymbol s -> (KnownSymbol s => r) -> r
   withSomeSChar :: forall (rep :: GHC.Types.RuntimeRep) (r :: TYPE rep). GHC.Types.Char -> (forall (c :: GHC.Types.Char). SChar c -> r) -> r
-  withSomeSNat :: forall (rep :: GHC.Types.RuntimeRep) (r :: TYPE rep). GHC.Num.Integer.Integer -> (forall (n :: Nat). GHC.Internal.Maybe.Maybe (SNat n) -> r) -> r
+  withSomeSNat :: forall (rep :: GHC.Types.RuntimeRep) (r :: TYPE rep). GHC.Internal.Bignum.Integer.Integer -> (forall (n :: Nat). GHC.Internal.Maybe.Maybe (SNat n) -> r) -> r
   withSomeSSymbol :: forall (rep :: GHC.Types.RuntimeRep) (r :: TYPE rep). GHC.Internal.Base.String -> (forall (s :: Symbol). SSymbol s -> r) -> r
 
 module GHC.TypeLits.Internal where
@@ -9861,7 +9861,7 @@ module Numeric where
     log1pexp :: a -> a
     log1mexp :: a -> a
     {-# MINIMAL pi, exp, log, sin, cos, asin, acos, atan, sinh, cosh, asinh, acosh, atanh #-}
-  floatToDigits :: forall a. GHC.Internal.Float.RealFloat a => GHC.Num.Integer.Integer -> a -> ([GHC.Types.Int], GHC.Types.Int)
+  floatToDigits :: forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Bignum.Integer.Integer -> a -> ([GHC.Types.Int], GHC.Types.Int)
   fromRat :: forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Real.Rational -> a
   lexDigits :: GHC.Internal.Text.ParserCombinators.ReadP.ReadS GHC.Internal.Base.String
   readBin :: forall a. (GHC.Classes.Eq a, GHC.Internal.Num.Num a) => GHC.Internal.Text.ParserCombinators.ReadP.ReadS a
@@ -10214,8 +10214,8 @@ module Prelude where
 
 module System.CPUTime where
   -- Safety: Trustworthy
-  cpuTimePrecision :: GHC.Num.Integer.Integer
-  getCPUTime :: GHC.Types.IO GHC.Num.Integer.Integer
+  cpuTimePrecision :: GHC.Internal.Bignum.Integer.Integer
+  getCPUTime :: GHC.Types.IO GHC.Internal.Bignum.Integer.Integer
 
 module System.Console.GetOpt where
   -- Safety: Safe
@@ -10295,7 +10295,7 @@ module System.IO where
   getContents' :: IO GHC.Internal.Base.String
   getLine :: IO GHC.Internal.Base.String
   hClose :: Handle -> IO ()
-  hFileSize :: Handle -> IO GHC.Num.Integer.Integer
+  hFileSize :: Handle -> IO GHC.Internal.Bignum.Integer.Integer
   hFlush :: Handle -> IO ()
   hGetBuf :: forall a. Handle -> GHC.Internal.Ptr.Ptr a -> GHC.Types.Int -> IO GHC.Types.Int
   hGetBufNonBlocking :: forall a. Handle -> GHC.Internal.Ptr.Ptr a -> GHC.Types.Int -> IO GHC.Types.Int
@@ -10323,16 +10323,16 @@ module System.IO where
   hPutStr :: Handle -> GHC.Internal.Base.String -> IO ()
   hPutStrLn :: Handle -> GHC.Internal.Base.String -> IO ()
   hReady :: Handle -> IO GHC.Types.Bool
-  hSeek :: Handle -> SeekMode -> GHC.Num.Integer.Integer -> IO ()
+  hSeek :: Handle -> SeekMode -> GHC.Internal.Bignum.Integer.Integer -> IO ()
   hSetBinaryMode :: Handle -> GHC.Types.Bool -> IO ()
   hSetBuffering :: Handle -> BufferMode -> IO ()
   hSetEcho :: Handle -> GHC.Types.Bool -> IO ()
   hSetEncoding :: Handle -> TextEncoding -> IO ()
-  hSetFileSize :: Handle -> GHC.Num.Integer.Integer -> IO ()
+  hSetFileSize :: Handle -> GHC.Internal.Bignum.Integer.Integer -> IO ()
   hSetNewlineMode :: Handle -> NewlineMode -> IO ()
   hSetPosn :: HandlePosn -> IO ()
   hShow :: Handle -> IO GHC.Internal.Base.String
-  hTell :: Handle -> IO GHC.Num.Integer.Integer
+  hTell :: Handle -> IO GHC.Internal.Bignum.Integer.Integer
   hWaitForInput :: Handle -> GHC.Types.Int -> IO GHC.Types.Bool
   interact :: (GHC.Internal.Base.String -> GHC.Internal.Base.String) -> IO ()
   isEOF :: IO GHC.Types.Bool
@@ -10560,7 +10560,7 @@ module System.Posix.Internals where
   const_vmin :: GHC.Internal.Foreign.C.Types.CInt
   const_vtime :: GHC.Internal.Foreign.C.Types.CInt
   dEFAULT_BUFFER_SIZE :: GHC.Types.Int
-  fdFileSize :: FD -> GHC.Types.IO GHC.Num.Integer.Integer
+  fdFileSize :: FD -> GHC.Types.IO GHC.Internal.Bignum.Integer.Integer
   fdGetMode :: FD -> GHC.Types.IO GHC.Internal.IO.IOMode.IOMode
   fdStat :: FD -> GHC.Types.IO (GHC.Internal.IO.Device.IODeviceType, GHC.Internal.System.Posix.Types.CDev, GHC.Internal.System.Posix.Types.CIno)
   fdType :: FD -> GHC.Types.IO GHC.Internal.IO.Device.IODeviceType
@@ -10726,7 +10726,7 @@ module Text.Printf where
   errorShortFormat :: forall a. a
   formatChar :: GHC.Types.Char -> FieldFormatter
   formatInt :: forall a. (GHC.Internal.Real.Integral a, GHC.Internal.Enum.Bounded a) => a -> FieldFormatter
-  formatInteger :: GHC.Num.Integer.Integer -> FieldFormatter
+  formatInteger :: GHC.Internal.Bignum.Integer.Integer -> FieldFormatter
   formatRealFloat :: forall a. GHC.Internal.Float.RealFloat a => a -> FieldFormatter
   formatString :: forall a. IsChar a => [a] -> FieldFormatter
   hPrintf :: forall r. HPrintfType r => GHC.Internal.IO.Handle.Types.Handle -> GHC.Internal.Base.String -> r
@@ -10788,8 +10788,8 @@ module Text.Read.Lex where
   isSymbolChar :: GHC.Types.Char -> GHC.Types.Bool
   lex :: GHC.Internal.Text.ParserCombinators.ReadP.ReadP Lexeme
   lexChar :: GHC.Internal.Text.ParserCombinators.ReadP.ReadP GHC.Types.Char
-  numberToFixed :: GHC.Num.Integer.Integer -> Number -> GHC.Internal.Maybe.Maybe (GHC.Num.Integer.Integer, GHC.Num.Integer.Integer)
-  numberToInteger :: Number -> GHC.Internal.Maybe.Maybe GHC.Num.Integer.Integer
+  numberToFixed :: GHC.Internal.Bignum.Integer.Integer -> Number -> GHC.Internal.Maybe.Maybe (GHC.Internal.Bignum.Integer.Integer, GHC.Internal.Bignum.Integer.Integer)
+  numberToInteger :: Number -> GHC.Internal.Maybe.Maybe GHC.Internal.Bignum.Integer.Integer
   numberToRangedRational :: (GHC.Types.Int, GHC.Types.Int) -> Number -> GHC.Internal.Maybe.Maybe GHC.Internal.Real.Rational
   numberToRational :: Number -> GHC.Internal.Real.Rational
   readBinP :: forall a. (GHC.Classes.Eq a, GHC.Internal.Num.Num a) => GHC.Internal.Text.ParserCombinators.ReadP.ReadP a
@@ -11025,9 +11025,9 @@ instance [safe] Text.Printf.PrintfArg GHC.Internal.Int.Int16 -- Defined in ‘Te
 instance [safe] Text.Printf.PrintfArg GHC.Internal.Int.Int32 -- Defined in ‘Text.Printf’
 instance [safe] Text.Printf.PrintfArg GHC.Internal.Int.Int64 -- Defined in ‘Text.Printf’
 instance [safe] Text.Printf.PrintfArg GHC.Internal.Int.Int8 -- Defined in ‘Text.Printf’
-instance [safe] Text.Printf.PrintfArg GHC.Num.Integer.Integer -- Defined in ‘Text.Printf’
+instance [safe] Text.Printf.PrintfArg GHC.Internal.Bignum.Integer.Integer -- Defined in ‘Text.Printf’
 instance [safe] forall c. Text.Printf.IsChar c => Text.Printf.PrintfArg [c] -- Defined in ‘Text.Printf’
-instance [safe] Text.Printf.PrintfArg GHC.Num.Natural.Natural -- Defined in ‘Text.Printf’
+instance [safe] Text.Printf.PrintfArg GHC.Internal.Bignum.Natural.Natural -- Defined in ‘Text.Printf’
 instance [safe] Text.Printf.PrintfArg GHC.Types.Word -- Defined in ‘Text.Printf’
 instance [safe] Text.Printf.PrintfArg GHC.Internal.Word.Word16 -- Defined in ‘Text.Printf’
 instance [safe] Text.Printf.PrintfArg GHC.Internal.Word.Word32 -- Defined in ‘Text.Printf’
@@ -11281,8 +11281,8 @@ instance forall a. GHC.Internal.Bits.Bits a => GHC.Internal.Bits.Bits (GHC.Inter
 instance forall a. GHC.Internal.Bits.Bits a => GHC.Internal.Bits.Bits (GHC.Internal.Data.Bits.Xor a) -- Defined in ‘GHC.Internal.Data.Bits’
 instance GHC.Internal.Bits.Bits GHC.Types.Bool -- Defined in ‘GHC.Internal.Bits’
 instance GHC.Internal.Bits.Bits GHC.Types.Int -- Defined in ‘GHC.Internal.Bits’
-instance GHC.Internal.Bits.Bits GHC.Num.Integer.Integer -- Defined in ‘GHC.Internal.Bits’
-instance GHC.Internal.Bits.Bits GHC.Num.Natural.Natural -- Defined in ‘GHC.Internal.Bits’
+instance GHC.Internal.Bits.Bits GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Bits’
+instance GHC.Internal.Bits.Bits GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Bits’
 instance GHC.Internal.Bits.Bits GHC.Types.Word -- Defined in ‘GHC.Internal.Bits’
 instance forall a. GHC.Internal.Bits.Bits a => GHC.Internal.Bits.Bits (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance GHC.Internal.Bits.Bits GHC.Internal.Int.Int16 -- Defined in ‘GHC.Internal.Int’
@@ -11438,11 +11438,11 @@ instance GHC.Internal.Data.Data.Data GHC.Internal.Int.Int32 -- Defined in ‘GHC
 instance GHC.Internal.Data.Data.Data GHC.Internal.Int.Int64 -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Foreign.Ptr.IntPtr -- Defined in ‘GHC.Internal.Data.Data’
-instance GHC.Internal.Data.Data.Data GHC.Num.Integer.Integer -- Defined in ‘GHC.Internal.Data.Data’
+instance GHC.Internal.Data.Data.Data GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Monoid.Last a) -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data [a] -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Maybe.Maybe a) -- Defined in ‘GHC.Internal.Data.Data’
-instance GHC.Internal.Data.Data.Data GHC.Num.Natural.Natural -- Defined in ‘GHC.Internal.Data.Data’
+instance GHC.Internal.Data.Data.Data GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Types.Ordering -- Defined in ‘GHC.Internal.Data.Data’
 instance forall p. GHC.Internal.Data.Data.Data p => GHC.Internal.Data.Data.Data (GHC.Internal.Generics.Par1 p) -- Defined in ‘GHC.Internal.Data.Data’
@@ -11629,9 +11629,9 @@ instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (GHC.Inter
 instance GHC.Internal.Enum.Enum GHC.Types.Bool -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Enum GHC.Types.Char -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Enum GHC.Types.Int -- Defined in ‘GHC.Internal.Enum’
-instance GHC.Internal.Enum.Enum GHC.Num.Integer.Integer -- Defined in ‘GHC.Internal.Enum’
+instance GHC.Internal.Enum.Enum GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Enum GHC.Types.Levity -- Defined in ‘GHC.Internal.Enum’
-instance GHC.Internal.Enum.Enum GHC.Num.Natural.Natural -- Defined in ‘GHC.Internal.Enum’
+instance GHC.Internal.Enum.Enum GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Enum GHC.Types.Ordering -- Defined in ‘GHC.Internal.Enum’
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (Solo a) -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Enum () -- Defined in ‘GHC.Internal.Enum’
@@ -11975,8 +11975,8 @@ instance GHC.Internal.Ix.Ix GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.
 instance GHC.Internal.Ix.Ix GHC.Types.Bool -- Defined in ‘GHC.Internal.Ix’
 instance GHC.Internal.Ix.Ix GHC.Types.Char -- Defined in ‘GHC.Internal.Ix’
 instance GHC.Internal.Ix.Ix GHC.Types.Int -- Defined in ‘GHC.Internal.Ix’
-instance GHC.Internal.Ix.Ix GHC.Num.Integer.Integer -- Defined in ‘GHC.Internal.Ix’
-instance GHC.Internal.Ix.Ix GHC.Num.Natural.Natural -- Defined in ‘GHC.Internal.Ix’
+instance GHC.Internal.Ix.Ix GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Ix’
+instance GHC.Internal.Ix.Ix GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Ix’
 instance GHC.Internal.Ix.Ix GHC.Types.Ordering -- Defined in ‘GHC.Internal.Ix’
 instance forall a. GHC.Internal.Ix.Ix a => GHC.Internal.Ix.Ix (Solo a) -- Defined in ‘GHC.Internal.Ix’
 instance forall a1 a2 a3 a4 a5 a6 a7 a8 a9 aA. (GHC.Internal.Ix.Ix a1, GHC.Internal.Ix.Ix a2, GHC.Internal.Ix.Ix a3, GHC.Internal.Ix.Ix a4, GHC.Internal.Ix.Ix a5, GHC.Internal.Ix.Ix a6, GHC.Internal.Ix.Ix a7, GHC.Internal.Ix.Ix a8, GHC.Internal.Ix.Ix a9, GHC.Internal.Ix.Ix aA) => GHC.Internal.Ix.Ix (a1, a2, a3, a4, a5, a6, a7, a8, a9, aA) -- Defined in ‘GHC.Internal.Ix’
@@ -12081,8 +12081,8 @@ instance GHC.Internal.Num.Num GHC.Internal.Foreign.C.Types.CWchar -- Defined in 
 instance GHC.Internal.Num.Num GHC.Types.Double -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Num.Num GHC.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Num.Num GHC.Types.Int -- Defined in ‘GHC.Internal.Num’
-instance GHC.Internal.Num.Num GHC.Num.Integer.Integer -- Defined in ‘GHC.Internal.Num’
-instance GHC.Internal.Num.Num GHC.Num.Natural.Natural -- Defined in ‘GHC.Internal.Num’
+instance GHC.Internal.Num.Num GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Num’
+instance GHC.Internal.Num.Num GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Num’
 instance GHC.Internal.Num.Num GHC.Types.Word -- Defined in ‘GHC.Internal.Num’
 instance forall k a (b :: k). GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Functor.ZipList.ZipList a) -- Defined in ‘GHC.Internal.Functor.ZipList’
@@ -12098,11 +12098,11 @@ instance GHC.Internal.Read.Read GHC.Types.Double -- Defined in ‘GHC.Internal.R
 instance GHC.Internal.Read.Read GHC.Types.Float -- Defined in ‘GHC.Internal.Read’
 instance GHC.Internal.Read.Read GHC.Internal.Unicode.GeneralCategory -- Defined in ‘GHC.Internal.Read’
 instance GHC.Internal.Read.Read GHC.Types.Int -- Defined in ‘GHC.Internal.Read’
-instance GHC.Internal.Read.Read GHC.Num.Integer.Integer -- Defined in ‘GHC.Internal.Read’
+instance GHC.Internal.Read.Read GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Read’
 instance GHC.Internal.Read.Read GHC.Internal.Text.Read.Lex.Lexeme -- Defined in ‘GHC.Internal.Read’
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read [a] -- Defined in ‘GHC.Internal.Read’
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Maybe.Maybe a) -- Defined in ‘GHC.Internal.Read’
-instance GHC.Internal.Read.Read GHC.Num.Natural.Natural -- Defined in ‘GHC.Internal.Read’
+instance GHC.Internal.Read.Read GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Read’
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Read’
 instance GHC.Internal.Read.Read GHC.Types.Ordering -- Defined in ‘GHC.Internal.Read’
 instance forall a. (GHC.Internal.Real.Integral a, GHC.Internal.Read.Read a) => GHC.Internal.Read.Read (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Read’
@@ -12233,8 +12233,8 @@ instance GHC.Internal.Real.Integral GHC.Internal.Int.Int32 -- Defined in ‘GHC.
 instance GHC.Internal.Real.Integral GHC.Internal.Int.Int64 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Internal.Real.Integral GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Internal.Real.Integral GHC.Types.Int -- Defined in ‘GHC.Internal.Real’
-instance GHC.Internal.Real.Integral GHC.Num.Integer.Integer -- Defined in ‘GHC.Internal.Real’
-instance GHC.Internal.Real.Integral GHC.Num.Natural.Natural -- Defined in ‘GHC.Internal.Real’
+instance GHC.Internal.Real.Integral GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Real’
+instance GHC.Internal.Real.Integral GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Real’
 instance GHC.Internal.Real.Integral GHC.Types.Word -- Defined in ‘GHC.Internal.Real’
 instance GHC.Internal.Real.Integral GHC.Internal.Word.Word16 -- Defined in ‘GHC.Internal.Word’
 instance GHC.Internal.Real.Integral GHC.Internal.Word.Word32 -- Defined in ‘GHC.Internal.Word’
@@ -12272,8 +12272,8 @@ instance GHC.Internal.Real.Real GHC.Internal.Int.Int64 -- Defined in ‘GHC.Inte
 instance GHC.Internal.Real.Real GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.Int’
 instance forall a. GHC.Internal.Real.Real a => GHC.Internal.Real.Real (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance GHC.Internal.Real.Real GHC.Types.Int -- Defined in ‘GHC.Internal.Real’
-instance GHC.Internal.Real.Real GHC.Num.Integer.Integer -- Defined in ‘GHC.Internal.Real’
-instance GHC.Internal.Real.Real GHC.Num.Natural.Natural -- Defined in ‘GHC.Internal.Real’
+instance GHC.Internal.Real.Real GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Real’
+instance GHC.Internal.Real.Real GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Real’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.Real.Real (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
 instance GHC.Internal.Real.Real GHC.Types.Word -- Defined in ‘GHC.Internal.Real’
 instance GHC.Internal.Real.Real GHC.Internal.Word.Word16 -- Defined in ‘GHC.Internal.Word’
@@ -12365,13 +12365,13 @@ instance GHC.Internal.Show.Show GHC.Types.Bool -- Defined in ‘GHC.Internal.Sho
 instance GHC.Internal.Show.Show GHC.Internal.Stack.Types.CallStack -- Defined in ‘GHC.Internal.Show’
 instance GHC.Internal.Show.Show GHC.Types.Char -- Defined in ‘GHC.Internal.Show’
 instance GHC.Internal.Show.Show GHC.Types.Int -- Defined in ‘GHC.Internal.Show’
-instance GHC.Internal.Show.Show GHC.Num.Integer.Integer -- Defined in ‘GHC.Internal.Show’
+instance GHC.Internal.Show.Show GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Show’
 instance GHC.Internal.Show.Show GHC.Types.KindRep -- Defined in ‘GHC.Internal.Show’
 instance GHC.Internal.Show.Show GHC.Types.Levity -- Defined in ‘GHC.Internal.Show’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show [a] -- Defined in ‘GHC.Internal.Show’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Maybe.Maybe a) -- Defined in ‘GHC.Internal.Show’
 instance GHC.Internal.Show.Show GHC.Types.Module -- Defined in ‘GHC.Internal.Show’
-instance GHC.Internal.Show.Show GHC.Num.Natural.Natural -- Defined in ‘GHC.Internal.Show’
+instance GHC.Internal.Show.Show GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Show’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Show’
 instance GHC.Internal.Show.Show GHC.Types.Ordering -- Defined in ‘GHC.Internal.Show’
 instance GHC.Internal.Show.Show GHC.Types.RuntimeRep -- Defined in ‘GHC.Internal.Show’
@@ -12740,9 +12740,9 @@ instance GHC.Classes.Eq GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘G
 instance forall i e. GHC.Classes.Eq (GHC.Internal.IOArray.IOArray i e) -- Defined in ‘GHC.Internal.IOArray’
 instance forall a. GHC.Classes.Eq (GHC.Internal.IOPort.IOPort a) -- Defined in ‘GHC.Internal.IOPort’
 instance GHC.Classes.Eq GHC.Internal.InfoProv.Types.InfoProv -- Defined in ‘GHC.Internal.InfoProv.Types’
-instance GHC.Classes.Eq GHC.Num.Integer.Integer -- Defined in ‘GHC.Num.Integer’
-instance GHC.Classes.Eq GHC.Num.BigNat.BigNat -- Defined in ‘GHC.Num.BigNat’
-instance GHC.Classes.Eq GHC.Num.Natural.Natural -- Defined in ‘GHC.Num.Natural’
+instance GHC.Classes.Eq GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
+instance GHC.Classes.Eq GHC.Internal.Bignum.BigNat.BigNat -- Defined in ‘GHC.Internal.Bignum.BigNat’
+instance GHC.Classes.Eq GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Bignum.Natural’
 instance GHC.Classes.Eq GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
 instance forall a. GHC.Classes.Eq (GHC.Internal.StableName.StableName a) -- Defined in ‘GHC.Internal.StableName’
 instance GHC.Classes.Eq GHC.Internal.Stack.CloneStack.StackEntry -- Defined in ‘GHC.Internal.Stack.CloneStack’
@@ -12896,9 +12896,9 @@ instance GHC.Classes.Ord GHC.Internal.IO.Handle.Types.BufferMode -- Defined in �
 instance GHC.Classes.Ord GHC.Internal.IO.Handle.Types.Newline -- Defined in ‘GHC.Internal.IO.Handle.Types’
 instance GHC.Classes.Ord GHC.Internal.IO.Handle.Types.NewlineMode -- Defined in ‘GHC.Internal.IO.Handle.Types’
 instance GHC.Classes.Ord GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
-instance GHC.Classes.Ord GHC.Num.Integer.Integer -- Defined in ‘GHC.Num.Integer’
-instance GHC.Classes.Ord GHC.Num.BigNat.BigNat -- Defined in ‘GHC.Num.BigNat’
-instance GHC.Classes.Ord GHC.Num.Natural.Natural -- Defined in ‘GHC.Num.Natural’
+instance GHC.Classes.Ord GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
+instance GHC.Classes.Ord GHC.Internal.Bignum.BigNat.BigNat -- Defined in ‘GHC.Internal.Bignum.BigNat’
+instance GHC.Classes.Ord GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Bignum.Natural’
 instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Classes.Ord (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
 instance GHC.Classes.Ord GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
 instance forall (c :: GHC.Types.Char). GHC.Classes.Ord (GHC.Internal.TypeLits.SChar c) -- Defined in ‘GHC.Internal.TypeLits’

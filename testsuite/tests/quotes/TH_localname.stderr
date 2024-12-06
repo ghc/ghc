@@ -15,7 +15,7 @@ TH_localname.hs:3:11: error: [GHC-39999]
         instance GHC.Internal.TH.Lift.Lift Integer
           -- Defined in ‘GHC.Internal.TH.Lift’
         ...plus 15 others
-        ...plus 12 instances involving out-of-scope types
+        ...plus 71 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: GHC.Internal.TH.Lift.lift y
       In the expression:

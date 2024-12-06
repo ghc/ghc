@@ -50,7 +50,7 @@ foo :: Integer
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-foo = GHC.Num.Integer.IS 0#
+foo = GHC.Internal.Bignum.Integer.IS 0#
 
 
 

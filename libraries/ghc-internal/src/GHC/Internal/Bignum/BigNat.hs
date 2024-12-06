@@ -12,7 +12,7 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | Multi-precision natural
-module GHC.Num.BigNat where
+module GHC.Internal.Bignum.BigNat where
 
 #include "MachDeps.h"
 #include "WordSize.h"
@@ -21,9 +21,9 @@ import GHC.Prim
 import GHC.Types
 import GHC.Classes
 import GHC.Magic
-import GHC.Num.Primitives
-import GHC.Num.WordArray
-import GHC.Num.Backend
+import GHC.Internal.Bignum.Primitives
+import GHC.Internal.Bignum.WordArray
+import GHC.Internal.Bignum.Backend
 
 default ()
 
@@ -101,7 +101,7 @@ bigNatOne# _ = case bigNatOne of
 raiseDivZero_BigNat :: (# #) -> BigNat#
 raiseDivZero_BigNat _ = case raiseDivZero of
    !_ -> bigNatZero# (# #)
-   -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
+   -- see Note [ghc-bignum exceptions] in GHC.Internal.Bignum.Primitives
 
 -- | Indicate if a bigNat is zero
 bigNatIsZero :: BigNat# -> Bool
@@ -541,7 +541,7 @@ bigNatSubUnsafe a b
                (# s', _  #) -> case raiseUnderflow of
                                  !_ -> s'
                                  -- see Note [ghc-bignum exceptions] in
-                                 -- GHC.Num.Primitives
+                                 -- GHC.Internal.Bignum.Primitives
 
 -- | Subtract two BigNat
 bigNatSub :: BigNat# -> BigNat# -> (# (# #) | BigNat# #)
@@ -606,7 +606,7 @@ bigNatQuotRemWord# :: BigNat# -> Word# -> (# BigNat#, Word# #)
 bigNatQuotRemWord# a b
    | 0## <- b = case raiseDivZero of
                   !_ -> (# bigNatZero# (# #), 0## #)
-                  -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
+                  -- see Note [ghc-bignum exceptions] in GHC.Internal.Bignum.Primitives
    | 1## <- b = (# a, 0## #)
    | isTrue# (bigNatSize# a ==# 1#)
    , a0 <- indexWordArray# a 0#
@@ -634,7 +634,7 @@ bigNatQuotRem# :: BigNat# -> BigNat# -> (# BigNat#, BigNat# #)
 bigNatQuotRem# a b
    | bigNatIsZero b          = case raiseDivZero of
                                  !_ -> (# bigNatZero# (# #), bigNatZero# (# #) #)
-                                 -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
+                                 -- see Note [ghc-bignum exceptions] in GHC.Internal.Bignum.Primitives
    | bigNatIsZero a          = (# bigNatZero# (# #), bigNatZero# (# #) #)
    | bigNatIsOne b           = (# a                , bigNatZero# (# #) #)
    | LT <- cmp               = (# bigNatZero# (# #), a #)

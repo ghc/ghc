@@ -1,4 +1,3 @@
-
 T22141e.hs:8:11: warning: [GHC-68567] [-Wdata-kinds-tc (in -Wdefault)]
     • An occurrence of ‘42’ in a kind requires DataKinds.
       Future versions of GHC will turn this warning into an error.
@@ -8,7 +7,7 @@ T22141e.hs:8:11: warning: [GHC-68567] [-Wdata-kinds-tc (in -Wdefault)]
       Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
 
 T22141e.hs:8:11: warning: [GHC-68567] [-Wdata-kinds-tc (in -Wdefault)]
-    • An occurrence of ‘GHC.Num.Natural.Natural’ in a kind requires DataKinds.
+    • An occurrence of ‘GHC.Internal.Bignum.Natural.Natural’ in a kind requires DataKinds.
       Future versions of GHC will turn this warning into an error.
     • In a standalone kind signature for ‘D’: Proxy T -> Type
     Suggested fix:
@@ -20,3 +19,4 @@ T22141e.hs:8:11: warning: [GHC-68567] [-Wdata-kinds-tc (in -Wdefault)]
     • In a standalone kind signature for ‘D’: Proxy T -> Type
     Suggested fix:
       Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
+

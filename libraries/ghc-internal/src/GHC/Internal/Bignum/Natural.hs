@@ -8,7 +8,7 @@
 #include "MachDeps.h"
 #include "WordSize.h"
 
-module GHC.Num.Natural
+module GHC.Internal.Bignum.Natural
     ( Natural(..)
     , naturalCheck#
     , naturalCheck
@@ -116,8 +116,8 @@ import GHC.Prim
 import GHC.Types
 import GHC.Classes
 
-import GHC.Num.BigNat
-import GHC.Num.Primitives
+import GHC.Internal.Bignum.BigNat
+import GHC.Internal.Bignum.Primitives
 
 default ()
 
@@ -712,7 +712,7 @@ naturalFromByteArray# sz ba off e s = case bigNatFromByteArray# sz ba off e s of
 
 
 -- See Note [Optimising conversions between numeric types]
--- in GHC.Num.Integer
+-- in GHC.Internal.Bignum.Integer
 {-# RULES
 "Word# -> Natural -> Word#"
   forall x. naturalToWord# (NS x) = x

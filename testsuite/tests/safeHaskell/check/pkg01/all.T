@@ -29,7 +29,7 @@ make_args = 'VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn
 test('safePkg01',
      [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       normalise_errmsg_fun(ignoreLdOutput, normalise_errmsg),
-      normalise_version('ghc-internal', "array", "ghc-bignum", "bytestring",
+      normalise_version('ghc-internal', "array", "bytestring",
                         "base", "deepseq", "ghc-prim"),
       normalise_fun(normalise_errmsg),
       js_broken(22349)],

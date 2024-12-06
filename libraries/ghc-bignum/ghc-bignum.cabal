@@ -1,6 +1,6 @@
 cabal-version:       2.0
 name:                ghc-bignum
-version:             1.3
+version:             1.4
 synopsis:            GHC BigNum library
 license:             BSD3
 license-file:        LICENSE
@@ -8,22 +8,15 @@ author:              Sylvain Henry
 maintainer:          libraries@haskell.org
 bug-reports:         https://gitlab.haskell.org/ghc/ghc/issues/new
 category:            Numeric, Algebra, GHC
-build-type:          Configure
+build-type:          Simple
 description:
-    This package provides the low-level implementation of the standard
+    This package used to provide the low-level implementation of the standard
     'BigNat', 'Natural' and 'Integer' types.
+    Use `base:GHC.Num.{Integer,Natural,BigNat}` instead or other modules from
+    `ghc-internal`.
 
 extra-source-files:
-    aclocal.m4
-    cbits/gmp_wrappers.c
     changelog.md
-    configure
-    configure.ac
-    config.mk.in
-    include/WordSize.h
-    include/HsIntegerGmp.h.in
-    install-sh
-    ghc-bignum.buildinfo.in
 
 source-repository head
     type:     git
@@ -31,95 +24,29 @@ source-repository head
     subdir:   libraries/ghc-bignum
 
 
-Flag Native
-    Description: Enable native backend
-    Manual: True
-    Default: False
-
-Flag FFI
-    Description: Enable FFI backend
-    Manual: True
-    Default: False
-
-Flag GMP
-    Description: Enable GMP backend
-    Manual: True
-    Default: False
-
-Flag Check
-    Description: Validate results of the enabled backend against native backend.
-    Manual: True
-    Default: False
-
 library
-
-  -- check that at least one flag is set
-  if !flag(native) && !flag(gmp) && !flag(ffi)
-    buildable: False
-
-  -- check that at most one flag is set
-  if flag(native) && (flag(gmp) || flag(ffi))
-    buildable: False
-  if flag(gmp) && flag(ffi)
-    buildable: False
-
   default-language:    Haskell2010
-  other-extensions:
-    BangPatterns
-    CPP
-    ExplicitForAll
-    GHCForeignImportPrim
-    MagicHash
-    NegativeLiterals
-    NoImplicitPrelude
-    UnboxedTuples
-    UnliftedFFITypes
-    ForeignFunctionInterface
-
   build-depends:
-    ghc-prim >= 0.5.1.0 && < 0.12
+      base
+    , ghc-internal
 
-  hs-source-dirs: src/
-  include-dirs: include/
-  ghc-options: -Wall
-  cc-options: -std=c99 -Wall
-
-  ghc-options:
-    -- GHC has wired-in IDs from the ghc-bignum package. Hence the unit-id
-    -- of the package should not contain the version: i.e. it must be
-    -- "ghc-bignum" and not "ghc-bignum-1.0".
-    -this-unit-id ghc-bignum
-
-    -- See Note [ghc-bignum and error symbols]
-    -fno-catch-nonexhaustive-cases
-
-  if flag(gmp)
-      cpp-options: -DBIGNUM_GMP
-      other-modules:
-         GHC.Num.Backend.GMP
-      c-sources:
-         cbits/gmp_wrappers.c
-
-  if flag(ffi)
-      cpp-options: -DBIGNUM_FFI
-      other-modules:
-         GHC.Num.Backend.FFI
-
-  if flag(native)
-      cpp-options: -DBIGNUM_NATIVE
-
-  if flag(check)
-      cpp-options: -DBIGNUM_CHECK
-      other-modules:
-         GHC.Num.Backend.Check
-
-
-  exposed-modules:
-    GHC.Num.Primitives
-    GHC.Num.WordArray
-    GHC.Num.BigNat
-    GHC.Num.Backend
-    GHC.Num.Backend.Selected
-    GHC.Num.Backend.Native
-    GHC.Num.Natural
-    GHC.Num.Integer
+  other-modules:
+    -- dummy module to make Hadrian/GHC build a valid library...
+    Dummy
+  reexported-modules:
+    -- reexport from ghc-internal
+      GHC.Internal.Bignum.Primitives       as GHC.Num.Primitives
+    , GHC.Internal.Bignum.WordArray        as GHC.Num.WordArray
+    , GHC.Internal.Bignum.Backend          as GHC.Num.Backend
+    , GHC.Internal.Bignum.Backend.Selected as GHC.Num.Backend.Selected
+    , GHC.Internal.Bignum.Backend.Native   as GHC.Num.Backend.Native
+    -- reexport from base
+    -- We can't reexport these modules from ghc-internal otherwise we get
+    -- ambiguity between:
+    --   ghc-bignum:GHC.Num.X
+    --   base:GHC.Num.X
+    -- we should probably just deprecate ghc-bignum and encourage users to use
+    -- exports from base instead.
+    , GHC.Num.BigNat
+    , GHC.Num.Natural
+    , GHC.Num.Integer

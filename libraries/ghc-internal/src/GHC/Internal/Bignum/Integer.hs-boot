@@ -2,12 +2,12 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE MagicHash #-}
 
-module GHC.Num.Integer where
+module GHC.Internal.Bignum.Integer where
 
 import GHC.Types
 import GHC.Prim
-import {-# SOURCE #-} GHC.Num.BigNat
-import {-# SOURCE #-} GHC.Num.Natural
+import {-# SOURCE #-} GHC.Internal.Bignum.BigNat
+import {-# SOURCE #-} GHC.Internal.Bignum.Natural
 
 data Integer
 

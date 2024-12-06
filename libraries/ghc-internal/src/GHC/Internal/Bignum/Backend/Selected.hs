@@ -3,21 +3,21 @@
 
 -- | Selected backend
 --
--- We need this module in addition to GHC.Num.Backend to avoid module loops with
+-- We need this module in addition to GHC.Internal.Bignum.Backend to avoid module loops with
 -- Check backend.
-module GHC.Num.Backend.Selected
+module GHC.Internal.Bignum.Backend.Selected
    ( module Backend
    )
 where
 
 #if defined(BIGNUM_NATIVE)
-import GHC.Num.Backend.Native as Backend
+import GHC.Internal.Bignum.Backend.Native as Backend
 
 #elif defined(BIGNUM_FFI)
-import GHC.Num.Backend.FFI as Backend
+import GHC.Internal.Bignum.Backend.FFI as Backend
 
 #elif defined(BIGNUM_GMP)
-import GHC.Num.Backend.GMP as Backend
+import GHC.Internal.Bignum.Backend.GMP as Backend
 
 #else
 #error Undefined BigNum backend. Use a flag to select it (e.g. gmp, native, ffi)`

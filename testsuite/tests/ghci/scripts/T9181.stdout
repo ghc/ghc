@@ -1,11 +1,14 @@
-type (GHC.Internal.TypeNats.*) :: GHC.Num.Natural.Natural
-                                  -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
+type (GHC.Internal.TypeNats.*) :: GHC.Internal.Bignum.Natural.Natural
+                                  -> GHC.Internal.Bignum.Natural.Natural
+                                  -> GHC.Internal.Bignum.Natural.Natural
 type family (GHC.Internal.TypeNats.*) a b
-type (GHC.Internal.TypeNats.+) :: GHC.Num.Natural.Natural
-                                  -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
+type (GHC.Internal.TypeNats.+) :: GHC.Internal.Bignum.Natural.Natural
+                                  -> GHC.Internal.Bignum.Natural.Natural
+                                  -> GHC.Internal.Bignum.Natural.Natural
 type family (GHC.Internal.TypeNats.+) a b
-type (GHC.Internal.TypeNats.-) :: GHC.Num.Natural.Natural
-                                  -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
+type (GHC.Internal.TypeNats.-) :: GHC.Internal.Bignum.Natural.Natural
+                                  -> GHC.Internal.Bignum.Natural.Natural
+                                  -> GHC.Internal.Bignum.Natural.Natural
 type family (GHC.Internal.TypeNats.-) a b
 type (GHC.Internal.Data.Type.Ord.<=) :: forall {t}.
                                         t -> t -> Constraint
@@ -21,13 +24,13 @@ type GHC.Internal.TypeLits.AppendSymbol :: GHC.Types.Symbol
                                            -> GHC.Types.Symbol -> GHC.Types.Symbol
 type family GHC.Internal.TypeLits.AppendSymbol a b
 type GHC.Internal.TypeLits.CharToNat :: Char
-                                        -> GHC.Num.Natural.Natural
+                                        -> GHC.Internal.Bignum.Natural.Natural
 type family GHC.Internal.TypeLits.CharToNat a
 type GHC.Internal.TypeLits.Internal.CmpChar :: Char
                                                -> Char -> Ordering
 type family GHC.Internal.TypeLits.Internal.CmpChar a b
-type GHC.Internal.TypeNats.Internal.CmpNat :: GHC.Num.Natural.Natural
-                                              -> GHC.Num.Natural.Natural -> Ordering
+type GHC.Internal.TypeNats.Internal.CmpNat :: GHC.Internal.Bignum.Natural.Natural
+                                              -> GHC.Internal.Bignum.Natural.Natural -> Ordering
 type family GHC.Internal.TypeNats.Internal.CmpNat a b
 type GHC.Internal.TypeLits.Internal.CmpSymbol :: GHC.Types.Symbol
                                                  -> GHC.Types.Symbol -> Ordering
@@ -35,8 +38,9 @@ type family GHC.Internal.TypeLits.Internal.CmpSymbol a b
 type GHC.Internal.TypeLits.ConsSymbol :: Char
                                          -> GHC.Types.Symbol -> GHC.Types.Symbol
 type family GHC.Internal.TypeLits.ConsSymbol a b
-type GHC.Internal.TypeNats.Div :: GHC.Num.Natural.Natural
-                                  -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
+type GHC.Internal.TypeNats.Div :: GHC.Internal.Bignum.Natural.Natural
+                                  -> GHC.Internal.Bignum.Natural.Natural
+                                  -> GHC.Internal.Bignum.Natural.Natural
 type family GHC.Internal.TypeNats.Div a b
 type GHC.Internal.TypeError.ErrorMessage :: *
 data GHC.Internal.TypeError.ErrorMessage
@@ -62,21 +66,23 @@ type GHC.Internal.TypeLits.KnownSymbol :: GHC.Types.Symbol
 class GHC.Internal.TypeLits.KnownSymbol n where
   GHC.Internal.TypeLits.symbolSing :: GHC.Internal.TypeLits.SSymbol n
   {-# MINIMAL symbolSing #-}
-type GHC.Internal.TypeNats.Log2 :: GHC.Num.Natural.Natural
-                                   -> GHC.Num.Natural.Natural
+type GHC.Internal.TypeNats.Log2 :: GHC.Internal.Bignum.Natural.Natural
+                                   -> GHC.Internal.Bignum.Natural.Natural
 type family GHC.Internal.TypeNats.Log2 a
-type GHC.Internal.TypeNats.Mod :: GHC.Num.Natural.Natural
-                                  -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
+type GHC.Internal.TypeNats.Mod :: GHC.Internal.Bignum.Natural.Natural
+                                  -> GHC.Internal.Bignum.Natural.Natural
+                                  -> GHC.Internal.Bignum.Natural.Natural
 type family GHC.Internal.TypeNats.Mod a b
 type GHC.Internal.TypeNats.Nat :: *
-type GHC.Internal.TypeNats.Nat = GHC.Num.Natural.Natural
-type GHC.Internal.TypeLits.NatToChar :: GHC.Num.Natural.Natural
+type GHC.Internal.TypeNats.Nat =
+  GHC.Internal.Bignum.Natural.Natural
+type GHC.Internal.TypeLits.NatToChar :: GHC.Internal.Bignum.Natural.Natural
                                         -> Char
 type family GHC.Internal.TypeLits.NatToChar a
-type GHC.Num.Natural.Natural :: *
-data GHC.Num.Natural.Natural
-  = GHC.Num.Natural.NS GHC.Prim.Word#
-  | GHC.Num.Natural.NB GHC.Prim.ByteArray#
+type GHC.Internal.Bignum.Natural.Natural :: *
+data GHC.Internal.Bignum.Natural.Natural
+  = GHC.Internal.Bignum.Natural.NS GHC.Prim.Word#
+  | GHC.Internal.Bignum.Natural.NB GHC.Prim.ByteArray#
 type role GHC.Internal.Data.Type.Ord.OrderingI nominal nominal
 type GHC.Internal.Data.Type.Ord.OrderingI :: forall {k}.
                                              k -> k -> *
@@ -105,7 +111,7 @@ pattern GHC.Internal.TypeNats.SNat
 type role GHC.Internal.TypeNats.SNat nominal
 type GHC.Internal.TypeNats.SNat :: GHC.Internal.TypeNats.Nat -> *
 newtype GHC.Internal.TypeNats.SNat n
-  = GHC.Internal.TypeNats.UnsafeSNat_ GHC.Num.Natural.Natural
+  = GHC.Internal.TypeNats.UnsafeSNat_ GHC.Internal.Bignum.Natural.Natural
 pattern GHC.Internal.TypeLits.SSymbol
   :: () =>
      GHC.Internal.TypeLits.KnownSymbol s =>
@@ -137,8 +143,9 @@ type family GHC.Internal.TypeError.TypeError a where
 type GHC.Internal.TypeLits.UnconsSymbol :: GHC.Types.Symbol
                                            -> Maybe (Char, GHC.Types.Symbol)
 type family GHC.Internal.TypeLits.UnconsSymbol a
-type (GHC.Internal.TypeNats.^) :: GHC.Num.Natural.Natural
-                                  -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
+type (GHC.Internal.TypeNats.^) :: GHC.Internal.Bignum.Natural.Natural
+                                  -> GHC.Internal.Bignum.Natural.Natural
+                                  -> GHC.Internal.Bignum.Natural.Natural
 type family (GHC.Internal.TypeNats.^) a b
 GHC.Internal.TypeLits.charVal ::
   GHC.Internal.TypeLits.KnownChar n => proxy n -> Char

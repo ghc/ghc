@@ -304,7 +304,7 @@ module Language.Haskell.TH where
   type KindQ :: *
   type KindQ = Q Kind
   type Lit :: *
-  data Lit = CharL GHC.Types.Char | StringL GHC.Internal.Base.String | IntegerL GHC.Num.Integer.Integer | RationalL GHC.Internal.Real.Rational | IntPrimL GHC.Num.Integer.Integer | WordPrimL GHC.Num.Integer.Integer | FloatPrimL GHC.Internal.Real.Rational | DoublePrimL GHC.Internal.Real.Rational | StringPrimL [GHC.Internal.Word.Word8] | BytesPrimL GHC.Internal.TH.Syntax.Bytes | CharPrimL GHC.Types.Char
+  data Lit = CharL GHC.Types.Char | StringL GHC.Internal.Base.String | IntegerL GHC.Internal.Bignum.Integer.Integer | RationalL GHC.Internal.Real.Rational | IntPrimL GHC.Internal.Bignum.Integer.Integer | WordPrimL GHC.Internal.Bignum.Integer.Integer | FloatPrimL GHC.Internal.Real.Rational | DoublePrimL GHC.Internal.Real.Rational | StringPrimL [GHC.Internal.Word.Word8] | BytesPrimL GHC.Internal.TH.Syntax.Bytes | CharPrimL GHC.Types.Char
   type Loc :: *
   data Loc = Loc {loc_filename :: GHC.Internal.Base.String, loc_package :: GHC.Internal.Base.String, loc_module :: GHC.Internal.Base.String, loc_start :: GHC.Internal.TH.Syntax.CharPos, loc_end :: GHC.Internal.TH.Syntax.CharPos}
   type Match :: *
@@ -399,7 +399,7 @@ module Language.Haskell.TH where
   type TExpQ :: forall (r :: GHC.Types.RuntimeRep). TYPE r -> *
   type TExpQ a = Q (TExp a)
   type TyLit :: *
-  data TyLit = NumTyLit GHC.Num.Integer.Integer | StrTyLit GHC.Internal.Base.String | CharTyLit GHC.Types.Char
+  data TyLit = NumTyLit GHC.Internal.Bignum.Integer.Integer | StrTyLit GHC.Internal.Base.String | CharTyLit GHC.Types.Char
   type TyLitQ :: *
   type TyLitQ = Q TyLit
   type TySynEqn :: *
@@ -526,8 +526,8 @@ module Language.Haskell.TH where
   injectivityAnn :: Name -> [Name] -> GHC.Internal.TH.Lib.InjectivityAnn
   instanceD :: forall (m :: * -> *). Quote m => m Cxt -> m Type -> [m Dec] -> m Dec
   instanceWithOverlapD :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe Overlap -> m Cxt -> m Type -> [m Dec] -> m Dec
-  intPrimL :: GHC.Num.Integer.Integer -> Lit
-  integerL :: GHC.Num.Integer.Integer -> Lit
+  intPrimL :: GHC.Internal.Bignum.Integer.Integer -> Lit
+  integerL :: GHC.Internal.Bignum.Integer.Integer -> Lit
   interruptible :: Safety
   invisP :: forall (m :: * -> *). Quote m => m Type -> m Pat
   isExtEnabled :: Extension -> Q GHC.Types.Bool
@@ -586,7 +586,7 @@ module Language.Haskell.TH where
   normalG :: forall (m :: * -> *). Quote m => m Exp -> m Guard
   normalGE :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m (Guard, Exp)
   notStrict :: forall (m :: * -> *). Quote m => m Strict
-  numTyLit :: forall (m :: * -> *). Quote m => GHC.Num.Integer.Integer -> m TyLit
+  numTyLit :: forall (m :: * -> *). Quote m => GHC.Internal.Bignum.Integer.Integer -> m TyLit
   openTypeFamilyD :: forall (m :: * -> *). Quote m => Name -> [TyVarBndr BndrVis] -> FamilyResultSig -> GHC.Internal.Maybe.Maybe InjectivityAnn -> m Dec
   parS :: forall (m :: * -> *). Quote m => [[m Stmt]] -> m Stmt
   parensE :: forall (m :: * -> *). Quote m => m Exp -> m Exp
@@ -725,7 +725,7 @@ module Language.Haskell.TH where
   wildP :: forall (m :: * -> *). Quote m => m Pat
   withDecDoc :: GHC.Internal.Base.String -> Q Dec -> Q Dec
   withDecsDoc :: GHC.Internal.Base.String -> Q [Dec] -> Q [Dec]
-  wordPrimL :: GHC.Num.Integer.Integer -> Lit
+  wordPrimL :: GHC.Internal.Bignum.Integer.Integer -> Lit
 
 module Language.Haskell.TH.CodeDo where
   -- Safety: Safe-Inferred
@@ -1050,8 +1050,8 @@ module Language.Haskell.TH.Lib where
   injectivityAnn :: GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.Name] -> GHC.Internal.TH.Lib.InjectivityAnn
   instanceD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
   instanceWithOverlapD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe Overlap -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
-  intPrimL :: GHC.Num.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
-  integerL :: GHC.Num.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
+  intPrimL :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
+  integerL :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
   interruptible :: GHC.Internal.TH.Syntax.Safety
   invisP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Pat
   isStrict :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Strict
@@ -1096,7 +1096,7 @@ module Language.Haskell.TH.Lib where
   normalG :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Guard
   normalGE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m (GHC.Internal.TH.Syntax.Guard, GHC.Internal.TH.Syntax.Exp)
   notStrict :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Strict
-  numTyLit :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Num.Integer.Integer -> m GHC.Internal.TH.Syntax.TyLit
+  numTyLit :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Bignum.Integer.Integer -> m GHC.Internal.TH.Syntax.TyLit
   openTypeFamilyD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.TH.Syntax.FamilyResultSig -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.InjectivityAnn -> m GHC.Internal.TH.Syntax.Dec
   parS :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [[m GHC.Internal.TH.Syntax.Stmt]] -> m GHC.Internal.TH.Syntax.Stmt
   parensE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
@@ -1207,7 +1207,7 @@ module Language.Haskell.TH.Lib where
   wildP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat
   withDecDoc :: GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec
   withDecsDoc :: GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q [GHC.Internal.TH.Syntax.Dec] -> GHC.Internal.TH.Syntax.Q [GHC.Internal.TH.Syntax.Dec]
-  wordPrimL :: GHC.Num.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
+  wordPrimL :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
 
 module Language.Haskell.TH.Lib.Internal where
   -- Safety: Safe
@@ -1389,8 +1389,8 @@ module Language.Haskell.TH.Lib.Internal where
   injectivityAnn :: GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.Name] -> InjectivityAnn
   instanceD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
   instanceWithOverlapD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Overlap -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
-  intPrimL :: GHC.Num.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
-  integerL :: GHC.Num.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
+  intPrimL :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
+  integerL :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
   interruptible :: GHC.Internal.TH.Syntax.Safety
   invisP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Pat
   isStrict :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Strict
@@ -1434,7 +1434,7 @@ module Language.Haskell.TH.Lib.Internal where
   normalG :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Guard
   normalGE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m (GHC.Internal.TH.Syntax.Guard, GHC.Internal.TH.Syntax.Exp)
   notStrict :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Strict
-  numTyLit :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Num.Integer.Integer -> m GHC.Internal.TH.Syntax.TyLit
+  numTyLit :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Bignum.Integer.Integer -> m GHC.Internal.TH.Syntax.TyLit
   openTypeFamilyD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> m GHC.Internal.TH.Syntax.FamilyResultSig -> GHC.Internal.Maybe.Maybe InjectivityAnn -> m GHC.Internal.TH.Syntax.Dec
   orP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Base.NonEmpty (m GHC.Internal.TH.Syntax.Pat) -> m GHC.Internal.TH.Syntax.Pat
   parS :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [[m GHC.Internal.TH.Syntax.Stmt]] -> m GHC.Internal.TH.Syntax.Stmt
@@ -1549,7 +1549,7 @@ module Language.Haskell.TH.Lib.Internal where
   wildP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat
   withDecDoc :: GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec
   withDecsDoc :: GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q [GHC.Internal.TH.Syntax.Dec] -> GHC.Internal.TH.Syntax.Q [GHC.Internal.TH.Syntax.Dec]
-  wordPrimL :: GHC.Num.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
+  wordPrimL :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
 
 module Language.Haskell.TH.Ppr where
   -- Safety: Safe
@@ -1674,7 +1674,7 @@ module Language.Haskell.TH.PprLib where
   hcat :: [Doc] -> Doc
   hsep :: [Doc] -> Doc
   int :: GHC.Types.Int -> Doc
-  integer :: GHC.Num.Integer.Integer -> Doc
+  integer :: GHC.Internal.Bignum.Integer.Integer -> Doc
   isEmpty :: Doc -> PprM GHC.Types.Bool
   lbrace :: Doc
   lbrack :: Doc
@@ -1983,7 +1983,7 @@ module Language.Haskell.TH.Syntax where
     liftTyped :: forall (m :: * -> *). Quote m => t -> Code m t
     {-# MINIMAL liftTyped #-}
   type Lit :: *
-  data Lit = CharL GHC.Types.Char | StringL GHC.Internal.Base.String | IntegerL GHC.Num.Integer.Integer | RationalL GHC.Internal.Real.Rational | IntPrimL GHC.Num.Integer.Integer | WordPrimL GHC.Num.Integer.Integer | FloatPrimL GHC.Internal.Real.Rational | DoublePrimL GHC.Internal.Real.Rational | StringPrimL [GHC.Internal.Word.Word8] | BytesPrimL Bytes | CharPrimL GHC.Types.Char
+  data Lit = CharL GHC.Types.Char | StringL GHC.Internal.Base.String | IntegerL GHC.Internal.Bignum.Integer.Integer | RationalL GHC.Internal.Real.Rational | IntPrimL GHC.Internal.Bignum.Integer.Integer | WordPrimL GHC.Internal.Bignum.Integer.Integer | FloatPrimL GHC.Internal.Real.Rational | DoublePrimL GHC.Internal.Real.Rational | StringPrimL [GHC.Internal.Word.Word8] | BytesPrimL Bytes | CharPrimL GHC.Types.Char
   type Loc :: *
   data Loc = Loc {loc_filename :: GHC.Internal.Base.String, loc_package :: GHC.Internal.Base.String, loc_module :: GHC.Internal.Base.String, loc_start :: CharPos, loc_end :: CharPos}
   type Match :: *
@@ -2093,7 +2093,7 @@ module Language.Haskell.TH.Syntax where
   type TExp :: forall (r :: GHC.Types.RuntimeRep). TYPE r -> *
   newtype TExp a = TExp {unType :: Exp}
   type TyLit :: *
-  data TyLit = NumTyLit GHC.Num.Integer.Integer | StrTyLit GHC.Internal.Base.String | CharTyLit GHC.Types.Char
+  data TyLit = NumTyLit GHC.Internal.Bignum.Integer.Integer | StrTyLit GHC.Internal.Base.String | CharTyLit GHC.Types.Char
   type TySynEqn :: *
   data TySynEqn = TySynEqn (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) Type Type
   type TyVarBndr :: * -> *
@@ -2103,7 +2103,7 @@ module Language.Haskell.TH.Syntax where
   type TypeFamilyHead :: *
   data TypeFamilyHead = TypeFamilyHead Name [TyVarBndr BndrVis] FamilyResultSig (GHC.Internal.Maybe.Maybe InjectivityAnn)
   type Uniq :: *
-  type Uniq = GHC.Num.Integer.Integer
+  type Uniq = GHC.Internal.Bignum.Integer.Integer
   type Unlifted :: *
   type Unlifted = GHC.Types.Bool
   type VarBangType :: *
@@ -2481,7 +2481,7 @@ instance GHC.Internal.TH.Lift.Lift GHC.Internal.Int.Int16 -- Defined in ‘GHC.I
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Int.Int32 -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Int.Int64 -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.TH.Lift’
-instance GHC.Internal.TH.Lift.Lift GHC.Num.Integer.Integer -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a. GHC.Internal.TH.Lift.Lift a => GHC.Internal.TH.Lift.Lift [a] -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Lit -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Loc -- Defined in ‘GHC.Internal.TH.Lift’
@@ -2494,7 +2494,7 @@ instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.NameFlavour -- Defined
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.NameIs -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.NameSpace -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.NamespaceSpecifier -- Defined in ‘GHC.Internal.TH.Lift’
-instance GHC.Internal.TH.Lift.Lift GHC.Num.Natural.Natural -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a. GHC.Internal.TH.Lift.Lift a => GHC.Internal.TH.Lift.Lift (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.OccName -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Overlap -- Defined in ‘GHC.Internal.TH.Lift’

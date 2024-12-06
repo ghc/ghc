@@ -23,9 +23,9 @@ gmpObjects s = do
     then return []
     else do
       -- Indirectly ensure object creation
-      let ctx = vanillaContext s ghcBignum
-      ghcBignumPath <- buildPath ctx
-      need [ghcBignumPath -/- "include/ghc-gmp.h"]
+      let ctx = vanillaContext s ghcInternal
+      ghcInternalPath <- buildPath ctx
+      need [ghcInternalPath -/- "include/ghc-gmp.h"]
 
       gmpPath <- gmpIntreePath s
       map (unifyPath . (gmpPath -/-)) <$>
@@ -54,13 +54,13 @@ gmpRules = do
     let
       -- Path to libraries/integer-gmp/gmp in the source tree
       gmpBase :: FilePath
-      gmpBase = pkgPath ghcBignum -/- "gmp"
+      gmpBase = pkgPath ghcInternal -/- "gmp"
 
     -- Build in-tree gmp if necessary
-    -- Produce: ghc-bignum/build/include/ghc-gmp.h
+    -- Produce: ghc-internal/build/include/ghc-gmp.h
     --   In-tree: copy gmp.h from in-tree build
     --   External: copy ghc-gmp.h from base sources
-    root -/- "stage*/libraries/ghc-bignum/build/include/ghc-gmp.h" %> \header -> do
+    root -/- "stage*/libraries/ghc-internal/build/include/ghc-gmp.h" %> \header -> do
         let includeP   = takeDirectory header
             buildP     = takeDirectory includeP
             packageP   = takeDirectory buildP
@@ -85,13 +85,13 @@ gmpRules = do
 
         let
           -- parse a path of the form "//stage*/gmp/xxx" and returns a vanilla
-          -- context from it for ghc-bignum package.
+          -- context from it for ghc-internal package.
           makeGmpPathContext gmpP = do
                let
                    stageP   = takeDirectory gmpP
                    stageS   = takeFileName stageP
                stage <- parsePath parseStage "<stage>" stageS
-               pure (vanillaContext stage ghcBignum)
+               pure (vanillaContext stage ghcInternal)
 
           gmpPath = root -/- "stage*/gmp"
 

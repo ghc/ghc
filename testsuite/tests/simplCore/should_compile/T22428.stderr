@@ -9,7 +9,7 @@ T22428.f1 :: Integer
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-T22428.f1 = GHC.Num.Integer.IS 1#
+T22428.f1 = GHC.Internal.Bignum.Integer.IS 1#
 
 -- RHS size: {terms: 28, types: 10, coercions: 0, joins: 1/1}
 f :: Integer -> Integer -> Integer
@@ -31,15 +31,16 @@ f = \ (x :: Integer) (y :: Integer) ->
                  Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)}]
         go (ds :: Integer)
           = case ds of x1 {
-              GHC.Num.Integer.IS x2 ->
+              GHC.Internal.Bignum.Integer.IS x2 ->
                 case x2 of {
-                  __DEFAULT -> jump go (GHC.Num.Integer.integerSub x1 T22428.f1);
+                  __DEFAULT ->
+                    jump go (GHC.Internal.Bignum.Integer.integerSub x1 T22428.f1);
                   0# -> x
                 };
-              GHC.Num.Integer.IP x2 ->
-                jump go (GHC.Num.Integer.integerSub x1 T22428.f1);
-              GHC.Num.Integer.IN x2 ->
-                jump go (GHC.Num.Integer.integerSub x1 T22428.f1)
+              GHC.Internal.Bignum.Integer.IP x2 ->
+                jump go (GHC.Internal.Bignum.Integer.integerSub x1 T22428.f1);
+              GHC.Internal.Bignum.Integer.IN x2 ->
+                jump go (GHC.Internal.Bignum.Integer.integerSub x1 T22428.f1)
             }; } in
       jump go y
 

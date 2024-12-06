@@ -1,1 +1,1 @@
-VarI T18263.x (ConT GHC.Num.Integer.Integer) Nothing
+VarI T18263.x (ConT GHC.Internal.Bignum.Integer.Integer) Nothing

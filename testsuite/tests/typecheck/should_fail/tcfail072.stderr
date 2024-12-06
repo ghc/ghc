@@ -1,4 +1,3 @@
-
 tcfail072.hs:23:13: error: [GHC-39999]
     • Could not deduce ‘Ord p0’ arising from a use of ‘g’
       from the context: (Ord p, Ord q)
@@ -8,9 +7,10 @@ tcfail072.hs:23:13: error: [GHC-39999]
       The type variable ‘p0’ is ambiguous
       Potentially matching instances:
         instance Ord Ordering -- Defined in ‘GHC.Classes’
-        instance Ord Integer -- Defined in ‘GHC.Num.Integer’
+        instance Ord Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
         ...plus 23 others
-        ...plus two instances involving out-of-scope types
+        ...plus three instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: g A
       In an equation for ‘g’: g (B _ _) = g A
+

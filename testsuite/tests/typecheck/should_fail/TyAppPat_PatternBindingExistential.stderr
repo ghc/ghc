@@ -1,4 +1,3 @@
-
 TyAppPat_PatternBindingExistential.hs:10:1: error: [GHC-48361]
     • Binding type variables is not allowed in pattern bindings
     • In the pattern: Some @a x
@@ -29,3 +28,4 @@ TyAppPat_PatternBindingExistential.hs:13:3: error: [GHC-39999]
     • In a stmt of a 'do' block: print (x :: a)
       In the expression: do print (x :: a)
       In an equation for ‘main’: main = do print (x :: a)
+

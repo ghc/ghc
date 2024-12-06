@@ -21,8 +21,8 @@ module GHC.Internal.Num
    ( Num(..)
    , subtract
    , quotRemInteger
-   , module GHC.Num.Integer
-   , module GHC.Num.Natural
+   , module GHC.Internal.Bignum.Integer
+   , module GHC.Internal.Bignum.Natural
     -- reexported for backward compatibility
    , module GHC.Internal.Natural
    , module GHC.Internal.Integer
@@ -35,8 +35,8 @@ import qualified GHC.Internal.Natural
 import qualified GHC.Internal.Integer
 
 import GHC.Internal.Base
-import GHC.Num.Integer
-import GHC.Num.Natural
+import GHC.Internal.Bignum.Integer
+import GHC.Internal.Bignum.Natural
 
 infixl 7  *
 infixl 6  +, -

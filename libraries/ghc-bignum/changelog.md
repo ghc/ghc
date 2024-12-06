@@ -1,5 +1,11 @@
 # Changelog for `ghc-bignum` package
 
+## 1.4
+
+- `ghc-bignum`'s implementation has been merged into `ghc-internal`.
+  Downstream users should import `GHC.Num.{Integer,Natural,BigNat}` stable
+  modules from `base` instead.
+
 ## 1.3
 
 - Expose backendName

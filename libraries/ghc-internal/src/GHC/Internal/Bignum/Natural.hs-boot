@@ -1,10 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 
-module GHC.Num.Natural where
+module GHC.Internal.Bignum.Natural where
 
-import {-# SOURCE #-} GHC.Num.BigNat
-import GHC.Num.Primitives
+import {-# SOURCE #-} GHC.Internal.Bignum.BigNat
+import GHC.Internal.Bignum.Primitives
 import GHC.Prim
 import GHC.Types
 

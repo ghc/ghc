@@ -132,6 +132,109 @@ AC_ARG_WITH([iconv-libraries],
 AC_SUBST(ICONV_INCLUDE_DIRS)
 AC_SUBST(ICONV_LIB_DIRS)
 
+dnl--------------------------------------------------------------------
+dnl * Deal with arguments telling us gmp is somewhere odd
+dnl--------------------------------------------------------------------
+
+AC_ARG_WITH([gmp],
+  [AS_HELP_STRING([--with-gmp],
+    [Enable GMP backend])],
+    [GMP_ENABLED=YES],
+    [GMP_ENABLED=NO])
+
+AC_ARG_WITH([gmp-includes],
+  [AS_HELP_STRING([--with-gmp-includes],
+    [directory containing gmp.h])],
+    [GMP_INCLUDE_DIRS=$withval; CPPFLAGS="-I$withval"],
+    [GMP_INCLUDE_DIRS=])
+
+AC_ARG_WITH([gmp-libraries],
+  [AS_HELP_STRING([--with-gmp-libraries],
+    [directory containing gmp library])],
+    [GMP_LIB_DIRS=$withval; LDFLAGS="-L$withval"],
+    [GMP_LIB_DIRS=])
+
+AC_ARG_WITH([gmp-framework-preferred],
+  [AS_HELP_STRING([--with-gmp-framework-preferred],
+    [on OSX, prefer the GMP framework to the gmp lib])],
+    [GMP_PREFER_FRAMEWORK=YES],
+    [GMP_PREFER_FRAMEWORK=NO])
+
+AC_ARG_WITH([intree-gmp],
+  [AS_HELP_STRING([--with-intree-gmp],
+    [force using the in-tree GMP])],
+    [GMP_FORCE_INTREE=YES],
+    [GMP_FORCE_INTREE=NO])
+
+if test "$GMP_ENABLED" = "YES"
+then
+
+dnl--------------------------------------------------------------------
+dnl * Detect gmp
+dnl--------------------------------------------------------------------
+
+   HaveLibGmp=NO
+   GMP_LIBS=
+   HaveFrameworkGMP=NO
+   GMP_FRAMEWORK=
+   HaveSecurePowm=0
+
+   if test "$GMP_FORCE_INTREE" != "YES"
+   then
+       if test "$GMP_PREFER_FRAMEWORK" = "YES"
+       then
+           LOOK_FOR_GMP_FRAMEWORK
+           LOOK_FOR_GMP_LIB
+       else
+           LOOK_FOR_GMP_LIB
+           LOOK_FOR_GMP_FRAMEWORK
+       fi
+   fi
+
+   AC_MSG_CHECKING([whether to use in-tree GMP])
+   if test "$HaveFrameworkGMP" = "YES" || test "$HaveLibGmp" = "YES"
+   then
+       AC_MSG_RESULT([no])
+       UseIntreeGmp=0
+       AC_CHECK_HEADER([gmp.h], , [AC_MSG_ERROR([Cannot find gmp.h])])
+
+       AC_MSG_CHECKING([GMP version])
+       AC_COMPUTE_INT(GhcGmpVerMj, __GNU_MP_VERSION, [#include <gmp.h>],
+           AC_MSG_ERROR([Unable to get value of __GNU_MP_VERSION]))
+       AC_COMPUTE_INT(GhcGmpVerMi, __GNU_MP_VERSION_MINOR, [#include <gmp.h>],
+           AC_MSG_ERROR([Unable to get value of __GNU_MP_VERSION_MINOR]))
+       AC_COMPUTE_INT(GhcGmpVerPl, __GNU_MP_VERSION_PATCHLEVEL, [#include <gmp.h>],
+           AC_MSG_ERROR([Unable to get value of __GNU_MP_VERSION_PATCHLEVEL]))
+       AC_MSG_RESULT([$GhcGmpVerMj.$GhcGmpVerMi.$GhcGmpVerPl])
+
+   else
+       AC_MSG_RESULT([yes])
+       UseIntreeGmp=1
+       HaveSecurePowm=1
+
+       AC_MSG_CHECKING([GMP version])
+       GhcGmpVerMj=6
+       GhcGmpVerMi=1
+       GhcGmpVerPl=2
+       AC_MSG_RESULT([$GhcGmpVerMj.$GhcGmpVerMi.$GhcGmpVerPl])
+   fi
+
+   GMP_INSTALL_INCLUDES="HsIntegerGmp.h ghc-gmp.h"
+fi
+
+
+AC_SUBST(GMP_INCLUDE_DIRS)
+AC_SUBST(GMP_LIBS)
+AC_SUBST(GMP_LIB_DIRS)
+AC_SUBST(GMP_FRAMEWORK)
+AC_SUBST(GMP_INSTALL_INCLUDES)
+AC_SUBST(HaveLibGmp)
+AC_SUBST(HaveFrameworkGMP)
+AC_SUBST(HaveSecurePowm)
+AC_SUBST(UseIntreeGmp)
+AC_SUBST(GhcGmpVerMj)
+AC_SUBST(GhcGmpVerMi)
+AC_SUBST(GhcGmpVerPl)
 
 # Compute offsets/sizes used by jsbits/base.js
 if test "$host" = "javascript-ghcjs"
@@ -305,6 +408,6 @@ AC_CHECK_TYPE([struct MD5Context], [], [AC_MSG_ERROR([internal error])], [#inclu
 AC_CHECK_SIZEOF([struct MD5Context], [], [#include "include/md5.h"])
 
 AC_SUBST(EXTRA_LIBS)
-AC_CONFIG_FILES([ghc-internal.buildinfo])
+AC_CONFIG_FILES([ghc-internal.buildinfo include/HsIntegerGmp.h])
 
 AC_OUTPUT

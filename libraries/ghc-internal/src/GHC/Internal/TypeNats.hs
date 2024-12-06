@@ -28,7 +28,7 @@ for working with type-level naturals should be defined in a separate library.
 
 module GHC.Internal.TypeNats
   ( -- * Nat Kind
-    Natural -- declared in GHC.Num.Natural in package ghc-bignum
+    Natural -- declared in GHC.Internal.Bignum.Natural
   , Nat
     -- * Linking type and value level
   , KnownNat(natSing), natVal, natVal'
@@ -57,7 +57,7 @@ module GHC.Internal.TypeNats
 import GHC.Internal.Base( Eq(..), Functor(..), Ord(..), WithDict(..), (.), otherwise
                , Void, errorWithoutStackTrace, (++))
 import GHC.Types
-import GHC.Num.Natural(Natural)
+import GHC.Internal.Bignum.Natural(Natural)
 import GHC.Internal.Show(Show(..), appPrec, appPrec1, showParen, showString)
 import GHC.Internal.Read(Read(..))
 import GHC.Prim(Proxy#)

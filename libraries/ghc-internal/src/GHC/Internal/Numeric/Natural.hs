@@ -22,5 +22,5 @@ module GHC.Internal.Numeric.Natural
     , minusNaturalMaybe
     ) where
 
-import GHC.Num.Natural
+import GHC.Internal.Bignum.Natural
 import GHC.Internal.Natural (minusNaturalMaybe)

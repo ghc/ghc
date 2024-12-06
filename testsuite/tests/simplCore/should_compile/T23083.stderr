@@ -8,14 +8,14 @@ Result size of CorePrep = {terms: 34, types: 34, coercions: 0, joins: 0/1}
 (T23083.$$) = \ (@a) (@b) (f [Occ=Once1!] :: a -> b) (x [Occ=Once1] :: a) -> f x
 
 -- RHS size: {terms: 12, types: 12, coercions: 0, joins: 0/1}
-T23083.g :: ((GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer) -> GHC.Num.Integer.Integer) -> (GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer) -> GHC.Num.Integer.Integer
+T23083.g :: ((GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer) -> GHC.Internal.Bignum.Integer.Integer) -> (GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer) -> GHC.Internal.Bignum.Integer.Integer
 [GblId, Arity=2, Str=<1C(1,L)><ML>, Unf=OtherCon []]
 T23083.g
-  = \ (f [Occ=Once1!] :: (GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer) -> GHC.Num.Integer.Integer) (h [Occ=OnceL1] :: GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer) ->
+  = \ (f [Occ=Once1!] :: (GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer) -> GHC.Internal.Bignum.Integer.Integer) (h [Occ=OnceL1] :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer) ->
       let {
-        sat [Occ=Once1] :: GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer
+        sat [Occ=Once1] :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
         [LclId, Unf=OtherCon []]
-        sat = \ (eta [Occ=Once1] :: GHC.Num.Integer.Integer) -> case h of h1 [Occ=Once1] { __DEFAULT -> T23083.$$ @GHC.Num.Integer.Integer @GHC.Num.Integer.Integer h1 eta } } in
+        sat = \ (eta [Occ=Once1] :: GHC.Internal.Bignum.Integer.Integer) -> case h of h1 [Occ=Once1] { __DEFAULT -> T23083.$$ @GHC.Internal.Bignum.Integer.Integer @GHC.Internal.Bignum.Integer.Integer h1 eta } } in
       f sat
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}

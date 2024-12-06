@@ -13,7 +13,7 @@
 {-# LANGUAGE BinaryLiterals #-}
 {-# OPTIONS_GHC -fexpose-all-unfoldings #-}
 
-module GHC.Num.Primitives
+module GHC.Internal.Bignum.Primitives
    (
    -- * Bool#
    Bool#

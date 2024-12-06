@@ -128,10 +128,10 @@ module GHC.Integer.GMP.Internals
 
 import GHC.Internal.Integer
 import GHC.Internal.Natural
-import GHC.Num.Integer (Integer(..))
-import qualified GHC.Num.Integer as I
-import qualified GHC.Num.BigNat as B
-import qualified GHC.Num.Primitives as P
+import GHC.Internal.Bignum.Integer (Integer(..))
+import qualified GHC.Internal.Bignum.Integer as I
+import qualified GHC.Internal.Bignum.BigNat as B
+import qualified GHC.Internal.Bignum.Primitives as P
 import GHC.Types
 import GHC.Prim
 import GHC.Exts (runRW#)

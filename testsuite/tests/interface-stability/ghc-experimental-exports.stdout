@@ -6311,14 +6311,14 @@ module GHC.TypeLits.Experimental where
   appendSSymbol :: forall (a :: GHC.Types.Symbol) (b :: GHC.Types.Symbol). GHC.Internal.TypeLits.SSymbol a -> GHC.Internal.TypeLits.SSymbol b -> GHC.Internal.TypeLits.SSymbol (GHC.Internal.TypeLits.AppendSymbol a b)
   consSSymbol :: forall (a :: GHC.Types.Char) (b :: GHC.Types.Symbol). GHC.Internal.TypeLits.SChar a -> GHC.Internal.TypeLits.SSymbol b -> GHC.Internal.TypeLits.SSymbol (GHC.Internal.TypeLits.ConsSymbol a b)
   sCharToSNat :: forall (a :: GHC.Types.Char). GHC.Internal.TypeLits.SChar a -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeLits.CharToNat a)
-  sNatToSChar :: forall (n :: GHC.Num.Natural.Natural). (n GHC.Internal.Data.Type.Ord.<= 1114111) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeLits.SChar (GHC.Internal.TypeLits.NatToChar n)
+  sNatToSChar :: forall (n :: GHC.Internal.Bignum.Natural.Natural). (n GHC.Internal.Data.Type.Ord.<= 1114111) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeLits.SChar (GHC.Internal.TypeLits.NatToChar n)
 
 module GHC.TypeNats.Experimental where
   -- Safety: None
-  divSNat :: forall (m :: GHC.Num.Natural.Natural) (n :: GHC.Internal.TypeNats.Nat). (1 GHC.Internal.Data.Type.Ord.<= m) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Div n m)
-  log2SNat :: forall (n :: GHC.Num.Natural.Natural). (1 GHC.Internal.Data.Type.Ord.<= n) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Log2 n)
+  divSNat :: forall (m :: GHC.Internal.Bignum.Natural.Natural) (n :: GHC.Internal.TypeNats.Nat). (1 GHC.Internal.Data.Type.Ord.<= m) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Div n m)
+  log2SNat :: forall (n :: GHC.Internal.Bignum.Natural.Natural). (1 GHC.Internal.Data.Type.Ord.<= n) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Log2 n)
   minusSNat :: forall (m :: GHC.Internal.TypeNats.Nat) (n :: GHC.Internal.TypeNats.Nat). (m GHC.Internal.Data.Type.Ord.<= n) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.- m)
-  modSNat :: forall (m :: GHC.Num.Natural.Natural) (n :: GHC.Internal.TypeNats.Nat). (1 GHC.Internal.Data.Type.Ord.<= m) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Mod n m)
+  modSNat :: forall (m :: GHC.Internal.Bignum.Natural.Natural) (n :: GHC.Internal.TypeNats.Nat). (1 GHC.Internal.Data.Type.Ord.<= m) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Mod n m)
   plusSNat :: forall (n :: GHC.Internal.TypeNats.Nat) (m :: GHC.Internal.TypeNats.Nat). GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.+ m)
   powerSNat :: forall (n :: GHC.Internal.TypeNats.Nat) (m :: GHC.Internal.TypeNats.Nat). GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.^ m)
   timesSNat :: forall (n :: GHC.Internal.TypeNats.Nat) (m :: GHC.Internal.TypeNats.Nat). GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.* m)

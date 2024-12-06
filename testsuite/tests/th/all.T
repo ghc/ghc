@@ -266,7 +266,7 @@ test('T8028', [], multimod_compile, ['T8028', '-v0 ' + config.ghc_th_way_flags])
 test('TH_Roles1', normal, compile_fail, ['-v0'])
 test('TH_Roles2', normalise_version('ghc-internal', 'array', 'base', 'deepseq', 'ghc-prim',
                                     'ghc-boot', 'ghc-boot-th',
-                                    'ghc-bignum', 'pretty', 'template-haskell',
+                                    'pretty', 'template-haskell',
                                     'binary', 'bytestring', 'containers'
                                     ), compile, ['-v0 -ddump-tc -dsuppress-uniques'])
 test('TH_Roles3', normal, compile, ['-v0 -dsuppress-uniques'])

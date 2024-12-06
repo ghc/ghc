@@ -96,7 +96,7 @@ import {-# SOURCE #-} GHC.Internal.Exception( divZeroException, overflowExceptio
                                    , underflowException
                                    , ratioZeroDenomException )
 
-import GHC.Num.BigNat (gcdInt,gcdWord)
+import GHC.Internal.Bignum.BigNat (gcdInt,gcdWord)
 
 infixr 8  ^, ^^
 infixl 7  /, `quot`, `rem`, `div`, `mod`

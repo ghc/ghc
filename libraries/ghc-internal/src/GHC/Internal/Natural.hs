@@ -49,11 +49,11 @@ where
 import GHC.Prim
 import GHC.Types
 import GHC.Internal.Maybe
-import GHC.Num.Natural (Natural)
-import GHC.Num.Integer (Integer)
-import qualified GHC.Num.BigNat  as B
-import qualified GHC.Num.Natural as N
-import qualified GHC.Num.Integer as I
+import GHC.Internal.Bignum.Natural (Natural)
+import GHC.Internal.Bignum.Integer (Integer)
+import qualified GHC.Internal.Bignum.BigNat  as B
+import qualified GHC.Internal.Bignum.Natural as N
+import qualified GHC.Internal.Bignum.Integer as I
 
 {-# COMPLETE NatS#, NatJ# #-}
 
