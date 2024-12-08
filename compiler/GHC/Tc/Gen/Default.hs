@@ -157,14 +157,14 @@ tcDefaults decls
             -- in the module.
             -- We shortcut the treatment of such a default declaration with no class nor types: we won't
             -- try to point 'cd_class' to 'Num' since it may not even exist yet.
-            (True, [L _ (DefaultDecl _ Nothing [])]) -> pure []
+            (True, [L _ (DefaultDecl _ Nothing [] _)]) -> pure []
             -- Otherwise we take apart the declaration into the class constructor and its default types.
             _ ->  mapM (declarationParts extra_clss) decls
         ; defaultEnv . concat <$> mapM (reportDuplicates here extra_clss) (groupBy ((==) `on` sndOf3) decls') }
   where
     declarationParts :: [Class] -> LDefaultDecl GhcRn -> TcM (LDefaultDecl GhcRn, TyCon, [Type])
     reportDuplicates :: Module -> [Class] -> NonEmpty (LDefaultDecl GhcRn, TyCon, [Type]) -> TcM [ClassDefaults]
-    declarationParts extra_clss decl@(L locn (DefaultDecl _ cls_tyMaybe mono_tys))
+    declarationParts extra_clss decl@(L locn (DefaultDecl _ cls_tyMaybe mono_tys _))
       = addErrCtxt defaultDeclCtxt $
         setSrcSpan (locA locn)     $
         do { tau_tys <- mapAndReportM tc_default_ty mono_tys

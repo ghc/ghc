@@ -2132,7 +2132,8 @@ instance ToHie (LocatedA (FixitySig GhcRn)) where
 
 instance ToHie (LocatedA (DefaultDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
-      DefaultDecl _ cl typs ->
+      DefaultDecl _ cl typs _mods ->
+        -- MODS_TODO do we call `toHie` on every modifier's type?
         [ maybe (pure []) (toHie . C Use) cl
         , toHie typs
         ]

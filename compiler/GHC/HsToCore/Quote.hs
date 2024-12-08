@@ -468,6 +468,7 @@ repTyClD (L loc (SynDecl { tcdLName = tc, tcdTyVars = tvs, tcdRhs = rhs }))
 repTyClD (L loc (DataDecl { tcdLName = tc
                           , tcdTyVars = tvs
                           , tcdDataDefn = defn }))
+  -- MODS_TODO what do we do with modifiers here?
   = do { tc1 <- lookupLOcc tc           -- See Note [Binders and occurrences]
        ; dec <- addQTyVarBinds ReuseBoundNames tvs $ \bndrs ->
                 repDataDefn tc1 (Left bndrs) defn
@@ -477,6 +478,7 @@ repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
                              tcdTyVars = tvs, tcdFDs = fds,
                              tcdSigs = sigs, tcdMeths = meth_binds,
                              tcdATs = ats, tcdATDefs = atds }))
+  -- MODS_TODO what do we do with modifiers here?
   = do { cls1 <- lookupLOcc cls         -- See Note [Binders and occurrences]
        ; dec  <- addQTyVarBinds FreshNamesOnly tvs $ \bndrs ->
            do { cxt1   <- repLContext cxt
@@ -640,6 +642,7 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
                          , cid_datafam_insts = adts
                          , cid_overlap_mode = overlap
                          })
+  -- MODS_TODO what do we do with modifiers here?
   = addSimpleTyVarBinds FreshNamesOnly tvs $
             -- We must bring the type variables into scope, so their
             -- occurrences don't fail, even though the binders don't
@@ -792,10 +795,12 @@ rep_fix_d loc (FixitySig ns_spec names (Fixity prec dir))
        ; mapM do_one names }
 
 repDefD :: LDefaultDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
-repDefD (L loc (DefaultDecl _ _ tys)) = do { tys1 <- repLTys tys
-                                           ; MkC tys2 <- coreListM typeTyConName tys1
-                                           ; dec <- rep2 defaultDName [tys2]
-                                           ; return (locA loc, dec)}
+repDefD (L loc (DefaultDecl _ _ tys _)) =
+  -- MODS_TODO what do we do with modifiers here?
+  do { tys1 <- repLTys tys
+     ; MkC tys2 <- coreListM typeTyConName tys1
+     ; dec <- rep2 defaultDName [tys2]
+     ; return (locA loc, dec)}
 
 repRuleD :: LRuleDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repRuleD (L loc (HsRule { rd_name = n
@@ -868,6 +873,7 @@ repC (L _ (ConDeclH98 { con_name   = con
                       , con_forall = False
                       , con_mb_cxt = Nothing
                       , con_args   = args }))
+  -- MODS_TODO what do we do with modifiers here?
   = repH98DataCon con args
 
 repC (L _ (ConDeclH98 { con_name = con
@@ -875,6 +881,7 @@ repC (L _ (ConDeclH98 { con_name = con
                       , con_ex_tvs = con_tvs
                       , con_mb_cxt = mcxt
                       , con_args = args }))
+  -- MODS_TODO what do we do with modifiers here?
   = addHsTyVarBinds FreshNamesOnly con_tvs $ \ ex_bndrs ->
          do { c'    <- repH98DataCon con args
             ; ctxt' <- repMbContext mcxt
@@ -888,6 +895,7 @@ repC (L _ (ConDeclGADT { con_names  = cons
                        , con_mb_cxt = mcxt
                        , con_g_args = args
                        , con_res_ty = res_ty }))
+  -- MODS_TODO what do we do with modifiers here?
   | null_outer_imp_tvs && null_outer_exp_tvs
                                  -- No implicit or explicit variables
   , Nothing <- mcxt              -- No context

@@ -1295,8 +1295,8 @@ cl_decl :: { LTyClDecl GhcPs }
 -- Default declarations (toplevel)
 --
 default_decl :: { LDefaultDecl GhcPs }
-             : 'default' opt_class '(' comma_types0 ')'
-               {% amsA' (sLL $1 $> (DefaultDecl (epTok $1,epTok $3,epTok $5) $2 $4)) }
+             : declModifiers 'default' opt_class '(' comma_types0 ')'
+               {% amsA' (sL (comb3 $1 $2 $>) (DefaultDecl (epTok $2,epTok $4,epTok $6) $3 $5 (unLoc $1))) }
 
 
 -- Type declarations (toplevel)

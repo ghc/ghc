@@ -22,6 +22,8 @@ class B a
 %True
 instance B A
 
+%() default (Int)
+
 l1 :: forall (m :: Bool) a b . a %m -> b
 l1 = undefined
 

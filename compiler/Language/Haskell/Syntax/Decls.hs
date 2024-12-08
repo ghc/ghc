@@ -1494,7 +1494,8 @@ data DefaultDecl pass
   = DefaultDecl
       { defd_ext      :: XCDefaultDecl pass
       , defd_class    :: Maybe (LIdP pass)  -- Nothing in absence of NamedDefaults
-      , defd_defaults :: [LHsType pass] }
+      , defd_defaults :: [LHsType pass]
+      , defd_modifiers :: [HsModifier pass] }
         -- ^ - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnDefault',
         --          'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose'
 

@@ -369,11 +369,12 @@ rnAnnProvenance provenance = do
 -}
 
 rnDefaultDecl :: DefaultDecl GhcPs -> RnM (DefaultDecl GhcRn, FreeVars)
-rnDefaultDecl (DefaultDecl _ mb_cls tys)
+rnDefaultDecl (DefaultDecl _ mb_cls tys mods)
   = do {
        ; mb_cls' <- traverse (traverse lookupOccRn) mb_cls
        ; (tys', ty_fvs) <- rnLHsTypes doc_str tys
-       ; return (DefaultDecl noExtField mb_cls' tys', ty_fvs) }
+       ; (mods', mods_fvs) <- rnModifiersContextAndWarn doc_str mods
+       ; return (DefaultDecl noExtField mb_cls' tys' mods', ty_fvs `plusFV` mods_fvs) }
   where
     doc_str = DefaultDeclCtx
 
