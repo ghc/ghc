@@ -1643,6 +1643,8 @@ xs !! n
 --
 -- WARNING: This function takes linear time in the index.
 --
+-- @since base-4.19.0.0
+--
 -- ==== __Examples__
 --
 -- >>> ['a', 'b', 'c'] !? 0
