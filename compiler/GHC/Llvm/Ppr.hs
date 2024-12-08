@@ -669,9 +669,7 @@ ppTypeLit = ppTypeLit' []
 {-# SPECIALIZE ppTypeLit :: LlvmCgConfig -> LlvmLit -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 ppTypeLit' :: IsLine doc => [LlvmParamAttr] -> LlvmCgConfig -> LlvmLit -> doc
-ppTypeLit' attrs opts l = case l of
-  LMVectorLit {} -> ppLit opts l
-  _              -> ppLlvmType (getLitType l) <+> ppSpaceJoin ppLlvmParamAttr attrs <+> ppLit opts l
+ppTypeLit' attrs opts l = ppLlvmType (getLitType l) <+> ppSpaceJoin ppLlvmParamAttr attrs <+> ppLit opts l
 {-# SPECIALIZE ppTypeLit' :: [LlvmParamAttr] -> LlvmCgConfig -> LlvmLit -> SDoc #-}
 {-# SPECIALIZE ppTypeLit' :: [LlvmParamAttr] -> LlvmCgConfig -> LlvmLit -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
