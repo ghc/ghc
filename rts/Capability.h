@@ -270,11 +270,13 @@ INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED,
 // extern Capability MainCapability;
 
 // declared in rts/include/rts/Threads.h:
+// extern uint32_t max_n_capabilities;
 // extern uint32_t n_capabilities;
 // extern uint32_t enabled_capabilities;
 
-// Array of all the capabilities
-extern Capability *capabilities[MAX_N_CAPABILITIES];
+// Array of all the capabilities, of size max_n_capabilities
+// See Note [Capabilities array sizing] in rts/Capability.c.
+extern Capability **capabilities;
 
 INLINE_HEADER Capability *getCapability(uint32_t i)
 {
