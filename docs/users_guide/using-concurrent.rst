@@ -153,6 +153,13 @@ use the RTS :rts-flag:`-N ⟨x⟩` options.
     changed while the program is running by calling
     ``Control.Concurrent.setNumCapabilities``.
 
+
+.. note::
+
+    The maximum number of capabilities supported by the GHC runtime system is
+    determined when the compiler is built and currently defaults to 256
+    capabilities.
+
 The following options affect the way the runtime schedules threads on
 CPUs:
 
