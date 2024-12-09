@@ -344,8 +344,6 @@ initCapability (Capability *cap, uint32_t i)
  * ------------------------------------------------------------------------- */
 void initCapabilities (void)
 {
-    uint32_t i;
-
     /* Declare a couple capability sets representing the process and
        clock domain. Each capability will get added to these capsets. */
     traceCapsetCreate(CAPSET_OSPROCESS_DEFAULT, CapsetTypeOsProcess);
@@ -354,7 +352,7 @@ void initCapabilities (void)
     // Initialise NUMA
     if (!RtsFlags.GcFlags.numa) {
         n_numa_nodes = 1;
-        for (i = 0; i < MAX_NUMA_NODES; i++) {
+        for (uint32_t i = 0; i < MAX_NUMA_NODES; i++) {
             numa_map[i] = 0;
         }
     } else if (RtsFlags.DebugFlags.numa) {
@@ -412,7 +410,7 @@ void initCapabilities (void)
     // There are no free capabilities to begin with.  We will start
     // a worker Task to each Capability, which will quickly put the
     // Capability on the free list when it finds nothing to do.
-    for (i = 0; i < n_numa_nodes; i++) {
+    for (uint32_t i = 0; i < n_numa_nodes; i++) {
         last_free_capability[i] = getCapability(0);
     }
 }
