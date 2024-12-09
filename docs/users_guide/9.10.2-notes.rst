@@ -15,6 +15,7 @@ Language
 Compiler
 ~~~~~~~~
 
+- Optimized lowering of BigNat# literals. (#23942, !12179)
 
 
 JavaScript backend
