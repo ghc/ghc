@@ -209,8 +209,9 @@ tsanTarget fn formals args =
 tsanStore :: Env
           -> CmmType -> CmmExpr
           -> Block CmmNode O O
-tsanStore env ty addr =
-    mkUnsafeCall env ftarget [] [addr]
+tsanStore env ty addr
+  | typeWidth ty < W128 = mkUnsafeCall env ftarget [] [addr]
+  | otherwise           = emptyBlock
   where
     ftarget = tsanTarget fn [] [AddrHint]
     w = widthInBytes (typeWidth ty)
@@ -219,8 +220,9 @@ tsanStore env ty addr =
 tsanLoad :: Env
          -> AlignmentSpec -> CmmType -> CmmExpr
          -> Block CmmNode O O
-tsanLoad env align ty addr =
-    mkUnsafeCall env ftarget [] [addr]
+tsanLoad env align ty addr
+  | typeWidth ty < W128  = mkUnsafeCall env ftarget [] [addr]
+  | otherwise            = emptyBlock
   where
     ftarget = tsanTarget fn [] [AddrHint]
     w = widthInBytes (typeWidth ty)
