@@ -17,6 +17,7 @@ Compiler
 
 - Optimized lowering of BigNat# literals. (#23942, !12179)
 
+- Fixed a bug where the jump shortcutting optimization could lead to unsoundness in pattern matching. (#24507)
 
 - Look for haskell symbols only in relevant libraries. (#23415)
 
