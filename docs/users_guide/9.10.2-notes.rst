@@ -18,6 +18,18 @@ Compiler
 - Optimized lowering of BigNat# literals. (#23942, !12179)
 
 
+- Look for haskell symbols only in relevant libraries. (#23415)
+
+  When dynamically loading a Haskell symbol (typical when running a splice or
+  GHCi expression), before this change we would search for the symbol in
+  all dynamic libraries that were loaded. However, this could be very
+  inefficient when too many packages are loaded (which can happen if there are
+  many package dependencies) because the time to lookup the would be
+  linear in the number of packages loaded.
+
+  In one measurement, this improved performance for executing a GHCi expression
+  from ~38 seconds down to ~2s.
+
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 
