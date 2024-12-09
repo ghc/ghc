@@ -46,7 +46,7 @@ module GHC.Unit.Module.Graph
     -- (without changing the 'ModuleGraph' structure itself!).
     -- 'mgModSummaries' lists out all 'ModSummary's, and
     -- 'mgLookupModule' looks up a 'ModSummary' for a given module.
-   , mgMap, mgMapM
+   , mapMG, mgMapM
    , mgModSummaries
    , mgLookupModule
 
@@ -239,8 +239,8 @@ lengthMG = length . mg_mss
 
 -- | Map a function 'f' over all the 'ModSummaries'.
 -- To preserve invariants, 'f' can't change the isBoot status.
-mgMap :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
-mgMap f mg@ModuleGraph{..} = mg
+mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
+mapMG f mg@ModuleGraph{..} = mg
   { mg_mss = flip fmap mg_mss $ \case
       InstantiationNode uid iuid -> InstantiationNode uid iuid
       LinkNode uid nks -> LinkNode uid nks

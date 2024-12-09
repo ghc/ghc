@@ -74,7 +74,7 @@ module GHC (
         compileToCoreModule, compileToCoreSimplified,
 
         -- * Inspecting the module structure of the program
-        ModuleGraph, emptyMG, mgMap, mkModuleGraph, mgModSummaries,
+        ModuleGraph, emptyMG, mapMG, mkModuleGraph, mgModSummaries,
         mgLookupModule,
         ModSummary(..), ms_mod_name, ModLocation(..),
         pattern ModLocation,
@@ -874,7 +874,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
 --
 invalidateModSummaryCache :: GhcMonad m => m ()
 invalidateModSummaryCache =
-  modifySession $ \h -> h { hsc_mod_graph = mgMap inval (hsc_mod_graph h) }
+  modifySession $ \h -> h { hsc_mod_graph = mapMG inval (hsc_mod_graph h) }
  where
   inval ms = ms { ms_hs_hash = fingerprint0 }
 
