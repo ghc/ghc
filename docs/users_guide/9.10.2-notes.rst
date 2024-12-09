@@ -31,6 +31,9 @@ Compiler
   In one measurement, this improved performance for executing a GHCi expression
   from ~38 seconds down to ~2s.
 
+- Fixed a bug that could cause a linker error when `TypeData` and `StrictData`
+  where used in combination. (#24620)
+
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 
