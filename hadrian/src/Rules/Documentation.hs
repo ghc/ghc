@@ -326,11 +326,27 @@ getPkgDocTarget root path =
 
 -- | Build all PDF documentation
 buildPdfDocumentation :: Rules ()
-buildPdfDocumentation = mapM_ buildSphinxPdf docPaths
+buildPdfDocumentation = do
+    -- Note [Avoiding mktexfmt race]
+    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    -- We must ensure that the *first* xelatex invocation in the
+    -- build is performed serially (that is, not concurrently with
+    -- any other xelatex invocations) as mktexfmt does not handle
+    -- racing `mkdir` calls gracefully. However, we assume that
+    -- subsequent invocations are safe to run concurrently since the
+    -- initial call will have created the requisite directories (namely
+    -- $HOME/.texlive2020/texmf-var/web2c).
+    --
+    -- Fixes #25564.
+    let maxConcurrentReaders = 1000
+    xelatexMutex <- newResource "xelatex-mutex" maxConcurrentReaders
+    let rs = [(xelatexMutex, 1)]
+
+    mapM_ (buildSphinxPdf rs) docPaths
 
 -- | Compile a Sphinx ReStructured Text package to LaTeX
-buildSphinxPdf :: FilePath -> Rules ()
-buildSphinxPdf path = do
+buildSphinxPdf :: [(Resource, Int)] -> FilePath -> Rules ()
+buildSphinxPdf rs path = do
     root <- buildRootRules
     root -/- pdfRoot -/- path <.> "pdf" %> \file -> do
 
@@ -344,7 +360,8 @@ buildSphinxPdf path = do
             checkSphinxWarnings dir
 
             -- LaTeX "fixed point"
-            build $ target docContext Xelatex [path <.> "tex"] [dir]
+            -- See Note [Avoiding mktexfmt race] above.
+            buildWithResources rs $ target docContext Xelatex [path <.> "tex"] [dir]
             build $ target docContext Xelatex [path <.> "tex"] [dir]
             build $ target docContext Xelatex [path <.> "tex"] [dir]
             build $ target docContext Makeindex [path <.> "idx"] [dir]
