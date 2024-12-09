@@ -30,38 +30,55 @@ source-repository head
 
 flag libm
   default: False
+  manual: True
 flag librt
   default: False
+  manual: True
 flag libdl
   default: False
+  manual: True
 flag use-system-libffi
   default: False
+  manual: True
 flag libffi-adjustors
   default: False
+  manual: True
 flag need-pthread
   default: False
+  manual: True
 flag libbfd
   default: False
+  manual: True
 flag need-atomic
   default: False
+  manual: True
 flag libdw
   default: False
+  manual: True
 flag libnuma
   default: False
+  manual: True
 flag libzstd
   default: False
+  manual: True
 flag static-libzstd
   default: False
+  manual: True
 flag leading-underscore
   default: False
+  manual: True
 flag unregisterised
   default: False
+  manual: True
 flag tables-next-to-code
   default: False
+  manual: True
 flag smp
   default: True
+  manual: True
 flag find-ptr
   default: False
+  manual: True
 -- Some cabal flags used to control the flavours we want to produce
 -- for libHSrts in hadrian. By default, we just produce vanilla and
 -- threaded. The flags "compose": if you enable debug and profiling,
@@ -69,18 +86,23 @@ flag find-ptr
 -- _thr_debug_p and so on.
 flag profiling
   default: False
+  manual: True
 flag debug
   default: False
+  manual: True
 flag dynamic
   default: False
+  manual: True
 flag threaded
   default: False
+  manual: True
 flag thread-sanitizer
   description:
     Enable checking for data races using the ThreadSanitizer (TSAN)
     mechanism supported by GCC and Clang. See Note [ThreadSanitizer]
     in @rts/include/rts/TSANUtils.h@.
   default: False
+  manual: True
 
 library
     -- rts is a wired in package and
