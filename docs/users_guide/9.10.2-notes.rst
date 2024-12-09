@@ -32,6 +32,8 @@ GHCi
 
 - When using XDG directories ``.ghci_history`` now uses the ``$XDG_DATA_HOME`` variable as expected. (#24266)
 
+- Replaced some uses of lists with Arrays for better performance during bytecode compilation.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
@@ -55,6 +57,8 @@ Runtime system
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
+
+- Added some utility functions to `GHC.Data.SmallArray`
 
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
