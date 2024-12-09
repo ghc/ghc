@@ -911,6 +911,7 @@ extern char **environ;
       SymI_NeedsDataProto(rts_stop_on_exception)                        \
       SymI_HasProto(stopTimer)                                          \
       SymI_HasProto(n_capabilities)                                     \
+      SymI_HasProto(max_n_capabilities)                                 \
       SymI_HasProto(enabled_capabilities)                               \
       SymI_HasDataProto(stg_traceEventzh)                                   \
       SymI_HasDataProto(stg_traceMarkerzh)                                  \
