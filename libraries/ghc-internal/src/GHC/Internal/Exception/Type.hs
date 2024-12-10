@@ -197,8 +197,7 @@ instance Exception SomeException where
         in SomeException e
     fromException = Just
     backtraceDesired (SomeException e) = backtraceDesired e
-    displayException (SomeException e) =
-        displayException e ++ "\n" ++ displayContext ?exceptionContext
+    displayException (SomeException e) = displayException e
 
 displayContext :: ExceptionContext -> String
 displayContext (ExceptionContext anns0) = go anns0
