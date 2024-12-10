@@ -166,7 +166,7 @@ ObjectCode *loaded_objects;
 static OCSectionIndices *global_s_indices = NULL;
 
 // Is it safe for us to unload code?
-static bool safeToUnload(void)
+static bool tryToUnload(void)
 {
     if (RtsFlags.ProfFlags.doHeapProfile != NO_HEAP_PROFILING) {
         // We mustn't unload anything as the heap census may contain
@@ -174,7 +174,8 @@ static bool safeToUnload(void)
         // See #24512.
         return false;
     }
-    return true;
+
+    return global_s_indices != NULL;
 }
 
 static OCSectionIndices *createOCSectionIndices(void)
@@ -432,7 +433,7 @@ static bool markObjectLive(void *data STG_UNUSED, StgWord key, const void *value
 
 void markObjectCode(const void *addr)
 {
-    if (global_s_indices == NULL) {
+    if (!tryToUnload()) {
         return;
     }
 
@@ -450,7 +451,7 @@ void markObjectCode(const void *addr)
 // unloading.
 bool prepareUnloadCheck(void)
 {
-    if (global_s_indices == NULL) {
+    if (!tryToUnload()) {
         return false;
     }
 
@@ -472,7 +473,7 @@ void checkUnload(void)
     // code (loaded_objects). Mark the roots first, then unload any unmarked
     // objects.
 
-    if (global_s_indices != NULL && safeToUnload()) {
+    if (tryToUnload()) {
         OCSectionIndices *s_indices = global_s_indices;
         ASSERT(s_indices->sorted);
 
