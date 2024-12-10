@@ -72,3 +72,14 @@ data FV4' where
 -- %a class FV6 a
 
 -- %a instance B a
+
+-- And which concrete types?
+
+%CT1 data CT1
+
+%CT2Con data CT2 = CT2Con
+
+%CT2Con' data CT2' where
+  CT2Con' :: CT2'
+
+%CT3 class CT3 a

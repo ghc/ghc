@@ -69,3 +69,15 @@ Modifiers.hs:65:15: warning: [GHC-49969] [-Wunknown-modifiers]
 Modifiers.hs:68:3: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
+Modifiers.hs:78:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %CT1
+
+Modifiers.hs:80:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %CT2Con
+
+Modifiers.hs:82:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %CT2Con'
+
+Modifiers.hs:85:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %CT3
+
