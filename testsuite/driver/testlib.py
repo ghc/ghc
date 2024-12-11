@@ -260,6 +260,10 @@ def req_interp( name, opts ):
     # JS backend doesn't provide an interpreter yet
     js_skip(name, opts)
 
+def req_c_rts( name, opts ):
+    """ Require the C runtime system (rather than, e.g. the Javascript RTS). """
+    js_skip(name, opts)
+
 def req_rts_linker( name, opts ):
     if not config.have_RTS_linker:
         opts.expect = 'fail'
