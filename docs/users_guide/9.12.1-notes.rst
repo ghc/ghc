@@ -1,4 +1,4 @@
-.. _release-9-11-1:
+.. _release-9-12-1:
 
 Version 9.12.1
 ==============
@@ -80,6 +80,8 @@ Language
 Compiler
 ~~~~~~~~
 
+- GHC now has experimental support for native RISC-V code generation (:ghc-ticket:`16783`).
+
 - Constructor ``PluginProv`` of type ``UnivCoProvenance``, relevant
   for typing plugins, gets an extra ``DCoVarSet`` argument.
   The argument is intended to contain the in-scope coercion variables
@@ -109,16 +111,14 @@ Compiler
   welcome!
 
 - i386 Windows support is now completely removed amid massive cleanup
-  of legacy code to pave way for ARM64 Windows support (`#24883
-  <https://gitlab.haskell.org/ghc/ghc/-/issues/24883>`_). Rest
+  of legacy code to pave way for ARM64 Windows support (:ghc-ticket:`24883`). Rest
   assured, this does not impact existing support for x86_64 Windows or
   i386 Linux. For end users, the ``stdcall`` C calling convention is
   now fully deprecated and GHC will unconditionally produce a warning
   and treat it as ``ccall``. All C import/export declarations on
   Windows should now use ``ccall``.
 
-- 32-bit macOS/iOS support has also been completely removed (`#24921
-  <https://gitlab.haskell.org/ghc/ghc/-/issues/24921>`_). This does
+- 32-bit macOS/iOS support has also been completely removed (:ghc-ticket:`24921`). This does
   not affect existing support of Apple systems on x86_64/aarch64.
 
 - The flag :ghc-flag:`-fignore-asserts` will now also enable the
@@ -216,6 +216,25 @@ Cmm
 
 - The `deprecation process of GHC.Pack <https://gitlab.haskell.org/ghc/ghc/-/issues/21461>`_ has come its term. The module has now been removed from ``base``.
 
+- ``GHC.Desugar`` has been deprecated and should be removed in GHC 9.14. (`CLC proposal #216 <https://github.com/haskell/core-libraries-committee/issues/216>`_)
+- Add a ``readTixFile`` field to the ``HpcFlags`` record in ``GHC.RTS.Flags`` (`CLC proposal #276 <https://github.com/haskell/core-libraries-committee/issues/276>`_)
+- Add ``compareLength`` to ``Data.List`` and ``Data.List.NonEmpty`` (`CLC proposal #257 <https://github.com/haskell/core-libraries-committee/issues/257>`_)
+- Add ``INLINE[1]`` to ``compareInt`` / ``compareWord`` (`CLC proposal #179 <https://github.com/haskell/core-libraries-committee/issues/179>`_)
+- Refactor ``GHC.RTS.Flags`` in preparation for new I/O managers: introduce ``data IoManagerFlag`` and use it in ``MiscFlags``, remove ``getIoManagerFlag``, deprecate re-export of ``IoSubSystem`` (`CLC proposal #263 <https://github.com/haskell/core-libraries-committee/issues/263>`_)
+- Add the ``MonadFix`` instance for ``(,) a``, similar to the one for ``Writer a`` (`CLC proposal #238 <https://github.com/haskell/core-libraries-committee/issues/238>`_)
+- Improve ``toInteger :: Word32 -> Integer`` on 64-bit platforms (`CLC proposal #259 <https://github.com/haskell/core-libraries-committee/issues/259>`_)
+- Make ``flip`` representation polymorphic (`CLC proposal #245 <https://github.com/haskell/core-libraries-committee/issues/245>`_)
+- The ``HasField`` class now supports representation polymorphism (`CLC proposal #194 <https://github.com/haskell/core-libraries-committee/issues/194>`_)
+- Make ``read`` accept binary integer notation (`CLC proposal #177 <https://github.com/haskell/core-libraries-committee/issues/177>`_)
+- Improve the performance of ``Data.List.sort`` using an improved merging strategy. Instead of ``compare``, ``sort`` now uses ``(>)`` which may brea-malform- ``Ord`` instances (`CLC proposal #236 <https://github.com/haskell/core-libraries-committee/issues/236>`_)
+- Add ``inits1`` and ``tails1`` to ``Data.List``, factored from the corresponding functions in ``Data.List.NonEmpty`` (`CLC proposal #252 <https://github.com/haskell/core-libraries-committee/issues/252>`_)
+- Add ``firstA`` and ``secondA`` to ``Data.Bitraversable``. (`CLC proposal #172 <https://github.com/haskell/core-libraries-committee/issues/172>`_)
+- Deprecate ``GHC.TypeNats.Internal``, ``GHC.TypeLits.Internal``, ``GHC.ExecutionStack.Internal`` (`CLC proposal #217 <https://github.com/haskell/core-libraries-committee/issues/217>`_)
+- ``System.IO.Error.ioError`` and ``Control.Exception.ioError`` now both carry ``HasCallStack`` constraints (`CLC proposal #275 <https://github.com/haskell/core-libraries-committee/issues/275>`_)
+- Define ``Eq1``, ``Ord1``, ``Show1`` and ``Read1`` instances for basic ``Generic`` representation types. (`CLC proposal #273 <https://github.com/haskell/core-libraries-committee/issues/273>`_)
+- ``setNonBlockingMode`` will no longer throw an exception when called on a FD associated with a unknown device type. (`CLC proposal #282 <https://github.com/haskell/core-libraries-committee/issues/282>`_)
+
+
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
@@ -255,10 +274,16 @@ Cmm
 ~~~~~~~~~~~~~~~~~~~~
 
 ``ghc-experimental`` library
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+j~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``template-haskell`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Extend ``Exp`` with ``ForallE``, ``ForallVisE``, ``ConstraintedE``, introduce
+  functions ``forallE``, ``forallVisE``, ``constraintedE`` `GHC proposal #281
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_.
+- ``template-haskell`` is no longer wired-in. All wired-in identifiers have been moved to ``ghc-internal``.
+- ``Lift`` instances were added for the ``template-haskell`` AST.
 
 Included libraries
 ~~~~~~~~~~~~~~~~~~
@@ -269,6 +294,7 @@ for further change information.
 
 .. ghc-package-list::
 
+    compiler/ghc.cabal:                                  The compiler itself
     libraries/array/array.cabal:                         Dependency of ``ghc`` library
     libraries/base/base.cabal:                           Core library
     libraries/binary/binary.cabal:                       Dependency of ``ghc`` library
@@ -279,23 +305,26 @@ for further change information.
     libraries/deepseq/deepseq.cabal:                     Dependency of ``ghc`` library
     libraries/directory/directory.cabal:                 Dependency of ``ghc`` library
     libraries/exceptions/exceptions.cabal:               Dependency of ``ghc`` and ``haskeline`` library
+    libraries/file-io/file-io.cabal:                     Dependency of ``directory`` library
     libraries/filepath/filepath.cabal:                   Dependency of ``ghc`` library
-    compiler/ghc.cabal:                                  The compiler itself
-    libraries/ghci/ghci.cabal:                           The REPL interface
     libraries/ghc-boot/ghc-boot.cabal:                   Internal compiler library
     libraries/ghc-boot-th/ghc-boot-th.cabal:             Internal compiler library
     libraries/ghc-compact/ghc-compact.cabal:             Core library
+    libraries/ghc-experimental/ghc-experimental.cabal:   Core library
     libraries/ghc-heap/ghc-heap.cabal:                   GHC heap-walking library
+    libraries/ghci/ghci.cabal:                           The REPL interface
+    libraries/ghc-internal/ghc-internal.cabal:           Core library
+    libraries/ghc-platform/ghc-platform.cabal:           Internal library
     libraries/ghc-prim/ghc-prim.cabal:                   Core library
-    utils/haddock/haddock-api/haddock-api.cabal:         Dependency of ``haddock`` executable
-    utils/haddock/haddock-library/haddock-library.cabal: Dependency of ``haddock`` executable
     libraries/haskeline/haskeline.cabal:                 Dependency of ``ghci`` executable
     libraries/hpc/hpc.cabal:                             Dependency of ``hpc`` executable
     libraries/integer-gmp/integer-gmp.cabal:             Core library
     libraries/mtl/mtl.cabal:                             Dependency of ``Cabal`` library
+    libraries/os-string/os-string.cabal:                 Dependency of ``filepath`` library
     libraries/parsec/parsec.cabal:                       Dependency of ``Cabal`` library
     libraries/pretty/pretty.cabal:                       Dependency of ``ghc`` library
     libraries/process/process.cabal:                     Dependency of ``ghc`` library
+    libraries/semaphore-compat/semaphore-compat.cabal:   Dependency of ``ghc`` library
     libraries/stm/stm.cabal:                             Dependency of ``haskeline`` library
     libraries/template-haskell/template-haskell.cabal:   Core library
     libraries/terminfo/terminfo.cabal:                   Dependency of ``haskeline`` library
@@ -305,5 +334,5 @@ for further change information.
     libraries/unix/unix.cabal:                           Dependency of ``ghc`` library
     libraries/Win32/Win32.cabal:                         Dependency of ``ghc`` library
     libraries/xhtml/xhtml.cabal:                         Dependency of ``haddock`` executable
-    libraries/os-string/os-string.cabal:                 Dependency of ``filepath`` library
-    libraries/file-io/file-io.cabal:                     Dependency of ``directory`` library
+    utils/haddock/haddock-api/haddock-api.cabal:         Dependency of ``haddock`` executable
+    utils/haddock/haddock-library/haddock-library.cabal: Dependency of ``haddock`` executable

@@ -1,6 +1,7 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.21.0.0 *TBA*
+## 4.21.0.0 December 2024
+  * Shipped with GHC 9.12.1
   * `GHC.Desugar` has been deprecated and should be removed in GHC 9.14. ([CLC proposal #216](https://github.com/haskell/core-libraries-committee/issues/216))
   * Add a `readTixFile` field to the `HpcFlags` record in `GHC.RTS.Flags` ([CLC proposal #276](https://github.com/haskell/core-libraries-committee/issues/276))
   * Add `compareLength` to `Data.List` and `Data.List.NonEmpty` ([CLC proposal #257](https://github.com/haskell/core-libraries-committee/issues/257))
