@@ -956,7 +956,8 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
        ; let (spec_prags, other_sigs) = partition (isSpecLSig <||> isSpecInstLSig) sigs
              bound_nms = mkNameSet (collectHsBindsBinders CollNoDictBinders binds')
              sig_ctxt | is_cls_decl = ClsDeclCtxt cls
-                      | otherwise   = InstDeclCtxt bound_nms
+                      | otherwise   = InstDeclCtxt (mkOccEnv [ (nameOccName n, n)
+                                                             | n <- nonDetEltsUniqSet bound_nms ])
        ; (spec_prags', spg_fvs) <- renameSigs sig_ctxt spec_prags
        ; (other_sigs', sig_fvs) <- bindLocalNamesFV ktv_names $
                                       renameSigs sig_ctxt other_sigs
@@ -1071,18 +1072,9 @@ renameSigs ctxt sigs
         ; return (good_sigs, sig_fvs) }
 
 ----------------------
--- We use lookupSigOccRn in the signatures, which is a little bit unsatisfactory
--- because this won't work for:
---      instance Foo T where
---        {-# INLINE op #-}
---        Baz.op = ...
--- We'll just rename the INLINE prag to refer to whatever other 'op'
--- is in scope.  (I'm assuming that Baz.op isn't in scope unqualified.)
--- Doesn't seem worth much trouble to sort this.
-
 renameSig :: HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeVars)
 renameSig ctxt sig@(TypeSig _ vs ty)
-  = do  { new_vs <- mapM (lookupSigOccRnN ctxt sig) vs
+  = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
         ; (new_ty, fvs) <- rnHsSigWcType doc ty
         ; return (TypeSig noAnn new_vs new_ty, fvs) }
@@ -1091,7 +1083,7 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures
         ; when (is_deflt && not defaultSigs_on) $
           addErr (TcRnUnexpectedDefaultSig sig)
-        ; new_v <- mapM (lookupSigOccRnN ctxt sig) vs
+        ; new_v <- mapM (lookupSigOccRn ctxt sig) vs
         ; (new_ty, fvs) <- rnHsSigType ty_ctxt TypeLevel ty
         ; return (ClassOpSig noAnn is_deflt new_v new_ty, fvs) }
   where
@@ -1119,7 +1111,7 @@ renameSig _ (SpecInstSig (_, src) ty)
 renameSig ctxt sig@(SpecSig _ v tys inl)
   = do  { new_v <- case ctxt of
                      TopSigCtxt {} -> lookupLocatedOccRn v
-                     _             -> lookupSigOccRnN ctxt sig v
+                     _             -> lookupSigOccRn ctxt sig v
         ; (new_ty, fvs) <- foldM do_one ([],emptyFVs) tys
         ; return (SpecSig noAnn new_v new_ty inl, fvs) }
   where
@@ -1130,7 +1122,7 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
 renameSig ctxt sig@(InlineSig _ v s)
-  = do  { new_v <- lookupSigOccRnN ctxt sig v
+  = do  { new_v <- lookupSigOccRn ctxt sig v
         ; return (InlineSig noAnn new_v s, emptyFVs) }
 
 renameSig ctxt (FixSig _ fsig)
@@ -1138,11 +1130,11 @@ renameSig ctxt (FixSig _ fsig)
         ; return (FixSig noAnn new_fsig, emptyFVs) }
 
 renameSig ctxt sig@(MinimalSig (_, s) (L l bf))
-  = do new_bf <- bfTraverse (lookupSigOccRnN ctxt sig) bf
+  = do new_bf <- bfTraverse (lookupSigOccRn ctxt sig) bf
        return (MinimalSig (noAnn, s) (L l new_bf), emptyFVs)
 
 renameSig ctxt sig@(PatSynSig _ vs ty)
-  = do  { new_vs <- mapM (lookupSigOccRnN ctxt sig) vs
+  = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; (ty', fvs) <- rnHsSigType ty_ctxt TypeLevel ty
         ; return (PatSynSig noAnn new_vs ty', fvs) }
   where
@@ -1150,7 +1142,7 @@ renameSig ctxt sig@(PatSynSig _ vs ty)
                           <+> ppr_sig_bndrs vs)
 
 renameSig ctxt sig@(SCCFunSig (_, st) v s)
-  = do  { new_v <- lookupSigOccRnN ctxt sig v
+  = do  { new_v <- lookupSigOccRn ctxt sig v
         ; return (SCCFunSig (noAnn, st) new_v s, emptyFVs) }
 
 -- COMPLETE Sigs can refer to imported IDs which is why we use
