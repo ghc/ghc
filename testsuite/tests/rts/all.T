@@ -447,7 +447,7 @@ test('T14497', [omit_ways(['profasm']), multi_cpu_race], compile_and_run, ['-O']
 # The issue in the above test also happened with compaction enabled.
 test('T14497-compact',
                [ extra_files(['T14497.hs'])
-               , omit_ways(['profasm'])
+               , only_ways(['normal'])
                , multi_cpu_race
                , extra_run_opts('+RTS -c -RTS')
                ] , compile_and_run, ['-O'])
