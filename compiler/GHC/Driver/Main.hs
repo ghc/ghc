@@ -993,12 +993,12 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = do
   -- contain serialized stub dynamic objects, and we can simply write
   -- them to temporary objects and refer to them as unlinked items
   -- directly.
-  stub_uls <- for (mi_stub_objs mod_iface) $ \stub_obj -> do
+  {-  stub_uls <- for (mi_stub_objs mod_iface) $ \stub_obj -> do
     f <- newTempName (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (tmpDir (hsc_dflags hsc_env)) TFL_GhcSession "dyn_o"
     BS.writeFile f stub_obj
-    pure $ DotO f
+    pure $ DotO f -}
   bytecode_uls <- for uls go
-  pure $ LM utc_time this_mod $ stub_uls ++ bytecode_uls
+  pure $ LM utc_time this_mod $ {- stub_uls ++ -} bytecode_uls
   where
     go (CoreBindings fi) = do
         let act hpt  =
