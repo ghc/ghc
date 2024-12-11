@@ -798,7 +798,17 @@ emitProc mb_info lbl live blocks offset do_layout
               tinfo = TopInfo { info_tbls = DWrap infos
                               , stack_info=sinfo}
 
-              proc_block = CmmProc tinfo lbl live blks
+              -- we must be careful to:
+              -- 1. not emit a proc label twice (#22792)
+              -- 2. emit it at least once! (#25565)
+              --
+              -- (2) happened because the entry label was the label of a basic
+              -- block that got dropped (empty basic block...), hence we never
+              -- generated a label for it after we fixed (1) where we were
+              -- always emitting entry label.
+              proc_lbl = toProcDelimiterLbl lbl
+
+              proc_block = CmmProc tinfo proc_lbl live blks
 
         ; state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
