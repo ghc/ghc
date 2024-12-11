@@ -76,14 +76,11 @@ pprNatCmmDecl config proc@(CmmProc top_info entry_lbl _ (ListGraph blocks)) =
   let platform = ncgPlatform config
       top_info_table = topInfoTable proc
       -- we need a label to delimit the proc code (e.g. in debug builds). When
-      -- we have an info table, we reuse the info table label. Otherwise we make
-      -- a fresh "entry" label from the label of the entry block. We can't reuse
-      -- the entry block label as-is, otherwise we get redundant labels:
-      -- delimiters for the entry block and for the whole proc are the same (see
-      -- #22792).
+      -- we have an info table, we reuse the info table label. Otherwise we use
+      -- the entry label.
       proc_lbl = case top_info_table of
         Just (CmmStaticsRaw info_lbl _) -> info_lbl
-        Nothing                         -> toProcDelimiterLbl entry_lbl
+        Nothing                         -> entry_lbl
 
       -- handle subsections_via_symbols when enabled and when we have an
       -- info-table to link to. See Note [Subsections Via Symbols]
