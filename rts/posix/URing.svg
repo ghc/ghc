@@ -1,0 +1,691 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/PR-SVG-20010719/DTD/svg10.dtd">
+<svg width="116cm" height="39cm" viewBox="-281 18 2304 768" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <g>
+    <rect style="fill: #ffffff" x="-200" y="20" width="158.525" height="70"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="-200" y="20" width="158.525" height="70"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="-120.738" y="42.8812">
+      <tspan x="-120.738" y="42.8812">Primop: async</tspan>
+      <tspan x="-120.738" y="58.8812">non-blocking I/O</tspan>
+      <tspan x="-120.738" y="74.8812">submission</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-120.738" y="55">
+    <tspan x="-120.738" y="55"></tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="-120.738" y1="90" x2="-120.224" y2="112.267"/>
+    <polygon style="fill: #000000" points="-120.052,119.765 -125.281,109.882 -120.224,112.267 -115.283,109.652 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="-120.052,119.765 -125.281,109.882 -120.224,112.267 -115.283,109.652 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="-200" y="122" width="160" height="54"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="-200" y="122" width="160" height="54"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="-120" y="144.881">
+      <tspan x="-120" y="144.881">Allocate AIOP</tspan>
+      <tspan x="-120" y="160.881">Allocate table index</tspan>
+    </text>
+  </g>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x1="-280" y1="105" x2="180" y2="105"/>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-280" y="98.6222">
+    <tspan x="-280" y="98.6222">RTS CMM</tspan>
+  </text>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-280" y="121.539">
+    <tspan x="-280" y="121.539">RTS C</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="0" y="25" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="0" y="25" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="80" y="58.8813">
+      <tspan x="80" y="58.8813">Primop: GC and retry</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="80" y="55">
+    <tspan x="80" y="55"></tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="0" y1="55" x2="-31.7389" y2="55"/>
+    <polygon style="fill: #000000" points="-39.2389,55 -29.2389,50 -31.7389,55 -29.2389,60 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="-39.2389,55 -29.2389,50 -31.7389,55 -29.2389,60 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-120" y="149">
+    <tspan x="-120" y="149"></tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-20" y="156.981">
+    <tspan x="-20" y="156.981">mem alloc failure?</tspan>
+  </text>
+  <g>
+    <polygon style="fill: #ffffff" points="-120,262 -40,322.81 -120,383.619 -200,322.81 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="-120,262 -40,322.81 -120,383.619 -200,322.81 "/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="-120" y="310.691">
+      <tspan x="-120" y="310.691">inflight</tspan>
+      <tspan x="-120" y="326.691">within</tspan>
+      <tspan x="-120" y="342.691">limit?</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="-200" y="402" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="-200" y="402" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="-120" y="427.881">
+      <tspan x="-120" y="427.881">Allocate SQE on ring</tspan>
+      <tspan x="-120" y="443.881">Inc prep counter</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-80" y="386.431">
+    <tspan x="-80" y="386.431">Yes</tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-20" y="346.431">
+    <tspan x="-20" y="346.431">No</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="-12.825" y="395" width="185.65" height="70"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="-12.825" y="395" width="185.65" height="70"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="80" y="417.881">
+      <tspan x="80" y="417.881">Allocate SQE on heap</tspan>
+      <tspan x="80" y="433.881">Inc overflow counter</tspan>
+      <tspan x="80" y="449.881">TSO &amp; SQE on overflow Q</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="-201.625" y="202" width="163.25" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="-201.625" y="202" width="163.25" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="-120" y="225.881">
+      <tspan x="-120" y="225.881">Inc submitted counter</tspan>
+    </text>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="-120" y1="384.619" x2="-120" y2="392.264"/>
+    <polygon style="fill: #000000" points="-120,399.764 -125,389.764 -120,392.264 -115,389.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="-120,399.764 -125,389.764 -120,392.264 -115,389.764 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="-120" y1="176" x2="-120" y2="192.264"/>
+    <polygon style="fill: #000000" points="-120,199.764 -125,189.764 -120,192.264 -115,189.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="-120,199.764 -125,189.764 -120,192.264 -115,189.764 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="-120" y1="242" x2="-120" y2="252.264"/>
+    <polygon style="fill: #000000" points="-120,259.764 -125,249.764 -120,252.264 -115,249.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="-120,259.764 -125,249.764 -120,252.264 -115,249.764 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="-40,149 80,125 80,94.7361 "/>
+    <polygon style="fill: #000000" points="80,87.2361 85,97.2361 80,94.7361 75,97.2361 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="80,87.2361 85,97.2361 80,94.7361 75,97.2361 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="80" y="430">
+    <tspan x="80" y="430"></tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="-100" y="482" width="160" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="-100" y="482" width="160" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="-20" y="505.881">
+      <tspan x="-20" y="505.881">Fill in SQE</tspan>
+    </text>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="-120" y1="462" x2="-106.884" y2="475.116"/>
+    <polygon style="fill: #000000" points="-101.581,480.419 -112.188,476.883 -106.884,475.116 -105.117,469.812 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="-101.581,480.419 -112.188,476.883 -106.884,475.116 -105.117,469.812 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="80" y1="465" x2="67.4183" y2="475.694"/>
+    <polygon style="fill: #000000" points="61.7037,480.552 66.0849,470.266 67.4183,475.694 72.5614,477.885 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="61.7037,480.552 66.0849,470.266 67.4183,475.694 72.5614,477.885 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="-195.75" y="677" width="157.15" height="70"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="-195.75" y="677" width="157.15" height="70"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="-117.175" y="699.881">
+      <tspan x="-117.175" y="699.881">Primop:</tspan>
+      <tspan x="-117.175" y="715.881">result is AIOP</tspan>
+      <tspan x="-117.175" y="731.881">control to caller</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="0" y="677" width="160" height="70"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="0" y="677" width="160" height="70"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="80" y="699.881">
+      <tspan x="80" y="699.881">Primop:</tspan>
+      <tspan x="80" y="715.881">result is AIOP</tspan>
+      <tspan x="80" y="731.881">control to scheduler</tspan>
+    </text>
+  </g>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x1="-280" y1="662" x2="180" y2="662"/>
+  <g>
+    <polygon style="fill: #ffffff" points="-20,542 120,592 -20,642 -160,592 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="-20,542 120,592 -20,642 -160,592 "/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="-20" y="587.881">
+      <tspan x="-20" y="587.881">inflight within limit</tspan>
+      <tspan x="-20" y="603.881">And SQ ring not full</tspan>
+    </text>
+  </g>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-280" y="682">
+    <tspan x="-280" y="682">RTS CMM</tspan>
+  </text>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-280" y="655.622">
+    <tspan x="-280" y="655.622">RTS C</tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="-20" y1="522.977" x2="-20" y2="532.264"/>
+    <polygon style="fill: #000000" points="-20,539.764 -25,529.764 -20,532.264 -15,529.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="-20,539.764 -25,529.764 -20,532.264 -15,529.764 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="-55" y1="629.5" x2="-73.6614" y2="668.229"/>
+    <polygon style="fill: #000000" points="-76.917,674.986 -77.0805,663.806 -73.6614,668.229 -68.0718,668.147 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="-76.917,674.986 -77.0805,663.806 -73.6614,668.229 -68.0718,668.147 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="15" y1="629.5" x2="35.4655" y2="668.384"/>
+    <polygon style="fill: #000000" points="38.9586,675.021 29.8765,668.501 35.4655,668.384 38.7257,663.843 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="38.9586,675.021 29.8765,668.501 35.4655,668.384 38.7257,663.843 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-100" y="646.431">
+    <tspan x="-100" y="646.431">Yes</tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="40" y="646.431">
+    <tspan x="40" y="646.431">No</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="1019.34" y="25" width="163.85" height="70"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1019.34" y="25" width="163.85" height="70"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1101.26" y="47.8812">
+      <tspan x="1101.26" y="47.8812">Primop: async</tspan>
+      <tspan x="1101.26" y="63.8812">blocking I/O</tspan>
+      <tspan x="1101.26" y="79.8812">submission</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1101.26" y="60">
+    <tspan x="1101.26" y="60"></tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1101.26" y1="95" x2="1101.76" y2="115.267"/>
+    <polygon style="fill: #000000" points="1101.95,122.765 1096.7,112.89 1101.76,115.267 1106.7,112.645 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1101.95,122.765 1096.7,112.89 1101.76,115.267 1106.7,112.645 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1022" y="125" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1022" y="125" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1102" y="150.881">
+      <tspan x="1102" y="150.881">Allocate AIOP</tspan>
+      <tspan x="1102" y="166.881">Allocate table index</tspan>
+    </text>
+  </g>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x1="942" y1="110" x2="1402" y2="110"/>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="942" y="103.622">
+    <tspan x="942" y="103.622">RTS CMM</tspan>
+  </text>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="942" y="126.539">
+    <tspan x="942" y="126.539">RTS C</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="1222" y="30" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1222" y="30" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1302" y="63.8813">
+      <tspan x="1302" y="63.8813">Primop: GC and retry</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1302" y="60">
+    <tspan x="1302" y="60"></tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1222" y1="60" x2="1192.92" y2="60"/>
+    <polygon style="fill: #000000" points="1185.42,60 1195.42,55 1192.92,60 1195.42,65 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1185.42,60 1195.42,55 1192.92,60 1195.42,65 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1102" y="155">
+    <tspan x="1102" y="155"></tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1222" y="161.981">
+    <tspan x="1222" y="161.981">mem alloc failure?</tspan>
+  </text>
+  <g>
+    <polygon style="fill: #ffffff" points="1102,285 1182,345.81 1102,406.619 1022,345.81 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1102,285 1182,345.81 1102,406.619 1022,345.81 "/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1102" y="333.691">
+      <tspan x="1102" y="333.691">inflight</tspan>
+      <tspan x="1102" y="349.691">within</tspan>
+      <tspan x="1102" y="365.691">limit?</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1022" y="440" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1022" y="440" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1102" y="465.881">
+      <tspan x="1102" y="465.881">Allocate SQE on ring</tspan>
+      <tspan x="1102" y="481.881">Inc ring prep counter</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1042" y="409.431">
+    <tspan x="1042" y="409.431">Yes</tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1142" y="409.431">
+    <tspan x="1142" y="409.431">No</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="1020.37" y="205" width="163.25" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1020.37" y="205" width="163.25" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1102" y="228.881">
+      <tspan x="1102" y="228.881">Inc submitted counter</tspan>
+    </text>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1102" y1="406.62" x2="1102" y2="430.264"/>
+    <polygon style="fill: #000000" points="1102,437.764 1097,427.764 1102,430.264 1107,427.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1102,437.764 1097,427.764 1102,430.264 1107,427.764 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1102" y1="185" x2="1102" y2="195.264"/>
+    <polygon style="fill: #000000" points="1102,202.764 1097,192.764 1102,195.264 1107,192.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1102,202.764 1097,192.764 1102,195.264 1107,192.764 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1102" y1="245" x2="1102" y2="275.264"/>
+    <polygon style="fill: #000000" points="1102,282.764 1097,272.764 1102,275.264 1107,272.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1102,282.764 1097,272.764 1102,275.264 1107,272.764 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1182,155 1302,130 1302,99.7361 "/>
+    <polygon style="fill: #000000" points="1302,92.2361 1307,102.236 1302,99.7361 1297,102.236 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1302,92.2361 1307,102.236 1302,99.7361 1297,102.236 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1202" y="455">
+    <tspan x="1202" y="455"></tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="1022" y="525" width="160" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1022" y="525" width="160" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1102" y="548.881">
+      <tspan x="1102" y="548.881">Fill in SQE</tspan>
+    </text>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1102" y1="500" x2="1102" y2="515.264"/>
+    <polygon style="fill: #000000" points="1102,522.764 1097,512.764 1102,515.264 1107,512.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1102,522.764 1097,512.764 1102,515.264 1107,512.764 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1022" y="716" width="160" height="70"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1022" y="716" width="160" height="70"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1102" y="738.881">
+      <tspan x="1102" y="738.881">Primop:</tspan>
+      <tspan x="1102" y="754.881">result is AIOP</tspan>
+      <tspan x="1102" y="770.881">control to caller</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1222" y="717" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1222" y="717" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1302" y="742.881">
+      <tspan x="1302" y="742.881">Primop:</tspan>
+      <tspan x="1302" y="758.881">throw exception</tspan>
+    </text>
+  </g>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x1="942" y1="697" x2="1402" y2="697"/>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="942" y="717">
+    <tspan x="942" y="717">RTS CMM</tspan>
+  </text>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="942" y="690.622">
+    <tspan x="942" y="690.622">RTS C</tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1102.53" y1="565.994" x2="1102.86" y2="579.104"/>
+    <polygon style="fill: #000000" points="1103.05,586.601 1097.8,576.73 1102.86,579.104 1107.79,576.479 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1103.05,586.601 1097.8,576.73 1102.86,579.104 1107.79,576.479 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1182,345.81 1182,345 1302,345 1302,707.264 "/>
+    <polygon style="fill: #000000" points="1302,714.764 1297,704.764 1302,707.264 1307,704.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1302,714.764 1297,704.764 1302,707.264 1307,704.764 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="-40,322.81 -40,322 80,322 80,385.264 "/>
+    <polygon style="fill: #000000" points="80,392.764 75,382.764 80,385.264 85,382.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="80,392.764 75,382.764 80,385.264 85,382.764 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="403" y="22" width="158.525" height="70"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="403" y="22" width="158.525" height="70"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="482.262" y="44.8813">
+      <tspan x="482.262" y="44.8813">Primop: sync</tspan>
+      <tspan x="482.262" y="60.8812">non-blocking I/O</tspan>
+      <tspan x="482.262" y="76.8812">submission</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="482.262" y="57">
+    <tspan x="482.262" y="57"></tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="482.262" y1="92" x2="482.795" y2="117.266"/>
+    <polygon style="fill: #000000" points="482.953,124.764 477.743,114.872 482.795,117.266 487.741,114.661 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="482.953,124.764 477.743,114.872 482.795,117.266 487.741,114.661 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="403" y="127" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="403" y="127" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="483" y="152.881">
+      <tspan x="483" y="152.881">Allocate AIOP</tspan>
+      <tspan x="483" y="168.881">Allocate table index</tspan>
+    </text>
+  </g>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x1="323" y1="107" x2="783" y2="107"/>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="323" y="100.622">
+    <tspan x="323" y="100.622">RTS CMM</tspan>
+  </text>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="323" y="123.539">
+    <tspan x="323" y="123.539">RTS C</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="603" y="27" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="603" y="27" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="683" y="60.8812">
+      <tspan x="683" y="60.8812">Primop: GC and retry</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="683" y="57">
+    <tspan x="683" y="57"></tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="603" y1="57" x2="571.262" y2="57"/>
+    <polygon style="fill: #000000" points="563.762,57 573.762,52 571.262,57 573.762,62 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="563.762,57 573.762,52 571.262,57 573.762,62 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="483" y="157">
+    <tspan x="483" y="157"></tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="583" y="163.981">
+    <tspan x="583" y="163.981">mem alloc failure?</tspan>
+  </text>
+  <g>
+    <polygon style="fill: #ffffff" points="483,262 563,322.81 483,383.619 403,322.81 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="483,262 563,322.81 483,383.619 403,322.81 "/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="483" y="310.691">
+      <tspan x="483" y="310.691">inflight</tspan>
+      <tspan x="483" y="326.691">within</tspan>
+      <tspan x="483" y="342.691">limit?</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="403" y="402" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="403" y="402" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="483" y="427.881">
+      <tspan x="483" y="427.881">Allocate SQE on ring</tspan>
+      <tspan x="483" y="443.881">Inc ring prep counter</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="523" y="386.431">
+    <tspan x="523" y="386.431">Yes</tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="583" y="346.431">
+    <tspan x="583" y="346.431">No</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="603" y="402" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="603" y="402" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="683" y="427.881">
+      <tspan x="683" y="427.881">Allocate SQE on heap</tspan>
+      <tspan x="683" y="443.881">TSO on overflow Q</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="401.375" y="207" width="163.25" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="401.375" y="207" width="163.25" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="483" y="230.881">
+      <tspan x="483" y="230.881">Inc submitted counter</tspan>
+    </text>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="483" y1="384.619" x2="483" y2="392.264"/>
+    <polygon style="fill: #000000" points="483,399.764 478,389.764 483,392.264 488,389.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="483,399.764 478,389.764 483,392.264 488,389.764 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="483" y1="187" x2="483" y2="197.264"/>
+    <polygon style="fill: #000000" points="483,204.764 478,194.764 483,197.264 488,194.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="483,204.764 478,194.764 483,197.264 488,194.764 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="483" y1="247" x2="483" y2="252.264"/>
+    <polygon style="fill: #000000" points="483,259.764 478,249.764 483,252.264 488,249.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="483,259.764 478,249.764 483,252.264 488,249.764 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="563,157 683,127 683,96.7361 "/>
+    <polygon style="fill: #000000" points="683,89.2361 688,99.2361 683,96.7361 678,99.2361 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="683,89.2361 688,99.2361 683,96.7361 678,99.2361 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="683" y="432">
+    <tspan x="683" y="432"></tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="503" y="482" width="160" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="503" y="482" width="160" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="583" y="505.881">
+      <tspan x="583" y="505.881">Fill in SQE</tspan>
+    </text>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="483" y1="462" x2="496.116" y2="475.116"/>
+    <polygon style="fill: #000000" points="501.419,480.419 490.812,476.883 496.116,475.116 497.883,469.812 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="501.419,480.419 490.812,476.883 496.116,475.116 497.883,469.812 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="683" y1="462" x2="669.884" y2="475.116"/>
+    <polygon style="fill: #000000" points="664.581,480.419 668.117,469.812 669.884,475.116 675.188,476.883 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="664.581,480.419 668.117,469.812 669.884,475.116 675.188,476.883 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="503" y="562" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="503" y="562" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="583" y="587.881">
+      <tspan x="583" y="587.881">Primop:</tspan>
+      <tspan x="583" y="603.881">control to scheduler</tspan>
+    </text>
+  </g>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x1="323" y1="542" x2="783" y2="542"/>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="323" y="562">
+    <tspan x="323" y="562">RTS CMM</tspan>
+  </text>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="323" y="535.622">
+    <tspan x="323" y="535.622">RTS C</tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="583" y1="522.991" x2="583" y2="552.264"/>
+    <polygon style="fill: #000000" points="583,559.764 578,549.764 583,552.264 588,549.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="583,559.764 578,549.764 583,552.264 588,549.764 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="563,322.81 563,322 683,322 683,392.264 "/>
+    <polygon style="fill: #000000" points="683,399.764 678,389.764 683,392.264 688,389.764 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="683,399.764 678,389.764 683,392.264 688,389.764 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1638.85" y="38.6" width="163.85" height="70"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1638.85" y="38.6" width="163.85" height="70"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1720.77" y="61.4813">
+      <tspan x="1720.77" y="61.4813">Primop: sync</tspan>
+      <tspan x="1720.77" y="77.4813">blocking I/O</tspan>
+      <tspan x="1720.77" y="93.4812">submission</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1720.77" y="73.6">
+    <tspan x="1720.77" y="73.6"></tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1720.77" y1="108.6" x2="1721.27" y2="128.867"/>
+    <polygon style="fill: #000000" points="1721.46,136.365 1716.21,126.491 1721.27,128.867 1726.21,126.245 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1721.46,136.365 1716.21,126.491 1721.27,128.867 1726.21,126.245 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1641.51" y="138.6" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1641.51" y="138.6" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1721.51" y="164.481">
+      <tspan x="1721.51" y="164.481">Allocate AIOP</tspan>
+      <tspan x="1721.51" y="180.481">Allocate table index</tspan>
+    </text>
+  </g>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x1="1561.51" y1="123.6" x2="2021.52" y2="123.6"/>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1561.51" y="117.222">
+    <tspan x="1561.51" y="117.222">RTS CMM</tspan>
+  </text>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1561.51" y="140.139">
+    <tspan x="1561.51" y="140.139">RTS C</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="1841.51" y="43.6" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1841.51" y="43.6" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1921.51" y="77.4813">
+      <tspan x="1921.51" y="77.4813">Primop: GC and retry</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1921.51" y="73.6">
+    <tspan x="1921.51" y="73.6"></tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1841.51" y1="73.6" x2="1812.44" y2="73.6"/>
+    <polygon style="fill: #000000" points="1804.94,73.6 1814.94,68.6 1812.44,73.6 1814.94,78.6 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1804.94,73.6 1814.94,68.6 1812.44,73.6 1814.94,78.6 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1721.51" y="168.6">
+    <tspan x="1721.51" y="168.6"></tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1841.51" y="175.581">
+    <tspan x="1841.51" y="175.581">mem alloc failure?</tspan>
+  </text>
+  <g>
+    <polygon style="fill: #ffffff" points="1721.51,298.6 1801.51,359.41 1721.51,420.219 1641.51,359.41 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1721.51,298.6 1801.51,359.41 1721.51,420.219 1641.51,359.41 "/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1721.51" y="347.291">
+      <tspan x="1721.51" y="347.291">inflight</tspan>
+      <tspan x="1721.51" y="363.291">within</tspan>
+      <tspan x="1721.51" y="379.291">limit?</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1641.51" y="453.6" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1641.51" y="453.6" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1721.51" y="479.481">
+      <tspan x="1721.51" y="479.481">Allocate SQE on ring</tspan>
+      <tspan x="1721.51" y="495.481">Inc ring prep counter</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1661.51" y="423.031">
+    <tspan x="1661.51" y="423.031">Yes</tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1761.51" y="423.031">
+    <tspan x="1761.51" y="423.031">No</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="1639.89" y="218.6" width="163.25" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1639.89" y="218.6" width="163.25" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1721.51" y="242.481">
+      <tspan x="1721.51" y="242.481">Inc submitted counter</tspan>
+    </text>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1721.51" y1="420.22" x2="1721.51" y2="443.864"/>
+    <polygon style="fill: #000000" points="1721.51,451.364 1716.51,441.364 1721.51,443.864 1726.51,441.364 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1721.51,451.364 1716.51,441.364 1721.51,443.864 1726.51,441.364 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1721.51" y1="198.6" x2="1721.51" y2="208.864"/>
+    <polygon style="fill: #000000" points="1721.51,216.364 1716.51,206.364 1721.51,208.864 1726.51,206.364 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1721.51,216.364 1716.51,206.364 1721.51,208.864 1726.51,206.364 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1721.51" y1="258.6" x2="1721.51" y2="288.864"/>
+    <polygon style="fill: #000000" points="1721.51,296.364 1716.51,286.364 1721.51,288.864 1726.51,286.364 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1721.51,296.364 1716.51,286.364 1721.51,288.864 1726.51,286.364 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1801.51,168.6 1921.51,143.6 1921.51,113.336 "/>
+    <polygon style="fill: #000000" points="1921.51,105.836 1926.51,115.836 1921.51,113.336 1916.51,115.836 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1921.51,105.836 1926.51,115.836 1921.51,113.336 1916.51,115.836 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1821.51" y="468.6">
+    <tspan x="1821.51" y="468.6"></tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="1641.51" y="538.6" width="160" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1641.51" y="538.6" width="160" height="40"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1721.51" y="562.481">
+      <tspan x="1721.51" y="562.481">Fill in SQE</tspan>
+    </text>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1721.51" y1="513.6" x2="1721.51" y2="528.864"/>
+    <polygon style="fill: #000000" points="1721.51,536.364 1716.51,526.364 1721.51,528.864 1726.51,526.364 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1721.51,536.364 1716.51,526.364 1721.51,528.864 1726.51,526.364 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1641.51" y="618.6" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1641.51" y="618.6" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1721.51" y="644.481">
+      <tspan x="1721.51" y="644.481">Primop:</tspan>
+      <tspan x="1721.51" y="660.481">return to scheduler</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1841.51" y="618.6" width="160" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1841.51" y="618.6" width="160" height="60"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1921.51" y="644.481">
+      <tspan x="1921.51" y="644.481">Primop:</tspan>
+      <tspan x="1921.51" y="660.481">throw exception</tspan>
+    </text>
+  </g>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke-dasharray: 4; stroke: #000000" x1="1561.51" y1="598.6" x2="2021.52" y2="598.6"/>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1561.51" y="618.6">
+    <tspan x="1561.51" y="618.6">RTS CMM</tspan>
+  </text>
+  <text font-size="14.6756" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1561.51" y="592.222">
+    <tspan x="1561.51" y="592.222">RTS C</tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="1721.51" y1="579.591" x2="1721.51" y2="608.864"/>
+    <polygon style="fill: #000000" points="1721.51,616.364 1716.51,606.364 1721.51,608.864 1726.51,606.364 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1721.51,616.364 1716.51,606.364 1721.51,608.864 1726.51,606.364 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1801.51,359.41 1801.51,358.6 1921.51,358.6 1921.51,608.864 "/>
+    <polygon style="fill: #000000" points="1921.51,616.364 1916.51,606.364 1921.51,608.864 1926.51,606.364 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1921.51,616.364 1916.51,606.364 1921.51,608.864 1926.51,606.364 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-120.738" y="55">
+    <tspan x="-120.738" y="55"></tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-120" y="149">
+    <tspan x="-120" y="149"></tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-117.175" y="712">
+    <tspan x="-117.175" y="712"></tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="-117.175" y="712">
+    <tspan x="-117.175" y="712"></tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="583" y="592">
+    <tspan x="583" y="592"></tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="80" y="712">
+    <tspan x="80" y="712"></tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1102" y="751">
+    <tspan x="1102" y="751"></tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1720.77" y="73.6">
+    <tspan x="1720.77" y="73.6"></tspan>
+  </text>
+  <g>
+    <polygon style="fill: #ffffff" points="1104,589.546 1208.51,624.256 1104,658.967 999.486,624.256 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1104,589.546 1208.51,624.256 1104,658.967 999.486,624.256 "/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1104" y="628.138">
+      <tspan x="1104" y="628.138">SQ ring not full</tspan>
+    </text>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1104" y="624.256">
+    <tspan x="1104" y="624.256"></tspan>
+  </text>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="483" y="227">
+    <tspan x="483" y="227"></tspan>
+  </text>
+</svg>

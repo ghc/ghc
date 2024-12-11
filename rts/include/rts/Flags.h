@@ -247,6 +247,7 @@ typedef enum _IO_MANAGER_FLAG {
     /* All other choices pick only the requested one, with no fallback. */
     IO_MNGR_FLAG_SELECT,          /* Unix only,    non-threaded RTS only */
     IO_MNGR_FLAG_POLL,            /* Unix only,    non-threaded RTS only */
+    IO_MNGR_FLAG_URING,           /* Linux only,   non-threaded RTS only */
     IO_MNGR_FLAG_MIO,             /* cross-platform,   threaded RTS only */
     IO_MNGR_FLAG_WINIO,           /* Windows only                        */
     IO_MNGR_FLAG_WIN32_LEGACY,    /* Windows only, non-threaded RTS only */
@@ -272,6 +273,8 @@ typedef struct _MISC_FLAGS {
                                   * for the linker, NULL ==> off */
     IO_MANAGER_FLAG ioManager;   /* The I/O manager to use.  */
     uint32_t numIoWorkerThreads; /* Number of I/O worker threads to use.  */
+    uint32_t io_uring_sq_entries; /* io_uring submission queue size */
+    uint32_t io_uring_cq_entries; /* io_uring completion queue size */
 } MISC_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */

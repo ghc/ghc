@@ -38,6 +38,11 @@
 #include "posix/Timeout.h"
 #endif
 
+#if defined(IOMGR_ENABLED_URING)
+#include "posix/URing.h"
+#include "posix/Timeout.h"
+#endif
+
 #if defined(IOMGR_ENABLED_MIO_POSIX)
 #include "posix/Signals.h"
 #include "Prelude.h"
@@ -111,6 +116,14 @@ parseIOManagerFlag(const char *iomgrstr, IO_MANAGER_FLAG *flag)
     else if (strcmp("poll", iomgrstr) == 0) {
 #if defined(IOMGR_ENABLED_POLL)
         *flag = IO_MNGR_FLAG_POLL;
+        return IOManagerAvailable;
+#else
+        return IOManagerUnavailable;
+#endif
+    }
+    else if (strcmp("uring", iomgrstr) == 0) {
+#if defined(IOMGR_ENABLED_URING)
+        *flag = IO_MNGR_FLAG_URING;
         return IOManagerAvailable;
 #else
         return IOManagerUnavailable;
@@ -218,6 +231,8 @@ void selectIOManager(void)
             iomgr_type = IO_MANAGER_SELECT;
 #elif defined(IOMGR_DEFAULT_NON_THREADED_POLL)
             iomgr_type = IO_MANAGER_POLL;
+#elif defined(IOMGR_DEFAULT_NON_THREADED_URING)
+            iomgr_type = IO_MANAGER_URING;
 #elif defined(IOMGR_DEFAULT_NON_THREADED_WINIO)
             iomgr_type = IO_MANAGER_WINIO;
 #elif defined(IOMGR_DEFAULT_NON_THREADED_WIN32_LEGACY)
@@ -237,6 +252,12 @@ void selectIOManager(void)
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MNGR_FLAG_POLL:
             iomgr_type = IO_MANAGER_POLL;
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MNGR_FLAG_URING:
+            iomgr_type = IO_MANAGER_URING;
             break;
 #endif
 
@@ -281,6 +302,10 @@ char * showIOManager(void)
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
             return "poll";
+#endif
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+            return "uring";
 #endif
 #if defined(IOMGR_ENABLED_MIO_POSIX)
         case IO_MANAGER_MIO_POSIX:
@@ -335,6 +360,12 @@ void initCapabilityIOManager(Capability *cap)
             break;
 #endif
 
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+            initCapabilityIOManagerURing(cap, iomgr);
+            break;
+#endif
+
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
         case IO_MANAGER_WIN32_LEGACY:
             iomgr->blocked_queue_hd = END_TSO_QUEUE;
@@ -375,6 +406,11 @@ void initIOManager(void)
              * wait on an invalid FD.
              */
             getStablePtr((StgPtr)blockedOnBadFD_closure);
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
             break;
 #endif
 
@@ -442,6 +478,18 @@ initIOManagerAfterFork(Capability **pcap)
             ioManagerStartCap(pcap);
             break;
 #endif
+#if defined(IOMGR_ENABLED_URING)
+        //TODO: So currently there's no per-cap re-initialisation
+        // except for cap0.
+        case IO_MANAGER_URING:
+        barf("IOManager.c:initIOManagerAfterFork:URing:TODO");
+        {
+            for (unsigned int i = 0; i < getNumCapabilities(); i++) {
+                Capability *cap = getCapability(i);
+                initCapabilityIOManagerAfterForkURing(cap, cap->iomgr);
+            }
+        }
+#endif
         /* The IO_MANAGER_SELECT needs no initialisation */
         /* The IO_MANAGER_POLL needs no initialisation */
 
@@ -452,7 +500,13 @@ initIOManagerAfterFork(Capability **pcap)
 }
 
 
-/* Called from setNumCapabilities.
+/* Called from setNumCapabilities, after all other per-capability changes have
+ * been made. When the scheduler increases the number of capabilities, it
+ * (indirectly) calls initCapabilityIOManager, for each new capability. So this
+ * notification is only needed by I/O managers that need a global hook (not
+ * per-cap), and/or need to be notified of there being fewer (as well as more)
+ * capabilities. There is no per-capability notification for disabling a
+ * capability (which occurs when the number of capabilities is reduced).
  */
 void notifyIOManagerCapabilitiesChanged(Capability **pcap)
 {
@@ -583,6 +637,18 @@ void markCapabilityIOManager(evac_fn evac, void *user, Capability *cap)
         }
 #endif
 
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+        {
+            CapIOManager *iomgr = cap->iomgr;
+            markClosureTable(evac, user, &iomgr->aiop_table);
+            evac(user, (StgClosure **)(void *)&iomgr->overflow_tso_q_hd);
+            evac(user, (StgClosure **)(void *)&iomgr->overflow_tso_q_tl);
+            evac(user, (StgClosure **)(void *)&iomgr->timeout_queue);
+            break;
+        }
+#endif
+
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
         case IO_MANAGER_WIN32_LEGACY:
         {
@@ -608,8 +674,15 @@ void scavengeTSOIOManager(StgTSO *tso)
              * both of these are not GC pointers, so there is nothing to do.
              */
 
+#if defined(IOMGR_ENABLED_POLL) \
+ || defined(IOMGR_ENABLED_URING)
+ 
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
+#endif
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+#endif
             /* BlockedOn{Read,Write} uses block_info.aiop
              * BlockedOnDelay        uses block_info.timeout
              * both of these are heap allocated, so we can do the same in all
@@ -667,6 +740,12 @@ bool anyPendingTimeoutsOrIO(Capability *cap)
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
             return anyPendingTimeoutsOrIOPoll(cap->iomgr);
+#endif
+
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+            return anyPendingTimeoutsOrIOURing(cap->iomgr);
+        //TODO: do we want to share code with poll here?
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
@@ -732,6 +811,12 @@ void pollCompletedTimeoutsOrIO(Capability *cap)
           break;
 #endif
 
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+          pollCompletedTimeoutsOrIOURing(cap);
+          break;
+#endif
+
 #if defined(IOMGR_ENABLED_WIN32_LEGACY) || \
    (defined(IOMGR_ENABLED_WINIO) && !defined(THREADED_RTS))
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
@@ -762,6 +847,12 @@ void awaitCompletedTimeoutsOrIO(Capability *cap)
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
           awaitCompletedTimeoutsOrIOPoll(cap);
+          break;
+#endif
+
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+          awaitCompletedTimeoutsOrIOURing(cap);
           break;
 #endif
 
@@ -805,11 +896,99 @@ int syncIOWaitReady(Capability   *cap,
 #endif
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
-            ASSERT(tso->why_blocked == NotBlocked);
             return syncIOWaitReadyPoll(cap, tso, rw, fd);
+#endif
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+            return syncIOWaitReadyURing(cap, tso, rw, fd);
 #endif
         default:
             barf("waitRead# / waitWrite# not available for current I/O manager");
+    }
+}
+
+
+int syncIOReadWrite(Capability *cap, StgTSO *tso,
+                    IOReadOrWrite rw, HsInt fd,
+                    StgClosure *live, void *buf,
+                    HsWord len)
+{
+    debugTrace(DEBUG_iomanager,
+               "thread %ld %s fd %d", (long) tso->id,
+               rw == IORead ? "reading from" : "writing to", (int) fd);
+    ASSERT(tso->why_blocked == NotBlocked);
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+            return syncIOReadWriteURing(cap, tso, rw, (int)fd, live, buf,
+                                        (size_t)len, (off_t)(-1));
+            /* off_t = -1 means use and update the file pointer. */
+#endif
+/*
+#if defined(IOMGR_ENABLED_SELECT) \
+ || defined(IOMGR_ENABLED_POLL)
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+#endif
+#if defined(IOMGR_ENABLED_POLL)
+        case IO_MANAGER_POLL:
+#endif
+        {
+            if (rw == IORead) {
+                read((int) fd, buf, (size_t) len);
+            } else {
+                write((int) fd, buf, (size_t) len);
+            }
+            //TODO: Ugg! We need to tell the primop to return synchonrously!
+            //Need to change the return type. Should use an out arg for the
+            //GC alloc retry.
+        }
+#endif
+*/
+        default:
+            barf("syncIORead/Write# not available for current I/O manager");
+    }
+}
+
+int syncIOReadWriteAt(Capability *cap, StgTSO *tso,
+                      IOReadOrWrite rw, HsInt fd,
+                      StgClosure *live, void *buf,
+                      HsWord len, HsInt64 off)
+{
+    debugTrace(DEBUG_iomanager,
+               "thread %ld %s fd %d", (long) tso->id,
+               rw == IORead ? "reading from" : "writing to", (int) fd);
+    ASSERT(tso->why_blocked == NotBlocked);
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+            return syncIOReadWriteURing(cap, tso, rw,
+                                        (int)fd, live, buf,
+                                        (size_t)len, (off_t)off);
+#endif
+/*
+#if defined(IOMGR_ENABLED_SELECT) \
+ || defined(IOMGR_ENABLED_POLL)
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+#endif
+#if defined(IOMGR_ENABLED_POLL)
+        case IO_MANAGER_POLL:
+#endif
+        {
+            if (rw == IORead) {
+                pread((int)fd, buf, (size_t)len, (off_t)off);
+            } else {
+                pwrite((int)fd, buf, (size_t)len, (off_t)off);
+            }
+            //TODO: Ugg! We need to tell the primop to return synchonrously!
+            //Need to change the return type. Should use an out arg for the
+            //GC alloc retry.
+        }
+#endif
+*/
+        default:
+            barf("syncIORead/Write# not available for current I/O manager");
     }
 }
 
@@ -827,6 +1006,11 @@ void syncIOCancel(Capability *cap, StgTSO *tso)
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
             syncIOCancelPoll(cap, tso);
+            break;
+#endif
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+            syncIOCancelURing(cap, tso);
             break;
 #endif
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
@@ -862,8 +1046,15 @@ int syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
             return 0;
         }
 #endif
+#if defined(IOMGR_ENABLED_POLL) \
+ || defined(IOMGR_ENABLED_URING)
+
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
+#endif
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+#endif
             return syncDelayTimeout(cap, tso, us_delay);
 #endif
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
@@ -903,8 +1094,15 @@ void syncDelayCancel(Capability *cap, StgTSO *tso)
             removeThreadFromQueue(cap, &cap->iomgr->sleeping_queue, tso);
             break;
 #endif
+#if defined(IOMGR_ENABLED_POLL) \
+ || defined(IOMGR_ENABLED_URING)
+
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
+#endif
+#if defined(IOMGR_ENABLED_URING)
+        case IO_MANAGER_URING:
+#endif
             syncDelayCancelTimeout(cap, tso);
             break;
 #endif

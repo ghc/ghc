@@ -713,7 +713,13 @@ union NotifyCompletion {
 enum NotifyCompletionType {
     NotifyTSO  = 0,
     NotifyMVar = 1,
-    NotifyTVar = 2
+    NotifyTVar = 2,
+    NotifyNone = 3
+    /* If a TSO receives an async exception while it's waiting on I/O then
+     * the TSO stops waiting but the I/O may still be outstanding, and we
+     * need the corresponding StgAsyncIOOp until the I/O completes. We use
+     * NotifyNone in this case to avoid disturbing the original TSO.
+     */
 };
 
 /* A node in the leftist heap. */
@@ -786,9 +792,9 @@ typedef struct {
       // to know which capability an aiop is on.
     uint16_t capno;
 
-      // Tells us which thing the notify union above contains.
-      // This is a value from enum IONotify but we don't use the enum type
-      // here due to portability concerns for this size C enum bitfield.
+      // Tells us which thing the notify union above contains. This is a value
+      // from enum NotifyCompletionType but we don't use the enum type here
+      // due to portability concerns for this size C enum bitfield.
     uint16_t notify_type: 2;
 
       // The outcome:
@@ -816,3 +822,15 @@ typedef struct {
       // We handle this in the INFO_TABLE_CONSTR decl for stg_ASYNCIOOP using
       // Either32Or64Bit(4,2) for the non-pointer words.
 } StgAsyncIOOp;
+
+struct io_uring_sqe;
+typedef struct {
+    StgHeader header;
+
+      // Any heap object to keep alive for the duration of the I/O operation,
+      // for example I/O buffers.
+    StgClosure *live;
+    
+    struct io_uring_sqe *sqe;
+} StgAsyncURingSQE;
+

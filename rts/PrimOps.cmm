@@ -2602,6 +2602,108 @@ stg_delayzh ( W_ us_delay )
     }
 }
 
+/*
+int syncIOReadWrite(Capability *cap, StgTSO *tso,
+                    IOReadOrWrite rw, HsInt fd,
+                    StgClosure *live, void *buf,
+                    HsWord len);
+
+int syncIOReadWriteAt(Capability *cap, StgTSO *tso,
+                      IOReadOrWrite rw, HsInt fd,
+                      StgClosure *live, void *buf,
+                      HsWord len, HsInt64 off);
+*/
+
+#define SYNCIO_BLOCK_OR_GC(fail)                                        \
+    if (fail == 0) (likely: True) {                                     \
+        jump stg_block_noregs();                                        \
+    } else {                                                            \
+        /* TODO: should invoke GC, requesting 'fail' words, then retry  \
+           see: https://gitlab.haskell.org/ghc/ghc/-/issues/24105 */    \
+        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure); \
+    }
+    //TODO: need to handle returning synchonrously, for non-uring I/O managers.
+    //or if uring optimises the read case.
+
+stg_syncIOReadAddrzh ( W_ fd, W_ buf, W_ len )
+{
+    W_ fail; /* Request this many words on heap alloc failure. */
+    (fail) = ccall syncIOReadWrite(MyCapability() "ptr", CurrentTSO "ptr",
+                                   0::I32 /* IORead */, fd,
+                                   stg_ASYNCIO_LIVE0_closure, buf,
+                                   len);
+    SYNCIO_BLOCK_OR_GC(fail);
+}
+
+stg_syncIOReadByteArrayzh ( W_ fd, P_ buf, W_ boff, W_ len )
+{
+    W_ fail; /* Request this many words on heap alloc failure. */
+    (fail) = ccall syncIOReadWrite(MyCapability() "ptr", CurrentTSO "ptr",
+                                   0::I32 /* IORead */, fd,
+                                   buf, buf + SIZEOF_StgArrBytes + boff,
+                                   len);
+    SYNCIO_BLOCK_OR_GC(fail);
+}
+
+stg_syncIOReadAddrAtzh ( W_ fd, W_ buf, W_ len, I64 foff )
+{
+    W_ fail; /* Request this many words on heap alloc failure. */
+    (fail) = ccall syncIOReadWriteAt(MyCapability() "ptr", CurrentTSO "ptr",
+                                     0::I32 /* IORead */, fd,
+                                     stg_ASYNCIO_LIVE0_closure, buf,
+                                     len, foff);
+    SYNCIO_BLOCK_OR_GC(fail);
+}
+
+stg_syncIOReadByteArrayAtzh ( W_ fd, P_ buf, W_ boff, W_ len, I64 foff )
+{
+    W_ fail; /* Request this many words on heap alloc failure. */
+    (fail) = ccall syncIOReadWrite(MyCapability() "ptr", CurrentTSO "ptr",
+                                   0::I32 /* IORead */, fd,
+                                   buf, buf + SIZEOF_StgArrBytes + boff,
+                                   len, foff);
+    SYNCIO_BLOCK_OR_GC(fail);    
+}
+
+stg_syncIOWriteAddrzh ( W_ fd, W_ buf, W_ len )
+{
+    W_ fail; /* Request this many words on heap alloc failure. */
+    (fail) = ccall syncIOReadWrite(MyCapability() "ptr", CurrentTSO "ptr",
+                                   1::I32 /* IOWrite */, fd,
+                                   stg_ASYNCIO_LIVE0_closure, buf,
+                                   len);
+    SYNCIO_BLOCK_OR_GC(fail);
+}
+
+stg_syncIOWriteByteArrayzh ( W_ fd, P_ buf, W_ boff, W_ len )
+{
+    W_ fail; /* Request this many words on heap alloc failure. */
+    (fail) = ccall syncIOReadWrite(MyCapability() "ptr", CurrentTSO "ptr",
+                                   1::I32 /* IOWrite */, fd,
+                                   buf, buf + SIZEOF_StgArrBytes + boff,
+                                   len);
+    SYNCIO_BLOCK_OR_GC(fail);
+}
+
+stg_syncIOWriteAddrAtzh ( W_ fd, W_ buf, W_ len, I64 foff )
+{
+    W_ fail; /* Request this many words on heap alloc failure. */
+    (fail) = ccall syncIOReadWriteAt(MyCapability() "ptr", CurrentTSO "ptr",
+                                     1::I32 /* IOWrite */, fd,
+                                     stg_ASYNCIO_LIVE0_closure, buf,
+                                     len, foff);
+    SYNCIO_BLOCK_OR_GC(fail);
+}
+
+stg_syncIOWriteByteArrayAtzh ( W_ fd, P_ buf, W_ boff, W_ len, I64 foff )
+{
+    W_ fail; /* Request this many words on heap alloc failure. */
+    (fail) = ccall syncIOReadWrite(MyCapability() "ptr", CurrentTSO "ptr",
+                                   1::I32 /* IOWrite */, fd,
+                                   buf, buf + SIZEOF_StgArrBytes + boff,
+                                   len, foff);
+    SYNCIO_BLOCK_OR_GC(fail);    
+}
 
 #if defined(mingw32_HOST_OS)
 stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )

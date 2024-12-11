@@ -46,6 +46,9 @@
 #if defined(IOMGR_BUILD_POLL) && !defined(THREADED_RTS)
     #define IOMGR_ENABLED_POLL
 #endif
+#if defined(IOMGR_BUILD_URING) && !defined(THREADED_RTS)
+    #define IOMGR_ENABLED_URING
+#endif
 #if defined(IOMGR_BUILD_MIO) && defined(THREADED_RTS)
 /* For MIO, it is really two separate I/O manager implementations: one for
  * Windows and one for non-Windows. This is clear from both the C code on the
@@ -110,6 +113,11 @@
 #else
     #define IOMGR_ENABLED_STR_POLL ""
 #endif
+#if defined(IOMGR_ENABLED_URING)
+    #define IOMGR_ENABLED_STR_URING " uring"
+#else
+    #define IOMGR_ENABLED_STR_URING ""
+#endif
 #if defined(IOMGR_ENABLED_MIO_POSIX) || defined(IOMGR_ENABLED_MIO_WIN32)
     #define IOMGR_ENABLED_STR_MIO " mio"
 #else
@@ -128,6 +136,7 @@
 #define IOMGRS_ENABLED_STR \
           IOMGR_ENABLED_STR_SELECT \
           IOMGR_ENABLED_STR_POLL \
+          IOMGR_ENABLED_STR_URING \
           IOMGR_ENABLED_STR_MIO \
           IOMGR_ENABLED_STR_WINIO \
           IOMGR_ENABLED_STR_WIN32_LEGACY
@@ -142,6 +151,9 @@ typedef enum {
 #endif
 #if defined(IOMGR_ENABLED_POLL)
     IO_MANAGER_POLL,
+#endif
+#if defined(IOMGR_ENABLED_URING)
+    IO_MANAGER_URING,
 #endif
 #if defined(IOMGR_ENABLED_MIO_POSIX)
     IO_MANAGER_MIO_POSIX,
@@ -298,7 +310,7 @@ void scavengeTSOIOManager(StgTSO *tso);
 /* Several code paths are almost identical between read and write paths. In
  * such cases we use a shared code path with an enum to say which we're doing.
  */
-typedef enum { IORead, IOWrite } IOReadOrWrite;
+typedef enum { IORead = 0, IOWrite = 1 } IOReadOrWrite;
 
 /* Synchronous operations: I/O and delays. As synchronous operations they
  * necessarily operate on threads. The thread is suspended until the operation
@@ -310,7 +322,18 @@ typedef enum { IORead, IOWrite } IOReadOrWrite;
  * GC to free up at least n words and then retry the operation.
  */
 
-int syncIOWaitReady(Capability *cap, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
+int syncIOWaitReady(Capability *cap, StgTSO *tso,
+                    IOReadOrWrite rw, HsInt fd);
+
+int syncIOReadWrite(Capability *cap, StgTSO *tso,
+                    IOReadOrWrite rw, HsInt fd,
+                    StgClosure *live, void *buf,
+                    HsWord len);
+
+int syncIOReadWriteAt(Capability *cap, StgTSO *tso,
+                      IOReadOrWrite rw, HsInt fd,
+                      StgClosure *live, void *buf,
+                      HsWord len, HsInt64 off);
 
 void syncIOCancel(Capability *cap, StgTSO *tso);
 

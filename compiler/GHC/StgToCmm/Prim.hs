@@ -1714,6 +1714,14 @@ emitPrimOp cfg primop =
   DelayOp -> alwaysExternal
   WaitReadOp -> alwaysExternal
   WaitWriteOp -> alwaysExternal
+  SyncIOReadAddrOp -> alwaysExternal
+  SyncIOReadByteArrayOp -> alwaysExternal
+  SyncIOReadAddrAtOp -> alwaysExternal
+  SyncIOReadByteArrayAtOp -> alwaysExternal
+  SyncIOWriteAddrOp -> alwaysExternal
+  SyncIOWriteByteArrayOp -> alwaysExternal
+  SyncIOWriteAddrAtOp -> alwaysExternal
+  SyncIOWriteByteArrayAtOp -> alwaysExternal
   ForkOp -> alwaysExternal
   ForkOnOp -> alwaysExternal
   KillThreadOp -> alwaysExternal

@@ -3186,6 +3186,128 @@ primop  WaitWriteOp "waitWrite#" GenPrimOp
    out_of_line      = True
 
 ------------------------------------------------------------------------
+section "synchronous I/O operations"
+  {These primops read up to n bytes from an open file into memory, or write up
+   to n bytes from memory to an open file.
+
+   There are I\/O primops for all combinations of:
+
+   * read or write to open files
+   * pinned byte array or raw pointer for the memory buffer
+   * I/O at the current file pointer or at a given file offset
+
+   All of these operations are synchronous with respect to the calling
+   thread. It is implementation defined whether these operations block just
+   the calling thread or block all other Haskell threads running on the same
+   capability. In practice this depends on the I\/O manager being used.
+
+   The result is the number of bytes transferred (if non-negative), or an
+   error code if negative. The error code is a system error code which,
+   depending on the platform, is either a C/Posix style errno, or a Win32 error
+   code.
+
+   Note that partial\/short reads\/writes are possible. These are common with
+   sockets and character devices, and rare with disk block devices, but they
+   can happen and Posix and Win32 APIs say they can happen, so they must be
+   handled.
+
+   The source\/destination buffer is either specified by a pointer, or by a
+   (mutable, pinned) byte array and an offset within the array. This area is
+   required to be at least n bytes large. This cannot be checked for the
+   pointer variants but it is checked for the byte array variants. For the
+   byte array variants, the array must be pinned (so that the location of the
+   buffer is stable for the duration of the I/O operation) and this is
+   checked.
+
+   The buffer must remain live for the duration of the I/O operation (until
+   the I/O completes or the I/O is cancelled by an asynchronous exception).
+   For the primop variants that use byte array buffers this is done
+   automatically: the byte array is kept live for the duration of the
+   operation. For the pointer primop variants it is the caller's
+   responsibility to keep the buffer live for the duration of the I/O
+   operation. For these synchronous primops, callers can rely on the guarantee
+   that the I/O operation is complete or cancelled by the time the I/O primop
+   returns.
+
+   For the primop variants that do I/O at the current file pointer, the
+   current file pointer constitutes shared mutable state and should be treated
+   appropriately. Concurrent reads or writes are possible, and will happen in
+   some sequentially consistent order, but the order is not deterministic.
+
+   For the primop variants that do I/O at given offsets, note that this is
+   only supported on seekable files, which in practice means disk files. There
+   is no mutation to a shared file pointer in this case so it is safer to
+   use concurrent reads and writes. Callers are however responsible for
+   avoiding concurrent write operations to overlapping ranges (either
+   write\/write or read\/write), as these would have unspecified results.
+  }
+------------------------------------------------------------------------
+
+primop  SyncIOReadAddrOp "syncIOReadAddr#" GenPrimOp
+  Int# -> Addr# -> Word# ->
+  State# RealWorld -> (# State# RealWorld, Int# #)
+  {Args: fd, buf, byte count}
+  with
+  effect = ReadWriteEffect
+  out_of_line = True
+
+primop  SyncIOReadByteArrayOp "syncIOReadByteArray#" GenPrimOp
+  Int# -> MutableByteArray# RealWorld -> Word# -> Word# ->
+  State# RealWorld -> (# State# RealWorld, Int# #)
+  {Args: fd, buf, buf offset, byte count}
+  with
+  effect = ReadWriteEffect
+  out_of_line = True
+
+primop  SyncIOReadAddrAtOp "syncIOReadAddrAt#" GenPrimOp
+  Int# -> Addr# -> Word# -> Int64# ->
+  State# RealWorld -> (# State# RealWorld, Int# #)
+  {Args: fd, buf, byte count, file offset}
+  with
+  effect = ReadWriteEffect
+  out_of_line = True
+
+primop  SyncIOReadByteArrayAtOp "syncIOReadByteArrayAt#" GenPrimOp
+  Int# -> MutableByteArray# RealWorld -> Word# -> Word# -> Int64# ->
+  State# RealWorld -> (# State# RealWorld, Int# #)
+  {Args: fd, buf, buf offset, byte count, file offset}
+  with
+  effect = ReadWriteEffect
+  out_of_line = True
+
+primop  SyncIOWriteAddrOp "syncIOWriteAddr#" GenPrimOp
+  Int# -> Addr# -> Word# ->
+  State# RealWorld -> (# State# RealWorld, Int# #)
+  {Args: fd, buf, byte count}
+  with
+  effect = ReadWriteEffect
+  out_of_line = True
+
+primop  SyncIOWriteByteArrayOp "syncIOWriteByteArray#" GenPrimOp
+  Int# -> ByteArray# -> Word# -> Word# ->
+  State# RealWorld -> (# State# RealWorld, Int# #)
+  {Args: fd, buf, buf offset, byte count}
+  with
+  effect = ReadWriteEffect
+  out_of_line = True
+
+primop  SyncIOWriteAddrAtOp "syncIOWriteAddrAt#" GenPrimOp
+  Int# -> Addr# -> Word# -> Int64# ->
+  State# RealWorld -> (# State# RealWorld, Int# #)
+  {Args: fd, buf, byte count, file offset}
+  with
+  effect = ReadWriteEffect
+  out_of_line = True
+
+primop  SyncIOWriteByteArrayAtOp "syncIOWriteByteArrayAt#" GenPrimOp
+  Int# -> ByteArray# -> Word# -> Word# -> Int64# ->
+  State# RealWorld -> (# State# RealWorld, Int# #)
+  {Args: fd, buf, buf offset, byte count, file offset}
+  with
+  effect = ReadWriteEffect
+  out_of_line = True
+
+------------------------------------------------------------------------
 section "Concurrency primitives"
 ------------------------------------------------------------------------
 

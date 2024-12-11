@@ -347,7 +347,7 @@ void pollCompletedTimeoutsOrIOPoll(Capability *cap)
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
         /* We could use poll here, since we use no timeout, but for
            consistency we use the same syscall as at the other call site. */
-        struct timespec tv = (struct timespec) { .tv_sec = 0, .tv_nsec = 0 };
+        struct timespec tv = { .tv_sec = 0, .tv_nsec = 0 };
         int res = ppoll(iomgr->aiop_poll_table, nfds, &tv, NULL);
 
         debugTrace(DEBUG_iomanager,

@@ -397,6 +397,23 @@ GHC_IOMANAGER_ENABLE([poll], [EnableIOManagerPoll], [IOMGR_BUILD_POLL],
             #include <poll.h>])
    fi])
 
+GHC_IOMANAGER_ENABLE([uring], [EnableIOManagerURing], [IOMGR_BUILD_URING],
+  [if test "$HostOS" = "linux"; then
+       AC_CHECK_HEADER([liburing.h], [HaveLiburingH=YES],
+           [AC_MSG_WARN([liburing.h is required by the uring I/O manager])],[])
+       AC_CHECK_LIB([uring], [io_uring_check_version], [HaveLiburing=YES],
+           [AC_MSG_WARN([liburing is required by the uring I/O manager])], [])
+       if test "$HaveLiburingH" = "YES" && test "$HaveLiburing" = YES; then
+           EnableIOManagerURing=YES
+           LinkLiburing=uring
+       else
+           EnableIOManagerURing=NO
+       fi
+   else
+       EnableIOManagerURing=NO
+   fi])
+AC_SUBST(LinkLiburing)
+
 GHC_IOMANAGER_ENABLE([mio], [EnableIOManagerMIO], [IOMGR_BUILD_MIO],
   [EnableIOManagerMIO=YES])
 
@@ -415,6 +432,7 @@ if test "$HostOS" = "mingw32"; then
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerThreadedDefault], [winio], [EnableIOManagerWinIO])
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerThreadedDefault], [mio], [EnableIOManagerMIO])
 else
+  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [uring], [EnableIOManagerURing])
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [select], [EnableIOManagerSelect])
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [poll], [EnableIOManagerPoll])
   GHC_IOMANAGER_DEFAULT_SELECT([IOManagerThreadedDefault], [mio], [EnableIOManagerMIO])
@@ -431,6 +449,9 @@ GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
 
 GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
                                 [poll], [IOMGR_DEFAULT_NON_THREADED_POLL])
+
+GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
+                                [uring], [IOMGR_DEFAULT_NON_THREADED_URING])
 
 GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
                                 [winio], [IOMGR_DEFAULT_NON_THREADED_WINIO])

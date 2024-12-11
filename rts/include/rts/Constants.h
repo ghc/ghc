@@ -271,7 +271,9 @@
    by tryWakeupThread() */
 #define ThreadMigrating     13
 
-/* Next number is 15.  */
+#define BlockedOnIOSubmission 15
+
+/* Next number is 16.  */
 
 /*
  * These constants are returned to the scheduler by a thread that has

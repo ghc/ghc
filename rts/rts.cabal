@@ -48,6 +48,8 @@ flag libdw
   default: False
 flag libnuma
   default: False
+flag liburing
+  default: True
 flag libzstd
   default: False
 flag static-libzstd
@@ -231,6 +233,8 @@ library
          extra-libraries: elf dw
       if flag(libnuma)
          extra-libraries: numa
+      if flag(liburing)
+         extra-libraries: uring
       if flag(libzstd)
          if flag(static-libzstd)
             if os(darwin)
@@ -536,6 +540,7 @@ library
                     posix/Signals.c
                     posix/Timeout.c
                     posix/TTY.c
+                    posix/URing.c
                     -- ticker/*.c
                     -- We don't want to compile posix/ticker/*.c, these will be #included
                     -- from Ticker.c
