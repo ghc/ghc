@@ -34,7 +34,7 @@ module GHC.Rename.Env (
         ChildLookupResult(..),
         lookupSubBndrOcc_helper,
 
-        HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn, lookupSigOccRnN,
+        HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
         lookupSigCtxtOccRn,
 
         lookupInstDeclBndr, lookupFamInstName,
@@ -2072,6 +2072,28 @@ data HsSigCtxt = ... | TopSigCtxt NameSet | ....
       f :: C a => a -> a   -- No, not ok
       class C a where
         f :: a -> a
+
+Note [Signatures in instance decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   class C a where
+     op :: a -> a
+     nop :: a -> a
+
+   instance C ty where
+     bop :: [a] -> [a]
+     bop x = x
+
+     nop :: [a] -> [a]
+
+When renameing the `bop` binding we'll give it an UnboundName (still with
+OccName "bop") because `bop` is not a method of C.  Then
+
+* when doing lookupSigOcc on `bop :: blah` we want to find `bop`, even though it
+  is an UnboundName (failing to do this causes #16610, and #25437)
+
+* When doing lookupSigOcc on `nop :: blah` we want to complain that there
+  is no accompanying binding, even though `nop` is a class method
 -}
 
 data HsSigCtxt
@@ -2079,8 +2101,8 @@ data HsSigCtxt
                              -- See Note [Signatures for top level things]
   | LocalBindCtxt NameSet    -- In a local binding, binding these names
   | ClsDeclCtxt   Name       -- Class decl for this class
-  | InstDeclCtxt  NameSet    -- Instance decl whose user-written method
-                             -- bindings are for these methods
+  | InstDeclCtxt  (OccEnv Name)  -- Instance decl whose user-written method
+                                 -- bindings are described by this OccEnv
   | HsBootCtxt NameSet       -- Top level of a hs-boot file, binding these names
   | RoleAnnotCtxt NameSet    -- A role annotation, with the names of all types
                              -- in the group
@@ -2095,13 +2117,9 @@ instance Outputable HsSigCtxt where
 
 lookupSigOccRn :: HsSigCtxt
                -> Sig GhcPs
-               -> LocatedA RdrName -> RnM (LocatedA Name)
+               -> GenLocated (EpAnn ann) RdrName
+               -> RnM (GenLocated (EpAnn ann) Name)
 lookupSigOccRn ctxt sig = lookupSigCtxtOccRn ctxt (hsSigDoc sig)
-
-lookupSigOccRnN :: HsSigCtxt
-               -> Sig GhcPs
-               -> LocatedN RdrName -> RnM (LocatedN Name)
-lookupSigOccRnN ctxt sig = lookupSigCtxtOccRn ctxt (hsSigDoc sig)
 
 -- | Lookup a name in relation to the names in a 'HsSigCtxt'
 lookupSigCtxtOccRn :: HsSigCtxt
@@ -2155,33 +2173,36 @@ lookupBindGroupOcc ctxt what rdr_name also_try_tycon_ns ns_spec
       RoleAnnotCtxt ns -> lookup_top (elem_name_set_with_namespace ns)
       LocalBindCtxt ns -> lookup_group ns
       ClsDeclCtxt  cls -> lookup_cls_op cls
-      InstDeclCtxt ns  -> if uniqSetAny isUnboundName ns -- #16610
-                          then return $ NE.singleton $ Right $ mkUnboundNameRdr rdr_name
-                          else lookup_top (elem_name_set_with_namespace ns)
+      InstDeclCtxt occ_env-> lookup_inst occ_env
   where
     elem_name_set_with_namespace ns n = check_namespace n && (n `elemNameSet` ns)
 
     check_namespace = coveredByNamespaceSpecifier ns_spec . nameNameSpace
 
     namespace = occNameSpace occ
-    occ = rdrNameOcc rdr_name
-    relevant_gres =
-      RelevantGREs
-        { includeFieldSelectors = WantBoth
-        , lookupVariablesForFields = True
-        , lookupTyConsAsWell = also_try_tycon_ns }
-    ok_gre = greIsRelevant relevant_gres namespace
+    occ       = rdrNameOcc rdr_name
+    ok_gre    = greIsRelevant relevant_gres namespace
+    relevant_gres = RelevantGREs { includeFieldSelectors    = WantBoth
+                                 , lookupVariablesForFields = True
+                                 , lookupTyConsAsWell = also_try_tycon_ns }
 
     finish err gre
       | ok_gre gre
-      = NE.singleton (Right $ greName gre)
+      = NE.singleton (Right (greName gre))
       | otherwise
       = NE.singleton (Left err)
+
+    succeed_with n = return $ NE.singleton $ Right n
 
     lookup_cls_op cls
       = NE.singleton <$> lookupSubBndrOcc AllDeprecationWarnings cls doc rdr_name
       where
         doc = text "method of class" <+> quotes (ppr cls)
+
+    lookup_inst occ_env  -- See Note [Signatures in instance decls]
+      = case lookupOccEnv occ_env occ of
+           Nothing -> bale_out_with []
+           Just n  -> succeed_with n
 
     lookup_top keep_me
       = do { env <- getGlobalRdrEnv
@@ -2205,7 +2226,7 @@ lookupBindGroupOcc ctxt what rdr_name also_try_tycon_ns ns_spec
            ; let candidates_msg = candidates $ localRdrEnvElts env
            ; case mname of
                Just n
-                 | n `elemNameSet` bound_names -> return $ NE.singleton $ Right n
+                 | n `elemNameSet` bound_names -> succeed_with n
                  | otherwise                   -> bale_out_with local_msg
                Nothing                         -> bale_out_with candidates_msg }
 
