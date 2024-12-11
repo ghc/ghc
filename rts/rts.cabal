@@ -366,8 +366,6 @@ library
                    HeapStackCheck.cmm
                    Jumps_D.cmm
                    Jumps_V16.cmm
-                   Jumps_V32.cmm
-                   Jumps_V64.cmm
                    PrimOps.cmm
                    StgMiscClosures.cmm
                    StgStartup.cmm
@@ -381,10 +379,14 @@ library
         cmm-sources:
           AutoApply_V32.cmm (-mavx2)
           AutoApply_V64.cmm (-mavx512f)
+          Jumps_V32.cmm (-mavx2)
+          Jumps_V64.cmm (-mavx512f)
       else
         cmm-sources:
           AutoApply_V32.cmm
           AutoApply_V64.cmm
+          Jumps_V32.cmm
+          Jumps_V64.cmm
 
       -- Adjustor stuff
       if flag(libffi-adjustors)
