@@ -232,7 +232,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
                               , "unknown_versioning" : centos7  }
           , "Linux_Fedora"  : { ">= 33": fedora33
                               , "unknown_versioning": centos7 }
-          , "Linux_RedHat"  : { "unknown_versioning": centos7 }
+          , "Linux_RedHat"  : { "unknown_versioning": fedora33 }
           , "Linux_UnknownLinux" : { "unknown_versioning": rocky8 }
           , "Darwin" : { "unknown_versioning" : darwin_x86 }
           , "Windows" : { "unknown_versioning" :  windows }
