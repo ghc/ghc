@@ -2,8 +2,8 @@ HADRIAN_SETTINGS_STAGE0 := $(shell ghc --info | runghc GenSettings.hs ghc-boot)
 HADRIAN_SETTINGS_STAGE1 := $(shell ghc --info | runghc GenSettings.hs ghc-boot)
 SETTINGS_STAGE1 := $(shell ghc --info | runghc GenSettings.hs stage1)
 
-# CABAL := /home/hsyl20/repo/cabal/dist-newstyle/build/x86_64-linux/ghc-9.8.2/cabal-install-3.15.0.0/x/cabal/build/cabal/cabal
-CABAL := cabal
+CABAL := /home/hsyl20/repo/cabal/dist-newstyle/build/x86_64-linux/ghc-9.8.2/cabal-install-3.15.0.0/x/cabal/build/cabal/cabal
+# CABAL := cabal
 
 all: _build/stage1/bin/ghc
 

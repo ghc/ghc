@@ -113,6 +113,7 @@ stage1_settings input = output
 
         , keep_def "target RTS linker only supports shared libraries" "NO"
         , ("Use interpreter", "NO")
+        , ("base unit-id", "base")
         , keep_fail "Support SMP"
         , keep_fail "RTS ways"
         , keep_fail "Tables next to code"

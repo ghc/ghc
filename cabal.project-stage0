@@ -39,4 +39,7 @@ package *
 package ghc-boot-th
   flags: +bootstrap
 
+-- package genprimopcode
+--   flags: -build-tool-depends
+
 allow-newer: ghc-boot-th
