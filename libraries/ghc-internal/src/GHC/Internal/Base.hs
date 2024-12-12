@@ -2107,6 +2107,9 @@ id x                    =  x
 
 -- Assertion function.  This simply ignores its boolean argument.
 -- The compiler may rewrite it to @('assertError' line)@.
+-- The Haddock below is attached to `assert`, since that is
+-- what occurs in source programs.
+-- See Note [Overview of assertions] in GHC.Tc.Gen.Head
 
 -- | If the first argument evaluates to 'True', then the result is the
 -- second argument.  Otherwise an 'Control.Exception.AssertionFailed' exception
@@ -2115,14 +2118,9 @@ id x                    =  x
 --
 -- Assertions can normally be turned on or off with a compiler flag
 -- (for GHC, assertions are normally on unless optimisation is turned on
--- with @-O@ or the @-fignore-asserts@
--- option is given).  When assertions are turned off, the first
--- argument to 'assert' is ignored, and the second argument is
--- returned as the result.
-
---      SLPJ: in 5.04 etc 'assert' is in GHC.Prim,
---      but from Template Haskell onwards it's simply
---      defined here in Base.hs
+-- with @-O@ or the @-fignore-asserts@ option is given). When assertions
+-- are turned off, the first argument to 'assert' is ignored, and the second
+-- argument is returned as the result.
 assert :: Bool -> a -> a
 assert _pred r = r
 

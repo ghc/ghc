@@ -438,6 +438,7 @@ instance Show IOException where
          _  -> showString " (" . showString s . showString ")")
 
 assertError :: (?callStack :: CallStack) => Bool -> a -> a
+-- See Note [Overview of assertions] in GHC.Tc.Gen.Head
 assertError predicate v
   | predicate = v
   | otherwise = lazy $ unsafeDupablePerformIO $ do -- lazy: See Note [Strictness of assertError]
