@@ -1,5 +1,4 @@
 
 T5001b.hs:10:17: error: [GHC-44432]
     The INLINE pragma for ‘genum’ lacks an accompanying binding
-    Suggested fix:
-      Move the INLINE pragma to the declaration site of ‘genum’.
+
