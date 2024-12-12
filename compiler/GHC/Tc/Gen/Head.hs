@@ -805,32 +805,22 @@ tcCheckId name res_ty
 tcInferId :: LocatedN Name -> TcM (HsExpr GhcTc, TcSigmaType)
 -- Look up an occurrence of an Id
 -- Do not instantiate its type
-tcInferId lname@(L _ id_name)
+tcInferId lname@(L loc id_name)
+
   | id_name `hasKey` assertIdKey
-  = do { dflags <- getDynFlags
+  = -- See Note [Overview of assertions]
+    do { dflags <- getDynFlags
        ; if gopt Opt_IgnoreAsserts dflags
          then tc_infer_id lname
-         else tc_infer_assert lname }
+         else tc_infer_id (L loc assertErrorName) }
 
   | otherwise
-  = do { (expr, ty) <- tc_infer_id lname
-       ; traceTc "tcInferId" (ppr id_name <+> dcolon <+> ppr ty)
-       ; return (expr, ty) }
-
-tc_infer_assert :: LocatedN Name -> TcM (HsExpr GhcTc, TcSigmaType)
--- Deal with an occurrence of 'assert'
--- See Note [Adding the implicit parameter to 'assert']
-tc_infer_assert (L loc assert_name)
-  = do { assert_error_id <- tcLookupId assertErrorName
-       ; (wrap, id_rho) <- topInstantiate (OccurrenceOf assert_name)
-                                          (idType assert_error_id)
-       ; return (mkHsWrap wrap (HsVar noExtField (L loc assert_error_id)), id_rho)
-       }
+  = tc_infer_id lname
 
 tc_infer_id :: LocatedN Name -> TcM (HsExpr GhcTc, TcSigmaType)
 tc_infer_id (L loc id_name)
  = do { thing <- tcLookup id_name
-      ; case thing of
+      ; (expr,ty) <- case thing of
              ATcId { tct_id = id }
                -> do { check_local_id id
                      ; return_id id }
@@ -845,12 +835,45 @@ tc_infer_id (L loc id_name)
              (tcTyThingTyCon_maybe -> Just tc) -> failIllegalTyCon WL_Anything (tyConName tc)
              ATyVar name _ -> failIllegalTyVal name
 
-             _ -> failWithTc $ TcRnExpectedValueId thing }
+             _ -> failWithTc $ TcRnExpectedValueId thing
+
+       ; traceTc "tcInferId" (ppr id_name <+> dcolon <+> ppr ty)
+       ; return (expr, ty) }
   where
     return_id id = return (HsVar noExtField (L loc id), idType id)
 
-{- Note [Suppress hints with RequiredTypeArguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Overview of assertions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If you write (assert pred x) then
+
+  * If `-fignore-asserts` (which sets Opt_IgnoreAsserts) is on, the code is
+    typechecked as written, but `assert`, defined in GHC.Internal.Base
+       assert _pred r = r
+    simply ignores `pred`
+
+  * But without `-fignore-asserts`, GHC rewrites it to (assertError pred e)
+    and that is defined in GHC.Internal.IO.Exception as
+        assertError :: (?callStack :: CallStack) => Bool -> a -> a
+    which does test the predicate and, if it is not True, throws an exception,
+    capturing the CallStack.
+
+    This rewrite is done in `tcInferId`.
+
+So `-fignore-asserts` makes the assertion go away altogether, which may be good for
+production code.
+
+The reason that `assert` and `assertError` are defined in very different modules
+is a historical accident.
+
+Note: the Haddock for `assert` is on `GHC.Internal.Base.assert`, since that is
+what appears in the user's source proram.
+
+It's not entirely kosher to rewrite `assert` to `assertError`, because there's no
+way to "undo" if you want to see the original source code in the typechecker
+output.  We can fix this if it becomes a problem.
+
+Note [Suppress hints with RequiredTypeArguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When a type variable is used at the term level, GHC assumes the user might
 have made a typo and suggests a term variable with a similar name.
 
@@ -948,16 +971,8 @@ tcInferPatSyn ps
 nonBidirectionalErr :: Name -> TcRnMessage
 nonBidirectionalErr = TcRnPatSynNotBidirectional
 
-{- Note [Adding the implicit parameter to 'assert']
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The typechecker transforms (assert e1 e2) to (assertError e1 e2).
-This isn't really the Right Thing because there's no way to "undo"
-if you want to see the original source code in the typechecker
-output.  We'll have fix this in due course, when we care more about
-being able to reconstruct the exact original program.
-
-Note [Typechecking data constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Typechecking data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As per Note [Polymorphisation of linear fields] in
 GHC.Core.Multiplicity, linear fields of data constructors get a
 polymorphic multiplicity when the data constructor is used as a term:
