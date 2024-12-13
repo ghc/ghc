@@ -2844,10 +2844,11 @@ mkGetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> Hs
 mkGetField get_field arg field = unLoc (head $ mkGet get_field [arg] field)
 
 -- mkSetField a field b calculates a set_field @field expression.
--- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' on a to b").
+-- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' to a on b").
+-- NB: the order of aruments is specified by GHC Proposal 583: HasField redesign.
 mkSetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> LHsExpr GhcRn -> HsExpr GhcRn
 mkSetField set_field a (L _ (FieldLabelString field)) b =
-  genHsApp (genHsApp (genHsVar set_field `genAppType` genHsTyLit field)  a) b
+  genHsApp (genHsApp (genHsVar set_field `genAppType` genHsTyLit field) b) a
 
 mkGet :: Name -> [LHsExpr GhcRn] -> LocatedAn NoEpAnns FieldLabelString -> [LHsExpr GhcRn]
 mkGet get_field l@(r : _) (L _ (FieldLabelString field)) =

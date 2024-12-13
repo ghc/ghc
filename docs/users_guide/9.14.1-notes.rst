@@ -12,7 +12,7 @@ Language
 ~~~~~~~~
 
 * ``-Wincomplete-record-selectors`` is now part of `-Wall`, as specified
-  by `GHC Proposal 516: add warning for incomplete record selectors <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0516-incomplete-record-selectors.rst>_`.
+  by `GHC Proposal 516: add warning for incomplete record selectors <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0516-incomplete-record-selectors.rst>`_.
   Hence, if a library is compiled with ``-Werror``, compilation may now fail. Solution: fix the library.
   Workaround: add ``-Werror=no-incomplete-record-selectors``.
 
@@ -24,6 +24,19 @@ Language
   no longer enables type applications in patterns, which now always requires
   :extension:`TypeAbstractions`. The warning flag``deprecated-type-abstractions``
   has also been removed from the compiler.
+
+* :extension:`OverloadedRecordUpdate` now passes the arguments to a ``setField`` function
+  in the flipped order, as specified by `GHC Proposal 583: HasField redesign <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0583-hasfield-redesign.rst>`_.
+
+  Previously GHC expected ``setField`` to have this type: ::
+
+    setField :: forall (fld :: Symbol) a r. r -> a -> r
+
+  And that's what GHC expects now: ::
+
+    setField :: forall (fld :: Symbol) a r. a -> r -> r
+
+  That will break the combination of :extension:`OverloadedRecordUpdate` with :extension:`RebindableSyntax`.
 
 Compiler
 ~~~~~~~~
