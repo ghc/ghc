@@ -261,6 +261,14 @@ Runtime system
   platform. The default size is now 1T on aarch64 as well. See
   :ghc-ticket:`24498`.
 
+Packaging & Build System
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Escape multiple arguments in the settings file (#24265)
+
+  GHC now escapes configuration options that end up in the settings file.
+  This prevents errors when those options included spaces or similar special characters.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
