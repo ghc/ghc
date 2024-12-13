@@ -31,6 +31,7 @@ getBooleanSetting key = fromMaybe (error msg) <$> parseYesNo <$> getTestSetting 
     msg = "Cannot parse test setting " ++ quote (show key)
 
 -- | Extra flags to send to the Haskell compiler to run tests.
+-- Passed to the Python testsuite driver via @-e ghc_compiler_always_flags=...@.
 runTestGhcFlags :: Action String
 runTestGhcFlags = do
     unregisterised <- queryTargetTarget tgtUnregisterised
