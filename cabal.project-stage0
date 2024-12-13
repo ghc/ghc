@@ -19,6 +19,7 @@ packages:
   ./_build/stage0/src/utils/hsc2hs
   ./_build/stage0/src/utils/unlit
   ./_build/stage0/src/utils/genprimopcode/
+  ./_build/stage0/src/utils/genapply/
   ./_build/stage0/src/utils/deriveConstants/
 
 benchmarks: False

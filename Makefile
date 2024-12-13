@@ -54,7 +54,7 @@ _build/stage0/bin/ghc:
 	
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE0)' \
 	  $(CABAL) build --project-file=cabal.project-stage0 \
-	  ghc-bin:ghc ghc-pkg:ghc-pkg genprimopcode:genprimopcode deriveConstants:deriveConstants \
+	  ghc-bin:ghc ghc-pkg:ghc-pkg genprimopcode:genprimopcode deriveConstants:deriveConstants genapply:genapply \
 	  -j --builddir=_build/stage0/cabal/
 	
 	# Installing binaries
@@ -62,6 +62,7 @@ _build/stage0/bin/ghc:
 	cp `$(CABAL) list-bin --project-file=cabal.project-stage0 --builddir=_build/stage0/cabal/ ghc-pkg:ghc-pkg` _build/stage0/bin/ghc-pkg
 	cp `$(CABAL) list-bin --project-file=cabal.project-stage0 --builddir=_build/stage0/cabal/ deriveConstants:deriveConstants` _build/stage0/bin/deriveConstants
 	cp `$(CABAL) list-bin --project-file=cabal.project-stage0 --builddir=_build/stage0/cabal/ genprimopcode:genprimopcode` _build/stage0/bin/genprimopcode
+	cp `$(CABAL) list-bin --project-file=cabal.project-stage0 --builddir=_build/stage0/cabal/ genapply:genapply` _build/stage0/bin/genapply
 	
 	# Generate settings
 	mkdir -p _build/stage0/lib
@@ -166,6 +167,12 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 		--gcc-flag "-I_build/stage1/src/libraries/rts/include" \
 		--gcc-flag "-I_build/stage1/src/libraries/rts" \
 		--gcc-flag "-I_build/stage1/cabal/build/x86_64-linux/ghc-9.13/rts-1.0.2/build/include"
+
+	# Generate autoapply
+	_build/stage0/bin/genapply _build/stage1/src/libraries/rts/include/DerivedConstants.h > _build/stage1/src/libraries/rts/AutoApply.cmm
+	_build/stage0/bin/genapply _build/stage1/src/libraries/rts/include/DerivedConstants.h -V16 > _build/stage1/src/libraries/rts/AutoApply_V16.cmm
+	_build/stage0/bin/genapply _build/stage1/src/libraries/rts/include/DerivedConstants.h -V32 > _build/stage1/src/libraries/rts/AutoApply_V32.cmm
+	_build/stage0/bin/genapply _build/stage1/src/libraries/rts/include/DerivedConstants.h -V64 > _build/stage1/src/libraries/rts/AutoApply_V64.cmm
 	
 	# Building boot libraries
 	mkdir -p _build/stage1/cabal/
