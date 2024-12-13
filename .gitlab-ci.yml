@@ -1048,6 +1048,7 @@ ghcup-metadata-release:
   # No explicit needs for release pipeline as we assume we need everything and everything will pass.
   extends: .ghcup-metadata
   script:
+    - nix shell -f .gitlab/rel_eng -c ghcup-metadata --release-mode --metadata ghcup-0.0.7.yaml --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" --fragment
     - nix shell --extra-experimental-features nix-command -f .gitlab/rel_eng -c ghcup-metadata --release-mode --metadata ghcup-0.0.7.yaml --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
   rules:
     - if: '$RELEASE_JOB == "yes"'
