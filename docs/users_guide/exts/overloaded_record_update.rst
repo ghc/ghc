@@ -30,8 +30,8 @@ Example:
 
   getField :: forall x r a . HasField x r a => r -> a
   getField = snd . hasField @x -- Note: a.x = is getField @"x" a.
-  setField :: forall x r a . HasField x r a => r -> a -> r
-  setField = fst . hasField @x -- Note : a{x = b} is setField @"x" a b.
+  setField :: forall x r a . HasField x r a => a -> r -> r
+  setField b a = fst (hasField @x a) b -- Note : a{x = b} is setField @"x" b a.
 
   data Person = Person { name :: String } deriving Show
   instance HasField "name" Person String where
