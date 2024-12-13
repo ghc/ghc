@@ -124,7 +124,7 @@ def fetch_artifacts(release: str, pipeline_id: int,
                 for f in doc_files:
                     subprocess.run(['tar', '-xf', f, '-C', dest])
                     logging.info(f'extracted docs {f} to {dest}')
-                index_path = destdir / 'index.html'
+                index_path = destdir / 'docs' / 'index.html'
                 index_path.replace(dest / 'index.html')
             elif job.name == 'hackage-doc-tarball':
                 dest = dest_dir / 'hackage_docs'
