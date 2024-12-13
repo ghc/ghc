@@ -128,6 +128,7 @@ test('T24234', [], compile, [overlapping_incomplete+'-Wincomplete-uni-patterns']
 
 test('PmSeriesS',
      [ collect_compiler_stats('bytes allocated',10),
+       no_lint,
        pre_cmd('$PYTHON ./genS.py 10'),
        extra_files(['genS.py']),
      ],
@@ -135,6 +136,7 @@ test('PmSeriesS',
      ['S', '-v0'])
 test('PmSeriesT',
      [ collect_compiler_stats('bytes allocated',10),
+       no_lint,
        pre_cmd('$PYTHON ./genT.py 10'),
        extra_files(['genT.py']),
      ],
@@ -142,6 +144,7 @@ test('PmSeriesT',
      ['T', '-v0'])
 test('PmSeriesV',
      [ collect_compiler_stats('bytes allocated',10),
+       no_lint,
        pre_cmd('$PYTHON ./genV.py 6'),
        extra_files(['genV.py']),
      ],
@@ -149,6 +152,7 @@ test('PmSeriesV',
      ['V', '-v0'])
 test('PmSeriesG',
      [ collect_compiler_stats('bytes allocated',10),
+       no_lint,
        pre_cmd('./genG 20'),
        extra_files(['genG']),
      ],
@@ -169,7 +173,7 @@ test('EmptyCase009', [],  compile, [overlapping_incomplete])
 test('EmptyCase010', [],  compile, [overlapping_incomplete])
 test('DsIncompleteRecSel1', normal, compile, ['-Wincomplete-record-selectors'])
 test('DsIncompleteRecSel2', normal, compile, ['-Wincomplete-record-selectors'])
-test('DsIncompleteRecSel3', [collect_compiler_stats('bytes allocated', 10)], compile, ['-Wincomplete-record-selectors'])
+test('DsIncompleteRecSel3', [no_lint, collect_compiler_stats('bytes allocated', 10)], compile, ['-Wincomplete-record-selectors'])
 test('DoubleMatch', normal, compile, [overlapping_incomplete])
 test('T24817', normal, compile, [overlapping_incomplete])
 test('T24824', normal, compile, ['-package ghc -Wincomplete-record-selectors'])

@@ -1,5 +1,6 @@
 test('mhu-perf',
      [ collect_compiler_stats('bytes allocated',2),
+       no_lint,
        extra_files(['genLargeHMU','Setup.hs']),
        pre_cmd('$MAKE -s --no-print-directory mhu-perf'),
        js_broken(22349),

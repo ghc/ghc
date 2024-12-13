@@ -155,6 +155,7 @@ test('T7702',
       # a large effect on allocation which is hard to separate from the
       # allocation done by the plugin... but a regression allocates > 90mb
       collect_compiler_stats('peak_megabytes_allocated',70),
+      no_lint,
       when(opsys('mingw32'), [multi_cpu_race]),
       req_plugins
      ],

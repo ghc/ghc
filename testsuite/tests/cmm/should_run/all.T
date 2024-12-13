@@ -12,8 +12,7 @@ test('cmp64',
 
 
 # test('T17516',
-#       [ collect_compiler_stats('bytes allocated', 5),
-#       ],
+#       [ collect_compiler_stats('bytes allocated', 5), no_lint ],
 #       multimod_compile,
 #       ['T17516', '-O -v0'])
 

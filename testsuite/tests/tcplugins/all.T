@@ -72,6 +72,7 @@ test('TcPlugin_RewritePerf'
         ])
       , only_ways(['normal'])
       , collect_compiler_stats('bytes allocated', 1)
+      , no_lint
       , high_memory_usage
       , req_th
       ]
