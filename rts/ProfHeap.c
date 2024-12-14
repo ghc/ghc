@@ -958,9 +958,9 @@ dumpCensus( Census *census )
                                           count * sizeof(W_));
             break;
         case HEAP_BY_ERA:
-            fprintf(hp_file, "%lu", (StgWord)ctr->identity);
+            fprintf(hp_file, "%" FMT_Word, (StgWord)ctr->identity);
             char str_era[100];
-            sprintf(str_era, "%lu", (StgWord)ctr->identity);
+            sprintf(str_era, "%" FMT_Word, (StgWord)ctr->identity);
             traceHeapProfSampleString(0, str_era, count * sizeof(W_));
             break;
         case HEAP_BY_MOD:
