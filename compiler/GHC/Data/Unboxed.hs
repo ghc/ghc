@@ -4,6 +4,13 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UnliftedNewtypes #-}
 
+{-# OPTIONS_GHC -fno-omit-interface-pragmas #-}
+  -- If you use -fomit-interface-pragmas for your build, we won't
+  -- inline the matcher for JustUB, and that turns out to have a
+  -- catastropic effect on Lint, which uses unboxed Maybes.
+  -- Simple fix: switch off -fomit-interface-pragmas for this tiny
+  -- and very stable module.
+
 module GHC.Data.Unboxed (
   MaybeUB(JustUB, NothingUB),
   fmapMaybeUB, fromMaybeUB, apMaybeUB, maybeUB
