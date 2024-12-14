@@ -187,7 +187,8 @@ instance Show SomeAsyncException where
     showsPrec p (SomeAsyncException e) = showsPrec p e
 
 -- | @since base-4.7.0.0
-instance Exception SomeAsyncException
+instance Exception SomeAsyncException where
+    displayException (SomeAsyncException e) = displayException e
 
 -- | @since base-4.7.0.0
 asyncExceptionToException :: Exception e => e -> SomeException
