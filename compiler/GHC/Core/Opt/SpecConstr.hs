@@ -2453,7 +2453,7 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
               good_pats :: [CallPat]
               good_pats = catMaybes mb_pats
 
-              in_scope = getSubstInScope (sc_subst env)
+              in_scope = substInScopeSet (sc_subst env)
 
               -- Remove patterns we have already done
               new_pats = filterOut is_done good_pats
@@ -2571,7 +2571,7 @@ callToPat :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
         --      over the following term variables
         -- The [CoreExpr] are the argument patterns for the rule
 callToPat env bndr_occs call@(Call fn args con_env)
-  = do  { let in_scope = getSubstInScope (sc_subst env)
+  = do  { let in_scope = substInScopeSet (sc_subst env)
 
         ; arg_triples <- zipWith3M (argToPat env in_scope con_env) args bndr_occs (map (const NotMarkedStrict) args)
                    -- This zip trims the args to be no longer than

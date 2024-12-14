@@ -219,7 +219,7 @@ soeZapSubst env@(SOE { soe_subst = subst })
   = env { soe_inl = emptyVarEnv, soe_subst = zapSubst subst }
 
 soeInScope :: SimpleOptEnv -> InScopeSet
-soeInScope (SOE { soe_subst = subst }) = getSubstInScope subst
+soeInScope (SOE { soe_subst = subst }) = substInScopeSet subst
 
 soeSetInScope :: InScopeSet -> SimpleOptEnv -> SimpleOptEnv
 soeSetInScope in_scope env2@(SOE { soe_subst = subst2 })
@@ -246,7 +246,7 @@ simple_opt_expr env expr
   where
     rec_ids      = soe_rec_ids env
     subst        = soe_subst env
-    in_scope     = getSubstInScope subst
+    in_scope     = substInScopeSet subst
     in_scope_env = ISE in_scope alwaysActiveUnfoldingFun
 
     ---------------
@@ -481,7 +481,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
     stable_unf = isStableUnfolding (idUnfolding in_bndr)
     active     = isAlwaysActive (idInlineActivation in_bndr)
     occ        = idOccInfo in_bndr
-    in_scope   = getSubstInScope subst
+    in_scope   = substInScopeSet subst
 
     out_rhs | JoinPoint join_arity <- idJoinPointHood in_bndr
             = simple_join_rhs join_arity
@@ -1321,7 +1321,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
           scrut'           = subst_expr subst scrut
 
     go (Right sub) floats (Var v) cont
-       = go (Left (getSubstInScope sub))
+       = go (Left (substInScopeSet sub))
             floats
             (lookupIdSubst sub v)
             cont
@@ -1394,7 +1394,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     -- The Left case is wildly dominant
 
     subst_in_scope (Left in_scope) = in_scope
-    subst_in_scope (Right s) = getSubstInScope s
+    subst_in_scope (Right s) = substInScopeSet s
 
     subst_extend_in_scope (Left in_scope) v = Left (in_scope `extendInScopeSet` v)
     subst_extend_in_scope (Right s) v = Right (s `extendSubstInScope` v)

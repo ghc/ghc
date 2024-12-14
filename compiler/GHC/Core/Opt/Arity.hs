@@ -2304,7 +2304,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
 
     go _ [] subst _
        ----------- Done!  No more expansion needed
-       = (getSubstInScope subst, EI [] MRefl)
+       = (substInScopeSet subst, EI [] MRefl)
 
     go n oss@(one_shot:oss1) subst ty
        ----------- Forall types  (forall a. ty)
@@ -2351,7 +2351,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
                          -- but its type isn't a function, or a binder
                          -- does not have a fixed runtime representation
        = warnPprTrace True "mkEtaWW" ((ppr orig_oss <+> ppr orig_ty) $$ ppr_orig_expr)
-         (getSubstInScope subst, EI [] MRefl)
+         (substInScopeSet subst, EI [] MRefl)
         -- This *can* legitimately happen:
         -- e.g.  coerce Int (\x. x) Essentially the programmer is
         -- playing fast and loose with types (Happy does this a lot).
@@ -3246,7 +3246,7 @@ freshEtaId n subst ty
       = (subst', eta_id')
       where
         Scaled mult' ty' = Type.substScaledTyUnchecked subst ty
-        eta_id' = uniqAway (getSubstInScope subst) $
+        eta_id' = uniqAway (substInScopeSet subst) $
                   mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) mult' ty'
                   -- "OrCoVar" since this can be used to eta-expand
                   -- coercion abstractions

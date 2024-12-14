@@ -121,7 +121,7 @@ module GHC.Core.Type (
         mkTYPEapp, mkTYPEapp_maybe,
         mkCONSTRAINTapp, mkCONSTRAINTapp_maybe,
         mkBoxedRepApp_maybe, mkTupleRepApp_maybe,
-        typeOrConstraintKind,
+        typeOrConstraintKind, liftedTypeOrConstraintKind,
 
         -- *** Levity and boxity
         sORTKind_maybe, typeTypeOrConstraint,
@@ -201,7 +201,7 @@ module GHC.Core.Type (
         zipTCvSubst,
         notElemSubst,
         getTvSubstEnv,
-        zapSubst, getSubstInScope, setInScope, getSubstRangeTyCoFVs,
+        zapSubst, substInScopeSet, setInScope, getSubstRangeTyCoFVs,
         extendSubstInScope, extendSubstInScopeList, extendSubstInScopeSet,
         extendTCvSubst, extendCvSubst,
         extendTvSubst, extendTvSubstList, extendTvSubstAndInScope,
@@ -2685,9 +2685,7 @@ typeKind :: HasDebugCallStack => Type -> Kind
 -- No need to expand synonyms
 typeKind (TyConApp tc tys)      = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)              = typeLiteralKind l
-typeKind (FunTy { ft_af = af }) = case funTyFlagResultTypeOrConstraint af of
-                                     TypeLike       -> liftedTypeKind
-                                     ConstraintLike -> constraintKind
+typeKind (FunTy { ft_af = af }) = liftedTypeOrConstraintKind (funTyFlagResultTypeOrConstraint af)
 typeKind (TyVarTy tyvar)        = tyVarKind tyvar
 typeKind (CastTy _ty co)        = coercionRKind co
 typeKind (CoercionTy co)        = coercionType co
@@ -2719,9 +2717,9 @@ typeKind ty@(ForAllTy {})
 
     lifted_kind_from_body  -- Implements (FORALL2)
       = case sORTKind_maybe body_kind of
-          Just (ConstraintLike, _) -> constraintKind
-          Just (TypeLike,       _) -> liftedTypeKind
-          Nothing -> pprPanic "typeKind" (ppr body_kind)
+          Just (torc, _) -> liftedTypeOrConstraintKind torc
+          Nothing        -> pprPanic "typeKind" (ppr body_kind)
+
 
 ---------------------------------------------
 
@@ -3450,3 +3448,7 @@ mkTupleRepApp_maybe _ = Nothing
 typeOrConstraintKind :: TypeOrConstraint -> RuntimeRepType -> Kind
 typeOrConstraintKind TypeLike       rep = mkTYPEapp       rep
 typeOrConstraintKind ConstraintLike rep = mkCONSTRAINTapp rep
+
+liftedTypeOrConstraintKind :: TypeOrConstraint -> Kind
+liftedTypeOrConstraintKind TypeLike       = liftedTypeKind
+liftedTypeOrConstraintKind ConstraintLike = constraintKind

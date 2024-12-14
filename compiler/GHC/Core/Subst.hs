@@ -24,7 +24,7 @@ module GHC.Core.Subst (
         extendIdSubstWithClone,
         extendSubst, extendSubstList, extendSubstWithVar,
         extendSubstInScope, extendSubstInScopeList, extendSubstInScopeSet,
-        isInScope, setInScope, getSubstInScope,
+        isInScope, setInScope, substInScopeSet,
         extendTvSubst, extendCvSubst,
         delBndr, delBndrs, zapSubst,
 

@@ -1824,7 +1824,7 @@ specLookupRule env fn args phase rules
   = lookupRule ropts in_scope_env is_active fn args rules
   where
     dflags       = se_dflags env
-    in_scope     = getSubstInScope (se_subst env)
+    in_scope     = substInScopeSet (se_subst env)
     in_scope_env = ISE in_scope (whenActiveUnfoldingFun is_active)
     ropts        = initRuleOpts dflags
     is_active    = isActive phase
@@ -2573,7 +2573,7 @@ specHeader env (bndr : bndrs) (SpecType ty : args)
   = do { -- Find qvars, the type variables to add to the binders for the rule
          -- Namely those free in `ty` that aren't in scope
          -- See (MP2) in Note [Specialising polymorphic dictionaries]
-         let in_scope = Core.getSubstInScope (se_subst env)
+         let in_scope = Core.substInScopeSet (se_subst env)
              qvars    = scopedSort $
                         filterOut (`elemInScopeSet` in_scope) $
                         tyCoVarsOfTypeList ty
@@ -2635,7 +2635,7 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
               )
        }
    where
-     in_scope = Core.getSubstInScope (se_subst env)
+     in_scope = Core.substInScopeSet (se_subst env)
 
 -- Finally, we don't want to specialise on this argument 'i':
 --   - It's an UnSpecArg, or
