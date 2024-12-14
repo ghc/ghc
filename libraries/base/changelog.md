@@ -1,6 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.22.0.0 *TBA*
+  * Define `displayException` of `SomeAsyncException` to unwrap the exception.
+      ([CLC proposal #309](https://github.com/haskell/core-libraries-committee/issues/309))
   * Restrict `Data.List.NonEmpty.unzip` to `NonEmpty (a, b) -> (NonEmpty a, NonEmpty b)`. ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
   * Modify the implementation of `Control.Exception.throw` to avoid call-sites being inferred as diverging via precise exception.
     ([GHC #25066](https://gitlab.haskell.org/ghc/ghc/-/issues/25066), [CLC proposal #290](https://github.com/haskell/core-libraries-committee/issues/290))
