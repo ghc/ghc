@@ -913,6 +913,9 @@ test-primops-nightly:
 
 test-primops-release:
   extends: .test-primops
+  # test-primops upstream is failing with a link error
+  # See https://gitlab.haskell.org/ghc/ghc/-/issues/25582
+  allow_failure: true
   rules:
     - if: '$RELEASE_JOB == "yes"'
 
