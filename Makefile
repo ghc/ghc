@@ -174,6 +174,14 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	_build/stage0/bin/genapply _build/stage1/src/libraries/rts/include/DerivedConstants.h -V32 > _build/stage1/src/libraries/rts/AutoApply_V32.cmm
 	_build/stage0/bin/genapply _build/stage1/src/libraries/rts/include/DerivedConstants.h -V64 > _build/stage1/src/libraries/rts/AutoApply_V64.cmm
 	
+	# Build libffi
+	mkdir -p _build/stage1/src/libffi
+	mkdir -p _build/stage1/libffi
+	(cd _build/stage1/src/libffi; tar -xvf ../../../../libffi-tarballs/libffi-3.4.6.tar.gz)
+	(cd _build/stage1/src/libffi/libffi-3.4.6; ./configure --disable-docs --with-pics=yes --disable-multi-os-directory --prefix=`pwd`/../../../../../_build/stage1/libffi/ && make install -j)
+	cp -f _build/stage1/libffi/include/* _build/stage1/src/libraries/rts/include/
+	cp -f _build/stage1/libffi/lib/libffi.a _build/stage1/cabal/build/x86_64-linux/ghc-9.13/rts-1.0.2/build/libCffi.a
+
 	# Building boot libraries
 	mkdir -p _build/stage1/cabal/
 
