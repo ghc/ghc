@@ -296,13 +296,6 @@ tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
 
 tcExpr (XExpr e)                 res_ty = tcXExpr e res_ty
 
-tcExpr e@(HsOverLit _ lit) res_ty
-  = do { mb_res <- tcShortCutLit lit res_ty
-         -- See Note [Short cut for overloaded literals] in GHC.Tc.Zonk.Type
-       ; case mb_res of
-           Just lit' -> return (HsOverLit noExtField lit')
-           Nothing   -> tcApp e res_ty }
-
 -- Typecheck an occurrence of an unbound Id
 --
 -- Some of these started life as a true expression hole "_".
@@ -352,6 +345,51 @@ tcExpr e@(HsIPVar _ x) res_ty
 tcExpr e@(HsLam x lam_variant matches) res_ty
   = do { (wrap, matches') <- tcLambdaMatches e lam_variant matches [] res_ty
        ; return (mkHsWrap wrap $ HsLam x lam_variant matches') }
+
+{-
+************************************************************************
+*                                                                      *
+                Overloaded literals
+*                                                                      *
+************************************************************************
+-}
+
+tcExpr e@(HsOverLit _ lit) res_ty
+  = -- See Note [Typechecking overloaded literals]
+    do { mb_res <- tcShortCutLit lit res_ty
+         -- See Note [Short cut for overloaded literals] in GHC.Tc.Utils.TcMType
+       ; case mb_res of
+           Just lit' -> return (HsOverLit noExtField lit')
+           Nothing   -> tcApp e res_ty }
+           -- Why go via tcApp? See Note [Typechecking overloaded literals]
+
+{- Note [Typechecking overloaded literals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally speaking, an overloaded literal like "3" typechecks as if you
+had written (fromInteger (3 :: Integer)).   But in practice it's a little
+tricky:
+
+* Rebindable syntax (see #19154 and !4981). With rebindable syntax we might have
+     fromInteger :: Integer -> forall a. Num a => a
+  and then we might hope to use a Visible Type Application (VTA) to write
+     3 @Int
+  expecting it to expand to
+     fromInteger (3::Integer) @Int dNumInt
+  To achieve that, we need to
+    * treat the application using `tcApp` to deal with the VTA
+    * treat the overloaded literal as the "head" of an application;
+      see `GHC.Tc.Gen.Head.tcInferAppHead`.
+
+* Short-cutting.  If we have
+     xs :: [Int]
+     xs = [3,4,5,6... ]
+  then it's a huge short-cut (in compile time) to just cough up the `Int` literal
+  for `3`, rather than (fromInteger @Int d), with a wanted constraint `[W] Num Int`.
+  See Note [Short cut for overloaded literals] in GHC.Tc.Utils.TcMType.
+
+  We can only take this short-cut if rebindable syntax is off; see `tcShortCutLit`.
+-}
+
 
 {-
 ************************************************************************

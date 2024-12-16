@@ -765,6 +765,8 @@ tcInferOverLit lit@(OverLit { ol_val = val
     --   where fromInteger is gotten by looking up from_name, and
     --   the (3 :: Integer) is returned by mkOverLit
     -- Ditto the string literal "foo" to (fromString ("foo" :: String))
+    --
+    -- See Note [Typechecking overloaded literals] in GHC.Tc.Gen.Expr
     do { hs_lit <- mkOverLit val
        ; from_id <- tcLookupId from_name
        ; (wrap1, from_ty) <- topInstantiate (LiteralOrigin lit) (idType from_id)
@@ -781,9 +783,10 @@ tcInferOverLit lit@(OverLit { ol_val = val
              from_expr = mkHsWrap (wrap2 <.> wrap1) $
                          HsVar noExtField (L loc from_id)
              witness = HsApp noExtField (L (l2l loc) from_expr) lit_expr
-             lit' = lit { ol_ext = OverLitTc { ol_rebindable = rebindable
-                                             , ol_witness = witness
-                                             , ol_type = res_ty } }
+             lit' = OverLit { ol_val = val
+                            , ol_ext = OverLitTc { ol_rebindable = rebindable
+                                                 , ol_witness = witness
+                                                 , ol_type = res_ty } }
        ; return (HsOverLit noExtField lit', res_ty) }
 
 {- *********************************************************************

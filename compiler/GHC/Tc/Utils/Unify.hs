@@ -305,7 +305,7 @@ Both ultimately handled by matchExpectedFunTys.
 * For the Lambda case there are two sub-cases:
    * An expression with a type signature: (\ @a x y -> blah) :: hs_ty
      This is handled by `GHC.Tc.Gen.Head.tcExprWithSig`, which kind-checks
-     the signature and hands off to `tcExprPolyCheck` vai `tcPolyLExprSig`
+     the signature and hands off to `tcExprPolyCheck` via `tcPolyLExprSig`.
      Note that the foralls at the top of hs_ty scope over the expression.
 
    * A higher order call: h e, where h :: poly_ty -> blah
