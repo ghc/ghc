@@ -37,11 +37,12 @@ Compiler
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 
-
+- Changes for better support of the Google Closure Compiler (#24602, !12330)
 
 WebAssembly backend
 ~~~~~~~~~~~~~~~~~~~
 
+- wasm: use scheduler.postTask() for context switch when available
 
 GHCi
 ~~~~
@@ -49,6 +50,8 @@ GHCi
 - When using XDG directories ``.ghci_history`` now uses the ``$XDG_DATA_HOME`` variable as expected. (#24266)
 
 - Replaced some uses of lists with Arrays for better performance during bytecode compilation.
+
+- GHCi: support cross-module inlining of breakpoints. Fixing #24712
 
 Runtime system
 ~~~~~~~~~~~~~~
@@ -60,6 +63,20 @@ Runtime system
 
 - Reduce fragmentation incurred by the nonmoving GC's segment allocator. In one application this reduced resident set size by 26%. See :ghc-ticket:`24150`.
 
+- Emit warning when -M < -H.
+
+Build system and packaging
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Escape argument strings when storing them in the settings file. Fixes #24265
+
+- Updated autoconf scripts to commit 948ae97ca5703224bd3eada06b7a69f40dd15a02 (dated 2024-01-01).
+  (From https://git.savannah.gnu.org/cgit/config.git/)
+
+- GHC now distinguishes more between the Cmm and C preprocessor. The new flags
+  `-pgmCmmP` and `-optCmmP` can be used to control
+  the Cmm preprocessor. C preprocessor flags will still be passed to the Cmm
+  preprocessor, expect for -g flags which have special handling. Fixes #24474
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
