@@ -451,7 +451,7 @@ tcRnImports hsc_env import_decls
 
         ; this_mod <- getModule
         ; gbl_env <- getGblEnv
-        ; let unitId = homeUnitId $ hsc_home_unit hsc_env
+        ; let unitId = homeUnitAsUnit $ hsc_home_unit hsc_env
               mnwib = GWIB (moduleName this_mod)(hscSourceToIsBoot (tcg_src gbl_env))
         ; let { -- We want instance declarations from all home-package
                 -- modules below this one, including boot modules, except

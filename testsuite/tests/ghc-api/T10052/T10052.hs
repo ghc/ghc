@@ -5,13 +5,14 @@ module Main where
 
 import System.Environment
 import GHC
+import GHC.Driver.Env
 
 main :: IO ()
 main = do
     flags <- getArgs
     runGhc' flags $ do
-      dflags <- getSessionDynFlags
-      setTargets [Target (TargetFile "T10052-input.hs" Nothing) True (homeUnitId_ dflags) Nothing]
+      unit <- hscActiveUnit <$> getSession
+      setTargets [Target (TargetFile "T10052-input.hs" Nothing) True unit Nothing]
       _success <- load LoadAllTargets
       return ()
 

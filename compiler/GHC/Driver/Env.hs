@@ -17,7 +17,7 @@ module GHC.Driver.Env
    , hscUpdateHPT
    , hscSetActiveHomeUnit
    , hscSetActiveUnitId
-   , hscActiveUnitId
+   , hscActiveUnit
    , runHsc
    , runHsc'
    , mkInteractiveHscEnv
@@ -127,7 +127,7 @@ hsc_HUE = ue_currentHomeUnitEnv . hsc_unit_env
 hsc_HUG :: HscEnv -> HomeUnitGraph
 hsc_HUG = ue_home_unit_graph . hsc_unit_env
 
-hsc_all_home_unit_ids :: HscEnv -> Set.Set UnitId
+hsc_all_home_unit_ids :: HscEnv -> Set.Set Unit
 hsc_all_home_unit_ids = unitEnv_keys . hsc_HUG
 
 hscUpdateHPT_lazy :: (HomePackageTable -> HomePackageTable) -> HscEnv -> HscEnv
@@ -232,7 +232,7 @@ hptAllInstances hsc_env
     in (foldl' unionInstEnv emptyInstEnv insts, concat famInsts)
 
 -- | Find instances visible from the given set of imports
-hptInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> (InstEnv, [FamInst])
+hptInstancesBelow :: HscEnv -> Unit -> ModuleNameWithIsBoot -> (InstEnv, [FamInst])
 hptInstancesBelow hsc_env uid mnwib =
   let
     mn = gwib_mod mnwib
@@ -250,12 +250,12 @@ hptInstancesBelow hsc_env uid mnwib =
   in (foldl' unionInstEnv emptyInstEnv insts, concat famInsts)
 
 -- | Get rules from modules "below" this one (in the dependency sense)
-hptRules :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> [CoreRule]
+hptRules :: HscEnv -> Unit -> ModuleNameWithIsBoot -> [CoreRule]
 hptRules = hptSomeThingsBelowUs (md_rules . hm_details) False
 
 
 -- | Get annotations from modules "below" this one (in the dependency sense)
-hptAnns :: HscEnv -> Maybe (UnitId, ModuleNameWithIsBoot) -> [Annotation]
+hptAnns :: HscEnv -> Maybe (Unit, ModuleNameWithIsBoot) -> [Annotation]
 hptAnns hsc_env (Just (uid, mn)) = hptSomeThingsBelowUs (md_anns . hm_details) False hsc_env uid mn
 hptAnns hsc_env Nothing = hptAllThings (md_anns . hm_details) hsc_env
 
@@ -265,7 +265,7 @@ hptAllThings extract hsc_env = concatMap (concatHpt extract . homeUnitEnv_hpt . 
 
 -- | Get things from modules "below" this one (in the dependency sense)
 -- C.f Inst.hptInstances
-hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> UnitId -> ModuleNameWithIsBoot -> [a]
+hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> Unit -> ModuleNameWithIsBoot -> [a]
 hptSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
   | isOneShot (ghcMode (hsc_dflags hsc_env)) = []
 
@@ -312,7 +312,7 @@ prepareAnnotations hsc_env mb_guts = do
         -- Extract dependencies of the module if we are supplied one,
         -- otherwise load annotations from all home package table
         -- entries regardless of dependency ordering.
-        get_mod mg = (moduleUnitId (mg_module mg), GWIB (moduleName (mg_module mg)) NotBoot)
+        get_mod mg = (moduleUnit (mg_module mg), GWIB (moduleName (mg_module mg)) NotBoot)
         home_pkg_anns  = (mkAnnEnv . hptAnns hsc_env) $ fmap get_mod mb_guts
         other_pkg_anns = eps_ann_env eps
         ann_env        = foldl1' plusAnnEnv $ catMaybes [mb_this_module_anns,
@@ -394,15 +394,15 @@ hscSetFlags dflags h =
 
 -- See Note [Multiple Home Units]
 hscSetActiveHomeUnit :: HasDebugCallStack => HomeUnit -> HscEnv -> HscEnv
-hscSetActiveHomeUnit home_unit = hscSetActiveUnitId (homeUnitId home_unit)
+hscSetActiveHomeUnit home_unit = hscSetActiveUnitId (homeUnitAsUnit home_unit)
 
-hscSetActiveUnitId :: HasDebugCallStack => UnitId -> HscEnv -> HscEnv
+hscSetActiveUnitId :: HasDebugCallStack => Unit -> HscEnv -> HscEnv
 hscSetActiveUnitId uid e = e
   { hsc_unit_env = ue_setActiveUnit uid (hsc_unit_env e)
   , hsc_dflags = ue_unitFlags uid (hsc_unit_env e)  }
 
-hscActiveUnitId :: HscEnv -> UnitId
-hscActiveUnitId e = ue_currentUnit (hsc_unit_env e)
+hscActiveUnit :: HscEnv -> Unit
+hscActiveUnit e = ue_currentUnit (hsc_unit_env e)
 
 -- | Discard the contents of the InteractiveContext, but keep the DynFlags and
 -- the loaded plugins.  It will also keep ic_int_print and ic_monad if their

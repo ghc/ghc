@@ -364,7 +364,7 @@ buildUnit session cid insts lunit = do
             unitInstanceOf = cid,
             unitInstantiations = insts,
             -- Slight inefficiency here haha
-            unitExposedModules = map (\(m,n) -> (m,Just n)) mods,
+            unitExposedModules = map (\(m,_) -> (m,Nothing)) mods,
             unitHiddenModules = [], -- TODO: doc only
             unitDepends = case session of
                         -- Technically, we should state that we depend
@@ -445,11 +445,11 @@ addUnit u = do
     let unit_env = ue_setUnits unit_state $ ue_setUnitDbs (Just dbs) $ UnitEnv
           { ue_platform  = targetPlatform dflags
           , ue_namever   = ghcNameVersion dflags
-          , ue_current_unit = homeUnitId home_unit
+          , ue_current_unit = homeUnitAsUnit home_unit
 
           , ue_home_unit_graph =
                 unitEnv_singleton
-                    (homeUnitId home_unit)
+                    (homeUnitAsUnit home_unit)
                     (mkHomeUnitEnv dflags (ue_hpt old_unit_env) (Just home_unit))
           , ue_eps       = ue_eps old_unit_env
           }
@@ -572,7 +572,7 @@ mkBackpackMsg = do
                 msg <> showModMsg dflags (recompileRequired recomp) node
                     <> reason
       in case node of
-        InstantiationNode _ _ ->
+        InstantiationNode _ _ _ _ ->
           case recomp of
             UpToDate
               | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
@@ -727,8 +727,8 @@ hsunitModuleGraph do_link unit = do
         pn = hsPackageName (unLoc (hsunitName unit))
         home_unit = hsc_home_unit hsc_env
 
-        sig_keys = flip map (homeUnitInstantiations home_unit) $ \(mod_name, _) -> NodeKey_Module (ModNodeKeyWithUid (GWIB mod_name NotBoot) (homeUnitId home_unit))
-        keys = [NodeKey_Module (ModNodeKeyWithUid gwib (homeUnitId home_unit)) | (DeclD hsc_src lmodname _) <- map unLoc decls, let gwib = GWIB (unLoc lmodname) (hscSourceToIsBoot hsc_src) ]
+        sig_keys = flip map (homeUnitInstantiations home_unit) $ \(mod_name, _) -> NodeKey_Module (ModNodeKeyWithUid (GWIB mod_name NotBoot) (homeUnitAsUnit home_unit))
+        keys = [NodeKey_Module (ModNodeKeyWithUid gwib (homeUnitAsUnit home_unit)) | (DeclD hsc_src lmodname _) <- map unLoc decls, let gwib = GWIB (unLoc lmodname) (hscSourceToIsBoot hsc_src) ]
 
     --  1. Create a HsSrcFile/HsigFile summary for every
     --  explicitly mentioned module/signature.
@@ -750,9 +750,9 @@ hsunitModuleGraph do_link unit = do
             then return Nothing
             else fmap Just $ summariseRequirement pn mod_name
 
-    let graph_nodes = nodes ++ req_nodes ++ (instantiationNodes (homeUnitId $ hsc_home_unit hsc_env) (hsc_units hsc_env))
+    let graph_nodes = nodes ++ req_nodes ++ (instantiationNodes (homeUnitAsUnit $ hsc_home_unit hsc_env) (hsc_units hsc_env))
         key_nodes = map mkNodeKey graph_nodes
-        all_nodes = graph_nodes ++ [LinkNode key_nodes (homeUnitId $ hsc_home_unit hsc_env) | do_link]
+        all_nodes = graph_nodes ++ [LinkNode key_nodes (homeUnitAsUnit $ hsc_home_unit hsc_env) | do_link]
     -- This error message is not very good but .bkp mode is just for testing so
     -- better to be direct rather than pretty.
     when
@@ -816,7 +816,7 @@ summariseRequirement pn mod_name = do
         ms_hspp_opts = dflags,
         ms_hspp_buf = Nothing
         }
-    let nodes = [NodeKey_Module (ModNodeKeyWithUid (GWIB mn NotBoot) (homeUnitId home_unit)) | mn <- extra_sig_imports ]
+    let nodes = [NodeKey_Module (ModNodeKeyWithUid (GWIB mn NotBoot) (homeUnitAsUnit home_unit)) | mn <- extra_sig_imports ]
     return (ModuleNode nodes ms)
 
 summariseDecl :: PackageName
@@ -927,9 +927,9 @@ hsModuleToModSummary home_keys pn hsc_src modname
     let inst_nodes = map NodeKey_Unit inst_deps
         mod_nodes  =
           -- hs-boot edge
-          [k | k <- [NodeKey_Module (ModNodeKeyWithUid (GWIB (ms_mod_name ms) IsBoot)  (moduleUnitId this_mod))], NotBoot == isBootSummary ms,  k `elem` home_keys ] ++
+          [k | k <- [NodeKey_Module (ModNodeKeyWithUid (GWIB (ms_mod_name ms) IsBoot)  (moduleUnit this_mod))], NotBoot == isBootSummary ms,  k `elem` home_keys ] ++
           -- Normal edges
-          [k | (_, mnwib) <- msDeps ms, let k = NodeKey_Module (ModNodeKeyWithUid (fmap unLoc mnwib) (moduleUnitId this_mod)), k `elem` home_keys]
+          [k | (_, mnwib) <- msDeps ms, let k = NodeKey_Module (ModNodeKeyWithUid (fmap unLoc mnwib) (moduleUnit this_mod)), k `elem` home_keys]
 
 
     return (ModuleNode (mod_nodes ++ inst_nodes) ms)

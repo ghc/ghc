@@ -4,6 +4,7 @@ module Main (main) where
 import GHC
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Env
 import GHC.Utils.Outputable
 import GHC.Utils.Monad
 import GHC.Types.Name.Set
@@ -63,10 +64,12 @@ test7918 = do
   dynFlags <- getSessionDynFlags
   void $ setSessionDynFlags (gopt_set dynFlags Opt_BuildDynamicToo)
 
+  unit <- hscActiveUnit <$> getSession
+
   let target = Target {
                    targetId           = TargetFile "T7918B.hs" Nothing
                  , targetAllowObjCode = True
-                 , targetUnitId       = homeUnitId_ dynFlags
+                 , targetUnitId       = unit
                  , targetContents     = Nothing
                  }
   setTargets [target]

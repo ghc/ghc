@@ -309,13 +309,13 @@ import Data.Bifunctor
 %********************************************************************* -}
 
 newHscEnv :: FilePath -> DynFlags -> IO HscEnv
-newHscEnv top_dir dflags = newHscEnvWithHUG top_dir dflags (homeUnitId_ dflags) home_unit_graph
+newHscEnv top_dir dflags = newHscEnvWithHUG top_dir dflags (mkDefiniteUnit $ homeUnitId_ dflags) home_unit_graph
   where
     home_unit_graph = unitEnv_singleton
-                        (homeUnitId_ dflags)
+                        (mkDefiniteUnit $ homeUnitId_ dflags)
                         (mkHomeUnitEnv dflags emptyHomePackageTable Nothing)
 
-newHscEnvWithHUG :: FilePath -> DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
+newHscEnvWithHUG :: FilePath -> DynFlags -> Unit -> HomeUnitGraph -> IO HscEnv
 newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
     nc_var  <- initNameCache 'r' knownKeyNames
     fc_var  <- initFinderCache

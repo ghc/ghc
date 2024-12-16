@@ -24,7 +24,7 @@ import GHC.Prelude
 
 import GHC.Types.Name (Name)
 import GHC.Types.TyThing (TyThing)
-import GHC.Unit.Types (Module, InstalledModule, UnitId, Unit)
+import GHC.Unit.Types (Module, InstalledModule, Unit)
 import GHC.Unit.State (UnitState, ModuleSuggestion, ModuleOrigin, UnusableUnit, UnitInfo)
 import GHC.Exception.Type (SomeException)
 import GHC.Unit.Types ( IsBootInterface )
@@ -72,9 +72,9 @@ data ReadInterfaceError
   deriving Generic
 
 data CantFindInstalledReason
-  = NoUnitIdMatching UnitId [UnitInfo]
-  | MissingPackageFiles UnitId [FilePath]
-  | MissingPackageWayFiles String UnitId [FilePath]
+  = NoUnitIdMatching Unit [UnitInfo]
+  | MissingPackageFiles Unit [FilePath]
+  | MissingPackageWayFiles String Unit [FilePath]
   | ModuleSuggestion [ModuleSuggestion] [FilePath]
   | NotAModule
   | CouldntFindInFiles [FilePath]

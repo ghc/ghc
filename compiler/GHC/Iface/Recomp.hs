@@ -632,7 +632,7 @@ checkDependencies hsc_env summary iface
 
 
    classify _ (Found _ mod)
-    | (toUnitId $ moduleUnit mod) `elem` all_home_units = Right (Left ((toUnitId $ moduleUnit mod), moduleName mod))
+    | moduleUnit mod `elem` all_home_units = Right (Left ((toUnitId $ moduleUnit mod), moduleName mod))
     | otherwise = Right (Right (moduleNameFS (moduleName mod), toUnitId $ moduleUnit mod))
    classify reason _ = Left (RecompBecause reason)
 

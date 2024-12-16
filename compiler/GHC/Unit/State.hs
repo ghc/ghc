@@ -58,6 +58,8 @@ module GHC.Unit.State (
         instUnitToUnit,
         instModuleToModule,
 
+        mkHomeUnit,
+
         -- * Pretty-printing
         pprFlag,
         pprUnits,
@@ -353,10 +355,10 @@ data UnitConfig = UnitConfig
    , unitConfigFlagsIgnored :: [IgnorePackageFlag] -- ^ Ignored units
    , unitConfigFlagsTrusted :: [TrustFlag]         -- ^ Trusted units
    , unitConfigFlagsPlugins :: [PackageFlag]       -- ^ Plugins exposed units
-   , unitConfigHomeUnits    :: Set.Set UnitId
+   , unitConfigHomeUnits    :: Set.Set Unit
    }
 
-initUnitConfig :: DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> UnitConfig
+initUnitConfig :: DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set Unit -> UnitConfig
 initUnitConfig dflags cached_dbs home_units =
    let !hu_id             = homeUnitId_ dflags
        !hu_instanceof     = homeUnitInstanceOf_ dflags
@@ -457,7 +459,7 @@ data UnitState = UnitState {
   -- -Wunused-packages warning.
   explicitUnits :: [(Unit, Maybe PackageArg)],
 
-  homeUnitDepends    :: [UnitId],
+  homeUnitDepends    :: [Unit],
 
   -- | This is a full map from 'ModuleName' to all modules which may possibly
   -- be providing it.  These providers may be hidden (but we'll still want
@@ -637,7 +639,7 @@ listUnitInfo state = nonDetEltsUniqMap (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
+initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set Unit -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
 initUnits logger dflags cached_dbs home_units = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
@@ -1712,15 +1714,15 @@ mkUnitState logger cfg = do
          }
   return (state, raw_dbs)
 
-selectHptFlag :: Set.Set UnitId -> PackageFlag -> Bool
-selectHptFlag home_units (ExposePackage _ (UnitIdArg uid) _) | toUnitId uid `Set.member` home_units = True
+selectHptFlag :: Set.Set Unit -> PackageFlag -> Bool
+selectHptFlag home_units (ExposePackage _ (UnitIdArg uid) _) | uid `Set.member` home_units = True
 selectHptFlag _ _ = False
 
-selectHomeUnits :: Set.Set UnitId -> [PackageFlag] -> Set.Set UnitId
+selectHomeUnits :: Set.Set Unit -> [PackageFlag] -> Set.Set Unit
 selectHomeUnits home_units flags = foldl' go Set.empty flags
   where
-    go :: Set.Set UnitId -> PackageFlag -> Set.Set UnitId
-    go cur (ExposePackage _ (UnitIdArg uid) _) | toUnitId uid `Set.member` home_units = Set.insert (toUnitId uid) cur
+    go :: Set.Set Unit -> PackageFlag -> Set.Set Unit
+    go cur (ExposePackage _ (UnitIdArg uid) _) | uid `Set.member` home_units = Set.insert uid cur
     -- MP: This does not yet support thinning/renaming
     go cur _ = cur
 

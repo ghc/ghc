@@ -354,7 +354,7 @@ rnImportDecl this_mod
                             -- or the name of this_mod's package.  Yurgh!
                             -- c.f. GHC.findModule, and #9997
              NoPkgQual         -> True
-             ThisPkg uid       -> uid == homeUnitId_ (hsc_dflags hsc_env)
+             ThisPkg uid       -> uid == homeUnitAsUnit (hsc_home_unit hsc_env)
              OtherPkg _        -> False))
          (addErr (TcRnSelfImport imp_mod_name))
 
@@ -452,7 +452,7 @@ renamePkgQual :: UnitEnv -> ModuleName -> Maybe FastString -> PkgQual
 renamePkgQual unit_env mn mb_pkg = case mb_pkg of
   Nothing -> NoPkgQual
   Just pkg_fs
-    | Just uid <- homeUnitId <$> ue_homeUnit unit_env
+    | Just uid <- homeUnitAsUnit <$> ue_homeUnit unit_env
     , pkg_fs == fsLit "this"
     -> ThisPkg uid
 
@@ -471,14 +471,14 @@ renamePkgQual unit_env mn mb_pkg = case mb_pkg of
 
     units = ue_units unit_env
 
-    hpt_deps :: [UnitId]
+    hpt_deps :: [Unit]
     hpt_deps  = homeUnitDepends units
 
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
 calculateAvails :: HomeUnit
-                -> S.Set UnitId
+                -> S.Set Unit
                 -> ModIface
                 -> IsSafeImport
                 -> IsBootInterface
@@ -546,11 +546,11 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
         | isHomeUnit home_unit pkg = ptrust
         | otherwise = False
 
-      dependent_pkgs = if toUnitId pkg `S.member` other_home_units
+      dependent_pkgs = if pkg `S.member` other_home_units
                         then S.empty
                         else S.singleton ipkg
 
-      direct_mods = mkModDeps $ if toUnitId pkg `S.member` other_home_units
+      direct_mods = mkModDeps $ if pkg `S.member` other_home_units
                       then S.singleton (moduleUnitId imp_mod, (GWIB (moduleName imp_mod) want_boot))
                       else S.empty
 

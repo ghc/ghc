@@ -121,6 +121,7 @@ import System.Directory ( createDirectoryIfMissing
 import GHC.Unit.Finder.Types
 import GHC.Unit.Finder (findObjectLinkableMaybe, findHomeModule)
 import GHC.Driver.Config.Finder (initFinderOpts)
+import GHC.Unit.Home
 
 data LinkerStats = LinkerStats
   { bytesPerModule     :: !(Map Module Word64) -- ^ number of bytes linked per module
@@ -459,7 +460,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
   let (rts_wired_units, rts_wired_functions) = rtsDeps
 
   -- all the units we want to link together, without their dependencies
-  let root_units = filter (/= ue_currentUnit unit_env)
+  let root_units = filter (/= toUnitId (ue_currentUnit unit_env))
                    $ filter (/= interactiveUnitId)
                    $ nub
                    $ rts_wired_units ++ reverse obj_units ++ reverse units
@@ -488,7 +489,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
               case ue_homeUnit unit_env of
                 Nothing -> pprPanic "getDeps: No home-unit: " (pprModule mod)
                 Just home_unit -> do
-                    mb_stuff <- findHomeModule finder_cache finder_opts home_unit (moduleName mod)
+                    mb_stuff <- findHomeModule finder_cache finder_opts (homeUnitAsUnit home_unit) (moduleName mod)
                     case mb_stuff of
                       Found loc mod -> found loc mod
                       _ -> pprPanic "getDeps: Couldn't find home-module: " (pprModule mod)

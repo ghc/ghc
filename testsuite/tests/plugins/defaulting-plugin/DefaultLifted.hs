@@ -56,7 +56,7 @@ lookupModule mod_nm = do
   case found_module of
     FoundModule h -> return (fr_mod h)
     _          -> do
-      found_module' <- findImportedModule mod_nm (ThisPkg (homeUnitId home_unit))
+      found_module' <- findImportedModule mod_nm (ThisPkg (homeUnitAsUnit home_unit))
       case found_module' of
         FoundModule h -> return (fr_mod h)
         _          -> panicDoc "Unable to resolve module looked up by plugin: "

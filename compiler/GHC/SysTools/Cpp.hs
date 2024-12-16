@@ -121,7 +121,7 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
     -- enough approximation for things to work. A proper solution would be to have to declare which paths should
     -- be propagated to dependent packages.
     let home_pkg_deps =
-         [homeUnitEnv_dflags . ue_findHomeUnitEnv uid $ unit_env | uid <- ue_transitiveHomeDeps (ue_currentUnit unit_env) unit_env]
+         [homeUnitEnv_dflags . ue_findHomeUnitEnv uid $ unit_env | uid <- ue_transitiveHomeDeps (ue_currentUnit unit_env) (ue_home_unit_graph unit_env)]
         dep_pkg_extra_inputs = [offsetIncludePaths fs (includePaths fs) | fs <- home_pkg_deps]
 
     let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []

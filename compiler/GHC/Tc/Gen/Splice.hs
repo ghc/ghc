@@ -125,6 +125,7 @@ import GHC.Unit.Finder
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
+import GHC.Unit.Home
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic as Panic
@@ -1501,7 +1502,7 @@ instance TH.Quasi TcM where
       let home_unit = hsc_home_unit hsc_env
       let dflags    = hsc_dflags hsc_env
       let fopts     = initFinderOpts dflags
-      r <- liftIO $ findHomeModule fc fopts home_unit (mkModuleName plugin)
+      r <- liftIO $ findHomeModule fc fopts (homeUnitAsUnit home_unit) (mkModuleName plugin)
       let err = TcRnTHError $ AddInvalidCorePlugin plugin
       case r of
         Found {} -> addErr err

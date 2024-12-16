@@ -350,15 +350,15 @@ loadCmdLineLibs' interp hsc_env pls = snd <$>
       (hsc_all_home_unit_ids hsc_env)
 
   where
-    load :: Set.Set UnitId -> UnitId -> LoaderState -> IO (Set.Set UnitId, LoaderState)
-    load done uid pls | uid `Set.member` done = return (done, pls)
+    load :: Set.Set UnitId -> Unit -> LoaderState -> IO (Set.Set UnitId, LoaderState)
+    load done uid pls | toUnitId uid `Set.member` done = return (done, pls)
     load done uid pls = do
       let hsc' = hscSetActiveUnitId uid hsc_env
       -- Load potential dependencies first
       (done', pls') <- foldM (\(done', pls') uid -> load done' uid pls') (done, pls)
                           (homeUnitDepends (hsc_units hsc'))
       pls'' <- loadCmdLineLibs'' interp hsc' pls'
-      return $ (Set.insert uid done', pls'')
+      return $ (Set.insert (toUnitId uid) done', pls'')
 
 loadCmdLineLibs''
   :: Interp

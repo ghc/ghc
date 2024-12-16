@@ -97,7 +97,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
     dflags         = hsc_dflags hsc_env
     logger         = hsc_logger hsc_env
     extra_vars     = interactiveInScope (hsc_IC hsc_env)
-    home_pkg_rules = hptRules hsc_env (moduleUnitId mod) (GWIB { gwib_mod = moduleName mod
+    home_pkg_rules = hptRules hsc_env (moduleUnit mod) (GWIB { gwib_mod = moduleName mod
                                                                , gwib_isBoot = NotBoot })
     hpt_rule_base  = mkRuleBase home_pkg_rules
     name_ppr_ctx   = mkNamePprCtx ptc (hsc_unit_env hsc_env) rdr_env

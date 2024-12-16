@@ -168,7 +168,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         case fmap mkNodeKey <$> mgReachable mod_graph (NodeKey_Module nk) of
           Nothing ->
               let (ModNodeKeyWithUid _ uid) = nk
-              in make_deps_loop (addOneToUniqDSet found_units uid, found_mods) nexts
+              in make_deps_loop (addOneToUniqDSet found_units (toUnitId uid), found_mods) nexts
           Just trans_deps ->
             let deps = Set.insert (NodeKey_Module nk) (Set.fromList trans_deps)
                 -- See #936 and the ghci.prog007 test for why we have to continue traversing through
@@ -176,7 +176,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                 todo_boot_mods = [ModNodeKeyWithUid (GWIB mn NotBoot) uid | NodeKey_Module (ModNodeKeyWithUid (GWIB mn IsBoot) uid) <- trans_deps]
             in make_deps_loop (found_units, deps `Set.union` found_mods) (todo_boot_mods ++ nexts)
 
-    mkNk m = ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m)
+    mkNk m = ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnit m)
     (init_pkg_set, all_deps) = make_deps_loop (emptyUniqDSet, Set.empty) $ map mkNk (filterOut isInteractiveModule mods)
 
     all_home_mods = [with_uid | NodeKey_Module with_uid <- Set.toList all_deps]
@@ -276,7 +276,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
               Nothing -> no_obj mod
               Just home_unit -> do
                 from_bc <- ldLoadByteCode opts mod
-                maybe (fallback_no_bytecode home_unit mod) pure from_bc
+                maybe (fallback_no_bytecode (homeUnitAsUnit home_unit) mod) pure from_bc
         where
 
             fallback_no_bytecode home_unit mod = do

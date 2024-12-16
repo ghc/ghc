@@ -17,6 +17,7 @@ import GHC.Parser.Header
 import GHC.Types.Target
 import GHC.Types.SourceError
 import GHC.Utils.Outputable
+import GHC.Driver.Env
 import GHC.Data.StringBuffer
 import System.Directory
 import System.Environment
@@ -129,13 +130,13 @@ go label targets mods = do
   where
     mkTarget t mod@(name,_,_,_,sync) = do
       src <- liftIO $ genMod mod
-      dflags <- getSessionDynFlags
+      unit <- hscActiveUnit <$> getSession
       return $ if not (name `elem` targets)
          then Nothing
          else Just $ Target
            { targetId = TargetFile (name++".hs") Nothing
            , targetAllowObjCode = False
-           , targetUnitId = homeUnitId_ dflags
+           , targetUnitId = unit
            , targetContents =
                case sync of
                  OnDisk -> Nothing

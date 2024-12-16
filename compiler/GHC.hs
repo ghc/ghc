@@ -634,21 +634,21 @@ setSessionDynFlags dflags0 = do
   let all_uids = hsc_all_home_unit_ids hsc_env
   case S.toList all_uids of
     [uid] -> do
-      setUnitDynFlagsNoCheck uid dflags
-      modifySession (hscUpdateLoggerFlags . hscSetActiveUnitId (homeUnitId_ dflags))
+      home_unit <- setUnitDynFlagsNoCheck uid dflags
+      modifySession (hscUpdateLoggerFlags . hscSetActiveUnitId (homeUnitAsUnit home_unit))
       dflags' <- getDynFlags
       setTopSessionDynFlags dflags'
     [] -> panic "nohue"
     _ -> panic "setSessionDynFlags can only be used with a single home unit"
 
 
-setUnitDynFlags :: GhcMonad m => UnitId -> DynFlags -> m ()
+setUnitDynFlags :: GhcMonad m => Unit -> DynFlags -> m ()
 setUnitDynFlags uid dflags0 = do
   logger <- getLogger
   dflags1 <- checkNewDynFlags logger dflags0
-  setUnitDynFlagsNoCheck uid dflags1
+  void $ setUnitDynFlagsNoCheck uid dflags1
 
-setUnitDynFlagsNoCheck :: GhcMonad m => UnitId -> DynFlags -> m ()
+setUnitDynFlagsNoCheck :: GhcMonad m => Unit -> DynFlags -> m HomeUnit
 setUnitDynFlagsNoCheck uid dflags1 = do
   logger <- getLogger
   hsc_env <- getSession
@@ -682,11 +682,11 @@ setUnitDynFlagsNoCheck uid dflags1 = do
   -- the session there is one fake unit called main which is immediately replaced
   -- after the DynFlags are parsed.
   let !unit_env1 =
-        if homeUnitId_ dflags /= uid
+        if homeUnitAsUnit home_unit /= uid
           then
             ue_renameUnitId
                   uid
-                  (homeUnitId_ dflags)
+                  (homeUnitAsUnit home_unit)
                   unit_env0
           else unit_env0
 
@@ -694,6 +694,7 @@ setUnitDynFlagsNoCheck uid dflags1 = do
                          }
 
   invalidateModSummaryCache
+  return home_unit
 
 
 
@@ -1084,7 +1085,7 @@ removeTarget target_id
 --
 --   - otherwise interpret the string as a module name
 --
-guessTarget :: GhcMonad m => String -> Maybe UnitId -> Maybe Phase -> m Target
+guessTarget :: GhcMonad m => String -> Maybe Unit -> Maybe Phase -> m Target
 guessTarget str mUnitId (Just phase)
    = do
      tuid <- unitIdOrHomeUnit mUnitId
@@ -1123,9 +1124,9 @@ guessTarget str mUnitId Nothing
 
 -- | Unwrap 'UnitId' or retrieve the 'UnitId'
 -- of the current 'HomeUnit'.
-unitIdOrHomeUnit :: GhcMonad m => Maybe UnitId -> m UnitId
+unitIdOrHomeUnit :: GhcMonad m => Maybe Unit -> m Unit
 unitIdOrHomeUnit mUnitId = do
-  currentHomeUnitId <- homeUnitId . hsc_home_unit <$> getSession
+  currentHomeUnitId <- homeUnitAsUnit . hsc_home_unit <$> getSession
   pure (fromMaybe currentHomeUnitId mUnitId)
 
 -- | Inform GHC that the working directory has changed.  GHC will flush
@@ -1422,7 +1423,7 @@ isLoaded :: GhcMonad m => ModuleName -> m Bool
 isLoaded m = withSession $ \hsc_env ->
   return $! isJust (lookupHpt (hsc_HPT hsc_env) m)
 
-isLoadedModule :: GhcMonad m => UnitId -> ModuleName -> m Bool
+isLoadedModule :: GhcMonad m => Unit -> ModuleName -> m Bool
 isLoadedModule uid m = withSession $ \hsc_env ->
   return $! isJust (lookupHug (hsc_HUG hsc_env) uid m)
 
@@ -1457,7 +1458,7 @@ data ModuleInfo = ModuleInfo {
 -- | Request information about a loaded 'Module'
 getModuleInfo :: GhcMonad m => Module -> m (Maybe ModuleInfo)  -- XXX: Maybe X
 getModuleInfo mdl = withSession $ \hsc_env -> do
-  if moduleUnitId mdl `S.member` hsc_all_home_unit_ids hsc_env
+  if moduleUnit mdl `S.member` hsc_all_home_unit_ids hsc_env
         then liftIO $ getHomeModuleInfo hsc_env mdl
         else liftIO $ getPackageModuleInfo hsc_env mdl
 
@@ -1791,7 +1792,7 @@ lookupModule mod_name maybe_pkg = do
 
 lookupQualifiedModule :: GhcMonad m => PkgQual -> ModuleName -> m Module
 lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
-  home <- lookupLoadedHomeModule (homeUnitId $ hsc_home_unit hsc_env) mod_name
+  home <- lookupLoadedHomeModule (homeUnitAsUnit $ hsc_home_unit hsc_env) mod_name
   case home of
     Just m  -> return m
     Nothing -> liftIO $ do
@@ -1805,7 +1806,7 @@ lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
 lookupQualifiedModule pkgqual mod_name = findQualifiedModule pkgqual mod_name
 
-lookupLoadedHomeModule :: GhcMonad m => UnitId -> ModuleName -> m (Maybe Module)
+lookupLoadedHomeModule :: GhcMonad m => Unit -> ModuleName -> m (Maybe Module)
 lookupLoadedHomeModule uid mod_name = withSession $ \hsc_env -> do
   liftIO $ trace_if (hsc_logger hsc_env) (text "lookupLoadedHomeModule" <+> ppr mod_name <+> ppr uid)
   case lookupHug  (hsc_HUG hsc_env) uid mod_name  of

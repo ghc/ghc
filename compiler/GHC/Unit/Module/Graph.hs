@@ -118,7 +118,6 @@ import GHC.Utils.Misc ( partitionWith )
 
 import System.FilePath
 import qualified Data.Map as Map
-import GHC.Types.Unique.DSet
 import qualified Data.Set as Set
 import Data.Set (Set)
 import GHC.Unit.Module
@@ -172,11 +171,11 @@ mkModuleGraph = foldr (flip extendMG') emptyMG
 data ModuleGraphNode
   -- | Instantiation nodes track the instantiation of other units
   -- (backpack dependencies) with the holes (signatures) of the current package.
-  = InstantiationNode UnitId InstantiatedUnit
+  = InstantiationNode [NodeKey] Unit [ModuleName] InstantiatedUnit
   -- | There is a module summary node for each module, signature, and boot module being built.
   | ModuleNode [NodeKey] ModSummary
   -- | Link nodes are whether are are creating a linked product (ie executable/shared object etc) for a unit.
-  | LinkNode [NodeKey] UnitId
+  | LinkNode [NodeKey] Unit
 
 -- | Collect the immediate dependencies of a ModuleGraphNode,
 -- optionally avoiding hs-boot dependencies.
@@ -189,8 +188,8 @@ data ModuleGraphNode
 mgNodeDependencies :: Bool -> ModuleGraphNode -> [NodeKey]
 mgNodeDependencies drop_hs_boot_nodes = \case
     LinkNode deps _uid -> deps
-    InstantiationNode uid iuid ->
-      NodeKey_Module . (\mod -> ModNodeKeyWithUid (GWIB mod NotBoot) uid)  <$> uniqDSetToList (instUnitHoles iuid)
+    InstantiationNode deps _ _ _ -> pprTraceIt "nodeDeps" $
+      deps
     ModuleNode deps _ms ->
       map drop_hs_boot deps
   where
@@ -206,16 +205,22 @@ mgNodeModSum (InstantiationNode {}) = Nothing
 mgNodeModSum (LinkNode {})          = Nothing
 mgNodeModSum (ModuleNode _ ms)      = Just ms
 
-mgNodeUnitId :: ModuleGraphNode -> UnitId
+mgNodeUnitId :: ModuleGraphNode -> Unit
 mgNodeUnitId mgn =
   case mgn of
-    InstantiationNode uid _iud -> uid
-    ModuleNode _ ms           -> toUnitId (moduleUnit (ms_mod ms))
-    LinkNode _ uid             -> uid
+    InstantiationNode _ _ _mod iud -> VirtUnit iud
+    ModuleNode _ ms                -> moduleUnit (ms_mod ms)
+    LinkNode _ uid                 -> uid
+
+-- | Which modules does this node provide?
+mgNodeModules :: ModuleGraphNode -> [ModNodeKeyWithUid]
+mgNodeModules (InstantiationNode _ _ mns iuid) = map (\mn -> ModNodeKeyWithUid (GWIB mn NotBoot) (VirtUnit iuid)) mns
+mgNodeModules (LinkNode {}) = []
+mgNodeModules (ModuleNode _ ms) = [msKey ms]
 
 instance Outputable ModuleGraphNode where
   ppr = \case
-    InstantiationNode _ iuid -> ppr iuid
+    InstantiationNode deps mods uid iuid -> ppr iuid <+> ppr deps <+> ppr uid <+> ppr mods
     ModuleNode nks ms -> ppr (msKey ms) <+> ppr nks
     LinkNode uid _     -> text "LN:" <+> ppr uid
 
@@ -242,7 +247,7 @@ lengthMG = length . mg_mss
 mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
 mapMG f mg@ModuleGraph{..} = mg
   { mg_mss = flip fmap mg_mss $ \case
-      InstantiationNode uid iuid -> InstantiationNode uid iuid
+      InstantiationNode deps uid mods iuid -> InstantiationNode deps uid mods iuid
       LinkNode uid nks -> LinkNode uid nks
       ModuleNode deps ms  -> ModuleNode deps (f ms)
   }
@@ -252,7 +257,7 @@ mapMG f mg@ModuleGraph{..} = mg
 mgMapM :: (ModSummary -> IO ModSummary) -> ModuleGraph -> IO ModuleGraph
 mgMapM f mg@ModuleGraph{..} = do
   mss' <- forM mg_mss $ \case
-    InstantiationNode uid iuid -> pure $ InstantiationNode uid iuid
+    InstantiationNode deps uid mods iuid -> pure $ InstantiationNode deps uid mods iuid
     LinkNode uid nks -> pure $ LinkNode uid nks
     ModuleNode deps ms  -> ModuleNode deps <$> (f ms)
   return mg
@@ -375,10 +380,11 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
 -- be reached by following the given dependencies. Additionally, if both the
 -- boot module and the non-boot module can be reached, it only returns the
 -- non-boot one.
-moduleGraphModulesBelow :: ModuleGraph -> UnitId -> ModuleNameWithIsBoot -> Set ModNodeKeyWithUid
-moduleGraphModulesBelow mg uid mn = filtered_mods [ mn | NodeKey_Module mn <- modules_below ]
+moduleGraphModulesBelow :: ModuleGraph -> Unit -> ModuleNameWithIsBoot -> Set ModNodeKeyWithUid
+moduleGraphModulesBelow mg uid mn = filtered_mods modules_below
   where
-    modules_below = maybe [] (map mkNodeKey) (mgReachable mg (NodeKey_Module (ModNodeKeyWithUid mn uid)))
+    modules_below = maybe [] (concatMap mgNodeModules) (mgReachable mg (NodeKey_Module (ModNodeKeyWithUid mn uid)))
+
     filtered_mods = Set.fromDistinctAscList . filter_mods . sort
 
     -- IsBoot and NotBoot modules are necessarily consecutive in the sorted list
@@ -402,7 +408,7 @@ moduleGraphModulesBelow mg uid mn = filtered_mods [ mn | NodeKey_Module mn <- mo
 filterToposortToModules
   :: [SCC ModuleGraphNode] -> [SCC ModSummary]
 filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
-  InstantiationNode _ _ -> Nothing
+  InstantiationNode _ _ _ _ -> Nothing
   LinkNode{} -> Nothing
   ModuleNode _deps node -> Just node
   where
@@ -423,7 +429,7 @@ filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
 
 data NodeKey = NodeKey_Unit {-# UNPACK #-} !InstantiatedUnit
              | NodeKey_Module {-# UNPACK #-} !ModNodeKeyWithUid
-             | NodeKey_Link !UnitId
+             | NodeKey_Link !Unit
   deriving (Eq, Ord)
 
 instance Outputable NodeKey where
@@ -433,12 +439,12 @@ instance Outputable NodeKey where
 
 mkNodeKey :: ModuleGraphNode -> NodeKey
 mkNodeKey = \case
-  InstantiationNode _ iu -> NodeKey_Unit iu
+  InstantiationNode _ _ _ iu -> NodeKey_Unit iu
   ModuleNode _ x -> NodeKey_Module $ msKey x
   LinkNode _ uid   -> NodeKey_Link uid
 
-nodeKeyUnitId :: NodeKey -> UnitId
-nodeKeyUnitId (NodeKey_Unit iu)   = instUnitInstanceOf iu
+nodeKeyUnitId :: NodeKey -> Unit
+nodeKeyUnitId (NodeKey_Unit iu)   = VirtUnit iu
 nodeKeyUnitId (NodeKey_Module mk) = mnkUnitId mk
 nodeKeyUnitId (NodeKey_Link uid)  = uid
 
@@ -448,13 +454,13 @@ nodeKeyModName _ = Nothing
 
 type ModNodeKey = ModuleNameWithIsBoot
 data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: !ModuleNameWithIsBoot
-                                           , mnkUnitId     :: !UnitId } deriving (Eq, Ord)
+                                           , mnkUnitId     :: !Unit } deriving (Eq, Ord)
 
 instance Outputable ModNodeKeyWithUid where
   ppr (ModNodeKeyWithUid mnwib uid) = ppr uid <> colon <> ppr mnwib
 
 msKey :: ModSummary -> ModNodeKeyWithUid
-msKey ms = ModNodeKeyWithUid (ms_mnwib ms) (ms_unitid ms)
+msKey ms = ModNodeKeyWithUid (ms_mnwib ms) (ms_unit ms)
 
 --------------------------------------------------------------------------------
 -- ** Internal node representation (exposed)
@@ -482,8 +488,8 @@ showModMsg dflags _ (LinkNode {}) =
           arch_os   = platformArchOS platform
           exe_file  = exeFileName arch_os staticLink (outputFile_ dflags)
       in text exe_file
-showModMsg _ _ (InstantiationNode _uid indef_unit) =
-  ppr $ instUnitInstanceOf indef_unit
+showModMsg _ _ (InstantiationNode _deps _uid _ indef_unit) =
+  ppr (instUnitInstanceOf indef_unit) -- <+> text "as" <+> ppr (virtualUnitId indef_unit)
 showModMsg dflags recomp (ModuleNode _ mod_summary) =
   if gopt Opt_HideSourcePaths dflags
       then text mod_str
@@ -522,7 +528,7 @@ mkTransDeps = first graphReachability {- module graph is acyclic -} . moduleGrap
 
 extendMG' :: ModuleGraph -> ModuleGraphNode -> ModuleGraph
 extendMG' mg = \case
-  InstantiationNode uid depUnitId -> extendMGInst mg uid depUnitId
+  InstantiationNode deps uid mns depUnitId -> extendMGInst mg deps uid mns depUnitId
   ModuleNode deps ms -> extendMG mg deps ms
   LinkNode deps uid   -> extendMGLink mg uid deps
 
@@ -534,11 +540,11 @@ extendMG ModuleGraph{..} deps ms = ModuleGraph
   , mg_graph = mkTransDeps (ModuleNode deps ms : mg_mss)
   }
 
-extendMGInst :: ModuleGraph -> UnitId -> InstantiatedUnit -> ModuleGraph
-extendMGInst mg uid depUnitId = mg
-  { mg_mss = InstantiationNode uid depUnitId : mg_mss mg
+extendMGInst :: ModuleGraph -> [NodeKey] -> Unit -> [ModuleName] -> InstantiatedUnit -> ModuleGraph
+extendMGInst mg deps uid mns depUnitId = mg
+  { mg_mss = InstantiationNode deps uid mns depUnitId : mg_mss mg
   }
 
-extendMGLink :: ModuleGraph -> UnitId -> [NodeKey] -> ModuleGraph
+extendMGLink :: ModuleGraph -> Unit -> [NodeKey] -> ModuleGraph
 extendMGLink mg uid nks = mg { mg_mss = LinkNode nks uid : mg_mss mg }
 

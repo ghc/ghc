@@ -8,6 +8,7 @@ import Control.Monad (void)
 import System.Environment
 
 import GHC
+import GHC.Driver.Env
 import qualified GHC.Settings.Config as GHC
 import qualified GHC.Utils.Outputable as GHC
 import qualified GHC.Driver.Ppr as GHC
@@ -32,7 +33,8 @@ compileInGhc targets handlerOutput = do
     -- Set up targets.
     oldTargets <- getTargets
     let oldFiles = map fileFromTarget oldTargets
-    mapM_ (\filename -> addSingle filename (homeUnitId_ flags)) (targets \\ oldFiles)
+    unit <- hscActiveUnit <$> getSession
+    mapM_ (\filename -> addSingle filename unit) (targets \\ oldFiles)
     mapM_ (removeTarget . targetIdFromFile) $ oldFiles \\ targets
     -- Load modules to typecheck
     void $ load LoadAllTargets

@@ -38,6 +38,7 @@ module GHC.Unit.Types
    , mkInstantiatedUnit
    , mkInstantiatedUnitHash
    , mkVirtUnit
+   , mkDefiniteUnit
    , mapGenUnit
    , mapInstantiations
    , unitFreeModuleHoles
@@ -139,7 +140,7 @@ type InstalledModule = GenModule UnitId
 
 -- | A 'HomeUnitModule' is like an 'InstalledModule' but we expect to find it in
 -- one of the home units rather than the package database.
-type HomeUnitModule  = GenModule UnitId
+type HomeUnitModule  = GenModule Unit
 
 -- | An `InstantiatedModule` is a 'Module' whose unit is identified with an `InstantiatedUnit`.
 type InstantiatedModule = GenModule InstantiatedUnit
@@ -400,7 +401,7 @@ moduleFreeHoles (Module u        _   ) = unitFreeModuleHoles u
 
 
 -- | Create a new 'GenInstantiatedUnit' given an explicit module substitution.
-mkInstantiatedUnit :: IsUnitId u => u -> GenInstantiations u -> GenInstantiatedUnit u
+mkInstantiatedUnit :: IsUnitId u => u ->  GenInstantiations u -> GenInstantiatedUnit u
 mkInstantiatedUnit cid insts =
     InstantiatedUnit {
         instUnitInstanceOf = cid,
@@ -418,6 +419,9 @@ mkInstantiatedUnit cid insts =
 mkVirtUnit :: IsUnitId u => u -> [(ModuleName, GenModule (GenUnit u))] -> GenUnit u
 mkVirtUnit uid []    = RealUnit $ Definite uid
 mkVirtUnit uid insts = VirtUnit $ mkInstantiatedUnit uid insts
+
+mkDefiniteUnit :: UnitId -> Unit
+mkDefiniteUnit uid = RealUnit (Definite uid)
 
 -- | Generate a uniquely identifying hash (internal unit-id) for an instantiated
 -- unit.

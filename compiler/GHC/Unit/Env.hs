@@ -90,7 +90,7 @@ data UnitEnv = UnitEnv
         -- This is mutable because packages will be demand-loaded during
         -- a compilation run as required.
 
-    , ue_current_unit    :: UnitId
+    , ue_current_unit    :: Unit
 
     , ue_home_unit_graph :: !HomeUnitGraph
         -- See Note [Multiple Home Units]
@@ -105,7 +105,7 @@ data UnitEnv = UnitEnv
 ueEPS :: UnitEnv -> IO ExternalPackageState
 ueEPS = eucEPS . ue_eps
 
-initUnitEnv :: UnitId -> HomeUnitGraph -> GhcNameVersion -> Platform -> IO UnitEnv
+initUnitEnv :: Unit -> HomeUnitGraph -> GhcNameVersion -> Platform -> IO UnitEnv
 initUnitEnv cur_unit hug namever platform = do
   eps <- initExternalUnitCache
   return $ UnitEnv
@@ -131,15 +131,21 @@ updateHpt = ue_updateHPT
 updateHug :: (HomeUnitGraph -> HomeUnitGraph) -> UnitEnv -> UnitEnv
 updateHug = ue_updateHUG
 
-ue_transitiveHomeDeps :: UnitId -> UnitEnv -> [UnitId]
-ue_transitiveHomeDeps uid unit_env = Set.toList (loop Set.empty [uid])
+ue_transitiveHomeDeps :: Unit -> HomeUnitGraph -> [Unit]
+ue_transitiveHomeDeps uid hug = Set.toList (loop Set.empty [uid])
   where
-    loop acc [] = acc
-    loop acc (uid:uids)
-      | uid `Set.member` acc = loop acc uids
-      | otherwise =
-        let hue = homeUnitDepends (homeUnitEnv_units (ue_findHomeUnitEnv uid unit_env))
-        in loop (Set.insert uid acc) (hue ++ uids)
+      loop acc [] = acc
+      loop acc (uid:uids)
+        | uid `Set.member` acc = loop acc uids
+        | otherwise =
+            case unitEnv_lookup_maybe uid hug of
+              Just res ->
+                let hue = homeUnitDepends
+                      . homeUnitEnv_units $ res
+                in loop (Set.insert uid acc) (hue ++ uids)
+              Nothing -> case uid of
+                            VirtUnit iud -> loop (Set.insert uid acc) $ (mkDefiniteUnit (instUnitInstanceOf iud)) : uids
+                            _ -> panic "transitiveHomeDeps"
 
 
 -- -----------------------------------------------------------------------------
@@ -244,7 +250,7 @@ mkHomeUnitEnv dflags hpt home_unit = HomeUnitEnv
 isUnitEnvInstalledModule :: UnitEnv -> InstalledModule -> Bool
 isUnitEnvInstalledModule ue m = maybe False (`isHomeInstalledModule` m) hu
   where
-    hu = ue_unitHomeUnit_maybe (moduleUnit m) ue
+    hu = ue_unitHomeUnit_maybe (mkDefiniteUnit $ moduleUnit m) ue
 
 
 type HomeUnitGraph = UnitEnvGraph HomeUnitEnv
@@ -252,10 +258,10 @@ type HomeUnitGraph = UnitEnvGraph HomeUnitEnv
 lookupHugByModule :: Module -> HomeUnitGraph -> Maybe HomeModInfo
 lookupHugByModule mod hug
   | otherwise = do
-      env <- (unitEnv_lookup_maybe (toUnitId $ moduleUnit mod) hug)
+      env <- (unitEnv_lookup_maybe (moduleUnit mod) hug)
       lookupHptByModule (homeUnitEnv_hpt env) mod
 
-hugElts :: HomeUnitGraph -> [(UnitId, HomeUnitEnv)]
+hugElts :: HomeUnitGraph -> [(Unit, HomeUnitEnv)]
 hugElts hug = unitEnv_elts hug
 
 addHomeModInfoToHug :: HomeModInfo -> HomeUnitGraph -> HomeUnitGraph
@@ -264,7 +270,7 @@ addHomeModInfoToHug hmi hug = unitEnv_alter go hmi_unit hug
     hmi_mod :: Module
     hmi_mod = mi_module (hm_iface hmi)
 
-    hmi_unit = toUnitId (moduleUnit hmi_mod)
+    hmi_unit = moduleUnit hmi_mod
     _hmi_mn   = moduleName hmi_mod
 
     go :: Maybe HomeUnitEnv -> Maybe HomeUnitEnv
@@ -277,7 +283,7 @@ updateHueHpt f hue =
   in hue { homeUnitEnv_hpt = hpt }
 
 
-lookupHug :: HomeUnitGraph -> UnitId -> ModuleName -> Maybe HomeModInfo
+lookupHug :: HomeUnitGraph -> Unit -> ModuleName -> Maybe HomeModInfo
 lookupHug hug uid mod = unitEnv_lookup_maybe uid hug >>= flip lookupHpt mod . homeUnitEnv_hpt
 
 
@@ -285,7 +291,8 @@ instance Outputable (UnitEnvGraph HomeUnitEnv) where
   ppr g = ppr [(k, length (homeUnitEnv_hpt  hue)) | (k, hue) <- (unitEnv_elts g)]
 
 
-type UnitEnvGraphKey = UnitId
+-- See Note [Keys of HomeUnitGraph]
+type UnitEnvGraphKey = Unit
 
 newtype UnitEnvGraph v = UnitEnvGraph
   { unitEnv_graph :: Map UnitEnvGraphKey v
@@ -389,12 +396,12 @@ ue_updateHPT f e = ue_updateUnitHPT f (ue_currentUnit e) e
 ue_updateHUG :: HasDebugCallStack => (HomeUnitGraph -> HomeUnitGraph) -> UnitEnv -> UnitEnv
 ue_updateHUG f e = ue_updateUnitHUG f e
 
-ue_updateUnitHPT_lazy :: HasDebugCallStack => (HomePackageTable -> HomePackageTable) -> UnitId -> UnitEnv -> UnitEnv
+ue_updateUnitHPT_lazy :: HasDebugCallStack => (HomePackageTable -> HomePackageTable) -> Unit -> UnitEnv -> UnitEnv
 ue_updateUnitHPT_lazy f uid ue_env = ue_updateHomeUnitEnv update uid ue_env
   where
     update unitEnv = unitEnv { homeUnitEnv_hpt = f $ homeUnitEnv_hpt unitEnv }
 
-ue_updateUnitHPT :: HasDebugCallStack => (HomePackageTable -> HomePackageTable) -> UnitId -> UnitEnv -> UnitEnv
+ue_updateUnitHPT :: HasDebugCallStack => (HomePackageTable -> HomePackageTable) -> Unit -> UnitEnv -> UnitEnv
 ue_updateUnitHPT f uid ue_env = ue_updateHomeUnitEnv update uid ue_env
   where
     update unitEnv =
@@ -411,14 +418,14 @@ ue_updateUnitHUG f ue_env = ue_env { ue_home_unit_graph = f (ue_home_unit_graph 
 ue_setFlags :: HasDebugCallStack => DynFlags -> UnitEnv -> UnitEnv
 ue_setFlags dflags ue_env = ue_setUnitFlags (ue_currentUnit ue_env) dflags ue_env
 
-ue_setUnitFlags :: HasDebugCallStack => UnitId -> DynFlags -> UnitEnv -> UnitEnv
+ue_setUnitFlags :: HasDebugCallStack => Unit -> DynFlags -> UnitEnv -> UnitEnv
 ue_setUnitFlags uid dflags e =
   ue_updateUnitFlags (const dflags) uid e
 
-ue_unitFlags :: HasDebugCallStack => UnitId -> UnitEnv -> DynFlags
+ue_unitFlags :: HasDebugCallStack => Unit -> UnitEnv -> DynFlags
 ue_unitFlags uid ue_env = homeUnitEnv_dflags $ ue_findHomeUnitEnv uid ue_env
 
-ue_updateUnitFlags :: HasDebugCallStack => (DynFlags -> DynFlags) -> UnitId -> UnitEnv -> UnitEnv
+ue_updateUnitFlags :: HasDebugCallStack => (DynFlags -> DynFlags) -> Unit -> UnitEnv -> UnitEnv
 ue_updateUnitFlags f uid e = ue_updateHomeUnitEnv update uid e
   where
     update hue = hue { homeUnitEnv_dflags = f $ homeUnitEnv_dflags hue }
@@ -435,14 +442,14 @@ ue_unsafeHomeUnit ue = case ue_homeUnit ue of
   Nothing -> panic "unsafeGetHomeUnit: No home unit"
   Just h  -> h
 
-ue_unitHomeUnit_maybe :: UnitId -> UnitEnv -> Maybe HomeUnit
+ue_unitHomeUnit_maybe :: Unit -> UnitEnv -> Maybe HomeUnit
 ue_unitHomeUnit_maybe uid ue_env =
   homeUnitEnv_unsafeHomeUnit <$> (ue_findHomeUnitEnv_maybe uid ue_env)
 
-ue_unitHomeUnit :: UnitId -> UnitEnv -> HomeUnit
+ue_unitHomeUnit :: Unit -> UnitEnv -> HomeUnit
 ue_unitHomeUnit uid ue_env = homeUnitEnv_unsafeHomeUnit $ ue_findHomeUnitEnv uid ue_env
 
-ue_all_home_unit_ids :: UnitEnv -> Set.Set UnitId
+ue_all_home_unit_ids :: UnitEnv -> Set.Set Unit
 ue_all_home_unit_ids = unitEnv_keys . ue_home_unit_graph
 -- -------------------------------------------------------
 -- Query and modify the currently active unit
@@ -455,12 +462,12 @@ ue_currentHomeUnitEnv e =
     Nothing -> pprPanic "packageNotFound" $
       (ppr $ ue_currentUnit e) $$ ppr (ue_home_unit_graph e)
 
-ue_setActiveUnit :: UnitId -> UnitEnv -> UnitEnv
+ue_setActiveUnit :: Unit -> UnitEnv -> UnitEnv
 ue_setActiveUnit u ue_env = assertUnitEnvInvariant $ ue_env
   { ue_current_unit = u
   }
 
-ue_currentUnit :: UnitEnv -> UnitId
+ue_currentUnit :: UnitEnv -> Unit
 ue_currentUnit = ue_current_unit
 
 
@@ -468,18 +475,18 @@ ue_currentUnit = ue_current_unit
 -- Operations on arbitrary elements of the home unit graph
 -- -------------------------------------------------------
 
-ue_findHomeUnitEnv_maybe :: UnitId -> UnitEnv -> Maybe HomeUnitEnv
+ue_findHomeUnitEnv_maybe :: Unit -> UnitEnv -> Maybe HomeUnitEnv
 ue_findHomeUnitEnv_maybe uid e =
   unitEnv_lookup_maybe uid (ue_home_unit_graph e)
 
-ue_findHomeUnitEnv :: HasDebugCallStack => UnitId -> UnitEnv -> HomeUnitEnv
+ue_findHomeUnitEnv :: HasDebugCallStack => Unit -> UnitEnv -> HomeUnitEnv
 ue_findHomeUnitEnv uid e = case unitEnv_lookup_maybe uid (ue_home_unit_graph e) of
   Nothing -> pprPanic "Unit unknown to the internal unit environment"
               $  text "unit (" <> ppr uid <> text ")"
               $$ pprUnitEnvGraph e
   Just hue -> hue
 
-ue_updateHomeUnitEnv :: (HomeUnitEnv -> HomeUnitEnv) -> UnitId -> UnitEnv -> UnitEnv
+ue_updateHomeUnitEnv :: (HomeUnitEnv -> HomeUnitEnv) -> Unit -> UnitEnv -> UnitEnv
 ue_updateHomeUnitEnv f uid e = e
   { ue_home_unit_graph = unitEnv_adjust f uid $ ue_home_unit_graph e
   }
@@ -490,7 +497,7 @@ ue_updateHomeUnitEnv f uid e = e
 -- @'ue_renameUnitId' oldUnit newUnit UnitEnv@, it is assumed that the 'oldUnit' exists in the map,
 -- otherwise we panic.
 -- The 'DynFlags' associated with the home unit will have its field 'homeUnitId' set to 'newUnit'.
-ue_renameUnitId :: HasDebugCallStack => UnitId -> UnitId -> UnitEnv -> UnitEnv
+ue_renameUnitId :: HasDebugCallStack => Unit -> Unit -> UnitEnv -> UnitEnv
 ue_renameUnitId oldUnit newUnit unitEnv = case ue_findHomeUnitEnv_maybe oldUnit unitEnv of
   Nothing ->
     pprPanic "Tried to rename unit, but it didn't exist"
@@ -498,14 +505,14 @@ ue_renameUnitId oldUnit newUnit unitEnv = case ue_findHomeUnitEnv_maybe oldUnit 
               $$ nest 2 (pprUnitEnvGraph unitEnv)
   Just oldEnv ->
     let
-      activeUnit :: UnitId
+      activeUnit :: Unit
       !activeUnit = if ue_currentUnit unitEnv == oldUnit
                 then newUnit
                 else ue_currentUnit unitEnv
 
       newInternalUnitEnv = oldEnv
         { homeUnitEnv_dflags = (homeUnitEnv_dflags oldEnv)
-            { homeUnitId_ = newUnit
+            { homeUnitId_ = toUnitId newUnit
             }
         }
     in
@@ -538,7 +545,7 @@ pprUnitEnvGraph env = text "pprInternalUnitMap"
 pprHomeUnitGraph :: HomeUnitGraph -> SDoc
 pprHomeUnitGraph unitEnv = vcat (map (\(k, v) -> pprHomeUnitEnv k v) $ Map.assocs $ unitEnv_graph unitEnv)
 
-pprHomeUnitEnv :: UnitId -> HomeUnitEnv -> SDoc
+pprHomeUnitEnv :: Unit -> HomeUnitEnv -> SDoc
 pprHomeUnitEnv uid env =
   ppr uid <+> text "(flags:" <+> ppr (homeUnitId_ $ homeUnitEnv_dflags env) <> text "," <+> ppr (fmap homeUnitId $ homeUnitEnv_home_unit env) <> text ")" <+> text "->"
   $$ nest 4 (pprHPT $ homeUnitEnv_hpt env)
@@ -594,4 +601,15 @@ A non-exhaustive list is
 There is also a template-haskell function, makeRelativeToProject, which uses the `-working-directory` option
 in order to allow users to offset their own relative paths.
 
+Note [Keys of HomeUnitGraph]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the past, keys of a HomeUnitGraph were UnitId. This is fine in the world of
+definite units but incorrect when it comes to backpack.
+
+Now the keys are 'Unit's, a unit is either a definite unit or a backpack
+instantiation.
+
+In general, using 'Unit' seems the correct thing to do as it will make multiple
+home units work with backpack as well.
 -}

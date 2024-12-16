@@ -51,11 +51,11 @@ cantFindInstalledErr unit_state mhome_unit profile mod_name find_result
     more_info
       = case find_result of
             InstalledNoPackage pkg
-                -> NoUnitIdMatching pkg (searchPackageId unit_state (PackageId (unitIdFS pkg)))
+                -> NoUnitIdMatching (mkDefiniteUnit pkg) (searchPackageId unit_state (PackageId (unitIdFS pkg)))
 
             InstalledNotFound files mb_pkg
                 | Just pkg <- mb_pkg
-                , notHomeUnitId mhome_unit pkg
+                , notHomeUnit mhome_unit pkg
                 -> not_found_in_package pkg $ fmap unsafeDecodeUtf files
 
                 | null files
@@ -109,18 +109,18 @@ cantFindErr unit_env profile mod_name find_result
     more_info
       = case find_result of
             NoPackage pkg
-                -> NoUnitIdMatching (toUnitId pkg) []
+                -> NoUnitIdMatching pkg []
             NotFound { fr_paths = files, fr_pkg = mb_pkg
                      , fr_mods_hidden = mod_hiddens, fr_pkgs_hidden = pkg_hiddens
                      , fr_unusables = unusables, fr_suggestions = suggest }
                 | Just pkg <- mb_pkg
                 , Nothing <- mhome_unit           -- no home-unit
-                -> not_found_in_package (toUnitId pkg) files
+                -> not_found_in_package pkg files
 
                 | Just pkg <- mb_pkg
                 , Just home_unit <- mhome_unit    -- there is a home-unit but the
                 , not (isHomeUnit home_unit pkg)  -- module isn't from it
-                -> not_found_in_package (toUnitId pkg) files
+                -> not_found_in_package pkg files
 
                 | not (null suggest)
                 -> ModuleSuggestion suggest files

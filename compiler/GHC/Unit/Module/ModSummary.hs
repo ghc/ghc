@@ -5,6 +5,7 @@
 module GHC.Unit.Module.ModSummary
    ( ModSummary (..)
    , ms_unitid
+   , ms_unit
    , ms_installed_mod
    , ms_mod_name
    , ms_imps
@@ -99,6 +100,9 @@ data ModSummary
 
 ms_unitid :: ModSummary -> UnitId
 ms_unitid = toUnitId . moduleUnit . ms_mod
+
+ms_unit :: ModSummary -> Unit
+ms_unit = moduleUnit . ms_mod
 
 ms_installed_mod :: ModSummary -> InstalledModule
 ms_installed_mod = fst . getModuleInstantiation . ms_mod
@@ -207,10 +211,10 @@ findTarget ms ts =
         (t:_) -> Just t
   where
     summary `matches` Target { targetId = TargetModule m, targetUnitId = unitId }
-        = ms_mod_name summary == m && ms_unitid summary == unitId
+        = ms_mod_name summary == m && ms_unit summary == unitId
     summary `matches` Target { targetId = TargetFile f _, targetUnitId = unitid }
         | Just f' <- ml_hs_file (ms_location summary)
-        = f == f'  && ms_unitid summary == unitid
+        = f == f'  && ms_unit summary == unitid
     _ `matches` _
         = False
 

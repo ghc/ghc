@@ -45,11 +45,11 @@ import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings
 import GHC.Runtime.Loader   ( loadFrontendPlugin, initializeSessionPlugins )
 
 import GHC.Unit.Env
-import GHC.Unit (UnitId, homeUnitDepends)
+import GHC.Unit (Unit, homeUnitAsUnit)
 import GHC.Unit.Home.ModInfo (emptyHomePackageTable)
 import GHC.Unit.Module ( ModuleName, mkModuleName )
 import GHC.Unit.Module.ModIface
-import GHC.Unit.State  ( pprUnits, pprUnitsSimple )
+import GHC.Unit.State  ( pprUnits, pprUnitsSimple, emptyUnitState )
 import GHC.Unit.Finder ( findImportedModule, FindResult(..) )
 import qualified GHC.Unit.State as State
 import GHC.Unit.Types  ( IsBootInterface(..) )
@@ -795,7 +795,7 @@ removeRTS ("+RTS" : xs)  =
 removeRTS (y:ys)         = y : removeRTS ys
 removeRTS []             = []
 
-initMulti :: NE.NonEmpty String -> Ghc ([(String, Maybe UnitId, Maybe Phase)])
+initMulti :: NE.NonEmpty String -> Ghc ([(String, Maybe Unit, Maybe Phase)])
 initMulti unitArgsFiles  = do
   hsc_env <- GHC.getSession
   let logger = hsc_logger hsc_env
@@ -837,7 +837,8 @@ initMulti unitArgsFiles  = do
 
   let
     unitDflags = NE.map fst dynFlagsAndSrcs
-    srcs = NE.map (\(dflags, lsrcs) -> map (uncurry (,Just $ homeUnitId_ dflags,)) lsrcs) dynFlagsAndSrcs
+    mkH dflags = homeUnitAsUnit (State.mkHomeUnit emptyUnitState (homeUnitId_ dflags) (homeUnitInstanceOf_ dflags) (homeUnitInstantiations_ dflags))
+    srcs = NE.map (\(dflags, lsrcs) -> map (uncurry (,Just $ mkH dflags,)) lsrcs) dynFlagsAndSrcs
     (hs_srcs, _non_hs_srcs) = unzip (map (partition (\(file, _uid, phase) -> isHaskellishTarget (file, phase))) (NE.toList srcs))
 
   checkDuplicateUnits initial_dflags (NE.toList (NE.zip unitArgsFiles unitDflags))
@@ -896,8 +897,8 @@ initMulti unitArgsFiles  = do
 checkUnitCycles :: DynFlags -> UnitEnvGraph HomeUnitEnv -> Ghc ()
 checkUnitCycles dflags graph = processSCCs sccs
   where
-    mkNode :: (UnitId, HomeUnitEnv) -> Node UnitId UnitId
-    mkNode (uid, hue) = DigraphNode uid uid (homeUnitDepends (homeUnitEnv_units hue))
+    mkNode :: (Unit, HomeUnitEnv) -> Node Unit Unit
+    mkNode (uid, hue) = DigraphNode uid uid (State.homeUnitDepends (homeUnitEnv_units hue))
     nodes = map mkNode (unitEnv_elts graph)
 
     sccs = stronglyConnCompFromEdgedVerticesOrd nodes
@@ -956,11 +957,14 @@ offsetDynFlags dflags =
               | otherwise = f
 
 
-createUnitEnvFromFlags :: NE.NonEmpty DynFlags -> (HomeUnitGraph, UnitId)
+createUnitEnvFromFlags :: NE.NonEmpty DynFlags -> (HomeUnitGraph, Unit)
 createUnitEnvFromFlags unitDflags =
   let
     newInternalUnitEnv dflags = mkHomeUnitEnv dflags emptyHomePackageTable Nothing
-    unitEnvList = NE.map (\dflags -> (homeUnitId_ dflags, newInternalUnitEnv dflags)) unitDflags
+    unit dflags = State.mkHomeUnit emptyUnitState (homeUnitId_ dflags)
+                                           (homeUnitInstanceOf_ dflags)
+                                           (homeUnitInstantiations_ dflags)
+    unitEnvList = NE.map (\dflags -> (homeUnitAsUnit $ unit dflags, newInternalUnitEnv dflags)) unitDflags
     activeUnit = fst $ NE.head unitEnvList
   in
     (unitEnv_new (Map.fromList (NE.toList (unitEnvList))), activeUnit)

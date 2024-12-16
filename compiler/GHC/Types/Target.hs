@@ -27,7 +27,7 @@ data Target
   = Target {
       targetId           :: !TargetId, -- ^ module or filename
       targetAllowObjCode :: !Bool,     -- ^ object code allowed?
-      targetUnitId       :: !UnitId,   -- ^ id of the unit this target is part of
+      targetUnitId       :: !Unit,     -- ^ id of the unit this target is part of
       targetContents     :: !(Maybe (InputFileBuffer, UTCTime))
       -- ^ Optional in-memory buffer containing the source code GHC should
       -- use for this target instead of reading it from disk.

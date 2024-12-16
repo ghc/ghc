@@ -19,6 +19,7 @@ module GHC.Unit.Home
    , isHomeModule
    , isHomeInstalledModule
    , notHomeUnitId
+   , notHomeUnit
    , notHomeModule
    , notHomeModuleMaybe
    , notHomeInstalledModule
@@ -148,6 +149,10 @@ isHomeUnitId hu uid = uid == homeUnitId hu
 notHomeUnitId :: Maybe (GenHomeUnit u) -> UnitId -> Bool
 notHomeUnitId Nothing   _   = True
 notHomeUnitId (Just hu) uid = not (isHomeUnitId hu uid)
+
+notHomeUnit :: Maybe (GenHomeUnit UnitId) -> Unit -> Bool
+notHomeUnit Nothing _ = True
+notHomeUnit (Just hu) u = homeUnitAsUnit hu /= u
 
 -- | Test if the home unit is an instance of the given unit-id
 isHomeUnitInstanceOf :: HomeUnit -> UnitId -> Bool

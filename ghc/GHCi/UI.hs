@@ -489,12 +489,12 @@ default_prompt_cont = generatePromptFunctionFromString "ghci| "
 default_args :: [String]
 default_args = []
 
-interactiveUI :: GhciSettings -> [(FilePath, Maybe UnitId, Maybe Phase)] -> Maybe [String]
+interactiveUI :: GhciSettings -> [(FilePath, Maybe Unit, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
 interactiveUI config srcs maybe_exprs = do
    -- This is a HACK to make sure dynflags are not overwritten when setting
    -- options. When GHCi is made properly multi component it should be removed.
-   modifySession (\env -> hscSetActiveUnitId (hscActiveUnitId env) env)
+   modifySession (\env -> hscSetActiveUnitId (hscActiveUnit env) env)
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
    -- on a blackhole, and become unreachable during GC.  The GC will
@@ -663,7 +663,7 @@ getAppDataFile xdgDir file = do
       Left _ -> pure xdgAppDir
   pure $ appDir >>= \dir -> Just $ dir </> file
 
-runGHCi :: [(FilePath, Maybe UnitId, Maybe Phase)] -> Maybe [String] -> GHCi ()
+runGHCi :: [(FilePath, Maybe Unit, Maybe Phase)] -> Maybe [String] -> GHCi ()
 runGHCi paths maybe_exprs = do
   dflags <- getDynFlags
   let
@@ -2009,7 +2009,7 @@ wrapDeferTypeErrors load =
     (\originalFlags -> void $ GHC.setProgramDynFlags originalFlags)
     (\_ -> load)
 
-loadModule :: GhciMonad m => [(FilePath, Maybe UnitId, Maybe Phase)] -> m SuccessFlag
+loadModule :: GhciMonad m => [(FilePath, Maybe Unit, Maybe Phase)] -> m SuccessFlag
 loadModule fs = do
   (_, result) <- runAndPrintStats (const Nothing) (loadModule' fs)
   either (liftIO . Exception.throwIO) return result
@@ -2021,7 +2021,7 @@ loadModule_ fs = void $ loadModule (zip3 fs (repeat Nothing) (repeat Nothing))
 loadModuleDefer :: GhciMonad m => [FilePath] -> m ()
 loadModuleDefer = wrapDeferTypeErrors . loadModule_
 
-loadModule' :: GhciMonad m => [(FilePath, Maybe UnitId, Maybe Phase)] -> m SuccessFlag
+loadModule' :: GhciMonad m => [(FilePath, Maybe Unit, Maybe Phase)] -> m SuccessFlag
 loadModule' files = do
   let (filenames, uids, phases) = unzip3 files
   exp_filenames <- mapM expandPath filenames
@@ -2077,7 +2077,7 @@ addModule files = do
       hsc_env <- GHC.getSession
       let home_unit = hsc_home_unit hsc_env
       result <- liftIO $
-        Finder.findImportedModule hsc_env m (ThisPkg (homeUnitId home_unit))
+        Finder.findImportedModule hsc_env m (ThisPkg (homeUnitAsUnit home_unit))
       case result of
         Found _ _ -> return True
         _ -> do liftIO $ hPutStrLn stderr ("Module " ++ moduleNameString m ++ " not found")
@@ -2106,7 +2106,7 @@ unAddModule files = do
 reloadModule :: GhciMonad m => String -> m ()
 reloadModule m = do
   session <- GHC.getSession
-  let home_unit = homeUnitId (hsc_home_unit session)
+  let home_unit = homeUnitAsUnit (hsc_home_unit session)
   ok <- doLoadAndCollectInfo Reload (loadTargets home_unit)
   when (failed ok) failIfExprEvalMode
   where
@@ -3425,7 +3425,7 @@ printTyThing :: GHC.GhcMonad m => TyThing -> m ()
 printTyThing tyth = printForUser (pprTyThing showToHeader tyth)
 
 isLoadedModSummary :: GHC.GhcMonad m => ModSummary -> m Bool
-isLoadedModSummary ms = GHC.isLoadedModule (ms_unitid ms) (ms_mod_name ms)
+isLoadedModSummary ms = GHC.isLoadedModule (ms_unit ms) (ms_mod_name ms)
 
 {-
 Note [Filter bindings]

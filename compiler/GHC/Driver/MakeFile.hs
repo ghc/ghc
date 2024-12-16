@@ -214,7 +214,7 @@ processDeps _ _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
     throwOneError $ cyclicModuleErr nodes
 
-processDeps _ _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
+processDeps _ _ _ _ _ (AcyclicSCC (InstantiationNode _ _uid _mns node))
   =     -- There shouldn't be any backpack instantiations; report them as well
     throwOneError $
       mkPlainErrorMsgEnvelope noSrcSpan $

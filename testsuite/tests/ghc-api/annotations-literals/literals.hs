@@ -9,6 +9,7 @@ import System.IO
 import GHC
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Env
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Data.Bag (filterBag,isEmptyBag)
@@ -27,10 +28,11 @@ testOneFile libdir fileName = do
     t <- runGhc (Just libdir) $ do
         dflags <- getSessionDynFlags
         setSessionDynFlags dflags
+        unit <- hscActiveUnit <$> getSession
         let mn =mkModuleName fileName
         addTarget Target { targetId = TargetModule mn
                          , targetAllowObjCode = True
-                         , targetUnitId = homeUnitId_ dflags
+                         , targetUnitId = unit
                          , targetContents = Nothing }
         load LoadAllTargets
         modSum <- getModSummary mn

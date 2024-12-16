@@ -35,6 +35,8 @@ module GHC.Iface.Load (
         pprModIfaceSimple,
         ifaceStats, pprModIface, showIface,
 
+        computeInterface,
+
         module Iface_Errors -- avoids boot files in Ppr modules
    ) where
 
@@ -503,7 +505,7 @@ loadInterface doc_str mod from
         -- overlapping instances.
         ; massertPpr
               ((isOneShot (ghcMode (hsc_dflags hsc_env)))
-                || moduleUnitId mod `notElem` hsc_all_home_unit_ids hsc_env
+                || moduleUnit mod `notElem` hsc_all_home_unit_ids hsc_env
                 || mod == gHC_PRIM)
                 (text "Attempting to load home package interface into the EPS" $$ ppr hug $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod))
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
@@ -652,23 +654,11 @@ dontLeakTheHUG thing_inside = do
        let
          !maybe_type_vars | inOneShot = Just (hsc_type_env_vars env)
                           | otherwise = Nothing
-         -- wrinkle: when we're typechecking in --backpack mode, the
-         -- instantiation of a signature might reside in the HPT, so
-         -- this case breaks the assumption that EPS interfaces only
-         -- refer to other EPS interfaces.
-         -- As a temporary (MP Oct 2021 #20509) we only keep the HPT if it
-         -- contains any hole modules.
-         -- Quite a few tests in testsuite/tests/backpack break without this
-         -- tweak.
          old_unit_env = hsc_unit_env hsc_env
-         keepFor20509 hmi
-          | isHoleModule (mi_semantic_module (hm_iface hmi)) = True
-          | otherwise = False
          pruneHomeUnitEnv hme = hme { homeUnitEnv_hpt = emptyHomePackageTable }
          !unit_env
           = old_unit_env
-             { ue_home_unit_graph = if anyHpt keepFor20509 (ue_hpt old_unit_env) then ue_home_unit_graph old_unit_env
-                                                                                 else unitEnv_map pruneHomeUnitEnv (ue_home_unit_graph old_unit_env)
+             { ue_home_unit_graph = unitEnv_map pruneHomeUnitEnv (ue_home_unit_graph old_unit_env)
              }
        in
        hsc_env {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
@@ -718,13 +708,10 @@ computeInterface
   -> IO (MaybeErr MissingInterfaceError (ModIface, ModLocation))
 computeInterface hsc_env doc_str hi_boot_file mod0 = do
   massert (not (isHoleModule mod0))
-  let mhome_unit  = hsc_home_unit_maybe hsc_env
   let find_iface m = findAndReadIface hsc_env doc_str
                                       m mod0 hi_boot_file
   case getModuleInstantiation mod0 of
-      (imod, Just indef)
-        | Just home_unit <- mhome_unit
-        , isHomeUnitIndefinite home_unit ->
+      (imod, Just indef) ->
           find_iface imod >>= \case
             Succeeded (iface0, path) ->
               rnModIface hsc_env (instUnitInsts (moduleUnit indef)) Nothing iface0 >>= \case

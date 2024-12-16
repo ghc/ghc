@@ -6,6 +6,7 @@ module Main where
 
 import System.IO
 import GHC
+import GHC.Driver.Env
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import System.Directory (removeFile)
@@ -20,9 +21,10 @@ main = do
                         dflags <- getSessionDynFlags
                         setSessionDynFlags dflags
                         let mn =mkModuleName "Test"
+                        unit <- hscActiveUnit <$> getSession
                         addTarget Target { targetId = TargetModule mn
                                          , targetAllowObjCode = True
-                                         , targetUnitId = homeUnitId_ dflags
+                                         , targetUnitId = unit
                                          , targetContents = Nothing}
                         load LoadAllTargets
                         modSum <- getModSummary mn

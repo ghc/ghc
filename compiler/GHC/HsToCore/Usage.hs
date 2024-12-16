@@ -198,7 +198,7 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
 
 mk_mod_usage_info :: UsageConfig
               -> HomeUnit
-              -> Set.Set UnitId
+              -> Set.Set Unit
               -> Module
               -> ImportedMods
               -> NameSet
@@ -257,7 +257,7 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports used_names
     --     (need to recompile if its export list changes: export_fprint)
     mkUsage :: Module -> ModIface -> Maybe Usage
     mkUsage mod iface
-      | toUnitId (moduleUnit mod) `Set.notMember` home_unit_ids
+      | moduleUnit mod `Set.notMember` home_unit_ids
       = Just $ UsagePackageModule{ usg_mod      = mod,
                                    usg_mod_hash = mod_hash,
                                    usg_safe     = imp_safe }

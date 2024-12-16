@@ -6,6 +6,7 @@ import GHC
 import GHC.Utils.Monad  ( liftIO )
 import Data.Maybe
 import GHC.Driver.Session    ( defaultFatalMessager, defaultFlushOut )
+import GHC.Driver.Env
 import GHC.Types.Annotations ( AnnTarget(..), CoreAnnTarget )
 import GHC.Serialized  ( deserializeWithData )
 import GHC.Utils.Panic
@@ -25,10 +26,12 @@ main = defaultErrorHandler defaultFatalMessager defaultFlushOut
     let dflags' = dflags
     setSessionDynFlags dflags'
 
+    hsc_env <- getSession
     let mod_nm = mkModuleName "Annrun01_Help"
+    let unit = hscActiveUnit hsc_env
 
     liftIO $ putStrLn "Setting Target"
-    setTargets [Target (TargetModule mod_nm) True (homeUnitId_ dflags) Nothing]
+    setTargets [Target (TargetModule mod_nm) True unit Nothing]
     liftIO $ putStrLn "Loading Targets"
     load LoadAllTargets
 
