@@ -1804,12 +1804,13 @@ abstractVars :: Level -> LevelEnv -> DVarSet -> AbsVars
 -- Uniques are not deterministic.
 abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
   =  -- NB: sortQuantVars might not put duplicates next to each other
-    pprTrace "abstractVars"
-      (vcat [ text "r7:" <+> ppr r7
-           , text "r1:" <+> ppr r1
-           , text "r2:" <+> ppr r3
-           , text "r3:" <+> ppr r3
-           , text "subst:" <+> ppr subst ]) r7
+--    pprTrace "abstractVars"
+--      (vcat [ text "r7:" <+> ppr r7
+--           , text "r1:" <+> ppr r1
+--           , text "r2:" <+> ppr r3
+--           , text "r3:" <+> ppr r3
+--           , text "subst:" <+> ppr subst ])
+      r7
   where
     r7 = map zap r6
     r6 = dep_anal r5
