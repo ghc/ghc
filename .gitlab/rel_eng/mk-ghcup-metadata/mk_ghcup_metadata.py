@@ -228,7 +228,9 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
                               , "unknown_versioning" : centos7  }
           , "Linux_Fedora"  : { ">= 33": fedora33
                               , "unknown_versioning": centos7 }
-          , "Linux_RedHat"  : { "unknown_versioning": fedora33 }
+          , "Linux_RedHat"  : { "< 9": centos7
+                              , ">= 9": fedora33
+                              , "unknown_versioning": fedora33 }
           #MP: Replace here with Rocky8 when that job is in the pipeline
           , "Linux_UnknownLinux" : { "unknown_versioning": rocky8 }
           , "Darwin" : { "unknown_versioning" : darwin_x86 }
