@@ -457,6 +457,25 @@ we need to allow lots of things in the arguments of a call.
 
 TL;DR: we relaxed the let/app invariant to become the let-can-float invariant.
 
+Note [Type and coercion lets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We allow
+   let @a = TYPE ty in ...
+and similarly for coercions.
+
+   TODO: fill this out
+
+Wrinkles:
+
+(TCL1) In a type let (Let @a = TYPE ty in body), we do /not/ insist that
+  the binder `a` has a TyVarUnfolding.  But it it does not, then `body`
+  must be well-typed without paying atention to the binding. More precisely,
+       let @a = TYPE ty in body
+  where `a` has no TyVarUnfolding, is well-typed iff
+       (/\a. body) ty
+  is well-typed.  This is used during worker/wrapper, which creates type-lets.
+  See GHC.Core.Opt.WorkWrap.Utils.mkAppsBeta.
+
 Note [Core top-level string literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As an exception to the usual rule that top-level binders must be lifted,

@@ -914,17 +914,21 @@ lintCoreExpr (Let (NonRec tv (Type rhs_ty)) body)
   | isTyVar tv
   =     -- See Note [Linting type lets]
     do  { case tyVarUnfolding_maybe tv of
-             Nothing -> failWithL (text "Let-bound tyvar with no unfolding:" <+> ppr tv)
-             Just unf_ty -> ensureEqTys unf_ty rhs_ty $
-                            hang (text "Let-bound tyvar unfolding not same as RHS:" <+> ppr tv)
-                               2 (vcat [ text "Unfolding:" <+> ppr unf_ty
-                                       , text "RHS:      " <+> ppr rhs_ty ])
+             Nothing     -> return () -- See Note [Overview of type lets] wrinkle (TCL1)
+             Just unf_ty -> -- These comparisons compare InTypes, which is fine
+                            do { ensureEqTys (tyVarKind tv) (typeKind rhs_ty) $
+                                 tv_err unf_ty "Let-bound tyvar kind incompatible with RHS:"
+                               ; ensureEqTys unf_ty rhs_ty $
+                                 tv_err unf_ty "Let-bound tyvar unfolding not same as RHS:" }
 
-        ; rhs_ty' <- lintTypeAndSubst rhs_ty
-        ; lintTyCoBndr tv              $ \ tv' ->
-          addTyVarUnfolding tv tv' rhs_ty' $
-          do  { addLoc (RhsOf tv)     $ lintTyKind tv' rhs_ty'
-              ; addLoc (BodyOfLet tv) $ lintCoreExpr body } }
+        ; addLoc (RhsOf tv) $ lintType rhs_ty
+        ; lintTyCoBndr tv       $ \ _ ->
+          addLoc (BodyOfLet tv) $
+          lintCoreExpr body }
+  where
+    tv_err unf_ty msg = hang (text msg  <+> pprTyVarWithKind tv)
+                           2 (vcat [ text "Unfolding:" <+> ppr unf_ty
+                                   , text "RHS:      " <+> ppr rhs_ty ])
 
 lintCoreExpr (Let (NonRec bndr rhs) body)
   | isId bndr
@@ -1819,12 +1823,12 @@ lintBinder top_lvl site var linterF
   | isTyCoVar var = lintTyCoBndr var linterF
   | otherwise     = lintIdBndr top_lvl site var linterF
 
-lintTyCoBndr :: HasDebugCallStack => TyCoVar -> (OutTyCoVar -> LintM a) -> LintM a
+lintTyCoBndr :: HasDebugCallStack => InTyCoVar -> (OutTyCoVar -> LintM a) -> LintM a
 lintTyCoBndr tcv thing_inside
   = do { tcv_type' <- lintTypeAndSubst (varType tcv)
-       ; let tcv_kind' = typeKind tcv_type'
 
          -- See (FORALL1) and (FORALL2) in GHC.Core.Type
+       ; let tcv_kind' = typeKind tcv_type'
        ; if (isTyVar tcv)
          then -- Check that in (forall (a:ki). blah) we have ki:Type
               lintL (isLiftedTypeKind tcv_kind') $
@@ -2977,14 +2981,13 @@ data LintEnv
        , le_subst :: Subst
                   -- Current substitution, for TyCoVars only.
                   -- Non-CoVar Ids don't appear in here, not even in the InScopeSet
-                  -- Used for (a) cloning to avoid shadowing of TyCoVars,
-                  --              so that eqType works ok
-                  --          (b) substituting for let-bound tyvars, when we have
-                  --              (let @a = Int -> Int in ...)
+                  -- Used for cloning to avoid shadowing of TyCoVars, so that eqType works ok
+                  --    See Note [Dealing with shadowing]
+                  -- /Not/ used for substitution of type-lets; that is done via the unfoldign
+                  --    inside the type variable.
 
-       , le_in_vars :: VarEnv (InVar, OutType)
-                    -- Maps an InVar (i.e. its unique) to its binding InVar
-                    --    and to its OutType
+       , le_in_vars :: VarEnv (InVar, OutVar)
+                    -- Maps an InVar (i.e. its unique) to its binding InVar and corresponding OutVar
                     -- /All/ in-scope variables are here (term variables,
                     --    type variables, and coercion variables)
                     -- Used at an occurrence of the InVar
@@ -3066,7 +3069,83 @@ fromBoxedLResult :: (Maybe a, WarnsAndErrs) -> LResult a
 fromBoxedLResult (Just x, errs) = LResult (JustUB x) errs
 fromBoxedLResult (Nothing,errs) = LResult NothingUB errs
 
-{- Note [Checking for global Ids]
+{- Note [Dealing with shadowing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The simplifier generally tries to eliminate shadowing, but a program is not
+ill-typed just because it has shadowing.  But if we aren't careful, in a program
+with shadowing, we may fail to reject programs that should be rejected:
+
+   /\a. \(f:a->a->Int). \(y:a).
+   /\a. (\z:a).
+   f y z
+
+Is the call (f y z) well-typed?
+* (f y) is ok: `f` expects an argument of type `a` and `y:a`.
+* But what about ((f y) z)?  (f y) expects an argument of type `a`,
+  and the argument has type `a`.  BUT it's a different `a`!  One is
+  the "outer" `a` and one is the "inner" `a`.  Not well typed!
+
+Side note: In these examples I'm assuming that the name of a type variable
+(e.g. /\a.blah) expresses its unique identity. I could have written the example:
+   /\a_77. \(f:a_77->a_77->Int). \(y:a_77).
+   /\a_77. (\z:a_77).
+   f y z
+where "a_77" means "type variable a with Unique = 77".  But that just clutters
+up the examples.
+
+How can Lint be sure to reject such programs?  Answer:
+* Carry a Subst (incl in-scope set) in `le_subst`
+* Freshen type and coercion variables on the way down to eliminate shadowing.
+* Now just compare the freshened types.
+
+We use the terminology:
+* InType/InExpr: the original types/terms
+* OutType/OutExpr: the result of applying the freshening substitution
+
+Sub-note: types inside Ids
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We also want Lint to check that the type inside an /occurrence/ of an Id is
+the same as the type at its binding site. For example, this is wrong:
+   \(x:Int). (x:Float) + 1
+where I am writing (x:Float) for (Var (Id { idType=Float }); that is, a Var
+with the type `Float` stored inside it.
+
+But is this wrong?
+   /\a. \(f:a->Int). /\a. ....(f:a->Int)...
+Despite the intervening /\a, I think we want to say that this is fine.
+See Note [Closing over free variable kinds] in GHC.Core.TyCo.FVs, which seems
+to take this for granted.
+
+Conclusion:
+* At an occurrence of a variable, extract its type/kind as an InType,
+  and check that it is equal to the InType at the binding site.
+  We find the InType at the binding site by looking up in `le_in_vars`.
+  See `checkBndrOccCompatibility`.
+
+* We also need the OutType of f, to use when checking the use of f;
+  get this too by looking up f in `le_in_vars`
+
+Sub-note: type-lets
+~~~~~~~~~~~~~~~~~~~
+Consider this:
+   /\a. let b = Maybe a in
+    	/\a. id @b{=Maybe a}
+
+I have written b{=Maybe a} to denote the TyVar `b` with an unfolding `Maybe a`.
+Our invariant is that it is always, /unconditionally/ OK to replace a tyvar with
+its unfolding. But in this example it is not, because the `Maybe a` will be
+captured by the inner /\a.  So this program must be rejected by Lint.
+
+Conclusion:
+* At an occurrence of a TyVar with an unfolding, apply the substitution
+  to the unfolding to get an OutType, and check that it is equal to
+  the OutType at the binding site.
+
+* The *shallow* free vars of `b` include the free vars of its unfolding, `a`.
+  See `Note [Closing over free variable kinds]` in GHC.Core.TyCo.FVs.
+
+
+Note [Checking for global Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Before CoreTidy, all locally-bound Ids must be LocalIds, even
 top-level ones. See Note [Exported LocalIds] and #9857.
@@ -3086,20 +3165,6 @@ expression. The check is enabled only after the FloatOut, CorePrep,
 and CoreTidy passes and only if the module uses the StaticPointers
 language extension. Checking more often doesn't help since the condition
 doesn't hold until after the first FloatOut pass.
-
-Note [Type substitution]
-~~~~~~~~~~~~~~~~~~~~~~~~
-Why do we need a type substitution?  Consider
-        /\(a:*). \(x:a). /\(a:*). id a x
-This is ill typed, because (renaming variables) it is really
-        /\(a:*). \(x:a). /\(b:*). id b x
-Hence, when checking an application, we can't naively compare x's type
-(at its binding site) with its expected type (at a use site).  So we
-rename type binders as we go, maintaining a substitution.
-
-The same substitution also supports let-type, current expressed as
-        (/\(a:*). body) ty
-Here we substitute 'ty' for 'a' in 'body', on the fly.
 
 Note [Linting type synonym applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3358,7 +3423,7 @@ initL cfg m
     vars = l_vars cfg
     env = LE { le_flags   = l_flags cfg
              , le_subst   = mkEmptySubst (mkInScopeSetList vars)
-             , le_in_vars = mkVarEnv [ (v,(v, varType v)) | v <- vars ]
+             , le_in_vars = mkVarEnv [ (v,(v, v)) | v <- vars ]
              , le_joins   = emptyVarSet
              , le_loc     = []
              , le_ue_aliases = emptyNameEnv
@@ -3386,6 +3451,9 @@ getLintFlags = LintM $ \ env errs -> fromBoxedLResult (Just (le_flags env), errs
 checkL :: Bool -> SDoc -> LintM ()
 checkL True  _   = return ()
 checkL False msg = failWithL msg
+
+checkLM :: LintM Bool -> SDoc -> LintM ()
+checkLM m_pred msg  = do { pred <- m_pred; checkL pred msg }
 
 -- like checkL, but relevant to type checking
 lintL :: Bool -> SDoc -> LintM ()
@@ -3457,7 +3525,7 @@ addInScopeId in_id out_ty thing_inside
       where
         env1 = env { le_in_vars = in_vars', le_joins = join_set', le_ue_aliases = aliases' }
 
-        in_vars' = extendVarEnv id_vars in_id (in_id, out_ty)
+        in_vars' = extendVarEnv id_vars in_id (in_id, out_id)
         aliases' = delFromNameEnv aliases (idName in_id)
            -- aliases': when shadowing an alias, we need to make sure the
            -- Id is no longer classified as such. E.g.
@@ -3479,7 +3547,7 @@ addInScopeTyCoVar :: InTyCoVar -> OutType -> (OutTyCoVar -> LintM a) -> LintM a
 addInScopeTyCoVar tcv tcv_type thing_inside
   = LintM $ \ env@(LE { le_in_vars = in_vars, le_subst = subst }) errs ->
     let (tcv', subst') = subst_bndr subst
-        env' = env { le_in_vars = extendVarEnv in_vars tcv (tcv, tcv_type)
+        env' = env { le_in_vars = extendVarEnv in_vars tcv (tcv, tcv')
                    , le_subst = subst' }
     in unLintM (thing_inside tcv') env' errs
   where
@@ -3493,26 +3561,19 @@ addInScopeTyCoVar tcv tcv_type thing_inside
                  , text "tcv_type" <+> ppr tcv_type ])) $
         (tcv, subst `extendSubstInScope` tcv)
 
-      -- Clone, and extend the substitution
-      | let tcv' = uniqAway in_scope (setVarType tcv tcv_type)
-      = (tcv', Type.extendTCvSubstWithClone subst tcv tcv')
+      -- Clone, substitute the TyVar unfolding, if any, and extend the substitution
+      | otherwise
+      = (tcv3, Type.extendTCvSubstWithClone subst tcv tcv3)
       where
         in_scope = substInScopeSet subst
+        tcv1 = setVarType tcv tcv_type
+        tcv2 = uniqAway in_scope  tcv1
+        tcv3 = case tyVarUnfolding_maybe tcv of
+                 Just unf_ty -> setTyVarUnfolding tcv2 (substTy subst unf_ty)
+                 Nothing     -> tcv2
 
-getInVarEnv :: LintM (VarEnv (InId, OutType))
+getInVarEnv :: LintM (VarEnv (InId, OutVar))
 getInVarEnv = LintM (\env errs -> fromBoxedLResult (Just (le_in_vars env), errs))
-
-addTyVarUnfolding :: InTyVar -> OutTyVar -> OutType -> LintM a -> LintM a
-addTyVarUnfolding in_tv out_tv out_ty thing_inside
-  | in_tv == out_tv  -- No cloning, so no need to change the unfolding
-  = assertPpr (isJust (tyVarUnfolding_maybe out_tv)) (ppr in_tv)
-    thing_inside
-  | otherwise
-  = LintM $ \ env errs ->
-    unLintM thing_inside (env { le_subst = Type.extendTvSubst (le_subst env)
-                                                   in_tv tv_w_unf }) errs
-  where
-    tv_w_unf = mkTyVarTy (setTyVarUnfolding out_tv out_ty)
 
 markAllJoinsBad :: LintM a -> LintM a
 markAllJoinsBad m
@@ -3566,16 +3627,16 @@ lintVarOcc v_occ
                    | otherwise        -> failWithL (text "The" <+> ppr (whatItIs v_occ)
                                                     <+> quotes (ppr v_occ)
                                                     <+> text "is out of scope")
-           Just (v_bndr, out_ty) -> do { checkBndrOccCompatibility v_bndr v_occ
-                                       ; return out_ty } }
+           Just (in_bndr, out_bndr) -> do { checkBndrOccCompatibility in_bndr out_bndr v_occ
+                                          ; return (varType out_bndr) } }
 
-checkBndrOccCompatibility :: InVar -> InVar -> LintM ()
-checkBndrOccCompatibility v_bndr v_occ
+checkBndrOccCompatibility :: InVar -> OutVar -> InVar -> LintM ()
+checkBndrOccCompatibility in_bndr out_bndr v_occ
   = do { checkL (occ_is == bndr_is) $
          bndr_occ_mismatch (ppr bndr_is) (ppr occ_is)
 
        -- Check for the case where an /occurrence/ is
-       -- a GlobalId, but there is an enclosing binding fora a LocalId.
+       -- a GlobalId, but there is an enclosing binding for a LocalId.
        -- NB: the in-scope variables are mostly LocalIds, checked by lintIdBndr,
        --     but GHCi adds GlobalIds from the interactive context.  These
        --     are fine; hence the test (isLocalId id == isLocalId v)
@@ -3583,45 +3644,44 @@ checkBndrOccCompatibility v_bndr v_occ
        --     are defined locally, but appear in expressions as (global)
        --     wired-in Ids after worker/wrapper
        --     So we simply disable the test in this case
-       ; checkL (not (isGlobalId v_occ && isLocalId v_bndr && not (isWiredIn v_occ))) $
+       ; checkL (not (isGlobalId v_occ && isLocalId in_bndr && not (isWiredIn v_occ))) $
          bndr_occ_mismatch (text "LocalId") (text "GlobalId")
 
-
        -- Check that binder and occurrence have same type
-       ;  ensureEqTys occ_ty bndr_ty $  -- Compares InTypes
+       ;  ensureEqTys occ_ty in_bndr_ty $  -- Compares InTypes
           hang (text "Mismatch in type between binder and occurrence")
              2 extra_info
 
-       ; flags <- getLintFlags
-       ; checkL (sameUnfolding flags v_bndr v_occ) $
+       ; checkLM (sameUnfolding out_bndr v_occ) $
          hang (text "Mismatch in type-let unfolding between binder and occurrence")
             2 extra_info
        }
   where
-    bndr_ty = varType v_bndr
-    occ_ty  = varType v_occ
-    bndr_is = whatItIs v_bndr
-    occ_is  = whatItIs v_occ
+    in_bndr_ty = varType in_bndr
+    occ_ty     = varType v_occ
+    bndr_is    = whatItIs in_bndr
+    occ_is     = whatItIs v_occ
 
     bndr_occ_mismatch bndr_is occ_is
       = text "Occurrence is a" <+> occ_is <> comma
          <+> text "but binder is a" <+> bndr_is
 
-    extra_info = vcat [ hang (text "Binder    :") 2 $ pprBndr LetBind v_bndr
+    extra_info = vcat [ hang (text "Binder    :") 2 $ pprBndr LetBind in_bndr
                       , hang (text "Occurrence:") 2 $ pprBndr LetBind v_occ]
 
-sameUnfolding :: LintFlags
-              -> InVar   -- Binder
-              -> InVar   -- Occurrence
-              -> Bool
+sameUnfolding :: OutVar   -- Binder
+              -> InVar    -- Occurrence
+              -> LintM Bool
 -- Check that any unfolding in the /occurence/ is the same as that in the /binder/
 -- An unfolding in the occurrence is optional fo Ids, but compulsory for type-let-boud
 -- TyVars.  Somewhat lazily, we only check the latter.
-sameUnfolding flags v_bndr v_occ
+sameUnfolding v_bndr v_occ
   = case (tyVarUnfolding_maybe v_bndr, tyVarUnfolding_maybe v_occ) of
-      (Nothing,      Nothing)     -> True
-      (Just bndr_ty, Just occ_ty) -> eq_type flags bndr_ty occ_ty
-      _                           -> False
+      (Nothing,       Nothing)      -> return True
+      (Just bndr_unf, Just occ_unf) -> do { occ_unf' <- substTyM occ_unf
+                                          ; flags    <- getLintFlags
+                                          ; return (eq_type flags bndr_unf occ_unf') }
+      _                             -> return False
 
 lookupJoinId :: Id -> LintM JoinPointHood
 -- Look up an Id which should be a join point, valid here
