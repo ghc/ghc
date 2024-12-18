@@ -25,11 +25,12 @@ given compilation phase:
     Use ⟨cmd⟩ as the literate pre-processor.
 
 .. ghc-flag:: -pgmP ⟨cmd⟩
-    :shortdesc: Use ⟨cmd⟩ as the C pre-processor (with :ghc-flag:`-cpp` only)
+    :shortdesc: Use ⟨cmd⟩ as the Haskell C pre-processor (with :ghc-flag:`-cpp` only)
     :type: dynamic
     :category: phase-programs
 
-    Use ⟨cmd⟩ as the C pre-processor (with :ghc-flag:`-cpp` only).
+    Use ⟨cmd⟩ as the Haskell C pre-processor (with :ghc-flag:`-cpp` only).
+    Note that the Haskell C pre-processor only pre-processes Haskell files.
 
 .. ghc-flag:: -pgmJSP ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the JavaScript C pre-processor (only for javascript-backend)
@@ -177,7 +178,11 @@ the following flags:
     :type: dynamic
     :category: phase-options
 
-    Pass ⟨option⟩ to CPP (makes sense only if :ghc-flag:`-cpp` is also on).
+    Pass ⟨option⟩ to the Haskell CPP (makes sense only if :ghc-flag:`-cpp` is also on).
+    Note that the Haskell pre-processor options only apply to pre-processing
+    invocations on Haskell files, and, e.g., to use different options to
+    pre-process Javascript or Cmm, one should use ``-optJSP``, or
+    ``-optCmmP``, respectively).
 
 .. ghc-flag:: -optJSP ⟨option⟩
     :shortdesc: pass ⟨option⟩ to JavaScript C pre-processor (only for javascript-backend)
