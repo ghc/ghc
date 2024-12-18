@@ -9,9 +9,6 @@
   * Extend `Exp` with `ForallE`, `ForallVisE`, `ConstraintedE`,
     introduce functions `forallE`, `forallVisE`, `constraintedE` (GHC Proposal #281).
   * `template-haskell` is no longer wired-in. All wired-in identifiers have been moved to `ghc-internal`.
-
-## 2.22.1.0
-
   * `Lift` instances were added for the `template-haskell` AST.
 
 ## 2.22.0.0
