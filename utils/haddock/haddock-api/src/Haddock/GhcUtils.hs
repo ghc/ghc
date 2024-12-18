@@ -235,8 +235,8 @@ getMainDeclBinderI (ValD _ d) =
     [] -> []
     (name : _) -> [name]
 getMainDeclBinderI (SigD _ d) = sigNameNoLoc' emptyOccEnv d
-getMainDeclBinderI (ForD _ (ForeignImport _ name _ _)) = [unLoc name]
-getMainDeclBinderI (ForD _ (ForeignExport _ _ _ _)) = []
+getMainDeclBinderI (ForD _ (ForeignImport _ name _ _ _)) = [unLoc name]
+getMainDeclBinderI (ForD _ (ForeignExport _ _ _ _ _)) = []
 getMainDeclBinderI _ = []
 
 familyDeclLNameI :: FamilyDecl DocNameI -> LocatedN DocName

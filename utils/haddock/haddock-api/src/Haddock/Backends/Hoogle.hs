@@ -165,8 +165,8 @@ ppExportD
       f (TyClD _ d@SynDecl{}) = ppSynonym sDocContext d
       f (TyClD _ d@ClassDecl{}) = ppClass sDocContext d subdocs
       f (TyClD _ (FamDecl _ d)) = ppFam sDocContext d
-      f (ForD _ (ForeignImport _ name typ _)) = [ppSig sDocContext [name] typ]
-      f (ForD _ (ForeignExport _ name typ _)) = [ppSig sDocContext [name] typ]
+      f (ForD _ (ForeignImport _ name typ _ _)) = [ppSig sDocContext [name] typ]
+      f (ForD _ (ForeignExport _ name typ _ _)) = [ppSig sDocContext [name] typ]
       f (SigD _ sig) = ppSigWithDoc sDocContext sig []
       f _ = []
 

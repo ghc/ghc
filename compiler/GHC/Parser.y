@@ -1270,7 +1270,7 @@ topdecl :: { LHsDecl GhcPs }
         | stand_alone_deriving                  { L (getLoc $1) (DerivD noExtField (unLoc $1)) }
         | role_annot                            { L (getLoc $1) (RoleAnnotD noExtField (unLoc $1)) }
         | default_decl                          { L (getLoc $1) (DefD noExtField (unLoc $1)) }
-        | 'foreign' fdecl                       {% amsA' (sLL $1 $> ((unLoc $2) (epTok $1))) }
+        | declModifiers 'foreign' fdecl         {% amsA' (sL (comb3 $1 $2 $>) ((unLoc $3) (unLoc $1) (epTok $2))) }
         | '{-# DEPRECATED' deprecations '#-}'   {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ((glR $1,glR $3), (getDEPRECATED_PRAGs $1)) (fromOL $2))) }
         | '{-# WARNING' warnings '#-}'          {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ((glR $1,glR $3), (getWARNING_PRAGs $1)) (fromOL $2))) }
         | '{-# RULES' rules '#-}'               {% amsA' (sLL $1 $> $ RuleD noExtField (HsRules ((glR $1,glR $3), (getRULES_PRAGs $1)) (reverse $2))) }
@@ -2168,7 +2168,7 @@ annotation :: { LHsDecl GhcPs }
 -----------------------------------------------------------------------------
 -- Foreign import and export declarations
 
-fdecl :: { Located (EpToken "foreign" -> HsDecl GhcPs) }
+fdecl :: { Located ([HsModifier GhcPs] -> EpToken "foreign" -> HsDecl GhcPs) }
 fdecl : 'import' callconv safety fspec
                {% mkImport $2 $3 (snd $ unLoc $4) (epTok $1, fst $ unLoc $4) >>= \i ->
                  return (sLL $1 $> i)  }

@@ -24,6 +24,12 @@ instance B A
 
 %() default (Int)
 
+-- MODS_TODO for modifiers that get typechecked, %() currently throws an
+-- "unknown kind" error where %True doesn't.
+
+%True foreign import ccall "test" someImport :: Int
+%True foreign export ccall someImport :: Int
+
 l1 :: forall (m :: Bool) a b . a %m -> b
 l1 = undefined
 
@@ -33,9 +39,12 @@ l2 = undefined
 l3 :: a %(m :: Multiplicity) -> b %(m :: Multiplicity) -> c
 l3 = undefined
 
+l4 :: a %True -> b
+l4 = undefined
+
 -- MODS_TODO these are expected to fail, not tested in this test case:
--- l4 :: a %m -> b
--- l5 :: a %(m :: Multiplicity) -> b %m -> c
+-- l5 :: a %m -> b
+-- l6 :: a %(m :: Multiplicity) -> b %m -> c
 
 idt :: forall t -> t -> t
 idt _ x = x
@@ -48,6 +57,10 @@ visForallApp = idt (Int %() -> Int) (+ 1)
 -- MODS_TODO the current proposal doesn't make it clear what the results should
 -- be here. The commented out ones fail to compile, but that's not currently
 -- tested.
+--
+-- Note that for some of these, the kind of the type variable isn't fixed. So if
+-- these are allowed, rename-only modifiers with unknown kind are in fact
+-- possible.
 
 %a data FV1 a
 

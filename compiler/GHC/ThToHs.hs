@@ -841,7 +841,8 @@ cvtForD (ImportF callconv safety from nm ty) =
            ; return (ForeignImport { fd_i_ext = noAnn
                                    , fd_name = nm'
                                    , fd_sig_ty = ty'
-                                   , fd_fi = impspec })
+                                   , fd_fi = impspec
+                                   , fd_modifiers = []}) -- MODS_TODO I think this means "no way for TH to specify modifiers", seems right?
            }
     safety' = case safety of
                      Unsafe     -> PlayRisky
@@ -860,7 +861,8 @@ cvtForD (ExportF callconv as nm ty)
         ; return $ ForeignExport { fd_e_ext = noAnn
                                  , fd_name = nm'
                                  , fd_sig_ty = ty'
-                                 , fd_fe = e } }
+                                 , fd_fe = e
+                                 , fd_modifiers = [] } } -- MODS_TODO I think this means "no way for TH to specify modifiers", seems right?
 
 cvt_conv :: TH.Callconv -> CCallConv
 cvt_conv TH.CCall      = CCallConv

@@ -793,14 +793,16 @@ renameSig sig = case sig of
   _ -> error "expected TypeSig"
 
 renameForD :: ForeignDecl GhcRn -> RnM (ForeignDecl DocNameI)
-renameForD (ForeignImport _ lname ltype x) = do
+renameForD (ForeignImport _ lname ltype x modifiers) = do
   lname' <- renameNameL lname
   ltype' <- renameLSigType ltype
-  return (ForeignImport noExtField lname' ltype' (renameForI x))
-renameForD (ForeignExport _ lname ltype x) = do
+  modifiers' <- renameModifiers modifiers
+  return (ForeignImport noExtField lname' ltype' (renameForI x) modifiers')
+renameForD (ForeignExport _ lname ltype x modifiers) = do
   lname' <- renameNameL lname
   ltype' <- renameLSigType ltype
-  return (ForeignExport noExtField lname' ltype' (renameForE x))
+  modifiers' <- renameModifiers modifiers
+  return (ForeignExport noExtField lname' ltype' (renameForE x) modifiers')
 
 renameForI :: ForeignImport GhcRn -> ForeignImport DocNameI
 renameForI (CImport _ cconv safety mHeader spec) = CImport noExtField cconv safety mHeader spec

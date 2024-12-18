@@ -3027,7 +3027,7 @@ mkImport :: Located CCallConv
          -> Located Safety
          -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
          -> (EpToken "import", TokDcolon)
-         -> P (EpToken "foreign" -> HsDecl GhcPs)
+         -> P ([HsModifier GhcPs] -> EpToken "foreign" -> HsDecl GhcPs)
 mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td) =
     case unLoc cconv of
       CCallConv          -> returnSpec =<< mkCImport
@@ -3064,11 +3064,12 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
         funcTarget = CFunction (StaticTarget esrc entity' Nothing True)
         importSpec = CImport (L (l2l loc) esrc) (reLoc cconv) (reLoc safety) Nothing funcTarget
 
-    returnSpec spec = return $ \tforeign -> ForD noExtField $ ForeignImport
+    returnSpec spec = return $ \ mods tforeign -> ForD noExtField $ ForeignImport
           { fd_i_ext  = (tforeign, timport, td)
           , fd_name   = v
           , fd_sig_ty = ty
           , fd_fi     = spec
+          , fd_modifiers = mods
           }
 
 
@@ -3138,11 +3139,12 @@ parseCImport cconv safety nm str sourceText =
 mkExport :: Located CCallConv
          -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
          -> ( EpToken "export", TokDcolon)
-         -> P (EpToken "foreign" -> HsDecl GhcPs)
+         -> P ([HsModifier GhcPs] -> EpToken "foreign" -> HsDecl GhcPs)
 mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty) (texport, td)
- = return $ \tforeign -> ForD noExtField $
+ = return $ \mods tforeign -> ForD noExtField $
    ForeignExport { fd_e_ext = (tforeign, texport, td), fd_name = v, fd_sig_ty = ty
-                 , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic esrc entity' cconv)) }
+                 , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic esrc entity' cconv))
+                 , fd_modifiers = mods }
   where
     entity' | nullFS entity = mkExtName (unLoc v)
             | otherwise     = entity

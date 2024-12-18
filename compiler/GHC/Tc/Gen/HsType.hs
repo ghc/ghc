@@ -65,8 +65,8 @@ module GHC.Tc.Gen.HsType (
         tcLHsKindSig, checkDataKindSig, DataSort(..),
         checkClassKindSig,
 
-        -- Multiplicity
-        tcArrow, tcMult,
+        -- Modifiers
+        tcModifiers, tcArrow, tcMult,
 
         -- Pattern type signatures
         tcHsPatSigType, tcHsTyPat,
@@ -944,10 +944,13 @@ concern things that the renamer can't handle.
 -}
 
 tcArrow :: HsArrow GhcRn -> TcM Mult
-tcArrow hc = tc_arrow typeLevelMode hc
+tcArrow = tc_arrow typeLevelMode
 
 tcMult :: [HsModifier GhcRn] -> TcM (Maybe Mult)
-tcMult hc = tc_mult typeLevelMode hc
+tcMult = tc_mult typeLevelMode
+
+tcModifiers :: [HsModifier GhcRn] -> (TcKind -> Bool) -> TcM [TcType]
+tcModifiers = tc_modifiers typeLevelMode
 
 -- | Info about the context in which we're checking a type. Currently,
 -- differentiates only between types and kinds, but this will likely
@@ -1418,10 +1421,18 @@ tc_modifier mode mod@(HsModifier _ ty) is_expected_kind = do
     then return $ Just inf_ty
     else case inf_kind of
       -- MODS_TODO the point of this is to check for a modifier of unknown kind.
-      -- Seems hacky, presumably there's a standard way to do it? This only
-      -- affects modifiers that get typechecked, but rename-only modifiers
-      -- attached to class/instance declarations get an error if a modifier uses
-      -- a type var not in scope, so maybe unknown kinds are impossible?
+      -- Seems hacky, presumably there's a standard way to do it?
+      --
+      -- This doesn't seem to work for %() (i.e. it marks that as unknown kind),
+      -- but it does for %True. Dunno what's going on there.
+      --
+      -- This only affects modifiers that get typechecked. rename-only modifiers
+      -- get an error if a modifier uses a type var not in scope, so maybe
+      -- unknown kinds are impossible for those? But I guess not if
+      --
+      --     %a data FV1 (a :: k)
+      --
+      -- is supposed to compile.
       TyVarTy _ -> failWithTc $ TcRnUnknownModifierKind mod
       _ -> do
         warn_unknown <- woptM Opt_WarnUnknownModifiers

@@ -387,26 +387,33 @@ rnDefaultDecl (DefaultDecl _ mb_cls tys mods)
 -}
 
 rnHsForeignDecl :: ForeignDecl GhcPs -> RnM (ForeignDecl GhcRn, FreeVars)
-rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
+rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec, fd_modifiers = modifiers })
   = do { topEnv :: HscEnv <- getTopEnv
        ; name' <- lookupLocatedTopBndrRnN name
-       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
+       ; let ctxt = ForeignDeclCtx name
+       ; (ty', fvs) <- rnHsSigType ctxt TypeLevel ty
 
         -- Mark any PackageTarget style imports as coming from the current package
        ; let home_unit = hsc_home_unit topEnv
              spec'  = patchForeignImport (homeUnitAsUnit home_unit) spec
 
+       ; (modifiers', mods_fvs) <- rnModifiersContext ctxt modifiers
+
        ; return (ForeignImport { fd_i_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
-                               , fd_fi = spec' }, fvs) }
+                               , fd_fi = spec', fd_modifiers = modifiers' }
+                , fvs `plusFV` mods_fvs) }
 
-rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
+rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec, fd_modifiers = modifiers })
   = do { name' <- lookupLocatedOccRn name
+       ; let ctxt = ForeignDeclCtx name
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
+       ; (modifiers', mods_fvs) <- rnModifiersContext ctxt modifiers
        ; return (ForeignExport { fd_e_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
-                               , fd_fe = (\(CExport x c) -> CExport x c) spec }
-                , fvs `addOneFV` unLoc name') }
+                               , fd_fe = (\(CExport x c) -> CExport x c) spec
+                               , fd_modifiers = modifiers' }
+                , fvs `plusFV` mods_fvs `addOneFV` unLoc name') }
         -- NB: a foreign export is an *occurrence site* for name, so
         --     we add it to the free-variable list.  It might, for example,
         --     be imported from another module

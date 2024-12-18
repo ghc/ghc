@@ -411,12 +411,13 @@ ppFor
   links
   loc
   doc
-  (ForeignImport _ (L _ name) typ _)
+  (ForeignImport _ (L _ name) typ _ _)
   fixities
   splice
   unicode
   pkg
   qual =
+    -- MODS_TODO need to pprint modifiers
     ppFunSig summary links loc noHtml doc [name] typ fixities splice unicode pkg qual
 ppFor _ _ _ _ _ _ _ _ _ _ = error "ppFor"
 

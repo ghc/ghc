@@ -1652,11 +1652,11 @@ zonkForeignExports ls = mapM (wrapLocZonkMA zonkForeignExport) ls
 
 zonkForeignExport :: ForeignDecl GhcTc -> ZonkTcM (ForeignDecl GhcTc)
 zonkForeignExport (ForeignExport { fd_name = i, fd_e_ext = co
-                                 , fd_fe = spec })
+                                 , fd_fe = spec, fd_modifiers = mods })
   = do { i' <- zonkLIdOcc i
        ; return (ForeignExport { fd_name = i'
                                , fd_sig_ty = undefined, fd_e_ext = co
-                               , fd_fe = spec }) }
+                               , fd_fe = spec, fd_modifiers = mods }) }
 zonkForeignExport for_imp
   = return for_imp     -- Foreign imports don't need zonking
 

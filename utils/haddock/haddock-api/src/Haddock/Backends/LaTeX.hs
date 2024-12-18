@@ -283,8 +283,8 @@ declNames (L _ decl) = case decl of
   TyClD _ d -> (empty, [tcdNameI d])
   SigD _ (TypeSig _ lnames _) -> (empty, map unLoc lnames)
   SigD _ (PatSynSig _ lnames _) -> (text "pattern", map unLoc lnames)
-  ForD _ (ForeignImport _ (L _ n) _ _) -> (empty, [n])
-  ForD _ (ForeignExport _ (L _ n) _ _) -> (empty, [n])
+  ForD _ (ForeignImport _ (L _ n) _ _ _) -> (empty, [n])
+  ForD _ (ForeignExport _ (L _ n) _ _ _) -> (empty, [n])
   _ -> error "declaration not supported by declNames"
 
 forSummary :: (ExportItem DocNameI) -> Bool
@@ -337,7 +337,8 @@ ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
     unicode = False
 
 ppFor :: DocForDecl DocName -> ForeignDecl DocNameI -> Bool -> LaTeX
-ppFor doc (ForeignImport _ (L _ name) typ _) unicode =
+ppFor doc (ForeignImport _ (L _ name) typ _ _) unicode =
+  -- MODS_TODO need to pprint modifiers
   ppFunSig Nothing doc [name] typ unicode
 ppFor _ _ _ = error "ppFor error in Haddock.Backends.LaTeX"
 

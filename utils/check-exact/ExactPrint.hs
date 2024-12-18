@@ -1929,7 +1929,8 @@ instance ExactPrint (ForeignDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (ForeignImport (tf,ti,td) n ty fimport) = do
+  exact (ForeignImport (tf,ti,td) n ty fimport mods) = do
+    mods' <- mapM markAnnotated mods
     tf' <- markEpToken tf
     ti' <- markEpToken ti
 
@@ -1938,16 +1939,17 @@ instance ExactPrint (ForeignDecl GhcPs) where
     n' <- markAnnotated n
     td' <- markEpUniToken td
     ty' <- markAnnotated ty
-    return (ForeignImport (tf',ti',td') n' ty' fimport')
+    return (ForeignImport (tf',ti',td') n' ty' fimport' mods')
 
-  exact (ForeignExport (tf,te,td) n ty fexport) = do
+  exact (ForeignExport (tf,te,td) n ty fexport mods) = do
+    mods' <- mapM markAnnotated mods
     tf' <- markEpToken tf
     te' <- markEpToken te
     fexport' <- markAnnotated fexport
     n' <- markAnnotated n
     td' <- markEpUniToken td
     ty' <- markAnnotated ty
-    return (ForeignExport (tf',te',td') n' ty' fexport')
+    return (ForeignExport (tf',te',td') n' ty' fexport' mods')
 
 -- ---------------------------------------------------------------------
 

@@ -317,8 +317,8 @@ getMainDeclBinder _ (ValD _ d) =
     []       -> []
     (name:_) -> [name]
 getMainDeclBinder env (SigD _ d) = sigNameNoLoc env d
-getMainDeclBinder _   (ForD _ (ForeignImport _ name _ _)) = [unLoc name]
-getMainDeclBinder _   (ForD _ (ForeignExport _ _ _ _)) = []
+getMainDeclBinder _   (ForD _ (ForeignImport _ name _ _ _)) = [unLoc name]
+getMainDeclBinder _   (ForD _ (ForeignExport _ _ _ _ _)) = []
 getMainDeclBinder _ _ = []
 
 
@@ -474,7 +474,7 @@ declTypeDocs = \case
   SigD  _ (TypeSig _ _ ty)          -> sigTypeDocs (unLoc (dropWildCards ty))
   SigD  _ (ClassOpSig _ _ _ ty)     -> sigTypeDocs (unLoc ty)
   SigD  _ (PatSynSig _ _ ty)        -> sigTypeDocs (unLoc ty)
-  ForD  _ (ForeignImport _ _ ty _)  -> sigTypeDocs (unLoc ty)
+  ForD  _ (ForeignImport _ _ ty _ _) -> sigTypeDocs (unLoc ty)
   TyClD _ (SynDecl { tcdRhs = ty }) -> typeDocs (unLoc ty)
   _                                 -> IM.empty
 

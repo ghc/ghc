@@ -253,7 +253,7 @@ tcForeignImports' decls
 tcFImport :: LForeignDecl GhcRn
           -> TcM (Id, LForeignDecl GhcTc, Bag GlobalRdrElt)
 tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
-                                    , fd_fi = imp_decl }))
+                                    , fd_fi = imp_decl, fd_modifiers = mods }))
   = setSrcSpanA dloc $ addErrCtxt (foreignDeclCtxt fo)  $
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
        ; (Reduction norm_co norm_sig_ty, gres) <- normaliseFfiType sig_ty
@@ -276,10 +276,16 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
        ; imp_decl' <- tcCheckFIType arg_tys res_ty imp_decl
           -- Can't use sig_ty here because sig_ty :: Type and
           -- we need HsType Id hence the undefined
+
+       -- We don't recognize any modifiers here, but we still need to make sure
+       -- they type check and warn about them.
+       ; _ <- tcModifiers mods (const False)
+
        ; let fi_decl = ForeignImport { fd_name = L nloc id
                                      , fd_sig_ty = undefined
                                      , fd_i_ext = mkSymCo norm_co
-                                     , fd_fi = imp_decl' }
+                                     , fd_fi = imp_decl'
+                                     , fd_modifiers = [] }
        ; return (id, L dloc fi_decl, gres) }
 tcFImport d = pprPanic "tcFImport" (ppr d)
 
@@ -411,7 +417,7 @@ tcForeignExports' decls
 
 tcFExport :: ForeignDecl GhcRn
           -> TcM (LHsBind GhcTc, ForeignDecl GhcTc, Bag GlobalRdrElt)
-tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spec })
+tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spec, fd_modifiers = mods })
   = addErrCtxt (foreignDeclCtxt fo) $ do
 
     sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
@@ -420,6 +426,10 @@ tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spe
     (Reduction norm_co norm_sig_ty, gres) <- normaliseFfiType sig_ty
 
     spec' <- tcCheckFEType norm_sig_ty spec
+
+    -- We don't recognize any modifiers here, but we still need to make sure
+    -- they type check and warn about them.
+    _ <- tcModifiers mods (const False)
 
            -- we're exporting a function, but at a type possibly more
            -- constrained than its declared/inferred type. Hence the need
@@ -435,7 +445,8 @@ tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spe
            , ForeignExport { fd_name = L loc id
                            , fd_sig_ty = undefined
                            , fd_e_ext = norm_co
-                           , fd_fe = spec' }
+                           , fd_fe = spec'
+                           , fd_modifiers = [] }
            , gres)
 tcFExport d = pprPanic "tcFExport" (ppr d)
 
