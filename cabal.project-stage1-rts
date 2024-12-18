@@ -5,7 +5,6 @@ package-dbs: clear, global
 
 packages:
   ./_build/stage1/src/libraries/rts
-  ./_build/stage1/src/libraries/ghc-prim
 
 benchmarks: False
 tests: False

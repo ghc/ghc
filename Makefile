@@ -131,7 +131,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	# FIXME: deriveConstants requires ghcautoconf.h and ghcplatform.h
 	# Let's run cabal until it fails so that these files are generated...
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE1)' \
-	  $(CABAL) build --project-file=cabal.project-stage1 \
+	  $(CABAL) build --project-file=cabal.project-stage1-rts \
 	  rts \
 	  --with-compiler=`pwd`/_build/stage0/bin/ghc \
 	  --with-hc-pkg=`pwd`/_build/stage0/bin/ghc-pkg \
@@ -185,8 +185,11 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	# Building boot libraries
 	mkdir -p _build/stage1/cabal/
 
+	# we need to pass "-this-unit-id=rts", otherwise GHC tries to lookup the
+	# platform constants in the package db and fails. The flag is already
+	# set in rts.cabal but for some reason it isn't always passed :shrug:
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE1)' \
-	  $(CABAL) build --project-file=cabal.project-stage1 \
+	  $(CABAL) build --project-file=cabal.project-stage1-rts \
 	  rts \
 	  --with-compiler=`pwd`/_build/stage0/bin/ghc \
 	  --with-hc-pkg=`pwd`/_build/stage0/bin/ghc-pkg \
@@ -209,7 +212,35 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	  --ghc-options='"-optc=-DTargetVendor=\"FIXME\""' \
 	  --ghc-options='"-optc=-DGhcUnregisterised=\"FIXME\""' \
 	  --ghc-options='"-optc=-DTablesNextToCode=\"FIXME\""' \
-	  --ghc-options='-this-unit-id rts' \
+	  --ghc-options='-this-unit-id=rts' \
+	  --builddir=_build/stage1/cabal/
+	
+
+
+	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE1)' \
+	  $(CABAL) build --project-file=cabal.project-stage1 \
+	  rts ghc-prim \
+	  --with-compiler=`pwd`/_build/stage0/bin/ghc \
+	  --with-hc-pkg=`pwd`/_build/stage0/bin/ghc-pkg \
+	  --ghc-options="-ghcversion-file=`pwd`/_build/stage1/src/libraries/rts/include/ghcversion.h" \
+	  --ghc-options="-I`pwd`/_build/stage1/src/libraries/rts/include/" \
+	  --ghc-options="-I`pwd`/_build/stage1/src/libraries/rts/" \
+	  --ghc-options='"-optc=-DProjectVersion=\"913\""' \
+	  --ghc-options='"-optc=-DRtsWay=\"FIXME\""' \
+	  --ghc-options='"-optc=-DHostPlatform=\"FIXME\""' \
+	  --ghc-options='"-optc=-DHostArch=\"FIXME\""' \
+	  --ghc-options='"-optc=-DHostOS=\"FIXME\""' \
+	  --ghc-options='"-optc=-DHostVendor=\"FIXME\""' \
+	  --ghc-options='"-optc=-DBuildPlatform=\"FIXME\""' \
+	  --ghc-options='"-optc=-DBuildArch=\"FIXME\""' \
+	  --ghc-options='"-optc=-DBuildOS=\"FIXME\""' \
+	  --ghc-options='"-optc=-DBuildVendor=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTargetPlatform=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTargetArch=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTargetOS=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTargetVendor=\"FIXME\""' \
+	  --ghc-options='"-optc=-DGhcUnregisterised=\"FIXME\""' \
+	  --ghc-options='"-optc=-DTablesNextToCode=\"FIXME\""' \
 	  --builddir=_build/stage1/cabal/
 
 clean:
