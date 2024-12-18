@@ -1024,10 +1024,15 @@ instance NoAnn HsRuleBndrsAnn where
   noAnn = HsRuleBndrsAnn Nothing Nothing
 
 
-type instance XCRuleBndr    (GhcPass _) = AnnTyVarBndr
-type instance XCRuleBndrs   (GhcPass _) = HsRuleBndrsAnn
+
 type instance XXRuleBndrs   (GhcPass _) = DataConCantHappen
+type instance XCRuleBndrs   GhcPs = HsRuleBndrsAnn
+type instance XCRuleBndrs   GhcRn = NoExtField
+type instance XCRuleBndrs   GhcTc = [Var]   -- Binders of the rule, not
+                                            -- necessarily in dependency order
+
 type instance XRuleBndrSig  (GhcPass _) = AnnTyVarBndr
+type instance XCRuleBndr    (GhcPass _) = AnnTyVarBndr
 type instance XXRuleBndr    (GhcPass _) = DataConCantHappen
 
 instance (OutputableBndrId p) => Outputable (RuleBndrs (GhcPass p)) where

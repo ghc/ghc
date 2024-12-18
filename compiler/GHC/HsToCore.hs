@@ -436,11 +436,11 @@ Reason
 dsRule :: LRuleDecl GhcTc -> DsM (Maybe CoreRule)
 dsRule (L loc (HsRule { rd_name = name
                       , rd_act  = rule_act
-                      , rd_bndrs = RuleBndrs { rb_tmvs = vars }
+                      , rd_bndrs = RuleBndrs { rb_ext = bndrs }
                       , rd_lhs  = lhs
                       , rd_rhs  = rhs }))
   = putSrcSpanDs (locA loc) $
-    do  { let bndrs' = scopedSort [var | L _ (RuleBndr _ (L _ var)) <- vars]
+    do  { let bndrs' = scopedSort bndrs
                  -- The scopedSort is because the binders may not
                  -- be in dependency order; see wrinkle (FTV1) in
                  -- Note [Free tyvars on rule LHS] in GHC.Tc.Zonk.Type

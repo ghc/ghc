@@ -474,12 +474,12 @@ isCompleteMatchSig _                            = False
 ********************************************************************* -}
 
 data RuleBndrs pass = RuleBndrs
-       { rb_ext  :: (XCRuleBndrs pass)
+       { rb_ext  :: XCRuleBndrs pass
+           --   After typechecking rb_ext contains all the quantified tyvars
        , rb_tyvs :: Maybe [LHsTyVarBndr () (NoGhcTc pass)]
-           -- ^ Forall'd type vars
-       , rb_tmvs :: [LRuleBndr pass]
-           -- ^ Forall'd term vars, before typechecking;
-           --   after typechecking this includes all forall'd vars
+           -- ^ Forall'd type vars; preserved for pretty-printing
+       , rb_tmvs :: [LRuleBndr (NoGhcTc pass)]
+           -- ^ Forall'd term vars; preserved for pretty-printing
        }
   | XRuleBndrs !(XXRuleBndrs pass)
 

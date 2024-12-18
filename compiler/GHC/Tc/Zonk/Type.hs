@@ -1696,26 +1696,19 @@ zonkRule rule@(HsRule { rd_bndrs = bndrs
                             , rd_rhs   = new_rhs } } }
    where
      add_tvs :: [TyVar] -> RuleBndrs GhcTc -> RuleBndrs GhcTc
-     add_tvs tvs rbs@(RuleBndrs { rb_tmvs = bndrs })
-       = rbs { rb_tmvs = map (noLocA . RuleBndr noAnn . noLocA) tvs ++ bndrs }
+     add_tvs tvs rbs@(RuleBndrs { rb_ext = bndrs }) = rbs { rb_ext = tvs ++ bndrs }
 
 
 zonkRuleBndrs :: RuleBndrs GhcTc -> (RuleBndrs GhcTc -> ZonkTcM a) -> ZonkTcM a
-zonkRuleBndrs (RuleBndrs { rb_tyvs = tyvs, rb_tmvs = tmvs }) thing_inside
-  = runZonkBndrT (traverse zonk_tm_bndr tmvs) $ \ new_tmvs ->
-    thing_inside (RuleBndrs { rb_ext = noAnn, rb_tyvs = tyvs, rb_tmvs = new_tmvs })
+zonkRuleBndrs rb@(RuleBndrs { rb_ext = bndrs }) thing_inside
+  = runZonkBndrT (traverse zonk_it bndrs) $ \ new_bndrs ->
+    thing_inside (rb { rb_ext = new_bndrs })
   where
-   zonk_tm_bndr :: LRuleBndr GhcTc -> ZonkBndrTcM (LRuleBndr GhcTc)
-   zonk_tm_bndr (L l (RuleBndr x (L loc v)))
-      = do { v' <- zonk_it v
-           ; return (L l (RuleBndr x (L loc v'))) }
-   zonk_tm_bndr (L _ (RuleBndrSig {})) = panic "zonk_tm_bndr RuleBndrSig"
-
-   zonk_it v
-     | isId v     = zonkIdBndrX v
-     | otherwise  = assert (isImmutableTyVar v) $
-                    zonkTyBndrX v
-                    -- We may need to go inside the kind of v and zonk there!
+    zonk_it v
+      | isId v     = zonkIdBndrX v
+      | otherwise  = assert (isImmutableTyVar v) $
+                     zonkTyBndrX v
+                     -- We may need to go inside the kind of v and zonk there!
 
 {- Note [Free tyvars on rule LHS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
