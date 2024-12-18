@@ -2009,9 +2009,9 @@ tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
                            -- Example:
                            --    instance C [a] where
                            --       op :: forall b. Ord b => b -> a -> a
-                           --       {-# SPECIALISE b @Int #-}
-                           -- The speclalisation is for the `op` for this instance decl, not
-                           -- for the gloabal selector-id, of course.
+                           --       {-# SPECIALISE op @Int #-}
+                           -- The specialisation is for the `op` for this instance decl, not
+                           -- for the global selector-id, of course.
                            tcSpecPrags global_meth_id prags
 
         ; let specs  = mk_meth_spec_prags global_meth_id spec_inst_prags spec_prags

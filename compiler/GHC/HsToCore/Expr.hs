@@ -919,8 +919,8 @@ Note [Desugaring non-canonical evidence]
 When constructing an application
     f @ty1 ty2 .. dict1 dict2 .. arg1 arg2 ..
 if the evidence `dict_i` is canonical, we simply build that application.
-But if any of the `dict_i` are /non-canonical/, we wrap the appication in `nospec`,
-thus
+But if any of the `dict_i` are /non-canonical/, we wrap the application
+in `nospec`, thus
     nospec @fty f @ty1 @ty2 .. dict1 dict2 .. arg1 arg2 ..
 where  nospec :: forall a. a -> a  ensures that the typeclass specialiser
 doesn't attempt to common up this evidence term with other evidence terms
@@ -945,7 +945,7 @@ How do we decide if the arguments are non-canonical dictionaries?
 
 Wrinkle:
 
-(NC1) We don't do this in the LHS of a RULE.  In paritcular, if we have
+(NC1) We don't do this in the LHS of a RULE.  In particular, if we have
      f :: (Num a, HasCallStack) => a -> a
      {-# SPECIALISE f :: Int -> Int #-}
   then making a rule like
@@ -958,7 +958,7 @@ Wrinkle:
       nospec (f @Int d1) d2
 
   This is done by zapping the unspecables in `dsRule` to Nothing.  That `Nothing`
-  says not to collet unspecables at all.
+  says not to collect unspecables at all.
 
 
 Note [Desugaring explicit lists]

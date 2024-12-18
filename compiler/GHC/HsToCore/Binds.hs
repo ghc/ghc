@@ -793,24 +793,24 @@ Note [Desugaring SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have f :: forall a b. (Ord a, Eq b) => a -> b -> b, and a pragma
 
-  {-# SPECIALISE forall x. f @[a] @[Int] x 3 #-}
+  {-# SPECIALISE forall x. f @[a] @[Int] x [3,4] #-}
 
 The SPECIALISE pragma has an expression that desugars to something like
 
     forall @a (d:Ord a) (x:[a]).
       let d2:Ord [a] = $dfOrdList d
           d3:Eq [Int] = $dfEqList $dfEqInt
-      in f @[a] @[Int] d2 d3 x 3
+      in f @[a] @[Int] d2 d3 x [3,4]
 
 We want to get
 
     RULE  forall a (d2:Ord a) (d3:Eq [Int]) (x:[a]).
-             f @[a] @[Int] d2 d3 x 3 = $sf d2 x
+             f @[a] @[Int] d2 d3 x [3,4] = $sf d2 x
 
     $sf :: forall a. Ord [a] => a -> Int
-    $sf = /\a. d2 x.
+    $sf = /\a. \d2 x.
              let d3 = $dfEqList $dfEqInt
-             in <f-rhs> @[a] @[Int] d2 d3 x 3
+             in <f-rhs> @[a] @[Int] d2 d3 x [3,4]
 
 Notice that
 * If the expression had a type signature, such as
@@ -835,17 +835,17 @@ Notice that
   function body.  That is crucial -- it makes those specialised methods available in the
   specialised body. This are the `const_dict_binds`.
 
-* Where the dicionary binding depends on locally-quanitified dictionries, we just discard
+* Where the dicionary binding depends on locally-quantified dictionries, we just discard
   the binding, and pass the dictionary to the specialised function directly. No type-class
   specialisation arises thereby.
 
 Some wrinkles:
 
-(DS1) The `const-dict_binds` /can/ depend on locally-quantifed type vaiables.
+(DS1) The `const_dict_binds` /can/ depend on locally-quantifed type vaiables.
   For example, if we have
       instance Monad (ST s) where ...
-  the the dictionary for (Monad (ST s)) is effectlvely a constant dictionary.  This
-  is important to get specialisation for such types.  Emxample in test T8331.
+  the dictionary for (Monad (ST s)) is effectively a constant dictionary.  This
+  is important to get specialisation for such types.  Example in test T8331.
 
 -}
 

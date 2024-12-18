@@ -1739,7 +1739,7 @@ over it.   Here is how:
 * Here (ref :: TcRef [TyVar]) collects the type variables thus skolemised;
   again see `commitFlexi`.
 
-* When zonking af RULE, in `zonkRule` we
+* When zonking a RULE, in `zonkRule` we
    - make a fresh ref-cell to collect the skolemised type variables,
    - zonk the binders and LHS with ze_flexi = SkolemiseFlexi ref
    - read the ref-cell to get all the skolemised TyVars
@@ -1750,7 +1750,7 @@ All this applies for SPECIALISE pragmas too.
 Wrinkles:
 
 (FTV1) We just add the new tyvars to the front of the binder-list, but
-  that make make the list not be in dependency order.  Example (T12925):
+  that may make the list not be in dependency order.  Example (T12925):
   the existing list is  [k:Type, b:k], and we add (a:k) to the front.
   Also we just collect the new skolemised type variables in any old order,
   so they may not be ordered with respect to each other.

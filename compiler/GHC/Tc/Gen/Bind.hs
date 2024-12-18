@@ -918,7 +918,7 @@ mkExport prag_fn residual insoluble qtvs theta
         ; spec_prags <- tcExtendIdEnv1 poly_name poly_id $
                         tcSpecPrags poly_id prag_sigs
                         -- tcSpecPrags requires a zonked poly_id.  It also needs poly_id to
-                        -- be in the type env (so we can typecheck the SPECIALISE expression
+                        -- be in the type env (so we can typecheck the SPECIALISE expression)
 
         -- See Note [Impedance matching]
         -- NB: we have already done checkValidType, including an ambiguity check,

@@ -689,10 +689,11 @@ There are two major routes:
   - Deals with SPECIALISE pragmas have multiple signatures
        {-# SPECIALISE f :: Int -> Int, Float -> Float #-}
   - See Note [Handling old-form SPECIALISE pragmas]
+  - Deprecated, to be removed in GHC 9.18 as per #25540.
 
 * New form, described in GHC Proposal #493
   - Handled by `SpecSigE` and `SpecPragE`
-  - Deals with SPECIALISE pramgas which may have value arguments
+  - Deals with SPECIALISE pragmas which may have value arguments
        {-# SPECIALISE f @Int 3 #-}
   - See Note [Handling new-form SPECIALISE pragmas]
 
@@ -708,6 +709,7 @@ for-alls at the top.  e.g.
     {-# SPECIALISE forall x xs. f2 (x:xs) #-}
     {-# SPECIALISE f3 :: Int -> Int #-}
     {-# SPECIALISE (f4 :: Int -> Int) 5 #-}
+    {-# SPECIALISE forall a. forall x xs. f5 @a @a (x:xs) #-}
 
 See `GHC.Rename.Bind.checkSpecESigShape` for the shape-check.
 
@@ -729,7 +731,7 @@ We want to generate:
 
 Note that
 
-* The `rule_bndrs`, over which the RULE is quantified, are all the varaibles
+* The `rule_bndrs`, over which the RULE is quantified, are all the variables
   free in the call to `f`, /ignoring/ all dictionary simplification.  Why?
   Because we want to make the rule maximimally applicable; provided the types
   match, the dicionaries should match.
@@ -741,20 +743,20 @@ Note that
   equal at the call site.
 
 * The `spec_bnrs`, which are lambda-bound in the specialised function `$sf`,
-  are a subset of `rul_bndrs`.
+  are a subset of `rule_bndrs`.
 
     spec_bndrs = @p (d2::Eq p) (x::Int) (y::p)
 
 * The `spec_const_binds` make up the difference between `rule_bndrs` and
   `spec_bndrs`.  They communicate the specialisation!
-   If `spec_bndrs` = `rule_bndrs`, no specialisation has happended.
+   If `spec_bndrs` = `rule_bndrs`, no specialisation has happened.
 
     spec_const_binds =  let d1 = $fEqInt
                             d3 = d2
 
 How it works:
 
-* `GHC.Tc.Gen.Sig.tcSpecPrag` just typechecks the expresion, putting the results
+* `GHC.Tc.Gen.Sig.tcSpecPrag` just typechecks the expression, putting the results
   into a `SpecPragE` record.  Nothing very exciting happens here.
 
 * `GHC.Tc.Zonk.Type.zonkLTcSpecPrags` does a little extra work to collect any
@@ -763,19 +765,20 @@ How it works:
 
 * `GHC.HsToCore.Binds.dsSpec` does the clever stuff:
 
-  * Simplifies the expression. This is important becuase a type signature in the
+  * Simplifies the expression. This is important because a type signature in the
     expression will have led to type/dictionary abstractions/applications.  Now
     it should look like
            let <dict-binds> in f e1 e1 e3
 
   * `prepareSpecLHS` identifies the `spec_const_binds` (see above), discards
-    the other ditionary bindigns, and decomposes the call.
+    the other dictionary bindings, and decomposes the call.
 
   * Then it can build the RULE and specialised function.
 
 
 Note [Handling old-form SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+NB: this code path is deprecated, and is scheduled to be removed in GHC 9.18, as per #25440.
 We check that
    (forall a b. Num a => a -> b -> a)
       is more polymorphic than
@@ -958,7 +961,7 @@ tcSpecPrag poly_id (SpecSigE nm bndrs spec_e inl)
                    runTcSWithEvBinds ev_binds_var $
                    solveWanteds wanted
 
-       -- Quantifiy over the the constraints
+       -- Quantify over the the constraints
        ; qevs <- mapM newEvVar $
                  ctsPreds      $
                  approximateWC False wanted
@@ -1066,7 +1069,7 @@ That seems enough for now.
 
 Note [Typechecking rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-We *infer* the typ of the LHS, and use that type to *check* the type of
+We *infer* the type of the LHS, and use that type to *check* the type of
 the RHS.  That means that higher-rank rules work reasonably well. Here's
 an example (test simplCore/should_compile/rule2.hs) produced by Roman:
 

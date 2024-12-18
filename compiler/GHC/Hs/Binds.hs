@@ -830,10 +830,10 @@ data TcSpecPrags
                         -- be macro-expanded at every call site
   | SpecPrags [LTcSpecPrag]
 
--- | Located Type checker Specification Pragmas
+-- | Located Type checker Specialisation Pragmas
 type LTcSpecPrag = Located TcSpecPrag
 
--- | Type checker Specification Pragma
+-- | Type checker Specialisation Pragma
 -- This data type is used briefly, to communicate between the typechecker and renamer
 data TcSpecPrag
   = SpecPrag Id HsWrapper InlinePragma
