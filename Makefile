@@ -224,7 +224,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE1)' \
 	  $(CABAL) build --project-file=cabal.project-stage1 \
-	  rts ghc-prim \
+	  rts ghc-prim ghc-bignum \
 	  --with-compiler=`pwd`/_build/stage0/bin/ghc \
 	  --with-hc-pkg=`pwd`/_build/stage0/bin/ghc-pkg \
 	  --ghc-options="-ghcversion-file=`pwd`/_build/stage1/src/libraries/rts/include/ghcversion.h" \
