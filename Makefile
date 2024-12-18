@@ -215,6 +215,11 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	  --ghc-options='-this-unit-id=rts' \
 	  --builddir=_build/stage1/cabal/
 	
+	# generate files related to primops
+
+	gcc -E -undef -traditional -P -x c  _build/stage1/src/libraries/ghc/GHC/Builtin/primops.txt.pp > _build/stage1/src/libraries/ghc/GHC/Builtin/primops.txt
+	_build/stage0/bin/genprimopcode --make-haskell-source < _build/stage1/src/libraries/ghc/GHC/Builtin/primops.txt > _build/stage1/src/libraries/ghc-prim/GHC/Prim.hs
+	_build/stage0/bin/genprimopcode --make-haskell-wrappers < _build/stage1/src/libraries/ghc/GHC/Builtin/primops.txt >  _build/stage1/src/libraries/ghc-prim/GHC/PrimopWrappers.hs
 
 
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE1)' \
