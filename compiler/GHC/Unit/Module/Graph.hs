@@ -301,6 +301,8 @@ mgMember graph k = isJust $ snd (mg_graph graph) k
 --------------------------------------------------------------------------------
 
 -- | Return all nodes reachable from the given 'NodeKey'.
+--
+-- @Nothing@ if the key couldn't be found in the graph.
 mgReachable :: ModuleGraph -> NodeKey -> Maybe [ModuleGraphNode]
 mgReachable mg nk = map summaryNodeSummary <$> modules_below where
   (td_map, lookup_node) = mg_graph mg

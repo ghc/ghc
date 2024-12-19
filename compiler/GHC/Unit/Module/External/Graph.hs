@@ -7,13 +7,13 @@ module GHC.Unit.Module.External.Graph
     --
     -- | A module graph for the EPS.
     ExternalModuleGraph, ExternalGraphNode(..),
-    emptyExternalModuleGraph, externalKey
+    emptyExternalModuleGraph
 
     -- * Extending
     --
     -- | The @'ExternalModuleGraph'@ is a structure which is incrementally
     -- updated as the 'ExternalPackageState' (EPS) is updated (when an iface is
-    -- loaded, in 'loadInterface'.
+    -- loaded, in 'loadInterface').
     --
     -- Therefore, there is an operation for extending the 'ExternalModuleGraph',
     -- unlike @'GHC.Unit.Module.Graph.ModuleGraph'@, which is constructed once
@@ -42,7 +42,13 @@ module GHC.Unit.Module.External.Graph
     -- are also loaded), see @'loadHomePackageInterfacesBelow'@ in
     -- 'GHC.Iface.Load'.
   , isFullyLoadedModule
-  , setFullyLoadedModule -- arguably, this should happen by construction after the modules are fully loaded, but fine.
+  , setFullyLoadedModule
+
+    -- * Reachability
+    --
+    -- | Fast reachability queries on the external module graph. Similar to
+    -- reachability queries on 'GHC.Unit.Module.Graph'.
+  , emgReachable
   ) where
 
 import GHC.Prelude
@@ -53,6 +59,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
 import GHC.Utils.Outputable
+import GHC.Unit.Types (UnitId)
 
 --------------------------------------------------------------------------------
 -- * Main
@@ -74,18 +81,25 @@ data ExternalGraphNode
   = NodeHomePackage
       { externalNodeKey :: ModNodeKeyWithUid
       , externalNodeDeps :: [ExternalKey] }
-  -- possibly more constructors | ...
+  -- | A node for packages with at least one module loaded in the EPS.
+  --
+  -- Edge from A to NodeExternalPackage p when A has p as a direct package
+  -- dependency.
+  | NodeExternalPackage
+      { externalPkgKey :: UnitId
+      , externalPkgDeps :: [UnitId]
+      }
 
-newtype ExternalKey = ExternalModuleKey ModNodeKeyWithUid
-  deriving (Eq, Ord, Outputable)
-
-externalKey :: ExternalGraphNode -> ExternalKey
-externalKey (NodeHomePackage k _) = ExternalModuleKey k
+data ExternalKey
+  = ExternalModuleKey ModNodeKeyWithUid
+  | ExternalPackageKey UnitId
+  deriving (Eq, Ord)
 
 emptyExternalModuleGraph :: ExternalModuleGraph
 emptyExternalModuleGraph = ExternalModuleGraph [] (graphReachability emptyGraph, const Nothing) S.empty
 
 mkExternalModuleGraph :: [ExternalGraphNode] -> S.Set ExternalKey -> ExternalModuleGraph
+-- romes:todo: does this also need to be defined in terms of extend (like for `ModuleGraph`?)
 mkExternalModuleGraph nodes loaded =
   ExternalModuleGraph {
       external_nodes = nodes
@@ -104,15 +118,40 @@ extendExternalModuleGraph node graph = mkExternalModuleGraph (node : external_no
 -- * Loading
 --------------------------------------------------------------------------------
 
+isFullyLoadedModule :: ExternalKey -> ExternalModuleGraph -> Bool
+isFullyLoadedModule key graph = S.member key (external_fully_loaded graph)
+
 setFullyLoadedModule :: ExternalKey -> ExternalModuleGraph -> ExternalModuleGraph
 setFullyLoadedModule key graph = graph { external_fully_loaded = S.insert key (external_fully_loaded graph)}
 
-isFullyLoadedModule :: ExternalKey -> ExternalModuleGraph -> Bool
-isFullyLoadedModule key graph = S.member key (external_fully_loaded graph)
+--------------------------------------------------------------------------------
+-- * Reachability
+--------------------------------------------------------------------------------
+
+-- | Return all nodes reachable from the given key, also known as its full
+-- transitive closure.
+--
+-- @Nothing@ if the key couldn't be found in the graph.
+emgReachable :: ExternalModuleGraph -> ExternalKey -> Maybe [ExternalGraphNode]
+emgReachable mg nk = map node_payload <$> modules_below where
+  (td_map, lookup_node) = external_trans mg
+  modules_below =
+    allReachable td_map <$> lookup_node nk
 
 --------------------------------------------------------------------------------
 -- * Internals
 --------------------------------------------------------------------------------
+
+-- | Get the dependencies of an 'ExternalNode'
+emgNodeDeps :: ExternalGraphNode -> [ExternalKey]
+emgNodeDeps = \case
+  NodeHomePackage _ dps -> dps
+  NodeExternalPackage _ dps -> map ExternalPackageKey dps
+
+-- | The graph key for a given node
+externalKey :: ExternalGraphNode -> ExternalKey
+externalKey (NodeHomePackage k _) = ExternalModuleKey k
+externalKey (NodeExternalPackage k _) = ExternalPackageKey k
 
 -- | Turn a list of graph nodes into an efficient queriable graph.
 externalGraphNodes ::
@@ -126,7 +165,7 @@ externalGraphNodes summaries =
 
       where
         go (s, key) = DigraphNode s key $ out_edge_keys $
-                          (externalNodeDeps s)
+                          (emgNodeDeps s)
 
     numbered_summaries = zip summaries [1..]
 
@@ -149,3 +188,9 @@ externalGraphNodes summaries =
 instance Outputable ExternalGraphNode where
   ppr = \case
     NodeHomePackage mk ds -> text "NodeHomePackage" <+> ppr mk <+> ppr ds
+    NodeExternalPackage mk ds -> text "NodeExternalPackage" <+> ppr mk <+> ppr ds
+
+instance Outputable ExternalKey where
+  ppr = \case
+    ExternalModuleKey mk -> text "ExternalModuleKey" <+> ppr mk
+    ExternalPackageKey uid -> text "ExternalPackageKey" <+> ppr uid
