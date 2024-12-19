@@ -59,8 +59,10 @@ usage() {
     echo "  prepare_docs       prepare the documentation directory"
     echo "  upload_docs        upload documentation downloads.haskell.org"
     echo "  upload             upload the tarballs and documentation to downloads.haskell.org"
+    echo "  set_symlink <symlink>"
+    echo "                     set the given symlink (e.g. latest) to the current version"
     echo "  purge_all          purge entire release from the CDN"
-    echo "  purge_file file    purge a given file from the CDN"
+    echo "  purge_file <file>  purge a given file from the CDN"
     echo "  verify             verify the signatures in this directory"
     echo
 }
@@ -198,6 +200,14 @@ function upload_docs() {
         args+=( "--publish" )
     fi
     "$GHC_TREE/.gitlab/rel_eng/upload_ghc_libs.py" upload --docs=hackage_docs ${args[@]}
+}
+
+function set_symlink() {
+    local SYMLINK="$1"
+    # Check to make sure that the indicated version actually exists.
+    curl "https://downloads.haskell.org/ghc/$ver" > /dev/null || (echo "$ver doesn't exist"; exit 1)
+    echo -e "rm ghc/$SYMLINK\nln -s $ver ghc/$SYMLINK" | sftp ghc@downloads-origin.haskell.org
+    curl -X PURGE "http://downloads.haskell.org/~ghc/$SYMLINK"
 }
 
 if [ "x$1" == "x" ]; then
