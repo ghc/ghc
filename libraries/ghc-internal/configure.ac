@@ -6,6 +6,8 @@ AC_CONFIG_SRCDIR([include/HsBase.h])
 
 AC_CONFIG_HEADERS([include/HsBaseConfig.h include/EventConfig.h])
 
+CPPFLAGS="-I$srcdir $CPPFLAGS"
+
 AC_PROG_CC
 dnl make extensions visible to allow feature-tests to detect them later on
 AC_USE_SYSTEM_EXTENSIONS
@@ -402,10 +404,10 @@ AS_IF([test "x$with_libcharset" != xno],
 
 fi
 
-dnl Calling AC_CHECK_TYPE(T) makes AC_CHECK_SIZEOF(T) abort on failure
-dnl instead of considering sizeof(T) as 0.
-AC_CHECK_TYPE([struct MD5Context], [], [AC_MSG_ERROR([internal error])], [#include "include/md5.h"])
 AC_CHECK_SIZEOF([struct MD5Context], [], [#include "include/md5.h"])
+AS_IF([test "$ac_cv_sizeof_struct_MD5Context" -eq 0],[
+  AC_MSG_ERROR([cannot determine sizeof(struct MD5Context)])
+])
 
 AC_SUBST(EXTRA_LIBS)
 AC_CONFIG_FILES([ghc-internal.buildinfo include/HsIntegerGmp.h])
