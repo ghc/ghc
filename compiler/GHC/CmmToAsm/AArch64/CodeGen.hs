@@ -454,7 +454,7 @@ getArithImm n w
   -- TODO: Handle sign extension
   | n <= 0
   = Nothing
-  -- Fits in 16 bits
+
   -- Fits in 12 bits
   | sized_n < 2^(12::Int)
   = Just $ OpImm (ImmInteger truncated)
@@ -1522,6 +1522,7 @@ genCondJump
     -> NatM InstrBlock
 genCondJump bid expr = do
     case expr of
+      -- If there is a literal the Cmm optimizer puts it as the 2nd argument.
       -- Optimized == 0 case.
       CmmMachOp (MO_Eq w) [x, CmmLit (CmmInt 0 _)] -> do
         (reg_x, _format_x, code_x) <- getSomeReg x
@@ -1535,27 +1536,48 @@ genCondJump bid expr = do
       -- Generic case.
       CmmMachOp mop [x, y] -> do
 
-        let ubcond w cmp = do
+        -- Encode y either as an immediate, or store it in a register operand
+        -- with the currect extension
+        let get_y_op :: Width -> Bool -> NatM (Operand, OrdList Instr)
+            get_y_op w is_signed = case y of
+              -- We trancate the value to operation width, not literal width.
+              CmmLit (CmmInt i _w)
+                | Just op <- getArithImm i w
+                -> pure $ (op, nilOL)
+              _ -> do
+                (reg_y, _format_y, code_y) <- getSomeReg y
+                let op = if is_signed
+                            then case w of
+                              W8  -> OpRegExt w reg_y ESXTB 0
+                              W16 -> OpRegExt w reg_y ESXTH 0
+                              _ -> OpReg w reg_y
+                            else case w of
+                              W8  -> OpRegExt w reg_y EUXTB 0
+                              W16 -> OpRegExt w reg_y EUXTH 0
+                              _ -> OpReg w reg_y
+
+                return (op, code_y)
+
+            ubcond w cmp = do
                 -- compute both sides.
                 (reg_x, _format_x, code_x) <- getSomeReg x
-                (reg_y, _format_y, code_y) <- getSomeReg y
+                (y', code_y) <- get_y_op w False
+
                 let x' = OpReg w reg_x
-                    y' = OpReg w reg_y
                 return $ case w of
-                  W8  -> code_x `appOL` code_y `appOL` toOL [ UXTB x' x', UXTB y' y', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
-                  W16 -> code_x `appOL` code_y `appOL` toOL [ UXTH x' x', UXTH y' y', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
-                  _   -> code_x `appOL` code_y `appOL` toOL [                         CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+                  W8  -> code_x `appOL` code_y `appOL` toOL [ UXTB x' x', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+                  W16 -> code_x `appOL` code_y `appOL` toOL [ UXTH x' x', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+                  _   -> code_x `appOL` code_y `appOL` toOL [             CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
 
             sbcond w cmp = do
-                -- compute both sides.
+                -- compute both sides..
                 (reg_x, _format_x, code_x) <- getSomeReg x
-                (reg_y, _format_y, code_y) <- getSomeReg y
+                (y', code_y) <- get_y_op w True
                 let x' = OpReg w reg_x
-                    y' = OpReg w reg_y
                 return $ case w of
-                  W8  -> code_x `appOL` code_y `appOL` toOL [ SXTB x' x', SXTB y' y', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
-                  W16 -> code_x `appOL` code_y `appOL` toOL [ SXTH x' x', SXTH y' y', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
-                  _   -> code_x `appOL` code_y `appOL` toOL [                         CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+                  W8  -> code_x `appOL` code_y `appOL` toOL [ SXTB x' x', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+                  W16 -> code_x `appOL` code_y `appOL` toOL [ SXTH x' x', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+                  _   -> code_x `appOL` code_y `appOL` toOL [             CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
 
             fbcond w cmp = do
               -- ensure we get float regs

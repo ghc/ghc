@@ -4,7 +4,7 @@
 
 module GHC.Cmm.MachOp
     ( MachOp(..)
-    , pprMachOp, isCommutableMachOp, isAssociativeMachOp
+    , pprMachOp, isCommutableMachOp, commuteMachOpArgs, isAssociativeMachOp
     , isComparisonMachOp, maybeIntComparison, machOpResultType
     , machOpArgReps, maybeInvertComparison, isFloatComparison
     , isCommutableCallishMachOp
@@ -336,6 +336,23 @@ isCommutableMachOp mop =
         MO_F_Min {}             -> True
         MO_F_Max {}             -> True
         _other                  -> False
+
+-- x > y ==> y < x
+commuteMachOpArgs :: MachOp -> a -> b -> Maybe (MachOp,b,a)
+commuteMachOpArgs mop x y
+  = case mop of
+    -- Signed comparisons
+    MO_S_Ge w -> Just (MO_S_Le w, y, x)
+    MO_S_Le w -> Just (MO_S_Ge w, y, x)
+    MO_S_Gt w -> Just (MO_S_Lt w, y, x)
+    MO_S_Lt w -> Just (MO_S_Ge w, y, x)
+
+    -- Unsigned comparisons
+    MO_U_Ge w -> Just (MO_U_Le w, y, x)
+    MO_U_Le w -> Just (MO_U_Ge w, y, x)
+    MO_U_Gt w -> Just (MO_U_Lt w, y, x)
+    MO_U_Lt w -> Just (MO_U_Gt w, y, x)
+    _ -> Nothing
 
 -- ----------------------------------------------------------------------------
 -- isAssociativeMachOp

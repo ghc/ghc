@@ -199,6 +199,12 @@ cmmMachOpFoldM platform op [x@(CmmLit _), y]
    | not (isLit y) && isCommutableMachOp op
    = Just $! (cmmMachOpFold platform op [y, x])
 
+   -- We can also turn comparisons around
+   -- e.g. 1 < x  ==>  x >= 1
+   | not (isLit y)
+   , Just (op',y',x') <- commuteMachOpArgs op x y
+   = Just $! (cmmMachOpFold platform op' [y', x'])
+
 -- Turn (a+b)+c into a+(b+c) where possible.  Because literals are
 -- moved to the right, it is more likely that we will find
 -- opportunities for constant folding when the expression is
