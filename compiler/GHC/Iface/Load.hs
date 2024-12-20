@@ -581,7 +581,7 @@ loadInterface doc_str mod from
 
         ; let direct_deps = map (uncurry (flip ModNodeKeyWithUid)) $ (Set.toList (dep_direct_mods $ mi_deps iface))
         ; let direct_pkg_deps = Set.toList (dep_direct_pkgs $ mi_deps iface)
-        ; let !module_graph_key = pprTrace "module_graph_on_load" (ppr (eps_module_graph eps)) $
+        ; let !module_graph_key =
                 if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env
                                     --- ^ home unit mods in eps can only happen in oneshot mode
                   then Just $ NodeHomePackage (miKey iface) (map ExternalModuleKey direct_deps)
