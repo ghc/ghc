@@ -53,6 +53,14 @@ Compiler
 
 - Better type inference in certain situations. (#24810)
 
+- Fixed a bug where the magic `inline` function sometimes failed to inline functions
+  if there were coercions involved. (#24808)
+
+- Fixed a bug where the simplifier sometimes destroyed join points during float out. (#24768)
+
+- PPC NCG: Fix sign hints in C calls. This bug caused segfaults when using FFI under some
+  circumstances. (#23034)
+
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 
@@ -74,6 +82,9 @@ GHCi
 - Replaced some uses of lists with Arrays for better performance during bytecode compilation.
 
 - GHCi: support cross-module inlining of breakpoints. Fixing #24712
+
+- Fix a bug where GHCi would not start alongside a local file called ``Prelude.hs``
+  or ``Prelude.lhs`` (:ghc-ticket:`10920`).
 
 Runtime system
 ~~~~~~~~~~~~~~
