@@ -6,8 +6,9 @@ module GHC.Unit.Module.External.Graph
   ( -- * External Module Graph
     --
     -- | A module graph for the EPS.
-    ExternalModuleGraph, ExternalGraphNode(..),
-    emptyExternalModuleGraph
+    ExternalModuleGraph, ExternalGraphNode(..)
+  , ExternalKey(..), emptyExternalModuleGraph
+  , emgNodeKey, emgNodeDeps
 
     -- * Extending
     --
@@ -49,6 +50,7 @@ module GHC.Unit.Module.External.Graph
     -- | Fast reachability queries on the external module graph. Similar to
     -- reachability queries on 'GHC.Unit.Module.Graph'.
   , emgReachable
+  , emgReachableMany
   ) where
 
 import GHC.Prelude
@@ -107,6 +109,17 @@ mkExternalModuleGraph nodes loaded =
                        in (graphReachability g, f)
     , external_fully_loaded = loaded  }
 
+-- | Get the dependencies of an 'ExternalNode'
+emgNodeDeps :: ExternalGraphNode -> [ExternalKey]
+emgNodeDeps = \case
+  NodeHomePackage _ dps -> dps
+  NodeExternalPackage _ dps -> map ExternalPackageKey dps
+
+-- | The graph key for a given node
+emgNodeKey :: ExternalGraphNode -> ExternalKey
+emgNodeKey (NodeHomePackage k _) = ExternalModuleKey k
+emgNodeKey (NodeExternalPackage k _) = ExternalPackageKey k
+
 --------------------------------------------------------------------------------
 -- * Extending
 --------------------------------------------------------------------------------
@@ -138,20 +151,16 @@ emgReachable mg nk = map node_payload <$> modules_below where
   modules_below =
     allReachable td_map <$> lookup_node nk
 
+-- | Return all nodes reachable from all of the given keys.
+emgReachableMany :: ExternalModuleGraph -> [ExternalKey] -> [ExternalGraphNode]
+emgReachableMany mg nk = map node_payload modules_below where
+  (td_map, lookup_node) = external_trans mg
+  modules_below =
+    allReachableMany td_map (mapMaybe lookup_node nk)
+
 --------------------------------------------------------------------------------
 -- * Internals
 --------------------------------------------------------------------------------
-
--- | Get the dependencies of an 'ExternalNode'
-emgNodeDeps :: ExternalGraphNode -> [ExternalKey]
-emgNodeDeps = \case
-  NodeHomePackage _ dps -> dps
-  NodeExternalPackage _ dps -> map ExternalPackageKey dps
-
--- | The graph key for a given node
-externalKey :: ExternalGraphNode -> ExternalKey
-externalKey (NodeHomePackage k _) = ExternalModuleKey k
-externalKey (NodeExternalPackage k _) = ExternalPackageKey k
 
 -- | Turn a list of graph nodes into an efficient queriable graph.
 externalGraphNodes ::
@@ -177,7 +186,7 @@ externalGraphNodes summaries =
 
     node_map :: M.Map ExternalKey ExternalNode
     node_map =
-      M.fromList [ (externalKey s, node)
+      M.fromList [ (emgNodeKey s, node)
                    | node <- nodes
                    , let s = node_payload node
                    ]

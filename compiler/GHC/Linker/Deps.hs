@@ -38,16 +38,15 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.WholeCoreBindings
 import GHC.Unit.Module.Deps
 import GHC.Unit.Module.Graph
+import GHC.Unit.Module.External.Graph
 import GHC.Unit.Home.ModInfo
 
 import GHC.Iface.Errors.Types
-import GHC.Iface.Errors.Ppr
 
 import GHC.Utils.Misc
 import GHC.Unit.Home
 import GHC.Data.Maybe
 
-import Control.Monad
 import Control.Applicative
 
 import qualified Data.Set as Set
@@ -55,6 +54,9 @@ import Data.List (isSuffixOf)
 
 import System.FilePath
 import System.Directory
+import GHC.Utils.Monad (mapMaybeM)
+import Data.Either (partitionEithers)
+import Data.Bifunctor (Bifunctor(..))
 
 data LinkDepsOpts = LinkDepsOpts
   { ldObjSuffix   :: !String                        -- ^ Suffix of .o files
@@ -68,8 +70,8 @@ data LinkDepsOpts = LinkDepsOpts
   , ldWays        :: !Ways                          -- ^ Enabled ways
   , ldFinderCache :: !FinderCache
   , ldFinderOpts  :: !FinderOpts
-  , ldLoadIface   :: !(SDoc -> Module -> IO (MaybeErr MissingInterfaceError ModIface))
   , ldLoadByteCode :: !(Module -> IO (Maybe Linkable))
+  , ldLoadHomeIfacesBelow :: !((Module -> SDoc) -> [Module] -> IO ExternalModuleGraph)
   }
 
 data LinkDeps = LinkDeps
@@ -102,7 +104,6 @@ getLinkDeps opts interp pls span mods = do
 
       get_link_deps opts pls maybe_normal_osuf span mods
 
-
 get_link_deps
   :: LinkDepsOpts
   -> LoaderState
@@ -111,31 +112,26 @@ get_link_deps
   -> [Module]
   -> IO LinkDeps
 get_link_deps opts pls maybe_normal_osuf span mods = do
-        -- 1.  Find the dependent home-pkg-modules/packages from each iface
+
+      -- Three step process:
+
+        -- 1. Find the dependent home-pkg-modules/packages from each iface
         -- (omitting modules from the interactive package, which is already linked)
-      (mods_s, pkgs_s) <-
-          -- Why two code paths here? There is a significant amount of repeated work
-          -- performed calculating transitive dependencies
-          -- if --make uses the oneShot code path (see MultiLayerModulesTH_* tests)
-          if ldOneShotMode opts
-            then follow_deps (filterOut isInteractiveModule mods)
-                              emptyUniqDSet emptyUniqDSet;
-            else do
-              mmods <- mapM get_mod_info all_home_mods
-              return (catMaybes mmods, mkUniqDSet all_dep_pkgs)
+      (all_home_mods, pkgs_s) <- get_reachable_nodes opts relevant_mods
+      mods_s <- mapMaybeM get_mod_info all_home_mods
 
       let
         -- 2.  Exclude ones already linked
         --      Main reason: avoid findModule calls in get_linkable
-            (mods_needed, links_got) = partitionWith split_mods mods_s
-            pkgs_needed = eltsUDFM $ getUniqDSet pkgs_s `minusUDFM` pkgs_loaded pls
+        (mods_needed, links_got) = partitionWith split_mods mods_s
+        pkgs_needed = eltsUDFM $ getUniqDSet pkgs_s `minusUDFM` pkgs_loaded pls
 
-            split_mods mod =
-                let is_linked = lookupModuleEnv (objs_loaded pls) mod
-                                <|> lookupModuleEnv (bcos_loaded pls) mod
-                in case is_linked of
-                     Just linkable -> Right linkable
-                     Nothing -> Left mod
+        split_mods mod =
+            let is_linked = lookupModuleEnv (objs_loaded pls) mod
+                            <|> lookupModuleEnv (bcos_loaded pls) mod
+            in case is_linked of
+                 Just linkable -> Right linkable
+                 Nothing -> Left mod
 
         -- 3.  For each dependent module, find its linkable
         --     This will either be in the HPT or (in the case of one-shot
@@ -149,20 +145,9 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         , ldNeededUnits     = pkgs_s
         }
   where
-    mod_graph = ldModuleGraph opts
     unit_env  = ldUnitEnv     opts
 
-    mkNk m
-       = let k = NodeKey_Module (ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m))
-         in if mgMember mod_graph k
-              then k
-              else NodeKey_ExternalUnit (moduleUnitId m)
-
-    initial_keys = map mkNk (filterOut isInteractiveModule mods)
-    all_deps = initial_keys ++ map mkNodeKey (mgReachableLoop mod_graph initial_keys)
-
-    all_home_mods = [with_uid | NodeKey_Module with_uid <- all_deps]
-    all_dep_pkgs = [uid | NodeKey_ExternalUnit uid <- all_deps]
+    relevant_mods = filterOut isInteractiveModule mods
 
     get_mod_info (ModNodeKeyWithUid gwib uid) =
       case lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) of
@@ -173,6 +158,10 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
               _          -> return $ Just (mi_module iface)
         Nothing -> throwProgramError opts $
           text "getLinkDeps: Home module not loaded" <+> ppr (gwib_mod gwib) <+> ppr uid
+
+    link_boot_mod_error mod = throwProgramError opts $
+            text "module" <+> ppr mod <+>
+            text "cannot be linked; it is only available as a boot module"
 
 
        -- This code is used in one-shot mode to traverse downwards through the HPT
@@ -190,13 +179,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         = return (uniqDSetToList acc_mods, acc_pkgs)
     follow_deps (mod:mods) acc_mods acc_pkgs
         = do
-          mb_iface <- ldLoadIface opts msg mod
-          iface <- case mb_iface of
-                    Failed err      -> throwProgramError opts $
-                      missingInterfaceErrorDiagnostic (ldMsgOpts opts) err
-                    Succeeded iface -> return iface
-
-          when (mi_boot iface == IsBoot) $ link_boot_mod_error mod
+          iface <- _loadIface opts msg mod
 
           let
             pkg = moduleUnit mod
@@ -220,16 +203,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
             Just home_unit | isHomeUnit home_unit pkg ->  follow_deps (mod_deps' ++ mods)
                                                                       acc_mods' acc_pkgs'
             _ ->  follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
-        where
-           msg = text "need to link module" <+> ppr mod <+>
-                  text "due to use of Template Haskell"
 
-
-
-    link_boot_mod_error :: Module -> IO a
-    link_boot_mod_error mod = throwProgramError opts $
-            text "module" <+> ppr mod <+>
-            text "cannot be linked; it is only available as a boot module"
 
     no_obj :: Outputable a => a -> IO b
     no_obj mod = dieWith opts span $
@@ -299,6 +273,54 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
               CoreBindings WholeCoreBindings {wcb_module} ->
                 pprPanic "Unhydrated core bindings" (ppr wcb_module)
 
+-- See Note [Reachability in One-shot mode vs Make mode]
+get_reachable_nodes :: LinkDepsOpts -> [Module] -> IO ([ModNodeKeyWithUid], UniqDSet UnitId)
+get_reachable_nodes opts mods
+
+  -- Reachability on 'ExternalModuleGraph' (for one shot mode)
+  | ldOneShotMode opts
+  = do
+    emg <- ldLoadHomeIfacesBelow opts msg mods
+    go (ExternalModuleKey . mkModuleNk) emgNodeKey (emgReachableMany emg) (map emgProject)
+
+  -- Reachability on 'ModuleGraph' (for --make mode)
+  | otherwise
+  = go hmgModKey mkNodeKey (mgReachableLoop hmGraph) (catMaybes . map hmgProject)
+
+  where
+    mkModuleNk m = ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m)
+    msg mod =
+      text "need to link module" <+> ppr mod <+>
+        text "and the modules below it, due to use of Template Haskell"
+
+    hmGraph = ldModuleGraph opts
+
+    hmgModKey m
+      | let k = NodeKey_Module (mkModuleNk m)
+      , mgMember hmGraph k = k
+      | otherwise = NodeKey_ExternalUnit (moduleUnitId m)
+
+    hmgProject = \case
+      NodeKey_Module with_uid  -> Just $ Left  with_uid
+      NodeKey_ExternalUnit uid -> Just $ Right uid
+      _                        -> Nothing
+
+    emgProject = \case
+      ExternalModuleKey with_uid -> Left  with_uid
+      ExternalPackageKey uid     -> Right uid
+
+    -- The main driver for getting dependencies, which calls the given
+    -- functions to compute the reachable nodes.
+    go :: (Module -> key)
+       -> (node -> key)
+       -> ([key] -> [node])
+       -> ([key] -> [Either ModNodeKeyWithUid UnitId])
+       -> IO ([ModNodeKeyWithUid], UniqDSet UnitId)
+    go modKey nodeKey manyReachable project
+      | let mod_keys = map modKey mods
+      = pure $ second mkUniqDSet $ partitionEithers $ project $
+          mod_keys ++ map nodeKey (manyReachable mod_keys)
+
 {-
 Note [Using Byte Code rather than Object Code for Template Haskell]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -322,6 +344,30 @@ The only other place where the flag is consulted is when enabling code generatio
 with `-fno-code`, which does so to anticipate what decision we will make at the
 splice point about what we would prefer.
 
+Note [Reachability in One-shot mode vs Make mode]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Why are there two code paths in `get_reachable_nodes`? (ldOneShotMode vs otherwise)
+
+In one-shot mode, the home package modules are loaded into the EPS,
+whereas for --make mode, the home package modules are in the HUG/HPT.
+
+For both of these cases, we cache the calculation of transitive
+dependencies in a 'ModuleGraph'. For the --make case, the relevant
+'ModuleGraph' is in the EPS, the other case uses the 'ModuleGraph'
+for the home modules.
+
+The home modules graph is known statically after downsweep.
+On the contrary, the EPS module graph is only extended when a
+module is loaded into the EPS -- which is done lazily as needed.
+Therefore, for get_link_deps, we need to force the transitive
+closure to be loaded before querying the graph for the reachable
+link dependencies -- done in the call to 'ldLoadHomeIfacesBelow'.
+Because we cache the transitive closure, this work is only done once.
+
+After forcing the modules with the call to 'ldLoadHomeIfacesBelow' in
+'get_reachable_nodes', the external module graph has all edges needed to
+compute the full transitive closure so we can proceed just like we do in the
+second path with a normal module graph.
 -}
 
 dieWith :: LinkDepsOpts -> SrcSpan -> SDoc -> IO a

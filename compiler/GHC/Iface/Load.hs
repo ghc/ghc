@@ -25,6 +25,7 @@ module GHC.Iface.Load (
         -- IfM functions
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
+        loadHomePackageInterfacesBelow,
         findAndReadIface, readIface, writeIface,
         flagsToIfCompression,
         moduleFreeHolesPrecise,
@@ -122,6 +123,7 @@ import GHC.Iface.Errors.Types
 import Data.Function ((&))
 import qualified Data.Set as Set
 import GHC.Unit.Module.Graph
+import GHC.Linker.Deps (throwProgramError)
 
 {-
 ************************************************************************
@@ -410,20 +412,53 @@ loadInterfaceWithException doc mod_name where_from
     let ctx = initSDocContext dflags defaultUserStyle
     withIfaceErr ctx (loadInterface doc mod_name where_from)
 
--- | Load all interfaces from the home package, presumes that this operation
--- can be completed by traversing from the already loaded home packages.
+-- | Load all interfaces from the home package that are transitively reachable
+-- from the given modules -- presumes that this operation can be completed by
+-- traversing from the already loaded home packages.
+--
+-- This operation is used just before TH splices are run (in 'getLinkDeps').
+--
+-- TODO: SHOULD WE ASSERT THIS IS ONLY CALLED ON ONESHOT MODE? WE SHOULD NEVER
+-- WANT TO LOAD HOME MODULE PACKAGES INTO THE EPS ANY OTHER WAY.
+--
+-- The first time this is run...??
+--
+-- A field in the EPS tracks which home modules are already fully loaded, which we use
+-- here to avoid trying to load them a second time.
+--
+-- For convenience, reads the module graph out of the EPS after having loaded
+-- all the modules and returns it. It would be harder to get the updated module
+-- graph in 'getLinkDeps' another way.
+loadHomePackageInterfacesBelow :: (Module -> SDoc) -> [Module] -> IfM lcl ()
+loadHomePackageInterfacesBelow msg mods = do
+  dflags <- getDynFlags
+  let ctx = initSDocContext dflags defaultUserStyle
 
--- This operation is used just before TH splices are run.
+  forM mods $ \mod -> do
 
--- The first time this is run
--- A field in the EPS tracks which home modules are fully loaded
-_loadHomePackageInterfacesBelow :: ModNodeKeyWithUid -> IfM lcl ()
-_loadHomePackageInterfacesBelow mn = do
-  graph <- eps_module_graph <$> getEps
-  let key = ExternalModuleKey mn
-  if isFullyLoadedModule key graph
-    then return ()
-    else return ()
+    graph <- eps_module_graph <$> getEps
+    let key = ExternalModuleKey $ ModNodeKeyWithUid (GWIB (moduleName mod) NotBoot) (moduleUnitId mod)
+
+    if isFullyLoadedModule key graph
+      then return ()
+      else do
+        iface <- withIfaceErr ctx $
+          loadInterface msg mod (ImportByUser NotBoot)
+
+        let pkg = moduleUnit mod
+            deps = mi_deps iface
+            pkg_deps = dep_direct_pkgs deps
+            mod_deps = dep_direct_mods deps
+
+      -- Load all modules from the home package
+      -- (IS THIS FROM THE HOME PACKAGE AT THE TIME OF INTERFACE WRITING; OR OF NOW?)
+      pprTraceM "loadHomePackageInterfacesBelow" (ppr mod_deps)
+
+      -- RM:TODO: Does this make any sense here?
+      -- when (mi_boot iface == IsBoot) $ link_boot_mod_error mod
+
+      let graph' = setFullyLoadedModule key graph
+      _
 
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
@@ -534,10 +569,12 @@ loadInterface doc_str mod from
         ; purged_hsc_env <- getTopEnv
 
         ; let direct_deps = map (uncurry (flip ModNodeKeyWithUid)) $ (Set.toList (dep_direct_mods $ mi_deps iface))
-        ; let !module_graph_key =
-                if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env
+        ; let !module_graph_key = pprTrace "module_graph_on_load" (ppr (external_nodes $ eps_module_graph eps)) $
+                if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env -- can only happen in oneshot mode
                   then Just $ NodeHomePackage (miKey iface) (map ExternalModuleKey direct_deps)
                   else Nothing
+        -- ; let !module_graph_external_pkgs_nods = _
+                -- ROMES:TODO: Fairly sure we need to insert package nodes somewhere here.
 
         ; let final_iface = iface
                                & set_mi_decls     (panic "No mi_decls in PIT")
