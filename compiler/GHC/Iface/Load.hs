@@ -580,12 +580,20 @@ loadInterface doc_str mod from
         ; purged_hsc_env <- getTopEnv
 
         ; let direct_deps = map (uncurry (flip ModNodeKeyWithUid)) $ (Set.toList (dep_direct_mods $ mi_deps iface))
+        ; let direct_pkg_deps = Set.toList (dep_direct_pkgs $ mi_deps iface)
         ; let !module_graph_key = pprTrace "module_graph_on_load" (ppr (eps_module_graph eps)) $
-                if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env -- can only happen in oneshot mode
+                if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env
+                                    --- ^ home unit mods in eps can only happen in oneshot mode
                   then Just $ NodeHomePackage (miKey iface) (map ExternalModuleKey direct_deps)
                   else Nothing
-        -- ; let !module_graph_external_pkgs_nods = _
-                -- ROMES:TODO: Fairly sure we need to insert package nodes somewhere here.
+        ; let !module_graph_pkg_key = do
+                let pkg_key = toUnitId $ moduleUnit (mi_module iface)
+                pkg_node <- emgLookupKey (ExternalPackageKey pkg_key) (eps_module_graph eps)
+                case pkg_node of
+                  NodeHomePackage{} -> panic "ExternalPackageKey lookup should never return a NodeHomePackage node"
+                  NodeExternalPackage _ deps_uids -> pure $
+                    NodeExternalPackage pkg_key (deps_uids ++ direct_pkg_deps)
+
 
         ; let final_iface = iface
                                & set_mi_decls     (panic "No mi_decls in PIT")
@@ -627,9 +635,14 @@ loadInterface doc_str mod from
                   eps_iface_bytecode = add_bytecode (eps_iface_bytecode eps),
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,
-                  eps_module_graph = case module_graph_key of
-                                        Just k -> extendExternalModuleGraph k (eps_module_graph eps)
-                                        Nothing -> eps_module_graph eps,
+                  eps_module_graph =
+                    let eps_graph'  = case module_graph_key of
+                                       Just k -> extendExternalModuleGraph k (eps_module_graph eps)
+                                       Nothing -> eps_module_graph eps
+                        eps_graph'' = case module_graph_pkg_key of
+                                        Just k -> extendExternalModuleGraph k eps_graph'
+                                        Nothing -> eps_graph'
+                     in eps_graph'',
                   eps_complete_matches
                                    = eps_complete_matches eps ++ new_eps_complete_matches,
                   eps_inst_env     = extendInstEnvList (eps_inst_env eps)
