@@ -76,7 +76,7 @@ import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 
 import GHC.Unit.Env
-import GHC.Unit.External (ExternalPackageState (EPS, eps_iface_bytecode))
+import GHC.Unit.External (ExternalPackageState (EPS, eps_iface_bytecode, eps_module_graph))
 import GHC.Unit.Module
 import GHC.Unit.State as Packages
 
@@ -603,12 +603,16 @@ initLinkDepsOpts hsc_env = opts
             , ldUseByteCode = gopt Opt_UseBytecodeRatherThanObjects dflags
             , ldMsgOpts     = initIfaceMessageOpts dflags
             , ldWays        = ways dflags
-            , ldLoadIface
+            , ldLoadHomeIfacesBelow
             , ldLoadByteCode
             }
     dflags = hsc_dflags hsc_env
-    ldLoadIface msg mod = initIfaceCheck (text "loader") hsc_env
-                          $ loadInterface msg mod (ImportByUser NotBoot)
+    ldLoadHomeIfacesBelow msg hu mods
+      = do
+        initIfaceCheck (text "loader") hsc_env
+          $ loadHomePackageInterfacesBelow msg hu mods
+        -- Read the module graph only after `loadHomePackageInterfacesBelow`
+        eps_module_graph <$> hscEPS hsc_env
 
     ldLoadByteCode mod = do
       EPS {eps_iface_bytecode} <- hscEPS hsc_env

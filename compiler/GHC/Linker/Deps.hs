@@ -36,7 +36,6 @@ import GHC.Unit.Finder
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.WholeCoreBindings
-import GHC.Unit.Module.Deps
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.External.Graph
 import GHC.Unit.Home.ModInfo
@@ -49,7 +48,6 @@ import GHC.Data.Maybe
 
 import Control.Applicative
 
-import qualified Data.Set as Set
 import Data.List (isSuffixOf)
 
 import System.FilePath
@@ -71,7 +69,8 @@ data LinkDepsOpts = LinkDepsOpts
   , ldFinderCache :: !FinderCache
   , ldFinderOpts  :: !FinderOpts
   , ldLoadByteCode :: !(Module -> IO (Maybe Linkable))
-  , ldLoadHomeIfacesBelow :: !((Module -> SDoc) -> [Module] -> IO ExternalModuleGraph)
+  , ldLoadHomeIfacesBelow :: !((Module -> SDoc) -> Maybe HomeUnit {- current home unit -}
+                                -> [Module] -> IO ExternalModuleGraph)
   }
 
 data LinkDeps = LinkDeps
@@ -163,48 +162,6 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
             text "module" <+> ppr mod <+>
             text "cannot be linked; it is only available as a boot module"
 
-
-       -- This code is used in one-shot mode to traverse downwards through the HPT
-       -- to find all link dependencies.
-       -- The ModIface contains the transitive closure of the module dependencies
-       -- within the current package, *except* for boot modules: if we encounter
-       -- a boot module, we have to find its real interface and discover the
-       -- dependencies of that.  Hence we need to traverse the dependency
-       -- tree recursively.  See bug #936, testcase ghci/prog007.
-    follow_deps :: [Module]             -- modules to follow
-                -> UniqDSet Module         -- accum. module dependencies
-                -> UniqDSet UnitId          -- accum. package dependencies
-                -> IO ([Module], UniqDSet UnitId) -- result
-    follow_deps []     acc_mods acc_pkgs
-        = return (uniqDSetToList acc_mods, acc_pkgs)
-    follow_deps (mod:mods) acc_mods acc_pkgs
-        = do
-          iface <- _loadIface opts msg mod
-
-          let
-            pkg = moduleUnit mod
-            deps  = mi_deps iface
-
-            pkg_deps = dep_direct_pkgs deps
-            (boot_deps, mod_deps) = flip partitionWith (Set.toList (dep_direct_mods deps)) $
-              \case
-                (_, GWIB m IsBoot)  -> Left m
-                (_, GWIB m NotBoot) -> Right m
-
-            mod_deps' = case ue_homeUnit unit_env of
-                          Nothing -> []
-                          Just home_unit -> filter (not . (`elementOfUniqDSet` acc_mods)) (map (mkHomeModule home_unit) $ (boot_deps ++ mod_deps))
-            acc_mods'  = case ue_homeUnit unit_env of
-                          Nothing -> acc_mods
-                          Just home_unit -> addListToUniqDSet acc_mods (mod : map (mkHomeModule home_unit) mod_deps)
-            acc_pkgs'  = addListToUniqDSet acc_pkgs (Set.toList pkg_deps)
-
-          case ue_homeUnit unit_env of
-            Just home_unit | isHomeUnit home_unit pkg ->  follow_deps (mod_deps' ++ mods)
-                                                                      acc_mods' acc_pkgs'
-            _ ->  follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
-
-
     no_obj :: Outputable a => a -> IO b
     no_obj mod = dieWith opts span $
                      text "cannot find object file for module " <>
@@ -280,8 +237,10 @@ get_reachable_nodes opts mods
   -- Reachability on 'ExternalModuleGraph' (for one shot mode)
   | ldOneShotMode opts
   = do
-    emg <- ldLoadHomeIfacesBelow opts msg mods
+    emg <- ldLoadHomeIfacesBelow opts msg (ue_homeUnit (ldUnitEnv opts)) mods
     go (ExternalModuleKey . mkModuleNk) emgNodeKey (emgReachableMany emg) (map emgProject)
+    --romes:todo:^ make sure we only get non-boot files out of this. perhaps as
+    --easy as filtering them out by ModNodeKeyWithUid with is boot information.
 
   -- Reachability on 'ModuleGraph' (for --make mode)
   | otherwise

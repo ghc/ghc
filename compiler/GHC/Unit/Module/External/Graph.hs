@@ -203,3 +203,7 @@ instance Outputable ExternalKey where
   ppr = \case
     ExternalModuleKey mk -> text "ExternalModuleKey" <+> ppr mk
     ExternalPackageKey uid -> text "ExternalPackageKey" <+> ppr uid
+
+instance Outputable ExternalModuleGraph where
+  ppr ExternalModuleGraph{external_nodes, external_fully_loaded}
+    = text "ExternalModuleGraph" <+> ppr external_nodes <+> ppr external_fully_loaded

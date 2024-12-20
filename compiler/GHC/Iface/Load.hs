@@ -123,7 +123,6 @@ import GHC.Iface.Errors.Types
 import Data.Function ((&))
 import qualified Data.Set as Set
 import GHC.Unit.Module.Graph
-import GHC.Linker.Deps (throwProgramError)
 
 {-
 ************************************************************************
@@ -429,12 +428,14 @@ loadInterfaceWithException doc mod_name where_from
 -- For convenience, reads the module graph out of the EPS after having loaded
 -- all the modules and returns it. It would be harder to get the updated module
 -- graph in 'getLinkDeps' another way.
-loadHomePackageInterfacesBelow :: (Module -> SDoc) -> [Module] -> IfM lcl ()
-loadHomePackageInterfacesBelow msg mods = do
+loadHomePackageInterfacesBelow :: (Module -> SDoc) -> Maybe HomeUnit {-^ The current home unit -}
+                               -> [Module] -> IfM lcl ()
+loadHomePackageInterfacesBelow _ Nothing _ = error "No home unit, what to do?"
+loadHomePackageInterfacesBelow msg (Just home_unit) mods = do
   dflags <- getDynFlags
   let ctx = initSDocContext dflags defaultUserStyle
 
-  forM mods $ \mod -> do
+  forM_ mods $ \mod -> do
 
     graph <- eps_module_graph <$> getEps
     let key = ExternalModuleKey $ ModNodeKeyWithUid (GWIB (moduleName mod) NotBoot) (moduleUnitId mod)
@@ -443,22 +444,32 @@ loadHomePackageInterfacesBelow msg mods = do
       then return ()
       else do
         iface <- withIfaceErr ctx $
-          loadInterface msg mod (ImportByUser NotBoot)
+          loadInterface (msg mod) mod (ImportByUser NotBoot)
 
-        let pkg = moduleUnit mod
-            deps = mi_deps iface
-            pkg_deps = dep_direct_pkgs deps
+        -- RM:TODO: THINGS WE ARE NOT DOING
+        --
+        -- The ModIface contains the transitive closure of the module dependencies
+        -- within the current package, *except* for boot modules: if we encounter
+        -- a boot module, we have to find its real interface and discover the
+        -- dependencies of that.  Hence we need to traverse the dependency
+        -- tree recursively.  See bug #936, testcase ghci/prog007.
+
+        -- RM:TODO: WHAT WAS THIS DOING BEFORE IN FOLLOW_DEPS?
+        -- (was in follow_deps)
+        -- when (mi_boot iface == IsBoot) $ link_boot_mod_error mod
+
+        let deps = mi_deps iface
             mod_deps = dep_direct_mods deps
 
-      -- Load all modules from the home package
-      -- (IS THIS FROM THE HOME PACKAGE AT THE TIME OF INTERFACE WRITING; OR OF NOW?)
-      pprTraceM "loadHomePackageInterfacesBelow" (ppr mod_deps)
+        -- Load all direct dependencies that are in the home package
+        loadHomePackageInterfacesBelow msg (Just home_unit)
+          $ map (\(uid, GWIB mn _) -> mkModule (RealUnit (Definite uid)) mn)
+          $ filter ((==) (homeUnitId home_unit) . fst)
+          $ Set.toList mod_deps
 
-      -- RM:TODO: Does this make any sense here?
-      -- when (mi_boot iface == IsBoot) $ link_boot_mod_error mod
-
-      let graph' = setFullyLoadedModule key graph
-      _
+        -- Update the external graph with this module being fully loaded.
+        updateEps_ $ \eps ->
+          eps{eps_module_graph = setFullyLoadedModule key (eps_module_graph eps)}
 
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
@@ -569,7 +580,7 @@ loadInterface doc_str mod from
         ; purged_hsc_env <- getTopEnv
 
         ; let direct_deps = map (uncurry (flip ModNodeKeyWithUid)) $ (Set.toList (dep_direct_mods $ mi_deps iface))
-        ; let !module_graph_key = pprTrace "module_graph_on_load" (ppr (external_nodes $ eps_module_graph eps)) $
+        ; let !module_graph_key = pprTrace "module_graph_on_load" (ppr (eps_module_graph eps)) $
                 if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env -- can only happen in oneshot mode
                   then Just $ NodeHomePackage (miKey iface) (map ExternalModuleKey direct_deps)
                   else Nothing
