@@ -205,6 +205,25 @@ not-interruptible:
     - if: $NIGHTLY
       when: always
 
+.nix:
+  image: nixos/nix:2.25.2
+  variables:
+    LANG: "C.UTF-8"
+  before_script:
+    - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
+    # Note [Nix-in-Docker]
+    # ~~~~~~~~~~~~~~~~~~~~
+    # The nixos/nix default config is max-jobs=1 and cores=$(logical
+    # cores num) which doesn't play nice with our $CPUS convention. We
+    # fix it before invoking any nix build to avoid oversubscribing
+    # while allowing a reasonable degree of parallelism.
+    # FIXME: Disabling build-users-group=nixbld is a workaround for a Nix-in-Docker issue. See
+    # https://gitlab.haskell.org/ghc/head.hackage/-/issues/38#note_560487 for
+    # discussion.
+    - echo "cores = $CPUS" >> /etc/nix/nix.conf
+    - echo "max-jobs = $CPUS" >> /etc/nix/nix.conf
+    - nix run nixpkgs#gnused -- -i -e 's/ nixbld//' /etc/nix/nix.conf
+
 
 ############################################################
 # Validate jobs
@@ -255,6 +274,24 @@ typecheck-testsuite:
     - mypy testsuite/driver/runtests.py
   dependencies: []
 
+lint-boot-tags:
+  extends: [.lint, .nix]
+  script:
+    - nix run ./utils/check-submodules# -- check-tags
+  rules:
+    - if: $RELEASE_JOB
+      allow_failure: false
+    - allow_failure: true
+
+lint-boot-versions:
+  extends: [.lint, .nix]
+  script:
+    - nix run ./utils/check-submodules# -- check-versions
+  rules:
+    - if: $RELEASE_JOB
+      allow_failure: false
+    - allow_failure: true
+
 # We allow the submodule checker to fail when run on merge requests (to
 # accommodate, e.g., haddock changes not yet upstream) but not on `master` or
 # Marge jobs.
@@ -292,26 +329,11 @@ lint-author:
     - *drafts-can-fail-lint
 
 lint-ci-config:
-  image: nixos/nix:2.25.2
-  extends: .lint
+  extends: [.lint, .nix]
   # We don't need history/submodules in this job
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
-  before_script:
-    - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
-    # Note [Nix-in-Docker]
-    # ~~~~~~~~~~~~~~~~~~~~
-    # The nixos/nix default config is max-jobs=1 and cores=$(logical
-    # cores num) which doesn't play nice with our $CPUS convention. We
-    # fix it before invoking any nix build to avoid oversubscribing
-    # while allowing a reasonable degree of parallelism.
-    # FIXME: Disabling build-users-group=nixbld is a workaround for a Nix-in-Docker issue. See
-    # https://gitlab.haskell.org/ghc/head.hackage/-/issues/38#note_560487 for
-    # discussion.
-    - echo "cores = $CPUS" >> /etc/nix/nix.conf
-    - echo "max-jobs = $CPUS" >> /etc/nix/nix.conf
-    - nix run nixpkgs#gnused -- -i -e 's/ nixbld//' /etc/nix/nix.conf
   script:
     - nix run .gitlab/generate-ci#generate-jobs
     # 1 if .gitlab/generate_jobs changed the output of the generated config
