@@ -435,12 +435,12 @@ loadHomePackageInterfacesBelow msg (Just home_unit) mods = do
   dflags <- getDynFlags
   let ctx = initSDocContext dflags defaultUserStyle
 
-  forM_ mods $ \mod -> do
+  forM_ mods $ \mod -> pprTrace "modsloadhomepkgbeloW" (ppr mod) $ do
 
     graph <- eps_module_graph <$> getEps
     let key = ExternalModuleKey $ ModNodeKeyWithUid (GWIB (moduleName mod) NotBoot) (moduleUnitId mod)
 
-    if isFullyLoadedModule key graph
+    if pprTrace "==============" (ppr graph) $ isFullyLoadedModule key graph
       then return ()
       else do
         iface <- withIfaceErr ctx $
@@ -453,10 +453,6 @@ loadHomePackageInterfacesBelow msg (Just home_unit) mods = do
         -- a boot module, we have to find its real interface and discover the
         -- dependencies of that.  Hence we need to traverse the dependency
         -- tree recursively.  See bug #936, testcase ghci/prog007.
-
-        -- RM:TODO: WHAT WAS THIS DOING BEFORE IN FOLLOW_DEPS?
-        -- (was in follow_deps)
-        -- when (mi_boot iface == IsBoot) $ link_boot_mod_error mod
 
         let deps = mi_deps iface
             mod_deps = dep_direct_mods deps
@@ -506,10 +502,11 @@ loadInterface doc_str mod from
 
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
+        ; eps <- liftIO $ hscEPS hsc_env
         ; let mhome_unit = ue_homeUnit (hsc_unit_env hsc_env)
         ; case lookupIfaceByModule hug (eps_PIT eps) mod of {
             Just iface
-                -> return (Succeeded iface) ;   -- Already loaded
+                -> pprTrace "HWATTTT" (ppr (mi_module iface) <+> ppr (eps_module_graph eps)) $ return (Succeeded iface) ;   -- Already loaded
             _ -> do {
 
         -- READ THE MODULE IN
@@ -580,20 +577,23 @@ loadInterface doc_str mod from
         ; purged_hsc_env <- getTopEnv
 
         ; let direct_deps = map (uncurry (flip ModNodeKeyWithUid)) $ (Set.toList (dep_direct_mods $ mi_deps iface))
-        ; let direct_pkg_deps = Set.toList (dep_direct_pkgs $ mi_deps iface)
-        ; let !module_graph_key =
+        ; let direct_pkg_deps = dep_direct_pkgs $ mi_deps iface
+        ; let !module_graph_key = pprTrace "module_graph_on_load" (ppr (eps_module_graph eps)) $
                 if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env
                                     --- ^ home unit mods in eps can only happen in oneshot mode
                   then Just $ NodeHomePackage (miKey iface) (map ExternalModuleKey direct_deps)
                   else Nothing
         ; let !module_graph_pkg_key =
+                -- ROMES:TODO: This doesn't work as expected. Insertions on the
+                -- graph don't override previous nodes, they just create new
+                -- ones. We get multiple duplicate nodes with incomplete dependencies each.
                 let pkg_key = toUnitId $ moduleUnit (mi_module iface)
                  in case emgLookupKey (ExternalPackageKey pkg_key) (eps_module_graph eps) of
                   Nothing -> NodeExternalPackage pkg_key direct_pkg_deps
                   Just pkg_node -> case pkg_node of
                     NodeHomePackage{} -> panic "ExternalPackageKey lookup should never return a NodeHomePackage node"
                     NodeExternalPackage _ deps_uids ->
-                      NodeExternalPackage pkg_key (deps_uids ++ direct_pkg_deps)
+                      NodeExternalPackage pkg_key (deps_uids `Set.union` direct_pkg_deps)
 
 
         ; let final_iface = iface

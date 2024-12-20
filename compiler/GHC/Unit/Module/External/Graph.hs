@@ -91,7 +91,7 @@ data ExternalGraphNode
   -- dependency.
   | NodeExternalPackage
       { externalPkgKey :: UnitId
-      , externalPkgDeps :: [UnitId]
+      , externalPkgDeps :: S.Set UnitId
       }
 
 data ExternalKey
@@ -106,7 +106,7 @@ emptyExternalModuleGraph = ExternalModuleGraph [] (graphReachability emptyGraph,
 emgNodeDeps :: ExternalGraphNode -> [ExternalKey]
 emgNodeDeps = \case
   NodeHomePackage _ dps -> dps
-  NodeExternalPackage _ dps -> map ExternalPackageKey dps
+  NodeExternalPackage _ dps -> map ExternalPackageKey $ S.toList dps
 
 -- | The graph key for a given node
 emgNodeKey :: ExternalGraphNode -> ExternalKey

@@ -44,6 +44,7 @@ import GHC.Iface.Errors.Types
 
 import GHC.Utils.Misc
 import GHC.Unit.Home
+import GHC.Unit.External (ExternalPackageState, eps_module_graph, eps_PIT)
 import GHC.Data.Maybe
 
 import Control.Applicative
@@ -54,7 +55,7 @@ import System.FilePath
 import System.Directory
 import GHC.Utils.Monad (mapMaybeM)
 import Data.Either (partitionEithers)
-import Data.Bifunctor (Bifunctor(..))
+import Control.Monad (forM)
 
 data LinkDepsOpts = LinkDepsOpts
   { ldObjSuffix   :: !String                        -- ^ Suffix of .o files
@@ -69,8 +70,8 @@ data LinkDepsOpts = LinkDepsOpts
   , ldFinderCache :: !FinderCache
   , ldFinderOpts  :: !FinderOpts
   , ldLoadByteCode :: !(Module -> IO (Maybe Linkable))
-  , ldLoadHomeIfacesBelow :: !((Module -> SDoc) -> Maybe HomeUnit {- current home unit -}
-                                -> [Module] -> IO ExternalModuleGraph)
+  , ldLoadHomeIfacesBelow :: !((Module -> SDoc) -> Maybe HomeUnit {-^ current home unit -}
+                                -> [Module] -> IO ExternalPackageState {-^ EPS after loading -})
   }
 
 data LinkDeps = LinkDeps
@@ -116,8 +117,8 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 
         -- 1. Find the dependent home-pkg-modules/packages from each iface
         -- (omitting modules from the interactive package, which is already linked)
-      (all_home_mods, pkgs_s) <- get_reachable_nodes opts relevant_mods
-      mods_s <- mapMaybeM get_mod_info all_home_mods
+      (mods_s, pkgs_s) <- get_reachable_nodes opts relevant_mods
+      pprTraceM "Linkable deps:" (ppr relevant_mods $$ ppr mods_s $$ ppr pkgs_s)
 
       let
         -- 2.  Exclude ones already linked
@@ -144,23 +145,8 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         , ldNeededUnits     = pkgs_s
         }
   where
-    unit_env  = ldUnitEnv     opts
-
+    unit_env = ldUnitEnv opts
     relevant_mods = filterOut isInteractiveModule mods
-
-    get_mod_info (ModNodeKeyWithUid gwib uid) =
-      case lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) of
-        Just hmi ->
-          let iface = (hm_iface hmi)
-          in case mi_hsc_src iface of
-              HsBootFile -> link_boot_mod_error (mi_module iface)
-              _          -> return $ Just (mi_module iface)
-        Nothing -> throwProgramError opts $
-          text "getLinkDeps: Home module not loaded" <+> ppr (gwib_mod gwib) <+> ppr uid
-
-    link_boot_mod_error mod = throwProgramError opts $
-            text "module" <+> ppr mod <+>
-            text "cannot be linked; it is only available as a boot module"
 
     no_obj :: Outputable a => a -> IO b
     no_obj mod = dieWith opts span $
@@ -231,22 +217,32 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                 pprPanic "Unhydrated core bindings" (ppr wcb_module)
 
 -- See Note [Reachability in One-shot mode vs Make mode]
-get_reachable_nodes :: LinkDepsOpts -> [Module] -> IO ([ModNodeKeyWithUid], UniqDSet UnitId)
+get_reachable_nodes :: LinkDepsOpts -> [Module] -> IO ([Module], UniqDSet UnitId)
 get_reachable_nodes opts mods
 
   -- Reachability on 'ExternalModuleGraph' (for one shot mode)
   | ldOneShotMode opts
   = do
-    emg <- ldLoadHomeIfacesBelow opts msg (ue_homeUnit (ldUnitEnv opts)) mods
-    go (ExternalModuleKey . mkModuleNk) emgNodeKey (emgReachableMany emg) (map emgProject)
-    --romes:todo:^ make sure we only get non-boot files out of this. perhaps as
-    --easy as filtering them out by ModNodeKeyWithUid with is boot information.
+    eps <- ldLoadHomeIfacesBelow opts msg (ue_homeUnit (ldUnitEnv opts)) mods
+    let
+      emg = eps_module_graph eps
+      get_mod_info_eps (ModNodeKeyWithUid gwib uid)
+        | Just iface <- lookupModuleEnv (eps_PIT eps) (Module (RealUnit $ Definite uid) (gwib_mod gwib))
+        = return iface
+        | otherwise
+        = moduleNotLoaded "(in EPS)" gwib uid
+
+    go (ExternalModuleKey . mkModuleNk) emgNodeKey (emgReachableMany emg) (map emgProject) get_mod_info_eps
+    --romes:todo:^ do we need to make sure we only get non-boot files out of
+    --this. perhaps as easy as filtering them out by ModNodeKeyWithUid with is
+    --boot information?
 
   -- Reachability on 'ModuleGraph' (for --make mode)
   | otherwise
-  = go hmgModKey mkNodeKey (mgReachableLoop hmGraph) (catMaybes . map hmgProject)
+  = go hmgModKey mkNodeKey (mgReachableLoop hmGraph) (catMaybes . map hmgProject) get_mod_info_hug
 
   where
+    unit_env = ldUnitEnv opts
     mkModuleNk m = ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m)
     msg mod =
       text "need to link module" <+> ppr mod <+>
@@ -274,11 +270,31 @@ get_reachable_nodes opts mods
        -> (node -> key)
        -> ([key] -> [node])
        -> ([key] -> [Either ModNodeKeyWithUid UnitId])
-       -> IO ([ModNodeKeyWithUid], UniqDSet UnitId)
-    go modKey nodeKey manyReachable project
+       -> (ModNodeKeyWithUid -> IO ModIface)
+       -> IO ([Module], UniqDSet UnitId)
+    go modKey nodeKey manyReachable project get_mod_info
       | let mod_keys = map modKey mods
-      = pure $ second mkUniqDSet $ partitionEithers $ project $
-          mod_keys ++ map nodeKey (manyReachable mod_keys)
+      = do
+        let (all_home_mods, pkgs_s) = partitionEithers $ project $ mod_keys ++ map nodeKey (manyReachable mod_keys)
+        ifaces <- mapM get_mod_info all_home_mods
+        mods_s <- forM ifaces $ \iface -> case mi_hsc_src iface of
+                    HsBootFile -> link_boot_mod_error (mi_module iface)
+                    _          -> return $ mi_module iface
+        return (mods_s, mkUniqDSet pkgs_s)
+
+    get_mod_info_hug (ModNodeKeyWithUid gwib uid)
+      | Just hmi <- lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib)
+      = return (hm_iface hmi)
+      | otherwise
+      = moduleNotLoaded "(in HUG)" gwib uid
+
+    moduleNotLoaded m gwib uid = throwProgramError opts $
+      text "getLinkDeps: Home module not loaded" <+> text m <+> ppr (gwib_mod gwib) <+> ppr uid
+
+    link_boot_mod_error mod = throwProgramError opts $
+            text "module" <+> ppr mod <+>
+            text "cannot be linked; it is only available as a boot module"
+
 
 {-
 Note [Using Byte Code rather than Object Code for Template Haskell]
