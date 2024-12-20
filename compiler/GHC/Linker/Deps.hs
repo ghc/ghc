@@ -70,8 +70,8 @@ data LinkDepsOpts = LinkDepsOpts
   , ldFinderCache :: !FinderCache
   , ldFinderOpts  :: !FinderOpts
   , ldLoadByteCode :: !(Module -> IO (Maybe Linkable))
-  , ldLoadHomeIfacesBelow :: !((Module -> SDoc) -> Maybe HomeUnit {-^ current home unit -}
-                                -> [Module] -> IO ExternalPackageState {-^ EPS after loading -})
+  , ldLoadHomeIfacesBelow :: !((Module -> SDoc) -> Maybe HomeUnit {- current home unit -}
+                                -> [Module] -> IO ExternalPackageState {- EPS after loading -})
   }
 
 data LinkDeps = LinkDeps
@@ -227,10 +227,12 @@ get_reachable_nodes opts mods
     let
       emg = eps_module_graph eps
       get_mod_info_eps (ModNodeKeyWithUid gwib uid)
-        | Just iface <- lookupModuleEnv (eps_PIT eps) (Module (RealUnit $ Definite uid) (gwib_mod gwib))
-        = return iface
+        | uid == homeUnitId (ue_unsafeHomeUnit unit_env)
+        = case lookupModuleEnv (eps_PIT eps) (Module (RealUnit $ Definite uid) (gwib_mod gwib)) of
+            Just iface -> return $ Just iface
+            Nothing -> moduleNotLoaded "(in EPS)" gwib uid
         | otherwise
-        = moduleNotLoaded "(in EPS)" gwib uid
+        = return Nothing
 
     go (ExternalModuleKey . mkModuleNk) emgNodeKey (emgReachableMany emg) (map emgProject) get_mod_info_eps
     --romes:todo:^ do we need to make sure we only get non-boot files out of
@@ -270,13 +272,13 @@ get_reachable_nodes opts mods
        -> (node -> key)
        -> ([key] -> [node])
        -> ([key] -> [Either ModNodeKeyWithUid UnitId])
-       -> (ModNodeKeyWithUid -> IO ModIface)
+       -> (ModNodeKeyWithUid -> IO (Maybe ModIface))
        -> IO ([Module], UniqDSet UnitId)
     go modKey nodeKey manyReachable project get_mod_info
       | let mod_keys = map modKey mods
       = do
         let (all_home_mods, pkgs_s) = partitionEithers $ project $ mod_keys ++ map nodeKey (manyReachable mod_keys)
-        ifaces <- mapM get_mod_info all_home_mods
+        ifaces <- mapMaybeM get_mod_info all_home_mods
         mods_s <- forM ifaces $ \iface -> case mi_hsc_src iface of
                     HsBootFile -> link_boot_mod_error (mi_module iface)
                     _          -> return $ mi_module iface
@@ -284,7 +286,7 @@ get_reachable_nodes opts mods
 
     get_mod_info_hug (ModNodeKeyWithUid gwib uid)
       | Just hmi <- lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib)
-      = return (hm_iface hmi)
+      = return $ Just (hm_iface hmi)
       | otherwise
       = moduleNotLoaded "(in HUG)" gwib uid
 
