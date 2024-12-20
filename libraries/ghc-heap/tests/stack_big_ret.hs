@@ -57,8 +57,8 @@ checkArg w sf =
       c <- getBoxedClosureData b
       assertEqual CONSTR_0_1 $ (tipe . info) c
       assertEqual "I#" (name c)
-      assertEqual "ghc-prim" (pkg c)
-      assertEqual "GHC.Types" (modl c)
+      assertEqual "ghc-internal" (pkg c)
+      assertEqual "GHC.Internal.Types" (modl c)
       assertEqual True $ (null . ptrArgs) c
       assertEqual [w] (dataArgs c)
       pure ()

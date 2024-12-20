@@ -49,7 +49,7 @@ import GHC.Internal.Num (Num)
 import GHC.Internal.Read (Read(..), lex, readParen)
 import GHC.Internal.Real (Fractional, Integral, Real, RealFrac)
 import GHC.Internal.Show (Show(..), showParen, showString)
-import GHC.Types (Bool(..))
+import GHC.Internal.Types (Bool(..))
 
 -- | Identity functor and monad. (a non-strict monad)
 --

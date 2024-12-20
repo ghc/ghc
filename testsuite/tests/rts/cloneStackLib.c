@@ -75,7 +75,7 @@ static int countOnes(StgPtr spBottom, StgPtr payload,
         switch (info->type) {
         case CONSTR_0_1: {
           const StgConInfoTable *con_info = get_con_itbl(closure);
-          if (strcmp(GET_CON_DESC(con_info), "ghc-prim:GHC.Types.I#") == 0 &&
+          if (strcmp(GET_CON_DESC(con_info), "ghc-internal:GHC.Internal.Types.I#") == 0 &&
               closure->payload[0] == (StgClosure*) 1) {
             ones++;
           }

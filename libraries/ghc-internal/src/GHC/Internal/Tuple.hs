@@ -2,9 +2,9 @@
 {-# LANGUAGE NoImplicitPrelude, PatternSynonyms, ExplicitNamespaces #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.Tuple
+-- Module      :  GHC.Internal.Tuple
 -- Copyright   :  (c) The University of Glasgow 2001
--- License     :  BSD-style (see the file libraries/ghc-prim/LICENSE)
+-- License     :  BSD-style (see the file libraries/ghc-internal/LICENSE)
 --
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
@@ -16,7 +16,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Tuple (
+module GHC.Internal.Tuple (
   Tuple0, Tuple1,
   Unit(..),
   Solo (Solo, MkSolo), getSolo,
@@ -30,7 +30,7 @@ module GHC.Tuple (
 ) where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Types ()
+import GHC.Internal.Types ()
 
 default () -- Double and Integer aren't available yet
 

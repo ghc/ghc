@@ -5,7 +5,7 @@ module GHC.Internal.Data.Version
   , makeVersion
   ) where
 
-import GHC.Types
+import GHC.Internal.Types
 
 
 -- The generated module GHC.Internal.Unicode.Version depends on

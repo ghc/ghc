@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE Safe #-}
 
 -- ----------------------------------------------------------------------------
 -- | This module provides scalable event notification for file
@@ -13,6 +12,10 @@
 module GHC.Internal.Event
 #if defined(javascript_HOST_ARCH)
     ( ) where
+
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Internal.Types ()
+
 #else
     ( -- * Types
       EventManager

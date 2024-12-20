@@ -1,5 +1,5 @@
-
 T22559c.hs:10:2: error: [GHC-40746]
     Kind signatures are only allowed on GADTs
     When splicing a TH declaration:
-      newtype instance D :: * = MkD GHC.Types.Int
+      newtype instance D :: * = MkD GHC.Internal.Types.Int
+

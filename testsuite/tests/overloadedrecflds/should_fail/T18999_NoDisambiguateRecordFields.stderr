@@ -1,4 +1,3 @@
-
 T18999_NoDisambiguateRecordFields.hs:6:13: error: [GHC-87543]
     Ambiguous occurrence ‘not’.
     It could refer to
@@ -6,7 +5,7 @@ T18999_NoDisambiguateRecordFields.hs:6:13: error: [GHC-87543]
               defined at T18999_NoDisambiguateRecordFields.hs:4:18,
            or ‘Prelude.not’,
               imported from ‘Prelude’ at T18999_NoDisambiguateRecordFields.hs:2:8-40
-              (and originally defined in ‘GHC.Classes’).
+              (and originally defined in ‘GHC.Internal.Classes’).
 
 T18999_NoDisambiguateRecordFields.hs:8:11: error: [GHC-56428]
     Ambiguous record field ‘not’.
@@ -15,6 +14,7 @@ T18999_NoDisambiguateRecordFields.hs:8:11: error: [GHC-56428]
         defined at T18999_NoDisambiguateRecordFields.hs:4:18
       • variable ‘not’,
         imported from ‘Prelude’ at T18999_NoDisambiguateRecordFields.hs:2:8-40
-        (and originally defined in ‘GHC.Classes’)
+        (and originally defined in ‘GHC.Internal.Classes’)
     Suggested fix:
       Perhaps you intended to use the ‘DisambiguateRecordFields’ extension (implied by ‘RecordWildCards’ and ‘DuplicateRecordFields’)
+

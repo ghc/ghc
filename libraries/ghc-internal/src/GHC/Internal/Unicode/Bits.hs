@@ -32,7 +32,7 @@ module GHC.Internal.Unicode.Bits
 
 import GHC.Internal.Bits (finiteBitSize, popCount)
 import {-# SOURCE #-} GHC.Internal.ByteOrder
-import GHC.Prim
+import GHC.Internal.Prim
 import GHC.Internal.ST
 import GHC.Internal.Base
 import GHC.Internal.Num

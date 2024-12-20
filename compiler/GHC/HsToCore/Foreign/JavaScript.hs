@@ -647,6 +647,6 @@ mkJsCall :: Unique -> FastString -> [CoreExpr] -> Type -> CoreExpr
 mkJsCall u tgt args t = mkFCall u ccall args t
   where
     ccall = CCall $ CCallSpec
-              (StaticTarget NoSourceText tgt (Just primUnit) True)
+              (StaticTarget NoSourceText tgt (Just ghcInternalUnit) True)
               JavaScriptCallConv
               PlayRisky

@@ -1,10 +1,10 @@
 class T10891.C (a_0 :: *)
-    where {T10891.f :: a_0 -> GHC.Types.Int}
+    where {T10891.f :: a_0 -> GHC.Internal.Types.Int}
 class T10891.C' (a_0 :: *)
     where {type T10891.F (a_0 :: *) :: *;
            type T10891.F a_0 = a_0;
-           T10891.f' :: a_0 -> GHC.Types.Int}
-instance T10891.C' GHC.Types.Int
+           T10891.f' :: a_0 -> GHC.Internal.Types.Int}
+instance T10891.C' GHC.Internal.Types.Int
 class T10891.C'' (a_0 :: *)
     where {data T10891.Fd (a_0 :: *) :: *}
-instance T10891.C'' GHC.Types.Int
+instance T10891.C'' GHC.Internal.Types.Int

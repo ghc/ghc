@@ -108,16 +108,18 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep
          (GenDerivOutput.Rose a) = GHC.Internal.Generics.D1
                                      ('GHC.Internal.Generics.MetaData
-                                        "Rose" "GenDerivOutput" "main" 'GHC.Types.False)
+                                        "Rose" "GenDerivOutput" "main" 'GHC.Internal.Types.False)
                                      (GHC.Internal.Generics.C1
                                         ('GHC.Internal.Generics.MetaCons
-                                           "Empty" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                           "Empty"
+                                           'GHC.Internal.Generics.PrefixI
+                                           'GHC.Internal.Types.False)
                                         GHC.Internal.Generics.U1
                                       GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                                   ('GHC.Internal.Generics.MetaCons
                                                                      "Rose"
                                                                      'GHC.Internal.Generics.PrefixI
-                                                                     'GHC.Types.False)
+                                                                     'GHC.Internal.Types.False)
                                                                   (GHC.Internal.Generics.S1
                                                                      ('GHC.Internal.Generics.MetaSel
                                                                         'GHC.Internal.Maybe.Nothing
@@ -138,16 +140,18 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep1
          GenDerivOutput.Rose = GHC.Internal.Generics.D1
                                  ('GHC.Internal.Generics.MetaData
-                                    "Rose" "GenDerivOutput" "main" 'GHC.Types.False)
+                                    "Rose" "GenDerivOutput" "main" 'GHC.Internal.Types.False)
                                  (GHC.Internal.Generics.C1
                                     ('GHC.Internal.Generics.MetaCons
-                                       "Empty" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                       "Empty"
+                                       'GHC.Internal.Generics.PrefixI
+                                       'GHC.Internal.Types.False)
                                     GHC.Internal.Generics.U1
                                   GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                               ('GHC.Internal.Generics.MetaCons
                                                                  "Rose"
                                                                  'GHC.Internal.Generics.PrefixI
-                                                                 'GHC.Types.False)
+                                                                 'GHC.Internal.Types.False)
                                                               (GHC.Internal.Generics.S1
                                                                  ('GHC.Internal.Generics.MetaSel
                                                                     'GHC.Internal.Maybe.Nothing
@@ -167,16 +171,18 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep
          (GenDerivOutput.List a) = GHC.Internal.Generics.D1
                                      ('GHC.Internal.Generics.MetaData
-                                        "List" "GenDerivOutput" "main" 'GHC.Types.False)
+                                        "List" "GenDerivOutput" "main" 'GHC.Internal.Types.False)
                                      (GHC.Internal.Generics.C1
                                         ('GHC.Internal.Generics.MetaCons
-                                           "Nil" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                           "Nil"
+                                           'GHC.Internal.Generics.PrefixI
+                                           'GHC.Internal.Types.False)
                                         GHC.Internal.Generics.U1
                                       GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                                   ('GHC.Internal.Generics.MetaCons
                                                                      "Cons"
                                                                      'GHC.Internal.Generics.PrefixI
-                                                                     'GHC.Types.True)
+                                                                     'GHC.Internal.Types.True)
                                                                   (GHC.Internal.Generics.S1
                                                                      ('GHC.Internal.Generics.MetaSel
                                                                         ('GHC.Internal.Maybe.Just
@@ -198,16 +204,18 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep1
          GenDerivOutput.List = GHC.Internal.Generics.D1
                                  ('GHC.Internal.Generics.MetaData
-                                    "List" "GenDerivOutput" "main" 'GHC.Types.False)
+                                    "List" "GenDerivOutput" "main" 'GHC.Internal.Types.False)
                                  (GHC.Internal.Generics.C1
                                     ('GHC.Internal.Generics.MetaCons
-                                       "Nil" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                       "Nil"
+                                       'GHC.Internal.Generics.PrefixI
+                                       'GHC.Internal.Types.False)
                                     GHC.Internal.Generics.U1
                                   GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                               ('GHC.Internal.Generics.MetaCons
                                                                  "Cons"
                                                                  'GHC.Internal.Generics.PrefixI
-                                                                 'GHC.Types.True)
+                                                                 'GHC.Internal.Types.True)
                                                               (GHC.Internal.Generics.S1
                                                                  ('GHC.Internal.Generics.MetaSel
                                                                     ('GHC.Internal.Maybe.Just

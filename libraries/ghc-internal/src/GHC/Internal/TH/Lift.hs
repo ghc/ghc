@@ -477,16 +477,16 @@ dataToQa mkCon mkLit appCon antiQ t =
                     case showConstr constr of
                       "(:)"       -> Name (mkOccName ":")
                                           (NameG DataName
-                                                (mkPkgName "ghc-prim")
-                                                (mkModName "GHC.Types"))
+                                                (mkPkgName "ghc-internal")
+                                                (mkModName "GHC.Internal.Types"))
                       con@"[]"    -> Name (mkOccName con)
                                           (NameG DataName
-                                                (mkPkgName "ghc-prim")
-                                                (mkModName "GHC.Types"))
+                                                (mkPkgName "ghc-internal")
+                                                (mkModName "GHC.Internal.Types"))
                       con@('(':_) -> Name (mkOccName con)
                                           (NameG DataName
-                                                (mkPkgName "ghc-prim")
-                                                (mkModName "GHC.Tuple"))
+                                                (mkPkgName "ghc-internal")
+                                                (mkModName "GHC.Internal.Tuple"))
 
                       -- Tricky case: see Note [Data for non-algebraic types]
                       fun@(x:_)   | startsVarSym x || startsVarId x

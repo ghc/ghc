@@ -1,2 +1,2 @@
 foo :: Goof Int
-foo = T14978.Goof @Int @~<Co:1> :: Int GHC.Prim.~# Int
+foo = T14978.Goof @Int @~<Co:1> :: Int GHC.Internal.Prim.~# Int

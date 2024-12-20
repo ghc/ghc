@@ -32,7 +32,7 @@ module GHC.Internal.TypeError
   ) where
 
 import GHC.Internal.Data.Bool
-import GHC.Types (TYPE, Constraint, Symbol)
+import GHC.Internal.Types (TYPE, Constraint, Symbol)
 
 {- Note [Custom type errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

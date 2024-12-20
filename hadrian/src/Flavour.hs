@@ -236,7 +236,7 @@ enableThreadSanitizer instrumentCmm = addArgs $ notStage0 ? mconcat
     , builder Testsuite ? arg "--config=have_thread_sanitizer=True"
     , builder (Ghc CompileHs) ? mconcat
         [ package pkg ? (arg "-optc-fsanitize=thread" <> arg "-fcmm-thread-sanitizer")
-        | pkg <- [base, ghcPrim, array, rts]
+        | pkg <- [base, ghcInternal, array, rts]
         ]
     ]
 

@@ -30,7 +30,7 @@ module GHC.Internal.Int (
         shiftRLInt8#, shiftRLInt16#, shiftRLInt32#,
 
         -- * Equality operators
-        -- | See GHC.Classes#matching_overloaded_methods_in_rules
+        -- | See GHC.Internal.Classes#matching_overloaded_methods_in_rules
         eqInt, neInt, gtInt, geInt, ltInt, leInt,
         eqInt8, neInt8, gtInt8, geInt8, ltInt8, leInt8,
         eqInt16, neInt16, gtInt16, geInt16, ltInt16, leInt16,
@@ -42,7 +42,7 @@ module GHC.Internal.Int (
 import GHC.Internal.Data.Bits
 import GHC.Internal.Data.Maybe
 
-import GHC.Prim
+import GHC.Internal.Prim
 import GHC.Internal.Base
 
 import GHC.Internal.Enum
@@ -62,7 +62,7 @@ import GHC.Internal.Show
 data {-# CTYPE "HsInt8" #-} Int8 = I8# Int8#
 -- ^ 8-bit signed integer type
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 -- | @since base-2.01
 instance Eq Int8 where
     (==) = eqInt8
@@ -273,7 +273,7 @@ instance FiniteBits Int8 where
 data {-# CTYPE "HsInt16" #-} Int16 = I16# Int16#
 -- ^ 16-bit signed integer type
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 -- | @since base-2.01
 instance Eq Int16 where
     (==) = eqInt16
@@ -481,7 +481,7 @@ instance FiniteBits Int16 where
 data {-# CTYPE "HsInt32" #-} Int32 = I32# Int32#
 -- ^ 32-bit signed integer type
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 -- | @since base-2.01
 instance Eq Int32 where
     (==) = eqInt32
@@ -694,7 +694,7 @@ instance Ix Int32 where
 data {-# CTYPE "HsInt64" #-} Int64 = I64# Int64#
 -- ^ 64-bit signed integer type
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 -- | @since base-2.01
 instance Eq Int64 where
     (==) = eqInt64

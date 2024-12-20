@@ -6,39 +6,43 @@ DATA CONSTRUCTORS
   K2 :: forall a. FunPtr a -> T2 a
   K1 :: forall a. IO a -> T1 a
 Dependent modules: []
-Dependent packages: [base-4.19.0.0]
+Dependent packages: [base-4.20.0.0]
 
 ==================== Typechecker ====================
 Roles2.$tcT2
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       9065817229114433861#Word64 13399581642971864140#Word64
-      Roles2.$trModule (GHC.Types.TrNameS "T2"#) 0# GHC.Types.krep$*Arr*
+      Roles2.$trModule (GHC.Internal.Types.TrNameS "T2"#) 0#
+      GHC.Internal.Types.krep$*Arr*
 Roles2.$tc'K2
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       17395957229042313563#Word64 12263882107019815181#Word64
-      Roles2.$trModule (GHC.Types.TrNameS "'K2"#) 1# $krep
+      Roles2.$trModule (GHC.Internal.Types.TrNameS "'K2"#) 1# $krep
 Roles2.$tcT1
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       10310640733256438505#Word64 9162099558816022096#Word64
-      Roles2.$trModule (GHC.Types.TrNameS "T1"#) 0# GHC.Types.krep$*Arr*
+      Roles2.$trModule (GHC.Internal.Types.TrNameS "T1"#) 0#
+      GHC.Internal.Types.krep$*Arr*
 Roles2.$tc'K1
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       16530009231990968394#Word64 11761390951471299534#Word64
-      Roles2.$trModule (GHC.Types.TrNameS "'K1"#) 1# $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+      Roles2.$trModule (GHC.Internal.Types.TrNameS "'K1"#) 1# $krep
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
+  = GHC.Internal.Types.KindRepTyConApp
       GHC.Internal.Ptr.$tcFunPtr ((:) $krep [])
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp Roles2.$tcT2 ((:) $krep [])
+  = GHC.Internal.Types.KindRepTyConApp Roles2.$tcT2 ((:) $krep [])
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp GHC.Types.$tcIO ((:) $krep [])
+  = GHC.Internal.Types.KindRepTyConApp
+      GHC.Internal.Types.$tcIO ((:) $krep [])
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp Roles2.$tcT1 ((:) $krep [])
+  = GHC.Internal.Types.KindRepTyConApp Roles2.$tcT1 ((:) $krep [])
 Roles2.$trModule
-  = GHC.Types.Module
-      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles2"#)
+  = GHC.Internal.Types.Module
+      (GHC.Internal.Types.TrNameS "main"#)
+      (GHC.Internal.Types.TrNameS "Roles2"#)
 
 

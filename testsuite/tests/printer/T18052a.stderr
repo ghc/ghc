@@ -6,7 +6,7 @@ TYPE CONSTRUCTORS
 PATTERN SYNONYMS
   (:||:) :: forall {a} {b}. a -> b -> (a, b)
 Dependent modules: []
-Dependent packages: [base-4.17.0.0]
+Dependent packages: [base-4.20.0.0]
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
@@ -24,11 +24,12 @@ T18052a.$b:||: = \ (@a) (@b) (x :: a) (y :: b) -> (x, y)
 
 -- RHS size: {terms: 13, types: 18, coercions: 0, joins: 0/0}
 T18052a.$m:||:
-  :: forall {rep :: GHC.Types.RuntimeRep} {r :: TYPE rep} {a} {b}.
+  :: forall {rep :: GHC.Internal.Types.RuntimeRep} {r :: TYPE rep}
+            {a} {b}.
      (a, b) -> (a -> b -> r) -> ((# #) -> r) -> r
 [GblId, Arity=3, Unf=OtherCon []]
 T18052a.$m:||:
-  = \ (@(rep :: GHC.Types.RuntimeRep))
+  = \ (@(rep :: GHC.Internal.Types.RuntimeRep))
       (@(r :: TYPE rep))
       (@a)
       (@b)

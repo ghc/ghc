@@ -23,8 +23,8 @@ module Prelude.Experimental (
   module Data.Sum.Experimental,
 ) where
 
-import GHC.Types (List)
-import GHC.Classes
+import GHC.Internal.Types (List)
+import GHC.Internal.Classes
 
 import Data.Tuple.Experimental
 import Data.Sum.Experimental

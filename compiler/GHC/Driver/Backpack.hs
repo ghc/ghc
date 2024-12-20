@@ -45,7 +45,6 @@ import GHC.Rename.Names
 import GHC hiding (Failed, Succeeded)
 import GHC.Tc.Utils.Monad
 import GHC.Iface.Recomp
-import GHC.Builtin.Names
 
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
@@ -804,7 +803,6 @@ summariseRequirement pn mod_name = do
         ms_hie_date = hie_timestamp,
         ms_srcimps = [],
         ms_textual_imps = ((,) NoPkgQual . noLoc) <$> extra_sig_imports,
-        ms_ghc_prim_import = False,
         ms_parsed_mod = Just (HsParsedModule {
                 hpm_module = L loc (HsModule {
                         hsmodExt = XModulePs {
@@ -877,11 +875,6 @@ hsModuleToModSummary home_keys pn hsc_src modname
     -- Also copied from 'getImports'
     let (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
-             -- GHC.Prim doesn't exist physically, so don't go looking for it.
-        (ordinary_imps, ghc_prim_import)
-          = partition ((/= moduleName gHC_PRIM) . unLoc . ideclName . unLoc)
-              ord_idecls
-
         implicit_prelude = xopt LangExt.ImplicitPrelude dflags
         implicit_imports = mkPrelImports modname loc
                                          implicit_prelude imps
@@ -891,7 +884,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
 
-    let normal_imports = map convImport (implicit_imports ++ ordinary_imps)
+    let normal_imports = map convImport (implicit_imports ++ ord_idecls)
     (implicit_sigs, inst_deps) <- liftIO $ implicitRequirementsShallow hsc_env normal_imports
 
     -- So that Finder can find it, even though it doesn't exist...
@@ -909,7 +902,6 @@ hsModuleToModSummary home_keys pn hsc_src modname
             ms_hspp_opts = dflags,
             ms_hspp_buf = Nothing,
             ms_srcimps = map convImport src_idecls,
-            ms_ghc_prim_import = not (null ghc_prim_import),
             ms_textual_imps = normal_imports
                            -- We have to do something special here:
                            -- due to merging, requirements may end up with

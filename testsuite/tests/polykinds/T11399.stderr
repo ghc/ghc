@@ -1,6 +1,6 @@
-
 T11399.hs:10:32: error: [GHC-83865]
-    • Couldn't match kind ‘*’ with ‘GHC.Types.LiftedRep’
+    • Couldn't match kind ‘*’ with ‘GHC.Internal.Types.LiftedRep’
       Expected kind ‘* -> *’, but ‘UhOh a’ has kind ‘a (*) -> *’
     • In the first argument of ‘Functor’, namely ‘(UhOh a)’
       In the instance declaration for ‘Functor (UhOh a)’
+

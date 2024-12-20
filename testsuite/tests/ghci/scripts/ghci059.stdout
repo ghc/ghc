@@ -7,5 +7,6 @@ of the user's guide for details.
 type role Coercible representational representational
 type Coercible :: forall k. k -> k -> Constraint
 class Coercible a b => Coercible a b
-  	-- Defined in ‘GHC.Types’
-coerce :: Coercible a b => a -> b 	-- Defined in ‘GHC.Prim’
+  	-- Defined in ‘GHC.Internal.Types’
+coerce :: Coercible a b => a -> b
+  	-- Defined in ‘GHC.Internal.Prim’

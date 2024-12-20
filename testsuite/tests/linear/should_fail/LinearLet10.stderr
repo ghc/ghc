@@ -1,6 +1,7 @@
-
 LinearLet10.hs:7:12: error: [GHC-83865]
-    • Expected kind ‘GHC.Types.Multiplicity’, but ‘Int’ has kind ‘*’
+    • Expected kind ‘GHC.Internal.Types.Multiplicity’,
+        but ‘Int’ has kind ‘*’
     • In the type ‘Int’
       In a pattern binding: y = x
       In the expression: let %Int y = x in y
+

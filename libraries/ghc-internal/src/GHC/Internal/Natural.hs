@@ -46,8 +46,8 @@ module GHC.Internal.Natural
    )
 where
 
-import GHC.Prim
-import GHC.Types
+import GHC.Internal.Prim
+import GHC.Internal.Types
 import GHC.Internal.Maybe
 import GHC.Internal.Bignum.Natural (Natural)
 import GHC.Internal.Bignum.Integer (Integer)

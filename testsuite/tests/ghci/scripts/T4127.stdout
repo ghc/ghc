@@ -1,1 +1,1 @@
-[InstanceD Nothing [] (AppT (ConT GHC.Internal.Base.Monad) (AppT (ConT GHC.Tuple.Tuple2) (VarT a_0))) [ValD (VarP GHC.Internal.Base.>>=) (NormalB (VarE GHC.Internal.Err.undefined)) []]]
+[InstanceD Nothing [] (AppT (ConT GHC.Internal.Base.Monad) (AppT (ConT GHC.Internal.Tuple.Tuple2) (VarT a_0))) [ValD (VarP GHC.Internal.Base.>>=) (NormalB (VarE GHC.Internal.Err.undefined)) []]]

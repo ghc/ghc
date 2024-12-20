@@ -28,8 +28,8 @@ instance [safe] Eq w => Eq (Maybe w)
 instance GHC.Internal.Generics.Generic [w]
   -- Defined in ‘GHC.Internal.Generics’
 instance Read w => Read [w] -- Defined in ‘GHC.Internal.Read’
-instance Eq w => Eq [w] -- Defined in ‘GHC.Classes’
-instance Ord w => Ord [w] -- Defined in ‘GHC.Classes’
+instance Eq w => Eq [w] -- Defined in ‘GHC.Internal.Classes’
+instance Ord w => Ord [w] -- Defined in ‘GHC.Internal.Classes’
 instance Show w => Show [w] -- Defined in ‘GHC.Internal.Show’
 instance Monoid [w] -- Defined in ‘GHC.Internal.Base’
 instance Semigroup [w] -- Defined in ‘GHC.Internal.Base’
@@ -54,10 +54,10 @@ instance Enum Bool -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Bits.FiniteBits Bool
   -- Defined in ‘GHC.Internal.Bits’
 instance GHC.Internal.Ix.Ix Bool -- Defined in ‘GHC.Internal.Ix’
-instance Ord Bool -- Defined in ‘GHC.Classes’
+instance Ord Bool -- Defined in ‘GHC.Internal.Classes’
 instance Read Bool -- Defined in ‘GHC.Internal.Read’
 instance Show Bool -- Defined in ‘GHC.Internal.Show’
-instance Eq Bool -- Defined in ‘GHC.Classes’
+instance Eq Bool -- Defined in ‘GHC.Internal.Classes’
 instance Traversable ((,) Int)
   -- Defined in ‘GHC.Internal.Data.Traversable’
 instance Foldable ((,) Int)

@@ -13,8 +13,8 @@
 #include "Cmm.h"
 #include "Updates.h"
 
-import CLOSURE ghczmprim_GHCziCString_unpackCStringzh_info;
-import CLOSURE ghczmprim_GHCziCString_unpackCStringUtf8zh_info;
+import CLOSURE ghczminternal_GHCziInternalziCString_unpackCStringzh_info;
+import CLOSURE ghczminternal_GHCziInternalziCString_unpackCStringUtf8zh_info;
 #if !defined(UnregisterisedCompiler)
 import CLOSURE STK_CHK_ctr;
 import CLOSURE stg_bh_upd_frame_info;
@@ -348,7 +348,7 @@ stg_do_unpack_cstring(P_ node, P_ newCAF_ret) {
     W_ str;
     str = StgThunk_payload(node, 2);
     push (UPDATE_FRAME_FIELDS(,,stg_bh_upd_frame_info, CCCS, 0, newCAF_ret)) {
-        jump %ENTRY_CODE(ghczmprim_GHCziCString_unpackCStringzh_info)(node, str);
+        jump %ENTRY_CODE(ghczminternal_GHCziInternalziCString_unpackCStringzh_info)(node, str);
     }
 }
 
@@ -372,7 +372,7 @@ stg_do_unpack_cstring_utf8(P_ node, P_ newCAF_ret) {
     W_ str;
     str = StgThunk_payload(node, 2);
     push (UPDATE_FRAME_FIELDS(,,stg_bh_upd_frame_info, CCCS, 0, newCAF_ret)) {
-        jump %ENTRY_CODE(ghczmprim_GHCziCString_unpackCStringUtf8zh_info)(node, str);
+        jump %ENTRY_CODE(ghczminternal_GHCziInternalziCString_unpackCStringUtf8zh_info)(node, str);
     }
 }
 

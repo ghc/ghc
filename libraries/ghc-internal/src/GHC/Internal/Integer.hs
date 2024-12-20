@@ -59,8 +59,8 @@ module GHC.Internal.Integer (
 
 import GHC.Internal.Bignum.Integer (Integer)
 import qualified GHC.Internal.Bignum.Integer as I
-import GHC.Prim
-import GHC.Types
+import GHC.Internal.Prim
+import GHC.Internal.Types
 
 smallInteger :: Int# -> Integer
 smallInteger = I.integerFromInt#

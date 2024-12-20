@@ -1,5 +1,5 @@
-
 T18740d.hs:17:7: error: [GHC-55017]
     • Illegal variable name: ‘Bool’
-      When splicing a TH expression: GHC.Types.Bool
+      When splicing a TH expression: GHC.Internal.Types.Bool
     • In the untyped splice: $(return (VarE ''Bool))
+

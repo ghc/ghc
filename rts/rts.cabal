@@ -215,7 +215,7 @@ library
       if os(linux)
          -- the RTS depends upon libc. while this dependency is generally
          -- implicitly added by `cc`, we must explicitly add it here to ensure
-         -- that it is ordered correctly with libpthread, since ghc-prim.cabal
+         -- that it is ordered correctly with libpthread, since ghc-internal.cabal
          -- also explicitly lists libc. See #19029.
          extra-libraries: c
       if flag(libm)

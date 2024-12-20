@@ -1,24 +1,24 @@
 type Unit :: *
 data Unit = ()
-  	-- Defined in ‘GHC.Tuple’
+  	-- Defined in ‘GHC.Internal.Tuple’
 instance Monoid () -- Defined in ‘GHC.Internal.Base’
 instance Semigroup () -- Defined in ‘GHC.Internal.Base’
 instance Bounded () -- Defined in ‘GHC.Internal.Enum’
 instance Read () -- Defined in ‘GHC.Internal.Read’
 instance Enum () -- Defined in ‘GHC.Internal.Enum’
+instance Eq () -- Defined in ‘GHC.Internal.Classes’
+instance Ord () -- Defined in ‘GHC.Internal.Classes’
 instance Show () -- Defined in ‘GHC.Internal.Show’
-instance Eq () -- Defined in ‘GHC.Classes’
-instance Ord () -- Defined in ‘GHC.Classes’
-type Unit# :: GHC.Types.ZeroBitType
+type Unit# :: GHC.Internal.Types.ZeroBitType
 data Unit# = (##)
-  	-- Defined in ‘GHC.Types’
+  	-- Defined in ‘GHC.Internal.Types’
 () :: ()
 (##) :: (# #)
 (   ) :: ()
 (#   #) :: (# #)
 type Tuple2 :: * -> * -> *
 data Tuple2 a b = (,) a b
-  	-- Defined in ‘GHC.Tuple’
+  	-- Defined in ‘GHC.Internal.Tuple’
 instance Traversable ((,) a)
   -- Defined in ‘GHC.Internal.Data.Traversable’
 instance Monoid a => Applicative ((,) a)
@@ -28,24 +28,27 @@ instance Foldable ((,) a)
 instance Functor ((,) a) -- Defined in ‘GHC.Internal.Base’
 instance Monoid a => Monad ((,) a)
   -- Defined in ‘GHC.Internal.Base’
-instance (Monoid a, Monoid b) => Monoid (a, b)
-  -- Defined in ‘GHC.Internal.Base’
-instance (Semigroup a, Semigroup b) => Semigroup (a, b)
-  -- Defined in ‘GHC.Internal.Base’
 instance (Bounded a, Bounded b) => Bounded (a, b)
   -- Defined in ‘GHC.Internal.Enum’
 instance (Read a, Read b) => Read (a, b)
   -- Defined in ‘GHC.Internal.Read’
-instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‘GHC.Classes’
-instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
+instance (Eq a, Eq b) => Eq (a, b)
+  -- Defined in ‘GHC.Internal.Classes’
+instance (Ord a, Ord b) => Ord (a, b)
+  -- Defined in ‘GHC.Internal.Classes’
 instance (Show a, Show b) => Show (a, b)
   -- Defined in ‘GHC.Internal.Show’
+instance (Monoid a, Monoid b) => Monoid (a, b)
+  -- Defined in ‘GHC.Internal.Base’
+instance (Semigroup a, Semigroup b) => Semigroup (a, b)
+  -- Defined in ‘GHC.Internal.Base’
 type Tuple2# :: *
                 -> *
                 -> TYPE
-                     (GHC.Types.TupleRep [GHC.Types.LiftedRep, GHC.Types.LiftedRep])
+                     (GHC.Internal.Types.TupleRep
+                        [GHC.Internal.Types.LiftedRep, GHC.Internal.Types.LiftedRep])
 data Tuple2# a b = (#,#) a b
-  	-- Defined in ‘GHC.Types’
+  	-- Defined in ‘GHC.Internal.Types’
 (,) :: a -> b -> (a, b)
 (#,#) :: a -> b -> (# a, b #)
 (  ,  ) :: a -> b -> (a, b)

@@ -35,7 +35,7 @@
 -- CP875.TXT
 module GHC.Internal.IO.Encoding.CodePage.Table where
 
-import GHC.Prim
+import GHC.Internal.Prim
 import GHC.Internal.Base
 import GHC.Internal.Word
 data ConvArray a = ConvArray Addr#

@@ -1,8 +1,8 @@
-
 T14563.hs:9:39: error: [GHC-25897]
-    • Couldn't match kind ‘rep''’ with ‘GHC.Types.LiftedRep’
+    • Couldn't match kind ‘rep''’ with ‘GHC.Internal.Types.LiftedRep’
       Expected kind ‘TYPE rep -> TYPE rep''’,
         but ‘h’ has kind ‘TYPE rep -> *’
     • In the second argument of ‘Lan’, namely ‘h’
       In the type ‘Lan g h a’
       In the definition of data constructor ‘Lan’
+

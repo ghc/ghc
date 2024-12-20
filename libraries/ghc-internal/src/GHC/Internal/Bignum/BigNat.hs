@@ -17,10 +17,10 @@ module GHC.Internal.Bignum.BigNat where
 #include "MachDeps.h"
 #include "WordSize.h"
 
-import GHC.Prim
-import GHC.Types
-import GHC.Classes
-import GHC.Magic
+import GHC.Internal.Prim
+import GHC.Internal.Types
+import GHC.Internal.Classes
+import GHC.Internal.Magic
 import GHC.Internal.Bignum.Primitives
 import GHC.Internal.Bignum.WordArray
 import GHC.Internal.Bignum.Backend
@@ -1645,23 +1645,3 @@ instance Ord BigNat where
    BN# a <= BN# b = bigNatLe a b
    BN# a >  BN# b = bigNatGt a b
    BN# a >= BN# b = bigNatGe a b
-
-{- Note [ghc-bignum and error symbols]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-ghc-bignum only depends on ghc-prim, not base.
-Hence it may not introduce any symbol references to the error symbols in
-Control.Exception.Base such as `patError` or `impossibleError`, otherwise
-we get linker errors.
-
-This implies that
-
-  * Every pattern match must be "obviously complete", otherwise GHC's desugaring
-    inserts `patError`s for the missing cases. "Obviously complete" in the sense
-    that the desugarer is able to infer completeness, so considering type info
-    but not long distance information (as the pattern-match checker would do).
-  * We compile with -fno-catch-nonexhaustive-cases so that we don't risk
-    introducing `impossibleError`
-  * ... probably other similar observations that will be added to this list in
-    the future ...
-
--}

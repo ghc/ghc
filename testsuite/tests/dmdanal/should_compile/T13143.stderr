@@ -6,25 +6,27 @@ Result size of Tidy Core
 Rec {
 -- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
-  :: forall {a}. (# #) -> a
-[GblId, Arity=1, Str=<B>b{sBo->S}, Cpr=b, Unf=OtherCon []]
-T13143.$wf = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Types.(##)
+  :: forall a. (# #) -> a
+[GblId, Arity=1, Str=<B>b{sBX->S}, Cpr=b, Unf=OtherCon []]
+T13143.$wf
+  = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Internal.Types.(##)
 end Rec }
 
 -- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
 f [InlPrag=NOINLINE[final]] :: forall a. Int -> a
 [GblId,
  Arity=1,
- Str=<B>b{sBo->S},
+ Str=<B>b{sBX->S},
  Cpr=b,
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
-         Tmpl= \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Types.(##)}]
-f = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Types.(##)
+         Tmpl= \ (@a) _ [Occ=Dead] ->
+                 T13143.$wf @a GHC.Internal.Types.(##)}]
+f = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Internal.Types.(##)
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T13143.$trModule4 :: GHC.Prim.Addr#
+T13143.$trModule4 :: GHC.Internal.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -32,15 +34,15 @@ T13143.$trModule4 :: GHC.Prim.Addr#
 T13143.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T13143.$trModule3 :: GHC.Types.TrName
+T13143.$trModule3 :: GHC.Internal.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-T13143.$trModule3 = GHC.Types.TrNameS T13143.$trModule4
+T13143.$trModule3 = GHC.Internal.Types.TrNameS T13143.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T13143.$trModule2 :: GHC.Prim.Addr#
+T13143.$trModule2 :: GHC.Internal.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -48,46 +50,48 @@ T13143.$trModule2 :: GHC.Prim.Addr#
 T13143.$trModule2 = "T13143"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T13143.$trModule1 :: GHC.Types.TrName
+T13143.$trModule1 :: GHC.Internal.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-T13143.$trModule1 = GHC.Types.TrNameS T13143.$trModule2
+T13143.$trModule1 = GHC.Internal.Types.TrNameS T13143.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T13143.$trModule :: GHC.Types.Module
+T13143.$trModule :: GHC.Internal.Types.Module
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
 T13143.$trModule
-  = GHC.Types.Module T13143.$trModule3 T13143.$trModule1
+  = GHC.Internal.Types.Module T13143.$trModule3 T13143.$trModule1
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 lvl :: Int
-[GblId, Str=b{sBo->S}, Cpr=b]
-lvl = T13143.$wf @Int GHC.Types.(##)
+[GblId, Str=b{sBX->S}, Cpr=b]
+lvl = T13143.$wf @Int GHC.Internal.Types.(##)
 
 Rec {
 -- RHS size: {terms: 28, types: 7, coercions: 0, joins: 0/0}
 T13143.$wg [InlPrag=[2], Occ=LoopBreaker]
-  :: Bool -> Bool -> GHC.Prim.Int# -> GHC.Prim.Int#
+  :: Bool -> Bool -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
 [GblId[StrictWorker([!, !])],
  Arity=3,
  Str=<1L><1L><L>,
  Unf=OtherCon []]
 T13143.$wg
-  = \ (ds :: Bool) (ds1 :: Bool) (ww :: GHC.Prim.Int#) ->
+  = \ (ds :: Bool) (ds1 :: Bool) (ww :: GHC.Internal.Prim.Int#) ->
       case ds of {
         False ->
           case ds1 of {
-            False -> T13143.$wg GHC.Types.False GHC.Types.True ww;
-            True -> GHC.Prim.+# ww 1#
+            False ->
+              T13143.$wg GHC.Internal.Types.False GHC.Internal.Types.True ww;
+            True -> GHC.Internal.Prim.+# ww 1#
           };
         True ->
           case ds1 of {
-            False -> T13143.$wg GHC.Types.True GHC.Types.True ww;
+            False ->
+              T13143.$wg GHC.Internal.Types.True GHC.Internal.Types.True ww;
             True -> case lvl of {}
           }
       }
@@ -105,14 +109,16 @@ g [InlPrag=[2]] :: Bool -> Bool -> Int -> Int
          Tmpl= \ (ds [Occ=Once1] :: Bool)
                  (ds1 [Occ=Once1] :: Bool)
                  (p [Occ=Once1!] :: Int) ->
-                 case p of { GHC.Types.I# ww [Occ=Once1] ->
+                 case p of { GHC.Internal.Types.I# ww [Occ=Once1] ->
                  case T13143.$wg ds ds1 ww of ww1 [Occ=Once1] { __DEFAULT ->
-                 GHC.Types.I# ww1
+                 GHC.Internal.Types.I# ww1
                  }
                  }}]
 g = \ (ds :: Bool) (ds1 :: Bool) (p :: Int) ->
-      case p of { GHC.Types.I# ww ->
-      case T13143.$wg ds ds1 ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
+      case p of { GHC.Internal.Types.I# ww ->
+      case T13143.$wg ds ds1 ww of ww1 { __DEFAULT ->
+      GHC.Internal.Types.I# ww1
+      }
       }
 
 

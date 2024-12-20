@@ -1,9 +1,9 @@
 type (~) :: forall k. k -> k -> Constraint
 class (a ~ b) => (~) a b
-  	-- Defined in ‘GHC.Types’
+  	-- Defined in ‘GHC.Internal.Types’
 infix 4 ~
 (~) :: k -> k -> Constraint
 type (~) :: forall k. k -> k -> Constraint
-class (a GHC.Prim.~# b) => (~) a b
-  	-- Defined in ‘GHC.Types’
+class (a GHC.Internal.Prim.~# b) => (~) a b
+  	-- Defined in ‘GHC.Internal.Types’
 infix 4 ~

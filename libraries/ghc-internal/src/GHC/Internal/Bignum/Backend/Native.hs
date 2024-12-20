@@ -25,13 +25,13 @@ import GHC.Internal.Bignum.Integer
 #endif
 import GHC.Internal.Bignum.WordArray
 import GHC.Internal.Bignum.Primitives
-import GHC.Prim
-import GHC.Types
+import GHC.Internal.Prim
+import GHC.Internal.Types
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 -- (This module uses the empty tuple () and string literals.)
-import GHC.Tuple ()
-import GHC.CString ()
+import GHC.Internal.Tuple ()
+import GHC.Internal.CString ()
 
 default ()
 

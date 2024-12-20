@@ -42,7 +42,7 @@ import GHC.Internal.Char
 import GHC.Internal.Bignum.Integer
 import GHC.Internal.Num
 import GHC.Internal.Show
-import GHC.Tuple (Solo (..))
+import GHC.Internal.Tuple (Solo (..))
 default ()              -- Double isn't available yet
 
 -- | The 'Bounded' class is used to name the upper and lower limits of a
@@ -1098,7 +1098,7 @@ enumNegDeltaToNatural x0 ndelta lim = go x0
 enumIntToWord :: Int -> Word
 enumIntToWord (I# i) = W# (int2Word# i)
 
--- Instances from GHC.Types
+-- Instances from GHC.Internal.Types
 
 -- | @since base-4.16.0.0
 deriving instance Bounded Levity

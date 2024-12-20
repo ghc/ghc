@@ -931,8 +931,7 @@ tcGetDefaultTys
         ; defaults <- getDeclaredDefaultTys -- User-supplied defaults
         ; this_module <- tcg_mod <$> getGblEnv
         ; let this_unit = moduleUnit this_module
-              is_internal_unit = this_unit `elem` [ghcInternalUnit, primUnit]
-        ; if is_internal_unit
+        ; if this_unit == ghcInternalUnit
              -- see Note [Default class defaults]
           then return (defaults, extended_defaults)
           else do

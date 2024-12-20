@@ -1,32 +1,33 @@
 
 ==================== Initial STG: ====================
 Noinline01.f [InlPrag=INLINE (sat-args=1)]
-  :: forall {p}. p -> GHC.Types.Bool
+  :: forall {p}. p -> GHC.Internal.Types.Bool
 [GblId, Arity=1, Str=<A>, Cpr=2, Unf=OtherCon []] =
-    \r [eta] GHC.Types.True [];
+    \r [eta] GHC.Internal.Types.True [];
 
-Noinline01.g :: GHC.Types.Bool
+Noinline01.g :: GHC.Internal.Types.Bool
 [GblId] =
-    \u [] Noinline01.f GHC.Types.False;
+    \u [] Noinline01.f GHC.Internal.Types.False;
 
-Noinline01.$trModule4 :: GHC.Prim.Addr#
+Noinline01.$trModule4 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []] =
     "main"#;
 
-Noinline01.$trModule3 :: GHC.Types.TrName
+Noinline01.$trModule3 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []] =
-    GHC.Types.TrNameS! [Noinline01.$trModule4];
+    GHC.Internal.Types.TrNameS! [Noinline01.$trModule4];
 
-Noinline01.$trModule2 :: GHC.Prim.Addr#
+Noinline01.$trModule2 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []] =
     "Noinline01"#;
 
-Noinline01.$trModule1 :: GHC.Types.TrName
+Noinline01.$trModule1 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []] =
-    GHC.Types.TrNameS! [Noinline01.$trModule2];
+    GHC.Internal.Types.TrNameS! [Noinline01.$trModule2];
 
-Noinline01.$trModule :: GHC.Types.Module
+Noinline01.$trModule :: GHC.Internal.Types.Module
 [GblId, Unf=OtherCon []] =
-    GHC.Types.Module! [Noinline01.$trModule3 Noinline01.$trModule1];
+    GHC.Internal.Types.Module! [Noinline01.$trModule3
+                                Noinline01.$trModule1];
 
 

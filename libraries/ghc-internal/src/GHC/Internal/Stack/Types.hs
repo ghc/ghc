@@ -13,7 +13,7 @@
 -- |
 -- Module      :  GHC.Internal.Stack.Types
 -- Copyright   :  (c) The University of Glasgow 2015
--- License     :  see libraries/ghc-prim/LICENSE
+-- License     :  see libraries/ghc-internal/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
 -- Stability   :  internal
@@ -51,8 +51,8 @@ import cycle,
     which imports ‘GHC.Base‘ (libraries/base/GHC/Base.hs)
 -}
 
-import GHC.Classes (Eq)
-import GHC.Types (Char, Int)
+import GHC.Internal.Classes (Eq)
+import GHC.Internal.Types (Char, Int)
 
 default ()
 

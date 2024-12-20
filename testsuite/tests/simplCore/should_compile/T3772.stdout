@@ -4,7 +4,7 @@ Result size of Tidy Core
   = {terms: 46, types: 19, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T3772.$trModule4 :: GHC.Prim.Addr#
+T3772.$trModule4 :: GHC.Internal.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -12,15 +12,15 @@ T3772.$trModule4 :: GHC.Prim.Addr#
 T3772.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T3772.$trModule3 :: GHC.Types.TrName
+T3772.$trModule3 :: GHC.Internal.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-T3772.$trModule3 = GHC.Types.TrNameS T3772.$trModule4
+T3772.$trModule3 = GHC.Internal.Types.TrNameS T3772.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T3772.$trModule2 :: GHC.Prim.Addr#
+T3772.$trModule2 :: GHC.Internal.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -28,41 +28,41 @@ T3772.$trModule2 :: GHC.Prim.Addr#
 T3772.$trModule2 = "T3772"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T3772.$trModule1 :: GHC.Types.TrName
+T3772.$trModule1 :: GHC.Internal.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-T3772.$trModule1 = GHC.Types.TrNameS T3772.$trModule2
+T3772.$trModule1 = GHC.Internal.Types.TrNameS T3772.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T3772.$trModule :: GHC.Types.Module
+T3772.$trModule :: GHC.Internal.Types.Module
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
 T3772.$trModule
-  = GHC.Types.Module T3772.$trModule3 T3772.$trModule1
+  = GHC.Internal.Types.Module T3772.$trModule3 T3772.$trModule1
 
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
-$wxs :: GHC.Prim.Int# -> (# #)
+$wxs :: GHC.Internal.Prim.Int# -> (# #)
 [GblId, Arity=1, Str=<1L>, Unf=OtherCon []]
 $wxs
-  = \ (ww :: GHC.Prim.Int#) ->
+  = \ (ww :: GHC.Internal.Prim.Int#) ->
       case ww of ds1 {
-        __DEFAULT -> $wxs (GHC.Prim.-# ds1 1#);
-        1# -> GHC.Types.(##)
+        __DEFAULT -> $wxs (GHC.Internal.Prim.-# ds1 1#);
+        1# -> GHC.Internal.Types.(##)
       }
 end Rec }
 
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
-T3772.$wfoo [InlPrag=NOINLINE] :: GHC.Prim.Int# -> (# #)
+T3772.$wfoo [InlPrag=NOINLINE] :: GHC.Internal.Prim.Int# -> (# #)
 [GblId, Arity=1, Str=<L>, Unf=OtherCon []]
 T3772.$wfoo
-  = \ (ww :: GHC.Prim.Int#) ->
-      case GHC.Prim.<# 0# ww of {
-        __DEFAULT -> GHC.Types.(##);
+  = \ (ww :: GHC.Internal.Prim.Int#) ->
+      case GHC.Internal.Prim.<# 0# ww of {
+        __DEFAULT -> GHC.Internal.Types.(##);
         1# -> $wxs ww
       }
 
@@ -76,13 +76,13 @@ foo [InlPrag=NOINLINE[final]] :: Int -> ()
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once1!] :: Int) ->
-                 case n of { GHC.Types.I# ww [Occ=Once1] ->
-                 case T3772.$wfoo ww of { (# #) -> GHC.Tuple.() }
+                 case n of { GHC.Internal.Types.I# ww [Occ=Once1] ->
+                 case T3772.$wfoo ww of { (# #) -> GHC.Internal.Tuple.() }
                  }}]
 foo
   = \ (n :: Int) ->
-      case n of { GHC.Types.I# ww ->
-      case T3772.$wfoo ww of { (# #) -> GHC.Tuple.() }
+      case n of { GHC.Internal.Types.I# ww ->
+      case T3772.$wfoo ww of { (# #) -> GHC.Internal.Tuple.() }
       }
 
 

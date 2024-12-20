@@ -8,7 +8,7 @@ module GHC.Internal.Maybe
 where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Classes
+import GHC.Internal.Classes
 
 default ()
 

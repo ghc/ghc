@@ -1,6 +1,6 @@
-instance [orphan] GHC.Internal.IsList.IsList [GHC.Types.Bool]
+instance [orphan] GHC.Internal.IsList.IsList [GHC.Internal.Types.Bool]
 instance GHC.Internal.IsList.IsList [X] = $fIsListX
 family instance GHC.Internal.IsList.Item [X] = D:R:ItemX
-family instance [orphan] GHC.Internal.IsList.Item [GHC.Types.Bool]
+family instance [orphan] GHC.Internal.IsList.Item [GHC.Internal.Types.Bool]
 "myrule1" [orphan] forall @a.
 "myrule2" GHC.Internal.Base.id @(X -> X) f = f

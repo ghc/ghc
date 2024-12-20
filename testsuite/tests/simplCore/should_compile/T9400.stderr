@@ -1,4 +1,3 @@
-
 T9400.hs:13:9: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In a case alternative: [] -> ...
@@ -6,6 +5,7 @@ T9400.hs:13:9: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
 T9400.hs:18:9: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In a case alternative: "" -> ...
+
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
@@ -19,7 +19,7 @@ $trModule1 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 $trModule2 :: TrName
 [GblId, Unf=OtherCon []]
-$trModule2 = GHC.Types.TrNameS $trModule1
+$trModule2 = GHC.Internal.Types.TrNameS $trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule3 :: Addr#
@@ -29,12 +29,12 @@ $trModule3 = "T9400"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 $trModule4 :: TrName
 [GblId, Unf=OtherCon []]
-$trModule4 = GHC.Types.TrNameS $trModule3
+$trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T9400.$trModule :: Module
 [GblId, Unf=OtherCon []]
-T9400.$trModule = GHC.Types.Module $trModule2 $trModule4
+T9400.$trModule = GHC.Internal.Types.Module $trModule2 $trModule4
 
 -- RHS size: {terms: 33, types: 21, coercions: 0, joins: 0/0}
 main :: IO ()

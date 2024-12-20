@@ -1,6 +1,5 @@
-
 T17963.hs:15:23: error: [GHC-25897]
-    • Couldn't match kind ‘rep’ with ‘GHC.Types.LiftedRep’
+    • Couldn't match kind ‘rep’ with ‘GHC.Internal.Types.LiftedRep’
       When matching kinds
         k0 :: *
         ob :: TYPE rep
@@ -10,3 +9,4 @@ T17963.hs:15:23: error: [GHC-25897]
     • In the first argument of ‘cat’, namely ‘a’
       In the type signature: id' :: forall a. cat a a
       In the class declaration for ‘Category'’
+

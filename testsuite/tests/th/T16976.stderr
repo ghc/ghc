@@ -5,7 +5,8 @@ T16976.MkT1 :: forall (s_0 :: *) . T16976.T s_0
 T16976.MkT2 :: forall (s_0 :: *) . T16976.T s_0
 T16976.T :: * -> *
 T16976.P :: forall {s_0 :: *} . T16976.T s_0
-GHC.Classes.not :: GHC.Types.Bool -> GHC.Types.Bool
+GHC.Internal.Classes.not :: GHC.Internal.Types.Bool ->
+                            GHC.Internal.Types.Bool
 GHC.Internal.Base.id :: forall (a_0 :: *) . a_0 -> a_0
 GHC.Internal.Maybe.Nothing :: forall (a_0 :: *) .
                               GHC.Internal.Maybe.Maybe a_0

@@ -1,6 +1,6 @@
-
 T8958.hs:2:31: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
 TYPE CONSTRUCTORS
   newtype Map{2} :: * -> * -> *
     roles nominal representational
@@ -18,64 +18,75 @@ CLASS INSTANCES
     -- Defined at T8958.hs:11:10
   instance [incoherent] Nominal a -- Defined at T8958.hs:8:10
 Dependent modules: []
-Dependent packages: [base-4.18.0.0]
+Dependent packages: [base-4.20.0.0]
 
 ==================== Typechecker ====================
 T8958.$tcMap
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       16542473435673943392#Word64 5374201132143305512#Word64
-      T8958.$trModule (GHC.Types.TrNameS "Map"#) 0#
-      GHC.Types.krep$*->*->*
+      T8958.$trModule (GHC.Internal.Types.TrNameS "Map"#) 0#
+      GHC.Internal.Types.krep$*->*->*
 T8958.$tc'MkMap
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       2942839876828444488#Word64 3989137838066763457#Word64
-      T8958.$trModule (GHC.Types.TrNameS "'MkMap"#) 2# $krep
+      T8958.$trModule (GHC.Internal.Types.TrNameS "'MkMap"#) 2# $krep
 T8958.$tcRepresentational
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       12809567151893673426#Word64 12159693688248149156#Word64
-      T8958.$trModule (GHC.Types.TrNameS "Representational"#) 0# $krep
+      T8958.$trModule (GHC.Internal.Types.TrNameS "Representational"#) 0#
+      $krep
 T8958.$tc'C:Representational
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       2358772282532242424#Word64 5444038897914446879#Word64
-      T8958.$trModule (GHC.Types.TrNameS "'C:Representational"#) 1# $krep
+      T8958.$trModule (GHC.Internal.Types.TrNameS "'C:Representational"#)
+      1# $krep
 T8958.$tcNominal
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       12224997609886144634#Word64 9866011944332051160#Word64
-      T8958.$trModule (GHC.Types.TrNameS "Nominal"#) 0# $krep
+      T8958.$trModule (GHC.Internal.Types.TrNameS "Nominal"#) 0# $krep
 T8958.$tc'C:Nominal
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       10562260635335201742#Word64 1215478186250709459#Word64
-      T8958.$trModule (GHC.Types.TrNameS "'C:Nominal"#) 1# $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+      T8958.$trModule (GHC.Internal.Types.TrNameS "'C:Nominal"#) 1# $krep
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 1
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun GHC.Types.krep$* GHC.Types.krep$Constraint
+  = GHC.Internal.Types.KindRepFun
+      GHC.Internal.Types.krep$* GHC.Internal.Types.krep$Constraint
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
-      GHC.Tuple.$tcTuple2
-      ((:) @GHC.Types.KindRep
-         $krep ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep))
+  = GHC.Internal.Types.KindRepTyConApp
+      GHC.Internal.Tuple.$tcTuple2
+      ((:) @GHC.Internal.Types.KindRep
+         $krep
+         ((:) @GHC.Internal.Types.KindRep
+            $krep [] @GHC.Internal.Types.KindRep))
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
+  = GHC.Internal.Types.KindRepTyConApp
       T8958.$tcMap
-      ((:) @GHC.Types.KindRep
-         $krep ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep))
+      ((:) @GHC.Internal.Types.KindRep
+         $krep
+         ((:) @GHC.Internal.Types.KindRep
+            $krep [] @GHC.Internal.Types.KindRep))
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
-      GHC.Types.$tcList
-      ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep)
+  = GHC.Internal.Types.KindRepTyConApp
+      GHC.Internal.Types.$tcList
+      ((:) @GHC.Internal.Types.KindRep
+         $krep [] @GHC.Internal.Types.KindRep)
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
+  = GHC.Internal.Types.KindRepTyConApp
       T8958.$tcRepresentational
-      ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep)
+      ((:) @GHC.Internal.Types.KindRep
+         $krep [] @GHC.Internal.Types.KindRep)
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
+  = GHC.Internal.Types.KindRepTyConApp
       T8958.$tcNominal
-      ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep)
+      ((:) @GHC.Internal.Types.KindRep
+         $krep [] @GHC.Internal.Types.KindRep)
 T8958.$trModule
-  = GHC.Types.Module
-      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T8958"#)
+  = GHC.Internal.Types.Module
+      (GHC.Internal.Types.TrNameS "main"#)
+      (GHC.Internal.Types.TrNameS "T8958"#)
 AbsBinds [a] []
   {Exports: [T8958.$fRepresentationala <= $dRepresentational
                wrap: <>]
@@ -95,7 +106,6 @@ AbsBinds [a] []
    Evidence: [EvBinds{}]}
 
 
-
 T8958.hs:14:54: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
     • The constraint ‘Representational v’ matches
         instance Representational a -- Defined at T8958.hs:11:10
@@ -111,3 +121,4 @@ T8958.hs:14:54: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdef
         either use MonoLocalBinds, or simplify it using the instance
     • In the definition of data constructor ‘MkMap’
       In the newtype declaration for ‘Map’
+

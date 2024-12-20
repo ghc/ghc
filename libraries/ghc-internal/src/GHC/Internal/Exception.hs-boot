@@ -31,7 +31,7 @@ module GHC.Internal.Exception
   ) where
 
 import {-# SOURCE #-} GHC.Internal.Exception.Type
-import GHC.Types ( Char )
+import GHC.Internal.Types ( Char )
 import GHC.Internal.Stack.Types ( CallStack )
 
 errorCallException :: [Char] -> SomeException

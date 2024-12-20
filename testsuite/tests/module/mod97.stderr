@@ -1,7 +1,7 @@
-
 mod97.hs:4:9: error: [GHC-88464]
     Variable not in scope:
-      (==) :: GHC.Types.Char -> GHC.Types.Char -> t
+      (==) :: GHC.Internal.Types.Char -> GHC.Internal.Types.Char -> t
     Suggested fix:
       Add ‘==’ to the import list in the import of ‘Prelude’
       (at mod97.hs:3:1-18).
+

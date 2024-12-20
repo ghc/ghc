@@ -1,10 +1,11 @@
-
 UnliftedNewtypesInfinite.hs:9:20: error: [GHC-27958]
     • Couldn't match kind ‘t0’
-                     with ‘GHC.Types.TupleRep [GHC.Types.IntRep, t0]’
+                     with ‘GHC.Internal.Types.TupleRep [GHC.Internal.Types.IntRep, t0]’
       Expected kind ‘TYPE t0’,
         but ‘(# Int#, Foo #)’ has kind ‘TYPE
-                                          (GHC.Types.TupleRep [GHC.Types.IntRep, t0])’
+                                          (GHC.Internal.Types.TupleRep
+                                             [GHC.Internal.Types.IntRep, t0])’
     • In the type ‘(# Int#, Foo #)’
       In the definition of data constructor ‘FooC’
       In the newtype declaration for ‘Foo’
+

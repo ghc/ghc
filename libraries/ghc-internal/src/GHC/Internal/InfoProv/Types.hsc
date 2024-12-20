@@ -29,7 +29,7 @@ import GHC.Internal.Foreign.Marshal.Alloc (allocaBytes)
 import GHC.Internal.IO.Encoding (utf8)
 import GHC.Internal.Foreign.Storable (peekByteOff)
 import GHC.Internal.ClosureTypes
-import GHC.Prim (whereFrom##)
+import GHC.Internal.Prim (whereFrom##)
 
 data InfoProv = InfoProv {
   ipName :: String,

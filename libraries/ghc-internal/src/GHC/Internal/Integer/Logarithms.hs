@@ -12,7 +12,7 @@ where
 import qualified GHC.Internal.Bignum.Primitives as N
 import qualified GHC.Internal.Bignum.Integer    as N
 import GHC.Internal.Bignum.Integer (Integer)
-import GHC.Prim
+import GHC.Internal.Prim
 
 wordLog2# :: Word# -> Int#
 wordLog2# i = word2Int# (N.wordLog2# i)

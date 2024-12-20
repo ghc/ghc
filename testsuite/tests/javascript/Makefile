@@ -30,4 +30,4 @@ T24744:
 	grep -c "h\$$r1 = \"test_val_80_local_once" T24744.dump-js
 	# check that the optimization occurred
 	grep -c "h\$$r1 = h\$$decodeUtf8z" T24744.dump-js
-	grep -c "h\$$stc(h\$$mainZCMainzitestzuvalzu80zulocal,h\$$mainZCMainzitestzuvalzu80zulocal_e,\[h\$$ghczmprimZCGHCziCStringziunpackCStringzh,h\$$mainZCMainzimain7_1,h\$$mainZCMainzimain7_2\])" T24744.jsexe/out.js
+	grep -c "h\$$stc(h\$$mainZCMainzitestzuvalzu80zulocal,h\$$mainZCMainzitestzuvalzu80zulocal_e,\[h\$$ghczminternalZCGHCziInternalziCStringziunpackCStringzh,h\$$mainZCMainzimain7_1,h\$$mainZCMainzimain7_2\])" T24744.jsexe/out.js

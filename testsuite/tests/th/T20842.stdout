@@ -1,3 +1,3 @@
 data MyData_0 where
     D1_1 :: MyData_0
-    D2_2 :: GHC.Types.Bool -> MyData_0
+    D2_2 :: GHC.Internal.Types.Bool -> MyData_0

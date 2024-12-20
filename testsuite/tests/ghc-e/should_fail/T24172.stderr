@@ -1,8 +1,8 @@
-
 [;1mT24172.hs:1:20: [;1m[31merror[0m[0m[;1m: [GHC-01928][0m[0m[;1m
     • Illegal term-level use of the type constructor ‘Bool’
     • imported from ‘Prelude’ at T24172.hs:1:1
-      (and originally defined in ‘GHC.Types’)
+      (and originally defined in ‘GHC.Internal.Types’)
     • In the second argument of ‘(+)’, namely ‘Bool’
       In the second argument of ‘($)’, namely ‘1 + Bool’
       In the expression: print $ 1 + Bool[0m[0m
+

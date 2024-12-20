@@ -4,8 +4,8 @@
 
 module GHC.Internal.Bignum.Integer where
 
-import GHC.Types
-import GHC.Prim
+import GHC.Internal.Types
+import GHC.Internal.Prim
 import {-# SOURCE #-} GHC.Internal.Bignum.BigNat
 import {-# SOURCE #-} GHC.Internal.Bignum.Natural
 

@@ -113,7 +113,7 @@
 // JavaScript main thread.
 #define BUSY_YIELD_NS 15000000
 
-import CLOSURE ghczmprim_GHCziTuple_Z0T_closure;
+import CLOSURE ghczminternal_GHCziInternalziTuple_Z0T_closure;
 #if !defined(UnregisterisedCompiler)
 import CLOSURE stg_scheduler_loop_epoch;
 import CLOSURE stg_scheduler_loop_tid;
@@ -139,7 +139,7 @@ stg_scheduler_loopzh ()
   // Only meant to be run from a "main thread" (aka bound to an InCall
   // frame), not from a forked thread!
   if (StgTSO_bound(CurrentTSO) == NULL) {
-    return (ghczmprim_GHCziTuple_Z0T_closure);
+    return (ghczminternal_GHCziInternalziTuple_Z0T_closure);
   }
 
   // Entering the scheduler loop for the first time.
@@ -154,7 +154,7 @@ stg_scheduler_loopzh ()
 
   // Someone else is running the loop, not my business anymore.
   if (I64[stg_scheduler_loop_tid] != StgTSO_id(CurrentTSO)) {
-    return (ghczmprim_GHCziTuple_Z0T_closure);
+    return (ghczminternal_GHCziInternalziTuple_Z0T_closure);
   }
 
 work:
@@ -180,7 +180,7 @@ work:
 
 cleanup:
   I64[stg_scheduler_loop_tid] = 0 :: I64;
-  return (ghczmprim_GHCziTuple_Z0T_closure);
+  return (ghczminternal_GHCziInternalziTuple_Z0T_closure);
 }
 
 // After creating a new thread with only a stop frame on the stack,

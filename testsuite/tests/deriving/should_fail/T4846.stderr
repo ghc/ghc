@@ -1,12 +1,13 @@
-
 T4846.hs:29:1: error: [GHC-18872]
     • Couldn't match type ‘Bool’ with ‘BOOL’
-        arising from a use of ‘GHC.Prim.coerce’
+        arising from a use of ‘GHC.Internal.Prim.coerce’
     • In the expression:
-        GHC.Prim.coerce @(Expr Bool) @(Expr BOOL) (mkExpr @Bool)
+        GHC.Internal.Prim.coerce @(Expr Bool) @(Expr BOOL) (mkExpr @Bool)
       In an equation for ‘mkExpr’:
-          mkExpr = GHC.Prim.coerce @(Expr Bool) @(Expr BOOL) (mkExpr @Bool)
+          mkExpr
+            = GHC.Internal.Prim.coerce @(Expr Bool) @(Expr BOOL) (mkExpr @Bool)
       When typechecking the code for ‘mkExpr’
         in a derived instance for ‘B BOOL’:
         To see the code I am typechecking, use -ddump-deriv
       In the instance declaration for ‘B BOOL’
+

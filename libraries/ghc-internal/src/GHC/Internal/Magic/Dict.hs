@@ -10,9 +10,9 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.Magic.Dict
+-- Module      :  GHC.Internal.Magic.Dict
 -- Copyright   :  (c) The University of Glasgow 2009
--- License     :  see libraries/ghc-prim/LICENSE
+-- License     :  see libraries/ghc-internal/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
 -- Stability   :  internal
@@ -21,19 +21,19 @@
 -- Defines the 'withDict' function. For more information, see
 -- @Note [withDict]@ in "GHC.Tc.Instance.Class" in GHC.
 -- The definition of 'withDict' is located in a separate module from
--- "GHC.Magic" because 'withDict' is @Unsafe@ (it threatens type class
--- coherence) while "GHC.Magic" is @Trustworthy@.
+-- "GHC.Internal.Magic" because 'withDict' is @Unsafe@ (it threatens type class
+-- coherence) while "GHC.Internal.Magic" is @Trustworthy@.
 --
 -- Use "GHC.Exts" from the @base@ package instead of importing this
 -- module directly.
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic.Dict (
+module GHC.Internal.Magic.Dict (
     WithDict( withDict )
   ) where
 
-import GHC.Types (RuntimeRep, TYPE)
+import GHC.Internal.Types (RuntimeRep, TYPE)
 
 -- | The constraint @'WithDict' cls meth@ can be solved when evidence for
 -- the constraint @cls@ can be provided in the form of a dictionary of

@@ -1,4 +1,3 @@
-
 T14273.hs:7:27: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
     • Could not deduce ‘Show a1’ arising from a use of ‘show’
       from the context: Show a
@@ -11,7 +10,7 @@ T14273.hs:7:27: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
           -- Defined in ‘GHC.Internal.Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Internal.Show’
         ...plus 26 others
-        ...plus 48 instances involving out-of-scope types
+        ...plus 49 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘Just’, namely ‘(show _a)’
       In the expression: Just (show _a)
@@ -36,19 +35,19 @@ T14273.hs:7:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
            (and originally defined in ‘GHC.Internal.Base’))
         False :: Bool
           (imported from ‘Prelude’ at T14273.hs:1:8-40
-           (and originally defined in ‘GHC.Types’))
+           (and originally defined in ‘GHC.Internal.Types’))
         True :: Bool
           (imported from ‘Prelude’ at T14273.hs:1:8-40
-           (and originally defined in ‘GHC.Types’))
+           (and originally defined in ‘GHC.Internal.Types’))
         LT :: Ordering
           (imported from ‘Prelude’ at T14273.hs:1:8-40
-           (and originally defined in ‘GHC.Types’))
+           (and originally defined in ‘GHC.Internal.Types’))
         EQ :: Ordering
           (imported from ‘Prelude’ at T14273.hs:1:8-40
-           (and originally defined in ‘GHC.Types’))
+           (and originally defined in ‘GHC.Internal.Types’))
         GT :: Ordering
           (imported from ‘Prelude’ at T14273.hs:1:8-40
-           (and originally defined in ‘GHC.Types’))
+           (and originally defined in ‘GHC.Internal.Types’))
         () :: () (bound at <wired into compiler>)
         pi :: forall a. Floating a => a
           with pi @Double
@@ -80,3 +79,4 @@ T14273.hs:13:16: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         xs :: [a] (bound at T14273.hs:13:5)
         foo :: [a] -> String (bound at T14273.hs:13:1)
       Valid hole fits include k :: String (defined at T14273.hs:10:1)
+

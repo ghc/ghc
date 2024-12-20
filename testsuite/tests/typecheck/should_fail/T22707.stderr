@@ -1,7 +1,7 @@
-
 T22707.hs:6:59: error: [GHC-25897]
     • Couldn't match expected type ‘i1’
-                  with actual type ‘m0 GHC.Types.LiftedRep GHC.Types.LiftedRep b0’
+                  with actual type ‘m0
+                                      GHC.Internal.Types.LiftedRep GHC.Internal.Types.LiftedRep b0’
       ‘i1’ is a rigid type variable bound by
         the type signature for:
           t1 :: forall i2 o i1 a. Cont (i2 -> o) i1 a -> Cont o i2 (a -> i1)
@@ -21,15 +21,15 @@ T22707.hs:6:59: error: [GHC-25897]
 T22707.hs:6:72: error: [GHC-25897]
     • Couldn't match type ‘o’
                      with ‘m0
-                             GHC.Types.LiftedRep
-                             GHC.Types.LiftedRep
-                             (m0 GHC.Types.LiftedRep GHC.Types.LiftedRep b0)’
+                             GHC.Internal.Types.LiftedRep
+                             GHC.Internal.Types.LiftedRep
+                             (m0 GHC.Internal.Types.LiftedRep GHC.Internal.Types.LiftedRep b0)’
       Expected: Cont
                   ((a -> i1)
                    -> m0
-                        GHC.Types.LiftedRep
-                        GHC.Types.LiftedRep
-                        (m0 GHC.Types.LiftedRep GHC.Types.LiftedRep b0))
+                        GHC.Internal.Types.LiftedRep
+                        GHC.Internal.Types.LiftedRep
+                        (m0 GHC.Internal.Types.LiftedRep GHC.Internal.Types.LiftedRep b0))
                   i1
                   a
         Actual: Cont (i2 -> o) i1 a
@@ -44,3 +44,4 @@ T22707.hs:6:72: error: [GHC-25897]
         c :: Cont (i2 -> o) i1 a (bound at T22707.hs:6:4)
         t1 :: Cont (i2 -> o) i1 a -> Cont o i2 (a -> i1)
           (bound at T22707.hs:6:1)
+

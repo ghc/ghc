@@ -589,7 +589,7 @@ checkDependencies hsc_env summary iface
  = do
     res_normal <- classify_import (findImportedModule hsc_env) (ms_textual_imps summary ++ ms_srcimps summary)
     res_plugin <- classify_import (\mod _ -> findPluginModule fc fopts units mhome_unit mod) (ms_plugin_imps summary)
-    case sequence (res_normal ++ res_plugin ++ [Right (fake_ghc_prim_import)| ms_ghc_prim_import summary]) of
+    case sequence (res_normal ++ res_plugin) of
       Left recomp -> return $ NeedsRecompile recomp
       Right es -> do
         let (hs, ps) = partitionEithers es
@@ -620,16 +620,6 @@ checkDependencies hsc_env summary iface
    prev_dep_mods = map (second gwib_mod) $ Set.toAscList $ dep_direct_mods (mi_deps iface)
    prev_dep_pkgs = Set.toAscList (Set.union (dep_direct_pkgs (mi_deps iface))
                                             (dep_plugin_pkgs (mi_deps iface)))
-
-   -- GHC.Prim is very special and doesn't appear in ms_textual_imps but
-   -- ghc-prim will appear in the package dependencies still. In order to not confuse
-   -- the recompilation logic we need to not forget we imported GHC.Prim.
-   fake_ghc_prim_import =  case mhome_unit of
-                              Just home_unit
-                                | homeUnitId home_unit == primUnitId
-                                -> Left (primUnitId, mkModuleName "GHC.Prim")
-                              _ -> Right (fsLit "GHC.Prim", primUnitId)
-
 
    classify _ (Found _ mod)
     | (toUnitId $ moduleUnit mod) `elem` all_home_units = Right (Left ((toUnitId $ moduleUnit mod), moduleName mod))

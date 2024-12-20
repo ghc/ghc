@@ -1,13 +1,13 @@
 foreign import ccall interruptible "&" foo :: GHC.Internal.Ptr.Ptr ()
-foreign import prim safe "bar" bar :: GHC.Prim.Int# ->
-                                      GHC.Prim.Int#
-foreign import capi unsafe "baz" baz :: GHC.Types.Double ->
-                                        GHC.Types.IO ()
-foreign import stdcall safe "bay" bay :: (GHC.Types.Int ->
-                                          GHC.Types.Bool) ->
-                                         GHC.Types.IO GHC.Types.Int
-foreign import javascript unsafe "bax" bax :: GHC.Internal.Ptr.Ptr GHC.Types.Int ->
-                                              GHC.Types.IO GHC.Internal.Base.String
+foreign import prim safe "bar" bar :: GHC.Internal.Prim.Int# ->
+                                      GHC.Internal.Prim.Int#
+foreign import capi unsafe "baz" baz :: GHC.Internal.Types.Double ->
+                                        GHC.Internal.Types.IO ()
+foreign import stdcall safe "bay" bay :: (GHC.Internal.Types.Int ->
+                                          GHC.Internal.Types.Bool) ->
+                                         GHC.Internal.Types.IO GHC.Internal.Types.Int
+foreign import javascript unsafe "bax" bax :: GHC.Internal.Ptr.Ptr GHC.Internal.Types.Int ->
+                                              GHC.Internal.Types.IO GHC.Internal.Base.String
 TH_foreignCallingConventions.hs:(16,2)-(27,2): Splicing declarations
     do let fi cconv safety lbl name ty
              = ForeignD (ImportF cconv safety lbl name ty)

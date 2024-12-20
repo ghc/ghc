@@ -8,14 +8,11 @@ category:       GHC
 maintainer:     libraries@haskell.org
 bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
 synopsis:       GHC primitives
-build-type:     Custom
+build-type:     Simple
 description:
-    This package contains the primitive types and operations supplied by GHC.
-
-    It is an internal package, only for the use of GHC developers.
-    GHC users should not use it!  If you do use it then expect
-    breaking changes at any time without warning.  You should prefer
-    to import @GHC.Exts@ from the @base@ package instead.
+    This package used to contain the primitive types and operations supplied by
+    GHC. They are now exported by the ghc-internal package and ghc-prim is
+    deprecated.
 
 extra-source-files: changelog.md
 
@@ -24,86 +21,26 @@ source-repository head
     location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   libraries/ghc-prim
 
-custom-setup
-    setup-depends: base >= 4 && < 5, process, filepath, directory, Cabal >= 1.23 && < 3.9
-
-flag need-atomic
-  default: False
-
 Library
     default-language: Haskell2010
-    other-extensions:
-        BangPatterns
-        CPP
-        DeriveGeneric
-        MagicHash
-        MultiParamTypeClasses
-        NoImplicitPrelude
-        StandaloneDeriving
-        Trustworthy
-        TypeFamilies
-        UnboxedTuples
-        UnliftedFFITypes
 
-    build-depends: rts == 1.0.*
+    build-depends: ghc-internal
 
-    exposed-modules:
-        GHC.CString
-        GHC.Classes
-        GHC.Debug
-        GHC.Magic
-        GHC.Magic.Dict
-        GHC.Prim
-        GHC.Prim.Ext
-        GHC.Prim.Panic
-        GHC.Prim.Exception
-        GHC.Prim.PtrEq
-        GHC.PrimopWrappers
-        GHC.Tuple
-        GHC.Types
+    other-modules:
+      -- dummy module to make Hadrian/GHC build a valid library...
+      Dummy
 
-    autogen-modules:
-        GHC.Prim
-        GHC.PrimopWrappers
-
-    -- OS Specific
-    if os(windows)
-        -- Windows requires some extra libraries for linking because the RTS
-        -- is no longer re-exporting them (see #11223)
-        -- ucrt: standard C library. The RTS will automatically include this,
-        --       but is added for completeness.
-        -- mingwex: provides GNU POSIX extensions that aren't provided by ucrt.
-        -- mingw32: Unfortunately required because of a resource leak between
-        --          mingwex and mingw32. the __math_err symbol is defined in
-        --          mingw32 which is required by mingwex.
-        -- user32: provides access to apis to modify user components (UI etc)
-        --         on Windows. Required because of mingw32.
-        extra-libraries: user32, mingw32, mingwex, ucrt
-
-    if os(linux)
-        -- we need libm, but for musl and other's we might need libc, as libm
-        -- is just an empty shell.
-        extra-libraries: c, m
-
-    if flag(need-atomic)
-        -- for 64-bit atomic ops on armel (#20549)
-        extra-libraries: atomic
-
-    if !os(ghcjs)
-      c-sources:
-          cbits/atomic.c
-          cbits/bswap.c
-          cbits/bitrev.c
-          cbits/clz.c
-          cbits/ctz.c
-          cbits/debug.c
-          cbits/longlong.c
-          cbits/mulIntMayOflo.c
-          cbits/pdep.c
-          cbits/pext.c
-          cbits/popcnt.c
-          cbits/word2float.c
-
-    -- We need to set the unit ID to ghc-prim (without a version number)
-    -- as it's magic.
-    ghc-options: -this-unit-id ghc-prim
+    reexported-modules:
+          GHC.Internal.CString         as GHC.CString
+        , GHC.Internal.Classes         as GHC.Classes
+        , GHC.Internal.Debug           as GHC.Debug
+        , GHC.Internal.Magic           as GHC.Magic
+        , GHC.Internal.Magic.Dict      as GHC.Magic.Dict
+        , GHC.Internal.Prim            as GHC.Prim
+        , GHC.Internal.Prim.Ext        as GHC.Prim.Ext
+        , GHC.Internal.Prim.Panic      as GHC.Prim.Panic
+        , GHC.Internal.Prim.Exception  as GHC.Prim.Exception
+        , GHC.Internal.Prim.PtrEq      as GHC.Prim.PtrEq
+        , GHC.Internal.PrimopWrappers  as GHC.PrimopWrappers
+        , GHC.Internal.Tuple           as GHC.Tuple
+        , GHC.Internal.Types           as GHC.Types

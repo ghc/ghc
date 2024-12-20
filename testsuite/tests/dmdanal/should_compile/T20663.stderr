@@ -4,131 +4,131 @@ Result size of Tidy Core = {terms: 166, types: 107, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 11, types: 6, coercions: 0, joins: 0/0}
 T20663.$WFoo :: Int %1 -> Int %1 -> Foo
-T20663.$WFoo = \ (conrep :: Int) (conrep :: Int) -> case conrep of { GHC.Types.I# unbx -> case conrep of { GHC.Types.I# unbx -> T20663.Foo unbx unbx } }
+T20663.$WFoo = \ (conrep :: Int) (conrep1 :: Int) -> case conrep of { GHC.Internal.Types.I# unbx -> case conrep1 of { GHC.Internal.Types.I# unbx1 -> T20663.Foo unbx unbx1 } }
 
 -- RHS size: {terms: 11, types: 6, coercions: 0, joins: 0/0}
 T20663.$WGram :: Int %1 -> Int %1 -> Gram
-T20663.$WGram = \ (conrep :: Int) (conrep :: Int) -> case conrep of { GHC.Types.I# unbx -> case conrep of { GHC.Types.I# unbx -> T20663.Gram unbx unbx } }
+T20663.$WGram = \ (conrep :: Int) (conrep1 :: Int) -> case conrep of { GHC.Internal.Types.I# unbx -> case conrep1 of { GHC.Internal.Types.I# unbx1 -> T20663.Gram unbx unbx1 } }
 
 -- RHS size: {terms: 5, types: 6, coercions: 0, joins: 0/0}
-T20663.$wyeah :: GHC.Prim.Int# -> GHC.Prim.Int# -> (# GHC.Prim.Int#, GHC.Prim.Int# #)
-T20663.$wyeah = \ (ww :: GHC.Prim.Int#) (ww1 :: GHC.Prim.Int#) -> (# ww, ww1 #)
+T20663.$wyeah :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> (# GHC.Internal.Prim.Int#, GHC.Internal.Prim.Int# #)
+T20663.$wyeah = \ (ww :: GHC.Internal.Prim.Int#) (ww1 :: GHC.Internal.Prim.Int#) -> (# ww, ww1 #)
 
 -- RHS size: {terms: 14, types: 13, coercions: 0, joins: 0/0}
 yeah :: Gram -> (Int, Int)
-yeah = \ (g :: Gram) -> case g of { Gram ww ww1 -> case T20663.$wyeah ww ww1 of { (# ww2, ww3 #) -> (GHC.Types.I# ww2, GHC.Types.I# ww3) } }
+yeah = \ (g :: Gram) -> case g of { Gram ww ww1 -> case T20663.$wyeah ww ww1 of { (# ww2, ww3 #) -> (GHC.Internal.Types.I# ww2, GHC.Internal.Types.I# ww3) } }
 
 -- RHS size: {terms: 5, types: 6, coercions: 0, joins: 0/0}
-T20663.$wbam :: GHC.Prim.Int# -> GHC.Prim.Int# -> (# GHC.Prim.Int#, GHC.Prim.Int# #)
-T20663.$wbam = \ (ww :: GHC.Prim.Int#) (ww1 :: GHC.Prim.Int#) -> (# ww, ww1 #)
+T20663.$wbam :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> (# GHC.Internal.Prim.Int#, GHC.Internal.Prim.Int# #)
+T20663.$wbam = \ (ww :: GHC.Internal.Prim.Int#) (ww1 :: GHC.Internal.Prim.Int#) -> (# ww, ww1 #)
 
 -- RHS size: {terms: 14, types: 13, coercions: 0, joins: 0/0}
 bam :: Foo -> (Int, Int)
-bam = \ (f :: Foo) -> case f of { Foo ww ww1 -> case T20663.$wbam ww ww1 of { (# ww2, ww3 #) -> (GHC.Types.I# ww2, GHC.Types.I# ww3) } }
+bam = \ (f :: Foo) -> case f of { Foo ww ww1 -> case T20663.$wbam ww ww1 of { (# ww2, ww3 #) -> (GHC.Internal.Types.I# ww2, GHC.Internal.Types.I# ww3) } }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T20663.$trModule4 :: GHC.Prim.Addr#
+T20663.$trModule4 :: GHC.Internal.Prim.Addr#
 T20663.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T20663.$trModule3 :: GHC.Types.TrName
-T20663.$trModule3 = GHC.Types.TrNameS T20663.$trModule4
+T20663.$trModule3 :: GHC.Internal.Types.TrName
+T20663.$trModule3 = GHC.Internal.Types.TrNameS T20663.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T20663.$trModule2 :: GHC.Prim.Addr#
+T20663.$trModule2 :: GHC.Internal.Prim.Addr#
 T20663.$trModule2 = "T20663"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T20663.$trModule1 :: GHC.Types.TrName
-T20663.$trModule1 = GHC.Types.TrNameS T20663.$trModule2
+T20663.$trModule1 :: GHC.Internal.Types.TrName
+T20663.$trModule1 = GHC.Internal.Types.TrNameS T20663.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T20663.$trModule :: GHC.Types.Module
-T20663.$trModule = GHC.Types.Module T20663.$trModule3 T20663.$trModule1
+T20663.$trModule :: GHC.Internal.Types.Module
+T20663.$trModule = GHC.Internal.Types.Module T20663.$trModule3 T20663.$trModule1
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep :: GHC.Types.KindRep
-$krep = GHC.Types.KindRepTyConApp GHC.Types.$tcInt (GHC.Types.[] @GHC.Types.KindRep)
+$krep :: GHC.Internal.Types.KindRep
+$krep = GHC.Internal.Types.KindRepTyConApp GHC.Internal.Types.$tcInt (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$krep1 :: GHC.Types.RuntimeRep
-$krep1 = GHC.Types.BoxedRep GHC.Types.Unlifted
+$krep1 :: GHC.Internal.Types.RuntimeRep
+$krep1 = GHC.Internal.Types.BoxedRep GHC.Internal.Types.Unlifted
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T20663.$tcGram1 :: GHC.Types.KindRep
-T20663.$tcGram1 = GHC.Types.KindRepTYPE $krep1
+T20663.$tcGram1 :: GHC.Internal.Types.KindRep
+T20663.$tcGram1 = GHC.Internal.Types.KindRepTYPE $krep1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T20663.$tcGram3 :: GHC.Prim.Addr#
+T20663.$tcGram3 :: GHC.Internal.Prim.Addr#
 T20663.$tcGram3 = "Gram"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T20663.$tcGram2 :: GHC.Types.TrName
-T20663.$tcGram2 = GHC.Types.TrNameS T20663.$tcGram3
+T20663.$tcGram2 :: GHC.Internal.Types.TrName
+T20663.$tcGram2 = GHC.Internal.Types.TrNameS T20663.$tcGram3
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T20663.$tcGram :: GHC.Types.TyCon
-T20663.$tcGram = GHC.Types.TyCon 14476255489265172493#Word64 4126058292614824653#Word64 T20663.$trModule T20663.$tcGram2 0# T20663.$tcGram1
+T20663.$tcGram :: GHC.Internal.Types.TyCon
+T20663.$tcGram = GHC.Internal.Types.TyCon 14476255489265172493#Word64 4126058292614824653#Word64 T20663.$trModule T20663.$tcGram2 0# T20663.$tcGram1
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep2 :: GHC.Types.KindRep
-$krep2 = GHC.Types.KindRepTyConApp T20663.$tcGram (GHC.Types.[] @GHC.Types.KindRep)
+$krep2 :: GHC.Internal.Types.KindRep
+$krep2 = GHC.Internal.Types.KindRepTyConApp T20663.$tcGram (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep3 :: GHC.Types.KindRep
-$krep3 = GHC.Types.KindRepFun $krep $krep2
+$krep3 :: GHC.Internal.Types.KindRep
+$krep3 = GHC.Internal.Types.KindRepFun $krep $krep2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T20663.$tc'Gram1 :: GHC.Types.KindRep
-T20663.$tc'Gram1 = GHC.Types.KindRepFun $krep $krep3
+T20663.$tc'Gram1 :: GHC.Internal.Types.KindRep
+T20663.$tc'Gram1 = GHC.Internal.Types.KindRepFun $krep $krep3
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T20663.$tc'Gram3 :: GHC.Prim.Addr#
+T20663.$tc'Gram3 :: GHC.Internal.Prim.Addr#
 T20663.$tc'Gram3 = "'Gram"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T20663.$tc'Gram2 :: GHC.Types.TrName
-T20663.$tc'Gram2 = GHC.Types.TrNameS T20663.$tc'Gram3
+T20663.$tc'Gram2 :: GHC.Internal.Types.TrName
+T20663.$tc'Gram2 = GHC.Internal.Types.TrNameS T20663.$tc'Gram3
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T20663.$tc'Gram :: GHC.Types.TyCon
-T20663.$tc'Gram = GHC.Types.TyCon 6930635511997833813#Word64 5635348526001679009#Word64 T20663.$trModule T20663.$tc'Gram2 0# T20663.$tc'Gram1
+T20663.$tc'Gram :: GHC.Internal.Types.TyCon
+T20663.$tc'Gram = GHC.Internal.Types.TyCon 6930635511997833813#Word64 5635348526001679009#Word64 T20663.$trModule T20663.$tc'Gram2 0# T20663.$tc'Gram1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T20663.$tcFoo2 :: GHC.Prim.Addr#
+T20663.$tcFoo2 :: GHC.Internal.Prim.Addr#
 T20663.$tcFoo2 = "Foo"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T20663.$tcFoo1 :: GHC.Types.TrName
-T20663.$tcFoo1 = GHC.Types.TrNameS T20663.$tcFoo2
+T20663.$tcFoo1 :: GHC.Internal.Types.TrName
+T20663.$tcFoo1 = GHC.Internal.Types.TrNameS T20663.$tcFoo2
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T20663.$tcFoo :: GHC.Types.TyCon
-T20663.$tcFoo = GHC.Types.TyCon 4170886864186800403#Word64 12966498080784616609#Word64 T20663.$trModule T20663.$tcFoo1 0# GHC.Types.krep$*
+T20663.$tcFoo :: GHC.Internal.Types.TyCon
+T20663.$tcFoo = GHC.Internal.Types.TyCon 4170886864186800403#Word64 12966498080784616609#Word64 T20663.$trModule T20663.$tcFoo1 0# GHC.Internal.Types.krep$*
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep4 :: GHC.Types.KindRep
-$krep4 = GHC.Types.KindRepTyConApp T20663.$tcFoo (GHC.Types.[] @GHC.Types.KindRep)
+$krep4 :: GHC.Internal.Types.KindRep
+$krep4 = GHC.Internal.Types.KindRepTyConApp T20663.$tcFoo (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep5 :: GHC.Types.KindRep
-$krep5 = GHC.Types.KindRepFun $krep $krep4
+$krep5 :: GHC.Internal.Types.KindRep
+$krep5 = GHC.Internal.Types.KindRepFun $krep $krep4
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T20663.$tc'Foo1 :: GHC.Types.KindRep
-T20663.$tc'Foo1 = GHC.Types.KindRepFun $krep $krep5
+T20663.$tc'Foo1 :: GHC.Internal.Types.KindRep
+T20663.$tc'Foo1 = GHC.Internal.Types.KindRepFun $krep $krep5
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T20663.$tc'Foo3 :: GHC.Prim.Addr#
+T20663.$tc'Foo3 :: GHC.Internal.Prim.Addr#
 T20663.$tc'Foo3 = "'Foo"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T20663.$tc'Foo2 :: GHC.Types.TrName
-T20663.$tc'Foo2 = GHC.Types.TrNameS T20663.$tc'Foo3
+T20663.$tc'Foo2 :: GHC.Internal.Types.TrName
+T20663.$tc'Foo2 = GHC.Internal.Types.TrNameS T20663.$tc'Foo3
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T20663.$tc'Foo :: GHC.Types.TyCon
-T20663.$tc'Foo = GHC.Types.TyCon 9844518566125716364#Word64 9262896337475646272#Word64 T20663.$trModule T20663.$tc'Foo2 0# T20663.$tc'Foo1
+T20663.$tc'Foo :: GHC.Internal.Types.TyCon
+T20663.$tc'Foo = GHC.Internal.Types.TyCon 9844518566125716364#Word64 9262896337475646272#Word64 T20663.$trModule T20663.$tc'Foo2 0# T20663.$tc'Foo1
 
 
 

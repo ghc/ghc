@@ -38,7 +38,7 @@ module GHC.Internal.Word (
     bitReverse64,
 
     -- * Equality operators
-    -- | See GHC.Classes#matching_overloaded_methods_in_rules
+    -- | See GHC.Internal.Classes#matching_overloaded_methods_in_rules
     eqWord, neWord, gtWord, geWord, ltWord, leWord,
     eqWord8, neWord8, gtWord8, geWord8, ltWord8, leWord8,
     eqWord16, neWord16, gtWord16, geWord16, ltWord16, leWord16,
@@ -48,7 +48,7 @@ module GHC.Internal.Word (
 
 import GHC.Internal.Data.Maybe
 
-import GHC.Prim
+import GHC.Internal.Prim
 import GHC.Internal.Base
 
 import GHC.Internal.Bits
@@ -71,7 +71,7 @@ data {-# CTYPE "HsWord8" #-} Word8
 
 -- ^ 8-bit unsigned integer type
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 -- | @since base-2.01
 instance Eq Word8 where
     (==) = eqWord8
@@ -261,7 +261,7 @@ instance FiniteBits Word8 where
 data {-# CTYPE "HsWord16" #-} Word16 = W16# Word16#
 -- ^ 16-bit unsigned integer type
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 -- | @since base-2.01
 instance Eq Word16 where
     (==) = eqWord16
@@ -493,7 +493,7 @@ byteSwap16 (W16# w#) = W16# (wordToWord16# (byteSwap16# (word16ToWord# w#)))
 data {-# CTYPE "HsWord32" #-} Word32 = W32# Word32#
 -- ^ 32-bit unsigned integer type
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 -- | @since base-2.01
 instance Eq Word32 where
     (==) = eqWord32
@@ -681,7 +681,7 @@ byteSwap32 (W32# w#) = W32# (wordToWord32# (byteSwap32# (word32ToWord# w#)))
 data {-# CTYPE "HsWord64" #-} Word64 = W64# Word64#
 -- ^ 64-bit unsigned integer type
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 -- | @since base-2.01
 instance Eq Word64 where
     (==) = eqWord64

@@ -1,1 +1,1 @@
-TyConI (DataD [] Main.T [] Nothing [NormalC Main.T [(Bang NoSourceUnpackedness NoSourceStrictness,AppT (AppT (UnboxedSumT 2) (ConT GHC.Types.Int)) (ConT GHC.Types.Char))]] [])
+TyConI (DataD [] Main.T [] Nothing [NormalC Main.T [(Bang NoSourceUnpackedness NoSourceStrictness,AppT (AppT (UnboxedSumT 2) (ConT GHC.Internal.Types.Int)) (ConT GHC.Internal.Types.Char))]] [])

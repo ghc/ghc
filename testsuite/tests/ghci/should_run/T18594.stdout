@@ -1,6 +1,6 @@
 type (->) :: * -> * -> *
 type (->) = FUN Many
-  	-- Defined in ‘GHC.Types’
+  	-- Defined in ‘GHC.Internal.Types’
 infixr -1 ->
 instance Monoid b => Monoid (a -> b)
   -- Defined in ‘GHC.Internal.Base’
@@ -11,10 +11,10 @@ instance Functor ((->) r) -- Defined in ‘GHC.Internal.Base’
 instance Monad ((->) r) -- Defined in ‘GHC.Internal.Base’
 type Constraint :: *
 type Constraint = CONSTRAINT LiftedRep
-  	-- Defined in ‘GHC.Types’
+  	-- Defined in ‘GHC.Internal.Types’
 type Type :: *
 type Type = TYPE LiftedRep
-  	-- Defined in ‘GHC.Types’
+  	-- Defined in ‘GHC.Internal.Types’
 type Type :: Type
 type Type = TYPE LiftedRep
-  	-- Defined in ‘GHC.Types’
+  	-- Defined in ‘GHC.Internal.Types’

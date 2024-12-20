@@ -142,7 +142,7 @@ module GHC.Internal.Float
     , roundingMode#
 
       -- * Monomorphic equality operators
-      -- | See GHC.Classes#matching_overloaded_methods_in_rules
+      -- | See GHC.Internal.Classes#matching_overloaded_methods_in_rules
     , eqFloat, eqDouble
 
       -- * Internal

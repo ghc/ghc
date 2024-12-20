@@ -1,8 +1,8 @@
 Collecting type info for 1 module(s) ... 
-T15369.hs:(3,1)-(3,1): GHC.Types.Int
-T15369.hs:(3,5)-(3,5): GHC.Types.Int
-T15369.hs:(3,1)-(3,1): GHC.Types.Int
-T15369.hs:(3,5)-(3,5): GHC.Types.Int
+T15369.hs:(3,1)-(3,1): GHC.Internal.Types.Int
+T15369.hs:(3,5)-(3,5): GHC.Internal.Types.Int
+T15369.hs:(3,1)-(3,1): GHC.Internal.Types.Int
+T15369.hs:(3,5)-(3,5): GHC.Internal.Types.Int
 Collecting type info for 1 module(s) ... 
-T15369.hs:(3,1)-(3,1): GHC.Types.Double
-T15369.hs:(3,5)-(3,5): GHC.Types.Double
+T15369.hs:(3,1)-(3,1): GHC.Internal.Types.Double
+T15369.hs:(3,5)-(3,5): GHC.Internal.Types.Double

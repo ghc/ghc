@@ -16,7 +16,7 @@ T19244a.bkp:22:9: error: [GHC-15843]
     • Type constructor ‘Key’ has conflicting definitions in the module
       and its hsig file.
       Main module: type Key :: * -> Constraint
-                   type Key = GHC.Classes.Ord
+                   type Key = GHC.Internal.Classes.Ord
         Hsig file: type Key :: forall {k}. k -> Constraint
                    class Key k1
       The types have different kinds.
@@ -44,7 +44,8 @@ T19244a.bkp:22:9: error: [GHC-15843]
     • Identifier ‘lookup’ has conflicting definitions in the module
       and its hsig file.
       Main module: lookup ::
-                     GHC.Classes.Ord k => k -> Map k a -> GHC.Internal.Maybe.Maybe a
+                     GHC.Internal.Classes.Ord k =>
+                     k -> Map k a -> GHC.Internal.Maybe.Maybe a
         Hsig file: lookup ::
                      Key (*) k => k -> Map (*) (*) k a -> GHC.Internal.Maybe.Maybe a
       The two types are different.
@@ -54,7 +55,7 @@ T19244a.bkp:22:9: error: [GHC-15843]
     • Identifier ‘insert’ has conflicting definitions in the module
       and its hsig file.
       Main module: insert ::
-                     GHC.Classes.Ord k => k -> a -> Map k a -> Map k a
+                     GHC.Internal.Classes.Ord k => k -> a -> Map k a -> Map k a
         Hsig file: insert ::
                      Key (*) k => k -> a -> Map (*) (*) k a -> Map (*) (*) k a
       The two types are different.

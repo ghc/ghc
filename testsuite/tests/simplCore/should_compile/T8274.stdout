@@ -4,20 +4,20 @@ T8274.$trModule4 :: Addr#
 T8274.$trModule4 = "main"#
 T8274.$trModule2 :: Addr#
 T8274.$trModule2 = "T8274"#
-$krep = GHC.Types.KindRepTyConApp GHC.Types.$tcWord# (GHC.Types.[] @GHC.Types.KindRep)
-$krep1 = GHC.Types.KindRepTyConApp GHC.Types.$tcChar# (GHC.Types.[] @GHC.Types.KindRep)
-$krep2 = GHC.Types.KindRepTyConApp GHC.Types.$tcDouble# (GHC.Types.[] @GHC.Types.KindRep)
-$krep3 = GHC.Types.KindRepTyConApp GHC.Types.$tcFloat# (GHC.Types.[] @GHC.Types.KindRep)
-$krep4 = GHC.Types.KindRepTyConApp GHC.Types.$tcInt# (GHC.Types.[] @GHC.Types.KindRep)
+$krep = GHC.Internal.Types.KindRepTyConApp GHC.Internal.Types.$tcWord# (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
+$krep1 = GHC.Internal.Types.KindRepTyConApp GHC.Internal.Types.$tcChar# (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
+$krep2 = GHC.Internal.Types.KindRepTyConApp GHC.Internal.Types.$tcDouble# (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
+$krep3 = GHC.Internal.Types.KindRepTyConApp GHC.Internal.Types.$tcFloat# (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
+$krep4 = GHC.Internal.Types.KindRepTyConApp GHC.Internal.Types.$tcInt# (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 T8274.$tcP2 :: Addr#
 T8274.$tcP2 = "P"#
-T8274.$tcP = GHC.Types.TyCon 7483823267324216774#Word64 12197132127820124256#Word64 T8274.$trModule T8274.$tcP1 0# GHC.Types.krep$*
+T8274.$tcP = GHC.Internal.Types.TyCon 7483823267324216774#Word64 12197132127820124256#Word64 T8274.$trModule T8274.$tcP1 0# GHC.Internal.Types.krep$*
 T8274.$tc'Positives3 :: Addr#
 T8274.$tc'Positives3 = "'Positives"#
-T8274.$tc'Positives = GHC.Types.TyCon 14886798270706315033#Word64 15735393004803600911#Word64 T8274.$trModule T8274.$tc'Positives2 0# T8274.$tc'Positives1
+T8274.$tc'Positives = GHC.Internal.Types.TyCon 14886798270706315033#Word64 15735393004803600911#Word64 T8274.$trModule T8274.$tc'Positives2 0# T8274.$tc'Positives1
 T8274.$tcN2 :: Addr#
 T8274.$tcN2 = "N"#
-T8274.$tcN = GHC.Types.TyCon 17387464673997143412#Word64 16681536026493340311#Word64 T8274.$trModule T8274.$tcN1 0# GHC.Types.krep$*
+T8274.$tcN = GHC.Internal.Types.TyCon 17387464673997143412#Word64 16681536026493340311#Word64 T8274.$trModule T8274.$tcN1 0# GHC.Internal.Types.krep$*
 T8274.$tc'Negatives3 :: Addr#
 T8274.$tc'Negatives3 = "'Negatives"#
-T8274.$tc'Negatives = GHC.Types.TyCon 14330047746189143983#Word64 12207513731214201811#Word64 T8274.$trModule T8274.$tc'Negatives2 0# T8274.$tc'Negatives1
+T8274.$tc'Negatives = GHC.Internal.Types.TyCon 14330047746189143983#Word64 12207513731214201811#Word64 T8274.$trModule T8274.$tc'Negatives2 0# T8274.$tc'Negatives1

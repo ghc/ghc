@@ -734,21 +734,21 @@ import GHC.Internal.Data.Either     ( Either (..) )
 import GHC.Internal.Data.Maybe      ( Maybe(..), fromMaybe )
 import GHC.Internal.Data.Ord        ( Down(..) )
 import GHC.Internal.Bignum.Integer ( Integer, integerToInt )
-import GHC.Prim        ( Addr#, Char#, Double#, Float#, Int#, Word# )
+import GHC.Internal.Prim        ( Addr#, Char#, Double#, Float#, Int#, Word# )
 import GHC.Internal.Ptr         ( Ptr(..) )
-import GHC.Types
+import GHC.Internal.Types
 
 -- Needed for instances
 import GHC.Internal.Ix      ( Ix )
 import GHC.Internal.Base    ( Alternative(..), Applicative(..), Functor(..)
                    , Monad(..), MonadPlus(..), NonEmpty(..), String, coerce
                    , Semigroup(..), Monoid(..), Void )
-import GHC.Classes ( Eq(..), Ord(..) )
+import GHC.Internal.Classes ( Eq(..), Ord(..) )
 import GHC.Internal.Enum    ( Bounded, Enum )
 import GHC.Internal.Read    ( Read(..) )
 import GHC.Internal.Show    ( Show(..), showString, showChar, showParen, appPrec )
 import GHC.Internal.Stack.Types ( SrcLoc(..) )
-import GHC.Tuple   (Solo (..))
+import GHC.Internal.Tuple   (Solo (..))
 import GHC.Internal.Unicode ( GeneralCategory(..) )
 import GHC.Internal.Fingerprint.Type ( Fingerprint(..) )
 

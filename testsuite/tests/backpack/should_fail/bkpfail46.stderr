@@ -9,15 +9,15 @@
   [1 of 1] Including p[A=q:A]
     Instantiating p[A=q:A]
     [1 of 2] Compiling A[sig]           ( p/A.hsig, bkpfail46.out/p/p-HVmFlcYSefiK5n1aDP1v7x/A.o )
-
 bkpfail46.bkp:16:9: error: [GHC-15843]
     • Type constructor ‘K’ has conflicting definitions in the module
       and its hsig file.
       Main module: type K :: * -> Constraint
-                   type K a = GHC.Classes.Eq a
+                   type K a = GHC.Internal.Classes.Eq a
         Hsig file: type K :: * -> Constraint
                    class K a
       Illegal parameterized type synonym in implementation of abstract data.
     • While checking that ‘q:A’ implements signature ‘A’ in ‘p[A=q:A]’.
     Suggested fix:
       If possible, eta-reduce the type synonym ‘K’ so that it is nullary.
+

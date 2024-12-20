@@ -1,4 +1,3 @@
-
 T14884.hs:4:5: error: [GHC-88464]
     • Found hole: _ :: (a0 -> IO ()) -> String -> IO ()
       Where: ‘a0’ is an ambiguous type variable
@@ -23,11 +22,14 @@ T14884.hs:4:5: error: [GHC-88464]
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Internal.Base’))
         ($) :: forall a b. (a -> b) -> a -> b
-          with ($) @GHC.Types.LiftedRep @GHC.Types.LiftedRep @String @(IO ())
+          with ($) @GHC.Internal.Types.LiftedRep
+                   @GHC.Internal.Types.LiftedRep
+                   @String
+                   @(IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Internal.Base’))
         ($!) :: forall a b. (a -> b) -> a -> b
-          with ($!) @GHC.Types.LiftedRep @String @(IO ())
+          with ($!) @GHC.Internal.Types.LiftedRep @String @(IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Internal.Base’))
 
@@ -45,3 +47,4 @@ T14884.hs:4:7: error: [GHC-39999]
     • In the first argument of ‘_’, namely ‘print’
       In the expression: _ print "abc"
       In an equation for ‘x’: x = _ print "abc"
+

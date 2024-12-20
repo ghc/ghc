@@ -59,7 +59,7 @@ module GHC.Internal.Exception
     , toExceptionWithBacktrace
 
       -- * Reexports
-      -- Re-export CallStack and SrcLoc from GHC.Types
+      -- Re-export CallStack and SrcLoc from GHC.Internal.Types
     , CallStack, fromCallSiteList, getCallStack, prettyCallStack
     , prettyCallStackLines
     , SrcLoc(..), prettySrcLoc

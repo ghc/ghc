@@ -1,4 +1,3 @@
-
 NamedWildcardsNotInMonotype.hs:5:1: error: [GHC-39999]
     • Could not deduce ‘Eq w0’
       from the context: (Show a, Eq w, Eq a)
@@ -7,12 +6,13 @@ NamedWildcardsNotInMonotype.hs:5:1: error: [GHC-39999]
         at NamedWildcardsNotInMonotype.hs:5:1-33
       The type variable ‘w0’ is ambiguous
       Potentially matching instances:
-        instance Eq Ordering -- Defined in ‘GHC.Classes’
-        instance Eq a => Eq (Solo a) -- Defined in ‘GHC.Classes’
+        instance Eq Ordering -- Defined in ‘GHC.Internal.Classes’
+        instance Eq a => Eq (Solo a) -- Defined in ‘GHC.Internal.Classes’
         ...plus 22 others
-        ...plus four instances involving out-of-scope types
+        ...plus five instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the ambiguity check for the inferred type for ‘foo’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type
         foo :: forall {a} {w}. (Show a, Eq w, Eq a) => a -> a -> String
+

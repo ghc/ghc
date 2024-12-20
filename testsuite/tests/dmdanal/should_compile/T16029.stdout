@@ -2,8 +2,32 @@
          Tmpl= \ (conrep [Occ=Once1!] :: Int)
                  (conrep1 [Occ=Once1!] :: Int) ->
   = \ (conrep [Occ=Once1!] :: Int) (conrep1 [Occ=Once1!] :: Int) ->
-  :: GHC.Prim.Int# -> GHC.Prim.Int#
-  = \ (ww :: GHC.Prim.Int#) ->
+T16029.$trModule4 :: GHC.Internal.Prim.Addr#
+T16029.$trModule3 :: GHC.Internal.Types.TrName
+T16029.$trModule2 :: GHC.Internal.Prim.Addr#
+T16029.$trModule1 :: GHC.Internal.Types.TrName
+T16029.$trModule :: GHC.Internal.Types.Module
+$krep :: GHC.Internal.Types.KindRep
+T16029.$tcS2 :: GHC.Internal.Prim.Addr#
+T16029.$tcS1 :: GHC.Internal.Types.TrName
+T16029.$tcS :: GHC.Internal.Types.TyCon
+$krep1 :: GHC.Internal.Types.KindRep
+$krep2 :: GHC.Internal.Types.KindRep
+T16029.$tc'MkS1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+T16029.$tc'MkS3 :: GHC.Internal.Prim.Addr#
+T16029.$tc'MkS2 :: GHC.Internal.Types.TrName
+T16029.$tc'MkS :: GHC.Internal.Types.TyCon
+T16029.$tcT2 :: GHC.Internal.Prim.Addr#
+T16029.$tcT1 :: GHC.Internal.Types.TrName
+T16029.$tcT :: GHC.Internal.Types.TyCon
+$krep3 :: GHC.Internal.Types.KindRep
+$krep4 :: GHC.Internal.Types.KindRep
+T16029.$tc'MkT1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+T16029.$tc'MkT3 :: GHC.Internal.Prim.Addr#
+T16029.$tc'MkT2 :: GHC.Internal.Types.TrName
+T16029.$tc'MkT :: GHC.Internal.Types.TyCon
+  :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+  = \ (ww :: GHC.Internal.Prim.Int#) ->
 g2 [InlPrag=[2]] :: T -> Int -> Int
          Tmpl= \ (ds [Occ=Once1!] :: T) (ds1 [Occ=Once1!] :: Int) ->
   = \ (ds :: T) (ds1 :: Int) ->

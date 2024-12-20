@@ -56,7 +56,7 @@ AC_PROG_CC([cc gcc clang])
 dnl make extensions visible to allow feature-tests to detect them lateron
 AC_USE_SYSTEM_EXTENSIONS
 
-dnl ** Used to determine how to compile ghc-prim's atomics.c, used by
+dnl ** Used to determine how to compile ghc-internal's atomics.c, used by
 dnl    unregisterised, Sparc, and PPC backends. Also determines whether
 dnl    linking to libatomic is required for atomic operations, e.g. on
 dnl    RISCV64 GCC.

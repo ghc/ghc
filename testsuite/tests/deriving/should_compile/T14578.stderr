@@ -5,7 +5,7 @@ Derived class instances:
             GHC.Internal.Base.Applicative g, GHC.Internal.Base.Semigroup a) =>
            GHC.Internal.Base.Semigroup (T14578.Wat f g a) where
     (GHC.Internal.Base.<>)
-      = GHC.Prim.coerce
+      = GHC.Internal.Prim.coerce
           @(T14578.App (Data.Functor.Compose.Compose f g) a
             -> T14578.App (Data.Functor.Compose.Compose f g) a
             -> T14578.App (Data.Functor.Compose.Compose f g) a)
@@ -13,7 +13,7 @@ Derived class instances:
           ((GHC.Internal.Base.<>)
              @(T14578.App (Data.Functor.Compose.Compose f g) a))
     GHC.Internal.Base.sconcat
-      = GHC.Prim.coerce
+      = GHC.Internal.Prim.coerce
           @(GHC.Internal.Base.NonEmpty
               (T14578.App (Data.Functor.Compose.Compose f g) a)
             -> T14578.App (Data.Functor.Compose.Compose f g) a)
@@ -22,7 +22,7 @@ Derived class instances:
           (GHC.Internal.Base.sconcat
              @(T14578.App (Data.Functor.Compose.Compose f g) a))
     GHC.Internal.Base.stimes @b
-      = GHC.Prim.coerce
+      = GHC.Internal.Prim.coerce
           @(b
             -> T14578.App (Data.Functor.Compose.Compose f g) a
             -> T14578.App (Data.Functor.Compose.Compose f g) a)
@@ -33,38 +33,38 @@ Derived class instances:
   instance GHC.Internal.Base.Functor f =>
            GHC.Internal.Base.Functor (T14578.App f) where
     GHC.Internal.Base.fmap @a @b
-      = GHC.Prim.coerce
+      = GHC.Internal.Prim.coerce
           @((a -> b) -> f a -> f b)
           @((a -> b) -> T14578.App f a -> T14578.App f b)
           (GHC.Internal.Base.fmap @f @a @b)
     (GHC.Internal.Base.<$) @a @b
-      = GHC.Prim.coerce
+      = GHC.Internal.Prim.coerce
           @(a -> f b -> f a) @(a -> T14578.App f b -> T14578.App f a)
           ((GHC.Internal.Base.<$) @f @a @b)
   
   instance GHC.Internal.Base.Applicative f =>
            GHC.Internal.Base.Applicative (T14578.App f) where
     GHC.Internal.Base.pure @a
-      = GHC.Prim.coerce
+      = GHC.Internal.Prim.coerce
           @(a -> f a) @(a -> T14578.App f a) (GHC.Internal.Base.pure @f @a)
     (GHC.Internal.Base.<*>) @a @b
-      = GHC.Prim.coerce
+      = GHC.Internal.Prim.coerce
           @(f (a -> b) -> f a -> f b)
           @(T14578.App f (a -> b) -> T14578.App f a -> T14578.App f b)
           ((GHC.Internal.Base.<*>) @f @a @b)
     GHC.Internal.Base.liftA2 @a @b @c
-      = GHC.Prim.coerce
+      = GHC.Internal.Prim.coerce
           @((a -> b -> c) -> f a -> f b -> f c)
           @((a -> b -> c)
             -> T14578.App f a -> T14578.App f b -> T14578.App f c)
           (GHC.Internal.Base.liftA2 @f @a @b @c)
     (GHC.Internal.Base.*>) @a @b
-      = GHC.Prim.coerce
+      = GHC.Internal.Prim.coerce
           @(f a -> f b -> f b)
           @(T14578.App f a -> T14578.App f b -> T14578.App f b)
           ((GHC.Internal.Base.*>) @f @a @b)
     (GHC.Internal.Base.<*) @a @b
-      = GHC.Prim.coerce
+      = GHC.Internal.Prim.coerce
           @(f a -> f b -> f a)
           @(T14578.App f a -> T14578.App f b -> T14578.App f a)
           ((GHC.Internal.Base.<*) @f @a @b)

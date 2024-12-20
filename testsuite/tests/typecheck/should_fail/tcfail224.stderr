@@ -1,7 +1,8 @@
-
 tcfail224.hs:8:5: error: [GHC-39999]
     • No instance for ‘Num Int’ arising from the literal ‘3’
       There are instances for similar types:
-        instance Num GHC.Types.Int -- Defined in ‘GHC.Internal.Num’
+        instance Num GHC.Internal.Types.Int
+          -- Defined in ‘GHC.Internal.Num’
     • In the expression: 3
       In an equation for ‘f’: f = 3
+

@@ -1,2 +1,2 @@
-      case r @(GHC.Types.ZonkAny 0) of { __DEFAULT ->
-      case r @(GHC.Types.ZonkAny 1) of { __DEFAULT -> r @a }
+      case r @(GHC.Internal.Types.ZonkAny 0) of { __DEFAULT ->
+      case r @(GHC.Internal.Types.ZonkAny 1) of { __DEFAULT -> r @a }

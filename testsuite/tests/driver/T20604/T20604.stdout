@@ -1,4 +1,3 @@
 A1
 A
-addDependentFile "/home/hsyl20/projects/ghc/merge-root-libs/_build/stage1/lib/../lib/x86_64-linux-ghc-9.13.20241206/libHSghc-prim-0.11.0-inplace-ghc9.13.20241206.so" eb2f485440020aa72d9405ee2f412f28
-addDependentFile "/home/hsyl20/projects/ghc/merge-root-libs/_build/stage1/lib/../lib/x86_64-linux-ghc-9.13.20241206/libHSghc-internal-9.1300.0-inplace-ghc9.13.20241206.so" 1518b20f7a86f9851d924e1da640c1b3
+addDependentFile "/home/hsyl20/projects/ghc/merge-ghc-prim/_build/stage1/lib/../lib/x86_64-linux-ghc-9.13.20241220/libHSghc-internal-9.1300.0-inplace-ghc9.13.20241220.so" b035bf4e19d2537a0af5c8861760eaf1

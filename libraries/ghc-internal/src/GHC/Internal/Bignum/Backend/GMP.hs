@@ -23,17 +23,17 @@ module GHC.Internal.Bignum.Backend.GMP where
 
 import GHC.Internal.Bignum.WordArray
 import GHC.Internal.Bignum.Primitives
-import GHC.Prim
-import GHC.Types
-import GHC.Magic (runRW#)
+import GHC.Internal.Prim
+import GHC.Internal.Types
+import GHC.Internal.Magic (runRW#)
 import {-# SOURCE #-} GHC.Internal.Bignum.Integer
 import {-# SOURCE #-} GHC.Internal.Bignum.BigNat
 import {-# SOURCE #-} GHC.Internal.Bignum.Natural
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 -- (This module uses the empty tuple () and string literals.)
-import GHC.Tuple ()
-import GHC.CString ()
+import GHC.Internal.Tuple ()
+import GHC.Internal.CString ()
 
 default ()
 

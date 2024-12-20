@@ -1,7 +1,7 @@
 T19978.hs:8:7: error: [GHC-01928]
     • Illegal term-level use of the type constructor ‘Bool’
     • imported from ‘Prelude’ at T19978.hs:3:8-13
-      (and originally defined in ‘GHC.Types’)
+      (and originally defined in ‘GHC.Internal.Types’)
     • In the expression: Bool
       In an equation for ‘ex1’: ex1 = Bool
     Suggested fix:

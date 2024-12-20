@@ -1,141 +1,128 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 98, types: 40, coercions: 5, joins: 0/0}
+Result size of Tidy Core = {terms: 98, types: 40, coercions: 6, joins: 0/0}
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 T18078.unN1 :: N -> N
-[GblId,
- Arity=1,
- Str=<S,1*U>,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
-         Tmpl= \ (ds [Occ=Once] :: N) -> ds}]
+[GblId, Arity=1, Str=<1L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
 T18078.unN1 = \ (ds :: N) -> ds
 
--- RHS size: {terms: 1, types: 0, coercions: 3, joins: 0/0}
+-- RHS size: {terms: 1, types: 0, coercions: 4, joins: 0/0}
 unN :: N -> Int -> Int
-[GblId[[RecSel]],
- Arity=1,
- Str=<S,1*U>,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)
-         Tmpl= T18078.unN1 `cast` (<N>_R ->_R T18078.N:N[0] :: (N -> N) ~R# (N -> Int -> Int))}]
-unN = T18078.unN1 `cast` (<N>_R ->_R T18078.N:N[0] :: (N -> N) ~R# (N -> Int -> Int))
+[GblId[[RecSel]], Arity=1, Str=<1L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+unN = T18078.unN1 `cast` (<N>_R %<Many>_N ->_R T18078.N:N :: (N -> N) ~R# (N -> Int -> Int))
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T18078.$trModule4 :: GHC.Prim.Addr#
+T18078.$trModule4 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T18078.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T18078.$trModule3 :: GHC.Types.TrName
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T18078.$trModule3 = GHC.Types.TrNameS T18078.$trModule4
+T18078.$trModule3 :: GHC.Internal.Types.TrName
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18078.$trModule3 = GHC.Internal.Types.TrNameS T18078.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T18078.$trModule2 :: GHC.Prim.Addr#
+T18078.$trModule2 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T18078.$trModule2 = "T18078"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T18078.$trModule1 :: GHC.Types.TrName
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T18078.$trModule1 = GHC.Types.TrNameS T18078.$trModule2
+T18078.$trModule1 :: GHC.Internal.Types.TrName
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18078.$trModule1 = GHC.Internal.Types.TrNameS T18078.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T18078.$trModule :: GHC.Types.Module
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
-T18078.$trModule = GHC.Types.Module T18078.$trModule3 T18078.$trModule1
+T18078.$trModule :: GHC.Internal.Types.Module
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18078.$trModule = GHC.Internal.Types.Module T18078.$trModule3 T18078.$trModule1
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep :: GHC.Types.KindRep
-[GblId, Cpr=m1, Unf=OtherCon []]
-$krep = GHC.Types.KindRepTyConApp GHC.Types.$tcInt (GHC.Types.[] @GHC.Types.KindRep)
+$krep :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep = GHC.Internal.Types.KindRepTyConApp GHC.Internal.Types.$tcInt (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep1 :: GHC.Types.KindRep
-[GblId, Cpr=m4, Unf=OtherCon []]
-$krep1 = GHC.Types.KindRepFun $krep $krep
+$krep1 :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep1 = GHC.Internal.Types.KindRepFun $krep $krep
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T18078.$tcN2 :: GHC.Prim.Addr#
+T18078.$tcN2 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T18078.$tcN2 = "N"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T18078.$tcN1 :: GHC.Types.TrName
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T18078.$tcN1 = GHC.Types.TrNameS T18078.$tcN2
+T18078.$tcN1 :: GHC.Internal.Types.TrName
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18078.$tcN1 = GHC.Internal.Types.TrNameS T18078.$tcN2
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T18078.$tcN :: GHC.Types.TyCon
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
-T18078.$tcN = GHC.Types.TyCon 8242209344145137716## 16993518540698548720## T18078.$trModule T18078.$tcN1 0# GHC.Types.krep$*
+T18078.$tcN :: GHC.Internal.Types.TyCon
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18078.$tcN = GHC.Internal.Types.TyCon 8242209344145137716#Word64 16993518540698548720#Word64 T18078.$trModule T18078.$tcN1 0# GHC.Internal.Types.krep$*
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep2 :: GHC.Types.KindRep
-[GblId, Cpr=m1, Unf=OtherCon []]
-$krep2 = GHC.Types.KindRepTyConApp T18078.$tcN (GHC.Types.[] @GHC.Types.KindRep)
+$krep2 :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep2 = GHC.Internal.Types.KindRepTyConApp T18078.$tcN (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T18078.$tc'N1 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
-[GblId, Cpr=m4, Unf=OtherCon []]
-T18078.$tc'N1 = GHC.Types.KindRepFun $krep1 $krep2
+T18078.$tc'N1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+T18078.$tc'N1 = GHC.Internal.Types.KindRepFun $krep1 $krep2
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T18078.$tc'N3 :: GHC.Prim.Addr#
+T18078.$tc'N3 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T18078.$tc'N3 = "'N"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T18078.$tc'N2 :: GHC.Types.TrName
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T18078.$tc'N2 = GHC.Types.TrNameS T18078.$tc'N3
+T18078.$tc'N2 :: GHC.Internal.Types.TrName
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18078.$tc'N2 = GHC.Internal.Types.TrNameS T18078.$tc'N3
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T18078.$tc'N :: GHC.Types.TyCon
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
-T18078.$tc'N = GHC.Types.TyCon 15484649745433776318## 6635095266531093649## T18078.$trModule T18078.$tc'N2 0# T18078.$tc'N1
+T18078.$tc'N :: GHC.Internal.Types.TyCon
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18078.$tc'N = GHC.Internal.Types.TyCon 15484649745433776318#Word64 6635095266531093649#Word64 T18078.$trModule T18078.$tc'N2 0# T18078.$tc'N1
 
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
-T18078.$wf [InlPrag=NOINLINE, Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=1, Str=<S,1*U>, Unf=OtherCon []]
+T18078.$wf [InlPrag=NOINLINE, Occ=LoopBreaker] :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+[GblId, Arity=1, Str=<1L>, Unf=OtherCon []]
 T18078.$wf
-  = \ (ww :: GHC.Prim.Int#) ->
+  = \ (ww :: GHC.Internal.Prim.Int#) ->
       case ww of wild {
-        __DEFAULT -> T18078.$wf (GHC.Prim.-# wild 1#);
+        __DEFAULT -> T18078.$wf (GHC.Internal.Prim.-# wild 1#);
         0# -> 0#
       }
 end Rec }
 
 -- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
-T18078.f1 [InlPrag=NOUSERINLINE[-1]] :: Int -> Int
+T18078.f1 [InlPrag=NOINLINE[final]] :: Int -> Int
 [GblId,
  Arity=1,
- Str=<S(S),1*U(1*U)>,
- Cpr=m1,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once!] :: Int) -> case w of { GHC.Types.I# ww1 [Occ=Once] -> case T18078.$wf ww1 of ww2 [Occ=Once] { __DEFAULT -> GHC.Types.I# ww2 } }}]
-T18078.f1 = \ (w :: Int) -> case w of { GHC.Types.I# ww1 -> case T18078.$wf ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 } }
+ Str=<1!P(1L)>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (n [Occ=Once1!] :: Int) -> case n of { GHC.Internal.Types.I# ww [Occ=Once1] -> case T18078.$wf ww of ww1 [Occ=Once1] { __DEFAULT -> GHC.Internal.Types.I# ww1 } }}]
+T18078.f1 = \ (n :: Int) -> case n of { GHC.Internal.Types.I# ww -> case T18078.$wf ww of ww1 { __DEFAULT -> GHC.Internal.Types.I# ww1 } }
 
 -- RHS size: {terms: 1, types: 0, coercions: 2, joins: 0/0}
-f [InlPrag=NOUSERINLINE[-1]] :: N
-[GblId,
- Arity=1,
- Str=<S(S),1*U(1*U)>,
- Cpr=m1,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)
-         Tmpl= T18078.f1 `cast` (Sym (T18078.N:N[0]) :: (Int -> Int) ~R# N)}]
-f = T18078.f1 `cast` (Sym (T18078.N:N[0]) :: (Int -> Int) ~R# N)
+f [InlPrag=NOINLINE[final]] :: N
+[GblId, Arity=1, Str=<1!P(1L)>, Cpr=1, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+f = T18078.f1 `cast` (Sym T18078.N:N :: (Int -> Int) ~R# N)
 
 -- RHS size: {terms: 12, types: 4, coercions: 0, joins: 0/0}
 g :: Int -> Int
 [GblId,
  Arity=1,
- Str=<S,1*U(U)>,
- Cpr=m1,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (x [Occ=Once!] :: Int) -> case x of { GHC.Types.I# x1 [Occ=Once] -> T18078.f1 (GHC.Types.I# (GHC.Prim.+# x1 1#)) }}]
-g = \ (x :: Int) -> case x of { GHC.Types.I# x1 -> case T18078.$wf (GHC.Prim.+# x1 1#) of ww { __DEFAULT -> GHC.Types.I# ww } }
+ Str=<1!P(L)>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x [Occ=Once1!] :: Int) -> case x of { GHC.Internal.Types.I# x1 [Occ=Once1] -> T18078.f1 (GHC.Internal.Types.I# (GHC.Internal.Prim.+# x1 1#)) }}]
+g = \ (x :: Int) -> case x of { GHC.Internal.Types.I# x1 -> case T18078.$wf (GHC.Internal.Prim.+# x1 1#) of ww { __DEFAULT -> GHC.Internal.Types.I# ww } }
 
 
 

@@ -6,7 +6,7 @@ module GHC.Internal.Bignum.BigNat where
 
 import GHC.Internal.Bignum.WordArray
 import GHC.Internal.Bignum.Primitives
-import GHC.Prim
+import GHC.Internal.Prim
 
 type BigNat# = WordArray#
 data BigNat = BN# { unBigNat :: BigNat# }

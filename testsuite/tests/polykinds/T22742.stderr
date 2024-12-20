@@ -1,6 +1,6 @@
-
 T22742.hs:7:17: error: [GHC-83865]
-    • Couldn't match kind ‘GHC.Types.BoxedRep’ with ‘f a’
+    • Couldn't match kind ‘GHC.Internal.Types.BoxedRep’ with ‘f a’
       Expected kind ‘TYPE (f a b)’, but ‘()’ has kind ‘*’
     • In the second argument of ‘T’, namely ‘()’
       In the type signature: f :: T @(f a b) () -> ()
+

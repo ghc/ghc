@@ -11,7 +11,7 @@ module GHC.Internal.IO.Handle.Lock.LinuxOFD where
 
 #if !HAVE_OFD_LOCKING
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Types ()
+import GHC.Internal.Types ()
 #else
 
 -- Not only is this a good idea but it also works around #17950.

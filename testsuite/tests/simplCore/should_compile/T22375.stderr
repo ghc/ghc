@@ -13,11 +13,15 @@ T22375.$fEqX_$c== :: X -> X -> Bool
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=True)}]
 T22375.$fEqX_$c==
   = \ (a :: X) (b :: X) ->
-      case GHC.Prim.dataToTagLarge# @GHC.Types.Lifted @X a of a#
+      case GHC.Internal.Prim.dataToTagLarge#
+             @GHC.Internal.Types.Lifted @X a
+      of a#
       { __DEFAULT ->
-      case GHC.Prim.dataToTagLarge# @GHC.Types.Lifted @X b of b#
+      case GHC.Internal.Prim.dataToTagLarge#
+             @GHC.Internal.Types.Lifted @X b
+      of b#
       { __DEFAULT ->
-      GHC.Prim.tagToEnum# @Bool (GHC.Prim.==# a# b#)
+      GHC.Internal.Prim.tagToEnum# @Bool (GHC.Internal.Prim.==# a# b#)
       }
       }
 
@@ -31,13 +35,17 @@ T22375.$fEqX_$c/= [InlPrag=INLINE (sat-args=2)] :: X -> X -> Bool
          Guidance=ALWAYS_IF(arity=2,unsat_ok=False,boring_ok=False)}]
 T22375.$fEqX_$c/=
   = \ (eta :: X) (eta1 :: X) ->
-      case GHC.Prim.dataToTagLarge# @GHC.Types.Lifted @X eta of a#
+      case GHC.Internal.Prim.dataToTagLarge#
+             @GHC.Internal.Types.Lifted @X eta
+      of a#
       { __DEFAULT ->
-      case GHC.Prim.dataToTagLarge# @GHC.Types.Lifted @X eta1 of b#
+      case GHC.Internal.Prim.dataToTagLarge#
+             @GHC.Internal.Types.Lifted @X eta1
+      of b#
       { __DEFAULT ->
-      case GHC.Prim.==# a# b# of {
-        __DEFAULT -> GHC.Types.True;
-        1# -> GHC.Types.False
+      case GHC.Internal.Prim.==# a# b# of {
+        __DEFAULT -> GHC.Internal.Types.True;
+        1# -> GHC.Internal.Types.False
       }
       }
       }
@@ -46,12 +54,15 @@ T22375.$fEqX_$c/=
 T22375.$fEqX [InlPrag=CONLIKE] :: Eq X
 [GblId[DFunId],
  Unf=DFun: \ ->
-       GHC.Classes.C:Eq TYPE: X T22375.$fEqX_$c== T22375.$fEqX_$c/=]
+       GHC.Internal.Classes.C:Eq TYPE: X
+                                 T22375.$fEqX_$c==
+                                 T22375.$fEqX_$c/=]
 T22375.$fEqX
-  = GHC.Classes.C:Eq @X T22375.$fEqX_$c== T22375.$fEqX_$c/=
+  = GHC.Internal.Classes.C:Eq @X T22375.$fEqX_$c== T22375.$fEqX_$c/=
 
 -- RHS size: {terms: 44, types: 3, coercions: 0, joins: 0/0}
-T22375.$wf [InlPrag=[2]] :: X -> GHC.Prim.Int# -> GHC.Prim.Int#
+T22375.$wf [InlPrag=[2]]
+  :: X -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
 [GblId[StrictWorker([!])],
  Arity=2,
  Str=<1L><L>,
@@ -59,18 +70,18 @@ T22375.$wf [InlPrag=[2]] :: X -> GHC.Prim.Int# -> GHC.Prim.Int#
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [119 0] 110 0}]
 T22375.$wf
-  = \ (x :: X) (ww :: GHC.Prim.Int#) ->
+  = \ (x :: X) (ww :: GHC.Internal.Prim.Int#) ->
       case x of {
-        A -> GHC.Prim.+# ww 1#;
-        B -> GHC.Prim.+# ww 2#;
-        C -> GHC.Prim.+# ww 3#;
-        D -> GHC.Prim.+# ww 4#;
-        E -> GHC.Prim.+# ww 5#;
-        F -> GHC.Prim.+# ww 6#;
-        G -> GHC.Prim.+# ww 7#;
-        H -> GHC.Prim.+# ww 8#;
-        I -> GHC.Prim.+# ww 9#;
-        J -> GHC.Prim.+# ww 10#
+        A -> GHC.Internal.Prim.+# ww 1#;
+        B -> GHC.Internal.Prim.+# ww 2#;
+        C -> GHC.Internal.Prim.+# ww 3#;
+        D -> GHC.Internal.Prim.+# ww 4#;
+        E -> GHC.Internal.Prim.+# ww 5#;
+        F -> GHC.Internal.Prim.+# ww 6#;
+        G -> GHC.Internal.Prim.+# ww 7#;
+        H -> GHC.Internal.Prim.+# ww 8#;
+        I -> GHC.Internal.Prim.+# ww 9#;
+        J -> GHC.Internal.Prim.+# ww 10#
       }
 
 -- RHS size: {terms: 12, types: 5, coercions: 0, joins: 0/0}
@@ -83,8 +94,10 @@ f [InlPrag=[2]] :: X -> Int -> Int
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)}]
 f = \ (x :: X) (v :: Int) ->
-      case v of { GHC.Types.I# ww ->
-      case T22375.$wf x ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
+      case v of { GHC.Internal.Types.I# ww ->
+      case T22375.$wf x ww of ww1 { __DEFAULT ->
+      GHC.Internal.Types.I# ww1
+      }
       }
 
 

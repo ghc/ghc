@@ -15,7 +15,7 @@ docs:
                 {HaddockSpanIssueT24378.hs:3:2-3}
                 GHC.Internal.Base.<>
                 {HaddockSpanIssueT24378.hs:3:15-18}
-                GHC.Types.Bool
+                GHC.Internal.Types.Bool
        export docs:
          []
        declaration docs:

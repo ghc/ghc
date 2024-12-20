@@ -34,7 +34,7 @@ module GHC.Internal.TypeLits.Internal
   ) where
 
 import GHC.Internal.Base(Ordering)
-import GHC.Types(Symbol, Char)
+import GHC.Internal.Types(Symbol, Char)
 
 -- | Comparison of type-level symbols, as a function.
 --

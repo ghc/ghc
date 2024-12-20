@@ -1,19 +1,21 @@
 data family T17296.Foo1 :: * -> *
 data instance forall (a_0 :: *). T17296.Foo1 (GHC.Internal.Maybe.Maybe a_0)
-data instance T17296.Foo1 GHC.Types.Bool = T17296.Foo1Bool
+data instance T17296.Foo1 GHC.Internal.Types.Bool = T17296.Foo1Bool
 
 data family T17296.Foo2 :: k_0 -> *
-data instance T17296.Foo2 :: (GHC.Types.Char -> GHC.Types.Char) ->
+data instance T17296.Foo2 :: (GHC.Internal.Types.Char ->
+                              GHC.Internal.Types.Char) ->
                              *
-data instance T17296.Foo2 :: GHC.Types.Char -> *
+data instance T17296.Foo2 :: GHC.Internal.Types.Char -> *
 data instance forall (a_1 :: *). T17296.Foo2 (GHC.Internal.Maybe.Maybe a_1 :: *)
-data instance T17296.Foo2 GHC.Types.Bool = T17296.Foo2Bool
+data instance T17296.Foo2 GHC.Internal.Types.Bool = T17296.Foo2Bool
 
 data family T17296.Foo3 :: k_0
-data instance T17296.Foo3 :: GHC.Types.Char -> *
-data instance T17296.Foo3 :: (GHC.Types.Char -> GHC.Types.Char) ->
+data instance T17296.Foo3 :: GHC.Internal.Types.Char -> *
+data instance T17296.Foo3 :: (GHC.Internal.Types.Char ->
+                              GHC.Internal.Types.Char) ->
                              *
 data instance forall (a_1 :: *). T17296.Foo3 (GHC.Internal.Maybe.Maybe a_1 :: *)
-data instance T17296.Foo3 GHC.Types.Bool = T17296.Foo3Bool
+data instance T17296.Foo3 GHC.Internal.Types.Bool = T17296.Foo3Bool
 data instance T17296.Foo3 :: *
 

@@ -1,4 +1,3 @@
-
 refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [Integer] -> Integer
     • In an equation for ‘f’: f = _
@@ -74,15 +73,15 @@ refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
            (and originally defined in ‘GHC.Internal.Base’))
         ($) (_ :: [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
-          with ($) @GHC.Types.LiftedRep
-                   @GHC.Types.LiftedRep
+          with ($) @GHC.Internal.Types.LiftedRep
+                   @GHC.Internal.Types.LiftedRep
                    @[Integer]
                    @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Internal.Base’))
         ($!) (_ :: [Integer] -> Integer)
           where ($!) :: forall a b. (a -> b) -> a -> b
-          with ($!) @GHC.Types.LiftedRep @[Integer] @Integer
+          with ($!) @GHC.Internal.Types.LiftedRep @[Integer] @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Internal.Base’))
         return (_ :: Integer)
@@ -184,20 +183,25 @@ refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
            (and originally defined in ‘GHC.Internal.Base’))
         flip (_ :: [Integer] -> Integer -> Integer)
           where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
-          with flip @GHC.Types.LiftedRep @[Integer] @Integer @Integer
+          with flip @GHC.Internal.Types.LiftedRep
+                    @[Integer]
+                    @Integer
+                    @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Internal.Base’))
         ($) (_ :: Integer -> [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
-          with ($) @GHC.Types.LiftedRep
-                   @GHC.Types.LiftedRep
+          with ($) @GHC.Internal.Types.LiftedRep
+                   @GHC.Internal.Types.LiftedRep
                    @Integer
                    @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Internal.Base’))
         ($!) (_ :: Integer -> [Integer] -> Integer)
           where ($!) :: forall a b. (a -> b) -> a -> b
-          with ($!) @GHC.Types.LiftedRep @Integer @([Integer] -> Integer)
+          with ($!) @GHC.Internal.Types.LiftedRep
+                    @Integer
+                    @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Internal.Base’))
         return (_ :: [Integer] -> Integer)
@@ -263,3 +267,4 @@ refinement_hole_fits.hs:10:7: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)
         j (_ :: a)
           where j :: a -> a
           (bound at refinement_hole_fits.hs:10:1)
+

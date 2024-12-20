@@ -1,8 +1,11 @@
 {-# LANGUAGE CPP #-}
 #if defined(javascript_HOST_ARCH)
 
-{-# LANGUAGE Safe #-}
 module GHC.Internal.Event.TimerManager () where
+
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Internal.Types ()
+
 
 #else
 

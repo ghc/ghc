@@ -3,8 +3,8 @@
 T15226b.bar1
   :: forall a.
      GHC.Internal.Maybe.Maybe a
-     -> GHC.Prim.State# GHC.Prim.RealWorld
-     -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+     -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+     -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
            T15226b.Str (GHC.Internal.Maybe.Maybe a) #)
 [GblId, Arity=2, Str=<L><L>, Cpr=1(, 1), Unf=OtherCon []] =
     {} \r [x void]
@@ -14,15 +14,15 @@ T15226b.bar1
           sat [Occ=Once1] :: T15226b.Str (GHC.Internal.Maybe.Maybe a)
           [LclId, Unf=OtherCon []] =
               T15226b.Str! [sat];
-        } in  GHC.Types.MkSolo# [sat];
+        } in  GHC.Internal.Types.MkSolo# [sat];
         };
 
 T15226b.bar
   :: forall a.
      GHC.Internal.Maybe.Maybe a
-     -> GHC.Types.IO (T15226b.Str (GHC.Internal.Maybe.Maybe a))
+     -> GHC.Internal.Types.IO (T15226b.Str (GHC.Internal.Maybe.Maybe a))
 [GblId, Arity=2, Str=<L><L>, Cpr=1(, 1), Unf=OtherCon []] =
-    {} \r [eta void] T15226b.bar1 eta GHC.Prim.void#;
+    {} \r [eta void] T15226b.bar1 eta GHC.Internal.Prim.void#;
 
 T15226b.Str [InlPrag=CONLIKE] :: forall a. a %1 -> T15226b.Str a
 [GblId[DataCon],

@@ -6,20 +6,22 @@ Result size of Desugar (after optimization)
 -- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
 f :: forall a b. (a ~ b) => a -> b -> Bool
 [LclIdX,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=True)}]
 f = \ (@a) (@b) _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] ->
-      GHC.Types.True
+      GHC.Internal.Types.True
 
 -- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
-T13032.$trModule :: GHC.Types.Module
+T13032.$trModule :: GHC.Internal.Types.Module
 [LclIdX,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 80 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 80 10}]
 T13032.$trModule
-  = GHC.Types.Module
-      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T13032"#)
+  = GHC.Internal.Types.Module
+      (GHC.Internal.Types.TrNameS "main"#)
+      (GHC.Internal.Types.TrNameS "T13032"#)
 
 
 

@@ -7,6 +7,10 @@
 module GHC.Internal.Event.Thread
 #if defined(javascript_HOST_ARCH)
     ( ) where
+
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Internal.Types ()
+
 #else
     ( getSystemEventManager
     , getSystemTimerManager

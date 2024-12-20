@@ -316,6 +316,9 @@ tcRnModuleTcRnM hsc_env mod_sum
                  traceRn "rn1a" empty
                ; tcg_env <-
                    case hsc_src of
+                    -- See Note [Don't typecheck GHC.Internal.Prim]
+                    _ | tcg_mod tcg_env1 == gHC_PRIM -> pure tcg_env1
+
                     HsBootOrSig boot_or_sig ->
                       do { tcg_env <- tcRnHsBootDecls boot_or_sig local_decls
                          ; traceRn "rn4a: before exports" empty
@@ -367,6 +370,14 @@ tcRnModuleTcRnM hsc_env mod_sum
                }
         }
       }
+
+{- Note [Don't typecheck GHC.Internal.Prim]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC (currently) can't type-check GHC.Internal.Prim, as that module
+contains primitive functions that can't be defined in source Haskell.
+The GHC.Internal.Prim source file is only used to generate Haddock documentation;
+the actual contents of the module are wired in to GHC.
+-}
 
 {- Note [Disambiguation of multiple default declarations]
 
@@ -977,9 +988,7 @@ checkHiBootIface'
 
         ; mod <- tcg_mod <$> getGblEnv
 
-        -- don't perform type-checking for ghc-prim:GHC.Prim module.
-        -- The interface (see ghcPrimIface in GHC.Iface.Load) exports entities
-        -- not found in the module code.
+        -- See Note [Don't typecheck GHC.Internal.Prim]
         ; if mod == gHC_PRIM then pure [] else do {
 
         ; gre_env <- getGlobalRdrEnv

@@ -5,7 +5,7 @@ module GHC.Internal.Real (Integral (..)) where
 -- For why this file exists
 -- See Note [Semigroup stimes cycle] in GHC.Internal.Base
 
-import GHC.Classes (Ord)
+import GHC.Internal.Classes (Ord)
 import GHC.Internal.Bignum.Integer (Integer)
 
 import {-# SOURCE #-} GHC.Internal.Num (Num)

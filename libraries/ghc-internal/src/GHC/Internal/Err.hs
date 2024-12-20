@@ -23,9 +23,9 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Err( absentErr, error, errorWithoutStackTrace, undefined ) where
-import GHC.Types (Char, RuntimeRep)
+import GHC.Internal.Types (Char, RuntimeRep)
 import GHC.Internal.Stack.Types
-import GHC.Prim
+import GHC.Internal.Prim
 import {-# SOURCE #-} GHC.Internal.Exception
   ( errorCallWithCallStackException
   , errorCallException )

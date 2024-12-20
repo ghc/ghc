@@ -5,8 +5,8 @@ module GHC.Internal.Bignum.Natural where
 
 import {-# SOURCE #-} GHC.Internal.Bignum.BigNat
 import GHC.Internal.Bignum.Primitives
-import GHC.Prim
-import GHC.Types
+import GHC.Internal.Prim
+import GHC.Internal.Types
 
 data Natural
    = NS !Word#

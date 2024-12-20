@@ -1,18 +1,21 @@
-S1 :: TYPE GHC.Types.WordRep
+S1 :: TYPE GHC.Internal.Types.WordRep
       -> TYPE
-           (GHC.Types.SumRep
-              [GHC.Types.IntRep, GHC.Types.DoubleRep, GHC.Types.WordRep])
+           (GHC.Internal.Types.SumRep
+              [GHC.Internal.Types.IntRep, GHC.Internal.Types.DoubleRep,
+               GHC.Internal.Types.WordRep])
 = (# | | #) Int# Double#
-S2 :: TYPE GHC.Types.DoubleRep
-      -> TYPE GHC.Types.WordRep
+S2 :: TYPE GHC.Internal.Types.DoubleRep
+      -> TYPE GHC.Internal.Types.WordRep
       -> TYPE
-           (GHC.Types.SumRep
-              [GHC.Types.IntRep, GHC.Types.DoubleRep, GHC.Types.WordRep])
+           (GHC.Internal.Types.SumRep
+              [GHC.Internal.Types.IntRep, GHC.Internal.Types.DoubleRep,
+               GHC.Internal.Types.WordRep])
 = (# | | #) Int#
-S3 :: TYPE GHC.Types.IntRep
-      -> TYPE GHC.Types.DoubleRep
-      -> TYPE GHC.Types.WordRep
+S3 :: TYPE GHC.Internal.Types.IntRep
+      -> TYPE GHC.Internal.Types.DoubleRep
+      -> TYPE GHC.Internal.Types.WordRep
       -> TYPE
-           (GHC.Types.SumRep
-              [GHC.Types.IntRep, GHC.Types.DoubleRep, GHC.Types.WordRep])
+           (GHC.Internal.Types.SumRep
+              [GHC.Internal.Types.IntRep, GHC.Internal.Types.DoubleRep,
+               GHC.Internal.Types.WordRep])
 = (# | | #)

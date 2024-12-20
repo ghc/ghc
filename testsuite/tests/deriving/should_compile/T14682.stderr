@@ -4,7 +4,7 @@ Derived class instances:
   instance GHC.Internal.Show.Show T14682.Foo where
     GHC.Internal.Show.showsPrec a (T14682.Foo b1 b2)
       = GHC.Internal.Show.showParen
-          (a GHC.Classes.>= 11)
+          (a GHC.Internal.Classes.>= 11)
           (\ z
              -> GHC.Internal.Show.showString
                   "Foo "
@@ -31,33 +31,35 @@ Derived class instances:
     GHC.Internal.Data.Data.toConstr (T14682.Foo _ _) = $cFoo
     GHC.Internal.Data.Data.dataTypeOf _ = $tFoo
   
-  instance GHC.Classes.Eq T14682.Foo where
-    (GHC.Classes.==) (T14682.Foo a1 a2) (T14682.Foo b1 b2)
-      = (((a1 GHC.Classes.== b1))
-           GHC.Classes.&& ((a2 GHC.Classes.== b2)))
+  instance GHC.Internal.Classes.Eq T14682.Foo where
+    (GHC.Internal.Classes.==) (T14682.Foo a1 a2) (T14682.Foo b1 b2)
+      = (((a1 GHC.Internal.Classes.== b1))
+           GHC.Internal.Classes.&& ((a2 GHC.Internal.Classes.== b2)))
   
-  instance GHC.Classes.Ord T14682.Foo where
-    GHC.Classes.compare a b
+  instance GHC.Internal.Classes.Ord T14682.Foo where
+    GHC.Internal.Classes.compare a b
       = case a of
           T14682.Foo a1 a2
             -> case b of
                  T14682.Foo b1 b2
-                   -> case (GHC.Classes.compare a1 b1) of
-                        GHC.Types.LT -> GHC.Types.LT
-                        GHC.Types.EQ -> (a2 `GHC.Classes.compare` b2)
-                        GHC.Types.GT -> GHC.Types.GT
-    (GHC.Classes.<) a b
+                   -> case (GHC.Internal.Classes.compare a1 b1) of
+                        GHC.Internal.Types.LT -> GHC.Internal.Types.LT
+                        GHC.Internal.Types.EQ -> (a2 `GHC.Internal.Classes.compare` b2)
+                        GHC.Internal.Types.GT -> GHC.Internal.Types.GT
+    (GHC.Internal.Classes.<) a b
       = case a of
           T14682.Foo a1 a2
             -> case b of
                  T14682.Foo b1 b2
-                   -> case (GHC.Classes.compare a1 b1) of
-                        GHC.Types.LT -> GHC.Types.True
-                        GHC.Types.EQ -> (a2 GHC.Classes.< b2)
-                        GHC.Types.GT -> GHC.Types.False
-    (GHC.Classes.<=) a b = GHC.Classes.not ((GHC.Classes.<) b a)
-    (GHC.Classes.>) a b = (GHC.Classes.<) b a
-    (GHC.Classes.>=) a b = GHC.Classes.not ((GHC.Classes.<) a b)
+                   -> case (GHC.Internal.Classes.compare a1 b1) of
+                        GHC.Internal.Types.LT -> GHC.Internal.Types.True
+                        GHC.Internal.Types.EQ -> (a2 GHC.Internal.Classes.< b2)
+                        GHC.Internal.Types.GT -> GHC.Internal.Types.False
+    (GHC.Internal.Classes.<=) a b
+      = GHC.Internal.Classes.not ((GHC.Internal.Classes.<) b a)
+    (GHC.Internal.Classes.>) a b = (GHC.Internal.Classes.<) b a
+    (GHC.Internal.Classes.>=) a b
+      = GHC.Internal.Classes.not ((GHC.Internal.Classes.<) a b)
   
   instance GHC.Internal.Ix.Ix T14682.Foo where
     GHC.Internal.Ix.range (T14682.Foo a1 a2, T14682.Foo b1 b2)
@@ -75,7 +77,7 @@ Derived class instances:
       (T14682.Foo a1 a2, T14682.Foo b1 b2)
       (T14682.Foo c1 c2)
       = (GHC.Internal.Ix.inRange (a1, b1) c1
-           GHC.Classes.&& GHC.Internal.Ix.inRange (a2, b2) c2)
+           GHC.Internal.Classes.&& GHC.Internal.Ix.inRange (a2, b2) c2)
   
   $tFoo :: GHC.Internal.Data.Data.DataType
   $cFoo :: GHC.Internal.Data.Data.Constr
@@ -172,20 +174,20 @@ GHC.Internal.Data.Data.Data [T14682.Foo]
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Eq [T14682.Foo]
-  (GHC.Classes./=) = GHC.Classes.$dm/= @T14682.Foo
+GHC.Internal.Classes.Eq [T14682.Foo]
+  (GHC.Internal.Classes./=) = GHC.Internal.Classes.$dm/= @T14682.Foo
 
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Ord [T14682.Foo]
-  GHC.Classes.max = GHC.Classes.$dmmax @T14682.Foo
+GHC.Internal.Classes.Ord [T14682.Foo]
+  GHC.Internal.Classes.max = GHC.Internal.Classes.$dmmax @T14682.Foo
 
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Ord [T14682.Foo]
-  GHC.Classes.min = GHC.Classes.$dmmin @T14682.Foo
+GHC.Internal.Classes.Ord [T14682.Foo]
+  GHC.Internal.Classes.min = GHC.Internal.Classes.$dmmin @T14682.Foo
 
 
 

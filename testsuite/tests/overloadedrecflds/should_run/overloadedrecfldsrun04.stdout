@@ -1,5 +1,5 @@
-data Main.R = Main.MkR {Main.foo :: GHC.Types.Int}
-Main.foo :: Main.R -> GHC.Types.Int
-Main.foo :: Main.R -> GHC.Types.Int
-Main.foo :: Main.R -> GHC.Types.Int
+data Main.R = Main.MkR {Main.foo :: GHC.Internal.Types.Int}
+Main.foo :: Main.R -> GHC.Internal.Types.Int
+Main.foo :: Main.R -> GHC.Internal.Types.Int
+Main.foo :: Main.R -> GHC.Internal.Types.Int
 42

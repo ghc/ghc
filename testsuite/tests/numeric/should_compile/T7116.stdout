@@ -4,7 +4,7 @@ Result size of Tidy Core
   = {terms: 36, types: 19, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7116.$trModule4 :: GHC.Prim.Addr#
+T7116.$trModule4 :: GHC.Internal.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -12,15 +12,15 @@ T7116.$trModule4 :: GHC.Prim.Addr#
 T7116.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7116.$trModule3 :: GHC.Types.TrName
+T7116.$trModule3 :: GHC.Internal.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-T7116.$trModule3 = GHC.Types.TrNameS T7116.$trModule4
+T7116.$trModule3 = GHC.Internal.Types.TrNameS T7116.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7116.$trModule2 :: GHC.Prim.Addr#
+T7116.$trModule2 :: GHC.Internal.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -28,21 +28,21 @@ T7116.$trModule2 :: GHC.Prim.Addr#
 T7116.$trModule2 = "T7116"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7116.$trModule1 :: GHC.Types.TrName
+T7116.$trModule1 :: GHC.Internal.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-T7116.$trModule1 = GHC.Types.TrNameS T7116.$trModule2
+T7116.$trModule1 = GHC.Internal.Types.TrNameS T7116.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T7116.$trModule :: GHC.Types.Module
+T7116.$trModule :: GHC.Internal.Types.Module
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
 T7116.$trModule
-  = GHC.Types.Module T7116.$trModule3 T7116.$trModule1
+  = GHC.Internal.Types.Module T7116.$trModule3 T7116.$trModule1
 
 -- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
 dr :: Double -> Double
@@ -54,12 +54,14 @@ dr :: Double -> Double
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once1!] :: Double) ->
-                 case x of { GHC.Types.D# x1 ->
-                 GHC.Types.D# (GHC.Prim.+## x1 x1)
+                 case x of { GHC.Internal.Types.D# x1 ->
+                 GHC.Internal.Types.D# (GHC.Internal.Prim.+## x1 x1)
                  }}]
 dr
   = \ (x :: Double) ->
-      case x of { GHC.Types.D# x1 -> GHC.Types.D# (GHC.Prim.+## x1 x1) }
+      case x of { GHC.Internal.Types.D# x1 ->
+      GHC.Internal.Types.D# (GHC.Internal.Prim.+## x1 x1)
+      }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 dl :: Double -> Double
@@ -82,13 +84,13 @@ fr :: Float -> Float
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once1!] :: Float) ->
-                 case x of { GHC.Types.F# x1 ->
-                 GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
+                 case x of { GHC.Internal.Types.F# x1 ->
+                 GHC.Internal.Types.F# (GHC.Internal.Prim.plusFloat# x1 x1)
                  }}]
 fr
   = \ (x :: Float) ->
-      case x of { GHC.Types.F# x1 ->
-      GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
+      case x of { GHC.Internal.Types.F# x1 ->
+      GHC.Internal.Types.F# (GHC.Internal.Prim.plusFloat# x1 x1)
       }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}

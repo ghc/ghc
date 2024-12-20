@@ -3,14 +3,14 @@
 
 -- | Users should not import this module.  It is GHC internal only.
 
-module GHC.Debug ( debugLn, debugErrLn ) where
+module GHC.Internal.Debug ( debugLn, debugErrLn ) where
 
-import GHC.Prim
-import GHC.Types
+import GHC.Internal.Prim
+import GHC.Internal.Types
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 -- (This module uses the empty tuple.)
-import GHC.Tuple ()
+import GHC.Internal.Tuple ()
 
 debugLn :: [Char] -> IO ()
 debugLn xs = IO (\s0 ->

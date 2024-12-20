@@ -153,7 +153,7 @@ T18013.$wmapMaybeRule
         wild1
         ((\ (s2 :: s)
             (a1 :: Maybe a)
-            (s1 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+            (s1 :: GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld) ->
             case a1 of {
               Nothing ->
                 (# s1,
@@ -162,8 +162,9 @@ T18013.$wmapMaybeRule
               Just x ->
                 case ((wild s2 x)
                       `cast` <Co:4> :: IO (Result s b)
-                                       ~R# (GHC.Prim.State# GHC.Prim.RealWorld
-                                            -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                       ~R# (GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+                                            -> (# GHC.Internal.Prim.State#
+                                                    GHC.Internal.Prim.RealWorld,
                                                   Result s b #)))
                        s1
                 of
@@ -176,8 +177,9 @@ T18013.$wmapMaybeRule
             })
          `cast` <Co:13> :: (s
                             -> Maybe a
-                            -> GHC.Prim.State# GHC.Prim.RealWorld
-                            -> (# GHC.Prim.State# GHC.Prim.RealWorld, Result s (Maybe b) #))
+                            -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+                            -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+                                  Result s (Maybe b) #))
                            ~R# (s -> Maybe a -> IO (Result s (Maybe b))))
       }
       }

@@ -812,7 +812,7 @@
                     [])
                    (EpaComments
                     []))
-                  {Name: GHC.Types.Type})))))))))
+                  {Name: GHC.Internal.Types.Type})))))))))
          (Nothing))))]
      []
      []
@@ -930,7 +930,7 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: GHC.Types.Type}))))))))))]
+                     {Name: GHC.Internal.Types.Type}))))))))))]
           (Prefix)
           (HsDataDefn
            (AnnDataDefn
@@ -1016,7 +1016,7 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: GHC.Types.Type})))))))
+                     {Name: GHC.Internal.Types.Type})))))))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:19:57-60 })
@@ -1034,7 +1034,7 @@
                    [])
                   (EpaComments
                    []))
-                 {Name: GHC.Types.Type}))))))
+                 {Name: GHC.Internal.Types.Type}))))))
            (NewTypeCon
             (L
              (EpAnn
@@ -1847,7 +1847,7 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: GHC.Types.Type}))))))))])
+                   {Name: GHC.Internal.Types.Type}))))))))])
          (Prefix)
          (L
           (EpAnn
@@ -1874,7 +1874,7 @@
                 [])
                (EpaComments
                 []))
-              {Name: GHC.Types.Type})))))
+              {Name: GHC.Internal.Types.Type})))))
          (Nothing))))]
      []
      [(L
@@ -2002,7 +2002,7 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: GHC.Types.Type})))))))
+                     {Name: GHC.Internal.Types.Type})))))))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:24:32-35 })
@@ -2020,7 +2020,7 @@
                    [])
                   (EpaComments
                    []))
-                 {Name: GHC.Types.Type})))))))))))]
+                 {Name: GHC.Internal.Types.Type})))))))))))]
      [])
    ,(TyClGroup
      (NoExtField)
@@ -2576,7 +2576,7 @@
                 [])
                (EpaComments
                 []))
-              {Name: GHC.Types.Type})))
+              {Name: GHC.Internal.Types.Type})))
            (Nothing)))])))))]
   (Nothing)
   (Nothing)

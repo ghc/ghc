@@ -12,7 +12,7 @@ Foo.f :: forall {a}. a -> [GHC.Internal.Maybe.Maybe a]
         let {
           sat [Occ=Once1] :: [GHC.Internal.Maybe.Maybe a]
           [LclId, Unf=OtherCon []] =
-              :! [sat GHC.Types.[]];
+              :! [sat GHC.Internal.Types.[]];
         } in  : [sat sat];
         };
 

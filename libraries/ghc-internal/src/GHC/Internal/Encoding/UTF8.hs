@@ -41,7 +41,7 @@ module GHC.Internal.Encoding.UTF8
     , utf8EncodedLength
     ) where
 
-import GHC.Types
+import GHC.Internal.Types
 import GHC.Internal.Base
 import GHC.Internal.IO
 import GHC.Internal.ST
@@ -65,7 +65,7 @@ a. the implementation used by GHC in `ghc-boot:GHC.Utils.Encoding`; this can be
 b. the copy of the `ghc-boot` definition now exported by `base:GHC.Encoding.UTF8`.
    This can be used at `Addr#`, `Ptr`, `ByteArray#`, and `ForeignPtr`.
 
-c. the decoder used by `unpackCStringUtf8#` in `ghc-prim:GHC.CString`; this is
+c. the decoder used by `unpackCStringUtf8#` in `ghc-internal:GHC.Internal.CString`; this is
    specialised at `Addr#`.
 
 d. the codec used by the IO subsystem in `base:GHC.IO.Encoding.UTF8`; this is
@@ -81,7 +81,7 @@ detail in errors they can report, and the ability to recover from partial
 codepoints). Consequently, it's quite unclear that further consolidation
 would be worthwhile.
 
-The most obvious opportunity is to move (b) into `ghc-prim` and use it to
+The most obvious opportunity is to move (b) into `ghc-internal` and use it to
 implement (c) (namely `unpackCStringUtf8#` and friends). However, it's not
 clear that this would be worthwhile as several of the types supported by (b)
 are defined in `base`.

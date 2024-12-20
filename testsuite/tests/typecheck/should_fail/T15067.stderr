@@ -1,4 +1,3 @@
-
 T15067.hs:9:14: error: [GHC-39999]
     • No instance for ‘Typeable (# | #)’
         arising from a use of ‘typeRep’
@@ -6,6 +5,9 @@ T15067.hs:9:14: error: [GHC-39999]
           Typeable ((# | #) :: *
                                -> *
                                -> TYPE
-                                    (GHC.Types.SumRep [GHC.Types.LiftedRep, GHC.Types.LiftedRep]))
+                                    (GHC.Internal.Types.SumRep
+                                       [GHC.Internal.Types.LiftedRep,
+                                        GHC.Internal.Types.LiftedRep]))
     • In the expression: typeRep
       In an equation for ‘floopadoop’: floopadoop = typeRep
+

@@ -701,7 +701,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   hsc_env <- initializePlugins hsc_env1
 
   -- gather the imports and module name
-  (hspp_buf,mod_name,imps,src_imps, ghc_prim_imp) <- do
+  (hspp_buf,mod_name,imps,src_imps) <- do
     buf <- hGetStringBuffer input_fn
     let imp_prelude = xopt LangExt.ImplicitPrelude dflags
         popts = initParserOpts dflags
@@ -710,8 +710,8 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
     eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
     case eimps of
         Left errs -> throwErrors (GhcPsMessage <$> errs)
-        Right (src_imps,imps, ghc_prim_imp, L _ mod_name) -> return
-              (Just buf, mod_name, rn_imps imps, rn_imps src_imps, ghc_prim_imp)
+        Right (src_imps,imps, L _ mod_name) -> return
+              (Just buf, mod_name, rn_imps imps, rn_imps src_imps)
 
   -- Take -o into account if present
   -- Very like -ohi, but we must *only* do this if we aren't linking
@@ -750,7 +750,6 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
                                 ms_parsed_mod   = Nothing,
                                 ms_iface_date   = hi_date,
                                 ms_hie_date     = hie_date,
-                                ms_ghc_prim_import = ghc_prim_imp,
                                 ms_textual_imps = imps,
                                 ms_srcimps      = src_imps }
 

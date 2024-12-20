@@ -1,17 +1,19 @@
 data family D_0 a_1 :: * -> *
-data instance D_0 GHC.Types.Int GHC.Types.Bool :: * where
-    DInt_2 :: D_0 GHC.Types.Int GHC.Types.Bool
+data instance D_0 GHC.Internal.Types.Int
+                  GHC.Internal.Types.Bool :: * where
+    DInt_2 :: D_0 GHC.Internal.Types.Int GHC.Internal.Types.Bool
 data E_3 where MkE_4 :: a_5 -> E_3
 data Foo_6 a_7 b_8 where
     MkFoo_9, MkFoo'_10 :: a_11 -> Foo_6 a_11 b_12
-newtype Bar_13 :: * -> GHC.Types.Bool -> * where
+newtype Bar_13 :: * -> GHC.Internal.Types.Bool -> * where
     MkBar_14 :: a_15 -> Bar_13 a_15 b_16
 data T10828.T (a_0 :: *) where
     T10828.MkT :: forall (a_1 :: *) . a_1 -> a_1 -> T10828.T a_1
-    T10828.MkC :: forall (a_2 :: *) (b_3 :: *) . (GHC.Types.~) a_2
-                                                               GHC.Types.Int => {T10828.foo :: a_2,
-                                                                                 T10828.bar :: b_3} -> T10828.T GHC.Types.Int
+    T10828.MkC :: forall (a_2 :: *) (b_3 :: *) . (GHC.Internal.Types.~) a_2
+                                                                        GHC.Internal.Types.Int => {T10828.foo :: a_2,
+                                                                                                   T10828.bar :: b_3} -> T10828.T GHC.Internal.Types.Int
 data T'_0 a_1 :: * where
     MkT'_2 :: a_3 -> a_3 -> T'_0 a_3
-    MkC'_4 :: forall a_5 b_6 . a_5 ~ GHC.Types.Int => {foo_7 :: a_5,
-                                                       bar_8 :: b_6} -> T'_0 GHC.Types.Int
+    MkC'_4 :: forall a_5 b_6 . a_5 ~
+                               GHC.Internal.Types.Int => {foo_7 :: a_5,
+                                                          bar_8 :: b_6} -> T'_0 GHC.Internal.Types.Int

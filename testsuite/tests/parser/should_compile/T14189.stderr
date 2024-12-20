@@ -23,7 +23,7 @@
         (DataDeclRn
          (True)
          {NameSet:
-          [{Name: GHC.Types.Int}]})
+          [{Name: GHC.Internal.Types.Int}]})
         (L
          (EpAnn
           (EpaSpan { T14189.hs:6:6-11 })
@@ -98,7 +98,7 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: GHC.Types.Int}))))])
+                   {Name: GHC.Internal.Types.Int}))))])
              (Nothing)))
           ,(L
             (EpAnn
@@ -205,7 +205,7 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: GHC.Types.Int})))
+                     {Name: GHC.Internal.Types.Int})))
                   (Nothing)))]))
              (Nothing)))])
          [])))]

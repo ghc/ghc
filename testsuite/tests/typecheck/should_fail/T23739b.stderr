@@ -1,14 +1,14 @@
 T23739b.hs:8:4: error: [GHC-01928]
     • Illegal term-level use of the type constructor ‘Int’
     • imported from ‘Prelude’ at T23739b.hs:2:8-14
-      (and originally defined in ‘GHC.Types’)
+      (and originally defined in ‘GHC.Internal.Types’)
     • In the pattern: Int
       In an equation for ‘g1’: g1 Int = ()
 
 T23739b.hs:11:6: error: [GHC-01928]
     • Illegal term-level use of the type constructor ‘Int’
     • imported from ‘Prelude’ at T23739b.hs:2:8-14
-      (and originally defined in ‘GHC.Types’)
+      (and originally defined in ‘GHC.Internal.Types’)
     • In the expression: Int
       In an equation for ‘g2’: g2 = Int
 

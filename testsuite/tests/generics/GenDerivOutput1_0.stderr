@@ -29,16 +29,18 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep1
          GenDerivOutput1_0.List = GHC.Internal.Generics.D1
                                     ('GHC.Internal.Generics.MetaData
-                                       "List" "GenDerivOutput1_0" "main" 'GHC.Types.False)
+                                       "List" "GenDerivOutput1_0" "main" 'GHC.Internal.Types.False)
                                     (GHC.Internal.Generics.C1
                                        ('GHC.Internal.Generics.MetaCons
-                                          "Nil" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                          "Nil"
+                                          'GHC.Internal.Generics.PrefixI
+                                          'GHC.Internal.Types.False)
                                        GHC.Internal.Generics.U1
                                      GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                                  ('GHC.Internal.Generics.MetaCons
                                                                     "Cons"
                                                                     'GHC.Internal.Generics.PrefixI
-                                                                    'GHC.Types.True)
+                                                                    'GHC.Internal.Types.True)
                                                                  (GHC.Internal.Generics.S1
                                                                     ('GHC.Internal.Generics.MetaSel
                                                                        ('GHC.Internal.Maybe.Just

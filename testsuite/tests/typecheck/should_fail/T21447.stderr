@@ -1,6 +1,6 @@
-
 T21447.hs:8:3: error: [GHC-89498]
     • A newtype must not be a GADT
-      H :: forall a. a -> H @GHC.Types.LiftedRep a
+      H :: forall a. a -> H @GHC.Internal.Types.LiftedRep a
     • In the definition of data constructor ‘H’
       In the newtype declaration for ‘H’
+

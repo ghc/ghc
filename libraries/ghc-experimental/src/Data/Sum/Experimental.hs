@@ -80,6 +80,6 @@ module Data.Sum.Experimental (
   Sum63#,
 ) where
 
-import GHC.Types
+import GHC.Internal.Types
 
 default ()

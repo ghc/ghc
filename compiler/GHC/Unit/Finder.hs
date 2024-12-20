@@ -37,8 +37,6 @@ import GHC.Prelude
 
 import GHC.Platform.Ways
 
-import GHC.Builtin.Names ( gHC_PRIM )
-
 import GHC.Data.OsPath
 
 import GHC.Unit.Env
@@ -466,14 +464,7 @@ findInstalledHomeModule fc fopts home_unit mod_name = do
      (search_dirs, exts)
           | finder_lookupHomeInterfaces fopts = (hi_dir_path, hi_exts)
           | otherwise                         = (home_path, source_exts)
-   in
-
-   -- special case for GHC.Prim; we won't find it in the filesystem.
-   -- This is important only when compiling the base package (where GHC.Prim
-   -- is a home module).
-   if mod `installedModuleEq` gHC_PRIM
-         then return (InstalledFound (error "GHC.Prim ModLocation"))
-         else searchPathExts search_dirs mod exts
+   in searchPathExts search_dirs mod exts
 
 -- | Prepend the working directory to the search path.
 augmentImports :: OsPath -> [OsPath] -> [OsPath]
@@ -502,12 +493,6 @@ findPackageModule_ fc fopts mod pkg_conf = do
   massertPpr (moduleUnit mod == unitId pkg_conf)
              (ppr (moduleUnit mod) <+> ppr (unitId pkg_conf))
   modLocationCache fc mod $
-
-    -- special case for GHC.Prim; we won't find it in the filesystem.
-    if mod `installedModuleEq` gHC_PRIM
-          then return (InstalledFound (error "GHC.Prim ModLocation"))
-          else
-
     let
        tag = waysBuildTag (finder_ways fopts)
 

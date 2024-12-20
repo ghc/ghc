@@ -20,7 +20,7 @@ imports module ‘GHC.Stable’
 module GHC.Internal.ByteOrder where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Types ()
+import GHC.Internal.Types ()
 
 data ByteOrder
     = BigEndian

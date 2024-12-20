@@ -8,63 +8,65 @@ Result size of Tidy Core
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl :: Integer
 [GblId, Unf=OtherCon []]
-lvl = GHC.Num.Integer.IS 2#
+lvl = GHC.Internal.Bignum.Integer.IS 2#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl1 :: Integer
 [GblId, Unf=OtherCon []]
-lvl1 = GHC.Num.Integer.IS 0#
+lvl1 = GHC.Internal.Bignum.Integer.IS 0#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl2 :: Integer
 [GblId, Unf=OtherCon []]
-lvl2 = GHC.Num.Integer.IS 10#
+lvl2 = GHC.Internal.Bignum.Integer.IS 10#
 
 Rec {
 -- RHS size: {terms: 25, types: 5, coercions: 0, joins: 0/0}
 T21851_2.$s$wwombat [InlPrag=[~], Occ=LoopBreaker]
-  :: GHC.Prim.Int# -> Bool -> [Char]
+  :: GHC.Internal.Prim.Int# -> Bool -> [Char]
 [GblId, Arity=2, Str=<1L><ML>, Unf=OtherCon []]
 T21851_2.$s$wwombat
-  = \ (ww :: GHC.Prim.Int#) (y :: Bool) ->
+  = \ (ww :: GHC.Internal.Prim.Int#) (y :: Bool) ->
       case ww of ds {
         __DEFAULT ->
           case y of {
             False ->
-              GHC.CString.unpackAppendCString#
-                GHC.Show.$fShowBool3
-                (T21851_2.$s$wwombat (GHC.Prim.-# ds 1#) GHC.Types.False);
+              GHC.Internal.CString.unpackAppendCString#
+                GHC.Internal.Show.$fShowBool2
+                (T21851_2.$s$wwombat
+                   (GHC.Internal.Prim.-# ds 1#) GHC.Internal.Types.False);
             True ->
-              GHC.CString.unpackAppendCString#
-                GHC.Show.$fShowBool2
-                (T21851_2.$s$wwombat (GHC.Prim.-# ds 1#) GHC.Types.True)
+              GHC.Internal.CString.unpackAppendCString#
+                GHC.Internal.Show.$fShowBool1
+                (T21851_2.$s$wwombat
+                   (GHC.Internal.Prim.-# ds 1#) GHC.Internal.Types.True)
           };
-        0# -> GHC.Types.[] @Char
+        0# -> GHC.Internal.Types.[] @Char
       }
 end Rec }
 
 Rec {
 -- RHS size: {terms: 16, types: 6, coercions: 0, joins: 0/0}
 T21851_2.$w$sg [InlPrag=[2], Occ=LoopBreaker]
-  :: GHC.Prim.Int# -> (# GHC.Prim.Int#, String #)
+  :: GHC.Internal.Prim.Int# -> (# GHC.Internal.Prim.Int#, String #)
 [GblId, Arity=1, Str=<L>, Unf=OtherCon []]
 T21851_2.$w$sg
-  = \ (ww :: GHC.Prim.Int#) ->
-      case GHC.Prim.<# ww 10# of {
-        __DEFAULT -> T21851_2.$w$sg (GHC.Prim.-# ww 2#);
-        1# -> (# 0#, T21851_2.$s$wwombat ww GHC.Types.True #)
+  = \ (ww :: GHC.Internal.Prim.Int#) ->
+      case GHC.Internal.Prim.<# ww 10# of {
+        __DEFAULT -> T21851_2.$w$sg (GHC.Internal.Prim.-# ww 2#);
+        1# -> (# 0#, T21851_2.$s$wwombat ww GHC.Internal.Types.True #)
       }
 end Rec }
 
 -- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
-lvl3 :: forall {a}. [Char]
+lvl3 :: forall a. [Char]
 [GblId]
-lvl3 = \ (@a) -> T21851_2a.$wf GHC.Prim.(##) @a @Bool
+lvl3 = \ (@a) -> T21851_2a.$wf @a @Bool GHC.Internal.Types.(##)
 
 Rec {
 -- RHS size: {terms: 27, types: 18, coercions: 0, joins: 0/0}
 T21851_2.$wg [InlPrag=[2], Occ=LoopBreaker]
-  :: forall {a}. (Ord a, Num a) => a -> (# a, String #)
+  :: forall a. (Ord a, Num a) => a -> (# a, String #)
 [GblId[StrictWorker([!])],
  Arity=3,
  Str=<SP(A,A,SC(S,C(1,L)),A,A,A,A,A)><LP(A,LC(L,C(1,L)),A,A,A,A,L)><L>,
@@ -85,8 +87,8 @@ g [InlPrag=[2]] :: forall a. (Ord a, Num a) => a -> (a, String)
  Arity=3,
  Str=<SP(A,A,SC(S,C(1,L)),A,A,A,A,A)><LP(A,LC(L,C(1,L)),A,A,A,A,L)><L>,
  Cpr=1,
- Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@a)
                  ($dOrd [Occ=Once1] :: Ord a)
@@ -104,10 +106,11 @@ g = \ (@a) ($dOrd :: Ord a) ($dNum :: Num a) (n :: a) ->
 -- RHS size: {terms: 8, types: 9, coercions: 0, joins: 0/0}
 h :: (Int, String)
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
-         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 50 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=False, ConLike=False, WorkFree=False, Expandable=False,
+         Guidance=IF_ARGS [] 50 10}]
 h = case T21851_2.$w$sg 3# of { (# ww, ww1 #) ->
-    (GHC.Types.I# ww, ww1)
+    (GHC.Internal.Types.I# ww, ww1)
     }
 
 

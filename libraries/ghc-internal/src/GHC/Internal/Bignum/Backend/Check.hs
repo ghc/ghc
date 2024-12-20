@@ -12,9 +12,9 @@
 -- | Check Native implementation against another backend
 module GHC.Internal.Bignum.Backend.Check where
 
-import GHC.CString
-import GHC.Prim
-import GHC.Types
+import GHC.Internal.CString
+import GHC.Internal.Prim
+import GHC.Internal.Types
 import GHC.Internal.Bignum.WordArray
 import GHC.Internal.Bignum.Primitives
 import {-# SOURCE #-} GHC.Internal.Bignum.Integer

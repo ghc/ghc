@@ -6,6 +6,6 @@
 module GHC.Internal.Enum (Enum) where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Types ()
+import GHC.Internal.Types ()
 
 class Enum a

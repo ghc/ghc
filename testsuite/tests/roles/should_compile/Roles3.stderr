@@ -21,52 +21,57 @@ COERCION AXIOMS
   axiom Roles3.N:C3 :: C3 a b = a -> F3 b -> F3 b
   axiom Roles3.N:C4 :: C4 a b = a -> F4 b -> F4 b
 Dependent modules: []
-Dependent packages: [base-4.17.0.0]
+Dependent packages: [base-4.20.0.0]
 
 ==================== Typechecker ====================
 Roles3.$tcC4
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       6800596812149592130#Word64 15513203864133461281#Word64
-      Roles3.$trModule (GHC.Types.TrNameS "C4"#) 0# $krep
+      Roles3.$trModule (GHC.Internal.Types.TrNameS "C4"#) 0# $krep
 Roles3.$tcC3
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       5076086601454991970#Word64 10299714674904836194#Word64
-      Roles3.$trModule (GHC.Types.TrNameS "C3"#) 0# $krep
+      Roles3.$trModule (GHC.Internal.Types.TrNameS "C3"#) 0# $krep
 Roles3.$tcC2
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       7902873224172523979#Word64 11840994447152209031#Word64
-      Roles3.$trModule (GHC.Types.TrNameS "C2"#) 0# $krep
+      Roles3.$trModule (GHC.Internal.Types.TrNameS "C2"#) 0# $krep
 Roles3.$tc'C:C2
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       11218882737915989529#Word64 9454910899374397367#Word64
-      Roles3.$trModule (GHC.Types.TrNameS "'C:C2"#) 2# $krep
+      Roles3.$trModule (GHC.Internal.Types.TrNameS "'C:C2"#) 2# $krep
 Roles3.$tcC1
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       11013585501375994163#Word64 16371608655219610659#Word64
-      Roles3.$trModule (GHC.Types.TrNameS "C1"#) 0# $krep
+      Roles3.$trModule (GHC.Internal.Types.TrNameS "C1"#) 0# $krep
 Roles3.$tc'C:C1
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       4508088879886988796#Word64 13962145553903222779#Word64
-      Roles3.$trModule (GHC.Types.TrNameS "'C:C1"#) 1# $krep
+      Roles3.$trModule (GHC.Internal.Types.TrNameS "'C:C1"#) 1# $krep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
-      GHC.Types.$tc~ ((:) GHC.Types.krep$* ((:) $krep ((:) $krep [])))
+  = GHC.Internal.Types.KindRepTyConApp
+      GHC.Internal.Types.$tc~
+      ((:) GHC.Internal.Types.krep$* ((:) $krep ((:) $krep [])))
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp Roles3.$tcC2 ((:) $krep ((:) $krep []))
+  = GHC.Internal.Types.KindRepTyConApp
+      Roles3.$tcC2 ((:) $krep ((:) $krep []))
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp Roles3.$tcC1 ((:) $krep [])
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
+  = GHC.Internal.Types.KindRepTyConApp Roles3.$tcC1 ((:) $krep [])
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 1
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun GHC.Types.krep$* GHC.Types.krep$Constraint
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+  = GHC.Internal.Types.KindRepFun GHC.Internal.Types.krep$* $krep
+$krep [InlPrag=[~]]
+  = GHC.Internal.Types.KindRepFun
+      GHC.Internal.Types.krep$* GHC.Internal.Types.krep$Constraint
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 Roles3.$trModule
-  = GHC.Types.Module
-      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles3"#)
+  = GHC.Internal.Types.Module
+      (GHC.Internal.Types.TrNameS "main"#)
+      (GHC.Internal.Types.TrNameS "Roles3"#)
 
 

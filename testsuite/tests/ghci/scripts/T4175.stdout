@@ -24,16 +24,16 @@ type family E a where
   	-- Defined at T4175.hs:25:1
 type Unit :: *
 data Unit = ()
-  	-- Defined in ‘GHC.Tuple’
+  	-- Defined in ‘GHC.Internal.Tuple’
 instance [safe] C () -- Defined at T4175.hs:22:10
 instance Monoid () -- Defined in ‘GHC.Internal.Base’
 instance Semigroup () -- Defined in ‘GHC.Internal.Base’
 instance Bounded () -- Defined in ‘GHC.Internal.Enum’
 instance Enum () -- Defined in ‘GHC.Internal.Enum’
-instance Ord () -- Defined in ‘GHC.Classes’
+instance Ord () -- Defined in ‘GHC.Internal.Classes’
 instance Read () -- Defined in ‘GHC.Internal.Read’
 instance Show () -- Defined in ‘GHC.Internal.Show’
-instance Eq () -- Defined in ‘GHC.Classes’
+instance Eq () -- Defined in ‘GHC.Internal.Classes’
 data instance B () = MkB 	-- Defined at T4175.hs:14:15
 type instance D Int () = String 	-- Defined at T4175.hs:20:10
 type instance D () () = Bool 	-- Defined at T4175.hs:23:10
@@ -60,18 +60,18 @@ instance [safe] Eq a => Eq (Maybe a)
   -- Defined in ‘GHC.Internal.Maybe’
 type instance A (Maybe a) a = a 	-- Defined at T4175.hs:10:15
 type Int :: *
-data Int = GHC.Types.I# GHC.Prim.Int#
-  	-- Defined in ‘GHC.Types’
+data Int = GHC.Internal.Types.I# GHC.Internal.Prim.Int#
+  	-- Defined in ‘GHC.Internal.Types’
 instance [safe] C Int -- Defined at T4175.hs:19:10
 instance Bounded Int -- Defined in ‘GHC.Internal.Enum’
 instance Enum Int -- Defined in ‘GHC.Internal.Enum’
 instance Integral Int -- Defined in ‘GHC.Internal.Real’
 instance Num Int -- Defined in ‘GHC.Internal.Num’
-instance Ord Int -- Defined in ‘GHC.Classes’
+instance Ord Int -- Defined in ‘GHC.Internal.Classes’
 instance Read Int -- Defined in ‘GHC.Internal.Read’
 instance Real Int -- Defined in ‘GHC.Internal.Real’
 instance Show Int -- Defined in ‘GHC.Internal.Show’
-instance Eq Int -- Defined in ‘GHC.Classes’
+instance Eq Int -- Defined in ‘GHC.Internal.Classes’
 type instance A Int Int = () 	-- Defined at T4175.hs:9:15
 type instance D Int () = String 	-- Defined at T4175.hs:20:10
 type Z :: * -> Constraint

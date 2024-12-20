@@ -27,7 +27,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names
 import GHC.Types.DefaultEnv ( DefaultEnv, ClassDefaults (..), defaultEnv )
 import GHC.Types.SrcLoc
-import GHC.Unit.Types (Module, ghcInternalUnit, moduleUnit, primUnit)
+import GHC.Unit.Types (Module, ghcInternalUnit, moduleUnit)
 import GHC.Utils.Misc (fstOf3, sndOf3)
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -149,7 +149,7 @@ tcDefaults decls
         ; tcg_env <- getGblEnv
         ; let extra_clss = deflt_str ++ deflt_interactive
               here = tcg_mod tcg_env
-              is_internal_unit = moduleUnit here `elem` [ghcInternalUnit, primUnit]
+              is_internal_unit = moduleUnit here == ghcInternalUnit
         ; decls' <- case (is_internal_unit, decls) of
             -- Some internal GHC modules contain @default ()@ to declare that no defaults can take place
             -- in the module.

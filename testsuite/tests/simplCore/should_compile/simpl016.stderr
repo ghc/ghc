@@ -1,10 +1,10 @@
-
 simpl016.hs:7:1: warning: [GHC-40548]
     Forall'd constraint ‘Num b’ is not bound in RULE lhs
       Orig bndrs: [b, $dNum]
       Orig lhs: let {
                   $dEq :: Eq Int
                   [LclId]
-                  $dEq = GHC.Classes.$fEqInt } in
+                  $dEq = GHC.Internal.Classes.$fEqInt } in
                 delta' @Int @b $dEq
       optimised lhs: delta' @Int @b $dEq
+

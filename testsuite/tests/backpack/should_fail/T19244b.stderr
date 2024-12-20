@@ -9,13 +9,13 @@
   [1 of 1] Including user[Map=ordmap:Map]
     Instantiating user[Map=ordmap:Map]
     [1 of 2] Compiling Map[sig]         ( user/Map.hsig, T19244b.out/user/user-GzloW2NeDdA2M0V8qzN4g2/Map.o )
-
 T19244b.bkp:11:27: error: [GHC-15843]
     • Type constructor ‘Key’ has conflicting definitions in the module
       and its hsig file.
       Main module: type Key :: * -> Constraint
-                   type Key = GHC.Classes.Ord
+                   type Key = GHC.Internal.Classes.Ord
         Hsig file: type Key :: forall {k}. k -> Constraint
                    class Key k1
       The types have different kinds.
     • While checking that ‘ordmap:Map’ implements signature ‘Map’ in ‘user[Map=ordmap:Map]’.
+

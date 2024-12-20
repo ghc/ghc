@@ -28,13 +28,13 @@
 {- Note [Where do we export PrimOps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Built in primops are automatically exported via the magical module
-GHC.Prim (See Note [GHC.Prim]).
-However we don't want users to use GHC.Prim directly. Among other reasons that
+GHC.Internal.Prim (See Note [GHC.Prim]).
+However we don't want users to use GHC.Internal.Prim directly. Among other reasons that
 would prevent us from giving those primops a regular haskell or cmm
 implementation in the future.
 
 So instead we provide a hirarchy of Modules through which we expose PrimOps.
-* ghc-internal:GHC.Exts.Internal re-exports GHC.Prim along with some other
+* ghc-internal:GHC.Exts.Internal re-exports GHC.Internal.Prim along with some other
   builtin functionality. It gives zero stability guarantee and is mostly inteded
   for ghc internal use.
 * ghc-experimental:GHC.PrimOps contains a more stable subset of GHC.Exts.Internal.
@@ -61,15 +61,15 @@ module GHC.Internal.Exts
         Ptr(..), FunPtr(..),
 
         -- ** Other primitive types
-        module GHC.Types,
+        module GHC.Internal.Types,
 
         -- ** Legacy interface for arrays of arrays
         module GHC.Internal.ArrayArray,
 
         -- * Primitive operations
 
-        module GHC.Prim,
-        module GHC.Prim.Ext,
+        module GHC.Internal.Prim,
+        module GHC.Internal.Prim.Ext,
 
         -- ** Running 'RealWorld' state thread
         runRW#,
@@ -165,13 +165,13 @@ module GHC.Internal.Exts
         maxTupleSize,
        ) where
 
-import GHC.Prim hiding ( coerce, dataToTagSmall#, dataToTagLarge#, whereFrom# )
+import GHC.Internal.Prim hiding ( coerce, dataToTagSmall#, dataToTagLarge#, whereFrom# )
   -- Hide dataToTagLarge# because it is expected to break for
   -- GHC-internal reasons in the near future, and shouldn't
   -- be exposed from base (not even GHC.Exts)
   -- whereFrom# is similarly internal.
 
-import GHC.Types
+import GHC.Internal.Types
   hiding ( IO   -- Exported from "GHC.IO"
          , Type -- Exported from "Data.Kind"
 
@@ -307,7 +307,7 @@ import GHC.Types
          Sum62#,
          Sum63#,
   )
-import qualified GHC.Prim.Ext
+import qualified GHC.Internal.Prim.Ext
 import GHC.Internal.ArrayArray
 import GHC.Internal.Base hiding ( coerce )
 import GHC.Internal.IO (seq#)

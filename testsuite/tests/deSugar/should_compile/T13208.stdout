@@ -1,6 +1,6 @@
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
-f = \ (@p) _ [Occ=Dead] -> GHC.Types.True
+f = \ (@p) _ [Occ=Dead] -> GHC.Internal.Types.True
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,

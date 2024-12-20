@@ -1,5 +1,5 @@
-CaseE (UnboxedTupE [Just (LitE (CharL 'b')),Just (ConE GHC.Types.False)]) [Match (UnboxedTupP [LitP (CharL 'a'),ConP GHC.Types.True [] []]) (NormalB (UnboxedTupE [Just (LitE (StringL "One")),Just (LitE (IntegerL 1))])) [],Match (UnboxedTupP [LitP (CharL 'b'),ConP GHC.Types.False [] []]) (NormalB (UnboxedTupE [Just (LitE (StringL "Two")),Just (LitE (IntegerL 2))])) [],Match (UnboxedTupP [WildP,WildP]) (NormalB (UnboxedTupE [Just (LitE (StringL "Three")),Just (LitE (IntegerL 3))])) []]
-case (# 'b', GHC.Types.False #) of
-{(# 'a', GHC.Types.True #) -> (# "One", 1 #);
- (# 'b', GHC.Types.False #) -> (# "Two", 2 #);
+CaseE (UnboxedTupE [Just (LitE (CharL 'b')),Just (ConE GHC.Internal.Types.False)]) [Match (UnboxedTupP [LitP (CharL 'a'),ConP GHC.Internal.Types.True [] []]) (NormalB (UnboxedTupE [Just (LitE (StringL "One")),Just (LitE (IntegerL 1))])) [],Match (UnboxedTupP [LitP (CharL 'b'),ConP GHC.Internal.Types.False [] []]) (NormalB (UnboxedTupE [Just (LitE (StringL "Two")),Just (LitE (IntegerL 2))])) [],Match (UnboxedTupP [WildP,WildP]) (NormalB (UnboxedTupE [Just (LitE (StringL "Three")),Just (LitE (IntegerL 3))])) []]
+case (# 'b', GHC.Internal.Types.False #) of
+{(# 'a', GHC.Internal.Types.True #) -> (# "One", 1 #);
+ (# 'b', GHC.Internal.Types.False #) -> (# "Two", 2 #);
  (# _, _ #) -> (# "Three", 3 #)}

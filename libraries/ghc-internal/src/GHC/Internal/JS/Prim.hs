@@ -41,10 +41,10 @@ module GHC.Internal.JS.Prim ( JSVal(..), JSVal#
 
 import           GHC.Internal.Unsafe.Coerce (unsafeCoerce)
 
-import           GHC.Prim
+import           GHC.Internal.Prim
 import qualified GHC.Internal.Exception as Ex
 import qualified GHC.Internal.Exts as Exts
-import qualified GHC.CString as GHC
+import qualified GHC.Internal.CString as GHC
 import           GHC.Internal.IO
 import           GHC.Internal.Data.Bool
 import           GHC.Internal.Base

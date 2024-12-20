@@ -4,15 +4,15 @@ interfacePlugin: Prelude
 interfacePlugin: GHC.Internal.Base
 interfacePlugin: GHC.Internal.Data.NonEmpty
 interfacePlugin: GHC.Internal.Float
-interfacePlugin: GHC.Prim.Ext
+interfacePlugin: GHC.Internal.Prim.Ext
 interfacePlugin: GHC.Internal.System.IO
-interfacePlugin: GHC.Types
+interfacePlugin: GHC.Internal.Types
 interfacePlugin: GHC.Internal.Show
 typeCheckPlugin (rn)
 interfacePlugin: GHC.Internal.TopHandler
 typeCheckPlugin (tc)
-interfacePlugin: GHC.CString
-interfacePlugin: GHC.Prim
+interfacePlugin: GHC.Internal.CString
+interfacePlugin: GHC.Internal.Prim
 ==pure.1
 ==fp0.0
 parsePlugin()

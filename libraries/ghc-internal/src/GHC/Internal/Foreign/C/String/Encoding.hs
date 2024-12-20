@@ -55,7 +55,7 @@ import GHC.Internal.Show ( show )
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.ForeignPtr
 
-import GHC.Debug
+import GHC.Internal.Debug
 import GHC.Internal.List
 import GHC.Internal.Num
 import GHC.Internal.Base

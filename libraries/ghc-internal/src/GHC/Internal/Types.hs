@@ -7,9 +7,9 @@
 {-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.Types
+-- Module      :  GHC.Internal.Types
 -- Copyright   :  (c) The University of Glasgow 2009
--- License     :  see libraries/ghc-prim/LICENSE
+-- License     :  see libraries/ghc-internal/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
 -- Stability   :  internal
@@ -21,7 +21,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Types (
+module GHC.Internal.Types (
         -- * Built-in types
         Bool(..), Char(..), Int(..), Word(..),
         Float(..), Double(..),
@@ -198,7 +198,7 @@ module GHC.Types (
 
     ) where
 
-import GHC.Prim
+import GHC.Internal.Prim
 
 infixr 5 :
 
@@ -565,13 +565,13 @@ Note [Kind-changing of (~) and Coercible]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (~) and Coercible are tricky to define. To the user, they must appear as
 constraints, but we cannot define them as such in Haskell. But we also cannot
-just define them only in GHC.Prim (like (->)), because we need a real module
+just define them only in GHC.Internal.Prim (like (->)), because we need a real module
 for them, e.g. to compile the constructor's info table.
 
 Furthermore the type of MkCoercible cannot be written in Haskell
 (no syntax for ~#R).
 
-So we define them as regular data types in GHC.Types, and do magic in GHC.Builtin.Types,
+So we define them as regular data types in GHC.Internal.Types, and do magic in GHC.Builtin.Types,
 inside GHC, to change the kind and type.
 -}
 
@@ -744,8 +744,8 @@ you're reading this in 2023 then things went wrong). See #8326.
 -- before @SpecConstr@.
 --
 -- This type is reexported from "GHC.Exts" since GHC 9.0 and @base-4.15@.
--- For compatibility with earlier releases import it from "GHC.Types"
--- in @ghc-prim@ package.
+-- For compatibility with earlier releases import it from "GHC.Internal.Types"
+-- in @ghc-internal@ package.
 --
 -- @since 0.3.1.0
 --
@@ -802,7 +802,7 @@ data VecCount = Vec2
               | Vec16
               | Vec32
               | Vec64
--- Enum, Bounded instances in GHC.Enum
+-- Enum, Bounded instances in GHC.Internal.Enum
 
 -- | Element of a SIMD vector type
 data VecElem = Int8ElemRep
@@ -815,7 +815,7 @@ data VecElem = Int8ElemRep
              | Word64ElemRep
              | FloatElemRep
              | DoubleElemRep
--- Enum, Bounded instances in GHC.Enum
+-- Enum, Bounded instances in GHC.Internal.Enum
 
 {-# DEPRECATED Void# "Void# is now an alias for the unboxed tuple (# #)." #-}
 type Void# = (# #)
@@ -864,7 +864,7 @@ data type T.  Things to think about
 
   - We want them to be economical on space; ideally pure data with no thunks.
 
-  - We do this for every module (except this module GHC.Types), so we can't
+  - We do this for every module (except this module GHC.Internal.Types), so we can't
     depend on anything else (eg string unpacking code)
 
 That's why we have these terribly low-level representations.  The TrName
@@ -903,7 +903,7 @@ data TypeLitSort = TypeLitSymbol
                  | TypeLitNat
                  | TypeLitChar
 
--- Show instance for TyCon found in GHC.Show
+-- Show instance for TyCon found in GHC.Internal.Show
 data TyCon = TyCon Word64#    -- ^ Fingerprint (high)
                    Word64#    -- ^ Fingerprint (low)
                    Module     -- ^ Module in which this is defined

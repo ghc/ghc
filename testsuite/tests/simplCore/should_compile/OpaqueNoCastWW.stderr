@@ -42,71 +42,73 @@ times
                     Signed m -> Signed n -> Signed (m + n)))
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$trModule1 :: GHC.Prim.Addr#
+$trModule1 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $trModule1 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$trModule2 :: GHC.Types.TrName
+$trModule2 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []]
-$trModule2 = GHC.Types.TrNameS $trModule1
+$trModule2 = GHC.Internal.Types.TrNameS $trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$trModule3 :: GHC.Prim.Addr#
+$trModule3 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $trModule3 = "OpaqueNoCastWW"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$trModule4 :: GHC.Types.TrName
+$trModule4 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []]
-$trModule4 = GHC.Types.TrNameS $trModule3
+$trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-OpaqueNoCastWW.$trModule :: GHC.Types.Module
+OpaqueNoCastWW.$trModule :: GHC.Internal.Types.Module
 [GblId, Unf=OtherCon []]
-OpaqueNoCastWW.$trModule = GHC.Types.Module $trModule2 $trModule4
+OpaqueNoCastWW.$trModule
+  = GHC.Internal.Types.Module $trModule2 $trModule4
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$krep :: GHC.Types.KindRep
+$krep :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep = GHC.Types.KindRepVar 0#
+$krep = GHC.Internal.Types.KindRepVar 0#
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep1 :: GHC.Types.KindRep
+$krep1 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
 $krep1
-  = GHC.Types.KindRepTyConApp
+  = GHC.Internal.Types.KindRepTyConApp
       GHC.Internal.Bignum.Integer.$tcInteger
-      (GHC.Types.[] @GHC.Types.KindRep)
+      (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep2 :: GHC.Types.KindRep
+$krep2 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
 $krep2
-  = GHC.Types.KindRepTyConApp
+  = GHC.Internal.Types.KindRepTyConApp
       GHC.Internal.Bignum.Natural.$tcNatural
-      (GHC.Types.[] @GHC.Types.KindRep)
+      (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep3 :: GHC.Types.KindRep
+$krep3 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep3 = GHC.Types.KindRepFun $krep2 GHC.Types.krep$*
+$krep3
+  = GHC.Internal.Types.KindRepFun $krep2 GHC.Internal.Types.krep$*
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$tcSigned1 :: GHC.Prim.Addr#
+$tcSigned1 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $tcSigned1 = "Signed"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$tcSigned2 :: GHC.Types.TrName
+$tcSigned2 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []]
-$tcSigned2 = GHC.Types.TrNameS $tcSigned1
+$tcSigned2 = GHC.Internal.Types.TrNameS $tcSigned1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-OpaqueNoCastWW.$tcSigned :: GHC.Types.TyCon
+OpaqueNoCastWW.$tcSigned :: GHC.Internal.Types.TyCon
 [GblId, Unf=OtherCon []]
 OpaqueNoCastWW.$tcSigned
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       12374680438872388605#Word64
       16570143229152367467#Word64
       OpaqueNoCastWW.$trModule
@@ -115,37 +117,41 @@ OpaqueNoCastWW.$tcSigned
       $krep3
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-$krep4 :: [GHC.Types.KindRep]
+$krep4 :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
 $krep4
-  = GHC.Types.:
-      @GHC.Types.KindRep $krep (GHC.Types.[] @GHC.Types.KindRep)
+  = GHC.Internal.Types.:
+      @GHC.Internal.Types.KindRep
+      $krep
+      (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep5 :: GHC.Types.KindRep
+$krep5 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep5 = GHC.Types.KindRepTyConApp OpaqueNoCastWW.$tcSigned $krep4
+$krep5
+  = GHC.Internal.Types.KindRepTyConApp
+      OpaqueNoCastWW.$tcSigned $krep4
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep6 :: GHC.Types.KindRep
+$krep6 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep6 = GHC.Types.KindRepFun $krep1 $krep5
+$krep6 = GHC.Internal.Types.KindRepFun $krep1 $krep5
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$tc'S1 :: GHC.Prim.Addr#
+$tc'S1 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $tc'S1 = "'S"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$tc'S2 :: GHC.Types.TrName
+$tc'S2 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []]
-$tc'S2 = GHC.Types.TrNameS $tc'S1
+$tc'S2 = GHC.Internal.Types.TrNameS $tc'S1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-OpaqueNoCastWW.$tc'S :: GHC.Types.TyCon
+OpaqueNoCastWW.$tc'S :: GHC.Internal.Types.TyCon
 [GblId, Unf=OtherCon []]
 OpaqueNoCastWW.$tc'S
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       9801584576887380300#Word64
       5757617350287545124#Word64
       OpaqueNoCastWW.$trModule

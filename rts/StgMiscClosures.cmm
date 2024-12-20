@@ -13,8 +13,8 @@
 #include "Cmm.h"
 
 import pthread_mutex_lock;
-import ghczmprim_GHCziTypes_Czh_info;
-import ghczmprim_GHCziTypes_Izh_info;
+import ghczminternal_GHCziInternalziTypes_Czh_info;
+import ghczminternal_GHCziInternalziTypes_Izh_info;
 import AcquireSRWLockExclusive;
 import ReleaseSRWLockExclusive;
 
@@ -982,11 +982,11 @@ INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "C
  *    we don't rewrite to static closures at all with Windows DLLs.
  */
 // #warning Is this correct? _imp is a pointer!
-#define Char_hash_con_info _imp__ghczmprim_GHCziTypes_Czh_con_info
-#define Int_hash_con_info _imp__ghczmprim_GHCziTypes_Izh_con_info
+#define Char_hash_con_info _imp__ghczminternal_GHCziInternalziTypes_Czh_con_info
+#define Int_hash_con_info _imp__ghczminternal_GHCziInternalziTypes_Izh_con_info
 #else
-#define Char_hash_con_info ghczmprim_GHCziTypes_Czh_con_info
-#define Int_hash_con_info ghczmprim_GHCziTypes_Izh_con_info
+#define Char_hash_con_info ghczminternal_GHCziInternalziTypes_Czh_con_info
+#define Int_hash_con_info ghczminternal_GHCziInternalziTypes_Izh_con_info
 #endif
 
 

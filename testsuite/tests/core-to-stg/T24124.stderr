@@ -4,8 +4,9 @@ T24124.testFun1
   :: forall a b.
      a
      -> b
-     -> GHC.Prim.State# GHC.Prim.RealWorld
-     -> (# GHC.Prim.State# GHC.Prim.RealWorld, T24124.StrictPair a b #)
+     -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+     -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+           T24124.StrictPair a b #)
 [GblId, Arity=3, Str=<L><L><L>, Cpr=1, Unf=OtherCon []] =
     {} \r [x y void]
         case x of sat {
@@ -17,14 +18,16 @@ T24124.testFun1
         of
         sat
         {
-        __DEFAULT -> GHC.Types.MkSolo# [sat];
+        __DEFAULT -> GHC.Internal.Types.MkSolo# [sat];
         };
         };
 
 T24124.testFun
-  :: forall a b. a -> b -> GHC.Types.IO (T24124.StrictPair a b)
+  :: forall a b.
+     a -> b -> GHC.Internal.Types.IO (T24124.StrictPair a b)
 [GblId, Arity=3, Str=<L><L><L>, Cpr=1, Unf=OtherCon []] =
-    {} \r [eta eta void] T24124.testFun1 eta eta GHC.Prim.void#;
+    {} \r [eta eta void]
+        T24124.testFun1 eta eta GHC.Internal.Prim.void#;
 
 T24124.MkStrictPair [InlPrag=CONLIKE]
   :: forall a b. a %1 -> b %1 -> T24124.StrictPair a b

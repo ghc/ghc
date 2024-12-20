@@ -1,2 +1,2 @@
 instance Bug.C (GHC.Internal.Maybe.Maybe a_0)
-    where {type Bug.T (GHC.Internal.Maybe.Maybe a_0) = GHC.Types.Char}
+    where {type Bug.T (GHC.Internal.Maybe.Maybe a_0) = GHC.Internal.Types.Char}

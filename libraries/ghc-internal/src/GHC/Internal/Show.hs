@@ -53,7 +53,7 @@ import GHC.Internal.Base
 import GHC.Internal.List ((!!), foldr1, break)
 import GHC.Internal.Num
 import GHC.Internal.Stack.Types
-import GHC.Tuple (Solo (..))
+import GHC.Internal.Tuple (Solo (..))
 
 
 -- | The @shows@ functions return a function that prepends the

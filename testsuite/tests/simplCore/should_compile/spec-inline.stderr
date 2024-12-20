@@ -4,7 +4,7 @@ Result size of Tidy Core
   = {terms: 136, types: 55, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-lvl :: GHC.Prim.Addr#
+lvl :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
 lvl = "spec-inline.hs:(19,5)-(29,25)|function go"#
 
@@ -13,32 +13,38 @@ Roman.foo3 :: ()
 [GblId, Str=b, Cpr=b]
 Roman.foo3
   = GHC.Internal.Control.Exception.Base.patError
-      @GHC.Types.LiftedRep @() lvl
+      @GHC.Internal.Types.LiftedRep @() lvl
 
 Rec {
 -- RHS size: {terms: 40, types: 5, coercions: 0, joins: 0/0}
 Roman.foo_$s$wgo [Occ=LoopBreaker]
-  :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
+  :: GHC.Internal.Prim.Int#
+     -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
 [GblId, Arity=2, Str=<A><L>, Unf=OtherCon []]
 Roman.foo_$s$wgo
-  = \ (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#) ->
-      case GHC.Prim.<=# sc1 0# of {
+  = \ (sc :: GHC.Internal.Prim.Int#)
+      (sc1 :: GHC.Internal.Prim.Int#) ->
+      case GHC.Internal.Prim.<=# sc1 0# of {
         __DEFAULT ->
-          case GHC.Prim.<# sc1 100# of {
+          case GHC.Internal.Prim.<# sc1 100# of {
             __DEFAULT ->
-              case GHC.Prim.<# sc1 500# of {
+              case GHC.Internal.Prim.<# sc1 500# of {
                 __DEFAULT ->
-                  Roman.foo_$s$wgo (GHC.Prim.*# 14# sc) (GHC.Prim.-# sc1 1#);
-                1# -> Roman.foo_$s$wgo (GHC.Prim.*# 7# sc) (GHC.Prim.-# sc1 3#)
+                  Roman.foo_$s$wgo
+                    (GHC.Internal.Prim.*# 14# sc) (GHC.Internal.Prim.-# sc1 1#);
+                1# ->
+                  Roman.foo_$s$wgo
+                    (GHC.Internal.Prim.*# 7# sc) (GHC.Internal.Prim.-# sc1 3#)
               };
-            1# -> Roman.foo_$s$wgo sc (GHC.Prim.-# sc1 2#)
+            1# -> Roman.foo_$s$wgo sc (GHC.Internal.Prim.-# sc1 2#)
           };
         1# -> 0#
       }
 end Rec }
 
 -- RHS size: {terms: 61, types: 18, coercions: 0, joins: 0/0}
-Roman.$wgo [InlPrag=[2]] :: Maybe Int -> Maybe Int -> GHC.Prim.Int#
+Roman.$wgo [InlPrag=[2]]
+  :: Maybe Int -> Maybe Int -> GHC.Internal.Prim.Int#
 [GblId[StrictWorker([!, !])],
  Arity=2,
  Str=<1L><1L>,
@@ -50,21 +56,24 @@ Roman.$wgo
       case ds of {
         Nothing -> case Roman.foo3 of {};
         Just x ->
-          case x of { GHC.Types.I# ipv ->
+          case x of { GHC.Internal.Types.I# ipv ->
           case u of {
-            Nothing -> Roman.foo_$s$wgo (GHC.Prim.*# 7# ipv) 10#;
+            Nothing -> Roman.foo_$s$wgo (GHC.Internal.Prim.*# 7# ipv) 10#;
             Just n ->
-              case n of { GHC.Types.I# x2 ->
-              case GHC.Prim.<=# x2 0# of {
+              case n of { GHC.Internal.Types.I# x2 ->
+              case GHC.Internal.Prim.<=# x2 0# of {
                 __DEFAULT ->
-                  case GHC.Prim.<# x2 100# of {
+                  case GHC.Internal.Prim.<# x2 100# of {
                     __DEFAULT ->
-                      case GHC.Prim.<# x2 500# of {
+                      case GHC.Internal.Prim.<# x2 500# of {
                         __DEFAULT ->
-                          Roman.foo_$s$wgo (GHC.Prim.*# 14# ipv) (GHC.Prim.-# x2 1#);
-                        1# -> Roman.foo_$s$wgo (GHC.Prim.*# 7# ipv) (GHC.Prim.-# x2 3#)
+                          Roman.foo_$s$wgo
+                            (GHC.Internal.Prim.*# 14# ipv) (GHC.Internal.Prim.-# x2 1#);
+                        1# ->
+                          Roman.foo_$s$wgo
+                            (GHC.Internal.Prim.*# 7# ipv) (GHC.Internal.Prim.-# x2 3#)
                       };
-                    1# -> Roman.foo_$s$wgo ipv (GHC.Prim.-# x2 2#)
+                    1# -> Roman.foo_$s$wgo ipv (GHC.Internal.Prim.-# x2 2#)
                   };
                 1# -> 0#
               }
@@ -85,11 +94,13 @@ Roman.foo_go [InlPrag=[2]] :: Maybe Int -> Maybe Int -> Int
          Tmpl= \ (u [Occ=Once1] :: Maybe Int)
                  (ds [Occ=Once1] :: Maybe Int) ->
                  case Roman.$wgo u ds of ww [Occ=Once1] { __DEFAULT ->
-                 GHC.Types.I# ww
+                 GHC.Internal.Types.I# ww
                  }}]
 Roman.foo_go
   = \ (u :: Maybe Int) (ds [OS=OneShot] :: Maybe Int) ->
-      case Roman.$wgo u ds of ww { __DEFAULT -> GHC.Types.I# ww }
+      case Roman.$wgo u ds of ww { __DEFAULT ->
+      GHC.Internal.Types.I# ww
+      }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.foo2 :: Int
@@ -97,7 +108,7 @@ Roman.foo2 :: Int
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-Roman.foo2 = GHC.Types.I# 6#
+Roman.foo2 = GHC.Internal.Types.I# 6#
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 Roman.foo1 :: Maybe Int
@@ -117,21 +128,25 @@ foo :: Int -> Int
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once1!] :: Int) ->
-                 case n of n1 [Occ=Once1] { GHC.Types.I# _ [Occ=Dead] ->
+                 case n of n1 [Occ=Once1] { GHC.Internal.Types.I# _ [Occ=Dead] ->
                  Roman.foo_go (GHC.Internal.Maybe.Just @Int n1) Roman.foo1
                  }}]
 foo
   = \ (n :: Int) ->
-      case n of { GHC.Types.I# ipv ->
-      case Roman.foo_$s$wgo 6# ipv of ww { __DEFAULT -> GHC.Types.I# ww }
+      case n of { GHC.Internal.Types.I# ipv ->
+      case Roman.foo_$s$wgo 6# ipv of ww { __DEFAULT ->
+      GHC.Internal.Types.I# ww
+      }
       }
 
 
 ------ Local rules for imported ids --------
 "SC:$wgo0" [2]
-    forall (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#).
-      Roman.$wgo (GHC.Internal.Maybe.Just @Int (GHC.Types.I# sc1))
-                 (GHC.Internal.Maybe.Just @Int (GHC.Types.I# sc))
+    forall (sc :: GHC.Internal.Prim.Int#)
+           (sc1 :: GHC.Internal.Prim.Int#).
+      Roman.$wgo (GHC.Internal.Maybe.Just
+                    @Int (GHC.Internal.Types.I# sc1))
+                 (GHC.Internal.Maybe.Just @Int (GHC.Internal.Types.I# sc))
       = Roman.foo_$s$wgo sc sc1
 
 

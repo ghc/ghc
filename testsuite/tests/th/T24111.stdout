@@ -1,7 +1,8 @@
-pattern (:+_0) :: GHC.Types.Int ->
-                  GHC.Types.Int -> (GHC.Types.Int, GHC.Types.Int)
+pattern (:+_0) :: GHC.Internal.Types.Int ->
+                  GHC.Internal.Types.Int ->
+                  (GHC.Internal.Types.Int, GHC.Internal.Types.Int)
 pattern x_1 :+_0 y_2 = (x_1, y_2)
-pattern A_0 :: GHC.Types.Int -> GHC.Internal.Base.String
+pattern A_0 :: GHC.Internal.Types.Int -> GHC.Internal.Base.String
 pattern A_0 n_1 <- (GHC.Internal.Text.Read.read -> n_1) where
                        A_0 0 = "hi"
                        A_0 1 = "bye"

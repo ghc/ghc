@@ -1,3 +1,4 @@
-f_0 :: GHC.Internal.Maybe.Maybe GHC.Types.Int -> GHC.Types.Int
+f_0 :: GHC.Internal.Maybe.Maybe GHC.Internal.Types.Int ->
+       GHC.Internal.Types.Int
 f_0 (GHC.Internal.Maybe.Nothing) = 3
 f_0 (GHC.Internal.Maybe.Just x_1) = x

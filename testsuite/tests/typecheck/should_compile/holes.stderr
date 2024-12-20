@@ -52,6 +52,9 @@ holes.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         EQ :: Ordering
         GT :: Ordering
         () :: ()
+        (&&) :: Bool -> Bool -> Bool
+        not :: Bool -> Bool
+        (||) :: Bool -> Bool -> Bool
         lines :: String -> [String]
         unlines :: [String] -> String
         unwords :: [String] -> String
@@ -71,9 +74,6 @@ holes.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         putStrLn :: String -> IO ()
         readFile :: FilePath -> IO String
         writeFile :: FilePath -> String -> IO ()
-        (&&) :: Bool -> Bool -> Bool
-        not :: Bool -> Bool
-        (||) :: Bool -> Bool -> Bool
         (++) :: forall a. [a] -> [a] -> [a]
         filter :: forall a. (a -> Bool) -> [a] -> [a]
         fromInteger :: forall a. Num a => Integer -> a

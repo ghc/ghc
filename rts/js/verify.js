@@ -143,7 +143,7 @@ function h$verify_rep_addr(v, o) {
  */
 function h$verify_match_alg(tc, v) {
   if(typeof v === 'boolean') {
-    if(tc === "ghc-prim:GHC.Types.Bool") return;
+    if(tc === "ghc-internal:GHC.Internal.Types.Bool") return;
     throw new Error("invalid pattern match boolean rep " + tc);
   } else if(typeof v === 'number') {
     // h$log("h$verify_match_alg number: " + tc);

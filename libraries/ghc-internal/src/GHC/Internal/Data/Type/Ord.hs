@@ -38,7 +38,7 @@ import GHC.Internal.Show(Show(..))
 import GHC.Internal.TypeError
 import GHC.Internal.TypeLits.Internal
 import GHC.Internal.TypeNats.Internal
-import GHC.Types (type (~), Char)
+import GHC.Internal.Types (type (~), Char)
 import GHC.Internal.Data.Bool
 import GHC.Internal.Data.Eq
 import GHC.Internal.Data.Ord

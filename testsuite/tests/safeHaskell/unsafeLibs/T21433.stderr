@@ -1,4 +1,4 @@
-
 T21433.hs:6:1: error: [GHC-44360]
-    GHC.Prim.PtrEq: Can't be safely imported!
+    GHC.Internal.Prim.PtrEq: Can't be safely imported!
     The module itself isn't safe.
+

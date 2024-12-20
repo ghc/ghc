@@ -13,7 +13,7 @@
 #include "Cmm.h"
 #include "RaiseAsync.h"
 
-import CLOSURE ghczmprim_GHCziTypes_True_closure;
+import CLOSURE ghczminternal_GHCziInternalziTypes_True_closure;
 import CLOSURE ghczminternal_GHCziInternalziExceptionziType_divZZeroException_closure;
 import CLOSURE ghczminternal_GHCziInternalziExceptionziType_underflowException_closure;
 import CLOSURE ghczminternal_GHCziInternalziExceptionziType_overflowException_closure;
@@ -539,7 +539,7 @@ retry_pop_stack:
             Sp(12) = exception;
             Sp(11) = stg_raise_ret_info;
             Sp(10) = exception;
-            Sp(9)  = ghczmprim_GHCziTypes_True_closure; // True <=> an exception
+            Sp(9)  = ghczminternal_GHCziInternalziTypes_True_closure; // True <=> an exception
             Sp(8)  = stg_ap_ppv_info;
             Sp(7)  = 0;
             Sp(6)  = stg_ap_n_info;

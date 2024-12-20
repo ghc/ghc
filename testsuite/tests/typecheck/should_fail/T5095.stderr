@@ -3,7 +3,7 @@ T5095.hs:9:11: error: [GHC-43085]
       Matching instance:
         instance [overlappable] Show a => Eq a -- Defined at T5095.hs:5:31
       Potentially matching instances:
-        instance Eq Ordering -- Defined in ‘GHC.Classes’
+        instance Eq Ordering -- Defined in ‘GHC.Internal.Classes’
         instance Eq Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
         ...plus 23 others
         ...plus five instances involving out-of-scope types

@@ -1,34 +1,34 @@
 type List :: * -> *
 data List a = [] | a : [a]
-  	-- Defined in ‘GHC.Types’
+  	-- Defined in ‘GHC.Internal.Types’
 instance Monoid [a] -- Defined in ‘GHC.Internal.Base’
 instance Semigroup [a] -- Defined in ‘GHC.Internal.Base’
 instance Foldable [] -- Defined in ‘GHC.Internal.Data.Foldable’
 instance Traversable []
   -- Defined in ‘GHC.Internal.Data.Traversable’
 instance Read a => Read [a] -- Defined in ‘GHC.Internal.Read’
+instance Eq a => Eq [a] -- Defined in ‘GHC.Internal.Classes’
+instance Ord a => Ord [a] -- Defined in ‘GHC.Internal.Classes’
 instance Show a => Show [a] -- Defined in ‘GHC.Internal.Show’
 instance Applicative [] -- Defined in ‘GHC.Internal.Base’
 instance Functor [] -- Defined in ‘GHC.Internal.Base’
 instance MonadFail []
   -- Defined in ‘GHC.Internal.Control.Monad.Fail’
 instance Monad [] -- Defined in ‘GHC.Internal.Base’
-instance Eq a => Eq [a] -- Defined in ‘GHC.Classes’
-instance Ord a => Ord [a] -- Defined in ‘GHC.Classes’
 type Unit :: *
 data Unit = ()
-  	-- Defined in ‘GHC.Tuple’
+  	-- Defined in ‘GHC.Internal.Tuple’
 instance Monoid () -- Defined in ‘GHC.Internal.Base’
 instance Read () -- Defined in ‘GHC.Internal.Read’
 instance Semigroup () -- Defined in ‘GHC.Internal.Base’
 instance Bounded () -- Defined in ‘GHC.Internal.Enum’
 instance Enum () -- Defined in ‘GHC.Internal.Enum’
-instance Ord () -- Defined in ‘GHC.Classes’
+instance Ord () -- Defined in ‘GHC.Internal.Classes’
 instance Show () -- Defined in ‘GHC.Internal.Show’
-instance Eq () -- Defined in ‘GHC.Classes’
+instance Eq () -- Defined in ‘GHC.Internal.Classes’
 type Tuple2 :: * -> * -> *
 data Tuple2 a b = (,) a b
-  	-- Defined in ‘GHC.Tuple’
+  	-- Defined in ‘GHC.Internal.Tuple’
 instance Traversable ((,) a)
   -- Defined in ‘GHC.Internal.Data.Traversable’
 instance Monoid a => Applicative ((,) a)
@@ -38,15 +38,17 @@ instance Foldable ((,) a)
 instance Functor ((,) a) -- Defined in ‘GHC.Internal.Base’
 instance Monoid a => Monad ((,) a)
   -- Defined in ‘GHC.Internal.Base’
-instance (Monoid a, Monoid b) => Monoid (a, b)
-  -- Defined in ‘GHC.Internal.Base’
-instance (Semigroup a, Semigroup b) => Semigroup (a, b)
-  -- Defined in ‘GHC.Internal.Base’
 instance (Bounded a, Bounded b) => Bounded (a, b)
   -- Defined in ‘GHC.Internal.Enum’
 instance (Read a, Read b) => Read (a, b)
   -- Defined in ‘GHC.Internal.Read’
-instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‘GHC.Classes’
-instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
+instance (Eq a, Eq b) => Eq (a, b)
+  -- Defined in ‘GHC.Internal.Classes’
+instance (Ord a, Ord b) => Ord (a, b)
+  -- Defined in ‘GHC.Internal.Classes’
 instance (Show a, Show b) => Show (a, b)
   -- Defined in ‘GHC.Internal.Show’
+instance (Monoid a, Monoid b) => Monoid (a, b)
+  -- Defined in ‘GHC.Internal.Base’
+instance (Semigroup a, Semigroup b) => Semigroup (a, b)
+  -- Defined in ‘GHC.Internal.Base’

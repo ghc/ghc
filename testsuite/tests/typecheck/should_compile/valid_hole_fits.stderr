@@ -108,19 +108,19 @@ valid_hole_fits.hs:30:10: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
            (and originally defined in ‘GHC.Internal.Base’))
         False :: Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Types’))
+           (and originally defined in ‘GHC.Internal.Types’))
         True :: Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Types’))
+           (and originally defined in ‘GHC.Internal.Types’))
         LT :: Ordering
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Types’))
+           (and originally defined in ‘GHC.Internal.Types’))
         EQ :: Ordering
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Types’))
+           (and originally defined in ‘GHC.Internal.Types’))
         GT :: Ordering
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Types’))
+           (and originally defined in ‘GHC.Internal.Types’))
         () :: () (bound at <wired into compiler>)
         pi :: forall a. Floating a => a
           with pi @Double
@@ -138,7 +138,7 @@ valid_hole_fits.hs:34:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
       Valid hole fits include
         not :: Bool -> Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Classes’))
+           (and originally defined in ‘GHC.Internal.Classes’))
         enumFrom :: forall a. Enum a => a -> [a]
           with enumFrom @Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
@@ -185,10 +185,10 @@ valid_hole_fits.hs:34:14: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
            (and originally defined in ‘GHC.Internal.Base’))
         False :: Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Types’))
+           (and originally defined in ‘GHC.Internal.Types’))
         True :: Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Types’))
+           (and originally defined in ‘GHC.Internal.Types’))
         maxBound :: forall a. Bounded a => a
           with maxBound @Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
@@ -219,7 +219,7 @@ valid_hole_fits.hs:38:10: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         seq :: forall a b. a -> b -> b
           with seq @a @[a]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Prim’))
+           (and originally defined in ‘GHC.Internal.Prim’))
         mempty :: forall a. Monoid a => a
           with mempty @(a -> [a] -> [a])
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40

@@ -1,8 +1,8 @@
-
 mod110.hs:11:10: error: [GHC-87543]
     Ambiguous occurrence ‘Eq’.
     It could refer to
        either ‘Prelude.Eq’,
               imported from ‘Prelude’ at mod110.hs:4:1-14
-              (and originally defined in ‘GHC.Classes’),
+              (and originally defined in ‘GHC.Internal.Classes’),
            or ‘M.Eq’, defined at mod110.hs:7:1.
+

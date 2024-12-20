@@ -546,7 +546,7 @@
           [])
          (EpaComments
           []))
-        {Var: GHC.Types.krep$*})))))))
+        {Var: GHC.Internal.Types.krep$*})))))))
 ,(L
   (EpAnn
    (EpaSpan { <no location info> })
@@ -1196,7 +1196,7 @@
           [])
          (EpaComments
           []))
-        {Var: GHC.Types.krep$*})))))))
+        {Var: GHC.Internal.Types.krep$*})))))))
 ,(L
   (EpAnn
    (EpaSpan { <no location info> })

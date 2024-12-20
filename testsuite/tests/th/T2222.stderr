@@ -1,5 +1,5 @@
 inside b: GHC.Internal.Bignum.Integer.Integer
-inside d: GHC.Types.Bool
-type of c: GHC.Types.Bool
-inside f: GHC.Types.Bool
-type of e: GHC.Types.Bool
+inside d: GHC.Internal.Types.Bool
+type of c: GHC.Internal.Types.Bool
+inside f: GHC.Internal.Types.Bool
+type of e: GHC.Internal.Types.Bool

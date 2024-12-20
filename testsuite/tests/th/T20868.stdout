@@ -1,8 +1,10 @@
-newtype MyType_0 where MyCons_1 :: GHC.Types.Bool -> MyType_0
+newtype MyType_0 where
+    MyCons_1 :: GHC.Internal.Types.Bool -> MyType_0
 newtype MyType1_2 where
     MyCons1_3 :: GHC.Internal.Show.Show a_4 => a_4 ->
-                                               GHC.Types.Bool -> MyType_0
+                                               GHC.Internal.Types.Bool -> MyType_0
 newtype MyType2_5 a_6 where MyCons2_7 :: a_8 -> MyType_0
 newtype MyType3_9 a_10 where MyCons3_11 :: a_12 -> MyType_0
-newtype MyType4_13 = (:#_14) GHC.Types.Int
-newtype MyType5_15 where (:##_16) :: GHC.Types.Int -> MyType_0
+newtype MyType4_13 = (:#_14) GHC.Internal.Types.Int
+newtype MyType5_15 where
+    (:##_16) :: GHC.Internal.Types.Int -> MyType_0

@@ -1,23 +1,23 @@
 [1 of 4] Processing p
-  [1 of 2] Compiling H[sig]           ( p\H.hsig, nothing )
-  [2 of 2] Compiling M                ( p\M.hs, nothing )
+  [1 of 2] Compiling H[sig]           ( p/H.hsig, nothing )
+  [2 of 2] Compiling M                ( p/M.hs, nothing )
 [2 of 4] Processing q
-  [1 of 2] Compiling H2[sig]          ( q\H2.hsig, nothing )
-  [2 of 2] Compiling N                ( q\N.hs, nothing )
+  [1 of 2] Compiling H2[sig]          ( q/H2.hsig, nothing )
+  [2 of 2] Compiling N                ( q/N.hs, nothing )
 [3 of 4] Processing badimpl
   Instantiating badimpl
-  [1 of 1] Compiling H2               ( badimpl\H2.hs, bkpfail22.out\badimpl\H2.o )
+  [1 of 1] Compiling H2               ( badimpl/H2.hs, bkpfail22.out/badimpl/H2.o )
 [4 of 4] Processing check
   Instantiating check
   [1 of 2] Including q[H2=badimpl:H2]
     Instantiating q[H2=badimpl:H2]
-    [1 of 2] Compiling H2[sig]          ( q\H2.hsig, bkpfail22.out\q\q-FjwGsuDQ5qiKUCvnEATUA9\H2.o )
-
+    [1 of 2] Compiling H2[sig]          ( q/H2.hsig, bkpfail22.out/q/q-FjwGsuDQ5qiKUCvnEATUA9/H2.o )
 bkpfail22.bkp:16:9: error: [GHC-15843]
     • Type constructor ‘S’ has conflicting definitions in the module
       and its hsig file.
       Main module: type S :: *
                    type S = ()
         Hsig file: type S :: *
-                   type S = GHC.Types.Bool
+                   type S = GHC.Internal.Types.Bool
     • While checking that ‘badimpl:H2’ implements signature ‘H2’ in ‘q[H2=badimpl:H2]’.
+

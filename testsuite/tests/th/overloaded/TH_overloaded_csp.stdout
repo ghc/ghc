@@ -1,2 +1,2 @@
-ConE GHC.Tuple.()
-ConE GHC.Tuple.()
+ConE GHC.Internal.Tuple.()
+ConE GHC.Internal.Tuple.()

@@ -149,10 +149,10 @@ module GHC.Internal.Bignum.Integer
 #include "MachDeps.h"
 #include "WordSize.h"
 
-import GHC.Prim
-import GHC.Types
-import GHC.Classes
-import GHC.Magic
+import GHC.Internal.Prim
+import GHC.Internal.Types
+import GHC.Internal.Classes
+import GHC.Internal.Magic
 import GHC.Internal.Bignum.Primitives
 import GHC.Internal.Bignum.BigNat
 import GHC.Internal.Bignum.Natural

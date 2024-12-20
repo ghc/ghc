@@ -1,12 +1,12 @@
 type Int :: *
-data Int = GHC.Types.I# GHC.Prim.Int#
-  	-- Defined in ‘GHC.Types’
+data Int = GHC.Internal.Types.I# GHC.Internal.Prim.Int#
+  	-- Defined in ‘GHC.Internal.Types’
 instance Bounded Int -- Defined in ‘GHC.Internal.Enum’
 instance Read Int -- Defined in ‘GHC.Internal.Read’
 instance Enum Int -- Defined in ‘GHC.Internal.Enum’
+instance Eq Int -- Defined in ‘GHC.Internal.Classes’
 instance Integral Int -- Defined in ‘GHC.Internal.Real’
 instance Num Int -- Defined in ‘GHC.Internal.Num’
+instance Ord Int -- Defined in ‘GHC.Internal.Classes’
 instance Real Int -- Defined in ‘GHC.Internal.Real’
 instance Show Int -- Defined in ‘GHC.Internal.Show’
-instance Eq Int -- Defined in ‘GHC.Classes’
-instance Ord Int -- Defined in ‘GHC.Classes’

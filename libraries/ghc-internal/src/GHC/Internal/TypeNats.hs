@@ -56,11 +56,11 @@ module GHC.Internal.TypeNats
 
 import GHC.Internal.Base( Eq(..), Functor(..), Ord(..), WithDict(..), (.), otherwise
                , Void, errorWithoutStackTrace, (++))
-import GHC.Types
+import GHC.Internal.Types
 import GHC.Internal.Bignum.Natural(Natural)
 import GHC.Internal.Show(Show(..), appPrec, appPrec1, showParen, showString)
 import GHC.Internal.Read(Read(..))
-import GHC.Prim(Proxy#)
+import GHC.Internal.Prim(Proxy#)
 import GHC.Internal.Data.Either(Either(..))
 import GHC.Internal.Data.Maybe(Maybe(..))
 import GHC.Internal.Data.Proxy (Proxy(..))

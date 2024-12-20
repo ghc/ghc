@@ -32,7 +32,7 @@ T25180.hs:19:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         MkSolo :: forall a. a -> Solo a
           with MkSolo @a
           (imported from ‘Data.Tuple’ at T25180.hs:6:1-17
-           (and originally defined in ‘GHC.Tuple’))
+           (and originally defined in ‘GHC.Internal.Tuple’))
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @Solo @a
           (imported from ‘Prelude’ at T25180.hs:3:8-13
@@ -93,7 +93,7 @@ T25180.hs:45:9: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         utup1 :: a -> (# a #) (bound at T25180.hs:45:1)
         MkSolo# :: forall a. a -> (# a #)
           with MkSolo# @LiftedRep @a
-          (imported from ‘GHC.Types’ at T25180.hs:7:1-16)
+          (imported from ‘GHC.Internal.Types’ at T25180.hs:7:1-16)
 
 T25180.hs:52:9: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a -> b -> (# a, b #)

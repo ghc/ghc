@@ -1,7 +1,6 @@
-
 deriving-via-fail5.hs:8:1: error: [GHC-10283]
     • Couldn't match representation of type ‘a’ with that of ‘b’
-        arising from a use of ‘GHC.Prim.coerce’
+        arising from a use of ‘GHC.Internal.Prim.coerce’
       ‘a’ is a rigid type variable bound by
         the instance declaration
         at deriving-via-fail5.hs:(8,1)-(9,24)
@@ -9,12 +8,12 @@ deriving-via-fail5.hs:8:1: error: [GHC-10283]
         the instance declaration
         at deriving-via-fail5.hs:(8,1)-(9,24)
     • In the expression:
-        GHC.Prim.coerce
+        GHC.Internal.Prim.coerce
           @(Int -> Identity b -> ShowS) @(Int -> Foo4 a -> ShowS)
           (showsPrec @(Identity b))
       In an equation for ‘showsPrec’:
           showsPrec
-            = GHC.Prim.coerce
+            = GHC.Internal.Prim.coerce
                 @(Int -> Identity b -> ShowS) @(Int -> Foo4 a -> ShowS)
                 (showsPrec @(Identity b))
       When typechecking the code for ‘showsPrec’
@@ -27,7 +26,7 @@ deriving-via-fail5.hs:8:1: error: [GHC-10283]
 
 deriving-via-fail5.hs:8:1: error: [GHC-10283]
     • Couldn't match representation of type ‘a’ with that of ‘b’
-        arising from a use of ‘GHC.Prim.coerce’
+        arising from a use of ‘GHC.Internal.Prim.coerce’
       ‘a’ is a rigid type variable bound by
         the instance declaration
         at deriving-via-fail5.hs:(8,1)-(9,24)
@@ -35,11 +34,11 @@ deriving-via-fail5.hs:8:1: error: [GHC-10283]
         the instance declaration
         at deriving-via-fail5.hs:(8,1)-(9,24)
     • In the expression:
-        GHC.Prim.coerce
+        GHC.Internal.Prim.coerce
           @(Identity b -> String) @(Foo4 a -> String) (show @(Identity b))
       In an equation for ‘show’:
           show
-            = GHC.Prim.coerce
+            = GHC.Internal.Prim.coerce
                 @(Identity b -> String) @(Foo4 a -> String) (show @(Identity b))
       When typechecking the code for ‘show’
         in a derived instance for ‘Show (Foo4 a)’:
@@ -50,7 +49,7 @@ deriving-via-fail5.hs:8:1: error: [GHC-10283]
 
 deriving-via-fail5.hs:8:1: error: [GHC-10283]
     • Couldn't match representation of type ‘a’ with that of ‘b’
-        arising from a use of ‘GHC.Prim.coerce’
+        arising from a use of ‘GHC.Internal.Prim.coerce’
       ‘a’ is a rigid type variable bound by
         the instance declaration
         at deriving-via-fail5.hs:(8,1)-(9,24)
@@ -58,12 +57,12 @@ deriving-via-fail5.hs:8:1: error: [GHC-10283]
         the instance declaration
         at deriving-via-fail5.hs:(8,1)-(9,24)
     • In the expression:
-        GHC.Prim.coerce
+        GHC.Internal.Prim.coerce
           @([Identity b] -> ShowS) @([Foo4 a] -> ShowS)
           (showList @(Identity b))
       In an equation for ‘showList’:
           showList
-            = GHC.Prim.coerce
+            = GHC.Internal.Prim.coerce
                 @([Identity b] -> ShowS) @([Foo4 a] -> ShowS)
                 (showList @(Identity b))
       When typechecking the code for ‘showList’
@@ -72,3 +71,4 @@ deriving-via-fail5.hs:8:1: error: [GHC-10283]
       In the instance declaration for ‘Show (Foo4 a)’
     • Relevant bindings include
         showList :: [Foo4 a] -> ShowS (bound at deriving-via-fail5.hs:8:1)
+

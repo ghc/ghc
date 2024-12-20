@@ -162,7 +162,7 @@ import GHC.JS.Syntax
 
 import GHC.IfaceToCore  ( typecheckIface, typecheckWholeCoreBindings )
 
-import GHC.Iface.Load   ( ifaceStats, writeIface, flagsToIfCompression )
+import GHC.Iface.Load   ( ifaceStats, writeIface, flagsToIfCompression, getGhcPrimIface )
 import GHC.Iface.Make
 import GHC.Iface.Recomp
 import GHC.Iface.Tidy
@@ -1270,7 +1270,11 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
 
           liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
 
-          return $ HscUpdate iface
+          -- when compiling gHC_PRIM without generating code (e.g. with
+          -- Haddock), we still want the virtual interface in the cache
+          if ms_mod summary == gHC_PRIM
+            then return $ HscUpdate (getGhcPrimIface hsc_env)
+            else return $ HscUpdate iface
 
 
       -- We are not generating code or writing an interface with simplified core so we can skip simplification
@@ -1281,7 +1285,11 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
 
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
 
-        return $ HscUpdate iface
+        -- when compiling gHC_PRIM without generating code (e.g. with
+        -- Haddock), we still want the virtual interface in the cache
+        if ms_mod summary == gHC_PRIM
+          then return $ HscUpdate (getGhcPrimIface hsc_env)
+          else return $ HscUpdate iface
 
 {-
 Note [Writing interface files]

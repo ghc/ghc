@@ -1,22 +1,22 @@
 [1 of 3] Processing p
-  [1 of 2] Compiling H[sig]           ( p\H.hsig, nothing )
-  [2 of 2] Compiling A                ( p\A.hs, nothing )
+  [1 of 2] Compiling H[sig]           ( p/H.hsig, nothing )
+  [2 of 2] Compiling A                ( p/A.hs, nothing )
 [2 of 3] Processing qimpl
   Instantiating qimpl
-  [1 of 2] Compiling T                ( qimpl\T.hs, bkpfail06.out\qimpl\T.o )
-  [2 of 2] Compiling H                ( qimpl\H.hs, bkpfail06.out\qimpl\H.o )
+  [1 of 2] Compiling T                ( qimpl/T.hs, bkpfail06.out/qimpl/T.o )
+  [2 of 2] Compiling H                ( qimpl/H.hs, bkpfail06.out/qimpl/H.o )
 [3 of 3] Processing q
   Instantiating q
   [1 of 1] Including p[H=qimpl:H]
     Instantiating p[H=qimpl:H]
-    [1 of 2] Compiling H[sig]           ( p\H.hsig, bkpfail06.out\p\p-IueY0RdHDM2I4k0mLZuqM0\H.o )
-
+    [1 of 2] Compiling H[sig]           ( p/H.hsig, bkpfail06.out/p/p-IueY0RdHDM2I4k0mLZuqM0/H.o )
 bkpfail06.bkp:10:9: error: [GHC-15843]
     • Type constructor ‘T’ has conflicting definitions in the module
       and its hsig file.
       Main module: type T :: *
-                   data T = T GHC.Types.Bool
+                   data T = T GHC.Internal.Types.Bool
         Hsig file: type T :: *
-                   data T = T GHC.Types.Int
+                   data T = T GHC.Internal.Types.Int
       The constructors do not match: The types for ‘T’ differ.
     • While checking that ‘qimpl:H’ implements signature ‘H’ in ‘p[H=qimpl:H]’.
+

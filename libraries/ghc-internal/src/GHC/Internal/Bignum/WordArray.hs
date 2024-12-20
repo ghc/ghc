@@ -12,9 +12,9 @@
 
 module GHC.Internal.Bignum.WordArray where
 
-import GHC.Prim
-import GHC.Magic
-import GHC.Types
+import GHC.Internal.Prim
+import GHC.Internal.Magic
+import GHC.Internal.Types
 import GHC.Internal.Bignum.Primitives
 
 #include "MachDeps.h"

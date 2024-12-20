@@ -77,13 +77,15 @@ commonCppDefs_profiled = genCommonCppDefs True
 -- | Generate macros MK_TUP* for tuples sized 2+.
 genMkTup :: Bool -> Int -> ByteString
 genMkTup profiling n = mconcat
-  [ "#define MK_TUP", sn                                                          -- #define MK_TUPn
-  , "(", B.intercalate "," xs, ")"                                                -- (x1,x2,...)
-  , "(h$c", sn, "("                                                               -- (h$cn(
-  , bytesFS symbol, ","                                                           -- h$ghczmprimZCGHCziTupleziZnT_con_e,                                                                        -- ,
-  , B.intercalate "," $ map (\x -> "(" <> x <> ")") xs                            -- (x1),(x2),(...)
-  , if profiling then ",h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM" else "" -- ,h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM
-  , "))\n"                                                                        -- ))\n
+  [ "#define MK_TUP", sn                                        -- #define MK_TUPn
+  , "(", B.intercalate "," xs, ")"                              -- (x1,x2,...)
+  , "(h$c", sn, "("                                             -- (h$cn(
+  , bytesFS symbol, ","                                         -- h$ghczminternalZCGHCziInternalziTupleziZnT_con_e,
+  , B.intercalate "," $ map (\x -> "(" <> x <> ")") xs          -- (x1),(x2),(...)
+  , if profiling                                                -- ,h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM
+      then ",h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM"
+      else ""
+  , "))\n"                                                      -- ))\n
   ]
   where
     xs = take n $ map (("x" <>) . Char8.pack . show) ([1..] :: [Int])
@@ -154,20 +156,20 @@ genCommonCppDefs profiling = mconcat
       else "#define MK_JUST(val) (h$c1(h$ghczminternalZCGHCziInternalziMaybeziJust_con_e, (val)))\n"
 
   -- Data.List
-  , "#define HS_NIL h$ghczmprimZCGHCziTypesziZMZN\n"
-  , "#define HS_NIL_CON h$ghczmprimZCGHCziTypesziZMZN_con_e\n"
-  , "#define IS_CONS(cl) ((cl).f === h$ghczmprimZCGHCziTypesziZC_con_e)\n"
-  , "#define IS_NIL(cl) ((cl).f === h$ghczmprimZCGHCziTypesziZMZN_con_e)\n"
+  , "#define HS_NIL h$ghczminternalZCGHCziInternalziTypesziZMZN\n"
+  , "#define HS_NIL_CON h$ghczminternalZCGHCziInternalziTypesziZMZN_con_e\n"
+  , "#define IS_CONS(cl) ((cl).f === h$ghczminternalZCGHCziInternalziTypesziZC_con_e)\n"
+  , "#define IS_NIL(cl) ((cl).f === h$ghczminternalZCGHCziInternalziTypesziZMZN_con_e)\n"
   , "#define CONS_HEAD(cl) ((cl).d1)\n"
   , "#define CONS_TAIL(cl) ((cl).d2)\n"
   , if profiling
       then mconcat
-        [ "#define MK_CONS(head,tail) (h$c2(h$ghczmprimZCGHCziTypesziZC_con_e, (head), (tail), h$CCS_SYSTEM))\n"
-        , "#define MK_CONS_CC(head,tail,cc) (h$c2(h$ghczmprimZCGHCziTypesziZC_con_e, (head), (tail), (cc)))\n"
+        [ "#define MK_CONS(head,tail) (h$c2(h$ghczminternalZCGHCziInternalziTypesziZC_con_e, (head), (tail), h$CCS_SYSTEM))\n"
+        , "#define MK_CONS_CC(head,tail,cc) (h$c2(h$ghczminternalZCGHCziInternalziTypesziZC_con_e, (head), (tail), (cc)))\n"
         ]
       else mconcat
-        [ "#define MK_CONS(head,tail) (h$c2(h$ghczmprimZCGHCziTypesziZC_con_e, (head), (tail)))\n"
-        , "#define MK_CONS_CC(head,tail,cc) (h$c2(h$ghczmprimZCGHCziTypesziZC_con_e, (head), (tail)))\n"
+        [ "#define MK_CONS(head,tail) (h$c2(h$ghczminternalZCGHCziInternalziTypesziZC_con_e, (head), (tail)))\n"
+        , "#define MK_CONS_CC(head,tail,cc) (h$c2(h$ghczminternalZCGHCziInternalziTypesziZC_con_e, (head), (tail)))\n"
         ]
 
   -- Data.Text

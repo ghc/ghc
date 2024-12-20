@@ -23,7 +23,7 @@ module GHC.Internal.ConsoleHandler
         where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Types ()
+import GHC.Internal.Types ()
 #else /* whole file */
         ( Handler(..)
         , installHandler

@@ -1,7 +1,7 @@
 T12957.hs:4:5: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type ‘[GHC.Types.ZonkAny 0]’ not matched: []
+        Patterns of type ‘[GHC.Internal.Types.ZonkAny 0]’ not matched: []
 
 T12957.hs:4:16: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant

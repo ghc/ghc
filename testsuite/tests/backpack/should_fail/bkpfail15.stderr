@@ -11,8 +11,8 @@
 bkpfail15.bkp:8:9: error: [GHC-11890]
     • Identifier ‘f’ has conflicting definitions in the module
       and its hsig file.
-      Main module: f :: GHC.Types.Bool
-        Hsig file: f :: GHC.Types.Int
+      Main module: f :: GHC.Internal.Types.Bool
+        Hsig file: f :: GHC.Internal.Types.Int
       The two types are different.
     • While checking that ‘q:Q’ implements signature ‘Q’ in ‘p[A=<A>,Q=q:Q]’.
 

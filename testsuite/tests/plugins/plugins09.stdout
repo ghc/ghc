@@ -3,6 +3,6 @@ interfacePlugin: Prelude
 interfacePlugin: GHC.Internal.Base
 interfacePlugin: GHC.Internal.Data.NonEmpty
 interfacePlugin: GHC.Internal.Float
-interfacePlugin: GHC.Prim.Ext
+interfacePlugin: GHC.Internal.Prim.Ext
 typeCheckPlugin (rn)
 typeCheckPlugin (tc)

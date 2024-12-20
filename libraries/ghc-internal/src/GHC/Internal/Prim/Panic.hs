@@ -9,22 +9,27 @@
 -- | Primitive panics.
 --
 -- Users should not import this module.  It is GHC internal only.
-module GHC.Prim.Panic
+module GHC.Internal.Prim.Panic
    ( absentSumFieldError
    , panicError
    , absentError, absentConstraintError
    )
 where
 
-import GHC.Prim
-import GHC.Magic
-import GHC.Types( Type )
+import GHC.Internal.Prim
+import GHC.Internal.Magic
+import GHC.Internal.Types( Type )
 
 default () -- Double and Integer aren't available yet
 
 {-
 Note [Compiler error functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Note: this was written before the base/ghc-internal split and before ghc-prim
+was merged into ghc-internal. We could probably revisit this. See also
+W2 of Note [Tracking dependencies on primitives] in GHC.Internal.Base.
+
 Most error functions (such as pattern match failure) are defined
 in base:Control.Exception.Base.  But absentError# and absentSumFieldError#
 are defined here in the ghc-prim package for two reasons:

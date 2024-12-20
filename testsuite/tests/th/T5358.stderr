@@ -30,7 +30,7 @@ T5358.hs:10:21: error: [GHC-83865]
 
 T5358.hs:14:12: error: [GHC-87897]
     • Exception when trying to run compile-time code:
-        runTest called error: forall {t_0 :: *} . t_0 -> GHC.Types.Bool
+        runTest called error: forall {t_0 :: *} . t_0 -> GHC.Internal.Types.Bool
       Code: (do VarI _ t _ <- reify (mkName "prop_x1")
                 error $ ("runTest called error: " ++ pprint t))
     • In the untyped splice:

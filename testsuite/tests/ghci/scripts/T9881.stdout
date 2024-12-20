@@ -10,11 +10,11 @@ instance Semigroup Data.ByteString.Lazy.ByteString
   -- Defined in ‘Data.ByteString.Lazy.Internal’
 instance Read Data.ByteString.Lazy.ByteString
   -- Defined in ‘Data.ByteString.Lazy.Internal’
-instance Show Data.ByteString.Lazy.ByteString
-  -- Defined in ‘Data.ByteString.Lazy.Internal’
 instance Eq Data.ByteString.Lazy.ByteString
   -- Defined in ‘Data.ByteString.Lazy.Internal’
 instance Ord Data.ByteString.Lazy.ByteString
+  -- Defined in ‘Data.ByteString.Lazy.Internal’
+instance Show Data.ByteString.Lazy.ByteString
   -- Defined in ‘Data.ByteString.Lazy.Internal’
 
 type Data.ByteString.ByteString :: *
@@ -29,9 +29,9 @@ instance Semigroup Data.ByteString.ByteString
   -- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’
 instance Read Data.ByteString.ByteString
   -- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’
-instance Show Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’
 instance Eq Data.ByteString.ByteString
   -- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’
 instance Ord Data.ByteString.ByteString
+  -- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’
+instance Show Data.ByteString.ByteString
   -- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’

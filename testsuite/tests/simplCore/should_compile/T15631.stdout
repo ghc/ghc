@@ -3,4 +3,4 @@
           = case GHC.Internal.List.$wlenAcc
       case ys of {
                  case Foo.$wf @a xs of ww [Occ=Once1] { __DEFAULT ->
-      case Foo.$wf @a xs of ww { __DEFAULT -> GHC.Types.I# ww }
+      case Foo.$wf @a xs of ww { __DEFAULT -> GHC.Internal.Types.I# ww }

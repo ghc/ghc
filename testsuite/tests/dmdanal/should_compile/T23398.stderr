@@ -42,8 +42,8 @@ Rec {
 -- RHS size: {terms: 21, types: 19, coercions: 3, joins: 0/0}
 T23398.$wbar [InlPrag=[2], Occ=LoopBreaker]
   :: forall a b.
-     (a GHC.Prim.~# b, Show a) =>
-     GHC.Prim.Int# -> a -> (# b, String #)
+     (a GHC.Internal.Prim.~# b, Show a) =>
+     GHC.Internal.Prim.Int# -> a -> (# b, String #)
 [GblId[StrictWorker([~, !])],
  Arity=4,
  Str=<L><SP(A,SC(S,L),A)><1L><L>,
@@ -51,14 +51,19 @@ T23398.$wbar [InlPrag=[2], Occ=LoopBreaker]
 T23398.$wbar
   = \ (@a)
       (@b)
-      (ww :: a GHC.Prim.~# b)
+      (ww :: a GHC.Internal.Prim.~# b)
       ($dShow :: Show a)
-      (ww1 :: GHC.Prim.Int#)
+      (ww1 :: GHC.Internal.Prim.Int#)
       (eta :: a) ->
       case ww1 of ds {
         __DEFAULT ->
           T23398.$wbar
-            @a @b @~(ww :: a GHC.Prim.~# b) $dShow (GHC.Prim.-# ds 1#) eta;
+            @a
+            @b
+            @~(ww :: a GHC.Internal.Prim.~# b)
+            $dShow
+            (GHC.Internal.Prim.-# ds 1#)
+            eta;
         0# -> (# eta `cast` (Sub ww :: a ~R# b), show @a $dShow eta #)
       }
 end Rec }
@@ -79,9 +84,10 @@ bar [InlPrag=[2]]
                  ($dShow [Occ=Once1] :: Show a)
                  (eta [Occ=Once1!] :: Int)
                  (eta1 [Occ=Once1] :: a) ->
-                 case $d~ of { GHC.Types.Eq# ww ->
-                 case eta of { GHC.Types.I# ww1 [Occ=Once1] ->
-                 case T23398.$wbar @a @b @~(ww :: a GHC.Prim.~# b) $dShow ww1 eta1
+                 case $d~ of { GHC.Internal.Types.Eq# ww ->
+                 case eta of { GHC.Internal.Types.I# ww1 [Occ=Once1] ->
+                 case T23398.$wbar
+                        @a @b @~(ww :: a GHC.Internal.Prim.~# b) $dShow ww1 eta1
                  of
                  { (# ww2 [Occ=Once1], ww3 [Occ=Once1] #) ->
                  (ww2, ww3)
@@ -95,9 +101,10 @@ bar
       ($dShow :: Show a)
       (eta :: Int)
       (eta1 :: a) ->
-      case $d~ of { GHC.Types.Eq# ww ->
-      case eta of { GHC.Types.I# ww1 ->
-      case T23398.$wbar @a @b @~(ww :: a GHC.Prim.~# b) $dShow ww1 eta1
+      case $d~ of { GHC.Internal.Types.Eq# ww ->
+      case eta of { GHC.Internal.Types.I# ww1 ->
+      case T23398.$wbar
+             @a @b @~(ww :: a GHC.Internal.Prim.~# b) $dShow ww1 eta1
       of
       { (# ww2, ww3 #) ->
       (ww2, ww3)

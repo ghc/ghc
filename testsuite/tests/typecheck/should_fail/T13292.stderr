@@ -14,15 +14,15 @@ T13292a.hs:4:12: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
       In an equation for ‘someFunc’: someFunc = return ()
 
 T13292.hs:6:1: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘GHC.Types.ZonkAny 0’ with ‘IO’
+    • Couldn't match type ‘GHC.Internal.Types.ZonkAny 0’ with ‘IO’
       Expected: IO ()
-        Actual: GHC.Types.ZonkAny 0 ()
+        Actual: GHC.Internal.Types.ZonkAny 0 ()
     • When checking the type of the IO action ‘main’
 
 T13292.hs:6:1: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘GHC.Types.ZonkAny 0’ with ‘IO’
+    • Couldn't match type ‘GHC.Internal.Types.ZonkAny 0’ with ‘IO’
       Expected: IO ()
-        Actual: GHC.Types.ZonkAny 0 ()
+        Actual: GHC.Internal.Types.ZonkAny 0 ()
     • In the expression: main
       When checking the type of the IO action ‘main’
 

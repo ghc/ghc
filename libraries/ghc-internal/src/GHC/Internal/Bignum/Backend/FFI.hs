@@ -15,8 +15,8 @@
 -- providing the implementation.
 module GHC.Internal.Bignum.Backend.FFI where
 
-import GHC.Prim
-import GHC.Types
+import GHC.Internal.Prim
+import GHC.Internal.Types
 import GHC.Internal.Bignum.WordArray
 import GHC.Internal.Bignum.Primitives
 import qualified GHC.Internal.Bignum.Backend.Native as Native
@@ -25,8 +25,8 @@ import {-# SOURCE #-} GHC.Internal.Bignum.Integer
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 -- (This module uses the empty tuple () and string literals.)
-import GHC.Tuple ()
-import GHC.CString ()
+import GHC.Internal.Tuple ()
+import GHC.Internal.CString ()
 
 default ()
 

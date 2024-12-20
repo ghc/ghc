@@ -8,13 +8,13 @@
   [1 of 1] Including sig[Sig=impl:Impl]
     Instantiating sig[Sig=impl:Impl]
     [1 of 1] Compiling Sig[sig]         ( sig/Sig.hsig, RepPolyBackpack3.out/sig/sig-Absk5cIXTXe6UYhGMYGber/Sig.o )
-
 RepPolyBackpack3.bkp:17:5: error: [GHC-15843]
     • Type constructor ‘Rep’ has conflicting definitions in the module
       and its hsig file.
-      Main module: type Rep :: GHC.Types.RuntimeRep
+      Main module: type Rep :: GHC.Internal.Types.RuntimeRep
                    type Rep = T
-        Hsig file: type Rep :: GHC.Types.RuntimeRep
+        Hsig file: type Rep :: GHC.Internal.Types.RuntimeRep
                    data Rep
       Illegal implementation of abstract data: Invalid type family ‘T’.
     • While checking that ‘impl:Impl’ implements signature ‘Sig’ in ‘sig[Sig=impl:Impl]’.
+

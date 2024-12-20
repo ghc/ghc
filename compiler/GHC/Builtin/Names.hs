@@ -548,16 +548,15 @@ genericTyConNames = [
 gHC_PRIM, gHC_PRIM_PANIC,
     gHC_TYPES, gHC_INTERNAL_DATA_DATA, gHC_MAGIC, gHC_MAGIC_DICT,
     gHC_CLASSES, gHC_PRIMOPWRAPPERS :: Module
-gHC_PRIM           = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
-gHC_PRIM_PANIC     = mkPrimModule (fsLit "GHC.Prim.Panic")
-gHC_TYPES          = mkPrimModule (fsLit "GHC.Types")
-gHC_MAGIC          = mkPrimModule (fsLit "GHC.Magic")
-gHC_MAGIC_DICT     = mkPrimModule (fsLit "GHC.Magic.Dict")
-gHC_CSTRING        = mkPrimModule (fsLit "GHC.CString")
-gHC_CLASSES        = mkPrimModule (fsLit "GHC.Classes")
-gHC_PRIMOPWRAPPERS = mkPrimModule (fsLit "GHC.PrimopWrappers")
-
-gHC_INTERNAL_TUPLE                  = mkPrimModule (fsLit "GHC.Tuple")
+gHC_PRIM           = mkGhcInternalModule (fsLit "GHC.Internal.Prim")   -- Primitive types and values
+gHC_PRIM_PANIC     = mkGhcInternalModule (fsLit "GHC.Internal.Prim.Panic")
+gHC_TYPES          = mkGhcInternalModule (fsLit "GHC.Internal.Types")
+gHC_MAGIC          = mkGhcInternalModule (fsLit "GHC.Internal.Magic")
+gHC_MAGIC_DICT     = mkGhcInternalModule (fsLit "GHC.Internal.Magic.Dict")
+gHC_CSTRING        = mkGhcInternalModule (fsLit "GHC.Internal.CString")
+gHC_CLASSES        = mkGhcInternalModule (fsLit "GHC.Internal.Classes")
+gHC_PRIMOPWRAPPERS = mkGhcInternalModule (fsLit "GHC.Internal.PrimopWrappers")
+gHC_INTERNAL_TUPLE = mkGhcInternalModule (fsLit "GHC.Internal.Tuple")
 
 gHC_INTERNAL_CONTROL_MONAD_ZIP :: Module
 gHC_INTERNAL_CONTROL_MONAD_ZIP  = mkGhcInternalModule (fsLit "GHC.Internal.Control.Monad.Zip")
@@ -671,9 +670,6 @@ mkInteractiveModule n = mkModule interactiveUnit (mkModuleName ("Ghci" ++ n))
 pRELUDE_NAME, mAIN_NAME :: ModuleName
 pRELUDE_NAME   = mkModuleNameFS (fsLit "Prelude")
 mAIN_NAME      = mkModuleNameFS (fsLit "Main")
-
-mkPrimModule :: FastString -> Module
-mkPrimModule m = mkModule primUnit (mkModuleNameFS m)
 
 mkGhcInternalModule :: FastString -> Module
 mkGhcInternalModule m = mkGhcInternalModule_ (mkModuleNameFS m)

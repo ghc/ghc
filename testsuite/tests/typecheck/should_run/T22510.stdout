@@ -1,16 +1,16 @@
-Levity: GHC.Types
-'Lifted: GHC.Types
-RuntimeRep: GHC.Types
-'IntRep: GHC.Types
-'BoxedRep: GHC.Types
-'Lifted: GHC.Types
-VecCount: GHC.Types
-'Vec2: GHC.Types
-VecElem: GHC.Types
-'Int8ElemRep: GHC.Types
-((),()): GHC.Tuple
-(# (),() #): GHC.Types
-Int64#: GHC.Prim
-Word64#: GHC.Prim
-TYPE: GHC.Prim
-CONSTRAINT: GHC.Prim
+Levity: GHC.Internal.Types
+'Lifted: GHC.Internal.Types
+RuntimeRep: GHC.Internal.Types
+'IntRep: GHC.Internal.Types
+'BoxedRep: GHC.Internal.Types
+'Lifted: GHC.Internal.Types
+VecCount: GHC.Internal.Types
+'Vec2: GHC.Internal.Types
+VecElem: GHC.Internal.Types
+'Int8ElemRep: GHC.Internal.Types
+((),()): GHC.Internal.Tuple
+(# (),() #): GHC.Internal.Types
+Int64#: GHC.Internal.Prim
+Word64#: GHC.Internal.Prim
+TYPE: GHC.Internal.Prim
+CONSTRAINT: GHC.Internal.Prim

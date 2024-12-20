@@ -43,7 +43,7 @@ function h$stl(o, xs, t, ccs) {
 #else
 function h$stl(o, xs, t) {
 #endif
-    var r = t ? t : h$ghczmprimZCGHCziTypesziZMZN;
+    var r = t ? t : h$ghczminternalZCGHCziInternalziTypesziZMZN;
     var x;
     if(xs.length > 0) {
         for(var i=xs.length-1;i>=0;i--) {
@@ -66,9 +66,9 @@ function h$stl(o, xs, t) {
 // when profiling, the current ccs is assigned
 
 // #ifdef GHCJS_PROF
-// var h$nil = h$c(h$ghczmprimZCGHCziTypesziZMZN_con_e, h$CCS_SYSTEM);
+// var h$nil = h$c(h$ghczminternalZCGHCziInternalziTypesziZMZN_con_e, h$CCS_SYSTEM);
 // #else
-// var h$nil = h$c(h$ghczmprimZCGHCziTypesziZMZN_con_e);
+// var h$nil = h$c(h$ghczminternalZCGHCziInternalziTypesziZMZN_con_e);
 // #endif
 
 // #ifdef GHCJS_PROF

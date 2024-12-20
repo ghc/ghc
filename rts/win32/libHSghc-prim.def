@@ -1,14 +1,14 @@
 
-LIBRARY "libHSghc-prim-@LibVersion@-ghc@ProjectVersion@.dll"
+LIBRARY "libHSghc-internal-@LibVersion@-ghc@ProjectVersion@.dll"
 
 EXPORTS
 
-	ghczmprim_GHCziTypes_True_closure
-	ghczmprim_GHCziTypes_False_closure
-	ghczmprim_GHCziTypes_Czh_con_info
-	ghczmprim_GHCziTypes_Izh_con_info
-	ghczmprim_GHCziTypes_Fzh_con_info
-	ghczmprim_GHCziTypes_Dzh_con_info
-	ghczmprim_GHCziTypes_Wzh_con_info
-	ghczmprim_GHCziTypes_Czh_static_info
-	ghczmprim_GHCziTypes_Izh_static_info
+	ghczminternal_GHCziInternalziTypes_True_closure
+	ghczminternal_GHCziInternalziTypes_False_closure
+	ghczminternal_GHCziInternalziTypes_Czh_con_info
+	ghczminternal_GHCziInternalziTypes_Izh_con_info
+	ghczminternal_GHCziInternalziTypes_Fzh_con_info
+	ghczminternal_GHCziInternalziTypes_Dzh_con_info
+	ghczminternal_GHCziInternalziTypes_Wzh_con_info
+	ghczminternal_GHCziInternalziTypes_Czh_static_info
+	ghczminternal_GHCziInternalziTypes_Izh_static_info

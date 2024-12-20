@@ -5,23 +5,23 @@
 -- | Primitive exceptions.
 --
 -- Users should not import this module.  It is GHC internal only.
-module GHC.Prim.Exception
+module GHC.Internal.Prim.Exception
    ( raiseOverflow
    , raiseUnderflow
    , raiseDivZero
    )
 where
 
-import GHC.Prim
+import GHC.Internal.Prim
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Types ()
+import GHC.Internal.Types ()
 
 default () -- Double and Integer aren't available yet
 
 -- Note [Arithmetic exceptions]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- ghc-prim provides several functions to raise arithmetic exceptions
+-- ghc-internal provides several functions to raise arithmetic exceptions
 -- (raiseDivZero, raiseUnderflow, raiseOverflow) that are wired-in the RTS.
 -- These exceptions are meant to be used by the package implementing arbitrary
 -- precision numbers (Natural,Integer). It can't depend on `base` package to

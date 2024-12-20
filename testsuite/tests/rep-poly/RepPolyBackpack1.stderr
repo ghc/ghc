@@ -1,7 +1,6 @@
 [1 of 1] Processing number-unknown
-  [1 of 2] Compiling NumberUnknown[sig] ( number-unknown\NumberUnknown.hsig, nothing )
-  [2 of 2] Compiling NumberStuff      ( number-unknown\NumberStuff.hs, nothing )
-
+  [1 of 2] Compiling NumberUnknown[sig] ( number-unknown/NumberUnknown.hsig, nothing )
+  [2 of 2] Compiling NumberStuff      ( number-unknown/NumberStuff.hs, nothing )
 RepPolyBackpack1.bkp:17:5: error: [GHC-55287]
     The second pattern in the equation for ‘funcA’
     does not have a fixed runtime representation.
@@ -12,8 +11,9 @@ RepPolyBackpack1.bkp:17:17: error: [GHC-55287]
     • The argument ‘x’ of ‘plus’
       does not have a fixed runtime representation.
       Its type is:
-        Number GHC.Types.Lifted :: TYPE (Rep l0)
+        Number GHC.Internal.Types.Lifted :: TYPE (Rep l0)
       Cannot unify ‘l’ with the type variable ‘l0’
       because the former is not a concrete ‘Levity’.
     • In the expression: plus x (multiply x y)
       In an equation for ‘funcA’: funcA x y = plus x (multiply x y)
+

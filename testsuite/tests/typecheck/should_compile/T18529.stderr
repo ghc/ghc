@@ -6,36 +6,41 @@ TYPE CONSTRUCTORS
 COERCION AXIOMS
   axiom Bug.N:C :: forall a b. C a b = a -> b -> ()
 Dependent modules: []
-Dependent packages: [base-4.18.0.0]
+Dependent packages: [base-4.20.0.0]
 
 ==================== Typechecker ====================
 Bug.$tcC
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       12754692886077552850#Word64 18375870125396612007#Word64
-      Bug.$trModule (GHC.Types.TrNameS "C"#) 0# $krep
+      Bug.$trModule (GHC.Internal.Types.TrNameS "C"#) 0# $krep
 Bug.$tc'C:C
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       302756782745842909#Word64 14248103394115774781#Word64 Bug.$trModule
-      (GHC.Types.TrNameS "'C:C"#) 2# $krep
+      (GHC.Internal.Types.TrNameS "'C:C"#) 2# $krep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
+  = GHC.Internal.Types.KindRepTyConApp
       Bug.$tcC
-      ((:) @GHC.Types.KindRep
-         $krep ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep))
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
+      ((:) @GHC.Internal.Types.KindRep
+         $krep
+         ((:) @GHC.Internal.Types.KindRep
+            $krep [] @GHC.Internal.Types.KindRep))
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 1
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun GHC.Types.krep$* GHC.Types.krep$Constraint
+  = GHC.Internal.Types.KindRepFun GHC.Internal.Types.krep$* $krep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
-      GHC.Tuple.$tcUnit [] @GHC.Types.KindRep
+  = GHC.Internal.Types.KindRepFun
+      GHC.Internal.Types.krep$* GHC.Internal.Types.krep$Constraint
+$krep [InlPrag=[~]]
+  = GHC.Internal.Types.KindRepTyConApp
+      GHC.Internal.Tuple.$tcUnit [] @GHC.Internal.Types.KindRep
 Bug.$trModule
-  = GHC.Types.Module
-      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Bug"#)
+  = GHC.Internal.Types.Module
+      (GHC.Internal.Types.TrNameS "main"#)
+      (GHC.Internal.Types.TrNameS "Bug"#)
 AbsBinds [a, b] [$dC, $dNum]
   {Exports: [foo <= foo
                wrap: <>]

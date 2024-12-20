@@ -1,10 +1,9 @@
-
 T15883b.hs:14:1: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from a use of ‘==’
       prevents the constraint ‘(Eq a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance Eq Ordering -- Defined in ‘GHC.Classes’
+        instance Eq Ordering -- Defined in ‘GHC.Internal.Classes’
         instance Eq (Foo LiftedRep) -- Defined at T15883b.hs:14:1
         ...plus 24 others
         ...plus five instances involving out-of-scope types
@@ -15,3 +14,4 @@ T15883b.hs:14:1: error: [GHC-39999]
         in a derived instance for ‘Eq (Foo LiftedRep)’:
         To see the code I am typechecking, use -ddump-deriv
       In the instance declaration for ‘Eq (Foo LiftedRep)’
+

@@ -1,28 +1,30 @@
 
 ==================== Derived instances ====================
 Derived class instances:
-  instance GHC.Classes.Eq T17240.Nullary where
-    (GHC.Classes.==) a b
-      = case (GHC.Magic.dataToTag# a) of
+  instance GHC.Internal.Classes.Eq T17240.Nullary where
+    (GHC.Internal.Classes.==) a b
+      = case (GHC.Internal.Magic.dataToTag# a) of
           a#
-            -> case (GHC.Magic.dataToTag# b) of
-                 b# -> (GHC.Prim.tagToEnum# (a# GHC.Prim.==# b#))
+            -> case (GHC.Internal.Magic.dataToTag# b) of
+                 b# -> (GHC.Internal.Prim.tagToEnum# (a# GHC.Internal.Prim.==# b#))
   
-  instance GHC.Classes.Eq T17240.T where
-    (GHC.Classes.==) a b
+  instance GHC.Internal.Classes.Eq T17240.T where
+    (GHC.Internal.Classes.==) a b
       = case
-            (case (GHC.Magic.dataToTag# a) of
-               a# -> case (GHC.Magic.dataToTag# b) of b# -> a# GHC.Prim./=# b#)
+            (case (GHC.Internal.Magic.dataToTag# a) of
+               a#
+                 -> case (GHC.Internal.Magic.dataToTag# b) of
+                      b# -> a# GHC.Internal.Prim./=# b#)
         of
-          1# -> GHC.Types.False
+          1# -> GHC.Internal.Types.False
           _ -> case a of
                  (T17240.B a1)
-                   -> case b of (T17240.B b1) -> ((a1 GHC.Classes.== b1))
+                   -> case b of (T17240.B b1) -> ((a1 GHC.Internal.Classes.== b1))
                  (T17240.C a1)
-                   -> case b of (T17240.C b1) -> ((a1 GHC.Classes.== b1))
+                   -> case b of (T17240.C b1) -> ((a1 GHC.Internal.Classes.== b1))
                  (T17240.D a1)
-                   -> case b of (T17240.D b1) -> ((a1 GHC.Classes.== b1))
-                 _ -> GHC.Types.True
+                   -> case b of (T17240.D b1) -> ((a1 GHC.Internal.Classes.== b1))
+                 _ -> GHC.Internal.Types.True
   
 
 Derived type family instances:
@@ -30,13 +32,14 @@ Derived type family instances:
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Eq [T17240.Nullary]
-  (GHC.Classes./=) = GHC.Classes.$dm/= @T17240.Nullary
+GHC.Internal.Classes.Eq [T17240.Nullary]
+  (GHC.Internal.Classes./=)
+    = GHC.Internal.Classes.$dm/= @T17240.Nullary
 
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Eq [T17240.T]
-  (GHC.Classes./=) = GHC.Classes.$dm/= @T17240.T
+GHC.Internal.Classes.Eq [T17240.T]
+  (GHC.Internal.Classes./=) = GHC.Internal.Classes.$dm/= @T17240.T
 
 

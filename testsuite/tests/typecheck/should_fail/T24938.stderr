@@ -1,5 +1,5 @@
 T24938.hs:30:16: error: [GHC-25897]
-    • Could not deduce ‘p ~ GHC.Types.Bool’
+    • Could not deduce ‘p ~ GHC.Internal.Types.Bool’
       from the context: Nt String ~ Mt Int
         bound by a pattern with constructor:
                    Refl :: forall {k} (a :: k). Eq a a,

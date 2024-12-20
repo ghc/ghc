@@ -25,7 +25,7 @@ module GHC.Internal.Data.Tuple
   , swap
   ) where
 
-import GHC.Tuple (Solo (..), getSolo)
+import GHC.Internal.Tuple (Solo (..), getSolo)
 
 default ()              -- Double isn't available yet
 

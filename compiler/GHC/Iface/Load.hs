@@ -36,6 +36,8 @@ module GHC.Iface.Load (
         pprModIfaceSimple,
         ifaceStats, pprModIface, showIface,
 
+        getGhcPrimIface,
+
         module Iface_Errors -- avoids boot files in Ppr modules
    ) where
 
@@ -1012,7 +1014,6 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
       mhome_unit  = hsc_home_unit_maybe hsc_env
       dflags     = hsc_dflags hsc_env
       logger     = hsc_logger hsc_env
-      hooks      = hsc_hooks hsc_env
       other_fopts = initFinderOpts . homeUnitEnv_dflags <$> (hsc_HUG hsc_env)
 
 
@@ -1029,9 +1030,7 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
   -- TODO: make this check a function
   if mod `installedModuleEq` gHC_PRIM
       then do
-          let iface = case ghcPrimIfaceHook hooks of
-                       Nothing -> ghcPrimIface
-                       Just h  -> h
+          let iface = getGhcPrimIface hsc_env
           return (Succeeded (iface, panic "GHC.Prim ModLocation (findAndReadIface)"))
       else do
           let fopts = initFinderOpts dflags
@@ -1391,3 +1390,15 @@ instance Outputable WhereFrom where
   ppr (ImportByUser NotBoot)               = empty
   ppr ImportBySystem                       = text "{- SYSTEM -}"
   ppr ImportByPlugin                       = text "{- PLUGIN -}"
+
+
+-- | Get gHC_PRIM interface file
+--
+-- This is a helper function that takes into account the hook allowing ghc-prim
+-- interface to be extended via the ghc-api. Afaik it was introduced for GHCJS
+-- so that it can add its own primitive types.
+getGhcPrimIface :: HscEnv -> ModIface
+getGhcPrimIface hsc_env =
+  case ghcPrimIfaceHook (hsc_hooks hsc_env) of
+    Nothing -> ghcPrimIface
+    Just h  -> h

@@ -1,6 +1,6 @@
 Collecting type info for 1 module(s) ... 
-T20150.hs:(7,1)-(7,3): GHC.Internal.StaticPtr.StaticPtr GHC.Types.Int
-T20150.hs:(7,14)-(7,14): GHC.Types.Int
-T20150.hs:(7,7)-(7,14): GHC.Internal.StaticPtr.StaticPtr GHC.Types.Int
-T20150.hs:(7,7)-(7,14): GHC.Internal.StaticPtr.StaticPtr GHC.Types.Int -> GHC.Internal.StaticPtr.StaticPtr GHC.Types.Int
-T20150.hs:(7,7)-(7,14): GHC.Internal.StaticPtr.StaticPtr GHC.Types.Int
+T20150.hs:(7,1)-(7,3): GHC.Internal.StaticPtr.StaticPtr GHC.Internal.Types.Int
+T20150.hs:(7,14)-(7,14): GHC.Internal.Types.Int
+T20150.hs:(7,7)-(7,14): GHC.Internal.StaticPtr.StaticPtr GHC.Internal.Types.Int
+T20150.hs:(7,7)-(7,14): GHC.Internal.StaticPtr.StaticPtr GHC.Internal.Types.Int -> GHC.Internal.StaticPtr.StaticPtr GHC.Internal.Types.Int
+T20150.hs:(7,7)-(7,14): GHC.Internal.StaticPtr.StaticPtr GHC.Internal.Types.Int

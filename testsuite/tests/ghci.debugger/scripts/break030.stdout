@@ -2,15 +2,17 @@ Breakpoint 0 activated at InlinedBreakpoint1.hs:10:7-31
 optimized
 Stopped in InlinedBreakpoint1.inl, InlinedBreakpoint1.hs:10:7-31
 _result ::
-  GHC.Prim.State# GHC.Prim.RealWorld
-  -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #) = _
+  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+        () #) = _
 interpretation
 done
 Breakpoint 1 activated at InlinedBreakpoint1.hs:10:7-31
 optimized
 Stopped in InlinedBreakpoint1.inl, InlinedBreakpoint1.hs:10:7-31
 _result ::
-  GHC.Prim.State# GHC.Prim.RealWorld
-  -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #) = _
+  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+        () #) = _
 interpretation
 done

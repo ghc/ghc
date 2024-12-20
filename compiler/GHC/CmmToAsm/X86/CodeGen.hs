@@ -64,7 +64,7 @@ import GHC.Platform
 -- Our intermediate code:
 import GHC.Types.Basic
 import GHC.Cmm.BlockId
-import GHC.Unit.Types ( primUnitId )
+import GHC.Unit.Types ( ghcInternalUnitId )
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Cmm
@@ -3445,7 +3445,7 @@ genPrimCCall
 genPrimCCall bid lbl_txt dsts args = do
   config <- getConfig
   -- FIXME: we should use mkForeignLabel instead of mkCmmCodeLabel
-  let lbl = mkCmmCodeLabel primUnitId lbl_txt
+  let lbl = mkCmmCodeLabel ghcInternalUnitId lbl_txt
   addr <- cmmMakeDynamicReference config CallReference lbl
   let conv = ForeignConvention CCallConv [] [] CmmMayReturn
   genCCall bid addr conv dsts args

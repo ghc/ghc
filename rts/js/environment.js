@@ -435,18 +435,18 @@ var h$__hscore_localtime_r = h$localtime_r;
 
 function h$checkForeignRefs(refs) {
   function argSize(t) {
-    if(t === "ghc-prim:GHC.Prim.Word64#")    return 2;
-    if(t === "ghc-prim:GHC.Prim.State#")     return 0;
-    if(t === "ghc-prim:GHC.Prim.Void#")      return 0;
-    if(t === "ghc-prim:GHC.Prim.Int#")       return 1;
-    if(t === "ghc-prim:GHC.Prim.Int64#")     return 2;
-    if(t === "ghc-prim:GHC.Prim.Weak#")      return 1;
-    if(t === "ghc-prim:GHC.Prim.Addr#")      return 2;
-    if(t === "ghc-prim:GHC.Prim.Word#")      return 1;
-    if(t === "ghc-prim:GHC.Prim.Float#")     return 1;
-    if(t === "ghc-prim:GHC.Prim.Double#")    return 1;
-    if(t === "ghc-prim:GHC.Prim.ByteArray#") return 2;
-    if(t === "ghc-prim:GHC.Prim.ThreadId#")  return 1;
+    if(t === "ghc-internal:GHC.Internal.Prim.Word64#")    return 2;
+    if(t === "ghc-internal:GHC.Internal.Prim.State#")     return 0;
+    if(t === "ghc-internal:GHC.Internal.Prim.Void#")      return 0;
+    if(t === "ghc-internal:GHC.Internal.Prim.Int#")       return 1;
+    if(t === "ghc-internal:GHC.Internal.Prim.Int64#")     return 2;
+    if(t === "ghc-internal:GHC.Internal.Prim.Weak#")      return 1;
+    if(t === "ghc-internal:GHC.Internal.Prim.Addr#")      return 2;
+    if(t === "ghc-internal:GHC.Internal.Prim.Word#")      return 1;
+    if(t === "ghc-internal:GHC.Internal.Prim.Float#")     return 1;
+    if(t === "ghc-internal:GHC.Internal.Prim.Double#")    return 1;
+    if(t === "ghc-internal:GHC.Internal.Prim.ByteArray#") return 2;
+    if(t === "ghc-internal:GHC.Internal.Prim.ThreadId#")  return 1;
     console.warn("unknown argument type: " + t);
     return 1;
   }
@@ -471,7 +471,7 @@ function h$checkForeignRefs(refs) {
       for(var i = 0; i < r.arguments.length; i++) {
         var a = r.arguments[i];
         s  += argSize(a);
-        ba += a === "ghc-prim:GHC.Prim.ByteArray#" ? 1 : 0;
+        ba += a === "ghc-internal:GHC.Internal.Prim.ByteArray#" ? 1 : 0;
       }
       if(f.length != s) {
         console.warn("number of arguments does not seem to match: " + callStr(r));

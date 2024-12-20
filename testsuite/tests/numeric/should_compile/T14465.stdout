@@ -12,7 +12,7 @@ ten :: Natural
 ten = GHC.Internal.Bignum.Natural.NS 10##
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-M.$trModule4 :: GHC.Prim.Addr#
+M.$trModule4 :: GHC.Internal.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -20,15 +20,15 @@ M.$trModule4 :: GHC.Prim.Addr#
 M.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-M.$trModule3 :: GHC.Types.TrName
+M.$trModule3 :: GHC.Internal.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-M.$trModule3 = GHC.Types.TrNameS M.$trModule4
+M.$trModule3 = GHC.Internal.Types.TrNameS M.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-M.$trModule2 :: GHC.Prim.Addr#
+M.$trModule2 :: GHC.Internal.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -36,20 +36,20 @@ M.$trModule2 :: GHC.Prim.Addr#
 M.$trModule2 = "M"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-M.$trModule1 :: GHC.Types.TrName
+M.$trModule1 :: GHC.Internal.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-M.$trModule1 = GHC.Types.TrNameS M.$trModule2
+M.$trModule1 = GHC.Internal.Types.TrNameS M.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-M.$trModule :: GHC.Types.Module
+M.$trModule :: GHC.Internal.Types.Module
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-M.$trModule = GHC.Types.Module M.$trModule3 M.$trModule1
+M.$trModule = GHC.Internal.Types.Module M.$trModule3 M.$trModule1
 
 -- RHS size: {terms: 1, types: 1, coercions: 0, joins: 0/0}
 minusOne :: Natural
@@ -59,7 +59,7 @@ minusOne :: Natural
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=False, ConLike=False, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
-minusOne = GHC.Prim.Exception.raiseUnderflow @Natural
+minusOne = GHC.Internal.Prim.Exception.raiseUnderflow @Natural
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 twoTimesTwo :: Natural

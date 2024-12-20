@@ -1,9 +1,10 @@
-
 tcfail159.hs:9:11: error: [GHC-83865]
     • Couldn't match a lifted type with an unlifted type
       Expected: *
         Actual: TYPE
-                  (GHC.Types.TupleRep [GHC.Types.LiftedRep, GHC.Types.LiftedRep])
+                  (GHC.Internal.Types.TupleRep
+                     [GHC.Internal.Types.LiftedRep, GHC.Internal.Types.LiftedRep])
     • In the pattern: ~(# p, q #)
       In a case alternative: ~(# p, q #) -> p
       In the expression: case h x of ~(# p, q #) -> p
+

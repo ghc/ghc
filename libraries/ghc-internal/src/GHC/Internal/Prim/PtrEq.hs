@@ -8,8 +8,8 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.Prim.PtrEq
--- License     :  see libraries/ghc-prim/LICENSE
+-- Module      :  GHC.Internal.Prim.PtrEq
+-- License     :  see libraries/ghc-internal/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
 -- Stability   :  internal
@@ -22,7 +22,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Prim.PtrEq
+module GHC.Internal.Prim.PtrEq
   ( reallyUnsafePtrEquality,
     unsafePtrEquality#,
     sameArray#,
@@ -39,8 +39,8 @@ module GHC.Prim.PtrEq
     eqStableName#
   ) where
 
-import GHC.Prim
-import GHC.Types -- Also make implicit dependency known to build system
+import GHC.Internal.Prim
+import GHC.Internal.Types -- Also make implicit dependency known to build system
   ( RuntimeRep(BoxedRep), UnliftedType )
 default () -- Double and Integer aren't available yet
 

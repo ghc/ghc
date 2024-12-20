@@ -11,10 +11,10 @@ The overall structure of the GHC Prelude is a bit tricky.
 So the rough structure is as follows, in (linearised) dependency order
 
 
-GHC.Prim        Has no implementation.  It defines built-in things, and
-                by importing it you bring them into scope.
-                The source file is GHC.Prim.hi-boot, which is just
-                copied to make GHC.Prim.hi
+GHC.Internal.Prim        Has no implementation.  It defines built-in things, and
+                         by importing it you bring them into scope.
+                         The source file is GHC.Internal.Prim.hi-boot, which is just
+                         copied to make GHC.Internal.Prim.hi
 
 GHC.Internal.Base        Classes: Eq, Ord, Functor, Monad
                 Types:   List, (), Int, Bool, Ordering, Char, String, NonEmpty
@@ -106,20 +106,20 @@ Other Prelude modules are much easier with fewer complex dependencies.
 module GHC.Internal.Base
         (
         module GHC.Internal.Base,
-        module GHC.Classes,
-        module GHC.CString,
-        module GHC.Magic,
-        module GHC.Magic.Dict,
-        module GHC.Types,
-        module GHC.Prim,         -- Re-export GHC.Prim, GHC.Prim.Ext,
-        module GHC.Prim.Ext,     -- GHC.Prim.PtrEq and [boot] GHC.Internal.Err
-        module GHC.Prim.PtrEq,   -- to avoid lots of people having to
-        module GHC.Internal.Err, -- import these modules explicitly
+        module GHC.Internal.Classes,
+        module GHC.Internal.CString,
+        module GHC.Internal.Magic,
+        module GHC.Internal.Magic.Dict,
+        module GHC.Internal.Types,
+        module GHC.Internal.Prim,         -- Re-export GHC.Internal.Prim, GHC.Internal.Prim.Ext,
+        module GHC.Internal.Prim.Ext,     -- GHC.Internal.Prim.PtrEq and [boot] GHC.Internal.Err
+        module GHC.Internal.Prim.PtrEq,   -- to avoid lots of people having to
+        module GHC.Internal.Err,          -- import these modules explicitly
         module GHC.Internal.Maybe
   )
         where
 
-import GHC.Types hiding (
+import GHC.Internal.Types hiding (
   Unit#,
   Solo#,
   Tuple0#,
@@ -250,7 +250,7 @@ import GHC.Types hiding (
   Sum62#,
   Sum63#,
   )
-import GHC.Classes hiding (
+import GHC.Internal.Classes hiding (
   CUnit,
   CSolo,
   CTuple0,
@@ -319,21 +319,21 @@ import GHC.Classes hiding (
   CTuple63,
   CTuple64,
   )
-import GHC.CString
-import GHC.Magic
-import GHC.Magic.Dict
-import GHC.Prim hiding (dataToTagSmall#, dataToTagLarge#, whereFrom#)
+import GHC.Internal.CString
+import GHC.Internal.Magic
+import GHC.Internal.Magic.Dict
+import GHC.Internal.Prim hiding (dataToTagSmall#, dataToTagLarge#, whereFrom#)
   -- Hide dataToTag# ops because they are expected to break for
   -- GHC-internal reasons in the near future, and shouldn't
   -- be exposed from base (not even GHC.Exts)
 
-import GHC.Prim.Ext
-import GHC.Prim.PtrEq
+import GHC.Internal.Prim.Ext
+import GHC.Internal.Prim.PtrEq
 import GHC.Internal.Err
 import GHC.Internal.Maybe
 import {-# SOURCE #-} GHC.Internal.IO (mkUserError, mplusIO)
 
-import GHC.Tuple (Solo (MkSolo))
+import GHC.Internal.Tuple (Solo (MkSolo))
 
 -- See Note [Semigroup stimes cycle]
 import {-# SOURCE #-} GHC.Internal.Num (Num (..))
@@ -378,11 +378,11 @@ Such implicit dependencies can be introduced in at least the following ways:
 
 W1:
   Common awkward dependencies:
-   * TypeRep metadata introduces references to GHC.Types in EVERY module.
-   * A String literal introduces a reference to GHC.CString, for either
+   * TypeRep metadata introduces references to GHC.Internal.Types in EVERY module.
+   * A String literal introduces a reference to GHC.Internal.CString, for either
      unpackCString# or unpackCStringUtf8# depending on its contents.
-   * Tuple-notation introduces references to GHC.Tuple.
-   * Constraint tuples introduce references to GHC.Classes.
+   * Tuple-notation introduces references to GHC.Internal.Tuple.
+   * Constraint tuples introduce references to GHC.Internal.Classes.
    * Short lists like [3,8,2] produce references to GHC.Internal.Base.build
 
   A module can transitively depend on all of these by importing any of
@@ -394,7 +394,7 @@ W1:
    * Most modules in ghc-internal import GHC.Internal.Base.
    * Most modules in compiler/ import GHC.Prelude, which imports Prelude.
    * Most hs-boot files that would otherwise have no imports can get
-     away with just importing GHC.Types.
+     away with just importing GHC.Internal.Types.
 
   Unfortunately, the requirement to transitively import these modules
   when they are implicitly used is obscure and causes only /intermittent/
@@ -408,7 +408,8 @@ W2:
   missing record fields, and missing class instance methods all
   introduce references to GHC.Internal.Control.Exception.Base.
 
-  These constructs are therefore not allowed in ghc-prim or ghc-bignum.
+  These constructs are therefore not allowed in packages below ghc-internal.
+  This was the case when ghc-prim and ghc-bignum were separate of ghc-internal.
   But since they generally have bad code smell and are avoided by
   developers anyway, this restriction has not been very burdensome.
 

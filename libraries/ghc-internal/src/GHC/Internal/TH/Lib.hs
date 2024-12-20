@@ -22,6 +22,7 @@ module GHC.Internal.TH.Lib where
 
 import GHC.Internal.TH.Syntax hiding (Role, InjectivityAnn)
 import qualified GHC.Internal.TH.Syntax as TH
+
 #ifdef BOOTSTRAP_TH
 import Control.Applicative(liftA, Applicative(..))
 import qualified Data.Kind as Kind (Type)
@@ -41,7 +42,7 @@ import GHC.Internal.List (zip)
 import GHC.Internal.Real
 import GHC.Internal.Show
 import GHC.Internal.Word
-import qualified GHC.Types as Kind (Type)
+import qualified GHC.Internal.Types as Kind (Type)
 #endif
 
 ----------------------------------------------------------

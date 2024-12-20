@@ -25,7 +25,7 @@ T13242a.hs:13:13: error: [GHC-39999]
       Relevant bindings include x :: a0 (bound at T13242a.hs:10:5)
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance Eq Ordering -- Defined in ‘GHC.Classes’
+        instance Eq Ordering -- Defined in ‘GHC.Internal.Classes’
         instance Eq Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
         ...plus 23 others
         ...plus six instances involving out-of-scope types

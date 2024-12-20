@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team, 2014-2014
  *
- * Declarations for C fallback primitives implemented by 'ghc-prim' package.
+ * Declarations for C fallback primitives implemented by 'ghc-internal' package.
  *
  * Do not #include this file directly: #include "Rts.h" instead.
  *
@@ -13,7 +13,7 @@
 
 #pragma once
 
-/* libraries/ghc-prim/cbits/atomic.c */
+/* libraries/ghc-internal/cbits/atomic.c */
 StgWord hs_atomic_add8(StgWord x, StgWord val);
 StgWord hs_atomic_add16(StgWord x, StgWord val);
 StgWord hs_atomic_add32(StgWord x, StgWord val);
@@ -55,12 +55,12 @@ StgWord hs_xchg16(StgWord x, StgWord val);
 StgWord hs_xchg32(StgWord x, StgWord val);
 StgWord64 hs_xchg64(StgWord x, StgWord64 val);
 
-/* libraries/ghc-prim/cbits/bswap.c */
+/* libraries/ghc-internal/cbits/bswap.c */
 StgWord16 hs_bswap16(StgWord16 x);
 StgWord32 hs_bswap32(StgWord32 x);
 StgWord64 hs_bswap64(StgWord64 x);
 
-/* libraries/ghc-prim/cbits/bitrev.c
+/* libraries/ghc-internal/cbits/bitrev.c
 This was done as part of issue #16164.
 See Note [Bit reversal primop] for more details about the implementation.*/
 StgWord hs_bitrev8(StgWord x);
@@ -68,7 +68,7 @@ StgWord16 hs_bitrev16(StgWord16 x);
 StgWord32 hs_bitrev32(StgWord32 x);
 StgWord64 hs_bitrev64(StgWord64 x);
 
-/* libraries/ghc-prim/cbits/longlong.c */
+/* libraries/ghc-internal/cbits/longlong.c */
 #if WORD_SIZE_IN_BITS < 64
 StgInt hs_eq64 (StgWord64 a, StgWord64 b);
 StgInt hs_ne64 (StgWord64 a, StgWord64 b);
@@ -101,36 +101,36 @@ StgWord64 hs_wordToWord64  (StgWord   w);
 StgWord   hs_word64ToWord  (StgWord64 w);
 #endif
 
-/* libraries/ghc-prim/cbits/pdep.c */
+/* libraries/ghc-internal/cbits/pdep.c */
 StgWord64 hs_pdep64(StgWord64 src, StgWord64 mask);
 StgWord hs_pdep32(StgWord src, StgWord mask);
 StgWord hs_pdep16(StgWord src, StgWord mask);
 StgWord hs_pdep8(StgWord src, StgWord mask);
 
-/* libraries/ghc-prim/cbits/pext.c */
+/* libraries/ghc-internal/cbits/pext.c */
 StgWord64 hs_pext64(StgWord64 src, StgWord64 mask);
 StgWord hs_pext32(StgWord src, StgWord mask);
 StgWord hs_pext16(StgWord src, StgWord mask);
 StgWord hs_pext8(StgWord src, StgWord mask);
 
-/* libraries/ghc-prim/cbits/popcnt.c */
+/* libraries/ghc-internal/cbits/popcnt.c */
 StgWord hs_popcnt8(StgWord x);
 StgWord hs_popcnt16(StgWord x);
 StgWord hs_popcnt32(StgWord x);
 StgWord hs_popcnt64(StgWord64 x);
 StgWord hs_popcnt(StgWord x);
 
-/* libraries/ghc-prim/cbits/word2float.c */
+/* libraries/ghc-internal/cbits/word2float.c */
 StgFloat hs_word2float32(StgWord x);
 StgDouble hs_word2float64(StgWord x);
 
-/* libraries/ghc-prim/cbits/clz.c */
+/* libraries/ghc-internal/cbits/clz.c */
 StgWord hs_clz8(StgWord x);
 StgWord hs_clz16(StgWord x);
 StgWord hs_clz32(StgWord x);
 StgWord hs_clz64(StgWord64 x);
 
-/* libraries/ghc-prim/cbits/ctz.c */
+/* libraries/ghc-internal/cbits/ctz.c */
 StgWord hs_ctz8(StgWord x);
 StgWord hs_ctz16(StgWord x);
 StgWord hs_ctz32(StgWord x);

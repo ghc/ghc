@@ -948,7 +948,7 @@ splitApps = go []
 -- somehow. We need to construct this by hand because otherwise
 -- we end up with horrible and somewhat mysterious loops trying to calculate
 -- typeRep @TYPE. For the moment, we use the fact that we can get the proper
--- name of the ghc-prim package from the TyCon of LiftedRep (which we can
+-- name of the ghc-internal package from the TyCon of LiftedRep (which we can
 -- produce a TypeRep for without difficulty), and then just substitute in the
 -- appropriate module and constructor names.
 --
@@ -962,26 +962,26 @@ splitApps = go []
 -- #14480.
 
 tyConRuntimeRep :: TyCon
-tyConRuntimeRep = mkTyCon ghcPrimPackage "GHC.Types" "RuntimeRep" 0
+tyConRuntimeRep = mkTyCon ghcPrimPackage "GHC.Internal.Types" "RuntimeRep" 0
   (KindRepTYPE (BoxedRep Lifted))
 
 tyConTYPE :: TyCon
-tyConTYPE = mkTyCon ghcPrimPackage "GHC.Prim" "TYPE" 0
+tyConTYPE = mkTyCon ghcPrimPackage "GHC.Internal.Prim" "TYPE" 0
     (KindRepFun
       (KindRepTyConApp tyConRuntimeRep [])
       (KindRepTYPE (BoxedRep Lifted))
     )
 
 tyConLevity :: TyCon
-tyConLevity = mkTyCon ghcPrimPackage "GHC.Types" "Levity" 0
+tyConLevity = mkTyCon ghcPrimPackage "GHC.Internal.Types" "Levity" 0
   (KindRepTYPE (BoxedRep Lifted))
 
 tyCon'Lifted :: TyCon
-tyCon'Lifted = mkTyCon ghcPrimPackage "GHC.Types" "'Lifted" 0
+tyCon'Lifted = mkTyCon ghcPrimPackage "GHC.Internal.Types" "'Lifted" 0
   (KindRepTyConApp tyConLevity [])
 
 tyCon'BoxedRep :: TyCon
-tyCon'BoxedRep = mkTyCon ghcPrimPackage "GHC.Types" "'BoxedRep" 0
+tyCon'BoxedRep = mkTyCon ghcPrimPackage "GHC.Internal.Types" "'BoxedRep" 0
   (KindRepFun (KindRepTyConApp tyConLevity []) (KindRepTyConApp tyConRuntimeRep []))
 
 ghcPrimPackage :: String
@@ -995,8 +995,8 @@ isListTyCon tc = tc == typeRepTyCon (typeRep :: TypeRep [])
 
 isTupleTyCon :: TyCon -> Maybe (Bool, Int)
 isTupleTyCon tc
-  | tyConPackage tc == "ghc-prim"
-  , tyConModule  tc == "GHC.Tuple" || tyConModule tc == "GHC.Types"
+  | tyConPackage tc == "ghc-internal"
+  , tyConModule  tc == "GHC.Internal.Tuple" || tyConModule tc == "GHC.Internal.Types"
   = case tyConName tc of
       "Unit" -> Just (True, 0)
       "Unit#" -> Just (False, 0)
@@ -1138,7 +1138,7 @@ mkTyConFingerprint pkg_name mod_name tycon_name =
 
 mkTypeLitTyCon :: String -> TyCon -> TyCon
 mkTypeLitTyCon name kind_tycon
-  = mkTyCon "base" "GHC.TypeLits" name 0 kind
+  = mkTyCon "base" "GHC.Internal.TypeLits" name 0 kind
   where kind = KindRepTyConApp kind_tycon []
 
 -- | Used to make `'Typeable' instance for things of kind Nat

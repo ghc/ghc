@@ -1,4 +1,4 @@
-GHC.Internal.Base.const @GHC.Types.Int @GHC.Types.Bool (1 GHC.Internal.Num.+ 2) GHC.Types.True
+GHC.Internal.Base.const @GHC.Internal.Types.Int @GHC.Internal.Types.Bool (1 GHC.Internal.Num.+ 2) GHC.Internal.Types.True
 (\a_0 b_1 -> (b_1,
-              a_0)) (GHC.Internal.Maybe.Just 'x') GHC.Types.False
+              a_0)) (GHC.Internal.Maybe.Just 'x') GHC.Internal.Types.False
 (GHC.Internal.Real.even GHC.Internal.Base.. GHC.Internal.Data.Foldable.length) "Hello"

@@ -514,7 +514,7 @@ labelThreadByteArray# (ThreadId t) str =
     IO $ \s -> case labelThread# t str s of s1 -> (# s1, () #)
 
 --      Nota Bene: 'pseq' used to be 'seq'
---                 but 'seq' is now defined in GHC.Prim
+--                 but 'seq' is now defined in GHC.Internal.Prim
 --
 -- "pseq" is defined a bit weirdly (see below)
 --

@@ -246,7 +246,7 @@ gen_hs_source (Info defaults entries) =
     ++ "\n"
         ++ (replicate 77 '-' ++ "\n") -- For 80-col cleanliness
         ++ "-- |\n"
-        ++ "-- Module      :  GHC.Prim\n"
+        ++ "-- Module      :  GHC.Internal.Prim\n"
         ++ "-- \n"
         ++ "-- Maintainer  :  ghc-devs@haskell.org\n"
         ++ "-- Stability   :  internal\n"
@@ -271,15 +271,17 @@ gen_hs_source (Info defaults entries) =
                 -- and we don't want a complaint that the constraint is redundant
                 -- Remember, this silly file is only for Haddock's consumption
 
-        ++ "{-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}"
-        ++ "module GHC.Prim (\n"
+        ++ "{-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}\n"
+        ++ "module GHC.Internal.Prim (\n"
         ++ unlines (map (("        " ++) . hdr) entries')
         ++ ") where\n"
     ++ "\n"
     ++ "{-\n"
         ++ unlines (map opt defaults)
     ++ "-}\n"
-    ++ "import GHC.Types (Coercible)\n"
+    -- this import introduces a loop between GHC.Internal.Types and
+    -- GHC.Internal.Prim.
+    -- ++ "import GHC.Internal.Types (Coercible)\n"
 
     ++ "default ()"  -- If we don't say this then the default type include Integer
                      -- so that runs off and loads modules that are not part of
@@ -387,7 +389,7 @@ getName _ = Nothing
 
 {- Note [Placeholder declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We are generating fake declarations for things in GHC.Prim, just to
+We are generating fake declarations for things in GHC.Internal.Prim, just to
 keep GHC's renamer and typechecker happy enough for what Haddock
 needs.  Our main plan is to say
         foo :: <type>
@@ -397,7 +399,7 @@ That works for all the primitive functions except tagToEnum#.
 If we generate the binding
         tagToEnum# = tagToEnum#
 GHC will complain about "tagToEnum# must appear applied to one argument".
-We could hack GHC to silence this complaint when compiling GHC.Prim,
+We could hack GHC to silence this complaint when compiling GHC.Internal.Prim,
 but it seems easier to generate
         tagToEnum# = let x = x in x
 We don't do this for *all* bindings because for ones with an unboxed
@@ -468,10 +470,10 @@ gen_wrappers (Info _ entries)
         -- don't need the Prelude here so we add NoImplicitPrelude.
      ++ "{-# OPTIONS_GHC -Wno-deprecations -O0 -fno-do-eta-reduction #-}\n"
         -- Very important OPTIONS_GHC!  See Note [OPTIONS_GHC in GHC.PrimopWrappers]
-     ++ "module GHC.PrimopWrappers where\n"
-     ++ "import qualified GHC.Prim\n"
-     ++ "import GHC.Tuple ()\n"
-     ++ "import GHC.Prim (" ++ types ++ ")\n"
+     ++ "module GHC.Internal.PrimopWrappers where\n"
+     ++ "import qualified GHC.Internal.Prim\n"
+     ++ "import GHC.Internal.Tuple ()\n"
+     ++ "import GHC.Internal.Prim (" ++ types ++ ")\n"
      ++ unlines (concatMap mk_wrapper wrappers)
      where
         wrappers = filter want_wrapper entries
@@ -488,8 +490,8 @@ gen_wrappers (Info _ entries)
               lhs ++ " = " ++ rhs]
         wrap nm | isLower (head nm) = nm
                 | otherwise = "(" ++ nm ++ ")"
-        wrap_qual nm | isLower (head nm) = "GHC.Prim." ++ nm
-                     | otherwise         = "(GHC.Prim." ++ nm ++ ")"
+        wrap_qual nm | isLower (head nm) = "GHC.Internal.Prim." ++ nm
+                     | otherwise         = "(GHC.Internal.Prim." ++ nm ++ ")"
 
         want_wrapper :: Entry -> Bool
         want_wrapper entry =

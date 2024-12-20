@@ -1,6 +1,5 @@
 [1 of 2] Compiling T24396a          ( T24396a.hs, T24396a.o )
 [2 of 2] Compiling T24396b          ( T24396b.hs, T24396b.o )
-
 T24396b.hs:8:7: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
     In the use of type constructor or class ‘C1’
     (imported from T24396a):
@@ -61,8 +60,10 @@ T24396b.hs:26:14: warning: [GHC-63394] [-Wdeprecations (in -Wextended-warnings)]
     "Type operator warning"
 
 T24396b.hs:27:8: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
-    In the use of data constructor ‘Solo’ (imported from GHC.Tuple):
+    In the use of data constructor ‘Solo’
+    (imported from GHC.Internal.Tuple):
     Deprecated: "The Solo constructor has been renamed to MkSolo to avoid punning."
 
 T24396b.hs:27:13: warning: [GHC-63394] [-Wdeprecations (in -Wextended-warnings)]
     In the use of ‘$’ (imported from T24396a): "Value operator warning"
+

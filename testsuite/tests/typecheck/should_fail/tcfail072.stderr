@@ -6,7 +6,7 @@ tcfail072.hs:23:13: error: [GHC-39999]
         at tcfail072.hs:22:1-38
       The type variable ‘p0’ is ambiguous
       Potentially matching instances:
-        instance Ord Ordering -- Defined in ‘GHC.Classes’
+        instance Ord Ordering -- Defined in ‘GHC.Internal.Classes’
         instance Ord Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
         ...plus 23 others
         ...plus three instances involving out-of-scope types

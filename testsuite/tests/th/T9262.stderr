@@ -1,1 +1,1 @@
-instance GHC.Classes.Eq a_0 => GHC.Classes.Eq [a_0]
+instance GHC.Internal.Classes.Eq a_0 => GHC.Internal.Classes.Eq [a_0]

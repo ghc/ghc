@@ -4,10 +4,13 @@ Type and Constraint unqualified:
 Functor :: (Type -> Type) -> Constraint
 
 Type qualified, Constraint unqualified:
-(->) :: GHC.Types.Type -> GHC.Types.Type -> GHC.Types.Type
-Functor :: (GHC.Types.Type -> GHC.Types.Type) -> Constraint
+(->) :: GHC.Internal.Types.Type
+        -> GHC.Internal.Types.Type -> GHC.Internal.Types.Type
+Functor :: (GHC.Internal.Types.Type -> GHC.Internal.Types.Type)
+           -> Constraint
 
 Type and Constraint qualified:
-(->) :: GHC.Types.Type -> GHC.Types.Type -> GHC.Types.Type
-Functor :: (GHC.Types.Type -> GHC.Types.Type)
-           -> GHC.Types.Constraint
+(->) :: GHC.Internal.Types.Type
+        -> GHC.Internal.Types.Type -> GHC.Internal.Types.Type
+Functor :: (GHC.Internal.Types.Type -> GHC.Internal.Types.Type)
+           -> GHC.Internal.Types.Constraint

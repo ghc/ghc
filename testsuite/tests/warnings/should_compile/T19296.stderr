@@ -1,4 +1,3 @@
-
 T19296.hs:6:6: warning: [GHC-30606] [-Wredundant-constraints]
     Redundant constraint: Eq a
     In the type signature for:
@@ -31,7 +30,7 @@ T19296.hs:21:1: warning: [GHC-40548]
       Orig lhs: let {
                   $dOrd :: Ord Int
                   [LclId]
-                  $dOrd = GHC.Classes.$fOrdInt } in
+                  $dOrd = GHC.Internal.Classes.$fOrdInt } in
                 spec @Int @a $dOrd
       optimised lhs: spec @Int @a $dOrd
    |
@@ -63,3 +62,4 @@ T19296.hs:39:12: warning: [GHC-30606] [-Wredundant-constraints]
    |
 39 |     bar :: (Eq b, Ord b) => Int -> b -> Int
    |            ^^^^^^^^^^^^^
+

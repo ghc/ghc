@@ -2,8 +2,8 @@ TupE [Just (LitE (IntegerL 909)),Nothing]
 (909,)
 TupE [Nothing,Just (LitE (IntegerL 909))]
 (, 909)
-ConE GHC.Tuple.(,)
-GHC.Tuple.(,)
+ConE GHC.Internal.Tuple.(,)
+GHC.Internal.Tuple.(,)
 TupE [Just (LitE (IntegerL 909)),Just (LitE (IntegerL 606))]
 (909, 606)
 TupE [Nothing,Nothing,Just (LitE (IntegerL 909))]
@@ -12,8 +12,8 @@ TupE [Just (LitE (IntegerL 909)),Nothing]
 (909,)
 TupE [Nothing,Just (LitE (IntegerL 909))]
 (, 909)
-ConE GHC.Tuple.(,)
-GHC.Tuple.(,)
+ConE GHC.Internal.Tuple.(,)
+GHC.Internal.Tuple.(,)
 TupE [Just (LitE (IntegerL 909)),Just (LitE (IntegerL 606))]
 (909, 606)
 TupE [Nothing,Nothing,Just (LitE (IntegerL 909))]
@@ -21,13 +21,13 @@ TupE [Nothing,Nothing,Just (LitE (IntegerL 909))]
 "(909,) applied to 'c' should be (909, 'c') ===> True"
 "(,909) applied to False should be (False, 909) ===> True"
 "(,,909) applied to 606 and True should be (606, True, 909) ===> True"
-ConE GHC.Types.(#,#)
-GHC.Types.(#,#)
-UnboxedTupE [Just (LitE (CharL 'c')),Just (ConE GHC.Types.False)]
-(# 'c', GHC.Types.False #)
+ConE GHC.Internal.Types.(#,#)
+GHC.Internal.Types.(#,#)
+UnboxedTupE [Just (LitE (CharL 'c')),Just (ConE GHC.Internal.Types.False)]
+(# 'c', GHC.Internal.Types.False #)
 UnboxedTupE [Just (LitE (CharL 'c')),Nothing]
 (# 'c', #)
-UnboxedTupE [Nothing,Just (ConE GHC.Types.False)]
-(# , GHC.Types.False #)
-AppE (UnboxedTupE [Nothing,Just (ConE GHC.Types.False)]) (LitE (CharL 'c'))
-(# , GHC.Types.False #) 'c'
+UnboxedTupE [Nothing,Just (ConE GHC.Internal.Types.False)]
+(# , GHC.Internal.Types.False #)
+AppE (UnboxedTupE [Nothing,Just (ConE GHC.Internal.Types.False)]) (LitE (CharL 'c'))
+(# , GHC.Internal.Types.False #) 'c'

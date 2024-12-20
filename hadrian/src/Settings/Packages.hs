@@ -130,13 +130,6 @@ packageArgs = do
         , package ghcPkg ?
           builder (Cabal Flags) ? notM cross `cabalFlag` "terminfo"
 
-        -------------------------------- ghcPrim -------------------------------
-        , package ghcPrim ? mconcat
-          [ builder (Cabal Flags) ? flag NeedLibatomic `cabalFlag` "need-atomic"
-
-          , builder (Cc CompileC) ? (not <$> flag CcLlvmBackend) ?
-            input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
-
         -------------------------------- ghcBoot ------------------------------
         , package ghcBoot ?
             builder (Cabal Flags) ? (stage0 `cabalFlag` "bootstrap")
@@ -290,6 +283,12 @@ ghcInternalArgs = package ghcInternal ? do
                      ]
                   ]
                _ -> mempty
+
+          , builder (Cabal Flags) ? flag NeedLibatomic `cabalFlag` "need-atomic"
+
+          , builder (Cc CompileC) ? (not <$> flag CcLlvmBackend) ?
+              input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand"
+
           ]
 
 -- | RTS-specific command line arguments.

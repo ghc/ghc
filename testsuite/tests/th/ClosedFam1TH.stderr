@@ -1,6 +1,8 @@
-
 ClosedFam1TH.hs:7:2: warning: [GHC-39584]
     type family Foo_0 a_1 (b_2 :: k_3) where
-    Foo_0 GHC.Types.Int GHC.Types.Bool = GHC.Types.Int
-    Foo_0 a_4 GHC.Internal.Maybe.Maybe = GHC.Types.Bool
-    Foo_0 b_5 (x_6 :: GHC.Types.Bool) = GHC.Types.Char
+    Foo_0 GHC.Internal.Types.Int
+          GHC.Internal.Types.Bool = GHC.Internal.Types.Int
+    Foo_0 a_4 GHC.Internal.Maybe.Maybe = GHC.Internal.Types.Bool
+    Foo_0 b_5
+          (x_6 :: GHC.Internal.Types.Bool) = GHC.Internal.Types.Char
+

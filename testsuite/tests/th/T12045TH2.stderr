@@ -1,6 +1,7 @@
 forall (k_0 :: *) . k_0 -> *
 type family T12045TH2.Foo (a_0 :: k_1) :: * where
-    forall (a_2 :: *). T12045TH2.Foo (a_2 :: *) = GHC.Types.Bool
+    forall (a_2 :: *). T12045TH2.Foo (a_2 :: *) = GHC.Internal.Types.Bool
 type family T12045TH2.Baz (a_0 :: k_1) :: *
 type instance forall (a_0 :: * ->
-                             * -> *). T12045TH2.Baz (a_0 :: * -> * -> *) = GHC.Types.Char
+                             * -> *). T12045TH2.Baz (a_0 :: * ->
+                                                            * -> *) = GHC.Internal.Types.Char

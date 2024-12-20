@@ -1,3 +1,4 @@
 data family T9692.F (a_0 :: k_1) (b_2 :: k_3) :: *
-data instance forall (x_4 :: *). T9692.F GHC.Types.Int (x_4 :: *)
+data instance forall (x_4 :: *). T9692.F GHC.Internal.Types.Int
+                                         (x_4 :: *)
     = T9692.FInt x_4

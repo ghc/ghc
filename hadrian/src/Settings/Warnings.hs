@@ -52,7 +52,6 @@ ghcWarningsArgs = do
                                       , "-Wincomplete-uni-patterns"
                                       , "-Wincomplete-record-updates"
                                       ]
-        , package ghcPrim      ? pure [ "-Wno-trustworthy-safe" ]
         , package haddockLibrary ? pure [ "-Wno-unused-imports" ]
         , package haddockApi     ? pure [ "-Wno-unused-imports"
                                         , "-Wno-deprecations"

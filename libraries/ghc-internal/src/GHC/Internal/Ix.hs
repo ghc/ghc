@@ -25,7 +25,7 @@ import GHC.Internal.Num
 import GHC.Internal.Base
 import GHC.Internal.Real( fromIntegral )
 import GHC.Internal.Show
-import GHC.Tuple (Solo (..))
+import GHC.Internal.Tuple (Solo (..))
 
 -- | The 'Ix' class is used to map a contiguous subrange of values in
 -- a type onto integers.  It is used primarily for array indexing

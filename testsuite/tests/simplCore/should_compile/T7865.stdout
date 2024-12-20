@@ -3,6 +3,6 @@ T7865.$wexpensive
 expensive [InlPrag=NOINLINE[final]] :: Int -> Int
                  case T7865.$wexpensive ww of ww1 [Occ=Once1] { __DEFAULT ->
 expensive
-      case T7865.$wexpensive ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
+      case T7865.$wexpensive ww of ww1 { __DEFAULT ->
             case T7865.$wexpensive ww of ww1 { __DEFAULT ->
                      case T7865.$wexpensive ww of ww1 { __DEFAULT ->

@@ -366,7 +366,7 @@ external prototype return neither of these types to workaround #11395.
 #include "stg/MiscClosures.h"
 #endif
 
-#include "stg/Prim.h" /* ghc-prim fallbacks */
+#include "stg/Prim.h" /* ghc-internal fallbacks */
 #include "stg/SMP.h"
 
 /* -----------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 class C_0 a_1
     where {data D_2 a_1; f_3 :: a_1 -> D_2 a_1}
-instance C_0 GHC.Types.Int
-    where {data D_2 GHC.Types.Int where
-               {C1_4 :: GHC.Types.Int -> D_2 GHC.Types.Int;
-                C2_5 :: D_2 GHC.Types.Int};
+instance C_0 GHC.Internal.Types.Int
+    where {data D_2 GHC.Internal.Types.Int where
+               {C1_4 :: GHC.Internal.Types.Int -> D_2 GHC.Internal.Types.Int;
+                C2_5 :: D_2 GHC.Internal.Types.Int};
            f_3 = C1_4}

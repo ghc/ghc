@@ -1,21 +1,21 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, BangPatterns, UnliftedFFITypes #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.CString
+-- Module      :  GHC.Internal.CString
 -- Copyright   :  (c) The University of Glasgow 2011
--- License     :  see libraries/ghc-prim/LICENSE
+-- License     :  see libraries/ghc-internal/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
--- GHC C strings definitions (previously in GHC.Base).
+-- GHC C strings definitions (previously in GHC.Internal.Base).
 -- Use GHC.Exts from the base package instead of importing this
 -- module directly.
 --
 -----------------------------------------------------------------------------
 
-module GHC.CString (
+module GHC.Internal.CString (
         -- * Ascii variants
         unpackCString#, unpackAppendCString#, unpackFoldrCString#,
         cstringLength#,
@@ -27,8 +27,8 @@ module GHC.CString (
         unpackNBytes#,
     ) where
 
-import GHC.Types hiding (One)
-import GHC.Prim
+import GHC.Internal.Types hiding (One)
+import GHC.Internal.Prim
 
 {-
 Note [String literals in GHC]
@@ -40,14 +40,14 @@ summarises the moving parts.
   turn calls GHC.Core.Make.mkStringExprFS.
 
   The desugarer desugars the Haskell literal "foo" into Core
-     GHC.CString.unpackCString# "foo"#
+     GHC.Internal.CString.unpackCString# "foo"#
   where "foo"# is primitive string literal (of type Addr#).
 
   When the string cannot be encoded as a C string, we use UTF8:
-     GHC.CString.unpackCStringUtf8# "foo"#
+     GHC.Internal.CString.unpackCStringUtf8# "foo"#
 
-* The library module ghc-prim:GHC.CString has a bunch of functions that
-  work over primitive strings, including GHC.CString.unpackCString#
+* The library module ghc-internal:GHC.Internal.CString has a bunch of functions that
+  work over primitive strings, including GHC.Internal.CString.unpackCString#
 
 * GHC.Core.Op.ConstantFold has some RULES that optimise certain string
   operations on literal strings. For example:
@@ -57,10 +57,10 @@ summarises the moving parts.
     + Comparing strings
     + and more
 
-* GHC.Base has a number of regular rules for String literals.
+* GHC.Internal.Base has a number of regular rules for String literals.
 
   + a rule "eqString": (==) @String = eqString
-    where GHC.Base.eqString :: String -> String -> Bool
+    where GHC.Internal.Base.eqString :: String -> String -> Bool
 
     ConstantFold has a RULE for eqString on literals:
      eqString (Lit "foo"#) (Lit "bar"#) --> False
@@ -95,10 +95,6 @@ summarises the moving parts.
 -- This code is needed for virtually all programs, since it's used for
 -- unpacking the strings of error messages.
 
--- Used to be in GHC.Base, but was moved to ghc-prim because the new generics
--- stuff uses Strings in the representation, so to give representations for
--- ghc-prim types we need unpackCString#
-
 {- Note [Inlining unpackCString#]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There's really no point in ever inlining things like unpackCString# as the loop
@@ -114,7 +110,7 @@ to match unpackCString#,
        eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)
           = s1 == s2
 
- * unpacking rules; e.g. in GHC.Base,
+ * unpacking rules; e.g. in GHC.Internal.Base,
        unpackCString# a
           = build (unpackFoldrCString# a)
 

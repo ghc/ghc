@@ -55,6 +55,9 @@ holes3.hs:11:15: error: [GHC-88464]
         EQ :: Ordering
         GT :: Ordering
         () :: ()
+        (&&) :: Bool -> Bool -> Bool
+        not :: Bool -> Bool
+        (||) :: Bool -> Bool -> Bool
         lines :: String -> [String]
         unlines :: [String] -> String
         unwords :: [String] -> String
@@ -74,9 +77,6 @@ holes3.hs:11:15: error: [GHC-88464]
         putStrLn :: String -> IO ()
         readFile :: FilePath -> IO String
         writeFile :: FilePath -> String -> IO ()
-        (&&) :: Bool -> Bool -> Bool
-        not :: Bool -> Bool
-        (||) :: Bool -> Bool -> Bool
         (++) :: forall a. [a] -> [a] -> [a]
         filter :: forall a. (a -> Bool) -> [a] -> [a]
         fromInteger :: forall a. Num a => Integer -> a

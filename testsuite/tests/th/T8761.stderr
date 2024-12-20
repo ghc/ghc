@@ -1,5 +1,5 @@
 pattern Q1 x1_0 x2_1 x3_2 <- ((x1_0, x2_1), [x3_2], _, _)
-pattern x1_0 `Q2` x2_1 = GHC.Tuple.MkSolo (x1_0, x2_1)
+pattern x1_0 `Q2` x2_1 = GHC.Internal.Tuple.MkSolo (x1_0, x2_1)
 pattern Q3 {qx3, qy3, qz3} <- ((qx3, qy3), [qz3]) where
                                   Q3 qx3 qy3 qz3 = ((qx3, qy3), [qz3])
 T8761.hs:(16,1)-(39,13): Splicing declarations
@@ -121,23 +121,23 @@ T8761.hs:(71,1)-(105,39): Splicing declarations
     pattern Puep ::
               forall a. () => forall b. Show b => a -> b -> (ExProv, a)
     pattern Puep x y <- (MkExProv y, x)
-pattern T8761.P :: GHC.Types.Bool
+pattern T8761.P :: GHC.Internal.Types.Bool
 pattern T8761.Pe :: () => forall (a_0 :: *) . a_0 -> T8761.Ex
 pattern T8761.Pu :: forall (a_0 :: *) . a_0 -> a_0
 pattern T8761.Pue :: forall (a_0 :: *) . () => forall (b_1 :: *) .
                                                a_0 -> b_1 -> (a_0, T8761.Ex)
 pattern T8761.Pur :: forall (a_0 :: *) . (GHC.Internal.Num.Num a_0,
-                                          GHC.Classes.Eq a_0) =>
+                                          GHC.Internal.Classes.Eq a_0) =>
                      a_0 -> [a_0]
 pattern T8761.Purp :: forall (a_0 :: *) (b_1 :: *) . (GHC.Internal.Num.Num a_0,
-                                                      GHC.Classes.Eq a_0) =>
+                                                      GHC.Internal.Classes.Eq a_0) =>
                       GHC.Internal.Show.Show b_1 =>
                       a_0 -> b_1 -> ([a_0], T8761.UnivProv b_1)
 pattern T8761.Pure :: forall (a_0 :: *) . (GHC.Internal.Num.Num a_0,
-                                           GHC.Classes.Eq a_0) =>
+                                           GHC.Internal.Classes.Eq a_0) =>
                       forall (b_1 :: *) . a_0 -> b_1 -> ([a_0], T8761.Ex)
 pattern T8761.Purep :: forall (a_0 :: *) . (GHC.Internal.Num.Num a_0,
-                                            GHC.Classes.Eq a_0) =>
+                                            GHC.Internal.Classes.Eq a_0) =>
                        forall (b_1 :: *) . GHC.Internal.Show.Show b_1 =>
                        a_0 -> b_1 -> ([a_0], T8761.ExProv)
 pattern T8761.Pep :: () => forall (a_0 :: *) . GHC.Internal.Show.Show a_0 =>

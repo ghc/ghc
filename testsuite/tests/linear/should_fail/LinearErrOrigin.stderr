@@ -1,19 +1,19 @@
-
 LinearErrOrigin.hs:7:7: error: [GHC-25897]
     • Couldn't match type ‘p’ with ‘q’ arising from multiplicity of ‘x’
       ‘p’ is a rigid type variable bound by
         the type signature for:
-          foo :: forall a (p :: GHC.Types.Multiplicity) b
-                        (q :: GHC.Types.Multiplicity).
+          foo :: forall a (p :: GHC.Internal.Types.Multiplicity) b
+                        (q :: GHC.Internal.Types.Multiplicity).
                  (a %p -> b) -> a %q -> b
         at LinearErrOrigin.hs:6:1-31
       ‘q’ is a rigid type variable bound by
         the type signature for:
-          foo :: forall a (p :: GHC.Types.Multiplicity) b
-                        (q :: GHC.Types.Multiplicity).
+          foo :: forall a (p :: GHC.Internal.Types.Multiplicity) b
+                        (q :: GHC.Internal.Types.Multiplicity).
                  (a %p -> b) -> a %q -> b
         at LinearErrOrigin.hs:6:1-31
     • In an equation for ‘foo’: foo f x = f x
     • Relevant bindings include
         f :: a %p -> b (bound at LinearErrOrigin.hs:7:5)
         foo :: (a %p -> b) -> a %q -> b (bound at LinearErrOrigin.hs:7:1)
+

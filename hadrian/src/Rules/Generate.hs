@@ -1,7 +1,6 @@
 module Rules.Generate (
     isGeneratedCmmFile, compilerDependencies, generatePackageCode,
     generateRules, copyRules, generatedDependencies,
-    ghcPrimDependencies,
     templateRules
     ) where
 
@@ -47,11 +46,11 @@ isGeneratedCmmFile file =
     , "AutoApply_V64"
     ]
 
-ghcPrimDependencies :: Expr [FilePath]
-ghcPrimDependencies = do
+ghcInternalDependencies :: Expr [FilePath]
+ghcInternalDependencies = do
     stage <- getStage
-    path  <- expr $ buildPath (vanillaContext stage ghcPrim)
-    return [path -/- "GHC/Prim.hs", path -/- "GHC/PrimopWrappers.hs"]
+    path  <- expr $ buildPath (vanillaContext stage ghcInternal)
+    return [path -/- "GHC/Internal/Prim.hs", path -/- "GHC/Internal/PrimopWrappers.hs"]
 
 rtsDependencies :: Expr [FilePath]
 rtsDependencies = do
@@ -109,9 +108,9 @@ compilerDependencies = do
 
 generatedDependencies :: Expr [FilePath]
 generatedDependencies = do
-    mconcat [ package compiler ? compilerDependencies
-            , package ghcPrim  ? ghcPrimDependencies
-            , package rts      ? rtsDependencies
+    mconcat [ package compiler    ? compilerDependencies
+            , package ghcInternal ? ghcInternalDependencies
+            , package rts         ? rtsDependencies
             ]
 
 generate :: FilePath -> Context -> Expr String -> Action ()
@@ -144,9 +143,9 @@ generatePackageCode context@(Context stage pkg _ _) = do
             root -/- "**" -/- dir -/- "GHC/Platform/Constants.hs" %> genPlatformConstantsType context
             root -/- "**" -/- dir -/- "GHC/Settings/Config.hs" %> go generateConfigHs
             root -/- "**" -/- dir -/- "*.hs-incl" %> genPrimopCode context
-        when (pkg == ghcPrim) $ do
-            root -/- "**" -/- dir -/- "GHC/Prim.hs" %> genPrimopCode context
-            root -/- "**" -/- dir -/- "GHC/PrimopWrappers.hs" %> genPrimopCode context
+        when (pkg == ghcInternal) $ do
+            root -/- "**" -/- dir -/- "GHC/Internal/Prim.hs" %> genPrimopCode context
+            root -/- "**" -/- dir -/- "GHC/Internal/PrimopWrappers.hs" %> genPrimopCode context
         when (pkg == ghcBoot) $ do
             root -/- "**" -/- dir -/- "GHC/Version.hs" %> go generateVersionHs
             root -/- "**" -/- dir -/- "GHC/Platform/Host.hs" %> go generatePlatformHostHs

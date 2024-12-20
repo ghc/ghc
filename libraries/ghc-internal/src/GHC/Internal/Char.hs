@@ -6,7 +6,7 @@ module GHC.Internal.Char
       chr
 
       -- * Monomorphic equality operators
-      -- | See GHC.Classes#matching_overloaded_methods_in_rules
+      -- | See GHC.Internal.Classes#matching_overloaded_methods_in_rules
     , eqChar, neChar
     ) where
 

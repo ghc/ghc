@@ -1,6 +1,6 @@
-
 UnliftedNewtypesNotEnabled.hs:9:1: error: [GHC-55233]
-    • Newtype has non-* return kind ‘TYPE GHC.Types.IntRep’
+    • Newtype has non-* return kind ‘TYPE GHC.Internal.Types.IntRep’
     • In the newtype declaration for ‘Baz’
     Suggested fix:
       Perhaps you intended to use the ‘UnliftedNewtypes’ extension
+

@@ -178,16 +178,16 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep1
          CanDoRep1_1.Dd = GHC.Internal.Generics.D1
                             ('GHC.Internal.Generics.MetaData
-                               "Dd" "CanDoRep1_1" "main" 'GHC.Types.False)
+                               "Dd" "CanDoRep1_1" "main" 'GHC.Internal.Types.False)
                             (GHC.Internal.Generics.C1
                                ('GHC.Internal.Generics.MetaCons
-                                  "D0d" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                  "D0d" 'GHC.Internal.Generics.PrefixI 'GHC.Internal.Types.False)
                                GHC.Internal.Generics.U1
                              GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                          ('GHC.Internal.Generics.MetaCons
                                                             "D1d"
                                                             'GHC.Internal.Generics.PrefixI
-                                                            'GHC.Types.True)
+                                                            'GHC.Internal.Types.True)
                                                          (GHC.Internal.Generics.S1
                                                             ('GHC.Internal.Generics.MetaSel
                                                                ('GHC.Internal.Maybe.Just "d11d")
@@ -207,16 +207,18 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep
          (CanDoRep1_1.Dd a) = GHC.Internal.Generics.D1
                                 ('GHC.Internal.Generics.MetaData
-                                   "Dd" "CanDoRep1_1" "main" 'GHC.Types.False)
+                                   "Dd" "CanDoRep1_1" "main" 'GHC.Internal.Types.False)
                                 (GHC.Internal.Generics.C1
                                    ('GHC.Internal.Generics.MetaCons
-                                      "D0d" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                      "D0d"
+                                      'GHC.Internal.Generics.PrefixI
+                                      'GHC.Internal.Types.False)
                                    GHC.Internal.Generics.U1
                                  GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                              ('GHC.Internal.Generics.MetaCons
                                                                 "D1d"
                                                                 'GHC.Internal.Generics.PrefixI
-                                                                'GHC.Types.True)
+                                                                'GHC.Internal.Types.True)
                                                              (GHC.Internal.Generics.S1
                                                                 ('GHC.Internal.Generics.MetaSel
                                                                    ('GHC.Internal.Maybe.Just "d11d")
@@ -237,16 +239,18 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep
          (CanDoRep1_1.Dc a) = GHC.Internal.Generics.D1
                                 ('GHC.Internal.Generics.MetaData
-                                   "Dc" "CanDoRep1_1" "main" 'GHC.Types.False)
+                                   "Dc" "CanDoRep1_1" "main" 'GHC.Internal.Types.False)
                                 (GHC.Internal.Generics.C1
                                    ('GHC.Internal.Generics.MetaCons
-                                      "D0c" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                      "D0c"
+                                      'GHC.Internal.Generics.PrefixI
+                                      'GHC.Internal.Types.False)
                                    GHC.Internal.Generics.U1
                                  GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                              ('GHC.Internal.Generics.MetaCons
                                                                 "D1c"
                                                                 'GHC.Internal.Generics.PrefixI
-                                                                'GHC.Types.True)
+                                                                'GHC.Internal.Types.True)
                                                              (GHC.Internal.Generics.S1
                                                                 ('GHC.Internal.Generics.MetaSel
                                                                    ('GHC.Internal.Maybe.Just "d11c")
@@ -267,16 +271,16 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep1
          CanDoRep1_1.Db = GHC.Internal.Generics.D1
                             ('GHC.Internal.Generics.MetaData
-                               "Db" "CanDoRep1_1" "main" 'GHC.Types.False)
+                               "Db" "CanDoRep1_1" "main" 'GHC.Internal.Types.False)
                             (GHC.Internal.Generics.C1
                                ('GHC.Internal.Generics.MetaCons
-                                  "D0b" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                  "D0b" 'GHC.Internal.Generics.PrefixI 'GHC.Internal.Types.False)
                                GHC.Internal.Generics.U1
                              GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                          ('GHC.Internal.Generics.MetaCons
                                                             "D1b"
                                                             'GHC.Internal.Generics.PrefixI
-                                                            'GHC.Types.True)
+                                                            'GHC.Internal.Types.True)
                                                          (GHC.Internal.Generics.S1
                                                             ('GHC.Internal.Generics.MetaSel
                                                                ('GHC.Internal.Maybe.Just "d11b")
@@ -296,16 +300,16 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep1
          CanDoRep1_1.Dc = GHC.Internal.Generics.D1
                             ('GHC.Internal.Generics.MetaData
-                               "Dc" "CanDoRep1_1" "main" 'GHC.Types.False)
+                               "Dc" "CanDoRep1_1" "main" 'GHC.Internal.Types.False)
                             (GHC.Internal.Generics.C1
                                ('GHC.Internal.Generics.MetaCons
-                                  "D0c" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                  "D0c" 'GHC.Internal.Generics.PrefixI 'GHC.Internal.Types.False)
                                GHC.Internal.Generics.U1
                              GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                          ('GHC.Internal.Generics.MetaCons
                                                             "D1c"
                                                             'GHC.Internal.Generics.PrefixI
-                                                            'GHC.Types.True)
+                                                            'GHC.Internal.Types.True)
                                                          (GHC.Internal.Generics.S1
                                                             ('GHC.Internal.Generics.MetaSel
                                                                ('GHC.Internal.Maybe.Just "d11c")
@@ -325,16 +329,18 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep
          (CanDoRep1_1.Db a) = GHC.Internal.Generics.D1
                                 ('GHC.Internal.Generics.MetaData
-                                   "Db" "CanDoRep1_1" "main" 'GHC.Types.False)
+                                   "Db" "CanDoRep1_1" "main" 'GHC.Internal.Types.False)
                                 (GHC.Internal.Generics.C1
                                    ('GHC.Internal.Generics.MetaCons
-                                      "D0b" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                      "D0b"
+                                      'GHC.Internal.Generics.PrefixI
+                                      'GHC.Internal.Types.False)
                                    GHC.Internal.Generics.U1
                                  GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                              ('GHC.Internal.Generics.MetaCons
                                                                 "D1b"
                                                                 'GHC.Internal.Generics.PrefixI
-                                                                'GHC.Types.True)
+                                                                'GHC.Internal.Types.True)
                                                              (GHC.Internal.Generics.S1
                                                                 ('GHC.Internal.Generics.MetaSel
                                                                    ('GHC.Internal.Maybe.Just "d11b")
@@ -355,16 +361,16 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep
          (CanDoRep1_1.Da a) = GHC.Internal.Generics.D1
                                 ('GHC.Internal.Generics.MetaData
-                                   "Da" "CanDoRep1_1" "main" 'GHC.Types.False)
+                                   "Da" "CanDoRep1_1" "main" 'GHC.Internal.Types.False)
                                 (GHC.Internal.Generics.C1
                                    ('GHC.Internal.Generics.MetaCons
-                                      "D0" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                      "D0" 'GHC.Internal.Generics.PrefixI 'GHC.Internal.Types.False)
                                    GHC.Internal.Generics.U1
                                  GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                              ('GHC.Internal.Generics.MetaCons
                                                                 "D1"
                                                                 'GHC.Internal.Generics.PrefixI
-                                                                'GHC.Types.True)
+                                                                'GHC.Internal.Types.True)
                                                              (GHC.Internal.Generics.S1
                                                                 ('GHC.Internal.Generics.MetaSel
                                                                    ('GHC.Internal.Maybe.Just "d11a")
@@ -385,16 +391,16 @@ Derived type family instances:
   type GHC.Internal.Generics.Rep1
          CanDoRep1_1.Da = GHC.Internal.Generics.D1
                             ('GHC.Internal.Generics.MetaData
-                               "Da" "CanDoRep1_1" "main" 'GHC.Types.False)
+                               "Da" "CanDoRep1_1" "main" 'GHC.Internal.Types.False)
                             (GHC.Internal.Generics.C1
                                ('GHC.Internal.Generics.MetaCons
-                                  "D0" 'GHC.Internal.Generics.PrefixI 'GHC.Types.False)
+                                  "D0" 'GHC.Internal.Generics.PrefixI 'GHC.Internal.Types.False)
                                GHC.Internal.Generics.U1
                              GHC.Internal.Generics.:+: GHC.Internal.Generics.C1
                                                          ('GHC.Internal.Generics.MetaCons
                                                             "D1"
                                                             'GHC.Internal.Generics.PrefixI
-                                                            'GHC.Types.True)
+                                                            'GHC.Internal.Types.True)
                                                          (GHC.Internal.Generics.S1
                                                             ('GHC.Internal.Generics.MetaSel
                                                                ('GHC.Internal.Maybe.Just "d11a")

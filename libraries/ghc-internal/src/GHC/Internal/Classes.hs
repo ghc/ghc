@@ -9,7 +9,7 @@
   -- Because of the type-variable superclasses for tuples
 
 {-# OPTIONS_GHC -Wno-unused-imports #-}
--- -Wno-unused-imports needed for the GHC.Tuple import below. Sigh.
+-- -Wno-unused-imports needed for the GHC.Internal.Tuple import below. Sigh.
 
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 -- -Wno-unused-top-binds is there (I hope) to stop Haddock complaining
@@ -22,7 +22,7 @@
 {-# OPTIONS_HADDOCK not-home #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.Classes
+-- Module      :  GHC.Internal.Classes
 -- Copyright   :  (c) The University of Glasgow, 1992-2002
 -- License     :  see libraries/base/LICENSE
 --
@@ -37,7 +37,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Classes(
+module GHC.Internal.Classes(
     -- * Implicit parameters
     IP(..),
 
@@ -137,11 +137,11 @@ module GHC.Classes(
  ) where
 
 -- GHC.Magic is used in some derived instances
-import GHC.Magic ()
-import GHC.Prim
-import GHC.Tuple
-import GHC.CString (unpackCString#)
-import GHC.Types
+import GHC.Internal.Magic ()
+import GHC.Internal.Prim
+import GHC.Internal.Tuple
+import GHC.Internal.CString (unpackCString#)
+import GHC.Internal.Types
 
 infix  4  ==, /=, <, <=, >=, >
 infixr 3  &&
@@ -282,19 +282,19 @@ instance Eq Word where
     (==) = eqWord
     (/=) = neWord
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqWord #-}
 {-# INLINE [1] neWord #-}
 eqWord, neWord :: Word -> Word -> Bool
 (W# x) `eqWord` (W# y) = isTrue# (x `eqWord#` y)
 (W# x) `neWord` (W# y) = isTrue# (x `neWord#` y)
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 instance Eq Char where
     (==) = eqChar
     (/=) = neChar
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqChar #-}
 {-# INLINE [1] neChar #-}
 eqChar, neChar :: Char -> Char -> Bool
@@ -316,7 +316,7 @@ eqChar, neChar :: Char -> Char -> Bool
 instance Eq Float where
     (==) = eqFloat
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqFloat #-}
 eqFloat :: Float -> Float -> Bool
 (F# x) `eqFloat` (F# y) = isTrue# (x `eqFloat#` y)
@@ -336,7 +336,7 @@ eqFloat :: Float -> Float -> Bool
 instance Eq Double where
     (==) = eqDouble
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqDouble #-}
 eqDouble :: Double -> Double -> Bool
 (D# x) `eqDouble` (D# y) = isTrue# (x ==## y)
@@ -345,7 +345,7 @@ instance Eq Int where
     (==) = eqInt
     (/=) = neInt
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqInt #-}
 {-# INLINE [1] neInt #-}
 eqInt, neInt :: Int -> Int -> Bool
@@ -564,7 +564,7 @@ instance Ord Int where
     (>=)    = geInt
     (>)     = gtInt
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] gtInt #-}
 {-# INLINE [1] geInt #-}
 {-# INLINE [1] ltInt #-}
@@ -575,7 +575,7 @@ gtInt, geInt, ltInt, leInt :: Int -> Int -> Bool
 (I# x) `ltInt` (I# y) = isTrue# (x <#  y)
 (I# x) `leInt` (I# y) = isTrue# (x <=# y)
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] compareInt #-}
 compareInt :: Int -> Int -> Ordering
 (I# x#) `compareInt` (I# y#) = compareInt# x# y#
@@ -593,7 +593,7 @@ instance Ord Word where
     (>=)    = geWord
     (>)     = gtWord
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] gtWord #-}
 {-# INLINE [1] geWord #-}
 {-# INLINE [1] ltWord #-}
@@ -604,7 +604,7 @@ gtWord, geWord, ltWord, leWord :: Word -> Word -> Bool
 (W# x) `ltWord` (W# y) = isTrue# (x `ltWord#` y)
 (W# x) `leWord` (W# y) = isTrue# (x `leWord#` y)
 
--- See GHC.Classes#matching_overloaded_methods_in_rules
+-- See GHC.Internal.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] compareWord #-}
 compareWord :: Word -> Word -> Ordering
 (W# x#) `compareWord` (W# y#) = compareWord# x# y#

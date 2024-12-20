@@ -10,9 +10,9 @@ module GHC.Internal.Event.Arr
     ) where
 
 import GHC.Internal.Base (($))
-import GHC.Prim (MutableArray#, RealWorld, newArray#, readArray#,
-                 sizeofMutableArray#, writeArray#)
-import GHC.Types (IO(..), Int(..))
+import GHC.Internal.Prim (MutableArray#, RealWorld, newArray#, readArray#,
+                          sizeofMutableArray#, writeArray#)
+import GHC.Internal.Types (IO(..), Int(..))
 
 data Arr a = Arr (MutableArray# RealWorld a)
 

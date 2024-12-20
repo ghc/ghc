@@ -89,10 +89,10 @@ where
 -- Required for WORDS_BIGENDIAN
 #include <ghcautoconf.h>
 
-import GHC.Prim.Exception
+import GHC.Internal.Prim.Exception
 
-import GHC.Prim
-import GHC.Types
+import GHC.Internal.Prim
+import GHC.Internal.Types
 
 default ()
 
@@ -593,9 +593,9 @@ ioBool (IO io) s = case io s of
 
 -- Note [ghc-bignum exceptions]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- `ghc-bignum` package can't depend on `base` package (it would create a cyclic
--- dependency). Hence it can't import "Control.Exception" and throw exceptions
--- the usual way. Instead it uses some wired-in functions from `ghc-prim` which
+-- `ghc-bignum` package couldn't depend on `ghc-internal` package (it would create a cyclic
+-- dependency). Hence it couldn't import "Control.Exception" and throw exceptions
+-- the usual way. Instead it uses some wired-in functions from `ghc-internal` which
 -- themselves call wired-in functions from the RTS: raiseOverflow,
 -- raiseUnderflow, raiseDivZero.
 --
@@ -609,6 +609,8 @@ ioBool (IO io) s = case io s of
 --                !_ -> 0## -- the bang-pattern is necessary!
 --                          -- 0## is a dummy value (unreachable code)
 --
+-- Since ghc-bignum has been merged into ghc-internal, it may be possible to
+-- replace these exception primops with hs-boot files.
 
 unexpectedValue_Int# :: (# #) -> Int#
 unexpectedValue_Int# _ = case unexpectedValue of

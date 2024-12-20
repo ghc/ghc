@@ -1,12 +1,14 @@
-
 T18891a.hs:8:4: error: [GHC-89498]
     • A newtype must not be a GADT
-      MkN1 :: N1 @GHC.Types.LiftedRep -> N1 @GHC.Types.LiftedRep
+      MkN1 :: N1 @GHC.Internal.Types.LiftedRep
+              -> N1 @GHC.Internal.Types.LiftedRep
     • In the definition of data constructor ‘MkN1’
       In the newtype declaration for ‘N1’
 
 T18891a.hs:12:3: error: [GHC-89498]
     • A newtype must not be a GADT
-      MkN2 :: N2 @GHC.Types.LiftedRep -> N2 @GHC.Types.LiftedRep
+      MkN2 :: N2 @GHC.Internal.Types.LiftedRep
+              -> N2 @GHC.Internal.Types.LiftedRep
     • In the definition of data constructor ‘MkN2’
       In the newtype declaration for ‘N2’
+

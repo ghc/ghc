@@ -99,7 +99,7 @@ import qualified Data.ByteString          as BS
 import Data.Function            (on)
 import qualified Data.IntSet              as IS
 import Data.IORef
-import Data.List  ( nub, intercalate, groupBy, intersperse, sortBy)
+import Data.List  ( nub, intercalate, groupBy, intersperse )
 import Data.Map.Strict          (Map)
 import qualified Data.Map.Strict          as M
 import Data.Maybe
@@ -926,22 +926,8 @@ collectModuleCodes ar_cache link_plan = do
       module_blocks = M.fromListWith IS.union $
                       map (\ref -> (block_ref_mod ref, IS.singleton (block_ref_idx ref))) (S.toList blocks)
 
-  -- GHCJS had this comment: "read ghc-prim first, since we depend on that for
-  -- static initialization". Not sure if it's still true as we haven't ported
-  -- the compactor yet. Still we sort to read ghc-prim blocks first just in
-  -- case.
-  let pred x = moduleUnitId (fst x) == primUnitId
-      cmp x y = case (pred x, pred y) of
-        (True,False)  -> LT
-        (False,True)  -> GT
-        (True,True)   -> EQ
-        (False,False) -> EQ
-
-      sorted_module_blocks :: [(Module,BlockIds)]
-      sorted_module_blocks = sortBy cmp (M.toList module_blocks)
-
   -- load blocks
-  forM sorted_module_blocks $ \(mod,bids) -> do
+  forM (M.toList module_blocks) $ \(mod,bids) -> do
     case M.lookup mod block_info of
       Nothing  -> pprPanic "collectModuleCodes: couldn't find block info for module" (ppr mod)
       Just lbi -> extractBlocks ar_cache lbi bids
@@ -1013,7 +999,7 @@ readArObject ar_cache mod ar_file = do
 -- | dependencies for the RTS, these need to be always linked
 rtsDeps :: ([UnitId], Set ExportedFun)
 rtsDeps =
-  ( [ghcInternalUnitId, primUnitId]
+  ( [ghcInternalUnitId]
   , S.fromList $ concat
       [ mkInternalFuns "GHC.Internal.Conc.Sync"
           ["reportError"]
@@ -1054,11 +1040,11 @@ rtsDeps =
           , "setCurrentThreadResultException"
           , "setCurrentThreadResultValue"
           ]
-      , mkPrimFuns "GHC.Types"
+      , mkInternalFuns "GHC.Internal.Types"
           [ ":"
           , "[]"
           ]
-      , mkPrimFuns "GHC.Tuple"
+      , mkInternalFuns "GHC.Internal.Tuple"
           [ "(,)"
           , "(,,)"
           , "(,,,)"
@@ -1075,10 +1061,6 @@ rtsDeps =
 -- | Export the functions in @ghc-internal@
 mkInternalFuns :: FastString -> [FastString] -> [ExportedFun]
 mkInternalFuns = mkExportedFuns ghcInternalUnitId
-
--- | Export the Prim functions
-mkPrimFuns :: FastString -> [FastString] -> [ExportedFun]
-mkPrimFuns = mkExportedFuns primUnitId
 
 -- | Given a @UnitId@, a module name, and a set of symbols in the module,
 -- package these into an @ExportedFun@.

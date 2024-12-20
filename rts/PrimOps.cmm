@@ -35,7 +35,7 @@ import CLOSURE ghczminternal_GHCziInternalziIOziException_blockedIndefinitelyOnM
 import CLOSURE ghczminternal_GHCziInternalziIOPort_doubleReadException_closure;
 import AcquireSRWLockExclusive;
 import ReleaseSRWLockExclusive;
-import CLOSURE ghczmprim_GHCziTypes_False_closure;
+import CLOSURE ghczminternal_GHCziInternalziTypes_False_closure;
 #if defined(PROFILING)
 import CLOSURE CCS_MAIN;
 #endif
@@ -2785,13 +2785,13 @@ stg_getSparkzh ()
     W_ spark;
 
 #if !defined(THREADED_RTS)
-    return (0,ghczmprim_GHCziTypes_False_closure);
+    return (0,ghczminternal_GHCziInternalziTypes_False_closure);
 #else
     ("ptr" spark) = ccall findSpark(MyCapability() "ptr");
     if (spark != 0) {
         return (1,spark);
     } else {
-        return (0,ghczmprim_GHCziTypes_False_closure);
+        return (0,ghczminternal_GHCziInternalziTypes_False_closure);
     }
 #endif
 }

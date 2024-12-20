@@ -125,7 +125,7 @@ import GHC.Internal.List
 import GHC.Internal.Num
 import GHC.Internal.Read
 import GHC.Internal.Show
-import GHC.Tuple (Solo (..))
+import GHC.Internal.Tuple (Solo (..))
 import GHC.Internal.Text.Read( reads )
 
 -- Imports for the instances

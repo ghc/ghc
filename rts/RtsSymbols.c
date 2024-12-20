@@ -986,7 +986,7 @@ extern char **environ;
 #if defined(riscv64_HOST_ARCH)
 // See https://gcc.gnu.org/onlinedocs/gccint/Integer-library-routines.html as
 // reference for the following built-ins. __clzdi2 and __ctzdi2 probably relate
-// to __builtin-s in libraries/ghc-prim/cbits/ctz.c.
+// to __builtin-s in libraries/ghc-internal/cbits/ctz.c.
 #define RTS_ARCH_LIBGCC_SYMBOLS \
   SymI_NeedsProto(__clzdi2) \
   SymI_NeedsProto(__ctzdi2)

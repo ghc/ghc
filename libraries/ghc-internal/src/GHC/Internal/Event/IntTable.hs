@@ -18,12 +18,12 @@ import GHC.Internal.Data.Bits ((.&.), shiftL, shiftR)
 import GHC.Internal.Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import GHC.Internal.Data.Maybe (Maybe(..), isJust)
 import GHC.Internal.Base (Monad(..), (=<<), ($), ($!), const, liftM, otherwise, when)
-import GHC.Classes (Eq(..), Ord(..))
+import GHC.Internal.Classes (Eq(..), Ord(..))
 import GHC.Internal.Event.Arr (Arr)
 import GHC.Internal.Event.IntVar
 import GHC.Internal.Num (Num(..))
-import GHC.Prim (seq)
-import GHC.Types (Bool(..), IO(..), Int(..))
+import GHC.Internal.Prim (seq)
+import GHC.Internal.Types (Bool(..), IO(..), Int(..))
 import qualified GHC.Internal.Event.Arr as Arr
 
 -- A very simple chained integer-keyed mutable hash table. We use

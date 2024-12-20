@@ -112,9 +112,9 @@ module GHC.Internal.Bignum.Natural
     , naturalSizeInBase#
     ) where
 
-import GHC.Prim
-import GHC.Types
-import GHC.Classes
+import GHC.Internal.Prim
+import GHC.Internal.Types
+import GHC.Internal.Classes
 
 import GHC.Internal.Bignum.BigNat
 import GHC.Internal.Bignum.Primitives

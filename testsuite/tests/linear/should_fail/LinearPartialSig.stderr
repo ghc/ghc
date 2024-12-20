@@ -1,6 +1,6 @@
-
 LinearPartialSig.hs:5:9: error: [GHC-88464]
     • Found type wildcard ‘_’
-        standing for ‘Many :: GHC.Types.Multiplicity’
+        standing for ‘Many :: GHC.Internal.Types.Multiplicity’
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: f :: a %_ -> a
+

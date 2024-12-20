@@ -31,8 +31,8 @@ class GHC.Internal.Base.Applicative m => Monad m
 catMaybes :: [Maybe a] -> [a]
 fromJust :: GHC.Internal.Stack.Types.HasCallStack => Maybe a -> a
 fromMaybe :: a -> Maybe a -> a
-isJust :: Maybe a -> GHC.Types.Bool
-isNothing :: Maybe a -> GHC.Types.Bool
+isJust :: Maybe a -> GHC.Internal.Types.Bool
+isNothing :: Maybe a -> GHC.Internal.Types.Bool
 listToMaybe :: [a] -> Maybe a
 mapMaybe :: (a -> Maybe b) -> [a] -> [b]
 maybe :: b -> (a -> b) -> Maybe a -> b
@@ -50,13 +50,14 @@ class Eq a
   ...
 -- imported via Prelude, T
 Prelude.length ::
-  GHC.Internal.Data.Foldable.Foldable t => t a -> GHC.Types.Int
+  GHC.Internal.Data.Foldable.Foldable t =>
+  t a -> GHC.Internal.Types.Int
 -- imported via T
 type T.Integer :: *
 data T.Integer = ...
 T.length ::
   bytestring-0.12.1.0:Data.ByteString.Internal.Type.ByteString
-  -> GHC.Types.Int
+  -> GHC.Internal.Types.Int
 :browse! T
 -- defined locally
 T.length :: T.Integer

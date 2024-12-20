@@ -16,7 +16,7 @@ See the proposal for motivation and explanations:
 https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0475-tuple-syntax.rst
 -}
 module Data.Tuple.Experimental (
-  module GHC.Tuple,
+  module GHC.Internal.Tuple,
   Solo (Solo, MkSolo),
 
   -- * Unboxed tuples
@@ -158,8 +158,8 @@ module Data.Tuple.Experimental (
   CTuple64,
 ) where
 
-import GHC.Tuple
-import GHC.Types
-import GHC.Classes
+import GHC.Internal.Tuple
+import GHC.Internal.Types
+import GHC.Internal.Classes
 
 default ()

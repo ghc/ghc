@@ -1,4 +1,4 @@
 Rule fired: Int# -> Integer -> Word# (GHC.Internal.Bignum.Integer)
-Rule fired: Word# -> Int# -> Word# (GHC.Prim.Ext)
+Rule fired: Word# -> Int# -> Word# (GHC.Internal.Prim.Ext)
 Rule fired: Int# -> Integer -> Int# (GHC.Internal.Bignum.Integer)
 Rule fired: Word# -> Natural -> Word# (GHC.Internal.Bignum.Natural)

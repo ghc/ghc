@@ -3,6 +3,6 @@ T17697.hs:6:5: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables (in -Wdef
 
 T17697.hs:6:5: warning: [GHC-81995] [-Wunused-do-bind (in -Wall)]
     A do-notation statement discarded a result of type
-      ‘GHC.Types.ZonkAny 1’
+      ‘GHC.Internal.Types.ZonkAny 1’
     Suggested fix: Suppress this warning by saying ‘_ <- threadDelay 1’
 

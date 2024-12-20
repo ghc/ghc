@@ -6,38 +6,43 @@ Result size of Tidy Core
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T4908.$trModule4 :: Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
 T4908.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T4908.$trModule3 :: TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
-T4908.$trModule3 = GHC.Types.TrNameS T4908.$trModule4
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+T4908.$trModule3 = GHC.Internal.Types.TrNameS T4908.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T4908.$trModule2 :: Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
 T4908.$trModule2 = "T4908"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T4908.$trModule1 :: TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
-T4908.$trModule1 = GHC.Types.TrNameS T4908.$trModule2
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+T4908.$trModule1 = GHC.Internal.Types.TrNameS T4908.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T4908.$trModule :: Module
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T4908.$trModule
-  = GHC.Types.Module T4908.$trModule3 T4908.$trModule1
+  = GHC.Internal.Types.Module T4908.$trModule3 T4908.$trModule1
 
 Rec {
 -- RHS size: {terms: 19, types: 5, coercions: 0, joins: 0/0}
@@ -49,9 +54,9 @@ T4908.f_$s$wf
         __DEFAULT ->
           case sc1 of ds1 {
             __DEFAULT -> T4908.f_$s$wf sc ds1 (-# ds 1#);
-            0# -> GHC.Types.(##)
+            0# -> GHC.Internal.Types.(##)
           };
-        0# -> GHC.Types.(##)
+        0# -> GHC.Internal.Types.(##)
       }
 end Rec }
 
@@ -61,8 +66,8 @@ f [InlPrag=[2]] :: Int -> (Int, Int) -> Bool
  Arity=2,
  Str=<1!P(1L)><MP(A,1P(1L))>,
  Cpr=2,
- Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (ds [Occ=Once1!] :: Int) (x [Occ=Once1!] :: (Int, Int)) ->
                  case ds of { I# ww [Occ=Once1!] ->
@@ -73,13 +78,13 @@ f [InlPrag=[2]] :: Int -> (Int, Int) -> Bool
                      case ds2 of ds3 [Occ=Once1] {
                        __DEFAULT ->
                          case T4908.f_$s$wf a ds3 (-# ds1 1#) of { (# #) ->
-                         GHC.Types.True
+                         GHC.Internal.Types.True
                          };
-                       0# -> GHC.Types.True
+                       0# -> GHC.Internal.Types.True
                      }
                      }
                      };
-                   0# -> GHC.Types.True
+                   0# -> GHC.Internal.Types.True
                  }
                  }}]
 f = \ (ds :: Int) (x :: (Int, Int)) ->
@@ -91,13 +96,13 @@ f = \ (ds :: Int) (x :: (Int, Int)) ->
           case ds2 of ds3 {
             __DEFAULT ->
               case T4908.f_$s$wf a ds3 (-# ds1 1#) of { (# #) ->
-              GHC.Types.True
+              GHC.Internal.Types.True
               };
-            0# -> GHC.Types.True
+            0# -> GHC.Internal.Types.True
           }
           }
           };
-        0# -> GHC.Types.True
+        0# -> GHC.Internal.Types.True
       }
       }
 

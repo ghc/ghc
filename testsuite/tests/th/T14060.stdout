@@ -1,12 +1,12 @@
 newtype Main.Foo1
-    = Main.Foo1 (GHC.Internal.Data.Proxy.Proxy ('(:) 'GHC.Types.False
-                                                     ('(:) 'GHC.Types.True
-                                                           ('(:) 'GHC.Types.False
-                                                                 ('[] :: [GHC.Types.Bool])))))
+    = Main.Foo1 (GHC.Internal.Data.Proxy.Proxy ('(:) 'GHC.Internal.Types.False
+                                                     ('(:) 'GHC.Internal.Types.True
+                                                           ('(:) 'GHC.Internal.Types.False
+                                                                 ('[] :: [GHC.Internal.Types.Bool])))))
 newtype Main.Foo2 (a_0 :: *)
     = Main.Foo2 (GHC.Internal.Data.Proxy.Proxy (Main.Wurble (GHC.Internal.Maybe.Maybe a_0)
                                                             ('GHC.Internal.Maybe.Nothing :: GHC.Internal.Maybe.Maybe a_0)))
 newtype Main.Foo3
-    = Main.Foo3 (GHC.Internal.Data.Proxy.Proxy (Main.Foo3Fam2 GHC.Types.Int :: *))
+    = Main.Foo3 (GHC.Internal.Data.Proxy.Proxy (Main.Foo3Fam2 GHC.Internal.Types.Int :: *))
 newtype Main.Foo4
-    = Main.Foo4 (GHC.Internal.Data.Proxy.Proxy (Main.Foo4Fam2 GHC.Types.Int :: *))
+    = Main.Foo4 (GHC.Internal.Data.Proxy.Proxy (Main.Foo4Fam2 GHC.Internal.Types.Int :: *))

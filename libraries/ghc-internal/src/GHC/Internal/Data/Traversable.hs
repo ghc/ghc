@@ -54,7 +54,7 @@ import GHC.Internal.Base ( Applicative(..), Monad(..), Monoid, Maybe(..), NonEmp
                   ($), (.), id, flip )
 import GHC.Internal.Generics
 import qualified GHC.Internal.List as List ( foldr )
-import GHC.Tuple (Solo (..))
+import GHC.Internal.Tuple (Solo (..))
 
 -- $setup
 -- >>> import Prelude

@@ -1,6 +1,6 @@
-f_0 :: (forall a_1 . GHC.Classes.Eq (T15738.Foo a_1)) =>
-       T15738.Foo x_2 -> T15738.Foo x_2 -> GHC.Types.Bool
-f_0 = (GHC.Classes.==)
+f_0 :: (forall a_1 . GHC.Internal.Classes.Eq (T15738.Foo a_1)) =>
+       T15738.Foo x_2 -> T15738.Foo x_2 -> GHC.Internal.Types.Bool
+f_0 = (GHC.Internal.Classes.==)
 T15738.hs:(11,2)-(14,12): Splicing declarations
     do d <- [d| f :: (forall a. Eq (Foo a)) => Foo x -> Foo x -> Bool
                 f = (==) |]

@@ -20,15 +20,15 @@
 #endif
 
 /* See Note [Wired-in exceptions are not CAFfy] in GHC.Core.Make. */
-PRELUDE_CLOSURE(ghczmprim_GHCziPrimziPanic_absentSumFieldError_closure);
+PRELUDE_CLOSURE(ghczminternal_GHCziInternalziPrimziPanic_absentSumFieldError_closure);
 
 /* Define canonical names so we can abstract away from the actual
  * modules these names are defined in.
  */
 
-PRELUDE_CLOSURE(ghczmprim_GHCziTuple_Z0T_closure);
-PRELUDE_CLOSURE(ghczmprim_GHCziTypes_True_closure);
-PRELUDE_CLOSURE(ghczmprim_GHCziTypes_False_closure);
+PRELUDE_CLOSURE(ghczminternal_GHCziInternalziTuple_Z0T_closure);
+PRELUDE_CLOSURE(ghczminternal_GHCziInternalziTypes_True_closure);
+PRELUDE_CLOSURE(ghczminternal_GHCziInternalziTypes_False_closure);
 PRELUDE_CLOSURE(ghczminternal_GHCziInternalziPack_unpackCString_closure);
 PRELUDE_CLOSURE(ghczminternal_GHCziInternalziPack_unpackCStringUtf8_closure);
 PRELUDE_CLOSURE(ghczminternal_GHCziInternalziWeak_runFinalizzerBatch_closure);
@@ -68,12 +68,12 @@ PRELUDE_CLOSURE(ghczminternal_GHCziInternalziEventziWindows_processRemoteComplet
 PRELUDE_CLOSURE(ghczminternal_GHCziInternalziTopHandler_flushStdHandles_closure);
 PRELUDE_CLOSURE(ghczminternal_GHCziInternalziTopHandler_runMainIO_closure);
 
-PRELUDE_INFO(ghczmprim_GHCziCString_unpackCStringzh_info);
-PRELUDE_INFO(ghczmprim_GHCziTypes_Czh_con_info);
-PRELUDE_INFO(ghczmprim_GHCziTypes_Izh_con_info);
-PRELUDE_INFO(ghczmprim_GHCziTypes_Fzh_con_info);
-PRELUDE_INFO(ghczmprim_GHCziTypes_Dzh_con_info);
-PRELUDE_INFO(ghczmprim_GHCziTypes_Wzh_con_info);
+PRELUDE_INFO(ghczminternal_GHCziInternalziCString_unpackCStringzh_info);
+PRELUDE_INFO(ghczminternal_GHCziInternalziTypes_Czh_con_info);
+PRELUDE_INFO(ghczminternal_GHCziInternalziTypes_Izh_con_info);
+PRELUDE_INFO(ghczminternal_GHCziInternalziTypes_Fzh_con_info);
+PRELUDE_INFO(ghczminternal_GHCziInternalziTypes_Dzh_con_info);
+PRELUDE_INFO(ghczminternal_GHCziInternalziTypes_Wzh_con_info);
 
 PRELUDE_INFO(ghczminternal_GHCziInternalziPtr_Ptr_con_info);
 PRELUDE_INFO(ghczminternal_GHCziInternalziPtr_FunPtr_con_info);
@@ -87,9 +87,9 @@ PRELUDE_INFO(ghczminternal_GHCziInternalziWord_W32zh_con_info);
 PRELUDE_INFO(ghczminternal_GHCziInternalziWord_W64zh_con_info);
 PRELUDE_INFO(ghczminternal_GHCziInternalziStable_StablePtr_con_info);
 
-#define Unit_closure              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTuple_Z0T_closure)
-#define True_closure              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_True_closure)
-#define False_closure             DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_False_closure)
+#define Unit_closure              DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTuple_Z0T_closure)
+#define True_closure              DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTypes_True_closure)
+#define False_closure             DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTypes_False_closure)
 #define unpackCString_closure     DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziPack_unpackCString_closure)
 #define runFinalizerBatch_closure DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziWeakziFinalizze_runFinalizzerBatch_closure)
 #define mainIO_closure            (&ZCMain_main_closure)
@@ -117,18 +117,18 @@ PRELUDE_INFO(ghczminternal_GHCziInternalziStable_StablePtr_con_info);
 #define nonTermination_closure    DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziControlziExceptionziBase_nonTermination_closure)
 #define nestedAtomically_closure  DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziControlziExceptionziBase_nestedAtomically_closure)
 #define doubleReadException  DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziIOPort_doubleReadException_closure)
-#define absentSumFieldError_closure DLL_IMPORT_DATA_REF(ghczmprim_GHCziPrimziPanic_absentSumFieldError_closure)
+#define absentSumFieldError_closure DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziPrimziPanic_absentSumFieldError_closure)
 #define underflowException_closure DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziExceptionziType_underflowException_closure)
 #define overflowException_closure DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziExceptionziType_overflowException_closure)
 #define divZeroException_closure  DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziExceptionziType_divZZeroException_closure)
 
 #define blockedOnBadFD_closure    DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziEventziThread_blockedOnBadFD_closure)
 
-#define Czh_con_info              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Czh_con_info)
-#define Izh_con_info              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Izh_con_info)
-#define Fzh_con_info              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Fzh_con_info)
-#define Dzh_con_info              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Dzh_con_info)
-#define Wzh_con_info              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Wzh_con_info)
+#define Czh_con_info              DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTypes_Czh_con_info)
+#define Izh_con_info              DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTypes_Izh_con_info)
+#define Fzh_con_info              DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTypes_Fzh_con_info)
+#define Dzh_con_info              DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTypes_Dzh_con_info)
+#define Wzh_con_info              DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTypes_Wzh_con_info)
 #define W8zh_con_info             DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziWord_W8zh_con_info)
 #define W16zh_con_info            DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziWord_W16zh_con_info)
 #define W32zh_con_info            DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziWord_W32zh_con_info)

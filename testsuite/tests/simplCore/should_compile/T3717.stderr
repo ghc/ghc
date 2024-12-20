@@ -4,50 +4,55 @@ Result size of Tidy Core
   = {terms: 36, types: 15, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T3717.$trModule4 :: GHC.Prim.Addr#
+T3717.$trModule4 :: GHC.Internal.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
 T3717.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T3717.$trModule3 :: GHC.Types.TrName
+T3717.$trModule3 :: GHC.Internal.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
-T3717.$trModule3 = GHC.Types.TrNameS T3717.$trModule4
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+T3717.$trModule3 = GHC.Internal.Types.TrNameS T3717.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T3717.$trModule2 :: GHC.Prim.Addr#
+T3717.$trModule2 :: GHC.Internal.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
 T3717.$trModule2 = "T3717"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T3717.$trModule1 :: GHC.Types.TrName
+T3717.$trModule1 :: GHC.Internal.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
-T3717.$trModule1 = GHC.Types.TrNameS T3717.$trModule2
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+T3717.$trModule1 = GHC.Internal.Types.TrNameS T3717.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T3717.$trModule :: GHC.Types.Module
+T3717.$trModule :: GHC.Internal.Types.Module
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T3717.$trModule
-  = GHC.Types.Module T3717.$trModule3 T3717.$trModule1
+  = GHC.Internal.Types.Module T3717.$trModule3 T3717.$trModule1
 
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
 T3717.$wfoo [InlPrag=[2], Occ=LoopBreaker]
-  :: GHC.Prim.Int# -> GHC.Prim.Int#
+  :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
 [GblId, Arity=1, Str=<1L>, Unf=OtherCon []]
 T3717.$wfoo
-  = \ (ww :: GHC.Prim.Int#) ->
+  = \ (ww :: GHC.Internal.Prim.Int#) ->
       case ww of ds {
-        __DEFAULT -> T3717.$wfoo (GHC.Prim.-# ds 1#);
+        __DEFAULT -> T3717.$wfoo (GHC.Internal.Prim.-# ds 1#);
         0# -> 0#
       }
 end Rec }
@@ -58,19 +63,21 @@ foo [InlPrag=[2]] :: Int -> Int
  Arity=1,
  Str=<1!P(1L)>,
  Cpr=1,
- Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (ds [Occ=Once1!] :: Int) ->
-                 case ds of { GHC.Types.I# ww [Occ=Once1] ->
+                 case ds of { GHC.Internal.Types.I# ww [Occ=Once1] ->
                  case T3717.$wfoo ww of ww1 [Occ=Once1] { __DEFAULT ->
-                 GHC.Types.I# ww1
+                 GHC.Internal.Types.I# ww1
                  }
                  }}]
 foo
   = \ (ds :: Int) ->
-      case ds of { GHC.Types.I# ww ->
-      case T3717.$wfoo ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
+      case ds of { GHC.Internal.Types.I# ww ->
+      case T3717.$wfoo ww of ww1 { __DEFAULT ->
+      GHC.Internal.Types.I# ww1
+      }
       }
 
 

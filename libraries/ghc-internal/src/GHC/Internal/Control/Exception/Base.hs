@@ -421,7 +421,7 @@ instance Exception NoMatchingContinuationPrompt
 
 -----
 
--- See Note [Compiler error functions] in ghc-prim:GHC.Prim.Panic
+-- See Note [Compiler error functions] in ghc-internal:GHC.Internal.Prim.Panic
 recSelError, recConError, typeError,
   nonExhaustiveGuardsError, patError, noMethodBindingError
         :: Addr# -> a   -- All take a UTF8-encoded C string

@@ -1,7 +1,7 @@
 T23739c.hs:8:5: error: [GHC-01928]
     • Illegal term-level use of the type constructor ‘Int’
     • imported from ‘Prelude’ at T23739c.hs:2:8-14
-      (and originally defined in ‘GHC.Types’)
+      (and originally defined in ‘GHC.Internal.Types’)
     • In the expression: Int {}
       In an equation for ‘g’: g = Int {}
 

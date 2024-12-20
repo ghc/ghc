@@ -12,9 +12,9 @@ bkpfail07.bkp:6:9: error: [GHC-15843]
     • Type constructor ‘T’ has conflicting definitions in the module
       and its hsig file.
       Main module: type T :: *
-                   data T = T GHC.Types.Bool
+                   data T = T GHC.Internal.Types.Bool
         Hsig file: type T :: *
-                   data T = T GHC.Types.Int
+                   data T = T GHC.Internal.Types.Int
       The constructors do not match: The types for ‘T’ differ.
     • While checking that ‘h[A=<A>]:H’ implements signature ‘H’ in ‘p[H=h[A=<A>]:H]’.
 

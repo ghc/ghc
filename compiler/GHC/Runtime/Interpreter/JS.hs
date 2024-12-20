@@ -228,9 +228,9 @@ jsLinkRts logger tmpfs tmp_dir cfg unit_env inst = do
         , lcLinkCsources    = False -- we know that there are no C sources to load for the RTS
         }
 
-  -- link the RTS and its dependencies (things it uses from `base`, etc.)
+  -- link the RTS and its dependencies (things it uses from `ghc-internal`, etc.)
   let link_spec = LinkSpec
-        { lks_unit_ids        = [rtsUnitId, ghcInternalUnitId, primUnitId]
+        { lks_unit_ids        = [rtsUnitId, ghcInternalUnitId]
         , lks_obj_root_filter = const False
         , lks_extra_roots     = mempty
         , lks_objs_hs         = mempty

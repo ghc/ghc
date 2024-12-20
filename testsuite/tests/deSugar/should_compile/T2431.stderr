@@ -7,7 +7,7 @@ Result size of Tidy Core
 T2431.$WRefl [InlPrag=INLINE[final] CONLIKE] :: forall a. a :~: a
 [GblId[DataConWrapper], Unf=OtherCon []]
 T2431.$WRefl
-  = \ (@a) -> T2431.Refl @a @a @~(<a>_N :: a GHC.Prim.~# a)
+  = \ (@a) -> T2431.Refl @a @a @~(<a>_N :: a GHC.Internal.Prim.~# a)
 
 -- RHS size: {terms: 4, types: 7, coercions: 0, joins: 0/0}
 absurd :: forall a. (Int :~: Bool) -> a
@@ -15,89 +15,92 @@ absurd :: forall a. (Int :~: Bool) -> a
 absurd = \ (@a) (x :: Int :~: Bool) -> case x of {}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$trModule1 :: GHC.Prim.Addr#
+$trModule1 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $trModule1 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$trModule2 :: GHC.Types.TrName
+$trModule2 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []]
-$trModule2 = GHC.Types.TrNameS $trModule1
+$trModule2 = GHC.Internal.Types.TrNameS $trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$trModule3 :: GHC.Prim.Addr#
+$trModule3 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $trModule3 = "T2431"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$trModule4 :: GHC.Types.TrName
+$trModule4 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []]
-$trModule4 = GHC.Types.TrNameS $trModule3
+$trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T2431.$trModule :: GHC.Types.Module
+T2431.$trModule :: GHC.Internal.Types.Module
 [GblId, Unf=OtherCon []]
-T2431.$trModule = GHC.Types.Module $trModule2 $trModule4
+T2431.$trModule = GHC.Internal.Types.Module $trModule2 $trModule4
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$krep :: GHC.Types.KindRep
+$krep :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep = GHC.Types.KindRepVar 0#
+$krep = GHC.Internal.Types.KindRepVar 0#
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$tc:~:1 :: GHC.Prim.Addr#
+$tc:~:1 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $tc:~:1 = ":~:"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$tc:~:2 :: GHC.Types.TrName
+$tc:~:2 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []]
-$tc:~:2 = GHC.Types.TrNameS $tc:~:1
+$tc:~:2 = GHC.Internal.Types.TrNameS $tc:~:1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T2431.$tc:~: :: GHC.Types.TyCon
+T2431.$tc:~: :: GHC.Internal.Types.TyCon
 [GblId, Unf=OtherCon []]
 T2431.$tc:~:
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       4608886815921030019#Word64
       6030312177285011233#Word64
       T2431.$trModule
       $tc:~:2
       0#
-      GHC.Types.krep$*->*->*
+      GHC.Internal.Types.krep$*->*->*
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-$krep1 :: [GHC.Types.KindRep]
+$krep1 :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
 $krep1
-  = GHC.Types.:
-      @GHC.Types.KindRep $krep (GHC.Types.[] @GHC.Types.KindRep)
+  = GHC.Internal.Types.:
+      @GHC.Internal.Types.KindRep
+      $krep
+      (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep2 :: [GHC.Types.KindRep]
+$krep2 :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep2 = GHC.Types.: @GHC.Types.KindRep $krep $krep1
+$krep2
+  = GHC.Internal.Types.: @GHC.Internal.Types.KindRep $krep $krep1
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep3 :: GHC.Types.KindRep
+$krep3 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep3 = GHC.Types.KindRepTyConApp T2431.$tc:~: $krep2
+$krep3 = GHC.Internal.Types.KindRepTyConApp T2431.$tc:~: $krep2
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$tc'Refl1 :: GHC.Prim.Addr#
+$tc'Refl1 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $tc'Refl1 = "'Refl"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$tc'Refl2 :: GHC.Types.TrName
+$tc'Refl2 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []]
-$tc'Refl2 = GHC.Types.TrNameS $tc'Refl1
+$tc'Refl2 = GHC.Internal.Types.TrNameS $tc'Refl1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T2431.$tc'Refl :: GHC.Types.TyCon
+T2431.$tc'Refl :: GHC.Internal.Types.TyCon
 [GblId, Unf=OtherCon []]
 T2431.$tc'Refl
-  = GHC.Types.TyCon
+  = GHC.Internal.Types.TyCon
       2478588351447975921#Word64
       2684375695874497811#Word64
       T2431.$trModule

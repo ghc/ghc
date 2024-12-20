@@ -84,3 +84,4 @@ test('T24496'
       , when(have_llvm(), extra_ways(["optllvm"]))
       ]
     , compile_and_run, ['-O'])
+test('T6026', normal, compile_and_run, [''])

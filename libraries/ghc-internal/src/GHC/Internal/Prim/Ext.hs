@@ -26,10 +26,10 @@
 -- primops because the compiler doesn't care about them at all: they just are
 -- extra foreign C-- calls libraries can make into the RTS.
 --
--- Note that 'GHC.Prim' has the same haddock section names as this module, but
+-- Note that 'GHC.Internal.Prim' has the same haddock section names as this module, but
 -- with descriptions. Consult that module's documentation for what each section means.
 -- are described over there.
-module GHC.Prim.Ext
+module GHC.Internal.Prim.Ext
   (
   -- * Misc
     getThreadAllocationCounter#
@@ -41,10 +41,10 @@ module GHC.Prim.Ext
 #endif
   ) where
 
-import GHC.Prim
+import GHC.Internal.Prim
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Types ()
+import GHC.Internal.Types ()
 
 default () -- Double and Integer aren't available yet
 

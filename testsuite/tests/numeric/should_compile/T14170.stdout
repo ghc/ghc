@@ -4,7 +4,7 @@ Result size of Tidy Core
   = {terms: 17, types: 6, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-NatVal.$trModule4 :: GHC.Prim.Addr#
+NatVal.$trModule4 :: GHC.Internal.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -12,15 +12,15 @@ NatVal.$trModule4 :: GHC.Prim.Addr#
 NatVal.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-NatVal.$trModule3 :: GHC.Types.TrName
+NatVal.$trModule3 :: GHC.Internal.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-NatVal.$trModule3 = GHC.Types.TrNameS NatVal.$trModule4
+NatVal.$trModule3 = GHC.Internal.Types.TrNameS NatVal.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-NatVal.$trModule2 :: GHC.Prim.Addr#
+NatVal.$trModule2 :: GHC.Internal.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -28,21 +28,21 @@ NatVal.$trModule2 :: GHC.Prim.Addr#
 NatVal.$trModule2 = "NatVal"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-NatVal.$trModule1 :: GHC.Types.TrName
+NatVal.$trModule1 :: GHC.Internal.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-NatVal.$trModule1 = GHC.Types.TrNameS NatVal.$trModule2
+NatVal.$trModule1 = GHC.Internal.Types.TrNameS NatVal.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-NatVal.$trModule :: GHC.Types.Module
+NatVal.$trModule :: GHC.Internal.Types.Module
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
 NatVal.$trModule
-  = GHC.Types.Module NatVal.$trModule3 NatVal.$trModule1
+  = GHC.Internal.Types.Module NatVal.$trModule3 NatVal.$trModule1
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 foo :: Integer

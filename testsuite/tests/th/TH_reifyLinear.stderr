@@ -1,1 +1,2 @@
-type TH_reifyLinear.T = GHC.Types.Int %1 -> GHC.Types.Int
+type TH_reifyLinear.T = GHC.Internal.Types.Int %1 ->
+                        GHC.Internal.Types.Int

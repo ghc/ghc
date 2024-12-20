@@ -1,4 +1,3 @@
-
 T17940.hs:7:14: error: [GHC-88464]
     • Found hole: _ :: Word8# -> Word8#
     • In the expression: _ (indexWord8Array# a i)
@@ -10,8 +9,9 @@ T17940.hs:7:14: error: [GHC-88464]
       Valid hole fits include
         notWord8# :: Word8# -> Word8#
           (imported from ‘GHC.Exts’ at T17940.hs:4:1-15
-           (and originally defined in ‘GHC.Prim’))
+           (and originally defined in ‘GHC.Internal.Prim’))
         coerce :: forall a b. Coercible a b => a -> b
           with coerce @Word8# @Word8#
           (imported from ‘GHC.Exts’ at T17940.hs:4:1-15
-           (and originally defined in ‘GHC.Prim’))
+           (and originally defined in ‘GHC.Internal.Prim’))
+

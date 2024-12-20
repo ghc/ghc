@@ -1,5 +1,5 @@
 f_0 :: GHC.Internal.Bignum.Integer.Integer ->
        forall a_1 -> GHC.Internal.Num.Num a_1 => a_1
 f_0 n_2 (type _) = GHC.Internal.Num.fromInteger n_2
-x_3 = 42 `f_0` (type GHC.Types.Double)
+x_3 = 42 `f_0` (type GHC.Internal.Types.Double)
 n_4 = f_0 42 (type GHC.Internal.Bignum.Integer.Integer)

@@ -1,6 +1,6 @@
-
 mod87.hs:4:5: error: [GHC-88464]
-    Data constructor not in scope: Left :: GHC.Types.Char -> t
+    Data constructor not in scope: Left :: GHC.Internal.Types.Char -> t
     Suggested fix:
       Add ‘Left’ to the import list in the import of ‘Prelude’
       (at mod87.hs:3:1-22).
+

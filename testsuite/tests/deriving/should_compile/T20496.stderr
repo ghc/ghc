@@ -15,12 +15,12 @@ rnd
   
   instance Traversable UhOh where traverse _ z = pure (case z of {})
   
-  instance Functor Trixie where fmap _ = GHC.Prim.coerce
+  instance Functor Trixie where fmap _ = GHC.Internal.Prim.coerce
   
   instance Foldable Trixie where foldMap _ _ = mempty
   
   instance Traversable Trixie where
-    traverse _ z = pure (GHC.Prim.coerce z)
+    traverse _ z = pure (GHC.Internal.Prim.coerce z)
   
   instance Functor T where
     fmap f (MkT a1) = MkT (f a1)
