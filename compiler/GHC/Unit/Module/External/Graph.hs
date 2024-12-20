@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Like @'GHC.Unit.Module.Graph'@ but for the @'ExternalModuleGraph'@ which is
 -- stored in the EPS.
@@ -59,6 +60,7 @@ import GHC.Data.Graph.Directed.Reachability
 import GHC.Data.Graph.Directed
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Bifunctor (first)
 import Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Unit.Types (UnitId)
@@ -100,15 +102,6 @@ data ExternalKey
 emptyExternalModuleGraph :: ExternalModuleGraph
 emptyExternalModuleGraph = ExternalModuleGraph [] (graphReachability emptyGraph, const Nothing) S.empty
 
-mkExternalModuleGraph :: [ExternalGraphNode] -> S.Set ExternalKey -> ExternalModuleGraph
--- romes:todo: does this also need to be defined in terms of extend (like for `ModuleGraph`?)
-mkExternalModuleGraph nodes loaded =
-  ExternalModuleGraph {
-      external_nodes = nodes
-    , external_trans = let (g, f) = (externalGraphNodes nodes)
-                       in (graphReachability g, f)
-    , external_fully_loaded = loaded  }
-
 -- | Get the dependencies of an 'ExternalNode'
 emgNodeDeps :: ExternalGraphNode -> [ExternalKey]
 emgNodeDeps = \case
@@ -129,7 +122,14 @@ emgLookupKey k emg = node_payload <$> (snd (external_trans emg)) k
 --------------------------------------------------------------------------------
 
 extendExternalModuleGraph :: ExternalGraphNode -> ExternalModuleGraph -> ExternalModuleGraph
-extendExternalModuleGraph node graph = mkExternalModuleGraph (node : external_nodes graph) (external_fully_loaded graph)
+extendExternalModuleGraph node ExternalModuleGraph{..} =
+  ExternalModuleGraph
+    { external_fully_loaded = external_fully_loaded
+    , external_nodes = node : external_nodes
+    , external_trans = first graphReachability $
+                       externalGraphNodes (node : external_nodes)
+    }
+
 
 --------------------------------------------------------------------------------
 -- * Loading
