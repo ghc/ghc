@@ -151,10 +151,10 @@ data ModuleGraph = ModuleGraph
     -- so that a lot of work is not repeated whenever the transitive
     -- dependencies need to be calculated (for example, hptInstances).
     --
-    -- * `mg_graph` is a reachability index constructed from a module
+    --- - `mg_graph` is a reachability index constructed from a module
     -- graph /with/ boot nodes (which make the graph acyclic), and
     --
-    -- * `mg_loop_graph` is a reachability index for the graph /without/
+    --- * `mg_loop_graph` is a reachability index for the graph /without/
     -- hs-boot nodes, that may be cyclic.
   }
 
