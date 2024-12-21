@@ -502,7 +502,6 @@ loadInterface doc_str mod from
 
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
-        ; eps <- liftIO $ hscEPS hsc_env
         ; let mhome_unit = ue_homeUnit (hsc_unit_env hsc_env)
         ; case lookupIfaceByModule hug (eps_PIT eps) mod of {
             Just iface
