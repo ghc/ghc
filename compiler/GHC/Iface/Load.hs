@@ -435,12 +435,12 @@ loadHomePackageInterfacesBelow msg (Just home_unit) mods = do
   dflags <- getDynFlags
   let ctx = initSDocContext dflags defaultUserStyle
 
-  forM_ mods $ \mod -> pprTrace "modsloadhomepkgbeloW" (ppr mod) $ do
+  forM_ mods $ \mod -> do
 
     graph <- eps_module_graph <$> getEps
     let key = ExternalModuleKey $ ModNodeKeyWithUid (GWIB (moduleName mod) NotBoot) (moduleUnitId mod)
 
-    if pprTrace "==============" (ppr graph) $ isFullyLoadedModule key graph
+    if isFullyLoadedModule key graph
       then return ()
       else do
         iface <- withIfaceErr ctx $
@@ -505,7 +505,7 @@ loadInterface doc_str mod from
         ; let mhome_unit = ue_homeUnit (hsc_unit_env hsc_env)
         ; case lookupIfaceByModule hug (eps_PIT eps) mod of {
             Just iface
-                -> pprTrace "HWATTTT" (ppr (mi_module iface) <+> ppr (eps_module_graph eps)) $ return (Succeeded iface) ;   -- Already loaded
+                -> return (Succeeded iface) ;   -- Already loaded
             _ -> do {
 
         -- READ THE MODULE IN
@@ -577,7 +577,7 @@ loadInterface doc_str mod from
 
         ; let direct_deps = map (uncurry (flip ModNodeKeyWithUid)) $ (Set.toList (dep_direct_mods $ mi_deps iface))
         ; let direct_pkg_deps = dep_direct_pkgs $ mi_deps iface
-        ; let !module_graph_key = pprTrace "module_graph_on_load" (ppr (eps_module_graph eps)) $
+        ; let !module_graph_key = -- pprTrace "module_graph_on_load" (ppr (eps_module_graph eps)) $
                 if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env
                                     --- ^ home unit mods in eps can only happen in oneshot mode
                   then Just $ NodeHomePackage (miKey iface) (map ExternalModuleKey direct_deps)
