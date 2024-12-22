@@ -9,7 +9,7 @@ module Context (
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile, pkgSetupConfigDir,
     pkgHaddockFile, pkgRegisteredLibraryFile, pkgRegisteredLibraryFileName,
     pkgLibraryFile, pkgGhciLibraryFile,
-    pkgConfFile, pkgStampFile, resourcePath, objectPath, contextPath, getContextPath, libPath, distDir,
+    pkgConfFile, pkgStampFile, resourcePath, objectPath, contextPath, getContextPath, libPath, distDir, distDynDir,
     haddockStatsFilesDir
     ) where
 
@@ -20,7 +20,8 @@ import Hadrian.Expression
 import Hadrian.Haskell.Cabal
 import Oracles.Setting
 import GHC.Toolchain.Target (Target(..))
-import GHC.Platform.ArchOS
+import Hadrian.Oracles.Cabal
+import Hadrian.Haskell.Cabal.Type
 
 -- | Most targets are built only one way, hence the notion of 'vanillaContext'.
 vanillaContext :: Stage -> Package -> Context
@@ -62,12 +63,15 @@ libPath Context {..} = buildRoot <&> (-/- (stageString stage -/- "lib"))
 --
 -- We preform some renaming to accommodate Cabal's slightly different naming
 -- conventions (see 'cabalOsString' and 'cabalArchString').
-distDir :: Stage -> Action FilePath
-distDir st = do
-    version        <- ghcVersionStage st
-    targetOs       <- cabalOsString   . stringEncodeOS   . archOS_OS   . tgtArchOs <$> targetStage st
-    targetArch     <- cabalArchString . stringEncodeArch . archOS_arch . tgtArchOs <$> targetStage st
-    return $ targetArch ++ "-" ++ targetOs ++ "-ghc-" ++ version
+distDir :: Context -> Action FilePath
+distDir c = do
+    cd <- readContextData c
+    return (contextLibdir cd)
+
+distDynDir :: Context -> Action FilePath
+distDynDir c = do
+    cd <- readContextData c
+    return (contextDynLibdir cd)
 
 pkgFileName :: Context -> Package -> String -> String -> Action FilePath
 pkgFileName context package prefix suffix = do
@@ -104,13 +108,12 @@ pkgHaddockFile Context {..} = do
 -- @_build/stage1/lib/x86_64-linux-ghc-8.9.0/array-0.5.1.0/libHSarray-0.5.4.0.a@
 pkgRegisteredLibraryFile :: Context -> Action FilePath
 pkgRegisteredLibraryFile context@Context {..} = do
-    libDir    <- libPath context
-    pkgId     <- pkgUnitId stage package
     fileName  <- pkgRegisteredLibraryFileName context
-    distDir   <- distDir stage
+    distDir   <- distDir context
+    distDynDir  <- distDynDir context
     return $ if Dynamic `wayUnit` way
-        then libDir -/- distDir -/- fileName
-        else libDir -/- distDir -/- pkgId -/- fileName
+        then distDynDir -/- fileName
+        else distDir -/- fileName
 
 -- | Just the final filename portion of pkgRegisteredLibraryFile
 pkgRegisteredLibraryFileName :: Context -> Action FilePath

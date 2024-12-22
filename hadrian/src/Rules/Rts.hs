@@ -154,10 +154,9 @@ needRtsSymLinks :: Stage -> Set.Set Way -> Action ()
 needRtsSymLinks stage rtsWays
     = forM_ (Set.filter (wayUnit Dynamic) rtsWays) $ \ way -> do
         let ctx = Context stage rts way Final
-        libPath     <- libPath ctx
-        distDir     <- distDir stage
+        distDir     <- distDynDir ctx
         rtsLibFile  <- takeFileName <$> pkgLibraryFile ctx
-        need [removeRtsDummyVersion (libPath </> distDir </> rtsLibFile)]
+        need [removeRtsDummyVersion (distDir </> rtsLibFile)]
 
 prefix, versionlessPrefix :: String
 versionlessPrefix = "libHSrts"

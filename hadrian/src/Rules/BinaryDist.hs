@@ -1,8 +1,6 @@
 {-# LANGUAGE TupleSections, MultiWayIf #-}
 module Rules.BinaryDist where
 
-import Hadrian.Haskell.Cabal
-
 import CommandLine
 import Context
 import Expression
@@ -146,15 +144,12 @@ bindistRules = do
     phony "binary-dist-dir" $ do
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
-        distDir        <- Context.distDir Stage1
-        rtsDir         <- pkgUnitId Stage1 rts
-        -- let rtsDir  = "rts"
+        distDir        <- Context.distDir (vanillaContext Stage1 rts)
 
         let ghcBuildDir      = root -/- stageString Stage1
             bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
             ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
-            rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir
-                               -/- "include"
+            rtsIncludeDir    = distDir -/- "include"
 
         -- We 'need' all binaries and libraries
         all_pkgs <- stagePackages Stage1

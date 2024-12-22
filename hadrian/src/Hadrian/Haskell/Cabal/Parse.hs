@@ -254,6 +254,7 @@ resolveContextData context@Context {..} = do
     pdi <- liftIO $ getHookedBuildInfo [pkgPath package, cPath -/- "build"]
     let pd'  = C.updatePackageDescription pdi (C.localPkgDescr lbi)
         lbi' = lbi { C.localPkgDescr = pd' }
+    pkgDbPath <- packageDbPath (PackageDbLoc stage iplace)
 
     -- TODO: Get rid of deprecated 'externalPackageDeps' and drop -Wno-deprecations
     -- See: https://github.com/snowleopard/hadrian/issues/548
@@ -302,6 +303,8 @@ resolveContextData context@Context {..} = do
           | takeExtension fp `elem` [".cpp", ".cxx", ".c++"]= CppMain
           | otherwise = CMain
 
+        install_dirs = absoluteInstallDirs pd' lbi' (CopyToDb pkgDbPath)
+
         main_src = fmap (first C.display) mainIs
         cdata = ContextData
           { dependencies    = deps
@@ -343,7 +346,10 @@ resolveContextData context@Context {..} = do
           , depLdOpts          = forDeps Installed.ldOptions
           , buildGhciLib       = C.withGHCiLib lbi'
           , frameworks         = C.frameworks buildInfo
-          , packageDescription = pd' }
+          , packageDescription = pd'
+          , contextLibdir      = libdir install_dirs
+          , contextDynLibdir   = dynlibdir install_dirs
+          }
 
       in return cdata
 
