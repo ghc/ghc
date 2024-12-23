@@ -2483,7 +2483,14 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
     do { def_eqs <- readTcRef def_eq_ref  -- Capture current state of def_eqs
 
        -- Attempt to unify kinds
-       ; co_k <- uType (mkKindEnv env ty1 ty2) (typeKind ty2) (tyVarKind tv1)
+       -- When doing so, be careful to preserve orientation;
+       --    see Note [Kind Equality Orientation] in GHC.Tc.Solver.Equality
+       --    and wrinkle (W2) in Note [Fundeps with instances, and equality orientation]
+       --        in GHC.Tc.Solver.Dict
+       -- Failing to preserve orientation led to #25597.
+       ; let kind_env = unSwap swapped (mkKindEnv env) ty1 ty2
+       ; co_k <- unSwap swapped (uType kind_env) (tyVarKind tv1) (typeKind ty2)
+
        ; traceTc "uUnfilledVar2 ok" $
          vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
               , ppr ty2 <+> dcolon <+> ppr (typeKind  ty2)
