@@ -979,6 +979,7 @@ module Data.Enum where
     enumFromTo :: a -> a -> [a]
     enumFromThenTo :: a -> a -> a -> [a]
     {-# MINIMAL toEnum, fromEnum #-}
+  enumerate :: forall a. (Enum a, Bounded a) => [a]
 
 module Data.Eq where
   -- Safety: Safe
