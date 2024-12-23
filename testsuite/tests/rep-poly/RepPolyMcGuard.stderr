@@ -1,12 +1,12 @@
-
 RepPolyMcGuard.hs:30:16: error: [GHC-55287]
-    • The first argument of the rebindable syntax operator ‘guard’
+    • The first argument of the rebindable syntax operator ‘(>>)’
         arising from a statement in a monad comprehension
       does not have a fixed runtime representation.
       Its type is:
-        a0 :: TYPE rep0
+        ma0 :: TYPE rep0
       Cannot unify ‘rep’ with the type variable ‘rep0’
       because the former is not a concrete ‘RuntimeRep’.
     • In a stmt of a monad comprehension: undefined
       In the expression: [() | undefined]
       In an equation for ‘foo’: foo _ = [() | undefined]
+

@@ -2234,7 +2234,7 @@ to our new cbv. This is actually done by `break_given` in
 `GHC.Tc.Solver.Monad.checkTypeEq`.
 
 Note its orientation: The type family ends up on the left; see
-Note [Orienting TyFamLHS/TyFamLHS]d. No special treatment for
+Note [Orienting TyFamLHS/TyFamLHS]. No special treatment for
 CycleBreakerTvs is necessary. This scenario is now easily soluble, by using
 the first Given to rewrite the Wanted, which can now be solved.
 
@@ -2906,8 +2906,7 @@ arising from injectivity improvement (#12522).  Suppose we have
   type instance F (a, Int) = (Int, G a)
 where G is injective; and wanted constraints
 
-  [W] TF (alpha, beta) ~ fuv
-  [W] fuv ~ (Int, <some type>)
+  [W] F (alpha, beta) ~ (Int, <some type>)
 
 The injectivity will give rise to constraints
 
@@ -2923,8 +2922,8 @@ so that the fresh unification variable will be eliminated in
 favour of alpha.  If we instead had
    [W] alpha ~ gamma1
 then we would unify alpha := gamma1; and kick out the wanted
-constraint.  But when we grough it back in, it'd look like
-   [W] TF (gamma1, beta) ~ fuv
+constraint.  But when we substitute it back in, it'd look like
+   [W] F (gamma1, beta) ~ fuv
 and exactly the same thing would happen again!  Infinite loop.
 
 This all seems fragile, and it might seem more robust to avoid
@@ -2981,8 +2980,9 @@ improveWantedTopFunEqs :: TyCon -> [TcType] -> CtEvidence -> Xi -> TcS Bool
 -- Work-item is a Wanted
 improveWantedTopFunEqs fam_tc args ev rhs_ty
   = do { eqns <- improve_wanted_top_fun_eqs fam_tc args rhs_ty
-       ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr rhs_ty
-                                           , ppr eqns ])
+       ; traceTcS "improveTopFunEqs" (vcat [ text "lhs:" <+> ppr fam_tc <+> ppr args
+                                           , text "rhs:" <+> ppr rhs_ty
+                                           , text "eqns:" <+> ppr eqns ])
        ; unifyFunDeps ev Nominal $ \uenv ->
          uPairsTcM (bump_depth uenv) (reverse eqns) }
          -- Missing that `reverse` causes T13135 and T13135_simple to loop.
@@ -3005,6 +3005,8 @@ improve_wanted_top_fun_eqs fam_tc lhs_tys rhs_ty
   = do { fam_envs <- getFamInstEnvs
        ; top_eqns <- improve_injective_wanted_top fam_envs inj_args fam_tc lhs_tys rhs_ty
        ; let local_eqns = improve_injective_wanted_famfam  inj_args fam_tc lhs_tys rhs_ty
+       ; traceTcS "improve_wanted_top_fun_eqs" $
+         vcat [ ppr fam_tc, text "local_eqns" <+> ppr local_eqns, text "top_eqns" <+> ppr top_eqns ]
        ; return (local_eqns ++ top_eqns) }
 
   | otherwise  -- No injectivity
@@ -3035,14 +3037,14 @@ improve_injective_wanted_top fam_envs inj_args fam_tc lhs_tys rhs_ty
                  -- The order of unsubstTvs is important; it must be
                  -- in telescope order e.g. (k:*) (a:k)
 
-           ; subst <- instFlexiX subst unsubstTvs
+           ; subst1 <- instFlexiX subst unsubstTvs
                 -- If the current substitution bind [k -> *], and
                 -- one of the un-substituted tyvars is (a::k), we'd better
                 -- be sure to apply the current substitution to a's kind.
                 -- Hence instFlexiX.   #13135 was an example.
 
-           ; if apartnessCheck (substTys subst branch_lhs_tys) branch
-             then return (mkInjectivityEqns inj_args (map (substTy subst) branch_lhs_tys) lhs_tys)
+           ; if apartnessCheck (substTys subst1 branch_lhs_tys) branch
+             then return (mkInjectivityEqns inj_args (map (substTy subst1) branch_lhs_tys) lhs_tys)
                   -- NB: The fresh unification variables (from unsubstTvs) are on the left
                   --     See Note [Improvement orientation]
              else return [] }

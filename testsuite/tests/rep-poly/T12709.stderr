@@ -1,6 +1,5 @@
-
 T12709.hs:28:13: error: [GHC-55287]
-    • The argument ‘1’ of ‘(+)’
+    • The argument ‘1 + 2 + 3’ of ‘(+)’
       does not have a fixed runtime representation.
       Its type is:
         a0 :: TYPE rep0
@@ -13,3 +12,4 @@ T12709.hs:28:13: error: [GHC-55287]
           u :: Num (a :: TYPE rep) => a
           u = 1 + 2 + 3 + 4
         in BUB u u
+
