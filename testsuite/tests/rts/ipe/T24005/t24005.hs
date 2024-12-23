@@ -32,5 +32,5 @@ instance Show a => Show (B a) where
 main :: IO ()
 main = do
     -- Should both result in InfoProvs with correct source locations
-    (\(Box d) -> print =<< whereFrom d) $ mkBox @(Show A)
-    (\(Box d) -> print =<< whereFrom d) $ mkBox @(Show (B A))
+    (\(Box !d) -> print =<< whereFrom d) $ mkBox @(Show A)
+    (\(Box !d) -> print =<< whereFrom d) $ mkBox @(Show (B A))

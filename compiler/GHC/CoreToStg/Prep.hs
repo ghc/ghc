@@ -2054,12 +2054,27 @@ floats and how far they go.
 Note [Controlling Speculative Evaluation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Most of the time, speculative evaluation has a positive effect on performance,
-but we have found a case where speculative evaluation of dictionary functions
-leads to a performance regression #25284.
+Most of the time, speculative evaluation in the coreprep phase has a positive
+effect on performance, however we have found that some forms of speculative
+evaluation can lead to large performance regressions. See #25284.
 
-Therefore we have some flags to control it. See the optimization section in
-the User's Guide for the description of these flags and when to use them.
+Therefore we have some flags to control which types of speculative evaluation
+are done:
+
+  -fspec-eval
+     Globally enable/disable speculative evaluation ( -fno-spec-eval also turns
+     off all other speculative evaluation). On by default for all
+     optimization levels. Turning on this flag by itself should never cause
+     a performance regression. Please open a ticket if you find any.
+
+  -fspec-eval-dictfun
+     Enable speculative evaluation for dictionary functions. Off by default
+     since it can cause an increase in allocations (#24284). We have no
+     examples that show a large performance improvement when turning on this
+     flag. Please open a ticket if you find any.
+
+Also see the optimization section in the User's Guide for the description of
+these flags and when to use them.
 
 Note [Floats and FloatDecision]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

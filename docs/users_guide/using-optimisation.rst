@@ -428,7 +428,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     :category:
     :reverse: -fno-spec-eval-dictfun
 
-    :default: on
+    :default: off
     :since: 9.14.1
 
     Enables speculative (strict) evaluation of dictionary functions.
