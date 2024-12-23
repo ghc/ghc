@@ -466,8 +466,15 @@ lintCoreBindings' :: LintConfig -> CoreProgram -> WarnsAndErrs
 lintCoreBindings' cfg binds
   = initL cfg $
     addLoc TopLevelBindings           $
-    do { checkL (null dups) (dupVars dups)
+    do { -- Check that all top-level binders are distinct
+         -- We do not allow  [NonRec x=1, NonRec y=x, NonRec x=2]
+         -- because of glomming; see Note [Glomming] in GHC.Core.Opt.OccurAnal
+         checkL (null dups) (dupVars dups)
+
+         -- Check for External top level binders with the same M.n name
        ; checkL (null ext_dups) (dupExtVars ext_dups)
+
+         -- Typecheck the bindings
        ; lintRecBindings TopLevel all_pairs $ \_ ->
          return () }
   where

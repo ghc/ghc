@@ -9,7 +9,7 @@ module GHC.Core.Opt.CSE (cseProgram, cseOneExpr) where
 import GHC.Prelude
 
 import GHC.Core.Subst
-import GHC.Types.Var.Env ( mkInScopeSet )
+import GHC.Types.Var.Env ( mkInScopeSet, mkInScopeSetList )
 import GHC.Types.Id
 import GHC.Core.Utils   ( mkAltExpr
                         , exprIsTickedString
@@ -379,14 +379,21 @@ body/rest of the module.
 -}
 
 cseProgram :: CoreProgram -> CoreProgram
-cseProgram binds = snd (mapAccumL (cseBind TopLevel) emptyCSEnv binds)
+cseProgram binds
+  = snd (mapAccumL (cseBind TopLevel) init_env binds)
+  where
+    init_env  = emptyCSEnv $
+                mkInScopeSetList (bindersOfBinds binds)
+                -- Put all top-level binders into scope; it is possible to have
+                -- forward references.  See Note [Glomming] in GHC.Core.Opt.OccurAnal
+                -- Missing this caused #25468
 
 cseBind :: TopLevelFlag -> CSEnv -> CoreBind -> (CSEnv, CoreBind)
 cseBind toplevel env (NonRec b e)
   = (env2, NonRec b2 e2)
   where
     -- See Note [Separate envs for let rhs and body]
-    (env1, b1)       = addBinder env b
+    (env1, b1)       = addNonRecBinder toplevel env b
     (env2, (b2, e2)) = cse_bind toplevel env env1 (b,e) b1
 
 cseBind toplevel env (Rec [(in_id, rhs)])
@@ -404,7 +411,7 @@ cseBind toplevel env (Rec [(in_id, rhs)])
   = (extendCSRecEnv env1 out_id rhs'' id_expr', Rec [(zapped_id, rhs')])
 
   where
-    (env1, Identity out_id) = addRecBinders env (Identity in_id)
+    (env1, Identity out_id) = addRecBinders toplevel env (Identity in_id)
     rhs'  = cseExpr env1 rhs
     rhs'' = stripTicksE tickishFloatable rhs'
     ticks = stripTicksT tickishFloatable rhs'
@@ -414,7 +421,7 @@ cseBind toplevel env (Rec [(in_id, rhs)])
 cseBind toplevel env (Rec pairs)
   = (env2, Rec pairs')
   where
-    (env1, bndrs1) = addRecBinders env (map fst pairs)
+    (env1, bndrs1) = addRecBinders toplevel env (map fst pairs)
     (env2, pairs') = mapAccumL do_one env1 (zip pairs bndrs1)
 
     do_one env (pr, b1) = cse_bind toplevel env env pr b1
@@ -692,7 +699,8 @@ try_for_cse env expr
 -- as a convenient entry point for users of the GHC API.
 cseOneExpr :: InExpr -> OutExpr
 cseOneExpr e = cseExpr env e
-  where env = emptyCSEnv {cs_subst = mkEmptySubst (mkInScopeSet (exprFreeVars e)) }
+  where
+    env = emptyCSEnv (mkInScopeSet (exprFreeVars e))
 
 cseExpr :: CSEnv -> InExpr -> OutExpr
 cseExpr env (Type t)              = Type (substTyUnchecked (csEnvSubst env) t)
@@ -858,9 +866,11 @@ data CSEnv
             -- See Note [CSE for recursive bindings]
        }
 
-emptyCSEnv :: CSEnv
-emptyCSEnv = CS { cs_map = emptyCoreMap, cs_rec_map = emptyCoreMap
-                , cs_subst = emptySubst }
+emptyCSEnv :: InScopeSet -> CSEnv
+emptyCSEnv in_scope
+    = CS { cs_map     = emptyCoreMap
+         , cs_rec_map = emptyCoreMap
+         , cs_subst   = mkEmptySubst in_scope }
 
 lookupCSEnv :: CSEnv -> OutExpr -> Maybe OutExpr
 lookupCSEnv (CS { cs_map = csmap }) expr
@@ -905,8 +915,19 @@ addBinders cse vs = (cse { cs_subst = sub' }, vs')
                 where
                   (sub', vs') = substBndrs (cs_subst cse) vs
 
-addRecBinders :: Traversable f => CSEnv -> f Id -> (CSEnv, f Id)
-addRecBinders = \ cse vs ->
-    let (sub', vs') = substRecBndrs (cs_subst cse) vs
-    in (cse { cs_subst = sub' }, vs')
+addNonRecBinder :: TopLevelFlag -> CSEnv -> Var -> (CSEnv, Var)
+-- Don't clone at top level
+addNonRecBinder top_lvl cse v
+  | isTopLevel top_lvl = (cse,                      v)
+  | otherwise          = (cse { cs_subst = sub' }, v')
+  where
+    (sub', v') = substBndr (cs_subst cse) v
+
+addRecBinders :: Traversable f => TopLevelFlag -> CSEnv -> f Id -> (CSEnv, f Id)
+-- Don't clone at top level
+addRecBinders top_lvl cse vs
+  | isTopLevel top_lvl  = (cse,                     vs)
+  | otherwise           = (cse { cs_subst = sub' }, vs')
+  where
+    (sub', vs') = substRecBndrs (cs_subst cse) vs
 {-# INLINE addRecBinders #-}
