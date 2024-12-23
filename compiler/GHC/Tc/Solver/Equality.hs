@@ -2228,7 +2228,7 @@ to our new cbv. This is actually done by `break_given` in
 `GHC.Tc.Solver.Monad.checkTypeEq`.
 
 Note its orientation: The type family ends up on the left; see
-Note [Orienting TyFamLHS/TyFamLHS]d. No special treatment for
+Note [Orienting TyFamLHS/TyFamLHS]. No special treatment for
 CycleBreakerTvs is necessary. This scenario is now easily soluble, by using
 the first Given to rewrite the Wanted, which can now be solved.
 
@@ -2900,8 +2900,7 @@ arising from injectivity improvement (#12522).  Suppose we have
   type instance F (a, Int) = (Int, G a)
 where G is injective; and wanted constraints
 
-  [W] TF (alpha, beta) ~ fuv
-  [W] fuv ~ (Int, <some type>)
+  [W] F (alpha, beta) ~ (Int, <some type>)
 
 The injectivity will give rise to constraints
 
@@ -2917,8 +2916,8 @@ so that the fresh unification variable will be eliminated in
 favour of alpha.  If we instead had
    [W] alpha ~ gamma1
 then we would unify alpha := gamma1; and kick out the wanted
-constraint.  But when we grough it back in, it'd look like
-   [W] TF (gamma1, beta) ~ fuv
+constraint.  But when we substitute it back in, it'd look like
+   [W] F (gamma1, beta) ~ fuv
 and exactly the same thing would happen again!  Infinite loop.
 
 This all seems fragile, and it might seem more robust to avoid
@@ -2999,8 +2998,9 @@ improveTopFunEqs fam_tc args (EqCt { eq_ev = ev, eq_rhs = rhs })
   | otherwise
   = do { fam_envs <- getFamInstEnvs
        ; eqns <- improve_top_fun_eqs fam_envs fam_tc args rhs
-       ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr rhs
-                                           , ppr eqns ])
+       ; traceTcS "improveTopFunEqs" (vcat [ text "lhs:" <+> ppr fam_tc <+> ppr args
+                                           , text "rhs:" <+> ppr rhs
+                                           , text "eqns:" <+> ppr eqns ])
        ; unifyFunDeps ev Nominal $ \uenv ->
          uPairsTcM (bump_depth uenv) (reverse eqns) }
          -- Missing that `reverse` causes T13135 and T13135_simple to loop.
@@ -3072,17 +3072,17 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
                      -> ([Type], Subst, [TyCoVar], Maybe CoAxBranch)
                      -> TcS [TypeEqn]
       injImproveEqns inj_args (ax_args, subst, unsubstTvs, cabr)
-        = do { subst <- instFlexiX subst unsubstTvs
+        = do { subst1 <- instFlexiX subst unsubstTvs
                   -- If the current substitution bind [k -> *], and
                   -- one of the un-substituted tyvars is (a::k), we'd better
                   -- be sure to apply the current substitution to a's kind.
                   -- Hence instFlexiX.   #13135 was an example.
 
-             ; return [ Pair (substTy subst ax_arg) arg
+             ; return [ Pair (substTy subst1 ax_arg) arg
                         -- NB: the ax_arg part is on the left
                         -- see Note [Improvement orientation]
                       | case cabr of
-                          Just cabr' -> apartnessCheck (substTys subst ax_args) cabr'
+                          Just cabr' -> apartnessCheck (substTys subst1 ax_args) cabr'
                           _          -> True
                       , (ax_arg, arg, True) <- zip3 ax_args args inj_args ] }
 
