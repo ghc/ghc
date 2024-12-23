@@ -81,6 +81,10 @@ These steps give you the default build, which includes everything
 optimised and built in various ways (eg. profiling libs are built).
 It can take a long time.  To customise the build, see the file `HACKING.md`.
 
+## Nix
+
+If you are looking to use nix to develop on GHC, [check out the wiki for instructions](https://gitlab.haskell.org/ghc/ghc/-/wikis/building/preparation).
+
 Filing bugs and feature requests
 ================================
 
