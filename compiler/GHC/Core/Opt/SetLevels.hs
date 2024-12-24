@@ -1781,9 +1781,8 @@ mkAbsLamTypes abs_vars ty
     --       , text "res" <+> ppr res ])
       res
   where
-    res = expandTyVarUnfoldings (mkVarEnv tv_unf_prs) (mkLamTypes abs_lam_vars ty)
-    abs_lam_vars = [ v       | v  <- abs_vars, isNothing (tyVarUnfolding_maybe v) ]
-    tv_unf_prs   = [ (tv,ty) | tv <- abs_vars, Just ty <- [tyVarUnfolding_maybe tv] ]
+    res = expandTyVarUnfoldings (mkVarSet tvs_w_unfs) (mkLamTypes abs_lam_vars ty)
+    (abs_lam_vars, tvs_w_unfs) = partition (isNothing . tyVarUnfolding_maybe) abs_vars
 
 mkAbsVarApps :: Expr LevelledBndr -> AbsVars -> Expr LevelledBndr
 mkAbsVarApps fun [] = fun

@@ -508,15 +508,15 @@ on its fast path must also be inlined, linked back to this Note.
 *                                                                      *
 ********************************************************************* -}
 
-expandTyVarUnfoldings :: TyVarEnv Type -> Type -> Type
--- (expandTyvarUnfoldings tvs ty) replace any occurrences of `tvs` in `ty`
+expandTyVarUnfoldings :: TyVarSet -> Type -> Type
+-- (expandTyVarUnfoldings tvs ty) replace any occurrences of `tvs` in `ty`
 -- with their unfoldings.  The returned type does not mention any of `tvs`.
 --
 -- There are no substitution or variable-capture issues: if we have (let @a = ty
--- in body), then at all occurrences of `a` the free vars of `body` are also in
--- scope, without having been shadowed.
+-- in body), then at all occurrences of `a` in `body`, the free vars of `ty` are
+-- also in scope, without having been shadowed.
 expandTyVarUnfoldings tvs ty
-  | isEmptyVarEnv tvs = ty
+  | isEmptyVarSet tvs = ty
   | otherwise         = runIdentity (expand ty)
   where
     expand :: Type -> Identity Type
@@ -524,9 +524,9 @@ expandTyVarUnfoldings tvs ty
        = mapTyCo (TyCoMapper { tcm_tyvar = exp_tv, tcm_covar = exp_cv
                              , tcm_hole = exp_hole, tcm_tycobinder = exp_tcb
                              , tcm_tycon = pure })
-    exp_tv _ tv = case lookupVarEnv tvs tv of
-                      Just ty -> expand ty
-                      Nothing -> pure (TyVarTy tv)
+    exp_tv _ tv = case tyVarUnfolding_maybe tv of
+                    Just ty | tv `elemVarSet` tvs -> expand ty
+                    _                             -> pure (TyVarTy tv)
     exp_cv _   cv = pure (CoVarCo cv)
     exp_hole _ cv = pprPanic "expand_tv_unf" (ppr cv)
     exp_tcb :: () -> TyCoVar -> ForAllTyFlag -> (() -> TyCoVar -> Identity r) -> Identity r

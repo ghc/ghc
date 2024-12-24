@@ -476,6 +476,13 @@ Wrinkles:
   is well-typed.  This is used during worker/wrapper, which creates type-lets.
   See GHC.Core.Opt.WorkWrap.Utils.mkAppsBeta.
 
+(TCL2) Consider a beta-redex  ((/\a. blah) ty).  We may turn that into
+         let @a = ty in blah
+  and it's crucial that /every/ occurrence of `a` in `blah` is replaced by
+  `a{=ty}` with an unfolding.  To ensure that, we extend the /substitution/
+  (which is always substituted) with the tyvar-replete-with-unfolding, rather
+  than merely extending the in-scope set as we do for Ids.
+
 Note [Core top-level string literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As an exception to the usual rule that top-level binders must be lifted,

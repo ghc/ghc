@@ -914,7 +914,7 @@ lintCoreExpr (Let (NonRec tv (Type rhs_ty)) body)
   | isTyVar tv
   =     -- See Note [Linting type lets]
     do  { case tyVarUnfolding_maybe tv of
-             Nothing     -> return () -- See Note [Overview of type lets] wrinkle (TCL1)
+             Nothing     -> return () -- See GHC.Core Note [Type and coercion lets] wrinkle (TCL1)
              Just unf_ty -> -- These comparisons compare InTypes, which is fine
                             do { ensureEqTys (tyVarKind tv) (typeKind rhs_ty) $
                                  tv_err unf_ty "Let-bound tyvar kind incompatible with RHS:"
@@ -1467,8 +1467,7 @@ subtype of the required type, as one would expect.
 -- e.g. f :: Int -> Bool -> Int would return `Int` as result type.
 lintCoreArgs  :: (OutType, UsageEnv) -> [InExpr] -> LintM (OutType, UsageEnv)
 lintCoreArgs (fun_ty, fun_ue) args
-  = lintApp (text "expression")
-              lintTyArg lintValArg fun_ty args fun_ue
+  = lintApp (text "expression") lintTyArg lintValArg fun_ty args fun_ue
 
 lintTyArg :: InExpr -> LintM OutType
 
