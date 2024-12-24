@@ -1502,7 +1502,6 @@ The former had the CPR property, and so should the latter.
 
 Other considered designs
 ------------------------
-
 One design that was rejected was to *require* that runRW#'s continuation be
 headed by a lambda. However, this proved to be quite fragile. For instance,
 SetLevels is very eager to float bottoming expressions. For instance given

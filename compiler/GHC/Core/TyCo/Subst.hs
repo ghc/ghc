@@ -83,7 +83,8 @@ import GHC.Types.Unique.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import Data.List (mapAccumL)
+import Data.List ( mapAccumL )
+import Data.Maybe( isNothing )
 
 {-
 %************************************************************************
@@ -1058,7 +1059,8 @@ substTyVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
 
     old_ki = tyVarKind old_var
     no_kind_change = noFreeVarsOfType old_ki -- verify that kind is closed
-    no_change = no_kind_change && (new_var == old_var)
+    no_unf_change  = isNothing (tyVarUnfolding_maybe old_var)
+    no_change = no_kind_change && (new_var == old_var) && no_unf_change
         -- no_change means that the new_var is identical in
         -- all respects to the old_var (same unique, same kind)
         -- See Note [Extending the TvSubstEnv and CvSubstEnv]
@@ -1069,17 +1071,18 @@ substTyVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
         --      (\x.e) with id_subst = [x |-> e']
         -- Here we must simply zap the substitution for x
 
-    new_var1 | no_kind_change = uniqAway in_scope old_var
-             | otherwise = uniqAway in_scope $
-                           setTyVarKind old_var (subst_fn subst old_ki)
+    new_var1 = uniqAway in_scope old_var
         -- The uniqAway part makes sure the new variable is not already in scope
+
+    new_var2 | no_kind_change = new_var1
+             | otherwise      = setTyVarKind new_var1 (subst_fn subst old_ki)
 
     -- Preserve the unfolding on the TyVar; it is NOT optional
     -- In particular, when substituting over /terms/, in GHC.Core.Subst.substBindSC,
     -- we must not lose the type variable's unfolding
     new_var = case tyVarUnfolding_maybe old_var of
-                Nothing -> new_var1
-                Just unf_ty -> setTyVarUnfolding new_var1 (subst_fn subst unf_ty)
+                Nothing     -> new_var2
+                Just unf_ty -> setTyVarUnfolding new_var2 (subst_fn subst unf_ty)
 
 -- | Substitute a covar in a binding position, returning an
 -- extended subst and a new covar.
