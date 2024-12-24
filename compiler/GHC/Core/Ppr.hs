@@ -430,13 +430,14 @@ pprTypedLamBinder :: BindingSite -> Bool -> Var -> SDoc
 -- For lambda and case binders, show the unfolding info (usually none)
 pprTypedLamBinder bind_site debug_on var
   = sdocOption sdocSuppressTypeSignatures $ \suppress_sigs ->
+    sdocOption sdocPrintDeadBinders       $ \print_dead ->
     case () of
     _
-      | not debug_on            -- Show case-bound wild binders only if debug is on
+      | not print_dead      -- Suppress case-bound wildcard binders
       , CaseBind <- bind_site
       , isDeadBinder var        -> empty
 
-      | not debug_on            -- Even dead binders can be one-shot
+      | not print_dead      -- Even dead binders can be one-shot
       , isDeadBinder var        -> char '_' <+> ppWhen (isId var)
                                                 (pprIdBndrInfo (idInfo var))
 
