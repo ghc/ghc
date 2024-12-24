@@ -61,6 +61,7 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep( mkNakedFunTy )
+import GHC.Core.TyCon( isTypeFamilyTyCon )
 
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -1193,23 +1194,36 @@ tcRule (HsRule { rd_ext  = ext
                                   vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
                   ])
 
-       -- SimplfyRule Plan, step 5
+       -- /Temporarily/ deal with the fact that we previously accepted a RULE that quantified
+       -- over equalities.  If all the residual LHS constraints are previously-quantifiable
+       -- equalities, and the RHS constraints are not insoluble (if they are, just report those
+       -- errors), then emit a warning and discard the rule entirely.
+       -- Eliminate this deprecation warning in due course!
+       ; case allPreviouslyQuantifiableEqualities residual_lhs_wanted of {
+           Just cts | not (insolubleWC rhs_wanted)
+                    -> pprTrace "tcRule: discarding" (ppr cts) $
+                       return Nothing ;
+           Nothing  ->
+
+   do  { -- SimplfyRule Plan, step 5
        -- Simplify the LHS and RHS constraints:
        -- For the LHS constraints we must solve the remaining constraints
        -- (a) so that we report insoluble ones
        -- (b) so that we bind any soluble ones
-       ; (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl (getSkolemInfo skol_info) qtkvs
+         (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl (getSkolemInfo skol_info) qtkvs
                                          lhs_evs residual_lhs_wanted
        ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl (getSkolemInfo skol_info) qtkvs
                                          lhs_evs rhs_wanted
+
        ; emitImplications (lhs_implic `unionBags` rhs_implic)
 
-       ; return $ Just $ HsRule { rd_ext   = ext
-                                , rd_name  = rname
-                                , rd_act   = act
-                                , rd_bndrs = bndrs { rb_ext = qtkvs ++ tpl_ids }
-                                , rd_lhs   = mkHsDictLet lhs_binds lhs'
-                                , rd_rhs   = mkHsDictLet rhs_binds rhs' } }
+       ; return $ Just $
+         HsRule { rd_ext   = ext
+                , rd_name  = rname
+                , rd_act   = act
+                , rd_bndrs = bndrs { rb_ext = qtkvs ++ tpl_ids }
+                , rd_lhs   = mkHsDictLet lhs_binds lhs'
+                , rd_rhs   = mkHsDictLet rhs_binds rhs' } } } }
 
 {- ********************************************************************************
 *                                                                                 *
@@ -1368,7 +1382,6 @@ RHS constraints.  Actually much of this is done by the on-the-fly
 constraint solving, so the same order must be observed in
 tcRule.
 
-
 Note [RULE quantification over equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 At the moment a RULE never quantifies over an equality; see `rule_quant_ct`
@@ -1381,6 +1394,14 @@ in `getRuleQuantCts`.  Why not?
     (a) because we prefer to report a LHS type error
     (b) because if such things end up in 'givens' we get a bogus
         "inaccessible code" error
+
+ * Matching on coercions is Deeply Suspicious.  We don't want to generate a
+   RULE like
+         forall a (co :: F a ~ Int).
+                foo (x |> Sym co) = ...co...
+   because matching on that template, to bind `co`, would require us to
+   match on the /structure/ of a coercion, which we must never do.
+   See GHC.Core.Rules Note [Casts in the template]
 
  * Equality constraints are unboxed, and that leads to complications
    For example equality constraints from the LHS will emit coercion hole
@@ -1523,3 +1544,31 @@ getRuleQuantCts wc
 
      | otherwise
      = pprPanic "getRuleQuantCts" (ppr ct)
+
+allPreviouslyQuantifiableEqualities :: WantedConstraints -> Maybe [Ct]
+allPreviouslyQuantifiableEqualities wc = go emptyVarSet wc
+  where
+    go skol_tvs (WC { wc_simple = simples, wc_impl = implics })
+      = do { cts1 <- mapM (go_simple skol_tvs) simples
+           ; cts2 <- mapM (go_implic skol_tvs) implics
+           ; return (concat cts1 ++ concat cts2) }
+
+    go_simple skol_tvs ct
+      | not (tyCoVarsOfCt ct `disjointVarSet` skol_tvs)
+      = Nothing
+      | EqPred _ t1 t2 <- classifyPredType (ctPred ct), ok_eq t1 t2
+      = Just [ct]
+      | otherwise
+      = Nothing
+
+    go_implic skol_tvs (Implic { ic_skols = skols, ic_wanted = wc })
+      = go (skol_tvs `extendVarSetList` skols) wc
+
+    ok_eq t1 t2
+       | t1 `tcEqType` t2 = False
+       | otherwise        = is_fun_app t1 || is_fun_app t2
+
+    is_fun_app ty   -- ty is of form (F tys) where F is a type function
+      = case tyConAppTyCon_maybe ty of
+          Just tc -> isTypeFamilyTyCon tc
+          Nothing -> False
