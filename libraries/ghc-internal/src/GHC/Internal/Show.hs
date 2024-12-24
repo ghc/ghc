@@ -394,8 +394,8 @@ showLitString :: String -> ShowS
 -- It converts the string to a string using Haskell escape conventions
 -- for non-printable characters. Does not add double-quotes around the
 -- whole thing; the caller should do that.
--- The main difference from showLitChar (apart from the fact that the
--- argument is a string not a list) is that we must escape double-quotes
+-- The main difference from showLitChar (apart from iterating over all Chars
+-- in the String) is that we must escape double-quotes
 showLitString []         s = s
 showLitString ('"' : cs) s = showString "\\\"" (showLitString cs s)
 showLitString (c   : cs) s = showLitChar c (showLitString cs s)
@@ -404,13 +404,15 @@ showLitString (c   : cs) s = showLitChar c (showLitString cs s)
    -- The sticking point is the recursive call to (showLitString cs), which
    -- it can't figure out would be ok with arity 2.
 
-showMultiLineString :: String -> [String]
--- | Like 'showLitString' (expand escape characters using Haskell
--- escape conventions), but
---   * break the string into multiple lines
---   * wrap the entire thing in double quotes
+-- | Like 'showLitString', but split on newlines, assuming that all newlines
+-- were written with string gaps. Also wraps string in double quotes.
+--
 -- Example:  @showMultiLineString "hello\ngoodbye\nblah"@
 -- returns   @["\"hello\\n\\", "\\goodbye\n\\", "\\blah\""]@
+--
+-- Note: despite the name, this has nothing to do with -XMultilineStrings.
+-- It simply displays a single-line string on multiple lines with string gaps.
+showMultiLineString :: String -> [String]
 showMultiLineString str
   = go '\"' str
   where

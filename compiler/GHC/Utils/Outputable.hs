@@ -69,7 +69,7 @@ module GHC.Utils.Outputable (
         pprDebugAndThen,
 
         pprInfixVar, pprPrefixVar,
-        pprHsChar, pprHsString, pprHsBytes,
+        pprHsChar, pprHsString, pprHsString', pprHsStringMulti', pprHsBytes,
 
         primFloatSuffix, primCharSuffix, primDoubleSuffix,
         primInt8Suffix, primWord8Suffix,
@@ -161,7 +161,7 @@ import Data.Void
 import Control.DeepSeq (NFData(rnf))
 
 import GHC.Fingerprint
-import GHC.Show         ( showMultiLineString )
+import GHC.Show         ( showLitString )
 import GHC.Utils.Exception
 import GHC.Exts (oneShot)
 
@@ -1298,14 +1298,36 @@ pprHsChar :: Char -> SDoc
 pprHsChar c | c > '\x10ffff' = char '\\' <> text (show (fromIntegral (ord c) :: Word32))
             | otherwise      = text (show c)
 
--- | Special combinator for showing string literals.
+-- | Special combinator for showing single-line string literals.
 pprHsString :: FastString -> SDoc
-pprHsString fs = vcat (map text (showMultiLineString (unpackFS fs)))
+pprHsString fs = char '"' <> pprHsString' (unpackFS fs) <> char '"'
+
+pprHsString' :: String -> SDoc
+pprHsString' = vcat . map text . showLitStringLines
+  where
+    -- like GHC.Show.showMultiLineString, except without wrapping in quotes
+    showLitStringLines = go id
+      where
+        go pre s =
+          case break (== '\n') s of
+            (l, '\n':s'@(_:_)) -> (pre $ showLitString l "\\n\\") : go ('\\' :) s'
+            (l, '\n':[])       -> [pre $ showLitString l "\\n"]
+            (l, _)             -> [pre $ showLitString l ""]
+
+pprHsStringMulti' :: String -> SDoc
+pprHsStringMulti' = vcat . map text . showLitStringMultiline
+  where
+    showLitChars :: String -> ShowS
+    showLitChars [] s = s
+    showLitChars (c : cs) s = showLitChar c (showLitChars cs s)
+
+    showLitStringMultiline :: String -> [String]
+    showLitStringMultiline = map (flip showLitChars "") . lines
 
 -- | Special combinator for showing bytestring literals.
 pprHsBytes :: ByteString -> SDoc
 pprHsBytes bs = let escaped = concatMap escape $ BS.unpack bs
-                in vcat (map text (showMultiLineString escaped)) <> char '#'
+                in char '"' <> pprHsString' escaped <> text "\"#"
     where escape :: Word8 -> String
           escape w = let c = chr (fromIntegral w)
                      in if isAscii c
