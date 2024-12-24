@@ -1499,6 +1499,7 @@ initSDocContext dflags style = SDC
   , sdocPrintPotentialInstances     = gopt Opt_PrintPotentialInstances dflags
   , sdocPrintEqualityRelations      = gopt Opt_PrintEqualityRelations dflags
   , sdocPrintTyVarUnfoldings        = gopt Opt_PrintTyVarUnfoldings dflags
+  , sdocPrintDeadBinders            = gopt Opt_PrintDeadBinders dflags
   , sdocSuppressTicks               = gopt Opt_SuppressTicks dflags
   , sdocSuppressTypeSignatures      = gopt Opt_SuppressTypeSignatures dflags
   , sdocSuppressTypeApplications    = gopt Opt_SuppressTypeApplications dflags
