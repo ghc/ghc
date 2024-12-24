@@ -365,6 +365,51 @@ static bool set_initial_registers(Dwfl_Thread *thread,
         );
     return dwfl_thread_state_registers(thread, 0, 33, regs);
 }
+#elif defined(riscv64_HOST_ARCH)
+// See
+// https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/eb2b2962934078605f34b9e26895e7143409d72a/riscv-dwarf.adoc
+static bool set_initial_registers(Dwfl_Thread *thread,
+                                  void *arg STG_UNUSED) {
+
+    Dwarf_Word regs[32] = {};
+    __asm__ ("sd x0,  0x000(%0)\n\t"
+             "sd x1,  0x008(%0)\n\t"
+             "sd x2,  0x010(%0)\n\t"
+             "sd x3,  0x018(%0)\n\t"
+             "sd x4,  0x020(%0)\n\t"
+             "sd x5,  0x028(%0)\n\t"
+             "sd x6,  0x030(%0)\n\t"
+             "sd x7,  0x038(%0)\n\t"
+             "sd x8,  0x040(%0)\n\t"
+             "sd x9,  0x048(%0)\n\t"
+             "sd x10, 0x050(%0)\n\t"
+             "sd x11, 0x058(%0)\n\t"
+             "sd x12, 0x060(%0)\n\t"
+             "sd x13, 0x068(%0)\n\t"
+             "sd x14, 0x070(%0)\n\t"
+             "sd x15, 0x078(%0)\n\t"
+             "sd x16, 0x080(%0)\n\t"
+             "sd x17, 0x088(%0)\n\t"
+             "sd x18, 0x090(%0)\n\t"
+             "sd x19, 0x098(%0)\n\t"
+             "sd x20, 0x0a0(%0)\n\t"
+             "sd x21, 0x0a8(%0)\n\t"
+             "sd x22, 0x0b0(%0)\n\t"
+             "sd x23, 0x0b8(%0)\n\t"
+             "sd x24, 0x0c0(%0)\n\t"
+             "sd x25, 0x0c8(%0)\n\t"
+             "sd x26, 0x0d0(%0)\n\t"
+             "sd x27, 0x0d8(%0)\n\t"
+             "sd x28, 0x0e0(%0)\n\t"
+             "sd x29, 0x0e8(%0)\n\t"
+             "sd x30, 0x0f0(%0)\n\t"
+             "sd x31, 0x0f8(%0)\n\t"
+             :                            /* no output */
+             :"r" (&regs[0])              /* input */
+             :                           /* clobbered */
+        );
+    return dwfl_thread_state_registers(thread, 0, 33, regs);
+}
 #elif defined(i386_HOST_ARCH)
 static bool set_initial_registers(Dwfl_Thread *thread,
                                   void *arg STG_UNUSED) {
