@@ -219,7 +219,7 @@ instance IsPass p => Outputable (HsLit (GhcPass p)) where
     ppr (HsString st s)     = pprWithSourceText st (pprHsString s)
     ppr (HsMultilineString st s) =
       case st of
-        NoSourceText -> pprHsString s
+        NoSourceText -> text "\"\"\"" <> pprHsStringMulti' (unpackFS s) <> text "\"\"\""
         SourceText src -> vcat $ map text $ split '\n' (unpackFS src)
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
