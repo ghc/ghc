@@ -1001,16 +1001,16 @@ In short, it is Very Deeply Suspicious for a rule to quantify over a coercion
 variable.  And SpecConstr no longer does so: see Note [SpecConstr and casts] in
 SpecConstr.
 
-It is, however, OK for a cast to appear in a template.  For example
-    newtype N a = MkN (a,a)    -- Axiom ax:N a :: (a,a) ~R N a
-    f :: N a -> bah
-    RULE forall b x:b y:b. f @b ((x,y) |> (axN @b)) = ...
-
-When matching we can just move these casts to the other side:
-    match (tmpl |> co) tgt  -->   match tmpl (tgt |> sym co)
-See matchTemplateCast.
-
 Wrinkles:
+
+(CT0) It is, however, OK for a cast to appear in a template provided the cast mentions
+  none of the template variables.  For example
+      newtype N a = MkN (a,a)    -- Axiom ax:N a :: (a,a) ~R N a
+      f :: N a -> bah
+      RULE forall b x:b y:b. f @b ((x,y) |> (axN @b)) = ...
+  When matching we can just move these casts to the other side:
+      match (tmpl |> co) tgt  -->   match tmpl (tgt |> sym co)
+  See matchTemplateCast.
 
 (CT1) We need to be careful about scoping, and to match left-to-right, so that we
   know the substitution [a :-> b] before we meet (co :: (a,a) ~R N a), and so we
@@ -1496,11 +1496,12 @@ matchTemplateCast renv subst e1 co1 e2 mco
     filterFV (`elemVarSet` rv_tmpls renv) $    -- Check that the coercion does not
     tyCoFVsOfCo substed_co                     -- mention any of the template variables
   = -- This is the good path
-    -- See Note [Casts in the template]
+    -- See Note [Casts in the template] wrinkle (CT0)
     match renv subst e1 e2 (checkReflexiveMCo (mkTransMCoL mco (mkSymCo substed_co)))
 
   | otherwise
   = -- This is the Deeply Suspicious Path
+    -- See Note [Casts in the template]
     do { let co2 = case mco of
                      MRefl   -> mkRepReflCo (exprType e2)
                      MCo co2 -> co2
