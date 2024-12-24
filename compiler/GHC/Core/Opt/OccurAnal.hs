@@ -2758,17 +2758,16 @@ occAnalApp env (Var fun_id, args, ticks)
         -- See Note [Sources of one-shot information], bullet point A']
 
 occAnalApp env (fun, args, ticks)
-  = WUD (markAllNonTail (fun_uds `andUDs` args_uds))
-                     (mkTicks ticks app')
+  = WUD (fun_uds `andUDs` markAllNonTail args_uds)
+        (mkTicks ticks app')
   where
     !(WUD args_uds app') = occAnalArgs env fun' args []
-    !(WUD fun_uds fun')  = occAnal (addAppCtxt env args) fun
-        -- The addAppCtxt is a bit cunning.  One iteration of the simplifier
-        -- often leaves behind beta redexes like
-        --      (\x y -> e) a1 a2
-        -- Here we would like to mark x,y as one-shot, and treat the whole
-        -- thing much like a let.  We do this by pushing some OneShotLam items
-        -- onto the context stack.
+
+    -- fun_uds: see Note [Occurrence analysis for beta-redexes]
+    fun_env = addAppCtxt env args
+    !(WUD fun_uds fun')  = adjustNonRecRhs (JoinPoint (length args)) $
+                           occAnalLamTail fun_env                    $
+                           fun
 
 addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
 addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
@@ -2783,7 +2782,30 @@ addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
     n_val_args = valArgCount args
 
 
-{-
+{- Note [Occurrence analysis for beta-redexes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some passes, notably worker/wrapper, leaves behing beta-redexes like
+       (\x y -> e) a1 a2
+We'd like to behave as it if was
+       let {x=a1; y=a2} in e
+notably:
+ * The variables in `e` should not be marked InsideLam
+ * Tail calls in `e` are tail calls for the whole expression
+
+This is achieved as follows:
+
+* Occurrence-analyse the lambea wtih `occAnalLamTail` whichh doesn't adjust for
+  inside-lambda and non-tail-calls.
+
+* Adjust the OccEnv by adding one-shot info for the lambdas, corresponding to the
+  supplied arguments.
+
+* Use adjustNonRecRhs to adjust both tail-call and inside-lam info.
+
+Side note: one might wonder if worker/wrapper etc could just use a let, or
+type-let.  But actually that doesn't work well when the binders of the wrapper
+involved shadowing.
+
 Note [Sources of one-shot information]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The occurrence analyser obtains one-shot-lambda information from two sources:
@@ -4017,7 +4039,7 @@ decideRecJoinPointHood lvl usage bndrs
   where
     ok bndr = okForJoinPoint lvl bndr (lookupTailCallInfo usage bndr)
 
-okForJoinPoint :: TopLevelFlag -> Id -> TailCallInfo -> Bool
+okForJoinPoint :: HasDebugCallStack => TopLevelFlag -> Id -> TailCallInfo -> Bool
     -- See Note [Invariants on join points]; invariants cited by number below.
     -- Invariant 2 is always satisfiable by the simplifier by eta expansion.
 okForJoinPoint lvl bndr tail_call_info

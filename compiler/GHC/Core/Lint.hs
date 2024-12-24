@@ -557,6 +557,86 @@ Check a core binding, returning the list of variables bound.
 -- Returns a UsageEnv because this function is called in lintCoreExpr for
 -- Let
 
+lintLetExpr :: TyVarSet   -- Enclosing let-bound tyvars, all with unfoldings
+            -> InExpr
+            -> LintM (OutType, UsageEnv)
+-- Postcondition: the returned OutType does not mention any of the
+--                tyvars in the incoming TyVarSet; we guarantee this
+--                by using expandTyVarUnfoldings
+-- c.f. the use of `expandTyVarUnfoldings` in GHC.Core.Utils.exprType
+-- The reason we have a recursive `lintLetExpr` is so we can do this expansion
+-- once (only) for the whole block of lets.
+lintLetExpr tvs (Let (NonRec tv (Type rhs_ty)) body)
+  | isTyVar tv
+  =     -- See Note [Linting type lets]
+    do  { case tyVarUnfolding_maybe tv of
+             Nothing     -> return () -- See GHC.Core Note [Type and coercion lets] wrinkle (TCL1)
+             Just unf_ty -> -- These comparisons compare InTypes, which is fine
+                            do { ensureEqTys (tyVarKind tv) (typeKind rhs_ty) $
+                                 tv_err unf_ty "Let-bound tyvar kind incompatible with RHS:"
+                               ; ensureEqTys unf_ty rhs_ty $
+                                 tv_err unf_ty "Let-bound tyvar unfolding not same as RHS:" }
+
+        ; addLoc (RhsOf tv) $ lintType rhs_ty
+
+        ; lintTyCoBndr tv     $ \ tv' ->
+          addLoc (BodyOfLet tv) $
+          lintLetExpr (tvs `extendVarSet` tv') body }
+  where
+    tv_err unf_ty msg = hang (text msg  <+> pprTyVarWithKind tv)
+                           2 (vcat [ text "Unfolding:" <+> ppr unf_ty
+                                   , text "RHS:      " <+> ppr rhs_ty ])
+
+lintLetExpr tvs (Let (NonRec bndr rhs) body)
+  | isId bndr
+  = do { -- First Lint the RHS, before bringing the binder into scope
+         (rhs_ty, let_ue) <- lintRhs bndr rhs
+
+          -- See Note [Multiplicity of let binders] in Var
+         -- Now lint the binder
+       ; lintLocalBinder LetBind bndr $ \bndr' ->
+    do { lintLetBind NotTopLevel NonRecursive bndr' rhs rhs_ty
+       ; addAliasUE bndr' let_ue $
+         lintLetBody tvs (BodyOfLet bndr') [bndr'] body } }
+
+  | otherwise
+  = failWithL (mkLetErr bndr rhs)       -- Not quite accurate
+
+
+lintLetExpr tvs e@(Let (Rec pairs) body)
+  = do  { -- Check that the list of pairs is non-empty
+          checkL (not (null pairs)) (emptyRec e)
+
+          -- Check that there are no duplicated binders
+        ; let (_, dups) = removeDups compare bndrs
+        ; checkL (null dups) (dupVars dups)
+
+          -- Check that either all the binders are joins, or none
+        ; checkL (all isJoinId bndrs || all (not . isJoinId) bndrs) $
+          mkInconsistentRecMsg bndrs
+
+          -- See Note [Multiplicity of let binders] in Var
+        ; ((body_type, body_ue), ues) <-
+            lintRecBindings NotTopLevel pairs $ \ bndrs' ->
+            lintLetBody tvs (BodyOfLetRec bndrs') bndrs' body
+        ; return (body_type, body_ue  `addUE` scaleUE ManyTy (foldr1 addUE ues)) }
+  where
+    bndrs = map fst pairs
+
+lintLetExpr tvs e
+  = do { (e_ty, ue) <- lintCoreExpr e
+       ; let expanded_ty = expandTyVarUnfoldings tvs e_ty
+             -- This is where we expand out any tyvar unfoldings in the
+             -- returned type that would be captured by enclosing lets
+       ; return (expanded_ty, ue) }
+
+lintLetBody :: TyVarSet -> LintLocInfo -> [OutId]
+            -> CoreExpr -> LintM (OutType, UsageEnv)
+lintLetBody tvs loc bndrs body
+  = do { (body_ty, body_ue) <- addLoc loc (lintLetExpr tvs body)
+       ; mapM_ (lintJoinBndrType body_ty) bndrs
+       ; return (body_ty, body_ue) }
+
 lintRecBindings :: TopLevelFlag -> [(Id, CoreExpr)]
                 -> ([OutId] -> LintM a) -> LintM (a, [UsageEnv])
 lintRecBindings top_lvl pairs thing_inside
@@ -571,12 +651,6 @@ lintRecBindings top_lvl pairs thing_inside
         do { (rhs_ty, ue) <- lintRhs bndr' rhs         -- Check the rhs
            ; lintLetBind top_lvl Recursive bndr' rhs rhs_ty
            ; return ue }
-
-lintLetBody :: LintLocInfo -> [OutId] -> CoreExpr -> LintM (OutType, UsageEnv)
-lintLetBody loc bndrs body
-  = do { (body_ty, body_ue) <- addLoc loc (lintCoreExpr body)
-       ; mapM_ (lintJoinBndrType body_ty) bndrs
-       ; return (body_ty, body_ue) }
 
 lintLetBind :: TopLevelFlag -> RecFlag -> OutId
               -> CoreExpr -> OutType -> LintM ()
@@ -917,61 +991,6 @@ lintCoreExpr (Tick tickish expr)
       -- context, but soft-scoped and non-scoped ticks simply wrap the result
       -- (see Simplify.simplTick).
 
-lintCoreExpr (Let (NonRec tv (Type rhs_ty)) body)
-  | isTyVar tv
-  =     -- See Note [Linting type lets]
-    do  { case tyVarUnfolding_maybe tv of
-             Nothing     -> return () -- See GHC.Core Note [Type and coercion lets] wrinkle (TCL1)
-             Just unf_ty -> -- These comparisons compare InTypes, which is fine
-                            do { ensureEqTys (tyVarKind tv) (typeKind rhs_ty) $
-                                 tv_err unf_ty "Let-bound tyvar kind incompatible with RHS:"
-                               ; ensureEqTys unf_ty rhs_ty $
-                                 tv_err unf_ty "Let-bound tyvar unfolding not same as RHS:" }
-
-        ; addLoc (RhsOf tv) $ lintType rhs_ty
-        ; lintTyCoBndr tv       $ \ _ ->
-          addLoc (BodyOfLet tv) $
-          lintCoreExpr body }
-  where
-    tv_err unf_ty msg = hang (text msg  <+> pprTyVarWithKind tv)
-                           2 (vcat [ text "Unfolding:" <+> ppr unf_ty
-                                   , text "RHS:      " <+> ppr rhs_ty ])
-
-lintCoreExpr (Let (NonRec bndr rhs) body)
-  | isId bndr
-  = do { -- First Lint the RHS, before bringing the binder into scope
-         (rhs_ty, let_ue) <- lintRhs bndr rhs
-
-          -- See Note [Multiplicity of let binders] in Var
-         -- Now lint the binder
-       ; lintLocalBinder LetBind bndr $ \bndr' ->
-    do { lintLetBind NotTopLevel NonRecursive bndr' rhs rhs_ty
-       ; addAliasUE bndr' let_ue $
-         lintLetBody (BodyOfLet bndr') [bndr'] body } }
-
-  | otherwise
-  = failWithL (mkLetErr bndr rhs)       -- Not quite accurate
-
-lintCoreExpr e@(Let (Rec pairs) body)
-  = do  { -- Check that the list of pairs is non-empty
-          checkL (not (null pairs)) (emptyRec e)
-
-          -- Check that there are no duplicated binders
-        ; let (_, dups) = removeDups compare bndrs
-        ; checkL (null dups) (dupVars dups)
-
-          -- Check that either all the binders are joins, or none
-        ; checkL (all isJoinId bndrs || all (not . isJoinId) bndrs) $
-          mkInconsistentRecMsg bndrs
-
-          -- See Note [Multiplicity of let binders] in Var
-        ; ((body_type, body_ue), ues) <-
-            lintRecBindings NotTopLevel pairs $ \ bndrs' ->
-            lintLetBody (BodyOfLetRec bndrs') bndrs' body
-        ; return (body_type, body_ue  `addUE` scaleUE ManyTy (foldr1 addUE ues)) }
-  where
-    bndrs = map fst pairs
-
 lintCoreExpr e@(App _ _)
   | Var fun <- fun
   , fun `hasKey` runRWKey
@@ -1024,6 +1043,9 @@ lintCoreExpr e@(App _ _)
 lintCoreExpr (Lam var expr)
   = markAllJoinsBad $
     lintLambda var $ lintCoreExpr expr
+
+lintCoreExpr e@(Let {})
+  = lintLetExpr emptyVarSet e
 
 lintCoreExpr (Case scrut var alt_ty alts)
   = lintCaseExpr scrut var alt_ty alts
@@ -3595,7 +3617,7 @@ getValidJoins = LintM (\ env errs -> fromBoxedLResult (Just (le_joins env), errs
 getSubst :: LintM Subst
 getSubst = LintM (\ env errs -> fromBoxedLResult (Just (le_subst env), errs))
 
-substTyM :: InType -> LintM OutType
+substTyM :: HasDebugCallStack => InType -> LintM OutType
 -- Apply the substitution to the type
 -- The substitution is often empty, in which case it is a no-op
 substTyM ty
@@ -3658,7 +3680,7 @@ checkBndrOccCompatibility in_bndr out_bndr v_occ
           hang (text "Mismatch in type between binder and occurrence")
              2 extra_info
 
-       ; checkLM (sameUnfolding out_bndr v_occ) $
+       ; checkLM (sameUnfolding in_bndr v_occ) $
          hang (text "Mismatch in type-let unfolding between binder and occurrence")
             2 extra_info
        }
@@ -3675,18 +3697,19 @@ checkBndrOccCompatibility in_bndr out_bndr v_occ
     extra_info = vcat [ hang (text "Binder    :") 2 $ pprBndr LetBind in_bndr
                       , hang (text "Occurrence:") 2 $ pprBndr LetBind v_occ]
 
-sameUnfolding :: OutVar   -- Binder
+sameUnfolding :: InVar   -- Binder
               -> InVar    -- Occurrence
               -> LintM Bool
 -- Check that any unfolding in the /occurence/ is the same as that in the /binder/
--- An unfolding in the occurrence is optional fo Ids, but compulsory for type-let-boud
+-- An unfolding in the occurrence is optional for Ids, but compulsory for type-let-boud
 -- TyVars.  Somewhat lazily, we only check the latter.
+-- We also just compare them as InTypes (as we do the type of the variable);
+-- all we care is that that they are identical.
 sameUnfolding v_bndr v_occ
   = case (tyVarUnfolding_maybe v_bndr, tyVarUnfolding_maybe v_occ) of
       (Nothing,       Nothing)      -> return True
-      (Just bndr_unf, Just occ_unf) -> do { occ_unf' <- substTyM occ_unf
-                                          ; flags    <- getLintFlags
-                                          ; return (eq_type flags bndr_unf occ_unf') }
+      (Just bndr_unf, Just occ_unf) -> do { flags    <- getLintFlags
+                                          ; return (eq_type flags bndr_unf occ_unf) }
       _                             -> return False
 
 lookupJoinId :: Id -> LintM JoinPointHood
