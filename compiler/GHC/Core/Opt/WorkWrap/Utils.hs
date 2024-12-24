@@ -282,7 +282,7 @@ mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
 mkAppsBeta :: CoreExpr -> [CoreArg] -> CoreExpr
 -- The precondition holds for our call site in mkWwBodies, because all the FVs
 -- of as are either cloned_arg_vars (and thus fresh) or fresh worker args.
-mkAppsBeta (Lam b body) (a:as) = bindNonRec b a $! mkAppsBeta body as
+-- mkAppsBeta (Lam b body) (a:as) = bindNonRec b a $! mkAppsBeta body as
 mkAppsBeta f            as     = mkApps f as
 
 -- See Note [Limit w/w arity]
