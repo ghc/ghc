@@ -54,7 +54,7 @@ import GHC.Types.Demand
 import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
-import GHC.Types.Var    ( isTyCoVar, setTyVarUnfolding )
+import GHC.Types.Var    ( isTyCoVar, setTyVarUnfolding, zapTyVarUnfolding )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey, seqHashKey )
 
@@ -294,7 +294,10 @@ simplTyVarBind env tv ty
   = return (emptyFloats env', env')
   | otherwise
   = do { ty' <- simplType env ty
-       ; completeTyVarBindX env tv ty' }
+       ; completeTyVarBindX env (zapTyVarUnfolding tv) ty' }
+         -- Zap any unfolding because competeTyVarBindX will add
+         -- the new unfolding and we don't wnat to waste work
+         -- substituting the old one
 
 completeTyVarBindX :: SimplEnv -> InTyVar -> OutType
                    -> SimplM (SimplFloats, SimplEnv)
