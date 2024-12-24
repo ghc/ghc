@@ -130,9 +130,11 @@ exprType :: HasDebugCallStack => CoreExpr -> Type
 -- ^ Recover the type of a well-typed Core expression. Fails when
 -- applied to the actual 'GHC.Core.Type' expression as it cannot
 -- really be said to have a type
-exprType e = go emptyVarEnv e
+exprType e = go emptyVarSet e
   where
-      -- When we get to a type, expand locally-bound tyvars, if any
+    -- When we get to a type, expand locally-bound tyvars, if any
+    -- For example,   exprType (let @a{=Int} = Int in Nothing @(a,b))
+    --   should return (Maybe (Int,b)), having expanded out the `a`
     expand = expandTyVarUnfoldings
 
     go tvs (Var var)         = expand tvs $ idType var
@@ -140,7 +142,7 @@ exprType e = go emptyVarEnv e
     go tvs (Coercion co)     = expand tvs $ coercionType co
     go tvs (Let bind body)
       | NonRec tv rhs <- bind    -- See Note [Type bindings]
-      , Type ty <- rhs       = go (extendVarEnv tvs tv ty) body
+      , Type {} <- rhs       = go (tvs `extendVarSet` tv) body
       | otherwise            = go tvs body
     go tvs (Case _ _ ty _)   = expand tvs ty
     go tvs (Cast _ co)       = expand tvs $ coercionRKind co

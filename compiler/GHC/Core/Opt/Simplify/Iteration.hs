@@ -306,6 +306,11 @@ completeTyVarBindX env in_tv out_ty
   = do { (env1, out_tv) <- simplTyVarBndr env in_tv
        ; let out_tv_w_unf = out_tv `setTyVarUnfolding` out_ty
              env2         = extendTvSubst env1 in_tv (mkTyVarTy out_tv_w_unf)
+               -- NB: Put the in_tv :-> out_tv_w_unf in the (compulsory)
+               --     substitution, so that it guarantees to replace every
+               --     occurrence of in_tv. After all, in a beta-redex, in_tv
+               --     had no unfolding. See (TCL2) in
+               --     Note [Type and coercion lets] in GHC.Core
        ; return (mkFloatBind env2 (NonRec out_tv_w_unf (Type out_ty))) }
 
 {-
