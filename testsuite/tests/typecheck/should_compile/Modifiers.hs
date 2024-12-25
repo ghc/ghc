@@ -1,26 +1,39 @@
 {-# OPTIONS_GHC -Wunknown-modifiers #-}
-{-# LANGUAGE LinearTypes, RequiredTypeArguments, DataKinds #-}
+{-# LANGUAGE LinearTypes, RequiredTypeArguments, DataKinds, TypeData #-}
 
 module Modifiers where
 
 import GHC.Types (Multiplicity(..))
 
-%() data A
-  = %() A1 Int
-  | %True A2 String
-  | %False A3 { a3 %() :: () }
+%() data D
+  = %() D1 Int
+  | %True D2 String
+  | %False D3 { d3 %() :: () }
 
-%() data A' where
-  %() A1' :: Int -> A'
-  %True A2' :: String -> A'
-  %False A3' :: { a3' %() :: () } -> A'
+%() data D' where
+  %() D1' :: Int -> D'
+  %True D2' :: String -> D'
+  %False D3' :: { d3' %() :: () } -> D'
+
+%() newtype N = %True N { n %False :: Int }
+
+%() newtype N' where
+  %True N' :: { n' %False :: Int } -> N'
+
+%() type data TD
+  = %() TD1 Int
+  | %True TD2 String
+
+%() type data TD' where
+  %() TD1' :: Int -> TD'
+  %True TD2' :: String -> TD'
 
 %() %True
-class B a
+class C a
 
 %()
 %True
-instance B A
+instance C D
 
 %() default (Int)
 
