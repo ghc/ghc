@@ -286,14 +286,17 @@ figureLlvmVersion logger dflags = traceSystoolCommand logger "llc" $ do
               (pin, pout, perr, p) <- runInteractiveProcess pgm args'
                                               Nothing Nothing
               {- > llc -version
-                  LLVM (http://llvm.org/):
-                    LLVM version 3.5.2
+                  <vendor> LLVM version 15.0.7
                     ...
+                  OR
+                  LLVM (http://llvm.org/):
+                    LLVM version 14.0.6
               -}
               hSetBinaryMode pout False
-              _     <- hGetLine pout
-              vline <- hGetLine pout
-              let mb_ver = parseLlvmVersion vline
+              line1 <- hGetLine pout
+              mb_ver <- case parseLlvmVersion line1 of
+                mb_ver@(Just _) -> return mb_ver
+                Nothing -> parseLlvmVersion <$> hGetLine pout -- Try the second line
               hClose pin
               hClose pout
               hClose perr
