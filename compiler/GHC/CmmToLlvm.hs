@@ -11,7 +11,7 @@ module GHC.CmmToLlvm
    )
 where
 
-import GHC.Prelude hiding ( head )
+import GHC.Prelude
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
@@ -28,7 +28,6 @@ import GHC.Cmm.Dataflow.Collections
 
 import GHC.Utils.BufHandle
 import GHC.Driver.Session
-import GHC.Platform ( platformArch, Arch(..) )
 import GHC.Utils.Error
 import GHC.Data.FastString
 import GHC.Utils.Outputable
@@ -37,8 +36,7 @@ import GHC.Utils.Logger
 import qualified GHC.Data.Stream as Stream
 
 import Control.Monad ( when, forM_ )
-import Data.List.NonEmpty ( head )
-import Data.Maybe ( fromMaybe, catMaybes )
+import Data.Maybe ( fromMaybe, catMaybes, isNothing )
 import System.IO
 
 -- -----------------------------------------------------------------------------
@@ -68,11 +66,13 @@ llvmCodeGen logger cfg h cmm_stream
            "up to" <+> text (llvmVersionStr supportedLlvmVersionUpperBound) <+> "(non inclusive) is supported." <+>
            "System LLVM version: " <> text (llvmVersionStr ver) $$
            "We will try though..."
-         let isS390X = platformArch (llvmCgPlatform cfg)  == ArchS390X
-         let major_ver = head . llvmVersionNE $ ver
-         when (isS390X && major_ver < 10 && doWarn) $ putMsg logger $
-           "Warning: For s390x the GHC calling convention is only supported since LLVM version 10." <+>
-           "You are using LLVM version: " <> text (llvmVersionStr ver)
+
+       when (isNothing mb_ver) $ do
+         let doWarn = llvmCgDoWarn cfg
+         when doWarn $ putMsg logger $
+           "Failed to detect LLVM version!" $$
+           "Make sure LLVM is installed correctly." $$
+           "We will try though..."
 
        -- HACK: the Nothing case here is potentially wrong here but we
        -- currently don't use the LLVM version to guide code generation
