@@ -56,7 +56,7 @@
 --   :: (Traversable t, Monoid b, Monad m)
 --   => (a -> b) -> (a -> b -> m c) -> t a -> m (t c)
 -- repminM f g as = do
---   (b, cs) \<- mapAccumM (\\acc a -> (f a <> acc,) <$> g a b) mempty as
+--   (b, cs) \<- mapAccumM (\\acc a -> (f a <> acc,) \<$\> g a b) mempty as
 --   pure cs
 -- @
 --
@@ -77,7 +77,7 @@
 --   :: (Traversable t, Monoid b, MonadFix m)
 --   => (a -> b) -> (a -> b -> m c) -> t a -> m (t c)
 -- repminM f g as = fmap snd $ mfix $
---   \\(~(b, cs)) -> mapAccumM (\\acc a -> (f a <> acc,) <$> g a b) mempty as
+--   \\(~(b, cs)) -> mapAccumM (\\acc a -> (f a <> acc,) \<$\> g a b) mempty as
 -- @
 --
 -- For example,
@@ -90,7 +90,7 @@
 -- [13,15,12]
 --
 -- Incredibly, GHC is capable to do this transformation automatically,
--- when {-# LANGUAGE RecursiveDo #-} is enabled. Namely, the following
+-- when @{-# LANGUAGE RecursiveDo #-}@ is enabled. Namely, the following
 -- implementation of @repminM@ works (note @mdo@ instead of @do@):
 --
 -- @
@@ -100,7 +100,7 @@
 --   :: (Traversable t, Monoid b, MonadFix m)
 --   => (a -> b) -> (a -> b -> m c) -> t a -> m (t c)
 -- repminM f g as = mdo
---   (b, cs) \<- mapAccumM (\\acc a -> (f a <> acc,) <$> g a b) mempty as
+--   (b, cs) \<- mapAccumM (\\acc a -> (f a <> acc,) \<$\> g a b) mempty as
 --   pure cs
 -- @
 --
