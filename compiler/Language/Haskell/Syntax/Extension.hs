@@ -660,6 +660,7 @@ type family XExplicitListTy  x
 type family XExplicitTupleTy x
 type family XTyLit           x
 type family XWildCardTy      x
+type family XModifiedTy      x
 type family XXType           x
 
 -- ---------------------------------------------------------------------

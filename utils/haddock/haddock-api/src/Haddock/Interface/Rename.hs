@@ -419,6 +419,8 @@ renameType t = case t of
   HsSpliceTy (HsUntypedSpliceTop _ st) _ -> renameType (unLoc st)
   HsSpliceTy (HsUntypedSpliceNested _) _ -> error "renameType: not an top level type splice"
   HsWildCardTy _ -> pure (HsWildCardTy noAnn)
+  HsModifiedTy _ mods ty ->
+    HsModifiedTy noAnn <$> renameModifiers mods <*> renameLType ty
 
 renameTyLit :: HsTyLit GhcRn -> HsTyLit DocNameI
 renameTyLit t = case t of

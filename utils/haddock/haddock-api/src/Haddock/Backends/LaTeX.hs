@@ -1354,6 +1354,7 @@ ppr_mono_ty (HsDocTy _ ty _) unicode =
 ppr_mono_ty (HsWildCardTy _) _ = char '_'
 ppr_mono_ty (HsTyLit _ t) u = ppr_tylit t u
 ppr_mono_ty (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
+ppr_mono_ty (HsModifiedTy _ _ ty) unicode = ppr_mono_lty ty unicode -- MODS_TODO need to pprint modifiers
 
 ppr_tylit :: HsTyLit DocNameI -> Bool -> LaTeX
 ppr_tylit (HsNumTy _ n) _ = integer n

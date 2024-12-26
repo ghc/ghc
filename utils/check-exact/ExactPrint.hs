@@ -4115,6 +4115,10 @@ instance ExactPrint (HsType GhcPs) where
       (HsCharTy src v) -> printSourceText src (show v)
     return (HsTyLit a lit)
   exact t@(HsWildCardTy _) = printStringAdvance "_" >> return t
+  exact (HsModifiedTy _ mods ty) = do
+    mods' <- markAnnotated mods
+    ty' <- markAnnotated ty
+    return (HsModifiedTy noExtField mods' ty')
   exact x = error $ "missing match for HsType:" ++ showAst x
 
 -- ---------------------------------------------------------------------

@@ -443,6 +443,14 @@ reparenTypePrec = go
     go _ t@HsSpliceTy{} = t
     go _ t@HsTyLit{} = t
     go _ t@HsWildCardTy{} = t
+
+    -- MODS_TODO do we need to descend into mods, too? If so I'd expect that we
+    -- also need to in HsFunTy, but we didn't do that in master.
+    go p (HsModifiedTy x [] ty) = HsModifiedTy x [] (goL p ty)
+    go p (HsModifiedTy x mods ty) =
+      -- MODS_TODO is this the right precedence?
+      paren p PREC_SIG $ HsModifiedTy x mods (goL PREC_TOP ty)
+
     go _ t@XHsType{} = t
 
     -- Located variant of 'go'

@@ -1283,6 +1283,13 @@ tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
                 tc_check_lhs_type mode ty sig'
        ; checkExpKind rn_ty ty' sig' exp_kind }
 
+tcHsType mode rn_ty@(HsModifiedTy _ mods ty) exp_kind
+  = do -- We don't recognize any modifiers here, but we still need to type check
+       -- them in case of errors or unknown kinds.
+       _ <- tc_modifiers mode mods (const False)
+       ty' <- tcLHsType mode ty exp_kind
+       checkExpKind rn_ty ty' (typeKind ty') exp_kind
+
 -- See Note [Typechecking HsCoreTys]
 tcHsType _ rn_ty@(XHsType ty) exp_kind
   = do env <- getLclEnv
@@ -1424,7 +1431,7 @@ tc_modifier mode mod@(HsModifier _ ty) is_expected_kind = do
       -- Seems hacky, presumably there's a standard way to do it?
       --
       -- This doesn't seem to work for %() (i.e. it marks that as unknown kind),
-      -- but it does for %True. Dunno what's going on there.
+      -- but it does for %True, %Bool and %'(). Dunno what's going on there.
       --
       -- This only affects modifiers that get typechecked. rename-only modifiers
       -- get an error if a modifier uses a type var not in scope, so maybe

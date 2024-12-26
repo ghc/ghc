@@ -1959,6 +1959,9 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsTyLit _ _ -> []
       HsWildCardTy _ -> []
       HsStarTy _ _ -> []
+      HsModifiedTy _ _ ty ->
+        [ toHie ty -- MODS_TODO include modifiers?
+        ]
       XHsType _ -> []
 
 instance (ToHie tm, ToHie ty) => ToHie (HsArg (GhcPass p) tm ty) where

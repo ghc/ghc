@@ -501,6 +501,8 @@ type instance XTyLit           (GhcPass _) = NoExtField
 
 type instance XWildCardTy      (GhcPass _) = NoExtField
 
+type instance XModifiedTy      (GhcPass _) = NoExtField
+
 type instance XXType         (GhcPass _) = HsCoreTy
 
 -- An escape hatch for tunnelling a Core 'Type' through 'HsType'.
@@ -1437,6 +1439,9 @@ ppr_mono_ty (HsParTy _ ty)
 ppr_mono_ty (HsDocTy _ ty doc)
   = pprWithDoc doc $ ppr_mono_lty ty
 
+ppr_mono_ty (HsModifiedTy _ mods ty)
+  = pprHsModifiers mods <+> ppr_mono_lty ty
+
 ppr_mono_ty (XHsType t) = ppr t
 
 --------------------------
@@ -1489,6 +1494,8 @@ hsTypeNeedsParens p = go_hs_ty
     go_hs_ty (HsOpTy{})               = p >= opPrec
     go_hs_ty (HsParTy{})              = False
     go_hs_ty (HsDocTy _ (L _ t) _)    = go_hs_ty t
+    go_hs_ty (HsModifiedTy _ [] (L _ t)) = go_hs_ty t
+    go_hs_ty (HsModifiedTy _ _ _)     = p > sigPrec
     go_hs_ty (XHsType ty)             = go_core_ty ty
 
     go_core_ty (TyVarTy{})    = False
@@ -1541,6 +1548,8 @@ lhsTypeHasLeadingPromotionQuote ty
     go (HsAppKindTy _ t _)   = goL t
     go (HsParTy{})           = False
     go (HsDocTy _ t _)       = goL t
+    go (HsModifiedTy _ [] t) = goL t
+    go (HsModifiedTy _ _ _)  = False
     go (XHsType{})           = False
 
 -- | @'parenthesizeHsType' p ty@ checks if @'hsTypeNeedsParens' p ty@ is

@@ -1427,6 +1427,11 @@ rn_ty_pat ty@HsRecTy{} = do
     TcRnIllegalRecordSyntax (Left ty)
   pure (HsWildCardTy noExtField) -- trick to avoid `failWithTc`
 
+rn_ty_pat (HsModifiedTy _ mods ty) = do
+  mods' <- rn_modifiers_pat mods
+  ty' <- rn_lty_pat ty
+  pure (HsModifiedTy noExtField mods' ty')
+
 rn_ty_pat ty@(XHsType{}) = do
   ctxt <- askDocContext
   liftRnFV $ rnHsType ctxt ty

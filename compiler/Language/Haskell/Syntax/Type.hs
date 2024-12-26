@@ -1013,6 +1013,11 @@ data HsType pass
 
       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
+  | HsModifiedTy -- Modifiers attached to a type.
+        (XModifiedTy pass)
+        [HsModifier pass]
+        (LHsType pass)
+
   -- Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
   | XHsType
       !(XXType pass)

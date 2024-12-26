@@ -865,6 +865,7 @@ type instance XExplicitListTy DocNameI = EpAnn NoEpAnns
 type instance XExplicitTupleTy DocNameI = EpAnn NoEpAnns
 type instance XTyLit DocNameI = EpAnn NoEpAnns
 type instance XWildCardTy DocNameI = EpAnn NoEpAnns
+type instance XModifiedTy DocNameI = EpAnn NoEpAnns
 type instance XXType DocNameI = HsCoreTy
 
 type instance XNumTy DocNameI = NoExtField

@@ -278,7 +278,6 @@ no_anon_wc_ty lty = go lty
           go_arrow w = case w of
             HsStandardArrow _ mods -> all go_mod mods
             HsLinearArrow _ mods -> all go_mod mods
-          go_mod (HsModifier _ ty) = go ty
       HsListTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys
       HsSumTy _ tys                  -> gos tys
@@ -301,9 +300,11 @@ no_anon_wc_ty lty = go lty
       HsTyLit{} -> True
       HsTyVar{} -> True
       HsStarTy{} -> True
+      HsModifiedTy _ mods ty -> go ty && all go_mod mods
       XHsType{} -> True       -- HsCoreTy, which does not have any wildcard
 
     gos = all go
+    go_mod (HsModifier _ ty) = go ty
 
 no_anon_wc_tele :: HsForAllTelescope GhcRn -> Bool
 no_anon_wc_tele tele = case tele of

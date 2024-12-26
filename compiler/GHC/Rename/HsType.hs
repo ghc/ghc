@@ -756,6 +756,10 @@ rnHsTyKi env (HsWildCardTy _)
   = do { checkAnonWildCard env
        ; return (HsWildCardTy noExtField, emptyFVs) }
 
+rnHsTyKi env (HsModifiedTy _ mods ty) =
+  do { (mods', mods_fvs) <- rnModifiers env mods
+     ; (ty', fvs) <- rnLHsTyKi env ty
+     ; return (HsModifiedTy noExtField mods' ty', mods_fvs `plusFV` fvs) }
 
 rnHsTyLit :: HsTyLit GhcPs -> RnM (HsTyLit GhcRn)
 rnHsTyLit (HsStrTy x s) = pure (HsStrTy x s)
@@ -2163,6 +2167,10 @@ extract_lty (L _ ty) acc
       XHsType {}                  -> acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
+      HsModifiedTy _ mods ty      -> extract_lty ty $
+                                     foldr (\(HsModifier _ ty') -> extract_lty ty')
+                                           acc
+                                           mods
 
 extract_kind_sig :: LHsType GhcPs -- type
                  -> LHsType GhcPs -- kind

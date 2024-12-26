@@ -1867,6 +1867,9 @@ ppr_mono_ty (HsDocTy _ ty _) unicode qual emptyCtxts =
   ppr_mono_lty ty unicode qual emptyCtxts
 ppr_mono_ty (HsWildCardTy _) _ _ _ = char '_'
 ppr_mono_ty (HsTyLit _ n) _ _ _ = ppr_tylit n
+ppr_mono_ty (HsModifiedTy _ _ ty) unicode qual emptyCtxts =
+  -- MODS_TODO need to pprint modifiers
+  ppr_mono_lty ty unicode qual emptyCtxts
 
 ppr_tylit :: HsTyLit DocNameI -> Html
 ppr_tylit (HsNumTy _ n) = toHtml (show n)
