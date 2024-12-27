@@ -99,3 +99,6 @@ main = do
             0x_ff == 0xff,
             0x__ff == 0xff
           ]
+
+    -- ensure that strings are unaffected
+    print ["\o16_000", "\16_000", "\x16_000"]
