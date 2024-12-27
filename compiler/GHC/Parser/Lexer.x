@@ -132,6 +132,7 @@ import GHC.Parser.Errors.Basic
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer.Interface
+import qualified GHC.Parser.Lexer.String as Lexer.String
 import GHC.Parser.String
 }
 
@@ -620,13 +621,6 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   -- characters than this rule, so this rule will only fire if the string
   -- could not be lexed correctly
   \" @stringchar*    $unigraphic / { isSmartQuote } { smart_quote_error }
-}
-
-<string_multi_content> {
-  -- Parse as much of the multiline string as possible, except for quotes
-  @stringchar* ($nl ([\  $tab] | @gap)* @stringchar*)* { tok_string_multi_content }
-  -- Allow bare quotes if it's not a triple quote
-  (\" | \"\") / ([\n .] # \") { tok_string_multi_content }
 }
 
 <0> {
@@ -2171,11 +2165,23 @@ tok_string span buf len _buf2 = do
     src = SourceText $ lexemeToFastString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
 
--- | Ideally, we would define this completely with Alex syntax, like normal strings.
--- Instead, this is defined as a hybrid solution by manually invoking lex states, which
--- we're doing for two reasons:
---   1. The multiline string should all be one lexical token, not multiple
---   2. We need to allow bare quotes, which can't be done with one regex
+{- Note [Lexing multiline strings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ideally, we would lex multiline strings completely with Alex syntax, like
+normal strings. However, we can't because:
+
+    1. The multiline string should all be one lexical token, not multiple
+    2. We need to allow bare quotes, which can't be done with one regex
+
+Instead, we'll lex them with a hybrid solution in tok_string_multi by manually
+invoking lex states. This allows us to get the performance of native Alex
+syntax as much as possible, and just gluing the pieces together outside of
+Alex.
+
+Implemented in string_multi_content in GHC/Parser/Lexer/String.x
+-}
+
+-- | See Note [Lexing multiline strings]
 tok_string_multi :: Action
 tok_string_multi startSpan startBuf _len _buf2 = do
   -- advance to the end of the multiline string
@@ -2201,17 +2207,14 @@ tok_string_multi startSpan startBuf _len _buf2 = do
   pure $ L span $ ITstringMulti src (mkFastString s)
   where
     goContent i0 =
-      case alexScan i0 string_multi_content of
-        AlexToken i1 len _
+      case Lexer.String.alexScan i0 Lexer.String.string_multi_content of
+        Lexer.String.AlexToken i1 len _
           | Just i2 <- lexDelim i1 -> pure (i1, i2)
           | isEOF i1 -> checkSmartQuotes >> setInput i1 >> lexError LexError
-          -- is the next token a tab character?
-          -- need this explicitly because there's a global rule matching $tab
-          | Just ('\t', _) <- alexGetChar' i1 -> setInput i1 >> lexError LexError
           -- Can happen if no patterns match, e.g. an unterminated gap
           | len == 0  -> setInput i1 >> lexError LexError
           | otherwise -> goContent i1
-        AlexSkip i1 _ -> goContent i1
+        Lexer.String.AlexSkip i1 _ -> goContent i1
         _ -> setInput i0 >> lexError LexError
 
     lexDelim =
@@ -2234,11 +2237,6 @@ tok_string_multi startSpan startBuf _len _buf2 = do
       case findSmartQuote (AI (psSpanStart startSpan) startBuf) of
         Just (c, loc) -> throwSmartQuoteError c loc
         Nothing -> pure ()
-
--- | Dummy action that should never be called. Should only be used in lex states
--- that are manually lexed in tok_string_multi.
-tok_string_multi_content :: Action
-tok_string_multi_content = panic "tok_string_multi_content unexpectedly invoked"
 
 lex_chars :: (String, String) -> PsSpan -> StringBuffer -> Int -> P String
 lex_chars (startDelim, endDelim) span buf len =
@@ -3371,6 +3369,7 @@ topNoLayoutContainsCommas (ALRNoLayout b _ : _) = b
 -- If the generated alexScan/alexScanUser functions are called multiple times
 -- in this file, alexScanUser gets broken out into a separate function and
 -- increases memory usage. Make sure GHC inlines this function and optimizes it.
+-- https://github.com/haskell/alex/pull/262
 {-# INLINE alexScanUser #-}
 
 lexToken :: P (PsLocated Token)
