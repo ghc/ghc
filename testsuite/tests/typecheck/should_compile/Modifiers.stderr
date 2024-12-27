@@ -13,121 +13,155 @@ Modifiers.hs:11:12: warning: [GHC-49969] [-Wunknown-modifiers]
 Modifiers.hs:11:12: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:13:1: warning: [GHC-49969] [-Wunknown-modifiers]
-    Unknown modifier %()
+Modifiers.hs:12:11: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %Bool
 
-Modifiers.hs:14:3: warning: [GHC-49969] [-Wunknown-modifiers]
-    Unknown modifier %()
+Modifiers.hs:13:6: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %Maybe
+    • In the type ‘(%Maybe Int)’
+      In the definition of data constructor ‘:**’
+      In the data declaration for ‘D’
 
-Modifiers.hs:15:3: warning: [GHC-49969] [-Wunknown-modifiers]
-    Unknown modifier %True
+Modifiers.hs:13:6: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %Maybe
+    • In the type ‘(%Maybe Int)’
+      In the definition of data constructor ‘:**’
+      In the data declaration for ‘D’
+
+Modifiers.hs:15:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
 
 Modifiers.hs:16:3: warning: [GHC-49969] [-Wunknown-modifiers]
-    Unknown modifier %False
-
-Modifiers.hs:16:3: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:18:1: warning: [GHC-49969] [-Wunknown-modifiers]
-    Unknown modifier %()
-
-Modifiers.hs:18:23: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:17:3: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %True
 
-Modifiers.hs:18:23: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:18:3: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %False
+
+Modifiers.hs:18:3: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
 
 Modifiers.hs:20:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:21:3: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:20:23: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %True
 
-Modifiers.hs:21:3: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:20:23: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %False
 
-Modifiers.hs:23:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:22:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:24:9: warning: [GHC-49969] [-Wunknown-modifiers]
-    Unknown modifier %()
-
-Modifiers.hs:25:11: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:23:3: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %True
 
-Modifiers.hs:27:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:23:3: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %False
+
+Modifiers.hs:25:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:28:3: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:26:9: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:29:3: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:27:11: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %True
 
-Modifiers.hs:31:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:29:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
+
+Modifiers.hs:30:3: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
+
+Modifiers.hs:31:3: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %True
 
-Modifiers.hs:31:1: warning: [GHC-49969] [-Wunknown-modifiers]
-    Unknown modifier %()
-
-Modifiers.hs:34:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:33:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %True
 
-Modifiers.hs:34:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:33:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:38:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:36:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %True
+
+Modifiers.hs:36:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:43:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:40:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
+
+Modifiers.hs:45:1: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %True
     • When checking declaration:
         foreign import ccall safe "test" someImport :: Int
 
-Modifiers.hs:44:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:46:1: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %True
     • When checking declaration:
         foreign export ccall "someImport" someImport :: Int
 
-Modifiers.hs:46:32: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:48:32: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %m
     • In the type signature: l1 :: forall (m :: Bool) a b. a %m -> b
 
-Modifiers.hs:55:7: warning: [GHC-49969] [-Wunknown-modifiers]
-    • Unknown modifier %True
-    • In the type signature: l4 :: a %True -> b
+Modifiers.hs:57:7: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %Bool
+    • In the type signature: l4 :: a %Bool -> b
 
-Modifiers.hs:66:21: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:60:7: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %'()
+    • In the type signature: t1 :: %'() Int
+
+Modifiers.hs:63:14: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %True
+    • In the first argument of ‘Maybe’, namely ‘(%True Int)’
+      In the type signature: t2 :: Maybe (%True Int)
+
+Modifiers.hs:66:14: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %(%True True)
+    • In the first argument of ‘Maybe’, namely ‘(%(%True True) Int)’
+      In the type signature: t3 :: Maybe (%(%True True) Int)
+
+Modifiers.hs:66:16: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %True
+    • In the first argument of ‘Maybe’, namely ‘(%(%True True) Int)’
+      In the type signature: t3 :: Maybe (%(%True True) Int)
+
+Modifiers.hs:77:21: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %()
     • In the type ‘Int %() -> Int’
       In the expression: idt (Int %() -> Int) (+ 1)
       In an equation for ‘visForallApp’:
           visForallApp = idt (Int %() -> Int) (+ 1)
 
-Modifiers.hs:78:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:89:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:80:17: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:91:17: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:85:14: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:96:14: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:91:15: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:102:15: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:94:3: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:105:3: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:104:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:115:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %CT1
 
-Modifiers.hs:106:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:117:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %CT2Con
 
-Modifiers.hs:108:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:119:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %CT2Con'
 
-Modifiers.hs:111:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:122:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %CT3
 

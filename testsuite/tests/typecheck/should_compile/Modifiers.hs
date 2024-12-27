@@ -3,12 +3,14 @@
 
 module Modifiers where
 
-import GHC.Types (Multiplicity(..))
+import GHC.Types (Multiplicity(..), Type)
 
 %() data D
   = %() D1 Int
   | %True D2 String
   | %False D3 { d3 %() :: () }
+  | %Bool Int :* Bool
+  | (%Maybe Int) :** Bool
 
 %() data D' where
   %() D1' :: Int -> D'
@@ -52,8 +54,17 @@ l2 = undefined
 l3 :: a %(m :: Multiplicity) -> b %(m :: Multiplicity) -> c
 l3 = undefined
 
-l4 :: a %True -> b
+l4 :: a %Bool -> b
 l4 = undefined
+
+t1 :: %'() Int
+t1 = 0
+
+t2 :: Maybe (%True Int)
+t2 = Nothing
+
+t3 :: Maybe (%(%True True) Int)
+t3 = Nothing
 
 -- MODS_TODO these are expected to fail, not tested in this test case:
 -- l5 :: a %m -> b
@@ -98,6 +109,15 @@ data FV4' where
 -- %a class FV6 a
 
 -- %a instance B a
+
+fv7 :: forall (a :: Type) . %a a
+fv7 = undefined
+
+fv8 :: %(a :: Type) a
+fv8 = undefined
+
+-- fv9 :: %a a -- unknown kind
+-- fv9 = undefined
 
 -- And which concrete types?
 

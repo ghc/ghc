@@ -1380,10 +1380,27 @@ sks_vars :: { Located [LocatedN RdrName] }  -- Returned in reverse order
 modifier :: { Located (HsModifier GhcPs) }
   : PREFIX_PERCENT atype            { sLL $1 $2 (HsModifier (epTok $1) $2) }
 
--- | Modifiers attached in most places.
+-- | Modifiers attached inline.
 modifiers :: { Located [HsModifier GhcPs] }
   : modifier modifiers              { sLL $1 $2 (unLoc $1 : unLoc $2) }
   | {- empty -}                     { sL0 [] }
+
+-- MODS_TODO explain this. Short version is that in
+--
+--     data X = %a X
+--
+-- we can either take the %a to be the modifiers attached to the constructor, or
+-- to the type. Having this variant means it's the constructor. We get other
+-- errors (that I don't really understand) if we add the %shift to regular
+-- `modifiers`.
+--
+--     constr -> . modifiers forall constr_stuff
+--
+-- if we reduce, we resolve `modifiers` as []. By shifting we make sure it
+-- resolves as [%a].
+modifiersShift :: { Located [HsModifier GhcPs] }
+  : modifier modifiersShift         { sLL $1 $2 (unLoc $1 : unLoc $2) }
+  | {- empty -} %shift              { sL0 [] }
 
 modifiers1 :: { Located [HsModifier GhcPs] }
   : modifier modifiers              { sLL $1 $2 (unLoc $1 : unLoc $2) }
@@ -2318,8 +2335,11 @@ type :: { LHsType GhcPs }
                                           amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow (epTok $3) (unLoc $2)) $1 $4) }
                                               -- [mu AnnLollyU $2] }
 
+-- MODS_TODO I'm very not confident this is the right place for modifiers to be
+-- accepted.
 btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }
+        | modifiers1 atype              {% amsA' $ sLL $1 $2 $ HsModifiedTy noExtField (unLoc $1) $2 }
 
 infixtype :: { forall b. DisambTD b => PV (LocatedA b) }
         -- See Note [%shift: infixtype -> ftype]
@@ -2594,7 +2614,7 @@ constrs1 :: { Located [LConDecl GhcPs] }
         | constr                         { sL1 $1 [$1] }
 
 constr :: { LConDecl GhcPs }
-        : modifiers forall context '=>' constr_stuff
+        : modifiersShift forall context '=>' constr_stuff
                 {% amsA' (let (con,details) = unLoc $5 in
                   (L (comb4 $2 $3 $4 $5) (mkConDeclH98
                                                        (epUniTok $4,(fst $ unLoc $2))
@@ -2603,7 +2623,7 @@ constr :: { LConDecl GhcPs }
                                                        (snd $ unLoc $2)
                                                        (Just $3)
                                                        details))) }
-        | modifiers forall constr_stuff
+        | modifiersShift forall constr_stuff
                 {% amsA' (let (con,details) = unLoc $3 in
                   (L (comb2 $2 $3) (mkConDeclH98 (noAnn, fst $ unLoc $2)
                                                       (unLoc $1)
