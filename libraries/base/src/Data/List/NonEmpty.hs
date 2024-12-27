@@ -20,6 +20,13 @@
 -- @since 4.9.0.0
 ----------------------------------------------------------------------------
 
+-- Function implementations in this module adhere to the following principle:
+--
+-- For every NonEmpty function that is different from a corresponding
+-- List function only in the presence of NonEmpty in its type, both
+-- the List and NonEmpty functions should have the same strictness
+-- properties. Same applies to the class instances.
+
 module Data.List.NonEmpty (
    -- * The type of non-empty streams
      NonEmpty(..)
