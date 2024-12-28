@@ -63,7 +63,11 @@ module GHC.Core.Utils (
         isUnsafeEqualityCase,
 
         -- * Dumping stuff
-        dumpIdInfoOfProgram
+        dumpIdInfoOfProgram,
+
+        -- * AbsVars
+        AbsVar, AbsVars, mkPolyAbsLams, mkCoreAbsLams, mkTaggedAbsLams,
+                         mkAbsLamTypes, mkAbsVarApps
     ) where
 
 import GHC.Prelude
@@ -3057,3 +3061,92 @@ isUnsafeEqualityCase scrut bndr alts
   = Just rhs
   | otherwise
   = Nothing
+
+
+{- *********************************************************************
+*                                                                      *
+             Abstracting over free variables
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Abstracting over free variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are abstracting over variables {a:Type, x:a} that are free in an
+expression.  This happens in GHC.Core.Opt.SetLevels and GHC.Core.Opt.Exitify.
+What if one of those variables is a type variable with an unfolding?  Then
+we don't want to /abstract/ over it; rather we want to push the binding into
+the body of the lambda. So
+
+* `AbsVars` is a list of free variables, in dependency order, to abstract.
+  Some of them may be tyvars-with-unfoldings. For example
+      vs = [a, b=[a], x:b]
+
+* `mkCoreAbsLams` forms a lambda abstraction pushing the tyvar bindings
+  into the body:
+      mkCoreAbsLams [a, b=[a], x:b] body
+         = \a. \(x:[a]). let @b = [a] in body
+
+   It pushes the let inwards to try to keep the lambas together; this
+   matters for join points, where the lambdas are supposed to be adjacent.
+
+* `mkAbsVarApps` forms an application, droppping those tyvars-with-unfoldings
+      mkAbsVarApps fun [a, b=[a], x:b]
+         = fun @a x
+-}
+
+type AbsVar        = Var
+type AbsVars       = [AbsVar]
+type TaggedAbsVars t = [TaggedBndr t]
+
+mkPolyAbsLams :: (b -> AbsVar, Var -> b -> b)
+          -> [b] -> Expr b -> Expr b
+-- `mkPolyAbsLams` is polymorphic in (get,set) so that we can
+-- use it for both CoreExpr and LevelledExpr
+{-# INLINE mkPolyAbsLams #-}
+mkPolyAbsLams (get,set) bndrs body
+  = go emptyVarSet [] bndrs
+  where
+    go _ tv_binds []
+      = mkLets (reverse tv_binds) body
+    go tvs tv_binds (bndr:bndrs)
+      | Just ty <- tyVarUnfolding_maybe var
+      = go (tvs `extendVarSet` var) (NonRec bndr (Type ty) : tv_binds) bndrs
+      | otherwise
+      = Lam bndr' (go tvs tv_binds bndrs)
+      where
+        var = get bndr
+        var' = updateVarType (expandTyVarUnfoldings tvs) $
+               zap_unfolding var
+        bndr' | isEmptyVarSet tvs = bndr
+              | otherwise         = set var' bndr
+
+        -- zap: We are going to lambda-abstract, so nuke any IdInfo
+        zap_unfolding var | isId var  = setIdInfo var vanillaIdInfo
+                          | otherwise = var
+
+mkCoreAbsLams :: AbsVars -> CoreExpr -> CoreExpr
+-- Specialise for CoreExpr
+mkCoreAbsLams = mkPolyAbsLams (get, set)
+  where
+    get v   = v
+    set v _ = v
+
+mkTaggedAbsLams :: TaggedAbsVars t -> TaggedExpr t -> TaggedExpr t
+-- Specialise for TaggedExpr
+mkTaggedAbsLams = mkPolyAbsLams (get, set)
+  where
+    get (TB v _)   = v
+    set v (TB _ t) = TB v t
+
+mkAbsLamTypes :: AbsVars -> Type -> Type
+mkAbsLamTypes abs_vars ty
+  = expandTyVarUnfoldings (mkVarSet tvs_w_unfs) (mkLamTypes abs_lam_vars ty)
+  where
+    (abs_lam_vars, tvs_w_unfs) = partition (isNothing . tyVarUnfolding_maybe) abs_vars
+
+mkAbsVarApps :: Expr b -> AbsVars -> Expr b
+mkAbsVarApps fun [] = fun
+mkAbsVarApps fun (a:as)
+  | Just {} <- tyVarUnfolding_maybe a = mkAbsVarApps fun                         as
+  | otherwise                         = mkAbsVarApps (App fun (varToCoreExpr a)) as
+
