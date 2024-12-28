@@ -2482,6 +2482,17 @@ the validity checker), that will not happen. But I cannot think of a non-contriv
 example that will notice this lack of inference, so it seems better to improve
 error messages than be able to infer this instantiation.
 
+Another place to imrpove the error messages with the same handling is in the case
+of a newtype instance,
+
+  -- no UnliftedNewtypes
+
+  data family D :: UnliftedType
+  newtype instance D = MkD Any
+
+Here we also want to be suggesting to enable UnliftedNewtypes. So we allow the
+possibility that the kind is not Type regardless of whether UnliftedNewtypes is enabled.
+
 Note [Implementation of UnliftedDatatypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Expected behavior of UnliftedDatatypes:

@@ -1007,10 +1007,9 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
     -- See Note [Implementation of UnliftedNewtypes] in GHC.Tc.TyCl, families (2),
     -- and Note [Implementation of UnliftedDatatypes].
     tc_kind_sig Nothing
-      = do { unlifted_newtypes  <- xoptM LangExt.UnliftedNewtypes
-           ; unlifted_datatypes <- xoptM LangExt.UnliftedDatatypes
+      = do { unlifted_datatypes <- xoptM LangExt.UnliftedDatatypes
            ; case new_or_data of
-               NewType  | unlifted_newtypes  -> newOpenTypeKind
+               NewType                       -> newOpenTypeKind
                DataType | unlifted_datatypes -> newOpenTypeKind
                _                             -> pure liftedTypeKind
            }
