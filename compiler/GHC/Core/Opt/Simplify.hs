@@ -277,7 +277,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
            dump_end_iteration logger dump_core_sizes name_ppr_ctx iteration_no counts1 binds2 rules1 ;
 
            for_ (so_pass_result_cfg opts) $ \pass_result_cfg ->
-             lintPassResult logger pass_result_cfg binds2 ;
+             lintPassResult logger pass_result_cfg binds2 rules1 ;
 
                 -- Loop
            do_iteration (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
