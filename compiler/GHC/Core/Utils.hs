@@ -3070,17 +3070,33 @@ isUnsafeEqualityCase scrut bndr alts
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [Abstracting over free variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Type-lets and abstracting over free variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we are abstracting over variables {a:Type, x:a} that are free in an
 expression.  This happens in GHC.Core.Opt.SetLevels and GHC.Core.Opt.Exitify.
 What if one of those variables is a type variable with an unfolding?  Then
-we don't want to /abstract/ over it; rather we want to push the binding into
-the body of the lambda. So
+we don't want to /abstract/ over it; rather we want to /duplicate/ the binding into
+the body of the lambda.  For example
+      /\a. \(x::a). let @b = Maybe a in
+                    let foo = \(y::b). isJust y
+                    in ...
+Suppose we want to float that `foo` binding outside the /\a (x::a).  We can't
+just abstract over b, thus
+     foo = /\b (y::b). isJust y
+because the type-correctness of `isJust y` relies on knowning that `b=Maybe a`.
+Instead we must duplicate that type-let thus:
+     let lvl_foo = /\a. let @b = Maybe a in \(y:b). isJust y
+     in /\a. \(x::a). let @b = Maybe a in
+                      let foo = lvl_foo @a
+
+So:
 
 * `AbsVars` is a list of free variables, in dependency order, to abstract.
   Some of them may be tyvars-with-unfoldings. For example
       vs = [a, b=[a], x:b]
+
+* When we make an AbsVars list, we close over the free vars of the unfoldings
+  of any tyvars in it.  So if `b{=Maybe a}` is in the list then so is `a`
 
 * `mkCoreAbsLams` forms a lambda abstraction pushing the tyvar bindings
   into the body:
