@@ -43,6 +43,7 @@ data TestSetting = TestHostOS
                  | TestLeadingUnderscore
                  | TestGhcPackageDb
                  | TestGhcLibDir
+                 | TestGhcRtsWithLibdw
                  deriving (Show)
 
 -- | Lookup a test setting in @ghcconfig@ file.
@@ -76,6 +77,7 @@ testSetting key = do
         TestLeadingUnderscore     -> "LeadingUnderscore"
         TestGhcPackageDb          -> "GhcGlobalPackageDb"
         TestGhcLibDir             -> "GhcLibdir"
+        TestGhcRtsWithLibdw       -> "GhcRtsWithLibdw"
 
 -- | Get the RTS ways of the test compiler
 testRTSSettings :: Action [String]

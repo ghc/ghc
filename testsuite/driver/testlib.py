@@ -1067,6 +1067,9 @@ def have_gdb( ) -> bool:
 def have_readelf( ) -> bool:
     return config.have_readelf
 
+def have_libdw( ) -> bool:
+    return config.have_libdw
+
 def have_fast_bignum( ) -> bool:
     return config.have_fast_bignum
 

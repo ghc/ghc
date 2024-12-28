@@ -150,6 +150,12 @@ else
 RUNTEST_OPTS += -e config.have_readelf=False
 endif
 
+ifeq "$(GhcRtsWithLibdw)" "YES"
+RUNTEST_OPTS += -e "config.have_libdw=True"
+else
+RUNTEST_OPTS += -e "config.have_libdw=False"
+endif
+
 ifeq "$(BIGNUM_GMP)" ""
 RUNTEST_OPTS += -e config.have_fast_bignum=False
 else

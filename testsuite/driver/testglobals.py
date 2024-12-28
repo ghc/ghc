@@ -174,6 +174,9 @@ class TestConfig:
         # Is readelf available?
         self.have_readelf = False
 
+        # Is libww (DWARF) available
+        self.have_libdw = False
+
         # Do we use a fast backend for bignum (e.g. GMP)
         self.have_fast_bignum = True
 

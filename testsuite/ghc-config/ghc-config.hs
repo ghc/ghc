@@ -29,6 +29,7 @@ main = do
   getGhcFieldOrFail fields "GhcRTSWays" "RTS ways"
   getGhcFieldOrFail fields "GhcLibdir" "LibDir"
   getGhcFieldOrFail fields "GhcGlobalPackageDb" "Global Package DB"
+  getGhcFieldOrFail fields "GhcRtsWithLibdw" "RTS expects libdw"
   getGhcFieldOrDefault fields "TargetRTSLinkerOnlySupportsSharedLibs" "target RTS linker only supports shared libraries" "NO"
   getGhcFieldOrDefault fields "GhcDynamic" "GHC Dynamic" "NO"
   getGhcFieldOrDefault fields "GhcProfiled" "GHC Profiled" "NO"
