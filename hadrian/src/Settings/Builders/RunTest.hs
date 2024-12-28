@@ -93,7 +93,8 @@ data TestCompilerArgs = TestCompilerArgs{
  ,   libdir :: FilePath
  ,   have_llvm :: Bool
  ,   rtsLinker :: Bool
- ,   pkgConfCacheFile :: FilePath }
+ ,   pkgConfCacheFile :: FilePath
+ ,   hasLibdw :: Bool}
    deriving (Eq, Show)
 
 -- | Some archs like wasm32/js used to report have_llvm=True because
@@ -128,7 +129,6 @@ inTreeCompilerArgs stg = do
     unregisterised      <- queryTargetTarget tgtUnregisterised
     tables_next_to_code <- queryTargetTarget tgtTablesNextToCode
     targetWithSMP       <- targetSupportsSMP
-
 
     let ghcStage
           | cross, Stage1 <- stg = Stage1
@@ -203,6 +203,7 @@ outOfTreeCompilerArgs = do
     libdir <- getTestSetting TestGhcLibDir
 
     rtsLinker <- getBooleanSetting TestGhcWithRtsLinker
+    hasLibdw <- getBooleanSetting TestGhcRtsWithLibdw
     return TestCompilerArgs{..}
 
 
@@ -311,6 +312,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ asBool "config.target_has_smp=" targetWithSMP
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
             , arg "-e", arg $ "config.leading_underscore=" ++ show leadingUnderscore
+            , arg "-e", arg $ "config.have_libdw=" ++ show hasLibdw
 
             , arg "-e", arg $ "config.wordsize=" ++ show wordsize
             , arg "-e", arg $ "config.os="       ++ show os
