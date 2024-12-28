@@ -50,11 +50,12 @@ import GHC.Types.Var.Env
 import GHC.Types.Basic( JoinPointHood(..) )
 
 import GHC.Utils.Monad.State.Strict
-import GHC.Utils.Misc( mapSnd )
+import GHC.Utils.Misc( mapSnd, count )
 
 import GHC.Data.FastString
 
 import Data.Bifunctor
+import Data.Maybe( isNothing )
 import Control.Monad
 
 -- | Traverses the AST, simply to find all joinrecs and call 'exitify' on them.
@@ -223,12 +224,14 @@ exitifyRec in_scope pairs
       -- We have something to float out!
       | otherwise
       = do { -- Assemble the RHS of the exit join point
-             let rhs   = mkLams abs_vars e
+             -- Reminder: see GHC.Core.Utils Note [Abstracting over free variables]
+             let rhs   = mkCoreAbsLams abs_vars e
                  avoid = in_scope `extendInScopeSetList` captured
+                 join_arity = count (isNothing . tyVarUnfolding_maybe) abs_vars
              -- Remember this binding under a suitable name
-           ; v <- addExit avoid (length abs_vars) rhs
+           ; v <- addExit avoid join_arity rhs
              -- And jump to it from here
-           ; return $ mkVarApps (Var v) abs_vars }
+           ; return $ mkAbsVarApps (Var v) abs_vars }
 
       where
         -- Used to detect exit expressions that are already proper exit jumps
@@ -489,7 +492,6 @@ could get more from running it multiple times, as seen in fish).
 
 Note [Picking arguments to abstract over]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When we create an exit join point, so we need to abstract over those of its
 free variables that are be out-of-scope at the destination of the exit join
 point. So we go through the list `captured` and pick those that are actually

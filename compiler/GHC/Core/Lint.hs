@@ -350,7 +350,7 @@ endPassIO logger cfg binds rules
                         (renderWithContext defaultSDocContext (ep_prettyPass cfg))
                         (ep_passDetails cfg) binds rules
        ; for_ (ep_lintPassResult cfg) $ \lp_cfg ->
-           lintPassResult logger lp_cfg binds
+           lintPassResult logger lp_cfg binds rules
        }
   where
     mb_flag = case ep_dumpFlag cfg of
@@ -409,23 +409,25 @@ data LintPassResultConfig = LintPassResultConfig
   }
 
 lintPassResult :: Logger -> LintPassResultConfig
-               -> CoreProgram -> IO ()
-lintPassResult logger cfg binds
-  = do { let warns_and_errs = lintCoreBindings'
-               (LintConfig
-                { l_diagOpts = lpr_diagOpts cfg
-                , l_platform = lpr_platform cfg
-                , l_flags    = lpr_makeLintFlags cfg
-                , l_vars     = lpr_localsInScope cfg
-                })
-               binds
+               -> CoreProgram -> [CoreRule] -> IO ()
+lintPassResult logger cfg binds rules
+  = do { let warns_and_errs = lintCoreBindings' config binds rules
        ; Err.showPass logger $
            "Core Linted result of " ++
            renderWithContext defaultSDocContext (lpr_passPpr cfg)
        ; displayLintResults logger
                             (lpr_showLintWarnings cfg) (lpr_passPpr cfg)
-                            (pprCoreBindings binds) warns_and_errs
+                            pp_pgm warns_and_errs
        }
+  where
+    config = LintConfig { l_diagOpts = lpr_diagOpts cfg
+                        , l_platform = lpr_platform cfg
+                        , l_flags    = lpr_makeLintFlags cfg
+                        , l_vars     = lpr_localsInScope cfg }
+
+    pp_pgm = vcat [ pprCoreBindings binds
+                  , text "------ Local rules for imported ids --------"
+                  , pprRules rules ]
 
 displayLintResults :: Logger
                    -> Bool -- ^ If 'True', display linter warnings.
@@ -459,11 +461,11 @@ lint_banner string pass = text "*** Core Lint"      <+> text string
                           <+> text "***"
 
 -- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
-lintCoreBindings' :: LintConfig -> CoreProgram -> WarnsAndErrs
+lintCoreBindings' :: LintConfig -> CoreProgram -> [CoreRule] -> WarnsAndErrs
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreBindings' cfg binds
+lintCoreBindings' cfg binds rules
   = initL cfg $
     addLoc TopLevelBindings           $
     do { -- Check that all top-level binders are distinct
@@ -476,7 +478,8 @@ lintCoreBindings' cfg binds
 
          -- Typecheck the bindings
        ; lintRecBindings TopLevel all_pairs $ \_ ->
-         return () }
+         -- Don't forget to check the local rules for imported Ids
+         mapM_ lintImpRule rules }
   where
     all_pairs = flattenBinds binds
      -- Put all the top-level binders in scope at the start
@@ -733,7 +736,8 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
 
            _ -> return ()
 
-       ; addLoc (RuleOf binder) $ mapM_ (lintCoreRule binder binder_ty) (idCoreRules binder)
+       ; addLoc (RuleOf binder) $
+         mapM_ (lintCoreRule binder binder_ty) (idCoreRules binder)
 
        ; addLoc (UnfoldingOf binder) $
          lintIdUnfolding binder binder_ty (idUnfolding binder)
@@ -2275,14 +2279,40 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
          (rule_doc <+> vcat [ text "lhs type:" <+> ppr lhs_ty
                             , text "rhs type:" <+> ppr rhs_ty
                             , text "fun_ty:" <+> ppr fun_ty ])
-       ; let bad_bndrs = filter is_bad_bndr bndrs
 
-       ; checkL (null bad_bndrs)
-                (rule_doc <+> text "unbound" <+> ppr bad_bndrs)
-            -- See Note [Linting rules]
-    }
+       ; checkUnboundTemplateVars rule_doc bndrs args rhs }
   where
     rule_doc = text "Rule" <+> doubleQuotes (ftext name) <> colon
+
+
+lintImpRule :: CoreRule -> LintM ()
+lintImpRule (BuiltinRule {})
+  = return ()  -- Don't bother
+
+lintImpRule (Rule { ru_name = name, ru_bndrs = bndrs
+                  , ru_args = args, ru_rhs = rhs })
+  = addLoc (InRule name)              $
+    lintLocalBinders LambdaBind bndrs $ \ _ ->
+    do { mapM_ lintCoreArg args
+       ; _ <- lintCoreExpr rhs
+       ; checkUnboundTemplateVars rule_doc bndrs args rhs }
+  where
+    rule_doc = text "Rule" <+> doubleQuotes (ftext name) <> colon
+
+
+lintCoreArg :: CoreExpr -> LintM ()
+lintCoreArg (Type ty)     = lintType     ty
+lintCoreArg (Coercion co) = lintCoercion co
+lintCoreArg e             = do { _ <- lintCoreExpr e; return () }
+
+checkUnboundTemplateVars :: SDoc -> [Var] -> [CoreExpr] -> CoreExpr -> LintM ()
+checkUnboundTemplateVars rule_doc bndrs args rhs
+   = checkL (null bad_bndrs)
+            (rule_doc <+> text "unbound" <+> ppr bad_bndrs)
+            -- See Note [Linting rules]
+  where
+
+    bad_bndrs = filter is_bad_bndr bndrs
 
     lhs_fvs = exprsFreeVars args
     rhs_fvs = exprFreeVars rhs
@@ -3427,9 +3457,10 @@ data LintLocInfo
   | AnExpr CoreExpr     -- Some expression
   | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
   | TopLevelBindings
-  | InType Type         -- Inside a type
-  | InCo   Coercion     -- Inside a coercion
+  | InType Type                  -- Inside a type
+  | InCo   Coercion              -- Inside a coercion
   | InAxiom (CoAxiom Branched)   -- Inside a CoAxiom
+  | InRule RuleName              -- Inside a rule
 
 data LintConfig = LintConfig
   { l_diagOpts   :: !DiagOpts         -- ^ Diagnostics opts
@@ -3655,11 +3686,11 @@ lintVarOcc v_occ
                    | otherwise        -> failWithL (text "The" <+> ppr (whatItIs v_occ)
                                                     <+> quotes (ppr v_occ)
                                                     <+> text "is out of scope")
-           Just (in_bndr, out_bndr) -> do { checkBndrOccCompatibility in_bndr out_bndr v_occ
+           Just (in_bndr, out_bndr) -> do { checkBndrOccCompatibility in_bndr v_occ
                                           ; return (varType out_bndr) } }
 
-checkBndrOccCompatibility :: InVar -> OutVar -> InVar -> LintM ()
-checkBndrOccCompatibility in_bndr out_bndr v_occ
+checkBndrOccCompatibility :: InVar -> InVar -> LintM ()
+checkBndrOccCompatibility in_bndr v_occ
   = do { checkL (occ_is == bndr_is) $
          bndr_occ_mismatch (ppr bndr_is) (ppr occ_is)
 
@@ -3821,6 +3852,9 @@ dumpLoc (LambdaBodyOf b)
 
 dumpLoc (RuleOf b)
   = (getSrcLoc b, text "In a rule attached to" <+> pp_binder b)
+
+dumpLoc (InRule n)
+  = (noSrcLoc, text "In the rule" <+> quotes (ppr n))
 
 dumpLoc (UnfoldingOf b)
   = (getSrcLoc b, text "In the unfolding of" <+> pp_binder b)

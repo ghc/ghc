@@ -48,7 +48,7 @@ import GHC.Unit.Module.ModGuts
 import GHC.Types.Error (MessageClass(..), Severity(..), DiagnosticReason(WarningWithoutFlag), ResolvedDiagnosticReason (..))
 import GHC.Types.Literal ( litIsLifted )
 import GHC.Types.Id
-import GHC.Types.Var     ( setTyVarUnfolding )
+import GHC.Types.Var     ( setTyVarUnfolding, zapTyVarUnfolding )
 import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
 import GHC.Types.Var.Env
@@ -1015,7 +1015,7 @@ initScEnv guts
         -- Acccount for top-level bindings that are not in dependency order;
         -- see Note [Glomming] in GHC.Core.Opt.OccurAnal
         -- Easiest thing is to bring all the top level binders into scope at once,
-        -- as if  at once, as if all the top-level decls were mutually recursive.
+        -- as if all the top-level decls were mutually recursive.
 
 data HowBound = RecFun  -- These are the recursive functions for which
                         -- we seek interesting call patterns
@@ -1063,9 +1063,8 @@ extendScInScope :: ScEnv -> [Var] -> ScEnv
 extendScInScope env qvars
   = env { sc_subst = extendSubstInScopeList (sc_subst env) qvars }
 
-        -- Extend the substitution
-extendScSubst :: ScEnv -> Var -> OutExpr -> ScEnv
-extendScSubst env var expr = env { sc_subst = extendSubst (sc_subst env) var expr }
+extendScTvSubst :: ScEnv -> TyVar -> OutType -> ScEnv
+extendScTvSubst env var ty = env { sc_subst = extendTvSubst (sc_subst env) var ty }
 
 extendScSubstList :: ScEnv -> [(Var,OutExpr)] -> ScEnv
 extendScSubstList env prs = env { sc_subst = extendSubstList (sc_subst env) prs }
@@ -1399,10 +1398,18 @@ scBind :: TopLevelFlag -> ScEnv -> InBind
 scBind top_lvl env (NonRec bndr rhs) do_body
   | Type rhs_ty <- rhs
   = assertPpr (isTyVar bndr) (ppr bndr) $
-    do { let (body_env, bndr') = extendBndr env bndr
-             !(MkSolo rhs_ty') = scSubstTy env rhs_ty
-             bndr'' = setTyVarUnfolding bndr' rhs_ty'
-             body_env' = extendScSubst body_env bndr (Type (mkTyVarTy bndr''))
+    if isTopLevel top_lvl then
+      -- At top level there is nothing to do; no need to clone,
+      -- and the tyvar is already in scope, with the correct unfolding
+      do { (final_usage, body', warnings) <- do_body env
+         ; return (final_usage, [], body', warnings) }
+   else
+      -- Type-lets may be created by doBeta, so the tyvar
+      -- may or may not have a proper TyVarUnfolding
+      do { let (body_env, bndr') = extendBndr env (zapTyVarUnfolding bndr)
+               !(MkSolo rhs_ty') = scSubstTy env rhs_ty
+               bndr'' = setTyVarUnfolding bndr' rhs_ty'
+               body_env' = extendScTvSubst body_env bndr (mkTyVarTy bndr'')
        ; (final_usage, body', warnings) <- do_body body_env'
        ; return (final_usage, [NonRec bndr'' (Type rhs_ty')], body', warnings) }
 

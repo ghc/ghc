@@ -92,7 +92,7 @@ import GHC.Core.Subst
 import GHC.Core.Type
 
 import GHC.Types.Id
-import GHC.Types.Id.Info
+import GHC.Types.Id.Info      ( vanillaIdInfo )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Set   ( nonDetStrictFoldUniqSet )
@@ -650,7 +650,7 @@ lvlMFE env strict_ctxt ann_expr
   , let Pair bx_bndr ubx_bndr = mkTemplateLocals (Pair box_ty expr_ty)
   = do { expr1 <- lvlExpr rhs_env ann_expr
        ; let l1r       = incMinorLvlFrom rhs_env
-             float_rhs = mkAbsLams abs_vars_w_lvls $
+             float_rhs = mkTaggedAbsLams abs_vars_w_lvls $
                          Case expr1 (stayPut l1r ubx_bndr) box_ty
                              [Alt DEFAULT [] (App boxing_expr (Var ubx_bndr))]
 
@@ -1307,7 +1307,7 @@ lvlBind env (AnnRec pairs)
     new_rhs_body <- lvlRhs body_env2 Recursive is_bot NotJoinPoint rhs_body
     (poly_env, Identity poly_bndr) <- newPolyBndrs dest_lvl env abs_vars (Identity bndr)
     return (Rec [(TB poly_bndr (FloatMe dest_lvl)
-                 , mkAbsLams abs_vars_w_lvls $
+                 , mkTaggedAbsLams abs_vars_w_lvls $
                    mkLams lam_bndrs2 $
                    Let (Rec [( TB new_bndr (StayPut rhs_lvl)
                              , mkLams lam_bndrs2 new_rhs_body)])
@@ -1408,7 +1408,7 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
                      && any isId bndrs
                   then lvlMFE  body_env True body
                   else lvlExpr body_env      body
-       ; return (mkAbsLams bndrs' body') }
+       ; return (mkTaggedAbsLams bndrs' body') }
   where
     (bndrs, body)     | JoinPoint join_arity <- mb_join_arity
                       = collectNAnnBndrs join_arity rhs
@@ -1756,46 +1756,6 @@ lookupVar le v = case lookupVarEnv (le_env le) v of
                     Just (_, expr) -> expr
                     _              -> Var v
 
-type AbsVars         = [OutVar]
-type LevelledAbsVars = [LevelledBndr]
-  -- A list of variables to abstract, in the correct dependency order
-  -- May include type variables with unfoldings:
-  --    when abstracting, use a let
-  --    when applying, ignore
-  -- E.g   [a, b=[a], x:a]
-  -- We might make
-  --    f = /\a let @b=[a] in  \(x:a). blah
-  -- and at an application site say
-  --    f @ty arg
-
-mkAbsLams :: LevelledAbsVars -> Expr LevelledBndr -> Expr LevelledBndr
-mkAbsLams [] body = body
-mkAbsLams (bndr@(TB v _) : bndrs) body
-  | Just ty <- tyVarUnfolding_maybe v
-  = Let (NonRec bndr (Type ty)) (mkAbsLams bndrs body)
-  | otherwise
-  = Lam bndr (mkAbsLams bndrs body)
-
-mkAbsLamTypes :: AbsVars -> Type -> Type
-mkAbsLamTypes abs_vars ty
-  = -- pprTrace "mkAbsLamTypes" (
-    --  vcat [ text "abs_vars" <+> ppr abs_vars
-    --       , text "abs_lam_vars" <+> ppr abs_lam_vars
-    --       , text "tv_unf_prs" <+> ppr tv_unf_prs
-    --       , text "ty" <+> ppr ty
-    --       , text "mkLam" <+> ppr (mkLamTypes abs_lam_vars ty)
-    --       , text "res" <+> ppr res ])
-      res
-  where
-    res = expandTyVarUnfoldings (mkVarSet tvs_w_unfs) (mkLamTypes abs_lam_vars ty)
-    (abs_lam_vars, tvs_w_unfs) = partition (isNothing . tyVarUnfolding_maybe) abs_vars
-
-mkAbsVarApps :: Expr LevelledBndr -> AbsVars -> Expr LevelledBndr
-mkAbsVarApps fun [] = fun
-mkAbsVarApps fun (a:as)
-  | Just {} <- tyVarUnfolding_maybe a = mkAbsVarApps fun                         as
-  | otherwise                         = mkAbsVarApps (App fun (varToCoreExpr a)) as
-
 abstractVars :: Level -> LevelEnv -> DVarSet -> AbsVars
 -- Find the variables in fvs, free vars of the target expression,
 -- whose level is greater than the destination level
@@ -1815,9 +1775,8 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
 --           , text "r2:" <+> ppr r3
 --           , text "r3:" <+> ppr r3
 --           , text "subst:" <+> ppr subst ])
-      r7
+      r6
   where
-    r7 = map zap r6
     r6 = dep_anal r5
     r5 = filter abstract_me r4
     r4 = dVarSetElems r3
@@ -1831,20 +1790,22 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
                         Just lvl -> dest_lvl `ltLvl` lvl
                         Nothing  -> False
 
-    zap :: Var -> Var
-    -- zap: We are going to lambda-abstract, so nuke any IdInfo
-    -- But leave TyVar unfoldings alone
-    zap v | isId v    = setIdInfo v vanillaIdInfo
-          | otherwise = v
-
     close_set :: DVarSet -> DVarSet
     close_set s = mapUnionDVarSet close (dVarSetElems s)
 
     close :: Var -> DVarSet
-    close v | Just ty <- tyVarUnfolding_maybe v
-            = close_set (tyCoVarsOfTypeDSet ty) `extendDVarSet` v
-            | otherwise   -- We have already got the free vars of its kind
-            = unitDVarSet v
+    close v | isId v    = close_set ty_tvs `extendDVarSet` zapped_id
+            | otherwise = close_set (unf_tvs `unionDVarSet` ty_tvs)
+                          `extendDVarSet` v
+      where
+        unf_tvs = case tyVarUnfolding_maybe v of
+                     Just ty -> tyCoVarsOfTypeDSet ty
+                     Nothing -> emptyDVarSet
+        ty_tvs = tyCoVarsOfTypeDSet (varType v)
+
+        -- zapped_id: We are going to lambda-abstract, so nuke any IdInfo
+        --           But (crucially) leave TyVar unfoldings alone
+        zapped_id = setIdInfo v vanillaIdInfo
 
     dep_anal vs = scopedSort tcvs ++ ids
       where
