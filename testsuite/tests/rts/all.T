@@ -636,3 +636,6 @@ test('T25280', [unless(opsys('linux'),skip),req_process,js_skip], compile_and_ru
 # N.B. This will likely issue a warning on stderr but we merely care that the
 # program doesn't crash.
 test('T25560', [req_c_rts, ignore_stderr], compile_and_run, [''])
+
+# TODO: Refine the command line args. (For now, turn DWARF on - anyhow - to ensure that no missing flag causes troubles.)
+test("execution_stack", [unless(have_libdw(), skip)], compile_and_run, ['-debug -g -optc=-g3'])
