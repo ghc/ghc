@@ -669,3 +669,6 @@ test('TimeoutQueue',
 test('ClosureTable',
      [req_c, only_ways(['normal', 'debug']), extra_files(['ClosureTable_c.c'])], compile_and_run,
      ['-debug -O0 ClosureTable_c.c -I{top}/../rts -I{top}/../rts/include'])
+
+# TODO: Refine the command line args. (For now, turn DWARF on - anyhow - to ensure that no missing flag causes troubles.)
+test("execution_stack", [unless(have_libdw(), skip)], compile_and_run, ['-debug -g -optc=-g3'])
