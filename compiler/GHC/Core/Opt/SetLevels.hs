@@ -1218,7 +1218,7 @@ lvlBind :: LevelEnv
         -> LvlM (LevelledBind, LevelEnv)
 
 lvlBind env (AnnNonRec bndr rhs)
-  |  isTyVar bndr  -- Don't float TyVar binders (simplifier gets rid of them pronto)
+  |  isTyVar bndr  -- Don't float TyVar binders
   || isCoVar bndr  -- Don't float CoVars: difficult to fix up CoVar occurrences
                    --                     (see extendPolyLvlEnv)
   || not (wantToFloat env NonRecursive dest_lvl is_join is_top_bindable)
@@ -1761,12 +1761,15 @@ abstractVars :: Level -> LevelEnv -> DVarSet -> AbsVars
 -- whose level is greater than the destination level
 -- These are the ones we are going to abstract out
 --
--- Note that to get reproducible builds, the variables need to be
--- abstracted in deterministic order, not dependent on the values of
--- Uniques. This is achieved by using DVarSets, deterministic free
--- variable computation and deterministic sort.
--- See Note [Unique Determinism] in GHC.Types.Unique for explanation of why
--- Uniques are not deterministic.
+-- Type-lets: see Note [Type-lets and abstracting over free variables]
+--            in GHC.Core.Utils.
+--
+-- Determinism: to get reproducible builds, the variables need to be
+--     abstracted in deterministic order, not dependent on the values of
+--     Uniques. This is achieved by using DVarSets, deterministic free
+--     variable computation and deterministic sort.
+--     See Note [Unique Determinism] in GHC.Types.Unique for explanation of why
+--     Uniques are not deterministic.
 abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
   =  -- NB: sortQuantVars might not put duplicates next to each other
 --    pprTrace "abstractVars"
@@ -1777,12 +1780,12 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
 --           , text "subst:" <+> ppr subst ])
       r6
   where
-    r6 = dep_anal r5
-    r5 = filter abstract_me r4
-    r4 = dVarSetElems r3
-    r3 = mapUnionDVarSet close r2
-    r2 = substFreeVars subst r1
     r1 = dVarSetElems in_fvs
+    r2 = substFreeVars subst r1     -- Apply the substituteion
+    r3 = mapUnionDVarSet close r2   -- Close over tyvar unfoldings, and zap Id unfoldings
+    r4 = dVarSetElems r3
+    r5 = filter abstract_me r4      -- Filter out the ones to abstract
+    r6 = dep_anal r5                -- and put them in dependency order
         -- NB: it's important to call abstract_me only on the OutIds the
         -- come from substDVarSet (not on fv, which is an InId)
 
@@ -1794,6 +1797,8 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
     close_set s = mapUnionDVarSet close (dVarSetElems s)
 
     close :: Var -> DVarSet
+    -- See Note [Type-lets and abstracting over free variables]
+    --    in GHC.Core.Utils.
     close v | isId v    = close_set ty_tvs `extendDVarSet` zapped_id
             | otherwise = close_set (unf_tvs `unionDVarSet` ty_tvs)
                           `extendDVarSet` v
