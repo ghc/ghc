@@ -8,6 +8,7 @@ import GHC.Prelude
 import GHC.Data.FastString
 import GHC.Hs.Doc
 import GHC.Parser.Lexer
+import GHC.Parser.Lexer.Interface (adjustChar)
 import GHC.Parser.Annotation
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
