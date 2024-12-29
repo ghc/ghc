@@ -57,9 +57,26 @@
 #define REG_D5          fs10
 #define REG_D6          fs11
 
+/* The definition of XMM*, YMM* and ZMM* is optimistic: We do not know if there
+will be any of them in this context. However, we won't emit code for them if
+they are not configured. */
 #define REG_XMM1        v1
 #define REG_XMM2        v2
 #define REG_XMM3        v3
 #define REG_XMM4        v4
 #define REG_XMM5        v5
 #define REG_XMM6        v6
+
+#define REG_YMM1        v1
+#define REG_YMM2        v2
+#define REG_YMM3        v3
+#define REG_YMM4        v4
+#define REG_YMM5        v5
+#define REG_YMM6        v6
+
+#define REG_ZMM1        v1
+#define REG_ZMM2        v2
+#define REG_ZMM3        v3
+#define REG_ZMM4        v4
+#define REG_ZMM5        v5
+#define REG_ZMM6        v6
