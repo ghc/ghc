@@ -76,6 +76,7 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmTickyAP                   :: !Bool   -- ^ Disable use of precomputed standard thunks.
   , stgToCmmSaveFCallTargetToLocal    :: !Bool   -- ^ Save a foreign call target to a Cmm local, see
                                                  -- Note [Saving foreign call target to local] for details
+  -- TODO: Update comment
   ------------------------------ SIMD flags ------------------------------------
   -- Each of these flags checks vector compatibility with the backend requested
   -- during compilation. In essence, this means checking for @-fllvm@ which is
@@ -86,6 +87,9 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmAvx            :: !Bool              -- ^ check for Advanced Vector Extensions
   , stgToCmmAvx2           :: !Bool              -- ^ check for Advanced Vector Extensions 2
   , stgToCmmAvx512f        :: !Bool              -- ^ check for Advanced Vector 512-bit Extensions
+  -- TODO: This could be used to replace architecture specific logic ("Is this
+  -- AVX...?") Right now, it's only used for RISC-V.
+  , stgToCmmVectorMinBits  :: Maybe Word         -- ^ The minimal amount of bits a vector register can hold
   }
 
 
