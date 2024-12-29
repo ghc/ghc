@@ -754,6 +754,7 @@ exprCtOrigin (HsEmbTy {})        = Shouldn'tHappenOrigin "type expression"
 exprCtOrigin (HsForAll {})       = Shouldn'tHappenOrigin "forall telescope"    -- See Note [Types in terms]
 exprCtOrigin (HsQual {})         = Shouldn'tHappenOrigin "constraint context"  -- See Note [Types in terms]
 exprCtOrigin (HsFunArr {})       = Shouldn'tHappenOrigin "function arrow"      -- See Note [Types in terms]
+exprCtOrigin (HsModifiedExpr _ _ e) = lexprCtOrigin e
 exprCtOrigin (XExpr (ExpandedThingRn thing _)) | OrigExpr a <- thing = exprCtOrigin a
                                                | OrigStmt _ <- thing = DoOrigin
                                                | OrigPat p  <- thing = DoPatOrigin p

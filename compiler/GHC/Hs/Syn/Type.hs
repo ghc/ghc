@@ -149,6 +149,7 @@ hsExprType (HsEmbTy x _) = dataConCantHappen x
 hsExprType (HsQual x _ _) = dataConCantHappen x
 hsExprType (HsForAll x _ _) = dataConCantHappen x
 hsExprType (HsFunArr x _ _ _) = dataConCantHappen x
+hsExprType (HsModifiedExpr _ _ e) = lhsExprType e
 hsExprType (XExpr (WrapExpr wrap e)) = hsWrapperType wrap $ hsExprType e
 hsExprType (XExpr (ExpandedThingTc _ e))  = hsExprType e
 hsExprType (XExpr (ConLikeTc con _ _)) = conLikeType con

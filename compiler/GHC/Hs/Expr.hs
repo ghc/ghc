@@ -406,6 +406,8 @@ type instance XFunArr        GhcPs = NoExtField
 type instance XFunArr        GhcRn = NoExtField
 type instance XFunArr        GhcTc = DataConCantHappen
 
+type instance XModifiedExpr  (GhcPass _) = NoExtField
+
 type instance XPragE         (GhcPass _) = NoExtField
 
 type instance XFunRhs  = AnnFunRhs
@@ -904,6 +906,9 @@ ppr_expr (HsForAll _ tele ty)
 ppr_expr (HsFunArr _ arr arg res)
   = sep [ppr_lexpr arg, pprHsArrow arr <+> ppr_lexpr res]
 
+ppr_expr (HsModifiedExpr _ mods ex)
+  = pprHsModifiers mods <+> ppr_lexpr ex
+
 ppr_expr (XExpr x) = case ghcPass @p of
   GhcRn -> ppr x
   GhcTc -> ppr x
@@ -1065,6 +1070,8 @@ hsExprNeedsParens prec = go
     go (HsForAll{})                   = prec >= funPrec
     go (HsQual{})                     = prec >= funPrec
     go (HsFunArr{})                   = prec >= funPrec
+    go (HsModifiedExpr _ [] ex)       = go (unLoc ex)
+    go (HsModifiedExpr _ _ _)         = prec > sigPrec
     go (XExpr x) = case ghcPass @p of
                      GhcTc -> go_x_tc x
                      GhcRn -> go_x_rn x

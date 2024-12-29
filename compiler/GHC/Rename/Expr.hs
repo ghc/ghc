@@ -645,6 +645,12 @@ rnExpr (HsFunArr _ mult arg res)
       _ -> False
     oneType = noLocA $ HsVar noExtField $ noLocA oneDataConName
 
+rnExpr (HsModifiedExpr _ mods expr)
+  = do { (mods', mods_fvs) <- rnModifiersContext HsTypeCtx mods -- MODS_TODO right context?
+       ; (expr', fvs) <- rnLExpr expr
+       ; return (HsModifiedExpr noExtField mods' expr', mods_fvs `plusFV` fvs)
+       }
+
 {-
 ************************************************************************
 *                                                                      *

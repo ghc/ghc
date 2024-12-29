@@ -1726,6 +1726,8 @@ repE (HsFunArr _ mult arg res) = do
   arg' <- repLE arg
   res' <- repLE res
   repApps fun [arg', res']
+repE (HsModifiedExpr _ [] e) = repLE e
+repE e@(HsModifiedExpr{}) = notHandled (ThExpressionForm e)
 repE e@(XExpr (ExpandedThingRn o x))
   | OrigExpr e <- o
   = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax

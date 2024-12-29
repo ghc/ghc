@@ -1351,6 +1351,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         ]
       HsGetField {} -> []
       HsProjection {} -> []
+      HsModifiedExpr _ _ e -> [ toHie e ] -- MODS_TODO also modifiers?
       XExpr x -> case hiePass @p of
         HieTc -> case x of
           WrapExpr w a

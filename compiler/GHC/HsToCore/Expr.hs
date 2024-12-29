@@ -557,6 +557,7 @@ dsExpr (HsOverLabel x _)  = dataConCantHappen x
 dsExpr (OpApp x _ _ _)    = dataConCantHappen x
 dsExpr (SectionL x _ _)   = dataConCantHappen x
 dsExpr (SectionR x _ _)   = dataConCantHappen x
+dsExpr (HsModifiedExpr _ _ e) = dsLExpr e
 
 
 {- *********************************************************************

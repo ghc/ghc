@@ -662,6 +662,9 @@ data HsExpr p
   -- See Note [Types in terms]
   | HsFunArr (XFunArr p) (HsArrowOf (LHsExpr p) p) (LHsExpr p) (LHsExpr p)
 
+  -- | Modifiers attached to an expression.
+  | HsModifiedExpr (XModifiedExpr p) [HsModifier p] (LHsExpr p)
+
   | XExpr       !(XXExpr p)
   -- Note [Trees That Grow] in Language.Haskell.Syntax.Extension for the
   -- general idea, and Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr

@@ -451,6 +451,7 @@ type family XEmbTy          x
 type family XForAll         x
 type family XQual           x
 type family XFunArr         x
+type family XModifiedExpr   x
 type family XXExpr          x
 
 -- -------------------------------------

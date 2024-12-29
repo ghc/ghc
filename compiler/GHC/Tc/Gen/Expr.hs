@@ -698,6 +698,13 @@ tcExpr (HsOverLabel {})    ty = pprPanic "tcExpr:HsOverLabel"  (ppr ty)
 tcExpr (SectionL {})       ty = pprPanic "tcExpr:SectionL"    (ppr ty)
 tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
 
+tcExpr (HsModifiedExpr _ mods e) res_ty = do
+  -- We don't do anything with modifiers, but we do need to make sure they type
+  -- check.
+  _ <- tcModifiers mods (const False)
+  e' <- tcMonoExpr e res_ty
+  return $ HsModifiedExpr noExtField [] e'
+
 
 {-
 ************************************************************************

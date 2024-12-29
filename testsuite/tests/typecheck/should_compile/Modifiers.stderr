@@ -153,15 +153,23 @@ Modifiers.hs:102:15: warning: [GHC-49969] [-Wunknown-modifiers]
 Modifiers.hs:105:3: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:115:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:113:29: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %a
+    • In the type signature: fv7 :: forall (a :: Type). %a a
+
+Modifiers.hs:116:8: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %(a :: Type)
+    • In the type signature: fv8 :: %(a :: Type) a
+
+Modifiers.hs:124:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %CT1
 
-Modifiers.hs:117:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:126:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %CT2Con
 
-Modifiers.hs:119:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:128:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %CT2Con'
 
-Modifiers.hs:122:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:131:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %CT3
 
