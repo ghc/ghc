@@ -2604,9 +2604,13 @@ checkVecCompatibility cfg vcat l w =
     checkAArch64 W512 = sorry $ "512-bit wide SIMD vector instructions are not supported."
     checkAArch64 _ = return ()
 
-    -- TODO: This needs to be implemented according to VLEN
     checkRISCV64 :: Width -> FCode ()
-    checkRISCV64 _ = return ()
+    checkRISCV64 w = case stgToCmmVectorMinBits cfg of
+      Nothing -> sorry "Vector support has not been configured."
+      Just w' | widthInBits w <= fromIntegral w' -> return ()
+      Just w' ->
+        sorry
+          $ "Vector size is " ++ show w ++ ", but only " ++ show w' ++ " configured."
 
     vecWidth = typeWidth (vecCmmType vcat l w)
 
