@@ -1,0 +1,13 @@
+.PHONY: boot configure build test-simd000
+
+boot:
+	./boot
+
+configure: boot
+	configure_ghc
+
+build:
+	hadrian/build -j --docs=none --flavour=devel2
+
+test-simd000: build
+	CROSS_EMULATOR="qemu-riscv64" hadrian/build -j --docs=none --flavour=devel2 test --only=simd000

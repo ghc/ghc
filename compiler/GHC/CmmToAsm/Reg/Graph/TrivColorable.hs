@@ -144,10 +144,9 @@ allocatableRegs arch rc =
     ArchMipsel    -> panic "trivColorable ArchMipsel"
     ArchS390X     -> panic "trivColorable ArchS390X"
     ArchRISCV64   -> case rc of
-      -- TODO: for Sven Tennie
       Separate.RcInteger -> 14
       Separate.RcFloat   -> 20
-      Separate.RcVector  -> 20
+      Separate.RcVector  -> 32 - 6 - 1 -- 32 - pc_MAX_Real_XMM_REG - 1 mask_register
     ArchLoongArch64   -> case rc of
       Separate.RcInteger -> 16
       Separate.RcFloat   -> 24
