@@ -33,6 +33,7 @@ data NCGConfig = NCGConfig
    , ncgAvxEnabled            :: !Bool
    , ncgAvx2Enabled           :: !Bool
    , ncgAvx512fEnabled        :: !Bool
+   , ncgVectorMinBits         :: Maybe Word
    , ncgBmiVersion            :: Maybe BmiVersion -- ^ (x86) BMI instructions
    , ncgDumpRegAllocStages    :: !Bool
    , ncgDumpAsmStats          :: !Bool
