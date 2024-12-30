@@ -610,6 +610,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnUnusedVariableInRuleDecl"                  = 65669
   GhcDiagnosticCode "TcRnUnexpectedStandaloneKindSig"               = 45906
   GhcDiagnosticCode "TcRnIllegalRuleLhs"                            = 63294
+  GhcDiagnosticCode "TcRnRuleLhsEqualities"                         = 53522
   GhcDiagnosticCode "TcRnDuplicateRoleAnnot"                        = 97170
   GhcDiagnosticCode "TcRnDuplicateKindSig"                          = 43371
   GhcDiagnosticCode "TcRnIllegalDerivStrategy"                      = 87139
