@@ -82,9 +82,10 @@ import GHC.Utils.Panic
 import GHC.Data.Bag
 import GHC.Data.Maybe( orElse, whenIsJust )
 
-import Data.Maybe( mapMaybe )
-import qualified Data.List.NonEmpty as NE
 import Control.Monad( unless )
+import Data.Foldable ( toList )
+import qualified Data.List.NonEmpty as NE
+import Data.Maybe( mapMaybe )
 
 
 {- -------------------------------------------------------------
@@ -1195,18 +1196,17 @@ tcRule (HsRule { rd_ext  = ext
                                   vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
                   ])
 
-       -- /Temporarily/ deal with the fact that we previously accepted a RULE that quantified
-       -- over equalities.  If all the residual LHS constraints are previously-quantifiable
-       -- equalities, and the RHS constraints are not insoluble (if they are, just report those
-       -- errors), then emit a warning and discard the rule entirely.
-       -- Eliminate this deprecation warning in due course!
+       -- /Temporarily/ deal with the fact that we previously accepted
+       -- rules that quantify over certain equality constraints.
+       --
+       -- See Note [Quantifying over equalities in RULES].
        ; case allPreviouslyQuantifiableEqualities residual_lhs_wanted of {
            Just cts | not (insolubleWC rhs_wanted)
-                    -> pprTrace "tcRule: discarding" (ppr cts) $
-                       return Nothing ;
-           Nothing  ->
+                    -> do { addDiagnostic $ TcRnRuleLhsEqualities name lhs cts
+                          ; return Nothing } ;
+           _  ->
 
-   do  { -- SimplfyRule Plan, step 5
+   do  { -- SimplifyRule Plan, step 5
        -- Simplify the LHS and RHS constraints:
        -- For the LHS constraints we must solve the remaining constraints
        -- (a) so that we report insoluble ones
@@ -1553,24 +1553,85 @@ getRuleQuantCts wc
      | otherwise
      = pprPanic "getRuleQuantCts" (ppr ct)
 
-allPreviouslyQuantifiableEqualities :: WantedConstraints -> Maybe [Ct]
+
+{- Note [Quantifying over equalities in RULES]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Up until version 9.12 (included), GHC would happily quantify over certain Wanted
+equalities in the LHS of a RULE. This was incorrect behaviour that lead to a
+RULE that would never fire, so GHC 9.14 and above no longer allow such RULES.
+However, instead of throwing an error, GHC will /temporarily/ emit a warning
+and drop the rule instead, in order to ease migration for library maintainers
+(NB: this warning is not emitted when the RHS constraints are insoluble; in that
+case we simply report those constraints as errors instead).
+
+The function 'allPreviouslyQuantifiableEqualities' computes the equality
+constraints that previous (<= 9.12) versions of GHC accepted quantifying over.
+
+
+  Example (test case 'RuleEqs', extracted from the 'mono-traversable' library):
+
+    type family Element mono
+    type instance Element [a] = a
+
+    class MonoFoldable mono where
+        otoList :: mono -> [Element mono]
+    instance MonoFoldable [a] where
+        otoList = id
+
+    ointercalate :: (MonoFoldable mono, Monoid (Element mono))
+                 => Element mono -> mono -> Element mono
+    {-# RULES "ointercalate list" forall x. ointercalate x = Data.List.intercalate x . otoList #-}
+
+  Now, because Data.List.intercalate has the type signature
+
+    forall a. [a] -> [[a]] -> [a]
+
+  typechecking the LHS of this rule would give rise to the Wanted equality
+
+    [W] Element mono ~ [a]
+
+  Due to the type family, GHC 9.12 and below accepted to quantify over this
+  equality, which would lead to a rule LHS template of the form:
+
+    forall (@mono) (@a)
+           ($dMonoFoldable :: MonoFoldable mono)
+           ($dMonoid :: Monoid (Element mono))
+           (co :: [a] ~ Element mono)
+           (x :: [a]).
+      ointercalate @mono $dMonoFoldable $dMonoid
+        (x `cast` (Sub co))
+
+  Matching against this template would match on the structure of a coercion,
+  which goes against Note [Casts in the template] in GHC.Core.Rules.
+  In practice, this meant that this RULE would never fire.
+-}
+
+-- | Computes all equality constraints that GHC doesn't accept, but previously
+-- did accept (until GHC 9.12 (included)), when deciding what to quantify over
+-- in the LHS of a RULE.
+--
+-- See Note [Quantifying over equalities in RULES].
+allPreviouslyQuantifiableEqualities :: WantedConstraints -> Maybe (NE.NonEmpty Ct)
 allPreviouslyQuantifiableEqualities wc = go emptyVarSet wc
   where
+    go :: TyVarSet -> WantedConstraints -> Maybe (NE.NonEmpty Ct)
     go skol_tvs (WC { wc_simple = simples, wc_impl = implics })
-      = do { cts1 <- mapM (go_simple skol_tvs) simples
-           ; cts2 <- mapM (go_implic skol_tvs) implics
-           ; return (concat cts1 ++ concat cts2) }
+      = do { cts1 <-       mapM (go_simple skol_tvs) simples
+           ; cts2 <- concatMapM (go_implic skol_tvs) implics
+           ; NE.nonEmpty $ toList cts1 ++ toList cts2 }
 
+    go_simple :: TyVarSet -> Ct -> Maybe Ct
     go_simple skol_tvs ct
       | not (tyCoVarsOfCt ct `disjointVarSet` skol_tvs)
       = Nothing
       | EqPred _ t1 t2 <- classifyPredType (ctPred ct), ok_eq t1 t2
-      = Just [ct]
+      = Just ct
       | otherwise
       = Nothing
 
+    go_implic :: TyVarSet -> Implication -> Maybe [Ct]
     go_implic skol_tvs (Implic { ic_skols = skols, ic_wanted = wc })
-      = go (skol_tvs `extendVarSetList` skols) wc
+      = fmap toList $ go (skol_tvs `extendVarSetList` skols) wc
 
     ok_eq t1 t2
        | t1 `tcEqType` t2 = False

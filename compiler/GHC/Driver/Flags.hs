@@ -1073,6 +1073,7 @@ data WarningFlag =
    | Opt_WarnViewPatternSignatures                   -- Since 9.12
    | Opt_WarnUselessSpecialisations                  -- Since 9.14
    | Opt_WarnDeprecatedPragmas                       -- Since 9.14
+   | Opt_WarnRuleLhsEqualities                       -- Since 9.14
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1191,6 +1192,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnViewPatternSignatures                   -> "view-pattern-signatures" :| []
   Opt_WarnUselessSpecialisations                  -> "useless-specialisations" :| ["useless-specializations"]
   Opt_WarnDeprecatedPragmas                       -> "deprecated-pragmas" :| []
+  Opt_WarnRuleLhsEqualities                       -> "rule-lhs-equalities" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -1334,7 +1336,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnTypeEqualityOutOfScope,
         Opt_WarnViewPatternSignatures,
         Opt_WarnUselessSpecialisations,
-        Opt_WarnDeprecatedPragmas
+        Opt_WarnDeprecatedPragmas,
+        Opt_WarnRuleLhsEqualities
       ]
 
 -- | Things you get with -W

@@ -436,6 +436,24 @@ of ``-W(no-)*``.
     uses multiple comma-separated type signatures (deprecated and scheduled
     to be removed in GHC 9.18).
 
+.. ghc-flag:: -Wrule-lhs-equalities
+    :shortdesc: warn about rules whose LHS contains equality constraints
+    :type: dynamic
+    :reverse: -Wno-rule-lhs-equalities
+    :category:
+
+    :since: 9.14
+
+    :default: on
+
+    When GHC encounters a RULE whose left-hand side gives rise to equality
+    constraints that previous GHC versions (``<= 9.12``) accepted quantifying
+    over, GHC will instead drop the rule and emit a warning message, with the
+    warning message being controlled by this flag.
+
+    This warning is intended to give visibility to the fact that the RULES that
+    previous GHC versions generated in such circumstances could never fire.
+
 .. ghc-flag:: -Wmissed-specialisations
     :shortdesc: warn when specialisation of an imported, overloaded function
         fails.
