@@ -250,11 +250,11 @@ function h$setenv(name, name_off, val, val_off, overwrite) {
   var n = h$decodeUtf8z(name, name_off);
   var v = h$decodeUtf8z(val, val_off);
   TRACE_ENV("setenv: " + n + " -> " + v)
+#ifndef GHCJS_BROWSER
   if(n.indexOf('=') !== -1) {
     h$setErrno("EINVAL");
     return -1;
   }
-#ifndef GHCJS_BROWSER
   if(h$isNode()) {
     if(overwrite || typeof process.env[n] !== 'undefined') process.env[n] = v;
   }
@@ -265,11 +265,11 @@ function h$setenv(name, name_off, val, val_off, overwrite) {
 function h$unsetenv(name, name_off) {
   var n = h$decodeUtf8z(name, name_off);
   TRACE_ENV("unsetenv: " + n)
+#ifndef GHCJS_BROWSER
   if(n.indexOf('=') !== -1) {
     h$setErrno("EINVAL");
     return -1;
   }
-#ifndef GHCJS_BROWSER
   if(h$isNode()) delete process.env[n];
 #endif
   return 0;
@@ -317,10 +317,12 @@ function h$append_prog_name(str) {
    return path.split('/').reverse()[0];
   }
 
+#ifndef GHCJS_BROWSER
   // only works for node for now
   if(h$isNode()) {
     return basename(process.argv[1]) + ": " + str;
   }
+#endif
 
   return str;
 }

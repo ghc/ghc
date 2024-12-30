@@ -1,6 +1,6 @@
 //#OPTIONS: CPP
 
-// Used definitions: PROFILING and GHCJS_ASSERT_PROF
+// Used definitions: PROFILING, GHCJS_BROWSER and GHCJS_ASSERT_PROF
 
 #ifdef GHCJS_ASSERT_PROF
 function assert(condition, message) {
@@ -27,6 +27,8 @@ var h$registerCC = null, h$registerCCS = null, h$setCCS = null;
 var h$runProf = function(f) {
     f();
 }
+
+#ifndef GHCJS_BROWSER
 if(h$isNode()) {
     (function() {
 	try {
@@ -40,6 +42,7 @@ if(h$isNode()) {
 	} catch(e) {}
     })();
 }
+#endif
 
 var h$cachedCurrentCcs = -1;
 function h$reportCurrentCcs() {

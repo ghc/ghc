@@ -44,36 +44,44 @@ function h$base_close(fd, c) {
 }
 
 function h$close(fd,c) {
-  if (c) {
-    //asynchronous
-    var fdo = h$base_fds[fd];
-    if(fdo) {
-        delete h$base_fds[fd];
-        if(--fdo.refs < 1) {
-          TRACE_IO("base_close: closing underlying fd")
-          if(fdo.close) {
-            fdo.close(fd, fdo, c);
+#ifndef GHCJS_BROWSER
+  if (h$isNode()) {
+    if (c) {
+      //asynchronous
+      var fdo = h$base_fds[fd];
+      if(fdo) {
+          delete h$base_fds[fd];
+          if(--fdo.refs < 1) {
+            TRACE_IO("base_close: closing underlying fd")
+            if(fdo.close) {
+              fdo.close(fd, fdo, c);
+            } else {
+              c(0);
+            }
           } else {
+            TRACE_IO("base_close: remaining references, not closing underlying fd")
             c(0);
           }
-        } else {
-          TRACE_IO("base_close: remaining references, not closing underlying fd")
-          c(0);
-        }
+      } else {
+          TRACE_IO("base_close: file descriptor not found, already closed?")
+          h$errno = CONST_EINVAL;
+          c(-1);
+      }
     } else {
-        TRACE_IO("base_close: file descriptor not found, already closed?")
-        h$errno = CONST_EINVAL;
-        c(-1);
+      //synchronous
+      try {
+        h$fs.closeSync(fd);
+        return 0;
+      } catch(err) {
+        h$setErrno(err);
+        return (-1);
+      }
     }
-  } else {
-    //synchronous
-    try {
-      h$fs.closeSync(fd);
-      return 0;
-    } catch(err) {
-      h$setErrno(err);
-      return (-1);
-    }
+  } else 
+#endif
+  {
+    TRACE_IO("base_close: unsupported")
+    h$unsupported(-1,c);
   }
 }
 
@@ -455,18 +463,16 @@ function h$calculate_at(dirfd, file, file_off) {
 
   // relative path
   var dir;
+#ifndef GHCJS_BROWSER
   if (dirfd == h$base_at_fdcwd) {
     dir = h$process.cwd();
   }
-#ifndef GHCJS_BROWSER
   else if (h$isNode()) {
     // hack that probably only works on Linux with /proc mounted
     dir = h$fs.readlinkSync("/proc/self/fd/"+dirfd);
-  }
+  } else
 #endif
-  else {
-    return h$unsupported(-1);
-  }
+  return h$unsupported(-1);
 
   return h$path_join2(dir,path);
 }
@@ -564,9 +570,14 @@ function h$base_read(fd, buf, buf_off, n, c) {
     if(fdo && fdo.read) {
         fdo.read(fd, fdo, buf, buf_off, n, c);
     } else {
+      #ifndef GHCJS_BROWSER
+      if(h$isNode()) {
         h$fs.read(fd, buf.u8, buf_off, n, null, function(err, bytesRead, buf0) {
             h$handleErrnoC(err, -1, bytesRead, c);
         });
+      } else
+      #endif
+        h$unsupported(-1, c);
     }
 }
 function h$base_stat(file, file_off, stat, stat_off, c) {
@@ -604,18 +615,24 @@ function h$base_write(fd, buf, buf_off, n, c) {
 }
 
 function h$write(fd, buf, buf_off, n, c) {
-
     if (c) {
       var fdo = h$base_fds[fd];
       // asynchronous
       if(fdo && fdo.write) {
           fdo.write(fd, fdo, buf, buf_off, n, c);
       } else {
-          h$fs.write(fd, buf.u8, buf_off, n, function(err, bytesWritten, buf0) {
-              h$handleErrnoC(err, -1, bytesWritten, c);
-          });
+          #ifndef GHCJS_BROWSER
+          if(h$isNode()) {
+            h$fs.write(fd, buf.u8, buf_off, n, function(err, bytesWritten, buf0) {
+                h$handleErrnoC(err, -1, bytesWritten, c);
+            });
+          } else
+          #endif
+            h$unsupported(-1, c);
       }
     } else {
+#ifndef GHCJS_BROWSER
+      if(h$isNode()) {
       //synchronous
       try {
         return h$fs.writeSync(fd, buf.u8, buf_off, n);
@@ -623,6 +640,9 @@ function h$write(fd, buf, buf_off, n, c) {
         h$setErrno(err);
         return (-1);
       }
+    } else
+    #endif
+      return h$unsupported(-1, c);
     }
 }
 
@@ -725,25 +745,49 @@ const h$base_at_symlink_follow   = 0x400;
 
 
 function h$base_stat_check_mode(mode,p) {
+#ifndef GHCJS_BROWSER
   // inspired by Node's checkModeProperty
   var r = (mode & h$fs.constants.S_IFMT) === p;
   return r ? 1 : 0;
+#else
+  throw "h$base_stat_check_mode_unsupported";
+#endif
 }
 
 function h$base_c_s_isreg(mode) {
+#ifndef GHCJS_BROWSER
   return h$base_stat_check_mode(mode,h$fs.constants.S_IFREG);
+#else
+  throw "h$base_c_s_isreg_unsupported";
+#endif
 }
 function h$base_c_s_ischr(mode) {
+#ifndef GHCJS_BROWSER
   return h$base_stat_check_mode(mode,h$fs.constants.S_IFCHR);
+#else
+  throw "h$base_c_s_ischr_unsupported";
+#endif
 }
 function h$base_c_s_isblk(mode) {
+#ifndef GHCJS_BROWSER
   return h$base_stat_check_mode(mode,h$fs.constants.S_IFBLK);
+#else
+  throw "h$base_c_s_isblk_unsupported";
+#endif
 }
 function h$base_c_s_isdir(mode) {
+#ifndef GHCJS_BROWSER
   return h$base_stat_check_mode(mode,h$fs.constants.S_IFDIR);
+#else
+  throw "h$base_c_s_isdir_unsupported";
+#endif
 }
 function h$base_c_s_isfifo(mode) {
+#ifndef GHCJS_BROWSER
   return h$base_stat_check_mode(mode,h$fs.constants.S_IFIFO);
+#else
+  throw "h$base_c_s_isfifo_unsupported";
+#endif
 }
 function h$base_c_fcntl_read(fd,cmd) {
     return -1;
@@ -1155,34 +1199,43 @@ function h$__hscore_set_errno(n) {
  *******************************************/
 
 function h$opendir(path) {
-  if(!h$isNode()) {
+#ifdef GHCJS_BROWSER
+  throw "h$opendir unsupported";
+#else
+  if(!h$isNode())
     throw "h$opendir unsupported";
-  }
 
   const d = h$fs.opendirSync(h$decodeUtf8z(path,0));
   RETURN_UBX_TUP2(d,0);
+#endif
 }
 
 function h$closedir(d,o) {
-  if(!h$isNode()) {
-    throw "h$closedir unsupported";
-  }
+#ifndef GHCJS_BROWSER
+  if(!h$isNode())
+#endif
+  throw "h$closedir unsupported";
+
   d.closeSync();
   return 0;
 }
 
 function h$readdir(d,o) {
-  if(!h$isNode()) {
-    throw "h$readdir unsupported";
-  }
+#ifndef GHCJS_BROWSER
+  if(!h$isNode())
+#endif
+  throw "h$readdir unsupported";
+
   const c = d.readSync();
   RETURN_UBX_TUP2(c,0);
 }
 
 function h$__hscore_readdir(d,o,dst_a,dst_o) {
-  if(!h$isNode()) {
-    throw "h$readdir unsupported";
-  }
+#ifndef GHCJS_BROWSER
+  if(!h$isNode())
+#endif
+  throw "h$readdir unsupported";
+  
   const e = d.readSync();
 
   PUT_ADDR(dst_a,dst_o*2,e,0);
@@ -1197,9 +1250,13 @@ function h$__hscore_d_name(a,o) {
 }
 
 function h$mkdir(path, path_offset, mode) {
-  if (!h$isNode()) {
+#ifdef GHCJS_BROWSER
+  throw "h$mkdir unsupported";
+#else
+  if (!h$isNode())
     throw "h$mkdir unsupported";
-  }
+
+
   const d = h$decodeUtf8z(path, path_offset);
   try {
     h$fs.mkdirSync(d, {mode: mode});
@@ -1212,6 +1269,7 @@ function h$mkdir(path, path_offset, mode) {
     return -1;
   }
   return 0;
+#endif
 }
 
 // It is required by Google Closure Compiler to be at least defined if

@@ -559,7 +559,9 @@ function h$charCodeArrayToString(arr) {
 }
 
 function h$hs_iconv_open(to,to_off,from,from_off) {
+#ifndef GHCJS_BROWSER
   h$setErrno("EINVAL"); // no encodings supported
+#endif
   return -1;
 //  var fromStr = decodeUtf8(from, from_off);
 //  var toStr = decodeUtf8(to, to_off);
