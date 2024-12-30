@@ -78,7 +78,6 @@ module GHC.Parser.Lexer (
    commentToAnnotation,
    HdkComment(..),
    warnopt,
-   adjustChar,
    addPsMessage
   ) where
 
@@ -132,6 +131,8 @@ import GHC.Driver.Flags
 import GHC.Parser.Errors.Basic
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
+import GHC.Parser.Lexer.Interface
+import qualified GHC.Parser.Lexer.String as Lexer.String
 import GHC.Parser.String
 }
 
@@ -620,13 +621,6 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   -- characters than this rule, so this rule will only fire if the string
   -- could not be lexed correctly
   \" @stringchar*    $unigraphic / { isSmartQuote } { smart_quote_error }
-}
-
-<string_multi_content> {
-  -- Parse as much of the multiline string as possible, except for quotes
-  @stringchar* ($nl ([\  $tab] | @gap)* @stringchar*)* { tok_string_multi_content }
-  -- Allow bare quotes if it's not a triple quote
-  (\" | \"\") / ([\n .] # \") { tok_string_multi_content }
 }
 
 <0> {
@@ -2171,11 +2165,23 @@ tok_string span buf len _buf2 = do
     src = SourceText $ lexemeToFastString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
 
--- | Ideally, we would define this completely with Alex syntax, like normal strings.
--- Instead, this is defined as a hybrid solution by manually invoking lex states, which
--- we're doing for two reasons:
---   1. The multiline string should all be one lexical token, not multiple
---   2. We need to allow bare quotes, which can't be done with one regex
+{- Note [Lexing multiline strings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ideally, we would lex multiline strings completely with Alex syntax, like
+normal strings. However, we can't because:
+
+    1. The multiline string should all be one lexical token, not multiple
+    2. We need to allow bare quotes, which can't be done with one regex
+
+Instead, we'll lex them with a hybrid solution in tok_string_multi by manually
+invoking lex states. This allows us to get the performance of native Alex
+syntax as much as possible, and just gluing the pieces together outside of
+Alex.
+
+Implemented in string_multi_content in GHC/Parser/Lexer/String.x
+-}
+
+-- | See Note [Lexing multiline strings]
 tok_string_multi :: Action
 tok_string_multi startSpan startBuf _len _buf2 = do
   -- advance to the end of the multiline string
@@ -2201,17 +2207,14 @@ tok_string_multi startSpan startBuf _len _buf2 = do
   pure $ L span $ ITstringMulti src (mkFastString s)
   where
     goContent i0 =
-      case alexScan i0 string_multi_content of
-        AlexToken i1 len _
+      case Lexer.String.alexScan i0 Lexer.String.string_multi_content of
+        Lexer.String.AlexToken i1 len _
           | Just i2 <- lexDelim i1 -> pure (i1, i2)
           | isEOF i1 -> checkSmartQuotes >> setInput i1 >> lexError LexError
-          -- is the next token a tab character?
-          -- need this explicitly because there's a global rule matching $tab
-          | Just ('\t', _) <- alexGetChar' i1 -> setInput i1 >> lexError LexError
           -- Can happen if no patterns match, e.g. an unterminated gap
           | len == 0  -> setInput i1 >> lexError LexError
           | otherwise -> goContent i1
-        AlexSkip i1 _ -> goContent i1
+        Lexer.String.AlexSkip i1 _ -> goContent i1
         _ -> setInput i0 >> lexError LexError
 
     lexDelim =
@@ -2234,11 +2237,6 @@ tok_string_multi startSpan startBuf _len _buf2 = do
       case findSmartQuote (AI (psSpanStart startSpan) startBuf) of
         Just (c, loc) -> throwSmartQuoteError c loc
         Nothing -> pure ()
-
--- | Dummy action that should never be called. Should only be used in lex states
--- that are manually lexed in tok_string_multi.
-tok_string_multi_content :: Action
-tok_string_multi_content = panic "tok_string_multi_content unexpectedly invoked"
 
 lex_chars :: (String, String) -> PsSpan -> StringBuffer -> Int -> P String
 lex_chars (startDelim, endDelim) span buf len =
@@ -2590,105 +2588,6 @@ getLastLocIncludingComments = P $ \s@(PState { prev_loc = prev_loc }) -> POk s p
 
 getLastLoc :: P PsSpan
 getLastLoc = P $ \s@(PState { last_loc = last_loc }) -> POk s last_loc
-
-data AlexInput = AI !PsLoc !StringBuffer deriving (Show)
-
-{-
-Note [Unicode in Alex]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Although newer versions of Alex support unicode, this grammar is processed with
-the old style '--latin1' behaviour. This means that when implementing the
-functions
-
-    alexGetByte       :: AlexInput -> Maybe (Word8,AlexInput)
-    alexInputPrevChar :: AlexInput -> Char
-
-which Alex uses to take apart our 'AlexInput', we must
-
-  * return a latin1 character in the 'Word8' that 'alexGetByte' expects
-  * return a latin1 character in 'alexInputPrevChar'.
-
-We handle this in 'adjustChar' by squishing entire classes of unicode
-characters into single bytes.
--}
-
-{-# INLINE adjustChar #-}
-adjustChar :: Char -> Word8
-adjustChar c = adj_c
-  where non_graphic     = 0x00
-        upper           = 0x01
-        lower           = 0x02
-        digit           = 0x03
-        symbol          = 0x04
-        space           = 0x05
-        other_graphic   = 0x06
-        uniidchar       = 0x07
-
-        adj_c
-          | c <= '\x07' = non_graphic
-          | c <= '\x7f' = fromIntegral (ord c)
-          -- Alex doesn't handle Unicode, so when Unicode
-          -- character is encountered we output these values
-          -- with the actual character value hidden in the state.
-          | otherwise =
-                -- NB: The logic behind these definitions is also reflected
-                -- in "GHC.Utils.Lexeme"
-                -- Any changes here should likely be reflected there.
-
-                case generalCategory c of
-                  UppercaseLetter       -> upper
-                  LowercaseLetter       -> lower
-                  TitlecaseLetter       -> upper
-                  ModifierLetter        -> uniidchar -- see #10196
-                  OtherLetter           -> lower -- see #1103
-                  NonSpacingMark        -> uniidchar -- see #7650
-                  SpacingCombiningMark  -> other_graphic
-                  EnclosingMark         -> other_graphic
-                  DecimalNumber         -> digit
-                  LetterNumber          -> digit
-                  OtherNumber           -> digit -- see #4373
-                  ConnectorPunctuation  -> symbol
-                  DashPunctuation       -> symbol
-                  OpenPunctuation       -> other_graphic
-                  ClosePunctuation      -> other_graphic
-                  InitialQuote          -> other_graphic
-                  FinalQuote            -> other_graphic
-                  OtherPunctuation      -> symbol
-                  MathSymbol            -> symbol
-                  CurrencySymbol        -> symbol
-                  ModifierSymbol        -> symbol
-                  OtherSymbol           -> symbol
-                  Space                 -> space
-                  _other                -> non_graphic
-
--- Getting the previous 'Char' isn't enough here - we need to convert it into
--- the same format that 'alexGetByte' would have produced.
---
--- See Note [Unicode in Alex] and #13986.
-alexInputPrevChar :: AlexInput -> Char
-alexInputPrevChar (AI _ buf) = unsafeChr (fromIntegral (adjustChar pc))
-  where pc = prevChar buf '\n'
-
-unsafeChr :: Int -> Char
-unsafeChr (I# c) = GHC.Exts.C# (GHC.Exts.chr# c)
-
--- backwards compatibility for Alex 2.x
-alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
-alexGetChar inp = case alexGetByte inp of
-                    Nothing    -> Nothing
-                    Just (b,i) -> c `seq` Just (c,i)
-                       where c = unsafeChr $ fromIntegral b
-
--- See Note [Unicode in Alex]
-alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
-alexGetByte (AI loc s)
-  | atEnd s   = Nothing
-  | otherwise = byte `seq` loc' `seq` s' `seq`
-                --trace (show (ord c)) $
-                Just (byte, (AI loc' s'))
-  where (c,s') = nextChar s
-        loc'   = advancePsLoc loc c
-        byte   = adjustChar c
 
 {-# INLINE alexGetChar' #-}
 -- This version does not squash unicode characters, it is used when
@@ -3470,6 +3369,7 @@ topNoLayoutContainsCommas (ALRNoLayout b _ : _) = b
 -- If the generated alexScan/alexScanUser functions are called multiple times
 -- in this file, alexScanUser gets broken out into a separate function and
 -- increases memory usage. Make sure GHC inlines this function and optimizes it.
+-- https://github.com/haskell/alex/pull/262
 {-# INLINE alexScanUser #-}
 
 lexToken :: P (PsLocated Token)
