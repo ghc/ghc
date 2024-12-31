@@ -1461,6 +1461,18 @@ getRegister' config plat expr =
                       unitOL $ annExpr expr (ADD (OpReg w dst) zero (OpImm (ImmInt 1)))
                   )
 
+-- TODO: Missing MachOps:
+-- - MO_V_Add
+-- - MO_V_Sub
+-- - MO_V_Mul
+-- - MO_VS_Quot
+-- - MO_VS_Rem
+-- - MO_VS_Neg
+-- - MO_VU_Quot
+-- - MO_VU_Rem
+-- - MO_V_Shuffle
+-- - MO_VF_Shuffle
+
 -- | Instructions to sign-extend the value in the given register from width @w@
 -- up to width @w'@.
 signExtendReg :: Width -> Width -> Reg -> NatM (Reg, OrdList Instr)
