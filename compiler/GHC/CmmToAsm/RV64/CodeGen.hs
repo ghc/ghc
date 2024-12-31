@@ -660,14 +660,16 @@ getRegister' config plat expr =
       Amode addr addr_code <- getAmode plat width mem
       case (width, format) of
         (_w, f)
-          | VecFormat l vf <- f ->
+          | isVecFormat f ->
+              -- TODO: Check for configured vectorMinBits
               pure
                 ( Any
                     format
                     ( \dst ->
-                        unitOL (COMMENT (text "XXX here")) `appOL`
                         addr_code `snocOL`
                           annExpr expr
+                            -- We pattern match on the format in the pretty-printer.
+                            -- So, we can here simply emit LDRU for all vectors.
                             (LDRU format (OpReg width dst) (OpAddr addr))
                     )
                 )
@@ -682,22 +684,7 @@ getRegister' config plat expr =
                           `snocOL` LDRU format (OpReg width dst) (OpAddr addr)
                     )
                 )
-        -- TODO: Load vector - instructions VLW, VLB, VLH, ... Encode in ppr of LDRU?
-        -- riscv64-unknown-linux-gnu-ghc: panic! (the 'impossible' happened)
-        -- GHC version 9.13.20241013:
-        --       Width too big! Cannot load: W128
-        -- Fx2V128[Sp + 8]
-        -- Call stack:
-        --     CallStack (from HasCallStack):
-        --       callStackDoc, called at compiler/GHC/Utils/Panic.hs:190:37 in ghc-9.13-inplace:GHC.Utils.Panic
-        --       pprPanic, called at compiler/GHC/CmmToAsm/RV64/CodeGen.hs:678:11 in ghc-9.13-inplace:GHC.CmmToAsm.RV64.CodeGen
-        -- CallStack (from HasCallStack):
-        --   panic, called at compiler/GHC/Utils/Error.hs:507:29 in ghc-9.13-inplace:GHC.Utils.Error
-
-        -- Fx2V128 -> cat= Float, length = 2, widthInBits = 128
-
-        _ ->
-          pprPanic ("Width too big! Cannot load: " ++ show width) (pdoc plat expr)
+        _ -> pprPanic ("Width too big! Cannot load: " ++ show width) (pdoc plat expr)
     CmmStackSlot _ _ ->
       pprPanic "getRegister' (CmmStackSlot): " (pdoc plat expr)
     CmmReg reg ->
