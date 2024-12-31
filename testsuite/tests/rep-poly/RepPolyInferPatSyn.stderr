@@ -1,12 +1,10 @@
-
 RepPolyInferPatSyn.hs:22:16: error: [GHC-55287]
     • The pattern synonym argument pattern
       does not have a fixed runtime representation.
       Its type is:
         T :: TYPE R
-      Cannot unify ‘R’ with the type variable ‘c0’
-      because the former is not a concrete ‘RuntimeRep’.
     • When checking that the pattern signature: T
         fits the type of its context: T
       In the pattern: a :: T
       In the declaration for pattern synonym ‘P’
+

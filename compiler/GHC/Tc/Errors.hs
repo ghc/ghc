@@ -1051,8 +1051,7 @@ reportNotConcreteErrs ctxt errs@(err0:_)
           | frr_errs <- go frr_errs errs
           = case err of
               NCE_FRR
-                { nce_frr_origin = frr_orig
-                , nce_reasons = _not_conc } ->
+                { nce_frr_origin = frr_orig } ->
                 FRR_Info
                   { frr_info_origin       = frr_orig
                   , frr_info_not_concrete = Nothing }

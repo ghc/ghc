@@ -235,7 +235,8 @@ module GHC.Core.Type (
 
         -- * Kinds
         isTYPEorCONSTRAINT,
-        isConcreteType, isFixedRuntimeRepKind,
+        isConcreteType, isConcreteTypeWith,
+        isFixedRuntimeRepKind
     ) where
 
 import GHC.Prelude
@@ -291,6 +292,8 @@ import GHC.Data.FastString
 
 import GHC.Data.Maybe   ( orElse, isJust, firstJust )
 import GHC.List (build)
+
+import Data.Functor.Identity
 
 -- $type_classification
 -- #type_classification#
@@ -2323,7 +2326,7 @@ buildSynTyCon name binders res_kind roles rhs
     qtvs         = mkVarSet (map binderVar binders)
     is_tau       = isTauTy rhs
     is_fam_free  = isFamFreeTy rhs
-    is_concrete  = isConcreteTypeWith qtvs rhs
+    is_concrete  = isConcreteTypeTySyn qtvs rhs
     is_forgetful = not (qtvs `subVarSet` expanded_rhs_tyvars)
 
     expanded_rhs_tyvars = tyCoVarsOfType (expandTypeSynonyms rhs)
@@ -2867,27 +2870,39 @@ isFixedRuntimeRepKind k
 --
 -- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
 isConcreteType :: Type -> Bool
-isConcreteType = isConcreteTypeWith emptyVarSet
+isConcreteType = runIdentity . isConcreteTypeWith (Identity . isConcreteTyVar)
 
-isConcreteTypeWith :: TyVarSet -> Type -> Bool
--- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
--- For this "With" version we pass in a set of TyVars to be considered
--- concrete.  This supports mkSynonymTyCon, which needs to test the RHS
--- for concreteness, under the assumption that the binders are instantiated
--- to concrete types
-isConcreteTypeWith conc_tvs = go
+-- | Like 'isConcreteType', but allows specifying a set of type variables
+-- that are to be considered concrete.
+isConcreteTypeTySyn :: TyVarSet -> Type -> Bool
+isConcreteTypeTySyn conc_tvs = runIdentity . isConcreteTypeWith (Identity . ok)
   where
-    go (TyVarTy tv)        = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
-    go (AppTy ty1 ty2)     = go ty1 && go ty2
-    go (TyConApp tc tys)   = go_tc tc tys
-    go ForAllTy{}          = False
-    go (FunTy _ w t1 t2)   =  go w
-                           && go (typeKind t1) && go t1
-                           && go (typeKind t2) && go t2
-    go LitTy{}             = True
-    go CastTy{}            = False
-    go CoercionTy{}        = False
+    ok tv = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
 
+-- | A version of 'isConcreteType' which takes a function to decide which
+-- type variables are concrete.
+--
+-- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
+isConcreteTypeWith :: forall f. Applicative f => (TyVar -> f Bool) -> Type -> f Bool
+-- Parametrising 'isConcreteTypeWith' in this manner:
+--
+--  - supports 'mkSynonymTyCon', which needs to test the RHS for concreteness,
+--    under the assumption that the binders are instantiated to concrete types,
+--  - supports unification, in which when we encounter kappa[conc] ~# D alpha[tau]
+--    for a data constructor D, will make alpha into a concrete type variable.
+isConcreteTypeWith tv_is_concrete = go
+  where
+    go :: Type -> f Bool
+    go (TyVarTy tv)      = tv_is_concrete tv
+    go (AppTy ty1 ty2)   = (&&) <$> go ty1 <*> go ty2
+    go (TyConApp tc tys) = go_tc tc tys
+    go ForAllTy{}        = pure False
+    go (FunTy _ w t1 t2) = and <$> traverse go [w, typeKind t1, t1, typeKind t2, t2]
+    go LitTy{}           = pure True
+    go CastTy{}          = pure False
+    go CoercionTy{}      = pure False
+
+    go_tc :: TyCon -> [Type] -> f Bool
     go_tc tc tys
       | isForgetfulSynTyCon tc  -- E.g. type S a = Int
                                 -- Then (S x) is concrete even if x isn't
@@ -2898,11 +2913,11 @@ isConcreteTypeWith conc_tvs = go
       -- is enough; no need to expand.  This is good for e.g
       --      type LiftedRep = BoxedRep Lifted
       | isConcreteTyCon tc
-      = all go tys
+      = and <$> traverse go tys
 
       | otherwise  -- E.g. type families
-      = False
-
+      = pure False
+{-# INLINEABLE isConcreteTypeWith #-}
 
 {-
 %************************************************************************

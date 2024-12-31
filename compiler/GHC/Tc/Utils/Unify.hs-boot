@@ -1,11 +1,15 @@
 module GHC.Tc.Utils.Unify where
 
 import GHC.Prelude
-import GHC.Core.Type         ( Mult )
-import GHC.Tc.Utils.TcType   ( TcTauType )
-import GHC.Tc.Types          ( TcM )
-import GHC.Tc.Types.Evidence ( TcCoercion )
-import GHC.Tc.Types.Origin   ( CtOrigin, TypedThing )
+import GHC.Core.Type           ( Mult )
+import GHC.Tc.Utils.TcType     ( TcTauType )
+import GHC.Tc.Types            ( TcM )
+import GHC.Tc.Types.Constraint ( Cts )
+import GHC.Tc.Types.Evidence   ( TcCoercion )
+import GHC.Tc.Types.Origin     ( CtOrigin, TypedThing )
+import GHC.Tc.Utils.TcType     ( TcType, ConcreteTvOrigin )
+
+import GHC.Data.FastString ( FastString )
 
 
 -- This boot file exists only to tie the knot between
@@ -15,3 +19,6 @@ unifyType          :: Maybe TypedThing -> TcTauType -> TcTauType -> TcM TcCoerci
 unifyInvisibleType :: TcTauType -> TcTauType -> TcM TcCoercion
 
 tcSubMult :: CtOrigin -> Mult -> Mult -> TcM ()
+
+makeTypeConcrete :: FastString -> ConcreteTvOrigin
+                 -> TcType -> TcM (TcCoercion, Cts)

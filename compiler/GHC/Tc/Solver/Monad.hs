@@ -201,6 +201,7 @@ import GHC.Exts (oneShot)
 import Control.Monad
 import Data.IORef
 import Data.List ( mapAccumL )
+import Data.Maybe ( isJust )
 import Data.Foldable
 import qualified Data.Semigroup as S
 import GHC.Types.SrcLoc
@@ -2122,7 +2123,7 @@ checkTouchableTyVarEq ev lhs_tv rhs
        _ -> pprPanic "checkTouchableTyVarEq" (ppr lhs_tv)
             -- lhs_tv should be a meta-tyvar
 
-    is_concrete_lhs_tv = isConcreteInfo lhs_tv_info
+    is_concrete_lhs_tv = isJust $ concreteInfo_maybe lhs_tv_info
 
     check_rhs rhs
        -- Crucial special case for  alpha ~ F tys
@@ -2289,7 +2290,7 @@ where both sides are TyFamLHSs.  We don't want to flatten that RHS to
 Instead we'd like to say "occurs-check" and swap LHS and RHS, which yields a
 canonical constraint
     [G] G (...(F ty)...) ~ F ty
-That tents to rewrite a big type to smaller one. This happens in T15703,
+That tends to rewrite a big type to smaller one. This happens in T15703,
 where we had:
     [G] Pure g ~ From1 (To1 (Pure g))
 Making a loop breaker and rewriting left to right just makes much bigger

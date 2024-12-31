@@ -3,6 +3,8 @@
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE TypeApplications    #-}
+
 
 {-
 (c) The University of Glasgow 2006
@@ -28,6 +30,7 @@ module GHC.Tc.Utils.Unify (
   swapOverTyVars, touchabilityAndShapeTest, checkTopShape, lhsPriority,
   UnifyEnv(..), updUEnvLoc, setUEnvRole,
   uType,
+  makeTypeConcrete,
 
   --------------------------------
   -- Holes
@@ -52,7 +55,7 @@ import GHC.Prelude
 
 import GHC.Hs
 
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep, hasFixedRuntimeRep_syntactic )
+import GHC.Tc.Utils.Concrete
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Monad
@@ -92,7 +95,7 @@ import GHC.Utils.Panic
 
 import GHC.Driver.DynFlags
 import GHC.Data.Bag
-import GHC.Data.FastString( fsLit )
+import GHC.Data.FastString
 
 import Control.Monad
 import Data.Monoid as DM ( Any(..) )
@@ -3116,7 +3119,8 @@ data TyEqFlags a
         , tef_lhs      :: CanEqLHS     -- LHS of the constraint
         , tef_unifying :: AreUnifying  -- Always NotUnifying if tef_lhs is TyFamLHS
         , tef_fam_app  :: TyEqFamApp a
-        , tef_occurs   :: CheckTyEqProblem }  -- Soluble or insoluble occurs check
+        , tef_occurs   :: CheckTyEqProblem -- Soluble or insoluble occurs check
+        }
 
 -- | What to do when encountering a type-family application while processing
 -- a type equality in the pure unifier.
@@ -3399,7 +3403,7 @@ checkTyConApp flags@(TEF { tef_unifying = unifying, tef_foralls = foralls_ok })
   = failCheckWith impredicativeProblem
 
   | Unifying info _ _ <- unifying
-  , isConcreteInfo info
+  , Just {} <- concreteInfo_maybe info
   , not (isConcreteTyCon tc)
   = failCheckWith (cteProblem cteConcrete)
 
@@ -3430,7 +3434,7 @@ checkFamApp flags@(TEF { tef_unifying = unifying, tef_occurs = occ_prob
              TEFA_Break breaker -> breaker fam_app
 
       _ | Unifying lhs_info _ _ <- unifying
-        , isConcreteInfo lhs_info
+        , Just {} <- concreteInfo_maybe lhs_info
         -> case fam_app_flag of
              TEFA_Recurse       -> failCheckWith (cteProblem cteConcrete)
              TEFA_Break breaker -> breaker fam_app
@@ -3453,6 +3457,7 @@ checkFamApp flags@(TEF { tef_unifying = unifying, tef_occurs = occ_prob
     arg_flags = famAppArgFlags flags
 
 -------------------
+
 checkTyVar :: forall a. TyEqFlags a -> TcTyVar -> TcM (PuResult a Reduction)
 checkTyVar (TEF { tef_lhs = lhs, tef_unifying = unifying, tef_occurs = occ_prob }) occ_tv
   = case lhs of
@@ -3471,23 +3476,37 @@ checkTyVar (TEF { tef_lhs = lhs, tef_unifying = unifying, tef_occurs = occ_prob 
     check_tv (Unifying info lvl prom) lhs_tv
       = do { mb_done <- isFilledMetaTyVar_maybe occ_tv
            ; case mb_done of
-               Just {} -> success
-               -- Already promoted; job done
-               -- Example alpha[2] ~ Maybe (beta[4], beta[4])
-               -- We promote the first occurrence, and then encounter it
-               -- a second time; we don't want to re-promote it!
-               -- Remember, the entire process started with a fully zonked type
+               Just rhs_ty ->
+                 do { ok_conc <-
+                        case concreteInfo_maybe info of
+                          Just conc_orig ->
+                            -- If we are unifying a concrete type variable,
+                            -- we must insist on a concrete RHS.
+                            isConcreteTypeWith (try_make_concrete conc_orig) rhs_ty
+                          Nothing ->
+                            pure True
+                    ; if not ok_conc
+                      then failCheckWith (cteProblem cteConcrete)
+                      else okCheckRefl rhs_ty
+                    }
 
-               Nothing -> check_unif info lvl prom lhs_tv }
+               Nothing ->
+                -- Already promoted; job done
+                -- Example alpha[2] ~ Maybe (beta[4], beta[4])
+                -- We promote the first occurrence, and then encounter it
+                -- a second time; we don't want to re-promote it!
+                -- Remember, the entire process started with a fully zonked type
+                check_unif info lvl prom lhs_tv
+           }
 
     ---------------------
     -- We are in the Unifying branch of AreUnifying; and occ_tv is unfilled
     check_unif :: MetaInfo -> TcLevel -> LevelCheck
                -> TcTyVar -> TcM (PuResult a Reduction)
     check_unif lhs_tv_info lhs_tv_lvl prom lhs_tv
-      | isConcreteInfo lhs_tv_info
+      | Just {} <- concreteInfo_maybe lhs_tv_info
       , not (isConcreteTyVar occ_tv)
-      = if can_make_concrete occ_tv
+      = if isMetaTyVar occ_tv
         then promote lhs_tv lhs_tv_info lhs_tv_lvl
         else failCheckWith (cteProblem cteConcrete)
 
@@ -3512,31 +3531,59 @@ checkTyVar (TEF { tef_lhs = lhs, tef_unifying = unifying, tef_occurs = occ_prob 
         (check_kind, _) = mkOccFolders lhs_tv
 
     ---------------------
-    can_make_concrete occ_tv = case tcTyVarDetails occ_tv of
-      MetaTv { mtv_info = info } -> case info of
-                                      ConcreteTv {} -> True
-                                      TauTv {}      -> True
-                                      _             -> False
-      _ -> False  -- Don't attempt to make other type variables concrete
-                  -- (e.g. SkolemTv, TyVarTv, CycleBreakerTv, RuntimeUnkTv).
+    try_make_concrete :: ConcreteTvOrigin -> TcTyVar -> TcM Bool
+    try_make_concrete conc_orig occ_tv =
+      case tcTyVarDetails occ_tv of
+        MetaTv { mtv_info = info } ->
+          case info of
+            ConcreteTv {} -> return True
+            TauTv {} ->
+              do { mb_filled <- isFilledMetaTyVar_maybe occ_tv
+                 ; case mb_filled of
+                    Nothing ->
+                      do { conc_ty <- mkTyVarTy <$> cloneMetaTyVarWithInfo (ConcreteTv conc_orig) (tcTyVarLevel occ_tv) occ_tv
+                         ; liftZonkM $ writeMetaTyVar occ_tv conc_ty
+                         ; return True
+                         }
+                    Just ty ->
+                      isConcreteTypeWith (try_make_concrete conc_orig) ty
+                 }
+            _ -> return False
+        _ -> return False
+          -- Don't attempt to make other type variables concrete
+          -- (e.g. SkolemTv, TyVarTv, CycleBreakerTv, RuntimeUnkTv).
 
     ---------------------
     -- occ_tv is definitely a MetaTyVar
     promote lhs_tv lhs_tv_info lhs_tv_lvl
       | MetaTv { mtv_info = info_occ, mtv_tclvl = lvl_occ } <- tcTyVarDetails occ_tv
-      = do { let new_info | isConcreteInfo lhs_tv_info = lhs_tv_info
-                          | otherwise                  = info_occ
+      = do { let new_info | Just {} <- concreteInfo_maybe lhs_tv_info = lhs_tv_info
+                          | otherwise                                 = info_occ
                  new_lvl = lhs_tv_lvl `minTcLevel` lvl_occ
                            -- c[conc,3] ~ p[tau,2]: want to clone p:=p'[conc,2]
                            -- c[tau,2]  ~ p[tau,3]: want to clone p:=p'[tau,2]
 
            -- Check the kind of occ_tv
            ; reason <- checkPromoteFreeVars occ_prob lhs_tv lhs_tv_lvl (tyCoVarsOfType (tyVarKind occ_tv))
-
-           ; if cterHasNoProblem reason  -- Successfully promoted
-             then do { new_tv_ty <- promote_meta_tyvar new_info new_lvl occ_tv
-                     ; okCheckRefl new_tv_ty }
-             else failCheckWith reason }
+           ; if not (cterHasNoProblem reason)
+             then failCheckWith reason
+             else
+        do { let promote_and_finish tv =
+                   do { new_tv_ty <- promote_meta_tyvar new_info new_lvl tv
+                      ; okCheckRefl new_tv_ty
+                      }
+           ; case concreteInfo_maybe lhs_tv_info of
+                  Nothing -> promote_and_finish occ_tv
+                  Just conc_orig ->
+                    -- If the LHS is a concrete type variable and the RHS is an
+                    -- unfilled meta-tyvar, say 'occ_tv', we need to ensure that
+                    -- the kind of 'occ_tv' is concrete.   Test case: T23176.
+                    do { (kind_co, conc_cts) <- makeTypeConcrete (fsLit "cx") conc_orig (tyVarKind occ_tv)
+                       ; if null conc_cts
+                         then promote_and_finish $ setTyVarKind occ_tv (coercionRKind kind_co)
+                         else failCheckWith (cteProblem cteConcrete)
+                        }
+           } }
 
       | otherwise = pprPanic "promote" (ppr occ_tv)
 
@@ -3618,3 +3665,103 @@ checkTopShape info xi
                         _                             -> False
       CycleBreakerTv -> False  -- We never unify these
       _ -> True
+
+--------------------------------------------------------------------------------
+-- Making a type concrete.
+
+-- | Try to turn the provided type into a concrete type, by ensuring
+-- unfilled metavariables are appropriately marked as concrete.
+--
+-- Returns a zonked type which is "as concrete as possible", and a collection of
+-- Wanted equality constraints that are necessary to make the type concrete.
+-- For example, for an input @TYPE a[sk]@ we will return @TYPE gamma[conc]@
+-- together with the Wanted equality constraint @a ~# gamma@.
+--
+-- INVARIANT: the returned type is equal to the input type, up to zonking and
+-- the returned Wanted equality constraints.
+--
+-- INVARIANT: if this function returns an empty list of constraints
+-- then the returned type is concrete, in the sense of Note [Concrete types].
+makeTypeConcrete :: FastString -> ConcreteTvOrigin
+                 -> TcType -> TcM (TcCoercion, Cts)
+makeTypeConcrete occ_fs conc_orig ty =
+  do { tc_lvl <- getTcLevel
+
+     ; traceTc "makeTypeConcrete {" $
+        vcat [ text "ty:" <+> ppr ty ]
+
+     -- Step 1: create a new concrete metavariable alpha[conc].
+
+     ; let ki = typeKind ty
+     ; (kind_co, kind_cts) <-
+         if isConcreteType ki
+         then return (mkNomReflCo ki, emptyBag)
+         else makeTypeConcrete occ_fs conc_orig ki
+     ; let conc_ki = coercionRKind kind_co
+     ; conc_tv <- newConcreteTyVar conc_orig occ_fs conc_ki
+
+       -- Step 2: call checkTyEqRhs, attempting to unify
+       -- LHS 'alpha[conc]' with RHS 'ty'.
+     ; let ty' = mkCastTy ty kind_co
+           ty_eq_flags =
+             TEF { tef_foralls  = False
+                 , tef_lhs      = TyVarLHS conc_tv
+                 , tef_unifying = Unifying
+                                    (ConcreteTv conc_orig)
+                                    tc_lvl
+                                    LC_None
+                 , tef_fam_app  = TEFA_Fail
+                 , tef_occurs   = cteInsolubleOccurs }
+     ; pu_res <- checkTyEqRhs @() ty_eq_flags ty'
+     ; (cts, redn) <-
+         case pu_res of
+           PuOK _ redn ->
+            do { traceTc "makeTypeConcrete: unifier success" $
+                   vcat [ text "ty:" <+> ppr ty <+> dcolon <+> ppr (typeKind ty)
+                        , text "conc_tv:" <+> ppr conc_tv <+> dcolon <+> ppr (tyVarKind conc_tv)
+                        , text "redn:" <+> ppr redn
+                        ]
+               ; return (emptyBag, redn) }
+           PuFail _prob ->
+             do { traceTc "makeTypeConcrete: unifier failure" $
+                   vcat [ text "ty:" <+> ppr ty <+> dcolon <+> ppr (typeKind ty)
+                        , text "conc_tv:" <+> ppr conc_tv <+> dcolon <+> ppr (tyVarKind conc_tv)
+                        , text "problem:" <+> ppr _prob
+                        ]
+                  -- NB: the unifier works with a constraint of the form "conc_tv ~ rhs",
+                  -- this means the **LHS** type of the returned Reduction is concrete.
+                ; let conc_ty = mkTyVarTy conc_tv
+                      pty = mkEqPredRole Nominal conc_ty ty'
+                ; hole <- newCoercionHoleO orig pty
+                ; loc <- getCtLocM orig (Just KindLevel)
+                ; let ct = mkNonCanonical
+                         $ CtWanted { ctev_pred      = pty
+                                    , ctev_dest      = HoleDest hole
+                                    , ctev_loc       = loc
+                                    , ctev_rewriters = emptyRewriterSet }
+                ; return (unitBag ct, mkReduction (HoleCo hole) ty')
+                }
+
+     ; let final_co =
+            mkGReflRightCo Nominal ty kind_co
+              `mkTransCo`
+            (mkSymCo $ reductionCoercion redn)
+            -- SymCo: we want the concrete type on the right,
+            -- but the unifier returns a Reduction with it on the left.
+
+     ; traceTc "makeTypeConcrete }" $
+        vcat [ text "ty:" <+> _ppr_ty ty
+             , text "ty':" <+> _ppr_ty ty'
+             , text "kind_co:" <+> _ppr_co kind_co
+             , text "final_co:" <+> _ppr_co final_co ]
+
+     ; return (final_co, kind_cts `unionBags` cts)
+     }
+  where
+
+    _ppr_ty ty = ppr ty <+> dcolon <+> ppr (typeKind ty)
+    _ppr_co co = ppr co <+> dcolon <+> parens (_ppr_ty (coercionLKind co)) <+> text "~#" <+> parens (_ppr_ty (coercionRKind co))
+
+    orig :: CtOrigin
+    orig = case conc_orig of
+      ConcreteFRR frr_orig -> FRROrigin frr_orig

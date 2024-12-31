@@ -52,7 +52,6 @@ module GHC.Tc.Types.Constraint (
 
         Hole(..), HoleSort(..), isOutOfScopeHole,
         DelayedError(..), NotConcreteError(..),
-        NotConcreteReason(..),
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         isSolvedWC, andWC, unionsWC, mkSimpleWC, mkImplicWC,
@@ -132,7 +131,6 @@ import Data.Coerce
 import qualified Data.Semigroup as S
 import Control.Monad ( msum, when )
 import Data.Maybe ( mapMaybe, isJust )
-import Data.List.NonEmpty ( NonEmpty )
 
 -- these are for CheckTyEqResult
 import Data.Word  ( Word8 )
@@ -435,29 +433,7 @@ data NotConcreteError
       -- ^ Where did this check take place?
     , nce_frr_origin :: FixedRuntimeRepOrigin
       -- ^ Which representation-polymorphism check did we perform?
-    , nce_reasons    :: NonEmpty NotConcreteReason
-      -- ^ Why did the check fail?
     }
-
--- | Why did we decide that a type was not concrete?
-data NotConcreteReason
-  -- | The type contains a 'TyConApp' of a non-concrete 'TyCon'.
-  --
-  -- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
-  = NonConcreteTyCon TyCon [TcType]
-
-  -- | The type contains a type variable that could not be made
-  -- concrete (e.g. a skolem type variable).
-  | NonConcretisableTyVar TyVar
-
-  -- | The type contains a cast.
-  | ContainsCast TcType TcCoercionN
-
-  -- | The type contains a forall.
-  | ContainsForall ForAllTyBinder TcType
-
-  -- | The type contains a 'CoercionTy'.
-  | ContainsCoercionTy TcCoercion
 
 instance Outputable NotConcreteError where
   ppr (NCE_FRR { nce_frr_origin = frr_orig })

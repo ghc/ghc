@@ -19,39 +19,35 @@ module GHC.Tc.Utils.Concrete
 import GHC.Prelude
 
 import GHC.Builtin.Names       ( unsafeCoercePrimName )
-import GHC.Builtin.Types       ( liftedTypeKindTyCon, unliftedTypeKindTyCon )
+import GHC.Builtin.Types
 
-import GHC.Core.Coercion       ( coToMCo, mkCastTyMCo
-                               , mkGReflRightMCo, mkNomReflCo )
-import GHC.Core.TyCo.Rep       ( Type(..), MCoercion(..) )
-import GHC.Core.TyCon          ( isConcreteTyCon )
-import GHC.Core.Type           ( isConcreteType, typeKind, mkFunTy)
+import GHC.Core.Coercion
+import GHC.Core.TyCo.Rep
+import GHC.Core.Type
 
-import GHC.Tc.Types.Constraint ( NotConcreteError(..), NotConcreteReason(..) )
-import GHC.Tc.Types.Evidence   ( Role(..), TcCoercionN, TcMCoercionN )
+import GHC.Data.Bag
+
+import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.TcMType
+import {-# SOURCE #-} GHC.Tc.Utils.Unify
 
 import GHC.Types.Basic         ( TypeOrKind(KindLevel) )
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.Var           ( tyVarKind, tyVarName )
+import GHC.Types.Var
 
 import GHC.Utils.Misc          ( HasDebugCallStack )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString     ( FastString, fsLit )
-
 
 import Control.Monad      ( void )
 import Data.Functor       ( ($>) )
-import Data.List.NonEmpty ( NonEmpty((:|)) )
 
-import Control.Monad.Trans.Class      ( lift )
-import Control.Monad.Trans.Writer.CPS ( WriterT, runWriterT, tell )
 
 {- Note [Concrete overview]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -219,10 +215,6 @@ A concrete metavariable is a metavariable whose 'MetaInfo' is 'ConcreteTv'.
 Similar to 'TyVarTv's which are type variables which can only be unified with
 other type variables, a 'ConcreteTv' type variable is a type variable which can
 only be unified with a concrete type (in the sense of Note [Concrete types]).
-
-INVARIANT: the kind of a concrete metavariable is concrete.
-
-This invariant is upheld at the time of creation of a new concrete metavariable.
 
 Concrete metavariables are useful for representation-polymorphism checks:
 they allow us to refer to a type whose representation is not yet known but will
@@ -632,7 +624,7 @@ hasFixedRuntimeRep :: HasDebugCallStack
                         -- That is, @ty'@ has a syntactically fixed RuntimeRep
                         -- in the sense of Note [Fixed RuntimeRep].
 hasFixedRuntimeRep frr_ctxt ty =
-  checkFRR_with (unifyConcrete (fsLit "cx") . ConcreteFRR) frr_ctxt ty
+  checkFRR_with (fmap (fmap coToMCo) . unifyConcrete_kind (fsLit "cx") . ConcreteFRR) frr_ctxt ty
 
 -- | Like 'hasFixedRuntimeRep', but we perform an eager syntactic check.
 --
@@ -712,213 +704,93 @@ checkFRR_with check_kind frr_ctxt ty
 -- and emits an equality constraint @ty ~# concrete_tv@,
 -- to be handled by the constraint solver.
 --
+-- Precondition: @ki@ must be of the form @TYPE rep@ or @CONSTRAINT rep@.
+unifyConcrete_kind :: HasDebugCallStack
+                   => FastString -- ^ name to use when creating concrete metavariables
+                   -> ConcreteTvOrigin
+                   -> TcKind
+                   -> TcM TcCoercionN
+unifyConcrete_kind occ_fs conc_orig ki
+  | Just (torc, rep) <- sORTKind_maybe ki
+  = do { let tc = case torc of
+                    TypeLike -> tYPETyCon
+                    ConstraintLike -> cONSTRAINTTyCon
+       ; rep_co <- unifyConcrete occ_fs conc_orig rep
+       ; return $ mkTyConAppCo Nominal tc [rep_co] }
+  | otherwise
+  = pprPanic "unifyConcrete_kind: kind is not of the form 'TYPE rep' or 'CONSTRAINT rep'" $
+      ppr ki <+> dcolon <+> ppr (typeKind ki)
+
+
+-- | Ensure the given type can be unified with
+-- a concrete type, in the sense of Note [Concrete types].
+--
+-- Returns a coercion @co :: ty ~# conc_ty@, where @conc_ty@ is
+-- concrete.
+--
+-- If the type is already syntactically concrete, this
+-- immediately returns a reflexive coercion.
+-- Otherwise, it will create new concrete metavariables and emit
+-- new Wanted equality constraints, to be handled by the constraint solver.
+--
 -- Invariant: the kind of the supplied type must be concrete.
 --
 -- We assume the provided type is already at the kind-level
 -- (this only matters for error messages).
-unifyConcrete :: HasDebugCallStack
-              => FastString -> ConcreteTvOrigin -> TcType -> TcM TcMCoercionN
+unifyConcrete :: FastString -> ConcreteTvOrigin -> TcType -> TcM TcCoercionN
 unifyConcrete occ_fs conc_orig ty
-  = do { (ty, errs) <- makeTypeConcrete conc_orig ty
-       ; case errs of
-           -- We were able to make the type fully concrete.
-         { [] -> return MRefl
-           -- The type could not be made concrete; perhaps it contains
-           -- a skolem type variable, a type family application, ...
-           --
-           -- Create a new ConcreteTv metavariable @concrete_tv@
-           -- and unify @ty ~# concrete_tv@.
-         ; _  ->
-    do { conc_tv <- newConcreteTyVar conc_orig occ_fs ki
-           -- NB: newConcreteTyVar asserts that 'ki' is concrete.
-       ; coToMCo <$> emitWantedEq orig KindLevel Nominal ty (mkTyVarTy conc_tv) } } }
-  where
-    ki :: TcKind
-    ki = typeKind ty
-    orig :: CtOrigin
-    orig = case conc_orig of
-      ConcreteFRR frr_orig -> FRROrigin frr_orig
+  = do { (co, cts) <- makeTypeConcrete occ_fs conc_orig ty
+       ; emitSimples cts
+       ; return co }
 
--- | Ensure that the given type is concrete.
+-- | Ensure that the given kind @ki@ is concrete.
 --
 -- This is an eager syntactic check, and never defers
--- any work to the constraint solver.
+-- any work to the constraint solver. However,
+-- it may perform unification.
 --
--- Invariant: the kind of the supplied type must be concrete.
--- Invariant: the output type is equal to the input type,
---            up to zonking.
---
--- We assume the provided type is already at the kind-level
--- (this only matters for error messages).
+-- Invariant: the output type is equal to the input type, up to zonking.
 ensureConcrete :: HasDebugCallStack
                => FixedRuntimeRepOrigin
-               -> TcType
-               -> TcM TcType
-ensureConcrete frr_orig ty
-  = do { traceTc "ensureConcrete {" (ppr frr_orig $$ ppr ty)
-       ; (ty', errs) <- makeTypeConcrete conc_orig ty
-       ; case errs of
-          { err:errs ->
-              do { traceTc "ensureConcrete } failure" $
-                     vcat [ text "ty:" <+> ppr ty
-                          , text "ty':" <+> ppr ty' ]
-                 ; loc <- getCtLocM (FRROrigin frr_orig) (Just KindLevel)
-                 ; emitNotConcreteError $
-                     NCE_FRR
-                       { nce_loc = loc
-                       , nce_frr_origin = frr_orig
-                       , nce_reasons = err :| errs }
-                 }
-          ; [] ->
-              traceTc "ensureConcrete } success" $
-                vcat [ text "ty: " <+> ppr ty
-                     , text "ty':" <+> ppr ty' ] }
-        ; return ty' }
+               -> TcKind
+               -> TcM TcKind
+ensureConcrete frr_orig ki
+  -- Maintain the invariant that if the input is of the form
+  -- 'TYPE r' or 'CONSTRAINT r', then the output is as well.
+  | Just (torc, rep) <- sORTKind_maybe ki
+  = do { traceTc "ensureConcrete {" (ppr frr_orig $$ ppr ki)
+       ; rep' <- ensure_concrete rep
+       ; let tc = case torc of
+                    TypeLike -> tYPETyCon
+                    ConstraintLike -> cONSTRAINTTyCon
+       ; return $ mkTyConApp tc [rep'] }
+  | otherwise
+  = do { pprTraceM "ensureConcrete: kind not of form 'TYPE r' or 'CONSTRAINT r'"
+           (text "ki:" <+> ppr ki)
+       ; ensure_concrete ki }
+    -- Don't panic here, as this can happen (probably bogusly).
+    -- See PandocArrowCmd test, and the call
+    --   hasFixedRuntimeRep_syntactic (FRRArrow $ ArrowCmdResTy cmd) res_ty
+    -- in GHC.Tc.Gen.Arrow.
   where
     conc_orig :: ConcreteTvOrigin
     conc_orig = ConcreteFRR frr_orig
 
-{-***********************************************************************
-%*                                                                      *
-                    Making a type concrete
-%*                                                                      *
-%************************************************************************
-
-Note [Unifying concrete metavariables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Unifying concrete metavariables (as defined in Note [ConcreteTv]) is not
-an all-or-nothing affair as it is for other sorts of metavariables.
-
-Consider the following unification problem in which all metavariables
-are unfilled (and ignoring any TcLevel considerations):
-
-  alpha[conc] ~# TYPE (TupleRep '[ beta[conc], IntRep, gamma[tau] ])
-
-We can't immediately unify `alpha` with the RHS, because the RHS is not
-a concrete type (in the sense of Note [Concrete types]). Instead, we
-proceed as follows:
-
-  - create a fresh concrete metavariable variable `gamma'[conc]`,
-  - write gamma[tau] := gamma'[conc],
-  - write alpha[conc] := TYPE (TupleRep '[ beta[conc], IntRep, gamma'[conc] ]).
-
-Thus, in general, to unify `alpha[conc] ~# rhs`, we first try to turn
-`rhs` into a concrete type (see the 'makeTypeConcrete' function).
-If this succeeds, resulting in a concrete type `rhs'`, we simply fill
-`alpha[conc] := rhs'`. If it fails, then syntactic unification fails.
-
-Example 1:
-
-    alpha[conc] ~# TYPE (TupleRep '[ beta[conc], IntRep, gamma[tau] ])
-
-  We proceed by filling metavariables:
-
-    gamma[tau] := gamma[conc]
-    alpha[conc] := TYPE (TupleRep '[ beta[conc], IntRep, gamma[conc] ])
-
-  This successfully unifies alpha.
-
-Example 2:
-
-  For a type family `F :: Type -> Type`:
-
-    delta[conc] ~# TYPE (SumRep '[ zeta[tau], a[sk], F omega[tau] ])
-
-  We write zeta[tau] := zeta[conc], and then fail, providing the following
-  two reasons:
-
-    - `a[sk]` is not a concrete type variable, so the overall type
-      cannot be concrete
-    - `F` is not a concrete type constructor, in the sense of
-       Note [Concrete types]. So we keep it as is; in particular,
-       we /should not/ try to make its argument `omega[tau]` into
-       a ConcreteTv.
-
-  Note that making zeta concrete allows us to propagate information.
-  For example, after more typechecking, we might try to unify
-  `zeta ~# rr[sk]`. If we made zeta a ConcreteTv, we will report
-  this unsolved equality using the 'ConcreteTvOrigin' stored in zeta[conc].
-  This allows us to report ALL the problems in a representation-polymorphism
-  check (instead of only a non-empty subset).
--}
-
--- | Try to turn the provided type into a concrete type, by ensuring
--- unfilled metavariables are appropriately marked as concrete.
---
--- Returns a zonked type which is "as concrete as possible", and
--- a list of problems encountered when trying to make it concrete.
---
--- INVARIANT: the returned type is equal to the input type, up to zonking.
--- INVARIANT: if this function returns an empty list of 'NotConcreteReasons',
--- then the returned type is concrete, in the sense of Note [Concrete types].
-makeTypeConcrete :: ConcreteTvOrigin -> TcType -> TcM (TcType, [NotConcreteReason])
--- TODO: it could be worthwhile to return enough information to continue solving.
--- Consider unifying `alpha[conc] ~# TupleRep '[ beta[tau], F Int ]` for
--- a type family 'F'.
--- This function will concretise `beta[tau] := beta[conc]` and return
--- that `TupleRep '[ beta[conc], F Int ]` is not concrete because of the
--- type family application `F Int`. But we could decompose by setting
--- alpha := TupleRep '[ beta, gamma[conc] ] and emitting `[W] gamma[conc] ~ F Int`.
-makeTypeConcrete conc_orig ty =
-  do { res@(ty', _) <- runWriterT $ go ty
-     ; traceTc "makeTypeConcrete" $
-        vcat [ text "ty:" <+> ppr ty
-             , text "ty':" <+> ppr ty' ]
-     ; return res }
-  where
-    go :: TcType -> WriterT [NotConcreteReason] TcM TcType
-    go ty
-      | Just ty <- coreView ty
-      = go ty
-      | isConcreteType ty
-      = pure ty
-    go ty@(TyVarTy tv) -- not a ConcreteTv (already handled above)
-      = do { mb_filled <- lift $ isFilledMetaTyVar_maybe tv
-           ; case mb_filled of
-           { Just ty -> go ty
-           ; Nothing
-               | isMetaTyVar tv
-               , TauTv <- metaTyVarInfo tv
-               -> -- Change the MetaInfo to ConcreteTv, but retain the TcLevel
-               do { kind <- go (tyVarKind tv)
-                  ; let occ_fs = occNameFS (getOccName tv)
-                        -- occ_fs: preserve the occurrence name of the original tyvar
-                        -- This helps in error messages
-                  ; lift $
-                    do { conc_tv <- setTcLevel (tcTyVarLevel tv) $
-                                    newConcreteTyVar conc_orig occ_fs kind
-                       ; let conc_ty = mkTyVarTy conc_tv
-                       ; liftZonkM $ writeMetaTyVar tv conc_ty
-                       ; return conc_ty } }
-               | otherwise
-               -- Don't attempt to make other type variables concrete
-               -- (e.g. SkolemTv, TyVarTv, CycleBreakerTv, RuntimeUnkTv).
-               -> bale_out ty (NonConcretisableTyVar tv) } }
-    go ty@(TyConApp tc tys)
-      | isConcreteTyCon tc
-      = mkTyConApp tc <$> mapM go tys
-      | otherwise
-      = bale_out ty (NonConcreteTyCon tc tys)
-    go (FunTy af w ty1 ty2)
-      = do { w <- go w
-           ; ty1 <- go ty1
-           ; ty2 <- go ty2
-           ; return $ mkFunTy af w ty1 ty2 }
-    go (AppTy ty1 ty2)
-      = do { ty1 <- go ty1
-           ; ty2 <- go ty2
-           ; return $ mkAppTy ty1 ty2 }
-    go ty@(LitTy {})
-      = return ty
-    go ty@(CastTy cast_ty kco)
-      = bale_out ty (ContainsCast cast_ty kco)
-    go ty@(ForAllTy tcv body)
-      = bale_out ty (ContainsForall tcv body)
-    go ty@(CoercionTy co)
-      = bale_out ty (ContainsCoercionTy co)
-
-    bale_out :: TcType -> NotConcreteReason -> WriterT [NotConcreteReason] TcM TcType
-    bale_out ty reason = do { tell [reason]; return ty }
+    ensure_concrete :: TcType -> TcM TcType
+    ensure_concrete ty
+      = do { (co, cts) <- makeTypeConcrete (fsLit "cx") conc_orig ty
+           ; let trace_msg = vcat [ text "ty: " <+> ppr ki
+                                  , text "co:" <+> ppr co ]
+           ; if isEmptyBag cts
+             then traceTc "ensureConcrete } success" trace_msg
+             else do { traceTc "ensureConcrete } failure" trace_msg
+                     ; loc <- getCtLocM (FRROrigin frr_orig) (Just KindLevel)
+                     ; emitNotConcreteError $
+                         NCE_FRR
+                           { nce_loc = loc
+                           , nce_frr_origin = frr_orig }
+                 }
+           ; return $ coercionRKind co }
 
 {-***********************************************************************
 %*                                                                      *
