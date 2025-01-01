@@ -494,7 +494,7 @@ mkBatchMsg hsc_env =
     then batchMultiMsg
     else batchMsg
 
-type AnyGhcDiagnostic = UnknownDiagnostic (DiagnosticOpts GhcMessage)
+type AnyGhcDiagnostic = UnknownDiagnosticFor GhcMessage
 
 loadWithCache :: GhcMonad m => Maybe ModIfaceCache -- ^ Instructions about how to cache interfaces as we create them.
                             -> (GhcMessage -> AnyGhcDiagnostic) -- ^ How to wrap error messages before they are displayed to a user.

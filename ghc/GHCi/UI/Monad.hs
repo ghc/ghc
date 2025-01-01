@@ -24,9 +24,7 @@ module GHCi.UI.Monad (
         runStmt, runDecls, runDecls', resume, recordBreak, revertCAFs,
         ActionStats(..), runAndPrintStats, runWithStats, printStats,
 
-        printForUserNeverQualify,
-        printForUserGlobalRdrEnv,
-        printForUser, printForUserPartWay, prettyLocations,
+        prettyLocations,
 
         compileGHCiExpr,
         initInterpBuffering,
@@ -42,7 +40,6 @@ import GHC.Driver.Monad hiding (liftIO)
 import GHC.Utils.Outputable
 import qualified GHC.Driver.Ppr as Ppr
 import GHC.Types.Name.Occurrence
-import GHC.Types.Name.Reader
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Driver.Env
@@ -51,12 +48,10 @@ import GHC.Types.SafeHaskell
 import GHC.Driver.Make (ModIfaceCache(..))
 import GHC.Unit
 import GHC.Types.Name.Reader as RdrName (mkOrig)
-import qualified GHC.Types.Name.Ppr as Ppr (mkNamePprCtx)
 import GHC.Builtin.Names (gHC_INTERNAL_GHCI_HELPERS)
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Context
 import GHCi.RemoteTypes
-import GHCi.UI.Exception (printGhciException)
 import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import GHC.Hs.Utils
 import GHC.Utils.Misc
@@ -81,6 +76,8 @@ import Data.Map.Strict (Map)
 import qualified Data.IntMap.Strict as IntMap
 import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
+
+import GHCi.UI.Print
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -155,9 +152,6 @@ data GHCiState = GHCiState
             -- "import Prelude hiding (map)"
 
         ghc_e :: Bool, -- ^ True if this is 'ghc -e' (or runghc)
-
-        short_help :: String,
-            -- ^ help text to display to a user
         long_help  :: String,
         lastErrorLocations :: IORef [(FastString, Int)],
 
@@ -367,36 +361,6 @@ unsetOption opt
  = do st <- getGHCiState
       setGHCiState (st{ options = filter (/= opt) (options st) })
 
-printForUserNeverQualify :: GhcMonad m => SDoc -> m ()
-printForUserNeverQualify doc = do
-  dflags <- GHC.getInteractiveDynFlags
-  liftIO $ Ppr.printForUser dflags stdout neverQualify AllTheWay doc
-
-printForUserGlobalRdrEnv :: (GhcMonad m, Outputable info)
-                         => Maybe (GlobalRdrEnvX info) -> SDoc -> m ()
-printForUserGlobalRdrEnv mb_rdr_env doc = do
-  dflags <- GHC.getInteractiveDynFlags
-  name_ppr_ctx <- mkNamePprCtxFromGlobalRdrEnv dflags mb_rdr_env
-  liftIO $ Ppr.printForUser dflags stdout name_ppr_ctx AllTheWay doc
-    where
-      mkNamePprCtxFromGlobalRdrEnv _ Nothing = GHC.getNamePprCtx
-      mkNamePprCtxFromGlobalRdrEnv dflags (Just rdr_env) =
-        withSession $ \ hsc_env ->
-        let unit_env = hsc_unit_env hsc_env
-            ptc = initPromotionTickContext dflags
-        in  return $ Ppr.mkNamePprCtx ptc unit_env rdr_env
-
-printForUser :: GhcMonad m => SDoc -> m ()
-printForUser doc = do
-  name_ppr_ctx <- GHC.getNamePprCtx
-  dflags <- GHC.getInteractiveDynFlags
-  liftIO $ Ppr.printForUser dflags stdout name_ppr_ctx AllTheWay doc
-
-printForUserPartWay :: GhcMonad m => SDoc -> m ()
-printForUserPartWay doc = do
-  name_ppr_ctx <- GHC.getNamePprCtx
-  dflags <- GHC.getInteractiveDynFlags
-  liftIO $ Ppr.printForUser dflags stdout name_ppr_ctx DefaultDepth doc
 
 -- | Run a single Haskell expression
 runStmt
