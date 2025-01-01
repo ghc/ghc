@@ -1,10 +1,5 @@
-<interactive>: Uncaught exception ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
-
-syntax:  :script <filename>
-
-While handling syntax:  :script <filename>
-
-HasCallStack backtrace:
-  throwIO, called at compiler/GHC/Utils/Error.hs:512:19 in ghc-9.13-inplace:GHC.Utils.Error
+<interactive>: error: [GHCi-72682]
+    Syntax:
+      :script <filename>
 
 1

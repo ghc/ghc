@@ -29,13 +29,13 @@ import GHC.Prelude
 
 import GHC.Core.InstEnv         ( LookupInstanceErrReason )
 import GHC.Hs.Extension         ( GhcRn )
-import GHC.Types.Error          ( DiagnosticCode(..), UnknownDiagnostic (..), NoDiagnosticOpts
-                                , diagnosticCode )
+import GHC.Types.Error          ( DiagnosticCode(..), UnknownDiagnostic (..)
+                                , diagnosticCode, UnknownDiagnosticFor )
 import GHC.Unit.Module.Warnings ( WarningTxt )
 import GHC.Utils.Panic.Plain
 
 -- Import all the structured error data types
-import GHC.Driver.Errors.Types   ( DriverMessage, GhcMessageOpts, DriverMessageOpts )
+import GHC.Driver.Errors.Types   ( DriverMessage, GhcMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
 import GHC.Iface.Errors.Types
 import GHC.Parser.Errors.Types   ( PsMessage, PsHeaderMessage )
@@ -1025,12 +1025,12 @@ type family ConRecursInto con where
   ConRecursInto "GhcPsMessage"             = 'Just PsMessage
   ConRecursInto "GhcTcRnMessage"           = 'Just TcRnMessage
   ConRecursInto "GhcDsMessage"             = 'Just DsMessage
-  ConRecursInto "GhcUnknownMessage"        = 'Just (UnknownDiagnostic GhcMessageOpts)
+  ConRecursInto "GhcUnknownMessage"        = 'Just (UnknownDiagnosticFor GhcMessage)
 
   ----------------------------------
   -- Constructors of DriverMessage
 
-  ConRecursInto "DriverUnknownMessage"     = 'Just (UnknownDiagnostic DriverMessageOpts)
+  ConRecursInto "DriverUnknownMessage"     = 'Just (UnknownDiagnosticFor DriverMessage)
   ConRecursInto "DriverPsHeaderMessage"    = 'Just PsMessage
   ConRecursInto "DriverInterfaceError"     = 'Just IfaceMessage
 
@@ -1045,13 +1045,13 @@ type family ConRecursInto con where
   ----------------------------------
   -- Constructors of PsMessage
 
-  ConRecursInto "PsUnknownMessage"         = 'Just (UnknownDiagnostic NoDiagnosticOpts)
+  ConRecursInto "PsUnknownMessage"         = 'Just (UnknownDiagnosticFor PsMessage)
   ConRecursInto "PsHeaderMessage"          = 'Just PsHeaderMessage
 
   ----------------------------------
   -- Constructors of TcRnMessage
 
-  ConRecursInto "TcRnUnknownMessage"       = 'Just (UnknownDiagnostic TcRnMessageOpts)
+  ConRecursInto "TcRnUnknownMessage"       = 'Just (UnknownDiagnosticFor TcRnMessage)
 
     -- Recur into TcRnMessageWithInfo to get the underlying TcRnMessage
   ConRecursInto "TcRnMessageWithInfo"      = 'Just TcRnMessageDetailed
@@ -1146,7 +1146,7 @@ type family ConRecursInto con where
   ----------------------------------
   -- Constructors of DsMessage
 
-  ConRecursInto "DsUnknownMessage"         = 'Just (UnknownDiagnostic NoDiagnosticOpts)
+  ConRecursInto "DsUnknownMessage"         = 'Just (UnknownDiagnosticFor DsMessage)
 
   ----------------------------------
   -- Constructors of ImportLookupBad
@@ -1242,14 +1242,14 @@ class ConstructorCodes namespace con f seen recur where
 -- If we recur into the 'UnknownDiagnostic' existential datatype,
 -- unwrap the existential and obtain the error code.
 instance {-# OVERLAPPING #-}
-         ( ConRecursIntoFor namespace con ~ 'Just (UnknownDiagnostic opts)
-         , HasType namespace (UnknownDiagnostic opts) con f )
-      => ConstructorCode namespace con f ('Just (UnknownDiagnostic opts)) where
-  gconstructorCode diag = case getType @namespace @(UnknownDiagnostic opts) @con @f diag of
-    UnknownDiagnostic _ diag -> diagnosticCode diag
+         ( ConRecursIntoFor namespace con ~ 'Just (UnknownDiagnostic opts hint)
+         , HasType namespace (UnknownDiagnostic opts hint) con f )
+      => ConstructorCode namespace con f ('Just (UnknownDiagnostic opts hint)) where
+  gconstructorCode diag = case getType @namespace @(UnknownDiagnostic opts hint) @con @f diag of
+    UnknownDiagnostic _ _ diag -> diagnosticCode diag
 instance {-# OVERLAPPING #-}
-         ( ConRecursIntoFor namespace con ~ 'Just (UnknownDiagnostic opts) )
-      => ConstructorCodes namespace con f seen ('Just (UnknownDiagnostic opts)) where
+         ( ConRecursIntoFor namespace con ~ 'Just (UnknownDiagnostic opts hint) )
+      => ConstructorCodes namespace con f seen ('Just (UnknownDiagnostic opts hint)) where
   gconstructorCodes = Map.empty
 
 -- | (*) Base instance: use the diagnostic code for this constructor in this namespace.

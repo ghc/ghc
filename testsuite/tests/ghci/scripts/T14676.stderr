@@ -1,2 +1,6 @@
-File Notfound.hs not found
-Module NotFound not found
+<interactive>: error: [GHCi-31901]
+    File Notfound.hs not found
+
+<interactive>: error: [GHCi-23305]
+    Module NotFound not found
+

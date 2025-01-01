@@ -1,16 +1,16 @@
-unrecognised flag: -XNoSafe
-did you mean one of:
-  -XSafe
+<interactive>: error: [GHCi-15670]
+    Unrecognised flag: -XNoSafe
+    Suggested fix: did you mean -XSafe
 
 <no location info>: Incompatible Safe Haskell flags! (Safe, Trustworthy)
 Usage: For basic information, try the `--help' option.
-unrecognised flag: -XNoTrustworthy
-did you mean one of:
-  -XTrustworthy
+<interactive>: error: [GHCi-15670]
+    Unrecognised flag: -XNoTrustworthy
+    Suggested fix: did you mean -XTrustworthy
 
 <no location info>: Incompatible Safe Haskell flags! (Safe, Unsafe)
 Usage: For basic information, try the `--help' option.
-unrecognised flag: -XNoUnsafe
-did you mean one of:
-  -XUnsafe
+<interactive>: error: [GHCi-15670]
+    Unrecognised flag: -XNoUnsafe
+    Suggested fix: did you mean -XUnsafe
 

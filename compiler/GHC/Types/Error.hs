@@ -30,13 +30,13 @@ module GHC.Types.Error
    , Severity (..)
    , Diagnostic (..)
    , UnknownDiagnostic (..)
+   , UnknownDiagnosticFor
    , mkSimpleUnknownDiagnostic
    , mkUnknownDiagnostic
    , embedUnknownDiagnostic
    , DiagnosticMessage (..)
    , DiagnosticReason (WarningWithFlag, ..)
    , ResolvedDiagnosticReason(..)
-   , DiagnosticHint (..)
    , mkPlainDiagnostic
    , mkPlainError
    , mkDecoratedDiagnostic
@@ -171,7 +171,7 @@ instance Diagnostic e => Outputable (Messages e) where
                pprDiagnostic (errMsgDiagnostic envelope)
              ]
 
-instance Diagnostic e => ToJson (Messages e) where
+instance (Diagnostic e) => ToJson (Messages e) where
   json msgs =  JSArray . toList $ json <$> getMessages msgs
 
 {- Note [Discarding Messages]
@@ -251,10 +251,15 @@ defaultDiagnosticOpts = defaultOpts @(DiagnosticOpts opts)
 -- A 'Diagnostic' carries the /actual/ description of the message (which, in
 -- GHC's case, it can be an error or a warning) and the /reason/ why such
 -- message was generated in the first place.
-class (HasDefaultDiagnosticOpts (DiagnosticOpts a)) => Diagnostic a where
+class (Outputable (DiagnosticHint a), HasDefaultDiagnosticOpts (DiagnosticOpts a)) => Diagnostic a where
 
   -- | Type of configuration options for the diagnostic.
   type DiagnosticOpts a
+
+  -- | Type of hint this diagnostic can provide.
+  -- By default, this is 'GhcHint'.
+  type DiagnosticHint a
+  type DiagnosticHint a = GhcHint
 
   -- | Extract the error message text from a 'Diagnostic'.
   diagnosticMessage :: DiagnosticOpts a -> a -> DecoratedSDoc
@@ -265,7 +270,7 @@ class (HasDefaultDiagnosticOpts (DiagnosticOpts a)) => Diagnostic a where
 
   -- | Extract any hints a user might use to repair their
   -- code to avoid this diagnostic.
-  diagnosticHints   :: a -> [GhcHint]
+  diagnosticHints   :: a -> [DiagnosticHint a]
 
   -- | Get the 'DiagnosticCode' associated with this 'Diagnostic'.
   -- This can return 'Nothing' for at least two reasons:
@@ -282,19 +287,23 @@ class (HasDefaultDiagnosticOpts (DiagnosticOpts a)) => Diagnostic a where
   diagnosticCode    :: a -> Maybe DiagnosticCode
 
 -- | An existential wrapper around an unknown diagnostic.
-data UnknownDiagnostic opts where
+data UnknownDiagnostic opts hint where
   UnknownDiagnostic :: (Diagnostic a, Typeable a)
                     => (opts -> DiagnosticOpts a) -- Inject the options of the outer context
                                                   -- into the options for the wrapped diagnostic.
+                    -> (DiagnosticHint a -> hint)
                     -> a
-                    -> UnknownDiagnostic opts
+                    -> UnknownDiagnostic opts hint
 
-instance HasDefaultDiagnosticOpts opts => Diagnostic (UnknownDiagnostic opts) where
-  type DiagnosticOpts (UnknownDiagnostic opts) = opts
-  diagnosticMessage opts (UnknownDiagnostic f diag) = diagnosticMessage (f opts) diag
-  diagnosticReason    (UnknownDiagnostic _ diag) = diagnosticReason  diag
-  diagnosticHints     (UnknownDiagnostic _ diag) = diagnosticHints   diag
-  diagnosticCode      (UnknownDiagnostic _ diag) = diagnosticCode    diag
+type UnknownDiagnosticFor a = UnknownDiagnostic (DiagnosticOpts a) (DiagnosticHint a)
+
+instance (HasDefaultDiagnosticOpts opts, Outputable hint) => Diagnostic (UnknownDiagnostic opts hint) where
+  type DiagnosticOpts (UnknownDiagnostic opts _) = opts
+  type DiagnosticHint (UnknownDiagnostic _ hint) = hint
+  diagnosticMessage opts (UnknownDiagnostic f _ diag) = diagnosticMessage (f opts) diag
+  diagnosticReason       (UnknownDiagnostic _ _ diag) = diagnosticReason diag
+  diagnosticHints        (UnknownDiagnostic _ f diag) = map f (diagnosticHints diag)
+  diagnosticCode         (UnknownDiagnostic _ _ diag) = diagnosticCode diag
 
 -- A fallback 'DiagnosticOpts' which can be used when there are no options
 -- for a particular diagnostic.
@@ -302,17 +311,21 @@ data NoDiagnosticOpts = NoDiagnosticOpts
 instance HasDefaultDiagnosticOpts NoDiagnosticOpts where
   defaultOpts = NoDiagnosticOpts
 
--- | Make a "simple" unknown diagnostic which doesn't have any configuration options.
-mkSimpleUnknownDiagnostic :: (Diagnostic a, Typeable a, DiagnosticOpts a ~ NoDiagnosticOpts) => a -> UnknownDiagnostic b
-mkSimpleUnknownDiagnostic = UnknownDiagnostic (const NoDiagnosticOpts)
+-- | Make a "simple" unknown diagnostic which doesn't have any configuration options
+-- and the same hint.
+mkSimpleUnknownDiagnostic :: (Diagnostic a, Typeable a, DiagnosticOpts a ~ NoDiagnosticOpts) =>
+  a -> UnknownDiagnostic b (DiagnosticHint a)
+mkSimpleUnknownDiagnostic = UnknownDiagnostic (const NoDiagnosticOpts) id
 
--- | Make an unknown diagnostic which uses the same options as the context it will be embedded into.
-mkUnknownDiagnostic :: (Typeable a, Diagnostic a) => a -> UnknownDiagnostic (DiagnosticOpts a)
-mkUnknownDiagnostic = UnknownDiagnostic id
+-- | Make an unknown diagnostic which uses the same options and hint
+-- as the context it will be embedded into.
+mkUnknownDiagnostic :: (Typeable a, Diagnostic a) =>
+  a -> UnknownDiagnosticFor a
+mkUnknownDiagnostic = UnknownDiagnostic id id
 
 -- | Embed a more complicated diagnostic which requires a potentially different options type.
-embedUnknownDiagnostic :: (Diagnostic a, Typeable a) => (opts -> DiagnosticOpts a) -> a -> UnknownDiagnostic opts
-embedUnknownDiagnostic = UnknownDiagnostic
+embedUnknownDiagnostic :: (Diagnostic a, Typeable a) => (opts -> DiagnosticOpts a) -> a -> UnknownDiagnostic opts (DiagnosticHint a)
+embedUnknownDiagnostic f = UnknownDiagnostic f id
 
 --------------------------------------------------------------------------------
 
@@ -321,11 +334,6 @@ pprDiagnostic e = vcat [ ppr (diagnosticReason e)
                        , nest 2 (vcat (unDecorated (diagnosticMessage opts e))) ]
   where opts = defaultDiagnosticOpts @e
 
--- | A generic 'Hint' message, to be used with 'DiagnosticMessage'.
-data DiagnosticHint = DiagnosticHint !SDoc
-
-instance Outputable DiagnosticHint where
-  ppr (DiagnosticHint msg) = msg
 
 -- | A generic 'Diagnostic' message, without any further classification or
 -- provenance: By looking at a 'DiagnosticMessage' we don't know neither

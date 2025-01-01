@@ -147,7 +147,7 @@ instance HasDefaultDiagnosticOpts TcRnMessageOpts where
 instance Diagnostic TcRnMessage where
   type DiagnosticOpts TcRnMessage = TcRnMessageOpts
   diagnosticMessage opts = \case
-    TcRnUnknownMessage (UnknownDiagnostic f m)
+    TcRnUnknownMessage (UnknownDiagnostic f _ m)
       -> diagnosticMessage (f opts) m
     TcRnMessageWithInfo unit_state msg_with_info
       -> case msg_with_info of

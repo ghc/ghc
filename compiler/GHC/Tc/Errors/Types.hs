@@ -306,7 +306,7 @@ data TcRnMessageDetailed
         -- ^ main error payload
   deriving Generic
 
-mkTcRnUnknownMessage :: (Diagnostic a, Typeable a, DiagnosticOpts a ~ NoDiagnosticOpts)
+mkTcRnUnknownMessage :: (Diagnostic a, Typeable a, DiagnosticOpts a ~ NoDiagnosticOpts, DiagnosticHint a ~ DiagnosticHint TcRnMessage)
                      => a -> TcRnMessage
 mkTcRnUnknownMessage diag = TcRnUnknownMessage (mkSimpleUnknownDiagnostic diag)
   -- Please don't use this function inside the GHC codebase;
@@ -320,7 +320,7 @@ data TcRnMessage where
   {-| Simply wraps an unknown 'Diagnostic' message @a@. It can be used by plugins
       to provide custom diagnostic messages originated during typechecking/renaming.
   -}
-  TcRnUnknownMessage :: (UnknownDiagnostic (DiagnosticOpts TcRnMessage)) -> TcRnMessage
+  TcRnUnknownMessage :: UnknownDiagnosticFor TcRnMessage -> TcRnMessage
 
   {-| Wrap an 'IfaceMessage' to a 'TcRnMessage' for when we attempt to load interface
       files during typechecking but encounter an error. -}

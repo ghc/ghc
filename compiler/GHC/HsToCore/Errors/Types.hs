@@ -31,7 +31,7 @@ type MaxPmCheckModels = Int
 -- | Diagnostics messages emitted during desugaring.
 data DsMessage
   -- | Simply wraps a generic 'Diagnostic' message.
-  = DsUnknownMessage (UnknownDiagnostic (DiagnosticOpts DsMessage))
+  = DsUnknownMessage (UnknownDiagnosticFor DsMessage)
 
     {-| DsEmptyEnumeration is a warning (controlled by the -Wempty-enumerations flag) that is
         emitted if an enumeration is empty.

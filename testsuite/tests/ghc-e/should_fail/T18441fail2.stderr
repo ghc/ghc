@@ -1,11 +1,3 @@
-<interactive>: Uncaught exception ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
-
-unrecognised flag: -Xabcde
-
-
-While handling unrecognised flag: -Xabcde
-
-HasCallStack backtrace:
-  throwIO, called at compiler/GHC/Utils/Error.hs:512:19 in ghc-9.13-inplace:GHC.Utils.Error
+<interactive>: error: [GHCi-15670] Unrecognised flag: -Xabcde
 
 1

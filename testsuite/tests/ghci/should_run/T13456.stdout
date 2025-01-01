@@ -1,11 +1,22 @@
-macro name cannot start with an exclamation mark
-macro 'type' overwrites builtin command.  Use ':def!' to overwrite.
-macro 'ty' overwrites builtin command.  Use ':def!' to overwrite.
+<interactive>: error: [GHCi-64996]
+    Macro ‘! macro’ cannot start with an exclamation mark
+
+<interactive>: error: [GHCi-86201]
+    Macro ‘type’ overwrites builtin command
+    Suggested fix: Use ‘:def!’ to overwrite
+
+<interactive>: error: [GHCi-86201]
+    Macro ‘ty’ overwrites builtin command
+    Suggested fix: Use ‘:def!’ to overwrite
+
 I'm a macro
 I'm a macro
 macro :: p -> IO String
 macro :: p -> IO String
-macro 'test' is already defined.  Use ':def!' to overwrite.
+<interactive>: error: [GHCi-93909]
+    Macro ‘test’ is already defined
+    Suggested fix: Use ‘:def!’ to overwrite
+
 the following macros are defined:
-test
-type
+  • test
+  • type

@@ -1,12 +1,12 @@
-unrecognised flag: -XNoSafe
-did you mean one of:
-  -XSafe
+<interactive>: error: [GHCi-15670]
+    Unrecognised flag: -XNoSafe
+    Suggested fix: did you mean -XSafe
 
-unrecognised flag: -fno-package-trust
-did you mean one of:
-  -fpackage-trust
-
+<interactive>: error: [GHCi-15670]
+    Unrecognised flag: -fno-package-trust
+    Suggested fix: did you mean -fpackage-trust
 
 <no location info>: error: [GHC-75165]
     Data.ByteString: Can't be safely imported!
-    The package (bytestring-0.11.4.0) the module resides in isn't trusted.
+    The package (bytestring-0.12.1.0) the module resides in isn't trusted.
+

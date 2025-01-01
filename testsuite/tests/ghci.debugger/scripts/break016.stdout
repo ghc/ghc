@@ -1,3 +1,4 @@
 Breakpoint 0 activated at break016.hs:1:7-14
-macro '__cond' is not defined
+<interactive>: error: [GHCi-40561] Macro ‘__cond’ is not defined
+
 4

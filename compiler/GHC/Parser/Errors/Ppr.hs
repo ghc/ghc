@@ -44,7 +44,7 @@ import GHC.Parser.Annotation (noAnn)
 instance Diagnostic PsMessage where
   type DiagnosticOpts PsMessage = NoDiagnosticOpts
   diagnosticMessage opts = \case
-    PsUnknownMessage (UnknownDiagnostic f m)
+    PsUnknownMessage (UnknownDiagnostic f _ m)
       -> diagnosticMessage (f opts) m
 
     PsHeaderMessage m

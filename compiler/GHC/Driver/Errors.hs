@@ -13,7 +13,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable (hang, ppr, ($$),  text, mkErrStyle, sdocStyle, updSDocContext )
 import GHC.Utils.Logger
 
-printMessages :: forall a . Diagnostic a => Logger -> DiagnosticOpts a -> DiagOpts -> Messages a -> IO ()
+printMessages :: forall a. (Diagnostic a) => Logger -> DiagnosticOpts a -> DiagOpts -> Messages a -> IO ()
 printMessages logger msg_opts opts msgs
   = sequence_ [ let style = mkErrStyle name_ppr_ctx
                     ctx   = (diag_ppr_ctx opts) { sdocStyle = style }
@@ -28,7 +28,7 @@ printMessages logger msg_opts opts msgs
                                   errMsgContext    = name_ppr_ctx }
                   <- sortMsgBag (Just opts) (getMessages msgs) ]
   where
-    messageWithHints :: Diagnostic a => a -> SDoc
+    messageWithHints :: a -> SDoc
     messageWithHints e =
       let main_msg = formatBulleted $ diagnosticMessage msg_opts e
           in case diagnosticHints e of

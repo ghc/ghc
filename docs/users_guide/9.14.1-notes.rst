@@ -52,6 +52,9 @@ GHCi
   considered semantically significant. See the documentation for :ghci-cmd:`:info`
   itself for a more detailed explanation.
 
+- GHCi errors and warnings now have their own numeric error codes that are
+  displayed alongside the error.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
@@ -70,6 +73,11 @@ Cmm
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
+
+* The `UnknownDiagnostic` constructor now takes an additional type argument
+  for the type of hints corresponding to the diagnostic, and an additional
+  value-level argument used for existential wrapping of the hints of the inner
+  diagnostic.
 
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
