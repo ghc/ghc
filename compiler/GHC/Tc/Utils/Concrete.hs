@@ -754,24 +754,7 @@ ensureConcrete :: HasDebugCallStack
                => FixedRuntimeRepOrigin
                -> TcKind
                -> TcM TcKind
-ensureConcrete frr_orig ki
-  -- Maintain the invariant that if the input is of the form
-  -- 'TYPE r' or 'CONSTRAINT r', then the output is as well.
-  | Just (torc, rep) <- sORTKind_maybe ki
-  = do { traceTc "ensureConcrete {" (ppr frr_orig $$ ppr ki)
-       ; rep' <- ensure_concrete rep
-       ; let tc = case torc of
-                    TypeLike -> tYPETyCon
-                    ConstraintLike -> cONSTRAINTTyCon
-       ; return $ mkTyConApp tc [rep'] }
-  | otherwise
-  = do { pprTraceM "ensureConcrete: kind not of form 'TYPE r' or 'CONSTRAINT r'"
-           (text "ki:" <+> ppr ki)
-       ; ensure_concrete ki }
-    -- Don't panic here, as this can happen (probably bogusly).
-    -- See PandocArrowCmd test, and the call
-    --   hasFixedRuntimeRep_syntactic (FRRArrow $ ArrowCmdResTy cmd) res_ty
-    -- in GHC.Tc.Gen.Arrow.
+ensureConcrete frr_orig ki = ensure_concrete ki
   where
     conc_orig :: ConcreteTvOrigin
     conc_orig = ConcreteFRR frr_orig
