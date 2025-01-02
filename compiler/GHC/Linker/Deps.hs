@@ -118,7 +118,6 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         -- 1. Find the dependent home-pkg-modules/packages from each iface
         -- (omitting modules from the interactive package, which is already linked)
       (mods_s, pkgs_s) <- get_reachable_nodes opts relevant_mods
-      pprTraceM "Linkable deps:" (ppr relevant_mods $$ ppr mods_s $$ ppr pkgs_s)
 
       let
         -- 2.  Exclude ones already linked

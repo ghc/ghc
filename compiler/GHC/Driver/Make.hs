@@ -1751,7 +1751,7 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
              Just {} -> loopUnit cache uxs
              Nothing -> case unitDepends <$> lookupUnitId (hsc_units hsc_env) u of
                          Just us -> loopUnit (loopUnit (Map.insert nk (PackageNode us u) cache) us) uxs
-                         Nothing -> panic "bad"
+                         Nothing -> pprPanic "loopUnit" (text "Malformed package database, missing " <+> ppr u)
 
 getRootSummary ::
   [ModuleName] ->

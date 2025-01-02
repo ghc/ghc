@@ -417,11 +417,6 @@ loadInterfaceWithException doc mod_name where_from
 --
 -- This operation is used just before TH splices are run (in 'getLinkDeps').
 --
--- TODO: SHOULD WE ASSERT THIS IS ONLY CALLED ON ONESHOT MODE? WE SHOULD NEVER
--- WANT TO LOAD HOME MODULE PACKAGES INTO THE EPS ANY OTHER WAY.
---
--- The first time this is run...??
---
 -- A field in the EPS tracks which home modules are already fully loaded, which we use
 -- here to avoid trying to load them a second time.
 --
@@ -430,7 +425,7 @@ loadInterfaceWithException doc mod_name where_from
 -- graph in 'getLinkDeps' another way.
 loadHomePackageInterfacesBelow :: (Module -> SDoc) -> Maybe HomeUnit {-^ The current home unit -}
                                -> [Module] -> IfM lcl ()
-loadHomePackageInterfacesBelow _ Nothing _ = error "No home unit, what to do?"
+loadHomePackageInterfacesBelow _ Nothing _ = panic "loadHomePackageInterfacesBelow: No home unit"
 loadHomePackageInterfacesBelow msg (Just home_unit) mods = do
   dflags <- getDynFlags
   let ctx = initSDocContext dflags defaultUserStyle
