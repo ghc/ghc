@@ -187,6 +187,7 @@ AC_DEFUN([VALIDATE_GHC_TOOLCHAIN],[
     "$GHC_TOOLCHAIN_BIN" format --input="$1" --output="$o1"
     "$GHC_TOOLCHAIN_BIN" format --input="$2" --output="$o2"
     diff_output=`diff "$o1" "$o2" 2>&1`
+    rm -f "$o1" "$o2"
     if test -z "$diff_output"; then
       true
     else
