@@ -49,6 +49,9 @@ module GHC.Unit.Home.PackageTable
   , addHomeModInfoToHpt
   , addHomeModInfosToHpt
 
+    -- * Restrict the HPT
+  , restrictHpt
+
     -- * Queries about home modules
   , hptCompleteSigs
   , hptAllInstances
@@ -116,6 +119,8 @@ import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModIface
 import GHC.Utils.Outputable
 import GHC.Builtin.Names (gHC_PRIM)
+import GHC.Types.Unique (getUnique, getKey)
+import qualified GHC.Data.Word64Set as W64
 
 -- | Helps us find information about modules in the home package
 newtype HomePackageTable = HPT {
@@ -191,6 +196,12 @@ addToHpt HPT{table=hptr} mn hmi = do
 -- | 'addHomeModInfoToHpt' for multiple module infos.
 addHomeModInfosToHpt :: HomePackageTable -> [HomeModInfo] -> IO ()
 addHomeModInfosToHpt hpt = mapM_ (flip addHomeModInfoToHpt hpt)
+
+restrictHpt :: HomePackageTable -> [HomeModInfo] -> IO ()
+restrictHpt HPT{table=hptr} hmis =
+  let key_set = map (getKey . getUnique . hmi_mod) hmis
+      hmi_mod hmi = moduleName (mi_module (hm_iface hmi))
+  in atomicModifyIORef' hptr (\hpt -> (udfmRestrictKeysSet hpt (W64.fromList key_set), ()))
 
 {-# DEPRECATED addListToHpt "Deprecated in favour of 'addHomeModInfosToHpt', as the module at which a 'HomeModInfo' is inserted should always be derived from the 'HomeModInfo' itself." #-}
 -- After deprecation cycle, remove.

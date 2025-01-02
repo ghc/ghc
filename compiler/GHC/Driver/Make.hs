@@ -125,7 +125,7 @@ import qualified Control.Monad.Catch as MC
 import Data.IORef
 import Data.Maybe
 import Data.Time
-import Data.List (sortOn, unfoldr)
+import Data.List (sortOn, unfoldr, groupBy)
 import Data.Bifunctor (first)
 import System.Directory
 import System.FilePath
@@ -145,6 +145,7 @@ import GHC.Runtime.Loader
 import GHC.Rename.Names
 import GHC.Utils.Constants
 import GHC.Iface.Errors.Types
+import Data.Function
 
 import GHC.Data.Graph.Directed.Reachability
 import qualified GHC.Unit.Home.Graph as HUG
@@ -791,7 +792,10 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
     (upsweep_ok, new_deps) <- withDeferredDiagnostics $ do
       hsc_env <- getSession
       liftIO $ upsweep worker_limit hsc_env mhmi_cache diag_wrapper mHscMessage (toCache pruned_cache) build_plan
-    liftIO $ addDepsToHscEnv new_deps hsc_env
+
+    -- At this point, all the HPT variables will be populated, but we don't want
+    -- to leak the contents of a failed session.
+    liftIO $ restrictDepsHscEnv new_deps hsc_env
     case upsweep_ok of
       Failed -> loadFinish upsweep_ok
       Succeeded -> do
@@ -2486,10 +2490,19 @@ cleanCurrentModuleTempFilesMaybe logger tmpfs dflags =
     else liftIO $ cleanCurrentModuleTempFiles logger tmpfs
 
 
-addDepsToHscEnv ::  [HomeModInfo] -> HscEnv -> IO ()
-addDepsToHscEnv deps hsc_env = do
-  let hug = ue_home_unit_graph $ hsc_unit_env hsc_env
-  mapM_ (\d -> HUG.addHomeModInfoToHug d hug) deps
+-- | Thin each HPT variable to only contain keys from the given dependencies.
+-- This is used at the end of upsweep to make sure that only completely successfully loaded
+-- modules are visible for subsequent operations.
+restrictDepsHscEnv :: [HomeModInfo] -> HscEnv -> IO ()
+restrictDepsHscEnv deps hsc_env =
+  let deps_with_unit = map (\xs -> (fst (head xs), map snd xs)) $ groupBy ((==) `on` fst) (sortOn fst (map go deps))
+      hug = ue_home_unit_graph $ hsc_unit_env hsc_env
+      go hmi = (hmi_unit, hmi)
+        where
+          hmi_mod  = mi_module (hm_iface hmi)
+          hmi_unit = toUnitId (moduleUnit hmi_mod)
+  in HUG.restrictHug deps_with_unit hug
+
 
 setHUG ::  HomeUnitGraph -> HscEnv -> HscEnv
 setHUG deps hsc_env =

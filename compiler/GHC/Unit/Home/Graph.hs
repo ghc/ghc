@@ -25,6 +25,7 @@ module GHC.Unit.Home.Graph
 
   -- * Operations
   , addHomeModInfoToHug
+  , restrictHug
   , renameUnitId
   , allUnits
   , updateUnitFlags
@@ -216,6 +217,15 @@ addHomeModInfoToHug hmi hug =
     hmi_mod :: Module
     hmi_mod  = mi_module (hm_iface hmi)
     hmi_unit = toUnitId (moduleUnit hmi_mod)
+
+restrictHug :: [(UnitId, [HomeModInfo])] -> HomeUnitGraph -> IO ()
+restrictHug deps hug = unitEnv_foldWithKey (\k uid hue -> restrict_one uid hue >> k) (return ()) hug
+  where
+    deps_map = Map.fromList deps
+    restrict_one uid hue  =
+      restrictHpt (homeUnitEnv_hpt hue) (Map.findWithDefault [] uid deps_map)
+
+
 
 -- | Rename a unit id in the 'HomeUnitGraph'
 --
