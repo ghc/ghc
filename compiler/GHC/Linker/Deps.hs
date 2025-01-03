@@ -233,10 +233,12 @@ get_reachable_nodes opts mods
         | otherwise
         = return Nothing
 
-    go (ExternalModuleKey . mkModuleNk) emgNodeKey (emgReachableMany emg) (map emgProject) get_mod_info_eps
-    --romes:todo:^ do we need to make sure we only get non-boot files out of
-    --this. perhaps as easy as filtering them out by ModNodeKeyWithUid with is
-    --boot information?
+      get_mod_key m
+        | moduleUnitId m == homeUnitId (ue_unsafeHomeUnit unit_env)
+        = ExternalModuleKey (mkModuleNk m)
+        | otherwise = ExternalPackageKey (moduleUnitId m)
+
+    go get_mod_key emgNodeKey (emgReachableMany emg) (map emgProject) get_mod_info_eps
 
   -- Reachability on 'ModuleGraph' (for --make mode)
   | otherwise

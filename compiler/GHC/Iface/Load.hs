@@ -25,7 +25,7 @@ module GHC.Iface.Load (
         -- IfM functions
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
-        loadHomePackageInterfacesBelow,
+        loadExternalGraphBelow,
         findAndReadIface, readIface, writeIface,
         flagsToIfCompression,
         moduleFreeHolesPrecise,
@@ -423,44 +423,96 @@ loadInterfaceWithException doc mod_name where_from
 -- For convenience, reads the module graph out of the EPS after having loaded
 -- all the modules and returns it. It would be harder to get the updated module
 -- graph in 'getLinkDeps' another way.
-loadHomePackageInterfacesBelow :: (Module -> SDoc) -> Maybe HomeUnit {-^ The current home unit -}
-                               -> [Module] -> IfM lcl ()
-loadHomePackageInterfacesBelow _ Nothing _ = panic "loadHomePackageInterfacesBelow: No home unit"
-loadHomePackageInterfacesBelow msg (Just home_unit) mods = do
+loadExternalGraphBelow :: (Module -> SDoc) -> Maybe HomeUnit {-^ The current home unit -}
+                               -> Set.Set ExternalKey -> [Module] -> IfM lcl (Set.Set ExternalKey)
+loadExternalGraphBelow _ Nothing _ _ = panic "loadHomePackageInterfacesBelow: No home unit"
+loadExternalGraphBelow msg (Just home_unit) init_loaded mods =
+  foldM (loadExternalGraphModule msg home_unit) init_loaded mods
+
+loadExternalGraphModule :: (Module -> SDoc) -> HomeUnit
+                         -> Set.Set ExternalKey -> Module -> IfM lcl (Set.Set ExternalKey)
+loadExternalGraphModule msg home_unit init_loaded mod
+  | homeUnitId home_unit /= moduleUnitId mod = do
+      loadExternalPackageBelow init_loaded (moduleUnitId mod)
+  | otherwise =  do
+
+      let key = ExternalModuleKey $ ModNodeKeyWithUid (GWIB (moduleName mod) NotBoot) (moduleUnitId mod)
+      let new_cache = Set.insert key init_loaded
+      graph <- eps_module_graph <$> getEps
+
+      if (not (isFullyLoadedModule key graph || Set.member key init_loaded))
+        then actuallyLoadExternalGraphModule msg home_unit new_cache key mod
+        else
+          return init_loaded
+
+actuallyLoadExternalGraphModule
+  :: (Module -> SDoc)
+  -> HomeUnit
+  -> Set.Set ExternalKey
+  -> ExternalKey
+  -> Module
+  -> IOEnv (Env IfGblEnv lcl) (Set.Set ExternalKey)
+actuallyLoadExternalGraphModule  msg home_unit new_cache key mod = do
   dflags <- getDynFlags
   let ctx = initSDocContext dflags defaultUserStyle
+  iface <- withIfaceErr ctx $
+    loadInterface (msg mod) mod (ImportByUser NotBoot)
 
-  forM_ mods $ \mod -> do
+  -- RM:TODO: THINGS WE ARE NOT DOING
+  --
+  -- The ModIface contains the transitive closure of the module dependencies
+  -- within the current package, *except* for boot modules: if we encounter
+  -- a boot module, we have to find its real interface and discover the
+  -- dependencies of that.  Hence we need to traverse the dependency
+  -- tree recursively.  See bug #936, testcase ghci/prog007.
 
+  let deps = mi_deps iface
+      mod_deps = dep_direct_mods deps
+      pkg_deps = dep_direct_pkgs deps
+
+  -- Load all direct dependencies that are in the home package
+  cache_mods <- loadExternalGraphBelow msg (Just home_unit) new_cache
+    $ map (\(uid, GWIB mn _) -> mkModule (RealUnit (Definite uid)) mn)
+    $ Set.toList mod_deps
+
+  cache_pkgs <- foldM loadExternalPackageBelow cache_mods (Set.toList pkg_deps)
+
+  registerFullyLoaded key
+  return cache_pkgs
+
+registerFullyLoaded :: ExternalKey -> IfM lcl ()
+registerFullyLoaded key = do
+    -- Update the external graph with this module being fully loaded.
+    logger <- getLogger
+    liftIO $ trace_if logger (text "Fully loaded:" <+> ppr key)
+    updateEps_ $ \eps ->
+      eps{eps_module_graph = setFullyLoadedModule key (eps_module_graph eps)}
+
+loadExternalPackageBelow :: Set.Set ExternalKey -> UnitId ->  IfM lcl (Set.Set ExternalKey)
+loadExternalPackageBelow cache uid = do
     graph <- eps_module_graph <$> getEps
-    let key = ExternalModuleKey $ ModNodeKeyWithUid (GWIB (moduleName mod) NotBoot) (moduleUnitId mod)
+    us    <- hsc_units <$> getTopEnv
+    let key = ExternalPackageKey uid
+    let cache' = Set.insert key cache
+    if not (isFullyLoadedModule key graph || Set.member key cache)
+      then do
+        case unitDepends <$> lookupUnitId us uid of
+          Just dep_uids -> do
+            loadPackageIntoEPSGraph uid dep_uids
+            final_cache <- foldM loadExternalPackageBelow cache' dep_uids
+            registerFullyLoaded key
+            return final_cache
+          Nothing -> pprPanic "loadExternalPackagesBelow: missing" (ppr uid)
+      else
+        return cache
 
-    if isFullyLoadedModule key graph
-      then return ()
-      else do
-        iface <- withIfaceErr ctx $
-          loadInterface (msg mod) mod (ImportByUser NotBoot)
 
-        -- RM:TODO: THINGS WE ARE NOT DOING
-        --
-        -- The ModIface contains the transitive closure of the module dependencies
-        -- within the current package, *except* for boot modules: if we encounter
-        -- a boot module, we have to find its real interface and discover the
-        -- dependencies of that.  Hence we need to traverse the dependency
-        -- tree recursively.  See bug #936, testcase ghci/prog007.
 
-        let deps = mi_deps iface
-            mod_deps = dep_direct_mods deps
+loadPackageIntoEPSGraph :: UnitId -> [UnitId] -> IfM lcl ()
+loadPackageIntoEPSGraph uid dep_uids =
+  updateEps_ $ \eps ->
+    eps { eps_module_graph = extendExternalModuleGraph (NodeExternalPackage uid (Set.fromList dep_uids)) (eps_module_graph eps) }
 
-        -- Load all direct dependencies that are in the home package
-        loadHomePackageInterfacesBelow msg (Just home_unit)
-          $ map (\(uid, GWIB mn _) -> mkModule (RealUnit (Definite uid)) mn)
-          $ filter ((==) (homeUnitId home_unit) . fst)
-          $ Set.toList mod_deps
-
-        -- Update the external graph with this module being fully loaded.
-        updateEps_ $ \eps ->
-          eps{eps_module_graph = setFullyLoadedModule key (eps_module_graph eps)}
 
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
@@ -571,24 +623,13 @@ loadInterface doc_str mod from
         ; purged_hsc_env <- getTopEnv
 
         ; let direct_deps = map (uncurry (flip ModNodeKeyWithUid)) $ (Set.toList (dep_direct_mods $ mi_deps iface))
-        ; let direct_pkg_deps = dep_direct_pkgs $ mi_deps iface
+        ; let direct_pkg_deps = Set.toList $ dep_direct_pkgs $ mi_deps iface
         ; let !module_graph_key = -- pprTrace "module_graph_on_load" (ppr (eps_module_graph eps)) $
                 if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env
                                     --- ^ home unit mods in eps can only happen in oneshot mode
-                  then Just $ NodeHomePackage (miKey iface) (map ExternalModuleKey direct_deps)
+                  then Just $ NodeHomePackage (miKey iface) (map ExternalModuleKey direct_deps
+                                                            ++ map ExternalPackageKey direct_pkg_deps)
                   else Nothing
-        ; let !module_graph_pkg_key =
-                -- ROMES:TODO: This doesn't work as expected. Insertions on the
-                -- graph don't override previous nodes, they just create new
-                -- ones. We get multiple duplicate nodes with incomplete dependencies each.
-                let pkg_key = toUnitId $ moduleUnit (mi_module iface)
-                 in case emgLookupKey (ExternalPackageKey pkg_key) (eps_module_graph eps) of
-                  Nothing -> NodeExternalPackage pkg_key direct_pkg_deps
-                  Just pkg_node -> case pkg_node of
-                    NodeHomePackage{} -> panic "ExternalPackageKey lookup should never return a NodeHomePackage node"
-                    NodeExternalPackage _ deps_uids ->
-                      NodeExternalPackage pkg_key (deps_uids `Set.union` direct_pkg_deps)
-
 
         ; let final_iface = iface
                                & set_mi_decls     (panic "No mi_decls in PIT")
@@ -634,8 +675,7 @@ loadInterface doc_str mod from
                     let eps_graph'  = case module_graph_key of
                                        Just k -> extendExternalModuleGraph k (eps_module_graph eps)
                                        Nothing -> eps_module_graph eps
-                        eps_graph'' = extendExternalModuleGraph module_graph_pkg_key eps_graph'
-                     in eps_graph'',
+                     in eps_graph',
                   eps_complete_matches
                                    = eps_complete_matches eps ++ new_eps_complete_matches,
                   eps_inst_env     = extendInstEnvList (eps_inst_env eps)

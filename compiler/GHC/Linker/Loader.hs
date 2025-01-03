@@ -610,7 +610,7 @@ initLinkDepsOpts hsc_env = opts
     ldLoadHomeIfacesBelow msg hu mods
       = do
         initIfaceCheck (text "loader") hsc_env
-          $ loadHomePackageInterfacesBelow msg hu mods
+          $ void $ loadExternalGraphBelow msg hu Set.empty mods
         -- Read the EPS only after `loadHomePackageInterfacesBelow`
         hscEPS hsc_env
 

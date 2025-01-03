@@ -125,7 +125,8 @@ import qualified Control.Monad.Catch as MC
 import Data.IORef
 import Data.Maybe
 import Data.Time
-import Data.List (sortOn, unfoldr)
+import Data.Function
+import Data.List (sortOn, unfoldr, sortBy)
 import Data.Bifunctor (first)
 import System.Directory
 import System.FilePath
@@ -1491,7 +1492,24 @@ topSortModuleGraph
 topSortModuleGraph drop_hs_boot_nodes module_graph mb_root_mod =
     -- stronglyConnCompG flips the original order, so if we reverse
     -- the summaries we get a stable topological sort.
-  topSortModules drop_hs_boot_nodes (reverse $ mgModSummaries' module_graph) mb_root_mod
+  topSortModules drop_hs_boot_nodes (sortBy (cmpModuleGraphNodes `on` mkNodeKey) $ mgModSummaries' module_graph) mb_root_mod
+
+
+  where
+    -- In order to get the "right" ordering
+    --    Module nodes must be in reverse lexigraphic order.
+    --    All modules nodes must appear before package nodes or link nodes.
+    --
+    -- Given the current implementation of scc, the result is in
+    -- The order is sensitive to the internal implementation in Data.Graph,
+    -- if it changes in future then this ordering will need to be modified.
+    cmpModuleGraphNodes (NodeKey_Module k1) (NodeKey_Module k2) = compare k2 k1
+    cmpModuleGraphNodes (NodeKey_Link uid1)   (NodeKey_Link uid2) = compare uid2 uid1
+    cmpModuleGraphNodes (NodeKey_Link {}) _                     = LT
+    cmpModuleGraphNodes _                   (NodeKey_Link {})   = GT
+    cmpModuleGraphNodes (NodeKey_Module {}) _                   = LT
+    cmpModuleGraphNodes _                   (NodeKey_Module {}) = GT
+    cmpModuleGraphNodes n1                n2                    = compare n2 n1
 
 topSortModules :: Bool -> [ModuleGraphNode] -> Maybe HomeUnitModule -> [SCC ModuleGraphNode]
 topSortModules drop_hs_boot_nodes summaries mb_root_mod
@@ -1723,7 +1741,10 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
                case mb_s of
                    NotThere -> loopImports ss done summarised
                    External uid -> do
-                    let done' = loopUnit done [uid]
+                    -- Pass an updated hsc_env to loopUnit, as each unit might
+                    -- have a different visible package database.
+                    let hsc_env' = hscSetActiveHomeUnit home_unit hsc_env
+                    let done' = loopUnit hsc_env' done [uid]
                     (other_deps, done'', summarised') <- loopImports ss done' summarised
                     return (NodeKey_ExternalUnit uid : other_deps, done'', summarised')
                    FoundInstantiation iud -> do
@@ -1743,14 +1764,14 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
             GWIB { gwib_mod = L loc mod, gwib_isBoot = is_boot } = gwib
             wanted_mod = L loc mod
 
-        loopUnit :: Map.Map NodeKey ModuleGraphNode -> [UnitId] -> Map.Map NodeKey ModuleGraphNode
-        loopUnit cache [] = cache
-        loopUnit cache (u:uxs) = do
+        loopUnit :: HscEnv -> Map.Map NodeKey ModuleGraphNode -> [UnitId] -> Map.Map NodeKey ModuleGraphNode
+        loopUnit _ cache [] = cache
+        loopUnit lcl_hsc_env cache (u:uxs) = do
            let nk = (NodeKey_ExternalUnit u)
            case Map.lookup nk cache of
-             Just {} -> loopUnit cache uxs
-             Nothing -> case unitDepends <$> lookupUnitId (hsc_units hsc_env) u of
-                         Just us -> loopUnit (loopUnit (Map.insert nk (PackageNode us u) cache) us) uxs
+             Just {} -> loopUnit lcl_hsc_env cache uxs
+             Nothing -> case unitDepends <$> lookupUnitId (hsc_units lcl_hsc_env) u of
+                         Just us -> loopUnit lcl_hsc_env (loopUnit lcl_hsc_env (Map.insert nk (PackageNode us u) cache) us) uxs
                          Nothing -> pprPanic "loopUnit" (text "Malformed package database, missing " <+> ppr u)
 
 getRootSummary ::
