@@ -87,6 +87,7 @@ module GHC.Unit.Module.Graph
    , ModNodeKey
    , ModNodeKeyWithUid(..)
    , msKey
+   , miKey
 
     -- ** Internal node representation
     --
@@ -116,6 +117,7 @@ import GHC.Types.SourceFile ( hscSourceString )
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
 import GHC.Utils.Outputable
+import GHC.Unit.Module.ModIface
 import GHC.Utils.Misc ( partitionWith )
 
 import System.FilePath
@@ -124,6 +126,7 @@ import GHC.Types.Unique.DSet
 import qualified Data.Set as Set
 import Data.Set (Set)
 import GHC.Unit.Module
+import GHC.Unit.Module.ModNodeKey
 import GHC.Linker.Static.Utils
 
 import Data.Bifunctor
@@ -480,15 +483,13 @@ nodeKeyModName :: NodeKey -> Maybe ModuleName
 nodeKeyModName (NodeKey_Module mk) = Just (gwib_mod $ mnkModuleName mk)
 nodeKeyModName _ = Nothing
 
-type ModNodeKey = ModuleNameWithIsBoot
-data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: !ModuleNameWithIsBoot
-                                           , mnkUnitId     :: !UnitId } deriving (Eq, Ord)
-
-instance Outputable ModNodeKeyWithUid where
-  ppr (ModNodeKeyWithUid mnwib uid) = ppr uid <> colon <> ppr mnwib
-
 msKey :: ModSummary -> ModNodeKeyWithUid
 msKey ms = ModNodeKeyWithUid (ms_mnwib ms) (ms_unitid ms)
+
+miKey :: ModIface -> ModNodeKeyWithUid
+miKey hmi = ModNodeKeyWithUid (mi_mnwib hmi) ((toUnitId $ moduleUnit (mi_module hmi)))
+
+type ModNodeKey = ModuleNameWithIsBoot
 
 --------------------------------------------------------------------------------
 -- ** Internal node representation (exposed)

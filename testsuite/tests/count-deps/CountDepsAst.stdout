@@ -199,6 +199,7 @@ GHC.Unit.Module.Env
 GHC.Unit.Module.Imported
 GHC.Unit.Module.Location
 GHC.Unit.Module.ModIface
+GHC.Unit.Module.ModNodeKey
 GHC.Unit.Module.Warnings
 GHC.Unit.Module.WholeCoreBindings
 GHC.Unit.Parser
