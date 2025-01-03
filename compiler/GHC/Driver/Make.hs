@@ -2848,39 +2848,6 @@ executeLinkNode hug kn uid deps = do
       Failed -> fail "Link Failed"
       Succeeded -> return ()
 
-{-
-Note [ModuleNameSet, efficiency and space leaks]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-During upsweep, the results of compiling modules are placed into a MVar. When we need
-to compute the right compilation environment for a module, we consult this MVar and
-set the HomeUnitGraph accordingly. This is done to avoid having to precisely track
-module dependencies and recreating the HUG from scratch each time, which is very expensive.
-
-In serial mode (-j1), this all works out fine: a module can only be compiled
-after its dependencies have finished compiling, and compilation can't be
-interleaved with the compilation of other module loops. This ensures that
-the HUG only ever contains finalised interfaces.
-
-In parallel mode, we have to be more careful: the HUG variable can contain non-finalised
-interfaces, which have been started by another thread. In order to avoid a space leak
-in which a finalised interface is compiled against a HPT which contains a non-finalised
-interface, we have to restrict the HUG to only contain the visible modules.
-
-The collection of visible modules explains which transitive modules are visible
-from a certain point. It is recorded in the ModuleNameSet.
-Before a module is compiled, we use this set to restrict the HUG to the visible
-modules only, avoiding this tricky space leak.
-
-Efficiency of the ModuleNameSet is of utmost importance, because a union occurs for
-each edge in the module graph. To achieve this, the set is represented directly as an IntSet,
-which provides suitable performance – even using a UniqSet (which is backed by an IntMap) is
-too slow. The crucial test of performance here is the time taken to a do a no-op build in --make mode.
-
-See test "jspace" for an example which used to trigger this problem.
-
--}
-
 -- | Wait for dependencies to finish, and then return their results.
 wait_deps :: [BuildResult] -> RunMakeM [HomeModInfo]
 wait_deps [] = return []
@@ -3073,6 +3040,4 @@ which can be checked easily using ghc-debug.
 5. At the end of a successful upsweep, the number of live ModDetails equals the
    number of non-boot Modules.
    Why? Each module has a HomeModInfo which contains a ModDetails from that module.
-   Where? See Note [ModuleNameSet, efficiency and space leaks], a variety of places
-          in the driver are responsible.
 -}
