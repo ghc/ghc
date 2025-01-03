@@ -113,10 +113,10 @@ hsc_home_unit :: HscEnv -> HomeUnit
 hsc_home_unit = unsafeGetHomeUnit . hsc_unit_env
 
 hsc_home_unit_maybe :: HscEnv -> Maybe HomeUnit
-hsc_home_unit_maybe = homeUnit . hsc_unit_env
+hsc_home_unit_maybe = ue_homeUnit . hsc_unit_env
 
 hsc_units :: HasDebugCallStack => HscEnv -> UnitState
-hsc_units = homeUnitState . hsc_unit_env
+hsc_units = ue_homeUnitState . hsc_unit_env
 
 hsc_HPT :: HscEnv -> HomePackageTable
 hsc_HPT = ue_hpt . hsc_unit_env
@@ -421,7 +421,7 @@ hscUpdateFlags f h = hscSetFlags (f (hsc_dflags h)) h
 hscSetFlags :: HasDebugCallStack => DynFlags -> HscEnv -> HscEnv
 hscSetFlags dflags h =
   hscUpdateLoggerFlags $ h { hsc_dflags = dflags
-                           , hsc_unit_env = setFlags dflags (hsc_unit_env h) }
+                           , hsc_unit_env = ue_setFlags dflags (hsc_unit_env h) }
 
 -- See Note [Multiple Home Units]
 hscSetActiveHomeUnit :: HasDebugCallStack => HomeUnit -> HscEnv -> HscEnv
@@ -430,7 +430,7 @@ hscSetActiveHomeUnit home_unit = hscSetActiveUnitId (homeUnitId home_unit)
 hscSetActiveUnitId :: HasDebugCallStack => UnitId -> HscEnv -> HscEnv
 hscSetActiveUnitId uid e = e
   { hsc_unit_env = ue_setActiveUnit uid (hsc_unit_env e)
-  , hsc_dflags = UnitEnv.unitFlags uid (hsc_unit_env e)  }
+  , hsc_dflags = ue_unitFlags uid (hsc_unit_env e)  }
 
 hscActiveUnitId :: HscEnv -> UnitId
 hscActiveUnitId e = ue_currentUnit (hsc_unit_env e)

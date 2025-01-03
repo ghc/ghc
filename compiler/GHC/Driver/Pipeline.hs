@@ -469,7 +469,7 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         -- modification times on all of the objects and libraries, then omit
         -- linking (unless the -fforce-recomp flag was given).
   let platform   = ue_platform unit_env
-      unit_state = homeUnitState unit_env
+      unit_state = ue_homeUnitState unit_env
       arch_os    = platformArchOS platform
       exe_file   = exeFileName arch_os staticLink (outputFile_ dflags)
   e_exe_time <- tryIO $ getModificationUTCTime exe_file

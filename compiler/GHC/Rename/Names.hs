@@ -452,14 +452,14 @@ renamePkgQual :: UnitEnv -> ModuleName -> Maybe FastString -> PkgQual
 renamePkgQual unit_env mn mb_pkg = case mb_pkg of
   Nothing -> NoPkgQual
   Just pkg_fs
-    | Just uid <- homeUnitId <$> homeUnit unit_env
+    | Just uid <- homeUnitId <$> ue_homeUnit unit_env
     , pkg_fs == fsLit "this"
     -> ThisPkg uid
 
     | Just (uid, _) <- find (fromMaybe False . fmap (== pkg_fs) . snd) home_names
     -> ThisPkg uid
 
-    | Just uid <- resolvePackageImport units mn (PackageName pkg_fs)
+    | Just uid <- resolvePackageImport unit_state mn (PackageName pkg_fs)
     -> OtherPkg uid
 
     | otherwise
@@ -469,10 +469,10 @@ renamePkgQual unit_env mn mb_pkg = case mb_pkg of
   where
     home_names  = map (\uid -> (uid, mkFastString <$> thisPackageName (homeUnitEnv_dflags (ue_findHomeUnitEnv uid unit_env)))) hpt_deps
 
-    units = homeUnitState unit_env
+    unit_state = ue_homeUnitState unit_env
 
     hpt_deps :: [UnitId]
-    hpt_deps  = homeUnitDepends units
+    hpt_deps  = homeUnitDepends unit_state
 
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular

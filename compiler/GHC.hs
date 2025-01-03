@@ -734,7 +734,7 @@ setTopSessionDynFlags dflags = do
                   wasmInterpTargetPlatform = targetPlatform dflags,
                   wasmInterpProfiled = profiled,
                   wasmInterpHsSoSuffix = way_tag ++ dynLibSuffix (ghcNameVersion dflags),
-                  wasmInterpUnitState = homeUnitState $ hsc_unit_env hsc_env
+                  wasmInterpUnitState = ue_homeUnitState $ hsc_unit_env hsc_env
                 }
         pure $ Just $ Interp (ExternalInterp $ ExtWasm $ ExtInterpState cfg s) loader lookup_cache
 
@@ -822,7 +822,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
   if changed
     then do
         -- additionally, set checked dflags so we don't lose fixes
-        old_unit_env <- UnitEnv.setFlags dflags0 . hsc_unit_env <$> getSession
+        old_unit_env <- ue_setFlags dflags0 . hsc_unit_env <$> getSession
 
         home_unit_graph <- forM (ue_home_unit_graph old_unit_env) $ \homeUnitEnv -> do
           let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv

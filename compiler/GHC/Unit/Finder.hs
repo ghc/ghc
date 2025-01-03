@@ -215,7 +215,7 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
                     findExposedPackageModule fc fopts units mod_name NoPkgQual
 
     units     = case mhome_unit of
-                  Nothing -> homeUnitState ue
+                  Nothing -> ue_homeUnitState ue
                   Just home_unit -> HUG.homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
     hpt_deps :: [UnitId]
     hpt_deps  = homeUnitDepends units

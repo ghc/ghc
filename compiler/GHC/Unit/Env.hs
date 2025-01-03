@@ -10,11 +10,11 @@
 --
 -- Querying...
 --
--- This module is meant to be imported qualified as @UnitEnv@:
+-- This module is meant to be imported as @UnitEnv@ when calling @insertHpt@:
 --
 -- @
 -- import GHC.Unit.Env (UnitEnv, HomeUnitGraph, HomeUnitEnv)
--- import qualified GHC.Unit.Env as UnitEnv
+-- import GHC.Unit.Env as UnitEnv
 -- @
 --
 -- Here is an overview of how the UnitEnv, ModuleGraph, HUG, HPT, and EPS interact:
@@ -75,18 +75,18 @@ module GHC.Unit.Env
 
     -- ** Modifying the current active home unit
     , insertHpt
-    , setFlags
+    , ue_setFlags
 
     -- * Queries
 
     -- ** Queries on the current active home unit
-    , homeUnitState
-    , homeUnitDbs
-    , homeUnit
-    , unitFlags
+    , ue_homeUnitState
+    , ue_homeUnitDbs
+    , ue_homeUnit
+    , ue_unitFlags
 
     -- ** Reachability
-    , transitiveHomeDeps
+    , ue_transitiveHomeDeps
 
     --------------------------------------------------------------------------------
     -- Harder queries for the whole UnitEnv
@@ -217,7 +217,7 @@ preloadUnitsInfo' unit_env ids0 = all_infos
   where
     unit_state = HUG.homeUnitEnv_units (ue_currentHomeUnitEnv unit_env)
     ids      = ids0 ++ inst_ids
-    inst_ids = case homeUnit unit_env of
+    inst_ids = case ue_homeUnit unit_env of
       Nothing -> []
       Just home_unit
        -- An indefinite package will have insts to HOLE,
@@ -258,11 +258,11 @@ ue_findHomeUnitEnv uid e = case HUG.lookupHugUnit uid (ue_home_unit_graph e) of
 -- Query and modify UnitState of active unit in HomeUnitEnv
 -- -------------------------------------------------------
 
-homeUnitState :: HasDebugCallStack => UnitEnv -> UnitState
-homeUnitState = HUG.homeUnitEnv_units . ue_currentHomeUnitEnv
+ue_homeUnitState :: HasDebugCallStack => UnitEnv -> UnitState
+ue_homeUnitState = HUG.homeUnitEnv_units . ue_currentHomeUnitEnv
 
-homeUnitDbs :: UnitEnv ->  Maybe [UnitDatabase UnitId]
-homeUnitDbs = HUG.homeUnitEnv_unit_dbs . ue_currentHomeUnitEnv
+ue_homeUnitDbs :: UnitEnv ->  Maybe [UnitDatabase UnitId]
+ue_homeUnitDbs = HUG.homeUnitEnv_unit_dbs . ue_currentHomeUnitEnv
 
 -- -------------------------------------------------------
 -- Query and modify Home Package Table in HomeUnitEnv
@@ -288,12 +288,12 @@ ue_updateUnitHUG f ue_env = ue_env { ue_home_unit_graph = f (ue_home_unit_graph 
 -- Query and modify DynFlags in HomeUnitEnv
 -- -------------------------------------------------------
 
-unitFlags :: HasDebugCallStack => UnitId -> UnitEnv -> DynFlags
-unitFlags uid ue_env = HUG.homeUnitEnv_dflags $ ue_findHomeUnitEnv uid ue_env
+ue_unitFlags :: HasDebugCallStack => UnitId -> UnitEnv -> DynFlags
+ue_unitFlags uid ue_env = HUG.homeUnitEnv_dflags $ ue_findHomeUnitEnv uid ue_env
 
 -- | Sets the 'DynFlags' of the /current unit/ being compiled to the given ones
-setFlags :: HasDebugCallStack => DynFlags -> UnitEnv -> UnitEnv
-setFlags dflags env =
+ue_setFlags :: HasDebugCallStack => DynFlags -> UnitEnv -> UnitEnv
+ue_setFlags dflags env =
   env
     { ue_home_unit_graph = HUG.updateUnitFlags
                             (ue_currentUnit env)
@@ -305,11 +305,11 @@ setFlags dflags env =
 -- Query and modify home units in HomeUnitEnv
 -- -------------------------------------------------------
 
-homeUnit :: UnitEnv -> Maybe HomeUnit
-homeUnit = HUG.homeUnitEnv_home_unit . ue_currentHomeUnitEnv
+ue_homeUnit :: UnitEnv -> Maybe HomeUnit
+ue_homeUnit = HUG.homeUnitEnv_home_unit . ue_currentHomeUnitEnv
 
 ue_unsafeHomeUnit :: UnitEnv -> HomeUnit
-ue_unsafeHomeUnit ue = case homeUnit ue of
+ue_unsafeHomeUnit ue = case ue_homeUnit ue of
   Nothing -> panic "unsafeGetHomeUnit: No home unit"
   Just h  -> h
 
@@ -375,8 +375,8 @@ renameUnitId oldUnit newUnit unitEnv =
 -- Transitive closure
 -- ---------------------------------------------
 
-transitiveHomeDeps :: UnitId -> UnitEnv -> [UnitId]
-transitiveHomeDeps uid e =
+ue_transitiveHomeDeps :: UnitId -> UnitEnv -> [UnitId]
+ue_transitiveHomeDeps uid e =
   case HUG.transitiveHomeDeps uid (ue_home_unit_graph e) of
     Nothing -> pprPanic "Unit unknown to the internal unit environment"
                 $  text "unit (" <> ppr uid <> text ")"
@@ -461,7 +461,7 @@ in order to allow users to offset their own relative paths.
 -- * Legacy API
 --------------------------------------------------------------------------------
 
-{-# DEPRECATED ue_units "Renamed to homeUnitState" #-}
+{-# DEPRECATED ue_units "Renamed to ue_homeUnitState because of confusion between units(tate) and unit(s) plural" #-}
 ue_units :: HasDebugCallStack => UnitEnv -> UnitState
-ue_units = homeUnitState
+ue_units = ue_homeUnitState
 

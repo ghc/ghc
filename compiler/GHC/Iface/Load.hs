@@ -445,7 +445,7 @@ loadInterface doc_str mod from
 
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
-        ; let mhome_unit = homeUnit (hsc_unit_env hsc_env)
+        ; let mhome_unit = ue_homeUnit (hsc_unit_env hsc_env)
         ; liftIO (lookupIfaceByModule hug (eps_PIT eps) mod) >>= \case {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded

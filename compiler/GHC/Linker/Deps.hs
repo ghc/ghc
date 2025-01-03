@@ -228,15 +228,15 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                 (_, GWIB m IsBoot)  -> Left m
                 (_, GWIB m NotBoot) -> Right m
 
-            mod_deps' = case homeUnit unit_env of
+            mod_deps' = case ue_homeUnit unit_env of
                           Nothing -> []
                           Just home_unit -> filter (not . (`elementOfUniqDSet` acc_mods)) (map (mkHomeModule home_unit) $ (boot_deps ++ mod_deps))
-            acc_mods'  = case homeUnit unit_env of
+            acc_mods'  = case ue_homeUnit unit_env of
                           Nothing -> acc_mods
                           Just home_unit -> addListToUniqDSet acc_mods (mod : map (mkHomeModule home_unit) mod_deps)
             acc_pkgs'  = addListToUniqDSet acc_pkgs (Set.toList pkg_deps)
 
-          case homeUnit unit_env of
+          case ue_homeUnit unit_env of
             Just home_unit | isHomeUnit home_unit pkg ->  follow_deps (mod_deps' ++ mods)
                                                                       acc_mods' acc_pkgs'
             _ ->  follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
@@ -273,7 +273,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
           Nothing -> do
            -- It's not in the HPT because we are in one shot mode,
            -- so use the Finder to get a ModLocation...
-           case homeUnit unit_env of
+           case ue_homeUnit unit_env of
             Nothing -> no_obj mod
             Just home_unit -> do
               from_bc <- ldLoadByteCode opts mod

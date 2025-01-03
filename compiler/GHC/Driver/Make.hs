@@ -1898,7 +1898,7 @@ enableCodeGenWhen
 enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
   mgMapM enable_code_gen mg
   where
-    defaultBackendOf ms = platformDefaultBackend (targetPlatform $ unitFlags (ms_unitid ms) unit_env)
+    defaultBackendOf ms = platformDefaultBackend (targetPlatform $ ue_unitFlags (ms_unitid ms) unit_env)
     enable_code_gen :: ModSummary -> IO ModSummary
     enable_code_gen ms
       | ModSummary

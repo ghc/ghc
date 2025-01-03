@@ -433,7 +433,7 @@ addUnit u = do
     logger <- getLogger
     let dflags0 = hsc_dflags hsc_env
     let old_unit_env = hsc_unit_env hsc_env
-    newdbs <- case homeUnitDbs old_unit_env of
+    newdbs <- case ue_homeUnitDbs old_unit_env of
         Nothing  -> panic "addUnit: called too early"
         Just dbs ->
          let newdb = UnitDatabase
