@@ -1495,7 +1495,7 @@ topSortModuleGraph drop_hs_boot_nodes module_graph mb_root_mod =
 
 topSortModules :: Bool -> [ModuleGraphNode] -> Maybe HomeUnitModule -> [SCC ModuleGraphNode]
 topSortModules drop_hs_boot_nodes summaries mb_root_mod
-  = map (fmap summaryNodeSummary) $ stronglyConnCompStableG initial_graph
+  = map (fmap summaryNodeSummary) $ stronglyConnCompG initial_graph
   where
     (graph, lookup_node) =
       moduleGraphNodes drop_hs_boot_nodes summaries
