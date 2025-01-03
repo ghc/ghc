@@ -12,6 +12,7 @@ module GHC.Data.Graph.Directed (
 
         SCC(..), Node(..), G.flattenSCC, G.flattenSCCs,
         stronglyConnCompG,
+        stronglyConnCompStableG,
         topologicalSortG,
         verticesG, edgesG, hasVertexG,
         reachablesG,
@@ -290,6 +291,9 @@ We use the order of nodes to normalize the order of edges.
 
 stronglyConnCompG :: Graph node -> [SCC node]
 stronglyConnCompG graph = decodeSccs graph $ scc (gr_int_graph graph)
+
+stronglyConnCompStableG :: Graph node -> [SCC node]
+stronglyConnCompStableG graph = decodeSccs graph $ stableScc (gr_int_graph graph)
 
 decodeSccs :: Graph node -> [SCC Vertex] -> [SCC node]
 decodeSccs Graph { gr_vertex_to_node = vertex_fn }

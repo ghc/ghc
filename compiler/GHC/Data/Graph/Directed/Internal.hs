@@ -70,11 +70,15 @@ preorderF ts         = concatMap flatten ts
 reachable    :: IntGraph -> [Vertex] -> [Vertex]
 reachable g vs = preorderF (G.dfs g vs)
 
-scc :: IntGraph -> [SCC Vertex]
-scc graph = map decode forest
-  where
-    forest = {-# SCC "Digraph.scc" #-} scc2 graph
+scc, stableScc :: IntGraph -> [SCC Vertex]
+scc graph = decodeScc graph (G.scc graph)
 
+stableScc graph = decodeScc graph (stableSccWorker graph)
+
+
+decodeScc :: IntGraph -> [Tree Vertex] -> [SCC Vertex]
+decodeScc graph forest = map decode forest
+  where
     decode (Node v []) | mentions_itself v = CyclicSCC [v]
                        | otherwise         = AcyclicSCC v
     decode other = CyclicSCC (dec other [])
@@ -113,8 +117,8 @@ contains v    = SetM $ \ m -> readArray m v
 include      :: Vertex -> SetM s ()
 include v     = SetM $ \ m -> writeArray m v True
 
-scc2 :: G.Graph -> [Tree Vertex]
-scc2 g = dfs g (reverse (postOrd (G.transposeG g)))
+stableSccWorker :: G.Graph -> [Tree Vertex]
+stableSccWorker g = dfsStable g (reverse (postOrdStable (G.transposeG g)))
 
 postorder :: Tree a -> [a] -> [a]
 postorder (Node a ts) = postorderF ts . (a :)
@@ -122,16 +126,16 @@ postorder (Node a ts) = postorderF ts . (a :)
 postorderF   :: [Tree a] -> [a] -> [a]
 postorderF ts = foldr (.) id $ map postorder ts
 
-postOrd :: G.Graph -> [Vertex]
-postOrd g = postorderF (dff g) []
+postOrdStable :: G.Graph -> [Vertex]
+postOrdStable g = postorderF (dffStable g) []
 
-dff          :: G.Graph -> [Tree Vertex]
-dff g         = dfs g (G.vertices g)
+dffStable          :: G.Graph -> [Tree Vertex]
+dffStable g         = dfsStable g (G.vertices g)
 
 
 -- This dfs provides stability under transposition.
-dfs :: G.Graph -> [Vertex] -> [Tree Vertex]
-dfs g vs0 = run (bounds g) $ go vs0
+dfsStable :: G.Graph -> [Vertex] -> [Tree Vertex]
+dfsStable g vs0 = run (bounds g) $ go vs0
   where
     go :: [Vertex] -> SetM s [Tree Vertex]
     go [] = pure []
