@@ -717,7 +717,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        ; let new_or_data = dataDefnConsNewOrData hs_cons
        ; (qtvs, non_user_tvs, pats, tc_res_kind, stupid_theta)
              <- tcDataFamInstHeader mb_clsinfo skol_info fam_tc outer_bndrs fixity
-                                    hs_ctxt hs_pats m_ksig new_or_data
+                                    hs_ctxt hs_pats m_ksig hs_cons new_or_data
 
        -- Eta-reduce the axiom if possible
        -- Quite tricky: see Note [Implementing eta reduction for data families]
@@ -917,7 +917,7 @@ TyVarEnv will simply be empty, and there is nothing to worry about.
 tcDataFamInstHeader
     :: AssocInstInfo -> SkolemInfo -> TyCon -> HsOuterFamEqnTyVarBndrs GhcRn
     -> LexicalFixity -> Maybe (LHsContext GhcRn)
-    -> HsFamEqnPats GhcRn -> Maybe (LHsKind GhcRn)
+    -> HsFamEqnPats GhcRn -> Maybe (LHsKind GhcRn) -> DataDefnCons (LConDecl GhcRn)
     -> NewOrData
     -> TcM ([TcTyVar], TyVarSet, [TcType], TcKind, TcThetaType)
          -- All skolem TcTyVars, all zonked so it's clear what the free vars are
@@ -926,7 +926,7 @@ tcDataFamInstHeader
 --    e.g.  data instance D [a] :: * -> * where ...
 -- Here the "header" is the bit before the "where"
 tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
-                    hs_ctxt hs_pats m_ksig new_or_data
+                    hs_ctxt hs_pats m_ksig hs_cons new_or_data
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
        ; (tclvl, wanted, (outer_bndrs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind)))
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
@@ -947,6 +947,10 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
 
                   -- Do not add constraints from the data constructors
                   -- See Note [Kind inference for data family instances]
+
+                  -- Add constraints from the data constructors
+                  ; kcConDecls new_or_data res_kind hs_cons
+
 
                   -- Check that the result kind of the TyCon applied to its args
                   -- is compatible with the explicit signature (or Type, if there
