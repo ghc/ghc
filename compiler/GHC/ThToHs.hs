@@ -245,8 +245,9 @@ cvtDec (TH.FunD nm cls)
 cvtDec (TH.SigD nm typ)
   = do  { nm' <- vNameN nm
         ; ty' <- cvtSigType typ
+        -- MODS_TODO I think this means "no way for TH to specify modifiers", seems right?
         ; returnJustLA $ Hs.SigD noExtField
-                                    (TypeSig noAnn [nm'] (mkHsWildCardBndrs ty')) }
+                                    (TypeSig noAnn [nm'] (mkHsWildCardBndrs ty') []) }
 
 cvtDec (TH.KiSigD nm ki)
   = do  { nm' <- tconNameN nm

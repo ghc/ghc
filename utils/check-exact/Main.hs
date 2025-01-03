@@ -852,9 +852,9 @@ rmTypeSig1 _libdir lp = do
           tlDecs = hsDecls lp
           (s0:de1:d2) = tlDecs
           s1 = captureTypeSigSpacing s0
-          (L l (SigD x1 (TypeSig x2 [n1,n2] typ))) = s1
+          (L l (SigD x1 (TypeSig x2 [n1,n2] typ mods))) = s1
           L ln n2' = transferEntryDP n1 n2
-          s1' = (L l (SigD x1 (TypeSig x2 [L (noTrailingN ln) n2'] typ)))
+          s1' = (L l (SigD x1 (TypeSig x2 [L (noTrailingN ln) n2'] typ mods)))
 
       lp' = doRmDecl
   return lp'

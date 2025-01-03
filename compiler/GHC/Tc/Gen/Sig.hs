@@ -172,10 +172,13 @@ tcTySig (L _ (XSig (IdSig id)))
              sig = completeSigFromId ctxt id
        ; return [TcIdSig (TcCompleteSig sig)] }
 
-tcTySig (L loc (TypeSig _ names sig_ty))
+tcTySig (L loc (TypeSig _ names sig_ty mods))
   = setSrcSpanA loc $
     do { sigs <- sequence [ tcUserTypeSig (locA loc) sig_ty (Just name)
                           | L _ name <- names ]
+         -- We don't do anything with modifiers, but we do need to make sure
+         -- they type check.
+       ; _ <- tcModifiers mods (const False)
        ; return (map TcIdSig sigs) }
 
 tcTySig (L loc (PatSynSig _ names sig_ty))

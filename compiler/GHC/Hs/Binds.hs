@@ -837,7 +837,8 @@ instance OutputableBndrId p => Outputable (Sig (GhcPass p)) where
 
 ppr_sig :: forall p. OutputableBndrId p
         => Sig (GhcPass p) -> SDoc
-ppr_sig (TypeSig _ vars ty)  = pprVarSig (map unLoc vars) (ppr ty)
+ppr_sig (TypeSig _ vars ty mods) =
+  pprVarSig (map unLoc vars) (ppr ty) <+> pprHsModifiers mods
 ppr_sig (ClassOpSig _ is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
   | otherwise                = pprVarSig (map unLoc vars) (ppr ty)

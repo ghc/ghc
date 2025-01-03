@@ -2706,9 +2706,10 @@ instance ExactPrint (Sig GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (TypeSig (AnnSig dc mp md) vars ty)  = do
+  exact (TypeSig (AnnSig dc mp md) vars ty mods)  = do
+    mods' <- markAnnotated mods
     (dc', vars', ty') <- exactVarSig dc vars ty
-    return (TypeSig (AnnSig dc' mp md) vars' ty')
+    return (TypeSig (AnnSig dc' mp md) vars' ty' mods')
 
   exact (PatSynSig (AnnSig dc mp md) lns typ) = do
     mp' <- mapM markEpToken mp

@@ -773,10 +773,11 @@ renameLFieldOcc (L l (FieldOcc rdr (L n sel))) = do
 
 renameSig :: Sig GhcRn -> RnM (Sig DocNameI)
 renameSig sig = case sig of
-  TypeSig _ lnames ltype -> do
+  TypeSig _ lnames ltype mods -> do
     lnames' <- mapM renameNameL lnames
     ltype' <- renameLSigWcType ltype
-    return (TypeSig noExtField lnames' ltype')
+    mods' <- renameModifiers mods
+    return (TypeSig noExtField lnames' ltype' mods')
   ClassOpSig _ is_default lnames sig_ty -> do
     lnames' <- mapM renameNameL lnames
     ltype' <- renameLSigType sig_ty

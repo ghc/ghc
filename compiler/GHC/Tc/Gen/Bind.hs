@@ -212,7 +212,8 @@ tcHsBootSigs binds sigs
             rejectBootDecls HsBoot BootBindsRn (concatMap snd binds)
         ; concatMapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
   where
-    tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames
+    -- MODS_TODO we haven't said what happens with modifiers in hs-boot files.
+    tc_boot_sig (TypeSig _ lnames hs_ty _) = mapM f lnames
       where
         f (L _ name)
           = do { sigma_ty <- tcHsSigWcType (FunSigCtxt name NoRRC) hs_ty

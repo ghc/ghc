@@ -238,7 +238,7 @@ isSimpleSig
       ( RnExportD
           { rnExpDExpD =
             ExportD
-              { expDDecl = L _ (SigD _ (TypeSig _ lnames t))
+              { expDDecl = L _ (SigD _ (TypeSig _ lnames t _))
               , expDMbDoc = (Documentation Nothing Nothing, argDocs)
               }
           }
@@ -281,7 +281,7 @@ declNames
      )
 declNames (L _ decl) = case decl of
   TyClD _ d -> (empty, [tcdNameI d])
-  SigD _ (TypeSig _ lnames _) -> (empty, map unLoc lnames)
+  SigD _ (TypeSig _ lnames _ _) -> (empty, map unLoc lnames)
   SigD _ (PatSynSig _ lnames _) -> (text "pattern", map unLoc lnames)
   ForD _ (ForeignImport _ (L _ n) _ _ _) -> (empty, [n])
   ForD _ (ForeignExport _ (L _ n) _ _ _) -> (empty, [n])
@@ -327,7 +327,8 @@ ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
   TyClD _ d@DataDecl{} -> ppDataDecl pats instances subdocs (Just doc) d unicode
   TyClD _ d@SynDecl{} -> ppTySyn (doc, fnArgsDoc) d unicode
   TyClD _ d@ClassDecl{} -> ppClassDecl instances doc subdocs d unicode
-  SigD _ (TypeSig _ lnames ty) -> ppFunSig Nothing (doc, fnArgsDoc) (map unLoc lnames) (dropWildCardsI ty) unicode
+  -- MODS_TODO need to pprint modifiers
+  SigD _ (TypeSig _ lnames ty _) -> ppFunSig Nothing (doc, fnArgsDoc) (map unLoc lnames) (dropWildCardsI ty) unicode
   SigD _ (PatSynSig _ lnames ty) -> ppLPatSig (doc, fnArgsDoc) (map unLoc lnames) ty unicode
   ForD _ d -> ppFor (doc, fnArgsDoc) d unicode
   InstD _ _ -> empty

@@ -75,7 +75,8 @@ ppDecl summ links (L loc decl) pats (mbDoc, fnArgsDoc) instances fixities subdoc
   TyClD _ d@(DataDecl{}) -> ppDataDecl summ links instances fixities subdocs (locA loc) mbDoc d pats splice unicode pkg qual
   TyClD _ d@(SynDecl{}) -> ppTySyn summ links fixities (locA loc) (mbDoc, fnArgsDoc) d splice unicode pkg qual
   TyClD _ d@(ClassDecl{}) -> ppClassDecl summ links instances fixities (locA loc) mbDoc subdocs d splice unicode pkg qual
-  SigD _ (TypeSig _ lnames lty) ->
+  SigD _ (TypeSig _ lnames lty _) ->
+    -- MODS_TODO need to pprint modifiers
     ppLFunSig
       summ
       links
@@ -1146,7 +1147,7 @@ ppInstanceSigs
   -> [Sig DocNameI]
   -> [Html]
 ppInstanceSigs links splice unicode qual sigs = do
-  TypeSig _ lnames typ <- sigs
+  TypeSig _ lnames typ _ <- sigs
   let names = map unLoc lnames
       L _ rtyp = dropWildCardsI typ
   -- Instance methods signatures are synified and thus don't have a useful

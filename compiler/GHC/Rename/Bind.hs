@@ -684,7 +684,7 @@ mkScopedTvFn sigs = \n -> lookupNameEnv env n `orElse` []
     -- Returns (binders, scoped tvs for those binders)
     get_scoped_tvs (L _ (ClassOpSig _ _ names sig_ty))
       = Just (names, hsScopedTvs sig_ty)
-    get_scoped_tvs (L _ (TypeSig _ names sig_ty))
+    get_scoped_tvs (L _ (TypeSig _ names sig_ty _))
       = Just (names, hsWcScopedTvs sig_ty)
     get_scoped_tvs (L _ (PatSynSig _ names sig_ty))
       = Just (names, hsScopedTvs sig_ty)
@@ -1078,11 +1078,12 @@ renameSigs ctxt sigs
 -- Doesn't seem worth much trouble to sort this.
 
 renameSig :: HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeVars)
-renameSig ctxt sig@(TypeSig _ vs ty)
+renameSig ctxt sig@(TypeSig _ vs ty mods)
   = do  { new_vs <- mapM (lookupSigOccRnN ctxt sig) vs
         ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
         ; (new_ty, fvs) <- rnHsSigWcType doc ty
-        ; return (TypeSig noAnn new_vs new_ty, fvs) }
+        ; (mods', mods_fvs) <- rnModifiersContext doc mods
+        ; return (TypeSig noAnn new_vs new_ty mods', fvs `plusFV` mods_fvs) }
 
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures
@@ -1247,7 +1248,7 @@ findDupSigs sigs
     expand_sig :: Sig GhcPs -> [(LocatedN RdrName, Sig GhcPs)] -- AZ
     expand_sig sig@(FixSig _ (FixitySig _ ns _)) = zip ns (repeat sig)
     expand_sig sig@(InlineSig _ n _)             = [(n,sig)]
-    expand_sig sig@(TypeSig _ ns _)              = [(n,sig) | n <- ns]
+    expand_sig sig@(TypeSig _ ns _ _)            = [(n,sig) | n <- ns]
     expand_sig sig@(ClassOpSig _ _ ns _)         = [(n,sig) | n <- ns]
     expand_sig sig@(PatSynSig _ ns  _ )          = [(n,sig) | n <- ns]
     expand_sig sig@(SCCFunSig (_, _) n _)           = [(n,sig)]

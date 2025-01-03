@@ -1000,7 +1000,7 @@ extractRecSel nm t tvs (L _ con : rest) =
   case getRecConArgs_maybe con of
     Just (L _ fields)
       | ((l, L _ (ConDeclField _ _nn ty _ _)) : _) <- matching_fields fields ->
-          pure (L (noAnnSrcSpan l) (TypeSig noAnn [noLocA nm] (mkEmptyWildCardBndrs $ mkEmptySigType (noLocA (HsFunTy noExtField (HsStandardArrow noExtField []) data_ty (getBangType ty))))))
+          pure (L (noAnnSrcSpan l) (TypeSig noAnn [noLocA nm] (mkEmptyWildCardBndrs $ mkEmptySigType (noLocA (HsFunTy noExtField (HsStandardArrow noExtField []) data_ty (getBangType ty)))) []))
     _ -> extractRecSel nm t tvs rest
   where
     matching_fields :: [LConDeclField GhcRn] -> [(SrcSpan, LConDeclField GhcRn)]

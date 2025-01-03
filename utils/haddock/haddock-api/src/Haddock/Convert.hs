@@ -203,6 +203,7 @@ tyThingToLHsDecl prr t = case t of
             noAnn
             [synifyNameN dc]
             (synifySigWcType ImplicitizeForAll [] (dataConWrapperType dc))
+            []
         )
   AConLike (PatSynCon ps) ->
     allOK . SigD noExtField $ PatSynSig noAnn [synifyNameN ps] (synifyPatSynSigType ps)
@@ -583,7 +584,8 @@ synifyIdSig
   -> Id
   -- ^ the 'Id' from which to get the type signature
   -> Sig GhcRn
-synifyIdSig prr s vs i = TypeSig noAnn [n] (synifySigWcType s vs t)
+synifyIdSig prr s vs i = TypeSig noAnn [n] (synifySigWcType s vs t) []
+  -- MODS_TODO: no idea what synify means so hard to say if I'm doing this right.
   where
     !n = force $ synifyNameN i
     t = defaultType prr (varType i)

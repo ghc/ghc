@@ -769,7 +769,7 @@ getTypeSigNames sigs
     get_type_sig :: LSig GhcRn -> NameSet -> NameSet
     get_type_sig sig ns =
       case sig of
-        L _ (TypeSig _ names _) -> extendNameSetList ns (map unLoc names)
+        L _ (TypeSig _ names _ _) -> extendNameSetList ns (map unLoc names)
         L _ (PatSynSig _ names _) -> extendNameSetList ns (map unLoc names)
         _ -> ns
 

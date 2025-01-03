@@ -2785,12 +2785,13 @@ sigdecl :: { LHsDecl GhcPs }
                         {% do { $1 <- runPV (unECP $1)
                               ; v <- checkValSigLhs $1
                               ; amsA' (sLL $1 $> $ SigD noExtField $
-                                  TypeSig (AnnSig (epUniTok $2) Nothing Nothing) [v] (mkHsWildCardBndrs $3))} }
+                                  TypeSig (AnnSig (epUniTok $2) Nothing Nothing) [v] (mkHsWildCardBndrs $3) [])} }
 
         | var ',' sig_vars '::' sigtype
            {% do { v <- addTrailingCommaN $1 (gl $2)
                  ; let sig = TypeSig (AnnSig (epUniTok $4) Nothing Nothing) (v : reverse (unLoc $3))
                                       (mkHsWildCardBndrs $5)
+                                      []
                  ; amsA' (sLL $1 $> $ SigD noExtField sig ) }}
 
         | infix prec namespace_spec ops

@@ -330,7 +330,7 @@ getMainDeclBinder _ _ = []
 -- AST.
 -- See also Note [default method Name] in GHC.Iface.Recomp
 sigNameNoLoc :: forall a . (UnXRec a, HasOccName (IdP a)) => OccEnv (IdP a) -> Sig a -> [IdP a]
-sigNameNoLoc _   (TypeSig    _   ns _)         = map (unXRec @a) ns
+sigNameNoLoc _   (TypeSig    _   ns _ _)       = map (unXRec @a) ns
 sigNameNoLoc _   (ClassOpSig _ False ns _)     = map (unXRec @a) ns
 sigNameNoLoc env (ClassOpSig _ True  ns _)     = mapMaybe (lookupOccEnv env . mkDefaultMethodOcc . occName) $ map (unXRec @a) ns
 sigNameNoLoc _   (PatSynSig  _   ns _)         = map (unXRec @a) ns
@@ -471,7 +471,7 @@ classDecls decl
 -- | Extract function argument docs from inside top-level decls.
 declTypeDocs :: HsDecl GhcRn -> IntMap (HsDoc GhcRn)
 declTypeDocs = \case
-  SigD  _ (TypeSig _ _ ty)          -> sigTypeDocs (unLoc (dropWildCards ty))
+  SigD  _ (TypeSig _ _ ty _)        -> sigTypeDocs (unLoc (dropWildCards ty))
   SigD  _ (ClassOpSig _ _ _ ty)     -> sigTypeDocs (unLoc ty)
   SigD  _ (PatSynSig _ _ ty)        -> sigTypeDocs (unLoc ty)
   ForD  _ (ForeignImport _ _ ty _ _) -> sigTypeDocs (unLoc ty)

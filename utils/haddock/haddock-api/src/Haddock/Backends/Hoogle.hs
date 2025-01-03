@@ -177,7 +177,7 @@ ppExportD
 
 ppSigWithDoc :: SDocContext -> Sig GhcRn -> [(Name, DocForDecl Name)] -> [String]
 ppSigWithDoc sDocContext sig subdocs = case sig of
-  TypeSig _ names t -> concatMap (mkDocSig "" (dropWildCards t)) names
+  TypeSig _ names t _ -> concatMap (mkDocSig "" (dropWildCards t)) names
   PatSynSig _ names t -> concatMap (mkDocSig "pattern " t) names
   _ -> []
   where

@@ -349,7 +349,7 @@ hsScopedTvBinders binds
 
 get_scoped_tvs :: LSig GhcRn -> [Name]
 get_scoped_tvs (L _ signature)
-  | TypeSig _ _ sig <- signature
+  | TypeSig _ _ sig _ <- signature
   = get_scoped_tvs_from_sig (hswc_body sig)
   | ClassOpSig _ _ _ sig <- signature
   = get_scoped_tvs_from_sig sig
@@ -990,7 +990,8 @@ rep_sigs :: [LSig GhcRn] -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_sigs = concatMapM rep_sig
 
 rep_sig :: LSig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
-rep_sig (L loc (TypeSig _ nms ty))
+rep_sig (L loc (TypeSig _ nms ty _))
+  -- MODS_TODO what do we do with modifiers here?
   = mapM (rep_wc_ty_sig sigDName (locA loc) ty) nms
 rep_sig (L loc (PatSynSig _ nms ty))
   = mapM (rep_patsyn_ty_sig (locA loc) ty) nms

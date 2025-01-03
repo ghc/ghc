@@ -2186,7 +2186,7 @@ genAuxBindSpecOriginal :: SrcSpan -> AuxBindSpec
 genAuxBindSpecOriginal loc spec
   = (gen_bind spec,
      L loca (TypeSig noAnn [L locn (auxBindSpecRdrName spec)]
-           (genAuxBindSpecSig loc spec)))
+           (genAuxBindSpecSig loc spec) []))
   where
     loca = noAnnSrcSpan loc
     locn = noAnnSrcSpan loc
@@ -2241,7 +2241,7 @@ genAuxBindSpecDup :: SrcSpan -> RdrName -> AuxBindSpec
 genAuxBindSpecDup loc original_rdr_name dup_spec
   = (mkHsVarBind loc dup_rdr_name (nlHsVar original_rdr_name),
      L loca (TypeSig noAnn [L locn dup_rdr_name]
-           (genAuxBindSpecSig loc dup_spec)))
+           (genAuxBindSpecSig loc dup_spec) []))
   where
     loca = noAnnSrcSpan loc
     locn = noAnnSrcSpan loc

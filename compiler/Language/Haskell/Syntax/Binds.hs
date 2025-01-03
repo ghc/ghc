@@ -368,6 +368,7 @@ data Sig pass
        (XTypeSig pass)
        [LIdP pass]           -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
+       [HsModifier pass]     -- Attached modifiers
 
       -- | A pattern synonym type signature
       --

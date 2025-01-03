@@ -756,7 +756,9 @@ mkClassOpSigs :: [LSig GhcPs] -> [LSig GhcPs]
 mkClassOpSigs sigs
   = map fiddle sigs
   where
-    fiddle (L loc (TypeSig anns nms ty))
+    -- MODS_TODO this drops modifiers. Should we be throwing an error if there
+    -- are any?
+    fiddle (L loc (TypeSig anns nms ty _))
       = L loc (ClassOpSig anns False nms (dropWildCards ty))
     fiddle sig = sig
 

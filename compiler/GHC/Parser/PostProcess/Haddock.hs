@@ -437,10 +437,10 @@ instance HasHaddock (HsDecl GhcPs) where
   --      :: Int  -- ^ Comment on Int
   --      -> Bool -- ^ Comment on Bool
   --
-  addHaddock (SigD _ (TypeSig x names t)) = do
+  addHaddock (SigD _ (TypeSig x names t mods)) = do
       traverse_ registerHdkA names
       t' <- addHaddock t
-      pure (SigD noExtField (TypeSig x names t'))
+      pure (SigD noExtField (TypeSig x names t' mods))
 
   -- Pattern synonym type signatures:
   --

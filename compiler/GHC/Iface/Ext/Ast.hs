@@ -1829,7 +1829,8 @@ instance HiePass p => ToHie (SigContext (LocatedA (Sig (GhcPass p)))) where
     case hiePass @p of
       HieTc -> pure []
       HieRn -> concatM $ makeNodeA sig sp : case sig of
-        TypeSig _ names typ ->
+        TypeSig _ names typ _ ->
+          -- MODS_TODO modifiers?
           [ toHie $ map (C TyDecl) names
           , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
           ]
