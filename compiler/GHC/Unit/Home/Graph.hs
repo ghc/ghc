@@ -43,9 +43,6 @@ module GHC.Unit.Home.Graph
   , allFamInstances
   , allAnns
   , allCompleteSigs
-  , rulesBelow
-  , annsBelow
-  , instancesBelow
 
   -- * Utilities
   , hugSCCs
@@ -94,32 +91,6 @@ import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
 import GHC.Types.Name.Env
 
---------------------------------------------------------------------------------
--- TODO
---------------------------------------------------------------------------------
--- WE MAY WANT TO CACHE SOME OF THESE AS WE BUILD UP THE HPT, to make these
--- queries O(1). But it's kind of hard because they wouldn't be rehydrated!!!!!
--- Then we'd have the HPT itself rehydrated, but the cached fields with
--- bad references.
-
--- | Get annotations from all modules "below" this one (in the dependency
--- sense) within the home units. If the module is @Nothing@, returns /all/
--- annotations in the home units.
-annsBelow :: HomeUnitGraph -> ModuleGraph -> UnitId -> ModuleNameWithIsBoot -> IO AnnEnv
-annsBelow hug mg uid mn = foldr go (pure emptyAnnEnv) hug where
-  go hue = liftA2 plusAnnEnv (hptAnnsBelow (homeUnitEnv_hpt hue) mg uid mn)
-
----- | Get rules from modules "below" this one (in the dependency sense) within
---the home units.
-rulesBelow :: HomeUnitGraph -> ModuleGraph -> UnitId -> ModuleNameWithIsBoot -> IO RuleBase
-rulesBelow hug mg uid mn = foldr go (pure emptyRuleBase) hug where
-  go hue = liftA2 plusNameEnv (hptRulesBelow (homeUnitEnv_hpt hue) mg uid mn)
-
--- | Find instances visible from the given set of imports
-instancesBelow :: HomeUnitGraph -> ModuleGraph -> UnitId -> ModuleNameWithIsBoot -> IO (InstEnv, [FamInst])
-instancesBelow hug mg uid mn = foldr go (pure (emptyInstEnv, [])) hug where
-  go hue = liftA2 (\(a,b) (a',b') -> (a `unionInstEnv` a', b ++ b'))
-                  (hptInstancesBelow (homeUnitEnv_hpt hue) mg uid mn)
 
 -- | Get all 'CompleteMatches' (arising from COMPLETE pragmas) present across
 -- all home units.

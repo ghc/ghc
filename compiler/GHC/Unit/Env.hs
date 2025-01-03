@@ -99,9 +99,6 @@ module GHC.Unit.Env
     , hugCompleteSigs
     , hugAllInstances
     , hugAllAnns
-    , hugAnnsBelow
-    , hugRulesBelow
-    , hugInstancesBelow
 
 
     -- * Legacy API
@@ -140,21 +137,6 @@ import GHC.Core.FamInstEnv
 --------------------------------------------------------------------------------
 -- The hard queries
 --------------------------------------------------------------------------------
-
--- | Get annotations from all modules "below" this one (in the dependency
--- sense) within the home units. If the module is @Nothing@, returns /all/
--- annotations in the home units.
-hugAnnsBelow :: UnitEnv -> ModuleGraph -> UnitId -> ModuleNameWithIsBoot -> IO AnnEnv
-hugAnnsBelow = HUG.annsBelow . ue_home_unit_graph
-
----- | Get rules from modules "below" this one (in the dependency sense) within
---the home units.
-hugRulesBelow :: UnitEnv -> ModuleGraph -> UnitId -> ModuleNameWithIsBoot -> IO RuleBase
-hugRulesBelow = HUG.rulesBelow . ue_home_unit_graph
-
--- | Find instances visible from the given set of imports
-hugInstancesBelow :: UnitEnv -> ModuleGraph -> UnitId -> ModuleNameWithIsBoot -> IO (InstEnv, [FamInst])
-hugInstancesBelow = HUG.instancesBelow . ue_home_unit_graph
 
 -- | Find all the instance declarations (of classes and families) from
 -- the Home Package Table filtered by the provided predicate function.

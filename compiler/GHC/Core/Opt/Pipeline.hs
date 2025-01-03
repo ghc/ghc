@@ -99,7 +99,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
     dflags         = hsc_dflags hsc_env
     logger         = hsc_logger hsc_env
     extra_vars     = interactiveInScope (hsc_IC hsc_env)
-    home_pkg_rules = UnitEnv.hugRulesBelow (hsc_unit_env hsc_env) (hsc_mod_graph hsc_env) (moduleUnitId mod)
+    home_pkg_rules = rulesBelow hsc_env (moduleUnitId mod)
                       (GWIB { gwib_mod = moduleName mod, gwib_isBoot = NotBoot })
     name_ppr_ctx   = mkNamePprCtx ptc (hsc_unit_env hsc_env) rdr_env
     ptc            = initPromotionTickContext dflags

@@ -1212,11 +1212,11 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
           !build_deps = getDependencies (map gwib_mod deps) build_map
       let loop_action = withCurrentUnit loop_unit $ do
             !_ <- wait_deps build_deps
-            hsc_env_TODO <- asks hsc_env
+            hsc_env <- asks hsc_env
             let mns :: [ModuleName]
                 mns = mapMaybe (nodeKeyModName . gwib_mod) deps
 
-            hmis' <- liftIO $ rehydrateAfter hsc_env_TODO mns
+            hmis' <- liftIO $ rehydrateAfter hsc_env mns
 
             checkRehydrationInvariant hmis' deps
 
