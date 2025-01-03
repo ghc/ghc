@@ -97,7 +97,6 @@ import qualified Data.Set as Set
 
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv
-import GHC.Core.Rules
 import GHC.Linker.Types
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
@@ -105,11 +104,9 @@ import GHC.Types.Unique.DFM
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module
 import GHC.Unit.Module.Deps
-import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModIface
 import GHC.Utils.Outputable
-import GHC.Builtin.Names (gHC_PRIM)
 import GHC.Types.Unique (getUnique, getKey)
 import qualified GHC.Data.Word64Set as W64
 

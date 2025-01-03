@@ -71,7 +71,6 @@ import GHC.Unit.Home
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 import GHC.Unit.Module
-import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModIface
 import GHC.Unit.State
 import GHC.Utils.Outputable
@@ -85,11 +84,9 @@ import qualified Data.Set as Set
 import GHC.Data.Maybe
 import GHC.Data.Graph.Directed
 
-import GHC.Core.Rules
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
-import GHC.Types.Name.Env
 
 
 -- | Get all 'CompleteMatches' (arising from COMPLETE pragmas) present across

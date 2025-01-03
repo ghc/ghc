@@ -63,7 +63,6 @@ import GHC.Types.Var ( Var )
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.Module
-import qualified GHC.Unit.Env as UnitEnv
 
 {-
 ************************************************************************

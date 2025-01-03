@@ -62,7 +62,6 @@ import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Env as UnitEnv
 import GHC.Unit.External
 
-import GHC.Types.Annotations ( AnnEnv, mkAnnEnv, plusAnnEnv )
 import GHC.Types.Error ( emptyMessages, Messages )
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -79,7 +78,6 @@ import GHC.Utils.Logger
 
 import GHC.Core.Rules
 import GHC.Types.Annotations
-import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Builtin.Names

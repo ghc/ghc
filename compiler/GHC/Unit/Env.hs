@@ -114,7 +114,6 @@ import GHC.Unit.External
 import GHC.Unit.State
 import GHC.Unit.Home
 import GHC.Unit.Types
-import GHC.Unit.Module.Graph
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 import GHC.Unit.Home.Graph (HomeUnitGraph, HomeUnitEnv)
@@ -128,7 +127,6 @@ import GHC.Driver.DynFlags
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import GHC.Core.Rules
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
