@@ -1319,10 +1319,10 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
           [ toHieForAllTele tele (getLocA body)
           ]
         HieTc -> dataConCantHappen x
-      HsFunArr x _mult arg res -> case hiePass @p of
+      HsFunArr x mult arg res -> case hiePass @p of
         HieRn ->
-          [ {- toHie (arrowToHsExpr mult) -- MODS_TODO: do we call `toHie` on the types of all modifiers?
-          , -} toHie arg
+          [ toHie mult
+          , toHie arg
           , toHie res
           ]
         HieTc -> dataConCantHappen x
@@ -1351,7 +1351,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         ]
       HsGetField {} -> []
       HsProjection {} -> []
-      HsModifiedExpr _ _ e -> [ toHie e ] -- MODS_TODO also modifiers?
+      HsModifiedExpr _ mods e -> toHie e : (toHie <$> mods)
       XExpr x -> case hiePass @p of
         HieTc -> case x of
           WrapExpr w a
@@ -1747,8 +1747,7 @@ instance ToHie (LocatedP OverlapMode) where
   toHie (L span _) = locOnly (locA span)
 
 instance ToHie a => ToHie (HsScaled GhcRn a) where
-  -- MODS_TODO do we call `toHie` on every modifier's type?
-  toHie (HsScaled _w t) = concatM [{- toHie (arrowToHsType w), -} toHie t]
+  toHie (HsScaled mult t) = concatM [toHie mult, toHie t]
 
 instance ToHie (LocatedA (ConDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
@@ -1829,11 +1828,11 @@ instance HiePass p => ToHie (SigContext (LocatedA (Sig (GhcPass p)))) where
     case hiePass @p of
       HieTc -> pure []
       HieRn -> concatM $ makeNodeA sig sp : case sig of
-        TypeSig _ names typ _ ->
-          -- MODS_TODO modifiers?
+        TypeSig _ names typ mods ->
           [ toHie $ map (C TyDecl) names
           , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
           ]
+            ++ (toHie <$> mods)
         PatSynSig _ names typ ->
           [ toHie $ map (C TyDecl) names
           , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
@@ -1909,9 +1908,9 @@ instance ToHie (LocatedA (HsType GhcRn)) where
         [ toHie ty
         , toHie ki
         ]
-      HsFunTy _ _w a b ->
-        [ {- toHie (arrowToHsType w) -- MODS_TODO: do we call `toHie` on the types of all modifiers?
-        , -} toHie a
+      HsFunTy _ mult a b ->
+        [ toHie mult
+        , toHie a
         , toHie b
         ]
       HsListTy _ a ->
@@ -1961,10 +1960,17 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsTyLit _ _ -> []
       HsWildCardTy _ -> []
       HsStarTy _ _ -> []
-      HsModifiedTy _ _ ty ->
-        [ toHie ty -- MODS_TODO include modifiers?
-        ]
+      HsModifiedTy _ mods ty ->
+         toHie ty : (toHie <$> mods)
       XHsType _ -> []
+
+instance ToHie ty => ToHie (HsModifierOf ty pass) where
+  toHie (HsModifier _ ty) = toHie ty
+
+instance ToHie ty => ToHie (HsArrowOf ty pass) where
+  toHie (HsStandardArrow _ mods) = concatM $ toHie <$> mods
+  toHie (HsLinearArrow _ mods) = concatM $ toHie <$> mods
+  toHie (XArrow _) = pure []
 
 instance (ToHie tm, ToHie ty) => ToHie (HsArg (GhcPass p) tm ty) where
   toHie (HsValArg _ tm) = toHie tm
@@ -2005,11 +2011,12 @@ instance HiePass p => ToHie (LocatedC [LocatedA (HsExpr (GhcPass p))]) where
 
 instance ToHie (LocatedA (ConDeclField GhcRn)) where
   toHie (L span field) = concatM $ makeNode field (locA span) : case field of
-      ConDeclField _ fields typ _mods doc -> -- MODS_TODO what do we do with modifiers?
+      ConDeclField _ fields typ mods doc ->
         [ toHie $ map (RFC RecFieldDecl (getRealSpan $ getHasLoc typ)) fields
         , toHie typ
         , toHie doc
         ]
+          ++ (toHie <$> mods)
 
 instance ToHie (LHsExpr a) => ToHie (ArithSeqInfo a) where
   toHie (From expr) = toHie expr
@@ -2137,11 +2144,11 @@ instance ToHie (LocatedA (FixitySig GhcRn)) where
 
 instance ToHie (LocatedA (DefaultDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
-      DefaultDecl _ cl typs _mods ->
-        -- MODS_TODO do we call `toHie` on every modifier's type?
+      DefaultDecl _ cl typs mods ->
         [ maybe (pure []) (toHie . C Use) cl
         , toHie typs
         ]
+          ++ (toHie <$> mods)
 
 instance ToHie (LocatedA (ForeignDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
