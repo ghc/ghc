@@ -1759,7 +1759,9 @@ kcTyClDecl :: TyClDecl GhcRn -> MonoTcTyCon -> TcM ()
 -- - In this function, those TcTyVars are unified with other kind variables during
 --   kind inference (see GHC.Tc.TyCl Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon])
 
-kcTyClDecl (DataDecl { tcdLName    = (L _ _name), tcdDataDefn = HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } }) tycon
+kcTyClDecl (DataDecl { tcdLName    = (L _ _name)
+                     , tcdDataDefn = HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } })
+           tycon
   = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
        -- NB: binding these tyvars isn't necessary for GADTs, but it does no
        -- harm.  For GADTs, each data con brings its own tyvars into scope,
@@ -1767,7 +1769,7 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ _name), tcdDataDefn = HsDataDefn { dd_
        -- (conceivably) shadowed.
     do { traceTc "kcTyClDecl" (ppr tycon $$ ppr (tyConTyVars tycon) $$ ppr (tyConResKind tycon))
        ; _ <- tcHsContext ctxt
-       ; kcConDecls (dataDefnConsNewOrData cons) (tyConResKind tycon) cons
+       ; kcConDecls (tyConResKind tycon) cons
        }
 
 kcTyClDecl (SynDecl { tcdLName = L _ _name, tcdRhs = rhs }) tycon
@@ -1799,67 +1801,70 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 -- This includes doing kind unification if the type is a newtype.
 -- See Note [Implementation of UnliftedNewtypes] for why we need
 -- the first two arguments.
-kcConArgTys :: NewOrData -> TcKind -> [HsScaled GhcRn (LHsType GhcRn)] -> TcM ()
-kcConArgTys new_or_data res_kind arg_tys = do
-  { let exp_kind = getArgExpKind new_or_data res_kind
-  ; forM_ arg_tys (\(HsScaled mult ty) -> do _ <- tcCheckLHsTypeInContext (getBangType ty) exp_kind
-                                             tcMult mult)
+kcConArgTys :: ConArgKind                         -- Expected kind of the argument(s)
+            -> [HsScaled GhcRn (LHsType GhcRn)]   -- User-written argument types
+            -> TcM ()
+kcConArgTys exp_kind arg_tys
+  = forM_ arg_tys $ \(HsScaled mult ty) ->
+    do { _ <- tcCheckLHsTypeInContext (getBangType ty) exp_kind
+       ; tcMult mult }
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
-  }
 
 -- Kind-check the types of arguments to a Haskell98 data constructor.
-kcConH98Args :: NewOrData -> TcKind -> HsConDeclH98Details GhcRn -> TcM ()
-kcConH98Args new_or_data res_kind con_args = case con_args of
-  PrefixCon _ tys   -> kcConArgTys new_or_data res_kind tys
-  InfixCon ty1 ty2  -> kcConArgTys new_or_data res_kind [ty1, ty2]
-  RecCon (L _ flds) -> kcConArgTys new_or_data res_kind $
+kcConH98Args :: ConArgKind                       -- Expected kind of the argument(s)
+             -> HsConDeclH98Details GhcRn
+             -> TcM ()
+kcConH98Args exp_kind con_args = case con_args of
+  PrefixCon _ tys   -> kcConArgTys exp_kind tys
+  InfixCon ty1 ty2  -> kcConArgTys exp_kind [ty1, ty2]
+  RecCon (L _ flds) -> kcConArgTys exp_kind $
                        map (hsLinear . cd_fld_type . unLoc) flds
 
 -- Kind-check the types of arguments to a GADT data constructor.
-kcConGADTArgs :: NewOrData -> TcKind -> HsConDeclGADTDetails GhcRn -> TcM ()
-kcConGADTArgs new_or_data res_kind con_args = case con_args of
-  PrefixConGADT _ tys     -> kcConArgTys new_or_data res_kind tys
-  RecConGADT _ (L _ flds) -> kcConArgTys new_or_data res_kind $
+kcConGADTArgs :: ConArgKind                       -- Expected kind of the argument(s)
+              -> HsConDeclGADTDetails GhcRn
+              -> TcM ()
+kcConGADTArgs exp_kind con_args = case con_args of
+  PrefixConGADT _ tys     -> kcConArgTys exp_kind tys
+  RecConGADT _ (L _ flds) -> kcConArgTys exp_kind $
                              map (hsLinear . cd_fld_type . unLoc) flds
 
-kcConDecls :: Foldable f
-           => NewOrData
-           -> TcKind             -- The result kind signature
-                               --   Used only in H98 case
-           -> f (LConDecl GhcRn) -- The data constructors
-           -> TcM ()
+kcConDecls :: TcKind  -- Result kind of tycon
+                      -- Used only in H98 case
+           -> DataDefnCons (LConDecl GhcRn) -> TcM ()
 -- See Note [kcConDecls: kind-checking data type decls]
-kcConDecls new_or_data tc_res_kind = traverse_ (wrapLocMA_ (kcConDecl new_or_data tc_res_kind))
+kcConDecls tc_res_kind cons
+  = traverse_ (wrapLocMA_ (kcConDecl new_or_data tc_res_kind)) cons
+  where
+    new_or_data = dataDefnConsNewOrData cons
 
 -- Kind check a data constructor. In additional to the data constructor,
 -- we also need to know about whether or not its corresponding type was
 -- declared with data or newtype, and we need to know the result kind of
 -- this type. See Note [Implementation of UnliftedNewtypes] for why
 -- we need the first two arguments.
-kcConDecl :: NewOrData
-          -> TcKind  -- Result kind of the type constructor
-                   -- Usually Type but can be TYPE UnliftedRep
-                   -- or even TYPE r, in the case of unlifted newtype
-                   -- Used only in H98 case
-          -> ConDecl GhcRn
-          -> TcM ()
-kcConDecl new_or_data tc_res_kind (ConDeclH98
-  { con_name = name, con_ex_tvs = ex_tvs
-  , con_mb_cxt = ex_ctxt, con_args = args })
+kcConDecl :: NewOrData -> TcKind -> ConDecl GhcRn -> TcM ()
+kcConDecl new_or_data tc_res_kind
+          (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
+                      , con_mb_cxt = ex_ctxt, con_args = args })
   = addErrCtxt (dataConCtxt (NE.singleton name)) $
     discardResult                   $
     bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsContext ex_ctxt
-       ; kcConH98Args new_or_data tc_res_kind args
+       ; let arg_exp_kind = getArgExpKind new_or_data tc_res_kind
+             -- getArgExpKind: for newtypes, check that the argument kind
+             -- is the same as the tc_res_kind.  See (KCD1)
+             -- in Note [kcConDecls: kind-checking data type decls]
+       ; kcConH98Args arg_exp_kind args
          -- We don't need to check the telescope here,
          -- because that's done in tcConDecl
        }
 
-kcConDecl new_or_data
-          _tc_res_kind   -- Not used in GADT case (and doesn't make sense)
-          (ConDeclGADT
-    { con_names = names, con_bndrs = L _ outer_bndrs, con_mb_cxt = cxt
-    , con_g_args = args, con_res_ty = res_ty })
+kcConDecl new_or_data _tc_res_kind
+                      -- NB: _tc_res_kind is unused.   See (KCD3) in
+                      -- Note [kcConDecls: kind-checking data type decls]
+          (ConDeclGADT { con_names = names, con_bndrs = L _ outer_bndrs
+                       , con_mb_cxt = cxt, con_g_args = args, con_res_ty = res_ty })
   = -- See Note [kcConDecls: kind-checking data type decls]
     addErrCtxt (dataConCtxt names) $
     discardResult                      $
@@ -1870,45 +1875,80 @@ kcConDecl new_or_data
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
        ; con_res_kind <- newOpenTypeKind
        ; _ <- tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
-       ; kcConGADTArgs new_or_data con_res_kind args
-       ; traceTc "kcConDecl:GADT }" (ppr names $$ ppr con_res_kind)
+
+       ; let arg_exp_kind = getArgExpKind new_or_data con_res_kind
+             -- getArgExpKind: for newtypes, check that the argument kind
+             -- is the same the kind of `res_ty`, the data con's return type
+             -- See (KCD2) in Note [kcConDecls: kind-checking data type decls]
+       ; kcConGADTArgs arg_exp_kind args
+
+       ; traceTc "kcConDecl:GADT }" (ppr names $$ ppr arg_exp_kind)
        ; return () }
 
 {- Note [kcConDecls: kind-checking data type decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 kcConDecls is used when we are inferring the kind of the type
-constructor in a data type declaration.  E.g.
-    data T f a = MkT (f a)
-we want to infer the kind of 'f' and 'a'. The basic plan is described
-in Note [Inferring kinds for type declarations]; here we are doing Step 2.
+constructor in a data type declaration. The basic plan is described in
+Note [Inferring kinds for type declarations]; here we are doing Step 2.
 
-In the GADT case we may have this:
-   data T f a where
-      MkT :: forall g b. g b -> T g b
+We are kind-checking the data constructors /only/ to compute the kind of
+the type construtor.  For example
+       data T f a = MkT (f a)
+The (f a) in the data construtor constrains the kinds of `f` and `a`, and hence
+of `T`.
 
-Notice that the variables f,a, and g,b are quite distinct.
-Nevertheless, the type signature for MkT must still influence the kind
-T which is (remember Step 1) something like
-  T :: kappa1 -> kappa2 -> Type
-Otherwise we'd infer the bogus kind
-  T :: forall k1 k2. k1 -> k2 -> Type.
+There are two cases to consider in `kcConDecl`
 
-The type signature for MkT influences the kind of T simply by
-kind-checking the result type (T g b), which will force 'f' and 'g' to
-have the same kinds. This is the call to
-    tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
-Because this is the result type of an arrow, we know the kind must be
-of form (TYPE rr), and we get better error messages if we enforce that
-here (e.g. test gadt10).
+* Haskell 98 data constructors, as above.  We simply bring `f` and `a`
+  into scope and kind-check the data constructors.
 
-For unlifted newtypes only, we must ensure that the argument kind
-and result kind are the same:
-* In the H98 case, we need the result kind of the TyCon, to unify with
-  the argument kind.
+* GADT data type decls e.g.
+      data S f a where
+         MkS :: g b -> S g b
+  Here `f` and `a` don't scope over the data constructor signatures.
+  Instead, we just kind-check the entire signature (including the result `S g b`),
+  relying on the fact that `S` is in scope with its initial kind `k1 -> k2 -> Type`;
+  doing so will constrain `k1` and `k2` appropriately.
 
-* In GADT syntax, this unification happens via the result kind passed
-  to kcConGADTArgs. The tycon's result kind is not used at all in the
-  GADT case.
+The arguments of each data constructor are always of kind (TYPE r) for some
+r :: RuntimeRep.  But in the case of a newytype, the argument kind must be
+the same as the tycon result kind.  Since we are trying to figure out the
+tycon kind, kcConDecls must account for this, which is surprisingly tricky.
+Again there are two cases to consider in `kcConDecl`:
+
+* Haskell 98 data type decls, e.g.
+       data T f a = MkT (f a)
+  * In the header, all the tycon binders are specified (here `f` and `a`)
+    and there is no result kind signature.
+  * The binders from the header scope over the data construtors.
+  * In the case of unlifted newtypes, the argument kind affects the tycon kind
+       newtype N = MkN Int#
+    Here `getInitialKind` will give `N` the result kind `TYPE r`, where `r` is
+    a unification variable, and `kcConDecls` should unify that `r` with
+    `IntRep` becuase of the `Int#`
+
+  Solution (KCD1): just check that the argumet type has the same kind as the result
+  kind of the tycon.
+
+* GADT data type decls e.g.
+       data S f :: Type -> Type where
+          MkS :: g a -> S g a
+  * In the header, not all the tycon binders are specified (here just `f`),
+    and there can be a kind signature
+  * The kind signature may describe some, all, or none of the tycon binders.
+    Regardless, in the TcTyCon constructed by `getInitialKind`, the tyConResKind
+    is the signature, not the "ultimate" result type of the tycon (which is
+    usually Type)
+  * In the case of unlifted newtypes, we again want the argument kind to be the
+    same as the result kind of the tycon; but it's not so clear what /is/ the
+    result kind of the tycon, because of the signature stuff in the previous bullet.
+
+  Solution (KCD2): kind-check the result type of the data constructor (here
+  `S g a`) and, for newtypes, ensure that the arugment has that same kind.
+
+  (KCD3) The tycon's result kind `tc_res_kind` is not used at all in the GADT
+  case; rather it is accessed via looking up S's kind in the type environment
+  when kind-checking the result type of the data constructor.
 
 Note [Using TyVarTvs for kind-checking GADTs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3866,13 +3906,21 @@ nothing wrong with it).  We are implicitly requiring tha
 tcInferLHsTypeKind doesn't any gratuitous top-level casts.
 -}
 
+
+type ConArgKind = ContextKind
+  -- The expected kind of the argument(s) of a constructor
+  -- For data types this is always OpenKind
+  -- For newtypes it is (TheKind ki)
+  --     where `ki` is the result kind of the newtype
+  -- With NoUnliftedNewtype, ki=Type, but with UnliftedNewtypes it can be a variable
+
 -- | Produce an "expected kind" for the arguments of a data/newtype.
 -- If the declaration is indeed for a newtype,
 -- then this expected kind will be the kind provided. Otherwise,
 -- it is OpenKind for datatypes and liftedTypeKind.
 -- Why do we not check for -XUnliftedNewtypes? See point <Error Messages>
 -- in Note [Implementation of UnliftedNewtypes]
-getArgExpKind :: NewOrData -> TcKind -> ContextKind
+getArgExpKind :: NewOrData -> TcKind -> ConArgKind
 getArgExpKind NewType res_ki = TheKind res_ki
 getArgExpKind DataType _     = OpenKind
 
@@ -3898,7 +3946,7 @@ tcConIsInfixGADT con details
                         ; return (con `elemNameEnv` fix_env) }
                | otherwise -> return False
 
-tcConH98Args :: ContextKind  -- expected kind of arguments
+tcConH98Args :: ConArgKind   -- expected kind of arguments
                              -- always OpenKind for datatypes, but unlifted newtypes
                              -- might have a specific kind
              -> HsConDeclH98Details GhcRn
@@ -3912,7 +3960,7 @@ tcConH98Args exp_kind (InfixCon bty1 bty2)
 tcConH98Args exp_kind (RecCon fields)
   = tcRecConDeclFields exp_kind fields
 
-tcConGADTArgs :: ContextKind  -- expected kind of arguments
+tcConGADTArgs :: ConArgKind   -- expected kind of arguments
                               -- always OpenKind for datatypes, but unlifted newtypes
                               -- might have a specific kind
               -> HsConDeclGADTDetails GhcRn
@@ -3922,7 +3970,7 @@ tcConGADTArgs exp_kind (PrefixConGADT _ btys)
 tcConGADTArgs exp_kind (RecConGADT _ fields)
   = tcRecConDeclFields exp_kind fields
 
-tcConArg :: ContextKind  -- expected kind for args; always OpenKind for datatypes,
+tcConArg :: ConArgKind   -- expected kind for args; always OpenKind for datatypes,
                          -- but might be an unlifted type with UnliftedNewtypes
          -> HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
 tcConArg exp_kind (HsScaled w bty)
@@ -3932,7 +3980,7 @@ tcConArg exp_kind (HsScaled w bty)
         ; traceTc "tcConArg 2" (ppr bty)
         ; return (Scaled w' arg_ty, getBangStrictness bty) }
 
-tcRecConDeclFields :: ContextKind
+tcRecConDeclFields :: ConArgKind
                    -> LocatedL [LConDeclField GhcRn]
                    -> TcM [(Scaled TcType, HsSrcBang)]
 tcRecConDeclFields exp_kind fields
