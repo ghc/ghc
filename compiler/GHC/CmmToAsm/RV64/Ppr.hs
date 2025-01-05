@@ -751,7 +751,7 @@ pprInstr platform instr = case instr of
                 | isVectorRegOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "v") o1 o2
                 | True -> pprPanic "RV64.pprInstr - impossible vector move (VMV)" (pprOp platform o1 <+> pprOp platform o2 <+> text "fmt" <> colon <> (text . show) fmt)
   -- TODO: Remove o2 from constructor
-  VID fmt o1 _o2 -> configVec fmt $$ op1 (text "\tvid.v") o1
+  VID fmt o1 -> configVec fmt $$ op1 (text "\tvid.v") o1
   -- TODO: This expects int register as third operand: Generalize by calculating
   -- the instruction suffix (".vx")
   VMSEQ fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvmseq.vx") o1 o2 o3

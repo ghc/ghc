@@ -826,7 +826,7 @@ getRegister' config plat expr =
         MO_V_Broadcast length w -> do
           (reg_val, format_val, code_val) <- getSomeReg e
           let w_val = formatToWidth format_val
-          pure $ Any (vecFormat (cmmVec length (cmmFloat w))) $ \dst ->
+          pure $ Any (vecFormat (cmmVec length (cmmBits w))) $ \dst ->
             code_val `snocOL`
             annExpr expr
               (VMV (VecFormat length (intScalarFormat w)) (OpReg w dst) (OpReg w_val reg_val))
@@ -1311,53 +1311,9 @@ getRegister' config plat expr =
         --   ret
         --
         -- https://godbolt.org/z/sEG8MrM8P
-        MO_VF_Insert length w ->
-          do
-            (reg_v, format_v, code_v) <- getSomeReg x
-            (reg_f, format_f, code_f) <- getFloatReg y
-            (reg_idx, format_idx, code_idx) <- getSomeReg z
-            (reg_l, format_l, code_l) <- getSomeReg (CmmLit (CmmInt (toInteger length) W64))
-            tmp <- getNewRegNat (VecFormat length (floatScalarFormat w))
-            let targetFormat = VecFormat length (floatScalarFormat w)
-            pure $ Any targetFormat $ \dst ->
-              code_v `appOL`
-              code_f `appOL`
-              code_idx `appOL`
-              code_l `snocOL`
-              annExpr expr
-              -- Build mask for index
-              -- 1. fill elements with index numbers
-              -- TODO: The Width is made up
-               (VID (VecFormat length (intScalarFormat w)) (OpReg W8 v0Reg) (OpReg (formatToWidth format_l) reg_l)) `snocOL`
-              -- 2. Splat value into tmp vector
-              VMV (VecFormat length (floatScalarFormat w)) (OpReg w tmp) (OpReg (formatToWidth format_f) reg_f) `snocOL`
-              -- 3. Merge with mask -> set element at index
-              VMSEQ (VecFormat length (floatScalarFormat w)) (OpReg W8 v0Reg) (OpReg W8 v0Reg) (OpReg (formatToWidth format_idx) reg_idx) `snocOL`
-              VMERGE (VecFormat length (floatScalarFormat w)) (OpReg w dst) (OpReg (formatToWidth format_v) reg_v)  (OpReg w tmp) (OpReg W8 v0Reg)
-        -- TODO: Duplication with MO_VF_Insert
-        MO_V_Insert length w ->
-          do
-            (reg_v, format_v, code_v) <- getSomeReg x
-            (reg_f, format_f, code_f) <- getSomeReg y
-            (reg_idx, format_idx, code_idx) <- getSomeReg z
-            (reg_l, format_l, code_l) <- getSomeReg (CmmLit (CmmInt (toInteger length) W64))
-            tmp <- getNewRegNat (VecFormat length (intScalarFormat w))
-            let targetFormat = VecFormat length (intScalarFormat w)
-            pure $ Any targetFormat $ \dst ->
-              code_v `appOL`
-              code_f `appOL`
-              code_idx `appOL`
-              code_l `snocOL`
-              annExpr expr
-              -- Build mask for index
-              -- 1. fill elements with index numbers
-              -- TODO: The Width is made up
-               (VID (VecFormat length (intScalarFormat w)) (OpReg W8 v0Reg) (OpReg (formatToWidth format_l) reg_l)) `snocOL`
-              -- 2. Splat value into tmp vector
-              VMV (VecFormat length (intScalarFormat w)) (OpReg w tmp) (OpReg (formatToWidth format_f) reg_f) `snocOL`
-              -- 3. Merge with mask -> set element at index
-              VMSEQ (VecFormat length (intScalarFormat w)) (OpReg W8 v0Reg) (OpReg W8 v0Reg) (OpReg (formatToWidth format_idx) reg_idx) `snocOL`
-              VMERGE (VecFormat length (intScalarFormat w)) (OpReg w dst) (OpReg (formatToWidth format_v) reg_v)  (OpReg w tmp) (OpReg W8 v0Reg)
+        MO_VF_Insert length width ->vecInsert floatScalarFormat length width
+
+        MO_V_Insert length width -> vecInsert intScalarFormat length width
 
         _ ->
           pprPanic "getRegister' (unhandled ternary CmmMachOp): "
@@ -1365,6 +1321,31 @@ getRegister' config plat expr =
             <+> text "in"
             <+> pdoc plat expr
       where
+        vecInsert :: (Width -> ScalarFormat) -> Int -> Width -> NatM Register
+        vecInsert widthToScalarFormat length width =
+            do
+              let targetVecFormat = VecFormat length (widthToScalarFormat width)
+              (reg_v, format_v, code_v) <- getSomeReg x
+              (reg_f, format_f, code_f) <- getSomeReg y
+              (reg_idx, format_idx, code_idx) <- getSomeReg z
+              tmp <- getNewRegNat targetVecFormat
+              pure $ Any targetVecFormat $ \dst ->
+                code_v `appOL`
+                code_f `appOL`
+                code_idx `snocOL`
+                annExpr expr
+                -- 1. fill elements with index numbers
+                -- TODO: The Width is made up
+                -- TODO: Is it safe to use v0 (default mask register) here? Instructions may be shuffled around...
+                -- Can we use an explicitly fetched register as mask (depends on instructions)?
+                 (VID targetVecFormat (OpReg W8 v0Reg)) `snocOL`
+                -- 2. Build mask
+                VMSEQ  targetVecFormat(OpReg W8 v0Reg) (OpReg W8 v0Reg) (OpReg (formatToWidth format_idx) reg_idx) `snocOL`
+                -- 3. Splat value into tmp vector
+                VMV targetVecFormat (OpReg width tmp) (OpReg (formatToWidth format_f) reg_f) `snocOL`
+                -- 4. Merge with mask -> set element at index
+                VMERGE targetVecFormat (OpReg width dst) (OpReg (formatToWidth format_v) reg_v) (OpReg width tmp) (OpReg W8 v0Reg)
+
         float3Op w op = do
           (reg_fx, format_x, code_fx) <- getFloatReg x
           (reg_fy, format_y, code_fy) <- getFloatReg y

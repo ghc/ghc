@@ -111,7 +111,7 @@ regUsageOfInstr platform instr = case instr of
   FMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VMV fmt dst src1 -> usage (regOp src1, regOp dst)
-  VID fmt dst src1 -> usage (regOp src1, regOp dst)
+  VID fmt dst -> usage ([], regOp dst)
   VMSEQ fmt dst src op -> usage (regOp src ++ regOp op, regOp dst)
   VMERGE fmt dst op1 op2 opm -> usage (regOp op1 ++ regOp op2 ++ regOp opm, regOp dst)
   VSLIDEDOWN fmt dst op1 op2 -> usage (regOp op1 ++ regOp op2, regOp dst)
@@ -233,7 +233,7 @@ patchRegsOfInstr instr env = case instr of
   FMIN o1 o2 o3 -> FMIN (patchOp o1) (patchOp o2) (patchOp o3)
   FMAX o1 o2 o3 -> FMAX (patchOp o1) (patchOp o2) (patchOp o3)
   VMV fmt o1 o2 -> VMV fmt (patchOp o1) (patchOp o2)
-  VID fmt o1 o2 -> VID fmt (patchOp o1) (patchOp o2)
+  VID fmt o1 -> VID fmt (patchOp o1)
   VMSEQ fmt o1 o2 o3 -> VMSEQ fmt (patchOp o1) (patchOp o2) (patchOp o3)
   VMERGE fmt o1 o2 o3 o4 -> VMERGE fmt (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
   VSLIDEDOWN fmt o1 o2 o3 -> VSLIDEDOWN fmt (patchOp o1) (patchOp o2) (patchOp o3)
@@ -684,7 +684,7 @@ data Instr
 
   -- TODO: Care about the variants (<instr>.x.y) -> sum type
   | VMV Format Operand Operand
-  | VID Format Operand Operand
+  | VID Format Operand 
   | VMSEQ Format Operand Operand Operand
   | VMERGE Format Operand Operand Operand Operand
   | VSLIDEDOWN Format Operand Operand Operand
