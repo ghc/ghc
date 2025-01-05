@@ -1253,6 +1253,8 @@ freeReg REG_D5    = False
 freeReg REG_D6    = False
 # endif
 
+-- N.B. XMM* YMM* and ZMM* refer to the same registers on RISCV64. Thus,
+-- defining freeReg for one vector register size is good enough.
 # if defined(REG_XMM1)
 freeReg REG_XMM1    = False
 # endif
