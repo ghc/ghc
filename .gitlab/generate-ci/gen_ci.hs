@@ -170,6 +170,7 @@ configureArgsStr bc = unwords $
   ++ ["--with-system-libffi" | crossTarget bc == Just "wasm32-wasi" ]
   ++ ["--enable-ipe-data-compression" | withZstd bc ]
   ++ ["--enable-strict-ghc-toolchain-check"]
+  ++ ["--enable-dwarf-unwind" | withDwarf bc]
 
 -- Compute the hadrian flavour from the BuildConfig
 mkJobFlavour :: BuildConfig -> Flavour
