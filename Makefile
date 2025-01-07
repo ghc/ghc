@@ -97,6 +97,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	cp _build/stage1/src/ghc-bin/ghc-bin.cabal{.in,}
 	cp _build/stage1/src/libraries/ghc/ghc.cabal{.in,}
 	cp _build/stage1/src/libraries/ghc/GHC/CmmToLlvm/Version/Bounds.hs{.in,}
+	cp _build/stage1/src/libraries/ghc-internal/ghc-internal.cabal{.in,}
 	cp _build/stage1/src/libraries/ghc-boot/ghc-boot.cabal{.in,}
 	cp _build/stage1/src/libraries/ghc-boot-th/ghc-boot-th.cabal{.in,}
 	cp _build/stage1/src/libraries/ghc-heap/ghc-heap.cabal{.in,}
@@ -119,6 +120,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	sed -i 's/@ProjectVersion@/9.13/' _build/stage1/src/libraries/ghci/ghci.cabal
 	sed -i 's/@ProjectVersionMunged@/9.13/' _build/stage1/src/libraries/ghci/ghci.cabal
 	sed -i 's/@ProjectVersionForLib@/9.13/' _build/stage1/src/libraries/ghci/ghci.cabal
+	sed -i 's/@ProjectVersionForLib@/9.13/' _build/stage1/src/libraries/ghc-internal/ghc-internal.cabal
 	sed -i 's/@ProjectVersion@/9.13/' _build/stage1/src/libraries/rts/include/ghcversion.h
 	sed -i 's/@ProjectVersionInt@/913/' _build/stage1/src/libraries/rts/include/ghcversion.h
 	sed -i 's/@ProjectPatchLevel1@/0/' _build/stage1/src/libraries/rts/include/ghcversion.h
@@ -224,7 +226,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE1)' \
 	  $(CABAL) build --project-file=cabal.project-stage1 \
-	  rts ghc-prim ghc-bignum \
+	  rts ghc-prim ghc-bignum ghc-internal \
 	  --with-compiler=`pwd`/_build/stage0/bin/ghc \
 	  --with-hc-pkg=`pwd`/_build/stage0/bin/ghc-pkg \
 	  --ghc-options="-ghcversion-file=`pwd`/_build/stage1/src/libraries/rts/include/ghcversion.h" \
@@ -246,7 +248,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	  --ghc-options='"-optc=-DTargetVendor=\"FIXME\""' \
 	  --ghc-options='"-optc=-DGhcUnregisterised=\"FIXME\""' \
 	  --ghc-options='"-optc=-DTablesNextToCode=\"FIXME\""' \
-	  --builddir=_build/stage1/cabal/
+	  --builddir=_build/stage1/cabal/ -v
 
 clean:
 	rm -rf _build
