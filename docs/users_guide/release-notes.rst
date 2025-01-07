@@ -10,3 +10,4 @@ Release notes
    9.6.4-notes
    9.6.5-notes
    9.6.6-notes
+   9.6.7-notes
