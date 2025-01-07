@@ -1284,6 +1284,8 @@ topdecl :: { LHsDecl GhcPs }
         | infixexp                              {% runPV (unECP $1) >>= \ $1 ->
                                                        commentsPA $ mkSpliceDecl $1 }
 
+        | modifiers1 ';' topdecl { $3 }
+
 -- Type classes
 --
 cl_decl :: { LTyClDecl GhcPs }
@@ -2269,6 +2271,20 @@ type :: { LHsType GhcPs }
         | btype '->.' ctype            {% hintLinear (getLoc $2) >>
                                           amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow (EpLolly (epTok $2))) $1 $3) }
 
+modifier :: { () }
+modifier
+  : PREFIX_PERCENT atype            { () }
+
+modifiers1 :: { [()] }
+modifiers1
+  : modifiers1 modifier { $2 : $1 }
+  | modifier            { [$1] }
+
+modifiers :: { [()] }
+modifiers
+  : modifiers1 { $1 }
+  |            { [] }
+
 mult :: { Located (EpUniToken "->" "\8594" -> HsArrow GhcPs) }
         : PREFIX_PERCENT atype          { sLL $1 $> (mkMultTy (epTok $1) $2) }
 
@@ -2292,6 +2308,7 @@ infixtype :: { forall b. DisambTD b => PV (LocatedA b) }
 
 ftype :: { forall b. DisambTD b => PV (LocatedA b) }
         : atype                         { mkHsAppTyHeadPV $1 }
+        | modifiers1 atype              { mkHsAppTyHeadPV $2 }
         | tyop                          { failOpFewArgs (fst $1) }
         | ftype tyarg                   { $1 >>= \ $1 ->
                                           mkHsAppTyPV $1 $2 }
@@ -2669,17 +2686,6 @@ decl_no_th :: { LHsDecl GhcPs }
                                         -- [FunBind vs PatBind]
                                           ; !cs <- getCommentsFor l
                                           ; return $! (sL (commentsA l cs) $ ValD noExtField r) } }
-        | PREFIX_PERCENT atype infixexp     opt_sig rhs  {% runPV (unECP $3) >>= \ $3 ->
-                                       do { let { l = comb2 $1 $> }
-                                          ; r <- checkValDef l $3 (mkMultAnn (epTok $1) $2, $4) $5;
-                                        -- parses bindings of the form %p x or
-                                        -- %p x :: sig
-                                        --
-                                        -- Depending upon what the pattern looks like we might get either
-                                        -- a FunBind or PatBind back from checkValDef. See Note
-                                        -- [FunBind vs PatBind]
-                                          ; !cs <- getCommentsFor l
-                                          ; return $! (sL (commentsA l cs) $ ValD noExtField r) } }
         | pattern_synonym_decl  { $1 }
 
 decl    :: { LHsDecl GhcPs }
@@ -2994,6 +3000,7 @@ fexp    :: { ECP }
                                         amsA' (sLL $1 $> $ HsStatic (epTok $1) $2) }
 
         | aexp                       { $1 }
+        | modifiers1 aexp            { $2 }
 
 aexp    :: { ECP }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
