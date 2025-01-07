@@ -36,7 +36,7 @@
 	  ><th
 	    >Safe Haskell</th
 	    ><td
-	    >Safe-Inferred</td
+	    >None</td
 	    ></tr
 	  ><tr
 	  ><th
@@ -69,6 +69,66 @@
 	      > a (m :: <a href="#" title="GHC.Exts"
 	      >Multiplicity</a
 	      >) b. a %m -&gt; b</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >C</a
+	      > (m :: <a href="#" title="GHC.Exts"
+	      >Multiplicity</a
+	      >) = <a href="#"
+	      >C</a
+	      > {<ul class="subs"
+	      ><li
+		><a href="#"
+		  >linC</a
+		  > :: <a href="#" title="Data.Int"
+		  >Int</a
+		  ></li
+		><li
+		><a href="#"
+		  >urC</a
+		  > %'<a href="#" title="GHC.Exts"
+		  >Many</a
+		  > :: <a href="#" title="Data.Char"
+		  >Char</a
+		  ></li
+		><li
+		><a href="#"
+		  >varC</a
+		  > %m :: <a href="#" title="Data.String"
+		  >String</a
+		  ></li
+		><li
+		><a href="#"
+		  >noC</a
+		  > :: <a href="#" title="Data.Bool"
+		  >Bool</a
+		  ></li
+		></ul
+	      >}</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >G</a
+	      > (mult :: <a href="#" title="GHC.Exts"
+	      >Multiplicity</a
+	      >) <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
+	      ><li
+		><a href="#"
+		  >G</a
+		  > :: <span class="keyword"
+		  >forall</span
+		  > (mult :: <a href="#" title="GHC.Exts"
+		  >Multiplicity</a
+		  >). {..} -&gt; <a href="#" title="LinearTypes"
+		  >G</a
+		  > mult</li
+		></ul
+	      ></li
 	    ></ul
 	  ></details
 	></div
@@ -113,6 +173,184 @@
 	  ><div class="doc"
 	  ><p
 	    >Does something polymorphic.</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:C" class="def"
+	    >C</a
+	    > (m :: <a href="#" title="GHC.Exts"
+	    >Multiplicity</a
+	    >) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >A record with non-linear fields.</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v:C" class="def"
+		  >C</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ><tr
+	      ><td colspan="2"
+		><div class="subs fields"
+		  ><p class="caption"
+		    >Fields</p
+		    ><ul
+		    ><li
+		      ><dfn class="src"
+			><a id="v:linC" class="def"
+			  >linC</a
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  ></dfn
+			><div class="doc empty"
+			>&nbsp;</div
+			></li
+		      ><li
+		      ><dfn class="src"
+			><a id="v:urC" class="def"
+			  >urC</a
+			  > %'<a href="#" title="GHC.Exts"
+			  >Many</a
+			  > :: <a href="#" title="Data.Char"
+			  >Char</a
+			  ></dfn
+			><div class="doc empty"
+			>&nbsp;</div
+			></li
+		      ><li
+		      ><dfn class="src"
+			><a id="v:varC" class="def"
+			  >varC</a
+			  > %m :: <a href="#" title="Data.String"
+			  >String</a
+			  ></dfn
+			><div class="doc empty"
+			>&nbsp;</div
+			></li
+		      ><li
+		      ><dfn class="src"
+			><a id="v:noC" class="def"
+			  >noC</a
+			  > :: <a href="#" title="Data.Bool"
+			  >Bool</a
+			  ></dfn
+			><div class="doc empty"
+			>&nbsp;</div
+			></li
+		      ></ul
+		    ></div
+		  ></td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:G" class="def"
+	    >G</a
+	    > (mult :: <a href="#" title="GHC.Exts"
+	    >Multiplicity</a
+	    >) <span class="keyword"
+	    >where</span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >A GADT record with non-linear fields.</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v:G" class="def"
+		  >G</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ><tr
+	      ><td colspan="2"
+		><div class="subs fields"
+		  ><p class="caption"
+		    >Fields</p
+		    ><ul
+		    ><li
+		      ><dfn class="src"
+			>:: <span class="keyword"
+			  >forall</span
+			  > (mult :: <a href="#" title="GHC.Exts"
+			  >Multiplicity</a
+			  >). { <a id="v:linG" class="def"
+			  >linG</a
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  ></dfn
+			><div class="doc empty"
+			>&nbsp;</div
+			></li
+		      ><li
+		      ><dfn class="src"
+			>&nbsp;&nbsp;&nbsp;, <a id="v:urG" class="def"
+			  >urG</a
+			  > %'<a href="#" title="GHC.Exts"
+			  >Many</a
+			  > :: <a href="#" title="Data.Char"
+			  >Char</a
+			  ></dfn
+			><div class="doc empty"
+			>&nbsp;</div
+			></li
+		      ><li
+		      ><dfn class="src"
+			>&nbsp;&nbsp;&nbsp;, <a id="v:varG" class="def"
+			  >varG</a
+			  > %mult :: <a href="#" title="Data.String"
+			  >String</a
+			  ></dfn
+			><div class="doc empty"
+			>&nbsp;</div
+			></li
+		      ><li
+		      ><dfn class="src"
+			>&nbsp;&nbsp;&nbsp;, <a id="v:noG" class="def"
+			  >noG</a
+			  > :: <a href="#" title="Data.Bool"
+			  >Bool</a
+			  ></dfn
+			><div class="doc empty"
+			>&nbsp;</div
+			></li
+		      ><li
+		      ><dfn class="src"
+			>&nbsp;&nbsp;&nbsp;} -&gt; <a href="#" title="LinearTypes"
+			  >G</a
+			  > mult</dfn
+			><div class="doc empty"
+			>&nbsp;</div
+			></li
+		      ></ul
+		    ></div
+		  ></td
+		></tr
+	      ></table
 	    ></div
 	  ></div
 	></div

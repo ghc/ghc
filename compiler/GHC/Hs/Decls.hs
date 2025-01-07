@@ -886,11 +886,11 @@ pprConDecl (ConDeclH98 { con_name = L _ con
   where
     -- In ppr_details: let's not print the multiplicities (they are always 1, by
     -- definition) as they do not appear in an actual declaration.
-    ppr_details (InfixCon t1 t2) = hsep [ppr (hsScaledThing t1),
+    ppr_details (InfixCon t1 t2) = hsep [pprHsConFieldSpecNoMult t1,
                                          pprInfixOcc con,
-                                         ppr (hsScaledThing t2)]
+                                         pprHsConFieldSpecNoMult t2]
     ppr_details (PrefixCon _ tys) = hsep (pprPrefixOcc con
-                                    : map (pprHsType . unLoc . hsScaledThing) tys)
+                                    : map pprHsConFieldSpecNoMult tys)
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
 
@@ -901,12 +901,12 @@ pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
     <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext mcxt,
               sep (ppr_args args ++ [ppr res_ty]) ])
   where
-    ppr_args (PrefixConGADT _ args) = map (\(HsScaled arr t) -> ppr t <+> ppr_arr arr) args
+    ppr_args (PrefixConGADT _ args) = map (pprHsConFieldSpecWith (\arr tyDoc -> tyDoc <+> ppr_arr arr)) args
     ppr_args (RecConGADT _ fields) = [pprConDeclFields (unLoc fields) <+> arrow]
 
     -- Display linear arrows as unrestricted with -XNoLinearTypes
     -- (cf. dataConDisplayType in Note [Displaying linear fields] in GHC.Core.DataCon)
-    ppr_arr (HsLinearArrow _) = sdocOption sdocLinearTypes $ \show_linear_types ->
+    ppr_arr (HsLinearAnn _) = sdocOption sdocLinearTypes $ \show_linear_types ->
                                   if show_linear_types then lollipop else arrow
     ppr_arr arr = pprHsArrow arr
 

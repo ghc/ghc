@@ -962,12 +962,12 @@ extractPatternSyn nm t tvs cons =
       let args =
             case con of
               ConDeclH98{con_args = con_args'} -> case con_args' of
-                PrefixCon _ args' -> map hsScaledThing args'
-                RecCon (L _ fields) -> cd_fld_type . unLoc <$> fields
-                InfixCon arg1 arg2 -> map hsScaledThing [arg1, arg2]
+                PrefixCon _ args' -> map cfs_type args'
+                RecCon (L _ fields) -> cfs_type . cd_fld_spec . unLoc <$> fields
+                InfixCon arg1 arg2 -> map cfs_type [arg1, arg2]
               ConDeclGADT{con_g_args = con_args'} -> case con_args' of
-                PrefixConGADT _ args' -> map hsScaledThing args'
-                RecConGADT _ (L _ fields) -> cd_fld_type . unLoc <$> fields
+                PrefixConGADT _ args' -> map cfs_type args'
+                RecConGADT _ (L _ fields) -> cfs_type . cd_fld_spec . unLoc <$> fields
           typ = longArrow args (data_ty con)
           typ' =
             case con of
@@ -998,13 +998,13 @@ extractRecSel _ _ _ [] = Left "extractRecSel: selector not found"
 extractRecSel nm t tvs (L _ con : rest) =
   case getRecConArgs_maybe con of
     Just (L _ fields)
-      | ((l, L _ (ConDeclField _ _nn ty _)) : _) <- matching_fields fields ->
-          pure (L (noAnnSrcSpan l) (TypeSig noAnn [noLocA nm] (mkEmptyWildCardBndrs $ mkEmptySigType (noLocA (HsFunTy noExtField (HsUnrestrictedArrow noExtField) data_ty (getBangType ty))))))
+      | ((l, L _ (ConDeclField _ _nn ty)) : _) <- matching_fields fields ->
+          pure (L (noAnnSrcSpan l) (TypeSig noAnn [noLocA nm] (mkEmptyWildCardBndrs $ mkEmptySigType (noLocA (HsFunTy noExtField (HsUnrestrictedArrow noExtField) data_ty (cfs_type ty))))))
     _ -> extractRecSel nm t tvs rest
   where
     matching_fields :: [LConDeclField GhcRn] -> [(SrcSpan, LConDeclField GhcRn)]
     matching_fields flds =
-      [ (locA l, f) | f@(L _ (ConDeclField _ ns _ _)) <- flds, L l n <- ns, unLoc (foLabel n) == nm
+      [ (locA l, f) | f@(L _ (ConDeclField _ ns _)) <- flds, L l n <- ns, unLoc (foLabel n) == nm
       ]
     data_ty
       -- ResTyGADT _ ty <- con_res con = ty

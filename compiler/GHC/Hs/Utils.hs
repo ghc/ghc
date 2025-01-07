@@ -630,7 +630,7 @@ nlHsTyVar p x = noLocA (HsTyVar noAnn p (noLocA x))
 nlHsFunTy a b = noLocA (HsFunTy noExtField (HsUnrestrictedArrow x) a b)
   where
     x = case ghcPass @p of
-      GhcPs -> noAnn
+      GhcPs -> EpArrow noAnn
       GhcRn -> noExtField
       GhcTc -> noExtField
 nlHsParTy t   = noLocA (HsParTy noAnn t)

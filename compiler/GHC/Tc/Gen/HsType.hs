@@ -945,7 +945,7 @@ concern things that the renamer can't handle.
 
 -}
 
-tcMult :: HsArrow GhcRn -> TcM Mult
+tcMult :: HsMultAnnOn (LHsType GhcRn) GhcRn -> TcM Mult
 tcMult hc = tc_mult typeLevelMode hc
 
 -- | Info about the context in which we're checking a type. Currently,
@@ -1100,15 +1100,6 @@ tcHsType :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 
 tcHsType mode (HsParTy _ ty)   exp_kind = tcLHsType mode ty exp_kind
 tcHsType mode (HsDocTy _ ty _) exp_kind = tcLHsType mode ty exp_kind
-tcHsType _ ty@(HsBangTy _ bang _) _
-    -- While top-level bangs at this point are eliminated (eg !(Maybe Int)),
-    -- other kinds of bangs are not (eg ((!Maybe) Int)). These kinds of
-    -- bangs are invalid, so fail. (#7210, #14761)
-    = failWith $ TcRnUnexpectedAnnotation ty bang
-tcHsType _ ty@(HsRecTy {})      _
-      -- Record types (which only show up temporarily in constructor
-      -- signatures) should have been removed by now
-    = failWithTc $ TcRnIllegalRecordSyntax (Right ty)
 
 -- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSpliceType'.
 -- Here we get rid of it and add the finalizers to the global environment
@@ -1371,8 +1362,8 @@ Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in "GHC.Core.TyCo
 -}
 
 ------------------------------------------
-tc_mult :: TcTyMode -> HsArrow GhcRn -> TcM Mult
-tc_mult mode ty = tc_check_lhs_type mode (arrowToHsType ty) multiplicityTy
+tc_mult :: TcTyMode -> HsMultAnnOn (LHsType GhcRn) GhcRn -> TcM Mult
+tc_mult mode ty = tc_check_lhs_type mode (multAnnToHsType ty) multiplicityTy
 ------------------------------------------
 tc_fun_type :: TcTyMode -> HsArrow GhcRn -> LHsType GhcRn -> LHsType GhcRn -> ExpKind
             -> TcM TcType

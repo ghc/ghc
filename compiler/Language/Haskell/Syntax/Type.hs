@@ -8,6 +8,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE LambdaCase #-}
                                       -- in module Language.Haskell.Syntax.Extension
 {-
@@ -20,9 +22,9 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 module Language.Haskell.Syntax.Type (
-        HsScaled(..),
-        hsMult, hsScaledThing,
-        HsArrow, HsArrowOf(..), XUnrestrictedArrow, XLinearArrow, XExplicitMult, XXArrow,
+        HsArrow, HsArrowOf, HsMultAnnOn(..), HsMultAnnOnWhat(..),
+        pattern HsUnrestrictedArrow,
+        XUnannotated, XLinearAnn, XExplicitMult, XXMultAnnOn,
 
         HsType(..), LHsType, HsKind, LHsKind,
         HsBndrVis(..), XBndrRequired, XBndrInvisible, XXBndrVis,
@@ -46,13 +48,12 @@ module Language.Haskell.Syntax.Type (
 
         LHsTypeArg,
 
-        LBangType, BangType,
-        HsBang(..),
         PromotionFlag(..), isPromoted,
 
         ConDeclField(..), LConDeclField,
 
         HsConDetails(..), noTypeArgs,
+        HsConFieldSpec(..),
 
         FieldOcc(..), LFieldOcc,
 
@@ -63,7 +64,7 @@ module Language.Haskell.Syntax.Type (
 
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 
-import Language.Haskell.Syntax.Basic ( HsBang(..) )
+import Language.Haskell.Syntax.Basic ( SrcStrictness, SrcUnpackedness )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Specificity
 
@@ -98,25 +99,6 @@ data PromotionFlag
 isPromoted :: PromotionFlag -> Bool
 isPromoted IsPromoted  = True
 isPromoted NotPromoted = False
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Bang annotations}
-*                                                                      *
-************************************************************************
--}
-
--- | Located Bang Type
-type LBangType pass = XRec pass (BangType pass)
-
--- | Bang Type
---
--- In the parser, strictness and packedness annotations bind more tightly
--- than docstrings. This means that when consuming a 'BangType' (and looking
--- for 'HsBangTy') we must be ready to peer behind a potential layer of
--- 'HsDocTy'. See #15206 for motivation and 'getBangType' for an example.
-type BangType pass  = HsType pass       -- Bangs are in the HsType data type
 
 {-
 ************************************************************************
@@ -904,12 +886,6 @@ data HsType pass
   | HsDocTy             (XDocTy pass)
                         (LHsType pass) (LHsDoc pass) -- A documented type
 
-  | HsBangTy    (XBangTy pass)          -- Contains the SourceText in GHC passes.
-                HsBang (LHsType pass)   -- Bang-style type annotations
-
-  | HsRecTy     (XRecTy pass)
-                [LConDeclField pass]    -- Only in data type declarations
-
   | HsExplicitListTy       -- A promoted explicit list
         (XExplicitListTy pass)
         PromotionFlag      -- whether explicitly promoted, for pretty printer
@@ -938,37 +914,40 @@ data HsTyLit pass
   | XTyLit   !(XXTyLit pass)
 
 type HsArrow pass = HsArrowOf (LHsType pass) pass
+type HsArrowOf = HsMultAnnOn
 
--- | Denotes the type of arrows in the surface language
-data HsArrowOf mult pass
-  = HsUnrestrictedArrow !(XUnrestrictedArrow mult pass)
-    -- ^ a -> b or a → b
+pattern HsUnrestrictedArrow :: XUnannotated mult pass -> HsMultAnnOn mult pass
+pattern HsUnrestrictedArrow a = HsUnannotated OnArrow a
 
-  | HsLinearArrow !(XLinearArrow mult pass)
-    -- ^ a %1 -> b or a %1 → b, or a ⊸ b
+-- HsMultAnnOn is used both to represent function arrows and multiplicity annotations
+-- in the data declaration syntax. But the default multiplicity is different
+-- between the two uses. In constructors, the default is One, but on arrows, the
+-- default is Many. (But note that non-record GADT syntax follows the default of arrows.)
+-- `HsMultAnnOnWhat` is used to distinguish between the two uses.
+data HsMultAnnOnWhat = OnArrow | OnConField
+  deriving Data
+
+-- | Denotes multiplicity annotations in the surface language
+data HsMultAnnOn mult pass
+  = HsUnannotated !HsMultAnnOnWhat !(XUnannotated mult pass)
+    -- ^ a -> b or a → b or { nm :: a }
+
+  | HsLinearAnn !(XLinearAnn mult pass)
+    -- ^ a %1 -> b or a %1 → b, or a ⊸ b, or { nm %1 :: a }
 
   | HsExplicitMult !(XExplicitMult mult pass) !mult
-    -- ^ a %m -> b or a %m → b (very much including `a %Many -> b`!
+    -- ^ a %m -> b or a %m → b or { nm %m :: a }
+    -- (very much including `a %Many -> b`!
     -- This is how the programmer wrote it). It is stored as an
     -- `HsType` so as to preserve the syntax as written in the
     -- program.
 
-  | XArrow !(XXArrow mult pass)
+  | XMultAnnOn !(XXMultAnnOn mult pass)
 
-type family XUnrestrictedArrow mult p
-type family XLinearArrow       mult p
-type family XExplicitMult      mult p
-type family XXArrow            mult p
-
--- | This is used in the syntax. In constructor declaration. It must keep the
--- arrow representation.
-data HsScaled pass a = HsScaled (HsArrow pass) a
-
-hsMult :: HsScaled pass a -> HsArrow pass
-hsMult (HsScaled m _) = m
-
-hsScaledThing :: HsScaled pass a -> a
-hsScaledThing (HsScaled _ t) = t
+type family XUnannotated  mult p
+type family XLinearAnn    mult p
+type family XExplicitMult mult p
+type family XXMultAnnOn   mult p
 
 {-
 Note [Unit tuples]
@@ -1069,12 +1048,11 @@ data HsTupleSort = HsUnboxedTuple
 type LConDeclField pass = XRec pass (ConDeclField pass)
 
 -- | Constructor Declaration Field
-data ConDeclField pass  -- Record fields have Haddock docs on them
+data ConDeclField pass
   = ConDeclField { cd_fld_ext  :: XConDeclField pass,
                    cd_fld_names :: [LFieldOcc pass],
-                                   -- ^ See Note [ConDeclField pass]
-                   cd_fld_type :: LBangType pass,
-                   cd_fld_doc  :: Maybe (LHsDoc pass)}
+                                   -- ^ See Note [FieldOcc pass]
+                   cd_fld_spec :: HsConFieldSpec pass }
   | XConDeclField !(XXConDeclField pass)
 
 -- | Describes the arguments to a data constructor. This is a common
@@ -1104,24 +1082,48 @@ data HsConDetails tyarg arg rec
 noTypeArgs :: [Void]
 noTypeArgs = []
 
-{-
-Note [ConDeclField pass]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+-- | Constructor field specification, see Note [HsConFieldSpec on pass]
+data HsConFieldSpec pass
+  = CFS { cfs_ext          :: XConFieldSpec pass
+          -- ^ Extension point
 
-A ConDeclField contains a list of field occurrences: these always
-include the field label as the user wrote it.  After the renamer, it
-will additionally contain the identity of the selector function in the
-second component.
+        , cfs_unpack       :: SrcUnpackedness
+          -- ^ UNPACK pragma if any
+          -- E.g. data T = MkT {-# UNPACK #-} Int
 
-Due to DuplicateRecordFields, the OccName of the selector function
-may have been mangled, which is why we keep the original field label
-separately.  For example, when DuplicateRecordFields is enabled
+        , cfs_bang         :: SrcStrictness
+          -- ^ User-specified strictness, if any
+          -- E.g. data T a = MkT !a
 
-    data T = MkT { x :: Int }
+        , cfs_multiplicity :: HsMultAnnOn (LHsType pass) pass
+          -- ^ User-specified multiplicity, if any
+          -- E.g. data T a = MkT { t %Many :: a }
+          --   or data T a where MtT :: a %1 -> T a
 
-gives
+        , cfs_type         :: LHsType pass
+          -- ^ The type of the field
 
-    ConDeclField { cd_fld_names = [L _ (FieldOcc "x" $sel:x:MkT)], ... }.
+        , cfs_doc          :: Maybe (LHsDoc pass)
+          -- ^ Documentation for the field
+          -- F.e. this very piece of documentation
+        }
+
+{- Note [HsConFieldSpec on pass]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`HsConFieldSpec` is used to specify the type of a data single constructor argument for all of:
+* Haskell-98 style declarations (with prefix, infix or record syntax)
+  e.g.  data T1 a = MkT (Maybe a) !Int
+* GADT-style declarations with arrow syntax
+  e.g.  data T2 a where MkT :: Maybe a -> !Int -> T2 a
+* GADT-style declarations with record syntax
+  e.g.  data T3 a where MkT :: { x :: Maybe a, y :: !Int } -> T3 a
+
+These argument types are decorated with any user-defined
+  a) UNPACK pragma `cfs_unpack`
+  b) strictness annotation `cfs_bang`
+  c) multiplicity annotation `cfs_multiplicity`
+     In the case of Haskell-98 style declarations, this only applies to record syntax.
+  d) documentation `cfs_doc`
 -}
 
 -----------------------
@@ -1275,7 +1277,7 @@ type LFieldOcc pass = XRec pass (FieldOcc pass)
 --
 -- We store both the 'RdrName' the user originally wrote, and after
 -- the renamer we use the extension field to store the selector
--- function.
+-- function. See note [FieldOcc pass]
 --
 -- There is a wrinkle in that update field occurances are sometimes
 -- ambiguous during the rename stage. See note
@@ -1292,6 +1294,23 @@ deriving instance (
   , Eq (XCFieldOcc pass)
   , Eq (XXFieldOcc pass)
   ) => Eq (FieldOcc pass)
+
+{- Note [FieldOcc pass]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The foLabel field of FieldOcc GhcRn contains the field name as the user wrote it.
+After the renamer, a FieldOcc GhcTc has
+- foExt field: A RdrName containing the original field label written by the user
+- foLabel field: An Id for the field selector, whose OccName may have been mangled
+  to give it a globally unique identity.
+
+For example, when DuplicateRecordFields is enabled
+
+    data T = MkT { x :: Int }
+
+gives
+
+    FieldOcc "x" $sel:x:MkT.
+-}
 
 {-
 ************************************************************************

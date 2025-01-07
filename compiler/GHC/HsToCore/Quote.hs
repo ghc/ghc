@@ -918,17 +918,13 @@ repSrcStrictness SrcLazy     = rep2 sourceLazyName         []
 repSrcStrictness SrcStrict   = rep2 sourceStrictName       []
 repSrcStrictness NoSrcStrict = rep2 noSourceStrictnessName []
 
-repBangTy :: LBangType GhcRn -> MetaM (Core (M TH.BangType))
-repBangTy ty = do
-  MkC u <- repSrcUnpackedness su'
-  MkC s <- repSrcStrictness ss'
+repConFieldSpec :: HsConFieldSpec GhcRn -> MetaM (Core (M TH.BangType))
+repConFieldSpec (CFS _ su ss _ ty' _) = do
+  MkC u <- repSrcUnpackedness su
+  MkC s <- repSrcStrictness ss
   MkC b <- rep2 bangName [u, s]
   MkC t <- repLTy ty'
   rep2 bangTypeName [b, t]
-  where
-    (su', ss', ty') = case unLoc ty of
-            HsBangTy _ (HsBang su ss) ty -> (su, ss, ty)
-            _ -> (NoSrcUnpack, NoSrcStrict, ty)
 
 -------------------------------------------------------
 --                      Deriving clauses
@@ -1430,7 +1426,7 @@ repTy (HsFunTy _ w f a) | isUnrestricted w = do
                                 a1   <- repLTy a
                                 tcon <- repArrowTyCon
                                 repTapps tcon [f1, a1]
-repTy (HsFunTy _ w f a) = do w1   <- repLTy (arrowToHsType w)
+repTy (HsFunTy _ w f a) = do w1   <- repLTy (multAnnToHsType w)
                              f1   <- repLTy f
                              a1   <- repLTy a
                              tcon <- repMulArrowTyCon
@@ -2836,8 +2832,8 @@ repH98DataCon con details
              rep2 normalCName [unC con', unC arg_tys]
            InfixCon st1 st2 -> do
              verifyLinearFields [st1, st2]
-             arg1 <- repBangTy (hsScaledThing st1)
-             arg2 <- repBangTy (hsScaledThing st2)
+             arg1 <- repConFieldSpec st1
+             arg2 <- repConFieldSpec st2
              rep2 infixCName [unC arg1, unC con', unC arg2]
            RecCon ips -> do
              arg_vtys <- repRecConArgs ips
@@ -2863,36 +2859,37 @@ repGadtDataCons cons details res_ty
 -- TH currently only supports linear constructors.
 -- We also accept the (->) arrow when -XLinearTypes is off, because this
 -- denotes a linear field.
--- This check is not performed in repRecConArgs, since the GADT record
--- syntax currently does not have a way to mark fields as nonlinear.
-verifyLinearFields :: [HsScaled GhcRn (LHsType GhcRn)] -> MetaM ()
+verifyLinearFields :: [HsConFieldSpec GhcRn] -> MetaM ()
 verifyLinearFields ps = do
   linear <- lift $ xoptM LangExt.LinearTypes
-  let allGood = all (\st -> case hsMult st of
-                              HsUnrestrictedArrow _ -> not linear
-                              HsLinearArrow _       -> True
-                              _                     -> False) ps
+  let allGood = all (hsMultIsLinear linear . cfs_multiplicity) ps
   unless allGood $ notHandled ThNonLinearDataCon
+  where
+    hsMultIsLinear linearTypesEnabled (HsUnannotated OnArrow _) = not linearTypesEnabled
+    hsMultIsLinear _ (HsUnannotated OnConField _) = True
+    hsMultIsLinear _ HsLinearAnn{} = True
+    hsMultIsLinear _ _ = False
 
 -- Desugar the arguments in a data constructor declared with prefix syntax.
-repPrefixConArgs :: [HsScaled GhcRn (LHsType GhcRn)]
-                 -> MetaM (Core [M TH.BangType])
+repPrefixConArgs :: [HsConFieldSpec GhcRn] -> MetaM (Core [M TH.BangType])
 repPrefixConArgs ps = do
   verifyLinearFields ps
-  repListM bangTypeTyConName repBangTy (map hsScaledThing ps)
+  repListM bangTypeTyConName repConFieldSpec ps
 
 -- Desugar the arguments in a data constructor declared with record syntax.
 repRecConArgs :: LocatedL [LConDeclField GhcRn]
               -> MetaM (Core [M TH.VarBangType])
-repRecConArgs ips = do
-  args     <- concatMapM rep_ip (unLoc ips)
+repRecConArgs lips = do
+  let ips = map unLoc (unLoc lips)
+  verifyLinearFields (map cd_fld_spec ips)
+  args <- concatMapM rep_ip ips
   coreListM varBangTypeTyConName args
     where
-      rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
+      rep_ip ip = mapM (rep_one_ip (cd_fld_spec ip)) (cd_fld_names ip)
 
-      rep_one_ip :: LBangType GhcRn -> LFieldOcc GhcRn -> MetaM (Core (M TH.VarBangType))
+      rep_one_ip :: HsConFieldSpec GhcRn -> LFieldOcc GhcRn -> MetaM (Core (M TH.VarBangType))
       rep_one_ip t n = do { MkC v  <- lookupOcc (unLoc . foLabel $ unLoc n)
-                          ; MkC ty <- repBangTy  t
+                          ; MkC ty <- repConFieldSpec t
                           ; rep2 varBangTypeName [v,ty] }
 
 ------------ Types -------------------

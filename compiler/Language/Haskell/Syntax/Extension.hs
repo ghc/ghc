@@ -651,8 +651,6 @@ type family XStarTy          x
 type family XKindSig         x
 type family XSpliceTy        x
 type family XDocTy           x
-type family XBangTy          x
-type family XRecTy           x
 type family XExplicitListTy  x
 type family XExplicitTupleTy x
 type family XTyLit           x
@@ -681,6 +679,11 @@ type family XXTyVarBndr  x
 -- ConDeclField type families
 type family XConDeclField  x
 type family XXConDeclField x
+
+-- ---------------------------------------------------------------------
+-- ConFieldSpec type families
+type family XConFieldSpec  x
+type family XXConFieldSpec x
 
 -- ---------------------------------------------------------------------
 -- FieldOcc type families

@@ -27,7 +27,7 @@ import Data.List (sort)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
-import GHC hiding (fromMaybeContext)
+import GHC hiding (HsTypeGhcPsExt (..), fromMaybeContext)
 import GHC.Core.Type (Specificity (..))
 import GHC.Data.FastString (unpackFS)
 import GHC.Types.Name (getOccString, nameOccName, tidyNameOcc)
@@ -597,7 +597,7 @@ ppSubSigLike unicode typ argDocs subdocs leader = do_sig_args 0 leader typ
       , decltt (ppLContextNoArrow lctxt unicode) <+> nl
       )
         : do_largs n (darrow unicode) ltype
-    do_args n leader (HsFunTy _ _w (L _ (HsRecTy _ fields)) r) =
+    do_args n leader (HsFunTy _ _w (L _ (XHsType (HsRecTy fields))) r) =
       [ (decltt ldr, latex <+> nl)
       | (L _ field, ldr) <- zip fields (leader <+> gadtOpen : repeat gadtComma)
       , let latex = ppSideBySideField subdocs unicode field
@@ -964,7 +964,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
                       hsep
                         [ header_
                         , ppOcc
-                        , hsep (map (ppLParendType unicode . hsScaledThing) args)
+                        , hsep (map (ppLParendType unicode . hsConFieldSpecToHsTypeNoMult) args)
                         ]
                 -- Record constructor, e.g. 'Identity { runIdentity :: a }'
                 RecCon _ -> header_ <+> ppOcc
@@ -974,9 +974,9 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
                   | otherwise ->
                       hsep
                         [ header_
-                        , ppLParendType unicode (hsScaledThing arg1)
+                        , ppLParendType unicode (hsConFieldSpecToHsTypeNoMult arg1)
                         , ppOccInfix
-                        , ppLParendType unicode (hsScaledThing arg2)
+                        , ppLParendType unicode (hsConFieldSpecToHsTypeNoMult arg2)
                         ]
       ConDeclGADT{}
         | hasArgDocs || not (isEmpty fieldPart) -> ppOcc
@@ -993,15 +993,15 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
         -- GADT record declarations
         RecConGADT _ _ -> doConstrArgsWithDocs []
         -- GADT prefix data constructors
-        PrefixConGADT _ args | hasArgDocs -> doConstrArgsWithDocs (map hsScaledThing args)
+        PrefixConGADT _ args | hasArgDocs -> doConstrArgsWithDocs (map hsConFieldSpecToHsTypeNoMult args)
         _ -> empty
       ConDeclH98{con_args = con_args'} -> case con_args' of
         -- H98 record declarations
         RecCon (L _ fields) -> doRecordFields fields
         -- H98 prefix data constructors
-        PrefixCon _ args | hasArgDocs -> doConstrArgsWithDocs (map hsScaledThing args)
+        PrefixCon _ args | hasArgDocs -> doConstrArgsWithDocs (map hsConFieldSpecToHsTypeNoMult args)
         -- H98 infix data constructor
-        InfixCon arg1 arg2 | hasArgDocs -> doConstrArgsWithDocs (map hsScaledThing [arg1, arg2])
+        InfixCon arg1 arg2 | hasArgDocs -> doConstrArgsWithDocs (map hsConFieldSpecToHsTypeNoMult [arg1, arg2])
         _ -> empty
 
     doRecordFields fields =
@@ -1031,21 +1031,27 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
 
 -- | Pretty-print a record field
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocNameI -> LaTeX
-ppSideBySideField subdocs unicode (ConDeclField _ names ltype _) =
+ppSideBySideField subdocs unicode (ConDeclField _ names ltype) =
   decltt
     ( cat (punctuate comma (map (ppBinder . rdrNameOcc . foExt . unLoc) names))
-        <+> dcolon unicode
-        <+> ppLType unicode ltype
+        <+> ppRecFieldMultAnn unicode ltype (dcolon unicode)
+        <+> ppLType unicode (hsConFieldSpecToHsTypeNoMult ltype)
     )
     <-> rDoc mbDoc
   where
-    -- don't use cd_fld_doc for same reason we don't use con_doc above
-    -- Where there is more than one name, they all have the same documentation
     mbDoc = lookup (unLoc . foLabel . unLoc $ name) subdocs >>= fmap _doc . combineDocumentation . fst
     name =
       case Maybe.listToMaybe names of
         Nothing -> error "No names. An invariant was broken. Please report this to the Haddock project"
         Just hd -> hd
+
+-- don't use cfs_doc for same reason we don't use con_doc above
+-- Where there is more than one name, they all have the same documentation
+ppRecFieldMultAnn :: Bool -> HsConFieldSpec DocNameI -> LaTeX -> LaTeX
+ppRecFieldMultAnn unicode (CFS _ _ _ arr _ _) following = case arr of
+  HsUnannotated _ _ -> following
+  HsLinearAnn _ -> text "%1" <+> following
+  HsExplicitMult _ mult -> multAnnotation <> ppr_mono_lty mult unicode <+> following
 
 -- | Pretty-print a bundled pattern synonym
 ppSideBySidePat
@@ -1193,9 +1199,9 @@ pp_hs_context cxt unicode = parenList (map (ppType unicode) cxt)
 
 -------------------------------------------------------------------------------
 
-ppBang :: HsBang -> LaTeX
-ppBang (HsBang _ SrcStrict) = char '!'
-ppBang (HsBang _ SrcLazy) = char '~'
+ppBang :: HsSrcBang -> LaTeX
+ppBang (HsSrcBang _ _ SrcStrict) = char '!'
+ppBang (HsSrcBang _ _ SrcLazy) = char '~'
 ppBang _ = empty
 
 tupleParens :: HsTupleSort -> [LaTeX] -> LaTeX
@@ -1311,10 +1317,9 @@ ppr_mono_ty (HsFunTy _ mult ty1 ty2) u =
     ]
   where
     arr = case mult of
-      HsLinearArrow _ -> lollipop u
-      HsUnrestrictedArrow _ -> arrow u
+      HsLinearAnn _ -> lollipop u
+      HsUnannotated _ _ -> arrow u
       HsExplicitMult _ m -> multAnnotation <> ppr_mono_lty m u <+> arrow u
-ppr_mono_ty (HsBangTy _ b ty) u = ppBang b <> ppLParendType u ty
 ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
 ppr_mono_ty (HsTyVar _ IsPromoted (L _ name)) _ = char '\'' <> ppDocName name
 ppr_mono_ty (HsTupleTy _ con tys) u = tupleParens con (map (ppLType u) tys)
@@ -1323,8 +1328,9 @@ ppr_mono_ty (HsKindSig _ ty kind) u = parens (ppr_mono_lty ty u <+> dcolon u <+>
 ppr_mono_ty (HsListTy _ ty) u = brackets (ppr_mono_lty ty u)
 ppr_mono_ty (HsIParamTy _ (L _ n) ty) u = ppIPName n <+> dcolon u <+> ppr_mono_lty ty u
 ppr_mono_ty (HsSpliceTy v _) _ = dataConCantHappen v
-ppr_mono_ty (HsRecTy{}) _ = text "{..}"
-ppr_mono_ty (XHsType{}) _ = error "ppr_mono_ty HsCoreTy"
+ppr_mono_ty (XHsType (HsBangTy b ty)) u = ppBang b <> ppLParendType u ty
+ppr_mono_ty (XHsType HsRecTy{}) _ = text "{..}"
+ppr_mono_ty (XHsType HsCoreTy{}) _ = error "ppr_mono_ty HsCoreTy"
 ppr_mono_ty (HsExplicitListTy _ IsPromoted tys) u = Pretty.quote $ brackets $ hsep $ punctuate comma $ map (ppLType u) tys
 ppr_mono_ty (HsExplicitListTy _ NotPromoted tys) u = brackets $ hsep $ punctuate comma $ map (ppLType u) tys
 ppr_mono_ty (HsExplicitTupleTy _ IsPromoted tys) u = Pretty.quote $ parenList $ map (ppLType u) tys

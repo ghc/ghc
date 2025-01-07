@@ -161,10 +161,18 @@
              (Nothing)
              (PrefixCon
               []
-              [(HsScaled
-                (HsLinearArrow
-                 (EpPct1
+              [(CFS
+                ((,)
+                 ((,,)
+                  (EpaDelta { <no location info> } (SameLine 0) [])
                   (NoEpTok)
+                  (EpaDelta { <no location info> } (SameLine 0) []))
+                 (NoSourceText))
+                (NoSrcUnpack)
+                (NoSrcStrict)
+                (HsUnannotated
+                 (OnConField)
+                 (EpColon
                   (NoEpUniTok)))
                 (L
                  (EpAnn
@@ -184,7 +192,8 @@
                     (EpaComments
                      []))
                    (Unqual
-                    {OccName: Query})))))])
+                    {OccName: Query}))))
+                (Nothing))])
              (Nothing)))
           ,(L
             (EpAnn
@@ -212,10 +221,18 @@
              (Nothing)
              (PrefixCon
               []
-              [(HsScaled
-                (HsLinearArrow
-                 (EpPct1
+              [(CFS
+                ((,)
+                 ((,,)
+                  (EpaDelta { <no location info> } (SameLine 0) [])
                   (NoEpTok)
+                  (EpaDelta { <no location info> } (SameLine 0) []))
+                 (NoSourceText))
+                (NoSrcUnpack)
+                (NoSrcStrict)
+                (HsUnannotated
+                 (OnConField)
+                 (EpColon
                   (NoEpUniTok)))
                 (L
                  (EpAnn
@@ -239,10 +256,12 @@
                      []))
                    (HsFunTy
                     (NoExtField)
-                    (HsUnrestrictedArrow
-                     (EpUniTok
-                      (EpaSpan { Test20239.hs:7:62-63 })
-                      (NormalSyntax)))
+                    (HsUnannotated
+                     (OnArrow)
+                     (EpArrow
+                      (EpUniTok
+                       (EpaSpan { Test20239.hs:7:62-63 })
+                       (NormalSyntax))))
                     (L
                      (EpAnn
                       (EpaSpan { Test20239.hs:7:51-60 })
@@ -373,7 +392,8 @@
                              (EpTok
                               (EpaSpan { Test20239.hs:7:84 })))
                             (HsBoxedOrConstraintTuple)
-                            [])))))))))))))])
+                            []))))))))))))
+                (Nothing))])
              (Nothing)))])
          []))))))]))
 

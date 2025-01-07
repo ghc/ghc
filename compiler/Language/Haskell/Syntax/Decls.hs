@@ -1116,7 +1116,7 @@ or contexts in two parts:
 
 -- | The arguments in a Haskell98-style data constructor.
 type HsConDeclH98Details pass
-   = HsConDetails Void (HsScaled pass (LBangType pass)) (XRec pass [LConDeclField pass])
+   = HsConDetails Void (HsConFieldSpec pass) (XRec pass [LConDeclField pass])
 -- The Void argument to HsConDetails here is a reflection of the fact that
 -- type applications are not allowed in data constructor declarations.
 
@@ -1127,7 +1127,7 @@ type HsConDeclH98Details pass
 -- derived Show instances—see Note [Infix GADT constructors] in
 -- GHC.Tc.TyCl—but that is an orthogonal concern.)
 data HsConDeclGADTDetails pass
-   = PrefixConGADT !(XPrefixConGADT pass) [HsScaled pass (LBangType pass)]
+   = PrefixConGADT !(XPrefixConGADT pass) [HsConFieldSpec pass]
    | RecConGADT !(XRecConGADT pass) (XRec pass [LConDeclField pass])
    | XConDeclGADTDetails !(XXConDeclGADTDetails pass)
 

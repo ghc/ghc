@@ -1282,7 +1282,7 @@ Two wrinkles:
              f (\(MkT @b (d::Num b) (x::b)) -> h @b d x) = ...
      where the HOP is (h @b d x). In principle this might be possible, but
      it seems fragile; e.g. we would still need to insist that the (invisible)
-     @b was a type variable.  And since `h` gets a polymoprhic type, that
+     @b was a type variable.  And since `h` gets a polymorphic type, that
      type would have to be declared by the programmer.
 
      Maybe one day.  But for now, we insist (in `arg_as_lcl_var`)that a HOP

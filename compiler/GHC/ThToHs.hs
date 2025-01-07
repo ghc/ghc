@@ -703,8 +703,8 @@ cvtConstr :: TH.Name -- ^ name of first constructor of parent type
 
 cvtConstr _ do_con_name (NormalC c strtys)
   = do  { c'   <- do_con_name c
-        ; tys' <- mapM cvt_arg strtys
-        ; returnLA $ mkConDeclH98 noAnn c' Nothing Nothing (PrefixCon noTypeArgs (map hsLinear tys')) }
+        ; tys' <- mapM (cvt_arg OnConField) strtys
+        ; returnLA $ mkConDeclH98 noAnn c' Nothing Nothing (PrefixCon noTypeArgs tys') }
 
 cvtConstr parent_con do_con_name (RecC c varstrtys)
   = do  { c'    <- do_con_name c
@@ -714,10 +714,10 @@ cvtConstr parent_con do_con_name (RecC c varstrtys)
 
 cvtConstr _ do_con_name (InfixC st1 c st2)
   = do  { c'   <- do_con_name c
-        ; st1' <- cvt_arg st1
-        ; st2' <- cvt_arg st2
+        ; st1' <- cvt_arg OnConField st1
+        ; st2' <- cvt_arg OnConField st2
         ; returnLA $ mkConDeclH98 noAnn c' Nothing Nothing
-                       (InfixCon (hsLinear st1') (hsLinear st2')) }
+                       (InfixCon st1' st2') }
 
 cvtConstr parent_con do_con_name (ForallC tvs ctxt con)
   = do  { tvs'      <- cvtTvs tvs
@@ -754,9 +754,9 @@ cvtConstr _ do_con_name (GadtC c strtys ty) = case nonEmpty c of
     Nothing -> failWith GadtNoCons
     Just c -> do
         { c'      <- mapM do_con_name c
-        ; args    <- mapM cvt_arg strtys
+        ; args    <- mapM (cvt_arg OnArrow) strtys
         ; ty'     <- cvtType ty
-        ; mk_gadt_decl c' (PrefixConGADT noExtField $ map hsLinear args) ty'}
+        ; mk_gadt_decl c' (PrefixConGADT noExtField args) ty'}
 
 cvtConstr parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
     Nothing -> failWith RecGadtNoCons
@@ -790,25 +790,24 @@ cvtSrcStrictness NoSourceStrictness = NoSrcStrict
 cvtSrcStrictness SourceLazy         = SrcLazy
 cvtSrcStrictness SourceStrict       = SrcStrict
 
-cvt_arg :: (TH.Bang, TH.Type) -> CvtM (LHsType GhcPs)
-cvt_arg (Bang su ss, ty)
+cvt_arg :: HsMultAnnOnWhat -> (TH.Bang, TH.Type) -> CvtM (HsConFieldSpec GhcPs)
+cvt_arg onWhat (Bang su ss, ty)
   = do { ty'' <- cvtType ty
        ; let ty' = parenthesizeHsType appPrec ty''
              su' = cvtSrcUnpackedness su
              ss' = cvtSrcStrictness ss
-       ; returnLA $ HsBangTy (noAnn, NoSourceText) (HsBang su' ss') ty' }
+       ; return $ CFS noAnn su' ss' (hsNoMultAnn onWhat) ty' Nothing }
 
 cvt_id_arg :: TH.Name -- ^ parent constructor name
            -> (TH.Name, TH.Bang, TH.Type) -> CvtM (LConDeclField GhcPs)
 cvt_id_arg parent_con (i, str, ty)
   = do  { L li i' <- fldNameN (nameBase parent_con) i
-        ; ty' <- cvt_arg (str,ty)
+        ; ty' <- cvt_arg OnConField (str,ty)
         ; returnLA $ ConDeclField
-                          { cd_fld_ext = noAnn
+                          { cd_fld_ext = noExtField
                           , cd_fld_names
                               = [L (l2l li) $ FieldOcc noExtField (L li i')]
-                          , cd_fld_type =  ty'
-                          , cd_fld_doc = Nothing} }
+                          , cd_fld_spec = ty' } }
 
 cvtDerivs :: [TH.DerivClause] -> CvtM (HsDeriving GhcPs)
 cvtDerivs cs = do { mapM cvtDerivClause cs }
@@ -1705,7 +1704,7 @@ cvtTypeKind typeOrKind ty
                           _            -> return $
                                           parenthesizeHsType sigPrec x'
                  let y'' = parenthesizeHsType sigPrec y'
-                 returnLA (HsFunTy noExtField (HsUnrestrictedArrow noAnn) x'' y'')
+                 returnLA (HsFunTy noExtField (HsUnrestrictedArrow (EpArrow noAnn)) x'' y'')
              | otherwise
              -> do { fun_tc <- returnLA $ getRdrName unrestrictedFunTyCon
                    ; mk_apps (HsTyVar noAnn NotPromoted fun_tc) tys' }
@@ -1871,9 +1870,9 @@ cvtTypeKind typeOrKind ty
 hsTypeToArrow :: LHsType GhcPs -> HsArrow GhcPs
 hsTypeToArrow w = case unLoc w of
                      HsTyVar _ _ (L _ (isExact_maybe -> Just n))
-                        | n == oneDataConName -> HsLinearArrow noAnn
-                        | n == manyDataConName -> HsUnrestrictedArrow noAnn
-                     _ -> HsExplicitMult noAnn w
+                        | n == oneDataConName -> HsLinearAnn noAnn
+                        | n == manyDataConName -> HsUnrestrictedArrow (EpArrow noAnn)
+                     _ -> HsExplicitMult (noAnn, EpArrow noAnn) w
 
 -- ConT/InfixT can contain both data constructor (i.e., promoted) names and
 -- other (i.e, unpromoted) names, as opposed to PromotedT, which can only

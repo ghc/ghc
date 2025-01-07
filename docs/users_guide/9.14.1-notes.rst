@@ -40,6 +40,15 @@ Language
 
 * Multiline strings are now accepted in foreign imports. (#25157)
 
+* With :extension:`LinearTypes` record fields can now be non-linear. This means that
+  the following record declaration is now valid:
+
+  ::
+
+      data Record = Rec { x %'Many :: Int, y :: Char }
+
+  This causes the constructor to have type ``Rec :: Int %'Many -> Char %1 -> Record``.
+
 Compiler
 ~~~~~~~~
 

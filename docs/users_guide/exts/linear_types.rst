@@ -250,7 +250,8 @@ therefore constructors appear to have regular function types.
 Hence the linearity of type constructors is invisible when
 ``-XLinearTypes`` is off.
 
-Whether a data constructor field is linear or not can be customized using the GADT syntax. Given
+Whether a data constructor field is linear or not can be customized
+using GADT syntax or record syntax. Given
 
 ::
 
@@ -260,7 +261,16 @@ Whether a data constructor field is linear or not can be customized using the GA
 the value ``MkT2 x y z`` can be constructed only if ``x`` is
 unrestricted. On the other hand, a linear function which is matching
 on ``MkT2 x y z`` must consume ``y`` and ``z`` exactly once, but there
-is no restriction on ``x``.
+is no restriction on ``x``. The same example can be written using record syntax:
+
+::
+
+    data T2 a b c = MkT2 { x %'Many :: a, y :: b, z :: c }
+
+Again, the constructor ``MkT2`` has type ``MkT2 :: a -> b %1 -> c %1 -> T2 a b c``.
+Note that by default record fields are linear, only unrestricted fields
+require a multiplicity annotation. The annotation has no effect on the record selectors.
+So ``x`` has type ``x :: T2 a b c -> a`` and similarly ``y`` has type ``y :: T2 a b c -> b``.
 
 It is also possible to define a multiplicity-polymorphic field:
 
@@ -268,6 +278,12 @@ It is also possible to define a multiplicity-polymorphic field:
 
     data T3 a m where
         MkT3 :: a %m -> T3 a m
+
+or using record syntax:
+
+::
+
+    data T3 a m = MkT3 { x %m :: a }
 
 While linear fields are generalized (``MkT1 :: forall {m} a. a %m -> T1 a``
 in the previous example), multiplicity-polymorphic fields are not;
