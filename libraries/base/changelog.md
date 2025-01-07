@@ -10,6 +10,13 @@
   * `Data.List.NonEmpty` functions now have the same laziness as their `Data.List` counterparts (i.e. make them more strict than they currently are) ([CLC proposal #107](https://github.com/haskell/core-libraries-committee/issues/107))
   * `instance Functor NonEmpty` is now specified using `map` (rather than duplicating code). ([CLC proposal #300](https://github.com/haskell/core-libraries-committee/issues/300))
   * The `Data.Enum.enumerate` function was introduced ([CLC #306](https://github.com/haskell/core-libraries-committee/issues/306))
+  * Worker threads used by various `base` facilities are now labelled with descriptive thread labels ([CLC proposal #305](https://github.com/haskell/core-libraries-committee/issues/305), [GHC #25452](https://gitlab.haskell.org/ghc/ghc/-/issues/25452)). Specifically, these include:
+    * `Control.Concurrent.threadWaitRead`
+    * `Control.Concurrent.threadWaitWrite`
+    * `Control.Concurrent.threadWaitReadSTM`
+    * `Control.Concurrent.threadWaitWriteSTM`
+    * `System.Timeout.timeout`
+    * `GHC.Conc.Signal.runHandlers`
 
 ## 4.21.0.0 *TBA*
   * Change `SrcLoc` to be a strict and unboxed (finishing [CLC proposal #55](https://github.com/haskell/core-libraries-committee/issues/55))
