@@ -1432,7 +1432,7 @@ runTcPluginsWanted wc@(WC { wc_simple = simples1 })
        ; wanted <- TcS.zonkSimples simples1    -- Plugin requires zonked inputs
 
        ; traceTcS "Running plugins (" (vcat [ text "Given:" <+> ppr given
-                                            , text "Watned:" <+> ppr wanted ])
+                                            , text "Wanted:" <+> ppr wanted ])
        ; p <- runTcPluginSolvers solvers (given, bagToList wanted)
        ; let (_, solved_wanted)   = pluginSolvedCts p
              (_, unsolved_wanted) = pluginInputCts p
