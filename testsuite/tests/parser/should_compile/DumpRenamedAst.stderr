@@ -222,8 +222,17 @@
              (Nothing)
              (PrefixCon
               []
-              [(HsScaled
-                (HsLinearArrow
+              [(CDF
+                ((,)
+                 ((,,)
+                  (EpaDelta { <no location info> } (SameLine 0) [])
+                  (NoEpTok)
+                  (EpaDelta { <no location info> } (SameLine 0) []))
+                 (NoSourceText))
+                (NoSrcUnpack)
+                (NoSrcStrict)
+                (HsUnannotated
+                 (OnConField)
                  (NoExtField))
                 (L
                  (EpAnn
@@ -242,7 +251,8 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: DumpRenamedAst.Peano}))))])
+                   {Name: DumpRenamedAst.Peano})))
+                (Nothing))])
              (Nothing)))])
          [])))]
      []
@@ -640,7 +650,8 @@
              []))
            (HsFunTy
             (NoExtField)
-            (HsUnrestrictedArrow
+            (HsUnannotated
+             (OnArrow)
              (NoExtField))
             (L
              (EpAnn
@@ -748,7 +759,8 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsUnannotated
+              (OnArrow)
               (NoExtField))
              (L
               (EpAnn
@@ -777,7 +789,8 @@
                 []))
               (HsFunTy
                (NoExtField)
-               (HsUnrestrictedArrow
+               (HsUnannotated
+                (OnArrow)
                 (NoExtField))
                (L
                 (EpAnn
@@ -895,7 +908,8 @@
                    []))
                  (HsFunTy
                   (NoExtField)
-                  (HsUnrestrictedArrow
+                  (HsUnannotated
+                   (OnArrow)
                    (NoExtField))
                   (L
                    (EpAnn
@@ -959,7 +973,8 @@
                []))
              (HsFunTy
               (NoExtField)
-              (HsUnrestrictedArrow
+              (HsUnannotated
+               (OnArrow)
                (NoExtField))
               (L
                (EpAnn
@@ -981,7 +996,8 @@
                    []))
                  (HsFunTy
                   (NoExtField)
-                  (HsUnrestrictedArrow
+                  (HsUnannotated
+                   (OnArrow)
                    (NoExtField))
                   (L
                    (EpAnn
@@ -1070,8 +1086,17 @@
               (Nothing)
               (PrefixConGADT
                (NoExtField)
-               [(HsScaled
-                 (HsUnrestrictedArrow
+               [(CDF
+                 ((,)
+                  ((,,)
+                   (EpaDelta { <no location info> } (SameLine 0) [])
+                   (NoEpTok)
+                   (EpaDelta { <no location info> } (SameLine 0) []))
+                  (NoSourceText))
+                 (NoSrcUnpack)
+                 (NoSrcStrict)
+                 (HsUnannotated
+                  (OnArrow)
                   (NoExtField))
                  (L
                   (EpAnn
@@ -1136,7 +1161,8 @@
                         []))
                       (HsFunTy
                        (NoExtField)
-                       (HsUnrestrictedArrow
+                       (HsUnannotated
+                        (OnArrow)
                         (NoExtField))
                        (L
                         (EpAnn
@@ -1227,7 +1253,8 @@
                               [])
                              (EpaComments
                               []))
-                            {Name: xx}))))))))))))])
+                            {Name: xx})))))))))))
+                 (Nothing))])
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:20:39-45 })
@@ -1442,8 +1469,17 @@
              (Nothing)
              (PrefixCon
               []
-              [(HsScaled
-                (HsLinearArrow
+              [(CDF
+                ((,)
+                 ((,,)
+                  (EpaDelta { <no location info> } (SameLine 0) [])
+                  (NoEpTok)
+                  (EpaDelta { <no location info> } (SameLine 0) []))
+                 (NoSourceText))
+                (NoSrcUnpack)
+                (NoSrcStrict)
+                (HsUnannotated
+                 (OnConField)
                  (NoExtField))
                 (L
                  (EpAnn
@@ -1500,7 +1536,8 @@
                          [])
                         (EpaComments
                          []))
-                       {Name: a}))))))))])
+                       {Name: a})))))))
+                (Nothing))])
              (Nothing)))])
          [])))]
      []
@@ -1812,7 +1849,8 @@
                  []))
                (HsFunTy
                 (NoExtField)
-                (HsUnrestrictedArrow
+                (HsUnannotated
+                 (OnArrow)
                  (NoExtField))
                 (L
                  (EpAnn
@@ -1916,7 +1954,8 @@
              []))
            (HsFunTy
             (NoExtField)
-            (HsUnrestrictedArrow
+            (HsUnannotated
+             (OnArrow)
              (NoExtField))
             (L
              (EpAnn
@@ -1945,7 +1984,8 @@
                []))
              (HsFunTy
               (NoExtField)
-              (HsUnrestrictedArrow
+              (HsUnannotated
+               (OnArrow)
                (NoExtField))
               (L
                (EpAnn
@@ -1967,7 +2007,8 @@
                    []))
                  (HsFunTy
                   (NoExtField)
-                  (HsUnrestrictedArrow
+                  (HsUnannotated
+                   (OnArrow)
                    (NoExtField))
                   (L
                    (EpAnn

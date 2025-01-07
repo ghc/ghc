@@ -827,10 +827,12 @@
             []))
           (HsFunTy
            (NoExtField)
-           (HsUnrestrictedArrow
-            (EpUniTok
-             (EpaSpan { KindSigs.hs:22:22-23 })
-             (NormalSyntax)))
+           (HsUnannotated
+            (OnArrow)
+            (EpArrow
+             (EpUniTok
+              (EpaSpan { KindSigs.hs:22:22-23 })
+              (NormalSyntax))))
            (L
             (EpAnn
              (EpaSpan { KindSigs.hs:22:8-20 })
@@ -902,10 +904,12 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { KindSigs.hs:22:30-31 })
-               (NormalSyntax)))
+             (HsUnannotated
+              (OnArrow)
+              (EpArrow
+               (EpUniTok
+                (EpaSpan { KindSigs.hs:22:30-31 })
+                (NormalSyntax))))
              (L
               (EpAnn
                (EpaSpan { KindSigs.hs:22:25-28 })

@@ -415,7 +415,7 @@ type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body 
 type instance Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) = SrcSpanAnnA
 
 arrowToHsExpr :: HsArrowOf (LocatedA (HsExpr GhcRn)) GhcRn -> LocatedA (HsExpr GhcRn)
-arrowToHsExpr = expandHsArrow (HsVar noExtField)
+arrowToHsExpr = expandHsMultAnnOn (HsVar noExtField)
 
 data AnnExplicitSum
   = AnnExplicitSum {

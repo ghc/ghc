@@ -1,7 +1,5 @@
 T7210.hs:5:19: error: [GHC-18932]
-    • Unexpected strictness annotation: !IntMap
-      strictness annotation cannot appear nested inside a type
-    • In the type ‘!IntMap Int’
-      In the definition of data constructor ‘C’
-      In the data type declaration for ‘T’
+    • Unexpected strictness (!) annotation: !IntMap
+      strictness (!) annotation can only appear on the arguments of a data constructor type
+    • In the definition of data constructor ‘C’
 

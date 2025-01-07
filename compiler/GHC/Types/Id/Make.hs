@@ -1144,18 +1144,18 @@ dataConSrcToImplBang
    -> HsImplBang
 
 dataConSrcToImplBang bang_opts fam_envs arg_ty
-                     (HsSrcBang ann (HsBang unpk NoSrcStrict))
+                     (HsSrcBang ann unpk NoSrcStrict)
   | bang_opt_strict_data bang_opts -- StrictData => strict field
   = dataConSrcToImplBang bang_opts fam_envs arg_ty
-                  (mkHsSrcBang ann unpk SrcStrict)
+                  (HsSrcBang ann unpk SrcStrict)
   | otherwise -- no StrictData => lazy field
   = HsLazy
 
-dataConSrcToImplBang _ _ _ (HsSrcBang _ (HsBang _ SrcLazy))
+dataConSrcToImplBang _ _ _ (HsSrcBang _ _ SrcLazy)
   = HsLazy
 
 dataConSrcToImplBang bang_opts fam_envs arg_ty
-                     (HsSrcBang _ (HsBang unpk_prag SrcStrict))
+                     (HsSrcBang _ unpk_prag SrcStrict)
   | isUnliftedType (scaledThing arg_ty)
     -- NB: non-newtype data constructors can't have representation-polymorphic fields
     -- so this is OK.
@@ -1470,7 +1470,7 @@ shouldUnpackArgTy bang_opts prag fam_envs arg_ty
              -- We'd get a black hole if we used dataConImplBangs
 
          ok_arg :: NameSet -> (Scaled Type, HsSrcBang) -> Bool
-         ok_arg dcs (Scaled _ ty, HsSrcBang _ (HsBang unpack_prag str_prag))
+         ok_arg dcs (Scaled _ ty, HsSrcBang _ unpack_prag str_prag)
            | strict_field str_prag
            , Just data_cons <- unpackable_type_datacons (topNormaliseType fam_envs ty)
            , should_unpack_conservative unpack_prag data_cons  -- Wrinkle (W3)
