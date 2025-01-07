@@ -46,6 +46,7 @@ import GHC.Hs
 
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
+import GHC.Tc.TyCl ( IsPrefixConGADT(..), unannotatedMultIsLinear )
 
 import GHC.Core.Class
 import GHC.Core.DataCon
@@ -919,17 +920,13 @@ repSrcStrictness SrcLazy     = rep2 sourceLazyName         []
 repSrcStrictness SrcStrict   = rep2 sourceStrictName       []
 repSrcStrictness NoSrcStrict = rep2 noSourceStrictnessName []
 
-repBangTy :: LBangType GhcRn -> MetaM (Core (M TH.BangType))
-repBangTy ty = do
-  MkC u <- repSrcUnpackedness su'
-  MkC s <- repSrcStrictness ss'
+repConDeclField :: HsConDeclField GhcRn -> MetaM (Core (M TH.BangType))
+repConDeclField (CDF { cdf_unpack, cdf_bang, cdf_type }) = do
+  MkC u <- repSrcUnpackedness cdf_unpack
+  MkC s <- repSrcStrictness cdf_bang
   MkC b <- rep2 bangName [u, s]
-  MkC t <- repLTy ty'
+  MkC t <- repLTy cdf_type
   rep2 bangTypeName [b, t]
-  where
-    (su', ss', ty') = case unLoc ty of
-            HsBangTy _ (HsBang su ss) ty -> (su, ss, ty)
-            _ -> (NoSrcUnpack, NoSrcStrict, ty)
 
 -------------------------------------------------------
 --                      Deriving clauses
@@ -1426,16 +1423,17 @@ repTy (HsAppKindTy _ ty ki) = do
                                 ty1 <- repLTy ty
                                 ki1 <- repLTy ki
                                 repTappKind ty1 ki1
-repTy (HsFunTy _ w f a) | isUnrestricted w = do
-                                f1   <- repLTy f
-                                a1   <- repLTy a
+repTy (HsFunTy _ w f a) = do
+                            f1   <- repLTy f
+                            a1   <- repLTy a
+                            case multAnnToHsType w of
+                              Nothing -> do
                                 tcon <- repArrowTyCon
                                 repTapps tcon [f1, a1]
-repTy (HsFunTy _ w f a) = do w1   <- repLTy (arrowToHsType w)
-                             f1   <- repLTy f
-                             a1   <- repLTy a
-                             tcon <- repMulArrowTyCon
-                             repTapps tcon [w1, f1, a1]
+                              Just m -> do
+                                w1 <- repLTy m
+                                tcon <- repMulArrowTyCon
+                                repTapps tcon [w1, f1, a1]
 repTy (HsListTy _ t)        = do
                                 t1   <- repLTy t
                                 tcon <- repListTyCon
@@ -1703,7 +1701,7 @@ repE (HsForAll _ tele body) =
         body' <- repLE body
         rep2 forall_name [unC bndrs, unC body']
 repE (HsFunArr _ mult arg res) = do
-  fun  <- repFunArr mult
+  fun  <- repFunArrMult mult
   arg' <- repLE arg
   res' <- repLE res
   repApps fun [arg', res']
@@ -1724,12 +1722,12 @@ repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)
 repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)
 repE e@(HsProc{}) = notHandled (ThExpressionForm e)
 
-repFunArr :: HsArrowOf (LocatedA (HsExpr GhcRn)) GhcRn -> MetaM (Core (M TH.Exp))
-repFunArr HsUnrestrictedArrow{} = repConName unrestrictedFunTyConName
-repFunArr mult
-  = do { fun <- repConName fUNTyConName
-       ; mult' <- repLE (arrowToHsExpr mult)
-       ; repApp fun mult' }
+repFunArrMult :: HsMultAnnOf (LocatedA (HsExpr GhcRn)) GhcRn -> MetaM (Core (M TH.Exp))
+repFunArrMult mult = case multAnnToHsExpr mult of
+  Nothing -> repConName unrestrictedFunTyConName
+  Just e -> do { fun <- repConName fUNTyConName
+               ; mult' <- repLE e
+               ; repApp fun mult' }
 
 repConName :: Name -> MetaM (Core (M TH.Exp))
 repConName n = do
@@ -2831,12 +2829,12 @@ repH98DataCon con details
     = do con' <- lookupLOcc con -- See Note [Binders and occurrences]
          case details of
            PrefixCon ps -> do
-             arg_tys <- repPrefixConArgs ps
+             arg_tys <- repPrefixConArgs IsNotPrefixConGADT ps
              rep2 normalCName [unC con', unC arg_tys]
            InfixCon st1 st2 -> do
-             verifyLinearFields [st1, st2]
-             arg1 <- repBangTy (hsScaledThing st1)
-             arg2 <- repBangTy (hsScaledThing st2)
+             verifyLinearFields IsNotPrefixConGADT [st1, st2]
+             arg1 <- repConDeclField st1
+             arg2 <- repConDeclField st2
              rep2 infixCName [unC arg1, unC con', unC arg2]
            RecCon ips -> do
              arg_vtys <- repRecConArgs ips
@@ -2850,7 +2848,7 @@ repGadtDataCons cons details res_ty
     = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
          case details of
            PrefixConGADT _ ps -> do
-             arg_tys <- repPrefixConArgs ps
+             arg_tys <- repPrefixConArgs IsPrefixConGADT ps
              res_ty' <- repLTy res_ty
              rep2 gadtCName [ unC (nonEmptyCoreList' cons'), unC arg_tys, unC res_ty']
            RecConGADT _ ips -> do
@@ -2862,36 +2860,37 @@ repGadtDataCons cons details res_ty
 -- TH currently only supports linear constructors.
 -- We also accept the (->) arrow when -XLinearTypes is off, because this
 -- denotes a linear field.
--- This check is not performed in repRecConArgs, since the GADT record
--- syntax currently does not have a way to mark fields as nonlinear.
-verifyLinearFields :: [HsScaled GhcRn (LHsType GhcRn)] -> MetaM ()
-verifyLinearFields ps = do
-  linear <- lift $ xoptM LangExt.LinearTypes
-  let allGood = all (\st -> case hsMult st of
-                              HsUnrestrictedArrow _ -> not linear
-                              HsLinearArrow _       -> True
-                              _                     -> False) ps
+verifyLinearFields :: IsPrefixConGADT -> [HsConDeclField GhcRn] -> MetaM ()
+verifyLinearFields isPrefixConGADT ps = do
+  linear <- lift $ unannotatedMultIsLinear isPrefixConGADT
+  let allGood = all (hsMultIsLinear linear . cdf_multiplicity) ps
   unless allGood $ notHandled ThNonLinearDataCon
+  where
+    hsMultIsLinear linear HsUnannotated{} = linear
+    hsMultIsLinear _ HsLinearAnn{} = True
+    hsMultIsLinear _ (HsExplicitMult _ (L _ (HsTyVar _ _ (L _ n)))) = n == oneDataConName
+    hsMultIsLinear _ _ = False
 
 -- Desugar the arguments in a data constructor declared with prefix syntax.
-repPrefixConArgs :: [HsScaled GhcRn (LHsType GhcRn)]
-                 -> MetaM (Core [M TH.BangType])
-repPrefixConArgs ps = do
-  verifyLinearFields ps
-  repListM bangTypeTyConName repBangTy (map hsScaledThing ps)
+repPrefixConArgs :: IsPrefixConGADT -> [HsConDeclField GhcRn] -> MetaM (Core [M TH.BangType])
+repPrefixConArgs isPrefixConGADT ps = do
+  verifyLinearFields isPrefixConGADT ps
+  repListM bangTypeTyConName repConDeclField ps
 
 -- Desugar the arguments in a data constructor declared with record syntax.
-repRecConArgs :: LocatedL [LConDeclField GhcRn]
+repRecConArgs :: LocatedL [LHsConDeclRecField GhcRn]
               -> MetaM (Core [M TH.VarBangType])
-repRecConArgs ips = do
-  args     <- concatMapM rep_ip (unLoc ips)
+repRecConArgs lips = do
+  let ips = map unLoc (unLoc lips)
+  verifyLinearFields IsNotPrefixConGADT (map cdrf_spec ips)
+  args <- concatMapM rep_ip ips
   coreListM varBangTypeTyConName args
     where
-      rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
+      rep_ip ip = mapM (rep_one_ip (cdrf_spec ip)) (cdrf_names ip)
 
-      rep_one_ip :: LBangType GhcRn -> LFieldOcc GhcRn -> MetaM (Core (M TH.VarBangType))
+      rep_one_ip :: HsConDeclField GhcRn -> LFieldOcc GhcRn -> MetaM (Core (M TH.VarBangType))
       rep_one_ip t n = do { MkC v  <- lookupOcc (unLoc . foLabel $ unLoc n)
-                          ; MkC ty <- repBangTy  t
+                          ; MkC ty <- repConDeclField t
                           ; rep2 varBangTypeName [v,ty] }
 
 ------------ Types -------------------

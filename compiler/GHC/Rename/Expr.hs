@@ -634,7 +634,7 @@ rnExpr (HsForAll _ tele expr)
 
 rnExpr (HsFunArr _ mult arg res)
   = do { (arg', fvs1) <- rnLExpr arg
-       ; (mult', fvs2) <- rnHsArrowWith rnLExpr mult
+       ; (mult', fvs2) <- rnHsMultAnnWith rnLExpr mult
        ; (res', fvs3) <- rnLExpr res
        ; checkTypeSyntaxExtension FunctionArrowSyntax
        ; return (HsFunArr noExtField mult' arg' res', plusFVs [fvs1, fvs2, fvs3]) }

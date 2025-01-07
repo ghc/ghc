@@ -98,7 +98,6 @@ dropHsDocTy = drop_sig_ty
 
     drop_ty (HsForAllTy x a e) = HsForAllTy x a (drop_lty e)
     drop_ty (HsQualTy x a e) = HsQualTy x a (drop_lty e)
-    drop_ty (HsBangTy x a b) = HsBangTy x a (drop_lty b)
     drop_ty (HsAppTy x a b) = HsAppTy x (drop_lty a) (drop_lty b)
     drop_ty (HsAppKindTy x a b) = HsAppKindTy x (drop_lty a) (drop_lty b)
     drop_ty (HsFunTy x w a b) = HsFunTy x w (drop_lty a) (drop_lty b)
@@ -295,17 +294,17 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
   -- AZ:TODO get rid of the concatMap
   concatMap (lookupCon sDocContext subdocs) [con_name con] ++ f con_args'
   where
-    f (PrefixCon args) = [typeSig name $ (map hsScaledThing args) ++ [resType]]
+    f (PrefixCon args) = [typeSig name $ (map cdf_type args) ++ [resType]]
     f (InfixCon a1 a2) = f $ PrefixCon [a1, a2]
     f (RecCon (L _ recs)) =
-      f (PrefixCon $ map (hsLinear . cd_fld_type . unLoc) recs)
+      f (PrefixCon $ map (cdrf_spec . unLoc) recs)
         ++ concat
-          [ (concatMap (lookupCon sDocContext subdocs . noLocA . unLoc . foLabel . unLoc) (cd_fld_names r))
-            ++ [out sDocContext (map (foExt . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
+          [ (concatMap (lookupCon sDocContext subdocs . noLocA . unLoc . foLabel . unLoc) (cdrf_names r))
+            ++ [out sDocContext (map (foExt . unLoc) $ cdrf_names r) `typeSig` [resType, cdf_type $ cdrf_spec r]]
           | r <- map unLoc recs
           ]
 
-    funs = foldr1 (\x y -> reL $ HsFunTy noExtField (HsUnrestrictedArrow noExtField) x y)
+    funs = foldr1 (\x y -> reL $ HsFunTy noExtField (HsUnannotated noExtField) x y)
     apps = foldl1 (\x y -> reL $ HsAppTy noExtField x y)
 
     typeSig nm flds =
@@ -355,9 +354,9 @@ ppCtor
             Nothing -> tau_ty
           tau_ty = foldr mkFunTy res_ty $
             case args of
-              PrefixConGADT _ pos_args -> map hsScaledThing pos_args
-              RecConGADT _ (L _ flds) -> map (cd_fld_type . unL) flds
-          mkFunTy a b = noLocA (HsFunTy noExtField (HsUnrestrictedArrow noExtField) a b)
+              PrefixConGADT _ pos_args -> map cdf_type pos_args
+              RecConGADT _ (L _ flds) -> map (cdf_type . cdrf_spec . unL) flds
+          mkFunTy a b = noLocA (HsFunTy noExtField (HsUnannotated noExtField) a b)
 
 ppFixity :: SDocContext -> (Name, Fixity) -> [String]
 ppFixity sDocContext (name, fixity) = [out sDocContext ((FixitySig NoNamespaceSpecifier [noLocA name] fixity) :: FixitySig GhcRn)]

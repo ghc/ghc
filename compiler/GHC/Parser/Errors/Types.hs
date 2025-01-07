@@ -466,7 +466,7 @@ data PsMessage
    | PsErrParseRightOpSectionInPat !RdrName !(PatBuilder GhcPs)
 
    -- | Illegal linear arrow or multiplicity annotation in GADT record syntax
-   | PsErrIllegalGadtRecordMultiplicity !(HsArrow GhcPs)
+   | PsErrIllegalGadtRecordMultiplicity !(HsMultAnn GhcPs)
 
    | PsErrInvalidCApiImport
 
@@ -552,7 +552,7 @@ data PsErrPunDetails
 data PsErrTypeSyntaxDetails
   = PETS_FunctionArrow
       !(LocatedA (PatBuilder GhcPs))
-      !(HsArrowOf (LocatedA (PatBuilder GhcPs)) GhcPs)
+      !(HsMultAnnOf (LocatedA (PatBuilder GhcPs)) GhcPs)
       !(LocatedA (PatBuilder GhcPs))
   | PETS_Multiplicity
       !(EpToken "%")

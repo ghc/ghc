@@ -805,9 +805,9 @@ type instance Anno (HsType DocNameI) = SrcSpanAnnA
 type instance Anno (DataFamInstDecl DocNameI) = SrcSpanAnnA
 type instance Anno (DerivStrategy DocNameI) = EpAnn NoEpAnns
 type instance Anno (FieldOcc DocNameI) = SrcSpanAnnA
-type instance Anno (ConDeclField DocNameI) = SrcSpan
-type instance Anno (Located (ConDeclField DocNameI)) = SrcSpan
-type instance Anno [Located (ConDeclField DocNameI)] = SrcSpan
+type instance Anno (HsConDeclRecField DocNameI) = SrcSpan
+type instance Anno (Located (HsConDeclRecField DocNameI)) = SrcSpan
+type instance Anno [Located (HsConDeclRecField DocNameI)] = SrcSpan
 type instance Anno (ConDecl DocNameI) = SrcSpan
 type instance Anno (FunDep DocNameI) = SrcSpan
 type instance Anno (TyFamInstDecl DocNameI) = SrcSpanAnnA
@@ -838,10 +838,10 @@ type instance XBndrRequired DocNameI = NoExtField
 type instance XBndrInvisible DocNameI = NoExtField
 type instance XXBndrVis DocNameI = DataConCantHappen
 
-type instance XUnrestrictedArrow _ DocNameI = NoExtField
-type instance XLinearArrow _ DocNameI = NoExtField
+type instance XUnannotated _ DocNameI = NoExtField
+type instance XLinearAnn _ DocNameI = NoExtField
 type instance XExplicitMult _ DocNameI = NoExtField
-type instance XXArrow _ DocNameI = DataConCantHappen
+type instance XXMultAnnOf _ DocNameI = DataConCantHappen
 
 type instance XForAllTy DocNameI = EpAnn NoEpAnns
 type instance XQualTy DocNameI = EpAnn NoEpAnns
@@ -859,13 +859,19 @@ type instance XIParamTy DocNameI = EpAnn NoEpAnns
 type instance XKindSig DocNameI = EpAnn NoEpAnns
 type instance XSpliceTy DocNameI = DataConCantHappen
 type instance XDocTy DocNameI = EpAnn NoEpAnns
-type instance XBangTy DocNameI = EpAnn NoEpAnns
-type instance XRecTy DocNameI = EpAnn NoEpAnns
 type instance XExplicitListTy DocNameI = EpAnn NoEpAnns
 type instance XExplicitTupleTy DocNameI = EpAnn NoEpAnns
 type instance XTyLit DocNameI = EpAnn NoEpAnns
 type instance XWildCardTy DocNameI = EpAnn NoEpAnns
-type instance XXType DocNameI = HsCoreTy
+type instance XXType DocNameI = HsTypeDocNameIExt
+
+data HsTypeDocNameIExt
+  = HsCoreTy    HsCoreTy
+
+  | HsBangTy    HsSrcBang
+                (LHsType DocNameI)
+
+  | HsRecTy     [LHsConDeclRecField DocNameI]
 
 type instance XNumTy DocNameI = NoExtField
 type instance XStrTy DocNameI = NoExtField
@@ -959,6 +965,9 @@ type instance XXHsSigType DocNameI = DataConCantHappen
 
 type instance XHsQTvs DocNameI = NoExtField
 type instance XXLHsQTyVars DocNameI = DataConCantHappen
+
+type instance XConDeclRecField DocNameI = NoExtField
+type instance XXConDeclRecField DocNameI = DataConCantHappen
 
 type instance XConDeclField DocNameI = NoExtField
 type instance XXConDeclField DocNameI = DataConCantHappen

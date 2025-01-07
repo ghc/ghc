@@ -651,8 +651,6 @@ type family XStarTy          x
 type family XKindSig         x
 type family XSpliceTy        x
 type family XDocTy           x
-type family XBangTy          x
-type family XRecTy           x
 type family XExplicitListTy  x
 type family XExplicitTupleTy x
 type family XTyLit           x
@@ -676,6 +674,11 @@ type family XXHsForAllTelescope x
 -- HsTyVarBndr type families
 type family XTyVarBndr   x
 type family XXTyVarBndr  x
+
+-- ---------------------------------------------------------------------
+-- HsConDeclRecField type families
+type family XConDeclRecField  x
+type family XXConDeclRecField x
 
 -- ---------------------------------------------------------------------
 -- ConDeclField type families

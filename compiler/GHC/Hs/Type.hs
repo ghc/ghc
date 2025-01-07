@@ -23,14 +23,14 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 -}
 
 module GHC.Hs.Type (
-        Mult, HsScaled(..),
-        hsMult, hsScaledThing,
-        HsArrow, HsArrowOf(..), arrowToHsType, expandHsArrow,
-        EpLinearArrow(..),
-        hsLinear, hsUnrestricted, isUnrestricted,
-        pprHsArrow,
+        Mult,
+        HsMultAnn, HsMultAnnOf(..),
+        multAnnToHsType, expandHsMultAnnOf,
+        EpLinear(..), EpArrowOrColon(..),
+        pprHsArrow, pprHsMultAnn,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
+        HsTypeGhcPsExt(..),
         HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,
         HsTyVarBndr(..), LHsTyVarBndr, AnnTyVarBndr(..),
         HsBndrKind(..),
@@ -51,14 +51,14 @@ module GHC.Hs.Type (
         LHsTypeArg, lhsTypeArgSrcSpan,
         OutputableBndrFlag,
 
-        LBangType, BangType,
         HsSrcBang(..), HsImplBang(..),
         SrcStrictness(..), SrcUnpackedness(..),
-        getBangType, getBangStrictness,
 
-        ConDeclField(..), LConDeclField, pprConDeclFields,
+        HsConDeclRecField(..), LHsConDeclRecField, pprHsConDeclRecFields,
 
         HsConDetails(..),
+        HsConDeclField(..), pprHsConDeclFieldWith, pprHsConDeclFieldNoMult,
+        hsPlainTypeField, mkConDeclField,
         FieldOcc(..), LFieldOcc, mkFieldOcc,
         fieldOccRdrName, fieldOccLRdrName,
 
@@ -105,7 +105,6 @@ import {-# SOURCE #-} GHC.Hs.Expr ( pprUntypedSplice, HsUntypedSpliceResult(..) 
 import Language.Haskell.Syntax.Extension
 import GHC.Core.DataCon ( SrcStrictness(..), SrcUnpackedness(..)
                         , HsSrcBang(..), HsImplBang(..)
-                        , mkHsSrcBang
                         )
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
@@ -117,7 +116,7 @@ import GHC.Types.Name.Reader ( RdrName )
 import GHC.Types.Var ( VarBndr, visArgTypeLike )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Builtin.Names ( negateName )
-import GHC.Builtin.Types( manyDataConName, oneDataConName, mkTupleStr )
+import GHC.Builtin.Types( oneDataConName, mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
 import GHC.Core.Multiplicity( pprArrowWithMultiplicity )
@@ -132,25 +131,6 @@ import Data.Data (Data)
 
 import qualified Data.Semigroup as S
 import GHC.Data.Bag
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Bang annotations}
-*                                                                      *
-************************************************************************
--}
-
-getBangType :: LHsType (GhcPass p) -> LHsType (GhcPass p)
-getBangType                 (L _ (HsBangTy _ _ lty))       = lty
-getBangType (L _ (HsDocTy x (L _ (HsBangTy _ _ lty)) lds)) =
-  addCLocA lty lds (HsDocTy x lty lds)
-getBangType lty                                            = lty
-
-getBangStrictness :: LHsType (GhcPass p) -> HsSrcBang
-getBangStrictness                 (L _ (HsBangTy (_, s) b _))     = HsSrcBang s b
-getBangStrictness (L _ (HsDocTy _ (L _ (HsBangTy (_, s) b _)) _)) = HsSrcBang s b
-getBangStrictness _ = (mkHsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
 
 {-
 ************************************************************************
@@ -479,11 +459,8 @@ type instance XSpliceTy        GhcRn = HsUntypedSpliceResult (LHsType GhcRn)
 type instance XSpliceTy        GhcTc = Kind
 
 type instance XDocTy           (GhcPass _) = NoExtField
-type instance XBangTy          (GhcPass _) = ((EpaLocation, EpToken "#-}", EpaLocation), SourceText)
-
-type instance XRecTy           GhcPs = AnnList ()
-type instance XRecTy           GhcRn = NoExtField
-type instance XRecTy           GhcTc = NoExtField
+type instance XConDeclField    (GhcPass _) = ((EpaLocation, EpToken "#-}", EpaLocation), SourceText)
+type instance XXConDeclRecField   (GhcPass _) = DataConCantHappen
 
 type instance XExplicitListTy  GhcPs = (EpToken "'", EpToken "[", EpToken "]")
 type instance XExplicitListTy  GhcRn = NoExtField
@@ -499,91 +476,122 @@ type instance XWildCardTy      GhcPs = EpToken "_"
 type instance XWildCardTy      GhcRn = NoExtField
 type instance XWildCardTy      GhcTc = NoExtField
 
-type instance XXType         (GhcPass _) = HsCoreTy
-
--- An escape hatch for tunnelling a Core 'Type' through 'HsType'.
--- For more details on how this works, see:
---
--- * @Note [Renaming HsCoreTys]@ in "GHC.Rename.HsType"
---
--- * @Note [Typechecking HsCoreTys]@ in "GHC.Tc.Gen.HsType"
-type HsCoreTy = Type
+type instance XXType           GhcPs = HsTypeGhcPsExt
+type instance XXType           GhcRn = HsCoreTy
+type instance XXType           GhcTc = DataConCantHappen
 
 type instance XNumTy         (GhcPass _) = SourceText
 type instance XStrTy         (GhcPass _) = SourceText
 type instance XCharTy        (GhcPass _) = SourceText
 type instance XXTyLit        (GhcPass _) = DataConCantHappen
 
-data EpLinearArrow
-  = EpPct1 !(EpToken "%1") !(TokRarrow)
+type HsCoreTy = Type
+
+-- Extension of HsType during parsing.
+-- see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
+data HsTypeGhcPsExt
+  = HsCoreTy    HsCoreTy
+    -- An escape hatch for tunnelling a Core 'Type' through 'HsType'.
+    -- For more details on how this works, see:
+    --
+    -- @Note [Renaming HsCoreTys]@ in "GHC.Rename.HsType"
+    --
+    -- @Note [Typechecking HsCoreTys]@ in "GHC.Tc.Gen.HsType"
+
+  | HsBangTy    (EpaLocation, EpToken "#-}", EpaLocation)
+                HsSrcBang
+                (LHsType GhcPs)
+    -- See Note [Parsing data type declarations]
+
+  | HsRecTy     (AnnList ())
+                [LHsConDeclRecField GhcPs]
+    -- See Note [Parsing data type declarations]
+
+{- Note [Parsing data type declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When parsing it is not always clear if we're parsing a constructor field type
+or not. So during parsing we extend the type syntax to support bang annotations
+and record braces. We do this through the extension constructor of (HsType GhcPs),
+namely `HsTypeGhcPsExt`, adding data constructors for `HsBangTy` and `HsRecTy`.
+Once parsing is done (i.e. (HsType GhcRn) and (HsType GhcTc)) these constructors
+are not needed; instead the data is stored in `HsConDeclField`. It is an error
+if it turns out the extensions were used outside of a constructor field type.
+-}
+
+data EpArrowOrColon
+  = EpArrow !TokRarrow
+  | EpColon !TokDcolon
+  | EpPatBind
+  deriving Data
+
+data EpLinear
+  = EpPct1 !(EpToken "%1") !EpArrowOrColon
   | EpLolly !(EpToken "⊸")
   deriving Data
 
-instance NoAnn EpLinearArrow where
-  noAnn = EpPct1 noAnn noAnn
+instance NoAnn EpLinear where
+  noAnn = EpPct1 noAnn (EpArrow noAnn)
 
-type instance XUnrestrictedArrow _ GhcPs = TokRarrow
-type instance XUnrestrictedArrow _ GhcRn = NoExtField
-type instance XUnrestrictedArrow _ GhcTc = NoExtField
+type instance XUnannotated  _ GhcPs = EpArrowOrColon
+type instance XUnannotated  _ GhcRn = NoExtField
+type instance XUnannotated  _ GhcTc = Mult
 
-type instance XLinearArrow       _ GhcPs = EpLinearArrow
-type instance XLinearArrow       _ GhcRn = NoExtField
-type instance XLinearArrow       _ GhcTc = NoExtField
+type instance XLinearAnn    _ GhcPs = EpLinear
+type instance XLinearAnn    _ GhcRn = NoExtField
+type instance XLinearAnn    _ GhcTc = Mult
 
-type instance XExplicitMult      _ GhcPs = (EpToken "%", TokRarrow)
-type instance XExplicitMult      _ GhcRn = NoExtField
-type instance XExplicitMult      _ GhcTc = NoExtField
+type instance XExplicitMult _ GhcPs = (EpToken "%", EpArrowOrColon)
+type instance XExplicitMult _ GhcRn = NoExtField
+type instance XExplicitMult _ GhcTc = Mult
 
-type instance XXArrow            _ (GhcPass _) = DataConCantHappen
+type instance XXMultAnnOf   _ (GhcPass _) = DataConCantHappen
 
-hsLinear :: forall p a. IsPass p => a -> HsScaled (GhcPass p) a
-hsLinear = HsScaled (HsLinearArrow x)
-  where
-    x = case ghcPass @p of
-      GhcPs -> noAnn
-      GhcRn -> noExtField
-      GhcTc -> noExtField
+multAnnToHsType :: HsMultAnn GhcRn -> Maybe (LHsType GhcRn)
+multAnnToHsType = expandHsMultAnnOf (HsTyVar noAnn NotPromoted)
 
-hsUnrestricted :: forall p a. IsPass p => a -> HsScaled (GhcPass p) a
-hsUnrestricted = HsScaled (HsUnrestrictedArrow x)
-  where
-    x = case ghcPass @p of
-      GhcPs -> noAnn
-      GhcRn -> noExtField
-      GhcTc -> noExtField
-
-isUnrestricted :: HsArrow GhcRn -> Bool
-isUnrestricted (arrowToHsType -> L _ (HsTyVar _ _ (L _ n))) = n == manyDataConName
-isUnrestricted _ = False
-
-arrowToHsType :: HsArrow GhcRn -> LHsType GhcRn
-arrowToHsType = expandHsArrow (HsTyVar noAnn NotPromoted)
-
--- | Convert an arrow into its corresponding multiplicity. In essence this
--- erases the information of whether the programmer wrote an explicit
--- multiplicity or a shorthand.
-expandHsArrow :: (LocatedN Name -> t GhcRn) -> HsArrowOf (LocatedA (t GhcRn)) GhcRn -> LocatedA (t GhcRn)
-expandHsArrow mk_var (HsUnrestrictedArrow _) = noLocA (mk_var (noLocA manyDataConName))
-expandHsArrow mk_var (HsLinearArrow _) = noLocA (mk_var (noLocA oneDataConName))
-expandHsArrow _mk_var (HsExplicitMult _ p) = p
+-- | Convert an multiplicity annotation into its corresponding multiplicity.
+-- If no annotation was written, `Nothing` is returned.
+-- In this polymorphic function, `t` can be `HsType` or `HsExpr`
+expandHsMultAnnOf :: (LocatedN Name -> t GhcRn)
+                  -> HsMultAnnOf (LocatedA (t GhcRn)) GhcRn
+                  -> Maybe (LocatedA (t GhcRn))
+expandHsMultAnnOf _mk_var HsUnannotated{} = Nothing
+expandHsMultAnnOf mk_var (HsLinearAnn _) = Just (noLocA (mk_var (noLocA oneDataConName)))
+expandHsMultAnnOf _mk_var (HsExplicitMult _ p) = Just p
 
 instance
       (Outputable mult, OutputableBndrId pass) =>
-      Outputable (HsArrowOf mult (GhcPass pass)) where
+      Outputable (HsMultAnnOf mult (GhcPass pass)) where
   ppr arr = parens (pprHsArrow arr)
 
 -- See #18846
-pprHsArrow :: (Outputable mult, OutputableBndrId pass) => HsArrowOf mult (GhcPass pass) -> SDoc
-pprHsArrow (HsUnrestrictedArrow _) = pprArrowWithMultiplicity visArgTypeLike (Left False)
-pprHsArrow (HsLinearArrow _)       = pprArrowWithMultiplicity visArgTypeLike (Left True)
-pprHsArrow (HsExplicitMult _ p)    = pprArrowWithMultiplicity visArgTypeLike (Right (ppr p))
+pprHsArrow :: (Outputable mult, OutputableBndrId pass) => HsMultAnnOf mult (GhcPass pass) -> SDoc
+pprHsArrow (HsUnannotated _)    = pprArrowWithMultiplicity visArgTypeLike (Left False)
+pprHsArrow (HsLinearAnn _)      = pprArrowWithMultiplicity visArgTypeLike (Left True)
+pprHsArrow (HsExplicitMult _ p) = pprArrowWithMultiplicity visArgTypeLike (Right (ppr p))
 
-type instance XConDeclField  (GhcPass _) = TokDcolon
-type instance XXConDeclField (GhcPass _) = DataConCantHappen
+-- Used to print, for instance, let bindings:
+--   let %1 x = …
+-- and record field declarations:
+--   { x %1 :: … }
+pprHsMultAnn :: forall id. OutputableBndrId id => HsMultAnn (GhcPass id) -> SDoc
+pprHsMultAnn (HsUnannotated _) = empty
+pprHsMultAnn (HsLinearAnn _) = text "%1"
+pprHsMultAnn (HsExplicitMult _ p) = text "%" <> ppr p
+
+type instance XConDeclRecField  (GhcPass _) = NoExtField
+type instance XXConDeclRecField (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
-       => Outputable (ConDeclField (GhcPass p)) where
-  ppr (ConDeclField _ fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
+       => Outputable (HsConDeclRecField (GhcPass p)) where
+  ppr (HsConDeclRecField _ fld_n cfs) = pprMaybeWithDoc (cdf_doc cfs) (ppr_names fld_n <+> pprHsConDeclFieldWith ppr_mult cfs { cdf_doc = Nothing })
+    where
+      ppr_names :: [LFieldOcc (GhcPass p)] -> SDoc
+      ppr_names [n] = pprPrefixOcc n
+      ppr_names ns = sep (punctuate comma (map pprPrefixOcc ns))
+
+      ppr_mult :: HsMultAnn (GhcPass p) -> SDoc -> SDoc
+      ppr_mult mult tyDoc = pprHsMultAnn mult <+> dcolon <+> tyDoc
 
 ---------------------
 hsWcScopedTvs :: LHsSigWcType GhcRn -> [Name]
@@ -715,10 +723,10 @@ mkHsAppKindTy at ty k = addCLocA ty k (HsAppKindTy at ty k)
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
 -- It returns API Annotations for any parens removed
 splitHsFunType ::
-     LHsType (GhcPass p)
+     LHsType GhcPs
   -> ( ([EpToken "("], [EpToken ")"]) , EpAnnComments -- The locations of any parens and
                                   -- comments discarded
-     , [HsScaled (GhcPass p) (LHsType (GhcPass p))], LHsType (GhcPass p))
+     , [HsConDeclField GhcPs], LHsType GhcPs)
 splitHsFunType ty = go ty
   where
     go (L l (HsParTy (op,cp) ty))
@@ -729,7 +737,7 @@ splitHsFunType ty = go ty
 
     go (L ll (HsFunTy _ mult x y))
       | (anns, csy, args, res) <- splitHsFunType y
-      = (anns, csy S.<> epAnnComments ll, HsScaled mult x:args, res)
+      = (anns, csy S.<> epAnnComments ll, mkConDeclField mult x:args, res)
 
     go other = (noAnn, emptyComments, [], other)
 
@@ -1289,6 +1297,23 @@ instance (Outputable arg, Outputable rec)
   ppr (RecCon rec)     = text "RecCon:" <+> ppr rec
   ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]
 
+pprHsConDeclFieldWith :: (OutputableBndrId p)
+                      => (HsMultAnn (GhcPass p) -> SDoc -> SDoc)
+                      -> HsConDeclField (GhcPass p) -> SDoc
+pprHsConDeclFieldWith ppr_mult (CDF _ prag mark mult ty doc) =
+  pprMaybeWithDoc doc (ppr_mult mult (ppr prag <+> ppr mark <> ppr ty))
+
+pprHsConDeclFieldNoMult :: (OutputableBndrId p) => HsConDeclField (GhcPass p) -> SDoc
+pprHsConDeclFieldNoMult = pprHsConDeclFieldWith (\_ d -> d)
+
+hsPlainTypeField :: LHsType GhcPs -> HsConDeclField GhcPs
+hsPlainTypeField = mkConDeclField (HsUnannotated (EpColon noAnn))
+
+mkConDeclField :: HsMultAnn GhcPs -> LHsType GhcPs -> HsConDeclField GhcPs
+mkConDeclField mult (L _ (HsDocTy _ ty lds)) = (mkConDeclField mult ty) { cdf_doc = Just lds }
+mkConDeclField mult (L _ (XHsType (HsBangTy ann (HsSrcBang srcTxt unp str) t))) = CDF (ann, srcTxt) unp str mult t Nothing
+mkConDeclField mult t = CDF noAnn NoSrcUnpack NoSrcStrict mult t Nothing
+
 instance Outputable (XRecGhc (IdGhcP p)) =>
        Outputable (FieldOcc (GhcPass p)) where
   ppr = ppr . foLabel
@@ -1361,17 +1386,9 @@ pprLHsContextAlways (L _ ctxt)
       [L _ ty] -> ppr_mono_ty ty           <+> darrow
       _        -> parens (interpp'SP ctxt) <+> darrow
 
-pprConDeclFields :: forall p. OutputableBndrId p
-                 => [LConDeclField (GhcPass p)] -> SDoc
-pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
-  where
-    ppr_fld (L _ (ConDeclField { cd_fld_names = ns, cd_fld_type = ty,
-                                 cd_fld_doc = doc }))
-        = pprMaybeWithDoc doc (ppr_names ns <+> dcolon <+> ppr ty)
-
-    ppr_names :: forall p. OutputableBndrId p => [LFieldOcc (GhcPass p)] -> SDoc
-    ppr_names [n] = pprPrefixOcc n
-    ppr_names ns = sep (punctuate comma (map pprPrefixOcc ns))
+pprHsConDeclRecFields :: forall p. OutputableBndrId p
+                 => [LHsConDeclRecField (GhcPass p)] -> SDoc
+pprHsConDeclRecFields fields = braces (sep (punctuate comma (map ppr fields)))
 
 -- Printing works more-or-less as for Types
 
@@ -1389,8 +1406,6 @@ ppr_mono_ty (HsForAllTy { hst_tele = tele, hst_body = ty })
 ppr_mono_ty (HsQualTy { hst_ctxt = ctxt, hst_body = ty })
   = sep [pprLHsContextAlways ctxt, ppr_mono_lty ty]
 
-ppr_mono_ty (HsBangTy _ b ty)           = ppr b <> ppr_mono_lty ty
-ppr_mono_ty (HsRecTy _ flds)            = pprConDeclFields flds
 ppr_mono_ty (HsTyVar _ prom (L _ name)) = pprOccWithTick Prefix prom name
 ppr_mono_ty (HsFunTy _ mult ty1 ty2)    = ppr_fun_ty mult ty1 ty2
 ppr_mono_ty (HsTupleTy _ con tys)
@@ -1447,11 +1462,16 @@ ppr_mono_ty (HsParTy _ ty)
 ppr_mono_ty (HsDocTy _ ty doc)
   = pprWithDoc doc $ ppr_mono_lty ty
 
-ppr_mono_ty (XHsType t) = ppr t
+ppr_mono_ty (XHsType t) = case ghcPass @p of
+  GhcPs -> case t of
+    HsCoreTy ty     -> ppr ty
+    HsBangTy _ b ty -> ppr b <> ppr_mono_lty ty
+    HsRecTy _ flds  -> pprHsConDeclRecFields flds
+  GhcRn -> ppr t
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId p)
-           => HsArrow (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p) -> SDoc
+           => HsMultAnn (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p) -> SDoc
 ppr_fun_ty mult ty1 ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
@@ -1466,13 +1486,11 @@ quote_tuple NotPromoted doc = doc
 --------------------------
 -- | @'hsTypeNeedsParens' p t@ returns 'True' if the type @t@ needs parentheses
 -- under precedence @p@.
-hsTypeNeedsParens :: PprPrec -> HsType (GhcPass p) -> Bool
+hsTypeNeedsParens :: forall p. IsPass p => PprPrec -> HsType (GhcPass p) -> Bool
 hsTypeNeedsParens p = go_hs_ty
   where
     go_hs_ty (HsForAllTy{})           = p >= funPrec
     go_hs_ty (HsQualTy{})             = p >= funPrec
-    go_hs_ty (HsBangTy{})             = p > topPrec
-    go_hs_ty (HsRecTy{})              = False
     go_hs_ty (HsTyVar{})              = False
     go_hs_ty (HsFunTy{})              = p >= funPrec
     -- Special-case unary boxed tuple applications so that they are
@@ -1503,7 +1521,12 @@ hsTypeNeedsParens p = go_hs_ty
     go_hs_ty (HsOpTy{})               = p >= opPrec
     go_hs_ty (HsParTy{})              = False
     go_hs_ty (HsDocTy _ (L _ t) _)    = go_hs_ty t
-    go_hs_ty (XHsType ty)             = go_core_ty ty
+    go_hs_ty (XHsType t)             = case ghcPass @p of
+      GhcPs -> case t of
+        HsCoreTy ty -> go_core_ty ty
+        HsBangTy{}  -> p > topPrec
+        HsRecTy{}   -> False
+      GhcRn -> go_core_ty t
 
     go_core_ty (TyVarTy{})    = False
     go_core_ty (AppTy{})      = p >= appPrec
@@ -1535,8 +1558,6 @@ lhsTypeHasLeadingPromotionQuote ty
     go (HsQualTy{ hst_ctxt = ctxt, hst_body = body})
       | (L _ (c:_)) <- ctxt = goL c
       | otherwise            = goL body
-    go (HsBangTy{})          = False
-    go (HsRecTy{})           = False
     go (HsTyVar _ p _)       = isPromoted p
     go (HsFunTy _ _ arg _)   = goL arg
     go (HsListTy{})          = False
@@ -1560,7 +1581,7 @@ lhsTypeHasLeadingPromotionQuote ty
 -- | @'parenthesizeHsType' p ty@ checks if @'hsTypeNeedsParens' p ty@ is
 -- true, and if so, surrounds @ty@ with an 'HsParTy'. Otherwise, it simply
 -- returns @ty@.
-parenthesizeHsType :: PprPrec -> LHsType (GhcPass p) -> LHsType (GhcPass p)
+parenthesizeHsType :: IsPass p => PprPrec -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 parenthesizeHsType p lty@(L loc ty)
   | hsTypeNeedsParens p ty = L loc (HsParTy noAnn lty)
   | otherwise              = lty
@@ -1569,8 +1590,7 @@ parenthesizeHsType p lty@(L loc ty)
 -- @c@ such that @'hsTypeNeedsParens' p c@ is true, and if so, surrounds @c@
 -- with an 'HsParTy' to form a parenthesized @ctxt@. Otherwise, it simply
 -- returns @ctxt@ unchanged.
-parenthesizeHsContext :: PprPrec
-                      -> LHsContext (GhcPass p) -> LHsContext (GhcPass p)
+parenthesizeHsContext :: IsPass p => PprPrec -> LHsContext (GhcPass p) -> LHsContext (GhcPass p)
 parenthesizeHsContext p lctxt@(L loc ctxt) =
   case ctxt of
     [c] -> L loc [parenthesizeHsType p c]
@@ -1584,7 +1604,6 @@ parenthesizeHsContext p lctxt@(L loc ctxt) =
 ************************************************************************
 -}
 
-type instance Anno (BangType (GhcPass p)) = SrcSpanAnnA
 type instance Anno [LocatedA (HsType (GhcPass p))] = SrcSpanAnnC
 type instance Anno (HsType (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsSigType (GhcPass p)) = SrcSpanAnnA
@@ -1598,6 +1617,6 @@ type instance Anno (HsTyVarBndr _flag GhcTc) = SrcSpanAnnA
 
 type instance Anno (HsOuterTyVarBndrs _ (GhcPass _)) = SrcSpanAnnA
 type instance Anno HsIPName = EpAnnCO
-type instance Anno (ConDeclField (GhcPass p)) = SrcSpanAnnA
+type instance Anno (HsConDeclRecField (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno (FieldOcc (GhcPass p)) = SrcSpanAnnA

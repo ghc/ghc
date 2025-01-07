@@ -1927,14 +1927,12 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
     has_labelled_fields _ = False
 
     has_strictness_flags condecl
-      = any (is_strict . getBangStrictness . hsScaledThing) (con_args condecl)
+      = any isSrcStrict (con_arg_bangs condecl)
 
-    is_strict (HsSrcBang _ (HsBang _ s)) = isSrcStrict s
-
-    con_args (ConDeclGADT { con_g_args = PrefixConGADT _ args }) = args
-    con_args (ConDeclH98 { con_args = PrefixCon args }) = args
-    con_args (ConDeclH98 { con_args = InfixCon arg1 arg2 }) = [arg1, arg2]
-    con_args _ = []
+    con_arg_bangs (ConDeclGADT { con_g_args = PrefixConGADT _ args }) = map cdf_bang args
+    con_arg_bangs (ConDeclH98 { con_args = PrefixCon args }) = map cdf_bang args
+    con_arg_bangs (ConDeclH98 { con_args = InfixCon arg1 arg2 }) = [cdf_bang arg1, cdf_bang arg2]
+    con_arg_bangs _ = []
 
 {-
 Note [Type data declarations]
@@ -2482,14 +2480,14 @@ rnConDeclH98Details ::
    -> HsConDeclH98Details GhcPs
    -> RnM (HsConDeclH98Details GhcRn, FreeVars)
 rnConDeclH98Details _ doc (PrefixCon tys)
-  = do { (new_tys, fvs) <- mapFvRn (rnScaledLHsType doc) tys
+  = do { (new_tys, fvs) <- mapFvRn (rnHsConDeclField doc) tys
        ; return (PrefixCon new_tys, fvs) }
 rnConDeclH98Details _ doc (InfixCon ty1 ty2)
-  = do { (new_ty1, fvs1) <- rnScaledLHsType doc ty1
-       ; (new_ty2, fvs2) <- rnScaledLHsType doc ty2
+  = do { (new_ty1, fvs1) <- rnHsConDeclField doc ty1
+       ; (new_ty2, fvs2) <- rnHsConDeclField doc ty2
        ; return (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2) }
 rnConDeclH98Details con doc (RecCon flds)
-  = do { (new_flds, fvs) <- rnRecConDeclFields con doc flds
+  = do { (new_flds, fvs) <- rnRecHsConDeclRecFields con doc flds
        ; return (RecCon new_flds, fvs) }
 
 rnConDeclGADTDetails ::
@@ -2498,20 +2496,20 @@ rnConDeclGADTDetails ::
    -> HsConDeclGADTDetails GhcPs
    -> RnM (HsConDeclGADTDetails GhcRn, FreeVars)
 rnConDeclGADTDetails _ doc (PrefixConGADT _ tys)
-  = do { (new_tys, fvs) <- mapFvRn (rnScaledLHsType doc) tys
+  = do { (new_tys, fvs) <- mapFvRn (rnHsConDeclField doc) tys
        ; return (PrefixConGADT noExtField new_tys, fvs) }
 rnConDeclGADTDetails con doc (RecConGADT _ flds)
-  = do { (new_flds, fvs) <- rnRecConDeclFields con doc flds
+  = do { (new_flds, fvs) <- rnRecHsConDeclRecFields con doc flds
        ; return (RecConGADT noExtField new_flds, fvs) }
 
-rnRecConDeclFields ::
+rnRecHsConDeclRecFields ::
      Name
   -> HsDocContext
-  -> LocatedL [LConDeclField GhcPs]
-  -> RnM (LocatedL [LConDeclField GhcRn], FreeVars)
-rnRecConDeclFields con doc (L l fields)
+  -> LocatedL [LHsConDeclRecField GhcPs]
+  -> RnM (LocatedL [LHsConDeclRecField GhcRn], FreeVars)
+rnRecHsConDeclRecFields con doc (L l fields)
   = do  { fls <- lookupConstructorFields con
-        ; (new_fields, fvs) <- rnConDeclFields doc fls fields
+        ; (new_fields, fvs) <- rnHsConDeclRecFields doc fls fields
                 -- No need to check for duplicate fields
                 -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
         ; pure (L l new_fields, fvs) }

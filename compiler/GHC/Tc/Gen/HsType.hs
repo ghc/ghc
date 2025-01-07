@@ -945,8 +945,8 @@ concern things that the renamer can't handle.
 
 -}
 
-tcMult :: HsArrow GhcRn -> TcM Mult
-tcMult hc = tc_mult typeLevelMode hc
+tcMult :: LHsType GhcRn -> TcM Mult
+tcMult ty = tc_check_lhs_type typeLevelMode ty multiplicityTy
 
 -- | Info about the context in which we're checking a type. Currently,
 -- differentiates only between types and kinds, but this will likely
@@ -1100,15 +1100,6 @@ tcHsType :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 
 tcHsType mode (HsParTy _ ty)   exp_kind = tcLHsType mode ty exp_kind
 tcHsType mode (HsDocTy _ ty _) exp_kind = tcLHsType mode ty exp_kind
-tcHsType _ ty@(HsBangTy _ bang _) _
-    -- While top-level bangs at this point are eliminated (eg !(Maybe Int)),
-    -- other kinds of bangs are not (eg ((!Maybe) Int)). These kinds of
-    -- bangs are invalid, so fail. (#7210, #14761)
-    = failWith $ TcRnUnexpectedAnnotation ty bang
-tcHsType _ ty@(HsRecTy {})      _
-      -- Record types (which only show up temporarily in constructor
-      -- signatures) should have been removed by now
-    = failWithTc $ TcRnIllegalRecordSyntax (Right ty)
 
 -- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSpliceType'.
 -- Here we get rid of it and add the finalizers to the global environment
@@ -1128,7 +1119,7 @@ tcHsType mode (HsFunTy _ mult ty1 ty2) exp_kind
 
 tcHsType mode (HsOpTy _ _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` unrestrictedFunTyConKey
-  = tc_fun_type mode (HsUnrestrictedArrow noExtField) ty1 ty2 exp_kind
+  = tc_fun_type mode (HsUnannotated noExtField) ty1 ty2 exp_kind
 
 --------- Foralls
 tcHsType mode t@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
@@ -1371,10 +1362,7 @@ Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in "GHC.Core.TyCo
 -}
 
 ------------------------------------------
-tc_mult :: TcTyMode -> HsArrow GhcRn -> TcM Mult
-tc_mult mode ty = tc_check_lhs_type mode (arrowToHsType ty) multiplicityTy
-------------------------------------------
-tc_fun_type :: TcTyMode -> HsArrow GhcRn -> LHsType GhcRn -> LHsType GhcRn -> ExpKind
+tc_fun_type :: TcTyMode -> HsMultAnn GhcRn -> LHsType GhcRn -> LHsType GhcRn -> ExpKind
             -> TcM TcType
 tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
   TypeLevel ->
@@ -1394,6 +1382,10 @@ tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
        ; checkExpKind (HsFunTy noExtField mult ty1 ty2)
                       (tcMkVisFunTy mult' ty1' ty2')
                       liftedTypeKind exp_kind }
+  where
+    tc_mult mode mult = case multAnnToHsType mult of
+      Just mult' -> tc_check_lhs_type mode mult' multiplicityTy
+      Nothing    -> return manyDataConTy
 
 {- Note [Skolem escape and forall-types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

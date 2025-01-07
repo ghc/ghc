@@ -215,9 +215,8 @@ collectHdkWarnings HdkSt{ hdk_st_pending, hdk_st_warnings } =
 -- But having a single name for all of them is just easier to read, and makes it clear
 -- that they all are of the form  t -> HdkA t  for some t.
 --
--- If you need to handle a more complicated scenario that doesn't fit this
--- pattern, it's always possible to define separate functions outside of this
--- class, as is done in case of e.g. addHaddockConDeclField.
+-- If you need to handle a more complicated scenario that doesn't fit this pattern,
+-- it's always possible to define separate functions outside of this class.
 --
 -- See Note [Adding Haddock comments to the syntax tree].
 class HasHaddock a where
@@ -711,7 +710,7 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
           case con_g_args of
             PrefixConGADT x ts -> PrefixConGADT x <$> addHaddock ts
             RecConGADT arr (L l_rec flds) -> do
-              flds' <- traverse addHaddockConDeclField flds
+              flds' <- traverse addHaddock flds
               pure $ RecConGADT arr (L l_rec flds')
         con_res_ty' <- addHaddock con_res_ty
         pure $ L l_con_decl $
@@ -735,22 +734,22 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
             case con_args of
               PrefixCon ts -> do
                 con_doc' <- getConDoc (getLocA con_name)
-                ts' <- traverse addHaddockConDeclFieldTy ts
+                ts' <- traverse addHaddock ts
                 pure $ L l_con_decl $
                   ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
                                con_doc = lexLHsDocString <$> con_doc',
                                con_args = PrefixCon ts' }
               InfixCon t1 t2 -> do
-                t1' <- addHaddockConDeclFieldTy t1
+                t1' <- addHaddock t1
                 con_doc' <- getConDoc (getLocA con_name)
-                t2' <- addHaddockConDeclFieldTy t2
+                t2' <- addHaddock t2
                 pure $ L l_con_decl $
                   ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
                                con_doc = lexLHsDocString <$> con_doc',
                                con_args = InfixCon t1' t2' }
               RecCon (L l_rec flds) -> do
                 con_doc' <- getConDoc (getLocA con_name)
-                flds' <- traverse addHaddockConDeclField flds
+                flds' <- traverse addHaddock flds
                 pure $ L l_con_decl $
                   ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
                                con_doc = lexLHsDocString <$> con_doc',
@@ -785,25 +784,11 @@ getConDoc
   -> HdkA (Maybe (Located HsDocString))
 getConDoc l = extendHdkA l $ liftHdkA $ getPrevNextDoc l
 
--- Add documentation comment to a data constructor field.
--- Used for PrefixCon and InfixCon.
-addHaddockConDeclFieldTy
-  :: HsScaled GhcPs (LHsType GhcPs)
-  -> HdkA (HsScaled GhcPs (LHsType GhcPs))
-addHaddockConDeclFieldTy (HsScaled mult (L l t)) =
-  extendHdkA (locA l) $ liftHdkA $ do
-    mDoc <- getPrevNextDoc (locA l)
-    return (HsScaled mult (mkLHsDocTy (L l t) mDoc))
-
--- Add documentation comment to a data constructor field.
--- Used for RecCon.
-addHaddockConDeclField
-  :: LConDeclField GhcPs
-  -> HdkA (LConDeclField GhcPs)
-addHaddockConDeclField (L l_fld fld) =
-  extendHdkA (locA l_fld) $ liftHdkA $ do
-    cd_fld_doc <- fmap lexLHsDocString <$> getPrevNextDoc (locA l_fld)
-    return (L l_fld (fld { cd_fld_doc }))
+instance HasHaddock (LocatedA (HsConDeclRecField GhcPs)) where
+  addHaddock (L l_fld (HsConDeclRecField ext nms cfs)) =
+    extendHdkA (locA l_fld) $ liftHdkA $ do
+      cdf_doc <- fmap lexLHsDocString <$> getPrevNextDoc (locA l_fld)
+      return $ L l_fld (HsConDeclRecField ext nms (cfs { cdf_doc }))
 
 {- Note [Leading and trailing comments on H98 constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -906,8 +891,12 @@ We implement this in two steps:
             including its field types
 -}
 
-instance HasHaddock a => HasHaddock (HsScaled GhcPs a) where
-  addHaddock (HsScaled mult a) = HsScaled mult <$> addHaddock a
+instance HasHaddock (HsConDeclField GhcPs) where
+  addHaddock cfs = do
+    cdf_type <- addHaddock (cdf_type cfs)
+    return $ case cdf_type of
+      L _ (HsDocTy _ ty doc) -> cfs { cdf_type = ty, cdf_doc = Just doc }
+      _ -> cfs { cdf_type }
 
 instance HasHaddock a => HasHaddock (HsWildCardBndrs GhcPs a) where
   addHaddock (HsWC _ t) = HsWC noExtField <$> addHaddock t

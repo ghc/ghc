@@ -808,9 +808,6 @@ markLensBracketsC' a l =
     ListNone -> return (set l ListNone a)
 -- -------------------------------------
 
--- markEpTokenM :: forall m w tok . (Monad m, Monoid w, KnownSymbol tok)
---   => Maybe (EpToken tok) -> EP w m (Maybe (EpToken tok))
-
 markEpToken :: forall m w tok . (Monad m, Monoid w, KnownSymbol tok)
   => EpToken tok -> EP w m (EpToken tok)
 markEpToken NoEpTok = return NoEpTok
@@ -833,25 +830,6 @@ markEpUniToken (EpUniTok aa isUnicode)  = do
     NormalSyntax  -> printStringAtAA aa (symbolVal (Proxy @tok))
     UnicodeSyntax -> printStringAtAA aa (symbolVal (Proxy @utok))
   return (EpUniTok aa' isUnicode)
-
--- ---------------------------------------------------------------------
-
-markArrow :: (Monad m, Monoid w, ExactPrint a) => HsArrowOf a GhcPs -> EP w m (HsArrowOf a GhcPs)
-markArrow (HsUnrestrictedArrow arr) = do
-  arr' <- markEpUniToken arr
-  return (HsUnrestrictedArrow arr')
-markArrow (HsLinearArrow (EpPct1 pct1 arr)) = do
-  pct1' <- markEpToken pct1
-  arr' <- markEpUniToken arr
-  return (HsLinearArrow (EpPct1 pct1' arr'))
-markArrow (HsLinearArrow (EpLolly arr)) = do
-  arr' <- markEpToken arr
-  return (HsLinearArrow (EpLolly arr'))
-markArrow (HsExplicitMult (pct, arr) t) = do
-  pct' <- markEpToken pct
-  t' <- markAnnotated t
-  arr' <- markEpUniToken arr
-  return (HsExplicitMult (pct', arr') t')
 
 -- ---------------------------------------------------------------------
 
@@ -2323,8 +2301,7 @@ instance ExactPrint (HsBind GhcPs) where
     return (FunBind x fun_id' matches')
 
   exact (PatBind x pat q grhss) = do
-    q' <- markAnnotated q
-    pat' <- markAnnotated pat
+    (q', pat') <- markMultAnnOf q (markAnnotated pat)
     grhss' <- markAnnotated grhss
     return (PatBind x pat' q' grhss')
   exact (PatSynBind x bind) = do
@@ -2332,19 +2309,6 @@ instance ExactPrint (HsBind GhcPs) where
     return (PatSynBind x bind')
 
   exact x = error $ "HsBind: exact for " ++ showAst x
-
-instance ExactPrint (HsMultAnn GhcPs) where
-  getAnnotationEntry _ = NoEntryVal
-  setAnnotationAnchor a _ _ _ = a
-
-  exact (HsNoMultAnn x) = return (HsNoMultAnn x)
-  exact (HsPct1Ann tok) = do
-      tok' <- markEpToken tok
-      return (HsPct1Ann tok')
-  exact (HsMultAnn tok ty) = do
-      tok' <- markEpToken tok
-      ty' <- markAnnotated ty
-      return (HsMultAnn tok' ty')
 
 -- ---------------------------------------------------------------------
 
@@ -3148,8 +3112,7 @@ instance ExactPrint (HsExpr GhcPs) where
     return (HsEmbTy toktype' t')
 
   exact (HsFunArr _ mult arg res) = do
-    arg' <- markAnnotated arg
-    mult' <- markArrow mult
+    (mult', arg') <- markMultAnnOf mult (markAnnotated arg)
     res' <- markAnnotated res
     return (HsFunArr noExtField mult' arg' res')
 
@@ -3957,8 +3920,7 @@ instance ExactPrint (HsType GhcPs) where
     ki' <- markAnnotated ki
     return (HsAppKindTy at' ty' ki')
   exact (HsFunTy an mult ty1 ty2) = do
-    ty1' <- markAnnotated ty1
-    mult' <- markArrow mult
+    (mult', ty1') <- markMultAnnOf mult (markAnnotated ty1)
     ty2' <- markAnnotated ty2
     return (HsFunTy an mult' ty1' ty2')
   exact (HsListTy an tys) = do
@@ -4007,22 +3969,10 @@ instance ExactPrint (HsType GhcPs) where
   exact (HsDocTy an ty doc) = do
     ty' <- markAnnotated ty
     return (HsDocTy an ty' doc)
-  exact (HsBangTy ((o,c,tk), mt) (HsBang up str) ty) = do
-    (o',c') <-
-      case mt of
-        NoSourceText -> return (o,c)
-        SourceText src -> do
-          debugM $ "HsBangTy: src=" ++ showAst src
-          o' <- printStringAtAA o (unpackFS src)
-          c' <- markEpToken c
-          return (o',c')
-    tk' <-
-      case str of
-        SrcLazy     -> printStringAtAA tk "~"
-        SrcStrict   -> printStringAtAA tk "!"
-        NoSrcStrict -> return tk
+  exact (XHsType (HsBangTy ann (HsSrcBang mt up str) ty)) = do
+    (ann', mt') <- exactBang (ann, mt) str
     ty' <- markAnnotated ty
-    return (HsBangTy ((o',c',tk'), mt) (HsBang up str) ty')
+    return (XHsType (HsBangTy ann' (HsSrcBang mt' up str) ty'))
   exact (HsExplicitListTy (sq,o,c) prom tys) = do
     sq' <- if (isPromoted prom)
              then markEpToken sq
@@ -4385,15 +4335,14 @@ instance ExactPrintTVFlag flag => ExactPrint (HsOuterTyVarBndrs flag GhcPs) wher
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (ConDeclField GhcPs) where
+instance ExactPrint (HsConDeclRecField GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (ConDeclField td names ftype mdoc) = do
+  exact (HsConDeclRecField _ names ftype) = do
     names' <- markAnnotated names
-    td' <- markEpUniToken td
     ftype' <- markAnnotated ftype
-    return (ConDeclField td' names' ftype' mdoc)
+    return (HsConDeclRecField noExtField names' ftype')
 
 -- ---------------------------------------------------------------------
 
@@ -4406,13 +4355,60 @@ instance ExactPrint (FieldOcc GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance (ExactPrint a) => ExactPrint (HsScaled GhcPs a) where
+instance ExactPrint (HsConDeclField GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
-  exact (HsScaled arr t) = do
-    t' <- markAnnotated t
-    arr' <- markArrow arr
-    return (HsScaled arr' t')
+  exact cdf@(CDF { cdf_ext, cdf_bang, cdf_multiplicity, cdf_type }) = do
+    (mult, (an, t)) <- markMultAnnOf cdf_multiplicity ((,) <$> exactBang cdf_ext cdf_bang <*> markAnnotated cdf_type)
+    return (cdf { cdf_ext = an, cdf_multiplicity = mult, cdf_type = t })
+
+markMultAnnOf :: (Monad m, Monoid w, ExactPrint a) => HsMultAnnOf a GhcPs -> EP w m b -> EP w m (HsMultAnnOf a GhcPs, b)
+markMultAnnOf (HsUnannotated arrOrCol) tyM = do
+  ((), arrOrCol', ty') <- markArrOrCol (pure ()) arrOrCol tyM
+  return (HsUnannotated arrOrCol', ty')
+markMultAnnOf (HsLinearAnn (EpPct1 pct1 arrOrCol)) tyM = do
+  (pct1', arrOrCol', ty') <- markArrOrCol (markEpToken pct1) arrOrCol tyM
+  return (HsLinearAnn (EpPct1 pct1' arrOrCol'), ty')
+markMultAnnOf (HsLinearAnn (EpLolly arr)) tyM = do
+  ty' <- tyM
+  arr' <- markEpToken arr
+  return (HsLinearAnn (EpLolly arr'), ty')
+markMultAnnOf (HsExplicitMult (pct, arrOrCol) t) tyM = do
+  ((pct', t'), arrOrCol', ty') <- markArrOrCol ((,) <$> markEpToken pct <*> markAnnotated t) arrOrCol tyM
+  return (HsExplicitMult (pct', arrOrCol') t', ty')
+
+markArrOrCol :: (Monad m, Monoid w) => EP w m a -> EpArrowOrColon -> EP w m b -> EP w m (a, EpArrowOrColon, b)
+markArrOrCol multM (EpArrow arr) tyM = do
+  ty' <- tyM
+  mult' <- multM
+  arr' <- markEpUniToken arr
+  return (mult', EpArrow arr', ty')
+markArrOrCol multM (EpColon col) tyM = do
+  mult' <- multM
+  col' <- markEpUniToken col
+  ty' <- tyM
+  return (mult', EpColon col', ty')
+markArrOrCol multM EpPatBind patM = do
+  mult' <- multM
+  pat' <- patM
+  return (mult', EpPatBind, pat')
+
+exactBang :: (Monoid w, Monad m) => XConDeclField GhcPs -> SrcStrictness -> EP w m (XConDeclField GhcPs)
+exactBang ((o,c,tk), mt) str = do
+  (o',c') <-
+    case mt of
+      NoSourceText -> return (o,c)
+      SourceText src -> do
+        debugM $ "HsBangTy: src=" ++ showAst src
+        o' <- printStringAtAA o (unpackFS src)
+        c' <- markEpToken c
+        return (o',c')
+  tk' <-
+    case str of
+      SrcLazy     -> printStringAtAA tk "~"
+      SrcStrict   -> printStringAtAA tk "!"
+      NoSrcStrict -> return tk
+  return ((o',c',tk'), mt)
 
 -- ---------------------------------------------------------------------
 
@@ -4505,11 +4501,11 @@ instance ExactPrint (LocatedLW [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsCmd Gh
     an1 <- markLensBracketsC an0 lal_brackets
     return (L an1 es')
 
-instance ExactPrint (LocatedL [LocatedA (ConDeclField GhcPs)]) where
+instance ExactPrint (LocatedL [LocatedA (HsConDeclRecField GhcPs)]) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor = setAnchorAn
   exact (L an fs) = do
-    debugM $ "LocatedL [LConDeclField"
+    debugM $ "LocatedL [LHsConDeclRecField"
     (an', fs') <- markAnnList an (markAnnotated fs)
     return (L an' fs')
 

@@ -397,7 +397,7 @@ buildClass tycon_name binders roles fds
         ; traceIf (text "buildClass" <+> ppr tycon)
         ; return result }
   where
-    no_bang = mkHsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
+    no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
 
     mk_op_item :: Class -> TcMethInfo -> TcRnIf n m ClassOpItem
     mk_op_item rec_clas (op_name, _, dm_spec)

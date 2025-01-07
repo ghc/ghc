@@ -1283,7 +1283,7 @@ rn_ty_pat (HsAppKindTy _ ty ki) = do
 
 rn_ty_pat (HsFunTy an mult lhs rhs) = do
   lhs' <- rn_lty_pat lhs
-  mult' <- rn_ty_pat_arrow mult
+  mult' <- rn_ty_pat_mult mult
   rhs' <- rn_lty_pat rhs
   pure (HsFunTy an mult' lhs' rhs')
 
@@ -1371,29 +1371,14 @@ rn_ty_pat (HsSpliceTy _ splice) = do
       | hsTypeNeedsParens maxPrec hs_ty = L loc (HsParTy noAnn lhs_ty)
       | otherwise                       = lhs_ty
 
-rn_ty_pat (HsBangTy an bang_src lty) = do
-  ctxt <- askDocContext
-  lty'@(L _ ty') <- rn_lty_pat lty
-  liftRn $ addErr $
-    TcRnWithHsDocContext ctxt $
-    TcRnUnexpectedAnnotation ty' bang_src
-  pure (HsBangTy an bang_src lty')
-
-rn_ty_pat ty@HsRecTy{} = do
-  ctxt <- askDocContext
-  liftRn $ addErr $
-    TcRnWithHsDocContext ctxt $
-    TcRnIllegalRecordSyntax (Left ty)
-  pure (HsWildCardTy noExtField) -- trick to avoid `failWithTc`
-
 rn_ty_pat ty@(XHsType{}) = do
   ctxt <- askDocContext
   liftRnFV $ rnHsType ctxt ty
 
-rn_ty_pat_arrow :: HsArrow GhcPs -> TPRnM (HsArrow GhcRn)
-rn_ty_pat_arrow (HsUnrestrictedArrow _) = pure (HsUnrestrictedArrow noExtField)
-rn_ty_pat_arrow (HsLinearArrow _) = pure (HsLinearArrow noExtField)
-rn_ty_pat_arrow (HsExplicitMult _ p)
+rn_ty_pat_mult :: HsMultAnn GhcPs -> TPRnM (HsMultAnn GhcRn)
+rn_ty_pat_mult (HsUnannotated _) = pure (HsUnannotated noExtField)
+rn_ty_pat_mult (HsLinearAnn _) = pure (HsLinearAnn noExtField)
+rn_ty_pat_mult (HsExplicitMult _ p)
   = rn_lty_pat p <&> (\mult -> HsExplicitMult noExtField mult)
 
 check_data_kinds :: HsType GhcPs -> TPRnM ()

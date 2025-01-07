@@ -805,7 +805,7 @@ getConNames ConDeclGADT {con_names = names} = toList names
 -- | Return @'Just' fields@ if a data constructor declaration uses record
 -- syntax (i.e., 'RecCon'), where @fields@ are the field selectors.
 -- Otherwise, return 'Nothing'.
-getRecConArgs_maybe :: ConDecl GhcRn -> Maybe (LocatedL [LConDeclField GhcRn])
+getRecConArgs_maybe :: ConDecl GhcRn -> Maybe (LocatedL [LHsConDeclRecField GhcRn])
 getRecConArgs_maybe (ConDeclH98{con_args = args}) = case args of
   PrefixCon{} -> Nothing
   RecCon flds -> Just flds
@@ -886,13 +886,13 @@ pprConDecl (ConDeclH98 { con_name = L _ con
   where
     -- In ppr_details: let's not print the multiplicities (they are always 1, by
     -- definition) as they do not appear in an actual declaration.
-    ppr_details (InfixCon t1 t2) = hsep [ppr (hsScaledThing t1),
+    ppr_details (InfixCon t1 t2) = hsep [pprHsConDeclFieldNoMult t1,
                                          pprInfixOcc con,
-                                         ppr (hsScaledThing t2)]
+                                         pprHsConDeclFieldNoMult t2]
     ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
-                                    : map (pprHsType . unLoc . hsScaledThing) tys)
+                                    : map pprHsConDeclFieldNoMult tys)
     ppr_details (RecCon fields)  = pprPrefixOcc con
-                                 <+> pprConDeclFields (unLoc fields)
+                                    <+> pprHsConDeclRecFields (unLoc fields)
 
 pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
                         , con_mb_cxt = mcxt, con_g_args = args
@@ -901,12 +901,12 @@ pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
     <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext mcxt,
               sep (ppr_args args ++ [ppr res_ty]) ])
   where
-    ppr_args (PrefixConGADT _ args) = map (\(HsScaled arr t) -> ppr t <+> ppr_arr arr) args
-    ppr_args (RecConGADT _ fields) = [pprConDeclFields (unLoc fields) <+> arrow]
+    ppr_args (PrefixConGADT _ args) = map (pprHsConDeclFieldWith (\arr tyDoc -> tyDoc <+> ppr_arr arr)) args
+    ppr_args (RecConGADT _ fields) = [pprHsConDeclRecFields (unLoc fields) <+> arrow]
 
     -- Display linear arrows as unrestricted with -XNoLinearTypes
     -- (cf. dataConDisplayType in Note [Displaying linear fields] in GHC.Core.DataCon)
-    ppr_arr (HsLinearArrow _) = sdocOption sdocLinearTypes $ \show_linear_types ->
+    ppr_arr (HsLinearAnn _) = sdocOption sdocLinearTypes $ \show_linear_types ->
                                   if show_linear_types then lollipop else arrow
     ppr_arr arr = pprHsArrow arr
 
@@ -1493,7 +1493,7 @@ type instance Anno (DerivClauseTys (GhcPass _)) = SrcSpanAnnC
 type instance Anno (StandaloneKindSig (GhcPass p)) = SrcSpanAnnA
 type instance Anno (ConDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno Bool = EpAnnCO
-type instance Anno [LocatedA (ConDeclField (GhcPass _))] = SrcSpanAnnL
+type instance Anno [LocatedA (HsConDeclRecField (GhcPass _))] = SrcSpanAnnL
 type instance Anno (FamEqn p (LocatedA (HsType p))) = SrcSpanAnnA
 type instance Anno (TyFamInstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (DataFamInstDecl (GhcPass p)) = SrcSpanAnnA

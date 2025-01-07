@@ -1495,10 +1495,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { DumpSemis.hs:29:18-19 })
-               (NormalSyntax)))
+             (HsUnannotated
+              (EpArrow
+               (EpUniTok
+                (EpaSpan { DumpSemis.hs:29:18-19 })
+                (NormalSyntax))))
              (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:29:12-16 })
@@ -1711,10 +1712,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { DumpSemis.hs:31:27-28 })
-               (NormalSyntax)))
+             (HsUnannotated
+              (EpArrow
+               (EpUniTok
+                (EpaSpan { DumpSemis.hs:31:27-28 })
+                (NormalSyntax))))
              (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:31:25 })
