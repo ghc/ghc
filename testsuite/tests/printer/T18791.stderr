@@ -118,11 +118,20 @@
            (Nothing)
            (PrefixConGADT
             (NoExtField)
-            [(HsScaled
-              (HsUnrestrictedArrow
-               (EpUniTok
-                (EpaSpan { T18791.hs:5:14-15 })
-                (NormalSyntax)))
+            [(CDF
+              ((,)
+               ((,,)
+                (EpaDelta { <no location info> } (SameLine 0) [])
+                (NoEpTok)
+                (EpaDelta { <no location info> } (SameLine 0) []))
+               (NoSourceText))
+              (NoSrcUnpack)
+              (NoSrcStrict)
+              (HsUnannotated
+               (EpArrow
+                (EpUniTok
+                 (EpaSpan { T18791.hs:5:14-15 })
+                 (NormalSyntax))))
               (L
                (EpAnn
                 (EpaSpan { T18791.hs:5:10-12 })
@@ -141,7 +150,8 @@
                   (EpaComments
                    []))
                  (Unqual
-                  {OccName: Int})))))])
+                  {OccName: Int}))))
+              (Nothing))])
            (L
             (EpAnn
              (EpaSpan { T18791.hs:5:17 })

@@ -71,6 +71,8 @@ module GHC.Parser.PostProcess (
         UnpackednessPragma(..),
         mkMultTy,
         mkMultAnn,
+        mkMultField,
+        mkConDeclField,
 
         -- Token location
         mkTokenLocation,
@@ -803,9 +805,9 @@ mkGadtDecl loc names dcol ty = do
 
   (args, res_ty, (ops, cps), csa) <-
     case body_ty of
-     L ll (HsFunTy _ hsArr (L (EpAnn anc _ cs) (HsRecTy an rf)) res_ty) -> do
+     L ll (HsFunTy _ hsArr (L (EpAnn anc _ cs) (XHsType (HsRecTy an rf))) res_ty) -> do
        arr <- case hsArr of
-         HsUnrestrictedArrow arr -> return arr
+         HsUnannotated (EpArrow arr) -> return arr
          _ -> do addError $ mkPlainErrorMsgEnvelope (getLocA body_ty) $
                                  (PsErrIllegalGadtRecordMultiplicity hsArr)
                  return noAnn
@@ -1370,7 +1372,7 @@ checkValDef loc lhs (mult, Just (sigAnn, sig)) grhss
        checkPatBind loc lhs' grhss mult
 
 checkValDef loc lhs (mult_ann, Nothing) grhss
-  | HsNoMultAnn{} <- mult_ann
+  | HsUnannotated{} <- mult_ann
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
             Just (fun, is_infix, pats, ops, cps) -> do
@@ -1431,7 +1433,7 @@ checkPatBind :: SrcSpan
              -> HsMultAnn GhcPs
              -> P (HsBind GhcPs)
 checkPatBind loc (L _ (BangPat an (L _ (VarPat _ v))))
-                        (L _match_span grhss) (HsNoMultAnn _)
+                        (L _match_span grhss) (HsUnannotated _)
       = return (makeFunBind v (L (noAnnSrcSpan loc)
                 [L (noAnnSrcSpan loc) (m an v)]))
   where
@@ -1521,8 +1523,8 @@ isFunLhs e = go e [] [] []
    go _ _ _ _ = return Nothing
 
 mkBangTy :: EpaLocation -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs
-mkBangTy tok_loc strictness =
-  HsBangTy ((noAnn, noAnn, tok_loc), NoSourceText) (HsBang NoSrcUnpack strictness)
+mkBangTy tok_loc strictness lty =
+  XHsType (HsBangTy (noAnn, noAnn, tok_loc) (HsSrcBang NoSourceText NoSrcUnpack strictness) lty)
 
 -- | Result of parsing @{-\# UNPACK \#-}@ or @{-\# NOUNPACK \#-}@.
 data UnpackednessPragma =
@@ -1539,11 +1541,11 @@ addUnpackednessP (L lprag (UnpackednessPragma anns prag unpk)) ty = do
     -- such as ~T or !T, then add the pragma to the existing HsBangTy.
     --
     -- Otherwise, wrap the type in a new HsBangTy constructor.
-    addUnpackedness (o,c) (L _ (HsBangTy ((_,_,tl), NoSourceText) bang t))
-      | HsBang NoSrcUnpack strictness <- bang
-      = HsBangTy ((o,c,tl), prag) (HsBang unpk strictness) t
+    addUnpackedness (o,c) (L _ (XHsType (HsBangTy (_,_,tl) bang t)))
+      | HsSrcBang NoSourceText NoSrcUnpack strictness <- bang
+      = XHsType (HsBangTy (o,c,tl) (HsSrcBang prag unpk strictness) t)
     addUnpackedness (o,c) t
-      = HsBangTy ((o,c,noAnn), prag) (HsBang unpk NoSrcStrict) t
+      = XHsType (HsBangTy (o,c,noAnn) (HsSrcBang prag unpk NoSrcStrict) t)
 
 ---------------------------------------------------------------------------
 -- | Check for monad comprehensions
@@ -2057,10 +2059,10 @@ instance DisambECP (PatBuilder GhcPs) where
     where
       tok :: TokRarrow
       tok = case arr of
-        HsUnrestrictedArrow x -> x
+        HsUnannotated (EpArrow x) -> x
         _ -> -- unreachable case because in Parser.y the reduction rules for
              -- (a %m -> b) and (a ->. b) use ArrowIsFunType
-             panic "mkHsArrowPV ArrowIsViewPat: expected HsUnrestrictedArrow"
+             panic "mkHsArrowPV ArrowIsViewPat: expected HsUnannotated"
   mkHsArrowPV l ArrowIsFunType a arr b =
     patFail l (PsErrTypeSyntaxInPat (PETS_FunctionArrow a arr b))
   mkHsMultPV tok arg =
@@ -2317,16 +2319,16 @@ dataConBuilderDetails :: LocatedA DataConBuilder -> HsConDeclH98Details GhcPs
 -- Detect when the record syntax is used:
 --   data T = MkT { ... }
 dataConBuilderDetails (L _ (PrefixDataConBuilder flds _))
-  | [L (EpAnn anc _ cs) (HsRecTy an fields)] <- toList flds
+  | [L (EpAnn anc _ cs) (XHsType (HsRecTy an fields))] <- toList flds
   = RecCon (L (EpAnn anc an cs) fields)
 
 -- Normal prefix constructor, e.g.  data T = MkT A B C
 dataConBuilderDetails (L _ (PrefixDataConBuilder flds _))
-  = PrefixCon noTypeArgs (map hsLinear (toList flds))
+  = PrefixCon noTypeArgs (map hsPlainTypeField (toList flds))
 
 -- Infix constructor, e.g. data T = Int :! Bool
 dataConBuilderDetails (L (EpAnn _ _ csl) (InfixDataConBuilder (L (EpAnn anc ann csll) lhs) _ rhs))
-  = InfixCon (hsLinear (L (EpAnn anc ann (csl Semi.<> csll)) lhs)) (hsLinear rhs)
+  = InfixCon (hsPlainTypeField (L (EpAnn anc ann (csl Semi.<> csll)) lhs)) (hsPlainTypeField rhs)
 
 
 instance DisambTD DataConBuilder where
@@ -2353,7 +2355,7 @@ instance DisambTD DataConBuilder where
       return $ L (addCommentsToEpAnn l cs) (InfixDataConBuilder lhs data_con rhs)
     where
       l = combineLocsA lhs rhs
-      check_no_ops (HsBangTy _ _ t) = check_no_ops (unLoc t)
+      check_no_ops (XHsType (HsBangTy _ _ t)) = check_no_ops (unLoc t)
       check_no_ops (HsOpTy{}) =
         addError $ mkPlainErrorMsgEnvelope (locA l) $
                      (PsErrInvalidInfixDataCon (unLoc lhs) (unLoc tc) (unLoc rhs))
@@ -2394,7 +2396,7 @@ checkNotPromotedDataCon IsPromoted (L l name) =
 
 mkUnboxedSumCon :: LHsType GhcPs -> ConTag -> Arity -> (LocatedN RdrName, HsConDeclH98Details GhcPs)
 mkUnboxedSumCon t tag arity =
-  (noLocA (getRdrName (sumDataCon tag arity)), PrefixCon noTypeArgs [hsLinear t])
+  (noLocA (getRdrName (sumDataCon tag arity)), PrefixCon noTypeArgs [hsPlainTypeField t])
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3474,35 +3476,31 @@ mkLHsOpTy prom x op y =
   let loc = locA x `combineSrcSpans` locA op `combineSrcSpans` locA y
   in L (noAnnSrcSpan loc) (mkHsOpTy prom x op y)
 
-mkMultTy :: EpToken "%" -> LHsType GhcPs -> TokRarrow -> HsArrow GhcPs
-mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) arr
-  -- See #18888 for the use of (SourceText "1") above
-  = HsLinearArrow (EpPct1 pct1 arr)
-  where
-    -- The location of "%" combined with the location of "1".
-    pct1 :: EpToken "%1"
-    pct1 = epTokenWidenR pct (locA (getLoc t))
-mkMultTy pct t arr = HsExplicitMult (pct, arr) t
-
 mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> TokRarrow -> HsArrowOf (LHsExpr GhcPs) GhcPs
 mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpackFS -> "1")) _ 1))))) arr
   -- See #18888 for the use of (SourceText "1") above
-  = HsLinearArrow (EpPct1 pct1 arr)
+  = HsLinearAnn (EpPct1 pct1 (EpArrow arr))
   where
     -- The location of "%" combined with the location of "1".
     pct1 :: EpToken "%1"
     pct1 = epTokenWidenR pct (locA (getLoc t))
-mkMultExpr pct t arr = HsExplicitMult (pct, arr) t
+mkMultExpr pct t arr = HsExplicitMult (pct, EpArrow arr) t
 
-mkMultAnn :: EpToken "%" -> LHsType GhcPs -> HsMultAnn GhcPs
-mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1)))
+mkMultTy :: EpToken "%" -> LHsType GhcPs -> TokRarrow -> HsArrow GhcPs
+mkMultTy pct t arr = mkMultAnn pct t (EpArrow arr)
+
+mkMultAnn :: EpToken "%" -> LHsType GhcPs -> EpArrowOrColon -> HsMultAnn GhcPs
+mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) ep
   -- See #18888 for the use of (SourceText "1") above
-  = HsPct1Ann pct1
+  = HsLinearAnn (EpPct1 pct1 ep)
   where
     -- The location of "%" combined with the location of "1".
     pct1 :: EpToken "%1"
     pct1 = epTokenWidenR pct (locA (getLoc t))
-mkMultAnn pct t = HsMultAnn pct t
+mkMultAnn pct t ep = HsExplicitMult (pct, ep) t
+
+mkMultField :: EpToken "%" -> LHsType GhcPs -> TokDcolon -> LHsType GhcPs -> HsConDeclField GhcPs
+mkMultField pct mult col t = mkConDeclField (mkMultAnn pct mult (EpColon col)) t
 
 mkTokenLocation :: SrcSpan -> TokenLocation
 mkTokenLocation (UnhelpfulSpan _) = NoTokenLoc

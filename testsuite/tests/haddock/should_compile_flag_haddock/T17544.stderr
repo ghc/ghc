@@ -148,10 +148,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { T17544.hs:6:11-12 })
-               (NormalSyntax)))
+             (HsUnannotated
+              (EpArrow
+               (EpUniTok
+                (EpaSpan { T17544.hs:6:11-12 })
+                (NormalSyntax))))
              (L
               (EpAnn
                (EpaSpan { T17544.hs:6:9 })
@@ -326,10 +327,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { T17544.hs:10:11-12 })
-               (NormalSyntax)))
+             (HsUnannotated
+              (EpArrow
+               (EpUniTok
+                (EpaSpan { T17544.hs:10:11-12 })
+                (NormalSyntax))))
              (L
               (EpAnn
                (EpaSpan { T17544.hs:10:9 })
@@ -502,10 +504,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { T17544.hs:14:11-12 })
-               (NormalSyntax)))
+             (HsUnannotated
+              (EpArrow
+               (EpUniTok
+                (EpaSpan { T17544.hs:14:11-12 })
+                (NormalSyntax))))
              (L
               (EpAnn
                (EpaSpan { T17544.hs:14:9 })
@@ -681,10 +684,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { T17544.hs:18:11-12 })
-               (NormalSyntax)))
+             (HsUnannotated
+              (EpArrow
+               (EpUniTok
+                (EpaSpan { T17544.hs:18:11-12 })
+                (NormalSyntax))))
              (L
               (EpAnn
                (EpaSpan { T17544.hs:18:9 })
@@ -767,10 +771,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { T17544.hs:20:11-12 })
-               (NormalSyntax)))
+             (HsUnannotated
+              (EpArrow
+               (EpUniTok
+                (EpaSpan { T17544.hs:20:11-12 })
+                (NormalSyntax))))
              (L
               (EpAnn
                (EpaSpan { T17544.hs:20:9 })

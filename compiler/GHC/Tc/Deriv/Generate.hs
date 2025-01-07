@@ -2126,7 +2126,7 @@ nlHsAppType e s = noLocA (HsAppType noAnn e hs_ty)
     hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec $ nlHsCoreTy s
 
 nlHsCoreTy :: HsCoreTy -> LHsType GhcPs
-nlHsCoreTy = noLocA . XHsType
+nlHsCoreTy = noLocA . XHsType . HsCoreTy
 
 mkCoerceClassMethEqn :: Class   -- the class being derived
                      -> [TyVar] -- the tvs in the instance head (this includes
@@ -2243,10 +2243,10 @@ genAuxBindSpecSig :: SrcSpan -> AuxBindSpec -> LHsSigWcType GhcPs
 genAuxBindSpecSig loc spec = case spec of
   DerivTag2Con tycon _
     -> mk_sig $ L (noAnnSrcSpan loc) $
-       XHsType $ mkSpecForAllTys (tyConTyVars tycon) $
+       XHsType $ HsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
        intTy `mkVisFunTyMany` mkParentType tycon
   DerivMaxTag _ _
-    -> mk_sig (L (noAnnSrcSpan loc) (XHsType intTy))
+    -> mk_sig (L (noAnnSrcSpan loc) (XHsType (HsCoreTy intTy)))
   DerivDataDataType _ _ _
     -> mk_sig (nlHsTyVar NotPromoted dataType_RDR)
   DerivDataConstr _ _ _

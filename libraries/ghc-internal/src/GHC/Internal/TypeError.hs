@@ -162,7 +162,7 @@ Note [The Unsatisfiable representation-polymorphism trick]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The class method `unsatisfiableLifted :: forall (a::Type). Unsatisfiable msg => a`
 works only for lifted types `a`.  What if we want an unsatisfiable value of type
-`Int#`, say?  The function `unsatisfiable` has a representation-polymoprhic type
+`Int#`, say?  The function `unsatisfiable` has a representation-polymorphic type
    unsatisfiable :: forall {rep} (msg :: ErrorMessage) (b :: TYPE rep).
                     Unsatisfiable msg => b
 and yet is defined in terms of `unsatisfiableLifted`.  How? By instantiating

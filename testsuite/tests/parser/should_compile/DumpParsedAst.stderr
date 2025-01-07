@@ -173,10 +173,17 @@
            (Nothing)
            (PrefixCon
             []
-            [(HsScaled
-              (HsLinearArrow
-               (EpPct1
+            [(CDF
+              ((,)
+               ((,,)
+                (EpaDelta { <no location info> } (SameLine 0) [])
                 (NoEpTok)
+                (EpaDelta { <no location info> } (SameLine 0) []))
+               (NoSourceText))
+              (NoSrcUnpack)
+              (NoSrcStrict)
+              (HsUnannotated
+               (EpColon
                 (NoEpUniTok)))
               (L
                (EpAnn
@@ -196,7 +203,8 @@
                   (EpaComments
                    []))
                  (Unqual
-                  {OccName: Peano})))))])
+                  {OccName: Peano}))))
+              (Nothing))])
            (Nothing)))])
        []))))
   ,(L
@@ -244,10 +252,11 @@
            []))
          (HsFunTy
           (NoExtField)
-          (HsUnrestrictedArrow
-           (EpUniTok
-            (EpaSpan { DumpParsedAst.hs:9:20-21 })
-            (NormalSyntax)))
+          (HsUnannotated
+           (EpArrow
+            (EpUniTok
+             (EpaSpan { DumpParsedAst.hs:9:20-21 })
+             (NormalSyntax))))
           (L
            (EpAnn
             (EpaSpan { DumpParsedAst.hs:9:16-18 })
@@ -828,10 +837,17 @@
            (Nothing)
            (PrefixCon
             []
-            [(HsScaled
-              (HsLinearArrow
-               (EpPct1
+            [(CDF
+              ((,)
+               ((,,)
+                (EpaDelta { <no location info> } (SameLine 0) [])
                 (NoEpTok)
+                (EpaDelta { <no location info> } (SameLine 0) []))
+               (NoSourceText))
+              (NoSrcUnpack)
+              (NoSrcStrict)
+              (HsUnannotated
+               (EpColon
                 (NoEpUniTok)))
               (L
                (EpAnn
@@ -892,7 +908,8 @@
                       (EpaComments
                        []))
                      (Unqual
-                      {OccName: a})))))))))])
+                      {OccName: a}))))))))
+              (Nothing))])
            (Nothing)))])
        []))))
   ,(L
@@ -940,10 +957,11 @@
            []))
          (HsFunTy
           (NoExtField)
-          (HsUnrestrictedArrow
-           (EpUniTok
-            (EpaSpan { DumpParsedAst.hs:17:14-15 })
-            (NormalSyntax)))
+          (HsUnannotated
+           (EpArrow
+            (EpUniTok
+             (EpaSpan { DumpParsedAst.hs:17:14-15 })
+             (NormalSyntax))))
           (L
            (EpAnn
             (EpaSpan { DumpParsedAst.hs:17:12 })
@@ -972,10 +990,11 @@
              []))
            (HsFunTy
             (NoExtField)
-            (HsUnrestrictedArrow
-             (EpUniTok
-              (EpaSpan { DumpParsedAst.hs:17:29-30 })
-              (NormalSyntax)))
+            (HsUnannotated
+             (EpArrow
+              (EpUniTok
+               (EpaSpan { DumpParsedAst.hs:17:29-30 })
+               (NormalSyntax))))
             (L
              (EpAnn
               (EpaSpan { DumpParsedAst.hs:17:17-27 })
@@ -998,10 +1017,11 @@
                  []))
                (HsFunTy
                 (NoExtField)
-                (HsUnrestrictedArrow
-                 (EpUniTok
-                  (EpaSpan { DumpParsedAst.hs:17:20-21 })
-                  (NormalSyntax)))
+                (HsUnannotated
+                 (EpArrow
+                  (EpUniTok
+                   (EpaSpan { DumpParsedAst.hs:17:20-21 })
+                   (NormalSyntax))))
                 (L
                  (EpAnn
                   (EpaSpan { DumpParsedAst.hs:17:18 })
@@ -1384,10 +1404,11 @@
                []))
              (HsFunTy
               (NoExtField)
-              (HsUnrestrictedArrow
-               (EpUniTok
-                (EpaSpan { DumpParsedAst.hs:18:33-34 })
-                (NormalSyntax)))
+              (HsUnannotated
+               (EpArrow
+                (EpUniTok
+                 (EpaSpan { DumpParsedAst.hs:18:33-34 })
+                 (NormalSyntax))))
               (L
                (EpAnn
                 (EpaSpan { DumpParsedAst.hs:18:31 })
@@ -1516,10 +1537,11 @@
             []))
           (HsFunTy
            (NoExtField)
-           (HsUnrestrictedArrow
-            (EpUniTok
-             (EpaSpan { DumpParsedAst.hs:21:22-23 })
-             (NormalSyntax)))
+           (HsUnannotated
+            (EpArrow
+             (EpUniTok
+              (EpaSpan { DumpParsedAst.hs:21:22-23 })
+              (NormalSyntax))))
            (L
             (EpAnn
              (EpaSpan { DumpParsedAst.hs:21:20 })
@@ -1548,10 +1570,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
-              (EpUniTok
-               (EpaSpan { DumpParsedAst.hs:21:27-28 })
-               (NormalSyntax)))
+             (HsUnannotated
+              (EpArrow
+               (EpUniTok
+                (EpaSpan { DumpParsedAst.hs:21:27-28 })
+                (NormalSyntax))))
              (L
               (EpAnn
                (EpaSpan { DumpParsedAst.hs:21:25 })
@@ -1673,10 +1696,11 @@
                  []))
                (HsFunTy
                 (NoExtField)
-                (HsUnrestrictedArrow
-                 (EpUniTok
-                  (EpaSpan { DumpParsedAst.hs:22:30-31 })
-                  (NormalSyntax)))
+                (HsUnannotated
+                 (EpArrow
+                  (EpUniTok
+                   (EpaSpan { DumpParsedAst.hs:22:30-31 })
+                   (NormalSyntax))))
                 (L
                  (EpAnn
                   (EpaSpan { DumpParsedAst.hs:22:28 })
@@ -1745,10 +1769,11 @@
              []))
            (HsFunTy
             (NoExtField)
-            (HsUnrestrictedArrow
-             (EpUniTok
-              (EpaSpan { DumpParsedAst.hs:22:54-55 })
-              (NormalSyntax)))
+            (HsUnannotated
+             (EpArrow
+              (EpUniTok
+               (EpaSpan { DumpParsedAst.hs:22:54-55 })
+               (NormalSyntax))))
             (L
              (EpAnn
               (EpaSpan { DumpParsedAst.hs:22:42-52 })
@@ -1771,10 +1796,11 @@
                  []))
                (HsFunTy
                 (NoExtField)
-                (HsUnrestrictedArrow
-                 (EpUniTok
-                  (EpaSpan { DumpParsedAst.hs:22:45-46 })
-                  (NormalSyntax)))
+                (HsUnannotated
+                 (EpArrow
+                  (EpUniTok
+                   (EpaSpan { DumpParsedAst.hs:22:45-46 })
+                   (NormalSyntax))))
                 (L
                  (EpAnn
                   (EpaSpan { DumpParsedAst.hs:22:43 })
@@ -1870,11 +1896,20 @@
             (Nothing)
             (PrefixConGADT
              (NoExtField)
-             [(HsScaled
-               (HsUnrestrictedArrow
-                (EpUniTok
-                 (EpaSpan { DumpParsedAst.hs:23:36-37 })
-                 (NormalSyntax)))
+             [(CDF
+               ((,)
+                ((,,)
+                 (EpaDelta { <no location info> } (SameLine 0) [])
+                 (NoEpTok)
+                 (EpaDelta { <no location info> } (SameLine 0) []))
+                (NoSourceText))
+               (NoSrcUnpack)
+               (NoSrcStrict)
+               (HsUnannotated
+                (EpArrow
+                 (EpUniTok
+                  (EpaSpan { DumpParsedAst.hs:23:36-37 })
+                  (NormalSyntax))))
                (L
                 (EpAnn
                  (EpaSpan { DumpParsedAst.hs:23:10-34 })
@@ -1942,10 +1977,11 @@
                       []))
                     (HsFunTy
                      (NoExtField)
-                     (HsUnrestrictedArrow
-                      (EpUniTok
-                       (EpaSpan { DumpParsedAst.hs:23:27-28 })
-                       (NormalSyntax)))
+                     (HsUnannotated
+                      (EpArrow
+                       (EpUniTok
+                        (EpaSpan { DumpParsedAst.hs:23:27-28 })
+                        (NormalSyntax))))
                      (L
                       (EpAnn
                        (EpaSpan { DumpParsedAst.hs:23:22-25 })
@@ -2039,7 +2075,8 @@
                            (EpaComments
                             []))
                           (Unqual
-                           {OccName: xx})))))))))))))])
+                           {OccName: xx}))))))))))))
+               (Nothing))])
             (L
              (EpAnn
               (EpaSpan { DumpParsedAst.hs:23:39-45 })

@@ -2273,7 +2273,7 @@ data TcRnMessage where
                 typecheck/should_fail/T7210
                 rename/should_fail/T22478b
   -}
-  TcRnUnexpectedAnnotation :: !(HsType GhcRn) -> !HsBang -> TcRnMessage
+  TcRnUnexpectedAnnotation :: !(HsType GhcPs) -> !HsSrcBang -> TcRnMessage
 
   {-| TcRnIllegalRecordSyntax is an error indicating an illegal use of record syntax.
 
@@ -2284,7 +2284,7 @@ data TcRnMessage where
                 rename/should_fail/T9077
                 rename/should_fail/T22478b
   -}
-  TcRnIllegalRecordSyntax :: Either (HsType GhcPs) (HsType GhcRn) -> TcRnMessage
+  TcRnIllegalRecordSyntax :: HsType GhcPs -> TcRnMessage
 
   {-| TcRnInvalidVisibleKindArgument is an error for a kind application on a
      target type that cannot accept it.

@@ -414,8 +414,8 @@ type instance XFunRhs  = AnnFunRhs
 type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))))] = SrcSpanAnnLW
 type instance Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) = SrcSpanAnnA
 
-arrowToHsExpr :: HsArrowOf (LocatedA (HsExpr GhcRn)) GhcRn -> LocatedA (HsExpr GhcRn)
-arrowToHsExpr = expandHsArrow (HsVar noExtField)
+arrowToHsExpr :: HsArrowOf (LocatedA (HsExpr GhcRn)) GhcRn -> Maybe (LocatedA (HsExpr GhcRn))
+arrowToHsExpr = expandHsMultAnnOf (HsVar noExtField)
 
 data AnnExplicitSum
   = AnnExplicitSum {
