@@ -5,4 +5,8 @@ class C a where
     app :: a (a Int)
 
 newtype N cat a b = MkN (cat a b)  deriving( C )
--- The newtype coercion is   N cat ~R cat
+-- The inferred instance is:
+--
+--   instance
+--     (Coercible (cat a (N cat a Int)) (cat a (cat a Int)), C (cat a)) =>
+--     C (N cat a)

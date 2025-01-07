@@ -1,9 +1,0 @@
-T8984.hs:7:46: error: [GHC-18872]
-    • Couldn't match representation of type: cat a (N cat a Int)
-                               with that of: cat a (cat a Int)
-        arising from the coercion of the method ‘app’
-          from type ‘cat a (cat a Int)’ to type ‘N cat a (N cat a Int)’
-      Note: We cannot know what roles the parameters to ‘cat a’ have;
-            we must assume that the role is nominal.
-    • When deriving the instance for (C (N cat a))
-

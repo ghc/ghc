@@ -2,6 +2,7 @@
 
 module GHC.Tc.Solver(
        InferMode(..), simplifyInfer, findInferredDiff,
+       pickQuantifiablePreds,
        growThetaTyVars,
        simplifyAmbiguityCheck,
        simplifyDefault,

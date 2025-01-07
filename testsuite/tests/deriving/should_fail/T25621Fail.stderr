@@ -1,0 +1,8 @@
+T25621Fail.hs:24:21: error: [GHC-25897]
+    • Couldn't match type ‘a’ with ‘()’
+        arising from the 'deriving' clause of a data type declaration
+      ‘a’ is a rigid type variable bound by
+        the deriving clause for ‘Cls (Foo a)’
+        at T25621Fail.hs:24:21-23
+    • When deriving the instance for (Cls (Foo a))
+

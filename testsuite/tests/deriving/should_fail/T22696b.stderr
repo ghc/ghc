@@ -1,5 +1,0 @@
-
-T22696b.hs:13:12: error: [GHC-05617]
-    • Could not solve: ‘c Int’
-        arising from the 'deriving' clause of a data type declaration
-    • When deriving the instance for (C (T c))

@@ -11,9 +11,6 @@ instance c Int => C (S c) where
 
 newtype T c = MkT (S c)
   deriving C
-  -- The inferred instance would be:
+  -- The inferred instance is:
   --
   --  instance c Int => C (T c)
-  --
-  -- And we want to reject this instance due to the reasons mentioned in
-  -- (VD2) in Note [Valid 'deriving' predicate] in GHC.Tc.Validity.

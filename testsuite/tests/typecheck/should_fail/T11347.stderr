@@ -1,13 +1,18 @@
-
-T11347.hs:6:41: error: [GHC-10283]
+T11347.hs:19:18: error: [GHC-10283]
     • Couldn't match representation of type ‘a’ with that of ‘b’
-        arising from the coercion of the method ‘unsafe’
-          from type ‘Id1 a -> Discern (Id1 a) b’
-            to type ‘Id2 a -> Discern (Id2 a) b’
+        arising from a use of ‘unsafe’
       ‘a’ is a rigid type variable bound by
-        the deriving clause for ‘UnsafeCast b (Id2 a)’
-        at T11347.hs:6:41-52
+        the type signature for:
+          unsafeCoerce :: forall a b. a -> b
+        at T11347.hs:18:1-22
       ‘b’ is a rigid type variable bound by
-        the deriving clause for ‘UnsafeCast b (Id2 a)’
-        at T11347.hs:6:41-52
-    • When deriving the instance for (UnsafeCast b (Id2 a))
+        the type signature for:
+          unsafeCoerce :: forall a b. a -> b
+        at T11347.hs:18:1-22
+    • In the expression: unsafe (MkId2 (MkId1 x))
+      In an equation for ‘unsafeCoerce’:
+          unsafeCoerce x = unsafe (MkId2 (MkId1 x))
+    • Relevant bindings include
+        x :: a (bound at T11347.hs:19:14)
+        unsafeCoerce :: a -> b (bound at T11347.hs:19:1)
+

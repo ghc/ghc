@@ -1,15 +1,14 @@
-
-deriving-via-fail.hs:10:34: error: [GHC-10283]
-    • Couldn't match representation of type ‘a’ with that of ‘b’
-        arising from the coercion of the method ‘showsPrec’
-          from type ‘Int -> Identity b -> ShowS’
-            to type ‘Int -> Foo1 a -> ShowS’
-      ‘a’ is a rigid type variable bound by
-        the deriving clause for ‘Show (Foo1 a)’
+deriving-via-fail.hs:10:34: error: [GHC-39999]
+    • Could not deduce ‘Show b’
+        arising from the 'deriving' clause of a data type declaration
+      from the context: Coercible a b
+        bound by the deriving clause for ‘Show (Foo1 a)’
         at deriving-via-fail.hs:10:34-37
-      ‘b’ is a rigid type variable bound by
-        the deriving clause for ‘Show (Foo1 a)’
-        at deriving-via-fail.hs:10:34-37
+      Possible fix:
+        add (Show b) to the context of
+          the deriving clause for ‘Show (Foo1 a)’
+        or use a standalone 'deriving instance' declaration,
+             so you can specify the instance context yourself
     • When deriving the instance for (Show (Foo1 a))
 
 deriving-via-fail.hs:13:12: error: [GHC-63174]
@@ -18,11 +17,15 @@ deriving-via-fail.hs:13:12: error: [GHC-63174]
         but ‘fooo’ has kind ‘*’
     • In the newtype declaration for ‘Foo2’
 
-deriving-via-fail.hs:16:20: error: [GHC-10283]
-    • Couldn't match representation of type ‘a’ with that of ‘Foo3’
-        arising from the coercion of the method ‘==’
-          from type ‘a -> a -> Bool’ to type ‘Foo3 -> Foo3 -> Bool’
-      ‘a’ is a rigid type variable bound by
-        the deriving clause for ‘Eq Foo3’
+deriving-via-fail.hs:16:20: error: [GHC-39999]
+    • Could not deduce ‘Eq a’
+        arising from the 'deriving' clause of a data type declaration
+      from the context: Coercible a Foo3
+        bound by the deriving clause for ‘Eq Foo3’
         at deriving-via-fail.hs:16:20-21
+      Possible fix:
+        add (Eq a) to the context of the deriving clause for ‘Eq Foo3’
+        or use a standalone 'deriving instance' declaration,
+             so you can specify the instance context yourself
     • When deriving the instance for (Eq Foo3)
+

@@ -69,7 +69,6 @@ import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar, tyVarName )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing ( TyThing(..) )
-import GHC.Types.Unique.Set( isEmptyUniqSet )
 
 import GHC.Utils.FV
 import GHC.Utils.Error
@@ -1834,16 +1833,61 @@ encounters a constraint that is too complex, it will reject it, and you will
 have to use StandaloneDeriving to manually specify the instance context that
 you want.
 
-There are two criteria for a constraint inferred by a `deriving` clause to be
-considered valid, which are described below as (VD1) and (VD2). (Here, "VD"
-stands for "valid deriving".) `validDerivPred` implements these checks. While
-`validDerivPred` is similar to other things defined in GHC.Tc.Deriv.Infer, we
-define it here in GHC.Tc.Validity because it is quite similar to
-`checkInstTermination`.
+As a general rule, GHC tries to apply the same validity checks to inferred
+constraints arising from derived instances as it does for inferred constraints
+arising from let-bindings. For instance, if we wrote:
 
------------------------------------
--- (VD1) The Paterson conditions --
------------------------------------
+  let f (MkT x) (MkT y) = (x == y) in ...
+
+Then GHC should use the same rules for the inferred context in `f`'s type
+signature as it does for the inferred context in a derived `Eq` instance. Let's
+briefly review the rules that GHC applies for inferred contexts in
+let-bindings. (Each let-binding-related rule with be prefixed with "A".)
+
+A1. After collecting the wanted constraints from type inference, GHC decides
+    which constraints to quantify over in the inferred type signature by calling
+    `approximateWC`. See Note [ApproximateWC] in GHC.Tc.Types.Constraint for
+    more details on what forms of constraints `approximateWC` accepts.
+
+A2. The constraints are then checked by `pickQuantifiablePreds`, which only
+    accepts constraints that mention variables that will be quantified over.
+    See Note [pickQuantifiablePreds] in GHC.Tc.Solver.
+
+A3. Finally, the constraints are checked by `checkValidType`. Among other
+    things, this checks for termination and ensures that each constraint is
+    either of the form `C a_1 a_2 ... a_n` or, if not, that the
+    `FlexibleContexts` language extension is enabled.
+
+The implementation of type inference in `deriving` is rather different from the
+implementation of type inference for let-bindings, but we can still achieve the
+same validity checks nonetheless. Let's now go over the rules that GHC applies
+for inferred contexts in derived instances. (Each `deriving`-related rule will
+be prefixed with "B".)
+
+B1. After gathering the wanted constraints from a derived instance, GHC calls
+    `approximateWC` on them. (This step is exactly the same as A1.)
+
+B2. The constraints are then checked by `pickQuantifiablePreds`. (Similarly,
+    this step is exactly the same as A2.)
+
+B3. Finally, the constraints are checked by `checkValidTheta`. This step differs
+    from A3 slightly in that A3 checks the entirety of the inferred type
+    signature (using `checkValidType`). In `deriving`, however, only the
+    constraints need to be inferred—the rest of the instance is provided by the
+    user when they write the data type declaration and the deriving clause. As
+    such, it suffices to only call `checkValidTheta`.
+
+    Also, in order to be absolutely sure that the inferred context will
+    terminate, GHC explicitly checks that the inferred context satisfies the
+    Paterson conditions. This check is implemented in the `validDerivPred`
+    function. (See "Wrinkle: The Paterson conditions" below for more on this.)
+    While `validDerivPred` is similar to other things defined in
+    GHC.Tc.Deriv.Infer, we define it here in GHC.Tc.Validity because it is quite
+    similar to `checkInstTermination`.
+
+--------------------------------------
+-- Wrinkle: The Paterson conditions --
+--------------------------------------
 
 Constraints must satisfy the Paterson conditions (see Note [Paterson
 conditions]) to be valid. Not only does this check for termination (of course),
@@ -1889,97 +1933,6 @@ and then:
 
 and so on. Instead we want to complain of no instance for (Show (Succ a)).
 
----------------------------------
--- (VD2) No exotic constraints --
----------------------------------
-
-A constraint must satisfy one of the following properties in order to be valid:
-
-* It is a `ClassPred` of the form `C a_1 ... a_n`, where C is a type class
-  constructor and a_1, ..., a_n are either raw type variables or applications
-  of type variables (e.g., `f a`).
-* It is an `IrredPred` of the form `c a_1 ... a_n`, where `c` is a raw type
-  variable and a_1, ..., a_n are either raw type variables or applications of
-  type variables (e.g., `f a`).
-
-If a constraint does not meet either of these properties, it is considered
-*exotic*. A constraint will be exotic if it contains:
-
-* Other type constructors (besides the class in a `ClassPred`),
-* Foralls, or
-* Equalities
-
-A common form of exotic constraint is one that mentions another type
-constructor. For example, given the following:
-
-  data NotAShowInstance
-  data Foo = MkFoo Int NotAShowInstance deriving Show
-
-GHC would attempt to generate the following derived `Show` instance:
-
-  instance (Show Int, Show NotAShowInstance) => Show Foo
-
-Note that because there is a top-level `Show Int` instance, GHC is able to
-simplify away the inferred `Show Int` constraint. However, it cannot do the
-same for the `Show NotAShowInstance` constraint. One possibility would be to
-generate this instance:
-
-  instance Show NotAShowInstance => Show Foo
-
-But this is almost surely not what we want most of the time. For this reason,
-we reject the constraint above as being exotic.
-
-Here are some other interesting examples:
-
-* Derived instances whose instance context would mention TypeError, such as the
-  code from the deriving/should_fail/T14339 test case, are exotic. For example:
-
-    newtype Foo = Foo Int
-
-    class Bar a where
-      bar :: a
-
-    instance (TypeError (Text "Boo")) => Bar Foo where
-      bar = undefined
-
-    newtype Baz = Baz Foo
-      deriving Bar
-
-  The `deriving Bar` clause would generate this instance:
-
-    instance TypeError (Text "Boo") => Bar Baz
-
-  The instance context is exotic, as `TypeError` is not a type constructor, and
-  `Text "Boo"` is not an application of type variables. As such, GHC rejects
-  it. This has the desirable side effect of causing the TypeError to fire in
-  the resulting error message.
-
-* The following `IrredPred`s are not exotic:
-
-    instance c => C (T c a)
-    instance c a => C (T c a)
-
-  This `IrredPred`, however, *is* exotic:
-
-    instance c NotAShowInstance => C (T c)
-
-  This is rejected for the same reasons that we do not permit a `ClassPred`
-  with a type constructor argument, such as the `Show NotAShowInstance` example
-  above.
-
-As part of implementing this check, GHC calls `tyConsOfType` on the arguments
-of the constraint, ensuring that there are no other type constructors.
-Wrinkle: for `ClassPred`s, we look only at the /visible/ arguments of the class
-type constructor. Including the non-visible arguments can cause the following,
-perfectly valid instance to be rejected:
-
-  class Category (cat :: k -> k -> Type) where ...
-  newtype T (c :: Type -> Type -> Type) a b = MkT (c a b)
-  instance Category c => Category (T c) where ...
-
-since the first argument to `Category` is a non-visible `Type`, which has a type
-constructor! See #11833.
-
 Note [Equality class instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We can't have users writing instances for the equality classes. But we
@@ -1988,24 +1941,23 @@ instances only in the defining module.
 -}
 
 validDerivPred :: PatersonSize -> PredType -> Bool
--- See Note [Valid 'deriving' predicate]
+-- See Note [Valid 'deriving' predicate] (Wrinkle: The Paterson conditions)
 validDerivPred head_size pred
   = case classifyPredType pred of
-            EqPred {}     -> False  -- Reject equality constraints (VD2)
-            ForAllPred {} -> False  -- Rejects quantified predicates (VD2)
-
-            ClassPred cls tys -> check_size (pSizeClassPred cls tys)        -- (VD1)
-                              && isEmptyUniqSet (tyConsOfTypes visible_tys) -- (VD2)
-                where
-                  -- See the wrinkle about visible arguments in (VD2)
-                  visible_tys = filterOutInvisibleTypes (classTyCon cls) tys
-
-            IrredPred {} -> check_size (pSizeType pred)        -- (VD1)
-                         && isEmptyUniqSet (tyConsOfType pred) -- (VD2)
-
+            -- Equality constraints don't need to be checked in order to satisfy
+            -- the Paterson conditions, so we simply return True here. (They are
+            -- validity checked elsewhere in `approximateWC`, however.
+            -- See Note [ApproximateWC] in GHC.Tc.Types.Constraint.)
+            EqPred {}     -> True
+            -- Similarly, we don't need to check quantified constraints for
+            -- Paterson condition purposes, so simply return True here. (It
+            -- doesn't really matter what we return here, since `approximateWC`
+            -- won't quantify over a quantified constraint anywya.)
+            ForAllPred {} -> True
+            ClassPred cls tys -> check_size (pSizeClassPred cls tys)
+            IrredPred {} -> check_size (pSizeType pred)
   where
     check_size pred_size = isNothing (pred_size `ltPatersonSize` head_size)
-        -- Check (VD1)
 
 {-
 ************************************************************************

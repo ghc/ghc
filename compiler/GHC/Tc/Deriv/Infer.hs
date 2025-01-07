@@ -26,10 +26,10 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Solver( simplifyTopImplic )
+import GHC.Tc.Solver( pickQuantifiablePreds, simplifyTopImplic )
 import GHC.Tc.Solver.Solve( solveWanteds )
 import GHC.Tc.Solver.Monad ( runTcS )
-import GHC.Tc.Validity (validDerivPred)
+import GHC.Tc.Validity (checkValidTheta, validDerivPred)
 import GHC.Tc.Utils.Unify (buildImplicationFor)
 import GHC.Tc.Zonk.TcType ( zonkWC )
 import GHC.Tc.Zonk.Env ( ZonkFlexi(..), initZonkEnv )
@@ -53,6 +53,7 @@ import GHC.Utils.Misc
 
 import GHC.Types.Basic
 import GHC.Types.Var
+import GHC.Types.Var.Set (mkVarSet)
 
 import GHC.Data.Bag
 
@@ -844,18 +845,19 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
 
        -- See [STEP DAC HOIST]
        -- From the simplified constraints extract a subset 'good' that will
-       -- become the context 'min_theta' for the derived instance.
+       -- become the context 'min_theta' for the derived instance. See also (B1)
+       -- in Note [Valid 'deriving' predicate] in GHC.Tc.Validity.
        ; let residual_simple = approximateWC False solved_wanteds
                 -- False: ignore any non-quantifiable constraints,
                 --        including equalities hidden under Given equalities
              head_size = pSizeClassPred clas inst_tys
              good      = mapMaybeBag get_good residual_simple
 
-             -- Returns @Just p@ (where @p@ is the type of the Ct) if a Ct is
-             -- suitable to be inferred in the context of a derived instance.
-             -- Returns @Nothing@ if the Ct is too exotic.
-             -- See (VD2) in Note [Valid 'deriving' predicate] in
-             -- GHC.Tc.Validity for what constitutes an exotic constraint.
+             -- Returns @Just p@ (where @p@ is the type of the Ct) if a Ct
+             -- satisfies the Paterson conditions (and is therefore suitable to
+             -- be inferred in the context of a derived instance). Returns
+             -- @Nothing@ otherwise. See Note [Valid 'deriving' predicate]
+             -- (Wrinkle: The Paterson conditions) in GHC.Tc.Validity.
              get_good :: Ct -> Maybe PredType
              get_good ct | validDerivPred head_size p = Just p
                          | otherwise                  = Nothing
@@ -865,9 +867,12 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
          vcat [ ppr tvs, ppr residual_simple, ppr good ]
 
        -- Return the good unsolved constraints (unskolemizing on the way out.)
-       ; let min_theta = mkMinimalBySCs id (bagToList good)
-             -- An important property of mkMinimalBySCs (used above) is that in
-             -- addition to removing constraints that are made redundant by
+       -- Also reject quantified constraints if they appear. See (B2) in
+       -- Note [Valid 'deriving' predicate] in GHC.Tc.Validity.
+       ; let min_theta = pickQuantifiablePreds (mkVarSet tvs) (bagToList good)
+             -- Note that pickQuantifiablePreds (used above) also invokes
+             -- mkMinimalBySCs. An important property of mkMinimalBySCs is that
+             -- in addition to removing constraints that are made redundant by
              -- superclass relationships, it also removes _duplicate_
              -- constraints.
              -- See Note [Gathering and simplifying constraints for
@@ -891,10 +896,10 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
 
        ; traceTc "GHC.Tc.Deriv" (ppr deriv_rhs $$ ppr min_theta)
 
-         -- Claim: the result instance declaration is guaranteed valid
-         -- Hence no need to call:
-         --     checkValidInstance tyvars theta clas inst_tys
-         -- See Note [Valid 'deriving' predicate] in GHC.Tc.Validity
+       ; checkValidTheta user_ctxt min_theta
+         -- Ensure that the inferred context terminates and passes
+         -- FlexibleContexts-related checks.
+         -- See (B3) in Note [Valid 'deriving' predicate] in GHC.Tc.Validity.
 
        ; return min_theta }
 
@@ -1076,7 +1081,9 @@ Now we can use mkMinimalBySCs to remove superclasses and duplicates, giving
 
   (Show a, Ord a)
 
-And that's what GHC uses for CX.
+And that's what GHC uses for CX. (Note that the implementation of simplifyDeriv
+does not call mkMinimalBySCs directly, but rather invokes it transitively by
+calling pickQuantifiablePreds instead.)
 
 [STEP DAC RESIDUAL]
 In this case we have solved all the leftover constraints, but what if

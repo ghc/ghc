@@ -1,18 +1,18 @@
-
 deriving-via-fail4.hs:15:12: error: [GHC-18872]
     • Couldn't match representation of type ‘Int’ with that of ‘Char’
         arising from the coercion of the method ‘==’
           from type ‘Char -> Char -> Bool’ to type ‘F1 -> F1 -> Bool’
     • When deriving the instance for (Eq F1)
 
-deriving-via-fail4.hs:18:13: error: [GHC-10283]
-    • Couldn't match representation of type ‘a1’ with that of ‘a2’
-        arising from the coercion of the method ‘c’
-          from type ‘a -> a -> Bool’ to type ‘a -> F2 a1 -> Bool’
-      ‘a1’ is a rigid type variable bound by
-        the deriving clause for ‘C a (F2 a1)’
-        at deriving-via-fail4.hs:18:13-15
-      ‘a2’ is a rigid type variable bound by
-        the deriving clause for ‘C a (F2 a1)’
-        at deriving-via-fail4.hs:18:13-15
+deriving-via-fail4.hs:18:13: error: [GHC-43085]
+    • Overlapping instances for C a2 a2
+        arising from the 'deriving' clause of a data type declaration
+      Matching instance:
+        instance C a a -- Defined at deriving-via-fail4.hs:11:10
+      Potentially matching instance:
+        instance C a2 (F2 a1) -- Defined at deriving-via-fail4.hs:18:13
+      (The choice depends on the instantiation of ‘a2’
+       To pick the first instance above, use IncoherentInstances
+       when compiling the other instance declarations)
     • When deriving the instance for (C a (F2 a1))
+
