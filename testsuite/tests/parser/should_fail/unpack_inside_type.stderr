@@ -1,7 +1,5 @@
-
 unpack_inside_type.hs:3:25: error: [GHC-18932]
     • Unexpected UNPACK annotation: {-# UNPACK #-}Int
-      UNPACK annotation cannot appear nested inside a type
-    • In the first argument of ‘Maybe’, namely ‘{-# UNPACK #-}Int’
-      In the type ‘Maybe {-# UNPACK #-}Int’
-      In the definition of data constructor ‘T’
+      UNPACK annotation can only appear on the arguments of a data constructor type
+    • In the definition of data constructor ‘T’
+

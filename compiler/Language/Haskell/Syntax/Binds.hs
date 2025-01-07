@@ -251,20 +251,6 @@ data PatSynBind idL idR
      }
    | XPatSynBind !(XXPatSynBind idL idR)
 
--- | Multiplicity annotations, on binders, are always resolved (to a unification
--- variable if there is no annotation) during type-checking. The resolved
--- multiplicity is stored in the extension fields.
-data HsMultAnn pass
-  = HsNoMultAnn !(XNoMultAnn pass)
-  | HsPct1Ann   !(XPct1Ann pass)
-  | HsMultAnn   !(XMultAnn pass) (LHsType (NoGhcTc pass))
-  | XMultAnn    !(XXMultAnn pass)
-
-type family XNoMultAnn p
-type family XPct1Ann   p
-type family XMultAnn   p
-type family XXMultAnn  p
-
 {-
 ************************************************************************
 *                                                                      *

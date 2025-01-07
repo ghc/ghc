@@ -5,8 +5,8 @@ T22478b.hs:16:18: error: [GHC-10498]
     • In an equation for ‘fOutOfOrder’
 
 T22478b.hs:18:14: error: [GHC-18932]
-    • Unexpected strictness annotation: Int
-      strictness annotation cannot appear nested inside a type
+    • Unexpected strictness (!) annotation: !Int
+      strictness (!) annotation can only appear on the arguments of a data constructor type
     • In a type argument in a pattern
 
 T22478b.hs:21:54: error: [GHC-76037]

@@ -21,7 +21,10 @@ module GHC.Tc.TyCl (
         tcFamTyPats, tcTyFamInstEqn,
         tcAddOpenTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
         unravelFamInstPats, addConsistencyConstraints,
-        checkFamTelescope
+        checkFamTelescope,
+
+        -- Used by GHC.HsToCore.Quote
+        IsPrefixConGADT(..), unannotatedMultIsLinear
     ) where
 
 import GHC.Prelude
@@ -57,7 +60,7 @@ import GHC.Tc.Types.ErrCtxt ( TyConInstFlavour(..) )
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Origin
 
-import GHC.Builtin.Types ( oneDataConTy,  unitTy, makeRecoveryTyCon )
+import GHC.Builtin.Types ( oneDataConTy,  unitTy, makeRecoveryTyCon, manyDataConTy )
 
 import GHC.Rename.Env( lookupConstructorFields )
 
@@ -1804,13 +1807,13 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 -- This includes doing kind unification if the type is a newtype.
 -- See Note [Implementation of UnliftedNewtypes] for why we need
 -- the first two arguments.
-kcConArgTys :: ConArgKind                         -- Expected kind of the argument(s)
-            -> [HsScaled GhcRn (LHsType GhcRn)]   -- User-written argument types
+kcConArgTys :: ConArgKind                      -- Expected kind of the argument(s)
+            -> [HsConDeclField GhcRn]          -- User-written argument types
             -> TcM ()
 kcConArgTys exp_kind arg_tys
-  = forM_ arg_tys $ \(HsScaled mult ty) ->
-    do { _ <- tcCheckLHsTypeInContext (getBangType ty) exp_kind
-       ; tcMult mult }
+  = forM_ arg_tys $ \(CDF { cdf_multiplicity, cdf_type }) ->
+    do { _ <- tcCheckLHsTypeInContext cdf_type exp_kind
+       ; maybe (pure ()) (void . tcMult) (multAnnToHsType cdf_multiplicity) }
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
 
 -- Kind-check the types of arguments to a Haskell98 data constructor.
@@ -1821,7 +1824,7 @@ kcConH98Args exp_kind con_args = case con_args of
   PrefixCon tys     -> kcConArgTys exp_kind tys
   InfixCon ty1 ty2  -> kcConArgTys exp_kind [ty1, ty2]
   RecCon (L _ flds) -> kcConArgTys exp_kind $
-                       map (hsLinear . cd_fld_type . unLoc) flds
+                       map (cdrf_spec . unLoc) flds
 
 -- Kind-check the types of arguments to a GADT data constructor.
 kcConGADTArgs :: ConArgKind                       -- Expected kind of the argument(s)
@@ -1830,7 +1833,7 @@ kcConGADTArgs :: ConArgKind                       -- Expected kind of the argume
 kcConGADTArgs exp_kind con_args = case con_args of
   PrefixConGADT _ tys     -> kcConArgTys exp_kind tys
   RecConGADT _ (L _ flds) -> kcConArgTys exp_kind $
-                             map (hsLinear . cd_fld_type . unLoc) flds
+                             map (cdrf_spec . unLoc) flds
 
 kcConDecls :: TcKind  -- Result kind of tycon
                       -- Used only in H98 case
@@ -3957,7 +3960,7 @@ tcConIsInfixGADT con details
            RecConGADT{} -> return False
            PrefixConGADT _ arg_tys       -- See Note [Infix GADT constructors]
                | isSymOcc (getOccName con)
-               , [_ty1,_ty2] <- map hsScaledThing arg_tys
+               , [_ty1,_ty2] <- arg_tys
                   -> do { fix_env <- getFixityEnv
                         ; return (con `elemNameEnv` fix_env) }
                | otherwise -> return False
@@ -3968,13 +3971,13 @@ tcConH98Args :: ConArgKind   -- expected kind of arguments
              -> HsConDeclH98Details GhcRn
              -> TcM [(Scaled TcType, HsSrcBang)]
 tcConH98Args exp_kind (PrefixCon btys)
-  = mapM (tcConArg exp_kind) btys
+  = mapM (tcConArg exp_kind IsNotPrefixConGADT) btys
 tcConH98Args exp_kind (InfixCon bty1 bty2)
-  = do { bty1' <- tcConArg exp_kind bty1
-       ; bty2' <- tcConArg exp_kind bty2
+  = do { bty1' <- tcConArg exp_kind IsNotPrefixConGADT bty1
+       ; bty2' <- tcConArg exp_kind IsNotPrefixConGADT bty2
        ; return [bty1', bty2'] }
 tcConH98Args exp_kind (RecCon fields)
-  = tcRecConDeclFields exp_kind fields
+  = tcRecHsConDeclRecFields exp_kind fields
 
 tcConGADTArgs :: ConArgKind   -- expected kind of arguments
                               -- always OpenKind for datatypes, but unlifted newtypes
@@ -3982,39 +3985,51 @@ tcConGADTArgs :: ConArgKind   -- expected kind of arguments
               -> HsConDeclGADTDetails GhcRn
               -> TcM [(Scaled TcType, HsSrcBang)]
 tcConGADTArgs exp_kind (PrefixConGADT _ btys)
-  = mapM (tcConArg exp_kind) btys
+  = mapM (tcConArg exp_kind IsPrefixConGADT) btys
 tcConGADTArgs exp_kind (RecConGADT _ fields)
-  = tcRecConDeclFields exp_kind fields
+  = tcRecHsConDeclRecFields exp_kind fields
 
 tcConArg :: ConArgKind   -- expected kind for args; always OpenKind for datatypes,
                          -- but might be an unlifted type with UnliftedNewtypes
-         -> HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
-tcConArg exp_kind (HsScaled w bty)
+         -> IsPrefixConGADT
+         -> HsConDeclField GhcRn -> TcM (Scaled TcType, HsSrcBang)
+tcConArg exp_kind isPrefixConGADT (CDF (_, src) unp str w bty _)
   = do  { traceTc "tcConArg 1" (ppr bty)
-        ; arg_ty <- tcCheckLHsTypeInContext (getBangType bty) exp_kind
-        ; w' <- tcDataConMult w
+        ; arg_ty <- tcCheckLHsTypeInContext bty exp_kind
+        ; w' <- tcDataConMult isPrefixConGADT w
         ; traceTc "tcConArg 2" (ppr bty)
-        ; return (Scaled w' arg_ty, getBangStrictness bty) }
+        ; return (Scaled w' arg_ty, HsSrcBang src unp str) }
 
-tcRecConDeclFields :: ConArgKind
-                   -> LocatedL [LConDeclField GhcRn]
+tcRecHsConDeclRecFields :: ConArgKind
+                   -> LocatedL [LHsConDeclRecField GhcRn]
                    -> TcM [(Scaled TcType, HsSrcBang)]
-tcRecConDeclFields exp_kind fields
-  = mapM (tcConArg exp_kind) btys
+tcRecHsConDeclRecFields exp_kind fields
+  = mapM (tcConArg exp_kind IsNotPrefixConGADT) btys
   where
     -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(L _ f) -> (cd_fld_names f,hsLinear (cd_fld_type f)))
+    combined = map (\(L _ f) -> (cdrf_names f, cdrf_spec f))
                    (unLoc fields)
     explode (ns,ty) = zip ns (repeat ty)
     exploded = concatMap explode combined
     (_,btys) = unzip exploded
 
-tcDataConMult :: HsArrow GhcRn -> TcM Mult
-tcDataConMult arr@(HsUnrestrictedArrow _) = do
-  -- See Note [Function arrows in GADT constructors]
-  linearEnabled <- xoptM LangExt.LinearTypes
-  if linearEnabled then tcMult arr else return oneDataConTy
-tcDataConMult arr = tcMult arr
+data IsPrefixConGADT = IsPrefixConGADT | IsNotPrefixConGADT deriving (Eq)
+
+-- See Note [Function arrows in GADT constructors]
+unannotatedMultIsLinear :: IsPrefixConGADT -> TcRnIf gbl lcl Bool
+unannotatedMultIsLinear isPrefixConGADT = do
+  if isPrefixConGADT == IsPrefixConGADT then do
+    linearEnabled <- xoptM LangExt.LinearTypes
+    return $ not linearEnabled
+  else
+    return True
+
+tcDataConMult :: IsPrefixConGADT -> HsMultAnn GhcRn -> TcM Mult
+tcDataConMult isPrefixConGADT arr = case multAnnToHsType arr of
+  Nothing -> do
+    isLinear <- unannotatedMultIsLinear isPrefixConGADT
+    return $ if isLinear then oneDataConTy else manyDataConTy
+  Just ty -> tcMult ty
 
 {-
 Note [Function arrows in GADT constructors]
@@ -4760,32 +4775,32 @@ checkValidDataCon dflags existential_ok tc con
         ; hsc_env <- getTopEnv
         ; let check_bang :: Type -> HsSrcBang -> HsImplBang -> Int -> TcM ()
               check_bang orig_arg_ty bang rep_bang n
-               | HsSrcBang _ (HsBang _ SrcLazy) <- bang
+               | HsSrcBang _  _ SrcLazy <- bang
                , not (bang_opt_strict_data bang_opts)
                = addErrTc (bad_bang n LazyFieldsDisabled)
 
                -- Warn about UNPACK without "!"
                -- e.g.   data T = MkT {-# UNPACK #-} Int
-               | HsSrcBang _ (HsBang want_unpack strict_mark) <- bang
+               | HsSrcBang _ want_unpack strict_mark <- bang
                , isSrcUnpacked want_unpack, not (is_strict strict_mark)
                , not (isUnliftedType orig_arg_ty)
                = addDiagnosticTc (bad_bang n UnpackWithoutStrictness)
 
                -- Warn about a redundant ! on an unlifted type
                -- e.g.   data T = MkT !Int#
-               | HsSrcBang _ (HsBang _ SrcStrict) <- bang
+               | HsSrcBang _ _ SrcStrict <- bang
                , isUnliftedType orig_arg_ty
                = addDiagnosticTc $ TcRnBangOnUnliftedType orig_arg_ty
 
                -- Warn about a ~ on an unlifted type (#21951)
                -- e.g.   data T = MkT ~Int#
-               | HsSrcBang _ (HsBang _ SrcLazy) <- bang
+               | HsSrcBang _ _ SrcLazy <- bang
                , isUnliftedType orig_arg_ty
                = addDiagnosticTc $ TcRnLazyBangOnUnliftedType orig_arg_ty
 
                -- Warn about unusable UNPACK pragmas
                -- e.g.   data T a = MkT {-# UNPACK #-} !a      -- Can't unpack
-               | HsSrcBang _ (HsBang want_unpack _) <- bang
+               | HsSrcBang _ want_unpack _ <- bang
 
                -- See Note [Detecting useless UNPACK pragmas] in GHC.Core.DataCon.
                , isSrcUnpacked want_unpack  -- this means the user wrote {-# UNPACK #-}
@@ -4884,9 +4899,9 @@ checkNewDataCon con
     (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
       = dataConFullSig con
 
-    ok_bang (HsSrcBang _ (HsBang _ SrcStrict)) = False
-    ok_bang (HsSrcBang _ (HsBang _ SrcLazy))   = False
-    ok_bang _                                  = True
+    ok_bang (HsSrcBang _ _ SrcStrict) = False
+    ok_bang (HsSrcBang _ _ SrcLazy)   = False
+    ok_bang _                         = True
 
     ok_mult OneTy = True
     ok_mult _     = False

@@ -77,8 +77,16 @@
              []
              (Nothing)
              (PrefixCon
-              [(HsScaled
-                (HsLinearArrow
+              [(CDF
+                ((,)
+                 ((,,)
+                  (EpaDelta { <no location info> } (SameLine 0) [])
+                  (NoEpTok)
+                  (EpaDelta { <no location info> } (SameLine 0) []))
+                 (NoSourceText))
+                (NoSrcUnpack)
+                (NoSrcStrict)
+                (HsUnannotated
                  (NoExtField))
                 (L
                  (EpAnn
@@ -97,7 +105,8 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: GHC.Internal.Types.Int}))))])
+                   {Name: GHC.Internal.Types.Int})))
+                (Nothing))])
              (Nothing)))
           ,(L
             (EpAnn
@@ -166,8 +175,8 @@
                    [])
                   (EpaComments
                    []))
-                 (ConDeclField
-                  (NoEpUniTok)
+                 (HsConDeclRecField
+                  (NoExtField)
                   [(L
                     (EpAnn
                      (EpaSpan { T14189.hs:6:33 })
@@ -186,25 +195,36 @@
                        (EpaComments
                         []))
                       {Name: T14189.f})))]
-                  (L
-                   (EpAnn
-                    (EpaSpan { T14189.hs:6:38-40 })
-                    (AnnListItem
-                     [])
-                    (EpaComments
-                     []))
-                   (HsTyVar
-                    (NoEpTok)
-                    (NotPromoted)
-                    (L
-                     (EpAnn
-                      (EpaSpan { T14189.hs:6:38-40 })
-                      (NameAnnTrailing
-                       [])
-                      (EpaComments
-                       []))
-                     {Name: GHC.Internal.Types.Int})))
-                  (Nothing)))]))
+                  (CDF
+                   ((,)
+                    ((,,)
+                     (EpaDelta { <no location info> } (SameLine 0) [])
+                     (NoEpTok)
+                     (EpaDelta { <no location info> } (SameLine 0) []))
+                    (NoSourceText))
+                   (NoSrcUnpack)
+                   (NoSrcStrict)
+                   (HsUnannotated
+                    (NoExtField))
+                   (L
+                    (EpAnn
+                     (EpaSpan { T14189.hs:6:38-40 })
+                     (AnnListItem
+                      [])
+                     (EpaComments
+                      []))
+                    (HsTyVar
+                     (NoEpTok)
+                     (NotPromoted)
+                     (L
+                      (EpAnn
+                       (EpaSpan { T14189.hs:6:38-40 })
+                       (NameAnnTrailing
+                        [])
+                       (EpaComments
+                        []))
+                      {Name: GHC.Internal.Types.Int})))
+                   (Nothing))))]))
              (Nothing)))])
          [])))]
      []

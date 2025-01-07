@@ -108,10 +108,17 @@
            []
            (Nothing)
            (PrefixCon
-            [(HsScaled
-              (HsLinearArrow
-               (EpPct1
+            [(CDF
+              ((,)
+               ((,,)
+                (EpaDelta { <no location info> } (SameLine 0) [])
                 (NoEpTok)
+                (EpaDelta { <no location info> } (SameLine 0) []))
+               (NoSourceText))
+              (NoSrcUnpack)
+              (NoSrcStrict)
+              (HsUnannotated
+               (EpColon
                 (NoEpUniTok)))
               (L
                (EpAnn
@@ -131,7 +138,8 @@
                   (EpaComments
                    []))
                  (Unqual
-                  {OccName: Int})))))])
+                  {OccName: Int}))))
+              (Nothing))])
            (Just
             (L
              { T24221.hs:4:3-20 }
@@ -172,10 +180,17 @@
            []
            (Nothing)
            (PrefixCon
-            [(HsScaled
-              (HsLinearArrow
-               (EpPct1
+            [(CDF
+              ((,)
+               ((,,)
+                (EpaDelta { <no location info> } (SameLine 0) [])
                 (NoEpTok)
+                (EpaDelta { <no location info> } (SameLine 0) []))
+               (NoSourceText))
+              (NoSrcUnpack)
+              (NoSrcStrict)
+              (HsUnannotated
+               (EpColon
                 (NoEpUniTok)))
               (L
                (EpAnn
@@ -195,7 +210,8 @@
                   (EpaComments
                    []))
                  (Unqual
-                  {OccName: Int})))))])
+                  {OccName: Int}))))
+              (Nothing))])
            (Just
             (L
              { T24221.hs:6:3-20 }
@@ -234,10 +250,17 @@
            []
            (Nothing)
            (InfixCon
-            (HsScaled
-             (HsLinearArrow
-              (EpPct1
+            (CDF
+             ((,)
+              ((,,)
+               (EpaDelta { <no location info> } (SameLine 0) [])
                (NoEpTok)
+               (EpaDelta { <no location info> } (SameLine 0) []))
+              (NoSourceText))
+             (NoSrcUnpack)
+             (NoSrcStrict)
+             (HsUnannotated
+              (EpColon
                (NoEpUniTok)))
              (L
               (EpAnn
@@ -257,11 +280,19 @@
                  (EpaComments
                   []))
                 (Unqual
-                 {OccName: Int})))))
-            (HsScaled
-             (HsLinearArrow
-              (EpPct1
+                 {OccName: Int}))))
+             (Nothing))
+            (CDF
+             ((,)
+              ((,,)
+               (EpaDelta { <no location info> } (SameLine 0) [])
                (NoEpTok)
+               (EpaDelta { <no location info> } (SameLine 0) []))
+              (NoSourceText))
+             (NoSrcUnpack)
+             (NoSrcStrict)
+             (HsUnannotated
+              (EpColon
                (NoEpUniTok)))
              (L
               (EpAnn
@@ -281,7 +312,8 @@
                  (EpaComments
                   []))
                 (Unqual
-                 {OccName: Bool}))))))
+                 {OccName: Bool}))))
+             (Nothing)))
            (Just
             (L
              { T24221.hs:8:3-33 }
@@ -365,10 +397,17 @@
            []
            (Nothing)
            (InfixCon
-            (HsScaled
-             (HsLinearArrow
-              (EpPct1
+            (CDF
+             ((,)
+              ((,,)
+               (EpaDelta { <no location info> } (SameLine 0) [])
                (NoEpTok)
+               (EpaDelta { <no location info> } (SameLine 0) []))
+              (NoSourceText))
+             (NoSrcUnpack)
+             (NoSrcStrict)
+             (HsUnannotated
+              (EpColon
                (NoEpUniTok)))
              (L
               (EpAnn
@@ -388,11 +427,19 @@
                  (EpaComments
                   []))
                 (Unqual
-                 {OccName: Int})))))
-            (HsScaled
-             (HsLinearArrow
-              (EpPct1
+                 {OccName: Int}))))
+             (Nothing))
+            (CDF
+             ((,)
+              ((,,)
+               (EpaDelta { <no location info> } (SameLine 0) [])
                (NoEpTok)
+               (EpaDelta { <no location info> } (SameLine 0) []))
+              (NoSourceText))
+             (NoSrcUnpack)
+             (NoSrcStrict)
+             (HsUnannotated
+              (EpColon
                (NoEpUniTok)))
              (L
               (EpAnn
@@ -412,7 +459,8 @@
                  (EpaComments
                   []))
                 (Unqual
-                 {OccName: Bool}))))))
+                 {OccName: Bool}))))
+             (Nothing)))
            (Just
             (L
              { T24221.hs:12:15-45 }
@@ -496,10 +544,17 @@
            []
            (Nothing)
            (InfixCon
-            (HsScaled
-             (HsLinearArrow
-              (EpPct1
+            (CDF
+             ((,)
+              ((,,)
+               (EpaDelta { <no location info> } (SameLine 0) [])
                (NoEpTok)
+               (EpaDelta { <no location info> } (SameLine 0) []))
+              (NoSourceText))
+             (NoSrcUnpack)
+             (NoSrcStrict)
+             (HsUnannotated
+              (EpColon
                (NoEpUniTok)))
              (L
               (EpAnn
@@ -508,43 +563,42 @@
                 [])
                (EpaComments
                 []))
-              (HsDocTy
-               (NoExtField)
+              (HsTyVar
+               (NoEpTok)
+               (NotPromoted)
                (L
                 (EpAnn
                  (EpaSpan { T24221.hs:15:3-5 })
-                 (AnnListItem
+                 (NameAnnTrailing
                   [])
                  (EpaComments
                   []))
-                (HsTyVar
-                 (NoEpTok)
-                 (NotPromoted)
-                 (L
-                  (EpAnn
-                   (EpaSpan { T24221.hs:15:3-5 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (Unqual
-                   {OccName: Int}))))
-               (L
-                { T24221.hs:15:10-26 }
-                (WithHsDocIdentifiers
-                 (MultiLineDocString
-                  (HsDocStringPrevious)
-                  (:|
-                   (L
-                    { T24221.hs:15:14-26 }
-                    (HsDocStringChunk
-                     " Docs for Int"))
-                   []))
-                 [])))))
-            (HsScaled
-             (HsLinearArrow
-              (EpPct1
+                (Unqual
+                 {OccName: Int}))))
+             (Just
+              (L
+               { T24221.hs:15:10-26 }
+               (WithHsDocIdentifiers
+                (MultiLineDocString
+                 (HsDocStringPrevious)
+                 (:|
+                  (L
+                   { T24221.hs:15:14-26 }
+                   (HsDocStringChunk
+                    " Docs for Int"))
+                  []))
+                []))))
+            (CDF
+             ((,)
+              ((,,)
+               (EpaDelta { <no location info> } (SameLine 0) [])
                (NoEpTok)
+               (EpaDelta { <no location info> } (SameLine 0) []))
+              (NoSourceText))
+             (NoSrcUnpack)
+             (NoSrcStrict)
+             (HsUnannotated
+              (EpColon
                (NoEpUniTok)))
              (L
               (EpAnn
@@ -553,39 +607,31 @@
                 [])
                (EpaComments
                 []))
-              (HsDocTy
-               (NoExtField)
+              (HsTyVar
+               (NoEpTok)
+               (NotPromoted)
                (L
                 (EpAnn
                  (EpaSpan { T24221.hs:17:3-6 })
-                 (AnnListItem
+                 (NameAnnTrailing
                   [])
                  (EpaComments
                   []))
-                (HsTyVar
-                 (NoEpTok)
-                 (NotPromoted)
-                 (L
-                  (EpAnn
-                   (EpaSpan { T24221.hs:17:3-6 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (Unqual
-                   {OccName: Bool}))))
-               (L
-                { T24221.hs:17:10-27 }
-                (WithHsDocIdentifiers
-                 (MultiLineDocString
-                  (HsDocStringPrevious)
-                  (:|
-                   (L
-                    { T24221.hs:17:14-27 }
-                    (HsDocStringChunk
-                     " Docs for Bool"))
-                   []))
-                 []))))))
+                (Unqual
+                 {OccName: Bool}))))
+             (Just
+              (L
+               { T24221.hs:17:10-27 }
+               (WithHsDocIdentifiers
+                (MultiLineDocString
+                 (HsDocStringPrevious)
+                 (:|
+                  (L
+                   { T24221.hs:17:14-27 }
+                   (HsDocStringChunk
+                    " Docs for Bool"))
+                  []))
+                [])))))
            (Just
             (L
              { T24221.hs:16:10-40 }
@@ -669,10 +715,17 @@
            []
            (Nothing)
            (InfixCon
-            (HsScaled
-             (HsLinearArrow
-              (EpPct1
+            (CDF
+             ((,)
+              ((,,)
+               (EpaDelta { <no location info> } (SameLine 0) [])
                (NoEpTok)
+               (EpaDelta { <no location info> } (SameLine 0) []))
+              (NoSourceText))
+             (NoSrcUnpack)
+             (NoSrcStrict)
+             (HsUnannotated
+              (EpColon
                (NoEpUniTok)))
              (L
               (EpAnn
@@ -681,43 +734,42 @@
                 [])
                (EpaComments
                 []))
-              (HsDocTy
-               (NoExtField)
+              (HsTyVar
+               (NoEpTok)
+               (NotPromoted)
                (L
                 (EpAnn
                  (EpaSpan { T24221.hs:21:3-5 })
-                 (AnnListItem
+                 (NameAnnTrailing
                   [])
                  (EpaComments
                   []))
-                (HsTyVar
-                 (NoEpTok)
-                 (NotPromoted)
-                 (L
-                  (EpAnn
-                   (EpaSpan { T24221.hs:21:3-5 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (Unqual
-                   {OccName: Int}))))
-               (L
-                { T24221.hs:20:3-19 }
-                (WithHsDocIdentifiers
-                 (MultiLineDocString
-                  (HsDocStringNext)
-                  (:|
-                   (L
-                    { T24221.hs:20:7-19 }
-                    (HsDocStringChunk
-                     " Docs for Int"))
-                   []))
-                 [])))))
-            (HsScaled
-             (HsLinearArrow
-              (EpPct1
+                (Unqual
+                 {OccName: Int}))))
+             (Just
+              (L
+               { T24221.hs:20:3-19 }
+               (WithHsDocIdentifiers
+                (MultiLineDocString
+                 (HsDocStringNext)
+                 (:|
+                  (L
+                   { T24221.hs:20:7-19 }
+                   (HsDocStringChunk
+                    " Docs for Int"))
+                  []))
+                []))))
+            (CDF
+             ((,)
+              ((,,)
+               (EpaDelta { <no location info> } (SameLine 0) [])
                (NoEpTok)
+               (EpaDelta { <no location info> } (SameLine 0) []))
+              (NoSourceText))
+             (NoSrcUnpack)
+             (NoSrcStrict)
+             (HsUnannotated
+              (EpColon
                (NoEpUniTok)))
              (L
               (EpAnn
@@ -726,39 +778,31 @@
                 [])
                (EpaComments
                 []))
-              (HsDocTy
-               (NoExtField)
+              (HsTyVar
+               (NoEpTok)
+               (NotPromoted)
                (L
                 (EpAnn
                  (EpaSpan { T24221.hs:25:3-6 })
-                 (AnnListItem
+                 (NameAnnTrailing
                   [])
                  (EpaComments
                   []))
-                (HsTyVar
-                 (NoEpTok)
-                 (NotPromoted)
-                 (L
-                  (EpAnn
-                   (EpaSpan { T24221.hs:25:3-6 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (Unqual
-                   {OccName: Bool}))))
-               (L
-                { T24221.hs:24:3-20 }
-                (WithHsDocIdentifiers
-                 (MultiLineDocString
-                  (HsDocStringNext)
-                  (:|
-                   (L
-                    { T24221.hs:24:7-20 }
-                    (HsDocStringChunk
-                     " Docs for Bool"))
-                   []))
-                 []))))))
+                (Unqual
+                 {OccName: Bool}))))
+             (Just
+              (L
+               { T24221.hs:24:3-20 }
+               (WithHsDocIdentifiers
+                (MultiLineDocString
+                 (HsDocStringNext)
+                 (:|
+                  (L
+                   { T24221.hs:24:7-20 }
+                   (HsDocStringChunk
+                    " Docs for Bool"))
+                  []))
+                [])))))
            (Just
             (L
              { T24221.hs:22:3-33 }
@@ -865,10 +909,8 @@
                     (EpaSpan { T24221.hs:29:10 })))])
                 (EpaComments
                  []))
-               (ConDeclField
-                (EpUniTok
-                 (EpaSpan { T24221.hs:28:15-16 })
-                 (NormalSyntax))
+               (HsConDeclRecField
+                (NoExtField)
                 [(L
                   (EpAnn
                    (EpaSpan { T24221.hs:28:12-13 })
@@ -887,38 +929,52 @@
                       []))
                     (Unqual
                      {OccName: a6}))))]
-                (L
-                 (EpAnn
-                  (EpaSpan { T24221.hs:28:18-20 })
-                  (AnnListItem
-                   [])
-                  (EpaComments
-                   []))
-                 (HsTyVar
-                  (NoEpTok)
-                  (NotPromoted)
-                  (L
-                   (EpAnn
-                    (EpaSpan { T24221.hs:28:18-20 })
-                    (NameAnnTrailing
-                     [])
-                    (EpaComments
-                     []))
-                   (Unqual
-                    {OccName: Int}))))
-                (Just
+                (CDF
+                 ((,)
+                  ((,,)
+                   (EpaDelta { <no location info> } (SameLine 0) [])
+                   (NoEpTok)
+                   (EpaDelta { <no location info> } (SameLine 0) []))
+                  (NoSourceText))
+                 (NoSrcUnpack)
+                 (NoSrcStrict)
+                 (HsUnannotated
+                  (EpColon
+                   (EpUniTok
+                    (EpaSpan { T24221.hs:28:15-16 })
+                    (NormalSyntax))))
                  (L
-                  { T24221.hs:28:24-39 }
-                  (WithHsDocIdentifiers
-                   (MultiLineDocString
-                    (HsDocStringPrevious)
-                    (:|
-                     (L
-                      { T24221.hs:28:28-39 }
-                      (HsDocStringChunk
-                       " Docs for a6"))
-                     []))
-                   [])))))
+                  (EpAnn
+                   (EpaSpan { T24221.hs:28:18-20 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsTyVar
+                   (NoEpTok)
+                   (NotPromoted)
+                   (L
+                    (EpAnn
+                     (EpaSpan { T24221.hs:28:18-20 })
+                     (NameAnnTrailing
+                      [])
+                     (EpaComments
+                      []))
+                    (Unqual
+                     {OccName: Int}))))
+                 (Just
+                  (L
+                   { T24221.hs:28:24-39 }
+                   (WithHsDocIdentifiers
+                    (MultiLineDocString
+                     (HsDocStringPrevious)
+                     (:|
+                      (L
+                       { T24221.hs:28:28-39 }
+                       (HsDocStringChunk
+                        " Docs for a6"))
+                      []))
+                    []))))))
              ,(L
                (EpAnn
                 (EpaSpan { T24221.hs:29:12-20 })
@@ -926,10 +982,8 @@
                  [])
                 (EpaComments
                  []))
-               (ConDeclField
-                (EpUniTok
-                 (EpaSpan { T24221.hs:29:15-16 })
-                 (NormalSyntax))
+               (HsConDeclRecField
+                (NoExtField)
                 [(L
                   (EpAnn
                    (EpaSpan { T24221.hs:29:12-13 })
@@ -948,38 +1002,52 @@
                       []))
                     (Unqual
                      {OccName: b6}))))]
-                (L
-                 (EpAnn
-                  (EpaSpan { T24221.hs:29:18-20 })
-                  (AnnListItem
-                   [])
-                  (EpaComments
-                   []))
-                 (HsTyVar
-                  (NoEpTok)
-                  (NotPromoted)
-                  (L
-                   (EpAnn
-                    (EpaSpan { T24221.hs:29:18-20 })
-                    (NameAnnTrailing
-                     [])
-                    (EpaComments
-                     []))
-                   (Unqual
-                    {OccName: Int}))))
-                (Just
+                (CDF
+                 ((,)
+                  ((,,)
+                   (EpaDelta { <no location info> } (SameLine 0) [])
+                   (NoEpTok)
+                   (EpaDelta { <no location info> } (SameLine 0) []))
+                  (NoSourceText))
+                 (NoSrcUnpack)
+                 (NoSrcStrict)
+                 (HsUnannotated
+                  (EpColon
+                   (EpUniTok
+                    (EpaSpan { T24221.hs:29:15-16 })
+                    (NormalSyntax))))
                  (L
-                  { T24221.hs:29:24-39 }
-                  (WithHsDocIdentifiers
-                   (MultiLineDocString
-                    (HsDocStringPrevious)
-                    (:|
-                     (L
-                      { T24221.hs:29:28-39 }
-                      (HsDocStringChunk
-                       " Docs for b6"))
-                     []))
-                   [])))))]))
+                  (EpAnn
+                   (EpaSpan { T24221.hs:29:18-20 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsTyVar
+                   (NoEpTok)
+                   (NotPromoted)
+                   (L
+                    (EpAnn
+                     (EpaSpan { T24221.hs:29:18-20 })
+                     (NameAnnTrailing
+                      [])
+                     (EpaComments
+                      []))
+                    (Unqual
+                     {OccName: Int}))))
+                 (Just
+                  (L
+                   { T24221.hs:29:24-39 }
+                   (WithHsDocIdentifiers
+                    (MultiLineDocString
+                     (HsDocStringPrevious)
+                     (:|
+                      (L
+                       { T24221.hs:29:28-39 }
+                       (HsDocStringChunk
+                        " Docs for b6"))
+                      []))
+                    []))))))]))
            (Nothing)))])
        []))))
   ,(L
@@ -1074,10 +1142,8 @@
                     (EpaSpan { T24221.hs:34:5 })))])
                 (EpaComments
                  []))
-               (ConDeclField
-                (EpUniTok
-                 (EpaSpan { T24221.hs:33:10-11 })
-                 (NormalSyntax))
+               (HsConDeclRecField
+                (NoExtField)
                 [(L
                   (EpAnn
                    (EpaSpan { T24221.hs:33:7-8 })
@@ -1096,38 +1162,52 @@
                       []))
                     (Unqual
                      {OccName: a7}))))]
-                (L
-                 (EpAnn
-                  (EpaSpan { T24221.hs:33:13-15 })
-                  (AnnListItem
-                   [])
-                  (EpaComments
-                   []))
-                 (HsTyVar
-                  (NoEpTok)
-                  (NotPromoted)
-                  (L
-                   (EpAnn
-                    (EpaSpan { T24221.hs:33:13-15 })
-                    (NameAnnTrailing
-                     [])
-                    (EpaComments
-                     []))
-                   (Unqual
-                    {OccName: Int}))))
-                (Just
+                (CDF
+                 ((,)
+                  ((,,)
+                   (EpaDelta { <no location info> } (SameLine 0) [])
+                   (NoEpTok)
+                   (EpaDelta { <no location info> } (SameLine 0) []))
+                  (NoSourceText))
+                 (NoSrcUnpack)
+                 (NoSrcStrict)
+                 (HsUnannotated
+                  (EpColon
+                   (EpUniTok
+                    (EpaSpan { T24221.hs:33:10-11 })
+                    (NormalSyntax))))
                  (L
-                  { T24221.hs:33:20-35 }
-                  (WithHsDocIdentifiers
-                   (MultiLineDocString
-                    (HsDocStringPrevious)
-                    (:|
-                     (L
-                      { T24221.hs:33:24-35 }
-                      (HsDocStringChunk
-                       " Docs for a7"))
-                     []))
-                   [])))))
+                  (EpAnn
+                   (EpaSpan { T24221.hs:33:13-15 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsTyVar
+                   (NoEpTok)
+                   (NotPromoted)
+                   (L
+                    (EpAnn
+                     (EpaSpan { T24221.hs:33:13-15 })
+                     (NameAnnTrailing
+                      [])
+                     (EpaComments
+                      []))
+                    (Unqual
+                     {OccName: Int}))))
+                 (Just
+                  (L
+                   { T24221.hs:33:20-35 }
+                   (WithHsDocIdentifiers
+                    (MultiLineDocString
+                     (HsDocStringPrevious)
+                     (:|
+                      (L
+                       { T24221.hs:33:24-35 }
+                       (HsDocStringChunk
+                        " Docs for a7"))
+                      []))
+                    []))))))
              ,(L
                (EpAnn
                 (EpaSpan { T24221.hs:34:7-15 })
@@ -1135,10 +1215,8 @@
                  [])
                 (EpaComments
                  []))
-               (ConDeclField
-                (EpUniTok
-                 (EpaSpan { T24221.hs:34:10-11 })
-                 (NormalSyntax))
+               (HsConDeclRecField
+                (NoExtField)
                 [(L
                   (EpAnn
                    (EpaSpan { T24221.hs:34:7-8 })
@@ -1157,38 +1235,52 @@
                       []))
                     (Unqual
                      {OccName: b7}))))]
-                (L
-                 (EpAnn
-                  (EpaSpan { T24221.hs:34:13-15 })
-                  (AnnListItem
-                   [])
-                  (EpaComments
-                   []))
-                 (HsTyVar
-                  (NoEpTok)
-                  (NotPromoted)
-                  (L
-                   (EpAnn
-                    (EpaSpan { T24221.hs:34:13-15 })
-                    (NameAnnTrailing
-                     [])
-                    (EpaComments
-                     []))
-                   (Unqual
-                    {OccName: Int}))))
-                (Just
+                (CDF
+                 ((,)
+                  ((,,)
+                   (EpaDelta { <no location info> } (SameLine 0) [])
+                   (NoEpTok)
+                   (EpaDelta { <no location info> } (SameLine 0) []))
+                  (NoSourceText))
+                 (NoSrcUnpack)
+                 (NoSrcStrict)
+                 (HsUnannotated
+                  (EpColon
+                   (EpUniTok
+                    (EpaSpan { T24221.hs:34:10-11 })
+                    (NormalSyntax))))
                  (L
-                  { T24221.hs:34:20-35 }
-                  (WithHsDocIdentifiers
-                   (MultiLineDocString
-                    (HsDocStringPrevious)
-                    (:|
-                     (L
-                      { T24221.hs:34:24-35 }
-                      (HsDocStringChunk
-                       " Docs for b7"))
-                     []))
-                   [])))))]))
+                  (EpAnn
+                   (EpaSpan { T24221.hs:34:13-15 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsTyVar
+                   (NoEpTok)
+                   (NotPromoted)
+                   (L
+                    (EpAnn
+                     (EpaSpan { T24221.hs:34:13-15 })
+                     (NameAnnTrailing
+                      [])
+                     (EpaComments
+                      []))
+                    (Unqual
+                     {OccName: Int}))))
+                 (Just
+                  (L
+                   { T24221.hs:34:20-35 }
+                   (WithHsDocIdentifiers
+                    (MultiLineDocString
+                     (HsDocStringPrevious)
+                     (:|
+                      (L
+                       { T24221.hs:34:24-35 }
+                       (HsDocStringChunk
+                        " Docs for b7"))
+                      []))
+                    []))))))]))
            (Just
             (L
              { T24221.hs:32:10-29 }
@@ -1295,10 +1387,8 @@
                     (EpaSpan { T24221.hs:40:14 })))])
                 (EpaComments
                  []))
-               (ConDeclField
-                (EpUniTok
-                 (EpaSpan { T24221.hs:40:8-9 })
-                 (NormalSyntax))
+               (HsConDeclRecField
+                (NoExtField)
                 [(L
                   (EpAnn
                    (EpaSpan { T24221.hs:40:5-6 })
@@ -1317,38 +1407,52 @@
                       []))
                     (Unqual
                      {OccName: a8}))))]
-                (L
-                 (EpAnn
-                  (EpaSpan { T24221.hs:40:11-13 })
-                  (AnnListItem
-                   [])
-                  (EpaComments
-                   []))
-                 (HsTyVar
-                  (NoEpTok)
-                  (NotPromoted)
-                  (L
-                   (EpAnn
-                    (EpaSpan { T24221.hs:40:11-13 })
-                    (NameAnnTrailing
-                     [])
-                    (EpaComments
-                     []))
-                   (Unqual
-                    {OccName: Int}))))
-                (Just
+                (CDF
+                 ((,)
+                  ((,,)
+                   (EpaDelta { <no location info> } (SameLine 0) [])
+                   (NoEpTok)
+                   (EpaDelta { <no location info> } (SameLine 0) []))
+                  (NoSourceText))
+                 (NoSrcUnpack)
+                 (NoSrcStrict)
+                 (HsUnannotated
+                  (EpColon
+                   (EpUniTok
+                    (EpaSpan { T24221.hs:40:8-9 })
+                    (NormalSyntax))))
                  (L
-                  { T24221.hs:39:5-20 }
-                  (WithHsDocIdentifiers
-                   (MultiLineDocString
-                    (HsDocStringNext)
-                    (:|
-                     (L
-                      { T24221.hs:39:9-20 }
-                      (HsDocStringChunk
-                       " Docs for a8"))
-                     []))
-                   [])))))
+                  (EpAnn
+                   (EpaSpan { T24221.hs:40:11-13 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsTyVar
+                   (NoEpTok)
+                   (NotPromoted)
+                   (L
+                    (EpAnn
+                     (EpaSpan { T24221.hs:40:11-13 })
+                     (NameAnnTrailing
+                      [])
+                     (EpaComments
+                      []))
+                    (Unqual
+                     {OccName: Int}))))
+                 (Just
+                  (L
+                   { T24221.hs:39:5-20 }
+                   (WithHsDocIdentifiers
+                    (MultiLineDocString
+                     (HsDocStringNext)
+                     (:|
+                      (L
+                       { T24221.hs:39:9-20 }
+                       (HsDocStringChunk
+                        " Docs for a8"))
+                      []))
+                    []))))))
              ,(L
                (EpAnn
                 (EpaSpan { T24221.hs:42:5-13 })
@@ -1356,10 +1460,8 @@
                  [])
                 (EpaComments
                  []))
-               (ConDeclField
-                (EpUniTok
-                 (EpaSpan { T24221.hs:42:8-9 })
-                 (NormalSyntax))
+               (HsConDeclRecField
+                (NoExtField)
                 [(L
                   (EpAnn
                    (EpaSpan { T24221.hs:42:5-6 })
@@ -1378,38 +1480,52 @@
                       []))
                     (Unqual
                      {OccName: b8}))))]
-                (L
-                 (EpAnn
-                  (EpaSpan { T24221.hs:42:11-13 })
-                  (AnnListItem
-                   [])
-                  (EpaComments
-                   []))
-                 (HsTyVar
-                  (NoEpTok)
-                  (NotPromoted)
-                  (L
-                   (EpAnn
-                    (EpaSpan { T24221.hs:42:11-13 })
-                    (NameAnnTrailing
-                     [])
-                    (EpaComments
-                     []))
-                   (Unqual
-                    {OccName: Int}))))
-                (Just
+                (CDF
+                 ((,)
+                  ((,,)
+                   (EpaDelta { <no location info> } (SameLine 0) [])
+                   (NoEpTok)
+                   (EpaDelta { <no location info> } (SameLine 0) []))
+                  (NoSourceText))
+                 (NoSrcUnpack)
+                 (NoSrcStrict)
+                 (HsUnannotated
+                  (EpColon
+                   (EpUniTok
+                    (EpaSpan { T24221.hs:42:8-9 })
+                    (NormalSyntax))))
                  (L
-                  { T24221.hs:41:5-20 }
-                  (WithHsDocIdentifiers
-                   (MultiLineDocString
-                    (HsDocStringNext)
-                    (:|
-                     (L
-                      { T24221.hs:41:9-20 }
-                      (HsDocStringChunk
-                       " Docs for b8"))
-                     []))
-                   [])))))]))
+                  (EpAnn
+                   (EpaSpan { T24221.hs:42:11-13 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsTyVar
+                   (NoEpTok)
+                   (NotPromoted)
+                   (L
+                    (EpAnn
+                     (EpaSpan { T24221.hs:42:11-13 })
+                     (NameAnnTrailing
+                      [])
+                     (EpaComments
+                      []))
+                    (Unqual
+                     {OccName: Int}))))
+                 (Just
+                  (L
+                   { T24221.hs:41:5-20 }
+                   (WithHsDocIdentifiers
+                    (MultiLineDocString
+                     (HsDocStringNext)
+                     (:|
+                      (L
+                       { T24221.hs:41:9-20 }
+                       (HsDocStringChunk
+                        " Docs for b8"))
+                      []))
+                    []))))))]))
            (Just
             (L
              { T24221.hs:37:3-22 }

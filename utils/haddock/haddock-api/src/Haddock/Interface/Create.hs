@@ -933,7 +933,7 @@ extractDecl prr dflags sDocContext name decl
                         insts
                     , -- , L _ ConDecl { con_details = RecCon rec } <- toList $ dd_cons (feqn_rhs d)
                     Just rec <- toList $ getRecConArgs_maybe . unLoc <$> dd_cons (feqn_rhs d)
-                    , ConDeclField{cd_fld_names = ns} <- map unLoc (unLoc rec)
+                    , HsConDeclRecField{cdrf_names = ns} <- map unLoc (unLoc rec)
                     , L _ n <- ns
                     , unLoc (foLabel n) == name
                     ]
@@ -962,12 +962,12 @@ extractPatternSyn nm t tvs cons =
       let args =
             case con of
               ConDeclH98{con_args = con_args'} -> case con_args' of
-                PrefixCon args' -> map hsScaledThing args'
-                RecCon (L _ fields) -> cd_fld_type . unLoc <$> fields
-                InfixCon arg1 arg2 -> map hsScaledThing [arg1, arg2]
+                PrefixCon args' -> map cdf_type args'
+                RecCon (L _ fields) -> cdf_type . cdrf_spec . unLoc <$> fields
+                InfixCon arg1 arg2 -> map cdf_type [arg1, arg2]
               ConDeclGADT{con_g_args = con_args'} -> case con_args' of
-                PrefixConGADT _ args' -> map hsScaledThing args'
-                RecConGADT _ (L _ fields) -> cd_fld_type . unLoc <$> fields
+                PrefixConGADT _ args' -> map cdf_type args'
+                RecConGADT _ (L _ fields) -> cdf_type . cdrf_spec . unLoc <$> fields
           typ = longArrow args (data_ty con)
           typ' =
             case con of
@@ -977,7 +977,7 @@ extractPatternSyn nm t tvs cons =
        in PatSynSig noAnn [noLocA nm] (mkEmptySigType typ'')
 
     longArrow :: [LHsType GhcRn] -> LHsType GhcRn -> LHsType GhcRn
-    longArrow inputs output = foldr (\x y -> noLocA (HsFunTy noExtField (HsUnrestrictedArrow noExtField) x y)) output inputs
+    longArrow inputs output = foldr (\x y -> noLocA (HsFunTy noExtField (HsUnannotated noExtField) x y)) output inputs
 
     data_ty con
       | ConDeclGADT{} <- con = con_res_ty con
@@ -998,13 +998,13 @@ extractRecSel _ _ _ [] = Left "extractRecSel: selector not found"
 extractRecSel nm t tvs (L _ con : rest) =
   case getRecConArgs_maybe con of
     Just (L _ fields)
-      | ((l, L _ (ConDeclField _ _nn ty _)) : _) <- matching_fields fields ->
-          pure (L (noAnnSrcSpan l) (TypeSig noAnn [noLocA nm] (mkEmptyWildCardBndrs $ mkEmptySigType (noLocA (HsFunTy noExtField (HsUnrestrictedArrow noExtField) data_ty (getBangType ty))))))
+      | ((l, L _ (HsConDeclRecField _ _nn ty)) : _) <- matching_fields fields ->
+          pure (L (noAnnSrcSpan l) (TypeSig noAnn [noLocA nm] (mkEmptyWildCardBndrs $ mkEmptySigType (noLocA (HsFunTy noExtField (HsUnannotated noExtField) data_ty (cdf_type ty))))))
     _ -> extractRecSel nm t tvs rest
   where
-    matching_fields :: [LConDeclField GhcRn] -> [(SrcSpan, LConDeclField GhcRn)]
+    matching_fields :: [LHsConDeclRecField GhcRn] -> [(SrcSpan, LHsConDeclRecField GhcRn)]
     matching_fields flds =
-      [ (locA l, f) | f@(L _ (ConDeclField _ ns _ _)) <- flds, L l n <- ns, unLoc (foLabel n) == nm
+      [ (locA l, f) | f@(L _ (HsConDeclRecField _ ns _)) <- flds, L l n <- ns, unLoc (foLabel n) == nm
       ]
     data_ty
       -- ResTyGADT _ ty <- con_res con = ty

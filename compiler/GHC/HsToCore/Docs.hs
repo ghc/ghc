@@ -399,7 +399,7 @@ subordinates env instMap decl = case decl of
                   | c <- toList cons, cname <- getConNames c ]
         fields  = [ (unLoc $ foLabel n, maybeToList $ fmap unLoc doc, IM.empty)
                   | Just flds <- toList $ fmap getRecConArgs_maybe cons
-                  , (L _ (ConDeclField _ ns _ doc)) <- (unLoc flds)
+                  , (L _ (HsConDeclRecField _ ns (CDF { cdf_doc = doc }))) <- (unLoc flds)
                   , (L _ n) <- ns ]
         derivs  = [ (instName, [unLoc doc], IM.empty)
                   | (l, doc) <- concatMap (extract_deriv_clause_tys .
@@ -430,21 +430,23 @@ conArgDocs (ConDeclGADT{con_g_args = args, con_res_ty = res_ty}) =
 
 h98ConArgDocs :: HsConDeclH98Details GhcRn -> IntMap (HsDoc GhcRn)
 h98ConArgDocs con_args = case con_args of
-  PrefixCon args     -> con_arg_docs 0 $ map (unLoc . hsScaledThing) args
-  InfixCon arg1 arg2 -> con_arg_docs 0 [ unLoc (hsScaledThing arg1)
-                                       , unLoc (hsScaledThing arg2) ]
+  PrefixCon args     -> con_arg_docs 0 $ map cdf_doc args
+  InfixCon arg1 arg2 -> con_arg_docs 0 [ cdf_doc arg1, cdf_doc arg2 ]
   RecCon _           -> IM.empty
 
 gadtConArgDocs :: HsConDeclGADTDetails GhcRn -> HsType GhcRn -> IntMap (HsDoc GhcRn)
 gadtConArgDocs con_args res_ty = case con_args of
-  PrefixConGADT _ args -> con_arg_docs 0 $ map (unLoc . hsScaledThing) args ++ [res_ty]
-  RecConGADT _ _       -> con_arg_docs 1 [res_ty]
+  PrefixConGADT _ args -> con_arg_docs 0 $ map cdf_doc args ++ [res_doc]
+  RecConGADT _ _       -> con_arg_docs 1 [res_doc]
+  where
+    res_doc = case res_ty of
+      HsDocTy _ _ lds -> Just lds
+      _               -> Nothing
 
-con_arg_docs :: Int -> [HsType GhcRn] -> IntMap (HsDoc GhcRn)
+con_arg_docs :: Int -> [Maybe (LHsDoc GhcRn)] -> IntMap (HsDoc GhcRn)
 con_arg_docs n = IM.fromList . catMaybes . zipWith f [n..]
   where
-    f n (HsDocTy _ _ lds) = Just (n, unLoc lds)
-    f n (HsBangTy _ _ (L _ (HsDocTy _ _ lds))) = Just (n, unLoc lds)
+    f n (Just lds) = Just (n, unLoc lds)
     f _ _ = Nothing
 
 isValD :: HsDecl a -> Bool

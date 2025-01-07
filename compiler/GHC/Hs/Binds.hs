@@ -140,20 +140,6 @@ type instance XPSB         (GhcPass idL) GhcTc = NameSet
 
 type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = DataConCantHappen
 
-type instance XNoMultAnn GhcPs = NoExtField
-type instance XNoMultAnn GhcRn = NoExtField
-type instance XNoMultAnn GhcTc = Mult
-
-type instance XPct1Ann   GhcPs = EpToken "%1"
-type instance XPct1Ann   GhcRn = NoExtField
-type instance XPct1Ann   GhcTc = Mult
-
-type instance XMultAnn   GhcPs = EpToken "%"
-type instance XMultAnn   GhcRn = NoExtField
-type instance XMultAnn   GhcTc = Mult
-
-type instance XXMultAnn  (GhcPass _) = DataConCantHappen
-
 data AnnPSB
   = AnnPSB {
       ap_pattern :: EpToken "pattern",
@@ -167,14 +153,14 @@ instance NoAnn AnnPSB where
   noAnn = AnnPSB noAnn noAnn noAnn noAnn noAnn
 
 setTcMultAnn :: Mult -> HsMultAnn GhcRn -> HsMultAnn GhcTc
-setTcMultAnn mult (HsPct1Ann _)   = HsPct1Ann mult
-setTcMultAnn mult (HsMultAnn _ p) = HsMultAnn mult p
-setTcMultAnn mult (HsNoMultAnn _) = HsNoMultAnn mult
+setTcMultAnn mult (HsLinearAnn _)   = HsLinearAnn mult
+setTcMultAnn mult (HsExplicitMult _ p) = HsExplicitMult mult p
+setTcMultAnn mult (HsUnannotated _) = HsUnannotated mult
 
 getTcMultAnn :: HsMultAnn GhcTc -> Mult
-getTcMultAnn (HsPct1Ann mult)   = mult
-getTcMultAnn (HsMultAnn mult _) = mult
-getTcMultAnn (HsNoMultAnn mult) = mult
+getTcMultAnn (HsLinearAnn mult)   = mult
+getTcMultAnn (HsExplicitMult mult _) = mult
+getTcMultAnn (HsUnannotated mult) = mult
 
 -- ---------------------------------------------------------------------
 
@@ -545,13 +531,6 @@ plusHsValBinds (XValBindsLR (NValBinds ds1 sigs1))
   = XValBindsLR (NValBinds (ds1 ++ ds2) (sigs1 ++ sigs2))
 plusHsValBinds _ _
   = panic "HsBinds.plusHsValBinds"
-
--- Used to print, for instance, let bindings:
---   let %1 x = …
-pprHsMultAnn :: forall id. OutputableBndrId id => HsMultAnn (GhcPass id) -> SDoc
-pprHsMultAnn (HsNoMultAnn _) = empty
-pprHsMultAnn (HsPct1Ann _) = text "%1"
-pprHsMultAnn (HsMultAnn _ p) = text "%" <> ppr p
 
 instance (OutputableBndrId pl, OutputableBndrId pr)
          => Outputable (HsBindLR (GhcPass pl) (GhcPass pr)) where

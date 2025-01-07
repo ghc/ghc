@@ -31,7 +31,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Traversable (mapM)
 
-import GHC hiding (NoLink)
+import GHC hiding (NoLink, HsTypeGhcPsExt (..))
 import GHC.Builtin.Types (eqTyCon_RDR, tupleDataConName, tupleTyConName)
 import GHC.Types.Basic (Boxity (..), TopLevelFlag (..), TupleSort (..))
 import GHC.Types.Name
@@ -340,10 +340,10 @@ renameMaybeInjectivityAnn
   -> RnM (Maybe (LInjectivityAnn DocNameI))
 renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
-renameArrow :: HsArrow GhcRn -> RnM (HsArrow DocNameI)
-renameArrow (HsUnrestrictedArrow _) = return (HsUnrestrictedArrow noExtField)
-renameArrow (HsLinearArrow _) = return (HsLinearArrow noExtField)
-renameArrow (HsExplicitMult _ p) = HsExplicitMult noExtField <$> renameLType p
+renameMultAnn :: HsMultAnn GhcRn -> RnM (HsMultAnn DocNameI)
+renameMultAnn (HsUnannotated _) = return (HsUnannotated noExtField)
+renameMultAnn (HsLinearAnn _) = return (HsLinearAnn noExtField)
+renameMultAnn (HsExplicitMult _ p) = HsExplicitMult noExtField <$> renameLType p
 
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of
@@ -362,7 +362,6 @@ renameType t = case t of
     ltype' <- renameLType ltype
     return (HsQualTy{hst_xqual = noAnn, hst_ctxt = lcontext', hst_body = ltype'})
   HsTyVar _ ip (L l n) -> return . HsTyVar noAnn ip . L l =<< renameName n
-  HsBangTy _ b ltype -> return . HsBangTy noAnn b =<< renameLType ltype
   HsStarTy _ isUni -> return (HsStarTy noAnn isUni)
   HsAppTy _ a b -> do
     a' <- renameLType a
@@ -375,7 +374,7 @@ renameType t = case t of
   HsFunTy _ w a b -> do
     a' <- renameLType a
     b' <- renameLType b
-    w' <- renameArrow w
+    w' <- renameMultAnn w
     return (HsFunTy noAnn w' a' b')
   HsListTy _ ty -> return . (HsListTy noAnn) =<< renameLType ty
   HsIParamTy _ n ty -> liftM (HsIParamTy noAnn n) (renameLType ty)
@@ -403,8 +402,7 @@ renameType t = case t of
     doc' <- renameLDocHsSyn doc
     return (HsDocTy noAnn ty' doc')
   HsTyLit _ x -> return (HsTyLit noAnn (renameTyLit x))
-  HsRecTy _ a -> HsRecTy noAnn <$> mapM renameConDeclFieldField a
-  XHsType a -> pure (XHsType a)
+  XHsType a -> pure (XHsType (HsCoreTy a))
   HsExplicitListTy _ a b -> HsExplicitListTy noAnn a <$> mapM renameLType b
   -- Special-case unary boxed tuples so that they are pretty-printed as
   -- `'MkSolo x`, not `'(x)`
@@ -718,37 +716,47 @@ renameCon
           }
       )
 
-renameHsScaled
-  :: HsScaled GhcRn (LHsType GhcRn)
-  -> RnM (HsScaled DocNameI (LHsType DocNameI))
-renameHsScaled (HsScaled w ty) = HsScaled <$> renameArrow w <*> renameLType ty
+renameHsConDeclField
+  :: HsConDeclField GhcRn
+  -> RnM (HsConDeclField DocNameI)
+renameHsConDeclField cdf = do
+  w <- renameMultAnn (cdf_multiplicity cdf)
+  ty <- renameLType (cdf_type cdf)
+  doc <- mapM renameLDocHsSyn (cdf_doc cdf)
+  return
+    ( cdf
+      { cdf_ext = noExtField
+      , cdf_multiplicity = w
+      , cdf_type = ty
+      , cdf_doc = doc
+      }
+    )
 
 renameH98Details
   :: HsConDeclH98Details GhcRn
   -> RnM (HsConDeclH98Details DocNameI)
 renameH98Details (RecCon (L l fields)) = do
-  fields' <- mapM renameConDeclFieldField fields
+  fields' <- mapM renameHsConDeclRecFieldField fields
   return (RecCon (L (locA l) fields'))
-renameH98Details (PrefixCon ps) = PrefixCon <$> mapM renameHsScaled ps
+renameH98Details (PrefixCon ps) = PrefixCon <$> mapM renameHsConDeclField ps
 renameH98Details (InfixCon a b) = do
-  a' <- renameHsScaled a
-  b' <- renameHsScaled b
+  a' <- renameHsConDeclField a
+  b' <- renameHsConDeclField b
   return (InfixCon a' b')
 
 renameGADTDetails
   :: HsConDeclGADTDetails GhcRn
   -> RnM (HsConDeclGADTDetails DocNameI)
 renameGADTDetails (RecConGADT _ (L l fields)) = do
-  fields' <- mapM renameConDeclFieldField fields
+  fields' <- mapM renameHsConDeclRecFieldField fields
   return (RecConGADT noExtField (L (locA l) fields'))
-renameGADTDetails (PrefixConGADT _ ps) = PrefixConGADT noExtField <$> mapM renameHsScaled ps
+renameGADTDetails (PrefixConGADT _ ps) = PrefixConGADT noExtField <$> mapM renameHsConDeclField ps
 
-renameConDeclFieldField :: LConDeclField GhcRn -> RnM (LConDeclField DocNameI)
-renameConDeclFieldField (L l (ConDeclField _ names t doc)) = do
+renameHsConDeclRecFieldField :: LHsConDeclRecField GhcRn -> RnM (LHsConDeclRecField DocNameI)
+renameHsConDeclRecFieldField (L l (HsConDeclRecField _ names t)) = do
   names' <- mapM renameLFieldOcc names
-  t' <- renameLType t
-  doc' <- mapM renameLDocHsSyn doc
-  return $ L (locA l) (ConDeclField noExtField names' t' doc')
+  t' <- renameHsConDeclField t
+  return $ L (locA l) (HsConDeclRecField noExtField names' t')
 
 renameLFieldOcc :: LFieldOcc GhcRn -> RnM (LFieldOcc DocNameI)
 renameLFieldOcc (L l (FieldOcc rdr (L n sel))) = do

@@ -135,7 +135,7 @@ import GHC.Core.ConLike
 import GHC.Core.Make   ( mkChunkified )
 import GHC.Core.Type   ( Type, isUnliftedType )
 
-import GHC.Builtin.Types ( unitTy )
+import GHC.Builtin.Types ( unitTy, manyDataConTy )
 
 import GHC.Types.Id
 import GHC.Types.Name
@@ -626,12 +626,12 @@ nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLocA (HsAppTy noExtField f t)
 nlHsTyVar p x = noLocA (HsTyVar noAnn p (noLocA x))
-nlHsFunTy a b = noLocA (HsFunTy noExtField (HsUnrestrictedArrow x) a b)
+nlHsFunTy a b = noLocA (HsFunTy noExtField (HsUnannotated x) a b)
   where
     x = case ghcPass @p of
-      GhcPs -> noAnn
+      GhcPs -> EpArrow noAnn
       GhcRn -> noExtField
-      GhcTc -> noExtField
+      GhcTc -> manyDataConTy
 nlHsParTy t   = noLocA (HsParTy noAnn t)
 
 nlHsTyConApp :: forall p a. IsSrcSpanAnn p a
@@ -1645,7 +1645,7 @@ hsConDeclsBinders cons = go emptyFieldIndices cons
     get_flds_gadt seen (PrefixConGADT _ []) = (Just [], seen)
     get_flds_gadt seen _ = (Nothing, seen)
 
-    get_flds :: FieldIndices p -> LocatedL [LConDeclField (GhcPass p)]
+    get_flds :: FieldIndices p -> LocatedL [LHsConDeclRecField (GhcPass p)]
              -> ([Located Int], FieldIndices p)
     get_flds seen flds =
       foldr add_fld ([], seen) fld_names
@@ -1653,7 +1653,7 @@ hsConDeclsBinders cons = go emptyFieldIndices cons
         add_fld fld (is, ixs) =
           let (i, ixs') = insertField fld ixs
           in  (i:is, ixs')
-        fld_names = concatMap (cd_fld_names . unLoc) (unLoc flds)
+        fld_names = concatMap (cdrf_names . unLoc) (unLoc flds)
 
 -- | A bijection between record fields of a datatype and integers,
 -- used to implement Note [Collecting record fields in data declarations].

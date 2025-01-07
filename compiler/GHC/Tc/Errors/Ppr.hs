@@ -1006,15 +1006,15 @@ instance Diagnostic TcRnMessage where
     TcRnUnexpectedAnnotation ty bang
       -> mkSimpleDecorated $
            let err = case bang of
-                 HsBang SrcUnpack   _       -> "UNPACK"
-                 HsBang SrcNoUnpack _       -> "NOUNPACK"
-                 HsBang NoSrcUnpack SrcLazy -> "laziness"
-                 HsBang _           _       -> "strictness"
+                 HsSrcBang _ SrcUnpack   _       -> "UNPACK"
+                 HsSrcBang _ SrcNoUnpack _       -> "NOUNPACK"
+                 HsSrcBang _ NoSrcUnpack SrcLazy -> "laziness (~)"
+                 HsSrcBang _ _           _       -> "strictness (!)"
             in text "Unexpected" <+> text err <+> text "annotation:" <+> ppr ty $$
-               text err <+> text "annotation cannot appear nested inside a type"
-    TcRnIllegalRecordSyntax either_ty_ty
+               text err <+> text "annotation can only appear on the arguments of a data constructor type"
+    TcRnIllegalRecordSyntax ty
       -> mkSimpleDecorated $
-           text "Record syntax is illegal here:" <+> either ppr ppr either_ty_ty
+           text "Record syntax is illegal here:" <+> ppr ty
 
     TcRnInvalidVisibleKindArgument arg ty
       -> mkSimpleDecorated $

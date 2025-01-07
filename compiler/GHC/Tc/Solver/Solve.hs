@@ -855,7 +855,7 @@ everything to be in terms of b, while k does none of that. This is
 ridiculous, but I (Richard E) don't see a good fix.
 
 Shortcoming 2.  Removing a redundant constraint can cause clients to fail to
-compile, by making the function more polymoprhic. Consider (#16154)
+compile, by making the function more polymorphic. Consider (#16154)
 
   f :: (a ~ Bool) => a -> Int
   f x = 3

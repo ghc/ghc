@@ -29,7 +29,7 @@ import Data.List (intersperse, sort)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
-import GHC hiding (LexicalFixity (..), fromMaybeContext)
+import GHC hiding (HsTypeGhcPsExt (..), LexicalFixity (..), fromMaybeContext)
 import GHC.Core.Type (Specificity (..))
 import GHC.Data.BooleanFormula
 import GHC.Exts hiding (toList)
@@ -335,7 +335,7 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_sig_args 0 sep
       | otherwise =
           (leader <+> ppLContextNoArrow lctxt unicode qual emptyCtxts, Nothing, [])
             : do_largs n (darrow unicode) ltype
-    do_args n leader (HsFunTy _ _w (L _ (HsRecTy _ fields)) r) =
+    do_args n leader (HsFunTy _ _w (L _ (XHsType (HsRecTy fields))) r) =
       [ (ldr <+> html, mdoc, subs)
       | (L _ field, ldr) <- zip fields (leader <+> gadtOpen : repeat gadtComma)
       , let (html, mdoc, subs) = ppSideBySideField subdocs unicode qual field
@@ -1350,7 +1350,7 @@ ppShortConstrParts summary dataInst con unicode qual =
          in case det of
               -- Prefix constructor, e.g. 'Just a'
               PrefixCon args ->
-                ( header_ <+> hsep (ppOcc : map (ppLParendType unicode qual HideEmptyContexts . hsScaledThing) args)
+                ( header_ <+> hsep (ppOcc : map (ppLParendType unicode qual HideEmptyContexts . hsConDeclFieldToHsTypeNoMult) args)
                 , noHtml
                 , noHtml
                 )
@@ -1368,9 +1368,9 @@ ppShortConstrParts summary dataInst con unicode qual =
               InfixCon arg1 arg2 ->
                 ( header_
                     <+> hsep
-                      [ ppLParendType unicode qual HideEmptyContexts (hsScaledThing arg1)
+                      [ ppLParendType unicode qual HideEmptyContexts (hsConDeclFieldToHsTypeNoMult arg1)
                       , ppOccInfix
-                      , ppLParendType unicode qual HideEmptyContexts (hsScaledThing arg2)
+                      , ppLParendType unicode qual HideEmptyContexts (hsConDeclFieldToHsTypeNoMult arg2)
                       ]
                 , noHtml
                 , noHtml
@@ -1431,7 +1431,7 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con) =
                   | otherwise ->
                       hsep
                         [ header_ <+> ppOcc
-                        , hsep (map (ppLParendType unicode qual HideEmptyContexts . hsScaledThing) args)
+                        , hsep (map (ppLParendType unicode qual HideEmptyContexts . hsConDeclFieldToHsTypeNoMult) args)
                         , fixity
                         ]
                 -- Record constructor, e.g. 'Identity { runIdentity :: a }'
@@ -1441,9 +1441,9 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con) =
                   | hasArgDocs -> header_ <+> ppOcc <+> fixity
                   | otherwise ->
                       hsep
-                        [ header_ <+> ppLParendType unicode qual HideEmptyContexts (hsScaledThing arg1)
+                        [ header_ <+> ppLParendType unicode qual HideEmptyContexts (hsConDeclFieldToHsTypeNoMult arg1)
                         , ppOccInfix
-                        , ppLParendType unicode qual HideEmptyContexts (hsScaledThing arg2)
+                        , ppLParendType unicode qual HideEmptyContexts (hsConDeclFieldToHsTypeNoMult arg2)
                         , fixity
                         ]
       -- GADT constructor, e.g. 'Foo :: Int -> Foo'
@@ -1480,10 +1480,11 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con) =
         qual
         (map (ppSideBySideField subdocs unicode qual) (map unLoc fields))
 
+    doConstrArgsWithDocs :: [HsConDeclField DocNameI] -> Html
     doConstrArgsWithDocs args = subFields pkg qual $ case con of
       ConDeclH98{} ->
         [ (ppLParendType unicode qual HideEmptyContexts arg, mdoc, [])
-        | (i, arg) <- zip [0 ..] (map hsScaledThing args)
+        | (i, arg) <- zip [0 ..] (map hsConDeclFieldToHsTypeNoMult args)
         , let mdoc = Map.lookup i argDocs
         ]
       ConDeclGADT{} ->
@@ -1531,9 +1532,9 @@ ppSideBySideField
   :: [(DocName, DocForDecl DocName)]
   -> Unicode
   -> Qualification
-  -> ConDeclField DocNameI
+  -> HsConDeclRecField DocNameI
   -> SubDecl
-ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
+ppSideBySideField subdocs unicode qual (HsConDeclRecField _ names ltype) =
   ( hsep
       ( punctuate
           comma
@@ -1542,24 +1543,32 @@ ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
           , let field = (foExt) name
           ]
       )
+      <+> ppRecFieldMultAnn unicode qual ltype
       <+> dcolon unicode
-      <+> ppLType unicode qual HideEmptyContexts ltype
+      <+> ppLType unicode qual HideEmptyContexts (hsConDeclFieldToHsTypeNoMult ltype)
   , mbDoc
   , []
   )
   where
-    -- don't use cd_fld_doc for same reason we don't use con_doc above
-    -- Where there is more than one name, they all have the same documentation
     mbDoc = lookup (unLoc . foLabel $ unLoc declName) subdocs >>= combineDocumentation . fst
     declName = case Maybe.listToMaybe names of
       Nothing -> error "No names. An invariant was broken. Please report this to the Haddock project"
       Just hd -> hd
 
-ppShortField :: Bool -> Unicode -> Qualification -> ConDeclField DocNameI -> Html
-ppShortField summary unicode qual (ConDeclField _ names ltype _) =
+-- don't use cdf_doc for same reason we don't use con_doc above
+-- Where there is more than one name, they all have the same documentation
+ppRecFieldMultAnn :: Unicode -> Qualification -> HsConDeclField DocNameI -> Html
+ppRecFieldMultAnn unicode qual (CDF { cdf_multiplicity = ann }) = case ann of
+  HsUnannotated _ -> noHtml
+  HsLinearAnn _ -> toHtml "%1"
+  HsExplicitMult _ mult -> multAnnotation <> ppr_mono_lty mult unicode qual HideEmptyContexts
+
+ppShortField :: Bool -> Unicode -> Qualification -> HsConDeclRecField DocNameI -> Html
+ppShortField summary unicode qual (HsConDeclRecField _ names ltype) =
   hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . foExt . unLoc) names))
+    <+> ppRecFieldMultAnn unicode qual ltype
     <+> dcolon unicode
-    <+> ppLType unicode qual HideEmptyContexts ltype
+    <+> ppLType unicode qual HideEmptyContexts (hsConDeclFieldToHsTypeNoMult ltype)
 
 -- | Pretty print an expanded pattern (for bundled patterns)
 ppSideBySidePat
@@ -1654,9 +1663,9 @@ ppDataHeader _ _ _ _ = error "ppDataHeader: illegal argument"
 
 --------------------------------------------------------------------------------
 
-ppBang :: HsBang -> Html
-ppBang (HsBang _ SrcStrict) = toHtml "!"
-ppBang (HsBang _ SrcLazy) = toHtml "~"
+ppBang :: HsSrcBang -> Html
+ppBang (HsSrcBang _ _ SrcStrict) = toHtml "!"
+ppBang (HsSrcBang _ _ SrcLazy) = toHtml "~"
 ppBang _ = noHtml
 
 tupleParens :: HsTupleSort -> [Html] -> Html
@@ -1802,8 +1811,6 @@ ppr_mono_ty (HsQualTy _ ctxt ty) unicode qual emptyCtxts =
 -- UnicodeSyntax alternatives
 ppr_mono_ty (HsTyVar _ _ (L _ name)) True _ _
   | getOccString (getName name) == "(->)" = toHtml "(→)"
-ppr_mono_ty (HsBangTy _ b ty) u q _ =
-  ppBang b +++ ppLParendType u q HideEmptyContexts ty
 ppr_mono_ty (HsTyVar _ prom (L _ name)) _ q _
   | isPromoted prom = promoQuote (ppDocName q Prefix True name)
   | otherwise = ppDocName q Prefix True name
@@ -1816,8 +1823,8 @@ ppr_mono_ty (HsFunTy _ mult ty1 ty2) u q e =
     ]
   where
     arr = case mult of
-      HsLinearArrow _ -> lollipop u
-      HsUnrestrictedArrow _ -> arrow u
+      HsLinearAnn _ -> lollipop u
+      HsUnannotated _ -> arrow u
       HsExplicitMult _ m -> multAnnotation <> ppr_mono_lty m u q e <+> arrow u
 ppr_mono_ty (HsTupleTy _ con tys) u q _ =
   tupleParens con (map (ppLType u q HideEmptyContexts) tys)
@@ -1829,11 +1836,13 @@ ppr_mono_ty (HsListTy _ ty) u q _ = brackets (ppr_mono_lty ty u q HideEmptyConte
 ppr_mono_ty (HsIParamTy _ (L _ n) ty) u q _ =
   ppIPName n <+> dcolon u <+> ppr_mono_lty ty u q HideEmptyContexts
 ppr_mono_ty (HsSpliceTy v _) _ _ _ = dataConCantHappen v
-ppr_mono_ty (HsRecTy{}) _ _ _ = toHtml "{..}"
+ppr_mono_ty (XHsType (HsBangTy b ty)) u q _ =
+  ppBang b +++ ppLParendType u q HideEmptyContexts ty
+ppr_mono_ty (XHsType (HsRecTy{})) _ _ _ = toHtml "{..}"
 -- Can now legally occur in ConDeclGADT, the output here is to provide a
 -- placeholder in the signature, which is followed by the field
 -- declarations.
-ppr_mono_ty (XHsType{}) _ _ _ = error "ppr_mono_ty HsCoreTy"
+ppr_mono_ty (XHsType HsCoreTy{}) _ _ _ = error "ppr_mono_ty HsCoreTy"
 ppr_mono_ty (HsExplicitListTy _ IsPromoted tys) u q _ = promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
 ppr_mono_ty (HsExplicitListTy _ NotPromoted tys) u q _ = brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
 ppr_mono_ty (HsExplicitTupleTy _ IsPromoted tys) u q _ = promoQuote $ parenList $ map (ppLType u q HideEmptyContexts) tys

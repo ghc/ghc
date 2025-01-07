@@ -2267,19 +2267,19 @@ type :: { LHsType GhcPs }
         -- See Note [%shift: type -> btype]
         : btype %shift                 { $1 }
         | btype '->' ctype             {% amsA' (sLL $1 $>
-                                            $ HsFunTy noExtField (HsUnrestrictedArrow (epUniTok $2)) $1 $3) }
+                                            $ HsFunTy noExtField (HsUnannotated (EpArrow (epUniTok $2))) $1 $3) }
 
         | btype mult '->' ctype        {% hintLinear (getLoc $2)
                                        >> let arr = (unLoc $2) (epUniTok $3)
                                           in amsA' (sLL $1 $> $ HsFunTy noExtField arr $1 $4) }
 
         | btype '->.' ctype            {% hintLinear (getLoc $2) >>
-                                          amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow (EpLolly (epTok $2))) $1 $3) }
+                                          amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearAnn (EpLolly (epTok $2))) $1 $3) }
 
-mult :: { Located (EpUniToken "->" "\8594" -> HsArrow GhcPs) }
-        : PREFIX_PERCENT atype          { sLL $1 $> (mkMultTy (epTok $1) $2) }
+mult :: { Located (EpUniToken "->" "\8594" -> HsMultAnn GhcPs) }
+        : PREFIX_PERCENT atype          { sLL $1 $> (mkMultAnn (epTok $1) $2 . EpArrow) }
 
-expmult :: { forall b. DisambECP b => PV (Located (EpUniToken "->" "\8594" -> HsArrowOf (LocatedA b) GhcPs)) }
+expmult :: { forall b. DisambECP b => PV (Located (EpUniToken "->" "\8594" -> HsMultAnnOf (LocatedA b) GhcPs)) }
 expmult : PREFIX_PERCENT aexp           { unECP $2 >>= \ $2 ->
                                           fmap (sLL $1 $>) (mkHsMultPV (epTok $1) $2) }
 
@@ -2331,7 +2331,7 @@ atype :: { LHsType GhcPs }
         | PREFIX_TILDE atype             {% amsA' (sLL $1 $> (mkBangTy (glR $1) SrcLazy $2)) }
         | PREFIX_BANG  atype             {% amsA' (sLL $1 $> (mkBangTy (glR $1) SrcStrict $2)) }
 
-        | '{' fielddecls '}'             {% do { decls <- amsA' (sLL $1 $> $ HsRecTy (AnnList (listAsAnchorM $2) (ListBraces (epTok $1) (epTok $3)) [] noAnn []) $2)
+        | '{' fielddecls '}'             {% do { decls <- amsA' (sLL $1 $> $ XHsType $ HsRecTy (AnnList (listAsAnchorM $2) (ListBraces (epTok $1) (epTok $3)) [] noAnn []) $2)
                                                ; checkRecordSyntax decls }}
                                                         -- Constructor sigs only
 
@@ -2588,23 +2588,30 @@ usum_constr :: { (LHsType GhcPs, Int, Int) } -- constructor for the data decls S
          : ktype bars { ($1, 1, (snd $2 + 1)) }
          | bars ktype bars0 { ($2, snd $1 + 1, snd $1 + snd $3 + 1) }
 
-fielddecls :: { [LConDeclField GhcPs] }
+fielddecls :: { [LHsConDeclRecField GhcPs] }
         : {- empty -}     { [] }
         | fielddecls1     { $1 }
 
-fielddecls1 :: { [LConDeclField GhcPs] }
+fielddecls1 :: { [LHsConDeclRecField GhcPs] }
         : fielddecl ',' fielddecls1
             {% do { h <- addTrailingCommaA $1 (epTok $2)
                   ; return (h : $3) }}
         | fielddecl   { [$1] }
 
-fielddecl :: { LConDeclField GhcPs }
+fielddecl :: { LHsConDeclRecField GhcPs }
                                               -- A list because of   f,g :: Int
         : sig_vars '::' ctype
             {% amsA' (L (comb2 $1 $3)
-                      (ConDeclField (epUniTok $2)
+                      (HsConDeclRecField noExtField
                                     (reverse (map (\ln@(L l n)
-                                               -> L (fromTrailingN l) $ FieldOcc noExtField (L (noTrailingN l) n)) (unLoc $1))) $3 Nothing))}
+                                               -> L (fromTrailingN l) $ FieldOcc noExtField (L (noTrailingN l) n)) (unLoc $1)))
+                                    (mkConDeclField (HsUnannotated (EpColon (epUniTok $2))) $3)))}
+        | sig_vars PREFIX_PERCENT atype '::' ctype
+            {% amsA' (L (comb4 $1 $2 $3 $5)
+                      (HsConDeclRecField noExtField
+                                    (reverse (map (\ln@(L l n)
+                                               -> L (fromTrailingN l) $ FieldOcc noExtField (L (noTrailingN l) n)) (unLoc $1)))
+                                    (mkMultField (epTok $2) $3 (epUniTok $4) $5)))}
 
 -- Reversed!
 maybe_derivings :: { Located (HsDeriving GhcPs) }
@@ -2668,17 +2675,17 @@ There's an awkward overlap with a type signature.  Consider
 decl_no_th :: { LHsDecl GhcPs }
         : sigdecl               { $1 }
 
-        | infixexp     opt_sig rhs  {% runPV (unECP $1) >>= \ $1 ->
+        | infixexp opt_sig rhs  {% runPV (unECP $1) >>= \ $1 ->
                                        do { let { l = comb2 $1 $> }
-                                          ; r <- checkValDef l $1 (HsNoMultAnn noExtField, $2) $3;
+                                          ; r <- checkValDef l $1 (HsUnannotated EpPatBind, $2) $3;
                                         -- Depending upon what the pattern looks like we might get either
                                         -- a FunBind or PatBind back from checkValDef. See Note
                                         -- [FunBind vs PatBind]
                                           ; !cs <- getCommentsFor l
                                           ; return $! (sL (commentsA l cs) $ ValD noExtField r) } }
-        | PREFIX_PERCENT atype infixexp     opt_sig rhs  {% runPV (unECP $3) >>= \ $3 ->
+        | PREFIX_PERCENT atype infixexp opt_sig rhs {% runPV (unECP $3) >>= \ $3 ->
                                        do { let { l = comb2 $1 $> }
-                                          ; r <- checkValDef l $3 (mkMultAnn (epTok $1) $2, $4) $5;
+                                          ; r <- checkValDef l $3 (mkMultAnn (epTok $1) $2 EpPatBind, $4) $5;
                                         -- parses bindings of the form %p x or
                                         -- %p x :: sig
                                         --
@@ -2871,7 +2878,7 @@ infixexp2 :: { ECP }
                                   withArrowParsingMode' $ \mode ->
                                   unECP $1 >>= \ $1 ->
                                   unECP $3 >>= \ $3 ->
-                                  let arr = HsUnrestrictedArrow (epUniTok $2)
+                                  let arr = HsUnannotated (EpArrow (epUniTok $2))
                                   in mkHsArrowPV (comb2 $1 $>) mode $1 arr $3 }
         | infixexp expmult '->'  infixexp2
                                 { ECP $
@@ -2886,7 +2893,7 @@ infixexp2 :: { ECP }
                                   hintLinear (getLoc $2) >>
                                   unECP $1 >>= \ $1 ->
                                   unECP $3 >>= \ $3 ->
-                                  let arr = HsLinearArrow (EpLolly (epTok $2))
+                                  let arr = HsLinearAnn (EpLolly (epTok $2))
                                   in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $3 }
         | expcontext    '=>'  infixexp2
                                 { ECP $

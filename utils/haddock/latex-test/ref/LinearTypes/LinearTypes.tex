@@ -3,7 +3,8 @@
 \haddockbeginheader
 {\haddockverb\begin{verbatim}
 module LinearTypes (
-    unrestricted, linear, poly
+    unrestricted, linear, poly, C(C, linC, noC, urC, varC),
+    G(G, linG, noG, urG, varG)
   ) where\end{verbatim}}
 \haddockendheader
 
@@ -27,4 +28,32 @@ poly :: forall a (m :: Multiplicity) b. a {\char '45}m -> b
 \end{tabular}]
 {\haddockbegindoc
 Does something polymorphic.\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+data C m
+\end{tabular}]
+{\haddockbegindoc
+A record with non-linear fields.\par
+\enspace \emph{Constructors}\par
+\haddockbeginconstrs
+\haddockdecltt{=} & \haddockdecltt{C} & \\
+                                        & \haddocktt{\qquad \{} \haddockdecltt{linC :: Int} & \\
+                                        & \haddocktt{\qquad ,} \haddockdecltt{urC {\char '45}'Many :: Char} & \\
+                                        & \haddocktt{\qquad ,} \haddockdecltt{varC {\char '45}m :: String} & \\
+                                        & \haddocktt{\qquad ,} \haddockdecltt{noC :: Bool} & \\ & \haddocktt{\qquad \}} \\
+\end{tabulary}\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+data G mult where
+\end{tabular}]
+{\haddockbegindoc
+A GADT record with non-linear fields.\par
+\enspace \emph{Constructors}\par
+\haddockbeginconstrs
+& \haddockdecltt{G} & \\
+                      & \qquad \haddockdecltt{::} \enspace \haddockdecltt{forall (mult :: Multiplicity).} {..}
+                                                                                                          -> G mult
+\end{tabulary}\par}
 \end{haddockdesc}

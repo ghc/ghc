@@ -100,7 +100,7 @@ renameType (HsTyVar x ip name) = HsTyVar x ip <$> locatedN renameName name
 renameType t@(HsStarTy _ _) = pure t
 renameType (HsAppTy x lf la) = HsAppTy x <$> renameLType lf <*> renameLType la
 renameType (HsAppKindTy x lt lk) = HsAppKindTy x <$> renameLType lt <*> renameLKind lk
-renameType (HsFunTy x w la lr) = HsFunTy x <$> renameHsArrow w <*> renameLType la <*> renameLType lr
+renameType (HsFunTy x w la lr) = HsFunTy x <$> renameHsMultAnn w <*> renameLType la <*> renameLType lr
 renameType (HsListTy x lt) = HsListTy x <$> renameLType lt
 renameType (HsTupleTy x srt lt) = HsTupleTy x srt <$> mapM renameLType lt
 renameType (HsSumTy x lt) = HsSumTy x <$> mapM renameLType lt
@@ -111,8 +111,6 @@ renameType (HsIParamTy x ip lt) = HsIParamTy x ip <$> renameLType lt
 renameType (HsKindSig x lt lk) = HsKindSig x <$> renameLType lt <*> pure lk
 renameType t@(HsSpliceTy _ _) = pure t
 renameType (HsDocTy x lt doc) = HsDocTy x <$> renameLType lt <*> pure doc
-renameType (HsBangTy x bang lt) = HsBangTy x bang <$> renameLType lt
-renameType t@(HsRecTy _ _) = pure t
 renameType t@(XHsType _) = pure t
 renameType (HsExplicitListTy x ip ltys) =
   HsExplicitListTy x ip <$> renameLTypes ltys
@@ -121,9 +119,9 @@ renameType (HsExplicitTupleTy x ip ltys) =
 renameType t@(HsTyLit _ _) = pure t
 renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
 
-renameHsArrow :: HsArrow GhcRn -> Rename (IdP GhcRn) (HsArrow GhcRn)
-renameHsArrow (HsExplicitMult x p) = HsExplicitMult x <$> renameLType p
-renameHsArrow mult = pure mult
+renameHsMultAnn :: HsMultAnn GhcRn -> Rename (IdP GhcRn) (HsMultAnn GhcRn)
+renameHsMultAnn (HsExplicitMult x p) = HsExplicitMult x <$> renameLType p
+renameHsMultAnn mult = pure mult
 
 renameLType :: LHsType GhcRn -> Rename (IdP GhcRn) (LHsType GhcRn)
 renameLType = located renameType

@@ -990,9 +990,9 @@ expr_to_type earg =
          ; res' <- go res
          ; return (L l (HsFunTy noExtField mult' arg' res'))}
          where
-          go_arrow :: HsArrowOf (LHsExpr GhcRn) GhcRn -> TcM (HsArrow GhcRn)
-          go_arrow (HsUnrestrictedArrow{}) = pure (HsUnrestrictedArrow noExtField)
-          go_arrow (HsLinearArrow{}) = pure (HsLinearArrow noExtField)
+          go_arrow :: HsMultAnnOf (LHsExpr GhcRn) GhcRn -> TcM (HsMultAnn GhcRn)
+          go_arrow (HsUnannotated _) = pure (HsUnannotated noExtField)
+          go_arrow (HsLinearAnn{}) = pure (HsLinearAnn noExtField)
           go_arrow (HsExplicitMult _ exp) = HsExplicitMult noExtField <$> go exp
     go (L l (HsForAll _ tele expr)) =
       do { ty <- go expr
