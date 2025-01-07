@@ -2,4 +2,4 @@
 <no location info>: warning: [GHC-42258] [-Wunused-packages]
     The following packages were specified via -package or -package-id flags,
     but were not needed for compilation:
-      - internal-lib-0.1.0.0 (exposed by flag -package-id internal-lib-0.1.0.0-85MtRTf8HPX4Uo1lkUlkVq-sublib-unused)
+      - internal-lib-0.1.0.0 (exposed by flag -package-id internal-lib-0.1.0.0-I1syA7vc5NQI5FJIz8hm8G-sublib-unused)

@@ -1,6 +1,6 @@
 cabal-version:  3.0
 name:           base
-version:        4.18.2.1
+version:        4.18.3.0
 -- NOTE: Don't forget to update ./changelog.md
 
 license:        BSD-3-Clause
