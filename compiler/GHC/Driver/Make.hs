@@ -1565,21 +1565,29 @@ downsweep :: HscEnv
                 -- (Modules, IsBoot) identifiers, unless the Bool is true in
                 -- which case there can be repeats
 downsweep hsc_env old_summaries excl_mods allow_dup_roots = do
-  worker_limit <- liftIO $ mkWorkerLimit (hsc_dflags hsc_env)
-  downsweep_workers worker_limit hsc_env old_summaries excl_mods allow_dup_roots
+  n_jobs <- mkWorkerLimit (hsc_dflags hsc_env)
+  new <- rootSummariesParallel n_jobs hsc_env summary
+  downsweep_imports hsc_env old_summary_map excl_mods allow_dup_roots new
+  where
+    summary = getRootSummary excl_mods old_summary_map
 
-downsweep_workers :: WorkerLimit
-                  -- ^ The number of workers we wish to run in parallel
-                  -> HscEnv
-                  -> [ModSummary]
+    -- A cache from file paths to the already summarised modules. The same file
+    -- can be used in multiple units so the map is also keyed by which unit the
+    -- file was used in.
+    -- Reuse these if we can because the most expensive part of downsweep is
+    -- reading the headers.
+    old_summary_map :: M.Map (UnitId, FilePath) ModSummary
+    old_summary_map =
+      M.fromList [((ms_unitid ms, msHsFilePath ms), ms) | ms <- old_summaries]
+
+downsweep_imports :: HscEnv
+                  -> M.Map (UnitId, FilePath) ModSummary
                   -> [ModuleName]
                   -> Bool
+                  -> ([(UnitId, DriverMessages)], [ModSummary])
                   -> IO ([DriverMessages], [ModuleGraphNode])
-downsweep_workers n_jobs hsc_env old_summaries excl_mods allow_dup_roots
+downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, rootSummariesOk)
    = do
-       (root_errs, rootSummariesOk) <-
-         rootSummariesParallel n_jobs hsc_env
-         (getRootSummary excl_mods old_summary_map) roots
        let root_map = mkRootMap rootSummariesOk
        checkDuplicates root_map
        (deps, map0) <- loopSummaries rootSummariesOk (M.empty, root_map)
@@ -1619,15 +1627,6 @@ downsweep_workers n_jobs hsc_env old_summaries excl_mods allow_dup_roots
           [(ms_unitid ms, b, c) | (b, c) <- msDeps ms ]
 
         logger = hsc_logger hsc_env
-        roots  = hsc_targets hsc_env
-
-        -- A cache from file paths to the already summarised modules. The same file
-        -- can be used in multiple units so the map is also keyed by which unit the
-        -- file was used in.
-        -- Reuse these if we can because the most expensive part of downsweep is
-        -- reading the headers.
-        old_summary_map :: M.Map (UnitId, FilePath) ModSummary
-        old_summary_map = M.fromList [((ms_unitid ms, msHsFilePath ms), ms) | ms <- old_summaries]
 
         -- In a root module, the filename is allowed to diverge from the module
         -- name, so we have to check that there aren't multiple root files
@@ -1695,7 +1694,7 @@ downsweep_workers n_jobs hsc_env old_summaries excl_mods allow_dup_roots
                 loopImports ss done summarised
           | otherwise
           = do
-               mb_s <- summariseModule hsc_env home_unit old_summary_map
+               mb_s <- summariseModule hsc_env home_unit old_summaries
                                        is_boot wanted_mod mb_pkg
                                        Nothing excl_mods
                case mb_s of
@@ -1774,31 +1773,37 @@ rootSummariesParallel ::
   WorkerLimit ->
   HscEnv ->
   (HscEnv -> Target -> IO (Either (UnitId, DriverMessages) ModSummary)) ->
-  [Target] ->
   IO ([(UnitId, DriverMessages)], [ModSummary])
-rootSummariesParallel n_jobs hsc_env get_summary targets = do
-  n_cap <- getNumCapabilities
-  let bundle_size = max 1 (length targets `div` (n_cap * 2))
-      bundles = mk_bundles bundle_size targets
-  (actions, results) <- unzip <$> mapM action_and_result (zip [1..] bundles)
+rootSummariesParallel n_jobs hsc_env get_summary = do
+  (actions, get_results) <- unzip <$> mapM action_and_result (zip [1..] bundles)
   runPipelines n_jobs hsc_env mkUnknownDiagnostic Nothing actions
-  partitionEithers . concat . catMaybes <$!> sequence results
+  (sequence . catMaybes <$> sequence get_results) >>= \case
+    Right results -> pure (partitionEithers (concat results))
+    Left exc -> throwIO exc
   where
-    mk_bundles sz = unfoldr \case
+    bundles = mk_bundles targets
+
+    mk_bundles = unfoldr \case
       [] -> Nothing
-      ts -> Just (splitAt sz ts)
+      ts -> Just (splitAt bundle_size ts)
+
+    bundle_size = 20
+
+    targets = hsc_targets hsc_env
 
     action_and_result (log_queue_id, ts) = do
       res_var <- liftIO newEmptyMVar
       pure $! (MakeAction (action log_queue_id ts) res_var, readMVar res_var)
 
     action log_queue_id target_bundle = do
-      env@MakeEnv {diag_wrapper, compile_sem} <- ask
-      lift $ MaybeT $
+      env@MakeEnv {compile_sem} <- ask
+      lift $ lift $
         withAbstractSem compile_sem $
         withLoggerHsc log_queue_id env \ lcl_hsc_env ->
-          wrapAction diag_wrapper lcl_hsc_env $
-          mapM (get_summary lcl_hsc_env) target_bundle
+          MC.try (mapM (get_summary lcl_hsc_env) target_bundle) >>= \case
+            Left e | Just (_ :: SomeAsyncException) <- fromException e ->
+              throwIO e
+            a -> pure a
 
 -- | This function checks then important property that if both p and q are home units
 -- then any dependency of p, which transitively depends on q is also a home unit.
