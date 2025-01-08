@@ -96,6 +96,37 @@ import GHC.Stg.Syntax
 import qualified Data.IntSet as IntSet
 import GHC.CoreToIface
 
+-- Note [The bytecode compilation pipeline]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- We generate bytecode from STG. `GHC.StgToByteCode.byteCodeGen` takes an STG
+-- module and transforms it to a `CompiledByteCode`, which is a collection of:
+--
+--   * binary bytecode objects (`UnlinkedBCO`s) for the module's bindings
+--   * the set of the module's info tables to allocate
+--   * the module's top-level unboxed strings
+--     (see Note [Allocating string literals] in `GHC.ByteCode.Asm`).
+--   * the module's foreign imports
+--   * breakpoint information (i.e. `ModBreaks`)
+--
+-- The work of compiling STG to the bytecode machine is carried out by
+-- `GHC.StgToByteCode.schemeE`, which delegates tail-calling forms to
+-- `GHC.StgToByteCode.schemeT`. These produce a `ProtoBCO` (that is, a list of
+-- bytecode instructions and associated metadata) which is then passed to
+-- `GHC.ByteCode.Asm.assembleBCO`, which produces the binary bytecode
+-- representation (the `CompiledByteCode`).
+--
+-- `CompiledByteCode`s eventually find their way to
+-- `GHC.ByteCode.Linker.linkBCO` which resolves free variables into
+-- concrete references (`ResolvedBCOPtr`s). These `ResolvedBCO`s can
+-- in turn can passed to `GHCi.CreateBCO.createBCO` where they will
+-- be reified on the heap as `BCO` objects and made ready for
+-- execution by the runtime system's interpreter (rts/Interpreter.c).
+--
+-- See also:
+--  * Note [Return convention for non-tuple values].
+--  * Note [GHCi and native call registers]
+--
+
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
 
