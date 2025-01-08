@@ -693,6 +693,7 @@ data GeneralFlag
    | Opt_KeepAutoRules -- ^Keep auto-generated rules even if they seem to have become useless
    | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
    | Opt_WriteSelfRecompInfo
+   | Opt_WriteSelfRecompFlags -- ^ Include detailed flag information for self-recompilation debugging
    | Opt_WriteHie -- generate .hie files
 
    -- JavaScript opts

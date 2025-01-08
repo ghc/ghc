@@ -1,9 +1,14 @@
-module GHC.Iface.Recomp.Types ( ModIfaceSelfRecomp(..)
-                              ) where
+module GHC.Iface.Recomp.Types (
+  ModIfaceSelfRecomp(..),
+  IfaceDynFlags(..),
+  pprIfaceDynFlags,
+  missingExtraFlagInfo,
+) where
 
 import GHC.Prelude
 import GHC.Fingerprint
 import GHC.Utils.Outputable
+import GHC.Iface.Flags
 import GHC.Unit.Module.Deps
 
 import GHC.Utils.Binary
@@ -64,7 +69,7 @@ data ModIfaceSelfRecomp =
                        -- NOT STRICT!  we read this field lazily from the interface file
                        -- It is *only* consulted by the recompilation checker
 
-                       , mi_sr_flag_hash :: !Fingerprint
+                       , mi_sr_flag_hash :: !(Fingerprint, Maybe IfaceDynFlags)
                        -- ^ Hash of the important flags used when compiling the module, excluding
                        -- optimisation flags
                        , mi_sr_opt_hash :: !Fingerprint
@@ -99,7 +104,7 @@ instance Outputable ModIfaceSelfRecomp where
     = vcat [text "Self-Recomp"
             , nest 2 (vcat [ text "src hash:" <+> ppr mi_sr_src_hash
                            , text "usages:" <+> ppr (length mi_sr_usages)
-                           , text "flag hash:" <+> ppr mi_sr_flag_hash
+                           , text "flags:" <+> pprIfaceDynFlags mi_sr_flag_hash
                            , text "opt hash:" <+> ppr mi_sr_opt_hash
                            , text "hpc hash:" <+> ppr mi_sr_hpc_hash
                            , text "plugin hash:" <+> ppr mi_sr_plugin_hash

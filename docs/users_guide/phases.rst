@@ -705,7 +705,6 @@ Options affecting code generation
 .. ghc-flag:: -fwrite-if-self-recomp
     :shortdesc: Write information for self-recompilation checking in an interface file
     :type: dynamic
-    :category: codegen
 
     :default: on
 
@@ -718,6 +717,14 @@ Options affecting code generation
     there is less chance of build paths leaking into the interface file and affecting
     determinism.
 
+.. ghc-flag:: -fwrite-if-self-recomp-flags
+    :shortdesc: Include detailed flag information for self-recompilation checking
+    :type: dynamic
+
+    Include detailed information about which flags were used during compilation
+    in an interface file. This makes it easier to debug issues with recompilation
+    by providing more context about the compilation environment. This flag is
+    primarily intended for debugging recompilation problems with ``-ddump-hi-diffs``
 
 
 
