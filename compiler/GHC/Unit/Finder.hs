@@ -49,7 +49,6 @@ import GHC.Unit.Home
 import GHC.Unit.State
 import GHC.Unit.Finder.Types
 
-import GHC.Data.Maybe    ( expectJust )
 import qualified GHC.Data.ShortText as ST
 
 import GHC.Utils.Misc
@@ -89,6 +88,20 @@ type BaseName = String  -- Basename of file
 -- -----------------------------------------------------------------------------
 -- The finder's cache
 
+{-
+[Note: Monotonic addToFinderCache]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+addToFinderCache is only used by functions that return the cached value
+if there is one, or by functions that always write an InstalledFound value.
+Without multithreading it is then safe to always directly write the value
+without checking the previously cached value.
+
+However, with multithreading, it is possible that another function has
+written a value into cache between the lookup and the addToFinderCache call.
+in this case we should check to not overwrite an InstalledFound with an
+InstalledNotFound.
+-}
 
 initFinderCache :: IO FinderCache
 initFinderCache = FinderCache <$> newIORef emptyInstalledModuleEnv
@@ -98,32 +111,37 @@ initFinderCache = FinderCache <$> newIORef emptyInstalledModuleEnv
 -- assumed to not move around during a session; also flush the file hash
 -- cache
 flushFinderCaches :: FinderCache -> UnitEnv -> IO ()
-flushFinderCaches (FinderCache ref file_ref) ue = do
-  atomicModifyIORef' ref $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
-  atomicModifyIORef' file_ref $ \_ -> (M.empty, ())
+flushFinderCaches (FinderCache mod_cache file_cache) ue = do
+  atomicModifyIORef' mod_cache $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
+  atomicModifyIORef' file_cache $ \_ -> (M.empty, ())
  where
   is_ext mod _ = not (isUnitEnvInstalledModule ue mod)
 
 addToFinderCache :: FinderCache -> InstalledModule -> InstalledFindResult -> IO ()
-addToFinderCache (FinderCache ref _) key val =
-  atomicModifyIORef' ref $ \c -> (extendInstalledModuleEnv c key val, ())
+addToFinderCache (FinderCache mod_cache _) key val =
+  atomicModifyIORef' mod_cache $ \c ->
+    case (lookupInstalledModuleEnv c key, val) of
+      -- Don't overwrite an InstalledFound with an InstalledNotFound
+      -- See [Note Monotonic addToFinderCache]
+      (Just InstalledFound{}, InstalledNotFound{}) -> (c, ())
+      _ -> (extendInstalledModuleEnv c key val, ())
+
+lookupFinderCache :: FinderCache -> InstalledModule -> IO (Maybe InstalledFindResult)
+lookupFinderCache (FinderCache mod_cache _) key = do
+   c <- readIORef mod_cache
+   return $! lookupInstalledModuleEnv c key
 
 removeFromFinderCache :: FinderCache -> InstalledModule -> IO ()
 removeFromFinderCache (FinderCache ref _) key =
   atomicModifyIORef' ref $ \c -> (delInstalledModuleEnv c key, ())
 
-lookupFinderCache :: FinderCache -> InstalledModule -> IO (Maybe InstalledFindResult)
-lookupFinderCache (FinderCache ref _) key = do
-   c <- readIORef ref
-   return $! lookupInstalledModuleEnv c key
-
 lookupFileCache :: FinderCache -> FilePath -> IO Fingerprint
-lookupFileCache (FinderCache _ ref) key = do
-   c <- readIORef ref
+lookupFileCache (FinderCache _ file_cache) key = do
+   c <- readIORef file_cache
    case M.lookup key c of
      Nothing -> do
        hash <- getFileHash key
-       atomicModifyIORef' ref $ \c -> (M.insert key hash c, ())
+       atomicModifyIORef' file_cache $ \c -> (M.insert key hash c, ())
        return hash
      Just fp -> return fp
 
