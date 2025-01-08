@@ -6,7 +6,6 @@ package-dbs: clear, global
 packages:
   ./_build/stage1/src/libraries/rts
   ./_build/stage1/src/libraries/ghc-prim
-  ./_build/stage1/src/libraries/ghc-bignum
   ./_build/stage1/src/libraries/ghc-internal
 
 benchmarks: False
@@ -25,6 +24,6 @@ package *
   executable-static: False
   ghc-options: -fhide-source-paths -j
 
-package ghc-bignum
+package ghc-internal
   -- make our life easier for now by using the native bignum backend
-  flags: +native
+  flags: +bignum-native

@@ -103,6 +103,10 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	cp -f rts/include/stg/MachRegs.h             _build/stage1/src/libraries/ghc/
 	mkdir -p _build/stage1/src/libraries/ghc/MachRegs
 	cp -f rts/include/stg/MachRegs/*.h           _build/stage1/src/libraries/ghc/MachRegs/
+
+	cp -f utils/fs/fs.h _build/stage1/src/libraries/ghc-internal/include
+	cp -f utils/fs/fs.c _build/stage1/src/libraries/ghc-internal/cbits
+	cp -f utils/fs/fs.* _build/stage1/src/libraries/rts/
 	
 	python rts/gen_event_types.py --event-types-defines _build/stage1/src/libraries/rts/include/rts/EventLogConstants.h
 	python rts/gen_event_types.py --event-types-array   _build/stage1/src/libraries/rts/include/rts/EventTypes.h
@@ -182,7 +186,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 		--objdump-program objdump \
 		--gcc-flag "-I_build/stage1/src/libraries/rts/include" \
 		--gcc-flag "-I_build/stage1/src/libraries/rts" \
-		--gcc-flag "-I_build/stage1/cabal/build/x86_64-linux/ghc-9.13/rts-1.0.2/build/include"
+		--gcc-flag "-I_build/stage1/cabal/build/x86_64-linux/ghc-9.13/rts-1.0.3/build/include"
 
 	# Generate autoapply
 	_build/stage0/bin/genapply _build/stage1/src/libraries/rts/include/DerivedConstants.h > _build/stage1/src/libraries/rts/AutoApply.cmm
@@ -196,7 +200,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	(cd _build/stage1/src/libffi; tar -xvf ../../../../libffi-tarballs/libffi-3.4.6.tar.gz)
 	(cd _build/stage1/src/libffi/libffi-3.4.6; ./configure --disable-docs --with-pics=yes --disable-multi-os-directory --prefix=`pwd`/../../../../../_build/stage1/libffi/ && make install -j)
 	cp -f _build/stage1/libffi/include/* _build/stage1/src/libraries/rts/include/
-	cp -f _build/stage1/libffi/lib/libffi.a _build/stage1/cabal/build/x86_64-linux/ghc-9.13/rts-1.0.2/build/libCffi.a
+	cp -f _build/stage1/libffi/lib/libffi.a _build/stage1/cabal/build/x86_64-linux/ghc-9.13/rts-1.0.3/build/libCffi.a
 
 	# Building boot libraries
 	mkdir -p _build/stage1/cabal/
@@ -240,7 +244,7 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS_STAGE1)' \
 	  $(CABAL) build --project-file=cabal.project-stage1 \
-	  rts ghc-prim ghc-bignum ghc-internal \
+	  rts ghc-prim ghc-internal \
 	  --with-compiler=`pwd`/_build/stage0/bin/ghc \
 	  --with-hc-pkg=`pwd`/_build/stage0/bin/ghc-pkg \
 	  --ghc-options="-ghcversion-file=`pwd`/_build/stage1/src/libraries/rts/include/ghcversion.h" \
