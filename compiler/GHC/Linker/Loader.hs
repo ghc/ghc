@@ -639,15 +639,7 @@ loadDecls interp hsc_env span linkable = do
         then throwGhcExceptionIO (ProgramError "")
         else do
           -- Link the expression itself
-          let le  = linker_env pls
-              le2 = le { itbl_env = foldl' (\acc cbc -> plusNameEnv acc (bc_itbls cbc)) (itbl_env le) cbcs
-                       , addr_env = foldl' (\acc cbc -> plusNameEnv acc (bc_strs cbc)) (addr_env le) cbcs }
-
-          -- Link the necessary packages and linkables
-          new_bindings <- linkSomeBCOs interp (pkgs_loaded pls) le2 cbcs
-          nms_fhvs <- makeForeignNamedHValueRefs interp new_bindings
-          let ce2  = extendClosureEnv (closure_env le2) nms_fhvs
-              !pls2 = pls { linker_env = le2 { closure_env = ce2 } }
+          (pls2, nms_fhvs) <- link_compiled_bytecodes interp isExternalName cbcs pls
           return (pls2, (nms_fhvs, links_needed, units_needed))
   where
     cbcs = linkableBCOs linkable
@@ -851,34 +843,41 @@ rmDupLinkables already ls
 
 dynLinkBCOs :: Interp -> LoaderState -> [Linkable] -> IO LoaderState
 dynLinkBCOs interp pls bcos = do
+    fst <$> link_compiled_bytecodes interp (const True) cbcs pls1
+  where
+    (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
+    pls1 = pls { bcos_loaded = bcos_loaded' }
 
-        let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
-            pls1                     = pls { bcos_loaded = bcos_loaded' }
+    parts :: [LinkablePart]
+    parts = concatMap (NE.toList . linkableParts) new_bcos
 
-            parts :: [LinkablePart]
-            parts = concatMap (NE.toList . linkableParts) new_bcos
+    cbcs = concatMap linkablePartAllBCOs parts
 
-            cbcs :: [CompiledByteCode]
-            cbcs = concatMap linkablePartAllBCOs parts
+link_compiled_bytecodes
+    :: Interp
+    -> (Name -> Bool)      -- ^ predicate determining which names to add to 'ClosureEnv'
+    -> [CompiledByteCode]  -- ^ bytecode to load
+    -> LoaderState
+    -> IO (LoaderState, [(Name, ForeignHValue)])
+link_compiled_bytecodes interp expose_pred cbcs pls = do
+    let le1 = linker_env pls
+        le2 = le1 { itbl_env = foldr plusNameEnv (itbl_env le1) (map bc_itbls cbcs)
+                  , addr_env = foldr plusNameEnv (addr_env le1) (map bc_strs cbcs)
+                  }
 
+    names_and_refs <- linkSomeBCOs interp (pkgs_loaded pls) le2 cbcs
 
-            le1 = linker_env pls
-            ie2 = foldr plusNameEnv (itbl_env le1) (map bc_itbls cbcs)
-            ae2 = foldr plusNameEnv (addr_env le1) (map bc_strs cbcs)
-            le2 = le1 { itbl_env = ie2, addr_env = ae2 }
+    -- We only want to add the external ones to the ClosureEnv
+    let (to_add, to_drop) = partition (expose_pred . fst) names_and_refs
 
-        names_and_refs <- linkSomeBCOs interp (pkgs_loaded pls) le2 cbcs
+    -- Immediately release any HValueRefs we're not going to add
+    freeHValueRefs interp (map snd to_drop)
 
-        -- We only want to add the external ones to the ClosureEnv
-        let (to_add, to_drop) = partition (isExternalName.fst) names_and_refs
+    -- Wrap finalizers on the ones we want to keep
+    new_binds <- makeForeignNamedHValueRefs interp to_add
 
-        -- Immediately release any HValueRefs we're not going to add
-        freeHValueRefs interp (map snd to_drop)
-        -- Wrap finalizers on the ones we want to keep
-        new_binds <- makeForeignNamedHValueRefs interp to_add
-
-        let ce2 = extendClosureEnv (closure_env le2) new_binds
-        return $! pls1 { linker_env = le2 { closure_env = ce2 } }
+    let !pls' = modifyClosureEnv pls (`extendClosureEnv` new_binds)
+    return (pls', new_binds)
 
 -- Link a bunch of BCOs and return references to their values
 linkSomeBCOs :: Interp
