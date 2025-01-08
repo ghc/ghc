@@ -95,6 +95,7 @@ GHC.Driver.Backpack.Syntax
 GHC.Driver.DynFlags
 GHC.Driver.Errors.Types
 GHC.Driver.Flags
+GHC.Driver.IncludeSpecs
 GHC.Driver.Phases
 GHC.Driver.Pipeline.Monad
 GHC.Driver.Plugins.External
@@ -117,6 +118,7 @@ GHC.HsToCore.Errors.Types
 GHC.HsToCore.Pmc.Solver.Types
 GHC.Iface.Errors.Types
 GHC.Iface.Ext.Fields
+GHC.Iface.Flags
 GHC.Iface.Recomp.Binary
 GHC.Iface.Syntax
 GHC.Iface.Type

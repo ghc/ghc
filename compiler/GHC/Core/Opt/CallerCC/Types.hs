@@ -19,6 +19,7 @@ import GHC.Types.Name hiding (varName)
 import GHC.Utils.Panic
 import qualified GHC.Utils.Binary as B
 import Data.Char
+import Control.DeepSeq
 
 import Language.Haskell.Syntax.Module.Name
 
@@ -32,6 +33,11 @@ instance Outputable NamePattern where
   ppr (PChar c rest) = char c <> ppr rest
   ppr (PWildcard rest) = char '*' <> ppr rest
   ppr PEnd = Outputable.empty
+
+instance NFData NamePattern where
+  rnf (PChar c n) = rnf c `seq` rnf n
+  rnf (PWildcard np) = rnf np
+  rnf PEnd = ()
 
 instance B.Binary NamePattern where
   get bh = do
@@ -75,6 +81,9 @@ data CallerCcFilter
     = CallerCcFilter { ccfModuleName  :: Maybe ModuleName
                      , ccfFuncName    :: NamePattern
                      }
+
+instance NFData CallerCcFilter where
+  rnf (CallerCcFilter mn n) = rnf mn `seq` rnf n
 
 instance Outputable CallerCcFilter where
   ppr ccf =

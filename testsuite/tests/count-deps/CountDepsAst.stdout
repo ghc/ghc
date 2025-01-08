@@ -91,6 +91,7 @@ GHC.Driver.Backend
 GHC.Driver.Backend.Internal
 GHC.Driver.DynFlags
 GHC.Driver.Flags
+GHC.Driver.IncludeSpecs
 GHC.Driver.Phases
 GHC.Driver.Pipeline.Monad
 GHC.Driver.Plugins.External
@@ -111,6 +112,7 @@ GHC.Hs.Type
 GHC.Hs.Utils
 GHC.Iface.Errors.Types
 GHC.Iface.Ext.Fields
+GHC.Iface.Flags
 GHC.Iface.Recomp.Binary
 GHC.Iface.Syntax
 GHC.Iface.Type
