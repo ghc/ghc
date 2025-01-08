@@ -19,10 +19,13 @@ import GHC.Types.Name
 import GHC.Types.SafeHaskell
 import GHC.Utils.Fingerprint
 import GHC.Iface.Recomp.Binary
-import GHC.Core.Opt.CallerCC () -- for Binary instances
+import GHC.Iface.Flags
 
 import GHC.Data.EnumSet as EnumSet
 import System.FilePath (normalise)
+import Data.Maybe
+
+-- The subset of DynFlags which is used by the recompilation checker.
 
 -- | Produce a fingerprint of a @DynFlags@ value. We only base
 -- the finger print on important fields in @DynFlags@ so that
@@ -32,7 +35,7 @@ import System.FilePath (normalise)
 -- file, not the actual 'Module' according to our 'DynFlags'.
 fingerprintDynFlags :: HscEnv -> Module
                     -> (WriteBinHandle -> Name -> IO ())
-                    -> IO Fingerprint
+                    -> IO (Fingerprint, IfaceDynFlags)
 
 fingerprintDynFlags hsc_env this_mod nameio =
     let dflags@DynFlags{..} = hsc_dflags hsc_env
@@ -43,53 +46,61 @@ fingerprintDynFlags hsc_env this_mod nameio =
         -- oflags   = sort $ filter filterOFlags $ flags dflags
 
         -- all the extension flags and the language
-        lang = (fmap fromEnum language,
-                map fromEnum $ EnumSet.toList extensionFlags)
+        lang = fmap IfaceLanguage language
+        exts = map IfaceExtension $ EnumSet.toList extensionFlags
 
         -- avoid fingerprinting the absolute path to the directory of the source file
         -- see Note [Implicit include paths]
         includePathsMinusImplicit = includePaths { includePathsQuoteImplicit = [] }
 
         -- -I, -D and -U flags affect Haskell C/CPP Preprocessor
-        cpp = ( map normalise $ flattenIncludes includePathsMinusImplicit
-            -- normalise: eliminate spurious differences due to "./foo" vs "foo"
-              , picPOpts dflags
-              , opt_P_signature dflags)
+        cpp = IfaceCppOptions
+                { ifaceCppIncludes = map normalise $ flattenIncludes includePathsMinusImplicit
+                -- normalise: eliminate spurious differences due to "./foo" vs "foo"
+                , ifaceCppOpts = picPOpts dflags
+                , ifaceCppSig =  opt_P_signature dflags
+                }
             -- See Note [Repeated -optP hashing]
 
+
         -- -I, -D and -U flags affect JavaScript C/CPP Preprocessor
-        js = ( map normalise $ flattenIncludes includePathsMinusImplicit
+        js = IfaceCppOptions
+              { ifaceCppIncludes =  map normalise $ flattenIncludes includePathsMinusImplicit
             -- normalise: eliminate spurious differences due to "./foo" vs "foo"
-              , picPOpts dflags
-              , opt_JSP_signature dflags)
+              , ifaceCppOpts = picPOpts dflags
+              , ifaceCppSig = opt_JSP_signature dflags
+              }
             -- See Note [Repeated -optP hashing]
 
         -- -I, -D and -U flags affect C-- CPP Preprocessor
-        cmm = ( map normalise $ flattenIncludes includePathsMinusImplicit
+        cmm = IfaceCppOptions {
+              ifaceCppIncludes =  map normalise $ flattenIncludes includePathsMinusImplicit
             -- normalise: eliminate spurious differences due to "./foo" vs "foo"
-              , picPOpts dflags
-              , opt_CmmP_signature dflags)
+              , ifaceCppOpts = picPOpts dflags
+              , ifaceCppSig = ([], opt_CmmP_signature dflags)
+              }
 
         -- Note [path flags and recompilation]
         paths = [ hcSuf ]
 
         -- -fprof-auto etc.
-        prof = if sccProfilingEnabled dflags then fromEnum profAuto else 0
+        prof = if sccProfilingEnabled dflags then Just (IfaceProfAuto profAuto) else Nothing
 
         -- Ticky
         ticky =
-          map (`gopt` dflags) [Opt_Ticky, Opt_Ticky_Allocd, Opt_Ticky_LNE, Opt_Ticky_Dyn_Thunk, Opt_Ticky_Tag]
+          mapMaybe (\f -> (if f `gopt` dflags then Just (IfaceGeneralFlag f) else Nothing)) [Opt_Ticky, Opt_Ticky_Allocd, Opt_Ticky_LNE, Opt_Ticky_Dyn_Thunk, Opt_Ticky_Tag]
 
         -- Other flags which affect code generation
-        codegen = map (`gopt` dflags) (EnumSet.toList codeGenFlags)
+        codegen = mapMaybe (\f -> (if f `gopt` dflags then Just (IfaceGeneralFlag f) else Nothing)) (EnumSet.toList codeGenFlags)
 
         -- Did we include core for all bindings?
         fat_iface = gopt Opt_WriteIfSimplifiedCore dflags
 
-        flags = ((mainis, safeHs, lang, cpp, js, cmm), (paths, prof, ticky, codegen, debugLevel, callerCcFilters, fat_iface))
+        f = IfaceDynFlags mainis safeHs lang exts cpp js cmm paths prof ticky codegen fat_iface debugLevel callerCcFilters
 
-    in -- pprTrace "flags" (ppr flags) $
-       computeFingerprint nameio flags
+    in do
+      fp <- computeFingerprint nameio f
+      return (fp, f)
 
 -- Fingerprint the optimisation info. We keep this separate from the rest of
 -- the flags because GHCi users (especially) may wish to ignore changes in

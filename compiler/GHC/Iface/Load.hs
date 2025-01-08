@@ -56,6 +56,7 @@ import GHC.Driver.Plugins
 import GHC.Iface.Warnings
 import GHC.Iface.Syntax
 import GHC.Iface.Ext.Fields
+import GHC.Iface.Flags
 import GHC.Iface.Binary
 import GHC.Iface.Rename
 import GHC.Iface.Env
@@ -1130,7 +1131,7 @@ pprModIface unit_state iface
         , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash exts))
         , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash exts))
         , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash exts))
-        , nest 2 (text "flag hash:" <+> ppr (mi_flag_hash exts))
+        , nest 2 (text "flag hash:" <+> pprIfaceDynFlags (mi_flags exts))
         , nest 2 (text "opt_hash:" <+> ppr (mi_opt_hash exts))
         , nest 2 (text "hpc_hash:" <+> ppr (mi_hpc_hash exts))
         , nest 2 (text "plugin_hash:" <+> ppr (mi_plugin_hash exts))
@@ -1166,6 +1167,7 @@ pprModIface unit_state iface
     pp_hsc_src HsBootFile = text "[boot]"
     pp_hsc_src HsigFile   = text "[hsig]"
     pp_hsc_src HsSrcFile  = Outputable.empty
+
 
 {-
 When printing export lists, we print like this:

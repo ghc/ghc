@@ -99,12 +99,14 @@ import GHC.Prelude
 import GHC.Hs
 
 import GHC.Iface.Syntax
+import GHC.Iface.Flags
 import GHC.Iface.Ext.Fields
 
 import GHC.Unit
 import GHC.Unit.Module.Deps
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.WholeCoreBindings (IfaceForeign (..), emptyIfaceForeign)
+
 
 import GHC.Types.Avail
 import GHC.Types.Fixity
@@ -122,6 +124,7 @@ import qualified GHC.Data.Strict as Strict
 
 import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
+import GHC.Utils.Panic
 
 import Control.DeepSeq
 import Control.Exception
@@ -155,9 +158,8 @@ data ModIfaceBackend = ModIfaceBackend
     -- ^ Hash of the whole interface
   , mi_mod_hash :: !Fingerprint
     -- ^ Hash of the ABI only
-  , mi_flag_hash :: !Fingerprint
-    -- ^ Hash of the important flags used when compiling the module, excluding
-    -- optimisation flags
+  , mi_flags :: !(Fingerprint, IfaceDynFlags)
+    -- ^ The important flags used when compiling the module, excluding optimisation flags
   , mi_opt_hash :: !Fingerprint
     -- ^ Hash of optimisation flags
   , mi_hpc_hash :: !Fingerprint
@@ -486,7 +488,7 @@ instance Binary ModIface where
                  mi_final_exts_ = ModIfaceBackend {
                    mi_iface_hash = iface_hash,
                    mi_mod_hash = mod_hash,
-                   mi_flag_hash = flag_hash,
+                   mi_flags = flag_hash,
                    mi_opt_hash = opt_hash,
                    mi_hpc_hash = hpc_hash,
                    mi_plugin_hash = plugin_hash,
@@ -598,7 +600,7 @@ instance Binary ModIface where
                  mi_final_exts_ = ModIfaceBackend {
                    mi_iface_hash = iface_hash,
                    mi_mod_hash = mod_hash,
-                   mi_flag_hash = flag_hash,
+                   mi_flags = flag_hash,
                    mi_opt_hash = opt_hash,
                    mi_hpc_hash = hpc_hash,
                    mi_plugin_hash = plugin_hash,
@@ -611,6 +613,7 @@ instance Binary ModIface where
                    mi_fix_fn = mkIfaceFixCache fixities,
                    mi_hash_fn = mkIfaceHashCache decls
                  }})
+
 
 
 -- | The original names declared of a certain module that are exported
@@ -656,7 +659,7 @@ emptyFullModIface mod =
       , mi_final_exts_ = ModIfaceBackend
         { mi_iface_hash = fingerprint0,
           mi_mod_hash = fingerprint0,
-          mi_flag_hash = fingerprint0,
+          mi_flags = (fingerprint0, panic "emptyFullModIface: unititialised"),
           mi_opt_hash = fingerprint0,
           mi_hpc_hash = fingerprint0,
           mi_plugin_hash = fingerprint0,
@@ -725,13 +728,13 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq` ()
 
 instance NFData (ModIfaceBackend) where
-  rnf (ModIfaceBackend{ mi_iface_hash, mi_mod_hash, mi_flag_hash, mi_opt_hash
+  rnf (ModIfaceBackend{ mi_iface_hash, mi_mod_hash, mi_flags, mi_opt_hash
                       , mi_hpc_hash, mi_plugin_hash, mi_orphan, mi_finsts, mi_exp_hash
                       , mi_orphan_hash, mi_decl_warn_fn, mi_export_warn_fn, mi_fix_fn
                       , mi_hash_fn})
     =     rnf mi_iface_hash
     `seq` rnf mi_mod_hash
-    `seq` rnf mi_flag_hash
+    `seq` rnf mi_flags
     `seq` rnf mi_opt_hash
     `seq` rnf mi_hpc_hash
     `seq` rnf mi_plugin_hash

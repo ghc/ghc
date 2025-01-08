@@ -14,6 +14,7 @@ import GHC.Prelude
 
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
+import Control.DeepSeq
 
 import Data.Word
 
@@ -31,6 +32,15 @@ data SafeHaskellMode
    | Sf_Ignore        -- ^ @-fno-safe-haskell@ state
    deriving (Eq)
 
+instance NFData SafeHaskellMode where
+  rnf x = case x of
+            Sf_None -> ()
+            Sf_Unsafe -> ()
+            Sf_Trustworthy -> ()
+            Sf_Safe -> ()
+            Sf_SafeInferred -> ()
+            Sf_Ignore -> ()
+
 instance Show SafeHaskellMode where
     show Sf_None         = "None"
     show Sf_Unsafe       = "Unsafe"
@@ -45,6 +55,10 @@ instance Outputable SafeHaskellMode where
 -- | Safe Haskell information for 'ModIface'
 -- Simply a wrapper around SafeHaskellMode to separate iface and flags
 newtype IfaceTrustInfo = TrustInfo SafeHaskellMode
+
+instance NFData IfaceTrustInfo where
+  rnf (TrustInfo shm) = rnf shm
+
 
 getSafeMode :: IfaceTrustInfo -> SafeHaskellMode
 getSafeMode (TrustInfo x) = x
