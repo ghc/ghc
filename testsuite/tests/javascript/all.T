@@ -25,3 +25,5 @@ test('T24495', normal, makefile_test, ['T24495'])
 
 test('T23479', normal, makefile_test, ['T23479'])
 test('T24744', normal, makefile_test, ['T24744'])
+
+test('T25633', normal, compile_and_run, [''])

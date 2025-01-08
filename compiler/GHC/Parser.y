@@ -2148,6 +2148,9 @@ fspec :: { Located (TokDcolon
        : STRING var '::' sigtype        { sLL $1 $> (epUniTok $3
                                              ,(L (getLoc $1)
                                                     (getStringLiteral $1), $2, $4)) }
+       | STRING_MULTI var '::' sigtype  { sLL $1 $> (epUniTok $3
+                                             ,(L (getLoc $1)
+                                                    (getStringMultiLiteral $1), $2, $4)) }
        |        var '::' sigtype        { sLL $1 $> (epUniTok $2
                                              ,(noLoc (StringLiteral NoSourceText nilFS Nothing), $1, $3)) }
          -- if the entity string is missing, it defaults to the empty string;
@@ -4247,6 +4250,7 @@ getINCOHERENT_PRAGs   (L _ (ITincoherent_prag   src)) = src
 getCTYPEs             (L _ (ITctype             src)) = src
 
 getStringLiteral l = StringLiteral (getSTRINGs l) (getSTRING l) Nothing
+getStringMultiLiteral l = StringLiteral (getSTRINGMULTIs l) (getSTRINGMULTI l) Nothing
 
 isUnicode :: Located Token -> Bool
 isUnicode (L _ (ITforall         iu)) = iu == UnicodeSyntax

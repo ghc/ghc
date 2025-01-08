@@ -38,6 +38,8 @@ Language
 
   That will break the combination of :extension:`OverloadedRecordUpdate` with :extension:`RebindableSyntax`.
 
+* Multiline strings are now accepted in foreign imports. (#25157)
+
 Compiler
 ~~~~~~~~
 
