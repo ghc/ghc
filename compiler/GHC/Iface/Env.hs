@@ -15,7 +15,7 @@ module GHC.Iface.Env (
 
         ifaceExportNames,
 
-        trace_if, trace_hi_diffs,
+        trace_if, trace_hi_diffs, trace_hi_diffs_io,
 
         -- Name-cache stuff
         allocateGlobalBinder,
@@ -270,6 +270,12 @@ trace_if :: Logger -> SDoc -> IO ()
 {-# INLINE trace_if #-} -- see Note [INLINE conditional tracing utilities]
 trace_if logger doc = when (logHasDumpFlag logger Opt_D_dump_if_trace) $ putMsg logger doc
 
+trace_hi_diffs_io :: Logger -> IO SDoc -> IO ()
+{-# INLINE trace_hi_diffs_io #-} -- see Note [INLINE conditional tracing utilities]
+trace_hi_diffs_io logger doc =
+  when (logHasDumpFlag logger Opt_D_dump_hi_diffs) $
+    doc >>= putMsg logger
+
 trace_hi_diffs :: Logger -> SDoc -> IO ()
 {-# INLINE trace_hi_diffs #-} -- see Note [INLINE conditional tracing utilities]
-trace_hi_diffs logger doc = when (logHasDumpFlag logger Opt_D_dump_hi_diffs) $ putMsg logger doc
+trace_hi_diffs logger doc = trace_hi_diffs_io logger (pure doc)

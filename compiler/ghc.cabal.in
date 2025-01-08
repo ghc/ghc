@@ -511,6 +511,7 @@ Library
         GHC.Driver.Config.Tidy
         GHC.Driver.Config.StgToJS
         GHC.Driver.DynFlags
+        GHC.Driver.IncludeSpecs
         GHC.Driver.Env
         GHC.Driver.Env.KnotVars
         GHC.Driver.Env.Types
@@ -608,6 +609,7 @@ Library
         GHC.Iface.Recomp.Flags
         GHC.Iface.Rename
         GHC.Iface.Syntax
+        GHC.Iface.Flags
         GHC.Iface.Tidy
         GHC.Iface.Tidy.StaticPtrTable
         GHC.Iface.Warnings

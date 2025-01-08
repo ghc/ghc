@@ -103,6 +103,7 @@ import GHC.Prelude
 import GHC.Hs
 
 import GHC.Iface.Syntax
+import GHC.Iface.Flags
 import GHC.Iface.Ext.Fields
 
 import GHC.Unit
@@ -395,7 +396,7 @@ That's why in GHC.Driver.Main.hscMaybeWriteIface there is the call to
 forceModIface.
 -}
 
-mi_flag_hash :: ModIface_ phase -> Maybe Fingerprint
+mi_flag_hash :: ModIface_ phase -> Maybe (Fingerprint, IfaceDynFlags)
 mi_flag_hash = fmap mi_sr_flag_hash . mi_self_recomp_info_
 
 mi_opt_hash :: ModIface_ phase -> Maybe Fingerprint
@@ -611,7 +612,6 @@ instance Binary ModIface where
                    mi_fix_fn = mkIfaceFixCache fixities,
                    mi_hash_fn = mkIfaceHashCache decls
                  }})
-
 
 
 emptyPartialModIface :: Module -> PartialModIface

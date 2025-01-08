@@ -30,6 +30,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Plugins
 
 import GHC.Iface.Syntax
+import GHC.Iface.Flags
 import GHC.Iface.Recomp.Binary
 import GHC.Iface.Load
 import GHC.Iface.Recomp.Flags
@@ -70,6 +71,8 @@ import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.Deps
 
 import Control.Monad
+import Control.Monad.Trans.State
+import Control.Monad.Trans.Class
 import Data.List (sortBy, sort, sortOn)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -189,6 +192,7 @@ data RecompReason
   | FileChanged FilePath
   | CustomReason String
   | FlagsChanged
+  | LinkFlagsChanged
   | OptimFlagsChanged
   | HpcFlagsChanged
   | MissingBytecode
@@ -200,6 +204,7 @@ data RecompReason
   | LibraryChanged
   | THWithJS
   deriving (Eq)
+
 
 instance Outputable RecompReason where
   ppr = \case
@@ -223,6 +228,7 @@ instance Outputable RecompReason where
     FileChanged fp           -> text fp <+> text "changed"
     CustomReason s           -> text s
     FlagsChanged             -> text "Flags changed"
+    LinkFlagsChanged         -> text "Flags changed"
     OptimFlagsChanged        -> text "Optimisation flags changed"
     HpcFlagsChanged          -> text "HPC flags changed"
     MissingBytecode          -> text "Missing bytecode"
@@ -524,13 +530,43 @@ checkHie dflags mod_summary =
 checkFlagHash :: HscEnv -> Module -> ModIfaceSelfRecomp -> IO RecompileRequired
 checkFlagHash hsc_env iface_mod self_recomp = do
     let logger   = hsc_logger hsc_env
-    let old_hash = mi_sr_flag_hash self_recomp
-    new_hash <- fingerprintDynFlags hsc_env iface_mod putNameLiterally
-    case old_hash == new_hash of
-        True  -> up_to_date logger (text "Module flags unchanged")
-        False -> out_of_date_hash logger FlagsChanged
-                     (text "  Module flags have changed")
-                     old_hash new_hash
+    let (old_fp, old_flags) = mi_sr_flag_hash self_recomp
+    (new_fp, new_flags) <- fingerprintDynFlags hsc_env iface_mod putNameLiterally
+    if old_fp == new_fp
+      then up_to_date logger (text "Module flags unchanged")
+      else do
+        -- Do not perform this computation unless -ddump-hi-diffs is on
+        let diffs = checkIfaceFlags old_flags new_flags
+        out_of_date logger FlagsChanged (fmap vcat diffs)
+
+checkIfaceFlags :: IfaceDynFlags -> IfaceDynFlags -> IO [SDoc]
+checkIfaceFlags (IfaceDynFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14)
+                (IfaceDynFlags b1 b2 b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14) =
+  flip execStateT [] $ do
+    check_one "main is" (ppr . fmap (fmap (text @SDoc))) a1 b1
+    check_one_simple "safemode" a2 b2
+    check_one_simple "lang"  a3 b3
+    check_one_simple "exts" a4 b4
+    check_one_simple "cpp option" a5 b5
+    check_one_simple "js option" a6 b6
+    check_one_simple "cmm option" a7 b7
+    check_one "paths" (ppr . map (text @SDoc)) a8 b8
+    check_one_simple "prof" a9 b9
+    check_one_simple "ticky" a10 b10
+    check_one_simple "codegen" a11 b11
+    check_one_simple "fat iface" a12 b12
+    check_one_simple "debug level" a13 b13
+    check_one_simple "caller cc filter" a14 b14
+  where
+    diffSimple p a b = vcat [text "before:" <+> p a
+                           , text "after:" <+> p b ]
+
+    check_one_simple s a b = check_one s ppr a b
+
+    check_one s p a b = do
+      a' <- lift $ computeFingerprint putNameLiterally a
+      b' <- lift $ computeFingerprint putNameLiterally b
+      if a' == b' then pure () else modify (([ text s <+> text "flags changed"] ++ [diffSimple p a b]) ++)
 
 -- | Check the optimisation flags haven't changed
 checkOptimHash :: HscEnv -> ModIfaceSelfRecomp -> IO RecompileRequired
@@ -828,7 +864,7 @@ checkEntityUsage :: Logger
 checkEntityUsage logger reason new_hash (name,old_hash) = do
   case new_hash name of
     -- We used it before, but it ain't there now
-    Nothing       -> out_of_date logger reason (sep [text "No longer exported:", ppr name])
+    Nothing       -> out_of_date logger reason (pure $ sep [text "No longer exported:", ppr name])
     -- It's there, but is it up to date?
     Just (_, new_hash)
       | new_hash == old_hash
@@ -840,12 +876,12 @@ checkEntityUsage logger reason new_hash (name,old_hash) = do
 up_to_date :: Logger -> SDoc -> IO RecompileRequired
 up_to_date logger msg = trace_hi_diffs logger msg >> return UpToDate
 
-out_of_date :: Logger -> RecompReason -> SDoc -> IO RecompileRequired
-out_of_date logger reason msg = trace_hi_diffs logger msg >> return (needsRecompileBecause reason)
+out_of_date :: Logger -> RecompReason -> IO SDoc -> IO RecompileRequired
+out_of_date logger reason msg = trace_hi_diffs_io logger msg >> return (needsRecompileBecause reason)
 
 out_of_date_hash :: Logger -> RecompReason -> SDoc -> Fingerprint -> Fingerprint -> IO RecompileRequired
 out_of_date_hash logger reason msg old_hash new_hash
-  = out_of_date logger reason (hsep [msg, ppr old_hash, text "->", ppr new_hash])
+  = out_of_date logger reason (pure $ hsep [msg, ppr old_hash, text "->", ppr new_hash])
 
 -- ---------------------------------------------------------------------------
 -- Compute fingerprints for the interface
