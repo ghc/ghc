@@ -2,7 +2,7 @@ HADRIAN_SETTINGS_STAGE0 := $(shell ghc --info | runghc GenSettings.hs ghc-boot)
 HADRIAN_SETTINGS_STAGE1 := $(shell ghc --info | runghc GenSettings.hs ghc-boot)
 SETTINGS_STAGE1 := $(shell ghc --info | runghc GenSettings.hs stage1)
 
-CABAL := /home/hsyl20/repo/cabal/dist-newstyle/build/x86_64-linux/ghc-9.8.2/cabal-install-3.15.0.0/x/cabal/build/cabal/cabal
+CABAL := /home/hsyl20/projects/cabal/dist-newstyle/build/x86_64-linux/ghc-9.10.1/cabal-install-3.15.0.0/x/cabal/build/cabal/cabal
 # CABAL := cabal
 
 all: _build/stage1/bin/ghc
@@ -14,6 +14,13 @@ _build/stage0/bin/ghc:
 	cp -rf ./compiler    _build/stage0/src/libraries/ghc
 	cp -rf ./ghc   	     _build/stage0/src/ghc-bin
 	cp -rf ./utils       _build/stage0/src/
+
+	cp -f rts/include/rts/Bytecodes.h            _build/stage0/src/libraries/ghc/
+	cp -f rts/include/rts/storage/ClosureTypes.h _build/stage0/src/libraries/ghc/
+	cp -f rts/include/rts/storage/FunTypes.h     _build/stage0/src/libraries/ghc/
+	cp -f rts/include/stg/MachRegs.h             _build/stage0/src/libraries/ghc/
+	mkdir -p _build/stage0/src/libraries/ghc/MachRegs
+	cp -f rts/include/stg/MachRegs/*.h           _build/stage0/src/libraries/ghc/MachRegs/
 	
 	## Substituting variables
 	cp _build/stage0/src/ghc-bin/ghc-bin.cabal{.in,}
@@ -89,6 +96,13 @@ _build/stage1/bin/ghc: _build/stage0/bin/ghc
 	cp -rf ./ghc   	      _build/stage1/src/ghc-bin
 	cp -rf ./config.sub   _build/stage1/src/libraries/rts/
 	cp -rf ./config.guess _build/stage1/src/libraries/rts/
+
+	cp -f rts/include/rts/Bytecodes.h            _build/stage1/src/libraries/ghc/
+	cp -f rts/include/rts/storage/ClosureTypes.h _build/stage1/src/libraries/ghc/
+	cp -f rts/include/rts/storage/FunTypes.h     _build/stage1/src/libraries/ghc/
+	cp -f rts/include/stg/MachRegs.h             _build/stage1/src/libraries/ghc/
+	mkdir -p _build/stage1/src/libraries/ghc/MachRegs
+	cp -f rts/include/stg/MachRegs/*.h           _build/stage1/src/libraries/ghc/MachRegs/
 	
 	python rts/gen_event_types.py --event-types-defines _build/stage1/src/libraries/rts/include/rts/EventLogConstants.h
 	python rts/gen_event_types.py --event-types-array   _build/stage1/src/libraries/rts/include/rts/EventTypes.h
