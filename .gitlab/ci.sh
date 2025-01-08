@@ -7,7 +7,8 @@
 set -Eeuo pipefail
 
 # Configuration:
-HACKAGE_INDEX_STATE="2020-12-21T14:48:20Z"
+# N.B. You may want to also update the index-state in hadrian/cabal.project.
+HACKAGE_INDEX_STATE="2025-01-08T09:21:31Z"
 HAPPY_CONSTRAINT=">=1.20&&<1.21"
 MIN_ALEX_VERSION="3.2.6"
 
