@@ -214,6 +214,7 @@ platformNcgSupported platform = if
          ArchAArch64   -> True
          ArchWasm32    -> True
          ArchRISCV64   -> True
+         ArchLoongArch64 -> True
          _             -> False
 
 -- | Is the platform supported by the JS backend?

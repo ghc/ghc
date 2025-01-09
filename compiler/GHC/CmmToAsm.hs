@@ -68,6 +68,7 @@ import qualified GHC.CmmToAsm.PPC   as PPC
 import qualified GHC.CmmToAsm.AArch64 as AArch64
 import qualified GHC.CmmToAsm.Wasm as Wasm32
 import qualified GHC.CmmToAsm.RV64  as RV64
+import qualified GHC.CmmToAsm.LA64 as LA64
 
 import GHC.CmmToAsm.Reg.Liveness
 import qualified GHC.CmmToAsm.Reg.Linear                as Linear
@@ -151,7 +152,7 @@ nativeCodeGen logger ts config modLoc h cmms
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
       ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
       ArchRISCV64   -> nCG' (RV64.ncgRV64 config)
-      ArchLoongArch64->panic "nativeCodeGen: No NCG for LoongArch64"
+      ArchLoongArch64 -> nCG' (LA64.ncgLA64 config)
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
       ArchWasm32    -> Wasm32.ncgWasm config logger platform ts modLoc h cmms

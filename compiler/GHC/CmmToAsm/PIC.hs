@@ -137,6 +137,11 @@ cmmMakeDynamicReference config referenceKind lbl
               addImport symbolPtr
               return $ cmmMakePicReference config symbolPtr
 
+        AccessViaSymbolPtr | ArchLoongArch64 <- platformArch platform -> do
+              let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
+              addImport symbolPtr
+              return $ cmmMakePicReference config symbolPtr
+
         AccessViaSymbolPtr -> do
               let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
               addImport symbolPtr
@@ -176,6 +181,9 @@ cmmMakePicReference config lbl
 
   -- as on AArch64, there's no pic base register.
   | ArchRISCV64 <- platformArch platform
+  = CmmLit $ CmmLabel lbl
+
+  | ArchLoongArch64 <- platformArch platform
   = CmmLit $ CmmLabel lbl
 
   | OSAIX <- platformOS platform

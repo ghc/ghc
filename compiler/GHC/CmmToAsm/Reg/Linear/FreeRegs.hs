@@ -34,11 +34,13 @@ import qualified GHC.CmmToAsm.Reg.Linear.X86     as X86
 import qualified GHC.CmmToAsm.Reg.Linear.X86_64  as X86_64
 import qualified GHC.CmmToAsm.Reg.Linear.AArch64 as AArch64
 import qualified GHC.CmmToAsm.Reg.Linear.RV64    as RV64
+import qualified GHC.CmmToAsm.Reg.Linear.LA64    as LA64
 
 import qualified GHC.CmmToAsm.PPC.Instr     as PPC.Instr
 import qualified GHC.CmmToAsm.X86.Instr     as X86.Instr
 import qualified GHC.CmmToAsm.AArch64.Instr as AArch64.Instr
 import qualified GHC.CmmToAsm.RV64.Instr    as RV64.Instr
+import qualified GHC.CmmToAsm.LA64.Instr    as LA64.Instr
 
 class Show freeRegs => FR freeRegs where
     frAllocateReg :: Platform -> RealReg -> freeRegs -> freeRegs
@@ -76,6 +78,12 @@ instance FR RV64.FreeRegs where
     frInitFreeRegs = RV64.initFreeRegs
     frReleaseReg = const RV64.releaseReg
 
+instance FR LA64.FreeRegs where
+    frAllocateReg = \_ -> LA64.allocateReg
+    frGetFreeRegs = \_ -> LA64.getFreeRegs
+    frInitFreeRegs = LA64.initFreeRegs
+    frReleaseReg = \_ -> LA64.releaseReg
+
 allFreeRegs :: FR freeRegs => Platform -> freeRegs -> [RealReg]
 allFreeRegs plat fr = foldMap (\rcls -> frGetFreeRegs plat rcls fr) allRegClasses
   where
@@ -98,7 +106,7 @@ maxSpillSlots config = case platformArch (ncgPlatform config) of
    ArchMipseb    -> panic "maxSpillSlots ArchMipseb"
    ArchMipsel    -> panic "maxSpillSlots ArchMipsel"
    ArchRISCV64   -> RV64.Instr.maxSpillSlots config
-   ArchLoongArch64->panic "maxSpillSlots ArchLoongArch64"
+   ArchLoongArch64  -> LA64.Instr.maxSpillSlots config
    ArchJavaScript-> panic "maxSpillSlots ArchJavaScript"
    ArchWasm32    -> panic "maxSpillSlots ArchWasm32"
    ArchUnknown   -> panic "maxSpillSlots ArchUnknown"

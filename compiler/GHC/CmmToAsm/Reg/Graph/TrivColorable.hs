@@ -148,7 +148,10 @@ allocatableRegs arch rc =
       Separate.RcInteger -> 14
       Separate.RcFloat   -> 20
       Separate.RcVector  -> 20
-    ArchLoongArch64->panic "trivColorable ArchLoongArch64"
+    ArchLoongArch64   -> case rc of
+      Separate.RcInteger -> 16
+      Separate.RcFloat   -> 24
+      Separate.RcVector  -> 24
     ArchJavaScript-> panic "trivColorable ArchJavaScript"
     ArchWasm32    -> panic "trivColorable ArchWasm32"
     ArchUnknown   -> panic "trivColorable ArchUnknown"

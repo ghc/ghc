@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module GHC.Platform.LoongArch64 where
+module GHC.Platform.LA64 where
 
 import GHC.Prelude
 

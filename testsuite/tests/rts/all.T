@@ -71,6 +71,8 @@ test('divbyzero',
       # Apparently the output can be different on different
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
+      when(arch('loongarch64'), skip),
+      # LoongArch64 has no exception for this, too.
       when(opsys('linux'), ignore_stderr),
       # On OpenBSD the output varies depending on ulimit, exit code is enough.
       when(opsys('openbsd'), ignore_stderr),

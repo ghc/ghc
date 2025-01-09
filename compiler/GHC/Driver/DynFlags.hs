@@ -1295,6 +1295,7 @@ default_PIC platform =
                                          -- always generate PIC. See
                                          -- #10597 for more
                                          -- information.
+    (OSLinux,   ArchLoongArch64) -> [Opt_PIC, Opt_ExternalDynamicRefs]
     _                      -> []
 
 -- | The language extensions implied by the various language variants.

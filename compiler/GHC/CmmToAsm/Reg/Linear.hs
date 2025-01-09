@@ -111,6 +111,7 @@ import qualified GHC.CmmToAsm.Reg.Linear.X86     as X86
 import qualified GHC.CmmToAsm.Reg.Linear.X86_64  as X86_64
 import qualified GHC.CmmToAsm.Reg.Linear.AArch64 as AArch64
 import qualified GHC.CmmToAsm.Reg.Linear.RV64    as RV64
+import qualified GHC.CmmToAsm.Reg.Linear.LA64    as LA64
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Reg.Utils
@@ -225,7 +226,7 @@ linearRegAlloc config entry_ids block_live sccs
       ArchMipseb     -> panic "linearRegAlloc ArchMipseb"
       ArchMipsel     -> panic "linearRegAlloc ArchMipsel"
       ArchRISCV64    -> go (frInitFreeRegs platform :: RV64.FreeRegs)
-      ArchLoongArch64-> panic "linearRegAlloc ArchLoongArch64"
+      ArchLoongArch64 -> go $ (frInitFreeRegs platform :: LA64.FreeRegs)
       ArchJavaScript -> panic "linearRegAlloc ArchJavaScript"
       ArchWasm32     -> panic "linearRegAlloc ArchWasm32"
       ArchUnknown    -> panic "linearRegAlloc ArchUnknown"

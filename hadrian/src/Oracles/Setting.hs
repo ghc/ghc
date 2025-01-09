@@ -200,7 +200,6 @@ targetSupportsRPaths :: Action Bool
 targetSupportsRPaths = queryTargetTarget (\t -> let os = archOS_OS (tgtArchOs t)
                                              in osElfTarget os || osMachOTarget os)
 
-
 -- | Which variant of the ARM architecture is the target (or 'Nothing' if not
 -- ARM)?
 targetArmVersion :: Action (Maybe ArmISA)

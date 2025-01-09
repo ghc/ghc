@@ -283,6 +283,13 @@ Library
         GHC.CmmToAsm.Dwarf.Types
         GHC.CmmToAsm.Format
         GHC.CmmToAsm.Instr
+        GHC.CmmToAsm.LA64
+        GHC.CmmToAsm.LA64.CodeGen
+        GHC.CmmToAsm.LA64.Cond
+        GHC.CmmToAsm.LA64.Instr
+        GHC.CmmToAsm.LA64.Ppr
+        GHC.CmmToAsm.LA64.RegInfo
+        GHC.CmmToAsm.LA64.Regs
         GHC.CmmToAsm.Monad
         GHC.CmmToAsm.PIC
         GHC.CmmToAsm.PPC
@@ -307,6 +314,7 @@ Library
         GHC.CmmToAsm.Reg.Linear.Base
         GHC.CmmToAsm.Reg.Linear.FreeRegs
         GHC.CmmToAsm.Reg.Linear.JoinToTargets
+        GHC.CmmToAsm.Reg.Linear.LA64
         GHC.CmmToAsm.Reg.Linear.PPC
         GHC.CmmToAsm.Reg.Linear.RV64
         GHC.CmmToAsm.Reg.Linear.StackMap
@@ -667,7 +675,7 @@ Library
         GHC.Platform.ARM
         GHC.Platform.AArch64
         GHC.Platform.Constants
-        GHC.Platform.LoongArch64
+        GHC.Platform.LA64
         GHC.Platform.NoRegs
         GHC.Platform.PPC
         GHC.Platform.Profile

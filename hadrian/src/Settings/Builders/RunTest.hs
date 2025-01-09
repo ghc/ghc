@@ -119,7 +119,7 @@ inTreeCompilerArgs stg = do
 
     os          <- queryHostTarget queryOS
     arch        <- queryTargetTarget queryArch
-    let codegen_arches = ["x86_64", "i386", "powerpc", "powerpc64", "powerpc64le", "aarch64", "wasm32", "riscv64"]
+    let codegen_arches = ["x86_64", "i386", "powerpc", "powerpc64", "powerpc64le", "aarch64", "wasm32", "riscv64", "loongarch64"]
     let withNativeCodeGen
           | unregisterised = False
           | arch `elem` codegen_arches = True

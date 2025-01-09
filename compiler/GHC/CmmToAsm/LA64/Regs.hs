@@ -1,0 +1,155 @@
+module GHC.CmmToAsm.LA64.Regs where
+
+import GHC.Prelude
+import GHC.Cmm
+import GHC.Cmm.CLabel           ( CLabel )
+import GHC.CmmToAsm.Format
+import GHC.Data.FastString
+import GHC.Platform
+import GHC.Platform.Reg
+import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Separate
+import GHC.Platform.Regs
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Types.Unique
+
+-- All machine register numbers.
+allMachRegNos :: [RegNo]
+allMachRegNos = [0..31] ++ [32..63]
+
+zeroReg, raReg, tpMachReg, fpMachReg, spMachReg, tmpReg :: Reg
+zeroReg = regSingle 0
+raReg = regSingle 1
+tpMachReg = regSingle 2
+-- Not to be confused with the `CmmReg` `spReg`
+spMachReg = regSingle 3
+fpMachReg = regSingle 22
+-- Use t8(r20) for LA64 IP register.
+tmpReg = regSingle 20
+
+-- Registers available to the register allocator.
+allocatableRegs :: Platform -> [RealReg]
+allocatableRegs platform =
+  let isFree = freeReg platform
+   in map RealRegSingle $ filter isFree allMachRegNos
+
+-- Integer argument registers according to the calling convention
+allGpArgRegs :: [Reg]
+allGpArgRegs = map regSingle [4..11]
+
+-- | Floating point argument registers according to the calling convention
+allFpArgRegs :: [Reg]
+allFpArgRegs = map regSingle [32..39]
+
+-- Addressing modes
+data AddrMode
+  = AddrRegReg Reg Reg
+  | AddrRegImm Reg Imm
+  | AddrReg Reg
+  deriving (Eq, Show)
+
+-- Immediates
+data Imm
+  = ImmInt      Int
+  | ImmInteger  Integer     -- Sigh.
+  | ImmCLbl     CLabel      -- AbstractC Label (with baggage)
+  | ImmLit      FastString
+  | ImmIndex    CLabel Int
+  | ImmFloat    Rational
+  | ImmDouble   Rational
+  | ImmConstantSum Imm Imm
+  | ImmConstantDiff Imm Imm
+  deriving (Eq, Show)
+
+-- Map CmmLit to Imm
+litToImm :: CmmLit -> Imm
+litToImm (CmmInt i w) = ImmInteger (narrowS w i)
+-- narrow to the width: a CmmInt might be out of
+-- range, but we assume that ImmInteger only contains
+-- in-range values.  A signed value should be fine here.
+litToImm (CmmFloat f W32) = ImmFloat f
+litToImm (CmmFloat f W64) = ImmDouble f
+litToImm (CmmLabel l)     = ImmCLbl l
+litToImm (CmmLabelOff l off) = ImmIndex l off
+litToImm (CmmLabelDiffOff l1 l2 off _) =
+  ImmConstantSum
+    (ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
+    (ImmInt off)
+litToImm l = panic $ "LA64.Regs.litToImm: no match for " ++ show l
+
+-- == To satisfy GHC.CmmToAsm.Reg.Target =======================================
+
+-- squeese functions for the graph allocator -----------------------------------
+-- | regSqueeze_class reg
+--      Calculate the maximum number of register colors that could be
+--      denied to a node of this class due to having this reg
+--      as a neighbour.
+--
+{-# INLINE virtualRegSqueeze #-}
+virtualRegSqueeze :: RegClass -> VirtualReg -> Int
+virtualRegSqueeze cls vr
+  = case cls of
+    RcInteger ->
+      case vr of
+        VirtualRegI {} -> 1
+        VirtualRegHi {} -> 1
+        _other -> 0
+    RcFloat ->
+      case vr of
+        VirtualRegD {} -> 1
+        _other -> 0
+    RcVector ->
+      case vr of
+        VirtualRegV128 {} -> 1
+        _other -> 0
+
+{-# INLINE realRegSqueeze #-}
+realRegSqueeze :: RegClass -> RealReg -> Int
+realRegSqueeze cls rr =
+  case cls of
+    RcInteger ->
+      case rr of
+        RealRegSingle regNo
+          | regNo < 32
+          -> 1
+          | otherwise
+          -> 0
+    RcFloat ->
+      case rr of
+        RealRegSingle regNo
+          |  regNo < 32
+          || regNo > 63
+          -> 0
+          | otherwise
+          -> 1
+    RcVector ->
+      case rr of
+        RealRegSingle regNo
+          | regNo > 63
+          -> 1
+          | otherwise
+          -> 0
+
+mkVirtualReg :: Unique -> Format -> VirtualReg
+mkVirtualReg u format
+   | not (isFloatFormat format) = VirtualRegI u
+   | otherwise
+   = case format of
+        FF32    -> VirtualRegD u
+        FF64    -> VirtualRegD u
+        _       -> panic "LA64.mkVirtualReg"
+
+{-# INLINE classOfRealReg #-}
+classOfRealReg :: RealReg -> RegClass
+classOfRealReg (RealRegSingle i)
+   | i < 32 = RcInteger
+   | i > 63 = RcVector
+   | otherwise = RcFloat
+
+regDotColor :: RealReg -> SDoc
+regDotColor reg
+ = case classOfRealReg reg of
+        RcInteger       -> text "blue"
+        RcFloat         -> text "red"
+        RcVector        -> text "green"
