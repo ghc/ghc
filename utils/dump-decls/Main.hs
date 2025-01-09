@@ -38,6 +38,7 @@ run root pkg_nm = runGhc (Just root) $ do
             , "-dppr-cols=1000"
             , "-fprint-explicit-runtime-reps"
             , "-fprint-explicit-foralls"
+            , "-fsuppress-unit-ids"
             ]
     dflags <- do
         dflags <- getSessionDynFlags
