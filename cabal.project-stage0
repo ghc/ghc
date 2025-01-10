@@ -36,7 +36,7 @@ package *
   shared: False
   executable-profiling: False
   executable-dynamic: False
-  executable-static: False
+  executable-static: True
   ghc-options: -fhide-source-paths -j
 
 constraints:
