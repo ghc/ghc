@@ -124,7 +124,6 @@ llvmCodeGen' dflags location cfg cmm_stream
 debugInfoGen :: DynFlags -> ModLocation -> LlvmM ()
 debugInfoGen dflags location
   = do  fileMeta <- getMetaUniqueId
-        subprogramsMeta <- getMetaUniqueId
         cuMeta <- getMetaUniqueId
         dwarfVersionMeta <- getMetaUniqueId
         debugInfoVersionMeta <- getMetaUniqueId
@@ -144,7 +143,6 @@ debugInfoGen dflags location
                 , dicuIsOptimized = llvmOptLevel dflags > 0
                 }
               , MetaNamed (fsLit "llvm.dbg.cu") NotDistinct [ cuMeta ]
-              , MetaUnnamed subprogramsMeta NotDistinct $ MetaStruct []
               , MetaNamed (fsLit "llvm.module.flags") NotDistinct
                 [ dwarfVersionMeta
                 , debugInfoVersionMeta
