@@ -72,7 +72,7 @@ fa7RegNo, d17RegNo :: RegNo
 d17RegNo = 49
 fa7RegNo = d17RegNo
 
-v0RegNo ::RegNo
+v0RegNo :: RegNo
 v0RegNo = 64
 
 v8RegNo :: RegNo
