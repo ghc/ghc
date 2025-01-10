@@ -142,7 +142,6 @@ debugInfoGen dflags location
                 , dicuFile        = fileMeta
                 , dicuProducer    = fsLit "ghc"
                 , dicuIsOptimized = llvmOptLevel dflags > 0
-                , dicuSubprograms = MetaStruct $ map MetaNode subprograms
                 }
               , MetaNamed (fsLit "llvm.dbg.cu") NotDistinct [ cuMeta ]
               , MetaUnnamed subprogramsMeta NotDistinct $ MetaStruct []
