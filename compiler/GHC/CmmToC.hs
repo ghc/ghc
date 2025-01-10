@@ -873,25 +873,9 @@ pprMachOp_for_C platform mop = case mop of
                                 (text "MO_V_Mul")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Mul"
                                       ++ "unsupported by the unregisterised backend")
-        MO_VS_Quot {}     -> pprTrace "offending mop:"
-                                (text "MO_VS_Quot")
-                                (panic $ "PprC.pprMachOp_for_C: MO_VS_Quot"
-                                      ++ "unsupported by the unregisterised backend")
-        MO_VS_Rem {}      -> pprTrace "offending mop:"
-                                (text "MO_VS_Rem")
-                                (panic $ "PprC.pprMachOp_for_C: MO_VS_Rem"
-                                      ++ "unsupported by the unregisterised backend")
         MO_VS_Neg {}      -> pprTrace "offending mop:"
                                 (text "MO_VS_Neg")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VS_Neg"
-                                      ++ "unsupported by the unregisterised backend")
-        MO_VU_Quot {}     -> pprTrace "offending mop:"
-                                (text "MO_VU_Quot")
-                                (panic $ "PprC.pprMachOp_for_C: MO_VU_Quot"
-                                      ++ "unsupported by the unregisterised backend")
-        MO_VU_Rem {}      -> pprTrace "offending mop:"
-                                (text "MO_VU_Rem")
-                                (panic $ "PprC.pprMachOp_for_C: MO_VU_Rem"
                                       ++ "unsupported by the unregisterised backend")
         MO_V_Broadcast {} -> pprTrace "offending mop:"
                                  (text "MO_V_Broadcast")
@@ -1063,6 +1047,14 @@ pprCallishMachOp_for_C mop
         MO_AddIntC    {} -> unsupported
         MO_SubIntC    {} -> unsupported
         MO_U_Mul2     {} -> unsupported
+        MO_VS_Quot    {} -> unsupported
+        MO_VS_Rem     {} -> unsupported
+        MO_VU_Quot    {} -> unsupported
+        MO_VU_Rem     {} -> unsupported
+        MO_I64X2_Min     -> unsupported
+        MO_I64X2_Max     -> unsupported
+        MO_W64X2_Min     -> unsupported
+        MO_W64X2_Max     -> unsupported
         MO_Touch         -> unsupported
         -- we could support prefetch via "__builtin_prefetch"
         -- Not adding it for now

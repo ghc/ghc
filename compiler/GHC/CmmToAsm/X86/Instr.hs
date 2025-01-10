@@ -221,7 +221,7 @@ data Instr
         -- are  Operand Reg.
 
         -- SSE2 floating-point division:
-        | FDIV          Format Operand Operand   -- divisor, dividend(dst)
+        | FDIV          Format Operand Reg   -- divisor, dividend(dst)
 
         -- use CMP for comparisons.  ucomiss and ucomisd instructions
         -- compare single/double prec floating point respectively.
@@ -316,12 +316,22 @@ data Instr
         -- logic operations
         | PXOR        Format Operand Reg
         | VPXOR       Format Reg Reg Reg
+        | PAND        Format Operand Reg
+        | PANDN       Format Operand Reg
+        | POR         Format Operand Reg
 
         -- Arithmetic
         | VADD       Format Operand Reg Reg
         | VSUB       Format Operand Reg Reg
         | VMUL       Format Operand Reg Reg
         | VDIV       Format Operand Reg Reg
+        | PADD       Format Operand Reg
+        | PSUB       Format Operand Reg
+        | PMULL      Format Operand Reg
+        | PMULUDQ    Format Operand Reg
+
+        -- SIMD compare
+        | PCMPGT     Format Operand Reg
 
         -- Shuffle
         | SHUF       Format Imm Operand Reg
@@ -334,15 +344,20 @@ data Instr
         | MOVHLPS    Format Reg Reg
         | UNPCKL     Format Operand Reg
         | PUNPCKLQDQ Format Operand Reg
+        | PUNPCKLDQ  Format Operand Reg
         | PUNPCKLWD  Format Operand Reg
         | PUNPCKLBW  Format Operand Reg
+        | PUNPCKHBW  Format Operand Reg
+        | PACKUSWB   Format Operand Reg
 
         -- Shift
+        | PSLL       Format Operand Reg
         | PSLLDQ     Format Operand Reg
+        | PSRL       Format Operand Reg
         | PSRLDQ     Format Operand Reg
 
         -- min/max
-        | MINMAX  MinOrMax MinMaxType Format Operand Operand
+        | MINMAX  MinOrMax MinMaxType Format Operand Reg
         | VMINMAX MinOrMax MinMaxType Format Operand Reg Reg
 
 data PrefetchVariant = NTA | Lvl0 | Lvl1 | Lvl2
@@ -453,7 +468,7 @@ regUsageOfInstr platform instr
     CVTTSD2SIQ fmt src dst -> mkRU (use_R FF64 src []) [mk fmt dst]
     CVTSI2SS   fmt src dst -> mkRU (use_R fmt src []) [mk FF32 dst]
     CVTSI2SD   fmt src dst -> mkRU (use_R fmt src []) [mk FF64 dst]
-    FDIV fmt     src dst  -> usageRM fmt src dst
+    FDIV fmt     src dst  -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     SQRT fmt src dst      -> mkRU (use_R fmt src []) [mk fmt dst]
 
     FETCHGOT reg        -> mkRU [] [mk addrFmt reg]
@@ -522,10 +537,20 @@ regUsageOfInstr platform instr
       | otherwise
       -> mkRU [mk fmt s1, mk fmt s2] [mk fmt dst]
 
+    PAND         fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PANDN        fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    POR          fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+
     VADD         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
     VSUB         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
     VMUL         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
     VDIV         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
+    PADD         fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PSUB         fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PMULL        fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PMULUDQ      fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+
+    PCMPGT       fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
     SHUF fmt _mask src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
@@ -536,7 +561,10 @@ regUsageOfInstr platform instr
     VPSHUFD fmt _mask src dst
       -> mkRU (use_R fmt src []) [mk fmt dst]
 
-    PSLLDQ fmt off dst -> mkRU (use_R fmt off []) [mk fmt dst]
+    PSLL   fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
+    PSLLDQ fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
+    PSRL   fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
+    PSRLDQ fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
 
     MOVHLPS    fmt src dst
       -> mkRU [mk fmt src] [mk fmt dst]
@@ -544,13 +572,19 @@ regUsageOfInstr platform instr
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PUNPCKLQDQ fmt src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PUNPCKLDQ fmt src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PUNPCKLWD fmt src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PUNPCKLBW fmt src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PUNPCKHBW fmt src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PACKUSWB fmt src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
     MINMAX _ _ fmt src dst
-      -> usageRM fmt src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     VMINMAX _ _ fmt src1 src2 dst
       -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
     _other              -> panic "regUsage: unrecognised instr"
@@ -710,7 +744,7 @@ patchRegsOfInstr platform instr env
     CVTTSD2SIQ fmt src dst -> CVTTSD2SIQ fmt (patchOp src) (env dst)
     CVTSI2SS fmt src dst -> CVTSI2SS fmt (patchOp src) (env dst)
     CVTSI2SD fmt src dst -> CVTSI2SD fmt (patchOp src) (env dst)
-    FDIV fmt src dst     -> FDIV fmt (patchOp src) (patchOp dst)
+    FDIV fmt src dst     -> FDIV fmt (patchOp src) (env dst)
     SQRT fmt src dst    -> SQRT fmt (patchOp src) (env dst)
 
     CALL (Left _)  _    -> instr
@@ -769,11 +803,20 @@ patchRegsOfInstr platform instr env
 
     PXOR       fmt src dst   -> PXOR fmt (patchOp src) (env dst)
     VPXOR      fmt s1 s2 dst -> VPXOR fmt (env s1) (env s2) (env dst)
+    PAND       fmt src dst   -> PAND fmt (patchOp src) (env dst)
+    PANDN      fmt src dst   -> PANDN fmt (patchOp src) (env dst)
+    POR        fmt src dst   -> POR fmt (patchOp src) (env dst)
 
     VADD       fmt s1 s2 dst -> VADD fmt (patchOp s1) (env s2) (env dst)
     VSUB       fmt s1 s2 dst -> VSUB fmt (patchOp s1) (env s2) (env dst)
     VMUL       fmt s1 s2 dst -> VMUL fmt (patchOp s1) (env s2) (env dst)
     VDIV       fmt s1 s2 dst -> VDIV fmt (patchOp s1) (env s2) (env dst)
+    PADD       fmt src dst   -> PADD fmt (patchOp src) (env dst)
+    PSUB       fmt src dst   -> PSUB fmt (patchOp src) (env dst)
+    PMULL      fmt src dst   -> PMULL fmt (patchOp src) (env dst)
+    PMULUDQ    fmt src dst   -> PMULUDQ fmt (patchOp src) (env dst)
+
+    PCMPGT     fmt src dst   -> PCMPGT fmt (patchOp src) (env dst)
 
     SHUF      fmt off src dst
       -> SHUF fmt off (patchOp src) (env dst)
@@ -784,8 +827,12 @@ patchRegsOfInstr platform instr env
     VPSHUFD      fmt off src dst
       -> VPSHUFD fmt off (patchOp src) (env dst)
 
+    PSLL         fmt off dst
+      -> PSLL    fmt (patchOp off) (env dst)
     PSLLDQ       fmt off dst
       -> PSLLDQ  fmt (patchOp off) (env dst)
+    PSRL         fmt off dst
+      -> PSRL    fmt (patchOp off) (env dst)
     PSRLDQ       fmt off dst
       -> PSRLDQ  fmt (patchOp off) (env dst)
 
@@ -795,13 +842,19 @@ patchRegsOfInstr platform instr env
       -> UNPCKL fmt (patchOp src) (env dst)
     PUNPCKLQDQ fmt src dst
       -> PUNPCKLQDQ fmt (patchOp src) (env dst)
+    PUNPCKLDQ fmt src dst
+      -> PUNPCKLDQ fmt (patchOp src) (env dst)
     PUNPCKLWD fmt src dst
       -> PUNPCKLWD fmt (patchOp src) (env dst)
     PUNPCKLBW fmt src dst
       -> PUNPCKLBW fmt (patchOp src) (env dst)
+    PUNPCKHBW fmt src dst
+      -> PUNPCKHBW fmt (patchOp src) (env dst)
+    PACKUSWB fmt src dst
+      -> PACKUSWB fmt (patchOp src) (env dst)
 
     MINMAX minMax ty fmt src dst
-      -> MINMAX minMax ty fmt (patchOp src) (patchOp dst)
+      -> MINMAX minMax ty fmt (patchOp src) (env dst)
     VMINMAX minMax ty fmt src1 src2 dst
       -> VMINMAX minMax ty fmt (patchOp src1) (env src2) (env dst)
 

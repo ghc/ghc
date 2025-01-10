@@ -4160,13 +4160,19 @@ primop VecDivOp "divide#" GenPrimOp
 
 primop VecQuotOp "quot#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
-   { Rounds towards zero element-wise. }
+   { Rounds towards zero element-wise.
+
+     Note: Most CPU ISAs do not contain any SIMD integer division instructions.
+     Do not expect high performance. }
    with effect = CanFail
         vector = INT_VECTOR_TYPES
 
 primop VecRemOp "rem#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
-   { Satisfies @('quot#' x y) 'times#' y 'plus#' ('rem#' x y) == x@. }
+   { Satisfies @('quot#' x y) 'times#' y 'plus#' ('rem#' x y) == x@.
+
+     Note: Most CPU ISAs do not contain any SIMD integer division instructions.
+     Do not expect high performance. }
    with effect = CanFail
         vector = INT_VECTOR_TYPES
 

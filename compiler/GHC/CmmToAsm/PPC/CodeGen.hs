@@ -661,11 +661,7 @@ getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_V_Add {} -> vectorsNeedLlvm
       MO_V_Sub {} -> vectorsNeedLlvm
       MO_V_Mul {} -> vectorsNeedLlvm
-      MO_VS_Quot {} -> vectorsNeedLlvm
-      MO_VS_Rem {} -> vectorsNeedLlvm
       MO_VS_Neg {} -> vectorsNeedLlvm
-      MO_VU_Quot {} -> vectorsNeedLlvm
-      MO_VU_Rem {} -> vectorsNeedLlvm
       MO_VF_Extract {} -> vectorsNeedLlvm
       MO_VF_Add {} -> vectorsNeedLlvm
       MO_VF_Sub {} -> vectorsNeedLlvm
@@ -2192,6 +2188,14 @@ genCCall' config gcp target dest_regs args
                     MO_AddIntC {}    -> unsupported
                     MO_SubIntC {}    -> unsupported
                     MO_U_Mul2 {}     -> unsupported
+                    MO_VS_Quot {}    -> unsupported
+                    MO_VS_Rem {}     -> unsupported
+                    MO_VU_Quot {}    -> unsupported
+                    MO_VU_Rem {}     -> unsupported
+                    MO_I64X2_Min     -> unsupported
+                    MO_I64X2_Max     -> unsupported
+                    MO_W64X2_Min     -> unsupported
+                    MO_W64X2_Max     -> unsupported
                     MO_AcquireFence  -> unsupported
                     MO_ReleaseFence  -> unsupported
                     MO_SeqCstFence   -> unsupported

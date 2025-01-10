@@ -169,15 +169,7 @@ data MachOp
   | MO_V_Add Length Width
   | MO_V_Sub Length Width
   | MO_V_Mul Length Width
-
-  -- Signed vector multiply/divide
-  | MO_VS_Quot Length Width
-  | MO_VS_Rem  Length Width
   | MO_VS_Neg  Length Width
-
-  -- Unsigned vector multiply/divide
-  | MO_VU_Quot Length Width
-  | MO_VU_Rem  Length Width
 
   -- Vector shuffles
   | MO_V_Shuffle  Length Width [Int]
@@ -514,14 +506,10 @@ machOpResultType platform mop tys =
     MO_V_Sub l w        -> cmmVec l (cmmBits w)
     MO_V_Mul l w        -> cmmVec l (cmmBits w)
 
-    MO_VS_Quot l w      -> cmmVec l (cmmBits w)
-    MO_VS_Rem  l w      -> cmmVec l (cmmBits w)
     MO_VS_Neg  l w      -> cmmVec l (cmmBits w)
     MO_VS_Min  l w      -> cmmVec l (cmmBits w)
     MO_VS_Max  l w      -> cmmVec l (cmmBits w)
 
-    MO_VU_Quot l w      -> cmmVec l (cmmBits w)
-    MO_VU_Rem  l w      -> cmmVec l (cmmBits w)
     MO_VU_Min  l w      -> cmmVec l (cmmBits w)
     MO_VU_Max  l w      -> cmmVec l (cmmBits w)
 
@@ -631,14 +619,10 @@ machOpArgReps platform op =
     MO_V_Sub l w        -> [vecwidth l w, vecwidth l w]
     MO_V_Mul l w        -> [vecwidth l w, vecwidth l w]
 
-    MO_VS_Quot l w      -> [vecwidth l w, vecwidth l w]
-    MO_VS_Rem  l w      -> [vecwidth l w, vecwidth l w]
     MO_VS_Neg  l w      -> [vecwidth l w]
     MO_VS_Min  l w      -> [vecwidth l w, vecwidth l w]
     MO_VS_Max  l w      -> [vecwidth l w, vecwidth l w]
 
-    MO_VU_Quot l w      -> [vecwidth l w, vecwidth l w]
-    MO_VU_Rem  l w      -> [vecwidth l w, vecwidth l w]
     MO_VU_Min  l w      -> [vecwidth l w, vecwidth l w]
     MO_VU_Max  l w      -> [vecwidth l w, vecwidth l w]
 
@@ -751,6 +735,20 @@ data CallishMachOp
   | MO_AddIntC   Width
   | MO_SubIntC   Width
   | MO_U_Mul2    Width
+
+  -- Signed vector divide
+  | MO_VS_Quot Length Width
+  | MO_VS_Rem  Length Width
+
+  -- Unsigned vector divide
+  | MO_VU_Quot Length Width
+  | MO_VU_Rem  Length Width
+
+  -- Int64X2/Word64X2 min/max
+  | MO_I64X2_Min
+  | MO_I64X2_Max
+  | MO_W64X2_Min
+  | MO_W64X2_Max
 
   | MO_Touch         -- Keep variables live (when using interior pointers)
 

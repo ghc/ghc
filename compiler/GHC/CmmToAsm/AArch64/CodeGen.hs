@@ -827,11 +827,7 @@ getRegister' config plat expr
         MO_V_Add {} -> notUnary
         MO_V_Sub {} -> notUnary
         MO_V_Mul {} -> notUnary
-        MO_VS_Quot {} -> notUnary
-        MO_VS_Rem {} -> notUnary
         MO_VS_Neg {} -> notUnary
-        MO_VU_Quot {} -> notUnary
-        MO_VU_Rem {} -> notUnary
         MO_V_Shuffle {} -> notUnary
         MO_VF_Shuffle  {} -> notUnary
         MO_VF_Insert {} -> notUnary
@@ -1216,11 +1212,7 @@ getRegister' config plat expr
         MO_V_Add {} -> vectorsNeedLlvm
         MO_V_Sub {} -> vectorsNeedLlvm
         MO_V_Mul {} -> vectorsNeedLlvm
-        MO_VS_Quot {} -> vectorsNeedLlvm
-        MO_VS_Rem {} -> vectorsNeedLlvm
         MO_VS_Neg {} -> vectorsNeedLlvm
-        MO_VU_Quot {} -> vectorsNeedLlvm
-        MO_VU_Rem {} -> vectorsNeedLlvm
         MO_VF_Extract {} -> vectorsNeedLlvm
         MO_VF_Add {} -> vectorsNeedLlvm
         MO_VF_Sub {} -> vectorsNeedLlvm
@@ -2137,7 +2129,7 @@ genCCall target dest_regs arg_regs = do
         -- Conversion
         MO_UF_Conv w        -> mkCCall (word2FloatLabel w)
 
-        -- Arithmatic
+        -- Arithmetic
         -- These are not supported on X86, so I doubt they are used much.
         MO_S_QuotRem  _w -> unsupported mop
         MO_U_QuotRem  _w -> unsupported mop
@@ -2147,6 +2139,16 @@ genCCall target dest_regs arg_regs = do
         MO_SubWordC   _w -> unsupported mop
         MO_AddIntC    _w -> unsupported mop
         MO_SubIntC    _w -> unsupported mop
+
+        -- Vector
+        MO_VS_Quot {} -> unsupported mop
+        MO_VS_Rem {} -> unsupported mop
+        MO_VU_Quot {} -> unsupported mop
+        MO_VU_Rem {} -> unsupported mop
+        MO_I64X2_Min -> unsupported mop
+        MO_I64X2_Max -> unsupported mop
+        MO_W64X2_Min -> unsupported mop
+        MO_W64X2_Max -> unsupported mop
 
         -- Memory Ordering
         -- Set flags according to their C pendants (stdatomic.h):

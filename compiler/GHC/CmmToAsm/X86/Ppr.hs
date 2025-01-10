@@ -915,7 +915,7 @@ pprInstr platform i = case i of
       -> pprFormatOp (text "mul") format op
 
    FDIV format op1 op2
-      -> pprFormatOpOp (text "div") format op1 op2
+      -> pprFormatOpReg (text "div") format op1 op2
 
    FMA3 format var perm op1 op2 op3
       -> let mnemo = case var of
@@ -990,6 +990,16 @@ pprInstr platform i = case i of
      -> pprFormatOpRegReg (text "vmul") format s1 s2 dst
    VDIV format s1 s2 dst
      -> pprFormatOpRegReg (text "vdiv") format s1 s2 dst
+   PADD format src dst
+     -> pprFormatOpReg (text "padd") format src dst
+   PSUB format src dst
+     -> pprFormatOpReg (text "psub") format src dst
+   PMULL format src dst
+     -> pprFormatOpReg (text "pmull") format src dst
+   PMULUDQ format src dst
+     -> pprOpReg (text "pmuludq") format src dst
+   PCMPGT format src dst
+     -> pprFormatOpReg (text "pcmpgt") format src dst
    VBROADCAST format@(VecFormat _ sFmt) from to
      -> pprBroadcast (text "vbroadcast") (scalarFormatFormat sFmt) format from to
    VBROADCAST format _ _
@@ -1021,6 +1031,12 @@ pprInstr platform i = case i of
      -> pprPXor (text "pxor") format src dst
    VPXOR format s1 s2 dst
      -> pprXor (text "vpxor") format s1 s2 dst
+   PAND format src dst
+     -> pprOpReg (text "pand") format src dst
+   PANDN format src dst
+     -> pprOpReg (text "pandn") format src dst
+   POR format src dst
+     -> pprOpReg (text "por") format src dst
    VEXTRACT format offset from to
      -> pprFormatImmRegOp (text "vextract") format offset from to
    INSERTPS format offset addr dst
@@ -1039,8 +1055,12 @@ pprInstr platform i = case i of
    VPSHUFD format offset src dst
      -> pprShuf (text "vpshufd") format offset src dst
 
+   PSLL format offset dst
+     -> pprFormatOpReg (text "psll") format offset dst
    PSLLDQ format offset dst
      -> pprDoubleShift (text "pslldq") format offset dst
+   PSRL format offset dst
+     -> pprFormatOpReg (text "psrl") format offset dst
    PSRLDQ format offset dst
      -> pprDoubleShift (text "psrldq") format offset dst
 
@@ -1050,13 +1070,19 @@ pprInstr platform i = case i of
      -> pprFormatOpReg (text "unpckl") format src dst
    PUNPCKLQDQ format from to
      -> pprOpReg (text "punpcklqdq") format from to
+   PUNPCKLDQ format from to
+     -> pprOpReg (text "punpckldq") format from to
    PUNPCKLWD format from to
      -> pprOpReg (text "punpcklwd") format from to
    PUNPCKLBW format from to
      -> pprOpReg (text "punpcklbw") format from to
+   PUNPCKHBW format from to
+     -> pprOpReg (text "punpckhbw") format from to
+   PACKUSWB format from to
+     -> pprOpReg (text "packuswb") format from to
 
    MINMAX minMax ty fmt src dst
-     -> pprMinMax False minMax ty fmt [src, dst]
+     -> pprMinMax False minMax ty fmt [src, OpReg dst]
    VMINMAX minMax ty fmt src1 src2 dst
      -> pprMinMax True minMax ty fmt [src1, OpReg src2, OpReg dst]
 

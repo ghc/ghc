@@ -1868,6 +1868,14 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
     MO_AddIntC _w -> unsupported mop
     MO_SubIntC _w -> unsupported mop
     MO_U_Mul2 _w -> unsupported mop
+    MO_VS_Quot {} -> unsupported mop
+    MO_VS_Rem {} -> unsupported mop
+    MO_VU_Quot {} -> unsupported mop
+    MO_VU_Rem {} -> unsupported mop
+    MO_I64X2_Min -> unsupported mop
+    MO_I64X2_Max -> unsupported mop
+    MO_W64X2_Min -> unsupported mop
+    MO_W64X2_Max -> unsupported mop
     -- Memory Ordering
     -- The related C functions are:
     -- #include <stdatomic.h>

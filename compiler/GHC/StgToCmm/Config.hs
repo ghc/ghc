@@ -72,6 +72,7 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmAllowIntMul2Instr         :: !Bool   -- ^ Allowed to generate IntMul2 instruction
   , stgToCmmAllowWordMul2Instr        :: !Bool   -- ^ Allowed to generate WordMul2 instruction
   , stgToCmmAllowFMAInstr             :: FMASign -> Bool -- ^ Allowed to generate FMA instruction
+  , stgToCmmAllowIntWord64X2MinMax    :: !Bool   -- ^ Allowed to generate min/max instructions for Int64X2/Word64X2
   , stgToCmmTickyAP                   :: !Bool   -- ^ Disable use of precomputed standard thunks.
   , stgToCmmSaveFCallTargetToLocal    :: !Bool   -- ^ Save a foreign call target to a Cmm local, see
                                                  -- Note [Saving foreign call target to local] for details

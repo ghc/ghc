@@ -444,6 +444,34 @@ genCall t@(PrimTarget (MO_AddWordC w)) [dstV, dstO] [lhs, rhs] =
 genCall t@(PrimTarget (MO_SubWordC w)) [dstV, dstO] [lhs, rhs] =
     genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
 
+genCall (PrimTarget (MO_VS_Quot l w)) [dst] [lhs, rhs] = runStmtsDecls $ do
+    lhsVar <- exprToVarW lhs
+    rhsVar <- exprToVarW rhs
+    result <- doExprW (LMVector l (widthToLlvmInt w)) (LlvmOp LM_MO_SDiv lhsVar rhsVar)
+    (dstReg, _dstTy) <- lift $ getCmmReg (CmmLocal dst)
+    statement $ Store result dstReg Nothing []
+
+genCall (PrimTarget (MO_VS_Rem l w)) [dst] [lhs, rhs] = runStmtsDecls $ do
+    lhsVar <- exprToVarW lhs
+    rhsVar <- exprToVarW rhs
+    result <- doExprW (LMVector l (widthToLlvmInt w)) (LlvmOp LM_MO_SRem lhsVar rhsVar)
+    (dstReg, _dstTy) <- lift $ getCmmReg (CmmLocal dst)
+    statement $ Store result dstReg Nothing []
+
+genCall (PrimTarget (MO_VU_Quot l w)) [dst] [lhs, rhs] = runStmtsDecls $ do
+    lhsVar <- exprToVarW lhs
+    rhsVar <- exprToVarW rhs
+    result <- doExprW (LMVector l (widthToLlvmInt w)) (LlvmOp LM_MO_UDiv lhsVar rhsVar)
+    (dstReg, _dstTy) <- lift $ getCmmReg (CmmLocal dst)
+    statement $ Store result dstReg Nothing []
+
+genCall (PrimTarget (MO_VU_Rem l w)) [dst] [lhs, rhs] = runStmtsDecls $ do
+    lhsVar <- exprToVarW lhs
+    rhsVar <- exprToVarW rhs
+    result <- doExprW (LMVector l (widthToLlvmInt w)) (LlvmOp LM_MO_URem lhsVar rhsVar)
+    (dstReg, _dstTy) <- lift $ getCmmReg (CmmLocal dst)
+    statement $ Store result dstReg Nothing []
+
 -- Handle all other foreign calls and prim ops.
 genCall target res args = do
   platform <- getPlatform
@@ -1003,6 +1031,15 @@ cmmPrimOpFunctions mop = do
     -- appropriate case of genCall.
     MO_U_Mul2 {}     -> unsupported
 
+    MO_VS_Quot {} -> unsupported
+    MO_VS_Rem {}  -> unsupported
+    MO_VU_Quot {} -> unsupported
+    MO_VU_Rem {}  -> unsupported
+    MO_I64X2_Min  -> unsupported
+    MO_I64X2_Max  -> unsupported
+    MO_W64X2_Min  -> unsupported
+    MO_W64X2_Max  -> unsupported
+
     MO_ReleaseFence  -> unsupported
     MO_AcquireFence  -> unsupported
     MO_SeqCstFence   -> unsupported
@@ -1515,13 +1552,9 @@ genMachOp _ op [x] = case op of
     MO_V_Sub      _ _ -> panicOp
     MO_V_Mul      _ _ -> panicOp
 
-    MO_VS_Quot    _ _ -> panicOp
-    MO_VS_Rem     _ _ -> panicOp
     MO_VS_Min     _ _ -> panicOp
     MO_VS_Max     _ _ -> panicOp
 
-    MO_VU_Quot    _ _ -> panicOp
-    MO_VU_Rem     _ _ -> panicOp
     MO_VU_Min     _ _ -> panicOp
     MO_VU_Max     _ _ -> panicOp
 
@@ -1698,12 +1731,6 @@ genMachOp_slow opt op [x, y] = case op of
     MO_V_Add l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Add
     MO_V_Sub l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Sub
     MO_V_Mul l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Mul
-
-    MO_VS_Quot l w -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_SDiv
-    MO_VS_Rem  l w -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_SRem
-
-    MO_VU_Quot l w -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_UDiv
-    MO_VU_Rem  l w -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_URem
 
     MO_VF_Add  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FAdd
     MO_VF_Sub  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FSub

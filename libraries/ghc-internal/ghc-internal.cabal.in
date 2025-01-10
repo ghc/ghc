@@ -440,11 +440,13 @@ Library
           cbits/clz.c
           cbits/ctz.c
           cbits/debug.c
+          cbits/int64x2minmax.c
           cbits/longlong.c
           cbits/mulIntMayOflo.c
           cbits/pdep.c
           cbits/pext.c
           cbits/popcnt.c
+          cbits/vectorQuotRem.c
           cbits/word2float.c
 
       cmm-sources:

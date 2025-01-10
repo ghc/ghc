@@ -844,11 +844,6 @@ iselExpr64ParallelBin op e1 e2 = do
 
 --------------------------------------------------------------------------------
 
--- This is a helper data type which helps reduce the code duplication for
--- the code generation of arithmetic operations. This is not specifically
--- targetted for any particular type like Int8, Int32 etc
-data VectorArithInstns = VA_Add | VA_Sub | VA_Mul | VA_Div | VA_Min | VA_Max
-
 getRegister :: HasDebugCallStack => CmmExpr -> NatM Register
 getRegister e = do platform <- getPlatform
                    is32Bit <- is32BitPlatform
@@ -1064,8 +1059,9 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
 
       MO_VF_Neg l w  | avx       -> vector_float_negate_avx l w x
                      | otherwise -> vector_float_negate_sse l w x
-      -- SIMD NCG TODO: add integer negation
-      MO_VS_Neg {} -> needLlvm mop
+      -- SIMD NCG TODO: Support 256/512-bit integer vectors
+      MO_VS_Neg l w -> getRegister' platform is32Bit (CmmMachOp (MO_V_Sub l w) [zero_vec, x])
+        where zero_vec = CmmLit $ CmmVec $ replicate l $ CmmInt 0 w
 
       MO_VF_Broadcast l w
         | avx
@@ -1124,10 +1120,6 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_V_Add {}         -> incorrectOperands
       MO_V_Sub {}         -> incorrectOperands
       MO_V_Mul {}         -> incorrectOperands
-      MO_VS_Quot {}       -> incorrectOperands
-      MO_VS_Rem {}        -> incorrectOperands
-      MO_VU_Quot {}       -> incorrectOperands
-      MO_VU_Rem {}        -> incorrectOperands
       MO_V_Shuffle {}     -> incorrectOperands
       MO_VF_Shuffle {}    -> incorrectOperands
       MO_VU_Min {}  -> incorrectOperands
@@ -1309,6 +1301,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
 
 getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
   sse4_1 <- sse4_1Enabled
+  sse4_2 <- sse4_2Enabled
   avx <- avxEnabled
   case mop of
       MO_F_Eq _ -> condFltReg is32Bit EQQ x y
@@ -1333,10 +1326,10 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_U_Lt _ -> condIntReg LU  x y
       MO_U_Le _ -> condIntReg LEU x y
 
-      MO_F_Add  w -> trivialFCode_sse2 w ADD  x y
-      MO_F_Sub  w -> trivialFCode_sse2 w SUB  x y
+      MO_F_Add  w -> trivialFCode_sse2 w (\fmt op2 -> ADD fmt op2 . OpReg) x y
+      MO_F_Sub  w -> trivialFCode_sse2 w (\fmt op2 -> SUB fmt op2 . OpReg) x y
       MO_F_Quot w -> trivialFCode_sse2 w FDIV x y
-      MO_F_Mul  w -> trivialFCode_sse2 w MUL  x y
+      MO_F_Mul  w -> trivialFCode_sse2 w (\fmt op2 -> MUL fmt op2 . OpReg) x y
       MO_F_Min  w -> trivialFCode_sse2 w (MINMAX Min FloatMinMax) x y
       MO_F_Max  w -> trivialFCode_sse2 w (MINMAX Max FloatMinMax) x y
 
@@ -1389,37 +1382,84 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       -- SIMD NCG TODO: 256/512-bit vector
       MO_V_Extract {} -> needLlvm mop
 
-      MO_VF_Add l w         | avx       -> vector_float_op_avx VA_Add l w x y
-                            | otherwise -> vector_float_op_sse VA_Add l w x y
+      MO_VF_Add l w         | avx       -> vector_float_op_avx VADD l w x y
+                            | otherwise -> vector_float_op_sse (\fmt op2 -> ADD fmt op2 . OpReg) l w x y
 
-      MO_VF_Sub l w         | avx       -> vector_float_op_avx VA_Sub l w x y
-                            | otherwise -> vector_float_op_sse VA_Sub l w x y
+      MO_VF_Sub l w         | avx       -> vector_float_op_avx VSUB l w x y
+                            | otherwise -> vector_float_op_sse (\fmt op2 -> SUB fmt op2 . OpReg) l w x y
 
-      MO_VF_Mul l w         | avx       -> vector_float_op_avx VA_Mul l w x y
-                            | otherwise -> vector_float_op_sse VA_Mul l w x y
+      MO_VF_Mul l w         | avx       -> vector_float_op_avx VMUL l w x y
+                            | otherwise -> vector_float_op_sse (\fmt op2 -> MUL fmt op2 . OpReg) l w x y
 
-      MO_VF_Quot l w        | avx       -> vector_float_op_avx VA_Div l w x y
-                            | otherwise -> vector_float_op_sse VA_Div l w x y
+      MO_VF_Quot l w        | avx       -> vector_float_op_avx VDIV l w x y
+                            | otherwise -> vector_float_op_sse FDIV l w x y
 
-      MO_VF_Min l w         | avx       -> vector_float_op_avx VA_Min l w x y
-                            | otherwise -> vector_float_op_sse VA_Min l w x y
+      MO_VF_Min l w         | avx       -> vector_float_op_avx (VMINMAX Min FloatMinMax) l w x y
+                            | otherwise -> vector_float_op_sse (MINMAX Min FloatMinMax) l w x y
 
-      MO_VF_Max l w         | avx       -> vector_float_op_avx VA_Max l w x y
-                            | otherwise -> vector_float_op_sse VA_Max l w x y
+      MO_VF_Max l w         | avx       -> vector_float_op_avx (VMINMAX Max FloatMinMax) l w x y
+                            | otherwise -> vector_float_op_sse (MINMAX Max FloatMinMax) l w x y
 
-      -- SIMD NCG TODO: integer vector operations
+      -- SIMD NCG TODO: shuffle and 256/512-bit integer vector operations
       MO_V_Shuffle {} -> needLlvm mop
-      MO_V_Add {} -> needLlvm mop
-      MO_V_Sub {} -> needLlvm mop
+      MO_V_Add l w | l * widthInBits w == 128 -> vector_int_op_sse PADD l w x y
+                   | otherwise -> needLlvm mop
+      MO_V_Sub l w | l * widthInBits w == 128 -> vector_int_op_sse PSUB l w x y
+                   | otherwise -> needLlvm mop
+      MO_V_Mul 16 W8 -> vector_int8x16_mul_sse2 x y
+      MO_V_Mul l@8 w@W16 -> vector_int_op_sse PMULL l w x y -- PMULLW (SSE2)
+      MO_V_Mul l@4 w@W32 | sse4_1 -> vector_int_op_sse PMULL l w x y -- PMULLD (SSE4.1)
+                         | otherwise -> vector_int32x4_mul_sse2 x y
+      MO_V_Mul 2 W64 -> vector_int64x2_mul_sse2 x y
       MO_V_Mul {} -> needLlvm mop
-      MO_VS_Quot {} -> needLlvm mop
-      MO_VS_Rem {} -> needLlvm mop
-      MO_VU_Quot {} -> needLlvm mop
-      MO_VU_Rem {} -> needLlvm mop
 
+      MO_VU_Min l@16 w@W8
+                    -> vector_int_op_sse (MINMAX Min (IntVecMinMax False)) l w x y -- PMINUB (SSE2)
+      MO_VU_Min l@8 w@W16
+        | sse4_1    -> vector_int_op_sse (MINMAX Min (IntVecMinMax False)) l w x y -- PMINUW (SSE4.1)
+        | otherwise -> vector_word_minmax_sse Min l w x y
+      MO_VU_Min l@4 w@W32
+        | sse4_1    -> vector_int_op_sse (MINMAX Min (IntVecMinMax False)) l w x y -- PMINUD (SSE4.1)
+        | otherwise -> vector_word_minmax_sse Min l w x y
+      MO_VU_Min l@2 w@W64
+        | sse4_2    -> vector_word_minmax_sse Min l w x y -- PCMPGTQ requires SSE4.2
+        -- The SSE2 version is implemented as a C call (MO_W64X2_Min)
       MO_VU_Min {} -> needLlvm mop
+      MO_VU_Max l@16 w@W8
+                    -> vector_int_op_sse (MINMAX Max (IntVecMinMax False)) l w x y -- PMAXUB (SSE2)
+      MO_VU_Max l@8 w@W16
+        | sse4_1    -> vector_int_op_sse (MINMAX Max (IntVecMinMax False)) l w x y -- PMAXUW (SSE4.1)
+        | otherwise -> vector_word_minmax_sse Max l w x y
+      MO_VU_Max l@4 w@W32
+        | sse4_1    -> vector_int_op_sse (MINMAX Max (IntVecMinMax False)) l w x y -- PMAXUD (SSE4.1)
+        | otherwise -> vector_word_minmax_sse Max l w x y
+      MO_VU_Max l@2 w@W64
+        | sse4_2    -> vector_word_minmax_sse Max l w x y -- PCMPGTQ requires SSE4.2
+        -- The SSE2 version is implemented as a C call (MO_W64X2_Max)
       MO_VU_Max {} -> needLlvm mop
+      MO_VS_Min l@16 w@W8
+        | sse4_1    -> vector_int_op_sse (MINMAX Min (IntVecMinMax True)) l w x y -- PMINSB (SSE4.1)
+        | otherwise -> vector_int_minmax_sse Min l w x y
+      MO_VS_Min l@8 w@W16
+                    -> vector_int_op_sse (MINMAX Min (IntVecMinMax True)) l w x y -- PMINSW (SSE2)
+      MO_VS_Min l@4 w@W32
+        | sse4_1    -> vector_int_op_sse (MINMAX Min (IntVecMinMax True)) l w x y -- PMINSD (SSE4.1)
+        | otherwise -> vector_int_minmax_sse Min l w x y
+      MO_VS_Min l@2 w@W64
+        | sse4_2    -> vector_int_minmax_sse Min l w x y -- PCMPGTQ requires SSE4.2
+        -- The SSE2 version is implemented as a C call (MO_I64X2_Min)
       MO_VS_Min {} -> needLlvm mop
+      MO_VS_Max l@16 w@W8
+        | sse4_1    -> vector_int_op_sse (MINMAX Max (IntVecMinMax True)) l w x y -- PMAXSB (SSE4.1)
+        | otherwise -> vector_int_minmax_sse Max l w x y
+      MO_VS_Max l@8 w@W16
+                    -> vector_int_op_sse (MINMAX Max (IntVecMinMax True)) l w x y -- PMAXSW (SSE2)
+      MO_VS_Max l@4 w@W32
+        | sse4_1    -> vector_int_op_sse (MINMAX Max (IntVecMinMax True)) l w x y -- PMAXSD (SSE4.1)
+        | otherwise -> vector_int_minmax_sse Max l w x y
+      MO_VS_Max l@2 w@W64
+        | sse4_2    -> vector_int_minmax_sse Max l w x y -- PCMPGTQ requires SSE4.2
+        -- The SSE2 version is implemented as a C call (MO_I64X2_Max)
       MO_VS_Max {} -> needLlvm mop
 
       -- Unary MachOps
@@ -1632,13 +1672,13 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
 
     -----------------------
     -- Vector operations---
-    vector_float_op_avx :: VectorArithInstns
+    vector_float_op_avx :: (Format -> Operand -> Reg -> Reg -> Instr)
                         -> Length
                         -> Width
                         -> CmmExpr
                         -> CmmExpr
                         -> NatM Register
-    vector_float_op_avx op l w expr1 expr2 = do
+    vector_float_op_avx instr l w expr1 expr2 = do
       (reg1, exp1) <- getSomeReg expr1
       (reg2, exp2) <- getSomeReg expr2
       let format   = case w of
@@ -1646,56 +1686,55 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                        W64 -> VecFormat l FmtDouble
                        _ -> pprPanic "Floating-point AVX vector operation not supported at this width"
                              (text "width:" <+> ppr w)
-          code dst = case op of
-            VA_Add -> arithInstr VADD
-            VA_Sub -> arithInstr VSUB
-            VA_Mul -> arithInstr VMUL
-            VA_Div -> arithInstr VDIV
-            VA_Min -> arithInstr (VMINMAX Min FloatMinMax)
-            VA_Max -> arithInstr (VMINMAX Max FloatMinMax)
-            where
-              -- opcode src2 src1 dst <==> dst = src1 `opcode` src2
-              arithInstr instr = exp1 `appOL` exp2 `snocOL`
-                                 (instr format (OpReg reg2) reg1 dst)
+          -- opcode src2 src1 dst <==> dst = src1 `opcode` src2
+          code dst = exp1 `appOL` exp2 `snocOL`
+                     (instr format (OpReg reg2) reg1 dst)
       return (Any format code)
 
-    vector_float_op_sse :: VectorArithInstns
-                        -> Length
-                        -> Width
-                        -> CmmExpr
-                        -> CmmExpr
-                        -> NatM Register
-    vector_float_op_sse op l w expr1 expr2 = do
+    vector_float_op_sse :: (Format -> Operand -> Reg -> Instr)
+                        -> Length -> Width -> CmmExpr -> CmmExpr -> NatM Register
+    vector_float_op_sse instr l w = vector_op_sse instr format
+      where format = case w of
+                       W32 -> VecFormat l FmtFloat
+                       W64 -> VecFormat l FmtDouble
+                       _ -> pprPanic "Floating-point SSE vector operation not supported at this width"
+                             (text "width:" <+> ppr w)
+
+    vector_int_op_sse :: (Format -> Operand -> Reg -> Instr)
+                      -> Length -> Width -> CmmExpr -> CmmExpr -> NatM Register
+    vector_int_op_sse instr l w = vector_op_sse instr format
+      where format = case w of
+                       W8 -> VecFormat l FmtInt8
+                       W16 -> VecFormat l FmtInt16
+                       W32 -> VecFormat l FmtInt32
+                       W64 -> VecFormat l FmtInt64
+                       _ -> pprPanic "Integer SSE vector operation not supported at this width"
+                              (text "width:" <+> ppr w)
+
+    vector_op_sse :: (Format -> Operand -> Reg -> Instr)
+                  -> Format
+                  -> CmmExpr
+                  -> CmmExpr
+                  -> NatM Register
+    vector_op_sse instr format expr1 expr2 = do
       -- This function is similar to genTrivialCode, but re-using it would require
       -- handling alignment correctly: SSE vector instructions typically require 16-byte
       -- alignment for their memory operand (this restriction is relaxed with VEX-encoded
       -- instructions).
       -- For now, we always load the value into a register and avoid the alignment issue.
+      config <- getConfig
       exp1_code <- getAnyReg expr1
-      (reg2, exp2_code) <- getSomeReg expr2
-      let format   = case w of
-                       W32 -> VecFormat l FmtFloat
-                       W64 -> VecFormat l FmtDouble
-                       _ -> pprPanic "Floating-point SSE vector operation not supported at this width"
-                             (text "width:" <+> ppr w)
+      (reg2, exp2_code) <- getSomeReg expr2 -- vector registers are never clobbered by an instruction
       tmp <- getNewRegNat format
-      let code dst = case op of
-            VA_Add -> arithInstr ADD
-            VA_Sub -> arithInstr SUB
-            VA_Mul -> arithInstr MUL
-            VA_Div -> arithInstr FDIV
-            VA_Min -> arithInstr (MINMAX Min FloatMinMax)
-            VA_Max -> arithInstr (MINMAX Max FloatMinMax)
-            where
-              -- opcode src2 src1 <==> src1 = src1 `opcode` src2
-              arithInstr instr
-                | dst == reg2 = exp2_code `snocOL`
-                                (MOVU format (OpReg reg2) (OpReg tmp)) `appOL`
-                                exp1_code dst `snocOL`
-                                instr format (OpReg tmp) (OpReg dst)
-                | otherwise = exp2_code `appOL`
-                              exp1_code dst `snocOL`
-                              instr format (OpReg reg2) (OpReg dst)
+      let code dst
+            -- opcode src2 src1 <==> src1 = src1 `opcode` src2
+            | dst == reg2 = exp2_code `snocOL`
+                            movInstr config format (OpReg reg2) (OpReg tmp) `appOL` -- MOVU or MOVDQU
+                            exp1_code dst `snocOL`
+                            instr format (OpReg tmp) dst
+            | otherwise = exp2_code `appOL`
+                          exp1_code dst `snocOL`
+                          instr format (OpReg reg2) dst
       return (Any format code)
     --------------------
     vector_float_extract :: Length
@@ -1834,6 +1873,153 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       return (Any II64 code)
     vector_int64x2_extract_sse2 _ offset
       = pprPanic "Unsupported offset" (pdoc platform offset)
+
+    vector_int8x16_mul_sse2 :: CmmExpr -> CmmExpr -> NatM Register
+    vector_int8x16_mul_sse2 expr1 expr2 = do
+      -- use two SSE2 PMULLW (low 16 bits of int16 multiplication) operations
+      (reg1, exp1) <- getSomeReg expr1
+      (reg2, exp2) <- getSomeReg expr2
+      let format = VecFormat 16 FmtInt8
+          format16 = VecFormat 8 FmtInt16 -- for PMULLW
+      tmp1lo <- getNewRegNat format
+      tmp1hi <- getNewRegNat format
+      tmp2hi <- getNewRegNat format
+      tmp2lo <- getNewRegNat format
+      (maskReg, maskCode) <- getSomeReg (CmmLit $ CmmVec $ replicate 8 (CmmInt 0xff W16)) -- (0xff,0,0xff,0,...,0xff,0) :: Int8X16
+      let code = exp1 `appOL` exp2 `appOL` maskCode `snocOL`
+                 (MOVDQU format (OpReg reg1) (OpReg tmp1lo)) `snocOL` -- tmp1lo <- reg1
+                 (MOVDQU format (OpReg reg2) (OpReg tmp2lo)) `snocOL` -- tmp2lo <- reg2
+                 (PUNPCKLBW format (OpReg reg1) tmp1lo) `snocOL`      -- tmp1lo <- (tmp1lo[0],reg1[0],tmp1lo[1],reg1[1],...,tmp1lo[7],reg1[7]); The first operand does not really matter
+                 (PUNPCKLBW format (OpReg reg2) tmp2lo) `snocOL`      -- tmp2lo <- (tmp2lo[0],reg2[0],tmp2lo[1],reg2[1],...,tmp2lo[7],reg2[7]); The first operand does not really matter
+                 (MOVDQU format (OpReg reg1) (OpReg tmp1hi)) `snocOL` -- tmp1hi <- reg1
+                 (MOVDQU format (OpReg reg2) (OpReg tmp2hi)) `snocOL` -- tmp2hi <- reg2
+                 (PUNPCKHBW format (OpReg reg1) tmp1hi) `snocOL`      -- tmp1hi <- (tmp1hi[8],reg1[8],tmp1hi[9],reg1[9],...,tmp1hi[15],reg1[15]); The first operand does not really matter
+                 (PMULL format16 (OpReg tmp2lo) tmp1lo) `snocOL`      -- PMULLW; tmp1lo <- (tmp1lo[0]*tmp2lo[0],*,tmp1lo[2]*tmp2lo[2],*,...,tmp1lo[14]*tmp2lo[14],*)
+                 (PUNPCKHBW format (OpReg reg2) tmp2hi) `snocOL`      -- tmp2hi <- (tmp2hi[8],reg2[8],tmp2hi[9],reg2[9],...,tmp2hi[15],reg2[15]); The first operand does not really matter
+                 (PMULL format16 (OpReg tmp2hi) tmp1hi) `snocOL`      -- PMULLW; tmp1hi <- (tmp1hi[0]*tmp2hi[0],*,tmp1hi[2]*tmp2hi[2],*,...,tmp1hi[14]*tmp2hi[14],*)
+                 (PAND format (OpReg maskReg) tmp1lo) `snocOL`        -- tmp1lo <- (tmp1lo[0],0,tmp1lo[2],0,...,tmp1lo[14],0)
+                 (PAND format (OpReg maskReg) tmp1hi) `snocOL`        -- tmp1hi <- (tmp1hi[0],0,tmp1hi[2],0,...,tmp1hi[14],0)
+                 (PACKUSWB format (OpReg tmp1hi) tmp1lo)              -- tmp1lo <- (tmp1lo[0],tmp1lo[2],...,tmp1lo[14],tmp1hi[0],tmp1hi[2],...tmp1hi[14])
+      return (Fixed format tmp1lo code)
+
+    vector_int32x4_mul_sse2 :: CmmExpr -> CmmExpr -> NatM Register
+    vector_int32x4_mul_sse2 expr1 expr2 = do
+      -- use two SSE2 PMULUDQ (int32 x int32 -> int64 multiplication) operations
+      (reg1, exp1) <- getSomeReg expr1
+      (reg2, exp2) <- getSomeReg expr2
+      let format = VecFormat 4 FmtInt32
+      tmpEven <- getNewRegNat format
+      tmpOdd1 <- getNewRegNat format
+      tmpOdd2 <- getNewRegNat format
+      let code dst = exp1 `appOL` exp2 `snocOL`
+                     (MOVDQU format (OpReg reg1) (OpReg tmpEven)) `snocOL`                   -- tmpEven <- reg1
+                     (PSHUFD format (ImmInt 0b11_11_01_01) (OpReg reg1) tmpOdd1) `snocOL`    -- tmpOdd1 <- (reg1[1],reg1[1],reg1[3],reg1[3])
+                     (PMULUDQ format (OpReg reg2) tmpEven) `snocOL`                          -- tmpEven <- (tmpEven[0]*reg2[0],*,tmpEven[2]*reg2[2],*)
+                     (PSHUFD format (ImmInt 0b11_11_01_01) (OpReg reg2) tmpOdd2) `snocOL`    -- tmpOdd2 <- (reg2[1],reg2[1],reg2[3],reg2[3])
+                     (PMULUDQ format (OpReg tmpOdd2) tmpOdd1) `snocOL`                       -- tmpOdd1 <- (tmpOdd1[0]*tmpOdd2[0],*,tmpOdd1[2]*tmpOdd2[2],*)
+                     (PSHUFD format (ImmInt 0b00_00_10_00) (OpReg tmpEven) dst) `snocOL`     -- dst <- (tmpEven[0],tmpEven[2],tmpEven[0],tmpEven[0])
+                     (PSHUFD format (ImmInt 0b00_00_10_00) (OpReg tmpOdd1) tmpOdd1) `snocOL` -- tmpOdd1 <- (tmpOdd1[0],tmpOdd1[2],tmpOdd1[0],tmpOdd1[0])
+                     (PUNPCKLDQ format (OpReg tmpOdd1) dst)                                  -- dst <- (dst[0],tmpOdd1[0],dst[1],tmpOdd1[1])
+      return (Any format code)
+
+    -- TODO: We could use `VPMULLQ` if AVX-512 or AVX10.1 is available.
+    vector_int64x2_mul_sse2 :: CmmExpr -> CmmExpr -> NatM Register
+    vector_int64x2_mul_sse2 expr1 expr2 = do
+      -- implement 64 bit multiplication using 32-bit PMULUDQ multiplication instructions
+      -- (lo1 + shiftL hi1 32) * (lo2 + shiftL hi2 32) = lo1 * lo2 + shiftL (lo1 * hi2) 32 + shiftL (lo2 * hi1) 32
+      exp1 <- getAnyReg expr1
+      exp2 <- getAnyReg expr2
+      let format = VecFormat 2 FmtInt64
+      reg1 <- getNewRegNat format
+      reg2 <- getNewRegNat format
+      tmp1Hi <- getNewRegNat format
+      tmp2Hi <- getNewRegNat format
+      let code dst = exp1 reg1 `appOL` exp2 reg2 `snocOL`
+                     (MOVDQU format (OpReg reg1) (OpReg dst)) `snocOL`    -- dst <- reg1
+                     (MOVDQU format (OpReg reg1) (OpReg tmp1Hi)) `snocOL` -- tmp1Hi <- reg1
+                     (MOVDQU format (OpReg reg2) (OpReg tmp2Hi)) `snocOL` -- tmp2Hi <- reg2
+                     (PSRL format (OpImm (ImmInt 32)) tmp1Hi) `snocOL`    -- PSRLQ (logical shift); tmp1Hi <- (tmp1Hi[0] >> 32, tmp1Hi[1] >> 32)
+                     (PMULUDQ format (OpReg reg2) dst) `snocOL`           -- dst <- ((dst as Word32X4)[0] * (reg2 as Word32X4)[0] as Word64, (dst as Word32X4)[2] * (reg2 as Word32X4)[2] as Word64)
+                     (PSRL format (OpImm (ImmInt 32)) tmp2Hi) `snocOL`    -- PSRLQ (logical shift); tmp2Hi <- (tmp2Hi[0] >> 32, tmp2Hi[1] >> 32)
+                     (PMULUDQ format (OpReg reg2) tmp1Hi) `snocOL`        -- tmp1Hi <- ((tmp1Hi as Word32X4)[0] * (reg2 as Word32X4)[0] as Word64, (tmp1Hi as Word32X4)[2] * (reg2 as Word32X4)[2] as Word64)
+                     (PMULUDQ format (OpReg reg1) tmp2Hi) `snocOL`        -- tmp2Hi <- ((tmp2Hi as Word32X4)[0] * (reg1 as Word32X4)[0] as Word64, (tmp2Hi as Word32X4)[2] * (reg1 as Word32X4)[2] as Word64)
+                     (PADD format (OpReg tmp2Hi) tmp1Hi) `snocOL`         -- PADDQ; tmp1Hi <- (tmp1Hi[0] + tmp2Hi[0], tmp1Hi[1] + tmp2Hi[1])
+                     (PSLL format (OpImm (ImmInt 32)) tmp1Hi) `snocOL`    -- PSLLQ; tmp1Hi <- (tmp1Hi[0] << 32, tmp1Hi[1] << 32)
+                     (PADD format (OpReg tmp1Hi) dst)                     -- PADDQ; dst <- (dst[0] + tmp1Hi[0], dst[1] + tmp1Hi[1])
+      return (Any format code)
+
+    vector_int_minmax_sse :: MinOrMax -> Length -> Width -> CmmExpr -> CmmExpr -> NatM Register
+    vector_int_minmax_sse minmax l w expr1 expr2 = do
+      -- SSE2 fallback: compute a mask of 0s/1s using PCMPGT, then max a b = (mask & a) | (not mask & b)
+      exp1 <- getAnyReg expr1
+      exp2 <- getAnyReg expr2
+      let format = case w of
+            W8 -> VecFormat l FmtInt8
+            W16 -> VecFormat l FmtInt16
+            W32 -> VecFormat l FmtInt32
+            W64 -> VecFormat l FmtInt64
+            _  -> panic "Unsupported width"
+      reg1 <- getNewRegNat format
+      reg2 <- getNewRegNat format
+      tmp <- getNewRegNat format
+      let codeMin dst = exp1 reg1 `appOL` exp2 reg2 `snocOL`
+                        (MOVDQU format (OpReg reg1) (OpReg dst)) `snocOL` -- dst <- reg1
+                        (MOVDQU format (OpReg reg2) (OpReg tmp)) `snocOL` -- tmp <- reg2
+                        (PCMPGT format (OpReg reg2) dst) `snocOL`         -- dst <- if dst > reg2 then True(-1) else False(0)
+                        (PAND format (OpReg dst) tmp) `snocOL`            -- tmp <- tmp & dst; if dst then tmp else 0
+                        (PANDN format (OpReg reg1) dst) `snocOL`          -- dst <- ~dst & reg1; if dst then 0 else reg1
+                        (POR format (OpReg tmp) dst)                      -- dst <- tmp | dst
+          codeMax dst = exp1 reg1 `appOL` exp2 reg2 `snocOL`
+                        (MOVDQU format (OpReg reg1) (OpReg dst)) `snocOL` -- dst <- reg1
+                        (MOVDQU format (OpReg reg1) (OpReg tmp)) `snocOL` -- tmp <- reg1
+                        (PCMPGT format (OpReg reg2) dst) `snocOL`         -- dst <- if dst > reg2 then True(-1) else False(0)
+                        (PAND format (OpReg dst) tmp) `snocOL`            -- tmp <- tmp & dst; if dst then tmp else 0
+                        (PANDN format (OpReg reg2) dst) `snocOL`          -- dst <- ~dst & reg2; if dst then 0 else reg2
+                        (POR format (OpReg tmp) dst)                      -- dst <- tmp | dst
+      return $ case minmax of
+        Min -> Any format codeMin
+        Max -> Any format codeMax
+
+    vector_word_minmax_sse :: MinOrMax -> Length -> Width -> CmmExpr -> CmmExpr -> NatM Register
+    vector_word_minmax_sse minmax l w expr1 expr2 = do
+      -- SSE2 fallback: compute a mask of 0s/1s using PCMPGT, then max a b = (mask & a) | (not mask & b)
+      -- We can use PCMPGT to compare unsigned integers by flipping the most significant bit.
+      exp1 <- getAnyReg expr1
+      exp2 <- getAnyReg expr2
+      let (format, sign) = case w of
+            W8 -> (VecFormat l FmtInt8, 0x80)
+            W16 -> (VecFormat l FmtInt16, 0x8000)
+            W32 -> (VecFormat l FmtInt32, 2^(31 :: Int))
+            W64 -> (VecFormat l FmtInt64, 2^(63 :: Int))
+            _  -> panic "Unsupported width"
+      reg1 <- getNewRegNat format
+      reg2 <- getNewRegNat format
+      tmp1 <- getNewRegNat format
+      tmp2 <- getNewRegNat format
+      (signReg, signCode) <- getSomeReg (CmmLit $ CmmVec $ replicate l (CmmInt sign w))
+      let codeMin dst = exp1 reg1 `appOL` exp2 reg2 `appOL` signCode `snocOL`
+                        (MOVDQU format (OpReg reg1) (OpReg dst)) `snocOL`  -- dst <- reg1
+                        (MOVDQU format (OpReg reg2) (OpReg tmp1)) `snocOL` -- tmp1 <- reg2
+                        (MOVDQU format (OpReg reg2) (OpReg tmp2)) `snocOL` -- tmp2 <- reg2
+                        (PXOR format (OpReg signReg) dst) `snocOL`         -- dst <- dst ^ 2^(w-1)
+                        (PXOR format (OpReg signReg) tmp1) `snocOL`        -- tmp1 < dst ^ 2^(w-1)
+                        (PCMPGT format (OpReg tmp1) dst) `snocOL`          -- dst <- if dst > tmp1 then True(-1) else False(0)
+                        (PAND format (OpReg dst) tmp2) `snocOL`            -- tmp2 <- tmp2 & dst; if dst then tmp2 else 0
+                        (PANDN format (OpReg reg1) dst) `snocOL`           -- dst <- ~dst & reg1; if dst then 0 else reg1
+                        (POR format (OpReg tmp2) dst)                      -- dst <- tmp2 | dst
+          codeMax dst = exp1 reg1 `appOL` exp2 reg2 `appOL` signCode `snocOL`
+                        (MOVDQU format (OpReg reg1) (OpReg dst)) `snocOL`  -- dst <- reg1
+                        (MOVDQU format (OpReg reg2) (OpReg tmp1)) `snocOL` -- tmp1 <- reg2
+                        (MOVDQU format (OpReg reg1) (OpReg tmp2)) `snocOL` -- tmp2 <- reg1
+                        (PXOR format (OpReg signReg) dst) `snocOL`         -- dst <- dst ^ 2^(w-1)
+                        (PXOR format (OpReg signReg) tmp1) `snocOL`        -- tmp1 <- tmp1 ^ 2^(w-1)
+                        (PCMPGT format (OpReg tmp1) dst) `snocOL`          -- dst <- if dst > tmp1 then True(-1) else False(0)
+                        (PAND format (OpReg dst) tmp2) `snocOL`            -- tmp2 <- tmp2 & dst; if dst then tmp2 else 0
+                        (PANDN format (OpReg reg2) dst) `snocOL`           -- dst <- ~dst & reg2; if dst then 0 else reg2
+                        (POR format (OpReg tmp2) dst)                      -- dst <- tmp2 | dst
+      return $ case minmax of
+        Min -> Any format codeMin
+        Max -> Any format codeMax
 
     vector_shuffle_float :: Length -> Width -> CmmExpr -> CmmExpr -> [Int] -> NatM Register
     vector_shuffle_float l w v1 v2 is = do
@@ -3339,6 +3525,30 @@ genSimplePrim bid MO_I64_Quot          [dst]   [x,y]          = genPrimCCall bid
 genSimplePrim bid MO_I64_Rem           [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_remInt64") [dst] [x,y]
 genSimplePrim bid MO_W64_Quot          [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_quotWord64") [dst] [x,y]
 genSimplePrim bid MO_W64_Rem           [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_remWord64") [dst] [x,y]
+genSimplePrim bid (MO_VS_Quot 16 W8)   [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_quotInt8X16") [dst] [x,y]
+genSimplePrim bid (MO_VS_Quot 8 W16)   [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_quotInt16X8") [dst] [x,y]
+genSimplePrim bid (MO_VS_Quot 4 W32)   [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_quotInt32X4") [dst] [x,y]
+genSimplePrim bid (MO_VS_Quot 2 W64)   [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_quotInt64X2") [dst] [x,y]
+genSimplePrim _   op@(MO_VS_Quot {})   _       _              = pprPanic "Unsupported vector instruction for the native code generator:" (pprCallishMachOp op)
+genSimplePrim bid (MO_VS_Rem 16 W8)    [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_remInt8X16") [dst] [x,y]
+genSimplePrim bid (MO_VS_Rem 8 W16)    [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_remInt16X8") [dst] [x,y]
+genSimplePrim bid (MO_VS_Rem 4 W32)    [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_remInt32X4") [dst] [x,y]
+genSimplePrim bid (MO_VS_Rem 2 W64)    [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_remInt64X2") [dst] [x,y]
+genSimplePrim _   op@(MO_VS_Rem {})    _       _              = pprPanic "Unsupported vector instruction for the native code generator:" (pprCallishMachOp op)
+genSimplePrim bid (MO_VU_Quot 16 W8)   [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_quotWord8X16") [dst] [x,y]
+genSimplePrim bid (MO_VU_Quot 8 W16)   [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_quotWord16X8") [dst] [x,y]
+genSimplePrim bid (MO_VU_Quot 4 W32)   [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_quotWord32X4") [dst] [x,y]
+genSimplePrim bid (MO_VU_Quot 2 W64)   [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_quotWord64X2") [dst] [x,y]
+genSimplePrim _   op@(MO_VU_Quot {})   _       _              = pprPanic "Unsupported vector instruction for the native code generator:" (pprCallishMachOp op)
+genSimplePrim bid (MO_VU_Rem 16 W8)    [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_remWord8X16") [dst] [x,y]
+genSimplePrim bid (MO_VU_Rem 8 W16)    [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_remWord16X8") [dst] [x,y]
+genSimplePrim bid (MO_VU_Rem 4 W32)    [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_remWord32X4") [dst] [x,y]
+genSimplePrim bid (MO_VU_Rem 2 W64)    [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_remWord64X2") [dst] [x,y]
+genSimplePrim _   op@(MO_VU_Rem {})    _       _              = pprPanic "Unsupported vector instruction for the native code generator:" (pprCallishMachOp op)
+genSimplePrim bid MO_I64X2_Min         [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_minInt64X2") [dst] [x,y]
+genSimplePrim bid MO_I64X2_Max         [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_maxInt64X2") [dst] [x,y]
+genSimplePrim bid MO_W64X2_Min         [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_minWord64X2") [dst] [x,y]
+genSimplePrim bid MO_W64X2_Max         [dst]   [x,y]          = genPrimCCall bid (fsLit "hs_maxWord64X2") [dst] [x,y]
 genSimplePrim _   op                   dst     args           = do
   platform <- ncgPlatform <$> getConfig
   pprPanic "genSimplePrim: unhandled primop" (ppr (pprCallishMachOp op, dst, fmap (pdoc platform) args))
@@ -4697,10 +4907,10 @@ trivialCode' platform width _ (Just revinstr) (CmmLit lit_a) b
   return (Any (intFormat width) code)
 
 trivialCode' _ width instr _ a b
-  = genTrivialCode (intFormat width) instr a b
+  = genTrivialCode (intFormat width) (\op2 -> instr op2 . OpReg) a b
 
 -- This is re-used for floating pt instructions too.
-genTrivialCode :: Format -> (Operand -> Operand -> Instr)
+genTrivialCode :: Format -> (Operand -> Reg -> Instr)
                -> CmmExpr -> CmmExpr -> NatM Register
 genTrivialCode rep instr a b = do
   (b_op, b_code) <- getNonClobberedOperand b
@@ -4718,11 +4928,11 @@ genTrivialCode rep instr a b = do
                 b_code `appOL`
                 unitOL (MOV rep b_op (OpReg tmp)) `appOL`
                 a_code dst `snocOL`
-                instr (OpReg tmp) (OpReg dst)
+                instr (OpReg tmp) dst
         | otherwise =
                 b_code `appOL`
                 a_code dst `snocOL`
-                instr b_op (OpReg dst)
+                instr b_op dst
   return (Any rep code)
 
 regClashesWithOp :: Reg -> Operand -> Bool
@@ -4818,7 +5028,7 @@ trivialUCode rep instr x = do
 -----------
 
 
-trivialFCode_sse2 :: Width -> (Format -> Operand -> Operand -> Instr)
+trivialFCode_sse2 :: Width -> (Format -> Operand -> Reg -> Instr)
                   -> CmmExpr -> CmmExpr -> NatM Register
 trivialFCode_sse2 ty instr x y
     = genTrivialCode format (instr format) x y

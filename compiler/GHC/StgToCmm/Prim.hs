@@ -1534,20 +1534,28 @@ emitPrimOp cfg primop =
   (VecSubOp  IntVec n w) -> opTranslate (MO_V_Sub   n w)
   (VecMulOp  IntVec n w) -> opTranslate (MO_V_Mul   n w)
   (VecDivOp  IntVec _ _) -> \_ -> panic "unsupported primop"
-  (VecQuotOp IntVec n w) -> opTranslate (MO_VS_Quot n w)
-  (VecRemOp  IntVec n w) -> opTranslate (MO_VS_Rem  n w)
+  (VecQuotOp IntVec n w) -> opCallish (MO_VS_Quot n w)
+  (VecRemOp  IntVec n w) -> opCallish (MO_VS_Rem n w)
   (VecNegOp  IntVec n w) -> opTranslate (MO_VS_Neg  n w)
+  (VecMinOp  IntVec 2 W64)
+    | not allowIntWord64X2MinMax -> opCallish MO_I64X2_Min
   (VecMinOp  IntVec n w) -> opTranslate (MO_VS_Min  n w)
+  (VecMaxOp  IntVec 2 W64)
+    | not allowIntWord64X2MinMax -> opCallish MO_I64X2_Max
   (VecMaxOp  IntVec n w) -> opTranslate (MO_VS_Max  n w)
 
   (VecAddOp  WordVec n w) -> opTranslate (MO_V_Add   n w)
   (VecSubOp  WordVec n w) -> opTranslate (MO_V_Sub   n w)
   (VecMulOp  WordVec n w) -> opTranslate (MO_V_Mul   n w)
   (VecDivOp  WordVec _ _) -> \_ -> panic "unsupported primop"
-  (VecQuotOp WordVec n w) -> opTranslate (MO_VU_Quot n w)
-  (VecRemOp  WordVec n w) -> opTranslate (MO_VU_Rem  n w)
+  (VecQuotOp WordVec n w) -> opCallish (MO_VU_Quot n w)
+  (VecRemOp  WordVec n w) -> opCallish (MO_VU_Rem n w)
   (VecNegOp  WordVec _ _) -> \_ -> panic "unsupported primop"
+  (VecMinOp  WordVec 2 W64)
+    | not allowIntWord64X2MinMax -> opCallish MO_W64X2_Min
   (VecMinOp  WordVec n w) -> opTranslate (MO_VU_Min  n w)
+  (VecMaxOp  WordVec 2 W64)
+    | not allowIntWord64X2MinMax -> opCallish MO_W64X2_Max
   (VecMaxOp  WordVec n w) -> opTranslate (MO_VU_Max  n w)
 
   -- Vector FMA instructions
@@ -1861,6 +1869,7 @@ emitPrimOp cfg primop =
   allowWord2Mul = stgToCmmAllowWordMul2Instr        cfg
   allowArith64  = stgToCmmAllowArith64              cfg
   allowQuot64   = stgToCmmAllowQuot64               cfg
+  allowIntWord64X2MinMax = stgToCmmAllowIntWord64X2MinMax cfg
 
   -- a bit of a hack, for certain code generaters, e.g. PPC, and i386 we
   -- continue to use the cmm versions of these functions instead of inline
