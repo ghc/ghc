@@ -181,8 +181,8 @@ llvmHeader cfg =
 {-# SPECIALIZE llvmHeader :: LlvmCgConfig -> SDoc #-}
 {-# SPECIALIZE llvmHeader :: LlvmCgConfig -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
-llvmGroupLlvmGens :: DynFlags -> ModLocation -> RawCmmGroup -> LlvmM ()
-llvmGroupLlvmGens dflags location cmm = do
+llvmGroupLlvmGens :: DynFlags -> ModLocation -> MetaId -> RawCmmGroup -> LlvmM ()
+llvmGroupLlvmGens dflags location fileMetaId cmm = do
         let debug_map :: LabelMap DebugBlock
             debug_map
               | (debugLevel dflags) >= 1 = debugToMap $ cmmDebugGen location cmm
@@ -203,7 +203,7 @@ llvmGroupLlvmGens dflags location cmm = do
         {-# SCC "llvm_datas_gen" #-}
           cmmDataLlvmGens cdata
         {-# SCC "llvm_procs_gen" #-}
-          mapM_ (cmmLlvmGen debug_map) cmm
+          mapM_ (cmmLlvmGen debug_map fileMetaId) cmm
 
 -- -----------------------------------------------------------------------------
 -- | Do LLVM code generation on all these Cmms data sections.
@@ -226,8 +226,8 @@ cmmDataLlvmGens statics
                   (pprLlvmData cfg (concat gss', concat tss))
 
 -- | Complete LLVM code generation phase for a single top-level chunk of Cmm.
-cmmLlvmGen :: LabelMap DebugBlock -> RawCmmDecl -> LlvmM ()
-cmmLlvmGen debug_map cmm@CmmProc{} = do
+cmmLlvmGen :: LabelMap DebugBlock -> MetaId -> RawCmmDecl -> LlvmM ()
+cmmLlvmGen debug_map fileMetaId cmm@CmmProc{} = do
 
     -- rewrite assignments to global regs
     platform <- getPlatform
@@ -242,11 +242,11 @@ cmmLlvmGen debug_map cmm@CmmProc{} = do
     -- pretty print - print as we go, since we produce HDocs, we know
     -- no nesting state needs to be maintained for the SDocs.
     forM_ llvmBC (\decl -> do
-        (hdoc, sdoc) <- pprLlvmCmmDecl debug_map decl
+        (hdoc, sdoc) <- pprLlvmCmmDecl debug_map decl fileMetaId
         renderLlvm (hdoc $$ empty) (sdoc $$ empty)
       )
 
-cmmLlvmGen _ _ = return ()
+cmmLlvmGen _ _ _ = return ()
 
 -- -----------------------------------------------------------------------------
 -- | Generate meta data nodes
