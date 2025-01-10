@@ -101,7 +101,7 @@ pprLlvmCmmDecl debug_map (CmmProc (label, mb_info) entry_lbl live (ListGraph blk
                                         , disIsDefinition = True
                                         }
                addMetaDecl typeMetaDef
-               addSubprogram subprogMeta subprog
+               addMetaDecl (MetaUnnamed subprogMeta Distinct subprog)
                return $ Just $ MetaAnnot (fsLit "dbg") (MetaNode subprogMeta)
              _   -> return Nothing
 

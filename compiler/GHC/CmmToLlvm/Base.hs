@@ -20,7 +20,7 @@ module GHC.CmmToLlvm.Base (
         markStackReg, checkStackReg,
         funLookup, funInsert, getLlvmVer,
         dumpIfSetLlvm, renderLlvm, markUsedVar, getUsedVars,
-        addMetaDecl, getMetaDecls, addSubprogram, getSubprograms,
+        addMetaDecl, getMetaDecls,
         ghcInternalFunctions, getPlatform, getConfig,
 
         getMetaUniqueId,
@@ -290,8 +290,6 @@ data LlvmEnv = LlvmEnv
   , envAliases   :: UniqSet LMString -- ^ Globals that we had to alias, see [Llvm Forward References]
   , envUsedVars  :: [LlvmVar]        -- ^ Pointers to be added to llvm.used (see @cmmUsedLlvmGens@)
   , envMetaDecls :: [MetaDecl]     -- ^ Metadata declarations to be included in final output
-  , envSubprograms :: [MetaId]     -- ^ 'MetaId's of the @DISubprogram@ metadata
-                                   -- nodes defined in this @DICompileUnit@.
 
     -- the following get cleared for every function (see @withClearVars@)
   , envVarMap    :: LlvmEnvMap       -- ^ Local variables so far, with type
@@ -345,7 +343,6 @@ runLlvm logger cfg ver out us m = do
                       , envStackRegs = []
                       , envUsedVars  = []
                       , envMetaDecls = []
-                      , envSubprograms = []
                       , envAliases   = emptyUniqSet
                       , envVersion   = ver
                       , envConfig    = cfg
@@ -438,15 +435,6 @@ setUniqMeta f m = modifyEnv $ \env -> env { envUniqMeta = addToUFM (envUniqMeta 
 -- | Gets metadata node for given unique
 getUniqMeta :: Unique -> LlvmM (Maybe MetaId)
 getUniqMeta s = getEnv (flip lookupUFM s . envUniqMeta)
-
--- | Add a @DISubprogram@ metadata declaration to the current compilation unit.
-addSubprogram :: MetaId -> MetaExpr -> LlvmM ()
-addSubprogram metaId metaExpr = do
-    modifyEnv $ \env -> env { envSubprograms = metaId : envSubprograms env }
-    addMetaDecl (MetaUnnamed metaId Distinct metaExpr)
-
-getSubprograms :: LlvmM [MetaId]
-getSubprograms = LlvmM $ \env -> return (envSubprograms env, env { envSubprograms = [] })
 
 -- | Add a metadata declaration to the output.
 addMetaDecl :: MetaDecl -> LlvmM ()
