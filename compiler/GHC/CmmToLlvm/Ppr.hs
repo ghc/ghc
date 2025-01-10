@@ -87,25 +87,19 @@ pprLlvmCmmDecl debug_map (CmmProc (label, mb_info) entry_lbl live (ListGraph blk
                let disName = getLexicalFastString name
                let defName = llvmDefLabel disName
                subprogMeta <- getMetaUniqueId
-               fileMeta <- getMetaUniqueId
                typeMeta <- getMetaUniqueId
-               let fileDef = MetaUnnamed fileMeta NotDistinct
-                             $ MetaDIFile { difFilename = srcSpanFile span
-                                          , difDirectory = fsLit "TODO"
-                                          }
-                   typeMetaDef =
+               let typeMetaDef =
                        MetaUnnamed typeMeta NotDistinct
                        $ MetaDISubroutineType [MetaVar $ LMLitVar $ LMNullLit i1]
                    subprog =
                        MetaDISubprogram { disName         = disName
                                         , disLinkageName  = defName
-                                        , disScope        = fileMeta
-                                        , disFile         = fileMeta
+                                        , disScope        = fileMetaId
+                                        , disFile         = fileMetaId
                                         , disLine         = srcSpanStartLine span
                                         , disType         = typeMeta
                                         , disIsDefinition = True
                                         }
-               addMetaDecl fileDef
                addMetaDecl typeMetaDef
                addSubprogram subprogMeta subprog
                return $ Just $ MetaAnnot (fsLit "dbg") (MetaNode subprogMeta)
