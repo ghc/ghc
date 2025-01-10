@@ -323,7 +323,6 @@ ppMetaExpr opts = \case
       , ("isOptimized", if dicuIsOptimized
                             then text "true"
                             else text "false")
-      , ("subprograms", ppMetaExpr opts $ dicuSubprograms)
       ]
   MetaDISubprogram {..} ->
       specialMetadata "DISubprogram"
