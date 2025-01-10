@@ -123,7 +123,7 @@ tmpReg = regSingle tmpRegNo
 v0Reg :: Reg
 v0Reg = regSingle v0RegNo
 
--- | All machine register numbers.
+-- | All machine register numbers. Including potential vector registers.
 allMachRegNos :: [RegNo]
 allMachRegNos = intRegs ++ fpRegs ++ vRegs
   where
@@ -137,6 +137,11 @@ allMachRegNos = intRegs ++ fpRegs ++ vRegs
 -- These are all registers minus those with a fixed role in RISCV ABI (zero, lr,
 -- sp, gp, tp, fp, tmp) and GHC RTS (Base, Sp, Hp, HpLim, R1..R8, F1..F6,
 -- D1..D6.)
+--
+-- We pretend that vector registers are always available. If they aren't, we
+-- simply don't emit instructions using them. This is much simpler than fixing
+-- the register allocators which expect a configuration per platform (which we
+-- can only set when GHC itself gets build.)
 allocatableRegs :: Platform -> [RealReg]
 allocatableRegs platform =
   let isFree = freeReg platform
