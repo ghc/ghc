@@ -759,7 +759,7 @@ pprInstr platform instr = case instr of
   -- validate this constraint.
   VMERGE fmt o1 o2 o3 o4 -> configVec fmt $$ op4 (text "\tvmerge.vvm") o1 o2 o3 o4
   VSLIDEDOWN fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvslidedown.vx") o1 o2 o3
-  -- TODO: Use configVec, adjust VSETIVLI to contain only format?
+  -- TODO: adjust VSETIVLI to contain only format?
   VSETIVLI dst len width grouping ta ma ->
     line
       $ text "\tvsetivli"
