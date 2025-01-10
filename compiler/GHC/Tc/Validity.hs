@@ -12,7 +12,7 @@
 module GHC.Tc.Validity (
   Rank(..), UserTypeCtxt(..), checkValidType, checkValidMonoType,
   checkValidTheta,
-  checkValidInstance, checkValidInstHead, validDerivPred,
+  checkValidInstance, checkValidInstHead, instPredTerminates,
   checkTySynRhs, checkEscapingKind,
   checkValidCoAxiom, checkValidCoAxBranch,
   checkFamPatBinders, checkTyFamEqnValidityInfo,
@@ -1879,11 +1879,10 @@ B3. Finally, the constraints are checked by `checkValidTheta`. This step differs
 
     Also, in order to be absolutely sure that the inferred context will
     terminate, GHC explicitly checks that the inferred context satisfies the
-    Paterson conditions. This check is implemented in the `validDerivPred`
+    Paterson conditions. This check is implemented in the `instPredTerminates`
     function. (See "Wrinkle: The Paterson conditions" below for more on this.)
-    While `validDerivPred` is similar to other things defined in
-    GHC.Tc.Deriv.Infer, we define it here in GHC.Tc.Validity because it is quite
-    similar to `checkInstTermination`.
+    Note that `instPredTerminates` is the same function that powers
+    `checkInstTermination`.
 
 --------------------------------------
 -- Wrinkle: The Paterson conditions --
@@ -1939,25 +1938,6 @@ We can't have users writing instances for the equality classes. But we
 still need to be able to write instances for them ourselves. So we allow
 instances only in the defining module.
 -}
-
-validDerivPred :: PatersonSize -> PredType -> Bool
--- See Note [Valid 'deriving' predicate] (Wrinkle: The Paterson conditions)
-validDerivPred head_size pred
-  = case classifyPredType pred of
-            -- Equality constraints don't need to be checked in order to satisfy
-            -- the Paterson conditions, so we simply return True here. (They are
-            -- validity checked elsewhere in `approximateWC`, however.
-            -- See Note [ApproximateWC] in GHC.Tc.Types.Constraint.)
-            EqPred {}     -> True
-            -- Similarly, we don't need to check quantified constraints for
-            -- Paterson condition purposes, so simply return True here. (It
-            -- doesn't really matter what we return here, since `approximateWC`
-            -- won't quantify over a quantified constraint anywya.)
-            ForAllPred {} -> True
-            ClassPred cls tys -> check_size (pSizeClassPred cls tys)
-            IrredPred {} -> check_size (pSizeType pred)
-  where
-    check_size pred_size = isNothing (pred_size `ltPatersonSize` head_size)
 
 {-
 ************************************************************************
@@ -2108,10 +2088,39 @@ splitInstTyForValidity = split_context [] . drop_foralls
       | isInvisibleFunArg af = split_context (pred:preds) tau
     split_context preds ty = (reverse preds, ty)
 
+-- | @'checkInstTermation' theta head_pred@ checks if the instance context
+-- @theta@ satisfies the Paterson conditions (i.e., checks if it would
+-- terminate) if put into an instance of the form @instance theta => head_pred@.
+-- See @Note [Paterson conditions]@. If it doesn't satisfy the Paterson
+-- conditions, throw an error.
+--
+-- This function is like 'instPredTerminates', except that this function is
+-- monadic and works over an entire instance context instead of just a single
+-- instance constraint.
 checkInstTermination :: ThetaType -> TcPredType -> TcM ()
--- See Note [Paterson conditions]
-checkInstTermination theta head_pred
-  = check_preds emptyVarSet theta
+checkInstTermination theta head_pred =
+  let terminates :: PredType -> Maybe TcRnMessage
+      terminates theta_pred = instPredTerminates theta_pred head_pred
+
+      terminationErrors :: [Maybe TcRnMessage]
+      terminationErrors = map terminates theta
+
+      firstTerminationError :: Maybe TcRnMessage
+      firstTerminationError = asum terminationErrors in
+
+  case firstTerminationError of
+    Just err -> failWithTc err
+    Nothing -> pure ()
+
+-- | @'instPredTerminates' theta_pred head_pred@ checks if the instance
+-- constraint @theta_pred@ satisfies the Paterson conditions (i.e., checks if it
+-- would terminate) if put into an instance of the form
+-- @instance theta_pred => head_pred@. See @Note [Paterson conditions]@.
+-- If it does satisfy the Paterson conditions, return 'Nothing'. Otherwise,
+-- return @'Just' err@, where @err@ is the reason why it does not terminate.
+instPredTerminates :: PredType -> TcPredType -> Maybe TcRnMessage
+instPredTerminates theta_pred head_pred
+  = check emptyVarSet theta_pred
   where
    head_size = pSizeType head_pred
    -- This is inconsistent and probably wrong.  pSizeType does not filter out
@@ -2121,13 +2130,13 @@ checkInstTermination theta head_pred
    -- for why I didn't change it. See Note [Invisible arguments and termination]
    -- in GHC.Tc.Utils.TcType
 
-   check_preds :: VarSet -> [PredType] -> TcM ()
-   check_preds foralld_tvs preds = mapM_ (check foralld_tvs) preds
+   check_preds :: VarSet -> [PredType] -> Maybe TcRnMessage
+   check_preds foralld_tvs preds = asum $ map (check foralld_tvs) preds
 
-   check :: VarSet -> PredType -> TcM ()
+   check :: VarSet -> PredType -> Maybe TcRnMessage
    check foralld_tvs pred
      = case classifyPredType pred of
-         EqPred {}      -> return ()  -- See #4200.
+         EqPred {}      -> Nothing  -- See #4200.
          IrredPred {}   -> check2 (pSizeTypeX foralld_tvs pred)
 
          ClassPred cls tys
@@ -2145,8 +2154,8 @@ checkInstTermination theta head_pred
       where
         check2 pred_size
           = case pred_size `ltPatersonSize` head_size of
-              Just pc_failure -> failWithTc $ TcRnPatersonCondFailure pc_failure InInstanceDecl pred head_pred
-              Nothing         -> return ()
+              Just pc_failure -> Just $ TcRnPatersonCondFailure pc_failure InInstanceDecl pred head_pred
+              Nothing         -> Nothing
 
 {- Note [Instances and constraint synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

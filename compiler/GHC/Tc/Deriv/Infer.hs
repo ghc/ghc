@@ -29,7 +29,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Solver( pickQuantifiablePreds, simplifyTopImplic )
 import GHC.Tc.Solver.Solve( solveWanteds )
 import GHC.Tc.Solver.Monad ( runTcS )
-import GHC.Tc.Validity (checkValidTheta, validDerivPred)
+import GHC.Tc.Validity (checkValidTheta, instPredTerminates)
 import GHC.Tc.Utils.Unify (buildImplicationFor)
 import GHC.Tc.Zonk.TcType ( zonkWC )
 import GHC.Tc.Zonk.Env ( ZonkFlexi(..), initZonkEnv )
@@ -820,7 +820,7 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
                   , ds_cls = clas, ds_tys = inst_tys, ds_theta = deriv_rhs
                   , ds_skol_info = skol_info, ds_user_ctxt = user_ctxt })
   = setSrcSpan loc  $
-    addErrCtxt (derivInstCtxt (mkClassPred clas inst_tys)) $
+    addErrCtxt (derivInstCtxt inst_head) $
     do {
        -- See [STEP DAC BUILD]
        -- Generate the implication constraints, one for each method, to solve
@@ -850,8 +850,7 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
        ; let residual_simple = approximateWC False solved_wanteds
                 -- False: ignore any non-quantifiable constraints,
                 --        including equalities hidden under Given equalities
-             head_size = pSizeClassPred clas inst_tys
-             good      = mapMaybeBag get_good residual_simple
+             good = mapMaybeBag get_good residual_simple
 
              -- Returns @Just p@ (where @p@ is the type of the Ct) if a Ct
              -- satisfies the Paterson conditions (and is therefore suitable to
@@ -859,8 +858,9 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
              -- @Nothing@ otherwise. See Note [Valid 'deriving' predicate]
              -- (Wrinkle: The Paterson conditions) in GHC.Tc.Validity.
              get_good :: Ct -> Maybe PredType
-             get_good ct | validDerivPred head_size p = Just p
-                         | otherwise                  = Nothing
+             get_good ct
+               | isNothing (instPredTerminates p inst_head) = Just p
+               | otherwise                                  = Nothing
                where p = ctPred ct
 
        ; traceTc "simplifyDeriv outputs" $
@@ -902,6 +902,8 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
          -- See (B3) in Note [Valid 'deriving' predicate] in GHC.Tc.Validity.
 
        ; return min_theta }
+  where
+    inst_head = mkClassPred clas inst_tys
 
 {-
 Note [Overlap and deriving]

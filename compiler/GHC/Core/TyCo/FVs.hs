@@ -1103,8 +1103,7 @@ tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
 It is slightly odd to find the TyCons of a type.  Especially since, via a type
 family reduction or axiom, a type that doesn't mention T might start to mention T.
 
-This function is used in only three places:
-* In GHC.Tc.Validity.validDerivPred, when identifying "exotic" predicates.
+This function is used in only two places:
 * In GHC.Tc.Errors.Ppr.pprTcSolverReportMsg, when trying to print a helpful
   error about overlapping instances
 * In utils/dump-decls/Main.hs, an ill-documented module.

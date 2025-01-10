@@ -2223,7 +2223,7 @@ expand into anything else.  They are:
 
 For now we treat them as being size zero, but (#22696) I think we should
 actually treat them as big (like any other ype family) because we don't
-want to abstract over them in e.g. validDerivPred.
+want to abstract over them.
 
 The type-family termination test, in GHC.Tc.Validity.checkFamInstRhs, already
 has a separate call to isStuckTypeFamily, so the `F` above will still be accepted.
