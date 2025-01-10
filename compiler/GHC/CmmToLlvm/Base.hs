@@ -71,8 +71,6 @@ import Data.Ord (comparing)
 import qualified Control.Monad.IO.Class as IO
 import GHC.Cmm.Dataflow.Label (Label)
 
--- import Hoopl.Label ( Label )
-
 -- ----------------------------------------------------------------------------
 -- * Some Data Types
 --

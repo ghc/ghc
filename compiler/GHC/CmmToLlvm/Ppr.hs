@@ -14,8 +14,10 @@ import GHC.CmmToLlvm.Base
 import GHC.CmmToLlvm.Data
 import GHC.CmmToLlvm.Config
 
-import GHC.Cmm.CLabel
 import GHC.Cmm
+import GHC.Cmm.CLabel
+import GHC.Cmm.Dataflow.Label ( mapLookup, LabelMap )
+import GHC.Cmm.DebugBlock
 
 import GHC.Data.FastString
 import GHC.Utils.Outputable
@@ -24,8 +26,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Tickish ( GenTickish(SourceNote) )
 
 import Data.Maybe ( maybeToList )
-import GHC.Cmm.Dataflow.Label (mapLookup, LabelMap)
-import GHC.Cmm.DebugBlock
 
 -- ----------------------------------------------------------------------------
 -- * Top level

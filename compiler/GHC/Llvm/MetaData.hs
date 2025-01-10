@@ -17,7 +17,6 @@ import GHC.Prelude
 
 import GHC.Llvm.Types
 import GHC.Utils.Outputable
-import GHC.Data.FastString
 
 -- The LLVM Metadata System.
 --
@@ -89,18 +88,18 @@ data MetaExpr = MetaStr !LMString
               | MetaNode !MetaId
               | MetaVar !LlvmVar
               | MetaStruct [MetaExpr]
-              | MetaDIFile { difFilename  :: !FastString
-                           , difDirectory :: !FastString
+              | MetaDIFile { difFilename  :: !LMString
+                           , difDirectory :: !LMString
                            }
               | MetaDISubroutineType { distType     :: ![MetaExpr] }
-              | MetaDICompileUnit { dicuLanguage    :: !FastString
+              | MetaDICompileUnit { dicuLanguage    :: !LMString
                                   , dicuFile        :: !MetaId
-                                  , dicuProducer    :: !FastString
+                                  , dicuProducer    :: !LMString
                                   , dicuIsOptimized :: !Bool
                                   , dicuSubprograms :: !MetaExpr
                                   }
-              | MetaDISubprogram { disName          :: !FastString
-                                 , disLinkageName   :: !FastString
+              | MetaDISubprogram { disName          :: !LMString
+                                 , disLinkageName   :: !LMString
                                  , disScope         :: !MetaId
                                  , disFile          :: !MetaId
                                  , disLine          :: !Int
