@@ -49,13 +49,13 @@ pprLlvmData cfg (globals, types) =
 -- The HDoc we return is used to produce the final LLVM file, with the
 -- SDoc being returned alongside for use when @Opt_D_dump_llvm@ is set
 -- as we can't (currently) dump HDocs.
-pprLlvmCmmDecl :: LabelMap DebugBlock -> LlvmCmmDecl -> LlvmM (HDoc, SDoc)
-pprLlvmCmmDecl _ (CmmData _ lmdata) = do
+pprLlvmCmmDecl :: LabelMap DebugBlock -> LlvmCmmDecl -> MetaId -> LlvmM (HDoc, SDoc)
+pprLlvmCmmDecl _ (CmmData _ lmdata) _ = do
   opts <- getConfig
   return ( vcat $ map (pprLlvmData opts) lmdata
          , vcat $ map (pprLlvmData opts) lmdata)
 
-pprLlvmCmmDecl debug_map (CmmProc (label, mb_info) entry_lbl live (ListGraph blks))
+pprLlvmCmmDecl debug_map (CmmProc (label, mb_info) entry_lbl live (ListGraph blks)) fileMetaId
   = do let lbl = case mb_info of
                      Nothing -> entry_lbl
                      Just (CmmStaticsRaw info_lbl _) -> info_lbl
