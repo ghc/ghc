@@ -499,8 +499,12 @@ ppALoad opts ord st var =
 
 ppStore :: IsLine doc => LlvmCgConfig -> LlvmVar -> LlvmVar -> LMAlign -> [MetaAnnot] -> doc
 ppStore opts val dst alignment metas =
-    text "store" <+> ppVar opts val <> comma <+> ppVar opts dst <> align <+> ppMetaAnnots opts metas
+    text "store" <+> ppVar opts val <> comma <+> ppVar opts dst <> align <> metaComma
   where
+    metaComma =
+      case metas of
+        [] -> empty
+        _ -> comma <+> ppMetaAnnots opts metas
     align =
       case alignment of
         Just n  -> text ", align" <+> int n
