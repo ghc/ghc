@@ -675,7 +675,7 @@ rnHsTyKi env (XHsType ty)
       when (isNothing mb_name) $
         addErr $
           TcRnWithHsDocContext (rtke_ctxt env) $
-            TcRnNotInScope (notInScopeErr WL_LocalOnly rdr_name) rdr_name [] []
+            TcRnNotInScope (notInScopeErr WL_LocalOnly rdr_name) rdr_name [] noHints
 
 rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
   = do { checkDataKinds env ty

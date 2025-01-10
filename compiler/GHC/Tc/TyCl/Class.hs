@@ -53,7 +53,6 @@ import GHC.Core.TyCon
 
 import GHC.Driver.DynFlags
 
-import GHC.Types.Error
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -464,23 +463,19 @@ badDmPrag :: TcId -> Sig GhcRn -> TcM ()
 badDmPrag sel_id prag
   = addErrTc (TcRnDefaultMethodForPragmaLacksBinding sel_id prag)
 
-instDeclCtxt1 :: LHsSigType GhcRn -> SDoc
+instDeclCtxt1 :: LHsSigType GhcRn -> ErrCtxtMsg
 instDeclCtxt1 hs_inst_ty
-  = inst_decl_ctxt (ppr (getLHsInstDeclHead hs_inst_ty))
+  = InstDeclErrCtxt (Left $ getLHsInstDeclHead hs_inst_ty)
 
-instDeclCtxt2 :: Type -> SDoc
+instDeclCtxt2 :: Type -> ErrCtxtMsg
 instDeclCtxt2 dfun_ty
   = instDeclCtxt3 cls tys
   where
     (_,_,cls,tys) = tcSplitDFunTy dfun_ty
 
-instDeclCtxt3 :: Class -> [Type] -> SDoc
+instDeclCtxt3 :: Class -> [Type] -> ErrCtxtMsg
 instDeclCtxt3 cls cls_tys
-  = inst_decl_ctxt (ppr (mkClassPred cls cls_tys))
-
-inst_decl_ctxt :: SDoc -> SDoc
-inst_decl_ctxt doc = hang (text "In the instance declaration for")
-                        2 (quotes doc)
+  = InstDeclErrCtxt (Right $ mkClassPred cls cls_tys)
 
 tcATDefault :: SrcSpan
             -> Subst

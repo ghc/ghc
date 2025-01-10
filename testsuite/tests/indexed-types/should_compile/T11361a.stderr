@@ -1,7 +1,7 @@
-
 T11361a.hs:7:3: error: [GHC-41522]
     • Illegal argument ‘*’ in:
         ‘type F @(*) x = ...’
         The arguments to ‘F’ must all be distinct type variables.
-    • In the default type instance declaration for ‘F’
+    • In the default associated type family instance declaration for ‘F’
       In the class declaration for ‘C’
+

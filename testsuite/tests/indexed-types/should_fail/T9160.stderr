@@ -1,7 +1,7 @@
-
 T9160.hs:19:3: error: [GHC-95424]
     • Type indexes must match class instance head
       Expected: F @(*)
         Actual: F @(* -> *)
-    • In the type instance declaration for ‘F’
+    • In the associated type family instance declaration for ‘F’
       In the instance declaration for ‘C (a :: *)’
+

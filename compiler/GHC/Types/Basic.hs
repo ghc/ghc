@@ -114,7 +114,7 @@ module GHC.Types.Basic (
         Levity(..), mightBeLifted, mightBeUnlifted,
         TypeOrConstraint(..),
 
-        TyConFlavour(..), TypeOrData(..), tyConFlavourAssoc_maybe,
+        TyConFlavour(..), TypeOrData(..), NewOrData(..), tyConFlavourAssoc_maybe,
 
         NonStandardDefaultingStrategy(..),
         DefaultingStrategy(..), defaultNonStandardTyVars,
@@ -2198,7 +2198,12 @@ instance Outputable (TyConFlavour tc) where
         = assoc ++ t_or_d ++ " family"
         where
           assoc = if isJust mb_par then "associated " else ""
-          t_or_d = case type_or_data of { IAmType -> "type"; IAmData -> "data" }
+          t_or_d = case type_or_data of
+            IAmType -> "type"
+            IAmData new_or_data ->
+              case new_or_data of
+                DataType -> "data"
+                NewType  -> "newtype"
       go ClosedTypeFamilyFlavour = "type family"
       go TypeSynonymFlavour      = "type synonym"
       go BuiltInTypeFlavour      = "built-in type"
@@ -2225,13 +2230,25 @@ tyConFlavourAssoc_maybe _                               = Nothing
 -- | Whether something is a type or a data declaration,
 -- e.g. a type family or a data family.
 data TypeOrData
-  = IAmData
+  = IAmData !NewOrData
   | IAmType
   deriving (Eq, Data)
 
+-- | When we only care whether a data-type declaration is `data` or `newtype`,
+-- but not what constructors it has.
+data NewOrData
+  = NewType                     -- ^ @newtype Blah ...@
+  | DataType                    -- ^ @data Blah ...@
+  deriving ( Eq, Data )                -- Needed because Demand derives Eq
+
 instance Outputable TypeOrData where
-  ppr IAmData = text "data"
+  ppr (IAmData newOrData) = ppr newOrData
   ppr IAmType = text "type"
+
+instance Outputable NewOrData where
+ ppr = \case
+    NewType  -> text "newtype"
+    DataType -> text "data"
 
 {- *********************************************************************
 *                                                                      *

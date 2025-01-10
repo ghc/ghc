@@ -1,7 +1,6 @@
-
 T13837.hs:9:4: error: [GHC-97784]
     • The Name ‘Fam’ is not in scope.
-    • In the argument of reifyInstances: Fam_0
+    • In the argument of ‘reifyInstances’: Fam_0
       In the untyped splice:
         $(do fam_name <- newName "Fam"
              stringE . show =<< qReifyInstances fam_name [])
@@ -9,3 +8,4 @@ T13837.hs:9:4: error: [GHC-97784]
       If you bound a unique Template Haskell name (NameU)
       perhaps via newName,
       then -ddump-splices might be useful.
+

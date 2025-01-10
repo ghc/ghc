@@ -1,5 +1,5 @@
-
 T15433a.hs:7:11: error: [GHC-65507]
     • Wildcard ‘_’ not allowed
     • In the type ‘_’
-      In the type declaration for ‘T’
+      In the type synonym declaration for ‘T’
+

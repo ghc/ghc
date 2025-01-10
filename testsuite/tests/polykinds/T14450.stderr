@@ -1,7 +1,7 @@
-
 T14450.hs:35:3: error: [GHC-95424]
     • Type indexes must match class instance head
       Expected: Dom @k @k (IddSym0 @k)
         Actual: Dom @(*) @(*) (IddSym0 @(*))
-    • In the type instance declaration for ‘Dom’
+    • In the associated type family instance declaration for ‘Dom’
       In the instance declaration for ‘Varpi (IddSym0 :: k ~> k)’
+

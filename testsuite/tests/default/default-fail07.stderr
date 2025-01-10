@@ -1,4 +1,4 @@
+default-fail07.hs:5:1: error: [GHC-88933]
+    • The default type ‘String’ is not an instance of ‘Num’
+    • When checking the types in a default declaration
 
-default-fail07.hs:5:1: [GHC-88933]
-     The default type ‘String’ is not an instance of ‘Num’
-     When checking the types in a default declaration

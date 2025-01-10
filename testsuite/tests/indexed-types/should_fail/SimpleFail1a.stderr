@@ -1,5 +1,5 @@
-
 SimpleFail1a.hs:4:1: error: [GHC-83865]
     • Expecting one more argument to ‘T1 Int’
       Expected a type, but ‘T1 Int’ has kind ‘* -> *’
-    • In the data instance declaration for ‘T1’
+    • In the data family instance declaration for ‘T1’
+

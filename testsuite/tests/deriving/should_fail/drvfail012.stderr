@@ -1,4 +1,3 @@
-
 drvfail012.hs:5:33: error: [GHC-39999]
     • Could not deduce ‘Eq (Ego a)’
         arising from the 'deriving' clause of a data type declaration
@@ -9,3 +8,4 @@ drvfail012.hs:5:33: error: [GHC-39999]
         use a standalone 'deriving instance' declaration,
           so you can specify the instance context yourself
     • When deriving the instance for (Ord (Ego a))
+

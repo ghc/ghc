@@ -1,4 +1,3 @@
-
 T16181.hs:14:13: error: [GHC-38996]
     • Cannot eta-reduce to an instance of form
         instance (...) => Show1 (FlipConst a)
@@ -16,4 +15,5 @@ T16181.hs:19:14: error: [GHC-38996]
 
 T16181.hs:26:12: error: [GHC-38996]
     • Cannot eta-reduce to an instance of form instance (...) => C T
-    • In the data declaration for ‘T’
+    • In the data type declaration for ‘T’
+

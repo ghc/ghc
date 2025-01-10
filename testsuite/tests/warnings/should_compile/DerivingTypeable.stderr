@@ -1,4 +1,4 @@
 DerivingTypeable.hs:8:12: warning: [GHC-90584] [-Wderiving-typeable (in -Wall)]
     • Deriving ‘Typeable’ has no effect: all types now auto-derive Typeable
-    • In the data declaration for ‘Foo’
+    • In the data type declaration for ‘Foo’
 

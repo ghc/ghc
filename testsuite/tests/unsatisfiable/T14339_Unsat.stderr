@@ -1,4 +1,4 @@
-
 T14339_Unsat.hs:25:12: error: [GHC-22250]
     • Boo
     • When deriving the instance for (Bar Baz2)
+

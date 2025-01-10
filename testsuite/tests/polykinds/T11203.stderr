@@ -1,4 +1,4 @@
-
 T11203.hs:7:9: error: [GHC-17370]
     • Different names for the same type variable: ‘k1’ and ‘k2’
-    • In the data declaration for ‘Q’
+    • In the data type declaration for ‘Q’
+

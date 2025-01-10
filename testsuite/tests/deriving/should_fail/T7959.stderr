@@ -1,4 +1,3 @@
-
 T7959.hs:5:1: error: [GHC-38178]
     • Can't make a derived instance of ‘A’:
     • In the stand-alone deriving instance for ‘A’
@@ -7,4 +6,5 @@ T7959.hs:5:1: error: [GHC-38178]
 
 T7959.hs:6:17: error: [GHC-73993]
     • ‘A’ is not a unary constraint, as expected by a `deriving' clause
-    • In the data declaration for ‘B’
+    • In the data type declaration for ‘B’
+

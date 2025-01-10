@@ -1,5 +1,5 @@
-
 T11136.hs:7:3: error: [GHC-12985]
     • Number of parameters must match family declaration; expected 1.
-    • In the default type instance declaration for ‘D’
+    • In the default associated type family instance declaration for ‘D’
       In the class declaration for ‘C’
+

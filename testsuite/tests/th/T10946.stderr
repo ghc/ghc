@@ -1,14 +1,14 @@
-
 T10946.hs:8:13: error: [GHC-88464]
     • Found hole: _ :: a
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:
                  m :: forall a. a -> a
                at T10946.hs:7:1-11
-    • In the Template Haskell quotation [|| _ ||]
+    • In the Template Haskell typed quotation: [|| _ ||]
       In the expression: [|| _ ||]
-      In the Template Haskell splice $$([|| _ ||])
+      In the typed Template Haskell splice: $$([|| _ ||])
     • Relevant bindings include
         x :: a (bound at T10946.hs:8:3)
         m :: a -> a (bound at T10946.hs:8:1)
       Valid hole fits include x :: a (bound at T10946.hs:8:3)
+

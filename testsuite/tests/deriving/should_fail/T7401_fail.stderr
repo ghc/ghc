@@ -1,8 +1,8 @@
-
 T7401_fail.hs:4:17: error: [GHC-64560]
     • Can't make a derived instance of ‘Eq D’:
         ‘D’ must have at least one data constructor
-    • In the data declaration for ‘D’
+    • In the data type declaration for ‘D’
     Suggested fix:
       Use the ‘EmptyDataDeriving’ extension
       to enable deriving for empty data types
+

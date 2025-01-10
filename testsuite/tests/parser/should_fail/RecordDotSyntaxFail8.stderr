@@ -1,4 +1,3 @@
-
 RecordDotSyntaxFail8.hs:37:3: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from a use of ‘print’
       prevents the constraint ‘(Show a0)’ from being solved.
@@ -18,10 +17,12 @@ RecordDotSyntaxFail8.hs:37:3: error: [GHC-39999]
 RecordDotSyntaxFail8.hs:37:11: error: [GHC-39999]
     • No instance for ‘HasField "quux" Quux a0’
         arising from selecting the field ‘quux’
-      NB: There is no field selector ‘quux :: Quux
-                                              -> a0’ in scope for record type ‘Quux’
     • In the second argument of ‘($)’, namely ‘....baz.quux’
       In a stmt of a 'do' block: print $ ....baz.quux
       In the expression:
         do let a = ...
            print $ ....quux
+    Suggested fix:
+      NB: There is no field selector ‘quux :: Quux
+                                              -> a0’ in scope for record type ‘Quux’
+

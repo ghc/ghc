@@ -1,28 +1,28 @@
-
 T6148d.hs:5:6: error: [GHC-94803]
     • A 65-tuple is too large for GHC
         (max size is 64)
         Workaround: use nested tuples or define a data type
-    • In the Template Haskell quotation
+    • In the Template Haskell quotation:
         ''(,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)
 
 T6148d.hs:6:6: error: [GHC-94803]
     • A 65-tuple is too large for GHC
         (max size is 64)
         Workaround: use nested tuples or define a data type
-    • In the Template Haskell quotation
+    • In the Template Haskell quotation:
         '(,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)
 
 T6148d.hs:7:6: error: [GHC-94803]
     • A 65-tuple is too large for GHC
         (max size is 64)
         Workaround: use nested tuples or define a data type
-    • In the Template Haskell quotation
+    • In the Template Haskell quotation:
         ''(#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#)
 
 T6148d.hs:8:6: error: [GHC-94803]
     • A 65-tuple is too large for GHC
         (max size is 64)
         Workaround: use nested tuples or define a data type
-    • In the Template Haskell quotation
+    • In the Template Haskell quotation:
         '(#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#)
+

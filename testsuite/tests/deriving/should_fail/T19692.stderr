@@ -1,8 +1,7 @@
-
 T19692.hs:8:23: error: [GHC-00158]
     • Can't make a derived instance of ‘C1 G1’:
         ‘C1’ is not a stock derivable class (Eq, Show, etc.)
-    • In the data declaration for ‘G1’
+    • In the data type declaration for ‘G1’
 
 T19692.hs:10:1: error: [GHC-00158]
     • Can't make a derived instance of ‘C1 G1'’:
@@ -12,7 +11,7 @@ T19692.hs:10:1: error: [GHC-00158]
 T19692.hs:14:23: error: [GHC-00158]
     • Can't make a derived instance of ‘C2 G2’:
         ‘C2’ is not a stock derivable class (Eq, Show, etc.)
-    • In the data declaration for ‘G2’
+    • In the data type declaration for ‘G2’
     Suggested fix:
       Perhaps you intended to use the ‘DeriveAnyClass’ extension
 
@@ -26,7 +25,7 @@ T19692.hs:16:1: error: [GHC-00158]
 T19692.hs:21:23: error: [GHC-00158]
     • Can't make a derived instance of ‘C3 G3’:
         ‘C3’ is not a stock derivable class (Eq, Show, etc.)
-    • In the data declaration for ‘G3’
+    • In the data type declaration for ‘G3’
     Suggested fix:
       Perhaps you intended to use the ‘DeriveAnyClass’ extension
 
@@ -40,7 +39,7 @@ T19692.hs:23:1: error: [GHC-00158]
 T19692.hs:29:23: error: [GHC-00158]
     • Can't make a derived instance of ‘C4 G4’:
         ‘C4’ is not a stock derivable class (Eq, Show, etc.)
-    • In the data declaration for ‘G4’
+    • In the data type declaration for ‘G4’
     Suggested fix:
       Perhaps you intended to use the ‘DeriveAnyClass’ extension
 
@@ -92,7 +91,7 @@ T19692.hs:57:1: error: [GHC-23244]
 T19692.hs:61:38: error: [GHC-38178]
     • Can't make a derived instance of
         ‘Eq G11’ with the anyclass strategy:
-    • In the data declaration for ‘G11’
+    • In the data type declaration for ‘G11’
     Suggested fix:
       Perhaps you intended to use the ‘DeriveAnyClass’ extension
 
@@ -102,3 +101,4 @@ T19692.hs:63:1: error: [GHC-38178]
     • In the stand-alone deriving instance for ‘Eq G11'’
     Suggested fix:
       Perhaps you intended to use the ‘DeriveAnyClass’ extension
+

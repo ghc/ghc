@@ -1,7 +1,7 @@
-
 ErrorIndexLinks.hs:7:1: error: []8;;https://errors.haskell.org/messages/GHC-83865\GHC-83865]8;;\]
     • Couldn't match type: [Char]
                      with: IO t0
       Expected: IO t0
         Actual: String
     • When checking the type of the IO action ‘main’
+

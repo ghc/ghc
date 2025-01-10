@@ -1,5 +1,5 @@
-
 T14110.hs:9:8: error: [GHC-12985]
     • Number of parameters must match family declaration; expected 1.
-    • In the type instance declaration for ‘R_’
+    • In the associated type family instance declaration for ‘R_’
       In the instance declaration for ‘R Eq’
+

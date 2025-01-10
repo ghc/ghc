@@ -177,7 +177,7 @@ data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
                              -- See @Note [Scoped tyvars in a TcTyCon]@ in
                              -- "GHC.Core.TyCon".
                            , di_clauses :: [LHsDerivingClause GhcRn]
-                           , di_ctxt    :: SDoc -- ^ error context
+                           , di_ctxt    :: ErrCtxtMsg -- ^ error context
                            }
 
 {-
@@ -520,7 +520,7 @@ deriveClause :: TyCon
              -> Maybe (LDerivStrategy GhcRn)
              -> LocatedC [LHsSigType GhcRn]
                 -- ^ The location refers to the @(Show, Eq)@ part of @deriving (Show, Eq)@.
-             -> SDoc
+             -> ErrCtxtMsg
              -> TcM [EarlyDerivSpec]
 deriveClause rep_tc scoped_tvs mb_lderiv_strat (L loc deriv_preds) err_ctxt
   = setSrcSpanA loc $
@@ -692,7 +692,7 @@ deriveStandalone :: LDerivDecl GhcRn -> TcM (Maybe EarlyDerivSpec)
 -- a no-op nowadays.
 deriveStandalone (L loc (DerivDecl (warn, _) deriv_ty mb_lderiv_strat overlap_mode))
   = setSrcSpanA loc                       $
-    addErrCtxt (standaloneCtxt deriv_ty)  $
+    addErrCtxt (StandaloneDerivCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
        ; let ctxt = GHC.Tc.Types.Origin.InstDeclCtxt True
        ; traceTc "Deriving strategy (standalone deriving)" $
@@ -2350,6 +2350,3 @@ derivingThingErrMechanism mechanism why
       = if isDerivSpecNewtype mechanism then YesGeneralizedNewtypeDeriving
                                         else NoGeneralizedNewtypeDeriving
 
-standaloneCtxt :: LHsSigWcType GhcRn -> SDoc
-standaloneCtxt ty = hang (text "In the stand-alone deriving instance for")
-                       2 (quotes (ppr ty))

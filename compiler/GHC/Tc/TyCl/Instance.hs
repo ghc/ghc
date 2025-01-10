@@ -64,7 +64,6 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.Class
-import GHC.Types.Error
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -591,8 +590,8 @@ tcTyFamInstDecl :: AssocInstInfo
   -- "type instance"; open type families only
   -- See Note [Associated type instances]
 tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
-  = setSrcSpanA loc           $
-    tcAddTyFamInstCtxt decl  $
+  = setSrcSpanA loc                        $
+    tcAddOpenTyFamInstCtxt mb_clsinfo decl $
     do { let fam_lname = feqn_tycon eqn
        ; fam_tc <- tcLookupLocatedTyCon fam_lname
        ; tcFamInstDeclChecks mb_clsinfo IAmType fam_tc
@@ -700,11 +699,11 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                                         , dd_cons    = hs_cons
                                         , dd_kindSig = m_ksig
                                         , dd_derivs  = derivs } }}))
-  = setSrcSpanA loc            $
-    tcAddDataFamInstCtxt decl  $
+  = setSrcSpanA loc                      $
+    tcAddDataFamInstCtxt mb_clsinfo new_or_data decl $
     do { fam_tc <- tcLookupLocatedTyCon lfam_name
 
-       ; tcFamInstDeclChecks mb_clsinfo IAmData fam_tc
+       ; tcFamInstDeclChecks mb_clsinfo (IAmData new_or_data) fam_tc
 
        -- Check that the family declaration is for the right kind
        ; checkTc (isDataFamilyTyCon fam_tc) $
@@ -714,7 +713,6 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
           -- See [Arity of data families] in GHC.Core.FamInstEnv
        ; skol_info <- mkSkolemInfo FamInstSkol
-       ; let new_or_data = dataDefnConsNewOrData hs_cons
        ; (qtvs, non_user_tvs, pats, tc_res_kind, stupid_theta)
              <- tcDataFamInstHeader mb_clsinfo skol_info fam_tc outer_bndrs fixity
                                     hs_ctxt hs_pats m_ksig new_or_data
@@ -845,11 +843,15 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                  Just $ DerivInfo { di_rep_tc     = rep_tc
                                   , di_scoped_tvs = scoped_tvs
                                   , di_clauses    = preds
-                                  , di_ctxt       = tcMkDataFamInstCtxt decl }
+                                  , di_ctxt       = tcMkDataFamInstCtxt mb_clsinfo new_or_data decl
+                                  }
 
        ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
        ; return (fam_inst, m_deriv_info) }
   where
+
+    new_or_data = dataDefnConsNewOrData hs_cons
+
     eta_reduce :: TyCon -> [Type] -> ([Type], [TyConBinder])
     -- See Note [Eta reduction for data families] in GHC.Core.Coercion.Axiom
     -- Splits the incoming patterns into two: the [TyVar]
@@ -2025,7 +2027,7 @@ tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
         -- we want to print out the full source code if there's an error
         -- because otherwise the user won't see the code at all
     add_meth_ctxt thing
-      | is_derived = addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys) thing
+      | is_derived = addLandmarkErrCtxt (DerivBindCtxt sel_id clas inst_tys) thing
       | otherwise  = thing
 
 tcMethodBodyHelp :: HsSigFun -> Id -> TcId
@@ -2114,15 +2116,11 @@ mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
     poly_meth_ty  = mkSpecSigmaTy tyvars theta local_meth_ty
     theta         = map idType dfun_ev_vars
 
-methSigCtxt :: Name -> TcType -> TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
+methSigCtxt :: Name -> TcType -> TcType -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
 methSigCtxt sel_name sig_ty meth_ty env0
   = do { (env1, sig_ty)  <- zonkTidyTcType env0 sig_ty
        ; (env2, meth_ty) <- zonkTidyTcType env1 meth_ty
-       ; let msg = hang (text "When checking that instance signature for" <+> quotes (ppr sel_name))
-                      2 (vcat [ text "is more general than its signature in the class"
-                              , text "Instance sig:" <+> ppr sig_ty
-                              , text "   Class sig:" <+> ppr meth_ty ])
-       ; return (env2, msg) }
+       ; return (env2, MethSigCtxt sel_name sig_ty meth_ty) }
 
 {- Note [Instance method signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2272,12 +2270,6 @@ mkDefMethBind loc dfun_id clas sel_id dm_name dm_spec
     type_to_hs_type = parenthesizeHsType appPrec . noLocA . XHsType
 
 ----------------------
-derivBindCtxt :: Id -> Class -> [Type ] -> SDoc
-derivBindCtxt sel_id clas tys
-   = vcat [ text "When typechecking the code for" <+> quotes (ppr sel_id)
-          , nest 2 (text "in a derived instance for"
-                    <+> quotes (pprClassPred clas tys) <> colon)
-          , nest 2 $ text "To see the code I am typechecking, use -ddump-deriv" ]
 
 warnUnsatisfiedMinimalDefinition :: ClassMinimalDef -> TcM ()
 warnUnsatisfiedMinimalDefinition mindef
@@ -2612,12 +2604,10 @@ tcSpecInstPrags dfun_id (InstBindings { ib_binds = binds, ib_pragmas = uprags })
 ------------------------------
 tcSpecInst :: Id -> Sig GhcRn -> TcM TcSpecPrag
 tcSpecInst dfun_id prag@(SpecInstSig _ hs_ty)
-  = addErrCtxt (spec_ctxt prag) $
+  = addErrCtxt (SpecPragmaCtxt prag) $
     do  { spec_dfun_ty <- tcHsClsInstType SpecInstCtxt hs_ty
         ; co_fn <- tcSpecWrapper SpecInstCtxt (idType dfun_id) spec_dfun_ty
         ; return (SpecPrag dfun_id co_fn defaultInlinePragma) }
-  where
-    spec_ctxt prag = hang (text "In the pragma:") 2 (ppr prag)
 
 tcSpecInst _  _ = panic "tcSpecInst"
 
@@ -2629,16 +2619,12 @@ tcSpecInst _  _ = panic "tcSpecInst"
 ************************************************************************
 -}
 
-instDeclCtxt1 :: LHsSigType GhcRn -> SDoc
+instDeclCtxt1 :: LHsSigType GhcRn -> ErrCtxtMsg
 instDeclCtxt1 hs_inst_ty
-  = inst_decl_ctxt (ppr (getLHsInstDeclHead hs_inst_ty))
+  = InstDeclErrCtxt $ Left $ getLHsInstDeclHead hs_inst_ty
 
-instDeclCtxt2 :: Type -> SDoc
+instDeclCtxt2 :: Type -> ErrCtxtMsg
 instDeclCtxt2 dfun_ty
-  = inst_decl_ctxt (ppr head_ty)
+  = InstDeclErrCtxt $ Right $ head_ty
   where
     (_,_,head_ty) = tcSplitQuantPredTy dfun_ty
-
-inst_decl_ctxt :: SDoc -> SDoc
-inst_decl_ctxt doc = hang (text "In the instance declaration for")
-                        2 (quotes doc)

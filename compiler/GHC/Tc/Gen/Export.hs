@@ -20,7 +20,6 @@ import GHC.Rename.Module
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Unbound ( reportUnboundName )
-import GHC.Utils.Error
 import GHC.Unit.Module
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module.Warnings
@@ -527,11 +526,11 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
           } (L loc ie@(IEThingWith (warn_txt_ps, ann) l wc sub_rdrs doc))
-        = do mb_gre <- addExportErrCtxt ie
+        = do mb_gre <- addErrCtxt (ExportCtxt ie)
                      $ lookupGreAvailRn $ lieWrappedName l
              for mb_gre $ \ par -> do
                (subs, with_kids)
-                 <- addExportErrCtxt ie
+                 <- addErrCtxt (ExportCtxt ie)
                   $ lookup_ie_kids_with par sub_rdrs
 
                wc_kids <-
@@ -860,16 +859,13 @@ checkPatSynParent parent NoParent nm
        ; case mpat_syn_thing of
             AnId i | isId i
                    , RecSelId { sel_tycon = RecSelPatSyn p } <- idDetails i
-                   -> handle_pat_syn (selErr nm) parent_ty_con p
+                   -> handle_pat_syn (PatSynRecSelExportCtxt p nm) parent_ty_con p
 
-            AConLike (PatSynCon p) -> handle_pat_syn (psErr p) parent_ty_con p
+            AConLike (PatSynCon p) -> handle_pat_syn (PatSynExportCtxt p) parent_ty_con p
 
             _ -> failWithDcErr parent nm [] }
   where
-    psErr  = exportErrCtxt "pattern synonym"
-    selErr = exportErrCtxt "pattern synonym record selector"
-
-    handle_pat_syn :: SDoc
+    handle_pat_syn :: ErrCtxtMsg
                    -> TyCon      -- Parent TyCon
                    -> PatSyn     -- Corresponding bundled PatSyn
                                  -- and pretty printed origin
@@ -972,18 +968,6 @@ dupExport_ok child ie1 ie2
     single IEVar {}      = True
     single IEThingAbs {} = True
     single _             = False
-
-exportErrCtxt :: Outputable o => String -> o -> SDoc
-exportErrCtxt herald exp =
-  text "In the" <+> text (herald ++ ":") <+> ppr exp
-
-
-addExportErrCtxt :: (OutputableBndrId p)
-                 => IE (GhcPass p) -> TcM a -> TcM a
-addExportErrCtxt ie = addErrCtxt exportCtxt
-  where
-    exportCtxt = text "In the export:" <+> ppr ie
-
 
 failWithDcErr :: Name -> Name -> [Name] -> TcM a
 failWithDcErr parent child parents = do

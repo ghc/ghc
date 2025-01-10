@@ -1,7 +1,7 @@
-
 T8368a.hs:7:3: error: [GHC-83865]
     • Couldn't match type ‘Bool’ with ‘Int’
       Expected: Fam Int b
         Actual: Fam Bool b
     • In the result type of data constructor ‘MkFam’
-      In the data instance declaration for ‘Fam’
+      In the data family instance declaration for ‘Fam’
+

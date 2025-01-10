@@ -2846,7 +2846,7 @@ tyConFlavour (TyCon { tyConDetails = details })
 
   | FamilyTyCon { famTcFlav = flav, famTcParent = parent } <- details
   = case flav of
-      DataFamilyTyCon{}            -> OpenFamilyFlavour IAmData parent
+      DataFamilyTyCon{}            -> OpenFamilyFlavour (IAmData DataType) parent
       OpenSynFamilyTyCon           -> OpenFamilyFlavour IAmType parent
       ClosedSynFamilyTyCon{}       -> ClosedTypeFamilyFlavour
       AbstractClosedSynFamilyTyCon -> ClosedTypeFamilyFlavour
@@ -2867,7 +2867,7 @@ tcFlavourMustBeSaturated SumFlavour              = False
 tcFlavourMustBeSaturated AbstractTypeFlavour {}  = False
 tcFlavourMustBeSaturated BuiltInTypeFlavour      = False
 tcFlavourMustBeSaturated PromotedDataConFlavour  = False
-tcFlavourMustBeSaturated (OpenFamilyFlavour td _)= case td of { IAmData -> False; IAmType -> True }
+tcFlavourMustBeSaturated (OpenFamilyFlavour td _)= case td of { IAmData {} -> False; IAmType -> True }
 tcFlavourMustBeSaturated TypeSynonymFlavour      = True
 tcFlavourMustBeSaturated ClosedTypeFamilyFlavour = True
 

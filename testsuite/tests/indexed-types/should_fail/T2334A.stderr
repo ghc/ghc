@@ -1,18 +1,18 @@
-
 T2334A.hs:9:26: error: [GHC-23517]
     • A newtype constructor must have exactly one field but ‘F’ has two
       F :: () -> () -> F ()
     • In the definition of data constructor ‘F’
-      In the newtype instance declaration for ‘F’
+      In the newtype family instance declaration for ‘F’
 
 T2334A.hs:10:27: error: [GHC-23517]
     • A newtype constructor must have exactly one field
         but ‘H’ has none
       H :: F Int
     • In the definition of data constructor ‘H’
-      In the newtype instance declaration for ‘F’
+      In the newtype family instance declaration for ‘F’
 
 T2334A.hs:12:15: error: [GHC-34447]
     Conflicting family instance declarations:
       F Bool -- Defined at T2334A.hs:12:15
       F Bool -- Defined at T2334A.hs:13:15
+

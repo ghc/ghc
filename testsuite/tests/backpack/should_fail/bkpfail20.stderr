@@ -1,13 +1,13 @@
 [1 of 3] Processing p
-  [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
+  [1 of 1] Compiling A[sig]           ( p\A.hsig, nothing )
 [2 of 3] Processing q
-  [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
+  [1 of 1] Compiling A[sig]           ( q\A.hsig, nothing )
 [3 of 3] Processing r
-  [1 of 3] Compiling B[sig]           ( r/B.hsig, nothing )
-
+  [1 of 3] Compiling B[sig]           ( r\B.hsig, nothing )
 bkpfail20.bkp:1:1: error: [GHC-93009]
     • While merging export lists, could not unify Data.STRef.Lazy.newSTRef with GHC.Internal.STRef.newSTRef
-    • while merging the signatures from:
+    • While merging the signatures from:
         • p[A=<B>]:A
         • q[A=<B>]:A
         • ...and the local signature for B
+

@@ -1,4 +1,4 @@
+Overlap7.hs:8:1: error: [GHC-06207]
+    • Illegal instance for closed family ‘F’
+    • In the type family instance declaration for ‘F’
 
-Overlap7.hs:8:1: [GHC-06207]
-    Illegal instance for closed family ‘F’
-    In the type instance declaration for ‘F’

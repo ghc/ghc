@@ -2,9 +2,9 @@
   [1 of 1] Compiling A[sig]           ( q\A.hsig, nothing )
 [2 of 2] Processing p
   [1 of 2] Compiling A[sig]           ( p\A.hsig, nothing )
-
 bkpfail48.bkp:6:18: error: [GHC-90973]
     • The export item ‘module Data.Bool’ is not imported
-    • while merging the signatures from:
+    • While merging the signatures from:
         • q[A=<A>]:A
         • ...and the local signature for A
+

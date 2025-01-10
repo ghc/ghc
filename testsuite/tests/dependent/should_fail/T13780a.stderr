@@ -1,7 +1,7 @@
-
 T13780a.hs:9:40: error: [GHC-28374]
     • Data constructor ‘MkFoo’ cannot be used here
         (it has an unpromotable context ‘a ~ Bool’)
     • In the second argument of ‘(~)’, namely ‘MkFoo’
       In the definition of data constructor ‘SMkFoo’
-      In the data instance declaration for ‘Sing’
+      In the data family instance declaration for ‘Sing’
+

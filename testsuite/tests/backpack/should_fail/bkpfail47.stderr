@@ -4,7 +4,6 @@
   [1 of 1] Compiling A[sig]           ( q\A.hsig, nothing )
 [3 of 3] Processing r
   [1 of 3] Compiling A[sig]           ( r\A.hsig, nothing )
-
 bkpfail47.bkp:10:9: error: [GHC-15843]
     • Type constructor ‘T’ has conflicting definitions in the module
       and its hsig file.
@@ -17,7 +16,8 @@ bkpfail47.bkp:10:9: error: [GHC-15843]
       The roles are not compatible:
       Main module: [nominal, representational]
         Hsig file: [representational, nominal]
-    • while merging the signatures from:
+    • While merging the signatures from:
         • p[A=<A>]:A
         • q[A=<A>]:A
         • ...and the local signature for A
+

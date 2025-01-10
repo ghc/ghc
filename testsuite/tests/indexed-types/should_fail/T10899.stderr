@@ -1,5 +1,5 @@
-
 T10899.hs:8:3: error: [GHC-91510]
     • Illegal polymorphic type: forall (m :: * -> *). m a
-    • In the default type instance declaration for ‘F’
+    • In the default associated type family instance declaration for ‘F’
       In the class declaration for ‘C’
+

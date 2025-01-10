@@ -1037,12 +1037,7 @@ tcPatSig in_pat_bind sig res_ty
        = do { (tidy_env, sig_ty) <- zonkTidyTcType tidy_env sig_ty
             ; res_ty <- readExpType res_ty   -- should be filled in by now
             ; (tidy_env, res_ty) <- zonkTidyTcType tidy_env res_ty
-            ; let msg = vcat [ hang (text "When checking that the pattern signature:")
-                                  4 (ppr sig_ty)
-                             , nest 2 (hang (text "fits the type of its context:")
-                                          2 (ppr res_ty)) ]
-            ; return (tidy_env, msg) }
-
+            ; return (tidy_env, PatSigErrCtxt sig_ty res_ty) }
 
 {- *********************************************************************
 *                                                                      *
@@ -1870,14 +1865,13 @@ maybeWrapPatCtxt :: Pat GhcRn -> (TcM a -> TcM b) -> TcM a -> TcM b
 -- Not all patterns are worth pushing a context
 maybeWrapPatCtxt pat tcm thing_inside
   | not (worth_wrapping pat) = tcm thing_inside
-  | otherwise                = addErrCtxt msg $ tcm $ popErrCtxt thing_inside
+  | otherwise                = addErrCtxt (PatCtxt pat) $ tcm $ popErrCtxt thing_inside
                                -- Remember to pop before doing thing_inside
   where
    worth_wrapping (VarPat {}) = False
    worth_wrapping (ParPat {}) = False
    worth_wrapping (AsPat {})  = False
    worth_wrapping _           = True
-   msg = hang (text "In the pattern:") 2 (ppr pat)
 
 -----------------------------------------------
 

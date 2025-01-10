@@ -4,3 +4,4 @@ default-fail02.hs:1:1: error: [GHC-55756]
     • When checking the types in a default declaration
     Suggested fix:
       Perhaps you intended to use the ‘NamedDefaults’ extension
+

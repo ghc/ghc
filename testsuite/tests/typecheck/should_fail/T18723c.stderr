@@ -1,4 +1,3 @@
-
 T18723c.hs:5:2: error: [GHC-94803]
     • A 65-tuple is too large for GHC
         (max size is 64)
@@ -10,4 +9,5 @@ T18723c.hs:5:2: error: [GHC-94803]
                       Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int,
                       Int, Int, Int #)’
       In the definition of data constructor ‘MkT3’
-      In the data declaration for ‘T3’
+      In the data type declaration for ‘T3’
+

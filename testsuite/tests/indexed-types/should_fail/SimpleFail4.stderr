@@ -1,7 +1,7 @@
-
 SimpleFail4.hs:11:3: error: [GHC-41522]
     • Illegal argument ‘Int’ in:
         ‘type S2 Int = ...’
         The arguments to ‘S2’ must all be distinct type variables.
-    • In the default type instance declaration for ‘S2’
+    • In the default associated type family instance declaration for ‘S2’
       In the class declaration for ‘C2’
+

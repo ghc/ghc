@@ -1,7 +1,7 @@
-
 T11450.hs:9:3: error: [GHC-95424]
     • Type indexes must match class instance head
       Expected: T (Either a b)
         Actual: T (Either b a)
-    • In the type instance declaration for ‘T’
+    • In the associated type family instance declaration for ‘T’
       In the instance declaration for ‘C (Either a b)’
+

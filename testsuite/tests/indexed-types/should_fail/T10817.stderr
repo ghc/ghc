@@ -1,8 +1,8 @@
-
 T10817.hs:9:3: error: [GHC-22979]
     • The type-family application ‘F a’
         is no smaller than the LHS of the family instance ‘F a’
-    • In the default type instance declaration for ‘F’
+    • In the default associated type family instance declaration for ‘F’
       In the class declaration for ‘C’
     Suggested fix:
       Perhaps you intended to use the ‘UndecidableInstances’ extension
+

@@ -1,12 +1,12 @@
-
 ExplicitForAllFams4a.hs:8:12: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but it isn't used in the family instance.
     • In the equations for closed type family ‘H’
-      In the type family declaration for ‘H’
+      In the type family instance declaration for ‘H’
 
 ExplicitForAllFams4a.hs:9:10: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but does not appear in any of the LHS patterns of the family instance.
     • In the equations for closed type family ‘H’
-      In the type family declaration for ‘H’
+      In the type family instance declaration for ‘H’
+

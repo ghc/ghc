@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Typechecking annotations
-module GHC.Tc.Gen.Annotation ( tcAnnotations, annCtxt ) where
+module GHC.Tc.Gen.Annotation ( tcAnnotations ) where
 
 import GHC.Prelude
 
@@ -22,8 +22,6 @@ import GHC.Tc.Utils.Monad
 import GHC.Unit.Module
 
 import GHC.Hs
-
-import GHC.Utils.Outputable
 
 import GHC.Types.Name
 import GHC.Types.Annotations
@@ -54,7 +52,7 @@ tcAnnotation (L loc ann@(HsAnnotation _ provenance expr)) = do
     let target = annProvenanceToTarget mod provenance
 
     -- Run that annotation and construct the full Annotation data structure
-    setSrcSpanA loc $ addErrCtxt (annCtxt ann) $ do
+    setSrcSpanA loc $ addErrCtxt (AnnCtxt ann) $ do
       -- See #10826 -- Annotations allow one to bypass Safe Haskell.
       dflags <- getDynFlags
       when (safeLanguageOn dflags) $ failWithTc TcRnAnnotationInSafeHaskell
@@ -66,6 +64,3 @@ annProvenanceToTarget _   (ValueAnnProvenance (L _ name)) = NamedTarget name
 annProvenanceToTarget _   (TypeAnnProvenance (L _ name))  = NamedTarget name
 annProvenanceToTarget mod ModuleAnnProvenance             = ModuleTarget mod
 
-annCtxt :: (OutputableBndrId p) => AnnDecl (GhcPass p) -> SDoc
-annCtxt ann
-  = hang (text "In the annotation:") 2 (ppr ann)

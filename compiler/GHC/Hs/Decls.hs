@@ -43,7 +43,7 @@ module GHC.Hs.Decls (
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
   isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
   tyFamInstDeclName, tyFamInstDeclLName,
-  countTyClDecls, pprTyClDeclFlavour,
+  countTyClDecls, tyClDeclFlavour,
   tyClDeclLName, tyClDeclTyVars,
   hsDeclHasCusk, famResultKindSignature,
   FamilyDecl(..), LFamilyDecl,
@@ -572,13 +572,18 @@ pp_vanilla_decl_head thing (HsQTvs { hsq_explicit = tyvars }) fixity context
                   , hsep (map (ppr.unLoc) (varl:varsr))]
     pp_tyvars [] = pprPrefixOcc (unLoc thing)
 
-pprTyClDeclFlavour :: TyClDecl (GhcPass p) -> SDoc
-pprTyClDeclFlavour (ClassDecl {})   = text "class"
-pprTyClDeclFlavour (SynDecl {})     = text "type"
-pprTyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
-  = pprFlavour info <+> text "family"
-pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_cons = nd } })
-  = ppr (dataDefnConsNewOrData nd)
+tyClDeclFlavour :: TyClDecl (GhcPass p) -> TyConFlavour tc
+tyClDeclFlavour (ClassDecl {})   = ClassFlavour
+tyClDeclFlavour (SynDecl {})     = TypeSynonymFlavour
+tyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
+  = case info of
+      DataFamily          -> OpenFamilyFlavour (IAmData DataType) Nothing
+      OpenTypeFamily      -> OpenFamilyFlavour IAmType Nothing
+      ClosedTypeFamily {} -> ClosedTypeFamilyFlavour
+tyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_cons = nd } })
+  = case dataDefnConsNewOrData nd of
+      NewType  -> NewtypeFlavour
+      DataType -> DataTypeFlavour
 
 instance OutputableBndrId p => Outputable (FunDep (GhcPass p)) where
   ppr = pprFunDep
@@ -1097,10 +1102,6 @@ instDeclDataFamInsts inst_decls
 newOrDataToFlavour :: NewOrData -> TyConFlavour tc
 newOrDataToFlavour NewType  = NewtypeFlavour
 newOrDataToFlavour DataType = DataTypeFlavour
-
-instance Outputable NewOrData where
-  ppr NewType  = text "newtype"
-  ppr DataType = text "data"
 
 -- At the moment we only call this with @f = '[]'@ and @f = 'DataDefnCons'@.
 anyLConIsGadt :: Foldable f => f (GenLocated l (ConDecl pass)) -> Bool

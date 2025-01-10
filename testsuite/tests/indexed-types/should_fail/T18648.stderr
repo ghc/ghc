@@ -1,14 +1,14 @@
-
 T18648.hs:7:4: error: [GHC-41522]
     • Illegal argument ‘f a’ in:
         ‘type Bar1 (f a) = ...’
         The arguments to ‘Bar1’ must all be distinct type variables.
-    • In the default type instance declaration for ‘Bar1’
+    • In the default associated type family instance declaration for ‘Bar1’
       In the class declaration for ‘Foo1’
 
 T18648.hs:11:4: error: [GHC-41522]
     • Illegal argument ‘Bar2 a’ in:
         ‘type Bar2 (Bar2 a) = ...’
         The arguments to ‘Bar2’ must all be distinct type variables.
-    • In the default type instance declaration for ‘Bar2’
+    • In the default associated type family instance declaration for ‘Bar2’
       In the class declaration for ‘Foo2’
+

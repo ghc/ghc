@@ -21,7 +21,7 @@ module GHC.Tc.TyCl (
         kcConDecls, tcConDecls, DataDeclInfo(..),
         dataDeclChecks, checkValidTyCon,
         tcFamTyPats, tcTyFamInstEqn,
-        tcAddTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
+        tcAddOpenTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
         unravelFamInstPats, addConsistencyConstraints,
         checkFamTelescope
     ) where
@@ -55,10 +55,11 @@ import GHC.Tc.Instance.Class( AssocInstInfo(..) )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Instance.Family
-import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt ( TyConInstFlavour(..) )
 import GHC.Tc.Types.LclEnv
+import GHC.Tc.Types.Origin
 
-import GHC.Builtin.Types (oneDataConTy,  unitTy, makeRecoveryTyCon )
+import GHC.Builtin.Types ( oneDataConTy,  unitTy, makeRecoveryTyCon )
 
 import GHC.Rename.Env( lookupConstructorFields )
 
@@ -74,7 +75,6 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Unify
 
-import GHC.Types.Error
 import GHC.Types.Id
 import GHC.Types.Id.Make
 import GHC.Types.Var
@@ -218,8 +218,13 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
            -- as we might look them up in checkTyConConsistentWithBoot.
            -- See Note [TyCon boot consistency checking].
           fmap concat . for tyclss_with_validity_infos $ \ (tycls, ax_validity_infos) ->
-          do { tcAddFamInstCtxt (text "type family") (tyConName tycls) $
-               tcAddClosedTypeFamilyDeclCtxt tycls $
+          do { let inst_flav =
+                     TyConInstFlavour
+                       { tyConInstFlavour = tyConFlavour tycls
+                       , tyConInstIsDefault = False
+                       }
+             ; tcAddFamInstCtxt inst_flav (tyConName tycls) $
+               addErrCtxt (ClosedFamEqnCtxt tycls) $
                  mapM_ (checkTyFamEqnValidityInfo tycls) ax_validity_infos
              ; checkValidTyCl tycls }
 
@@ -1847,7 +1852,7 @@ kcConDecl :: NewOrData -> TcKind -> ConDecl GhcRn -> TcM ()
 kcConDecl new_or_data tc_res_kind
           (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                       , con_mb_cxt = ex_ctxt, con_args = args })
-  = addErrCtxt (dataConCtxt (NE.singleton name)) $
+  = addErrCtxt (DataConDefCtxt (NE.singleton name)) $
     discardResult                   $
     bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsContext ex_ctxt
@@ -1866,7 +1871,7 @@ kcConDecl new_or_data _tc_res_kind
           (ConDeclGADT { con_names = names, con_bndrs = L _ outer_bndrs
                        , con_mb_cxt = cxt, con_g_args = args, con_res_ty = res_ty })
   = -- See Note [kcConDecls: kind-checking data type decls]
-    addErrCtxt (dataConCtxt names) $
+    addErrCtxt (DataConDefCtxt names) $
     discardResult                      $
     -- Not sure this is right, should just extend rather than skolemise but no test
     bindOuterSigTKBndrs_Tv outer_bndrs $
@@ -2792,8 +2797,15 @@ tcDefaultAssocDecl fam_tc
                                    , feqn_pats  = hs_pats
                                    , feqn_rhs   = hs_rhs_ty }})]
   = -- See Note [Type-checking default assoc decls]
+    let
+       inst_flav =
+         TyConInstFlavour
+           { tyConInstFlavour = tyConFlavour fam_tc
+           , tyConInstIsDefault = True
+           }
+    in
     setSrcSpanA loc $
-    tcAddFamInstCtxt (text "default type instance") tc_name $
+    tcAddFamInstCtxt inst_flav tc_name $
     do { traceTc "tcDefaultAssocDecl 1" (ppr tc_name)
        ; let fam_tc_name = tyConName fam_tc
              vis_arity = length (tyConVisibleTyVars fam_tc)
@@ -3115,7 +3127,7 @@ tcTySynRhs roles_info tc_name hs_ty
   where
     skol_info = TyConSkol TypeSynonymFlavour tc_name
 
-tcDataDefn :: SDoc -> RolesInfo -> Name
+tcDataDefn :: ErrCtxtMsg -> RolesInfo -> Name
            -> HsDataDefn GhcRn -> TcM (TyCon, [DerivInfo])
   -- NB: not used for newtype/data instances (whether associated or not)
 tcDataDefn err_ctxt roles_info tc_name
@@ -3646,7 +3658,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
                       , con_ex_tvs = explicit_tkv_nms
                       , con_mb_cxt = hs_ctxt
                       , con_args = hs_args })
-  = addErrCtxt (dataConCtxt (NE.singleton lname)) $
+  = addErrCtxt (DataConDefCtxt (NE.singleton lname)) $
     do { -- NB: the tyvars from the declaration header are in scope
 
          -- Get hold of the existential type variables
@@ -3744,7 +3756,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                        , con_bndrs = L _ outer_hs_bndrs
                        , con_mb_cxt = cxt, con_g_args = hs_args
                        , con_res_ty = hs_res_ty })
-  = addErrCtxt (dataConCtxt names) $
+  = addErrCtxt (DataConDefCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let L _ name :| _ = names
        ; skol_info <- mkSkolemInfo (DataConSkol name)
@@ -3764,8 +3776,8 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                         do { (subst, _meta_tvs) <- newMetaTyVars (binderVars tc_bndrs)
                            ; let head_shape = substTy subst hdr_ty
                            ; discardResult $
-                             popErrCtxt $  -- Drop dataConCtxt
-                             addErrCtxt (dataConResCtxt names) $
+                             popErrCtxt $  -- Drop DataConDefCtxt
+                             addErrCtxt (DataConResTyCtxt names) $
                              unifyType Nothing res_ty head_shape }
 
                    -- See Note [Datatype return kinds]
@@ -4555,7 +4567,7 @@ checkValidTyCon tc
             | Just fam_flav <- famTyConFlav_maybe tc
               -> case fam_flav of
                { ClosedSynFamilyTyCon (Just ax)
-                   -> tcAddClosedTypeFamilyDeclCtxt tc $
+                   -> addErrCtxt (ClosedFamEqnCtxt tc) $
                       checkValidCoAxiom ax
                ; ClosedSynFamilyTyCon Nothing   -> return ()
                ; AbstractClosedSynFamilyTyCon ->
@@ -4662,7 +4674,7 @@ checkFieldCompat fld con1 con2 res1 res2 fty1 fty2
 checkValidDataCon :: DynFlags -> Bool -> TyCon -> DataCon -> TcM ()
 checkValidDataCon dflags existential_ok tc con
   = setSrcSpan con_loc $
-    addErrCtxt (dataConCtxt (NE.singleton (L (noAnnSrcSpan con_loc) con_name))) $
+    addErrCtxt (DataConDefCtxt (NE.singleton (L (noAnnSrcSpan con_loc) con_name))) $
     do  { let tc_tvs      = tyConTyVars tc
               res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
               arg_tys     = dataConOrigArgTys con
@@ -4918,7 +4930,7 @@ checkValidClass cls
 
     check_op constrained_class_methods (sel_id, dm)
       = setSrcSpan (getSrcSpan sel_id) $
-        addErrCtxt (classOpCtxt sel_id op_ty) $ do
+        addErrCtxt (ClassOpCtxt sel_id op_ty) $ do
         { traceTc "class op type" (ppr op_ty)
         ; checkValidType ctxt op_ty
                 -- This implements the ambiguity check, among other things
@@ -4974,8 +4986,15 @@ checkValidClass cls
                   , vi_non_user_tvs = non_user_tvs
                   , vi_pats         = pats
                   , vi_rhs          = orig_rhs } ->
+                 let
+                    inst_flav =
+                      TyConInstFlavour
+                        { tyConInstFlavour = tyConFlavour fam_tc
+                        , tyConInstIsDefault = True
+                        }
+                 in
                  setSrcSpan loc $
-                 tcAddFamInstCtxt (text "default type instance") (getName fam_tc) $
+                 tcAddFamInstCtxt inst_flav (getName fam_tc) $
                  do { checkValidAssocTyFamDeflt fam_tc pats
                     ; checkFamPatBinders fam_tc qtvs non_user_tvs pats orig_rhs
                     ; checkValidTyFamEqn fam_tc pats orig_rhs }}
@@ -5306,7 +5325,7 @@ checkValidRoleAnnots role_annots tc
           warnIf (not (isClassTyCon tc) && not (null vis_roles)) $
           TcRnMissingRoleAnnotation name vis_roles
       Just (decl@(L loc (RoleAnnotDecl _ _ the_role_annots))) ->
-          addRoleAnnotCtxt name $
+          addErrCtxt (RoleAnnotErrCtxt name) $
           setSrcSpanA loc $ do
           { role_annots_ok <- xoptM LangExt.RoleAnnotations
           ; unless role_annots_ok $ addErrTc $ TcRnRoleAnnotationsDisabled tc
@@ -5451,9 +5470,9 @@ checkValidRoles tc
 ************************************************************************
 -}
 
-tcMkDeclCtxt :: TyClDecl GhcRn -> SDoc
-tcMkDeclCtxt decl = hsep [text "In the", pprTyClDeclFlavour decl,
-                      text "declaration for", quotes (ppr (tcdName decl))]
+tcMkDeclCtxt :: TyClDecl GhcRn -> ErrCtxtMsg
+tcMkDeclCtxt decl =
+  TyConDeclCtxt (tcdName decl) (tyClDeclFlavour decl)
 
 addVDQNote :: TcTyCon -> TcM a -> TcM a
 -- See Note [Inferring visible dependent quantification]
@@ -5461,7 +5480,7 @@ addVDQNote :: TcTyCon -> TcM a -> TcM a
 addVDQNote tycon thing_inside
   | assertPpr (isMonoTcTyCon tycon) (ppr tycon $$ ppr tc_kind)
     has_vdq
-  = addLandmarkErrCtxt vdq_warning thing_inside
+  = addLandmarkErrCtxt (VDQWarningCtxt tycon) thing_inside
   | otherwise
   = thing_inside
   where
@@ -5478,62 +5497,41 @@ addVDQNote tycon thing_inside
     is_vdq_tcb tcb = (binderVar tcb `elemVarSet` kind_fvs) &&
                      isVisibleTyConBinder tcb
 
-    vdq_warning = vcat
-      [ text "NB: Type" <+> quotes (ppr tycon) <+>
-        text "was inferred to use visible dependent quantification."
-      , text "Most types with visible dependent quantification are"
-      , text "polymorphically recursive and need a standalone kind"
-      , text "signature. Perhaps supply one, with StandaloneKindSignatures."
-      ]
-
 tcAddDeclCtxt :: TyClDecl GhcRn -> TcM a -> TcM a
 tcAddDeclCtxt decl thing_inside
   = addErrCtxt (tcMkDeclCtxt decl) thing_inside
 
-tcAddTyFamInstCtxt :: TyFamInstDecl GhcRn -> TcM a -> TcM a
-tcAddTyFamInstCtxt decl
-  = tcAddFamInstCtxt (text "type instance") (tyFamInstDeclName decl)
-
-tcMkDataFamInstCtxt :: DataFamInstDecl GhcRn -> SDoc
-tcMkDataFamInstCtxt decl@(DataFamInstDecl { dfid_eqn = eqn })
-  = tcMkFamInstCtxt (pprDataFamInstFlavour decl <+> text "instance")
-                    (unLoc (feqn_tycon eqn))
-
-tcAddDataFamInstCtxt :: DataFamInstDecl GhcRn -> TcM a -> TcM a
-tcAddDataFamInstCtxt decl
-  = addErrCtxt (tcMkDataFamInstCtxt decl)
-
-tcMkFamInstCtxt :: SDoc -> Name -> SDoc
-tcMkFamInstCtxt flavour tycon
-  = hsep [ text "In the" <+> flavour <+> text "declaration for"
-         , quotes (ppr tycon) ]
-
-tcAddFamInstCtxt :: SDoc -> Name -> TcM a -> TcM a
-tcAddFamInstCtxt flavour tycon thing_inside
-  = addErrCtxt (tcMkFamInstCtxt flavour tycon) thing_inside
-
-tcAddClosedTypeFamilyDeclCtxt :: TyCon -> TcM a -> TcM a
-tcAddClosedTypeFamilyDeclCtxt tc
-  = addErrCtxt ctxt
+tcAddOpenTyFamInstCtxt :: AssocInstInfo -> TyFamInstDecl GhcRn -> TcM a -> TcM a
+tcAddOpenTyFamInstCtxt mb_assoc decl
+  = tcAddFamInstCtxt flav (tyFamInstDeclName decl)
   where
-    ctxt = text "In the equations for closed type family" <+>
-           quotes (ppr tc)
+    assoc = case mb_assoc of
+      NotAssociated -> Nothing
+      InClsInst { ai_class = cls } -> Just $ classTyCon cls
+    flav = TyConInstFlavour
+         { tyConInstFlavour = OpenFamilyFlavour IAmType assoc
+         , tyConInstIsDefault = False
+         }
 
-dataConCtxt :: NonEmpty (LocatedN Name) -> SDoc
-dataConCtxt cons = text "In the definition of data constructor" <> plural (toList cons)
-                   <+> ppr_cons (toList cons)
+tcMkDataFamInstCtxt :: AssocInstInfo -> NewOrData -> DataFamInstDecl GhcRn -> ErrCtxtMsg
+tcMkDataFamInstCtxt mb_assoc new_or_data (DataFamInstDecl { dfid_eqn = eqn })
+  = TyConInstCtxt (unLoc (feqn_tycon eqn))
+      (TyConInstFlavour
+        { tyConInstFlavour   = OpenFamilyFlavour (IAmData new_or_data) assoc
+        , tyConInstIsDefault = False
+        })
+  where
+    assoc = case mb_assoc of
+      NotAssociated -> Nothing
+      InClsInst { ai_class = cls } -> Just $ classTyCon cls
 
-dataConResCtxt :: NonEmpty (LocatedN Name) -> SDoc
-dataConResCtxt cons = text "In the result type of data constructor" <> plural (toList cons)
-                      <+> ppr_cons (toList cons)
+tcAddDataFamInstCtxt :: AssocInstInfo -> NewOrData -> DataFamInstDecl GhcRn -> TcM a -> TcM a
+tcAddDataFamInstCtxt assoc new_or_data decl
+  = addErrCtxt (tcMkDataFamInstCtxt assoc new_or_data decl)
 
-ppr_cons :: [LocatedN Name] -> SDoc
-ppr_cons [con] = quotes (ppr con)
-ppr_cons cons  = interpp'SP cons
-
-classOpCtxt :: Var -> Type -> SDoc
-classOpCtxt sel_id tau = sep [text "When checking the class method:",
-                              nest 2 (pprPrefixOcc sel_id <+> dcolon <+> ppr tau)]
+tcAddFamInstCtxt :: TyConInstFlavour -> Name -> TcM a -> TcM a
+tcAddFamInstCtxt flavour tycon thing_inside
+  = addErrCtxt (TyConInstCtxt tycon flavour) thing_inside
 
 illegalRoleAnnotDecl :: LRoleAnnotDecl GhcRn -> TcM ()
 illegalRoleAnnotDecl (L loc role)
@@ -5542,12 +5540,7 @@ illegalRoleAnnotDecl (L loc role)
     addErrTc $ TcRnIllegalRoleAnnotation role
 
 addTyConCtxt :: TyCon -> TcM a -> TcM a
-addTyConCtxt tc = addTyConFlavCtxt name flav
+addTyConCtxt tc = addErrCtxt (TyConDeclCtxt name flav)
   where
     name = getName tc
     flav = tyConFlavour tc
-
-addRoleAnnotCtxt :: Name -> TcM a -> TcM a
-addRoleAnnotCtxt name
-  = addErrCtxt $
-    text "while checking a role annotation for" <+> quotes (ppr name)

@@ -1,6 +1,6 @@
-
 T16923.hs:4:32: error: [GHC-83865]
     • Expecting one more argument to ‘Maybe’
       Expected a type, but ‘Maybe’ has kind ‘* -> *’
     • In the first argument of ‘Maybe’, namely ‘Maybe’
-      In the data declaration for ‘Foo’
+      In the data type declaration for ‘Foo’
+

@@ -1,4 +1,4 @@
-
 UnlDataInvalidResKind1.hs:9:1: error: [GHC-55233]
     • Data type has non-BoxedRep return kind ‘TYPE IntRep’
-    • In the data declaration for ‘T’
+    • In the data type declaration for ‘T’
+

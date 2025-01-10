@@ -1,6 +1,6 @@
-
 T10384.hs:3:37: error: [GHC-06568]
     • Can't splice the polymorphic local variable ‘y’
-    • In the Template Haskell quotation [|| y ||]
+    • In the Template Haskell typed quotation: [|| y ||]
       In the expression: [|| y ||]
       In the expression: \ (y :: forall a. a -> a) -> [|| y ||]
+

@@ -1,5 +1,5 @@
-
 T1830_1.hs:6:29: error: [GHC-86639]
     • Can't make a derived instance of ‘Lift (Foo a)’:
         You need DeriveLift to derive an instance for this class
-    • In the data declaration for ‘Foo’
+    • In the data type declaration for ‘Foo’
+

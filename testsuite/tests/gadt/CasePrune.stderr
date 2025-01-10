@@ -1,6 +1,6 @@
-
 CasePrune.hs:14:31: error: [GHC-18872]
     • Couldn't match type ‘Int’ with ‘A’
         arising from the coercion of the method ‘ic’
           from type ‘T Int’ to type ‘T A’
     • When deriving the instance for (C A)
+

@@ -5,5 +5,5 @@ T15787.hs:17:14: error: [GHC-25897]
         at T15787.hs:17:3-43
     • In the type ‘k’
       In the definition of data constructor ‘Kl’
-      In the data declaration for ‘Kl_kind’
+      In the data type declaration for ‘Kl_kind’
 

@@ -1,9 +1,9 @@
-
 TypeSkolEscape.hs:9:52: error: [GHC-46956]
     • Expected kind ‘k0’, but ‘a’ has kind ‘TYPE v’
-    • because kind variable ‘v’ would escape its scope
-    This (rigid, skolem) kind variable is bound by
-      an explicit forall (v :: RuntimeRep) (a :: TYPE v)
-      at TypeSkolEscape.hs:9:19-49
+        because kind variable ‘v’ would escape its scope
+      This (rigid, skolem) kind variable is bound by
+        an explicit forall (v :: RuntimeRep) (a :: TYPE v)
+        at TypeSkolEscape.hs:9:19-49
     • In the type ‘forall (v :: RuntimeRep) (a :: TYPE v). a’
-      In the type declaration for ‘Bad’
+      In the type synonym declaration for ‘Bad’
+

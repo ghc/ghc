@@ -1,4 +1,4 @@
-
 T5922.hs:3:42: error: [GHC-11913]
     • Illegal deriving item ‘show’
-    • In the data declaration for ‘Proposition’
+    • In the data type declaration for ‘Proposition’
+

@@ -1,5 +1,5 @@
-
 T15474.hs:10:1: error: [GHC-16220]
     • Uninferrable type variable k0 in
       the type synonym right-hand side: forall (t :: k0). Proxy @{k0} t
-    • In the type declaration for ‘Forall’
+    • In the type synonym declaration for ‘Forall’
+

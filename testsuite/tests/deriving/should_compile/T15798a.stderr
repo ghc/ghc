@@ -1,6 +1,6 @@
 T15798a.hs:11:12: warning: [GHC-55631] [-Wmissing-deriving-strategies]
     • No deriving strategy specified. Did you want stock, newtype, or anyclass?
-    • In the data declaration for ‘Bar’
+    • In the data type declaration for ‘Bar’
     Suggested fix:
       Use explicit deriving strategies: deriving stock (Eq, Show)
 

@@ -1,7 +1,8 @@
-ListTuplePunsFail4.hs:10:14: [GHC-83865]
-     Couldn't match kind ‘Tuple2# (*) (*)’ with ‘*’
+ListTuplePunsFail4.hs:10:14: error: [GHC-83865]
+    • Couldn't match kind ‘Tuple2# (*) (*)’ with ‘*’
       Expected kind ‘* -> * -> *’,
         but ‘(#,#)’ has kind ‘* -> * -> Tuple2# (*) (*)’
-     In the first argument of ‘F2’, namely ‘(#,#)’
+    • In the first argument of ‘F2’, namely ‘(#,#)’
       In the type ‘F2 (#,#)’
-      In the type declaration for ‘T3’
+      In the type synonym declaration for ‘T3’
+

@@ -1,4 +1,3 @@
-
 T21302.hs:6:13: error: [GHC-05617]
     • Could not solve: ‘c0 Eq Int’
         arising from the first field of ‘BoxAssocDouble’
@@ -17,3 +16,4 @@ T21302.hs:12:19: error: [GHC-05617]
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the stand-alone deriving instance for
         ‘c Eq a => Eq (BoxAssoc a)’
+

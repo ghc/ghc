@@ -1,6 +1,6 @@
-
 GenCannotDoRep1_0.hs:9:49: error: [GHC-16437]
     • Can't make a derived instance of ‘Generic1 Dynamic’:
         Constructor ‘Dynamic’ has existential type variables in its type
-    • In the data declaration for ‘Dynamic’
+    • In the data type declaration for ‘Dynamic’
     Suggested fix: Use a standalone deriving declaration instead
+

@@ -1,4 +1,4 @@
-
 T14339.hs:17:12: error: [GHC-64725]
     • Boo
     • When deriving the instance for (Bar Baz)
+

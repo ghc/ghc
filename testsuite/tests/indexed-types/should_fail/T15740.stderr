@@ -1,11 +1,11 @@
-
 T15740.hs:11:20: error: [GHC-83865]
     • Expected kind ‘forall k. k -> *’,
         but ‘SBool’ has kind ‘Bool -> *’
     • In the type ‘SBool’
-      In the type instance declaration for ‘F2’
+      In the type family instance declaration for ‘F2’
 
 T15740.hs:12:20: error: [GHC-83865]
     • Expected kind ‘forall k. k -> *’, but ‘SNat’ has kind ‘Nat -> *’
     • In the type ‘SNat’
-      In the type instance declaration for ‘F2’
+      In the type family instance declaration for ‘F2’
+

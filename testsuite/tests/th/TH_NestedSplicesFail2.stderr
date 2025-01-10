@@ -1,5 +1,5 @@
-
 TH_NestedSplicesFail2.hs:4:12: error: [GHC-45108]
     • Untyped splices may not appear in typed brackets.
     • In the untyped splice: $y
-      In the Template Haskell typed quotation [|| $y ||]
+      In the Template Haskell typed quotation: [|| $y ||]
+

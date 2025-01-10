@@ -163,9 +163,11 @@ unboundNameOrTermInType if_term_in_type looking_for rdr_name hints
 
       err = notInScopeErr (lf_where looking_for) name_to_search
 
-      make_error imp_errs hints = case if_term_in_type of
-        TermInTypes demoted_name -> TcRnTermNameInType demoted_name hints
-        _ -> TcRnNotInScope err name_to_search imp_errs hints
+      make_error imp_errs hints =
+        case if_term_in_type of
+          TermInTypes demoted_name ->
+            TcRnTermNameInType demoted_name hints
+          _ -> TcRnNotInScope err name_to_search imp_errs hints
 
 notInScopeErr :: WhereLooking -> RdrName -> NotInScopeError
 notInScopeErr where_look rdr_name

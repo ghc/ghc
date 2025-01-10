@@ -3,6 +3,6 @@ TH_NestedSplicesFail3.hs:4:12: error: [GHC-39999]
                          (GHC.Internal.TH.Syntax.Code GHC.Internal.TH.Syntax.Q)’
         arising from a quotation bracket
     • In the expression: [| 'x' |]
-      In the Template Haskell splice $$([| 'x' |])
+      In the typed Template Haskell splice: $$([| 'x' |])
       In the expression: $$([| 'x' |])
 

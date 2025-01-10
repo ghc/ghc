@@ -1,11 +1,11 @@
+<interactive>:2:68: error: [GHC-29916]
+    • Multiple declarations of ‘f’
+      Declared at: <interactive>:2:32
+                   <interactive>:2:68
+    • In the Template Haskell quotation:
+        [d| f = undefined
+            class Foo x where
+              f :: x -> x
+            instance Foo Int where
+              f = id |]
 
-<interactive>:2:68: [GHC-29916]
-    Multiple declarations of ‘f’
-    Declared at: <interactive>:2:32
-                 <interactive>:2:68
-    In the Template Haskell quotation
-      [d| f = undefined
-          class Foo x where
-            f :: x -> x
-          instance Foo Int where
-            f = id |]

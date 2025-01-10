@@ -26,11 +26,9 @@ import GHC.Tc.Validity
 import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names
 import GHC.Types.DefaultEnv ( DefaultEnv, ClassDefaults (..), defaultEnv )
-import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Unit.Types (Module, ghcInternalUnit, moduleUnit, primUnit)
 import GHC.Utils.Misc (fstOf3, sndOf3)
-import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad (void)
@@ -165,8 +163,8 @@ tcDefaults decls
     declarationParts :: [Class] -> LDefaultDecl GhcRn -> TcM (LDefaultDecl GhcRn, TyCon, [Type])
     reportDuplicates :: Module -> [Class] -> NonEmpty (LDefaultDecl GhcRn, TyCon, [Type]) -> TcM [ClassDefaults]
     declarationParts extra_clss decl@(L locn (DefaultDecl _ cls_tyMaybe mono_tys))
-      = addErrCtxt defaultDeclCtxt $
-        setSrcSpan (locA locn)     $
+      = addErrCtxt DefaultDeclErrCtxt $
+        setSrcSpan (locA locn)        $
         do { tau_tys <- mapAndReportM tc_default_ty mono_tys
            ; def_clsCon <- case cls_tyMaybe of
                Nothing ->
@@ -230,9 +228,6 @@ check_instance ty (clsTyCon, clsArgs, [cls_argKind])
   = simplifyDefault [mkTyConApp clsTyCon (clsArgs ++ [ty])]
 check_instance _ _
   = return False
-
-defaultDeclCtxt :: SDoc
-defaultDeclCtxt = text "When checking the types in a default declaration"
 
 dupDefaultDeclErr :: TyCon -> NonEmpty (LDefaultDecl GhcRn) -> TcRnMessage
 dupDefaultDeclErr cls (L _ DefaultDecl {} :| dup_things)

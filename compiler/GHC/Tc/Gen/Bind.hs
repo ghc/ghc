@@ -77,7 +77,6 @@ import GHC.Types.Name.Env
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 
-import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Types.Basic
 import GHC.Utils.Outputable as Outputable
@@ -1134,12 +1133,10 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
 chooseInferredQuantifiers _ _ _ _ (Just sig)
   = pprPanic "chooseInferredQuantifiers" (ppr sig)
 
-mk_inf_msg :: Name -> TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
+mk_inf_msg :: Name -> TcType -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
 mk_inf_msg poly_name poly_ty tidy_env
  = do { (tidy_env1, poly_ty) <- zonkTidyTcType tidy_env poly_ty
-      ; let msg = vcat [ text "When checking the inferred type"
-                       , nest 2 $ ppr poly_name <+> dcolon <+> ppr poly_ty ]
-      ; return (tidy_env1, msg) }
+      ; return (tidy_env1, InferredTypeCtxt poly_name poly_ty) }
 
 -- | Warn the user about polymorphic local binders that lack type signatures.
 localSigWarn :: Id -> Maybe TcIdSigInst -> TcM ()
@@ -1362,7 +1359,7 @@ tcMonoBinds is_rec sig_fn no_gen
            [L b_loc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_ann })]
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , all (isNothing . sig_fn) bndrs
-  = addErrCtxt (patMonoBindsCtxt pat grhss) $
+  = addErrCtxt (PatMonoBindsCtxt pat grhss) $
     do { mult <- tcMultAnn mult_ann
 
        ; (grhss', pat_ty) <- tcInferFRR FRRPatBind $ \ exp_ty ->
@@ -1553,7 +1550,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_a
         ; mult <- tcMultAnn mult_ann
             -- See Note [Typechecking pattern bindings]
         ; ((pat', nosig_mbis), pat_ty)
-            <- addErrCtxt (patMonoBindsCtxt pat grhss) $
+            <- addErrCtxt (PatMonoBindsCtxt pat grhss) $
                tcInferFRR FRRPatBind $ \ exp_ty ->
                tcLetPat inst_sig_fun no_gen pat (Scaled mult exp_ty) $
                  -- The above inferred type get an unrestricted multiplicity. It may be
@@ -1637,7 +1634,7 @@ tcRhs (TcPatBind infos pat' mult mult_ann grhss pat_ty)
     -- That's why we have the special case for a single FunBind in tcMonoBinds
     tcExtendIdBinderStackForRhs infos        $
     do  { traceTc "tcRhs: pat bind" (ppr pat' $$ ppr pat_ty)
-        ; grhss' <- addErrCtxt (patMonoBindsCtxt pat' grhss) $
+        ; grhss' <- addErrCtxt (PatMonoBindsCtxt pat' grhss) $
                     tcGRHSsPat mult grhss (mkCheckExpType pat_ty)
 
         ; return ( PatBind { pat_lhs = pat', pat_rhs = grhss'
@@ -1947,15 +1944,3 @@ function may be exported.  And it's easier to grok "MonoLocalBinds" as
 applying to, well, local bindings.
 -}
 
-{- *********************************************************************
-*                                                                      *
-               Error contexts and messages
-*                                                                      *
-********************************************************************* -}
-
--- This one is called on LHS, when pat and grhss are both Name
--- and on RHS, when pat is TcId and grhss is still Name
-patMonoBindsCtxt :: (OutputableBndrId p)
-                 => LPat (GhcPass p) -> GRHSs GhcRn (LHsExpr GhcRn) -> SDoc
-patMonoBindsCtxt pat grhss
-  = hang (text "In a pattern binding:") 2 (pprPatBind pat grhss)

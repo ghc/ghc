@@ -1,7 +1,7 @@
-
 T23740i.hs:10:6: error: [GHC-45510]
     • Term variable ‘id’ cannot be used here
         (term variables cannot be promoted)
     • In the first argument of ‘Show’, namely ‘id’
       In the type ‘Show id’
-      In the argument of reifyInstances: GHC.Internal.Show.Show id
+      In the argument of ‘reifyInstances’: GHC.Internal.Show.Show id
+

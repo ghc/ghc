@@ -1,6 +1,6 @@
-
 T9858a.hs:21:18: error: [GHC-91510]
     • Illegal qualified type:
         (() :: Constraint, () :: Constraint) => ()
     • In the expansion of type synonym ‘PX’
-      In the newtype instance declaration for ‘F’
+      In the newtype family instance declaration for ‘F’
+

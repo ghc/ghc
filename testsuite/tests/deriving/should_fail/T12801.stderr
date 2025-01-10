@@ -1,5 +1,5 @@
-
 T12801.hs:9:17: error: [GHC-86639]
     • Can't make a derived instance of ‘Functor Wibble’:
         You need DeriveFunctor to derive an instance for this class
-    • In the data declaration for ‘Wibble’
+    • In the data type declaration for ‘Wibble’
+

@@ -1,5 +1,5 @@
-
 AssocTyDef05.hs:6:5: error: [GHC-12985]
     • Number of parameters must match family declaration; expected 1.
-    • In the default type instance declaration for ‘Typ’
+    • In the default associated type family instance declaration for ‘Typ’
       In the class declaration for ‘Cls’
+

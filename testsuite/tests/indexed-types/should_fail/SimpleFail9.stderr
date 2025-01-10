@@ -1,7 +1,7 @@
-
 SimpleFail9.hs:16:3: error: [GHC-95424]
     • Type indexes must match class instance head
       Expected: S7 (a, Int)
         Actual: S7 (b, Int)
-    • In the data instance declaration for ‘S7’
+    • In the associated data family instance declaration for ‘S7’
       In the instance declaration for ‘C7 Char (a, Int)’
+

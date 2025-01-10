@@ -1,5 +1,5 @@
-
 TH_NestedSplicesFail8.hs:4:10: error: [GHC-59185]
     • Template Haskell brackets cannot be nested (without intervening splices)
-    • In the Template Haskell quotation [| 'a' |]
-      In the Template Haskell typed quotation [|| [| 'a' |] ||]
+    • In the Template Haskell quotation: [| 'a' |]
+      In the Template Haskell typed quotation: [|| [| 'a' |] ||]
+

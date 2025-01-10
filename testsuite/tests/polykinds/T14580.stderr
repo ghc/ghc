@@ -1,7 +1,7 @@
-
 T14580.hs:8:32: error: [GHC-25897]
     • Couldn't match kind ‘b’ with ‘a -> *’
       Expected kind ‘Cat a’, but ‘iso :: cat a b’ has kind ‘cat a b’
     • In the first argument of ‘ISO’, namely ‘(iso :: cat a b)’
       In the type ‘ISO (iso :: cat a b)’
-      In the type declaration for ‘<-->’
+      In the type synonym declaration for ‘<-->’
+

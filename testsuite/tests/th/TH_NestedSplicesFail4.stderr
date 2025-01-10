@@ -3,7 +3,7 @@ TH_NestedSplicesFail4.hs:4:11: error: [GHC-83865]
                      with: GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Exp
       Expected: GHC.Internal.TH.Lib.ExpQ
         Actual: GHC.Internal.TH.Syntax.Code m0 Char
-    • In the Template Haskell quotation [|| 'y' ||]
+    • In the Template Haskell typed quotation: [|| 'y' ||]
       In the expression: [|| 'y' ||]
       In the untyped splice: $([|| 'y' ||])
 

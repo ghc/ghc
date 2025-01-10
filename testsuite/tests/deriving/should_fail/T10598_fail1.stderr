@@ -1,11 +1,11 @@
-
 T10598_fail1.hs:9:40: error: [GHC-10333]
     • Can't make a derived instance of
         ‘Show A’ with the newtype strategy:
         GeneralizedNewtypeDeriving cannot be used on non-newtypes
-    • In the data declaration for ‘A’
+    • In the data type declaration for ‘A’
 
 T10598_fail1.hs:10:40: error: [GHC-00158]
     • Can't make a derived instance of ‘Num B’ with the stock strategy:
         ‘Num’ is not a stock derivable class (Eq, Show, etc.)
     • In the newtype declaration for ‘B’
+

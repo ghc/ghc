@@ -254,7 +254,7 @@ tcFImport :: LForeignDecl GhcRn
           -> TcM (Id, LForeignDecl GhcTc, Bag GlobalRdrElt)
 tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
                                     , fd_fi = imp_decl }))
-  = setSrcSpanA dloc $ addErrCtxt (foreignDeclCtxt fo)  $
+  = setSrcSpanA dloc $ addErrCtxt (ForeignDeclCtxt fo)  $
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
        ; (Reduction norm_co norm_sig_ty, gres) <- normaliseFfiType sig_ty
        ; let
@@ -412,7 +412,7 @@ tcForeignExports' decls
 tcFExport :: ForeignDecl GhcRn
           -> TcM (LHsBind GhcTc, ForeignDecl GhcTc, Bag GlobalRdrElt)
 tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spec })
-  = addErrCtxt (foreignDeclCtxt fo) $ do
+  = addErrCtxt (ForeignDeclCtxt fo) $ do
 
     sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
     rhs <- tcCheckPolyExpr (nlHsVar nm) sig_ty
@@ -579,12 +579,6 @@ check :: Validity' IllegalForeignTypeReason
       -> TcM ()
 check IsValid _                   = return ()
 check (NotValid reason) mkMessage = addErrTc (mkMessage reason)
-
-foreignDeclCtxt :: ForeignDecl GhcRn -> SDoc
-foreignDeclCtxt fo
-  = hang (text "When checking declaration:")
-       2 (ppr fo)
-
 
 {- Predicates on Types used in this module -}
 

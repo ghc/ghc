@@ -1,4 +1,4 @@
-
 TyFamArity1.hs:4:15: error: [GHC-12985]
     • Number of parameters must match family declaration; expected 2.
-    • In the type instance declaration for ‘T’
+    • In the type family instance declaration for ‘T’
+

@@ -1,8 +1,7 @@
-
 ExplicitForAllFams4b.hs:8:24: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but it isn't used in the family instance.
-    • In the type instance declaration for ‘J’
+    • In the type family instance declaration for ‘J’
 
 ExplicitForAllFams4b.hs:8:27: error: [GHC-34447]
     Conflicting family instance declarations:
@@ -12,12 +11,12 @@ ExplicitForAllFams4b.hs:8:27: error: [GHC-34447]
 ExplicitForAllFams4b.hs:9:22: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but does not appear in any of the LHS patterns of the family instance.
-    • In the type instance declaration for ‘J’
+    • In the type family instance declaration for ‘J’
 
 ExplicitForAllFams4b.hs:12:24: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but does not appear in any of the LHS patterns of the family instance.
-    • In the data instance declaration for ‘K’
+    • In the data family instance declaration for ‘K’
 
 ExplicitForAllFams4b.hs:12:27: error: [GHC-34447]
     Conflicting family instance declarations:
@@ -27,12 +26,12 @@ ExplicitForAllFams4b.hs:12:27: error: [GHC-34447]
 ExplicitForAllFams4b.hs:13:22: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but does not appear in any of the LHS patterns of the family instance.
-    • In the data instance declaration for ‘K’
+    • In the data family instance declaration for ‘K’
 
 ExplicitForAllFams4b.hs:16:27: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but does not appear in any of the LHS patterns of the family instance.
-    • In the newtype instance declaration for ‘L’
+    • In the newtype family instance declaration for ‘L’
 
 ExplicitForAllFams4b.hs:16:30: error: [GHC-34447]
     Conflicting family instance declarations:
@@ -42,54 +41,55 @@ ExplicitForAllFams4b.hs:16:30: error: [GHC-34447]
 ExplicitForAllFams4b.hs:17:25: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but does not appear in any of the LHS patterns of the family instance.
-    • In the newtype instance declaration for ‘L’
+    • In the newtype family instance declaration for ‘L’
 
 ExplicitForAllFams4b.hs:24:3: error: [GHC-95424]
     • Type indexes must match class instance head
       Expected: CT Int _
         Actual: CT [a] (a, a)
-    • In the type instance declaration for ‘CT’
+    • In the associated type family instance declaration for ‘CT’
       In the instance declaration for ‘C Int’
 
 ExplicitForAllFams4b.hs:24:17: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but it isn't used in the family instance.
-    • In the type instance declaration for ‘CT’
+    • In the associated type family instance declaration for ‘CT’
       In the instance declaration for ‘C Int’
 
 ExplicitForAllFams4b.hs:25:3: error: [GHC-95424]
     • Type indexes must match class instance head
       Expected: CD Int _
         Actual: CD [a] (a, a)
-    • In the data instance declaration for ‘CD’
+    • In the associated data family instance declaration for ‘CD’
       In the instance declaration for ‘C Int’
 
 ExplicitForAllFams4b.hs:25:17: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but does not appear in any of the LHS patterns of the family instance.
-    • In the data instance declaration for ‘CD’
+    • In the associated data family instance declaration for ‘CD’
       In the instance declaration for ‘C Int’
 
 ExplicitForAllFams4b.hs:28:15: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but does not appear in any of the LHS patterns of the family instance.
-    • In the type instance declaration for ‘CT’
+    • In the associated type family instance declaration for ‘CT’
       In the instance declaration for ‘C Bool’
 
 ExplicitForAllFams4b.hs:29:15: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but does not appear in any of the LHS patterns of the family instance.
-    • In the data instance declaration for ‘CD’
+    • In the associated data family instance declaration for ‘CD’
       In the instance declaration for ‘C Bool’
 
 ExplicitForAllFams4b.hs:32:15: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but it isn't used in the family instance.
-    • In the type instance declaration for ‘CT’
+    • In the associated type family instance declaration for ‘CT’
       In the instance declaration for ‘C Double’
 
 ExplicitForAllFams4b.hs:33:15: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but does not appear in any of the LHS patterns of the family instance.
-    • In the data instance declaration for ‘CD’
+    • In the associated data family instance declaration for ‘CD’
       In the instance declaration for ‘C Double’
+

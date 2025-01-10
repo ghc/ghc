@@ -1,4 +1,3 @@
-
 T23686A.hs:4:1: error: [GHC-39191]
     • Illegal family declaration for ‘GMap’
     • In the data family declaration for ‘GMap’
@@ -9,9 +8,10 @@ T23686A.hs:4:1: error: [GHC-39191]
 
 T23686B.hs:5:5: error: [GHC-62558]
     • Syntax error on [| \ left right x -> left (right x) |]
-    • In the Template Haskell quotation
+    • In the Template Haskell quotation:
         [| \ left right x -> left (right x) |]
     Suggested fix:
       Perhaps you intended to use the ‘TemplateHaskellQuotes’ extension (implied by ‘TemplateHaskell’)
       You may enable this language extension in GHCi with:
         :set -XTemplateHaskellQuotes
+

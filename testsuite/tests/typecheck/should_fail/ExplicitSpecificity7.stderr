@@ -1,6 +1,6 @@
-
 ExplicitSpecificity7.hs:8:12: error: [GHC-20967]
     • Cannot apply function of kind ‘Bool -> b0 -> b0’
       to visible kind argument ‘Int’
     • In the type ‘Foo @Bool @Int True 42’
-      In the type declaration for ‘Bar’
+      In the type synonym declaration for ‘Bar’
+

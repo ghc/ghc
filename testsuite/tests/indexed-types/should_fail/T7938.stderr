@@ -1,6 +1,6 @@
-
 T7938.hs:12:29: error: [GHC-83865]
     • Expected a type, but ‘KP :: KProxy k2’ has kind ‘KProxy k2’
     • In the type ‘(KP :: KProxy k2)’
-      In the type instance declaration for ‘Bar’
+      In the associated type family instance declaration for ‘Bar’
       In the instance declaration for ‘Foo (a :: k1) (b :: k2)’
+

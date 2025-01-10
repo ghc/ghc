@@ -1,6 +1,6 @@
 T15798c.hs:6:12: warning: [GHC-55631] [-Wmissing-deriving-strategies]
     • No deriving strategy specified. Did you want stock, newtype, or anyclass?
-    • In the data declaration for ‘Foo’
+    • In the data type declaration for ‘Foo’
     Suggested fixes:
       • Use explicit deriving strategies: deriving stock (Eq)
       • Perhaps you intended to use the ‘DerivingStrategies’ extension (implied by ‘DerivingVia’)

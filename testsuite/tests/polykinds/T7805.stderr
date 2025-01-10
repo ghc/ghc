@@ -1,6 +1,6 @@
-
 T7805.hs:8:21: error: [GHC-83865]
     • Expected kind ‘forall a. a -> a’, but ‘x’ has kind ‘*’
     • In the first argument of ‘HR’, namely ‘x’
       In the first argument of ‘F’, namely ‘(HR x)’
-      In the type instance declaration for ‘F’
+      In the type family instance declaration for ‘F’
+

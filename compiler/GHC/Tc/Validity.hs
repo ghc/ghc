@@ -241,7 +241,7 @@ checkAmbiguity ctxt ty
          -- tyvars are skolemised, we can safely use tcSimplifyTop
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; unless allow_ambiguous $
-         do { (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
+         do { (_wrap, wanted) <- addErrCtxt (AmbiguityCheckCtxt ctxt allow_ambiguous) $
                                  captureConstraints $
                                  tcSubTypeAmbiguity ctxt ty ty
                                  -- See Note [Ambiguity check and deep subsumption]
@@ -252,13 +252,6 @@ checkAmbiguity ctxt ty
 
   | otherwise
   = return ()
- where
-   mk_msg allow_ambiguous
-     = vcat [ text "In the ambiguity check for" <+> what
-            , ppUnless allow_ambiguous ambig_msg ]
-   ambig_msg = text "To defer the ambiguity check to use sites, enable AllowAmbiguousTypes"
-   what | Just n <- isSigMaybe ctxt = quotes (ppr n)
-        | otherwise                 = pprUserTypeCtxt ctxt
 
 wantAmbiguityCheck :: UserTypeCtxt -> Bool
 wantAmbiguityCheck ctxt
@@ -880,10 +873,8 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
     check_expansion_only expand
       = assertPpr (isTypeSynonymTyCon tc) (ppr tc) $
         case coreView ty of
-         Just ty' -> let err_ctxt = text "In the expansion of type synonym"
-                                    <+> quotes (ppr tc)
-                     in addErrCtxt err_ctxt $
-                        check_type (ve{ve_expand = expand}) ty'
+         Just ty' -> addErrCtxt (TySynErrCtxt tc) $
+                     check_type (ve{ve_expand = expand}) ty'
          Nothing  -> pprPanic "check_syn_tc_app" (ppr ty)
 
 {-
@@ -1309,7 +1300,7 @@ check_pred_help under_syn env dflags ctxt pred
 check_quant_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
                  -> PredType -> ThetaType -> PredType -> TcM ()
 check_quant_pred env dflags ctxt pred theta head_pred
-  = addErrCtxt (text "In the quantified constraint" <+> quotes (ppr pred)) $
+  = addErrCtxt (QuantifiedCtCtxt pred) $
     do { -- Check the instance head
          case classifyPredType head_pred of
                                  -- SigmaCtxt tells checkValidInstHead that
@@ -1495,11 +1486,9 @@ Flexibility check:
   generalized actually.
 -}
 
-checkThetaCtxt :: UserTypeCtxt -> ThetaType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
+checkThetaCtxt :: UserTypeCtxt -> ThetaType -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
 checkThetaCtxt ctxt theta env
-  = return ( env
-           , vcat [ text "In the context:" <+> pprTheta (tidyTypes env theta)
-                  , text "While checking" <+> pprUserTypeCtxt ctxt ] )
+  = return (env, ThetaCtxt ctxt (tidyTypes env theta))
 
 tyConArityErr :: TyCon -> [TcType] -> TcRnMessage
 -- For type-constructor arity errors, be careful to report

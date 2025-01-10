@@ -1,4 +1,4 @@
-
 T17021b.hs:10:1: error: [GHC-55233]
     • Data instance has non-* return kind ‘F Int’
-    • In the data instance declaration for ‘Fix’
+    • In the data family instance declaration for ‘Fix’
+

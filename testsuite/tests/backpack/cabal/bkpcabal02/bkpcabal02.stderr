@@ -1,10 +1,10 @@
-
 q\H.hsig:2:1: error: [GHC-11890]
     • Identifier ‘x’ has conflicting definitions in the module
       and its hsig file.
       Main module: x :: Int
         Hsig file: x :: Bool
       The two types are different.
-    • while merging the signatures from:
+    • While merging the signatures from:
         • bkpcabal01-0.1.0.0:p[H=<H>]:H
         • ...and the local signature for H
+

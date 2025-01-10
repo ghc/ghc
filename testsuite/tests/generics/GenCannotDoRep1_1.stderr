@@ -1,8 +1,8 @@
-
 GenCannotDoRep1_1.hs:1:29: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 GenCannotDoRep1_1.hs:8:49: error: [GHC-30367]
     • Can't make a derived instance of ‘Generic1 Context’:
         Context must not have a datatype context
-    • In the data declaration for ‘Context’
+    • In the data type declaration for ‘Context’
+

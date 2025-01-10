@@ -1,8 +1,8 @@
-
 mod56.hs:4:39: error: [GHC-58291]
     • Can't make a derived instance of ‘Ix T’:
         ‘T’ must be an enumeration type
         (an enumeration consists of one or more nullary, non-GADT constructors)
           or
         ‘T’ must have precisely one constructor
-    • In the data declaration for ‘T’
+    • In the data type declaration for ‘T’
+

@@ -1,4 +1,3 @@
-
 tcfail117.hs:6:32: error: [GHC-30750]
     • Can't make a derived instance of ‘Enum N1’:
         ‘N1’ must be an enumeration type
@@ -12,4 +11,5 @@ tcfail117.hs:7:32: error: [GHC-30750]
     • Can't make a derived instance of ‘Enum N2’:
         ‘N2’ must be an enumeration type
         (an enumeration consists of one or more nullary, non-GADT constructors)
-    • In the data declaration for ‘N2’
+    • In the data type declaration for ‘N2’
+

@@ -1,22 +1,22 @@
-
 TyFamUndec.hs:6:15: error: [GHC-22979]
     • Variable ‘b’ occurs more often
         in the type-family application ‘T (b, b)’
         than in the LHS of the family instance ‘T (a, [b])’
-    • In the type instance declaration for ‘T’
+    • In the type family instance declaration for ‘T’
     Suggested fix:
       Perhaps you intended to use the ‘UndecidableInstances’ extension
 
 TyFamUndec.hs:7:15: error: [GHC-22979]
     • The type-family application ‘T (a, Maybe b)’
         is no smaller than the LHS of the family instance ‘T (a, Maybe b)’
-    • In the type instance declaration for ‘T’
+    • In the type family instance declaration for ‘T’
     Suggested fix:
       Perhaps you intended to use the ‘UndecidableInstances’ extension
 
 TyFamUndec.hs:8:15: error: [GHC-22979]
     • Illegal nested use of type family ‘T’
         in the arguments of the type-family application ‘T (a, T b)’
-    • In the type instance declaration for ‘T’
+    • In the type family instance declaration for ‘T’
     Suggested fix:
       Perhaps you intended to use the ‘UndecidableInstances’ extension
+

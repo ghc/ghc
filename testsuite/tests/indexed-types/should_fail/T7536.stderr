@@ -1,6 +1,6 @@
-
 T7536.hs:8:18: error: [GHC-30337]
     • Dodgy type variable ‘a’ in the LHS of a family instance:
         the type variable ‘a’ syntactically appears in LHS patterns,
         but it doesn't appear in an injective position.
-    • In the type instance declaration for ‘TF’
+    • In the type family instance declaration for ‘TF’
+

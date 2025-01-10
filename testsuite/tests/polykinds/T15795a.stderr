@@ -1,4 +1,3 @@
-
 T15795a.hs:9:3: error: [GHC-71451]
     • Cannot generalise type; skolem ‘u’ would escape its scope
       if I tried to quantify (cat10 :: u) in this type:
@@ -6,4 +5,5 @@ T15795a.hs:9:3: error: [GHC-71451]
       (Indeed, I sometimes struggle even printing this correctly,
        due to its ill-scoped nature.)
     • In the definition of data constructor ‘Prod’
-      In the data declaration for ‘F’
+      In the data type declaration for ‘F’
+

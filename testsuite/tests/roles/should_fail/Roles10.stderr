@@ -1,6 +1,6 @@
-
 Roles10.hs:16:12: error: [GHC-18872]
     • Couldn't match representation of type ‘Bool’ with that of ‘Char’
         arising from the coercion of the method ‘meth’
           from type ‘Int -> F Int’ to type ‘Age -> F Age’
     • When deriving the instance for (C Age)
+

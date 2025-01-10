@@ -1,6 +1,6 @@
-
 T12966.hs:4:39: error: [GHC-83865]
     • Expecting one more argument to ‘(~) (Maybe d)’
       Expected a type, but ‘(~) (Maybe d)’ has kind ‘* -> Constraint’
     • In the type ‘forall d. (c d) => ((~) (Maybe d))’
-      In the type declaration for ‘Maybeify’
+      In the type synonym declaration for ‘Maybeify’
+

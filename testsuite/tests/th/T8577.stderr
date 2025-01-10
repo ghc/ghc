@@ -1,8 +1,8 @@
-
 T8577.hs:9:11: error: [GHC-83865]
     • Couldn't match type ‘Int’ with ‘Bool’
       Expected: Code Q (A Bool)
         Actual: Code Q (A Int)
     • In the expression: y
-      In the Template Haskell splice $$(y)
+      In the typed Template Haskell splice: $$(y)
       In the expression: $$(y)
+

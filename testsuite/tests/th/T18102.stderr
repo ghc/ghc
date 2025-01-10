@@ -1,17 +1,16 @@
-
 T18102.hs:11:22: error: [GHC-76037]
     • Not in scope: ‘ifThenElse’
-    • In the Template Haskell typed quotation
+    • In the Template Haskell typed quotation:
         [|| if True then 10 else 15 ||]
-      In the typed splice:
+      In the typed Template Haskell splice:
         $$(do _stuff <- [|| if True then 10 else 15 ||]
               return [])
 
 T18102.hs:11:35: error: [GHC-76037]
     • Not in scope: ‘fromInteger’
-    • In the Template Haskell typed quotation
+    • In the Template Haskell typed quotation:
         [|| if True then 10 else 15 ||]
-      In the typed splice:
+      In the typed Template Haskell splice:
         $$(do _stuff <- [|| if True then 10 else 15 ||]
               return [])
     Suggested fix:
@@ -20,11 +19,12 @@ T18102.hs:11:35: error: [GHC-76037]
 
 T18102.hs:11:43: error: [GHC-76037]
     • Not in scope: ‘fromInteger’
-    • In the Template Haskell typed quotation
+    • In the Template Haskell typed quotation:
         [|| if True then 10 else 15 ||]
-      In the typed splice:
+      In the typed Template Haskell splice:
         $$(do _stuff <- [|| if True then 10 else 15 ||]
               return [])
     Suggested fix:
       Add ‘fromInteger’ to the import list in the import of ‘Prelude’
       (at T18102.hs:5:1-50).
+

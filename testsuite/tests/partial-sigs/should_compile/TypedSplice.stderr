@@ -1,8 +1,7 @@
-
 TypedSplice.hs:9:22: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Bool’
     • In an expression type signature: _ -> _b
-      In the Template Haskell quotation [|| not :: _ -> _b ||]
+      In the Template Haskell typed quotation: [|| not :: _ -> _b ||]
       In the expression: [|| not :: _ -> _b ||]
     • Relevant bindings include
         metaExp :: Code Q (Bool -> Bool) (bound at TypedSplice.hs:9:1)
@@ -10,7 +9,8 @@ TypedSplice.hs:9:22: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefau
 TypedSplice.hs:9:27: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_b’ standing for ‘Bool’
     • In an expression type signature: _ -> _b
-      In the Template Haskell quotation [|| not :: _ -> _b ||]
+      In the Template Haskell typed quotation: [|| not :: _ -> _b ||]
       In the expression: [|| not :: _ -> _b ||]
     • Relevant bindings include
         metaExp :: Code Q (Bool -> Bool) (bound at TypedSplice.hs:9:1)
+

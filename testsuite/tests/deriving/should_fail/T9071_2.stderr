@@ -1,5 +1,5 @@
-
 T9071_2.hs:7:40: error: [GHC-18872]
     • Couldn't match kind ‘* -> *’ with ‘*’
         arising from the first field of ‘F1’ (type ‘Mu (K1 a)’)
     • When deriving the instance for (Functor F1)
+

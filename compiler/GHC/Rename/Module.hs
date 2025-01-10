@@ -39,7 +39,6 @@ import GHC.Rename.Utils ( mapFvRn, bindLocalNames
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
 import GHC.Tc.Errors.Types
-import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin ( TypedThing(..) )
 
@@ -342,7 +341,7 @@ rnLWarningTxt (L loc warn) = L loc <$> rnWarningTxt warn
 
 rnAnnDecl :: AnnDecl GhcPs -> RnM (AnnDecl GhcRn, FreeVars)
 rnAnnDecl ann@(HsAnnotation (_, s) provenance expr)
-  = addErrCtxt (annCtxt ann) $
+  = addErrCtxt (AnnCtxt ann) $
     do { (provenance', provenance_fvs) <- rnAnnProvenance provenance
        ; (expr', expr_fvs) <- setStage (Splice Untyped) $
                               rnLExpr expr

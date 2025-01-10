@@ -1,6 +1,6 @@
-
 T12163.hs:8:16: error: [GHC-16437]
     • Can't make a derived instance of ‘Functor (T a)’:
         Constructor ‘Mk’ is a GADT
-    • In the data declaration for ‘T’
+    • In the data type declaration for ‘T’
     Suggested fix: Use a standalone deriving declaration instead
+

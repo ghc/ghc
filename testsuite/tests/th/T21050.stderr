@@ -4,7 +4,7 @@ T21050.hs:8:18: error: [GHC-25897]
         the inferred type of f :: Quote m => p -> Code m T
         at T21050.hs:8:1-23
     • In the expression: x
-      In the Template Haskell splice $$(x)
+      In the typed Template Haskell splice: $$(x)
       In the first argument of ‘MkT’, namely ‘$$(x)’
     • Relevant bindings include
         x :: p (bound at T21050.hs:8:3)
@@ -21,6 +21,6 @@ T21050.hs:11:18: error: [GHC-91028]
           forall a. a
         at T21050.hs:11:15-19
     • In the expression: x
-      In the Template Haskell splice $$(x)
+      In the typed Template Haskell splice: $$(x)
       In the first argument of ‘MkT’, namely ‘$$(x)’
 

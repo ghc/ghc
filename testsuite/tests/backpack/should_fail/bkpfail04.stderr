@@ -4,7 +4,6 @@
   [1 of 1] Compiling A[sig]           ( q\A.hsig, nothing )
 [3 of 3] Processing r
   [1 of 4] Compiling A[sig]           ( r\A.hsig, nothing )
-
 bkpfail04.bkp:7:9: error: [GHC-15843]
     • Type constructor ‘A’ has conflicting definitions in the module
       and its hsig file.
@@ -15,7 +14,8 @@ bkpfail04.bkp:7:9: error: [GHC-15843]
       The constructors do not match:
         • The record label lists for ‘A’ differ.
         • The types for ‘A’ differ.
-    • while merging the signatures from:
+    • While merging the signatures from:
         • p[A=<A>]:A
         • q[A=<A>]:A
         • ...and the local signature for A
+

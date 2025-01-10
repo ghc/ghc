@@ -1,5 +1,5 @@
-
 tcfail070.hs:15:15: error: [GHC-83865]
     • Expected kind ‘* -> k0’, but ‘[Int]’ has kind ‘*’
     • In the type ‘([Int] Bool)’
-      In the type declaration for ‘State’
+      In the type synonym declaration for ‘State’
+

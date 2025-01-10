@@ -1,22 +1,22 @@
-
 T23734.hs:7:25: error: [GHC-30337]
     • The type variable ‘a’ is bound by a forall,
       but it isn't used in the family instance.
-    • In the type instance declaration for ‘F’
+    • In the type family instance declaration for ‘F’
 
 T23734.hs:10:3: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but it isn't used in the family instance.
     • In the equations for closed type family ‘G’
-      In the type family declaration for ‘G’
+      In the type family instance declaration for ‘G’
 
 T23734.hs:14:3: error: [GHC-30337]
     • The type variable ‘c’ is bound by a forall,
       but it isn't used in the family instance.
-    • In the default type instance declaration for ‘H’
+    • In the default associated type family instance declaration for ‘H’
       In the class declaration for ‘C’
 
 T23734.hs:17:23: error: [GHC-30337]
     • The type variable ‘d’ is bound by a forall,
       but does not appear in any of the LHS patterns of the family instance.
-    • In the data instance declaration for ‘D’
+    • In the data family instance declaration for ‘D’
+

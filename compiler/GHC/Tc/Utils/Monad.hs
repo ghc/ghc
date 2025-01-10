@@ -89,7 +89,7 @@ module GHC.Tc.Utils.Monad(
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
-  mkErrInfo,
+  mkErrCtxt,
   addTcRnDiagnostic, addDetailedDiagnostic,
   mkTcRnMessage, reportDiagnostic, reportDiagnostics,
   warnIf, diagnosticTc, diagnosticTcM,
@@ -163,6 +163,7 @@ import GHC.Tc.Types     -- Re-export all
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.TcRef
 import GHC.Tc.Utils.TcType
@@ -183,8 +184,14 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Type( mkNumLitTy )
 
 import GHC.Driver.Env
+import GHC.Driver.Env.KnotVars
 import GHC.Driver.Session
 import GHC.Driver.Config.Diagnostic
+
+import GHC.Iface.Errors.Types
+import GHC.Iface.Errors.Ppr
+
+import GHC.Linker.Types
 
 import GHC.Runtime.Context
 
@@ -215,6 +222,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Ppr
 import GHC.Types.Unique.FM ( emptyUFM )
+import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Supply
 import GHC.Types.Annotations
 import GHC.Types.Basic( TopLevelFlag, TypeOrKind(..) )
@@ -227,13 +235,8 @@ import Data.IORef
 import Control.Monad
 
 import qualified Data.Map as Map
-import GHC.Driver.Env.KnotVars
-import GHC.Linker.Types
-import GHC.Types.Unique.DFM
-import GHC.Iface.Errors.Types
-import GHC.Iface.Errors.Ppr
-import GHC.Tc.Types.LclEnv
 import GHC.Core.Coercion (isReflCo)
+
 
 {-
 ************************************************************************
@@ -1059,11 +1062,11 @@ addErrAt :: SrcSpan -> TcRnMessage -> TcRn ()
 -- work doesn't matter
 addErrAt loc msg = do { ctxt <- getErrCtxt
                       ; tidy_env <- liftZonkM $ tcInitTidyEnv
-                      ; err_info <- mkErrInfo tidy_env ctxt
-                      ; let detailed_msg = mkDetailedMessage (ErrInfo err_info Outputable.empty) msg
+                      ; err_ctxt <- mkErrCtxt tidy_env ctxt
+                      ; let detailed_msg = mkDetailedMessage (ErrInfo err_ctxt Nothing noHints) msg
                       ; add_long_err_at loc detailed_msg }
 
-mkDetailedMessage :: ErrInfo -> TcRnMessage -> TcRnMessageDetailed
+mkDetailedMessage :: ErrInfo-> TcRnMessage -> TcRnMessageDetailed
 mkDetailedMessage err_info msg =
   TcRnMessageDetailed err_info msg
 
@@ -1218,12 +1221,12 @@ setErrCtxt ctxt = updLclEnv (setLclEnvErrCtxt ctxt)
 
 -- | Add a fixed message to the error context. This message should not
 -- do any tidying.
-addErrCtxt :: SDoc -> TcM a -> TcM a
+addErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 -- | Add a message to the error context. This message may do tidying.
-addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, SDoc)) -> TcM a -> TcM a
+addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
 {-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addErrCtxtM ctxt = pushCtxt (False, ctxt)
 
@@ -1231,13 +1234,13 @@ addErrCtxtM ctxt = pushCtxt (False, ctxt)
 -- message is always sure to be reported, even if there is a lot of
 -- context. It also doesn't count toward the maximum number of contexts
 -- reported.
-addLandmarkErrCtxt :: SDoc -> TcM a -> TcM a
+addLandmarkErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxt #-}  -- Note [Inlining addErrCtxt]
 addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 
 -- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
 -- and tidying.
-addLandmarkErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, SDoc)) -> TcM a -> TcM a
+addLandmarkErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addLandmarkErrCtxtM ctxt = pushCtxt (True, ctxt)
 
@@ -1596,9 +1599,6 @@ warnIf :: Bool -> TcRnMessage -> TcRn ()
 warnIf is_bad msg -- No need to check any flag here, it will be done in 'diagReasonSeverity'.
   = when is_bad (addDiagnostic msg)
 
-no_err_info :: ErrInfo
-no_err_info = ErrInfo Outputable.empty Outputable.empty
-
 -- | Display a warning if a condition is met.
 diagnosticTc :: Bool -> TcRnMessage -> TcM ()
 diagnosticTc should_report warn_msg
@@ -1621,22 +1621,23 @@ addDiagnosticTc msg
 addDiagnosticTcM :: (TidyEnv, TcRnMessage) -> TcM ()
 addDiagnosticTcM (env0, msg)
  = do { ctxt <- getErrCtxt
-      ; extra <- mkErrInfo env0 ctxt
-      ; let err_info = ErrInfo extra Outputable.empty
-            detailed_msg = mkDetailedMessage err_info msg
+      ; extra <- mkErrCtxt env0 ctxt
+      ; let detailed_msg = mkDetailedMessage (ErrInfo extra Nothing noHints) msg
       ; add_diagnostic detailed_msg }
 
 -- | A variation of 'addDiagnostic' that takes a function to produce a 'TcRnDsMessage'
 -- given some additional context about the diagnostic.
-addDetailedDiagnostic :: (ErrInfo -> TcRnMessage) -> TcM ()
+addDetailedDiagnostic :: ([ErrCtxtMsg] -> TcRnMessage) -> TcM ()
 addDetailedDiagnostic mkMsg = do
   loc <- getSrcSpanM
   name_ppr_ctx <- getNamePprCtx
   !diag_opts  <- initDiagOpts <$> getDynFlags
   env0 <- liftZonkM tcInitTidyEnv
   ctxt <- getErrCtxt
-  err_info <- mkErrInfo env0 ctxt
-  reportDiagnostic (mkMsgEnvelope diag_opts loc name_ppr_ctx (mkMsg (ErrInfo err_info empty)))
+  err_info <- mkErrCtxt env0 ctxt
+  reportDiagnostic $
+    mkMsgEnvelope diag_opts loc name_ppr_ctx $
+      mkMsg err_info
 
 addTcRnDiagnostic :: TcRnMessage -> TcM ()
 addTcRnDiagnostic msg = do
@@ -1646,13 +1647,13 @@ addTcRnDiagnostic msg = do
 -- | Display a diagnostic for the current source location, taken from
 -- the 'TcRn' monad.
 addDiagnostic :: TcRnMessage -> TcRn ()
-addDiagnostic msg = add_diagnostic (mkDetailedMessage no_err_info msg)
+addDiagnostic msg = add_diagnostic (mkDetailedMessage (ErrInfo [] Nothing noHints) msg)
 
 -- | Display a diagnostic for a given source location.
 addDiagnosticAt :: SrcSpan -> TcRnMessage -> TcRn ()
 addDiagnosticAt loc msg = do
   unit_state <- hsc_units <$> getTopEnv
-  let detailed_msg = mkDetailedMessage no_err_info msg
+  let detailed_msg = mkDetailedMessage (ErrInfo [] Nothing noHints) msg
   mkTcRnMessage loc (TcRnMessageWithInfo unit_state detailed_msg) >>= reportDiagnostic
 
 -- | Display a diagnostic, with an optional flag, for the current source
@@ -1673,12 +1674,13 @@ add_err_tcm :: TidyEnv -> TcRnMessage -> SrcSpan
             -> [ErrCtxt]
             -> TcM ()
 add_err_tcm tidy_env msg loc ctxt
- = do { err_info <- mkErrInfo tidy_env ctxt ;
-        add_long_err_at loc (mkDetailedMessage (ErrInfo err_info Outputable.empty) msg) }
+ = do { err_ctxt <- mkErrCtxt tidy_env ctxt
+      ; add_long_err_at loc $
+          mkDetailedMessage (ErrInfo err_ctxt Nothing noHints) msg }
 
-mkErrInfo :: TidyEnv -> [ErrCtxt] -> TcM SDoc
+mkErrCtxt :: TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
 -- Tidy the error info, trimming excessive contexts
-mkErrInfo env ctxts
+mkErrCtxt env ctxts
 --  = do
 --       dbg <- hasPprDebug <$> getDynFlags
 --       if dbg                -- In -dppr-debug style the output
@@ -1686,14 +1688,14 @@ mkErrInfo env ctxts
 --          else go dbg 0 env ctxts
  = go False 0 env ctxts
  where
-   go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc
-   go _ _ _   [] = return empty
+   go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
+   go _ _ _   [] = return []
    go dbg n env ((is_landmark, ctxt) : ctxts)
      | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
      = do { (env', msg) <- liftZonkM $ ctxt env
           ; let n' = if is_landmark then n else n+1
           ; rest <- go dbg n' env' ctxts
-          ; return (msg $$ rest) }
+          ; return (msg : rest) }
      | otherwise
      = go dbg n env ctxts
 

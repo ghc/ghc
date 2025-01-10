@@ -1,4 +1,4 @@
-
 T11821a.hs:4:16: error: [GHC-17370]
     • Different names for the same type variable: ‘k1’ and ‘k2’
-    • In the type declaration for ‘SameKind’
+    • In the type synonym declaration for ‘SameKind’
+

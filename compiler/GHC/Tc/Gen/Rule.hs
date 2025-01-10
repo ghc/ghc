@@ -13,6 +13,7 @@ import GHC.Prelude
 
 import GHC.Hs
 import GHC.Tc.Types
+import GHC.Tc.Errors.Types ( ErrCtxtMsg(RuleCtxt) )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Solver.Solve( solveWanteds )
 import GHC.Tc.Solver.Monad ( runTcS )
@@ -122,7 +123,7 @@ tcRule (HsRule { rd_ext  = ext
                , rd_tmvs = tm_bndrs
                , rd_lhs  = lhs
                , rd_rhs  = rhs })
-  = addErrCtxt (ruleCtxt name)  $
+  = addErrCtxt (RuleCtxt name)  $
     do { traceTc "---- Rule ------" (pprFullRuleName (snd ext) rname)
        ; skol_info <- mkSkolemInfo (RuleSkol name)
         -- Note [Typechecking rules]
@@ -260,11 +261,6 @@ tcRuleTmBndrs rule_name (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
         ; (tyvars, tmvars) <- tcExtendNameTyVarEnv tvs $
                                    tcRuleTmBndrs rule_name rule_bndrs
         ; return (map snd tvs ++ tyvars, id : tmvars) }
-
-ruleCtxt :: FastString -> SDoc
-ruleCtxt name = text "When checking the rewrite rule" <+>
-                doubleQuotes (ftext name)
-
 
 {-
 *********************************************************************************

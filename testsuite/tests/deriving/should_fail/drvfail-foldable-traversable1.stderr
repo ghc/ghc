@@ -1,4 +1,3 @@
-
 drvfail-foldable-traversable1.hs:9:23: error: [GHC-39999]
     • No instance for ‘Functor Trivial1’
         arising from the 'deriving' clause of a data type declaration
@@ -18,9 +17,10 @@ drvfail-foldable-traversable1.hs:13:22: error: [GHC-39999]
 drvfail-foldable-traversable1.hs:17:22: error: [GHC-16437]
     • Can't make a derived instance of ‘Foldable Infinite’:
         Constructor ‘Infinite’ must not contain function types
-    • In the data declaration for ‘Infinite’
+    • In the data type declaration for ‘Infinite’
 
 drvfail-foldable-traversable1.hs:21:22: error: [GHC-16437]
     • Can't make a derived instance of ‘Traversable (Cont r)’:
         Constructor ‘Cont’ must not contain function types
-    • In the data declaration for ‘Cont’
+    • In the data type declaration for ‘Cont’
+

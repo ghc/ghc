@@ -1,18 +1,18 @@
 [1 of 3] Processing p
-  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
-  [2 of 2] Compiling C[sig]           ( p/C.hsig, nothing )
+  [1 of 2] Compiling A[sig]           ( p\A.hsig, nothing )
+  [2 of 2] Compiling C[sig]           ( p\C.hsig, nothing )
 [2 of 3] Processing q
-  [1 of 2] Compiling B[sig]           ( q/B.hsig, nothing )
-  [2 of 2] Compiling C[sig]           ( q/C.hsig, nothing )
+  [1 of 2] Compiling B[sig]           ( q\B.hsig, nothing )
+  [2 of 2] Compiling C[sig]           ( q\C.hsig, nothing )
 [3 of 3] Processing r
-  [1 of 5] Compiling H2[sig]          ( r/H2.hsig, nothing )
-  [2 of 5] Compiling H1[sig]          ( r/H1.hsig, nothing )
-  [3 of 5] Compiling H3[sig]          ( r/H3.hsig, nothing )
-
+  [1 of 5] Compiling H2[sig]          ( r\H2.hsig, nothing )
+  [2 of 5] Compiling H1[sig]          ( r\H1.hsig, nothing )
+  [3 of 5] Compiling H3[sig]          ( r\H3.hsig, nothing )
 bkpfail21.bkp:1:1: error: [GHC-93009]
     • While merging export lists, could not unify {H1.T} with {H2.T}
       Neither name variable originates from the current signature.
-    • while merging the signatures from:
+    • While merging the signatures from:
         • p[A=<H1>,C=<H3>]:C
         • q[B=<H2>,C=<H3>]:C
         • ...and the local signature for H3
+

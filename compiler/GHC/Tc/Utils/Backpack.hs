@@ -484,15 +484,6 @@ inheritedSigPvpWarning =
 -- logically "implicit" entities are defined indirectly in an interface
 -- file.  #13151 gives a proposal to make these *truly* implicit.
 
-merge_msg :: ModuleName -> [InstantiatedModule] -> SDoc
-merge_msg mod_name [] =
-    text "while checking the local signature" <+> ppr mod_name <+>
-    text "for consistency"
-merge_msg mod_name reqs =
-  hang (text "while merging the signatures from" <> colon)
-   2 (vcat [ bullet <+> ppr req | req <- reqs ] $$
-      bullet <+> text "...and the local signature for" <+> ppr mod_name)
-
 -- | Given a local 'ModIface', merge all inherited requirements
 -- from 'requirementMerges' into this signature, producing
 -- a final 'TcGblEnv' that matches the local signature and
@@ -542,7 +533,7 @@ mergeSignatures
     -- we are going to merge in.
     let reqs = requirementMerges unit_state mod_name
 
-    addErrCtxt (pprWithUnitState unit_state $ merge_msg mod_name reqs) $ do
+    addErrCtxt (MergeSignaturesCtxt unit_state mod_name reqs) $ do
 
     -- STEP 2: Read in the RAW forms of all of these interfaces
     ireq_ifaces0 <- liftIO $ forM reqs $ \(Module iuid mod_name) -> do
@@ -918,13 +909,6 @@ tcRnInstantiateSignature hsc_env this_mod real_loc =
 exportOccs :: [AvailInfo] -> [OccName]
 exportOccs = concatMap (map nameOccName . availNames)
 
-impl_msg :: UnitState -> Module -> InstantiatedModule -> SDoc
-impl_msg unit_state impl_mod (Module req_uid req_mod_name)
-   = pprWithUnitState unit_state $
-      text "While checking that" <+> quotes (ppr impl_mod) <+>
-      text "implements signature" <+> quotes (ppr req_mod_name) <+>
-      text "in" <+> quotes (ppr req_uid) <> dot
-
 -- | Check if module implements a signature.  (The signature is
 -- always un-hashed, which is why its components are specified
 -- explicitly.)
@@ -934,7 +918,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
   let unit_state = hsc_units hsc_env
       home_unit  = hsc_home_unit hsc_env
       other_home_units = hsc_all_home_unit_ids hsc_env
-  addErrCtxt (impl_msg unit_state impl_mod req_mod) $ do
+  addErrCtxt (CheckImplementsCtxt unit_state impl_mod req_mod) $ do
     let insts = instUnitInsts uid
 
     -- STEP 1: Load the implementing interface, and make a RdrEnv

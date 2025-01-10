@@ -38,7 +38,6 @@ import GHC.Rename.Utils
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
-import GHC.Types.Error
 import GHC.Types.FieldLabel
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
@@ -553,10 +552,8 @@ tcExpr (HsStatic fvs expr) res_ty
   = do  { res_ty          <- expTypeToType res_ty
         ; (co, (p_ty, expr_ty)) <- matchExpectedAppTy res_ty
         ; (expr', lie)    <- captureConstraints $
-            addErrCtxt (hang (text "In the body of a static form:")
-                             2 (ppr expr)
-                       ) $
-            tcCheckPolyExprNC expr expr_ty
+            addErrCtxt (StaticFormCtxt expr) $
+              tcCheckPolyExprNC expr expr_ty
 
         -- Check that the free variables of the static form are closed.
         -- It's OK to use nonDetEltsUniqSet here as the only side effects of
@@ -1286,7 +1283,7 @@ expandRecordUpd :: LHsExpr GhcRn
                            -- Expanded record update expression
                         , TcType
                            -- result type of expanded record update
-                        , SDoc
+                        , ErrCtxtMsg
                            -- error context to push when typechecking
                            -- the expanded code
                         )
@@ -1331,8 +1328,11 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
            <- disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
        ; let sel_ids       = map (unLoc . foLabel . unLoc . hfbLHS . unLoc) rbinds
              upd_fld_names = map idName sel_ids
-             relevant_cons = nonDetEltsUniqSet cons
-             relevant_con  = head relevant_cons
+             relevant_cons@(relevant_con NE.:| _) =
+              case NE.nonEmpty $ nonDetEltsUniqSet cons of
+                Just rel_cons -> rel_cons
+                Nothing -> pprPanic "desugarRecordUpd: no relevant constructors" $
+                              vcat [ text "record_expr:" <+> ppr record_expr ]
 
       -- STEP 2: expand the record update.
       --
@@ -1458,7 +1458,7 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
              case_expr = HsCase RecUpd record_expr
                        $ mkMatchGroup (Generated OtherExpansion DoPmc) (wrapGenSpan matches)
              matches :: [LMatch GhcRn (LHsExpr GhcRn)]
-             matches = map make_pat relevant_cons
+             matches = map make_pat (NE.toList relevant_cons)
 
              let_binds :: HsLocalBindsLR GhcRn GhcRn
              let_binds = HsValBinds noAnn $ XValBindsLR
@@ -1479,29 +1479,9 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
                  , text "ds_res_ty:" <+> ppr ds_res_ty
                  ]
 
-        ; let cons = pprQuotedList relevant_cons
-              err_lines =
-                (text "In a record update at field" <> plural upd_fld_names <+> pprQuotedList upd_fld_names :)
-                $ case relevant_con of
-                     RealDataCon con ->
-                        [ text "with type constructor" <+> quotes (ppr (dataConTyCon con))
-                        , text "data constructor" <+> plural relevant_cons <+> cons ]
-                     PatSynCon {} ->
-                        [ text "with pattern synonym" <+> plural relevant_cons <+> cons ]
-                ++ if null ex_tvs
-                   then []
-                   else [ text "existential variable" <> plural ex_tvs <+> pprQuotedList ex_tvs ]
-              err_ctxt = make_lines_msg err_lines
+        ; return (ds_expr, ds_res_ty, RecordUpdCtxt relevant_cons upd_fld_names ex_tvs) }
 
-        ; return (ds_expr, ds_res_ty, err_ctxt) }
 
--- | Pretty-print a collection of lines, adding commas at the end of each line,
--- and adding "and" to the start of the last line.
-make_lines_msg :: [SDoc] -> SDoc
-make_lines_msg []      = empty
-make_lines_msg [last]  = ppr last <> dot
-make_lines_msg [l1,l2] = l1 $$ text "and" <+> l2 <> dot
-make_lines_msg (l:ls)  = l <> comma $$ make_lines_msg ls
 
 {- *********************************************************************
 *                                                                      *
@@ -1690,16 +1670,12 @@ tcRecordBinds con_like arg_tys (HsRecFields x rbinds dd)
                                                      , hfbRHS = rhs'
                                                      , hfbPun = hfbPun fld}))) }
 
-fieldCtxt :: FieldLabelString -> SDoc
-fieldCtxt field_name
-  = text "In the" <+> quotes (ppr field_name) <+> text "field of a record"
-
 tcRecordField :: ConLike -> Assoc Name (Scaled Type)
               -> LFieldOcc GhcRn -> LHsExpr GhcRn
               -> TcM (Maybe (LFieldOcc GhcTc, LHsExpr GhcTc))
 tcRecordField con_like flds_w_tys (L loc (FieldOcc rdr (L l sel_name))) rhs
   | Just (Scaled field_mult field_ty) <- assocMaybe flds_w_tys sel_name
-      = addErrCtxt (fieldCtxt field_lbl) $
+      = addErrCtxt (FieldCtxt field_lbl)$
         do { rhs' <- tcScalingUsage field_mult $ tcCheckPolyExprNC rhs field_ty
            ; hasFixedRuntimeRep_syntactic (FRRRecordCon rdr (unLoc rhs'))
                 field_ty

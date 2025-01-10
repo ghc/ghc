@@ -1,5 +1,5 @@
-
 T8368.hs:9:3: error: [GHC-83865]
     • Couldn't match expected type ‘Fam a0’ with actual type ‘Foo’
     • In the result type of data constructor ‘MkFam’
-      In the data instance declaration for ‘Fam’
+      In the data family instance declaration for ‘Fam’
+

@@ -1,6 +1,6 @@
-
 T8514.hs:3:16: error: [GHC-83865]
     • Expecting one more argument to ‘Maybe’
       Expected a type, but ‘Maybe’ has kind ‘* -> *’
     • In the type ‘(a, Maybe)’
-      In the type declaration for ‘T’
+      In the type synonym declaration for ‘T’
+

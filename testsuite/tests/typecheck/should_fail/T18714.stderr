@@ -1,7 +1,7 @@
-
 T18714.hs:11:14: error: [GHC-01259]
     • Illegal constraint in a kind: forall a. Show a => a -> a
     • In the first argument of ‘Id’, namely
         ‘(Any :: forall a. Show a => a -> a)’
       In the type ‘Id (Any :: forall a. Show a => a -> a)’
-      In the type declaration for ‘F’
+      In the type synonym declaration for ‘F’
+

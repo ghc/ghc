@@ -1147,16 +1147,17 @@ renameSig ctxt sig@(SCCFunSig (_, st) v s)
 
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn
-renameSig _ctxt sig@(CompleteMatchSig (_, s) bf mty)
+renameSig _ctxt (CompleteMatchSig (_, s) bf mty)
   = do new_bf <- traverse lookupLocatedOccRn bf
        new_mty  <- traverse lookupLocatedOccRn mty
 
        this_mod <- fmap tcg_mod getGblEnv
+       let rn_sig = CompleteMatchSig (noAnn, s) new_bf new_mty
        unless (any (nameIsLocalOrFrom this_mod . unLoc) new_bf) $
          -- Why 'any'? See Note [Orphan COMPLETE pragmas]
-         addErrCtxt (text "In" <+> ppr sig) $ failWithTc TcRnOrphanCompletePragma
+         addErrCtxt (SigCtxt rn_sig) $ failWithTc TcRnOrphanCompletePragma
 
-       return (CompleteMatchSig (noAnn, s) new_bf new_mty, emptyFVs)
+       return (rn_sig, emptyFVs)
 
 
 {-

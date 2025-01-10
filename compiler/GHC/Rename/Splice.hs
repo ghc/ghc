@@ -119,7 +119,7 @@ occurred in a typed splice: #24190.)
 
 rnTypedBracket :: HsExpr GhcPs -> LHsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnTypedBracket e br_body
-  = addErrCtxt (typedQuotationCtxtDoc br_body) $
+  = addErrCtxt (TypedTHBracketCtxt br_body) $
     do { checkForTemplateHaskellQuotes e
 
          -- Check for nested brackets
@@ -148,7 +148,7 @@ rnTypedBracket e br_body
 
 rnUntypedBracket :: HsExpr GhcPs -> HsQuote GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnUntypedBracket e br_body
-  = addErrCtxt (untypedQuotationCtxtDoc br_body) $
+  = addErrCtxt (UntypedTHBracketCtxt br_body) $
     do { checkForTemplateHaskellQuotes e
 
          -- Check for nested brackets
@@ -253,16 +253,6 @@ check_namespace is_single_tick nm
   where
     ns = nameNameSpace nm
 
-typedQuotationCtxtDoc :: LHsExpr GhcPs -> SDoc
-typedQuotationCtxtDoc br_body
-  = hang (text "In the Template Haskell typed quotation")
-         2 (thTyBrackets . ppr $ br_body)
-
-untypedQuotationCtxtDoc :: HsQuote GhcPs -> SDoc
-untypedQuotationCtxtDoc br_body
-  = hang (text "In the Template Haskell quotation")
-         2 (ppr br_body)
-
 {-
 *********************************************************
 *                                                      *
@@ -306,7 +296,7 @@ rnUntypedSpliceGen :: (HsUntypedSplice GhcRn -> RnM (a, FreeVars))
                    -> HsUntypedSplice GhcPs
                    -> RnM (a, FreeVars)
 rnUntypedSpliceGen run_splice pend_splice splice
-  = addErrCtxt (spliceCtxt splice) $ do
+  = addErrCtxt (UntypedSpliceCtxt splice) $ do
     { stage <- getStage
     ; case stage of
         Brack _ RnPendingTyped
@@ -460,7 +450,7 @@ rnUntypedSplice (HsQuasiQuote ext quoter quote)
 rnTypedSplice :: LHsExpr GhcPs -- Typed splice expression
               -> RnM (HsExpr GhcRn, FreeVars)
 rnTypedSplice expr
-  = addErrCtxt (hang (text "In the typed splice:") 2 (pprTypedSplice Nothing expr)) $ do
+  = addErrCtxt (TypedSpliceCtxt Nothing expr) $ do
     { stage <- getStage
     ; case stage of
         Brack pop_stage RnPendingTyped
@@ -880,14 +870,6 @@ HsUntypedSplice GhcRn, and HsUntypedSpliceResult (Pat GhcPs) -- which models
 the existence of either the result of running the splice (HsUntypedSpliceTop),
 or its splice point name if nested (HsUntypedSpliceNested)
 -}
-
-spliceCtxt :: HsUntypedSplice GhcPs -> SDoc
-spliceCtxt splice
-  = hang (text "In the" <+> what) 2 (pprUntypedSplice True Nothing splice)
-  where
-    what = case splice of
-             HsUntypedSpliceExpr {} -> text "untyped splice:"
-             HsQuasiQuote        {} -> text "quasi-quotation:"
 
 -- | The splice data to be logged
 data SpliceInfo

@@ -1,4 +1,4 @@
-
 drvfail005.hs:4:13: error: [GHC-73993]
     • ‘Show a’ is not a unary constraint, as expected by a `deriving' clause
-    • In the data declaration for ‘Test’
+    • In the data type declaration for ‘Test’
+

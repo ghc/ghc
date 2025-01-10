@@ -1,4 +1,3 @@
-
 deriving-via-fail.hs:10:34: error: [GHC-10283]
     • Couldn't match representation of type ‘a’ with that of ‘b’
         arising from the coercion of the method ‘showsPrec’
@@ -26,3 +25,4 @@ deriving-via-fail.hs:16:20: error: [GHC-10283]
         the deriving clause for ‘Eq Foo3’
         at deriving-via-fail.hs:16:20-21
     • When deriving the instance for (Eq Foo3)
+

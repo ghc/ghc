@@ -1,8 +1,12 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
+
 module GHC.Tc.Errors.Types.PromotionErr ( PromotionErr(..)
                                         , pprPECategory
                                         , peCategory
                                         , TermLevelUseErr(..)
+                                        , TermLevelUseCtxt(..)
+                                        , pprTermLevelUseCtxt
                                         , teCategory
                                         ) where
 
@@ -11,6 +15,8 @@ import GHC.Core.Type (ThetaType)
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Generics (Generic)
+import GHC.Types.Name.Reader (GlobalRdrElt, pprNameProvenance)
+import GHC.Types.Name (Name, nameSrcLoc)
 
 data PromotionErr
   = TyConPE          -- TyCon used in a kind before we are ready
@@ -65,6 +71,17 @@ teCategory :: TermLevelUseErr -> String
 teCategory ClassTE = "class"
 teCategory TyConTE = "type constructor"
 teCategory TyVarTE = "type variable"
+
+data TermLevelUseCtxt
+  = TermLevelUseGRE !GlobalRdrElt
+  | TermLevelUseTyVar
+  deriving (Generic)
+
+pprTermLevelUseCtxt :: Name -> TermLevelUseCtxt -> SDoc
+pprTermLevelUseCtxt nm = \case
+  TermLevelUseGRE gre -> pprNameProvenance gre
+  TermLevelUseTyVar -> text "bound at" <+> ppr (nameSrcLoc nm)
+
 
 {- Note [Type variable scoping errors during typechecking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

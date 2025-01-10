@@ -40,7 +40,6 @@ import GHC.Builtin.Types
 import GHC.Types.Var.Set
 import GHC.Builtin.Types.Prim
 import GHC.Types.Basic( Arity )
-import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -161,7 +160,7 @@ tc_cmd env (HsCmdLet x binds (L body_loc body)) res_ty
         ; return (HsCmdLet x binds' (L body_loc body')) }
 
 tc_cmd env in_cmd@(HsCmdCase x scrut matches) (stk, res_ty)
-  = addErrCtxt (cmdCtxt in_cmd) $ do
+  = addErrCtxt (CmdCtxt in_cmd) $ do
     do { (scrut', scrut_ty) <- tcInferRho scrut
        ; hasFixedRuntimeRep_syntactic (FRRArrow $ ArrowCmdCase) scrut_ty
        ; matches' <- tcCmdMatches env scrut_ty matches (stk, res_ty)
@@ -211,7 +210,7 @@ tc_cmd env (HsCmdIf x fun@(SyntaxExprRn {}) pred b1 b2) res_ty -- Rebindable syn
 -- (plus -<< requires ArrowApply)
 
 tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (_, res_ty)
-  = addErrCtxt (cmdCtxt cmd)    $
+  = addErrCtxt (CmdCtxt cmd)    $
     do  { arg_ty <- newOpenFlexiTyVarTy
         ; let fun_ty = mkCmdArrTy env arg_ty res_ty
         ; fun' <- select_arrow_scope (tcCheckMonoExpr fun fun_ty)
@@ -242,7 +241,7 @@ tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (_, res_ty)
 -- D;G |-a cmd exp : stk --> res
 
 tc_cmd env cmd@(HsCmdApp x fun arg) (cmd_stk, res_ty)
-  = addErrCtxt (cmdCtxt cmd)    $
+  = addErrCtxt (CmdCtxt cmd)    $
     do  { arg_ty <- newOpenFlexiTyVarTy
         ; fun'   <- tcCmd env fun (mkPairTy arg_ty cmd_stk, res_ty)
         ; arg'   <- tcCheckMonoExpr arg arg_ty
@@ -261,7 +260,7 @@ tc_cmd env cmd@(HsCmdApp x fun arg) (cmd_stk, res_ty)
 tc_cmd env cmd@(HsCmdLam x lam_variant match) cmd_ty
   = (case lam_variant of   -- Add context only for \case and \cases
         LamSingle -> id    -- Avoids clutter in the vanilla-lambda form
-        _         -> addErrCtxt (cmdCtxt cmd)) $
+        _         -> addErrCtxt (CmdCtxt cmd)) $
     do { let match_ctxt = ArrowLamAlt lam_variant
        ; arity <- checkArgCounts match
        ; (wrap, match') <- tcCmdMatchLambda env match_ctxt arity match cmd_ty
@@ -291,7 +290,7 @@ tc_cmd env (HsCmdDo _ (L l stmts) ) (cmd_stk, res_ty)
 --      D; G |-a  (| e c1 ... cn |)  :  stk --> t
 
 tc_cmd env cmd@(HsCmdArrForm fixity expr f cmd_args) (cmd_stk, res_ty)
-  = addErrCtxt (cmdCtxt cmd)
+  = addErrCtxt (CmdCtxt cmd)
     do  { (cmd_args', cmd_tys) <- mapAndUnzipM tc_cmd_arg cmd_args
                               -- We use alphaTyVar for 'w'
         ; let e_ty = mkInfForAllTy alphaTyVar $
@@ -338,7 +337,7 @@ tcCmdMatchLambda env ctxt arity
 
        ; let check_arg_tys = map (unrestricted . mkCheckExpType) arg_tys
        ; matches' <- forM matches $
-           addErrCtxt . pprMatchInCtxt . unLoc <*> tc_match check_arg_tys cmd_stk'
+           addErrCtxt . MatchInCtxt . unLoc <*> tc_match check_arg_tys cmd_stk'
 
        ; let arg_tys' = map unrestricted arg_tys
              mg' = mg { mg_alts = L l matches'
@@ -470,14 +469,3 @@ mkPairTy t1 t2 = mkTyConApp pairTyCon [t1,t2]
 
 arrowTyConKind :: Kind          --  *->*->*
 arrowTyConKind = mkVisFunTysMany [liftedTypeKind, liftedTypeKind] liftedTypeKind
-
-{-
-************************************************************************
-*                                                                      *
-                Errors
-*                                                                      *
-************************************************************************
--}
-
-cmdCtxt :: HsCmd GhcRn -> SDoc
-cmdCtxt cmd = text "In the command:" <+> ppr cmd

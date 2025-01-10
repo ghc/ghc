@@ -1,10 +1,10 @@
-
 T17804.hs:8:17: warning: [GHC-00846] [-Wimplicit-lift]
     • The variable ‘x’ is implicitly lifted in the TH quotation
-    • In the Template Haskell quotation [| x |]
+    • In the Template Haskell quotation: [| x |]
 
 T17804.hs:11:18: warning: [GHC-00846] [-Wimplicit-lift]
     • The variable ‘x’ is implicitly lifted in the TH quotation
-    • In the Template Haskell quotation [|| x ||]
-      In the expression: [|| x ||]
-      In an equation for ‘warning2’: warning2 x = [|| x ||]
+    • In the Template Haskell typed quotation: [|| x ||]
+    • In the expression: [|| x ||]
+    • In an equation for ‘warning2’: warning2 x = [|| x ||]
+

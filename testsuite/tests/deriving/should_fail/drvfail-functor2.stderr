@@ -1,4 +1,3 @@
-
 drvfail-functor2.hs:2:29: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
@@ -20,7 +19,7 @@ drvfail-functor2.hs:16:14: error: [GHC-62016]
 drvfail-functor2.hs:21:14: error: [GHC-16588]
     • Can't make a derived instance of ‘Functor StupidConstraint’:
         Data type ‘StupidConstraint’ must not have a class context: Eq a
-    • In the data declaration for ‘StupidConstraint’
+    • In the data type declaration for ‘StupidConstraint’
 
 drvfail-functor2.hs:27:14: error: [GHC-39999]
     • No instance for ‘Functor NoFunctor’
@@ -29,3 +28,4 @@ drvfail-functor2.hs:27:14: error: [GHC-39999]
         use a standalone 'deriving instance' declaration,
           so you can specify the instance context yourself
     • When deriving the instance for (Functor UseNoFunctor)
+

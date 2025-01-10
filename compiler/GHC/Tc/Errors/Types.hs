@@ -12,9 +12,8 @@ module GHC.Tc.Errors.Types (
     TcRnMessage(..)
   , TcRnMessageOpts(..)
   , mkTcRnUnknownMessage
-  , TcRnMessageDetailed(..)
+  , TcRnMessageDetailed(..), ErrInfo(..)
   , TypeDataForbids(..)
-  , ErrInfo(..)
   , FixedRuntimeRepProvenance(..)
   , pprFixedRuntimeRepProvenance
   , ShadowedNameProvenance(..)
@@ -57,7 +56,7 @@ module GHC.Tc.Errors.Types (
 
   , ErrorItem(..), errorItemOrigin, errorItemEqRel, errorItemPred, errorItemCtLoc
 
-  , SolverReport(..), SolverReportSupplementary(..)
+  , SolverReport(..), SupplementaryInfo(..)
   , SolverReportWithCtxt(..)
   , SolverReportErrCtxt(..)
   , getUserGivens, discardProvCtxtGivens
@@ -162,9 +161,12 @@ module GHC.Tc.Errors.Types (
   -- * Zonker errors
   , ZonkerMessage(..)
 
-  -- FFI Errors
+  -- * FFI Errors
   , IllegalForeignTypeReason(..)
   , TypeCannotBeMarshaledReason(..)
+
+  -- * Error contexts
+  , ErrCtxtMsg(..)
   ) where
 
 import GHC.Prelude
@@ -173,15 +175,16 @@ import GHC.Hs
 
 import GHC.Tc.Errors.Types.PromotionErr
 import GHC.Tc.Errors.Hole.FitTypes (HoleFit)
+import GHC.Tc.Types.BasicTypes
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence (EvBindsVar)
+import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
                            , UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing
                            , FixedRuntimeRepOrigin(..), InstanceWhat )
 import GHC.Tc.Types.CtLoc( CtLoc, ctLocOrigin, SubGoalDepth )
 import GHC.Tc.Types.Rank (Rank)
 import GHC.Tc.Types.TH
-import GHC.Tc.Types.BasicTypes
 import GHC.Tc.Utils.TcType (TcType, TcSigmaType, TcPredType,
                             PatersonCondFailure, PatersonCondFailureContext)
 
@@ -192,9 +195,9 @@ import GHC.Types.Hint (UntickedPromotedThing(..), AssumedDerivingStrategy(..))
 import GHC.Types.ForeignCall (CLabelString)
 import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name (NamedThing(..), Name, OccName, getSrcLoc, getSrcSpan)
+import GHC.Types.Name.Env (NameEnv)
 import qualified GHC.Types.Name.Occurrence as OccName
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Env (NameEnv)
 import GHC.Types.SourceFile (HsBootOrSig(..))
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing (TyThing)
@@ -208,6 +211,8 @@ import GHC.Unit.State (UnitState)
 import GHC.Unit.Module.Warnings (WarningCategory, WarningTxt)
 import GHC.Unit.Module.ModIface (ModIface)
 
+import GHC.Utils.Outputable
+
 import GHC.Core.Class (Class, ClassMinimalDef, ClassOpItem, ClassATItem)
 import GHC.Core.Coercion (Coercion)
 import GHC.Core.Coercion.Axiom (CoAxBranch)
@@ -219,9 +224,11 @@ import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate (EqRel, predTypeEqRel)
 import GHC.Core.TyCon (TyCon, Role, FamTyConFlav, AlgTyConRhs)
 import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType, ForAllTyFlag)
+
 import GHC.Driver.Backend (Backend)
 
-import GHC.Utils.Outputable
+import GHC.Iface.Errors.Types
+
 import GHC.Utils.Misc (filterOut)
 
 import qualified GHC.LanguageExtensions as LangExt
@@ -237,8 +244,6 @@ import qualified GHC.Internal.TH.Syntax as TH
 import Data.Map.Strict (Map)
 
 import GHC.Generics ( Generic )
-import GHC.Iface.Errors.Types
-
 
 
 data TcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext :: !Bool -- ^ Whether we show the error context or not
@@ -277,22 +282,28 @@ any use of SDoc in the diagnostic reporting of GHC, we can surely revisit the us
 existence of these two types, which for now remain a "necessary evil".
 -}
 
--- The majority of TcRn messages come with extra context about the error,
+
+-- | The majority of TcRn messages come with extra context about the error,
 -- and this newtype captures it. See Note [Migrating TcM Messages].
 data ErrInfo = ErrInfo {
-    errInfoContext :: !SDoc
+    errInfoContext :: ![ErrCtxtMsg]
     -- ^ Extra context associated to the error.
-  , errInfoSupplementary :: !SDoc
+  , errInfoSupplementary :: !(Maybe (HoleFitDispConfig, [SupplementaryInfo]))
     -- ^ Extra supplementary info associated to the error.
+  , errInfoHints :: ![GhcHint]
+    -- ^ Extra hints associated to the error.
   }
+
 
 -- | 'TcRnMessageDetailed' is an \"internal\" type (used only inside
 -- 'GHC.Tc.Utils.Monad' that wraps a 'TcRnMessage' while also providing
 -- any extra info needed to correctly pretty-print this diagnostic later on.
 data TcRnMessageDetailed
-  = TcRnMessageDetailed !ErrInfo
-                        -- ^ Extra info associated with the message
-                        !TcRnMessage
+  = TcRnMessageDetailed
+      !ErrInfo
+        -- ^ extra info associated with the message
+      !TcRnMessage
+        -- ^ main error payload
   deriving Generic
 
 mkTcRnUnknownMessage :: (Diagnostic a, Typeable a, DiagnosticOpts a ~ NoDiagnosticOpts)
@@ -431,7 +442,7 @@ data TcRnMessage where
   -}
   TcRnTypeDoesNotHaveFixedRuntimeRep :: !Type
                                      -> !FixedRuntimeRepProvenance
-                                     -> !ErrInfo -- Extra info accumulated in the TcM monad
+                                     -> ![ErrCtxtMsg] -- Extra info accumulated in the TcM monad
                                      -> TcRnMessage
 
   {-| TcRnImplicitLift is a warning (controlled with -Wimplicit-lift) that occurs when
@@ -443,7 +454,7 @@ data TcRnMessage where
 
      Test cases: th/T17804
   -}
-  TcRnImplicitLift :: Name -> !ErrInfo -> TcRnMessage
+  TcRnImplicitLift :: Name -> ![ErrCtxtMsg] -> TcRnMessage
 
   {-| TcRnUnusedPatternBinds is a warning (controlled with -Wunused-pattern-binds)
       that occurs if a pattern binding binds no variables at all, unless it is a
@@ -2021,7 +2032,7 @@ data TcRnMessage where
 
       Test cases: T21605{c,d}
   -}
-  TcRnTermNameInType :: RdrName -> [GhcHint] -> TcRnMessage
+  TcRnTermNameInType :: !RdrName -> ![GhcHint] -> TcRnMessage
 
   {-| TcRnUntickedPromotedThing is a warning (controlled with -Wunticked-promoted-constructors)
       that is triggered by an unticked occurrence of a promoted data constructor.
@@ -5285,17 +5296,19 @@ See 'GHC.Tc.Errors.Types.SolverReport' and 'GHC.Tc.Errors.mkErrorReport'.
 data SolverReport
   = SolverReport
   { sr_important_msg :: SolverReportWithCtxt
-  , sr_supplementary :: [SolverReportSupplementary]
+  , sr_supplementary :: [SupplementaryInfo]
+  , sr_hints         :: [GhcHint]
   }
 
--- | Additional information to print in a 'SolverReport', after the
+-- | Additional information to print in an error message, after the
 -- important messages and after the error context.
 --
 -- See Note [Error report].
-data SolverReportSupplementary
-  = SupplementaryBindings RelevantBindings
-  | SupplementaryHoleFits ValidHoleFits
-  | SupplementaryCts      [(PredType, RealSrcSpan)]
+data SupplementaryInfo
+  = SupplementaryBindings     RelevantBindings
+  | SupplementaryHoleFits     ValidHoleFits
+  | SupplementaryCts          (NE.NonEmpty (PredType, RealSrcSpan))
+  | SupplementaryImportErrors (NE.NonEmpty ImportError)
 
 -- | A 'TcSolverReportMsg', together with context (e.g. enclosing implication constraints)
 -- that are needed in order to report it.
@@ -5556,11 +5569,8 @@ data TcSolverReportMsg
     { cannotResolve_item         :: ErrorItem
     , cannotResolve_unifiers     :: [ClsInst]
     , cannotResolve_candidates   :: [ClsInst]
-    , cannotResolve_importErrors :: [ImportError]
-    , cannotResolve_suggestions  :: [GhcHint]
-    , cannotResolve_relevant_bindings :: RelevantBindings }
-      -- TODO: remove the fields of type [GhcHint] and RelevantBindings,
-      -- in order to handle them uniformly with other diagnostic messages.
+    , cannotResolve_relBinds     :: RelevantBindings
+    }
 
   -- | Could not solve a constraint using available instances
   -- because the instances overlap.
@@ -5844,7 +5854,7 @@ data HoleError
   -- See 'NotInScopeError' for other not-in-scope errors.
   --
   -- Test cases: T9177a.
-  = OutOfScopeHole [ImportError] [GhcHint]
+  = OutOfScopeHole
   -- | Report a typed hole, or wildcard, with additional information.
   | HoleError HoleSort
               [TcTyVar]                     -- Other type variables which get computed on the way.

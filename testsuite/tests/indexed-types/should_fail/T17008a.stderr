@@ -1,7 +1,7 @@
-
 T17008a.hs:12:5: error: [GHC-30337]
     • Dodgy type variable ‘a’ in the LHS of a family instance:
         the type variable ‘a’ syntactically appears in LHS patterns,
         but it doesn't appear in an injective position.
     • In the equations for closed type family ‘F’
-      In the type family declaration for ‘F’
+      In the type family instance declaration for ‘F’
+

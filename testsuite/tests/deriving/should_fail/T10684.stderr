@@ -1,5 +1,5 @@
-
 T10684.hs:4:28: error: [GHC-86639]
     • Can't make a derived instance of ‘Generic A’:
         You need DeriveGeneric to derive an instance for this class
-    • In the data declaration for ‘A’
+    • In the data type declaration for ‘A’
+

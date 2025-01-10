@@ -1,13 +1,13 @@
 [1 of 3] Compiling T14365B[boot]    ( T14365B.hs-boot, T14365B.o-boot )
-
 T14365B.hs-boot:5:13: error: [GHC-30903]
     • Can't make a derived instance of ‘Functor Foo’:
         Cannot derive instances in hs-boot files
         Write an instance declaration instead
-    • In the data declaration for ‘Foo’
+    • In the data type declaration for ‘Foo’
 
 T14365B.hs-boot:7:1: error: [GHC-30903]
     • Can't make a derived instance of ‘Foldable Foo’:
         Cannot derive instances in hs-boot files
         Write an instance declaration instead
     • In the stand-alone deriving instance for ‘Foldable Foo’
+

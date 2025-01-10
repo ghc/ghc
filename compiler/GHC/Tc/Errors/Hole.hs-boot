@@ -7,13 +7,10 @@ module GHC.Tc.Errors.Hole where
 import GHC.Tc.Errors.Types ( HoleFitDispConfig, ValidHoleFits )
 import GHC.Tc.Types  ( TcM )
 import GHC.Tc.Types.Constraint ( CtEvidence, Hole, Implication )
-import GHC.Utils.Outputable ( SDoc )
 import GHC.Types.Var.Env ( TidyEnv )
-import GHC.Tc.Errors.Hole.FitTypes ( HoleFit )
 
 findValidHoleFits :: TidyEnv -> [Implication] -> [CtEvidence] -> Hole
                   -> TcM (TidyEnv, ValidHoleFits)
 
 getHoleFitDispConfig :: TcM HoleFitDispConfig
 
-pprHoleFit :: HoleFitDispConfig -> HoleFit -> SDoc

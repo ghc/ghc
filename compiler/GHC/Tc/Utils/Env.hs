@@ -115,7 +115,7 @@ import GHC.Utils.Misc ( HasDebugCallStack )
 
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
-import GHC.Data.Maybe( MaybeErr(..), orElse )
+import GHC.Data.Maybe( MaybeErr(..), orElse, maybeToList )
 
 import GHC.Types.SrcLoc
 import GHC.Types.Basic hiding( SuccessFlag(..) )
@@ -126,6 +126,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.DefaultEnv ( DefaultEnv, ClassDefaults(..),
                               defaultEnv, emptyDefaultEnv, lookupDefaultEnv, unitDefaultEnv )
+import GHC.Types.Error
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name.Reader
@@ -133,12 +134,15 @@ import GHC.Types.TyThing
 import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
 
+import GHC.Iface.Errors.Types
+import GHC.Rename.Unbound ( unknownNameSuggestions, WhatLooking(..) )
+import GHC.Tc.Errors.Types.PromotionErr
+import {-# SOURCE #-} GHC.Tc.Errors.Hole (getHoleFitDispConfig)
+
+import Control.Monad
 import Data.IORef
 import Data.List          ( intercalate )
-import Control.Monad
-import GHC.Iface.Errors.Types
-import GHC.Types.Error
-import GHC.Rename.Unbound ( unknownNameSuggestions, WhatLooking(..) )
+import qualified Data.List.NonEmpty as NE
 
 {- *********************************************************************
 *                                                                      *
@@ -359,27 +363,24 @@ failIllegalTyVal :: Name -> TcM a
     fail_tycon what_looking tc_nm = do
       gre <- getGlobalRdrEnv
       let mb_gre = lookupGRE_Name gre tc_nm
-          pprov = case mb_gre of
-                      Just gre -> nest 2 (pprNameProvenance gre)
-                      Nothing  -> empty
           err = case greInfo <$> mb_gre of
             Just (IAmTyCon ClassFlavour) -> ClassTE
             _ -> TyConTE
-      fail_with_msg what_looking dataName tc_nm pprov err
+      fail_with_msg what_looking dataName tc_nm (TermLevelUseGRE <$> mb_gre) err
 
     fail_tyvar nm =
-      let pprov = nest 2 (text "bound at" <+> ppr (getSrcLoc nm))
-      in fail_with_msg WL_Anything varName nm pprov TyVarTE
+      fail_with_msg WL_Anything varName nm (Just TermLevelUseTyVar) TyVarTE
 
     fail_with_msg what_looking whatName nm pprov err = do
-      (import_errs, hints) <- get_suggestions what_looking whatName nm
+      (imp_errs, hints) <- get_suggestions what_looking whatName nm
+      hfdc <- getHoleFitDispConfig
       unit_state <- hsc_units <$> getTopEnv
-      let
-        -- TODO: unfortunate to have to convert to SDoc here.
-        -- This should go away once we refactor ErrInfo.
-        hint_msg = vcat $ map ppr hints
-        import_err_msg = vcat $ map ppr import_errs
-        info = ErrInfo { errInfoContext = pprov, errInfoSupplementary = import_err_msg $$ hint_msg }
+      let info = ErrInfo { errInfoContext = maybeToList $ fmap (TermLevelUseCtxt nm) pprov
+                         , errInfoSupplementary =
+                             fmap ((hfdc,) . (:[]) . SupplementaryImportErrors) $
+                               NE.nonEmpty imp_errs
+                         , errInfoHints = hints
+                         }
       failWithTc $ TcRnMessageWithInfo unit_state (
               mkDetailedMessage info (TcRnIllegalTermLevelUse nm err))
 

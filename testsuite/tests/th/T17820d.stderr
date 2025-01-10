@@ -2,7 +2,7 @@ T17820d.hs:6:38: error: [GHC-28914]
     • Stage error: ‘foo’ is bound at stage 2 but used at stage 1
       Hint: quoting [| foo |] or an enclosing expression would allow the quotation to be used in an earlier stage
     • In the untyped splice: $(const [| 0 |] foo)
-      In the Template Haskell quotation
+      In the Template Haskell quotation:
         [d| data D = MkD {foo :: Int}
             blargh = $(const [| 0 |] foo) |]
 

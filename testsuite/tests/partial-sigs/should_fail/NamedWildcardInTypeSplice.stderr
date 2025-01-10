@@ -1,8 +1,8 @@
-
 NamedWildcardInTypeSplice.hs:8:16: error: [GHC-76037]
     • Not in scope: type variable ‘_a’
-    • In the Template Haskell quotation [t| _a -> _a |]
+    • In the Template Haskell quotation: [t| _a -> _a |]
 
 NamedWildcardInTypeSplice.hs:8:22: error: [GHC-76037]
     • Not in scope: type variable ‘_a’
-    • In the Template Haskell quotation [t| _a -> _a |]
+    • In the Template Haskell quotation: [t| _a -> _a |]
+

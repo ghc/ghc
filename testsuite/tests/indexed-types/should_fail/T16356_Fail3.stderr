@@ -1,6 +1,6 @@
-
 T16356_Fail3.hs:10:3: error: [GHC-20967]
     • Cannot apply function of kind ‘* -> *’
       to visible kind argument ‘Type’
-    • In the default type instance declaration for ‘T1’
+    • In the default associated type family instance declaration for ‘T1’
       In the class declaration for ‘C’
+

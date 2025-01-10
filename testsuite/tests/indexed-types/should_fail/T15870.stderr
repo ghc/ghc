@@ -1,4 +1,3 @@
-
 T15870.hs:32:34: error: [GHC-25897]
     • Couldn't match kind ‘k’ with ‘*’
       Expected kind ‘Optic @{k} a’, but ‘g2’ has kind ‘Optic @{*} b’
@@ -7,4 +6,5 @@ T15870.hs:32:34: error: [GHC-25897]
         at T15870.hs:(27,1)-(32,35)
     • In the second argument of ‘Get’, namely ‘g2’
       In the type ‘Get a g2’
-      In the type instance declaration for ‘Get’
+      In the associated type family instance declaration for ‘Get’
+

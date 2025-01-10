@@ -75,7 +75,6 @@ import GHC.Rename.Utils( mkRnSyntaxExpr )
 
 import GHC.Types.Id.Make( mkDictFunId )
 import GHC.Types.Basic ( TypeOrKind(..), Arity, VisArity )
-import GHC.Types.Error
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var.Env
@@ -887,15 +886,10 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
      hasFixedRuntimeRepRes std_nm user_nm_expr sigma1
      return (std_nm, unLoc expr)
 
-syntaxNameCtxt :: HsExpr GhcRn -> CtOrigin -> Type -> SrcSpan -> TidyEnv
-               -> ZonkM (TidyEnv, SDoc)
-syntaxNameCtxt name orig ty loc tidy_env = return (tidy_env, msg)
-  where
-    msg = vcat [ text "When checking that" <+> quotes (ppr name)
-                          <+> text "(needed by a syntactic construct)"
-               , nest 2 (text "has the required type:"
-                         <+> ppr (tidyType tidy_env ty))
-               , nest 2 (sep [ppr orig, text "at" <+> ppr loc])]
+syntaxNameCtxt :: HsExpr GhcRn -> CtOrigin -> Type -> SrcSpan
+               -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
+syntaxNameCtxt name orig ty loc tidy_env =
+  return (tidy_env, SyntaxNameCtxt name orig (tidyType tidy_env ty) loc)
 
 {-
 ************************************************************************

@@ -1,6 +1,6 @@
 [1 of 1] Processing p
   [1 of 1] Compiling A[sig]           ( p\A.hsig, nothing )
-
 bkpfail32.bkp:2:18: error: [GHC-76037]
     • Not in scope: type constructor or class ‘T’
-    • while checking the local signature A for consistency
+    • While checking the local signature A for consistency
+

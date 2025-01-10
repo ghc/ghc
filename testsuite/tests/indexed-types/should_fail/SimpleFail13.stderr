@@ -1,22 +1,22 @@
-
 SimpleFail13.hs:9:15: error: [GHC-73138]
     • Illegal type synonym family application ‘C a’ in instance:
         D [C a]
-    • In the data instance declaration for ‘D’
+    • In the data family instance declaration for ‘D’
 
 SimpleFail13.hs:9:17: error: [GHC-30337]
     • Dodgy type variable ‘a’ in the LHS of a family instance:
         the type variable ‘a’ syntactically appears in LHS patterns,
         but it doesn't appear in an injective position.
-    • In the data instance declaration for ‘D’
+    • In the data family instance declaration for ‘D’
 
 SimpleFail13.hs:13:15: error: [GHC-73138]
     • Illegal type synonym family application ‘C a’ in instance:
         E [C a]
-    • In the type instance declaration for ‘E’
+    • In the type family instance declaration for ‘E’
 
 SimpleFail13.hs:13:17: error: [GHC-30337]
     • Dodgy type variable ‘a’ in the LHS of a family instance:
         the type variable ‘a’ syntactically appears in LHS patterns,
         but it doesn't appear in an injective position.
-    • In the type instance declaration for ‘E’
+    • In the type family instance declaration for ‘E’
+

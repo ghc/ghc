@@ -1961,13 +1961,11 @@ getIOType = do { ioTyCon <- tcLookupTyCon ioTyConName
 setMainCtxt :: Name -> TcType -> TcM a -> TcM (TcEvBinds, a)
 setMainCtxt main_name io_ty thing_inside
   = setSrcSpan (getSrcSpan main_name) $
-    addErrCtxt main_ctxt              $
+    addErrCtxt (MainCtxt main_name)   $
     checkConstraints skol_info [] []  $  -- Builds an implication if necessary
     thing_inside                         -- e.g. with -fdefer-type-errors
   where
     skol_info = SigSkol (FunSigCtxt main_name NoRRC) io_ty []
-    main_ctxt = text "When checking the type of the"
-                <+> ppMainFn (nameOccName main_name)
 
 {- Note [Dealing with main]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

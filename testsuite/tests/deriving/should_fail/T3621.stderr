@@ -1,4 +1,3 @@
-
 T3621.hs:24:43: error: [GHC-25897]
     • Couldn't match type ‘s’ with ‘state’
         arising from a functional dependency between:
@@ -13,3 +12,4 @@ T3621.hs:24:43: error: [GHC-25897]
         at T3621.hs:24:43-58
     • When deriving the instance for (MonadState
                                         state (WrappedState s))
+

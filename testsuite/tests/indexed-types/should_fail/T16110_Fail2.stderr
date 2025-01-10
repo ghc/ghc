@@ -1,7 +1,7 @@
-
 T16110_Fail2.hs:9:3: error: [GHC-48178]
     • Illegal duplicate variable ‘b’ in:
         ‘type T a b b = ...’
         The arguments to ‘T’ must all be distinct type variables.
-    • In the default type instance declaration for ‘T’
+    • In the default associated type family instance declaration for ‘T’
       In the class declaration for ‘C’
+

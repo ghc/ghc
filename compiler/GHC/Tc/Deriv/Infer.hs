@@ -17,6 +17,7 @@ where
 import GHC.Prelude
 
 import GHC.Tc.Deriv.Utils
+import GHC.Tc.Errors.Types ( ErrCtxtMsg(..) )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Deriv.Generate
 import GHC.Tc.Deriv.Functor
@@ -46,7 +47,6 @@ import GHC.Data.Pair
 import GHC.Builtin.Names
 import GHC.Builtin.Types (mkConstraintTupleTy, typeToTypeKind)
 
-import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -797,10 +797,6 @@ simplifyInstanceContexts infer_specs
        -- See Note [Deterministic simplifyInstanceContexts]
     canSolution = map (sortBy nonDetCmpType)
 
-derivInstCtxt :: PredType -> SDoc
-derivInstCtxt pred
-  = text "When deriving the instance for" <+> parens (ppr pred)
-
 {-
 ***********************************************************************************
 *                                                                                 *
@@ -819,7 +815,7 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
                   , ds_cls = clas, ds_tys = inst_tys, ds_theta = deriv_rhs
                   , ds_skol_info = skol_info, ds_user_ctxt = user_ctxt })
   = setSrcSpan loc  $
-    addErrCtxt (derivInstCtxt (mkClassPred clas inst_tys)) $
+    addErrCtxt (DerivInstCtxt (mkClassPred clas inst_tys)) $
     do {
        -- See [STEP DAC BUILD]
        -- Generate the implication constraints, one for each method, to solve

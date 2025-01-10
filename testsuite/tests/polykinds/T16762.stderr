@@ -1,7 +1,7 @@
-
 T16762.hs:11:17: error: [GHC-97739]
     • These kind and type variables: a kx (b :: kx)
       are out of dependency order. Perhaps try this ordering:
         kx (a :: kx) (b :: kx)
     • In the definition of data constructor ‘MkT’
-      In the data declaration for ‘T’
+      In the data type declaration for ‘T’
+

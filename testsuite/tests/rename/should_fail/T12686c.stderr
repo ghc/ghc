@@ -1,7 +1,7 @@
-
 T12686c.hs:8:18: error: [GHC-45510]
     • Term variable ‘x’ cannot be used here
         (term variables cannot be promoted)
     • In the type ‘'x’
       In the definition of data constructor ‘MkBad’
-      In the data declaration for ‘Bad’
+      In the data type declaration for ‘Bad’
+

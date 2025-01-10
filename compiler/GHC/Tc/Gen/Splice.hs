@@ -666,7 +666,7 @@ runAnnotation        :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
 
 -- See Note [How brackets and nested splices are handled]
 tcTypedBracket rn_expr expr res_ty
-  = addErrCtxt (quotationCtxtDoc expr) $
+  = addErrCtxt (TypedTHBracketCtxt expr) $
     do { cur_stage <- getStage
        ; ps_ref <- newMutVar []
        ; lie_var <- getConstraintVar   -- Any constraints arising from nested splices
@@ -808,11 +808,6 @@ tcTExpTy m_ty exp_ty
        ; let rep = getRuntimeRep exp_ty
        ; return (mkTyConApp codeCon [m_ty, rep, exp_ty]) }
 
-quotationCtxtDoc :: LHsExpr GhcRn -> SDoc
-quotationCtxtDoc br_body
-  = hang (text "In the Template Haskell quotation")
-         2 (thTyBrackets . ppr $ br_body)
-
 
   -- The whole of the rest of the file is the else-branch (ie stage2 only)
 
@@ -836,7 +831,7 @@ getUntypedSpliceBody (HsUntypedSpliceNested {})
   = panic "tcTopUntypedSplice: invalid nested splice"
 
 tcTypedSplice splice_name expr res_ty
-  = addErrCtxt (typedSpliceCtxtDoc splice_name expr) $
+  = addErrCtxt (TypedSpliceCtxt (Just splice_name) expr) $
     setSrcSpan (getLocA expr)    $ do
     { stage <- getStage
     ; case stage of
@@ -958,7 +953,7 @@ runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
         -- These steps should never fail; this is a *typed* splice
        ; (res, wcs) <-
             captureConstraints $
-              addErrCtxt (spliceResultDoc zonked_q_expr) $ do
+              addErrCtxt (TypedSpliceResultCtxt zonked_q_expr) $ do
                 { (exp3, _fvs) <- rnLExpr expr2
                 ; tcCheckMonoExpr exp3 zonked_ty }
        ; ev <- simplifyTop wcs
@@ -973,17 +968,6 @@ runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
 *                                                                      *
 ************************************************************************
 -}
-
-typedSpliceCtxtDoc :: SplicePointName -> LHsExpr GhcRn -> SDoc
-typedSpliceCtxtDoc n splice
-  = hang (text "In the Template Haskell splice")
-         2 (pprTypedSplice (Just n) splice)
-
-spliceResultDoc :: LHsExpr GhcTc -> SDoc
-spliceResultDoc expr
-  = sep [ text "In the result of the splice:"
-        , nest 2 (text "$$" <> ppr expr)
-        , text "To see what the splice expanded to, use -ddump-splices"]
 
 stubNestedSplice :: HsExpr GhcTc
 -- Used when we need a (LHsExpr GhcTc) that we are never going
@@ -1898,8 +1882,7 @@ reifyInstances' :: TH.Name
                 -- ^ Returns 'Left' in the case that the instances were found to
                 -- be class instances, or 'Right' if they are family instances.
 reifyInstances' th_nm th_tys
-   = addErrCtxt (text "In the argument of reifyInstances:"
-                 <+> ppr_th th_nm <+> sep (map ppr_th th_tys)) $
+   = addErrCtxt (ReifyInstancesCtxt th_nm th_tys) $
      do { loc <- getSrcSpanM
         ; th_origin <- getThSpliceOrigin
         ; rdr_ty <- cvt th_origin loc (mkThAppTs (TH.ConT th_nm) th_tys)
@@ -2915,9 +2898,6 @@ mkThAppTs fun_ty arg_tys = foldl' TH.AppT fun_ty arg_tys
 
 noTH :: UnrepresentableTypeDescr -> Type -> TcM a
 noTH s d = failWithTc $ TcRnTHError $ THReifyError $ CannotRepresentType s d
-
-ppr_th :: TH.Ppr a => a -> SDoc
-ppr_th x = text (TH.pprint x)
 
 tcGetInterp :: TcM Interp
 tcGetInterp = do

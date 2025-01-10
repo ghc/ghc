@@ -1,4 +1,3 @@
-
 tcfail118.hs:10:29: error: [GHC-43085]
     • Overlapping instances for Eq Foo
         arising from the first field of ‘Bar’ (type ‘Foo’)
@@ -6,3 +5,4 @@ tcfail118.hs:10:29: error: [GHC-43085]
         instance Eq Foo -- Defined at tcfail118.hs:13:10
         instance Eq Foo -- Defined at tcfail118.hs:11:25
     • When deriving the instance for (Eq Bar)
+

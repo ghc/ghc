@@ -1,7 +1,7 @@
-
 T11145.hs:8:1: error: [GHC-83865]
     • Couldn't match type ‘Bool’ with ‘(a0, b0)’
       Expected: Fuggle Int (Maybe (a0, b0))
         Actual: Fuggle Int (Maybe Bool)
     • In the result type of data constructor ‘MkFuggle’
-      In the data instance declaration for ‘Fuggle’
+      In the data family instance declaration for ‘Fuggle’
+

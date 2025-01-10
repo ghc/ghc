@@ -1,4 +1,4 @@
-
 T14048a.hs:6:1: error: [GHC-55233]
     • Data type has non-* return kind ‘Constraint’
-    • In the data declaration for ‘Foo’
+    • In the data type declaration for ‘Foo’
+

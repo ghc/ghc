@@ -4,7 +4,6 @@
 [2 of 2] Processing q
   [1 of 4] Compiling B                ( q\B.hs, nothing )
   [2 of 4] Compiling A[sig]           ( q\A.hsig, nothing )
-
 bkpfail53.bkp:15:9: error: [GHC-15843]
     • Type constructor ‘T’ has conflicting definitions in the module
       and its hsig file.
@@ -12,6 +11,7 @@ bkpfail53.bkp:15:9: error: [GHC-15843]
                    type T = B.T
         Hsig file: type T :: *
                    data T = T Int
-    • while merging the signatures from:
+    • While merging the signatures from:
         • p[H=<A>]:H
         • ...and the local signature for A
+

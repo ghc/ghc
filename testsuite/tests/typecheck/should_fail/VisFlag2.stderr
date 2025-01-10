@@ -1,15 +1,15 @@
-
 VisFlag2.hs:13:21: error: [GHC-83865]
     • Couldn't match kind: forall a. a
                      with: forall a -> a
       Expected kind ‘* -> forall a -> a’,
         but ‘Invis’ has kind ‘* -> forall a. a’
     • In the type ‘Invis’
-      In the type instance declaration for ‘Vis’
+      In the type family instance declaration for ‘Vis’
 
 VisFlag2.hs:14:23: error: [GHC-83865]
     • Expecting one more argument to ‘Vis’
       Expected kind ‘* -> forall a. a’,
         but ‘Vis’ has kind ‘* -> forall a -> a’
     • In the type ‘Vis’
-      In the type instance declaration for ‘Invis’
+      In the type family instance declaration for ‘Invis’
+

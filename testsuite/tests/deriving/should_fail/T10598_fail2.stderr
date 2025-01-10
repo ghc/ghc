@@ -1,8 +1,7 @@
-
 T10598_fail2.hs:5:37: error: [GHC-38178]
     • Can't make a derived instance of
         ‘Eq A’ with the anyclass strategy:
-    • In the data declaration for ‘A’
+    • In the data type declaration for ‘A’
     Suggested fix:
       Perhaps you intended to use the ‘DeriveAnyClass’ extension
 
@@ -13,3 +12,4 @@ T10598_fail2.hs:6:37: error: [GHC-26557]
     Suggested fix:
       Perhaps you intended to use the ‘GeneralizedNewtypeDeriving’ extension
       for GHC's newtype-deriving extension
+

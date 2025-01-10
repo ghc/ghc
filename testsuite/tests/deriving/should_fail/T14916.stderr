@@ -1,8 +1,8 @@
-
 T14916.hs:7:24: error: [GHC-97044]
     • Class ‘~’ does not support user-specified instances.
-    • In the data declaration for ‘A’
+    • In the data type declaration for ‘A’
 
 T14916.hs:8:24: error: [GHC-97044]
     • Class ‘Coercible’ does not support user-specified instances.
-    • In the data declaration for ‘B’
+    • In the data type declaration for ‘B’
+

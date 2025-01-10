@@ -1,4 +1,3 @@
-
 T14880.hs:13:5: error: [GHC-71451]
     • Cannot generalise type; skolem ‘arg’ would escape its scope
       if I tried to quantify (a0 :: arg) in this type:
@@ -9,4 +8,5 @@ T14880.hs:13:5: error: [GHC-71451]
       (Indeed, I sometimes struggle even printing this correctly,
        due to its ill-scoped nature.)
     • In the definition of data constructor ‘MkBar’
-      In the data declaration for ‘Bar’
+      In the data type declaration for ‘Bar’
+

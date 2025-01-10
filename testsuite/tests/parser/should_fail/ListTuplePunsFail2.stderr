@@ -1,5 +1,6 @@
-ListTuplePunsFail2.hs:9:14: [GHC-83865]
-     Expected a type, but ‘(Int, Double)’ has kind ‘Tuple2 (*) (*)’
-     In the first argument of ‘F1’, namely ‘(Int, Double)’
+ListTuplePunsFail2.hs:9:14: error: [GHC-83865]
+    • Expected a type, but ‘(Int, Double)’ has kind ‘Tuple2 (*) (*)’
+    • In the first argument of ‘F1’, namely ‘(Int, Double)’
       In the type ‘F1 (Int, Double)’
-      In the type declaration for ‘T1’
+      In the type synonym declaration for ‘T1’
+

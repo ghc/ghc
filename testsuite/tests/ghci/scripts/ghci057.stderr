@@ -1,7 +1,6 @@
-
 <interactive>:4:1: error: [GHC-23894]
     • Illegal generalised algebraic data declaration for ‘T’
-    • In the data declaration for ‘T’
+    • In the data type declaration for ‘T’
     Suggested fix:
       Perhaps you intended to use the ‘GADTs’ extension
       You may enable this language extension in GHCi with: :set -XGADTs
@@ -38,3 +37,4 @@ ghci057.hs:4:3: error: [GHC-25709]
       You may enable these language extensions in GHCi with:
         :set -XExistentialQuantification
         :set -XGADTs
+

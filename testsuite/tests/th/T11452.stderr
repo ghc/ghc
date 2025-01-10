@@ -1,7 +1,7 @@
 T11452.hs:6:12: error: [GHC-94642]
     • Illegal polytype: (forall a. a -> a) -> ()
       The type of a Typed Template Haskell expression must not have any quantification.
-    • In the Template Haskell splice $$([|| \ _ -> () ||])
+    • In the typed Template Haskell splice: $$([|| \ _ -> () ||])
       In the expression: $$([|| \ _ -> () ||])
       In an equation for ‘impred’: impred = $$([|| \ _ -> () ||])
 
@@ -13,7 +13,7 @@ T11452.hs:6:14: error: [GHC-91028]
                   GHC.Internal.TH.Syntax.Q (p0 -> ())
       Cannot instantiate unification variable ‘p0’
       with a type involving polytypes: forall a. a -> a
-    • In the Template Haskell quotation [|| \ _ -> () ||]
+    • In the Template Haskell typed quotation: [|| \ _ -> () ||]
       In the expression: [|| \ _ -> () ||]
-      In the Template Haskell splice $$([|| \ _ -> () ||])
+      In the typed Template Haskell splice: $$([|| \ _ -> () ||])
 

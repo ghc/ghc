@@ -1,7 +1,7 @@
-
 T12041.hs:12:3: error: [GHC-95424]
     • Type indexes must match class instance head
       Expected: Ob @i (I @{i} @{i})
         Actual: Ob @(*) (I @{*} @{*})
-    • In the type instance declaration for ‘Ob’
+    • In the associated type family instance declaration for ‘Ob’
       In the instance declaration for ‘Category I’
+

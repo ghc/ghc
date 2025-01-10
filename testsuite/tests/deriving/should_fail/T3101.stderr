@@ -1,6 +1,6 @@
-
 T3101.hs:9:12: error: [GHC-16437]
     • Can't make a derived instance of ‘Show Boom’:
         Constructor ‘Boom’ has a higher-rank type
-    • In the data declaration for ‘Boom’
+    • In the data type declaration for ‘Boom’
     Suggested fix: Use a standalone deriving declaration instead
+

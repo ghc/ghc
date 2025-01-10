@@ -72,11 +72,9 @@ module GHC.Tc.Gen.HsType (
         tcHsPatSigType, tcHsTyPat,
         HoleMode(..),
 
-        -- Error messages
-        funAppCtxt, addTyConFlavCtxt,
-
         -- Utils
         tyLitFromLit, tyLitFromOverloadedLit,
+
    ) where
 
 import GHC.Prelude hiding ( head, init, last, tail )
@@ -87,6 +85,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.LclEnv
+import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
@@ -358,11 +357,15 @@ funsSigCtxt :: [LocatedN Name] -> UserTypeCtxt
 funsSigCtxt (L _ name1 : _) = FunSigCtxt name1 NoRRC
 funsSigCtxt []              = panic "funSigCtxt"
 
-addSigCtxt :: Outputable hs_ty => UserTypeCtxt -> LocatedA hs_ty -> TcM a -> TcM a
+addSigCtxt :: UserTypeCtxt -> UserSigType GhcRn -> TcM a -> TcM a
 addSigCtxt ctxt hs_ty thing_inside
-  = setSrcSpan (getLocA hs_ty) $
-    addErrCtxt (pprSigCtxt ctxt hs_ty) $
+  = setSrcSpan l $
+    addErrCtxt (UserSigCtxt ctxt hs_ty) $
     thing_inside
+  where
+    l = case hs_ty of
+      UserLHsSigType ty -> getLocA ty
+      UserLHsType ty    -> getLocA ty
 
 pprSigCtxt :: Outputable hs_ty => UserTypeCtxt -> LocatedA hs_ty -> SDoc
 -- (pprSigCtxt ctxt <extra> <type>)
@@ -399,7 +402,7 @@ kcClassSigType :: [LocatedN Name] -> LHsSigType GhcRn -> TcM ()
 -- and then we can't set kappa := f a, because a is local.
 kcClassSigType names
     sig_ty@(L _ (HsSig { sig_bndrs = hs_outer_bndrs, sig_body = hs_ty }))
-  = addSigCtxt (funsSigCtxt names) sig_ty $
+  = addSigCtxt (funsSigCtxt names) (UserLHsSigType sig_ty) $
     do { _ <- bindOuterSigTKBndrs_Tv hs_outer_bndrs    $
               tcCheckLHsType hs_ty liftedTypeKind
        ; return () }
@@ -407,7 +410,7 @@ kcClassSigType names
 tcClassSigType :: [LocatedN Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType names sig_ty
-  = addSigCtxt sig_ctxt sig_ty $
+  = addSigCtxt sig_ctxt (UserLHsSigType sig_ty) $
     do { skol_info <- mkSkolemInfo skol_info_anon
        ; (implic, ty) <- tc_lhs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
        ; emitImplication implic
@@ -436,7 +439,7 @@ tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- Does validity checking
 -- See Note [Recipe for checking a signature]
 tcHsSigType ctxt sig_ty
-  = addSigCtxt ctxt sig_ty $
+  = addSigCtxt ctxt (UserLHsSigType sig_ty) $
     do { traceTc "tcHsSigType {" (ppr sig_ty)
        ; skol_info <- mkSkolemInfo skol_info
           -- Generalise here: see Note [Kind generalisation]
@@ -585,7 +588,7 @@ top level of a signature.
 -- Does validity checking and zonking.
 tcStandaloneKindSig :: LStandaloneKindSig GhcRn -> TcM (Name, Kind)
 tcStandaloneKindSig (L _ (StandaloneKindSig _ (L _ name) ksig))
-  = addSigCtxt ctxt ksig $
+  = addSigCtxt ctxt (UserLHsSigType ksig) $
     do { kind <- tc_top_lhs_type KindLevel ctxt ksig
        ; checkValidType ctxt kind
        ; return (name, kind) }
@@ -1671,7 +1674,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
              ; let exp_kind = substTy subst $ piTyBinderType ki_binder
              ; arg_mode <- mkHoleMode KindLevel HM_VTA
                    -- HM_VKA: see Note [Wildcards in visible kind application]
-             ; ki_arg <- addErrCtxt (funAppCtxt orig_hs_ty hs_ki_arg n) $
+             ; ki_arg <- addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty hs_ki_arg) n) $
                          tc_check_lhs_type arg_mode hs_ki_arg exp_kind
 
              ; traceTc "tcInferTyApps (vis kind app)" (ppr exp_kind)
@@ -1702,7 +1705,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
                                 , ppr (piTyBinderType ki_binder)
                                 , ppr subst ])
                 ; let exp_kind = substTy subst $ piTyBinderType ki_binder
-                ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty arg n) $
+                ; arg' <- addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty arg) n) $
                           tc_check_lhs_type mode arg exp_kind
                 ; traceTc "tcInferTyApps (vis normal app) 2" (ppr exp_kind)
                 ; (subst', fun') <- mkAppTyM subst fun ki_binder arg'
@@ -2215,10 +2218,8 @@ addTypeCtxt :: LHsType GhcRn -> TcM a -> TcM a
         -- Wrap a context around only if we want to show that contexts.
         -- Omit invisible ones and ones user's won't grok
 addTypeCtxt (L _ (HsWildCardTy _)) thing = thing   -- "In the type '_'" just isn't helpful.
-addTypeCtxt (L _ ty) thing
-  = addErrCtxt doc thing
-  where
-    doc = text "In the type" <+> quotes (ppr ty)
+addTypeCtxt ty thing = addErrCtxt (TypeCtxt ty) thing
+
 
 
 {- *********************************************************************
@@ -2430,7 +2431,7 @@ kcCheckDeclHeader_cusk name flav
                       , hsq_explicit = hs_tvs }) kc_res_ki
   -- CUSK case
   -- See Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
-  = addTyConFlavCtxt name flav $
+  = addErrCtxt (TyConDeclCtxt name flav) $
     do { skol_info <- mkSkolemInfo skol_info_anon
        ; (tclvl, wanted, (scoped_kvs, (tc_bndrs, res_kind)))
            <- pushLevelAndSolveEqualitiesX "kcCheckDeclHeader_cusk" $
@@ -2531,7 +2532,7 @@ kcInferDeclHeader name flav
                       , hsq_explicit = hs_bndrs }) kc_res_ki
   -- No standalone kind signature and no CUSK.
   -- See Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
-  = addTyConFlavCtxt name flav $
+  = addErrCtxt (TyConDeclCtxt name flav) $
     do { rejectInvisibleBinders name hs_bndrs
        ; (scoped_kvs, (tc_bndrs, res_kind))
            -- Why bindImplicitTKBndrs_Q_Tv which uses newTyVarTyVar?
@@ -2603,7 +2604,7 @@ kcCheckDeclHeader_sig
 kcCheckDeclHeader_sig sig_kind name flav
           (HsQTvs { hsq_ext      = implicit_nms
                   , hsq_explicit = hs_tv_bndrs }) kc_res_ki
-  = addTyConFlavCtxt name flav $
+  = addErrCtxt (TyConDeclCtxt name flav) $
     do { skol_info <- mkSkolemInfo (TyConSkol flav name)
        ; let avoid_occs = map nameOccName (hsLTyVarNames hs_tv_bndrs)
        ; (sig_tcbs :: [TcTyConBinder], sig_res_kind :: Kind)
@@ -4210,7 +4211,7 @@ tcHsPartialSigType ctxt sig_ty
   | HsWC { hswc_ext  = sig_wcs, hswc_body = sig_ty } <- sig_ty
   , L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = body_ty}) <- sig_ty
   , (hs_ctxt, hs_tau) <- splitLHsQualTy body_ty
-  = addSigCtxt ctxt sig_ty $
+  = addSigCtxt ctxt (UserLHsSigType sig_ty) $
     do { mode <- mkHoleMode TypeLevel HM_Sig
        ; (outer_bndrs, (wcs, wcx, theta, tau))
             <- solveEqualities "tcHsPartialSigType" $
@@ -4524,7 +4525,7 @@ tc_type_in_pat :: UserTypeCtxt
                                               -- the scoped type variables
                       , TcType)       -- The type
 tc_type_in_pat ctxt hole_mode hs_ty wcs ns ctxt_kind
-  = addSigCtxt ctxt hs_ty $
+  = addSigCtxt ctxt (UserLHsType hs_ty) $
     do { tkv_prs <- mapM new_implicit_tv ns
        ; mode <- mkHoleMode TypeLevel hole_mode
        ; (wcs, ty)
@@ -4719,7 +4720,7 @@ tc_lhs_kind_sig :: TcTyMode -> UserTypeCtxt -> LHsKind GhcRn -> TcM Kind
 tc_lhs_kind_sig mode ctxt hs_kind
 -- See  Note [Recipe for checking a signature] in GHC.Tc.Gen.HsType
 -- Result is zonked
-  = do { kind <- addErrCtxt (text "In the kind" <+> quotes (ppr hs_kind)) $
+  = do { kind <- addErrCtxt (KindCtxt hs_kind) $
                  solveEqualities "tcLHsKindSig" $
                  tc_check_lhs_type mode hs_kind liftedTypeKind
        ; traceTc "tcLHsKindSig" (ppr hs_kind $$ ppr kind)
@@ -4740,29 +4741,6 @@ tc_lhs_kind_sig mode ctxt hs_kind
 promotionErr :: Name -> PromotionErr -> TcM a
 promotionErr name err
   = failWithTc $ TcRnUnpromotableThing name err
-
-{-
-************************************************************************
-*                                                                      *
-          Error messages and such
-*                                                                      *
-************************************************************************
--}
-
-
--- | Make an appropriate message for an error in a function argument.
--- Used for both expressions and types.
-funAppCtxt :: (Outputable fun, Outputable arg) => fun -> arg -> Int -> SDoc
-funAppCtxt fun arg arg_no
-  = hang (hsep [ text "In the", speakNth arg_no, text "argument of",
-                    quotes (ppr fun) <> text ", namely"])
-       2 (quotes (ppr arg))
-
--- | Add a "In the data declaration for T" or some such.
-addTyConFlavCtxt :: Name -> TyConFlavour tc -> TcM a -> TcM a
-addTyConFlavCtxt name flav
-  = addErrCtxt $ hsep [ text "In the", ppr flav
-                      , text "declaration for", quotes (ppr name) ]
 
 {-
 ************************************************************************

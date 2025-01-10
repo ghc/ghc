@@ -52,6 +52,8 @@ import GHC.Prelude
 
 import GHC.Hs
 
+import GHC.Tc.Errors.Types ( ErrCtxtMsg(..) )
+import GHC.Tc.Errors.Ppr   ( pprErrCtxtMsg )
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep, hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Instantiate
@@ -188,7 +190,7 @@ matchActualFunTy herald mb_thing err_info fun_ty
            ; return (mkWpCastN co, arg_ty, res_ty) }
 
     ------------
-    mk_ctxt :: TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
+    mk_ctxt :: TcType -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
     mk_ctxt _res_ty = mkFunTysMsg herald err_info
 
 {- Note [matchActualFunTy error handling]
@@ -897,26 +899,15 @@ new_check_arg_ty herald arg_pos -- Position for error messages only, 1 for first
 
 mkFunTysMsg :: ExpectedFunTyOrigin
             -> (VisArity, TcType)
-            -> TidyEnv -> ZonkM (TidyEnv, SDoc)
+            -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
 -- See Note [Reporting application arity errors]
 mkFunTysMsg herald (n_vis_args_in_call, fun_ty) env
   = do { (env', fun_ty) <- zonkTidyTcType env fun_ty
 
        ; let (pi_ty_bndrs, _) = splitPiTys fun_ty
              n_fun_args = count isVisiblePiTyBinder pi_ty_bndrs
-             msg | n_vis_args_in_call <= n_fun_args  -- Enough args, in the end
-                 = text "In the result of a function call"
-                 | otherwise
-                 = hang (full_herald <> comma)
-                      2 (sep [ text "but its type" <+> quotes (pprSigmaType fun_ty)
-                             , if n_fun_args == 0 then text "has none"
-                               else text "has only" <+> speakN n_fun_args])
 
-       ; return (env', msg) }
- where
-  full_herald = pprExpectedFunTyHerald herald
-            <+> speakNOf n_vis_args_in_call (text "visible argument")
-             -- What are "visible" arguments? See Note [Visibility and arity] in GHC.Types.Basic
+       ; return (env', FunTysCtxt herald fun_ty n_vis_args_in_call n_fun_args) }
 
 
 {- Note [Reporting application arity errors]
@@ -1391,11 +1382,7 @@ addSubTypeCtxt ty_actual ty_expected thing_inside
            ; ty_expected             <- readExpType ty_expected
                    -- A worry: might not be filled if we're debugging. Ugh.
            ; (tidy_env, ty_expected) <- zonkTidyTcType tidy_env ty_expected
-           ; let msg = vcat [ hang (text "When checking that:")
-                                 4 (ppr ty_actual)
-                            , nest 2 (hang (text "is more polymorphic than:")
-                                         2 (ppr ty_expected)) ]
-           ; return (tidy_env, msg) }
+           ; return (tidy_env, SubTypeCtxt ty_expected ty_actual) }
 
 
 {- Note [Instantiation of InferResult]
@@ -2148,15 +2135,16 @@ uType_defer (UE { u_loc = loc, u_defer = ref
          -- snocBag: see Note [Work-list ordering] in GHC.Tc.Solver.Equality
 
        -- Error trace only
-       -- NB. do *not* call mkErrInfo unless tracing is on,
+       -- NB. do *not* call mkErrCtxt unless tracing is on,
        --     because it is hugely expensive (#5631)
        ; whenDOptM Opt_D_dump_tc_trace $
-         do { ctxt <- getErrCtxt
-            ; doc  <- mkErrInfo emptyTidyEnv ctxt
-            ; traceTc "utype_defer" (vcat [ ppr role
-                                          , debugPprType ty1
-                                          , debugPprType ty2
-                                          , doc])
+         do { ctxt     <- getErrCtxt
+            ; err_ctxt <- mkErrCtxt emptyTidyEnv ctxt
+            ; traceTc "utype_defer" $
+                vcat ( ppr role
+                     : debugPprType ty1
+                     : debugPprType ty2
+                     : map pprErrCtxtMsg err_ctxt )
             ; traceTc "utype_defer2" (ppr co) }
 
        ; return co }

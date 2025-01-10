@@ -1,5 +1,5 @@
-
 T15816.hs:8:1: error: [GHC-20967]
     • Cannot apply function of kind ‘*’
       to visible kind argument ‘Int’
-    • In the data instance declaration for ‘U’
+    • In the data family instance declaration for ‘U’
+

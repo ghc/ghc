@@ -98,7 +98,7 @@ import Language.Haskell.Syntax.Basic (Role, LexicalFixity)
 import Language.Haskell.Syntax.Specificity (Specificity)
 
 import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName, Activation
-                       ,TyConFlavour(..), TypeOrData(..))
+                       ,TyConFlavour(..), TypeOrData(..), NewOrData(..))
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 
 import GHC.Unit.Module.Warnings (WarningTxt)
@@ -780,7 +780,7 @@ familyInfoTyConFlavour
   -> TyConFlavour tc
 familyInfoTyConFlavour mb_parent_tycon info =
   case info of
-    DataFamily         -> OpenFamilyFlavour IAmData mb_parent_tycon
+    DataFamily         -> OpenFamilyFlavour (IAmData DataType) mb_parent_tycon
     OpenTypeFamily     -> OpenFamilyFlavour IAmType mb_parent_tycon
     ClosedTypeFamily _ -> assert (isNothing mb_parent_tycon)
                           -- See Note [Closed type family mb_parent_tycon]
@@ -915,12 +915,6 @@ terms. However, partial standalone kind signatures are not a proper replacement
 for CUSKs, so this would be a separate feature.
 -}
 
--- | When we only care whether a data-type declaration is `data` or `newtype`, but not what constructors it has
-data NewOrData
-  = NewType                     -- ^ @newtype Blah ...@
-  | DataType                    -- ^ @data Blah ...@
-  deriving ( Eq, Data )                -- Needed because Demand derives Eq
-
 -- | Whether a data-type declaration is @data@ or @newtype@, and its constructors.
 data DataDefnCons a
   = NewTypeCon          -- @newtype N x = MkN blah@
@@ -935,8 +929,8 @@ data DataDefnCons a
 
 dataDefnConsNewOrData :: DataDefnCons a -> NewOrData
 dataDefnConsNewOrData = \ case
-    NewTypeCon _ -> NewType
-    DataTypeCons _ _ -> DataType
+    NewTypeCon   {} -> NewType
+    DataTypeCons {} -> DataType
 
 -- | Are the constructors within a @type data@ declaration?
 -- See Note [Type data declarations] in GHC.Rename.Module.

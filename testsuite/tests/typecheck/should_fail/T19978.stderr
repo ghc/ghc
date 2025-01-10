@@ -1,12 +1,12 @@
-
 T19978.hs:8:7: error: [GHC-01928]
     • Illegal term-level use of the type constructor ‘Bool’
     • imported from ‘Prelude’ at T19978.hs:3:8-13
       (and originally defined in ‘GHC.Types’)
-    • Perhaps use one of these:
-        ‘Bowl’ (line 11), variable ‘bool’ (line 12)
     • In the expression: Bool
       In an equation for ‘ex1’: ex1 = Bool
+    Suggested fix:
+      Perhaps use one of these:
+        ‘Bowl’ (line 11), variable ‘bool’ (line 12)
 
 T19978.hs:14:7: error: [GHC-88464]
     Data constructor not in scope: Let
@@ -15,7 +15,9 @@ T19978.hs:14:7: error: [GHC-88464]
 T19978.hs:21:7: error: [GHC-01928]
     • Illegal term-level use of the type variable ‘mytv’
     • bound at T19978.hs:20:15
-    • Perhaps use one of these:
-        data constructor ‘Mytv’ (line 24), ‘myvv’ (line 25)
     • In the expression: mytv
       In an equation for ‘ex3’: ex3 = mytv
+    Suggested fix:
+      Perhaps use one of these:
+        data constructor ‘Mytv’ (line 24), ‘myvv’ (line 25)
+

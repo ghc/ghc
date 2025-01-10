@@ -33,6 +33,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..) )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Utils.Concrete( hasFixedRuntimeRep_syntactic )
@@ -904,7 +905,7 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
        ; case ctxt of
            VACall fun arg_no _ | not in_generated_code
              -> do setSrcSpanA arg_loc                    $
-                     addErrCtxt (funAppCtxt fun arg arg_no) $
+                     addErrCtxt (FunAppCtxt (FunAppCtxtExpr fun arg) arg_no) $
                      thing_inside
 
            VAExpansion (OrigStmt (L _ stmt@(BindStmt {}))) _ loc

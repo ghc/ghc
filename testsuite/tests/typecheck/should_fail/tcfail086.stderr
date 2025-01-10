@@ -1,6 +1,6 @@
-
 tcfail086.hs:6:38: error: [GHC-16437]
     • Can't make a derived instance of ‘Eq Ex’:
         Constructor ‘Ex’ has existential type variables in its type
-    • In the data declaration for ‘Ex’
+    • In the data type declaration for ‘Ex’
     Suggested fix: Use a standalone deriving declaration instead
+

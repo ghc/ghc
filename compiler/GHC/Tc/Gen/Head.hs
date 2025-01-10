@@ -1209,37 +1209,11 @@ addFunResCtxt fun args fun_res_ty env_ty thing_inside
                      -- is not deeply skolemised, so still use tcSplitNestedSigmaTys
                  (args_fun, res_fun) = tcSplitFunTys fun_tau
                  (args_env, res_env) = tcSplitFunTys env_tau
-                 n_fun = length args_fun
-                 n_env = length args_env
-                 info  | -- Check for too few args
-                         --  fun_tau = a -> b, res_tau = Int
-                         n_fun > n_env
-                       , not_fun res_env
-                       = text "Probable cause:" <+> quotes (ppr fun)
-                         <+> text "is applied to too few arguments"
-
-                       | -- Check for too many args
-                         -- fun_tau = a -> Int,   res_tau = a -> b -> c -> d
-                         -- The final guard suppresses the message when there
-                         -- aren't enough args to drop; eg. the call is (f e1)
-                         n_fun < n_env
-                       , not_fun res_fun
-                       , (n_fun + count isValArg args) >= n_env
-                          -- Never suggest that a naked variable is
-                                           -- applied to too many args!
-                       = text "Possible cause:" <+> quotes (ppr fun)
-                         <+> text "is applied to too many arguments"
-
-                       | otherwise
-                       = Outputable.empty
-
+                 info =
+                  FunResCtxt fun (count isValArg args) res_fun res_env
+                    (length args_fun) (length args_env)
            ; return info }
 
-    not_fun ty   -- ty is definitely not an arrow type,
-                 -- and cannot conceivably become one
-      = case tcSplitTyConApp_maybe ty of
-          Just (tc, _) -> isAlgTyCon tc
-          Nothing      -> False
 
 {-
 Note [Splitting nested sigma types in mismatched function types]
@@ -1291,25 +1265,16 @@ mis-match in the number of value arguments.
 ********************************************************************* -}
 
 addStmtCtxt :: ExprStmt GhcRn -> TcRn a -> TcRn a
-addStmtCtxt stmt thing_inside
-  = do let err_doc = pprStmtInCtxt (HsDoStmt (DoExpr Nothing)) stmt
-       addErrCtxt err_doc thing_inside
-  where
-    pprStmtInCtxt :: HsStmtContextRn -> StmtLR GhcRn GhcRn (LHsExpr GhcRn) -> SDoc
-    pprStmtInCtxt ctxt stmt
-      = vcat [ hang (text "In a stmt of"
-                     <+> pprAStmtContext ctxt <> colon) 2 (pprStmt stmt)
-             ]
+addStmtCtxt stmt =
+  addErrCtxt (StmtErrCtxt (HsDoStmt (DoExpr Nothing)) stmt)
 
 addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside
   = case e of
       HsUnboundVar {} -> thing_inside
-      _ -> addErrCtxt (exprCtxt e) thing_inside
+      _ -> addErrCtxt (ExprCtxt e) thing_inside
    -- The HsUnboundVar special case addresses situations like
    --    f x = _
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself
 
-exprCtxt :: HsExpr GhcRn -> SDoc
-exprCtxt expr = hang (text "In the expression:") 2 (ppr (stripParensHsExpr expr))

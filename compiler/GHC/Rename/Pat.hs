@@ -53,6 +53,7 @@ import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType ( hsOverLitName )
+import GHC.Rename.Doc (rnLHsDoc)
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames
@@ -63,17 +64,19 @@ import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 
+import GHC.Types.Hint
+import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
-
 import GHC.Types.Basic
 import GHC.Types.SourceText
-import GHC.Utils.Misc
+
 import GHC.Data.FastString ( uniqCompareFS )
 import GHC.Data.List.SetOps( removeDups )
-import GHC.Utils.Outputable
+
+import GHC.Utils.Misc
 import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Types.Literal   ( inCharRange )
@@ -94,9 +97,6 @@ import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Data.Functor ((<&>))
-import GHC.Rename.Doc (rnLHsDoc)
-import GHC.Types.Hint
-import GHC.Types.Fixity (LexicalFixity(..))
 import Data.Coerce
 
 {-
@@ -447,13 +447,12 @@ rn_pats_general ctxt pats thing_inside = do
     --
     -- See Note [Don't report shadowing for pattern synonyms]
     let bndrs = collectPatsBinders CollVarTyVarBinders (toList pats')
-    addErrCtxt doc_pat $
+    addErrCtxt (MatchCtxt ctxt) $
       if isPatSynCtxt ctxt
          then checkDupNames bndrs
          else checkDupAndShadowedNames envs_before bndrs
     thing_inside pats'
   where
-    doc_pat = text "In" <+> pprMatchContext ctxt
 
     -- See Note [Invisible binders in functions] in GHC.Hs.Pat
     --

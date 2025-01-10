@@ -1,5 +1,5 @@
-
 UnliftedNewtypesInstanceFail.hs:13:3: error: [GHC-83865]
     • Expected a WordRep type, but ‘Bar Bool’ is an IntRep type
-    • In the newtype instance declaration for ‘Bar’
+    • In the associated newtype family instance declaration for ‘Bar’
       In the instance declaration for ‘Foo Bool’
+

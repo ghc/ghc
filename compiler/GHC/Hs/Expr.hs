@@ -2346,7 +2346,8 @@ pprStmtInCtxt ctxt stmt
                         , trS_form = form }) = pprTransStmt by using form
     ppr_stmt stmt = pprStmt stmt
 
-pprMatchContext :: Outputable fn => HsMatchContext fn -> SDoc
+
+pprMatchContext :: Outputable p => HsMatchContext p -> SDoc
 pprMatchContext ctxt
   | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
   | otherwise    = text "a"  <+> pprMatchContextNoun ctxt

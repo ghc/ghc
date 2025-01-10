@@ -1,15 +1,15 @@
 [1 of 3] Processing p
-  [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
+  [1 of 1] Compiling A[sig]           ( p\A.hsig, nothing )
 [2 of 3] Processing q
-  [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
+  [1 of 1] Compiling A[sig]           ( q\A.hsig, nothing )
 [3 of 3] Processing r
-  [1 of 4] Compiling A[sig]           ( r/A.hsig, nothing )
-
+  [1 of 4] Compiling A[sig]           ( r\A.hsig, nothing )
 bkpfail29.bkp:8:9: error: [GHC-97522]
     • Cycle in type synonym declarations:
         bkpfail29.bkp:8:9-18: S from external module
         bkpfail29.bkp:7:9-14: T from external module
-    • while merging the signatures from:
+    • While merging the signatures from:
         • p[A=<A>]:A
         • q[A=<A>]:A
         • ...and the local signature for A
+

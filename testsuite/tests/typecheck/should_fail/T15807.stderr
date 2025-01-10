@@ -1,4 +1,3 @@
-
 T15807.hs:12:3: error: [GHC-71451]
     • Cannot generalise type; skolem ‘f’ would escape its scope
       if I tried to quantify (f0 :: f -> *) in this type:
@@ -6,4 +5,5 @@ T15807.hs:12:3: error: [GHC-71451]
       (Indeed, I sometimes struggle even printing this correctly,
        due to its ill-scoped nature.)
     • In the definition of data constructor ‘MkApp’
-      In the data declaration for ‘App’
+      In the data type declaration for ‘App’
+

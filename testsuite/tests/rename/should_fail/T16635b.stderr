@@ -1,7 +1,7 @@
-
 T16635b.hs:14:17: error: [GHC-47557]
     • Type variable ‘a’ cannot be used here
         (type variables bound in a kind signature cannot be used in the type)
     • In the first argument of ‘Just’, namely ‘a’
       In the type ‘(Just @a :: forall a. a -> Maybe a) U’
-      In the type declaration for ‘F’
+      In the type synonym declaration for ‘F’
+

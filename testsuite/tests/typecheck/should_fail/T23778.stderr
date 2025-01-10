@@ -1,5 +1,5 @@
-
 T23778.hs:7:22: error: [GHC-30337]
     • The type variables ‘d’, ‘v’ are bound by a forall,
       but do not appear in any of the LHS patterns of the family instance.
-    • In the data instance declaration for ‘D’
+    • In the data family instance declaration for ‘D’
+

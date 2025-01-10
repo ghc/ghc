@@ -1,6 +1,6 @@
-
 T16762a.hs:12:22: error: [GHC-97739]
     • These kind and type variables: a k (b :: k)
       are out of dependency order. Perhaps try this ordering:
         k (a :: k) (b :: k)
-    • In the type instance declaration for ‘F’
+    • In the type family instance declaration for ‘F’
+

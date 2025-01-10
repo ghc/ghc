@@ -1,7 +1,7 @@
-
 T15828.hs:9:3: error: [GHC-95424]
     • Type indexes must match class instance head
       Expected: T (Maybe a) _
         Actual: T (Maybe a1) b
-    • In the type instance declaration for ‘T’
+    • In the associated type family instance declaration for ‘T’
       In the instance declaration for ‘C (Maybe a)’
+

@@ -280,7 +280,7 @@ tcMatch tc_body pat_tys rhs_ty match
         add_match_ctxt thing_inside = case ctxt of
             LamAlt LamSingle -> thing_inside
             StmtCtxt (HsDoStmt{}) -> thing_inside -- this is an expanded do stmt
-            _          -> addErrCtxt (pprMatchInCtxt match) thing_inside
+            _          -> addErrCtxt (MatchInCtxt match) thing_inside
 
 -------------
 tcGRHSs :: AnnoBody body
@@ -438,7 +438,7 @@ tcStmtsAndThen ctxt stmt_chk (L loc stmt : stmts) res_ty thing_inside
   | otherwise
   = do  { (stmt', (stmts', thing)) <-
                 setSrcSpanA loc                             $
-                addErrCtxt (pprStmtInCtxt ctxt stmt)        $
+                addErrCtxt (StmtErrCtxt ctxt stmt)          $
                 stmt_chk ctxt stmt res_ty                   $ \ res_ty' ->
                 popErrCtxt                                  $
                 tcStmtsAndThen ctxt stmt_chk stmts res_ty'  $
@@ -1157,7 +1157,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                     , ..
                     }, pat_ty, exp_ty)
       = setSrcSpan (combineSrcSpans (getLocA pat) (getLocA rhs)) $
-        addErrCtxt (pprStmtInCtxt ctxt (mkRnBindStmt pat rhs))   $
+        addErrCtxt (StmtErrCtxt ctxt (mkRnBindStmt pat rhs))   $
         do { rhs'      <- tcCheckMonoExprNC rhs exp_ty
            ; (pat', _) <- tcCheckPat (StmtCtxt ctxt) pat (unrestricted pat_ty) $
                           return ()

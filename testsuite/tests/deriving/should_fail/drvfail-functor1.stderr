@@ -1,5 +1,5 @@
-
 drvfail-functor1.hs:7:14: error: [GHC-86639]
     • Can't make a derived instance of ‘Functor List’:
         You need DeriveFunctor to derive an instance for this class
-    • In the data declaration for ‘List’
+    • In the data type declaration for ‘List’
+

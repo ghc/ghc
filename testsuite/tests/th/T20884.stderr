@@ -1,7 +1,7 @@
-
 T20884.hs:10:17: error: [GHC-31891]
     • The data constructor ‘:’ does not live in the type-level namespace
-    • In the Template Haskell quotation ''(:)
+    • In the Template Haskell quotation: ''(:)
       In the untyped splice:
         $(conE ''(:) `appE` litE (IntegerL 5) `appE` conE '[])
     Suggested fix: Perhaps use a single tick
+

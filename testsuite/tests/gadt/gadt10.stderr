@@ -1,7 +1,7 @@
-
 gadt10.hs:6:24: error: [GHC-83865]
     • Expecting one more argument to ‘RInt’
       Expected a type, but ‘RInt’ has kind ‘k0 -> *’
     • In the type ‘RInt’
       In the definition of data constructor ‘R’
-      In the data declaration for ‘RInt’
+      In the data type declaration for ‘RInt’
+

@@ -11,7 +11,6 @@ module GHC.Tc.Errors.Hole
    , isFlexiTyVar
    , tcFilterHoleFits
    , getLocalBindings
-   , pprHoleFit
    , addHoleFitDocs
    , getHoleFitSortingAlg
    , getHoleFitDispConfig
@@ -42,7 +41,6 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Zonk.TcType
-import GHC.Core.Type
 import GHC.Core.TyCon( TyCon, isGenerativeTyCon )
 import GHC.Core.TyCo.Rep( Type(..) )
 import GHC.Core.DataCon
@@ -57,7 +55,6 @@ import GHC.Types.TyThing
 import GHC.Data.Bag
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Utils.Misc
-import GHC.Utils.Panic
 import GHC.Tc.Utils.Env (tcLookup)
 import GHC.Utils.Outputable
 import GHC.Driver.DynFlags
@@ -497,63 +494,6 @@ addHoleFitDocs fits =
                    text "Make sure the modules are compiled with '-haddock'.")
      ; warnPprTrace (not $ Set.null mods) "addHoleFitDocs" warning (pure ())
      }
-
--- For pretty printing hole fits, we display the name and type of the fit,
--- with added '_' to represent any extra arguments in case of a non-zero
--- refinement level.
-pprHoleFit :: HoleFitDispConfig -> HoleFit -> SDoc
-pprHoleFit _ (RawHoleFit sd) = sd
-pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (TcHoleFit (HoleFit {..})) =
- hang display 2 provenance
- where tyApp = sep $ zipWithEqual "pprHoleFit" pprArg vars hfWrap
-         where pprArg b arg = case binderFlag b of
-                                Specified -> text "@" <> pprParendType arg
-                                  -- Do not print type application for inferred
-                                  -- variables (#16456)
-                                Inferred  -> empty
-                                Required  -> pprPanic "pprHoleFit: bad Required"
-                                                         (ppr b <+> ppr arg)
-       tyAppVars = sep $ punctuate comma $
-           zipWithEqual "pprHoleFit" (\v t -> ppr (binderVar v) <+>
-                                               text "~" <+> pprParendType t)
-           vars hfWrap
-
-       vars = unwrapTypeVars hfType
-         where
-           -- Attempts to get all the quantified type variables in a type,
-           -- e.g.
-           -- return :: forall (m :: * -> *) Monad m => (forall a . a -> m a)
-           -- into [m, a]
-           unwrapTypeVars :: Type -> [ForAllTyBinder]
-           unwrapTypeVars t = vars ++ case splitFunTy_maybe unforalled of
-                               Just (_, _, _, unfunned) -> unwrapTypeVars unfunned
-                               _ -> []
-             where (vars, unforalled) = splitForAllForAllTyBinders t
-       holeVs = sep $ map (parens . (text "_" <+> dcolon <+>) . ppr) hfMatches
-       holeDisp = if sMs then holeVs
-                  else sep $ replicate (length hfMatches) $ text "_"
-       occDisp = case hfCand of
-                   GreHFCand gre   -> pprPrefixOcc (greName gre)
-                   NameHFCand name -> pprPrefixOcc name
-                   IdHFCand id_    -> pprPrefixOcc id_
-       tyDisp = ppWhen sTy $ dcolon <+> ppr hfType
-       has = not . null
-       wrapDisp = ppWhen (has hfWrap && (sWrp || sWrpVars))
-                   $ text "with" <+> if sWrp || not sTy
-                                     then occDisp <+> tyApp
-                                     else tyAppVars
-       docs = case hfDoc of
-                Just d -> pprHsDocStrings d
-                _ -> empty
-       funcInfo = ppWhen (has hfMatches && sTy) $
-                    text "where" <+> occDisp <+> tyDisp
-       subDisp = occDisp <+> if has hfMatches then holeDisp else tyDisp
-       display =  subDisp $$ nest 2 (funcInfo $+$ docs $+$ wrapDisp)
-       provenance = ppWhen sProv $ parens $
-             case hfCand of
-                 GreHFCand gre -> pprNameProvenance gre
-                 NameHFCand name -> text "bound at" <+> ppr (getSrcLoc name)
-                 IdHFCand id_ -> text "bound at" <+> ppr (getSrcLoc id_)
 
 getLocalBindings :: TidyEnv -> CtLoc -> TcM [Id]
 getLocalBindings tidy_orig ct_loc

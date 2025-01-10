@@ -1,4 +1,3 @@
-
 T17567StupidTheta.hs:1:37: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
@@ -6,4 +5,5 @@ T17567StupidTheta.hs:6:1: error: [GHC-16220]
     • Uninferrable type variable k0 in
       the datatype context:
       forall (a :: k -> k0). (a b :: k0) ~ (a c :: k0)
-    • In the data declaration for ‘T’
+    • In the data type declaration for ‘T’
+

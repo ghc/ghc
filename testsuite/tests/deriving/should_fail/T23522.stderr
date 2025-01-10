@@ -1,7 +1,7 @@
-
 T23522.hs:5:42: error: [GHC-53946]
     • Illegal instance for type synonym ‘F’.
       Instance heads must be of the form
         C ty_1 ... ty_n
       where ‘C’ is a class.
-    • In the data declaration for ‘Proposition’
+    • In the data type declaration for ‘Proposition’
+

@@ -31,7 +31,7 @@ import GHC.Driver.Backend
 import GHC.Hs
 
 
-import GHC.Tc.Errors.Types ( FixedRuntimeRepProvenance(..), TcRnMessage(..) )
+import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Types
 import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
@@ -782,7 +782,7 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
 --          for the selector Id, but the poly_id is something like $cop
 -- However we want to use fun_name in the error message, since that is
 -- what the user wrote (#8537)
-  = addErrCtxt (spec_ctxt prag) $
+  = addErrCtxt (SpecPragmaCtxt prag) $
     do  { warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl)) $
                  TcRnNonOverloadedSpecialisePragma fun_name
                     -- Note [SPECIALISE pragmas]
@@ -792,7 +792,6 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
   where
     name      = idName poly_id
     poly_ty   = idType poly_id
-    spec_ctxt prag = hang (text "In the pragma:") 2 (ppr prag)
 
     tc_one hs_ty
       = do { spec_ty <- tcHsSigType   (FunSigCtxt name NoRRC) hs_ty
