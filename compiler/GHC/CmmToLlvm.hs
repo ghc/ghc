@@ -26,13 +26,17 @@ import GHC.CmmToLlvm.Version
 import GHC.StgToCmm.CgUtils ( fixStgRegisters, CgStream )
 import GHC.Cmm
 import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.DebugBlock
 
 import GHC.Types.Unique.DSM
 import GHC.Utils.BufHandle
 import GHC.Driver.DynFlags
-import GHC.Platform ( platformArch, Arch(..) )
-import GHC.Utils.Error
 import GHC.Data.FastString
+import GHC.Platform ( platformArch, Arch(..) )
+
+import GHC.Unit.Module.Location
+
+import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
@@ -41,8 +45,6 @@ import qualified GHC.Data.Stream as Stream
 import Control.Monad ( when, forM_ )
 import Data.Maybe ( fromMaybe, catMaybes, isNothing )
 import System.IO
-import GHC.Cmm.DebugBlock
-import GHC.Unit.Module.Location
 
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM Code generator
