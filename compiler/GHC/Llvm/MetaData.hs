@@ -96,7 +96,6 @@ data MetaExpr = MetaStr !LMString
                                   , dicuFile        :: !MetaId
                                   , dicuProducer    :: !LMString
                                   , dicuIsOptimized :: !Bool
-                                  , dicuSubprograms :: !MetaExpr
                                   }
               | MetaDISubprogram { disName          :: !LMString
                                  , disLinkageName   :: !LMString
