@@ -106,10 +106,10 @@ llvmCodeGen' dflags location cfg cmm_stream
         cmmMetaLlvmPrelude
 
         -- Debug metadata header
-        metaFileId <- debugInfoGen dflags location
+        metaCUId <- debugInfoGen dflags location
 
         -- Procedures
-        a <- Stream.consume cmm_stream (GHC.CmmToLlvm.Base.liftUDSMT) (llvmGroupLlvmGens dflags location metaFileId)
+        a <- Stream.consume cmm_stream (GHC.CmmToLlvm.Base.liftUDSMT) (llvmGroupLlvmGens dflags location metaCUId)
 
         -- Declare aliases for forward references
         decls <- generateExternDecls
@@ -163,7 +163,7 @@ debugInfoGen dflags location
         cfg <- getConfig
         renderLlvm (ppLlvmMetas cfg metaHeader) (ppLlvmMetas cfg metaHeader)
 
-        pure fileMeta
+        pure cuMeta
 
 llvmHeader :: IsDoc doc => LlvmCgConfig -> doc
 llvmHeader cfg =
@@ -185,7 +185,7 @@ llvmHeader cfg =
 {-# SPECIALIZE llvmHeader :: LlvmCgConfig -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 llvmGroupLlvmGens :: DynFlags -> ModLocation -> MetaId -> RawCmmGroup -> LlvmM ()
-llvmGroupLlvmGens dflags location fileMetaId cmm = do
+llvmGroupLlvmGens dflags location metaCUId cmm = do
         let debug_map :: LabelMap DebugBlock
             debug_map
               | (debugLevel dflags) >= 1 = debugToMap $ cmmDebugGen location cmm
@@ -206,7 +206,7 @@ llvmGroupLlvmGens dflags location fileMetaId cmm = do
         {-# SCC "llvm_datas_gen" #-}
           cmmDataLlvmGens cdata
         {-# SCC "llvm_procs_gen" #-}
-          mapM_ (cmmLlvmGen debug_map fileMetaId) cmm
+          mapM_ (cmmLlvmGen debug_map metaCUId) cmm
 
 -- -----------------------------------------------------------------------------
 -- | Do LLVM code generation on all these Cmms data sections.
@@ -230,7 +230,7 @@ cmmDataLlvmGens statics
 
 -- | Complete LLVM code generation phase for a single top-level chunk of Cmm.
 cmmLlvmGen :: LabelMap DebugBlock -> MetaId -> RawCmmDecl -> LlvmM ()
-cmmLlvmGen debug_map fileMetaId cmm@CmmProc{} = do
+cmmLlvmGen debug_map metaCUId cmm@CmmProc{} = do
 
     -- rewrite assignments to global regs
     platform <- getPlatform
@@ -245,7 +245,7 @@ cmmLlvmGen debug_map fileMetaId cmm@CmmProc{} = do
     -- pretty print - print as we go, since we produce HDocs, we know
     -- no nesting state needs to be maintained for the SDocs.
     forM_ llvmBC (\decl -> do
-        (hdoc, sdoc) <- pprLlvmCmmDecl debug_map decl fileMetaId
+        (hdoc, sdoc) <- pprLlvmCmmDecl debug_map decl metaCUId
         renderLlvm (hdoc $$ empty) (sdoc $$ empty)
       )
 

@@ -104,6 +104,7 @@ data MetaExpr = MetaStr !LMString
                                  , disLine          :: !Int
                                  , disType          :: !MetaId
                                  , disIsDefinition  :: !Bool
+                                 , disUnit          :: !MetaId
                                  }
               deriving (Eq)
 

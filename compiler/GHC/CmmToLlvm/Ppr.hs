@@ -55,7 +55,7 @@ pprLlvmCmmDecl _ (CmmData _ lmdata) _ = do
   return ( vcat $ map (pprLlvmData opts) lmdata
          , vcat $ map (pprLlvmData opts) lmdata)
 
-pprLlvmCmmDecl debug_map (CmmProc (label, mb_info) entry_lbl live (ListGraph blks)) fileMetaId
+pprLlvmCmmDecl debug_map (CmmProc (label, mb_info) entry_lbl live (ListGraph blks)) metaCUId
   = do let lbl = case mb_info of
                      Nothing -> entry_lbl
                      Just (CmmStaticsRaw info_lbl _) -> info_lbl
@@ -87,19 +87,26 @@ pprLlvmCmmDecl debug_map (CmmProc (label, mb_info) entry_lbl live (ListGraph blk
                let disName = getLexicalFastString name
                let defName = llvmDefLabel disName
                subprogMeta <- getMetaUniqueId
+               fileMeta <- getMetaUniqueId
                typeMeta <- getMetaUniqueId
-               let typeMetaDef =
+               let fileDef = MetaUnnamed fileMeta NotDistinct
+                             $ MetaDIFile { difFilename = srcSpanFile span
+                                          , difDirectory = fsLit "TODO"
+                                          }
+                   typeMetaDef =
                        MetaUnnamed typeMeta NotDistinct
                        $ MetaDISubroutineType [MetaVar $ LMLitVar $ LMNullLit i1]
                    subprog =
                        MetaDISubprogram { disName         = disName
                                         , disLinkageName  = defName
-                                        , disScope        = fileMetaId
-                                        , disFile         = fileMetaId
+                                        , disScope        = fileMeta
+                                        , disFile         = fileMeta
                                         , disLine         = srcSpanStartLine span
                                         , disType         = typeMeta
                                         , disIsDefinition = True
+                                        , disUnit         = metaCUId
                                         }
+               addMetaDecl fileDef
                addMetaDecl typeMetaDef
                addMetaDecl (MetaUnnamed subprogMeta Distinct subprog)
                return $ Just $ MetaAnnot (fsLit "dbg") (MetaNode subprogMeta)
