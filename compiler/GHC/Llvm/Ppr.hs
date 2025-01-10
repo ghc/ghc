@@ -335,6 +335,7 @@ ppMetaExpr opts = \case
       , ("isDefinition", if disIsDefinition
                               then text "true"
                               else text "false")
+      , ("unit"        , ppMetaId disUnit)
       ]
   where
     specialMetadata :: IsLine doc => String -> [(String, doc)] -> doc
