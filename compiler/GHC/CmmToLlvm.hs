@@ -105,8 +105,11 @@ llvmCodeGen' dflags location cfg cmm_stream
         ghcInternalFunctions
         cmmMetaLlvmPrelude
 
+        -- Debug metadata header
+        metaFileId <- debugInfoGen dflags location
+
         -- Procedures
-        a <- Stream.consume cmm_stream (GHC.CmmToLlvm.Base.liftUDSMT) (llvmGroupLlvmGens dflags location)
+        a <- Stream.consume cmm_stream (GHC.CmmToLlvm.Base.liftUDSMT) (llvmGroupLlvmGens dflags location metaFileId)
 
         -- Declare aliases for forward references
         decls <- generateExternDecls
@@ -116,21 +119,19 @@ llvmCodeGen' dflags location cfg cmm_stream
         -- Postamble
         cmmUsedLlvmGens
 
-        -- Debug metadata
-        debugInfoGen dflags location
+        -- Debug metadata for subprograms
+        cfg <- getConfig
+        metaSubs <- getMetaDecls
+        renderLlvm (ppLlvmMetas cfg metaSubs) (ppLlvmMetas cfg metaSubs)
 
         return a
 
-debugInfoGen :: DynFlags -> ModLocation -> LlvmM ()
+debugInfoGen :: DynFlags -> ModLocation -> LlvmM MetaId
 debugInfoGen dflags location
   = do  fileMeta <- getMetaUniqueId
         cuMeta <- getMetaUniqueId
         dwarfVersionMeta <- getMetaUniqueId
         debugInfoVersionMeta <- getMetaUniqueId
-        cfg <- getConfig
-        metaSubs <- getMetaDecls
-        renderLlvm (ppLlvmMetas cfg metaSubs) (ppLlvmMetas cfg metaSubs)
-        subprograms <- getSubprograms
         let metaHeader =
               [ MetaUnnamed fileMeta NotDistinct $ MetaDIFile
                 { difFilename     = fsLit $ fromMaybe "TODO" (ml_hs_file location)
@@ -158,7 +159,11 @@ debugInfoGen dflags location
                 , MetaVar $ LMLitVar $ LMIntLit 3 i32
                 ]
               ]
+
+        cfg <- getConfig
         renderLlvm (ppLlvmMetas cfg metaHeader) (ppLlvmMetas cfg metaHeader)
+
+        pure fileMeta
 
 llvmHeader :: IsDoc doc => LlvmCgConfig -> doc
 llvmHeader cfg =
