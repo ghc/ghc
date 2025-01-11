@@ -802,8 +802,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       | otherwise =
       [ ".gitlab/ci.sh save_cache"
       , ".gitlab/ci.sh save_test_output"
-      , ".gitlab/ci.sh clean"
-      , "cat ci_timings" ]
+      , ".gitlab/ci.sh clean" ]
 
     jobFlavour = mkJobFlavour buildConfig
 

@@ -4,8 +4,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -70,8 +69,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -133,8 +131,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -195,8 +192,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -257,8 +253,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -319,8 +314,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": true,
     "artifacts": {
@@ -382,8 +376,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -444,8 +437,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -506,8 +498,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -573,8 +564,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -637,8 +627,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -700,8 +689,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -763,8 +751,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -826,8 +813,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": true,
     "artifacts": {
@@ -890,8 +876,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -953,8 +938,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1016,8 +1000,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1086,8 +1069,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1152,8 +1134,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": true,
     "artifacts": {
@@ -1216,8 +1197,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1280,8 +1260,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1344,8 +1323,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1408,8 +1386,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1472,8 +1449,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1536,8 +1512,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1600,8 +1575,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1665,8 +1639,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1728,8 +1701,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1791,8 +1763,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1856,8 +1827,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1922,8 +1892,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1985,8 +1954,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2048,8 +2016,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": true,
     "artifacts": {
@@ -2111,8 +2078,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2175,8 +2141,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2238,8 +2203,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2303,8 +2267,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2366,8 +2329,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2429,8 +2391,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2492,8 +2453,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2555,8 +2515,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": true,
     "artifacts": {
@@ -2620,8 +2579,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2683,8 +2641,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2746,8 +2703,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2811,8 +2767,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2877,8 +2832,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2942,8 +2896,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3005,8 +2958,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3068,8 +3020,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3131,8 +3082,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3194,8 +3144,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3383,8 +3332,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3451,8 +3399,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3517,8 +3464,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3582,8 +3528,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3647,8 +3592,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": true,
     "artifacts": {
@@ -3713,8 +3657,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3778,8 +3721,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3843,8 +3785,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3914,8 +3855,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3982,8 +3922,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": true,
     "artifacts": {
@@ -4048,8 +3987,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4114,8 +4052,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4180,8 +4117,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4246,8 +4182,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4312,8 +4247,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4377,8 +4311,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4442,8 +4375,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4507,8 +4439,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4572,8 +4503,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4637,8 +4567,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4704,8 +4633,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4771,8 +4699,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4838,8 +4765,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4903,8 +4829,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -4968,8 +4893,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5033,8 +4957,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5098,8 +5021,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5291,8 +5213,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5360,8 +5281,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5425,8 +5345,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": true,
     "artifacts": {
@@ -5488,8 +5407,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5551,8 +5469,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5614,8 +5531,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5677,8 +5593,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5740,8 +5655,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5804,8 +5718,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5868,8 +5781,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5932,8 +5844,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -5994,8 +5905,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6056,8 +5966,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6120,8 +6029,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6185,8 +6093,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6247,8 +6154,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6309,8 +6215,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6372,8 +6277,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6435,8 +6339,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6497,8 +6400,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6561,8 +6463,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6623,8 +6524,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6685,8 +6585,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6747,8 +6646,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6809,8 +6707,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": true,
     "artifacts": {
@@ -6874,8 +6771,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6936,8 +6832,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -6998,8 +6893,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -7062,8 +6956,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -7127,8 +7020,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -7191,8 +7083,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -7253,8 +7144,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -7315,8 +7205,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -7377,8 +7266,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -7439,8 +7327,7 @@
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      ".gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
