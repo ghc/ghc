@@ -255,9 +255,39 @@ runLlvmOptPhase pipe_env hsc_env input_fn = do
     let dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
     llvm_config <- readLlvmConfigCache (hsc_llvm_config hsc_env)
-    let -- we always (unless -optlo specified) run Opt since we rely on it to
+    let -- LLVM debug metadata generation does not support inliner passes currently.
+        -- We have to disable it if debug information is required for the build.
+        -- Fortunately it is already done for `O0` of `opt`, so, we will override to the lowest
+        -- it when debug info is enabled.
+        -- Otherwise LLVM ERROR will be shown for `rts/Apply.cmm` and others.
+        -- The error is very common to rts cmm code.
+        -- inlinable function call in a function with debug info must have a !dbg location
+        --   tail call ghccc void @"cy_info$def"(i64* noalias nocapture nonnull %Base_Arg, i64* noalias nocapture nonnull %ln2l, i64* noalias nocapture %Hp_Arg, i64 %R1_Arg, i64 undef, i64 undef, i64 undef, i64 undef, i64 undef, i64 %SpLim_Arg) #0
+        -- LLVM ERROR: Broken module found, compilation aborted!
+        -- PLEASE submit a bug report to https://bugs.llvm.org/ and include the crash backtrace.
+        -- Stack dump:
+        -- 0.	Program arguments: /nix/store/22qzc2gsw44j2w5vkny5m2zlmk42vk9w-llvm-13.0.1/bin/opt -passes=default<O2> -relocation-model=pic /tmp/ghc21926_tmp_0/ghc_tmp_3.ll -o /tmp/ghc21926_tmp_0/ghc_tmp_5.bc
+        -- Stack dump without symbol names (ensure you have llvm-symbolizer in your PATH or set the environment var `LLVM_SYMBOLIZER_PATH` to point to it):
+        -- 0  libLLVM.dylib            0x0000000106d2f3a8 llvm::sys::PrintStackTrace(llvm::raw_ostream&, int) + 72
+        -- 1  libLLVM.dylib            0x0000000106d2e124 llvm::sys::RunSignalHandlers() + 112
+        -- 2  libLLVM.dylib            0x0000000106d2fae8 SignalHandler(int) + 416
+        -- 3  libsystem_platform.dylib 0x0000000196faa584 _sigtramp + 56
+        -- 4  libsystem_pthread.dylib  0x0000000196f79c20 pthread_kill + 288
+        -- 5  libsystem_c.dylib        0x0000000196e86a30 abort + 180
+        -- 6  libLLVM.dylib            0x0000000106c6ddc4 llvm::report_fatal_error(std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char> > const&, bool) + 0
+        -- 7  libLLVM.dylib            0x0000000106c6dc10 llvm::report_fatal_error(llvm::Twine const&, bool) + 0
+        -- 8  libLLVM.dylib            0x0000000106efa5e0 llvm::VerifierPass::run(llvm::Function&, llvm::AnalysisManager<llvm::Function>&) + 0
+        -- 9  libLLVM.dylib            0x0000000106ecbac4 llvm::PassManager<llvm::Module, llvm::AnalysisManager<llvm::Module> >::run(llvm::Module&, llvm::AnalysisManager<llvm::Module>&) + 424
+        -- 10 opt                      0x0000000100c97bec llvm::runPassPipeline(llvm::StringRef, llvm::Module&, llvm::TargetMachine*, llvm::TargetLibraryInfoImpl*, llvm::ToolOutputFile*, llvm::ToolOutputFile*, llvm::ToolOutputFile*, llvm::StringRef, llvm::ArrayRef<llvm::StringRef>, llvm::opt_tool::OutputKind, llvm::opt_tool::VerifierKind, bool, bool, bool, bool, bool) + 14312
+        -- 11 opt                      0x0000000100ca8a28 main + 9588
+        -- 12 dyld                     0x0000000196bef154 start + 2476
+        -- `opt' failed in phase `LLVM Optimiser'. (Exit code: -6)
+        maxOptIdxAvailable :: Int = if (debugLevel dflags) >= 1 then 0 else 2
+
+        -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
-        optIdx = max 0 $ min 2 $ llvmOptLevel dflags  -- ensure we're in [0,2]
+        optIdx = max 0 $ min maxOptIdxAvailable $ llvmOptLevel dflags  -- ensure we're in [0,2]
+
         llvmOpts = case lookup optIdx $ llvmPasses llvm_config of
                     Just passes -> passes
                     Nothing -> panic ("runPhase LlvmOpt: llvm-passes file "
