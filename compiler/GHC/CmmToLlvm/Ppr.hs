@@ -112,11 +112,8 @@ pprLlvmCmmDecl debug_map (CmmProc (label, mb_info) entry_lbl live (ListGraph blk
                return $ Just $ MetaAnnot (fsLit "dbg") (MetaNode subprogMeta)
              _   -> return Nothing
 
-       let funcMetas = maybeToList subprogAnnot
-
-
        let fun = LlvmFunction funDec funArgs llvmStdFunAttrs funSect
-                              prefix funcMetas lmblocks
+                              prefix (maybeToList subprogAnnot) lmblocks
            name = decName $ funcDecl fun
            defName = llvmDefLabel name
            funcDecl' = (funcDecl fun) { decName = defName }
