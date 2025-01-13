@@ -5,12 +5,15 @@ build-depends:
   directory,
   filepath,
   process,
-  text
+  text,
+  temporary
 -}
 
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- | GHC builder
 --
@@ -29,6 +32,7 @@ import System.Directory
 import System.Process
 import System.FilePath
 import System.Exit
+import System.IO.Temp
 
 main :: IO ()
 main = do
@@ -54,6 +58,15 @@ main = do
 
   -- build GHC stage1
   buildGhcStage1 defaultGhcBuildOptions cabal ghc0
+
+  ghc1    <- Ghc    <$> makeAbsolute "_build/stage0/bin/ghc"
+  ghcPkg1 <- GhcPkg <$> makeAbsolute "_build/stage0/bin/ghc-pkg"
+  deriveConstants <- DeriveConstants <$> makeAbsolute "_build/stage0/bin/deriveConstants"
+  genapply <- GenApply <$> makeAbsolute "_build/stage0/bin/genapply"
+  genprimop <- GenPrimop <$> makeAbsolute "_build/stage0/bin/genprimopcode"
+
+  -- build boot libraries with stage1 compiler
+  buildBootLibraries cabal ghc1 ghcPkg1 deriveConstants genapply genprimop defaultGhcBuildOptions
 
 
 -- | Build stage1 GHC program
@@ -136,6 +149,20 @@ buildGhcStage1 opts cabal ghc0 = do
   copy_bin "genprimopcode:genprimopcode"     "genprimopcode"
   copy_bin "genapply:genapply"		     "genapply"
 
+  -- initialize empty global package database
+  pkgdb <- makeAbsolute "_build/stage1/pkgs"
+  doesDirectoryExist pkgdb >>= \case
+    True -> pure () -- don't try to recreate the DB if it already exist as it would fail
+    False -> do
+      ghcpkg <- GhcPkg <$> makeAbsolute "_build/stage0/bin/ghc-pkg"
+      void $ readCreateProcess (runGhcPkg ghcpkg ["init", pkgdb]) ""
+      void $ readCreateProcess (runGhcPkg ghcpkg
+                [ "recache"
+                , "--global-package-db="++pkgdb
+                , "--no-user-package-db"
+                ]) ""
+
+
   -- generate settings based on stage1 compiler settings
   createDirectoryIfMissing True "_build/stage0/lib"
   let stage1_settings = makeStage1Settings stage0_settings
@@ -149,8 +176,6 @@ buildGhcStage1 opts cabal ghc0 = do
     ExitFailure n -> do
       putStrLn $ "Failed to run stage1 compiler with error code " ++ show n
       exitFailure
-
-
 
 
 data GhcBuildOptions = GhcBuildOptions
@@ -186,8 +211,12 @@ prepareGhcSources opts dst = do
 
   cp "./libraries" dst
   cp "./compiler"  (dst </> "libraries/ghc")
+  cp "./rts"       (dst </> "libraries/")
   cp "./ghc"	   (dst </> "ghc-bin")
   cp "./utils"     dst
+
+  cp "./config.sub"   (dst </> "libraries/rts/")
+  cp "./config.guess" (dst </> "libraries/rts/")
 
   cp "rts/include/rts/Bytecodes.h"            (dst </> "libraries/ghc/")
   cp "rts/include/rts/storage/ClosureTypes.h" (dst </> "libraries/ghc/")
@@ -195,6 +224,25 @@ prepareGhcSources opts dst = do
   cp "rts/include/stg/MachRegs.h"             (dst </> "libraries/ghc/")
   createDirectoryIfMissing True (dst </> "libraries/ghc/MachRegs")
   cp "rts/include/stg/MachRegs/*.h"           (dst </> "libraries/ghc/MachRegs/")
+
+  cp "utils/fs/fs.h" (dst </> "libraries/ghc-internal/include")
+  cp "utils/fs/fs.c" (dst </> "libraries/ghc-internal/cbits")
+  cp "utils/fs/fs.*" (dst </> "libraries/rts/")
+
+  python <- findExecutable "python" >>= \case
+    Nothing -> error "Couldn't find 'python'"
+    Just r -> pure r
+
+  void $ readCreateProcess (proc python
+    [ "rts/gen_event_types.py"
+    , "--event-types-defines"
+    , dst </> "libraries/rts/include/rts/EventLogConstants.h"
+    ]) ""
+  void $ readCreateProcess (proc python
+    [ "rts/gen_event_types.py"
+    , "--event-types-array"
+    , dst </> "libraries/rts/include/rts/EventTypes.h"
+    ]) ""
 
   -- substitute variables in files
   let subst fin fout rs = do
@@ -205,6 +253,9 @@ prepareGhcSources opts dst = do
 	[ (,) "@ProjectVersion@"       (gboVersion opts)
 	, (,) "@ProjectVersionMunged@" (gboVersionMunged opts)
 	, (,) "@ProjectVersionForLib@" (gboVersionForLib opts)
+	, (,) "@ProjectPatchLevel1@"   (gboVersionPatchLevel1 opts)
+	, (,) "@ProjectPatchLevel2@"   (gboVersionPatchLevel2 opts)
+	, (,) "@ProjectVersionInt@"    (gboVersionInt opts)
 	]
       llvm_substs =
 	[ (,) "@LlvmMinVersion@" (gboLlvmMinVersion opts)
@@ -224,18 +275,44 @@ prepareGhcSources opts dst = do
   subst_in (dst </> "libraries/ghc/GHC/CmmToLlvm/Version/Bounds.hs") llvm_substs
   subst_in (dst </> "utils/ghc-pkg/ghc-pkg.cabal") common_substs
 
+  subst_in (dst </> "libraries/ghc-internal/ghc-internal.cabal") common_substs
+  subst_in (dst </> "libraries/base/base.cabal") common_substs
+  subst_in (dst </> "libraries/rts/include/ghcversion.h") common_substs
+
 -- Avoid FilePath blindness by using type aliases for programs.
 newtype Ghc = Ghc FilePath
+newtype GhcPkg = GhcPkg FilePath
 newtype Cabal = Cabal FilePath
+newtype DeriveConstants = DeriveConstants FilePath
+newtype GenApply = GenApply FilePath
+newtype GenPrimop = GenPrimop FilePath
 
 runGhc :: Ghc -> [String] -> CreateProcess
 runGhc (Ghc f) = proc f
 
+ghcPath :: Ghc -> FilePath
+ghcPath (Ghc x) = x
+
+runGhcPkg :: GhcPkg -> [String] -> CreateProcess
+runGhcPkg (GhcPkg f) = proc f
+
+ghcPkgPath :: GhcPkg -> FilePath
+ghcPkgPath (GhcPkg x) = x
+
 runCabal :: Cabal -> [String] -> CreateProcess
 runCabal (Cabal f) = proc f
 
+runDeriveConstants :: DeriveConstants -> [String] -> CreateProcess
+runDeriveConstants (DeriveConstants f) = proc f
+
+runGenApply :: GenApply -> [String] -> CreateProcess
+runGenApply (GenApply f) = proc f
+
+runGenPrimop :: GenPrimop -> [String] -> CreateProcess
+runGenPrimop (GenPrimop f) = proc f
+
 cp :: String -> String -> IO ()
-cp src dst = void (readCreateProcessWithExitCode (shell $ "cp -rf " ++ src ++ " " ++ dst) "")
+cp src dst = void (readCreateProcess (shell $ "cp -rf " ++ src ++ " " ++ dst) "")
 
 -- | Generate settings for stage1 compiler, based on given settings (stage0's
 -- compiler settings)
@@ -324,3 +401,150 @@ makeStage1Settings in_settings = out_settings
         , keep_fail "RTS expects libdw"
         , ("Relative Global Package DB", "../../stage1/pkgs")
         ]
+
+buildBootLibraries :: Cabal -> Ghc -> GhcPkg -> DeriveConstants -> GenApply -> GenPrimop -> GhcBuildOptions -> IO ()
+buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = do
+  -- FIXME: should be parameters
+  let dst = "_build/stage1/"
+  src <- makeAbsolute "_build/stage1/src"
+
+  putStrLn "Preparing GHC sources to build GHC stage2..."
+  prepareGhcSources opts src
+
+  -- Build the RTS
+  putStrLn "Building the RTS..."
+  src_rts <- makeAbsolute (src </> "libraries/rts")
+  build_dir <- makeAbsolute (dst </> "cabal")
+  ghcversionh <- makeAbsolute (src_rts </> "include/ghcversion.h")
+
+  putStrLn "Generating RTS headers..."
+
+  let build_rts_cmd = runCabal cabal
+        [ "build"
+        , "--project-file=cabal.project-stage1-rts" -- TODO: replace with command-line args
+        , "rts"
+        , "--with-compiler=" ++ ghcPath ghc     -- FIXME: escape path
+        , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg -- FIXME: escape path
+        , "--ghc-options=\"-ghcversion-file=" ++ ghcversionh ++ "\""
+        , "--ghc-options=\"-I" ++ (src_rts </> "include") ++ "\""
+        , "--ghc-options=\"-I" ++ src_rts ++ "\""
+        , "--builddir=" ++ build_dir
+	  -- we need to pass "-this-unit-id=rts", otherwise GHC tries to lookup the
+	  -- platform constants in the package db and fails. The flag is already
+	  -- set in rts.cabal but for some reason it isn't always passed :shrug:
+	, "--ghc-options=-this-unit-id=rts"
+        , "--ghc-options=-DProjectVersion=913"
+        , "--ghc-options=\"-optc=-DProjectVersion=\\\"913\\\"\""
+        , "--ghc-options=\"-optc=-DRtsWay=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DHostPlatform=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DHostArch=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DHostOS=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DHostVendor=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DBuildPlatform=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DBuildArch=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DBuildOS=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DBuildVendor=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DTargetPlatform=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DTargetArch=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DTargetOS=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DTargetVendor=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DGhcUnregisterised=\\\"FIXME\\\"\""
+        , "--ghc-options=\"-optc=-DTablesNextToCode=\\\"FIXME\\\"\""
+        ]
+
+  -- FIXME: deriveConstants requires ghcautoconf.h and ghcplatform.h but these
+  -- files are generated by the configure script of the RTS...
+  -- We use the following hack:
+  --  1. run cabal until it fails. This should generate the headers we need before failing.
+  --  2. use deriveConstants to generate the other files
+  --  3. rerun cabal to build the rts
+
+  -- first run is expected to fail because of misssing headers
+  void $ readCreateProcessWithExitCode build_rts_cmd ""
+  ghcplatform_dir <- takeDirectory <$> readCreateProcess (shell ("find " ++ build_dir ++ " -name ghcplatform.h")) ""
+
+  -- deriving constants
+  let derived_constants = src_rts </> "include/DerivedConstants.h"
+  withSystemTempDirectory "derive-constants" $ \tmp_dir -> do
+    void $ readCreateProcess (runDeriveConstants derive_constants
+      [ "--gen-header"
+      , "-o",  derived_constants
+      , "--target-os", "linux" -- FIXME
+      , "--tmpdir", tmp_dir
+      , "--gcc-program", "gcc" -- FIXME
+      , "--nm-program", "nm"   -- FIXME
+      , "--objdump-program", "objdump" -- FIXME
+      , "--gcc-flag", "-I" ++ src_rts </> "include"
+      , "--gcc-flag", "-I" ++ src_rts
+      , "--gcc-flag", "-I" ++ ghcplatform_dir
+      ]) ""
+
+  -- Generate autoapply
+  let run_genapply args out = writeFile out =<< readCreateProcess (runGenApply genapply args) ""
+  run_genapply [derived_constants]         (src_rts </> "AutoApply.cmm")
+  run_genapply [derived_constants, "-V16"] (src_rts </> "AutoApply_V16.cmm")
+  run_genapply [derived_constants, "-V32"] (src_rts </> "AutoApply_V32.cmm")
+  run_genapply [derived_constants, "-V64"] (src_rts </> "AutoApply_V64.cmm")
+
+  -- Generate genprimopcode
+  let primops_txt    = src </> "libraries/ghc/GHC/Builtin/primops.txt"
+  let primops_txt_pp = primops_txt <.> ".pp"
+  primops <- readCreateProcess (shell $ "gcc -E -undef -traditional -P -x c " ++ primops_txt_pp) ""
+  writeFile primops_txt primops
+  writeFile (src </> "libraries/ghc-prim/GHC/Prim.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-source"]) primops
+  writeFile (src </> "libraries/ghc-prim/GHC/PrimopWrappers.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops
+
+  -- build libffi
+  putStrLn "Building libffi..."
+  src_libffi <- makeAbsolute (src </> "libffi")
+  dst_libffi <- makeAbsolute (dst </> "libffi")
+  let libffi_version = "3.4.6"
+  createDirectoryIfMissing True src_libffi
+  createDirectoryIfMissing True dst_libffi
+  void $ readCreateProcess (shell ("tar -xvf libffi-tarballs/libffi-" ++ libffi_version ++ ".tar.gz -C " ++ src_libffi)) ""
+  let build_libffi = mconcat
+        [ "cd " ++ src_libffi </> "libffi-" ++ libffi_version ++ "; "
+        , "./configure --disable-docs --with-pic=yes --disable-multi-os-directory --prefix=" ++ dst_libffi
+        , " && make install -j"
+        ]
+  (libffi_exit_code, libffi_stdout, libffi_stderr) <- readCreateProcessWithExitCode (shell build_libffi) ""
+  case libffi_exit_code of
+    ExitSuccess -> pure ()
+    ExitFailure r -> do
+      putStrLn $ "Failed to build libffi with error code " ++ show r
+      putStrLn libffi_stdout
+      putStrLn libffi_stderr
+      exitFailure
+  cp (dst_libffi </> "include" </> "*") (src_rts </> "include")
+  cp (dst_libffi </> "lib" </> "libffi.a") (takeDirectory ghcplatform_dir </> "libCffi.a")
+
+  -- second run of cabal is expected to succeed now that have generated all the headers!
+  (rts_exit_code, rts_stdout, rts_stderr) <- readCreateProcessWithExitCode build_rts_cmd ""
+  case rts_exit_code of
+    ExitSuccess -> pure ()
+    ExitFailure r -> do
+      putStrLn $ "Failed to build the RTS with error code " ++ show r
+      putStrLn rts_stdout
+      putStrLn rts_stderr
+      exitFailure
+
+  -- build boot libraries: ghc-internal, base... but not GHC itself
+  let build_boot_cmd = runCabal cabal
+        [ "build"
+        , "--project-file=cabal.project-stage1" -- TODO: replace with command-line args
+        , "ghc-prim", "ghc-internal", "base"
+        , "--with-compiler=" ++ ghcPath ghc     -- FIXME: escape path
+        , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg -- FIXME: escape path
+        , "--ghc-options=\"-ghcversion-file=" ++ ghcversionh ++ "\""
+        , "--builddir=" ++ build_dir
+        ]
+
+  putStrLn "Building boot libraries..."
+  (boot_exit_code, boot_stdout, boot_stderr) <- readCreateProcessWithExitCode build_boot_cmd ""
+  case boot_exit_code of
+    ExitSuccess -> pure ()
+    ExitFailure r -> do
+      putStrLn $ "Failed to build boot libraries with error code " ++ show r
+      putStrLn boot_stdout
+      putStrLn boot_stderr
+      exitFailure
