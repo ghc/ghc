@@ -70,6 +70,8 @@ main = do
   -- build boot libraries with stage1 compiler
   buildBootLibraries cabal ghc1 ghcPkg1 deriveConstants genapply genprimop defaultGhcBuildOptions
 
+  msg "Done"
+
 
 -- | Build stage1 GHC program
 buildGhcStage1 :: GhcBuildOptions -> Cabal -> Ghc -> IO ()
@@ -419,7 +421,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
   build_dir <- makeAbsolute (dst </> "cabal")
   ghcversionh <- makeAbsolute (src_rts </> "include/ghcversion.h")
 
-  msg "Generating RTS headers..."
+  msg "  - Generating RTS headers..."
 
   let build_rts_cmd = runCabal cabal
         [ "build"
@@ -497,7 +499,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
   writeFile (src </> "libraries/ghc-prim/GHC/PrimopWrappers.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops
 
   -- build libffi
-  msg "Building libffi..."
+  msg "  - Building libffi..."
   src_libffi <- makeAbsolute (src </> "libffi")
   dst_libffi <- makeAbsolute (dst </> "libffi")
   let libffi_version = "3.4.6"
