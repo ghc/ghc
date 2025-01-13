@@ -1140,7 +1140,7 @@ generaliseTcTyCon (tc, skol_info, scoped_prs, tc_res_kind)
              flav = tyConFlavour tc
 
        -- Eta expand
-       ; (eta_tcbs, tc_res_kind) <- etaExpandAlgTyCon flav skol_info all_tcbs tc_res_kind
+       ; (eta_tcbs, tc_res_kind) <- maybeEtaExpandAlgTyCon flav skol_info all_tcbs tc_res_kind
 
        -- Step 6: Make the result TcTyCon
        ; let final_tcbs = all_tcbs `chkAppend` eta_tcbs
@@ -1257,7 +1257,7 @@ paths for
 
 Note that neither code path worries about point (4) above, as this
 is nicely handled by not mangling the res_kind. (Mangling res_kinds is done
-*after* all this stuff, in tcDataDefn's call to etaExpandAlgTyCon.)
+*after* all this stuff, in tcDataDefn's call to maybeEtaExpandAlgTyCon.)
 
 We can tell Inferred apart from Specified by looking at the scoped
 tyvars; Specified are always included there.
@@ -2128,7 +2128,7 @@ DT3 Eta-expansion: Any forall-bound variables and function arguments in a result
      data T a :: Type -> Type where ...
 
     we really mean for T to have two parameters. The second parameter
-    is produced by processing the return kind in etaExpandAlgTyCon,
+    is produced by processing the return kind in maybeEtaExpandAlgTyCon,
     called in tcDataDefn.
 
     See also Note [splitTyConKind] in GHC.Tc.Gen.HsType.
@@ -2223,14 +2223,20 @@ DF0 Where these kinds come from:
      Type. This assumption is in getInitialKind for CUSKs or
      get_fam_decl_initial_kind for non-signature & non-CUSK cases.
 
-   Instances: The data family already has a known kind. The return kind
-     of an instance is then calculated by applying the data family tycon
-     to the patterns provided, as computed by the typeKind lhs_ty in the
-     end of tcDataFamInstHeader. In the case of an instance written in GADT
-     syntax, there are potentially *two* return kinds: the one computed from
-     applying the data family tycon to the patterns, and the one given by
-     the user. This second kind is checked by the tc_kind_sig function within
-     tcDataFamInstHeader. See also DF3, below.
+    Instances: There are potentially *two* return kinds:
+     * Master kind:
+       The data family already has a known kind. The return kind of an instance
+       is then calculated by applying the data family tycon to the patterns
+       provided, as computed by the `tcFamTyPats fam_tc hs_pats` in the
+       tcDataFamInstHeader.
+     * Instance kind:
+       The kind specified by the user in GADT syntax. If H98 syntax is used,
+       with UnliftedNewtypes/UnliftedDatatypes, it defaults to newOpenTypeKind
+       for newtypes/datatypes, otherwise it defaults to liftedTypeKind.
+       This is checked or defaulted by the tc_kind_sig function within
+       tcDataFamInstHeader. Defaulting can be tricky for some cases,
+       See Note [Defaulting result kind of newtype/data family instance].
+     See also DF3, below.
 
 DF1 In a data/newtype instance, we treat the kind of the /data family/,
     once instantiated, as the "master kind" for the representation

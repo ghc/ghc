@@ -5,3 +5,11 @@ UnliftedNewtypesFamilyKindFail2.hs:12:20: error: [GHC-83865]
     • In the first argument of ‘F’, namely ‘5’
       In the newtype family instance declaration for ‘F’
 
+UnliftedNewtypesFamilyKindFail2.hs:12:31: [GHC-83865]
+     Expected a type,
+      but ‘5’ has kind
+      ‘GHC.Internal.Bignum.Natural.Natural’
+     In the first argument of ‘F’, namely ‘5’
+      In the type ‘(F 5)’
+      In the definition of data constructor ‘MkF’
+

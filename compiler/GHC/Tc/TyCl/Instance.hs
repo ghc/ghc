@@ -8,6 +8,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -715,7 +716,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        ; skol_info <- mkSkolemInfo FamInstSkol
        ; (qtvs, non_user_tvs, pats, tc_res_kind, stupid_theta)
              <- tcDataFamInstHeader mb_clsinfo skol_info fam_tc outer_bndrs fixity
-                                    hs_ctxt hs_pats m_ksig new_or_data
+                                    hs_ctxt hs_pats m_ksig hs_cons
 
        -- Eta-reduce the axiom if possible
        -- Quite tricky: see Note [Implementing eta reduction for data families]
@@ -740,8 +741,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        --     we did it before the "extra" tvs from etaExpandAlgTyCon
        --     would always be eta-reduced
        --
-       ; let flav = newOrDataToFlavour new_or_data
-       ; (extra_tcbs, tc_res_kind) <- etaExpandAlgTyCon flav skol_info full_tcbs tc_res_kind
+       ; (extra_tcbs, tc_res_kind) <- etaExpandAlgTyCon skol_info full_tcbs tc_res_kind
 
        -- Check the result kind; it may come from a user-written signature.
        -- See Note [Datatype return kinds] in GHC.Tc.TyCl point 4(a)
@@ -919,8 +919,7 @@ TyVarEnv will simply be empty, and there is nothing to worry about.
 tcDataFamInstHeader
     :: AssocInstInfo -> SkolemInfo -> TyCon -> HsOuterFamEqnTyVarBndrs GhcRn
     -> LexicalFixity -> Maybe (LHsContext GhcRn)
-    -> HsFamEqnPats GhcRn -> Maybe (LHsKind GhcRn)
-    -> NewOrData
+    -> HsFamEqnPats GhcRn -> Maybe (LHsKind GhcRn) -> DataDefnCons (LConDecl GhcRn)
     -> TcM ([TcTyVar], TyVarSet, [TcType], TcKind, TcThetaType)
          -- All skolem TcTyVars, all zonked so it's clear what the free vars are
 -- The "header" of a data family instance is the part other than
@@ -928,7 +927,7 @@ tcDataFamInstHeader
 --    e.g.  data instance D [a] :: * -> * where ...
 -- Here the "header" is the bit before the "where"
 tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
-                    hs_ctxt hs_pats m_ksig new_or_data
+                    hs_ctxt hs_pats m_ksig hs_cons
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
        ; (tclvl, wanted, (outer_bndrs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind)))
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
@@ -944,16 +943,17 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                   -- with its parent class
                   ; addConsistencyConstraints mb_clsinfo lhs_ty
 
-                  -- Add constraints from the result signature
-                  ; res_kind <- tc_kind_sig m_ksig
-
-                  -- Do not add constraints from the data constructors
-                  -- See Note [Kind inference for data family instances]
+                  -- Add constraints from the data constructors
+                  -- Fix #25611
+                  -- See DESIGN CHOICE in Note [Kind inference for data family instances]
+                  ; when is_H98_or_newtype $ kcConDecls lhs_applied_kind hs_cons
 
                   -- Check that the result kind of the TyCon applied to its args
                   -- is compatible with the explicit signature (or Type, if there
                   -- is none)
                   ; let hs_lhs = nlHsTyConApp NotPromoted fixity (getName fam_tc) hs_pats
+                  -- Add constraints from the result signature
+                  ; res_kind <- tc_kind_sig m_ksig
                   ; _ <- unifyKind (Just . HsTypeRnThing $ unLoc hs_lhs) lhs_applied_kind res_kind
 
                   ; traceTc "tcDataFamInstHeader" $
@@ -1005,9 +1005,16 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
   where
     fam_name  = tyConName fam_tc
     data_ctxt = DataKindCtxt fam_name
+    new_or_data = dataDefnConsNewOrData hs_cons
+    is_H98_or_newtype = case hs_cons of
+      NewTypeCon{} -> True
+      DataTypeCons _ cons -> all isH98 cons
+    isH98 (L _ (ConDeclH98 {})) = True
+    isH98 _ = False
 
     -- See Note [Implementation of UnliftedNewtypes] in GHC.Tc.TyCl, families (2),
-    -- and Note [Implementation of UnliftedDatatypes].
+    -- Note [Implementation of UnliftedDatatypes]
+    -- and Note [Defaulting result kind of newtype/data family instance].
     tc_kind_sig Nothing
       = do { unlifted_newtypes  <- xoptM LangExt.UnliftedNewtypes
            ; unlifted_datatypes <- xoptM LangExt.UnliftedDatatypes
@@ -1032,6 +1039,21 @@ But here, we're at the top-level of an instance declaration, so
 we actually have a place to put the regeneralised variables.
 Thus: skolemise away. cf. GHC.Tc.Utils.Unify.tcTopSkolemise
 Examples in indexed-types/should_compile/T12369
+
+Note [Defaulting result kind of newtype/data family instance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It is tempting to let `tc_kind_sig` just return `newOpenTypeKind`
+even without `-XUnliftedNewtypes`, but we rely on `tc_kind_sig` to
+constrain the result kind of a newtype instance to `Type`.
+Consider the following example:
+
+  -- no UnliftedNewtypes
+  data family D :: k -> k
+  newtype instance D a = MkIntD a
+
+`tc_kind_sig` defaulting to `newOpenTypeKind` would result in `D a`
+having kind `forall r. TYPE r` instead of `Type`, which would be
+rejected validity checking. The same applies to Data Instances.
 
 Note [Implementing eta reduction for data families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1187,31 +1209,48 @@ kind -- that came from the family declaration, and is not influenced
 by the data instances -- and hence we /can/ specialise T's kind
 differently in different GADT data constructors.
 
-SHORT SUMMARY: in a data instance decl, it's not clear whether kind
+SHORT SUMMARY: In a data instance decl, it's not clear whether kind
 constraints arising from the data constructors should be considered
 local to the (GADT) data /constructor/ or should apply to the entire
 data instance.
 
-DESIGN CHOICE: in data/newtype family instance declarations, we ignore
-the /data constructor/ declarations altogether, looking only at the
-data instance /header/.
+DESIGN CHOICE: In a data/newtype family instance declaration:
+* We take account of the data constructors (via `kcConDecls`) for:
+  * Haskell-98 style data instance declarations
+  * All newtype instance declarations
+  For Haskell-98 style declarations, there is no GADT refinement. And for
+  GADT-style newtype declarations, no GADT matching is allowed anyway,
+  so it's just a syntactic difference from Haskell-98.
+
+* We /ignore/ the data constructors for:
+  * GADT-style data instance declarations
+  Here, the instance kinds are influenced only by the header.
+
+This choice is implemented by the guarded call to `kcConDecls` in
+`tcDataFamInstHeader`.
 
 Observations:
-* This choice is simple to describe, as well as simple to implement.
-  For a data/newtype instance decl, the instance kinds are influenced
-  /only/ by the header.
+* With `UnliftedNewtypes` or `UnliftedDatatypes`, looking at the data
+  constructors is necessary to infer the kind of the result type for
+  certain cases. Otherwise, additional kind signatures are required.
+  Consider the following example in #25611:
 
-* We could treat Haskell-98 style data-instance decls differently, by
-  taking the data constructors into account, since there are no GADT
-  issues.  But we don't, for simplicity, and because it means you can
-  understand the data type instance by looking only at the header.
+    data family Fix :: (k -> Type) -> k
+    newtype instance Fix f = In { out :: f (Fix f) }
 
-* Newtypes can be declared in GADT syntax, but they can't do GADT-style
-  specialisation, so like Haskell-98 definitions we could take the
-  data constructors into account.  Again we don't, for the same reason.
+  If we are not looking at the data constructors:
+  * Without `UnliftedNewtypes`, it is accepted since `Fix f` is defaulted
+    to `Type`.
+  * But with `UnliftedNewtypes`, `Fix f` is defaulted to `TYPE r` where
+    `r` is not scoped over the data constructor. Then the header `Fix f :: TYPE r`
+    will fail to kind unify with `f (Fix f) :: Type`.
 
-So for now at least, we keep the simplest choice. See #18891 and !4419
-for more discussion of this issue.
+  Hence, we need to look at the data constructor to infer `Fix f :: Type`
+  for this newtype instance.
+
+This DESIGN CHOICE strikes a balance between well-rounded kind inference
+and implementation simplicity. See #25611, #18891, and !4419 for more
+discussion of this issue.
 
 Kind inference for data types (Xie et al) https://arxiv.org/abs/1911.06153
 takes a slightly different approach.

@@ -42,7 +42,8 @@ module GHC.Tc.Gen.HsType (
         -- Type checking type and class decls, and instances thereof
         bindTyClTyVars, bindTyClTyVarsAndZonk,
         tcFamTyPats,
-        etaExpandAlgTyCon, tcbVisibilities,
+        maybeEtaExpandAlgTyCon, tcbVisibilities,
+        etaExpandAlgTyCon,
 
           -- tyvars
         zonkAndScopedSort,
@@ -2468,7 +2469,7 @@ kcCheckDeclHeader_cusk name flav
                       ++ map (mkExplicitTyConBinder mentioned_kv_set) tc_bndrs
 
        -- Eta expand if necessary; we are building a PolyTyCon
-       ; (eta_tcbs, res_kind) <- etaExpandAlgTyCon flav skol_info all_tcbs res_kind
+       ; (eta_tcbs, res_kind) <- maybeEtaExpandAlgTyCon flav skol_info all_tcbs res_kind
 
        ; let all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ binderVars tc_bndrs)
              final_tcbs = all_tcbs `chkAppend` eta_tcbs
@@ -3921,14 +3922,20 @@ Hence using zonked_kinds when forming tvs'.
 -}
 
 -----------------------------------
-etaExpandAlgTyCon :: TyConFlavour tc  -> SkolemInfo
+maybeEtaExpandAlgTyCon :: TyConFlavour tc  -> SkolemInfo
                   -> [TcTyConBinder] -> Kind
                   -> TcM ([TcTyConBinder], Kind)
-etaExpandAlgTyCon flav skol_info tcbs res_kind
+maybeEtaExpandAlgTyCon flav skol_info tcbs res_kind
   | needsEtaExpansion flav
-  = splitTyConKind skol_info in_scope avoid_occs res_kind
+  = etaExpandAlgTyCon skol_info tcbs res_kind
   | otherwise
   = return ([], res_kind)
+
+etaExpandAlgTyCon :: SkolemInfo
+                  -> [TcTyConBinder] -> Kind
+                  -> TcM ([TcTyConBinder], Kind)
+etaExpandAlgTyCon skol_info tcbs res_kind
+  = splitTyConKind skol_info in_scope avoid_occs res_kind
   where
     tyvars     = binderVars tcbs
     in_scope   = mkInScopeSetList tyvars

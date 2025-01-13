@@ -3,3 +3,8 @@ UnliftedNewtypesInstanceFail.hs:13:3: error: [GHC-83865]
     • In the associated newtype family instance declaration for ‘Bar’
       In the instance declaration for ‘Foo Bool’
 
+UnliftedNewtypesInstanceFail.hs:14:17: [GHC-83865]
+     Expected an IntRep type, but ‘Word#’ is a WordRep type
+     In the type ‘Word#’
+      In the definition of data constructor ‘BarBoolC’
+      In the associated newtype family instance declaration for ‘Bar’

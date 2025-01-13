@@ -6,7 +6,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE GADTs #-}
 
-module UnliftedNewtypesUnassociatedFamily where
+module T25611c where
 
 import GHC.Int (Int(I#))
 import GHC.Word (Word(W#))
@@ -15,9 +15,15 @@ import GHC.Exts (TYPE,RuntimeRep(IntRep,WordRep,TupleRep))
 
 data family DF :: TYPE (r :: RuntimeRep)
 
--- All these fail: see #18891 and !4419
+-- it used to be failed: see #18891 and !4419
 -- See Note [Kind inference for data family instances]
 -- in GHC.Tc.TyCl.Instance
+-- but succ now see #25611
 newtype instance DF = MkDF1a Int#
 newtype instance DF = MkDF2a Word#
 newtype instance DF = MkDF3a (# Int#, Word# #)
+
+go = 1
+  where
+    x :: DF @IntRep
+    x = MkDF1a 3#
