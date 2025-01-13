@@ -14,6 +14,7 @@ build-depends:
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NumericUnderscores #-}
 
 -- | GHC builder
 --
@@ -33,6 +34,7 @@ import System.Process
 import System.FilePath
 import System.Exit
 import System.IO.Temp
+import System.CPUTime
 
 main :: IO ()
 main = do
@@ -72,13 +74,13 @@ main = do
 -- | Build stage1 GHC program
 buildGhcStage1 :: GhcBuildOptions -> Cabal -> Ghc -> IO ()
 buildGhcStage1 opts cabal ghc0 = do
-  putStrLn "Preparing GHC sources to build GHC stage1..."
+  msg "Preparing GHC sources to build GHC stage1..."
   prepareGhcSources opts "_build/stage0/src/"
 
   let builddir = "_build/stage0/cabal/"
   createDirectoryIfMissing True builddir
 
-  putStrLn "Prepare GHC stage1 configuration..."
+  msg "Prepare GHC stage1 configuration..."
   -- we need to augment the current environment to pass HADRIAN_SETTINGS
   -- environment variable to ghc-boot's Setup.hs script.
   stage0_settings <- read <$> readCreateProcess (runGhc ghc0 ["--info"]) ""
@@ -100,7 +102,7 @@ buildGhcStage1 opts cabal ghc0 = do
   current_env <- getEnvironment
   let stage1_env = ("HADRIAN_SETTINGS", stage1_ghc_boot_settings) : current_env
 
-  putStrLn "Building GHC stage1 and bootstrapping utility programs..."
+  msg "Building GHC stage1 and bootstrapping utility programs..."
   let build_cmd = (runCabal cabal
               [ "build"
               , "--project-file=cabal.project-stage0"
@@ -125,7 +127,7 @@ buildGhcStage1 opts cabal ghc0 = do
       putStrLn "Logs can be found in \"_build/stage0/cabal.{stdout,stderr}\""
       exitFailure
 
-  putStrLn "Copying stage0 programs and generating settings to use them..."
+  msg "Copying stage0 programs and generating settings to use them..."
   let listbin_cmd p = runCabal cabal
 	[ "list-bin"
 	, "--project-file=cabal.project-stage0"
@@ -408,16 +410,16 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
   let dst = "_build/stage1/"
   src <- makeAbsolute "_build/stage1/src"
 
-  putStrLn "Preparing GHC sources to build GHC stage2..."
+  msg "Preparing GHC sources to build GHC stage2..."
   prepareGhcSources opts src
 
   -- Build the RTS
-  putStrLn "Building the RTS..."
+  msg "Building the RTS..."
   src_rts <- makeAbsolute (src </> "libraries/rts")
   build_dir <- makeAbsolute (dst </> "cabal")
   ghcversionh <- makeAbsolute (src_rts </> "include/ghcversion.h")
 
-  putStrLn "Generating RTS headers..."
+  msg "Generating RTS headers..."
 
   let build_rts_cmd = runCabal cabal
         [ "build"
@@ -495,7 +497,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
   writeFile (src </> "libraries/ghc-prim/GHC/PrimopWrappers.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops
 
   -- build libffi
-  putStrLn "Building libffi..."
+  msg "Building libffi..."
   src_libffi <- makeAbsolute (src </> "libffi")
   dst_libffi <- makeAbsolute (dst </> "libffi")
   let libffi_version = "3.4.6"
@@ -539,7 +541,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
         , "--builddir=" ++ build_dir
         ]
 
-  putStrLn "Building boot libraries..."
+  msg "Building boot libraries..."
   (boot_exit_code, boot_stdout, boot_stderr) <- readCreateProcessWithExitCode build_boot_cmd ""
   case boot_exit_code of
     ExitSuccess -> pure ()
@@ -548,3 +550,11 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
       putStrLn boot_stdout
       putStrLn boot_stderr
       exitFailure
+
+
+
+msg :: String -> IO ()
+msg x = do
+  t <- getCPUTime
+  let d = t `div` 1_000_000_000
+  putStrLn ("[" ++ show d ++ "] " ++ x)
