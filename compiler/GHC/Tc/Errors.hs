@@ -1526,7 +1526,7 @@ maybeAddDeferredBindings hole report = do
       when (deferringAnyBindings ctxt) $ do
         err_tm <- mkErrorTerm (hole_loc hole) ref_ty report
           -- NB: ref_ty, not hole_ty. hole_ty might be rewritten.
-          -- See Note [Holes] in GHC.Tc.Types.Constraint
+          -- See Note [Holes in expressions] in GHC.Tc.Types.Constraint
         writeMutVar ref err_tm
     _ -> pure ()
   where

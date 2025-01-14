@@ -361,7 +361,7 @@ data DelayedError
   = DE_Hole Hole
     -- ^ A hole (in a type or in a term).
     --
-    -- See Note [Holes].
+    -- See Note [Holes in expressions].
   | DE_NotConcrete NotConcreteError
     -- ^ A type could not be ensured to be concrete.
     --
@@ -380,7 +380,7 @@ instance Outputable DelayedError where
 -- | A hole stores the information needed to report diagnostics
 -- about holes in terms (unbound identifiers or underscores) or
 -- in types (also called wildcards, as used in partial type
--- signatures). See Note [Holes].
+-- signatures). See Note [Holes in expressions] for holes in terms.
 data Hole
   = Hole { hole_sort :: HoleSort -- ^ What flavour of hole is this?
          , hole_occ  :: RdrName  -- ^ The name of this hole
@@ -670,43 +670,78 @@ of the rhs. This is necessary because these constraints are used for substitutio
 during solving. If the kinds differed, then the substitution would take a well-kinded
 type to an ill-kinded one.
 
-Note [Holes]
-~~~~~~~~~~~~
-This Note explains how GHC tracks *holes*.
+Note [Holes in expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note explains how GHC tracks "holes" in expressions.  It does not
+deal with holes in types, nor with partial type signatures.
 
-A hole represents one of two conditions:
- - A missing bit of an expression. Example: foo x = x + _
- - A missing bit of a type. Example: bar :: Int -> _
+A hole represents a missing bit of an expression. Example:
+   foo x = x && _
+GHC then emits a diagnostic, describing the bit that is left out:
+  Foo.hs:5:14: error: [GHC-88464]
+    • Found hole: _ :: Bool
+    • In the second argument of ‘(&&)’, namely ‘_’
+      In the expression: x && _
 
-What these have in common is that both cause GHC to emit a diagnostic to the
-user describing the bit that is left out.
+GHC uses the same mechanism is used to give diagnostics for out-of-scope
+variables:
+   foo x = x && y
+gives diagnostic
+  Foo.hs:5:14: error: [GHC-88464]
+    Variable not in scope: y :: Bool
 
-When a hole is encountered, a new entry of type Hole is added to the ambient
-WantedConstraints. The type (hole_ty) of the hole is then simplified during
-solving (with respect to any Givens in surrounding implications). It is
-reported with all the other errors in GHC.Tc.Errors.
+Here is how holes are represented in expressions:
 
-For expression holes, the user has the option of deferring errors until runtime
-with -fdefer-type-errors. In this case, the hole actually has evidence: this
-evidence is an erroring expression that prints an error and crashes at runtime.
-The ExprHole variant of holes stores an IORef EvTerm that will contain this evidence;
-during constraint generation, this IORef was stored in the HsUnboundVar extension
-field by the type checker. The desugarer simply dereferences to get the CoreExpr.
+* If the user wrote "_":
+    Parser        HsHole (HoleVar (EpAnnHole ...), NoExtField)
+    Renamer       HsHole (HoleVar "_", NoExtField)
+    Typechecker   HsHole (HoleVar "_", ref)
 
-Prior to fixing #17812, we used to invent an Id to hold the erroring
-expression, and then bind it during type-checking. But this does not support
-representation-polymorphic out-of-scope identifiers. See
-typecheck/should_compile/T17812. We thus use the mutable-CoreExpr approach
-described above.
+* If the user wrote "x", where `x` is not in scope
+    Parser        HsVar "x"
+    Renamer       HsHole (HoleVar "x", NoExtField)
+    Typechecker   HsHole (HoleVar "x", ref)
 
-You might think that the type in the HoleExprRef is the same as the type of the
-hole. However, because the hole type (hole_ty) is rewritten with respect to
-givens, this might not be the case. That is, the hole_ty is always (~) to the
-type of the HoleExprRef, but they might not be `eqType`. We need the type of the generated
-evidence to match what is expected in the context of the hole, and so we must
-store these types separately.
+In both cases (ref::HoleExprRef) contains
+   - The type of the hole.
+   - A ref-cell that is filled in (by the typechecker) with an
+     error thunk.   With -fdefer-type errors we use this as the
+     value of the hole.
+   - A Unique (see Note [Uniques and tags]).
 
-Type-level holes have no evidence at all.
+Typechecking holes
+
+* When the typechecker encounters a `HsHole`, it returns one with the
+  HoleExprRef, but also emits a `DelayedError` into the `WantedConstraints`.
+
+* This DelayedError later triggers the error reporting, and the filling-in of
+  the error thunk, in GHC.Tc.Errors.
+
+* The user has the option of deferring errors until runtime with
+  `-fdefer-type-errors`. In this case, the hole carries evidence in its
+  `HoleExprRef`. This evidence is an erroring expression that prints an error
+  and crashes at runtime.
+
+Desugaring holes
+
+* During desugaring, the `(HsHole (HoleVar "x", ref))` is desugared by
+  reading the ref-cell to find the error thunk evidence term, put there by the
+  constraint solver.
+
+Wrinkles:
+
+* Prior to fixing #17812, we used to invent an Id to hold the erroring
+  expression, and then bind it during type-checking. But this does not support
+  representation-polymorphic out-of-scope identifiers. See
+  typecheck/should_compile/T17812. We thus use the mutable-CoreExpr approach
+  described above.
+
+* You might think that the type in the HoleExprRef is the same as the type of the
+  hole. However, because the hole type (hole_ty) is rewritten with respect to
+  givens, this might not be the case. That is, the hole_ty is always (~) to the
+  type of the HoleExprRef, but they might not be `eqType`. We need the type of the generated
+  evidence to match what is expected in the context of the hole, and so we must
+  store these types separately.
 -}
 
 mkNonCanonical :: CtEvidence -> Ct

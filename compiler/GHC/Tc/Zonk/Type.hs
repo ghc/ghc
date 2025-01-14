@@ -925,15 +925,16 @@ zonkExpr (HsVar x (L l id))
   do { id' <- zonkIdOcc id
      ; return (HsVar x (L l id')) }
 
-zonkExpr (HsUnboundVar her occ)
+zonkExpr (HsHole (HoleVar occ, her))
   = do her' <- zonk_her her
-       return (HsUnboundVar her' occ)
+       return (HsHole (HoleVar occ, her'))
   where
     zonk_her :: HoleExprRef -> ZonkTcM HoleExprRef
     zonk_her (HER ref ty u)
       = do updTcRefM ref zonkEvTerm
            ty'  <- zonkTcTypeToTypeX ty
            return (HER ref ty' u)
+zonkExpr (HsHole (HoleParseError x, _)) = dataConCantHappen x
 
 
 zonkExpr (HsIPVar x _) = dataConCantHappen x

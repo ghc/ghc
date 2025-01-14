@@ -1298,7 +1298,7 @@ badRuleLhsErr name lhs bad_e
   = TcRnIllegalRuleLhs errReason name lhs bad_e
   where
     errReason = case bad_e of
-      HsUnboundVar _ uv ->
+      HsHole (HoleVar uv, NoExtField) ->
         UnboundVariable uv $ notInScopeErr WL_Global uv
       _ -> IllegalExpression
 

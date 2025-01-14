@@ -11,6 +11,7 @@
 {-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TypeApplications          #-}
 {-# LANGUAGE TypeFamilyDependencies    #-}
+{-# LANGUAGE AllowAmbiguousTypes    #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 
@@ -220,9 +221,9 @@ data EpAnnLam = EpAnnLam
 instance NoAnn EpAnnLam where
   noAnn = EpAnnLam noAnn noAnn
 
-data EpAnnUnboundVar = EpAnnUnboundVar
-     { hsUnboundBackquotes :: (EpToken "`", EpToken "`")
-     , hsUnboundHole       :: EpToken "_"
+data EpAnnHole = EpAnnHole
+     { hsHoleBackquotes :: (EpToken "`", EpToken "`")
+     , hsHoleHole       :: EpToken "_"
      } deriving Data
 
 -- Record selectors at parse time are HsVar; they convert to HsRecSel
@@ -240,14 +241,6 @@ type instance XOverLabel     GhcTc = DataConCantHappen
 -- ---------------------------------------------------------------------
 
 type instance XVar           (GhcPass _) = NoExtField
-
-type instance XUnboundVar    GhcPs = Maybe EpAnnUnboundVar
-type instance XUnboundVar    GhcRn = NoExtField
-type instance XUnboundVar    GhcTc = HoleExprRef
-  -- We really don't need the whole HoleExprRef; just the IORef EvTerm
-  -- would be enough. But then deriving a Data instance becomes impossible.
-  -- Much, much easier just to define HoleExprRef with a Data instance and
-  -- store the whole structure.
 
 type instance XIPVar         GhcPs = NoExtField
 type instance XIPVar         GhcRn = NoExtField
@@ -393,6 +386,64 @@ type instance XEmbTy         GhcRn = NoExtField
 type instance XEmbTy         GhcTc = DataConCantHappen
   -- A free-standing HsEmbTy is an error.
   -- Valid usages are immediately desugared into Type.
+
+
+-- TODO: rewrite haddocks
+-- | Expression Hole.
+--
+-- Parser: produced on encountering an anonymous
+-- expression hole ("_"), or a parse error.
+--
+-- Renamer: produced from 'HsVar' when encountering out-of-scope variables
+-- (which can also be named expression holes, i.e. "_hole"). The 'ParseError'
+-- case is unhandled in this and the type checking phase.
+--
+-- Type checker: the HoleExprRef is where the erroring expression will be written after
+-- solving. See Note [Holes in expressions] in GHC.Tc.Types.Constraint.
+--
+-- We really don't need the whole HoleExprRef; just the IORef EvTerm would
+-- be enough. But then deriving a Data instance becomes impossible. Much,
+-- much easier just to define HoleExprRef with a Data instance and store
+-- the whole structure.
+type instance XHole (GhcPass p) =
+  (HoleKind (XHoleVar (GhcPass p)) (XHoleParseError (GhcPass p)), XHoleShared (GhcPass p))
+
+data HoleKind unboundVarInfo parseErrorInfo
+  = HoleVar unboundVarInfo
+  | HoleParseError parseErrorInfo
+  deriving Data
+
+-- | HsHole extensions for (named) holes and unbound variables.
+type family XHoleVar x
+type instance XHoleVar       GhcPs = Maybe EpAnnHole
+type instance XHoleVar       GhcRn = RdrName
+type instance XHoleVar       GhcTc = RdrName
+
+-- | HsHole extension for parse errors. Unused for now except to encode that
+-- these cannot occur after the renamer.
+type family XHoleParseError p
+type instance XHoleParseError GhcPs = NoExtField
+type instance XHoleParseError GhcRn = DataConCantHappen
+type instance XHoleParseError GhcTc = DataConCantHappen
+
+-- | HsHole extension shared between all types of holes.
+type family XHoleShared p
+type instance XHoleShared GhcPs = NoExtField
+type instance XHoleShared GhcRn = NoExtField
+type instance XHoleShared GhcTc = HoleExprRef
+
+-- | The RdrName for an unnamed hole ("_").
+unnamedHoleRdrName :: RdrName
+unnamedHoleRdrName = mkUnqual varName (fsLit "_")
+
+-- | The RdrName for an unnamed ("_") hole or named hole/unbound variable
+-- ("_hole").
+holeVarRdrName :: forall p. IsPass p => XHoleVar (GhcPass p) -> RdrName
+holeVarRdrName hv = case (ghcPass @p, hv) of
+  (GhcPs, _) -> unnamedHoleRdrName
+  (GhcRn, r) -> r
+  (GhcTc, r) -> r
+
 
 type instance XForAll        GhcPs = NoExtField
 type instance XForAll        GhcRn = NoExtField
@@ -698,7 +749,11 @@ ppr_lexpr e = ppr_expr (unLoc e)
 ppr_expr :: forall p. (OutputableBndrId p)
          => HsExpr (GhcPass p) -> SDoc
 ppr_expr (HsVar _ (L _ v))   = pprPrefixOcc v
-ppr_expr (HsUnboundVar _ uv) = pprPrefixOcc uv
+ppr_expr (HsHole (HoleVar v, _)) = pprPrefixOcc (holeVarRdrName @p v)
+ppr_expr (HsHole (HoleParseError x, _)) = case ghcPass @p of
+  GhcPs -> pprPrefixOcc unnamedHoleRdrName
+  GhcRn -> dataConCantHappen x
+  GhcTc -> dataConCantHappen x
 ppr_expr (HsIPVar _ v)       = ppr v
 ppr_expr (HsOverLabel s l) = case ghcPass @p of
                GhcPs -> helper s
@@ -954,10 +1009,13 @@ instance Outputable XXExprGhcTc where
             ppr exp, text ")"]
   ppr (HsRecSelTc f)      = pprPrefixOcc f
 
-
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
-ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
+ppr_infix_expr (HsHole (HoleVar hv, _)) = Just (pprInfixOcc (holeVarRdrName @p hv))
+ppr_infix_expr (HsHole (HoleParseError x, _)) = case ghcPass @p of
+  GhcPs -> Just (pprInfixOcc unnamedHoleRdrName) -- TODO: Why not print the actual source text in case of a parse error?
+  GhcRn -> dataConCantHappen x
+  GhcTc -> dataConCantHappen x
 ppr_infix_expr (XExpr x)            = case ghcPass @p of
                                         GhcRn -> ppr_infix_expr_rn x
                                         GhcTc -> ppr_infix_expr_tc x
@@ -975,7 +1033,6 @@ ppr_infix_expr_tc (ConLikeTc {})             = Nothing
 ppr_infix_expr_tc (HsTick {})                = Nothing
 ppr_infix_expr_tc (HsBinTick {})             = Nothing
 ppr_infix_expr_tc (HsRecSelTc f)            = Just (pprInfixOcc f)
-
 
 ppr_infix_hs_expansion :: HsThingRn -> Maybe SDoc
 ppr_infix_hs_expansion (OrigExpr e) = ppr_infix_expr e
@@ -1023,7 +1080,6 @@ hsExprNeedsParens prec = go
   where
     go :: HsExpr (GhcPass p) -> Bool
     go (HsVar{})                      = False
-    go (HsUnboundVar{})               = False
     go (HsIPVar{})                    = False
     go (HsOverLabel{})                = False
     go (HsLit _ l)                    = hsLitNeedsParens prec l
@@ -1065,6 +1121,7 @@ hsExprNeedsParens prec = go
     go (HsProjection{})               = True
     go (HsGetField{})                 = False
     go (HsEmbTy{})                    = prec > topPrec
+    go (HsHole{})                     = False
     go (HsForAll{})                   = prec >= funPrec
     go (HsQual{})                     = prec >= funPrec
     go (HsFunArr{})                   = prec >= funPrec
@@ -1120,7 +1177,7 @@ isAtomicHsExpr (HsLit {})        = True
 isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
-isAtomicHsExpr (HsUnboundVar {}) = True
+isAtomicHsExpr (HsHole{})        = True
 isAtomicHsExpr (XExpr x)
   | GhcTc <- ghcPass @p          = go_x_tc x
   | GhcRn <- ghcPass @p          = go_x_rn x
