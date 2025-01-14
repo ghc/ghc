@@ -22,8 +22,6 @@ packages:
   ./_build/stage0/src/utils/genapply/
   ./_build/stage0/src/utils/deriveConstants/
 
-with-compiler: ghc-9.8.4
-
 benchmarks: False
 tests: False
 allow-boot-library-installs: True

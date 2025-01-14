@@ -110,6 +110,7 @@ buildGhcStage1 opts cabal ghc0 = do
               , "--project-file=cabal.project-stage0"
               , "--builddir=" ++ builddir
               , "-j"
+              , "--with-compiler=" ++ ghcPath ghc0 -- FIXME: escape path
               -- the targets
               , "ghc-bin:ghc"
               , "ghc-pkg:ghc-pkg"
