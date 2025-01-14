@@ -41,6 +41,7 @@ packages:
   ./_build/stage1/src/libraries/Win32/
   ./_build/stage1/src/libraries/Cabal/Cabal-syntax
   ./_build/stage1/src/libraries/Cabal/Cabal
+  https://github.com/haskell/alex/archive/refs/tags/v3.5.2.0.tar.gz
 
 benchmarks: False
 tests: False
