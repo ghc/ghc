@@ -3081,7 +3081,7 @@ module GHC.Arr where
   (//) :: forall i e. Ix i => Array i e -> [(i, e)] -> Array i e
   type role Array nominal representational
   type Array :: * -> * -> *
-  data Array i e = Array !i !i {-# UNPACK #-}GHC.Types.Int (GHC.Prim.Array# e)
+  data Array i e = Array !i !i {-# UNPACK #-} !GHC.Types.Int (GHC.Prim.Array# e)
   type Ix :: * -> Constraint
   class GHC.Classes.Ord a => Ix a where
     range :: (a, a) -> [a]
@@ -3093,7 +3093,7 @@ module GHC.Arr where
     {-# MINIMAL range, (index | unsafeIndex), inRange #-}
   type role STArray nominal nominal representational
   type STArray :: * -> * -> * -> *
-  data STArray s i e = STArray !i !i {-# UNPACK #-}GHC.Types.Int (GHC.Prim.MutableArray# s e)
+  data STArray s i e = STArray !i !i {-# UNPACK #-} !GHC.Types.Int (GHC.Prim.MutableArray# s e)
   accum :: forall i e a. Ix i => (e -> a -> e) -> Array i e -> [(i, a)] -> Array i e
   accumArray :: forall i e a. Ix i => (e -> a -> e) -> e -> (i, i) -> [(i, a)] -> Array i e
   adjust :: forall e a s b. (e -> a -> e) -> GHC.Prim.MutableArray# s e -> (GHC.Types.Int, a) -> GHC.Internal.ST.STRep s b -> GHC.Internal.ST.STRep s b
@@ -3332,7 +3332,7 @@ module GHC.Base where
   type KindBndr :: *
   type KindBndr = Int
   type KindRep :: *
-  data KindRep = KindRepTyConApp TyCon [KindRep] | KindRepVar {-# UNPACK #-}KindBndr | KindRepApp KindRep KindRep | KindRepFun KindRep KindRep | KindRepTYPE !RuntimeRep | KindRepTypeLitS TypeLitSort Addr# | KindRepTypeLitD TypeLitSort [Char]
+  data KindRep = KindRepTyConApp TyCon [KindRep] | KindRepVar {-# UNPACK #-} !KindBndr | KindRepApp KindRep KindRep | KindRepFun KindRep KindRep | KindRepTYPE !RuntimeRep | KindRepTypeLitS TypeLitSort Addr# | KindRepTypeLitD TypeLitSort [Char]
   type Levity :: *
   data Levity = Lifted | Unlifted
   type LiftedRep :: RuntimeRep
@@ -5269,10 +5269,7 @@ module GHC.Event where
   type EventManager :: *
   data EventManager = ...
   type FdKey :: *
-  data FdKey
-    = ghc-internal-9.1300.0:GHC.Internal.Event.Manager.FdKey {keyFd :: ! {-# UNPACK #-}(GHC.Internal.System.Posix.Types.N:Fd
-                                                                                        ; GHC.Internal.Foreign.C.Types.N:CInt)GHC.Internal.System.Posix.Types.Fd,
-                                                              ...}
+  data FdKey = ghc-internal-9.1300.0:GHC.Internal.Event.Manager.FdKey {keyFd :: {-# UNPACK #-} !GHC.Internal.System.Posix.Types.Fd, ...}
   type IOCallback :: *
   type IOCallback = FdKey -> Event -> GHC.Types.IO ()
   type Lifetime :: *
@@ -5326,7 +5323,7 @@ module GHC.Exception where
   type SomeException :: *
   data SomeException = forall e. (Exception e, GHC.Internal.Exception.Type.HasExceptionContext) => SomeException e
   type SrcLoc :: *
-  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: {-# UNPACK #-}GHC.Types.Int, srcLocStartCol :: {-# UNPACK #-}GHC.Types.Int, srcLocEndLine :: {-# UNPACK #-}GHC.Types.Int, srcLocEndCol :: {-# UNPACK #-}GHC.Types.Int}
+  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: {-# UNPACK #-} !GHC.Types.Int, srcLocStartCol :: {-# UNPACK #-} !GHC.Types.Int, srcLocEndLine :: {-# UNPACK #-} !GHC.Types.Int, srcLocEndCol :: {-# UNPACK #-} !GHC.Types.Int}
   divZeroException :: SomeException
   errorCallException :: GHC.Internal.Base.String -> SomeException
   errorCallWithCallStackException :: GHC.Internal.Base.String -> CallStack -> SomeException
@@ -7097,7 +7094,7 @@ module GHC.Exts where
 module GHC.Fingerprint where
   -- Safety: Safe
   type Fingerprint :: *
-  data Fingerprint = Fingerprint {-# UNPACK #-}GHC.Internal.Word.Word64 {-# UNPACK #-}GHC.Internal.Word.Word64
+  data Fingerprint = Fingerprint {-# UNPACK #-} !GHC.Internal.Word.Word64 {-# UNPACK #-} !GHC.Internal.Word.Word64
   fingerprint0 :: Fingerprint
   fingerprintData :: GHC.Internal.Ptr.Ptr GHC.Internal.Word.Word8 -> GHC.Types.Int -> GHC.Types.IO Fingerprint
   fingerprintFingerprints :: [Fingerprint] -> Fingerprint
@@ -7107,7 +7104,7 @@ module GHC.Fingerprint where
 module GHC.Fingerprint.Type where
   -- Safety: Safe
   type Fingerprint :: *
-  data Fingerprint = Fingerprint {-# UNPACK #-}GHC.Internal.Word.Word64 {-# UNPACK #-}GHC.Internal.Word.Word64
+  data Fingerprint = Fingerprint {-# UNPACK #-} !GHC.Internal.Word.Word64 {-# UNPACK #-} !GHC.Internal.Word.Word64
 
 module GHC.Float where
   -- Safety: Safe
@@ -7346,7 +7343,7 @@ module GHC.ForeignPtr where
   type ForeignPtr :: * -> *
   data ForeignPtr a = ForeignPtr GHC.Prim.Addr# ForeignPtrContents
   type ForeignPtrContents :: *
-  data ForeignPtrContents = PlainForeignPtr ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef <Finalizers>_N)(GHC.Internal.IORef.IORef Finalizers) | FinalPtr | MallocPtr (GHC.Prim.MutableByteArray# GHC.Prim.RealWorld) ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef <Finalizers>_N)(GHC.Internal.IORef.IORef Finalizers) | PlainPtr (GHC.Prim.MutableByteArray# GHC.Prim.RealWorld)
+  data ForeignPtrContents = PlainForeignPtr {-# UNPACK #-} !(GHC.Internal.IORef.IORef Finalizers) | FinalPtr | MallocPtr (GHC.Prim.MutableByteArray# GHC.Prim.RealWorld) {-# UNPACK #-} !(GHC.Internal.IORef.IORef Finalizers) | PlainPtr (GHC.Prim.MutableByteArray# GHC.Prim.RealWorld)
   addForeignPtrConcFinalizer :: forall a. ForeignPtr a -> GHC.Types.IO () -> GHC.Types.IO ()
   addForeignPtrFinalizer :: forall a. FinalizerPtr a -> ForeignPtr a -> GHC.Types.IO ()
   addForeignPtrFinalizerEnv :: forall env a. FinalizerEnvPtr env a -> GHC.Internal.Ptr.Ptr env -> ForeignPtr a -> GHC.Types.IO ()
@@ -7548,7 +7545,7 @@ module GHC.IO.Buffer where
   -- Safety: Safe
   type role Buffer phantom
   type Buffer :: * -> *
-  data Buffer e = Buffer {bufRaw :: {-# UNPACK #-}(RawBuffer e), bufState :: BufferState, bufSize :: {-# UNPACK #-}GHC.Types.Int, bufOffset :: {-# UNPACK #-}GHC.Internal.Word.Word64, bufL :: {-# UNPACK #-}GHC.Types.Int, bufR :: {-# UNPACK #-}GHC.Types.Int}
+  data Buffer e = Buffer {bufRaw :: {-# UNPACK #-} !(RawBuffer e), bufState :: BufferState, bufSize :: {-# UNPACK #-} !GHC.Types.Int, bufOffset :: {-# UNPACK #-} !GHC.Internal.Word.Word64, bufL :: {-# UNPACK #-} !GHC.Types.Int, bufR :: {-# UNPACK #-} !GHC.Types.Int}
   type BufferState :: *
   data BufferState = ReadBuffer | WriteBuffer
   type CharBufElem :: *
@@ -7824,7 +7821,7 @@ module GHC.IO.Exception where
 module GHC.IO.FD where
   -- Safety: Safe
   type FD :: *
-  data FD = FD {fdFD :: ! {-# UNPACK #-}GHC.Internal.Foreign.C.Types.N:CIntGHC.Internal.Foreign.C.Types.CInt, fdIsNonBlocking :: {-# UNPACK #-}GHC.Types.Int}
+  data FD = FD {fdFD :: {-# UNPACK #-} !GHC.Internal.Foreign.C.Types.CInt, fdIsNonBlocking :: {-# UNPACK #-} !GHC.Types.Int}
   mkFD :: GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.IO.IOMode.IOMode -> GHC.Internal.Maybe.Maybe (GHC.Internal.IO.Device.IODeviceType, GHC.Internal.System.Posix.Types.CDev, GHC.Internal.System.Posix.Types.CIno) -> GHC.Types.Bool -> GHC.Types.Bool -> GHC.Types.IO (FD, GHC.Internal.IO.Device.IODeviceType)
   openFile :: GHC.Internal.IO.FilePath -> GHC.Internal.IO.IOMode.IOMode -> GHC.Types.Bool -> GHC.Types.IO (FD, GHC.Internal.IO.Device.IODeviceType)
   openFileWith :: forall r s. GHC.Internal.IO.FilePath -> GHC.Internal.IO.IOMode.IOMode -> GHC.Types.Bool -> (FD -> GHC.Internal.IO.Device.IODeviceType -> GHC.Types.IO r) -> ((forall x. GHC.Types.IO x -> GHC.Types.IO x) -> r -> GHC.Types.IO s) -> GHC.Types.IO s
@@ -8011,7 +8008,7 @@ module GHC.IO.Handle.Types where
   type BufferMode :: *
   data BufferMode = NoBuffering | LineBuffering | BlockBuffering (GHC.Internal.Maybe.Maybe GHC.Types.Int)
   type Handle :: *
-  data Handle = FileHandle GHC.Internal.IO.FilePath {-# UNPACK #-}(GHC.Internal.MVar.MVar Handle__) | DuplexHandle GHC.Internal.IO.FilePath {-# UNPACK #-}(GHC.Internal.MVar.MVar Handle__) {-# UNPACK #-}(GHC.Internal.MVar.MVar Handle__)
+  data Handle = FileHandle GHC.Internal.IO.FilePath {-# UNPACK #-} !(GHC.Internal.MVar.MVar Handle__) | DuplexHandle GHC.Internal.IO.FilePath {-# UNPACK #-} !(GHC.Internal.MVar.MVar Handle__) {-# UNPACK #-} !(GHC.Internal.MVar.MVar Handle__)
   type HandleType :: *
   data HandleType = ClosedHandle | SemiClosedHandle | ReadHandle | WriteHandle | AppendHandle | ReadWriteHandle
   type Handle__ :: *
@@ -8020,11 +8017,11 @@ module GHC.IO.Handle.Types where
       (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, ghc-internal-9.1300.0:GHC.Internal.Data.Typeable.Internal.Typeable dev) =>
       Handle__ {haDevice :: !dev,
                 haType :: HandleType,
-                haByteBuffer :: ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef <GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8>_N)(GHC.Internal.IORef.IORef (GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)),
+                haByteBuffer :: {-# UNPACK #-} !(GHC.Internal.IORef.IORef (GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)),
                 haBufferMode :: BufferMode,
-                haLastDecode :: ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef <(dec_state, GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)>_N)(GHC.Internal.IORef.IORef (dec_state, GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)),
-                haCharBuffer :: ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef <GHC.Internal.IO.Buffer.Buffer GHC.Internal.IO.Buffer.CharBufElem>_N)(GHC.Internal.IORef.IORef (GHC.Internal.IO.Buffer.Buffer GHC.Internal.IO.Buffer.CharBufElem)),
-                haBuffers :: ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef <BufferList GHC.Internal.IO.Buffer.CharBufElem>_N)(GHC.Internal.IORef.IORef (BufferList GHC.Internal.IO.Buffer.CharBufElem)),
+                haLastDecode :: {-# UNPACK #-} !(GHC.Internal.IORef.IORef (dec_state, GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)),
+                haCharBuffer :: {-# UNPACK #-} !(GHC.Internal.IORef.IORef (GHC.Internal.IO.Buffer.Buffer GHC.Internal.IO.Buffer.CharBufElem)),
+                haBuffers :: {-# UNPACK #-} !(GHC.Internal.IORef.IORef (BufferList GHC.Internal.IO.Buffer.CharBufElem)),
                 haEncoder :: GHC.Internal.Maybe.Maybe (GHC.Internal.IO.Encoding.Types.TextEncoder enc_state),
                 haDecoder :: GHC.Internal.Maybe.Maybe (GHC.Internal.IO.Encoding.Types.TextDecoder dec_state),
                 haCodec :: GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding,
@@ -9359,7 +9356,7 @@ module GHC.Stack where
   type HasCallStack :: Constraint
   type HasCallStack = ?callStack::CallStack
   type SrcLoc :: *
-  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: {-# UNPACK #-}GHC.Types.Int, srcLocStartCol :: {-# UNPACK #-}GHC.Types.Int, srcLocEndLine :: {-# UNPACK #-}GHC.Types.Int, srcLocEndCol :: {-# UNPACK #-}GHC.Types.Int}
+  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: {-# UNPACK #-} !GHC.Types.Int, srcLocStartCol :: {-# UNPACK #-} !GHC.Types.Int, srcLocEndLine :: {-# UNPACK #-} !GHC.Types.Int, srcLocEndCol :: {-# UNPACK #-} !GHC.Types.Int}
   callStack :: HasCallStack => CallStack
   ccLabel :: GHC.Internal.Ptr.Ptr CostCentre -> GHC.Types.IO GHC.Internal.Foreign.C.String.Encoding.CString
   ccModule :: GHC.Internal.Ptr.Ptr CostCentre -> GHC.Types.IO GHC.Internal.Foreign.C.String.Encoding.CString
@@ -9420,7 +9417,7 @@ module GHC.Stack.Types where
   type HasCallStack :: Constraint
   type HasCallStack = ?callStack::CallStack
   type SrcLoc :: *
-  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: {-# UNPACK #-}GHC.Types.Int, srcLocStartCol :: {-# UNPACK #-}GHC.Types.Int, srcLocEndLine :: {-# UNPACK #-}GHC.Types.Int, srcLocEndCol :: {-# UNPACK #-}GHC.Types.Int}
+  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: {-# UNPACK #-} !GHC.Types.Int, srcLocStartCol :: {-# UNPACK #-} !GHC.Types.Int, srcLocEndLine :: {-# UNPACK #-} !GHC.Types.Int, srcLocEndCol :: {-# UNPACK #-} !GHC.Types.Int}
   emptyCallStack :: CallStack
   freezeCallStack :: CallStack -> CallStack
   fromCallSiteList :: [([GHC.Types.Char], SrcLoc)] -> CallStack
@@ -10870,7 +10867,7 @@ module Type.Reflection where
 module Type.Reflection.Unsafe where
   -- Safety: None
   type KindRep :: *
-  data KindRep = KindRepTyConApp TyCon [KindRep] | KindRepVar {-# UNPACK #-}GHC.Types.KindBndr | KindRepApp KindRep KindRep | KindRepFun KindRep KindRep | KindRepTYPE !GHC.Types.RuntimeRep | KindRepTypeLitS TypeLitSort GHC.Prim.Addr# | KindRepTypeLitD TypeLitSort [GHC.Types.Char]
+  data KindRep = KindRepTyConApp TyCon [KindRep] | KindRepVar {-# UNPACK #-} !GHC.Types.KindBndr | KindRepApp KindRep KindRep | KindRepFun KindRep KindRep | KindRepTYPE !GHC.Types.RuntimeRep | KindRepTypeLitS TypeLitSort GHC.Prim.Addr# | KindRepTypeLitD TypeLitSort [GHC.Types.Char]
   pattern KindRepTypeLit :: TypeLitSort -> GHC.Internal.Base.String -> KindRep
   type TyCon :: *
   data TyCon = ...

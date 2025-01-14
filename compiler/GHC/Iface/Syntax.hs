@@ -1545,9 +1545,9 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
 
     ppr_bang IfNoBang = whenPprDebug $ char '_'
     ppr_bang IfStrict = char '!'
-    ppr_bang IfUnpack = text "{-# UNPACK #-}"
-    ppr_bang (IfUnpackCo co) = text "! {-# UNPACK #-}" <>
-                               pprParendIfaceCoercion co
+    ppr_bang IfUnpack = text "{-# UNPACK #-} !"
+    ppr_bang (IfUnpackCo co) = text "{-# UNPACK #-} !" <>
+                               whenPprDebug (pprParendIfaceCoercion co)
 
     pprFieldArgTy, pprArgTy :: (IfaceBang, IfaceType) -> SDoc
     -- If using record syntax, the only reason one would need to parenthesize
