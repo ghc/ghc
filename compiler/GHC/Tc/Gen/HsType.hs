@@ -1424,22 +1424,18 @@ tc_arrow mode arr = case arr of
 tc_modifier :: TcTyMode -> HsModifier GhcRn -> (TcKind -> Bool) -> TcM (Maybe TcType)
 tc_modifier mode mod@(HsModifier _ ty) is_expected_kind = do
   (inf_ty, inf_kind) <- tc_infer_lhs_type mode ty
-  if is_expected_kind inf_kind
+  -- MODS_TODO zonking here means that
+  --     Int %(m :: Multiplicity) -> Int %m -> Int
+  -- is rejected, but
+  --     Int %m -> Int %(m :: Multiplicity) -> Int
+  -- is accepted, which is probably not what the user expects.
+  inf_kind' <- liftZonkM $ zonkTcType inf_kind
+  if is_expected_kind inf_kind'
     then return $ Just inf_ty
-    else case inf_kind of
-      -- MODS_TODO the point of this is to check for a modifier of unknown kind.
-      -- Seems hacky, presumably there's a standard way to do it?
-      --
-      -- This doesn't seem to work for %() (i.e. it marks that as unknown kind),
-      -- but it does for %True, %Bool and %'(). Dunno what's going on there.
-      --
-      -- This only affects modifiers that get typechecked. rename-only modifiers
-      -- get an error if a modifier uses a type var not in scope, so maybe
-      -- unknown kinds are impossible for those? But I guess not if
-      --
-      --     %a data FV1 (a :: k)
-      --
-      -- is supposed to compile.
+    else case inf_kind' of
+      -- MODS_TODO This checks for a modifier of unknown kind. It doesn't detect
+      -- poly-kinded modifiers. e.g. %Just and %Nothing don't fail here, and
+      -- possibly they should.
       TyVarTy _ -> failWithTc $ TcRnUnknownModifierKind mod
       _ -> do
         warn_unknown <- woptM Opt_WarnUnknownModifiers
