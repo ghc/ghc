@@ -5,6 +5,42 @@ packages:
   ./_build/stage1/src/libraries/ghc-prim
   ./_build/stage1/src/libraries/ghc-internal
   ./_build/stage1/src/libraries/base
+  ./_build/stage1/src/libraries/ghc
+  ./_build/stage1/src/libraries/ghc-platform/
+  ./_build/stage1/src/libraries/ghc-boot/
+  ./_build/stage1/src/libraries/ghc-boot-th/
+  ./_build/stage1/src/libraries/ghc-heap
+  ./_build/stage1/src/libraries/ghci
+  ./_build/stage1/src/libraries/stm
+  ./_build/stage1/src/libraries/template-haskell
+  ./_build/stage1/src/libraries/hpc
+  ./_build/stage1/src/ghc-bin/
+  ./_build/stage1/src/utils/ghc-pkg
+  ./_build/stage1/src/utils/hsc2hs
+  ./_build/stage1/src/utils/unlit
+
+  ./_build/stage1/src/libraries/array
+  ./_build/stage1/src/libraries/binary
+  ./_build/stage1/src/libraries/bytestring
+  ./_build/stage1/src/libraries/containers/containers
+  ./_build/stage1/src/libraries/deepseq
+  ./_build/stage1/src/libraries/directory/
+  ./_build/stage1/src/libraries/exceptions
+  ./_build/stage1/src/libraries/file-io/
+  ./_build/stage1/src/libraries/filepath/
+  ./_build/stage1/src/libraries/mtl
+  ./_build/stage1/src/libraries/os-string/
+  ./_build/stage1/src/libraries/parsec
+  ./_build/stage1/src/libraries/pretty/
+  ./_build/stage1/src/libraries/process/
+  ./_build/stage1/src/libraries/semaphore-compat
+  ./_build/stage1/src/libraries/text
+  ./_build/stage1/src/libraries/time
+  ./_build/stage1/src/libraries/transformers
+  ./_build/stage1/src/libraries/unix/
+  ./_build/stage1/src/libraries/Win32/
+  ./_build/stage1/src/libraries/Cabal/Cabal-syntax
+  ./_build/stage1/src/libraries/Cabal/Cabal
 
 benchmarks: False
 tests: False
@@ -22,5 +58,9 @@ package *
   executable-static: False
 
 package ghc-internal
-  -- make our life easier for now by using the native bignum backend
+  -- FIXME: make our life easier for now by using the native bignum backend
   flags: +bignum-native
+
+package text
+  -- FIXME: avoid having to deal with system-cxx-std-lib fake package for now
+  flags: -simdutf

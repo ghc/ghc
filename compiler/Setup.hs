@@ -1,4 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE CPP #-}
 module Main where
 
 import Distribution.Simple
@@ -11,6 +12,9 @@ import Distribution.Verbosity
 import Distribution.Simple.Program
 import Distribution.Simple.Utils
 import Distribution.Simple.Setup
+#if MIN_VERSION_Cabal(3,14,0)
+import Distribution.Simple.LocalBuildInfo (interpretSymbolicPathLBI)
+#endif
 
 import System.IO
 import System.Process
@@ -58,8 +62,15 @@ primopIncls =
 ghcAutogen :: Verbosity -> LocalBuildInfo -> IO ()
 ghcAutogen verbosity lbi@LocalBuildInfo{pkgDescrFile,withPrograms,componentNameMap}
   = do
+
+#if MIN_VERSION_Cabal(3,14,0)
+  let fromSymPath = interpretSymbolicPathLBI lbi
+#else
+  let fromSymPath = id
+#endif
+
   -- Get compiler/ root directory from the cabal file
-  let Just compilerRoot = takeDirectory <$> pkgDescrFile
+  let Just compilerRoot = (takeDirectory . fromSymPath) <$> pkgDescrFile
 
   -- Require the necessary programs
   (gcc   ,withPrograms) <- requireProgram normal gccProgram withPrograms
@@ -79,10 +90,10 @@ ghcAutogen verbosity lbi@LocalBuildInfo{pkgDescrFile,withPrograms,componentNameM
   -- Call genprimopcode to generate *.hs-incl
   forM_ primopIncls $ \(file,command) -> do
     contents <- readProcess "genprimopcode" [command] primopsStr
-    rewriteFileEx verbosity (buildDir lbi </> file) contents
+    rewriteFileEx verbosity (fromSymPath (buildDir lbi) </> file) contents
 
   -- Write GHC.Platform.Constants
-  let platformConstantsPath = autogenPackageModulesDir lbi </> "GHC/Platform/Constants.hs"
+  let platformConstantsPath = fromSymPath (autogenPackageModulesDir lbi) </> "GHC/Platform/Constants.hs"
       targetOS = case lookup "target os" settings of
         Nothing -> error "no target os in settings"
         Just os -> os
@@ -97,7 +108,7 @@ ghcAutogen verbosity lbi@LocalBuildInfo{pkgDescrFile,withPrograms,componentNameM
                          _ -> error "Couldn't find unique cabal library when building ghc"
 
   -- Write GHC.Settings.Config
-      configHsPath = autogenPackageModulesDir lbi </> "GHC/Settings/Config.hs"
+      configHsPath = fromSymPath (autogenPackageModulesDir lbi) </> "GHC/Settings/Config.hs"
       configHs = generateConfigHs cProjectUnitId settings
   createDirectoryIfMissingVerbose verbosity True (takeDirectory configHsPath)
   rewriteFileEx verbosity configHsPath configHs

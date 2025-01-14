@@ -188,12 +188,13 @@ prepareGhcSources :: GhcBuildOptions -> FilePath -> IO ()
 prepareGhcSources opts dst = do
   msg $ "  - Preparing sources in " ++ dst ++ "..."
   createDirectoryIfMissing True dst 
+  createDirectoryIfMissing True (dst </> "libraries/ghc/MachRegs")
 
-  cp "./libraries" dst
-  cp "./compiler"  (dst </> "libraries/ghc")
-  cp "./rts"       (dst </> "libraries/")
-  cp "./ghc"	   (dst </> "ghc-bin")
-  cp "./utils"     dst
+  cp "./libraries"    dst
+  cp "./compiler/*"   (dst </> "libraries/ghc/")
+  cp "./rts"          (dst </> "libraries/")
+  cp "./ghc"	      (dst </> "ghc-bin")
+  cp "./utils"        dst
 
   cp "./config.sub"   (dst </> "libraries/rts/")
   cp "./config.guess" (dst </> "libraries/rts/")
@@ -202,7 +203,6 @@ prepareGhcSources opts dst = do
   cp "rts/include/rts/storage/ClosureTypes.h" (dst </> "libraries/ghc/")
   cp "rts/include/rts/storage/FunTypes.h"     (dst </> "libraries/ghc/")
   cp "rts/include/stg/MachRegs.h"             (dst </> "libraries/ghc/")
-  createDirectoryIfMissing True (dst </> "libraries/ghc/MachRegs")
   cp "rts/include/stg/MachRegs/*.h"           (dst </> "libraries/ghc/MachRegs/")
 
   cp "utils/fs/fs.h" (dst </> "libraries/ghc-internal/include")
@@ -251,6 +251,7 @@ prepareGhcSources opts dst = do
   subst_in (dst </> "libraries/ghc-boot/ghc-boot.cabal") common_substs
   subst_in (dst </> "libraries/ghc-boot-th/ghc-boot-th.cabal") (common_substs ++ boot_th_substs)
   subst_in (dst </> "libraries/ghc-heap/ghc-heap.cabal") common_substs
+  subst_in (dst </> "libraries/template-haskell/template-haskell.cabal") common_substs
   subst_in (dst </> "libraries/ghci/ghci.cabal") common_substs
   subst_in (dst </> "libraries/ghc/GHC/CmmToLlvm/Version/Bounds.hs") llvm_substs
   subst_in (dst </> "utils/ghc-pkg/ghc-pkg.cabal") common_substs
@@ -354,7 +355,6 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
   let dst = "_build/stage1/"
   src <- makeAbsolute "_build/stage1/src"
 
-  msg "  - Preparing sources to build with GHC stage1..."
   prepareGhcSources opts src
 
   -- Build the RTS
@@ -516,7 +516,7 @@ defaultGhcBuildOptions = GhcBuildOptions
   { gboVersion            = "9.13"
   , gboVersionInt         = "913"
   , gboVersionMunged      = "9.13"
-  , gboVersionForLib      = "9.13"
+  , gboVersionForLib      = "9.1300"
   , gboVersionPatchLevel  = "0"
   , gboVersionPatchLevel1 = "0"
   , gboVersionPatchLevel2 = "0"

@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE CPP #-}
 module Main where
 
 import Distribution.Simple
@@ -10,6 +10,9 @@ import Distribution.Verbosity
 import Distribution.Simple.Program
 import Distribution.Simple.Utils
 import Distribution.Simple.Setup
+#if MIN_VERSION_Cabal(3,14,0)
+import Distribution.Simple.LocalBuildInfo (interpretSymbolicPathLBI)
+#endif
 
 import System.IO
 import System.Directory
@@ -31,13 +34,19 @@ main = defaultMainWithHooks ghcHooks
 
 ghcAutogen :: Verbosity -> LocalBuildInfo -> IO ()
 ghcAutogen verbosity lbi@LocalBuildInfo{..} = do
+#if MIN_VERSION_Cabal(3,14,0)
+  let fromSymPath = interpretSymbolicPathLBI lbi
+#else
+  let fromSymPath = id
+#endif
+
   -- Get compiler/ root directory from the cabal file
-  let Just compilerRoot = takeDirectory <$> pkgDescrFile
+  let Just compilerRoot = (takeDirectory . fromSymPath) <$> pkgDescrFile
 
   let platformHostFile = "GHC/Platform/Host.hs"
-      platformHostPath = autogenPackageModulesDir lbi </> platformHostFile
+      platformHostPath = fromSymPath (autogenPackageModulesDir lbi) </> platformHostFile
       ghcVersionFile = "GHC/Version.hs"
-      ghcVersionPath = autogenPackageModulesDir lbi </> ghcVersionFile
+      ghcVersionPath = fromSymPath (autogenPackageModulesDir lbi) </> ghcVersionFile
 
   -- Get compiler settings
   settings <- lookupEnv "HADRIAN_SETTINGS" >>= \case
