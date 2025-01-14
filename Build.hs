@@ -77,7 +77,6 @@ main = do
 -- | Build stage1 GHC program
 buildGhcStage1 :: GhcBuildOptions -> Cabal -> Ghc -> IO ()
 buildGhcStage1 opts cabal ghc0 = do
-  msg "  - Preparing sources to build with GHC stage0..."
   prepareGhcSources opts "_build/stage0/src/"
 
   let builddir = "_build/stage0/cabal/"
@@ -184,35 +183,10 @@ buildGhcStage1 opts cabal ghc0 = do
       exitFailure
 
 
-data GhcBuildOptions = GhcBuildOptions
-  { gboVersion	          :: !Text -- ^ GHC version
-  , gboVersionInt         :: !Text -- ^ GHC version as an Int
-  , gboVersionMunged      :: !Text -- ^ GHC version "munged"
-  , gboVersionForLib      :: !Text -- ^ GHC version for libraries?
-  , gboVersionPatchLevel  :: !Text -- ^ GHC patchlevel version
-  , gboVersionPatchLevel1 :: !Text -- ^ GHC patchlevel1 version
-  , gboVersionPatchLevel2 :: !Text -- ^ GHC patchlevel2 version
-  , gboLlvmMinVersion     :: !Text -- ^ Min LLVM version supported
-  , gboLlvmMaxVersion     :: !Text -- ^ Max LLVM version supported
-  }
-
-defaultGhcBuildOptions :: GhcBuildOptions
-defaultGhcBuildOptions = GhcBuildOptions
-  { gboVersion            = "9.13"
-  , gboVersionInt         = "913"
-  , gboVersionMunged      = "9.13"
-  , gboVersionForLib      = "9.13"
-  , gboVersionPatchLevel  = "0"
-  , gboVersionPatchLevel1 = "0"
-  , gboVersionPatchLevel2 = "0"
-  , gboLlvmMinVersion     = "13"
-  , gboLlvmMaxVersion     = "20"
-  }
-
-
 -- | Prepare GHC sources in the given directory
 prepareGhcSources :: GhcBuildOptions -> FilePath -> IO ()
 prepareGhcSources opts dst = do
+  msg $ "  - Preparing sources in " ++ dst ++ "..."
   createDirectoryIfMissing True dst 
 
   cp "./libraries" dst
@@ -520,6 +494,35 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
       putStrLn boot_stdout
       putStrLn boot_stderr
       exitFailure
+
+---------------------------
+-- Options
+---------------------------
+
+data GhcBuildOptions = GhcBuildOptions
+  { gboVersion	          :: !Text -- ^ GHC version
+  , gboVersionInt         :: !Text -- ^ GHC version as an Int
+  , gboVersionMunged      :: !Text -- ^ GHC version "munged"
+  , gboVersionForLib      :: !Text -- ^ GHC version for libraries?
+  , gboVersionPatchLevel  :: !Text -- ^ GHC patchlevel version
+  , gboVersionPatchLevel1 :: !Text -- ^ GHC patchlevel1 version
+  , gboVersionPatchLevel2 :: !Text -- ^ GHC patchlevel2 version
+  , gboLlvmMinVersion     :: !Text -- ^ Min LLVM version supported
+  , gboLlvmMaxVersion     :: !Text -- ^ Max LLVM version supported
+  }
+
+defaultGhcBuildOptions :: GhcBuildOptions
+defaultGhcBuildOptions = GhcBuildOptions
+  { gboVersion            = "9.13"
+  , gboVersionInt         = "913"
+  , gboVersionMunged      = "9.13"
+  , gboVersionForLib      = "9.13"
+  , gboVersionPatchLevel  = "0"
+  , gboVersionPatchLevel1 = "0"
+  , gboVersionPatchLevel2 = "0"
+  , gboLlvmMinVersion     = "13"
+  , gboLlvmMaxVersion     = "20"
+  }
 
 
 
