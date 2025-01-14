@@ -1539,6 +1539,10 @@ repE (HsVar _ (L _ x)) =
         Just (DsBound y)   -> repVarOrCon x (coreVar y)
         Just (DsSplice e)  -> do { e' <- lift $ dsExpr e
                                  ; return (MkC e') } }
+repE (HsHole (HoleVar (L _ uv), NoExtField)) = do
+  name <- repRdrName uv
+  repUnboundVar name
+repE (HsHole (HoleError, NoExtField)) = panic "repE: HoleError"
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ s) = repOverLabel s
 
@@ -1677,9 +1681,6 @@ repE (HsTypedSplice n _) = rep_splice n
 repE (HsUntypedSplice (HsUntypedSpliceNested n) _)  = rep_splice n
 repE e@(HsUntypedSplice (HsUntypedSpliceTop _ _) _) = pprPanic "repE: top level splice" (ppr e)
 repE (HsStatic _ e)        = repLE e >>= rep2 staticEName . (:[]) . unC
-repE (HsUnboundVar _ uv)   = do
-                               name <- repRdrName uv
-                               repUnboundVar name
 repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ (FieldLabelString f))))) = do
   e1 <- repLE e
   repGetField e1 f
@@ -1714,10 +1715,8 @@ repE e@(XExpr (ExpandedThingRn o x))
          else repE e }
   | otherwise
   = notHandled (ThExpressionForm e)
-
 repE (XExpr (PopErrCtxt (L _ e))) = repE e
 repE (XExpr (HsRecSelRn (FieldOcc _ (L _ x)))) = repE (HsVar noExtField (noLocA x))
-
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
 repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)
 repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)
