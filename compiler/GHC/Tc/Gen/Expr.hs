@@ -298,13 +298,15 @@ tcExpr (XExpr e)                 res_ty = tcXExpr e res_ty
 -- Typecheck an occurrence of an unbound Id
 --
 -- Some of these started life as a true expression hole "_".
--- Others might simply be variables that accidentally have no binding site
-tcExpr (HsUnboundVar _ occ) res_ty
+-- Others might simply be variables that accidentally have no binding site.
+tcExpr (HsHole (HoleVar occ, NoExtField)) res_ty
   = do { ty <- expTypeToType res_ty    -- Allow Int# etc (#12531)
        ; her <- emitNewExprHole occ ty
        ; tcEmitBindingUsage bottomUE   -- Holes fit any usage environment
                                        -- (#18491)
-       ; return (HsUnboundVar her occ) }
+       ; return (HsHole (HoleVar occ, her))
+       }
+tcExpr (HsHole (HoleParseError x, NoExtField)) _ = dataConCantHappen x
 
 tcExpr e@(HsLit x lit) res_ty
   = do { let lit_ty = hsLitType lit
@@ -765,6 +767,7 @@ tcXExpr xe@(ExpandedThingRn o e') res_ty
   | OrigStmt ls@(L loc _) <- o
   = setSrcSpanA loc $
        mkExpandedStmtTc ls <$> tcApp (XExpr xe) res_ty
+
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
 
 {-

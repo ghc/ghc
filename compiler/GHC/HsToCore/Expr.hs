@@ -273,8 +273,9 @@ dsExpr e@(HsVar {})                 = dsApp e
 dsExpr e@(HsApp {})                 = dsApp e
 dsExpr e@(HsAppType {})             = dsApp e
 
-dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
-        -- See Note [Holes] in GHC.Tc.Types.Constraint
+dsExpr (HsHole (HoleVar _, HER ref _ _)) = dsEvTerm =<< readMutVar ref
+      -- See Note [Holes in expressions] in GHC.Tc.Types.Constraint.
+dsExpr (HsHole (HoleParseError x, _)) = dataConCantHappen x
 
 dsExpr (HsPar _ e)            = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e
@@ -314,6 +315,7 @@ dsExpr e@(XExpr ext_expr_tc)
         do { assert (exprType e2 `eqType` boolTy)
             mkBinaryTickBox ixT ixF e2
           }
+
 
 
 -- Strip ticks due to #21701, need to be invariant about warnings we produce whether
