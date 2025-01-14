@@ -800,6 +800,12 @@ function shell() {
   run "$cmd"
 }
 
+# Evaluate some shell code in the CI environment
+function eval_cmd() {
+  local cmd="${@: 1}"
+  eval "$cmd"
+}
+
 function lint_author(){
   base=$1
   head=$2
@@ -929,5 +935,6 @@ case $1 in
   clean) clean ;;
   save_cache) save_cache ;;
   shell) shift; shell "$@" ;;
+  eval) shift; eval_cmd "$@" ;;
   *) fail "unknown mode $1" ;;
 esac
