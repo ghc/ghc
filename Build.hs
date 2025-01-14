@@ -56,9 +56,10 @@ main = do
       Nothing -> error ("Couldn't find cabal-install: " ++ show cabal_path)
       Just x  -> pure (Cabal x)
 
-  void $ readCreateProcessWithExitCode (runGhc ghc0 ["--version"]) ""
+  ghc0_version <- readCreateProcess (runGhc ghc0 ["--version"]) ""
+  msg $ "Bootstrapping GHC version: " ++ init ghc0_version
 
-  -- build GHC stage1
+  msg "Building stage1 GHC program and utility programs"
   buildGhcStage1 defaultGhcBuildOptions cabal ghc0
 
   ghc1    <- Ghc    <$> makeAbsolute "_build/stage0/bin/ghc"
@@ -67,7 +68,7 @@ main = do
   genapply <- GenApply <$> makeAbsolute "_build/stage0/bin/genapply"
   genprimop <- GenPrimop <$> makeAbsolute "_build/stage0/bin/genprimopcode"
 
-  -- build boot libraries with stage1 compiler
+  msg "Building boot libraries with stage1 compiler..."
   buildBootLibraries cabal ghc1 ghcPkg1 deriveConstants genapply genprimop defaultGhcBuildOptions
 
   msg "Done"
@@ -76,13 +77,12 @@ main = do
 -- | Build stage1 GHC program
 buildGhcStage1 :: GhcBuildOptions -> Cabal -> Ghc -> IO ()
 buildGhcStage1 opts cabal ghc0 = do
-  msg "Preparing GHC sources to build GHC stage1..."
+  msg "  - Preparing sources to build with GHC stage0..."
   prepareGhcSources opts "_build/stage0/src/"
 
   let builddir = "_build/stage0/cabal/"
   createDirectoryIfMissing True builddir
 
-  msg "Prepare GHC stage1 configuration..."
   -- we need to augment the current environment to pass HADRIAN_SETTINGS
   -- environment variable to ghc-boot's Setup.hs script.
   stage0_settings <- read <$> readCreateProcess (runGhc ghc0 ["--info"]) ""
@@ -104,7 +104,7 @@ buildGhcStage1 opts cabal ghc0 = do
   current_env <- getEnvironment
   let stage1_env = ("HADRIAN_SETTINGS", stage1_ghc_boot_settings) : current_env
 
-  msg "Building GHC stage1 and bootstrapping utility programs..."
+  msg "  - Building GHC stage1 and bootstrapping utility programs..."
   let build_cmd = (runCabal cabal
               [ "build"
               , "--project-file=cabal.project-stage0"
@@ -130,7 +130,7 @@ buildGhcStage1 opts cabal ghc0 = do
       putStrLn "Logs can be found in \"_build/stage0/cabal.{stdout,stderr}\""
       exitFailure
 
-  msg "Copying stage0 programs and generating settings to use them..."
+  msg "  - Copying stage1 programs and generating settings to use them..."
   let listbin_cmd p = runCabal cabal
 	[ "list-bin"
 	, "--project-file=cabal.project-stage0"
@@ -285,40 +285,6 @@ prepareGhcSources opts dst = do
   subst_in (dst </> "libraries/base/base.cabal") common_substs
   subst_in (dst </> "libraries/rts/include/ghcversion.h") common_substs
 
--- Avoid FilePath blindness by using type aliases for programs.
-newtype Ghc = Ghc FilePath
-newtype GhcPkg = GhcPkg FilePath
-newtype Cabal = Cabal FilePath
-newtype DeriveConstants = DeriveConstants FilePath
-newtype GenApply = GenApply FilePath
-newtype GenPrimop = GenPrimop FilePath
-
-runGhc :: Ghc -> [String] -> CreateProcess
-runGhc (Ghc f) = proc f
-
-ghcPath :: Ghc -> FilePath
-ghcPath (Ghc x) = x
-
-runGhcPkg :: GhcPkg -> [String] -> CreateProcess
-runGhcPkg (GhcPkg f) = proc f
-
-ghcPkgPath :: GhcPkg -> FilePath
-ghcPkgPath (GhcPkg x) = x
-
-runCabal :: Cabal -> [String] -> CreateProcess
-runCabal (Cabal f) = proc f
-
-runDeriveConstants :: DeriveConstants -> [String] -> CreateProcess
-runDeriveConstants (DeriveConstants f) = proc f
-
-runGenApply :: GenApply -> [String] -> CreateProcess
-runGenApply (GenApply f) = proc f
-
-runGenPrimop :: GenPrimop -> [String] -> CreateProcess
-runGenPrimop (GenPrimop f) = proc f
-
-cp :: String -> String -> IO ()
-cp src dst = void (readCreateProcess (shell $ "cp -rf " ++ src ++ " " ++ dst) "")
 
 -- | Generate settings for stage1 compiler, based on given settings (stage0's
 -- compiler settings)
@@ -398,7 +364,7 @@ makeStage1Settings in_settings = out_settings
 
         , keep_def "target RTS linker only supports shared libraries" "NO"
         , ("Use interpreter", "NO")
-        , ("base unit-id", "base")
+        , ("base unit-id", "base") -- FIXME
         , keep_fail "Support SMP"
         , keep_fail "RTS ways"
         , keep_fail "Tables next to code"
@@ -414,16 +380,13 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
   let dst = "_build/stage1/"
   src <- makeAbsolute "_build/stage1/src"
 
-  msg "Preparing GHC sources to build GHC stage2..."
+  msg "  - Preparing sources to build with GHC stage1..."
   prepareGhcSources opts src
 
   -- Build the RTS
-  msg "Building the RTS..."
   src_rts <- makeAbsolute (src </> "libraries/rts")
   build_dir <- makeAbsolute (dst </> "cabal")
   ghcversionh <- makeAbsolute (src_rts </> "include/ghcversion.h")
-
-  msg "  - Generating RTS headers..."
 
   let build_rts_cmd = runCabal cabal
         [ "build"
@@ -464,6 +427,8 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
   --  1. run cabal until it fails. This should generate the headers we need before failing.
   --  2. use deriveConstants to generate the other files
   --  3. rerun cabal to build the rts
+
+  msg "  - Generating headers and sources..."
 
   -- first run is expected to fail because of misssing headers
   void $ readCreateProcessWithExitCode build_rts_cmd ""
@@ -525,6 +490,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
   cp (dst_libffi </> "lib" </> "libffi.a") (takeDirectory ghcplatform_dir </> "libCffi.a")
 
   -- second run of cabal is expected to succeed now that have generated all the headers!
+  msg "  - Building the RTS..."
   (rts_exit_code, rts_stdout, rts_stderr) <- readCreateProcessWithExitCode build_rts_cmd ""
   case rts_exit_code of
     ExitSuccess -> pure ()
@@ -545,7 +511,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
         , "--builddir=" ++ build_dir
         ]
 
-  msg "Building boot libraries..."
+  msg "  - Building boot libraries..."
   (boot_exit_code, boot_stdout, boot_stderr) <- readCreateProcessWithExitCode build_boot_cmd ""
   case boot_exit_code of
     ExitSuccess -> pure ()
@@ -557,8 +523,49 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
 
 
 
+---------------------------
+-- Utilities
+---------------------------
+
+-- | Display a message to the user with some timestamp
 msg :: String -> IO ()
 msg x = do
   t <- getCPUTime
   let d = t `div` 1_000_000_000
-  putStrLn ("[" ++ show d ++ "] " ++ x)
+  let stp = "[" ++ show d ++ "]"
+  putStrLn (stp ++ replicate (6 - length stp) ' ' ++ x)
+
+-- Avoid FilePath blindness by using type aliases for programs.
+newtype Ghc = Ghc FilePath
+newtype GhcPkg = GhcPkg FilePath
+newtype Cabal = Cabal FilePath
+newtype DeriveConstants = DeriveConstants FilePath
+newtype GenApply = GenApply FilePath
+newtype GenPrimop = GenPrimop FilePath
+
+runGhc :: Ghc -> [String] -> CreateProcess
+runGhc (Ghc f) = proc f
+
+ghcPath :: Ghc -> FilePath
+ghcPath (Ghc x) = x
+
+runGhcPkg :: GhcPkg -> [String] -> CreateProcess
+runGhcPkg (GhcPkg f) = proc f
+
+ghcPkgPath :: GhcPkg -> FilePath
+ghcPkgPath (GhcPkg x) = x
+
+runCabal :: Cabal -> [String] -> CreateProcess
+runCabal (Cabal f) = proc f
+
+runDeriveConstants :: DeriveConstants -> [String] -> CreateProcess
+runDeriveConstants (DeriveConstants f) = proc f
+
+runGenApply :: GenApply -> [String] -> CreateProcess
+runGenApply (GenApply f) = proc f
+
+runGenPrimop :: GenPrimop -> [String] -> CreateProcess
+runGenPrimop (GenPrimop f) = proc f
+
+cp :: String -> String -> IO ()
+cp src dst = void (readCreateProcess (shell $ "cp -rf " ++ src ++ " " ++ dst) "")
