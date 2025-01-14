@@ -134,6 +134,7 @@ buildGhcStage1 opts cabal ghc0 = do
   let listbin_cmd p = runCabal cabal
 	[ "list-bin"
 	, "--project-file=cabal.project-stage0"
+        , "--with-compiler=" ++ ghcPath ghc0     -- FIXME: escape path
 	, "--builddir=" ++ builddir
 	, p
 	]
