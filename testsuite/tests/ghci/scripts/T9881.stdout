@@ -1,7 +1,7 @@
 type Data.ByteString.Lazy.ByteString :: *
 data Data.ByteString.Lazy.ByteString
   = Data.ByteString.Lazy.Internal.Empty
-  | Data.ByteString.Lazy.Internal.Chunk {-# UNPACK #-}StrictByteString
+  | Data.ByteString.Lazy.Internal.Chunk {-# UNPACK #-} !StrictByteString
                                         Data.ByteString.Lazy.ByteString
   	-- Defined in ‘Data.ByteString.Lazy.Internal’
 instance Monoid Data.ByteString.Lazy.ByteString
@@ -19,19 +19,19 @@ instance Ord Data.ByteString.Lazy.ByteString
 
 type Data.ByteString.ByteString :: *
 data Data.ByteString.ByteString
-  = bytestring-0.12.1.0:Data.ByteString.Internal.Type.BS {-# UNPACK #-}(GHC.Internal.ForeignPtr.ForeignPtr
-                                                                          GHC.Internal.Word.Word8)
-                                                         {-# UNPACK #-}Int
-  	-- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
+  = bytestring-0.12.2.0:Data.ByteString.Internal.Type.BS {-# UNPACK #-} !(GHC.Internal.ForeignPtr.ForeignPtr
+                                                                            GHC.Internal.Word.Word8)
+                                                         {-# UNPACK #-} !Int
+  	-- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’
 instance Monoid Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
+  -- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’
 instance Semigroup Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
+  -- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’
 instance Read Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
+  -- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’
 instance Show Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
+  -- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’
 instance Eq Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
+  -- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’
 instance Ord Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.12.1.0:Data.ByteString.Internal.Type’
+  -- Defined in ‘bytestring-0.12.2.0:Data.ByteString.Internal.Type’

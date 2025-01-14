@@ -12,7 +12,6 @@
   [1 of 2] Including user[Map=ordmap:Map]
     Instantiating user[Map=ordmap:Map]
     [1 of 2] Compiling Map[sig]         ( user/Map.hsig, T19244a.out/user/user-GzloW2NeDdA2M0V8qzN4g2/Map.o )
-
 T19244a.bkp:22:9: error: [GHC-15843]
     • Type constructor ‘Key’ has conflicting definitions in the module
       and its hsig file.
@@ -29,7 +28,7 @@ T19244a.bkp:22:9: error: [GHC-15843]
       Main module: type role Map nominal representational
                    type Map :: * -> * -> *
                    data Map k a
-                     = Data.Map.Internal.Bin {-# UNPACK #-}Data.Map.Internal.Size
+                     = Data.Map.Internal.Bin {-# UNPACK #-} !Data.Map.Internal.Size
                                              !k
                                              a
                                              !(Map k a)
@@ -69,3 +68,4 @@ T19244a.bkp:22:9: error: [GHC-15843]
                      forall {k1} {k2} (k3 :: k1) (a :: k2). Map k1 k2 k3 a
       The two types are different.
     • While checking that ‘ordmap:Map’ implements signature ‘Map’ in ‘user[Map=ordmap:Map]’.
+
