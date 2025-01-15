@@ -376,3 +376,10 @@ test('test-late-plugin',
      [extra_files(['late-plugin/LatePlugin.hs']), ignore_stdout],
      makefile_test,
      [])
+
+test('T24486',
+     [extra_files(['T24486-plugin/', 'T24486_Helper.hs']),
+      when(opsys('mingw32'), skip),
+      pre_cmd('$MAKE -s --no-print-directory -C T24486-plugin package.T24486-plugin TOP={top}')
+      ],
+     makefile_test, [])

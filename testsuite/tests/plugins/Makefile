@@ -234,3 +234,10 @@ test-late-plugin:
 	ContainsLateBinding=$$(echo $$SHOW_IFACE | grep -o 222222) ; \
 	echo "$$ContainsLateBinding" ; \
 	[ "$$ContainsEarlyBinding" = "111111" ] && [ "$$ContainLateBinding" = "" ]
+
+# Test that .dyn_o files are accepted as valid object files on the command line
+# without producing "ignoring unrecognised input" warnings (#24486)
+.PHONY: T24486
+T24486:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -c T24486_Helper.hs -osuf dyn_o
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T24486.hs T24486_Helper.dyn_o -package-db T24486-plugin/pkg.T24486-plugin/local.package.conf -fplugin T24486_Plugin -plugin-package T24486-plugin
