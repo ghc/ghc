@@ -367,3 +367,16 @@ test('test-late-plugin',
      [extra_files(['late-plugin/LatePlugin.hs']), ignore_stdout],
      makefile_test,
      [])
+
+test('T21730',
+     [extra_files(['T21730-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C T21730-plugin package.T21730-plugin TOP={top}')
+      ],
+     makefile_test, [])
+
+test('T24486',
+     [extra_files(['T24486-plugin/', 'T24486_Helper.hs']),
+      when(opsys('mingw32'), skip),
+      pre_cmd('$MAKE -s --no-print-directory -C T24486-plugin package.T24486-plugin TOP={top}')
+      ],
+     makefile_test, [])
