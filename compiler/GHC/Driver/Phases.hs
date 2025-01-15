@@ -262,7 +262,7 @@ objish_suffixes :: Platform -> [String]
 -- the GHC-compiled code will run
 objish_suffixes platform = case platformOS platform of
   OSMinGW32 -> [ "o", "O", "obj", "OBJ" ]
-  _         -> [ "o" ]
+  _         -> [ "o", "dyn_o"]
 
 dynlib_suffixes :: Platform -> [String]
 dynlib_suffixes platform = case platformOS platform of
