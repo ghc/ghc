@@ -8,6 +8,9 @@ category:       GHC
 maintainer:     libraries@haskell.org
 bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
 synopsis:       GHC primitives
+-- We can't use Custom build-type with boot packages: building Setup.hs with
+-- cabal-install requires that base, Cabal, directory, process, filepath,
+-- containers, etc. libraries be available, but they aren't when we bootstrap.
 build-type:     Simple
 description:
     This package used to contain the primitive types and operations supplied by

@@ -376,8 +376,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
 	  -- platform constants in the package db and fails. The flag is already
 	  -- set in rts.cabal but for some reason it isn't always passed :shrug:
 	, "--ghc-options=-this-unit-id=rts"
-        , "--ghc-options=-DProjectVersion=913"
-        , "--ghc-options=\"-optc=-DProjectVersion=\\\"913\\\"\""
+        , "--ghc-options=\"-optc=-DProjectVersion=\\\"" ++ Text.unpack (gboVersionInt opts) ++ "\\\"\""
         , "--ghc-options=\"-optc=-DRtsWay=\\\"FIXME\\\"\""
         , "--ghc-options=\"-optc=-DHostPlatform=\\\"FIXME\\\"\""
         , "--ghc-options=\"-optc=-DHostArch=\\\"FIXME\\\"\""
@@ -431,7 +430,11 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
   run_genapply [derived_constants, "-V32"] (src_rts </> "AutoApply_V32.cmm")
   run_genapply [derived_constants, "-V64"] (src_rts </> "AutoApply_V64.cmm")
 
-  -- Generate genprimopcode
+  -- Generate primop code for ghc-prim
+  --
+  -- Note that this can't be done in a Setup.hs for ghc-prim because
+  -- cabal-install can't build it because t depends on base, Cabal, etc.
+  -- libraries that aren't built yet.
   let primops_txt    = src </> "libraries/ghc/GHC/Builtin/primops.txt"
   let primops_txt_pp = primops_txt <.> ".pp"
   primops <- readCreateProcess (shell $ "gcc -E -undef -traditional -P -x c " ++ primops_txt_pp) ""
@@ -478,11 +481,20 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = d
   let build_boot_cmd = runCabal cabal
         [ "build"
         , "--project-file=cabal.project-stage1" -- TODO: replace with command-line args
-        , "ghc-prim", "ghc-internal", "base"
         , "--with-compiler=" ++ ghcPath ghc     -- FIXME: escape path
         , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg -- FIXME: escape path
         , "--ghc-options=\"-ghcversion-file=" ++ ghcversionh ++ "\""
         , "--builddir=" ++ build_dir
+          -- never reinstall the RTS during this step: we should use the one
+          -- installed at the previous step. Otherwise we risk using invalid
+          -- generated files.
+          -- FIXME: but it doesn't work because the rts isn't really installed
+          -- , "--constraint=rts installed"
+
+          -- targets
+        , "ghc-prim"
+        , "ghc-internal"
+        , "base"
         ]
 
   msg "  - Building boot libraries..."

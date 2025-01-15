@@ -1,6 +1,6 @@
 packages:
   ./_build/stage0/src/ghc-bin/
-  ./_build/stage0/src/libraries/ghc
+  ./_build/stage0/src/libraries/ghc/
   ./_build/stage0/src/libraries/directory/
   ./_build/stage0/src/libraries/file-io/
   ./_build/stage0/src/libraries/filepath/
@@ -43,7 +43,9 @@ constraints:
 package ghc-boot-th
   flags: +bootstrap
 
+
 -- package genprimopcode
 --   flags: -build-tool-depends
 
+-- allow template-haskell with newer ghc-boot-th
 allow-newer: ghc-boot-th
