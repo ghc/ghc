@@ -60,7 +60,7 @@ main = do
   msg $ "Bootstrapping GHC version: " ++ init ghc0_version
 
   msg "Building stage1 GHC program and utility programs"
-  buildGhcStage1 defaultGhcBuildOptions cabal ghc0
+  buildGhcStage1 defaultGhcBuildOptions cabal ghc0 "_build/stage0/"
 
   ghc1    <- Ghc    <$> makeAbsolute "_build/stage0/bin/ghc"
   ghcPkg1 <- GhcPkg <$> makeAbsolute "_build/stage0/bin/ghc-pkg"
@@ -69,17 +69,17 @@ main = do
   genprimop <- GenPrimop <$> makeAbsolute "_build/stage0/bin/genprimopcode"
 
   msg "Building boot libraries with stage1 compiler..."
-  buildBootLibraries cabal ghc1 ghcPkg1 deriveConstants genapply genprimop defaultGhcBuildOptions
+  buildBootLibraries cabal ghc1 ghcPkg1 deriveConstants genapply genprimop defaultGhcBuildOptions "_build/stage1/"
 
   msg "Done"
 
 
 -- | Build stage1 GHC program
-buildGhcStage1 :: GhcBuildOptions -> Cabal -> Ghc -> IO ()
-buildGhcStage1 opts cabal ghc0 = do
-  prepareGhcSources opts "_build/stage0/src/"
+buildGhcStage1 :: GhcBuildOptions -> Cabal -> Ghc -> FilePath -> IO ()
+buildGhcStage1 opts cabal ghc0 dst = do
+  prepareGhcSources opts (dst </> "src/")
 
-  let builddir = "_build/stage0/cabal/"
+  let builddir = dst </> "cabal"
   createDirectoryIfMissing True builddir
 
   -- we need to augment the current environment to pass HADRIAN_SETTINGS
@@ -120,13 +120,13 @@ buildGhcStage1 opts cabal ghc0 = do
               { env = Just stage1_env
               }
   (exit_code, cabal_stdout, cabal_stderr) <- readCreateProcessWithExitCode build_cmd ""
-  writeFile "_build/stage0/cabal.stdout" cabal_stdout
-  writeFile "_build/stage0/cabal.stderr" cabal_stderr
+  writeFile (dst </> "cabal.stdout") cabal_stdout
+  writeFile (dst </> "cabal.stderr") cabal_stderr
   case exit_code of
     ExitSuccess -> pure ()
     ExitFailure n -> do
       putStrLn $ "cabal-install failed with error code: " ++ show n
-      putStrLn "Logs can be found in \"_build/stage0/cabal.{stdout,stderr}\""
+      putStrLn $ "Logs can be found in \"" ++ dst ++ "/cabal.{stdout,stderr}\""
       exitFailure
 
   msg "  - Copying stage1 programs and generating settings to use them..."
@@ -142,12 +142,12 @@ buildGhcStage1 opts cabal ghc0 = do
 	case list_bin_exit_code of
 	  ExitSuccess
 	    | (bin_src:_) <- lines list_bin_stdout
-	    -> cp bin_src ("_build/stage0/bin" </> bin)
+	    -> cp bin_src (dst </> "bin" </> bin)
 	  _ -> do
 	    putStrLn $ "Failed to run cabal list-bin for the target: " ++ show target
 	    putStrLn list_bin_stderr
 	    exitFailure
-  createDirectoryIfMissing True "_build/stage0/bin"
+  createDirectoryIfMissing True (dst </> "bin")
   copy_bin "ghc-bin:ghc"		     "ghc"
   copy_bin "ghc-pkg:ghc-pkg"  		     "ghc-pkg"
   copy_bin "deriveConstants:deriveConstants" "deriveConstants"
@@ -155,11 +155,11 @@ buildGhcStage1 opts cabal ghc0 = do
   copy_bin "genapply:genapply"		     "genapply"
 
   -- initialize empty global package database
-  pkgdb <- makeAbsolute "_build/stage1/pkgs"
+  pkgdb <- makeAbsolute (dst </> "pkgs")
   doesDirectoryExist pkgdb >>= \case
     True -> pure () -- don't try to recreate the DB if it already exist as it would fail
     False -> do
-      ghcpkg <- GhcPkg <$> makeAbsolute "_build/stage0/bin/ghc-pkg"
+      ghcpkg <- GhcPkg <$> makeAbsolute (dst </> "bin/ghc-pkg")
       void $ readCreateProcess (runGhcPkg ghcpkg ["init", pkgdb]) ""
       void $ readCreateProcess (runGhcPkg ghcpkg
                 [ "recache"
@@ -169,13 +169,13 @@ buildGhcStage1 opts cabal ghc0 = do
 
 
   -- generate settings based on stage1 compiler settings
-  createDirectoryIfMissing True "_build/stage0/lib"
+  createDirectoryIfMissing True (dst </> "lib")
   let stage1_settings = makeStage1Settings stage0_settings
-  writeFile "_build/stage0/lib/settings" (show stage1_settings)
+  writeFile (dst </> "lib/settings") (show stage1_settings)
 
   -- try to run the stage1 compiler (no package db yet, so just display the
   -- version)
-  (test_exit_code, test_stdout, _test_stderr) <- readCreateProcessWithExitCode (proc "_build/stage0/bin/ghc" ["--version"]) ""
+  (test_exit_code, test_stdout, _test_stderr) <- readCreateProcessWithExitCode (proc (dst </> "bin/ghc") ["--version"]) ""
   case test_exit_code of
     ExitSuccess -> pure ()
     ExitFailure n -> do
@@ -339,22 +339,19 @@ makeStage1Settings in_settings = out_settings
 
         , keep_def "target RTS linker only supports shared libraries" "NO"
         , ("Use interpreter", "NO")
-        , ("base unit-id", "base") -- FIXME
+        , ("base unit-id", "base") -- there is no base yet... Anyway this isn't really useful to set
         , keep_fail "Support SMP"
         , keep_fail "RTS ways"
         , keep_fail "Tables next to code"
         , keep_fail "Leading underscore"
         , keep_fail "Use LibFFI"
         , keep_fail "RTS expects libdw"
-        , ("Relative Global Package DB", "../../stage1/pkgs")
+        , ("Relative Global Package DB", "../pkgs")
         ]
 
-buildBootLibraries :: Cabal -> Ghc -> GhcPkg -> DeriveConstants -> GenApply -> GenPrimop -> GhcBuildOptions -> IO ()
-buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts = do
-  -- FIXME: should be parameters
-  let dst = "_build/stage1/"
-  src <- makeAbsolute "_build/stage1/src"
-
+buildBootLibraries :: Cabal -> Ghc -> GhcPkg -> DeriveConstants -> GenApply -> GenPrimop -> GhcBuildOptions -> FilePath -> IO ()
+buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst = do
+  src <- makeAbsolute (dst </> "src")
   prepareGhcSources opts src
 
   -- Build the RTS
