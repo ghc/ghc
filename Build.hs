@@ -437,10 +437,6 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "--ghc-options=\"-I" ++ (src_rts </> "include") ++ "\""
         , "--ghc-options=\"-I" ++ src_rts ++ "\""
         , "--builddir=" ++ build_dir
-	  -- we need to pass "-this-unit-id=rts", otherwise GHC tries to lookup the
-	  -- platform constants in the package db and fails. The flag is already
-	  -- set in rts.cabal but for some reason it isn't always passed :shrug:
-	, "--ghc-options=-this-unit-id=rts"
         , "--ghc-options=\"-optc=-DProjectVersion=\\\"" ++ Text.unpack (gboVersionInt opts) ++ "\\\"\""
         , "--ghc-options=\"-optc=-DRtsWay=\\\"FIXME\\\"\""
         , "--ghc-options=\"-optc=-DHostPlatform=\\\"FIXME\\\"\""
@@ -498,7 +494,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   -- Generate primop code for ghc-prim
   --
   -- Note that this can't be done in a Setup.hs for ghc-prim because
-  -- cabal-install can't build it because t depends on base, Cabal, etc.
+  -- cabal-install can't build Setup.hs because it depends on base, Cabal, etc.
   -- libraries that aren't built yet.
   let primops_txt    = src </> "libraries/ghc/GHC/Builtin/primops.txt"
   let primops_txt_pp = primops_txt <.> ".pp"

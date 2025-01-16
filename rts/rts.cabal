@@ -109,6 +109,7 @@ library
     -- expects the unit-id to be
     -- set without version
     ghc-options: -this-unit-id rts
+    cmm-options: -this-unit-id rts
 
     exposed: True
     exposed-modules:
