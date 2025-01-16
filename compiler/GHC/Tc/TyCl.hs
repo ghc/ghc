@@ -1875,9 +1875,9 @@ kcConDecl new_or_data tc_res_kind
     bindOuterSigTKBndrs_Tv outer_bndrs $
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsContext cxt
-       ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
+       ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty $$ ppr tc_res_kind)
        ; con_res_kind <-  if NewType == new_or_data
-                          then return tc_res_kind
+                          then return $ getTyConResultKind tc_res_kind
                           else newOpenTypeKind
        ; _ <- tcCheckLHsTypeInContext res_ty $ (TheKind con_res_kind)
        ; let arg_exp_kind = getArgExpKind new_or_data con_res_kind
