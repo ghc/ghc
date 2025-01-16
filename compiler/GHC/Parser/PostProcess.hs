@@ -34,6 +34,7 @@ module GHC.Parser.PostProcess (
         fromSpecTyVarBndr, fromSpecTyVarBndrs,
         annBinds,
         stmtsAnchor, stmtsLoc,
+        addModifiersToDecl,
 
         cvBindGroup,
         cvBindsAndSigs,
@@ -197,7 +198,6 @@ mkInstD :: LInstDecl (GhcPass p) -> LHsDecl (GhcPass p)
 mkInstD (L loc d) = L loc (InstD noExtField d)
 
 mkClassDecl :: SrcSpan
-            -> [HsModifier GhcPs]
             -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
             -> Located (a,[LHsFunDep GhcPs])
             -> OrdList (LHsDecl GhcPs)
@@ -205,7 +205,7 @@ mkClassDecl :: SrcSpan
             -> AnnClassDecl
             -> P (LTyClDecl GhcPs)
 
-mkClassDecl loc' mods (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
+mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
   = do { (binds, sigs, ats, at_defs, _, docs) <- cvBindsAndSigs where_cls
        ; (cls, tparams, fixity, ops, cps, cs) <- checkTyClHdr True tycl_hdr
        ; tyvars <- checkTyVars (text "class") whereDots cls tparams
@@ -220,10 +220,9 @@ mkClassDecl loc' mods (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
                                   , tcdMeths = binds
                                   , tcdATs = ats, tcdATDefs = at_defs
                                   , tcdDocs = docs
-                                  , tcdModifiers = mods })) }
+                                  , tcdModifiers = [] })) }
 
 mkTyData :: SrcSpan
-         -> [HsModifier GhcPs]
          -> Bool
          -> NewOrData
          -> Maybe (LocatedP CType)
@@ -233,7 +232,7 @@ mkTyData :: SrcSpan
          -> Located (HsDeriving GhcPs)
          -> AnnDataDefn
          -> P (LTyClDecl GhcPs)
-mkTyData loc' mods is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
+mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
          ksig data_cons (L _ maybe_deriv) annsIn
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False tycl_hdr
        ; tyvars <- checkTyVars (ppr new_or_data) equalsDots tc tparams
@@ -246,7 +245,7 @@ mkTyData loc' mods is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
                                    tcdLName = tc, tcdTyVars = tyvars,
                                    tcdFixity = fixity,
                                    tcdDataDefn = defn,
-                                   tcdModifiers = mods })) }
+                                   tcdModifiers = [] })) }
 
 mkDataDefn :: Maybe (LocatedP CType)
            -> Maybe (LHsContext GhcPs)
@@ -1994,7 +1993,7 @@ instance DisambECP (HsExpr GhcPs) where
     exprArrowParsingMode mode $
     return $ L (noAnnSrcSpan l) $
       HsFunArr noExtField arr arg res
-  mkHsMultPV lMods tok = return $ HsStandardArrow tok (unLoc lMods)
+  mkHsMultPV lMods tok = return $ HsStandardArrow tok (reverse $ unLoc lMods)
   mkHsForallPV l telescope ty =
     return $ L (noAnnSrcSpan l) $
       HsForAll noExtField (setTelescopeBndrsNameSpace varName telescope) ty
@@ -3027,7 +3026,7 @@ mkImport :: Located CCallConv
          -> Located Safety
          -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
          -> (EpToken "import", TokDcolon)
-         -> P ([HsModifier GhcPs] -> EpToken "foreign" -> HsDecl GhcPs)
+         -> P (EpToken "foreign" -> HsDecl GhcPs)
 mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td) =
     case unLoc cconv of
       CCallConv          -> returnSpec =<< mkCImport
@@ -3064,12 +3063,12 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
         funcTarget = CFunction (StaticTarget esrc entity' Nothing True)
         importSpec = CImport (L (l2l loc) esrc) (reLoc cconv) (reLoc safety) Nothing funcTarget
 
-    returnSpec spec = return $ \ mods tforeign -> ForD noExtField $ ForeignImport
+    returnSpec spec = return $ \ tforeign -> ForD noExtField $ ForeignImport
           { fd_i_ext  = (tforeign, timport, td)
           , fd_name   = v
           , fd_sig_ty = ty
           , fd_fi     = spec
-          , fd_modifiers = mods
+          , fd_modifiers = []
           }
 
 
@@ -3139,12 +3138,12 @@ parseCImport cconv safety nm str sourceText =
 mkExport :: Located CCallConv
          -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
          -> ( EpToken "export", TokDcolon)
-         -> P ([HsModifier GhcPs] -> EpToken "foreign" -> HsDecl GhcPs)
+         -> P (EpToken "foreign" -> HsDecl GhcPs)
 mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty) (texport, td)
- = return $ \mods tforeign -> ForD noExtField $
+ = return $ \tforeign -> ForD noExtField $
    ForeignExport { fd_e_ext = (tforeign, texport, td), fd_name = v, fd_sig_ty = ty
                  , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic esrc entity' cconv))
-                 , fd_modifiers = mods }
+                 , fd_modifiers = [] }
   where
     entity' | nullFS entity = mkExtName (unLoc v)
             | otherwise     = entity
@@ -3648,3 +3647,51 @@ mkListSyntaxTy1 brkOpen t brkClose =
 
     annsKeyword = (NoEpTok, EpTok brkOpen, EpTok brkClose)
     annParen = AnnParen AnnParensSquare brkOpen brkClose
+
+addModifiersToDecl :: Located [HsModifier GhcPs]
+                   -> HsDecl GhcPs
+                   -> P (HsDecl GhcPs)
+addModifiersToDecl (L _ mods) = \case
+  TyClD x decl -> TyClD x <$> case decl of
+    FamDecl{} -> forbidden decl
+    SynDecl{} -> forbidden decl
+    d@DataDecl{tcdModifiers = mods'} ->
+      pure $ d { tcdModifiers = mods ++ mods' }
+    d@ClassDecl{tcdModifiers = mods'} ->
+      pure $ d { tcdModifiers = mods ++ mods'}
+  InstD x decl -> InstD x <$> case decl of
+    ClsInstD x' d@(ClsInstDecl { cid_modifiers = mods' }) ->
+      pure $ ClsInstD x' (d { cid_modifiers = mods ++ mods' })
+    DataFamInstD{} -> forbidden decl
+    TyFamInstD{} -> forbidden decl
+  SigD x decl -> SigD x <$> case decl of
+    TypeSig x' a b mods' -> pure $ TypeSig x' a b (mods ++ mods')
+    PatSynSig{}        -> forbidden decl
+    ClassOpSig{}       -> forbidden decl
+    FixSig{}           -> forbidden decl
+    InlineSig{}        -> forbidden decl
+    SpecSig{}          -> forbidden decl
+    SpecInstSig{}      -> forbidden decl
+    MinimalSig{}       -> forbidden decl
+    SCCFunSig{}        -> forbidden decl
+    CompleteMatchSig{} -> forbidden decl
+  DefD x d@(DefaultDecl{defd_modifiers = mods'}) ->
+    pure $ DefD x (d { defd_modifiers = mods ++ mods' })
+  ForD x decl -> ForD x <$> case decl of
+    d@ForeignImport{fd_modifiers = mods'} ->
+      pure $ d { fd_modifiers = mods ++ mods'}
+    d@ForeignExport{fd_modifiers = mods'} ->
+      pure $ d { fd_modifiers = mods ++ mods'}
+  decl@DerivD{}     -> forbidden decl
+  decl@ValD{}       -> forbidden decl
+  decl@KindSigD{}   -> forbidden decl
+  decl@WarningD{}   -> forbidden decl
+  decl@AnnD{}       -> forbidden decl
+  decl@RuleD{}      -> forbidden decl
+  decl@SpliceD{}    -> forbidden decl
+  decl@DocD{}       -> forbidden decl
+  decl@RoleAnnotD{} -> forbidden decl
+ where
+  forbidden decl = do
+    addError $ error "modifiers forbidden here" -- MODS_TODO need an actual error message
+    pure decl

@@ -5,28 +5,34 @@ module Modifiers where
 
 import GHC.Types (Multiplicity(..), Type)
 
-%() data D
+%()
+data D
   = %() D1 Int
   | %True D2 String
   | %False D3 { d3 %() :: () }
   | %Bool Int :* Bool
   | (%Maybe Int) :** Bool
 
-%() data D' where
+%()
+data D' where
   %() D1' :: Int -> D'
   %True D2' :: String -> D'
   %False D3' :: { d3' %() :: () } -> D'
 
-%() newtype N = %True N { n %False :: Int }
+%()
+newtype N = %True N { n %False :: Int }
 
-%() newtype N' where
+%()
+newtype N' where
   %True N' :: { n' %False :: Int } -> N'
 
-%() type data TD
+%()
+type data TD
   = %() TD1 Int
   | %True TD2 String
 
-%() type data TD' where
+%()
+type data TD' where
   %() TD1' :: Int -> TD'
   %True TD2' :: String -> TD'
 
@@ -37,13 +43,17 @@ class C a
 %True
 instance C D
 
-%() default (Int)
+%()
+default (Int)
 
--- MODS_TODO for modifiers that get typechecked, %() currently throws an
--- "unknown kind" error where %True doesn't.
+%True
+foreign import ccall "test" someImport :: Int
+%True
+foreign export ccall someImport :: Int
 
-%True foreign import ccall "test" someImport :: Int
-%True foreign export ccall someImport :: Int
+%()
+sigDecl :: ()
+sigDecl = undefined
 
 l1 :: forall (m :: Bool) a b . a %m -> b
 l1 = undefined
@@ -54,8 +64,20 @@ l2 = undefined
 l3 :: a %(m :: Multiplicity) -> b %(m :: Multiplicity) -> c
 l3 = undefined
 
-l4 :: a %Bool -> b
+l4 :: a %() -> b
 l4 = undefined
+
+-- MODS_TODO This one should probably fail, since Just :: Maybe a is poly-kinded
+l5 :: a %Just -> b
+l5 = undefined
+
+-- MODS_TODO it's kinda weird that this one works but l8 fails
+l6 :: a %m -> b %(m :: Multiplicity) -> c
+l6 = undefined
+
+-- MODS_TODO these are expected to fail, not tested in this test case:
+-- l7 :: a %m -> b
+-- l8 :: a %(m :: Multiplicity) -> b %m -> c
 
 t1 :: %'() Int
 t1 = 0
@@ -65,10 +87,6 @@ t2 = Nothing
 
 t3 :: Maybe (%(%True True) Int)
 t3 = Nothing
-
--- MODS_TODO these are expected to fail, not tested in this test case:
--- l5 :: a %m -> b
--- l6 :: a %(m :: Multiplicity) -> b %m -> c
 
 idt :: forall t -> t -> t
 idt _ x = x
@@ -86,7 +104,8 @@ visForallApp = idt (Int %() -> Int) (+ 1)
 -- these are allowed, rename-only modifiers with unknown kind are in fact
 -- possible.
 
-%a data FV1 a
+%a
+data FV1 a
 
 data FV2 a = %a FV2
 
@@ -121,11 +140,15 @@ fv8 = undefined
 
 -- And which concrete types?
 
-%CT1 data CT1
+%CT1
+data CT1
 
-%CT2Con data CT2 = CT2Con
+%CT2Con
+data CT2 = CT2Con
 
-%CT2Con' data CT2' where
+%CT2Con'
+data CT2' where
   CT2Con' :: CT2'
 
-%CT3 class CT3 a
+%CT3
+class CT3 a
