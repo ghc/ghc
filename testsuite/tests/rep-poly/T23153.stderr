@@ -1,4 +1,3 @@
-
 T23153.hs:8:1: error: [GHC-52083]
     The argument ‘(h ())’ of ‘f’
     cannot be assigned a fixed runtime representation, not even by defaulting.
@@ -13,3 +12,4 @@ T23153.hs:8:1: error: [GHC-52083]
     The argument ‘(h ())’ of ‘f’
     cannot be assigned a fixed runtime representation, not even by defaulting.
     Suggested fix: Add a type signature.
+

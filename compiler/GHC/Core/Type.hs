@@ -235,7 +235,8 @@ module GHC.Core.Type (
 
         -- * Kinds
         isTYPEorCONSTRAINT,
-        isConcreteType, isFixedRuntimeRepKind,
+        isConcreteType,
+        isFixedRuntimeRepKind
     ) where
 
 import GHC.Prelude
@@ -2869,12 +2870,14 @@ isFixedRuntimeRepKind k
 isConcreteType :: Type -> Bool
 isConcreteType = isConcreteTypeWith emptyVarSet
 
-isConcreteTypeWith :: TyVarSet -> Type -> Bool
+-- | Like 'isConcreteType', but allows passing in a set of 'TyVar's that
+-- should be considered concrete.
+--
 -- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
--- For this "With" version we pass in a set of TyVars to be considered
--- concrete.  This supports mkSynonymTyCon, which needs to test the RHS
--- for concreteness, under the assumption that the binders are instantiated
--- to concrete types
+isConcreteTypeWith :: TyVarSet -> Type -> Bool
+-- This version, with a 'TyVarSet' argument, supports 'mkSynonymTyCon',
+-- which needs to test the RHS for concreteness, under the assumption that
+-- the binders are instantiated to concrete types
 isConcreteTypeWith conc_tvs = go
   where
     go (TyVarTy tv)        = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
@@ -2888,6 +2891,7 @@ isConcreteTypeWith conc_tvs = go
     go CastTy{}            = False
     go CoercionTy{}        = False
 
+    go_tc :: TyCon -> [Type] -> Bool
     go_tc tc tys
       | isForgetfulSynTyCon tc  -- E.g. type S a = Int
                                 -- Then (S x) is concrete even if x isn't
@@ -2902,7 +2906,6 @@ isConcreteTypeWith conc_tvs = go
 
       | otherwise  -- E.g. type families
       = False
-
 
 {-
 %************************************************************************

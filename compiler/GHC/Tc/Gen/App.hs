@@ -1202,8 +1202,7 @@ tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty
              ->
              -- Example: user wrote e.g. (#,#) @(F Bool) for a type family F.
              -- Emit [W] F Bool ~ kappa[conc] and pretend the user wrote (#,#) @kappa.
-             do { mco <- unifyConcrete (occNameFS $ getOccName $ tv_nm) conc ty_arg0
-                ; return $ case mco of { MRefl -> ty_arg0; MCo co -> coercionRKind co } }
+               coercionRKind <$> unifyConcrete (occNameFS $ getOccName $ tv_nm) conc ty_arg0
 
        ; let fun_ty    = mkForAllTy tvb inner_ty
              in_scope  = mkInScopeSet (tyCoVarsOfTypes [fun_ty, ty_arg])

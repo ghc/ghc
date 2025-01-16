@@ -755,7 +755,7 @@ newNamedAnonMetaTyVar tyvar_name meta_info kind
   = do  { name    <- newMetaTyVarName tyvar_name
         ; details <- newMetaDetails meta_info
         ; let tyvar = mkTcTyVar name kind details
-        ; traceTc "newAnonMetaTyVar" (ppr tyvar)
+        ; traceTc "newAnonMetaTyVar" (ppr tyvar <+> dcolon <+> ppr kind)
         ; return tyvar }
 
 -- makes a new skolem tv

@@ -1,6 +1,6 @@
-
 RepPolyTuple3.hs:21:9: error: [GHC-18872]
     • Couldn't match kind ‘FloatRep’ with ‘IntRep’
         arising from a representation-polymorphism check
     • In the expression: (#,#) @RR @RR x
       In an equation for ‘bar’: bar x = (#,#) @RR @RR x
+

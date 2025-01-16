@@ -53,7 +53,7 @@ module GHC.Tc.Utils.TcType (
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
   ConcreteTvOrigin(..), isConcreteTyVar_maybe, isConcreteTyVar,
-  isConcreteTyVarTy, isConcreteTyVarTy_maybe, isConcreteInfo,
+  isConcreteTyVarTy, isConcreteTyVarTy_maybe, concreteInfo_maybe,
   ConcreteTyVars, noConcreteTyVars,
   isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
@@ -1266,9 +1266,9 @@ isConcreteTyVar_maybe tv
   | otherwise
   = Nothing
 
-isConcreteInfo :: MetaInfo -> Bool
-isConcreteInfo (ConcreteTv {}) = True
-isConcreteInfo _               = False
+concreteInfo_maybe :: MetaInfo -> Maybe ConcreteTvOrigin
+concreteInfo_maybe (ConcreteTv conc_orig) = Just conc_orig
+concreteInfo_maybe _                      = Nothing
 
 -- | Is this type variable a concrete type variable, i.e.
 -- it is a metavariable with 'ConcreteTv' 'MetaInfo'?

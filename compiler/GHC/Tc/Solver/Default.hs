@@ -440,7 +440,7 @@ defaultEquality ct
 
   where
     try_default_tv lhs_tv rhs_ty
-      | MetaTv { mtv_info = info, mtv_tclvl = lvl } <- tcTyVarDetails lhs_tv
+      | MetaTv { mtv_info = info } <- tcTyVarDetails lhs_tv
       , tyVarKind lhs_tv `tcEqType` typeKind rhs_ty
       , checkTopShape info rhs_ty
       -- Do not test for touchability of lhs_tv; that is the whole point!
@@ -449,14 +449,13 @@ defaultEquality ct
 
            -- checkTyEqRhs: check that we can in fact unify lhs_tv := rhs_ty
            -- See Note [Defaulting equalities]
-           --   LC_Promote: promote deeper unification variables (DE4)
-           --   LC_Promote True: ...including under type families (DE5)
-           ; let flags :: TyEqFlags ()
-                 flags = TEF { tef_foralls  = False
-                             , tef_fam_app  = TEFA_Recurse
-                             , tef_lhs      = TyVarLHS lhs_tv
-                             , tef_unifying = Unifying info lvl (LC_Promote True)
-                             , tef_occurs   = cteInsolubleOccurs }
+           ; let task :: TEFTask
+                 task = unifyingLHSMetaTyVar_TEFTask lhs_tv (LC_Promote True)
+                    -- LC_Promote: promote deeper unification variables (DE4)
+                    -- LC_Promote True: ...including under type families (DE5)
+                 flags :: TyEqFlags ()
+                 flags = TEF { tef_task    = task
+                             , tef_fam_app = TEFA_Recurse }
            ; res :: PuResult () Reduction <- wrapTcS (checkTyEqRhs flags rhs_ty)
 
            ; case res of

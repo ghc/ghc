@@ -201,6 +201,7 @@ import GHC.Exts (oneShot)
 import Control.Monad
 import Data.IORef
 import Data.List ( mapAccumL )
+import Data.Maybe ( isJust )
 import Data.Foldable
 import qualified Data.Semigroup as S
 import GHC.Types.SrcLoc
@@ -2122,7 +2123,7 @@ checkTouchableTyVarEq ev lhs_tv rhs
        _ -> pprPanic "checkTouchableTyVarEq" (ppr lhs_tv)
             -- lhs_tv should be a meta-tyvar
 
-    is_concrete_lhs_tv = isConcreteInfo lhs_tv_info
+    is_concrete_lhs_tv = isJust $ concreteInfo_maybe lhs_tv_info
 
     check_rhs rhs
        -- Crucial special case for  alpha ~ F tys
@@ -2134,11 +2135,9 @@ checkTouchableTyVarEq ev lhs_tv rhs
        | otherwise
        = checkTyEqRhs flags rhs
 
-    flags = TEF { tef_foralls  = False -- isRuntimeUnkSkol lhs_tv
-                , tef_fam_app  = mkTEFA_Break ev NomEq break_wanted
-                , tef_unifying = Unifying lhs_tv_info lhs_tv_lvl (LC_Promote False)
-                , tef_lhs      = TyVarLHS lhs_tv
-                , tef_occurs   = cteInsolubleOccurs }
+    flags = TEF { tef_task    = unifyingLHSMetaTyVar_TEFTask lhs_tv (LC_Promote False)
+                , tef_fam_app = mkTEFA_Break ev NomEq break_wanted
+                }
 
     arg_flags = famAppArgFlags flags
 
@@ -2147,7 +2146,8 @@ checkTouchableTyVarEq ev lhs_tv rhs
       -- Occurs check or skolem escape; so flatten
       = do { let fam_app_kind = typeKind fam_app
            ; reason <- checkPromoteFreeVars cteInsolubleOccurs
-                            lhs_tv lhs_tv_lvl (tyCoVarsOfType fam_app_kind)
+                         (tyVarName lhs_tv) lhs_tv_lvl
+                         (tyCoVarsOfType fam_app_kind)
            ; if not (cterHasNoProblem reason)  -- Failed to promote free vars
              then failCheckWith reason
              else
@@ -2210,19 +2210,15 @@ checkTypeEq ev eq_rel lhs rhs
     arg_flags = famAppArgFlags given_flags
 
     given_flags :: TyEqFlags (TcTyVar,TcType)
-    given_flags = TEF { tef_lhs      = lhs
-                      , tef_foralls  = False
-                      , tef_unifying = NotUnifying
-                      , tef_fam_app  = mkTEFA_Break ev eq_rel break_given
-                      , tef_occurs   = occ_prob }
+    given_flags = TEF { tef_task    = notUnifying_TEFTask occ_prob lhs
+                      , tef_fam_app = mkTEFA_Break ev eq_rel break_given
+                      }
         -- TEFA_Break used for: [G] a ~ Maybe (F a)
         --                   or [W] F a ~ Maybe (F a)
 
-    wanted_flags = TEF { tef_lhs      = lhs
-                       , tef_foralls  = False
-                       , tef_unifying = NotUnifying
-                       , tef_fam_app  = TEFA_Recurse
-                       , tef_occurs   = occ_prob }
+    wanted_flags = TEF { tef_task    = notUnifying_TEFTask occ_prob lhs
+                       , tef_fam_app = TEFA_Recurse
+                       }
         -- TEFA_Recurse: see Note [Don't cycle-break Wanteds when not unifying]
 
     -- occ_prob: see Note [Occurs check and representational equality]
@@ -2289,7 +2285,7 @@ where both sides are TyFamLHSs.  We don't want to flatten that RHS to
 Instead we'd like to say "occurs-check" and swap LHS and RHS, which yields a
 canonical constraint
     [G] G (...(F ty)...) ~ F ty
-That tents to rewrite a big type to smaller one. This happens in T15703,
+That tends to rewrite a big type to smaller one. This happens in T15703,
 where we had:
     [G] Pure g ~ From1 (To1 (Pure g))
 Making a loop breaker and rewriting left to right just makes much bigger
