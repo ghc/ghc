@@ -77,7 +77,8 @@ main = do
 -- | Build stage1 GHC program
 buildGhcStage1 :: GhcBuildOptions -> Cabal -> Ghc -> FilePath -> IO ()
 buildGhcStage1 opts cabal ghc0 dst = do
-  prepareGhcSources opts (dst </> "src/")
+  let src = dst </> "src"
+  prepareGhcSources opts src
 
   let builddir = dst </> "cabal"
   createDirectoryIfMissing True builddir
@@ -104,12 +105,59 @@ buildGhcStage1 opts cabal ghc0 dst = do
   let stage1_env = ("HADRIAN_SETTINGS", stage1_ghc_boot_settings) : current_env
 
   msg "  - Building GHC stage1 and bootstrapping utility programs..."
+  let cabal_project_path = dst </> "cabal.project-stage0"
+  makeCabalProject cabal_project_path
+        [ "packages:"
+        , "  " ++ src </> "ghc-bin/"
+        , "  " ++ src </> "libraries/ghc/"
+        , "  " ++ src </> "libraries/directory/"
+        , "  " ++ src </> "libraries/file-io/"
+        , "  " ++ src </> "libraries/filepath/"
+        , "  " ++ src </> "libraries/ghc-platform/"
+        , "  " ++ src </> "libraries/ghc-boot/"
+        , "  " ++ src </> "libraries/ghc-boot-th/"
+        , "  " ++ src </> "libraries/ghc-heap"
+        , "  " ++ src </> "libraries/ghci"
+        , "  " ++ src </> "libraries/os-string/"
+        , "  " ++ src </> "libraries/process/"
+        , "  " ++ src </> "libraries/semaphore-compat"
+        , "  " ++ src </> "libraries/time"
+        , "  " ++ src </> "libraries/unix/"
+        , "  " ++ src </> "libraries/Win32/"
+        , "  " ++ src </> "utils/ghc-pkg"
+        , "  " ++ src </> "utils/hsc2hs"
+        , "  " ++ src </> "utils/unlit"
+        , "  " ++ src </> "utils/genprimopcode/"
+        , "  " ++ src </> "utils/genapply/"
+        , "  " ++ src </> "utils/deriveConstants/"
+        , ""
+        , "benchmarks: False"
+        , "tests: False"
+        , "allow-boot-library-installs: True"
+        , ""
+        , "package *"
+        , "  library-vanilla: True"
+        , "  shared: False"
+        , "  executable-profiling: False"
+        , "  executable-dynamic: False"
+        , "  executable-static: True"
+        , ""
+        , "constraints:"
+             -- for some reason 2.23 doesn't build
+        , "  template-haskell <= 2.22"
+        , ""
+        , "package ghc-boot-th"
+        , "  flags: +bootstrap"
+        , ""
+          -- allow template-haskell with newer ghc-boot-th
+        , "allow-newer: ghc-boot-th"
+        ]
   let build_cmd = (runCabal cabal
               [ "build"
-              , "--project-file=cabal.project-stage0"
+              , "--project-file=" ++ cabal_project_path
               , "--builddir=" ++ builddir
               , "-j"
-              , "--with-compiler=" ++ ghcPath ghc0 -- FIXME: escape path
+              , "--with-compiler=" ++ ghcPath ghc0
               -- the targets
               , "ghc-bin:ghc"
               , "ghc-pkg:ghc-pkg"
@@ -132,8 +180,8 @@ buildGhcStage1 opts cabal ghc0 dst = do
   msg "  - Copying stage1 programs and generating settings to use them..."
   let listbin_cmd p = runCabal cabal
 	[ "list-bin"
-	, "--project-file=cabal.project-stage0"
-        , "--with-compiler=" ++ ghcPath ghc0     -- FIXME: escape path
+	, "--project-file=" ++ cabal_project_path
+        , "--with-compiler=" ++ ghcPath ghc0
 	, "--builddir=" ++ builddir
 	, p
 	]
@@ -359,12 +407,32 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   build_dir <- makeAbsolute (dst </> "cabal")
   ghcversionh <- makeAbsolute (src_rts </> "include/ghcversion.h")
 
+  let cabal_project_rts_path = dst </> "cabal.project-rts"
+  makeCabalProject cabal_project_rts_path
+        [ "package-dbs: clear, global"
+        , ""
+        , "packages:"
+        , "  ./_build/stage1/src/libraries/rts"
+        , ""
+        , "benchmarks: False"
+        , "tests: False"
+        , "allow-boot-library-installs: True"
+        , "active-repositories: :none"
+        , ""
+        , "package *"
+        , "  library-vanilla: True"
+        , "  shared: False"
+        , "  executable-profiling: False"
+        , "  executable-dynamic: False"
+        , "  executable-static: False"
+        ]
+
   let build_rts_cmd = runCabal cabal
         [ "build"
-        , "--project-file=cabal.project-stage1-rts" -- TODO: replace with command-line args
+        , "--project-file=" ++ cabal_project_rts_path
         , "rts"
-        , "--with-compiler=" ++ ghcPath ghc     -- FIXME: escape path
-        , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg -- FIXME: escape path
+        , "--with-compiler=" ++ ghcPath ghc
+        , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg
         , "--ghc-options=\"-ghcversion-file=" ++ ghcversionh ++ "\""
         , "--ghc-options=\"-I" ++ (src_rts </> "include") ++ "\""
         , "--ghc-options=\"-I" ++ src_rts ++ "\""
@@ -475,11 +543,78 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
       exitFailure
 
   -- build boot libraries: ghc-internal, base... but not GHC itself
+  let cabal_project_bootlibs_path = dst </> "cabal-project-boot-libs"
+  makeCabalProject cabal_project_bootlibs_path
+        [ "package-dbs: clear, global"
+        , ""
+        , "packages:"
+        , "  ./_build/stage1/src/libraries/rts"
+        , "  ./_build/stage1/src/libraries/ghc-prim"
+        , "  ./_build/stage1/src/libraries/ghc-internal"
+        , "  ./_build/stage1/src/libraries/base"
+        , "  ./_build/stage1/src/libraries/ghc"
+        , "  ./_build/stage1/src/libraries/ghc-platform/"
+        , "  ./_build/stage1/src/libraries/ghc-boot/"
+        , "  ./_build/stage1/src/libraries/ghc-boot-th/"
+        , "  ./_build/stage1/src/libraries/ghc-heap"
+        , "  ./_build/stage1/src/libraries/ghci"
+        , "  ./_build/stage1/src/libraries/stm"
+        , "  ./_build/stage1/src/libraries/template-haskell"
+        , "  ./_build/stage1/src/libraries/hpc"
+        , "  ./_build/stage1/src/ghc-bin/"
+        , "  ./_build/stage1/src/utils/ghc-pkg"
+        , "  ./_build/stage1/src/utils/hsc2hs"
+        , "  ./_build/stage1/src/utils/unlit"
+        , ""
+        , "  ./_build/stage1/src/libraries/array"
+        , "  ./_build/stage1/src/libraries/binary"
+        , "  ./_build/stage1/src/libraries/bytestring"
+        , "  ./_build/stage1/src/libraries/containers/containers"
+        , "  ./_build/stage1/src/libraries/deepseq"
+        , "  ./_build/stage1/src/libraries/directory/"
+        , "  ./_build/stage1/src/libraries/exceptions"
+        , "  ./_build/stage1/src/libraries/file-io/"
+        , "  ./_build/stage1/src/libraries/filepath/"
+        , "  ./_build/stage1/src/libraries/mtl"
+        , "  ./_build/stage1/src/libraries/os-string/"
+        , "  ./_build/stage1/src/libraries/parsec"
+        , "  ./_build/stage1/src/libraries/pretty/"
+        , "  ./_build/stage1/src/libraries/process/"
+        , "  ./_build/stage1/src/libraries/semaphore-compat"
+        , "  ./_build/stage1/src/libraries/text"
+        , "  ./_build/stage1/src/libraries/time"
+        , "  ./_build/stage1/src/libraries/transformers"
+        , "  ./_build/stage1/src/libraries/unix/"
+        , "  ./_build/stage1/src/libraries/Win32/"
+        , "  ./_build/stage1/src/libraries/Cabal/Cabal-syntax"
+        , "  ./_build/stage1/src/libraries/Cabal/Cabal"
+        , "  https://github.com/haskell/alex/archive/refs/tags/v3.5.2.0.tar.gz"
+        , ""
+        , "benchmarks: False"
+        , "tests: False"
+        , "allow-boot-library-installs: True"
+        , "active-repositories: :none"
+        , ""
+        , "package *"
+        , "  library-vanilla: True"
+        , "  shared: False"
+        , "  executable-profiling: False"
+        , "  executable-dynamic: False"
+        , "  executable-static: False"
+        , ""
+        , "package ghc-internal"
+             -- FIXME: make our life easier for now by using the native bignum backend
+        , "  flags: +bignum-native"
+        , ""
+        , "package text"
+             -- FIXME: avoid having to deal with system-cxx-std-lib fake package for now
+        , "  flags: -simdutf"
+        ]
   let build_boot_cmd = runCabal cabal
         [ "build"
-        , "--project-file=cabal.project-stage1" -- TODO: replace with command-line args
-        , "--with-compiler=" ++ ghcPath ghc     -- FIXME: escape path
-        , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg -- FIXME: escape path
+        , "--project-file=" ++ cabal_project_bootlibs_path
+        , "--with-compiler=" ++ ghcPath ghc
+        , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg
         , "--ghc-options=\"-ghcversion-file=" ++ ghcversionh ++ "\""
         , "--builddir=" ++ build_dir
           -- never reinstall the RTS during this step: we should use the one
@@ -581,3 +716,12 @@ runGenPrimop (GenPrimop f) = proc f
 
 cp :: String -> String -> IO ()
 cp src dst = void (readCreateProcess (shell $ "cp -rf " ++ src ++ " " ++ dst) "")
+
+makeCabalProject :: FilePath -> [String] -> IO ()
+makeCabalProject path xs = writeFile path $ unlines (xs ++ common)
+  where
+    common =
+        [ ""
+        , "program-options"
+        , "  ghc-options: -fhide-source-paths -j"
+        ]
