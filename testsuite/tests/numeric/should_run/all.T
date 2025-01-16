@@ -86,3 +86,4 @@ test('foundation', [when(js_arch(), run_timeout_multiplier(2)), js_fragile(24259
 test('T24066', normal, compile_and_run, [''])
 test('div01', normal, compile_and_run, [''])
 test('T24245', normal, compile_and_run, [''])
+test('T25653', normal, compile_and_run, [''])
