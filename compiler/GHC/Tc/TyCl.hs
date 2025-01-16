@@ -1863,7 +1863,7 @@ kcConDecl new_or_data tc_res_kind
          -- because that's done in tcConDecl
        }
 
-kcConDecl new_or_data _tc_res_kind
+kcConDecl new_or_data tc_res_kind
                       -- NB: _tc_res_kind is unused.   See (KCD3) in
                       -- Note [kcConDecls: kind-checking data type decls]
           (ConDeclGADT { con_names = names, con_bndrs = L _ outer_bndrs
@@ -1876,9 +1876,10 @@ kcConDecl new_or_data _tc_res_kind
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsContext cxt
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
-       ; con_res_kind <- newOpenTypeKind
-       ; _ <- tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
-
+       ; con_res_kind <-  if NewType == new_or_data
+                          then return tc_res_kind
+                          else newOpenTypeKind
+       ; _ <- tcCheckLHsTypeInContext res_ty $ (TheKind con_res_kind)
        ; let arg_exp_kind = getArgExpKind new_or_data con_res_kind
              -- getArgExpKind: for newtypes, check that the argument kind
              -- is the same the kind of `res_ty`, the data con's return type
@@ -4683,6 +4684,7 @@ checkValidDataCon dflags existential_ok tc con
               res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
               arg_tys     = dataConOrigArgTys con
               orig_res_ty = dataConOrigResTy  con
+              -- dc_eq_spec = dcEqSpec con
 
         ; traceTc "checkValidDataCon" (vcat
               [ ppr con, ppr tc, ppr tc_tvs
@@ -4851,7 +4853,9 @@ checkNewDataCon con
         ; checkNoErrs $
           -- Fail here if the newtype is invalid: subsequent code in
           -- checkValidDataCon can fall over if it comes across an invalid newtype.
-     do { case arg_tys of
+     do {
+        traceTc "checkNewDataCon > eq_spec:" (ppr eq_spec)
+        ; case arg_tys of
             [Scaled arg_mult _] ->
               unless (ok_mult arg_mult) $
               addErrTc $
