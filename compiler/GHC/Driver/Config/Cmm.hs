@@ -26,8 +26,6 @@ initCmmConfig dflags = CmmConfig
   , cmmSplitProcPoints     = not (backendSupportsUnsplitProcPoints (backend dflags))
                              || not (platformTablesNextToCode platform)
                              || usingInconsistentPicReg
-  , cmmAllowMul2           = (ncg && x86ish) || llvm
-  , cmmOptConstDivision    = not llvm
   }
   where platform                = targetPlatform dflags
         usingInconsistentPicReg =
