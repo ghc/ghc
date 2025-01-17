@@ -1834,6 +1834,9 @@ kcConGADTArgs exp_kind con_args = case con_args of
   RecConGADT _ (L _ flds) -> kcConArgTys exp_kind $
                              map (hsLinear . cd_fld_type . unLoc) flds
 
+-- Specifically for GADT style declarations
+-- do we have lhs user supplied kind signature?
+-- as in `data xxx :: UserSuppliedKind where ...`
 data LHSUserSuppliedResultKind = LHSUserSuppliedResultKind | NoLHSUserSuppliedResultKind deriving Eq
 
 kcConDecls :: TcKind  -- Result kind of tycon
