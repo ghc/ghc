@@ -4693,7 +4693,6 @@ checkValidDataCon dflags existential_ok tc con
               res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
               arg_tys     = dataConOrigArgTys con
               orig_res_ty = dataConOrigResTy  con
-              -- dc_eq_spec = dcEqSpec con
 
         ; traceTc "checkValidDataCon" (vcat
               [ ppr con, ppr tc, ppr tc_tvs
@@ -4862,9 +4861,7 @@ checkNewDataCon con
         ; checkNoErrs $
           -- Fail here if the newtype is invalid: subsequent code in
           -- checkValidDataCon can fall over if it comes across an invalid newtype.
-     do {
-        traceTc "checkNewDataCon > eq_spec:" (ppr eq_spec)
-        ; case arg_tys of
+     do { case arg_tys of
             [Scaled arg_mult _] ->
               unless (ok_mult arg_mult) $
               addErrTc $
