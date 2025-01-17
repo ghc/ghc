@@ -648,6 +648,7 @@ data VarBndr var argf = Bndr var argf
 -- A 'ForAllTyBinder' is the binder of a ForAllTy
 -- It's convenient to define this synonym here rather its natural
 -- home in "GHC.Core.TyCo.Rep", because it's used in GHC.Core.DataCon.hs-boot
+-- See Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility]
 --
 -- A 'TyVarBinder' is a binder with only TyVar
 type ForAllTyBinder = VarBndr TyCoVar ForAllTyFlag
