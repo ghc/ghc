@@ -17,6 +17,8 @@ setTestOpts(
 test('simd_insert_baseline', [], compile_and_run, [''])
 test('simd_insert_array_baseline', [], compile_and_run, [''])
 
+test('T25658', [], compile_and_run, ['']) # #25658 is a bug with SSE2 code generation
+
 # Ensure we set the CPU features we have available.
 #
 # This is especially important with the LLVM backend, as LLVM can otherwise
