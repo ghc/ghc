@@ -120,13 +120,17 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
                    -- Makes sure that if the binding is unrestricted, it counts as
                    -- consuming its rhs Many times.
 
-                do { traceTc "tcFunBindMatches 2" (vcat [ pprUserTypeCtxt ctxt, ppr invis_pat_tys
-                                                      , ppr pat_tys $$ ppr rhs_ty ])
+                do { traceTc "tcFunBindMatches 2" $
+                     vcat [ text "ctxt:" <+> pprUserTypeCtxt ctxt
+                          , text "arity:" <+> ppr arity
+                          , text "invis_pat_tys:" <+> ppr invis_pat_tys
+                          , text "pat_tys:" <+> ppr pat_tys
+                          , text "rhs_ty:" <+> ppr rhs_ty ]
                    ; tcMatches tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches }
 
         ; return (wrap_fun, r) }
   where
-    herald        = ExpectedFunTyMatches (NameThing fun_name) matches
+    herald = ExpectedFunTyMatches (NameThing fun_name) matches
 
 funBindPrecondition :: MatchGroup GhcRn (LHsExpr GhcRn) -> Bool
 funBindPrecondition (MG { mg_alts = L _ alts })

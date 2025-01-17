@@ -1490,8 +1490,10 @@ tcSplitForAllTyVarsReqTVBindersN n_req ty
   = split n_req ty ty []
   where
     split n_req _orig_ty (ForAllTy b@(Bndr _ argf) ty) bs
-      | isVisibleForAllTyFlag argf, n_req > 0           = split (n_req - 1) ty ty (b:bs)
-      | otherwise                                       = split n_req       ty ty (b:bs)
+      | isVisibleForAllTyFlag argf, n_req > 0  -- Split off a visible forall
+      = split (n_req - 1) ty ty (b:bs)
+      | isInvisibleForAllTyFlag argf           -- Split off an invisible forall,
+      = split n_req       ty ty (b:bs)         -- even if n_req=0, i.e. the trailing ones
     split n_req orig_ty ty bs | Just ty' <- coreView ty = split n_req orig_ty ty' bs
     split n_req orig_ty _ty bs                          = (n_req, reverse bs, orig_ty)
 
@@ -1975,7 +1977,7 @@ isSigmaTy :: TcType -> Bool
 --     forall a. blah
 --     Eq a => blah
 --     ?x::Int => blah
--- But not
+-- But NOT
 --     forall a -> blah
 isSigmaTy (ForAllTy (Bndr _ af) _)     = isInvisibleForAllTyFlag af
 isSigmaTy (FunTy { ft_af = af })       = isInvisibleFunArg af
