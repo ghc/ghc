@@ -73,6 +73,7 @@ module GHC.Tc.Gen.HsType (
 
         -- Utils
         tyLitFromLit, tyLitFromOverloadedLit,
+
    ) where
 
 import GHC.Prelude hiding ( head, init, last, tail )
