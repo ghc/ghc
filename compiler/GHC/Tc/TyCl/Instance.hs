@@ -947,8 +947,8 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                   -- Fix #25611
                   -- See DESIGN CHOICE in Note [Kind inference for data family instances]
                   ; when is_H98_or_newtype $ kcConDecls lhs_applied_kind  (if (isJust m_ksig)
-                                          then UserSuppliedResultKind
-                                          else NoUserSuppliedResultKind)
+                                          then LHSUserSuppliedResultKind
+                                          else NoLHSUserSuppliedResultKind)
                                           hs_cons
 
 

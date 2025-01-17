@@ -12,7 +12,7 @@
 
 -- | Typecheck type and class declarations
 module GHC.Tc.TyCl (
-        UserSuppliedResultKind(..),
+        LHSUserSuppliedResultKind(..),
         tcTyAndClassDecls,
         -- Functions used by GHC.Tc.TyCl.Instance to check
         -- data/type family instance declarations
@@ -1773,8 +1773,8 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ _name)
     do { traceTc "kcTyClDecl" (ppr tycon $$ ppr (tyConTyVars tycon) $$ ppr (tyConResKind tycon))
        ; _ <- tcHsContext ctxt
        ; kcConDecls (tyConResKind tycon) (if (isJust kindSig)
-                                          then UserSuppliedResultKind
-                                          else NoUserSuppliedResultKind) cons
+                                          then LHSUserSuppliedResultKind
+                                          else NoLHSUserSuppliedResultKind) cons
        }
 
 kcTyClDecl (SynDecl { tcdLName = L _ _name, tcdRhs = rhs }) tycon
@@ -1834,11 +1834,11 @@ kcConGADTArgs exp_kind con_args = case con_args of
   RecConGADT _ (L _ flds) -> kcConArgTys exp_kind $
                              map (hsLinear . cd_fld_type . unLoc) flds
 
-data UserSuppliedResultKind = UserSuppliedResultKind | NoUserSuppliedResultKind deriving Eq
+data LHSUserSuppliedResultKind = LHSUserSuppliedResultKind | NoLHSUserSuppliedResultKind deriving Eq
 
 kcConDecls :: TcKind  -- Result kind of tycon
                       -- Used only in H98 case
-           -> UserSuppliedResultKind
+           -> LHSUserSuppliedResultKind
            -> DataDefnCons (LConDecl GhcRn) -> TcM ()
 -- See Note [kcConDecls: kind-checking data type decls]
 kcConDecls tc_res_kind usrk cons
@@ -1851,7 +1851,7 @@ kcConDecls tc_res_kind usrk cons
 -- declared with data or newtype, and we need to know the result kind of
 -- this type. See Note [Implementation of UnliftedNewtypes] for why
 -- we need the first two arguments.
-kcConDecl :: NewOrData -> UserSuppliedResultKind -> TcKind -> ConDecl GhcRn -> TcM ()
+kcConDecl :: NewOrData -> LHSUserSuppliedResultKind -> TcKind -> ConDecl GhcRn -> TcM ()
 kcConDecl new_or_data _usrk tc_res_kind
           (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                       , con_mb_cxt = ex_ctxt, con_args = args })
@@ -1882,8 +1882,8 @@ kcConDecl new_or_data usrk tc_res_kind
     do { _ <- tcHsContext cxt
     -- find the lhs signature
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty $$ ppr tc_res_kind)
-       ; con_res_kind <-  if NewType == new_or_data && NoUserSuppliedResultKind == usrk
-                          then return $ getTyConResultKind tc_res_kind
+       ; con_res_kind <-  if NewType == new_or_data && NoLHSUserSuppliedResultKind == usrk
+                          then return tc_res_kind
                           else newOpenTypeKind
        ; _ <- tcCheckLHsTypeInContext res_ty $ (TheKind con_res_kind)
        ; let arg_exp_kind = getArgExpKind new_or_data con_res_kind

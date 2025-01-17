@@ -73,8 +73,6 @@ module GHC.Tc.Gen.HsType (
 
         -- Utils
         tyLitFromLit, tyLitFromOverloadedLit,
-        getTyConResultKind
-
    ) where
 
 import GHC.Prelude hiding ( head, init, last, tail )
@@ -3899,12 +3897,6 @@ needsEtaExpansion NewtypeFlavour  = True
 needsEtaExpansion DataTypeFlavour = True
 needsEtaExpansion ClassFlavour    = True
 needsEtaExpansion _               = False
-
-getTyConResultKind :: Kind -> TcKind
-getTyConResultKind kind
-  = case splitPiTy_maybe kind of
-      Just (_, kind') -> getTyConResultKind kind'
-      Nothing         -> kind
 
 splitTyConKind :: SkolemInfo
                -> InScopeSet
