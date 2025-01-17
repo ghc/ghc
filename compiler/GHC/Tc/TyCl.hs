@@ -1883,7 +1883,6 @@ kcConDecl new_or_data usrk tc_res_kind
     bindOuterSigTKBndrs_Tv outer_bndrs $
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsContext cxt
-    -- find the lhs signature
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty $$ ppr tc_res_kind)
        ; con_res_kind <-  if NewType == new_or_data && NoLHSUserSuppliedResultKind == usrk
                           then return tc_res_kind
