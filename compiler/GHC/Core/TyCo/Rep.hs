@@ -155,11 +155,13 @@ data Type
 
   | ForAllTy  -- See Note [ForAllTy]
         {-# UNPACK #-} !ForAllTyBinder
-        Type            -- ^ A Π type.
-             -- See Note [Why ForAllTy can quantify over a coercion variable]
-             -- INVARIANT: If the binder is a coercion variable, it must
-             --            be mentioned in the Type.
-             --            See Note [Unused coercion variable in ForAllTy]
+           -- ForAllTyBinder: see GHC.Types.Var
+           --    Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility]
+        Type
+           -- INVARIANT: If the binder is a coercion variable, it must
+           --            be mentioned in the Type.
+           --            See Note [Unused coercion variable in ForAllTy]
+           -- See Note [Why ForAllTy can quantify over a coercion variable]
 
   | FunTy      -- ^ FUN m t1 t2   Very common, so an important special case
                 -- See Note [Function types]

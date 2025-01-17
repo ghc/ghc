@@ -1,0 +1,17 @@
+T25661.hs:38:20: error: [GHC-91028]
+    • Couldn't match expected type ‘forall (target :: Cat t) ->
+                                    (target ~ Target f) => source a a' -> target (f a) (f a')’
+                  with actual type ‘a0’
+      Cannot instantiate unification variable ‘a0’
+      with a type involving polytypes:
+        forall (target :: Cat t) ->
+        (target ~ Target f) => source a a' -> target (f a) (f a')
+    • In the expression: undefined
+      In an equation for ‘newmapVis’: newmapVis source = undefined
+    • Relevant bindings include
+        newmapVis :: forall (source :: Cat s) ->
+                     (source ~ Source f) =>
+                     forall (target :: Cat t) ->
+                     (target ~ Target f) => source a a' -> target (f a) (f a')
+          (bound at T25661.hs:38:1)
+
