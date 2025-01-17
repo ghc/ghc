@@ -1818,10 +1818,10 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       let code dst =
             case lit of
               CmmInt 0 _ -> exp `snocOL`
-                            (MOVD II64 (OpReg r) (OpReg dst))
+                            (MOVD FF64 (OpReg r) (OpReg dst))
               CmmInt 1 _ -> exp `snocOL`
                             (MOVHLPS fmt r tmp) `snocOL`
-                            (MOVD II64 (OpReg tmp) (OpReg dst))
+                            (MOVD FF64 (OpReg tmp) (OpReg dst))
               _          -> panic "Error in offset while unpacking"
       return (Any II64 code)
     vector_int64x2_extract_sse2 _ offset
