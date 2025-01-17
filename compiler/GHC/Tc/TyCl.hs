@@ -12,8 +12,8 @@
 
 -- | Typecheck type and class declarations
 module GHC.Tc.TyCl (
+        UserSuppliedResultKind(..),
         tcTyAndClassDecls,
-
         -- Functions used by GHC.Tc.TyCl.Instance to check
         -- data/type family instance declarations
         kcConDecls, tcConDecls, DataDeclInfo(..),
@@ -1763,7 +1763,7 @@ kcTyClDecl :: TyClDecl GhcRn -> MonoTcTyCon -> TcM ()
 --   kind inference (see GHC.Tc.TyCl Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon])
 
 kcTyClDecl (DataDecl { tcdLName    = (L _ _name)
-                     , tcdDataDefn = HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } })
+                     , tcdDataDefn = HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_kindSig = kindSig } })
            tycon
   = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
        -- NB: binding these tyvars isn't necessary for GADTs, but it does no
@@ -1772,7 +1772,9 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ _name)
        -- (conceivably) shadowed.
     do { traceTc "kcTyClDecl" (ppr tycon $$ ppr (tyConTyVars tycon) $$ ppr (tyConResKind tycon))
        ; _ <- tcHsContext ctxt
-       ; kcConDecls (tyConResKind tycon) cons
+       ; kcConDecls (tyConResKind tycon) (if (isJust kindSig)
+                                          then UserSuppliedResultKind
+                                          else NoUserSuppliedResultKind) cons
        }
 
 kcTyClDecl (SynDecl { tcdLName = L _ _name, tcdRhs = rhs }) tycon
@@ -1832,12 +1834,15 @@ kcConGADTArgs exp_kind con_args = case con_args of
   RecConGADT _ (L _ flds) -> kcConArgTys exp_kind $
                              map (hsLinear . cd_fld_type . unLoc) flds
 
+data UserSuppliedResultKind = UserSuppliedResultKind | NoUserSuppliedResultKind deriving Eq
+
 kcConDecls :: TcKind  -- Result kind of tycon
                       -- Used only in H98 case
+           -> UserSuppliedResultKind
            -> DataDefnCons (LConDecl GhcRn) -> TcM ()
 -- See Note [kcConDecls: kind-checking data type decls]
-kcConDecls tc_res_kind cons
-  = traverse_ (wrapLocMA_ (kcConDecl new_or_data tc_res_kind)) cons
+kcConDecls tc_res_kind usrk cons
+  = traverse_ (wrapLocMA_ (kcConDecl new_or_data usrk tc_res_kind)) cons
   where
     new_or_data = dataDefnConsNewOrData cons
 
@@ -1846,8 +1851,8 @@ kcConDecls tc_res_kind cons
 -- declared with data or newtype, and we need to know the result kind of
 -- this type. See Note [Implementation of UnliftedNewtypes] for why
 -- we need the first two arguments.
-kcConDecl :: NewOrData -> TcKind -> ConDecl GhcRn -> TcM ()
-kcConDecl new_or_data tc_res_kind
+kcConDecl :: NewOrData -> UserSuppliedResultKind -> TcKind -> ConDecl GhcRn -> TcM ()
+kcConDecl new_or_data _usrk tc_res_kind
           (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                       , con_mb_cxt = ex_ctxt, con_args = args })
   = addErrCtxt (DataConDefCtxt (NE.singleton name)) $
@@ -1863,7 +1868,7 @@ kcConDecl new_or_data tc_res_kind
          -- because that's done in tcConDecl
        }
 
-kcConDecl new_or_data tc_res_kind
+kcConDecl new_or_data usrk tc_res_kind
                       -- NB: _tc_res_kind is unused.   See (KCD3) in
                       -- Note [kcConDecls: kind-checking data type decls]
           (ConDeclGADT { con_names = names, con_bndrs = L _ outer_bndrs
@@ -1875,8 +1880,9 @@ kcConDecl new_or_data tc_res_kind
     bindOuterSigTKBndrs_Tv outer_bndrs $
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsContext cxt
+    -- find the lhs signature
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty $$ ppr tc_res_kind)
-       ; con_res_kind <-  if NewType == new_or_data
+       ; con_res_kind <-  if NewType == new_or_data && NoUserSuppliedResultKind == usrk
                           then return $ getTyConResultKind tc_res_kind
                           else newOpenTypeKind
        ; _ <- tcCheckLHsTypeInContext res_ty $ (TheKind con_res_kind)
