@@ -39,7 +39,6 @@ module GHC.CmmToAsm.X86.Instr
    , patchJumpInstr
    , isMetaInstr
    , isJumpishInstr
-   , movdOutFormat
    , MinOrMax(..), MinMaxType(..)
    )
 where
@@ -127,11 +126,16 @@ data Instr
              -- with @MOVABS@; we currently do not use this instruction in GHC.
              -- See https://stackoverflow.com/questions/52434073/whats-the-difference-between-the-x86-64-att-instructions-movq-and-movabsq.
 
-        | MOVD   Format Operand Operand -- ^ MOVD/MOVQ SSE2 instructions
-                                        -- (bitcast between a general purpose
-                                        -- register and a float register).
-                                        -- Format is input format, output format is
-                                        -- calculated in the 'movdOutFormat' function.
+        -- | MOVD/MOVQ SSE2 instructions
+        -- (bitcast between a general purpose register and a float register).
+        | MOVD
+           Format -- ^ input format
+           Format -- ^ output format
+           Operand Operand
+           -- NB: MOVD stores both the input and output formats. This is because
+           -- neither format fully determines the other, as either might be
+           -- a vector format, and we need to know the exact format in order to
+           -- correctly spill/unspill. See #25659.
         | CMOV   Cond Format Operand Reg
         | MOVZxL      Format Operand Operand
               -- ^ The format argument is the size of operand 1 (the number of bits we keep)
@@ -377,10 +381,10 @@ regUsageOfInstr platform instr
       -- (largely to avoid partial register stalls)
       | otherwise
       -> usageRW fmt src dst
-    MOVD   fmt src dst    ->
+    MOVD fmt1 fmt2 src dst    ->
       -- NB: MOVD and MOVQ always zero any remaining upper part of destination,
       -- so the destination is "written" not "modified".
-      usageRW' fmt (movdOutFormat fmt) src dst
+      usageRW' fmt1 fmt2 src dst
     CMOV _ fmt src dst    -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     MOVZxL fmt src dst    -> usageRW fmt src dst
     MOVSxL fmt src dst    -> usageRW fmt src dst
@@ -650,14 +654,6 @@ interesting :: Platform -> Reg -> Bool
 interesting _        (RegVirtual _)              = True
 interesting platform (RegReal (RealRegSingle i)) = freeReg platform i
 
-movdOutFormat :: Format -> Format
-movdOutFormat format = case format of
-  II32 -> FF32
-  II64 -> FF64
-  FF32 -> II32
-  FF64 -> II64
-  _    -> pprPanic "X86: improper format for movd/movq" (ppr format)
-
 
 -- | Applies the supplied function to all registers in instructions.
 -- Typically used to change virtual registers to real registers.
@@ -665,7 +661,7 @@ patchRegsOfInstr :: HasDebugCallStack => Platform -> Instr -> (Reg -> Reg) -> In
 patchRegsOfInstr platform instr env
   = case instr of
     MOV fmt src dst      -> MOV fmt (patchOp src) (patchOp dst)
-    MOVD fmt src dst     -> patch2 (MOVD fmt) src dst
+    MOVD fmt1 fmt2 src dst -> patch2 (MOVD fmt1 fmt2) src dst
     CMOV cc fmt src dst  -> CMOV cc fmt (patchOp src) (env dst)
     MOVZxL fmt src dst   -> patch2 (MOVZxL fmt) src dst
     MOVSxL fmt src dst   -> patch2 (MOVSxL fmt) src dst

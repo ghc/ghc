@@ -657,8 +657,8 @@ pprInstr platform i = case i of
    CMOV cc format src dst
      -> pprCondOpReg (text "cmov") format cc src dst
 
-   MOVD format src dst
-     -> pprMovdOpOp (text "mov") format src dst
+   MOVD format1 format2 src dst
+     -> pprMovdOpOp (text "mov") format1 format2 src dst
 
    MOVZxL II32 src dst
       -> pprFormatOpOp (text "mov") II32 src dst
@@ -1151,21 +1151,21 @@ pprInstr platform i = case i of
            pprOperand platform format op2
        ]
 
-   pprMovdOpOp :: Line doc -> Format -> Operand -> Operand -> doc
-   pprMovdOpOp name format op1 op2
-     = let instr = case format of
+   pprMovdOpOp :: Line doc -> Format -> Format -> Operand -> Operand -> doc
+   pprMovdOpOp name format1 format2 op1 op2
+     = let instr = case (format1, format2) of
              -- bitcasts to/from a general purpose register to a floating point
              -- register require II32 or II64.
-             II32 -> text "d"
-             II64 -> text "q"
-             FF32 -> text "d"
-             FF64 -> text "q"
-             _    -> panic "X86.Ppr.pprMovdOpOp: improper format for movd/movq."
+             (II32, _) -> text "d"
+             (II64, _) -> text "q"
+             (_, II32) -> text "d"
+             (_, II64) -> text "q"
+             _ -> panic "X86.Ppr.pprMovdOpOp: improper format for movd/movq."
        in line $ hcat [
            char '\t' <> name <> instr <> space,
-           pprOperand platform format op1,
+           pprOperand platform format1 op1,
            comma,
-           pprOperand platform (movdOutFormat format) op2
+           pprOperand platform format2 op2
            ]
 
    pprFormatImmRegOp :: Line doc -> Format -> Imm -> Reg -> Operand -> doc
