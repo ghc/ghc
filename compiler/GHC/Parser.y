@@ -2318,11 +2318,8 @@ type :: { LHsType GhcPs }
                                           amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow (epTok $3) (reverse $ unLoc $2)) $1 $4) }
                                               -- [mu AnnLollyU $2] }
 
--- MODS_TODO I'm very not confident this is the right place for modifiers to be
--- accepted.
 btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }
-        | modifiers1 atype              {% amsA' $ sLL $1 $2 $ HsModifiedTy noExtField (reverse $ unLoc $1) $2 }
 
 infixtype :: { forall b. DisambTD b => PV (LocatedA b) }
         -- See Note [%shift: infixtype -> ftype]
@@ -2337,6 +2334,7 @@ infixtype :: { forall b. DisambTD b => PV (LocatedA b) }
 
 ftype :: { forall b. DisambTD b => PV (LocatedA b) }
         : atype                         { mkHsAppTyHeadPV $1 }
+        | modifiers1 atype              { amsA' (sLL $1 $2 $ HsModifiedTy noExtField (reverse $ unLoc $1) $2) >>= mkHsAppTyHeadPV }
         | tyop                          { failOpFewArgs (fst $1) }
         | ftype tyarg                   { $1 >>= \ $1 ->
                                           mkHsAppTyPV $1 $2 }
