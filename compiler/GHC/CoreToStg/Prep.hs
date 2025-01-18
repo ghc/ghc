@@ -59,7 +59,8 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Types.Basic
-import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
+import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName, OccName )
+import GHC.Types.Name.Occurrence (occNameString)
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import GHC.Types.Literal
 import GHC.Types.Tickish
@@ -70,6 +71,7 @@ import qualified Data.ByteString.Builder as BB
 import Data.ByteString.Builder.Prim
 
 import Control.Monad
+import Data.List (intercalate)
 
 {-
 Note [CorePrep Overview]
@@ -247,11 +249,11 @@ corePrepPgm logger cp_cfg pgm_cfg
     withTiming logger
                (text "CorePrep"<+>brackets (ppr this_mod))
                (\a -> a `seqList` ()) $ do
-    us <- mkSplitUniqSupply 's'
     let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
 
-    let
-        implicit_binds = mkDataConWorkers
+    us <- mkSplitUniqSupply 's'
+
+    let implicit_binds = mkDataConWorkers
           (cpPgm_generateDebugInfo pgm_cfg)
           mod_loc data_tycons
             -- NB: we must feed mkImplicitBinds through corePrep too
@@ -711,13 +713,13 @@ cpePair :: TopLevelFlag -> RecFlag -> Demand -> Levity
         -> UniqSM (Floats, CpeRhs)
 -- Used for all bindings
 -- The binder is already cloned, hence an OutId
-cpePair top_lvl is_rec dmd lev env bndr rhs
+cpePair top_lvl is_rec dmd lev env0 bndr rhs
   = assert (not (isJoinId bndr)) $ -- those should use cpeJoinPair
     do { (floats1, rhs1) <- cpeRhsE env rhs
 
        -- See if we are allowed to float this stuff out of the RHS
        ; let dec = want_float_from_rhs floats1 rhs1
-       ; (floats2, rhs2) <- executeFloatDecision dec floats1 rhs1
+       ; (floats2, rhs2) <- executeFloatDecision env dec floats1 rhs1
 
        -- Make the arity match up
        ; (floats3, rhs3)
@@ -725,7 +727,7 @@ cpePair top_lvl is_rec dmd lev env bndr rhs
                then return (floats2, cpeEtaExpand arity rhs2)
                else warnPprTrace True "CorePrep: silly extra arguments:" (ppr bndr) $
                                -- Note [Silly extra arguments]
-                    (do { v <- newVar (idType bndr)
+                    (do { v <- newVar env (idType bndr)
                         ; let (float, v') = mkNonRecFloat env Lifted v rhs2
                         ; return ( snocFloat floats2 float
                                  , cpeEtaExpand arity (Var v')) })
@@ -735,6 +737,8 @@ cpePair top_lvl is_rec dmd lev env bndr rhs
 
        ; return (floats4, rhs4) }
   where
+    env = pushBinderContext bndr env0
+
     arity = idArity bndr        -- We must match this arity
 
     want_float_from_rhs floats rhs
@@ -967,36 +971,36 @@ cpeBodyNF env expr
 cpeBody :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeBody)
 cpeBody env expr
   = do { (floats1, rhs) <- cpeRhsE env expr
-       ; (floats2, body) <- rhsToBody rhs
+       ; (floats2, body) <- rhsToBody env rhs
        ; return (floats1 `appFloats` floats2, body) }
 
 --------
-rhsToBody :: CpeRhs -> UniqSM (Floats, CpeBody)
+rhsToBody :: CorePrepEnv -> CpeRhs -> UniqSM (Floats, CpeBody)
 -- Remove top level lambdas by let-binding
 
-rhsToBody (Tick t expr)
+rhsToBody env (Tick t expr)
   | tickishScoped t == NoScope  -- only float out of non-scoped annotations
-  = do { (floats, expr') <- rhsToBody expr
+  = do { (floats, expr') <- rhsToBody env expr
        ; return (floats, mkTick t expr') }
 
-rhsToBody (Cast e co)
+rhsToBody env (Cast e co)
         -- You can get things like
         --      case e of { p -> coerce t (\s -> ...) }
-  = do { (floats, e') <- rhsToBody e
+  = do { (floats, e') <- rhsToBody env e
        ; return (floats, Cast e' co) }
 
-rhsToBody expr@(Lam {})   -- See Note [No eta reduction needed in rhsToBody]
+rhsToBody env expr@(Lam {})   -- See Note [No eta reduction needed in rhsToBody]
   | all isTyVar bndrs           -- Type lambdas are ok
   = return (emptyFloats, expr)
   | otherwise                   -- Some value lambdas
   = do { let rhs = cpeEtaExpand (exprArity expr) expr
-       ; fn <- newVar (exprType rhs)
+       ; fn <- newVar env (exprType rhs)
        ; let float = Float (NonRec fn rhs) LetBound TopLvlFloatable
        ; return (unitFloat float, Var fn) }
   where
     (bndrs,_) = collectBinders expr
 
-rhsToBody expr = return (emptyFloats, expr)
+rhsToBody _env expr = return (emptyFloats, expr)
 
 
 {- Note [No eta reduction needed in rhsToBody]
@@ -1168,7 +1172,7 @@ cpeApp top_env expr
         -- allocating CaseBound Floats for token and thing as needed
         = do { (floats1, token) <- cpeArg env topDmd token
              ; (floats2, thing) <- cpeBody env thing
-             ; case_bndr <- (`setIdUnfolding` evaldUnfolding) <$> newVar ty
+             ; case_bndr <- (`setIdUnfolding` evaldUnfolding) <$> newVar env ty
              ; let tup = mkCoreUnboxedTuple [token, Var case_bndr]
              ; let float = mkCaseFloat case_bndr thing
              ; return (floats1 `appFloats` floats2 `snocFloat` float, tup) }
@@ -1577,7 +1581,7 @@ cpeArg env dmd arg
        ; let arg_ty = exprType arg1
              lev    = typeLevity arg_ty
              dec    = wantFloatLocal NonRecursive dmd lev floats1 arg1
-       ; (floats2, arg2) <- executeFloatDecision dec floats1 arg1
+       ; (floats2, arg2) <- executeFloatDecision env dec floats1 arg1
                 -- Else case: arg1 might have lambdas, and we can't
                 --            put them inside a wrapBinds
 
@@ -1586,7 +1590,7 @@ cpeArg env dmd arg
        -- see Note [ANF-ising literal string arguments]
        ; if exprIsTrivial arg2
          then return (floats2, arg2)
-         else do { v <- (`setIdDemandInfo` dmd) <$> newVar arg_ty
+         else do { v <- (`setIdDemandInfo` dmd) <$> newVar env arg_ty
                        -- See Note [Pin demand info on floats]
                  ; let arity = cpeArgArity env dec floats1 arg2
                        arg3  = cpeEtaExpand arity arg2
@@ -2424,13 +2428,13 @@ instance Outputable FloatDecision where
   ppr FloatNone = text "none"
   ppr FloatAll  = text "all"
 
-executeFloatDecision :: FloatDecision -> Floats -> CpeRhs -> UniqSM (Floats, CpeRhs)
-executeFloatDecision dec floats rhs
+executeFloatDecision :: CorePrepEnv -> FloatDecision -> Floats -> CpeRhs -> UniqSM (Floats, CpeRhs)
+executeFloatDecision env dec floats rhs
   = case dec of
       FloatAll                 -> return (floats, rhs)
       FloatNone
         | isEmptyFloats floats -> return (emptyFloats, rhs)
-        | otherwise            -> do { (floats', body) <- rhsToBody rhs
+        | otherwise            -> do { (floats', body) <- rhsToBody env rhs
                                      ; return (emptyFloats, wrapBinds floats $
                                                             wrapBinds floats' body) }
             -- FloatNone case: `rhs` might have lambdas, and we can't
@@ -2569,6 +2573,8 @@ data CorePrepEnv
         , cpe_subst :: Subst  -- ^ See Note [CorePrepEnv: cpe_subst]
 
         , cpe_rec_ids :: UnVarSet -- Faster OutIdSet; See Note [Speculative evaluation]
+
+        , cpe_context :: [OccName] -- ^ See Note [Binder context]
     }
 
 mkInitialCorePrepEnv :: CorePrepConfig -> CorePrepEnv
@@ -2576,6 +2582,7 @@ mkInitialCorePrepEnv cfg = CPE
       { cpe_config        = cfg
       , cpe_subst         = emptySubst
       , cpe_rec_ids       = emptyUnVarSet
+      , cpe_context       = []
       }
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
@@ -2615,6 +2622,14 @@ cpSubstTy (CPE { cpe_subst = subst }) ty = substTy subst ty
 cpSubstCo :: CorePrepEnv -> Coercion -> Coercion
 cpSubstCo (CPE { cpe_subst = subst }) co = substCo subst co
           -- substCo has a short-cut if the TCvSubst is empty
+
+-- | See Note [Binder context]
+pushBinderContext :: Id -> CorePrepEnv -> CorePrepEnv
+pushBinderContext ident env
+  | lengthAtLeast (cpe_context env) 2
+  = env
+  | otherwise
+  = env { cpe_context = getOccName ident : cpe_context env}
 
 ------------------------------------------------------------------------------
 -- Cloning binders
@@ -2704,10 +2719,20 @@ fiddleCCall id
 -- Generating new binders
 -- ---------------------------------------------------------------------------
 
-newVar :: Type -> UniqSM Id
-newVar ty
- = seqType ty `seq` mkSysLocalOrCoVarM (fsLit "sat") ManyTy ty
+newVar :: CorePrepEnv ->  Type -> UniqSM Id
+newVar env ty
+ -- See Note [Binder context]
+ = seqType ty `seq` mkSysLocalOrCoVarM (fsLit occ) ManyTy ty
+   where occ = intercalate "_" (map occNameString $ cpe_context env) ++ "_sat"
 
+{- Note [Binder context]
+   ~~~~~~~~~~~~~~~~~~~~~
+   To ensure that the compiled program (specifically symbol names)
+   remains understandable to the user we maintain a context
+   of binders that we are currently under. This allows us to give
+   identifiers conjured during CorePrep more contextually-meaningful
+   names. This is done in `newVar`.
+ -}
 
 ------------------------------------------------------------------------------
 -- Floating ticks

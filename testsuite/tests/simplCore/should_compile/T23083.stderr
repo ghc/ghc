@@ -13,10 +13,10 @@ T23083.g :: ((GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer
 T23083.g
   = \ (f [Occ=Once1!] :: (GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer) -> GHC.Internal.Bignum.Integer.Integer) (h [Occ=OnceL1] :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer) ->
       let {
-        sat [Occ=Once1] :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+        g_sat [Occ=Once1] :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
         [LclId, Unf=OtherCon []]
-        sat = \ (eta [Occ=Once1] :: GHC.Internal.Bignum.Integer.Integer) -> case h of h1 [Occ=Once1] { __DEFAULT -> T23083.$$ @GHC.Internal.Bignum.Integer.Integer @GHC.Internal.Bignum.Integer.Integer h1 eta } } in
-      f sat
+        g_sat = \ (eta [Occ=Once1] :: GHC.Internal.Bignum.Integer.Integer) -> case h of h1 [Occ=Once1] { __DEFAULT -> T23083.$$ @GHC.Internal.Bignum.Integer.Integer @GHC.Internal.Bignum.Integer.Integer h1 eta } } in
+      f g_sat
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T23083.$trModule4 :: GHC.Prim.Addr#

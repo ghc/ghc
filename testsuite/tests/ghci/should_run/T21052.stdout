@@ -4,9 +4,9 @@ BCO_toplevel :: GHC.Internal.Types.IO [GHC.Internal.Types.Any]
 [LclIdX] =
     {} \u []
         let {
-          sat :: [GHC.Internal.Types.Any]
+          _sat :: [GHC.Internal.Types.Any]
           [LclId, Unf=OtherCon []] =
               :! [GHC.Internal.Tuple.() GHC.Internal.Types.[]];
-        } in  GHC.Internal.Base.returnIO sat;
+        } in  GHC.Internal.Base.returnIO _sat;
 
 

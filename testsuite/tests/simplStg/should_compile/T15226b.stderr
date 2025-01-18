@@ -8,13 +8,13 @@ T15226b.bar1
            T15226b.Str (GHC.Internal.Maybe.Maybe a) #)
 [GblId, Arity=2, Str=<L><L>, Cpr=1(, 1), Unf=OtherCon []] =
     {} \r [x void]
-        case x of sat {
+        case x of bar1_sat {
         __DEFAULT ->
         let {
-          sat [Occ=Once1] :: T15226b.Str (GHC.Internal.Maybe.Maybe a)
+          bar1_sat [Occ=Once1] :: T15226b.Str (GHC.Internal.Maybe.Maybe a)
           [LclId, Unf=OtherCon []] =
-              T15226b.Str! [sat];
-        } in  GHC.Internal.Types.MkSolo# [sat];
+              T15226b.Str! [bar1_sat];
+        } in  GHC.Internal.Types.MkSolo# [bar1_sat];
         };
 
 T15226b.bar

@@ -6,14 +6,14 @@ Foo.f :: forall {a}. a -> [GHC.Internal.Maybe.Maybe a]
         case x of x1 {
         __DEFAULT ->
         let {
-          sat [Occ=Once1] :: GHC.Internal.Maybe.Maybe a
+          f_sat [Occ=Once1] :: GHC.Internal.Maybe.Maybe a
           [LclId, Unf=OtherCon []] =
               GHC.Internal.Maybe.Just! [x1]; } in
         let {
-          sat [Occ=Once1] :: [GHC.Internal.Maybe.Maybe a]
+          f_sat [Occ=Once1] :: [GHC.Internal.Maybe.Maybe a]
           [LclId, Unf=OtherCon []] =
-              :! [sat GHC.Internal.Types.[]];
-        } in  : [sat sat];
+              :! [f_sat GHC.Internal.Types.[]];
+        } in  : [f_sat f_sat];
         };
 
 
