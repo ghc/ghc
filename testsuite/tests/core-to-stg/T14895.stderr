@@ -11,10 +11,10 @@ T14895.go
           GHC.Internal.Data.Either.Left e [Occ=Once1] -> wild<TagProper>;
           GHC.Internal.Data.Either.Right a1 [Occ=Once1] ->
               let {
-                sat [Occ=Once1] :: b
+                go_sat [Occ=Once1] :: b
                 [LclId] =
                     {a1, f} \u [] f a1;
-              } in  GHC.Internal.Data.Either.Right [sat];
+              } in  GHC.Internal.Data.Either.Right [go_sat];
         };
 
 

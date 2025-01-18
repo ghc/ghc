@@ -9,16 +9,16 @@ T24124.testFun1
            T24124.StrictPair a b #)
 [GblId, Arity=3, Str=<L><L><L>, Cpr=1, Unf=OtherCon []] =
     {} \r [x y void]
-        case x of sat {
+        case x of testFun1_sat {
         __DEFAULT ->
         case
             case y of y [OS=OneShot] {
-            __DEFAULT -> T24124.MkStrictPair [sat y];
+            __DEFAULT -> T24124.MkStrictPair [testFun1_sat y];
             }
         of
-        sat
+        testFun1_sat
         {
-        __DEFAULT -> GHC.Internal.Types.MkSolo# [sat];
+        __DEFAULT -> GHC.Internal.Types.MkSolo# [testFun1_sat];
         };
         };
 

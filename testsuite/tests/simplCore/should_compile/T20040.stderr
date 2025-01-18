@@ -16,7 +16,9 @@ ifoldl' =
           Cons ipv2 ipv3 ->
               case z of z1 {
               __DEFAULT ->
-              case f z1 ipv2 of sat { __DEFAULT -> ifoldl' f sat ipv3; };
+              case f z1 ipv2 of ifoldl'_sat {
+              __DEFAULT -> ifoldl' f ifoldl'_sat ipv3;
+              };
               };
         };
 end Rec }
