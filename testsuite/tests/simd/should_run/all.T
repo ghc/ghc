@@ -20,6 +20,7 @@ test('floatx4_arith_baseline', [], compile_and_run, [''])
 test('doublex2_arith_baseline', [], compile_and_run, [''])
 
 test('T25658', [], compile_and_run, ['']) # #25658 is a bug with SSE2 code generation
+test('T25659', [], compile_and_run, [''])
 
 # Ensure we set the CPU features we have available.
 #

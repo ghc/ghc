@@ -1158,7 +1158,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
         bitcast :: Format -> Format -> CmmExpr -> NatM Register
         bitcast fmt rfmt expr =
           do (src, e_code) <- getSomeReg expr
-             let code = \dst -> e_code `snocOL` (MOVD fmt (OpReg src) (OpReg dst))
+             let code = \dst -> e_code `snocOL` (MOVD fmt rfmt (OpReg src) (OpReg dst))
              return (Any rfmt code)
 
         toI8Reg :: Width -> CmmExpr -> NatM Register
@@ -1242,14 +1242,14 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
           (reg, exp) <- getNonClobberedReg expr
           let fmt = VecFormat len FmtInt64
           return $ Any fmt (\dst -> exp `snocOL`
-                                    (MOVD II64 (OpReg reg) (OpReg dst)) `snocOL`
+                                    (MOVD II64 fmt (OpReg reg) (OpReg dst)) `snocOL`
                                     (PUNPCKLQDQ fmt (OpReg dst) dst)
                                     )
         vector_int_broadcast len W32 expr = do
           (reg, exp) <- getNonClobberedReg expr
           let fmt = VecFormat len FmtInt32
           return $ Any fmt (\dst -> exp `snocOL`
-                                    (MOVD II32 (OpReg reg) (OpReg dst)) `snocOL`
+                                    (MOVD II32 fmt (OpReg reg) (OpReg dst)) `snocOL`
                                     (PSHUFD fmt (ImmInt 0x00) (OpReg dst) dst)
                                     )
         vector_int_broadcast _ _ _ =
@@ -1703,10 +1703,10 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       let code dst =
             case lit of
               CmmInt 0 _ -> exp `snocOL`
-                            (MOVD FF64 (OpReg r) (OpReg dst))
+                            (MOVD fmt II64 (OpReg r) (OpReg dst))
               CmmInt 1 _ -> exp `snocOL`
                             (MOVHLPS fmt r tmp) `snocOL`
-                            (MOVD FF64 (OpReg tmp) (OpReg dst))
+                            (MOVD fmt II64 (OpReg tmp) (OpReg dst))
               _          -> panic "Error in offset while unpacking"
       return (Any II64 code)
     vector_int_extract_sse _ w c e
@@ -1924,12 +1924,12 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
                   CmmInt 0 _ -> valExp `appOL`
                                 vecExp `snocOL`
                                 (MOVHLPS fmt vecReg tmp) `snocOL`
-                                (MOVD II64 (OpReg valReg) (OpReg dst)) `snocOL`
+                                (MOVD II64 fmt (OpReg valReg) (OpReg dst)) `snocOL`
                                 (PUNPCKLQDQ fmt (OpReg tmp) dst)
                   CmmInt 1 _ -> valExp `appOL`
                                 vecExp `snocOL`
-                                (MOV II64 (OpReg vecReg) (OpReg dst)) `snocOL`
-                                (MOVD II64 (OpReg valReg) (OpReg tmp)) `snocOL`
+                                (MOVDQU fmt (OpReg vecReg) (OpReg dst)) `snocOL`
+                                (MOVD II64 fmt (OpReg valReg) (OpReg tmp)) `snocOL`
                                 (PUNPCKLQDQ fmt (OpReg tmp) dst)
                   _ -> pprPanic "MO_V_Insert Int64X2: unsupported offset" (ppr offset)
          in return $ Any fmt code
@@ -3869,7 +3869,7 @@ loadArgsWin config (arg:rest) = do
            -- arguments in both fp and integer registers.
            let (assign_code', regs')
                 | isFloatFormat arg_fmt =
-                    ( assign_code `snocOL` MOVD FF64 (OpReg freg) (OpReg ireg),
+                    ( assign_code `snocOL` MOVD FF64 II64 (OpReg freg) (OpReg ireg),
                       [ RegWithFormat freg FF64
                       , RegWithFormat ireg II64 ])
                 | otherwise = (assign_code, [RegWithFormat ireg II64])
