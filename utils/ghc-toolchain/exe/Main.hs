@@ -480,13 +480,8 @@ mkTarget opts = do
     opt <- optional $ findProgram "opt" (optOpt opts) ["opt"]
     llvmAs <- optional $ findProgram "llvm assembler" (optLlvmAs opts) ["clang"]
 
-    -- Windows-specific utilities
-    windres <-
-        case archOS_OS archOs of
-          OSMinGW32 -> do
-            windres <- findProgram "windres" (optWindres opts) ["windres"]
-            return (Just windres)
-          _ -> return Nothing
+    -- for windows, also used for cross compiling
+    windres <- optional $ findProgram "windres" (optWindres opts) ["windres"]
 
     -- Darwin-specific utilities
     (otool, installNameTool) <-
