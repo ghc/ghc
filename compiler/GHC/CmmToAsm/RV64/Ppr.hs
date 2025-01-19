@@ -826,12 +826,6 @@ pprInstr platform instr = case instr of
     opToVInstrSuffix op | isVectorRegOp op = text "v"
     opToVInstrSuffix op = pprPanic "Unsupported operand for vector instruction" (pprOp platform op)
 
-    -- TODO: unused?
-    floatWidthSuffix :: (IsLine doc) => Width -> doc
-    floatWidthSuffix W32 = text "s"
-    floatWidthSuffix W64 = text "d"
-    floatWidthSuffix w = pprPanic "Unsupported floating point vector operation width" (ppr w)
-
     configVec :: (IsDoc doc) => Format -> doc
     configVec (VecFormat length fmt) =
       pprInstr platform (VSETIVLI zeroReg (fromIntegral length) ((formatToWidth . scalarFormatFormat) fmt) M1 TA MA)
