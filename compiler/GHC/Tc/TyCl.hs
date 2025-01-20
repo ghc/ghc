@@ -12,7 +12,7 @@
 
 -- | Typecheck type and class declarations
 module GHC.Tc.TyCl (
-        LHSUserSuppliedResultKind(..),
+        UserHeaderKindSig(..),
         tcTyAndClassDecls,
         -- Functions used by GHC.Tc.TyCl.Instance to check
         -- data/type family instance declarations
@@ -1773,8 +1773,8 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ _name)
     do { traceTc "kcTyClDecl" (ppr tycon $$ ppr (tyConTyVars tycon) $$ ppr (tyConResKind tycon))
        ; _ <- tcHsContext ctxt
        ; kcConDecls (tyConResKind tycon) (if (isJust kindSig)
-                                          then LHSUserSuppliedResultKind
-                                          else NoLHSUserSuppliedResultKind) cons
+                                          then UserHeaderKindSig
+                                          else NoUserHeaderKindSig) cons
        }
 
 kcTyClDecl (SynDecl { tcdLName = L _ _name, tcdRhs = rhs }) tycon
@@ -1834,14 +1834,21 @@ kcConGADTArgs exp_kind con_args = case con_args of
   RecConGADT _ (L _ flds) -> kcConArgTys exp_kind $
                              map (hsLinear . cd_fld_type . unLoc) flds
 
--- Specifically for GADT style declarations
--- do we have lhs user supplied kind signature?
--- as in `data xxx :: UserSuppliedKind where ...`
-data LHSUserSuppliedResultKind = LHSUserSuppliedResultKind | NoLHSUserSuppliedResultKind deriving Eq
+
+{- Note [Header kind signatures for GADTs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Specifically for GADT style declarations
+Do we have user supplied header kind signature?
+as in `data xxx :: UserHeaderKindSig where ...`
+If not and it is newtype we can infer the kind of the data type
+from the data constructors
+-}
+-- see Note [Header kind signatures for GADTs]
+data UserHeaderKindSig = UserHeaderKindSig | NoUserHeaderKindSig deriving Eq
 
 kcConDecls :: TcKind  -- Result kind of tycon
                       -- Used only in H98 case
-           -> LHSUserSuppliedResultKind
+           -> UserHeaderKindSig
            -> DataDefnCons (LConDecl GhcRn) -> TcM ()
 -- See Note [kcConDecls: kind-checking data type decls]
 kcConDecls tc_res_kind usrk cons
@@ -1854,7 +1861,7 @@ kcConDecls tc_res_kind usrk cons
 -- declared with data or newtype, and we need to know the result kind of
 -- this type. See Note [Implementation of UnliftedNewtypes] for why
 -- we need the first two arguments.
-kcConDecl :: NewOrData -> LHSUserSuppliedResultKind -> TcKind -> ConDecl GhcRn -> TcM ()
+kcConDecl :: NewOrData -> UserHeaderKindSig -> TcKind -> ConDecl GhcRn -> TcM ()
 kcConDecl new_or_data _usrk tc_res_kind
           (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                       , con_mb_cxt = ex_ctxt, con_args = args })
@@ -1884,7 +1891,7 @@ kcConDecl new_or_data usrk tc_res_kind
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsContext cxt
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty $$ ppr tc_res_kind)
-       ; con_res_kind <-  if NewType == new_or_data && NoLHSUserSuppliedResultKind == usrk
+       ; con_res_kind <-  if NewType == new_or_data && NoUserHeaderKindSig == usrk
                           then return tc_res_kind
                           else newOpenTypeKind
        ; _ <- tcCheckLHsTypeInContext res_ty $ (TheKind con_res_kind)
