@@ -1228,10 +1228,10 @@ findBranch branches target_tys
        -> Maybe (BranchIndex, [Type], [Coercion])
     go (index, branch) other
       = let (CoAxBranch { cab_tvs = tpl_tvs, cab_cvs = tpl_cvs
-                        , cab_lhs = tpl_lhs
-                        , cab_incomps = incomps }) = branch
-            in_scope = mkInScopeSet (unionVarSets $
-                            map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
+--                        , cab_incomps = incomps
+                        , cab_lhs = tpl_lhs }) = branch
+--            in_scope = mkInScopeSet (unionVarSets $
+--                            map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
             -- See Note [Flattening type-family applications when matching instances]
             -- in GHC.Core.Unify
 --            flattened_target = flattenTys in_scope target_tys
