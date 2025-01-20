@@ -1234,10 +1234,10 @@ findBranch branches target_tys
                             map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
             -- See Note [Flattening type-family applications when matching instances]
             -- in GHC.Core.Unify
-            flattened_target = flattenTys in_scope target_tys
+--            flattened_target = flattenTys in_scope target_tys
         in case tcMatchTys tpl_lhs target_tys of
         Just subst -- matching worked. now, check for apartness.
-          |  apartnessCheck flattened_target branch
+          |  apartnessCheck target_tys branch
           -> -- matching worked & we're apart from all incompatible branches.
              -- success
              assert (all (isJust . lookupCoVar subst) tpl_cvs) $
