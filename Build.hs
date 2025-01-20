@@ -625,13 +625,15 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
 
   msg "  - Building boot libraries..."
   (boot_exit_code, boot_stdout, boot_stderr) <- readCreateProcessWithExitCode build_boot_cmd ""
+  writeFile (dst </> "boot-libs.stdout") boot_stdout
+  writeFile (dst </> "boot-libs.stderr") boot_stderr
   case boot_exit_code of
     ExitSuccess -> pure ()
     ExitFailure r -> do
       putStrLn $ "Failed to build boot libraries with error code " ++ show r
-      putStrLn boot_stdout
-      putStrLn boot_stderr
+      putStrLn $ "Logs can be found in " ++ dst ++ "/boot-libs.{stdout,stderr}"
       exitFailure
+
 
 ---------------------------
 -- Options
