@@ -256,6 +256,7 @@ prepareGhcSources opts dst = do
   cp "utils/fs/fs.h" (dst </> "libraries/ghc-internal/include")
   cp "utils/fs/fs.c" (dst </> "libraries/ghc-internal/cbits")
   cp "utils/fs/fs.*" (dst </> "libraries/rts/")
+  cp "utils/fs/fs.*" (dst </> "utils/unlit/")
 
   python <- findExecutable "python" >>= \case
     Nothing -> error "Couldn't find 'python'"
@@ -612,9 +613,11 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg
         , "--ghc-options=\"-ghcversion-file=" ++ ghcversionh ++ "\""
         , "--builddir=" ++ build_dir
+        , "-j"
           -- never reinstall the RTS during this step: we should use the one
           -- installed at the previous step. Otherwise we risk using invalid
-          -- generated files.
+          -- generated files and we don't pass enough options here to build the
+          -- rts anyway.
           -- FIXME: but it doesn't work because the rts isn't really installed
           -- , "--constraint=rts installed"
 
