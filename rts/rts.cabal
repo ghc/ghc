@@ -13,6 +13,11 @@ build-type: Configure
 
 extra-source-files:
     configure
+    config.guess
+    config.sub
+    ghcplatform.h.top.in
+    ghcplatform.h.bottom
+    ghcautoconf.h.autoconf.in
     configure.ac
     external-symbols.list.in
     rts.buildinfo.in

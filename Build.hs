@@ -433,6 +433,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , def_string "GhcUnregisterised" "FIXME"
         , def_string "TablesNextToCode"  "FIXME"
         , "  ghc-options: -I" ++ (src_rts </> "include")
+        , "  ghc-options: -I" ++ (src_rts </> "adjustor")
         , "  ghc-options: -I" ++ src_rts
         ]
   makeCabalProject cabal_project_rts_path $
@@ -463,7 +464,6 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg
         , "--ghc-options=\"-ghcversion-file=" ++ ghcversionh ++ "\""
         , "--builddir=" ++ build_dir
-        , "-v3"
         ]
 
   -- FIXME: deriveConstants requires ghcautoconf.h and ghcplatform.h but these
