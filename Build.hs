@@ -15,6 +15,7 @@ build-depends:
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NumericUnderscores #-}
+{-# OPTIONS_GHC -Wall #-}
 
 -- | GHC builder
 --
@@ -91,14 +92,14 @@ buildGhcStage1 opts cabal ghc0 dst = do
     -- we infer stage1's host platform from stage0's settings
     let settings =
           [ ("hostPlatformArch",    fromMaybe (error "Couldn't read 'target arch' setting") (lookup "target arch" stage0_settings))
-          , ("hostPlatformOS",	    fromMaybe (error "Couldn't read 'target os' setting") (lookup "target os" stage0_settings))
+          , ("hostPlatformOS",      fromMaybe (error "Couldn't read 'target os' setting") (lookup "target os" stage0_settings))
           , ("cProjectGitCommitId", commit_id)
-          , ("cProjectVersion",	    Text.unpack $ gboVersion opts)
+          , ("cProjectVersion",     Text.unpack $ gboVersion opts)
           , ("cProjectVersionInt",  Text.unpack $ gboVersionInt opts)
           , ("cProjectPatchLevel",  Text.unpack $ gboVersionPatchLevel opts)
           , ("cProjectPatchLevel1", Text.unpack $ gboVersionPatchLevel1 opts)
           , ("cProjectPatchLevel2", Text.unpack $ gboVersionPatchLevel2 opts)
-          ]
+          ] :: [(String,String)]
     pure (show settings)
 
   current_env <- getEnvironment
@@ -179,28 +180,28 @@ buildGhcStage1 opts cabal ghc0 dst = do
 
   msg "  - Copying stage1 programs and generating settings to use them..."
   let listbin_cmd p = runCabal cabal
-	[ "list-bin"
-	, "--project-file=" ++ cabal_project_path
+        [ "list-bin"
+        , "--project-file=" ++ cabal_project_path
         , "--with-compiler=" ++ ghcPath ghc0
-	, "--builddir=" ++ builddir
-	, p
-	]
+        , "--builddir=" ++ builddir
+        , p
+        ]
   let copy_bin target bin = do
-	(list_bin_exit_code, list_bin_stdout, list_bin_stderr) <- readCreateProcessWithExitCode (listbin_cmd target) ""
-	case list_bin_exit_code of
-	  ExitSuccess
-	    | (bin_src:_) <- lines list_bin_stdout
-	    -> cp bin_src (dst </> "bin" </> bin)
-	  _ -> do
-	    putStrLn $ "Failed to run cabal list-bin for the target: " ++ show target
-	    putStrLn list_bin_stderr
-	    exitFailure
+        (list_bin_exit_code, list_bin_stdout, list_bin_stderr) <- readCreateProcessWithExitCode (listbin_cmd target) ""
+        case list_bin_exit_code of
+          ExitSuccess
+            | (bin_src:_) <- lines list_bin_stdout
+            -> cp bin_src (dst </> "bin" </> bin)
+          _ -> do
+            putStrLn $ "Failed to run cabal list-bin for the target: " ++ show target
+            putStrLn list_bin_stderr
+            exitFailure
   createDirectoryIfMissing True (dst </> "bin")
-  copy_bin "ghc-bin:ghc"		     "ghc"
-  copy_bin "ghc-pkg:ghc-pkg"  		     "ghc-pkg"
+  copy_bin "ghc-bin:ghc"                     "ghc"
+  copy_bin "ghc-pkg:ghc-pkg"                 "ghc-pkg"
   copy_bin "deriveConstants:deriveConstants" "deriveConstants"
   copy_bin "genprimopcode:genprimopcode"     "genprimopcode"
-  copy_bin "genapply:genapply"		     "genapply"
+  copy_bin "genapply:genapply"               "genapply"
 
   -- initialize empty global package database
   pkgdb <- makeAbsolute (dst </> "pkgs")
@@ -223,7 +224,7 @@ buildGhcStage1 opts cabal ghc0 dst = do
 
   -- try to run the stage1 compiler (no package db yet, so just display the
   -- version)
-  (test_exit_code, test_stdout, _test_stderr) <- readCreateProcessWithExitCode (proc (dst </> "bin/ghc") ["--version"]) ""
+  (test_exit_code, _test_stdout, _test_stderr) <- readCreateProcessWithExitCode (proc (dst </> "bin/ghc") ["--version"]) ""
   case test_exit_code of
     ExitSuccess -> pure ()
     ExitFailure n -> do
@@ -241,7 +242,7 @@ prepareGhcSources opts dst = do
   cp "./libraries"    dst
   cp "./compiler/*"   (dst </> "libraries/ghc/")
   cp "./rts"          (dst </> "libraries/")
-  cp "./ghc"	      (dst </> "ghc-bin")
+  cp "./ghc"          (dst </> "ghc-bin")
   cp "./utils"        dst
 
   cp "./config.sub"   (dst </> "libraries/rts/")
@@ -275,25 +276,25 @@ prepareGhcSources opts dst = do
 
   -- substitute variables in files
   let subst fin fout rs = do
-	t <- Text.readFile fin
-	Text.writeFile fout (List.foldl' (\v (needle,rep) -> Text.replace needle rep v) t rs)
+        t <- Text.readFile fin
+        Text.writeFile fout (List.foldl' (\v (needle,rep) -> Text.replace needle rep v) t rs)
   let subst_in f = subst (f <.> "in") f
   let common_substs =
-	[ (,) "@ProjectVersion@"       (gboVersion opts)
-	, (,) "@ProjectVersionMunged@" (gboVersionMunged opts)
-	, (,) "@ProjectVersionForLib@" (gboVersionForLib opts)
-	, (,) "@ProjectPatchLevel1@"   (gboVersionPatchLevel1 opts)
-	, (,) "@ProjectPatchLevel2@"   (gboVersionPatchLevel2 opts)
-	, (,) "@ProjectVersionInt@"    (gboVersionInt opts)
-	]
+        [ (,) "@ProjectVersion@"       (gboVersion opts)
+        , (,) "@ProjectVersionMunged@" (gboVersionMunged opts)
+        , (,) "@ProjectVersionForLib@" (gboVersionForLib opts)
+        , (,) "@ProjectPatchLevel1@"   (gboVersionPatchLevel1 opts)
+        , (,) "@ProjectPatchLevel2@"   (gboVersionPatchLevel2 opts)
+        , (,) "@ProjectVersionInt@"    (gboVersionInt opts)
+        ]
       llvm_substs =
-	[ (,) "@LlvmMinVersion@" (gboLlvmMinVersion opts)
-	, (,) "@LlvmMaxVersion@" (gboLlvmMaxVersion opts)
-	]
+        [ (,) "@LlvmMinVersion@" (gboLlvmMinVersion opts)
+        , (,) "@LlvmMaxVersion@" (gboLlvmMaxVersion opts)
+        ]
       boot_th_substs =
-	[ (,) "@Suffix@"     ""
-	, (,) "@SourceRoot@" "."
-	]
+        [ (,) "@Suffix@"     ""
+        , (,) "@SourceRoot@" "."
+        ]
 
   subst_in (dst </> "ghc-bin/ghc-bin.cabal") common_substs
   subst_in (dst </> "libraries/ghc/ghc.cabal") common_substs
@@ -409,7 +410,32 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   ghcversionh <- makeAbsolute (src_rts </> "include/ghcversion.h")
 
   let cabal_project_rts_path = dst </> "cabal.project-rts"
-  makeCabalProject cabal_project_rts_path
+      -- cabal's code handling escaping is bonkers. We need to wrap the whole
+      -- option into \" otherwise it does weird things (like keeping only the
+      -- last double-quote).
+  let def_string k v = "  ghc-options: \"-optc-D" ++ k ++ "=\\\"" ++ v ++ "\\\"\""
+  let rts_options =
+        [ "package rts"
+        , def_string "ProjectVersion" (Text.unpack (gboVersionInt opts))
+        , def_string "RtsWay"            "FIXME"
+        , def_string "HostPlatform"      "FIXME"
+        , def_string "HostArch"          "FIXME"
+        , def_string "HostOS"            "FIXME"
+        , def_string "HostVendor"        "FIXME"
+        , def_string "BuildPlatform"     "FIXME"
+        , def_string "BuildArch"         "FIXME"
+        , def_string "BuildOS"           "FIXME"
+        , def_string "BuildVendor"       "FIXME"
+        , def_string "TargetPlatform"    "FIXME"
+        , def_string "TargetArch"        "FIXME"
+        , def_string "TargetOS"          "FIXME"
+        , def_string "TargetVendor"      "FIXME"
+        , def_string "GhcUnregisterised" "FIXME"
+        , def_string "TablesNextToCode"  "FIXME"
+        , "  ghc-options: -I" ++ (src_rts </> "include")
+        , "  ghc-options: -I" ++ src_rts
+        ]
+  makeCabalProject cabal_project_rts_path $
         [ "package-dbs: clear, global"
         , ""
         , "packages:"
@@ -426,7 +452,8 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "  executable-profiling: False"
         , "  executable-dynamic: False"
         , "  executable-static: False"
-        ]
+        , ""
+        ] ++ rts_options
 
   let build_rts_cmd = runCabal cabal
         [ "build"
@@ -435,25 +462,8 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "--with-compiler=" ++ ghcPath ghc
         , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg
         , "--ghc-options=\"-ghcversion-file=" ++ ghcversionh ++ "\""
-        , "--ghc-options=\"-I" ++ (src_rts </> "include") ++ "\""
-        , "--ghc-options=\"-I" ++ src_rts ++ "\""
         , "--builddir=" ++ build_dir
-        , "--ghc-options=\"-optc=-DProjectVersion=\\\"" ++ Text.unpack (gboVersionInt opts) ++ "\\\"\""
-        , "--ghc-options=\"-optc=-DRtsWay=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DHostPlatform=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DHostArch=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DHostOS=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DHostVendor=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DBuildPlatform=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DBuildArch=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DBuildOS=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DBuildVendor=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DTargetPlatform=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DTargetArch=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DTargetOS=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DTargetVendor=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DGhcUnregisterised=\\\"FIXME\\\"\""
-        , "--ghc-options=\"-optc=-DTablesNextToCode=\\\"FIXME\\\"\""
+        , "-v3"
         ]
 
   -- FIXME: deriveConstants requires ghcautoconf.h and ghcplatform.h but these
@@ -528,20 +538,9 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   cp (dst_libffi </> "include" </> "*") (src_rts </> "include")
   cp (dst_libffi </> "lib" </> "libffi.a") (takeDirectory ghcplatform_dir </> "libCffi.a")
 
-  -- second run of cabal is expected to succeed now that have generated all the headers!
-  msg "  - Building the RTS..."
-  (rts_exit_code, rts_stdout, rts_stderr) <- readCreateProcessWithExitCode build_rts_cmd ""
-  case rts_exit_code of
-    ExitSuccess -> pure ()
-    ExitFailure r -> do
-      putStrLn $ "Failed to build the RTS with error code " ++ show r
-      putStrLn rts_stdout
-      putStrLn rts_stderr
-      exitFailure
-
   -- build boot libraries: ghc-internal, base... but not GHC itself
   let cabal_project_bootlibs_path = dst </> "cabal-project-boot-libs"
-  makeCabalProject cabal_project_bootlibs_path
+  makeCabalProject cabal_project_bootlibs_path $
         [ "package-dbs: clear, global"
         , ""
         , "packages:"
@@ -605,7 +604,9 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "package text"
              -- FIXME: avoid having to deal with system-cxx-std-lib fake package for now
         , "  flags: -simdutf"
-        ]
+        , ""
+        ] ++ rts_options
+
   let build_boot_cmd = runCabal cabal
         [ "build"
         , "--project-file=" ++ cabal_project_bootlibs_path
@@ -614,14 +615,9 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "--ghc-options=\"-ghcversion-file=" ++ ghcversionh ++ "\""
         , "--builddir=" ++ build_dir
         , "-j"
-          -- never reinstall the RTS during this step: we should use the one
-          -- installed at the previous step. Otherwise we risk using invalid
-          -- generated files and we don't pass enough options here to build the
-          -- rts anyway.
-          -- FIXME: but it doesn't work because the rts isn't really installed
-          -- , "--constraint=rts installed"
 
           -- targets
+        , "rts"
         , "ghc-prim"
         , "ghc-internal"
         , "base"
@@ -642,7 +638,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
 ---------------------------
 
 data GhcBuildOptions = GhcBuildOptions
-  { gboVersion	          :: !Text -- ^ GHC version
+  { gboVersion            :: !Text -- ^ GHC version
   , gboVersionInt         :: !Text -- ^ GHC version as an Int
   , gboVersionMunged      :: !Text -- ^ GHC version "munged"
   , gboVersionForLib      :: !Text -- ^ GHC version for libraries?
