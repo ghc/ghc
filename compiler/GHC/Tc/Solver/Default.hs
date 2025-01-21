@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiWayIf #-}
+
 module GHC.Tc.Solver.Default(
    tryDefaulting, tryUnsatisfiableGivens,
    isInteractiveClass, isNumClass
@@ -26,7 +28,7 @@ import GHC.Core.Reduction( Reduction, reductionCoercion )
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Core.Make
-import GHC.Core.Coercion( mkNomReflCo, isReflCo )
+import GHC.Core.Coercion( isReflCo, mkReflCo, mkSubCo )
 import GHC.Core.Unify    ( tcMatchTyKis )
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -362,9 +364,9 @@ tryConstraintDefaulting wc
   where
     go_wc :: WantedConstraints -> TcS WantedConstraints
     go_wc wc@(WC { wc_simple = simples, wc_impl = implics })
-      = do { mb_simples <- mapMaybeBagM go_simple simples
+      = do { simples'   <- mapMaybeBagM go_simple simples
            ; mb_implics <- mapMaybeBagM go_implic implics
-           ; return (wc { wc_simple = mb_simples, wc_impl   = mb_implics }) }
+           ; return (wc { wc_simple = simples', wc_impl = mb_implics }) }
 
     go_simple :: Ct -> TcS (Maybe Ct)
     go_simple ct = do { solved <- tryCtDefaultingStrategy ct
@@ -403,7 +405,7 @@ defaultExceptionContext ct
        ; let ev = ctEvidence ct
              ev_tm = mkEvCast (Var empty_ec_id) (wrapIP (ctEvPred ev))
        ; setEvBindIfWanted ev EvCanonical ev_tm
-         -- EvCanonical: see Note [CallStack and ExecptionContext hack]
+         -- EvCanonical: see Note [CallStack and ExceptionContext hack]
          --              in GHC.Tc.Solver.Dict
        ; return True }
   | otherwise
@@ -423,19 +425,54 @@ defaultCallStack ct
 defaultEquality :: CtDefaultingStrategy
 -- See Note [Defaulting equalities]
 defaultEquality ct
-  | EqPred NomEq ty1 ty2 <- classifyPredType (ctPred ct)
+  | EqPred eq_rel ty1 ty2 <- classifyPredType (ctPred ct)
   = do { -- Remember: `ct` may not be zonked;
          -- see (DE3) in Note [Defaulting equalities]
          z_ty1 <- TcS.zonkTcType ty1
        ; z_ty2 <- TcS.zonkTcType ty2
-
+       ; case eq_rel of
+          { NomEq ->
        -- Now see if either LHS or RHS is a bare type variable
        -- You might think the type variable will only be on the LHS
        -- but with a type function we might get   F t1 ~ alpha
-       ; case (getTyVar_maybe z_ty1, getTyVar_maybe z_ty2) of
+         case (getTyVar_maybe z_ty1, getTyVar_maybe z_ty2) of
            (Just z_tv1, _) -> try_default_tv z_tv1 z_ty2
            (_, Just z_tv2) -> try_default_tv z_tv2 z_ty1
-           _               -> return False }
+           _               -> return False ;
+
+          ; ReprEq
+              -- See Note [Defaulting representational equalities]
+              | CIrredCan (IrredCt { ir_reason }) <- ct
+              , isInsolubleReason ir_reason
+              -- Don't do this for definitely insoluble representational
+              -- equalities such as Int ~R# Bool.
+              -> return False
+              | otherwise
+              ->
+       do { traceTcS "defaultEquality ReprEq {" $ vcat
+              [ text "ct:" <+> ppr ct
+              , text "z_ty1:" <+> ppr z_ty1
+              , text "z_ty2:" <+> ppr z_ty2
+              ]
+            -- Promote this representational equality to a nominal equality.
+            --
+            -- This handles cases such as @IO alpha[tau] ~R# IO Int@
+            -- by defaulting @alpha := Int@, which is useful in practice
+            -- (see Note [Defaulting representational equalities]).
+          ; (co, new_eqs, _unifs, _rw) <-
+              wrapUnifierX (ctEvidence ct) Nominal $
+              -- NB: nominal equality!
+                \ uenv -> uType uenv z_ty1 z_ty2
+            -- Only accept this solution if no new equalities are produced
+            -- by the unifier.
+            --
+            -- See Note [Defaulting representational equalities].
+          ; if null new_eqs
+            then do { setEvBindIfWanted (ctEvidence ct) EvCanonical $
+                       (evCoercion $ mkSubCo co)
+                    ; return True }
+            else return False
+          } } }
   | otherwise
   = return False
 
@@ -477,8 +514,10 @@ defaultEquality ct
                ; unifyTyVar lhs_tv rhs_ty  -- NB: unifyTyVar adds to the
                                            -- TcS unification counter
                ; setEvBindIfWanted (ctEvidence ct) EvCanonical $
-                 evCoercion (mkNomReflCo rhs_ty)
-               ; return True }
+                 evCoercion (mkReflCo Nominal rhs_ty)
+               ; return True
+               }
+
 
 combineStrategies :: CtDefaultingStrategy -> CtDefaultingStrategy -> CtDefaultingStrategy
 combineStrategies default1 default2 ct
@@ -518,29 +557,42 @@ too drastic.
 
 Note [Defaulting equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In top-level defaulting (as per Note [Top-level Defaulting Plan]), it makes
+sense to try to default equality constraints, in addition to e.g. typeclass
+defaulting: this doesn't threaten principal types (see DE1 below), but
+allows GHC to accept strictly more programs.
+
+This Note explains defaulting nominal equalities; see also
+Note [Defaulting representational equalities] which describes
+the defaulting of representational equalities.
+
 Consider
+
   f :: forall a. (forall t. (F t ~ Int) => a -> Int) -> Int
 
   g :: Int
   g = f id
 
 We'll typecheck
+
   id :: forall t. (F t ~ Int) => alpha[1] -> Int
+
 where the `alpha[1]` comes from instantiating `f`. So we'll end up
 with the implication constraint
+
    forall[2] t. (F t ~ Int) => alpha[1] ~ Int
-And that can't be solved because `alpha` is untouchable under the
+
+and that can't be solved because `alpha` is untouchable under the
 equality (F t ~ Int).
 
 This is tiresome, and gave rise to user complaints: #25125 and #25029.
 Moreover, in this case there is no good reason not to unify alpha:=Int.
 Doing so solves the constraint, and since `alpha` is not otherwise
-constrained, it does no harm.  So the new plan is this:
+constrained, it does no harm.
 
-  * For the Wanted constraint
-        [W] alpha ~ ty
-    if the only reason for not unifying is untouchability, then during
-    top-level defaulting, go ahead and unify
+In conclusion, for a Wanted equality constraint [W] lhs ~ rhs, if the only
+reason for not unifying is that either lhs or rhs is an untouchable metavariable
+then, in top-level defaulting, go ahead and unify.
 
 In top-level defaulting, we already do several other somewhat-ad-hoc,
 but terribly convenient, unifications. This is just one more.
@@ -555,12 +607,11 @@ Wrinkles:
      f x = case x of T1 -> True
 
   Should we infer f :: T a -> Bool, or f :: T a -> a.  Both are valid, but
-  neither is more general than the other
+  neither is more general than the other.
 
 (DE2) We still can't unify if there is a skolem-escape check, or an occurs check,
   or it it'd mean unifying a TyVarTv with a non-tyvar.  It's only the
-  "untouchability test" that we lift.  We can lift it by saying that the innermost
-  given equality is at top level.
+  "untouchability test" that we lift.
 
 (DE3) The contraint we are looking at may not be fully zonked; for example,
   an earlier defaulting might have affected it. So we zonk-on-the fly in
@@ -568,7 +619,7 @@ Wrinkles:
 
 (DE4) Promotion. Suppose we see  alpha[2] := Maybe beta[4].  We want to promote
   beta[4] to level 2 and unify alpha[2] := Maybe beta'[2].  This is done by
-  checkTyEqRhs.
+  checkTyEqRhs called in defaultEquality.
 
 (DE5) Promotion. Suppose we see  alpha[2] := F beta[4], where F is a type
   family. Then we still want to promote beta to beta'[2], and unify. This is
@@ -587,6 +638,64 @@ Then when we default 'a' we can solve the constraint.  And we want to do
 that before starting in on type classes.  We MUST do it before reporting
 errors, because it isn't an error!  #7967 was due to this.
 
+Note [Defaulting representational equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we end up with [W] alpha ~#R Int, with no other constraints on alpha.
+Then it makes sense to simply unify alpha := Int -- the alternative is to
+reject the program due to an ambiguous metavariable alpha, so it makes sense
+to unify and accept instead.
+
+This is particularly convenient for users of `coerce`, as it lessens the
+amount of type annotations required (see #21003). Consider for example:
+
+  -- 'foldMap' defined using 'traverse'
+  foldMapUsingTraverse :: forall t m a. (Traversable t, Monoid m) => (a -> m) -> t a -> m
+  foldMapUsingTraverse = coerce $ traverse @t @(Const m)
+
+  -- 'traverse_' defined using 'foldMap'
+  traverse_UsingFoldMap :: forall f t a. (Foldable t, Applicative f) => (a -> f ()) -> t a -> f ()
+  traverse_UsingFoldMap = coerce $ foldMap @t @(Ap f ())
+
+Typechecking these functions results in unsolved Wanted constraints of the form
+[W] alpha[tau] ~R# some_ty; accepting such programs by unifying
+alpha := some_ty avoids the need for users to specify tiresome additional
+type annotations, such as:
+
+    foldMapUsingTraverse = coerce $ traverse @t @(Const m) @a
+    traverse_UsingFoldMap = coerce $ foldMap @t @(Ap f ()) @a
+
+Consider also the following example:
+
+  -- 'sequence_', but for two nested 'Foldable' structures
+  sequenceNested_ :: forall f1 f2. (Foldable f1, Foldable f2) => f1 (f2 (IO ())) -> IO ()
+  sequenceNested_ = coerce $ sequence_ @( Compose f1 f2 )
+
+Here, we end up with [W] mu[tau] beta[tau] ~#R IO (), and it similarly makes
+sense to default mu := IO, beta := (). This avoids requiring the
+user to provide additional type applications:
+
+    sequenceNested_ = coerce $ sequence_ @( Compose f1 f2 ) @IO @()
+
+The plan for defaulting a representational equality, say [W] ty1 ~R# ty2,
+is thus as follows:
+
+  1. attempt to unify ty1 ~# ty2 (at nominal role)
+  2. a. if this succeeds without deferring any constraints, accept this solution
+     b. otherwise, keep the original constraint.
+
+(2b) ensures that we don't degrade all error messages by always turning unsolved
+representational equalities into nominal ones; we only want to default a
+representational equality when we can fully solve it.
+
+Note that this does not threaten principle types. Recall that the original worry
+(as per Note [Do not unify representational equalities]) was that we might have
+
+    [W] alpha ~R# Int
+    [W] alpha ~ Age
+
+in which case unifying alpha := Int would be wrong, as the correct solution is
+alpha := Age. This worry doesn't concern us in top-level defaulting, because
+defaulting takes place after generalisation; it is fully monomorphic.
 
 *********************************************************************************
 *                                                                               *

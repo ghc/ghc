@@ -40,6 +40,10 @@ Language
 
 * Multiline strings are now accepted in foreign imports. (#25157)
 
+* GHC now does a better job at inferring types in calls to ``coerce``: instead of
+  complaining about ambiguous type variables, GHC will consider that such type
+  variables are determined by the ``Coercible`` constraints they appear in.
+
 Compiler
 ~~~~~~~~
 

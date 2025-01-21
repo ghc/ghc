@@ -1,10 +1,10 @@
-
 T14561b.hs:12:9: error: [GHC-55287]
     • The first argument of ‘coerce’
       does not have a fixed runtime representation.
       Its type is:
-        a0 :: TYPE k0
+        b0 :: TYPE k0
       Cannot unify ‘r’ with the type variable ‘k0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: coerce
       In an equation for ‘badId’: badId = coerce
+

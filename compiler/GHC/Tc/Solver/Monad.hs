@@ -64,6 +64,8 @@ module GHC.Tc.Solver.Monad (
     getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
     tcLookupClass, tcLookupId, tcLookupTyCon,
 
+    getUnifiedRef,
+
 
     -- Inerts
     updInertSet, updInertCans,
@@ -98,7 +100,7 @@ module GHC.Tc.Solver.Monad (
     instDFunType,
 
     -- Unification
-    wrapUnifierTcS, unifyFunDeps, uPairsTcM, unifyForAllBody,
+    wrapUnifierX, wrapUnifierTcS, unifyFunDeps, uPairsTcM, unifyForAllBody,
 
     -- MetaTyVars
     newFlexiTcSTy, instFlexiX,
