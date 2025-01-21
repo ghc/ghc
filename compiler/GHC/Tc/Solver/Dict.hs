@@ -189,9 +189,9 @@ solveCallStack ev ev_cs
   = do { cs_tm <- evCallStack ev_cs
        ; let ev_tm = mkEvCast cs_tm (wrapIP (ctEvPred ev))
        ; setEvBindIfWanted ev EvCanonical ev_tm }
-         -- EvCanonical: see Note [CallStack and ExecptionContext hack]
+         -- EvCanonical: see Note [CallStack and ExceptionContext hack]
 
-{- Note [CallStack and ExecptionContext hack]
+{- Note [CallStack and ExceptionContext hack]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It isn't really right that we treat CallStack and ExceptionContext dictionaries
 as canonical, in the sense of Note [Coherence and specialisation: overview].
@@ -199,7 +199,7 @@ They definitely are not!
 
 But if we use EvNonCanonical here we get lots of
     nospec (error @Int) dict  string
-(since `error` takes a HasCallStack dict), and that isn't bottomng  (at least not
+(since `error` takes a HasCallStack dict), and that isn't bottoming  (at least not
 without extra work)  So, hackily, we just say that HasCallStack and ExceptionContext
 are canonical, even though they aren't really.
 

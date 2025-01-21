@@ -1,5 +1,6 @@
 module T10495 where
 
-import Data.Coerce
+class C a b where
+  meth :: a -> b
 
-foo = coerce
+foo = meth

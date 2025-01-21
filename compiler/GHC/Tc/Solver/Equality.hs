@@ -2708,6 +2708,10 @@ and we want to get alpha := N b.
 See also #15144, which was caused by unifying a representational
 equality.
 
+Note that it does however make sense to perform such unifications, as a last
+resort, when doing top-level defaulting.
+See Note [Defaulting representational equalities].
+
 Note [Solve by unification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we solve

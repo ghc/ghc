@@ -3110,7 +3110,7 @@ mapCheck f xs
 
 -----------------------------
 -- | Options describing how to deal with a type equality
--- in the pure unifier. See 'checkTyEqRhs'
+-- in the eager unifier. See 'checkTyEqRhs'
 data TyEqFlags m a
   -- | LHS is a type family application; we are not unifying.
   = TEFTyFam

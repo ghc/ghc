@@ -1,8 +1,5 @@
+T10495.hs:6:7: error: [GHC-39999]
+    • No instance for ‘C a0 b0’ arising from a use of ‘meth’
+    • In the expression: meth
+      In an equation for ‘foo’: foo = meth
 
-T10495.hs:5:7: error: [GHC-10283]
-    • Couldn't match representation of type ‘a0’ with that of ‘b0’
-        arising from a use of ‘coerce’
-    • In the expression: coerce
-      In an equation for ‘foo’: foo = coerce
-    • Relevant bindings include
-        foo :: a0 -> b0 (bound at T10495.hs:5:1)
