@@ -1757,6 +1757,9 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     :: SrcSpanAnnA -> Boxity -> SumOrTuple b -> (EpaLocation, EpaLocation) -> PV (LocatedA b)
   -- | Disambiguate "type t" (embedded type)
   mkHsEmbTyPV :: SrcSpan -> EpToken "type" -> LHsType GhcPs -> PV (LocatedA b)
+  -- | Disambiguate modifiers (%a)
+  mkHsModifiedPV
+    :: SrcSpan -> [HsModifier GhcPs] -> LocatedA b -> PV (LocatedA b)
   -- | Validate infixexp LHS to reject unwanted {-# SCC ... #-} pragmas
   rejectPragmaPV :: LocatedA b -> PV ()
 
@@ -1890,6 +1893,7 @@ instance DisambECP (HsCmd GhcPs) where
     text "!" <> ppr c
   mkSumOrTuplePV l boxity a _ = cmdFail (locA l) (pprSumOrTuple boxity a)
   mkHsEmbTyPV l _ ty = cmdFail l (text "type" <+> ppr ty)
+  mkHsModifiedPV l mods _ = cmdFail l (text "modifiers" <+> pprHsModifiers mods)
   rejectPragmaPV _ = return ()
 
 cmdFail :: SrcSpan -> SDoc -> PV a
@@ -2001,6 +2005,8 @@ instance DisambECP (HsExpr GhcPs) where
   mkQualPV l qual ty =
     return $ L (noAnnSrcSpan l) $
       HsQual noExtField qual ty
+  mkHsModifiedPV l mods expr =
+    return $ L (noAnnSrcSpan l) $ HsModifiedExpr noExtField mods expr
   rejectPragmaPV (L _ (OpApp _ _ _ e)) =
     -- assuming left-associative parsing of operators
     rejectPragmaPV e
@@ -2109,6 +2115,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsEmbTyPV l toktype ty =
     return $ L (noAnnSrcSpan l) $
       PatBuilderPat (EmbTyPat toktype (mkHsTyPat ty))
+  mkHsModifiedPV _l _mods _ = error "MODS_TODO parsing modifiers in pats"
   rejectPragmaPV _ = return ()
 
 -- For reasons of backwards compatibility, we can't simply add the pattern

@@ -1380,7 +1380,7 @@ modifier :: { Located (HsModifier GhcPs) }
 
 -- | Modifiers attached inline.
 modifiers :: { Located [HsModifier GhcPs] }
-  : modifiers modifier              { sLL $1 $2 (unLoc $2 : unLoc $1) }
+  : modifiers1                      { $1 }
   | {- empty -}                     { sL0 [] }
 
 modifiers1 :: { Located [HsModifier GhcPs] }
@@ -2717,18 +2717,6 @@ decl_no_th :: { LHsDecl GhcPs }
                                         -- [FunBind vs PatBind]
                                           ; !cs <- getCommentsFor l
                                           ; return $! (sL (commentsA l cs) $ ValD noExtField r) } }
-        | modifiers1 infixexp opt_sig rhs
-                                    {% runPV (unECP $2) >>= \ $2 ->
-                                       do { let { l = comb2 $1 $> }
-                                          ; r <- checkValDef l $2 (HsMultAnn noExtField (reverse $ unLoc $1), $3) $4;
-                                        -- parses bindings of the form %p x or
-                                        -- %p x :: sig
-                                        --
-                                        -- Depending upon what the pattern looks like we might get either
-                                        -- a FunBind or PatBind back from checkValDef. See Note
-                                        -- [FunBind vs PatBind]
-                                          ; !cs <- getCommentsFor l
-                                          ; return $! (sL (commentsA l cs) $ ValD noExtField r) } }
         | pattern_synonym_decl  { $1 }
 
 decl    :: { LHsDecl GhcPs }
@@ -3045,6 +3033,9 @@ fexp    :: { ECP }
                                         amsA' (sLL $1 $> $ HsStatic (epTok $1) $2) }
 
         | aexp                       { $1 }
+        | modifiers1 aexp            { ECP $
+                                         unECP $2 >>= \ $2 ->
+                                         mkHsModifiedPV (comb2 $1 $2) (unLoc $1) $2 }
 
 aexp    :: { ECP }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
