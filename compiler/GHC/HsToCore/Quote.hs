@@ -1541,10 +1541,10 @@ repE (HsVar _ (L _ x)) =
         Just (DsBound y)   -> repVarOrCon x (coreVar y)
         Just (DsSplice e)  -> do { e' <- lift $ dsExpr e
                                  ; return (MkC e') } }
-repE (HsHole (HoleVar uv, NoExtField)) = do
+repE (HsHole (GhcHole (HoleVar (L _ uv)) NoExtField)) = do
   name <- repRdrName uv
   repUnboundVar name
-repE (HsHole (HoleParseError x, NoExtField)) = dataConCantHappen x
+repE (HsHole (GhcHole HoleParseError NoExtField)) = panic "repE: HoleParseError"
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ s) = repOverLabel s
 

@@ -299,14 +299,15 @@ tcExpr (XExpr e)                 res_ty = tcXExpr e res_ty
 --
 -- Some of these started life as a true expression hole "_".
 -- Others might simply be variables that accidentally have no binding site.
-tcExpr (HsHole (HoleVar occ, NoExtField)) res_ty
+tcExpr (HsHole (GhcHole (HoleVar locc@(L _ occ)) NoExtField)) res_ty
   = do { ty <- expTypeToType res_ty    -- Allow Int# etc (#12531)
        ; her <- emitNewExprHole occ ty
        ; tcEmitBindingUsage bottomUE   -- Holes fit any usage environment
                                        -- (#18491)
-       ; return (HsHole (HoleVar occ, her))
+       ; return (HsHole (GhcHole (HoleVar locc) her))
        }
-tcExpr (HsHole (HoleParseError x, NoExtField)) _ = dataConCantHappen x
+tcExpr (HsHole (GhcHole HoleParseError NoExtField)) _ =
+  panic "GHC.Tc.Gen.Expr: tcExpr: HoleParseError: Not implemented"
 
 tcExpr e@(HsLit x lit) res_ty
   = do { let lit_ty = hsLitType lit

@@ -314,10 +314,6 @@ instance HasTrailing AnnExplicitSum where
   trailing _ = []
   setTrailing a _ = a
 
-instance HasTrailing (Maybe EpAnnHole) where
-  trailing _ = []
-  setTrailing a _ = a
-
 instance HasTrailing GrhsAnn where
   trailing _ = []
   setTrailing a _ = a
@@ -2879,17 +2875,13 @@ instance ExactPrint (HsExpr GhcPs) where
       then markAnnotated n
       else return n
     return (HsVar x n')
-  exact (HsHole (HoleVar an, NoExtField)) = do
-    case an of
-      Just (EpAnnHole (ob,cb) l) -> do
-        ob' <-  markEpToken ob
-        l'  <- markEpToken l
-        cb' <- markEpToken cb
-        return (HsHole (HoleVar (Just (EpAnnHole (ob',cb') l')), NoExtField))
-      Nothing -> do
-        printStringAdvanceA "_" >> return ()
-        return (HsHole (HoleVar an, NoExtField))
-  exact (HsHole (HoleParseError NoExtField, NoExtField)) = error "Cannot exact print HoleParseError"
+  exact (HsHole (GhcHole (HoleVar n) NoExtField)) = do
+    let pun_RDR = "pun-right-hand-side"
+    n' <- if (showPprUnsafe n /= pun_RDR)
+      then markAnnotated n
+      else return n
+    return (HsHole (GhcHole (HoleVar n') NoExtField))
+  exact (HsHole (GhcHole HoleParseError NoExtField)) = error "Cannot exact print HoleParseError"
   exact x@(HsOverLabel src l) = do
     printStringAdvanceA "#" >> return ()
     case src of

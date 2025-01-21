@@ -1469,7 +1469,7 @@ get_op :: LHsExpr GhcRn -> OpName
 -- An unbound name could be either HsVar or (HsHole (HoleVar _, _))
 -- See GHC.Rename.Expr.rnUnboundVar
 get_op (L _ (HsVar _ n))                 = NormalOp (unLoc n)
-get_op (L _ (HsHole (HoleVar uv, NoExtField))) = UnboundOp uv
+get_op (L _ (HsHole (GhcHole (HoleVar (L _ uv)) NoExtField))) = UnboundOp uv
 get_op (L _ (XExpr (HsRecSelRn fld)))    = RecFldOp fld
 get_op other                             = pprPanic "get_op" (ppr other)
 

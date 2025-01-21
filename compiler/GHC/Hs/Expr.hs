@@ -11,11 +11,11 @@
 {-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TypeApplications          #-}
 {-# LANGUAGE TypeFamilyDependencies    #-}
-{-# LANGUAGE AllowAmbiguousTypes    #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -221,11 +221,6 @@ data EpAnnLam = EpAnnLam
 instance NoAnn EpAnnLam where
   noAnn = EpAnnLam noAnn noAnn
 
-data EpAnnHole = EpAnnHole
-     { hsHoleBackquotes :: (EpToken "`", EpToken "`")
-     , hsHoleHole       :: EpToken "_"
-     } deriving Data
-
 -- Record selectors at parse time are HsVar; they convert to HsRecSel
 -- on renaming.
 type instance XRecSel              GhcPs = DataConCantHappen
@@ -404,44 +399,21 @@ type instance XEmbTy         GhcTc = DataConCantHappen
 -- be enough. But then deriving a Data instance becomes impossible. Much,
 -- much easier just to define HoleExprRef with a Data instance and store
 -- the whole structure.
-type instance XHole (GhcPass p) =
-  (HoleKind (XHoleVar (GhcPass p)) (XHoleParseError (GhcPass p)), XHoleShared (GhcPass p))
+type instance XHole GhcPs = GhcHole NoExtField
+type instance XHole GhcRn = GhcHole NoExtField
+type instance XHole GhcTc = GhcHole HoleExprRef
 
-data HoleKind unboundVarInfo parseErrorInfo
-  = HoleVar unboundVarInfo
-  | HoleParseError parseErrorInfo
+data GhcHole x = GhcHole HoleKind x
   deriving Data
 
--- | HsHole extensions for (named) holes and unbound variables.
-type family XHoleVar x
-type instance XHoleVar       GhcPs = Maybe EpAnnHole
-type instance XHoleVar       GhcRn = RdrName
-type instance XHoleVar       GhcTc = RdrName
-
--- | HsHole extension for parse errors. Unused for now except to encode that
--- these cannot occur after the renamer.
-type family XHoleParseError p
-type instance XHoleParseError GhcPs = NoExtField
-type instance XHoleParseError GhcRn = DataConCantHappen
-type instance XHoleParseError GhcTc = DataConCantHappen
-
--- | HsHole extension shared between all types of holes.
-type family XHoleShared p
-type instance XHoleShared GhcPs = NoExtField
-type instance XHoleShared GhcRn = NoExtField
-type instance XHoleShared GhcTc = HoleExprRef
+data HoleKind
+  = HoleVar (LIdP GhcPs)
+  | HoleParseError
+  deriving Data
 
 -- | The RdrName for an unnamed hole ("_").
 unnamedHoleRdrName :: RdrName
 unnamedHoleRdrName = mkUnqual varName (fsLit "_")
-
--- | The RdrName for an unnamed ("_") hole or named hole/unbound variable
--- ("_hole").
-holeVarRdrName :: forall p. IsPass p => XHoleVar (GhcPass p) -> RdrName
-holeVarRdrName hv = case (ghcPass @p, hv) of
-  (GhcPs, _) -> unnamedHoleRdrName
-  (GhcRn, r) -> r
-  (GhcTc, r) -> r
 
 
 type instance XForAll        GhcPs = NoExtField
@@ -748,11 +720,11 @@ ppr_lexpr e = ppr_expr (unLoc e)
 ppr_expr :: forall p. (OutputableBndrId p)
          => HsExpr (GhcPass p) -> SDoc
 ppr_expr (HsVar _ (L _ v))   = pprPrefixOcc v
-ppr_expr (HsHole (HoleVar v, _)) = pprPrefixOcc (holeVarRdrName @p v)
-ppr_expr (HsHole (HoleParseError x, _)) = case ghcPass @p of
-  GhcPs -> pprPrefixOcc unnamedHoleRdrName
-  GhcRn -> dataConCantHappen x
-  GhcTc -> dataConCantHappen x
+ppr_expr (HsHole x) = pprPrefixOcc $ case (ghcPass @p, x) of
+  (GhcPs, GhcHole (HoleVar (L _ v)) _) -> v
+  (GhcRn, GhcHole (HoleVar (L _ v)) _) -> v
+  (GhcTc, GhcHole (HoleVar (L _ v)) _) -> v
+  _ -> unnamedHoleRdrName -- TODO: this is the HoleError case; print the actual source code or something better than "_"
 ppr_expr (HsIPVar _ v)       = ppr v
 ppr_expr (HsOverLabel s l) = case ghcPass @p of
                GhcPs -> helper s
@@ -1010,11 +982,11 @@ instance Outputable XXExprGhcTc where
 
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
-ppr_infix_expr (HsHole (HoleVar hv, _)) = Just (pprInfixOcc (holeVarRdrName @p hv))
-ppr_infix_expr (HsHole (HoleParseError x, _)) = case ghcPass @p of
-  GhcPs -> Just (pprInfixOcc unnamedHoleRdrName) -- TODO: Why not print the actual source text in case of a parse error?
-  GhcRn -> dataConCantHappen x
-  GhcTc -> dataConCantHappen x
+ppr_infix_expr (HsHole x) = Just $ pprInfixOcc $ case (ghcPass @p, x) of
+  (GhcPs, GhcHole (HoleVar (L _ v)) _) -> v
+  (GhcRn, GhcHole (HoleVar (L _ v)) _) -> v
+  (GhcTc, GhcHole (HoleVar (L _ v)) _) -> v
+  _ -> unnamedHoleRdrName -- TODO: this is the HoleError case; print the actual source code or something better than "_"
 ppr_infix_expr (XExpr x)            = case ghcPass @p of
                                         GhcRn -> ppr_infix_expr_rn x
                                         GhcTc -> ppr_infix_expr_tc x

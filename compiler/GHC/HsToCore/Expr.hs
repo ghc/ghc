@@ -273,9 +273,8 @@ dsExpr e@(HsVar {})                 = dsApp e
 dsExpr e@(HsApp {})                 = dsApp e
 dsExpr e@(HsAppType {})             = dsApp e
 
-dsExpr (HsHole (HoleVar _, HER ref _ _)) = dsEvTerm =<< readMutVar ref
+dsExpr (HsHole (GhcHole _ (HER ref _ _))) = dsEvTerm =<< readMutVar ref
       -- See Note [Holes in expressions] in GHC.Tc.Types.Constraint.
-dsExpr (HsHole (HoleParseError x, _)) = dataConCantHappen x
 
 dsExpr (HsPar _ e)            = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e

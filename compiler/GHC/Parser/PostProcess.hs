@@ -1609,12 +1609,12 @@ type Fbind b = Either (LHsRecField GhcPs (LocatedA b)) (LHsRecProj GhcPs (Locate
 class DisambInfixOp b where
   mkHsVarOpPV :: LocatedN RdrName -> PV (LocatedN b)
   mkHsConOpPV :: LocatedN RdrName -> PV (LocatedN b)
-  mkHsInfixHolePV :: LocatedN (HsExpr GhcPs) -> PV (LocatedN b)
+  mkHsInfixHolePV :: LocatedN RdrName -> PV (LocatedN b)
 
 instance DisambInfixOp (HsExpr GhcPs) where
   mkHsVarOpPV v = return $ L (getLoc v) (HsVar noExtField v)
   mkHsConOpPV v = return $ L (getLoc v) (HsVar noExtField v)
-  mkHsInfixHolePV h = return h
+  mkHsInfixHolePV v = return $ L (getLoc v) (HsHole (GhcHole (HoleVar v) noExtField))
 
 instance DisambInfixOp RdrName where
   mkHsConOpPV (L l v) = return $ L l v
@@ -1949,7 +1949,7 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsOverLitPV (L (EpAnn l an csIn) a) = do
     !cs <- getCommentsFor (locA l)
     return $ L (EpAnn  l an (cs Semi.<> csIn)) (HsOverLit NoExtField a)
-  mkHsWildCardPV l = return $ L (noAnnSrcSpan l) (HsHole (HoleVar noAnn, NoExtField))
+  mkHsWildCardPV l = return $ L (noAnnSrcSpan l) (HsHole (GhcHole (HoleVar (L (noAnnSrcSpan l) (mkUnqual varName (fsLit "_")))) NoExtField))
   mkHsTySigPV l@(EpAnn anc an csIn) a sig anns = do
     !cs <- getCommentsFor (locA l)
     return $ L (EpAnn anc an (csIn Semi.<> cs)) (ExprWithTySig anns a (hsTypeToHsSigWcType sig))
@@ -3676,4 +3676,4 @@ mkListSyntaxTy1 brkOpen t brkClose =
     annParen = AnnParensSquare brkOpen brkClose
 
 parseError :: HsExpr GhcPs
-parseError = HsHole (HoleParseError NoExtField, NoExtField)
+parseError = HsHole (GhcHole HoleParseError NoExtField)

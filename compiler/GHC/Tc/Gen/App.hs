@@ -680,7 +680,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
 
     fun_is_out_of_scope  -- See Note [VTA for out-of-scope functions]
       = case tc_fun of
-          HsHole (HoleVar {}, _) -> True
+          HsHole _        -> True
           _               -> False
 
     inst_fun :: [HsExprArg 'TcpRn] -> ForAllTyFlag -> Bool
@@ -1056,7 +1056,7 @@ expr_to_type earg =
       = do { t <- go (L l e)
            ; let splice_result' = HsUntypedSpliceTop finalizers t
            ; return (L l (HsSpliceTy splice_result' splice)) }
-    go (L l (HsHole (HoleVar rdr, NoExtField)))
+    go (L l (HsHole (GhcHole (HoleVar (L _ rdr)) NoExtField)))
       | isUnderscore occ = return (L l (HsWildCardTy noExtField))
       | startsWithUnderscore occ =
           -- See Note [Wildcards in the T2T translation]

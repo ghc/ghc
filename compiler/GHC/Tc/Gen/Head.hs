@@ -1271,7 +1271,7 @@ addStmtCtxt stmt =
 addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside
   = case e of
-      HsHole (HoleVar {}, NoExtField) -> thing_inside
+      HsHole _ -> thing_inside
       _ -> addErrCtxt (ExprCtxt e) thing_inside
    -- The HsHole special case addresses situations like
    --    f x = _

@@ -313,18 +313,18 @@ finishHsVar (L l name)
         checkThLocalName name
       ; return (HsVar noExtField (L (l2l l) name), unitFV name) }
 
-rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
-rnUnboundVar v = do
+rnUnboundVar :: SrcSpanAnnN -> RdrName -> RnM (HsExpr GhcRn, FreeVars)
+rnUnboundVar l v = do
   deferOutofScopeVariables <- goptM Opt_DeferOutOfScopeVariables
   -- See Note [Reporting unbound names] for difference between qualified and unqualified names.
   unless (isUnqual v || deferOutofScopeVariables) (reportUnboundName v >> return ())
-  return (HsHole (HoleVar v, NoExtField), emptyFVs)
+  return (HsHole (GhcHole (HoleVar (L l v)) NoExtField), emptyFVs)
 
 rnExpr (HsVar _ (L l v))
   = do { dflags <- getDynFlags
        ; mb_gre <- lookupExprOccRn v
        ; case mb_gre of {
-           Nothing -> rnUnboundVar v ;
+           Nothing -> rnUnboundVar l v ;
            Just gre ->
     do { let nm   = greName gre
              info = greInfo gre
@@ -353,10 +353,8 @@ rnExpr (HsVar _ (L l v))
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
 
-rnExpr (HsHole (HoleVar _, NoExtField))
-  = return (HsHole (HoleVar unnamedHoleRdrName, NoExtField), emptyFVs)
-rnExpr (HsHole (HoleParseError NoExtField, NoExtField))
-  = panic "rnExpr tried to rename a HoleParseError"
+rnExpr (HsHole (GhcHole h NoExtField))
+  = return (HsHole (GhcHole h NoExtField), emptyFVs)
 
 -- HsOverLabel: see Note [Handling overloaded and rebindable constructs]
 rnExpr (HsOverLabel src v)
