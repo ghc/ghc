@@ -36,7 +36,6 @@ nitpick_ignore = [
 
     ("c:type", "bool"),
 
-    ("extension", "DoAndIfThenElse"),
     ("extension", "RelaxedPolyRec"),
 ]
 

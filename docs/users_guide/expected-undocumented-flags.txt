@@ -7,7 +7,6 @@
 -XAlternativeLayoutRule
 -XAlternativeLayoutRuleTransitional
 -XAutoDeriveTypeable
--XDoAndIfThenElse
 -XDoRec
 -XJavaScriptFFI
 -XParallelArrays

@@ -20,6 +20,7 @@ Syntax
     lambda_case
     empty_case
     multiway_if
+    doandifthenelse
     local_fixity_decls
     block_arguments
     typed_holes
