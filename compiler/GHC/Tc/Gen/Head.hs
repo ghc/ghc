@@ -83,6 +83,10 @@ import GHC.Utils.Panic
 
 import GHC.Data.Maybe
 import Control.Monad
+import qualified Data.Set as Set
+import qualified GHC.LanguageExtensions as LangExt
+
+
 
 {- *********************************************************************
 *                                                                      *
@@ -1067,22 +1071,23 @@ Wrinkles
 ************************************************************************
 -}
 
+-- TODO: We should do all level checks, once, and for all in the renamer in
+-- checkThLocalName.
 checkThLocalId :: Id -> TcM ()
--- The renamer has already done checkWellStaged,
---   in RnSplice.checkThLocalName, so don't repeat that here.
--- Here we just add constraints for cross-stage lifting
 checkThLocalId id
   = do  { mb_local_use <- getStageAndBindLevel (idName id)
         ; case mb_local_use of
              Just (top_lvl, bind_lvl, use_stage)
-                | thLevel use_stage > bind_lvl
-                -> checkCrossStageLifting top_lvl id use_stage
+                | thLevel use_stage `Set.notMember` bind_lvl
+                -> do
+                    dflags <- getDynFlags
+                    checkCrossStageLifting dflags top_lvl id use_stage
              _  -> return ()   -- Not a locally-bound thing, or
                                -- no cross-stage link
     }
 
 --------------------------------------
-checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
+checkCrossStageLifting :: DynFlags -> TopLevelFlag -> Id -> ThStage -> TcM ()
 -- If we are inside typed brackets, and (use_lvl > bind_lvl)
 -- we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [|| x ||]
@@ -1091,8 +1096,9 @@ checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
 -- This is similar to checkCrossStageLifting in GHC.Rename.Splice, but
 -- this code is applied to *typed* brackets.
 
-checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
+checkCrossStageLifting dflags top_lvl id (Brack _ (TcPending ps_var lie_var q))
   | isTopLevel top_lvl
+  , xopt LangExt.ImplicitStagePersistence dflags
   = when (isExternalName id_name) (keepAlive id_name)
     -- See Note [Keeping things alive for Template Haskell] in GHC.Rename.Splice
 
@@ -1140,7 +1146,7 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
   where
     id_name = idName id
 
-checkCrossStageLifting _ _ _ = return ()
+checkCrossStageLifting _ _ _ _ = return ()
 
 {-
 Note [Lifting strings]
@@ -1160,6 +1166,31 @@ Note [Local record selectors]
 Record selectors for TyCons in this module are ordinary local bindings,
 which show up as ATcIds rather than AGlobals.  So we need to check for
 naughtiness in both branches.  c.f. GHC.Tc.TyCl.Utils.mkRecSelBinds.
+
+Note [Explicit Level Imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This is the overview note which explains the whole implementation of ExplicitLevelImports
+
+GHC Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0682-explicit-level-imports.rst
+Paper: https://mpickering.github.io/papers/explicit-level-imports.pdf
+
+At the source level, the user marks imports with `quote` or `splice` to introduce
+them at level 2 or 0.
+
+The level which a name is availble at is stored in the 'GRE', in the normal
+GlobalRdrEnv. The function `greLevels` returns the levels which a specific GRE
+is imported at. The level information for a 'Name' is computed by `getStageAndBindLevel`.
+The level validity is checked by `checkCrossStageLifting`.
+
+Instances are checked by `checkWellStagedDFun`, which computes the level an
+instance by calling `checkWellStagedInstanceWhat`, which sees what is available at by looking at the module graph.
+
+That's it for the main implementation of the feature, and the rest is modifications
+to the driver parts of the code to use this information. For example, in downsweep,
+we only enable code generation for modules needed at the runtime stage.
+See Note [ExplicitLevelImports and -fno-code].
+
 -}
 
 

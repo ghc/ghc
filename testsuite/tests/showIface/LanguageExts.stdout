@@ -25,5 +25,6 @@ docs:
          CUSKs
          FieldSelectors
          ListTuplePuns
+         ImplicitStagePersistence
 extensible fields:
 

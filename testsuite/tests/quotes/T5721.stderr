@@ -1,0 +1,3 @@
+T5721.hs:7:14: warning: [GHC-86357] [-Wbadly-staged-types (in -Wdefault)]
+    Badly staged type: a is bound at stage {1} but used at stage 2
+

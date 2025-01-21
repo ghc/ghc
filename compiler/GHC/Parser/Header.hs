@@ -73,8 +73,8 @@ getImports :: ParserOpts   -- ^ Parser options
                            --   in the function result)
            -> IO (Either
                (Messages PsMessage)
-               ([(RawPkgQual, Located ModuleName)],
-                [(RawPkgQual, Located ModuleName)],
+               ([Located ModuleName],
+                [(ImportLevel, RawPkgQual, Located ModuleName)],
                 Located ModuleName))
               -- ^ The source imports and normal imports (with optional package
               -- names from -XPackageImports), and the module name.
@@ -101,10 +101,10 @@ getImports popts implicit_prelude buf filename source_filename = do
 
                 implicit_imports = mkPrelImports (unLoc mod) main_loc
                                                  implicit_prelude imps
-                convImport (L _ (i::ImportDecl GhcPs))
-                  = (ideclPkgQual i, reLoc $ ideclName i)
+                convImport (L _ (i :: ImportDecl GhcPs)) = (ideclLevel i, ideclPkgQual i, reLoc $ ideclName i)
+                convImport_src (L _ (i :: ImportDecl GhcPs)) = (reLoc $ ideclName i)
               in
-              return (map convImport src_idecls
+              return (map convImport_src src_idecls
                      , map convImport (implicit_imports ++ ord_idecls)
                      , reLoc mod)
 
@@ -133,6 +133,10 @@ mkPrelImports this_mod loc implicit_prelude import_decls
         && case ideclPkgQual decl of
             NoRawPkgQual -> True
             RawPkgQual {} -> False
+        -- Only a "normal" level import will override the implicit prelude import.
+        && case ideclLevel decl of
+              NormalLevel -> True
+              _ -> False
 
 
       loc' = noAnnSrcSpan loc
@@ -149,6 +153,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
                                 ideclSafe      = False,  -- Not a safe import
                                 ideclQualified = NotQualified,
                                 ideclAs        = Nothing,
+                                ideclLevel     = NormalLevel,
                                 ideclImportList = Nothing  }
 
 --------------------------------------------------------------

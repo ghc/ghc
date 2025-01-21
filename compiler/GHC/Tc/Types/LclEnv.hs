@@ -196,6 +196,7 @@ type ThBindEnv = NameEnv (TopLevelFlag, ThLevel)
    -- Nota bene: a ThLevel of 'outerLevel' is *not* the same as being
    -- bound at top level!  See Note [Template Haskell levels] in GHC.Tc.Gen.Splice
 
+
 ---------------------------
 -- Arrow-notation context
 ---------------------------

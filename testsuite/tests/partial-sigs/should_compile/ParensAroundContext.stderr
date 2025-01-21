@@ -1,4 +1,4 @@
 TYPE SIGNATURES
   f :: forall a. Eq a => a -> a -> Bool
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

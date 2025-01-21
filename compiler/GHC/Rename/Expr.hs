@@ -43,7 +43,7 @@ import GHC.Rename.Fixity
 import GHC.Rename.Utils
 import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice
-                          , rnUntypedSpliceExpr, checkThLocalName )
+                          , rnUntypedSpliceExpr, checkThLocalNameWithLift )
 import GHC.Rename.HsType
 import GHC.Rename.Pat
 
@@ -306,15 +306,6 @@ rnLExpr = wrapLocFstMA rnExpr
 
 rnExpr :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 
-finishHsVar :: RdrName -> LocatedA Name -> RnM (HsExpr GhcRn, FreeVars)
--- Separated from rnExpr because it's also used
--- when renaming infix expressions
-finishHsVar rdr (L l name)
- = do { this_mod <- getModule
-      ; when (nameIsLocalOrFrom this_mod name) $
-        checkThLocalName name
-      ; return (mkHsVarWithUserRdr rdr (L (l2l l) name), unitFV name) }
-
 rnUnboundVar :: SrcSpanAnnN -> RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar l v = do
   deferOutofScopeVariables <- goptM Opt_DeferOutOfScopeVariables
@@ -337,10 +328,8 @@ rnExpr (HsVar _ (L l v))
             -- matching GRE and add a name clash error
             -- (see lookupGlobalOccRn_overloaded, called by lookupExprOccRn).
             -> do { let sel_name = flSelector $ recFieldLabel fld_info
-                  ; this_mod <- getModule
-                  ; when (nameIsLocalOrFrom this_mod sel_name) $
-                      checkThLocalName sel_name
-                  ; return (XExpr (HsRecSelRn (FieldOcc v (L l sel_name))), unitFV sel_name)
+                  ; unless (isExact v || isOrig v) $ checkThLocalNameWithLift sel_name
+                  ; return (XExpr (HsRecSelRn (FieldOcc v  (L l sel_name))), unitFV sel_name)
                   }
             | nm == nilDataConName
               -- Treat [] as an ExplicitList, so that
@@ -350,8 +339,10 @@ rnExpr (HsVar _ (L l v))
             -> rnExpr (ExplicitList noAnn [])
 
             | otherwise
-            -> finishHsVar v (L (l2l l) nm)
+            -> do { unless (isExact v || isOrig v) (checkThLocalNameWithLift nm)
+                  ; return (HsVar noExtField (L (l2l l) (WithUserRdr v nm)), unitFV nm) }
         }}}
+
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)

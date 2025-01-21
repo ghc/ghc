@@ -639,6 +639,8 @@ are the most common patterns, rewritten as regular expressions for clarity:
  'stock'        { L _ ITstock }    -- for DerivingStrategies extension
  'anyclass'     { L _ ITanyclass } -- for DerivingStrategies extension
  'via'          { L _ ITvia }      -- for DerivingStrategies extension
+ 'splice'       { L _ ITsplice }   -- For StagedImports extension
+ 'quote'        { L _ ITquote }    -- For StagedImports extension
 
  'unit'         { L _ ITunit }
  'signature'    { L _ ITsignature }
@@ -1118,28 +1120,31 @@ importdecls_semi
         | {- empty -}           { [] }
 
 importdecl :: { LImportDecl GhcPs }
-        : 'import' maybe_src maybe_safe optqualified maybe_pkg modid optqualified maybeas maybeimpspec
+        : 'import' maybe_src maybe_splice maybe_safe optqualified maybe_pkg modid optqualified maybeas maybeimpspec
                 {% do {
-                  ; let { ; mPreQual = unLoc $4
-                          ; mPostQual = unLoc $7 }
+                  ; let { ; mPreQual = unLoc $5
+                          ; mPostQual = unLoc $8 }
                   ; checkImportDecl mPreQual mPostQual
                   ; let anns
                          = EpAnnImportDecl
                              { importDeclAnnImport    = epTok $1
                              , importDeclAnnPragma    = fst $ fst $2
-                             , importDeclAnnSafe      = fst $3
+                             , importDeclAnnStage    = fst $3
+                             , importDeclAnnSafe      = fst $4
                              , importDeclAnnQualified = fst $ importDeclQualifiedStyle mPreQual mPostQual
-                             , importDeclAnnPackage   = fst $5
-                             , importDeclAnnAs        = fst $8
+                             , importDeclAnnPackage   = fst $6
+                             , importDeclAnnAs        = fst $9
                              }
-                  ; let loc = (comb5 $1 $6 $7 (snd $8) $9);
+                  ; let loc = (comb5 $1 $7 $8 (snd $9) $10);
                   ; fmap reLoc $ acs loc (\loc cs -> L loc $
                       ImportDecl { ideclExt = XImportDeclPass (EpAnn (spanAsAnchor loc) anns cs) (snd $ fst $2) False
-                                  , ideclName = $6, ideclPkgQual = snd $5
-                                  , ideclSource = snd $2, ideclSafe = snd $3
+                                  , ideclName = $7, ideclPkgQual = snd $6
+                                  , ideclSource = snd $2
+                                  , ideclLevel  = snd $3
+                                  , ideclSafe = snd $4
                                   , ideclQualified = snd $ importDeclQualifiedStyle mPreQual mPostQual
-                                  , ideclAs = unLoc (snd $8)
-                                  , ideclImportList = unLoc $9 })
+                                  , ideclAs = unLoc (snd $9)
+                                  , ideclImportList = unLoc $10 })
                   }
                 }
 
@@ -1152,6 +1157,11 @@ maybe_src :: { ((Maybe (EpaLocation,EpToken "#-}"),SourceText),IsBootInterface) 
 maybe_safe :: { (Maybe (EpToken "safe"),Bool) }
         : 'safe'                                { (Just (epTok $1),True) }
         | {- empty -}                           { (Nothing,      False) }
+
+maybe_splice :: { (EpAnnLevel,ImportLevel) }
+        : 'splice'                              { (EpAnnLevelSplice (epTok $1), SpliceLevel) }
+        | 'quote'                               { (EpAnnLevelQuote (epTok $1), QuoteLevel) }
+        | {- empty -}                           { (NoEpAnnLevel,      NormalLevel) }
 
 maybe_pkg :: { (Maybe EpaLocation, RawPkgQual) }
         : STRING  {% do { let { pkgFS = getSTRING $1 }
@@ -4068,6 +4078,9 @@ special_id
         | 'unit'                { sL1 $1 (fsLit "unit") }
         | 'dependency'          { sL1 $1 (fsLit "dependency") }
         | 'signature'           { sL1 $1 (fsLit "signature") }
+        | 'quote'               { sL1 $1 (fsLit "quote") }
+        | 'splice'              { sL1 $1 (fsLit "splice") }
+
 
 special_sym :: { Located FastString }
 special_sym : '.'       { sL1 $1 (fsLit ".") }

@@ -2,4 +2,4 @@ TYPE SIGNATURES
   f :: forall {a}. a -> (a, Integer)
   x :: Integer
 Dependent modules: []
-Dependent packages: [base-4.17.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

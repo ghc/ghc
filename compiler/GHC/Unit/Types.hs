@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-orphans #-} -- instance Binary IsBootInterface
+{-# OPTIONS_GHC -Wno-orphans #-} -- instance Data ModuleName
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -117,6 +117,7 @@ data GenModule unit = Module
    }
    deriving (Eq,Ord,Data,Functor)
 
+-- TODO: should be moved back into Language.Haskell.Syntax.Module.Name
 instance Data ModuleName where
   -- don't traverse?
   toConstr _   = abstractConstr "ModuleName"
@@ -683,17 +684,6 @@ the WiringMap, and that's why 'wiredInUnitIds' no longer includes
 -- themselves, however, one should use not 'IsBoot' or conflate signatures and
 -- modules in opposition to boot interfaces. Instead, one should use
 -- 'DriverPhases.HscSource'. See Note [HscSource types].
-
-instance Binary IsBootInterface where
-  put_ bh ib = put_ bh $
-    case ib of
-      NotBoot -> False
-      IsBoot -> True
-  get bh = do
-    b <- get bh
-    return $ case b of
-      False -> NotBoot
-      True -> IsBoot
 
 -- | This data type just pairs a value 'mod' with an IsBootInterface flag. In
 -- practice, 'mod' is usually a @Module@ or @ModuleName@'.

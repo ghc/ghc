@@ -15,4 +15,4 @@ DATA CONSTRUCTORS
 FAMILY INSTANCES
   data instance Sing _ -- Defined at DataFamilyInstanceLHS.hs:8:15
 Dependent modules: []
-Dependent packages: [base-4.17.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

@@ -3,4 +3,4 @@ TYPE CONSTRUCTORS
     forall {k1} k2 (k3 :: k2). Proxy k3 -> k1 -> k2 -> *
     roles nominal nominal nominal phantom phantom phantom
 Dependent modules: []
-Dependent packages: [base-4.19.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

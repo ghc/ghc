@@ -1,5 +1,5 @@
-T16976z.hs:7:20: error: [GHC-57695]
-    • Stage error: the non-top-level quoted name 'str
-      must be used at the same stage at which it is bound.
+T16976z.hs:7:20: error: [GHC-28914]
+    • Stage error: ‘str’ is bound at stage {0} but used at stage 1
+      Hint: quoting [| str |] or an enclosing expression would allow the quotation to be used in an earlier stage
     • In the Template Haskell quotation: 'str
 

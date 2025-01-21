@@ -69,5 +69,6 @@ docs:
          StandaloneKindSignatures
          FieldSelectors
          ListTuplePuns
+         ImplicitStagePersistence
 extensible fields:
 

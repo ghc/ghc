@@ -265,6 +265,8 @@ module Language.Haskell.TH where
     | ExtendedLiterals
     | ListTuplePuns
     | MultilineStrings
+    | ExplicitLevelImports
+    | ImplicitStagePersistence
   type FamilyResultSig :: *
   data FamilyResultSig = NoSig | KindSig Kind | TyVarSig (TyVarBndr ())
   type FamilyResultSigQ :: *
@@ -871,6 +873,8 @@ module Language.Haskell.TH.LanguageExtensions where
     | ExtendedLiterals
     | ListTuplePuns
     | MultilineStrings
+    | ExplicitLevelImports
+    | ImplicitStagePersistence
 
 module Language.Haskell.TH.Lib where
   -- Safety: Safe
@@ -1610,6 +1614,8 @@ module Language.Haskell.TH.Syntax where
     | ExtendedLiterals
     | ListTuplePuns
     | MultilineStrings
+    | ExplicitLevelImports
+    | ImplicitStagePersistence
   type FamilyResultSig :: *
   data FamilyResultSig = NoSig | KindSig Kind | TyVarSig (TyVarBndr ())
   type FieldExp :: *

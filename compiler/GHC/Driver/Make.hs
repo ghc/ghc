@@ -458,7 +458,7 @@ warnUnusedPackages us dflags mod_graph =
 
     -- Only need non-source imports here because SOURCE imports are always HPT
         loadedPackages = concat $
-          mapMaybe (\(fs, mn) -> lookupModulePackage us (unLoc mn) fs)
+          mapMaybe (\(_st, fs, mn) -> lookupModulePackage us (unLoc mn) fs)
             $ concatMap ms_imps home_mod_sum
 
         used_args = Set.fromList (map unitId loadedPackages)
@@ -1193,7 +1193,6 @@ upsweep n_jobs hsc_env hmi_cache diag_wrapper mHscMessage old_hpt build_plan = d
 
 toCache :: [HomeModInfo] -> M.Map (ModNodeKeyWithUid) HomeModInfo
 toCache hmis = M.fromList ([(miKey $ hm_iface hmi, hmi) | hmi <- hmis])
-
 
 upsweep_inst :: HscEnv
              -> Maybe Messager

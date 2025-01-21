@@ -15,14 +15,18 @@ Derived class instances:
   
   instance GHC.Internal.TH.Lift.Lift T14682.Foo where
     GHC.Internal.TH.Lift.lift (T14682.Foo a1 a2)
-      = [| T14682.Foo
-             $(GHC.Internal.TH.Lift.lift a1) $(GHC.Internal.TH.Lift.lift a2) |]
-        pending(rn) [<spn, GHC.Internal.TH.Lift.lift a2>,
-                     <spn, GHC.Internal.TH.Lift.lift a1>]
+      = GHC.Internal.TH.Lib.appE
+          (GHC.Internal.TH.Lib.appE
+             (GHC.Internal.TH.Lib.conE 'T14682.Foo)
+             (GHC.Internal.TH.Lift.lift a1))
+          (GHC.Internal.TH.Lift.lift a2)
     GHC.Internal.TH.Lift.liftTyped (T14682.Foo a1 a2)
-      = [|| T14682.Foo
-              $$(GHC.Internal.TH.Lift.liftTyped a1)
-              $$(GHC.Internal.TH.Lift.liftTyped a2) ||]
+      = GHC.Internal.TH.Syntax.unsafeCodeCoerce
+          (GHC.Internal.TH.Lib.appE
+             (GHC.Internal.TH.Lib.appE
+                (GHC.Internal.TH.Lib.conE 'T14682.Foo)
+                (GHC.Internal.TH.Lift.lift a1))
+             (GHC.Internal.TH.Lift.lift a2))
   
   instance GHC.Internal.Data.Data.Data T14682.Foo where
     GHC.Internal.Data.Data.gfoldl k z (T14682.Foo a1 a2)

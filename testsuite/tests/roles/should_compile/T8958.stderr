@@ -18,7 +18,7 @@ CLASS INSTANCES
   instance [incoherent] Representational a
     -- Defined at T8958.hs:11:10
 Dependent modules: []
-Dependent packages: [base-4.21.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]
 
 ==================== Typechecker ====================
 T8958.$tcMap

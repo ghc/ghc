@@ -5,4 +5,4 @@ DATA CONSTRUCTORS
   MkT :: forall {k} k1 (f :: k1 -> k -> *) (a :: k1) (b :: k).
          f a b -> T f a b -> T f a b
 Dependent modules: []
-Dependent packages: [base-4.17.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

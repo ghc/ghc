@@ -254,6 +254,7 @@ import Data.Map.Strict (Map)
 
 import GHC.Generics ( Generic )
 
+import qualified Data.Set as Set
 
 data TcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext :: !Bool -- ^ Whether we show the error context or not
                                        , tcOptsIfaceOpts   :: !IfaceMessageOpts
@@ -3494,7 +3495,7 @@ data TcRnMessage where
   -}
   TcRnBadlyStaged
     :: !StageCheckReason -- ^ The binding being spliced.
-    -> !Int -- ^ The binding stage.
+    -> !(Set.Set Int) -- ^ The binding stage.
     -> !Int -- ^ The stage at which the binding is used.
     -> TcRnMessage
 
@@ -3519,7 +3520,7 @@ data TcRnMessage where
   -}
   TcRnBadlyStagedType
     :: !Name  -- ^ The type binding being spliced.
-    -> !Int -- ^ The binding stage.
+    -> !(Set.Set Int) -- ^ The binding stage.
     -> !Int -- ^ The stage at which the binding is used.
     -> TcRnMessage
 
@@ -6256,7 +6257,7 @@ data WrongThingSort
 
 data StageCheckReason
   = StageCheckInstance !InstanceWhat !PredType
-  | StageCheckSplice !Name
+  | StageCheckSplice !Name !(Maybe GlobalRdrElt)
 
 data UninferrableTyVarCtx
   = UninfTyCtx_ClassContext [TcType]

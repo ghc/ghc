@@ -5,4 +5,4 @@ TYPE CONSTRUCTORS
 DATA CONSTRUCTORS
   Foo :: forall x y z. x -> y -> z -> Foo x y z
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

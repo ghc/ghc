@@ -97,7 +97,7 @@ main = do
       msC <- getModSummaryFromTarget "T1C.hs"
 
       -- Get file paths and create locations for our modules
-      let findImports modName = case modName of
+      let findImports modName = map mkNormalEdge $ case modName of
             "T1A" -> []
             "T1B" -> [NodeKey_Module (msKey msA)]
             "T1C" -> [NodeKey_Module (msKey msA), NodeKey_Module (msKey msB)]

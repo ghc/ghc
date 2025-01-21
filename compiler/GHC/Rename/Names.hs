@@ -228,8 +228,8 @@ rnImports imports = do
                             (imp_boot_mods imp_avails)
                             (imp_direct_dep_mods imp_avails)
 
-        combJ (GWIB _ IsBoot) x = Just x
-        combJ r _               = Just r
+        combJ (GWIB _ IsBoot) (_, x) = Just x
+        combJ r _                    = Just r
     -- See Note [Combining ImportAvails]
     combine :: [(LImportDecl GhcRn,  ImportUserSpec, GlobalRdrEnv, ImportAvails)]
             -> ([LImportDecl GhcRn], [ImportUserSpec], GlobalRdrEnv, ImportAvails)
@@ -313,7 +313,9 @@ rnImportDecl :: Module -> (LImportDecl GhcPs, SDoc)
 rnImportDecl this_mod
              (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name
                                      , ideclPkgQual = raw_pkg_qual
-                                     , ideclSource = want_boot, ideclSafe = mod_safe
+                                     , ideclSource = want_boot
+                                     , ideclSafe = mod_safe
+                                     , ideclLevel = import_level
                                      , ideclQualified = qual_style
                                      , ideclExt = XImportDeclPass { ideclImplicit = implicit }
                                      , ideclAs = as_mod, ideclImportList = imp_details }), import_reason)
@@ -391,7 +393,8 @@ rnImportDecl this_mod
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
         imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only,
                                   is_dloc = locA loc, is_as = qual_mod_name,
-                                  is_pkg_qual = pkg_qual, is_isboot = want_boot }
+                                  is_pkg_qual = pkg_qual, is_isboot = want_boot,
+                                  is_level = import_level }
 
     -- filter the imports according to the import declaration
     (new_imp_details, imp_user_list, gbl_env) <- filterImports hsc_env iface imp_spec imp_details
@@ -418,6 +421,7 @@ rnImportDecl this_mod
             , imv_is_hiding   = is_hiding
             , imv_all_exports = potential_gres
             , imv_qualified   = qual_only
+            , imv_is_level   = import_level
             }
         imports = calculateAvails home_unit other_home_units iface mod_safe' want_boot (ImportedByUser imv)
 
@@ -435,6 +439,7 @@ rnImportDecl this_mod
           , ideclQualified = ideclQualified decl
           , ideclAs        = ideclAs decl
           , ideclImportList = new_imp_details
+          , ideclLevel     = ideclLevel decl
           }
 
     return (L loc new_imp_decl, ImpUserSpec imp_spec imp_user_list, gbl_env, imports)
@@ -547,13 +552,19 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
 
       dependent_pkgs = if toUnitId pkg `S.member` other_home_units
                         then S.empty
-                        else S.singleton ipkg
+                        else S.singleton (lvl, ipkg)
 
-      direct_mods = mkModDeps $ if toUnitId pkg `S.member` other_home_units
-                      then S.singleton (moduleUnitId imp_mod, (GWIB (moduleName imp_mod) want_boot))
-                      else S.empty
+      lvl = case imported_by of
+              ImportedByUser imv -> imv_is_level imv
+              ImportedBySystem -> NormalLevel
+
+
+      direct_mods = if toUnitId pkg `S.member` other_home_units
+                      then mkPlusModDeps (moduleUnitId imp_mod) lvl (GWIB (moduleName imp_mod) want_boot)
+                      else emptyInstalledModuleEnv
 
       dep_boot_mods_map = mkModDeps (dep_boot_mods deps)
+
 
       boot_mods
         -- If we are looking for a boot module, it must be HPT
@@ -590,6 +601,9 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
           imp_trust_own_pkg = pkg_trust_req
      }
 
+mkPlusModDeps :: UnitId -> ImportLevel -> ModuleNameWithIsBoot
+          -> InstalledModuleEnv (S.Set ImportLevel, ModuleNameWithIsBoot)
+mkPlusModDeps uid st elt = extendInstalledModuleEnv emptyInstalledModuleEnv (mkModule uid (gwib_mod elt)) (S.singleton st, elt)
 
 {-
 ************************************************************************

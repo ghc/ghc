@@ -117,6 +117,7 @@ module GHC.Utils.Outputable (
     ) where
 
 import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
+import Language.Haskell.Syntax.ImpExp.ImportLevel ( ImportLevel(..) )
 
 import GHC.Prelude.Basic
 
@@ -1079,6 +1080,11 @@ instance Outputable Extension where
 
 instance Outputable ModuleName where
   ppr = pprModuleName
+
+instance Outputable ImportLevel where
+  ppr NormalLevel = text "normal"
+  ppr SpliceLevel = text "splice"
+  ppr QuoteLevel = text "quote"
 
 pprModuleName :: IsLine doc => ModuleName -> doc
 pprModuleName (ModuleName nm) =

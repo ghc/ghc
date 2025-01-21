@@ -236,4 +236,4 @@ TYPE SIGNATURES
     (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]
   (||) :: Bool -> Bool -> Bool
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

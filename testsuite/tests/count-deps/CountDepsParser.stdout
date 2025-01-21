@@ -231,6 +231,7 @@ GHC.Unit.Module.Location
 GHC.Unit.Module.ModIface
 GHC.Unit.Module.ModNodeKey
 GHC.Unit.Module.ModSummary
+GHC.Unit.Module.Stage
 GHC.Unit.Module.Warnings
 GHC.Unit.Module.WholeCoreBindings
 GHC.Unit.Parser
@@ -272,6 +273,8 @@ Language.Haskell.Syntax.Decls
 Language.Haskell.Syntax.Expr
 Language.Haskell.Syntax.Extension
 Language.Haskell.Syntax.ImpExp
+Language.Haskell.Syntax.ImpExp.ImportLevel
+Language.Haskell.Syntax.ImpExp.IsBoot
 Language.Haskell.Syntax.Lit
 Language.Haskell.Syntax.Module.Name
 Language.Haskell.Syntax.Pat

@@ -1,8 +1,6 @@
-T21547.hs:9:14: error: [GHC-18157]
-    • GHC stage restriction:
-        instance for ‘ghc-internal-9.1300.0:GHC.Internal.Data.Typeable.Internal.Typeable
-                        T’ is used in a top-level splice, quasi-quote, or annotation,
-        and must be imported, not defined locally
+T21547.hs:9:14: error: [GHC-28914]
+    • Stage error: instance for ‘ghc-internal-9.1300.0:GHC.Internal.Data.Typeable.Internal.Typeable
+                                   T’ is bound at stage {1} but used at stage 0
     • In the expression: foo [|| T () ||]
       In the typed Template Haskell splice: $$(foo [|| T () ||])
       In the expression: $$(foo [|| T () ||])

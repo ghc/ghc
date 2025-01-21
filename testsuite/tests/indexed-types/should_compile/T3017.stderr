@@ -20,4 +20,4 @@ CLASS INSTANCES
 FAMILY INSTANCES
   type instance Elem (ListColl a) = a -- Defined at T3017.hs:13:9
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

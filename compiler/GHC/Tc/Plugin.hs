@@ -101,7 +101,6 @@ tcPluginIO a = unsafeTcPluginTcM (liftIO a)
 tcPluginTrace :: String -> SDoc -> TcPluginM ()
 tcPluginTrace a b = unsafeTcPluginTcM (traceTc a b)
 
-
 findImportedModule :: ModuleName -> PkgQual -> TcPluginM Finder.FindResult
 findImportedModule mod_name mb_pkg = do
     hsc_env <- getTopEnv

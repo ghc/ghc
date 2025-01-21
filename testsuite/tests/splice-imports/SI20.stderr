@@ -1,0 +1,7 @@
+SI20.hs:9:7: error: [GHC-28914]
+    • Stage error: ‘foo’ is bound at stage {0, 1} but used at stage 2
+      Hint: quoting [| foo |] or an enclosing expression would allow the quotation to be used in an earlier stage
+      From imports {imported from ‘SI19A’ at 0 at SI20.hs:7:1-19,
+                    imported from ‘SI19A’ at SI20.hs:6:1-12}
+    • In the Template Haskell quotation: 'foo
+

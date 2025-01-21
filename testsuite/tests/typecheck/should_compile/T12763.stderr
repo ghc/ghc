@@ -8,4 +8,4 @@ COERCION AXIOMS
 CLASS INSTANCES
   instance C Int -- Defined at T12763.hs:9:10
 Dependent modules: []
-Dependent packages: [base-4.17.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

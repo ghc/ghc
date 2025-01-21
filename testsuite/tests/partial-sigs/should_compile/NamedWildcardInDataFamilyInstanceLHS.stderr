@@ -14,4 +14,4 @@ FAMILY INSTANCES
   data instance Sing _a
                   -- Defined at NamedWildcardInDataFamilyInstanceLHS.hs:8:15
 Dependent modules: []
-Dependent packages: [base-4.17.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

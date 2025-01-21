@@ -1,4 +1,4 @@
 TYPE SIGNATURES
   showTwo :: forall {a}. Show a => a -> String
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

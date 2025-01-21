@@ -1,4 +1,4 @@
 TYPE SIGNATURES
   bar :: forall {w}. w -> Bool
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

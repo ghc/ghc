@@ -6,7 +6,7 @@ TYPE CONSTRUCTORS
 COERCION AXIOMS
   axiom Roles12.N:C2 :: C2 a = a -> a
 Dependent modules: []
-Dependent packages: [base-4.20.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]
 
 ==================== Typechecker ====================
 Roles12.$tcC2

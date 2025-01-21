@@ -243,6 +243,8 @@ classify tok =
     ITsignature -> TkKeyword
     ITdependency -> TkKeyword
     ITrequires -> TkKeyword
+    ITsplice   -> TkKeyword
+    ITquote    -> TkKeyword
     ITinline_prag{} -> TkPragma
     ITopaque_prag{} -> TkPragma
     ITspec_prag{} -> TkPragma

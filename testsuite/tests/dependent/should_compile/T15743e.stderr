@@ -54,4 +54,4 @@ DATA CONSTRUCTORS
                 (d :: Proxy k5) (e :: Proxy k7).
          f c -> T k8 a b f c d e
 Dependent modules: []
-Dependent packages: [base-4.20.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

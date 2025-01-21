@@ -21,6 +21,8 @@ module GHC.Unit.Module.Deps
    , HomeModImport (..)
    , HomeModImportedAvails (..)
    , ImportAvails (..)
+   , IfaceImportLevel(..)
+   , tcImportLevel
    )
 where
 
@@ -49,6 +51,8 @@ import Control.DeepSeq
 import GHC.Types.Name.Set
 
 
+import Language.Haskell.Syntax.ImpExp
+
 -- | Dependency information about ALL modules and packages below this one
 -- in the import hierarchy. This is the serialisable version of `ImportAvails`.
 --
@@ -60,11 +64,11 @@ import GHC.Types.Name.Set
 --
 -- See Note [Transitive Information in Dependencies]
 data Dependencies = Deps
-   { dep_direct_mods_ :: Set (UnitId, ModuleNameWithIsBoot)
+   { dep_direct_mods_ :: Set (IfaceImportLevel, UnitId, ModuleNameWithIsBoot)
       -- ^ All home-package modules which are directly imported by this one.
       -- This may include modules from other units when using multiple home units
 
-   , dep_direct_pkgs_ :: Set UnitId
+   , dep_direct_pkgs_ :: Set (IfaceImportLevel, UnitId)
       -- ^ All packages directly imported by this module
       -- I.e. packages to which this module's direct imports belong.
       -- Does not include other home units when using multiple home units.
@@ -113,8 +117,8 @@ data Dependencies = Deps
         -- Equality used only for old/new comparison in GHC.Iface.Recomp.addFingerprints
         -- See 'GHC.Tc.Utils.ImportAvails' for details on dependencies.
 
-pattern Dependencies :: Set (UnitId, ModuleNameWithIsBoot)
-             -> Set UnitId
+pattern Dependencies :: Set (IfaceImportLevel, UnitId, ModuleNameWithIsBoot)
+             -> Set (IfaceImportLevel, UnitId)
              -> Set UnitId
              -> [ModuleName]
              -> Set UnitId
@@ -145,6 +149,24 @@ instance NFData Dependencies where
         `seq` rnf finsts
         `seq` ()
 
+newtype IfaceImportLevel = IfaceImportLevel ImportLevel deriving (Eq, Ord)
+
+tcImportLevel :: IfaceImportLevel -> ImportLevel
+tcImportLevel (IfaceImportLevel lvl) = lvl
+
+instance Binary IfaceImportLevel where
+  put_ bh (IfaceImportLevel lvl) = put_ bh (fromEnum lvl)
+  get bh = IfaceImportLevel . toEnum <$> get bh
+
+instance NFData IfaceImportLevel where
+  rnf (IfaceImportLevel lvl) = case lvl of
+                                NormalLevel -> ()
+                                QuoteLevel  -> ()
+                                SpliceLevel -> ()
+
+instance Outputable IfaceImportLevel where
+  ppr (IfaceImportLevel lvl) = ppr lvl
+
 
 -- | Extract information from the rename and typecheck phases to produce
 -- a dependencies information for the module being compiled.
@@ -154,15 +176,19 @@ mkDependencies :: HomeUnit -> Module -> ImportAvails -> [Module] -> Dependencies
 mkDependencies home_unit mod imports plugin_mods =
   let (home_plugins, external_plugins) = partition (isHomeUnit home_unit . moduleUnit) plugin_mods
       plugin_units = Set.fromList (map (toUnitId . moduleUnit) external_plugins)
-      all_direct_mods = foldr (\mn m -> extendInstalledModuleEnv m mn (GWIB (moduleName mn) NotBoot))
+      all_direct_mods = foldr (\(s, mn) m -> extendInstalledModuleEnv m mn (s, (GWIB (moduleName mn) NotBoot)))
                               (imp_direct_dep_mods imports)
-                              (map (fmap toUnitId) home_plugins)
+                              (map (fmap (fmap toUnitId) . (Set.singleton SpliceLevel,)) home_plugins)
 
-      modDepsElts = Set.fromList . installedModuleEnvElts
+      modDepsElts_source :: Ord a => InstalledModuleEnv a -> Set.Set (InstalledModule, a)
+      modDepsElts_source = Set.fromList . installedModuleEnvElts
         -- It's OK to use nonDetEltsUFM here because sorting by module names
         -- restores determinism
 
-      direct_mods = first moduleUnit `Set.map` modDepsElts (delInstalledModuleEnv all_direct_mods (toUnitId <$> mod))
+      modDepsElts :: Ord a => InstalledModuleEnv (Set.Set ImportLevel, a) -> Set.Set (IfaceImportLevel, UnitId,  a)
+      modDepsElts e = Set.fromList [ (IfaceImportLevel s, moduleUnit im, a) | (im, (ss,a)) <- installedModuleEnvElts e, s <- Set.toList ss]
+
+      direct_mods = modDepsElts (delInstalledModuleEnv all_direct_mods (toUnitId <$> mod))
             -- M.hi-boot can be in the imp_dep_mods, but we must remove
             -- it before recording the modules on which this one depends!
             -- (We want to retain M.hi-boot in imp_dep_mods so that
@@ -174,7 +200,7 @@ mkDependencies home_unit mod imports plugin_mods =
             -- We must also remove self-references from imp_orphs. See
             -- Note [Module self-dependency]
 
-      direct_pkgs = imp_dep_direct_pkgs imports
+      direct_pkgs = Set.map (\(lvl, uid) -> (IfaceImportLevel lvl, uid)) (imp_dep_direct_pkgs imports)
 
       -- Set the packages required to be Safe according to Safe Haskell.
       -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
@@ -182,7 +208,7 @@ mkDependencies home_unit mod imports plugin_mods =
 
       -- If there's a non-boot import, then it shadows the boot import
       -- coming from the dependencies
-      source_mods = first moduleUnit `Set.map` modDepsElts (imp_boot_mods imports)
+      source_mods = first moduleUnit `Set.map` modDepsElts_source (imp_boot_mods imports)
 
       sig_mods = filter (/= (moduleName mod)) $ imp_sig_mods imports
 
@@ -271,8 +297,8 @@ pprDeps unit_state (Deps { dep_direct_mods_ = dmods
           text "family instance modules:" <+> fsep (map ppr finsts)
         ]
   where
-    ppr_mod (uid, (GWIB mod IsBoot))  = ppr uid <> colon <> ppr mod <+> text "[boot]"
-    ppr_mod (uid, (GWIB mod NotBoot)) = ppr uid <> colon <> ppr mod
+    ppr_mod (_, uid, (GWIB mod IsBoot))  = ppr uid <> colon <> ppr mod <+> text "[boot]"
+    ppr_mod (lvl, uid, (GWIB mod NotBoot)) = ppr lvl <+> ppr uid <> colon <> ppr mod
 
     ppr_set :: Outputable a => (a -> SDoc) -> Set a -> SDoc
     ppr_set w = fsep . fmap w . Set.toAscList
@@ -605,10 +631,10 @@ data ImportAvails
           -- different packages. (currently not the case, but might be in the
           -- future).
 
-        imp_direct_dep_mods :: InstalledModuleEnv ModuleNameWithIsBoot,
+        imp_direct_dep_mods :: InstalledModuleEnv (Set.Set ImportLevel, ModuleNameWithIsBoot),
           -- ^ Home-package modules directly imported by the module being compiled.
 
-        imp_dep_direct_pkgs :: Set UnitId,
+        imp_dep_direct_pkgs :: Set (ImportLevel, UnitId),
           -- ^ Packages directly needed by the module being compiled
 
         imp_trust_own_pkg :: Bool,
