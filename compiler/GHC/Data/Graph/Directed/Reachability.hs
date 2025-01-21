@@ -107,7 +107,6 @@ cyclicGraphReachability (Graph g from to) =
 --  * The list of nodes /does not/ include the @root@ node!
 --  * The list of nodes is deterministically ordered, but according to an
 --     internal order determined by the indices attributed to graph nodes.
---  * This function has $O(1)$ complexity.
 --
 -- If you need a topologically sorted list, consider using the functions exposed from 'GHC.Data.Graph.Directed' on 'Graph' instead.
 allReachable :: ReachabilityIndex node -> node {-^ The @root@ node -} -> [node] {-^ All nodes reachable from @root@ -}
@@ -139,7 +138,6 @@ allReachableMany (ReachabilityIndex index from to) roots = map from (IS.toList h
 --
 -- Properties:
 --  * No self loops, i.e. @isReachable _ a a == False@
---  * This function has $O(1)$ complexity.
 isReachable :: ReachabilityIndex node {-^ @g@ -}
             -> node -- ^ @a@
             -> node -- ^ @b@
@@ -157,15 +155,13 @@ isReachable (ReachabilityIndex index _ to) a b =
 --
 -- Properties:
 --  * No self loops, i.e. @isReachableMany _ [a] a == False@
---  * This function is $O(n)$ in the number of roots
 isReachableMany :: ReachabilityIndex node -- ^ @g@
                 -> [node] -- ^ @roots@
-                -> node -- ^ @b@
-                -> Bool -- ^ @b@ is reachable from any of the @roots@
-isReachableMany (ReachabilityIndex index _ to) roots b =
-    IS.member b_i $
-    IS.unions $
-    map (expectJust "reachablesQuery" . flip IM.lookup index) roots_i
-  where roots_i = [ v | Just v <- map to roots ]
-        b_i = expectJust "reachablesQuery:node not in graph" $ to b
-
+                -> (node -> Bool) -- ^ @b@ is reachable from any of the @roots@
+isReachableMany (ReachabilityIndex index _ to) roots =
+  let roots_i = [ v | Just v <- map to roots ]
+      unions =
+          IS.unions $
+            map (expectJust "reachablesQuery" . flip IM.lookup index) roots_i
+  in \b -> let b_i = expectJust "reachablesQuery:node not in graph" $ to b
+           in IS.member b_i unions

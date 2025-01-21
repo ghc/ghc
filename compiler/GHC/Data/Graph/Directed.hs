@@ -16,6 +16,7 @@ module GHC.Data.Graph.Directed (
         verticesG, edgesG, hasVertexG,
         reachablesG,
         transposeG, outgoingG,
+        --reachableG, reachablesG, reachablesG2, transposeG, allReachable, allReachableCyclic, outgoingG,
         emptyG,
 
         findCycle,

@@ -1,0 +1,4 @@
+SI21.hs:6:7: error: [GHC-76037]
+    • Not in scope: ‘a’
+    • In the Template Haskell quotation: 'a
+

@@ -8,5 +8,6 @@ data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: !ModuleNameWithIsB
                                            , mnkUnitId     :: !UnitId } deriving (Eq, Ord)
 
 instance Outputable ModNodeKeyWithUid where
-  ppr (ModNodeKeyWithUid mnwib uid) = ppr uid <> colon <> ppr mnwib
+  ppr (ModNodeKeyWithUid mnwib uid)
+    = ppr uid <> colon <> ppr mnwib
 

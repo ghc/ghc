@@ -626,12 +626,12 @@ loadInterface doc_str mod from
         ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
         ; purged_hsc_env <- getTopEnv
 
-        ; let direct_deps = map (uncurry (flip ModNodeKeyWithUid)) $ (Set.toList (dep_direct_mods $ mi_deps iface))
+        ; let direct_deps = map (\(uid, mn) -> ModNodeKeyWithUid mn uid) $ (Set.toList (dep_direct_mods $ mi_deps iface))
         ; let direct_pkg_deps = Set.toList $ dep_direct_pkgs $ mi_deps iface
         ; let !module_graph_key =
                 if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env
                                     --- ^ home unit mods in eps can only happen in oneshot mode
-                  then Just $ NodeHomePackage (miKey iface) (map ExternalModuleKey direct_deps
+                  then Just $ NodeHomePackage (miKey iface) (map (ExternalModuleKey ) direct_deps
                                                             ++ map ExternalPackageKey direct_pkg_deps)
                   else Nothing
 

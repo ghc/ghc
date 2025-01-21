@@ -256,6 +256,9 @@ extensionName = \case
   LangExt.ExtendedLiterals -> "ExtendedLiterals"
   LangExt.ListTuplePuns -> "ListTuplePuns"
   LangExt.MultilineStrings -> "MultilineStrings"
+  LangExt.StagedImports -> "ExplicitStageImports"
+  LangExt.PathCrossStagedPersistence -> "PathCSP"
+  LangExt.LiftCrossStagedPersistence -> "LiftCSP"
 
 -- | Is this extension known by any other names? For example
 -- -XGeneralizedNewtypeDeriving is accepted
@@ -349,6 +352,9 @@ impliedXFlags
 
     -- See (NVP3) in Note [Non-variable pattern bindings aren't linear] in GHC.Tc.Gen.Bind
     , (LangExt.LinearTypes, On LangExt.MonoLocalBinds)
+
+    , (LangExt.StagedImports, Off LangExt.LiftCrossStagedPersistence)
+    , (LangExt.StagedImports, Off LangExt.PathCrossStagedPersistence)
   ]
 
 

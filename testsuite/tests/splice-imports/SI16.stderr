@@ -1,0 +1,5 @@
+SI16.hs:7:7: error: [GHC-28914]
+    • Stage error: ‘x’ is bound at stage {1} but used at stage 2
+      Hint: quoting [| x |] or an enclosing expression would allow the quotation to be used in an earlier stage
+    • In the Template Haskell quotation: 'x
+

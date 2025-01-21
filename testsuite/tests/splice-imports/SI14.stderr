@@ -1,0 +1,10 @@
+SI14.hs:7:21: error: [GHC-28914]
+    • Stage error: ‘A’ is bound at stage {1} but used at stage 2
+      Hint: quoting [| A |] or an enclosing expression would allow the quotation to be used in an earlier stage
+    • In the Template Haskell quotation: 'A
+
+SI14.hs:7:21: error: [GHC-28914]
+    • Stage error: ‘A’ is bound at stage {1} but used at stage 2
+      Hint: quoting [| A |] or an enclosing expression would allow the quotation to be used in an earlier stage
+    • In the Template Haskell quotation: 'A
+

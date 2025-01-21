@@ -1,6 +1,15 @@
+annfail03.hs:12:16: error: [GHC-28914]
+    • Stage error: ‘InModule’ is bound at stage {1} but used at stage 0
+      Hint: quoting [| InModule |] or an enclosing expression would allow the quotation to be used in an earlier stage
+    • In the annotation: {-# ANN module InModule #-}
 
-annfail03.hs:17:11: [GHC-18157]
-    GHC stage restriction:
-      ‘InModule’ is used in a top-level splice, quasi-quote, or annotation,
-      and must be imported, not defined locally
-    In the annotation: {-# ANN f InModule #-}
+annfail03.hs:14:18: error: [GHC-28914]
+    • Stage error: ‘InModule’ is bound at stage {1} but used at stage 0
+      Hint: quoting [| InModule |] or an enclosing expression would allow the quotation to be used in an earlier stage
+    • In the annotation: {-# ANN type Foo InModule #-}
+
+annfail03.hs:17:11: error: [GHC-28914]
+    • Stage error: ‘InModule’ is bound at stage {1} but used at stage 0
+      Hint: quoting [| InModule |] or an enclosing expression would allow the quotation to be used in an earlier stage
+    • In the annotation: {-# ANN f InModule #-}
+

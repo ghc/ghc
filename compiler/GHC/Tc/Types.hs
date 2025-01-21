@@ -37,6 +37,8 @@ module GHC.Tc.Types(
         tcVisibleOrphanMods,
         RewriteEnv(..),
 
+        ThExternalBindEnv,
+
         -- Frontend types (shouldn't really be here)
         FrontendResult(..),
 
@@ -455,6 +457,9 @@ data FrontendResult
 --        since that will actually say the specific interface you
 --        want to track (and recompile if it changes)
 
+-- Bind level of imported names
+type ThExternalBindEnv = NameEnv (S.Set ThLevel)
+
 -- | 'TcGblEnv' describes the top-level of the module at the
 -- point at which the typechecker is finished work.
 -- It is this structure that is handed on to the desugarer
@@ -469,6 +474,7 @@ data TcGblEnv
           -- ^ What kind of module (regular Haskell, hs-boot, hsig)
 
         tcg_rdr_env :: GlobalRdrEnv,   -- ^ Top level envt; used during renaming
+        tcg_bind_env :: ThExternalBindEnv,      -- ^ Binding level of imported identifiers
         tcg_default         :: DefaultEnv,     -- ^ All class defaults in scope in the module
         tcg_default_exports :: DefaultEnv,     -- ^ All class defaults exported from the module
 

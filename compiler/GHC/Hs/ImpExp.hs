@@ -114,13 +114,14 @@ data EpAnnImportDecl = EpAnnImportDecl
   { importDeclAnnImport    :: EpToken "import" -- ^ The location of the @import@ keyword
   , importDeclAnnPragma    :: Maybe (EpaLocation, EpToken "#-}") -- ^ The locations of @{-# SOURCE@ and @#-}@ respectively
   , importDeclAnnSafe      :: Maybe (EpToken "safe") -- ^ The location of the @safe@ keyword
+  , importDeclAnnStage     :: Maybe EpaLocation -- ^ The location of the @splice@ or @quote@ keyword
   , importDeclAnnQualified :: Maybe (EpToken "qualified") -- ^ The location of the @qualified@ keyword
   , importDeclAnnPackage   :: Maybe EpaLocation -- ^ The location of the package name (when using @-XPackageImports@)
   , importDeclAnnAs        :: Maybe (EpToken "as") -- ^ The location of the @as@ keyword
   } deriving (Data)
 
 instance NoAnn EpAnnImportDecl where
-  noAnn = EpAnnImportDecl noAnn  Nothing  Nothing  Nothing  Nothing  Nothing
+  noAnn = EpAnnImportDecl noAnn  Nothing Nothing  Nothing  Nothing  Nothing  Nothing
 -- ---------------------------------------------------------------------
 
 simpleImportDecl :: ModuleName -> ImportDecl GhcPs
@@ -130,6 +131,7 @@ simpleImportDecl mn = ImportDecl {
       ideclPkgQual    = NoRawPkgQual,
       ideclSource     = NotBoot,
       ideclSafe       = False,
+      ideclStage      = NormalStage,
       ideclQualified  = NotQualified,
       ideclAs         = Nothing,
       ideclImportList = Nothing

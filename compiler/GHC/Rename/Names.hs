@@ -201,7 +201,7 @@ with yes we have gone with no for now.
 -- Note: Do the non SOURCE ones first, so that we get a helpful warning
 -- for SOURCE ones that are unnecessary
 rnImports :: [(LImportDecl GhcPs, SDoc)]
-          -> RnM ([LImportDecl GhcRn], [ImportUserSpec], GlobalRdrEnv, ImportAvails, [(Module, IfaceDefault)], AnyHpcUsage)
+          -> RnM ([LImportDecl GhcRn], [ImportUserSpec], GlobalRdrEnv, ThBindEnv, ImportAvails, [(Module, IfaceDefault)], AnyHpcUsage)
 rnImports imports = do
     tcg_env <- getGblEnv
     -- NB: want an identity module here, because it's OK for a signature
@@ -212,10 +212,10 @@ rnImports imports = do
     stuff1 <- mapAndReportM (rnImportDecl this_mod) ordinary
     stuff2 <- mapAndReportM (rnImportDecl this_mod) source
     -- Safe Haskell: See Note [Tracking Trust Transitively]
-    let (decls, imp_user_spec, rdr_env, imp_avails, defaults, hpc_usage) = combine (stuff1 ++ stuff2)
+    let (decls, imp_user_spec, rdr_env, bind_env, imp_avails, defaults, hpc_usage) = combine (stuff1 ++ stuff2)
     -- Update imp_boot_mods if imp_direct_mods mentions any of them
     let merged_import_avail = clobberSourceImports imp_avails
-    return (decls, imp_user_spec, rdr_env, merged_import_avail, defaults, hpc_usage)
+    return (decls, imp_user_spec, rdr_env, bind_env, merged_import_avail, defaults, hpc_usage)
 
   where
     clobberSourceImports imp_avails =
@@ -228,21 +228,22 @@ rnImports imports = do
         combJ (GWIB _ IsBoot) x = Just x
         combJ r _               = Just r
     -- See Note [Combining ImportAvails]
-    combine :: [(LImportDecl GhcRn,  ImportUserSpec, GlobalRdrEnv, ImportAvails, [(Module, IfaceDefault)], AnyHpcUsage)]
-            -> ([LImportDecl GhcRn], [ImportUserSpec], GlobalRdrEnv, ImportAvails, [(Module, IfaceDefault)], AnyHpcUsage)
+    combine :: [(LImportDecl GhcRn,  ImportUserSpec, GlobalRdrEnv, ThBindEnv, ImportAvails, [(Module, IfaceDefault)], AnyHpcUsage)]
+            -> ([LImportDecl GhcRn], [ImportUserSpec], GlobalRdrEnv, ThBindEnv, ImportAvails, [(Module, IfaceDefault)], AnyHpcUsage)
     combine ss =
-      let (decls, imp_user_spec, rdr_env, imp_avails, defaults, hpc_usage, finsts) = foldr
+      let (decls, imp_user_spec, rdr_env, th_bindenv, imp_avails, defaults, hpc_usage, finsts) = foldr
             plus
-            ([], [], emptyGlobalRdrEnv, emptyImportAvails, [], False, emptyModuleSet)
+            ([], [], emptyGlobalRdrEnv, emptyNameEnv, emptyImportAvails, [], False, emptyModuleSet)
             ss
-      in (decls, imp_user_spec, rdr_env, imp_avails { imp_finsts = moduleSetElts finsts },
+      in (decls, imp_user_spec, rdr_env, th_bindenv, imp_avails { imp_finsts = moduleSetElts finsts },
             defaults, hpc_usage)
 
-    plus (decl,  us, gbl_env1, imp_avails1, defaults1, hpc_usage1)
-         (decls, uss, gbl_env2, imp_avails2, defaults2, hpc_usage2, finsts_set)
+    plus (decl,  us, gbl_env1, th_bindenv1, imp_avails1, defaults1, hpc_usage1)
+         (decls, uss, gbl_env2, th_bindenv2, imp_avails2, defaults2, hpc_usage2, finsts_set)
       = ( decl:decls,
           us:uss,
           gbl_env1 `plusGlobalRdrEnv` gbl_env2,
+          th_bindenv1 `plusNameEnv` th_bindenv2,
           imp_avails1' `plusImportAvails` imp_avails2,
           defaults1 ++ defaults2,
           hpc_usage1 || hpc_usage2,
@@ -309,11 +310,13 @@ Running generateModules from #14693 with DEPTH=16, WIDTH=30 finishes in
 --  4. A boolean 'AnyHpcUsage' which is true if the imported module
 --     used HPC.
 rnImportDecl :: Module -> (LImportDecl GhcPs, SDoc)
-             -> RnM (LImportDecl GhcRn, ImportUserSpec , GlobalRdrEnv, ImportAvails, [(Module, IfaceDefault)], AnyHpcUsage)
+             -> RnM (LImportDecl GhcRn, ImportUserSpec , GlobalRdrEnv, ThBindEnv, ImportAvails, [(Module, IfaceDefault)], AnyHpcUsage)
 rnImportDecl this_mod
              (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name
                                      , ideclPkgQual = raw_pkg_qual
-                                     , ideclSource = want_boot, ideclSafe = mod_safe
+                                     , ideclSource = want_boot
+                                     , ideclSafe = mod_safe
+                                     , ideclStage = import_stage
                                      , ideclQualified = qual_style
                                      , ideclExt = XImportDeclPass { ideclImplicit = implicit }
                                      , ideclAs = as_mod, ideclImportList = imp_details }), import_reason)
@@ -391,7 +394,8 @@ rnImportDecl this_mod
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
         imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only,
                                   is_dloc = locA loc, is_as = qual_mod_name,
-                                  is_pkg_qual = pkg_qual, is_isboot = want_boot }
+                                  is_pkg_qual = pkg_qual, is_isboot = want_boot,
+                                  is_staged = import_stage }
 
     -- filter the imports according to the import declaration
     (new_imp_details, imp_user_list, gbl_env) <- filterImports hsc_env iface imp_spec imp_details
@@ -418,6 +422,7 @@ rnImportDecl this_mod
             , imv_is_hiding   = is_hiding
             , imv_all_exports = potential_gres
             , imv_qualified   = qual_only
+            , imv_is_staged   = unanalysedStage
             }
         imports = calculateAvails home_unit other_home_units iface mod_safe' want_boot (ImportedByUser imv)
 
@@ -435,9 +440,10 @@ rnImportDecl this_mod
           , ideclQualified = ideclQualified decl
           , ideclAs        = ideclAs decl
           , ideclImportList = new_imp_details
+          , ideclStage     = unanalysedStage
           }
 
-    return (L loc new_imp_decl, ImpUserSpec imp_spec imp_user_list, gbl_env,
+    return (L loc new_imp_decl, ImpUserSpec imp_spec imp_user_list, gbl_env, emptyNameEnv,
             imports, (,) (mi_module iface) <$> mi_defaults iface, mi_hpc iface)
 
 

@@ -23,7 +23,7 @@ initGhcM :: [String] -> Ghc ()
 initGhcM xs = do
     session <- getSession
     df1 <- getSessionDynFlags
-    let cmdOpts = ["-fforce-recomp"] ++ xs
+    let cmdOpts = ["-fforce-recomp", "-dno-debug-output"] ++ xs
     (df2, leftovers, _) <- parseDynamicFlags (hsc_logger session) df1 (map noLoc cmdOpts)
     setSessionDynFlags df2
     ghcUnitId <- case lookup "Project Unit Id" (compilerInfo df2) of

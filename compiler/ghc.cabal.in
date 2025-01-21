@@ -944,6 +944,7 @@ Library
         GHC.Unit.Module.Env
         GHC.Unit.Module.Graph
         GHC.Unit.Module.ModNodeKey
+        GHC.Unit.Module.Stage
         GHC.Unit.Module.External.Graph
         GHC.Unit.Module.Imported
         GHC.Unit.Module.Location

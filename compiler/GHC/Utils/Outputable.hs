@@ -164,6 +164,7 @@ import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 import GHC.Utils.Exception
 import GHC.Exts (oneShot)
+--import Language.Haskell.Syntax.ImpExp
 
 {-
 ************************************************************************
@@ -1079,6 +1080,9 @@ instance Outputable Extension where
 
 instance Outputable ModuleName where
   ppr = pprModuleName
+
+--instance Outputable ImportStage where
+--  ppr = text . show
 
 pprModuleName :: IsLine doc => ModuleName -> doc
 pprModuleName (ModuleName nm) =

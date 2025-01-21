@@ -7,11 +7,11 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 test.concio001:
-	"$(TEST_HC)" $(TEST_HC_OPTS) --make -fforce-recomp -v0 concio001 -o concio001 
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make -fforce-recomp -v0 concio001 -o concio001
 	(sleep 1; echo x) | ./concio001
 
 test.concio001.thr:
-	"$(TEST_HC)" $(TEST_HC_OPTS) --make -fforce-recomp -v0 -threaded concio001 -o concio001 
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make -fforce-recomp -v0 -threaded concio001 -o concio001
 	(sleep 1; echo x) | ./concio001
 
 # NB. utf8-test should *not* have a final newline.  The last char should be 'X'.
@@ -40,11 +40,11 @@ hSetEncoding001.in : latin1 utf8-test utf16le-test utf16be-test utf16-test utf32
 	cat >$@ latin1 utf8-test utf16le-test utf16be-test utf16-test utf32-test utf32le-test utf32be-test utf8-bom-test
 
 environment001-test:
-	"$(TEST_HC)" --make -fforce-recomp -v0 environment001.hs -o environment001 
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make -fforce-recomp -v0 environment001.hs -o environment001
 	GHC_TEST=马克斯 ./environment001 说
 
 T3307-test:
-	"$(TEST_HC)" --make -fforce-recomp -v0 T3307.hs -o T3307
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make -fforce-recomp -v0 T3307.hs -o T3307
 	echo Ni hao > chinese-file-小说
 	echo chinese-file-小说 > chinese-name
 	# The tests are run in whatever the default locale is. This is almost always UTF-8,

@@ -302,16 +302,7 @@ rnExprs ls = rnExprs' ls emptyUniqSet
 rnLExpr :: LHsExpr GhcPs -> RnM (LHsExpr GhcRn, FreeVars)
 rnLExpr = wrapLocFstMA rnExpr
 
-rnExpr :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
-
-finishHsVar :: LocatedA Name -> RnM (HsExpr GhcRn, FreeVars)
--- Separated from rnExpr because it's also used
--- when renaming infix expressions
-finishHsVar (L l name)
- = do { this_mod <- getModule
-      ; when (nameIsLocalOrFrom this_mod name) $
-        checkThLocalName name
-      ; return (HsVar noExtField (L (l2l l) name), unitFV name) }
+rnExpr :: HasCallStack=>HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 
 rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar v = do
@@ -334,9 +325,7 @@ rnExpr (HsVar _ (L l v))
             -- matching GRE and add a name clash error
             -- (see lookupGlobalOccRn_overloaded, called by lookupExprOccRn).
             -> do { let sel_name = flSelector $ recFieldLabel fld_info
-                  ; this_mod <- getModule
-                  ; when (nameIsLocalOrFrom this_mod sel_name) $
-                      checkThLocalName sel_name
+                  ; unless (isExact v || isOrig v) $ checkThLocalName sel_name
                   ; return (XExpr (HsRecSelRn (FieldOcc v  (L l sel_name))), unitFV sel_name)
                   }
             | nm == nilDataConName
@@ -347,8 +336,12 @@ rnExpr (HsVar _ (L l v))
             -> rnExpr (ExplicitList noAnn [])
 
             | otherwise
-            -> finishHsVar (L (l2l l) nm)
+            -> do { --pprTraceM "name" (ppr v $$ ppr (isOrig v) $$ ppr (isExact v))
+                  ; unless (isExact v || isOrig v) (checkThLocalName nm)
+                  ; return (HsVar noExtField (L (l2l l) nm), unitFV nm) }
+
         }}}
+
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)

@@ -1,0 +1,31 @@
+def check_nothing(actual_file, normaliser):
+  actual_raw = read_no_crs(actual_file)
+  return ("Nothing" in actual_raw)
+
+
+test('SI01', normal, multimod_compile, ['SI01', '-v0'])
+test('SI02', normal, multimod_compile, ['SI02', '-v0'])
+test('SI03', [extra_files(["SI01A.hs"])], multimod_compile_fail, ['SI03', '-v0'])
+test('SI04', [extra_files(["SI01A.hs"])], multimod_compile, ['SI04', '-v0'])
+test('SI05', [extra_files(["SI01A.hs"])], multimod_compile_fail, ['SI05', '-v0'])
+test('SI06', [extra_files(["SI01A.hs"])], multimod_compile, ['SI06', '-v0'])
+test('SI07', [extra_files(["SI05A.hs"])], multimod_compile, ['SI07', '-fwrite-interface -fno-code'])
+# Instance tests
+test('SI08', [extra_files(["ClassA.hs", "InstanceA.hs"])], multimod_compile_fail, ['SI08', '-v0'])
+test('SI09', [extra_files(["ClassA.hs", "InstanceA.hs"])], multimod_compile, ['SI09', '-v0'])
+test('SI10', [extra_files(["ClassA.hs", "InstanceA.hs"])], multimod_compile, ['SI10', '-v0'])
+test('SI11', normal,  compile_fail, [''])
+test('SI12', normal,  compile_fail, [''])
+test('SI13', normal,  multimod_compile, ['SI13', '-v0'])
+test('SI14', normal,  compile_fail, [''])
+test('SI15', normal,  compile_fail, [''])
+test('SI16', normal,  compile_fail, [''])
+test('SI17', normal,  compile, [''])
+test('SI18', normal,  compile_fail, [''])
+test('SI19', extra_files(["SI19A.hs"]),  multimod_compile, ['SI19', '-v0'])
+test('SI20', extra_files(["SI19A.hs"]),  multimod_compile_fail, ['SI20', '-v0'])
+test('SI21', normal,  multimod_compile_fail, ['SI21', '-v0'])
+test('SI22', normal,  multimod_compile_fail, ['SI22', '-v0'])
+test('SI23', extra_files(["SI23A.hs"]),  multimod_compile, ['SI23', '-v0'])
+test('SI24', normal, compile, [''])
+

@@ -85,7 +85,7 @@ module GHC.Types.Name.Reader (
         pprNameProvenance,
         mkGRE, mkExactGRE, mkLocalGRE, mkLocalVanillaGRE, mkLocalTyConGRE,
         mkLocalConLikeGRE, mkLocalFieldGREs,
-        gresToNameSet,
+        gresToNameSet, greStages,
 
         -- ** Shadowing
         greClashesWith, shadowNames,
@@ -101,10 +101,13 @@ module GHC.Types.Name.Reader (
         Parent(..), greParent_maybe,
         mkParent, availParent,
         ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
-        importSpecLoc, importSpecModule, isExplicitItem, bestImport,
+        importSpecLoc, importSpecModule, importSpecStage, isExplicitItem, bestImport,
 
         -- * Utils
-        opIsAt
+        opIsAt,
+
+        ImportStage(..), unanalysedStage
+
   ) where
 
 import GHC.Prelude
@@ -127,6 +130,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Builtin.Uniques ( isFldNSUnique )
+import qualified Data.Set as Set
 
 import GHC.Unit.Module
 
@@ -142,6 +146,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import qualified Data.Semigroup as S
 import System.IO.Unsafe ( unsafePerformIO )
+import Language.Haskell.Syntax.ImpExp
 
 {-
 ************************************************************************
@@ -615,6 +620,11 @@ greParent = gre_par
 
 greInfo :: GlobalRdrElt -> GREInfo
 greInfo = gre_info
+
+greStages :: GlobalRdrElt -> Set.Set ImportStage
+greStages g =
+  if gre_lcl g then Set.singleton NormalStage
+                 else Set.fromList (bagToList (fmap (is_staged . is_decl) (gre_imp g)))
 
 -- | See Note [Parents]
 data Parent = NoParent
@@ -1778,6 +1788,7 @@ shadowNames drop_only_qualified env new_gres = minusOccEnv_C_Ns do_shadowing env
                                    , is_as = old_mod_name
                                    , is_pkg_qual = NoPkgQual
                                    , is_qual = True
+                                   , is_staged = unanalysedStage
                                    , is_isboot = NotBoot
                                    , is_dloc = greDefinitionSrcSpan old_gre }
 
@@ -1940,8 +1951,11 @@ data ImpDeclSpec
         is_pkg_qual :: !PkgQual,    -- ^ Was this a package import?
         is_qual     :: !Bool,       -- ^ Was this import qualified?
         is_dloc     :: !SrcSpan,    -- ^ The location of the entire import declaration
-        is_isboot   :: !IsBootInterface -- ^ Was this a SOURCE import?
+        is_isboot   :: !IsBootInterface, -- ^ Was this a SOURCE import?
+        is_staged   :: !ImportStage -- ^ Was this import stage modified? splice/quote +-1
     } deriving (Eq, Data)
+
+
 
 instance NFData ImpDeclSpec where
   rnf = rwhnf -- Already strict in all fields
@@ -2058,6 +2072,9 @@ importSpecLoc (ImpSpec _    item)   = is_iloc item
 importSpecModule :: ImportSpec -> ModuleName
 importSpecModule = moduleName . is_mod . is_decl
 
+importSpecStage :: ImportSpec -> ImportStage
+importSpecStage = is_staged . is_decl
+
 isExplicitItem :: ImpItemSpec -> Bool
 isExplicitItem ImpAll                        = False
 isExplicitItem (ImpSome {is_explicit = exp}) = exp
@@ -2095,10 +2112,16 @@ instance Outputable ImportSpec where
    ppr imp_spec
      = text "imported" <+> qual
         <+> text "from" <+> quotes (ppr (importSpecModule imp_spec))
+        <+> stage
         <+> pprLoc (importSpecLoc imp_spec)
      where
        qual | is_qual (is_decl imp_spec) = text "qualified"
             | otherwise                  = empty
+
+       stage = case importSpecStage imp_spec of
+                NormalStage -> empty
+                QuoteStage -> text "at 2"
+                SpliceStage -> text "at 0"
 
 pprLoc :: SrcSpan -> SDoc
 pprLoc (RealSrcSpan s _)  = text "at" <+> ppr s

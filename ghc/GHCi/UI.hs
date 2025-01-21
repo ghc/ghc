@@ -2198,7 +2198,7 @@ setContextAfterLoad keep_ctxt (Just graph) = do
 
    (GHC.ModuleNode _ summary) `matches` Target { targetId = TargetModule m }
         = if GHC.ms_mod_name summary == m then Just summary else Nothing
-   (GHC.ModuleNode _ summary) `matches` Target { targetId = TargetFile f _ }
+   (GHC.ModuleNode _  summary) `matches` Target { targetId = TargetFile f _ }
         | Just f' <- GHC.ml_hs_file (GHC.ms_location summary)   =
           if f == f' then Just summary else Nothing
    _ `matches` _ = Nothing

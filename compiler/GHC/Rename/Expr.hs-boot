@@ -6,8 +6,9 @@ import GHC.Hs
 import GHC.Types.Name.Set ( FreeVars )
 import GHC.Tc.Types
 import GHC.Utils.Outputable  ( Outputable )
+import GHC.Stack
 
-rnExpr :: HsExpr GhcPs
+rnExpr :: HasCallStack => HsExpr GhcPs
         -> RnM (HsExpr GhcRn, FreeVars)
 
 rnLExpr :: LHsExpr GhcPs

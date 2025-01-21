@@ -669,7 +669,7 @@ get_reachable_nodes hsc_env mods
     hmgProject = \case
       NodeKey_Module with_uid  -> Just $ Left  with_uid
       NodeKey_ExternalUnit uid -> Just $ Right uid
-      _                        -> Nothing
+      _                            -> Nothing
 
     emgProject = \case
       ExternalModuleKey with_uid -> Left  with_uid

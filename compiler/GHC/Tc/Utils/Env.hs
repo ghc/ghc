@@ -60,7 +60,7 @@ module GHC.Tc.Utils.Env(
 
         -- Template Haskell stuff
         StageCheckReason(..),
-        checkWellStaged, tcMetaTy, thLevel,
+        tcMetaTy, thLevel,
         topIdLvl, isBrackStage,
 
         -- New Ids
@@ -850,21 +850,6 @@ tcExtendRules lcl_rules thing_inside
 ************************************************************************
 -}
 
-checkWellStaged :: StageCheckReason -- What the stage check is for
-                -> ThLevel      -- Binding level (increases inside brackets)
-                -> ThLevel      -- Use stage
-                -> TcM ()       -- Fail if badly staged, adding an error
-checkWellStaged pp_thing bind_lvl use_lvl
-  | use_lvl >= bind_lvl         -- OK! Used later than bound
-  = return ()                   -- E.g.  \x -> [| $(f x) |]
-
-  | bind_lvl == outerLevel      -- GHC restriction on top level splices
-  = failWithTc (TcRnStageRestriction pp_thing)
-
-  | otherwise                   -- Badly staged
-  = failWithTc $                -- E.g.  \x -> $(f x)
-    TcRnBadlyStaged pp_thing bind_lvl use_lvl
-
 topIdLvl :: Id -> ThLevel
 -- Globals may either be imported, or may be from an earlier "chunk"
 -- (separated by declaration splices) of this module.  The former
@@ -1166,7 +1151,7 @@ notFound name
            Splice {}
              | isUnboundName name -> failM  -- If the name really isn't in scope
                                             -- don't report it again (#11941)
-             | otherwise -> failWithTc (TcRnStageRestriction (StageCheckSplice name))
+             | otherwise -> failWithTc (TcRnStageRestriction (StageCheckSplice name Nothing))
 
            _ | isTermVarOrFieldNameSpace (nameNameSpace name) ->
                -- This code path is only reachable with RequiredTypeArguments enabled

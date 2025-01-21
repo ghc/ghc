@@ -2439,6 +2439,7 @@
         (Nothing)
         (Nothing)
         (Nothing)
+        (Nothing)
         (Nothing))
        (EpaComments
         []))
@@ -2454,6 +2455,7 @@
       {ModuleName: Prelude})
      (NoPkgQual)
      (NotBoot)
+     (NormalStage)
      (False)
      (NotQualified)
      (Nothing)
@@ -2476,6 +2478,7 @@
         (Nothing)
         (Nothing)
         (Nothing)
+        (Nothing)
         (Nothing))
        (EpaComments
         []))
@@ -2491,6 +2494,7 @@
       {ModuleName: Data.Kind})
      (NoPkgQual)
      (NotBoot)
+     (NormalStage)
      (False)
      (NotQualified)
      (Nothing)
@@ -2513,6 +2517,7 @@
         (Nothing)
         (Nothing)
         (Nothing)
+        (Nothing)
         (Nothing))
        (EpaComments
         []))
@@ -2528,6 +2533,7 @@
       {ModuleName: Data.Kind})
      (NoPkgQual)
      (NotBoot)
+     (NormalStage)
      (False)
      (NotQualified)
      (Nothing)

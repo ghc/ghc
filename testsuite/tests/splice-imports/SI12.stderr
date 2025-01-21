@@ -1,0 +1,5 @@
+SI12.hs:6:22: error: [GHC-28914]
+    • Stage error: ‘t’ is bound at stage {1} but used at stage 2
+      Hint: quoting [| t |] or an enclosing expression would allow the quotation to be used in an earlier stage
+    • In the Template Haskell quotation: [| t |]
+

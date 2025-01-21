@@ -225,6 +225,7 @@ GHC.Unit.Module.Location
 GHC.Unit.Module.ModIface
 GHC.Unit.Module.ModNodeKey
 GHC.Unit.Module.ModSummary
+GHC.Unit.Module.Stage
 GHC.Unit.Module.Warnings
 GHC.Unit.Module.WholeCoreBindings
 GHC.Unit.Parser

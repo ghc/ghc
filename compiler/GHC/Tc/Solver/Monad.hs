@@ -138,9 +138,9 @@ import qualified GHC.Tc.Utils.Monad    as TcM
 import qualified GHC.Tc.Utils.TcMType  as TcM
 import qualified GHC.Tc.Instance.Class as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified GHC.Tc.Utils.Env      as TcM
-       ( checkWellStaged, tcGetDefaultTys
+       ( tcGetDefaultTys
        , tcLookupClass, tcLookupId, tcLookupTyCon
-       , topIdLvl )
+       )
 import GHC.Tc.Zonk.Monad ( ZonkM )
 import qualified GHC.Tc.Zonk.TcType  as TcM
 import qualified GHC.Tc.Zonk.Type as TcM
@@ -183,8 +183,9 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.Set( elementOfUniqSet )
+import GHC.Types.Id
 
-import GHC.Unit.Module ( HasModule, getModule, extractModule )
+import GHC.Unit.Module
 import qualified GHC.Rename.Env as TcM
 
 import GHC.Utils.Outputable
@@ -201,16 +202,21 @@ import GHC.Exts (oneShot)
 import Control.Monad
 import Data.IORef
 import Data.List ( mapAccumL )
-import Data.Maybe ( isJust )
 import Data.Foldable
 import qualified Data.Semigroup as S
 import GHC.Types.SrcLoc
 import GHC.Rename.Env
+import GHC.LanguageExtensions as LangExt
 
 #if defined(DEBUG)
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Data.Graph.Directed
 #endif
+
+import qualified Data.Set as Set
+import GHC.Unit.Module.Graph
+
+import GHC.Data.Maybe
 
 {- *********************************************************************
 *                                                                      *
@@ -1413,26 +1419,70 @@ checkWellStagedDFun :: CtLoc -> InstanceWhat -> PredType -> TcS ()
 checkWellStagedDFun loc what pred
   = do
       mbind_lvl <- checkWellStagedInstanceWhat what
+      --env <- getLclEnv
+      --use_lvl <- thLevel <$> (wrapTcS $ TcM.getStage)
       case mbind_lvl of
-        Just bind_lvl | bind_lvl > impLevel ->
+        Just (bind_lvl, is_local) ->
           wrapTcS $ TcM.setCtLocM loc $ do
               { use_stage <- TcM.getStage
-              ; TcM.checkWellStaged (StageCheckInstance what pred) bind_lvl (thLevel use_stage) }
+              ; dflags <- getDynFlags
+              ; checkCrossStageClass dflags (StageCheckInstance what pred) bind_lvl (thLevel use_stage) is_local  }
         _ ->
+          --wrapTcS $ TcM.addErrTc (TcRnBadlyStaged (StageCheckInstance what pred) (Set.empty) use_lvl)
           return ()
+
+
+-- TODO: Unify this with checkCrossStageLifting function
+checkCrossStageClass :: DynFlags -> StageCheckReason -> Set.Set ThLevel -> ThLevel
+                            -> Bool -> TcM ()
+checkCrossStageClass dflags reason bind_lvl use_lvl is_local
+  -- If the Id is imported, ie global, then allow with PathCrossStagedPersist
+  | not is_local
+  , xopt LangExt.PathCrossStagedPersistence dflags
+  = return ()
+  | use_lvl `Set.member` bind_lvl = return ()
+  -- With path CSP, using later than bound is fine
+  | xopt LangExt.PathCrossStagedPersistence dflags
+  , any (use_lvl >=) bind_lvl  = return ()
+  | otherwise = TcM.failWithTc (TcRnBadlyStaged reason bind_lvl use_lvl)
+
+
 
 -- | Returns the ThLevel of evidence for the solved constraint (if it has evidence)
 -- See Note [Well-staged instance evidence]
-checkWellStagedInstanceWhat :: InstanceWhat -> TcS (Maybe ThLevel)
+checkWellStagedInstanceWhat :: InstanceWhat -> TcS (Maybe (Set.Set ThLevel, Bool))
 checkWellStagedInstanceWhat what
   | TopLevInstance { iw_dfun_id = dfun_id } <- what
-    = return $ Just (TcM.topIdLvl dfun_id)
+    = do
+        cur_mod <- extractModule <$> getGblEnv
+        hsc_env <- getTopEnv
+        let q = mgQueryZero (hsc_mod_graph hsc_env)
+        let mkKey s m = (Left (ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m), s))
+        let scope_key s = mkKey s cur_mod
+        let --lkup :: ImportStage -> Either _ UnitId -> Bool
+            lkup s k = q (scope_key s) k
+        let splice_lvl = lkup SpliceStage
+            normal_lvl = lkup NormalStage
+            quote_lvl  = lkup QuoteStage
+
+            name_module = nameModule (idName dfun_id)
+            instance_key = if moduleUnitId name_module `Set.member` hsc_all_home_unit_ids hsc_env
+                             then (mkKey NormalStage name_module)
+                             else Right (moduleUnitId name_module)
+        let lvls = [ 0 | splice_lvl instance_key]
+                 ++ [ 1 | normal_lvl instance_key]
+                 ++ [ 2 | quote_lvl instance_key]
+        if isLocalId dfun_id
+          then return $ Just ( (Set.singleton outerLevel, True) )
+          else return $ Just ( Set.fromList lvls, False )
+
   | BuiltinTypeableInstance tc <- what
     = do
         cur_mod <- extractModule <$> getGblEnv
         return $ Just (if nameIsLocalOrFrom cur_mod (tyConName tc)
-                        then outerLevel
-                        else impLevel)
+                        then (Set.singleton outerLevel, True)
+                        -- TODO, not correct, needs similar checks to normal instances
+                        else (Set.fromList [impLevel, outerLevel], False))
   | otherwise = return Nothing
 
 {-

@@ -13,8 +13,11 @@ import Data.Bool (Bool)
 import Data.Maybe (Maybe)
 import Data.String (String)
 import Data.Int (Int)
+import Prelude ( (.), show )
 
 import Control.DeepSeq
+import GHC.Stack
+import GHC.Utils.Outputable
 
 import {-# SOURCE #-} GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 
@@ -48,6 +51,15 @@ data IsBootInterface = NotBoot | IsBoot
 instance NFData IsBootInterface where
   rnf = rwhnf
 
+data ImportStage = NormalStage | SpliceStage | QuoteStage deriving (Eq, Ord, Data, Show)
+
+-- A placeholder which is used when the stage is not yet analysed.
+unanalysedStage :: HasCallStack => ImportStage
+unanalysedStage = NormalStage -- pprTrace "unanalysedStage" callStackDoc NormalStage
+
+instance Outputable ImportStage where
+  ppr = text . show
+
 -- | Import Declaration
 --
 -- A single Haskell @import@ declaration.
@@ -57,6 +69,7 @@ data ImportDecl pass
       ideclName       :: XRec pass ModuleName, -- ^ Module name.
       ideclPkgQual    :: ImportDeclPkgQual pass,  -- ^ Package qualifier.
       ideclSource     :: IsBootInterface,      -- ^ IsBoot \<=> {-\# SOURCE \#-} import
+      ideclStage      :: ImportStage,
       ideclSafe       :: Bool,          -- ^ True => safe import
       ideclQualified  :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclAs         :: Maybe (XRec pass ModuleName),  -- ^ as Module
