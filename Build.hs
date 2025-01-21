@@ -1,13 +1,4 @@
-#!/usr/bin/env cabal
-{- cabal:
-build-depends:
-  base,
-  directory,
-  filepath,
-  process,
-  text,
-  temporary
--}
+#!/usr/bin/env runhaskell
 
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ImportQualifiedPost #-}
@@ -29,12 +20,12 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
 import Control.Monad
+import Control.Exception (bracket)
 import System.Environment
 import System.Directory
 import System.Process
 import System.FilePath
 import System.Exit
-import System.IO.Temp
 import System.CPUTime
 
 main :: IO ()
@@ -731,3 +722,15 @@ makeCabalProject path xs = writeFile path $ unlines (xs ++ common)
         , "program-options"
         , "  ghc-options: -fhide-source-paths -j"
         ]
+
+
+withSystemTempDirectory :: String -> (String -> IO a) -> IO a
+withSystemTempDirectory prefix = do
+    bracket
+        (do
+            tmpdir <- getTemporaryDirectory
+            let dir = tmpdir </> prefix
+            createDirectory dir
+            return dir
+        )
+        removeDirectoryRecursive
