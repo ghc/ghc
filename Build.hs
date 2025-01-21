@@ -39,11 +39,6 @@ import System.CPUTime
 
 main :: IO ()
 main = do
-  -- FIXME: specific patched cabal-install for now and GHC that is known to
-  -- work...
-  setEnv "CABAL" "/home/hsyl20/projects/cabal/dist-newstyle/build/x86_64-linux/ghc-9.10.1/cabal-install-3.15.0.0/x/cabal/build/cabal/cabal"
-  setEnv "GHC" "ghc-9.8.4"
-
   -- detect GHC and cabal-install to use for bootstrapping
   ghc0 <- do
     ghc_path <- fromMaybe "ghc" <$> lookupEnv "GHC"
@@ -106,6 +101,7 @@ buildGhcStage1 opts cabal ghc0 dst = do
   let stage1_env = ("HADRIAN_SETTINGS", stage1_ghc_boot_settings) : current_env
 
   msg "  - Building GHC stage1 and bootstrapping utility programs..."
+
   let cabal_project_path = dst </> "cabal.project-stage0"
   makeCabalProject cabal_project_path
         [ "packages:"
@@ -153,6 +149,7 @@ buildGhcStage1 opts cabal ghc0 dst = do
           -- allow template-haskell with newer ghc-boot-th
         , "allow-newer: ghc-boot-th"
         ]
+
   let build_cmd = (runCabal cabal
               [ "build"
               , "--project-file=" ++ cabal_project_path
@@ -168,6 +165,7 @@ buildGhcStage1 opts cabal ghc0 dst = do
               ])
               { env = Just stage1_env
               }
+
   (exit_code, cabal_stdout, cabal_stderr) <- readCreateProcessWithExitCode build_cmd ""
   writeFile (dst </> "cabal.stdout") cabal_stdout
   writeFile (dst </> "cabal.stderr") cabal_stderr
