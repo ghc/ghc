@@ -26,7 +26,10 @@ import System.Directory
 import System.Process
 import System.FilePath
 import System.Exit
-import System.CPUTime
+import System.IO.Unsafe
+import Data.Time.Clock
+import Data.IORef
+import Data.Fixed
 
 main :: IO ()
 main = do
@@ -670,12 +673,17 @@ defaultGhcBuildOptions = GhcBuildOptions
 -- Utilities
 ---------------------------
 
+{-# NOINLINE init_time #-}
+init_time :: IORef UTCTime
+init_time = unsafePerformIO (newIORef =<< getCurrentTime)
+
 -- | Display a message to the user with some timestamp
 msg :: String -> IO ()
 msg x = do
-  t <- getCPUTime
-  let d = t `div` 1_000_000_000
-  let stp = "[" ++ show d ++ "]"
+  it <- readIORef init_time
+  t <- getCurrentTime
+  let d = realToFrac (nominalDiffTimeToSeconds (diffUTCTime t it)) :: Centi
+  let stp = "[" ++ show d ++ "s] "
   putStrLn (stp ++ replicate (6 - length stp) ' ' ++ x)
 
 -- Avoid FilePath blindness by using type aliases for programs.
