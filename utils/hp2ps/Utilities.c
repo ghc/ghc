@@ -3,7 +3,7 @@
 #include <string.h>
 #include "Error.h"
 
-extern void* malloc();
+extern void* malloc(long unsigned int);
 
 char*
 Basename(char *name)
@@ -89,7 +89,7 @@ void *
 xrealloc(void *p, size_t n)
 {
     void *r;
-    extern void *realloc();
+    extern void *realloc(void *, long unsigned int);
 
     r = realloc(p, n);
     if (!r) {
