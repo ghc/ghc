@@ -1,0 +1,9 @@
+SI25.hs:16:13: error: [GHC-28914]
+    • Level error: ‘nestedCode’ is bound at level -1
+      but used at level -2
+      Hint: quoting [| nestedCode |] or an enclosing expression
+      would allow the quotation to be used at an earlier level
+      From imports {imported from ‘SI25Helper’ at -1 at SI25.hs:6:1-24}
+    • In the untyped splice: $(nestedCode "nested")
+      In the untyped splice: $($(nestedCode "nested"))
+

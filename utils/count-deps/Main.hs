@@ -80,4 +80,4 @@ calcDeps modName libdir =
     mkModule ghcUnitId = Module (stringToUnit ghcUnitId)
 
     modDeps :: ModIface -> [ModuleName]
-    modDeps mi = map (gwib_mod . snd) $ Set.toList $ dep_direct_mods (mi_deps mi)
+    modDeps mi = map (gwib_mod . (\(_, _, mn) -> mn)) $ Set.toList $ dep_direct_mods (mi_deps mi)

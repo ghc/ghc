@@ -11,13 +11,13 @@ module GHC.Tc.Types.LclEnv (
   , getLclEnvLoc
   , getLclEnvRdrEnv
   , getLclEnvTcLevel
-  , getLclEnvThStage
+  , getLclEnvThLevel
   , setLclEnvTcLevel
   , setLclEnvLoc
   , setLclEnvRdrEnv
   , setLclEnvBinderStack
   , setLclEnvErrCtxt
-  , setLclEnvThStage
+  , setLclEnvThLevel
   , setLclEnvTypeEnv
   , modifyLclEnvTcLevel
 
@@ -108,7 +108,7 @@ data TcLclCtxt
                 --   we can look up record field names
 
 
-        tcl_th_ctxt    :: ThStage,         -- Template Haskell context
+        tcl_th_ctxt    :: ThLevel,         -- Template Haskell context
         tcl_th_bndrs   :: ThBindEnv,       -- and binder info
             -- The ThBindEnv records the TH binding level of in-scope Names
             -- defined in this module (not imported)
@@ -121,11 +121,11 @@ data TcLclCtxt
                                  -- Ids and TyVars defined in this module
     }
 
-getLclEnvThStage :: TcLclEnv -> ThStage
-getLclEnvThStage = tcl_th_ctxt . tcl_lcl_ctxt
+getLclEnvThLevel :: TcLclEnv -> ThLevel
+getLclEnvThLevel = tcl_th_ctxt . tcl_lcl_ctxt
 
-setLclEnvThStage :: ThStage -> TcLclEnv -> TcLclEnv
-setLclEnvThStage s = modifyLclCtxt (\env -> env { tcl_th_ctxt = s })
+setLclEnvThLevel :: ThLevel -> TcLclEnv -> TcLclEnv
+setLclEnvThLevel l = modifyLclCtxt (\env -> env { tcl_th_ctxt = l })
 
 getLclEnvThBndrs :: TcLclEnv -> ThBindEnv
 getLclEnvThBndrs = tcl_th_bndrs . tcl_lcl_ctxt
@@ -187,7 +187,7 @@ modifyLclCtxt upd env =
 
 type TcTypeEnv = NameEnv TcTyThing
 
-type ThBindEnv = NameEnv (TopLevelFlag, ThLevel)
+type ThBindEnv = NameEnv (TopLevelFlag, ThLevelIndex)
    -- Domain = all Ids bound in this module (ie not imported)
    -- The TopLevelFlag tells if the binding is syntactically top level.
    -- We need to know this, because the cross-stage persistence story allows
@@ -195,6 +195,7 @@ type ThBindEnv = NameEnv (TopLevelFlag, ThLevel)
    --
    -- Nota bene: a ThLevel of 'outerLevel' is *not* the same as being
    -- bound at top level!  See Note [Template Haskell levels] in GHC.Tc.Gen.Splice
+
 
 ---------------------------
 -- Arrow-notation context

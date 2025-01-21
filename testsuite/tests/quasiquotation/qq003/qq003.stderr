@@ -1,6 +1,6 @@
+qq003.hs:5:26: error: [GHC-28914]
+    • Level error: ‘parse’ is bound at level 0 but used at level -1
+      Hint: quoting [| parse |] or an enclosing expression
+      would allow the quotation to be used at an earlier level
+    • In the quasi-quotation: [parse||]
 
-qq003.hs:5:26: [GHC-18157]
-    GHC stage restriction:
-      ‘parse’ is used in a top-level splice, quasi-quote, or annotation,
-      and must be imported, not defined locally
-    In the quasi-quotation: [parse||]

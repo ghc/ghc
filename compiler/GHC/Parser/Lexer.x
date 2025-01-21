@@ -956,6 +956,9 @@ data Token
     -- represents a qualified quasi-quote of the form
     -- [Qual.quoter| quote |]
 
+  | ITsplice
+  | ITquote
+
   -- Arrow notation extension
   | ITproc
   | ITrec
@@ -1095,7 +1098,9 @@ reservedWordsFM = listToUFM $
 
          ( "rec",            ITrec,           xbit ArrowsBit .|.
                                               xbit RecursiveDoBit),
-         ( "proc",           ITproc,          xbit ArrowsBit)
+         ( "proc",           ITproc,          xbit ArrowsBit),
+         ( "splice",         ITsplice,        xbit LevelImportsBit),
+         ( "quote",          ITquote,         xbit LevelImportsBit)
      ]
 
 {-----------------------------------
@@ -2775,6 +2780,7 @@ data ExtBits
   | ViewPatternsBit
   | RequiredTypeArgumentsBit
   | MultilineStringsBit
+  | LevelImportsBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2858,6 +2864,7 @@ mkParserOpts extensionFlags diag_opts
       .|. ViewPatternsBit             `xoptBit` LangExt.ViewPatterns
       .|. RequiredTypeArgumentsBit    `xoptBit` LangExt.RequiredTypeArguments
       .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
+      .|. LevelImportsBit             `xoptBit` LangExt.ExplicitLevelImports
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream

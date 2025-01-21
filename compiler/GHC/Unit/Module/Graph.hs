@@ -39,6 +39,10 @@ module GHC.Unit.Module.Graph
    , mgNodeIsModule
    , mgNodeUnitId
 
+   , ModuleNodeEdge(..)
+   , mkModuleEdge
+   , mkNormalEdge
+
    , ModuleNodeInfo(..)
    , moduleNodeInfoModule
    , moduleNodeInfoUnitId
@@ -64,6 +68,7 @@ module GHC.Unit.Module.Graph
    , mgModSummaries
    , mgLookupModule
    , mgHasHoles
+   , showModMsg
 
     -- ** Reachability queries
     --
@@ -74,7 +79,10 @@ module GHC.Unit.Module.Graph
    , mgReachable
    , mgReachableLoop
    , mgQuery
+   , ZeroScopeKey(..)
+   , mgQueryZero
    , mgQueryMany
+   , mgQueryManyZero
    , mgMember
 
     -- ** Other operations
@@ -93,6 +101,11 @@ module GHC.Unit.Module.Graph
                              -- hptInstancesBelow is re-doing that work every
                              -- time it's called.
    , filterToposortToModules
+   , moduleGraphNodesZero
+   , StageSummaryNode
+   , stageSummaryNodeSummary
+   , stageSummaryNodeKey
+   , mkStageDeps
 
     -- * Keys into the 'ModuleGraph'
    , NodeKey(..)
@@ -110,6 +123,8 @@ module GHC.Unit.Module.Graph
    , mnKey
    , miKey
 
+   , ImportLevel(..)
+
     -- ** Internal node representation
     --
     -- | 'SummaryNode' is the internal representation for each node stored in
@@ -118,8 +133,6 @@ module GHC.Unit.Module.Graph
    , summaryNodeSummary
    , summaryNodeKey
 
-    -- * Utilities
-   , showModMsg
    )
 where
 
@@ -135,12 +148,13 @@ import GHC.Driver.Backend
 import GHC.Driver.DynFlags
 
 import GHC.Types.SourceFile ( hscSourceString, isHsigFile, HscSource(..))
+import GHC.Types.Basic
 
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 import GHC.Unit.Module.ModIface
-import GHC.Utils.Misc ( partitionWith )
+import GHC.Utils.Misc ( partitionWith, HasCallStack )
 
 import System.FilePath
 import qualified Data.Map as Map
@@ -149,6 +163,7 @@ import qualified Data.Set as Set
 import Data.Set (Set)
 import GHC.Unit.Module
 import GHC.Unit.Module.ModNodeKey
+import GHC.Unit.Module.Stage
 import GHC.Linker.Static.Utils
 
 import Data.Bifunctor
@@ -157,6 +172,7 @@ import Data.List (sort)
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
 import Control.Monad
+import qualified GHC.LanguageExtensions as LangExt
 
 -- | A '@ModuleGraph@' contains all the nodes from the home package (only). See
 -- '@ModuleGraphNode@' for information about the nodes.
@@ -173,6 +189,7 @@ data ModuleGraph = ModuleGraph
   { mg_mss :: [ModuleGraphNode]
   , mg_graph :: (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
   , mg_loop_graph :: (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
+  , mg_zero_graph :: (ReachabilityIndex ZeroSummaryNode, ZeroScopeKey -> Maybe ZeroSummaryNode)
 
     -- `mg_graph` and `mg_loop_graph` cached transitive dependency calculations
     -- so that a lot of work is not repeated whenever the transitive
@@ -192,7 +209,10 @@ data ModuleGraph = ModuleGraph
 
 -- | Why do we ever need to construct empty graphs? Is it because of one shot mode?
 emptyMG :: ModuleGraph
-emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing) (graphReachability emptyGraph, const Nothing) False
+emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing)
+                         (graphReachability emptyGraph, const Nothing)
+                         (graphReachability emptyGraph, const Nothing)
+                         False
 
 -- | Construct a module graph. This function should be the only entry point for
 -- building a 'ModuleGraph', since it is supposed to be built once and never modified.
@@ -229,12 +249,30 @@ data ModuleGraphNode
   -- - Fixed modules are not compiled, the artifacts are just loaded from disk.
   --   It is up to your to make sure the artifacts are up to date and available.
   -- - Compile modules are compiled from source if needed.
-  | ModuleNode [NodeKey] ModuleNodeInfo
+  | ModuleNode [ModuleNodeEdge] ModuleNodeInfo
   -- | Link nodes are whether are are creating a linked product (ie executable/shared object etc) for a unit.
   | LinkNode [NodeKey] UnitId
   -- | Package dependency
   | UnitNode [UnitId] UnitId
 
+
+data ModuleNodeEdge = ModuleNodeEdge { edgeLevel :: ImportLevel
+                                     , edgeTargetKey :: NodeKey }
+
+mkModuleEdge :: ImportLevel -> NodeKey -> ModuleNodeEdge
+mkModuleEdge level key = ModuleNodeEdge level key
+
+-- | A 'normal' edge in the graph which isn't offset by an import stage.
+mkNormalEdge :: NodeKey -> ModuleNodeEdge
+mkNormalEdge = mkModuleEdge NormalLevel
+
+instance Outputable ModuleNodeEdge where
+  ppr (ModuleNodeEdge level key) =
+    let level_str = case level of
+                      NormalLevel -> ""
+                      SpliceLevel -> "(S)"
+                      QuoteLevel -> "(Q)"
+    in text level_str <> ppr key
 
 data ModuleGraphInvariantError =
         FixedNodeDependsOnCompileNode ModNodeKeyWithUid [NodeKey]
@@ -308,7 +346,7 @@ checkFixedModuleInvariant node_types node = case node of
                            -- Dependency is not fixed
                            Just (Left MN_Compile) -> Just dep
                            _ -> Nothing
-        bad_deps = mapMaybe check_node deps
+        bad_deps = mapMaybe check_node (map edgeTargetKey deps)
     in if null bad_deps
        then Nothing
        else Just (FixedNodeDependsOnCompileNode key bad_deps)
@@ -394,7 +432,7 @@ mgNodeDependencies drop_hs_boot_nodes = \case
       [ NodeKey_Module (ModNodeKeyWithUid (GWIB mod NotBoot) uid) | mod <- uniqDSetToList (instUnitHoles iuid) ]
       ++ [ NodeKey_ExternalUnit (instUnitInstanceOf iuid) ]
     ModuleNode deps _ms ->
-      map drop_hs_boot deps
+      map (drop_hs_boot . edgeTargetKey) deps
     UnitNode deps _ -> map NodeKey_ExternalUnit deps
   where
     -- Drop hs-boot nodes by using HsSrcFile as the key
@@ -434,7 +472,6 @@ instance Ord ModuleGraphNode where
 --------------------------------------------------------------------------------
 -- * Module Graph operations
 --------------------------------------------------------------------------------
-
 -- | Returns the number of nodes in a 'ModuleGraph'
 lengthMG :: ModuleGraph -> Int
 lengthMG = length . mg_mss
@@ -469,12 +506,14 @@ mgMapM f mg@ModuleGraph{..} = do
     UnitNode deps uid -> pure $ UnitNode deps uid
   return $ mg { mg_mss = mss' }
 
+
 mgModSummaries :: ModuleGraph -> [ModSummary]
 mgModSummaries mg = [ m | ModuleNode _ (ModuleNodeCompile m) <- mgModSummaries' mg ]
 
 -- | Look up a non-boot ModSummary in the ModuleGraph.
 --
 -- Careful: Linear in the size of the module graph
+-- MP: This should probably be level aware
 mgLookupModule :: ModuleGraph -> Module -> Maybe ModuleNodeInfo
 mgLookupModule ModuleGraph{..} m = listToMaybe $ mapMaybe go mg_mss
   where
@@ -512,6 +551,19 @@ mgReachableLoop mg nk = map summaryNodeSummary modules_below where
   modules_below =
     allReachableMany td_map (mapMaybe lookup_node nk)
 
+
+-- | @'mgQueryZero' g root b@ answers the question: can we reach @b@ from @root@
+-- in the module graph @g@, only using normal (level 0) imports?
+mgQueryZero :: HasCallStack => ModuleGraph
+            -> ZeroScopeKey
+            -> ZeroScopeKey
+            -> Bool
+mgQueryZero mg nka nkb = pprTrace "mgQueryZero" (ppr nka <+> ppr nkb) $ isReachable td_map na nb where
+  (td_map, lookup_node) = mg_zero_graph mg
+  na = expectJust $ pprTrace "lookup_node nka" (ppr (reachabilityIndexMembers td_map) <+> ppr nka) $ lookup_node nka
+  nb = expectJust $ lookup_node nkb
+
+
 -- | Reachability Query.
 --
 -- @mgQuery(g, a, b)@ asks:
@@ -541,6 +593,21 @@ mgQueryMany mg roots nkb = isReachableMany td_map nroots nb where
   (td_map, lookup_node) = mg_graph mg
   nroots = mapMaybe lookup_node roots
   nb = expectJust $ lookup_node nkb
+
+-- | Many roots reachability Query.
+--
+-- @mgQuery(g, roots, b)@ asks:
+-- Can we reach @b@ from any of the @roots@ in graph @g@, only using normal (level 0) imports?
+--
+-- Node @b@ must be in @g@.
+mgQueryManyZero :: ModuleGraph -- ^ @g@
+            -> [ZeroScopeKey] -- ^ @roots@
+            -> ZeroScopeKey -- ^ @b@
+            -> Bool -- ^ @b@ is reachable from @roots@
+mgQueryManyZero mg roots nkb = isReachableMany td_map nroots nb where
+  (td_map, lookup_node) = mg_zero_graph mg
+  nroots = mapMaybe lookup_node roots
+  nb = expectJust $ lookup_node (pprTrace "mg" (ppr nkb) nkb)
 
 --------------------------------------------------------------------------------
 -- ** Other operations (read haddocks on export list)
@@ -598,12 +665,13 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
         -- If we want keep_hi_boot_nodes, then we do lookup_key with
         -- IsBoot; else False
 
+
 -- | This function returns all the modules belonging to the home-unit that can
 -- be reached by following the given dependencies. Additionally, if both the
 -- boot module and the non-boot module can be reached, it only returns the
 -- non-boot one.
 moduleGraphModulesBelow :: ModuleGraph -> UnitId -> ModuleNameWithIsBoot -> Set ModNodeKeyWithUid
-moduleGraphModulesBelow mg uid mn = filtered_mods [ mn | NodeKey_Module mn <- modules_below ]
+moduleGraphModulesBelow mg uid mn = filtered_mods [ mn |  NodeKey_Module mn <- modules_below]
   where
     modules_below = maybe [] (map mkNodeKey) (mgReachable mg (NodeKey_Module (ModNodeKeyWithUid mn uid)))
     filtered_mods = Set.fromDistinctAscList . filter_mods . sort
@@ -767,11 +835,190 @@ moduleNodeInfoBootString mn@(ModuleNodeFixed {}) =
 newtype NodeMap a = NodeMap { unNodeMap :: Map.Map NodeKey a }
   deriving (Functor, Traversable, Foldable)
 
+-- | Transitive dependencies, including SOURCE edges
 mkTransDeps :: [ModuleGraphNode] -> (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
 mkTransDeps = first graphReachability {- module graph is acyclic -} . moduleGraphNodes False
 
+-- | Transitive dependencies, ignoring SOURCE edges
 mkTransLoopDeps :: [ModuleGraphNode] -> (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
 mkTransLoopDeps = first cyclicGraphReachability . moduleGraphNodes True
+
+-- | Transitive dependencies, but only following "normal" level 0 imports.
+-- This graph can be used to query what the transitive dependencies of a particular
+-- level are within a module.
+mkTransZeroDeps :: [ModuleGraphNode] -> (ReachabilityIndex ZeroSummaryNode, ZeroScopeKey -> Maybe ZeroSummaryNode)
+mkTransZeroDeps = first graphReachability {- module graph is acyclic -} . moduleGraphNodesZero
+
+-- | Transitive dependencies, but with the stage that each module is required at.
+mkStageDeps :: [ModuleGraphNode] -> (ReachabilityIndex StageSummaryNode, (NodeKey, ModuleStage) -> Maybe StageSummaryNode)
+mkStageDeps = first graphReachability . moduleGraphNodesStages
+
+type ZeroSummaryNode = Node Int ZeroScopeKey
+
+zeroSummaryNodeKey :: ZeroSummaryNode -> Int
+zeroSummaryNodeKey = node_key
+
+zeroSummaryNodeSummary :: ZeroSummaryNode -> ZeroScopeKey
+zeroSummaryNodeSummary = node_payload
+
+-- | The 'ZeroScopeKey' indicates the different scopes which we can refer to in a zero-scope query.
+data ZeroScopeKey = ModuleScope ModNodeKeyWithUid ImportLevel | UnitScope UnitId
+  deriving (Eq, Ord)
+
+instance Outputable ZeroScopeKey where
+  ppr (ModuleScope mk il) = text "ModuleScope" <+> ppr mk <+> ppr il
+  ppr (UnitScope uid) = text "UnitScope" <+> ppr uid
+
+-- | Turn a list of graph nodes into an efficient queriable graph.
+-- This graph only has edges between level-0 imports
+--
+-- This query answers the question. If I am looking at level n in module M then which
+-- modules are visible?
+--
+-- If you are looking at level -1  then the reachable modules are those imported at splice and
+-- then any modules those modules import at zero. (Ie the zero scope for those modules)
+moduleGraphNodesZero ::
+     [ModuleGraphNode]
+  -> (Graph ZeroSummaryNode, ZeroScopeKey -> Maybe ZeroSummaryNode)
+moduleGraphNodesZero summaries =
+  (graphFromEdgedVerticesUniq nodes, lookup_node)
+  where
+    nodes = mapMaybe go numbered_summaries
+
+      where
+        go :: (((ModuleGraphNode, ImportLevel)), Int) -> Maybe ZeroSummaryNode
+        go (((ModuleNode nks ms), s), key) = Just $
+               DigraphNode (ModuleScope (mnKey ms) s) key $ out_edge_keys $
+                    mapMaybe (classifyDeps s) nks
+        go (((UnitNode uids uid), _s), key) =
+          Just $ DigraphNode (UnitScope uid) key (mapMaybe lookup_key $ map UnitScope uids)
+        go _ = Nothing
+
+    -- This is the key part, a dependency edge also depends on the NormalLevel scope of an import.
+    classifyDeps s (ModuleNodeEdge il (NodeKey_Module k)) | s == il = Just (ModuleScope k NormalLevel)
+    classifyDeps s (ModuleNodeEdge il (NodeKey_ExternalUnit u)) | s == il = Just (UnitScope u)
+    classifyDeps _ _ = Nothing
+
+    numbered_summaries :: [((ModuleGraphNode, ImportLevel), Int)]
+    numbered_summaries = zip (([(s, l) | s <- summaries, l <- [SpliceLevel, QuoteLevel, NormalLevel]])) [0..]
+
+    lookup_node :: ZeroScopeKey -> Maybe ZeroSummaryNode
+    lookup_node key = Map.lookup key node_map
+
+    lookup_key :: ZeroScopeKey -> Maybe Int
+    lookup_key = fmap zeroSummaryNodeKey . lookup_node
+
+    node_map :: Map.Map ZeroScopeKey ZeroSummaryNode
+    node_map =
+      Map.fromList [ (s, node)
+                   | node <- nodes
+                   , let s = zeroSummaryNodeSummary node
+                   ]
+
+    out_edge_keys :: [ZeroScopeKey] -> [Int]
+    out_edge_keys = mapMaybe lookup_key
+
+type StageSummaryNode = Node Int (NodeKey, ModuleStage)
+
+stageSummaryNodeKey :: StageSummaryNode -> Int
+stageSummaryNodeKey = node_key
+
+stageSummaryNodeSummary :: StageSummaryNode -> (NodeKey, ModuleStage)
+stageSummaryNodeSummary = node_payload
+
+-- | Turn a list of graph nodes into an efficient queriable graph.
+-- This graph has edges between modules and the stage they are required at.
+--
+-- This graph can be used to answer the query, if I am compiling a module at stage
+-- S, then what modules do I need at which stages for that?
+-- Used by 'downsweep' in order to determine which modules need code generation if you
+-- are using 'TemplateHaskell'.
+--
+-- The rules for this query can be read in more detail in the Explicit Level Imports proposal.
+-- Briefly:
+--  * If NoImplicitStagePersistence then Quote/Splice/Normal imports offset the required stage
+--  * If ImplicitStagePersistence and TemplateHaskell then imported module are needed at all stages.
+--  * Otherwise, an imported module is just needed at the normal stage.
+--
+--  * A module using TemplateHaskellQuotes required at C stage is also required at R
+--    stage.
+moduleGraphNodesStages ::
+     [ModuleGraphNode]
+  -> (Graph StageSummaryNode, (NodeKey, ModuleStage) -> Maybe StageSummaryNode)
+moduleGraphNodesStages summaries =
+  (graphFromEdgedVerticesUniq nodes, lookup_node)
+  where
+    nodes = map go numbered_summaries
+
+      where
+        go :: (((ModuleGraphNode, ModuleStage)), Int) -> StageSummaryNode
+        go (s, key) = normal_case s
+          where
+           normal_case :: (ModuleGraphNode, ModuleStage)  -> StageSummaryNode
+           normal_case ((m@(ModuleNode nks ms), s)) =
+                  DigraphNode ((mkNodeKey m, s)) key $ out_edge_keys $
+                       selfEdges ms s (mkNodeKey m) ++ concatMap (classifyDeps ms s) nks
+           normal_case (m, s) =
+             DigraphNode (mkNodeKey m, s) key (out_edge_keys . map (, s) $ mgNodeDependencies False m)
+
+    isExplicitStageMS :: ModSummary -> Bool
+    isExplicitStageMS ms = not (xopt LangExt.ImplicitStagePersistence (ms_hspp_opts ms))
+
+    isTemplateHaskellQuotesMS :: ModSummary -> Bool
+    isTemplateHaskellQuotesMS ms = xopt LangExt.TemplateHaskellQuotes (ms_hspp_opts ms)
+
+    -- Accounting for persistence within a module.
+    -- If a module is required @ C and it persists an idenfifier, it's also required
+    -- at R.
+    selfEdges (ModuleNodeCompile ms) s self_key
+      | not (isExplicitStageMS ms)
+        && (isTemplateHaskellQuotesMS ms
+            || isTemplateHaskellOrQQNonBoot ms)
+        = [(self_key, s') | s' <- onlyFutureStages s]
+    selfEdges _ _ _ = []
+
+    -- Case 1. No implicit stage persistnce is enabled
+    classifyDeps (ModuleNodeCompile ms) s (ModuleNodeEdge il k)
+      | isExplicitStageMS ms = case il of
+                                SpliceLevel -> [(k, decModuleStage s)]
+                                NormalLevel -> [(k, s)]
+                                QuoteLevel  -> [(k, incModuleStage s)]
+    -- Case 2a. TemplateHaskellQuotes case  (section 5.6 in the paper)
+    classifyDeps (ModuleNodeCompile ms) s (ModuleNodeEdge _ k)
+      | not (isExplicitStageMS ms)
+      , not (isTemplateHaskellOrQQNonBoot ms)
+      , isTemplateHaskellQuotesMS ms
+      = [(k, s') | s' <- nowAndFutureStages s]
+    -- Case 2b. Template haskell is enabled, with implicit stage persistence
+    classifyDeps (ModuleNodeCompile ms) _ (ModuleNodeEdge _ k)
+      | isTemplateHaskellOrQQNonBoot ms
+      , not (isExplicitStageMS ms) =
+        [(k, s) | s <- allStages]
+    -- Case 3. No template haskell, therefore no additional dependencies.
+    classifyDeps _ s (ModuleNodeEdge _ k) = [(k, s)]
+
+
+    numbered_summaries :: [((ModuleGraphNode, ModuleStage), Int)]
+    numbered_summaries = zip (([(s, l) | s <- summaries, l <- allStages])) [0..]
+
+    lookup_node :: (NodeKey, ModuleStage) -> Maybe StageSummaryNode
+    lookup_node key = Map.lookup key node_map
+
+    lookup_key ::  (NodeKey, ModuleStage) -> Maybe Int
+    lookup_key = fmap stageSummaryNodeKey . lookup_node
+
+    node_map :: Map.Map (NodeKey, ModuleStage) StageSummaryNode
+    node_map =
+      Map.fromList [ (s, node)
+                   | node <- nodes
+                   , let s = stageSummaryNodeSummary node
+                   ]
+
+    out_edge_keys :: [(NodeKey, ModuleStage)] -> [Int]
+    out_edge_keys = mapMaybe lookup_key
+        -- If we want keep_hi_boot_nodes, then we do lookup_key with
+        -- IsBoot; else False
+
 
 -- | Add an ExtendedModSummary to ModuleGraph. Assumes that the new ModSummary is
 -- not an element of the ModuleGraph.
@@ -781,5 +1028,7 @@ extendMG ModuleGraph{..} node =
     { mg_mss = node : mg_mss
     , mg_graph =  mkTransDeps (node : mg_mss)
     , mg_loop_graph = mkTransLoopDeps (node : mg_mss)
+    , mg_zero_graph = mkTransZeroDeps (node : mg_mss)
     , mg_has_holes = mg_has_holes || maybe False isHsigFile (moduleNodeInfoHscSource =<< mgNodeIsModule node)
     }
+

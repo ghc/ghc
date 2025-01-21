@@ -1,7 +1,5 @@
+annfail04.hs:14:12: error: [GHC-28914]
+    • Level error: instance for ‘Thing Int’ is bound at level 0
+      but used at level -1
+    • In the annotation: {-# ANN f (thing :: Int) #-}
 
-annfail04.hs:14:12: [GHC-18157]
-    GHC stage restriction:
-      instance for ‘Thing
-                      Int’ is used in a top-level splice, quasi-quote, or annotation,
-      and must be imported, not defined locally
-    In the annotation: {-# ANN f (thing :: Int) #-}

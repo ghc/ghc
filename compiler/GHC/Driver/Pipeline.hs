@@ -403,7 +403,9 @@ link' logger tmpfs fc dflags unit_env batch_attempt_linking mHscMessager hpt
                           _ -> False
 
         -- the packages we depend on
-        pkg_deps <- Set.toList <$> hptCollectDependencies hpt
+        -- TODO: This should be a query on the 'ModuleGraph', since we need to
+        -- know which packages are actually needed at the runtime stage.
+        pkg_deps <- map snd . Set.toList <$> hptCollectDependencies hpt
 
         -- the linkables to link
         linkables <- hptCollectObjects hpt

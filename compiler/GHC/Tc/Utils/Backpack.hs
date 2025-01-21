@@ -299,14 +299,14 @@ implicitRequirements hsc_env normal_imports
 -- than a transitive closure done here) all the free holes are still reachable.
 implicitRequirementsShallow
   :: HscEnv
-  -> [(PkgQual, Located ModuleName)]
+  -> [(ImportLevel, PkgQual, Located ModuleName)]
   -> IO ([ModuleName], [InstantiatedUnit])
 implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
  where
   mhome_unit = hsc_home_unit_maybe hsc_env
 
   go acc [] = pure acc
-  go (accL, accR) ((mb_pkg, L _ imp):imports) = do
+  go (accL, accR) ((_stage, mb_pkg, L _ imp):imports) = do
     found <- findImportedModule hsc_env imp mb_pkg
     let acc' = case found of
           Found _ mod | notHomeModuleMaybe mhome_unit mod ->
@@ -634,7 +634,8 @@ mergeSignatures
                                             is_pkg_qual = NoPkgQual,
                                             is_qual     = False,
                                             is_isboot   = NotBoot,
-                                            is_dloc     = locA loc
+                                            is_dloc     = locA loc,
+                                            is_level    = NormalLevel
                                           } ImpAll
                                 rdr_env = mkGlobalRdrEnv $ gresFromAvails hsc_env (Just ispec) as1
                             setGblEnv tcg_env {

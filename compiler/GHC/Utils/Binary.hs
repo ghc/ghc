@@ -2,6 +2,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -75,6 +77,9 @@ module GHC.Utils.Binary
    lazyGetMaybe,
    lazyPutMaybe,
 
+   -- * EnumBinary
+   EnumBinary(..),
+
    -- * User data
    ReaderUserData, getReaderUserData, setReaderUserData, noReaderUserData,
    WriterUserData, getWriterUserData, setWriterUserData, noWriterUserData,
@@ -115,6 +120,7 @@ module GHC.Utils.Binary
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Module.Name (ModuleName(..))
+import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 
 import {-# SOURCE #-} GHC.Types.Name (Name)
 import GHC.Data.FastString
@@ -1063,6 +1069,22 @@ instance Binary JoinPointHood where
         case h of
             0 -> return NotJoinPoint
             _ -> do { ar <- get bh; return (JoinPoint ar) }
+
+newtype EnumBinary a = EnumBinary { unEnumBinary :: a }
+instance Enum a => Binary (EnumBinary a) where
+  put_ bh (EnumBinary x) = put_ bh (fromEnum x)
+  get bh = do x <- get bh
+              return $ EnumBinary (toEnum x)
+
+
+instance Binary IsBootInterface where
+  put_ bh ib = put_ bh (case ib of
+                          IsBoot -> True
+                          NotBoot -> False)
+  get bh = do x <- get bh
+              return $ case x of
+                        True -> IsBoot
+                        False -> NotBoot
 
 {-
 Finally - a reasonable portable Integer instance.

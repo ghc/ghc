@@ -43,6 +43,7 @@ import GHC.Types.SourceFile ( HscSource(..), hscSourceString )
 import GHC.Types.SrcLoc
 import GHC.Types.Target
 import GHC.Types.PkgQual
+import GHC.Types.Basic
 
 import GHC.Data.Maybe
 import GHC.Data.OsPath (OsPath)
@@ -79,9 +80,9 @@ data ModSummary
           -- See Note [When source is considered modified] and #9243
         ms_hie_date   :: Maybe UTCTime,
           -- ^ Timestamp of hie file, if we have one
-        ms_srcimps      :: [(PkgQual, Located ModuleName)], -- FIXME: source imports are never from an external package, why do we allow PkgQual?
+        ms_srcimps      :: [Located ModuleName],
           -- ^ Source imports of the module
-        ms_textual_imps :: [(PkgQual, Located ModuleName)],
+        ms_textual_imps :: [(ImportLevel, PkgQual, Located ModuleName)],
           -- ^ Non-source imports of the module from the module *text*
         ms_parsed_mod   :: Maybe HsParsedModule,
           -- ^ The parsed, nonrenamed source, if we have it.  This is also
@@ -105,34 +106,36 @@ ms_mod_name :: ModSummary -> ModuleName
 ms_mod_name = moduleName . ms_mod
 
 -- | Textual imports, plus plugin imports but not SOURCE imports.
-ms_imps :: ModSummary -> [(PkgQual, Located ModuleName)]
+ms_imps :: ModSummary -> [(ImportLevel, PkgQual, Located ModuleName)]
 ms_imps ms = ms_textual_imps ms ++ ms_plugin_imps ms
 
 -- | Plugin imports
-ms_plugin_imps :: ModSummary -> [(PkgQual, Located ModuleName)]
-ms_plugin_imps ms = map ((NoPkgQual,) . noLoc) (pluginModNames (ms_hspp_opts ms))
+ms_plugin_imps :: ModSummary -> [(ImportLevel, PkgQual, Located ModuleName)]
+ms_plugin_imps ms = map ((SpliceLevel, NoPkgQual,) . noLoc) (pluginModNames (ms_hspp_opts ms))
 
 -- | All of the (possibly) home module imports from the given list that is to
 -- say, each of these module names could be a home import if an appropriately
 -- named file existed.  (This is in contrast to package qualified imports, which
 -- are guaranteed not to be home imports.)
-home_imps :: [(PkgQual, Located ModuleName)] -> [(PkgQual, Located ModuleName)]
-home_imps imps = filter (maybe_home . fst) imps
+home_imps :: [(ImportLevel, PkgQual, Located ModuleName)] -> [(ImportLevel, PkgQual, Located ModuleName)]
+home_imps imps = filter (maybe_home . pq) imps
   where maybe_home NoPkgQual    = True
         maybe_home (ThisPkg _)  = True
         maybe_home (OtherPkg _) = False
 
+        pq (_, p, _) = p
+
 -- | Like 'ms_home_imps', but for SOURCE imports.
 ms_home_srcimps :: ModSummary -> ([Located ModuleName])
 -- [] here because source imports can only refer to the current package.
-ms_home_srcimps = map snd . home_imps . ms_srcimps
+ms_home_srcimps = ms_srcimps
 
 -- | All of the (possibly) home module imports from a
 -- 'ModSummary'; that is to say, each of these module names
 -- could be a home import if an appropriately named file
 -- existed.  (This is in contrast to package qualified
 -- imports, which are guaranteed not to be home imports.)
-ms_home_imps :: ModSummary -> ([(PkgQual, Located ModuleName)])
+ms_home_imps :: ModSummary -> ([(ImportLevel, PkgQual, Located ModuleName)])
 ms_home_imps = home_imps . ms_imps
 
 -- The ModLocation contains both the original source filename and the
@@ -173,15 +176,14 @@ ms_mnwib :: ModSummary -> ModuleNameWithIsBoot
 ms_mnwib ms = GWIB (ms_mod_name ms) (isBootSummary ms)
 
 -- | Returns the dependencies of the ModSummary s.
-msDeps :: ModSummary -> ([(PkgQual, GenWithIsBoot (Located ModuleName))])
-msDeps s =
-           [ (NoPkgQual, d)
+msDeps :: ModSummary -> ([(ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))])
+msDeps s = [ (NormalLevel, NoPkgQual, d) -- Source imports are always NormalLevel
            | m <- ms_home_srcimps s
            , d <- [ GWIB { gwib_mod = m, gwib_isBoot = IsBoot }
                   ]
            ]
-        ++ [ (pkg, (GWIB { gwib_mod = m, gwib_isBoot = NotBoot }))
-           | (pkg, m) <- ms_imps s
+        ++ [ (stage, pkg, (GWIB { gwib_mod = m, gwib_isBoot = NotBoot }))
+           | (stage, pkg, m) <- ms_imps s
            ]
 
 instance Outputable ModSummary where

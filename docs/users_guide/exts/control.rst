@@ -120,6 +120,7 @@ Similarly, language extensions can be controlled (either enabled or disabled):
      * :extension:`TypeApplications`
      * :extension:`TypeOperators`
      * :extension:`TypeSynonymInstances`
+     * :extension:`ImplicitStagePersistence`
 
 .. extension:: GHC2021
     :shortdesc: Use GHC’s set of default language extensions from 2021
@@ -189,6 +190,7 @@ Similarly, language extensions can be controlled (either enabled or disabled):
      * :extension:`TypeOperators`
      * :extension:`TypeSynonymInstances`
      * :extension:`NoExplicitNamespaces <ExplicitNamespaces>`
+     * :extension:`ImplicitStagePersistence`
 
 
 .. extension:: Haskell2010
@@ -216,6 +218,7 @@ Similarly, language extensions can be controlled (either enabled or disabled):
      * :extension:`RelaxedPolyRec`
      * :extension:`StarIsType`
      * :extension:`TraditionalRecordSyntax`
+     * :extension:`ImplicitStagePersistence`
 
 
 .. extension:: Haskell98
@@ -240,6 +243,7 @@ Similarly, language extensions can be controlled (either enabled or disabled):
      * :extension:`NondecreasingIndentation`
      * :extension:`StarIsType`
      * :extension:`TraditionalRecordSyntax`
+     * :extension:`ImplicitStagePersistence`
 
 
 

@@ -9,6 +9,10 @@ module GHC.Data.Graph.Directed.Reachability
   -- * Reachability queries
   , allReachable, allReachableMany
   , isReachable, isReachableMany
+
+  -- * Debugging
+  , reachabilityIndexMembers
+
   )
   where
 
@@ -34,6 +38,10 @@ data ReachabilityIndex node = ReachabilityIndex {
     from_vertex :: Vertex -> node,
     to_vertex :: node -> Maybe Vertex
 }
+
+--
+reachabilityIndexMembers :: ReachabilityIndex node -> [node]
+reachabilityIndexMembers (ReachabilityIndex index from_vert _) = map from_vert (IM.keys index)
 
 --------------------------------------------------------------------------------
 -- * Construction
@@ -107,7 +115,6 @@ cyclicGraphReachability (Graph g from to) =
 --  * The list of nodes /does not/ include the @root@ node!
 --  * The list of nodes is deterministically ordered, but according to an
 --     internal order determined by the indices attributed to graph nodes.
---  * This function has $O(1)$ complexity.
 --
 -- If you need a topologically sorted list, consider using the functions exposed from 'GHC.Data.Graph.Directed' on 'Graph' instead.
 allReachable :: ReachabilityIndex node -> node {-^ The @root@ node -} -> [node] {-^ All nodes reachable from @root@ -}
@@ -139,7 +146,6 @@ allReachableMany (ReachabilityIndex index from to) roots = map from (IS.toList h
 --
 -- Properties:
 --  * No self loops, i.e. @isReachable _ a a == False@
---  * This function has $O(1)$ complexity.
 isReachable :: ReachabilityIndex node {-^ @g@ -}
             -> node -- ^ @a@
             -> node -- ^ @b@
@@ -155,17 +161,18 @@ isReachable (ReachabilityIndex index _ to) a b =
 -- On graph @g@ with many nodes @roots@ and node @b@, @isReachableMany g as b@
 -- asks whether @b@ can be reached through @g@ from any of the @roots@.
 --
+-- By partially applying this function to a set of roots, the resulting function can
+-- be applied many times and share the initial work.
+--
 -- Properties:
 --  * No self loops, i.e. @isReachableMany _ [a] a == False@
---  * This function is $O(n)$ in the number of roots
 isReachableMany :: ReachabilityIndex node -- ^ @g@
                 -> [node] -- ^ @roots@
-                -> node -- ^ @b@
-                -> Bool -- ^ @b@ is reachable from any of the @roots@
-isReachableMany (ReachabilityIndex index _ to) roots b =
-    IS.member b_i $
-    IS.unions $
-    map (expectJust . flip IM.lookup index) roots_i
-  where roots_i = [ v | Just v <- map to roots ]
-        b_i = expectJust $ to b
-
+                -> (node -> Bool) -- ^ @b@ is reachable from any of the @roots@
+isReachableMany (ReachabilityIndex index _ to) roots =
+  let roots_i = [ v | Just v <- map to roots ]
+      unions =
+          IS.unions $
+            map (expectJust . flip IM.lookup index) roots_i
+  in \b -> let b_i = expectJust $ to b
+           in IS.member b_i unions

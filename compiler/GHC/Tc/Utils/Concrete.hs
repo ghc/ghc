@@ -670,7 +670,7 @@ checkFRR_with :: HasDebugCallStack
                   -- ^ Returns @(co, frr_ty)@ with @co :: ty ~# frr_ty@
                   -- and @frr_@ty has a fixed 'RuntimeRep'.
 checkFRR_with check_kind frr_ctxt ty
-  = do { th_stage <- getStage
+  = do { th_lvl <- getThLevel
        ; if
           -- Shortcut: check for 'Type' and 'UnliftedType' type synonyms.
           | TyConApp tc [] <- ki
@@ -678,7 +678,7 @@ checkFRR_with check_kind frr_ctxt ty
           -> return refl
 
           -- See [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep].
-          | Brack _ (TcPending {}) <- th_stage
+          | Brack _ (TcPending {}) <- th_lvl
           -> return refl
 
           -- Otherwise: ensure that the kind 'ki' of 'ty' is concrete.

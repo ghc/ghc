@@ -118,7 +118,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Template Haskell context
   recordThUse, recordThNeededRuntimeDeps,
-  keepAlive, getStage, getStageAndBindLevel, setStage,
+  keepAlive, getThLevel, getCurrentAndBindLevel, setThLevel,
   addModFinalizersWithLclEnv,
 
   -- * Safe Haskell context
@@ -170,6 +170,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.TcRef
+import GHC.Tc.Types.TH
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Zonk.TcType
 
@@ -210,6 +211,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
 import qualified GHC.Data.Strict as Strict
+import qualified Data.Set as Set
 
 import GHC.Types.Error
 import GHC.Types.DefaultEnv ( DefaultEnv, emptyDefaultEnv )
@@ -229,7 +231,7 @@ import GHC.Types.Unique.FM ( emptyUFM )
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Supply
 import GHC.Types.Annotations
-import GHC.Types.Basic( TopLevelFlag, TypeOrKind(..) )
+import GHC.Types.Basic( TopLevelFlag(..), TypeOrKind(..) )
 import GHC.Types.CostCentre.State
 import GHC.Types.SourceFile
 
@@ -399,7 +401,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_in_gen_code = False,
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
-                tcl_th_ctxt    = topStage,
+                tcl_th_ctxt    = topLevel,
                 tcl_th_bndrs   = emptyNameEnv,
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
@@ -2113,18 +2115,38 @@ keepAlive name
        ; traceRn "keep alive" (ppr name)
        ; updTcRef (tcg_keep env) (`extendNameSet` name) }
 
-getStage :: TcM ThStage
-getStage = do { env <- getLclEnv; return (getLclEnvThStage env) }
+getThLevel :: TcM ThLevel
+getThLevel = do { env <- getLclEnv; return (getLclEnvThLevel env) }
 
-getStageAndBindLevel :: Name -> TcRn (Maybe (TopLevelFlag, ThLevel, ThStage))
-getStageAndBindLevel name
+getCurrentAndBindLevel :: Name -> TcRn (Maybe (TopLevelFlag, Set.Set ThLevelIndex, ThLevel))
+getCurrentAndBindLevel name
   = do { env <- getLclEnv;
        ; case lookupNameEnv (getLclEnvThBndrs env) name of
-           Nothing                  -> return Nothing
-           Just (top_lvl, bind_lvl) -> return (Just (top_lvl, bind_lvl, getLclEnvThStage env)) }
+           Nothing                  -> do
+              lvls <- getExternalBindLvl name
+              if Set.empty == lvls
+                -- This case happens when code is generated for identifiers which are not
+                -- in scope.
+                --
+                -- TODO: What happens if someone generates [|| GHC.Magic.dataToTag# ||]
+                then do
+                  return Nothing
+                else return (Just (TopLevel, lvls, getLclEnvThLevel env))
+           Just (top_lvl, bind_lvl) -> return (Just (top_lvl, Set.singleton bind_lvl, getLclEnvThLevel env)) }
 
-setStage :: ThStage -> TcM a -> TcRn a
-setStage s = updLclEnv (setLclEnvThStage s)
+getExternalBindLvl :: Name -> TcRn (Set.Set ThLevelIndex)
+getExternalBindLvl name = do
+  env <- getGlobalRdrEnv
+  mod <- getModule
+  case lookupGRE_Name env name of
+    Just gre -> return $ (Set.map thLevelIndexFromImportLevel (greLevels gre))
+    Nothing ->
+      if nameIsLocalOrFrom mod name
+        then return $ Set.singleton topLevelIndex
+        else return Set.empty
+
+setThLevel :: ThLevel -> TcM a -> TcRn a
+setThLevel l = updLclEnv (setLclEnvThLevel l)
 
 -- | Adds the given modFinalizers to the global environment and set them to use
 -- the current local environment.

@@ -1,2 +1,2 @@
 {"span":null,"doc":"-ddump-json is deprecated: Use `-fdiagnostics-as-json` instead","messageClass":"MCDiagnostic SevWarning WarningWithFlags Opt_WarnDeprecatedFlags :| [] Just GHC-53692"}
-{"span":null,"doc":"TYPE SIGNATURES\n  foo :: forall a. a -> a\nDependent modules: []\nDependent packages: [base-4.19.0.0]","messageClass":"MCOutput"}
+{"span":null,"doc":"TYPE SIGNATURES\n  foo :: forall a. a -> a\nDependent modules: []\nDependent packages: [(normal, base-4.21.0.0)]","messageClass":"MCOutput"}

@@ -282,10 +282,10 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ (ModuleN
 
         ; let do_imps is_boot idecls = sequence_
                     [ do_imp loc is_boot mb_pkg mod
-                    | (mb_pkg, L loc mod) <- idecls,
+                    | (_lvl, mb_pkg, L loc mod) <- idecls,
                       mod `notElem` excl_mods ]
 
-        ; do_imps IsBoot (ms_srcimps node)
+        ; do_imps IsBoot (map ((,,) NormalLevel NoPkgQual) (ms_srcimps node))
         ; do_imps NotBoot (ms_imps node)
         }
 
@@ -428,7 +428,8 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           is_boot_key (NodeKey_Module (ModNodeKeyWithUid (GWIB _ IsBoot) _)) = True
           is_boot_key _ = False
           is_boot_only n@(ModuleNode deps ms) =
-            let non_boot_deps = filter (not . is_boot_key) deps
+            let dep_mods = map edgeTargetKey deps
+                non_boot_deps = filter (not . is_boot_key) dep_mods
             in if not (any in_group non_boot_deps)
                 then Left (deps, ms)
                 else Right n
@@ -441,9 +442,9 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           groups =
             GHC.topSortModuleGraph True (mkModuleGraph all_others) Nothing
 
-    pp_mod :: [NodeKey] -> ModuleNodeInfo -> SDoc
+    pp_mod :: [ModuleNodeEdge] -> ModuleNodeInfo -> SDoc
     pp_mod deps mn =
-      text mod_str <> text (take (20 - length mod_str) (repeat ' ')) <> ppr_deps deps
+      text mod_str <> text (take (20 - length mod_str) (repeat ' ')) <> ppr_deps (map edgeTargetKey deps)
       where
         mod_str = moduleNameString (moduleNodeInfoModuleName mn)
 

@@ -1,7 +1,5 @@
+annfail06.hs:22:1: error: [GHC-28914]
+    • Level error: instance for ‘Data InstancesInWrongModule’
+      is bound at level 0 but used at level -1
+    • In the annotation: {-# ANN f InstancesInWrongModule #-}
 
-annfail06.hs:22:1: [GHC-18157]
-    GHC stage restriction:
-      instance for ‘Data
-                      InstancesInWrongModule’ is used in a top-level splice, quasi-quote, or annotation,
-      and must be imported, not defined locally
-    In the annotation: {-# ANN f InstancesInWrongModule #-}

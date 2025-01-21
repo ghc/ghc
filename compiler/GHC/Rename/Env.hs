@@ -238,8 +238,8 @@ newTopSrcBinder (L loc rdr_name)
                 -- Binders should not be qualified; if they are, and with a different
                 -- module name, we get a confusing "M.T is not in scope" error later
 
-        ; stage <- getStage
-        ; if isBrackStage stage then
+        ; level <- getThLevel
+        ; if isBrackLevel level then
                 -- We are inside a TH bracket, so make an *Internal* name
                 -- See Note [Top-level Names in Template Haskell decl quotes] in GHC.Rename.Names
              do { uniq <- newUnique
@@ -1015,7 +1015,7 @@ lookupLocalOccRn_maybe rdr_name
   = do { local_env <- getLocalRdrEnv
        ; return (lookupLocalRdrEnv local_env rdr_name) }
 
-lookupLocalOccThLvl_maybe :: Name -> RnM (Maybe (TopLevelFlag, ThLevel))
+lookupLocalOccThLvl_maybe :: Name -> RnM (Maybe (TopLevelFlag, ThLevelIndex))
 -- Just look in the local environment
 lookupLocalOccThLvl_maybe name
   = do { lcl_env <- getLclEnv
@@ -1978,7 +1978,13 @@ lookupQualifiedNameGHCi fos rdr_name
           , gre_info = info }
         where
           info = lookupGREInfo hsc_env nm
-          spec = ImpDeclSpec { is_mod = mod, is_as = moduleName mod, is_pkg_qual = NoPkgQual, is_qual = True, is_isboot = NotBoot, is_dloc = noSrcSpan }
+          spec = ImpDeclSpec { is_mod = mod
+                             , is_as = moduleName mod
+                             , is_pkg_qual = NoPkgQual
+                             , is_qual = True
+                             , is_isboot = NotBoot
+                             , is_dloc = noSrcSpan
+                             , is_level = NormalLevel }
           is = ImpSpec { is_decl = spec, is_item = ImpAll }
 
 -- | Look up the 'GREInfo' associated with the given 'Name'

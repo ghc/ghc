@@ -903,6 +903,7 @@ Library
         GHC.Types.HpcInfo
         GHC.Types.Id
         GHC.Types.IPE
+        GHC.Types.ThLevelIndex
         GHC.Types.Id.Info
         GHC.Types.Id.Make
         GHC.Types.Literal
@@ -957,6 +958,7 @@ Library
         GHC.Unit.Module.Env
         GHC.Unit.Module.Graph
         GHC.Unit.Module.ModNodeKey
+        GHC.Unit.Module.Stage
         GHC.Unit.Module.Imported
         GHC.Unit.Module.Location
         GHC.Unit.Module.ModDetails
@@ -1017,6 +1019,7 @@ Library
         Language.Haskell.Syntax.Expr
         Language.Haskell.Syntax.Extension
         Language.Haskell.Syntax.ImpExp
+        Language.Haskell.Syntax.ImpExp.IsBoot
         Language.Haskell.Syntax.Lit
         Language.Haskell.Syntax.Module.Name
         Language.Haskell.Syntax.Pat

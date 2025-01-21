@@ -1,0 +1,5 @@
+SI14.hs:9:21: error: [GHC-86639]
+    • Can't make a derived instance of ‘Lift A’:
+        You need ImplicitStagePersistence to derive an instance for this class
+    • In the data type declaration for ‘A’
+

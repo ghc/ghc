@@ -43,6 +43,9 @@ data ImportedModsVal = ImportedModsVal
    , imv_is_safe     :: IsSafeImport
       -- ^ whether this is a safe import
 
+   , imv_is_level    :: ImportLevel
+      -- ^ the level the module is imported at (splice, quote, or normal)
+
    , imv_is_hiding   :: Bool
       -- ^ whether this is an "hiding" import
 

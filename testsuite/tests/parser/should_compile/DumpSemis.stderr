@@ -79,6 +79,7 @@
         (Nothing)
         (Nothing)
         (Nothing)
+        (Nothing)
         (Nothing))
        (EpaComments
         []))
@@ -94,6 +95,7 @@
       {ModuleName: Data.List})
      (NoRawPkgQual)
      (NotBoot)
+     (NotLevelled)
      (False)
      (NotQualified)
      (Nothing)
@@ -144,6 +146,7 @@
         (Nothing)
         (Nothing)
         (Nothing)
+        (Nothing)
         (Nothing))
        (EpaComments
         []))
@@ -159,6 +162,7 @@
       {ModuleName: Data.Kind})
      (NoRawPkgQual)
      (NotBoot)
+     (NotLevelled)
      (False)
      (NotQualified)
      (Nothing)

@@ -6,23 +6,10 @@ Template Haskell
 Template Haskell allows you to do compile-time meta-programming in
 Haskell. The background to the main technical innovations is discussed
 in "`Template Meta-programming for
-Haskell <https://research.microsoft.com/~simonpj/papers/meta-haskell/>`__"
+Haskell <https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/meta-haskell.pdf>`__"
 (Proc Haskell Workshop 2002).
-
-The `Template Haskell <https://www.haskell.org/haskellwiki/Template_Haskell>`__
-page on the GHC Wiki has a wealth of information. You may also consult the
-Haddock reference documentation :th-ref:`Language.Haskell.TH.`.
-Many changes to the original
-design are described in `Notes on Template Haskell version
-2 <https://www.haskell.org/ghc/docs/papers/th2.ps>`__.
-Not all of these changes are in GHC, however.
-
 The first example from that paper is set out below (:ref:`th-example`)
 as a worked example to help get you started.
-
-The documentation here describes the realisation of Template Haskell in
-GHC. It is not detailed enough to understand Template Haskell; see the
-`Wiki page <https://haskell.org/haskellwiki/Template_Haskell>`__.
 
 .. _th-syntax:
 
@@ -48,34 +35,6 @@ Template Haskell has the following new syntactic constructions. You need to use
 the extension :extension:`TemplateHaskell` to switch these syntactic extensions on.
 Alternatively, the :extension:`TemplateHaskellQuotes` extension can be used to
 enable the quotation subset of Template Haskell (i.e. without top-level splices).
-The :extension:`TemplateHaskellQuotes` extension is considered safe under
-:ref:`safe-haskell` while :extension:`TemplateHaskell` is not.
-
--  A splice is written ``$x``, where ``x`` is an arbitrary expression.
-   There must be no space between the "$" and the expression.
-   This use of ``$`` overrides its meaning as an infix operator, just as ``M.x``
-   overrides the meaning of ``.`` as an infix operator. If you want the
-   infix operator, put spaces around it.
-
-   A top-level splice can occur in place of
-
-   -  an expression; the spliced expression must have type ``Q Exp``
-
-   -  a pattern; the spliced pattern must have type ``Q Pat``
-
-   -  a type; the spliced expression must have type ``Q Type``
-
-   -  a list of declarations at top level; the spliced expression must
-      have type ``Q [Dec]``
-
-   Inside a splice you can only call functions defined in imported
-   modules, not functions defined elsewhere in the same module. Note
-   that declaration splices are not allowed anywhere except at top level
-   (outside any other declarations).
-
-   The ``Q`` monad is a monad defined in :th-ref:`Language.Haskell.TH.Syntax.` which
-   supports several useful operations during code generation such as reporting
-   errors or looking up identifiers in the environment.
 
 -  A expression quotation is written in Oxford brackets, thus:
 
@@ -98,6 +57,32 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 
    See :ref:`pts-where` for using partial type signatures in quotations.
 
+-  A splice is written ``$x``, where ``x`` is an arbitrary expression.
+   There must be no space between the "$" and the expression.
+
+   A top-level splice can occur in place of
+
+   -  an expression; the spliced expression must have type ``Q Exp``
+
+   -  a pattern; the spliced pattern must have type ``Q Pat``
+
+   -  a type; the spliced expression must have type ``Q Type``
+
+   -  a list of declarations at top level; the spliced expression must
+      have type ``Q [Dec]``
+
+   Note that declaration splices are not allowed anywhere except at top level
+   (outside any other declarations).
+
+   The ``Q`` monad is a monad defined in :th-ref:`Language.Haskell.TH.Syntax.` which
+   supports several useful operations during code generation such as reporting
+   errors or looking up identifiers in the environment.
+
+   This use of ``$`` overrides its meaning as an infix operator, just as ``M.x``
+   overrides the meaning of ``.`` as an infix operator. If you want the
+   infix operator, put spaces around it.
+
+
 -  Splices can be nested inside quotation brackets. For example the fragment
    representing ``1 + 2`` can be constructed using nested splices::
 
@@ -108,24 +93,13 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 
     plusC = [| $oneC + $twoC |]
 
--  The precise type of a quotation depends on the types of the nested splices inside it::
+-  A *typed* expression quotation is written as ``[|| ... ||]``, or
+   ``[e|| ... ||]``, where the "..." is an expression; if the "..."
+   expression has type ``a``, then the quotation has type
+   ``Quote m => Code m a``.
 
-      -- Add a redundant constraint to demonstrate that constraints on the
-      -- monad used to build the representation are propagated when using nested
-      -- splices.
-      f :: (Quote m, C m) => m Exp
-      f = [| 5 | ]
-
-      -- f is used in a nested splice so the constraint on f, namely C, is propagated
-      -- to a constraint on the whole representation.
-      g :: (Quote m, C m) => m Exp
-      g = [| $f + $f |]
-
-   Remember, a top-level splice still requires its argument to be of type ``Q Exp``.
-   So then splicing in ``g`` will cause ``m`` to be instantiated to ``Q``::
-
-      h :: Int
-      h = $(g) -- m ~ Q
+   It is possible to extract a value of type ``m Exp`` from ``Code m a``
+   using the ``unTypeCode :: Code m a -> m Exp`` function.
 
 -  A *typed* expression splice is written ``$$x``, where ``x`` is
    is an arbitrary expression.
@@ -136,13 +110,6 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    **NOTE**: Currently typed splices may inhibit the unused identifier warning for
    identifiers in scope. See :ghc-ticket:`16524`.
 
--  A *typed* expression quotation is written as ``[|| ... ||]``, or
-   ``[e|| ... ||]``, where the "..." is an expression; if the "..."
-   expression has type ``a``, then the quotation has type
-   ``Quote m => Code m a``.
-
-   It is possible to extract a value of type ``m Exp`` from ``Code m a``
-   using the ``unTypeCode :: Code m a -> m Exp`` function.
 
 -  A quasi-quotation can appear in a pattern, type, expression, or
    declaration context and is also written in Oxford brackets:
@@ -174,30 +141,111 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    expressions, patterns, declarations etc. They may also be given as an
    argument to the ``reify`` function.
 
--  It is possible for a splice to expand to an expression that contain
-   names which are not in scope at the site of the splice. As an
-   example, consider the following code: ::
+-  The precise type of a quotation depends on the types of the nested splices inside it::
 
-       module Bar where
+      -- Add a redundant constraint to demonstrate that constraints on the
+      -- monad used to build the representation are propagated when using nested
+      -- splices.
+      f :: (Quote m, C m) => m Exp
+      f = [| 5 | ]
 
-       import Language.Haskell.TH
+      -- f is used in a nested splice so the constraint on f, namely C, is propagated
+      -- to a constraint on the whole representation.
+      g :: (Quote m, C m) => m Exp
+      g = [| $f + $f |]
 
-       add1 :: Quote m => Int -> m Exp
-       add1 x = [| x + 1 |]
+   Remember, a top-level splice still requires its argument to be of type ``Q Exp``.
+   So then splicing in ``g`` will cause ``m`` to be instantiated to ``Q``::
 
-   Now consider a splice using ``add1`` in a separate
-   module: ::
+      h :: Int
+      h = $(g) -- m ~ Q
 
-       module Foo where
+Levels and Stages
+------------------
 
-       import Bar
+Template Haskell executes code at both compile time and runtime, which requires
+understanding two key concepts: **levels** and **stages**.
 
-       two :: Int
-       two = $(add1 1)
+**Levels** are a concept the typechecker uses to ensure that code is well-staged -
+that is, the compiler can execute compile-time operations before runtime operations.
+**Stages** are the actual moments when code is compiled and executed. Levels are a semantic
+concept used by the typechecker, whilst stages are operational, a property of evaluation.
 
-   Template Haskell cannot know what the argument to ``add1`` will be at the
-   function's definition site, so a lifting mechanism is used to promote
-   ``x`` into a value of type ``Quote m => m Exp``. This functionality is exposed to the
+Understanding Levels
+~~~~~~~~~~~~~~~~~~~~
+
+Every expression in a program exists at a specific integer level:
+
+* Level 0: Normal top-level declarations in a module
+* Level -1: Code inside a top-level splice (code that runs at compile time)
+* Level 1: Code inside a quotation (code that is quoted for runtime)
+
+The level changes when entering quotes and splices:
+
+* Inside a quote ``[| e |]``, the level increases by 1
+* Inside a splice ``$( e )``, the level decreases by 1
+
+Thus, the level can be calculated as the number of surrounding quotes minus the
+number of surrounding splices. For example:
+
+.. code-block:: haskell
+
+    -- foo is at level 0
+    foo = $(let
+             -- bar is at level -1
+             bar = $(let
+                      -- baz is at level -2
+                      baz = [|
+                              -- qux is at level -1
+                              qux = [|
+                                      -- quux is at level 0
+                                      quux = [|
+                                              -- quuz is at level 1
+                                              quuz = 0
+                                             |]
+                                    |]
+                            |]
+                   in baz)
+          in bar)
+
+Top-level splices (which define where compile-time evaluation happens) are
+characterized by having their body at a negative level.
+
+* Top-level declarations introduce variables at level 1.
+* Imports introduce variables at level 1.
+* Local variables are introduced at the level of their expression. For example,
+  the ``x`` in [| let x = 0 in ... |] is at level 2.
+
+
+Cross-Stage Persistence
+~~~~~~~~~~~~~~~~~~~~~~~
+
+In normal Template Haskell, **cross-stage persistence (CSP)** allows identifiers
+to be used at levels different from where they were defined. There are two
+mechanisms for this:
+
+1. **Path-based persistence**: This allows a global definition at one level to be
+   used at a different level in two cases:
+
+   * Any global identifier can be used at a later level (i.e. inside a quotation).
+   * An imported identifier can be used at an earlier level (i.e. in a splice)
+
+   The :extension:`ImplicitStagePersistence` extension controls whether
+   path-based persistence is enabled. It is enabled by default in all current
+   language editions.
+
+2. **Serialisation-based persistence**: This allows locally-bound variables to be
+   used at higher levels through the ``Lift`` typeclass:
+
+   .. code-block:: haskell
+
+       tardy x = [| x |]  -- This is elaborated to [| $(lift x) |]
+
+   When the compiler sees a level error where a variable used one level higher than
+   it is defined, it will automatically insert a ``lift`` to serialise the variable
+   at the required level.
+
+   This functionality is exposed to the
    user as the ``Lift`` typeclass in the ``Language.Haskell.TH.Syntax``
    module. If a type has a ``Lift`` instance, then any of its values can be
    lifted to a Template Haskell expression: ::
@@ -206,20 +254,228 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
            lift :: Quote m => t -> m Exp
            liftTyped :: Quote m => t -> Code m t
 
-   In general, if GHC sees an expression within Oxford brackets (e.g., ``[|
-   foo bar |]``, then GHC looks up each name within the brackets. If a name
-   is global (e.g., suppose ``foo`` comes from an import or a top-level
-   declaration), then the fully qualified name is used directly in the
-   quotation. If the name is local (e.g., suppose ``bar`` is bound locally in
-   the function definition ``mkFoo bar = [| foo bar |]``), then GHC uses
-   ``lift`` on it (so GHC pretends ``[| foo bar |]`` actually contains ``[|
-   foo $(lift bar) |]``). Local names, which are not in scope at splice
-   locations, are actually evaluated when the quotation is processed.
 
-   The ``template-haskell`` library provides ``Lift`` instances for many
-   common data types. Furthermore, it is possible to derive ``Lift``
-   instances automatically by using the :extension:`DeriveLift` language extension.
+   ``Lift`` is defined for most built-in types and can be
+   derived using the :extension:`DeriveLift` extension.
    See :ref:`deriving-lift` for more information.
+
+Path-based persistence explains why this code works:
+
+.. code-block:: haskell
+
+    module M where
+
+    suc :: Int -> Int
+    suc = (+1)
+
+    one :: Q Exp
+    one = [| \x -> suc x |]  -- suc is used at level 1, defined at level 0
+
+    two = $(one)  -- one is used at level -1, defined at level 0
+
+With :extension:`ExplicitLevelImports` and :extension:`NoImplicitStagePersistence`,
+path-based persistence is disabled, requiring explicit indication of which
+identifiers can be used at which levels.
+
+Stages and Compilation
+~~~~~~~~~~~~~~~~~~~~~~
+
+While levels are a typechecker concept, **stages** refer to the actual moments
+when modules are compiled and executed:
+
+* Stage C (Compile time): Code that runs during compilation
+* Stage R (Runtime): Code that runs when the compiled program is executed
+
+The compiler may need to compile code differently depending on the stage.
+For example, if you are using :ghc-flag:`-fno-code`, no code is needed for the R stage
+but code generation will be needed for the C stage. If your compiler is dynamically
+linked then the C stage code will need to be dynamically linked, but the R stage
+may be statically linked.
+
+The cross-stage persistence rules admitted by a language arise from assumptions
+made about the stage structure. For GHC, with :extension:`ImplicitStagePersistence`,
+it must be assumed that a module will be available at all stages. This is a strong
+requirement.
+
+Declaration Groups
+------------------
+
+Top-level declaration splices break up a source file into
+*declaration groups*. A *declaration group* is the group of
+declarations created by a top-level declaration splice, plus those
+following it, down to but not including the next top-level
+declaration splice. N.B. only top-level splices delimit declaration
+groups, not expression splices. The first declaration group in a module
+includes all top-level definitions down to but not including the first
+top-level declaration splice.
+
+Each group is compiled just like a separately compiled module. That is:
+
+- Later groups can "see" declarations, and instance declarations, from
+  earlier groups;
+
+- But earlier groups cannot "see" declarations, or instance declarations,
+  from later groups.
+
+Each declaration group is mutually recursive only within the group.
+Declaration groups can refer to definitions within previous groups,
+but not later ones.
+
+Accordingly, the type environment seen by ``reify`` includes all the
+top-level declarations up to the end of the immediately preceding
+declaration group, but no more.
+
+Unlike normal declaration splices, declaration quasiquoters do not
+cause a break. These quasiquoters are expanded before the rest of the
+declaration group is processed, and the declarations they generate
+are merged into the surrounding declaration group. Consequently, the
+type environment seen by ``reify`` from a declaration quasiquoter
+will not include anything from the quasiquoter's declaration group.
+
+Concretely, consider the following code ::
+
+    module M where
+
+    import ...
+
+    f x = x
+
+    $(th1 4)
+
+    h y = k y y $(blah1)
+
+    [qq|blah|]
+
+    k x y z = x + y + z
+
+    $(th2 10)
+
+    w z = $(blah2)
+
+In this example, a ``reify`` inside...
+
+1. The splice ``$(th1 ...)`` would see the definition of ``f`` - the
+   splice is top-level and thus all definitions in the previous
+   declaration group are visible (that is, all definitions in the module
+   up-to, but not including, the splice itself).
+
+2. The splice ``$(blah1)`` cannot refer to the function ``w`` - ``w`` is
+   part of a later declaration group, and thus invisible, similarly,
+   ``$(blah1)`` cannot see the definition of ``h`` (since it is part of
+   the same declaration group as ``$(blah1)``. However, the splice
+   ``$(blah1)`` can see the definition of ``f`` (since it is in the
+   immediately preceding declaration group).
+
+3. The splice ``$(th2 ...)`` would see the definition of ``f``, all the
+   bindings created by ``$(th1 ...)``, the definition of ``h`` and all
+   bindings created by ``[qq|blah|]`` (they are all in previous
+   declaration groups).
+
+4. The body of ``h`` *can* refer to the function ``k`` appearing on the
+   other side of the declaration quasiquoter, as quasiquoters do not
+   cause a declaration group to be broken up.
+
+5. The ``qq`` quasiquoter would be able to see the definition of ``f``
+   from the preceding declaration group, but not the definitions of
+   ``h`` or ``k``, or any definitions from subsequent declaration
+   groups.
+
+6. The splice ``$(blah2)`` would see the same definitions as the splice
+   ``$(th2 ...)`` (but *not* any bindings it creates).
+
+Note that since an expression splice is unable to refer to declarations
+in the same declaration group, we can introduce a top-level (empty)
+splice to break up the declaration group ::
+
+    module M where
+
+    data D = C1 | C2
+
+    f1 = $(th1 ...)
+
+    $(return [])
+
+    f2 = $(th2 ...)
+
+Here
+
+1. The splice ``$(th1 ...)`` *cannot* refer to ``D`` - it is in the same
+   declaration group.
+2. The declaration group containing ``D`` is terminated by the empty
+   top-level declaration splice ``$(return [])`` (recall, ``Q`` is a
+   Monad, so we may simply ``return`` the empty list of declarations).
+3. Since the declaration group containing ``D`` is in the previous
+   declaration group, the splice ``$(th2 ...)`` *can* refer to ``D``.
+
+Note that in some cases, the presence or absence of top-level declaration
+splices can affect the *runtime* behavior of the surrounding code, because
+the resolution of instances may differ depending on their visiblity. One
+case where this arises is with
+:ref:`incoherent instances <instance-overlap>` ::
+
+    module Main where
+
+    main :: IO ()
+    main = do
+      let i :: Int
+          i = 42
+      putStrLn (m1 i)
+      putStrLn (m2 i)
+
+    class C1 a where
+      m1 :: a -> String
+
+    instance {-# INCOHERENT #-} C1 a where
+      m1 _ = "C1 incoherent"
+
+    instance C1 Int where
+      m1 = show
+
+    class C2 a where
+      m2 :: a -> String
+
+    instance {-# INCOHERENT #-} C2 a where
+      m2 _ = "C2 incoherent"
+
+    $(return [])
+
+    instance C2 Int where
+      m2 = show
+
+Here, ``C1`` and ``C2`` are the same classes with nearly identical
+instances. The only significant differences between ``C1`` and ``C2``, aside
+from the minor name change, is that all of ``C1``'s instances are defined
+within the same declaration group, whereas the ``C2 Int`` instance is put in
+a separate declaration group from the incoherent ``C2 a`` instance. This has
+an impact on the runtime behavior of the ``main`` function ::
+
+    $ runghc Main.hs
+    42
+    C2 incoherent
+
+Note that ``m1 i`` returns ``"42"``, but ``m2 i`` returns
+``"C2 incoherent"``. When each of these expressions are typechecked, GHC
+must figure out which ``C1 Int`` and ``C2 Int`` instances to use:
+
+1. When resolving the ``C1 Int`` instance, GHC discovers two possible
+   instances in the same declaration group: the incoherent ``C1 a`` instance
+   and the non-incoherent ``C1 Int`` instance. According to the instance
+   search rules described in :ref:`instance-overlap`, because there is
+   exactly one non-incoherent instance to pick, GHC will choose the
+   ``C1 Int`` instance. As a result, ``m1 i`` will be equivalent to
+   ``show i`` (i.e., ``"42"``).
+2. When resolving the ``C2 Int`` instance, GHC only discovers one instance
+   in the same declaration group: the incoherent ``C2 a`` instance. Note
+   that GHC does *not* see the ``C2 Int`` instance, as that is in a later
+   declaration group that is made separate by the intervening declaration
+   splice. As a result, GHC will choose the ``C2 a`` instance, making
+   ``m2 i`` equivalent to ``"C2 incoherent"``.
+
+Miscellaneous other features
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In this section the other features and issues of Template Haskell are
+discussed.
 
 -  You may omit the ``$(...)`` in a top-level declaration splice. Simply
    writing an expression (rather than a declaration) implies a splice.
@@ -275,176 +531,10 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
        f :: Int -> Int -> Int
        f n = \ [haskell|y|] -> y+n
 
--  Top-level declaration splices break up a source file into
-   *declaration groups*. A *declaration group* is the group of
-   declarations created by a top-level declaration splice, plus those
-   following it, down to but not including the next top-level
-   declaration splice. N.B. only top-level splices delimit declaration
-   groups, not expression splices. The first declaration group in a module
-   includes all top-level definitions down to but not including the first
-   top-level declaration splice.
 
-   Each group is compiled just like a separately compiled module. That is:
 
-   - Later groups can "see" declarations, and instance declarations, from
-     earlier groups;
-
-   - But earlier groups cannot "see" declarations, or instance declarations,
-     from later groups.
-
-   Each declaration group is mutually recursive only within the group.
-   Declaration groups can refer to definitions within previous groups,
-   but not later ones.
-
-   Accordingly, the type environment seen by ``reify`` includes all the
-   top-level declarations up to the end of the immediately preceding
-   declaration group, but no more.
-
-   Unlike normal declaration splices, declaration quasiquoters do not
-   cause a break. These quasiquoters are expanded before the rest of the
-   declaration group is processed, and the declarations they generate
-   are merged into the surrounding declaration group. Consequently, the
-   type environment seen by ``reify`` from a declaration quasiquoter
-   will not include anything from the quasiquoter's declaration group.
-
-   Concretely, consider the following code ::
-
-       module M where
-
-       import ...
-
-       f x = x
-
-       $(th1 4)
-
-       h y = k y y $(blah1)
-
-       [qq|blah|]
-
-       k x y z = x + y + z
-
-       $(th2 10)
-
-       w z = $(blah2)
-
-   In this example, a ``reify`` inside...
-
-   1. The splice ``$(th1 ...)`` would see the definition of ``f`` - the
-      splice is top-level and thus all definitions in the previous
-      declaration group are visible (that is, all definitions in the module
-      up-to, but not including, the splice itself).
-
-   2. The splice ``$(blah1)`` cannot refer to the function ``w`` - ``w`` is
-      part of a later declaration group, and thus invisible, similarly,
-      ``$(blah1)`` cannot see the definition of ``h`` (since it is part of
-      the same declaration group as ``$(blah1)``. However, the splice
-      ``$(blah1)`` can see the definition of ``f`` (since it is in the
-      immediately preceding declaration group).
-
-   3. The splice ``$(th2 ...)`` would see the definition of ``f``, all the
-      bindings created by ``$(th1 ...)``, the definition of ``h`` and all
-      bindings created by ``[qq|blah|]`` (they are all in previous
-      declaration groups).
-
-   4. The body of ``h`` *can* refer to the function ``k`` appearing on the
-      other side of the declaration quasiquoter, as quasiquoters do not
-      cause a declaration group to be broken up.
-
-   5. The ``qq`` quasiquoter would be able to see the definition of ``f``
-      from the preceding declaration group, but not the definitions of
-      ``h`` or ``k``, or any definitions from subsequent declaration
-      groups.
-
-   6. The splice ``$(blah2)`` would see the same definitions as the splice
-      ``$(th2 ...)`` (but *not* any bindings it creates).
-
-   Note that since an expression splice is unable to refer to declarations
-   in the same declaration group, we can introduce a top-level (empty)
-   splice to break up the declaration group ::
-
-       module M where
-
-       data D = C1 | C2
-
-       f1 = $(th1 ...)
-
-       $(return [])
-
-       f2 = $(th2 ...)
-
-   Here
-
-   1. The splice ``$(th1 ...)`` *cannot* refer to ``D`` - it is in the same
-      declaration group.
-   2. The declaration group containing ``D`` is terminated by the empty
-      top-level declaration splice ``$(return [])`` (recall, ``Q`` is a
-      Monad, so we may simply ``return`` the empty list of declarations).
-   3. Since the declaration group containing ``D`` is in the previous
-      declaration group, the splice ``$(th2 ...)`` *can* refer to ``D``.
-
-   Note that in some cases, the presence or absence of top-level declaration
-   splices can affect the *runtime* behavior of the surrounding code, because
-   the resolution of instances may differ depending on their visiblity. One
-   case where this arises is with
-   :ref:`incoherent instances <instance-overlap>` ::
-
-       module Main where
-
-       main :: IO ()
-       main = do
-         let i :: Int
-             i = 42
-         putStrLn (m1 i)
-         putStrLn (m2 i)
-
-       class C1 a where
-         m1 :: a -> String
-
-       instance {-# INCOHERENT #-} C1 a where
-         m1 _ = "C1 incoherent"
-
-       instance C1 Int where
-         m1 = show
-
-       class C2 a where
-         m2 :: a -> String
-
-       instance {-# INCOHERENT #-} C2 a where
-         m2 _ = "C2 incoherent"
-
-       $(return [])
-
-       instance C2 Int where
-         m2 = show
-
-   Here, ``C1`` and ``C2`` are the same classes with nearly identical
-   instances. The only significant differences between ``C1`` and ``C2``, aside
-   from the minor name change, is that all of ``C1``'s instances are defined
-   within the same declaration group, whereas the ``C2 Int`` instance is put in
-   a separate declaration group from the incoherent ``C2 a`` instance. This has
-   an impact on the runtime behavior of the ``main`` function ::
-
-       $ runghc Main.hs
-       42
-       C2 incoherent
-
-   Note that ``m1 i`` returns ``"42"``, but ``m2 i`` returns
-   ``"C2 incoherent"``. When each of these expressions are typechecked, GHC
-   must figure out which ``C1 Int`` and ``C2 Int`` instances to use:
-
-   1. When resolving the ``C1 Int`` instance, GHC discovers two possible
-      instances in the same declaration group: the incoherent ``C1 a`` instance
-      and the non-incoherent ``C1 Int`` instance. According to the instance
-      search rules described in :ref:`instance-overlap`, because there is
-      exactly one non-incoherent instance to pick, GHC will choose the
-      ``C1 Int`` instance. As a result, ``m1 i`` will be equivalent to
-      ``show i`` (i.e., ``"42"``).
-   2. When resolving the ``C2 Int`` instance, GHC only discovers one instance
-      in the same declaration group: the incoherent ``C2 a`` instance. Note
-      that GHC does *not* see the ``C2 Int`` instance, as that is in a later
-      declaration group that is made separate by the intervening declaration
-      splice. As a result, GHC will choose the ``C2 a`` instance, making
-      ``m2 i`` equivalent to ``"C2 incoherent"``.
+- The :extension:`TemplateHaskellQuotes` extension is considered safe under
+  :ref:`safe-haskell` while :extension:`TemplateHaskell` is not.
 
 -  Expression quotations accept most Haskell language constructs.
    However, there are some GHC-specific extensions which expression
@@ -469,6 +559,197 @@ splices and quotations are supported.)
     was not written by the user. If you want to have warnings for splices
     anyway, pass :ghc-flag:`-fenable-th-splice-warnings`.
 
+Explicit Level Imports
+----------------------
+
+The :extension:`ExplicitLevelImports` extension, along with
+:extension:`ImplicitStagePersistence`, gives programmers fine-grained control
+over which modules are needed at each stage of execution.
+
+For a detailed description of the extension, see the paper
+`Explicit Level Imports <https://mpickering.github.io/papers/explicit-level-imports.pdf>`_.
+
+.. extension:: ExplicitLevelImports
+    :shortdesc: Allow explicit level imports in Template Haskell.
+
+    :implies: :extension:`NoImplicitStagePersistence`
+    :since: 9.14.1
+
+    Enable explicit level imports for Template Haskell, allowing programmers to
+    specify which modules are needed at which level.
+
+    This introduces the ``splice`` and ``quote`` import modifiers which allow
+    a user to precisely express the level of identifiers introduced by an import.
+
+.. extension:: ImplicitStagePersistence
+    :shortdesc: Allow identifiers to be used at different levels from where they are defined.
+
+    :default: on
+    :since: 9.14.1
+
+    Allow identifiers to be used at different levels than where they're defined,
+    using path-based persistence.
+
+Syntax and Usage
+~~~~~~~~~~~~~~~~
+
+:extension:`ExplicitLevelImports` adds two new import modifiers:
+
+* ``import splice M (...)`` - imports identifiers at level -1 (for use in splices)
+* ``import quote M (...)`` - imports identifiers at level 1 (for use in quotations)
+* ``import M (...)`` - imports identifiers at level 0 (normal code)
+
+The syntax supports both options for placement of the level keywords:
+
+.. code-block:: haskell
+
+    import splice M          -- before the module name
+    import M splice          -- after the module name
+    import splice qualified M as MB -- with qualified
+    import splice M qualified as MB -- with -XImportQualifiedPost
+    import M splice qualified as MB -- with -XImportQualifiedPost
+
+Basic Examples
+~~~~~~~~~~~~~~
+
+Explicit level imports allow you to be more precise about which modules are needed at which level.
+
+.. code-block:: haskell
+
+    {-# LANGUAGE TemplateHaskell #-}
+    module Main where
+
+    import Control.Lens.TH (makeLenses)
+    import OtherModule (someFunction)
+
+    data User = User { _name :: String, _age :: Int }
+
+    $(makeLenses ''User)
+
+    main = print (someFunction (User "John" 30))
+
+In this version, both ``Control.Lens.TH`` and ``OtherModule`` are imported
+normally. GHC must compile both modules before it can start type-checking Main,
+because it can't tell in advance which imports might be needed when evaluating
+the ``makeLenses`` splice. Even though only ``makeLenses`` is actually used in
+the splice, GHC must assume that any imported identifier might be needed.
+
+If you use :extension:`ExplicitLevelImports`, you can be more precise about which
+modules are needed at which level. For example, ::
+
+.. code-block:: haskell
+
+    {-# LANGUAGE TemplateHaskell, ExplicitLevelImports #-}
+    module Main where
+
+    import splice Control.Lens.TH (makeLenses)
+    import OtherModule (someFunction)
+
+    data User = User { _name :: String, _age :: Int }
+
+    $(makeLenses ''User)
+
+    main = print (someFunction (User "John" 30))
+
+With explicit level imports, we've marked ``Control.Lens.TH`` with the
+``splice`` keyword, which tells GHC that this module is needed at compile-time
+for evaluating splices. This provides GHC with crucial information:
+
+1. ``Control.Lens.TH`` must be compiled to object code before type-checking ``Main``
+2. ``OtherModule`` only needs to be type-checked before ``Main``, with code generation potentially happening in parallel
+3. ``Control.Lens.TH`` won't be needed at runtime (assuming there are no other references to it)
+
+This distinction brings several benefits:
+
+* GHC doesn't need to wait for ``OtherModule`` to be fully compiled before starting on ``Main``
+* ``Control.Lens.TH`` won't be linked into the final executable since it's only needed at compile-time
+* The staging structure of the program is more explicit
+
+Another example showing different import levels:
+
+.. code-block:: haskell
+
+    {-# LANGUAGE TemplateHaskell, ExplicitLevelImports #-}
+    module Advanced where
+
+    import splice A (makeFunction)   -- Used in splices (level -1)
+    import B (normalFunction)        -- Used in normal code (level 0)
+    import quote C (runtimeValue)    -- Used in quotes (level 1)
+
+    -- This generates a function at compile time
+    $(makeFunction "generatedFunction")
+
+    -- This uses a normal function at runtime
+    result = normalFunction 42
+
+    -- This creates a quotation containing code that will use runtimeValue
+    quotation = [| runtimeValue * 2 |]
+
+In this example, we're explicitly marking each import with its intended level:
+* ``A`` provides code that runs at compile time (in splices)
+* ``B`` provides code that runs at normal runtime
+* ``C`` provides values that will be referenced in quoted code
+
+Level Rules and Errors
+~~~~~~~~~~~~~~~~~~~~~~
+
+With :extension:`NoImplicitStagePersistence`:
+
+* Functions imported at level 0 can only be used at level 0
+* Functions imported with ``splice`` can only be used inside top-level splices
+* Functions imported with ``quote`` can only be used inside quotes
+
+Errors will occur if you use an identifier at the wrong level:
+
+.. code-block:: haskell
+
+    import splice A (foo)       -- foo at level -1
+    import B (bar)              -- bar at level 0
+    import quote C (baz)        -- baz at level 1
+
+    x = $(foo 42)               -- OK: foo used at level -1
+    y = $(bar 42)               -- Error: bar imported at level 0 but used at level -1
+    z = [| baz 42 |]            -- OK: baz used at level 1
+    w = [| bar 42 |]            -- Error: bar imported at level 0 but used at level 1
+
+Class Instances and Levels
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Class instances are also subject to level checking. Instances must be available at the level where they're used:
+
+* Instances from the current module are at level 0
+* Instances from normally imported modules are at level 0
+* Instances from splice-imported modules are at level -1
+* Instances from quote-imported modules are at level 1
+
+Since classes are imported transitively, the typechecker ensures that there is a
+well-levelled path to access any instance. For example, if an instance is needed
+at level -1, then the instance must come from the transitive closure of splice
+imported modules.
+
+Prelude Imports
+~~~~~~~~~~~~~~~
+
+The implicit ``Prelude`` import only brings identifiers into scope at level 0.
+If you need ``Prelude`` functions in splices or quotes, you must explicitly
+import them:
+
+.. code-block:: haskell
+
+    import splice Prelude (map, filter)  -- Use these in splices
+    import quote Prelude (show, (+))     -- Use these in quotes
+
+Notes and Limitations
+~~~~~~~~~~~~~~~~~~~~~
+
+* Local definitions (those defined in the same module) are still subject to
+  level rules - you can't use a function in a splice if it's defined in the
+  same module
+* :extension:`ExplicitLevelImports` works best when most Template Haskell
+  usage is isolated to a few modules
+* Defining ``Lift`` instances requires special handling since the datatype must
+  be available at both compile-time and runtime
+
 .. _th-usage:
 
 Using Template Haskell
@@ -476,11 +757,6 @@ Using Template Haskell
 
 -  The data types and monadic constructor functions for Template Haskell
    are in the library :th-ref:`Language.Haskell.TH.Syntax.`.
-
--  You can only run a function at compile time if it is imported from
-   another module. That is, you can't define a function in a module, and
-   call it from within a splice in the same module. (It would make sense
-   to do so, but it's hard to implement.)
 
 -  You can only run a function at compile time if it is imported from
    another module *that is not part of a mutually-recursive group of
@@ -501,10 +777,6 @@ Using Template Haskell
    then looks at the result. So it's important that the program it
    compiles produces results whose representations are identical to
    those of the compiler itself.
-
-Template Haskell works in any mode (:ghc-flag:`--make`,
-:ghc-flag:`--interactive`, or file-at-a-time). There used to be a restriction to
-the former two, but that restriction has been lifted.
 
 .. _th-view-gen-code:
 
@@ -791,7 +1063,7 @@ single parser of type ``String -> a`` to generate both an expression
 parser that returns a value of type ``Q Exp`` and a pattern parser that
 returns a value of type ``Q Pat``.
 
-Quasiquoters must obey the same stage restrictions as Template Haskell,
+Quasiquoters must obey the same level restrictions as Template Haskell,
 e.g., in the example, ``expr`` cannot be defined in ``Main.hs`` where it
 is used, but must be imported.
 
@@ -865,5 +1137,6 @@ Run "main" and here is your output:
     $ ./main
     3
     1
+
 
 

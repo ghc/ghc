@@ -2928,6 +2928,7 @@ iiSubsumes (IIModule m1) (IIModule m2) = m1==m2
 iiSubsumes (IIDecl d1) (IIDecl d2)      -- A bit crude
   =  unLoc (ideclName d1) == unLoc (ideclName d2)
      && ideclAs d1 == ideclAs d2
+     && convImportLevel (ideclLevelSpec d1) == convImportLevel (ideclLevelSpec d2)
      && (not (isImportDeclQualified (ideclQualified d1)) || isImportDeclQualified (ideclQualified d2))
      && (ideclImportList d1 `hidingSubsumes` ideclImportList d2)
   where

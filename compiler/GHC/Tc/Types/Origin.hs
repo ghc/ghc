@@ -1533,7 +1533,7 @@ data InstanceWhat  -- How did we solve this constraint?
                          -- See GHC.Tc.Solver.InertSet Note [Solved dictionaries]
 
   | BuiltinTypeableInstance TyCon   -- Built-in solver for Typeable (T t1 .. tn)
-                         -- See Note [Well-staged instance evidence]
+                         -- See Note [Well-levelled instance evidence]
 
   | BuiltinInstance      -- Built-in solver for (C t1 .. tn) where C is
                          --   KnownNat, .. etc (classes with no top-level evidence)

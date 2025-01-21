@@ -6,7 +6,7 @@ DATA CONSTRUCTORS
   K2 :: forall a. FunPtr a -> T2 a
   K1 :: forall a. IO a -> T1 a
 Dependent modules: []
-Dependent packages: [base-4.20.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]
 
 ==================== Typechecker ====================
 Roles2.$tcT2

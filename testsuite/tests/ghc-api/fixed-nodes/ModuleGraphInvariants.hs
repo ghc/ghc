@@ -80,6 +80,10 @@ main = do
           keyB = NodeKey_Module (msKey msB)
           keyC = NodeKey_Module (msKey msC)
 
+          edgeA = mkNormalEdge keyA
+          edgeB = mkNormalEdge keyB
+          edgeC = mkNormalEdge keyC
+
       -- Define ModuleNodeInfos
       let infoA_compile = ModuleNodeCompile msA
           infoB_compile = ModuleNodeCompile msB
@@ -91,12 +95,12 @@ main = do
 
       -- Define the complete nodes
       let nodeA_compile = ModuleNode [] infoA_compile
-          nodeB_compile = ModuleNode [keyA] infoB_compile
-          nodeC_compile = ModuleNode [keyA, keyB] infoC_compile
+          nodeB_compile = ModuleNode [edgeA] infoB_compile
+          nodeC_compile = ModuleNode [edgeA, edgeB] infoC_compile
 
           nodeA_fixed = ModuleNode [] infoA_fixed
-          nodeB_fixed = ModuleNode [keyA] infoB_fixed
-          nodeC_fixed = ModuleNode [keyA, keyB] infoC_fixed
+          nodeB_fixed = ModuleNode [edgeA] infoB_fixed
+          nodeC_fixed = ModuleNode [edgeA, edgeB] infoC_fixed
 
       -- Test 1: Valid graph with all compile nodes
       let validGraph = mkModuleGraph [nodeA_compile, nodeB_compile, nodeC_compile]
@@ -118,7 +122,7 @@ main = do
 
       -- Test 5: Invalid - Missing dependency
       let nodeB_noDepends = ModuleNode [] infoB_compile
-          nodeC_missingDep = ModuleNode [keyA] infoC_compile
+          nodeC_missingDep = ModuleNode [edgeA] infoC_compile
           missingDepGraph = mkModuleGraph [nodeB_noDepends, nodeC_missingDep]
       testModuleGraph "Missing dependency" missingDepGraph
         [DependencyNotInGraph keyC [keyA]]

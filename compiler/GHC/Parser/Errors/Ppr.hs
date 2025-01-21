@@ -287,6 +287,8 @@ instance Diagnostic PsMessage where
              <+> text "in postpositive position. "
     PsErrImportQualifiedTwice
       -> mkSimpleDecorated $ text "Multiple occurrences of 'qualified'"
+    PsErrSpliceOrQuoteTwice
+      -> mkSimpleDecorated $ text "Multiple occurrences of a splice or quote keyword"
     PsErrIllegalImportBundleForm
       -> mkSimpleDecorated $
            text "Illegal import form, this syntax can only be used to bundle"
@@ -617,6 +619,7 @@ instance Diagnostic PsMessage where
     PsErrUnallowedPragma{}                        -> ErrorWithoutFlag
     PsErrImportPostQualified                      -> ErrorWithoutFlag
     PsErrImportQualifiedTwice                     -> ErrorWithoutFlag
+    PsErrSpliceOrQuoteTwice                       -> ErrorWithoutFlag
     PsErrIllegalImportBundleForm                  -> ErrorWithoutFlag
     PsErrInvalidRuleActivationMarker              -> ErrorWithoutFlag
     PsErrMissingBlock                             -> ErrorWithoutFlag
@@ -755,6 +758,7 @@ instance Diagnostic PsMessage where
     PsErrUnallowedPragma{}                        -> noHints
     PsErrImportPostQualified                      -> [suggestExtension LangExt.ImportQualifiedPost]
     PsErrImportQualifiedTwice                     -> noHints
+    PsErrSpliceOrQuoteTwice                       -> noHints
     PsErrIllegalImportBundleForm                  -> noHints
     PsErrInvalidRuleActivationMarker              -> noHints
     PsErrMissingBlock                             -> noHints

@@ -927,6 +927,7 @@ stockSideConditions deriv_ctxt cls
                                                    cond_vanilla `andCond`
                                                    cond_Representable1Ok)
   | sameUnique cls_key liftClassKey        = Just (checkFlag LangExt.DeriveLift `andCond`
+                                                   checkFlag LangExt.ImplicitStagePersistence `andCond`
                                                    cond_vanilla `andCond`
                                                    cond_args cls)
   | otherwise                        = Nothing

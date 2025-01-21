@@ -60,9 +60,9 @@ module GHC.Tc.Utils.Env(
         tcGetDefaultTys,
 
         -- Template Haskell stuff
-        StageCheckReason(..),
-        checkWellStaged, tcMetaTy, thLevel,
-        topIdLvl, isBrackStage,
+        LevelCheckReason(..),
+        tcMetaTy, thLevelIndex,
+        isBrackLevel,
 
         -- New Ids
         newDFunName,
@@ -520,9 +520,8 @@ tcExtendTyConEnv tycons thing_inside
 -- See GHC ticket #17820 .
 tcTyThBinders :: [TyThing] -> TcM ThBindEnv
 tcTyThBinders implicit_things = do
-  stage <- getStage
-  let th_lvl  = thLevel stage
-      th_bndrs = mkNameEnv
+  th_lvl <- thLevelIndex <$> getThLevel
+  let th_bndrs = mkNameEnv
                   [ ( n , (TopLevel, th_lvl) ) | n <- names ]
   return th_bndrs
   where
@@ -758,7 +757,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
   = do  { traceTc "tc_extend_local_env" (ppr extra_env)
         ; updLclCtxt upd_lcl_env thing_inside }
   where
-    upd_lcl_env env0@(TcLclCtxt { tcl_th_ctxt  = stage
+    upd_lcl_env env0@(TcLclCtxt { tcl_th_ctxt  = th_lvl
                                , tcl_rdr      = rdr_env
                                , tcl_th_bndrs = th_bndrs
                                , tcl_env      = lcl_type_env })
@@ -775,7 +774,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
               -- Template Haskell staging env simultaneously. Reason for extending
               -- LocalRdrEnv: after running a TH splice we need to do renaming.
       where
-        thlvl = (top_lvl, thLevel stage)
+        thlvl = (top_lvl, thLevelIndex th_lvl)
 
 
 tcExtendLocalTypeEnv :: [(Name, TcTyThing)] -> TcLclCtxt -> TcLclCtxt
@@ -922,34 +921,6 @@ tcExtendRules lcl_rules thing_inside
 ************************************************************************
 -}
 
-checkWellStaged :: StageCheckReason -- What the stage check is for
-                -> ThLevel      -- Binding level (increases inside brackets)
-                -> ThLevel      -- Use stage
-                -> TcM ()       -- Fail if badly staged, adding an error
-checkWellStaged pp_thing bind_lvl use_lvl
-  | use_lvl >= bind_lvl         -- OK! Used later than bound
-  = return ()                   -- E.g.  \x -> [| $(f x) |]
-
-  | bind_lvl == outerLevel      -- GHC restriction on top level splices
-  = failWithTc (TcRnStageRestriction pp_thing)
-
-  | otherwise                   -- Badly staged
-  = failWithTc $                -- E.g.  \x -> $(f x)
-    TcRnBadlyStaged pp_thing bind_lvl use_lvl
-
-topIdLvl :: Id -> ThLevel
--- Globals may either be imported, or may be from an earlier "chunk"
--- (separated by declaration splices) of this module.  The former
---  *can* be used inside a top-level splice, but the latter cannot.
--- Hence we give the former impLevel, but the latter topLevel
--- E.g. this is bad:
---      x = [| foo |]
---      $( f x )
--- By the time we are processing the $(f x), the binding for "x"
--- will be in the global env, not the local one.
-topIdLvl id | isLocalId id = outerLevel
-            | otherwise    = impLevel
-
 tcMetaTy :: Name -> TcM Type
 -- Given the name of a Template Haskell data type,
 -- return the type
@@ -958,9 +929,9 @@ tcMetaTy tc_name = do
     t <- tcLookupTyCon tc_name
     return (mkTyConTy t)
 
-isBrackStage :: ThStage -> Bool
-isBrackStage (Brack {}) = True
-isBrackStage _other     = False
+isBrackLevel :: ThLevel -> Bool
+isBrackLevel (Brack {}) = True
+isBrackLevel _other     = False
 
 {-
 ************************************************************************
@@ -1242,14 +1213,8 @@ pprBinders bndrs  = pprWithCommas ppr bndrs
 notFound :: Name -> TcM TyThing
 notFound name
   = do { lcl_env <- getLclEnv
-       ; let stage = getLclEnvThStage lcl_env
-       ; case stage of   -- See Note [Out of scope might be a staging error]
-           Splice {}
-             | isUnboundName name -> failM  -- If the name really isn't in scope
-                                            -- don't report it again (#11941)
-             | otherwise -> failWithTc (TcRnStageRestriction (StageCheckSplice name))
-
-           _ | isTermVarOrFieldNameSpace (nameNameSpace name) ->
+       ; if isTermVarOrFieldNameSpace (nameNameSpace name)
+           then
                -- This code path is only reachable with RequiredTypeArguments enabled
                -- via the following chain of calls:
                --   `notFound`       called from
@@ -1262,8 +1227,8 @@ notFound name
                -- See Note [Demotion of unqualified variables] (W1) in GHC.Rename.Env
                failWithTc $ TcRnUnpromotableThing name TermVariablePE
 
-             | otherwise -> failWithTc $
-                TcRnNotInScope (NotInScopeTc (getLclEnvTypeEnv lcl_env)) (getRdrName name)
+           else failWithTc $
+                 TcRnNotInScope (NotInScopeTc (getLclEnvTypeEnv lcl_env)) (getRdrName name)
                   -- Take care: printing the whole gbl env can
                   -- cause an infinite loop, in the case where we
                   -- are in the middle of a recursive TyCon/Class group;

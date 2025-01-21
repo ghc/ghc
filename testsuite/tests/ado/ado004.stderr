@@ -44,4 +44,4 @@ TYPE SIGNATURES
     (Monad m, Num (m a)) =>
     (m a -> m (m a)) -> p -> m a
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

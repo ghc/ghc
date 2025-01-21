@@ -13,7 +13,7 @@ module GHC.Rename.Splice (
         -- Brackets
         rnTypedBracket, rnUntypedBracket,
 
-        checkThLocalName, traceSplice, SpliceInfo(..),
+        checkThLocalName, checkThLocalNameWithLift, checkThLocalNameNoLift, traceSplice, SpliceInfo(..),
         checkThLocalTyName,
   ) where
 
@@ -44,7 +44,7 @@ import Control.Monad    ( unless, when )
 
 import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 
-import GHC.Tc.Utils.Env     ( checkWellStaged, tcMetaTy )
+import GHC.Tc.Utils.Env     ( tcMetaTy )
 
 import GHC.Driver.DynFlags
 import GHC.Data.FastString
@@ -70,6 +70,7 @@ import GHCi.RemoteTypes ( ForeignRef )
 import qualified GHC.Boot.TH.Syntax as TH (Q)
 
 import qualified GHC.LanguageExtensions as LangExt
+import qualified Data.Set as Set
 
 {-
 ************************************************************************
@@ -123,9 +124,9 @@ rnTypedBracket e br_body
     do { checkForTemplateHaskellQuotes e
 
          -- Check for nested brackets
-       ; cur_stage <- getStage
-       ; case cur_stage of
-           { Splice _       -> return ()
+       ; cur_level <- getThLevel
+       ; case cur_level of
+           { Splice _ _       -> return ()
                -- See Note [Untyped quotes in typed splices and vice versa]
            ; RunSplice _    ->
                -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
@@ -140,7 +141,7 @@ rnTypedBracket e br_body
        ; recordThUse
 
        ; traceRn "Renaming typed TH bracket" empty
-       ; (body', fvs_e) <- setStage (Brack cur_stage RnPendingTyped) $ rnLExpr br_body
+       ; (body', fvs_e) <- setThLevel (Brack cur_level RnPendingTyped) $ rnLExpr br_body
 
        ; return (HsTypedBracket noExtField body', fvs_e)
 
@@ -152,9 +153,9 @@ rnUntypedBracket e br_body
     do { checkForTemplateHaskellQuotes e
 
          -- Check for nested brackets
-       ; cur_stage <- getStage
-       ; case cur_stage of
-           { Splice _       -> return ()
+       ; cur_level <- getThLevel
+       ; case cur_level of
+           { Splice _ _       -> return ()
                -- See Note [Untyped quotes in typed splices and vice versa]
            ; RunSplice _    ->
                -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
@@ -173,49 +174,30 @@ rnUntypedBracket e br_body
        ; (body', fvs_e) <-
          -- See Note [Rebindable syntax and Template Haskell]
          unsetXOptM LangExt.RebindableSyntax $
-         setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
-                  rn_utbracket cur_stage br_body
+         setThLevel (Brack cur_level (RnPendingUntyped ps_var)) $
+                  rn_utbracket br_body
        ; pendings <- readMutVar ps_var
        ; return (HsUntypedBracket pendings body', fvs_e)
 
        }
 
-rn_utbracket :: ThStage -> HsQuote GhcPs -> RnM (HsQuote GhcRn, FreeVars)
-rn_utbracket outer_stage br@(VarBr _ flg rdr_name)
+rn_utbracket :: HsQuote GhcPs -> RnM (HsQuote GhcRn, FreeVars)
+rn_utbracket (VarBr _ flg rdr_name)
   = do { name <- lookupOccRn (if flg then WL_Term else WL_Type) (unLoc rdr_name)
+       ; if flg then checkThLocalNameNoLift name else checkThLocalTyName name
        ; check_namespace flg name
-       ; this_mod <- getModule
-
-       ; when (flg && nameIsLocalOrFrom this_mod name) $
-             -- Type variables can be quoted in TH. See #5721.
-                 do { mb_bind_lvl <- lookupLocalOccThLvl_maybe name
-                    ; case mb_bind_lvl of
-                        { Nothing -> return ()      -- Can happen for data constructors,
-                                                    -- but nothing needs to be done for them
-
-                        ; Just (top_lvl, bind_lvl)  -- See Note [Quoting names]
-                             | isTopLevel top_lvl
-                             -> when (isExternalName name) (keepAlive name)
-                             | otherwise
-                             -> do { traceRn "rn_utbracket VarBr"
-                                      (ppr name <+> ppr bind_lvl
-                                                <+> ppr outer_stage)
-                                   ; checkTc (thLevel outer_stage + 1 == bind_lvl) $
-                                      TcRnTHError $ THNameError $ QuotedNameWrongStage br }
-                        }
-                    }
        ; return (VarBr noExtField flg (noLocA name), unitFV name) }
 
-rn_utbracket _ (ExpBr _ e) = do { (e', fvs) <- rnLExpr e
+rn_utbracket (ExpBr _ e) = do { (e', fvs) <- rnLExpr e
                                 ; return (ExpBr noExtField e', fvs) }
 
-rn_utbracket _ (PatBr _ p)
+rn_utbracket (PatBr _ p)
   = rnPat ThPatQuote p $ \ p' -> return (PatBr noExtField p', emptyFVs)
 
-rn_utbracket _ (TypBr _ t) = do { (t', fvs) <- rnLHsType TypBrCtx t
+rn_utbracket (TypBr _ t) = do { (t', fvs) <- rnLHsType TypBrCtx t
                                 ; return (TypBr noExtField t', fvs) }
 
-rn_utbracket _ (DecBrL _ decls)
+rn_utbracket (DecBrL _ decls)
   = do { group <- groupDecls decls
        ; gbl_env  <- getGblEnv
        ; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
@@ -241,7 +223,7 @@ rn_utbracket _ (DecBrL _ decls)
                   }
            }}
 
-rn_utbracket _ (DecBrG {}) = panic "rn_ut_bracket: unexpected DecBrG"
+rn_utbracket (DecBrG {}) = panic "rn_ut_bracket: unexpected DecBrG"
 
 
 -- | Ensure that we are not using a term-level name in a type-level namespace
@@ -297,14 +279,14 @@ rnUntypedSpliceGen :: (HsUntypedSplice GhcRn -> RnM (a, FreeVars))
                    -> RnM (a, FreeVars)
 rnUntypedSpliceGen run_splice pend_splice splice
   = addErrCtxt (UntypedSpliceCtxt splice) $ do
-    { stage <- getStage
-    ; case stage of
+    { level <- getThLevel
+    ; case level of
         Brack _ RnPendingTyped
           -> failWithTc $ thSyntaxError
                         $ MismatchedSpliceType Untyped IsSplice
 
-        Brack pop_stage (RnPendingUntyped ps_var)
-          -> do { (splice', fvs) <- setStage pop_stage $
+        Brack pop_level (RnPendingUntyped ps_var)
+          -> do { (splice', fvs) <- setThLevel pop_level $
                                     rnUntypedSplice splice
                 ; loc  <- getSrcSpanM
                 ; splice_name <- newLocalBndrRn (L (noAnnSrcSpan loc) unqualSplice)
@@ -314,8 +296,9 @@ rnUntypedSpliceGen run_splice pend_splice splice
                 ; return (result, fvs) }
 
         _ ->  do { checkTopSpliceAllowed splice
+                 ; cur_level <- getThLevel
                  ; (splice', fvs1) <- checkNoErrs $
-                                      setStage (Splice Untyped) $
+                                      setThLevel (Splice Untyped cur_level) $
                                       rnUntypedSplice splice
                    -- checkNoErrs: don't attempt to run the splice if
                    -- renaming it failed; otherwise we get a cascade of
@@ -367,7 +350,7 @@ runRnSplice flavour run_meta ppr_res splice
 
              -- Run the expression
        ; mod_finalizers_ref <- newTcRef []
-       ; result <- setStage (RunSplice mod_finalizers_ref) $
+       ; result <- setThLevel (RunSplice mod_finalizers_ref) $
                      run_meta zonked_q_expr
        ; mod_finalizers <- readTcRef mod_finalizers_ref
        ; traceSplice (SpliceInfo { spliceDescription = what
@@ -442,7 +425,7 @@ rnUntypedSplice (HsQuasiQuote ext quoter quote)
         ; quoter' <- lookupOccRn WL_TermVariable quoter
         ; this_mod <- getModule
         ; when (nameIsLocalOrFrom this_mod quoter') $
-          checkThLocalName quoter'
+          checkThLocalNameNoLift quoter'
 
         ; return (HsQuasiQuote ext quoter' quote, unitFV quoter') }
 
@@ -451,10 +434,10 @@ rnTypedSplice :: LHsExpr GhcPs -- Typed splice expression
               -> RnM (HsExpr GhcRn, FreeVars)
 rnTypedSplice expr
   = addErrCtxt (TypedSpliceCtxt Nothing expr) $ do
-    { stage <- getStage
-    ; case stage of
-        Brack pop_stage RnPendingTyped
-          -> setStage pop_stage rn_splice
+    { level <- getThLevel
+    ; case level of
+        Brack pop_level RnPendingTyped
+          -> setThLevel pop_level rn_splice
 
         Brack _ (RnPendingUntyped _)
           -> failWithTc $ thSyntaxError $ MismatchedSpliceType Typed IsSplice
@@ -462,7 +445,8 @@ rnTypedSplice expr
         _ -> do { unlessXOptM LangExt.TemplateHaskell
                     (failWith $ thSyntaxError IllegalTHSplice)
 
-                ; (result, fvs1) <- checkNoErrs $ setStage (Splice Typed) rn_splice
+                ; cur_level <- getThLevel
+                ; (result, fvs1) <- checkNoErrs $ setThLevel (Splice Typed cur_level) rn_splice
                   -- checkNoErrs: don't attempt to run the splice if
                   -- renaming it failed; otherwise we get a cascade of
                   -- errors from e.g. unbound variables
@@ -806,8 +790,9 @@ rnTopSpliceDecls :: HsUntypedSplice GhcPs -> RnM ([LHsDecl GhcPs], FreeVars)
 -- Declaration splice at the very top level of the module
 rnTopSpliceDecls splice
    =  do { checkTopSpliceAllowed splice
+         ; cur_level <- getThLevel
          ; (rn_splice, fvs) <- checkNoErrs $
-                               setStage (Splice Untyped) $
+                               setThLevel (Splice Untyped cur_level) $
                                rnUntypedSplice splice
            -- As always, be sure to checkNoErrs above lest we end up with
            -- holes making it to typechecking, hence #12584.
@@ -924,66 +909,104 @@ checkThLocalTyName name
 
   | otherwise
   = do  { traceRn "checkThLocalTyName" (ppr name)
-        ; mb_local_use <- getStageAndBindLevel name
+        ; mb_local_use <- getCurrentAndBindLevel name
         ; case mb_local_use of {
              Nothing -> return () ;  -- Not a locally-bound thing
-             Just (top_lvl, bind_lvl, use_stage) ->
-    do  { let use_lvl = thLevel use_stage
-        -- We don't check the well stageness of name here.
+             Just (top_lvl, bind_lvl, use_lvl) ->
+    do  { let use_lvl_idx = thLevelIndex use_lvl
+        -- We don't check the well levelledness of name here.
         -- this would break test for #20969
         --
         -- Consequently there is no check&restiction for top level splices.
         -- But it's annoying anyway.
         --
-        -- Therefore checkCrossStageLiftingTy shouldn't assume anything
+        -- Therefore checkCrossLevelLiftingTy shouldn't assume anything
         -- about bind_lvl and use_lvl relation.
         --
-        -- ; checkWellStaged (StageCheckSplice name) bind_lvl use_lvl
-
         ; traceRn "checkThLocalTyName" (ppr name <+> ppr bind_lvl
-                                                 <+> ppr use_stage
+                                                 <+> ppr use_lvl
                                                  <+> ppr use_lvl)
-        ; checkCrossStageLiftingTy top_lvl bind_lvl use_stage use_lvl name } } }
+        ; dflags <- getDynFlags
+        ; checkCrossLevelLiftingTy dflags top_lvl bind_lvl use_lvl use_lvl_idx name } } }
 
-checkThLocalName :: Name -> RnM ()
-checkThLocalName name
+-- | Check whether we are allowed to use a Name in this context (for TH purposes)
+-- In the case of a level incorrect program, attempt to fix it by using
+-- a Lift constraint.
+checkThLocalNameWithLift :: Name -> RnM ()
+checkThLocalNameWithLift = checkThLocalName True
+
+-- | Check whether we are allowed to use a Name in this context (for TH purposes)
+-- In the case of a level incorrect program, do not attempt to fix it by using
+-- a Lift constraint.
+checkThLocalNameNoLift :: Name -> RnM ()
+checkThLocalNameNoLift = checkThLocalName False
+
+checkThLocalName :: Bool -> Name -> RnM ()
+checkThLocalName allow_lifting name
   | isUnboundName name   -- Do not report two errors for
   = return ()            --   $(not_in_scope args)
 
-  | otherwise
-  = do  { traceRn "checkThLocalName" (ppr name)
-        ; mb_local_use <- getStageAndBindLevel name
-        ; case mb_local_use of {
-             Nothing -> return () ;  -- Not a locally-bound thing
-             Just (top_lvl, bind_lvl, use_stage) ->
-    do  { let use_lvl = thLevel use_stage
-        ; checkWellStaged (StageCheckSplice name) bind_lvl use_lvl
-        ; traceRn "checkThLocalName" (ppr name <+> ppr bind_lvl
-                                               <+> ppr use_stage
-                                               <+> ppr use_lvl)
-        ; checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name } } }
-
---------------------------------------
-checkCrossStageLifting :: TopLevelFlag -> ThLevel -> ThStage -> ThLevel
-                       -> Name -> TcM ()
--- We are inside brackets, and (use_lvl > bind_lvl)
--- Now we must check whether there's a cross-stage lift to do
--- Examples   \x -> [| x |]
---            [| map |]
---
--- This code is similar to checkCrossStageLifting in GHC.Tc.Gen.Expr, but
--- this is only run on *untyped* brackets.
-
-checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name
-  | Brack _ (RnPendingUntyped ps_var) <- use_stage   -- Only for untyped brackets
-  , use_lvl > bind_lvl                               -- Cross-stage condition
-  = check_cross_stage_lifting top_lvl name ps_var
-  | otherwise
+  | isWiredInName name
   = return ()
 
-check_cross_stage_lifting :: TopLevelFlag -> Name -> TcRef [PendingRnSplice] -> TcM ()
-check_cross_stage_lifting top_lvl name ps_var
+  | otherwise
+  = do  {
+          mb_local_use <- getCurrentAndBindLevel name
+        ; case mb_local_use of {
+             Nothing -> return () ;  -- Not a locally-bound thing
+             Just (top_lvl, bind_lvl, use_lvl) ->
+    do  { let use_lvl_idx = thLevelIndex use_lvl
+        ; cur_mod <- extractModule <$> getGblEnv
+        ; let is_local
+                  | Just mod <- nameModule_maybe name = mod == cur_mod
+                  | otherwise = True
+        ; traceRn "checkThLocalName" (ppr name <+> ppr bind_lvl <+> ppr use_lvl <+> ppr use_lvl)
+        ; dflags <- getDynFlags
+        ; env <- getGlobalRdrEnv
+        ; let mgre = lookupGRE_Name env name
+        ; checkCrossLevelLifting dflags (LevelCheckSplice name mgre) top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name } } }
+
+--------------------------------------
+checkCrossLevelLifting :: DynFlags
+                       -> LevelCheckReason
+                       -> TopLevelFlag
+                       -> Bool
+                       -> Bool
+                       -> Set.Set ThLevelIndex
+                       -> ThLevel
+                       -> ThLevelIndex
+                       -> Name -> TcM ()
+checkCrossLevelLifting dflags reason top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name
+  -- 1. If name is in-scope, at the correct level.
+  | use_lvl_idx `Set.member` bind_lvl = return ()
+  -- 2. Name is imported with -XImplicitStagePersistence
+  | not is_local
+  , xopt LangExt.ImplicitStagePersistence dflags = return ()
+  -- 3. Name is top-level, with -XImplicitStagePersistence, and needs
+  -- to be persisted into the future.
   | isTopLevel top_lvl
+  , is_local
+  , any (use_lvl_idx >=) (Set.toList bind_lvl)
+  , xopt LangExt.ImplicitStagePersistence dflags = when (isExternalName name) (keepAlive name)
+  -- 4. Name is in an untyped bracket, and lifting is allowed.
+  | Brack _ (RnPendingUntyped ps_var) <- use_lvl   -- Only for untyped brackets
+  , any (use_lvl_idx >=) (Set.toList bind_lvl)
+  , allow_lifting
+  = do
+      dflags <- getDynFlags
+      check_cross_level_lifting dflags top_lvl name ps_var
+  -- 5. For a typed bracket, these checks happen again later on (checkThLocalId)
+  -- In the future we should do all the level checks here.
+  | Brack _ RnPendingTyped <- use_lvl  -- Lift for typed brackets is inserted later.
+  , any (use_lvl_idx >=) (Set.toList bind_lvl)
+    = return ()
+  -- Otherwise, we have a level error, report.
+  | otherwise = addErrTc (TcRnBadlyLevelled reason bind_lvl use_lvl_idx)
+
+check_cross_level_lifting :: DynFlags -> TopLevelFlag -> Name -> TcRef [PendingRnSplice] -> TcM ()
+check_cross_level_lifting dflags top_lvl name ps_var
+  | isTopLevel top_lvl
+  , xopt LangExt.ImplicitStagePersistence dflags
         -- Top-level identifiers in this module,
         -- (which have External Names)
         -- are just like the imported case:
@@ -1004,7 +1027,7 @@ check_cross_stage_lifting top_lvl name ps_var
         -- If 'x' occurs many times we may get many identical
         -- bindings of the same SplicePointName, but that doesn't
         -- matter, although it's a mite untidy.
-    do  { traceRn "checkCrossStageLifting" (ppr name)
+    do  { traceRn "checkCrossLevelLifting" (ppr name)
 
           -- Construct the (lift x) expression
         ; let lift_expr   = nlHsApp (nlHsVar liftName) (nlHsVar name)
@@ -1017,20 +1040,20 @@ check_cross_stage_lifting top_lvl name ps_var
         ; ps <- readMutVar ps_var
         ; writeMutVar ps_var (pend_splice : ps) }
 
-checkCrossStageLiftingTy :: TopLevelFlag -> ThLevel -> ThStage -> ThLevel -> Name -> TcM ()
-checkCrossStageLiftingTy top_lvl bind_lvl _use_stage use_lvl name
+checkCrossLevelLiftingTy :: DynFlags -> TopLevelFlag -> Set.Set ThLevelIndex -> ThLevel -> ThLevelIndex -> Name -> TcM ()
+checkCrossLevelLiftingTy dflags top_lvl bind_lvl _use_lvl use_lvl_idx name
   | isTopLevel top_lvl
+  , xopt LangExt.ImplicitStagePersistence dflags
   = return ()
 
   -- There is no liftType (yet), so we could error, or more conservatively, just warn.
   --
   -- For now, we check here for both untyped and typed splices, as we don't create splices.
-  | use_lvl > bind_lvl
-  = addDiagnostic $ TcRnBadlyStagedType name bind_lvl use_lvl
 
-  -- See comment in checkThLocalTyName: this can also happen.
-  | bind_lvl < use_lvl
-  = addDiagnostic $ TcRnBadlyStagedType name bind_lvl use_lvl
+  -- Can also happen for negative cases
+  -- See comment in checkThLocalTyName:
+  | use_lvl_idx `notElem` bind_lvl
+  = addDiagnostic $ TcRnBadlyLevelledType name bind_lvl use_lvl_idx
 
   | otherwise
   = return ()
@@ -1071,7 +1094,7 @@ them in the keep-alive set.
 Note [Quoting names]
 ~~~~~~~~~~~~~~~~~~~~
 A quoted name 'n is a bit like a quoted expression [| n |], except that we
-have no cross-stage lifting (c.f. GHC.Tc.Gen.Expr.thBrackId).  So, after incrementing
+have no cross-level lifting (c.f. GHC.Tc.Gen.Expr.thBrackId).  So, after incrementing
 the use-level to account for the brackets, the cases are:
 
         bind > use                      Error
@@ -1090,7 +1113,7 @@ Examples:
 
   \x. f 'x      -- Not ok (bind = 1, use = 1)
                 -- (whereas \x. f [| x |] might have been ok, by
-                --                               cross-stage lifting
+                --                               cross-level lifting
 
   \y. [| \x. $(f 'y) |] -- Not ok (bind =1, use = 1)
 

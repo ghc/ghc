@@ -1,0 +1,3 @@
+T5721.hs:7:14: warning: [GHC-86357] [-Wbadly-levelled-types (in -Wdefault)]
+    Badly levelled type: a is bound at level 0 but used at level 1
+

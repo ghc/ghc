@@ -1,5 +1,5 @@
+T17820a.hs:7:17: error: [GHC-28914]
+    Level error: ‘C’ is bound at level 0 but used at level -1
+    Hint: quoting [| C |] or an enclosing expression
+    would allow the quotation to be used at an earlier level
 
-T17820a.hs:7:17: error: [GHC-18157]
-    GHC stage restriction:
-      ‘C’ is used in a top-level splice, quasi-quote, or annotation,
-      and must be imported, not defined locally

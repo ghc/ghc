@@ -458,11 +458,11 @@ newInferExpType = new_inferExpType Nothing
 
 newInferExpTypeFRR :: FixedRuntimeRepContext -> TcM ExpTypeFRR
 newInferExpTypeFRR frr_orig
-  = do { th_stage <- getStage
+  = do { th_lvl <- getThLevel
        ; if
           -- See [Wrinkle: Typed Template Haskell]
           -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-          | Brack _ (TcPending {}) <- th_stage
+          | Brack _ (TcPending {}) <- th_lvl
           -> new_inferExpType Nothing
 
           | otherwise
@@ -800,11 +800,11 @@ newConcreteTyVar :: HasDebugCallStack => ConcreteTvOrigin
                  -> FastString -> TcKind -> TcM TcTyVar
 newConcreteTyVar reason fs kind
   = assertPpr (isConcreteType kind) assert_msg $
-  do { th_stage <- getStage
+  do { th_lvl <- getThLevel
      ; if
         -- See [Wrinkle: Typed Template Haskell]
         -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-        | Brack _ (TcPending {}) <- th_stage
+        | Brack _ (TcPending {}) <- th_lvl
         -> newNamedAnonMetaTyVar fs TauTv kind
 
         | otherwise
@@ -986,8 +986,8 @@ newOpenFlexiTyVar
 -- in GHC.Tc.Utils.Concrete.
 newOpenFlexiFRRTyVar :: FixedRuntimeRepContext -> TcM TcTyVar
 newOpenFlexiFRRTyVar frr_ctxt
-  = do { th_stage <- getStage
-       ; case th_stage of
+  = do { th_lvl <- getThLevel
+       ; case th_lvl of
           { Brack _ (TcPending {}) -- See [Wrinkle: Typed Template Haskell]
               -> newOpenFlexiTyVar -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
           ; _ ->
@@ -1040,11 +1040,11 @@ newMetaTyVarX = new_meta_tv_x TauTv
 -- | Like 'newMetaTyVarX', but for concrete type variables.
 newConcreteTyVarX :: ConcreteTvOrigin -> Subst -> TyVar -> TcM (Subst, TcTyVar)
 newConcreteTyVarX conc subst tv
-  = do { th_stage <- getStage
+  = do { th_lvl <- getThLevel
        ; if
           -- See [Wrinkle: Typed Template Haskell]
           -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-          | Brack _ (TcPending {}) <- th_stage
+          | Brack _ (TcPending {}) <- th_lvl
           -> new_meta_tv_x TauTv subst tv
           | otherwise
           -> new_meta_tv_x (ConcreteTv conc) subst tv }

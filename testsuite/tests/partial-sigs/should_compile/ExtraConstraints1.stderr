@@ -5,4 +5,4 @@ TYPE SIGNATURES
   arbitCs4 :: forall a. (Eq a, Show a, Enum a) => a -> String
   arbitCs5 :: forall a. (Eq a, Enum a, Show a) => a -> String
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

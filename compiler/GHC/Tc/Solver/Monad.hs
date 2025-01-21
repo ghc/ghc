@@ -125,7 +125,7 @@ module GHC.Tc.Solver.Monad (
     -- Misc
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
     matchFam, matchFamTcM,
-    checkWellStagedDFun,
+    checkWellLevelledDFun,
     pprEq,
 
     -- Enforcing invariants for type equalities
@@ -145,9 +145,9 @@ import qualified GHC.Tc.Utils.Monad    as TcM
 import qualified GHC.Tc.Utils.TcMType  as TcM
 import qualified GHC.Tc.Instance.Class as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified GHC.Tc.Utils.Env      as TcM
-       ( checkWellStaged, tcGetDefaultTys
+       ( tcGetDefaultTys
        , tcLookupClass, tcLookupId, tcLookupTyCon
-       , topIdLvl )
+       )
 import GHC.Tc.Zonk.Monad ( ZonkM )
 import qualified GHC.Tc.Zonk.TcType  as TcM
 import qualified GHC.Tc.Zonk.Type as TcM
@@ -156,6 +156,7 @@ import GHC.Driver.DynFlags
 
 import GHC.Tc.Instance.Class( safeOverlap, instanceReturnsDictCon )
 import GHC.Tc.Instance.FunDeps( FunDepEqn(..) )
+import GHC.Utils.Misc
 
 
 import GHC.Tc.Solver.Types
@@ -192,14 +193,16 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.Set( elementOfUniqSet )
+import GHC.Types.Id
+import GHC.Types.Basic (allImportLevels)
+import GHC.Types.ThLevelIndex (thLevelIndexFromImportLevel)
 
-import GHC.Unit.Module ( HasModule, getModule, extractModule )
+import GHC.Unit.Module
 import qualified GHC.Rename.Env as TcM
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
-import GHC.Utils.Misc (HasDebugCallStack, (<||>))
 
 import GHC.Data.Bag as Bag
 import GHC.Data.Pair
@@ -213,15 +216,20 @@ import Data.IORef
 import Data.List ( mapAccumL )
 import Data.List.NonEmpty ( nonEmpty )
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe ( isJust )
 import qualified Data.Semigroup as S
 import GHC.Types.SrcLoc
 import GHC.Rename.Env
+import GHC.LanguageExtensions as LangExt
 
 #if defined(DEBUG)
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Data.Graph.Directed
 #endif
+
+import qualified Data.Set as Set
+import GHC.Unit.Module.Graph
+
+import GHC.Data.Maybe
 
 {- *********************************************************************
 *                                                                      *
@@ -1592,40 +1600,118 @@ recordUsedGREs gres
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-checkWellStagedDFun :: CtLoc -> InstanceWhat -> PredType -> TcS ()
+checkWellLevelledDFun :: CtLoc -> InstanceWhat -> PredType -> TcS ()
 -- Check that we do not try to use an instance before it is available.  E.g.
 --    instance Eq T where ...
 --    f x = $( ... (\(p::T) -> p == p)... )
 -- Here we can't use the equality function from the instance in the splice
 
-checkWellStagedDFun loc what pred
+checkWellLevelledDFun loc what pred
   = do
-      mbind_lvl <- checkWellStagedInstanceWhat what
+      mbind_lvl <- checkWellLevelledInstanceWhat what
       case mbind_lvl of
-        Just bind_lvl | bind_lvl > impLevel ->
+        Just (bind_lvls, is_local) ->
           wrapTcS $ TcM.setCtLocM loc $ do
-              { use_stage <- TcM.getStage
-              ; TcM.checkWellStaged (StageCheckInstance what pred) bind_lvl (thLevel use_stage) }
-        _ ->
-          return ()
+              { use_lvl <- thLevelIndex <$> TcM.getThLevel
+              ; dflags <- getDynFlags
+              ; checkCrossLevelClsInst dflags (LevelCheckInstance what pred) bind_lvls use_lvl is_local  }
+        -- If no level information is returned for an InstanceWhat, then it's safe to use
+        -- at any level.
+        Nothing -> return ()
+
+
+-- TODO: Unify this with checkCrossLevelLifting function
+checkCrossLevelClsInst :: DynFlags -> LevelCheckReason
+                       -> Set.Set ThLevelIndex -> ThLevelIndex
+                       -> Bool -> TcM ()
+checkCrossLevelClsInst dflags reason bind_lvls use_lvl_idx is_local
+  -- If the Id is imported, then allow with ImplicitStagePersistence
+  | not is_local
+  , xopt LangExt.ImplicitStagePersistence dflags
+  = return ()
+  -- NB: Do this check after the ImplicitStagePersistence check, because
+  -- it will do some computation to work out the levels of instances.
+  | use_lvl_idx `Set.member` bind_lvls = return ()
+  -- With ImplicitStagePersistence, using later than bound is fine
+  | xopt LangExt.ImplicitStagePersistence dflags
+  , any (use_lvl_idx >=) bind_lvls  = return ()
+  | otherwise = TcM.addErrTc (TcRnBadlyLevelled reason bind_lvls use_lvl_idx)
+
+
 
 -- | Returns the ThLevel of evidence for the solved constraint (if it has evidence)
--- See Note [Well-staged instance evidence]
-checkWellStagedInstanceWhat :: InstanceWhat -> TcS (Maybe ThLevel)
-checkWellStagedInstanceWhat what
+-- See Note [Well-levelled instance evidence]
+checkWellLevelledInstanceWhat :: HasCallStack => InstanceWhat -> TcS (Maybe (Set.Set ThLevelIndex, Bool))
+checkWellLevelledInstanceWhat what
   | TopLevInstance { iw_dfun_id = dfun_id } <- what
-    = return $ Just (TcM.topIdLvl dfun_id)
+    = Just <$> checkNameVisibleLevels (idName dfun_id)
   | BuiltinTypeableInstance tc <- what
-    = do
-        cur_mod <- extractModule <$> getGblEnv
-        return $ Just (if nameIsLocalOrFrom cur_mod (tyConName tc)
-                        then outerLevel
-                        else impLevel)
+    -- The typeable instance is always defined in the same module as the TyCon.
+    = Just <$> checkNameVisibleLevels (tyConName tc)
   | otherwise = return Nothing
 
+-- | Check the levels at which the given name is visible, including a boolean
+-- indicating if the name is local or not.
+checkNameVisibleLevels :: Name -> TcS (Set.Set ThLevelIndex, Bool)
+checkNameVisibleLevels name = do
+  cur_mod <- extractModule <$> getGblEnv
+  if nameIsLocalOrFrom cur_mod name
+    then return (Set.singleton topLevelIndex, True)
+    else do
+      lvls <- checkModuleVisibleLevels (nameModule name)
+      return (lvls, False)
+
+{- Note [Using the module graph to compute TH level visiblities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When typechecking a module M, in order to implement GHC proposal #682
+(see Note [Explicit Level Imports] in GHC.Tc.Gen.Head), we need to be able to
+compute the Template Haskell levels that typeclass instances are visible at in M.
+
+To do this, we use the "level 0 imports" module graph, which we query via
+GHC.Unit.Module.Graph.mgQueryZero. For example, if we want all modules that are
+visible at level -1 from M, we do the following:
+
+  1. start with all the direct of M imports at level -1, i.e. the "splice imports"
+  2. then look at all modules that are reachable from these using only level 0
+     normal imports, using 'mgQueryZero'.
+
+This works precisely because, as specified in the proposal, with -XNoImplicitStagePersistence,
+modules only export items at level 0. In particular, instances are only exported
+at level 0.
+
+See the SI36 test for an illustration.
+-}
+
+-- | Check which TH levels a module is visable at
+--
+-- Used to check visibility of instances (do not use this for normal identifiers).
+checkModuleVisibleLevels :: Module -> TcS (Set.Set ThLevelIndex)
+checkModuleVisibleLevels check_mod = do
+  cur_mod <- extractModule <$> getGblEnv
+  hsc_env <- getTopEnv
+
+  -- 0. The keys for the scope of the current module.
+  let mkKey s m = (ModuleScope (moduleToMnk m NotBoot) s)
+      cur_mod_scope_key s = mkKey s cur_mod
+
+  -- 1. is_visible checks that a specific key is visible from the given level in the
+  -- current module.
+  let is_visible :: ImportLevel -> ZeroScopeKey -> Bool
+      is_visible s k = mgQueryZero (hsc_mod_graph hsc_env) (cur_mod_scope_key s) k
+
+  -- 2. The key we are looking for, either the module itself in the home package or the
+  -- module unit id of the module we are checking.
+  let instance_key = if moduleUnitId check_mod `Set.member` hsc_all_home_unit_ids hsc_env
+                       then mkKey NormalLevel check_mod
+                       else UnitScope (moduleUnitId check_mod)
+
+  -- 3. For each level, check if the key is visible from that level.
+  let lvls = [ thLevelIndexFromImportLevel lvl | lvl <- allImportLevels, is_visible lvl instance_key]
+  return $ Set.fromList lvls
+
 {-
-Note [Well-staged instance evidence]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Well-levelled instance evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Evidence for instances must obey the same level restrictions as normal bindings.
 In particular, it is forbidden to use an instance in a top-level splice in the
@@ -1665,12 +1751,12 @@ Main.hs:12:14: error:
 
 Solving a `Typeable (T t1 ...tn)` constraint generates code that relies on
 `$tcT`, the `TypeRep` for `T`; and we must check that this reference to `$tcT`
-is well staged.  It's easy to know the stage of `$tcT`: for imported TyCons it
-will be `impLevel`, and for local TyCons it will be `toplevel`.
+is well levelled.  It's easy to know the level of `$tcT`: for imported TyCons it
+will be the level of the imported TyCon Name, and for local TyCons it will be `toplevel`.
 
 Therefore the `InstanceWhat` type had to be extended with
 a special case for `Typeable`, which recorded the TyCon the evidence was for and
-could them be used to check that we were not attempting to evidence in a stage incorrect
+could them be used to check that we were not attempting to evidence in a level incorrect
 manner.
 
 -}

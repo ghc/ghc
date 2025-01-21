@@ -1,0 +1,7 @@
+<interactive>:2:3: error: [GHC-28914]
+    • Level error: ‘id’ is bound at level 0 but used at level -1
+      Hint: quoting [| id |] or an enclosing expression
+      would allow the quotation to be used at an earlier level
+      From imports {imported from ‘Prelude’}
+    • In the untyped splice: $(id [| () |])
+

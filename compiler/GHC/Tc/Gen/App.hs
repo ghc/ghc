@@ -1217,13 +1217,13 @@ tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty
        --
        -- See [Wrinkle: VTA] in Note [Representation-polymorphism checking built-ins]
        -- in GHC.Tc.Utils.Concrete.
-       ; th_stage <- getStage
+       ; th_lvl <- getThLevel
        ; ty_arg <- case mb_conc of
            Nothing   -> return ty_arg0
            Just conc
              -- See [Wrinkle: Typed Template Haskell]
              -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-             | Brack _ (TcPending {}) <- th_stage
+             | Brack _ (TcPending {}) <- th_lvl
              -> return ty_arg0
              | otherwise
              ->

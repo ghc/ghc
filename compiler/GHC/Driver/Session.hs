@@ -2265,7 +2265,9 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnAmbiguousFields -> warnSpec x
   Opt_WarnAutoOrphans -> depWarnSpec x "it has no effect"
   Opt_WarnCPPUndef -> warnSpec x
-  Opt_WarnBadlyStagedTypes -> warnSpec x
+  Opt_WarnBadlyLevelledTypes ->
+    warnSpec x ++
+    subWarnSpec "badly-staged-types" x "it is renamed to -Wbadly-levelled-types"
   Opt_WarnUnbangedStrictPatterns -> warnSpec x
   Opt_WarnDeferredTypeErrors -> warnSpec x
   Opt_WarnDeferredOutOfScopeVariables -> warnSpec x

@@ -21,6 +21,8 @@ types that
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module GHC.Types.Basic (
         LeftOrRight(..),
@@ -119,7 +121,9 @@ module GHC.Types.Basic (
         NonStandardDefaultingStrategy(..),
         DefaultingStrategy(..), defaultNonStandardTyVars,
 
-        ForeignSrcLang (..)
+        ForeignSrcLang (..),
+
+        ImportLevel(..), convImportLevel, convImportLevelSpec, allImportLevels
    ) where
 
 import GHC.Prelude
@@ -134,12 +138,12 @@ import qualified GHC.LanguageExtensions as LangExt
 import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
 import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag)
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr (HsDoFlavour)
-
 import Control.DeepSeq ( NFData(..) )
 import Data.Data
 import Data.Maybe
 import qualified Data.Semigroup as Semi
 
+import Language.Haskell.Syntax.ImpExp
 {-
 ************************************************************************
 *                                                                      *
@@ -2435,3 +2439,26 @@ instance Outputable NonStandardDefaultingStrategy where
 instance Outputable DefaultingStrategy where
   ppr DefaultKindVars            = text "DefaultKindVars"
   ppr (NonStandardDefaulting ns) = text "NonStandardDefaulting" <+> ppr ns
+
+-- | ImportLevel
+
+data ImportLevel = NormalLevel | SpliceLevel | QuoteLevel deriving (Eq, Ord, Data, Show, Enum, Bounded)
+
+instance Outputable ImportLevel where
+  ppr NormalLevel = text "normal"
+  ppr SpliceLevel = text "splice"
+  ppr QuoteLevel = text "quote"
+
+deriving via (EnumBinary ImportLevel) instance Binary ImportLevel
+
+allImportLevels :: [ImportLevel]
+allImportLevels = [minBound..maxBound]
+
+convImportLevel :: ImportDeclLevelStyle -> ImportLevel
+convImportLevel (LevelStylePre level) = convImportLevelSpec level
+convImportLevel (LevelStylePost level) = convImportLevelSpec level
+convImportLevel NotLevelled = NormalLevel
+
+convImportLevelSpec :: ImportDeclLevel -> ImportLevel
+convImportLevelSpec ImportDeclQuote = QuoteLevel
+convImportLevelSpec ImportDeclSplice = SpliceLevel

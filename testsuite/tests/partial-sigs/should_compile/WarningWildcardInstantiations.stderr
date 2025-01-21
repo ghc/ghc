@@ -2,8 +2,7 @@ TYPE SIGNATURES
   bar :: forall {t} {w}. t -> (t -> w) -> w
   foo :: forall {a}. (Show a, Enum a) => a -> String
 Dependent modules: []
-Dependent packages: [base-4.17.0.0]
-
+Dependent packages: [(normal, base-4.21.0.0)]
 WarningWildcardInstantiations.hs:5:14: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_a’ standing for ‘a’
       Where: ‘a’ is a rigid type variable bound by
@@ -42,3 +41,4 @@ WarningWildcardInstantiations.hs:8:18: warning: [GHC-88464] [-Wpartial-type-sign
                the inferred type of bar :: t -> (t -> w) -> w
                at WarningWildcardInstantiations.hs:9:1-13
     • In the type signature: bar :: _ -> _ -> _
+

@@ -55,6 +55,7 @@ import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Types.Annotations
 import GHC.Types.Avail
+import GHC.Types.Basic ( ImportLevel(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -86,9 +87,10 @@ import qualified Data.Semigroup
 import GHC.List (uncons)
 import Data.Ord
 import Data.Containers.ListUtils
-import Data.Bifunctor
 import GHC.Iface.Errors.Ppr
 import Data.Functor
+import Data.Bifunctor (first)
+import GHC.Types.PkgQual
 
 {-
   -----------------------------------------------
@@ -174,7 +176,7 @@ instance Monoid RecompileRequired where
   mempty = UpToDate
 
 data RecompReason
-  = UnitDepRemoved UnitId
+  = UnitDepRemoved (ImportLevel, UnitId)
   | ModulePackageChanged FastString
   | SourceFileChanged
   | NoSelfRecompInfo
@@ -187,8 +189,8 @@ data RecompReason
   | HieOutdated
   | SigsMergeChanged
   | ModuleChanged ModuleName
-  | ModuleRemoved (UnitId, ModuleName)
-  | ModuleAdded (UnitId, ModuleName)
+  | ModuleRemoved (ImportLevel, UnitId, ModuleName)
+  | ModuleAdded (ImportLevel, UnitId, ModuleName)
   | ModuleChangedRaw ModuleName
   | ModuleChangedIface ModuleName
   | FileChanged FilePath
@@ -210,7 +212,7 @@ data RecompReason
 
 instance Outputable RecompReason where
   ppr = \case
-    UnitDepRemoved uid       -> ppr uid <+> text "removed"
+    UnitDepRemoved (_lvl, uid) -> ppr uid <+> text "removed"
     ModulePackageChanged s   -> ftext s <+> text "package changed"
     SourceFileChanged        -> text "Source file changed"
     NoSelfRecompInfo         -> text "Old interface lacks recompilation info"
@@ -225,8 +227,8 @@ instance Outputable RecompReason where
     ModuleChanged m          -> ppr m <+> text "changed"
     ModuleChangedRaw m       -> ppr m <+> text "changed (raw)"
     ModuleChangedIface m     -> ppr m <+> text "changed (interface)"
-    ModuleRemoved (_uid, m)   -> ppr m <+> text "removed"
-    ModuleAdded (_uid, m)     -> ppr m <+> text "added"
+    ModuleRemoved (_st, _uid, m)   -> ppr m <+> text "removed"
+    ModuleAdded (_st, _uid, m)     -> ppr m <+> text "added"
     FileChanged fp           -> text fp <+> text "changed"
     CustomReason s           -> text s
     FlagsChanged             -> text "Flags changed"
@@ -633,8 +635,12 @@ checkMergedSignatures hsc_env mod_summary self_recomp = do
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
  = do
-    res_normal <- classify_import (findImportedModule hsc_env) (ms_textual_imps summary ++ ms_srcimps summary)
-    res_plugin <- classify_import (\mod _ -> findPluginModule hsc_env mod) (ms_plugin_imps summary)
+    res_normal <- classify_import (findImportedModule hsc_env)
+                                  ([(st, p, m) | (st, p, m) <- (ms_textual_imps summary)]
+                                  ++
+                                  [(NormalLevel, NoPkgQual, m) | m <- ms_srcimps summary ])
+    res_plugin <- classify_import (\mod _ -> findPluginModule hsc_env mod)
+                    [(st, p, m) | (st, p, m) <- (ms_plugin_imps summary) ]
     case sequence (res_normal ++ res_plugin) of
       Left recomp -> return $ NeedsRecompile recomp
       Right es -> do
@@ -647,27 +653,27 @@ checkDependencies hsc_env summary iface
  where
 
    classify_import :: (ModuleName -> t -> IO FindResult)
-                      -> [(t, GenLocated l ModuleName)]
+                      -> [(ImportLevel, t, GenLocated l ModuleName)]
                     -> IfG
                        [Either
-                          CompileReason (Either (UnitId, ModuleName) (FastString, UnitId))]
+                          CompileReason (Either (ImportLevel, UnitId, ModuleName) (FastString, (ImportLevel, UnitId)))]
    classify_import find_import imports =
-    liftIO $ traverse (\(mb_pkg, L _ mod) ->
+    liftIO $ traverse (\(st, mb_pkg, L _ mod) ->
            let reason = ModuleChanged mod
-           in classify reason <$> find_import mod mb_pkg)
+           in classify st reason <$> find_import mod mb_pkg)
            imports
    logger        = hsc_logger hsc_env
    all_home_units = hsc_all_home_unit_ids hsc_env
-   prev_dep_mods = map (second gwib_mod) $ Set.toAscList $ dep_direct_mods (mi_deps iface)
-   prev_dep_pkgs = Set.toAscList (Set.union (dep_direct_pkgs (mi_deps iface))
-                                            (dep_plugin_pkgs (mi_deps iface)))
+   prev_dep_mods = map (\(IfaceImportLevel s,u, a) -> (s, u, gwib_mod a)) $ Set.toAscList $ dep_direct_mods (mi_deps iface)
+   prev_dep_pkgs = Set.toAscList (Set.union (Set.map (first tcImportLevel) (dep_direct_pkgs (mi_deps iface)))
+                                            (Set.map ((SpliceLevel),) (dep_plugin_pkgs (mi_deps iface))))
 
-   classify _ (Found _ mod)
-    | (toUnitId $ moduleUnit mod) `elem` all_home_units = Right (Left ((toUnitId $ moduleUnit mod), moduleName mod))
-    | otherwise = Right (Right (moduleNameFS (moduleName mod), toUnitId $ moduleUnit mod))
-   classify reason _ = Left (RecompBecause reason)
+   classify st _ (Found _ mod)
+    | (toUnitId $ moduleUnit mod) `elem` all_home_units = Right (Left ((st, toUnitId $ moduleUnit mod, moduleName mod)))
+    | otherwise = Right (Right (moduleNameFS (moduleName mod), (st, toUnitId $ moduleUnit mod)))
+   classify _ reason _ = Left (RecompBecause reason)
 
-   check_mods :: [(UnitId, ModuleName)] -> [(UnitId, ModuleName)] -> IO RecompileRequired
+   check_mods :: [(ImportLevel, UnitId, ModuleName)] -> [(ImportLevel, UnitId, ModuleName)] -> IO RecompileRequired
    check_mods [] [] = return UpToDate
    check_mods [] (old:_) = do
      -- This case can happen when a module is change from HPT to package import
@@ -685,14 +691,14 @@ checkDependencies hsc_env summary iface
            text " not among previous dependencies"
         return $ needsRecompileBecause $ ModuleAdded new
 
-   check_packages :: [(FastString, UnitId)] -> [UnitId] -> IO RecompileRequired
+   check_packages :: [(FastString, (ImportLevel, UnitId))] -> [(ImportLevel, UnitId)] -> IO RecompileRequired
    check_packages [] [] = return UpToDate
    check_packages [] (old:_) = do
      trace_hi_diffs logger $
       text "package " <> quotes (ppr old) <>
         text "no longer in dependencies"
      return $ needsRecompileBecause $ UnitDepRemoved old
-   check_packages ((new_name, new_unit):news) olds
+   check_packages ((new_name, (new_unit)):news) olds
     | Just (old, olds') <- uncons olds
     , new_unit == old = check_packages (dropWhile ((== new_unit) . snd) news) olds'
     | otherwise = do

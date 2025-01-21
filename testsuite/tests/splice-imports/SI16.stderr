@@ -1,0 +1,6 @@
+SI16.hs:10:7: error: [GHC-28914]
+    • Level error: ‘x’ is bound at level 0 but used at level 1
+      Hint: quoting [| x |] or an enclosing expression
+      would allow the quotation to be used at an earlier level
+    • In the Template Haskell quotation: 'x
+

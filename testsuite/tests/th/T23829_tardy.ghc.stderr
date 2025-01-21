@@ -1,11 +1,11 @@
 [1 of 2] Compiling Main             ( T23829_tardy.hs, T23829_tardy.o )
+T23829_tardy.hs:9:15: warning: [GHC-86357] [-Wbadly-levelled-types (in -Wdefault)]
+    Badly levelled type: a is bound at level 0 but used at level 1
 
-T23829_tardy.hs:9:15: warning: [GHC-86357] [-Wbadly-staged-types (in -Wdefault)]
-    Badly staged type: a is bound at stage 1 but used at stage 2
+T23829_tardy.hs:12:19: warning: [GHC-86357] [-Wbadly-levelled-types (in -Wdefault)]
+    Badly levelled type: a is bound at level 0 but used at level 1
 
-T23829_tardy.hs:12:19: warning: [GHC-86357] [-Wbadly-staged-types (in -Wdefault)]
-    Badly staged type: a is bound at stage 1 but used at stage 2
+T23829_tardy.hs:15:20: warning: [GHC-86357] [-Wbadly-levelled-types (in -Wdefault)]
+    Badly levelled type: a is bound at level 0 but used at level 1
 
-T23829_tardy.hs:15:20: warning: [GHC-86357] [-Wbadly-staged-types (in -Wdefault)]
-    Badly staged type: a is bound at stage 1 but used at stage 2
 [2 of 2] Linking T23829_tardy

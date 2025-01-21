@@ -1,0 +1,8 @@
+SI29.hs:11:10: error: [GHC-28914]
+    • Level error:
+      instance for ‘GHC.Internal.TH.Syntax.Quote
+                      GHC.Internal.TH.Syntax.Q’
+      is bound at levels {0, 1} but used at level -1
+    • In the expression: [| id |]
+      In the untyped splice: $([| id |])
+

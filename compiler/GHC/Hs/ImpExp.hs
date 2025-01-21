@@ -8,6 +8,8 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
+{-# LANGUAGE MultiWayIf           #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -57,21 +59,14 @@ One per import declaration in a module.
 
 type instance Anno (ImportDecl (GhcPass p)) = SrcSpanAnnA
 
--- | Given two possible located 'qualified' tokens, compute a style
--- (in a conforming Haskell program only one of the two can be not
--- 'Nothing'). This is called from "GHC.Parser".
-importDeclQualifiedStyle :: Maybe (EpToken "qualified")
-                         -> Maybe (EpToken "qualified")
-                         -> (Maybe (EpToken "qualified"), ImportDeclQualifiedStyle)
-importDeclQualifiedStyle mPre mPost =
-  if isJust mPre then (mPre, QualifiedPre)
-  else if isJust mPost then (mPost,QualifiedPost) else (Nothing, NotQualified)
+
 
 -- | Convenience function to answer the question if an import decl. is
 -- qualified.
 isImportDeclQualified :: ImportDeclQualifiedStyle -> Bool
 isImportDeclQualified NotQualified = False
 isImportDeclQualified _ = True
+
 
 
 type instance ImportDeclPkgQual GhcPs = RawPkgQual
@@ -114,13 +109,24 @@ data EpAnnImportDecl = EpAnnImportDecl
   { importDeclAnnImport    :: EpToken "import" -- ^ The location of the @import@ keyword
   , importDeclAnnPragma    :: Maybe (EpaLocation, EpToken "#-}") -- ^ The locations of @{-# SOURCE@ and @#-}@ respectively
   , importDeclAnnSafe      :: Maybe (EpToken "safe") -- ^ The location of the @safe@ keyword
+  , importDeclAnnLevel     :: Maybe EpAnnLevel -- ^ The location of the @splice@ or @quote@ keyword
   , importDeclAnnQualified :: Maybe (EpToken "qualified") -- ^ The location of the @qualified@ keyword
   , importDeclAnnPackage   :: Maybe EpaLocation -- ^ The location of the package name (when using @-XPackageImports@)
   , importDeclAnnAs        :: Maybe (EpToken "as") -- ^ The location of the @as@ keyword
   } deriving (Data)
 
+
 instance NoAnn EpAnnImportDecl where
-  noAnn = EpAnnImportDecl noAnn  Nothing  Nothing  Nothing  Nothing  Nothing
+  noAnn = EpAnnImportDecl noAnn  Nothing Nothing  noAnn  Nothing  Nothing  Nothing
+
+data EpAnnLevel = EpAnnLevelSplice (EpToken "splice")
+                | EpAnnLevelQuote (EpToken "quote")
+                deriving Data
+
+instance HasLoc EpAnnLevel where
+  getHasLoc (EpAnnLevelSplice tok) = getEpTokenSrcSpan tok
+  getHasLoc (EpAnnLevelQuote tok) = getEpTokenSrcSpan tok
+
 -- ---------------------------------------------------------------------
 
 simpleImportDecl :: ModuleName -> ImportDecl GhcPs
@@ -130,6 +136,7 @@ simpleImportDecl mn = ImportDecl {
       ideclPkgQual    = NoRawPkgQual,
       ideclSource     = NotBoot,
       ideclSafe       = False,
+      ideclLevelSpec  = NotLevelled,
       ideclQualified  = NotQualified,
       ideclAs         = Nothing,
       ideclImportList = Nothing

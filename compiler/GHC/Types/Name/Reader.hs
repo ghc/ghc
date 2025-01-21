@@ -90,7 +90,7 @@ module GHC.Types.Name.Reader (
         pprNameProvenance,
         mkGRE, mkExactGRE, mkLocalGRE, mkLocalVanillaGRE, mkLocalTyConGRE,
         mkLocalConLikeGRE, mkLocalFieldGREs,
-        gresToNameSet,
+        gresToNameSet, greLevels,
 
         -- ** Shadowing
         greClashesWith, shadowNames,
@@ -106,10 +106,12 @@ module GHC.Types.Name.Reader (
         Parent(..), ParentGRE(..), greParent_maybe,
         mkParent, availParent,
         ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
-        importSpecLoc, importSpecModule, isExplicitItem, bestImport,
+        importSpecLoc, importSpecModule, importSpecLevel, isExplicitItem, bestImport,
+        ImportLevel(..),
 
         -- * Utils
-        opIsAt
+        opIsAt,
+
   ) where
 
 import GHC.Prelude
@@ -131,6 +133,8 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Builtin.Uniques ( isFldNSUnique )
+import GHC.Types.ThLevelIndex
+import qualified Data.Set as Set
 
 import GHC.Unit.Module
 
@@ -636,6 +640,11 @@ greParent = gre_par
 
 greInfo :: GlobalRdrElt -> GREInfo
 greInfo = gre_info
+
+greLevels :: GlobalRdrElt -> Set.Set ImportLevel
+greLevels g =
+  if gre_lcl g then Set.singleton NormalLevel
+               else Set.fromList (bagToList (fmap (is_level . is_decl) (gre_imp g)))
 
 -- | See Note [Parents]
 data Parent = NoParent
@@ -1812,6 +1821,7 @@ shadowNames drop_only_qualified env new_gres = minusOccEnv_C_Ns do_shadowing env
                                    , is_as = old_mod_name
                                    , is_pkg_qual = NoPkgQual
                                    , is_qual = True
+                                   , is_level = NormalLevel -- MP: Not 100% sure this is correct
                                    , is_isboot = NotBoot
                                    , is_dloc = greDefinitionSrcSpan old_gre }
 
@@ -1974,19 +1984,24 @@ data ImpDeclSpec
         is_pkg_qual :: !PkgQual,    -- ^ Was this a package import?
         is_qual     :: !Bool,       -- ^ Was this import qualified?
         is_dloc     :: !SrcSpan,    -- ^ The location of the entire import declaration
-        is_isboot   :: !IsBootInterface -- ^ Was this a SOURCE import?
+        is_isboot   :: !IsBootInterface, -- ^ Was this a SOURCE import?
+        is_level    :: !ImportLevel -- ^ Was this import level modified? splice/quote +-1
     } deriving (Eq, Data)
+
+
 
 instance NFData ImpDeclSpec where
   rnf = rwhnf -- Already strict in all fields
 
+
 instance Binary ImpDeclSpec where
-  put_ bh (ImpDeclSpec mod as pkg_qual qual _dloc isboot) = do
+  put_ bh (ImpDeclSpec mod as pkg_qual qual _dloc isboot isstage) = do
     put_ bh mod
     put_ bh as
     put_ bh pkg_qual
     put_ bh qual
     put_ bh isboot
+    put_ bh (fromEnum isstage)
 
   get bh = do
     mod <- get bh
@@ -1994,7 +2009,8 @@ instance Binary ImpDeclSpec where
     pkg_qual <- get bh
     qual <- get bh
     isboot <- get bh
-    return (ImpDeclSpec mod as pkg_qual qual noSrcSpan isboot)
+    isstage <- toEnum <$> get bh
+    return (ImpDeclSpec mod as pkg_qual qual noSrcSpan isboot isstage)
 
 -- | Import Item Specification
 --
@@ -2108,6 +2124,9 @@ importSpecLoc (ImpSpec _    item)   = is_iloc item
 importSpecModule :: ImportSpec -> ModuleName
 importSpecModule = moduleName . is_mod . is_decl
 
+importSpecLevel :: ImportSpec -> ImportLevel
+importSpecLevel = is_level . is_decl
+
 isExplicitItem :: ImpItemSpec -> Bool
 isExplicitItem ImpAll                        = False
 isExplicitItem (ImpSome {is_explicit = exp}) = exp
@@ -2145,10 +2164,17 @@ instance Outputable ImportSpec where
    ppr imp_spec
      = text "imported" <+> qual
         <+> text "from" <+> quotes (ppr (importSpecModule imp_spec))
+        <+> level_ppr
         <+> pprLoc (importSpecLoc imp_spec)
      where
        qual | is_qual (is_decl imp_spec) = text "qualified"
             | otherwise                  = empty
+
+       level = thLevelIndexFromImportLevel (is_level (is_decl imp_spec))
+       level_ppr
+        | level == topLevelIndex = empty
+        | otherwise = text "at" <+> ppr level
+
 
 pprLoc :: SrcSpan -> SDoc
 pprLoc (RealSrcSpan s _)  = text "at" <+> ppr s

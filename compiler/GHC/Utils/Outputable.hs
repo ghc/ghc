@@ -33,7 +33,7 @@ module GHC.Utils.Outputable (
         docToSDoc,
         interppSP, interpp'SP, interpp'SP',
         pprQuotedList, pprWithCommas, pprWithSemis,
-        unquotedListWith,
+        unquotedListWith, pprUnquotedSet,
         quotedListWithOr, quotedListWithNor, quotedListWithAnd,
         pprWithBars,
         spaceIfSingleQuote,
@@ -51,7 +51,7 @@ module GHC.Utils.Outputable (
         cat, fcat,
         hang, hangNotEmpty, punctuate, punctuateFinal,
         ppWhen, ppUnless, ppWhenOption, ppUnlessOption,
-        speakNth, speakN, speakNOf, plural, singular,
+        speakNth, speakN, speakNOf, plural, singular, pluralSet,
         isOrAre, doOrDoes, itsOrTheir, thisOrThese, hasOrHave,
         itOrThey,
         unicodeSyntax,
@@ -1080,6 +1080,7 @@ instance Outputable Extension where
 instance Outputable ModuleName where
   ppr = pprModuleName
 
+
 pprModuleName :: IsLine doc => ModuleName -> doc
 pprModuleName (ModuleName nm) =
     docWithStyle (ztext (zEncodeFS nm)) (\_ -> ftext nm)
@@ -1436,6 +1437,15 @@ interpp'SP' f xs = sep (punctuate comma (map f xs))
 pprQuotedList :: Outputable a => [a] -> SDoc
 pprQuotedList = quotedList . map ppr
 
+
+pprUnquotedSet :: Outputable a => Set.Set a -> SDoc
+pprUnquotedSet set =
+  case Set.toList set of
+    [] -> braces empty
+    [x] -> ppr x
+    xs  -> braces (fsep (punctuate comma (map ppr xs)))
+
+
 quotedList :: [SDoc] -> SDoc
 quotedList xs = fsep (punctuate comma (map quotes xs))
 
@@ -1539,6 +1549,10 @@ speakNOf n d = speakN n <+> d <> char 's'               -- E.g. "three arguments
 plural :: [a] -> SDoc
 plural [_] = empty  -- a bit frightening, but there you are
 plural _   = char 's'
+
+-- | Like 'plural', but for sets.
+pluralSet :: Set.Set a -> SDoc
+pluralSet set = plural (Set.toList set)
 
 -- | Determines the singular verb suffix appropriate for the length of a list:
 --

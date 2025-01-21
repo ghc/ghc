@@ -12,4 +12,4 @@ FAMILY INSTANCES
   type instance F Bool _ = Bool
                   -- Defined at TypeFamilyInstanceLHS.hs:8:15
 Dependent modules: []
-Dependent packages: [base-4.19.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]

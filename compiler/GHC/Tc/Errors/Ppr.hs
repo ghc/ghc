@@ -129,6 +129,7 @@ import GHC.Data.BooleanFormula (pprBooleanFormulaNice)
 
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
+import qualified Data.Set as Set
 import Data.Foldable ( fold )
 import Data.Function (on)
 import Data.List ( groupBy, sortBy, tails
@@ -1515,29 +1516,28 @@ instance Diagnostic TcRnMessage where
       hsep [ text "Unknown type variable" <> plural errorVars
            , text "on the RHS of injectivity condition:"
            , interpp'SP errorVars ]
-    TcRnBadlyStaged reason bind_lvl use_lvl
-      -> mkSimpleDecorated $
+    TcRnBadlyLevelled reason bind_lvls use_lvl
+      ->
+      mkSimpleDecorated $
          vcat $
-         [ text "Stage error:" <+> pprStageCheckReason reason <+>
-           hsep [text "is bound at stage" <+> ppr bind_lvl,
-                 text "but used at stage" <+> ppr use_lvl]
+         [ fsep [ text "Level error:", pprLevelCheckReason reason
+                , text "is bound at" <+> pprThBindLevel bind_lvls
+                , text "but used at level" <+> ppr use_lvl]
          ] ++
-         [ hsep [ text "Hint: quoting" <+> thBrackets (ppUnless (isValName n) "t") (ppr n)
-                , text "or an enclosing expression would allow the quotation to be used in an earlier stage"
+         [ fsep [ text "Hint: quoting" <+> thBrackets (ppUnless (isValName n) "t") (ppr n)
+                , text "or an enclosing expression"
+                , text "would allow the quotation to be used at an earlier level"
                 ]
-         | StageCheckSplice n <- [reason]
-         ]
-    TcRnBadlyStagedType name bind_lvl use_lvl
+         | LevelCheckSplice n _ <- [reason]
+         ] ++
+         [ "From imports" <+> (ppr (gre_imp gre))
+         | LevelCheckSplice _ (Just gre) <- [reason]
+         , not (isEmptyBag (gre_imp gre)) ]
+    TcRnBadlyLevelledType name bind_lvls use_lvl
       -> mkSimpleDecorated $
-         text "Badly staged type:" <+> ppr name <+>
-         hsep [text "is bound at stage" <+> ppr bind_lvl,
-               text "but used at stage" <+> ppr use_lvl]
-    TcRnStageRestriction reason
-      -> mkSimpleDecorated $
-         sep [ text "GHC stage restriction:"
-             , nest 2 (vcat [ pprStageCheckReason reason <+>
-                              text "is used in a top-level splice, quasi-quote, or annotation,"
-                            , text "and must be imported, not defined locally"])]
+         text "Badly levelled type:" <+> ppr name <+>
+         fsep [text "is bound at" <+> pprThBindLevel bind_lvls,
+               text "but used at level" <+> ppr use_lvl]
     TcRnTyThingUsedWrong sort thing name
       -> mkSimpleDecorated $
          pprTyThingUsedWrong sort thing name
@@ -2489,12 +2489,10 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnknownTyVarsOnRhsOfInjCond{}
       -> ErrorWithoutFlag
-    TcRnBadlyStaged{}
+    TcRnBadlyLevelled{}
       -> ErrorWithoutFlag
-    TcRnBadlyStagedType{}
-      -> WarningWithFlag Opt_WarnBadlyStagedTypes
-    TcRnStageRestriction{}
-      -> ErrorWithoutFlag
+    TcRnBadlyLevelledType{}
+      -> WarningWithFlag Opt_WarnBadlyLevelledTypes
     TcRnTyThingUsedWrong{}
       -> ErrorWithoutFlag
     TcRnCannotDefaultKindVar{}
@@ -3176,11 +3174,9 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnknownTyVarsOnRhsOfInjCond{}
       -> noHints
-    TcRnBadlyStaged{}
+    TcRnBadlyLevelled{}
       -> noHints
-    TcRnBadlyStagedType{}
-      -> noHints
-    TcRnStageRestriction{}
+    TcRnBadlyLevelledType{}
       -> noHints
     TcRnTyThingUsedWrong{}
       -> noHints
@@ -5780,11 +5776,11 @@ pprWrongThingSort =
     WrongThingTyCon -> "type constructor"
     WrongThingAxiom -> "axiom"
 
-pprStageCheckReason :: StageCheckReason -> SDoc
-pprStageCheckReason = \case
-  StageCheckInstance _ t ->
+pprLevelCheckReason :: LevelCheckReason -> SDoc
+pprLevelCheckReason = \case
+  LevelCheckInstance _ t ->
     text "instance for" <+> quotes (ppr t)
-  StageCheckSplice t ->
+  LevelCheckSplice t _ ->
     quotes (ppr t)
 
 pprUninferrableTyVarCtx :: UninferrableTyVarCtx -> SDoc
@@ -6887,10 +6883,6 @@ pprTHNameError = \case
     mkSimpleDecorated $
       hang (text "The binder" <+> quotes (ppr name) <+> text "is not a NameU.")
          2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
-  QuotedNameWrongStage quote ->
-    mkSimpleDecorated $
-      sep [ text "Stage error: the non-top-level quoted name" <+> ppr quote
-          , text "must be used at the same stage at which it is bound." ]
 
 pprTHReifyError :: THReifyError -> DecoratedSDoc
 pprTHReifyError = \case
@@ -7012,7 +7004,6 @@ thSyntaxErrorReason = \case
 thNameErrorReason :: THNameError -> DiagnosticReason
 thNameErrorReason = \case
   NonExactName {}         -> ErrorWithoutFlag
-  QuotedNameWrongStage {} -> ErrorWithoutFlag
 
 thReifyErrorReason :: THReifyError -> DiagnosticReason
 thReifyErrorReason = \case
@@ -7073,7 +7064,6 @@ thSyntaxErrorHints = \case
 thNameErrorHints :: THNameError -> [GhcHint]
 thNameErrorHints = \case
   NonExactName {}         -> noHints
-  QuotedNameWrongStage {} -> noHints
 
 thReifyErrorHints :: THReifyError -> [GhcHint]
 thReifyErrorHints = \case
@@ -7473,3 +7463,6 @@ pprErrCtxtMsg = \case
       text "in" <+> quotes (ppr req_uid) <> dot
 
 --------------------------------------------------------------------------------
+
+pprThBindLevel :: Set.Set ThLevelIndex -> SDoc
+pprThBindLevel levels_set = text "level" <> pluralSet levels_set <+> pprUnquotedSet levels_set

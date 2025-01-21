@@ -21,7 +21,7 @@ COERCION AXIOMS
   axiom Roles3.N:C3 :: C3 a b = a -> F3 b -> F3 b
   axiom Roles3.N:C4 :: C4 a b = a -> F4 b -> F4 b
 Dependent modules: []
-Dependent packages: [base-4.20.0.0]
+Dependent packages: [(normal, base-4.21.0.0)]
 
 ==================== Typechecker ====================
 Roles3.$tcC4

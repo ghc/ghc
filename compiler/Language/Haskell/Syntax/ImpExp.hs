@@ -1,13 +1,12 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-module Language.Haskell.Syntax.ImpExp where
+module Language.Haskell.Syntax.ImpExp ( module Language.Haskell.Syntax.ImpExp, IsBootInterface(..) ) where
 
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name
+import Language.Haskell.Syntax.ImpExp.IsBoot ( IsBootInterface(..) )
 
 import Data.Eq (Eq)
-import Data.Ord (Ord)
-import Text.Show (Show)
 import Data.Data (Data)
 import Data.Bool (Bool)
 import Data.Maybe (Maybe)
@@ -15,7 +14,6 @@ import Data.String (String)
 import Data.Int (Int)
 
 import Control.DeepSeq
-
 import {-# SOURCE #-} GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 
 {-
@@ -38,15 +36,13 @@ data ImportDeclQualifiedStyle
   | NotQualified  -- ^ Not qualified.
   deriving (Eq, Data)
 
--- | Indicates whether a module name is referring to a boot interface (hs-boot
--- file) or regular module (hs file). We need to treat boot modules specially
--- when building compilation graphs, since they break cycles. Regular source
--- files and signature files are treated equivalently.
-data IsBootInterface = NotBoot | IsBoot
-    deriving (Eq, Ord, Show, Data)
+data ImportDeclLevelStyle
+  = LevelStylePre ImportDeclLevel -- ^ 'splice' or 'quote' appears in prepositive position.
+  | LevelStylePost ImportDeclLevel -- ^ 'splice' or 'quote' appears in postpositive position.
+  | NotLevelled -- ^ Not levelled.
+  deriving (Eq, Data)
 
-instance NFData IsBootInterface where
-  rnf = rwhnf
+data ImportDeclLevel = ImportDeclQuote | ImportDeclSplice deriving (Eq, Data)
 
 -- | Import Declaration
 --
@@ -57,6 +53,7 @@ data ImportDecl pass
       ideclName       :: XRec pass ModuleName, -- ^ Module name.
       ideclPkgQual    :: ImportDeclPkgQual pass,  -- ^ Package qualifier.
       ideclSource     :: IsBootInterface,      -- ^ IsBoot \<=> {-\# SOURCE \#-} import
+      ideclLevelSpec  :: ImportDeclLevelStyle,
       ideclSafe       :: Bool,          -- ^ True => safe import
       ideclQualified  :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclAs         :: Maybe (XRec pass ModuleName),  -- ^ as Module

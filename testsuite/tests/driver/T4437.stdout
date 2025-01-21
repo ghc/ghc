@@ -1,0 +1,6 @@
+GHC-only flags: Unexpected flags
+-----
+ExplicitLevelImports
+ImplicitStagePersistence
+-----
+

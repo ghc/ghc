@@ -1624,14 +1624,14 @@ Example:
     ==>
 
     instance (Lift a) => Lift (Foo a) where
-        lift (Foo a) = [| Foo $(lift a) |]
-        lift ((:^:) u v) = [| (:^:) $(lift u) $(lift v) |]
+        lift (Foo a) = ConE 'Foo `appE` (lift a)
+        lift ((:^:) u v) = ConE '(:^:) `appE` (lift u) `appE` (lift v)
 
-        liftTyped (Foo a) = [|| Foo $$(liftTyped a) ||]
-        liftTyped ((:^:) u v) = [|| (:^:) $$(liftTyped u) $$(liftTyped v) ||]
+        liftTyped (Foo a) = unsafeCodeCoerce (ConE 'Foo `appE` (lift a))
+        liftTyped ((:^:) u v) = unsafeCodeCoerce (ConE '(:^:) `appE` (lift u) `appE` (lift v))
 
-Note that we use explicit splices here in order to not trigger the implicit
-lifting warning in derived code. (See #20688)
+Note that we use variable quotes, in order to avoid the constructor being
+lifted by implicit cross-stage lifting when `-XNoImplicitStagePersistence` is enabled.
 -}
 
 
@@ -1641,33 +1641,37 @@ gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
   ([lift_bind, liftTyped_bind], emptyBag)
   where
     lift_bind      = mkFunBindEC 1 loc lift_RDR (nlHsApp pure_Expr)
-                                 (map (pats_etc mk_untyped_bracket mk_usplice liftName) data_cons)
+                                 (map (pats_etc mk_untyped_bracket ) data_cons)
     liftTyped_bind = mkFunBindEC 1 loc liftTyped_RDR (nlHsApp unsafeCodeCoerce_Expr . nlHsApp pure_Expr)
-                                 (map (pats_etc mk_typed_bracket mk_tsplice liftTypedName) data_cons)
+                                 (map (pats_etc mk_typed_bracket ) data_cons)
 
-    mk_untyped_bracket = HsUntypedBracket noExtField . ExpBr noAnn
-    mk_typed_bracket = HsTypedBracket noAnn
+    mk_untyped_bracket = id
+    mk_typed_bracket = nlHsApp unsafeCodeCoerce_Expr
 
-    mk_tsplice = HsTypedSplice noAnn
-    mk_usplice = HsUntypedSplice noExtField . HsUntypedSpliceExpr noAnn
     data_cons = getPossibleDataCons tycon tycon_args
 
-    pats_etc mk_bracket mk_splice lift_name data_con
+
+    pats_etc :: (LHsExpr GhcPs -> LHsExpr GhcPs) -> DataCon -> ([LPat GhcPs], LHsExpr GhcPs)
+    pats_etc mk_bracket data_con
       = ([con_pat], lift_Expr)
        where
             con_pat      = nlConVarPat data_con_RDR as_needed
             data_con_RDR = getRdrName data_con
             con_arity    = dataConSourceArity data_con
             as_needed    = take con_arity as_RDRs
-            lift_Expr    = noLocA (mk_bracket br_body)
-            br_body      = nlHsApps (Exact (dataConName data_con))
-                                    (map lift_var as_needed)
+            lift_Expr    = mk_bracket finish
+            con_brack :: LHsExpr GhcPs
+            con_brack    = nlHsApps (Exact conEName)
+                            [noLocA $ HsUntypedBracket noExtField
+                              $ VarBr noSrcSpanA True (noLocA (Exact (dataConName data_con)))]
+
+            finish = foldl' (\b1 b2 -> nlHsApps (Exact appEName) [b1, b2]) con_brack (map lift_var as_needed)
 
             lift_var :: RdrName -> LHsExpr (GhcPass 'Parsed)
-            lift_var x   = noLocA (mk_splice (nlHsPar (mk_lift_expr x)))
+            lift_var x   = nlHsPar (mk_lift_expr x)
 
             mk_lift_expr :: RdrName -> LHsExpr (GhcPass 'Parsed)
-            mk_lift_expr x = nlHsApps (Exact lift_name) [nlHsVar x]
+            mk_lift_expr x = nlHsApps (Exact liftName) [nlHsVar x]
 
 {-
 ************************************************************************

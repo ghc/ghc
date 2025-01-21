@@ -348,7 +348,8 @@ rnAnnDecl :: AnnDecl GhcPs -> RnM (AnnDecl GhcRn, FreeVars)
 rnAnnDecl ann@(HsAnnotation (_, s) provenance expr)
   = addErrCtxt (AnnCtxt ann) $
     do { (provenance', provenance_fvs) <- rnAnnProvenance provenance
-       ; (expr', expr_fvs) <- setStage (Splice Untyped) $
+       ; cur_level <- getThLevel
+       ; (expr', expr_fvs) <- setThLevel (Splice Untyped cur_level) $
                               rnLExpr expr
        ; return (HsAnnotation (noAnn, s) provenance' expr',
                  provenance_fvs `plusFV` expr_fvs) }

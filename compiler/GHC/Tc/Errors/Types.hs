@@ -99,7 +99,7 @@ module GHC.Tc.Errors.Types (
   , RuleLhsErrReason(..)
   , HsigShapeMismatchReason(..)
   , WrongThingSort(..)
-  , StageCheckReason(..)
+  , LevelCheckReason(..)
   , UninferrableTyVarCtx(..)
   , PatSynInvalidRhsReason(..)
   , BadFieldAnnotationReason(..)
@@ -254,6 +254,7 @@ import Data.Map.Strict (Map)
 
 import GHC.Generics ( Generic )
 
+import qualified Data.Set as Set
 
 data TcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext :: !Bool -- ^ Whether we show the error context or not
                                        , tcOptsIfaceOpts   :: !IfaceMessageOpts
@@ -3486,41 +3487,31 @@ data TcRnMessage where
     -> !LookupInstanceErrReason
     -> TcRnMessage
 
-  {-| TcRnBadlyStaged is an error that occurs when a TH binding is used in an
-    invalid stage.
+  {-| TcRnBadlyLevelled is an error that occurs when a TH binding is used at an
+      invalid level.
 
     Test cases:
-      T17820d
+      T17820d, T17820, T21547, T5795, qq00[1-4], annfail0{3,4,6,9}
   -}
-  TcRnBadlyStaged
-    :: !StageCheckReason -- ^ The binding being spliced.
-    -> !Int -- ^ The binding stage.
-    -> !Int -- ^ The stage at which the binding is used.
+  TcRnBadlyLevelled
+    :: !LevelCheckReason -- ^ The binding
+    -> !(Set.Set ThLevelIndex) -- ^ The binding levels
+    -> !ThLevelIndex -- ^ The level at which the binding is used.
     -> TcRnMessage
 
-  {-| TcRnStageRestriction is an error that occurs when a top level splice refers to
-    a local name.
-
-    Test cases:
-      T17820, T21547, T5795, qq00[1-4], annfail0{3,4,6,9}
-  -}
-  TcRnStageRestriction
-    :: !StageCheckReason -- ^ The binding being spliced.
-    -> TcRnMessage
-
-  {-| TcRnBadlyStagedWarn is a warning that occurs when a TH type binding is
+  {-| TcRnBadlyLevelledWarn is a warning that occurs when a TH type binding is
     used in an invalid stage.
 
     Controlled by flags:
-       - Wbadly-staged-type
+       - Wbadly-levelled-type
 
     Test cases:
       T23829_timely T23829_tardy T23829_hasty
   -}
-  TcRnBadlyStagedType
+  TcRnBadlyLevelledType
     :: !Name  -- ^ The type binding being spliced.
-    -> !Int -- ^ The binding stage.
-    -> !Int -- ^ The stage at which the binding is used.
+    -> !(Set.Set ThLevelIndex) -- ^ The binding stage.
+    -> !ThLevelIndex -- ^ The stage at which the binding is used.
     -> TcRnMessage
 
   {-| TcRnTyThingUsedWrong is an error that occurs when a thing is used where another
@@ -6244,9 +6235,9 @@ data WrongThingSort
   | WrongThingTyCon
   | WrongThingAxiom
 
-data StageCheckReason
-  = StageCheckInstance !InstanceWhat !PredType
-  | StageCheckSplice !Name
+data LevelCheckReason
+  = LevelCheckInstance !InstanceWhat !PredType
+  | LevelCheckSplice !Name !(Maybe GlobalRdrElt)
 
 data UninferrableTyVarCtx
   = UninfTyCtx_ClassContext [TcType]
@@ -6759,13 +6750,6 @@ data THNameError
   -}
   = NonExactName !RdrName
 
-  {-| QuotedNameWrongStage is an error that can happen when a
-      (non-top-level) Name is used at a different Template Haskell stage
-      than the stage at which it is bound.
-
-     Test cases: T16976z
-  -}
-  | QuotedNameWrongStage !(HsQuote GhcPs)
   deriving Generic
 
 data THReifyError

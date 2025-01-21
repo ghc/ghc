@@ -181,6 +181,7 @@ GHC.Types.SourceFile
 GHC.Types.SourceText
 GHC.Types.SptEntry
 GHC.Types.SrcLoc
+GHC.Types.ThLevelIndex
 GHC.Types.Tickish
 GHC.Types.TyThing
 GHC.Types.Unique
@@ -244,6 +245,7 @@ Language.Haskell.Syntax.Decls
 Language.Haskell.Syntax.Expr
 Language.Haskell.Syntax.Extension
 Language.Haskell.Syntax.ImpExp
+Language.Haskell.Syntax.ImpExp.IsBoot
 Language.Haskell.Syntax.Lit
 Language.Haskell.Syntax.Module.Name
 Language.Haskell.Syntax.Pat

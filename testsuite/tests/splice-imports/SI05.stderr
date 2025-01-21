@@ -1,0 +1,18 @@
+SI05.hs:10:11: error: [GHC-28914]
+    • Level error: ‘SI01A.sid’ is bound at level 0 but used at level -1
+      Hint: quoting [| SI01A.sid |] or an enclosing expression
+      would allow the quotation to be used at an earlier level
+      From imports {imported from ‘SI01A’ at SI05.hs:6:1-12}
+    • In the untyped splice: $(sid [| pure () |])
+
+SI05.hs:10:11: error: [GHC-87543]
+    • Ambiguous occurrence ‘sid’.
+      It could refer to
+         either ‘SI01A.sid’,
+                imported from ‘SI01A’ at SI05.hs:6:1-12
+                (and originally defined at SI01A.hs:3:1-3),
+             or ‘SI05A.sid’,
+                imported from ‘SI05A’ at -1 at SI05.hs:7:1-19
+                (and originally defined at SI05A.hs:3:1-3).
+    • In the untyped splice: $(sid [| pure () |])
+

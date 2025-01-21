@@ -59,9 +59,15 @@ module GHC.Tc.Types(
         CompleteMatch, CompleteMatches,
 
         -- Template Haskell
-        ThStage(..), SpliceType(..), SpliceOrBracket(..), PendingStuff(..),
-        topStage, topAnnStage, topSpliceStage,
-        ThLevel, impLevel, outerLevel, thLevel,
+        ThLevel(..), SpliceType(..), SpliceOrBracket(..), PendingStuff(..),
+        topLevel, topAnnLevel, topSpliceLevel,
+        ThLevelIndex,
+        topLevelIndex,
+        spliceLevelIndex,
+        quoteLevelIndex,
+
+        thLevelIndex,
+
         ForeignSrcLang(..), THDocs, DocLoc(..),
         ThBindEnv,
 
@@ -902,6 +908,20 @@ mkModDeps deps = S.foldl' add emptyInstalledModuleEnv deps
   where
     add env (uid, elt) = extendInstalledModuleEnv env (mkModule uid (gwib_mod elt)) elt
 
+plusDirectModDeps :: InstalledModuleEnv (S.Set ImportLevel, ModuleNameWithIsBoot)
+            -> InstalledModuleEnv (S.Set ImportLevel, ModuleNameWithIsBoot)
+            -> InstalledModuleEnv (S.Set ImportLevel, ModuleNameWithIsBoot)
+plusDirectModDeps = plusInstalledModuleEnv plus_mod_dep
+  where
+    plus_mod_dep (st1, r1@(GWIB { gwib_mod = m1, gwib_isBoot = boot1 }))
+                 (st2, r2@(GWIB {gwib_mod = m2, gwib_isBoot = boot2}))
+      | assertPpr (m1 == m2) ((ppr m1 <+> ppr m2) $$ (ppr (boot1 == IsBoot) <+> ppr (boot2 == IsBoot)))
+        boot1 == IsBoot = (st1 `S.union` st2, r2)
+      | otherwise = (st1 `S.union` st2, r1)
+      -- If either side can "see" a non-hi-boot interface, use that
+      -- Reusing existing tuples saves 10% of allocations on test
+      -- perf/compiler/MultiLayerModules
+
 plusModDeps :: InstalledModuleEnv ModuleNameWithIsBoot
             -> InstalledModuleEnv ModuleNameWithIsBoot
             -> InstalledModuleEnv ModuleNameWithIsBoot
@@ -949,7 +969,7 @@ plusImportAvails
                   imp_trust_pkgs = tpkgs2, imp_trust_own_pkg = tself2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
   = ImportAvails { imp_mods          = M.unionWith (++) mods1 mods2,
-                   imp_direct_dep_mods = ddmods1 `plusModDeps` ddmods2,
+                   imp_direct_dep_mods = ddmods1 `plusDirectModDeps` ddmods2,
                    imp_dep_direct_pkgs      = ddpkgs1 `S.union` ddpkgs2,
                    imp_trust_pkgs    = tpkgs1 `S.union` tpkgs2,
                    imp_trust_own_pkg = tself1 || tself2,

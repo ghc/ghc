@@ -207,6 +207,9 @@ data PsMessage
    -- | Import: multiple occurrences of 'qualified'
    | PsErrImportQualifiedTwice
 
+   -- | Multiple occurrences of a splice or quote keyword
+   | PsErrSpliceOrQuoteTwice
+
    -- | Post qualified import without 'ImportQualifiedPost'
    | PsErrImportPostQualified
 

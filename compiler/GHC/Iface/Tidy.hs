@@ -477,7 +477,10 @@ tidyProgram opts (ModGuts { mg_module           = mod
                  , cg_ccs           = S.toList local_ccs
                  , cg_foreign       = all_foreign_stubs
                  , cg_foreign_files = foreign_files
-                 , cg_dep_pkgs      = dep_direct_pkgs deps
+                 -- TODO: Check whether we need to account for levels here.
+                 -- It seems that this field just gets used to write a comment
+                 -- in C codegen, so it's value doesn't affect an important result.
+                 , cg_dep_pkgs      = S.map snd (dep_direct_pkgs deps)
                  , cg_modBreaks     = modBreaks
                  , cg_spt_entries   = spt_entries
                  }

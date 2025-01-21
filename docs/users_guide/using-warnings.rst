@@ -78,7 +78,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wgadt-mono-local-binds`
         * :ghc-flag:`-Wtype-equality-requires-operators`
         * :ghc-flag:`-Wtype-equality-out-of-scope`
-        * :ghc-flag:`-Wbadly-staged-types`
+        * :ghc-flag:`-Wbadly-levelled-types`
         * :ghc-flag:`-Winconsistent-flags`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
         * :ghc-flag:`-Wnoncanonical-monad-instances`
@@ -2554,22 +2554,32 @@ of ``-W(no-)*``.
      When :ghc-flag:`-Wincomplete-export-warnings` is enabled, GHC warns about exports
      that are not deprecating a name that is deprecated with another export in that module.
 
-.. ghc-flag:: -Wbadly-staged-types
-    :shortdesc: warn when type binding is used at the wrong TH stage.
+.. ghc-flag:: -Wbadly-levelled-types
+    :shortdesc: warn when type binding is used at the wrong Template Haskell level.
     :type: dynamic
-    :reverse: -Wno-badly-staged-types
+    :reverse: -Wno-badly-levelled-types
 
-    :since: 9.10.1
+    :since: 9.14.1
 
     Consider an example: ::
 
         tardy :: forall a. Proxy a -> IO Type
         tardy _ = [t| a |]
 
-    The type binding ``a`` is bound at stage 1 but used on stage 2.
+    The type binding ``a`` is bound at level 0 but used at level 1.
 
-    This is badly staged program, and the ``tardy (Proxy @Int)`` won't produce
+    This is a badly levelled program, and the ``tardy (Proxy @Int)`` won't produce
     a type representation of ``Int``, but rather a local name ``a``.
+
+.. ghc-flag:: -Wbadly-staged-types
+    :shortdesc: A deprecated alias for :ghc-flag:`-Wbadly-levelled-types`
+    :type: dynamic
+    :reverse: -Wno-badly-staged-types
+
+    :since: 9.10.1
+
+    A deprecated alias for :ghc-flag:`-Wbadly-levelled-types`
+
 
 .. ghc-flag:: -Winconsistent-flags
     :shortdesc: warn when command line options are inconsistent in some way.

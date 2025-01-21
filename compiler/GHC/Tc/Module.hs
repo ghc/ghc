@@ -164,6 +164,7 @@ import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.Deps
+import GHC.Driver.Downsweep
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
@@ -2069,6 +2070,25 @@ exist. For this logic see GHC.IfaceToCore.mk_top_id.
 There is also some similar (probably dead) logic in GHC.Rename.Env which says it
 was added for External Core which faced a similar issue.
 
+Note [runTcInteractive module graph]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The `withInteractiveModuleNode` function sets up the module graph which contains
+the interactive module used by `runTcInteractive`.
+
+The module graph is essentially the ambient module graph which is set up when
+ghci loads a module using `load`, with the addition of the interactive module (Ghci<N>),
+which imports the parts specified by the `InteractiveImports`.
+
+Therefore `downsweepInteractiveImports` presumes that any import which is
+determined to be from the home module is already present in the module graph.
+This saves resummarising and performing the whole downsweep again if it's already been
+done.
+
+On the other hand, when GHCi starts up, and no modules have been loaded yet, the
+module graph will be empty. Therefore `downsweepInteractiveImports` will perform
+for the unit portion of the graph, if it's not already been performed.
+
 
 *********************************************************
 *                                                       *
@@ -2077,12 +2097,20 @@ was added for External Core which faced a similar issue.
 *********************************************************
 -}
 
+-- See Note [runTcInteractive module graph]
+withInteractiveModuleNode :: HscEnv -> TcM a -> TcM a
+withInteractiveModuleNode hsc_env thing_inside = do
+  mg <- liftIO $ downsweepInteractiveImports hsc_env (hsc_IC hsc_env)
+  updTopEnv (\env -> env { hsc_mod_graph = mg }) thing_inside
+
+
 runTcInteractive :: HscEnv -> TcRn a -> IO (Messages TcRnMessage, Maybe a)
 -- Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
 runTcInteractive hsc_env thing_inside
   = initTcInteractive hsc_env $ withTcPlugins hsc_env $
     withDefaultingPlugins hsc_env $ withHoleFitPlugins hsc_env $
+    withInteractiveModuleNode hsc_env $
     do { traceTc "setInteractiveContext" $
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
                  , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) (instEnvElts ic_insts))
