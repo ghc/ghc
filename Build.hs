@@ -432,9 +432,6 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , def_string "TargetVendor"      "FIXME"
         , def_string "GhcUnregisterised" "FIXME"
         , def_string "TablesNextToCode"  "FIXME"
-        , "  ghc-options: -I" ++ (src_rts </> "include")
-        , "  ghc-options: -I" ++ (src_rts </> "adjustor")
-        , "  ghc-options: -I" ++ src_rts
         ]
 
   makeCabalProject cabal_project_rts_path $
@@ -609,6 +606,8 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         ] ++ rts_options
 
   let build_boot_cmd = runCabal cabal
+        -- [ "install"
+        -- , "--lib"
         [ "build"
         , "--project-file=" ++ cabal_project_bootlibs_path
         , "--with-compiler=" ++ ghcPath ghc
