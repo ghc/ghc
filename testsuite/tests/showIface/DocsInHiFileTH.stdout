@@ -289,5 +289,7 @@ docs:
          StandaloneKindSignatures
          FieldSelectors
          ListTuplePuns
+         PathCrossStagedPersistence
+         LiftCrossStagedPersistence
 extensible fields:
 

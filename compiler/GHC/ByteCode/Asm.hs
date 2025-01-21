@@ -530,7 +530,7 @@ assembleI platform i = case i of
                                                   ]
 #if MIN_VERSION_rts(1,0,3)
   BCO_NAME name            -> do np <- lit [BCONPtrStr name]
-                                 emit bci_BCO_NAME [Op np]
+                                 emit 88 [Op np]
 #endif
 
   where

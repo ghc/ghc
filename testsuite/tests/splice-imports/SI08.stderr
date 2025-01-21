@@ -1,0 +1,6 @@
+SI08.hs:12:25: error: [GHC-28914]
+    • Stage error: instance for ‘C X’ is bound at stage {1} but used at stage 0
+    • In the second argument of ‘const’, namely ‘(x vx)’
+      In the expression: const [| x vx |] (x vx)
+      In the untyped splice: $(const [| x vx |] (x vx))
+

@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE LiftCSP #-}
 module Main where
 -- A test to check that CSP works with overloaded quotes
 

@@ -206,6 +206,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
 import qualified GHC.Data.Strict as Strict
+import qualified Data.Set as Set
 
 import GHC.Types.Error
 import GHC.Types.DefaultEnv ( DefaultEnv, emptyDefaultEnv )
@@ -225,7 +226,7 @@ import GHC.Types.Unique.FM ( emptyUFM )
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Supply
 import GHC.Types.Annotations
-import GHC.Types.Basic( TopLevelFlag, TypeOrKind(..) )
+import GHC.Types.Basic( TopLevelFlag(..), TypeOrKind(..) )
 import GHC.Types.CostCentre.State
 import GHC.Types.SourceFile
 
@@ -2080,12 +2081,39 @@ keepAlive name
 getStage :: TcM ThStage
 getStage = do { env <- getLclEnv; return (getLclEnvThStage env) }
 
-getStageAndBindLevel :: Name -> TcRn (Maybe (TopLevelFlag, ThLevel, ThStage))
+getStageAndBindLevel :: Name -> TcRn (Maybe (TopLevelFlag, Set.Set ThLevel, ThStage))
 getStageAndBindLevel name
   = do { env <- getLclEnv;
        ; case lookupNameEnv (getLclEnvThBndrs env) name of
-           Nothing                  -> return Nothing
-           Just (top_lvl, bind_lvl) -> return (Just (top_lvl, bind_lvl, getLclEnvThStage env)) }
+           Nothing                  -> do
+              lvls <- getExternalBindLvl name
+              if Set.empty == lvls
+                -- This case happens when code is generated for identifiers which are not
+                -- in scope.
+                --
+                -- TODO: What happens if someone generates [|| GHC.Magic.dataToTag# ||]
+                then do
+                  --env <- getGlobalRdrEnv
+                  --pprTrace "NO_LVLS" (ppr name) (return Nothing)
+                  return Nothing
+                else return (Just (TopLevel, lvls, getLclEnvThStage env))
+           Just (top_lvl, bind_lvl) -> return (Just (top_lvl, Set.singleton bind_lvl, getLclEnvThStage env)) }
+
+getExternalBindLvl :: Name -> TcRn (Set.Set ThLevel)
+getExternalBindLvl name = do
+  env <- getGlobalRdrEnv
+  mod <- getModule
+  case lookupGRE_Name env name of
+    Just gre -> return $ (Set.map convert_lvl (greStages gre))
+    Nothing ->
+      if nameIsLocalOrFrom mod name
+        then return $ Set.singleton outerLevel
+--        else pprTrace "NO LVLS" (ppr name) (return Set.empty) -- pprPanic "getExternalBindLvl" (ppr env $$ ppr name $$ ppr (nameSrcSpan name))
+        else return Set.empty
+  where
+    convert_lvl NormalStage = thLevel topStage
+    convert_lvl SpliceStage = thLevel topSpliceStage
+    convert_lvl QuoteStage  = thLevel (Brack topStage undefined)
 
 setStage :: ThStage -> TcM a -> TcRn a
 setStage s = updLclEnv (setLclEnvThStage s)

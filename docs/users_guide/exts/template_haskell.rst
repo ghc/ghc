@@ -469,6 +469,27 @@ splices and quotations are supported.)
     was not written by the user. If you want to have warnings for splices
     anyway, pass :ghc-flag:`-fenable-th-splice-warnings`.
 
+.. extension:: ExplicitLevelImports
+    :shortdesc: TODO
+
+    :since: 8.0.1
+
+    Enable Template Haskell's quotation syntax.
+
+.. extension:: ImplicitStagePersistence
+    :shortdesc: TODO
+
+    :since: 8.0.1
+
+    Enable Template Haskell's quotation syntax.
+
+.. extension:: LiftCSP
+    :shortdesc: TODO
+
+    :since: 8.0.1
+
+    TODO
+
 .. _th-usage:
 
 Using Template Haskell

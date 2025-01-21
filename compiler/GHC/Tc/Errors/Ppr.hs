@@ -1476,8 +1476,11 @@ instance Diagnostic TcRnMessage where
          [ hsep [ text "Hint: quoting" <+> thBrackets (ppUnless (isValName n) "t") (ppr n)
                 , text "or an enclosing expression would allow the quotation to be used in an earlier stage"
                 ]
-         | StageCheckSplice n <- [reason]
-         ]
+         | StageCheckSplice n _ <- [reason]
+         ] ++
+         [ "From imports" <+> (ppr (gre_imp gre))
+         | StageCheckSplice _ (Just gre) <- [reason]
+         , not (isEmptyBag (gre_imp gre)) ]
     TcRnBadlyStagedType name bind_lvl use_lvl
       -> mkSimpleDecorated $
          text "Badly staged type:" <+> ppr name <+>
@@ -5726,7 +5729,7 @@ pprStageCheckReason :: StageCheckReason -> SDoc
 pprStageCheckReason = \case
   StageCheckInstance _ t ->
     text "instance for" <+> quotes (ppr t)
-  StageCheckSplice t ->
+  StageCheckSplice t _ ->
     quotes (ppr t)
 
 pprUninferrableTyVarCtx :: UninferrableTyVarCtx -> SDoc

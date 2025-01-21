@@ -5,15 +5,8 @@
     • In the expression: [d| a = () |] :: Q Exp
       In an equation for ‘x’: x = [d| a = () |] :: Q Exp
 
-<interactive>:1:1: error: [GHC-87897]
-    • Exception when trying to run compile-time code:
-        <interactive>:3:9: error: [GHC-83865]
-    • Couldn't match type ‘[Dec]’ with ‘Exp’
-      Expected: Q Exp
-        Actual: Q GHC.Internal.TH.Lib.Decs
-    • In the expression: [d| a = () |] :: Q Exp
-      In an equation for ‘x’: x = [d| a = () |] :: Q Exp
-(deferred type error)
-      Code: x
+<interactive>:1:2: error: [GHC-28914]
+    • Stage error: ‘x’ is bound at stage {1} but used at stage 0
+      Hint: quoting [| x |] or an enclosing expression would allow the quotation to be used in an earlier stage
     • In the untyped splice: $x
 

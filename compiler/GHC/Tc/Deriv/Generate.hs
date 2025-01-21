@@ -1642,33 +1642,44 @@ gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
   ([lift_bind, liftTyped_bind], emptyBag)
   where
     lift_bind      = mkFunBindEC 1 loc lift_RDR (nlHsApp pure_Expr)
-                                 (map (pats_etc mk_untyped_bracket mk_usplice liftName) data_cons)
+                                 (map (pats_etc mk_untyped_bracket ) data_cons)
     liftTyped_bind = mkFunBindEC 1 loc liftTyped_RDR (nlHsApp unsafeCodeCoerce_Expr . nlHsApp pure_Expr)
-                                 (map (pats_etc mk_typed_bracket mk_tsplice liftTypedName) data_cons)
+                                 (map (pats_etc mk_typed_bracket ) data_cons)
 
-    mk_untyped_bracket = HsUntypedBracket noExtField . ExpBr noAnn
-    mk_typed_bracket = HsTypedBracket noAnn
+    mk_untyped_bracket = id
+    mk_typed_bracket = nlHsApp unsafeCodeCoerce_Expr
 
-    mk_tsplice = HsTypedSplice noAnn
-    mk_usplice = HsUntypedSplice noExtField . HsUntypedSpliceExpr noAnn
     data_cons = getPossibleDataCons tycon tycon_args
 
-    pats_etc mk_bracket mk_splice lift_name data_con
+
+    pats_etc :: (LHsExpr GhcPs -> LHsExpr GhcPs) -> DataCon -> ([LPat GhcPs], LHsExpr GhcPs)
+    pats_etc mk_bracket data_con
       = ([con_pat], lift_Expr)
        where
             con_pat      = nlConVarPat data_con_RDR as_needed
             data_con_RDR = getRdrName data_con
             con_arity    = dataConSourceArity data_con
             as_needed    = take con_arity as_RDRs
-            lift_Expr    = noLocA (mk_bracket br_body)
+            lift_Expr    = mk_bracket finish
+            con_brack :: LHsExpr GhcPs
+            con_brack    = nlHsApps (Exact conEName) [noLocA $ HsUntypedBracket noExtField $ VarBr noSrcSpanA True (noLocA (Exact (dataConName data_con)))]
+
+            finish = foldl' (\b1 b2 -> nlHsApps (Exact appEName) [b1, b2]) con_brack (map lift_var2 as_needed)
+
+
+{-
             br_body      = nlHsApps (Exact (dataConName data_con))
                                     (map lift_var as_needed)
+                                    -}
 
-            lift_var :: RdrName -> LHsExpr (GhcPass 'Parsed)
-            lift_var x   = noLocA (mk_splice (nlHsPar (mk_lift_expr x)))
+--            lift_var :: RdrName -> LHsExpr (GhcPass 'Parsed)
+--            lift_var x   = noLocA (mk_splice (nlHsPar (mk_lift_expr x)))
+
+            lift_var2 :: RdrName -> LHsExpr (GhcPass 'Parsed)
+            lift_var2 x   = nlHsPar (mk_lift_expr x)
 
             mk_lift_expr :: RdrName -> LHsExpr (GhcPass 'Parsed)
-            mk_lift_expr x = nlHsApps (Exact lift_name) [nlHsVar x]
+            mk_lift_expr x = nlHsApps (Exact liftName) [nlHsVar x]
 
 {-
 ************************************************************************

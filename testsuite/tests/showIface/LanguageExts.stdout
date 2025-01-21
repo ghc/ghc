@@ -25,5 +25,7 @@ docs:
          CUSKs
          FieldSelectors
          ListTuplePuns
+         PathCrossStagedPersistence
+         LiftCrossStagedPersistence
 extensible fields:
 

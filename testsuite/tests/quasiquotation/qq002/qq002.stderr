@@ -1,6 +1,5 @@
+qq002.hs:8:10: error: [GHC-28914]
+    • Stage error: ‘parse’ is bound at stage {1} but used at stage 0
+      Hint: quoting [| parse |] or an enclosing expression would allow the quotation to be used in an earlier stage
+    • In the quasi-quotation: [parse||]
 
-qq002.hs:8:10: [GHC-18157]
-    GHC stage restriction:
-      ‘parse’ is used in a top-level splice, quasi-quote, or annotation,
-      and must be imported, not defined locally
-    In the quasi-quotation: [parse||]

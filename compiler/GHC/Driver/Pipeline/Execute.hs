@@ -706,12 +706,12 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
     let imp_prelude = xopt LangExt.ImplicitPrelude dflags
         popts = initParserOpts dflags
         rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
-        rn_imps = fmap (\(rpk, lmn@(L _ mn)) -> (rn_pkg_qual mn rpk, lmn))
+        rn_imps = fmap (\(s, rpk, lmn@(L _ mn)) -> (s, rn_pkg_qual mn rpk, lmn))
     eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
     case eimps of
         Left errs -> throwErrors (GhcPsMessage <$> errs)
         Right (src_imps,imps, ghc_prim_imp, L _ mod_name) -> return
-              (Just buf, mod_name, rn_imps imps, rn_imps src_imps, ghc_prim_imp)
+              (Just buf, mod_name, rn_imps imps, src_imps, ghc_prim_imp)
 
   -- Take -o into account if present
   -- Very like -ohi, but we must *only* do this if we aren't linking

@@ -1,5 +1,5 @@
 T23829_hasty_b.hs:8:42: error: [GHC-28914]
-    • Stage error: ‘ty’ is bound at stage 2 but used at stage 1
+    • Stage error: ‘ty’ is bound at stage {2} but used at stage 1
       Hint: quoting [t| ty |] or an enclosing expression would allow the quotation to be used in an earlier stage
     • In the untyped splice: $ty
       In the Template Haskell quotation:

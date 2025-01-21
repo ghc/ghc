@@ -1,0 +1,6 @@
+SI03.hs:8:11: error: [GHC-28914]
+    • Stage error: ‘sid’ is bound at stage {1} but used at stage 0
+      Hint: quoting [| sid |] or an enclosing expression would allow the quotation to be used in an earlier stage
+      From imports {imported from ‘SI01A’ at SI03.hs:5:1-12}
+    • In the untyped splice: $(sid [| pure () |])
+

@@ -85,6 +85,7 @@ import GHC.Utils.Panic
 import GHC.Data.Maybe
 import Control.Monad
 import GHC.Rename.Unbound (WhatLooking(WL_Anything))
+import qualified GHC.LanguageExtensions as LangExt
 
 
 
@@ -1083,16 +1084,19 @@ checkThLocalId :: Id -> TcM ()
 -- Here we just add constraints for cross-stage lifting
 checkThLocalId id
   = do  { mb_local_use <- getStageAndBindLevel (idName id)
+--        ; pprTraceM "local" (ppr id $$ ppr mb_local_use)
         ; case mb_local_use of
              Just (top_lvl, bind_lvl, use_stage)
-                | thLevel use_stage > bind_lvl
-                -> checkCrossStageLifting top_lvl id use_stage
+                | thLevel use_stage `notElem` bind_lvl
+                -> do
+                    dflags <- getDynFlags
+                    checkCrossStageLifting dflags top_lvl id use_stage
              _  -> return ()   -- Not a locally-bound thing, or
                                -- no cross-stage link
     }
 
 --------------------------------------
-checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
+checkCrossStageLifting :: DynFlags -> TopLevelFlag -> Id -> ThStage -> TcM ()
 -- If we are inside typed brackets, and (use_lvl > bind_lvl)
 -- we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [|| x ||]
@@ -1101,12 +1105,13 @@ checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
 -- This is similar to checkCrossStageLifting in GHC.Rename.Splice, but
 -- this code is applied to *typed* brackets.
 
-checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
+checkCrossStageLifting dflags top_lvl id (Brack _ (TcPending ps_var lie_var q))
   | isTopLevel top_lvl
+  , xopt LangExt.ImplicitStagePersistence dflags
   = when (isExternalName id_name) (keepAlive id_name)
     -- See Note [Keeping things alive for Template Haskell] in GHC.Rename.Splice
 
-  | otherwise
+  | xopt LangExt.LiftCrossStagedPersistence dflags
   =     -- Nested identifiers, such as 'x' in
         -- E.g. \x -> [|| h x ||]
         -- We must behave as if the reference to x was
@@ -1147,10 +1152,11 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
         ; writeMutVar ps_var (pending_splice : ps)
 
         ; return () }
+    | otherwise = error "todo"
   where
     id_name = idName id
 
-checkCrossStageLifting _ _ _ = return ()
+checkCrossStageLifting _ _ _ _ = return ()
 
 {-
 Note [Lifting strings]

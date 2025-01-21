@@ -83,6 +83,7 @@ import Data.Ord
 import Data.Containers.ListUtils
 import Data.Bifunctor
 import GHC.Iface.Errors.Ppr
+import GHC.Types.PkgQual
 
 {-
   -----------------------------------------------
@@ -587,8 +588,12 @@ checkMergedSignatures hsc_env mod_summary iface = do
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
  = do
-    res_normal <- classify_import (findImportedModule hsc_env) (ms_textual_imps summary ++ ms_srcimps summary)
-    res_plugin <- classify_import (\mod _ -> findPluginModule fc fopts units mhome_unit mod) (ms_plugin_imps summary)
+    res_normal <- classify_import (findImportedModule hsc_env)
+                                  ([(p, m) | (_, p, m) <- (ms_textual_imps summary)]
+                                  ++
+                                  [(NoPkgQual, m) | m <- ms_srcimps summary ])
+    res_plugin <- classify_import (\mod _ -> findPluginModule fc fopts units mhome_unit mod)
+                    [(p, m) | (_, p, m) <- (ms_plugin_imps summary) ]
     case sequence (res_normal ++ res_plugin ++ [Right (fake_ghc_prim_import)| ms_ghc_prim_import summary]) of
       Left recomp -> return $ NeedsRecompile recomp
       Right es -> do

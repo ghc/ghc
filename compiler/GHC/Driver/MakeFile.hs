@@ -275,10 +275,10 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ node))
 
         ; let do_imps is_boot idecls = sequence_
                     [ do_imp loc is_boot mb_pkg mod
-                    | (mb_pkg, L loc mod) <- idecls,
+                    | (_stage, mb_pkg, L loc mod) <- idecls,
                       mod `notElem` excl_mods ]
 
-        ; do_imps IsBoot (ms_srcimps node)
+        ; do_imps IsBoot (map ((,,) GHC.NormalStage NoPkgQual) (ms_srcimps node))
         ; do_imps NotBoot (ms_imps node)
         }
 
@@ -418,7 +418,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           pp_ms loop_breaker $$ vcat (map pp_group groups)
         where
           (boot_only, others) = partition is_boot_only mss
-          is_boot_only (ModuleNode _ ms) = not (any in_group (map snd (ms_imps ms)))
+          is_boot_only (ModuleNode _ ms) = not (any in_group (map (\(_, _, m) -> m) (ms_imps ms)))
           is_boot_only  _ = False
           in_group (L _ m) = m `elem` group_mods
           group_mods = map (moduleName . ms_mod) [ms | ModuleNode _ ms <- mss]
@@ -429,8 +429,8 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
             GHC.topSortModuleGraph True (mkModuleGraph all_others) Nothing
 
     pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))
-                       <+> (pp_imps empty (map snd (ms_imps summary)) $$
-                            pp_imps (text "{-# SOURCE #-}") (map snd (ms_srcimps summary)))
+                       <+> (pp_imps empty (map (\(_, _, m) -> m) (ms_imps summary)) $$
+                            pp_imps (text "{-# SOURCE #-}") (ms_srcimps summary))
         where
           mod_str = moduleNameString (moduleName (ms_mod summary))
 
