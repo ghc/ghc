@@ -12,7 +12,7 @@
 
 -- | Typecheck type and class declarations
 module GHC.Tc.TyCl (
-        UserHeaderKindSig(..),
+        HasHeaderKindSig(..),
         tcTyAndClassDecls,
         -- Functions used by GHC.Tc.TyCl.Instance to check
         -- data/type family instance declarations
@@ -1773,8 +1773,8 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ _name)
     do { traceTc "kcTyClDecl" (ppr tycon $$ ppr (tyConTyVars tycon) $$ ppr (tyConResKind tycon))
        ; _ <- tcHsContext ctxt
        ; kcConDecls (tyConResKind tycon) (if (isJust kindSig)
-                                          then UserHeaderKindSig
-                                          else NoUserHeaderKindSig) cons
+                                          then HasHeaderKindSig
+                                          else NoHeaderKindSig) cons
        }
 
 kcTyClDecl (SynDecl { tcdLName = L _ _name, tcdRhs = rhs }) tycon
@@ -1839,16 +1839,16 @@ kcConGADTArgs exp_kind con_args = case con_args of
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Specifically for GADT style declarations.
 User supplied header kind signature as in
-`data xxx :: UserHeaderKindSig where ...`
+`data xxx :: HasHeaderKindSig where ...`
 See (KCD4) in Note [kcConDecls: kind-checking data type decls]
 for why we need to check this.
 -}
 -- see Note [Header kind signatures for GADTs]
-data UserHeaderKindSig = UserHeaderKindSig | NoUserHeaderKindSig deriving Eq
+data HasHeaderKindSig = HasHeaderKindSig | NoHeaderKindSig deriving Eq
 
 kcConDecls :: TcKind  -- Result kind of tycon
                       -- Used only in H98 case
-           -> UserHeaderKindSig
+           -> HasHeaderKindSig
            -> DataDefnCons (LConDecl GhcRn) -> TcM ()
 -- See Note [kcConDecls: kind-checking data type decls]
 kcConDecls tc_res_kind usrk cons
@@ -1861,7 +1861,7 @@ kcConDecls tc_res_kind usrk cons
 -- declared with data or newtype, and we need to know the result kind of
 -- this type. See Note [Implementation of UnliftedNewtypes] for why
 -- we need the first two arguments.
-kcConDecl :: NewOrData -> UserHeaderKindSig -> TcKind -> ConDecl GhcRn -> TcM ()
+kcConDecl :: NewOrData -> HasHeaderKindSig -> TcKind -> ConDecl GhcRn -> TcM ()
 kcConDecl new_or_data _usrk tc_res_kind
           (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                       , con_mb_cxt = ex_ctxt, con_args = args })
@@ -1896,7 +1896,7 @@ kcConDecl new_or_data usrk tc_res_kind
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty $$ ppr tc_res_kind)
        -- We handle the case of newtypes without user header kind signatures specially
        -- see (KCD4) in Note [kcConDecls: kind-checking data type decls]
-       ; con_res_kind <-  if NewType == new_or_data && NoUserHeaderKindSig == usrk
+       ; con_res_kind <-  if NewType == new_or_data && NoHeaderKindSig == usrk
                           then return tc_res_kind
                           else newOpenTypeKind
        ; _ <- tcCheckLHsTypeInContext res_ty $ (TheKind con_res_kind)

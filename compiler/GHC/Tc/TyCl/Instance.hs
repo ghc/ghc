@@ -946,10 +946,10 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                   -- Add constraints from the data constructors
                   -- Fix #25611
                   -- See DESIGN CHOICE in Note [Kind inference for data family instances]
-                  ; when is_H98_or_newtype $ kcConDecls lhs_applied_kind  (if (isJust m_ksig)
-                                          then UserHeaderKindSig
-                                          else NoUserHeaderKindSig)
-                                          hs_cons
+                  ; when is_H98_or_newtype $
+                      kcConDecls lhs_applied_kind  (if (isJust m_ksig)
+                                                   then HasHeaderKindSig
+                                                   else NoHeaderKindSig) hs_cons
 
 
                   -- Check that the result kind of the TyCon applied to its args
