@@ -6,8 +6,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 -----------------------------------------------------------------------------
 --
 -- Generating machine code (instruction selection)
@@ -1863,14 +1861,13 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
         VecFormat 4 FmtFloat
           -- indices 0 <= i <= 7
           | all ( (>= 0) <&&> (<= 7) ) is ->
-          case is of
-            [i1, i2, i3, i4]
+          case [(i, i-4) | i <- is] of
+            [(i1, j1), (i2, j2), (i3, j3), (i4, j4)]
               | all ( <= 3 ) is
               , let imm = i1 + i2 `shiftL` 2 + i3 `shiftL` 4 + i4 `shiftL` 6
               -> unitOL (VSHUF fmt (ImmInt imm) (OpReg v1) v1 dst)
               | all ( >= 4 ) is
-              , let [j1, j2, j3, j4] = map ( subtract 4 ) is
-                    imm = j1 + j2 `shiftL` 2 + j3 `shiftL` 4 + j4 `shiftL` 6
+              , let imm = j1 + j2 `shiftL` 2 + j3 `shiftL` 4 + j4 `shiftL` 6
               -> unitOL (VSHUF fmt (ImmInt imm) (OpReg v2) v2 dst)
               | i1 <= 3, i2 <= 3
               , i3 >= 4, i4 >= 4
@@ -2507,13 +2504,11 @@ x86_complex_amode base index shift offset
 -- (see trivialCode where this function is used for an example).
 
 getNonClobberedOperand :: CmmExpr -> NatM (Operand, InstrBlock)
-getNonClobberedOperand (CmmLit lit) =
-  if isSuitableFloatingPointLit lit
-  then do
-    let CmmFloat _ w = lit
+getNonClobberedOperand (CmmLit lit)
+  | Just w <- isSuitableFloatingPointLit_maybe lit = do
     Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
     return (OpAddr addr, code)
-  else do
+  | otherwise = do
     platform <- getPlatform
     if is32BitLit platform lit && isIntFormat (cmmTypeFormat (cmmLitType platform lit))
     then return (OpImm (litToImm lit), nilOL)
@@ -2563,18 +2558,15 @@ regClobbered _ _ = False
 -- computation of an arbitrary expression.
 getOperand :: CmmExpr -> NatM (Operand, InstrBlock)
 
-getOperand (CmmLit lit) = do
-  if isSuitableFloatingPointLit lit
-    then do
-      let CmmFloat _ w = lit
-      Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
-      return (OpAddr addr, code)
-    else do
-
-  platform <- getPlatform
-  if is32BitLit platform lit && (isIntFormat $ cmmTypeFormat (cmmLitType platform lit))
-    then return (OpImm (litToImm lit), nilOL)
-    else getOperand_generic (CmmLit lit)
+getOperand (CmmLit lit) = case isSuitableFloatingPointLit_maybe lit of
+    Just w -> do
+        Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
+        return (OpAddr addr, code)
+    Nothing -> do
+        platform <- getPlatform
+        if is32BitLit platform lit && (isIntFormat $ cmmTypeFormat (cmmLitType platform lit))
+            then return (OpImm (litToImm lit), nilOL)
+            else getOperand_generic (CmmLit lit)
 
 getOperand (CmmLoad mem ty _) = do
   is32Bit <- is32BitPlatform
@@ -2645,8 +2637,11 @@ loadAmode fmt addr addr_code = do
 -- zero, we're better off generating it into a register using
 -- xor.
 isSuitableFloatingPointLit :: CmmLit -> Bool
-isSuitableFloatingPointLit (CmmFloat f _) = f /= 0.0
-isSuitableFloatingPointLit _ = False
+isSuitableFloatingPointLit = isJust . isSuitableFloatingPointLit_maybe
+
+isSuitableFloatingPointLit_maybe :: CmmLit -> Maybe Width
+isSuitableFloatingPointLit_maybe (CmmFloat f w) = w <$ guard (f /= 0.0)
+isSuitableFloatingPointLit_maybe _ = Nothing
 
 getRegOrMem :: CmmExpr -> NatM (Operand, InstrBlock)
 getRegOrMem e@(CmmLoad mem ty _) = do
@@ -3895,14 +3890,14 @@ padStackArgs platform (args0, data_args0) =
       let (this_arg, pads') =
             case stk_arg of
               RawStackArg arg -> (StackArg arg pad, pads)
-              RawStackArgRef ref size ->
-                let (Padding arg_pad : rest_pads) = pads
-                    arg =
-                      StackArgRef
-                        { stackRef = ref
-                        , stackRefArgSize = size
-                        , stackRefArgPadding = arg_pad }
-                in (arg, rest_pads)
+              RawStackArgRef ref size -> case pads of
+                  Padding arg_pad : rest_pads ->
+                    let arg = StackArgRef
+                          { stackRef = ref
+                          , stackRefArgSize = size
+                          , stackRefArgPadding = arg_pad }
+                    in (arg, rest_pads)
+                  _ -> panic "padStackArgs: no padding info found for StackArgRef"
       in this_arg : resolve_args rest pads'
 
   in
