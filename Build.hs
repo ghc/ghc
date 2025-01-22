@@ -603,14 +603,12 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         ] ++ rts_options
 
 
-  let pkgdb = dst </> "pkgs"
-  initEmptyDB ghcpkg pkgdb
-
+  let boot_libs_env = dst </> "boot-libs.env"
   let build_boot_cmd = runCabal cabal
         [ "install"
         , "--lib"
-        , "--package-db=" ++ pkgdb
-        , "--package-env=" ++ dst
+        , "--package-env=" ++ boot_libs_env
+        , "--force-reinstalls"
         , "-v3"
         -- [ "build"
         , "--project-file=" ++ cabal_project_bootlibs_path
@@ -637,6 +635,13 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
       putStrLn $ "Failed to build boot libraries with error code " ++ show r
       putStrLn $ "Logs can be found in " ++ dst ++ "boot-libs.{stdout,stderr}"
       exitFailure
+
+  -- The libraries have been installed globally.
+  (global_gb:pkg_ids) <- (map (drop 11) . drop 2 . lines) <$> readFile boot_libs_env
+  putStrLn $ "We've built boot libraries in " ++ global_gb ++ ":"
+  mapM_ (putStrLn . ("  - " ++)) pkg_ids
+
+  -- TODO: copy the libs in another db
 
 
 ---------------------------
