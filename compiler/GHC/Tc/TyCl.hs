@@ -1974,7 +1974,7 @@ Again there are two cases to consider in `kcConDecl`:
   `S g a`) and, for newtypes, ensure that the arugment has that same kind.
 
   (KCD3) The tycon's result kind `tc_res_kind` is not used at all in the GADT
-  case except being newtype without user header kind signature(KCD4); rather it is
+  case except being newtype without user header kind signature; rather it is
   accessed via looking up S's kind in the type environment when kind-checking the
   result type of the data constructor.
 
