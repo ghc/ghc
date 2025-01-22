@@ -1837,11 +1837,11 @@ kcConGADTArgs exp_kind con_args = case con_args of
 
 {- Note [Header kind signatures for GADTs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Specifically for GADT style declarations
-Do we have user supplied header kind signature?
-as in `data xxx :: UserHeaderKindSig where ...`
-If not and it is newtype we can infer the kind of the data type
-from the data constructors
+Specifically for GADT style declarations.
+User supplied header kind signature as in
+`data xxx :: UserHeaderKindSig where ...`
+See (KCD4) in Note [kcConDecls: kind-checking data type decls]
+for why we need to check this.
 -}
 -- see Note [Header kind signatures for GADTs]
 data UserHeaderKindSig = UserHeaderKindSig | NoUserHeaderKindSig deriving Eq
@@ -1879,7 +1879,10 @@ kcConDecl new_or_data _usrk tc_res_kind
        }
 
 kcConDecl new_or_data usrk tc_res_kind
-                      -- NB: _tc_res_kind is unused.   See (KCD3) in
+                      -- tc_res_kind usage is a bit tricky here,
+                      -- only newtype with no user header kind signature
+                      -- uses it.
+                      -- See (KCD3), (KCD4) in
                       -- Note [kcConDecls: kind-checking data type decls]
           (ConDeclGADT { con_names = names, con_bndrs = L _ outer_bndrs
                        , con_mb_cxt = cxt, con_g_args = args, con_res_ty = res_ty })
@@ -1891,6 +1894,8 @@ kcConDecl new_or_data usrk tc_res_kind
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsContext cxt
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty $$ ppr tc_res_kind)
+       -- We handle the case of newtypes without user header kind signatures specially
+       -- see (KCD4) in Note [kcConDecls: kind-checking data type decls]
        ; con_res_kind <-  if NewType == new_or_data && NoUserHeaderKindSig == usrk
                           then return tc_res_kind
                           else newOpenTypeKind
@@ -1907,8 +1912,11 @@ kcConDecl new_or_data usrk tc_res_kind
 {- Note [kcConDecls: kind-checking data type decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 kcConDecls is used when we are inferring the kind of the type
-constructor in a data type declaration. The basic plan is described in
+constructor. For two cases:
+* Data type declarations, The basic plan is described in
 Note [Inferring kinds for type declarations]; here we are doing Step 2.
+* Data family instance declaration, see the DESIGN CHOICE
+in Note [Kind inference for data family instances].
 
 We are kind-checking the data constructors /only/ to compute the kind of
 the type construtor.  For example
@@ -1966,8 +1974,20 @@ Again there are two cases to consider in `kcConDecl`:
   `S g a`) and, for newtypes, ensure that the arugment has that same kind.
 
   (KCD3) The tycon's result kind `tc_res_kind` is not used at all in the GADT
-  case; rather it is accessed via looking up S's kind in the type environment
-  when kind-checking the result type of the data constructor.
+  case except being newtype without user header kind signature(KCD4); rather it is
+  accessed via looking up S's kind in the type environment when kind-checking the
+  result type of the data constructor.
+
+    data family Fix2 :: (k -> Type) -> k
+    newtype instance Fix2 f where In2 :: f (Fix2 f) -> Fix2 f
+
+  * When kind checking the newtype instance, Fix2's kind in the type environment is
+    already generalized. If using -XUnliftedNewtypes, since the instance does not have
+    a user header kind signature, the result kind is defaulted to (TYPE r), where r is
+    a unification variable. r could not be constrained through the type environment.
+
+  Solution (KCD4): For newtype instances, we have to use the `tc_res_kind` in
+  contrast to (KCD3) to constrain r properly.
 
 Note [Using TyVarTvs for kind-checking GADTs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
