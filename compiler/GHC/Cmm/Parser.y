@@ -1194,6 +1194,8 @@ callishMachOps platform = listToUFM $
     , allWidths "fetch_nand" (\w -> MO_AtomicRMW w AMO_Nand)
     , allWidths "fetch_or" (\w -> MO_AtomicRMW w AMO_Or)
     , allWidths "fetch_xor" (\w -> MO_AtomicRMW w AMO_Xor)
+    , allWidths "mul2_" (\w -> MO_S_Mul2 w)
+    , allWidths "mul2u_" (\w -> MO_U_Mul2 w)
     ]
   where
     allWidths
