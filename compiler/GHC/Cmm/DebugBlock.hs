@@ -6,9 +6,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE LambdaCase #-}
-
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE EmptyCase #-}
 
 -----------------------------------------------------------------------------
 --
@@ -41,13 +39,13 @@ import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Reg ( pprGlobalReg, pprGlobalRegUse )
 import GHC.Cmm.Utils
-import GHC.Data.FastString ( nilFS, mkFastString )
+import GHC.Data.FastString ( LexicalFastString, nilFS, mkFastString )
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
-import GHC.Utils.Misc      ( partitionWith, seqList )
+import GHC.Utils.Misc      ( seqList )
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
@@ -55,8 +53,13 @@ import GHC.Cmm.Dataflow.Label
 
 import Data.Maybe
 import Data.List     ( minimumBy, nubBy )
+import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
+import qualified Data.List.NonEmpty as NE
 import Data.Ord      ( comparing )
 import qualified Data.Map as Map
+import Data.Foldable ( toList )
+import Data.Either ( partitionEithers )
+import Data.Void
 
 -- | Debug information about a block of code. Ticks scope over nested
 -- blocks.
@@ -94,23 +97,32 @@ instance OutputableP Platform DebugBlock where
 
 -- | Intermediate data structure holding debug-relevant context information
 -- about a block.
-type BlockContext = (CmmBlock, RawCmmDecl)
+type BlockContext = (CmmBlock, RawCmmDeclNoStatics)
+
+-- Same as `RawCmmDecl`, but statically (in GHC) excludes the possibility of statics (in the CMM
+-- code). (The first argument is `Void` rather than `RawCmmStatics`.
+type RawCmmDeclNoStatics
+   = GenCmmDecl
+        Void
+        (LabelMap RawCmmStatics)
+        CmmGraph
 
 -- | Extract debug data from a group of procedures. We will prefer
 -- source notes that come from the given module (presumably the module
 -- that we are currently compiling).
-cmmDebugGen :: ModLocation -> RawCmmGroup -> [DebugBlock]
+cmmDebugGen :: ModLocation -> [RawCmmDecl] -> [DebugBlock]
 cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
   where
-      blockCtxs :: Map.Map CmmTickScope [BlockContext]
+      blockCtxs :: Map.Map CmmTickScope (NonEmpty BlockContext)
       blockCtxs = blockContexts decls
 
       -- Analyse tick scope structure: Each one is either a top-level
       -- tick scope, or the child of another.
       (topScopes, childScopes)
-        = partitionWith (\a -> findP a a) $ Map.keys blockCtxs
+        = partitionEithers $ map (\(k, a) -> findP (k, a) k) $ Map.toList blockCtxs
+
       findP tsc GlobalScope = Left tsc -- top scope
-      findP tsc scp | scp' `Map.member` blockCtxs = Right (scp', tsc)
+      findP tsc scp | Just x <- Map.lookup scp' blockCtxs = Right (scp', tsc, x)
                     | otherwise                   = findP tsc scp'
         where -- Note that we only following the left parent of
               -- combined scopes. This loses us ticks, which we will
@@ -118,7 +130,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
               scp' | SubScope _ scp' <- scp      = scp'
                    | CombinedScope scp' _ <- scp = scp'
 
-      scopeMap = foldl' (\acc (key, scope) -> insertMulti key scope acc) Map.empty childScopes
+      scopeMap = foldl' (\ acc (k, (k', a'), _) -> insertMulti k (k', a') acc) Map.empty childScopes
 
       -- This allows us to recover ticks that we lost by flattening
       -- the graph. Basically, if the parent is A but the child is
@@ -137,7 +149,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
                    | SubScope _ s' <- s       = ticks ++ go s'
                    | CombinedScope s1 s2 <- s = ticks ++ go s1 ++ go s2
                    | otherwise                = panic "ticksToCopy impossible"
-                where ticks = bCtxsTicks $ fromMaybe [] $ Map.lookup s blockCtxs
+                where ticks = bCtxsTicks $ maybe [] toList $ Map.lookup s blockCtxs
       ticksToCopy _ = []
       bCtxsTicks = concatMap (blockTicks . fst)
 
@@ -147,21 +159,19 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
       -- (if we generated one, we probably want debug information to
       -- refer to it).
       bestSrcTick = minimumBy (comparing rangeRating)
-      rangeRating (SourceNote span _)
+      rangeRating (span, _)
         | srcSpanFile span == thisFile = 1
         | otherwise                    = 2 :: Int
-      rangeRating note                 = pprPanic "rangeRating" (ppr note)
       thisFile = maybe nilFS mkFastString $ ml_hs_file modLoc
 
       -- Returns block tree for this scope as well as all nested
       -- scopes. Note that if there are multiple blocks in the (exact)
       -- same scope we elect one as the "branch" node and add the rest
       -- as children.
-      blocksForScope :: Maybe CmmTickish -> CmmTickScope -> DebugBlock
-      blocksForScope cstick scope = mkBlock True (head bctxs)
-        where bctxs = fromJust $ Map.lookup scope blockCtxs
-              nested = fromMaybe [] $ Map.lookup scope scopeMap
-              childs = map (mkBlock False) (tail bctxs) ++
+      blocksForScope :: Maybe (RealSrcSpan, LexicalFastString) -> (CmmTickScope, NonEmpty BlockContext) -> DebugBlock
+      blocksForScope cstick (scope, bctx:|bctxs) = mkBlock True bctx
+        where nested = fromMaybe [] $ Map.lookup scope scopeMap
+              childs = map (mkBlock False) bctxs ++
                        map (blocksForScope stick) nested
 
               mkBlock :: Bool -> BlockContext -> DebugBlock
@@ -173,11 +183,13 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
                              , dblParent       = Nothing
                              , dblTicks        = ticks
                              , dblPosition     = Nothing -- see cmmDebugLink
-                             , dblSourceTick   = stick
+                             , dblSourceTick   = uncurry SourceNote <$> stick
                              , dblBlocks       = blocks
                              , dblUnwind       = []
                              }
-                where (CmmProc infos _entryLbl _ graph) = prc
+                where (infos, graph) = case prc of
+                          CmmProc infos _ _ graph -> (infos, graph)
+                          CmmData _ v -> case v of
                       label = entryLabel block
                       info = mapLookup label infos
                       blocks | top       = seqList childs childs
@@ -185,26 +197,26 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
 
               -- A source tick scopes over all nested blocks. However
               -- their source ticks might take priority.
-              isSourceTick SourceNote {} = True
-              isSourceTick _             = False
+              isSourceTick (SourceNote span a) = Just (span, a)
+              isSourceTick _ = Nothing
               -- Collect ticks from all blocks inside the tick scope.
               -- We attempt to filter out duplicates while we're at it.
               ticks = nubBy (flip tickishContains) $
                       bCtxsTicks bctxs ++ ticksToCopy scope
-              stick = case filter isSourceTick ticks of
-                []     -> cstick
-                sticks -> Just $! bestSrcTick (sticks ++ maybeToList cstick)
+              stick = case nonEmpty $ mapMaybe isSourceTick ticks of
+                Nothing -> cstick
+                Just sticks -> Just $! bestSrcTick (sticks `NE.appendList` maybeToList cstick)
 
 -- | Build a map of blocks sorted by their tick scopes
 --
 -- This involves a pre-order traversal, as we want blocks in rough
 -- control flow order (so ticks have a chance to be sorted in the
 -- right order).
-blockContexts :: RawCmmGroup -> Map.Map CmmTickScope [BlockContext]
-blockContexts decls = Map.map reverse $ foldr walkProc Map.empty decls
-  where walkProc :: RawCmmDecl
-                 -> Map.Map CmmTickScope [BlockContext]
-                 -> Map.Map CmmTickScope [BlockContext]
+blockContexts :: [GenCmmDecl a (LabelMap RawCmmStatics) CmmGraph] -> Map.Map CmmTickScope (NonEmpty BlockContext)
+blockContexts = Map.map NE.reverse . foldr walkProc Map.empty
+  where walkProc :: GenCmmDecl a (LabelMap RawCmmStatics) CmmGraph
+                 -> Map.Map CmmTickScope (NonEmpty BlockContext)
+                 -> Map.Map CmmTickScope (NonEmpty BlockContext)
         walkProc CmmData{}                 m = m
         walkProc prc@(CmmProc _ _ _ graph) m
           | mapNull blocks = m
@@ -213,26 +225,27 @@ blockContexts decls = Map.map reverse $ foldr walkProc Map.empty decls
                 entry  = [mapFind (g_entry graph) blocks]
                 emptyLbls = setEmpty :: LabelSet
 
-        walkBlock :: RawCmmDecl -> [Block CmmNode C C]
-                  -> (LabelSet, Map.Map CmmTickScope [BlockContext])
-                  -> (LabelSet, Map.Map CmmTickScope [BlockContext])
+        walkBlock :: GenCmmDecl a (LabelMap RawCmmStatics) CmmGraph -> [Block CmmNode C C]
+                  -> (LabelSet, Map.Map CmmTickScope (NonEmpty BlockContext))
+                  -> (LabelSet, Map.Map CmmTickScope (NonEmpty BlockContext))
         walkBlock _   []             c            = c
-        walkBlock prc (block:blocks) (visited, m)
-          | lbl `setMember` visited
-          = walkBlock prc blocks (visited, m)
-          | otherwise
-          = walkBlock prc blocks $
-            walkBlock prc succs
-              (lbl `setInsert` visited,
-               insertMulti scope (block, prc) m)
+        walkBlock prc (block:blocks) (visited, m) = case (prc, setMember lbl visited) of
+            (CmmProc x y z graph, False) ->
+                let succs = flip mapFind (toBlockMap graph) <$>
+                        successors (lastNode block) in
+                walkBlock prc blocks $
+                walkBlock prc succs
+                  ( lbl `setInsert` visited
+                  , insertMultiNE scope (block, CmmProc x y z graph) m )
+            _ -> walkBlock prc blocks (visited, m)
           where CmmEntry lbl scope = firstNode block
-                (CmmProc _ _ _ graph) = prc
-                succs = map (flip mapFind (toBlockMap graph))
-                            (successors (lastNode block))
         mapFind = mapFindWithDefault (error "contextTree: block not found!")
 
 insertMulti :: Ord k => k -> a -> Map.Map k [a] -> Map.Map k [a]
 insertMulti k v = Map.insertWith (const (v:)) k [v]
+
+insertMultiNE :: Ord k => k -> a -> Map.Map k (NonEmpty a) -> Map.Map k (NonEmpty a)
+insertMultiNE k v = Map.insertWith (const (v NE.<|)) k (NE.singleton v)
 
 cmmDebugLabels :: (BlockId -> Bool) -> (i -> Bool) -> GenCmmGroup d g (ListGraph i) -> [Label]
 cmmDebugLabels is_valid_label isMeta nats = seqList lbls lbls
