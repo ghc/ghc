@@ -343,9 +343,11 @@ Library
         GHC.Internal.Tuple
         GHC.Internal.Types
 
-    autogen-modules:
-        GHC.Internal.Prim
-        GHC.Internal.PrimopWrappers
+    -- Cabal expects autogen modules to be some specific directories, not in the
+    -- source dirs...
+    -- autogen-modules:
+    --     GHC.Internal.Prim
+    --     GHC.Internal.PrimopWrappers
 
     other-modules:
         GHC.Internal.Data.Typeable.Internal

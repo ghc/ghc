@@ -197,16 +197,8 @@ buildGhcStage1 opts cabal ghc0 dst = do
 
   -- initialize empty global package database
   pkgdb <- makeAbsolute (dst </> "pkgs")
-  doesDirectoryExist pkgdb >>= \case
-    True -> pure () -- don't try to recreate the DB if it already exist as it would fail
-    False -> do
-      ghcpkg <- GhcPkg <$> makeAbsolute (dst </> "bin/ghc-pkg")
-      void $ readCreateProcess (runGhcPkg ghcpkg ["init", pkgdb]) ""
-      void $ readCreateProcess (runGhcPkg ghcpkg
-                [ "recache"
-                , "--global-package-db="++pkgdb
-                , "--no-user-package-db"
-                ]) ""
+  ghcpkg <- GhcPkg <$> makeAbsolute (dst </> "bin/ghc-pkg")
+  initEmptyDB ghcpkg pkgdb
 
 
   -- generate settings based on stage1 compiler settings
@@ -435,6 +427,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , def_string "TargetVendor"      "FIXME"
         , def_string "GhcUnregisterised" "FIXME"
         , def_string "TablesNextToCode"  "FIXME"
+        , "  flags: +use-system-libffi" -- FIXME: deal with libffi (add package?)
         ]
 
   makeCabalProject cabal_project_rts_path $
@@ -525,6 +518,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   void $ readCreateProcess (shell ("tar -xvf libffi-tarballs/libffi-" ++ libffi_version ++ ".tar.gz -C " ++ src_libffi)) ""
   let build_libffi = mconcat
         [ "cd " ++ src_libffi </> "libffi-" ++ libffi_version ++ "; "
+        -- FIXME: pass the appropriate toolchain (CC, LD...)
         , "./configure --disable-docs --with-pic=yes --disable-multi-os-directory --prefix=" ++ dst_libffi
         , " && make install -j"
         ]
@@ -608,10 +602,17 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , ""
         ] ++ rts_options
 
+
+  let pkgdb = dst </> "pkgs"
+  initEmptyDB ghcpkg pkgdb
+
   let build_boot_cmd = runCabal cabal
-        -- [ "install"
-        -- , "--lib"
-        [ "build"
+        [ "install"
+        , "--lib"
+        , "--package-db=" ++ pkgdb
+        , "--package-env=" ++ dst
+        , "-v3"
+        -- [ "build"
         , "--project-file=" ++ cabal_project_bootlibs_path
         , "--with-compiler=" ++ ghcPath ghc
         , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg
@@ -634,7 +635,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
     ExitSuccess -> pure ()
     ExitFailure r -> do
       putStrLn $ "Failed to build boot libraries with error code " ++ show r
-      putStrLn $ "Logs can be found in " ++ dst ++ "/boot-libs.{stdout,stderr}"
+      putStrLn $ "Logs can be found in " ++ dst ++ "boot-libs.{stdout,stderr}"
       exitFailure
 
 
@@ -741,3 +742,15 @@ withSystemTempDirectory prefix = do
             return dir
         )
         removeDirectoryRecursive
+
+initEmptyDB :: GhcPkg -> FilePath -> IO ()
+initEmptyDB ghcpkg pkgdb = do
+  doesDirectoryExist pkgdb >>= \case
+    True -> pure () -- don't try to recreate the DB if it already exist as it would fail
+    False -> do
+      void $ readCreateProcess (runGhcPkg ghcpkg ["init", pkgdb]) ""
+      void $ readCreateProcess (runGhcPkg ghcpkg
+                [ "recache"
+                , "--global-package-db="++pkgdb
+                , "--no-user-package-db"
+                ]) ""
