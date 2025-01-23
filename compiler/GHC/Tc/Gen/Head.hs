@@ -1111,7 +1111,7 @@ checkCrossStageLifting dflags top_lvl id (Brack _ (TcPending ps_var lie_var q))
   = when (isExternalName id_name) (keepAlive id_name)
     -- See Note [Keeping things alive for Template Haskell] in GHC.Rename.Splice
 
-  | xopt LangExt.LiftCrossStagedPersistence dflags
+  | otherwise
   =     -- Nested identifiers, such as 'x' in
         -- E.g. \x -> [|| h x ||]
         -- We must behave as if the reference to x was
@@ -1152,7 +1152,6 @@ checkCrossStageLifting dflags top_lvl id (Brack _ (TcPending ps_var lie_var q))
         ; writeMutVar ps_var (pending_splice : ps)
 
         ; return () }
-    | otherwise = error "todo"
   where
     id_name = idName id
 

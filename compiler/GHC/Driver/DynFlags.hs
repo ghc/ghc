@@ -1346,7 +1346,6 @@ languageExtensions (Just Haskell98)
        LangExt.DeepSubsumption,
        -- Non-standard but enabled for backwards compatability (see GHC proposal #511)
        LangExt.ListTuplePuns,
-       LangExt.LiftCrossStagedPersistence,
        LangExt.ImplicitStagePersistence
       ]
 
@@ -1366,7 +1365,6 @@ languageExtensions (Just Haskell2010)
        LangExt.RelaxedPolyRec,
        LangExt.DeepSubsumption,
        LangExt.ListTuplePuns,
-       LangExt.LiftCrossStagedPersistence,
        LangExt.ImplicitStagePersistence
        ]
 
@@ -1420,7 +1418,6 @@ languageExtensions (Just GHC2021)
        LangExt.TypeApplications,
        LangExt.TypeOperators,
        LangExt.TypeSynonymInstances,
-       LangExt.LiftCrossStagedPersistence,
        LangExt.ImplicitStagePersistence
        ]
 

@@ -1005,10 +1005,8 @@ checkCrossStageLifting dflags reason top_lvl is_local bind_lvl use_stage use_lvl
   | Brack _ (RnPendingUntyped ps_var) <- use_stage   -- Only for untyped brackets
   = do
       dflags <- getDynFlags
-      let err = TcRnBadlyStaged reason bind_lvl use_lvl
-      check_cross_stage_lifting err dflags top_lvl name ps_var
+      check_cross_stage_lifting dflags top_lvl name ps_var
   | Brack _ RnPendingTyped <- use_stage  -- Lift for typed brackets is inserted later.
-  , xopt LangExt.LiftCrossStagedPersistence dflags
     = return ()
   | isTopLevel top_lvl
   , is_local
@@ -1018,8 +1016,8 @@ checkCrossStageLifting dflags reason top_lvl is_local bind_lvl use_stage use_lvl
   , xopt LangExt.ImplicitStagePersistence dflags = return ()
   | otherwise = addErrTc (TcRnBadlyStaged reason bind_lvl use_lvl)
 
-check_cross_stage_lifting :: TcRnMessage -> DynFlags -> TopLevelFlag -> Name -> TcRef [PendingRnSplice] -> TcM ()
-check_cross_stage_lifting reason dflags top_lvl name ps_var
+check_cross_stage_lifting :: DynFlags -> TopLevelFlag -> Name -> TcRef [PendingRnSplice] -> TcM ()
+check_cross_stage_lifting dflags top_lvl name ps_var
   | isTopLevel top_lvl
   , xopt LangExt.ImplicitStagePersistence dflags
         -- Top-level identifiers in this module,
@@ -1032,7 +1030,7 @@ check_cross_stage_lifting reason dflags top_lvl name ps_var
   = when (isExternalName name) (keepAlive name)
     -- See Note [Keeping things alive for Template Haskell]
 
-  | xopt LangExt.LiftCrossStagedPersistence dflags
+  | otherwise
   =     -- Nested identifiers, such as 'x' in
         -- E.g. \x -> [| h x |]
         -- We must behave as if the reference to x was
@@ -1054,7 +1052,6 @@ check_cross_stage_lifting reason dflags top_lvl name ps_var
           -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; writeMutVar ps_var (pend_splice : ps) }
-  | otherwise = addErrTc reason
 
 checkCrossStageLiftingTy :: DynFlags -> TopLevelFlag -> Set.Set ThLevel -> ThStage -> ThLevel -> Name -> TcM ()
 checkCrossStageLiftingTy dflags top_lvl bind_lvl _use_stage use_lvl name
