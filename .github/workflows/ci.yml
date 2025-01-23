@@ -33,9 +33,10 @@ jobs:
         cabal-update: true
 
     - name: Configure the build
-      run: |
-        ./boot
+      run: ./boot
+
+    - name: Build patched cabal
+      run: make cabal
 
     - name: Build the bindist
-      run: |
-        make
+      run: make
