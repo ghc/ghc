@@ -72,6 +72,26 @@ Compiler
 
 - Fixed the behavior of ``Language.Haskell.TH.mkName "FUN"`` (:ghc-ticket:`25174`)
 
+- Various code generation improvements to the ARM backend.
+
+- Fixed a bug that could case segfaults in GHCi when `-fworker-wrapper-cbv` was enabled. (#24870)
+
+- Fixed -freg-graphs for AARch64 NCG
+
+- Fixed a correctness issues for Int64/Word64 on 32bit backends (#24893)
+
+- Various rts linker improvements:
+  - R_X86_64_PC64 relocation support on windows
+  - Use m32 allocator for sections when NEED_PLT - works around (#24432)
+  - AArch64 - Skip NONE relocations
+
+- Fixed a panic in the ghci debugger (#25109)
+
+- JS Backend: support rubbish static literals
+
+
+
+
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 
