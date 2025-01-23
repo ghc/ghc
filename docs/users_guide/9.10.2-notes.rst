@@ -87,15 +87,14 @@ Compiler
 
 - Fixed a panic in the ghci debugger (#25109)
 
-- JS Backend: support rubbish static literals
-
-
-
-
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 
 - Changes for better support of the Google Closure Compiler (#24602, !12330)
+
+- JS Backend: support rubbish static literals
+
+- Fix h$withCStringOnHeap helper (#25288)
 
 WebAssembly backend
 ~~~~~~~~~~~~~~~~~~~
@@ -128,6 +127,9 @@ Runtime system
 - Reduce fragmentation incurred by the nonmoving GC's segment allocator. In one application this reduced resident set size by 26%. See :ghc-ticket:`24150`.
 
 - Emit warning when -M < -H.
+
+- Fix a bug (#24672) causing programms on FreeBSD to occasionally terminate with the error:
+  ``internal error: Ticker: read(timerfd) failed with Operation not supported and returned -1``
 
 Build system and packaging
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
