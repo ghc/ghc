@@ -82,7 +82,7 @@ T10296a:
 
  .PHONY: T11788
 T11788:
-	"$(TEST_HC)" -c T11788.c -o T11788_obj.o
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c T11788.c -o T11788_obj.o
 	"$(AR)" rsT libT11788.a T11788_obj.o 2> /dev/null
 	echo main | "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS_INTERACTIVE)) T11788.hs -lT11788 -L"$(PWD)"
 
@@ -101,13 +101,13 @@ T14695:
 
 .PHONY: InternalCounters
 InternalCounters:
-	"$(TEST_HC)" +RTS -s --internal-counters -RTS 2>&1 | grep "Internal Counters"
-	-"$(TEST_HC)" +RTS -s -RTS 2>&1 | grep "Internal Counters"
+	"$(TEST_HC)" $(TEST_HC_OPTS) +RTS -s --internal-counters -RTS 2>&1 | grep "Internal Counters"
+	-"$(TEST_HC)" $(TEST_HC_OPTS) +RTS -s -RTS 2>&1 | grep "Internal Counters"
 
 .PHONY: KeepCafsFail
 KeepCafsFail:
-	"$(TEST_HC)" -c -g -v0 KeepCafsBase.hs KeepCafs1.hs KeepCafs2.hs
-	"$(TEST_HC)" -g -v0 KeepCafsMain.hs KeepCafsBase.o -debug -rdynamic -fwhole-archive-hs-libs $(KEEPCAFS)
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c -g -v0 KeepCafsBase.hs KeepCafs1.hs KeepCafs2.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -g -v0 KeepCafsMain.hs KeepCafsBase.o -debug -rdynamic -fwhole-archive-hs-libs $(KEEPCAFS)
 	./KeepCafsMain 2>&1 || echo "exit($$?)"
 
 .PHONY: KeepCafs
@@ -116,37 +116,37 @@ KeepCafs:
 
 .PHONY: EventlogOutput1
 EventlogOutput1:
-	"$(TEST_HC)" -v0 EventlogOutput.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 EventlogOutput.hs
 	./EventlogOutput +RTS -l -olhello.eventlog
 	ls hello.eventlog >/dev/null
 
 .PHONY: EventlogOutput2
 EventlogOutput2:
-	"$(TEST_HC)" -v0 EventlogOutput.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 EventlogOutput.hs
 	./EventlogOutput +RTS -l
 	ls EventlogOutput.eventlog >/dev/null
 
 .PHONY: EventlogOutputNull
 EventlogOutputNull:
-	"$(TEST_HC)" -rtsopts -v0 EventlogOutput.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -rtsopts -v0 EventlogOutput.hs
 	./EventlogOutput +RTS -l --null-eventlog-writer
 	test ! -e EventlogOutput.eventlog
 
 .PHONY: T20199
 T20199:
-	"$(TEST_HC)" -no-hs-main -optcxx-std=c++11 -v0 T20199.cpp -o T20199
+	"$(TEST_HC)" $(TEST_HC_OPTS) -no-hs-main -optcxx-std=c++11 -v0 T20199.cpp -o T20199
 	./T20199
 
 .PHONY: EventlogOutput_IPE
 EventlogOutput_IPE:
-	"$(TEST_HC)" -debug -finfo-table-map -v0 EventlogOutput.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -debug -finfo-table-map -v0 EventlogOutput.hs
 	./EventlogOutput +RTS -va 2> EventlogOutput_IPE.stderr.log
 	grep "IPE:" EventlogOutput_IPE.stderr.log
 
 .PHONY: T23142
 T23142:
 	# Test that the -Di output contains different frames
-	"$(TEST_HC)" --run -ignore-dot-ghci T23142.hs +RTS -Di -RTS 2> T23142.log
+	"$(TEST_HC)" $(TEST_HC_OPTS) --run -ignore-dot-ghci T23142.hs +RTS -Di -RTS 2> T23142.log
 	grep -m1 -c "ATOMICALLY_FRAME" T23142.log
 	grep -m1 -c "CATCH_RETRY_FRAME" T23142.log
 	grep -m1 -c "CATCH_STM_FRAME" T23142.log

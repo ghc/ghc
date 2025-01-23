@@ -41,6 +41,7 @@ main = do
                          `xopt_set` LangExt.StandaloneKindSignatures
                          `xopt_set` LangExt.UnliftedDatatypes
                          `xopt_set` LangExt.DataKinds
+                         `dopt_set` Opt_D_no_debug_output
         setSessionDynFlags dflags
         groups <- mapM loadPath files
         liftIO $ do
