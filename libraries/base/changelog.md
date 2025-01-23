@@ -1,5 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.20.1 *Jan 2025*
+  * Shipped with GHC 9.10.2
+
 ## 4.20.0.1 *May 2024*
   * Not shipped with any GHC: This is a documentation only release to fix various issues with base-4.20.0.0 docs due to the GHC internal split
   * For an accounting of the issues fixed, see [#24875](https://gitlab.haskell.org/ghc/ghc/-/issues/24875)
