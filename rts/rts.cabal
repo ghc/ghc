@@ -34,6 +34,7 @@ extra-source-files:
     posix/ticker/TimerFd.c
     -- headers files that are not installed by the rts package but only used to
     -- build the rts C code
+    xxhash.h
     adjustor/AdjustorPool.h
     Adjustor.h
     Apply.h
