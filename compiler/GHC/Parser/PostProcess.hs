@@ -1340,6 +1340,8 @@ checkAPat loc e0 = do
      p <- checkLPat e
      return (ParPat (lpar, rpar) p)
 
+   PatBuilderModifiers _mods pat -> unLoc <$> checkLPat pat -- MODS_TODO no mods in pats yet
+
    _           -> do
      details <- fromParseContext <$> askParseContext
      patFail (locA loc) (PsErrInPat e0 details)
@@ -1368,35 +1370,37 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 ---------------------------------------------------------------------------
 -- Check Equation Syntax
 
+pat_builder_modifiers :: LocatedA (PatBuilder p) -> [HsModifier p]
+pat_builder_modifiers = \case
+  L _ (PatBuilderModifiers m _) -> m
+  _ -> []
+
 checkValDef :: SrcSpan
             -> LocatedA (PatBuilder GhcPs)
-            -> (HsMultAnn GhcPs, Maybe (EpUniToken "::" "∷", LHsType GhcPs))
+            -> Maybe (EpUniToken "::" "∷", LHsType GhcPs)
             -> Located (GRHSs GhcPs (LHsExpr GhcPs))
             -> P (HsBind GhcPs)
 
-checkValDef loc lhs (mult, Just (sigAnn, sig)) grhss
+checkValDef loc lhs (Just (sigAnn, sig)) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
   = do lhs' <- runPV $ mkHsTySigPV (combineLocsA lhs sig) lhs sig sigAnn
                         >>= checkLPat
-       checkPatBind loc lhs' grhss mult
+       let mods = pat_builder_modifiers lhs
+       checkPatBind loc lhs' grhss (HsMultAnn noExtField mods)
 
-checkValDef loc lhs (mult_ann, Nothing) grhss
-  | HsMultAnn _ [] <- mult_ann
-  = do  { mb_fun <- isFunLhs lhs
-        ; case mb_fun of
-            Just (fun, is_infix, pats, ops, cps) -> do
+checkValDef loc lhs Nothing grhss
+        -- %p x = rhs  parses as a *pattern* binding
+  = do let mods = pat_builder_modifiers lhs
+       mb_fun <- isFunLhs lhs
+       case (mods, mb_fun) of
+         ([], Just (fun, is_infix, pats, ops, cps)) -> do
               let ann_fun = mk_ann_funrhs ops cps
               let l = listLocation pats
               checkFunBind loc ann_fun
                            fun is_infix (L l pats) grhss
-            Nothing -> do
+         _ -> do
               lhs' <- checkPattern lhs
-              checkPatBind loc lhs' grhss mult_ann }
-
-checkValDef loc lhs (mult_ann, Nothing) ghrss
-        -- %p x = rhs  parses as a *pattern* binding
-  = do lhs' <- checkPattern lhs
-       checkPatBind loc lhs' ghrss mult_ann
+              checkPatBind loc lhs' grhss (HsMultAnn noExtField mods)
 
 mk_ann_funrhs :: [EpToken "("] -> [EpToken ")"] -> AnnFunRhs
 mk_ann_funrhs ops cps = AnnFunRhs NoEpTok ops cps
@@ -2115,7 +2119,9 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsEmbTyPV l toktype ty =
     return $ L (noAnnSrcSpan l) $
       PatBuilderPat (EmbTyPat toktype (mkHsTyPat ty))
-  mkHsModifiedPV _l _mods _ = error "MODS_TODO parsing modifiers in pats"
+  mkHsModifiedPV l mods p = do
+    !cs <- getCommentsFor l
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (PatBuilderModifiers mods p)
   rejectPragmaPV _ = return ()
 
 -- For reasons of backwards compatibility, we can't simply add the pattern

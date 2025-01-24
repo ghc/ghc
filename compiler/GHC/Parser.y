@@ -2711,7 +2711,7 @@ decl_no_th :: { LHsDecl GhcPs }
 
         | infixexp     opt_sig rhs  {% runPV (unECP $1) >>= \ $1 ->
                                        do { let { l = comb2 $1 $> }
-                                          ; r <- checkValDef l $1 (HsMultAnn noExtField [], $2) $3;
+                                          ; r <- checkValDef l $1 $2 $3;
                                         -- Depending upon what the pattern looks like we might get either
                                         -- a FunBind or PatBind back from checkValDef. See Note
                                         -- [FunBind vs PatBind]

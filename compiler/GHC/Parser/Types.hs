@@ -60,6 +60,7 @@ data PatBuilder p
                     (LocatedA (PatBuilder p)) ([EpToken "("], [EpToken ")"])
   | PatBuilderVar (LocatedN RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
+  | PatBuilderModifiers [HsModifier p] (LocatedA (PatBuilder p))
 
 -- These instances are here so that they are not orphans
 type instance Anno (GRHS GhcPs (LocatedA (PatBuilder GhcPs)))             = EpAnnCO
@@ -75,6 +76,7 @@ instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderOpApp (L _ p1) op (L _ p2) _) = ppr p1 <+> ppr op <+> ppr p2
   ppr (PatBuilderVar v) = ppr v
   ppr (PatBuilderOverLit l) = ppr l
+  ppr (PatBuilderModifiers mods p) = pprHsModifiers mods <+> ppr p
 
 -- | An accumulator to build a prefix data constructor,
 --   e.g. when parsing @MkT A B C@, the accumulator will evolve as follows:
