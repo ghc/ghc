@@ -750,15 +750,8 @@ withSystemTempDirectory prefix = do
 
 initEmptyDB :: GhcPkg -> FilePath -> IO ()
 initEmptyDB ghcpkg pkgdb = do
-  doesDirectoryExist pkgdb >>= \case
-    True -> pure () -- don't try to recreate the DB if it already exist as it would fail
-    False -> do
-      void $ readCreateProcess (runGhcPkg ghcpkg ["init", pkgdb]) ""
-      void $ readCreateProcess (runGhcPkg ghcpkg
-                [ "recache"
-                , "--global-package-db="++pkgdb
-                , "--no-user-package-db"
-                ]) ""
+  exists <- doesDirectoryExist pkgdb
+  unless exists $ void $ readCreateProcess (runGhcPkg ghcpkg ["init", pkgdb]) ""
 
 runProcess' :: CreateProcess -> IO ExitCode
 runProcess' p = 
