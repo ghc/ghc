@@ -67,6 +67,7 @@ Flag dynamic-system-linker
 Flag build-tool-depends
     Description: Use build-tool-depends
     Default: True
+    Manual: True
 
 Flag with-libzstd
     Default: False

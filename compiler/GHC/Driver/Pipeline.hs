@@ -49,6 +49,8 @@ import GHC.Platform
 
 import GHC.Utils.Monad ( MonadIO(liftIO), mapMaybeM )
 
+import GHC.Builtin.Names
+
 import GHC.Driver.Main
 import GHC.Driver.Env hiding ( Hsc )
 import GHC.Driver.Errors
@@ -91,6 +93,7 @@ import GHC.Data.StringBuffer   ( hPutStringBuffer )
 import GHC.Data.Maybe          ( expectJust )
 
 import GHC.Iface.Make          ( mkFullIface )
+import GHC.Iface.Load          ( getGhcPrimIface )
 import GHC.Runtime.Loader      ( initializePlugins )
 
 
@@ -819,7 +822,13 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
         let !linkable = Linkable part_time (ms_mod mod_sum) (NE.singleton (DotO final_object ModuleObject))
         -- Add the object linkable to the potential bytecode linkable which was generated in HscBackend.
         return (mlinkable { homeMod_object = Just linkable })
-  return (miface, final_linkable)
+
+  -- when building ghc-internal with cabal-install, we still want the virtual
+  -- interface for gHC_PRIM in the cache
+  let miface_final
+        | ms_mod mod_sum == gHC_PRIM = getGhcPrimIface hsc_env
+        | otherwise                  = miface
+  return (miface_final, final_linkable)
 
 asPipeline :: P m => Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe ObjFile)
 asPipeline use_cpp pipe_env hsc_env location input_fn =

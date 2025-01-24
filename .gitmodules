@@ -8,9 +8,9 @@
 	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
-	url = https://github.com/hsyl20/cabal
+	url = https://github.com/stable-haskell/cabal
 	ignore = untracked
-	branch = hsyl20/per-file-extra-source-options
+	branch = wip/make-build
 [submodule "libraries/containers"]
 	path = libraries/containers
 	url = https://gitlab.haskell.org/ghc/packages/containers.git

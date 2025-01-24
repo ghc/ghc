@@ -413,7 +413,7 @@ test('T10904', [ extra_run_opts('20000'), req_c ],
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
                compile_and_run, [''])
 
-test('T9405', [when(opsys('mingw32'), fragile(21361)), js_broken(22261)], makefile_test, ['T9405'])
+test('T9405', [when(opsys('mingw32'), fragile(21361)), req_target_debug_rts], makefile_test, ['T9405'])
 
 test('T11788', [ when(ghc_dynamic(), skip)
                , req_interp
@@ -469,6 +469,8 @@ test('T14900',
 
 test('InternalCounters',
   [ js_skip # JS backend doesn't support internal counters
+    # Require threaded RTS
+  , req_target_smp
     # The ways which build against the debug RTS are built with PROF_SPIN and
     # therefore differ in output
   , omit_ways(['nonmoving_thr_sanity', 'threaded2_sanity', 'sanity'])
@@ -625,7 +627,7 @@ test('T23221',
      compile_and_run,
      ['-O -with-rtsopts -T'])
 
-test('T23142', [unless(debug_rts(), skip), req_interp], makefile_test, ['T23142'])
+test('T23142', [req_target_debug_rts, req_interp], makefile_test, ['T23142'])
 
 test('T23400', [], compile_and_run, ['-with-rtsopts -A8k'])
 

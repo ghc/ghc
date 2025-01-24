@@ -6,6 +6,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wall #-}
 
 -- | GHC builder
@@ -16,6 +17,8 @@ module Main where
 
 import Data.Maybe
 import Data.List qualified as List
+import Data.Map qualified as Map
+import Data.Map (Map)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
@@ -52,36 +55,96 @@ main = do
   msg "Building stage1 GHC program and utility programs"
   buildGhcStage1 defaultGhcBuildOptions cabal ghc0 "_build/stage0/"
 
-  ghc1    <- Ghc    <$> makeAbsolute "_build/stage0/bin/ghc"
-  ghcPkg1 <- GhcPkg <$> makeAbsolute "_build/stage0/bin/ghc-pkg"
-  deriveConstants <- DeriveConstants <$> makeAbsolute "_build/stage0/bin/deriveConstants"
-  genapply <- GenApply <$> makeAbsolute "_build/stage0/bin/genapply"
-  genprimop <- GenPrimop <$> makeAbsolute "_build/stage0/bin/genprimopcode"
+  -- now we copy the stage1 compiler and other tools into _build/stage1 and we
+  -- generate settings to use the newly installed packages. That's not what
+  -- Hadrian does but it's easier for us to nuke the stage1 directory to remove
+  -- only stage1's built libs without nuking the stage1 compiler which is slow
+  -- to build.
+  createDirectoryIfMissing True "_build/stage1/bin"
+  createDirectoryIfMissing True "_build/stage1/lib"
+  createDirectoryIfMissing True "_build/stage1/pkgs"
+  cp "_build/stage0/bin/*" "_build/stage1/bin/"
+  cp "_build/stage0/lib/template-hsc.h" "_build/stage1/lib/template-hsc.h"
+  cp "_build/stage0/pkgs/*" "_build/stage1/pkgs/"
+
+  ghc1    <- Ghc    <$> makeAbsolute "_build/stage1/bin/ghc"
+  ghcPkg1 <- GhcPkg <$> makeAbsolute "_build/stage1/bin/ghc-pkg"
+  deriveConstants <- DeriveConstants <$> makeAbsolute "_build/stage1/bin/deriveConstants"
+  genapply <- GenApply <$> makeAbsolute "_build/stage1/bin/genapply"
+  genprimop <- GenPrimop <$> makeAbsolute "_build/stage1/bin/genprimopcode"
+  ghcToolchain <- GhcToolchain <$> makeAbsolute "_build/stage1/bin/ghc-toolchain"
+
+  -- generate settings based on stage1 compiler settings: stage1 should never be
+  -- a cross-compiler! Hence we reuse the same target platform as the bootstrap
+  -- compiler.
+  stage0_target_triple <- ghcTargetTriple ghc0
+  let stage1_settings = emptySettings
+                          { settingsTriple = Just stage0_target_triple
+                          }
+  generateSettings ghcToolchain stage1_settings "_build/stage1/"
 
   msg "Building boot libraries with stage1 compiler..."
   buildBootLibraries cabal ghc1 ghcPkg1 deriveConstants genapply genprimop defaultGhcBuildOptions "_build/stage1/"
+
+  msg "Building stage2 GHC program"
+  createDirectoryIfMissing True "_build/stage2"
+  ghc1' <- Ghc <$> makeAbsolute "_build/stage1/bin/ghc"
+  buildGhcStage2 defaultGhcBuildOptions cabal ghc1' "_build/stage2/"
+
+  -- Reuse stage1 settings for stage2 and copy stage1's built boot package for
+  -- stage2 to use.
+  createDirectoryIfMissing True "_build/stage2/lib/"
+  cp "_build/stage1/pkgs/*" "_build/stage2/pkgs"
+  cp "_build/stage1/lib/settings" "_build/stage2/lib/settings"
+
+  -- TODO: in the future we want to generate different settings for cross
+  -- targets and build boot libraries with stage2 using these settings. In any
+  -- case, we need non-cross boot packages to build plugins for use with
+  -- -fplugin-library.
+
+
+  -- Finally create bindist directory
+  msg "Creating bindist"
+  createDirectoryIfMissing True "_build/bindist/lib/"
+  createDirectoryIfMissing True "_build/bindist/bin/"
+  createDirectoryIfMissing True "_build/bindist/pkgs/"
+  cp "_build/stage2/bin/*" "_build/bindist/bin/"
+  cp "_build/stage2/lib/*" "_build/bindist/lib/"
+  cp "_build/stage2/pkgs/*" "_build/bindist/pkgs/"
+  cp "driver/ghc-usage.txt" "_build/bindist/lib/"
+  cp "driver/ghci-usage.txt" "_build/bindist/lib/"
 
   msg "Done"
 
 
 -- | Build stage1 GHC program
 buildGhcStage1 :: GhcBuildOptions -> Cabal -> Ghc -> FilePath -> IO ()
-buildGhcStage1 opts cabal ghc0 dst = do
+buildGhcStage1 = buildGhcStage True
+
+-- | Build stage2 GHC program
+buildGhcStage2 :: GhcBuildOptions -> Cabal -> Ghc -> FilePath -> IO ()
+buildGhcStage2 = buildGhcStage False
+
+-- | Build GHC program
+buildGhcStage :: Bool -> GhcBuildOptions -> Cabal -> Ghc -> FilePath -> IO ()
+buildGhcStage booting opts cabal ghc0 dst = do
   let src = dst </> "src"
   prepareGhcSources opts src
+
+  msg "  - Building GHC and utility programs..."
 
   let builddir = dst </> "cabal"
   createDirectoryIfMissing True builddir
 
   -- we need to augment the current environment to pass HADRIAN_SETTINGS
   -- environment variable to ghc-boot's Setup.hs script.
-  stage0_settings <- read <$> readCreateProcess (runGhc ghc0 ["--info"]) ""
+  (arch,os) <- ghcTargetArchOS ghc0
   stage1_ghc_boot_settings <- do
     commit_id <- readCreateProcess (proc "git" ["rev-parse", "HEAD"]) ""
     -- we infer stage1's host platform from stage0's settings
     let settings =
-          [ ("hostPlatformArch",    fromMaybe (error "Couldn't read 'target arch' setting") (lookup "target arch" stage0_settings))
-          , ("hostPlatformOS",      fromMaybe (error "Couldn't read 'target os' setting") (lookup "target os" stage0_settings))
+          [ ("hostPlatformArch",    arch)
+          , ("hostPlatformOS",      os)
           , ("cProjectGitCommitId", commit_id)
           , ("cProjectVersion",     Text.unpack $ gboVersion opts)
           , ("cProjectVersionInt",  Text.unpack $ gboVersionInt opts)
@@ -94,10 +157,9 @@ buildGhcStage1 opts cabal ghc0 dst = do
   current_env <- getEnvironment
   let stage1_env = ("HADRIAN_SETTINGS", stage1_ghc_boot_settings) : current_env
 
-  msg "  - Building GHC stage1 and bootstrapping utility programs..."
+  let cabal_project_path = dst </> "cabal.project-ghc"
 
-  let cabal_project_path = dst </> "cabal.project-stage0"
-  makeCabalProject cabal_project_path
+  let stage1_project =
         [ "packages:"
         , "  " ++ src </> "ghc-bin/"
         , "  " ++ src </> "libraries/ghc/"
@@ -121,6 +183,8 @@ buildGhcStage1 opts cabal ghc0 dst = do
         , "  " ++ src </> "utils/genprimopcode/"
         , "  " ++ src </> "utils/genapply/"
         , "  " ++ src </> "utils/deriveConstants/"
+        , "  " ++ src </> "utils/ghc-toolchain/"
+        , "  " ++ src </> "utils/ghc-toolchain/exe"
         , ""
         , "benchmarks: False"
         , "tests: False"
@@ -133,30 +197,98 @@ buildGhcStage1 opts cabal ghc0 dst = do
         , "  executable-dynamic: False"
         , "  executable-static: True"
         , ""
-        , "constraints:"
-             -- for some reason 2.23 doesn't build
-        , "  template-haskell <= 2.22"
-        , ""
         , "package ghc-boot-th"
         , "  flags: +bootstrap"
         , ""
+        , "package hsc2hs"
+        , "  flags: +in-ghc-tree" -- allow finding template-hsc.h in GHC's /lib
+        , ""
           -- allow template-haskell with newer ghc-boot-th
         , "allow-newer: ghc-boot-th"
+        , ""
+        , "constraints:"
+          -- FIXME: template-haskell 2.23 is too recent when booting with 9.8.4
+        , "  template-haskell <= 2.22"
         ]
 
-  let build_cmd = (runCabal cabal
+  let stage2_project =
+        [ "packages:"
+            -- ghc *library* mustn't be listed here: otherwise its unit-id becomes
+            -- ghc-9.xx-inplace and it's wrong when we load plugins
+            -- (wired-in thisGhcUnitId is wrong)
+            --
+            -- actually we don't need any of the boot packages we already
+            -- installed.
+        , "  " ++ src </> "ghc-bin/"
+        , "  " ++ src </> "libraries/haskeline/"
+        , "  " ++ src </> "libraries/terminfo/"
+        , "  " ++ src </> "utils/ghc-pkg"
+        , "  " ++ src </> "utils/hsc2hs"
+        , "  " ++ src </> "utils/hp2ps"
+        , "  " ++ src </> "utils/hpc"
+        , "  " ++ src </> "utils/unlit"
+        , "  " ++ src </> "utils/iserv"
+        , "  " ++ src </> "utils/genprimopcode/"
+        , "  " ++ src </> "utils/genapply/"
+        , "  " ++ src </> "utils/deriveConstants/"
+        , "  " ++ src </> "utils/runghc/"
+        , ""
+        , "benchmarks: False"
+        , "tests: False"
+        , ""
+        , "package *"
+        , "  library-vanilla: True"
+        , "  shared: False"
+        , "  executable-profiling: False"
+        , "  executable-dynamic: False"
+        , "  executable-static: True"
+        , ""
+        , "package ghc-bin"
+        , "  flags: +internal-interpreter"
+        , ""
+        , "package hsc2hs"
+        , "  flags: +in-ghc-tree" -- allow finding template-hsc.h in GHC's /lib
+        , ""
+        , "package haskeline"
+        , "  flags: -terminfo" -- FIXME: should be enabled but I don't have the static libs for terminfo on ArchLinux...
+        , ""
+        ]
+
+  makeCabalProject cabal_project_path (if booting then stage1_project else stage2_project)
+
+  -- the targets
+  let targets
+        | booting =
+           [ "ghc-bin:ghc"
+           , "ghc-pkg:ghc-pkg"
+           , "genprimopcode:genprimopcode"
+           , "deriveConstants:deriveConstants"
+           , "genapply:genapply"
+           , "ghc-toolchain-bin:ghc-toolchain-bin"
+           , "unlit:unlit"
+           , "hsc2hs:hsc2hs"
+           ]
+        | otherwise = 
+           [ "ghc-bin:ghc"
+           , "ghc-pkg:ghc-pkg"
+           , "genprimopcode:genprimopcode"
+           , "deriveConstants:deriveConstants"
+           , "genapply:genapply"
+           , "unlit:unlit"
+           , "hsc2hs:hsc2hs"
+           , "hp2ps:hp2ps"
+           , "hpc-bin:hpc"
+           , "iserv:iserv"
+           , "runghc:runghc"
+           ]
+
+  let build_cmd = (runCabal cabal $
               [ "build"
               , "--project-file=" ++ cabal_project_path
               , "--builddir=" ++ builddir
               , "-j"
               , "--with-compiler=" ++ ghcPath ghc0
-              -- the targets
-              , "ghc-bin:ghc"
-              , "ghc-pkg:ghc-pkg"
-              , "genprimopcode:genprimopcode"
-              , "deriveConstants:deriveConstants"
-              , "genapply:genapply"
-              ])
+              ] ++ targets)
               { env = Just stage1_env
               }
 
@@ -167,10 +299,12 @@ buildGhcStage1 opts cabal ghc0 dst = do
     ExitSuccess -> pure ()
     ExitFailure n -> do
       putStrLn $ "cabal-install failed with error code: " ++ show n
-      putStrLn $ "Logs can be found in \"" ++ dst ++ "/cabal.{stdout,stderr}\""
+      putStrLn cabal_stdout
+      putStrLn cabal_stderr
+      putStrLn $ "Logs can be found in \"" ++ (dst </> "cabal.{stdout,stderr}\"")
       exitFailure
 
-  msg "  - Copying stage1 programs and generating settings to use them..."
+  msg "  - Copying programs and generating GHC settings..."
   let listbin_cmd p = runCabal cabal
         [ "list-bin"
         , "--project-file=" ++ cabal_project_path
@@ -189,37 +323,34 @@ buildGhcStage1 opts cabal ghc0 dst = do
             putStrLn list_bin_stderr
             exitFailure
   createDirectoryIfMissing True (dst </> "bin")
-  copy_bin "ghc-bin:ghc"                     "ghc"
-  copy_bin "ghc-pkg:ghc-pkg"                 "ghc-pkg"
-  copy_bin "deriveConstants:deriveConstants" "deriveConstants"
-  copy_bin "genprimopcode:genprimopcode"     "genprimopcode"
-  copy_bin "genapply:genapply"               "genapply"
+
+  copy_bin "ghc-bin:ghc"     "ghc"
+  copy_bin "ghc-pkg:ghc-pkg" "ghc-pkg"
+  copy_bin "unlit:unlit"     "unlit"
+  copy_bin "hsc2hs:hsc2hs"   "hsc2hs"
+  -- always install these tools: they are needed to build the ghc library (e.g.
+  -- for a different target)
+  copy_bin "deriveConstants:deriveConstants"     "deriveConstants"
+  copy_bin "genprimopcode:genprimopcode"         "genprimopcode"
+  copy_bin "genapply:genapply"                   "genapply"
+
+  createDirectoryIfMissing True (dst </> "lib")
+  cp (src </> "utils/hsc2hs/data/template-hsc.h") (dst </> "lib/template-hsc.h")
+
+  unless booting $ do
+    copy_bin "hp2ps:hp2ps"   "hp2ps"
+    copy_bin "hpc-bin:hpc"   "hpc"
+    copy_bin "runghc:runghc" "runghc"
+    copy_bin "iserv:iserv"   "ghc-iserv" -- vanilla iserv
+
+  when booting $ do
+    copy_bin "ghc-toolchain-bin:ghc-toolchain-bin" "ghc-toolchain"
 
   -- initialize empty global package database
   pkgdb <- makeAbsolute (dst </> "pkgs")
   ghcpkg <- GhcPkg <$> makeAbsolute (dst </> "bin/ghc-pkg")
   initEmptyDB ghcpkg pkgdb
 
-
-  -- generate settings based on stage1 compiler settings
-  createDirectoryIfMissing True (dst </> "lib")
-  let stage1_settings = makeStage1Settings stage0_settings
-  writeFile (dst </> "lib/settings") (show stage1_settings)
-
-  -- try to run the stage1 compiler (no package db yet, so just display the
-  -- version)
-  (test_exit_code, _test_stdout, _test_stderr) <- readCreateProcessWithExitCode (proc (dst </> "bin/ghc") ["--version"]) ""
-  case test_exit_code of
-    ExitSuccess -> pure ()
-    ExitFailure n -> do
-      putStrLn $ "Failed to run stage1 compiler with error code " ++ show n
-      exitFailure
-
-
--- TODO:
--- - headers shared between different packages should be a common dependency
--- - event types should be generated by Setup.hs
--- package versions: do they need to be all the same?
 
 -- | Prepare GHC sources in the given directory
 prepareGhcSources :: GhcBuildOptions -> FilePath -> IO ()
@@ -300,99 +431,14 @@ prepareGhcSources opts dst = do
   subst_in (dst </> "libraries/ghc/GHC/CmmToLlvm/Version/Bounds.hs") llvm_substs
 
   subst_in (dst </> "utils/ghc-pkg/ghc-pkg.cabal") common_substs
+  subst_in (dst </> "utils/iserv/iserv.cabal") common_substs
+  subst_in (dst </> "utils/runghc/runghc.cabal") common_substs
 
   subst_in (dst </> "libraries/ghc-internal/ghc-internal.cabal") common_substs
+  subst_in (dst </> "libraries/ghc-experimental/ghc-experimental.cabal") common_substs
   subst_in (dst </> "libraries/base/base.cabal") common_substs
   subst_in (dst </> "libraries/rts/include/ghcversion.h") common_substs
 
-
--- | Generate settings for stage1 compiler, based on given settings (stage0's
--- compiler settings)
-makeStage1Settings :: [(String,String)] -> [(String,String)]
-makeStage1Settings in_settings = out_settings
-  where
-    -- keep the previous setting, fail if it doesn't exist
-    keep_fail s = keep_def s (error ("Couldn't find setting "<> show s))
-
-    -- keep the previous setting, default to the given value if it doesn't exist
-    keep_def s d = case lookup s in_settings of
-      Nothing -> (s,d)
-      Just v  -> (s,v)
-
-    -- use the previous setting, or if it doesn't exist use the setting for the
-    -- second key. Fail if both don't exist. This is useful to support
-    -- bootstrapping with old compilers that mingled some settings.
-    keep_or_fail s s2 = case lookup s in_settings of
-      Nothing -> case lookup s2 in_settings of
-        Nothing -> error ("Couldn't find any of " <> show s <> " and " <> show s2)
-        Just v  -> (s,v)
-      Just v  -> (s,v)
-
-    --FIXME: we default to these flags for Cmm CPP, otherwise CPP fails
-    -- with error: missing '(' after "__has_feature"
-    -- because we pass `-traditional` while compiling Apply.cmm (in TSANUtils.h)
-    default_cpp_flags = "-E"
-
-    out_settings =
-        [ keep_fail "C compiler command"
-        , keep_fail "C compiler flags"
-        , keep_fail "C++ compiler command"
-        , keep_fail "C++ compiler flags"
-        , keep_fail "C compiler link flags"
-        , keep_fail "C compiler supports -no-pie"
-        , keep_or_fail "CPP command" "Haskell CPP command"
-        , keep_def "CPP flags" default_cpp_flags
-        , keep_fail "Haskell CPP command"
-        , keep_fail "Haskell CPP flags"
-        , keep_or_fail "JavaScript CPP command" "Haskell CPP command"
-        , keep_or_fail "JavaScript CPP flags" "Haskell CPP flags"
-        , keep_or_fail "C-- CPP command" "Haskell CPP command"
-        , keep_def "C-- CPP flags"   default_cpp_flags
-        , keep_def "C-- CPP supports -g0" "NO"
-        , keep_fail "ld supports compact unwind"
-        , keep_fail "ld supports filelist"
-        , keep_fail "ld supports single module"
-        , keep_fail "ld is GNU ld"
-        , keep_fail "Merge objects command"
-        , keep_fail "Merge objects flags"
-        , keep_def "Merge objects supports response files" "NO"
-        , keep_fail "ar command"
-        , keep_fail "ar flags"
-        , keep_fail "ar supports at file"
-        , keep_fail "ar supports -L"
-        , keep_fail "ranlib command"
-        , keep_fail "otool command"
-        , keep_fail "install_name_tool command"
-        , keep_fail "windres command"
-        , keep_fail "unlit command"
-        , keep_fail "cross compiling"
-        , keep_fail "target platform string"
-        , keep_fail "target os"
-        , keep_fail "target arch"
-        , keep_fail "target word size"
-        , keep_fail "target word big endian"
-        , keep_fail "target has GNU nonexec stack"
-        , keep_fail "target has .ident directive"
-        , keep_fail "target has subsections via symbols"
-        , keep_fail "target has libm"
-        , keep_fail "Unregisterised"
-        , keep_fail "LLVM target"
-        , keep_fail "LLVM llc command"
-        , keep_fail "LLVM opt command"
-        , keep_def "LLVM llvm-as command" "llvm-as"
-        , keep_fail "Use inplace MinGW toolchain"
-
-        , keep_def "target RTS linker only supports shared libraries" "NO"
-        , ("Use interpreter", "NO")
-        , ("base unit-id", "base") -- there is no base yet... Anyway this isn't really useful to set
-        , keep_fail "Support SMP"
-        , keep_fail "RTS ways"
-        , keep_fail "Tables next to code"
-        , keep_fail "Leading underscore"
-        , keep_fail "Use LibFFI"
-        , keep_fail "RTS expects libdw"
-        , ("Relative Global Package DB", "../pkgs")
-        ]
 
 buildBootLibraries :: Cabal -> Ghc -> GhcPkg -> DeriveConstants -> GenApply -> GenPrimop -> GhcBuildOptions -> FilePath -> IO ()
 buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst = do
@@ -409,25 +455,37 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
       -- option into \" otherwise it does weird things (like keeping only the
       -- last double-quote).
   let def_string k v = "  ghc-options: \"-optc-D" ++ k ++ "=\\\"" ++ v ++ "\\\"\""
+  let def        k v = "  ghc-options: \"-optc-D" ++ k ++ "=" ++ v ++ "\""
   let rts_options =
         [ "package rts"
         , def_string "ProjectVersion" (Text.unpack (gboVersionInt opts))
         , def_string "RtsWay"            "FIXME"
-        , def_string "HostPlatform"      "FIXME"
-        , def_string "HostArch"          "FIXME"
-        , def_string "HostOS"            "FIXME"
-        , def_string "HostVendor"        "FIXME"
+        , def_string "HostPlatform"      "x86_64-unknown-linux" -- FIXME
+        , def_string "HostArch"          "x86_64" -- FIXME: appropriate value required for the tests
+        , def_string "HostOS"            "linux" -- FIXME: appropriate value required for the tests
+        , def_string "HostVendor"        "unknown"
         , def_string "BuildPlatform"     "FIXME"
         , def_string "BuildArch"         "FIXME"
         , def_string "BuildOS"           "FIXME"
         , def_string "BuildVendor"       "FIXME"
-        , def_string "TargetPlatform"    "FIXME"
-        , def_string "TargetArch"        "FIXME"
-        , def_string "TargetOS"          "FIXME"
-        , def_string "TargetVendor"      "FIXME"
         , def_string "GhcUnregisterised" "FIXME"
         , def_string "TablesNextToCode"  "FIXME"
-        , "  flags: +use-system-libffi" -- FIXME: deal with libffi (add package?)
+          -- Set the namespace for the rts fs functions
+        , def "FS_NAMESPACE" "rts"
+        , "  flags: +use-system-libffi +tables-next-to-code"
+          -- FIXME: deal with libffi (add package?)
+          --
+          -- FIXME: we should make tables-next-to-code  optional here and in the
+          -- compiler settings. Ideally, GHC should even look into the rts's
+          -- ghcautoconf.h to check whether TABLES_NEXT_TO_CODE is defined or
+          -- not. It would be cleaner than duplicating this information into the
+          -- settings (similar to what we do with platform constants).
+
+          -- FIXME: Cabal doesn't like when flags are on separate lines like
+          -- this:
+          --  flags: +use-system-libffi
+          --  flags: +tables-next-to-code
+          -- Apparently it makes it ignore the first set of flags...
         ]
 
   makeCabalProject cabal_project_rts_path $
@@ -470,8 +528,16 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   msg "  - Generating headers and sources..."
 
   -- first run is expected to fail because of misssing headers
-  void $ readCreateProcessWithExitCode build_rts_cmd ""
-  ghcplatform_dir <- takeDirectory <$> readCreateProcess (shell ("find " ++ build_dir ++ " -name ghcplatform.h")) ""
+  (_exit_code, rts_conf_stdout, rts_conf_stderr) <- readCreateProcessWithExitCode build_rts_cmd ""
+  writeFile (dst </> "rts-conf.stdout") rts_conf_stdout
+  writeFile (dst </> "rts-conf.stderr") rts_conf_stderr
+  ghcplatform_dir <- do
+    ghcplatform_h <- readCreateProcess (shell ("find " ++ build_dir ++ " -name ghcplatform.h")) ""
+    case ghcplatform_h of
+      "" -> do
+        putStrLn "Couldn't find ghcplatform.h"
+        exitFailure
+      d  -> pure (takeDirectory d)
 
   -- deriving constants
   let derived_constants = src_rts </> "include/DerivedConstants.h"
@@ -496,17 +562,17 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   run_genapply [derived_constants, "-V32"] (src_rts </> "AutoApply_V32.cmm")
   run_genapply [derived_constants, "-V64"] (src_rts </> "AutoApply_V64.cmm")
 
-  -- Generate primop code for ghc-prim
+  -- Generate primop code for ghc-internal
   --
-  -- Note that this can't be done in a Setup.hs for ghc-prim because
+  -- Note that this can't be done in a Setup.hs for ghc-internal because
   -- cabal-install can't build Setup.hs because it depends on base, Cabal, etc.
   -- libraries that aren't built yet.
   let primops_txt    = src </> "libraries/ghc/GHC/Builtin/primops.txt"
   let primops_txt_pp = primops_txt <.> ".pp"
   primops <- readCreateProcess (shell $ "gcc -E -undef -traditional -P -x c " ++ primops_txt_pp) ""
   writeFile primops_txt primops
-  writeFile (src </> "libraries/ghc-prim/GHC/Prim.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-source"]) primops
-  writeFile (src </> "libraries/ghc-prim/GHC/PrimopWrappers.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops
+  writeFile (src </> "libraries/ghc-internal/src/GHC/Internal/Prim.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-source"]) primops
+  writeFile (src </> "libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops
 
   -- build libffi
   msg "  - Building libffi..."
@@ -533,7 +599,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   cp (dst_libffi </> "include" </> "*") (src_rts </> "include")
   cp (dst_libffi </> "lib" </> "libffi.a") (takeDirectory ghcplatform_dir </> "libCffi.a")
 
-  -- build boot libraries: ghc-internal, base... but not GHC itself
+  -- build boot libraries: ghc-internal, base...
   let cabal_project_bootlibs_path = dst </> "cabal-project-boot-libs"
   makeCabalProject cabal_project_bootlibs_path $
         [ "package-dbs: clear, global"
@@ -542,9 +608,13 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "  " ++ src </> "libraries/rts"
         , "  " ++ src </> "libraries/ghc-prim"
         , "  " ++ src </> "libraries/ghc-internal"
+        , "  " ++ src </> "libraries/ghc-experimental"
         , "  " ++ src </> "libraries/base"
         , "  " ++ src </> "libraries/ghc"
         , "  " ++ src </> "libraries/ghc-platform/"
+        , "  " ++ src </> "libraries/ghc-compact/"
+        , "  " ++ src </> "libraries/ghc-bignum/"
+        , "  " ++ src </> "libraries/integer-gmp/"
         , "  " ++ src </> "libraries/ghc-boot/"
         , "  " ++ src </> "libraries/ghc-boot-th/"
         , "  " ++ src </> "libraries/ghc-heap"
@@ -552,10 +622,14 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "  " ++ src </> "libraries/stm"
         , "  " ++ src </> "libraries/template-haskell"
         , "  " ++ src </> "libraries/hpc"
+        , "  " ++ src </> "libraries/system-cxx-std-lib"
         , "  " ++ src </> "ghc-bin/"
         , "  " ++ src </> "utils/ghc-pkg"
         , "  " ++ src </> "utils/hsc2hs"
         , "  " ++ src </> "utils/unlit"
+        , "  " ++ src </> "utils/genprimopcode"
+        , "  " ++ src </> "utils/deriveConstants"
+        , "  " ++ src </> "utils/ghc-toolchain/"
         , "  " ++ src </> "libraries/array"
         , "  " ++ src </> "libraries/binary"
         , "  " ++ src </> "libraries/bytestring"
@@ -578,7 +652,11 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "  " ++ src </> "libraries/Win32/"
         , "  " ++ src </> "libraries/Cabal/Cabal-syntax"
         , "  " ++ src </> "libraries/Cabal/Cabal"
-        , "  https://github.com/haskell/alex/archive/refs/tags/v3.5.2.0.tar.gz"
+          -- use alex from Hackage, not git, as it already has preprocessed
+          -- alex/happy files.
+        , "  https://hackage.haskell.org/package/alex-3.5.2.0/alex-3.5.2.0.tar.gz"
+        , "  https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz"
+        , "  https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz"
         , ""
         , "benchmarks: False"
         , "tests: False"
@@ -590,7 +668,17 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "  shared: False"
         , "  executable-profiling: False"
         , "  executable-dynamic: False"
-        , "  executable-static: False"
+        , "  executable-static: True"
+        , ""
+        , "package ghc"
+             -- build-tool-depends: require genprimopcode, etc. used by Setup.hs
+             -- internal-interpreter: otherwise our compiler has the internal
+             -- interpreter but not the boot library we install
+             -- FIXME: we should really install the lib we used to build stage2
+        , "  flags: +build-tool-depends +internal-interpreter"
+        , ""
+        , "package ghci"
+        , "  flags: +internal-interpreter"
         , ""
         , "package ghc-internal"
              -- FIXME: make our life easier for now by using the native bignum backend
@@ -609,8 +697,6 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "--lib"
         , "--package-env=" ++ boot_libs_env
         , "--force-reinstalls"
-        , "-v3"
-        -- [ "build"
         , "--project-file=" ++ cabal_project_bootlibs_path
         , "--with-compiler=" ++ ghcPath ghc
         , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg
@@ -620,9 +706,49 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
 
           -- targets
         , "rts"
-        , "ghc-prim"
         , "ghc-internal"
+        , "ghc-experimental"
+        , "ghc-compact"
         , "base"
+        , "stm"
+        , "system-cxx-std-lib"
+          -- shallow compat packages over ghc-internal
+        , "ghc-prim"
+        , "ghc-bignum"
+        , "integer-gmp"
+        , "template-haskell"
+          -- target dependencies
+        , "ghc-boot-th" -- dependency of template-haskell
+        , "pretty"      -- dependency of ghc-boot-th
+          -- other boot libraries used by tests
+        , "array"
+        , "binary"
+        , "bytestring"
+        , "Cabal"
+        , "Cabal-syntax"
+        , "containers"
+        , "deepseq"
+        , "directory"
+        , "exceptions"
+        , "file-io"
+        , "filepath"
+        , "hpc"
+        , "mtl"
+        , "os-string"
+        , "parsec"
+        , "process"
+        , "semaphore-compat"
+        , "text"
+        , "time"
+        , "transformers"
+        , "unix" -- FIXME: we'd have to install Win32 for Windows target. Maybe --libs could install dependencies too..
+          -- ghc related
+        , "ghc-boot"
+        , "ghc-heap"
+        , "ghc-platform"
+        , "ghc-toolchain" -- some test requires this
+        , "ghci"
+        , "ghc"
         ]
 
   msg "  - Building boot libraries..."
@@ -633,15 +759,43 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
     ExitSuccess -> pure ()
     ExitFailure r -> do
       putStrLn $ "Failed to build boot libraries with error code " ++ show r
+      putStrLn boot_stdout
+      putStrLn boot_stderr
       putStrLn $ "Logs can be found in " ++ dst ++ "boot-libs.{stdout,stderr}"
       exitFailure
 
   -- The libraries have been installed globally.
-  (global_gb:pkg_ids) <- (map (drop 11) . drop 2 . lines) <$> readFile boot_libs_env
-  putStrLn $ "We've built boot libraries in " ++ global_gb ++ ":"
+  boot_libs_env_lines <- lines <$> readFile boot_libs_env
+  -- FIXME: Sometimes the package environment contains the path to the global db,
+  -- sometimes not... I don't know why yet.
+  (global_db,pkg_ids) <- case drop 2 boot_libs_env_lines of
+    [] -> error "Unexpected empty package environment"
+    (x:xs)
+      | not ("package-db" `List.isPrefixOf` x)
+      -> do
+        putStrLn "For some reason cabal-install didn't generate a valid package environment (package-db is missing)."
+        putStrLn "It happens sometimes for unknown reasons... Rerun 'make' to workaround this..."
+        exitFailure
+      | otherwise -> pure (drop 11 x, map (drop 11) xs)
+  putStrLn $ "We've built boot libraries in " ++ global_db ++ ":"
   mapM_ (putStrLn . ("  - " ++)) pkg_ids
 
-  -- TODO: copy the libs in another db
+  -- copy the libs in another db
+  createDirectoryIfMissing True (dst </> "pkgs")
+  initEmptyDB ghcpkg (dst </> "pkgs")
+  let pkg_root = takeDirectory global_db
+  forM_ pkg_ids $ \pid -> do
+    conf <- Text.readFile (global_db </> pid <.> "conf")
+    -- replace full path with ${pkgroot}
+    -- NOTE: GHC assumes that pkgroot is just one directory above the directory
+    -- containing the package db. In our case where everything is at the same
+    -- level in "pkgs" we need to re-add "/pkgs"
+    Text.writeFile (dst </> "pkgs" </> pid <.> "conf")
+                   (Text.replace (Text.pack pkg_root) "${pkgroot}/pkgs" conf)
+    cp (pkg_root </> pid) (dst </> "pkgs")
+
+  void $ readCreateProcess (runGhcPkg ghcpkg ["recache", "--package-db=" ++ (dst </> "pkgs")]) ""
+
 
 
 ---------------------------
@@ -695,6 +849,7 @@ msg x = do
 -- Avoid FilePath blindness by using type aliases for programs.
 newtype Ghc = Ghc FilePath
 newtype GhcPkg = GhcPkg FilePath
+newtype GhcToolchain = GhcToolchain FilePath
 newtype Cabal = Cabal FilePath
 newtype DeriveConstants = DeriveConstants FilePath
 newtype GenApply = GenApply FilePath
@@ -708,6 +863,9 @@ ghcPath (Ghc x) = x
 
 runGhcPkg :: GhcPkg -> [String] -> CreateProcess
 runGhcPkg (GhcPkg f) = proc f
+
+runGhcToolchain :: GhcToolchain -> [String] -> CreateProcess
+runGhcToolchain (GhcToolchain f) = proc f
 
 ghcPkgPath :: GhcPkg -> FilePath
 ghcPkgPath (GhcPkg x) = x
@@ -724,8 +882,13 @@ runGenApply (GenApply f) = proc f
 runGenPrimop :: GenPrimop -> [String] -> CreateProcess
 runGenPrimop (GenPrimop f) = proc f
 
+-- | Copy
+--
+-- Recursively, force overwrite, and preserve timestamps (important for package
+-- dbs)
 cp :: String -> String -> IO ()
-cp src dst = void (readCreateProcess (shell $ "cp -rf " ++ src ++ " " ++ dst) "")
+cp src dst = void (readCreateProcess (shell $ "cp -rfp " ++ src ++ " " ++ dst) "")
+
 
 makeCabalProject :: FilePath -> [String] -> IO ()
 makeCabalProject path xs = writeFile path $ unlines (xs ++ common)
@@ -753,3 +916,119 @@ initEmptyDB ghcpkg pkgdb = do
   -- don't try to recreate the DB if it already exist as it would fail
   exists <- doesDirectoryExist pkgdb
   unless exists $ void $ readCreateProcess (runGhcPkg ghcpkg ["init", pkgdb]) ""
+
+-- | Retrieve GHC's target arch/os from ghc --info
+ghcTargetArchOS :: Ghc -> IO (String,String)
+ghcTargetArchOS ghc = do
+  is <- read <$> readCreateProcess (runGhc ghc ["--info"]) "" :: IO [(String,String)]
+  let arch = fromMaybe (error "Couldn't read 'target arch' setting") (lookup "target arch" is)
+  let os   = fromMaybe (error "Couldn't read 'target os' setting") (lookup "target os" is)
+  pure (arch,os)
+
+-- | Retrieve GHC's target triple
+ghcTargetTriple :: Ghc -> IO String
+ghcTargetTriple ghc = do
+  is <- read <$> readCreateProcess (runGhc ghc ["--info"]) "" :: IO [(String,String)]
+  pure $ fromMaybe (error "Couldn't read 'Target platform setting") (lookup "Target platform" is)
+
+
+data Settings = Settings
+  { settingsTriple            :: Maybe String
+  , settingsTargetPrefix      :: Maybe String
+  , settingsLocallyExecutable :: Maybe Bool
+  , settingsLlvmTriple        :: Maybe String
+  , settingsCc                :: ProgOpt
+  , settingsCxx               :: ProgOpt
+  , settingsCpp               :: ProgOpt
+  , settingsHsCpp             :: ProgOpt
+  , settingsJsCpp             :: ProgOpt
+  , settingsCmmCpp            :: ProgOpt
+  , settingsCcLink            :: ProgOpt
+  , settingsAr                :: ProgOpt
+  , settingsRanlib            :: ProgOpt
+  , settingsNm                :: ProgOpt
+  , settingsReadelf           :: ProgOpt
+  , settingsMergeObjs         :: ProgOpt
+  , settingsWindres           :: ProgOpt
+  -- Note we don't actually configure LD into anything but
+  -- see #23857 and #22550 for the very unfortunate story.
+  , settingsLd                :: ProgOpt
+  , settingsUnregisterised    :: Maybe Bool
+  , settingsTablesNextToCode  :: Maybe Bool
+  , settingsUseLibFFIForAdjustors :: Maybe Bool
+  , settingsLdOverride        :: Maybe Bool
+  }
+
+-- | Program specifier from the command-line.
+data ProgOpt = ProgOpt
+  { poPath :: Maybe String
+  -- ^ Refers to the path to an executable, or simply the
+  -- executable name.
+  , poFlags :: Maybe [String]
+  }
+
+emptyProgOpt :: ProgOpt
+emptyProgOpt = ProgOpt Nothing Nothing
+
+emptySettings :: Settings
+emptySettings = Settings
+    { settingsTriple    = Nothing
+    , settingsTargetPrefix = Nothing
+    , settingsLocallyExecutable = Nothing
+    , settingsLlvmTriple = Nothing
+    , settingsCc        = po0
+    , settingsCxx       = po0
+    , settingsCpp       = po0
+    , settingsHsCpp     = po0
+    , settingsJsCpp     = po0
+    , settingsCmmCpp    = po0
+    , settingsCcLink    = po0
+    , settingsAr        = po0
+    , settingsRanlib    = po0
+    , settingsNm        = po0
+    , settingsReadelf   = po0
+    , settingsMergeObjs = po0
+    , settingsWindres   = po0
+    , settingsLd        = po0
+    , settingsUnregisterised = Nothing
+    , settingsTablesNextToCode = Nothing
+    , settingsUseLibFFIForAdjustors = Nothing
+    , settingsLdOverride = Nothing
+    }
+  where
+    po0 = emptyProgOpt
+
+generateSettings :: GhcToolchain -> Settings -> FilePath -> IO ()
+generateSettings ghc_toolchain Settings{..} dst = do
+  createDirectoryIfMissing True (dst </> "lib")
+
+  let gen_settings_path = dst </> "lib/settings.generated"
+  let common_args =
+       [ "--output-settings"
+       , "-o", gen_settings_path
+       ]
+
+  let opt m f = fmap f m
+  let args = mconcat (catMaybes
+       [ opt settingsTriple $ \x -> ["--triple", x]
+       -- FIXME: add other options for ghc-toolchain from Settings
+       ]) ++ common_args
+
+  (exit_code, toolchain_stdout, toolchain_stderr) <- readCreateProcessWithExitCode (runGhcToolchain ghc_toolchain args) ""
+  writeFile (dst </> "ghc-toolchain.stdout") toolchain_stdout
+  writeFile (dst </> "ghc-toolchain.stderr") toolchain_stderr
+  case exit_code of
+    ExitSuccess -> pure ()
+    ExitFailure n -> do
+      putStrLn $ "ghc-toolchain failed with error code: " ++ show n
+      putStrLn toolchain_stdout
+      putStrLn toolchain_stderr
+      putStrLn $ "Logs can be found in \"" ++ (dst </> "ghc-toolchain.{stdout,stderr}\"")
+      exitFailure
+
+  -- fixup settings generated by ghc-toolchain
+  kvs <- (Map.fromList . read) <$> readFile gen_settings_path :: IO (Map String String)
+  let kvs' = Map.insert "Relative Global Package DB" "../pkgs"
+             $ Map.insert "Support SMP" "NO" -- FIXME: this depends on the different ways used to build the RTS!
+             $ kvs
+  writeFile (dst </> "lib/settings") (show $ Map.toList kvs')

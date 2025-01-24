@@ -124,6 +124,13 @@ else
 RUNTEST_OPTS += -e ghc_with_dynamic_rts=False
 endif
 
+ifeq "$(filter thr, $(GhcRTSWays))" "debug"
+RUNTEST_OPTS += -e config.debug_rts=True
+else
+RUNTEST_OPTS += -e config.debug_rts=False
+endif
+
+
 ifeq "$(GhcWithInterpreter)" "NO"
 RUNTEST_OPTS += -e config.have_interp=False
 else ifeq "$(GhcStage)" "1"

@@ -40,3 +40,22 @@ jobs:
 
     - name: Build the bindist
       run: make
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: bindist
+        path: _build/bindist
+
+    - name: Run the testsuite
+      run: make test
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }} # upload test results even if the testsuite failed to pass
+      with:
+        name: testsuite-results
+        path: |
+          _build/test-perf.csv
+          _build/test-summary.txt
+          _build/test-junit.xml

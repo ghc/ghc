@@ -13,7 +13,11 @@ import Distribution.Simple.Utils
 
 
 main :: IO ()
-main = withTempFile "encodingAllocations.tmp" (loop 1000000)
+main = withTempFile
+#if !MIN_VERSION_Cabal(3,15,0)
+        "."
+#endif
+        "encodingAllocations.tmp" (const $ loop 1000000)
 
 loop :: Int -> FilePath -> Handle -> IO ()
 loop 0  !_ !_ = pure ()
