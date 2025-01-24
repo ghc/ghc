@@ -20,13 +20,12 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
 import Control.Monad
-import Control.Exception (bracket, IOException, catch)
+import Control.Exception (bracket)
 import System.Environment
 import System.Directory
 import System.Process
 import System.FilePath
 import System.Exit
-import System.IO
 import System.IO.Unsafe
 import Data.Time.Clock
 import Data.IORef
@@ -145,49 +144,50 @@ buildGhcStage1 opts cabal ghc0 dst = do
         , "allow-newer: ghc-boot-th"
         ]
 
+  let build_cmd = (runCabal cabal
+              [ "build"
+              , "--project-file=" ++ cabal_project_path
+              , "--builddir=" ++ builddir
+              , "-j"
+              , "--with-compiler=" ++ ghcPath ghc0
+              -- the targets
+              , "ghc-bin:ghc"
+              , "ghc-pkg:ghc-pkg"
+              , "genprimopcode:genprimopcode"
+              , "deriveConstants:deriveConstants"
+              , "genapply:genapply"
+              ])
+              { env = Just stage1_env
+              }
 
-  exit_code <- 
-    let args = [ "build"
-               , "--project-file=" ++ cabal_project_path
-               , "--builddir=" ++ builddir
-               , "-j"
-               , "--with-compiler=" ++ ghcPath ghc0
-               -- the targets
-               , "ghc-bin:ghc"
-               , "ghc-pkg:ghc-pkg"
-               , "genprimopcode:genprimopcode"
-               , "deriveConstants:deriveConstants"
-               , "genapply:genapply"
-               ]
-    in runProcess' $ (runCabal cabal args) { env = Just stage1_env }
+  (exit_code, cabal_stdout, cabal_stderr) <- readCreateProcessWithExitCode build_cmd ""
+  writeFile (dst </> "cabal.stdout") cabal_stdout
+  writeFile (dst </> "cabal.stderr") cabal_stderr
   case exit_code of
     ExitSuccess -> pure ()
     ExitFailure n -> do
       putStrLn $ "cabal-install failed with error code: " ++ show n
+      putStrLn $ "Logs can be found in \"" ++ dst ++ "/cabal.{stdout,stderr}\""
       exitFailure
 
   msg "  - Copying stage1 programs and generating settings to use them..."
-
+  let listbin_cmd p = runCabal cabal
+        [ "list-bin"
+        , "--project-file=" ++ cabal_project_path
+        , "--with-compiler=" ++ ghcPath ghc0
+        , "--builddir=" ++ builddir
+        , p
+        ]
   let copy_bin target bin = do
-        let args =
-              [ "list-bin"
-              , "--project-file=" ++ cabal_project_path
-              , "--with-compiler=" ++ ghcPath ghc0
-              , "--builddir=" ++ builddir
-              , target
-              ]
-  
-        bin_src <- 
-            readCreateProcess (runCabal cabal args) ""
-            `catch` 
-            (\e -> do
-                    hPutStr stderr $ "Failed to run cabal list-bin for the target: " ++ show target
-                    hPutStr stderr $ show (e :: IOException)
-                    exitFailure
-            )
-
-        cp bin_src (dst </> "bin" </> bin)
-
+        (list_bin_exit_code, list_bin_stdout, list_bin_stderr) <- readCreateProcessWithExitCode (listbin_cmd target) ""
+        case list_bin_exit_code of
+          ExitSuccess
+            | (bin_src:_) <- lines list_bin_stdout
+            -> cp bin_src (dst </> "bin" </> bin)
+          _ -> do
+            putStrLn $ "Failed to run cabal list-bin for the target: " ++ show target
+            putStrLn list_bin_stderr
+            exitFailure
   createDirectoryIfMissing True (dst </> "bin")
   copy_bin "ghc-bin:ghc"                     "ghc"
   copy_bin "ghc-pkg:ghc-pkg"                 "ghc-pkg"
@@ -750,12 +750,6 @@ withSystemTempDirectory prefix = do
 
 initEmptyDB :: GhcPkg -> FilePath -> IO ()
 initEmptyDB ghcpkg pkgdb = do
+  -- don't try to recreate the DB if it already exist as it would fail
   exists <- doesDirectoryExist pkgdb
   unless exists $ void $ readCreateProcess (runGhcPkg ghcpkg ["init", pkgdb]) ""
-
-runProcess' :: CreateProcess -> IO ExitCode
-runProcess' p = 
-  withCreateProcess p { 
-    std_out = Inherit,
-    std_err = Inherit
-  } $ \_ _ _ ph ->  waitForProcess ph
