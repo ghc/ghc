@@ -633,6 +633,8 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
     ExitSuccess -> pure ()
     ExitFailure r -> do
       putStrLn $ "Failed to build boot libraries with error code " ++ show r
+      putStrLn boot_stdout
+      putStrLn boot_stderr
       putStrLn $ "Logs can be found in " ++ dst ++ "boot-libs.{stdout,stderr}"
       exitFailure
 
