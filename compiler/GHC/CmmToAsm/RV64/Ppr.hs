@@ -764,10 +764,10 @@ pprInstr platform instr = case instr of
   VSLIDEDOWN o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvslidedown.vx") o1 o2 o3
   VSLIDEDOWN o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VSLIDEDOWN can only target registers." (pprOp platform o1)
   -- TODO: adjust VSETIVLI to contain only format?
-  VSETIVLI dst len width grouping ta ma ->
+  VSETIVLI (OpReg fmt dst) len width grouping ta ma ->
     line
       $ text "\tvsetivli"
-      <+> pprReg II64 dst
+      <+> pprReg fmt dst
       <> comma
       <+> (text . show) len
       <> comma
@@ -778,6 +778,7 @@ pprInstr platform instr = case instr of
       <+> pprTA ta
       <> comma
       <+> pprMasking ma
+  VSETIVLI o1 _ _ _ _ _ -> pprPanic "RV64.pprInstr - VSETIVLI can only target registers." (pprOp platform o1)
   VNEG o1@(OpReg fmt _reg) o2 -> configVec fmt $$ op2 (text "\tvfneg.v") o1 o2
   VNEG o1 _o2 -> pprPanic "RV64.pprInstr - VNEG can only target registers." (pprOp platform o1)
   VADD o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfadd.vv") o1 o2 o3
@@ -843,7 +844,7 @@ pprInstr platform instr = case instr of
 
     configVec :: (IsDoc doc) => Format -> doc
     configVec (VecFormat length fmt) =
-      pprInstr platform (VSETIVLI zeroReg (fromIntegral length) ((formatToWidth . scalarFormatFormat) fmt) M1 TA MA)
+      pprInstr platform (VSETIVLI (OpReg II64 zeroReg) (fromIntegral length) ((formatToWidth . scalarFormatFormat) fmt) M1 TA MA)
     configVec fmt = pprPanic "Unsupported vector configuration" ((text . show) fmt)
 
 floatOpPrecision :: Platform -> Operand -> Operand -> String

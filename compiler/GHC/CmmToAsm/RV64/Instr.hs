@@ -96,10 +96,10 @@ regUsageOfInstr platform instr = case instr of
   -- ORI's third operand is always an immediate
   ORI dst src1 _ -> usage (regOp src1, regOp dst)
   XORI dst src1 _ -> usage (regOp src1, regOp dst)
-  J_TBL _ _ t -> usage ([t], [])
+  J_TBL _ _ t -> usage ([(t, II64)], [])
   B t -> usage (regTarget t, [])
   BCOND _ l r t -> usage (regTarget t ++ regOp l ++ regOp r, [])
-  BL t ps -> usage (t : ps, callerSavedRegisters)
+  BL t ps -> usage ((t, II64) : map (\p -> (p, II64)) ps, callerSavedRegisters)
   CSET dst l r _ -> usage (regOp l ++ regOp r, regOp dst)
   STR _ src dst -> usage (regOp src ++ regOp dst, [])
   LDR _ dst src -> usage (regOp src, regOp dst)
@@ -115,7 +115,7 @@ regUsageOfInstr platform instr = case instr of
   VMERGE dst op1 op2 opm -> usage (regOp op1 ++ regOp op2 ++ regOp opm, regOp dst)
   VSLIDEDOWN dst op1 op2 -> usage (regOp op1 ++ regOp op2, regOp dst)
   -- WARNING: VSETIVLI is a special case. It changes the interpretation of all vector registers!
-  VSETIVLI dst _ _ _ _ _ -> usage ([], [dst])
+  VSETIVLI (OpReg fmt reg)  _ _ _ _ _ -> usage ([], [(reg, fmt)])
   VNEG dst src1 -> usage (regOp src1, regOp dst)
   VADD dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VSUB dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -136,57 +136,49 @@ regUsageOfInstr platform instr = case instr of
     -- filtering the usage is necessary, otherwise the register
     -- allocator will try to allocate pre-defined fixed stg
     -- registers as well, as they show up.
-    usage :: ([Reg], [Reg]) -> RegUsage
+    usage :: ([(Reg, Format)], [(Reg, Format)]) -> RegUsage
     usage (srcRegs, dstRegs) =
       RU
         (map mkFmt $ filter (interesting platform) srcRegs)
         (map mkFmt $ filter (interesting platform) dstRegs)
 
-      -- SIMD NCG TODO: the format here is used for register spilling/unspilling.
-      -- As the RISCV64 NCG does not currently support SIMD registers,
-      -- this simple logic is OK.
-    mkFmt r = RegWithFormat r fmt
-      where
-        fmt = case cls of
-                RcInteger -> II64
-                RcFloat   -> FF64
-                -- TODO: We're expecting 128bit vector registers here. This
-                -- needs to be calculated from real format. Probably, we need to
-                -- hand around the format instead of the width for vector regs.
-                RcVector -> VecFormat 2 FmtInt64
-        cls = case r of
-                RegVirtual vr -> classOfVirtualReg (platformArch platform) vr
-                RegReal rr -> classOfRealReg rr
+    mkFmt (r, fmt) = RegWithFormat r fmt
 
-    regAddr :: AddrMode -> [Reg]
-    regAddr (AddrRegImm r1 _imm) = [r1]
-    regAddr (AddrReg r1) = [r1]
+    regAddr :: AddrMode -> [(Reg, Format)]
+    regAddr (AddrRegImm r1 _imm) = [(r1, II64)]
+    regAddr (AddrReg r1) = [(r1, II64)]
 
-    regOp :: Operand -> [Reg]
-    regOp (OpReg _w r1) = [r1]
+    regOp :: Operand -> [(Reg, Format)]
+    regOp (OpReg fmt r1) = [(r1, fmt)]
     regOp (OpAddr a) = regAddr a
     regOp (OpImm _imm) = []
 
-    regTarget :: Target -> [Reg]
+    regTarget :: Target -> [(Reg, Format)]
     regTarget (TBlock _bid) = []
-    regTarget (TReg r1) = [r1]
+    regTarget (TReg r1) = [(r1, II64)]
 
     -- Is this register interesting for the register allocator?
-    interesting :: Platform -> Reg -> Bool
-    interesting _ (RegVirtual _) = True
-    interesting platform (RegReal (RealRegSingle i)) = freeReg platform i
+    interesting :: Platform -> (Reg, Format) -> Bool
+    interesting _ ((RegVirtual _), _) = True
+    interesting platform ((RegReal (RealRegSingle i)), _) = freeReg platform i
 
 -- | Caller-saved registers (according to calling convention)
 --
 -- These registers may be clobbered after a jump.
-callerSavedRegisters :: [Reg]
+callerSavedRegisters :: [(Reg, Format)]
 callerSavedRegisters =
-  [regSingle raRegNo]
-    ++ map regSingle [t0RegNo .. t2RegNo]
-    ++ map regSingle [a0RegNo .. a7RegNo]
-    ++ map regSingle [t3RegNo .. t6RegNo]
-    ++ map regSingle [ft0RegNo .. ft7RegNo]
-    ++ map regSingle [fa0RegNo .. fa7RegNo]
+  [(toTuple . regSingle) raRegNo]
+    ++ map (toTuple . regSingle) [t0RegNo .. t2RegNo]
+    ++ map (toTuple . regSingle) [a0RegNo .. a7RegNo]
+    ++ map (toTuple . regSingle) [t3RegNo .. t6RegNo]
+    ++ map (toTuple . regSingle) [ft0RegNo .. ft7RegNo]
+    ++ map (toTuple . regSingle) [fa0RegNo .. fa7RegNo]
+  where
+    toTuple :: Reg -> (Reg, Format)
+    toTuple r = (r, format r)
+    format r | isIntReg r = II64
+             | isFloatReg r = FF64
+             | otherwise = panic $ "Unexpected register: " ++ show r
 
 -- | Apply a given mapping to all the register references in this instruction.
 patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
@@ -235,7 +227,7 @@ patchRegsOfInstr instr env = case instr of
   VMSEQ o1 o2 o3 -> VMSEQ (patchOp o1) (patchOp o2) (patchOp o3)
   VMERGE o1 o2 o3 o4 -> VMERGE (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
   VSLIDEDOWN o1 o2 o3 -> VSLIDEDOWN (patchOp o1) (patchOp o2) (patchOp o3)
-  VSETIVLI o1 o2 o3 o4 o5 o6 -> VSETIVLI (env o1) o2 o3 o4 o5 o6
+  VSETIVLI o1 o2 o3 o4 o5 o6 -> VSETIVLI (patchOp o1) o2 o3 o4 o5 o6
   VNEG o1 o2 -> VNEG (patchOp o1) (patchOp o2)
   VADD o1 o2 o3 -> VADD (patchOp o1) (patchOp o2) (patchOp o3)
   VSUB o1 o2 o3 -> VSUB (patchOp o1) (patchOp o2) (patchOp o3)
@@ -680,7 +672,7 @@ data Instr
   | VMSEQ Operand Operand Operand
   | VMERGE Operand Operand Operand Operand
   | VSLIDEDOWN Operand Operand Operand
-  | VSETIVLI Reg Word Width VectorGrouping TailAgnosticFlag MaskAgnosticFlag
+  | VSETIVLI Operand Word Width VectorGrouping TailAgnosticFlag MaskAgnosticFlag
   | VNEG Operand Operand
   | VADD Operand Operand Operand
   | VSUB Operand Operand Operand
