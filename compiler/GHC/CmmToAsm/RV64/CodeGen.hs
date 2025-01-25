@@ -1407,13 +1407,13 @@ getRegister' config plat expr =
                   (VID (OpReg format_vid vidReg))
                 `snocOL`
                 -- 2. Build mask
-                VMSEQ format_mask (OpReg format_mask v0Reg) (OpReg format_vid vidReg) (OpReg format_idx reg_idx)
+                VMSEQ (OpReg format_mask v0Reg) (OpReg format_vid vidReg) (OpReg format_idx reg_idx)
                 `snocOL`
                 -- 3. Splat value into tmp vector
                 VMV (OpReg format tmp) (OpReg format_f reg_f)
                 `snocOL`
                 -- 4. Merge with mask -> set element at index
-                VMERGE format (OpReg format dst) (OpReg format_v reg_v) (OpReg format tmp) (OpReg format_mask v0Reg)
+                VMERGE (OpReg format dst) (OpReg format_v reg_v) (OpReg format tmp) (OpReg format_mask v0Reg)
           where
             -- Which element width do I need in my vector to store indexes in it?
             vidWidth = case bitWidthFixed (fromIntegral length :: Word) of
