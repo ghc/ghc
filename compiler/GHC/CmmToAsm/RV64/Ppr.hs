@@ -320,20 +320,20 @@ pprOp :: (IsLine doc) => Platform -> Operand -> doc
 pprOp plat op = case op of
   OpReg w r -> pprReg w r
   OpImm im -> pprOpImm plat im
-  OpAddr (AddrRegImm r1 im) -> pprOpImm plat im <> char '(' <> pprReg W64 r1 <> char ')'
-  OpAddr (AddrReg r1) -> text "0(" <+> pprReg W64 r1 <+> char ')'
+  OpAddr (AddrRegImm r1 im) -> pprOpImm plat im <> char '(' <> pprReg II64 r1 <> char ')'
+  OpAddr (AddrReg r1) -> text "0(" <+> pprReg II64 r1 <+> char ')'
 
 -- | Pretty print register with calling convention name
 --
 -- This representation makes it easier to reason about the emitted assembly
 -- code.
-pprReg :: forall doc. (IsLine doc) => Width -> Reg -> doc
-pprReg w r = case r of
+pprReg :: forall doc. (IsLine doc) => Format -> Reg -> doc
+pprReg fmt r = assertFmtReg fmt r $ case r of
   RegReal (RealRegSingle i) -> ppr_reg_no i
   -- virtual regs should not show up, but this is helpful for debugging.
   RegVirtual (VirtualRegI u) -> text "%vI_" <> pprUniqueAlways u
   RegVirtual (VirtualRegD u) -> text "%vD_" <> pprUniqueAlways u
-  _ -> pprPanic "RiscV64.pprReg" (text (show r) <+> ppr w)
+  _ -> pprPanic "RiscV64.pprReg" (text (show r) <+> ppr fmt)
   where
     ppr_reg_no :: Int -> doc
     -- General Purpose Registers
@@ -435,19 +435,19 @@ pprReg w r = case r of
     ppr_reg_no 94 = text "v30"
     ppr_reg_no 95 = text "v31"
     ppr_reg_no i
-      | i < 0 = pprPanic "Unexpected register number (min is 0)" (ppr w <+> int i)
-      | i > 95 = pprPanic "Unexpected register number (max is 95)" (ppr w <+> int i)
+      | i < 0 = pprPanic "Unexpected register number (min is 0)" (ppr fmt <+> int i)
+      | i > 95 = pprPanic "Unexpected register number (max is 95)" (ppr fmt <+> int i)
       -- no support for widths > W64.
-      | otherwise = pprPanic "Unsupported width in register (max is 95)" (ppr w <+> int i)
+      | otherwise = pprPanic "Unsupported width in register (max is 95)" (ppr fmt <+> int i)
 
 -- | Single precission `Operand` (floating-point)
 isSingleOp :: Operand -> Bool
-isSingleOp (OpReg W32 _) = True
+isSingleOp (OpReg FF32 _) = True
 isSingleOp _ = False
 
 -- | Double precission `Operand` (floating-point)
 isDoubleOp :: Operand -> Bool
-isDoubleOp (OpReg W64 _) = True
+isDoubleOp (OpReg FF64 _) = True
 isDoubleOp _ = False
 
 -- | `Operand` is an immediate value
@@ -508,7 +508,7 @@ pprInstr platform instr = case instr of
   ADD o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfadd." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
     -- This case is used for sign extension: SEXT.W op
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, isImmOp o3 -> op3 (text "\taddiw") o1 o2 o3
+    | OpReg II64 _ <- o1, OpReg II32  _ <- o2, isImmOp o3 -> op3 (text "\taddiw") o1 o2 o3
     | otherwise -> op3 (text "\tadd") o1 o2 o3
   MUL o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfmul." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
@@ -581,8 +581,8 @@ pprInstr platform instr = case instr of
   J o1 -> pprInstr platform (B o1)
   J_TBL _ _ r -> pprInstr platform (B (TReg r))
   B l | isLabel l -> line $ text "\tjal" <+> pprOp platform x0 <> comma <+> getLabel platform l
-  B (TReg r) -> line $ text "\tjalr" <+> pprOp platform x0 <> comma <+> pprReg W64 r <> comma <+> text "0"
-  BL r _ -> line $ text "\tjalr" <+> text "x1" <> comma <+> pprReg W64 r <> comma <+> text "0"
+  B (TReg r) -> line $ text "\tjalr" <+> pprOp platform x0 <> comma <+> pprReg II64 r <> comma <+> text "0"
+  BL r _ -> line $ text "\tjalr" <+> text "x1" <> comma <+> pprReg II64 r <> comma <+> text "0"
   BCOND c l r t
     | isLabel t ->
         line $ text "\t" <> pprBcond c <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform t
@@ -700,22 +700,22 @@ pprInstr platform instr = case instr of
   LDRU fmt@(VecFormat _ FmtDouble) o1 o2 -> configVec fmt $$ op2 (text "\tvle64.v") o1 o2
   LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text . show) f <+> pprOp platform o1 <+> pprOp platform o2)
   FENCE r w -> line $ text "\tfence" <+> pprFenceType r <> char ',' <+> pprFenceType w
-  FCVT FloatToFloat o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.d") o1 o2
-  FCVT FloatToFloat o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.d.s") o1 o2
+  FCVT FloatToFloat o1@(OpReg FF32 _) o2@(OpReg FF64 _) -> op2 (text "\tfcvt.s.d") o1 o2
+  FCVT FloatToFloat o1@(OpReg FF64 _) o2@(OpReg FF32 _) -> op2 (text "\tfcvt.d.s") o1 o2
   FCVT FloatToFloat o1 o2 ->
     pprPanic "RV64.pprInstr - impossible float to float conversion"
       $ line (pprOp platform o1 <> text "->" <> pprOp platform o2)
-  FCVT IntToFloat o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.s.w") o1 o2
-  FCVT IntToFloat o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.l") o1 o2
-  FCVT IntToFloat o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.d.w") o1 o2
-  FCVT IntToFloat o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.d.l") o1 o2
+  FCVT IntToFloat o1@(OpReg FF32 _) o2@(OpReg II32 _) -> op2 (text "\tfcvt.s.w") o1 o2
+  FCVT IntToFloat o1@(OpReg FF32 _) o2@(OpReg II64 _) -> op2 (text "\tfcvt.s.l") o1 o2
+  FCVT IntToFloat o1@(OpReg FF64 _) o2@(OpReg II32 _) -> op2 (text "\tfcvt.d.w") o1 o2
+  FCVT IntToFloat o1@(OpReg FF64 _) o2@(OpReg II64 _) -> op2 (text "\tfcvt.d.l") o1 o2
   FCVT IntToFloat o1 o2 ->
     pprPanic "RV64.pprInstr - impossible integer to float conversion"
       $ line (pprOp platform o1 <> text "->" <> pprOp platform o2)
-  FCVT FloatToInt o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.w.s") o1 o2
-  FCVT FloatToInt o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.w.d") o1 o2
-  FCVT FloatToInt o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.l.s") o1 o2
-  FCVT FloatToInt o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.l.d") o1 o2
+  FCVT FloatToInt o1@(OpReg II32 _) o2@(OpReg FF32 _) -> op2 (text "\tfcvt.w.s") o1 o2
+  FCVT FloatToInt o1@(OpReg II32 _) o2@(OpReg FF64 _) -> op2 (text "\tfcvt.w.d") o1 o2
+  FCVT FloatToInt o1@(OpReg II64 _) o2@(OpReg FF32 _) -> op2 (text "\tfcvt.l.s") o1 o2
+  FCVT FloatToInt o1@(OpReg II64 _) o2@(OpReg FF64 _) -> op2 (text "\tfcvt.l.d") o1 o2
   FCVT FloatToInt o1 o2 ->
     pprPanic "RV64.pprInstr - impossible float to integer conversion"
       $ line (pprOp platform o1 <> text "->" <> pprOp platform o2)
@@ -763,7 +763,7 @@ pprInstr platform instr = case instr of
   VSETIVLI dst len width grouping ta ma ->
     line
       $ text "\tvsetivli"
-      <+> pprReg W64 dst
+      <+> pprReg II64 dst
       <> comma
       <+> (text . show) len
       <> comma
