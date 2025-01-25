@@ -44,30 +44,45 @@ function h$base_close(fd, c) {
 }
 
 function h$close(fd,c) {
-  if (c) {
-    //asynchronous
-    var fdo = h$base_fds[fd];
-    if(fdo) {
-        delete h$base_fds[fd];
-        if(--fdo.refs < 1) {
-          TRACE_IO("base_close: closing underlying fd")
-          if(fdo.close) {
-            fdo.close(fd, fdo, c);
-          } else {
-            c(0);
-          }
-        } else {
-          TRACE_IO("base_close: remaining references, not closing underlying fd")
-          c(0);
-        }
-    } else {
-        TRACE_IO("base_close: file descriptor not found, already closed?")
-        h$errno = CONST_EINVAL;
-        c(-1);
+  var fdo = h$base_fds[fd];
+
+  // File descriptor was closed already?
+  // It may happen only if its reference count reached <1 and actual closing is processed at underlying fd
+  if (!fdo) {
+    h$setErrno('EINVAL');
+
+    if (c) {
+      TRACE_IO("base_close: file descriptor not found, already closed?")
+      c(-1);
+      return;
     }
-  } else {
-    //synchronous
+
+    TRACE_IO("base_close sync: file descriptor not found, already closed?")
+    return (-1);
+  }
+
+  fdo.refs--;
+
+  if (fdo.refs < 1) {
+    // Process closing at underlying fd
+
+    if (c) {
+      TRACE_IO("base_close: closing underlying fd")
+      if (fdo.close) {
+        fdo.close(fd, fdo, c);
+      } else {
+        TRACE_IO("base_close: no actual underlying fd close, dummy implementation")
+        delete h$base_fds[fd];
+        c(0);
+      }
+      return;
+    }
+
+    TRACE_IO("base_close sync: closing underlying fd")
     try {
+      // See: https://nodejs.org/api/fs.html#fsclosesyncfd
+      // Calling fs.closeSync() on any file descriptor (fd) that is currently in use through any other fs operation may lead to undefined behavior.
+      delete h$base_fds[fd];
       h$fs.closeSync(fd);
       return 0;
     } catch(err) {
@@ -75,6 +90,16 @@ function h$close(fd,c) {
       return (-1);
     }
   }
+
+  // Dummy process closing due of remaining references
+  if (c) {
+    TRACE_IO("base_close: remaining references, not closing underlying fd")
+    c(0);
+    return;
+  }
+
+  TRACE_IO("base_close sync: remaining references, not closing underlying fd")
+  return 0;
 }
 
 function h$base_dup(fd, c) {
@@ -122,7 +147,7 @@ function h$base_dup2(fd, new_fd, c) {
 }
 
 function h$base_fstat(fd, stat, stat_off, c) {
-    TRACE_IO("base_stat")
+    TRACE_IO("base_fstat")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         h$fs.fstat(fd, function(err, fs) {
@@ -384,11 +409,13 @@ function h$rmdir(file, file_off) {
 }
 
 function h$rename(old_path, old_path_off, new_path, new_path_off) {
-  TRACE_IO("rename")
+  var old_path_str = h$decodeUtf8z(old_path, old_path_off);
+  var new_path_str = h$decodeUtf8z(new_path, new_path_off);
+  TRACE_IO("rename sync: " + old_path_str + " -> " + new_path_str)
 #ifndef GHCJS_BROWSER
   if (h$isNode()) {
     try {
-      h$fs.renameSync(h$decodeUtf8z(old_path, old_path_off), h$decodeUtf8z(new_path, new_path_off));
+      h$fs.renameSync(old_path_str, new_path_str);
       return 0;
     } catch(e) {
       h$setErrno(e);
@@ -473,11 +500,13 @@ function h$calculate_at(dirfd, file, file_off) {
 
 function h$openat(dirfd, file, file_off, how, mode, c) {
   var path = h$calculate_at(dirfd, file, file_off);
+  TRACE_IO("openat" + (!!c ? ": " : " sync: ") + path)
   return h$base_open(path, how, mode, c);
 }
 
 function h$open(file, file_off, how, mode, c) {
   var path = h$decodeUtf8z(file, file_off);
+  TRACE_IO("open" + (!!c ? ": " : " sync: ") + path)
   return h$base_open(path, how, mode, c);
 }
 
@@ -485,7 +514,7 @@ function h$base_open(fp, how, mode, c) {
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         var flags, off;
-        TRACE_IO("open: " + fp)
+        TRACE_IO("base_open" + (!!c ? ": " : " sync: ") + fp)
         var acc  = how & h$base_o_accmode;
         // passing a number lets node.js use it directly as the flags (undocumented)
         if(acc === h$base_o_rdonly) {
@@ -539,7 +568,7 @@ function h$base_open(fp, how, mode, c) {
                                        , pos:   p
                                        , refs:  1
                                        };
-                      TRACE_IO("open: " + fp + " -> " + fd)
+                      TRACE_IO("base_open sync: " + fp + " -> " + fd)
                   }
             if(off === -1) {
               var fs = h$fs.statSync(fp);
@@ -944,8 +973,8 @@ if(h$isNode()) {
     h$base_closeFile = function(fd, fdo, c) {
         TRACE_IO("base_closeFile: " + fd + " (" + fdo.fd + ")")
         var real_fd = typeof fdo.fd === 'number' ? fdo.fd : fd;
+        delete h$base_fds[fd];
         h$fs.close(real_fd, function(err) {
-            delete h$base_fds[fd];
             h$handleErrnoC(err, -1, 0, c);
         });
     }

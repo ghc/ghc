@@ -13,13 +13,13 @@ import Distribution.Simple.Utils
 
 
 main :: IO ()
-main = withTempFile "." "encodingAllocations.tmp" (const $ loop 1000000)
+main = withTempFile "encodingAllocations.tmp" (loop 1000000)
 
-loop :: Int -> Handle -> IO ()
-loop 0  !_ = pure ()
-loop !n !h = do
+loop :: Int -> FilePath -> Handle -> IO ()
+loop 0  !_ !_ = pure ()
+loop !n !fp !h = do
   hPutChar h $! dummy_char n
-  loop (n-1) h
+  loop (n-1) fp h
 
 -- unsafe efficient version of `chr`
 my_chr :: Int -> Char

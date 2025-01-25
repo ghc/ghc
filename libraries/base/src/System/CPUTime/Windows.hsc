@@ -60,7 +60,7 @@ type HANDLE = ()
 #if defined(i386_HOST_ARCH)
 foreign import stdcall unsafe "GetCurrentProcess" getCurrentProcess :: IO (Ptr HANDLE)
 foreign import stdcall unsafe "GetProcessTimes" getProcessTimes :: Ptr HANDLE -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> IO CInt
-#elif defined(x86_64_HOST_ARCH)
+#elif defined(x86_64_HOST_ARCH) || defined(aarch64_HOST_ARCH)
 foreign import ccall unsafe "GetCurrentProcess" getCurrentProcess :: IO (Ptr HANDLE)
 foreign import ccall unsafe "GetProcessTimes" getProcessTimes :: Ptr HANDLE -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> IO CInt
 #else

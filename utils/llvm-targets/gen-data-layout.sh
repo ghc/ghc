@@ -27,6 +27,7 @@ TARGETS=(
 
     # Windows
     "x86_64-unknown-windows-gnu"
+    "aarch64-unknown-windows-gnu"
 
     #########################
     # Linux

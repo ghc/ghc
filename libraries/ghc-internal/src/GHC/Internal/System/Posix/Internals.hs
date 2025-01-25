@@ -556,6 +556,8 @@ foreign import javascript interruptible "h$open"
    c_interruptible_open_ :: CFilePath -> CInt -> CMode -> IO CInt
 foreign import javascript interruptible "h$open"
    c_safe_open_ :: CFilePath -> CInt -> CMode -> IO CInt
+foreign import javascript interruptible "h$openat"
+   c_openat :: CInt -> CFilePath -> CInt -> CMode -> IO CInt
 foreign import javascript interruptible "h$base_read"
    c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 foreign import javascript interruptible "h$base_read"

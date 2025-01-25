@@ -13536,6 +13536,7 @@ module System.Posix.Internals where
   c_lseek :: GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.System.Posix.Types.COff -> GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.Types.IO GHC.Internal.System.Posix.Types.COff
   c_mkfifo :: GHC.Internal.Foreign.C.String.Encoding.CString -> GHC.Internal.System.Posix.Types.CMode -> GHC.Internal.Types.IO GHC.Internal.Foreign.C.Types.CInt
   c_open :: CFilePath -> GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.System.Posix.Types.CMode -> GHC.Internal.Types.IO GHC.Internal.Foreign.C.Types.CInt
+  c_openat :: GHC.Internal.Foreign.C.Types.CInt -> CFilePath -> GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.System.Posix.Types.CMode -> GHC.Internal.Types.IO GHC.Internal.Foreign.C.Types.CInt
   c_pipe :: GHC.Internal.Ptr.Ptr GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.Types.IO GHC.Internal.Foreign.C.Types.CInt
   c_read :: GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.Ptr.Ptr GHC.Internal.Word.Word8 -> GHC.Internal.Foreign.C.Types.CSize -> GHC.Internal.Types.IO GHC.Internal.System.Posix.Types.CSsize
   c_s_isblk :: GHC.Internal.System.Posix.Types.CMode -> GHC.Internal.Foreign.C.Types.CInt

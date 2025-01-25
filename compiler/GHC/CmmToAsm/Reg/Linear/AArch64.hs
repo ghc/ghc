@@ -118,6 +118,7 @@ getFreeRegs :: RegClass -> FreeRegs -> [RealReg]
 getFreeRegs cls (FreeRegs g f) =
   case cls of
     RcFloatOrVector -> go 32 f 31
+    -- x18 is a platform-reserved register for Win/Mac and free for Linux (See Note [Aarch64 Register x18 at Darwin and Windows])
     RcInteger       -> go  0 g 18
     where
         go _   _ i | i < 0 = []

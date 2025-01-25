@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE CPP #-}
 
 module GHC.CmmToAsm.AArch64.Ppr (pprNatCmmDecl, pprInstr, pprBasicBlock) where
 
@@ -43,7 +42,9 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         pprSectionAlign config (Section Text lbl) $$
         -- do not
         -- pprProcAlignment config $$
-        pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
+        (if lbl /= blockLbl (blockId (head blocks)) -- blocks can have clashed names
+          then pprLabel platform lbl -- blocks guaranteed not null, so label needed
+          else empty) $$
         vcat (map (pprBasicBlock platform with_dwarf top_info) blocks) $$
         (if ncgDwarfEnabled config
          then line (pprAsmLabel platform (mkAsmTempEndLabel lbl) <> char ':') else empty) $$
@@ -461,63 +462,51 @@ pprInstr platform instr = case instr of
   STR _f o1 o2 -> op2 (text "\tstr") o1 o2
   STLR _f o1 o2 -> op2 (text "\tstlr") o1 o2
 
-#if defined(darwin_HOST_OS)
   LDR _f o1 (OpImm (ImmIndex lbl' off)) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
-    op_adrp o1 (pprAsmLabel platform lbl <> text "@gotpage") $$
-    op_ldr o1 (pprAsmLabel platform lbl <> text "@gotpageoff") $$
-    op_add o1 (char '#' <> int off) -- TODO: check that off is in 12bits.
+    let (adrp', ldr') = op_adrp_reloc_dynamic $ pprAsmLabel platform lbl in
+    op_adrp o1 (adrp') $$
+    op_ldr o1 (ldr') $$
+    op_add o1 (check_off off)
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) | isForeignLabel lbl ->
-    op_adrp o1 (pprAsmLabel platform lbl <> text "@gotpage") $$
-    op_ldr o1 (pprAsmLabel platform lbl <> text "@gotpageoff") $$
-    op_add o1 (char '#' <> int off) -- TODO: check that off is in 12bits.
+    case platformOS platform of
+      OSMinGW32 ->
+        let (adrp', add') = op_adrp_reloc_local $ pprAsmLabel platform lbl in
+        op_adrp o1 (adrp') $$
+        op_add o1 add' $$
+        op_add o1 (check_off off)
+      _ ->
+        let (adrp', ldr') = op_adrp_reloc_dynamic $ pprAsmLabel platform lbl in
+        op_adrp o1 (adrp') $$
+        op_ldr o1 (ldr') $$
+        op_add o1 (check_off off)
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
-    op_adrp o1 (pprAsmLabel platform lbl <> text "@page") $$
-    op_add o1 (pprAsmLabel platform lbl <> text "@pageoff") $$
-    op_add o1 (char '#' <> int off) -- TODO: check that off is in 12bits.
+    let (adrp', add') = op_adrp_reloc_local $ pprAsmLabel platform lbl in
+    op_adrp o1 (adrp') $$
+    op_add o1 (add') $$
+    op_add o1 (check_off off)
 
   LDR _f o1 (OpImm (ImmCLbl lbl')) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
-    op_adrp o1 (pprAsmLabel platform lbl <> text "@gotpage") $$
-    op_ldr o1 (pprAsmLabel platform lbl <> text "@gotpageoff")
+    let (adrp', ldr') = op_adrp_reloc_dynamic $ pprAsmLabel platform lbl in
+    op_adrp o1 (adrp') $$
+    op_ldr o1 (ldr')
 
   LDR _f o1 (OpImm (ImmCLbl lbl)) | isForeignLabel lbl ->
-    op_adrp o1 (pprAsmLabel platform lbl <> text "@gotpage") $$
-    op_ldr o1 (pprAsmLabel platform lbl <> text "@gotpageoff")
+    case platformOS platform of
+      OSMinGW32 ->
+        let (adrp', add') = op_adrp_reloc_local $ pprAsmLabel platform lbl in
+        op_adrp o1 (adrp') $$
+        op_add o1 add'
+      _ ->
+        let (adrp', ldr') = op_adrp_reloc_dynamic $ pprAsmLabel platform lbl in
+        op_adrp o1 (adrp') $$
+        op_ldr o1 (ldr')
 
   LDR _f o1 (OpImm (ImmCLbl lbl)) ->
-    op_adrp o1 (pprAsmLabel platform lbl <> text "@page") $$
-    op_add o1 (pprAsmLabel platform lbl <> text "@pageoff")
-
-#else
-  LDR _f o1 (OpImm (ImmIndex lbl' off)) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
-    op_adrp o1 (text ":got:" <> pprAsmLabel platform lbl) $$
-    op_ldr o1 (text ":got_lo12:" <> pprAsmLabel platform lbl) $$
-    op_add o1 (char '#' <> int off) -- TODO: check that off is in 12bits.
-
-  LDR _f o1 (OpImm (ImmIndex lbl off)) | isForeignLabel lbl ->
-    op_adrp o1 (text ":got:" <> pprAsmLabel platform lbl) $$
-    op_ldr o1 (text ":got_lo12:" <> pprAsmLabel platform lbl) $$
-    op_add o1 (char '#' <> int off) -- TODO: check that off is in 12bits.
-
-  LDR _f o1 (OpImm (ImmIndex lbl off)) ->
-    op_adrp o1 (pprAsmLabel platform lbl) $$
-    op_add o1 (text ":lo12:" <> pprAsmLabel platform lbl) $$
-    op_add o1 (char '#' <> int off) -- TODO: check that off is in 12bits.
-
-  LDR _f o1 (OpImm (ImmCLbl lbl')) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
-    op_adrp o1 (text ":got:" <> pprAsmLabel platform lbl) $$
-    op_ldr o1 (text ":got_lo12:" <> pprAsmLabel platform lbl)
-
-  LDR _f o1 (OpImm (ImmCLbl lbl)) | isForeignLabel lbl ->
-    op_adrp o1 (text ":got:" <> pprAsmLabel platform lbl) $$
-    op_ldr o1 (text ":got_lo12:" <> pprAsmLabel platform lbl)
-
-  LDR _f o1 (OpImm (ImmCLbl lbl)) ->
-    op_adrp o1 (pprAsmLabel platform lbl) $$
-    op_add o1 (text ":lo12:" <> pprAsmLabel platform lbl)
-
-#endif
+    let (adrp', ldr') = op_adrp_reloc_local $ pprAsmLabel platform lbl in
+    op_adrp o1 adrp' $$
+    op_add o1 ldr'
 
   LDR _f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
     op2 (text "\tldrb") o1 o2
@@ -552,6 +541,21 @@ pprInstr platform instr = case instr of
        op_ldr o1 rest      = line $ text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> rest <> text "]"
        op_adrp o1 rest     = line $ text "\tadrp" <+> pprOp platform o1 <> comma <+> rest
        op_add o1 rest      = line $ text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> rest
+
+       op_adrp_reloc_dynamic asm_lbl = case platformOS platform of
+          OSDarwin -> (asm_lbl <> text "@gotpage", asm_lbl <> text "@gotpageoff")
+          OSLinux -> (text ":got:" <> asm_lbl, text ":got_lo12:" <> asm_lbl)
+          OSMinGW32 -> (text "__imp_" <> asm_lbl, text ":lo12:__imp_" <> asm_lbl)
+          os' -> pgmError $ "GHC.CmmToAsm.AArch64.Ppr.op_adrp_reloc_dynamic : " ++ show os' ++ " is unsuppported by relocations"
+
+       op_adrp_reloc_local asm_lbl = case platformOS platform of
+          OSDarwin -> (asm_lbl <> text "@page", asm_lbl <> text "@pageoff")
+          OSLinux -> (asm_lbl, text ":lo12:" <> asm_lbl)
+          OSMinGW32 -> (asm_lbl, text ":lo12:" <> asm_lbl)
+          os' -> pgmError $ "GHC.CmmToAsm.AArch64.Ppr.op_adrp_reloc_local : " ++ show os' ++ " is unsuppported by relocations"
+
+       check_off off = if off >= 0 && off <= 4095 then char '#' <> int off else
+         pgmError $ "GHC.CmmToAsm.AArch64.Ppr.check_off : " ++ show off ++ " is out of 12 bit"
 
 pprBcond :: IsLine doc => Cond -> doc
 pprBcond c = text "b." <> pprCond c

@@ -1032,11 +1032,15 @@ freeReg 29 = False
 -- ip0 -- used for spill offset computations
 freeReg 16 = False
 
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+-- Note [Aarch64 Register x18 at Darwin and Windows]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- x18 is reserved by the platform on Darwin/iOS, and can not be used
 -- More about ARM64 ABI that Apple platforms support:
 -- https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms
 -- https://github.com/Siguza/ios-resources/blob/master/bits/arm64.md
+-- It is a reserved at Windows as well. Acts like TEB register in user mode at Windows.
+-- https://learn.microsoft.com/en-us/cpp/build/arm64-windows-abi-conventions
+#if defined(darwin_HOST_OS) || defined(ios_HOST_OS) || defined(mingw32_HOST_OS)
 freeReg 18 = False
 #endif
 
