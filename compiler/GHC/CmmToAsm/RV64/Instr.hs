@@ -109,7 +109,7 @@ regUsageOfInstr platform instr = case instr of
   FABS dst src -> usage (regOp src, regOp dst)
   FMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VMV fmt dst src1 -> usage (regOp src1, regOp dst)
+  VMV dst src1 -> usage (regOp src1, regOp dst)
   VID dst -> usage ([], regOp dst)
   VMSEQ fmt dst src op -> usage (regOp src ++ regOp op, regOp dst)
   VMERGE fmt dst op1 op2 opm -> usage (regOp op1 ++ regOp op2 ++ regOp opm, regOp dst)
@@ -230,7 +230,7 @@ patchRegsOfInstr instr env = case instr of
   FABS o1 o2 -> FABS (patchOp o1) (patchOp o2)
   FMIN o1 o2 o3 -> FMIN (patchOp o1) (patchOp o2) (patchOp o3)
   FMAX o1 o2 o3 -> FMAX (patchOp o1) (patchOp o2) (patchOp o3)
-  VMV fmt o1 o2 -> VMV fmt (patchOp o1) (patchOp o2)
+  VMV o1 o2 -> VMV (patchOp o1) (patchOp o2)
   VID o1 -> VID (patchOp o1)
   VMSEQ fmt o1 o2 o3 -> VMSEQ fmt (patchOp o1) (patchOp o2) (patchOp o3)
   VMERGE fmt o1 o2 o3 o4 -> VMERGE fmt (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
@@ -675,7 +675,7 @@ data Instr
     FMA FMASign Operand Operand Operand Operand
 
   -- TODO: Care about the variants (<instr>.x.y) -> sum type
-  | VMV Format Operand Operand
+  | VMV Operand Operand
   | VID Operand 
   | VMSEQ Format Operand Operand Operand
   | VMERGE Format Operand Operand Operand Operand
