@@ -754,10 +754,12 @@ pprInstr platform instr = case instr of
   VID op -> pprPanic "RV64.pprInstr - VID can only target registers." (pprOp platform op)
   -- TODO: This expects int register as third operand: Generalize by calculating
   -- the instruction suffix (".vx")
-  VMSEQ fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvmseq.vx") o1 o2 o3
+  VMSEQ o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvmseq.vx") o1 o2 o3
+  VMSEQ o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VMSEQ can only target registers." (pprOp platform o1)
   -- TODO: All operands need to be vector registers. Make this more general or
   -- validate this constraint.
-  VMERGE fmt o1 o2 o3 o4 -> configVec fmt $$ op4 (text "\tvmerge.vvm") o1 o2 o3 o4
+  VMERGE o1@(OpReg fmt _reg) o2 o3 o4 -> configVec fmt $$ op4 (text "\tvmerge.vvm") o1 o2 o3 o4
+  VMERGE o1 _o2 _o3 _o4 -> pprPanic "RV64.pprInstr - VMERGE can only target registers." (pprOp platform o1)
   VSLIDEDOWN fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvslidedown.vx") o1 o2 o3
   -- TODO: adjust VSETIVLI to contain only format?
   VSETIVLI dst len width grouping ta ma ->
