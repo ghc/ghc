@@ -117,17 +117,17 @@ regUsageOfInstr platform instr = case instr of
   VSLIDEDOWN dst op1 op2 -> usage (regOp op1 ++ regOp op2, regOp dst)
   -- WARNING: VSETIVLI is a special case. It changes the interpretation of all vector registers!
   VSETIVLI dst _ _ _ _ _ -> usage ([], [dst])
-  VNEG fmt dst src1 -> usage (regOp src1, regOp dst)
-  VADD fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VSUB fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VMUL fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VQUOT fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VSMIN fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VSMAX fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VUMIN fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VUMAX fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VFMIN fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VFMAX fmt dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VNEG dst src1 -> usage (regOp src1, regOp dst)
+  VADD dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VSUB dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VMUL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VQUOT dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VSMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VSMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VUMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VUMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VFMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VFMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   VFMA _ _fmt op1 op2 op3 ->
@@ -238,17 +238,17 @@ patchRegsOfInstr instr env = case instr of
   VMERGE o1 o2 o3 o4 -> VMERGE (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
   VSLIDEDOWN o1 o2 o3 -> VSLIDEDOWN (patchOp o1) (patchOp o2) (patchOp o3)
   VSETIVLI o1 o2 o3 o4 o5 o6 -> VSETIVLI (env o1) o2 o3 o4 o5 o6
-  VNEG fmt o1 o2 -> VNEG fmt (patchOp o1) (patchOp o2)
-  VADD fmt o1 o2 o3 -> VADD fmt (patchOp o1) (patchOp o2) (patchOp o3)
-  VSUB fmt o1 o2 o3 -> VSUB fmt (patchOp o1) (patchOp o2) (patchOp o3)
-  VMUL fmt o1 o2 o3 -> VMUL fmt (patchOp o1) (patchOp o2) (patchOp o3)
-  VQUOT fmt o1 o2 o3 -> VQUOT fmt (patchOp o1) (patchOp o2) (patchOp o3)
-  VSMIN fmt o1 o2 o3 -> VSMIN fmt (patchOp o1) (patchOp o2) (patchOp o3)
-  VSMAX fmt o1 o2 o3 -> VSMAX fmt (patchOp o1) (patchOp o2) (patchOp o3)
-  VUMIN fmt o1 o2 o3 -> VUMIN fmt (patchOp o1) (patchOp o2) (patchOp o3)
-  VUMAX fmt o1 o2 o3 -> VUMAX fmt (patchOp o1) (patchOp o2) (patchOp o3)
-  VFMIN fmt o1 o2 o3 -> VFMIN fmt (patchOp o1) (patchOp o2) (patchOp o3)
-  VFMAX fmt o1 o2 o3 -> VFMAX fmt (patchOp o1) (patchOp o2) (patchOp o3)
+  VNEG o1 o2 -> VNEG (patchOp o1) (patchOp o2)
+  VADD o1 o2 o3 -> VADD (patchOp o1) (patchOp o2) (patchOp o3)
+  VSUB o1 o2 o3 -> VSUB (patchOp o1) (patchOp o2) (patchOp o3)
+  VMUL o1 o2 o3 -> VMUL (patchOp o1) (patchOp o2) (patchOp o3)
+  VQUOT o1 o2 o3 -> VQUOT (patchOp o1) (patchOp o2) (patchOp o3)
+  VSMIN o1 o2 o3 -> VSMIN (patchOp o1) (patchOp o2) (patchOp o3)
+  VSMAX o1 o2 o3 -> VSMAX (patchOp o1) (patchOp o2) (patchOp o3)
+  VUMIN o1 o2 o3 -> VUMIN (patchOp o1) (patchOp o2) (patchOp o3)
+  VUMAX o1 o2 o3 -> VUMAX (patchOp o1) (patchOp o2) (patchOp o3)
+  VFMIN o1 o2 o3 -> VFMIN (patchOp o1) (patchOp o2) (patchOp o3)
+  VFMAX o1 o2 o3 -> VFMAX (patchOp o1) (patchOp o2) (patchOp o3)
   FMA s o1 o2 o3 o4 ->
     FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
   VFMA s fmt o1 o2 o3 ->
@@ -689,17 +689,17 @@ data Instr
   | VMERGE Operand Operand Operand Operand
   | VSLIDEDOWN Operand Operand Operand
   | VSETIVLI Reg Word Width VectorGrouping TailAgnosticFlag MaskAgnosticFlag
-  | VNEG Format Operand Operand
-  | VADD Format Operand Operand Operand
-  | VSUB Format Operand Operand Operand
-  | VMUL Format Operand Operand Operand
-  | VQUOT Format Operand Operand Operand
-  | VSMIN Format Operand Operand Operand
-  | VSMAX Format Operand Operand Operand
-  | VUMIN Format Operand Operand Operand
-  | VUMAX Format Operand Operand Operand
-  | VFMIN Format Operand Operand Operand
-  | VFMAX Format Operand Operand Operand
+  | VNEG Operand Operand
+  | VADD Operand Operand Operand
+  | VSUB Operand Operand Operand
+  | VMUL Operand Operand Operand
+  | VQUOT Operand Operand Operand
+  | VSMIN Operand Operand Operand
+  | VSMAX Operand Operand Operand
+  | VUMIN Operand Operand Operand
+  | VUMAX Operand Operand Operand
+  | VFMIN Operand Operand Operand
+  | VFMAX Operand Operand Operand
   | VFMA FMASign Format Operand Operand Operand
 
 -- | Operand of a FENCE instruction (@r@, @w@ or @rw@)

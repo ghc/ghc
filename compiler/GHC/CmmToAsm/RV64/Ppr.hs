@@ -778,17 +778,28 @@ pprInstr platform instr = case instr of
       <+> pprTA ta
       <> comma
       <+> pprMasking ma
-  VNEG fmt o1 o2 -> configVec fmt $$ op2 (text "\tvfneg.v") o1 o2
-  VADD fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvfadd.vv") o1 o2 o3
-  VSUB fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvfsub.vv") o1 o2 o3
-  VMUL fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvfmul.vv") o1 o2 o3
-  VQUOT fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvfdiv.vv") o1 o2 o3
-  VSMIN fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvmin.vv") o1 o2 o3
-  VSMAX fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvmax.vv") o1 o2 o3
-  VUMIN fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvminu.vv") o1 o2 o3
-  VUMAX fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvmaxu.vv") o1 o2 o3
-  VFMIN fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvfmin.vv") o1 o2 o3
-  VFMAX fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvfmax.vv") o1 o2 o3
+  VNEG o1@(OpReg fmt _reg) o2 -> configVec fmt $$ op2 (text "\tvfneg.v") o1 o2
+  VNEG o1 _o2 -> pprPanic "RV64.pprInstr - VNEG can only target registers." (pprOp platform o1)
+  VADD o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfadd.vv") o1 o2 o3
+  VADD o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VADD can only target registers." (pprOp platform o1)
+  VSUB o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfsub.vv") o1 o2 o3
+  VSUB o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VSUB can only target registers." (pprOp platform o1)
+  VMUL o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfmul.vv") o1 o2 o3
+  VMUL o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VMUL can only target registers." (pprOp platform o1)
+  VQUOT o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfdiv.vv") o1 o2 o3
+  VQUOT o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VQUOT can only target registers." (pprOp platform o1)
+  VSMIN o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvmin.vv") o1 o2 o3
+  VSMIN o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VSMIN can only target registers." (pprOp platform o1)
+  VSMAX o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvmax.vv") o1 o2 o3
+  VSMAX o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VSMAX can only target registers." (pprOp platform o1)
+  VUMIN o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvminu.vv") o1 o2 o3
+  VUMIN o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VUMIN can only target registers." (pprOp platform o1)
+  VUMAX o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvmaxu.vv") o1 o2 o3
+  VUMAX o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VUMAX can only target registers." (pprOp platform o1)
+  VFMIN o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfmin.vv") o1 o2 o3
+  VFMIN o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VFMIN can only target registers." (pprOp platform o1)
+  VFMAX o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfmax.vv") o1 o2 o3
+  VFMAX o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VFMAX can only target registers." (pprOp platform o1)
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
   where
     op1 op o1 = line $ op <+> pprOp platform o1

@@ -886,7 +886,7 @@ getRegister' config plat expr =
             code_v
               `snocOL` annExpr
                 expr
-                (VNEG toFmt (OpReg toFmt dst) (OpReg format_v reg_v))
+                (VNEG (OpReg toFmt dst) (OpReg format_v reg_v))
         x -> pprPanic ("getRegister' (monadic CmmMachOp): " ++ show x) (pdoc plat expr)
       where
         -- In the case of 16- or 8-bit values we need to sign-extend to 32-bits
@@ -1297,17 +1297,17 @@ getRegister' config plat expr =
               -- Move to float register
               -- vmv.x.s a0, v8
               VMV (OpReg format_dst dst) (OpReg format_v tmp)
-        MO_VF_Add length w -> vecOp (floatVecFormat length w) (\d x y -> (VADD (VecFormat length (floatScalarFormat w)) d x y))
-        MO_VF_Sub length w -> vecOp (floatVecFormat length w) (\d x y -> (VSUB (VecFormat length (floatScalarFormat w)) d x y))
-        MO_VF_Mul length w -> vecOp (floatVecFormat length w) (\d x y -> (VMUL (VecFormat length (floatScalarFormat w)) d x y))
-        MO_VF_Quot length w -> vecOp (floatVecFormat length w) (\d x y -> (VQUOT (VecFormat length (floatScalarFormat w)) d x y))
+        MO_VF_Add length w -> vecOp (floatVecFormat length w) (\d x y -> (VADD d x y))
+        MO_VF_Sub length w -> vecOp (floatVecFormat length w) (\d x y -> (VSUB d x y))
+        MO_VF_Mul length w -> vecOp (floatVecFormat length w) (\d x y -> (VMUL d x y))
+        MO_VF_Quot length w -> vecOp (floatVecFormat length w) (\d x y -> (VQUOT d x y))
         -- See https://godbolt.org/z/PvcWKMKoW
-        MO_VS_Min length w -> vecOp (intVecFormat length w) (\d x y -> (VSMIN (VecFormat length (intScalarFormat w)) d x y))
-        MO_VS_Max length w -> vecOp (intVecFormat length w) (\d x y -> (VSMAX (VecFormat length (intScalarFormat w)) d x y))
-        MO_VU_Min length w -> vecOp (intVecFormat length w) (\d x y -> (VUMIN (VecFormat length (intScalarFormat w)) d x y))
-        MO_VU_Max length w -> vecOp (intVecFormat length w) (\d x y -> (VUMAX (VecFormat length (intScalarFormat w)) d x y))
-        MO_VF_Min length w -> vecOp (floatVecFormat length w) (\d x y -> (VFMIN (VecFormat length (floatScalarFormat w)) d x y))
-        MO_VF_Max length w -> vecOp (floatVecFormat length w) (\d x y -> (VFMAX (VecFormat length (floatScalarFormat w)) d x y))
+        MO_VS_Min length w -> vecOp (intVecFormat length w) (\d x y -> (VSMIN d x y))
+        MO_VS_Max length w -> vecOp (intVecFormat length w) (\d x y -> (VSMAX d x y))
+        MO_VU_Min length w -> vecOp (intVecFormat length w) (\d x y -> (VUMIN d x y))
+        MO_VU_Max length w -> vecOp (intVecFormat length w) (\d x y -> (VUMAX d x y))
+        MO_VF_Min length w -> vecOp (floatVecFormat length w) (\d x y -> (VFMIN d x y))
+        MO_VF_Max length w -> vecOp (floatVecFormat length w) (\d x y -> (VFMAX d x y))
         _e -> panic $ "Missing operation " ++ show expr
 
         -- Vectors
@@ -1353,7 +1353,7 @@ getRegister' config plat expr =
               (reg_y, format_y, code_y) <- getSomeReg y
               (reg_z, format_z, code_z) <- getSomeReg z
               let targetFormat = VecFormat length (floatScalarFormat w)
-                  negate_z = if var `elem` [FNMAdd, FNMSub] then unitOL (VNEG format_z (OpReg format_z reg_z) (OpReg format_z reg_z)) else nilOL
+                  negate_z = if var `elem` [FNMAdd, FNMSub] then unitOL (VNEG (OpReg format_z reg_z) (OpReg format_z reg_z)) else nilOL
               pure $ Any targetFormat $ \dst ->
                 code_x
                   `appOL` code_y
