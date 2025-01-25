@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE CPP #-}
 
 module GHC.CmmToAsm.AArch64.Instr
 
@@ -217,7 +218,11 @@ regUsageOfInstr platform instr = case instr of
 -- TODO: The zero register is currently mapped to -1 but should get it's own separate number.
 callerSavedRegisters :: [Reg]
 callerSavedRegisters
+#if defined(mingw32_HOST_OS)
+    = map regSingle [0..17]
+#else
     = map regSingle [0..18]
+#endif
     ++ map regSingle [32..39]
     ++ map regSingle [48..63]
 
