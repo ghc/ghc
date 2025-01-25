@@ -868,7 +868,7 @@ getRegister' config plat expr =
             code_val
               `snocOL` annExpr
                 expr
-                (VMV toFmt (OpReg toFmt dst) (OpReg format_val reg_val))
+                (VMV (OpReg toFmt dst) (OpReg format_val reg_val))
         MO_VF_Broadcast length w -> do
           (reg_val, format_val, code_val) <- getSomeReg e
           let toFmt = VecFormat length (floatScalarFormat w)
@@ -876,7 +876,7 @@ getRegister' config plat expr =
             code_val
               `snocOL` annExpr
                 expr
-                (VMV toFmt (OpReg toFmt dst) (OpReg format_val reg_val))
+                (VMV (OpReg toFmt dst) (OpReg format_val reg_val))
 
         -- TODO: NO MO_V_Neg? Why?
         MO_VF_Neg length w -> do
@@ -1274,7 +1274,7 @@ getRegister' config plat expr =
               `snocOL`
               -- Move to float register
               -- vmv.x.s a0, v8
-              VMV format_dst (OpReg format_dst dst) (OpReg format_v tmp)
+              VMV (OpReg format_dst dst) (OpReg format_v tmp)
 
         -- TODO: Duplication with MO_VF_Extract
         MO_V_Extract length w -> do
@@ -1296,7 +1296,7 @@ getRegister' config plat expr =
               `snocOL`
               -- Move to float register
               -- vmv.x.s a0, v8
-              VMV format_dst (OpReg format_dst dst) (OpReg format_v tmp)
+              VMV (OpReg format_dst dst) (OpReg format_v tmp)
         MO_VF_Add length w -> vecOp (floatVecFormat length w) (\d x y -> (VADD (VecFormat length (floatScalarFormat w)) d x y))
         MO_VF_Sub length w -> vecOp (floatVecFormat length w) (\d x y -> (VSUB (VecFormat length (floatScalarFormat w)) d x y))
         MO_VF_Mul length w -> vecOp (floatVecFormat length w) (\d x y -> (VMUL (VecFormat length (floatScalarFormat w)) d x y))
@@ -1361,7 +1361,7 @@ getRegister' config plat expr =
                   `appOL` negate_z
                   `snocOL` annExpr
                     expr
-                    (VMV targetFormat (OpReg targetFormat dst) (OpReg format_x reg_x))
+                    (VMV (OpReg targetFormat dst) (OpReg format_x reg_x))
                   `snocOL` VFMA var targetFormat (OpReg targetFormat dst) (OpReg format_y reg_y) (OpReg format_z reg_z)
 
         -- TODO: Implement length as immediate
@@ -1410,7 +1410,7 @@ getRegister' config plat expr =
                 VMSEQ format_mask (OpReg format_mask v0Reg) (OpReg format_vid vidReg) (OpReg format_idx reg_idx)
                 `snocOL`
                 -- 3. Splat value into tmp vector
-                VMV format (OpReg format tmp) (OpReg format_f reg_f)
+                VMV (OpReg format tmp) (OpReg format_f reg_f)
                 `snocOL`
                 -- 4. Merge with mask -> set element at index
                 VMERGE format (OpReg format dst) (OpReg format_v reg_v) (OpReg format tmp) (OpReg format_mask v0Reg)
