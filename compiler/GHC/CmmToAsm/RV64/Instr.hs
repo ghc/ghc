@@ -114,7 +114,7 @@ regUsageOfInstr platform instr = case instr of
   VID dst -> usage ([], regOp dst)
   VMSEQ dst src op -> usage (regOp src ++ regOp op, regOp dst)
   VMERGE dst op1 op2 opm -> usage (regOp op1 ++ regOp op2 ++ regOp opm, regOp dst)
-  VSLIDEDOWN fmt dst op1 op2 -> usage (regOp op1 ++ regOp op2, regOp dst)
+  VSLIDEDOWN dst op1 op2 -> usage (regOp op1 ++ regOp op2, regOp dst)
   -- WARNING: VSETIVLI is a special case. It changes the interpretation of all vector registers!
   VSETIVLI dst _ _ _ _ _ -> usage ([], [dst])
   VNEG fmt dst src1 -> usage (regOp src1, regOp dst)
@@ -236,7 +236,7 @@ patchRegsOfInstr instr env = case instr of
   VID o1 -> VID (patchOp o1)
   VMSEQ o1 o2 o3 -> VMSEQ (patchOp o1) (patchOp o2) (patchOp o3)
   VMERGE o1 o2 o3 o4 -> VMERGE (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
-  VSLIDEDOWN fmt o1 o2 o3 -> VSLIDEDOWN fmt (patchOp o1) (patchOp o2) (patchOp o3)
+  VSLIDEDOWN o1 o2 o3 -> VSLIDEDOWN (patchOp o1) (patchOp o2) (patchOp o3)
   VSETIVLI o1 o2 o3 o4 o5 o6 -> VSETIVLI (env o1) o2 o3 o4 o5 o6
   VNEG fmt o1 o2 -> VNEG fmt (patchOp o1) (patchOp o2)
   VADD fmt o1 o2 o3 -> VADD fmt (patchOp o1) (patchOp o2) (patchOp o3)
@@ -687,7 +687,7 @@ data Instr
   | VID Operand 
   | VMSEQ Operand Operand Operand
   | VMERGE Operand Operand Operand Operand
-  | VSLIDEDOWN Format Operand Operand Operand
+  | VSLIDEDOWN Operand Operand Operand
   | VSETIVLI Reg Word Width VectorGrouping TailAgnosticFlag MaskAgnosticFlag
   | VNEG Format Operand Operand
   | VADD Format Operand Operand Operand
