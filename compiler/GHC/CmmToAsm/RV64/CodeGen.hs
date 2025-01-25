@@ -1404,7 +1404,7 @@ getRegister' config plat expr =
                   -- TODO: The Width is made up
                   -- TODO: Is it safe to use v0 (default mask register) here? Instructions may be shuffled around...
                   -- Can we use an explicitly fetched register as mask (depends on instructions)?
-                  (VID format_vid (OpReg format_vid vidReg))
+                  (VID (OpReg format_vid vidReg))
                 `snocOL`
                 -- 2. Build mask
                 VMSEQ format_mask (OpReg format_mask v0Reg) (OpReg format_vid vidReg) (OpReg format_idx reg_idx)
