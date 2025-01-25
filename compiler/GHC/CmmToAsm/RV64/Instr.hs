@@ -20,8 +20,8 @@ import GHC.CmmToAsm.Utils
 import GHC.Data.FastString (LexicalFastString)
 import GHC.Platform
 import GHC.Platform.Reg
-import GHC.Platform.Regs
 import GHC.Platform.Reg.Class.Separate
+import GHC.Platform.Regs
 import GHC.Prelude
 import GHC.Stack
 import GHC.Types.Unique.DSM
@@ -368,7 +368,7 @@ mkSpillInstr _config (RegWithFormat reg fmt) delta slot =
       = scalarMoveFormat fmt
     mkStrSpImm imm =
       ANN (text "Spill@" <> int (off - delta))
-        $ STR fmt' (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
+        $ STR fmt' (OpReg fmt' reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
     movImmToTmp imm =
       ANN (text "Spill: TMP <- " <> int imm)
         $ MOV tmp (OpImm (ImmInt imm))
@@ -377,7 +377,7 @@ mkSpillInstr _config (RegWithFormat reg fmt) delta slot =
         $ ADD tmp tmp sp
     mkStrTmp =
       ANN (text "Spill@" <> int (off - delta))
-        $ STR fmt' (OpReg W64 reg) (OpAddr (AddrReg tmpReg))
+        $ STR fmt' (OpReg fmt' reg) (OpAddr (AddrReg tmpReg))
 
     off = spillSlotToOffset slot
 
@@ -407,7 +407,7 @@ mkLoadInstr _config (RegWithFormat reg fmt) delta slot =
       = scalarMoveFormat fmt
     mkLdrSpImm imm =
       ANN (text "Reload@" <> int (off - delta))
-        $ LDR fmt' (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
+        $ LDR fmt' (OpReg fmt' reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
     movImmToTmp imm =
       ANN (text "Reload: TMP <- " <> int imm)
         $ MOV tmp (OpImm (ImmInt imm))
@@ -416,7 +416,7 @@ mkLoadInstr _config (RegWithFormat reg fmt) delta slot =
         $ ADD tmp tmp sp
     mkLdrTmp =
       ANN (text "Reload@" <> int (off - delta))
-        $ LDR fmt' (OpReg W64 reg) (OpAddr (AddrReg tmpReg))
+        $ LDR fmt' (OpReg fmt' reg) (OpAddr (AddrReg tmpReg))
 
     off = spillSlotToOffset slot
 
@@ -450,11 +450,11 @@ isMetaInstr instr =
 -- | Copy the value in a register to another one.
 --
 -- Must work for all register classes.
-mkRegRegMoveInstr :: Reg -> Reg -> Instr
-mkRegRegMoveInstr src dst = ANN desc instr
+mkRegRegMoveInstr :: Format -> Reg -> Reg -> Instr
+mkRegRegMoveInstr fmt src dst = ANN desc instr
   where
     desc = text "Reg->Reg Move: " <> ppr src <> text " -> " <> ppr dst
-    instr = MOV (operandFromReg dst) (operandFromReg src)
+    instr = MOV (operandFromReg fmt dst) (operandFromReg fmt src)
 
 -- | Take the source and destination from this (potential) reg -> reg move instruction
 --
@@ -803,149 +803,130 @@ data Target
 -- TODO: OpReg should carry the format, not only the width. This would unify OpReg and OpVecReg.
 data Operand
   = -- | register
-    OpReg Width Reg
+    OpReg Format Reg
   | -- | immediate value
     OpImm Imm
   | -- | memory reference
     OpAddr AddrMode
   deriving (Eq, Show)
 
-operandFromReg :: Reg -> Operand
-operandFromReg = OpReg W64
+-- TODO: This just wraps a constructor... Inline?
+operandFromReg :: Format -> Reg -> Operand
+operandFromReg = OpReg
 
-operandFromRegNo :: RegNo -> Operand
-operandFromRegNo = operandFromReg . regSingle
+operandFromRegNo :: Format -> RegNo -> Operand
+operandFromRegNo fmt = operandFromReg fmt . regSingle
 
 zero, ra, sp, gp, tp, fp, tmp :: Operand
-zero = operandFromReg zeroReg
-ra = operandFromReg raReg
-sp = operandFromReg spMachReg
-gp = operandFromRegNo 3
-tp = operandFromRegNo 4
-fp = operandFromRegNo 8
-tmp = operandFromReg tmpReg
+zero = operandFromReg II64 zeroReg
+ra = operandFromReg II64 raReg
+sp = operandFromReg II64 spMachReg
+gp = operandFromRegNo II64 3
+tp = operandFromRegNo II64 4
+fp = operandFromRegNo II64 8
+tmp = operandFromReg II64 tmpReg
 
 x0, x1, x2, x3, x4, x5, x6, x7 :: Operand
 x8, x9, x10, x11, x12, x13, x14, x15 :: Operand
 x16, x17, x18, x19, x20, x21, x22, x23 :: Operand
 x24, x25, x26, x27, x28, x29, x30, x31 :: Operand
-x0 = operandFromRegNo x0RegNo
-x1 = operandFromRegNo 1
-x2 = operandFromRegNo 2
-x3 = operandFromRegNo 3
-x4 = operandFromRegNo 4
-x5 = operandFromRegNo x5RegNo
-x6 = operandFromRegNo 6
-x7 = operandFromRegNo x7RegNo
+x0 = operandFromRegNo II64 x0RegNo
+x1 = operandFromRegNo II64 1
+x2 = operandFromRegNo II64 2
+x3 = operandFromRegNo II64 3
+x4 = operandFromRegNo II64 4
+x5 = operandFromRegNo II64 x5RegNo
+x6 = operandFromRegNo II64 6
+x7 = operandFromRegNo II64 x7RegNo
 
-x8 = operandFromRegNo 8
+x8 = operandFromRegNo II64 8
 
-x9 = operandFromRegNo 9
+x9 = operandFromRegNo II64 9
 
-x10 = operandFromRegNo x10RegNo
+x10 = operandFromRegNo II64 x10RegNo
 
-x11 = operandFromRegNo 11
-
-x12 = operandFromRegNo 12
-
-x13 = operandFromRegNo 13
-
-x14 = operandFromRegNo 14
-
-x15 = operandFromRegNo 15
-
-x16 = operandFromRegNo 16
-
-x17 = operandFromRegNo x17RegNo
-
-x18 = operandFromRegNo 18
-
-x19 = operandFromRegNo 19
-
-x20 = operandFromRegNo 20
-
-x21 = operandFromRegNo 21
-
-x22 = operandFromRegNo 22
-
-x23 = operandFromRegNo 23
-
-x24 = operandFromRegNo 24
-
-x25 = operandFromRegNo 25
-
-x26 = operandFromRegNo 26
-
-x27 = operandFromRegNo 27
-
-x28 = operandFromRegNo x28RegNo
-
-x29 = operandFromRegNo 29
-
-x30 = operandFromRegNo 30
-
-x31 = operandFromRegNo x31RegNo
+x11 = operandFromRegNo II64 11
+x12 = operandFromRegNo II64 12
+x13 = operandFromRegNo II64 13
+x14 = operandFromRegNo II64 14
+x15 = operandFromRegNo II64 15
+x16 = operandFromRegNo II64 16
+x17 = operandFromRegNo II64 x17RegNo
+x18 = operandFromRegNo II64 18
+x19 = operandFromRegNo II64 19
+x20 = operandFromRegNo II64 20
+x21 = operandFromRegNo II64 21
+x22 = operandFromRegNo II64 22
+x23 = operandFromRegNo II64 23
+x24 = operandFromRegNo II64 24
+x25 = operandFromRegNo II64 25
+x26 = operandFromRegNo II64 26
+x27 = operandFromRegNo II64 27
+x28 = operandFromRegNo II64 x28RegNo
+x29 = operandFromRegNo II64 29
+x30 = operandFromRegNo II64 30
+x31 = operandFromRegNo II64 x31RegNo
 
 d0, d1, d2, d3, d4, d5, d6, d7 :: Operand
 d8, d9, d10, d11, d12, d13, d14, d15 :: Operand
 d16, d17, d18, d19, d20, d21, d22, d23 :: Operand
 d24, d25, d26, d27, d28, d29, d30, d31 :: Operand
-d0 = operandFromRegNo d0RegNo
-d1 = operandFromRegNo 33
-d2 = operandFromRegNo 34
-d3 = operandFromRegNo 35
-d4 = operandFromRegNo 36
-d5 = operandFromRegNo 37
-d6 = operandFromRegNo 38
-d7 = operandFromRegNo d7RegNo
+d0 = operandFromRegNo FF64 d0RegNo
+d1 = operandFromRegNo FF64 33
+d2 = operandFromRegNo FF64 34
+d3 = operandFromRegNo FF64 35
+d4 = operandFromRegNo FF64 36
+d5 = operandFromRegNo FF64 37
+d6 = operandFromRegNo FF64 38
+d7 = operandFromRegNo FF64 d7RegNo
 
-d8 = operandFromRegNo 40
+d8 = operandFromRegNo FF64 40
 
-d9 = operandFromRegNo 41
+d9 = operandFromRegNo FF64 41
 
-d10 = operandFromRegNo d10RegNo
+d10 = operandFromRegNo FF64 d10RegNo
 
-d11 = operandFromRegNo 43
+d11 = operandFromRegNo FF64 43
 
-d12 = operandFromRegNo 44
+d12 = operandFromRegNo FF64 44
 
-d13 = operandFromRegNo 45
+d13 = operandFromRegNo FF64 45
 
-d14 = operandFromRegNo 46
+d14 = operandFromRegNo FF64 46
 
-d15 = operandFromRegNo 47
+d15 = operandFromRegNo FF64 47
 
-d16 = operandFromRegNo 48
+d16 = operandFromRegNo FF64 48
 
-d17 = operandFromRegNo d17RegNo
+d17 = operandFromRegNo FF64 d17RegNo
 
-d18 = operandFromRegNo 50
+d18 = operandFromRegNo FF64 50
 
-d19 = operandFromRegNo 51
+d19 = operandFromRegNo FF64 51
 
-d20 = operandFromRegNo 52
+d20 = operandFromRegNo FF64 52
 
-d21 = operandFromRegNo 53
+d21 = operandFromRegNo FF64 53
 
-d22 = operandFromRegNo 54
+d22 = operandFromRegNo FF64 54
 
-d23 = operandFromRegNo 55
+d23 = operandFromRegNo FF64 55
 
-d24 = operandFromRegNo 56
+d24 = operandFromRegNo FF64 56
 
-d25 = operandFromRegNo 57
+d25 = operandFromRegNo FF64 57
 
-d26 = operandFromRegNo 58
+d26 = operandFromRegNo FF64 58
 
-d27 = operandFromRegNo 59
+d27 = operandFromRegNo FF64 59
 
-d28 = operandFromRegNo 60
+d28 = operandFromRegNo FF64 60
 
-d29 = operandFromRegNo 61
+d29 = operandFromRegNo FF64 61
 
-d30 = operandFromRegNo 62
+d30 = operandFromRegNo FF64 62
 
-d31 = operandFromRegNo d31RegNo
+d31 = operandFromRegNo FF64 d31RegNo
 
 fitsIn12bitImm :: (Num a, Ord a) => a -> Bool
 fitsIn12bitImm off = off >= intMin12bit && off <= intMax12bit
@@ -966,7 +947,7 @@ isEncodeableInWidth :: Width -> Integer -> Bool
 isEncodeableInWidth = isNbitEncodeable . widthInBits
 
 isIntRegOp :: Operand -> Bool
-isIntRegOp (OpReg _ reg) | isIntReg reg = True
+isIntRegOp (OpReg fmt reg) | isIntReg reg = assertFmtReg fmt reg $ True
 isIntRegOp _ = False
 
 isIntImmOp :: Operand -> Bool
@@ -978,7 +959,7 @@ isIntOp :: Operand -> Bool
 isIntOp op = isIntRegOp op || isIntImmOp op
 
 isFloatRegOp :: Operand -> Bool
-isFloatRegOp (OpReg _ reg) | isFloatReg reg = True
+isFloatRegOp (OpReg fmt reg) | isFloatReg reg = assertFmtReg fmt reg $ True
 isFloatRegOp _ = False
 
 isFloatImmOp :: Operand -> Bool
@@ -989,8 +970,21 @@ isFloatImmOp _ = False
 isFloatOp :: Operand -> Bool
 isFloatOp op = isFloatRegOp op || isFloatImmOp op
 
+-- TODO: Hide OpReg (Operand) constructor and use this guard to ensure only sane fmt/reg combinations can be used
+assertFmtReg :: HasCallStack => Format -> Reg -> a -> a
+assertFmtReg fmt reg| fmtRegCombinationIsSane fmt reg = id  
+assertFmtReg fmt reg = pprPanic 
+                              "Format does not fit to register."
+                              (text "fmt" <> colon <+> ppr fmt <+> text "reg" <> colon <+> ppr reg)
+
+fmtRegCombinationIsSane :: Format -> Reg -> Bool
+fmtRegCombinationIsSane fmt reg = 
+                           (isFloatFormat fmt && isFloatReg reg) ||
+                           (isIntFormat fmt && isIntReg reg) ||
+                           (isVecFormat fmt && isVectorReg reg)
+
 isVectorRegOp :: Operand -> Bool
-isVectorRegOp (OpReg _ reg) | isVectorReg reg = True
+isVectorRegOp (OpReg fmt reg) | isVectorReg reg = assertFmtReg fmt reg $ True
 isVectorRegOp _ = False
 
 isFloatReg :: Reg -> Bool
