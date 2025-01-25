@@ -1362,7 +1362,7 @@ getRegister' config plat expr =
                   `snocOL` annExpr
                     expr
                     (VMV (OpReg targetFormat dst) (OpReg format_x reg_x))
-                  `snocOL` VFMA var targetFormat (OpReg targetFormat dst) (OpReg format_y reg_y) (OpReg format_z reg_z)
+                  `snocOL` VFMA var (OpReg targetFormat dst) (OpReg format_y reg_y) (OpReg format_z reg_z)
 
         -- TODO: Implement length as immediate
 
