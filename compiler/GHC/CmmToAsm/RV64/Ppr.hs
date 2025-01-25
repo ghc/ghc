@@ -744,14 +744,15 @@ pprInstr platform instr = case instr of
             FNMAdd -> text "nmadd" -- TODO: Works only for floats!
             FNMSub -> text "nmsub"
      in op3 (tab <> prefix <> fma <> dot <> suffix) o1 o2 o3
-  VMV fmt o1 o2 | isFloatOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
+  VMV o1@(OpReg fmt _reg) o2 | isFloatOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
                 | isFloatOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "f") o1 o2
                 | isIntRegOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> text "x" <> dot <> text "s") o1 o2
                 | isIntRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "x") o1 o2
                 | isVectorRegOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "v") o1 o2
                 | True -> pprPanic "RV64.pprInstr - impossible vector move (VMV)" (pprOp platform o1 <+> pprOp platform o2 <+> text "fmt" <> colon <> (text . show) fmt)
+  VMV o1 _o2 -> pprPanic "RV64.pprInstr - VMV can only target registers." (pprOp platform o1)
   VID op@(OpReg fmt _reg) -> configVec fmt $$ op1 (text "\tvid.v") op
-  VID op -> pprPanic "RV64.pprInstr - VID can only work on registers." (pprOp platform op)
+  VID op -> pprPanic "RV64.pprInstr - VID can only target registers." (pprOp platform op)
   -- TODO: This expects int register as third operand: Generalize by calculating
   -- the instruction suffix (".vx")
   VMSEQ fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvmseq.vx") o1 o2 o3
