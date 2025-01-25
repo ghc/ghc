@@ -301,7 +301,8 @@ bindistRules = do
 
     let buildBinDist compressor = do
           win_target <- isWinTarget
-          when win_target (error "normal binary-dist does not work for Windows targets, use `reloc-binary-dist-*` target instead.")
+          win_host <- isWinHost
+          when (win_target && win_host) (error "normal binary-dist does not work at Windows, use `reloc-binary-dist-*` target instead.")
           buildBinDistX "binary-dist-dir" "bindist" compressor
         buildBinDistReloc = buildBinDistX "reloc-binary-dist-dir" "reloc-bindist"
 

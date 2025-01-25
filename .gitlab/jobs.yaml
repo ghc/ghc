@@ -315,6 +315,168 @@
       "TEST_ENV": "aarch64-linux-deb12-validate+llvm"
     }
   },
+  "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate.tar.xz",
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "aarch64-linux-deb12-wine-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12-wine:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || (($CI_MERGE_REQUEST_LABELS =~ /.*aarch64.*/) && ($CI_MERGE_REQUEST_LABELS =~ /.*Windows.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "aarch64-linux"
+    ],
+    "variables": {
+      "AR": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar",
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CC": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
+      "CFLAGS": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
+      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
+      "CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
+      "CROSS_EMULATOR": "/opt/wine-arm64ec-msys2-deb12/bin/wine",
+      "CROSS_TARGET": "aarch64-unknown-mingw32",
+      "CXX": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang++",
+      "HADRIAN_ARGS": "--docs=none",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "LD": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld",
+      "LLVMAS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
+      "MergeObjsCmd": "",
+      "NM": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-nm",
+      "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
+      "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
+      "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
+      "RUNTEST_ARGS": "",
+      "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
+      "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
+      "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
+      "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate",
+      "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres"
+    }
+  },
+  "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm.tar.xz",
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "aarch64-linux-deb12-wine-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12-wine:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate\\+llvm(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || (($CI_MERGE_REQUEST_LABELS =~ /.*aarch64.*/) && ($CI_MERGE_REQUEST_LABELS =~ /.*Windows.*/) && ($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "aarch64-linux"
+    ],
+    "variables": {
+      "AR": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar",
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
+      "BUILD_FLAVOUR": "validate+llvm",
+      "CC": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
+      "CFLAGS": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
+      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
+      "CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
+      "CROSS_EMULATOR": "/opt/wine-arm64ec-msys2-deb12/bin/wine",
+      "CROSS_TARGET": "aarch64-unknown-mingw32",
+      "CXX": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang++",
+      "HADRIAN_ARGS": "--docs=none",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "LD": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld",
+      "LLVMAS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
+      "MergeObjsCmd": "",
+      "NM": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-nm",
+      "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
+      "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
+      "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
+      "RUNTEST_ARGS": "",
+      "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
+      "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
+      "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
+      "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
+      "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres"
+    }
+  },
   "i386-linux-alpine3_20-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
@@ -819,6 +981,170 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb12-validate+llvm",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate.tar.xz",
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "aarch64-linux-deb12-wine-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12-wine:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "aarch64-linux"
+    ],
+    "variables": {
+      "AR": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar",
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CC": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
+      "CFLAGS": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
+      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
+      "CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
+      "CROSS_EMULATOR": "/opt/wine-arm64ec-msys2-deb12/bin/wine",
+      "CROSS_TARGET": "aarch64-unknown-mingw32",
+      "CXX": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang++",
+      "HADRIAN_ARGS": "--docs=none",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "LD": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld",
+      "LLVMAS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
+      "MergeObjsCmd": "",
+      "NM": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-nm",
+      "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
+      "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
+      "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
+      "RUNTEST_ARGS": "",
+      "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
+      "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
+      "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
+      "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate",
+      "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm.tar.xz",
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "aarch64-linux-deb12-wine-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12-wine:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "aarch64-linux"
+    ],
+    "variables": {
+      "AR": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar",
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
+      "BUILD_FLAVOUR": "validate+llvm",
+      "CC": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
+      "CFLAGS": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
+      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
+      "CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
+      "CROSS_EMULATOR": "/opt/wine-arm64ec-msys2-deb12/bin/wine",
+      "CROSS_TARGET": "aarch64-unknown-mingw32",
+      "CXX": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang++",
+      "HADRIAN_ARGS": "--docs=none",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "LD": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld",
+      "LLVMAS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
+      "MergeObjsCmd": "",
+      "NM": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-nm",
+      "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
+      "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
+      "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
+      "RUNTEST_ARGS": "",
+      "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
+      "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
+      "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
+      "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
+      "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres",
       "XZ_OPT": "-9"
     }
   },

@@ -348,6 +348,7 @@ tablesNextToCodeSupported archOs =
       ArchPPC      -> False
       ArchPPC_64 _ -> False
       ArchS390X    -> False
+      ArchAArch64  -> archOS_OS archOs /= OSMinGW32
       _            -> True
 
 determineTablesNextToCode

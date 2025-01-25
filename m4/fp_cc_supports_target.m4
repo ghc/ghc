@@ -20,7 +20,7 @@ AC_DEFUN([FP_CC_SUPPORTS_TARGET],
        # See Note [Don't pass --target to emscripten toolchain] in GHC.Toolchain.Program
        CONF_CC_SUPPORTS_TARGET=NO
        AC_MSG_RESULT([no])
-   elif $1 --target=$LlvmTarget -Werror conftest.c > /dev/null 2>&1 ; then
+   elif $1 --target=$LlvmTarget -Werror -c conftest.c > /dev/null 2>&1 ; then
        CONF_CC_SUPPORTS_TARGET=YES
        AC_MSG_RESULT([yes])
    else

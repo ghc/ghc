@@ -11,6 +11,7 @@ module Oracles.Setting (
     -- ** Target platform things
     anyTargetOs, anyTargetArch, anyHostOs,
     isElfTarget, isOsxTarget, isWinTarget, isJsTarget, isArmTarget,
+    isWinHost,
     targetArmVersion
     ) where
 
@@ -155,6 +156,9 @@ getSetting = expr . setting
 -- | The path to a Bourne shell interpreter.
 bashPath :: Action FilePath
 bashPath = setting BourneShell
+
+isWinHost :: Action Bool
+isWinHost = anyHostOs [OSMinGW32]
 
 isWinTarget :: Action Bool
 isWinTarget = anyTargetOs [OSMinGW32]

@@ -93,7 +93,7 @@ AC_DEFUN([FPTOOLS_OVERRIDE_PLATFORM_FROM_BOOTSTRAP],
 
 # FPTOOLS_SET_PLATFORM_VARS(platform,Platform)
 # ----------------------------------
-# Set the platform variables for a single plaform (one of build, host,
+# Set the platform variables for a single platform (one of build, host,
 # or target). Assumes <platform>Arch, <platform>Vendor, and <platform>OS
 # are defined, and does everything else in terms of them.
 AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],

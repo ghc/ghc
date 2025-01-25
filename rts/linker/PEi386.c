@@ -1195,6 +1195,12 @@ verifyCOFFHeader ( uint16_t machine, IMAGE_FILE_HEADER *hdr,
       errorBelch("%" PATH_FMT ": Not a x86_64 PE+ file.", fileName);
       return false;
    }
+#elif defined(aarch64_HOST_ARCH)
+   if (machine != IMAGE_FILE_MACHINE_ARM64) {
+      errorBelch("%" PATH_FMT ": Not a ARM64 PE+ file.", fileName);
+      return false;
+   }
+   errorBelch("PE/PE+ not supported on ARM64.");
 #else
    errorBelch("PE/PE+ not supported on this arch.");
 #endif
@@ -2131,6 +2137,19 @@ ocResolve_PEi386 ( ObjectCode* oc )
                    }
                    *(uint32_t *)pP = (uint32_t)v;
                    break;
+               }
+#elif defined(aarch64_HOST_ARCH)
+            case 1: // IMAGE_REL_ARM64_ADDR32, see https://llvm.org/doxygen/namespacellvm_1_1COFF.html, https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#arm64-processors
+               {
+                    // We have to put this stub due of errors like:
+                    // warning: variable 'A' set but not used.
+                    uint64_t v;
+                    v = S + A;
+
+                    debugBelch("%" PATH_FMT ": Catch ARM64 PEi386 relocation type %d, %llx\n",
+                        oc->fileName, reloc->Type, v);
+                    releaseOcInfo (oc);
+                    return false;
                }
 #endif
             default:
