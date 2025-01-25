@@ -43,7 +43,9 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         pprSectionAlign config (Section Text lbl) $$
         -- do not
         -- pprProcAlignment config $$
-        pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
+        (if lbl /= blockLbl (blockId (head blocks)) -- blocks can have clashed names
+          then pprLabel platform lbl -- blocks guaranteed not null, so label needed
+          else empty) $$
         vcat (map (pprBasicBlock platform with_dwarf top_info) blocks) $$
         (if ncgDwarfEnabled config
          then line (pprAsmLabel platform (mkAsmTempEndLabel lbl) <> char ':') else empty) $$
