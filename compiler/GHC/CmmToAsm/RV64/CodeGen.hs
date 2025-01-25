@@ -1270,7 +1270,7 @@ getRegister' config plat expr =
                 expr
                 -- Move selected element to index 0
                 -- vslidedown.vi v8, v9, 2
-                (VSLIDEDOWN format_v (OpReg format_v tmp) (OpReg format_v reg_v) (OpReg format_idx reg_idx))
+                (VSLIDEDOWN (OpReg format_v tmp) (OpReg format_v reg_v) (OpReg format_idx reg_idx))
               `snocOL`
               -- Move to float register
               -- vmv.x.s a0, v8
@@ -1292,7 +1292,7 @@ getRegister' config plat expr =
                 expr
                 -- Move selected element to index 0
                 -- vslidedown.vi v8, v9, 2
-                (VSLIDEDOWN format_v (OpReg format_v tmp) (OpReg format_v reg_v) (OpReg format_idx reg_idx))
+                (VSLIDEDOWN (OpReg format_v tmp) (OpReg format_v reg_v) (OpReg format_idx reg_idx))
               `snocOL`
               -- Move to float register
               -- vmv.x.s a0, v8
