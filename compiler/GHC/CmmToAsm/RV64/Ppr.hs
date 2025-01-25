@@ -761,7 +761,8 @@ pprInstr platform instr = case instr of
   -- validate this constraint.
   VMERGE o1@(OpReg fmt _reg) o2 o3 o4 -> configVec fmt $$ op4 (text "\tvmerge.vvm") o1 o2 o3 o4
   VMERGE o1 _o2 _o3 _o4 -> pprPanic "RV64.pprInstr - VMERGE can only target registers." (pprOp platform o1)
-  VSLIDEDOWN fmt o1 o2 o3 -> configVec fmt $$ op3 (text "\tvslidedown.vx") o1 o2 o3
+  VSLIDEDOWN o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvslidedown.vx") o1 o2 o3
+  VSLIDEDOWN o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VSLIDEDOWN can only target registers." (pprOp platform o1)
   -- TODO: adjust VSETIVLI to contain only format?
   VSETIVLI dst len width grouping ta ma ->
     line
