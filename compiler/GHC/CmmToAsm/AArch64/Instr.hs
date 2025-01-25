@@ -211,7 +211,7 @@ regUsageOfInstr platform instr = case instr of
 -- | <---- argument passing -------------> | <-- callee saved (lower 64 bits) ---> | <--------------------------------------- caller saved ----------------------> |
 -- | <------ free registers -------------> | F1 | F2 | F3 | F4 | D1 | D2 | D3 | D4 | <------ free registers -----------------------------------------------------> |
 -- '---------------------------------------------------------------------------------------------------------------------------------------------------------------'
--- IR: Indirect result location register, IP: Intra-procedure register, PL: Platform register, FP: Frame pointer, LR: Link register, SP: Stack pointer
+-- IR: Indirect result location register, IP: Intra-procedure register, PL: Platform register (See Note [Aarch64 Register x18 at Darwin and Windows]), FP: Frame pointer, LR: Link register, SP: Stack pointer
 -- BR: Base, SL: SpLim
 --
 -- TODO: The zero register is currently mapped to -1 but should get it's own separate number.

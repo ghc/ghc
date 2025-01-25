@@ -112,6 +112,7 @@ data Opsys
 
 data LinuxDistro
   = Debian12
+  | Debian12Wine
   | Debian12Riscv
   | Debian11
   | Debian11Js
@@ -315,6 +316,7 @@ distroName Debian12      = "deb12"
 distroName Debian11      = "deb11"
 distroName Debian11Js    = "deb11-emsdk-closure"
 distroName Debian12Riscv = "deb12-riscv"
+distroName Debian12Wine  = "deb12-wine"
 distroName Debian10      = "deb10"
 distroName Debian9       = "deb9"
 distroName Fedora33      = "fedora33"
@@ -724,6 +726,8 @@ data ValidateRule
   | IpeData      -- ^ Run this job when the "IPE" label is set
   | TestPrimops  -- ^ Run this job when "test-primops" label is set
   | I386Backend  -- ^ Run this job when the "i386" label is set
+  | WinArm64     -- ^ Run this job when the "aarch64" and "Windows" labels are set together without "LLVM backend"
+  | WinArm64LLVM -- ^ Run this job when the "aarch64" and "Windows" labels are set together with "LLVM backend"
   deriving (Show, Ord, Eq)
 
 -- | Convert the state of the rule into a string that gitlab understand.
@@ -768,6 +772,15 @@ validateRuleString NonmovingGc  = labelString "non-moving GC"
 validateRuleString IpeData      = labelString "IPE"
 validateRuleString TestPrimops  = labelString "test-primops"
 validateRuleString I386Backend  = labelString "i386"
+validateRuleString WinArm64     = and_all
+                                    [ labelString "aarch64"
+                                    , labelString "Windows"
+                                    ]
+validateRuleString WinArm64LLVM = and_all
+                                    [ labelString "aarch64"
+                                    , labelString "Windows"
+                                    , validateRuleString LLVMBackend
+                                    ]
 
 ---------------------------------------------------------------------
 -- The Job type
@@ -1260,9 +1273,49 @@ cross_jobs = [
       make_wasm_jobs wasm_build_config {bignumBackend = Native}
   , modifyValidateJobs manual $
       make_wasm_jobs wasm_build_config {unregisterised = True}
+
+    -- Linux Aarch64 (Wine + FEX + MSYS64) => Windows Aarch64
+  , makeWinArmJobs
+      $ addValidateRule WinArm64
+        (validateBuilds AArch64 (Linux Debian12Wine) winAarch64Config)
+  , makeWinArmJobs
+      $ addValidateRule WinArm64LLVM
+        (validateBuilds AArch64 (Linux Debian12Wine) (winAarch64Config {llvmBootstrap = True}))
   ]
   where
     javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
+                         { bignumBackend = Native }
+
+    makeWinArmJobs = modifyJobs
+        ( -- Cross compiler validate does not need any docs
+          setVariable "HADRIAN_ARGS" "--docs=none"
+        . setVariable "AR" (llvm_prefix ++ "llvm-ar")
+        . setVariable "CC" (llvm_prefix ++ "clang")
+        . setVariable "CXX" (llvm_prefix ++ "clang++")
+        . setVariable "NM" (llvm_prefix ++ "nm")
+        . setVariable "OBJCOPY" (llvm_prefix ++ "objcopy")
+        . setVariable "OBJDUMP" (llvm_prefix ++ "objdump")
+        . setVariable "RANLIB" (llvm_prefix ++ "llvm-ranlib")
+        . setVariable "SIZE" (llvm_prefix ++ "size")
+        . setVariable "STRINGS" (llvm_prefix ++ "strings")
+        . setVariable "STRIP" (llvm_prefix ++ "strip")
+        . setVariable "WindresCmd" (llvm_prefix ++ "windres")
+        . setVariable "LLVMAS" (llvm_prefix ++ "clang")
+        . setVariable "LD" (llvm_prefix ++ "ld")
+          -- Windows target require to make linker merge feature check disabled.
+        . setVariable "MergeObjsCmd" ""
+          -- LLVM MinGW Linux Toolchain expects to recieve "aarch64-w64-mingw32"
+          -- as a triple but we use more common "aarch64-unknown-mingw32".
+          -- Due of this we need configure ld manually for clang beacause
+          -- it will use system's ld otherwise when --target will be specified to
+          -- unexpected triple.
+        . setVariable "CFLAGS" cflags
+        . setVariable "CONF_CC_OPTS_STAGE2" cflags
+        ) where
+            llvm_prefix = "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-"
+            cflags = "-fuse-ld=" ++ llvm_prefix ++ "ld --rtlib=compiler-rt"
+
+    winAarch64Config = (crossConfig "aarch64-unknown-mingw32" (Emulator "/opt/wine-arm64ec-msys2-deb12/bin/wine") Nothing)
                          { bignumBackend = Native }
 
     make_wasm_jobs cfg =
@@ -1323,6 +1376,7 @@ platform_mapping = Map.map go combined_result
                 , "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
                 , "x86_64-windows-validate"
                 , "aarch64-linux-deb12-validate"
+                , "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate"
                 , "nightly-x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
                 , "nightly-x86_64-linux-deb11-validate"
                 , "nightly-x86_64-linux-deb12-validate"
@@ -1330,6 +1384,7 @@ platform_mapping = Map.map go combined_result
                 , "x86_64-linux-deb12-validate+thread_sanitizer_cmm"
                 , "nightly-aarch64-linux-deb10-validate"
                 , "nightly-aarch64-linux-deb12-validate"
+                , "nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate"
                 , "nightly-x86_64-linux-alpine3_12-validate"
                 , "nightly-x86_64-linux-deb10-validate"
                 , "nightly-x86_64-linux-fedora33-release"

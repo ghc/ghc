@@ -863,8 +863,12 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
          */
         "br %1\n\t"
 
+#if defined(mingw32_HOST_OS)
+        ".globl " STG_RETURN "\n"
+#else
         ".globl " STG_RETURN "\n\t"
-#if !defined(ios_HOST_OS) && !defined(darwin_HOST_OS)
+#endif
+#if !defined(ios_HOST_OS) && !defined(darwin_HOST_OS) && !defined(mingw32_HOST_OS)
         ".type " STG_RETURN ", %%function\n"
 #endif
         STG_RETURN ":\n\t"

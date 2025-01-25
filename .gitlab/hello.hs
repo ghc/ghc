@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wall -Wno-missing-fields #-}
 
-import GHC.Unit.Types (stringToUnitId)
 import GHC hiding (parseModule)
 import GHC.Data.StringBuffer
 import GHC.Driver.Config.Parser

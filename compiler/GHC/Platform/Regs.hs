@@ -112,7 +112,18 @@ freeReg platform
    ArchX86_64  -> X86_64.freeReg
    ArchS390X   -> S390X.freeReg
    ArchARM {}  -> ARM.freeReg
-   ArchAArch64 -> AArch64.freeReg
+   ArchAArch64 ->
+    -- See Note [Aarch64 Register x18 at Darwin and Windows].
+    -- It already has `freeReg 18 = False` but that line does not work for cross-compile when
+    -- we use host not from the list (darwin_HOST_OS, ios_HOST_OS, mingw32_HOST_OS) i.e. Linux
+    if platformOS platform == OSMinGW32 || platformOS platform == OSDarwin
+        then
+            let
+                x18Check :: RegNo -> Bool
+                x18Check 18 = False
+                x18Check a = AArch64.freeReg a
+            in x18Check
+        else AArch64.freeReg
    ArchRISCV64 -> RISCV64.freeReg
    ArchWasm32  -> Wasm32.freeReg
    ArchLoongArch64 -> LoongArch64.freeReg

@@ -561,9 +561,17 @@ function install_bindist() {
     *)
       read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
 
+      if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
+          # We suppose that host target = build target.
+          # By the fact above it is clearly turning out which host value is
+          # for currently built compiler.
+          # The fix for #21970 will probably remove this if-branch.
+          local -r CROSS_HOST_GUESS=$($SHELL ./config.guess)
+          args+=( "--target=$CROSS_TARGET" "--host=$CROSS_HOST_GUESS" )
+
       # FIXME: The bindist configure script shouldn't need to be reminded of
       # the target platform. See #21970.
-      if [ -n "${CROSS_TARGET:-}" ]; then
+      elif [ -n "${CROSS_TARGET:-}" ]; then
           args+=( "--target=$CROSS_TARGET" "--host=$CROSS_TARGET" )
       fi
 
@@ -572,7 +580,7 @@ function install_bindist() {
           "${args[@]+"${args[@]}"}" || fail "bindist configure failed"
       make_install_destdir "$TOP"/destdir "$instdir"
       # And check the `--info` of the installed compiler, sometimes useful in CI log.
-      "$instdir"/bin/ghc --info
+      "$instdir/bin/${cross_prefix}ghc$exe" --info
       ;;
   esac
   popd
@@ -629,8 +637,23 @@ function test_hadrian() {
     install_bindist _build/bindist/ghc-*/ "$instdir"
     echo 'main = putStrLn "hello world"' > expected
     run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
-    ${CROSS_EMULATOR:-} ./hello > actual
-    run diff expected actual
+
+    if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
+      ${CROSS_EMULATOR:-} ./hello.exe > actual
+    else
+      ${CROSS_EMULATOR:-} ./hello > actual
+    fi
+
+    # We have to use `-w` to make the test more stable across supported
+    # platforms, i.e. Windows:
+    # $ cmp expected actual
+    # differ: byte 30, line 1
+    # $ diff expected actual
+    # 1c1
+    # < main = putStrLn "hello world"
+    # ---
+    # > main = putStrLn "hello world"
+    run diff -w expected actual
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian \
       test \
