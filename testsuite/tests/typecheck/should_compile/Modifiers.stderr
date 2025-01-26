@@ -107,76 +107,99 @@ Modifiers.hs:51:1: warning: [GHC-49969] [-Wunknown-modifiers]
 Modifiers.hs:54:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:58:32: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:59:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
+
+Modifiers.hs:62:2: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %1
+    • In the pattern: %1 pat
+      In a pattern binding:
+        (%1 pat)
+          = ()
+          where
+              x = \ (%() y) -> y
+
+Modifiers.hs:64:15: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %()
+    • In the pattern: %() y
+      In the expression: \ (%() y) -> y
+      In an equation for ‘x’: x = \ (%() y) -> y
+
+Modifiers.hs:66:32: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %m
     • In the type signature: l1 :: forall (m :: Bool) a b. a %m -> b
 
-Modifiers.hs:67:7: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:75:7: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %()
     • In the type signature: l4 :: a %() -> b
 
-Modifiers.hs:71:7: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:79:7: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %Just
     • In the type signature: l5 :: a %Just -> b
 
-Modifiers.hs:82:7: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:90:7: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %'()
     • In the type signature: t1 :: %'() Int
 
-Modifiers.hs:85:14: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:93:14: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %True
     • In the first argument of ‘Maybe’, namely ‘(%True Int)’
       In the type signature: t2 :: Maybe (%True Int)
 
-Modifiers.hs:88:14: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:96:14: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %(%True True)
     • In the first argument of ‘Maybe’, namely ‘(%(%True True) Int)’
       In the type signature: t3 :: Maybe (%(%True True) Int)
 
-Modifiers.hs:88:16: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:96:16: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %True
     • In the first argument of ‘Maybe’, namely ‘(%(%True True) Int)’
       In the type signature: t3 :: Maybe (%(%True True) Int)
 
-Modifiers.hs:95:21: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:100:6: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %True
+    • In the expression: %True ()
+      In an equation for ‘e1’: e1 = %True ()
+
+Modifiers.hs:106:21: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %()
     • In the type ‘Int %() -> Int’
       In the expression: idt (Int %() -> Int) (+ 1)
       In an equation for ‘visForallApp’:
           visForallApp = idt (Int %() -> Int) (+ 1)
 
-Modifiers.hs:107:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:118:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:110:17: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:121:17: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:115:14: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:126:14: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:121:15: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:132:15: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:124:3: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:135:3: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:132:29: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:143:29: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %a
     • In the type signature: fv7 :: forall (a :: Type). %a a
 
-Modifiers.hs:135:8: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:146:8: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %(a :: Type)
     • In the type signature: fv8 :: %(a :: Type) a
 
-Modifiers.hs:143:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:168:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %CT1
 
-Modifiers.hs:146:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:171:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %CT2Con
 
-Modifiers.hs:149:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:174:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %CT2Con'
 
-Modifiers.hs:153:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:178:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %CT3
 

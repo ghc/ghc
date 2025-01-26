@@ -1274,6 +1274,7 @@ collect_pat flag pat bndrs = case pat of
   SplicePat ext _       -> collectXSplicePat @p flag ext bndrs
   EmbTyPat _ tp         -> collect_ty_pat_bndrs flag tp bndrs
   InvisPat _ tp         -> collect_ty_pat_bndrs flag tp bndrs
+  ModifiedPat _ _ pat   -> collect_lpat flag pat bndrs
 
   -- See Note [Dictionary binders in ConPatOut]
   ConPat {pat_args=ps}  -> case flag of

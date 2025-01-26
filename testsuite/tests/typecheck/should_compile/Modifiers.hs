@@ -55,6 +55,14 @@ foreign export ccall someImport :: Int
 sigDecl :: ()
 sigDecl = undefined
 
+patBind :: ()
+%() patBind = ()
+
+pat :: ()
+(%1 pat) = () -- without parens, this is a linear binding, forbidden here
+  -- MODS_TODO the warning for this has `/` instead of `\`?
+  where x = \(%() y) -> y
+
 l1 :: forall (m :: Bool) a b . a %m -> b
 l1 = undefined
 
@@ -87,6 +95,9 @@ t2 = Nothing
 
 t3 :: Maybe (%(%True True) Int)
 t3 = Nothing
+
+e1 :: ()
+e1 = %True ()
 
 idt :: forall t -> t -> t
 idt _ x = x
@@ -137,6 +148,20 @@ fv8 = undefined
 
 -- fv9 :: %a a -- unknown kind
 -- fv9 = undefined
+
+-- %a
+-- fv10 :: forall a . a
+-- fv10 = undefined
+
+-- %a
+-- fv11 :: a
+-- fv11 = undefined
+
+-- fv11 :: forall a . a
+-- %a fv11 = undefined
+
+-- fv12 :: a
+-- %a fv12 = undefined
 
 -- And which concrete types?
 

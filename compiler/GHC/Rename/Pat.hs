@@ -687,6 +687,12 @@ rnPatAndThen _ (InvisPat (_, spec) tp)
        ; return (InvisPat spec tp')
        }
 
+rnPatAndThen mk (ModifiedPat _ mods pat)
+  = do { mods' <- liftCpsFV $ rnModifiersContext PatCtx mods
+       ; pat' <- rnLPatAndThen mk pat
+       ; return $ ModifiedPat noExtField mods' pat'
+       }
+
 --------------------
 rnConPatAndThen :: NameMaker
                 -> LocatedN RdrName    -- the constructor

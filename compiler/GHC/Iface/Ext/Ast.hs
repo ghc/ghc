@@ -1075,6 +1075,8 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
       InvisPat _ tp ->
         [ toHie $ TS (ResolvedScopes [scope, pscope]) tp
         ]
+      ModifiedPat _ mods pat ->
+        toHie (PS rsp scope pscope pat) : (toHie <$> mods)
       XPat e ->
         case hiePass @p of
           HieRn -> case e of

@@ -1061,6 +1061,10 @@ tcPatToExpr args pat = go pat
     go1 (InvisPat _ _tp) = panic "tcPatToExpr: invalid invisible pattern"
     go1 (XPat (HsPatExpanded _ pat))= go1 pat
 
+    -- Modifiers attached to a pattern may be meaningless when attached to an
+    -- expression, so just drop them.
+    go1 (ModifiedPat _ _ pat) = go1 (unLoc pat)
+
     -- See Note [Invertible view patterns]
     go1 p@(ViewPat mbInverse _ pat) = case mbInverse of
       Nothing      -> notInvertible p

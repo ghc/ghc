@@ -424,6 +424,7 @@ tidy1 v g (ParPat _ pat)      = tidy1 v g (unLoc pat)
 tidy1 v g (SigPat _ pat _)    = tidy1 v g (unLoc pat)
 tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
 tidy1 v g (BangPat _ (L l p)) = tidy_bang_pat v g l p
+tidy1 v g (ModifiedPat _ _ pat) = tidy1 v g (unLoc pat)
 
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }

@@ -598,6 +598,7 @@ type family XNPlusKPat   x
 type family XSigPat      x
 type family XEmbTyPat    x
 type family XInvisPat    x
+type family XModifiedPat x
 type family XCoPat       x
 type family XXPat        x
 type family XHsFieldBind x

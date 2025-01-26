@@ -1340,7 +1340,7 @@ checkAPat loc e0 = do
      p <- checkLPat e
      return (ParPat (lpar, rpar) p)
 
-   PatBuilderModifiers _mods pat -> unLoc <$> checkLPat pat -- MODS_TODO no mods in pats yet
+   PatBuilderModifiers mods pat -> ModifiedPat noExtField mods <$> checkLPat pat
 
    _           -> do
      details <- fromParseContext <$> askParseContext
@@ -1370,10 +1370,17 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 ---------------------------------------------------------------------------
 -- Check Equation Syntax
 
-pat_builder_modifiers :: LocatedA (PatBuilder p) -> [HsModifier p]
-pat_builder_modifiers = \case
-  L _ (PatBuilderModifiers m _) -> m
-  _ -> []
+-- We distinguish between modifiers attached to bindings (which are used for
+-- multiplicity annotations) and modifiers attached to patterns (which are
+-- currently unused). Both are parsed as PatBuilderModifiers; if that's the
+-- top-level constructor, it's attached to the binding.
+-- Binding: let %m p = ... (PatBuilderModifiers ...)
+-- Pattern: let (%m p) = ... (PatBuilderPar (PatBuilderModifiers ...))
+extract_pat_builder_modifiers
+  :: LocatedA (PatBuilder p) -> (LocatedA (PatBuilder p), [HsModifier p])
+extract_pat_builder_modifiers = \case
+  L _ (PatBuilderModifiers m p) -> (p, m)
+  x -> (x, [])
 
 checkValDef :: SrcSpan
             -> LocatedA (PatBuilder GhcPs)
@@ -1383,15 +1390,15 @@ checkValDef :: SrcSpan
 
 checkValDef loc lhs (Just (sigAnn, sig)) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
-  = do lhs' <- runPV $ mkHsTySigPV (combineLocsA lhs sig) lhs sig sigAnn
+  = do let (lhs', mods) = extract_pat_builder_modifiers lhs
+       lhs'' <- runPV $ mkHsTySigPV (combineLocsA lhs' sig) lhs' sig sigAnn
                         >>= checkLPat
-       let mods = pat_builder_modifiers lhs
-       checkPatBind loc lhs' grhss (HsMultAnn noExtField mods)
+       checkPatBind loc lhs'' grhss (HsMultAnn noExtField mods)
 
 checkValDef loc lhs Nothing grhss
         -- %p x = rhs  parses as a *pattern* binding
-  = do let mods = pat_builder_modifiers lhs
-       mb_fun <- isFunLhs lhs
+  = do let (lhs', mods) = extract_pat_builder_modifiers lhs
+       mb_fun <- isFunLhs lhs'
        case (mods, mb_fun) of
          ([], Just (fun, is_infix, pats, ops, cps)) -> do
               let ann_fun = mk_ann_funrhs ops cps
@@ -1399,8 +1406,8 @@ checkValDef loc lhs Nothing grhss
               checkFunBind loc ann_fun
                            fun is_infix (L l pats) grhss
          _ -> do
-              lhs' <- checkPattern lhs
-              checkPatBind loc lhs' grhss (HsMultAnn noExtField mods)
+              lhs'' <- checkPattern lhs'
+              checkPatBind loc lhs'' grhss (HsMultAnn noExtField mods)
 
 mk_ann_funrhs :: [EpToken "("] -> [EpToken ")"] -> AnnFunRhs
 mk_ann_funrhs ops cps = AnnFunRhs NoEpTok ops cps

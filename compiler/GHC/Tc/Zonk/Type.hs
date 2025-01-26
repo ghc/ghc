@@ -1600,6 +1600,10 @@ zonk_pat (InvisPat ty tp)
   = do { ty' <- noBinders $ zonkTcTypeToTypeX ty
        ; return (InvisPat ty' tp) }
 
+zonk_pat (ModifiedPat x mods p)
+  = do  { p' <- zonkPat p
+        ; return (ModifiedPat x mods p') }
+
 zonk_pat (XPat ext) = case ext of
   { ExpansionPat orig pat->
     do { pat' <- zonk_pat pat
@@ -1611,7 +1615,7 @@ zonk_pat (XPat ext) = case ext of
        ; return (XPat $ CoPat co_fn' (unLoc pat') ty')
        } }
 
-zonk_pat pat = pprPanic "zonk_pat" (ppr pat)
+zonk_pat pat@(SplicePat {}) = pprPanic "zonk_pat" (ppr pat)
 
 ---------------------------
 zonkConStuff :: HsConPatDetails GhcTc

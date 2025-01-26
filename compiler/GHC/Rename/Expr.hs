@@ -2398,6 +2398,7 @@ definitelyLazyPattern (L loc pat) =
     NPat{}          -> False -- Some NPats are lazy; False is conservative
     NPlusKPat{}     -> False
     SplicePat{}     -> False
+    ModifiedPat _ _ p -> definitelyLazyPattern p
 
     -- The behavior of this case is unimportant, as GHC will throw an error shortly
     -- after reaching this case for other reasons (see TcRnIllegalTypePattern).

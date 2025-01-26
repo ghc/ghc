@@ -200,6 +200,9 @@ type instance XInvisPat GhcPs = (EpToken "@", Specificity)
 type instance XInvisPat GhcRn = Specificity
 type instance XInvisPat GhcTc = Type
 
+type instance XModifiedPat GhcPs = NoExtField
+type instance XModifiedPat GhcRn = NoExtField
+type instance XModifiedPat GhcTc = NoExtField
 
 {- Note [Invisible binders in functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -489,6 +492,7 @@ pprPat (InvisPat x tp) = char '@' <> delimit (ppr tp)
       GhcRn -> x == InferredSpec
       GhcTc -> False
     needs_parens = hsTypeNeedsParens appPrec $ unLoc $ hstp_body tp
+pprPat (ModifiedPat _ mods pat) = pprHsModifiers mods <+> ppr pat
 
 pprPat (XPat ext) = case ghcPass @p of
   GhcRn -> case ext of
@@ -688,6 +692,7 @@ isIrrefutableHsPat is_strict irref_conLike pat = go (unLoc pat)
     go (LitPat {})         = False
     go (NPat {})           = False
     go (NPlusKPat {})      = False
+    go (ModifiedPat _ _ pat) = goL pat
 
     -- We conservatively assume that no TH splices are irrefutable
     -- since we cannot know until the splice is evaluated.
@@ -766,6 +771,7 @@ isBoringHsPat = goL
       SplicePat {}  -> False
       EmbTyPat {}   -> True
       InvisPat {}   -> True
+      ModifiedPat _ _ pat -> goL pat
       XPat ext ->
         case ghcPass @p of
          GhcRn -> case ext of
@@ -1100,6 +1106,7 @@ patNeedsParens p = go @p
     go (ListPat {})      = False
     go (LitPat _ l)      = hsLitNeedsParens p l
     go (NPat _ lol _ _)  = hsOverLitNeedsParens p (unLoc lol)
+    go (ModifiedPat {})  = p > sigPrec
 
 -- | @'conPatNeedsParens' p cp@ returns 'True' if the constructor patterns @cp@
 -- needs parentheses under precedence @p@.

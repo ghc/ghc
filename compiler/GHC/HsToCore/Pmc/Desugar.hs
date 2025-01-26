@@ -120,6 +120,7 @@ desugarPat x pat = case pat of
   SigPat _ p _ty -> desugarLPat x p
   EmbTyPat _ _ -> pure GdEnd
   InvisPat _ _ -> pure GdEnd
+  ModifiedPat _ _ p -> desugarLPat x p
 
   XPat ext -> case ext of
 

@@ -723,6 +723,14 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 
         ; return $ (ViewPat pat_ty (mkLHsWrap expr_wrap expr') pat', res) }
 
+  ModifiedPat _ mods pat -> do
+          -- We don't do anything with modifiers, but we do need to make sure
+          -- they type check.
+        { _ <- tcModifiers mods (const False)
+        ; (pat', res) <- tc_lpat pat_ty penv pat thing_inside
+        ; return (ModifiedPat noExtField [] pat', res)
+        }
+
 {- Note [View patterns and polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this exotic example:

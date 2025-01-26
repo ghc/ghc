@@ -243,6 +243,8 @@ data Pat p
   --
   -- exactprint: the location of @\@@ is captured by 'GHC.Parser.Annotation.EpToken' @"\@"@
 
+  | ModifiedPat (XModifiedPat p) [HsModifier p] (LPat p)
+
   -- See Note [Invisible binders in functions] in GHC.Hs.Pat
 
   | -- | TTG Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension

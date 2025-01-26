@@ -588,6 +588,7 @@ isOkNoBindPattern (L _ pat) =
           TuplePat _ lps _ -> any lpatternContainsSplice lps
           SumPat _ lp _ _ -> lpatternContainsSplice lp
           ConPat _ _ cpd  -> any lpatternContainsSplice (hsConPatArgs cpd)
+          ModifiedPat _ _ lp -> lpatternContainsSplice lp
           XPat (HsPatExpanded _orig new) -> patternContainsSplice new
 
           -- The behavior of this case is unimportant, as GHC will throw an error shortly

@@ -4796,6 +4796,11 @@ instance ExactPrint (Pat GhcPs) where
     tp' <- markAnnotated tp
     pure (InvisPat (tokat', spec) tp')
 
+  exact (ModifiedPat x mods pat) = do
+    mods' <- markAnnotated mods
+    pat' <- markAnnotated pat
+    return (ModifiedPat x mods' pat')
+
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (HsPatSigType GhcPs) where
