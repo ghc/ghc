@@ -45,7 +45,7 @@ parseIdent parserOpts ns str0 =
     PFailed{} -> Nothing
   where
     realSrcLc = mkRealSrcLoc (fsLit "<unknown file>") 0 0
-    pstate str = initParserState parserOpts (stringToStringBuffer str) realSrcLc
+    pstate str = initParserState () parserOpts (stringToStringBuffer str) realSrcLc
     (wrap, str1) = case str0 of
       '(' : s@(c : _)
         | c /= ','
