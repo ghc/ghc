@@ -61,12 +61,35 @@ main = do
   msg "Building boot libraries with stage1 compiler..."
   buildBootLibraries cabal ghc1 ghcPkg1 deriveConstants genapply genprimop defaultGhcBuildOptions "_build/stage1/"
 
+  -- now we copy the stage1 compiler into _build/stage1 and we generate settings
+  -- to use the newly installed packages. That's not what Hadrian does but it's
+  -- easier for us to nuke the stage1 directory to remove only stage1's built
+  -- libs without nuking the stage1 compiler which is slow to build.
+  createDirectoryIfMissing True "_build/stage1/bin"
+  cp "_build/stage0/bin/ghc" "_build/stage1/bin/ghc"
+  cp "_build/stage0/bin/ghc-pkg" "_build/stage1/bin/ghc-pkg"
+  createDirectoryIfMissing True "_build/stage1/lib"
+  cp "_build/stage0/lib/settings" "_build/stage1/lib/settings"
+
+  msg "Building stage2 GHC program"
+  createDirectoryIfMissing True "_build/stage2"
+  ghc1' <- Ghc <$> makeAbsolute "_build/stage1/bin/ghc"
+  buildGhcStage2 defaultGhcBuildOptions cabal ghc1' "_build/stage2/"
+
   msg "Done"
 
 
 -- | Build stage1 GHC program
 buildGhcStage1 :: GhcBuildOptions -> Cabal -> Ghc -> FilePath -> IO ()
-buildGhcStage1 opts cabal ghc0 dst = do
+buildGhcStage1 = buildGhcStage True
+
+-- | Build stage2 GHC program
+buildGhcStage2 :: GhcBuildOptions -> Cabal -> Ghc -> FilePath -> IO ()
+buildGhcStage2 = buildGhcStage False
+
+-- | Build GHC program
+buildGhcStage :: Bool -> GhcBuildOptions -> Cabal -> Ghc -> FilePath -> IO ()
+buildGhcStage booting opts cabal ghc0 dst = do
   let src = dst </> "src"
   prepareGhcSources opts src
 
@@ -94,10 +117,9 @@ buildGhcStage1 opts cabal ghc0 dst = do
   current_env <- getEnvironment
   let stage1_env = ("HADRIAN_SETTINGS", stage1_ghc_boot_settings) : current_env
 
-  msg "  - Building GHC stage1 and bootstrapping utility programs..."
+  let cabal_project_path = dst </> "cabal.project-ghc"
 
-  let cabal_project_path = dst </> "cabal.project-stage0"
-  makeCabalProject cabal_project_path
+  let stage1_project =
         [ "packages:"
         , "  " ++ src </> "ghc-bin/"
         , "  " ++ src </> "libraries/ghc/"
@@ -133,30 +155,90 @@ buildGhcStage1 opts cabal ghc0 dst = do
         , "  executable-dynamic: False"
         , "  executable-static: True"
         , ""
-        , "constraints:"
-             -- for some reason 2.23 doesn't build
-        , "  template-haskell <= 2.22"
-        , ""
         , "package ghc-boot-th"
         , "  flags: +bootstrap"
         , ""
           -- allow template-haskell with newer ghc-boot-th
         , "allow-newer: ghc-boot-th"
+        , ""
+        , "constraints:"
+          -- FIXME: template-haskell 2.23 is too recent when booting with 9.8.4
+        , "  template-haskell <= 2.22"
         ]
 
-  let build_cmd = (runCabal cabal
+  let stage2_project =
+        [ "packages:"
+        , "  " ++ src </> "ghc-bin/"
+        , "  " ++ src </> "libraries/deepseq/"
+        , "  " ++ src </> "libraries/hpc/"
+        , "  " ++ src </> "libraries/stm/"
+        , "  " ++ src </> "libraries/text/"
+        , "  " ++ src </> "libraries/ghc/"
+        , "  " ++ src </> "libraries/directory/"
+        , "  " ++ src </> "libraries/file-io/"
+        , "  " ++ src </> "libraries/filepath/"
+        , "  " ++ src </> "libraries/ghc-platform/"
+        , "  " ++ src </> "libraries/ghc-boot/"
+        , "  " ++ src </> "libraries/ghc-boot-th/"
+        , "  " ++ src </> "libraries/ghc-heap"
+        , "  " ++ src </> "libraries/ghci"
+        , "  " ++ src </> "libraries/os-string/"
+        , "  " ++ src </> "libraries/process/"
+        , "  " ++ src </> "libraries/semaphore-compat"
+        , "  " ++ src </> "libraries/time"
+        , "  " ++ src </> "libraries/unix/"
+        , "  " ++ src </> "libraries/Win32/"
+        , "  " ++ src </> "utils/ghc-pkg"
+        , "  " ++ src </> "utils/hsc2hs"
+        , "  " ++ src </> "utils/unlit"
+        , "  " ++ src </> "utils/genprimopcode/"
+        , "  " ++ src </> "utils/genapply/"
+        , "  " ++ src </> "utils/deriveConstants/"
+        , ""
+        , "benchmarks: False"
+        , "tests: False"
+        , "allow-boot-library-installs: True"
+          -- we need even after booting because cabal thinks `template-haskell` isn't reinstallable otherwise
+        , ""
+        , "package *"
+        , "  library-vanilla: True"
+        , "  shared: False"
+        , "  executable-profiling: False"
+        , "  executable-dynamic: False"
+        , "  executable-static: True"
+        , ""
+          -- allow template-haskell with newer ghc-boot-th
+        , "allow-newer: ghc-boot-th"
+        , ""
+        , "package text"
+             -- FIXME: avoid having to deal with system-cxx-std-lib fake package for now
+        , "  flags: -simdutf"
+        , ""
+        ]
+
+  makeCabalProject cabal_project_path (if booting then stage1_project else stage2_project)
+
+  -- the targets
+  let targets
+        | booting =
+           [ "ghc-bin:ghc"
+           , "ghc-pkg:ghc-pkg"
+           , "genprimopcode:genprimopcode"
+           , "deriveConstants:deriveConstants"
+           , "genapply:genapply"
+           ]
+        | otherwise = 
+           [ "ghc-bin:ghc"
+           , "ghc-pkg:ghc-pkg"
+           ]
+
+  let build_cmd = (runCabal cabal $
               [ "build"
               , "--project-file=" ++ cabal_project_path
               , "--builddir=" ++ builddir
               , "-j"
               , "--with-compiler=" ++ ghcPath ghc0
-              -- the targets
-              , "ghc-bin:ghc"
-              , "ghc-pkg:ghc-pkg"
-              , "genprimopcode:genprimopcode"
-              , "deriveConstants:deriveConstants"
-              , "genapply:genapply"
-              ])
+              ] ++ targets)
               { env = Just stage1_env
               }
 
@@ -169,7 +251,7 @@ buildGhcStage1 opts cabal ghc0 dst = do
       putStrLn $ "cabal-install failed with error code: " ++ show n
       putStrLn cabal_stdout
       putStrLn cabal_stderr
-      putStrLn $ "Logs can be found in \"" ++ dst ++ "/cabal.{stdout,stderr}\""
+      putStrLn $ "Logs can be found in \"" ++ (dst </> "cabal.{stdout,stderr}\"")
       exitFailure
 
   msg "  - Copying stage1 programs and generating settings to use them..."
@@ -394,6 +476,7 @@ makeStage1Settings in_settings = out_settings
         , keep_fail "Use LibFFI"
         , keep_fail "RTS expects libdw"
         , ("Relative Global Package DB", "../pkgs")
+            -- relative to $topdir (i.e. /lib)
         ]
 
 buildBootLibraries :: Cabal -> Ghc -> GhcPkg -> DeriveConstants -> GenApply -> GenPrimop -> GhcBuildOptions -> FilePath -> IO ()
@@ -663,8 +746,11 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   forM_ pkg_ids $ \pid -> do
     conf <- Text.readFile (global_db </> pid <.> "conf")
     -- replace full path with ${pkgroot}
+    -- NOTE: GHC assumes that pkgroot is just one directory above the directory
+    -- containing the package db. In our case where everything is at the same
+    -- level in "pkgs" we need to re-add "/pkgs"
     Text.writeFile (dst </> "pkgs" </> pid <.> "conf")
-                   (Text.replace (Text.pack pkg_root) "${pkgroot}" conf)
+                   (Text.replace (Text.pack pkg_root) "${pkgroot}/pkgs/" conf)
     cp (pkg_root </> pid) (dst </> "pkgs" </> pid)
   void $ readCreateProcess (runGhcPkg ghcpkg ["recache", "--package-db=" ++ (dst </> "pkgs")]) ""
 
