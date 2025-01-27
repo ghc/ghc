@@ -641,8 +641,13 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
       exitFailure
 
   -- The libraries have been installed globally.
-  (global_gb:pkg_ids) <- (map (drop 11) . drop 2 . lines) <$> readFile boot_libs_env
-  putStrLn $ "We've built boot libraries in " ++ global_gb ++ ":"
+  --
+  -- FIXME: Sometimes the package environment contains the path to the global db,
+  -- sometimes not... I don't know why yet.
+  -- (global_db:pkg_ids) <- (map (drop 11) . drop 2 . lines) <$> readFile boot_libs_env
+  let global_db = "~/.cabal/store/ghc-9.13-inplace/package.db"
+  pkg_ids <- (map (drop 11) . drop 2 . lines) <$> readFile boot_libs_env
+  putStrLn $ "We've built boot libraries in " ++ global_db ++ ":"
   mapM_ (putStrLn . ("  - " ++)) pkg_ids
 
   -- TODO: copy the libs in another db
