@@ -315,6 +315,9 @@ negOp (OpImm (ImmInt i)) = OpImm (ImmInt (negate i))
 negOp (OpImm (ImmInteger i)) = OpImm (ImmInteger (negate i))
 negOp op = pprPanic "RV64.negOp" (text $ show op)
 
+pprOps :: (IsLine doc) => Platform -> [Operand] -> doc
+pprOps platform = hsep . map (pprOp platform)
+
 -- | Pretty print an operand
 pprOp :: (IsLine doc) => Platform -> Operand -> doc
 pprOp plat op = case op of
@@ -753,16 +756,12 @@ pprInstr platform instr = case instr of
   VMV o1 _o2 -> pprPanic "RV64.pprInstr - VMV can only target registers." (pprOp platform o1)
   VID op@(OpReg fmt _reg) -> configVec fmt $$ op1 (text "\tvid.v") op
   VID op -> pprPanic "RV64.pprInstr - VID can only target registers." (pprOp platform op)
-  -- TODO: This expects int register as third operand: Generalize by calculating
-  -- the instruction suffix (".vx")
-  VMSEQ o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvmseq.vx") o1 o2 o3
-  VMSEQ o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VMSEQ can only target registers." (pprOp platform o1)
-  -- TODO: All operands need to be vector registers. Make this more general or
-  -- validate this constraint.
-  VMERGE o1@(OpReg fmt _reg) o2 o3 o4 -> configVec fmt $$ op4 (text "\tvmerge.vvm") o1 o2 o3 o4
-  VMERGE o1 _o2 _o3 _o4 -> pprPanic "RV64.pprInstr - VMERGE can only target registers." (pprOp platform o1)
-  VSLIDEDOWN o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvslidedown.vx") o1 o2 o3
-  VSLIDEDOWN o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VSLIDEDOWN can only target registers." (pprOp platform o1)
+  VMSEQ o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2] && isIntOp o3 -> configVec fmt $$ op3 (text "\tvmseq.vx") o1 o2 o3
+  VMSEQ o1 o2 o3 -> pprPanic "RV64.pprInstr - VMSEQ wrong operands." (pprOps platform [o1, o2, o3])
+  VMERGE o1@(OpReg fmt _reg) o2 o3 o4 | allVectorRegOps [o1, o2, o3, o4] -> configVec fmt $$ op4 (text "\tvmerge.vvm") o1 o2 o3 o4
+  VMERGE o1 o2 o3 o4 -> pprPanic "RV64.pprInstr - VMERGE wrong operands." (pprOps platform [o1, o2, o3, o4])
+  VSLIDEDOWN o1@(OpReg fmt _reg) o2 o3 |allVectorRegOps [o1, o2] && isIntOp o3-> configVec fmt $$ op3 (text "\tvslidedown.vx") o1 o2 o3
+  VSLIDEDOWN o1 o2 o3 -> pprPanic "RV64.pprInstr - VSLIDEDOWN wrong operands." (pprOps platform [o1, o2, o3])
   -- TODO: adjust VSETIVLI to contain only format?
   VSETIVLI (OpReg fmt dst) len width grouping ta ma ->
     line
@@ -778,29 +777,29 @@ pprInstr platform instr = case instr of
       <+> pprTA ta
       <> comma
       <+> pprMasking ma
-  VSETIVLI o1 _ _ _ _ _ -> pprPanic "RV64.pprInstr - VSETIVLI can only target registers." (pprOp platform o1)
-  VNEG o1@(OpReg fmt _reg) o2 -> configVec fmt $$ op2 (text "\tvfneg.v") o1 o2
-  VNEG o1 _o2 -> pprPanic "RV64.pprInstr - VNEG can only target registers." (pprOp platform o1)
-  VADD o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfadd.vv") o1 o2 o3
-  VADD o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VADD can only target registers." (pprOp platform o1)
-  VSUB o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfsub.vv") o1 o2 o3
-  VSUB o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VSUB can only target registers." (pprOp platform o1)
-  VMUL o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfmul.vv") o1 o2 o3
-  VMUL o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VMUL can only target registers." (pprOp platform o1)
-  VQUOT o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfdiv.vv") o1 o2 o3
-  VQUOT o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VQUOT can only target registers." (pprOp platform o1)
-  VSMIN o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvmin.vv") o1 o2 o3
-  VSMIN o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VSMIN can only target registers." (pprOp platform o1)
-  VSMAX o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvmax.vv") o1 o2 o3
-  VSMAX o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VSMAX can only target registers." (pprOp platform o1)
-  VUMIN o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvminu.vv") o1 o2 o3
-  VUMIN o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VUMIN can only target registers." (pprOp platform o1)
-  VUMAX o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvmaxu.vv") o1 o2 o3
-  VUMAX o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VUMAX can only target registers." (pprOp platform o1)
-  VFMIN o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfmin.vv") o1 o2 o3
-  VFMIN o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VFMIN can only target registers." (pprOp platform o1)
-  VFMAX o1@(OpReg fmt _reg) o2 o3 -> configVec fmt $$ op3 (text "\tvfmax.vv") o1 o2 o3
-  VFMAX o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VFMAX can only target registers." (pprOp platform o1)
+  VSETIVLI o1 _ _ _ _ _ -> pprPanic "RV64.pprInstr - VSETIVLI wrong operands." (pprOp platform o1)
+  VNEG o1@(OpReg fmt _reg) o2 | allVectorRegOps [o1, o2] -> configVec fmt $$ op2 (text "\tvfneg.v") o1 o2
+  VNEG o1 o2 -> pprPanic "RV64.pprInstr - VNEG wrong operands." (pprOps platform [o1, o2])
+  VADD o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvfadd.vv") o1 o2 o3
+  VADD o1 o2 o3 -> pprPanic "RV64.pprInstr - VADD wrong operands." (pprOps platform [o1, o2, o3])
+  VSUB o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvfsub.vv") o1 o2 o3
+  VSUB o1 o2 o3 -> pprPanic "RV64.pprInstr - VSUB wrong operands." (pprOps platform [o1, o2, o3])
+  VMUL o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvfmul.vv") o1 o2 o3
+  VMUL o1 o2 o3 -> pprPanic "RV64.pprInstr - VMUL wrong operands." (pprOps platform [o1, o2, o3])
+  VQUOT o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvfdiv.vv") o1 o2 o3
+  VQUOT o1 o2 o3 -> pprPanic "RV64.pprInstr - VQUOT wrong operands." (pprOps platform [o1, o2, o3])
+  VSMIN o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvmin.vv") o1 o2 o3
+  VSMIN o1 o2 o3 -> pprPanic "RV64.pprInstr - VSMIN wrong operands." (pprOps platform [o1, o2, o3])
+  VSMAX o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvmax.vv") o1 o2 o3
+  VSMAX o1 o2 o3 -> pprPanic "RV64.pprInstr - VSMAX wrong operands." (pprOps platform [o1, o2, o3])
+  VUMIN o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvminu.vv") o1 o2 o3
+  VUMIN o1 o2 o3 -> pprPanic "RV64.pprInstr - VUMIN wrong operands." (pprOps platform [o1, o2, o3])
+  VUMAX o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvmaxu.vv") o1 o2 o3
+  VUMAX o1 o2 o3 -> pprPanic "RV64.pprInstr - VUMAX wrong operands." (pprOps platform [o1, o2, o3])
+  VFMIN o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvfmin.vv") o1 o2 o3
+  VFMIN o1 o2 o3 -> pprPanic "RV64.pprInstr - VFMIN wrong operands." (pprOps platform [o1, o2, o3])
+  VFMAX o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvfmax.vv") o1 o2 o3
+  VFMAX o1 o2 o3 -> pprPanic "RV64.pprInstr - VFMAX wrong operands." (pprOps platform [o1, o2, o3])
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
   where
     op1 op o1 = line $ op <+> pprOp platform o1
