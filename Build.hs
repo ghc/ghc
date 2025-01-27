@@ -167,6 +167,8 @@ buildGhcStage1 opts cabal ghc0 dst = do
     ExitSuccess -> pure ()
     ExitFailure n -> do
       putStrLn $ "cabal-install failed with error code: " ++ show n
+      putStrLn cabal_stdout
+      putStrLn cabal_stderr
       putStrLn $ "Logs can be found in \"" ++ dst ++ "/cabal.{stdout,stderr}\""
       exitFailure
 
@@ -496,17 +498,17 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   run_genapply [derived_constants, "-V32"] (src_rts </> "AutoApply_V32.cmm")
   run_genapply [derived_constants, "-V64"] (src_rts </> "AutoApply_V64.cmm")
 
-  -- Generate primop code for ghc-prim
+  -- Generate primop code for ghc-internal
   --
-  -- Note that this can't be done in a Setup.hs for ghc-prim because
+  -- Note that this can't be done in a Setup.hs for ghc-internal because
   -- cabal-install can't build Setup.hs because it depends on base, Cabal, etc.
   -- libraries that aren't built yet.
   let primops_txt    = src </> "libraries/ghc/GHC/Builtin/primops.txt"
   let primops_txt_pp = primops_txt <.> ".pp"
   primops <- readCreateProcess (shell $ "gcc -E -undef -traditional -P -x c " ++ primops_txt_pp) ""
   writeFile primops_txt primops
-  writeFile (src </> "libraries/ghc-prim/GHC/Prim.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-source"]) primops
-  writeFile (src </> "libraries/ghc-prim/GHC/PrimopWrappers.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops
+  writeFile (src </> "libraries/ghc-internal/src/GHC/Internal/Prim.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-source"]) primops
+  writeFile (src </> "libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops
 
   -- build libffi
   msg "  - Building libffi..."
