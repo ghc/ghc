@@ -513,6 +513,12 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , def_string "GhcUnregisterised" "FIXME"
         , def_string "TablesNextToCode"  "FIXME"
         , "  flags: +use-system-libffi" -- FIXME: deal with libffi (add package?)
+        , "  flags: +tables-next-to-code"
+          -- FIXME: we should make this optional here and in the compiler
+          -- settings. Ideally, GHC should even look into the rts's
+          -- ghcautoconf.h to check whether TABLES_NEXT_TO_CODE is defined or
+          -- not. It would be cleaner than duplicating this information into the
+          -- settings (similar to what we do with platform constants).
         ]
 
   makeCabalProject cabal_project_rts_path $
