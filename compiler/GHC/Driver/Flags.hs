@@ -127,6 +127,7 @@ extensionDeprecation = \case
 extensionName :: LangExt.Extension -> String
 extensionName = \case
   LangExt.Cpp -> "CPP"
+  LangExt.GhcCpp -> "GhcCPP"
   LangExt.OverlappingInstances -> "OverlappingInstances"
   LangExt.UndecidableInstances -> "UndecidableInstances"
   LangExt.IncoherentInstances -> "IncoherentInstances"

@@ -480,7 +480,6 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
     { token (ITcloseQuote UnicodeSyntax) }
 }
 
-
 <0> {
   "(|"
     / { ifExtension ArrowsBit `alexAndPred`
@@ -1860,7 +1859,7 @@ qvarsym buf len = ITqvarsym $! splitQualName buf len False
 qconsym buf len = ITqconsym $! splitQualName buf len False
 
 
-errSuffixAt :: PsSpan -> P a
+errSuffixAt :: PsSpan -> P p a
 errSuffixAt span = do
     input <- getInput
     failLocMsgP start (go input start) (\srcSpan -> mkPlainErrorMsgEnvelope srcSpan $ PsErrSuffixAT)
@@ -1980,7 +1979,7 @@ tok_integral
   -> Int                              -- ^ Offset of the unsigned value (e.g. 1 when we parsed "-", 2 for "0x", etc.)
   -> Int                              -- ^ Number of non-numeric characters parsed (e.g. 6 in "-12#Int8")
   -> (Integer, (Char -> Int))         -- ^ (radix, char_to_int parsing function)
-  -> Action
+  -> Action p
 tok_integral mk_token transval offset translen (radix,char_to_int) span buf len _buf2 = do
   numericUnderscores <- getBit NumericUnderscoresBit  -- #14473
   let src = lexemeToFastString buf len
@@ -2001,7 +2000,7 @@ tok_prim_num_ext
   :: (Integer -> Integer)             -- ^ value transformation (e.g. negate)
   -> Int                              -- ^ Offset of the unsigned value (e.g. 1 when we parsed "-", 2 for "0x", etc.)
   -> (Integer, (Char -> Int))         -- ^ (radix, char_to_int parsing function)
-  -> Action
+  -> Action p
 tok_prim_num_ext transval offset (radix,char_to_int) span buf len buf2 = do
   let !suffix_offset = findHashOffset buf + 1
   let !suffix_len    = len - suffix_offset
@@ -2253,7 +2252,7 @@ lex_string_prag_comment mkTok span _buf _len _buf2
 -- -----------------------------------------------------------------------------
 -- Strings & Chars
 
-tok_string :: Action
+tok_string :: Action p
 tok_string span buf len _buf2 = do
   s <- lex_chars ("\"", "\"") span buf (if endsInHash then len - 1 else len)
 
@@ -2288,7 +2287,7 @@ Implemented in string_multi_content in GHC/Parser/Lexer/String.x
 -}
 
 -- | See Note [Lexing multiline strings]
-tok_string_multi :: Action
+tok_string_multi :: Action p
 tok_string_multi startSpan startBuf _len _buf2 = do
   -- advance to the end of the multiline string
   let startLoc = psSpanStart startSpan
@@ -2344,7 +2343,7 @@ tok_string_multi startSpan startBuf _len _buf2 = do
         Just (c, loc) -> throwSmartQuoteError c loc
         Nothing -> pure ()
 
-lex_chars :: (String, String) -> PsSpan -> StringBuffer -> Int -> P String
+lex_chars :: (String, String) -> PsSpan -> StringBuffer -> Int -> P p String
 lex_chars (startDelim, endDelim) span buf len =
   either (throwStringLexError i0) pure $
     lexString contentLen contentBuf
@@ -2354,11 +2353,11 @@ lex_chars (startDelim, endDelim) span buf len =
     -- assumes delimiters are ASCII, with 1 byte per Char
     contentLen = len - length startDelim - length endDelim
 
-throwStringLexError :: AlexInput -> StringLexError -> P a
+throwStringLexError :: AlexInput -> StringLexError -> P p a
 throwStringLexError i (StringLexError e pos) = setInput (advanceInputTo pos i) >> lexError e
 
 
-tok_quoted_label :: Action
+tok_quoted_label :: Action p
 tok_quoted_label span buf len _buf2 = do
   s <- lex_chars ("#\"", "\"") span buf len
   pure $ L span (ITlabelvarid src (mkFastString s))
@@ -2367,7 +2366,7 @@ tok_quoted_label span buf len _buf2 = do
     src = SourceText . mkFastString . drop 1 $ lexemeToString buf len
 
 
-tok_char :: Action
+tok_char :: Action p
 tok_char span buf len _buf2 = do
   c <- lex_chars ("'", "'") span buf (if endsInHash then len - 1 else len) >>= \case
     [c] -> pure c
@@ -2447,7 +2446,7 @@ quasiquote_error start = do
 isSmartQuote :: AlexAccPred ExtsBitmap
 isSmartQuote _ _ _ (AI _ buf) = let c = prevChar buf ' ' in isSingleSmartQuote c || isDoubleSmartQuote c
 
-throwSmartQuoteError :: Char -> PsLoc -> P a
+throwSmartQuoteError :: Char -> PsLoc -> P p a
 throwSmartQuoteError c loc = addFatalError err
   where
     err =
@@ -2459,7 +2458,7 @@ throwSmartQuoteError c loc = addFatalError err
         else ('"', "Quotation Mark")
 
 -- | Throw a smart quote error, where the smart quote was the last character lexed
-smart_quote_error :: Action
+smart_quote_error :: Action p
 smart_quote_error span _ _ buf2 = do
   let c = prevChar buf2 (panic "smart_quote_error unexpectedly called on beginning of input")
   throwSmartQuoteError c (psSpanStart span)
@@ -2756,13 +2755,13 @@ advanceInputTo pos = go
       | Just (_, i') <- alexGetChar' i = go i'
       | otherwise = i -- reached the end, just return the last input
 
-getInput :: P AlexInput
+getInput :: P p AlexInput
 getInput = P $ \s@PState{ loc=l, buffer=b } -> POk s (AI l b)
 
 setInput :: AlexInput -> P p ()
 setInput (AI l b) = P $ \s -> POk s{ loc=l, buffer=b } ()
 
-nextIsEOF :: P Bool
+nextIsEOF :: P p Bool
 nextIsEOF = isEOF <$> getInput
 
 isEOF :: AlexInput -> Bool
@@ -3529,8 +3528,7 @@ topNoLayoutContainsCommas (ALRNoLayout b _ : _) = b
 #endif
 #endif
 
-lexToken :: P (PsLocated Token)
--- lexToken :: P p (PsLocated Token)
+lexToken :: P p (PsLocated Token)
 lexToken = do
   inp@(AI loc1 buf) <- getInput
   sc <- getLexState
