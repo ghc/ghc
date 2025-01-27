@@ -514,14 +514,15 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
           4 (ppr rhs)
 
     ppr (DataDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
-                  , tcdDataDefn = defn })
-      = pp_data_defn (pp_vanilla_decl_head ltycon tyvars fixity) defn
+                  , tcdDataDefn = defn, tcdModifiers = mods })
+      = pprHsModifiers mods
+        $$ pp_data_defn (pp_vanilla_decl_head ltycon tyvars fixity) defn
 
     ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
                     tcdSigs = sigs, tcdMeths = methods,
-                    tcdATs = ats, tcdATDefs = at_defs})
+                    tcdATs = ats, tcdATDefs = at_defs, tcdModifiers = mods})
       | null sigs && null methods && null ats && null at_defs -- No "where" part
       = top_matter
 
@@ -531,7 +532,8 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
                                      map (pprTyFamDefltDecl . unLoc) at_defs ++
                                      pprLHsBindsForUser methods sigs) ]
       where
-        top_matter = text "class"
+        top_matter = pprHsModifiers mods
+                    $$  text "class"
                     <+> pp_vanilla_decl_head lclas tyvars fixity context
                     <+> pprFundeps (map unLoc fds)
 
@@ -873,9 +875,11 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                        , con_ex_tvs = ex_tvs
                        , con_mb_cxt = mcxt
                        , con_args = args
+                       , con_modifiers = mods
                        , con_doc = doc })
   = pprMaybeWithDoc doc $
-    sep [ pprHsForAll (mkHsForAllInvisTele noAnn ex_tvs) mcxt
+    sep [ pprHsModifiers mods
+        , pprHsForAll (mkHsForAllInvisTele noAnn ex_tvs) mcxt
         , ppr_details args ]
   where
     -- In ppr_details: let's not print the multiplicities (they are always 1, by
@@ -890,8 +894,8 @@ pprConDecl (ConDeclH98 { con_name = L _ con
 
 pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
                         , con_mb_cxt = mcxt, con_g_args = args
-                        , con_res_ty = res_ty, con_doc = doc })
-  = pprMaybeWithDoc doc $ ppr_con_names (toList cons) <+> dcolon
+                        , con_res_ty = res_ty, con_modifiers = mods, con_doc = doc })
+  = pprMaybeWithDoc doc $ pprHsModifiers mods <+> ppr_con_names (toList cons) <+> dcolon
     <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext mcxt,
               sep (ppr_args args ++ [ppr res_ty]) ])
   where
@@ -1038,7 +1042,7 @@ instance OutputableBndrId p
     ppr (cid@ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = binds
                          , cid_sigs = sigs, cid_tyfam_insts = ats
                          , cid_overlap_mode = mbOverlap
-                         , cid_datafam_insts = adts })
+                         , cid_datafam_insts = adts, cid_modifiers = mods })
       | null sigs, null ats, null adts, null binds  -- No "where" part
       = top_matter
 
@@ -1049,7 +1053,8 @@ instance OutputableBndrId p
                map (pprDataFamInstDecl NotTopLevel . unLoc) adts ++
                pprLHsBindsForUser binds sigs ]
       where
-        top_matter = text "instance" <+> maybe empty ppr (cidDeprecation cid)
+        top_matter = pprHsModifiers mods
+                  $$ text "instance" <+> maybe empty ppr (cidDeprecation cid)
                                      <+> ppOverlapPragma mbOverlap
                                      <+> ppr inst_ty
 
@@ -1229,7 +1234,8 @@ type instance XXDefaultDecl    (GhcPass _) = DataConCantHappen
 instance OutputableBndrId p
        => Outputable (DefaultDecl (GhcPass p)) where
     ppr (DefaultDecl _ cl tys mods)
-      = pprHsModifiers mods <+> text "default" <+> maybe id ((<+>) . ppr) cl (parens (interpp'SP tys))
+      = pprHsModifiers mods
+      $$ text "default" <+> maybe id ((<+>) . ppr) cl (parens (interpp'SP tys))
 
 {-
 ************************************************************************
@@ -1260,10 +1266,12 @@ type instance XXForeignExport  (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (ForeignDecl (GhcPass p)) where
-  ppr (ForeignImport { fd_name = n, fd_sig_ty = ty, fd_fi = fimport })
-    = hang (text "foreign import" <+> ppr fimport <+> ppr n)
+  ppr (ForeignImport { fd_name = n, fd_sig_ty = ty, fd_fi = fimport, fd_modifiers = mods })
+    = pprHsModifiers mods $$
+      hang (text "foreign import" <+> ppr fimport <+> ppr n)
          2 (dcolon <+> ppr ty)
-  ppr (ForeignExport { fd_name = n, fd_sig_ty = ty, fd_fe = fexport }) =
+  ppr (ForeignExport { fd_name = n, fd_sig_ty = ty, fd_fe = fexport, fd_modifiers = mods }) =
+    pprHsModifiers mods $$
     hang (text "foreign export" <+> ppr fexport <+> ppr n)
        2 (dcolon <+> ppr ty)
 

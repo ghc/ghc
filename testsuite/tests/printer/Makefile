@@ -886,3 +886,8 @@ Test24159:
 Test25132:
 	$(CHECK_PPR)   $(LIBDIR) Test25132.hs
 	$(CHECK_EXACT) $(LIBDIR) Test25132.hs
+
+.PHONY: PprModifiers
+PprModifiers:
+	$(CHECK_PPR)   $(LIBDIR) PprModifiers.hs
+	$(CHECK_EXACT) $(LIBDIR) PprModifiers.hs

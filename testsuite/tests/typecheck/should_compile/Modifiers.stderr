@@ -97,11 +97,13 @@ Modifiers.hs:46:1: warning: [GHC-49969] [-Wunknown-modifiers]
 Modifiers.hs:49:1: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %True
     • When checking declaration:
+        %True
         foreign import ccall safe "test" someImport :: Int
 
 Modifiers.hs:51:1: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %True
     • When checking declaration:
+        %True
         foreign export ccall "someImport" someImport :: Int
 
 Modifiers.hs:54:1: warning: [GHC-49969] [-Wunknown-modifiers]

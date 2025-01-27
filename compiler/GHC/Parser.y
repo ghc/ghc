@@ -2599,7 +2599,7 @@ constr :: { LConDecl GhcPs }
                 {% amsA' (let (con,details) = unLoc $5 in
                   (L (comb4 $2 $3 $4 $5) (mkConDeclH98
                                                        (epUniTok $4,(fst $ unLoc $2))
-                                                       (unLoc $1)
+                                                       (reverse $ unLoc $1)
                                                        con
                                                        (snd $ unLoc $2)
                                                        (Just $3)
@@ -2607,7 +2607,7 @@ constr :: { LConDecl GhcPs }
         | modifiersShift forall constr_stuff
                 {% amsA' (let (con,details) = unLoc $3 in
                   (L (comb2 $2 $3) (mkConDeclH98 (noAnn, fst $ unLoc $2)
-                                                      (unLoc $1)
+                                                      (reverse $ unLoc $1)
                                                       con
                                                       (snd $ unLoc $2)
                                                       Nothing   -- No context
@@ -3035,7 +3035,7 @@ fexp    :: { ECP }
         | aexp                       { $1 }
         | modifiers1 aexp            { ECP $
                                          unECP $2 >>= \ $2 ->
-                                         mkHsModifiedPV (comb2 $1 $2) (unLoc $1) $2 }
+                                         mkHsModifiedPV (comb2 $1 $2) (reverse $ unLoc $1) $2 }
 
 aexp    :: { ECP }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
