@@ -600,13 +600,17 @@ getRegister' config plat expr =
           let op = litToImm' lit
               format = floatFormat w
           pure $ Any format (\dst -> unitOL $ annExpr expr (MOV (OpReg format dst) op))
-        CmmFloat _f W8 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (pdoc plat expr)
-        CmmFloat _f W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (pdoc plat expr)
-        CmmFloat f W32 -> do
-          -- TODO: Besides width, much duplication with the W64 case!
-          let word = castFloatToWord32 (fromRational f) :: Word32
-              format_int = intFormat W32
-              format_dst = floatFormat W32
+        CmmFloat f w -> do
+          let
+              toWord :: Rational -> Integer
+              toWord r = case w of
+                        W8 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (pdoc plat expr)  
+                        W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (pdoc plat expr)
+                        W32 -> fromIntegral $ castFloatToWord32 (fromRational r)
+                        W64 -> fromIntegral $ castDoubleToWord64 (fromRational r)
+                        w -> pprPanic ("getRegister' (CmmLit:CmmFloat), no support for width " ++ show w) (pdoc plat expr)
+              format_int = intFormat w
+              format_dst = floatFormat w
           intReg <- getNewRegNat format_int
           return
             ( Any
@@ -614,28 +618,11 @@ getRegister' config plat expr =
                 ( \dst ->
                     toOL
                       [ annExpr expr
-                          $ MOV (OpReg format_int intReg) (OpImm (ImmInteger (fromIntegral word))),
+                          $ MOV (OpReg format_int intReg) (OpImm (ImmInteger (toWord f))),
                         MOV (OpReg format_dst dst) (OpReg format_int intReg)
                       ]
                 )
             )
-        CmmFloat f W64 -> do
-          let word = castDoubleToWord64 (fromRational f) :: Word64
-              format_int = intFormat W64
-              format_dst = floatFormat W64
-          intReg <- getNewRegNat format_int
-          return
-            ( Any
-                format_dst
-                ( \dst ->
-                    toOL
-                      [ annExpr expr
-                          $ MOV (OpReg format_int intReg) (OpImm (ImmInteger (fromIntegral word))),
-                        MOV (OpReg format_dst dst) (OpReg format_int intReg)
-                      ]
-                )
-            )
-        CmmFloat _f _w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (pdoc plat expr)
         CmmVec lits
           | VecFormat l sFmt <- cmmTypeFormat $ cmmLitType plat lit,
             (f : fs) <- lits,
