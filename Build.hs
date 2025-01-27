@@ -641,12 +641,18 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
       exitFailure
 
   -- The libraries have been installed globally.
-  --
+  boot_libs_env_lines <- lines <$> readFile boot_libs_env
   -- FIXME: Sometimes the package environment contains the path to the global db,
   -- sometimes not... I don't know why yet.
-  -- (global_db:pkg_ids) <- (map (drop 11) . drop 2 . lines) <$> readFile boot_libs_env
-  let global_db = "~/.cabal/store/ghc-9.13-inplace/package.db"
-  pkg_ids <- (map (drop 11) . drop 2 . lines) <$> readFile boot_libs_env
+  (global_db,pkg_ids) <- case drop 2 boot_libs_env_lines of
+    [] -> error "Unexpected empty package environment"
+    (x:xs)
+      | not ("package-db" `List.isPrefixOf` x)
+      -> do
+        putStrLn "For some reason cabal-install didn't generate a valid package environment (package-db is missing)."
+        putStrLn "It happens sometimes for unknown reasons... Rerun 'make' to workaround this..."
+        exitFailure
+      | otherwise -> pure (drop 11 x, map (drop 11) xs)
   putStrLn $ "We've built boot libraries in " ++ global_db ++ ":"
   mapM_ (putStrLn . ("  - " ++)) pkg_ids
 
