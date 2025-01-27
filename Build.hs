@@ -751,7 +751,8 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
     -- level in "pkgs" we need to re-add "/pkgs"
     Text.writeFile (dst </> "pkgs" </> pid <.> "conf")
                    (Text.replace (Text.pack pkg_root) "${pkgroot}/pkgs/" conf)
-    cp (pkg_root </> pid) (dst </> "pkgs" </> pid)
+    cp (pkg_root </> pid) (dst </> "pkgs")
+
   void $ readCreateProcess (runGhcPkg ghcpkg ["recache", "--package-db=" ++ (dst </> "pkgs")]) ""
 
 
