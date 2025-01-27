@@ -1234,10 +1234,14 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
   -- No need for anns, returning original
   check (_opi,_cpi,_csi) _t = unprocessed
 
+  unprocessed :: P p (LHsContext GhcPs)
   unprocessed =
     return (L (EpAnn l (AnnContext Nothing [] []) emptyComments) [orig_t])
 
 
+  mkCTuple :: ([EpToken "("], [EpToken ")"], EpAnnComments)
+           -> e
+           -> P p (LocatedC e)
   mkCTuple (oparens, cparens, cs) ts =
     -- Append parens so that the original order in the source is maintained
     return (L (EpAnn l (AnnContext Nothing oparens cparens) cs) ts)
@@ -1282,8 +1286,8 @@ checkImportDecl :: Maybe (EpToken "qualified")
                 -> Maybe (EpToken "qualified")
                 -> Maybe EpAnnLevel
                 -> Maybe EpAnnLevel
-                -> P ((Maybe (EpToken "qualified"), ImportDeclQualifiedStyle)
-                     , (Maybe EpAnnLevel, ImportDeclLevelStyle))
+                -> P p ((Maybe (EpToken "qualified"), ImportDeclQualifiedStyle)
+                       , (Maybe EpAnnLevel, ImportDeclLevelStyle))
 checkImportDecl mPre mPost preLevel postLevel = do
   let whenJust mg f = maybe (pure ()) f mg
       tokenSpan tok = RealSrcSpan (epaLocationRealSrcSpan $ getEpTokenLoc tok) Strict.Nothing
@@ -3666,12 +3670,12 @@ mkRdrProjUpdate loc (L l flds) arg isPun anns =
 -----------------------------------------------------------------------------
 -- Tuple and list punning
 
-punsAllowed :: P Bool
+punsAllowed :: P p Bool
 punsAllowed = getBit ListTuplePunsBit
 
 -- | Check whether @ListTuplePuns@ is enabled and return the first arg if it is,
 -- the second arg otherwise.
-punsIfElse :: a -> a -> P a
+punsIfElse :: a -> a -> P p a
 punsIfElse enabled disabled = do
   allowed <- punsAllowed
   pure (if allowed then enabled else disabled)
@@ -3680,7 +3684,7 @@ punsIfElse enabled disabled = do
 -- @end@ if the extension @ListTuplePuns@ is disabled.
 --
 -- This is used in Parser.y to guard rules that require punning.
-requireLTPuns :: PsErrPunDetails -> Located a -> Located b -> P ()
+requireLTPuns :: PsErrPunDetails -> Located a -> Located b -> P p ()
 requireLTPuns err start end =
   unlessM punsAllowed $ do
     addError (mkPlainErrorMsgEnvelope loc (PsErrInvalidPun err))
@@ -3693,8 +3697,8 @@ withCombinedComments ::
   HasLoc l2 =>
   l1 ->
   l2 ->
-  (SrcSpan -> P a) ->
-  P (LocatedA a)
+  (SrcSpan -> P p a) ->
+  P p (LocatedA a)
 withCombinedComments start end use = do
   cs <- getCommentsFor fullSpan
   a <- use fullSpan
@@ -3709,7 +3713,7 @@ withCombinedComments start end use = do
 mkTupleSyntaxTy :: EpToken "("
                 -> [LocatedA (HsType GhcPs)]
                 -> EpToken ")"
-                -> P (HsType GhcPs)
+                -> P p (HsType GhcPs)
 mkTupleSyntaxTy parOpen args parClose =
   punsIfElse enabled disabled
   where
@@ -3725,7 +3729,7 @@ mkTupleSyntaxTy parOpen args parClose =
 -- type or data constructor, based on the extension @ListTuplePuns@.
 -- The case with an explicit promotion quote, @'(,)@, is handled
 -- by the rule @SIMPLEQUOTE sysdcon_nolist@ in @atype@.
-mkTupleSyntaxTycon :: Boxity -> Int -> P RdrName
+mkTupleSyntaxTycon :: Boxity -> Int -> P p RdrName
 mkTupleSyntaxTycon boxity n =
   punsIfElse
     (getRdrName (tupleTyCon boxity n))
@@ -3738,7 +3742,7 @@ mkTupleSyntaxTycon boxity n =
 mkListSyntaxTy0 :: EpToken "["
                 -> EpToken "]"
                 -> SrcSpan
-                -> P (HsType GhcPs)
+                -> P p (HsType GhcPs)
 mkListSyntaxTy0 brkOpen brkClose span =
   punsIfElse enabled disabled
   where
@@ -3761,7 +3765,7 @@ mkListSyntaxTy0 brkOpen brkClose span =
 mkListSyntaxTy1 :: EpToken "["
                 -> LocatedA (HsType GhcPs)
                 -> EpToken "]"
-                -> P (HsType GhcPs)
+                -> P p (HsType GhcPs)
 mkListSyntaxTy1 brkOpen t brkClose =
   punsIfElse enabled disabled
   where
