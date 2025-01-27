@@ -53,10 +53,10 @@ parseString libdir includes str = ghcWrapper libdir $ do
     dflags0 <- initDynFlags
     let dflags = dflags0{extensionFlags = EnumSet.insert LangExt.GhcCpp (extensionFlags dflags0)}
     let pflags = initParserOpts dflags
-    -- return $ strParser str dflags "fake_test_file.hs"
     liftIO $ putStrLn "-- parsing ----------"
     liftIO $ putStrLn str
     liftIO $ putStrLn "---------------------"
+    -- return $ strParserWrapper str dflags "fake_test_file.hs"
     return $ strGetToks includes pflags "fake_test_file.hs" str
 
 strGetToks :: Includes -> Lexer.ParserOpts -> FilePath -> String -> [Located Token]
@@ -86,6 +86,20 @@ showErrorMessages msgs =
         $ pprMsgEnvelopeBagWithLocDefault
         $ getMessages
         $ msgs
+
+
+strParserWrapper ::
+    -- | Haskell module source text (full Unicode is supported)
+    String ->
+    -- | the flags
+    DynFlags ->
+    -- | the filename (for source locations)
+    FilePath ->
+    [Located Token]
+strParserWrapper str dflags filename =
+  case strParser str dflags filename of
+    (_, Left err) -> error "oops"
+    (_, Right toks) -> toks
 
 {- | Parse a file, using the emulated haskell parser, returning the
 resulting tokens only

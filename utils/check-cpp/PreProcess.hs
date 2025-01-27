@@ -1,7 +1,7 @@
 module PreProcess where
 
 import Data.Char
-import Data.Map (Map)
+-- import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC
 import GHC.Data.FastString
@@ -129,7 +129,7 @@ processCpp fs = do
         Right (CppDefine name def) -> do
             ppDefine name def
         Right (CppIf cond) -> do
-            ppIf cond
+            _ <- ppIf cond
             return ()
         Right (CppIfdef name) -> do
             defined <- ppIsDefined name
