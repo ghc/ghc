@@ -656,7 +656,18 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   putStrLn $ "We've built boot libraries in " ++ global_db ++ ":"
   mapM_ (putStrLn . ("  - " ++)) pkg_ids
 
-  -- TODO: copy the libs in another db
+  -- copy the libs in another db
+  createDirectoryIfMissing True (dst </> "pkgs")
+  initEmptyDB ghcpkg (dst </> "pkgs")
+  let pkg_root = takeDirectory global_db
+  forM_ pkg_ids $ \pid -> do
+    conf <- Text.readFile (global_db </> pid <.> "conf")
+    -- replace full path with ${pkgroot}
+    Text.writeFile (dst </> "pkgs" </> pid <.> "conf")
+                   (Text.replace (Text.pack pkg_root) "${pkgroot}" conf)
+    cp (pkg_root </> pid) (dst </> "pkgs" </> pid)
+  void $ readCreateProcess (runGhcPkg ghcpkg ["recache", "--package-db=" ++ (dst </> "pkgs")]) ""
+
 
 
 ---------------------------
