@@ -471,7 +471,26 @@ litToImm' = OpImm . litToImm
 getRegister :: CmmExpr -> NatM Register
 getRegister e = do
   config <- getConfig
+  assertVectorRegWidth e
   getRegister' config (ncgPlatform config) e
+
+assertVectorRegWidth :: CmmExpr -> NatM ()
+assertVectorRegWidth expr = do
+  config <- getConfig
+  let platform = ncgPlatform config
+      mbRegMinBits :: Maybe Int = fromIntegral <$> ncgVectorMinBits config
+      format = cmmTypeFormat $ cmmExprType platform expr
+  if isVecFormat format then
+   case mbRegMinBits of
+    Nothing -> pprPanic
+                "CmmExpr results in vector format, but no vector register configured (see -mvector-min-width-bits in docs)"
+                (pdoc platform expr)
+    Just regMinBits | (formatInBytes format) * 8 <= regMinBits -> pure ()
+                    | otherwise -> pprPanic 
+                      "CmmExpr results in vector format which is bigger than the configured vector register size (see -mvector-min-width-bits in docs)"
+                      (pdoc platform expr)
+  else
+    pure ()
 
 -- | The register width to be used for an operation on the given width
 -- operand.
