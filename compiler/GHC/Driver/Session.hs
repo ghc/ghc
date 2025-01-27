@@ -3364,7 +3364,7 @@ setMainIs arg = parse parse_main_f arg
       POk _ (L _ re) -> callback re
 
     -- dummy parser state.
-    p_state str = initParserState
+    p_state str = initParserState ()
               (mkParserOpts mempty emptyDiagOpts False False False True)
               (stringToStringBuffer str)
               (mkRealSrcLoc (mkFastString []) 1 1)
