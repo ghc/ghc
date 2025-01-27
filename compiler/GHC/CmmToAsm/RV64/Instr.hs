@@ -992,3 +992,6 @@ isVectorReg :: Reg -> Bool
 isVectorReg (RegReal (RealRegSingle i)) | isVectorRegNo i = True
 isVectorReg (RegVirtual (VirtualRegD _)) = True
 isVectorReg _ = False
+
+allVectorRegOps :: [Operand] -> Bool
+allVectorRegOps = all isVectorRegOp
