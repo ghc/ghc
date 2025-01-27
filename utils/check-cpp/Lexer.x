@@ -7,7 +7,7 @@ import ParserM (
                 setStartCode,
                 show_pos, position,
                 AlexInput(..), alexGetByte)
-import qualified ParserM as ParserM (input)
+-- import qualified ParserM as ParserM (input)
 import Control.Monad
 
 -- The lexer is based on
