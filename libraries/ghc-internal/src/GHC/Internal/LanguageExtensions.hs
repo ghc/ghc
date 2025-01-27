@@ -31,6 +31,7 @@ data Extension
 -- See Note [Updating flag description in the User's Guide] in
 -- GHC.Driver.Session
    = Cpp
+   | GhcCpp
    | OverlappingInstances
    | UndecidableInstances
    | IncoherentInstances
