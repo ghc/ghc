@@ -24,7 +24,7 @@ T15226b.testFun1
         case y of conrep {
         __DEFAULT ->
         case T15226b.MkStrictPair [sat conrep] of sat {
-        __DEFAULT -> MkSolo# [sat];
+        __DEFAULT -> GHC.Types.MkSolo# [sat];
         };
         };
         };

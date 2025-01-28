@@ -1,6 +1,5 @@
 [1 of 2] Compiling ValidHoleFits    ( ValidHoleFits.hs, ValidHoleFits.o )
 [2 of 2] Compiling Foo              ( valid_hole_fits.hs, valid_hole_fits.o )
-
 valid_hole_fits.hs:9:6: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
     Variable not in scope: putStrLn :: String -> IO ()
     Suggested fixes:
@@ -148,9 +147,6 @@ valid_hole_fits.hs:34:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with Just @Bool
           (imported from ‘Data.Maybe’ at valid_hole_fits.hs:5:1-17
            (and originally defined in ‘GHC.Internal.Maybe’))
-        MkSolo :: forall a. a -> Solo a
-          with MkSolo @Bool
-          (bound at <wired into compiler>)
         id :: forall a. a -> a
           with id @Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
@@ -259,3 +255,4 @@ valid_hole_fits.hs:41:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with mempty @(String -> IO ())
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Base’))
+

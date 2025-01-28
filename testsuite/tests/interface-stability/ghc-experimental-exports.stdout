@@ -4474,6 +4474,7 @@ module GHC.PrimOps where
   type role MVar# nominal representational
   type MVar# :: forall {l :: Levity}. * -> TYPE (BoxedRep l) -> UnliftedType
   data MVar# a b
+  MkSolo# :: forall (k :: RuntimeRep) (a :: TYPE k). a -> (# a #)
   type MultMul :: Multiplicity -> Multiplicity -> Multiplicity
   type family MultMul a b where
     forall (x :: Multiplicity). MultMul One x = x
@@ -7331,9 +7332,9 @@ module Prelude.Experimental where
   data List a = ...
   pattern Solo :: forall a. a -> Solo a
   type Solo :: * -> *
-  data Solo a = ...
+  data Solo a = MkSolo a
   type Solo# :: forall (k :: GHC.Types.RuntimeRep). TYPE k -> TYPE (GHC.Types.TupleRep '[k])
-  data Solo# a = ...
+  data Solo# a = MkSolo# a
   type Sum10# :: forall (k0 :: GHC.Types.RuntimeRep) (k1 :: GHC.Types.RuntimeRep) (k2 :: GHC.Types.RuntimeRep) (k3 :: GHC.Types.RuntimeRep) (k4 :: GHC.Types.RuntimeRep) (k5 :: GHC.Types.RuntimeRep) (k6 :: GHC.Types.RuntimeRep) (k7 :: GHC.Types.RuntimeRep) (k8 :: GHC.Types.RuntimeRep) (k9 :: GHC.Types.RuntimeRep). TYPE k0 -> TYPE k1 -> TYPE k2 -> TYPE k3 -> TYPE k4 -> TYPE k5 -> TYPE k6 -> TYPE k7 -> TYPE k8 -> TYPE k9 -> TYPE (GHC.Types.SumRep [k0, k1, k2, k3, k4, k5, k6, k7, k8, k9])
   data Sum10# a b c d e f g h i j = ...
   type Sum11# :: forall (k0 :: GHC.Types.RuntimeRep) (k1 :: GHC.Types.RuntimeRep) (k2 :: GHC.Types.RuntimeRep) (k3 :: GHC.Types.RuntimeRep) (k4 :: GHC.Types.RuntimeRep) (k5 :: GHC.Types.RuntimeRep) (k6 :: GHC.Types.RuntimeRep) (k7 :: GHC.Types.RuntimeRep) (k8 :: GHC.Types.RuntimeRep) (k9 :: GHC.Types.RuntimeRep) (k10 :: GHC.Types.RuntimeRep). TYPE k0 -> TYPE k1 -> TYPE k2 -> TYPE k3 -> TYPE k4 -> TYPE k5 -> TYPE k6 -> TYPE k7 -> TYPE k8 -> TYPE k9 -> TYPE k10 -> TYPE (GHC.Types.SumRep [k0, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10])

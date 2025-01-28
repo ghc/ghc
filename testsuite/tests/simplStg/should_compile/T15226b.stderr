@@ -20,7 +20,7 @@ T15226b.bar1
           sat [Occ=Once1] :: T15226b.Str (GHC.Internal.Maybe.Maybe a)
           [LclId] =
               T15226b.Str! [sat];
-        } in  MkSolo# [sat];
+        } in  GHC.Types.MkSolo# [sat];
         };
 
 T15226b.bar

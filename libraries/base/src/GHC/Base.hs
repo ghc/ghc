@@ -278,7 +278,7 @@ import GHC.Internal.IO (seq#)
 import GHC.Internal.Maybe
 import GHC.Types hiding (
   Unit#,
-  Solo#,
+  Solo#(..),
   Tuple0#,
   Tuple1#,
   Tuple2#,

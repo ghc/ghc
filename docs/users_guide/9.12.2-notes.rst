@@ -12,6 +12,8 @@ Compiler
 ~~~~~~~~
 
 - Fixed miscompilation of certain division operations (:ghc-ticket:`25653`)
+- Fixed re-exports of ``MkSolo`` and ``MkSolo#`` (:ghc-ticket:`25182`)
+- Fixed the behavior of ``Language.Haskell.TH.mkName "FUN"`` (:ghc-ticket:`25174`)
 
 Included libraries
 ~~~~~~~~~~~~~~~~~~

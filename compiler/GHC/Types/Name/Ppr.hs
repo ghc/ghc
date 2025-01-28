@@ -123,7 +123,8 @@ mkQualName env = qual_name where
             , fUNTyConName, unrestrictedFunTyConName
             , oneDataConName
             , listTyConName
-            , manyDataConName ]
+            , manyDataConName
+            , soloDataConName ]
           || isJust (isTupleTyOcc_maybe mod occ)
           || isJust (isSumTyOcc_maybe mod occ)
 
