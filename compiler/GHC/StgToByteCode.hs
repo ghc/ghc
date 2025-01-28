@@ -548,7 +548,7 @@ returnUnliftedReps d s szb reps = do
                         PUSH_BCO tuple_bco `consOL`
                         unitOL RETURN_TUPLE
     return ( mkSlideB platform szb (d - s) -- clear to sequel
-             `consOL` ret)                 -- go
+             `appOL` ret)                 -- go
 
 -- construct and return an unboxed tuple
 returnUnboxedTuple
@@ -812,7 +812,7 @@ doTailCall init_d s p fn args = do
         platform <- profilePlatform <$> getProfile
         assert (sz == wordSize platform) return ()
         let slide = mkSlideB platform (d - init_d + wordSize platform) (init_d - s)
-        return (push_fn `appOL` (slide `consOL` unitOL ENTER))
+        return (push_fn `appOL` (slide `appOL` unitOL ENTER))
   do_pushes !d args reps = do
       let (push_apply, n, rest_of_reps) = findPushSeq reps
           (these_args, rest_of_args) = splitAt n args
@@ -1531,7 +1531,7 @@ generatePrimCall d s p target _mb_unit _result_ty args
               (push_target `consOL`
                push_info `consOL`
                PUSH_BCO args_bco `consOL`
-               (mkSlideB platform szb (d - s) `consOL` unitOL PRIMCALL))
+               (mkSlideB platform szb (d - s) `appOL` unitOL PRIMCALL))
 
 -- -----------------------------------------------------------------------------
 -- Deal with a CCall.
@@ -2266,8 +2266,8 @@ unsupportedCConvException = throwGhcException (ProgramError
   ("Error: bytecode compiler can't handle some foreign calling conventions\n"++
    "  Workaround: use -fobject-code, or compile this module to .o separately."))
 
-mkSlideB :: Platform -> ByteOff -> ByteOff -> BCInstr
-mkSlideB platform nb db = SLIDE n d
+mkSlideB :: Platform -> ByteOff -> ByteOff -> OrdList BCInstr
+mkSlideB platform nb db = mkSlideW n d
   where
     !n = bytesToWords platform nb
     !d = bytesToWords platform db
