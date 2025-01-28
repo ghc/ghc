@@ -497,6 +497,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
       -- option into \" otherwise it does weird things (like keeping only the
       -- last double-quote).
   let def_string k v = "  ghc-options: \"-optc-D" ++ k ++ "=\\\"" ++ v ++ "\\\"\""
+  let def        k v = "  ghc-options: \"-optc-D" ++ k ++ "=" ++ v ++ "\""
   let rts_options =
         [ "package rts"
         , def_string "ProjectVersion" (Text.unpack (gboVersionInt opts))
@@ -515,6 +516,8 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , def_string "TargetVendor"      "FIXME"
         , def_string "GhcUnregisterised" "FIXME"
         , def_string "TablesNextToCode"  "FIXME"
+          -- Set the namespace for the rts fs functions
+        , def "FS_NAMESPACE" "rts"
         , "  flags: +use-system-libffi +tables-next-to-code"
           -- FIXME: deal with libffi (add package?)
           --
