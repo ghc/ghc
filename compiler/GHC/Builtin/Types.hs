@@ -78,6 +78,7 @@ module GHC.Builtin.Types (
         promotedTupleDataCon,
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
         soloTyCon,
+        soloDataConName,
         pairTyCon, mkPromotedPairTy, isPromotedPairType,
         unboxedUnitTy,
         unboxedUnitTyCon, unboxedUnitDataCon,
@@ -896,7 +897,6 @@ isBuiltInOcc_maybe occ =
       ":"    -> Just consDataConName
 
       -- function tycon
-      "FUN"  -> Just fUNTyConName
       "->"  -> Just unrestrictedFunTyConName
 
       -- tuple data/tycon
@@ -1055,40 +1055,36 @@ isPunOcc_maybe mod occ
     isCTupleOcc_maybe  mod occ <|>
     isSumTyOcc_maybe   mod occ
 
-mkTupleOcc :: NameSpace -> Boxity -> Arity -> OccName
--- No need to cache these, the caching is done in mk_tuple
-mkTupleOcc ns Boxed   ar = mkOccName ns (mkBoxedTupleStr ns ar)
-mkTupleOcc ns Unboxed ar = mkOccName ns (mkUnboxedTupleStr ns ar)
+mkTupleOcc :: NameSpace -> Boxity -> Arity -> (OccName, BuiltInSyntax)
+mkTupleOcc ns b ar = (mkOccName ns str, built_in)
+  where (str, built_in) = mkTupleStr' ns b ar
 
 mkCTupleOcc :: NameSpace -> Arity -> OccName
 mkCTupleOcc ns ar = mkOccName ns (mkConstraintTupleStr ar)
 
 mkTupleStr :: Boxity -> NameSpace -> Arity -> String
-mkTupleStr Boxed   = mkBoxedTupleStr
-mkTupleStr Unboxed = mkUnboxedTupleStr
+mkTupleStr b ns ar = str
+  where (str, _) = mkTupleStr' ns b ar
 
-mkBoxedTupleStr :: NameSpace -> Arity -> String
-mkBoxedTupleStr ns 0
-  | isDataConNameSpace ns = "()"
-  | otherwise             = "Unit"
-mkBoxedTupleStr ns 1
-  | isDataConNameSpace ns = "MkSolo"  -- See Note [One-tuples]
-  | otherwise             = "Solo"
-mkBoxedTupleStr ns ar
-  | isDataConNameSpace ns = '(' : commas ar ++ ")"
-  | otherwise             = "Tuple" ++ showInt ar ""
-
-
-mkUnboxedTupleStr :: NameSpace -> Arity -> String
-mkUnboxedTupleStr ns 0
-  | isDataConNameSpace ns = "(##)"
-  | otherwise             = "Unit#"
-mkUnboxedTupleStr ns 1
-  | isDataConNameSpace ns = "(# #)"  -- See Note [One-tuples]
-  | otherwise             = "Solo#"
-mkUnboxedTupleStr ns ar
-  | isDataConNameSpace ns = "(#" ++ commas ar ++ "#)"
-  | otherwise             = "Tuple" ++ show ar ++ "#"
+mkTupleStr' :: NameSpace -> Boxity -> Arity -> (String, BuiltInSyntax)
+mkTupleStr' ns Boxed 0
+  | isDataConNameSpace ns = ("()", BuiltInSyntax)
+  | otherwise             = ("Unit", UserSyntax)
+mkTupleStr' ns Boxed 1
+  | isDataConNameSpace ns = ("MkSolo", UserSyntax)  -- See Note [One-tuples]
+  | otherwise             = ("Solo",   UserSyntax)
+mkTupleStr' ns Boxed ar
+  | isDataConNameSpace ns = ('(' : commas ar ++ ")", BuiltInSyntax)
+  | otherwise             = ("Tuple" ++ showInt ar "", UserSyntax)
+mkTupleStr' ns Unboxed 0
+  | isDataConNameSpace ns = ("(##)",  BuiltInSyntax)
+  | otherwise             = ("Unit#", UserSyntax)
+mkTupleStr' ns Unboxed 1
+  | isDataConNameSpace ns = ("(# #)", BuiltInSyntax) -- See Note [One-tuples]
+  | otherwise             = ("Solo#", UserSyntax)
+mkTupleStr' ns Unboxed ar
+  | isDataConNameSpace ns = ("(#" ++ commas ar ++ "#)", BuiltInSyntax)
+  | otherwise             = ("Tuple" ++ show ar ++ "#", UserSyntax)
 
 mkConstraintTupleStr :: Arity -> String
 mkConstraintTupleStr 0 = "CUnit"
@@ -1244,10 +1240,10 @@ mk_tuple Boxed arity = (tycon, tuple_con)
 
     boxity  = Boxed
     modu    = gHC_INTERNAL_TUPLE
-    tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
-                         (ATyCon tycon) UserSyntax
-    dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
-                            (AConLike (RealDataCon tuple_con)) BuiltInSyntax
+    tc_name = mkWiredInName modu occ tc_uniq (ATyCon tycon) built_in
+      where (occ, built_in) = mkTupleOcc tcName boxity arity
+    dc_name = mkWiredInName modu occ dc_uniq (AConLike (RealDataCon tuple_con)) built_in
+      where (occ, built_in) = mkTupleOcc dataName boxity arity
     tc_uniq = mkTupleTyConUnique   boxity arity
     dc_uniq = mkTupleDataConUnique boxity arity
 
@@ -1278,10 +1274,10 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
 
     boxity  = Unboxed
     modu    = gHC_TYPES
-    tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
-                         (ATyCon tycon) UserSyntax
-    dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
-                            (AConLike (RealDataCon tuple_con)) BuiltInSyntax
+    tc_name = mkWiredInName modu occ tc_uniq (ATyCon tycon) built_in
+      where (occ, built_in) = mkTupleOcc tcName boxity arity
+    dc_name = mkWiredInName modu occ dc_uniq (AConLike (RealDataCon tuple_con)) built_in
+      where (occ, built_in) = mkTupleOcc dataName boxity arity
     tc_uniq = mkTupleTyConUnique   boxity arity
     dc_uniq = mkTupleDataConUnique boxity arity
 
@@ -1344,6 +1340,9 @@ soloTyCon = tupleTyCon Boxed 1
 
 soloTyConName :: Name
 soloTyConName = tyConName soloTyCon
+
+soloDataConName :: Name
+soloDataConName = tupleDataConName Boxed 1
 
 pairTyCon :: TyCon
 pairTyCon = tupleTyCon Boxed 2

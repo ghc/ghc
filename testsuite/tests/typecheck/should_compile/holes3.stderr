@@ -91,7 +91,6 @@ holes3.hs:11:15: error: [GHC-88464]
         Nothing :: forall a. Maybe a
         Just :: forall a. a -> Maybe a
         [] :: forall a. [a]
-        MkSolo :: forall a. a -> Solo a
         asTypeOf :: forall a. a -> a -> a
         id :: forall a. a -> a
         until :: forall a. (a -> Bool) -> (a -> a) -> a -> a

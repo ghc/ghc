@@ -68,6 +68,10 @@ Compiler
   specialization rules was added. It was actually added ghc-9.10.1 already but
   mistakenly not mentioned in the 9.10.1 changelog.
 
+- Fixed re-exports of ``MkSolo`` (:ghc-ticket:`25182`)
+
+- Fixed the behavior of ``Language.Haskell.TH.mkName "FUN"`` (:ghc-ticket:`25174`)
+
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 
