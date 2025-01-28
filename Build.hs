@@ -254,7 +254,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
       putStrLn $ "Logs can be found in \"" ++ (dst </> "cabal.{stdout,stderr}\"")
       exitFailure
 
-  msg "  - Copying stage1 programs and generating settings to use them..."
+  msg "  - Copying programs and generating GHC settings..."
   let listbin_cmd p = runCabal cabal
         [ "list-bin"
         , "--project-file=" ++ cabal_project_path
@@ -273,11 +273,14 @@ buildGhcStage booting opts cabal ghc0 dst = do
             putStrLn list_bin_stderr
             exitFailure
   createDirectoryIfMissing True (dst </> "bin")
-  copy_bin "ghc-bin:ghc"                     "ghc"
-  copy_bin "ghc-pkg:ghc-pkg"                 "ghc-pkg"
-  copy_bin "deriveConstants:deriveConstants" "deriveConstants"
-  copy_bin "genprimopcode:genprimopcode"     "genprimopcode"
-  copy_bin "genapply:genapply"               "genapply"
+
+  copy_bin "ghc-bin:ghc"     "ghc"
+  copy_bin "ghc-pkg:ghc-pkg" "ghc-pkg"
+
+  when booting $ do
+    copy_bin "deriveConstants:deriveConstants" "deriveConstants"
+    copy_bin "genprimopcode:genprimopcode"     "genprimopcode"
+    copy_bin "genapply:genapply"               "genapply"
 
   -- initialize empty global package database
   pkgdb <- makeAbsolute (dst </> "pkgs")
@@ -708,7 +711,6 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "--package-env=" ++ boot_libs_env
         , "--force-reinstalls"
         , "-v3"
-        -- [ "build"
         , "--project-file=" ++ cabal_project_bootlibs_path
         , "--with-compiler=" ++ ghcPath ghc
         , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg
@@ -763,7 +765,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
     -- containing the package db. In our case where everything is at the same
     -- level in "pkgs" we need to re-add "/pkgs"
     Text.writeFile (dst </> "pkgs" </> pid <.> "conf")
-                   (Text.replace (Text.pack pkg_root) "${pkgroot}/pkgs/" conf)
+                   (Text.replace (Text.pack pkg_root) "${pkgroot}/pkgs" conf)
     cp (pkg_root </> pid) (dst </> "pkgs")
 
   void $ readCreateProcess (runGhcPkg ghcpkg ["recache", "--package-db=" ++ (dst </> "pkgs")]) ""

@@ -467,6 +467,7 @@ library
          extra-libraries: dl
       if flag(use-system-libffi)
          extra-libraries: ffi
+         extra-libraries-static: ffi
       if os(windows)
          extra-libraries:
             -- for the linker
