@@ -140,16 +140,16 @@ type LevelledExpr = TaggedExpr FloatSpec
 type LevelledBind = TaggedBind FloatSpec
 type LevelledBndr = TaggedBndr FloatSpec
 
-data Level = Level Int  -- Level number of enclosing lambdas
-                   Int  -- Number of big-lambda and/or case expressions and/or
-                        -- context boundaries between
-                        -- here and the nearest enclosing lambda
+data Level = Level !Int  -- Level number of enclosing lambdas
+                   !Int  -- Number of big-lambda and/or case expressions and/or
+                         -- context boundaries between
+                         -- here and the nearest enclosing lambda
 
 data FloatSpec
-  = FloatMe Level       -- Float to just inside the binding
-                        --    tagged with this level
-  | StayPut Level       -- Stay where it is; binding is
-                        --     tagged with this level
+  = FloatMe !Level       -- Float to just inside the binding
+                         --    tagged with this level
+  | StayPut !Level       -- Stay where it is; binding is
+                         --     tagged with this level
 
 floatSpecLevel :: FloatSpec -> Level
 floatSpecLevel (FloatMe l) = l
@@ -1633,7 +1633,7 @@ countFreeIds = nonDetStrictFoldUDFM add 0 . getUniqDSet
 
 data LevelEnv
   = LE { le_switches :: FloatOutSwitches
-       , le_ctxt_lvl :: Level           -- The current level
+       , le_ctxt_lvl :: !Level          -- The current level
        , le_lvl_env  :: VarEnv Level    -- Domain is *post-cloned* TyVars and Ids
 
        -- See Note [le_subst and le_env]
