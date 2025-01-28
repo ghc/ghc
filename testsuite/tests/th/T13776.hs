@@ -10,6 +10,9 @@ spliceTy1 = (1,2)
 spliceTy2 :: $(conT ''[] `appT` conT ''Int)
 spliceTy2 = []
 
+spliceTy3 :: $(conT ''(->)) [Int] Int
+spliceTy3 = sum
+
 spliceExp1 :: (Int, Int)
 spliceExp1 = $(conE '(,) `appE` litE (integerL 1) `appE` litE (integerL 1))
 

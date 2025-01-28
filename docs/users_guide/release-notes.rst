@@ -6,3 +6,4 @@ Release notes
 
    9.12.1-notes
    9.12.2-notes
+   9.12.3-notes
