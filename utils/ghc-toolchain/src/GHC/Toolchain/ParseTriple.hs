@@ -36,6 +36,7 @@ parseArch :: Cc -> String -> M Arch
 parseArch cc arch =
     case arch of
       "i386" -> pure ArchX86
+      "i686" -> pure ArchX86
       "x86_64" -> pure ArchX86_64
       "amd64" -> pure ArchX86_64
       "powerpc" -> pure ArchPPC
