@@ -93,6 +93,11 @@ def prep_ghc():
     build_copy_file(PACKAGES['ghc'], 'GHC/Platform/Constants.hs')
     build_copy_file(PACKAGES['ghc'], 'GHC/Settings/Config.hs')
 
+def prep_ghc_boot_th():
+    # Drop ghc-internal from `hs-source-dirs` as Hackage rejects this
+    modify_file(PACKAGES['ghc-boot-th'], 'ghc-boot-th.cabal',
+                lambda s: s.replace('../ghc-internal/src', ''))
+
 PACKAGES = {
     pkg.name: pkg
     for pkg in [
@@ -105,9 +110,10 @@ PACKAGES = {
         Package('template-haskell', Path("libraries/template-haskell"), no_prep),
         Package('ghc-heap', Path("libraries/ghc-heap"), no_prep),
         Package('ghc-boot', Path("libraries/ghc-boot"), prep_ghc_boot),
-        Package('ghc-boot-th', Path("libraries/ghc-boot-th"), no_prep),
+        Package('ghc-boot-th', Path("libraries/ghc-boot-th"), prep_ghc_boot_th),
         Package('ghc-compact', Path("libraries/ghc-compact"), no_prep),
         Package('ghc', Path("compiler"), prep_ghc),
+        Package('ghci', Path("libraries/ghci"), no_prep),
     ]
 }
 # Dict[str, Package]
