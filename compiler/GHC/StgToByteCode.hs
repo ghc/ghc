@@ -1954,6 +1954,11 @@ pushAtom d p (StgVarArg var)
               return (unitOL (PUSH_ADDR (getName var)), szb)
 
             | otherwise -> do
+              let varTy = idType var
+              massertPpr (definitelyLiftedType varTy) $
+                vcat [ text "pushAtom: unhandled unlifted type"
+                     , text "var:" <+> ppr var <+> dcolon <+> ppr varTy <> dcolon <+> ppr (typeKind varTy)
+                     ]
               return (unitOL (PUSH_G (getName var)), szb)
 
 pushAtom _ _ (StgLitArg lit) = pushLiteral True lit
