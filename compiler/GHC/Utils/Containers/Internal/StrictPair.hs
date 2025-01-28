@@ -7,6 +7,9 @@
 
 module GHC.Utils.Containers.Internal.StrictPair (StrictPair(..), toPair) where
 
+import Prelude () -- for build ordering; see #23942 and
+                  -- Note [Depend on GHC.Num.Integer] in base:GHC.Base
+
 -- | The same as a regular Haskell pair, but
 --
 -- @
