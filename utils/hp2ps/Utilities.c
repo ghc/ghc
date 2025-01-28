@@ -1,9 +1,8 @@
 #include "Main.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "Error.h"
-
-extern void* malloc(size_t);
 
 char*
 Basename(char *name)
@@ -89,7 +88,6 @@ void *
 xrealloc(void *p, size_t n)
 {
     void *r;
-    extern void *realloc(void *, size_t);
 
     r = realloc(p, n);
     if (!r) {
