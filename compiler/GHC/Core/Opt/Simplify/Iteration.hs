@@ -2307,17 +2307,28 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
 ---------- Try rewrite RULES, if ai_rewrite = TryRules --------------
 -- See Note [Rewrite rules and inlining]
 -- See also Note [Trying rewrite rules]
+
 rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
-                              , ai_rewrite = TryRules nr_wanted rules }) cont
-  | nr_wanted == 0 || no_more_args
+                              , ai_rewrite = TryRules _nr_wanted rules }) cont
+  | [] <- rev_args
+  = -- Try rewrite rules on unsimplified arguments, then once more when all
+    -- arguments have been simplified (below). See Note [TODO]
+    let (unsimp_info, res_cont') = take_unsimpl cont
+     in applyRules (ai_args unsimp_info) res_cont'
+
+  | no_more_args
   = -- We've accumulated a simplified call in <fun,rev_args>
     -- so try rewrite rules; see Note [RULES apply to simplified arguments]
     -- See also Note [Rules for recursive functions]
-    do { mb_match <- tryRules env rules fun (reverse rev_args) cont
-       ; case mb_match of
-             Just (env', rhs, cont') -> simplExprF env' rhs cont'
-             Nothing -> rebuildCall env (info { ai_rewrite = TryInlining }) cont }
+    applyRules rev_args cont
+
   where
+    applyRules rev_args' cont' = do
+      mb_match <- tryRules env rules fun (reverse rev_args') cont'
+      case mb_match of
+        Just (env', rhs, cont'') -> simplExprF env' rhs cont''
+        Nothing -> rebuildCall env (info { ai_rewrite = TryInlining }) cont'
+
     -- If we have run out of arguments, just try the rules; there might
     -- be some with lower arity.  Casts get in the way -- they aren't
     -- allowed on rule LHSs
@@ -2325,6 +2336,20 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
                       ApplyToTy  {} -> False
                       ApplyToVal {} -> False
                       _             -> True
+
+    take_unsimpl ApplyToVal { sc_arg = arg, sc_hole_ty = fun_ty, sc_cont = k }
+      | (i, k') <- take_unsimpl k
+      = (addValArgTo i arg fun_ty, k')
+    take_unsimpl ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = k }
+      | (i, k') <- take_unsimpl k
+      = (addTyArgTo i arg_ty hole_ty, k')
+    take_unsimpl CastIt { sc_co = co, sc_opt = opt, sc_cont = k }
+      | (i, k') <- take_unsimpl k
+      = (addCastTo i co', k')
+        where -- must still simpl coercions
+          co' = optOutCoercion env co opt
+    take_unsimpl k
+      = (info, k)
 
 ---------- Simplify type applications and casts --------------
 rebuildCall env info (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
