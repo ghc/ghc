@@ -2,6 +2,7 @@
 
 ## 4.21.0.0 *December 2024*
   * Shipped with GHC 9.12.1
+  * Change `SrcLoc` to be a strict and unboxed (finishing [CLC proposal #55](https://github.com/haskell/core-libraries-committee/issues/55))
   * Introduce `Data.Bounded` module exporting the `Bounded` typeclass (finishing [CLC proposal #208](https://github.com/haskell/core-libraries-committee/issues/208))
   * Deprecate export of `Bounded` class from `Data.Enum` ([CLC proposal #208](https://github.com/haskell/core-libraries-committee/issues/208))
   * `GHC.Desugar` has been deprecated and should be removed in GHC 9.14. ([CLC proposal #216](https://github.com/haskell/core-libraries-committee/issues/216))
