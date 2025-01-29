@@ -2313,7 +2313,7 @@ rebuildCall env original_info@(ArgInfo { ai_fun = fun, ai_args = rev_args
   | [] <- rev_args
   = -- Try rewrite rules on unsimplified arguments, then once more when all
     -- arguments have been simplified (below). See Note [TODO]
-    let (unsimp_info, res_cont') = take_unsimpl original_cont
+    let (unsimp_info, res_cont') = take_unsimpl_rev original_cont
      in -- pprTrace "rebuildCall:1" (ppr original_info $$ ppr original_cont $$ ppr unsimp_info $$ ppr res_cont') $
        applyRules False unsimp_info res_cont'
 
@@ -2327,8 +2327,12 @@ rebuildCall env original_info@(ArgInfo { ai_fun = fun, ai_args = rev_args
     applyRules are_simpl info' cont' = do
       mb_match <- tryRules env rules are_simpl fun (reverse $ ai_args info') cont'
       case mb_match of
-        Just (env', rhs, cont'') -> pprTrace "Match:1" (ppr info' $$ text "rhs:" <+> ppr rhs $$ text "origcont:" <+> ppr cont' $$ text "newcont:" <+> ppr cont'') $
-          simplExprF env' rhs cont''
+        Just (env', rhs, cont'') ->
+          pprTrace "Match:1" (text "aresimpl:" <+> ppr are_simpl
+              $$ ppr info' $$ text "rhs:" <+> ppr rhs $$ text "origcont:" <+> ppr cont' $$ text "newcont:" <+> ppr cont'') $
+          pprTrace "before try rules" (text "env:" <+> ppr (seInScope env) <+> ppr (seIdSubst env))
+            $ pprTrace "after try rules" (text "env':" <+> ppr (seInScope env') <+> ppr (seIdSubst env'))
+            $ simplExprF env' rhs cont''
         Nothing -> rebuildCall env (original_info { ai_rewrite = TryInlining }) original_cont
 
     -- If we have run out of arguments, just try the rules; there might
@@ -2339,6 +2343,9 @@ rebuildCall env original_info@(ArgInfo { ai_fun = fun, ai_args = rev_args
                       ApplyToVal {} -> False
                       _             -> True
 
+    take_unsimpl_rev k
+      | (i, k') <- take_unsimpl k
+      = (i{ ai_args = reverse (ai_args i) }, k')
     take_unsimpl ApplyToVal { sc_arg = arg, sc_hole_ty = fun_ty, sc_cont = k }
       | (i, k') <- take_unsimpl k
       = (addValArgTo i arg fun_ty, k')
@@ -2465,7 +2472,7 @@ tryInlining env logger var cont
       | not (logHasDumpFlag logger Opt_D_verbose_core2core)
       = when (isExternalName (idName var)) $
             log_inlining $
-                sep [text "Inlining done:", nest 4 (ppr var)]
+                sep [text "Inlining done:", nest 4 (ppr var)] $$ sep [text "Inlining continuation:", nest 4 (ppr cont)]
       | otherwise
       = log_inlining $
            sep [text "Inlining done: " <> ppr var,
@@ -2614,6 +2621,7 @@ tryRules env rules are_simpl fn args call_cont
                                         (argInfoAppArgs args) rules
   -- Fire a rule for the function
   = do { logger <- getLogger
+       ; pprTraceM "tryRules" (text "rule:" <+> ppr rule $$ text "rhs:" <+> ppr rule_rhs $$ text "lookedup" <+> ppr fn <+> ppr (argInfoAppArgs args))
        ; checkedTick (RuleFired (ruleName rule))
        ; let cont' = pushArgs zapped_env
                               (drop (ruleArity rule) args)
@@ -2635,8 +2643,10 @@ tryRules env rules are_simpl fn args call_cont
 
   where
     ropts      = seRuleOpts env
-    zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
-    pushArgs   = if are_simpl then pushSimplifiedArgs else pushUnsimplifiedArgs
+    zapped_env | are_simpl = zapSubstEnv env -- See Note [zapSubstEnv]
+               | otherwise = env             -- (we only zap when the arguments are already simplified)
+    pushArgs   | are_simpl = pushSimplifiedArgs
+               | otherwise = pushUnsimplifiedArgs
 
     printRuleModule rule
       = parens (maybe (text "BUILTIN")
