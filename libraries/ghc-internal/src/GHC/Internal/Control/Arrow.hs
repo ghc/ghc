@@ -131,10 +131,10 @@ class Category a => Arrow a where
     --   The default definition may be overridden with a more efficient
     --   version if desired.
     --
-    -- >   b ╭─────╮ b'
+    -- >   b ╭─────╮ c
     -- > >───┼─ f ─┼───>
     -- > >───┼─ g ─┼───>
-    -- >   c ╰─────╯ c'
+    -- >   b'╰─────╯ c'
     (***) :: a b c -> a b' c' -> a (b,b') (c,c')
     f *** g = first f >>> arr swap >>> first g >>> arr swap
       where swap ~(x,y) = (y,x)
