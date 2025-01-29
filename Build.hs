@@ -210,6 +210,12 @@ buildGhcStage booting opts cabal ghc0 dst = do
           -- allow template-haskell with newer ghc-boot-th
         , "allow-newer: ghc-boot-th"
         , ""
+        , "package ghc"
+        , "  flags: +internal-interpreter"
+        , ""
+        , "package ghci"
+        , "  flags: +internal-interpreter"
+        , ""
         , "package text"
              -- FIXME: avoid having to deal with system-cxx-std-lib fake package for now
         , "  flags: -simdutf"
