@@ -10,6 +10,7 @@ module GHC.Utils.Trace
   , warnPprTrace
   , warnPprTraceM
   , pprTraceUserWarning
+  , pprMarkerIO
   , trace
   )
 where
@@ -33,7 +34,7 @@ import GHC.Utils.GlobalVars
 import GHC.Utils.Constants
 import GHC.Stack
 
-import Debug.Trace (trace)
+import Debug.Trace (trace, traceMarkerIO)
 import Control.Monad.IO.Class
 
 -- | If debug output is on, show some 'SDoc' on the screen
@@ -101,3 +102,11 @@ traceCallStackDoc :: HasCallStack => SDoc
 traceCallStackDoc =
     hang (text "Call stack:")
        4 (vcat $ map text $ lines (prettyCallStack callStack))
+
+-- | Emit a marker to the eventlog.
+pprMarkerIO :: String -> SDoc -> IO ()
+pprMarkerIO s msg
+  | unsafeHasNoDebugOutput = return ()
+  | otherwise = pprDebugAndThen (traceSDocContext {sdocLineLength = 10000})
+                  traceMarkerIO empty (text s <+> msg)
+

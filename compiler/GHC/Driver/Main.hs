@@ -1114,6 +1114,7 @@ compileWholeCoreBindings ::
   WholeCoreBindings ->
   IO (CompiledByteCode, [FilePath])
 compileWholeCoreBindings hsc_env type_env wcb = do
+  pprMarkerIO "WholeCoreBindings:" (ppr wcb_module)
   core_binds <- typecheck
   (stubs, foreign_files) <- decode_foreign
   gen_bytecode core_binds stubs foreign_files
