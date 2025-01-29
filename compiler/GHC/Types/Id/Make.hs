@@ -566,7 +566,7 @@ mkDictSelRhs clas val_index
                                 -- varToCoreExpr needed for equality superclass selectors
                                 --   sel a b d = case x of { MkC _ (g:a~b) _ -> CO g }
 
-dictSelRule :: Int -> Arity -> RuleFun
+dictSelRule :: HasCallStack => Int -> Arity -> RuleFun
 -- Tries to persuade the argument to look like a constructor
 -- application, using exprIsConApp_maybe, and then selects
 -- from it

@@ -40,7 +40,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Ord (comparing)
 import qualified Data.Set as S
 
-getNth :: Outputable a => [a] -> Int -> a
+getNth :: (HasCallStack, Outputable a) => [a] -> Int -> a
 getNth xs n = assertPpr (xs `lengthExceeds` n) (ppr n $$ ppr xs) $
              xs !! n
 

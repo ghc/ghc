@@ -33,7 +33,7 @@ module GHC.Core.Opt.Simplify.Utils (
         ArgInfo(..), ArgSpec(..), RewriteCall(..), mkArgInfo,
         addValArgTo, addCastTo, addTyArgTo,
         argInfoExpr, argInfoAppArgs,
-        pushSimplifiedArgs, pushSimplifiedRevArgs,
+        pushSimplifiedArgs, pushSimplifiedRevArgs, pushUnsimplifiedArgs,
         isStrictArgInfo, lazyArgContext,
 
         abstractFloats,
@@ -405,12 +405,13 @@ argInfoAppArgs (CastBy {}                : _)  = []  -- Stop at a cast
 argInfoAppArgs (ValArg { as_arg = arg }  : as) = arg     : argInfoAppArgs as
 argInfoAppArgs (TyArg { as_arg_ty = ty } : as) = Type ty : argInfoAppArgs as
 
-pushSimplifiedArgs, pushSimplifiedRevArgs
+pushSimplifiedArgs, pushSimplifiedRevArgs, pushUnsimplifiedArgs
   :: SimplEnv
   -> [ArgSpec]   -- In normal, forward order for pushSimplifiedArgs,
                  -- in /reverse/ order for pushSimplifiedRevArgs
   -> SimplCont -> SimplCont
 pushSimplifiedArgs    env args cont = foldr  (pushSimplifiedArg env)             cont args
+pushUnsimplifiedArgs  env args cont = foldr  (pushUnsimplifiedArg env)           cont args
 pushSimplifiedRevArgs env args cont = foldl' (\k a -> pushSimplifiedArg env a k) cont args
 
 pushSimplifiedArg :: SimplEnv -> ArgSpec -> SimplCont -> SimplCont
@@ -422,6 +423,15 @@ pushSimplifiedArg env (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
                , sc_hole_ty = hole_ty, sc_cont = cont }
 pushSimplifiedArg _ (CastBy c) cont
   = CastIt { sc_co = c, sc_cont = cont, sc_opt = True }
+
+pushUnsimplifiedArg :: SimplEnv -> ArgSpec -> SimplCont -> SimplCont
+pushUnsimplifiedArg _env (TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }) cont
+  = ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont }
+pushUnsimplifiedArg env (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
+  = ApplyToVal { sc_arg = arg, sc_env = env, sc_dup = NoDup
+               , sc_hole_ty = hole_ty, sc_cont = cont }
+pushUnsimplifiedArg _ (CastBy c) cont
+  = CastIt { sc_co = c, sc_cont = cont, sc_opt = False }
 
 argInfoExpr :: OutId -> [ArgSpec] -> OutExpr
 -- NB: the [ArgSpec] is reversed so that the first arg
