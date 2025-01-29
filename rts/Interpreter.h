@@ -9,3 +9,5 @@
 #pragma once
 
 RTS_PRIVATE Capability *interpretBCO (Capability* cap);
+void interp_startup ( void );
+void interp_shutdown ( void );
