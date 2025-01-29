@@ -96,6 +96,9 @@ import GHC.Unit.Finder as Finder
 import GHC.Unit.Module.Graph (filterToposortToModules)
 import GHC.Unit.Module.ModSummary
 
+import GHC.Linker.Types
+import GHC.ByteCode.Types (seqCompiledByteCode)
+
 import GHC.Data.StringBuffer
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
@@ -179,6 +182,13 @@ import GHC.IO.Handle ( hFlushAll )
 import GHC.TopHandler ( topHandler )
 
 import qualified GHC.Unit.Module.Graph as GHC
+
+import GHC.Conc.Sync ( forkIO, getNumCapabilities, killThread, labelThread)
+import System.Mem.Weak
+import Debug.Trace ( traceMarkerIO )
+
+import Control.Concurrent.STM.TChan
+import Control.Concurrent.STM
 
 -----------------------------------------------------------------------------
 
@@ -564,7 +574,8 @@ interactiveUI config srcs maybe_exprs = do
                    mod_infos          = M.empty,
                    flushStdHandles    = flush,
                    noBuffering        = nobuffering,
-                   ifaceCache = empty_cache
+                   ifaceCache = empty_cache,
+                   workerThread = Nothing
                  }
 
    return ()
@@ -2377,6 +2388,8 @@ doLoad load_type howmuch = do
   -- turn off breakpoints before we load: we can't turn them off later, because
   -- the ModBreaks will have gone away.
   discardActiveBreakPoints
+  -- Stop any work from the previous session being evaluated.
+  killWorkerThread
 
   resetLastErrorLocations
   -- Enable buffering stdout and stderr as we're compiling. Keeping these
@@ -2407,6 +2420,75 @@ afterLoad ok load_type = do
   modulesLoadedMsg ok loaded_mods load_type
   graph <- GHC.getModuleGraph
   setContextAfterLoad (isReload load_type) (Just graph)
+  forceByteCode
+
+mkWorkerThread :: Int -> IO WorkerThread
+mkWorkerThread n = do
+  work_queue <- newTChanIO
+  traceMarkerIO "ghci workers created"
+  let enqueueWork work_item = atomically (writeTChan work_queue work_item)
+
+  let mkThread = do
+        tid <- forkIO $ forever $ do
+                         work_item <- atomically $ readTChan work_queue
+                         work_item
+        labelThread tid "ghci worker"
+        return tid
+
+  threads <- replicateM n mkThread
+
+  let shutdownWorkers = do
+        traceMarkerIO "ghci workers killed"
+        mapM_ killThread threads
+        -- NB no need to empty the chan because it is only reachable from the workers.
+
+  return $ WorkerThread{..}
+
+
+-- | Force any compiled bytecode in the background
+--
+-- During compilation the compiler leaves thunks when producing bytecode, so that
+-- the result is not forced before it is needed. (Especially important when doing recompilation
+-- checking)
+--
+-- However, after the reload is complete, the interpreter will otherwise be idle, so
+-- force those thunks in parallel so that when the user comes to write in the prompt
+-- the response is faster.
+--
+-- If a reload happens, then the thunks which have been sparked will no longer
+-- be reachable. Therefore they will be gced so we do not need to explicitly terminate
+-- the parallel work if a reload happens before we are finished.
+forceByteCode :: GhciMonad m => m ()
+forceByteCode = do
+  hsc_env <- GHC.getSession
+  -- A slightly awkward place to perform initialisation, but right now, this is the only
+  -- place where work is ever added to the queue.
+  buckets <- (2 *) <$> liftIO getNumCapabilities
+  worker <- liftIO $ mkWorkerThread buckets
+  setWorkerThread worker
+
+  let
+    queueLinkable :: Linkable -> IO ()
+    queueLinkable (Linkable _ _ ps) = mapM_ queuePart ps
+
+    queuePart (DotGBC ModuleByteCode{gbc_compiled_byte_code = cbc}) = do
+      w <- mkWeakPtr cbc Nothing
+      enqueueWork worker (mkWork w)
+    queuePart _ = return ()
+
+    -- The "work", dereferences a weak pointer and forces the value to WHNF.
+    mkWork x = do
+      wt <- deRefWeak x
+      case wt of
+        Nothing -> return ()
+        Just bc -> seqCompiledByteCode bc `seq` return ()
+
+  -- Spawn a new thread, so the thunks are forced completely in the background of the main thread
+  -- and we can get to the prompt as fast as possible.
+  void $ liftIO $ forkIO $ do
+    all_linkables <- (concat <$> traverse (hptCollectByteCode . homeUnitEnv_hpt) (hsc_HUG hsc_env))
+    mapM_ queueLinkable all_linkables
+
 
 setContextAfterLoad :: GhciMonad m => Bool -> Maybe GHC.ModuleGraph -> m ()
 setContextAfterLoad keep_ctxt Nothing = do

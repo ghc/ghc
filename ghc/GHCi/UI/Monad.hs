@@ -11,7 +11,7 @@
 
 module GHCi.UI.Monad (
         GHCi(..), startGHCi,
-        GHCiState(..), GhciMonad(..),
+        GHCiState(..), WorkerThread(..), GhciMonad(..),
         GHCiOption(..), isOptionSet, setOption, unsetOption,
         Command(..), CommandResult(..), cmdSuccess,
         CmdExecOutcome(..),
@@ -20,6 +20,9 @@ module GHCi.UI.Monad (
         BreakLocation(..),
         TickArray,
         extractDynFlags, getDynFlags,
+
+        setWorkerThread,
+        killWorkerThread,
 
         runStmt, runDecls, runDecls', resume, recordBreak, revertCAFs,
         ActionStats(..), runAndPrintStats, runWithStats, printStats,
@@ -168,7 +171,11 @@ data GHCiState = GHCiState
             -- ^ @hFlush stdout; hFlush stderr@ in the interpreter
         noBuffering :: ForeignHValue,
             -- ^ @hSetBuffering NoBuffering@ for stdin/stdout/stderr
-        ifaceCache :: ModIfaceCache
+        ifaceCache :: ModIfaceCache,
+
+        workerThread :: Maybe WorkerThread
+            -- ^ The WorkerThread abstraction which will compute things
+            -- in the background. Currently used for evaluating bytecode.
      }
 
 -- | A GHCi command
@@ -413,6 +420,25 @@ resume step mbIgnoreCnt = do
     withArgs (args st) $
       reflectGHCi x $ do
         GHC.resumeExec step mbIgnoreCnt
+
+{- WorkerThread implementation -}
+
+data WorkerThread =
+      WorkerThread { enqueueWork :: IO () -> IO ()
+                   , shutdownWorkers :: IO ()
+                   }
+
+setWorkerThread :: GhciMonad m => WorkerThread -> m ()
+setWorkerThread wt = modifyGHCiState (\st -> st { workerThread = Just wt } )
+
+killWorkerThread :: GhciMonad m => m ()
+killWorkerThread = do
+  mwt <- workerThread <$> getGHCiState
+  case mwt of
+    Nothing -> return ()
+    Just wt -> do
+      liftIO (shutdownWorkers wt)
+      modifyGHCiState (\st -> st { workerThread = Nothing })
 
 -- --------------------------------------------------------------------------
 -- timing & statistics

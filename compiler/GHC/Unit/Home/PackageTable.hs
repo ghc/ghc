@@ -47,6 +47,7 @@ module GHC.Unit.Home.PackageTable
     -- ** More Traversal-based queries
   , hptCollectDependencies
   , hptCollectObjects
+  , hptCollectByteCode
   , hptCollectModules
 
     -- ** Memory dangerous queries
@@ -247,6 +248,12 @@ hptCollectObjects HPT{table} = do
   hpt <- readIORef table
   return $
     foldr ((:) . expectJust . homeModInfoObject) [] hpt
+
+hptCollectByteCode :: HomePackageTable -> IO [Linkable]
+hptCollectByteCode HPT{table} = do
+  hpt <- readIORef table
+  return $
+    catMaybes $ foldr ((:) . homeModInfoByteCode) [] hpt
 
 -- | Collect all module ifaces in the HPT
 --
