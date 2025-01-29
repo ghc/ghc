@@ -240,11 +240,12 @@ ppBCEnv p
 -- Create a BCO and do a spot of peephole optimisation on the insns
 -- at the same time.
 mkProtoBCO
-   :: (Outputable name)
-   => Platform
-   -> Bool      -- ^ True <=> label with @BCO_NAME@ instruction
-                -- see Note [BCO_NAME]
-   -> name
+   ::
+    Platform
+   -> Maybe Module
+        -- ^ Just cur_mod <=> label with @BCO_NAME@ instruction
+        -- see Note [BCO_NAME]
+   -> Name
    -> BCInstrList
    -> Either  [CgStgAlt] (CgStgRhs)
                 -- ^ original expression; for debugging only
@@ -253,7 +254,7 @@ mkProtoBCO
    -> [StgWord] -- ^ bitmap
    -> Bool      -- ^ True <=> is a return point, rather than a function
    -> [FFIInfo]
-   -> ProtoBCO name
+   -> ProtoBCO Name
 mkProtoBCO platform _add_bco_name nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
    = ProtoBCO {
         protoBCOName = nm,
@@ -267,9 +268,9 @@ mkProtoBCO platform _add_bco_name nm instrs_ordlist origin arity bitmap_size bit
      where
 #if MIN_VERSION_rts(1,0,3)
         maybe_add_bco_name instrs
-          | _add_bco_name = BCO_NAME str : instrs
-          where
-            str = BS.pack $ showSDocOneLine defaultSDocContext (ppr nm)
+          | Just cur_mod <- _add_bco_name =
+              let str = BS.pack $ showSDocOneLine defaultSDocContext (pprFullName cur_mod nm)
+              in BCO_NAME str : instrs
 #endif
         maybe_add_bco_name instrs = instrs
 
@@ -1398,7 +1399,7 @@ Note [unboxed tuple bytecodes and tuple_BCO]
 
 tupleBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
 tupleBCO platform args_info args =
-  mkProtoBCO platform False invented_name body_code (Left [])
+  mkProtoBCO platform Nothing invented_name body_code (Left [])
              0{-no arity-} bitmap_size bitmap False{-is alts-}
   where
     {-
@@ -1419,7 +1420,7 @@ tupleBCO platform args_info args =
 
 primCallBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
 primCallBCO platform args_info args =
-  mkProtoBCO platform False invented_name body_code (Left [])
+  mkProtoBCO platform Nothing invented_name body_code (Left [])
              0{-no arity-} bitmap_size bitmap False{-is alts-}
   where
     {-
@@ -2359,8 +2360,12 @@ getHscEnv = BcM $ \st -> return (st, bcm_hsc_env st)
 getProfile :: BcM Profile
 getProfile = targetProfile <$> getDynFlags
 
-shouldAddBcoName :: BcM Bool
-shouldAddBcoName = gopt Opt_AddBcoName <$> getDynFlags
+shouldAddBcoName :: BcM (Maybe Module)
+shouldAddBcoName = do
+  add <- gopt Opt_AddBcoName <$> getDynFlags
+  if add
+    then Just <$> getCurrentModule
+    else return Nothing
 
 emitBc :: ([FFIInfo] -> ProtoBCO Name) -> BcM (ProtoBCO Name)
 emitBc bco
