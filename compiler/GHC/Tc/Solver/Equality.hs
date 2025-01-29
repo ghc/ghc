@@ -2018,8 +2018,9 @@ finishCanWithIrred :: CtIrredReason -> CtEvidence
                    -> TcS (StopOrContinue (Either IrredCt a))
 finishCanWithIrred reason ev
   = do { -- Abort fast if we have any insoluble Wanted constraints,
-         -- and the TcS abort-if-insoluble flag is on.
-         when (isInsolubleReason reason) tryEarlyAbortTcS
+         -- and the TcSMode is TcSHoleFits
+         mode <- getModeTcS
+       ; when (mode == TcSHoleFits && isInsolubleReason reason) failTcS
 
        ; continueWith $ Left $ IrredCt { ir_ev = ev, ir_reason = reason } }
 

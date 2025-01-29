@@ -972,7 +972,7 @@ tryDefaultGroup wanteds (Proposal assignments)
 
 errInvalidDefaultedTyVar :: WantedConstraints -> Proposal -> NonEmpty TcTyVar -> TcS ()
 errInvalidDefaultedTyVar wanteds (Proposal assignments) problematic_tvs
-  = failTcS $ TcRnInvalidDefaultedTyVar tidy_wanteds tidy_assignments tidy_problems
+  = failWithTcS $ TcRnInvalidDefaultedTyVar tidy_wanteds tidy_assignments tidy_problems
   where
     proposal_tvs = concatMap (\(tv, ty) -> tv : tyCoVarsOfTypeList ty) assignments
     tidy_env = tidyFreeTyCoVars emptyTidyEnv $ proposal_tvs ++ NE.toList problematic_tvs

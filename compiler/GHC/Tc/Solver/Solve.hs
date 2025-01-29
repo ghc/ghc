@@ -923,7 +923,7 @@ solveSimpleWanteds simples
     -- See Note [The solveSimpleWanteds loop]
     go n limit wc
       | n `intGtLimit` limit
-      = failTcS $ TcRnSimplifierTooManyIterations simples limit wc
+      = failWithTcS $ TcRnSimplifierTooManyIterations simples limit wc
       | isEmptyBag (wc_simple wc)
       = return (n,wc)
       | otherwise
@@ -1052,7 +1052,7 @@ solveCt (CNonCanonical ev)                   = solveNC ev
 solveCt (CIrredCan (IrredCt { ir_ev = ev })) = solveNC ev
 
 solveCt (CEqCan (EqCt { eq_ev = ev, eq_eq_rel = eq_rel
-                           , eq_lhs = lhs, eq_rhs = rhs }))
+                      , eq_lhs = lhs, eq_rhs = rhs }))
   = solveEquality ev eq_rel (canEqLHSType lhs) rhs
 
 solveCt (CQuantCan (QCI { qci_ev = ev, qci_pend_sc = pend_sc }))
@@ -1210,8 +1210,12 @@ solveForAllNC ev tvs theta pred
 solveForAll :: CtEvidence -> [TcTyVar] -> TcThetaType -> PredType -> ExpansionFuel
             -> TcS (StopOrContinue Void)
 -- Precondition: already rewritten by inert set
-solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_loc = loc })
-            tvs theta pred _fuel
+solveForAll ev tvs theta pred fuel
+  | CtGiven {} <- ev
+  -- See Note [Solving a Given forall-constraint]
+  = do { addInertForAll qci
+       ; stopWith ev "Given forall-constraint" }
+  | CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_loc = loc } <- ev
   = -- See Note [Solving a Wanted forall-constraint]
     TcS.setSrcSpan (getCtLocEnvLoc $ ctLocEnv loc) $
     -- This setSrcSpan is important: the emitImplicationTcS uses that
@@ -1257,11 +1261,6 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
                       ClassPred cls tys -> pSizeClassPred cls tys
                       _                 -> pSizeType pred
 
- -- See Note [Solving a Given forall-constraint]
-solveForAll ev@(CtGiven {}) tvs _theta pred fuel
-  = do { addInertForAll qci
-       ; stopWith ev "Given forall-constraint" }
-  where
     qci = QCI { qci_ev = ev, qci_tvs = tvs
               , qci_pred = pred, qci_pend_sc = fuel }
 

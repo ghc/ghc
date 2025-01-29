@@ -14,9 +14,10 @@
 module GHC.Tc.Solver.Monad (
 
     -- The TcS monad
-    TcS, runTcS, runTcSEarlyAbort, runTcSWithEvBinds, runTcSInerts,
-    failTcS, warnTcS, addErrTcS, wrapTcS, ctLocWarnTcS,
+    TcS, TcSMode(..),
+    runTcS, runTcSEarlyAbort, runTcSWithEvBinds, runTcSInerts,
     runTcSEqualities,
+    failTcS, failWithTcS, warnTcS, addErrTcS, wrapTcS, ctLocWarnTcS,
     nestTcS, nestImplicTcS, setEvBindsTcS,
     emitImplicationTcS, emitTvImplicationTcS,
     emitFunDepWanteds,
@@ -37,7 +38,7 @@ module GHC.Tc.Solver.Monad (
     stopWithStage, nopStage,
 
     -- Tracing etc
-    panicTcS, traceTcS, tryEarlyAbortTcS,
+    panicTcS, traceTcS, getModeTcS,
     traceFireTcS, bumpStepCountTcS, csTraceTcS,
     wrapErrTcS, wrapWarnTcS,
     resetUnificationFlag, setUnificationFlag,
@@ -825,6 +826,8 @@ added.  This is initialised from the innermost implication constraint.
 
 data TcSEnv
   = TcSEnv {
+      tcs_mode :: TcSMode,
+
       tcs_ev_binds    :: EvBindsVar,
 
       tcs_unified     :: IORef Int,
@@ -842,14 +845,23 @@ data TcSEnv
 
       tcs_inerts    :: IORef InertSet, -- Current inert set
 
-      -- Whether to throw an exception if we come across an insoluble constraint.
-      -- Used to fail-fast when checking for hole-fits. See Note [Speeding up
-      -- valid hole-fits].
-      tcs_abort_on_insoluble :: Bool,
-
       -- See Note [WorkList priorities] in GHC.Tc.Solver.InertSet
       tcs_worklist  :: IORef WorkList -- Current worklist
     }
+
+data TcSMode
+  = TcSVanilla
+
+  | TcSHoleFits  -- ^ Throw an exception if we come across an insoluble constraint,
+                 -- to fail-fast when checking for hole-fits.
+                 --
+                 -- See Note [Speeding up valid hole-fits].
+
+  deriving( Eq )
+
+instance Outputable TcSMode where
+  ppr TcSVanilla  = text "TcSVanilla"
+  ppr TcSHoleFits = text "TcSHoleFits"
 
 ---------------
 newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a }
@@ -911,17 +923,17 @@ wrapWarnTcS :: TcM a -> TcS a
 wrapWarnTcS = wrapTcS
 
 panicTcS  :: SDoc -> TcS a
-failTcS   :: TcRnMessage -> TcS a
+failTcS     :: TcS a
+failWithTcS :: TcRnMessage -> TcS a
 warnTcS, addErrTcS :: TcRnMessage -> TcS ()
-failTcS      = wrapTcS . TcM.failWith
+failTcS      = wrapTcS TcM.failM
+failWithTcS  = wrapTcS . TcM.failWith
 warnTcS msg  = wrapTcS (TcM.addDiagnostic msg)
 addErrTcS    = wrapTcS . TcM.addErr
 panicTcS doc = pprPanic "GHC.Tc.Solver.Monad" doc
 
-tryEarlyAbortTcS :: TcS ()
--- Abort (fail in the monad) if the abort_on_insoluble flag is on
-tryEarlyAbortTcS
-  = mkTcS (\env -> when (tcs_abort_on_insoluble env) TcM.failM)
+getModeTcS :: TcS TcSMode
+getModeTcS = mkTcS (\env -> return (tcs_mode env))
 
 -- | Emit a warning within the 'TcS' monad at the location given by the 'CtLoc'.
 ctLocWarnTcS :: CtLoc -> TcRnMessage -> TcS ()
@@ -977,11 +989,13 @@ csTraceTcM mk_doc
                        msg }) }
 {-# INLINE csTraceTcM #-}  -- see Note [INLINE conditional tracing utilities]
 
-runTcS :: TcS a                -- What to run
-       -> TcM (a, EvBindMap)
+runTcSWithEvBinds :: EvBindsVar -> TcS a -> TcM a
+runTcSWithEvBinds = runTcSWorker True TcSVanilla
+
+runTcS :: TcS a -> TcM (a, EvBindMap)
 runTcS tcs
   = do { ev_binds_var <- TcM.newTcEvBinds
-       ; res <- runTcSWithEvBinds ev_binds_var tcs
+       ; res <- runTcSWorker True TcSVanilla ev_binds_var tcs
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
        ; return (res, ev_binds) }
 
@@ -991,51 +1005,47 @@ runTcS tcs
 runTcSEarlyAbort :: TcS a -> TcM a
 runTcSEarlyAbort tcs
   = do { ev_binds_var <- TcM.newTcEvBinds
-       ; runTcSWithEvBinds' True True ev_binds_var tcs }
+       ; runTcSWorker True TcSHoleFits ev_binds_var tcs }
 
 -- | This can deal only with equality constraints.
 runTcSEqualities :: TcS a -> TcM a
 runTcSEqualities thing_inside
-  = do { ev_binds_var <- TcM.newNoTcEvBinds
-       ; runTcSWithEvBinds ev_binds_var thing_inside }
+  = do { ev_binds_var <- TcM.newNoTcEvBinds  -- No bindings
+       ; runTcSWorker True TcSVanilla ev_binds_var thing_inside }
 
 -- | A variant of 'runTcS' that takes and returns an 'InertSet' for
 -- later resumption of the 'TcS' session.
 runTcSInerts :: InertSet -> TcS a -> TcM (a, InertSet)
-runTcSInerts inerts tcs = do
-  ev_binds_var <- TcM.newTcEvBinds
-  runTcSWithEvBinds' False False ev_binds_var $ do
-    setInertSet inerts
-    a <- tcs
-    new_inerts <- getInertSet
-    return (a, new_inerts)
+runTcSInerts inerts tcs
+  = do { ev_binds_var <- TcM.newTcEvBinds
+       ; runTcSWorker False TcSVanilla ev_binds_var $
+         do { setInertSet inerts
+            ; a <- tcs
+            ; new_inerts <- getInertSet
+            ; return (a, new_inerts) } }
 
-runTcSWithEvBinds :: EvBindsVar
-                  -> TcS a
-                  -> TcM a
-runTcSWithEvBinds = runTcSWithEvBinds' True False
-
-runTcSWithEvBinds' :: Bool -- ^ Restore type variable cycles afterwards?
-                           -- Don't if you want to reuse the InertSet.
-                           -- See also Note [Type equality cycles]
-                           -- in GHC.Tc.Solver.Equality
-                   -> Bool
-                   -> EvBindsVar
-                   -> TcS a
-                   -> TcM a
-runTcSWithEvBinds' restore_cycles abort_on_insoluble ev_binds_var tcs
+-- runTcSWorker is not exported
+runTcSWorker :: Bool -- ^ Restore type variable cycles afterwards?
+                     -- Don't if you want to reuse the InertSet.
+                     -- See also Note [Type equality cycles]
+                     -- in GHC.Tc.Solver.Equality
+             -> TcSMode
+             -> EvBindsVar
+             -> TcS a
+             -> TcM a
+runTcSWorker restore_cycles mode ev_binds_var tcs
   = do { unified_var <- TcM.newTcRef 0
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef emptyInert
        ; wl_var <- TcM.newTcRef emptyWorkList
        ; unif_lvl_var <- TcM.newTcRef Nothing
-       ; let env = TcSEnv { tcs_ev_binds           = ev_binds_var
-                          , tcs_unified            = unified_var
-                          , tcs_unif_lvl           = unif_lvl_var
-                          , tcs_count              = step_count
-                          , tcs_inerts             = inert_var
-                          , tcs_abort_on_insoluble = abort_on_insoluble
-                          , tcs_worklist           = wl_var }
+       ; let env = TcSEnv { tcs_mode      = mode
+                          , tcs_ev_binds  = ev_binds_var
+                          , tcs_unified   = unified_var
+                          , tcs_unif_lvl  = unif_lvl_var
+                          , tcs_count     = step_count
+                          , tcs_inerts    = inert_var
+                          , tcs_worklist  = wl_var }
 
              -- Run the computation
        ; res <- unTcS tcs env
@@ -1092,12 +1102,7 @@ nestImplicTcS :: EvBindsVar
               -> TcLevel -> TcS a
               -> TcS a
 nestImplicTcS ref inner_tclvl (TcS thing_inside)
-  = TcS $ \ TcSEnv { tcs_unified            = unified_var
-                   , tcs_inerts             = old_inert_var
-                   , tcs_count              = count
-                   , tcs_unif_lvl           = unif_lvl
-                   , tcs_abort_on_insoluble = abort_on_insoluble
-                   } ->
+  = TcS $ \ env@(TcSEnv { tcs_inerts = old_inert_var }) ->
     do { inerts <- TcM.readTcRef old_inert_var
        ; let nest_inert = inerts { inert_cycle_breakers = pushCycleBreakerVarStack
                                                             (inert_cycle_breakers inerts)
@@ -1106,13 +1111,9 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
                  -- All other InertSet fields are inherited
        ; new_inert_var <- TcM.newTcRef nest_inert
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
-       ; let nest_env = TcSEnv { tcs_count              = count     -- Inherited
-                               , tcs_unif_lvl           = unif_lvl  -- Inherited
-                               , tcs_ev_binds           = ref
-                               , tcs_unified            = unified_var
-                               , tcs_inerts             = new_inert_var
-                               , tcs_abort_on_insoluble = abort_on_insoluble
-                               , tcs_worklist           = new_wl_var }
+       ; let nest_env = env  { tcs_ev_binds = ref
+                             , tcs_inerts   = new_inert_var
+                             , tcs_worklist = new_wl_var }
        ; res <- TcM.setTcLevel inner_tclvl $
                 thing_inside nest_env
 
