@@ -76,6 +76,9 @@ main = do
   ghc1' <- Ghc <$> makeAbsolute "_build/stage1/bin/ghc"
   buildGhcStage2 defaultGhcBuildOptions cabal ghc1' "_build/stage2/"
 
+  -- copy stage1's boot packages for stage2 to use.
+  cp "_build/stage1/pkgs/*" "_build/stage2/pkgs"
+
   msg "Done"
 
 
@@ -177,6 +180,8 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , "  " ++ src </> "libraries/directory/"
         , "  " ++ src </> "libraries/file-io/"
         , "  " ++ src </> "libraries/filepath/"
+        , "  " ++ src </> "libraries/haskeline/"
+        , "  " ++ src </> "libraries/terminfo/"
         , "  " ++ src </> "libraries/ghc-platform/"
         , "  " ++ src </> "libraries/ghc-boot/"
         , "  " ++ src </> "libraries/ghc-boot-th/"
@@ -215,6 +220,12 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , ""
         , "package ghci"
         , "  flags: +internal-interpreter"
+        , ""
+        , "package ghc-bin"
+        , "  flags: +internal-interpreter"
+        , ""
+        , "package haskeline"
+        , "  flags: -terminfo" -- FIXME: should be enabled but I don't have the static libs for terminfo on ArchLinux...
         , ""
         , "package text"
              -- FIXME: avoid having to deal with system-cxx-std-lib fake package for now
