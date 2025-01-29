@@ -182,6 +182,8 @@ int rts_stop_on_exception = 0;
 
 #if defined(INTERP_STATS)
 
+#define N_CODES 128
+
 /* Hacky stats, for tuning the interpreter ... */
 int it_unknown_entries[N_CLOSURE_TYPES];
 int it_total_unknown_entries;
@@ -195,8 +197,8 @@ int it_slides;
 int it_insns;
 int it_BCO_entries;
 
-int it_ofreq[27];
-int it_oofreq[27][27];
+int it_ofreq[N_CODES];
+int it_oofreq[N_CODES][N_CODES];
 int it_lastopc;
 
 
@@ -210,9 +212,9 @@ void interp_startup ( void )
    for (i = 0; i < N_CLOSURE_TYPES; i++)
       it_unknown_entries[i] = 0;
    it_slides = it_insns = it_BCO_entries = 0;
-   for (i = 0; i < 27; i++) it_ofreq[i] = 0;
-   for (i = 0; i < 27; i++)
-     for (j = 0; j < 27; j++)
+   for (i = 0; i < N_CODES; i++) it_ofreq[i] = 0;
+   for (i = 0; i < N_CODES; i++)
+     for (j = 0; j < N_CODES; j++)
         it_oofreq[i][j] = 0;
    it_lastopc = 0;
 }
@@ -234,14 +236,14 @@ void interp_shutdown ( void )
    }
    debugBelch("%d insns, %d slides, %d BCO_entries\n",
                    it_insns, it_slides, it_BCO_entries);
-   for (i = 0; i < 27; i++)
+   for (i = 0; i < N_CODES; i++)
       debugBelch("opcode %2d got %d\n", i, it_ofreq[i] );
 
    for (k = 1; k < 20; k++) {
       o_max = 0;
       i_max = j_max = 0;
-      for (i = 0; i < 27; i++) {
-         for (j = 0; j < 27; j++) {
+      for (i = 0; i < N_CODES; i++) {
+         for (j = 0; j < N_CODES; j++) {
             if (it_oofreq[i][j] > o_max) {
                o_max = it_oofreq[i][j];
                i_max = i; j_max = j;
@@ -258,6 +260,12 @@ void interp_shutdown ( void )
 }
 
 #else // !INTERP_STATS
+
+void interp_startup( void ){
+}
+
+void interp_shutdown( void ){
+}
 
 #define INTERP_TICK(n) /* nothing */
 
@@ -419,7 +427,7 @@ eval:
 
 eval_obj:
     obj = UNTAG_CLOSURE(tagged_obj);
-    INTERP_TICK(it_total_evals);
+    INTERP_TICK(it_total_entries);
 
     IF_DEBUG(interpreter,
              debugBelch(
@@ -1098,7 +1106,7 @@ run_BCO:
         INTERP_TICK(it_insns);
 
 #if defined(INTERP_STATS)
-        ASSERT( (int)instrs[bciPtr] >= 0 && (int)instrs[bciPtr] < 27 );
+        ASSERT( (int)instrs[bciPtr] >= 0 && (int)instrs[bciPtr] < N_CODES );
         it_ofreq[ (int)instrs[bciPtr] ] ++;
         it_oofreq[ it_lastopc ][ (int)instrs[bciPtr] ] ++;
         it_lastopc = (int)instrs[bciPtr];

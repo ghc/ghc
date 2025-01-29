@@ -17,6 +17,7 @@
 #include "Prelude.h"
 #include "Task.h"
 #include "Excn.h"
+#include "Interpreter.h"
 
 #if defined(DEBUG)
 # include "Printer.h"   /* for printing        */
@@ -55,6 +56,8 @@ int hs_main ( int argc, char *argv[],       // program args
     #endif
 
     hs_init_ghc(&argc, &argv, rts_config);
+
+    interp_startup();
 
     BEGIN_WINDOWS_VEH_HANDLER
 
@@ -95,6 +98,8 @@ int hs_main ( int argc, char *argv[],       // program args
     }
 
     END_WINDOWS_VEH_HANDLER
+
+    interp_shutdown();
 
     shutdownHaskellAndExit(exit_status, 0 /* !fastExit */);
     // No code beyond this point. Dead code elimination will remove it
