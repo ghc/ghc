@@ -3,9 +3,14 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 
-{-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
+{-# OPTIONS_GHC -O2 -funbox-strict-fields -fno-unoptimized-core-for-interpreter #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
+--
+-- Also important, if you load this module into GHCi then the data representation of
+-- FastString has to match that of the host compiler due to the shared FastString
+-- table. Otherwise you will get segfaults when the table is consulted and the fields
+-- from the FastString are in an incorrect order.
 
 -- |
 -- There are two principal string types used internally by GHC:
