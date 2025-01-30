@@ -1341,7 +1341,7 @@ isAutoRule (Rule { ru_auto = is_auto }) = is_auto
 
 -- | The number of arguments the 'ru_fn' must be applied
 -- to before the rule can match on it
-ruleArity :: CoreRule -> Int
+ruleArity :: CoreRule -> FullArgCount
 ruleArity (BuiltinRule {ru_nargs = n}) = n
 ruleArity (Rule {ru_args = args})      = length args
 
