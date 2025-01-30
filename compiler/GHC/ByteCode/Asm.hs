@@ -1,6 +1,9 @@
 {-# LANGUAGE CPP             #-}
 {-# LANGUAGE DeriveFunctor   #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -47,6 +50,7 @@ import GHC.Platform.Profile
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
+import Control.Monad.Trans.Reader
 
 import qualified Data.Array.Unboxed as Array
 import Data.Array.Base  ( UArray(..) )
@@ -176,6 +180,17 @@ assembleOneBCO interp profile pbco = do
   UnitFlatBag ubco' <- mallocStrings interp (UnitFlatBag ubco)
   return ubco'
 
+
+{-# NOINLINE inspectInstrs #-}
+inspectInstrs :: Platform -> Bool -> Word -> [BCInstr] -> (Word, LabelEnvMap)
+inspectInstrs platform long_jump e instrs =
+  inspectAsm long_jump e (mapM_ (assembleI @InspectAsm platform) instrs)
+
+{-# NOINLINE runInstrs #-}
+runInstrs :: AsmState -> Platform -> Bool -> LabelEnv -> [BCInstr] -> IO AsmState
+runInstrs initial_state platform long_jumps env instrs =
+  flip execStateT initial_state $ runAsm long_jumps env (mapM_ (assembleI @RunAsm platform) instrs)
+
 assembleBCO :: Platform -> ProtoBCO Name -> IO UnlinkedBCO
 assembleBCO platform
             (ProtoBCO { protoBCOName       = nm
@@ -184,9 +199,7 @@ assembleBCO platform
                       , protoBCOBitmapSize = bsize
                       , protoBCOArity      = arity }) = do
   -- pass 1: collect up the offsets of the local labels.
-  let asm = mapM_ (assembleI platform) instrs
-
-      initial_offset = 0
+  let initial_offset = 0
 
       -- Jump instructions are variable-sized, there are long and short variants
       -- depending on the magnitude of the offset.  However, we can't tell what
@@ -196,11 +209,11 @@ assembleBCO platform
       -- and if the final size is indeed small enough for short jumps, we are
       -- done.  Otherwise, we repeat the calculation, and we force all jumps in
       -- this BCO to be long.
-      (n_insns0, lbl_map0) = inspectAsm platform False initial_offset asm
+      (n_insns0, lbl_map0) = inspectInstrs platform False initial_offset instrs
       ((n_insns, lbl_map), long_jumps)
         | isLargeW (fromIntegral $ Map.size lbl_map0)
           || isLargeW n_insns0
-                    = (inspectAsm platform True initial_offset asm, True)
+                    = (inspectInstrs platform True initial_offset instrs, True)
         | otherwise = ((n_insns0, lbl_map0), False)
 
       env :: LocalLabel -> Word
@@ -209,8 +222,8 @@ assembleBCO platform
         (Map.lookup lbl lbl_map)
 
   -- pass 2: run assembler and generate instructions, literals and pointers
-  let initial_state = (emptySS, emptySS, emptySS)
-  (final_insns, final_lits, final_ptrs) <- flip execStateT initial_state $ runAsm platform long_jumps env asm
+  let initial_state = AsmState emptySS emptySS emptySS
+  AsmState final_insns final_lits final_ptrs <- runInstrs initial_state platform long_jumps env instrs
 
   -- precomputed size should be equal to final size
   massertPpr (n_insns == sizeSS final_insns)
@@ -237,9 +250,9 @@ mkBitmapArray bsize bitmap
       fromIntegral bsize : map (fromInteger . fromStgWord) bitmap
 
 -- instrs nonptrs ptrs
-type AsmState = (SizedSeq Word16,
-                 SizedSeq BCONPtr,
-                 SizedSeq BCOPtr)
+data AsmState = AsmState {-# UNPACK #-} !(SizedSeq Word16)
+                         {-# UNPACK #-} !(SizedSeq BCONPtr)
+                         {-# UNPACK #-} !(SizedSeq BCOPtr)
 
 data Operand
   = Op Word
@@ -259,39 +272,9 @@ truncHalfWord platform w = case platformWordSize platform of
   PW8 | w <= 4294967295 -> Op (fromIntegral w)
   _ -> pprPanic "GHC.ByteCode.Asm.truncHalfWord" (ppr w)
 
-data Assembler a
-  = AllocPtr (IO BCOPtr) (Word -> Assembler a)
-  | AllocLit [BCONPtr] (Word -> Assembler a)
-  | AllocLabel LocalLabel (Assembler a)
-  | Emit Word16 [Operand] (Assembler a)
-  | NullAsm a
-  deriving (Functor)
 
-instance Applicative Assembler where
-    pure = NullAsm
-    (<*>) = ap
-
-instance Monad Assembler where
-  NullAsm x >>= f = f x
-  AllocPtr p k >>= f = AllocPtr p (k >=> f)
-  AllocLit l k >>= f = AllocLit l (k >=> f)
-  AllocLabel lbl k >>= f = AllocLabel lbl (k >>= f)
-  Emit w ops k >>= f = Emit w ops (k >>= f)
-
-ioptr :: IO BCOPtr -> Assembler Word
-ioptr p = AllocPtr p return
-
-ptr :: BCOPtr -> Assembler Word
+ptr :: MonadAssembler m => BCOPtr -> m Word
 ptr = ioptr . return
-
-lit :: [BCONPtr] -> Assembler Word
-lit l = AllocLit l return
-
-label :: LocalLabel -> Assembler ()
-label w = AllocLabel w (return ())
-
-emit :: Word16 -> [Operand] -> Assembler ()
-emit w ops = Emit w ops (return ())
 
 type LabelEnv = LocalLabel -> Word
 
@@ -302,36 +285,59 @@ largeOp long_jumps op = case op of
    IOp i     -> isLargeI i
    LabelOp _ -> long_jumps
 
-runAsm :: Platform -> Bool -> LabelEnv -> Assembler a -> StateT AsmState IO a
-runAsm platform long_jumps e = go
-  where
-    go (NullAsm x) = return x
-    go (AllocPtr p_io k) = do
-      p <- lift p_io
-      w <- state $ \(st_i0,st_l0,st_p0) ->
-        let st_p1 = addToSS st_p0 p
-        in (sizeSS st_p0, (st_i0,st_l0,st_p1))
-      go $ k w
-    go (AllocLit lits k) = do
-      w <- state $ \(st_i0,st_l0,st_p0) ->
+newtype RunAsm a = RunAsm { runRunAsm :: Bool -> LabelEnv -> StateT AsmState IO a }
+
+instance Functor RunAsm where
+  fmap f (RunAsm x) = RunAsm (\b c -> fmap f (x b c) )
+
+instance Applicative RunAsm where
+  pure x = RunAsm $ \_ _ -> pure x
+  (RunAsm f) <*> (RunAsm x) = RunAsm $ \b c -> f b c <*> x b c
+  {-# INLINE (<*>) #-}
+
+instance Monad RunAsm where
+  return  = pure
+  (RunAsm m) >>= f = RunAsm $ \b c -> m b c >>= (\d -> runRunAsm (f d) b c)
+  {-# INLINE (>>=) #-}
+
+
+
+runAsm :: Bool -> LabelEnv -> RunAsm a -> StateT AsmState IO a
+runAsm long_jumps e (RunAsm{runRunAsm}) = runRunAsm long_jumps e
+
+instance MonadAssembler RunAsm where
+  ioptr p_io = RunAsm $ \_ _ -> do
+                 p <- lift p_io
+                 w <- state $ \(AsmState st_i0 st_l0 st_p0) ->
+                   let st_p1 = addToSS st_p0 p
+                   in (sizeSS st_p0, AsmState st_i0 st_l0 st_p1)
+                 return w
+  lit lits = RunAsm $ \_ _ ->
+      state $ \(AsmState st_i0 st_l0 st_p0) ->
         let st_l1 = addListToSS st_l0 lits
-        in (sizeSS st_l0, (st_i0,st_l1,st_p0))
-      go $ k w
-    go (AllocLabel _ k) = go k
-    go (Emit w ops k) = do
-      let largeArgs = any (largeOp long_jumps) ops
-          opcode
-            | largeArgs = largeArgInstr w
-            | otherwise = w
-          words = concatMap expand ops
-          expand (SmallOp w) = [w]
-          expand (LabelOp w) = expand (Op (e w))
-          expand (Op w) = if largeArgs then largeArg platform (fromIntegral w) else [fromIntegral w]
-          expand (IOp i) = if largeArgs then largeArg platform (fromIntegral i) else [fromIntegral i]
-      state $ \(st_i0,st_l0,st_p0) ->
-        let st_i1 = addListToSS st_i0 (opcode : words)
-        in ((), (st_i1,st_l0,st_p0))
-      go k
+        in (sizeSS st_l0, AsmState st_i0 st_l1 st_p0)
+
+  label _ = return ()
+
+  emit platform w ops = RunAsm $ \long_jumps e -> do
+                let largeArgs = any (largeOp long_jumps) ops
+                    opcode
+                      | largeArgs = largeArgInstr w
+                      | otherwise = w
+                    words = concatMap expand ops
+                    expand (SmallOp w) = [w]
+                    expand (LabelOp w) = expand (Op (e w))
+                    expand (Op w) = if largeArgs then largeArg platform (fromIntegral w) else [fromIntegral w]
+                    expand (IOp i) = if largeArgs then largeArg platform (fromIntegral i) else [fromIntegral i]
+                state $ \(AsmState st_i0 st_l0 st_p0) ->
+                  let st_i1 = addListToSS st_i0 (opcode : words)
+                  in ((), AsmState st_i1 st_l0 st_p0)
+
+  {-# INLINE emit #-}
+  {-# INLINE label #-}
+  {-# INLINE lit #-}
+  {-# INLINE ioptr #-}
+
 
 type LabelEnvMap = Map LocalLabel Word
 
@@ -342,32 +348,84 @@ data InspectState = InspectState
   , lblEnv :: LabelEnvMap
   }
 
+newtype InspectEnv = InspectEnv { _inspectLongJumps :: Bool
+                                }
+
 
 -- | A hand-specialised version of genericLength to Word.
 -- 'genericLength' does not specialise due to the NOINLINE pragma.
 wordLength :: [a] -> Word
 wordLength = foldl' (\n _ -> 1 + n) 0
 
-inspectAsm :: Platform -> Bool -> Word -> Assembler a -> (Word, LabelEnvMap)
-inspectAsm platform long_jumps initial_offset
-  = go (InspectState initial_offset 0 0 Map.empty)
-  where
-    go s (NullAsm _) = (instrCount s, lblEnv s)
-    go s (AllocPtr _ k) = go (s { ptrCount = n + 1 }) (k n)
-      where n = ptrCount s
-    go s (AllocLit ls k) = go (s { litCount = n + wordLength ls }) (k n)
-      where n = litCount s
-    go s (AllocLabel lbl k) = go s' k
-      where s' = s { lblEnv = Map.insert lbl (instrCount s) (lblEnv s) }
-    go s (Emit _ ops k) = go s' k
-      where
-        s' = s { instrCount = instrCount s + size }
-        size = sum (map count ops) + 1
+newtype InspectAsm a = InspectAsm { runInspectAsm :: InspectEnv -> InspectState -> (# InspectState,  a #) }
+
+instance Functor InspectAsm where
+  fmap f (InspectAsm k) = InspectAsm $ \a b -> case k a b of
+                                                  (# b', c #) -> (# b', f c #)
+
+instance Applicative InspectAsm where
+  pure x = InspectAsm $ \_ s -> (# s, x #)
+  (InspectAsm f) <*> (InspectAsm x) = InspectAsm $ \a b -> case f a b of
+                                                              (# s', f' #) ->
+                                                                case x a s' of
+                                                                  (# s'', x' #) -> (# s'', f' x' #)
+
+instance Monad InspectAsm where
+  return = pure
+  (InspectAsm m) >>= f = InspectAsm $ \ a b -> case m a b of
+                                                (# s', a' #) -> runInspectAsm (f a') a s'
+
+
+
+get_ :: InspectAsm InspectState
+get_ = InspectAsm $ \a b -> (# b, b #)
+
+put_ :: InspectState -> InspectAsm ()
+put_ !s = InspectAsm $ \_ _ -> (# s, () #)
+
+modify_ :: (InspectState -> InspectState) -> InspectAsm ()
+modify_ f = InspectAsm $ \_ s -> let !s' = f s in (# s', () #)
+
+ask_ :: InspectAsm InspectEnv
+ask_ = InspectAsm $ \a b -> (# b, a #)
+
+inspectAsm :: Bool -> Word -> InspectAsm () -> (Word, LabelEnvMap)
+inspectAsm long_jumps initial_offset (InspectAsm s) =
+  case s (InspectEnv long_jumps) (InspectState initial_offset 0 0 Map.empty) of
+    (# res, () #) -> (instrCount res, lblEnv res)
+{-# INLINE inspectAsm #-}
+
+instance MonadAssembler InspectAsm where
+  ioptr _ = do
+    s <- get_
+    let n = ptrCount s
+    put_ (s { ptrCount = n + 1 })
+    return n
+
+  lit ls = do
+    s <- get_
+    let n = litCount s
+    put_ (s { litCount = n + wordLength ls })
+    return n
+
+  label lbl = modify_ (\s -> s { lblEnv = Map.insert lbl (instrCount s) (lblEnv s) })
+
+  emit platform _ ops = do
+    InspectEnv long_jumps <- ask_
+    let size = sum (map count ops) + 1
         largeOps = any (largeOp long_jumps) ops
         count (SmallOp _) = 1
         count (LabelOp _) = count (Op 0)
         count (Op _) = if largeOps then largeArg16s platform else 1
         count (IOp _) = if largeOps then largeArg16s platform else 1
+    s <- get_
+    put_ (s { instrCount = instrCount s + size })
+
+  {-# INLINE emit #-}
+  {-# INLINE label #-}
+  {-# INLINE lit #-}
+  {-# INLINE ioptr #-}
+
 
 -- Bring in all the bci_ bytecode constants.
 #include "Bytecodes.h"
@@ -391,31 +449,41 @@ largeArg16s platform = case platformWordSize platform of
    PW8 -> 4
    PW4 -> 2
 
-assembleI :: Platform
+class Monad m => MonadAssembler m where
+  ioptr :: IO BCOPtr -> m Word
+  lit :: [BCONPtr] -> m Word
+  label :: LocalLabel -> m ()
+  emit :: Platform -> Word16 -> [Operand] -> m ()
+
+{-# SPECIALISE assembleI :: Platform -> BCInstr -> InspectAsm () #-}
+{-# SPECIALISE assembleI :: Platform -> BCInstr -> RunAsm () #-}
+
+assembleI :: forall m . MonadAssembler m
+          => Platform
           -> BCInstr
-          -> Assembler ()
+          -> m ()
 assembleI platform i = case i of
-  STKCHECK n               -> emit bci_STKCHECK [Op n]
-  PUSH_L o1                -> emit bci_PUSH_L [wOp o1]
-  PUSH_LL o1 o2            -> emit bci_PUSH_LL [wOp o1, wOp o2]
-  PUSH_LLL o1 o2 o3        -> emit bci_PUSH_LLL [wOp o1, wOp o2, wOp o3]
-  PUSH8 o1                 -> emit bci_PUSH8 [bOp o1]
-  PUSH16 o1                -> emit bci_PUSH16 [bOp o1]
-  PUSH32 o1                -> emit bci_PUSH32 [bOp o1]
-  PUSH8_W o1               -> emit bci_PUSH8_W [bOp o1]
-  PUSH16_W o1              -> emit bci_PUSH16_W [bOp o1]
-  PUSH32_W o1              -> emit bci_PUSH32_W [bOp o1]
+  STKCHECK n               -> emit_ bci_STKCHECK [Op n]
+  PUSH_L o1                -> emit_ bci_PUSH_L [wOp o1]
+  PUSH_LL o1 o2            -> emit_ bci_PUSH_LL [wOp o1, wOp o2]
+  PUSH_LLL o1 o2 o3        -> emit_ bci_PUSH_LLL [wOp o1, wOp o2, wOp o3]
+  PUSH8 o1                 -> emit_ bci_PUSH8 [bOp o1]
+  PUSH16 o1                -> emit_ bci_PUSH16 [bOp o1]
+  PUSH32 o1                -> emit_ bci_PUSH32 [bOp o1]
+  PUSH8_W o1               -> emit_ bci_PUSH8_W [bOp o1]
+  PUSH16_W o1              -> emit_ bci_PUSH16_W [bOp o1]
+  PUSH32_W o1              -> emit_ bci_PUSH32_W [bOp o1]
   PUSH_G nm                -> do p <- ptr (BCOPtrName nm)
-                                 emit bci_PUSH_G [Op p]
+                                 emit_ bci_PUSH_G [Op p]
   PUSH_PRIMOP op           -> do p <- ptr (BCOPtrPrimOp op)
-                                 emit bci_PUSH_G [Op p]
+                                 emit_ bci_PUSH_G [Op p]
   PUSH_BCO proto           -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
-                                 emit bci_PUSH_G [Op p]
+                                 emit_ bci_PUSH_G [Op p]
   PUSH_ALTS proto pk
                            -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
-                                 emit (push_alts pk) [Op p]
+                                 emit_ (push_alts pk) [Op p]
   PUSH_ALTS_TUPLE proto call_info tuple_proto
                            -> do let ul_bco = assembleBCO platform proto
                                      ul_tuple_bco = assembleBCO platform
@@ -424,121 +492,124 @@ assembleI platform i = case i of
                                  p_tup <- ioptr (liftM BCOPtrBCO ul_tuple_bco)
                                  info <- word (fromIntegral $
                                               mkNativeCallInfoSig platform call_info)
-                                 emit bci_PUSH_ALTS_T
+                                 emit_ bci_PUSH_ALTS_T
                                       [Op p, Op info, Op p_tup]
-  PUSH_PAD8                -> emit bci_PUSH_PAD8 []
-  PUSH_PAD16               -> emit bci_PUSH_PAD16 []
-  PUSH_PAD32               -> emit bci_PUSH_PAD32 []
+  PUSH_PAD8                -> emit_ bci_PUSH_PAD8 []
+  PUSH_PAD16               -> emit_ bci_PUSH_PAD16 []
+  PUSH_PAD32               -> emit_ bci_PUSH_PAD32 []
   PUSH_UBX8 lit            -> do np <- literal lit
-                                 emit bci_PUSH_UBX8 [Op np]
+                                 emit_ bci_PUSH_UBX8 [Op np]
   PUSH_UBX16 lit           -> do np <- literal lit
-                                 emit bci_PUSH_UBX16 [Op np]
+                                 emit_ bci_PUSH_UBX16 [Op np]
   PUSH_UBX32 lit           -> do np <- literal lit
-                                 emit bci_PUSH_UBX32 [Op np]
+                                 emit_ bci_PUSH_UBX32 [Op np]
   PUSH_UBX lit nws         -> do np <- literal lit
-                                 emit bci_PUSH_UBX [Op np, wOp nws]
+                                 emit_ bci_PUSH_UBX [Op np, wOp nws]
 
   -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode
   PUSH_ADDR nm             -> do np <- lit [BCONPtrAddr nm]
-                                 emit bci_PUSH_UBX [Op np, SmallOp 1]
+                                 emit_ bci_PUSH_UBX [Op np, SmallOp 1]
 
-  PUSH_APPLY_N             -> emit bci_PUSH_APPLY_N []
-  PUSH_APPLY_V             -> emit bci_PUSH_APPLY_V []
-  PUSH_APPLY_F             -> emit bci_PUSH_APPLY_F []
-  PUSH_APPLY_D             -> emit bci_PUSH_APPLY_D []
-  PUSH_APPLY_L             -> emit bci_PUSH_APPLY_L []
-  PUSH_APPLY_P             -> emit bci_PUSH_APPLY_P []
-  PUSH_APPLY_PP            -> emit bci_PUSH_APPLY_PP []
-  PUSH_APPLY_PPP           -> emit bci_PUSH_APPLY_PPP []
-  PUSH_APPLY_PPPP          -> emit bci_PUSH_APPLY_PPPP []
-  PUSH_APPLY_PPPPP         -> emit bci_PUSH_APPLY_PPPPP []
-  PUSH_APPLY_PPPPPP        -> emit bci_PUSH_APPLY_PPPPPP []
+  PUSH_APPLY_N             -> emit_ bci_PUSH_APPLY_N []
+  PUSH_APPLY_V             -> emit_ bci_PUSH_APPLY_V []
+  PUSH_APPLY_F             -> emit_ bci_PUSH_APPLY_F []
+  PUSH_APPLY_D             -> emit_ bci_PUSH_APPLY_D []
+  PUSH_APPLY_L             -> emit_ bci_PUSH_APPLY_L []
+  PUSH_APPLY_P             -> emit_ bci_PUSH_APPLY_P []
+  PUSH_APPLY_PP            -> emit_ bci_PUSH_APPLY_PP []
+  PUSH_APPLY_PPP           -> emit_ bci_PUSH_APPLY_PPP []
+  PUSH_APPLY_PPPP          -> emit_ bci_PUSH_APPLY_PPPP []
+  PUSH_APPLY_PPPPP         -> emit_ bci_PUSH_APPLY_PPPPP []
+  PUSH_APPLY_PPPPPP        -> emit_ bci_PUSH_APPLY_PPPPPP []
 
-  SLIDE     n by           -> emit bci_SLIDE [wOp n, wOp by]
-  ALLOC_AP  n              -> emit bci_ALLOC_AP [truncHalfWord platform n]
-  ALLOC_AP_NOUPD n         -> emit bci_ALLOC_AP_NOUPD [truncHalfWord platform n]
-  ALLOC_PAP arity n        -> emit bci_ALLOC_PAP [truncHalfWord platform arity, truncHalfWord platform n]
-  MKAP      off sz         -> emit bci_MKAP [wOp off, truncHalfWord platform sz]
-  MKPAP     off sz         -> emit bci_MKPAP [wOp off, truncHalfWord platform sz]
-  UNPACK    n              -> emit bci_UNPACK [wOp n]
+  SLIDE     n by           -> emit_ bci_SLIDE [wOp n, wOp by]
+  ALLOC_AP  n              -> emit_ bci_ALLOC_AP [truncHalfWord platform n]
+  ALLOC_AP_NOUPD n         -> emit_ bci_ALLOC_AP_NOUPD [truncHalfWord platform n]
+  ALLOC_PAP arity n        -> emit_ bci_ALLOC_PAP [truncHalfWord platform arity, truncHalfWord platform n]
+  MKAP      off sz         -> emit_ bci_MKAP [wOp off, truncHalfWord platform sz]
+  MKPAP     off sz         -> emit_ bci_MKPAP [wOp off, truncHalfWord platform sz]
+  UNPACK    n              -> emit_ bci_UNPACK [wOp n]
   PACK      dcon sz        -> do itbl_no <- lit [BCONPtrItbl (getName dcon)]
-                                 emit bci_PACK [Op itbl_no, wOp sz]
+                                 emit_ bci_PACK [Op itbl_no, wOp sz]
   LABEL     lbl            -> label lbl
   TESTLT_I  i l            -> do np <- int i
-                                 emit bci_TESTLT_I [Op np, LabelOp l]
+                                 emit_ bci_TESTLT_I [Op np, LabelOp l]
   TESTEQ_I  i l            -> do np <- int i
-                                 emit bci_TESTEQ_I [Op np, LabelOp l]
+                                 emit_ bci_TESTEQ_I [Op np, LabelOp l]
   TESTLT_W  w l            -> do np <- word w
-                                 emit bci_TESTLT_W [Op np, LabelOp l]
+                                 emit_ bci_TESTLT_W [Op np, LabelOp l]
   TESTEQ_W  w l            -> do np <- word w
-                                 emit bci_TESTEQ_W [Op np, LabelOp l]
+                                 emit_ bci_TESTEQ_W [Op np, LabelOp l]
   TESTLT_I64  i l          -> do np <- word64 (fromIntegral i)
-                                 emit bci_TESTLT_I64 [Op np, LabelOp l]
+                                 emit_ bci_TESTLT_I64 [Op np, LabelOp l]
   TESTEQ_I64  i l          -> do np <- word64 (fromIntegral i)
-                                 emit bci_TESTEQ_I64 [Op np, LabelOp l]
+                                 emit_ bci_TESTEQ_I64 [Op np, LabelOp l]
   TESTLT_I32  i l          -> do np <- word (fromIntegral i)
-                                 emit bci_TESTLT_I32 [Op np, LabelOp l]
+                                 emit_ bci_TESTLT_I32 [Op np, LabelOp l]
   TESTEQ_I32 i l           -> do np <- word (fromIntegral i)
-                                 emit bci_TESTEQ_I32 [Op np, LabelOp l]
+                                 emit_ bci_TESTEQ_I32 [Op np, LabelOp l]
   TESTLT_I16  i l          -> do np <- word (fromIntegral i)
-                                 emit bci_TESTLT_I16 [Op np, LabelOp l]
+                                 emit_ bci_TESTLT_I16 [Op np, LabelOp l]
   TESTEQ_I16 i l           -> do np <- word (fromIntegral i)
-                                 emit bci_TESTEQ_I16 [Op np, LabelOp l]
+                                 emit_ bci_TESTEQ_I16 [Op np, LabelOp l]
   TESTLT_I8  i l           -> do np <- word (fromIntegral i)
-                                 emit bci_TESTLT_I8 [Op np, LabelOp l]
+                                 emit_ bci_TESTLT_I8 [Op np, LabelOp l]
   TESTEQ_I8 i l            -> do np <- word (fromIntegral i)
-                                 emit bci_TESTEQ_I8 [Op np, LabelOp l]
+                                 emit_ bci_TESTEQ_I8 [Op np, LabelOp l]
   TESTLT_W64  w l          -> do np <- word64 w
-                                 emit bci_TESTLT_W64 [Op np, LabelOp l]
+                                 emit_ bci_TESTLT_W64 [Op np, LabelOp l]
   TESTEQ_W64  w l          -> do np <- word64 w
-                                 emit bci_TESTEQ_W64 [Op np, LabelOp l]
+                                 emit_ bci_TESTEQ_W64 [Op np, LabelOp l]
   TESTLT_W32  w l          -> do np <- word (fromIntegral w)
-                                 emit bci_TESTLT_W32 [Op np, LabelOp l]
+                                 emit_ bci_TESTLT_W32 [Op np, LabelOp l]
   TESTEQ_W32  w l          -> do np <- word (fromIntegral w)
-                                 emit bci_TESTEQ_W32 [Op np, LabelOp l]
+                                 emit_ bci_TESTEQ_W32 [Op np, LabelOp l]
   TESTLT_W16  w l          -> do np <- word (fromIntegral w)
-                                 emit bci_TESTLT_W16 [Op np, LabelOp l]
+                                 emit_ bci_TESTLT_W16 [Op np, LabelOp l]
   TESTEQ_W16  w l          -> do np <- word (fromIntegral w)
-                                 emit bci_TESTEQ_W16 [Op np, LabelOp l]
+                                 emit_ bci_TESTEQ_W16 [Op np, LabelOp l]
   TESTLT_W8  w l           -> do np <- word (fromIntegral w)
-                                 emit bci_TESTLT_W8 [Op np, LabelOp l]
+                                 emit_ bci_TESTLT_W8 [Op np, LabelOp l]
   TESTEQ_W8  w l           -> do np <- word (fromIntegral w)
-                                 emit bci_TESTEQ_W8 [Op np, LabelOp l]
+                                 emit_ bci_TESTEQ_W8 [Op np, LabelOp l]
   TESTLT_F  f l            -> do np <- float f
-                                 emit bci_TESTLT_F [Op np, LabelOp l]
+                                 emit_ bci_TESTLT_F [Op np, LabelOp l]
   TESTEQ_F  f l            -> do np <- float f
-                                 emit bci_TESTEQ_F [Op np, LabelOp l]
+                                 emit_ bci_TESTEQ_F [Op np, LabelOp l]
   TESTLT_D  d l            -> do np <- double d
-                                 emit bci_TESTLT_D [Op np, LabelOp l]
+                                 emit_ bci_TESTLT_D [Op np, LabelOp l]
   TESTEQ_D  d l            -> do np <- double d
-                                 emit bci_TESTEQ_D [Op np, LabelOp l]
-  TESTLT_P  i l            -> emit bci_TESTLT_P [SmallOp i, LabelOp l]
-  TESTEQ_P  i l            -> emit bci_TESTEQ_P [SmallOp i, LabelOp l]
-  CASEFAIL                 -> emit bci_CASEFAIL []
-  SWIZZLE   stkoff n       -> emit bci_SWIZZLE [wOp stkoff, IOp n]
-  JMP       l              -> emit bci_JMP [LabelOp l]
-  ENTER                    -> emit bci_ENTER []
-  RETURN rep               -> emit (return_non_tuple rep) []
-  RETURN_TUPLE             -> emit bci_RETURN_T []
+                                 emit_ bci_TESTEQ_D [Op np, LabelOp l]
+  TESTLT_P  i l            -> emit_ bci_TESTLT_P [SmallOp i, LabelOp l]
+  TESTEQ_P  i l            -> emit_ bci_TESTEQ_P [SmallOp i, LabelOp l]
+  CASEFAIL                 -> emit_ bci_CASEFAIL []
+  SWIZZLE   stkoff n       -> emit_ bci_SWIZZLE [wOp stkoff, IOp n]
+  JMP       l              -> emit_ bci_JMP [LabelOp l]
+  ENTER                    -> emit_ bci_ENTER []
+  RETURN rep               -> emit_ (return_non_tuple rep) []
+  RETURN_TUPLE             -> emit_ bci_RETURN_T []
   CCALL off m_addr i       -> do np <- addr m_addr
-                                 emit bci_CCALL [wOp off, Op np, SmallOp i]
-  PRIMCALL                 -> emit bci_PRIMCALL []
+                                 emit_ bci_CCALL [wOp off, Op np, SmallOp i]
+  PRIMCALL                 -> emit_ bci_PRIMCALL []
   BRK_FUN arr tick_mod tickx info_mod infox cc ->
                               do p1 <- ptr (BCOPtrBreakArray arr)
                                  tick_addr <- addr tick_mod
                                  info_addr <- addr info_mod
                                  np <- addr cc
-                                 emit bci_BRK_FUN [ Op p1
+                                 emit_ bci_BRK_FUN [ Op p1
                                                   , Op tick_addr, Op info_addr
                                                   , SmallOp tickx, SmallOp infox
                                                   , Op np
                                                   ]
 #if MIN_VERSION_rts(1,0,3)
   BCO_NAME name            -> do np <- lit [BCONPtrStr name]
-                                 emit bci_BCO_NAME [Op np]
+                                 emit_ bci_BCO_NAME [Op np]
 #endif
 
   where
+    emit_ = emit platform
+
+    literal :: Literal -> m Word
     literal (LitLabel fs _)   = litlabel fs
     literal LitNullAddr       = word 0
     literal (LitFloat r)      = float (fromRational r)
@@ -578,16 +649,16 @@ assembleI platform i = case i of
     -- Note that we only support host endianness == target endianness for now,
     -- even with the external interpreter. This would need to be fixed to
     -- support host endianness /= target endianness
-    int :: Int -> Assembler Word
+    int :: Int -> m Word
     int  i = word (fromIntegral i)
 
-    float :: Float -> Assembler Word
+    float :: Float -> m Word
     float f = word32 (castFloatToWord32 f)
 
-    double :: Double -> Assembler Word
+    double :: Double -> m Word
     double d = word64 (castDoubleToWord64 d)
 
-    word64 :: Word64 -> Assembler Word
+    word64 :: Word64 -> m Word
     word64 ww = case word_size of
        PW4 ->
         let !wl = fromIntegral ww
@@ -597,17 +668,17 @@ assembleI platform i = case i of
             BigEndian    -> words [wh,wl]
        PW8 -> word (fromIntegral ww)
 
-    word8 :: Word8 -> Assembler Word
+    word8 :: Word8 -> m Word
     word8  x = case platformByteOrder platform of
       LittleEndian -> word (fromIntegral x)
       BigEndian    -> word (fromIntegral x `unsafeShiftL` (word_size_bits - 8))
 
-    word16 :: Word16 -> Assembler Word
+    word16 :: Word16 -> m Word
     word16 x = case platformByteOrder platform of
       LittleEndian -> word (fromIntegral x)
       BigEndian    -> word (fromIntegral x `unsafeShiftL` (word_size_bits - 16))
 
-    word32 :: Word32 -> Assembler Word
+    word32 :: Word32 -> m Word
     word32 x = case platformByteOrder platform of
       LittleEndian -> word (fromIntegral x)
       BigEndian    -> case word_size of
