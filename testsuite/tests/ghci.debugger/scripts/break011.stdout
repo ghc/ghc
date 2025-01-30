@@ -29,9 +29,9 @@ HasCallStack backtrace:
   error, called at Test7.hs:2:18 in main:Main
 
 Stopped in <exception thrown>, <unknown>
-_exception :: e = _
+_exception :: e = SomeException (ErrorCall "foo")
 Stopped in <exception thrown>, <unknown>
-_exception :: e = _
+_exception :: e = SomeException (ErrorCall "foo")
 *** Exception: foo
 
 HasCallStack backtrace:

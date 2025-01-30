@@ -140,7 +140,7 @@ canDictCt ev cls tys
 
   | CtWanted { ctev_rewriters = rewriters } <- ev
   , Just ip_name <- isCallStackPred cls tys
-  , isPushCallStackOrigin orig
+  , Just fun_fs  <- isPushCallStackOrigin_maybe orig
   -- If we're given a CallStack constraint that arose from a function
   -- call, we need to push the current call-site onto the stack instead
   -- of solving it directly from a given.
@@ -159,8 +159,7 @@ canDictCt ev cls tys
 
          -- Then we solve the wanted by pushing the call-site
          -- onto the newly emitted CallStack
-       ; let ev_cs = EvCsPushCall (callStackOriginFS orig)
-                                  (ctLocSpan loc) (ctEvExpr new_ev)
+       ; let ev_cs = EvCsPushCall fun_fs (ctLocSpan loc) (ctEvExpr new_ev)
        ; solveCallStack ev ev_cs
 
        ; continueWith (DictCt { di_ev = new_ev, di_cls = cls

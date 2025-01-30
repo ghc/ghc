@@ -134,7 +134,7 @@ emptyDictMap = emptyTcAppMap
 findDict :: DictMap a -> CtLoc -> Class -> [Type] -> Maybe a
 findDict m loc cls tys
   | Just {} <- isCallStackPred cls tys
-  , isPushCallStackOrigin (ctLocOrigin loc)
+  , Just {} <- isPushCallStackOrigin_maybe (ctLocOrigin loc)
   = Nothing             -- See Note [Solving CallStack constraints]
 
   | otherwise
@@ -156,7 +156,7 @@ foldDicts = foldTcAppMap
 
 {- Note [Solving CallStack constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also Note [Overview of implicit CallStacks] in GHc.Tc.Types.Evidence.
+See Note [Overview of implicit CallStacks] in GHc.Tc.Types.Evidence.
 
 Suppose f :: HasCallStack => blah.  Then
 

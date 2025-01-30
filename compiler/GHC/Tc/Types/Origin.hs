@@ -27,7 +27,7 @@ module GHC.Tc.Types.Origin (
   TypedThing(..), TyVarBndrs(..),
 
   -- * CallStack
-  isPushCallStackOrigin, callStackOriginFS,
+  isPushCallStackOrigin_maybe,
 
   -- * FixedRuntimeRep origin
   FixedRuntimeRepOrigin(..),
@@ -984,18 +984,22 @@ pprNonLinearPatternReason OtherPatternReason = empty
 *                                                                      *
 ********************************************************************* -}
 
-isPushCallStackOrigin :: CtOrigin -> Bool
--- Do we want to solve this IP constraint directly (return False)
--- or push the call site (return True)
--- See Note [Overview of implicit CallStacks] in GHc.Tc.Types.Evidence
-isPushCallStackOrigin (IPOccOrigin {}) = False
-isPushCallStackOrigin _                = True
-
-
-callStackOriginFS :: CtOrigin -> FastString
--- This is the string that appears in the CallStack
-callStackOriginFS (OccurrenceOf fun) = occNameFS (getOccName fun)
-callStackOriginFS orig               = mkFastString (showSDocUnsafe (pprCtO orig))
+isPushCallStackOrigin_maybe :: CtOrigin -> Maybe FastString
+-- Do we want to solve this IP constraint normally (return Nothing)
+-- or push the call site (returning the name of the function being called)
+-- See Note [Overview of implicit CallStacks] esp (CS1) in GHC.Tc.Types.Evidence
+isPushCallStackOrigin_maybe (GivenOrigin {})   = Nothing
+isPushCallStackOrigin_maybe (GivenSCOrigin {}) = Nothing
+isPushCallStackOrigin_maybe (IPOccOrigin {})   = Nothing
+isPushCallStackOrigin_maybe (OccurrenceOf fun) = Just (occNameFS (getOccName fun))
+isPushCallStackOrigin_maybe orig               = Just orig_fs
+  -- This fall-through case is important to deal with call stacks
+  --      that arise from rebindable syntax (#19919)
+  -- Here the "name of the function being called" is approximated as
+  --      the result of prettty-printing the CtOrigin; a bit messy,
+  --      but we can perhaps improve it in the light of user feedback
+  where
+    orig_fs = mkFastString (showSDocUnsafe (pprCtO orig))
 
 {-
 ************************************************************************

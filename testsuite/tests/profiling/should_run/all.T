@@ -232,3 +232,5 @@ test('scc-prof-overloaded-calls002',
      # Need optimizations to get rid of unwanted overloaded calls
      ['-O -fno-prof-auto -fprof-late-overloaded-calls']
 )
+
+test('T25675', [], compile_and_run, ['-dcore-lint'])
