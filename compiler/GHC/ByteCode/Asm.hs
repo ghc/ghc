@@ -53,7 +53,6 @@ import Data.Array.Base  ( UArray(..) )
 
 import Foreign hiding (shiftL, shiftR)
 import Data.Char        ( ord )
-import Data.List        ( genericLength )
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map.Strict as Map
@@ -343,6 +342,7 @@ data InspectState = InspectState
   , lblEnv :: LabelEnvMap
   }
 
+
 inspectAsm :: Platform -> Bool -> Word -> Assembler a -> (Word, LabelEnvMap)
 inspectAsm platform long_jumps initial_offset
   = go (InspectState initial_offset 0 0 Map.empty)
@@ -350,7 +350,7 @@ inspectAsm platform long_jumps initial_offset
     go s (NullAsm _) = (instrCount s, lblEnv s)
     go s (AllocPtr _ k) = go (s { ptrCount = n + 1 }) (k n)
       where n = ptrCount s
-    go s (AllocLit ls k) = go (s { litCount = n + genericLength ls }) (k n)
+    go s (AllocLit ls k) = go (s { litCount = n + strictGenericLength ls }) (k n)
       where n = litCount s
     go s (AllocLabel lbl k) = go s' k
       where s' = s { lblEnv = Map.insert lbl (instrCount s) (lblEnv s) }
