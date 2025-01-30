@@ -1,26 +1,25 @@
 Rule fired
     Rule: funky
     Module: (T18668)
-    Before: GHC.Internal.Prim.+# ValArg 2# ValArg 3#
-    After:  GHC.Internal.Prim.*# ValArg 2# ValArg 3#
-    Cont:   Stop[BoringCtxt] GHC.Internal.Prim.Int#
+    Full arity: 0
+    Before: GHC.Internal.Prim.+# 2# 3#
+    After:  GHC.Internal.Prim.*#
 Rule fired
     Rule: *#
     Module: (BUILTIN)
-    Before: GHC.Internal.Prim.*# ValArg 2# ValArg 3#
+    Full arity: 2
+    Before: GHC.Internal.Prim.*# 2# 3#
     After:  6#
-    Cont:   Stop[BoringCtxt] GHC.Internal.Prim.Int#
 Rule fired
     Rule: flip
     Module: (T18668)
-    Before: GHC.Internal.Prim.># ValArg 1# ValArg 0#
+    Full arity: 1
+    Before: GHC.Internal.Prim.># 1# 0#
     After:  (\ (x :: GHC.Internal.Prim.Int#) -> GHC.Internal.Prim.<# x)
               1#
-              ValArg 0#
-    Cont:   Stop[BoringCtxt] GHC.Internal.Prim.Int#
 Rule fired
     Rule: <#
     Module: (BUILTIN)
-    Before: GHC.Internal.Prim.<# ValArg 1# ValArg 0#
+    Full arity: 2
+    Before: GHC.Internal.Prim.<# 1# 0#
     After:  0#
-    Cont:   Stop[BoringCtxt] GHC.Internal.Prim.Int#

@@ -281,7 +281,7 @@ simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
   | Just env' <- preInlineUnconditionally env (bindContextLevel bind_cxt)
                                           old_bndr rhs env
   = {-#SCC "simplRecOrTopPair-pre-inline-uncond" #-}
-    simplTrace "SimplBindr:inline-uncond" (ppr old_bndr) $
+    simplTrace "SimplBindr:inline-uncond1" (ppr old_bndr) $
     do { tick (PreInlineUnconditionally old_bndr)
        ; return ( emptyFloats env, env' ) }
 
@@ -799,8 +799,8 @@ makeTrivialArg :: HasDebugCallStack => SimplEnv -> ArgSpec -> SimplM (LetFloats,
 makeTrivialArg env arg@(ValArg { as_arg = e, as_dmd = dmd })
   = do { (floats, e') <- makeTrivial env NotTopLevel dmd (fsLit "arg") e
        ; return (floats, arg { as_arg = e' }) }
-makeTrivialArg _ arg
-  = return (emptyLetFloats, arg)  -- CastBy, TyArg
+makeTrivialArg _ arg@(TyArg {})
+  = return (emptyLetFloats, arg)
 
 makeTrivial :: HasDebugCallStack
             => SimplEnv -> TopLevelFlag -> Demand
@@ -1159,15 +1159,15 @@ simplExprF :: SimplEnv
            -> SimplM (SimplFloats, OutExpr)
 
 simplExprF !env e !cont -- See Note [Bangs in the Simplifier]
---  = pprTrace "simplExprF" (vcat
---      [ ppr e
---      , text "cont =" <+> ppr cont
---      , text "inscope =" <+> ppr (seInScope env)
---      , text "tvsubst =" <+> ppr (seTvSubst env)
---      , text "idsubst =" <+> ppr (seIdSubst env)
---      , text "cvsubst =" <+> ppr (seCvSubst env)
---      ]) $
-  = simplExprF1 env e cont
+  = -- pprTrace "simplExprF" (vcat
+    --  [ ppr e
+    --  , text "cont =" <+> ppr cont
+    --  , text "inscope =" <+> ppr (seInScope env)
+    --  , text "tvsubst =" <+> ppr (seTvSubst env)
+    --  , text "idsubst =" <+> ppr (seIdSubst env)
+    --  , text "cvsubst =" <+> ppr (seCvSubst env)
+    --  ]) $
+    simplExprF1 env e cont
 
 simplExprF1 :: HasDebugCallStack
             => SimplEnv -> InExpr -> SimplCont
@@ -1179,7 +1179,7 @@ simplExprF1 _ (Type ty) cont
     -- The (Type ty) case is handled separately by simplExpr
     -- and by the other callers of simplExprF
 
-simplExprF1 env (Var v)        cont = {-#SCC "simplIdF" #-} simplIdF env v cont
+simplExprF1 env (Var v)        cont = {-#SCC "simplInId" #-} simplInId env v cont
 simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-} rebuild env (Lit lit) cont
 simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t expr cont
 simplExprF1 env (Cast body co) cont = {-#SCC "simplCast" #-} simplCast env body co cont
@@ -1252,7 +1252,8 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
   | Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs env
     -- Because of the let-can-float invariant, it's ok to
     -- inline freely, or to drop the binding if it is dead.
-  = do { tick (PreInlineUnconditionally bndr)
+  = do { simplTrace "SimplBindr:inline-uncond2" (ppr bndr) $
+         tick (PreInlineUnconditionally bndr)
        ; simplExprF env' body cont }
 
   -- Now check for a join point.  It's better to do the preInlineUnconditionally
@@ -1357,7 +1358,7 @@ simplCoercion env co
              -- See Note [Inline depth] in GHC.Core.Opt.Simplify.Env
        ; seqCo opt_co `seq` return opt_co }
   where
-    subst = getSubst env
+    subst = getTCvSubst env
     opts  = seOptCoercionOpts env
 
 -----------------------------------
@@ -1519,14 +1520,18 @@ simplTick env tickish expr cont
 -}
 
 rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
--- At this point the substitution in the SimplEnv should be irrelevant;
--- only the in-scope set matters
-rebuild env expr cont
-  = case cont of
+rebuild env expr cont = rebuild_go (zapSubstEnv env) expr cont
+
+rebuild_go :: SimplEnvIS -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
+-- SimplEnvIS: at this point the substitution in the SimplEnv is irrelevant;
+-- only the in-scope set matters, plus the flags.
+rebuild_go env expr cont
+  = assertPpr (checkSimplEnvIS env) (pprBadSimplEnvIS env) $
+    case cont of
       Stop {}          -> return (emptyFloats env, expr)
-      TickIt t cont    -> rebuild env (mkTick t expr) cont
+      TickIt t cont    -> rebuild_go env (mkTick t expr) cont
       CastIt { sc_co = co, sc_opt = opt, sc_cont = cont }
-        -> rebuild env (mkCast expr co') cont
+        -> rebuild_go env (mkCast expr co') cont
            -- NB: mkCast implements the (Coercion co |> g) optimisation
         where
           co' = optOutCoercion env co opt
@@ -1535,20 +1540,20 @@ rebuild env expr cont
         -> rebuildCase (se `setInScopeFromE` env) expr bndr alts cont
 
       StrictArg { sc_fun = fun, sc_cont = cont, sc_fun_ty = fun_ty }
-        -> rebuildCall env (addValArgTo fun expr fun_ty ) cont
+        -> rebuildCall env (addValArgTo fun expr fun_ty) cont
 
       StrictBind { sc_bndr = b, sc_body = body, sc_env = se
                  , sc_cont = cont, sc_from = from_what }
         -> completeBindX (se `setInScopeFromE` env) from_what b expr body cont
 
       ApplyToTy  { sc_arg_ty = ty, sc_cont = cont}
-        -> rebuild env (App expr (Type ty)) cont
+        -> rebuild_go env (App expr (Type ty)) cont
 
       ApplyToVal { sc_arg = arg, sc_env = se, sc_dup = dup_flag
                  , sc_cont = cont, sc_hole_ty = fun_ty }
         -- See Note [Avoid redundant simplification]
         -> do { (_, _, arg') <- simplLazyArg env dup_flag fun_ty Nothing se arg
-              ; rebuild env (App expr arg') cont }
+              ; rebuild_go env (App expr arg') cont }
 
 completeBindX :: SimplEnv
               -> FromWhat
@@ -1658,7 +1663,7 @@ on each successive composition -- that's at least quadratic.  So:
 -}
 
 
-optOutCoercion :: SimplEnv -> OutCoercion -> Bool -> OutCoercion
+optOutCoercion :: SimplEnvIS -> OutCoercion -> Bool -> OutCoercion
 -- See Note [Avoid re-simplifying coercions]
 optOutCoercion env co already_optimised
   | already_optimised = co  -- See Note [Avoid re-simplifying coercions]
@@ -1708,7 +1713,7 @@ simplCast env body co0 cont0
                                           , sc_dup = dup, sc_cont = tail
                                           , sc_hole_ty = fun_ty })
           | not opt  -- pushCoValArg duplicates the coercion, so optimise first
-          = addCoerce (optOutCoercion env co opt) True cont
+          = addCoerce (optOutCoercion (zapSubstEnv env) co opt) True cont
 
           | Just (m_co1, m_co2) <- pushCoValArg co
           , fixed_rep m_co1
@@ -1746,7 +1751,8 @@ simplCast env body co0 cont0
           -- See Note [Representation polymorphism invariants] in GHC.Core
           -- test: typecheck/should_run/EtaExpandLevPoly
 
-simplLazyArg :: SimplEnv -> DupFlag
+simplLazyArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
+             -> DupFlag
              -> OutType                 -- ^ Type of the function applied to this arg
              -> Maybe ArgInfo           -- ^ Just <=> This arg `ai` occurs in an app
                                         --   `f a1 ... an` where we have ArgInfo on
@@ -1826,17 +1832,21 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
              --      It's wrong to err in either direction
              --      But fun_ty is an OutType, so is fully substituted
 
-       ; if | isSimplified dup  -- Don't re-simplify if we've simplified it once
-                                -- Including don't preInlineUnconditionally
-                                -- See Note [Avoiding simplifying repeatedly]
-            -> completeBindX env from_what bndr arg body cont
-
-            | Just env' <- preInlineUnconditionally env NotTopLevel bndr arg arg_se
+       ; if | Just env' <- preInlineUnconditionally env NotTopLevel bndr arg arg_se
             , not (needsCaseBindingL arg_levity arg)
               -- Ok to test arg::InExpr in needsCaseBinding because
               -- exprOkForSpeculation is stable under simplification
-            -> do { tick (PreInlineUnconditionally bndr)
+            , not ( isSimplified dup &&  -- See (SR2) in Note [Avoiding simplifying repeatedly]
+                    not (exprIsTrivial arg) &&
+                    not (isDeadOcc (idOccInfo bndr)) )
+            -> do { simplTrace "SimplBindr:inline-uncond3" (ppr bndr) $
+                    tick (PreInlineUnconditionally bndr)
                   ; simplLam env' body cont }
+
+            | isSimplified dup  -- Don't re-simplify if we've simplified it once
+                                -- Including don't preInlineUnconditionally
+                                -- See Note [Avoiding simplifying repeatedly]
+            -> completeBindX env from_what bndr arg body cont
 
             | otherwise
             -> simplNonRecE env from_what bndr (arg, arg_se) body cont }
@@ -1994,13 +2004,20 @@ So we go to some effort to avoid repeatedly simplifying the same thing:
 * We go to some efforts to avoid unnecessarily simplifying ApplyToVal,
   in at least two places
     - In simplCast/addCoerce, where we check for isReflCo
-    - In rebuildCall we avoid simplifying arguments before we have to
-      (see Note [Trying rewrite rules])
+    - We sometimes try rewrite RULES befoe simplifying arguments;
+      see Note [tryRules: plan (BEFORE)]
 
-All that said /postInlineUnconditionally/ (called in `completeBind`) does
-fire in the above (f BIG) situation.  See Note [Post-inline for single-use
-things] in Simplify.Utils.  This certainly risks repeated simplification, but
-in practice seems to be a small win.
+Wrinkles:
+
+(SR1) All that said /postInlineUnconditionally/ (called in `completeBind`) does
+    fire in the above (f BIG) situation.  See Note [Post-inline for single-use
+    things] in Simplify.Utils.  This certainly risks repeated simplification,
+    but in practice seems to be a small win.
+
+(SR2) When considering preInlineUnconditionally in `simpl_lam`, if the
+   expression is trivial, or it is dead (the binder doesn't occur), then there
+   is no danger of simplifying repeatedly. But there is a benefit: it can save
+   a simplifier iteration.  So we check for that.
 
 
 ************************************************************************
@@ -2221,9 +2238,9 @@ Some programs have a /lot/ of data constructors in the source program
 valuable.
 -}
 
-simplVar :: SimplEnv -> InVar -> SimplM OutExpr
+simplInVar :: SimplEnv -> InVar -> SimplM OutExpr
 -- Look up an InVar in the environment
-simplVar env var
+simplInVar env var
   -- Why $! ? See Note [Bangs in the Simplifier]
   | isTyVar var = return $! Type $! (substTyVar env var)
   | isCoVar var = return $! Coercion $! (substCoVar env var)
@@ -2234,11 +2251,11 @@ simplVar env var
         DoneId var1          -> return (Var var1)
         DoneEx e _           -> return e
 
-simplIdF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
-simplIdF env var cont
+simplInId :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
+simplInId env var cont
   | Just dc <- isDataConWorkId_maybe var
   , isLazyDataConRep dc                    -- See Note [Fast path for lazy data constructors]
-  = rebuild env (Var var) cont
+  = rebuild zapped_env (Var var) cont
   | otherwise
   = case substId env var of
       ContEx tvs cvs ids e -> simplExprF env' e cont
@@ -2247,113 +2264,39 @@ simplIdF env var cont
         where
           env' = setSubstEnv env tvs cvs ids
 
-      DoneId var1 ->
-        do { rule_base <- getSimplRules
-           ; let cont' = trimJoinCont var1 (idJoinPointHood var1) cont
-                 info  = mkArgInfo env rule_base var1 cont'
-           ; rebuildCall env info cont' }
+      DoneId out_id -> simplOutId zapped_env out_id cont'
+        where
+          cont' = trimJoinCont out_id (idJoinPointHood out_id) cont
 
-      DoneEx e mb_join -> simplExprF env' e cont'
+      DoneEx e mb_join -> simplExprF zapped_env e cont'
         where
           cont' = trimJoinCont var mb_join cont
-          env'  = zapSubstEnv env  -- See Note [zapSubstEnv]
+  where
+    zapped_env =  zapSubstEnv env  -- See Note [zapSubstEnv]
 
 ---------------------------------------------------------
---      Dealing with a call site
+simplOutId :: SimplEnvIS -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 
-rebuildCall :: SimplEnv -> ArgInfo -> SimplCont
-            -> SimplM (SimplFloats, OutExpr)
-
----------- Bottoming applications --------------
-rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) cont
-  -- When we run out of strictness args, it means
-  -- that the call is definitely bottom; see GHC.Core.Opt.Simplify.Utils.mkArgInfo
-  -- Then we want to discard the entire strict continuation.  E.g.
-  --    * case (error "hello") of { ... }
-  --    * (error "Hello") arg
-  --    * f (error "Hello") where f is strict
-  --    etc
-  -- Then, especially in the first of these cases, we'd like to discard
-  -- the continuation, leaving just the bottoming expression.  But the
-  -- type might not be right, so we may have to add a coerce.
-  | not (contIsTrivial cont)     -- Only do this if there is a non-trivial
-                                 -- continuation to discard, else we do it
-                                 -- again and again!
-  = seqType cont_ty `seq`        -- See Note [Avoiding space leaks in OutType]
-    return (emptyFloats env, castBottomExpr res cont_ty)
-  where
-    res     = argInfoExpr fun rev_args
-    cont_ty = contResultType cont
-
----------- Try inlining, if ai_rewrite = TryInlining --------
--- In the TryInlining case we try inlining immediately, before simplifying
--- any (more) arguments. Why?  See Note [Rewrite rules and inlining].
---
--- If there are rewrite rules we'll skip this case until we have
--- simplified enough args to satisfy nr_wanted==0 in the TryRules case below
--- Then we'll try the rules, and if that fails, we'll do TryInlining
-rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
-                              , ai_rewrite = TryInlining }) cont
-  = do { logger <- getLogger
-       ; let full_cont = pushSimplifiedRevArgs env rev_args cont
-       ; mb_inline <- tryInlining env logger fun full_cont
-       ; case mb_inline of
-            Just expr -> do { checkedTick (UnfoldingDone fun)
-                            ; let env1 = zapSubstEnv env
-                            ; simplExprF env1 expr full_cont }
-            Nothing -> rebuildCall env (info { ai_rewrite = TryNothing }) cont
-       }
-
----------- Try rewrite RULES, if ai_rewrite = TryRules --------------
--- See Note [Rewrite rules and inlining]
--- See also Note [Trying rewrite rules]
-rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
-                              , ai_rewrite = TryRules nr_wanted rules }) cont
-  | nr_wanted == 0 || no_more_args
-  = -- We've accumulated a simplified call in <fun,rev_args>
-    -- so try rewrite rules; see Note [RULES apply to simplified arguments]
-    -- See also Note [Rules for recursive functions]
-    do { mb_match <- tryRules env rules fun (reverse rev_args) cont
-       ; case mb_match of
-             Just (env', rhs, cont') -> simplExprF env' rhs cont'
-             Nothing -> rebuildCall env (info { ai_rewrite = TryInlining }) cont }
-  where
-    -- If we have run out of arguments, just try the rules; there might
-    -- be some with lower arity.  Casts get in the way -- they aren't
-    -- allowed on rule LHSs
-    no_more_args = case cont of
-                      ApplyToTy  {} -> False
-                      ApplyToVal {} -> False
-                      _             -> True
-
----------- Simplify type applications and casts --------------
-rebuildCall env info (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
-  = rebuildCall env (addCastTo info co') cont
-  where
-    co' = optOutCoercion env co opt
-
-rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
-  = rebuildCall env (addTyArgTo info arg_ty hole_ty) cont
-
----------- The runRW# rule. Do this after absorbing all arguments ------
+---------- The runRW# rule ------
 -- See Note [Simplification of runRW#] in GHC.CoreToSTG.Prep.
 --
 -- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
--- K[ runRW# rr ty body ]   -->   runRW rr' ty' (\s. K[ body s ])
-rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
-            (ApplyToVal { sc_arg = arg, sc_env = arg_se
-                        , sc_cont = cont, sc_hole_ty = fun_ty })
-  | fun_id `hasKey` runRWKey
-  , [ TyArg { as_arg_ty = hole_ty }, TyArg {} ] <- rev_args
+-- K[ runRW# @rr @hole_ty body ]   -->   runRW @rr' @ty' (\s. K[ body s ])
+simplOutId env fun cont
+  | fun `hasKey` runRWKey
+  , ApplyToTy  { sc_cont = cont1 } <- cont
+  , ApplyToTy  { sc_cont = cont2, sc_arg_ty = hole_ty } <- cont1
+  , ApplyToVal { sc_cont = cont3, sc_arg = arg
+               , sc_env = arg_se, sc_hole_ty = fun_ty } <- cont2
   -- Do this even if (contIsStop cont), or if seCaseCase is off.
   -- See Note [No eta-expansion in runRW#]
   = do { let arg_env = arg_se `setInScopeFromE` env
 
-             overall_res_ty  = contResultType cont
+             overall_res_ty = contResultType cont3
              -- hole_ty is the type of the current runRW# application
              (outer_cont, new_runrw_res_ty, inner_cont)
-                | seCaseCase env = (mkBoringStop overall_res_ty, overall_res_ty, cont)
-                | otherwise      = (cont, hole_ty, mkBoringStop hole_ty)
+                | seCaseCase env = (mkBoringStop overall_res_ty, overall_res_ty, cont3)
+                | otherwise      = (cont3, hole_ty, mkBoringStop hole_ty)
                 -- Only when case-of-case is on. See GHC.Driver.Config.Core.Opt.Simplify
                 --    Note [Case-of-case and full laziness]
 
@@ -2380,8 +2323,75 @@ rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
                    ; return (Lam s' body') }
 
        ; let rr'   = getRuntimeRep new_runrw_res_ty
-             call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg new_runrw_res_ty, arg']
+             call' = mkApps (Var fun) [mkTyArg rr', mkTyArg new_runrw_res_ty, arg']
        ; rebuild env call' outer_cont }
+
+-- Normal case for (f e1 .. en)
+simplOutId env fun cont
+  = -- Try rewrite rules: Plan (BEFORE) in Note [When to apply rewrite rules]
+    do { rule_base <- getSimplRules
+       ; let rules_for_me = getRules rule_base fun
+             out_args     = contOutArgs env cont :: [OutExpr]
+       ; mb_match <- if not (null rules_for_me) &&
+                        (isClassOpId fun || activeUnfolding (seMode env) fun)
+                     then tryRules env rules_for_me fun out_args
+                     else return Nothing
+       ; case mb_match of {
+             Just (rule_arity, rhs) -> simplExprF env rhs $
+                                       dropContArgs rule_arity cont ;
+             Nothing ->
+
+    -- Try inlining
+    do { logger <- getLogger
+       ; mb_inline <- tryInlining env logger fun cont
+       ; case mb_inline of{
+            Just expr -> do { checkedTick (UnfoldingDone fun)
+                            ; simplExprF env expr cont } ;
+            Nothing ->
+
+    -- Neither worked, so just rebuild
+    do { let arg_info = mkArgInfo env fun rules_for_me cont
+       ; rebuildCall env arg_info cont
+    } } } } }
+
+---------------------------------------------------------
+--      Dealing with a call site
+
+rebuildCall :: SimplEnvIS -> ArgInfo -> SimplCont
+            -> SimplM (SimplFloats, OutExpr)
+-- SimplEnvIS: at this point the substitution in the SimplEnv is irrelevant;
+-- it is usually empty, and regardless should be ignored.
+-- Only the in-scope set matters, plus the seMode flags
+
+-- Check the invariant
+rebuildCall env arg_info _cont
+  | assertPpr (checkSimplEnvIS env) (pprBadSimplEnvIS env $$ ppr arg_info) False
+  = pprPanic "rebuildCall" empty
+
+---------- Bottoming applications --------------
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) cont
+  -- When we run out of strictness args, it means
+  -- that the call is definitely bottom; see GHC.Core.Opt.Simplify.Utils.mkArgInfo
+  -- Then we want to discard the entire strict continuation.  E.g.
+  --    * case (error "hello") of { ... }
+  --    * (error "Hello") arg
+  --    * f (error "Hello") where f is strict
+  --    etc
+  -- Then, especially in the first of these cases, we'd like to discard
+  -- the continuation, leaving just the bottoming expression.  But the
+  -- type might not be right, so we may have to add a coerce.
+  | not (contIsTrivial cont)     -- Only do this if there is a non-trivial
+                                 -- continuation to discard, else we do it
+                                 -- again and again!
+  = seqType cont_ty `seq`        -- See Note [Avoiding space leaks in OutType]
+    return (emptyFloats env, castBottomExpr res cont_ty)
+  where
+    res     = argInfoExpr fun rev_args
+    cont_ty = contResultType cont
+
+---------- Simplify type applications --------------
+rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
+  = rebuildCall env (addTyArgTo info arg_ty hole_ty) cont
 
 ---------- Simplify value arguments --------------------
 rebuildCall env fun_info
@@ -2413,8 +2423,16 @@ rebuildCall env fun_info
         ; rebuildCall env (addValArgTo fun_info  arg' fun_ty) cont }
 
 ---------- No further useful info, revert to generic rebuild ------------
-rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
+  | null rules
   = rebuild env (argInfoExpr fun rev_args) cont
+  | otherwise  -- Try rules again: Plan (AFTER) in Note [When to apply rewrite rules]
+  = do { let args = reverse rev_args
+       ; mb_match <- tryRules env rules fun (map argSpecArg args)
+       ; case mb_match of
+           Just (rule_arity, rhs) -> simplExprF env rhs $
+                                     pushSimplifiedArgs env (drop rule_arity args) cont
+           Nothing -> rebuild env (argInfoExpr fun rev_args) cont }
 
 -----------------------------------
 tryInlining :: SimplEnv -> Logger -> OutId -> SimplCont -> SimplM (Maybe OutExpr)
@@ -2448,83 +2466,102 @@ tryInlining env logger var cont
                               text "Cont:  " <+> ppr cont])]
 
 
-{- Note [Trying rewrite rules]
+{- Note [When to apply rewrite rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Should we apply rewrite rules before simplifying the arguments, or after?
+Each is highly desirable in some cases, and in fact we do both!
+
+  - Plan (BEFORE) selectively, in `simplOutId`
+    See Note [tryRules: plan (BEFORE)]
+
+  - Plan (AFTER) always, in the finishing-up case of `rebuildCall`
+    See Note [tryRules: plan (AFTER)]
+
+Historical note.  Pre-2025, GHC only did tryRules once, when it had simplified
+enough arguments to saturate all the RULEs it had in hand.  But alas, if a new
+unrelated RULE showed up (but did not fire), it could nevertheless change the
+simplifier's behaviour a bit; and that messed up deterministic compilation
+(#25170).  (This was particularly nasty if the rule wasn't even transitively
+below the module being compiled.)  Current solution: ensure that adding a new,
+unrelated rule that never fires does not change the simplifier behaviour.  End
+of historical note.
+
+Note [tryRules: plan (BEFORE)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider an application (f e1 e2 e3) where the e1,e2,e3 are not yet
-simplified.  We want to simplify enough arguments to allow the rules
-to apply, but it's more efficient to avoid simplifying e2,e3 if e1 alone
-is sufficient.  Example: class ops
-   (+) dNumInt e2 e3
-If we rewrite ((+) dNumInt) to plusInt, we can take advantage of the
-latter's strictness when simplifying e2, e3.  Moreover, suppose we have
-  RULE  f Int = \x. x True
+It is sometimes desirable to apply RULES before simplifying the function
+arguments.  We do so in `simplOutId`.
 
-Then given (f Int e1) we rewrite to
-   (\x. x True) e1
-without simplifying e1.  Now we can inline x into its unique call site,
-and absorb the True into it all in the same pass.  If we simplified
-e1 first, we couldn't do that; see Note [Avoiding simplifying repeatedly].
+We do so /selectively/ (see (BF2)), in two particular cases:
 
-So we try to apply rules if either
-  (a) no_more_args: we've run out of argument that the rules can "see"
-  (b) nr_wanted: none of the rules wants any more arguments
+* Class ops
+     (+) dNumInt e2 e3
+  If we rewrite ((+) dNumInt) to plusInt, we can take advantage of the
+  latter's strictness when simplifying e2, e3.  Moreover, if
+      (+) dNumInt e2 e3   -->    (\x y -> ....) e2 e3
+  Frequently `x` is used just once in the body of the (\x y -> ...).
+  If `e2` is un-simplified we can preInlineUnconditinally and that saves
+  simplifying `e2` twice. See Note [Avoiding simplifying repeatedly].
 
+* Specialisation RULES.  In general we try to arrange that inlining is disabled
+  (via a pragma) if a rewrite rule should apply, so that the rule has a decent
+  chance to fire before we inline the function.
 
-Note [RULES apply to simplified arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's very desirable to try RULES once the arguments have been simplified, because
-doing so ensures that rule cascades work in one pass.  Consider
+  But it turns out that (especially when type-class specialisation or
+  SpecConstr is involved) it is very helpful for the the rewrite rule to
+  "win" over inlining when both are active at once: see #21851, #22097.
+
+  So if the Id has an unfolding, we want to try RULES before we try inlining.
+
+Wrinkles:
+
+(BF1) Each un-simplified argument has its own static environment, stored
+  in its `ApplyToVal` nodes.   So we can't just match on the un-simplified
+  arguments: we  have to apply that static environment as a substitution
+  first!  This is done lazily in `GHC.Core.Opt.Simplify.Utils.contOutArgs`,
+  so it'll be done just enough to allow the rule to match, or not.
+
+(BF2) The "selectively" in Plan (BEFORE) is a bit ad-hoc:
+
+  * We want Plan (BEFORE) for class ops (see above in this Note)
+
+  * But we do NOT want Plan (BEFORE) for primops, because the constant-folding
+    rules are quite complicated and expensive, and we don't want to try them
+    twice.  Moreover the benefts of Plan (BEFORE), described in the Note, don't
+    apply to primops.
+
+Note [tryRules: plan (AFTER)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's very desirable to try RULES once the arguments have been simplified,
+because doing so ensures that rule cascades work in one pass. We do this
+in the finishing-up case of `rebuildCall`.
+
+Consider
    {-# RULES g (h x) = k x
              f (k x) = x #-}
    ...f (g (h x))...
 Then we want to rewrite (g (h x)) to (k x) and only then try f's rules. If
 we match f's rules against the un-simplified RHS, it won't match.  This
-makes a particularly big difference when superclass selectors are involved:
+makes a particularly big difference for
+
+* Superclass selectors
         op ($p1 ($p2 (df d)))
-We want all this to unravel in one sweep.
+  We want all this to unravel in one sweep
 
-Note [Rewrite rules and inlining]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In general we try to arrange that inlining is disabled (via a pragma) if
-a rewrite rule should apply, so that the rule has a decent chance to fire
-before we inline the function.
-
-But it turns out that (especially when type-class specialisation or
-SpecConstr is involved) it is very helpful for the the rewrite rule to
-"win" over inlining when both are active at once: see #21851, #22097.
-
-The simplifier arranges to do this, as follows. In effect, the ai_rewrite
-field of the ArgInfo record is the state of a little state-machine:
-
-* mkArgInfo sets the ai_rewrite field to TryRules if there are any rewrite
-  rules avaialable for that function.
-
-* rebuildCall simplifies arguments until enough are simplified to match the
-  rule with greatest arity.  See Note [RULES apply to simplified arguments]
-  and the first field of `TryRules`.
-
-  But no more! As soon as we have simplified enough arguments to satisfy the
-  maximum-arity rules, we try the rules; see Note [Trying rewrite rules].
-
-* Once we have tried rules (or immediately if there are no rules) set
-  ai_rewrite to TryInlining, and the Simplifier will try to inline the
-  function.  We want to try this immediately (before simplifying any (more)
-  arguments). Why? Consider
-      f BIG      where   f = \x{OneOcc}. ...x...
-  If we inline `f` before simplifying `BIG` well use preInlineUnconditionally,
-  and we'll simplify BIG once, at x's occurrence, rather than twice.
-
-* GHC.Core.Opt.Simplify.Utils.mkRewriteCall: if there are no rules, and no
-  unfolding, we can skip both TryRules and TryInlining, which saves work.
+* Constant folding
+        +# 3# (+# 4# 5#)
+  We want this to happen in one pass
 
 Note [Avoid redundant simplification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Because RULES apply to simplified arguments, there's a danger of repeatedly
-simplifying already-simplified arguments.  An important example is that of
-        (>>=) d e1 e2
-Here e1, e2 are simplified before the rule is applied, but don't really
-participate in the rule firing. So we mark them as Simplified to avoid
-re-simplifying them.
+Because RULES often apply to simplified arguments (see Note [Plan (AFTER)]),
+there's a danger of simplifying already-simplified arguments.  For example,
+suppose we have
+   RULE f (x,y) = $sf x  y
+and the expression
+   f (p,q) e1 e2
+With Plan (AFTER) by the time the rule fires, we will have already simplified e1, e2,
+and we want to avoid doing so a second time.  So ApplyToVal records if the argument
+is already Simplified.
 
 Note [Shadowing in the Simplifier]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2574,33 +2611,19 @@ See Note [No free join points in arityType] in GHC.Core.Opt.Arity
 -}
 
 tryRules :: SimplEnv -> [CoreRule]
-         -> Id
-         -> [ArgSpec]   -- In /normal, forward/ order
-         -> SimplCont
-         -> SimplM (Maybe (SimplEnv, CoreExpr, SimplCont))
+         -> OutId -> [OutExpr]
+         -> SimplM (Maybe (FullArgCount, CoreExpr))
 
-tryRules env rules fn args call_cont
-  | null rules
-  = return Nothing
-
-  | Just (rule, rule_rhs) <- lookupRule ropts (getUnfoldingInRuleMatch env)
-                                        (activeRule (seMode env)) fn
-                                        (argInfoAppArgs args) rules
+tryRules env rules fn args
+  | Just (rule, rule_rhs) <- lookupRule ropts in_scope_env
+                                        act_fun fn args rules
   -- Fire a rule for the function
   = do { logger <- getLogger
        ; checkedTick (RuleFired (ruleName rule))
-       ; let cont' = pushSimplifiedArgs zapped_env
-                                        (drop (ruleArity rule) args)
-                                        call_cont
-                     -- (ruleArity rule) says how
-                     -- many args the rule consumed
-
-             occ_anald_rhs = occurAnalyseExpr rule_rhs
+       ; let occ_anald_rhs = occurAnalyseExpr rule_rhs
                  -- See Note [Occurrence-analyse after rule firing]
        ; dump logger rule rule_rhs
-       ; return (Just (zapped_env, occ_anald_rhs, cont')) }
-            -- The occ_anald_rhs and cont' are all Out things
-            -- hence zapping the environment
+       ; return (Just (ruleArity rule, occ_anald_rhs)) }
 
   | otherwise  -- No rule fires
   = do { logger <- getLogger
@@ -2608,8 +2631,9 @@ tryRules env rules fn args call_cont
        ; return Nothing }
 
   where
-    ropts      = seRuleOpts env
-    zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
+    ropts        = seRuleOpts env :: RuleOpts
+    in_scope_env = getUnfoldingInRuleMatch env :: InScopeEnv
+    act_fun      = activeRule (seMode env) :: Activation -> Bool
 
     printRuleModule rule
       = parens (maybe (text "BUILTIN")
@@ -2621,10 +2645,9 @@ tryRules env rules fn args call_cont
       = log_rule Opt_D_dump_rule_rewrites "Rule fired" $ vcat
           [ text "Rule:" <+> ftext (ruleName rule)
           , text "Module:" <+>  printRuleModule rule
+          , text "Full arity:" <+>  ppr (ruleArity rule)
           , text "Before:" <+> hang (ppr fn) 2 (sep (map ppr args))
-          , text "After: " <+> hang (pprCoreExpr rule_rhs) 2
-                               (sep $ map ppr $ drop (ruleArity rule) args)
-          , text "Cont:  " <+> ppr call_cont ]
+          , text "After: " <+> pprCoreExpr rule_rhs ]
 
       | logHasDumpFlag logger Opt_D_dump_rule_firings
       = log_rule Opt_D_dump_rule_firings "Rule fired:" $
@@ -2656,13 +2679,23 @@ tryRules env rules fn args call_cont
 trySeqRules :: SimplEnv
             -> OutExpr -> InExpr   -- Scrutinee and RHS
             -> SimplCont
-            -> SimplM (Maybe (SimplEnv, CoreExpr, SimplCont))
+            -> SimplM (Maybe (CoreExpr, SimplCont))
 -- See Note [User-defined RULES for seq]
+-- `in_env` applies to `rhs :: InExpr` but not to `scrut :: OutExpr`
 trySeqRules in_env scrut rhs cont
   = do { rule_base <- getSimplRules
-       ; tryRules in_env (getRules rule_base seqId) seqId out_args rule_cont }
+       ; let seq_rules = getRules rule_base seqId
+       ; mb_match <- tryRules in_env seq_rules seqId out_args
+       ; case mb_match of
+            Nothing                -> return Nothing
+            Just (rule_arity, rhs) -> return (Just (rhs, cont'))
+                where
+                  cont' = pushSimplifiedArgs in_env (drop rule_arity out_arg_specs) rule_cont
+       }
   where
     no_cast_scrut = drop_casts scrut
+
+    -- All these are OutTypes
     scrut_ty  = exprType no_cast_scrut
     seq_id_ty = idType seqId                    -- forall r a (b::TYPE r). a -> b -> b
     res1_ty   = piResultTy seq_id_ty rhs_rep    -- forall a (b::TYPE rhs_rep). a -> b -> b
@@ -2671,21 +2704,23 @@ trySeqRules in_env scrut rhs cont
     res4_ty   = funResultTy res3_ty             -- rhs_ty -> rhs_ty
     rhs_ty    = substTy in_env (exprType rhs)
     rhs_rep   = getRuntimeRep rhs_ty
-    out_args  = [ TyArg { as_arg_ty  = rhs_rep
+
+    out_args = [Type rhs_rep, Type scrut_ty, Type rhs_ty, no_cast_scrut]
+               -- Cheaper than (map argSpecArg out_arg_specs)
+    out_arg_specs  = [ TyArg { as_arg_ty  = rhs_rep
                         , as_hole_ty = seq_id_ty }
-                , TyArg { as_arg_ty  = scrut_ty
-                        , as_hole_ty = res1_ty }
-                , TyArg { as_arg_ty  = rhs_ty
-                        , as_hole_ty = res2_ty }
-                , ValArg { as_arg = no_cast_scrut
-                         , as_dmd = seqDmd
-                         , as_hole_ty = res3_ty } ]
+                     , TyArg { as_arg_ty  = scrut_ty
+                             , as_hole_ty = res1_ty }
+                     , TyArg { as_arg_ty  = rhs_ty
+                             , as_hole_ty = res2_ty }
+                     , ValArg { as_arg = no_cast_scrut
+                              , as_dmd = seqDmd
+                              , as_hole_ty = res3_ty } ]
     rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
                            , sc_env = in_env, sc_cont = cont
                            , sc_hole_ty = res4_ty }
 
     -- Lazily evaluated, so we don't do most of this
-
     drop_casts (Cast e _) = drop_casts e
     drop_casts e          = e
 
@@ -3161,8 +3196,8 @@ rebuildCase env scrut case_bndr alts@[Alt _ bndrs rhs] cont
   | is_plain_seq
   = do { mb_rule <- trySeqRules env scrut rhs cont
        ; case mb_rule of
-           Just (env', rule_rhs, cont') -> simplExprF env' rule_rhs cont'
-           Nothing                      -> reallyRebuildCase env scrut case_bndr alts cont }
+           Just (rule_rhs, cont') -> simplExprF (zapSubstEnv env) rule_rhs cont'
+           Nothing                -> reallyRebuildCase env scrut case_bndr alts cont }
 
 --------------------------------------------------
 --      3. Primop-related case-rules
@@ -3213,7 +3248,7 @@ reallyRebuildCase env scrut case_bndr alts cont
                             --    Note [Case-of-case and full laziness]
   = do { case_expr <- simplAlts env scrut case_bndr alts
                                 (mkBoringStop (contHoleType cont))
-       ; rebuild env case_expr cont }
+       ; rebuild (zapSubstEnv env) case_expr cont }
 
   | otherwise
   = do { (floats, env', cont') <- mkDupableCaseCont env alts cont
@@ -3726,7 +3761,7 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
       | exprIsTrivial scrut = return (emptyFloats env
                                      , extendIdSubst env bndr (DoneEx scrut NotJoinPoint))
                               -- See Note [Do not duplicate constructor applications]
-      | otherwise           = do { dc_args <- mapM (simplVar env) bs
+      | otherwise           = do { dc_args <- mapM (simplInVar env) bs
                                          -- dc_ty_args are already OutTypes,
                                          -- but bs are InBndrs
                                  ; let con_app = Var (dataConWorkId dc)
@@ -3817,13 +3852,17 @@ mkDupableCont :: SimplEnv
                                        --   extra let/join-floats and in-scope variables
                         , SimplCont)   -- dup_cont: duplicable continuation
 mkDupableCont env cont
-  = mkDupableContWithDmds env (repeat topDmd) cont
+  = mkDupableContWithDmds (zapSubstEnv env) (repeat topDmd) cont
 
 mkDupableContWithDmds
-   :: SimplEnv  -> [Demand]  -- Demands on arguments; always infinite
+   :: SimplEnvIS  -> [Demand]  -- Demands on arguments; always infinite
    -> SimplCont -> SimplM ( SimplFloats, SimplCont)
 
 mkDupableContWithDmds env _ cont
+  -- Check the invariant
+  | assertPpr (checkSimplEnvIS env) (pprBadSimplEnvIS env) False
+  = pprPanic "mkDupableContWithDmds" empty
+
   | contIsDupable cont
   = return (emptyFloats env, cont)
 
@@ -3987,7 +4026,7 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
   | otherwise
   = do { join_bndr <- newJoinId [arg_bndr] res_ty
        ; let arg_info = ArgInfo { ai_fun   = join_bndr
-                                , ai_rewrite = TryNothing, ai_args  = []
+                                , ai_rules = [], ai_args  = []
                                 , ai_encl  = False, ai_dmds  = repeat topDmd
                                 , ai_discs = repeat 0 }
        ; return ( addJoinFloats (emptyFloats env) $

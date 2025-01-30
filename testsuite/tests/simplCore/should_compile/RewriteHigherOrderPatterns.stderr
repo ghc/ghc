@@ -1,30 +1,30 @@
 Rule fired
     Rule: bar
     Module: (RewriteHigherOrderPatterns)
-    Before: bar ValArg \ x y z -> two (two x y) z
+    Full arity: 1
+    Before: bar \ x y z -> two (two x y) z
     After:  (\ f -> True) (\ x y -> two (two x y))
-    Cont:   Stop[RhsCtxt(NonRecursive)] Bool
 Rule fired
     Rule: bar
     Module: (RewriteHigherOrderPatterns)
-    Before: bar ValArg \ x _ z -> two (two x (I# 2#)) z
+    Full arity: 1
+    Before: bar \ x _ z -> two (two x (I# 2#)) z
     After:  (\ f -> True) (\ x _ -> two (two x (I# 2#)))
-    Cont:   Stop[RhsCtxt(NonRecursive)] Bool
 Rule fired
     Rule: foo
     Module: (RewriteHigherOrderPatterns)
-    Before: foo ValArg \ x -> two (two x (I# 2#)) x
+    Full arity: 1
+    Before: foo \ x -> two (two x (I# 2#)) x
     After:  (\ f -> True) (\ x -> two (two x (I# 2#)) x)
-    Cont:   Stop[RhsCtxt(NonRecursive)] Bool
 Rule fired
     Rule: qux
     Module: (RewriteHigherOrderPatterns)
-    Before: qux ValArg \ x y -> three (two x (I# 1#)) (I# 2#) y
+    Full arity: 1
+    Before: qux \ x y -> three (two x (I# 1#)) (I# 2#) y
     After:  (\ f -> True) (\ x -> three (two x (I# 1#)))
-    Cont:   Stop[RhsCtxt(NonRecursive)] Bool
 Rule fired
     Rule: baz
     Module: (RewriteHigherOrderPatterns)
-    Before: baz ValArg \ x -> three (two x (I# 1#)) (I# 2#) x
+    Full arity: 1
+    Before: baz \ x -> three (two x (I# 1#)) (I# 2#) x
     After:  (\ f -> True) (\ x -> three (two x (I# 1#)) (I# 2#))
-    Cont:   Stop[RhsCtxt(NonRecursive)] Bool

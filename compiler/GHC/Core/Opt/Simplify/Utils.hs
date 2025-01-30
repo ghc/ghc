@@ -25,15 +25,15 @@ module GHC.Core.Opt.Simplify.Utils (
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
         contIsTrivial, contArgs, contIsRhs,
-        countArgs,
+        countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
 
         -- ArgInfo
-        ArgInfo(..), ArgSpec(..), RewriteCall(..), mkArgInfo,
-        addValArgTo, addCastTo, addTyArgTo,
-        argInfoExpr, argInfoAppArgs,
-        pushSimplifiedArgs, pushSimplifiedRevArgs,
+        ArgInfo(..), ArgSpec(..), mkArgInfo,
+        addValArgTo, addTyArgTo,
+        argInfoExpr, argSpecArg,
+        pushSimplifiedArgs,
         isStrictArgInfo, lazyArgContext,
 
         abstractFloats,
@@ -55,7 +55,6 @@ import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
 import GHC.Core.FVs
 import GHC.Core.Utils
-import GHC.Core.Rules( RuleEnv, getRules )
 import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
@@ -84,7 +83,6 @@ import GHC.Utils.Panic
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
-import Data.List.NonEmpty ( nonEmpty )
 import GHC.Types.Name.Env
 import Data.Graph
 
@@ -285,7 +283,7 @@ instance Outputable SimplCont where
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
     = (text "ApplyToTy" <+> pprParendType ty) $$ ppr cont
   ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont, sc_hole_ty = hole_ty })
-    = (hang (text "ApplyToVal" <+> ppr dup <+> text "hole" <+> ppr hole_ty)
+    = (hang (text "ApplyToVal" <+> ppr dup <+> text "hole-ty:" <+> pprParendType hole_ty)
           2 (pprParendExpr arg))
       $$ ppr cont
   ppr (StrictBind { sc_bndr = b, sc_cont = cont })
@@ -325,11 +323,10 @@ data ArgInfo
   = ArgInfo {
         ai_fun   :: OutId,      -- The function
         ai_args  :: [ArgSpec],  -- ...applied to these args (which are in *reverse* order)
+                                -- NB: all these argumennts are already simplified
 
-        ai_rewrite :: RewriteCall,  -- What transformation to try next for this call
-             -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
-
-        ai_encl :: Bool,        -- Flag saying whether this function
+        ai_rules :: [CoreRule], -- Rules for this function
+        ai_encl  :: Bool,       -- Flag saying whether this function
                                 -- or an enclosing one has rules (recursively)
                                 --      True => be keener to inline in all args
 
@@ -343,12 +340,6 @@ data ArgInfo
                                 --   Always infinite
     }
 
-data RewriteCall  -- What rewriting to try next for this call
-                  -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
-  = TryRules FullArgCount [CoreRule]
-  | TryInlining
-  | TryNothing
-
 data ArgSpec
   = ValArg { as_dmd  :: Demand        -- Demand placed on this argument
            , as_arg  :: OutExpr       -- Apply to this (coercion or value); c.f. ApplyToVal
@@ -357,48 +348,34 @@ data ArgSpec
   | TyArg { as_arg_ty  :: OutType     -- Apply to this type; c.f. ApplyToTy
           , as_hole_ty :: OutType }   -- Type of the function (presumably forall a. blah)
 
-  | CastBy OutCoercion                -- Cast by this; c.f. CastIt
-                                      -- Coercion is optimised
-
 instance Outputable ArgInfo where
-  ppr (ArgInfo { ai_fun = fun, ai_args = args, ai_dmds = dmds, ai_rewrite = rewrite })
+  ppr (ArgInfo { ai_fun = fun, ai_args = args, ai_dmds = dmds, ai_rules = rules })
     = text "ArgInfo" <+> braces
          (sep [ text "fun =" <+> ppr fun
               , text "dmds(first 10) =" <+> ppr (take 10 dmds)
               , text "args =" <+> ppr args
-              , text "rewrite =" <+> ppr rewrite ])
-
-instance Outputable RewriteCall where
-  ppr (TryRules ac _rules) = text "TryRules" <+> ppr ac
-  ppr TryInlining          = text "TryInlining"
-  ppr TryNothing           = text "TryNothing"
+              , text "rewrite =" <+> ppr rules ])
 
 instance Outputable ArgSpec where
   ppr (ValArg { as_arg = arg })  = text "ValArg" <+> ppr arg
   ppr (TyArg { as_arg_ty = ty }) = text "TyArg" <+> ppr ty
-  ppr (CastBy c)                 = text "CastBy" <+> ppr c
 
 addValArgTo :: ArgInfo ->  OutExpr -> OutType -> ArgInfo
 addValArgTo ai arg hole_ty
-  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs, ai_rewrite = rew } <- ai
+  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs } <- ai
       -- Pop the top demand and and discounts off
   , let arg_spec = ValArg { as_arg = arg, as_hole_ty = hole_ty, as_dmd = dmd }
   = ai { ai_args    = arg_spec : ai_args ai
        , ai_dmds    = dmds
-       , ai_discs   = discs
-       , ai_rewrite = decArgCount rew }
+       , ai_discs   = discs }
   | otherwise
   = pprPanic "addValArgTo" (ppr ai $$ ppr arg)
     -- There should always be enough demands and discounts
 
 addTyArgTo :: ArgInfo -> OutType -> OutType -> ArgInfo
-addTyArgTo ai arg_ty hole_ty = ai { ai_args    = arg_spec : ai_args ai
-                                  , ai_rewrite = decArgCount (ai_rewrite ai) }
+addTyArgTo ai arg_ty hole_ty = ai { ai_args    = arg_spec : ai_args ai }
   where
     arg_spec = TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
-
-addCastTo :: ArgInfo -> OutCoercion -> ArgInfo
-addCastTo ai co = ai { ai_args = CastBy co : ai_args ai }
 
 isStrictArgInfo :: ArgInfo -> Bool
 -- True if the function is strict in the next argument
@@ -406,19 +383,11 @@ isStrictArgInfo (ArgInfo { ai_dmds = dmds })
   | dmd:_ <- dmds = isStrUsedDmd dmd
   | otherwise     = False
 
-argInfoAppArgs :: [ArgSpec] -> [OutExpr]
-argInfoAppArgs []                              = []
-argInfoAppArgs (CastBy {}                : _)  = []  -- Stop at a cast
-argInfoAppArgs (ValArg { as_arg = arg }  : as) = arg     : argInfoAppArgs as
-argInfoAppArgs (TyArg { as_arg_ty = ty } : as) = Type ty : argInfoAppArgs as
-
-pushSimplifiedArgs, pushSimplifiedRevArgs
-  :: SimplEnv
-  -> [ArgSpec]   -- In normal, forward order for pushSimplifiedArgs,
-                 -- in /reverse/ order for pushSimplifiedRevArgs
-  -> SimplCont -> SimplCont
-pushSimplifiedArgs    env args cont = foldr  (pushSimplifiedArg env)             cont args
-pushSimplifiedRevArgs env args cont = foldl' (\k a -> pushSimplifiedArg env a k) cont args
+pushSimplifiedArgs :: SimplEnv
+                   -> [ArgSpec]   -- In normal, forward order
+                   -> SimplCont -> SimplCont
+pushSimplifiedArgs env args cont = foldr (pushSimplifiedArg env) cont args
+-- pushSimplifiedRevArgs env args cont = foldl' (\k a -> pushSimplifiedArg env a k) cont args
 
 pushSimplifiedArg :: SimplEnv -> ArgSpec -> SimplCont -> SimplCont
 pushSimplifiedArg _env (TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }) cont
@@ -427,8 +396,10 @@ pushSimplifiedArg env (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
   = ApplyToVal { sc_arg = arg, sc_env = env, sc_dup = Simplified
                  -- The SubstEnv will be ignored since sc_dup=Simplified
                , sc_hole_ty = hole_ty, sc_cont = cont }
-pushSimplifiedArg _ (CastBy c) cont
-  = CastIt { sc_co = c, sc_cont = cont, sc_opt = True }
+
+argSpecArg :: ArgSpec -> OutExpr
+argSpecArg (ValArg { as_arg = arg })   = arg
+argSpecArg (TyArg  { as_arg_ty = ty }) = Type ty
 
 argInfoExpr :: OutId -> [ArgSpec] -> OutExpr
 -- NB: the [ArgSpec] is reversed so that the first arg
@@ -439,27 +410,6 @@ argInfoExpr fun rev_args
     go []                              = Var fun
     go (ValArg { as_arg = arg }  : as) = go as `App` arg
     go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
-    go (CastBy co                : as) = mkCast (go as) co
-
-decArgCount :: RewriteCall -> RewriteCall
-decArgCount (TryRules n rules) = TryRules (n-1) rules
-decArgCount rew                = rew
-
-mkRewriteCall :: Id -> RuleEnv -> RewriteCall
--- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
--- We try to skip any unnecessary stages:
---    No rules     => skip TryRules
---    No unfolding => skip TryInlining
--- This skipping is "just" for efficiency.  But rebuildCall is
--- quite a heavy hammer, so skipping stages is a good plan.
--- And it's extremely simple to do.
-mkRewriteCall fun rule_env
-  | Just rulesNE <- nonEmpty rules = TryRules (maximum $ ruleArity <$> rulesNE) rules
-  | canUnfold unf    = TryInlining
-  | otherwise        = TryNothing
-  where
-    rules = getRules rule_env fun
-    unf   = idUnfolding fun
 
 {-
 ************************************************************************
@@ -598,6 +548,34 @@ contArgs cont
                    -- Do *not* use short-cutting substitution here
                    -- because we want to get as much IdInfo as possible
 
+contOutArgs :: SimplEnv -> SimplCont -> [OutExpr]
+-- Get the leading arguments from the `SimplCont`, as /OutExprs/
+contOutArgs env cont
+  = go cont
+  where
+    in_scope = seInScope env
+
+    go (ApplyToTy { sc_arg_ty = ty, sc_cont = cont })
+      = Type ty : go cont
+
+    go (ApplyToVal { sc_dup = dup, sc_arg = arg, sc_env = env, sc_cont = cont })
+      | isSimplified dup = arg : go cont
+      | otherwise        = GHC.Core.Subst.substExpr (getFullSubst in_scope env) arg : go cont
+        -- Make sure we apply the static environment `sc_env` as a substitution
+        --   to get an OutExpr.  See (BF1) in Note [tryRules: plan (BEFORE)]
+        --   in GHC.Core.Opt.Simplify.Iteration
+        -- NB: we use substExpr, not substExprSC: we want to get the benefit of
+        --     knowing what is evaluated etc, via the in-scope set
+
+    -- No more arguments
+    go _ = []
+
+dropContArgs :: FullArgCount -> SimplCont -> SimplCont
+dropContArgs 0 cont = cont
+dropContArgs n (ApplyToTy  { sc_cont = cont }) = dropContArgs (n-1) cont
+dropContArgs n (ApplyToVal { sc_cont = cont }) = dropContArgs (n-1) cont
+dropContArgs n cont = pprPanic "dropContArgs" (ppr n $$ ppr cont)
+
 -- | Describes how the 'SimplCont' will evaluate the hole as a 'SubDemand'.
 -- This can be more insightful than the limited syntactic context that
 -- 'SimplCont' provides, because the 'Stop' constructor might carry a useful
@@ -629,28 +607,25 @@ contEvalContext k = case k of
     -- and case binder dmds, see addCaseBndrDmd. No priority right now.
 
 -------------------
-mkArgInfo :: SimplEnv -> RuleEnv -> Id -> SimplCont -> ArgInfo
-
-mkArgInfo env rule_base fun cont
+mkArgInfo :: SimplEnv -> Id -> [CoreRule] -> SimplCont -> ArgInfo
+mkArgInfo env fun rules_for_fun cont
   | n_val_args < idArity fun            -- Note [Unsaturated functions]
   = ArgInfo { ai_fun = fun, ai_args = []
-            , ai_rewrite = fun_rewrite
+            , ai_rules = rules_for_fun
             , ai_encl = False
             , ai_dmds = vanilla_dmds
             , ai_discs = vanilla_discounts }
   | otherwise
   = ArgInfo { ai_fun   = fun
             , ai_args  = []
-            , ai_rewrite = fun_rewrite
+            , ai_rules = rules_for_fun
             , ai_encl  = fun_has_rules || contHasRules cont
             , ai_dmds  = add_type_strictness (idType fun) arg_dmds
             , ai_discs = arg_discounts }
   where
-    n_val_args    = countValArgs cont
-    fun_rewrite   = mkRewriteCall fun rule_base
-    fun_has_rules = case fun_rewrite of
-                      TryRules {} -> True
-                      _           -> False
+    n_val_args  = countValArgs cont
+
+    fun_has_rules = not (null rules_for_fun)
 
     vanilla_discounts, arg_discounts :: [Int]
     vanilla_discounts = repeat 0
@@ -1521,6 +1496,10 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     canInlineInLam (Lit _)    = True
     canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
     canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
+    canInlineInLam (Var v)    = case idOccInfo v of
+                                  OneOcc { occ_in_lam = IsInsideLam } -> True
+                                  ManyOccs {}                         -> True
+                                  _                                   -> False
     canInlineInLam _          = False
       -- not ticks.  Counting ticks cannot be duplicated, and non-counting
       -- ticks around a Lam will disappear anyway.

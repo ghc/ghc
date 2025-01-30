@@ -6,7 +6,7 @@ Considering inlining: foo
   is work-free: True
   guidance IF_ARGS [0] 30 0
   case depth = 0
-  inline depth = 0
+  inline depth = 1
   depth based penalty = 0
   adjusted size = 10
   ANSWER = YES
@@ -26,7 +26,7 @@ Considering inlining: foo
   is work-free: True
   guidance IF_ARGS [0] 30 0
   case depth = 0
-  inline depth = 0
+  inline depth = 1
   depth based penalty = 0
   adjusted size = 20
   ANSWER = NO
