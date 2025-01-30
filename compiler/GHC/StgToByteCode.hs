@@ -70,7 +70,7 @@ import GHC.Types.Name.Env (mkNameEnv)
 import GHC.Types.Tickish
 import GHC.Types.SptEntry
 
-import Data.List ( genericReplicate, genericLength, intersperse
+import Data.List ( genericReplicate, intersperse
                  , partition, scanl', sortBy, zip4, zip6 )
 import Foreign hiding (shiftL, shiftR)
 import Control.Monad
@@ -394,7 +394,7 @@ schemeR_wrk fvs nm original_body (args, body)
 
          -- make the arg bitmap
          bits = argBits platform (reverse (map (idArgRep platform) all_args))
-         bitmap_size = genericLength bits
+         bitmap_size = strictGenericLength bits
          bitmap = mkBitmap platform bits
      body_code <- schemeER_wrk sum_szsb_args p_init body
 
@@ -608,7 +608,7 @@ schemeE d s p (StgLet _ext binds body) = do
      platform <- targetPlatform <$> getDynFlags
      let (xs,rhss) = case binds of StgNonRec x rhs  -> ([x],[rhs])
                                    StgRec xs_n_rhss -> unzip xs_n_rhss
-         n_binds = genericLength xs
+         n_binds = strictGenericLength xs
 
          fvss  = map (fvsToEnv p') rhss
 
@@ -617,7 +617,7 @@ schemeE d s p (StgLet _ext binds body) = do
          sizes = map (\rhs_fvs -> sum (map size_w rhs_fvs)) fvss
 
          -- the arity of each rhs
-         arities = map (genericLength . fst . collect) rhss
+         arities = map (strictGenericLength . fst . collect) rhss
 
          -- This p', d' defn is safe because all the items being pushed
          -- are ptrs, so all have size 1 word.  d' and p' reflect the stack
@@ -1858,7 +1858,7 @@ implement_tagToId
 implement_tagToId d s p arg names
   = assert (notNull names) $
     do (push_arg, arg_bytes) <- pushAtom d p (StgVarArg arg)
-       labels <- getLabelsBc (genericLength names)
+       labels <- getLabelsBc (strictGenericLength names)
        label_fail <- getLabelBc
        label_exit <- getLabelBc
        dflags <- getDynFlags

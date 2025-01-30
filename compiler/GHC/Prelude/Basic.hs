@@ -25,6 +25,8 @@ module GHC.Prelude.Basic
   , shiftL, shiftR
   , setBit, clearBit
   , head, tail
+
+  , strictGenericLength
   ) where
 
 
@@ -130,3 +132,15 @@ head = Prelude.head
 tail :: HasCallStack => [a] -> [a]
 tail = Prelude.tail
 {-# INLINE tail #-}
+
+{- |
+The 'genericLength' function defined in base can't be specialised due to the
+NOINLINE pragma.
+
+It is also not strict in the accumulator, and strictGenericLength is not exported.
+
+See #25706 for why it is important to use a strict, specialised version.
+
+-}
+strictGenericLength :: Num a => [x] -> a
+strictGenericLength = fromIntegral . length
