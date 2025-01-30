@@ -70,7 +70,7 @@ import GHC.Types.Name.Env (mkNameEnv)
 import GHC.Types.Tickish
 import GHC.Types.SptEntry
 
-import Data.List ( genericReplicate, genericLength, intersperse
+import Data.List ( genericReplicate, intersperse
                  , partition, scanl', sortBy, zip4, zip6 )
 import Foreign hiding (shiftL, shiftR)
 import Control.Monad
@@ -96,6 +96,16 @@ import Data.Either ( partitionEithers )
 import GHC.Stg.Syntax
 import qualified Data.IntSet as IntSet
 import GHC.CoreToIface
+
+-- | A specific version of genericLength for this module which will get inlined
+-- and specialised.
+--
+-- It is strict in the accumulator and marked as 'INLINE' so it is guaranteed to
+-- specialise (unlike genericLength in base).
+genericLength :: Num a => [x] -> a
+genericLength = foldl' (\n _ -> 1 + n) 0
+{-# INLINABLE genericLength #-}
+
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module

@@ -38,8 +38,8 @@ addToSS :: SizedSeq a -> a -> SizedSeq a
 addToSS (SizedSeq n r_xs) x = SizedSeq (n+1) (x:r_xs)
 
 addListToSS :: SizedSeq a -> [a] -> SizedSeq a
-addListToSS (SizedSeq n r_xs) xs
-  = SizedSeq (n + genericLength xs) (reverse xs ++ r_xs)
+addListToSS
+  = foldl' addToSS
 
 ssElts :: SizedSeq a -> [a]
 ssElts (SizedSeq _ r_xs) = reverse r_xs
