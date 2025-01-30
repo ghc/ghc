@@ -344,7 +344,7 @@ data ArgInfo
 
 data RewriteCall  -- What rewriting to try next for this call
                   -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
-  = TryRules FullArgCount [CoreRule]
+  = TryRules [CoreRule]
   | TryInlining
   | TryNothing
 
@@ -373,20 +373,18 @@ instance Outputable ArgSpec where
 
 addValArgTo :: ArgInfo ->  OutExpr -> OutType -> ArgInfo
 addValArgTo ai arg hole_ty
-  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs, ai_rewrite = rew } <- ai
+  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs } <- ai
       -- Pop the top demand and and discounts off
   , let arg_spec = ValArg { as_arg = arg, as_hole_ty = hole_ty, as_dmd = dmd }
   = ai { ai_args    = arg_spec : ai_args ai
        , ai_dmds    = dmds
-       , ai_discs   = discs
-       , ai_rewrite = decArgCount rew }
+       , ai_discs   = discs }
   | otherwise
   = pprPanic "addValArgTo" (ppr ai $$ ppr arg)
     -- There should always be enough demands and discounts
 
 addTyArgTo :: ArgInfo -> OutType -> OutType -> ArgInfo
-addTyArgTo ai arg_ty hole_ty = ai { ai_args    = arg_spec : ai_args ai
-                                  , ai_rewrite = decArgCount (ai_rewrite ai) }
+addTyArgTo ai arg_ty hole_ty = ai { ai_args    = arg_spec : ai_args ai }
   where
     arg_spec = TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
 
@@ -434,10 +432,6 @@ argInfoExpr fun rev_args
     go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
     go (CastBy co                : as) = mkCast (go as) co
 
-decArgCount :: RewriteCall -> RewriteCall
-decArgCount (TryRules n rules) = TryRules (n-1) rules
-decArgCount rew                = rew
-
 mkRewriteCall :: Id -> RuleEnv -> RewriteCall
 -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
 -- We try to skip any unnecessary stages:
@@ -447,11 +441,10 @@ mkRewriteCall :: Id -> RuleEnv -> RewriteCall
 -- quite a heavy hammer, so skipping stages is a good plan.
 -- And it's extremely simple to do.
 mkRewriteCall fun rule_env
-  | not (null rules) = TryRules n_required rules
+  | not (null rules) = TryRules rules
   | canUnfold unf    = TryInlining
   | otherwise        = TryNothing
   where
-    n_required = maximum (map ruleArity rules)
     rules = getRules rule_env fun
     unf   = idUnfolding fun
 
