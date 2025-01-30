@@ -146,6 +146,8 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , "  " ++ src </> "utils/genprimopcode/"
         , "  " ++ src </> "utils/genapply/"
         , "  " ++ src </> "utils/deriveConstants/"
+        , "  " ++ src </> "utils/ghc-toolchain/"
+        , "  " ++ src </> "utils/ghc-toolchain/exe"
         , ""
         , "benchmarks: False"
         , "tests: False"
@@ -243,6 +245,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
            , "genprimopcode:genprimopcode"
            , "deriveConstants:deriveConstants"
            , "genapply:genapply"
+           , "ghc-toolchain-bin:ghc-toolchain-bin"
            ]
         | otherwise = 
            [ "ghc-bin:ghc"
@@ -295,9 +298,10 @@ buildGhcStage booting opts cabal ghc0 dst = do
   copy_bin "ghc-pkg:ghc-pkg" "ghc-pkg"
 
   when booting $ do
-    copy_bin "deriveConstants:deriveConstants" "deriveConstants"
-    copy_bin "genprimopcode:genprimopcode"     "genprimopcode"
-    copy_bin "genapply:genapply"               "genapply"
+    copy_bin "deriveConstants:deriveConstants"     "deriveConstants"
+    copy_bin "genprimopcode:genprimopcode"         "genprimopcode"
+    copy_bin "genapply:genapply"                   "genapply"
+    copy_bin "ghc-toolchain-bin:ghc-toolchain-bin" "ghc-toolchain"
 
   -- initialize empty global package database
   pkgdb <- makeAbsolute (dst </> "pkgs")
