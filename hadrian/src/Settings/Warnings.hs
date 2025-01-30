@@ -56,7 +56,7 @@ ghcWarningsArgs = do
         , package primitive    ? pure [ "-Wno-unused-imports"
                                       , "-Wno-deprecations" ]
         , package rts          ? pure [ "-Wcpp-undef" ]
-        , package text         ? pure [ "-Wno-deprecations" ]
+        , package text         ? pure [ "-Wno-deprecations", "-Wno-unused-imports" ]
         , package terminfo     ? pure [ "-Wno-unused-imports" ]
         , package transformers ? pure [ "-Wno-unused-matches"
                                       , "-Wno-unused-imports"
