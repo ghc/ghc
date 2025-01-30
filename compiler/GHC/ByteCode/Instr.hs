@@ -36,6 +36,7 @@ import GHC.Stack.CCS (CostCentre)
 import GHC.Stg.Syntax
 import GHCi.BreakArray (BreakArray)
 import Language.Haskell.Syntax.Module.Name (ModuleName)
+import GHC.Types.Unique
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions
@@ -57,6 +58,10 @@ data ProtoBCO a
 -- | A local block label (e.g. identifying a case alternative).
 newtype LocalLabel = LocalLabel { getLocalLabel :: Word32 }
   deriving (Eq, Ord)
+
+-- Just so we can easily juse UniqFM.
+instance Uniquable LocalLabel where
+  getUnique (LocalLabel w) = mkUniqueGrimily $ fromIntegral w
 
 instance Outputable LocalLabel where
   ppr (LocalLabel lbl) = text "lbl:" <> ppr lbl

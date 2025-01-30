@@ -8,12 +8,10 @@ module GHC.Data.FlatBag
   , mappendFlatBag
   -- * Construction
   , fromList
-  , fromSizedSeq
+  , fromSmallArray
   ) where
 
 import GHC.Prelude
-
-import GHC.Data.SizedSeq (SizedSeq, ssElts, sizeSS)
 
 import Control.DeepSeq
 
@@ -125,5 +123,10 @@ fromList n elts =
 -- | Convert a 'SizedSeq' into its flattened representation.
 -- A 'FlatBag a' is more memory efficient than '[a]', if no further modification
 -- is necessary.
-fromSizedSeq :: SizedSeq a -> FlatBag a
-fromSizedSeq s = fromList (sizeSS s) (ssElts s)
+fromSmallArray :: SmallArray a -> FlatBag a
+fromSmallArray s = case sizeofSmallArray s of
+                      0 -> EmptyFlatBag
+                      1 -> UnitFlatBag (indexSmallArray s 0)
+                      2 -> TupleFlatBag (indexSmallArray s 0) (indexSmallArray s 1)
+                      _ -> FlatBag s
+
