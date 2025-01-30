@@ -43,7 +43,8 @@ module GHC.Core (
         foldBindersOfBindStrict, foldBindersOfBindsStrict,
         collectBinders, collectTyBinders, collectTyAndValBinders,
         collectNBinders, collectNValBinders_maybe,
-        collectArgs, collectValArgs, stripNArgs, collectArgsTicks, flattenBinds,
+        collectArgs, collectIdAppArgs, collectValArgs,
+        stripNArgs, collectArgsTicks, flattenBinds,
         collectFunSimple,
 
         exprToType,
@@ -2222,6 +2223,14 @@ collectArgs expr
   where
     go (App f a) as = go f (a:as)
     go e         as = (e, as)
+
+collectIdAppArgs :: Expr b -> Maybe (InId, [Arg b])
+collectIdAppArgs expr
+  = go expr []
+  where
+    go (App (Var v) a) as = Just (v, (a:as))
+    go (App f a)       as = go f (a:as)
+    go _               _  = Nothing
 
 -- | Takes a nested application expression and returns the function
 -- being applied and the arguments to which it is applied

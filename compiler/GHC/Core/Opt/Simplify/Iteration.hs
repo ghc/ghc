@@ -5,6 +5,7 @@
 -}
 
 
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
 
@@ -1185,8 +1186,16 @@ simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t exp
 simplExprF1 env (Cast body co) cont = {-#SCC "simplCast" #-} simplCast env body co cont
 simplExprF1 env (Coercion co)  cont = {-#SCC "simplCoercionF" #-} simplCoercionF env co cont
 
-simplExprF1 env (App fun arg) cont
-  = {-#SCC "simplExprF1-App" #-} case arg of
+simplExprF1 env expr@(App fun arg) cont
+  | Just (fun_id, args) <- collectIdAppArgs expr
+  -- Try rules on unsimplified arguments
+  = tryRulesUnsimpl env fun_id args >>= \case
+      Just (rhs, args') -> simplExprF env (mkApps rhs args') cont
+      Nothing           -> simplApp
+  | otherwise
+  = simplApp
+  where
+    simplApp = {-#SCC "simplExprF1-App" #-} case arg of
       Type ty -> do { -- The argument type will (almost) certainly be used
                       -- in the output program, so just force it now.
                       -- See Note [Avoiding space leaks in OutType]
@@ -2573,12 +2582,35 @@ See Note [No free join points in arityType] in GHC.Core.Opt.Arity
 ************************************************************************
 -}
 
+-- | Try rules on a function applied to unsimplified arguments.
+--
+-- Returns the RHS of the rule if one was successfully applied and the arguments that
+-- weren't used in the rewrite.
+tryRulesUnsimpl :: SimplEnv -> Id -> [CoreArg] -> SimplM (Maybe (CoreExpr, [CoreArg]))
+tryRulesUnsimpl env fn args = do
+  rules <- flip getRules fn <$> getSimplRules
+  if | null rules -> return Nothing
+     | Just (rule, rule_rhs) <- lookupRule (seRuleOpts env) (getUnfoldingInRuleMatch env)
+                                        (activeRule (seMode env)) fn
+                                        args rules
+     -> do
+      logger <- getLogger
+      checkedTick (RuleFired (ruleName rule))
+      let occ_anald_rhs = occurAnalyseExpr rule_rhs
+               -- See Note [Occurrence-analyse after rule firing]
+      rules_dump logger rule rule_rhs fn args Nothing
+      return (Just (occ_anald_rhs, drop (ruleArity rule) args))
+     | otherwise  -- No rule fires
+     -> do
+      logger <- getLogger
+      rules_nodump logger  -- This ensures that an empty file is written
+      return Nothing
+
 tryRules :: SimplEnv -> [CoreRule]
          -> Id
          -> [ArgSpec]   -- In /normal, forward/ order
          -> SimplCont
          -> SimplM (Maybe (SimplEnv, CoreExpr, SimplCont))
-
 tryRules env rules fn args call_cont
   | null rules
   = return Nothing
@@ -2597,61 +2629,19 @@ tryRules env rules fn args call_cont
 
              occ_anald_rhs = occurAnalyseExpr rule_rhs
                  -- See Note [Occurrence-analyse after rule firing]
-       ; dump logger rule rule_rhs
+       ; rules_dump logger rule rule_rhs fn args (Just call_cont)
        ; return (Just (zapped_env, occ_anald_rhs, cont')) }
             -- The occ_anald_rhs and cont' are all Out things
             -- hence zapping the environment
 
   | otherwise  -- No rule fires
   = do { logger <- getLogger
-       ; nodump logger  -- This ensures that an empty file is written
+       ; rules_nodump logger  -- This ensures that an empty file is written
        ; return Nothing }
 
   where
     ropts      = seRuleOpts env
     zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
-
-    printRuleModule rule
-      = parens (maybe (text "BUILTIN")
-                      (pprModuleName . moduleName)
-                      (ruleModule rule))
-
-    dump logger rule rule_rhs
-      | logHasDumpFlag logger Opt_D_dump_rule_rewrites
-      = log_rule Opt_D_dump_rule_rewrites "Rule fired" $ vcat
-          [ text "Rule:" <+> ftext (ruleName rule)
-          , text "Module:" <+>  printRuleModule rule
-          , text "Before:" <+> hang (ppr fn) 2 (sep (map ppr args))
-          , text "After: " <+> hang (pprCoreExpr rule_rhs) 2
-                               (sep $ map ppr $ drop (ruleArity rule) args)
-          , text "Cont:  " <+> ppr call_cont ]
-
-      | logHasDumpFlag logger Opt_D_dump_rule_firings
-      = log_rule Opt_D_dump_rule_firings "Rule fired:" $
-          ftext (ruleName rule)
-            <+> printRuleModule rule
-
-      | otherwise
-      = return ()
-
-    nodump logger
-      | logHasDumpFlag logger Opt_D_dump_rule_rewrites
-      = liftIO $
-          touchDumpFile logger Opt_D_dump_rule_rewrites
-
-      | logHasDumpFlag logger Opt_D_dump_rule_firings
-      = liftIO $
-          touchDumpFile logger Opt_D_dump_rule_firings
-
-      | otherwise
-      = return ()
-
-    log_rule flag hdr details
-      = do
-      { logger <- getLogger
-      ; liftIO $ logDumpFile logger (mkDumpStyle alwaysQualify) flag "" FormatText
-               $ sep [text hdr, nest 4 details]
-      }
 
 trySeqRules :: SimplEnv
             -> OutExpr -> InExpr   -- Scrutinee and RHS
@@ -2688,6 +2678,56 @@ trySeqRules in_env scrut rhs cont
 
     drop_casts (Cast e _) = drop_casts e
     drop_casts e          = e
+
+rules_dump :: Outputable arg => Logger -> CoreRule -> CoreExpr -> Id -> [arg] -> Maybe SimplCont -> SimplM ()
+rules_dump logger rule rule_rhs fn args mb_cont
+  | logHasDumpFlag logger Opt_D_dump_rule_rewrites
+  = rules_log_rule Opt_D_dump_rule_rewrites "Rule fired" $ vcat $
+      [ text "Rule:" <+> ftext (ruleName rule)
+      , text "Module:" <+>  printRuleModule rule
+      , text "Before:" <+> hang (ppr fn) 2 (sep (map ppr args))
+      , text "After: " <+> hang (pprCoreExpr rule_rhs) 2
+                           (sep $ map ppr $ drop (ruleArity rule) args)
+      ] ++
+      [ text "Cont:  " <+> ppr (call_cont :: SimplCont) | Just call_cont <- [mb_cont] ]
+
+  | logHasDumpFlag logger Opt_D_dump_rule_firings
+  = rules_log_rule Opt_D_dump_rule_firings "Rule fired:" $
+      ftext (ruleName rule)
+        <+> printRuleModule rule
+
+  | otherwise
+  = return ()
+
+  where
+    printRuleModule rule
+      = parens (maybe (text "BUILTIN")
+                      (pprModuleName . moduleName)
+                      (ruleModule rule))
+
+
+
+rules_nodump :: Logger -> SimplM ()
+rules_nodump logger
+  | logHasDumpFlag logger Opt_D_dump_rule_rewrites
+  = liftIO $
+      touchDumpFile logger Opt_D_dump_rule_rewrites
+
+  | logHasDumpFlag logger Opt_D_dump_rule_firings
+  = liftIO $
+      touchDumpFile logger Opt_D_dump_rule_firings
+
+  | otherwise
+  = return ()
+
+rules_log_rule :: DumpFlag -> String -> SDoc -> SimplM ()
+rules_log_rule flag hdr details
+  = do
+  { logger <- getLogger
+  ; liftIO $ logDumpFile logger (mkDumpStyle alwaysQualify) flag "" FormatText
+           $ sep [text hdr, nest 4 details]
+  }
+
 
 {- Note [User-defined RULES for seq]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
