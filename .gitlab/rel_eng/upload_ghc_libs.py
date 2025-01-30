@@ -94,9 +94,23 @@ def prep_ghc():
     build_copy_file(PACKAGES['ghc'], 'GHC/Settings/Config.hs')
 
 def prep_ghc_boot_th():
-    # Drop ghc-internal from `hs-source-dirs` as Hackage rejects this
+    # Drop references to `ghc-internal` from `hs-source-dirs` as Hackage rejects
+    # out-of-sdist references and this packages is only uploaded for documentation
+    # purposes.
     modify_file(PACKAGES['ghc-boot-th'], 'ghc-boot-th.cabal',
-                lambda s: s.replace('../ghc-internal/src', ''))
+                lambda s: s.replace('../ghc-internal/src', '')
+                           .replace('GHC.Internal.TH.Lib.Map', '')
+                           .replace('GHC.Internal.TH.PprLib', '')
+                           .replace('GHC.Internal.TH.Ppr', '')
+                           .replace('GHC.Internal.TH.Lib,', '')
+                           .replace('GHC.Internal.TH.Lib', '')
+                           .replace('GHC.Internal.TH.Lift,', '')
+                           .replace('GHC.Internal.TH.Quote,', '')
+                           .replace('GHC.Internal.TH.Syntax', '')
+                           .replace('GHC.Internal.ForeignSrcLang', '')
+                           .replace('GHC.Internal.LanguageExtensions', '')
+                           .replace('GHC.Internal.Lexeme', '')
+                )
 
 PACKAGES = {
     pkg.name: pkg
