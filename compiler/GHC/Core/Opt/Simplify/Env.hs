@@ -24,13 +24,15 @@ module GHC.Core.Opt.Simplify.Env (
         getSimplRules, enterRecGroupRHSs,
         reSimplifying,
 
+        SimplEnvIS,  checkSimplEnvIS, pprBadSimplEnvIS,
+
         -- * Substitution results
         SimplSR(..), mkContEx, substId, lookupRecBndr,
 
         -- * Simplifying 'Id' binders
         simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
         simplBinder, simplBinders,
-        substTy, substTyVar, getSubst,
+        substTy, substTyVar, getFullSubst, getTCvSubst,
         substCo, substCoVar,
 
         -- * Floats
@@ -58,8 +60,9 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Rules.Config ( RuleOpts(..) )
 import GHC.Core
 import GHC.Core.Utils
+import GHC.Core.Subst( substExprSC )
 import GHC.Core.Unfold
-import GHC.Core.TyCo.Subst (emptyIdSubstEnv)
+import GHC.Core.TyCo.Subst (emptyIdSubstEnv, mkSubst)
 import GHC.Core.Multiplicity( Scaled(..), mkMultMul )
 import GHC.Core.Make            ( mkWildValBinder, mkCoreLet )
 import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, substCo
@@ -200,6 +203,19 @@ data SimplEnv
                                -- unfolding, and simplify again; and so on
                                -- See Note [Inline depth]
     }
+
+type SimplEnvIS = SimplEnv
+     -- Invariant: the substitution is empty
+     -- We want this SimplEnv for its InScopeSet and flags
+
+checkSimplEnvIS :: SimplEnvIS -> Bool
+-- Check the invariant for SimplEnvIS
+checkSimplEnvIS (SimplEnv { seIdSubst = id_env, seTvSubst = tv_env, seCvSubst = cv_env })
+  = isEmptyVarEnv id_env && isEmptyVarEnv tv_env && isEmptyVarEnv cv_env
+
+pprBadSimplEnvIS :: SimplEnvIS -> SDoc
+-- Print a SimplEnv that fails checkSimplEnvIS
+pprBadSimplEnvIS env = ppr (getFullSubst (seInScope env) env)
 
 seArityOpts :: SimplEnv -> ArityOpts
 seArityOpts env = sm_arity_opts (seMode env)
@@ -1258,33 +1274,47 @@ See also Note [Return type for join points] and Note [Join points and case-of-ca
 ************************************************************************
 -}
 
-getSubst :: SimplEnv -> Subst
-getSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env })
-  = mkTCvSubst in_scope tv_env cv_env
+getTCvSubst :: SimplEnv -> Subst
+getTCvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env })
+  = mkSubst in_scope emptyVarEnv tv_env cv_env
+
+getFullSubst :: InScopeSet -> SimplEnv -> Subst
+getFullSubst in_scope (SimplEnv { seIdSubst = id_env, seTvSubst = tv_env, seCvSubst = cv_env })
+  = mk_full_subst in_scope tv_env cv_env id_env
+
+mk_full_subst :: InScopeSet -> TvSubstEnv -> CvSubstEnv -> SimplIdSubst -> Subst
+mk_full_subst in_scope tv_env cv_env id_env
+  = mkSubst in_scope (mapVarEnv to_expr id_env) tv_env cv_env
+  where
+    to_expr :: SimplSR -> CoreExpr
+    -- A tiresome impedence-matcher
+    to_expr (DoneEx e _)           = e
+    to_expr (DoneId v)             = Var v
+    to_expr (ContEx tvs cvs ids e) = GHC.Core.Subst.substExprSC (mk_full_subst in_scope tvs cvs ids) e
 
 substTy :: HasDebugCallStack => SimplEnv -> Type -> Type
-substTy env ty = Type.substTy (getSubst env) ty
+substTy env ty = Type.substTy (getTCvSubst env) ty
 
 substTyVar :: SimplEnv -> TyVar -> Type
-substTyVar env tv = Type.substTyVar (getSubst env) tv
+substTyVar env tv = Type.substTyVar (getTCvSubst env) tv
 
 substTyVarBndr :: SimplEnv -> TyVar -> (SimplEnv, TyVar)
 substTyVarBndr env tv
-  = case Type.substTyVarBndr (getSubst env) tv of
+  = case Type.substTyVarBndr (getTCvSubst env) tv of
         (Subst in_scope' _ tv_env' cv_env', tv')
            -> (env { seInScope = in_scope', seTvSubst = tv_env', seCvSubst = cv_env' }, tv')
 
 substCoVar :: SimplEnv -> CoVar -> Coercion
-substCoVar env tv = Coercion.substCoVar (getSubst env) tv
+substCoVar env tv = Coercion.substCoVar (getTCvSubst env) tv
 
 substCoVarBndr :: SimplEnv -> CoVar -> (SimplEnv, CoVar)
 substCoVarBndr env cv
-  = case Coercion.substCoVarBndr (getSubst env) cv of
+  = case Coercion.substCoVarBndr (getTCvSubst env) cv of
         (Subst in_scope' _ tv_env' cv_env', cv')
            -> (env { seInScope = in_scope', seTvSubst = tv_env', seCvSubst = cv_env' }, cv')
 
 substCo :: SimplEnv -> Coercion -> Coercion
-substCo env co = Coercion.substCo (getSubst env) co
+substCo env co = Coercion.substCo (getTCvSubst env) co
 
 ------------------
 substIdType :: SimplEnv -> Id -> Id

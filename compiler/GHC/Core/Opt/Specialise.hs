@@ -1377,9 +1377,9 @@ Note that `f` has the CPR property, and so will worker/wrapper.
 The call to `g` in `h` will make us specialise `g @Int`. And the specialised
 version of `g` will contain the call `f @Int`; but in the subsequent run of
 the Simplifier, there will be a competition between:
-* The user-supplied SPECIALISE rule for `f`
-* The inlining of the wrapper for `f`
-In fact, the latter wins -- see Note [Rewrite rules and inlining] in
+  * The user-supplied SPECIALISE rule for `f`
+  * The inlining of the wrapper for `f`
+In fact, the latter wins -- see Note [tryRules: plan (BEFORE)]
 GHC.Core.Opt.Simplify.Iteration.  However, it a bit fragile.
 
 Moreover consider (test T21851_2):
@@ -1408,11 +1408,10 @@ making sure that we have a reasonably up to date EPS rule base. Currently
 we load it up just once, in `initRuleEnv`, called at the beginning of
 `specProgram`.
 
-NB: you might wonder if running rules in the specialiser (this Note)
-renders Note [Rewrite rules and inlining] in the Simplifier redundant.
-That is, if we run rules in the specialiser, does it matter if we make
-rules "win" over inlining in the Simplifier?  Yes, it does!  See the
-discussion in #21851.
+NB: you might wonder if running rules in the specialiser (this Note) renders
+Note [tryRules: plan (BEFORE)] in the Simplifier (partly) redundant.  That is,
+if we run rules in the specialiser, does it matter if we make rules "win" over
+inlining in the Simplifier?  Yes, it does!  See the discussion in #21851.
 
 Note [Floating dictionaries out of cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
