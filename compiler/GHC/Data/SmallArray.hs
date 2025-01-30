@@ -16,17 +16,26 @@ module GHC.Data.SmallArray
   , mapSmallArray
   , foldMapSmallArray
   , rnfSmallArray
+
+  -- * IO Operations
+  , SmallMutableArrayIO
+  , newSmallArrayIO
+  , writeSmallArrayIO
+  , unsafeFreezeSmallArrayIO
   )
 where
 
 import GHC.Exts
 import GHC.Prelude
+import GHC.IO
 import GHC.ST
 import Control.DeepSeq
 
 data SmallArray a = SmallArray (SmallArray# a)
 
 data SmallMutableArray s a = SmallMutableArray (SmallMutableArray# s a)
+
+type SmallMutableArrayIO a = SmallMutableArray RealWorld a
 
 newSmallArray
   :: Int  -- ^ size
@@ -37,6 +46,9 @@ newSmallArray
 newSmallArray (I# sz) x s = case newSmallArray# sz x s of
   (# s', a #) -> (# s', SmallMutableArray a #)
 
+newSmallArrayIO :: Int -> a -> IO (SmallMutableArrayIO a)
+newSmallArrayIO sz x = IO $ \s -> newSmallArray sz x s
+
 writeSmallArray
   :: SmallMutableArray s a -- ^ array
   -> Int                   -- ^ index
@@ -45,6 +57,12 @@ writeSmallArray
   -> State# s
 {-# INLINE writeSmallArray #-}
 writeSmallArray (SmallMutableArray a) (I# i) x = writeSmallArray# a i x
+
+writeSmallArrayIO :: SmallMutableArrayIO a
+                  -> Int
+                  -> a
+                  -> IO ()
+writeSmallArrayIO a ix v = IO $ \s -> (# writeSmallArray a ix v s, () #)
 
 
 -- | Copy and freeze a slice of a mutable array.
@@ -68,6 +86,9 @@ unsafeFreezeSmallArray
 unsafeFreezeSmallArray (SmallMutableArray ma) s =
   case unsafeFreezeSmallArray# ma s of
     (# s', a #) -> (# s', SmallArray a #)
+
+unsafeFreezeSmallArrayIO :: SmallMutableArrayIO a -> IO (SmallArray a)
+unsafeFreezeSmallArrayIO arr = IO $ \s -> unsafeFreezeSmallArray arr s
 
 -- | Get the size of a 'SmallArray'
 sizeofSmallArray

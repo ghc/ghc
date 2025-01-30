@@ -415,3 +415,11 @@ test('T18964', [collect_stats('bytes allocated', 1), only_ways(['normal'])], com
 test('T23021', [collect_stats('bytes allocated', 1), only_ways(['normal'])], compile_and_run, ['-O2'])
 test('T25055', [collect_stats('bytes allocated', 2), only_ways(['normal'])], compile_and_run, ['-O2'])
 test('T17949', [collect_stats('bytes allocated', 1), only_ways(['normal'])], compile_and_run, ['-O2'])
+
+test('ByteCodeAsm',
+               [ extra_run_opts('"' + config.libdir + '"')
+               , js_broken(22261)
+               , collect_stats('bytes allocated', 10),
+               ],
+               compile_and_run,
+               ['-package ghc'])
