@@ -2308,8 +2308,8 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
 -- See Note [Rewrite rules and inlining]
 -- See also Note [Trying rewrite rules]
 rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
-                              , ai_rewrite = TryRules nr_wanted rules }) cont
-  | nr_wanted == 0 || no_more_args
+                              , ai_rewrite = TryRules rules }) cont
+  | no_more_args
   = -- We've accumulated a simplified call in <fun,rev_args>
     -- so try rewrite rules; see Note [RULES apply to simplified arguments]
     -- See also Note [Rules for recursive functions]
