@@ -21,7 +21,7 @@ module GHC.ByteCode.Types
   , CgBreakInfo(..)
   , ModBreaks (..), BreakIndex, emptyModBreaks
   , CCostCentre
-  , FlatBag, sizeFlatBag, fromSizedSeq, elemsFlatBag
+  , FlatBag, sizeFlatBag, fromSmallArray, elemsFlatBag
   ) where
 
 import GHC.Prelude
