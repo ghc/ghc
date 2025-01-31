@@ -1,4 +1,6 @@
+T22141c.hs:10:11: error: [GHC-68567]
+    • Illegal kind: ‘Proxy T’
+    • In a standalone kind signature for ‘D’: Proxy T -> Type
+    Suggested fix:
+      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
 
-T22141c.hs:8:17: error: [GHC-68567]
-    Illegal kind: ‘(# Type, Type #)’
-    Suggested fix: Perhaps you intended to use DataKinds
