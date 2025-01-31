@@ -82,7 +82,6 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Winconsistent-flags`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
         * :ghc-flag:`-Wnoncanonical-monad-instances`
-        * :ghc-flag:`-Wdata-kinds-tc`
         * :ghc-flag:`-Wimplicit-rhs-quantification`
         * :ghc-flag:`-Wunusable-unpack-pragmas`
 
@@ -2601,24 +2600,19 @@ of ``-W(no-)*``.
     is passed.
 
 .. ghc-flag:: -Wdata-kinds-tc
-    :shortdesc: warn when an illegal use of a type or kind without
-                :extension:`DataKinds` is caught by the typechecker
+    :shortdesc: *(deprecated)* Does nothing
     :type: dynamic
-    :reverse: -Wno-data-kinds-tc
 
     :since: 9.10.1
 
-    Introduced in GHC 9.10.1, this warns when an illegal use of a type or kind
-    (without having enabled the :extension:`DataKinds` extension) is caught in
-    the typechecker (hence the ``-tc`` suffix). These warnings complement the
-    existing :extension:`DataKinds` checks (that have existed since
-    :extension:`DataKinds` was first introduced), which result in errors
-    instead of warnings.
+    This warning is deprecated. It no longer has any effect since GHC 9.14.
 
-    This warning is scheduled to be changed to an error in a future GHC
-    version, at which point the :ghc-flag:`-Wdata-kinds-tc` flag will be
-    removed. Users can enable the :extension:`DataKinds` extension to avoid
-    issues (thus silencing the warning).
+    In the past, GHC 9.10 and 9.12 was overly permissive about which types or
+    kinds could be used without enabling the :extension:`DataKinds` extension.
+    In GHC 9.14 or later, however, GHC now consistently requires
+    :extension:`DataKinds`, and all :extension:`DataKinds` violations are now
+    errors. :ghc-flag:`-Wdata-kinds-tc` was used in the migration period before
+    the breaking change took place.
 
 .. ghc-flag:: -Wdefaulted-exception-context
     :shortdesc: warn when an :base-ref:`Control.Exception.Context.ExceptionContext`
