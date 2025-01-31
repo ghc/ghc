@@ -1001,18 +1001,11 @@ checkVdqOK ve tvbs ty = do
 
 -- | Check for a DataKinds violation in a kind context.
 -- See @Note [Checking for DataKinds]@.
---
--- Note that emitting DataKinds errors from the typechecker is a fairly recent
--- addition to GHC (introduced in GHC 9.10), and in order to prevent these new
--- errors from breaking users' code, we temporarily downgrade these errors to
--- warnings. (This is why we use 'diagnosticTcM' below.) See
--- @Note [Checking for DataKinds] (Wrinkle: Migration story for DataKinds
--- typechecker errors)@.
 checkDataKinds :: ValidityEnv -> Type -> TcM ()
 checkDataKinds (ValidityEnv{ ve_ctxt = ctxt, ve_tidy_env = env }) ty = do
   data_kinds <- xoptM LangExt.DataKinds
-  diagnosticTcM
-    (not (data_kinds || typeLevelUserTypeCtxt ctxt)) $
+  checkTcM
+    (data_kinds || typeLevelUserTypeCtxt ctxt) $
     (env, TcRnDataKindsError KindLevel (Right (tidyType env ty)))
 
 {- Note [No constraints in kinds]
@@ -1163,28 +1156,6 @@ different places in the code:
   `data Dat :: Proxy 42 -> Type` (where 42 is not hidden beneath a type
   synonym), so we also catch a subset of kind-level violations in the renamer
   to allow for earlier reporting of these errors.
-
------
--- Wrinkle: Migration story for DataKinds typechecker errors
------
-
-As mentioned above, DataKinds is checked in two different places: the renamer
-and the typechecker. The checks in the renamer have been around since DataKinds
-was introduced. The checks in the typechecker, on the other hand, are a fairly
-recent addition, having been introduced in GHC 9.10. As such, it is possible
-that there are some programs in the wild that (1) do not enable DataKinds, and
-(2) were accepted by a previous GHC version, but would now be rejected by the
-new DataKinds checks in the typechecker.
-
-To prevent the new DataKinds checks in the typechecker from breaking users'
-code, we temporarily allow programs to compile if they violate a DataKinds
-check in the typechecker, but GHC will emit a warning if such a violation
-occurs. Users can then silence the warning by enabling DataKinds in the module
-where the affected code lives. It is fairly straightforward to distinguish
-between DataKinds violations arising from the renamer versus the typechecker,
-as TcRnDataKindsError (the error message type classifying all DataKinds errors)
-stores an Either field that is Left when the error comes from the renamer and
-Right when the error comes from the typechecker.
 
 ************************************************************************
 *                                                                      *

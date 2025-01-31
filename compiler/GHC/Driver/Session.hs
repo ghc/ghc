@@ -2382,7 +2382,8 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnImplicitRhsQuantification -> warnSpec x
   Opt_WarnIncompleteExportWarnings -> warnSpec x
   Opt_WarnIncompleteRecordSelectors -> warnSpec x
-  Opt_WarnDataKindsTC -> warnSpec x
+  Opt_WarnDataKindsTC
+    -> depWarnSpec x "DataKinds violations are now always an error"
   Opt_WarnDefaultedExceptionContext -> warnSpec x
   Opt_WarnViewPatternSignatures -> warnSpec x
   Opt_WarnUselessSpecialisations -> warnSpec x

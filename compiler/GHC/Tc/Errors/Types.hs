@@ -2553,11 +2553,11 @@ data TcRnMessage where
                   rename/should_fail/T22478e
                   th/TH_Promoted1Tuple
                   typecheck/should_compile/tcfail094
-                  typecheck/should_compile/T22141a
-                  typecheck/should_compile/T22141b
-                  typecheck/should_compile/T22141c
-                  typecheck/should_compile/T22141d
-                  typecheck/should_compile/T22141e
+                  typecheck/should_fail/T22141a
+                  typecheck/should_fail/T22141b
+                  typecheck/should_fail/T22141c
+                  typecheck/should_fail/T22141d
+                  typecheck/should_fail/T22141e
                   typecheck/should_compile/T22141f
                   typecheck/should_compile/T22141g
                   typecheck/should_fail/T20873c

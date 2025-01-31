@@ -70,6 +70,21 @@ Language
 * The :extension:`ExplicitNamespaces` extension now allows the ``data``
   namespace specifier in import and export lists.
 
+* The ``-Wdata-kinds-tc`` warning has been deprecated, and the use of promoted
+  data types in kinds is now an error (rather than a warning) unless the
+  :extension:`DataKinds` extension is enabled. For example, the following code
+  will be rejected unless :extension:`DataKinds` is on:
+
+    import Data.Kind (Type)
+    import GHC.TypeNats (Nat)
+
+    -- Nat shouldn't be allowed here without DataKinds
+    data Vec :: Nat -> Type -> Type
+
+  (The ``-Wdata-kinds-tc`` warning was introduced in GHC 9.10 as part of a fix
+  for an accidental oversight in which programs like the one above were
+  mistakenly accepted without the use of :extension:`DataKinds`.)
+
 * The :extension:`MonadComprehensions` extension now implies :extension:`ParallelListComp` as was originally intended (see `Monad Comprehensions <https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/monad_comprehensions.html>`_).
 
 Compiler
