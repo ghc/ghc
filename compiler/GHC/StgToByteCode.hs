@@ -66,7 +66,6 @@ import GHC.Data.Bitmap
 import GHC.Data.FlatBag as FlatBag
 import GHC.Data.OrdList
 import GHC.Data.Maybe
-import GHC.Types.Name.Env (mkNameEnv)
 import GHC.Types.Tickish
 import GHC.Types.SptEntry
 
@@ -81,7 +80,6 @@ import GHC.Unit.Home.PackageTable (lookupHpt)
 
 import Data.Array
 import Data.Coerce (coerce)
-import Data.ByteString (ByteString)
 #if MIN_VERSION_rts(1,0,3)
 import qualified Data.ByteString.Char8 as BS
 #endif
@@ -96,6 +94,12 @@ import Data.Either ( partitionEithers )
 import GHC.Stg.Syntax
 import qualified Data.IntSet as IntSet
 import GHC.CoreToIface
+import GHC.Types.Name.Env
+import GHC.Utils.Binary
+import GHC.Iface.Binary
+import GHC.ByteCode.Serialize ()
+import GHC.Utils.TmpFs
+import System.FilePath
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -117,10 +121,9 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
                 bnd <- binds
                 case bnd of
                   StgTopLifted bnd      -> [Right bnd]
-                  StgTopStringLit b str -> [Left (b, str)]
+                  StgTopStringLit b str -> [Left (idName b, str)]
             flattenBind (StgNonRec b e) = [(b,e)]
             flattenBind (StgRec bs)     = bs
-        stringPtrs <- allocateTopStrings interp strings
 
         (BcM_State{..}, proto_bcos) <-
            runBc hsc_env this_mod mb_modBreaks $ do
@@ -137,7 +140,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
         let mod_breaks = case modBreaks of
              Nothing -> Nothing
              Just mb -> Just mb{ modBreaks_breakInfo = breakInfo }
-        cbc <- assembleBCOs interp profile proto_bcos tycs stringPtrs mod_breaks spt_entries
+        cbc <- assembleBCOs interp profile proto_bcos tycs strings mod_breaks spt_entries
 
         -- Squash space leaks in the CompiledByteCode.  This is really
         -- important, because when loading a set of modules into GHCi
@@ -147,25 +150,25 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
         -- modules.
         evaluate (seqCompiledByteCode cbc)
 
-        return cbc
+        cbc' <- case cbc of
+          CompiledByteCode{bc_itbls, bc_ffis = [], bc_breaks = Nothing, bc_spt_entries = []} | isEmptyNameEnv bc_itbls ->
+            withSystemTempDirectory "foo" $ \tmpdir ->
+            do
+              let fn = tmpdir </> "bar"
+              appendFile "/tmp/test.log" "1"
+              bh0 <- openBinMem (1024*1024)
+              putWithUserData QuietBinIFace NormalCompression bh0 cbc
+              writeBinMem bh0 fn
+              bh1 <- readBinMem fn
+              getWithUserData (hsc_NC hsc_env) bh1
+          _ -> pure cbc
+
+        return cbc'
 
   where dflags  = hsc_dflags hsc_env
         logger  = hsc_logger hsc_env
         interp  = hscInterp hsc_env
         profile = targetProfile dflags
-
--- | see Note [Generating code for top-level string literal bindings]
-allocateTopStrings
-  :: Interp
-  -> [(Id, ByteString)]
-  -> IO AddrEnv
-allocateTopStrings interp topStrings = do
-  let !(bndrs, strings) = unzip topStrings
-  ptrs <- interpCmd interp $ MallocStrings strings
-  return $ mkNameEnv (zipWith mk_entry bndrs ptrs)
-  where
-    mk_entry bndr ptr = let nm = getName bndr
-                        in (nm, (nm, AddrPtr ptr))
 
 {- Note [Generating code for top-level string literal bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
