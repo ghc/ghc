@@ -909,7 +909,10 @@ test-primops-label:
   extends: .test-primops-validate-template
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-primops.*/'
-    - *full-ci
+      # We do not use *.full-ci here since that would imply running in nightly
+      # where we do not have the normal validate jobs. We have the -nightly job
+      # below to handle this case.
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
 
 test-primops-nightly:
   extends: .test-primops
