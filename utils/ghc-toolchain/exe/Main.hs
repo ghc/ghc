@@ -1,12 +1,14 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
 import Control.Monad
-import Data.Char (toUpper)
+import Data.Char (toUpper,isSpace)
 import Data.Maybe (isNothing,fromMaybe)
+import qualified Data.List as List
 import System.Exit
 import System.Console.GetOpt
 import System.Environment
@@ -62,6 +64,7 @@ data Opts = Opts
     , optLdOverride :: Maybe Bool
     , optVerbosity :: Int
     , optKeepTemp  :: Bool
+    , optOutputSettings :: Bool -- ^ Output settings file, not Target
     }
 
 data FormatOpts = FormatOpts
@@ -107,6 +110,7 @@ emptyOpts = Opts
     , optLdOverride = Nothing
     , optVerbosity = 1
     , optKeepTemp  = False
+    , optOutputSettings = False
     }
   where
     po0 = emptyProgOpt
@@ -148,6 +152,9 @@ _optTablesNextToCode = Lens optTablesNextToCode (\x o -> o {optTablesNextToCode=
 _optUseLibFFIForAdjustors = Lens optUseLibFFIForAdjustors (\x o -> o {optUseLibFFIForAdjustors=x})
 _optLdOvveride = Lens optLdOverride (\x o -> o {optLdOverride=x})
 
+_optOutputSettings :: Lens Opts Bool
+_optOutputSettings = Lens optOutputSettings (\x o -> o {optOutputSettings=x})
+
 _optVerbosity :: Lens Opts Int
 _optVerbosity = Lens optVerbosity (\x o -> o {optVerbosity=x})
 
@@ -161,6 +168,7 @@ options =
     , llvmTripleOpt
     , verbosityOpt
     , keepTempOpt
+    , outputSettingsOpt
     , outputOpt
     ] ++
     concat
@@ -232,6 +240,9 @@ options =
 
     keepTempOpt = Option [] ["keep-temp"] (NoArg (set _optKeepTemp True))
         "do not remove temporary files"
+
+    outputSettingsOpt = Option [] ["output-settings"] (NoArg (set _optOutputSettings True))
+        "output settings instead of Target"
 
     outputOpt = Option ['o'] ["output"] (ReqArg (set _optOutput . Just) "OUTPUT")
         "The output path for the generated target toolchain configuration"
@@ -309,7 +320,10 @@ run opts = do
     tgt <- mkTarget opts
     logDebug $ "Final Target: " ++ show tgt
     let file = fromMaybe (error "undefined --output") (optOutput opts)
-    writeFile file (show tgt)
+    let output = case optOutputSettings opts of
+          False -> show tgt
+          True  -> show (targetToSettings tgt)
+    writeFile file output
 
 optional :: M a -> M (Maybe a)
 optional k = fmap Just k <|> pure Nothing
@@ -495,3 +509,189 @@ mkTarget opts = do
     return t
 
 --- ROMES:TODO: fp_settings.m4 in general which I don't think was ported completely (e.g. the basenames and windows llvm-XX and such)
+
+
+targetToSettings :: Target -> [(String,String)]
+targetToSettings tgt@Target{..} =
+  [ ("C compiler command",   ccPath)
+  , ("C compiler flags",     ccFlags)
+  , ("C++ compiler command", cxxPath)
+  , ("C++ compiler flags",   cxxFlags)
+  , ("C compiler link flags",       clinkFlags)
+  , ("C compiler supports -no-pie", linkSupportsNoPie)
+  , ("CPP command",         cppPath)
+  , ("CPP flags",           cppFlags)
+  , ("Haskell CPP command", hsCppPath)
+  , ("Haskell CPP flags",   hsCppFlags)
+  , ("JavaScript CPP command", jsCppPath)
+  , ("JavaScript CPP flags", jsCppFlags)
+  , ("C-- CPP command", cmmCppPath)
+  , ("C-- CPP flags",   cmmCppFlags)
+  , ("C-- CPP supports -g0", cmmCppSupportsG0')
+  , ("ld supports compact unwind", linkSupportsCompactUnwind)
+  , ("ld supports filelist",       linkSupportsFilelist)
+  , ("ld supports single module",  linkSupportsSingleModule)
+  , ("ld is GNU ld",               linkIsGnu)
+  , ("Merge objects command", mergeObjsPath)
+  , ("Merge objects flags", mergeObjsFlags)
+  , ("Merge objects supports response files", mergeObjsSupportsResponseFiles')
+  , ("ar command",          arPath)
+  , ("ar flags",            arFlags)
+  , ("ar supports at file", arSupportsAtFile')
+  , ("ar supports -L",      arSupportsDashL')
+  , ("ranlib command", ranlibPath)
+  , ("otool command", otool_cmd)
+  , ("install_name_tool command", install_name_cmd)
+  , ("windres command", (maybe "/bin/false" prgPath tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
+  , ("unlit command", "$topdir/../bin/unlit") -- FIXME
+  , ("cross compiling", yesNo False) -- FIXME: why do we need this settings at all?
+  , ("target platform string", targetPlatformTriple tgt)
+  , ("target os",        (show $ archOS_OS tgtArchOs))
+  , ("target arch",      (show $ archOS_arch tgtArchOs))
+  , ("target word size", wordSize)
+  , ("target word big endian",       isBigEndian)
+  , ("target has GNU nonexec stack", (yesNo tgtSupportsGnuNonexecStack))
+  , ("target has .ident directive",  (yesNo tgtSupportsIdentDirective))
+  , ("target has subsections via symbols", (yesNo tgtSupportsSubsectionsViaSymbols))
+  , ("target has libm", has_libm)
+  , ("Unregisterised", (yesNo tgtUnregisterised))
+  , ("LLVM target", tgtLlvmTarget)
+  , ("LLVM llc command", llc_cmd)
+  , ("LLVM opt command", llvm_opt_cmd)
+  , ("LLVM llvm-as command", llvm_as_cmd)
+  , ("Use inplace MinGW toolchain", use_inplace_mingw)
+  , ("target RTS linker only supports shared libraries", yesNo (targetRTSLinkerOnlySupportsSharedLibs tgt))
+  , ("Use interpreter", yesNo (targetSupportsInterpreter tgt))
+  , ("Support SMP", yesNo (targetSupportsSMP tgt))
+  , ("RTS ways", "") -- FIXME: should be a property of the RTS, not of the target
+  , ("Tables next to code", (yesNo tgtTablesNextToCode))
+  , ("Leading underscore",  (yesNo tgtSymbolsHaveLeadingUnderscore))
+  , ("Use LibFFI", yesNo tgtUseLibffiForAdjustors)
+  , ("RTS expects libdw", yesNo False) -- FIXME
+  , ("Relative Global Package DB", "")
+  , ("base unit-id", "")
+  ]
+  where
+    yesNo True  = "YES"
+    yesNo False = "NO"
+
+    wordSize = show (wordSize2Bytes tgtWordSize)
+    isBigEndian = yesNo $ (\case BigEndian -> True; LittleEndian -> False) tgtEndianness
+
+    otool_cmd = "" -- FIXME
+    install_name_cmd = "" -- FIXME
+    has_libm = "NO" -- FIXME
+    llc_cmd = "llc" -- FIXME
+    llvm_opt_cmd = "opt" -- FIXME
+    llvm_as_cmd = "llvm-as" -- FIXME
+    use_inplace_mingw = "NO" -- FIXME
+
+    ccPath  = prgPath $ ccProgram tgtCCompiler
+    ccFlags = escapeArgs $ prgFlags $ ccProgram tgtCCompiler
+    cxxPath  = prgPath $ cxxProgram tgtCxxCompiler
+    cxxFlags = escapeArgs $ prgFlags $ cxxProgram tgtCxxCompiler
+    clinkFlags = escapeArgs $ prgFlags $ ccLinkProgram tgtCCompilerLink
+    linkSupportsNoPie = yesNo $ ccLinkSupportsNoPie tgtCCompilerLink
+    cppPath  = prgPath $ cppProgram tgtCPreprocessor
+    cppFlags = escapeArgs $ prgFlags $ cppProgram tgtCPreprocessor
+    hsCppPath  = prgPath $ hsCppProgram tgtHsCPreprocessor
+    hsCppFlags = escapeArgs $ prgFlags $ hsCppProgram tgtHsCPreprocessor
+    jsCppPath  = maybe "" (prgPath . jsCppProgram) tgtJsCPreprocessor
+    jsCppFlags = maybe "" (escapeArgs . prgFlags . jsCppProgram) tgtJsCPreprocessor
+    cmmCppPath  = prgPath $ cmmCppProgram tgtCmmCPreprocessor
+    cmmCppFlags = escapeArgs $ prgFlags $ cmmCppProgram tgtCmmCPreprocessor
+    cmmCppSupportsG0' = yesNo $ cmmCppSupportsG0 tgtCmmCPreprocessor
+    mergeObjsPath  = maybe "" (prgPath . mergeObjsProgram) tgtMergeObjs
+    mergeObjsFlags = maybe "" (escapeArgs . prgFlags . mergeObjsProgram) tgtMergeObjs
+    linkSupportsSingleModule    = yesNo $ ccLinkSupportsSingleModule tgtCCompilerLink
+    linkSupportsFilelist        = yesNo $ ccLinkSupportsFilelist tgtCCompilerLink
+    linkSupportsCompactUnwind   = yesNo $ ccLinkSupportsCompactUnwind tgtCCompilerLink
+    linkIsGnu                   = yesNo $ ccLinkIsGnu tgtCCompilerLink
+    arPath  = prgPath $ arMkArchive tgtAr
+    arFlags = escapeArgs $ prgFlags (arMkArchive tgtAr)
+    arSupportsAtFile' = yesNo (arSupportsAtFile tgtAr)
+    arSupportsDashL' = yesNo (arSupportsDashL tgtAr)
+    ranlibPath  = maybe "" (prgPath . ranlibProgram) tgtRanlib
+    mergeObjsSupportsResponseFiles' = maybe "NO" (yesNo . mergeObjsSupportsResponseFiles) tgtMergeObjs
+
+-- | Just like 'GHC.ResponseFile.escapeArgs', but use spaces instead of newlines
+-- for splitting elements.
+escapeArgs :: [String] -> String
+escapeArgs = unwords . map escapeArg
+
+escapeArg :: String -> String
+escapeArg = reverse . List.foldl' escape []
+
+escape :: String -> Char -> String
+escape cs c
+  |    isSpace c
+    || '\\' == c
+    || '\'' == c
+    || '"'  == c = c:'\\':cs -- n.b., our caller must reverse the result
+  | otherwise    = c:cs
+
+-- | Does the target support the -N RTS flag?
+--
+-- Adapated from hadrian: Oracles.Flag.targetSupportsSMP
+targetSupportsSMP :: Target -> Bool
+targetSupportsSMP Target{..} = case archOS_arch tgtArchOs of
+    -- The THREADED_RTS requires `BaseReg` to be in a register and the
+    -- Unregisterised mode doesn't allow that.
+  _ | tgtUnregisterised -> False
+  ArchARM isa _ _
+    -- We don't support load/store barriers pre-ARMv7. See #10433.
+    | isa < ARMv7   -> False
+    | otherwise     -> True
+  ArchX86           -> True
+  ArchX86_64        -> True
+  ArchPPC           -> True
+  ArchPPC_64 ELF_V1 -> True
+  ArchPPC_64 ELF_V2 -> True
+  ArchAArch64       -> True
+  ArchS390X         -> True
+  ArchRISCV64       -> True
+  ArchLoongArch64   -> True
+  ArchAArch64       -> True
+  _                 -> False
+
+
+
+-- | Check whether the target supports GHCi.
+--
+-- Adapted from hadrian:Oracles.Settings.ghcWithInterpreter
+targetSupportsInterpreter :: Target -> Bool
+targetSupportsInterpreter Target{..} = goodOs && goodArch
+  where
+    goodOs = case archOS_OS tgtArchOs of
+      OSMinGW32 -> True
+      OSLinux   -> True
+      OSSolaris2 -> True
+      OSFreeBSD -> True
+      OSDragonFly -> True
+      OSNetBSD -> True
+      OSOpenBSD -> True
+      OSDarwin -> True
+      OSKFreeBSD -> True
+      OSWasi -> True
+      _ -> False
+      -- TODO "cygwin32"?
+
+    goodArch = case archOS_arch tgtArchOs of
+      ArchX86 -> True
+      ArchX86_64 -> True
+      ArchPPC -> True
+      ArchAArch64 -> True
+      ArchS390X -> True
+      ArchPPC_64 ELF_V1 -> True
+      ArchPPC_64 ELF_V2 -> True
+      ArchRISCV64 -> True
+      ArchWasm32 -> True
+      ArchAArch64 -> True
+      ArchARM {} -> True
+      _ -> False
+
+
+targetRTSLinkerOnlySupportsSharedLibs :: Target -> Bool
+targetRTSLinkerOnlySupportsSharedLibs tgt = case archOS_arch (tgtArchOs tgt) of
+  ArchWasm32 -> True
+  _ -> False
