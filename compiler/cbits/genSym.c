@@ -30,8 +30,8 @@ HsInt ghc_unique_inc     = 1;
 
 // This function has been added to the RTS. Here we pessimistically assume
 // that a threaded RTS is used. This function is only used for bootstrapping.
-#if !MIN_VERSION_GLASGOW_HASKELL(9,6,7,0)
-EXTERN_INLINE StgWord64
+#if !MIN_VERSION_GLASGOW_HASKELL(9,7,0,0)
+STATIC_INLINE StgWord64
 atomic_inc64(StgWord64 volatile* p, StgWord64 incr)
 {
 #if defined(HAVE_C11_ATOMICS)
