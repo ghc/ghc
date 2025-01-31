@@ -82,7 +82,6 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Winconsistent-flags`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
         * :ghc-flag:`-Wnoncanonical-monad-instances`
-        * :ghc-flag:`-Wdata-kinds-tc`
 
 .. ghc-flag:: -W
     :shortdesc: enable normal warnings
@@ -2534,26 +2533,6 @@ of ``-W(no-)*``.
     For example, when using GHCi, optimisation flags are ignored and a warning is
     issued. Another example is :ghc-flag:`-dynamic` is ignored when :ghc-flag:`-dynamic-too`
     is passed.
-
-.. ghc-flag:: -Wdata-kinds-tc
-    :shortdesc: warn when an illegal use of a type or kind without
-                :extension:`DataKinds` is caught by the typechecker
-    :type: dynamic
-    :reverse: -Wno-data-kinds-tc
-
-    :since: 9.10.1
-
-    Introduced in GHC 9.10.1, this warns when an illegal use of a type or kind
-    (without having enabled the :extension:`DataKinds` extension) is caught in
-    the typechecker (hence the ``-tc`` suffix). These warnings complement the
-    existing :extension:`DataKinds` checks (that have existed since
-    :extension:`DataKinds` was first introduced), which result in errors
-    instead of warnings.
-
-    This warning is scheduled to be changed to an error in a future GHC
-    version, at which point the :ghc-flag:`-Wdata-kinds-tc` flag will be
-    removed. Users can enable the :extension:`DataKinds` extension to avoid
-    issues (thus silencing the warning).
 
 .. ghc-flag:: -Wdefaulted-exception-context
     :shortdesc: warn when an :base-ref:`Control.Exception.Context.ExceptionContext`
