@@ -52,6 +52,8 @@ main = do
   msg "Building stage1 GHC program and utility programs"
   buildGhcStage1 defaultGhcBuildOptions cabal ghc0 "_build/stage0/"
 
+
+
   ghc1    <- Ghc    <$> makeAbsolute "_build/stage0/bin/ghc"
   ghcPkg1 <- GhcPkg <$> makeAbsolute "_build/stage0/bin/ghc-pkg"
   deriveConstants <- DeriveConstants <$> makeAbsolute "_build/stage0/bin/deriveConstants"
@@ -101,13 +103,13 @@ buildGhcStage booting opts cabal ghc0 dst = do
 
   -- we need to augment the current environment to pass HADRIAN_SETTINGS
   -- environment variable to ghc-boot's Setup.hs script.
-  stage0_settings <- read <$> readCreateProcess (runGhc ghc0 ["--info"]) ""
+  (arch,os) <- ghcTargetArchOS ghc0
   stage1_ghc_boot_settings <- do
     commit_id <- readCreateProcess (proc "git" ["rev-parse", "HEAD"]) ""
     -- we infer stage1's host platform from stage0's settings
     let settings =
-          [ ("hostPlatformArch",    fromMaybe (error "Couldn't read 'target arch' setting") (lookup "target arch" stage0_settings))
-          , ("hostPlatformOS",      fromMaybe (error "Couldn't read 'target os' setting") (lookup "target os" stage0_settings))
+          [ ("hostPlatformArch",    arch)
+          , ("hostPlatformOS",      os)
           , ("cProjectGitCommitId", commit_id)
           , ("cProjectVersion",     Text.unpack $ gboVersion opts)
           , ("cProjectVersionInt",  Text.unpack $ gboVersionInt opts)
@@ -308,20 +310,12 @@ buildGhcStage booting opts cabal ghc0 dst = do
   ghcpkg <- GhcPkg <$> makeAbsolute (dst </> "bin/ghc-pkg")
   initEmptyDB ghcpkg pkgdb
 
-
   -- generate settings based on stage1 compiler settings
   createDirectoryIfMissing True (dst </> "lib")
+  stage0_settings <- read <$> readCreateProcess (runGhc ghc0 ["--info"]) ""
   let stage1_settings = makeStage1Settings stage0_settings
   writeFile (dst </> "lib/settings") (show stage1_settings)
 
-  -- try to run the stage1 compiler (no package db yet, so just display the
-  -- version)
-  (test_exit_code, _test_stdout, _test_stderr) <- readCreateProcessWithExitCode (proc (dst </> "bin/ghc") ["--version"]) ""
-  case test_exit_code of
-    ExitSuccess -> pure ()
-    ExitFailure n -> do
-      putStrLn $ "Failed to run stage1 compiler with error code " ++ show n
-      exitFailure
 
 
 -- TODO:
@@ -905,3 +899,11 @@ initEmptyDB ghcpkg pkgdb = do
   -- don't try to recreate the DB if it already exist as it would fail
   exists <- doesDirectoryExist pkgdb
   unless exists $ void $ readCreateProcess (runGhcPkg ghcpkg ["init", pkgdb]) ""
+
+-- | Retrieve GHC's target arch/os from ghc --info
+ghcTargetArchOS :: Ghc -> IO (String,String)
+ghcTargetArchOS ghc = do
+  is <- read <$> readCreateProcess (runGhc ghc ["--info"]) "" :: IO [(String,String)]
+  let arch = fromMaybe (error "Couldn't read 'target arch' setting") (lookup "target arch" is)
+  let os   = fromMaybe (error "Couldn't read 'target os' setting") (lookup "target os" is)
+  pure (arch,os)
