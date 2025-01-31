@@ -1356,7 +1356,6 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnBadlyStagedTypes,
         Opt_WarnTypeEqualityRequiresOperators,
         Opt_WarnInconsistentFlags,
-        Opt_WarnDataKindsTC,
         Opt_WarnTypeEqualityOutOfScope,
         Opt_WarnImplicitRhsQuantification, -- was in -Wcompat since 9.8, enabled by default since 9.14, to turn into a hard error in 9.16
         Opt_WarnViewPatternSignatures,
