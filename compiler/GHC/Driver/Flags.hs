@@ -1087,7 +1087,6 @@ data WarningFlag =
    | Opt_WarnIncompleteRecordSelectors               -- ^ @since 9.10
    | Opt_WarnBadlyStagedTypes                        -- ^ @since 9.10
    | Opt_WarnInconsistentFlags                       -- ^ @since 9.8
-   | Opt_WarnDataKindsTC                             -- ^ @since 9.10
    | Opt_WarnDefaultedExceptionContext               -- ^ @since 9.10
    | Opt_WarnViewPatternSignatures                   -- ^ @since 9.12
    | Opt_WarnUselessSpecialisations                  -- ^ @since 9.14
@@ -1209,7 +1208,6 @@ warnFlagNames wflag = case wflag of
   Opt_WarnIncompleteRecordSelectors               -> "incomplete-record-selectors" :| []
   Opt_WarnBadlyStagedTypes                        -> "badly-staged-types" :| []
   Opt_WarnInconsistentFlags                       -> "inconsistent-flags" :| []
-  Opt_WarnDataKindsTC                             -> "data-kinds-tc" :| []
   Opt_WarnDefaultedExceptionContext               -> "defaulted-exception-context" :| []
   Opt_WarnViewPatternSignatures                   -> "view-pattern-signatures" :| []
   Opt_WarnUselessSpecialisations                  -> "useless-specialisations" :| ["useless-specializations"]
@@ -1354,7 +1352,6 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnBadlyStagedTypes,
         Opt_WarnTypeEqualityRequiresOperators,
         Opt_WarnInconsistentFlags,
-        Opt_WarnDataKindsTC,
         Opt_WarnTypeEqualityOutOfScope,
         Opt_WarnViewPatternSignatures,
         Opt_WarnUselessSpecialisations,
