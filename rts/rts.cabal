@@ -511,6 +511,7 @@ library
          cpp-options: -DNOSMP
 
       include-dirs: include
+      -- TODO: move internal headers into include/private?
       include-dirs: .
       includes: Rts.h
       autogen-includes: ghcautoconf.h ghcplatform.h
