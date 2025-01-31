@@ -6,6 +6,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wall #-}
 
 -- | GHC builder
@@ -16,6 +17,8 @@ module Main where
 
 import Data.Maybe
 import Data.List qualified as List
+import Data.Map qualified as Map
+import Data.Map (Map)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
@@ -52,13 +55,21 @@ main = do
   msg "Building stage1 GHC program and utility programs"
   buildGhcStage1 defaultGhcBuildOptions cabal ghc0 "_build/stage0/"
 
-
-
   ghc1    <- Ghc    <$> makeAbsolute "_build/stage0/bin/ghc"
   ghcPkg1 <- GhcPkg <$> makeAbsolute "_build/stage0/bin/ghc-pkg"
   deriveConstants <- DeriveConstants <$> makeAbsolute "_build/stage0/bin/deriveConstants"
   genapply <- GenApply <$> makeAbsolute "_build/stage0/bin/genapply"
   genprimop <- GenPrimop <$> makeAbsolute "_build/stage0/bin/genprimopcode"
+  ghcToolchain <- GhcToolchain <$> makeAbsolute "_build/stage0/bin/ghc-toolchain"
+
+  -- generate settings based on stage1 compiler settings: stage1 should never be
+  -- a cross-compiler! Hence we reuse the same target platform as the bootstrap
+  -- compiler.
+  stage0_target_triple <- ghcTargetTriple ghc0
+  let stage1_settings = emptySettings
+                          { settingsTriple = Just stage0_target_triple
+                          }
+  generateSettings ghcToolchain stage1_settings "_build/stage0/"
 
   msg "Building boot libraries with stage1 compiler..."
   buildBootLibraries cabal ghc1 ghcPkg1 deriveConstants genapply genprimop defaultGhcBuildOptions "_build/stage1/"
@@ -70,6 +81,7 @@ main = do
   createDirectoryIfMissing True "_build/stage1/bin"
   cp "_build/stage0/bin/ghc" "_build/stage1/bin/ghc"
   cp "_build/stage0/bin/ghc-pkg" "_build/stage1/bin/ghc-pkg"
+  cp "_build/stage0/bin/unlit" "_build/stage1/bin/unlit"
   createDirectoryIfMissing True "_build/stage1/lib"
   cp "_build/stage0/lib/settings" "_build/stage1/lib/settings"
 
@@ -78,8 +90,15 @@ main = do
   ghc1' <- Ghc <$> makeAbsolute "_build/stage1/bin/ghc"
   buildGhcStage2 defaultGhcBuildOptions cabal ghc1' "_build/stage2/"
 
-  -- copy stage1's boot packages for stage2 to use.
+  -- Reuse stage1 settings for stage2 and copy stage1's built boot package for
+  -- stage2 to use.
+  -- TODO: in the future we want to generate different settings for cross
+  -- targets and build boot libraries with stage2 using these settings. In any
+  -- case, we need non-cross boot packages to build plugins for use with
+  -- -fplugin-library.
+  createDirectoryIfMissing True "_build/stage2/lib/"
   cp "_build/stage1/pkgs/*" "_build/stage2/pkgs"
+  cp "_build/stage1/lib/settings" "_build/stage2/lib/settings"
 
   msg "Done"
 
@@ -248,10 +267,12 @@ buildGhcStage booting opts cabal ghc0 dst = do
            , "deriveConstants:deriveConstants"
            , "genapply:genapply"
            , "ghc-toolchain-bin:ghc-toolchain-bin"
+           , "unlit:unlit"
            ]
         | otherwise = 
            [ "ghc-bin:ghc"
            , "ghc-pkg:ghc-pkg"
+           , "unlit:unlit"
            ]
 
   let build_cmd = (runCabal cabal $
@@ -298,6 +319,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
 
   copy_bin "ghc-bin:ghc"     "ghc"
   copy_bin "ghc-pkg:ghc-pkg" "ghc-pkg"
+  copy_bin "unlit:unlit"     "unlit"
 
   when booting $ do
     copy_bin "deriveConstants:deriveConstants"     "deriveConstants"
@@ -309,12 +331,6 @@ buildGhcStage booting opts cabal ghc0 dst = do
   pkgdb <- makeAbsolute (dst </> "pkgs")
   ghcpkg <- GhcPkg <$> makeAbsolute (dst </> "bin/ghc-pkg")
   initEmptyDB ghcpkg pkgdb
-
-  -- generate settings based on stage1 compiler settings
-  createDirectoryIfMissing True (dst </> "lib")
-  stage0_settings <- read <$> readCreateProcess (runGhc ghc0 ["--info"]) ""
-  let stage1_settings = makeStage1Settings stage0_settings
-  writeFile (dst </> "lib/settings") (show stage1_settings)
 
 
 
@@ -407,95 +423,6 @@ prepareGhcSources opts dst = do
   subst_in (dst </> "libraries/base/base.cabal") common_substs
   subst_in (dst </> "libraries/rts/include/ghcversion.h") common_substs
 
-
--- | Generate settings for stage1 compiler, based on given settings (stage0's
--- compiler settings)
-makeStage1Settings :: [(String,String)] -> [(String,String)]
-makeStage1Settings in_settings = out_settings
-  where
-    -- keep the previous setting, fail if it doesn't exist
-    keep_fail s = keep_def s (error ("Couldn't find setting "<> show s))
-
-    -- keep the previous setting, default to the given value if it doesn't exist
-    keep_def s d = case lookup s in_settings of
-      Nothing -> (s,d)
-      Just v  -> (s,v)
-
-    -- use the previous setting, or if it doesn't exist use the setting for the
-    -- second key. Fail if both don't exist. This is useful to support
-    -- bootstrapping with old compilers that mingled some settings.
-    keep_or_fail s s2 = case lookup s in_settings of
-      Nothing -> case lookup s2 in_settings of
-        Nothing -> error ("Couldn't find any of " <> show s <> " and " <> show s2)
-        Just v  -> (s,v)
-      Just v  -> (s,v)
-
-    --FIXME: we default to these flags for Cmm CPP, otherwise CPP fails
-    -- with error: missing '(' after "__has_feature"
-    -- because we pass `-traditional` while compiling Apply.cmm (in TSANUtils.h)
-    default_cpp_flags = "-E"
-
-    out_settings =
-        [ keep_fail "C compiler command"
-        , keep_fail "C compiler flags"
-        , keep_fail "C++ compiler command"
-        , keep_fail "C++ compiler flags"
-        , keep_fail "C compiler link flags"
-        , keep_fail "C compiler supports -no-pie"
-        , keep_or_fail "CPP command" "Haskell CPP command"
-        , keep_def "CPP flags" default_cpp_flags
-        , keep_fail "Haskell CPP command"
-        , keep_fail "Haskell CPP flags"
-        , keep_or_fail "JavaScript CPP command" "Haskell CPP command"
-        , keep_or_fail "JavaScript CPP flags" "Haskell CPP flags"
-        , keep_or_fail "C-- CPP command" "Haskell CPP command"
-        , keep_def "C-- CPP flags"   default_cpp_flags
-        , keep_def "C-- CPP supports -g0" "NO"
-        , keep_fail "ld supports compact unwind"
-        , keep_fail "ld supports filelist"
-        , keep_fail "ld supports single module"
-        , keep_fail "ld is GNU ld"
-        , keep_fail "Merge objects command"
-        , keep_fail "Merge objects flags"
-        , keep_def "Merge objects supports response files" "NO"
-        , keep_fail "ar command"
-        , keep_fail "ar flags"
-        , keep_fail "ar supports at file"
-        , keep_fail "ar supports -L"
-        , keep_fail "ranlib command"
-        , keep_fail "otool command"
-        , keep_fail "install_name_tool command"
-        , keep_fail "windres command"
-        , keep_fail "unlit command"
-        , keep_fail "cross compiling"
-        , keep_fail "target platform string"
-        , keep_fail "target os"
-        , keep_fail "target arch"
-        , keep_fail "target word size"
-        , keep_fail "target word big endian"
-        , keep_fail "target has GNU nonexec stack"
-        , keep_fail "target has .ident directive"
-        , keep_fail "target has subsections via symbols"
-        , keep_fail "target has libm"
-        , keep_fail "Unregisterised"
-        , keep_fail "LLVM target"
-        , keep_fail "LLVM llc command"
-        , keep_fail "LLVM opt command"
-        , keep_def "LLVM llvm-as command" "llvm-as"
-        , keep_fail "Use inplace MinGW toolchain"
-
-        , keep_def "target RTS linker only supports shared libraries" "NO"
-        , ("Use interpreter", "NO")
-        , ("base unit-id", "base") -- there is no base yet... Anyway this isn't really useful to set
-        , keep_fail "Support SMP"
-        , keep_fail "RTS ways"
-        , keep_fail "Tables next to code"
-        , keep_fail "Leading underscore"
-        , keep_fail "Use LibFFI"
-        , keep_fail "RTS expects libdw"
-        , ("Relative Global Package DB", "../pkgs")
-            -- relative to $topdir (i.e. /lib)
-        ]
 
 buildBootLibraries :: Cabal -> Ghc -> GhcPkg -> DeriveConstants -> GenApply -> GenPrimop -> GhcBuildOptions -> FilePath -> IO ()
 buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst = do
@@ -841,6 +768,7 @@ msg x = do
 -- Avoid FilePath blindness by using type aliases for programs.
 newtype Ghc = Ghc FilePath
 newtype GhcPkg = GhcPkg FilePath
+newtype GhcToolchain = GhcToolchain FilePath
 newtype Cabal = Cabal FilePath
 newtype DeriveConstants = DeriveConstants FilePath
 newtype GenApply = GenApply FilePath
@@ -854,6 +782,9 @@ ghcPath (Ghc x) = x
 
 runGhcPkg :: GhcPkg -> [String] -> CreateProcess
 runGhcPkg (GhcPkg f) = proc f
+
+runGhcToolchain :: GhcToolchain -> [String] -> CreateProcess
+runGhcToolchain (GhcToolchain f) = proc f
 
 ghcPkgPath :: GhcPkg -> FilePath
 ghcPkgPath (GhcPkg x) = x
@@ -907,3 +838,109 @@ ghcTargetArchOS ghc = do
   let arch = fromMaybe (error "Couldn't read 'target arch' setting") (lookup "target arch" is)
   let os   = fromMaybe (error "Couldn't read 'target os' setting") (lookup "target os" is)
   pure (arch,os)
+
+-- | Retrieve GHC's target triple
+ghcTargetTriple :: Ghc -> IO String
+ghcTargetTriple ghc = do
+  is <- read <$> readCreateProcess (runGhc ghc ["--info"]) "" :: IO [(String,String)]
+  pure $ fromMaybe (error "Couldn't read 'Target platform setting") (lookup "Target platform" is)
+
+
+data Settings = Settings
+  { settingsTriple            :: Maybe String
+  , settingsTargetPrefix      :: Maybe String
+  , settingsLocallyExecutable :: Maybe Bool
+  , settingsLlvmTriple        :: Maybe String
+  , settingsCc                :: ProgOpt
+  , settingsCxx               :: ProgOpt
+  , settingsCpp               :: ProgOpt
+  , settingsHsCpp             :: ProgOpt
+  , settingsJsCpp             :: ProgOpt
+  , settingsCmmCpp            :: ProgOpt
+  , settingsCcLink            :: ProgOpt
+  , settingsAr                :: ProgOpt
+  , settingsRanlib            :: ProgOpt
+  , settingsNm                :: ProgOpt
+  , settingsReadelf           :: ProgOpt
+  , settingsMergeObjs         :: ProgOpt
+  , settingsWindres           :: ProgOpt
+  -- Note we don't actually configure LD into anything but
+  -- see #23857 and #22550 for the very unfortunate story.
+  , settingsLd                :: ProgOpt
+  , settingsUnregisterised    :: Maybe Bool
+  , settingsTablesNextToCode  :: Maybe Bool
+  , settingsUseLibFFIForAdjustors :: Maybe Bool
+  , settingsLdOverride        :: Maybe Bool
+  }
+
+-- | Program specifier from the command-line.
+data ProgOpt = ProgOpt
+  { poPath :: Maybe String
+  -- ^ Refers to the path to an executable, or simply the
+  -- executable name.
+  , poFlags :: Maybe [String]
+  }
+
+emptyProgOpt :: ProgOpt
+emptyProgOpt = ProgOpt Nothing Nothing
+
+emptySettings :: Settings
+emptySettings = Settings
+    { settingsTriple    = Nothing
+    , settingsTargetPrefix = Nothing
+    , settingsLocallyExecutable = Nothing
+    , settingsLlvmTriple = Nothing
+    , settingsCc        = po0
+    , settingsCxx       = po0
+    , settingsCpp       = po0
+    , settingsHsCpp     = po0
+    , settingsJsCpp     = po0
+    , settingsCmmCpp    = po0
+    , settingsCcLink    = po0
+    , settingsAr        = po0
+    , settingsRanlib    = po0
+    , settingsNm        = po0
+    , settingsReadelf   = po0
+    , settingsMergeObjs = po0
+    , settingsWindres   = po0
+    , settingsLd        = po0
+    , settingsUnregisterised = Nothing
+    , settingsTablesNextToCode = Nothing
+    , settingsUseLibFFIForAdjustors = Nothing
+    , settingsLdOverride = Nothing
+    }
+  where
+    po0 = emptyProgOpt
+
+generateSettings :: GhcToolchain -> Settings -> FilePath -> IO ()
+generateSettings ghc_toolchain Settings{..} dst = do
+  createDirectoryIfMissing True (dst </> "lib")
+
+  let gen_settings_path = dst </> "lib/settings.generated"
+  let common_args =
+       [ "--output-settings"
+       , "-o", gen_settings_path
+       ]
+
+  let opt m f = fmap f m
+  let args = mconcat (catMaybes
+       [ opt settingsTriple $ \x -> ["--triple", x]
+       -- FIXME: add other options for ghc-toolchain from Settings
+       ]) ++ common_args
+
+  (exit_code, toolchain_stdout, toolchain_stderr) <- readCreateProcessWithExitCode (runGhcToolchain ghc_toolchain args) ""
+  writeFile (dst </> "ghc-toolchain.stdout") toolchain_stdout
+  writeFile (dst </> "ghc-toolchain.stderr") toolchain_stderr
+  case exit_code of
+    ExitSuccess -> pure ()
+    ExitFailure n -> do
+      putStrLn $ "ghc-toolchain failed with error code: " ++ show n
+      putStrLn toolchain_stdout
+      putStrLn toolchain_stderr
+      putStrLn $ "Logs can be found in \"" ++ (dst </> "ghc-toolchain.{stdout,stderr}\"")
+      exitFailure
+
+  -- fixup settings generated by ghc-toolchain
+  kvs <- (Map.fromList . read) <$> readFile gen_settings_path :: IO (Map String String)
+  let kvs' = Map.insert "Relative Global Package DB" "../pkgs" kvs
+  writeFile (dst </> "lib/settings") (show $ Map.toList kvs')
