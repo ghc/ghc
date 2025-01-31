@@ -69,7 +69,7 @@ StgReturn:
 
 	.section	.note.GNU-stack,"",@progbits
 # else // Not ELF v2
-# error Only ELF v2 supported.
+       // ELF v1 is in StgCrun.c
 # endif
 
 #elif defined(powerpc_HOST_ARCH)
