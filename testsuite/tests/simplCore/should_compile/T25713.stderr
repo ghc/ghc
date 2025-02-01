@@ -1,0 +1,1267 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 480, types: 774, coercions: 434, joins: 1/1}
+
+-- RHS size: {terms: 2, types: 3, coercions: 1, joins: 0/0}
+Ifoldl.$WNil [InlPrag=INLINE[final] CONLIKE] :: forall a. Vec Z a
+[GblId[DataConWrapper],
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@a_akj) ->
+                 Ifoldl.Nil @Z @a_akj @~(<Z>_N :: Z GHC.Internal.Prim.~# Z)}]
+Ifoldl.$WNil
+  = \ (@a_akj) ->
+      Ifoldl.Nil @Z @a_akj @~(<Z>_N :: Z GHC.Internal.Prim.~# Z)
+
+-- RHS size: {terms: 7, types: 10, coercions: 2, joins: 0/0}
+Ifoldl.$W::: [InlPrag=INLINE[final] CONLIKE]
+  :: forall a (n :: Nat). a %1 -> Vec n a %1 -> Vec (S n) a
+[GblId[DataConWrapper],
+ Arity=2,
+ Str=<L><L>,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@a_akk)
+                 (@(n_X0 :: Nat))
+                 (conrep_aHU [Occ=Once1] :: a_akk)
+                 (conrep1_aHV [Occ=Once1] :: Vec n_X0 a_akk) ->
+                 Ifoldl.:::
+                   @(S n_X0)
+                   @a_akk
+                   @n_X0
+                   @~(<S n_X0>_N :: S n_X0 GHC.Internal.Prim.~# S n_X0)
+                   conrep_aHU
+                   conrep1_aHV}]
+Ifoldl.$W:::
+  = \ (@a_akk)
+      (@(n_X0 :: Nat))
+      (conrep_aHU [Occ=Once1] :: a_akk)
+      (conrep1_aHV [Occ=Once1] :: Vec n_X0 a_akk) ->
+      Ifoldl.:::
+        @(S n_X0)
+        @a_akk
+        @n_X0
+        @~(<S n_X0>_N :: S n_X0 GHC.Internal.Prim.~# S n_X0)
+        conrep_aHU
+        conrep1_aHV
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl_r1n5 :: Int
+[GblId, Unf=OtherCon []]
+lvl_r1n5 = GHC.Internal.Types.I# 6#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl1_r1n6 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+lvl1_r1n6 = "Nil"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl2_r1n7 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+lvl2_r1n7 = " ::: "#
+
+Rec {
+-- RHS size: {terms: 48, types: 39, coercions: 0, joins: 0/0}
+Ifoldl.$fShowVec_$cshowsPrec [Occ=LoopBreaker]
+  :: forall a (n :: Nat). Show a => Int -> Vec n a -> ShowS
+[GblId,
+ Arity=4,
+ Str=<LP(SC(S,C(1,C(1,L))),A,A)><ML><1L><L>,
+ Unf=OtherCon []]
+Ifoldl.$fShowVec_$cshowsPrec
+  = \ (@a_a11n)
+      (@(n_a11o :: Nat))
+      ($dShow_a11p :: Show a_a11n)
+      (ds_d1gq :: Int)
+      (ds1_d1gr :: Vec n_a11o a_a11n)
+      (eta_B0 :: String) ->
+      case ds1_d1gr of {
+        Nil co_a11w [Dmd=B] ->
+          GHC.Internal.CString.unpackAppendCString# lvl1_r1n6 eta_B0;
+        ::: @n1_a11A co_a11B [Dmd=B] b1_aJu b2_aJv ->
+          case ds_d1gq of { GHC.Internal.Types.I# x_a1kQ ->
+          case GHC.Internal.Prim.>=# x_a1kQ 6# of {
+            __DEFAULT ->
+              showsPrec
+                @a_a11n
+                $dShow_a11p
+                lvl_r1n5
+                b1_aJu
+                (GHC.Internal.CString.unpackAppendCString#
+                   lvl2_r1n7
+                   (Ifoldl.$fShowVec_$cshowsPrec
+                      @a_a11n @n1_a11A $dShow_a11p lvl_r1n5 b2_aJv eta_B0));
+            1# ->
+              GHC.Internal.Types.:
+                @Char
+                GHC.Internal.Show.$fShowCallStack3
+                (showsPrec
+                   @a_a11n
+                   $dShow_a11p
+                   lvl_r1n5
+                   b1_aJu
+                   (GHC.Internal.CString.unpackAppendCString#
+                      lvl2_r1n7
+                      (Ifoldl.$fShowVec_$cshowsPrec
+                         @a_a11n
+                         @n1_a11A
+                         $dShow_a11p
+                         lvl_r1n5
+                         b2_aJv
+                         (GHC.Internal.Types.:
+                            @Char GHC.Internal.Show.$fShowCallStack2 eta_B0))))
+          }
+          }
+      }
+end Rec }
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$fShowVec1 :: Int
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$fShowVec1 = GHC.Internal.Types.I# 0#
+
+-- RHS size: {terms: 11, types: 14, coercions: 0, joins: 0/0}
+Ifoldl.$fShowVec_$cshowList
+  :: forall a (n :: Nat). Show a => [Vec n a] -> ShowS
+[GblId,
+ Arity=3,
+ Str=<LP(SC(S,C(1,C(1,L))),A,A)><1L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [0 0 0] 70 0}]
+Ifoldl.$fShowVec_$cshowList
+  = \ (@a_a11n)
+      (@(n_a11o :: Nat))
+      ($dShow_a11p :: Show a_a11n)
+      (ls_a1hi :: [Vec n_a11o a_a11n])
+      (s_a1hj :: String) ->
+      GHC.Internal.Show.showList__
+        @(Vec n_a11o a_a11n)
+        (Ifoldl.$fShowVec_$cshowsPrec
+           @a_a11n @n_a11o $dShow_a11p Ifoldl.$fShowVec1)
+        ls_a1hi
+        s_a1hj
+
+-- RHS size: {terms: 9, types: 10, coercions: 0, joins: 0/0}
+Ifoldl.$fShowVec_$cshow
+  :: forall a (n :: Nat). Show a => Vec n a -> String
+[GblId,
+ Arity=2,
+ Str=<LP(SC(S,C(1,C(1,L))),A,A)><1L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [0 0] 50 0}]
+Ifoldl.$fShowVec_$cshow
+  = \ (@a_a11n)
+      (@(n_a11o :: Nat))
+      ($dShow_a11p :: Show a_a11n)
+      (x_a1hf :: Vec n_a11o a_a11n) ->
+      Ifoldl.$fShowVec_$cshowsPrec
+        @a_a11n
+        @n_a11o
+        $dShow_a11p
+        Ifoldl.$fShowVec1
+        x_a1hf
+        (GHC.Internal.Types.[] @Char)
+
+-- RHS size: {terms: 10, types: 13, coercions: 0, joins: 0/0}
+Ifoldl.$fShowVec [InlPrag=CONLIKE]
+  :: forall a (n :: Nat). Show a => Show (Vec n a)
+[GblId[DFunId],
+ Arity=1,
+ Str=<LP(LC(L,C(1,C(1,L))),A,A)>,
+ Unf=DFun: \ (@a_aAd) (@(n_aAe :: Nat)) (v_B1 :: Show a_aAd) ->
+       GHC.Internal.Show.C:Show TYPE: Vec n_aAe a_aAd
+                                Ifoldl.$fShowVec_$cshowsPrec @a_aAd @n_aAe v_B1
+                                Ifoldl.$fShowVec_$cshow @a_aAd @n_aAe v_B1
+                                Ifoldl.$fShowVec_$cshowList @a_aAd @n_aAe v_B1]
+Ifoldl.$fShowVec
+  = \ (@a_a11n) (@(n_a11o :: Nat)) ($dShow_a11p :: Show a_a11n) ->
+      GHC.Internal.Show.C:Show
+        @(Vec n_a11o a_a11n)
+        (Ifoldl.$fShowVec_$cshowsPrec @a_a11n @n_a11o $dShow_a11p)
+        (Ifoldl.$fShowVec_$cshow @a_a11n @n_a11o $dShow_a11p)
+        (Ifoldl.$fShowVec_$cshowList @a_a11n @n_a11o $dShow_a11p)
+
+-- RHS size: {terms: 7, types: 13, coercions: 0, joins: 0/0}
+Ifoldl.unFlip1
+  :: forall k1 k2 (f :: k1 -> k2 -> *) (y :: k2) (x :: k1).
+     Flip f y x -> Flip f y x
+[GblId,
+ Arity=1,
+ Str=<1L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+Ifoldl.unFlip1
+  = \ (@k_aJb)
+      (@k1_aJc)
+      (@(f_aJd :: k_aJb -> k1_aJc -> *))
+      (@(y_aJe :: k1_aJc))
+      (@(x_aJf :: k_aJb))
+      (ds_d1go :: Flip f_aJd y_aJe x_aJf) ->
+      ds_d1go
+
+-- RHS size: {terms: 1, types: 0, coercions: 26, joins: 0/0}
+unFlip
+  :: forall {k1} {k2} (f :: k1 -> k2 -> *) (y :: k2) (x :: k1).
+     Flip f y x -> f x y
+[GblId[[RecSel]],
+ Arity=1,
+ Str=<1L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+unFlip
+  = Ifoldl.unFlip1
+    `cast` (forall (k :: <*>_N) (k1 :: <*>_N) (f :: <k
+                                                     -> k1 -> *>_N) (y :: <k1>_N) (x :: <k>_N).
+            <Flip f y x>_R
+            %<Many>_N ->_R Ifoldl.N:Flip <k>_N <k1>_N <f>_R <y>_N <x>_N
+            :: (forall k k1 (f :: k -> k1 -> *) (y :: k1) (x :: k).
+                Flip f y x -> Flip f y x)
+               ~R# (forall k k1 (f :: k -> k1 -> *) (y :: k1) (x :: k).
+                    Flip f y x -> f x y))
+
+-- RHS size: {terms: 7, types: 37, coercions: 63, joins: 0/0}
+upWonk :: forall (k :: Nat) (w :: Nat). Wonk k w -> Wonk (S k) w
+[GblId,
+ Arity=1,
+ Str=<1!P(L)>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@(k_aXP :: Nat))
+                 (@(w_aXQ :: Nat))
+                 (ds_d1f6 [Occ=Once1!] :: Wonk k_aXP w_aXQ) ->
+                 case ds_d1f6
+                      `cast` (Ifoldl.N:Wonk <k_aXP>_N <w_aXQ>_N
+                              :: Wonk k_aXP w_aXQ
+                                 ~R# ((S k_aXP + S w_aXQ) :~: (S (S k_aXP) + w_aXQ)))
+                 of
+                 { Refl co_aXU ->
+                 (GHC.Internal.Data.Type.Equality.$WRefl
+                    @Nat @(S (S (S (k_aXP + w_aXQ)))))
+                 `cast` (((:~:)
+                            <Nat>_N
+                            ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aXP>_N <w_aXQ>_N)
+                                     ; SelCo:Tc(0,N)
+                                           (Sym (Ifoldl.D:R:+[1] <S k_aXP>_N <w_aXQ>_N)
+                                            ; co_aXU
+                                            ; Ifoldl.D:R:+[1] <k_aXP>_N <S w_aXQ>_N)))_N
+                                 ; Sym (Ifoldl.D:R:+[1] <k_aXP>_N <S w_aXQ>_N)))_N
+                             ; Sym (Ifoldl.D:R:+[1] <S k_aXP>_N <S w_aXQ>_N))
+                            ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aXP>_N <w_aXQ>_N)))_N
+                                 ; Sym (Ifoldl.D:R:+[1] <S k_aXP>_N <w_aXQ>_N)))_N
+                             ; Sym (Ifoldl.D:R:+[1] <S (S k_aXP)>_N <w_aXQ>_N)))_R
+                         ; Sym (Ifoldl.N:Wonk <S k_aXP>_N <w_aXQ>_N)
+                         :: (S (S (S (k_aXP + w_aXQ))) :~: S (S (S (k_aXP + w_aXQ))))
+                            ~R# Wonk (S k_aXP) w_aXQ)
+                 }}]
+upWonk
+  = \ (@(k_aXP :: Nat))
+      (@(w_aXQ :: Nat))
+      (ds_d1f6 :: Wonk k_aXP w_aXQ) ->
+      case ds_d1f6
+           `cast` (Ifoldl.N:Wonk <k_aXP>_N <w_aXQ>_N
+                   :: Wonk k_aXP w_aXQ
+                      ~R# ((S k_aXP + S w_aXQ) :~: (S (S k_aXP) + w_aXQ)))
+      of
+      { Refl co_aXU ->
+      (GHC.Internal.Data.Type.Equality.$WRefl
+         @Nat @(S (S (S (k_aXP + w_aXQ)))))
+      `cast` (((:~:)
+                 <Nat>_N
+                 ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aXP>_N <w_aXQ>_N)
+                          ; SelCo:Tc(0,N)
+                                (Sym (Ifoldl.D:R:+[1] <S k_aXP>_N <w_aXQ>_N)
+                                 ; co_aXU
+                                 ; Ifoldl.D:R:+[1] <k_aXP>_N <S w_aXQ>_N)))_N
+                      ; Sym (Ifoldl.D:R:+[1] <k_aXP>_N <S w_aXQ>_N)))_N
+                  ; Sym (Ifoldl.D:R:+[1] <S k_aXP>_N <S w_aXQ>_N))
+                 ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aXP>_N <w_aXQ>_N)))_N
+                      ; Sym (Ifoldl.D:R:+[1] <S k_aXP>_N <w_aXQ>_N)))_N
+                  ; Sym (Ifoldl.D:R:+[1] <S (S k_aXP)>_N <w_aXQ>_N)))_R
+              ; Sym (Ifoldl.N:Wonk <S k_aXP>_N <w_aXQ>_N)
+              :: (S (S (S (k_aXP + w_aXQ))) :~: S (S (S (k_aXP + w_aXQ))))
+                 ~R# Wonk (S k_aXP) w_aXQ)
+      }
+
+-- RHS size: {terms: 43, types: 198, coercions: 150, joins: 1/1}
+ifoldlRec [InlPrag=INLINE (sat-args=1)]
+  :: forall (b :: Nat -> *) (n :: Nat) a.
+     (forall (m :: Nat). b m -> a -> b (S m)) -> b Z -> Vec n a -> b n
+[GblId,
+ Arity=3,
+ Str=<LC(S,C(1,L))><L><1L>,
+ Unf=Unf{Src=StableUser, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
+         Tmpl= \ (@(b_aY8 :: Nat -> *))
+                 (@(n_aY9 :: Nat))
+                 (@a_aYa)
+                 (f_azT [Occ=OnceL1!]
+                    :: forall (m :: Nat). b_aY8 m -> a_aYa -> b_aY8 (S m))
+                 (eta_B0 [Occ=Once1] :: b_aY8 Z)
+                 (eta1_B1 [Occ=Once1] :: Vec n_aY9 a_aYa) ->
+                 joinrec {
+                   go_azU [Occ=LoopBreakerT[7]]
+                     :: forall (k :: Nat) (m :: Nat).
+                        ((k + Z) :~: k)
+                        -> ((k + m) :~: n_aY9)
+                        -> (forall (w :: Nat). Wonk k w)
+                        -> b_aY8 k
+                        -> Vec m a_aYa
+                        -> b_aY8 n_aY9
+                   [LclId[JoinId(7)(Nothing)],
+                    Arity=5,
+                    Str=<L><L><L><L><L>,
+                    Unf=OtherCon []]
+                   go_azU (@(k_aYT :: Nat))
+                          (@(m_aYU :: Nat))
+                          (ds_d1fg [Occ=Once1!] :: (k_aYT + Z) :~: k_aYT)
+                          (ds1_d1fh [Occ=Once1!] :: (k_aYT + m_aYU) :~: n_aY9)
+                          (ds2_d1fi :: forall (w :: Nat). Wonk k_aYT w)
+                          (bk_azY [Occ=Once2] :: b_aY8 k_aYT)
+                          (ds3_d1fj [Occ=Once1!] :: Vec m_aYU a_aYa)
+                     = case ds_d1fg of { Refl co_aYX ->
+                       case ds1_d1fh of { Refl co1_aYZ ->
+                       case (ds2_d1fi @(GHC.Internal.Types.ZonkAny 0))
+                            `cast` (Ifoldl.N:Wonk <k_aYT>_N <GHC.Internal.Types.ZonkAny 0>_N
+                                    :: Wonk k_aYT (GHC.Internal.Types.ZonkAny 0)
+                                       ~R# ((S k_aYT + S (GHC.Internal.Types.ZonkAny 0))
+                                            :~: (S (S k_aYT) + GHC.Internal.Types.ZonkAny 0)))
+                       of
+                       { Refl _ [Occ=Dead] ->
+                       case ds3_d1fj of {
+                         Nil co3_aZ5 ->
+                           bk_azY
+                           `cast` (<b_aY8>_R (co_aYX
+                                              ; (<k_aYT>_N + Sym co3_aZ5)_N
+                                              ; Sym co1_aYZ)
+                                   :: b_aY8 k_aYT ~R# b_aY8 n_aY9);
+                         ::: @ipv_s1jk ipv1_s1jl ipv2_s1jm [Occ=Once1]
+                             ipv3_s1jn [Occ=Once1] ->
+                           case ds2_d1fi of ds4_X5 { __DEFAULT ->
+                           jump go_azU
+                             @(S k_aYT)
+                             @ipv_s1jk
+                             ((GHC.Internal.Data.Type.Equality.$WRefl @Nat @(S k_aYT))
+                              `cast` (((:~:)
+                                         <Nat>_N
+                                         ((S co_aYX)_N
+                                          ; Sym (Ifoldl.D:R:+[1] <k_aYT>_N <Z>_N))
+                                         <S k_aYT>_N)_R
+                                      :: (S k_aYT :~: S k_aYT) ~R# ((S k_aYT + Z) :~: S k_aYT)))
+                             (case (ds4_X5 @ipv_s1jk)
+                                   `cast` (Ifoldl.N:Wonk <k_aYT>_N <ipv_s1jk>_N
+                                           :: Wonk k_aYT ipv_s1jk
+                                              ~R# ((S k_aYT + S ipv_s1jk)
+                                                   :~: (S (S k_aYT) + ipv_s1jk)))
+                              of
+                              { Refl co3_aZJ ->
+                              (GHC.Internal.Data.Type.Equality.$WRefl @Nat @n_aY9)
+                              `cast` (((:~:)
+                                         <Nat>_N
+                                         (co1_aYZ
+                                          ; (<k_aYT>_N + ipv1_s1jl)_N
+                                          ; SelCo:Tc(0,N)
+                                                (Sym (Ifoldl.D:R:+[1] <k_aYT>_N <S ipv_s1jk>_N)
+                                                 ; Sym co3_aZJ
+                                                 ; Ifoldl.D:R:+[1] <S k_aYT>_N <ipv_s1jk>_N))
+                                         <n_aY9>_N)_R
+                                      :: (n_aY9 :~: n_aY9) ~R# ((S k_aYT + ipv_s1jk) :~: n_aY9))
+                              })
+                             (\ (@(w_aZP :: Nat)) ->
+                                case (ds4_X5 @w_aZP)
+                                     `cast` (Ifoldl.N:Wonk <k_aYT>_N <w_aZP>_N
+                                             :: Wonk k_aYT w_aZP
+                                                ~R# ((S k_aYT + S w_aZP) :~: (S (S k_aYT) + w_aZP)))
+                                of
+                                { Refl co3_aXU ->
+                                (GHC.Internal.Data.Type.Equality.$WRefl
+                                   @Nat @(S (S (S (k_aYT + w_aZP)))))
+                                `cast` (((:~:)
+                                           <Nat>_N
+                                           ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aYT>_N <w_aZP>_N)
+                                                    ; SelCo:Tc(0,N)
+                                                          (Sym (Ifoldl.D:R:+[1]
+                                                                    <S k_aYT>_N <w_aZP>_N)
+                                                           ; co3_aXU
+                                                           ; Ifoldl.D:R:+[1]
+                                                                 <k_aYT>_N <S w_aZP>_N)))_N
+                                                ; Sym (Ifoldl.D:R:+[1] <k_aYT>_N <S w_aZP>_N)))_N
+                                            ; Sym (Ifoldl.D:R:+[1] <S k_aYT>_N <S w_aZP>_N))
+                                           ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aYT>_N <w_aZP>_N)))_N
+                                                ; Sym (Ifoldl.D:R:+[1] <S k_aYT>_N <w_aZP>_N)))_N
+                                            ; Sym (Ifoldl.D:R:+[1] <S (S k_aYT)>_N <w_aZP>_N)))_R
+                                        ; Sym (Ifoldl.N:Wonk <S k_aYT>_N <w_aZP>_N)
+                                        :: (S (S (S (k_aYT + w_aZP))) :~: S (S (S (k_aYT + w_aZP))))
+                                           ~R# Wonk (S k_aYT) w_aZP)
+                                })
+                             (f_azT @k_aYT bk_azY ipv2_s1jm)
+                             ipv3_s1jn
+                           }
+                       }
+                       }
+                       }
+                       }; } in
+                 jump go_azU
+                   @Z
+                   @n_aY9
+                   ((GHC.Internal.Data.Type.Equality.$WRefl @Nat @Z)
+                    `cast` (((:~:) <Nat>_N (Sym (Ifoldl.D:R:+[0] <Z>_N)) <Z>_N)_R
+                            :: (Z :~: Z) ~R# ((Z + Z) :~: Z)))
+                   ((GHC.Internal.Data.Type.Equality.$WRefl @Nat @n_aY9)
+                    `cast` (((:~:)
+                               <Nat>_N (Sym (Ifoldl.D:R:+[0] <n_aY9>_N)) <n_aY9>_N)_R
+                            :: (n_aY9 :~: n_aY9) ~R# ((Z + n_aY9) :~: n_aY9)))
+                   ((\ (@(w_a10g :: Nat)) ->
+                       GHC.Internal.Data.Type.Equality.$WRefl @Nat @(S (S w_a10g)))
+                    `cast` (forall (w :: <Nat>_N).
+                            ((:~:)
+                               <Nat>_N
+                               ((S (Sym (Ifoldl.D:R:+[0] <S w>_N)))_N
+                                ; Sym (Ifoldl.D:R:+[1] <Z>_N <S w>_N))
+                               ((S ((S (Sym (Ifoldl.D:R:+[0] <w>_N)))_N
+                                    ; Sym (Ifoldl.D:R:+[1] <Z>_N <w>_N)))_N
+                                ; Sym (Ifoldl.D:R:+[1] <S Z>_N <w>_N)))_R
+                            ; Sym (Ifoldl.N:Wonk <Z>_N <w>_N)
+                            :: (forall (w :: Nat). S (S w) :~: S (S w))
+                               ~R# (forall (w :: Nat). Wonk Z w)))
+                   eta_B0
+                   eta1_B1}]
+ifoldlRec
+  = \ (@(b_aY8 :: Nat -> *))
+      (@(n_aY9 :: Nat))
+      (@a_aYa)
+      (f_azT :: forall (m :: Nat). b_aY8 m -> a_aYa -> b_aY8 (S m))
+      (eta_B0 :: b_aY8 Z)
+      (eta1_B1 :: Vec n_aY9 a_aYa) ->
+      joinrec {
+        $wgo_s1lY [InlPrag=[2],
+                   Occ=LoopBreaker,
+                   Dmd=SC(S,C(1,C(1,C(1,C(1,L)))))]
+          :: forall (k :: Nat) (m :: Nat).
+             (k GHC.Internal.Prim.~# (k + Z),
+              n_aY9 GHC.Internal.Prim.~# (k + m)) =>
+             (forall (w :: Nat). Wonk k w)
+             -> b_aY8 k -> Vec m a_aYa -> b_aY8 n_aY9
+        [LclId[JoinId(7)(Just [~, ~, !, ~, !])],
+         Arity=5,
+         Str=<L><L><SL><L><1L>,
+         Unf=OtherCon []]
+        $wgo_s1lY (@(k_s1lK :: Nat))
+                  (@(m_s1lL :: Nat))
+                  (ww_s1lT :: k_s1lK GHC.Internal.Prim.~# (k_s1lK + Z))
+                  (ww1_s1lW :: n_aY9 GHC.Internal.Prim.~# (k_s1lK + m_s1lL))
+                  (ds_s1lO :: forall (w :: Nat). Wonk k_s1lK w)
+                  (bk_s1lP :: b_aY8 k_s1lK)
+                  (ds1_s1lQ :: Vec m_s1lL a_aYa)
+          = case (ds_s1lO @(GHC.Internal.Types.ZonkAny 0))
+                 `cast` (Ifoldl.N:Wonk <k_s1lK>_N <GHC.Internal.Types.ZonkAny 0>_N
+                         :: Wonk k_s1lK (GHC.Internal.Types.ZonkAny 0)
+                            ~R# ((S k_s1lK + S (GHC.Internal.Types.ZonkAny 0))
+                                 :~: (S (S k_s1lK) + GHC.Internal.Types.ZonkAny 0)))
+            of
+            { Refl co_aZ3 [Dmd=A] ->
+            case ds1_s1lQ of {
+              Nil co1_aZ5 [Dmd=S] ->
+                bk_s1lP
+                `cast` (<b_aY8>_R (ww_s1lT
+                                   ; (<k_s1lK>_N + Sym co1_aZ5)_N
+                                   ; Sym ww1_s1lW)
+                        :: b_aY8 k_s1lK ~R# b_aY8 n_aY9);
+              ::: @ipv_s1jf ipv1_s1jg [Dmd=S] ipv2_s1jh ipv3_s1ji ->
+                case ds_s1lO of ds2_X5 { __DEFAULT ->
+                case (ds2_X5 @ipv_s1jf)
+                     `cast` (Ifoldl.N:Wonk <k_s1lK>_N <ipv_s1jf>_N
+                             :: Wonk k_s1lK ipv_s1jf
+                                ~R# ((S k_s1lK + S ipv_s1jf) :~: (S (S k_s1lK) + ipv_s1jf)))
+                of
+                { Refl co1_aZJ ->
+                jump $wgo_s1lY
+                  @(S k_s1lK)
+                  @ipv_s1jf
+                  @~((S ww_s1lT)_N
+                     ; Sym (Ifoldl.D:R:+[1] <k_s1lK>_N <Z>_N)
+                     :: S k_s1lK GHC.Internal.Prim.~# (S k_s1lK + Z))
+                  @~(ww1_s1lW
+                     ; (<k_s1lK>_N + ipv1_s1jg)_N
+                     ; SelCo:Tc(0,N)
+                           (Sym (Ifoldl.D:R:+[1] <k_s1lK>_N <S ipv_s1jf>_N)
+                            ; Sym co1_aZJ
+                            ; Ifoldl.D:R:+[1] <S k_s1lK>_N <ipv_s1jf>_N)
+                     :: n_aY9 GHC.Internal.Prim.~# (S k_s1lK + ipv_s1jf))
+                  (\ (@(w_aZP :: Nat)) ->
+                     case (ds2_X5 @w_aZP)
+                          `cast` (Ifoldl.N:Wonk <k_s1lK>_N <w_aZP>_N
+                                  :: Wonk k_s1lK w_aZP
+                                     ~R# ((S k_s1lK + S w_aZP) :~: (S (S k_s1lK) + w_aZP)))
+                     of
+                     { Refl co2_aXU ->
+                     (GHC.Internal.Data.Type.Equality.$WRefl
+                        @Nat @(S (S (S (k_s1lK + w_aZP)))))
+                     `cast` (((:~:)
+                                <Nat>_N
+                                ((S ((S (Sym (Ifoldl.D:R:+[1] <k_s1lK>_N <w_aZP>_N)
+                                         ; SelCo:Tc(0,N)
+                                               (Sym (Ifoldl.D:R:+[1] <S k_s1lK>_N <w_aZP>_N)
+                                                ; co2_aXU
+                                                ; Ifoldl.D:R:+[1] <k_s1lK>_N <S w_aZP>_N)))_N
+                                     ; Sym (Ifoldl.D:R:+[1] <k_s1lK>_N <S w_aZP>_N)))_N
+                                 ; Sym (Ifoldl.D:R:+[1] <S k_s1lK>_N <S w_aZP>_N))
+                                ((S ((S (Sym (Ifoldl.D:R:+[1] <k_s1lK>_N <w_aZP>_N)))_N
+                                     ; Sym (Ifoldl.D:R:+[1] <S k_s1lK>_N <w_aZP>_N)))_N
+                                 ; Sym (Ifoldl.D:R:+[1] <S (S k_s1lK)>_N <w_aZP>_N)))_R
+                             ; Sym (Ifoldl.N:Wonk <S k_s1lK>_N <w_aZP>_N)
+                             :: (S (S (S (k_s1lK + w_aZP))) :~: S (S (S (k_s1lK + w_aZP))))
+                                ~R# Wonk (S k_s1lK) w_aZP)
+                     })
+                  (f_azT @k_s1lK bk_s1lP ipv2_s1jh)
+                  ipv3_s1ji
+                }
+                }
+            }
+            }; } in
+      jump $wgo_s1lY
+        @Z
+        @n_aY9
+        @~(Sym (Ifoldl.D:R:+[0] <Z>_N) :: Z GHC.Internal.Prim.~# (Z + Z))
+        @~(Sym (Ifoldl.D:R:+[0] <n_aY9>_N)
+           :: n_aY9 GHC.Internal.Prim.~# (Z + n_aY9))
+        ((\ (@(w_a10g :: Nat)) ->
+            GHC.Internal.Data.Type.Equality.$WRefl @Nat @(S (S w_a10g)))
+         `cast` (forall (w :: <Nat>_N).
+                 ((:~:)
+                    <Nat>_N
+                    ((S (Sym (Ifoldl.D:R:+[0] <S w>_N)))_N
+                     ; Sym (Ifoldl.D:R:+[1] <Z>_N <S w>_N))
+                    ((S ((S (Sym (Ifoldl.D:R:+[0] <w>_N)))_N
+                         ; Sym (Ifoldl.D:R:+[1] <Z>_N <w>_N)))_N
+                     ; Sym (Ifoldl.D:R:+[1] <S Z>_N <w>_N)))_R
+                 ; Sym (Ifoldl.N:Wonk <Z>_N <w>_N)
+                 :: (forall (w :: Nat). S (S w) :~: S (S w))
+                    ~R# (forall (w :: Nat). Wonk Z w)))
+        eta_B0
+        eta1_B1
+
+Rec {
+-- RHS size: {terms: 33, types: 159, coercions: 128, joins: 0/0}
+Ifoldl.$wpoly_go [InlPrag=[2], Occ=LoopBreaker]
+  :: forall a (n :: Nat) (k :: Nat) (m :: Nat).
+     (k GHC.Internal.Prim.~# (k + Z), n GHC.Internal.Prim.~# (k + m)) =>
+     (forall (w :: Nat). Wonk k w)
+     -> Flip Vec a k -> Vec m a -> Flip Vec a n
+[GblId[StrictWorker([~, ~, !, ~, !])],
+ Arity=5,
+ Str=<L><L><SL><L><1L>,
+ Unf=OtherCon []]
+Ifoldl.$wpoly_go
+  = \ (@a_s1m1)
+      (@(n_s1m2 :: Nat))
+      (@(k_s1m3 :: Nat))
+      (@(m_s1m4 :: Nat))
+      (ww_s1mc :: k_s1m3 GHC.Internal.Prim.~# (k_s1m3 + Z))
+      (ww1_s1mf :: n_s1m2 GHC.Internal.Prim.~# (k_s1m3 + m_s1m4))
+      (ds_s1m7 :: forall (w :: Nat). Wonk k_s1m3 w)
+      (bk_s1m8 :: Flip Vec a_s1m1 k_s1m3)
+      (ds1_s1m9 :: Vec m_s1m4 a_s1m1) ->
+      case (ds_s1m7 @(GHC.Internal.Types.ZonkAny 0))
+           `cast` (Ifoldl.N:Wonk <k_s1m3>_N <GHC.Internal.Types.ZonkAny 0>_N
+                   :: Wonk k_s1m3 (GHC.Internal.Types.ZonkAny 0)
+                      ~R# ((S k_s1m3 + S (GHC.Internal.Types.ZonkAny 0))
+                           :~: (S (S k_s1m3) + GHC.Internal.Types.ZonkAny 0)))
+      of
+      { Refl co_aZ3 [Dmd=A] ->
+      case ds1_s1m9 of {
+        Nil co1_aZ5 [Dmd=S] ->
+          bk_s1m8
+          `cast` ((Flip
+                     <Nat>_N
+                     <*>_N
+                     <Vec>_R
+                     <a_s1m1>_N
+                     (ww_s1mc
+                      ; (<k_s1m3>_N + Sym co1_aZ5)_N
+                      ; Sym ww1_s1mf))_R
+                  :: Flip Vec a_s1m1 k_s1m3 ~R# Flip Vec a_s1m1 n_s1m2);
+        ::: @ipv_s1jk ipv1_s1jl [Dmd=S] ipv2_s1jm ipv3_s1jn ->
+          case ds_s1m7 of ds2_X5 { __DEFAULT ->
+          case (ds2_X5 @ipv_s1jk)
+               `cast` (Ifoldl.N:Wonk <k_s1m3>_N <ipv_s1jk>_N
+                       :: Wonk k_s1m3 ipv_s1jk
+                          ~R# ((S k_s1m3 + S ipv_s1jk) :~: (S (S k_s1m3) + ipv_s1jk)))
+          of
+          { Refl co1_aZJ ->
+          Ifoldl.$wpoly_go
+            @a_s1m1
+            @n_s1m2
+            @(S k_s1m3)
+            @ipv_s1jk
+            @~((S ww_s1mc)_N
+               ; Sym (Ifoldl.D:R:+[1] <k_s1m3>_N <Z>_N)
+               :: S k_s1m3 GHC.Internal.Prim.~# (S k_s1m3 + Z))
+            @~(ww1_s1mf
+               ; (<k_s1m3>_N + ipv1_s1jl)_N
+               ; SelCo:Tc(0,N)
+                     (Sym (Ifoldl.D:R:+[1] <k_s1m3>_N <S ipv_s1jk>_N)
+                      ; Sym co1_aZJ
+                      ; Ifoldl.D:R:+[1] <S k_s1m3>_N <ipv_s1jk>_N)
+               :: n_s1m2 GHC.Internal.Prim.~# (S k_s1m3 + ipv_s1jk))
+            (\ (@(w_aZP :: Nat)) ->
+               case (ds2_X5 @w_aZP)
+                    `cast` (Ifoldl.N:Wonk <k_s1m3>_N <w_aZP>_N
+                            :: Wonk k_s1m3 w_aZP
+                               ~R# ((S k_s1m3 + S w_aZP) :~: (S (S k_s1m3) + w_aZP)))
+               of
+               { Refl co2_aXU ->
+               (GHC.Internal.Data.Type.Equality.$WRefl
+                  @Nat @(S (S (S (k_s1m3 + w_aZP)))))
+               `cast` (((:~:)
+                          <Nat>_N
+                          ((S ((S (Sym (Ifoldl.D:R:+[1] <k_s1m3>_N <w_aZP>_N)
+                                   ; SelCo:Tc(0,N)
+                                         (Sym (Ifoldl.D:R:+[1] <S k_s1m3>_N <w_aZP>_N)
+                                          ; co2_aXU
+                                          ; Ifoldl.D:R:+[1] <k_s1m3>_N <S w_aZP>_N)))_N
+                               ; Sym (Ifoldl.D:R:+[1] <k_s1m3>_N <S w_aZP>_N)))_N
+                           ; Sym (Ifoldl.D:R:+[1] <S k_s1m3>_N <S w_aZP>_N))
+                          ((S ((S (Sym (Ifoldl.D:R:+[1] <k_s1m3>_N <w_aZP>_N)))_N
+                               ; Sym (Ifoldl.D:R:+[1] <S k_s1m3>_N <w_aZP>_N)))_N
+                           ; Sym (Ifoldl.D:R:+[1] <S (S k_s1m3)>_N <w_aZP>_N)))_R
+                       ; Sym (Ifoldl.N:Wonk <S k_s1m3>_N <w_aZP>_N)
+                       :: (S (S (S (k_s1m3 + w_aZP))) :~: S (S (S (k_s1m3 + w_aZP))))
+                          ~R# Wonk (S k_s1m3) w_aZP)
+               })
+            ((Ifoldl.:::
+                @(S k_s1m3)
+                @a_s1m1
+                @k_s1m3
+                @~(<S k_s1m3>_N :: S k_s1m3 GHC.Internal.Prim.~# S k_s1m3)
+                ipv2_s1jm
+                (bk_s1m8
+                 `cast` (Ifoldl.N:Flip <Nat>_N <*>_N <Vec>_R <a_s1m1>_N <k_s1m3>_N
+                         :: Flip Vec a_s1m1 k_s1m3 ~R# Vec k_s1m3 a_s1m1)))
+             `cast` (Sym (Ifoldl.N:Flip
+                              <Nat>_N <*>_N <Vec>_R <a_s1m1>_N <S k_s1m3>_N)
+                     :: Vec (S k_s1m3) a_s1m1 ~R# Flip Vec a_s1m1 (S k_s1m3)))
+            ipv3_s1jn
+          }
+          }
+      }
+      }
+end Rec }
+
+-- RHS size: {terms: 8, types: 15, coercions: 49, joins: 0/0}
+Ifoldl.reverseVec_g
+  :: forall {n :: Nat} {a}. Vec n a -> Flip Vec a n
+[GblId,
+ Arity=1,
+ Str=<1L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [0] 40 60}]
+Ifoldl.reverseVec_g
+  = \ (@(n_a10v :: Nat)) (@a_a10w) (eta_B1 :: Vec n_a10v a_a10w) ->
+      Ifoldl.$wpoly_go
+        @a_a10w
+        @n_a10v
+        @Z
+        @n_a10v
+        @~(Sym (Ifoldl.D:R:+[0] <Z>_N) :: Z GHC.Internal.Prim.~# (Z + Z))
+        @~(Sym (Ifoldl.D:R:+[0] <n_a10v>_N)
+           :: n_a10v GHC.Internal.Prim.~# (Z + n_a10v))
+        ((\ (@(w_a10g :: Nat)) ->
+            GHC.Internal.Data.Type.Equality.$WRefl @Nat @(S (S w_a10g)))
+         `cast` (forall (w :: <Nat>_N).
+                 ((:~:)
+                    <Nat>_N
+                    ((S (Sym (Ifoldl.D:R:+[0] <S w>_N)))_N
+                     ; Sym (Ifoldl.D:R:+[1] <Z>_N <S w>_N))
+                    ((S ((S (Sym (Ifoldl.D:R:+[0] <w>_N)))_N
+                         ; Sym (Ifoldl.D:R:+[1] <Z>_N <w>_N)))_N
+                     ; Sym (Ifoldl.D:R:+[1] <S Z>_N <w>_N)))_R
+                 ; Sym (Ifoldl.N:Wonk <Z>_N <w>_N)
+                 :: (forall (w :: Nat). S (S w) :~: S (S w))
+                    ~R# (forall (w :: Nat). Wonk Z w)))
+        ((Ifoldl.$WNil @a_a10w)
+         `cast` (Sym (Ifoldl.N:Flip <Nat>_N <*>_N <Vec>_R <a_a10w>_N <Z>_N)
+                 :: Vec Z a_a10w ~R# Flip Vec a_a10w Z))
+        eta_B1
+
+-- RHS size: {terms: 1, types: 0, coercions: 15, joins: 0/0}
+reverseVec :: forall (n :: Nat) a. Vec n a -> Vec n a
+[GblId,
+ Arity=1,
+ Str=<1L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+reverseVec
+  = Ifoldl.reverseVec_g
+    `cast` (forall (n[infrd]~[spec] :: <Nat>_N) (a[infrd]~[spec] :: <*>_N).
+            <Vec n a>_R
+            %<Many>_N ->_R Ifoldl.N:Flip <Nat>_N <*>_N <Vec>_R <a>_N <n>_N
+            :: (forall {n :: Nat} {a}. Vec n a -> Flip Vec a n)
+               ~R# (forall (n :: Nat) a. Vec n a -> Vec n a))
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$trModule4 :: GHC.Internal.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+Ifoldl.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$trModule3 :: GHC.Internal.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$trModule3 = GHC.Internal.Types.TrNameS Ifoldl.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$trModule2 :: GHC.Internal.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
+Ifoldl.$trModule2 = "Ifoldl"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$trModule1 :: GHC.Internal.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$trModule1 = GHC.Internal.Types.TrNameS Ifoldl.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$trModule :: GHC.Internal.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$trModule
+  = GHC.Internal.Types.Module Ifoldl.$trModule3 Ifoldl.$trModule1
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep_r1n8 :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep_r1n8 = GHC.Internal.Types.KindRepVar 1#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep1_r1n9 :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep1_r1n9
+  = GHC.Internal.Types.KindRepFun
+      $krep_r1n8 GHC.Internal.Types.krep$*
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep2_r1na :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep2_r1na = GHC.Internal.Types.KindRepVar 0#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep3_r1nb :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep3_r1nb = GHC.Internal.Types.KindRepFun $krep2_r1na $krep1_r1n9
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep4_r1nc :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep4_r1nc
+  = GHC.Internal.Types.KindRepFun
+      $krep2_r1na GHC.Internal.Types.krep$*
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep5_r1nd :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep5_r1nd = GHC.Internal.Types.KindRepFun $krep_r1n8 $krep4_r1nc
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcFlip1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+Ifoldl.$tcFlip1
+  = GHC.Internal.Types.KindRepFun $krep3_r1nb $krep5_r1nd
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep6_r1ne :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep6_r1ne = GHC.Internal.Types.KindRepVar 2#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep7_r1nf :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep7_r1nf = GHC.Internal.Types.KindRepVar 3#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep8_r1ng :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep8_r1ng = GHC.Internal.Types.KindRepVar 4#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep9_r1nh :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep9_r1nh = GHC.Internal.Types.KindRepApp $krep6_r1ne $krep8_r1ng
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep10_r1ni :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep10_r1ni
+  = GHC.Internal.Types.KindRepApp $krep9_r1nh $krep7_r1nf
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcNat2 :: GHC.Internal.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+Ifoldl.$tcNat2 = "Nat"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcNat1 :: GHC.Internal.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tcNat1 = GHC.Internal.Types.TrNameS Ifoldl.$tcNat2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcNat :: GHC.Internal.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tcNat
+  = GHC.Internal.Types.TyCon
+      18236869020729724782#Word64
+      4245855676397049056#Word64
+      Ifoldl.$trModule
+      Ifoldl.$tcNat1
+      0#
+      GHC.Internal.Types.krep$*
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+Ifoldl.$tc'Z1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+Ifoldl.$tc'Z1
+  = GHC.Internal.Types.KindRepTyConApp
+      Ifoldl.$tcNat (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'Z3 :: GHC.Internal.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+Ifoldl.$tc'Z3 = "'Z"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'Z2 :: GHC.Internal.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tc'Z2 = GHC.Internal.Types.TrNameS Ifoldl.$tc'Z3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'Z :: GHC.Internal.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tc'Z
+  = GHC.Internal.Types.TyCon
+      12150613558191457985#Word64
+      17820276006185949984#Word64
+      Ifoldl.$trModule
+      Ifoldl.$tc'Z2
+      0#
+      Ifoldl.$tc'Z1
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep11_r1nj :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep11_r1nj
+  = GHC.Internal.Types.KindRepTyConApp
+      Ifoldl.$tc'Z (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcVec1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+Ifoldl.$tcVec1
+  = GHC.Internal.Types.KindRepFun
+      Ifoldl.$tc'Z1 GHC.Internal.Types.krep$*Arr*
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep12_r1nk :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep12_r1nk
+  = GHC.Internal.Types.KindRepFun
+      Ifoldl.$tc'Z1 GHC.Internal.Types.krep$*
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcWonk1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+Ifoldl.$tcWonk1
+  = GHC.Internal.Types.KindRepFun Ifoldl.$tc'Z1 $krep12_r1nk
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'S1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+Ifoldl.$tc'S1
+  = GHC.Internal.Types.KindRepFun Ifoldl.$tc'Z1 Ifoldl.$tc'Z1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'S3 :: GHC.Internal.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+Ifoldl.$tc'S3 = "'S"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'S2 :: GHC.Internal.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tc'S2 = GHC.Internal.Types.TrNameS Ifoldl.$tc'S3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'S :: GHC.Internal.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tc'S
+  = GHC.Internal.Types.TyCon
+      11382371654426533936#Word64
+      12395597000343428369#Word64
+      Ifoldl.$trModule
+      Ifoldl.$tc'S2
+      0#
+      Ifoldl.$tc'S1
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+$krep13_r1nl :: [GHC.Internal.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep13_r1nl
+  = GHC.Internal.Types.:
+      @GHC.Internal.Types.KindRep
+      $krep_r1n8
+      (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep14_r1nm :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep14_r1nm
+  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tc'S $krep13_r1nl
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcVec3 :: GHC.Internal.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+Ifoldl.$tcVec3 = "Vec"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcVec2 :: GHC.Internal.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tcVec2 = GHC.Internal.Types.TrNameS Ifoldl.$tcVec3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcVec :: GHC.Internal.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tcVec
+  = GHC.Internal.Types.TyCon
+      14854607458058977841#Word64
+      8374922991311866538#Word64
+      Ifoldl.$trModule
+      Ifoldl.$tcVec2
+      0#
+      Ifoldl.$tcVec1
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+$krep15_r1nn :: [GHC.Internal.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep15_r1nn
+  = GHC.Internal.Types.:
+      @GHC.Internal.Types.KindRep
+      $krep2_r1na
+      (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep16_r1no :: [GHC.Internal.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep16_r1no
+  = GHC.Internal.Types.:
+      @GHC.Internal.Types.KindRep $krep_r1n8 $krep15_r1nn
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep17_r1np :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep17_r1np
+  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tcVec $krep16_r1no
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep18_r1nq :: [GHC.Internal.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep18_r1nq
+  = GHC.Internal.Types.:
+      @GHC.Internal.Types.KindRep $krep14_r1nm $krep15_r1nn
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep19_r1nr :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep19_r1nr
+  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tcVec $krep18_r1nq
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep20_r1ns :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep20_r1ns
+  = GHC.Internal.Types.KindRepFun $krep17_r1np $krep19_r1nr
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc':::1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+Ifoldl.$tc':::1
+  = GHC.Internal.Types.KindRepFun $krep2_r1na $krep20_r1ns
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc':::3 :: GHC.Internal.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+Ifoldl.$tc':::3 = "':::"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc':::2 :: GHC.Internal.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tc':::2 = GHC.Internal.Types.TrNameS Ifoldl.$tc':::3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'::: :: GHC.Internal.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tc':::
+  = GHC.Internal.Types.TyCon
+      334686219684160234#Word64
+      3014902632845087398#Word64
+      Ifoldl.$trModule
+      Ifoldl.$tc':::2
+      2#
+      Ifoldl.$tc':::1
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep21_r1nt :: [GHC.Internal.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep21_r1nt
+  = GHC.Internal.Types.:
+      @GHC.Internal.Types.KindRep $krep11_r1nj $krep15_r1nn
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'Nil1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+Ifoldl.$tc'Nil1
+  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tcVec $krep21_r1nt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'Nil3 :: GHC.Internal.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+Ifoldl.$tc'Nil3 = "'Nil"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'Nil2 :: GHC.Internal.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tc'Nil2 = GHC.Internal.Types.TrNameS Ifoldl.$tc'Nil3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'Nil :: GHC.Internal.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tc'Nil
+  = GHC.Internal.Types.TyCon
+      6632636372057876164#Word64
+      13532705703229277899#Word64
+      Ifoldl.$trModule
+      Ifoldl.$tc'Nil2
+      1#
+      Ifoldl.$tc'Nil1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcWonk3 :: GHC.Internal.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+Ifoldl.$tcWonk3 = "Wonk"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcWonk2 :: GHC.Internal.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tcWonk2 = GHC.Internal.Types.TrNameS Ifoldl.$tcWonk3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcWonk :: GHC.Internal.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tcWonk
+  = GHC.Internal.Types.TyCon
+      2107340412666559272#Word64
+      605784541161197679#Word64
+      Ifoldl.$trModule
+      Ifoldl.$tcWonk2
+      0#
+      Ifoldl.$tcWonk1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcFlip3 :: GHC.Internal.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+Ifoldl.$tcFlip3 = "Flip"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcFlip2 :: GHC.Internal.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tcFlip2 = GHC.Internal.Types.TrNameS Ifoldl.$tcFlip3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tcFlip :: GHC.Internal.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tcFlip
+  = GHC.Internal.Types.TyCon
+      562740838472115680#Word64
+      15461924706169976739#Word64
+      Ifoldl.$trModule
+      Ifoldl.$tcFlip2
+      2#
+      Ifoldl.$tcFlip1
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+$krep22_r1nu :: [GHC.Internal.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep22_r1nu
+  = GHC.Internal.Types.:
+      @GHC.Internal.Types.KindRep
+      $krep8_r1ng
+      (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep23_r1nv :: [GHC.Internal.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep23_r1nv
+  = GHC.Internal.Types.:
+      @GHC.Internal.Types.KindRep $krep7_r1nf $krep22_r1nu
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep24_r1nw :: [GHC.Internal.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep24_r1nw
+  = GHC.Internal.Types.:
+      @GHC.Internal.Types.KindRep $krep6_r1ne $krep23_r1nv
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep25_r1nx :: [GHC.Internal.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep25_r1nx
+  = GHC.Internal.Types.:
+      @GHC.Internal.Types.KindRep $krep_r1n8 $krep24_r1nw
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep26_r1ny :: [GHC.Internal.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep26_r1ny
+  = GHC.Internal.Types.:
+      @GHC.Internal.Types.KindRep $krep2_r1na $krep25_r1nx
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep27_r1nz :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep27_r1nz
+  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tcFlip $krep26_r1ny
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'Flip1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+Ifoldl.$tc'Flip1
+  = GHC.Internal.Types.KindRepFun $krep10_r1ni $krep27_r1nz
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'Flip3 :: GHC.Internal.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
+Ifoldl.$tc'Flip3 = "'Flip"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'Flip2 :: GHC.Internal.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tc'Flip2 = GHC.Internal.Types.TrNameS Ifoldl.$tc'Flip3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Ifoldl.$tc'Flip :: GHC.Internal.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+Ifoldl.$tc'Flip
+  = GHC.Internal.Types.TyCon
+      7623277265010559423#Word64
+      16926366384040641029#Word64
+      Ifoldl.$trModule
+      Ifoldl.$tc'Flip2
+      5#
+      Ifoldl.$tc'Flip1
+
+
+
