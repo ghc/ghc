@@ -109,7 +109,7 @@ getCppTokensAsComments cppOptions sourceFile = do
   directiveToks <- GHC.liftIO $ getPreprocessorAsComments sourceFile
   -- Tokens without hash-ifdef
   nonDirectiveToks <- tokeniseOriginalSrc startLoc flags2 source
-  case GHC.lexTokenStream flags2 strSrcBuf startLoc of
+  case GHC.lexTokenStream () flags2 strSrcBuf startLoc of
         GHC.POk _ ts ->
                do
                   let toks = GHC.addSourceToTokens startLoc source ts
@@ -178,7 +178,7 @@ tokeniseOriginalSrc ::
   -> m [(GHC.Located GHC.Token, String)]
 tokeniseOriginalSrc startLoc flags buf = do
   let src = stripPreprocessorDirectives buf
-  case GHC.lexTokenStream flags src startLoc of
+  case GHC.lexTokenStream () flags src startLoc of
     GHC.POk _ ts -> return $ GHC.addSourceToTokens startLoc src ts
     GHC.PFailed pst -> parseError pst
 
@@ -285,7 +285,7 @@ makeBufSpan ss = pspan
 
 -- ---------------------------------------------------------------------
 
-parseError :: (GHC.MonadIO m) => GHC.PState -> m b
+parseError :: (GHC.MonadIO m) => GHC.PState p -> m b
 parseError pst = GHC.throwErrors (fmap GHC.GhcPsMessage (GHC.getPsErrorMessages pst))
 
 -- ---------------------------------------------------------------------

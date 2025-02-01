@@ -70,7 +70,7 @@ import qualified GHC.LanguageExtensions as LangExt
 -- element.
 parseWith :: GHC.DynFlags
           -> FilePath
-          -> GHC.P w
+          -> GHC.P () w
           -> String
           -> ParseResult w
 parseWith dflags fileName parser s =
@@ -84,7 +84,7 @@ parseWith dflags fileName parser s =
 parseWithECP :: (GHC.DisambECP w)
           => GHC.DynFlags
           -> FilePath
-          -> GHC.P GHC.ECP
+          -> GHC.P () GHC.ECP
           -> String
           -> ParseResult (GHC.LocatedA w)
 parseWithECP dflags fileName parser s =
@@ -96,12 +96,12 @@ parseWithECP dflags fileName parser s =
 
 -- ---------------------------------------------------------------------
 
-runParser :: GHC.P a -> GHC.DynFlags -> FilePath -> String -> GHC.ParseResult a
+runParser :: GHC.P () a -> GHC.DynFlags -> FilePath -> String -> GHC.ParseResult () a
 runParser parser flags filename str = GHC.unP parser parseState
     where
       location = GHC.mkRealSrcLoc (GHC.mkFastString filename) 1 1
       buffer = GHC.stringToStringBuffer str
-      parseState = GHC.initParserState (GHC.initParserOpts flags) buffer location
+      parseState = GHC.initParserState () (GHC.initParserOpts flags) buffer location
 
 -- ---------------------------------------------------------------------
 
@@ -119,7 +119,7 @@ withDynFlags libdir action = ghcWrapper libdir $ do
 
 -- ---------------------------------------------------------------------
 
-parseFile :: GHC.DynFlags -> FilePath -> String -> GHC.ParseResult (GHC.Located (GHC.HsModule GHC.GhcPs))
+parseFile :: GHC.DynFlags -> FilePath -> String -> GHC.ParseResult () (GHC.Located (GHC.HsModule GHC.GhcPs))
 parseFile = runParser GHC.parseModule
 
 -- ---------------------------------------------------------------------
