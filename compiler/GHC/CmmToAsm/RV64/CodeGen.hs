@@ -680,7 +680,6 @@ getRegister' config plat expr =
       case (width, format) of
         (_w, f)
           | isVecFormat f ->
-              -- TODO: Check for configured vectorMinBits
               pure
                 ( Any
                     format
@@ -866,23 +865,8 @@ getRegister' config plat expr =
 
         -- TODO: MO_V_Broadcast with immediate: If the right value is a literal,
         -- it may use vmv.v.i (simpler)
-        -- TODO: Duplication with MO_VF_Broadcast
-        MO_V_Broadcast length w -> do
-          (reg_val, format_val, code_val) <- getSomeReg e
-          let toFmt = VecFormat length (intScalarFormat w)
-          pure $ Any toFmt $ \dst ->
-            code_val
-              `snocOL` annExpr
-                expr
-                (VMV (OpReg toFmt dst) (OpReg format_val reg_val))
-        MO_VF_Broadcast length w -> do
-          (reg_val, format_val, code_val) <- getSomeReg e
-          let toFmt = VecFormat length (floatScalarFormat w)
-          pure $ Any (vecFormat (cmmVec length (cmmFloat w))) $ \dst ->
-            code_val
-              `snocOL` annExpr
-                expr
-                (VMV (OpReg toFmt dst) (OpReg format_val reg_val))
+        MO_V_Broadcast length w ->vectorBroadcast (intVecFormat length w)
+        MO_VF_Broadcast length w -> vectorBroadcast (floatVecFormat length w)
 
         -- TODO: NO MO_V_Neg? Why?
         MO_VF_Neg length w -> do
@@ -933,6 +917,15 @@ getRegister' config plat expr =
                     code `snocOL` MOV (OpReg fmt dst) (OpReg fmt reg)
           where
             shift = 64 - (widthInBits from - widthInBits to)
+
+        vectorBroadcast :: Format -> NatM Register
+        vectorBroadcast targetFormat = do
+          (reg_val, format_val, code_val) <- getSomeReg e
+          pure $ Any targetFormat $ \dst ->
+            code_val
+              `snocOL` annExpr
+                expr
+                (VMV (OpReg targetFormat dst) (OpReg format_val reg_val))
 
     -- Dyadic machops:
     --
@@ -1260,60 +1253,21 @@ getRegister' config plat expr =
         MO_U_Shr w -> intOp False w (\d x y -> unitOL $ annExpr expr (SRL d x y))
         MO_S_Shr w -> intOp True w (\d x y -> unitOL $ annExpr expr (SRA d x y))
 
-        -- TODO: Use vecOp here
-        MO_VF_Extract length w -> do
-          (reg_v, format_v, code_v) <- getSomeReg x
-          (reg_idx, format_idx, code_idx) <- getSomeReg y
-          let format_dst = floatFormat w
-          tmp <- getNewRegNat format_v
-          pure $ Any format_dst $ \dst ->
-            code_v
-              `appOL` code_idx
-              `snocOL`
-              -- Setup
-              -- TODO: Use width
-              annExpr
-                expr
-                -- Move selected element to index 0
-                -- vslidedown.vi v8, v9, 2
-                (VSLIDEDOWN (OpReg format_v tmp) (OpReg format_v reg_v) (OpReg format_idx reg_idx))
-              `snocOL`
-              -- Move to float register
-              -- vmv.x.s a0, v8
-              VMV (OpReg format_dst dst) (OpReg format_v tmp)
+        -- Vector operations
+        MO_VF_Extract length w -> vecOp (floatVecFormat length w) VSLIDEDOWN
+        MO_V_Extract length w -> vecOp (intVecFormat length w) VSLIDEDOWN
 
-        -- TODO: Duplication with MO_VF_Extract
-        MO_V_Extract length w -> do
-          (reg_v, format_v, code_v) <- getSomeReg x
-          (reg_idx, format_idx, code_idx) <- getSomeReg y
-          tmp <- getNewRegNat format_v
-          let format_dst = floatFormat w
-          pure $ Any format_dst $ \dst ->
-            code_v
-              `appOL` code_idx
-              `snocOL`
-              -- Setup
-              -- TODO: Use width
-              annExpr
-                expr
-                -- Move selected element to index 0
-                -- vslidedown.vi v8, v9, 2
-                (VSLIDEDOWN (OpReg format_v tmp) (OpReg format_v reg_v) (OpReg format_idx reg_idx))
-              `snocOL`
-              -- Move to float register
-              -- vmv.x.s a0, v8
-              VMV (OpReg format_dst dst) (OpReg format_v tmp)
-        MO_VF_Add length w -> vecOp (floatVecFormat length w) (\d x y -> (VADD d x y))
-        MO_VF_Sub length w -> vecOp (floatVecFormat length w) (\d x y -> (VSUB d x y))
-        MO_VF_Mul length w -> vecOp (floatVecFormat length w) (\d x y -> (VMUL d x y))
-        MO_VF_Quot length w -> vecOp (floatVecFormat length w) (\d x y -> (VQUOT d x y))
+        MO_VF_Add length w -> vecOp (floatVecFormat length w) VADD
+        MO_VF_Sub length w -> vecOp (floatVecFormat length w) VSUB
+        MO_VF_Mul length w -> vecOp (floatVecFormat length w) VMUL
+        MO_VF_Quot length w -> vecOp (floatVecFormat length w) VQUOT
         -- See https://godbolt.org/z/PvcWKMKoW
-        MO_VS_Min length w -> vecOp (intVecFormat length w) (\d x y -> (VSMIN d x y))
-        MO_VS_Max length w -> vecOp (intVecFormat length w) (\d x y -> (VSMAX d x y))
-        MO_VU_Min length w -> vecOp (intVecFormat length w) (\d x y -> (VUMIN d x y))
-        MO_VU_Max length w -> vecOp (intVecFormat length w) (\d x y -> (VUMAX d x y))
-        MO_VF_Min length w -> vecOp (floatVecFormat length w) (\d x y -> (VFMIN d x y))
-        MO_VF_Max length w -> vecOp (floatVecFormat length w) (\d x y -> (VFMAX d x y))
+        MO_VS_Min length w -> vecOp (intVecFormat length w) VSMIN
+        MO_VS_Max length w -> vecOp (intVecFormat length w) VSMAX
+        MO_VU_Min length w -> vecOp (intVecFormat length w) VUMIN
+        MO_VU_Max length w -> vecOp (intVecFormat length w) VUMAX
+        MO_VF_Min length w -> vecOp (floatVecFormat length w) VFMIN
+        MO_VF_Max length w -> vecOp (floatVecFormat length w) VFMAX
         _e -> panic $ "Missing operation " ++ show expr
 
         -- Vectors
