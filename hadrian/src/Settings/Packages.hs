@@ -341,13 +341,13 @@ rtsPackageArgs = package rts ? do
             --
             -- In particular, we **do not** pass -mavx when compiling
             -- AutoApply_V16.cmm, as that would lock out targets with SSE2 but not AVX.
-          , inputs ["**/AutoApply_V16.cmm"] ? pure [ "-mvector-min-width-bits 128" | riscv64]
-          , inputs ["**/AutoApply_V32.cmm"] ? pure ([ "-mavx2"    | x86 ] ++ [ "-mvector-min-width-bits 256" | riscv64])
-          , inputs ["**/AutoApply_V64.cmm"] ? pure ([ "-mavx512f" | x86 ] ++ [ "-mvector-min-width-bits 512" | riscv64])
+          , inputs ["**/AutoApply_V16.cmm"] ? pure [ "-mriscv-vlen 128" | riscv64]
+          , inputs ["**/AutoApply_V32.cmm"] ? pure ([ "-mavx2"    | x86 ] ++ [ "-mriscv-vlen 256" | riscv64])
+          , inputs ["**/AutoApply_V64.cmm"] ? pure ([ "-mavx512f" | x86 ] ++ [ "-mriscv-vlen 512" | riscv64])
 
-          , inputs ["**/Jumps_V16.cmm"] ? pure [ "-mvector-min-width-bits 128" | riscv64]
-          , inputs ["**/Jumps_V32.cmm"] ? pure ([ "-mavx2"    | x86 ] ++ [ "-mvector-min-width-bits 256" | riscv64])
-          , inputs ["**/Jumps_V64.cmm"] ? pure ([ "-mavx512f" | x86 ] ++ [ "-mvector-min-width-bits 512" | riscv64])
+          , inputs ["**/Jumps_V16.cmm"] ? pure [ "-mriscv-vlen 128" | riscv64]
+          , inputs ["**/Jumps_V32.cmm"] ? pure ([ "-mavx2"    | x86 ] ++ [ "-mriscv-vlen 256" | riscv64])
+          , inputs ["**/Jumps_V64.cmm"] ? pure ([ "-mavx512f" | x86 ] ++ [ "-mriscv-vlen 512" | riscv64])
           ]
 
     let cArgs = mconcat
@@ -427,7 +427,7 @@ rtsPackageArgs = package rts ? do
           , inputs ["**/AutoApply_V32.c"] ? pure ([ "-mavx2"    | x86 ] ++ [ "-march=rv64g_zvl256b" | riscv64])
           , inputs ["**/AutoApply_V64.c"] ? pure ([ "-mavx512f" | x86 ] ++ [ "-march=rv64g_zvl512b" | riscv64])
 
-          , inputs ["**/Jumps_V16.c"] ? pure [ "-mvector-min-width-bits 128" | riscv64]
+          , inputs ["**/Jumps_V16.c"] ? pure [ "-mriscv-vlen 128" | riscv64]
           , inputs ["**/Jumps_V32.c"] ? pure ([ "-mavx2"    | x86 ] ++ [ "-march=rv64g_zvl256b" | riscv64])
           , inputs ["**/Jumps_V64.c"] ? pure ([ "-mavx512f" | x86 ] ++ [ "-march=rv64g_zvl512b" | riscv64])
 
