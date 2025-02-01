@@ -1,4 +1,4 @@
-{-# LANGUAGE GhcCPP #-}
+{-# LANGUAGE GHC_CPP #-}
 module Example1 where
 
 y = 3
