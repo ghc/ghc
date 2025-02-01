@@ -1755,7 +1755,7 @@ Some flags only make sense for particular target platforms.
     multiply-add, which might perform non-IEEE-compliant software emulation on
     some platforms (depending on the implementation of the C standard library).
 
-.. ghc-flag:: -mvector-min-width-bits
+.. ghc-flag:: -mriscv-vlen
    :shortdesc: (RISC-V NCG only) Minimal width of vector registers in bits
    :type: dynamic
    :category: platform-options

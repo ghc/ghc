@@ -483,11 +483,11 @@ assertVectorRegWidth expr = do
   if isVecFormat format then
    case mbRegMinBits of
     Nothing -> pprPanic
-                "CmmExpr results in vector format, but no vector register configured (see -mvector-min-width-bits in docs)"
+                "CmmExpr results in vector format, but no vector register configured (see -mriscv-vlen in docs)"
                 (pdoc platform expr)
     Just regMinBits | (formatInBytes format) * 8 <= regMinBits -> pure ()
                     | otherwise -> pprPanic 
-                      "CmmExpr results in vector format which is bigger than the configured vector register size (see -mvector-min-width-bits in docs)"
+                      "CmmExpr results in vector format which is bigger than the configured vector register size (see -mriscv-vlen in docs)"
                       (pdoc platform expr)
   else
     pure ()
