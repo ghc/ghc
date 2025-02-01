@@ -1,4 +1,4 @@
-{-# LANGUAGE GhcCPP #-}
+{-# LANGUAGE GHC_CPP #-}
 module Example2 where
 
 /* package ghc-exactprint-1.7.0.1 */
