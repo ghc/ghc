@@ -211,9 +211,9 @@ processDeps :: DynFlags
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps _ _ _ _ _ (CyclicSCC nodes)
+processDeps _ _ _ _ _ (NECyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
-    throwOneError $ cyclicModuleErr nodes
+    throwOneError $ cyclicModuleErr $ NE.toList nodes
 
 processDeps _ _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
   =     -- There shouldn't be any backpack instantiations; report them as well

@@ -75,6 +75,7 @@ import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Data.Graph.Directed
 import GHC.Data.Bag
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 
 import GHC.Utils.Constants (debugIsOn)
@@ -1384,9 +1385,9 @@ dsEvBinds ev_binds thing_inside
         new_unspecables
             | transitively_unspecable = S.singleton v
             | otherwise = mempty
-    ds_component unspecables (CyclicSCC nodes) = (Rec pairs, new_unspecables)
+    ds_component unspecables (NECyclicSCC nodes) = (Rec pairs, new_unspecables)
       where
-        (pairs, direct_canonicity) = unzip $ map unpack_node nodes
+        (pairs, direct_canonicity) = unzip $ map unpack_node $ NE.toList nodes
 
         is_unspecable_remote dep = dep `S.member` unspecables
         transitively_unspecable = or [ is_unspecable this_canonical || any is_unspecable_remote deps

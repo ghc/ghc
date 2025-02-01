@@ -140,6 +140,8 @@ import GHC.Platform
 import Data.Containers.ListUtils
 import Data.Maybe
 import Data.List (sortOn)
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
 import Control.Monad
 
 -- -----------------------------------------------------------------------------
@@ -273,7 +275,7 @@ linearRA_SCCs entry_ids block_live blocksAcc (AcyclicSCC block : sccs)
                 ((reverse blocks') ++ blocksAcc)
                 sccs
 
-linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
+linearRA_SCCs entry_ids block_live blocksAcc (NECyclicSCC blocks : sccs)
  = do
         blockss' <- process entry_ids block_live blocks
         linearRA_SCCs entry_ids block_live
@@ -295,10 +297,10 @@ linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
 process :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
         => [BlockId]
         -> BlockMap (UniqSet RegWithFormat)
-        -> [GenBasicBlock (LiveInstr instr)]
+        -> NonEmpty (GenBasicBlock (LiveInstr instr))
         -> RegM freeRegs [[NatBasicBlock instr]]
 process entry_ids block_live =
-    \blocks -> go blocks [] (return []) False
+    \blocks -> go (NE.toList blocks) [] (return []) False
   where
     go :: [GenBasicBlock (LiveInstr instr)]
        -> [GenBasicBlock (LiveInstr instr)]

@@ -898,7 +898,7 @@ checkUnitCycles dflags graph = processSCCs (HUG.hugSCCs graph)
 
     processSCCs [] = return ()
     processSCCs (AcyclicSCC _: other_sccs) = processSCCs other_sccs
-    processSCCs (CyclicSCC uids: _) = throwGhcException $ CmdLineError $ showSDoc dflags (cycle_err uids)
+    processSCCs (NECyclicSCC uids: _) = throwGhcException $ CmdLineError $ showSDoc dflags (cycle_err uids)
 
 
     cycle_err uids =
@@ -910,8 +910,8 @@ checkUnitCycles dflags graph = processSCCs (HUG.hugSCCs graph)
                     (map (\uid -> text "-" <+> ppr uid <+> text "depends on") start)
                     ++ [text "-" <+> ppr final]
       where
-        start = init uids
-        final = last uids
+        start = NE.init uids
+        final = NE.last uids
 
 -- | Check that we don't have multiple units with the same UnitId.
 checkDuplicateUnits :: DynFlags -> [(FilePath, DynFlags)] -> Ghc ()

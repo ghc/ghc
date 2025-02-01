@@ -804,7 +804,7 @@ loopMembers cfg =
 
     setLevel :: SCC BlockId -> LabelMap Bool -> LabelMap Bool
     setLevel (AcyclicSCC bid) m = mapInsert bid False m
-    setLevel (CyclicSCC bids) m = foldl' (\m k -> mapInsert k True m) m bids
+    setLevel (NECyclicSCC bids) m = foldl' (\m k -> mapInsert k True m) m bids
 
 loopLevels :: CFG -> BlockId -> LabelMap Int
 loopLevels cfg root = liLevels loopInfos

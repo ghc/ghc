@@ -137,6 +137,6 @@ topSortDecls _m binds = rest ++ nr'
       [ (i, b) | StgVarArg i <- args, i `elementOfUniqSet` keys ]
     collectDeps _ = []
     g = graphFromVerticesAndAdjacency vs (concatMap collectDeps nr)
-    nr' | (not . null) [()| CyclicSCC _ <- stronglyConnCompG g]
+    nr' | (not . null) [()| NECyclicSCC _ <- stronglyConnCompG g]
             = error "topSortDecls: unexpected cycle"
         | otherwise = map node_payload (topologicalSortG g)

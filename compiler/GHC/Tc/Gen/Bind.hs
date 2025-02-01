@@ -92,6 +92,7 @@ import GHC.Data.Maybe
 
 import Control.Monad
 import Data.Foldable (find, traverse_)
+import qualified Data.List.NonEmpty as NE
 
 {-
 ************************************************************************
@@ -398,7 +399,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
     go []         = do  { thing <- thing_inside; return ([], thing) }
 
     tc_scc (AcyclicSCC bind) = tc_sub_group NonRecursive [bind]
-    tc_scc (CyclicSCC binds) = tc_sub_group Recursive    binds
+    tc_scc (NECyclicSCC binds) = tc_sub_group Recursive  (NE.toList binds)
 
     tc_sub_group rec_tc binds = tcPolyBinds top_lvl sig_fn prag_fn
                                             Recursive rec_tc closed binds

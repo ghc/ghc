@@ -111,6 +111,7 @@ import Control.Monad
 import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
 import Data.List ( intersperse, partition, sortBy, isSuffixOf, sortOn )
+import qualified Data.List.NonEmpty as NE
 import Data.Set (Set)
 import Data.Monoid (First(..))
 import qualified Data.Semigroup as Semigroup
@@ -1266,10 +1267,10 @@ reportCycles :: Logger -> [SCC UnitInfo] -> IO ()
 reportCycles logger sccs = mapM_ report sccs
   where
     report (AcyclicSCC _) = return ()
-    report (CyclicSCC vs) =
+    report (NECyclicSCC vs) =
         debugTraceMsg logger 2 $
           text "these packages are involved in a cycle:" $$
-            nest 2 (hsep (map (ppr . unitId) vs))
+            nest 2 (hsep (map (ppr . unitId) (NE.toList vs)))
 
 reportUnusable :: Logger -> UnusableUnits -> IO ()
 reportUnusable logger pkgs = mapM_ report (nonDetUniqMapToList pkgs)
@@ -1431,7 +1432,7 @@ validateDatabase cfg pkg_map1 =
     -- Find recursive units
     sccs = stronglyConnComp [ (pkg, unitId pkg, unitDepends pkg)
                             | pkg <- nonDetEltsUniqMap pkg_map2 ]
-    getCyclicSCC (CyclicSCC vs) = map unitId vs
+    getCyclicSCC (NECyclicSCC vs) = map unitId (NE.toList vs)
     getCyclicSCC (AcyclicSCC _) = []
     (pkg_map3, cyclic) = removeUnits (concatMap getCyclicSCC sccs) index pkg_map2
     unusable_cyclic = mk_unusable CyclicDependencies depsNotAvailable pkg_map3 cyclic

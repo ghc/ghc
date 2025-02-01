@@ -33,6 +33,8 @@ import GHC.Utils.Outputable
 import GHC.CmmToAsm.Format
 import GHC.Types.Unique.Set
 
+import Data.List.NonEmpty (NonEmpty(..))
+
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.
 --
@@ -327,7 +329,7 @@ handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
 --      require a fixup.
 --
 handleComponent delta instr
-        (CyclicSCC ((DigraphNode vreg (InReg (RealRegUsage sreg scls)) ((InReg (RealRegUsage dreg dcls): _))) : rest))
+        (NECyclicSCC ((DigraphNode vreg (InReg (RealRegUsage sreg scls)) ((InReg (RealRegUsage dreg dcls): _))) :| rest))
         -- dest list may have more than one element, if the reg is also InMem.
  = do
         -- spill the source into its slot
@@ -344,7 +346,7 @@ handleComponent delta instr
         --      so we don't end up clobbering the source values.
         return (instrSpill ++ concat remainingFixUps ++ instrLoad)
 
-handleComponent _ _ (CyclicSCC _)
+handleComponent _ _ (NECyclicSCC _)
  = panic "Register Allocator: handleComponent cyclic"
 
 

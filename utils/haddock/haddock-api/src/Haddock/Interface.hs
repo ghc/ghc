@@ -229,7 +229,7 @@ createIfaces verbosity modules flags instIfaceMap = do
         | NotBoot <- isBootSummary ms = [ms]
         | otherwise = []
       go (AcyclicSCC _) = []
-      go (CyclicSCC _) = error "haddock: module graph cyclic even with boot files"
+      go (NECyclicSCC _) = error "haddock: module graph cyclic even with boot files"
 
       -- Visit modules in that order
       sortedMods = concatMap go $ topSortModuleGraph False modGraph Nothing

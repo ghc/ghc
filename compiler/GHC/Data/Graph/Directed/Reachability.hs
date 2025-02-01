@@ -21,6 +21,7 @@ import Data.Graph ( Vertex, SCC(..) )
 import Data.Array ((!))
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import qualified Data.List.NonEmpty as NE
 
 import GHC.Data.Graph.Directed.Internal
 
@@ -84,9 +85,9 @@ cyclicGraphReachability (Graph g from to) =
           earlier_neighbours = neighboursOf v
           earlier_further = mapMaybe (flip IM.lookup earlier) earlier_neighbours
           all_remotes = IS.unions (IS.fromList earlier_neighbours : earlier_further)
-      add_one_comp earlier (CyclicSCC vs) = IM.union (IM.fromList [(v, local v `IS.union` all_remotes) | v <- vs]) earlier
+      add_one_comp earlier (NECyclicSCC vs) = IM.union (IM.fromList [(v, local v `IS.union` all_remotes) | v <- NE.toList vs]) earlier
         where
-          all_locals = IS.fromList vs
+          all_locals = IS.fromList (NE.toList vs)
           local v = IS.delete v all_locals
               -- Arguably, for a cyclic SCC we should include each
               -- vertex in its own reachable set. However, this could

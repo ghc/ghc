@@ -77,6 +77,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import Control.Monad
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
+import qualified Data.List.NonEmpty as NE
 import GHC.Types.Unique.DSet (mkUniqDSet)
 import GHC.Data.BooleanFormula (bfTraverse)
 
@@ -651,13 +652,13 @@ depAnalBinds binds_w_dus
                    binds_w_dus
 
     get_binds (AcyclicSCC (bind, _, _)) = (NonRecursive, [bind])
-    get_binds (CyclicSCC  binds_w_dus)  = (Recursive, [b | (b,_,_) <- binds_w_dus])
+    get_binds (NECyclicSCC binds_w_dus) = (Recursive, [b | (b,_,_) <- NE.toList binds_w_dus])
 
     get_du (AcyclicSCC (_, bndrs, uses)) = (Just (mkNameSet bndrs), uses)
-    get_du (CyclicSCC  binds_w_dus)      = (Just defs, uses)
+    get_du (NECyclicSCC binds_w_dus)    = (Just defs, uses)
         where
-          defs = mkNameSet [b | (_,bs,_) <- binds_w_dus, b <- bs]
-          uses = unionNameSets [u | (_,_,u) <- binds_w_dus]
+          defs = mkNameSet [b | (_,bs,_) <- NE.toList binds_w_dus, b <- bs]
+          uses = unionNameSets [u | (_,_,u) <- NE.toList binds_w_dus]
 
 ---------------------
 -- Bind the top-level forall'd type variables in the sigs.

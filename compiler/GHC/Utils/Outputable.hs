@@ -1069,7 +1069,7 @@ instance Outputable Fingerprint where
 
 instance Outputable a => Outputable (SCC a) where
    ppr (AcyclicSCC v) = text "NONREC" $$ (nest 3 (ppr v))
-   ppr (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr vs)))
+   ppr (NECyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr (NEL.toList vs))))
 
 instance Outputable Serialized where
     ppr (Serialized the_type bytes) = int (length bytes) <+> text "of type" <+> text (show the_type)

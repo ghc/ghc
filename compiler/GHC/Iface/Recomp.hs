@@ -70,6 +70,7 @@ import GHC.Unit.Module.Deps
 
 import Control.Monad
 import Data.List (sortBy, sort, sortOn)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Word (Word64)
@@ -1062,8 +1063,8 @@ addFingerprints hsc_env iface0
                env' <- extend_hash_env local_env (hash,decl)
                return (env', (hash,decl) : decls_w_hashes)
 
-       fingerprint_group (local_env, decls_w_hashes) (CyclicSCC abis)
-          = do let stable_abis = sortBy cmp_abiNames abis
+       fingerprint_group (local_env, decls_w_hashes) (NECyclicSCC abis)
+          = do let stable_abis = sortBy cmp_abiNames (NE.toList abis)
                    stable_decls = map abiDecl stable_abis
                local_env1 <- foldM extend_hash_env local_env
                                    (zip (map mkRecFingerprint [0..]) stable_decls)
