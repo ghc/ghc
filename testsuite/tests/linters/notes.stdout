@@ -16,6 +16,7 @@ ref    compiler/GHC/Hs/Extension.hs:144:5:     Note [Strict argument type constr
 ref    compiler/GHC/Hs/Pat.hs:156:74:     Note [Lifecycle of a splice]
 ref    compiler/GHC/HsToCore/Pmc/Solver.hs:860:20:     Note [COMPLETE sets on data families]
 ref    compiler/GHC/HsToCore/Quote.hs:1504:7:     Note [How brackets and nested splices are handled]
+ref    compiler/GHC/Parser/Lexer.x:2584:21:     Note [CPP in GHC]
 ref    compiler/GHC/Stg/Unarise.hs:451:32:     Note [Renaming during unarisation]
 ref    compiler/GHC/Tc/Gen/Default.hs:89:6:     Note [Disambiguation of multiple default declarations]
 ref    compiler/GHC/Tc/Gen/Default.hs:188:11:     Note [Disambiguation of multiple default declarations]
