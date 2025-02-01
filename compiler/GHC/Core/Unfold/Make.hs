@@ -97,7 +97,10 @@ mkDataConUnfolding expr
   where
     guide = UnfWhen { ug_arity     = manifestArity expr
                     , ug_unsat_ok  = unSaturatedOk
-                    , ug_boring_ok = False }
+                    , ug_boring_ok = inlineBoringOk expr }
+            -- inineBoringOk; sometimes wrappers are very simple, like
+            --    \@a p q. K @a <coercion> p q
+            -- and then we definitely want to inline it #25713
 
 mkWrapperUnfolding :: SimpleOpts -> CoreExpr -> Arity -> Unfolding
 -- Make the unfolding for the wrapper in a worker/wrapper split

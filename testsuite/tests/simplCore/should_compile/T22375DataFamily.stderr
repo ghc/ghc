@@ -8,7 +8,7 @@ T22375DataFamily.$WA [InlPrag=INLINE[final] CONLIKE] :: X ()
 [GblId[DataConWrapper],
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 T22375DataFamily.$WA
   = T22375DataFamily.A
     `cast` (Sym T22375DataFamily.D:R:XUnit0
@@ -19,7 +19,7 @@ T22375DataFamily.$WB [InlPrag=INLINE[final] CONLIKE] :: X ()
 [GblId[DataConWrapper],
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 T22375DataFamily.$WB
   = T22375DataFamily.B
     `cast` (Sym T22375DataFamily.D:R:XUnit0
@@ -30,7 +30,7 @@ T22375DataFamily.$WC [InlPrag=INLINE[final] CONLIKE] :: X ()
 [GblId[DataConWrapper],
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 T22375DataFamily.$WC
   = T22375DataFamily.C
     `cast` (Sym T22375DataFamily.D:R:XUnit0
@@ -41,7 +41,7 @@ T22375DataFamily.$WD [InlPrag=INLINE[final] CONLIKE] :: X ()
 [GblId[DataConWrapper],
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 T22375DataFamily.$WD
   = T22375DataFamily.D
     `cast` (Sym T22375DataFamily.D:R:XUnit0
@@ -52,7 +52,7 @@ T22375DataFamily.$WE [InlPrag=INLINE[final] CONLIKE] :: X ()
 [GblId[DataConWrapper],
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 T22375DataFamily.$WE
   = T22375DataFamily.E
     `cast` (Sym T22375DataFamily.D:R:XUnit0
@@ -63,7 +63,7 @@ T22375DataFamily.$WF [InlPrag=INLINE[final] CONLIKE] :: X ()
 [GblId[DataConWrapper],
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 T22375DataFamily.$WF
   = T22375DataFamily.F
     `cast` (Sym T22375DataFamily.D:R:XUnit0
@@ -74,7 +74,7 @@ T22375DataFamily.$WG [InlPrag=INLINE[final] CONLIKE] :: X ()
 [GblId[DataConWrapper],
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 T22375DataFamily.$WG
   = T22375DataFamily.G
     `cast` (Sym T22375DataFamily.D:R:XUnit0
@@ -85,7 +85,7 @@ T22375DataFamily.$WH [InlPrag=INLINE[final] CONLIKE] :: X ()
 [GblId[DataConWrapper],
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 T22375DataFamily.$WH
   = T22375DataFamily.H
     `cast` (Sym T22375DataFamily.D:R:XUnit0
@@ -96,7 +96,7 @@ T22375DataFamily.$WI [InlPrag=INLINE[final] CONLIKE] :: X ()
 [GblId[DataConWrapper],
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 T22375DataFamily.$WI
   = T22375DataFamily.I
     `cast` (Sym T22375DataFamily.D:R:XUnit0
@@ -107,7 +107,7 @@ T22375DataFamily.$WJ [InlPrag=INLINE[final] CONLIKE] :: X ()
 [GblId[DataConWrapper],
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)}]
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 T22375DataFamily.$WJ
   = T22375DataFamily.J
     `cast` (Sym T22375DataFamily.D:R:XUnit0
