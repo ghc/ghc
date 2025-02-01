@@ -1696,7 +1696,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "mavx512f"     (noArg (\d -> d { avx512f = True }))
   , make_ord_flag defGhcFlag "mavx512pf"    (noArg (\d ->
                                                          d { avx512pf = True }))
-  , make_ord_flag defGhcFlag "mvector-min-width-bits"
+  , make_ord_flag defGhcFlag "mriscv-vlen"
                                             (word64SuffixM setVectorMinBits)
   , make_ord_flag defGhcFlag "mfma"         (noArg (\d -> d { fma = True }))
 
