@@ -36,7 +36,7 @@ import Types
 process :: PpState -> Input -> (PpState, Output)
 process s str = (s0, o)
   where
-    o = case regularParse cppDirective str of
+    o = case parseDirective str of
         Left _ -> undefined
         Right r -> r
     s0 = case o of
@@ -71,7 +71,7 @@ cppIf s toks = r
     expanded = expand s (unwords toks)
     -- toks0 = cppLex expanded
     -- r = error (show toks0)
-    v = case regularParse plusTimesExpr expanded of
+    v = case parseCppParser plusTimesExpr expanded of
         Left err -> error $ show err
         Right tree -> eval tree
     --    We evaluate to an Int, which we convert to a bool
