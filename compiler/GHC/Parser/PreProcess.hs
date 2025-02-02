@@ -11,20 +11,20 @@ module GHC.Parser.PreProcess (
     initPpState,
     initParserState,
     initPragState,
-    PpState
+    PpState,
 ) where
 
 import Data.Char
 import Data.Map (Map)
-import qualified Data.Map as Map
-import qualified Data.Set as Set
+import Data.Map qualified as Map
+import Data.Set qualified as Set
 import Debug.Trace (trace)
 import GHC.Data.FastString
-import qualified GHC.Data.Strict as Strict
+import GHC.Data.Strict qualified as Strict
 import GHC.Data.StringBuffer
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
-import qualified GHC.Parser.Lexer as Lexer
+import GHC.Parser.Lexer qualified as Lexer
 import GHC.Prelude
 import GHC.Types.SrcLoc
 
@@ -47,13 +47,13 @@ initPpState =
         , pp_accepting = True
         }
 
-data PpState = PpState {
-        pp_defines :: !(Map String [String]),
-        pp_continuation :: ![Located Token],
-        -- pp_context :: ![PpContext],
-        pp_context :: ![Token], -- What preprocessor directive we are currently processing
-        pp_accepting :: !Bool
-     }
+data PpState = PpState
+    { pp_defines :: !(Map String [String])
+    , pp_continuation :: ![Located Token]
+    , -- pp_context :: ![PpContext],
+      pp_context :: ![Token] -- What preprocessor directive we are currently processing
+    , pp_accepting :: !Bool
+    }
     deriving (Show)
 
 -- ---------------------------------------------------------------------
