@@ -1,9 +1,9 @@
 module Types where
 
-import GHC.Parser.Lexer (Token (..))
-import GHC.Types.SrcLoc
-import qualified GHC.Parser.Lexer as Lexer
 import GHC.Data.StringBuffer
+import GHC.Parser.Lexer (Token (..))
+import qualified GHC.Parser.Lexer as Lexer
+import GHC.Types.SrcLoc
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -26,7 +26,8 @@ data PpState = PpState
     , pp_includes :: !(Map String StringBuffer)
     , pp_include_stack :: ![Lexer.AlexInput]
     , pp_continuation :: ![Located Token]
-    , pp_context :: ![Token] -- ^ What preprocessor directive we are currently processing
+    , pp_context :: ![Token]
+    -- ^ What preprocessor directive we are currently processing
     , pp_accepting :: !Bool
     }
     deriving (Show)
@@ -38,7 +39,7 @@ data CppDirective
     | CppDefine String [String]
     | CppIfdef String
     | CppIfndef String
-    | CppIf [String]
+    | CppIf String
     | CppElse
     | CppEndif
     deriving (Show, Eq)
@@ -61,3 +62,32 @@ type MacroDef = [String]
 
 type Input = String
 type Output = CppDirective
+
+-- ---------------------------------------------------------------------
+-- Expression language
+-- NOTE: need to take care of macro expansion while parsing. Or perhaps before?
+
+data Expr
+    = Parens Expr
+    | Var String
+    | IntVal Int
+    | Plus Expr Expr
+    | Times Expr Expr
+    | Logic LogicOp Expr Expr
+    | Comp CompOp Expr Expr
+    deriving (Show, Eq)
+
+data LogicOp
+    = LogicalOr
+    | LogicalAnd
+    deriving (Show, Eq)
+
+data CompOp
+    = CmpEqual
+    | CmpGt
+    | CmpGtE
+    | CmpLt
+    | CmpLtE
+    deriving (Show, Eq)
+
+-- ---------------------------------------------------------------------
