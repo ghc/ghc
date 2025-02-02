@@ -224,6 +224,8 @@ eOp = do
     op <- P.operator (trace "foo" lexer)
     return $ trace ("op=" ++ show op) LogicalOr
 
+-- TODO: Do we need this? the expression should be fully expanded by
+-- the time we get it
 eVariable :: CppParser Expr
 eVariable = do
     v <- P.identifier lexer
