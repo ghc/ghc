@@ -289,7 +289,7 @@ t8 :: Maybe (String, [String])
 t8 = parseDefine (mkFastString "#define MIN_VERSION_ghc_exactprint(major1,major2,minor) (  (major1) <  1 ||   (major1) == 1 && (major2) <  7 ||   (major1) == 1 && (major2) == 7 && (minor) <= 0)")
 
 t9 :: Either Parsec.ParseError CppDirective
-t9 = regularParse cppDirective "#define VERSION_ghc_exactprint \"1.7.0.1\""
+t9 = parseDirective "#define VERSION_ghc_exactprint \"1.7.0.1\""
 
 t10 :: IO ()
 t10 = do
