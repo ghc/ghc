@@ -24,12 +24,11 @@ import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Utils.Error
 import GHC.Utils.Outputable
-import qualified Text.Parsec as Parsec
 
-import ParsePP
-import Types
 import ParseSimulate
+import Parser
 import PreProcess
+import Types
 
 -- ---------------------------------------------------------------------
 
@@ -97,7 +96,7 @@ strParserWrapper ::
     [Located Token]
 strParserWrapper str dflags filename =
   case strParser str dflags filename of
-    (_, Left err) -> error "oops"
+    (_, Left _err) -> error "oops"
     (_, Right toks) -> toks
 
 {- | Parse a file, using the emulated haskell parser, returning the
@@ -203,7 +202,7 @@ t2 = do
 t3 :: IO ()
 t3 = do
     doTest
-        [ "{-# LANGUAGE GhcCPP #-}"
+        [ "{-# LANGUAGE GHC_CPP #-}"
         , "module Example1 where"
         , ""
         , "y = 1"
@@ -223,7 +222,7 @@ t3 = do
 t3a :: IO ()
 t3a = do
     doTest
-        [ "{-# LANGUAGE GhcCPP #-}"
+        [ "{-# LANGUAGE GHC_CPP #-}"
         , "module Example1 where"
         , ""
         , "#define FOO"
@@ -288,7 +287,7 @@ t7 = parseDefine (mkFastString "#define VERSION_ghc_exactprint \"1.7.0.1\"")
 t8 :: Maybe (String, [String])
 t8 = parseDefine (mkFastString "#define MIN_VERSION_ghc_exactprint(major1,major2,minor) (  (major1) <  1 ||   (major1) == 1 && (major2) <  7 ||   (major1) == 1 && (major2) == 7 && (minor) <= 0)")
 
-t9 :: Either Parsec.ParseError CppDirective
+t9 :: Either String CppDirective
 t9 = parseDirective "#define VERSION_ghc_exactprint \"1.7.0.1\""
 
 t10 :: IO ()
@@ -326,3 +325,6 @@ t11 = do
         , "x = 5"
         , "#endif"
         ]
+
+t12 :: Either String CppDirective
+t12 = parseDirective "#define VERSION_ghc_exactprint \"1.7.0.1\""
