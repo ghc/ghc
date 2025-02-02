@@ -26,8 +26,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import qualified Text.Parsec as Parsec
 
--- import ParseOld
-import Parse
+import ParsePP
 import Types
 import ParseSimulate
 import PreProcess
