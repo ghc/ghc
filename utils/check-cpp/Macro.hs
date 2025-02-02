@@ -29,6 +29,7 @@ import Eval
 import Lexer
 import ParsePP
 import ParserM
+import Parser
 import Types
 
 -- ---------------------------------------------------------------------
@@ -43,7 +44,7 @@ process s str = (s0, o)
         CppDefine name toks -> define s name toks
         CppInclude _ -> undefined
         CppIfdef name -> ifdef s name
-        CppIf toks -> cppIf s toks
+        CppIf str -> cppIf s str
         CppIfndef name -> ifndef s name
         CppElse -> undefined
         CppEndif -> undefined
@@ -65,10 +66,10 @@ ifndef s name =
         Just _ -> s{pp_accepting = False}
         _ -> s{pp_accepting = True}
 
-cppIf :: PpState -> [String] -> PpState
-cppIf s toks = r
+cppIf :: PpState -> String -> PpState
+cppIf s str = r
   where
-    expanded = expand s (unwords toks)
+    expanded = expand s str
     -- toks0 = cppLex expanded
     -- r = error (show toks0)
     v = case parseCppParser plusTimesExpr expanded of
@@ -119,3 +120,22 @@ m1 = cppLex "`"
 
 m2 :: Either String [Token]
 m2 = cppLex "hello(5)"
+
+m3 :: Either String [Token]
+m3 = cppLex "#define FOO(m1,m2,m) ((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) == 1 && (m2) == 7 && (m) <= 0)"
+
+-- Right [THash {t_str = "#"}
+--       ,TDefine {t_str = "define"}
+--       ,TUpperName {t_str = "FOO"}
+--       ,TOpenParen {t_str = "("}
+--       ,TLowerName {t_str = "m1"}
+--       ,TComma {t_str = ","}
+--       ,TLowerName {t_str = "m2"}
+--       ,TComma {t_str = ","}
+--       ,TLowerName {t_str = "m"}
+--       ,TCloseParen {t_str = ")"}
+--       ,TOther {t_str = " ((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) == 1 && (m2) == 7 && (m) <= 0)"}
+--       ]
+
+m4 :: Either String [Token]
+m4 = cppLex "#if (m < 1)"
