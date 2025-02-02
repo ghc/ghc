@@ -1,10 +1,7 @@
 module ParsePP (
     parseCppParser,
-    Op (..),
-    Expr (..),
     plusTimesExpr,
     -- testing, delete
-    parseDirective,
     cppDefinition,
 ) where
 
@@ -23,6 +20,7 @@ import Text.Parsec.Language (emptyDef)
 import Text.Parsec.Prim as PS hiding (token)
 import qualified Text.Parsec.Token as P
 
+import qualified Parser
 import Types
 
 -- =====================================================================
@@ -53,8 +51,12 @@ exprDef =
 
 type CppParser = Parsec String ()
 
-parseDirective :: String -> Either Parsec.ParseError CppDirective
-parseDirective = parseCppParser cppDirective
+
+-- parseDirective :: String -> Either String CppDirective
+-- parseDirective = Parser.parseDirective
+
+parseDirectiveOld :: String -> Either Parsec.ParseError CppDirective
+parseDirectiveOld = parseCppParser cppDirective
 
 parseCppParser :: CppParser a -> String -> Either Parsec.ParseError a
 parseCppParser p = PS.parse p ""
@@ -78,7 +80,7 @@ cppDirective = do
         , try $ cppKw "include" >> cmdInclude
         , try $ cppKw "ifdef" >> cmdIfdef
         , try $ cppKw "ifndef" >> cmdIfndef
-        , try $ cppKw "if" >> cmdIf
+        -- , try $ cppKw "if" >> cmdIf
         , try $ cppKw "else" >> return CppElse
         , cppKw "endif" >> return CppEndif
         -- , cppKw "elif" CppElifKw
@@ -104,8 +106,8 @@ cmdIfdef = CppIfdef <$> cppToken
 cmdIfndef :: CppParser CppDirective
 cmdIfndef = CppIfndef <$> cppToken
 
-cmdIf :: CppParser CppDirective
-cmdIf = CppIf <$> cppTokens
+-- cmdIf :: CppParser CppDirective
+-- cmdIf = CppIf <$> cppTokens
 
 cppKw :: String -> CppParser ()
 cppKw kw = void $ lexeme (PS.string kw)
@@ -130,29 +132,6 @@ cppToken = lexeme (PS.many1 (PS.satisfy (not . isSpace)))
 cppTokens :: CppParser [String]
 cppTokens = PS.many cppToken
 
--- ---------------------------------------------------------------------
--- Expression language
--- NOTE: need to take care of macro expansion while parsing. Or perhaps before?
-
-data Expr
-    = Parens Expr
-    | Var String
-    | IntVal Int
-    | Plus Expr Expr
-    | Times Expr Expr
-    | BinOp Op Expr Expr
-    deriving (Show)
-
-data Op
-    = LogicalOr
-    | LogicalAnd
-    | CmpEqual
-    | CmpGt
-    | CmpGtE
-    | CmpLt
-    | CmpLtE
-    deriving (Show)
-
 -- -------------------------------------
 
 plusTimesExpr :: CppParser Expr
@@ -160,19 +139,20 @@ plusTimesExpr = E.buildExpressionParser eTable eTerm
 
 eTable :: [[E.Operator String () Data.Functor.Identity.Identity Expr]]
 eTable =
-    -- Via https://learn.microsoft.com/en-us/cpp/cpp/cpp-built-in-operators-precedence-and-associativity?view=msvc-170
-    [ [E.Infix (Times <$ symbol "*") E.AssocLeft]
-    , [E.Infix (Plus <$ symbol "+") E.AssocLeft]
-    ,
-        [ E.Infix (try $ BinOp CmpLtE <$ symbol "<=") E.AssocLeft
-        , E.Infix (try $ BinOp CmpGtE <$ symbol ">=") E.AssocLeft
-        , E.Infix (BinOp CmpLt <$ symbol "<") E.AssocLeft
-        , E.Infix (BinOp CmpGt <$ symbol ">") E.AssocLeft
-        ]
-    , [E.Infix (BinOp CmpEqual <$ symbol "==") E.AssocLeft]
-    , [E.Infix (BinOp LogicalAnd <$ symbol "&&") E.AssocLeft]
-    , [E.Infix (BinOp LogicalOr <$ symbol "||") E.AssocLeft]
-    ]
+  []
+    -- -- Via https://learn.microsoft.com/en-us/cpp/cpp/cpp-built-in-operators-precedence-and-associativity?view=msvc-170
+    -- [ [E.Infix (Times <$ symbol "*") E.AssocLeft]
+    -- , [E.Infix (Plus <$ symbol "+") E.AssocLeft]
+    -- ,
+    --     [ E.Infix (try $ BinOp CmpLtE <$ symbol "<=") E.AssocLeft
+    --     , E.Infix (try $ BinOp CmpGtE <$ symbol ">=") E.AssocLeft
+    --     , E.Infix (BinOp CmpLt <$ symbol "<") E.AssocLeft
+    --     , E.Infix (BinOp CmpGt <$ symbol ">") E.AssocLeft
+    --     ]
+    -- , [E.Infix (BinOp CmpEqual <$ symbol "==") E.AssocLeft]
+    -- , [E.Infix (BinOp LogicalAnd <$ symbol "&&") E.AssocLeft]
+    -- , [E.Infix (BinOp LogicalOr <$ symbol "||") E.AssocLeft]
+    -- ]
 
 eTerm :: CppParser Expr
 eTerm =
@@ -186,28 +166,28 @@ pteParens = Parens <$> between (symbol "(") (symbol ")") plusTimesExpr
 symbol :: String -> CppParser String
 symbol s = lexeme $ string s
 
--- -------------------------------------
+-- -- -------------------------------------
 
-eExpr :: CppParser Expr
-eExpr = choice [eParens, eBinOp, eVariable]
+-- eExpr :: CppParser Expr
+-- eExpr = choice [eParens, eBinOp, eVariable]
 
-eParens :: CppParser Expr
-eParens = P.parens lexer $ do
-    Parens <$> eExpr
+-- eParens :: CppParser Expr
+-- eParens = P.parens lexer $ do
+--     Parens <$> eExpr
 
-eBinOp :: CppParser Expr
-eBinOp = do
-    e1 <- eExpr
-    op <- eOp
-    -- _ <- cppToken
-    -- let op = Or
-    BinOp op e1 <$> eExpr
+-- eBinOp :: CppParser Expr
+-- eBinOp = do
+--     e1 <- eExpr
+--     op <- eOp
+--     -- _ <- cppToken
+--     -- let op = Or
+--     BinOp op e1 <$> eExpr
 
-eOp :: CppParser Op
-eOp = do
-    -- op <- P.operator lexer
-    op <- P.operator (trace "foo" lexer)
-    return $ trace ("op=" ++ show op) LogicalOr
+-- eOp :: CppParser Op
+-- eOp = do
+--     -- op <- P.operator lexer
+--     op <- P.operator (trace "foo" lexer)
+--     return $ trace ("op=" ++ show op) LogicalOr
 
 -- TODO: Do we need this? the expression should be fully expanded by
 -- the time we get it
@@ -227,30 +207,33 @@ integer = read <$> lexeme (many1 digit)
 
 -- ---------------------------------------------------------------------
 
-doATest :: String -> Either Parsec.ParseError CppDirective
-doATest str = parseDirective str
+doATest :: String -> Either String CppDirective
+doATest str = Parser.parseDirective str
+-- doATest str = parseDirectiveOld str
 
-t0 :: Either Parsec.ParseError CppDirective
+t0 :: Either String CppDirective
 t0 = doATest "#define FOO(m1,m2,m) ((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) == 1 && (m2) == 7 && (m) <= 0)"
 
-t1 :: Either Parsec.ParseError Expr
-t1 = parseCppParser plusTimesExpr "(m < 1)"
+-- Right (CppDefine "FOO(m1,m2,m)" ["((m1)","<","1","||","(m1)","==","1","&&","(m2)","<","7","||","(m1)","==","1","&&","(m2)","==","7","&&","(m)","<=","0)"])
 
-t2 :: Either Parsec.ParseError Expr
-t2 = parseCppParser plusTimesExpr "((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) == 1 && (m2) == 7 && (m) <= 0)"
+t1 :: Either String CppDirective
+t1 = doATest "#if (m < 1)"
 
--- (Parens
---  (BinOp LogicalOr
---         (BinOp LogicalOr
---                (BinOp CmpLt (Parens (Var "m1")) (IntVal 1))
---                (BinOp LogicalAnd
---                       (BinOp CmpEqual (Parens (Var "m1")) (IntVal 1))
---                       (BinOp CmpLt (Parens (Var "m2")) (IntVal 7))))
---         (BinOp LogicalAnd
---                (BinOp LogicalAnd
---                       (BinOp CmpEqual (Parens (Var "m1")) (IntVal 1))
---                       (BinOp CmpEqual (Parens (Var "m2")) (IntVal 7)))
---                (BinOp CmpLtE (Parens (Var "m")) (IntVal 0)))))
+t2 :: Either String CppDirective
+t2 = doATest "# if ((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) == 1 && (m2) == 7 && (m) <= 0)"
 
-t3 :: Either ParseError CppDirective
-t3 = parseDirective "# if FOO == 4"
+-- Right (CppIf
+--        (Logic LogicalOr
+--         (Logic LogicalOr
+--          (Comp CmpLt (Var "m1") (IntVal 1))
+--          (Logic LogicalAnd
+--           (Comp CmpEqual (Var "m1") (IntVal 1))
+--           (Comp CmpLt (Var "m2") (IntVal 7))))
+--         (Logic LogicalAnd
+--           (Logic LogicalAnd
+--            (Comp CmpEqual (Var "m1") (IntVal 1))
+--            (Comp CmpEqual (Var "m2") (IntVal 7)))
+--           (Comp CmpLtE (Var "m") (IntVal 0)))))
+
+t3 :: Either String CppDirective
+t3 = Parser.parseDirective "# if FOO == 4"
