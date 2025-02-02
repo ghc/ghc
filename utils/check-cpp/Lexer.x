@@ -1,5 +1,5 @@
 {
-module Lexer (lex_tok, lexCppTokenStream) where
+module Lexer (lex_tok, lexCppTokenStream ) where
 
 import ParserM (
                 St, init_pos,
@@ -16,84 +16,105 @@ import Control.Monad
 
 words :-
 
-    <0>         $white+              ;
----------------------------------------
-    <0>         "{"                  { mkTv TOpenBrace }
-    <0>         "}"                  { mkTv TCloseBrace }
-    <0>         "["                  { mkTv TOpenBracket }
-    <0>         "]"                  { mkTv TCloseBracket }
-    <0>         "#"                  { mkTv THash }
-    <0>         "##"                 { mkTv THashHash }
-    <0>         "("                  { mkTv TOpenParen }
-    <0>         ")"                  { mkTv TCloseParen }
-    <0>         "<:"                 { mkTv TLtColon }
-    <0>         ":>"                 { mkTv TColonGt}
-    <0>         "<%"                 { mkTv TLtPercent }
-    <0>         "%>"                 { mkTv TPercentGt }
-    <0>         "%:"                 { mkTv TPercentColon }
-    <0>         "%:%:"               { mkTv TPercentColonTwice }
-    <0>         ";"                  { mkTv TSemi }
-    <0>         ":"                  { mkTv TColon }
-    <0>         "..."                { mkTv TDotDotDot }
-    <0>         "new"                { mkTv TNew }
-    <0>         "delete"             { mkTv TDelete }
-    <0>         "?"                  { mkTv TQuestion }
-    <0>         "::"                 { mkTv TColonColon}
-    <0>         "."                  { mkTv TDot }
-    <0>         ".*"                 { mkTv TDotStar }
-    <0>         "+"                  { mkTv TPlus }
-    <0>         "-"                  { mkTv TMinus }
-    <0>         "*"                  { mkTv TStar }
-    <0>         "/"                  { mkTv TSlash }
-    <0>         "%"                  { mkTv TPercent }
-    <0>         "^"                  { mkTv TUpArrow }
-    <0>         "&"                  { mkTv TAmpersand }
-    <0>         "|"                  { mkTv TPipe }
-    <0>         "~"                  { mkTv TTilde }
-    <0>         "!"                  { mkTv TExclamation }
-    <0>         "="                  { mkTv TEqual }
-    <0>         "<"                  { mkTv TOpenAngle }
-    <0>         ">"                  { mkTv TCloseAngle }
-    <0>         "+="                 { mkTv TPlusEqual }
-    <0>         "-="                 { mkTv TMinusEqual }
-    <0>         "*="                 { mkTv TStarEqual }
-    <0>         "/="                 { mkTv TSlashEqual }
-    <0>         "%="                 { mkTv TPercentEqual }
-    <0>         "^="                 { mkTv TUpEqual }
-    <0>         "&="                 { mkTv TAmpersandEqual }
-    <0>         "|="                 { mkTv TPipeEqual }
-    <0>         "<<"                 { mkTv TLtLt }
-    <0>         ">>"                 { mkTv TGtGt }
-    <0>         ">>="                { mkTv TGtGtEqual }
-    <0>         "<<="                { mkTv TLtLtEqual }
-    <0>         "=="                 { mkTv TEqualEqual }
-    <0>         "!="                 { mkTv TExclaimEqual }
-    <0>         "<="                 { mkTv TLtEqual }
-    <0>         ">="                 { mkTv TGtEqual }
-    <0>         "&&"                 { mkTv TAmpersandTwice }
-    <0>         "||"                 { mkTv TPipePipe }
-    <0>         "++"                 { mkTv TPlusPlus }
-    <0>         "--"                 { mkTv TMinusMinus }
-    <0>         ","                  { mkTv TComma }
-    <0>         "->*"                { mkTv TMinusGtStar }
-    <0>         "->"                 { mkTv TMinusGt }
-    <0>         "and"                { mkTv TAnd }
-    <0>         "and_eq"             { mkTv TAndEq }
-    <0>         "bitand"             { mkTv TBitand }
-    <0>         "bitor"              { mkTv TBitor }
-    <0>         "compl"              { mkTv TCompl }
-    <0>         "not"                { mkTv TNot }
-    <0>         "not_eq"             { mkTv TNotEq }
-    <0>         "or"                 { mkTv TOr }
-    <0>         "or_eq"              { mkTv TOrEq }
-    <0>         "xor"                { mkTv TXor }
-    <0>         "xor_eq"             { mkTv TXorEq }
+    <0,def,expr> $white+             ;
 ----------------------------------------
-    <0>         [a-z][a-zA-Z0-9\#_]* { mkTv TLowerName }
-    <0>         [A-Z][a-zA-Z0-9\#_]* { mkTv TUpperName }
-    <0>         \-? [0-9][0-9]*      { mkTv TInteger  }
-    <0>         \" [^\"]* \"         { mkTv (TString . tail . init) }
-    <0>         ()                   { begin other }
+    <0>         "#"                  { mkTv THash }
+    <0>         "define"             { \i -> do {setStartCode def; mkTv TDefine i} }
+    <0>         "include"            { mkTv TInclude }
+    <0>         "ifdef"              { mkTv TIfdef }
+    <0>         "ifndef"             { mkTv TIfndef }
+    <0>         "if"                 { \i -> do {setStartCode other; mkTv TIf i} }
+    <0>         "else"               { mkTv TElse }
+    <0>         "endif"              { mkTv TEndif }
+    <0>         ()                   { begin expr }
+
+---------------------------------------
+-- In a define. Params only, then other
+    <def>         "("                  { mkTv TOpenParen }
+    <def>         ","                  { mkTv TComma }
+    <def>         ")"                  { mkTv TCloseParen }
+    <def>         [a-z][a-zA-Z0-9\#_]* { mkTv TLowerName }
+    <def>         [A-Z][a-zA-Z0-9\#_]* { mkTv TUpperName }
+    <def>         ()                   { begin other }
+
+---------------------------------------
+
+    <expr>         "{"                  { mkTv TOpenBrace }
+    <expr>         "}"                  { mkTv TCloseBrace }
+    <expr>         "["                  { mkTv TOpenBracket }
+    <expr>         "]"                  { mkTv TCloseBracket }
+    <expr>         "#"                  { mkTv THash }
+    <expr>         "##"                 { mkTv THashHash }
+    <expr>         "("                  { mkTv TOpenParen }
+    <expr>         ")"                  { mkTv TCloseParen }
+    <expr>         "<:"                 { mkTv TLtColon }
+    <expr>         ":>"                 { mkTv TColonGt}
+    <expr>         "<%"                 { mkTv TLtPercent }
+    <expr>         "%>"                 { mkTv TPercentGt }
+    <expr>         "%:"                 { mkTv TPercentColon }
+    <expr>         "%:%:"               { mkTv TPercentColonTwice }
+    <expr>         ";"                  { mkTv TSemi }
+    <expr>         ":"                  { mkTv TColon }
+    <expr>         "..."                { mkTv TDotDotDot }
+    <expr>         "new"                { mkTv TNew }
+    <expr>         "delete"             { mkTv TDelete }
+    <expr>         "?"                  { mkTv TQuestion }
+    <expr>         "::"                 { mkTv TColonColon}
+    <expr>         "."                  { mkTv TDot }
+    <expr>         ".*"                 { mkTv TDotStar }
+    <expr>         "+"                  { mkTv TPlus }
+    <expr>         "-"                  { mkTv TMinus }
+    <expr>         "*"                  { mkTv TStar }
+    <expr>         "/"                  { mkTv TSlash }
+    <expr>         "%"                  { mkTv TPercent }
+    <expr>         "^"                  { mkTv TUpArrow }
+    <expr>         "&"                  { mkTv TAmpersand }
+    <expr>         "|"                  { mkTv TPipe }
+    <expr>         "~"                  { mkTv TTilde }
+    <expr>         "!"                  { mkTv TExclamation }
+    <expr>         "="                  { mkTv TEqual }
+    <expr>         "<"                  { mkTv TOpenAngle }
+    <expr>         ">"                  { mkTv TCloseAngle }
+    <expr>         "+="                 { mkTv TPlusEqual }
+    <expr>         "-="                 { mkTv TMinusEqual }
+    <expr>         "*="                 { mkTv TStarEqual }
+    <expr>         "/="                 { mkTv TSlashEqual }
+    <expr>         "%="                 { mkTv TPercentEqual }
+    <expr>         "^="                 { mkTv TUpEqual }
+    <expr>         "&="                 { mkTv TAmpersandEqual }
+    <expr>         "|="                 { mkTv TPipeEqual }
+    <expr>         "<<"                 { mkTv TLtLt }
+    <expr>         ">>"                 { mkTv TGtGt }
+    <expr>         ">>="                { mkTv TGtGtEqual }
+    <expr>         "<<="                { mkTv TLtLtEqual }
+    <expr>         "=="                 { mkTv TEqualEqual }
+    <expr>         "!="                 { mkTv TExclaimEqual }
+    <expr>         "<="                 { mkTv TLtEqual }
+    <expr>         ">="                 { mkTv TGtEqual }
+    <expr>         "&&"                 { mkTv TAmpersandTwice }
+    <expr>         "||"                 { mkTv TPipePipe }
+    <expr>         "++"                 { mkTv TPlusPlus }
+    <expr>         "--"                 { mkTv TMinusMinus }
+    <expr>         ","                  { mkTv TComma }
+    <expr>         "->*"                { mkTv TMinusGtStar }
+    <expr>         "->"                 { mkTv TMinusGt }
+    <expr>         "and"                { mkTv TAnd }
+    <expr>         "and_eq"             { mkTv TAndEq }
+    <expr>         "bitand"             { mkTv TBitand }
+    <expr>         "bitor"              { mkTv TBitor }
+    <expr>         "compl"              { mkTv TCompl }
+    <expr>         "not"                { mkTv TNot }
+    <expr>         "not_eq"             { mkTv TNotEq }
+    <expr>         "or"                 { mkTv TOr }
+    <expr>         "or_eq"              { mkTv TOrEq }
+    <expr>         "xor"                { mkTv TXor }
+    <expr>         "xor_eq"             { mkTv TXorEq }
+----------------------------------------
+    <expr>         [a-z][a-zA-Z0-9\#_]* { mkTv TLowerName }
+    <expr>         [A-Z][a-zA-Z0-9\#_]* { mkTv TUpperName }
+    <expr>         \-? [0-9][0-9]*      { mkTv TInteger  }
+    <expr>         \" [^\"]* \"         { mkTv (TString . tail . init) }
+    <expr>         ()                   { begin other }
 
     <other>     .+                   { \i -> do {setStartCode 0;
                                                  mkTv TOther i} }
