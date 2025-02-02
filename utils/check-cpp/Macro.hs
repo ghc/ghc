@@ -27,7 +27,7 @@ import Data.Maybe
 
 import Eval
 import Lexer
-import Parse
+import ParsePP
 import ParserM
 import Types
 

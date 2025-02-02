@@ -26,7 +26,7 @@ data PpState = PpState
     , pp_includes :: !(Map String StringBuffer)
     , pp_include_stack :: ![Lexer.AlexInput]
     , pp_continuation :: ![Located Token]
-    , pp_context :: ![Token] -- What preprocessor directive we are currently processing
+    , pp_context :: ![Token] -- ^ What preprocessor directive we are currently processing
     , pp_accepting :: !Bool
     }
     deriving (Show)
