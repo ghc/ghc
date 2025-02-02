@@ -17,6 +17,7 @@ import Debug.Trace
 import Macro
 
 import ParsePP
+import Parser
 import Types
 
 -- ---------------------------------------------------------------------
@@ -122,7 +123,7 @@ processCpp fs = do
     -- let s = cppInitial fs
     let s = cppInitial fs
     case parseDirective s of
-        Left err -> error $ show err
+        Left err -> error $ show (err,s)
         Right (CppInclude filename) -> do
             ppInclude filename
         Right (CppDefine name def) -> do
@@ -250,12 +251,12 @@ ppIsDefined def = P $ \s ->
     -- POk s (Map.member def (pp_defines (pp s)))
     POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") (MacroName def Nothing)) (pp_defines (pp s)))
 
-ppIf :: [String] -> PP Bool
-ppIf toks = P $ \s ->
+ppIf :: String -> PP Bool
+ppIf str = P $ \s ->
     -- -- POk s (Map.member def (pp_defines (pp s)))
     -- POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") def) (pp_defines (pp s)))
     let
-        s' = cppIf (pp s) toks
+        s' = cppIf (pp s) str
      in
         POk s{pp = s'} (pp_accepting s')
 
