@@ -172,7 +172,7 @@ processCpp fs = do
     -- traceM $ "processCpp: fs=" ++ show fs
     -- let s = cppInitial fs
     let s = cppInitial fs
-    case regularParse cppDirective s of
+    case parseDirective s of
         Left err -> error $ show err
         Right (CppInclude filename) -> do
             ppInclude filename
