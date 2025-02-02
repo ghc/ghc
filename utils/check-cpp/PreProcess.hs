@@ -16,8 +16,7 @@ import Debug.Trace
 
 import Macro
 
--- import ParseOld
-import Parse
+import ParsePP
 import Types
 
 -- ---------------------------------------------------------------------
