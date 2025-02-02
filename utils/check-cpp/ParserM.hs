@@ -1,5 +1,7 @@
 {-# LANGUAGE BinaryLiterals #-}
 
+-- Support functions for the CPP Lexer.x
+
 module ParserM (
     -- Parser Monad
     ParserM (..),
