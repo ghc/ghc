@@ -165,6 +165,14 @@ data Token
     | TString {t_str :: String}
     | TInteger {t_str :: String}
     | TOther {t_str :: String}
+    -- Command names
+    | TDefine {t_str :: String}
+    | TInclude {t_str :: String}
+    | TIfdef {t_str :: String}
+    | TIfndef {t_str :: String}
+    | TIf {t_str :: String}
+    | TElse {t_str :: String}
+    | TEndif {t_str :: String}
     deriving (Show)
 
 -- Actions
