@@ -8,7 +8,7 @@
 
 -- | Bytecode assembler and linker
 module GHC.ByteCode.Asm (
-        assembleBCOs, assembleOneBCO,
+        assembleBCOs,
         bcoFreeNames,
         SizedSeq, sizeSS, ssElts,
         iNTERP_STACK_CHECK_THRESH,
@@ -34,7 +34,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Core.TyCon
-import GHC.Data.FlatBag
 import GHC.Data.SizedSeq
 
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
@@ -167,15 +166,6 @@ mallocStrings interp ulbcos = do
 
   collectPtr (BCOPtrBCO bco) = collect bco
   collectPtr _ = return ()
-
-
-assembleOneBCO :: Interp -> Profile -> ProtoBCO Name -> IO UnlinkedBCO
-assembleOneBCO interp profile pbco = do
-  -- TODO: the profile should be bundled with the interpreter: the rts ways are
-  -- fixed for an interpreter
-  ubco <- assembleBCO (profilePlatform profile) pbco
-  UnitFlatBag ubco' <- mallocStrings interp (UnitFlatBag ubco)
-  return ubco'
 
 assembleBCO :: Platform -> ProtoBCO Name -> IO UnlinkedBCO
 assembleBCO platform
