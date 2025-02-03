@@ -602,6 +602,8 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "  " ++ src </> "libraries/base"
         , "  " ++ src </> "libraries/ghc"
         , "  " ++ src </> "libraries/ghc-platform/"
+        , "  " ++ src </> "libraries/ghc-bignum/"
+        , "  " ++ src </> "libraries/integer-gmp/"
         , "  " ++ src </> "libraries/ghc-boot/"
         , "  " ++ src </> "libraries/ghc-boot-th/"
         , "  " ++ src </> "libraries/ghc-heap"
@@ -676,9 +678,12 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
 
           -- targets
         , "rts"
-        , "ghc-prim"
         , "ghc-internal"
         , "base"
+          -- shallow compat packages over ghc-internal
+        , "ghc-prim"
+        , "ghc-bignum"
+        , "integer-gmp"
         ]
 
   msg "  - Building boot libraries..."
