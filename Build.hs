@@ -218,6 +218,8 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , "  " ++ src </> "libraries/Win32/"
         , "  " ++ src </> "utils/ghc-pkg"
         , "  " ++ src </> "utils/hsc2hs"
+        , "  " ++ src </> "utils/hp2ps"
+        , "  " ++ src </> "utils/hpc"
         , "  " ++ src </> "utils/unlit"
         , "  " ++ src </> "utils/genprimopcode/"
         , "  " ++ src </> "utils/genapply/"
@@ -268,11 +270,15 @@ buildGhcStage booting opts cabal ghc0 dst = do
            , "genapply:genapply"
            , "ghc-toolchain-bin:ghc-toolchain-bin"
            , "unlit:unlit"
+           , "hsc2hs:hsc2hs"
            ]
         | otherwise = 
            [ "ghc-bin:ghc"
            , "ghc-pkg:ghc-pkg"
            , "unlit:unlit"
+           , "hsc2hs:hsc2hs"
+           , "hp2ps:hp2ps"
+           , "hpc-bin:hpc"
            ]
 
   let build_cmd = (runCabal cabal $
@@ -320,6 +326,11 @@ buildGhcStage booting opts cabal ghc0 dst = do
   copy_bin "ghc-bin:ghc"     "ghc"
   copy_bin "ghc-pkg:ghc-pkg" "ghc-pkg"
   copy_bin "unlit:unlit"     "unlit"
+  copy_bin "hsc2hs:hsc2hs"   "hsc2hs"
+
+  unless booting $ do
+    copy_bin "hp2ps:hp2ps"   "hp2ps"
+    copy_bin "hpc-bin:hpc"   "hpc"
 
   when booting $ do
     copy_bin "deriveConstants:deriveConstants"     "deriveConstants"
