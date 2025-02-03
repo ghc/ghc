@@ -789,10 +789,10 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
               , text "eta_tcbs" <+> ppr eta_tcbs ]
        ; (rep_tc, (axiom, ax_rhs)) <- fixM $ \ ~(rec_rep_tc, _) ->
            do { data_cons <- tcExtendTyVarEnv (binderVars tc_ty_binders) $
-                  -- For H98 decls, the tyvars scope
-                  -- over the data constructors
-                  tcConDecls (DDataInstance orig_res_ty) rec_rep_tc tc_ty_binders tc_res_kind
-                      hs_cons
+                             -- tcExtendTyVarEnv: for H98 decls, the tyvars
+                             -- scope over the data constructors
+                             tcConDecls (DDataInstance orig_res_ty) rec_rep_tc
+                                        tc_ty_binders tc_res_kind hs_cons
 
               ; rep_tc_name <- newFamInstTyConName lfam_name pats
               ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
@@ -942,11 +942,6 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                   -- with its parent class
                   ; addConsistencyConstraints mb_clsinfo lhs_ty
 
-                  -- Add constraints from the data constructors
-                  -- Fix #25611
-                  -- See DESIGN CHOICE in Note [Kind inference for data family instances]
-                  ; when is_H98_or_newtype $ kcConDecls lhs_applied_kind hs_cons
-
                   -- Check that the result kind of the TyCon applied to its args
                   -- is compatible with the explicit signature (or Type, if there
                   -- is none)
@@ -954,6 +949,11 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                   -- Add constraints from the result signature
                   ; res_kind <- tc_kind_sig m_ksig
                   ; _ <- unifyKind (Just . HsTypeRnThing $ unLoc hs_lhs) lhs_applied_kind res_kind
+
+                  -- Add constraints from the data constructors
+                  -- Fix #25611
+                  -- See DESIGN CHOICE in Note [Kind inference for data family instances]
+                  ; when is_H98_or_newtype $ kcConDecls lhs_applied_kind hs_cons
 
                   ; traceTc "tcDataFamInstHeader" $
                     vcat [ ppr fam_tc, ppr m_ksig, ppr lhs_applied_kind, ppr res_kind, ppr m_ksig]
@@ -998,7 +998,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
 
        -- Split up the LHS type to get the type patterns
        -- For the scopedSort see Note [Generalising in tcTyFamInstEqnGuts]
-       ; let pats      = unravelFamInstPats lhs_ty
+       ; let pats = unravelFamInstPats lhs_ty
 
        ; return (final_tvs, mkVarSet non_user_tvs, pats, master_res_kind, stupid_theta) }
   where
