@@ -295,6 +295,7 @@ import Text.ParserCombinators.ReadP as R
 import qualified GHC.Data.EnumSet as EnumSet
 
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Parser.PreProcess (initPpState)
 
 
 -- Note [Updating flag description in the User's Guide]
@@ -3173,7 +3174,7 @@ setMainIs arg = parse parse_main_f arg
       POk _ (L _ re) -> callback re
 
     -- dummy parser state.
-    p_state str = initParserState ()
+    p_state str = initParserState initPpState
               (mkParserOpts mempty emptyDiagOpts False False False True)
               (stringToStringBuffer str)
               (mkRealSrcLoc (mkFastString []) 1 1)
