@@ -940,8 +940,8 @@ instance Binary a => Binary [a] where
 -- | This instance doesn't rely on the determinism of the keys' 'Ord' instance,
 -- so it works e.g. for 'Name's too.
 instance (Binary a, Ord a) => Binary (Set a) where
-  put_ bh s = put_ bh (Set.toList s)
-  get bh = Set.fromList <$> get bh
+  put_ bh s = put_ bh (Set.toAscList s)
+  get bh = Set.fromAscList <$> get bh
 
 instance Binary a => Binary (NonEmpty a) where
     put_ bh = put_ bh . NonEmpty.toList
@@ -2086,5 +2086,5 @@ source location as part of a larger structure.
 --------------------------------------------------------------------------------
 
 instance (Binary v) => Binary (IntMap v) where
-  put_ bh m = put_ bh (IntMap.toList m)
-  get bh = IntMap.fromList <$> get bh
+  put_ bh m = put_ bh (IntMap.toAscList m)
+  get bh = IntMap.fromAscList <$> get bh
