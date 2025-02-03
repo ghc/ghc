@@ -76,7 +76,7 @@ data CppDirective
 type MacroArgs = [String]
 data MacroName = MacroName String (Maybe MacroArgs)
     deriving (Show, Eq, Ord)
-type MacroDef = [String]
+type MacroDef = String
 
 -- ---------------------------------------------------------------------
 
@@ -321,7 +321,7 @@ parseDefine :: FastString -> Maybe (String, [String])
 parseDefine fs = r
   where
     -- r = Just (cleanTokenString s, "")
-    r = case regularParse cppDefinition (unpackFS fs) of
+    r = case parseCppParser cppDefinition (unpackFS fs) of
         Left _ -> Nothing
         Right v -> Just v
 
@@ -333,7 +333,6 @@ See Note [GhcCPP Initial Processing]
 cppInitial :: [FastString] -> String
 cppInitial fs = r
   where
-    -- go fs' = reverse $ drop 2 $ reverse $ unpackFS fs'
     r = concatMap unpackFS fs
 
 {-

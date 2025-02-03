@@ -17,7 +17,6 @@ import Debug.Trace
 import Macro
 
 import ParsePP
-import Parser
 import Types
 
 -- ---------------------------------------------------------------------
@@ -241,7 +240,7 @@ ppInclude filename = do
 
 -- return $ trace ("ppInclude:filename=[" ++ filename ++ "]") ()
 
-ppDefine :: String -> [String] -> PP ()
+ppDefine :: String -> String -> PP ()
 ppDefine name val = P $ \s ->
     -- POk s{pp = (pp s){pp_defines = Set.insert (cleanTokenString def) (pp_defines (pp s))}} ()
     POk s{pp = (pp s){pp_defines = Map.insert (trace ("ppDefine:def=[" ++ name ++ "]") (MacroName name Nothing)) val (pp_defines (pp s))}} ()
@@ -267,13 +266,13 @@ cleanTokenString fs = r
     ss = dropWhile (\c -> not $ isSpace c) (unpackFS fs)
     r = init ss
 
-parseDefine :: FastString -> Maybe (String, [String])
-parseDefine fs = r
-  where
-    -- r = Just (cleanTokenString s, "")
-    r = case parseCppParser cppDefinition (unpackFS fs) of
-        Left _ -> Nothing
-        Right v -> Just v
+-- parseDefine :: FastString -> Maybe (String, [String])
+-- parseDefine fs = r
+--   where
+--     -- r = Just (cleanTokenString s, "")
+--     r = case parseCppParser cppDefinition (unpackFS fs) of
+--         Left _ -> Nothing
+--         Right v -> Just v
 
 -- =====================================================================
 

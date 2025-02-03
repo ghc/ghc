@@ -25,8 +25,8 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 
+import ParsePP
 import ParseSimulate
-import Parser
 import PreProcess
 import Types
 
@@ -34,8 +34,8 @@ import Types
 
 showAst :: (Data a) => a -> String
 showAst ast =
-    showSDocUnsafe
-        $ showAstData BlankSrcSpanFile NoBlankEpAnnotations ast
+    showSDocUnsafe $
+        showAstData BlankSrcSpanFile NoBlankEpAnnotations ast
 
 -- =====================================================================
 
@@ -59,8 +59,9 @@ parseString libdir includes str = ghcWrapper libdir $ do
 
 strGetToks :: Includes -> Lexer.ParserOpts -> FilePath -> String -> [Located Token]
 strGetToks includes popts filename str = reverse $ lexAll pstate
--- strGetToks includes popts filename str = reverse $ lexAll (trace ("pstate=" ++ show initState) pstate)
   where
+    -- strGetToks includes popts filename str = reverse $ lexAll (trace ("pstate=" ++ show initState) pstate)
+
     includeMap = Map.fromList $ map (\(k, v) -> (k, stringToStringBuffer (intercalate "\n" v))) includes
     initState = initPpState{pp_includes = includeMap}
     pstate = Lexer.initParserState initState popts buf loc
@@ -79,12 +80,11 @@ strGetToks includes popts filename str = reverse $ lexAll pstate
 
 showErrorMessages :: Messages GhcMessage -> String
 showErrorMessages msgs =
-    renderWithContext defaultSDocContext
-        $ vcat
-        $ pprMsgEnvelopeBagWithLocDefault
-        $ getMessages
-        $ msgs
-
+    renderWithContext defaultSDocContext $
+        vcat $
+            pprMsgEnvelopeBagWithLocDefault $
+                getMessages $
+                    msgs
 
 strParserWrapper ::
     -- | Haskell module source text (full Unicode is supported)
@@ -95,9 +95,9 @@ strParserWrapper ::
     FilePath ->
     [Located Token]
 strParserWrapper str dflags filename =
-  case strParser str dflags filename of
-    (_, Left _err) -> error "oops"
-    (_, Right toks) -> toks
+    case strParser str dflags filename of
+        (_, Left _err) -> error "oops"
+        (_, Right toks) -> toks
 
 {- | Parse a file, using the emulated haskell parser, returning the
 resulting tokens only
@@ -143,8 +143,8 @@ initDynFlags = do
 -- | Internal function. Default runner of GHC.Ghc action in IO.
 ghcWrapper :: LibDir -> GHC.Ghc a -> IO a
 ghcWrapper libdir a =
-    GHC.defaultErrorHandler GHC.defaultFatalMessager GHC.defaultFlushOut
-        $ GHC.runGhc (Just libdir) a
+    GHC.defaultErrorHandler GHC.defaultFatalMessager GHC.defaultFlushOut $
+        GHC.runGhc (Just libdir) a
 
 -- ---------------------------------------------------------------------
 
@@ -180,6 +180,7 @@ t0 = do
         , "#endif"
         , ""
         ]
+  -- x = 1
 
 t1 :: IO ()
 t1 = do
@@ -187,6 +188,7 @@ t1 = do
         [ "data X = X"
         , ""
         ]
+  -- data X = X
 
 t2 :: IO ()
 t2 = do
@@ -198,6 +200,7 @@ t2 = do
         , "x = 5"
         , "#endif"
         ]
+  -- x = 5
 
 t3 :: IO ()
 t3 = do
@@ -218,6 +221,9 @@ t3 = do
         , ""
         , "foo = putStrLn x"
         ]
+  -- y = 1
+  -- x = "hello"
+  -- foo = putStrLn x
 
 t3a :: IO ()
 t3a = do
@@ -236,6 +242,8 @@ t3a = do
         , ""
         , "foo = putStrLn x"
         ]
+  -- x = "hello"
+  -- foo = putStrLn x
 
 t4 :: IO ()
 t4 = do
@@ -257,6 +265,7 @@ t4 = do
         , "x = \"no version\""
         , "#endif"
         ]
+  -- x = "got version"
 
 t5 :: IO ()
 t5 = do
@@ -267,6 +276,7 @@ t5 = do
         , "  (major1) == 1 && (major2) == 7 && (minor) <= 0)"
         , "x = x"
         ]
+  -- x = x
 
 t6 :: IO ()
 t6 = do
@@ -280,12 +290,13 @@ t6 = do
         , "#endif"
         , ""
         ]
+  -- x = "got version"
 
-t7 :: Maybe (String, [String])
-t7 = parseDefine (mkFastString "#define VERSION_ghc_exactprint \"1.7.0.1\"")
+-- t7 :: Maybe (String, [String])
+t7 = parseDirective "#define VERSION_ghc_exactprint \"1.7.0.1\""
 
-t8 :: Maybe (String, [String])
-t8 = parseDefine (mkFastString "#define MIN_VERSION_ghc_exactprint(major1,major2,minor) (  (major1) <  1 ||   (major1) == 1 && (major2) <  7 ||   (major1) == 1 && (major2) == 7 && (minor) <= 0)")
+-- t8 :: Maybe (String, [String])
+t8 = parseDirective "#define MIN_VERSION_ghc_exactprint(major1,major2,minor) (  (major1) <  1 ||   (major1) == 1 && (major2) <  7 ||   (major1) == 1 && (major2) == 7 && (minor) <= 0)"
 
 t9 :: Either String CppDirective
 t9 = parseDirective "#define VERSION_ghc_exactprint \"1.7.0.1\""
@@ -302,6 +313,7 @@ t10 = do
         , "x = 2"
         , "#endif"
         ]
+  -- x = 1
 
 testIncludes :: Includes
 testIncludes =
@@ -325,6 +337,4 @@ t11 = do
         , "x = 5"
         , "#endif"
         ]
-
-t12 :: Either String CppDirective
-t12 = parseDirective "#define VERSION_ghc_exactprint \"1.7.0.1\""
+  -- x = 1
