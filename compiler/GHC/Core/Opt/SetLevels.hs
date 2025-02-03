@@ -1221,35 +1221,36 @@ lvlBind :: LevelEnv
         -> CoreBindWithFVs
         -> LvlM (LevelledBind, LevelEnv)
 
-lvlBind env (AnnNonRec bndr rhs)
+lvlBind env0 (AnnNonRec bndr rhs)
   |  isTyVar bndr  -- Don't float TyVar binders (simplifier gets rid of them pronto)
   || isCoVar bndr  -- Don't float CoVars: difficult to fix up CoVar occurrences
                    --                     (see extendPolyLvlEnv)
   || not (wantToFloat env NonRecursive dest_lvl is_join is_top_bindable)
   = -- No float
-    do { rhs' <- lvlRhs env NonRecursive is_bot_lam mb_join_arity rhs
-       ; let  bind_lvl        = incMinorLvl (le_ctxt_lvl env)
-              (env', Identity bndr') = substAndLvlBndrs NonRecursive env bind_lvl (Identity bndr)
-       ; return (NonRec bndr' rhs', env') }
+    do { rhs' <- lvlRhs env' NonRecursive is_bot_lam mb_join_arity rhs
+       ; let  bind_lvl                = incMinorLvl (le_ctxt_lvl env1)
+              (env2, Identity bndr') = substAndLvlBndrs NonRecursive env1 bind_lvl (Identity bndr)
+       ; return (NonRec bndr' rhs', env2) }
 
   -- Otherwise we are going to float
   | null abs_vars
   = do {  -- No type abstraction; clone existing binder
-         rhs' <- lvlFloatRhs [] dest_lvl env NonRecursive
+         rhs' <- lvlFloatRhs [] dest_lvl env1 NonRecursive
                              is_bot_lam NotJoinPoint rhs
-       ; (env', Identity bndr') <- cloneLetVars NonRecursive env dest_lvl (Identity bndr)
+       ; (env2, Identity bndr') <- cloneLetVars NonRecursive env1 dest_lvl (Identity bndr)
        ; let bndr2 = annotateBotStr bndr' 0 mb_bot_str
-       ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
+       ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env2) }
 
   | otherwise
   = do {  -- Yes, type abstraction; create a new binder, extend substitution, etc
-         rhs' <- lvlFloatRhs abs_vars dest_lvl env NonRecursive
+         rhs' <- lvlFloatRhs abs_vars dest_lvl env1 NonRecursive
                              is_bot_lam NotJoinPoint rhs
-       ; (env', Identity bndr') <- newPolyBndrs dest_lvl env abs_vars (Identity bndr)
+       ; (env2, Identity bndr') <- newPolyBndrs dest_lvl env1 abs_vars (Identity bndr)
        ; let bndr2 = annotateBotStr bndr' n_extra mb_bot_str
-       ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
+       ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env2) }
 
   where
+    env1       = pushBindContext env bndr
     bndr_ty    = idType bndr
     ty_fvs     = tyCoVarsOfType bndr_ty
     rhs_fvs    = freeVarsOf rhs
@@ -1275,7 +1276,8 @@ lvlBind env (AnnRec pairs)
   = -- No float
     do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)
              (env', bndrs') = substAndLvlBndrs Recursive env bind_lvl bndrs
-             lvl_rhs (b,r)  = lvlRhs env' Recursive is_bot (idJoinPointHood b) r
+             lvl_rhs (b,r)  = lvlRhs env'' Recursive is_bot (idJoinPointHood b) r
+               where env'' = pushBindContext env' b
        ; rhss' <- mapM lvl_rhs pairs
        ; return (Rec (bndrs' `zip` rhss'), env') }
 
@@ -1300,8 +1302,9 @@ lvlBind env (AnnRec pairs)
         -- mutually recursive functions, but it's quite a bit more complicated
         --
         -- This all seems a bit ad hoc -- sigh
-    let (rhs_env, abs_vars_w_lvls) = lvlLamBndrs env dest_lvl abs_vars
+    let (rhs_env, abs_vars_w_lvls) = lvlLamBndrs env' dest_lvl abs_vars
         rhs_lvl = le_ctxt_lvl rhs_env
+        env' = pushBindContext env bndr
 
     (rhs_env', Identity new_bndr) <- cloneLetVars Recursive rhs_env rhs_lvl (Identity bndr)
     let
@@ -1309,7 +1312,7 @@ lvlBind env (AnnRec pairs)
         (body_env1, lam_bndrs1) = substBndrsSL NonRecursive rhs_env' lam_bndrs
         (body_env2, lam_bndrs2) = lvlLamBndrs body_env1 rhs_lvl lam_bndrs1
     new_rhs_body <- lvlRhs body_env2 Recursive is_bot NotJoinPoint rhs_body
-    (poly_env, Identity poly_bndr) <- newPolyBndrs dest_lvl env abs_vars (Identity bndr)
+    (poly_env, Identity poly_bndr) <- newPolyBndrs dest_lvl env' abs_vars (Identity bndr)
     return (Rec [(TB poly_bndr (FloatMe dest_lvl)
                  , mkLams abs_vars_w_lvls $
                    mkLams lam_bndrs2 $
@@ -1334,9 +1337,10 @@ lvlBind env (AnnRec pairs)
                       -- function in a Rec, and we don't much care what
                       -- happens to it.  False is simple!
 
-    do_rhs env (_,rhs) = lvlFloatRhs abs_vars dest_lvl env Recursive
-                                     is_bot NotJoinPoint
-                                     rhs
+    do_rhs env (b,rhs) =
+        lvlFloatRhs abs_vars dest_lvl env' Recursive
+                    is_bot NotJoinPoint rhs
+      where env' = pushBindContext env b
 
         -- Finding the free vars of the binding group is annoying
     bind_fvs = ((unionDVarSets [ freeVarsOf rhs | (_, rhs) <- pairs])
@@ -1638,16 +1642,17 @@ countFreeIds = nonDetStrictFoldUDFM add 0 . getUniqDSet
 -}
 
 data LevelEnv
-  = LE { le_switches :: FloatOutSwitches
-       , le_ctxt_lvl :: !Level          -- The current level
-       , le_lvl_env  :: VarEnv Level    -- Domain is *post-cloned* TyVars and Ids
+  = LE { le_switches  :: FloatOutSwitches
+       , le_bind_ctxt :: [Id]
+       , le_ctxt_lvl  :: !Level          -- The current level
+       , le_lvl_env   :: VarEnv Level    -- Domain is *post-cloned* TyVars and Ids
 
        -- See Note [le_subst and le_env]
-       , le_subst    :: Subst           -- Domain is pre-cloned TyVars and Ids
-                                        -- The Id -> CoreExpr in the Subst is ignored
-                                        -- (since we want to substitute a LevelledExpr for
-                                        -- an Id via le_env) but we do use the Co/TyVar substs
-       , le_env      :: IdEnv ([OutVar], LevelledExpr)  -- Domain is pre-cloned Ids
+       , le_subst     :: Subst           -- Domain is pre-cloned TyVars and Ids
+                                         -- The Id -> CoreExpr in the Subst is ignored
+                                         -- (since we want to substitute a LevelledExpr for
+                                         -- an Id via le_env) but we do use the Co/TyVar substs
+       , le_env       :: IdEnv ([OutVar], LevelledExpr)  -- Domain is pre-cloned Ids
     }
 
 {- Note [le_subst and le_env]
@@ -1684,6 +1689,7 @@ The domain of the le_lvl_env is the *post-cloned* Ids
 initialEnv :: FloatOutSwitches -> CoreProgram -> LevelEnv
 initialEnv float_lams binds
   = LE { le_switches  = float_lams
+       , le_bind_ctxt = []
        , le_ctxt_lvl  = tOP_LEVEL
        , le_lvl_env   = emptyVarEnv
        , le_subst     = mkEmptySubst in_scope_toplvl
@@ -1695,6 +1701,9 @@ initialEnv float_lams binds
       -- may both produce top-level bindings where an early binding refers
       -- to a later one.  So here we put all the top-level binders in scope before
       -- we start, to satisfy the lookupIdSubst invariants (#20200 and #20294)
+
+pushBindContext :: LevelEnv -> Id -> LevelEnv
+pushBindContext env i = env { le_bind_ctxt = i : le_bind_ctxt env }
 
 addLvl :: Level -> VarEnv Level -> OutVar -> VarEnv Level
 addLvl dest_lvl env v' = extendVarEnv env v' dest_lvl
