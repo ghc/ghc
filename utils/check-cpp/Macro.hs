@@ -26,7 +26,6 @@ import qualified Data.Map as Map
 import Data.Maybe
 
 import Eval
-import Lexer
 import ParsePP
 import ParserM
 import Parser
@@ -41,10 +40,10 @@ process s str = (s0, o)
         Left _ -> undefined
         Right r -> r
     s0 = case o of
-        CppDefine name toks -> define s name toks
+        CppDefine name rhs -> define s name rhs
         CppInclude _ -> undefined
         CppIfdef name -> ifdef s name
-        CppIf str -> cppIf s str
+        CppIf ifstr -> cppIf s ifstr
         CppIfndef name -> ifndef s name
         CppElse -> undefined
         CppEndif -> undefined
@@ -72,18 +71,11 @@ cppIf s str = r
     expanded = expand s str
     -- toks0 = cppLex expanded
     -- r = error (show toks0)
-    v = case parseCppParser plusTimesExpr expanded of
+    v = case Parser.parseExpr expanded of
         Left err -> error $ show err
         Right tree -> eval tree
     --    We evaluate to an Int, which we convert to a bool
     r = s{pp_accepting = toBool v}
-
--- ---------------------------------------------------------------------
-
-cppLex :: String -> Either String [Token]
-cppLex s = case lexCppTokenStream s init_state of
-    Left err -> Left err
-    Right (_inp, _st, toks) -> Right toks
 
 -- ---------------------------------------------------------------------
 
@@ -94,15 +86,15 @@ expand s str = expanded
     toks = case cppLex str of
         Left err -> error err
         Right tks -> tks
-    expanded = unwords $ concatMap (expandOne s) toks
+    expanded = concatMap (expandOne s) toks
 
-expandOne :: PpState -> Token -> [String]
+expandOne :: PpState -> Token -> String
 expandOne s tok = r
   where
     -- TODO: protect against looking up `define`
     r =
         fromMaybe
-            [t_str tok]
+            (t_str tok)
             (Map.lookup (MacroName (t_str tok) Nothing) (pp_defines s))
 
 -- ---------------------------------------------------------------------
