@@ -36,7 +36,7 @@ data PpState = PpState
 
 data CppDirective
     = CppInclude String
-    | CppDefine String [String]
+    | CppDefine String String
     | CppIfdef String
     | CppIfndef String
     | CppIf String
@@ -49,7 +49,7 @@ data CppDirective
 type MacroArgs = [String]
 data MacroName = MacroName String (Maybe MacroArgs)
     deriving (Show, Eq, Ord)
-type MacroDef = [String]
+type MacroDef = String
 
 -- data PpState = PpState
 --     { pp_defines :: !(Map MacroName MacroDef)
