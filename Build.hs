@@ -684,6 +684,11 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "ghc-prim"
         , "ghc-bignum"
         , "integer-gmp"
+        -- , "template-haskell" -- FIXME: adding this fails because cabal runs
+        -- ghc for some reason, without having the rts built (obviously, we're
+        -- building it!), hence it crashes because ghc can't find
+        -- `ghcversion.h`... which is the in the rts package it hasn't built yet
+        -- ffs!
         ]
 
   msg "  - Building boot libraries..."
