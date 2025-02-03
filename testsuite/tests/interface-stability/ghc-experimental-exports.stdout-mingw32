@@ -2633,7 +2633,7 @@ module Data.Tuple.Experimental where
   type Solo :: * -> *
   data Solo a = MkSolo a
   type Solo# :: forall (k :: GHC.Types.RuntimeRep). TYPE k -> TYPE (GHC.Types.TupleRep '[k])
-  data Solo# a = MkSolo# a
+  data Solo# a = ...
   type Tuple0 :: *
   type Tuple0 = ()
   type Tuple0# :: GHC.Types.ZeroBitType
@@ -4806,37 +4806,13 @@ module GHC.PrimOps where
   float2Double# :: Float# -> Double#
   float2Int# :: Float# -> Int#
   fmaddDouble# :: Double# -> Double# -> Double# -> Double#
-  fmaddDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2# -> DoubleX2#
-  fmaddDoubleX4# :: DoubleX4# -> DoubleX4# -> DoubleX4# -> DoubleX4#
-  fmaddDoubleX8# :: DoubleX8# -> DoubleX8# -> DoubleX8# -> DoubleX8#
   fmaddFloat# :: Float# -> Float# -> Float# -> Float#
-  fmaddFloatX16# :: FloatX16# -> FloatX16# -> FloatX16# -> FloatX16#
-  fmaddFloatX4# :: FloatX4# -> FloatX4# -> FloatX4# -> FloatX4#
-  fmaddFloatX8# :: FloatX8# -> FloatX8# -> FloatX8# -> FloatX8#
   fmsubDouble# :: Double# -> Double# -> Double# -> Double#
-  fmsubDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2# -> DoubleX2#
-  fmsubDoubleX4# :: DoubleX4# -> DoubleX4# -> DoubleX4# -> DoubleX4#
-  fmsubDoubleX8# :: DoubleX8# -> DoubleX8# -> DoubleX8# -> DoubleX8#
   fmsubFloat# :: Float# -> Float# -> Float# -> Float#
-  fmsubFloatX16# :: FloatX16# -> FloatX16# -> FloatX16# -> FloatX16#
-  fmsubFloatX4# :: FloatX4# -> FloatX4# -> FloatX4# -> FloatX4#
-  fmsubFloatX8# :: FloatX8# -> FloatX8# -> FloatX8# -> FloatX8#
   fnmaddDouble# :: Double# -> Double# -> Double# -> Double#
-  fnmaddDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2# -> DoubleX2#
-  fnmaddDoubleX4# :: DoubleX4# -> DoubleX4# -> DoubleX4# -> DoubleX4#
-  fnmaddDoubleX8# :: DoubleX8# -> DoubleX8# -> DoubleX8# -> DoubleX8#
   fnmaddFloat# :: Float# -> Float# -> Float# -> Float#
-  fnmaddFloatX16# :: FloatX16# -> FloatX16# -> FloatX16# -> FloatX16#
-  fnmaddFloatX4# :: FloatX4# -> FloatX4# -> FloatX4# -> FloatX4#
-  fnmaddFloatX8# :: FloatX8# -> FloatX8# -> FloatX8# -> FloatX8#
   fnmsubDouble# :: Double# -> Double# -> Double# -> Double#
-  fnmsubDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2# -> DoubleX2#
-  fnmsubDoubleX4# :: DoubleX4# -> DoubleX4# -> DoubleX4# -> DoubleX4#
-  fnmsubDoubleX8# :: DoubleX8# -> DoubleX8# -> DoubleX8# -> DoubleX8#
   fnmsubFloat# :: Float# -> Float# -> Float# -> Float#
-  fnmsubFloatX16# :: FloatX16# -> FloatX16# -> FloatX16# -> FloatX16#
-  fnmsubFloatX4# :: FloatX4# -> FloatX4# -> FloatX4# -> FloatX4#
-  fnmsubFloatX8# :: FloatX8# -> FloatX8# -> FloatX8# -> FloatX8#
   fork# :: forall {q :: RuntimeRep} (a :: TYPE q). (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
   forkOn# :: forall {q :: RuntimeRep} (a :: TYPE q). Int# -> (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
   freezeArray# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MutableArray# d a -> Int# -> Int# -> State# d -> (# State# d, Array# a #)
@@ -5109,11 +5085,9 @@ module GHC.PrimOps where
   intToInt64# :: Int# -> Int64#
   intToInt8# :: Int# -> Int8#
   isByteArrayPinned# :: ByteArray# -> Int#
-  isByteArrayWeaklyPinned# :: ByteArray# -> Int#
   isCurrentThreadBound# :: State# RealWorld -> (# State# RealWorld, Int# #)
   isEmptyMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MVar# d a -> State# d -> (# State# d, Int# #)
   isMutableByteArrayPinned# :: forall d. MutableByteArray# d -> Int#
-  isMutableByteArrayWeaklyPinned# :: forall d. MutableByteArray# d -> Int#
   isTrue# :: Int# -> Bool
   keepAlive# :: forall {l :: Levity} {r :: RuntimeRep} (a :: TYPE (BoxedRep l)) d (b :: TYPE r). a -> State# d -> (State# d -> b) -> b
   killThread# :: forall a. ThreadId# -> a -> State# RealWorld -> State# RealWorld
@@ -5153,71 +5127,7 @@ module GHC.PrimOps where
   makeStablePtr# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). a -> State# RealWorld -> (# State# RealWorld, StablePtr# a #)
   maskAsyncExceptions# :: forall {q :: RuntimeRep} (a :: TYPE q). (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
   maskUninterruptible# :: forall {q :: RuntimeRep} (a :: TYPE q). (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
-  maxDouble# :: Double# -> Double# -> Double#
-  maxDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2#
-  maxDoubleX4# :: DoubleX4# -> DoubleX4# -> DoubleX4#
-  maxDoubleX8# :: DoubleX8# -> DoubleX8# -> DoubleX8#
-  maxFloat# :: Float# -> Float# -> Float#
-  maxFloatX16# :: FloatX16# -> FloatX16# -> FloatX16#
-  maxFloatX4# :: FloatX4# -> FloatX4# -> FloatX4#
-  maxFloatX8# :: FloatX8# -> FloatX8# -> FloatX8#
-  maxInt16X16# :: Int16X16# -> Int16X16# -> Int16X16#
-  maxInt16X32# :: Int16X32# -> Int16X32# -> Int16X32#
-  maxInt16X8# :: Int16X8# -> Int16X8# -> Int16X8#
-  maxInt32X16# :: Int32X16# -> Int32X16# -> Int32X16#
-  maxInt32X4# :: Int32X4# -> Int32X4# -> Int32X4#
-  maxInt32X8# :: Int32X8# -> Int32X8# -> Int32X8#
-  maxInt64X2# :: Int64X2# -> Int64X2# -> Int64X2#
-  maxInt64X4# :: Int64X4# -> Int64X4# -> Int64X4#
-  maxInt64X8# :: Int64X8# -> Int64X8# -> Int64X8#
-  maxInt8X16# :: Int8X16# -> Int8X16# -> Int8X16#
-  maxInt8X32# :: Int8X32# -> Int8X32# -> Int8X32#
-  maxInt8X64# :: Int8X64# -> Int8X64# -> Int8X64#
   maxTupleSize :: Int
-  maxWord16X16# :: Word16X16# -> Word16X16# -> Word16X16#
-  maxWord16X32# :: Word16X32# -> Word16X32# -> Word16X32#
-  maxWord16X8# :: Word16X8# -> Word16X8# -> Word16X8#
-  maxWord32X16# :: Word32X16# -> Word32X16# -> Word32X16#
-  maxWord32X4# :: Word32X4# -> Word32X4# -> Word32X4#
-  maxWord32X8# :: Word32X8# -> Word32X8# -> Word32X8#
-  maxWord64X2# :: Word64X2# -> Word64X2# -> Word64X2#
-  maxWord64X4# :: Word64X4# -> Word64X4# -> Word64X4#
-  maxWord64X8# :: Word64X8# -> Word64X8# -> Word64X8#
-  maxWord8X16# :: Word8X16# -> Word8X16# -> Word8X16#
-  maxWord8X32# :: Word8X32# -> Word8X32# -> Word8X32#
-  maxWord8X64# :: Word8X64# -> Word8X64# -> Word8X64#
-  minDouble# :: Double# -> Double# -> Double#
-  minDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2#
-  minDoubleX4# :: DoubleX4# -> DoubleX4# -> DoubleX4#
-  minDoubleX8# :: DoubleX8# -> DoubleX8# -> DoubleX8#
-  minFloat# :: Float# -> Float# -> Float#
-  minFloatX16# :: FloatX16# -> FloatX16# -> FloatX16#
-  minFloatX4# :: FloatX4# -> FloatX4# -> FloatX4#
-  minFloatX8# :: FloatX8# -> FloatX8# -> FloatX8#
-  minInt16X16# :: Int16X16# -> Int16X16# -> Int16X16#
-  minInt16X32# :: Int16X32# -> Int16X32# -> Int16X32#
-  minInt16X8# :: Int16X8# -> Int16X8# -> Int16X8#
-  minInt32X16# :: Int32X16# -> Int32X16# -> Int32X16#
-  minInt32X4# :: Int32X4# -> Int32X4# -> Int32X4#
-  minInt32X8# :: Int32X8# -> Int32X8# -> Int32X8#
-  minInt64X2# :: Int64X2# -> Int64X2# -> Int64X2#
-  minInt64X4# :: Int64X4# -> Int64X4# -> Int64X4#
-  minInt64X8# :: Int64X8# -> Int64X8# -> Int64X8#
-  minInt8X16# :: Int8X16# -> Int8X16# -> Int8X16#
-  minInt8X32# :: Int8X32# -> Int8X32# -> Int8X32#
-  minInt8X64# :: Int8X64# -> Int8X64# -> Int8X64#
-  minWord16X16# :: Word16X16# -> Word16X16# -> Word16X16#
-  minWord16X32# :: Word16X32# -> Word16X32# -> Word16X32#
-  minWord16X8# :: Word16X8# -> Word16X8# -> Word16X8#
-  minWord32X16# :: Word32X16# -> Word32X16# -> Word32X16#
-  minWord32X4# :: Word32X4# -> Word32X4# -> Word32X4#
-  minWord32X8# :: Word32X8# -> Word32X8# -> Word32X8#
-  minWord64X2# :: Word64X2# -> Word64X2# -> Word64X2#
-  minWord64X4# :: Word64X4# -> Word64X4# -> Word64X4#
-  minWord64X8# :: Word64X8# -> Word64X8# -> Word64X8#
-  minWord8X16# :: Word8X16# -> Word8X16# -> Word8X16#
-  minWord8X32# :: Word8X32# -> Word8X32# -> Word8X32#
-  minWord8X64# :: Word8X64# -> Word8X64# -> Word8X64#
   minusAddr# :: Addr# -> Addr# -> Int#
   minusDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2#
   minusDoubleX4# :: DoubleX4# -> DoubleX4# -> DoubleX4#
@@ -5734,7 +5644,7 @@ module GHC.PrimOps where
   sameSmallMutableArray# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
   sameTVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). TVar# s a -> TVar# s a -> Int#
   seq :: forall {r :: RuntimeRep} a (b :: TYPE r). a -> b -> b
-  seq# :: forall a s. a -> State# s -> (# State# s, a #)
+  seq# :: forall a d. a -> State# d -> (# State# d, a #)
   setAddrRange# :: Addr# -> Int# -> Int# -> State# RealWorld -> State# RealWorld
   setByteArray# :: forall d. MutableByteArray# d -> Int# -> Int# -> Int# -> State# d -> State# d
   setThreadAllocationCounter# :: Int64# -> State# RealWorld -> State# RealWorld
@@ -5742,36 +5652,6 @@ module GHC.PrimOps where
   shiftRL# :: Word# -> Int# -> Word#
   shrinkMutableByteArray# :: forall d. MutableByteArray# d -> Int# -> State# d -> State# d
   shrinkSmallMutableArray# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). SmallMutableArray# d a -> Int# -> State# d -> State# d
-  shuffleDoubleX2# :: DoubleX2# -> DoubleX2# -> (# Int#, Int# #) -> DoubleX2#
-  shuffleDoubleX4# :: DoubleX4# -> DoubleX4# -> (# Int#, Int#, Int#, Int# #) -> DoubleX4#
-  shuffleDoubleX8# :: DoubleX8# -> DoubleX8# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> DoubleX8#
-  shuffleFloatX16# :: FloatX16# -> FloatX16# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> FloatX16#
-  shuffleFloatX4# :: FloatX4# -> FloatX4# -> (# Int#, Int#, Int#, Int# #) -> FloatX4#
-  shuffleFloatX8# :: FloatX8# -> FloatX8# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> FloatX8#
-  shuffleInt16X16# :: Int16X16# -> Int16X16# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Int16X16#
-  shuffleInt16X32# :: Int16X32# -> Int16X32# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Int16X32#
-  shuffleInt16X8# :: Int16X8# -> Int16X8# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Int16X8#
-  shuffleInt32X16# :: Int32X16# -> Int32X16# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Int32X16#
-  shuffleInt32X4# :: Int32X4# -> Int32X4# -> (# Int#, Int#, Int#, Int# #) -> Int32X4#
-  shuffleInt32X8# :: Int32X8# -> Int32X8# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Int32X8#
-  shuffleInt64X2# :: Int64X2# -> Int64X2# -> (# Int#, Int# #) -> Int64X2#
-  shuffleInt64X4# :: Int64X4# -> Int64X4# -> (# Int#, Int#, Int#, Int# #) -> Int64X4#
-  shuffleInt64X8# :: Int64X8# -> Int64X8# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Int64X8#
-  shuffleInt8X16# :: Int8X16# -> Int8X16# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Int8X16#
-  shuffleInt8X32# :: Int8X32# -> Int8X32# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Int8X32#
-  shuffleInt8X64# :: Int8X64# -> Int8X64# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Int8X64#
-  shuffleWord16X16# :: Word16X16# -> Word16X16# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Word16X16#
-  shuffleWord16X32# :: Word16X32# -> Word16X32# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Word16X32#
-  shuffleWord16X8# :: Word16X8# -> Word16X8# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Word16X8#
-  shuffleWord32X16# :: Word32X16# -> Word32X16# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Word32X16#
-  shuffleWord32X4# :: Word32X4# -> Word32X4# -> (# Int#, Int#, Int#, Int# #) -> Word32X4#
-  shuffleWord32X8# :: Word32X8# -> Word32X8# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Word32X8#
-  shuffleWord64X2# :: Word64X2# -> Word64X2# -> (# Int#, Int# #) -> Word64X2#
-  shuffleWord64X4# :: Word64X4# -> Word64X4# -> (# Int#, Int#, Int#, Int# #) -> Word64X4#
-  shuffleWord64X8# :: Word64X8# -> Word64X8# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Word64X8#
-  shuffleWord8X16# :: Word8X16# -> Word8X16# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Word8X16#
-  shuffleWord8X32# :: Word8X32# -> Word8X32# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Word8X32#
-  shuffleWord8X64# :: Word8X64# -> Word8X64# -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #) -> Word8X64#
   sinDouble# :: Double# -> Double#
   sinFloat# :: Float# -> Float#
   sinhDouble# :: Double# -> Double#
@@ -6157,23 +6037,6 @@ module GHC.Profiling.Eras where
   getUserEra :: GHC.Types.IO GHC.Types.Word
   incrementUserEra :: GHC.Types.Word -> GHC.Types.IO GHC.Types.Word
   setUserEra :: GHC.Types.Word -> GHC.Types.IO ()
-
-module GHC.TypeLits.Experimental where
-  -- Safety: Safe-Inferred
-  appendSSymbol :: forall (a :: GHC.Types.Symbol) (b :: GHC.Types.Symbol). GHC.Internal.TypeLits.SSymbol a -> GHC.Internal.TypeLits.SSymbol b -> GHC.Internal.TypeLits.SSymbol (GHC.Internal.TypeLits.AppendSymbol a b)
-  consSSymbol :: forall (a :: GHC.Types.Char) (b :: GHC.Types.Symbol). GHC.Internal.TypeLits.SChar a -> GHC.Internal.TypeLits.SSymbol b -> GHC.Internal.TypeLits.SSymbol (GHC.Internal.TypeLits.ConsSymbol a b)
-  sCharToSNat :: forall (a :: GHC.Types.Char). GHC.Internal.TypeLits.SChar a -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeLits.CharToNat a)
-  sNatToSChar :: forall (n :: GHC.Num.Natural.Natural). (n GHC.Internal.Data.Type.Ord.<= 1114111) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeLits.SChar (GHC.Internal.TypeLits.NatToChar n)
-
-module GHC.TypeNats.Experimental where
-  -- Safety: None
-  divSNat :: forall (m :: GHC.Num.Natural.Natural) (n :: GHC.Internal.TypeNats.Nat). (1 GHC.Internal.Data.Type.Ord.<= m) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Div n m)
-  log2SNat :: forall (n :: GHC.Num.Natural.Natural). (1 GHC.Internal.Data.Type.Ord.<= n) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Log2 n)
-  minusSNat :: forall (m :: GHC.Internal.TypeNats.Nat) (n :: GHC.Internal.TypeNats.Nat). (m GHC.Internal.Data.Type.Ord.<= n) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.- m)
-  modSNat :: forall (m :: GHC.Num.Natural.Natural) (n :: GHC.Internal.TypeNats.Nat). (1 GHC.Internal.Data.Type.Ord.<= m) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Mod n m)
-  plusSNat :: forall (n :: GHC.Internal.TypeNats.Nat) (m :: GHC.Internal.TypeNats.Nat). GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.+ m)
-  powerSNat :: forall (n :: GHC.Internal.TypeNats.Nat) (m :: GHC.Internal.TypeNats.Nat). GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.^ m)
-  timesSNat :: forall (n :: GHC.Internal.TypeNats.Nat) (m :: GHC.Internal.TypeNats.Nat). GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.* m)
 
 module Prelude.Experimental where
   -- Safety: Trustworthy
@@ -10578,7 +10441,6 @@ instance forall a. GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (G
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Show.Show (GHC.Internal.Ptr.FunPtr a) -- Defined in ‘GHC.Internal.Ptr’
 instance forall a. GHC.Internal.Show.Show (GHC.Internal.Ptr.Ptr a) -- Defined in ‘GHC.Internal.Ptr’
-instance GHC.Internal.Show.Show GHC.Internal.IO.MaskingState -- Defined in ‘GHC.Internal.IO’
 instance GHC.Classes.Eq GHC.Types.Bool -- Defined in ‘GHC.Classes’
 instance GHC.Classes.Eq GHC.Types.Char -- Defined in ‘GHC.Classes’
 instance GHC.Classes.Eq GHC.Types.Double -- Defined in ‘GHC.Classes’
@@ -10612,7 +10474,6 @@ instance forall a. GHC.Classes.Eq (GHC.Internal.Ptr.FunPtr a) -- Defined in ‘G
 instance forall a. GHC.Classes.Eq (GHC.Internal.Ptr.Ptr a) -- Defined in ‘GHC.Internal.Ptr’
 instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Classes.Eq GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Base’
-instance GHC.Classes.Eq GHC.Internal.IO.MaskingState -- Defined in ‘GHC.Internal.IO’
 instance GHC.Classes.Ord GHC.Types.Bool -- Defined in ‘GHC.Classes’
 instance GHC.Classes.Ord GHC.Types.Char -- Defined in ‘GHC.Classes’
 instance GHC.Classes.Ord GHC.Types.Double -- Defined in ‘GHC.Classes’
