@@ -1,4 +1,4 @@
-module Types where
+module GHC.Parser.PreProcess.Types where
 
 import GHC.Data.StringBuffer
 import GHC.Parser.Lexer (Token (..))
@@ -7,6 +7,7 @@ import GHC.Types.SrcLoc
 
 import Data.Map (Map)
 import qualified Data.Map as Map
+import GHC.Prelude
 
 -- ---------------------------------------------------------------------
 

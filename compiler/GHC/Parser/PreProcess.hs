@@ -25,6 +25,9 @@ import GHC.Data.StringBuffer
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
 import GHC.Parser.Lexer qualified as Lexer
+import GHC.Parser.PreProcess.Macro
+import GHC.Parser.PreProcess.ParsePP
+import GHC.Parser.PreProcess.Types
 import GHC.Prelude
 import GHC.Types.SrcLoc
 
@@ -38,46 +41,6 @@ initPragState = Lexer.initPragState initPpState
 initParserState :: Lexer.ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
 initParserState = Lexer.initParserState initPpState
 
-initPpState :: PpState
-initPpState =
-    PpState
-        { pp_defines = Map.empty
-        , pp_includes = Map.empty
-        , pp_include_stack = []
-        , pp_continuation = []
-        , pp_context = []
-        , pp_accepting = True
-        }
-
-data PpState = PpState
-    { pp_defines :: !(Map MacroName MacroDef)
-    , pp_includes :: !(Map String StringBuffer)
-    , pp_include_stack :: ![Lexer.AlexInput]
-    , pp_continuation :: ![Located Token]
-    , pp_context :: ![Token] -- ^ What preprocessor directive we are currently processing
-    , pp_accepting :: !Bool
-    }
-    deriving (Show)
-
--- ---------------------------------------------------------------------
-
-data CppDirective
-    = CppInclude String
-    | CppDefine String [String]
-    | CppIfdef String
-    | CppIfndef String
-    | CppIf [String]
-    | CppElse
-    | CppEndif
-    deriving (Show, Eq)
-
--- ---------------------------------------------------------------------
-
-type MacroArgs = [String]
-data MacroName = MacroName String (Maybe MacroArgs)
-    deriving (Show, Eq, Ord)
-type MacroDef = String
-
 -- ---------------------------------------------------------------------
 
 data CppState
@@ -87,21 +50,8 @@ data CppState
 
 -- ---------------------------------------------------------------------
 
-{-
-lexer, lexerDbg :: Bool -> (Located Token -> P PpState a) -> P PpState a
--- bypass for now, work in ghci
-lexer = Lexer.lexer
-lexerDbg = Lexer.lexerDbg
-
-setAccepting :: Bool -> P PpState ()
-setAccepting on =
-    P $ \s -> POk s{pp = (pp s){pp_accepting = on}} ()
-
-getAccepting :: P PpState Bool
-getAccepting = P $ \s -> POk s (pp_accepting (pp s))
--}
-
--- ---------------------------------------------------------------------
+lexer = ppLexer
+lexerDbg = ppLexerDbg
 
 ppLexer, ppLexerDbg :: Bool -> (Located Token -> PP a) -> PP a
 -- Use this instead of 'lexer' in GHC.Parser to dump the tokens for debugging.
@@ -113,16 +63,16 @@ ppLexer queueComments cont =
         queueComments
         ( \tk ->
             let
-                contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
-                -- contPush = pushContext (unLoc tk) >> contIgnoreTok tk
+                -- contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
+                contInner t = cont t
                 contIgnoreTok (L l tok) = do
                     case l of
                         RealSrcSpan r (Strict.Just b) -> Lexer.queueIgnoredToken (L (PsSpan r b) tok)
                         _ -> return ()
                     ppLexer queueComments cont
              in
-                -- case tk of
-                case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
+                case tk of
+                -- case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
                     L _ ITeof -> do
                         mInp <- popIncludeLoc
                         case mInp of
@@ -173,7 +123,7 @@ processCpp fs = do
     -- let s = cppInitial fs
     let s = cppInitial fs
     case parseDirective s of
-        Left err -> error $ show err
+        Left err -> error $ show (err, s)
         Right (CppInclude filename) -> do
             ppInclude filename
         Right (CppDefine name def) -> do
@@ -287,26 +237,26 @@ ppInclude filename = do
             pushIncludeLoc origInput
             let loc = PsLoc (mkRealSrcLoc (mkFastString filename) 1 1) (BufPos 0)
             Lexer.setInput (Lexer.AI loc src)
-    return $ trace ("ppInclude:mSrc=[" ++ show mSrc ++ "]") ()
+    -- return $ trace ("ppInclude:mSrc=[" ++ show mSrc ++ "]") ()
 
 -- return $ trace ("ppInclude:filename=[" ++ filename ++ "]") ()
 
-ppDefine :: String -> [String] -> PP ()
+ppDefine :: String -> String -> PP ()
 ppDefine name val = P $ \s ->
-    -- POk s{pp = (pp s){pp_defines = Set.insert (cleanTokenString def) (pp_defines (pp s))}} ()
-    POk s{pp = (pp s){pp_defines = Map.insert (trace ("ppDefine:def=[" ++ name ++ "]") (MacroName name Nothing)) val (pp_defines (pp s))}} ()
+    -- POk s{pp = (pp s){pp_defines = Map.insert (trace ("ppDefine:def=[" ++ name ++ "]") (MacroName name Nothing)) val (pp_defines (pp s))}} ()
+    POk s{pp = (pp s){pp_defines = Map.insert (MacroName name Nothing) val (pp_defines (pp s))}} ()
 
 ppIsDefined :: String -> PP Bool
 ppIsDefined def = P $ \s ->
-    -- POk s (Map.member def (pp_defines (pp s)))
-    POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") (MacroName def Nothing)) (pp_defines (pp s)))
+    POk s (Map.member (MacroName def Nothing) (pp_defines (pp s)))
+    -- POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") (MacroName def Nothing)) (pp_defines (pp s)))
 
-ppIf :: [String] -> PP Bool
-ppIf toks = P $ \s ->
+ppIf :: String -> PP Bool
+ppIf str = P $ \s ->
     -- -- POk s (Map.member def (pp_defines (pp s)))
     -- POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") def) (pp_defines (pp s)))
     let
-        s' = cppIf (pp s) toks
+        s' = cppIf (pp s) str
      in
         POk s{pp = s'} (pp_accepting s')
 
@@ -317,13 +267,13 @@ cleanTokenString fs = r
     ss = dropWhile (\c -> not $ isSpace c) (unpackFS fs)
     r = init ss
 
-parseDefine :: FastString -> Maybe (String, [String])
-parseDefine fs = r
-  where
-    -- r = Just (cleanTokenString s, "")
-    r = case parseCppParser cppDefinition (unpackFS fs) of
-        Left _ -> Nothing
-        Right v -> Just v
+-- parseDefine :: FastString -> Maybe (String, [String])
+-- parseDefine fs = r
+--   where
+--     -- r = Just (cleanTokenString s, "")
+--     r = case parseCppParser cppDefinition (unpackFS fs) of
+--         Left _ -> Nothing
+--         Right v -> Just v
 
 -- =====================================================================
 
@@ -331,9 +281,7 @@ parseDefine fs = r
 See Note [GhcCPP Initial Processing]
 -}
 cppInitial :: [FastString] -> String
-cppInitial fs = r
-  where
-    r = concatMap unpackFS fs
+cppInitial fs = concatMap unpackFS fs
 
 {-
 Note [GhcCPP Initial Processing]

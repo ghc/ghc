@@ -1264,8 +1264,8 @@ cppToken code span buf len _buf2 =
      -- check if the string ends with backslash and newline
      -- NOTE: performance likely sucks, make it work for now
      (len0, continue) <- case (reverse $ unpackFS tokStr) of
-        -- ('\n':'\\':_) -> pushLexState code >> return (len -2, True)
-        ('\n':'\\':_) -> pushLexState (trace ("cppToken: push state") code) >> return (len - 2, True)
+        ('\n':'\\':_) -> pushLexState code >> return (len -2, True)
+        -- ('\n':'\\':_) -> pushLexState (trace ("cppToken: push state") code) >> return (len - 2, True)
         ('\n':_) -> return (len - 1, False)
         _ -> return (len, False)
      return (L span (ITcpp continue $! lexemeToFastString buf len0))
@@ -1286,8 +1286,8 @@ cppTokenCont code span buf len _buf2 =
 cppTokenPop :: (FastString -> Token)-> Action p
 cppTokenPop t span buf len _buf2 =
   do _ <- popLexState
-     -- return (L span (t $! lexemeToFastString buf (len - 1)))
-     return (L span (t $! lexemeToFastString buf (trace "cppTokenPop" len)))
+     -- return (L span (t $! lexemeToFastString buf (trace "cppTokenPop" len)))
+     return (L span (t $! lexemeToFastString buf len))
 
 popCpp :: Action p
 popCpp _span _buf _len _buf2 =

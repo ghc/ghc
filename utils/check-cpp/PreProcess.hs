@@ -21,7 +21,6 @@ import Types
 
 -- ---------------------------------------------------------------------
 
-type PP = P PpState
 
 -- initPpState :: PpState
 -- initPpState =
@@ -95,6 +94,8 @@ ppLexer queueComments cont =
         )
 
 -- ---------------------------------------------------------------------
+
+type PP = P PpState
 
 preprocessElse :: PP ()
 preprocessElse = do
@@ -280,10 +281,7 @@ cleanTokenString fs = r
 See Note [GhcCPP Initial Processing]
 -}
 cppInitial :: [FastString] -> String
-cppInitial fs = r
-  where
-    -- go fs' = reverse $ drop 2 $ reverse $ unpackFS fs'
-    r = concatMap unpackFS fs
+cppInitial fs = concatMap unpackFS fs
 
 {-
 Note [GhcCPP Initial Processing]
