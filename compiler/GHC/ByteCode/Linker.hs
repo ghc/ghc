@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -210,9 +211,9 @@ linkFail who what
 
 
 nameToCLabel :: Name -> String -> FastString
-nameToCLabel n suffix = mkFastString label
+nameToCLabel n suffix = mkFastStringByteString label
   where
-    encodeZ = zString . zEncodeFS
+    encodeZ = fastZStringToByteString . zEncodeFS
     (Module pkgKey modName) = assert (isExternalName n) $ case nameModule n of
         -- Primops are exported from GHC.Prim, their HValues live in GHC.PrimopWrappers
         -- See Note [Primop wrappers] in GHC.Builtin.PrimOps.
@@ -222,11 +223,14 @@ nameToCLabel n suffix = mkFastString label
     modulePart  = encodeZ (moduleNameFS modName)
     occPart     = encodeZ $ occNameMangledFS (nameOccName n)
 
-    label = concat
-        [ if pkgKey == mainUnit then "" else packagePart ++ "_"
-        , modulePart
-        , '_':occPart
-        , '_':suffix
+    label = mconcat $
+        [ packagePart `mappend` "_" | pkgKey /= mainUnit ]
+        ++
+        [modulePart
+        , "_"
+        , occPart
+        , "_"
+        , fromString suffix
         ]
 
 
