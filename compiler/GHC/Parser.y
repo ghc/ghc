@@ -83,9 +83,10 @@ import GHC.Core.DataCon ( DataCon, dataConName )
 
 import GHC.Parser.PostProcess
 import GHC.Parser.PostProcess.Haddock
--- import GHC.Parser.Lexer hiding (lexer, lexerDbg)
-import GHC.Parser.Lexer
-import GHC.Parser.PreProcess hiding (lexer, lexerDbg)
+import GHC.Parser.Lexer hiding (lexer, lexerDbg)
+-- import GHC.Parser.Lexer
+-- import GHC.Parser.PreProcess hiding (lexer, lexerDbg)
+import GHC.Parser.PreProcess
 import GHC.Parser.HaddockLex
 import GHC.Parser.Annotation
 import GHC.Parser.Errors.Types
@@ -775,7 +776,8 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 -- '#else'         { L _ ITcppElse }
 -- '#endif'        { L _ ITcppEndif }
 
-%monad { P p } { >>= } { return }
+-- %monad { P p } { >>= } { return }
+%monad { P PpState } { >>= } { return }
 %lexer { (lexer True) } { L _ ITeof }
 -- %lexer { (lexerDbg True) } { L _ ITeof }
   -- Replace 'lexer' above with 'lexerDbg'
@@ -4185,7 +4187,7 @@ bars :: { ([EpToken "|"],Int) }     -- One or more bars
         | '|'                    { ([epTok $1],1) }
 
 {
-happyError :: P p a
+happyError :: P PpState a
 happyError = srcParseFail
 
 getVARID          (L _ (ITvarid    x)) = x
@@ -4290,7 +4292,7 @@ hasE (L _ (ITopenExpQuote HasE _)) = True
 hasE (L _ (ITopenTExpQuote HasE))  = True
 hasE _                             = False
 
-getSCC :: Located Token -> P p FastString
+getSCC :: Located Token -> P PpState FastString
 getSCC lt = do let s = getSTRING lt
                -- We probably actually want to be more restrictive than this
                if ' ' `elem` unpackFS s
@@ -4410,7 +4412,7 @@ incorrect.
 -- Make a source location for the file.  We're a bit lazy here and just
 -- make a point SrcSpan at line 1, column 0.  Strictly speaking we should
 -- try to find the span of the whole file (ToDo).
-fileSrcSpan :: P p SrcSpan
+fileSrcSpan :: P PpState SrcSpan
 fileSrcSpan = do
   l <- getRealSrcLoc;
   let loc = mkSrcLoc (srcLocFile l) 1 1;
@@ -4443,13 +4445,13 @@ hintOrPats pat = do
   return pat
 
 -- Hint about the MultiWayIf extension
-hintMultiWayIf :: SrcSpan -> P p ()
+hintMultiWayIf :: SrcSpan -> P PpState ()
 hintMultiWayIf span = do
   mwiEnabled <- getBit MultiWayIfBit
   unless mwiEnabled $ addError $ mkPlainErrorMsgEnvelope span PsErrMultiWayIf
 
 -- Hint about explicit-forall
-hintExplicitForall :: Located Token -> P p ()
+hintExplicitForall :: Located Token -> P PpState ()
 hintExplicitForall tok = do
     explicit_forall_enabled <- getBit ExplicitForallBit
     in_rule_prag <- getBit InRulePragBit
@@ -4458,7 +4460,7 @@ hintExplicitForall tok = do
         PsErrExplicitForall (isUnicode tok)
 
 -- Hint about qualified-do
-hintQualifiedDo :: Located Token -> P p ()
+hintQualifiedDo :: Located Token -> P PpState ()
 hintQualifiedDo tok = do
     qualifiedDo   <- getBit QualifiedDoBit
     case maybeQDoDoc of
@@ -4475,7 +4477,7 @@ hintQualifiedDo tok = do
 -- When two single quotes don't followed by tyvar or gtycon, we report the
 -- error as empty character literal, or TH quote that missing proper type
 -- variable or constructor. See #13450.
-reportEmptyDoubleQuotes :: SrcSpan -> P p a
+reportEmptyDoubleQuotes :: SrcSpan -> P PpState a
 reportEmptyDoubleQuotes span = do
     thQuotes <- getBit ThQuotesBit
     addFatalError $ mkPlainErrorMsgEnvelope span $ PsErrEmptyDoubleQuotes thQuotes
@@ -4530,7 +4532,7 @@ n2l :: LocatedN a -> LocatedA a
 n2l (L !la !a) = L (l2l la) a
 
 -- Called at the very end to pick up the EOF position, as well as any comments not allocated yet.
-acsFinal :: (EpAnnComments -> Maybe (RealSrcSpan, RealSrcSpan) -> Located a) -> P p (Located a)
+acsFinal :: (EpAnnComments -> Maybe (RealSrcSpan, RealSrcSpan) -> Located a) -> P PpState (Located a)
 acsFinal a = do
   let (L l _) = a emptyComments Nothing
   !cs <- getCommentsFor l
@@ -4561,7 +4563,7 @@ amsA' (L l a) = do
   !cs <- getCommentsFor l
   return (L (EpAnn (spanAsAnchor l) noAnn cs) a)
 
--- acsExpr :: (EpAnnComments -> LHsExpr GhcPs) -> P p ECP
+-- acsExpr :: (EpAnnComments -> LHsExpr GhcPs) -> P PpState ECP
 -- acsExpr a = do { expr :: (LHsExpr GhcPs) <- runPV $ acsa a
 --                ; return (ecpFromExp $ expr) }
 
@@ -4588,7 +4590,7 @@ amsr (L l a) an = do
 -- This and the signature module parser are the only parser entry points that
 -- deal with Haddock comments. The other entry points ('parseDeclaration',
 -- 'parseExpression', etc) do not insert them into the AST.
-parseModule :: P p (Located (HsModule GhcPs))
+parseModule :: P PpState (Located (HsModule GhcPs))
 parseModule = parseModuleNoHaddock >>= addHaddockToModule
 
 -- | Parse a Haskell signature module with Haddock comments. This is done in two
@@ -4600,7 +4602,7 @@ parseModule = parseModuleNoHaddock >>= addHaddockToModule
 -- This and the module parser are the only parser entry points that deal with
 -- Haddock comments. The other entry points ('parseDeclaration',
 -- 'parseExpression', etc) do not insert them into the AST.
-parseSignature :: P p (Located (HsModule GhcPs))
+parseSignature :: P PpState (Located (HsModule GhcPs))
 parseSignature = parseSignatureNoHaddock >>= addHaddockToModule
 
 commentsA :: (NoAnn ann) => SrcSpan -> EpAnnComments -> EpAnn ann
@@ -4614,7 +4616,7 @@ spanWithComments l = do
 -- | Instead of getting the *enclosed* comments, this includes the
 -- *preceding* ones.  It is used at the top level to get comments
 -- between top level declarations.
-commentsPA :: (NoAnn ann) => LocatedAn ann a -> P p (LocatedAn ann a)
+commentsPA :: (NoAnn ann) => LocatedAn ann a -> P PpState (LocatedAn ann a)
 commentsPA la@(L l a) = do
   !cs <- getPriorCommentsFor (getLocA la)
   return (L (addCommentsToEpAnn l cs) a)
