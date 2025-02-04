@@ -14,7 +14,6 @@ module GHC.Parser.PreProcess (
     PpState,
 ) where
 
-import Data.Char
 import Data.Map qualified as Map
 import Debug.Trace (trace)
 import GHC.Data.FastString
@@ -41,14 +40,12 @@ initParserState = Lexer.initParserState initPpState
 
 -- ---------------------------------------------------------------------
 
-data CppState
-    = CppIgnoring
-    | CppNormal
-    deriving (Show)
-
--- ---------------------------------------------------------------------
-
+-- | Continuation based lexer, provides input to GHC.Parser
+lexer :: Bool -> (Located Token -> PP a) -> PP a
 lexer = ppLexer
+
+-- | Debug version of @lexer@
+lexerDbg :: Bool -> (Located Token -> PP a) -> PP a
 lexerDbg = ppLexerDbg
 
 ppLexer, ppLexerDbg :: Bool -> (Located Token -> PP a) -> PP a
@@ -70,7 +67,7 @@ ppLexer queueComments cont =
                     ppLexer queueComments cont
              in
                 case tk of
-                -- case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
+                    -- case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
                     L _ ITeof -> do
                         mInp <- popIncludeLoc
                         case mInp of
@@ -92,8 +89,6 @@ ppLexer queueComments cont =
         )
 
 -- ---------------------------------------------------------------------
-
-type PP = P PpState
 
 preprocessElse :: PP ()
 preprocessElse = do
@@ -117,23 +112,21 @@ processCppToks fs = do
 
 processCpp :: [FastString] -> PP ()
 processCpp fs = do
-    -- traceM $ "processCpp: fs=" ++ show fs
-    -- let s = cppInitial fs
-    let s = cppInitial fs
+    let s = concatMap unpackFS fs
     case parseDirective s of
         Left err -> error $ show (err, s)
         Right (CppInclude filename) -> do
             ppInclude filename
         Right (CppDefine name def) -> do
-            ppDefine name def
+            ppDefine (MacroName name Nothing) def
         Right (CppIf cond) -> do
-            _ <- ppIf cond
+            ppIf cond
             return ()
         Right (CppIfdef name) -> do
-            defined <- ppIsDefined name
+            defined <- ppIsDefined (MacroName name Nothing)
             setAccepting defined
         Right (CppIfndef name) -> do
-            defined <- ppIsDefined name
+            defined <- ppIsDefined (MacroName name Nothing)
             setAccepting (not defined)
         Right CppElse -> do
             accepting <- getAccepting
@@ -144,63 +137,7 @@ processCpp fs = do
             setAccepting True
             return ()
 
-    -- return (trace ("processCpp:s=" ++ show s) ())
     return ()
-
--- ---------------------------------------------------------------------
--- Preprocessor state functions
-
-getCppState :: PP CppState
-getCppState = do
-    accepting <- getAccepting
-    if accepting
-        then return CppNormal
-        else return CppIgnoring
-
--- pp_context stack start -----------------
-
-pushContext :: Token -> PP ()
-pushContext new =
-    P $ \s -> POk s{pp = (pp s){pp_context = new : pp_context (pp s)}} ()
-
-popContext :: PP ()
-popContext =
-    P $ \s ->
-        let
-            new_context = case pp_context (pp s) of
-                [] -> []
-                (_ : t) -> t
-         in
-            POk s{pp = (pp s){pp_context = new_context}} ()
-
-peekContext :: PP Token
-peekContext =
-    P $ \s ->
-        let
-            r = case pp_context (pp s) of
-                [] -> ITeof -- Anthing really, for now, except a CPP one
-                (h : _) -> h
-         in
-            POk s r
-
-setAccepting :: Bool -> PP ()
-setAccepting on =
-    P $ \s -> POk s{pp = (pp s){pp_accepting = on}} ()
-
-getAccepting :: PP Bool
-getAccepting = P $ \s -> POk s (pp_accepting (pp s))
-
--- -------------------------------------
-
-pushContinuation :: Located Token -> PP ()
-pushContinuation new =
-    P $ \s -> POk s{pp = (pp s){pp_continuation = new : pp_continuation (pp s)}} ()
-
-popContinuation :: PP [Located Token]
-popContinuation =
-    P $ \s -> POk s{pp = (pp s){pp_continuation = []}} (pp_continuation (pp s))
-
--- pp_context stack end -------------------
 
 -- pp_include start -----------------------
 
@@ -235,51 +172,19 @@ ppInclude filename = do
             pushIncludeLoc origInput
             let loc = PsLoc (mkRealSrcLoc (mkFastString filename) 1 1) (BufPos 0)
             Lexer.setInput (Lexer.AI loc src)
-    -- return $ trace ("ppInclude:mSrc=[" ++ show mSrc ++ "]") ()
 
--- return $ trace ("ppInclude:filename=[" ++ filename ++ "]") ()
-
-ppDefine :: String -> String -> PP ()
-ppDefine name val = P $ \s ->
-    -- POk s{pp = (pp s){pp_defines = Map.insert (trace ("ppDefine:def=[" ++ name ++ "]") (MacroName name Nothing)) val (pp_defines (pp s))}} ()
-    POk s{pp = (pp s){pp_defines = Map.insert (MacroName name Nothing) val (pp_defines (pp s))}} ()
-
-ppIsDefined :: String -> PP Bool
-ppIsDefined def = P $ \s ->
-    POk s (Map.member (MacroName def Nothing) (pp_defines (pp s)))
-    -- POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") (MacroName def Nothing)) (pp_defines (pp s)))
-
-ppIf :: String -> PP Bool
+ppIf :: String -> PP ()
 ppIf str = P $ \s ->
-    -- -- POk s (Map.member def (pp_defines (pp s)))
-    -- POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") def) (pp_defines (pp s)))
     let
         s' = cppIf (pp s) str
      in
-        POk s{pp = s'} (pp_accepting s')
-
--- | Take a @FastString@ of the form "#define FOO\n" and strip off all but "FOO"
-cleanTokenString :: FastString -> String
-cleanTokenString fs = r
-  where
-    ss = dropWhile (\c -> not $ isSpace c) (unpackFS fs)
-    r = init ss
-
--- parseDefine :: FastString -> Maybe (String, [String])
--- parseDefine fs = r
---   where
---     -- r = Just (cleanTokenString s, "")
---     r = case parseCppParser cppDefinition (unpackFS fs) of
---         Left _ -> Nothing
---         Right v -> Just v
+        POk s{pp = s'} ()
 
 -- =====================================================================
 
 {- | Do cpp initial processing, as per https://gcc.gnu.org/onlinedocs/cpp/Initial-processing.html
 See Note [GhcCPP Initial Processing]
 -}
-cppInitial :: [FastString] -> String
-cppInitial fs = concatMap unpackFS fs
 
 {-
 Note [GhcCPP Initial Processing]
@@ -295,5 +200,62 @@ directive.
 3. Continued lines are merged into a single line
    and is handled in the Lexer.
 4. All comments are replaced with a single space
+
+Note [GhcCPP Processing Overview]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC.Parser calls `GHC.PreProcess.lexer` to provide it with the next
+token to parse, until it gets the EOF token.
+
+Without GHC_CPP, this simply calls `GHC.Parser.Lexer.lexer` to get the
+next token. But `GHC.PreProcess.lexer` runs its own loop between the
+two.
+
+- It calls `GHC.Parser.Lexer.lexer`
+
+- If the GhcCpp option is not set, it returns a normal token, which is
+  passed to the parser.
+
+- If the GhcCpp option is set, it may in addition return an `ITcpp`
+  token.
+
+  This is either one containing a whole line starting with a
+  preprocessor directive, or a continuation of the prior line if it
+  was a directive ending with a backlash
+
+- The lexing loop in this file accumulates these continuation tokens
+  until it has a full preprocessor line.
+
+- It does basic token-based analysis of this, to determine the
+  specific PP directive it refers to
+
+- The preprocessor can be in one of two states: `CppNormal` or
+  `CppIgnoring`.
+
+  When it is in `CppNormal` it passes non-PP tokens to the parser as
+  normal.
+
+  When it is in `CppIgnoring` it does not pass the non-PP tokens to
+  the parser, but inserts them into the parser queued comments store,
+  as if each was a comment.
+
+- When it has a full preprocessor directive, this is processed as expected.
+  `#define` : records a macro definition in the PP state
+  `#include` : not currently processed
+
+  `#ifdef` / `#ifndef` : If the following token is the name of a macro, switch to
+  `CppNormal` or `CppIgnoring` as appropriate
+
+  `#if` : perform macro expansion on the text, until it reaches a
+  fixpoint. Then parse it with `GHC.Parser.PreProcess.Parser/Lexer` as
+  an expression, and evaluate it. Set the state according to the outcome.
+
+- The `#if` / `#ifdef` / `#ifndef` directives also open a new macro
+  scope. Any macros defined will be stored in this scope.
+
+- `#else` : flip the state between `CppIgnoring` and `CppNormal`, and
+  pop the scope. Start a new scope.
+
+- `#endif` : pop the scope, set the state according to the surrounding
+  scope.
 
 -}
