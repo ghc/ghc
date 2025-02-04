@@ -1,11 +1,10 @@
 module GHC.Parser.PreProcess.ParsePP (
-    cppLex,
     parseDirective,
+    cppLex,
 ) where
 
-import Data.List
+import Data.List (intercalate)
 import GHC.Parser.Errors.Ppr ()
-
 import GHC.Parser.PreProcess.Lexer
 import GHC.Parser.PreProcess.ParserM (Token (..), init_state)
 import GHC.Parser.PreProcess.Types
@@ -15,7 +14,7 @@ import GHC.Prelude
 -- First parse to CPP tokens, using a C++-like language spec
 -- https://gcc.gnu.org/onlinedocs/cpp/Tokenization.html
 
--- Parse a CPP directive, using tokens from the CPP lexer
+-- | Parse a CPP directive, using tokens from the CPP lexer
 parseDirective :: String -> Either String CppDirective
 parseDirective s =
     case cppLex s of
@@ -29,23 +28,30 @@ parseDirective s =
                 ("#" : "ifdef" : ts) -> Right $ cppIfdef ts
                 ("#" : "else" : ts) -> Right $ cppElse ts
                 ("#" : "endif" : ts) -> Right $ cppEndif ts
-                other -> Left ("unexpected directive: " ++ (intercalate " " other))
+                other -> Left ("unexpected directive: " ++ (combineToks other))
+
+{- | Comply with the CPP requirement to not combine adjacent tokens.
+This will automatically insert a space in place of a comment, as
+comments cannot occur within a token.
+-}
+combineToks :: [String] -> String
+combineToks ss = intercalate " " ss
 
 cppDefine :: [String] -> Either String CppDirective
 cppDefine [] = Left "error:empty #define directive"
-cppDefine (n : ts) = Right $ CppDefine n (intercalate " " ts)
+cppDefine (n : ts) = Right $ CppDefine n (combineToks ts)
 
 cppInclude :: [String] -> CppDirective
-cppInclude ts = CppInclude (intercalate " " ts)
+cppInclude ts = CppInclude (combineToks ts)
 
 cppIf :: [String] -> CppDirective
-cppIf ts = CppIf (intercalate " " ts)
+cppIf ts = CppIf (combineToks ts)
 
 cppIfdef :: [String] -> CppDirective
-cppIfdef ts = CppIfdef (intercalate " " ts)
+cppIfdef ts = CppIfdef (combineToks ts)
 
 cppIfndef :: [String] -> CppDirective
-cppIfndef ts = CppIfndef (intercalate " " ts)
+cppIfndef ts = CppIfndef (combineToks ts)
 
 cppElse :: [String] -> CppDirective
 cppElse _ts = CppElse

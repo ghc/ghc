@@ -21,29 +21,14 @@ import Types
 
 -- ---------------------------------------------------------------------
 
+-- | Set parser options for parsing OPTIONS pragmas
+initPragState :: Lexer.ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+initPragState = Lexer.initPragState initPpState
 
--- initPpState :: PpState
--- initPpState =
---     PpState
---         { pp_defines = Map.empty
---         , pp_includes = Map.empty
---         , pp_include_stack = []
---         , pp_continuation = []
---         , pp_context = []
---         , pp_accepting = True
---         }
+-- | Creates a parse state from a 'ParserOpts' value
+initParserState :: Lexer.ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+initParserState = Lexer.initParserState initPpState
 
--- data PpState = PpState
---     { pp_defines :: !(Map String [String])
---     , pp_includes :: !(Map String StringBuffer)
---     , pp_include_stack :: ![Lexer.AlexInput]
---     , pp_continuation :: ![Located Token]
---     , pp_context :: ![Token] -- What preprocessor directive we are currently processing
---     , pp_accepting :: !Bool
---     }
---     deriving (Show)
-
--- deriving instance Show Lexer.AlexInput
 -- ---------------------------------------------------------------------
 
 data CppState
@@ -52,6 +37,9 @@ data CppState
     deriving (Show)
 
 -- ---------------------------------------------------------------------
+
+lexer = ppLexer
+lexerDbg = ppLexerDbg
 
 ppLexer, ppLexerDbg :: Bool -> (Located Token -> PP a) -> PP a
 -- Use this instead of 'lexer' in GHC.Parser to dump the tokens for debugging.
@@ -119,11 +107,9 @@ processCppToks fs = do
 
 processCpp :: [FastString] -> PP ()
 processCpp fs = do
-    -- traceM $ "processCpp: fs=" ++ show fs
-    -- let s = cppInitial fs
     let s = cppInitial fs
     case parseDirective s of
-        Left err -> error $ show (err,s)
+        Left err -> error $ show (err, s)
         Right (CppInclude filename) -> do
             ppInclude filename
         Right (CppDefine name def) -> do
@@ -146,7 +132,6 @@ processCpp fs = do
             setAccepting True
             return ()
 
-    -- return (trace ("processCpp:s=" ++ show s) ())
     return ()
 
 -- ---------------------------------------------------------------------
@@ -237,43 +222,21 @@ ppInclude filename = do
             pushIncludeLoc origInput
             let loc = PsLoc (mkRealSrcLoc (mkFastString filename) 1 1) (BufPos 0)
             Lexer.setInput (Lexer.AI loc src)
-    return $ trace ("ppInclude:mSrc=[" ++ show mSrc ++ "]") ()
-
--- return $ trace ("ppInclude:filename=[" ++ filename ++ "]") ()
 
 ppDefine :: String -> String -> PP ()
 ppDefine name val = P $ \s ->
-    -- POk s{pp = (pp s){pp_defines = Set.insert (cleanTokenString def) (pp_defines (pp s))}} ()
-    POk s{pp = (pp s){pp_defines = Map.insert (trace ("ppDefine:def=[" ++ name ++ "]") (MacroName name Nothing)) val (pp_defines (pp s))}} ()
+    POk s{pp = (pp s){pp_defines = Map.insert (MacroName name Nothing) val (pp_defines (pp s))}} ()
 
 ppIsDefined :: String -> PP Bool
 ppIsDefined def = P $ \s ->
-    -- POk s (Map.member def (pp_defines (pp s)))
-    POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") (MacroName def Nothing)) (pp_defines (pp s)))
+    POk s (Map.member (MacroName def Nothing) (pp_defines (pp s)))
 
 ppIf :: String -> PP Bool
 ppIf str = P $ \s ->
-    -- -- POk s (Map.member def (pp_defines (pp s)))
-    -- POk s (Map.member (trace ("ppIsDefined:def=[" ++ def ++ "]") def) (pp_defines (pp s)))
     let
         s' = cppIf (pp s) str
      in
         POk s{pp = s'} (pp_accepting s')
-
--- | Take a @FastString@ of the form "#define FOO\n" and strip off all but "FOO"
-cleanTokenString :: FastString -> String
-cleanTokenString fs = r
-  where
-    ss = dropWhile (\c -> not $ isSpace c) (unpackFS fs)
-    r = init ss
-
--- parseDefine :: FastString -> Maybe (String, [String])
--- parseDefine fs = r
---   where
---     -- r = Just (cleanTokenString s, "")
---     r = case parseCppParser cppDefinition (unpackFS fs) of
---         Left _ -> Nothing
---         Right v -> Just v
 
 -- =====================================================================
 
