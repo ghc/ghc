@@ -808,9 +808,11 @@ data HsDataDefn pass   -- The payload of a data type defn
                        --       *and* for data family instances
   = -- | Declares a data type or newtype, giving its constructors
     -- @
-    --  data/newtype T a = <constrs>
-    --  data/newtype instance T [a] = <constrs>
+    --  data/newtype T a :: ksig = <constrs>
+    --  data/newtype instance T [a] :: ksig = <constrs>
     -- @
+    -- The HsDataDefn describes the (optional) kind signature and the <constrs>
+    -- but not the `data T a` or `newtype T [a]` headers
     HsDataDefn { dd_ext    :: XCHsDataDefn pass,
                  dd_ctxt   :: Maybe (LHsContext pass), -- ^ Context
                  dd_cType  :: Maybe (XRec pass CType),

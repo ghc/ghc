@@ -16,20 +16,16 @@ newtype Fix1a f = In1a (f (Fix1a f))
 newtype Fix1b f where
     In1b :: forall ff. ff (Fix1b ff) -> Fix1b ff
 
--- A plain newtype, GADT syntax, with a return kind signature
+-- A plain newtype, GADT syntax, with a return kind signature,
+-- and runtime-rep quantification in the data constructor
 -- Should infer Fix2 :: forall r k. (k -> TYPE r) -> TYPE r
--- Rejected because of deafulting; maybe that's OK
--- newtype Fix2 f :: TYPE r where
---   In2 :: forall ff. ff (Fix2 ff) -> Fix2 ff
+newtype Fix2 f :: TYPE r where
+   In2 :: forall r (ff :: TYPE r -> TYPE r). ff (Fix2 ff) -> Fix2 ff
 
 -- Plain newtype, H98 syntax, standalone kind signature
 -- Should get In3 :: forall r (f :: TYPE r -> TYPE r). Fix3 @r f -> Fix3 @r f
 type Fix3 :: forall r. (TYPE r -> TYPE r) -> TYPE r
 newtype Fix3 f = In3 (f (Fix3 f))
-
--- This variant produces a /terrible/ message
--- type Fix3a :: forall r k. (TYPE r -> TYPE r) -> TYPE r
--- newtype Fix3a f = In3a (f (Fix3 f))
 
 -- Plain newtype, H98 syntax, standalone kind signature
 -- Should get In4 :: forall r k (f :: k -> TYPE r). Fix4 @r @k f -> Fix4 @r @k f
@@ -37,11 +33,6 @@ type Fix4 :: forall r. (TYPE r -> TYPE r) -> TYPE r
 newtype Fix4 f where
   In4 :: forall rr (ff :: TYPE rr -> TYPE rr).
          ff (Fix4 ff) -> Fix4 @rr ff
-
--- Rejected because of defulting; maybe that's OK
---type Fix4a :: forall r. (TYPE r -> TYPE r) -> TYPE r
---newtype Fix4a f where
---  In4a :: ff (Fix4a ff) -> Fix4a ff
 
 -------------------- Data families with newtype instance -----------------
 
@@ -64,14 +55,10 @@ data family Dix3 :: (k -> Type) -> k
 newtype instance Dix3 f = DIn3 (f (Dix3 f))
 
 -- newtype instance in GADT syntax
--- Rejected because of defaulting
+-- The newtype instance defaults to LiftedRep
 data family Dix4 :: (k -> TYPE r) -> k
 newtype instance Dix4 f where
   DIn4 :: forall ff. ff (Dix4 ff) -> Dix4 ff
-
---data family Dix4a :: (k -> TYPE r) -> k
---newtype instance forall r f. Dix4a f :: TYPE r where
---  DIn4a :: forall r (ff :: TYPE r -> TYPE r). ff (Dix4a ff) -> Dix4a ff
 
 -- newtype instance in H98 syntax
 data family Dix5 :: (k -> TYPE r) -> k
