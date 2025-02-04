@@ -23,30 +23,40 @@ import Lexer
 -- Parse a CPP directive, using tokens from the CPP lexer
 parseDirective :: String -> Either String CppDirective
 parseDirective s =
-  case cppLex s of
-    Left e -> Left e
-    Right toks ->
-      case map t_str toks of
-        ("#":"define":ts) -> cppDefine ts
-        ("#":"include":ts) -> Right $ cppInclude ts
-        ("#":"if":ts) -> Right $ cppIf ts
-        ("#":"ifndef":ts) -> Right $ cppIfndef ts
-        ("#":"ifdef":ts) -> Right $ cppIfdef ts
-        ("#":"else":ts) -> Right $ cppElse ts
-        ("#":"endif":ts) -> Right $ cppEndif ts
-        other -> Left ("unexpected directive: " ++ (intercalate " " other))
+    case cppLex s of
+        Left e -> Left e
+        Right toks ->
+            case map t_str toks of
+                ("#" : "define" : ts) -> cppDefine ts
+                ("#" : "include" : ts) -> Right $ cppInclude ts
+                ("#" : "if" : ts) -> Right $ cppIf ts
+                ("#" : "ifndef" : ts) -> Right $ cppIfndef ts
+                ("#" : "ifdef" : ts) -> Right $ cppIfdef ts
+                ("#" : "else" : ts) -> Right $ cppElse ts
+                ("#" : "endif" : ts) -> Right $ cppEndif ts
+                other -> Left ("unexpected directive: " ++ (intercalate " " other))
 
-
+cppDefine :: [String] -> Either String CppDirective
 cppDefine [] = Left "error:empty #define directive"
-cppDefine (n:ts) = Right $ CppDefine n (intercalate " " ts)
+cppDefine (n : ts) = Right $ CppDefine n (intercalate " " ts)
 
+cppInclude :: [String] -> CppDirective
 cppInclude ts = CppInclude (intercalate " " ts)
-cppIf ts = CppIf (intercalate " " ts)
-cppIfdef ts = CppIfdef (intercalate " " ts)
-cppIfndef ts = CppIfndef (intercalate " " ts)
-cppElse _ts = CppElse
-cppEndif _ts = CppEndif
 
+cppIf :: [String] -> CppDirective
+cppIf ts = CppIf (intercalate " " ts)
+
+cppIfdef :: [String] -> CppDirective
+cppIfdef ts = CppIfdef (intercalate " " ts)
+
+cppIfndef :: [String] -> CppDirective
+cppIfndef ts = CppIfndef (intercalate " " ts)
+
+cppElse :: [String] -> CppDirective
+cppElse _ts = CppElse
+
+cppEndif :: [String] -> CppDirective
+cppEndif _ts = CppEndif
 
 -- ---------------------------------------------------------------------
 
@@ -59,6 +69,7 @@ cppLex s = case lexCppTokenStream s init_state of
 
 doATest :: String -> Either String CppDirective
 doATest str = parseDirective str
+
 -- doATest str = parseDirectiveOld str
 
 t0 :: Either String CppDirective
