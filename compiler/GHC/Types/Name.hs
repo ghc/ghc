@@ -51,7 +51,7 @@ module GHC.Types.Name (
         mkExternalName, mkWiredInName,
 
         -- ** Manipulating and deconstructing 'Name's
-        nameUnique, setNameUnique,
+        nameUnique, setNameExternalModule, setNameUnique,
         nameOccName, nameNameSpace, nameModule, nameModule_maybe,
         setNameLoc,
         tidyNameOcc,
@@ -562,6 +562,9 @@ mkSysTvName uniq fs = mkSystemName uniq (mkTyVarOccFS fs)
 mkFCallName :: Unique -> FastString -> Name
 mkFCallName uniq str = mkInternalName uniq (mkVarOccFS str) noSrcSpan
    -- The encoded string completely describes the ccall
+
+setNameExternalModule :: Name -> Module -> Name
+setNameExternalModule name mod = name {n_sort = External mod}
 
 -- When we renumber/rename things, we need to be
 -- able to change a Name's Unique to match the cached

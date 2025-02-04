@@ -2747,7 +2747,8 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   -- The id has to be exported for the JS backend. This isn't required for the
   -- byte-code interpreter but it does no harm to always do it.
   u <- uniqFromTag 'I'
-  let binding_name = mkSystemVarName u (fsLit ("BCO_toplevel"))
+  let this_mod = mkInteractiveModule (show u)
+  let binding_name = mkExternalName u this_mod (mkVarOcc ("BCO_toplevel")) noSrcSpan
   let binding_id   = mkExportedVanillaId binding_name (exprType simpl_expr)
 
   {- Tidy it (temporary, until coreSat does cloning) -}
@@ -2781,7 +2782,6 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   -- guaranteed.
   --
   -- We reuse the unique we obtained for the binding, but any unique would do.
-  let this_mod = mkInteractiveModule (show u)
   let for_bytecode = True
 
   (stg_binds_with_deps, _prov_map, _collected_ccs, _stg_cg_infos) <-
