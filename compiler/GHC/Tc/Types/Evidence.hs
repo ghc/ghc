@@ -510,9 +510,6 @@ data EvTerm
 
 type EvExpr = CoreExpr
 
--- An EvTerm is (usually) constructed by any of the constructors here
--- and those more complicated ones who were moved to module GHC.Tc.Types.EvTerm
-
 -- | Any sort of evidence Id, including coercions
 evId ::  EvId -> EvExpr
 evId = Var
