@@ -185,7 +185,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , "package ghc-boot-th"
         , "  flags: +bootstrap"
         , ""
-        , "package hcs2hs"
+        , "package hsc2hs"
         , "  flags: +in-ghc-tree" -- allow finding template-hsc.h in GHC's /lib
         , ""
           -- allow template-haskell with newer ghc-boot-th
@@ -253,7 +253,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , "package ghc-bin"
         , "  flags: +internal-interpreter"
         , ""
-        , "package hcs2hs"
+        , "package hsc2hs"
         , "  flags: +in-ghc-tree" -- allow finding template-hsc.h in GHC's /lib
         , ""
         , "package haskeline"
