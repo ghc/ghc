@@ -40,7 +40,7 @@ import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.Class( classTyCon )
 import GHC.Core.DataCon
-import GHC.Core.TyCo.Rep( UnivCoProvenance(..), scaledThing )
+import GHC.Core.TyCo.Rep( scaledThing )
 import GHC.Core.Opt.OccurAnal
 
 import GHC.Data.Maybe
@@ -1353,9 +1353,9 @@ isUnaryClassApp v args
   where
     -- mk_co makes a coercion of kind (C ta tb tc ~ ty[t1/a,tb/b,tc/c])
     mk_co tycon ty_args
+      | [meth_ty] <- dataConInstArgTys (tyConSingleDataCon tycon) ty_args
       = mkUnaryClassCo (mkTyConApp tycon ty_args) (scaledThing meth_ty)
-      where
-        [meth_ty] = dataConInstArgTys (tyConSingleDataCon tycon) ty_args
+      | otherwise = pprPanic "isUnaryClassApp" (ppr args $$ ppr tycon $$ ppr ty_args)
 
 getUnaryClassPayload :: TyCon -> [ArgInfo] -> Maybe (CoreExpr, [Type], [ArgInfo])
 getUnaryClassPayload tc args

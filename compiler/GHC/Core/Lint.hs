@@ -2599,8 +2599,7 @@ lintCoercion the_co@(SelCo cs co)
             -> failWithL $ hang (text "Bad SelCo:") 2 $
                vcat [ text "the_co:" <+> ppr the_co
                     , text "lhs type:" <+> ppr s
-                    , text "rhs type:" <+> ppr t
-                    , text "role:" <+> ppr co_role ] }
+                    , text "rhs type:" <+> ppr t ] }
 
 lintCoercion the_co@(LRCo _lr co)
   = do { lintCoercion co

@@ -21,7 +21,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Origin ( InstanceWhat (..), SafeOverlapping, CtOrigin(GetFieldOrigin) )
-import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst, FamInstEnvs )
+import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcLookupDataFamInst, FamInstEnvs )
 
 import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
 
