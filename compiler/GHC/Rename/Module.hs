@@ -659,6 +659,7 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
 rnFamEqn :: HsDocContext
          -> AssocTyFamInfo
          -> FamEqn GhcPs rhs
+         -> FreeKiTyVars     -- Implicit binders of the rhs payload
          -> (HsDocContext -> rhs -> RnM (rhs', FreeVars))
          -> RnM (FamEqn GhcRn rhs', FreeVars)
 rnFamEqn doc atfi
@@ -666,7 +667,7 @@ rnFamEqn doc atfi
             , feqn_bndrs  = outer_bndrs
             , feqn_pats   = pats
             , feqn_fixity = fixity
-            , feqn_rhs    = payload }) rn_payload
+            , feqn_rhs    = payload }) payload_kvs rn_payload
   = do { tycon' <- lookupFamInstName mb_cls tycon
 
          -- all_imp_vars represent the implicitly bound type variables. This is
@@ -697,7 +698,7 @@ rnFamEqn doc atfi
          --
          -- For associated type family instances, exclude the type variables
          -- bound by the instance head with filterInScopeM (#19649).
-       ; all_imp_vars <- filterInScopeM $ pat_kity_vars
+       ; all_imp_vars <- filterInScopeM $ (pat_kity_vars ++ payload_kvs)
 
        ; bindHsOuterTyVarBndrs doc mb_cls all_imp_vars outer_bndrs $ \rn_outer_bndrs ->
     do { (pats', pat_fvs) <- rnLHsTypeArgs (FamPatCtx tycon) pats
@@ -847,8 +848,9 @@ rnTyFamInstEqn :: AssocTyFamInfo
                -> TyFamInstEqn GhcPs
                -> RnM (TyFamInstEqn GhcRn, FreeVars)
 rnTyFamInstEqn atfi eqn@(FamEqn { feqn_tycon = tycon })
-  = rnFamEqn (TySynCtx tycon) atfi eqn rnTySyn
-
+  = rnFamEqn (TySynCtx tycon) atfi eqn
+       [{- No implicit vars on RHS of a type instance -}]
+       rnTySyn
 
 rnTyFamDefltDecl :: Name
                  -> TyFamDefltDecl GhcPs
@@ -859,8 +861,9 @@ rnDataFamInstDecl :: AssocTyFamInfo
                   -> DataFamInstDecl GhcPs
                   -> RnM (DataFamInstDecl GhcRn, FreeVars)
 rnDataFamInstDecl atfi (DataFamInstDecl { dfid_eqn =
-                    eqn@(FamEqn { feqn_tycon = tycon })})
-  = do { (eqn', fvs) <- rnFamEqn (TyDataCtx tycon) atfi eqn rnDataDefn
+                    eqn@(FamEqn { feqn_tycon = tycon, feqn_rhs = defn })})
+  = do { let implicit_kvs = extractDataDefnKindVars defn
+       ; (eqn', fvs) <- rnFamEqn (TyDataCtx tycon) atfi eqn implicit_kvs rnDataDefn
        ; return (DataFamInstDecl { dfid_eqn = eqn' }, fvs) }
 
 -- Renaming of the associated types in instances.
