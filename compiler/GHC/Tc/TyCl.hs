@@ -1879,9 +1879,10 @@ kcConDecl new_or_data tc_res_kind
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsContext cxt
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
-       ; _ <- tcCheckLHsTypeInContext res_ty (TheKind tc_res_kind)
+       ; con_res_kind <- newOpenTypeKind
+       ; _ <- tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
 
-       ; let arg_exp_kind = getArgExpKind new_or_data tc_res_kind
+       ; let arg_exp_kind = getArgExpKind new_or_data con_res_kind
              -- getArgExpKind: for newtypes, check that the argument kind
              -- is the same the kind of `res_ty`, the data con's return type
              -- See (KCD2) in Note [kcConDecls: kind-checking data type decls]
@@ -3755,30 +3756,30 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
 
        ; return (NE.singleton dc) }
 
-tcConDecl new_or_data dd_info rep_tycon tc_bndrs tc_res_kind tag_map
-  -- TODO: fix this comment NB: don't use res_kind here, as it's ill-scoped. Instead,
+tcConDecl new_or_data dd_info rep_tycon tc_bndrs _tc_res_kind tag_map
+  -- NB: don't use _tc_res_kind here, as it's ill-scoped. Instead,
   -- we get the res_kind by typechecking the result type.
           (ConDeclGADT { con_names = names
                        , con_bndrs = L _ outer_hs_bndrs
                        , con_mb_cxt = cxt, con_g_args = hs_args
                        , con_res_ty = hs_res_ty })
   = addErrCtxt (DataConDefCtxt names) $
-    do { traceTc "tcConDecl 1 gadt" (ppr names $$ ppr tc_res_kind)
+    do { traceTc "tcConDecl 1 gadt" (ppr names $$ ppr _tc_res_kind)
        ; let L _ name :| _ = names
        ; skol_info <- mkSkolemInfo (DataConSkol name)
-       ; (tclvl, wanted, (outer_bndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
+       ; (tclvl, wanted, (outer_bndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts, res_kind)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
               tcOuterTKBndrs skol_info outer_hs_bndrs       $
               do { ctxt   <- tcHsContext cxt
 
+                 ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
+                              -- See Note [GADT return kinds]
+
                    -- See Note [Datatype return kinds]
-                 ; let exp_kind = getArgExpKind new_or_data tc_res_kind
+                 ; let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConGADTArgs exp_kind hs_args
 
-
-                 ; res_ty <- tcCheckLHsType hs_res_ty tc_res_kind
-                              -- See Note [GADT return kinds]
-                 ; traceTc "tcConDecl 1a gadt" (ppr res_ty)
+                 ; traceTc "tcConDecl 1a gadt" (ppr res_ty <+> dcolon <+> ppr res_kind)
 
                  -- For data instances (only), ensure that the return type,
                  -- res_ty, is a substitution instance of the header.
@@ -3795,7 +3796,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs tc_res_kind tag_map
 
                  ; let (arg_tys, stricts) = unzip btys
                  ; field_lbls <- lookupConstructorFields name
-                 ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
+                 ; return (ctxt, arg_tys, res_ty, field_lbls, stricts, res_kind)
                  }
 
        ; outer_bndrs <- scopedSortOuter outer_bndrs
@@ -3809,7 +3810,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs tc_res_kind tag_map
        ; traceTc "tcConDecl:GADT" (vcat [ text "names:" <+> ppr names
                                         , text "tkvs:" <+> ppr tkvs
                                         , text "res_ty:" <+> ppr res_ty
-                                        , text "tc_res_kind" <+> ppr tc_res_kind ])
+                                        , text "res_kind:" <+> ppr res_kind ])
        ; reportUnsolvedEqualities skol_info tkvs tclvl wanted
 
        ; let tvbndrs =  mkTyVarBinders InferredSpec tkvs ++ outer_tv_bndrs
@@ -3831,14 +3832,6 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs tc_res_kind tag_map
              arg_tys'   = substScaledTys arg_subst arg_tys
              res_ty'    = substTy  arg_subst res_ty
 
-             eq_preds' = pprTrace "eq_preds"
-                           (vcat [ ppr names
-                                 , text "res_tmpl:" <+> ppr res_tmpl
-                                 , text "res_ty:" <+> ppr res_ty
-                                 , text "tc_res_kind:" <+> ppr tc_res_kind
-                                 , text "eq_preds:" <+> ppr eq_preds ]) $
-                         eq_preds
-
        -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
        ; traceTc "tcConDecl 2" (ppr names $$ ppr field_lbls)
        ; fam_envs <- tcGetFamInstEnvs
@@ -3851,7 +3844,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs tc_res_kind tag_map
              ; let bang_opts = SrcBangOpts (initBangOpts dflags)
              ; buildDataCon fam_envs bang_opts name is_infix
                             rep_nm stricts field_lbls
-                            univ_tvs ex_tvs tvbndrs' eq_preds'
+                            univ_tvs ex_tvs tvbndrs' eq_preds
                             ctxt' arg_tys' res_ty' rep_tycon tag_map
                   -- NB:  we put data_tc, the type constructor gotten from the
                   --      constructor type signature into the data constructor;
