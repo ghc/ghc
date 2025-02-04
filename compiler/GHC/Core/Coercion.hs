@@ -42,9 +42,9 @@ module GHC.Core.Coercion (
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
         mkNakedForAllCo, mkForAllCo, mkHomoForAllCos,
-        mkPhantomCo,
+        mkPhantomCo, mkAxiomCo,
         mkHoleCo, mkUnivCo, mkSubCo,
-        mkProofIrrelCo,
+        mkProofIrrelCo, mkUnaryClassCo,
         downgradeRole,
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
         mkKindCo,
@@ -1417,6 +1417,9 @@ mkProofIrrelCo r co g  _ | isGReflCo co  = mkReflCo r (mkCoercionTy g)
   -- kco is a kind coercion, thus @isGReflCo@ rather than @isReflCo@
 mkProofIrrelCo r kco g1 g2 = mkUnivCo ProofIrrelProv [kco] r
                                       (mkCoercionTy g1) (mkCoercionTy g2)
+
+mkUnaryClassCo :: Type -> Type -> Coercion
+mkUnaryClassCo ty1 ty2 = mkUnivCo UnaryClassProv [] Representational ty1 ty2
 
 {-
 %************************************************************************

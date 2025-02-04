@@ -64,8 +64,7 @@ import GHC.Core.Class   ( classTyCon, classMethods )
 import GHC.Core.DataCon ( DataCon, dataConWrapId )
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
-import GHC.Core.InstEnv ( Canonical )
-
+import GHC.Core.InstEnv ( CanonicalEvidence )
 
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM

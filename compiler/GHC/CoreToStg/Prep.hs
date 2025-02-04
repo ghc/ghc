@@ -1353,9 +1353,7 @@ isUnaryClassApp v args
   where
     -- mk_co makes a coercion of kind (C ta tb tc ~ ty[t1/a,tb/b,tc/c])
     mk_co tycon ty_args
-      = mkUnivCo UnaryClassProv Representational
-                 (mkTyConApp tycon ty_args)
-                 (scaledThing meth_ty)
+      = mkUnaryClassCo (mkTyConApp tycon ty_args) (scaledThing meth_ty)
       where
         [meth_ty] = dataConInstArgTys (tyConSingleDataCon tycon) ty_args
 

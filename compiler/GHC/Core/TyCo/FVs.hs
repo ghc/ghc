@@ -745,25 +745,6 @@ almost_devoid_co_var_of_cos (co:cos) cv
   = almost_devoid_co_var_of_co co cv
   && almost_devoid_co_var_of_cos cos cv
 
-<<<<<<< HEAD
-||||||| constructed merge base
-almost_devoid_co_var_of_prov :: UnivCoProvenance -> CoVar -> Bool
-almost_devoid_co_var_of_prov (PhantomProv co) cv
-  = almost_devoid_co_var_of_co co cv
-almost_devoid_co_var_of_prov (ProofIrrelProv co) cv
-  = almost_devoid_co_var_of_co co cv
-almost_devoid_co_var_of_prov (PluginProv _ cvs) cv = not (cv `elemDVarSet` cvs)
-
-=======
-almost_devoid_co_var_of_prov :: UnivCoProvenance -> CoVar -> Bool
-almost_devoid_co_var_of_prov (PhantomProv co) cv
-  = almost_devoid_co_var_of_co co cv
-almost_devoid_co_var_of_prov (ProofIrrelProv co) cv
-  = almost_devoid_co_var_of_co co cv
-almost_devoid_co_var_of_prov (PluginProv _ cvs) cv = not (cv `elemDVarSet` cvs)
-almost_devoid_co_var_of_prov (UnaryClassProv {}) _ = True
-
->>>>>>> Make UanaryClass a new AlgTyConRhs
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
 almost_devoid_co_var_of_type (TyVarTy _) _ = True
 almost_devoid_co_var_of_type (TyConApp _ tys) cv
@@ -1176,19 +1157,6 @@ tyConsOfType ty
      go_mco MRefl    = emptyUniqSet
      go_mco (MCo co) = go_co co
 
-<<<<<<< HEAD
-||||||| constructed merge base
-     go_prov (PhantomProv co)    = go_co co
-     go_prov (ProofIrrelProv co) = go_co co
-     go_prov (PluginProv _ _)    = emptyUniqSet
-
-=======
-     go_prov (PhantomProv co)    = go_co co
-     go_prov (ProofIrrelProv co) = go_co co
-     go_prov (PluginProv {})     = emptyUniqSet
-     go_prov (UnaryClassProv {}) = emptyUniqSet
-
->>>>>>> Make UanaryClass a new AlgTyConRhs
      go_cos cos   = foldr (unionUniqSets . go_co)  emptyUniqSet cos
 
      go_tc tc = unitUniqSet tc
@@ -1400,16 +1368,3 @@ occCheckExpand vs_to_avoid ty
            ; cos' <- mapM (go_co cxt) cos
            ; return (co { uco_lty = ty1', uco_rty = ty2', uco_deps = cos' }) }
 
-<<<<<<< HEAD
-||||||| constructed merge base
-    ------------------
-    go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
-    go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co
-    go_prov _   p@(PluginProv _ _)  = return p
-=======
-    ------------------
-    go_prov cxt (PhantomProv co)      = PhantomProv <$> go_co cxt co
-    go_prov cxt (ProofIrrelProv co)   = ProofIrrelProv <$> go_co cxt co
-    go_prov _   p@(PluginProv {})     = return p
-    go_prov _   p@(UnaryClassProv {}) = return p
->>>>>>> Make UanaryClass a new AlgTyConRhs

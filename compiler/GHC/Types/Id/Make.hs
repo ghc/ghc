@@ -545,8 +545,7 @@ mkDictSelRhs clas val_index
     rhs_body | unary_cls = assertPpr (val_index == 0) (ppr clas) $
                            case arg_tys of
                              [arg_ty] ->  mkCast (Var dict_id) $
-                                          mkUnivCo UnaryClassProv Representational
-                                                   pred (scaledThing arg_ty)
+                                          mkUnaryClassCo pred (scaledThing arg_ty)
                              _ -> pprPanic "mkDictSelRhs" (ppr clas)
              | otherwise = mkSingleAltCase (Var dict_id) dict_id (DataAlt data_con)
                                            arg_ids (varToCoreExpr the_arg_id)
@@ -623,9 +622,6 @@ mkDataConWorkId wkr_name data_con
                                             -- LFInfo stores post-unarisation arity
 
     ----------- Workers for newtypes --------------
-    univ_tvs = dataConUnivTyVars data_con
-    ex_tcvs  = dataConExTyCoVars data_con
-    arg_tys  = dataConRepArgTys  data_con  -- Should be same as dataConOrigArgTys
     nt_info  = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
                   `setArityInfo` 1  -- Arity 1
                   `setLFInfo` (panic "mkDataConWorkId: we shouldn't look at LFInfo for newtype worker ids")

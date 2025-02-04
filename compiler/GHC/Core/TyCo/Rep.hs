@@ -1574,10 +1574,10 @@ data UnivCoProvenance
   -- Why Ord?  See Note [Ord instance of IfaceType] in GHC.Iface.Type
 
 instance Outputable UnivCoProvenance where
-  ppr (PhantomProv _)      = text "(phantom)"
-  ppr (ProofIrrelProv _)   = text "(proof irrel.)"
-  ppr (PluginProv str cvs) = parens (text "plugin" <+> brackets (text str) <+> ppr cvs)
+  ppr PhantomProv          = text "(phantom)"
   ppr UnaryClassProv       = text "(unary-class)"
+  ppr (ProofIrrelProv {})  = text "(proof irrel)"
+  ppr (PluginProv str)     = parens (text "plugin" <+> brackets (text str))
 
 instance NFData UnivCoProvenance where
   rnf p = p `seq` ()
@@ -1586,6 +1586,7 @@ instance Binary UnivCoProvenance where
   put_ bh PhantomProv    = putByte bh 1
   put_ bh ProofIrrelProv = putByte bh 2
   put_ bh (PluginProv a) = putByte bh 3 >> put_ bh a
+  put_ bh UnaryClassProv = putByte bh 4
   get bh = do
       tag <- getByte bh
       case tag of
@@ -1593,6 +1594,7 @@ instance Binary UnivCoProvenance where
            2 -> return ProofIrrelProv
            3 -> do a <- get bh
                    return $ PluginProv a
+           4 -> return UnaryClassProv
            _ -> panic ("get UnivCoProvenance " ++ show tag)
 
 
