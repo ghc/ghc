@@ -146,7 +146,7 @@ Build system and packaging
 
 - Bindists: Fixed a bug in the Makefile which caused windows installs to duplicate files. (#24800)
 
-
+- The packages ghc-internal and ghc-experimental are now versioned based on the GHC version they are shipped with.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
