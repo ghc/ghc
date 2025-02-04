@@ -888,8 +888,7 @@ rnDataFamInstDecl :: AssocTyFamInfo
                   -> RnM (DataFamInstDecl GhcRn, FreeVars)
 rnDataFamInstDecl atfi (DataFamInstDecl { dfid_eqn =
                     eqn@(FamEqn { feqn_tycon = tycon })})
-  = do { (eqn', fvs) <-
-           rnFamEqn (TyDataCtx tycon) atfi eqn rnDataDefn
+  = do { (eqn', fvs) <- rnFamEqn (TyDataCtx tycon) atfi eqn rnDataDefn
        ; return (DataFamInstDecl { dfid_eqn = eqn' }, fvs) }
 
 -- Renaming of the associated types in instances.

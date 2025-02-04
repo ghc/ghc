@@ -1866,8 +1866,8 @@ kcConDecl new_or_data tc_res_kind
          -- because that's done in tcConDecl
        }
 
-kcConDecl new_or_data tc_res_kind
-                      -- ToDo: fix this comment NB: _tc_res_kind is unused.   See (KCD3) in
+kcConDecl new_or_data _tc_res_kind
+                      -- NB: _tc_res_kind is unused.   See (KCD3) in
                       -- Note [kcConDecls: kind-checking data type decls]
           (ConDeclGADT { con_names = names, con_bndrs = L _ outer_bndrs
                        , con_mb_cxt = cxt, con_g_args = args, con_res_ty = res_ty })
@@ -3770,7 +3770,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _tc_res_kind tag_map
        ; (tclvl, wanted, (outer_bndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts, res_kind)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
               tcOuterTKBndrs skol_info outer_hs_bndrs       $
-              do { ctxt   <- tcHsContext cxt
+              do { ctxt <- tcHsContext cxt
 
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                               -- See Note [GADT return kinds]
