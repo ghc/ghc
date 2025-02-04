@@ -18,25 +18,33 @@ newtype Fix1b f where
 
 -- A plain newtype, GADT syntax, with a return kind signature
 -- Should infer Fix2 :: forall r k. (k -> TYPE r) -> TYPE r
-newtype Fix2 f :: TYPE r where
-   In2 :: forall ff. ff (Fix2 ff) -> Fix2 ff
+-- Rejected because of deafulting; maybe that's OK
+-- newtype Fix2 f :: TYPE r where
+--   In2 :: forall ff. ff (Fix2 ff) -> Fix2 ff
 
 -- Plain newtype, H98 syntax, standalone kind signature
--- Should get In3 :: forall r k (f :: k -> TYPE r). Fix4 @r @k f -> Fix4 @r @k f
---type Fix3 :: forall r k. (k -> TYPE r) -> k
---newtype Fix3 f = In3 (f (Fix3 f))
+-- Should get In3 :: forall r (f :: TYPE r -> TYPE r). Fix3 @r f -> Fix3 @r f
+type Fix3 :: forall r. (TYPE r -> TYPE r) -> TYPE r
+newtype Fix3 f = In3 (f (Fix3 f))
 
-{-
+-- This variant produces a /terrible/ message
+-- type Fix3a :: forall r k. (TYPE r -> TYPE r) -> TYPE r
+-- newtype Fix3a f = In3a (f (Fix3 f))
+
 -- Plain newtype, H98 syntax, standalone kind signature
 -- Should get In4 :: forall r k (f :: k -> TYPE r). Fix4 @r @k f -> Fix4 @r @k f
-type Fix4 :: forall r k. (k -> TYPE r) -> k
+type Fix4 :: forall r. (TYPE r -> TYPE r) -> TYPE r
 newtype Fix4 f where
-  In4 :: forall rr kk (ff :: kk -> TYPE rr).
-         ff (Fix4 ff) -> Fix4 @rr @kk ff
--}
+  In4 :: forall rr (ff :: TYPE rr -> TYPE rr).
+         ff (Fix4 ff) -> Fix4 @rr ff
+
+-- Rejected because of defaulting; maybe that's OK
+--type Fix4a :: forall r. (TYPE r -> TYPE r) -> TYPE r
+--newtype Fix4a f where
+--  In4a :: ff (Fix4a ff) -> Fix4a ff
+
 -------------------- Data families with newtype instance -----------------
 
-{-
 -- data instance in GADT sytntax
 data family Dix1 :: (k -> Type) -> k
 data instance Dix1 f where
@@ -47,17 +55,25 @@ data family Dix2 :: (k -> Type) -> k
 newtype instance Dix2 f where
   DIn2 :: forall ff. ff (Dix2 ff) -> Dix2 ff
 
+data family Dix2a :: (k -> Type) -> k
+newtype instance Dix2a f :: Type where
+  DIn2a :: forall ff. ff (Dix2a ff) -> Dix2a ff
+
 -- newtype instance in H98 syntax
 data family Dix3 :: (k -> Type) -> k
 newtype instance Dix3 f = DIn3 (f (Dix3 f))
 
 -- newtype instance in GADT syntax
+-- Rejected because of defaulting
 data family Dix4 :: (k -> TYPE r) -> k
 newtype instance Dix4 f where
   DIn4 :: forall ff. ff (Dix4 ff) -> Dix4 ff
+
+--data family Dix4a :: (k -> TYPE r) -> k
+--newtype instance forall r f. Dix4a f :: TYPE r where
+--  DIn4a :: forall r (ff :: TYPE r -> TYPE r). ff (Dix4a ff) -> Dix4a ff
 
 -- newtype instance in H98 syntax
 data family Dix5 :: (k -> TYPE r) -> k
 newtype instance Dix5 f = DIn5 (f (Dix5 f))
 
--}
