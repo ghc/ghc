@@ -84,6 +84,7 @@ main = do
   cp "_build/stage0/bin/unlit" "_build/stage1/bin/unlit"
   createDirectoryIfMissing True "_build/stage1/lib"
   cp "_build/stage0/lib/settings" "_build/stage1/lib/settings"
+  cp "_build/stage0/lib/template-hsc.h" "_build/stage1/lib/template-hsc.h"
 
   msg "Building stage2 GHC program"
   createDirectoryIfMissing True "_build/stage2"
@@ -184,6 +185,9 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , "package ghc-boot-th"
         , "  flags: +bootstrap"
         , ""
+        , "package hcs2hs"
+        , "  flags: +in-ghc-tree" -- allow finding template-hsc.h in GHC's /lib
+        , ""
           -- allow template-haskell with newer ghc-boot-th
         , "allow-newer: ghc-boot-th"
         , ""
@@ -248,6 +252,9 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , ""
         , "package ghc-bin"
         , "  flags: +internal-interpreter"
+        , ""
+        , "package hcs2hs"
+        , "  flags: +in-ghc-tree" -- allow finding template-hsc.h in GHC's /lib
         , ""
         , "package haskeline"
         , "  flags: -terminfo" -- FIXME: should be enabled but I don't have the static libs for terminfo on ArchLinux...
@@ -327,6 +334,8 @@ buildGhcStage booting opts cabal ghc0 dst = do
   copy_bin "ghc-pkg:ghc-pkg" "ghc-pkg"
   copy_bin "unlit:unlit"     "unlit"
   copy_bin "hsc2hs:hsc2hs"   "hsc2hs"
+  createDirectoryIfMissing True (dst </> "lib")
+  cp (src </> "utils/hsc2hs/data/template-hsc.h") (dst </> "lib/template-hsc.h")
 
   unless booting $ do
     copy_bin "hp2ps:hp2ps"   "hp2ps"
