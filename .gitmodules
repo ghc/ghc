@@ -98,7 +98,7 @@
 	ignore = untracked
 [submodule "utils/hsc2hs"]
 	path = utils/hsc2hs
-	url = https://github.com/hsyl20/hsc2hs.git
+	url = https://gitlab.haskell.org/ghc/hsc2hs.git
 	ignore = untracked
 [submodule "libffi-tarballs"]
 	path = libffi-tarballs
