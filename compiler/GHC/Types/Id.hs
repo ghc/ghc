@@ -165,13 +165,9 @@ import GHC.Stg.EnforceEpt.TagSig
 import GHC.Unit.Module
 import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Builtin.Uniques (mkBuiltinUnique)
-import GHC.Builtin.Uniques (mkBuiltinUnique)
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
-import GHC.Data.Maybe
-
-import GHC.Unit.Module
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
