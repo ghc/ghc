@@ -38,7 +38,7 @@ newtype Fix4 f where
   In4 :: forall rr (ff :: TYPE rr -> TYPE rr).
          ff (Fix4 ff) -> Fix4 @rr ff
 
--- Rejected because of defaulting; maybe that's OK
+-- Rejected because of defulting; maybe that's OK
 --type Fix4a :: forall r. (TYPE r -> TYPE r) -> TYPE r
 --newtype Fix4a f where
 --  In4a :: ff (Fix4a ff) -> Fix4a ff
