@@ -15,9 +15,7 @@ module GHC.Parser.PreProcess (
 ) where
 
 import Data.Char
-import Data.Map (Map)
 import Data.Map qualified as Map
-import Data.Set qualified as Set
 import Debug.Trace (trace)
 import GHC.Data.FastString
 import GHC.Data.Strict qualified as Strict

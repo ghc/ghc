@@ -58,11 +58,12 @@ import qualified GHC.Driver.Errors.Types as GHC
 import qualified GHC.Driver.Session     as GHC
 import qualified GHC.Parser             as GHC
 import qualified GHC.Parser.Header      as GHC
-import qualified GHC.Parser.Lexer       as GHC
+import qualified GHC.Parser.Lexer       as GHC hiding (initParserState)
 import qualified GHC.Parser.PostProcess as GHC
 import qualified GHC.Types.SrcLoc       as GHC
 
 import qualified GHC.LanguageExtensions as LangExt
+import qualified GHC.Parser.PreProcess as GHC
 
 -- ---------------------------------------------------------------------
 
@@ -70,7 +71,7 @@ import qualified GHC.LanguageExtensions as LangExt
 -- element.
 parseWith :: GHC.DynFlags
           -> FilePath
-          -> GHC.P () w
+          -> GHC.P GHC.PpState w
           -> String
           -> ParseResult w
 parseWith dflags fileName parser s =
@@ -84,7 +85,7 @@ parseWith dflags fileName parser s =
 parseWithECP :: (GHC.DisambECP w)
           => GHC.DynFlags
           -> FilePath
-          -> GHC.P () GHC.ECP
+          -> GHC.P GHC.PpState GHC.ECP
           -> String
           -> ParseResult (GHC.LocatedA w)
 parseWithECP dflags fileName parser s =
@@ -96,12 +97,12 @@ parseWithECP dflags fileName parser s =
 
 -- ---------------------------------------------------------------------
 
-runParser :: GHC.P () a -> GHC.DynFlags -> FilePath -> String -> GHC.ParseResult () a
+runParser :: GHC.P GHC.PpState a -> GHC.DynFlags -> FilePath -> String -> GHC.ParseResult GHC.PpState a
 runParser parser flags filename str = GHC.unP parser parseState
     where
       location = GHC.mkRealSrcLoc (GHC.mkFastString filename) 1 1
       buffer = GHC.stringToStringBuffer str
-      parseState = GHC.initParserState () (GHC.initParserOpts flags) buffer location
+      parseState = GHC.initParserState (GHC.initParserOpts flags) buffer location
 
 -- ---------------------------------------------------------------------
 
@@ -119,7 +120,7 @@ withDynFlags libdir action = ghcWrapper libdir $ do
 
 -- ---------------------------------------------------------------------
 
-parseFile :: GHC.DynFlags -> FilePath -> String -> GHC.ParseResult () (GHC.Located (GHC.HsModule GHC.GhcPs))
+parseFile :: GHC.DynFlags -> FilePath -> String -> GHC.ParseResult GHC.PpState (GHC.Located (GHC.HsModule GHC.GhcPs))
 parseFile = runParser GHC.parseModule
 
 -- ---------------------------------------------------------------------
