@@ -1,6 +1,6 @@
 module GHC.Parser.PreProcess.Eval where
 
-import GHC.Parser.PreProcess.Types
+import GHC.Parser.PreProcess.State
 import GHC.Prelude
 
 -- ---------------------------------------------------------------------

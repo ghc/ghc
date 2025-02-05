@@ -25,10 +25,17 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 
-import ParsePP
-import ParseSimulate
-import PreProcess
-import Types
+-- import ParsePP
+-- import ParseSimulate
+-- import PreProcess
+-- import Types
+
+import GHC.Parser.PreProcess.ParsePP
+-- import GHC.Parser.ParseSimulate
+import GHC.Parser.PreProcess
+import GHC.Parser.PreProcess as PP
+import GHC.Parser.PreProcess.State
+import GHC.Parser
 
 -- ---------------------------------------------------------------------
 
@@ -69,9 +76,10 @@ strGetToks includes popts filename str = reverse $ lexAll pstate
     buf = stringToStringBuffer str
     -- cpp_enabled = Lexer.GhcCppBit `Lexer.xtest` Lexer.pExtsBitmap popts
 
-    lexAll state = case unP (ppLexerDbg True return) state of
+    lexAll state = case unP (PP.lexerDbg True return) state of
         -- POk _ t@(L _ ITeof) -> [t]
         POk s t@(L _ ITeof) -> trace ("lexall end:s=" ++ show (Lexer.pp s)) [t]
+        -- POk s t@(L _ ITeof) -> trace ("lexall end:s=" ++ showPprUnsafe (Lexer.comment_q s)) [t]
         POk state' t -> t : lexAll state'
         -- (trace ("lexAll: " ++ show (unLoc t)) state')
         PFailed pst -> error $ "failed" ++ showErrorMessages (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
@@ -86,42 +94,42 @@ showErrorMessages msgs =
                 getMessages $
                     msgs
 
-strParserWrapper ::
-    -- | Haskell module source text (full Unicode is supported)
-    String ->
-    -- | the flags
-    DynFlags ->
-    -- | the filename (for source locations)
-    FilePath ->
-    [Located Token]
-strParserWrapper str dflags filename =
-    case strParser str dflags filename of
-        (_, Left _err) -> error "oops"
-        (_, Right toks) -> toks
+-- strParserWrapper ::
+--     -- | Haskell module source text (full Unicode is supported)
+--     String ->
+--     -- | the flags
+--     DynFlags ->
+--     -- | the filename (for source locations)
+--     FilePath ->
+--     [Located Token]
+-- strParserWrapper str dflags filename =
+--     case strParser str dflags filename of
+--         (_, Left _err) -> error "oops"
+--         (_, Right toks) -> toks
 
-{- | Parse a file, using the emulated haskell parser, returning the
-resulting tokens only
--}
-strParser ::
-    -- | Haskell module source text (full Unicode is supported)
-    String ->
-    -- | the flags
-    DynFlags ->
-    -- | the filename (for source locations)
-    FilePath ->
-    (WarningMessages, Either ErrorMessages [Located Token])
-strParser str dflags filename =
-    let
-        loc = mkRealSrcLoc (mkFastString filename) 1 1
-        buf = stringToStringBuffer str
-     in
-        case unP parseModuleNoHaddock (Lexer.initParserState initPpState (initParserOpts dflags) buf loc) of
-            PFailed pst ->
-                let (warns, errs) = Lexer.getPsMessages pst
-                 in (GhcPsMessage <$> warns, Left $ GhcPsMessage <$> errs)
-            POk pst rdr_module ->
-                let (warns, _) = Lexer.getPsMessages pst
-                 in (GhcPsMessage <$> warns, Right rdr_module)
+-- {- | Parse a file, using the emulated haskell parser, returning the
+-- resulting tokens only
+-- -}
+-- strParser ::
+--     -- | Haskell module source text (full Unicode is supported)
+--     String ->
+--     -- | the flags
+--     DynFlags ->
+--     -- | the filename (for source locations)
+--     FilePath ->
+--     (WarningMessages, Either ErrorMessages [Located Token])
+-- strParser str dflags filename =
+--     let
+--         loc = mkRealSrcLoc (mkFastString filename) 1 1
+--         buf = stringToStringBuffer str
+--      in
+--         case unP parseModuleNoHaddock (Lexer.initParserState initPpState (initParserOpts dflags) buf loc) of
+--             PFailed pst ->
+--                 let (warns, errs) = Lexer.getPsMessages pst
+--                  in (GhcPsMessage <$> warns, Left $ GhcPsMessage <$> errs)
+--             POk pst rdr_module ->
+--                 let (warns, _) = Lexer.getPsMessages pst
+--                  in (GhcPsMessage <$> warns, Right rdr_module)
 
 initDynFlags :: (GHC.GhcMonad m) => m GHC.DynFlags
 initDynFlags = do
@@ -332,6 +340,19 @@ t11 = do
     doTest
         [ "#define FOO 4"
         , "#if FOO > 3"
+        , "x = 1"
+        , "#else"
+        , "x = 5"
+        , "#endif"
+        ]
+  -- x = 1
+
+t12 :: IO ()
+t12 = do
+    doTest
+        [ "#define FOO 4"
+        , "#if FOO > 3"
+        , "#dumpghccpp"
         , "x = 1"
         , "#else"
         , "x = 5"
