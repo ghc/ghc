@@ -5,6 +5,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use newtype instead of data" #-}
+{-# HLINT ignore "Use camelCase" #-}
+
 import Data.Aeson as A
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -199,7 +204,7 @@ data FlavourTrans =
 data BaseFlavour = Release | Validate | SlowValidate deriving Eq
 
 -----------------------------------------------------------------------------
--- Build Configs
+-- Build Configurations
 -----------------------------------------------------------------------------
 
 -- | A standard build config
@@ -244,7 +249,7 @@ releaseConfig = vanilla { buildFlavour = Release }
 debug :: BuildConfig
 debug = vanilla { buildFlavour = SlowValidate
                 , withAssertions = True
-                -- WithNuma so at least one job tests Numa
+                  -- WithNuma so at least one job tests Numa
                 , withNuma = True
                 }
 
@@ -280,21 +285,21 @@ usePerfProfilingTestsuite :: BuildConfig -> BuildConfig
 usePerfProfilingTestsuite bc = bc { testsuiteUsePerf = True }
 
 -----------------------------------------------------------------------------
--- Platform specific variables
+-- Identifying Platforms
 -----------------------------------------------------------------------------
 
 -- | These tags have to match what we call the runners on gitlab
 runnerTag :: Arch -> Opsys -> String
 runnerTag arch (Linux _) =
   case arch of
-    Amd64   -> "x86_64-linux"
-    AArch64 -> "aarch64-linux"
-    I386    -> "x86_64-linux"
-runnerTag AArch64 Darwin = "aarch64-darwin"
-runnerTag Amd64 Darwin = "x86_64-darwin-m1"
-runnerTag Amd64 Windows = "new-x86_64-windows"
+    Amd64                -> "x86_64-linux"
+    AArch64              -> "aarch64-linux"
+    I386                 -> "x86_64-linux"
+runnerTag AArch64 Darwin  = "aarch64-darwin"
+runnerTag Amd64 Darwin    = "x86_64-darwin-m1"
+runnerTag Amd64 Windows   = "new-x86_64-windows"
 runnerTag Amd64 FreeBSD14 = "x86_64-freebsd14"
-runnerTag _ _ = error "Invalid arch/opsys"
+runnerTag _ _             = error "Invalid arch/opsys"
 
 tags :: Arch -> Opsys -> BuildConfig -> [String]
 tags arch opsys _bc = [runnerTag arch opsys] -- Tag for which runners we can use
@@ -305,34 +310,34 @@ runnerPerfTag arch sys = runnerTag arch sys ++ "-perf"
 -- These names are used to find the docker image so they have to match what is
 -- in the docker registry.
 distroName :: LinuxDistro -> String
-distroName Debian12   = "deb12"
-distroName Debian11   = "deb11"
-distroName Debian11Js = "deb11-emsdk-closure"
+distroName Debian12      = "deb12"
+distroName Debian11      = "deb11"
+distroName Debian11Js    = "deb11-emsdk-closure"
 distroName Debian12Riscv = "deb12-riscv"
-distroName Debian10   = "deb10"
-distroName Debian9    = "deb9"
-distroName Fedora33   = "fedora33"
-distroName Fedora38   = "fedora38"
-distroName Ubuntu1804 = "ubuntu18_04"
-distroName Ubuntu2004 = "ubuntu20_04"
-distroName Ubuntu2204 = "ubuntu22_04"
-distroName Centos7    = "centos7"
-distroName Alpine312  = "alpine3_12"
-distroName Alpine318  = "alpine3_18"
-distroName Alpine320  = "alpine3_20"
-distroName AlpineWasm = "alpine3_20-wasm"
-distroName Rocky8     = "rocky8"
+distroName Debian10      = "deb10"
+distroName Debian9       = "deb9"
+distroName Fedora33      = "fedora33"
+distroName Fedora38      = "fedora38"
+distroName Ubuntu1804    = "ubuntu18_04"
+distroName Ubuntu2004    = "ubuntu20_04"
+distroName Ubuntu2204    = "ubuntu22_04"
+distroName Centos7       = "centos7"
+distroName Alpine312     = "alpine3_12"
+distroName Alpine318     = "alpine3_18"
+distroName Alpine320     = "alpine3_20"
+distroName AlpineWasm    = "alpine3_20-wasm"
+distroName Rocky8        = "rocky8"
 
 opsysName :: Opsys -> String
 opsysName (Linux distro) = "linux-" ++ distroName distro
-opsysName Darwin = "darwin"
-opsysName FreeBSD14 = "freebsd14"
-opsysName Windows = "windows"
+opsysName Darwin         = "darwin"
+opsysName FreeBSD14      = "freebsd14"
+opsysName Windows        = "windows"
 
 archName :: Arch -> String
-archName Amd64 = "x86_64"
+archName Amd64   = "x86_64"
 archName AArch64 = "aarch64"
-archName I386  = "i386"
+archName I386    = "i386"
 
 binDistName :: Arch -> Opsys -> BuildConfig -> String
 binDistName arch opsys bc = "ghc-" ++ testEnv arch opsys bc
@@ -341,16 +346,18 @@ binDistName arch opsys bc = "ghc-" ++ testEnv arch opsys bc
 -- Either the change is reflected by modifying the flavourString or directly (as is
 -- the case for settings which affect environment variables)
 testEnv :: Arch -> Opsys -> BuildConfig -> String
-testEnv arch opsys bc = intercalate "-" $
-                        [ archName arch
-                        , opsysName opsys ]
-                        ++ ["int_" ++ bignumString (bignumBackend bc) | bignumBackend bc /= Gmp]
-                        ++ ["unreg" | unregisterised bc ]
-                        ++ ["numa"  | withNuma bc ]
-                        ++ ["zstd"  | withZstd bc ]
-                        ++ ["no_tntc"  | not (tablesNextToCode bc) ]
-                        ++ ["cross_"++triple  | Just triple <- pure $ crossTarget bc ]
-                        ++ [flavourString (mkJobFlavour bc)]
+testEnv arch opsys bc =
+  intercalate "-" $ concat
+    [ [ archName arch
+      , opsysName opsys ]
+    , ["int_" ++ bignumString (bignumBackend bc) | bignumBackend bc /= Gmp]
+    , ["unreg" | unregisterised bc ]
+    , ["numa"  | withNuma bc ]
+    , ["zstd"  | withZstd bc ]
+    , ["no_tntc"  | not (tablesNextToCode bc) ]
+    , ["cross_"++triple  | Just triple <- pure $ crossTarget bc ]
+    , [flavourString (mkJobFlavour bc)]
+    ]
 
 -- | The hadrian flavour string we are going to use for this build
 flavourString :: Flavour -> String
@@ -384,7 +391,7 @@ dockerImage arch (Linux distro) =
 dockerImage _ _ = Nothing
 
 -----------------------------------------------------------------------------
--- Platform specific variables
+-- Platform-specific variables
 -----------------------------------------------------------------------------
 
 -- The variables map is a monoidal map so that we don't ever accidentally lose
@@ -438,35 +445,36 @@ opsysVariables _ FreeBSD14 = mconcat
   , "CABAL_INSTALL_VERSION" =: "3.10.3.0"
   ]
 opsysVariables arch (Linux distro) = distroVariables arch distro
-opsysVariables AArch64 (Darwin {}) =
-  mconcat [ "NIX_SYSTEM" =: "aarch64-darwin"
-          , "MACOSX_DEPLOYMENT_TARGET" =: "11.0"
-          , "LANG" =: "en_US.UTF-8"
-          , "CONFIGURE_ARGS" =: "--with-intree-gmp --with-system-libffi"
-          -- Fonts can't be installed on darwin
-          , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
-          ]
-opsysVariables Amd64 (Darwin {}) =
-  mconcat [ "NIX_SYSTEM" =: "x86_64-darwin"
-          , "MACOSX_DEPLOYMENT_TARGET" =: "11.0"
-          -- "# Only Sierra and onwards supports clock_gettime. See #12858"
-          , "ac_cv_func_clock_gettime" =: "no"
-          -- # Only newer OS Xs support utimensat. See #17895
-          , "ac_cv_func_utimensat" =: "no"
-          -- # Only newer OS Xs support futimens. See #22938
-          , "ac_cv_func_futimens" =: "no"
-          , "LANG" =: "en_US.UTF-8"
-          , "CONFIGURE_ARGS" =: "--with-intree-gmp --with-system-libffi"
-          -- Fonts can't be installed on darwin
-          , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
+opsysVariables AArch64 (Darwin {}) = mconcat
+  [ "NIX_SYSTEM" =: "aarch64-darwin"
+  , "MACOSX_DEPLOYMENT_TARGET" =: "11.0"
+  , "LANG" =: "en_US.UTF-8"
+  , "CONFIGURE_ARGS" =: "--with-intree-gmp --with-system-libffi"
+    -- Fonts can't be installed on darwin
+  , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
+  ]
+opsysVariables Amd64 (Darwin {}) = mconcat
+  [ "NIX_SYSTEM" =: "x86_64-darwin"
+  , "MACOSX_DEPLOYMENT_TARGET" =: "11.0"
+    -- Only Sierra and onwards supports clock_gettime. See #12858
+  , "ac_cv_func_clock_gettime" =: "no"
+    -- Only newer OS Xs support utimensat. See #17895
+  , "ac_cv_func_utimensat" =: "no"
+    -- Only newer OS Xs support futimens. See #22938
+  , "ac_cv_func_futimens" =: "no"
+  , "LANG" =: "en_US.UTF-8"
+  , "CONFIGURE_ARGS" =: "--with-intree-gmp --with-system-libffi"
+    -- Fonts can't be installed on darwin
+  , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
 
-          ]
-opsysVariables _ (Windows {}) =
-  mconcat [ "MSYSTEM" =: "CLANG64"
-          , "LANG" =: "en_US.UTF-8"
-          , "CABAL_INSTALL_VERSION" =: "3.10.2.0"
-          , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
-          , "GHC_VERSION" =: "9.6.4" ]
+  ]
+opsysVariables _ (Windows {}) = mconcat
+  [ "MSYSTEM" =: "CLANG64"
+  , "LANG" =: "en_US.UTF-8"
+  , "CABAL_INSTALL_VERSION" =: "3.10.2.0"
+  , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
+  , "GHC_VERSION" =: "9.6.4"
+  ]
 opsysVariables _ _ = mempty
 
 alpineVariables :: Arch -> Variables
@@ -481,7 +489,7 @@ alpineVariables arch = mconcat $
   | I386 <- [arch]
   ] ++
   [ brokenTest "T22033" "#25497" | I386 <- [arch] ] ++
-  [-- Bootstrap compiler has incorrectly configured target triple #25200
+  [ -- Bootstrap compiler has incorrectly configured target triple #25200
     "CONFIGURE_ARGS" =: "--enable-ignore-build-platform-mismatch --build=aarch64-unknown-linux --host=aarch64-unknown-linux --target=aarch64-unknown-linux"
   | AArch64 <- [arch]
   ]
@@ -491,15 +499,14 @@ distroVariables :: Arch -> LinuxDistro -> Variables
 distroVariables arch Alpine312 = alpineVariables arch
 distroVariables arch Alpine318 = alpineVariables arch
 distroVariables arch Alpine320 = alpineVariables arch
-distroVariables _ Centos7 = mconcat [
-    "HADRIAN_ARGS" =: "--docs=no-sphinx"
-  , brokenTest "T22012" "#23979"
-  ]
-distroVariables _ Fedora33 = mconcat
+distroVariables _    Centos7   = mconcat [ "HADRIAN_ARGS" =: "--docs=no-sphinx"
+                                         , brokenTest "T22012" "#23979"
+                                         ]
+distroVariables _    Fedora33  = mconcat
   -- LLC/OPT do not work for some reason in our fedora images
   -- These tests fail with this error: T11649 T5681 T7571 T8131b
   -- +/opt/llvm/bin/opt: /lib64/libtinfo.so.5: no version information available (required by /opt/llvm/bin/opt)
--- +/opt/llvm/bin/llc: /lib64/libtinfo.so.5: no version information available (required by /opt/llvm/bin/llc)
+  -- +/opt/llvm/bin/llc: /lib64/libtinfo.so.5: no version information available (required by /opt/llvm/bin/llc)
   [ "LLC" =: "/bin/false"
   , "OPT" =: "/bin/false"
   ]
@@ -510,7 +517,7 @@ distroVariables _ _ = mempty
 -----------------------------------------------------------------------------
 
 data Cache
-  = Cache { cacheKey :: String
+  = Cache { cacheKey   :: String
           , cachePaths :: [String]
           }
 
@@ -550,25 +557,27 @@ data ArtifactsWhen = ArtifactsOnSuccess | ArtifactsOnFailure | ArtifactsAlways
 instance ToJSON ArtifactsWhen where
   toJSON ArtifactsOnSuccess = "on_success"
   toJSON ArtifactsOnFailure = "on_failure"
-  toJSON ArtifactsAlways = "always"
+  toJSON ArtifactsAlways    = "always"
 
------------------------------------------------------------------------------
+---------------------------------------------------------------------
 -- Rules, when do we run a job
------------------------------------------------------------------------------
+---------------------------------------------------------------------
 
 -- Data structure which records the condition when a job is run.
-data OnOffRules = OnOffRules { rule_set :: Rule -- ^ The enabled rules
-                             , when :: ManualFlag   -- ^ The additional condition about when to run this job.
-                             }
+data OnOffRules
+  = OnOffRules { rule_set :: Rule -- ^ The enabled rules
+               , when     :: ManualFlag   -- ^ The additional condition about when to run this job.
+               }
 
 -- The initial set of rules, which assumes a Validate pipeline which is run with FullCI.
 emptyRules :: String -> OnOffRules
 emptyRules jobName = OnOffRules (ValidateOnly jobName (S.fromList [FullCI])) OnSuccess
 
 -- When to run the job
-data ManualFlag = Manual -- ^ Only run the job when explicitly triggered by a user
-                | OnSuccess -- ^ Always run it, if the rules pass (the default)
-                deriving Eq
+data ManualFlag
+  = Manual -- ^ Only run the job when explicitly triggered by a user
+  | OnSuccess -- ^ Always run it, if the rules pass (the default)
+  deriving Eq
 
 setRule :: Rule -> OnOffRules -> OnOffRules
 setRule r (OnOffRules _ m) = OnOffRules r m
@@ -595,18 +604,23 @@ manualRule rules = rules { when = Manual }
 enumRules :: OnOffRules -> [OnOffRule]
 enumRules (OnOffRules r _) = rulesList
   where
-    rulesList = case r of
-                  ValidateOnly s rs -> [OnOffRule On (ValidateOnly s rs)
-                                    , OnOffRule Off ReleaseOnly
-                                    , OnOffRule Off Nightly ]
-                  Nightly -> [ OnOffRule Off (ValidateOnly "" S.empty)
-                             , OnOffRule Off ReleaseOnly
-                             , OnOffRule On Nightly ]
-                  ReleaseOnly -> [ OnOffRule Off (ValidateOnly "" S.empty)
-                                 , OnOffRule On ReleaseOnly
-                                 , OnOffRule Off Nightly ]
-
-
+    rulesList =
+      case r of
+        ValidateOnly s rs ->
+          [ OnOffRule On (ValidateOnly s rs)
+          , OnOffRule Off ReleaseOnly
+          , OnOffRule Off Nightly
+          ]
+        Nightly ->
+          [ OnOffRule Off (ValidateOnly "" S.empty)
+          , OnOffRule Off ReleaseOnly
+          , OnOffRule On Nightly
+          ]
+        ReleaseOnly ->
+          [ OnOffRule Off (ValidateOnly "" S.empty)
+          , OnOffRule On ReleaseOnly
+          , OnOffRule Off Nightly
+          ]
 
 data OnOffRule = OnOffRule OnOff Rule
 
@@ -617,45 +631,49 @@ instance ToJSON ManualFlag where
   toJSON OnSuccess = "on_success"
 
 instance ToJSON OnOffRules where
-  toJSON rules = toJSON [object ([
-    "if" A..= and_all (map one_rule (enumRules rules))
-    , "when" A..= toJSON (when rules)]
-    -- Necessary to stop manual jobs stopping pipeline progress
-    -- https://docs.gitlab.com/ee/ci/yaml/#rulesallow_failure
-    ++
-    ["allow_failure" A..= True | when rules == Manual ])]
-
+  toJSON rules = toJSON
+      [object $
+        [ "if" A..= and_all (map one_rule (enumRules rules))
+        , "when" A..= toJSON (when rules)
+        ] ++
+        -- Necessary to stop manual jobs stopping pipeline progress
+        -- https://docs.gitlab.com/ee/ci/yaml/#rulesallow_failure
+        [ "allow_failure" A..= True | when rules == Manual ]
+      ]
     where
       one_rule (OnOffRule onoff r) = ruleString onoff r
 
 
 parens :: [Char] -> [Char]
 parens s = "(" ++ s ++ ")"
+
 and_all :: [[Char]] -> [Char]
 and_all rs = intercalate " && " (map parens rs)
+
 or_all :: [[Char]] -> [Char]
 or_all rs = intercalate " || " (map parens rs)
 
 -- | A Rule corresponds to some condition which must be satisifed in order to
 -- run the job.
-data Rule = ReleaseOnly  -- ^ Only run this job in a release pipeline
-          | Nightly      -- ^ Only run this job in the nightly pipeline
-          | ValidateOnly String (S.Set ValidateRule) -- ^ Only run this job in a validate pipeline, when any of these rules are enabled.
-          deriving (Show, Ord, Eq)
+data Rule
+  = ReleaseOnly  -- ^ Only run this job in a release pipeline
+  | Nightly      -- ^ Only run this job in the nightly pipeline
+  | ValidateOnly String (S.Set ValidateRule) -- ^ Only run this job in a validate pipeline, when any of these rules are enabled.
+  deriving (Show, Ord, Eq)
 
-data ValidateRule =
-            FullCI       -- ^ Run this job when the "full-ci" label is present.
-          | FastCI       -- ^ Run this job on every validation pipeline
-          | LLVMBackend  -- ^ Run this job when the "LLVM backend" label is present
-          | JSBackend    -- ^ Run this job when the "javascript" label is present
-          | RiscV        -- ^ Run this job when the "RISC-V" label is present
-          | WasmBackend  -- ^ Run this job when the "wasm" label is present
-          | FreeBSDLabel -- ^ Run this job when the "FreeBSD" label is set.
-          | NonmovingGc  -- ^ Run this job when the "non-moving GC" label is set.
-          | IpeData      -- ^ Run this job when the "IPE" label is set
-          | TestPrimops  -- ^ Run this job when "test-primops" label is set
-          | I386Backend  -- ^ Run this job when the "i386" label is set
-          deriving (Show, Ord, Eq)
+data ValidateRule
+  = FullCI       -- ^ Run this job when the "full-ci" label is present.
+  | FastCI       -- ^ Run this job on every validation pipeline
+  | LLVMBackend  -- ^ Run this job when the "LLVM backend" label is present
+  | JSBackend    -- ^ Run this job when the "javascript" label is present
+  | RiscV        -- ^ Run this job when the "RISC-V" label is present
+  | WasmBackend  -- ^ Run this job when the "wasm" label is present
+  | FreeBSDLabel -- ^ Run this job when the "FreeBSD" label is set.
+  | NonmovingGc  -- ^ Run this job when the "non-moving GC" label is set.
+  | IpeData      -- ^ Run this job when the "IPE" label is set
+  | TestPrimops  -- ^ Run this job when "test-primops" label is set
+  | I386Backend  -- ^ Run this job when the "i386" label is set
+  deriving (Show, Ord, Eq)
 
 -- A constant evaluating to True because gitlab doesn't support "true" in the
 -- expression language.
@@ -669,21 +687,20 @@ _false = "\"disabled\" != \"disabled\""
 -- Convert the state of the rule into a string that gitlab understand.
 ruleString :: OnOff -> Rule -> String
 ruleString On (ValidateOnly only_job_name vs) =
-  let conds = S.toList vs
-      empty_only_job = envVarNull "ONLY_JOBS"
-      run_cond = case conds of
-                  [] -> _false
-                  cs -> or_all (map validateRuleString conds)
-      escape :: String -> String
-      escape = concatMap (\c -> if c == '+' then "\\+" else [c])
-
-  in
-    or_all  [
-    -- 1. Case when ONLY_JOBS is set
+    or_all
+    [ -- 1. Case when ONLY_JOBS is set
       and_all [ "$ONLY_JOBS", "$ONLY_JOBS =~ /.*\\b" ++  escape only_job_name ++ "(\\s|$).*/" ]
-    -- 2. Case when ONLY_JOBS is null
+      -- 2. Case when ONLY_JOBS is null
     , and_all [ empty_only_job, run_cond ]
     ]
+  where
+    conds = S.toList vs
+    empty_only_job = envVarNull "ONLY_JOBS"
+    run_cond = case conds of
+                 [] -> _false
+                 _  -> or_all (map validateRuleString conds)
+    escape :: String -> String
+    escape = concatMap (\c -> if c == '+' then "\\+" else [c])
 ruleString Off (ValidateOnly {}) = true
 ruleString On ReleaseOnly = "$RELEASE_JOB == \"yes\""
 ruleString Off ReleaseOnly = "$RELEASE_JOB != \"yes\""
@@ -707,12 +724,12 @@ envVarNull var = "$" ++ var ++ " == null"
 
 
 validateRuleString :: ValidateRule -> String
-validateRuleString FullCI = or_all ([ labelString "full-ci"
-                                    , labelString "marge_bot_batch_merge_job"
-                                    , branchStringExact "master"
-                                    , branchStringLike "ghc-[0-9]+\\.[0-9]+"
-                                    ])
-validateRuleString FastCI = true
+validateRuleString FullCI       = or_all [ labelString "full-ci"
+                                         , labelString "marge_bot_batch_merge_job"
+                                         , branchStringExact "master"
+                                         , branchStringLike "ghc-[0-9]+\\.[0-9]+"
+                                         ]
+validateRuleString FastCI       = true
 
 validateRuleString LLVMBackend  = labelString "LLVM backend"
 validateRuleString JSBackend    = labelString "javascript"
@@ -723,6 +740,10 @@ validateRuleString NonmovingGc  = labelString "non-moving GC"
 validateRuleString IpeData      = labelString "IPE"
 validateRuleString TestPrimops  = labelString "test-primops"
 validateRuleString I386Backend  = labelString "i386"
+
+---------------------------------------------------------------------
+-- The Job type
+---------------------------------------------------------------------
 
 -- | A 'Job' is the description of a single job in a gitlab pipeline. The
 -- job contains all the information about how to do the build but can be further
@@ -747,15 +768,15 @@ data Job
 instance ToJSON Job where
   toJSON Job{..} = object
     [ "stage" A..= jobStage
-    -- Convoluted to avoid download artifacts from ghci job
-    -- https://docs.gitlab.com/ee/ci/yaml/#needsartifacts
+      -- Convoluted to avoid download artifacts from ghci job
+      -- https://docs.gitlab.com/ee/ci/yaml/#needsartifacts
     , "needs" A..= map (\j -> object [ "job" A..= j, "artifacts" A..= False ]) jobNeeds
     , "dependencies" A..= jobDependencies
     , "image" A..= jobDockerImage
     , "tags" A..= jobTags
     , "allow_failure" A..= jobAllowFailure
-    -- Joining up variables like this may well be the wrong thing to do but
-    -- at least it doesn't lose information silently by overriding.
+      -- Joining up variables like this may well be the wrong thing to do but
+      -- at least it doesn't lose information silently by overriding.
     , "variables" A..= fmap unwords jobVariables
     , "artifacts" A..= jobArtifacts
     , "cache" A..= jobCache
@@ -783,7 +804,8 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       = [ "bash .gitlab/ci.sh setup"
         , "bash .gitlab/ci.sh configure"
         , "bash .gitlab/ci.sh build_hadrian"
-        , "bash .gitlab/ci.sh test_hadrian" ]
+        , "bash .gitlab/ci.sh test_hadrian"
+        ]
       | otherwise
       = [ "find libraries -name config.sub -exec cp config.sub {} \\;" | Darwin == opsys ] ++
         [ "sudo chown ghc:ghc -R ." | Linux {} <- [opsys]] ++
@@ -803,7 +825,8 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       [ ".gitlab/ci.sh save_cache"
       , ".gitlab/ci.sh save_test_output"
       , ".gitlab/ci.sh clean"
-      , "cat ci_timings" ]
+      , "cat ci_timings"
+      ]
 
     jobFlavour = mkJobFlavour buildConfig
 
@@ -819,9 +842,11 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       , maybe mempty ("CONFIGURE_WRAPPER" =:) (configureWrapper buildConfig)
       , maybe mempty ("CROSS_TARGET" =:) (crossTarget buildConfig)
       , case crossEmulator buildConfig of
-          NoEmulator       -> case crossTarget buildConfig of
-            Nothing -> mempty
-            Just _  -> "CROSS_EMULATOR" =: "NOT_SET" -- we need an emulator but it isn't set. Won't run the testsuite
+          NoEmulator
+            -- we need an emulator but it isn't set. Won't run the testsuite
+            | Just _ <- crossTarget buildConfig
+                           -> "CROSS_EMULATOR" =: "NOT_SET"
+            | otherwise    -> mempty
           Emulator s       -> "CROSS_EMULATOR" =: s
           NoEmulatorNeeded -> mempty
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else mempty
@@ -901,8 +926,10 @@ setVariable k v j = j { jobVariables = MonoidalMap $ Map.insert k [v] $ unMonoid
 delVariable :: String -> Job -> Job
 delVariable k j = j { jobVariables = MonoidalMap $ Map.delete k $ unMonoidalMap $ jobVariables j }
 
+---------------------------------------------------------------------
 -- Building the standard jobs
---
+---------------------------------------------------------------------
+
 -- | Make a normal validate CI job
 validate :: Arch -> Opsys -> BuildConfig -> NamedJob Job
 validate = job
@@ -919,15 +946,27 @@ releaseRule = setJobRule ReleaseOnly
 nightly :: Arch -> Opsys -> BuildConfig -> NamedJob Job
 nightly arch opsys bc =
   let NamedJob n j = job arch opsys bc
-  in NamedJob { name = "nightly-" ++ n, jobInfo = nightlyRule . keepArtifacts "8 weeks" . highCompression $ j}
+  in NamedJob { name = "nightly-" ++ n
+              , jobInfo = nightlyRule
+                        . keepArtifacts "8 weeks"
+                        . highCompression $ j
+              }
 
 -- | Make a normal release CI job
 release :: Arch -> Opsys -> BuildConfig -> NamedJob Job
 release arch opsys bc =
   let NamedJob n j = job arch opsys (bc { buildFlavour = Release })
-  in NamedJob { name = "release-" ++ n, jobInfo = releaseRule . keepArtifacts "1 year" . ignorePerfFailures . useHashUnitIds . highCompression $ j}
+  in NamedJob { name = "release-" ++ n
+              , jobInfo = releaseRule
+                        . keepArtifacts "1 year"
+                        . ignorePerfFailures
+                        . useHashUnitIds
+                        . highCompression $ j
+              }
 
+---------------------------------------------------------------------
 -- Specific job modification functions
+---------------------------------------------------------------------
 
 -- | Mark a job as requiring a manual trigger.
 manual :: Job -> Job
@@ -984,6 +1023,10 @@ onlyRule t = modifyValidateJobs (onlyValidateJobRule t)
 disableValidate :: JobGroup Job -> JobGroup Job
 disableValidate = modifyValidateJobs (removeValidateJobRule FastCI . removeValidateJobRule FullCI)
 
+---------------------------------------------------------------------
+-- NamedJob
+---------------------------------------------------------------------
+
 data NamedJob a = NamedJob { name :: String, jobInfo :: a } deriving (Show, Functor)
 
 renameJob :: (String -> String) -> NamedJob a -> NamedJob a
@@ -994,14 +1037,18 @@ instance ToJSON a => ToJSON (NamedJob a) where
     [ "name" A..= name nj
     , "jobInfo" A..= jobInfo nj ]
 
-
---data NamedJobGroup a = NamedJobGroup { platform :: String, jg :: JobGroup a }
+---------------------------------------------------------------------
+-- JobGroup
+---------------------------------------------------------------------
 
 -- Jobs are grouped into either triples or pairs depending on whether the
 -- job is just validate and nightly, or also release.
-data JobGroup a = StandardTriple { v :: Maybe (NamedJob a)
-                                 , n :: Maybe (NamedJob a)
-                                 , r :: Maybe (NamedJob a) } deriving (Functor, Show)
+data JobGroup a
+  = StandardTriple { v :: Maybe (NamedJob a)
+                   , n :: Maybe (NamedJob a)
+                   , r :: Maybe (NamedJob a)
+                   }
+  deriving (Functor, Show)
 
 instance ToJSON a => ToJSON (JobGroup a) where
   toJSON StandardTriple{..} = object
@@ -1039,16 +1086,19 @@ flattenJobGroup (StandardTriple a b c) = map flattenNamedJob (catMaybes [a,b,c])
 flattenNamedJob :: NamedJob a -> (String, a)
 flattenNamedJob (NamedJob n i) = (n, i)
 
-
 -- | Specification for all the jobs we want to build.
 jobs :: Map String Job
-jobs = Map.fromList $ concatMap (flattenJobGroup) job_groups
+jobs = Map.fromList $ concatMap flattenJobGroup job_groups
+
+---------------------------------------------------------------------
+-- Job definitions
+---------------------------------------------------------------------
 
 debian_x86 :: [JobGroup Job]
 debian_x86 =
   [ -- Release configurations
-  -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
-  -- not being at EOL until April 2023 and they still need tinfo5.
+    -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
+    -- not being at EOL until April 2023 and they still need tinfo5.
     disableValidate (standardBuildsWithConfig Amd64 (Linux Debian9) (splitSectionsBroken vanilla))
   , disableValidate (standardBuilds Amd64 (Linux Debian10))
   , disableValidate (standardBuildsWithConfig Amd64 (Linux Debian10) dwarf)
@@ -1056,15 +1106,15 @@ debian_x86 =
   , disableValidate (standardBuilds Amd64 (Linux Debian12))
 
 
-  -- Validate only builds
+    -- Validate only builds
   , fastCI (validateBuilds Amd64 (Linux validate_debian) debug)
   , validateBuilds Amd64 (Linux validate_debian) nativeInt
   , validateBuilds Amd64 (Linux validate_debian) unreg
-   -- More work is needed to address TSAN failures: #22520
+    -- More work is needed to address TSAN failures: #22520
   , modifyNightlyJobs allowFailure (modifyValidateJobs (allowFailure . manual) tsan_jobs)
   , -- Nightly allowed to fail: #22343
     modifyNightlyJobs allowFailure (modifyValidateJobs manual (validateBuilds Amd64 (Linux validate_debian) noTntc))
-  -- Run the 'perf' profiling nightly job in the release config.
+    -- Run the 'perf' profiling nightly job in the release config.
   , perfProfilingJob Amd64 (Linux Debian12) releaseConfig
 
   , onlyRule LLVMBackend (validateBuilds Amd64 (Linux validate_debian) llvm)
@@ -1095,7 +1145,7 @@ debian_aarch64 =
   [
      disableValidate (standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla))
    , fastCI (standardBuildsWithConfig AArch64 (Linux Debian12) (splitSectionsBroken vanilla))
-   -- LLVM backend bootstrap
+     -- LLVM backend bootstrap
    , onlyRule LLVMBackend (validateBuilds AArch64 (Linux Debian12) llvm)
   ]
 
@@ -1120,11 +1170,10 @@ rhel_x86 =
 
 fedora_x86 :: [JobGroup Job]
 fedora_x86 =
-  [
-  -- Fedora33 job is always built with perf so there's one job in the normal
-  -- validate pipeline which is built with perf.
+  [ -- Fedora33 job is always built with perf so there's one job in the normal
+    -- validate pipeline which is built with perf.
     fastCI (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig)
-  -- This job is only for generating head.hackage docs
+    -- This job is only for generating head.hackage docs
   , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
   , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
   , disableValidate (standardBuilds Amd64 (Linux Fedora38))
@@ -1154,7 +1203,7 @@ alpine_x86 =
   [ -- Fully static build, in theory usable on any linux distribution.
     fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken static))
   , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine312) staticNativeInt)))
-  -- Dynamically linked build, suitable for building your own static executables on alpine
+    -- Dynamically linked build, suitable for building your own static executables on alpine
   , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken vanilla))
   , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine320) (splitSectionsBroken vanilla))
   , allowFailureGroup (standardBuildsWithConfig I386 (Linux Alpine320) (splitSectionsBroken vanilla))
@@ -1173,16 +1222,16 @@ alpine_aarch64 = [
 
 cross_jobs :: [JobGroup Job]
 cross_jobs = [
-  -- x86 -> aarch64
+    -- x86 -> aarch64
     validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
 
-  -- x86_64 -> riscv
+    -- x86_64 -> riscv
   , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian12Riscv) (crossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
 
-  -- Javascript
+    -- Javascript
   , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11Js) javascriptConfig)
 
-  -- Wasm
+    -- Wasm
   , make_wasm_jobs wasm_build_config
   , modifyValidateJobs manual $
       make_wasm_jobs wasm_build_config {bignumBackend = Native}
@@ -1203,10 +1252,9 @@ cross_jobs = [
 
     wasm_build_config =
       (crossConfig "wasm32-wasi" NoEmulatorNeeded Nothing)
-        {
-          hostFullyStatic = True
-          , buildFlavour     = Release -- TODO: This needs to be validate but wasm backend doesn't pass yet
-          , textWithSIMDUTF = True
+        { hostFullyStatic = True
+        , buildFlavour    = Release -- TODO: This needs to be validate but wasm backend doesn't pass yet
+        , textWithSIMDUTF = True
         }
 
 job_groups :: [JobGroup Job]
@@ -1224,6 +1272,9 @@ job_groups =
   ++ cross_jobs
   ++ freebsd_jobs
 
+---------------------------------------------------------------------
+-- Platform mapping for GHCup metadata
+---------------------------------------------------------------------
 
 mkPlatform :: Arch -> Opsys -> String
 mkPlatform arch opsys = archName arch <> "-" <> opsysName opsys
@@ -1267,7 +1318,11 @@ platform_mapping = Map.map go combined_result
                 , "release-x86_64-windows-release"
                 ]
 
-    process sel = Map.fromListWith combine [ (uncurry mkPlatform (jobPlatform (jobInfo $ j)), j) | (sel -> Just j) <- job_groups  ]
+    process sel =
+      Map.fromListWith combine
+      [ (uncurry mkPlatform (jobPlatform (jobInfo j)), j)
+      | (sel -> Just j) <- job_groups
+      ]
 
     vs = process v
     ns = process n
@@ -1275,10 +1330,13 @@ platform_mapping = Map.map go combined_result
 
     all_platforms = Map.keysSet vs <> Map.keysSet ns <> Map.keysSet rs
 
-    combined_result = Map.fromList [ (p, StandardTriple { v = Map.lookup p vs
-                                                        , n = Map.lookup p ns
-                                                        , r = Map.lookup p rs })
-                                   | p <- S.toList all_platforms ]
+    combined_result =
+      Map.fromList
+      [ (p, StandardTriple { v = Map.lookup p vs
+                           , n = Map.lookup p ns
+                           , r = Map.lookup p rs })
+      | p <- S.toList all_platforms
+      ]
 
     combine a b
       | name a `elem` whitelist = a -- Explicitly selected
@@ -1293,6 +1351,9 @@ data BindistInfo = BindistInfo { bindistName :: String } deriving Show
 instance ToJSON BindistInfo where
   toJSON (BindistInfo n) = object [ "bindistName" A..= n ]
 
+---------------------------------------------------------------------
+-- Main entrypoint
+---------------------------------------------------------------------
 
 main :: IO ()
 main = do
