@@ -1,4 +1,4 @@
-module GHC.Parser.PreProcess.Types where
+module GHC.Parser.PreProcess.State where
 
 import Data.List.NonEmpty (NonEmpty (..), (<|))
 import Data.List.NonEmpty qualified as NonEmpty
@@ -54,6 +54,7 @@ data CppDirective
     | CppIf String
     | CppElse
     | CppEndif
+    | CppDumpState
     deriving (Show, Eq)
 
 -- ---------------------------------------------------------------------
@@ -159,6 +160,9 @@ setAccepting :: Bool -> PP ()
 setAccepting on = do
     scope <- getScope
     setScope (scope{pp_accepting = on})
+
+pushAccepting :: Bool -> PP ()
+pushAccepting on = pushScope (PpScope Map.empty on)
 
 pushAccepting' :: PpState -> Bool -> PpState
 pushAccepting' s on = pushScope' s (PpScope Map.empty on)
