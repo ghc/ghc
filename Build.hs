@@ -99,6 +99,11 @@ main = do
   -- -fplugin-library.
   createDirectoryIfMissing True "_build/stage2/lib/"
   cp "_build/stage1/pkgs/*" "_build/stage2/pkgs"
+  cp "_build/stage1/pkgs/package.cache" "_build/stage2/pkgs/package.cache"
+     -- copy package.cache last to make the date younger than other files,
+     -- otherwise we get a load of warnings like this:
+     --   WARNING: cache is out of date: {..}/_build/stage2/lib/../pkgs/package.cache
+     --   ghc will see an old view of this package db. Use 'ghc-pkg recache' to fix.
   cp "_build/stage1/lib/settings" "_build/stage2/lib/settings"
 
   msg "Done"
@@ -689,11 +694,42 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "rts"
         , "ghc-internal"
         , "base"
+        , "stm"
           -- shallow compat packages over ghc-internal
         , "ghc-prim"
         , "ghc-bignum"
         , "integer-gmp"
         , "template-haskell"
+          -- target dependencies
+        , "ghc-boot-th" -- dependency of template-haskell
+        , "pretty"      -- dependency of ghc-boot-th
+          -- other boot libraries used by tests
+        , "array"
+        , "binary"
+        , "bytestring"
+        , "Cabal"
+        , "Cabal-syntax"
+        , "containers"
+        , "deepseq"
+        , "directory"
+        , "exceptions"
+        , "file-io"
+        , "filepath"
+        , "hpc"
+        , "mtl"
+        , "os-string"
+        , "parsec"
+        , "process"
+        , "semaphore-compat"
+        , "text"
+        , "time"
+        , "transformers"
+        , "unix" -- FIXME: we'd have to install Win32 for Windows target. Maybe --libs could install dependencies too..
+          -- ghc related
+        , "ghc-boot"
+        , "ghc-heap"
+        , "ghci"
+        -- , "ghc" -- FIXME: somehow it breaks the build
         ]
 
   msg "  - Building boot libraries..."
