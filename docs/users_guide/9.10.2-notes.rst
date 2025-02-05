@@ -15,11 +15,11 @@ Language
 Compiler
 ~~~~~~~~
 
-- Optimized lowering of BigNat# literals. (#23942, !12179)
+- Optimized lowering of BigNat# literals. ((:ghc-ticket:`23942`), !12179)
 
-- Fixed a bug where the jump shortcutting optimization could lead to unsoundness in pattern matching. (#24507)
+- Fixed a bug where the jump shortcutting optimization could lead to unsoundness in pattern matching. ((:ghc-ticket:`24507`))
 
-- Look for haskell symbols only in relevant libraries. (#23415)
+- Look for haskell symbols only in relevant libraries. ((:ghc-ticket:`23415`))
 
   When dynamically loading a Haskell symbol (typical when running a splice or
   GHCi expression), before this change we would search for the symbol in
@@ -32,7 +32,7 @@ Compiler
   from ~38 seconds down to ~2s.
 
 - Fixed a bug that could cause a linker error when `TypeData` and `StrictData`
-  where used in combination. (#24620)
+  where used in combination. ((:ghc-ticket:`24620`))
 
 - The flag :ghc-flag:`-fprof-late` when combined with `-prof` will no longer prevent top level
   constructors from being statically allocated.
@@ -45,24 +45,24 @@ Compiler
 
   The tradeoff is that calling `whoCreated` on top level value definitions like `foo` will be less informative.
 
-- IPE profiling - optimize the representation of some internal representations. Leading to smaller executables. (#24504)
+- IPE profiling - optimize the representation of some internal representations. Leading to smaller executables. ((:ghc-ticket:`24504`))
 
-- Fixed an issue where `-Wmissing-home-modules` caused quadratic compile time increases. (#24778)
+- Fixed an issue where `-Wmissing-home-modules` caused quadratic compile time increases. ((:ghc-ticket:`24778`))
 
-- Fixed a crash when using `-prof` with `-forig-thunk-info`. (#24809)
+- Fixed a crash when using `-prof` with `-forig-thunk-info`. ((:ghc-ticket:`24809`))
 
-- Better type inference in certain situations. (#24810)
+- Better type inference in certain situations. ((:ghc-ticket:`24810`))
 
 - Fixed a bug where the magic `inline` function sometimes failed to inline functions
-  if there were coercions involved. (#24808)
+  if there were coercions involved. ((:ghc-ticket:`24808`))
 
-- Fixed a bug where the simplifier sometimes destroyed join points during float out. (#24768)
+- Fixed a bug where the simplifier sometimes destroyed join points during float out. ((:ghc-ticket:`24768`))
 
 - PPC NCG: Fix sign hints in C calls. This bug caused segfaults when using FFI under some
-  circumstances. (#23034)
+  circumstances. ((:ghc-ticket:`23034`))
 
 - Fixed a bug that caused GHC to panic when using the aarch64 ncg and -fregs-graph
-  on certain programs. (#24941)
+  on certain programs. ((:ghc-ticket:`24941`))
 
 - The flag :ghc-flag:`-fkeep-auto-rules` that forces GHC to keep auto generated
   specialization rules was added. It was actually added ghc-9.10.1 already but
@@ -74,27 +74,33 @@ Compiler
 
 - Various code generation improvements to the ARM backend.
 
-- Fixed a bug that could case segfaults in GHCi when `-fworker-wrapper-cbv` was enabled. (#24870)
+- Fixed a bug that could case segfaults in GHCi when `-fworker-wrapper-cbv` was enabled. ((:ghc-ticket:`24870`))
 
-- Fixed -freg-graphs for AARch64 NCG
-
-- Fixed a correctness issues for Int64/Word64 on 32bit backends (#24893)
+- Fixed a correctness issues for Int64/Word64 on 32bit backends ((:ghc-ticket:`24893`))
 
 - Various rts linker improvements:
   - R_X86_64_PC64 relocation support on windows
-  - Use m32 allocator for sections when NEED_PLT - works around (#24432)
+  - Use m32 allocator for sections when NEED_PLT - works around ((:ghc-ticket:`24432`))
   - AArch64 - Skip NONE relocations
 
-- Fixed a panic in the ghci debugger (#25109)
+- AArch64 ncg: Multiway branches are now lowered to jump tables for better performance. ((:ghc-ticket:`19912`))
+
+- Fixes related to better use of sse4 when using the llvm backend:
+  - Use +sse4.2 rather than +sse42, fixing ((:ghc-ticket:`25019`)),
+  - make SSE4.2 imply +popcnt, fixing ((:ghc-ticket:`25353`)).
+
+- Fixed a bug where the use of ``throw`` caused a loss of strictness ((:ghc-ticket:`25066`)).
+
+- Fixed incorrect behaviour that could occur when using ``control0#/prompt#`` ((:ghc-ticket:`25439`)) by making `prompt#` lazy.
 
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 
-- Changes for better support of the Google Closure Compiler (#24602, !12330)
+- Changes for better support of the Google Closure Compiler ((:ghc-ticket:`24602`), !12330)
 
 - JS Backend: support rubbish static literals
 
-- Fix h$withCStringOnHeap helper (#25288)
+- Fix h$withCStringOnHeap helper ((:ghc-ticket:`25288`))
 
 WebAssembly backend
 ~~~~~~~~~~~~~~~~~~~
@@ -107,14 +113,19 @@ WebAssembly backend
 GHCi
 ~~~~
 
-- When using XDG directories ``.ghci_history`` now uses the ``$XDG_DATA_HOME`` variable as expected. (#24266)
+- When using XDG directories ``.ghci_history`` now uses the ``$XDG_DATA_HOME`` variable as expected. ((:ghc-ticket:`24266`))
 
 - Replaced some uses of lists with Arrays for better performance during bytecode compilation.
 
-- GHCi: support cross-module inlining of breakpoints. Fixing #24712
+- GHCi: support cross-module inlining of breakpoints. Fixing (:ghc-ticket:`24712`)
 
 - Fix a bug where GHCi would not start alongside a local file called ``Prelude.hs``
   or ``Prelude.lhs`` (:ghc-ticket:`10920`).
+
+- Fixed a panic in the ghci debugger when using breakpoints around field selectors. ((:ghc-ticket:`25109`))
+
+- Fixed a bug (:ghc-ticket:`25150`) where ghc would not consider ``-working-dir`` when
+  looking for foreign files.
 
 Runtime system
 ~~~~~~~~~~~~~~
@@ -128,13 +139,19 @@ Runtime system
 
 - Emit warning when -M < -H.
 
-- Fix a bug (#24672) causing programms on FreeBSD to occasionally terminate with the error:
+- Fix a bug ((:ghc-ticket:`24672`)) causing programms on FreeBSD to occasionally terminate with the error:
   ``internal error: Ticker: read(timerfd) failed with Operation not supported and returned -1``
+
+- Fixed a bug ((:ghc-ticket:`25503`)) that sometimes caused the rts to terminate with ``internal error: alloc_adjustor_chunk: failed to allocate`` on windows.
+  This primarily affect programs making use of the ``foreign import "wrapper"`` functionality.
+
+- Fixed a bug in compacting gc that could result in program termination with ``update_fwd_large: unknown/strange object  38`` ((:ghc-ticket:`24791`)).
+
 
 Build system and packaging
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Escape argument strings when storing them in the settings file. Fixes #24265
+- Escape argument strings when storing them in the settings file. Fixes (:ghc-ticket:`24265`)
 
 - Updated autoconf scripts to commit 948ae97ca5703224bd3eada06b7a69f40dd15a02 (dated 2024-01-01).
   (From https://git.savannah.gnu.org/cgit/config.git/)
@@ -142,9 +159,9 @@ Build system and packaging
 - GHC now distinguishes more between the Cmm and C preprocessor. The new flags
   `-pgmCmmP` and `-optCmmP` can be used to control
   the Cmm preprocessor. C preprocessor flags will still be passed to the Cmm
-  preprocessor, expect for -g flags which have special handling. Fixes #24474
+  preprocessor, expect for -g flags which have special handling. Fixes (:ghc-ticket:`24474`)
 
-- Bindists: Fixed a bug in the Makefile which caused windows installs to duplicate files. (#24800)
+- Bindists: Fixed a bug in the Makefile which caused windows installs to duplicate files. ((:ghc-ticket:`24800`))
 
 - The packages ghc-internal and ghc-experimental are now versioned based on the GHC version they are shipped with.
 
@@ -170,6 +187,9 @@ Build system and packaging
 
 ``ghc-experimental`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Primops and other ghc extensions are now exported via ``GHC.PrimOps``
+* The library is now versioned according to the ghc version it shipped with.
 
 
 ``template-haskell`` library
