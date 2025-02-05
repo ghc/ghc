@@ -7,7 +7,7 @@ import Data.List (intercalate)
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.PreProcess.Lexer
 import GHC.Parser.PreProcess.ParserM (Token (..), init_state)
-import GHC.Parser.PreProcess.Types
+import GHC.Parser.PreProcess.State
 import GHC.Prelude
 
 -- =====================================================================
@@ -28,6 +28,7 @@ parseDirective s =
                 ("#" : "ifdef" : ts) -> Right $ cppIfdef ts
                 ("#" : "else" : ts) -> Right $ cppElse ts
                 ("#" : "endif" : ts) -> Right $ cppEndif ts
+                ("#" : "dumpghccpp" : ts) -> Right $ cppDumpState ts
                 other -> Left ("unexpected directive: " ++ (combineToks other))
 
 {- | Comply with the CPP requirement to not combine adjacent tokens.
@@ -58,6 +59,9 @@ cppElse _ts = CppElse
 
 cppEndif :: [String] -> CppDirective
 cppEndif _ts = CppEndif
+
+cppDumpState :: [String] -> CppDirective
+cppDumpState _ts = CppDumpState
 
 -- ---------------------------------------------------------------------
 

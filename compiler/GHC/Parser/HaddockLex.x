@@ -10,7 +10,7 @@ import GHC.Hs.Doc
 import GHC.Parser.Lexer hiding (AlexInput)
 import GHC.Parser.Lexer.Interface (adjustChar)
 import GHC.Parser.Annotation
-import GHC.Parser.PreProcess.Types (PpState(..), initPpState)
+import GHC.Parser.PreProcess.State (PpState(..), initPpState)
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Data.StringBuffer

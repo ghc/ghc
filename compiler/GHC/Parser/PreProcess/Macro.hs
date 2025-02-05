@@ -28,7 +28,7 @@ import GHC.Parser.PreProcess.Eval
 import GHC.Parser.PreProcess.ParsePP
 import GHC.Parser.PreProcess.Parser qualified as Parser
 import GHC.Parser.PreProcess.ParserM
-import GHC.Parser.PreProcess.Types
+import GHC.Parser.PreProcess.State
 import GHC.Prelude
 
 -- ---------------------------------------------------------------------

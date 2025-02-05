@@ -4,7 +4,7 @@ module GHC.Parser.PreProcess.Parser (parseExpr) where
 import GHC.Parser.PreProcess.Lexer (lex_tok)
 import GHC.Parser.PreProcess.ParserM (Token(..), ParserM, run_parser, get_pos, show_pos,
                 happyError)
-import GHC.Parser.PreProcess.Types
+import GHC.Parser.PreProcess.State
 import GHC.Prelude
 -- Needed when invoking happy -ad
 -- import qualified GHC.Internal.Data.Tuple as Happy_Prelude
