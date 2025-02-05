@@ -434,17 +434,49 @@ uncondInline is_join rhs bndrs arity body size
 
 uncondInlineJoin :: [Var] -> CoreExpr -> Bool
 -- See Note [Duplicating join points] point (DJ3) in GHC.Core.Opt.Simplify.Iteration
-uncondInlineJoin _bndrs body
+uncondInlineJoin bndrs body
+
+  -- (DJ3)(a)
   | exprIsTrivial body
   = True   -- Nullary constructors, literals
 
+  -- (DJ3)(b)
   | (Var v, args) <- collectArgs body
   , all exprIsTrivial args
   , isJoinId v   -- Indirection to another join point; always inline
   = True
 
+  -- (DJ3)(c)
+  | trivialAppWithoutFreeArgs
+  = True
+
   | otherwise
   = False
+
+  where
+    -- (DJ3)(c):
+    -- - $j1 x y = K y x |> co  -- YES, inline!
+    -- - $j2 x = K f x          -- No, don't! (because f is free)
+    trivialAppWithoutFreeArgs = go body
+
+    go (App f a)
+      | go_arg a         = go f
+      | otherwise        = False
+    go (Cast e _)        = go e
+    go (Tick _ e)        = go e
+    go (Var v)
+      | isDataConId v    = True -- e.g. $j a b = K a b
+      | v `elem` bndrs   = True -- e.g. $j a b = b a
+    go _                 = False
+
+    go_arg (Type {})     = True
+    go_arg (Coercion {}) = True
+    go_arg (Lit l)
+      | litIsTrivial l   = Just False   -- $j x = $j2 x 7 YES, but $j x = K x 7 NO
+    go_arg (App f a)
+    go_arg (Var f)       = f `elem` bndrs
+    go_arg _             = False
+      | isTyCoArg a      = go_arg f     -- e.g. $j f = K (f @a)
 
 
 sizeExpr :: UnfoldingOpts

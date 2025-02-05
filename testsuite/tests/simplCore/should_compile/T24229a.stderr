@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 83, types: 113, coercions: 8, joins: 1/1}
+Result size of Tidy Core = {terms: 79, types: 106, coercions: 8, joins: 0/0}
 
 Rec {
 foo_$s$wfoo
@@ -14,10 +14,9 @@ end Rec }
 foo
   = \ @a ds ds1 ->
       case ds of { I# ww ->
-      join { $j ww1 = Just ww1 } in
       case ww of ds2 {
-        __DEFAULT -> case ds1 `cast` <Co:4> :: ... of { (x, y) -> case foo_$s$wfoo y x (-# ds2 1#) of { (# ww1 #) -> jump $j ww1 } };
-        0# -> jump $j (ds1 `cast` <Co:4> :: ...)
+        __DEFAULT -> case ds1 `cast` <Co:4> :: ... of { (x, y) -> case foo_$s$wfoo y x (-# ds2 1#) of { (# ww1 #) -> Just ww1 } };
+        0# -> Just (ds1 `cast` <Co:4> :: ...)
       }
       }
 

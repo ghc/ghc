@@ -4172,16 +4172,39 @@ application (K f x).  So we might inline it to get
       K g y -> blah[g,y]
 
 But now we have to make `blah` into a join point, /abstracted/
-over `g` and `y`.   In contrast, if we /don't/ inline $j we
-don't need a join point for `blah` and we'll get
-    join $j x = let g=f, y=x in blah[g,y]
+over `g` and `y`. We get
+    join $j2 g y = blah
     in case v of
-       p1 -> $j x1
-       p2 -> $j x2
-       p3 -> $j x3
+         p1 -> $j2 f x1
+         p2 -> $j2 f x2
+         p3 -> $j2 f x3
+So now we can't see that `g` is always `f` in `blah`.
+
+In contrast, if we /don't/ inline $j we
+don't need a new join point for `blah` and we'll get
+    join $j' x = let g=f, y=x in blah[g,y]
+    in case v of
+       p1 -> $j' x1
+       p2 -> $j' x2
+       p3 -> $j' x3
 
 This can make a /massive/ difference, because `blah` can see
 what `f` is, instead of lambda-abstracting over it.
+
+If instead the RHS of the join point is a simple application that has no free
+variables, as in
+
+    case (join $j x f = K f x )
+         (in case v of      )
+         (     p1 -> $j x1 f1 ) of
+         (     p2 -> $j x2 f2 )
+         (     p3 -> $j x3 f3 )
+      K g y -> blah[g,y]
+
+then no information can be gained by preserving the join point (c.f. `f` being
+free in the join point above and being useful to `blah`). In this case, it's
+more beneficial to inline the join point (see (DJ3)(c)) to allow further
+optimisations to fire. An example where failing to do this went wrong is #25723.
 
 Beyond this, not-inlining join points reduces duplication.  In the above
 example, if `blah` was small enough we'd inline it, but that duplicates code,
@@ -4207,11 +4230,26 @@ unconditional-inlining for join points.
    case-of-case friendly.
 
 (DJ3) When should `uncondInlineJoin` return True?
-   * (exprIsTrivial rhs); this includes uses of unsafeEqualityProof etc; see
+   (a) (exprIsTrivial rhs); this includes uses of unsafeEqualityProof etc; see
      the defn of exprIsTrivial.  Also nullary constructors.
 
-   * The RHS is a call ($j x y z), where the arguments are all trivial and $j
+   (b) The RHS is a call ($j x y z), where the arguments are all trivial and $j
      is a join point: there is no point in creating an indirection.
+
+   (c) The RHS is a data constructor application (K x y z) where
+
+      - all the args x,y,z are trivial
+      - the free LocalIds of `f x y z` are a subset of the join point binders
+
+      Examples that return True
+        $j x y = K y (x |> co)
+        $j x y = x (y @Int)
+      Examples that return False
+        $j x = K y x    -- y is free
+        $j y = f y      -- f is free
+
+      Not duplicating these join points has no benefits and blocks other important
+      optimisations from firing (see #25723)
 
 (DJ4) By the same token we want to use Plan B in Note [Duplicating StrictArg] when
    the RHS of the new join point is a data constructor application.  See the
