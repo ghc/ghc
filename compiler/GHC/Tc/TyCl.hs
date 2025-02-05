@@ -3363,20 +3363,48 @@ So, we use bindOuterFamEqnTKBndrs (which does not create an implication for
 the telescope), and generalise over /all/ the variables in the LHS,
 without treating the explicitly-quantified ones specially. Wrinkles:
 
- - When generalising, include the explicit user-specified forall'd
+(GT1) When generalising, include the explicit user-specified forall'd
    variables, so that we get an error from Validity.checkFamPatBinders
    if a forall'd variable is not bound on the LHS
 
- - We still want to complain about a bad telescope among the user-specified
+(GT2) We still want to complain about a bad telescope among the user-specified
    variables.  So in checkFamTelescope we emit an implication constraint
    quantifying only over them, purely so that we get a good telescope error.
 
-  - Note that, unlike a type signature like
+(GT3) Note that, unlike a type signature like
        f :: forall (a::k). blah
     we do /not/ care about the Inferred/Specified designation or order for
     the final quantified tyvars.  Type-family instances are not invoked
     directly in Haskell source code, so visible type application etc plays
     no role.
+
+(GT4) Consider #25647 (with UnliftedNewtypes)
+         type N :: forall r. (TYPE r -> TYPE r) -> TYPE r
+         newtype N f where { MkN :: ff (N ff) -> N ff }
+    When kind-checking the type signature for MkN we'll start wtih
+           ff :: TYPE kappa -> TYPE kappa
+           MkN :: ff (N @kappa) ff -> N @kappa ff
+    Then we generalise /and default the RuntimeRep variable kappa/
+    (via `kindGeneralizeAll` in `tcConDecl`), thus kappa := LiftedRep
+
+    But now the newtype looks like a GADT and we get an error
+         A newtype must not be a GADT
+
+    This seems OK.  We are just following the rules.
+
+    But this variant (the original report in #25647)
+       data family Fix2 :: (k -> Type) -> k
+       newtype instance Fix2 f where { In2 :: f (Fix2 f) -> Fix2 f }
+    At the `newtype instance`, we first
+       1. Find the kind of the newtype instance in `tcDataFamInstHeader`
+       2. Typecheck the newtype definitition itself in `tcConDecl`
+    In step 1 we do /not/ want to get
+       newtype instance forall r .  Fix2 (f :: TYPE r -> TYPE r) :: TYPE r where
+    If we do, we'll get that same "newtype must not be GADT" error as for N above.
+    Rather, we want to default the RuntimeRep variable r := LiftedRep. Hence
+    the use of `DefaultNonStandardTyVars` in `tcDataFamInstHeader`.  The key thing
+    is that we must make the /same/ choice here as we do in kind-checking the data
+    constructor's type.
 
 See also Note [Re-quantify type variables in rules] in
 GHC.Tc.Gen.Sig, which explains a /very/ similar design when
