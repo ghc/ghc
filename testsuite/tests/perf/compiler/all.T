@@ -612,6 +612,17 @@ test ('T16473',
       compile_and_run,
       ['-O2 -flate-specialise'])
 
+# Run this program. If inlining the join point fails, it'll start to allocate much more.
+# The join point is only created when -fno-local-float-out
+test ('T25723',
+      [ collect_stats('bytes allocated',5)
+      , only_ways(['normal'])
+      , js_broken(22261)
+      ],
+      compile_and_run,
+      ['-O2 -fno-local-float-out'])
+
+
 test('T17516',
       [ collect_compiler_runtime(5),
       ],
