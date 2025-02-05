@@ -4,8 +4,6 @@
 {-# LANGUAGE BangPatterns #-}
 
 module GHC.Parser.PreProcess (
-    -- ppLexer,
-    -- ppLexerDbg,
     lexer,
     lexerDbg,
     initPpState,
@@ -24,7 +22,7 @@ import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
 import GHC.Parser.Lexer qualified as Lexer
 import GHC.Parser.PreProcess.Macro
 import GHC.Parser.PreProcess.ParsePP
-import GHC.Parser.PreProcess.Types
+import GHC.Parser.PreProcess.State
 import GHC.Prelude
 import GHC.Types.SrcLoc
 
@@ -75,11 +73,18 @@ ppLexer queueComments cont =
                             Just inp -> do
                                 Lexer.setInput inp
                                 ppLexer queueComments cont
-                    L _ (ITcpp continuation s) -> do
+                    L l (ITcpp continuation s) -> do
                         if continuation
-                            then pushContinuation tk
-                            else processCppToks s
-                        contIgnoreTok tk
+                            then do
+                                pushContinuation tk
+                                contIgnoreTok tk
+                            else do
+                                mdump <- processCppToks s
+                                case mdump of
+                                    Just dump ->
+                                        -- We have a dump of the state, put it into an ignored token
+                                        contIgnoreTok (L l (ITcpp continuation (appendFS s (fsLit dump))))
+                                    Nothing -> contIgnoreTok tk
                     _ -> do
                         state <- getCppState
                         -- case (trace ("CPP state:" ++ show state) state) of
@@ -90,17 +95,7 @@ ppLexer queueComments cont =
 
 -- ---------------------------------------------------------------------
 
-preprocessElse :: PP ()
-preprocessElse = do
-    accepting <- getAccepting
-    setAccepting (not accepting)
-
-preprocessEnd :: PP ()
-preprocessEnd = do
-    -- TODO: nested context
-    setAccepting True
-
-processCppToks :: FastString -> PP ()
+processCppToks :: FastString -> PP (Maybe String)
 processCppToks fs = do
     let
         get (L _ (ITcpp _ s)) = s
@@ -108,36 +103,38 @@ processCppToks fs = do
     -- Combine any prior continuation tokens
     cs <- popContinuation
     processCpp (reverse $ fs : map get cs)
-    return ()
 
-processCpp :: [FastString] -> PP ()
+processCpp :: [FastString] -> PP (Maybe String)
 processCpp fs = do
     let s = concatMap unpackFS fs
-    case parseDirective s of
-        Left err -> error $ show (err, s)
-        Right (CppInclude filename) -> do
-            ppInclude filename
-        Right (CppDefine name def) -> do
-            ppDefine (MacroName name Nothing) def
-        Right (CppIf cond) -> do
-            ppIf cond
-            return ()
-        Right (CppIfdef name) -> do
-            defined <- ppIsDefined (MacroName name Nothing)
-            setAccepting defined
-        Right (CppIfndef name) -> do
-            defined <- ppIsDefined (MacroName name Nothing)
-            setAccepting (not defined)
-        Right CppElse -> do
-            accepting <- getAccepting
-            setAccepting (not accepting)
-            return ()
-        Right CppEndif -> do
-            -- TODO: nested states
-            setAccepting True
-            return ()
-
-    return ()
+    let directive = parseDirective s
+    if directive == Right CppDumpState
+        then return (Just "\ndumped state\n")
+        else do
+            case directive of
+                Left err -> error $ show (err, s)
+                Right (CppInclude filename) -> do
+                    ppInclude filename
+                Right (CppDefine name def) -> do
+                    ppDefine (MacroName name Nothing) def
+                Right (CppIf cond) -> do
+                    ppIf cond
+                Right (CppIfdef name) -> do
+                    defined <- ppIsDefined (MacroName name Nothing)
+                    pushAccepting defined
+                Right (CppIfndef name) -> do
+                    defined <- ppIsDefined (MacroName name Nothing)
+                    pushAccepting (not defined)
+                Right CppElse -> do
+                    accepting <- getAccepting
+                    setAccepting (not accepting)
+                Right CppEndif -> do
+                    popScope
+                Right CppDumpState -> do
+                    return ()
+            -- accepting <- getAccepting
+            -- return (trace ("processCpp:" ++ show (accepting,directive)) Nothing)
+            return Nothing
 
 -- pp_include start -----------------------
 
