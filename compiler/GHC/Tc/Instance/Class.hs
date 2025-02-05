@@ -57,7 +57,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( splitAtList, fstOf3 )
 import GHC.Data.FastString
-import GHC.Data.Maybe ( expectJust )
 
 import GHC.Unit.Module.Warnings
 
