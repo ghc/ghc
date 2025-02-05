@@ -5,54 +5,13 @@ module T25647 where
 import GHC.Exts
 import Data.Kind
 
--------------------- Plain newtypes -----------------
-
 -- Rejected because in the type signature for In2 we default
 -- the runtime-rep variable to LiftedRep, and that makes In2
 -- into a GADT
 newtype Fix2 f :: TYPE r where
    In2 :: forall ff. ff (Fix2 ff) -> Fix2 ff
 
--- Rejected because of defulting; maybe that's OK
+-- Rejected for the same reason
 type Fix4a :: forall r. (TYPE r -> TYPE r) -> TYPE r
 newtype Fix4a f where
   In4a :: ff (Fix4a ff) -> Fix4a ff
-
--- This variant produces a /terrible/ message
--- type Fix3a :: forall r k. (TYPE r -> TYPE r) -> TYPE r
--- newtype Fix3a f = In3a (f (Fix3 f))
-
--------------------- Data families with newtype instance -----------------
-
--- data instance in GADT sytntax
-data family Dix1 :: (k -> Type) -> k
-data instance Dix1 f where
-  DIn1 :: forall ff. ff (Dix1 ff) -> Dix1 ff
-
--- newtype instance in GADT syntax
-data family Dix2 :: (k -> Type) -> k
-newtype instance Dix2 f where
-  DIn2 :: forall ff. ff (Dix2 ff) -> Dix2 ff
-
-data family Dix2a :: (k -> Type) -> k
-newtype instance Dix2a f :: Type where
-  DIn2a :: forall ff. ff (Dix2a ff) -> Dix2a ff
-
--- newtype instance in H98 syntax
-data family Dix3 :: (k -> Type) -> k
-newtype instance Dix3 f = DIn3 (f (Dix3 f))
-
--- newtype instance in GADT syntax
--- Rejected because of defaulting
-data family Dix4 :: (k -> TYPE r) -> k
-newtype instance Dix4 f where
-  DIn4 :: forall ff. ff (Dix4 ff) -> Dix4 ff
-
-data family Dix4a :: (k -> TYPE r) -> k
-newtype instance forall r f. Dix4a f :: TYPE r where
-  DIn4a :: forall r (ff :: TYPE r -> TYPE r). ff (Dix4a ff) -> Dix4a ff
-
--- newtype instance in H98 syntax
-data family Dix5 :: (k -> TYPE r) -> k
-newtype instance Dix5 f = DIn5 (f (Dix5 f))
-
