@@ -1,9 +1,13 @@
 {-# LANGUAGE DataKinds, TypeFamilies, PolyKinds, MagicHash #-}
 
-module T25647a where
+module T25647b where
 
 import GHC.Exts
 import Data.Kind
+
+---------------------------
+-- without UnliftedNewtypes
+---------------------------
 
 -------------------- Plain newtypes -----------------
 
@@ -16,23 +20,6 @@ newtype Fix1a f = In1a (f (Fix1a f))
 newtype Fix1b f where
     In1b :: forall ff. ff (Fix1b ff) -> Fix1b ff
 
--- A plain newtype, GADT syntax, with a return kind signature,
--- and runtime-rep quantification in the data constructor
--- Should infer Fix2 :: forall r k. (k -> TYPE r) -> TYPE r
--- newtype Fix2 f :: TYPE r where
---    In2 :: forall r (ff :: TYPE r -> TYPE r). ff (Fix2 ff) -> Fix2 ff
-
--- Plain newtype, H98 syntax, standalone kind signature
--- Should get In3 :: forall r (f :: TYPE r -> TYPE r). Fix3 @r f -> Fix3 @r f
--- type Fix3 :: forall r. (TYPE r -> TYPE r) -> TYPE r
--- newtype Fix3 f = In3 (f (Fix3 f))
-
--- Plain newtype, H98 syntax, standalone kind signature
--- Should get In4 :: forall r k (f :: k -> TYPE r). Fix4 @r @k f -> Fix4 @r @k f
--- type Fix4 :: forall r. (TYPE r -> TYPE r) -> TYPE r
--- newtype Fix4 f where
---   In4 :: forall rr (ff :: TYPE rr -> TYPE rr).
---          ff (Fix4 ff) -> Fix4 @rr ff
 
 -------------------- Data families with newtype instance -----------------
 
@@ -53,11 +40,6 @@ newtype instance Dix2a f :: Type where
 -- newtype instance in H98 syntax
 data family Dix3 :: (k -> Type) -> k
 newtype instance Dix3 f = DIn3 (f (Dix3 f))
-
-
--- data family Dix4 :: (k -> TYPE r) -> k
--- newtype instance Dix4 f where
---   DIn4 :: forall ff. ff (Dix4 ff) -> Dix4 ff
 
 -- newtype instance in H98 syntax
 data family Dix5 :: (k -> TYPE r) -> k
