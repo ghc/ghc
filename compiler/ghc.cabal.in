@@ -658,7 +658,7 @@ Library
         GHC.Parser.PreProcess.ParsePP
         GHC.Parser.PreProcess.ParserM
         GHC.Parser.PreProcess.Parser
-        GHC.Parser.PreProcess.Types
+        GHC.Parser.PreProcess.State
         GHC.Parser.String
         GHC.Parser.Types
         GHC.Parser.Utils
