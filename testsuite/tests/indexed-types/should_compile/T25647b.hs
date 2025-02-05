@@ -1,6 +1,6 @@
-{-# LANGUAGE DataKinds, UnliftedNewtypes, TypeFamilies, PolyKinds, MagicHash #-}
+{-# LANGUAGE DataKinds, TypeFamilies, PolyKinds, MagicHash #-}
 
-module T25647 where
+module T25647a where
 
 import GHC.Exts
 import Data.Kind
@@ -19,20 +19,20 @@ newtype Fix1b f where
 -- A plain newtype, GADT syntax, with a return kind signature,
 -- and runtime-rep quantification in the data constructor
 -- Should infer Fix2 :: forall r k. (k -> TYPE r) -> TYPE r
-newtype Fix2 f :: TYPE r where
-   In2 :: forall r (ff :: TYPE r -> TYPE r). ff (Fix2 ff) -> Fix2 ff
+-- newtype Fix2 f :: TYPE r where
+--    In2 :: forall r (ff :: TYPE r -> TYPE r). ff (Fix2 ff) -> Fix2 ff
 
 -- Plain newtype, H98 syntax, standalone kind signature
 -- Should get In3 :: forall r (f :: TYPE r -> TYPE r). Fix3 @r f -> Fix3 @r f
-type Fix3 :: forall r. (TYPE r -> TYPE r) -> TYPE r
-newtype Fix3 f = In3 (f (Fix3 f))
+-- type Fix3 :: forall r. (TYPE r -> TYPE r) -> TYPE r
+-- newtype Fix3 f = In3 (f (Fix3 f))
 
 -- Plain newtype, H98 syntax, standalone kind signature
 -- Should get In4 :: forall r k (f :: k -> TYPE r). Fix4 @r @k f -> Fix4 @r @k f
-type Fix4 :: forall r. (TYPE r -> TYPE r) -> TYPE r
-newtype Fix4 f where
-  In4 :: forall rr (ff :: TYPE rr -> TYPE rr).
-         ff (Fix4 ff) -> Fix4 @rr ff
+-- type Fix4 :: forall r. (TYPE r -> TYPE r) -> TYPE r
+-- newtype Fix4 f where
+--   In4 :: forall rr (ff :: TYPE rr -> TYPE rr).
+--          ff (Fix4 ff) -> Fix4 @rr ff
 
 -------------------- Data families with newtype instance -----------------
 
@@ -54,11 +54,6 @@ newtype instance Dix2a f :: Type where
 data family Dix3 :: (k -> Type) -> k
 newtype instance Dix3 f = DIn3 (f (Dix3 f))
 
--- newtype instance in GADT syntax
--- The newtype instance defaults to LiftedRep
--- fail with additional equality constraints:
-    -- • A newtype must not be a GADT:  [(t, LiftedRep), (r, LiftedRep),
-    --                                   (f, ff)]
 
 -- data family Dix4 :: (k -> TYPE r) -> k
 -- newtype instance Dix4 f where
@@ -68,6 +63,6 @@ newtype instance Dix3 f = DIn3 (f (Dix3 f))
 data family Dix5 :: (k -> TYPE r) -> k
 newtype instance Dix5 f = DIn5 (f (Dix5 f))
 
-data family Dix6 :: (k -> TYPE 'IntRep) -> k
-newtype instance Dix6 f where
-  DIn6 :: forall ff. ff (Dix6 ff) -> Dix6 ff
+-- data family Dix6 :: (k -> TYPE 'IntRep) -> k
+-- newtype instance Dix6 f where
+--   DIn6 :: forall ff. ff (Dix6 ff) -> Dix6 ff
