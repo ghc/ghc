@@ -247,6 +247,7 @@ $docsym    = [\| \^ \* \$]
 -- recognise any of the GhcCPP keywords introduced by a leading #
 @cppkeyword = "define" | "include" | "undef" | "error" | "ifdef"
                  | "ifndef" | "if" | "elif" | "else" | "endif"
+                 | "dumpghccpp"
 
 -- -----------------------------------------------------------------------------
 -- Alex "Identifier"
