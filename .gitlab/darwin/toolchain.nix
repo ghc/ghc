@@ -57,19 +57,6 @@ let
 
     '';
 
-    # N.B. Work around #20253.
-    nativeBuildInputs = [ pkgs.gnused ];
-    postInstallPhase = ''
-      settings="$out/lib/ghc-${version}/settings"
-      sed -i -e "s%\"llc\"%\"${llvm}/bin/llc\"%" $settings
-      sed -i -e "s%\"opt\"%\"${llvm}/bin/opt\"%" $settings
-      sed -i -e "s%\"clang\"%\"/usr/bin/clang\"%" $settings
-      sed -i -e 's%("C compiler command", "")%("C compiler command", "/usr/bin/clang")%' $settings
-      sed -i -e 's%("C compiler flags", "")%("C compiler flags", "--target=${targetTriple}")%' $settings
-      sed -i -e 's%("C++ compiler flags", "")%("C++ compiler flags", "--target=${targetTriple}")%' $settings
-      sed -i -e 's%("C compiler link flags", "")%("C compiler link flags", "--target=${targetTriple}")%' $settings
-    '';
-
     # Sanity check: verify that we can compile hello world.
     doInstallCheck = true;
     installCheckPhase = ''
