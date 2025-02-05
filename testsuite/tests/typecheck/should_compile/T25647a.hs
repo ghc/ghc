@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, UnliftedNewtypes, TypeFamilies, PolyKinds, MagicHash #-}
 
-module T25647 where
+module T25647a where
 
 import GHC.Exts
 import Data.Kind
@@ -63,4 +63,10 @@ newtype instance Dix4 f where
 -- newtype instance in H98 syntax
 data family Dix5 :: (k -> TYPE r) -> k
 newtype instance Dix5 f = DIn5 (f (Dix5 f))
+
+-- -- newtype instance that is not TYPE 'LiftedRep
+-- data family Dix6 :: (k -> TYPE 'IntRep) -> k
+-- newtype instance Dix6 f where
+--   DIn6 :: forall ff. ff (Dix6 ff) -> Dix6 ff
+
 
