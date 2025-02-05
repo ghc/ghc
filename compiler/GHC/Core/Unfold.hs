@@ -487,17 +487,55 @@ uncondInline is_join rhs bndrs arity body size
 
 uncondInlineJoin :: [Var] -> CoreExpr -> Bool
 -- See Note [Duplicating join points] point (DJ3) in GHC.Core.Opt.Simplify.Iteration
-uncondInlineJoin _bndrs body
+uncondInlineJoin bndrs body
+
+  -- (DJ3)(a)
   | exprIsTrivial body
   = True   -- Nullary constructors, literals
 
-  | (Var v, args) <- collectArgs body
-  , all exprIsTrivial args
-  , isJoinId v   -- Indirection to another join point; always inline
+  -- (DJ3)(b) and (DJ3)(c) combined
+  | indirectionOrAppWithoutFVs
   = True
 
   | otherwise
   = False
+
+  where
+    -- (DJ3)(b):
+    -- - $j1 x = $j2 y x |> co  -- YES, inline indirection regardless of free vars
+    -- (DJ3)(c):
+    -- - $j1 x y = K y x |> co  -- YES, inline!
+    -- - $j2 x = K f x          -- No, don't! (because f is free)
+    indirectionOrAppWithoutFVs = go False body
+
+    go !seen_fv (App f a)
+      | Just has_fv <- go_arg a
+                          = go (seen_fv || has_fv) f
+      | otherwise         = False       -- Not trivial
+    go seen_fv (Var v)
+      | isJoinId v        = True        -- Indirection to another join point; always inline
+      | isDataConId v     = not seen_fv -- e.g. $j a b = K a b
+      | v `elem` bndrs    = not seen_fv -- e.g. $j a b = b a
+    go seen_fv (Cast e _) = go seen_fv e
+    go seen_fv (Tick _ e) = go seen_fv e
+    go _ _                = False
+
+    -- go_arg returns:
+    --  - `Nothing` if arg is not trivial
+    --  - `Just True` if arg is trivial but contains free var, literal, or constructor
+    --  - `Just False` if arg is trivial without free vars
+    go_arg (Type {})     = Just False
+    go_arg (Coercion {}) = Just False
+    go_arg (Lit l)
+      | litIsTrivial l   = Just True    -- e.g. $j x = $j2 x 7 YES, but $j x = K x 7 NO
+      | otherwise        = Nothing
+    go_arg (App f a)
+      | isTyCoArg a      = go_arg f     -- e.g. $j f = K (f @a)
+      | otherwise        = Nothing
+    go_arg (Cast e _)    = go_arg e
+    go_arg (Tick _ e)    = go_arg e
+    go_arg (Var f)       = Just $! f `notElem` bndrs
+    go_arg _             = Nothing
 
 
 sizeExpr :: UnfoldingOpts
