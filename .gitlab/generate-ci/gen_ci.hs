@@ -9,6 +9,7 @@
 
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# HLINT ignore "Use camelCase" #-}
+{-# LANGUAGE DerivingStrategies #-}
 
 import Data.Aeson as A
 import qualified Data.Map as Map
@@ -563,7 +564,7 @@ instance ToJSON ArtifactsWhen where
 -- Rules, when do we run a job
 ---------------------------------------------------------------------
 
--- Data structure which records the condition when a job is run.
+-- | Data structure which records the condition when a job is run.
 data OnOffRules
   = OnOffRules { rule_set :: Rule -- ^ The enabled rules
                , when     :: ManualFlag   -- ^ The additional condition about when to run this job.
@@ -641,17 +642,70 @@ instance ToJSON OnOffRules where
         [ "allow_failure" A..= True | when rules == Manual ]
       ]
     where
-      one_rule (OnOffRule onoff r) = ruleString onoff r
+      one_rule (OnOffRule onoff r) = ruleToCond onoff r
 
+---------------------------------------------------------------------
+-- Rule conditions
+---------------------------------------------------------------------
 
-parens :: [Char] -> [Char]
-parens s = "(" ++ s ++ ")"
+-- | A predicate in GitLab's rules language.
+newtype Cond = Cond { getCond :: String }
+  deriving newtype (ToJSON)
 
-and_all :: [[Char]] -> [Char]
-and_all rs = intercalate " && " (map parens rs)
+parens :: Cond -> Cond
+parens (Cond s) = Cond $ "(" ++ s ++ ")"
 
-or_all :: [[Char]] -> [Char]
-or_all rs = intercalate " || " (map parens rs)
+and_all :: [Cond] -> Cond
+and_all =
+  Cond . intercalate " && " . map (getCond . parens)
+
+or_all :: [Cond] -> Cond
+or_all =
+  Cond . intercalate " || " . map (getCond . parens)
+
+type Var = String
+
+varIsSet :: Var -> Cond
+varIsSet var =
+  Cond $ "$" <> var
+
+-- | A constant evaluating to True because gitlab doesn't support "true" in the
+-- expression language.
+true :: Cond
+true = Cond "\"true\" == \"true\""
+
+-- | A constant evaluating to False because gitlab doesn't support "true" in the
+-- expression language.
+_false :: Cond
+_false = Cond "\"disabled\" != \"disabled\""
+
+labelString :: String -> Cond
+labelString s =
+  Cond $ "$CI_MERGE_REQUEST_LABELS =~ /.*" ++ s ++ ".*/"
+
+branchStringExact :: String -> Cond
+branchStringExact =
+  varEqString "CI_COMMIT_BRANCH"
+
+branchStringLike :: String -> Cond
+branchStringLike s =
+  Cond $ "$CI_COMMIT_BRANCH =~ /" ++ s ++ "/"
+
+varEqString :: String -> String -> Cond
+varEqString var s =
+  Cond $ "$" ++ var ++ " == \"" ++ s ++ "\""
+
+varNeString :: String -> String -> Cond
+varNeString var s =
+  Cond $ "$" ++ var ++ " != \"" ++ s ++ "\""
+
+varIsNull :: String -> Cond
+varIsNull var =
+  Cond $ "$" ++ var ++ " == null"
+
+---------------------------------------------------------------------
+-- Our Rules
+---------------------------------------------------------------------
 
 -- | A Rule corresponds to some condition which must be satisifed in order to
 -- run the job.
@@ -675,55 +729,32 @@ data ValidateRule
   | I386Backend  -- ^ Run this job when the "i386" label is set
   deriving (Show, Ord, Eq)
 
--- A constant evaluating to True because gitlab doesn't support "true" in the
--- expression language.
-true :: String
-true =  "\"true\" == \"true\""
--- A constant evaluating to False because gitlab doesn't support "true" in the
--- expression language.
-_false :: String
-_false = "\"disabled\" != \"disabled\""
-
--- Convert the state of the rule into a string that gitlab understand.
-ruleString :: OnOff -> Rule -> String
-ruleString On (ValidateOnly only_job_name vs) =
+-- | Convert the state of the rule into a string that gitlab understand.
+ruleToCond :: OnOff -> Rule -> Cond
+ruleToCond On (ValidateOnly only_job_name vs) =
     or_all
     [ -- 1. Case when ONLY_JOBS is set
-      and_all [ "$ONLY_JOBS", "$ONLY_JOBS =~ /.*\\b" ++  escape only_job_name ++ "(\\s|$).*/" ]
+      and_all [ varIsSet "ONLY_JOBS"
+              , Cond $ "$ONLY_JOBS =~ /.*\\b" ++ escape only_job_name ++ "(\\s|$).*/"
+              ]
       -- 2. Case when ONLY_JOBS is null
-    , and_all [ empty_only_job, run_cond ]
+    , and_all [ varIsNull "ONLY_JOBS"
+              , case S.toList vs of
+                  [] -> _false
+                  cs -> or_all (map validateRuleString cs)
+              ]
     ]
   where
-    conds = S.toList vs
-    empty_only_job = envVarNull "ONLY_JOBS"
-    run_cond = case conds of
-                 [] -> _false
-                 _  -> or_all (map validateRuleString conds)
     escape :: String -> String
     escape = concatMap (\c -> if c == '+' then "\\+" else [c])
-ruleString Off (ValidateOnly {}) = true
-ruleString On ReleaseOnly = "$RELEASE_JOB == \"yes\""
-ruleString Off ReleaseOnly = "$RELEASE_JOB != \"yes\""
-ruleString On Nightly = "$NIGHTLY"
-ruleString Off Nightly = envVarNull "NIGHTLY"
-
-labelString :: String -> String
-labelString s =  "$CI_MERGE_REQUEST_LABELS =~ /.*" ++ s ++ ".*/"
-
-branchStringExact :: String -> String
-branchStringExact s = envVarString "CI_COMMIT_BRANCH" s
-
-branchStringLike :: String -> String
-branchStringLike s = "$CI_COMMIT_BRANCH =~ /" ++ s ++ "/"
-
-envVarString :: String -> String -> String
-envVarString var s = "$" ++ var ++ " == \"" ++ s ++ "\""
-
-envVarNull :: String ->  String
-envVarNull var = "$" ++ var ++ " == null"
+ruleToCond Off (ValidateOnly {}) = true
+ruleToCond On  ReleaseOnly       = "RELEASE_JOB" `varEqString` "yes"
+ruleToCond Off ReleaseOnly       = "RELEASE_JOB" `varNeString` "yes"
+ruleToCond On  Nightly           = varIsSet "NIGHTLY"
+ruleToCond Off Nightly           = varIsNull "NIGHTLY"
 
 
-validateRuleString :: ValidateRule -> String
+validateRuleString :: ValidateRule -> Cond
 validateRuleString FullCI       = or_all [ labelString "full-ci"
                                          , labelString "marge_bot_batch_merge_job"
                                          , branchStringExact "master"
