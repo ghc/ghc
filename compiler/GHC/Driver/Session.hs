@@ -271,6 +271,7 @@ import GHC.CmmToAsm.CFG.Weight
 import GHC.Core.Opt.CallerCC
 import GHC.Parser (parseIdentifier)
 import GHC.Parser.Lexer (mkParserOpts, initParserState, P(..), ParseResult(..))
+import GHC.Parser.PreProcess (initPpState)
 
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
@@ -295,7 +296,6 @@ import Text.ParserCombinators.ReadP as R
 import qualified GHC.Data.EnumSet as EnumSet
 
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Parser.PreProcess (initPpState)
 
 
 -- Note [Updating flag description in the User's Guide]
