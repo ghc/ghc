@@ -92,11 +92,11 @@ words :-
     <0>         "xor"                { mkTv TXor }
     <0>         "xor_eq"             { mkTv TXorEq }
 ----------------------------------------
-    <0>         [a-z][a-zA-Z0-9\#_]* { mkTv TLowerName }
-    <0>         [A-Z][a-zA-Z0-9\#_]* { mkTv TUpperName }
-    <0>         \-? [0-9][0-9]*      { mkTv TInteger  }
-    <0>         \" [^\"]* \"         { mkTv (TString . tail . init) }
-    <0>         ()                   { begin other }
+    <0>         [_]*[a-z][a-zA-Z0-9\#_]* { mkTv TLowerName }
+    <0>         [_]*[A-Z][a-zA-Z0-9\#_]* { mkTv TUpperName }
+    <0>         \-? [0-9][0-9]*          { mkTv TInteger  }
+    <0>         \" [^\"]* \"             { mkTv (TString . tail . init) }
+    <0>         ()                       { begin other }
 
     <other>     .+                   { \i -> do {setStartCode 0;
                                                  mkTv TOther i} }
