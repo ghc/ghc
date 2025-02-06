@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Types used by the runtime interpreter
 module GHC.Runtime.Interpreter.Types
@@ -10,6 +12,20 @@ module GHC.Runtime.Interpreter.Types
    , ExtInterpInstance (..)
    , ExtInterpState (..)
    , InterpStatus(..)
+   -- * InterpSymbolCache
+   , InterpSymbolCache(..)
+   , mkInterpSymbolCache
+   , lookupInterpSymbolCache
+   , updateInterpSymbolCache
+   , purgeInterpSymbolCache
+   , InterpSymbol(..)
+   , SuffixOrInterpreted(..)
+   , interpSymbolName
+   , interpSymbolSuffix
+   , eliminateInterpSymbol
+   , interpretedInterpSymbol
+
+
    -- * IServ
    , IServ
    , IServConfig(..)
@@ -30,9 +46,6 @@ import GHC.Linker.Types
 
 import GHCi.RemoteTypes
 import GHCi.Message         ( Pipe )
-import GHC.Types.Unique.FM
-import GHC.Data.FastString ( FastString )
-import Foreign
 
 import GHC.Platform
 import GHC.Utils.TmpFs
@@ -42,6 +55,7 @@ import GHC.Unit.State
 import GHC.Unit.Types
 import GHC.StgToJS.Types
 import GHC.StgToJS.Linker.Types
+import GHC.Runtime.Interpreter.Types.SymbolCache
 
 import Control.Concurrent
 import System.Process   ( ProcessHandle, CreateProcess )
@@ -56,7 +70,7 @@ data Interp = Interp
   , interpLoader   :: !Loader
       -- ^ Interpreter loader
 
-  , interpLookupSymbolCache :: !(MVar (UniqFM FastString (Ptr ())))
+  , interpSymbolCache :: !InterpSymbolCache
       -- ^ LookupSymbol cache
   }
 

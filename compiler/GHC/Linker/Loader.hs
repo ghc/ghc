@@ -217,12 +217,12 @@ loadName interp hsc_env name = do
     case lookupNameEnv (closure_env (linker_env pls)) name of
       Just (_,aa) -> return (pls,(aa, links, pkgs))
       Nothing     -> assertPpr (isExternalName name) (ppr name) $
-                     do let sym_to_find = nameToCLabel name "closure"
-                        m <- lookupClosure interp (unpackFS sym_to_find)
+                     do let sym_to_find = IClosureSymbol name
+                        m <- lookupClosure interp sym_to_find
                         r <- case m of
                           Just hvref -> mkFinalizedHValue interp hvref
                           Nothing -> linkFail "GHC.Linker.Loader.loadName"
-                                       (unpackFS sym_to_find)
+                                       (ppr sym_to_find)
                         return (pls,(r, links, pkgs))
 
 loadDependencies
@@ -909,7 +909,7 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
     m <- loadDLL interp soFile
     case m of
       Right _ -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
-      Left err -> linkFail msg err
+      Left err -> linkFail msg (text err)
   where
     msg = "GHC.Linker.Loader.dynLoadObjs: Loading temp shared object failed"
 

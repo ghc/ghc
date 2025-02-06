@@ -2901,7 +2901,7 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
     jsLinkObject logger tmpfs tmp_dir js_config unit_env inst out_obj roots
 
   -- look up "id_sym" closure and create a StablePtr (HValue) from it
-  href <- lookupClosure interp (unpackFS id_sym) >>= \case
+  href <- lookupClosure interp (IFaststringSymbol id_sym) >>= \case
     Nothing -> pprPanic "Couldn't find just linked TH closure" (ppr id_sym)
     Just r  -> pure r
 

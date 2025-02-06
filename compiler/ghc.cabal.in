@@ -699,6 +699,7 @@ Library
         GHC.Runtime.Interpreter.JS
         GHC.Runtime.Interpreter.Process
         GHC.Runtime.Interpreter.Types
+        GHC.Runtime.Interpreter.Types.SymbolCache
         GHC.Runtime.Interpreter.Wasm
         GHC.Runtime.Loader
         GHC.Runtime.Utils
