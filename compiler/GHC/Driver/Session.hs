@@ -3611,8 +3611,8 @@ makeDynFlagsConsistent dflags
  , Nothing <- outputFile dflags
  = pgmError "--output must be specified when using --merge-objs"
 
- | platformTablesNextToCode platform 
-   && os == OSMinGW32 
+ | platformTablesNextToCode platform
+   && os == OSMinGW32
    && arch == ArchAArch64
     = case backendCodeOutput (backend dflags) of
         LlvmCodeOutput -> pgmError "-fllvm is incompatible with enabled TablesNextToCode at Windows Aarch64"
