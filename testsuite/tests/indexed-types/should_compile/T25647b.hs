@@ -20,6 +20,22 @@ newtype Fix1a f = In1a (f (Fix1a f))
 newtype Fix1b f where
     In1b :: forall ff. ff (Fix1b ff) -> Fix1b ff
 
+-- A plain newtype, GADT syntax, with a return kind signature,
+-- and runtime-rep quantification in the data constructor
+-- Should infer Fix2 :: (Type -> Type) -> Type
+newtype Fix2 f where
+   In2 :: forall (ff :: Type -> Type). ff (Fix2 ff) -> Fix2 ff
+
+-- Plain newtype, H98 syntax, standalone kind signature
+type Fix3 :: (Type -> Type) -> Type
+newtype Fix3 f = In3 (f (Fix3 f))
+
+-- Plain newtype, H98 syntax, standalone kind signature
+-- Should get In4 :: forall r k (f :: k -> TYPE r). Fix4 @r @k f -> Fix4 @r @k f
+type Fix4 :: (Type -> Type) -> Type
+newtype Fix4 f where
+  In4 :: forall (ff :: Type -> Type).
+         ff (Fix4 ff) -> Fix4 ff
 
 -------------------- Data families with newtype instance -----------------
 
