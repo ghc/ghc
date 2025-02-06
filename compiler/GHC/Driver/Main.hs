@@ -56,6 +56,7 @@ module GHC.Driver.Main
     , CgInteractiveGuts
     , generateByteCode
     , generateFreshByteCode
+    , initParserStateWithMacros
 
     -- * Running passes separately
     , hscRecompStatus
@@ -125,7 +126,7 @@ import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
 import GHC.Driver.Config.CoreToStg
 import GHC.Driver.Config.CoreToStg.Prep
 import GHC.Driver.Config.Logger   (initLogFlags)
-import GHC.Driver.Config.Parser   (initParserOpts)
+import GHC.Driver.Config.Parser   (initParserOpts, predefinedMacros)
 import GHC.Driver.Config.Stg.Ppr  (initStgPprOpts)
 import GHC.Driver.Config.Stg.Pipeline (initStgPipelineOpts)
 import GHC.Driver.Config.StgToCmm  (initStgToCmmConfig)
@@ -193,7 +194,8 @@ import GHC.CoreToStg    ( coreToStg )
 import GHC.Parser.Errors.Types
 import GHC.Parser
 import GHC.Parser.Lexer as Lexer hiding (initParserState)
-import GHC.Parser.PreProcess (initParserState, PpState)
+import GHC.Parser.Lexer qualified as Lexer
+import GHC.Parser.PreProcess.State (PpState (..), initPpState, PpScope (..))
 
 import GHC.Tc.Module
 import GHC.Tc.Utils.Monad
@@ -285,7 +287,7 @@ import Data.Map (Map)
 import qualified Data.Set as S
 import Data.Set (Set)
 import Control.DeepSeq (force)
-import Data.List.NonEmpty (NonEmpty ((:|)))
+import Data.List.NonEmpty (NonEmpty (..))
 import GHC.Unit.Module.WholeCoreBindings
 import GHC.Types.TypeEnv
 import System.IO
@@ -517,7 +519,7 @@ hscParse' mod_summary
                  = parseSignature
                  | otherwise = parseModule
 
-    case unP parseMod (initParserState (initParserOpts dflags) buf loc) of
+    case unP parseMod (initParserStateWithMacros dflags (initParserOpts dflags) buf loc) of
         PFailed pst ->
             handleWarningsThrowErrors (getPsMessages pst)
         POk pst rdr_module -> do
@@ -2667,7 +2669,7 @@ hscParseThingWithLocation source linenumber parser str = do
         let buf = stringToStringBuffer str
             loc = mkRealSrcLoc (fsLit source) linenumber 1
 
-        case unP parser (initParserState (initParserOpts dflags) buf loc) of
+        case unP parser (initParserStateWithMacros dflags (initParserOpts dflags) buf loc) of
             PFailed pst ->
                 handleWarningsThrowErrors (getPsMessages pst)
             POk pst thing -> do
@@ -2945,3 +2947,9 @@ writeInterfaceOnlyMode :: DynFlags -> Bool
 writeInterfaceOnlyMode dflags =
  gopt Opt_WriteInterface dflags &&
  not (backendGeneratesCode (backend dflags))
+
+-- -----------------------------------------------------------------------------
+
+initParserStateWithMacros :: DynFlags -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+initParserStateWithMacros df
+  = Lexer.initParserState (initPpState { pp_scope = (PpScope (predefinedMacros df) True) :| [] })
