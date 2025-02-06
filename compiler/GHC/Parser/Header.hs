@@ -29,7 +29,9 @@ import GHC.Driver.Errors.Types -- Unfortunate, needed due to the fact we throw e
 import GHC.Parser.Errors.Types
 import GHC.Parser           ( parseHeader )
 import GHC.Parser.Lexer hiding (initPragState, initParserState)
-import GHC.Parser.PreProcess   (initPragState, initParserState)
+import GHC.Parser.Lexer qualified as Lexer
+import GHC.Parser.PreProcess   (initPragState)
+import GHC.Parser.PreProcess.State (PpState (..), initPpState, PpScope (..))
 
 import GHC.Hs
 import GHC.Builtin.Names
@@ -47,6 +49,7 @@ import GHC.Utils.Monad
 import GHC.Utils.Error
 import GHC.Utils.Exception as Exception
 
+import qualified Data.List.NonEmpty as NE
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -60,13 +63,16 @@ import Data.Char (isSpace)
 import Text.ParserCombinators.ReadP (readP_to_S, gather)
 import Text.ParserCombinators.ReadPrec (readPrec_to_P)
 import Text.Read (readPrec)
+import GHC.Driver.Session (DynFlags)
+import GHC.Driver.Config.Parser (predefinedMacros)
 
 ------------------------------------------------------------------------------
 
 -- | Parse the imports of a source file.
 --
 -- Throws a 'SourceError' if parsing fails.
-getImports :: ParserOpts   -- ^ Parser options
+getImports :: DynFlags
+           -> ParserOpts   -- ^ Parser options
            -> Bool         -- ^ Implicit Prelude?
            -> StringBuffer -- ^ Parse this.
            -> FilePath     -- ^ Filename the buffer came from.  Used for
@@ -80,9 +86,9 @@ getImports :: ParserOpts   -- ^ Parser options
                 Located ModuleName))
               -- ^ The source imports and normal imports (with optional package
               -- names from -XPackageImports), and the module name.
-getImports popts implicit_prelude buf filename source_filename = do
+getImports dflags popts implicit_prelude buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
-  case unP parseHeader (initParserState popts buf loc) of
+  case unP parseHeader (initParserStateWithMacros dflags popts buf loc) of
     PFailed pst ->
         -- assuming we're not logging warnings here as per below
       return $ Left $ getPsErrorMessages pst
@@ -111,6 +117,9 @@ getImports popts implicit_prelude buf filename source_filename = do
                      , reLoc mod)
 
 
+initParserStateWithMacros :: DynFlags -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+initParserStateWithMacros df
+  = Lexer.initParserState (initPpState { pp_scope = (PpScope (predefinedMacros df) True) NE.:| [] })
 
 mkPrelImports :: ModuleName
               -> SrcSpan    -- Attribute the "import Prelude" to this location
