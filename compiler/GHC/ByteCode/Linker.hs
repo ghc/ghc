@@ -2,6 +2,7 @@
 {-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE DataKinds             #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -12,7 +13,6 @@ module GHC.ByteCode.Linker
   ( linkBCO
   , lookupStaticPtr
   , lookupIE
-  , nameToCLabel
   , linkFail
   )
 where
@@ -26,7 +26,6 @@ import GHCi.ResolvedBCO
 
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
-import GHC.Builtin.Names
 
 import GHC.Unit.Types
 
@@ -42,8 +41,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import qualified GHC.Types.Id as Id
 import GHC.Types.Unique.DFM
-
-import Language.Haskell.Syntax.Module.Name
 
 -- Standard libraries
 import Data.Array.Unboxed
@@ -92,30 +89,30 @@ lookupLiteral interp pkgs_loaded le ptr = case ptr of
 
 lookupStaticPtr :: Interp -> FastString -> IO (Ptr ())
 lookupStaticPtr interp addr_of_label_string = do
-  m <- lookupSymbol interp addr_of_label_string
+  m <- lookupSymbol interp (IFaststringSymbol addr_of_label_string)
   case m of
     Just ptr -> return ptr
     Nothing  -> linkFail "GHC.ByteCode.Linker: can't find label"
-                  (unpackFS addr_of_label_string)
+                  (ppr addr_of_label_string)
 
 lookupIE :: Interp -> PkgsLoaded -> ItblEnv -> Name -> IO (Ptr ())
 lookupIE interp pkgs_loaded ie con_nm =
   case lookupNameEnv ie con_nm of
     Just (_, ItblPtr a) -> return (fromRemotePtr (castRemotePtr a))
     Nothing -> do -- try looking up in the object files.
-       let sym_to_find1 = nameToCLabel con_nm "con_info"
-       m <- lookupHsSymbol interp pkgs_loaded con_nm "con_info"
+       let sym_to_find1 = IConInfoSymbol con_nm
+       m <- lookupHsSymbol interp pkgs_loaded sym_to_find1
        case m of
           Just addr -> return addr
           Nothing
              -> do -- perhaps a nullary constructor?
-                   let sym_to_find2 = nameToCLabel con_nm "static_info"
-                   n <- lookupHsSymbol interp pkgs_loaded con_nm "static_info"
+                   let sym_to_find2 = IStaticInfoSymbol con_nm
+                   n <- lookupHsSymbol interp pkgs_loaded sym_to_find2
                    case n of
                       Just addr -> return addr
                       Nothing   -> linkFail "GHC.ByteCode.Linker.lookupIE"
-                                      (unpackFS sym_to_find1 ++ " or " ++
-                                       unpackFS sym_to_find2)
+                                      (ppr sym_to_find1 <> " or " <>
+                                       ppr sym_to_find2)
 
 -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode
 lookupAddr :: Interp -> PkgsLoaded -> AddrEnv -> Name -> IO (Ptr ())
@@ -123,21 +120,21 @@ lookupAddr interp pkgs_loaded ae addr_nm = do
   case lookupNameEnv ae addr_nm of
     Just (_, AddrPtr ptr) -> return (fromRemotePtr ptr)
     Nothing -> do -- try looking up in the object files.
-      let sym_to_find = nameToCLabel addr_nm "bytes"
+      let sym_to_find = IBytesSymbol addr_nm
                           -- see Note [Bytes label] in GHC.Cmm.CLabel
-      m <- lookupHsSymbol interp pkgs_loaded addr_nm "bytes"
+      m <- lookupHsSymbol interp pkgs_loaded sym_to_find
       case m of
         Just ptr -> return ptr
         Nothing -> linkFail "GHC.ByteCode.Linker.lookupAddr"
-                     (unpackFS sym_to_find)
+                     (ppr sym_to_find)
 
 lookupPrimOp :: Interp -> PkgsLoaded -> PrimOp -> IO (RemotePtr ())
 lookupPrimOp interp pkgs_loaded primop = do
   let sym_to_find = primopToCLabel primop "closure"
-  m <- lookupHsSymbol interp pkgs_loaded (Id.idName $ primOpId primop) "closure"
+  m <- lookupHsSymbol interp pkgs_loaded (IClosureSymbol (Id.idName $ primOpId primop))
   case m of
     Just p -> return (toRemotePtr p)
-    Nothing -> linkFail "GHC.ByteCode.Linker.lookupCE(primop)" sym_to_find
+    Nothing -> linkFail "GHC.ByteCode.Linker.lookupCE(primop)" (text sym_to_find)
 
 resolvePtr
   :: Interp
@@ -157,11 +154,11 @@ resolvePtr interp pkgs_loaded le bco_ix ptr = case ptr of
     | otherwise
     -> assertPpr (isExternalName nm) (ppr nm) $
        do
-          let sym_to_find = nameToCLabel nm "closure"
-          m <- lookupHsSymbol interp pkgs_loaded nm "closure"
+          let sym_to_find = IClosureSymbol nm
+          m <- lookupHsSymbol interp pkgs_loaded sym_to_find
           case m of
             Just p -> return (ResolvedBCOStaticPtr (toRemotePtr p))
-            Nothing -> linkFail "GHC.ByteCode.Linker.lookupCE" (unpackFS sym_to_find)
+            Nothing -> linkFail "GHC.ByteCode.Linker.lookupCE" (ppr sym_to_find)
 
   BCOPtrPrimOp op
     -> ResolvedBCOStaticPtr <$> lookupPrimOp interp pkgs_loaded op
@@ -176,11 +173,10 @@ resolvePtr interp pkgs_loaded le bco_ix ptr = case ptr of
 -- loaded units.
 --
 -- See Note [Looking up symbols in the relevant objects].
-lookupHsSymbol :: Interp -> PkgsLoaded -> Name -> String -> IO (Maybe (Ptr ()))
-lookupHsSymbol interp pkgs_loaded nm sym_suffix = do
-  massertPpr (isExternalName nm) (ppr nm)
-  let sym_to_find = nameToCLabel nm sym_suffix
-      pkg_id = moduleUnitId $ nameModule nm
+lookupHsSymbol :: Interp -> PkgsLoaded -> InterpSymbol (Suffix s) -> IO (Maybe (Ptr ()))
+lookupHsSymbol interp pkgs_loaded sym_to_find = do
+  massertPpr (isExternalName (interpSymbolName sym_to_find)) (ppr sym_to_find)
+  let pkg_id = moduleUnitId $ nameModule (interpSymbolName sym_to_find)
       loaded_dlls = maybe [] loaded_pkg_hs_dlls $ lookupUDFM pkgs_loaded pkg_id
 
       go (dll:dlls) = do
@@ -194,12 +190,12 @@ lookupHsSymbol interp pkgs_loaded nm sym_suffix = do
 
   go loaded_dlls
 
-linkFail :: String -> String -> IO a
+linkFail :: String -> SDoc -> IO a
 linkFail who what
    = throwGhcExceptionIO (ProgramError $
         unlines [ "",who
                 , "During interactive linking, GHCi couldn't find the following symbol:"
-                , ' ' : ' ' : what
+                , ' ' : ' ' : showSDocUnsafe what
                 , "This may be due to you not asking GHCi to load extra object files,"
                 , "archives or DLLs needed by your current session.  Restart GHCi, specifying"
                 , "the missing library using the -L/path/to/object/dir and -lmissinglibname"
@@ -210,28 +206,8 @@ linkFail who what
                 ])
 
 
-nameToCLabel :: Name -> String -> FastString
-nameToCLabel n suffix = mkFastStringByteString label
-  where
-    encodeZ = fastZStringToByteString . zEncodeFS
-    (Module pkgKey modName) = assert (isExternalName n) $ case nameModule n of
-        -- Primops are exported from GHC.Prim, their HValues live in GHC.PrimopWrappers
-        -- See Note [Primop wrappers] in GHC.Builtin.PrimOps.
-        mod | mod == gHC_PRIM -> gHC_PRIMOPWRAPPERS
-        mod -> mod
-    packagePart = encodeZ (unitFS pkgKey)
-    modulePart  = encodeZ (moduleNameFS modName)
-    occPart     = encodeZ $ occNameMangledFS (nameOccName n)
 
-    label = mconcat $
-        [ packagePart `mappend` "_" | pkgKey /= mainUnit ]
-        ++
-        [modulePart
-        , "_"
-        , occPart
-        , "_"
-        , fromString suffix
-        ]
+
 
 
 -- See Note [Primop wrappers] in GHC.Builtin.PrimOps

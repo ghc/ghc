@@ -420,7 +420,6 @@ import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
 import GHC.Types.Breakpoint
 import GHC.Types.PkgQual
-import GHC.Types.Unique.FM
 
 import GHC.Unit
 import GHC.Unit.Env as UnitEnv
@@ -705,7 +704,7 @@ setTopSessionDynFlags :: GhcMonad m => DynFlags -> m ()
 setTopSessionDynFlags dflags = do
   hsc_env <- getSession
   logger  <- getLogger
-  lookup_cache  <- liftIO $ newMVar emptyUFM
+  lookup_cache  <- liftIO $ mkInterpSymbolCache
 
   -- Interpreter
   interp <- if

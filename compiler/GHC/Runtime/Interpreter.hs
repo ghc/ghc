@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Interacting with the iserv interpreter, whether it is running on an
 -- external process or in the current process.
@@ -83,7 +84,6 @@ import GHC.Data.Maybe
 import GHC.Data.FastString
 
 import GHC.Types.SrcLoc
-import GHC.Types.Unique.FM
 import GHC.Types.Basic
 
 import GHC.Utils.Panic
@@ -115,6 +115,12 @@ import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Directory
 import System.Process
+
+import GHC.Builtin.Names
+import GHC.Types.Name
+
+-- Standard libraries
+import GHC.Exts
 
 {- Note [Remote GHCi]
    ~~~~~~~~~~~~~~~~~~
@@ -457,38 +463,65 @@ handleSeqHValueStatus interp unit_env eval_status =
 initObjLinker :: Interp -> IO ()
 initObjLinker interp = interpCmd interp InitLinker
 
-lookupSymbol :: Interp -> FastString -> IO (Maybe (Ptr ()))
+lookupSymbol :: Interp -> InterpSymbol s -> IO (Maybe (Ptr ()))
 lookupSymbol interp str = withSymbolCache interp str $
   case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
+    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
 #endif
     ExternalInterp ext -> case ext of
       ExtIServ i -> withIServ i $ \inst -> fmap fromRemotePtr <$> do
         uninterruptibleMask_ $
-          sendMessage inst (LookupSymbol (unpackFS str))
+          sendMessage inst (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
       ExtWasm i -> withWasmInterp i $ \inst -> fmap fromRemotePtr <$> do
         uninterruptibleMask_ $
-          sendMessage inst (LookupSymbol (unpackFS str))
+          sendMessage inst (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
 
-lookupSymbolInDLL :: Interp -> RemotePtr LoadedDLL -> FastString -> IO (Maybe (Ptr ()))
+lookupSymbolInDLL :: Interp -> RemotePtr LoadedDLL -> InterpSymbol s -> IO (Maybe (Ptr ()))
 lookupSymbolInDLL interp dll str = withSymbolCache interp str $
   case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbolInDLL dll (unpackFS str))
+    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbolInDLL dll (unpackFS (interpSymbolToCLabel str)))
 #endif
     ExternalInterp ext -> case ext of
       ExtIServ i -> withIServ i $ \inst -> fmap fromRemotePtr <$> do
         uninterruptibleMask_ $
-          sendMessage inst (LookupSymbolInDLL dll (unpackFS str))
+          sendMessage inst (LookupSymbolInDLL dll (unpackFS (interpSymbolToCLabel str)))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
       -- wasm dyld doesn't track which symbol comes from which .so
       ExtWasm {} -> lookupSymbol interp str
 
-lookupClosure :: Interp -> String -> IO (Maybe HValueRef)
+interpSymbolToCLabel :: forall s . InterpSymbol s -> FastString
+interpSymbolToCLabel s = eliminateInterpSymbol s interpretedInterpSymbol $ \is ->
+  let
+    n = interpSymbolName is
+    suffix = interpSymbolSuffix is
+
+    encodeZ = fastZStringToByteString . zEncodeFS
+    (Module pkgKey modName) = assert (isExternalName n) $ case nameModule n of
+        -- Primops are exported from GHC.Prim, their HValues live in GHC.PrimopWrappers
+        -- See Note [Primop wrappers] in GHC.Builtin.PrimOps.
+        mod | mod == gHC_PRIM -> gHC_PRIMOPWRAPPERS
+        mod -> mod
+    packagePart = encodeZ (unitFS pkgKey)
+    modulePart  = encodeZ (moduleNameFS modName)
+    occPart     = encodeZ $ occNameMangledFS (nameOccName n)
+
+    label = mconcat $
+        [ packagePart `mappend` "_" | pkgKey /= mainUnit ]
+        ++
+        [modulePart
+        , "_"
+        , occPart
+        , "_"
+        , fromString suffix
+        ]
+  in mkFastStringByteString label
+
+lookupClosure :: Interp -> InterpSymbol s -> IO (Maybe HValueRef)
 lookupClosure interp str =
-  interpCmd interp (LookupClosure str)
+  interpCmd interp (LookupClosure (unpackFS (interpSymbolToCLabel str)))
 
 -- | 'withSymbolCache' tries to find a symbol in the 'interpLookupSymbolCache'
 -- which maps symbols to the address where they are loaded.
@@ -496,7 +529,7 @@ lookupClosure interp str =
 -- a miss we run the action which determines the symbol's address and populate
 -- the cache with the answer.
 withSymbolCache :: Interp
-                -> FastString
+                -> InterpSymbol s
                 -- ^ The symbol we are looking up in the cache
                 -> IO (Maybe (Ptr ()))
                 -- ^ An action which determines the address of the symbol we
@@ -513,21 +546,19 @@ withSymbolCache interp str determine_addr = do
   -- The analysis in #23415 further showed this cache should also benefit the
   -- internal interpreter's loading times, and needn't be used by the external
   -- interpreter only.
-  cache <- readMVar (interpLookupSymbolCache interp)
-  case lookupUFM cache str of
-    Just p -> return (Just p)
+  cached_val <- lookupInterpSymbolCache str (interpSymbolCache interp)
+  case cached_val of
+    Just {} -> return cached_val
     Nothing -> do
-
       maddr <- determine_addr
       case maddr of
         Nothing -> return Nothing
         Just p -> do
-          let upd_cache cache' = addToUFM cache' str p
-          modifyMVar_ (interpLookupSymbolCache interp) (pure . upd_cache)
-          return (Just p)
+          updateInterpSymbolCache str (interpSymbolCache interp) p
+          return maddr
 
 purgeLookupSymbolCache :: Interp -> IO ()
-purgeLookupSymbolCache interp = modifyMVar_ (interpLookupSymbolCache interp) (const (pure emptyUFM))
+purgeLookupSymbolCache interp = purgeInterpSymbolCache (interpSymbolCache interp)
 
 -- | loadDLL loads a dynamic library using the OS's native linker
 -- (i.e. dlopen() on Unix, LoadLibrary() on Windows).  It takes either
