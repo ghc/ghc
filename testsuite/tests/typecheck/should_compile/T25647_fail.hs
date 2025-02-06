@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, UnliftedNewtypes, TypeFamilies, PolyKinds, MagicHash #-}
 
-module T25647 where
+module T25647_fail where
 
 import GHC.Exts
 import Data.Kind
