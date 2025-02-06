@@ -3,6 +3,7 @@ module GHC.Parser.PreProcess.State where
 import Data.List.NonEmpty (NonEmpty (..), (<|))
 import Data.List.NonEmpty qualified as NonEmpty
 import Data.Map (Map)
+import Data.Maybe
 import Data.Map qualified as Map
 import GHC.Data.StringBuffer
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
@@ -88,6 +89,7 @@ data LogicOp
 
 data CompOp
     = CmpEqual
+    | CmpNotEqual
     | CmpGt
     | CmpGtE
     | CmpLt
@@ -230,7 +232,7 @@ ppDefinition' s name = lookup scopes
 getPpState :: PP PpState
 getPpState = P $ \s -> POk s (pp s)
 
--- -------------------------------------
+-- ---------------------------------------------------------------------
 
 pushContinuation :: Located Token -> PP ()
 pushContinuation new =
@@ -239,3 +241,5 @@ pushContinuation new =
 popContinuation :: PP [Located Token]
 popContinuation =
     P $ \s -> POk s{pp = (pp s){pp_continuation = []}} (pp_continuation (pp s))
+
+-- ---------------------------------------------------------------------
