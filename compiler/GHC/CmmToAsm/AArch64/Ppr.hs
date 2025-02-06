@@ -491,6 +491,34 @@ pprInstr platform instr = case instr of
     op_adrp o1 (pprAsmLabel platform lbl <> text "@page") $$
     op_add o1 (pprAsmLabel platform lbl <> text "@pageoff")
 
+#elif defined(mingw32_HOST_OS)
+  LDR _f o1 (OpImm (ImmIndex lbl' off)) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
+    op_adrp o1 (text "__imp_" <> pprAsmLabel platform lbl) $$
+    op_ldr o1 (text ":lo12:__imp_" <> pprAsmLabel platform lbl) $$
+    op_add o1 (char '#' <> int off) -- TODO: check that off is in 12bits.
+
+  LDR _f o1 (OpImm (ImmIndex lbl off)) | isForeignLabel lbl ->
+    op_adrp o1 (pprAsmLabel platform lbl) $$
+    op_add o1 (text ":lo12:" <> pprAsmLabel platform lbl) $$
+    op_add o1 (char '#' <> int off) -- TODO: check that off is in 12bits.
+
+  LDR _f o1 (OpImm (ImmIndex lbl off)) ->
+    op_adrp o1 (pprAsmLabel platform lbl) $$
+    op_add o1 (text ":lo12:" <> pprAsmLabel platform lbl) $$
+    op_add o1 (char '#' <> int off) -- TODO: check that off is in 12bits.
+
+  LDR _f o1 (OpImm (ImmCLbl lbl')) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
+    op_adrp o1 (text "__imp_" <> pprAsmLabel platform lbl) $$
+    op_ldr o1 (text ":lo12:__imp_" <> pprAsmLabel platform lbl)
+
+  LDR _f o1 (OpImm (ImmCLbl lbl)) | isForeignLabel lbl ->
+    op_adrp o1 (pprAsmLabel platform lbl) $$
+    op_add o1 (text ":lo12:" <> pprAsmLabel platform lbl)
+
+  LDR _f o1 (OpImm (ImmCLbl lbl)) ->
+    op_adrp o1 (pprAsmLabel platform lbl) $$
+    op_add o1 (text ":lo12:" <> pprAsmLabel platform lbl)
+
 #else
   LDR _f o1 (OpImm (ImmIndex lbl' off)) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
     op_adrp o1 (text ":got:" <> pprAsmLabel platform lbl) $$
