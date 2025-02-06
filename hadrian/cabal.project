@@ -3,7 +3,7 @@ packages: ./
           ../libraries/ghc-platform/
 
 -- This essentially freezes the build plan for hadrian
--- It would be wise to keep this up to date with the state set in ci.sh
+-- It would be wise to keep this up to date with the state set in .gitlab/ci.sh.
 index-state: 2025-02-03T15:14:19Z
 
 -- unordered-containers-0.2.20-r1 requires template-haskell < 2.22
