@@ -1,6 +1,8 @@
 {-# language GADTs, LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE CPP #-}
+
 module GHC.CmmToAsm.AArch64.CodeGen (
       cmmTopCodeGen
     , generateJumpTableForInstr
@@ -284,7 +286,11 @@ generateJumpTableForInstr config (J_TBL ids (Just lbl) _) =
               )
             where
               blockLabel = blockLbl blockid
+#if defined(mingw32_HOST_OS)
+   in Just (CmmData (Section Text lbl) (CmmStaticsRaw lbl jumpTable))
+#else
    in Just (CmmData (Section ReadOnlyData lbl) (CmmStaticsRaw lbl jumpTable))
+#endif
 generateJumpTableForInstr _ _ = Nothing
 
 -- -----------------------------------------------------------------------------
@@ -2481,9 +2487,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
     replace_jump !m !pos instr = do
       case instr of
         ANN ann instr -> do
-          replace_jump m pos instr >>= \
-            (idx,instr':|instrs') ->
-              pure (idx, ANN ann instr':|instrs')
+          replace_jump m pos instr >>= (\(idx,instr':|instrs') -> pure (idx, ANN ann instr':|instrs'))
         BCOND cond t
           -> case target_in_range m t pos of
               InRange -> pure (pos+long_bc_jump_size, NE.singleton instr)
