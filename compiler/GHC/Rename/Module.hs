@@ -789,7 +789,7 @@ rnFamEqn doc atfi
     --   type instance F a b c = Either a b
     --                   ^^^^^
     lhs_loc = case map lhsTypeArgSrcSpan pats of
-      []         -> panic "rnFamEqn.lhs_loc"
+      []         -> getLocA tycon
       [loc]      -> loc
       (loc:locs) -> loc `combineSrcSpans` last locs
 

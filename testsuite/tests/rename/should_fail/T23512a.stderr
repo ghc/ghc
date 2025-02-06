@@ -1,6 +1,3 @@
-
 T23512a.hs:6:31: error: [GHC-76037] Not in scope: type variable ‘j’
 
 T23512a.hs:6:36: error: [GHC-76037] Not in scope: type variable ‘j’
-
-T23512a.hs:9:20: error: [GHC-76037] Not in scope: type variable ‘k’
