@@ -69,4 +69,6 @@ newtype instance Dix5 f = DIn5 (f (Dix5 f))
 -- newtype instance Dix6 f where
 --   DIn6 :: forall ff. ff (Dix6 ff) -> Dix6 ff
 
+data family Dix7 :: (k -> TYPE 'IntRep) -> k
+newtype instance Dix7 f = DIn7 (f (Dix7 f))
 
