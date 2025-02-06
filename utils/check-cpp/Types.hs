@@ -75,6 +75,7 @@ data LogicOp
 
 data CompOp
     = CmpEqual
+    | CmpNotEqual
     | CmpGt
     | CmpGtE
     | CmpLt

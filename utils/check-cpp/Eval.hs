@@ -20,6 +20,7 @@ evalLogicOp LogicalAnd e1 e2 = fromBool $ (toBool e1) || (toBool e2)
 
 evalCompOp :: CompOp -> Int -> Int -> Int
 evalCompOp CmpEqual e1 e2 = fromBool $ e1 == e2
+evalCompOp CmpNotEqual e1 e2 = fromBool $ e1 /= e2
 evalCompOp CmpGt e1 e2 = fromBool $ e1 > e2
 evalCompOp CmpGtE e1 e2 = fromBool $ e1 >= e2
 evalCompOp CmpLt e1 e2 = fromBool $ e1 < e2

@@ -710,7 +710,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
         popts = initParserOpts dflags
         rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
         rn_imps = fmap (\(s, rpk, lmn@(L _ mn)) -> (s, rn_pkg_qual mn rpk, lmn))
-    eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
+    eimps <- getImports dflags popts imp_prelude buf input_fn (basename <.> suff)
     case eimps of
         Left errs -> throwErrors (GhcPsMessage <$> errs)
         Right (src_imps,imps, L _ mod_name) -> return

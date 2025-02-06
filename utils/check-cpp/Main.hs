@@ -4,6 +4,7 @@
 import Control.Monad.IO.Class
 import Data.Data hiding (Fixity)
 import Data.List
+import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
 import Debug.Trace
 import GHC
@@ -31,11 +32,13 @@ import GHC.Utils.Outputable
 -- import Types
 
 import GHC.Parser.PreProcess.ParsePP
+
 -- import GHC.Parser.ParseSimulate
+
+import GHC.Parser
 import GHC.Parser.PreProcess
 import GHC.Parser.PreProcess as PP
 import GHC.Parser.PreProcess.State
-import GHC.Parser
 
 -- ---------------------------------------------------------------------
 
@@ -62,15 +65,20 @@ parseString libdir includes str = ghcWrapper libdir $ do
     liftIO $ putStrLn str
     liftIO $ putStrLn "---------------------"
     -- return $ strParserWrapper str dflags "fake_test_file.hs"
-    return $ strGetToks includes pflags "fake_test_file.hs" str
+    return $ strGetToks dflags includes pflags "fake_test_file.hs" str
 
-strGetToks :: Includes -> Lexer.ParserOpts -> FilePath -> String -> [Located Token]
-strGetToks includes popts filename str = reverse $ lexAll pstate
+strGetToks :: DynFlags -> Includes -> Lexer.ParserOpts -> FilePath -> String -> [Located Token]
+strGetToks dflags includes popts filename str = reverse $ lexAll pstate
   where
     -- strGetToks includes popts filename str = reverse $ lexAll (trace ("pstate=" ++ show initState) pstate)
 
     includeMap = Map.fromList $ map (\(k, v) -> (k, stringToStringBuffer (intercalate "\n" v))) includes
-    initState = initPpState{pp_includes = includeMap}
+    macros = predefinedMacros dflags
+    initState =
+        initPpState
+            { pp_includes = includeMap
+            , pp_scope = (PpScope (predefinedMacros dflags) True) :| []
+            }
     pstate = Lexer.initParserState initState popts buf loc
     loc = mkRealSrcLoc (mkFastString filename) 1 1
     buf = stringToStringBuffer str
@@ -154,8 +162,6 @@ ghcWrapper libdir a =
     GHC.defaultErrorHandler GHC.defaultFatalMessager GHC.defaultFlushOut $
         GHC.runGhc (Just libdir) a
 
--- ---------------------------------------------------------------------
-
 -- =====================================================================
 -- ---------------------------------------------------------------------
 
@@ -188,7 +194,8 @@ t0 = do
         , "#endif"
         , ""
         ]
-  -- x = 1
+
+-- x = 1
 
 t1 :: IO ()
 t1 = do
@@ -196,7 +203,8 @@ t1 = do
         [ "data X = X"
         , ""
         ]
-  -- data X = X
+
+-- data X = X
 
 t2 :: IO ()
 t2 = do
@@ -208,7 +216,8 @@ t2 = do
         , "x = 5"
         , "#endif"
         ]
-  -- x = 5
+
+-- x = 5
 
 t3 :: IO ()
 t3 = do
@@ -229,9 +238,10 @@ t3 = do
         , ""
         , "foo = putStrLn x"
         ]
-  -- y = 1
-  -- x = "hello"
-  -- foo = putStrLn x
+
+-- y = 1
+-- x = "hello"
+-- foo = putStrLn x
 
 t3a :: IO ()
 t3a = do
@@ -250,8 +260,9 @@ t3a = do
         , ""
         , "foo = putStrLn x"
         ]
-  -- x = "hello"
-  -- foo = putStrLn x
+
+-- x = "hello"
+-- foo = putStrLn x
 
 t4 :: IO ()
 t4 = do
@@ -273,7 +284,8 @@ t4 = do
         , "x = \"no version\""
         , "#endif"
         ]
-  -- x = "got version"
+
+-- x = "got version"
 
 t5 :: IO ()
 t5 = do
@@ -284,7 +296,8 @@ t5 = do
         , "  (major1) == 1 && (major2) == 7 && (minor) <= 0)"
         , "x = x"
         ]
-  -- x = x
+
+-- x = x
 
 t6 :: IO ()
 t6 = do
@@ -298,7 +311,8 @@ t6 = do
         , "#endif"
         , ""
         ]
-  -- x = "got version"
+
+-- x = "got version"
 
 -- t7 :: Maybe (String, [String])
 t7 = parseDirective "#define VERSION_ghc_exactprint \"1.7.0.1\""
@@ -321,7 +335,8 @@ t10 = do
         , "x = 2"
         , "#endif"
         ]
-  -- x = 1
+
+-- x = 1
 
 testIncludes :: Includes
 testIncludes =
@@ -345,7 +360,8 @@ t11 = do
         , "x = 5"
         , "#endif"
         ]
-  -- x = 1
+
+-- x = 1
 
 t12 :: IO ()
 t12 = do
@@ -358,4 +374,18 @@ t12 = do
         , "x = 5"
         , "#endif"
         ]
-  -- x = 1
+
+-- x = 1
+
+t13 :: IO ()
+t13 = do
+    doTest
+        [
+          "#if __GLASGOW_HASKELL__ != 913"
+        , "x = 1"
+        , "#else"
+        , "x = 5"
+        , "#endif"
+        ]
+
+-- x = 1

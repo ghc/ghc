@@ -101,6 +101,7 @@ import GHC.Prelude
 %left '||'
 %left '&&'
 %left '=='
+%left '!='
 %left '>' '>=' '<' '<='
 %left '+' '-'
 %left '*' '/'
@@ -114,6 +115,7 @@ expr : variable           { $1 }
      | expr '||' expr     { Logic LogicalOr $1 $3 }
      | expr '&&' expr     { Logic LogicalAnd $1 $3 }
      | expr '==' expr     { Comp CmpEqual $1 $3 }
+     | expr '!=' expr     { Comp CmpNotEqual $1 $3 }
      | expr '>'  expr     { Comp CmpGt $1 $3 }
      | expr '>=' expr     { Comp CmpGtE $1 $3 }
      | expr '<'  expr     { Comp CmpLt $1 $3 }
