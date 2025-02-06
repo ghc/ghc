@@ -1,5 +1,7 @@
 {-# language GADTs, LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
+
 module GHC.CmmToAsm.AArch64.CodeGen (
       cmmTopCodeGen
     , generateJumpTableForInstr
@@ -281,7 +283,11 @@ generateJumpTableForInstr config (J_TBL ids (Just lbl) _) =
               )
             where
               blockLabel = blockLbl blockid
+#if defined(mingw32_HOST_OS)
+   in Just (CmmData (Section Text lbl) (CmmStaticsRaw lbl jumpTable))
+#else
    in Just (CmmData (Section ReadOnlyData lbl) (CmmStaticsRaw lbl jumpTable))
+#endif
 generateJumpTableForInstr _ _ = Nothing
 
 -- -----------------------------------------------------------------------------
