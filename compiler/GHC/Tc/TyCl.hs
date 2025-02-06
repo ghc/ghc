@@ -3451,7 +3451,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
 
        -- See Note [Generalising in tcTyFamInstEqnGuts]
        ; dvs  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
-       ; qtvs <- quantifyTyVars skol_info TryNotToDefaultNonStandardTyVars dvs
+       ; qtvs <- quantifyTyVars skol_info DefaultNonStandardTyVars dvs
        ; let final_tvs = scopedSort (qtvs ++ outer_tvs)
              -- This scopedSort is important: the qtvs may be /interleaved/ with
              -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
