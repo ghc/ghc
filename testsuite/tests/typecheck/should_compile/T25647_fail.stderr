@@ -11,3 +11,13 @@ T25647_fail.hs:17:3: [GHC-89498]
               ff (Fix4a @LiftedRep ff) -> Fix4a @LiftedRep ff
      In the definition of data constructor ‘In4a’
       In the newtype declaration for ‘Fix4a’
+
+T25647_fail.hs:21:3: [GHC-18872]
+     Couldn't match a lifted type with an unlifted type
+      When matching types
+        ff :: TYPE IntRep -> TYPE IntRep
+        f0 :: * -> TYPE IntRep
+      Expected: Dix6 f0
+        Actual: Dix6 ff
+     In the result type of data constructor ‘DIn6’
+      In the newtype family instance declaration for ‘Dix6’
