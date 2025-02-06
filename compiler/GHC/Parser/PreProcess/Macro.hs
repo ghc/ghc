@@ -47,6 +47,7 @@ process s str = (s0, o)
         CppIfndef name -> ifndef s name
         CppElse -> cppElse s
         CppEndif -> popScope' s
+        CppDumpState -> undefined
 
 -- ---------------------------------------------------------------------
 
@@ -65,7 +66,7 @@ cppIf s str = pushAccepting' s (toBool v)
   where
     expanded = expand s str
     v = case Parser.parseExpr expanded of
-        Left err -> error $ show err
+        Left err -> error $ "parseExpr:" ++ show (err, expanded)
         Right tree -> eval tree
 
 cppElse :: PpState -> PpState
@@ -78,7 +79,7 @@ expand s str = expanded
   where
     -- TODO: repeat until re-expand or fixpoint
     toks = case cppLex str of
-        Left err -> error err
+        Left err -> error $ "expand:" ++ show (err, str)
         Right tks -> tks
     expanded = concatMap (expandOne s) toks
 
