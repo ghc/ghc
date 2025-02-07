@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
 -------------------------------------------------------------------------------
 -- |
@@ -29,6 +29,7 @@ import GHC.Internal.Control.Exception   (Exception(..), handleJust, bracket,
                             asyncExceptionToException,
                             asyncExceptionFromException)
 import GHC.Internal.Data.Unique         (Unique, newUnique)
+import GHC.Conc (labelThread)
 import Prelude
 
 -- $setup
@@ -119,7 +120,9 @@ timeout n f
         let handleTimeout = do
                 v <- isEmptyMVar lock
                 when v $ void $ forkIOWithUnmask $ \unmask -> unmask $ do
-                    v2 <- tryPutMVar lock =<< myThreadId
+                    tid <- myThreadId
+                    labelThread tid "timeout worker"
+                    v2 <- tryPutMVar lock tid
                     when v2 $ throwTo pid ex
             cleanupTimeout key = uninterruptibleMask_ $ do
                 v <- tryPutMVar lock undefined
@@ -136,7 +139,9 @@ timeout n f
         ex  <- fmap Timeout newUnique
         handleJust (\e -> if e == ex then Just () else Nothing)
                    (\_ -> return Nothing)
-                   (bracket (forkIOWithUnmask $ \unmask ->
+                   (bracket (forkIOWithUnmask $ \unmask -> do
+                                 tid <- myThreadId
+                                 labelThread tid "timeout worker"
                                  unmask $ threadDelay n >> throwTo pid ex)
                             (uninterruptibleMask_ . killThread)
                             (\_ -> fmap Just f))
