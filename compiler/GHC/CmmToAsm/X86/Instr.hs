@@ -336,8 +336,12 @@ data Instr
         -- Shuffle
         | SHUF       Format Imm Operand Reg
         | VSHUF      Format Imm Operand Reg Reg
+        | PSHUFB     Format Operand Reg
+        | PSHUFLW    Format Imm Operand Reg
+        | PSHUFHW    Format Imm Operand Reg
         | PSHUFD     Format Imm Operand Reg
         | VPSHUFD    Format Imm Operand Reg
+        | PBLENDW    Format Imm Operand Reg
 
         -- | Move two 32-bit floats from the high part of an xmm register
         -- to the low part of another xmm register.
@@ -347,14 +351,18 @@ data Instr
         | PUNPCKLDQ  Format Operand Reg
         | PUNPCKLWD  Format Operand Reg
         | PUNPCKLBW  Format Operand Reg
+        | PUNPCKHQDQ Format Operand Reg
+        | PUNPCKHDQ  Format Operand Reg
+        | PUNPCKHWD  Format Operand Reg
         | PUNPCKHBW  Format Operand Reg
         | PACKUSWB   Format Operand Reg
 
         -- Shift
         | PSLL       Format Operand Reg
-        | PSLLDQ     Format Operand Reg
+        | PSLLDQ     Format Imm Reg
         | PSRL       Format Operand Reg
-        | PSRLDQ     Format Operand Reg
+        | PSRLDQ     Format Imm Reg
+        | PALIGNR    Format Imm Operand Reg
 
         -- min/max
         | MINMAX  MinOrMax MinMaxType Format Operand Reg
@@ -556,15 +564,24 @@ regUsageOfInstr platform instr
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     VSHUF fmt _mask src1 src2 dst
       -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
+    PSHUFB fmt mask dst
+      -> mkRU (use_R fmt mask [mk fmt dst]) [mk fmt dst]
+    PSHUFLW fmt _mask src dst
+      -> mkRU (use_R fmt src []) [mk fmt dst]
+    PSHUFHW fmt _mask src dst
+      -> mkRU (use_R fmt src []) [mk fmt dst]
     PSHUFD fmt _mask src dst
       -> mkRU (use_R fmt src []) [mk fmt dst]
     VPSHUFD fmt _mask src dst
       -> mkRU (use_R fmt src []) [mk fmt dst]
+    PBLENDW fmt _mask src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
     PSLL   fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
-    PSLLDQ fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
+    PSLLDQ fmt _off dst -> mkRU [mk fmt dst] [mk fmt dst]
     PSRL   fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
-    PSRLDQ fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
+    PSRLDQ fmt _off dst -> mkRU [mk fmt dst] [mk fmt dst]
+    PALIGNR fmt _off src dst -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
     MOVHLPS    fmt src dst
       -> mkRU [mk fmt src] [mk fmt dst]
@@ -577,6 +594,12 @@ regUsageOfInstr platform instr
     PUNPCKLWD fmt src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PUNPCKLBW fmt src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PUNPCKHQDQ fmt src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PUNPCKHDQ fmt src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PUNPCKHWD fmt src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PUNPCKHBW fmt src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
@@ -822,19 +845,29 @@ patchRegsOfInstr platform instr env
       -> SHUF fmt off (patchOp src) (env dst)
     VSHUF      fmt off src1 src2 dst
       -> VSHUF fmt off (patchOp src1) (env src2) (env dst)
+    PSHUFB       fmt mask dst
+      -> PSHUFB fmt (patchOp mask) (env dst)
+    PSHUFLW      fmt off src dst
+      -> PSHUFLW fmt off (patchOp src) (env dst)
+    PSHUFHW      fmt off src dst
+      -> PSHUFHW fmt off (patchOp src) (env dst)
     PSHUFD       fmt off src dst
       -> PSHUFD  fmt off (patchOp src) (env dst)
     VPSHUFD      fmt off src dst
       -> VPSHUFD fmt off (patchOp src) (env dst)
+    PBLENDW      fmt mask src dst
+      -> PBLENDW fmt mask (patchOp src) (env dst)
 
     PSLL         fmt off dst
       -> PSLL    fmt (patchOp off) (env dst)
     PSLLDQ       fmt off dst
-      -> PSLLDQ  fmt (patchOp off) (env dst)
+      -> PSLLDQ  fmt off (env dst)
     PSRL         fmt off dst
       -> PSRL    fmt (patchOp off) (env dst)
     PSRLDQ       fmt off dst
-      -> PSRLDQ  fmt (patchOp off) (env dst)
+      -> PSRLDQ  fmt off (env dst)
+    PALIGNR      fmt off src dst
+      -> PALIGNR fmt off (patchOp src) (env dst)
 
     MOVHLPS    fmt src dst
       -> MOVHLPS fmt (env src) (env dst)
@@ -848,6 +881,12 @@ patchRegsOfInstr platform instr env
       -> PUNPCKLWD fmt (patchOp src) (env dst)
     PUNPCKLBW fmt src dst
       -> PUNPCKLBW fmt (patchOp src) (env dst)
+    PUNPCKHQDQ fmt src dst
+      -> PUNPCKHQDQ fmt (patchOp src) (env dst)
+    PUNPCKHDQ fmt src dst
+      -> PUNPCKHDQ fmt (patchOp src) (env dst)
+    PUNPCKHWD fmt src dst
+      -> PUNPCKHWD fmt (patchOp src) (env dst)
     PUNPCKHBW fmt src dst
       -> PUNPCKHBW fmt (patchOp src) (env dst)
     PACKUSWB fmt src dst

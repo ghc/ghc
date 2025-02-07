@@ -1050,10 +1050,18 @@ pprInstr platform i = case i of
      -> pprShuf (text "shuf" <> pprFormat format) format offset src dst
    VSHUF format offset src1 src2 dst
      -> pprVShuf (text "vshuf" <> pprFormat format) format offset src1 src2 dst
+   PSHUFB format mask dst
+     -> pprOpReg (text "pshufb") format mask dst
+   PSHUFLW format offset src dst
+     -> pprShuf (text "pshuflw") format offset src dst
+   PSHUFHW format offset src dst
+     -> pprShuf (text "pshufhw") format offset src dst
    PSHUFD format offset src dst
      -> pprShuf (text "pshufd") format offset src dst
    VPSHUFD format offset src dst
      -> pprShuf (text "vpshufd") format offset src dst
+   PBLENDW format mask src dst
+     -> pprShuf (text "pblendw") format mask src dst
 
    PSLL format offset dst
      -> pprFormatOpReg (text "psll") format offset dst
@@ -1063,6 +1071,8 @@ pprInstr platform i = case i of
      -> pprFormatOpReg (text "psrl") format offset dst
    PSRLDQ format offset dst
      -> pprDoubleShift (text "psrldq") format offset dst
+   PALIGNR format offset src dst
+     -> pprImmOpReg (text "palignr") format offset src dst
 
    MOVHLPS format from to
      -> pprOpReg (text "movhlps") format (OpReg from) to
@@ -1076,6 +1086,12 @@ pprInstr platform i = case i of
      -> pprOpReg (text "punpcklwd") format from to
    PUNPCKLBW format from to
      -> pprOpReg (text "punpcklbw") format from to
+   PUNPCKHQDQ format from to
+     -> pprOpReg (text "punpckhqdq") format from to
+   PUNPCKHDQ format from to
+     -> pprOpReg (text "punpckhdq") format from to
+   PUNPCKHWD format from to
+     -> pprOpReg (text "punpckhwd") format from to
    PUNPCKHBW format from to
      -> pprOpReg (text "punpckhbw") format from to
    PACKUSWB format from to
@@ -1442,13 +1458,24 @@ pprInstr platform i = case i of
            pprReg platform format reg4
        ]
 
-   pprDoubleShift :: Line doc -> Format -> Operand -> Reg -> doc
+   pprDoubleShift :: Line doc -> Format -> Imm -> Reg -> doc
    pprDoubleShift name format off reg
      = line $ hcat [
            pprGenMnemonic name format,
-           pprOperand platform format off,
+           pprDollImm off,
            comma,
            pprReg platform format reg
+       ]
+
+   pprImmOpReg :: Line doc -> Format -> Imm -> Operand -> Reg -> doc
+   pprImmOpReg name format imm1 op2 reg3
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprDollImm imm1,
+           comma,
+           pprOperand platform format op2,
+           comma,
+           pprReg platform format reg3
        ]
 
    pprMinMax :: Bool -> MinOrMax -> MinMaxType -> Format -> [Operand] -> doc

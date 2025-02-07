@@ -2738,12 +2738,14 @@ doVecInsertOp ty src e idx res = do
 doShuffleOp :: CmmType -> [CmmExpr] -> LocalReg -> FCode ()
 doShuffleOp ty (v1:v2:idxs) res
   | isVecType ty
+  -- The type checker ensures that the indices have the correct length,
+  -- so we only need to check whether the indices are constants and within the valid range.
   = case mapMaybe idx_maybe idxs of
       is
         | length is == len
         -> emitAssign (CmmLocal res) (CmmMachOp (mo is) [v1,v2])
         | otherwise
-        -> pprPanic "doShuffleOp" $
+        -> pgmErrorDoc "Vector shuffle:" $
              vcat [ text "shuffle indices must be literals, 0 <= i <" <+> ppr (2 * len) ]
   | otherwise
   = pprPanic "doShuffleOp" $

@@ -93,6 +93,7 @@ import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class (lift)
 import Data.Foldable (fold)
 import Data.Int
+import Data.List (partition)
 import Data.Maybe
 import Data.Word
 
@@ -102,6 +103,11 @@ is32BitPlatform :: NatM Bool
 is32BitPlatform = do
     platform <- getPlatform
     return $ target32Bit platform
+
+ssse3Enabled :: NatM Bool
+ssse3Enabled = do
+  config <- getConfig
+  return (ncgSseVersion config >= Just SSSE3)
 
 sse4_1Enabled :: NatM Bool
 sse4_1Enabled = do
@@ -1400,7 +1406,11 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_VF_Max l w         | avx       -> vector_float_op_avx (VMINMAX Max FloatMinMax) l w x y
                             | otherwise -> vector_float_op_sse (MINMAX Max FloatMinMax) l w x y
 
-      -- SIMD NCG TODO: shuffle and 256/512-bit integer vector operations
+      -- SIMD NCG TODO: 256/512-bit integer vector operations
+      MO_V_Shuffle 16 W8 is | not is32Bit -> vector_shuffle_int8x16 sse4_1 x y is
+      MO_V_Shuffle 8 W16 is -> vector_shuffle_int16x8 sse4_1 x y is
+      MO_V_Shuffle 4 W32 is -> vector_shuffle_int32x4 sse4_1 x y is
+      MO_V_Shuffle 2 W64 is -> vector_shuffle_int64x2 sse4_1 x y is
       MO_V_Shuffle {} -> needLlvm mop
       MO_V_Add l w | l * widthInBits w == 128 -> vector_int_op_sse PADD l w x y
                    | otherwise -> needLlvm mop
@@ -2097,6 +2107,466 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
           -> pprPanic "vector shuffle: indices out of bounds 0 <= i <= 7" (ppr is)
         _ ->
           pprPanic "vector shuffle: unsupported format" (ppr fmt)
+
+    isZeroVecLit :: CmmExpr -> Bool
+    isZeroVecLit (CmmLit (CmmVec elems)) = all (\lit -> case lit of CmmInt 0 _ -> True; _ -> False) elems
+    isZeroVecLit _ = False
+
+    vector_shuffle_int128_common :: Bool -> Format -> CmmExpr -> CmmExpr -> [Int] -> Maybe (NatM Register)
+    vector_shuffle_int128_common sse4_1 fmt v1 v2 is
+      | length is == n, all (\i -> 0 <= i && i < 2 * n) is = if
+        -- Trivial cases
+        | is == [0..n-1] -> Just $ getRegister' platform is32Bit v1
+        | is == [n..2*n-1] -> Just $ getRegister' platform is32Bit v2
+
+        -- We would like to emit PXOR for these trivial cases, instead of PSLLDQ.
+        -- These conditions can be generalized to the cases where all elements are equal,
+        -- or more generally, a constant-folding rule.
+        | v1IsZero, all (< n) is -> Just $ getRegister' platform is32Bit v1
+        | v2IsZero, all (>= n) is -> Just $ getRegister' platform is32Bit v2
+
+        -- PSLLDQ: v2 == 0 && is == [n..(2n-1),...,n..(2n-1);0,1,2,3,...,n-i-1]
+        | v2IsZero, (z, js) <- span (>= n) is, and (zipWith (==) js [0..]) -> Just $ do
+          exp1 <- getAnyReg v1
+          let code dst = exp1 dst `snocOL`
+                         (PSLLDQ fmt (ImmInt (widthInBytes * length z)) dst)
+          return (Any fmt code)
+
+        -- PSLLDQ: v1 == 0 && is == [0..(n-1),...,0..(n-1);n,n+1,...,2n-i-1]
+        | v1IsZero, (z, js) <- span (< n) is, and (zipWith (==) js [n..]) -> Just $ do
+          exp2 <- getAnyReg v2
+          let code dst = exp2 dst `snocOL`
+                         (PSLLDQ fmt (ImmInt (widthInBytes * length z)) dst)
+          return (Any fmt code)
+
+        -- PSRLDQ: v2 == 0 && is == [i,i+1,...,n-2,n-1;n..(2n-1),...,n..(2n-1)]
+        | v2IsZero, (js, z) <- span (< n) is, all (>= n) z, and (zipWith (==) (reverse js) [n-1,n-2..]) -> Just $ do
+          exp1 <- getAnyReg v1
+          let code dst = exp1 dst `snocOL`
+                         (PSRLDQ fmt (ImmInt (widthInBytes * length z)) dst)
+          return (Any fmt code)
+
+        -- PSRLDQ: v1 == 0 && is == [n+i,...,2n-2,2n-1;0..(n-1),...,0..(n-1)]
+        | v1IsZero, (js, z) <- span (>= n) is, all (< n) z, and (zipWith (==) (reverse js) [2*n-1,2*n-2..]) -> Just $ do
+          exp2 <- getAnyReg v2
+          let code dst = exp2 dst `snocOL`
+                         (PSRLDQ fmt (ImmInt (widthInBytes * length z)) dst)
+          return (Any fmt code)
+
+        -- PALIGNR (SSSE3) or PSLLDQ + PSRLDQ: is == [i,i+1,...,n-2,n-1;n,n+1,...,n+i-1]
+        | (js, ks) <- span (< n) is, and (zipWith (==) (reverse js) [n-1,n-2..]), and (zipWith (==) ks [n..]) -> Just $ do
+          ssse3 <- ssse3Enabled
+          let amountInBytes = widthInBytes * length ks
+          if ssse3
+            then vector_op_sse (`PALIGNR` (ImmInt amountInBytes)) fmt v2 v1
+            else do
+              exp1 <- getAnyReg v1
+              exp2 <- getAnyReg v2
+              tmp <- getNewRegNat fmt
+              let code dst = exp1 tmp `snocOL`
+                             (PSRLDQ fmt (ImmInt amountInBytes) tmp) `appOL`
+                             exp2 dst `snocOL`
+                             (PSLLDQ fmt (ImmInt (16 - amountInBytes)) dst) `snocOL`
+                             (POR fmt (OpReg tmp) dst)
+              return (Any fmt code)
+
+        -- PALIGNR (SSSE3) or PSLLDQ + PSRLDQ: is == [n+i,n+i+1,...,2n-2,2n-1;0,1,...,i-1]
+        | (js, ks) <- span (>= n) is, and (zipWith (==) (reverse js) [2*n-1,2*n-2..]), and (zipWith (==) ks [0..]) -> Just $ do
+          ssse3 <- ssse3Enabled
+          let amountInBytes = widthInBytes * length ks
+          if ssse3
+            then vector_op_sse (`PALIGNR` (ImmInt amountInBytes)) fmt v1 v2
+            else do
+              exp1 <- getAnyReg v1
+              exp2 <- getAnyReg v2
+              tmp <- getNewRegNat fmt
+              let code dst = exp2 tmp `snocOL`
+                             (PSRLDQ fmt (ImmInt amountInBytes) tmp) `appOL`
+                             exp1 dst `snocOL`
+                             (PSLLDQ fmt (ImmInt (16 - amountInBytes)) dst) `snocOL`
+                             (POR fmt (OpReg tmp) dst)
+              return (Any fmt code)
+
+        -- PBLENDW (SSE4.1): map (`mod` n) is == [0,1,...,n-1] if widthInBytes >= 2
+        | sse4_1, widthInBytes >= 2, and (zipWith (\i j -> i `rem` n == j) is [0..]) -> Just $ do
+          let k = widthInBytes `quot` 2
+              m = bit k - 1
+              imm = foldr (\i acc -> if i >= n then (acc `shiftL` k) .|. m else acc `shiftL` k) 0 is
+          vector_op_sse (`PBLENDW` (ImmInt imm)) fmt v1 v2
+
+        | otherwise -> Nothing
+
+      | otherwise = pprPanic "vector shuffle: wrong indices" (ppr is)
+      where
+        (n, widthInBytes) = case fmt of
+          VecFormat 16 FmtInt8 -> (16, 1)
+          VecFormat 8 FmtInt16 -> (8, 2)
+          VecFormat 4 FmtInt32 -> (4, 4)
+          VecFormat 2 FmtInt64 -> (2, 8)
+          _ -> pprPanic "Invalid format" (ppr fmt)
+        v1IsZero = isZeroVecLit v1
+        v2IsZero = isZeroVecLit v2
+
+    vector_shuffle_int8x16 :: Bool -> CmmExpr -> CmmExpr -> [Int] -> NatM Register
+    vector_shuffle_int8x16 sse4_1 v1 v2 is
+      | Just commonCase <- vector_shuffle_int128_common sse4_1 fmt v1 v2 is = commonCase
+      | otherwise = do
+        ssse3 <- ssse3Enabled
+        let fmtInt16X8 = VecFormat 8 FmtInt16
+            v1IsZero = isZeroVecLit v1
+            v2IsZero = isZeroVecLit v2
+            tryInt16X8Mask [] = Just []
+            tryInt16X8Mask (j0:j1:js)
+              | even j0, j1 == j0 + 1 = (j0 `quot` 2 :) <$> tryInt16X8Mask js
+            tryInt16X8Mask _ = Nothing
+        if
+          -- PUNPCKLBW / PUNPCKHBW
+          | [0,16,1,17,2,18,3,19,4,20,5,21,6,22,7,23] <- is -> vector_op_sse PUNPCKLBW fmt v1 v2
+          | [16,0,17,1,18,2,19,3,20,4,21,5,22,6,23,7] <- is -> vector_op_sse PUNPCKLBW fmt v2 v1
+          | [8,24,9,25,10,26,11,27,12,28,13,29,14,30,15,31] <- is -> vector_op_sse PUNPCKHBW fmt v1 v2
+          | [24,8,25,9,26,10,27,11,28,12,29,13,30,14,31,15] <- is -> vector_op_sse PUNPCKHBW fmt v2 v1
+
+          -- PSHUFB (SSSE3)
+          | ssse3, all (< 16) is || v2IsZero -> do
+            exp1 <- getAnyReg v1
+            let mask1 = CmmVec $ map (\i -> CmmInt (toInteger $ if i < 16 then i else 255) W8) is
+            Amode amode1 amode_code1 <- memConstant (mkAlignment 16) mask1
+            let code dst = exp1 dst `appOL`
+                           amode_code1 `snocOL`
+                           (PSHUFB fmt (OpAddr amode1) dst)
+            return (Any fmt code)
+
+          -- PSHUFB (SSSE3)
+          | ssse3, all (>= 16) is || v1IsZero -> do
+            exp2 <- getAnyReg v2
+            let mask2 = CmmVec $ map (\i -> CmmInt (toInteger $ if i >= 16 then i - 16 else 255) W8) is
+            Amode amode2 amode_code2 <- memConstant (mkAlignment 16) mask2
+            let code dst = exp2 dst `appOL`
+                           amode_code2 `snocOL`
+                           (PSHUFB fmt (OpAddr amode2) dst)
+            return (Any fmt code)
+
+          -- PBLENDW (SSE4.1): js <- tryInt16X8Mask is, map (`mod` 8) js == [0,1,...,7]
+          | sse4_1, Just js <- tryInt16X8Mask is, and (zipWith (\i j -> i `rem` 8 == j) js [0..]) -> do
+            let imm = foldr (\i acc -> if i >= 8 then (acc `shiftL` 1) .|. 1 else acc `shiftL` 1) 0 js
+            vector_op_sse (`PBLENDW` (ImmInt imm)) fmt v1 v2
+
+          -- General case with SSSE3: PSHUFB + PSHUFB + POR
+          | ssse3 -> do
+            exp1 <- getAnyReg v1
+            exp2 <- getAnyReg v2
+            tmp1 <- getNewRegNat fmt
+            let mask1 = CmmVec $ map (\i -> CmmInt (toInteger $ if i < 16 then i else 255) W8) is
+                mask2 = CmmVec $ map (\i -> CmmInt (toInteger $ if i >= 16 then i - 16 else 255) W8) is
+            Amode amode1 amode_code1 <- memConstant (mkAlignment 16) mask1
+            Amode amode2 amode_code2 <- memConstant (mkAlignment 16) mask2
+            let code dst = exp1 tmp1 `appOL` exp2 dst `appOL`
+                           amode_code1 `snocOL`
+                           (PSHUFB fmt (OpAddr amode1) tmp1) `appOL`
+                           amode_code2 `snocOL`
+                           (PSHUFB fmt (OpAddr amode2) dst) `snocOL`
+                           (POR fmt (OpReg tmp1) dst)
+            return (Any fmt code)
+
+          -- General case with SSE2: GPR + MOVQ + PUNPCKLQDQ
+          | otherwise -> do
+            (r1, exp1) <- getSomeReg v1
+            (r2, exp2) <- getSomeReg v2
+            tmp <- getNewRegNat II64
+            tmpLo <- getNewRegNat II64
+            tmpHi <- getNewRegNat II64
+            tmpXmm <- getNewRegNat fmt
+            dst <- getNewRegNat fmt
+            let place8Bits srcPos dstPos dst =
+                  -- Assumption: 0 <= srcPos < 32, 0 <= dstPos < 8
+                  -- tmp <- (src[srcPos] `shiftR` ((srcPos `rem` 16) * 8)) .&. 0xff
+                  -- dst <- dst .|. (tmp `shiftL` (dstPos * 8))
+                  let r = if srcPos < 16 then r1 else r2
+                  in case (srcPos `rem` 16) `quotRem` 2 of
+                      (k, 0) -> toOL [ PEXTR II32 fmtInt16X8 (ImmInt k) r (OpReg tmp)
+                                     , MOVZxL II8 (OpReg tmp) (OpReg tmp)
+                                     , SHL II64 (OpImm (ImmInt (8 * dstPos))) (OpReg tmp)
+                                     , OR II64 (OpReg tmp) (OpReg dst)
+                                     ]
+                      (k, _) -> (PEXTR II32 fmtInt16X8 (ImmInt k) r (OpReg tmp)) `consOL`
+                                ((case dstPos of
+                                    0 -> unitOL (SHR II32 (OpImm (ImmInt 8)) (OpReg tmp))
+                                    1 -> unitOL (AND II32 (OpImm (ImmInt 0xff00)) (OpReg tmp))
+                                    _ -> toOL [ AND II32 (OpImm (ImmInt 0xff00)) (OpReg tmp)
+                                              , SHL II64 (OpImm (ImmInt (8 * (dstPos - 1)))) (OpReg tmp) ]) `snocOL`
+                                 (OR II64 (OpReg tmp) (OpReg dst)))
+                makeInt8x8OnGPR dst js = (XOR II32 (OpReg dst) (OpReg dst)) `consOL`
+                                         concatOL [ place8Bits srcPos dstPos dst | (srcPos, dstPos) <- zip js [0..] ]
+                code = exp1 `appOL` exp2 `appOL`
+                       makeInt8x8OnGPR tmpLo (take 8 is) `snocOL`
+                       (MOVD II64 fmt (OpReg tmpLo) (OpReg dst)) `appOL`
+                       makeInt8x8OnGPR tmpHi (drop 8 is) `snocOL`
+                       (MOVD II64 fmt (OpReg tmpHi) (OpReg tmpXmm)) `snocOL`
+                       (PUNPCKLQDQ fmt (OpReg tmpXmm) dst)
+            return (Fixed fmt dst code)
+      where fmt = VecFormat 16 FmtInt8
+
+    vector_shuffle_int16x8 :: Bool -> CmmExpr -> CmmExpr -> [Int] -> NatM Register
+    vector_shuffle_int16x8 sse4_1 v1 v2 is@(i0:i1:i2:i3:i4567@[i4,i5,i6,i7])
+      | Just commonCase <- vector_shuffle_int128_common sse4_1 fmt v1 v2 is = commonCase
+      | otherwise = do
+        (r1, exp1) <- getSomeReg v1
+        (r2, exp2) <- getSomeReg v2
+        let -- shufL src dst k0 k1 k2 k3 (0 <= k_i < 4):
+            --   dst <- (src[k0],src[k1],src[k2],src[k3],src[4],src[5],src[6],src[7])
+            shufL src dst 0 1 2 3 | src == dst = nilOL
+                                  | otherwise = unitOL (MOVDQU fmt (OpReg src) (OpReg dst))
+            shufL src dst k0 k1 k2 k3 = let imm = k0 + (k1 `shiftL` 2) + (k2 `shiftL` 4) + (k3 `shiftL` 6)
+                                        in unitOL (PSHUFLW fmt (ImmInt imm) (OpReg src) dst)
+            -- shufH src dst k0 k1 k2 k3 (4 <= k_i < 8):
+            --   dst <- (src[0],src[1],src[2],src[3],src[k0],src[k1],src[k2],src[k3])
+            shufH src dst 4 5 6 7 | src == dst = nilOL
+                                  | otherwise = unitOL (MOVDQU fmt (OpReg src) (OpReg dst))
+            shufH src dst k0 k1 k2 k3 = let imm = (k0 - 4) + ((k1 - 4) `shiftL` 2) + ((k2 - 4) `shiftL` 4) + ((k3 - 4) `shiftL` 6)
+                                        in unitOL (PSHUFHW fmt (ImmInt imm) (OpReg src) dst)
+
+            shufLHImm src dst immLo immHi = case (immLo, immHi) of
+              (0b11_10_01_00, 0b11_10_01_00)
+                | src == dst -> nilOL
+                | otherwise -> unitOL (MOVDQU fmt (OpReg src) (OpReg dst))
+              (0b11_10_01_00, _) -> unitOL (PSHUFHW fmt (ImmInt immHi) (OpReg src) dst)
+              (_, 0b11_10_01_00) -> unitOL (PSHUFLW fmt (ImmInt immLo) (OpReg src) dst)
+              (_, _) -> toOL [PSHUFLW fmt (ImmInt immLo) (OpReg src) dst,
+                              PSHUFHW fmt (ImmInt immHi) (OpReg dst) dst]
+
+            -- ks = [k0,...,k7]
+            -- Assumption: 0 <= k_i < 4 for 0 <= i < 4, 4 <= k_i < 8 for 4 <= i < 8
+            -- dst <- (src[k0],...,src[k7])
+            shufLH src dst ks
+              = let (k_lo, k_hi) = splitAt 4 ks
+                    immLo = foldr (\k acc -> (acc `shiftL` 2) + k) 0 k_lo
+                    immHi = foldr (\k acc -> (acc `shiftL` 2) + (k - 4)) 0 k_hi
+                in shufLHImm src dst immLo immHi
+
+            -- shufRev src dst j0 j1 j2 j3 j4 j5 j6 j7:
+            -- Assumption: [j0,j1,j2,j3] `elem` permutations [0,1,2,3] && [j4,j5,j6,j7] `elem` permutations [4,5,6,7]:
+            --   dst[j0] <- src[0]; dst[j1] <- src[1]; dst[j2] <- src[2]; dst[j3] <- src[3];
+            --   dst[j4] <- src[4]; dst[j5] <- src[5]; dst[j6] <- src[6]; dst[j7] <- src[7];
+            shufRev src dst _j0 j1 j2 j3 _j4 j5 j6 j7
+              = let immLo = (1 `shiftL` (2 * j1)) + (2 `shiftL` (2 * j2)) + (3 `shiftL` (2 * j3))
+                    immHi = (1 `shiftL` (2 * (j5 - 4))) + (2 `shiftL` (2 * (j6 - 4))) + (3 `shiftL` (2 * (j7 - 4)))
+                in shufLHImm src dst immLo immHi
+            i0123 = [i0, i1, i2, i3]
+        if
+          -- PSHUFLW + PSHUFHW
+          | all (\i -> i < 4) i0123
+          , all (\i -> 4 <= i && i < 8) i4567
+          -> do
+            let code dst = exp1 `appOL`
+                           shufLH r1 dst is
+            return (Any fmt code)
+
+          -- PSHUFLW + PSHUFHW
+          | all (\i -> 8 <= i && i < 12) i0123
+          , all (\i -> 12 <= i) i4567
+          -> do
+            let code dst = exp2 `appOL`
+                           shufLH r2 dst (map (subtract 8) is)
+            return (Any fmt code)
+
+          -- PSHUF{L,H}W + PBLENDW (SSE4.1)
+          | sse4_1
+          , all (\i -> i `rem` 8 < 4) i0123
+          , all (\i -> 4 <= i `rem` 8) i4567
+          -> do
+            tmp <- getNewRegNat fmt
+            let imm = foldl' (\acc (i,p) -> if i >= 8 then setBit acc p else acc) 0 (zip is [0..])
+                js = zipWith (\i p -> if i >= 8 then p else i) is [0..]
+                ks = zipWith (\i p -> if i >= 8 then i - 8 else p) is [0..]
+                code dst = exp1 `appOL` exp2 `appOL`
+                           shufLH r2 tmp ks `appOL`
+                           shufLH r1 dst js `snocOL`
+                           (PBLENDW fmt (ImmInt imm) (OpReg tmp) dst)
+            return (Any fmt code)
+
+          -- PSHUFLW + PSHUFLW + PUNPCKLWD + PSHUFLW + PSHUFHW
+          | all (\i -> i < 4 || (8 <= i && i < 12)) is
+          , ([(j0, k0), (j1, k1)], [(j2, k2), (j3, k3)]) <- partition (\(_, i) -> i < 4) [(0, i0), (1, i1), (2, i2), (3, i3)]
+          , ([(j4, k4), (j5, k5)], [(j6, k6), (j7, k7)]) <- partition (\(_, i) -> i < 4) [(4, i4), (5, i5), (6, i6), (7, i7)]
+          -> do
+            tmp1 <- getNewRegNat fmt
+            tmp2 <- getNewRegNat fmt
+            let code dst = exp1 `appOL` exp2 `appOL`
+                           shufL r1 tmp1 k0 k1 k4 k5 `appOL`
+                           shufL r2 tmp2 (k2 - 8) (k3 - 8) (k6 - 8) (k7 - 8) `snocOL`
+                           (PUNPCKLWD fmt (OpReg tmp2) tmp1) `appOL`
+                           shufRev tmp1 dst j0 j2 j1 j3 j4 j6 j5 j7
+            return (Any fmt code)
+
+          -- PSHUFHW + PSHUFHW + PUNPCKHWD + PSHUFLW + PSHUFHW
+          | all (\i -> (4 <= i && i < 8) || 12 <= i) is
+          , ([(j0, k0), (j1, k1)], [(j2, k2), (j3, k3)]) <- partition (\(_, i) -> i < 8) [(0, i0), (1, i1), (2, i2), (3, i3)]
+          , ([(j4, k4), (j5, k5)], [(j6, k6), (j7, k7)]) <- partition (\(_, i) -> i < 8) [(4, i4), (5, i5), (6, i6), (7, i7)]
+          -> do
+            tmp1 <- getNewRegNat fmt
+            tmp2 <- getNewRegNat fmt
+            let code dst = exp1 `appOL` exp2 `appOL`
+                           shufH r1 tmp1 k0 k1 k4 k5 `appOL`
+                           shufH r2 tmp2 (k2 - 8) (k3 - 8) (k6 - 8) (k7 - 8) `snocOL`
+                           (PUNPCKHWD fmt (OpReg tmp2) tmp1) `appOL`
+                           shufRev tmp1 dst j0 j2 j1 j3 j4 j6 j5 j7
+            return (Any fmt code)
+
+          -- Generic implementation
+          | otherwise -> do
+            tmp0 <- getNewRegNat II32
+            tmps <- replicateM 7 (getNewRegNat II32)
+            let code dst = exp1 `appOL` exp2 `appOL`
+                           toOL [ PEXTR II32 fmt (ImmInt i') r (OpReg tmp)
+                                | (i, tmp) <- zip is (tmp0:tmps)
+                                , let (i', r) = if i < 8 then (i, r1) else (i - 8, r2)
+                                ] `snocOL`
+                           (MOVD II32 fmt (OpReg tmp0) (OpReg dst)) `appOL`
+                           toOL [ PINSR II32 fmt (ImmInt i) (OpReg tmp) dst
+                                | (i, tmp) <- zip [1..] tmps
+                                ]
+            return (Any fmt code)
+      where fmt = VecFormat 8 FmtInt16
+    vector_shuffle_int16x8 _ _ _ is = pprPanic "vector shuffle: wrong number of indices (expected 8)" (ppr is)
+
+    vector_shuffle_int32x4 :: Bool -> CmmExpr -> CmmExpr -> [Int] -> NatM Register
+    vector_shuffle_int32x4 sse4_1 v1 v2 is
+      | Just commonCase <- vector_shuffle_int128_common sse4_1 fmt v1 v2 is = commonCase
+      | otherwise = do
+        let -- `pshufd imm src dst` is equivalent to `PSHUFD fmt (ImmInt imm) (OpReg src) dst`
+            pshufd 0b11_10_01_00 src dst
+              | src == dst = nilOL
+              | otherwise = unitOL (MOVDQU fmt (OpReg src) (OpReg dst))
+            pshufd imm src dst = unitOL (PSHUFD fmt (ImmInt imm) (OpReg src) dst)
+
+            -- PSHUFD (composeImm imm1 imm2) src dst == (PSHUFD imm1 src tmp; PSHUFD imm2 tmp dst)
+            composeMask :: Int -> Int -> Int
+            composeMask imm1 imm2 = foldr (\i acc -> let j = (imm2 `shiftR` (2 * i)) .&. 3
+                                                     in (imm1 `shiftR` (2 * j) .&. 3) .|. (acc `shiftL` 2)
+                                          ) 0 [0..3]
+
+            makeMask :: [(Int, Int)] -- List of (dst,src). If src == -1, the value there can be anything.
+                     -> Int
+            makeMask m = foldl' (.|.) 0 [ src `shiftL` (2 * dst) | dst <- [0..3], let src = fromMaybe dst (mfilter (>= 0) $ lookup dst m) ]
+
+            twoAndTwo p0@(1,_) p1@(3,_) q0@(0,_) q1@(2,_) imm4 v1 v2 = twoAndTwo' q0 q1 p0 p1 imm4 v2 v1
+            twoAndTwo p0 p1 q0 q1 imm4 v1 v2 = twoAndTwo' p0 p1 q0 q1 imm4 v1 v2
+            twoAndTwo' p0 p1 q0 q1 imm4 v1 v2 = do
+              (r1, exp1) <- getSomeReg v1
+              (r2, exp2) <- getSomeReg v2
+              tmp <- getNewRegNat fmt
+              let (instr, imm1, imm2) =
+                    if all (\(_,i) -> 2 <= i || i == -1) [p0,p1,q0,q1] then
+                      -- The inputs are all from higher lanes
+                      (PUNPCKHDQ, makeMask [(2,snd p0),(3,snd p1)], makeMask [(2,snd q0),(3,snd q1)])
+                    else
+                      (PUNPCKLDQ, makeMask [(0,snd p0),(1,snd p1)], makeMask [(0,snd q0),(1,snd q1)])
+                  imm3 = makeMask [(fst p0,0),(fst q0,1),(fst p1,2),(fst q1,3)]
+                  code dst = exp1 `appOL` exp2 `appOL`
+                             pshufd imm2 r2 tmp `appOL`             -- tmp <- (*,*,r2[snd q0],r2[snd q1]) or (r2[snd q0],r2[snd q1],*,*)
+                             pshufd imm1 r1 dst `snocOL`            -- dst <- (*,*,r1[snd p0],r1[snd p1]) or (r1[snd p0],r1[snd p1],*,*)
+                             instr fmt (OpReg tmp) dst `appOL`      -- dst <- (dst[0],tmp[0],dst[1],tmp[1]) = (r1[snd p0],r2[snd q0],r1[snd p1],r2[snd q1])
+                             pshufd (composeMask imm3 imm4) dst dst -- (dst[fst p0],dst[fst q0],dst[fst p1],dst[fst q1]) <- dst
+              return $ Any fmt code
+
+            threeAndOne p0 p1 p2 q0
+              | snd p0 == snd p1 = twoAndTwo p0 p2 q0 (fst p1,-1) (makeMask [(fst p0,fst p0),(fst p1,fst p0),(fst p2,fst p2),(fst q0,fst q0)])
+              | snd p0 == snd p2 = twoAndTwo p0 p1 q0 (fst p2,-1) (makeMask [(fst p0,fst p0),(fst p1,fst p1),(fst p2,fst p0),(fst q0,fst q0)])
+              | snd p1 == snd p2 = twoAndTwo p0 p1 q0 (fst p2,-1) (makeMask [(fst p0,fst p0),(fst p1,fst p1),(fst p2,fst p1),(fst q0,fst q0)])
+              | otherwise = \v1 v2 -> do
+                (r1, exp1) <- getSomeReg v1
+                (r2, exp2) <- getSomeReg v2
+                tmp1 <- getNewRegNat fmt
+                if sse4_1
+                  then do
+                    let imm1 = makeMask [p0,p1,p2]
+                        imm2 = makeMask [q0]
+                        imm3 = foldl' (.|.) 0 [ (if i == fst q0 then 0 else 3) `shiftL` (2 * i) | i <- [0..3] ]
+                    let code dst = exp1 `appOL` exp2 `appOL`
+                                   pshufd imm1 r1 tmp1 `appOL`
+                                   pshufd imm2 r2 dst `snocOL`
+                                   PBLENDW fmt (ImmInt imm3) (OpReg tmp1) dst
+                    return $ Any fmt code
+                  else do
+                    tmp2 <- getNewRegNat fmt
+                    tmp3 <- getNewRegNat fmt
+                    let imm1 = snd q0 .|. 0b11_10_01_00
+                        imm2 = snd p1 .|. 0b11_10_01_00
+                        imm3 = snd p0 .|. (snd p2 `shiftL` 2) .|. 0b11_10_00_00
+                        imm6 = makeMask [(fst q0,0),(fst p0,1),(fst p1,2),(fst p2,3)]
+                        code dst = exp1 `appOL` exp2 `appOL`
+                                   pshufd imm1 r2 tmp1 `appOL`              -- tmp1 <- (y0,*,*,*)
+                                   pshufd imm2 r1 tmp2 `appOL`              -- tmp2 <- (x1,*,*,*)
+                                   pshufd imm3 r1 tmp3 `snocOL`             -- tmp3 <- (x0,x2,*,*)
+                                   PUNPCKLDQ fmt (OpReg tmp2) tmp1 `snocOL` -- tmp1 <- unpckldq tmp1 tmp2 = (y0,x1,*,*)
+                                   PUNPCKLDQ fmt (OpReg tmp3) tmp1 `appOL`  -- tmp1 <- unpckldq tmp1 tmp3 = (y0,x0,x1,x2)
+                                   pshufd imm6 tmp1 dst                     -- dst <- shuffle tmp1
+                    return $ Any fmt code
+
+        let (from_first, from_second) = partition (\(_dstPos,srcPos) -> srcPos < 4) (zip [0..] is)
+        case (from_first, map (\(dstPos,srcPos) -> (dstPos, srcPos - 4)) from_second) of
+          ([p0,p1,p2,p3], []) -> do
+            (r, exp) <- getSomeReg v1
+            let imm = makeMask [p0,p1,p2,p3]
+                code dst = exp `appOL` pshufd imm r dst
+            return $ Any fmt code
+
+          ([], [q0,q1,q2,q3]) -> do
+            (r, exp) <- getSomeReg v2
+            let imm = makeMask [q0,q1,q2,q3]
+                code dst = exp `appOL` pshufd imm r dst
+            return $ Any fmt code
+
+          ([p0,p1], [q0,q1]) -> twoAndTwo p0 p1 q0 q1 0b11_10_01_00 v1 v2
+          ([p0], [q0,q1,q2]) -> threeAndOne q0 q1 q2 p0 v2 v1
+          ([p0,p1,p2], [q0]) -> threeAndOne p0 p1 p2 q0 v1 v2
+
+          _ -> pprPanic "vector shuffle: cannot occur" (ppr is)
+      where fmt = VecFormat 4 FmtInt32
+
+    vector_shuffle_int64x2 :: Bool -> CmmExpr -> CmmExpr -> [Int] -> NatM Register
+    vector_shuffle_int64x2 sse4_1 v1 v2 is
+      | Just commonCase <- vector_shuffle_int128_common sse4_1 fmt v1 v2 is = commonCase
+      | otherwise = case is of
+        -- PUNPCKLQDQ / PUNPCKHQDQ
+        [i, i'] | i == i' -> do
+          exp <- getAnyReg $ if i < 2 then v1 else v2
+          let instr = if i == 0 || i == 2
+                      then PUNPCKLQDQ
+                      else PUNPCKHQDQ
+              code dst = exp dst `snocOL`
+                         (instr fmt (OpReg dst) dst)
+          return $ Any fmt code
+        [0, 2] -> vector_op_sse PUNPCKLQDQ fmt v1 v2
+        [2, 0] -> vector_op_sse PUNPCKLQDQ fmt v2 v1
+        [1, 3] -> vector_op_sse PUNPCKHQDQ fmt v1 v2
+        [3, 1] -> vector_op_sse PUNPCKHQDQ fmt v2 v1
+
+        -- PSHUFD
+        [1, 0] -> do
+          (r1, exp1) <- getSomeReg v1
+          let code dst = exp1 `snocOL`
+                         (PSHUFD fmt (ImmInt 0b01_00_11_10) (OpReg r1) dst)
+          return $ Any fmt code
+        [3, 2] -> do
+          (r2, exp2) <- getSomeReg v2
+          let code dst = exp2 `snocOL`
+                         (PSHUFD fmt (ImmInt 0b01_00_11_10) (OpReg r2) dst)
+          return $ Any fmt code
+
+        -- Others:
+        -- If SSE4.1 is available, use PBLENDW (see vector_shuffle_int128_common).
+        -- Otherwise, we resort to SHUFPD.
+        [0, 3] -> vector_op_sse (\_ -> SHUF doubleFormat (ImmInt 2)) fmt v1 v2
+        [2, 1] -> vector_op_sse (\_ -> SHUF doubleFormat (ImmInt 2)) fmt v2 v1
+
+        -- [0, 1], [2, 3], [1, 2], [3, 0] are covered by the common cases
+
+        -- Indices are checked in vector_shuffle_int128_common, so the following line should be unreachable:
+        _ -> pprPanic "vector shuffle: wrong number of indices (expected 2)" (ppr is)
+      where fmt = VecFormat 2 FmtInt64
+            doubleFormat = VecFormat 2 FmtDouble
+
 
 getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
   avx    <- avxEnabled
