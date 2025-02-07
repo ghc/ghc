@@ -169,10 +169,12 @@ moduleFilesOracle = void $ do
 
         let pairs = sort $ mainpairs ++ [ (encodeModule d f, f) | (fs, d) <- result, f <- fs ]
             multi = [ (m, f1, f2) | (m, f1):(n, f2):_ <- tails pairs, m == n ]
-        unless (null multi) $ do
-            let (m, f1, f2) = head multi
-            error $ "Module " ++ m ++ " has more than one source file: "
-                ++ f1 ++ " and " ++ f2 ++ "."
+
+        case multi of
+            [] -> return ()
+            (m, f1, f2) : _ ->
+              fail $ "Module " ++ m ++ " has more than one source file: "
+                  ++ f1 ++ " and " ++ f2 ++ "."
         return $ lookupAll modules pairs
 
     -- Optimisation: we discard Haskell files here, because they are never used
