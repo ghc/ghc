@@ -777,17 +777,18 @@ There is also the possibility of mentioning a wildcard
 
 -}
 
-tcFamTyPats :: TyCon
+tcFamTyPats :: (Maybe SkolemInfo)
+            -> TyCon
             -> HsFamEqnPats GhcRn                -- Patterns
             -> TcM (TcType, TcKind)          -- (lhs_type, lhs_kind)
 -- Check the LHS of a type/data family instance
 -- e.g.   type instance F ty1 .. tyn = ...
 -- Used for both type and data families
-tcFamTyPats fam_tc hs_pats
+tcFamTyPats skol_info fam_tc hs_pats
   = do { traceTc "tcFamTyPats {" $
          vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity ]
 
-       ; mode <- mkHoleMode TypeLevel HM_FamPat
+       ; mode <- mkHoleMode TypeLevel (HM_FamPat skol_info)
                  -- HM_FamPat: See Note [Wildcards in family instances] in
                  -- GHC.Rename.Module
        ; let fun_ty = mkTyConApp fam_tc []
@@ -967,7 +968,7 @@ type HoleInfo = Maybe (TcLevel, HoleMode)
 -- HoleMode says how to treat the occurrences
 -- of anonymous wildcards; see tcAnonWildCardOcc
 data HoleMode = HM_Sig      -- Partial type signatures: f :: _ -> Int
-              | HM_FamPat   -- Family instances: F _ Int = Bool
+              | HM_FamPat (Maybe SkolemInfo)   -- Family instances: F _ Int = Bool
               | HM_VTA      -- Visible type and kind application:
                             --   f @(Maybe _)
                             --   Maybe @(_ -> _)
@@ -990,10 +991,10 @@ mkHoleMode tyki hm
                           , mode_holes = Just (lvl,hm) }) }
 
 instance Outputable HoleMode where
-  ppr HM_Sig      = text "HM_Sig"
-  ppr HM_FamPat   = text "HM_FamPat"
-  ppr HM_VTA      = text "HM_VTA"
-  ppr HM_TyAppPat = text "HM_TyAppPat"
+  ppr HM_Sig        = text "HM_Sig"
+  ppr (HM_FamPat _) = text "HM_FamPat"
+  ppr HM_VTA        = text "HM_VTA"
+  ppr HM_TyAppPat   = text "HM_TyAppPat"
 
 instance Outputable TcTyMode where
   ppr (TcTyMode { mode_tyki = tyki, mode_holes = hm })
@@ -2212,7 +2213,7 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
     --           esp the bullet on nested forall types
   = do { kv_details <- newTauTvDetailsAtLevel hole_lvl
        ; kv_name    <- newMetaTyVarName (fsLit "k")
-       ; wc_details <- newTauTvDetailsAtLevel hole_lvl
+       ; wc_details <- mk_wc_details
        ; wc_name    <- newMetaTyVarName wc_nm
        ; let kv      = mkTcTyVar kv_name liftedTypeKind kv_details
              wc_kind = mkTyVarTy kv
@@ -2230,17 +2231,21 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
        -- so we have to do it properly (T14140a)
        ; checkExpectedKind ty (mkTyVarTy wc_tv) wc_kind exp_kind }
   where
+     -- make sure we align with none-wild card type variables
+     mk_wc_details = case hole_mode of
+                       HM_FamPat (Just skol_info) -> return $ SkolemTv skol_info hole_lvl False
+                       _ -> newTauTvDetailsAtLevel hole_lvl
      -- See Note [Wildcard names]
      wc_nm = case hole_mode of
                HM_Sig      -> fsLit "w"
-               HM_FamPat   -> fsLit "_"
+               HM_FamPat _ -> fsLit "_"
                HM_VTA      -> fsLit "w"
                HM_TyAppPat -> fsLit "_"
 
      emit_holes = case hole_mode of
-                     HM_Sig     -> True
-                     HM_FamPat  -> False
-                     HM_VTA     -> False
+                     HM_Sig      -> True
+                     HM_FamPat _ -> False
+                     HM_VTA      -> False
                      HM_TyAppPat -> False
 
 tcAnonWildCardOcc is_extra _ _ _
