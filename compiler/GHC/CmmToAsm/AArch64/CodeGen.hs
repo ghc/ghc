@@ -23,7 +23,7 @@ import GHC.Cmm.DebugBlock
 import GHC.CmmToAsm.Monad
    ( NatM, getNewRegNat
    , getPicBaseMaybeNat, getPlatform, getConfig
-   , getDebugBlock, getFileId, getNewLabelNat
+   , getDebugBlock, getFileId
    )
 -- import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
@@ -50,7 +50,7 @@ import GHC.Types.Unique.Supply
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
 
-import Control.Monad    ( mapAndUnzipM )
+import Control.Monad    ( mapAndUnzipM, foldM )
 import Data.Maybe
 import GHC.Float
 
@@ -210,79 +210,43 @@ annExpr e instr {- debugIsOn -} = ANN (text . show $ e) instr
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
--- | Generate jump to jump table target
+-- TODO jump tables would be a lot faster, but we'll use bare bones for now.
+-- this is usually done by sticking the jump table ids into an instruction
+-- and then have the @generateJumpTableForInstr@ callback produce the jump
+-- table as a static.
 --
--- The index into the jump table is calulated by evaluating @expr@. The
--- corresponding table entry contains the relative address to jump to (relative
--- to the jump table's first entry / the table's own label).
-genSwitch :: NCGConfig -> CmmExpr -> SwitchTargets -> NatM InstrBlock
-genSwitch config expr targets = do
-  (reg, fmt1, e_code) <- getSomeReg indexExpr
-  let fmt = II64
-  targetReg <- getNewRegNat fmt
-  lbl <- getNewLabelNat
-  dynRef <- cmmMakeDynamicReference config DataReference lbl
-  (tableReg, fmt2, t_code) <- getSomeReg dynRef
-  let code =
-        toOL
-          [ COMMENT (text "indexExpr" <+> (text . show) indexExpr),
-            COMMENT (text "dynRef" <+> (text . show) dynRef)
-          ]
-          `appOL` e_code
-          `appOL` t_code
-          `appOL` toOL
-            [ COMMENT (ftext "Jump table for switch"),
-              -- index to offset into the table (relative to tableReg)
-              annExpr expr (LSL (OpReg (formatToWidth fmt1) reg) (OpReg (formatToWidth fmt1) reg) (OpImm (ImmInt 3))),
-              -- calculate table entry address
-              ADD (OpReg W64 targetReg) (OpReg (formatToWidth fmt1) reg) (OpReg (formatToWidth fmt2) tableReg),
-              -- load table entry (relative offset from tableReg (first entry) to target label)
-              LDR II64 (OpReg W64 targetReg) (OpAddr (AddrRegImm targetReg (ImmInt 0))),
-              -- calculate absolute address of the target label
-              ADD (OpReg W64 targetReg) (OpReg W64 targetReg) (OpReg W64 tableReg),
-              -- prepare jump to target label
-              J_TBL ids (Just lbl) targetReg
-            ]
-  return code
-  where
-    -- See Note [Sub-word subtlety during jump-table indexing] in
-    -- GHC.CmmToAsm.X86.CodeGen for why we must first offset, then widen.
-    indexExpr0 = cmmOffset platform expr offset
-    -- We widen to a native-width register to sanitize the high bits
-    indexExpr =
-      CmmMachOp
-        (MO_UU_Conv expr_w (platformWordWidth platform))
-        [indexExpr0]
-    expr_w = cmmExprWidth platform expr
-    (offset, ids) = switchTargetsToTable targets
-    platform = ncgPlatform config
+-- See Ticket 19912
+--
+-- data SwitchTargets =
+--    SwitchTargets
+--        Bool                       -- Signed values
+--        (Integer, Integer)         -- Range
+--        (Maybe Label)              -- Default value
+--        (M.Map Integer Label)      -- The branches
+--
+-- Non Jumptable plan:
+-- xE <- expr
+--
+genSwitch :: CmmExpr -> SwitchTargets -> NatM InstrBlock
+genSwitch expr targets = do -- pprPanic "genSwitch" (ppr expr)
+  (reg, format, code) <- getSomeReg expr
+  let w = formatToWidth format
+  let mkbranch acc (key, bid) = do
+        (keyReg, _format, code) <- getSomeReg (CmmLit (CmmInt key w))
+        return $ code `appOL`
+                 toOL [ CMP (OpReg w reg) (OpReg w keyReg)
+                      , BCOND EQ (TBlock bid)
+                      ] `appOL` acc
+      def_code = case switchTargetsDefault targets of
+        Just bid -> unitOL (B (TBlock bid))
+        Nothing  -> nilOL
 
--- | Generate jump table data (if required)
---
--- The idea is to emit one table entry per case. The entry is the relative
--- address of the block to jump to (relative to the table's first entry /
--- table's own label.) The calculation itself is done by the linker.
-generateJumpTableForInstr ::
-  NCGConfig ->
-  Instr ->
-  Maybe (NatCmmDecl RawCmmStatics Instr)
-generateJumpTableForInstr config (J_TBL ids (Just lbl) _) =
-  let jumpTable =
-        map jumpTableEntryRel ids
-        where
-          jumpTableEntryRel Nothing =
-            CmmStaticLit (CmmInt 0 (ncgWordWidth config))
-          jumpTableEntryRel (Just blockid) =
-            CmmStaticLit
-              ( CmmLabelDiffOff
-                  blockLabel
-                  lbl
-                  0
-                  (ncgWordWidth config)
-              )
-            where
-              blockLabel = blockLbl blockid
-   in Just (CmmData (Section ReadOnlyData lbl) (CmmStaticsRaw lbl jumpTable))
+  switch_code <- foldM mkbranch nilOL (switchTargetsCases targets)
+  return $ code `appOL` switch_code `appOL` def_code
+
+-- We don't do jump tables for now, see Ticket 19912
+generateJumpTableForInstr :: NCGConfig -> Instr
+  -> Maybe (NatCmmDecl RawCmmStatics Instr)
 generateJumpTableForInstr _ _ = Nothing
 
 -- -----------------------------------------------------------------------------
@@ -314,7 +278,6 @@ stmtToInstrs :: BlockId -- ^ Basic block this statement will start to be placed 
 stmtToInstrs bid stmt = do
   -- traceM $ "-- -------------------------- stmtToInstrs -------------------------- --\n"
   --     ++ showSDocUnsafe (ppr stmt)
-  config <- getConfig
   platform <- getPlatform
   case stmt of
     CmmUnsafeForeignCall target result_regs args
@@ -343,7 +306,7 @@ stmtToInstrs bid stmt = do
       CmmCondBranch arg true false _prediction ->
           genCondBranch bid true false arg
 
-      CmmSwitch arg ids -> genSwitch config arg ids
+      CmmSwitch arg ids -> genSwitch arg ids
 
       CmmCall { cml_target = arg } -> genJump arg
 
@@ -388,6 +351,12 @@ getRegisterReg platform (CmmGlobal reg@(GlobalRegUse mid _))
         -- ones which map to a real machine register on this
         -- platform.  Hence if it's not mapped to a registers something
         -- went wrong earlier in the pipeline.
+-- | Convert a BlockId to some CmmStatic data
+-- TODO: Add JumpTable Logic, see Ticket 19912
+-- jumpTableEntry :: NCGConfig -> Maybe BlockId -> CmmStatic
+-- jumpTableEntry config Nothing   = CmmStaticLit (CmmInt 0 (ncgWordWidth config))
+-- jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
+--     where blockLabel = blockLbl blockid
 
 -- -----------------------------------------------------------------------------
 -- General things for putting together code sequences
