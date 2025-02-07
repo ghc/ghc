@@ -1,4 +1,4 @@
 T9357.hs:12:15: error: [GHC-91510]
-    • Illegal polymorphic type: forall (a :: TYPE t). a -> a
+     Illegal polymorphic type: forall a. a -> a
     • In the type family instance declaration for ‘F’
 
