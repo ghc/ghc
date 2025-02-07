@@ -156,6 +156,7 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
           [ "-D__SSE__"      | isSseEnabled      platform ] ++
           [ "-D__SSE2__"     | isSse2Enabled     platform ] ++
           [ "-D__SSE3__"     | isSse3Enabled     dflags ] ++
+          [ "-D__SSSE3__"    | isSsse3Enabled    dflags ] ++
           [ "-D__SSE4_1__"   | isSse4_1Enabled   dflags ] ++
           [ "-D__SSE4_2__"   | isSse4_2Enabled   dflags ]
 

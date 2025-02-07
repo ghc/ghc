@@ -206,6 +206,7 @@ module GHC.Driver.Session (
 
         -- * SSE and AVX
         isSse3Enabled,
+        isSsse3Enabled,
         isSse4_1Enabled,
         isSse4_2Enabled,
         isBmiEnabled,
@@ -1674,6 +1675,8 @@ dynamic_flags_deps = [
                                                   d { sseVersion = Just SSE2 }))
   , make_ord_flag defGhcFlag "msse3"        (noArg (\d ->
                                                   d { sseVersion = Just SSE3 }))
+  , make_ord_flag defGhcFlag "mssse3"       (noArg (\d ->
+                                                  d { sseVersion = Just SSSE3 }))
   , make_ord_flag defGhcFlag "msse4"        (noArg (\d ->
                                                   d { sseVersion = Just SSE4 }))
   , make_ord_flag defGhcFlag "msse4.2"      (noArg (\d ->

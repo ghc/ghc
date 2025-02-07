@@ -1680,6 +1680,18 @@ Some flags only make sense for particular target platforms.
     (whether using the :ref:`native code generator <native-code-gen>`
     or the :ref:`LLVM backend <llvm-code-gen>`).
 
+.. ghc-flag:: -mssse3
+    :shortdesc: (x86 only) Use SSSE3 for vector operations
+    :type: dynamic
+    :category: platform-options
+
+    :since: 9.14.1
+
+    (x86 only) Use the SSSE3 instruction set to
+    implement some vector operations
+    (whether using the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`).
+
 .. ghc-flag:: -msse4
     :shortdesc: (x86 only) Use SSE4 for floating-point operations
     :type: dynamic

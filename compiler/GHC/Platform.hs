@@ -269,6 +269,7 @@ data SseVersion
    = SSE1
    | SSE2
    | SSE3
+   | SSSE3
    | SSE4
    | SSE42
    deriving (Eq, Ord)
