@@ -138,7 +138,10 @@ unifyPath = toStandard . normaliseEx
 
 -- | Combine paths with a forward slash regardless of platform.
 (-/-) :: FilePath -> FilePath -> FilePath
-_  -/- b | isAbsolute b && not (isAbsolute $ tail b) = b
+_  -/- b
+    | isAbsolute b
+    , _:b' <- b
+    , not (isAbsolute b') = b
 "" -/- b = b
 a  -/- b
     | last a == '/' = a ++       b
@@ -615,7 +618,8 @@ renderLibrary name lib synopsis = renderBox $
 -- | ipsum    |
 -- \----------/
 renderBox :: [String] -> String
-renderBox ls = tail $ concatMap ('\n' :) (boxTop : map renderLine ls ++ [boxBot])
+renderBox ls =
+    drop 1 $ concatMap ('\n' :) (boxTop : map renderLine ls ++ [boxBot])
   where
     -- Minimum total width of the box in characters
     minimumBoxWidth = 32
