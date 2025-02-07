@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-deprecations #-}
+{-# OPTIONS_GHC -Wno-x-data-list-nonempty-unzip #-}
 
 module Rules.Dependencies (buildPackageDependencies) where
 
