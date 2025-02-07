@@ -184,14 +184,11 @@ instance Match SettingsM where
 matchStringSettingsM :: String -> SettingsM ()
 matchStringSettingsM s = do
   ks <- State.get
-  if null ks
-    then throwError $ "expected " ++ show s ++ ", got nothing"
-    else go (head ks)
-
-  where go k
-          | k == s = State.modify tail
-          | otherwise = throwError $
-              "expected " ++ show s ++ ", got " ++ show k
+  case ks of
+    []            -> throwError $ "expected " ++ show s ++ ", got nothing"
+    k:_
+      | k == s    -> State.modify (drop 1)
+      | otherwise -> throwError $ "expected " ++ show s ++ ", got " ++ show k
 
 matchOneOfSettingsM :: [SettingsM a] -> SettingsM a
 matchOneOfSettingsM acts = StateT $ \k -> do

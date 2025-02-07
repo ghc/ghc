@@ -149,7 +149,10 @@ as /c/foo, while it occasionally falls over on paths of the form C:\foo.
 --
 -- See Note [Absolute paths and MSYS].
 (-/-) :: FilePath -> FilePath -> FilePath
-_  -/- b | isAbsolute b && not (isAbsolute $ tail b) = b
+_  -/- b
+    | isAbsolute b
+    , _:b' <- b
+    , not (isAbsolute b') = b
 "" -/- b = b
 a  -/- b
     | last a == '/' = a ++       b
@@ -636,7 +639,8 @@ renderLibrary name lib synopsis = renderBox $
 -- | ipsum    |
 -- \----------/
 renderBox :: [String] -> String
-renderBox ls = tail $ concatMap ('\n' :) (boxTop : map renderLine ls ++ [boxBot])
+renderBox ls =
+    drop 1 $ concatMap ('\n' :) (boxTop : map renderLine ls ++ [boxBot])
   where
     -- Minimum total width of the box in characters
     minimumBoxWidth = 32
