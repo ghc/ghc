@@ -197,12 +197,12 @@ type SortedSlotTys = [SlotTy]
 -- of the list we have the slot for the tag.
 ubxSumRepType :: [[PrimRep]] -> NonEmpty SlotTy
 ubxSumRepType constrs0
-  -- These first two cases never classify an actual unboxed sum, which always
+  -- This first case never classifies an actual unboxed sum, which always
   -- has at least two disjuncts. But it could happen if a user writes, e.g.,
   -- forall (a :: TYPE (SumRep [IntRep])). ...
   -- which could never be instantiated. We still don't want to panic.
   | constrs0 `lengthLessThan` 2
-  = WordSlot :| []
+  = Word8Slot :| []
 
   | otherwise
   = let
@@ -230,8 +230,13 @@ ubxSumRepType constrs0
       rep :: [PrimRep] -> SortedSlotTys
       rep ty = sort (map primRepSlot ty)
 
-      sumRep = WordSlot :| combine_alts (map rep constrs0)
-               -- WordSlot: for the tag of the sum
+      -- constructors start at 1 (XXX is this correct?)
+      tag_slot | length constrs0 < 256        = Word8Slot
+               | length constrs0 < 65536      = Word16Slot
+               | length constrs0 < 4294967296 = Word32Slot
+               | otherwise                    = WordSlot
+
+      sumRep = tag_slot :| combine_alts (map rep constrs0)
     in
       sumRep
 
@@ -275,10 +280,17 @@ layoutUbxSum sum_slots0 arg_slots0 =
 --   - Float slots: Shared between floating point types.
 --
 --   - Void slots: Shared between void types. Not used in sums.
---
--- TODO(michalt): We should probably introduce `SlotTy`s for 8-/16-/32-bit
--- values, so that we can pack things more tightly.
-data SlotTy = PtrLiftedSlot | PtrUnliftedSlot | WordSlot | Word64Slot | FloatSlot | DoubleSlot | VecSlot Int PrimElemRep
+
+data SlotTy = PtrLiftedSlot
+            | PtrUnliftedSlot
+            | Word8Slot
+            | Word16Slot
+            | Word32Slot
+            | WordSlot  -- the order is important, later ones are bigger. this works for word sizes 32 and 64 bit (XXX fix this)
+            | Word64Slot
+            | FloatSlot
+            | DoubleSlot
+            | VecSlot Int PrimElemRep
   deriving (Eq, Ord)
     -- Constructor order is important! If slot A could fit into slot B
     -- then slot A must occur first.  E.g.  FloatSlot before DoubleSlot
@@ -291,6 +303,9 @@ instance Outputable SlotTy where
   ppr PtrUnliftedSlot = text "PtrUnliftedSlot"
   ppr Word64Slot      = text "Word64Slot"
   ppr WordSlot        = text "WordSlot"
+  ppr Word32Slot      = text "Word32Slot"
+  ppr Word16Slot      = text "Word16Slot"
+  ppr Word8Slot       = text "Word8Slot"
   ppr DoubleSlot      = text "DoubleSlot"
   ppr FloatSlot       = text "FloatSlot"
   ppr (VecSlot n e)   = text "VecSlot" <+> ppr n <+> ppr e
@@ -307,14 +322,14 @@ primRepSlot (BoxedRep mlev) = case mlev of
   Just Lifted   -> PtrLiftedSlot
   Just Unlifted -> PtrUnliftedSlot
 primRepSlot IntRep      = WordSlot
-primRepSlot Int8Rep     = WordSlot
-primRepSlot Int16Rep    = WordSlot
-primRepSlot Int32Rep    = WordSlot
+primRepSlot Int8Rep     = Word8Slot
+primRepSlot Int16Rep    = Word16Slot
+primRepSlot Int32Rep    = Word32Slot
 primRepSlot Int64Rep    = Word64Slot
 primRepSlot WordRep     = WordSlot
-primRepSlot Word8Rep    = WordSlot
-primRepSlot Word16Rep   = WordSlot
-primRepSlot Word32Rep   = WordSlot
+primRepSlot Word8Rep    = Word8Slot
+primRepSlot Word16Rep   = Word16Slot
+primRepSlot Word32Rep   = Word32Slot
 primRepSlot Word64Rep   = Word64Slot
 primRepSlot AddrRep     = WordSlot
 primRepSlot FloatRep    = FloatSlot
@@ -325,6 +340,9 @@ slotPrimRep :: SlotTy -> PrimRep
 slotPrimRep PtrLiftedSlot   = BoxedRep (Just Lifted)
 slotPrimRep PtrUnliftedSlot = BoxedRep (Just Unlifted)
 slotPrimRep Word64Slot      = Word64Rep
+slotPrimRep Word32Slot      = Word32Rep
+slotPrimRep Word16Slot      = Word16Rep
+slotPrimRep Word8Slot       = Word8Rep
 slotPrimRep WordSlot        = WordRep
 slotPrimRep DoubleSlot      = DoubleRep
 slotPrimRep FloatSlot       = FloatRep
@@ -349,10 +367,11 @@ fitsIn ty1 ty2
   -- See Note [Casting slot arguments]
   where
     isWordSlot Word64Slot = True
+    isWordSlot Word32Slot = True
+    isWordSlot Word16Slot = True
+    isWordSlot Word8Slot  = True
     isWordSlot WordSlot   = True
     isWordSlot _          = False
-
-
 
 {- **********************************************************************
 *                                                                       *
