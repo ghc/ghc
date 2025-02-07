@@ -298,8 +298,8 @@ data UnknownDiagnostic opts hint where
 type UnknownDiagnosticFor a = UnknownDiagnostic (DiagnosticOpts a) (DiagnosticHint a)
 
 instance (HasDefaultDiagnosticOpts opts, Outputable hint) => Diagnostic (UnknownDiagnostic opts hint) where
-  type DiagnosticOpts (UnknownDiagnostic opts _) = opts
-  type DiagnosticHint (UnknownDiagnostic _ hint) = hint
+  type DiagnosticOpts (UnknownDiagnostic opts hint) = opts
+  type DiagnosticHint (UnknownDiagnostic opts hint) = hint
   diagnosticMessage opts (UnknownDiagnostic f _ diag) = diagnosticMessage (f opts) diag
   diagnosticReason       (UnknownDiagnostic _ _ diag) = diagnosticReason diag
   diagnosticHints        (UnknownDiagnostic _ f diag) = map f (diagnosticHints diag)
