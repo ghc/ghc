@@ -75,6 +75,7 @@ module GHC.Driver.DynFlags (
         initPromotionTickContext,
 
         -- * Platform features
+        isSse3Enabled,
         isSse4_1Enabled,
         isSse4_2Enabled,
         isAvxEnabled,
@@ -1523,6 +1524,9 @@ initPromotionTickContext dflags =
 
 -- -----------------------------------------------------------------------------
 -- SSE, AVX, FMA
+
+isSse3Enabled :: DynFlags -> Bool
+isSse3Enabled dflags = sseVersion dflags >= Just SSE3
 
 isSse4_1Enabled :: DynFlags -> Bool
 isSse4_1Enabled dflags = sseVersion dflags >= Just SSE4

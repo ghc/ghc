@@ -205,6 +205,8 @@ module GHC.Driver.Session (
         setUnsafeGlobalDynFlags,
 
         -- * SSE and AVX
+        isSse3Enabled,
+        isSse4_1Enabled,
         isSse4_2Enabled,
         isBmiEnabled,
         isBmi2Enabled,

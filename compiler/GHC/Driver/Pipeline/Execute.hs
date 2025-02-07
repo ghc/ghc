@@ -985,6 +985,8 @@ llvmOptions llvm_config dflags =
                    -- LLVM gates POPCNT instructions behind the popcnt flag,
                    -- while the GHC NCG (as well as GCC, Clang) gates it
                    -- behind SSE4.2 instead.
+              ++ ["+sse4.1"  | isSse4_1Enabled dflags   ]
+              ++ ["+sse3"    | isSse3Enabled dflags     ]
               ++ ["+sse2"    | isSse2Enabled platform   ]
               ++ ["+sse"     | isSseEnabled platform    ]
               ++ ["+avx512f" | isAvx512fEnabled dflags  ]
