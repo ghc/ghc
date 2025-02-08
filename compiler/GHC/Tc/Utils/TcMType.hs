@@ -34,7 +34,8 @@ module GHC.Tc.Utils.TcMType (
 
   newMultiplicityVar,
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
-  newTauTvDetailsAtLevel, newMetaDetails, newMetaTyVarName,
+  newWildCardTvDetailsAtLevel, newTauTvDetailsAtLevel,
+  newMetaDetails, newMetaTyVarName,
   isFilledMetaTyVar_maybe, isFilledMetaTyVar, isUnfilledMetaTyVar,
 
   --------------------------------
@@ -692,6 +693,16 @@ the thinking.
 *                                                                      *
 ********************************************************************* -}
 
+{- Note [WildCardTv]
+~~~~~~~~~~~~~~~~~
+A WildCardTv behaves like a TauTv, except that it can not be defaulted.
+
+It is used for a anonymous wildcard in a type signature, e.g.
+  f :: _ -> Int
+  f = ...
+
+-}
+
 {- Note [TyVarTv]
 ~~~~~~~~~~~~~~~~~
 A TyVarTv can unify with type *variables* only, including other TyVarTvs and
@@ -740,6 +751,7 @@ metaInfoToTyVarName :: MetaInfo -> FastString
 metaInfoToTyVarName  meta_info =
   case meta_info of
        TauTv          -> fsLit "t"
+       WildCardTv     -> fsLit "_"
        TyVarTv        -> fsLit "a"
        RuntimeUnkTv   -> fsLit "r"
        CycleBreakerTv -> fsLit "b"
@@ -850,6 +862,13 @@ newTauTvDetailsAtLevel :: TcLevel -> TcM TcTyVarDetails
 newTauTvDetailsAtLevel tclvl
   = do { ref <- newMutVar Flexi
        ; return (MetaTv { mtv_info  = TauTv
+                        , mtv_ref   = ref
+                        , mtv_tclvl = tclvl }) }
+
+newWildCardTvDetailsAtLevel :: TcLevel -> TcM TcTyVarDetails
+newWildCardTvDetailsAtLevel tclvl
+  = do { ref <- newMutVar Flexi
+       ; return (MetaTv { mtv_info  = WildCardTv
                         , mtv_ref   = ref
                         , mtv_tclvl = tclvl }) }
 
@@ -1841,7 +1860,10 @@ defaultTyVar :: DefaultingStrategy
              -> TcTyVar    -- If it's a MetaTyVar then it is unbound
              -> TcM Bool   -- True <=> defaulted away altogether
 defaultTyVar def_strat tv
-  | not (isMetaTyVar tv)
+  | not (isMetaTyVar tv )
+  || isWildCardMetaTyVar tv
+    -- do not default WildcardTvs, wildcardTvs are are only meant to be unified
+    -- or be on its own but never defaulted.
   || isTyVarTyVar tv
     -- Do not default TyVarTvs. Doing so would violate the invariants
     -- on TyVarTvs; see Note [TyVarTv] in GHC.Tc.Utils.TcMType.
