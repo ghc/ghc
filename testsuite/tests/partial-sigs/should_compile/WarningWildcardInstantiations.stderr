@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  bar :: forall {w1} {w2}. w1 -> (w1 -> w2) -> w2
+  bar :: forall {t} {w}. t -> (t -> w) -> w
   foo :: forall {a}. (Show a, Enum a) => a -> String
 Dependent modules: []
 Dependent packages: [base-4.17.0.0]
@@ -23,22 +23,22 @@ WarningWildcardInstantiations.hs:5:30: warning: [GHC-88464] [-Wpartial-type-sign
     • In the type signature: foo :: (Show _a, _) => _a -> _
 
 WarningWildcardInstantiations.hs:8:8: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
-     Found type wildcard ‘_’ standing for ‘w1’
-      Where: ‘w1’ is a rigid type variable bound by
-               the inferred type of bar :: w1 -> (w1 -> w2) -> w2
+    • Found type wildcard ‘_’ standing for ‘t’
+      Where: ‘t’ is a rigid type variable bound by
+               the inferred type of bar :: t -> (t -> w) -> w
                at WarningWildcardInstantiations.hs:9:1-13
     • In the type signature: bar :: _ -> _ -> _
 
 WarningWildcardInstantiations.hs:8:13: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
-     Found type wildcard ‘_’ standing for ‘w1 -> w2’
-      Where: ‘w1’, ‘w2’ are rigid type variables bound by
-               the inferred type of bar :: w1 -> (w1 -> w2) -> w2
+    • Found type wildcard ‘_’ standing for ‘t -> w’
+      Where: ‘t’, ‘w’ are rigid type variables bound by
+               the inferred type of bar :: t -> (t -> w) -> w
                at WarningWildcardInstantiations.hs:9:1-13
     • In the type signature: bar :: _ -> _ -> _
 
 WarningWildcardInstantiations.hs:8:18: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
-     Found type wildcard ‘_’ standing for ‘w2’
-      Where: ‘w2’ is a rigid type variable bound by
-               the inferred type of bar :: w1 -> (w1 -> w2) -> w2
+    • Found type wildcard ‘_’ standing for ‘w’
+      Where: ‘w’ is a rigid type variable bound by
+               the inferred type of bar :: t -> (t -> w) -> w
                at WarningWildcardInstantiations.hs:9:1-13
     • In the type signature: bar :: _ -> _ -> _
