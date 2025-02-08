@@ -82,7 +82,8 @@ import qualified GHC.Data.List.NonEmpty as NE
 
 import Control.Monad
 import Control.Arrow ( second )
-import Data.List.NonEmpty (NonEmpty)
+import Data.Foldable (toList)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (mapMaybe)
 
 import qualified GHC.LanguageExtensions as LangExt
@@ -561,17 +562,18 @@ tcLcStmt m_tc ctxt (ParStmt _ bndr_stmts_s _ _) elt_ty thing_inside
     --
     -- Invariant: on entry to `loop`, the LocalRdrEnv is set to
     --            origEnv, the LocalRdrEnv for the entire comprehension
-    loop _ allBinds [] = do { thing <- bindLocalNames allBinds $ thing_inside elt_ty
-                            ; return ([], thing) }   -- matching in the branches
-
-    loop origEnv priorBinds (ParStmtBlock x stmts names _ : pairs)
+    loop origEnv priorBinds (ParStmtBlock x stmts names _ :| pairs)
       = do { (stmts', (ids, pairs', thing))
                 <- tcStmtsAndThen ctxt (tcLcStmt m_tc) stmts elt_ty $ \ _elt_ty' ->
                    do { ids <- tcLookupLocalIds names
                       ; (pairs', thing) <- setLocalRdrEnv origEnv $
-                          loop origEnv (names ++ priorBinds) pairs
+                            loop1 origEnv (names ++ priorBinds) pairs
                       ; return (ids, pairs', thing) }
-           ; return ( ParStmtBlock x stmts' ids noSyntaxExpr : pairs', thing ) }
+           ; return ( ParStmtBlock x stmts' ids noSyntaxExpr :| pairs', thing ) }
+
+    -- matching in the branches
+    loop1 _ binds [] = [ ([], a) | a <- bindLocalNames binds (thing_inside elt_ty) ]
+    loop1 env binds (x:xs) = [ (toList ys, a) | (ys, a) <- loop env binds (x:|xs) ]
 
 tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
                               , trS_bndrs =  bindersMap
@@ -875,7 +877,7 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
            | tup_tys <- mkBigCoreTupTy <$> traverse (const (newFlexiTyVarTy liftedTypeKind)) names ]) bndr_stmts_s
 
        -- Typecheck bind:
-       ; let tuple_ty = mk_tuple_ty (fst <$> tup_tys_and_bndr_stmts_s)
+       ; let tuple_ty = mk_tuple_ty (NE.map fst tup_tys_and_bndr_stmts_s)
 
        ; (((blocks', thing), inner_res_ty), bind_op')
            <- tcSyntaxOp MCompOrigin bind_op
@@ -895,11 +897,7 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
        --      -> [TcType]                              -- tup_tys
        --      -> [ParStmtBlock Name]
        --      -> TcM ([([LStmt GhcTc], [TcId])], thing)
-    loop _ inner_res_ty [] = do { thing <- thing_inside inner_res_ty
-                                   ; return ([], thing) }
-                                   -- matching in the branches
-
-    loop m_ty inner_res_ty ((tup_ty_in, ParStmtBlock x stmts names return_op) : xs)
+    loop m_ty inner_res_ty ((tup_ty_in, ParStmtBlock x stmts names return_op) :| xs)
       = do { let m_tup_ty = m_ty `mkAppTy` tup_ty_in
            ; (stmts', (ids, return_op', pairs', thing))
                 <- tcStmtsAndThen ctxt tcMcStmt stmts (mkCheckExpType m_tup_ty) $
@@ -910,9 +908,13 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
                           tcSyntaxOp MCompOrigin return_op
                                      [synKnownType tup_ty] m_tup_ty' $
                                      \ _ _ -> return ()
-                      ; (pairs', thing) <- loop m_ty inner_res_ty xs
+                      ; (pairs', thing) <- loop1 m_ty inner_res_ty xs
                       ; return (ids, return_op', pairs', thing) }
-           ; return (ParStmtBlock x stmts' ids return_op' : pairs', thing) }
+           ; return (ParStmtBlock x stmts' ids return_op' :| pairs', thing) }
+
+    -- matching in the branches
+    loop1 _ r [] = [ ([], a) | a <- thing_inside r ]
+    loop1 m r (x:xs) = [ (toList ys, a) | (ys, a) <- loop m r (x:|xs) ]
 
 tcMcStmt _ stmt _ _
   = pprPanic "tcMcStmt: unexpected Stmt" (ppr stmt)

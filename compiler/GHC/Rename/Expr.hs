@@ -1377,33 +1377,39 @@ rnStmt ctxt _ (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = for
 
 rnParallelStmts :: forall thing. HsStmtContextRn
                 -> SyntaxExpr GhcRn
-                -> [ParStmtBlock GhcPs GhcPs]
+                -> NonEmpty (ParStmtBlock GhcPs GhcPs)
                 -> ([Name] -> RnM (thing, FreeVars))
-                -> RnM (([ParStmtBlock GhcRn GhcRn], thing), FreeVars)
+                -> RnM ((NonEmpty (ParStmtBlock GhcRn GhcRn), thing), FreeVars)
 -- Note [Renaming parallel Stmts]
 rnParallelStmts ctxt return_op segs thing_inside
   = do { orig_lcl_env <- getLocalRdrEnv
-       ; rn_segs orig_lcl_env [] segs }
+       ; rn_segs (:|) orig_lcl_env [] segs }
   where
-    rn_segs :: LocalRdrEnv
-            -> [Name] -> [ParStmtBlock GhcPs GhcPs]
-            -> RnM (([ParStmtBlock GhcRn GhcRn], thing), FreeVars)
-    rn_segs _ bndrs_so_far []
-      = do { let (bndrs', dups) = removeDupsOn nameOccName bndrs_so_far
-           ; mapM_ dupErr dups
-           ; (thing, fvs) <- bindLocalNames bndrs' (thing_inside bndrs')
-           ; return (([], thing), fvs) }
-
-    rn_segs env bndrs_so_far (ParStmtBlock x stmts _ _ : segs)
+    -- The `cons` argument is how we cons the first `ParStmtBlock` onto the rest.
+    -- It is called with `cons = (:)` or `cons = (:|)`.
+    -- Thus, the return type `parStmtBlocks` is `[ParStmtBlock _ _]` or
+    -- `NonEmpty (ParStmtBlock _ _)`, in turn.
+    rn_segs :: (ParStmtBlock GhcRn GhcRn -> [ParStmtBlock GhcRn GhcRn] -> parStmtBlocks)
+            -> LocalRdrEnv
+            -> [Name] -> NonEmpty (ParStmtBlock GhcPs GhcPs)
+            -> RnM ((parStmtBlocks, thing), FreeVars)
+    rn_segs cons env bndrs_so_far (ParStmtBlock x stmts _ _ :| segs)
       = do { ((stmts', (used_bndrs, segs', thing)), fvs)
                     <- rnStmts ctxt rnExpr stmts $ \ bndrs ->
                        setLocalRdrEnv env       $ do
-                       { ((segs', thing), fvs) <- rn_segs env (bndrs ++ bndrs_so_far) segs
+                       { ((segs', thing), fvs) <- rn_segs1 env (bndrs ++ bndrs_so_far) segs
                        ; let used_bndrs = filter (`elemNameSet` fvs) bndrs
                        ; return ((used_bndrs, segs', thing), fvs) }
 
            ; let seg' = ParStmtBlock x stmts' used_bndrs return_op
-           ; return ((seg':segs', thing), fvs) }
+           ; return ((cons seg' segs', thing), fvs) }
+
+    rn_segs1 _ bndrs [] = do
+      { let (bndrs', dups) = removeDupsOn nameOccName bndrs
+      ; mapM_ dupErr dups
+      ; (thing, fvs) <- bindLocalNames bndrs' (thing_inside bndrs')
+      ; return (([], thing), fvs) }
+    rn_segs1 env bndrs (x:xs) = rn_segs (:) env bndrs (x:|xs)
 
     dupErr vs = addErr $ TcRnListComprehensionDuplicateBinding (NE.head vs)
 

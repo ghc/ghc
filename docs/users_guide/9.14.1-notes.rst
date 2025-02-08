@@ -94,6 +94,10 @@ Cmm
     HUG (the typical use case), or `traverse` or `unitEnv_foldWithKey` in other
     cases.
 
+* Changes to `Language.Haskell.Syntax.Expr`
+
+  - The `ParStmtBlock` list argument of the `ParStmt` constructor of `StmtLR` is now `NonEmpty`.
+
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
 

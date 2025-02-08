@@ -101,6 +101,7 @@ import Control.Monad
 import Control.Monad.Trans.Class ( lift )
 import Data.Semigroup
 import Data.List.NonEmpty ( NonEmpty )
+import Data.Foldable ( toList )
 
 {- Note [What is zonking?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1301,7 +1302,7 @@ zonkStmt _ (ParStmt bind_ty stmts_w_bndrs mzip_op bind_op)
        ; new_stmts_w_bndrs <- noBinders $ mapM zonk_branch stmts_w_bndrs
 
        -- Add in the binders after we're done with all the branches.
-       ; let new_binders = [ b | ParStmtBlock _ _ bs _ <- new_stmts_w_bndrs
+       ; let new_binders = [ b | ParStmtBlock _ _ bs _ <- toList new_stmts_w_bndrs
                            , b <- bs ]
        ; extendIdZonkEnvRec new_binders
        ; new_mzip <- noBinders $ zonkExpr mzip_op

@@ -1185,7 +1185,7 @@ collectStmtBinders flag = \case
     LetStmt _  binds -> collectLocalBinders flag binds
     BodyStmt {}      -> []
     LastStmt {}      -> []
-    ParStmt _ xs _ _ -> collectLStmtsBinders flag [s | ParStmtBlock _ ss _ _ <- xs, s <- ss]
+    ParStmt _ xs _ _ -> collectLStmtsBinders flag [s | ParStmtBlock _ ss _ _ <- toList xs, s <- ss]
     TransStmt { trS_stmts = stmts } -> collectLStmtsBinders flag stmts
     RecStmt { recS_stmts = L _ ss } -> collectLStmtsBinders flag ss
     XStmtLR x -> case ghcPass :: GhcPass idR of
@@ -1786,7 +1786,7 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (LetStmt _ binds)     = hs_local_binds binds
     hs_stmt (BodyStmt {})         = []
     hs_stmt (LastStmt {})         = []
-    hs_stmt (ParStmt _ xs _ _)    = hs_lstmts [s | ParStmtBlock _ ss _ _ <- xs , s <- ss]
+    hs_stmt (ParStmt _ xs _ _)    = hs_lstmts [s | ParStmtBlock _ ss _ _ <- toList xs , s <- ss]
     hs_stmt (TransStmt { trS_stmts = stmts }) = hs_lstmts stmts
     hs_stmt (RecStmt { recS_stmts = L _ ss }) = hs_lstmts ss
 

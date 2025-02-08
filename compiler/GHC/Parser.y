@@ -13,6 +13,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonadComprehensions #-}
 
 -- | This module provides the generated Happy parser for Haskell. It exports
 -- a number of parsers which may be used in any library that uses the GHC API.
@@ -3360,8 +3361,8 @@ lexps :: { forall b. DisambECP b => PV [LocatedA b] }
 -- List Comprehensions
 
 flattenedpquals :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
-    : pquals   { case (unLoc $1) of
-                    [qs] -> sL1 $1 qs
+    : pquals   { case unLoc $1 of
+                    qs:|[] -> sL1 $1 qs
                     -- We just had one thing in our "parallel" list so
                     -- we simply return that thing directly
 
@@ -3372,30 +3373,30 @@ flattenedpquals :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
                     -- we wrap them into as a ParStmt
                 }
 
-pquals :: { Located [[LStmt GhcPs (LHsExpr GhcPs)]] }
+pquals :: { Located (NonEmpty [LStmt GhcPs (LHsExpr GhcPs)]) }
     : squals '|' pquals
                      {% case unLoc $1 of
-                          (h:t) -> do
+                          h:|t -> do
                             h' <- addTrailingVbarA h (epTok $2)
-                            return (sLL $1 $> (reverse (h':t) : unLoc $3)) }
-    | squals         { L (getLoc $1) [reverse (unLoc $1)] }
+                            return (sLL $1 $> (reverse (h':t) NE.<| unLoc $3)) }
+    | squals         { L (getLoc $1) (NE.singleton (reverse (toList (unLoc $1)))) }
 
-squals :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }   -- In reverse order, because the last
+squals :: { Located (NonEmpty (LStmt GhcPs (LHsExpr GhcPs))) }   -- In reverse order, because the last
                                         -- one can "grab" the earlier ones
     : squals ',' transformqual
              {% case unLoc $1 of
-                  (h:t) -> do
+                  h:|t -> do
                     h' <- addTrailingCommaA h (epTok $2)
-                    return (sLL $1 $> [sLLa $1 $> ((unLoc $3) (reverse (h':t)))]) }
+                    return (sLL $1 $> (NE.singleton (sLLa $1 $> ((unLoc $3) (reverse (h':t)))))) }
     | squals ',' qual
              {% runPV $3 >>= \ $3 ->
                 case unLoc $1 of
-                  (h:t) -> do
+                  h:|t -> do
                     h' <- addTrailingCommaA h (epTok $2)
-                    return (sLL $1 $> ($3 : (h':t))) }
-    | transformqual        { sLL $1 $> [L (getLocAnn $1) ((unLoc $1) [])] }
+                    return (sLL $1 $> ($3 :| (h':t))) }
+    | transformqual        { sLL $1 $> (NE.singleton (L (getLocAnn $1) ((unLoc $1) []))) }
     | qual                               {% runPV $1 >>= \ $1 ->
-                                            return $ sL1 $1 [$1] }
+                                            return $ sL1 $1 (NE.singleton $1) }
 --  | transformquals1 ',' '{|' pquals '|}'   { sLL $1 $> ($4 : unLoc $1) }
 --  | '{|' pquals '|}'                       { sL1 $1 [$2] }
 

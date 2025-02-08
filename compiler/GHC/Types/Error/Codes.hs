@@ -779,6 +779,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DefaultDataInstDecl"                           = 39639
   GhcDiagnosticCode "FunBindLacksEquations"                         = 52078
   GhcDiagnosticCode "EmptyGuard"                                    = 45149
+  GhcDiagnosticCode "EmptyParStmt"                                  = 95595
 
   -- TcRnDodgyImports/DodgyImportsReason
   GhcDiagnosticCode "DodgyImportsEmptyParent"                       = 99623

@@ -1886,8 +1886,8 @@ repSts (BodyStmt _ e _ _ : ss) =
       ; (ss2,zs) <- repSts ss
       ; return (ss2, z : zs) }
 repSts (ParStmt _ stmt_blocks _ _ : ss) =
-   do { (ss_s, stmt_blocks1) <- mapAndUnzipM rep_stmt_block stmt_blocks
-      ; let stmt_blocks2 = nonEmptyCoreList stmt_blocks1
+   do { (ss_s, stmt_blocks1) <- unzip <$> traverse rep_stmt_block stmt_blocks
+      ; let stmt_blocks2 = nonEmptyCoreList' stmt_blocks1
             ss1 = concat ss_s
       ; z <- repParSt stmt_blocks2
       ; (ss2, zs) <- addBinds ss1 (repSts ss)

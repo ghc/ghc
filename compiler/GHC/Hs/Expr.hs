@@ -1883,7 +1883,7 @@ pprStmt (LastStmt _ expr m_dollar_stripped _)
 pprStmt (BindStmt _ pat expr)  = pprBindStmt pat expr
 pprStmt (LetStmt _ binds)      = hsep [text "let", pprBinds binds]
 pprStmt (BodyStmt _ expr _ _)  = ppr expr
-pprStmt (ParStmt _ stmtss _ _) = sep (punctuate (text " | ") (map ppr stmtss))
+pprStmt (ParStmt _ stmtss _ _) = sep (punctuate (text " | ") (map ppr $ toList stmtss))
 
 pprStmt (TransStmt { trS_stmts = stmts, trS_by = by
                    , trS_using = using, trS_form = form })

@@ -1043,7 +1043,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   -- ParStmts only occur in a list/monad comprehension
   | ParStmt  (XParStmt idL idR body)    -- Post typecheck,
                                         -- S in (>>=) :: Q -> (R -> S) -> T
-             [ParStmtBlock idL idR]
+             (NonEmpty (ParStmtBlock idL idR))
              (HsExpr idR)               -- Polymorphic `mzip` for monad comprehensions
              (SyntaxExpr idR)           -- The `>>=` operator
                                         -- See notes [Monad Comprehensions]

@@ -1365,8 +1365,11 @@ cvtStmt (NoBindS e)    = do { e' <- cvtl e; returnLA $ mkBodyStmt e' }
 cvtStmt (TH.BindS p e) = do { p' <- cvtPat p; e' <- cvtl e; returnLA $ mkPsBindStmt noAnn p' e' }
 cvtStmt (TH.LetS ds)   = do { ds' <- cvtLocalDecs LetBinding ds
                             ; returnLA $ LetStmt noAnn ds' }
-cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss
-                            ; returnLA $ ParStmt noExtField dss' noExpr noSyntaxExpr }
+cvtStmt (TH.ParS dss)  = case nonEmpty dss of
+    Nothing -> failWith EmptyParStmt
+    Just dss -> do
+      { dss' <- mapM cvt_one dss
+      ; returnLA $ ParStmt noExtField dss' noExpr noSyntaxExpr }
   where
     cvt_one ds = do { ds' <- cvtStmts ds
                     ; return (ParStmtBlock noExtField ds' undefined noSyntaxExpr) }

@@ -5707,6 +5707,8 @@ pprConversionFailReason = \case
     <+> text "has no equations"
   EmptyGuard ->
     text "Empty guard"
+  EmptyParStmt ->
+    text "Empty par stmt"
 
 pprTyThingUsedWrong :: WrongThingSort -> TcTyThing -> Name -> SDoc
 pprTyThingUsedWrong sort thing name =
