@@ -12,7 +12,7 @@ import GHC.Parser.Errors.Ppr ()
 import Data.List
 
 import qualified Parser
-import Types
+import State
 import ParserM (Token(..),init_state)
 import Lexer
 
@@ -34,29 +34,40 @@ parseDirective s =
                 ("#" : "ifdef" : ts) -> Right $ cppIfdef ts
                 ("#" : "else" : ts) -> Right $ cppElse ts
                 ("#" : "endif" : ts) -> Right $ cppEndif ts
-                other -> Left ("unexpected directive: " ++ (intercalate " " other))
+                ("#" : "dumpghccpp" : ts) -> Right $ cppDumpState ts
+                other -> Left ("unexpected directive: " ++ (combineToks other))
+
+{- | Comply with the CPP requirement to not combine adjacent tokens.
+This will automatically insert a space in place of a comment, as
+comments cannot occur within a token.
+-}
+combineToks :: [String] -> String
+combineToks ss = intercalate " " ss
 
 cppDefine :: [String] -> Either String CppDirective
 cppDefine [] = Left "error:empty #define directive"
-cppDefine (n : ts) = Right $ CppDefine n (intercalate " " ts)
+cppDefine (n : ts) = Right $ CppDefine n (combineToks ts)
 
 cppInclude :: [String] -> CppDirective
-cppInclude ts = CppInclude (intercalate " " ts)
+cppInclude ts = CppInclude (combineToks ts)
 
 cppIf :: [String] -> CppDirective
-cppIf ts = CppIf (intercalate " " ts)
+cppIf ts = CppIf (combineToks ts)
 
 cppIfdef :: [String] -> CppDirective
-cppIfdef ts = CppIfdef (intercalate " " ts)
+cppIfdef ts = CppIfdef (combineToks ts)
 
 cppIfndef :: [String] -> CppDirective
-cppIfndef ts = CppIfndef (intercalate " " ts)
+cppIfndef ts = CppIfndef (combineToks ts)
 
 cppElse :: [String] -> CppDirective
 cppElse _ts = CppElse
 
 cppEndif :: [String] -> CppDirective
 cppEndif _ts = CppEndif
+
+cppDumpState :: [String] -> CppDirective
+cppDumpState _ts = CppDumpState
 
 -- ---------------------------------------------------------------------
 
