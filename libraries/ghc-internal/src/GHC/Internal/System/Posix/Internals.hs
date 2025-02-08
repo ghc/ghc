@@ -97,7 +97,11 @@ data {-# CTYPE "struct stat" #-}  CStat
 data {-# CTYPE "struct termios" #-} CTermios
 data {-# CTYPE "struct tm" #-} CTm
 data {-# CTYPE "struct tms" #-} CTms
+#if defined(mingw32_HOST_OS)
+data {-# CTYPE "struct _utimbuf" #-} CUtimbuf
+#else
 data {-# CTYPE "struct utimbuf" #-} CUtimbuf
+#endif
 data {-# CTYPE "struct utsname" #-} CUtsname
 
 type FD = CInt
