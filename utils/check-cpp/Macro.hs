@@ -29,7 +29,7 @@ import Eval
 import ParsePP
 import ParserM
 import Parser
-import Types
+import State
 
 -- ---------------------------------------------------------------------
 
@@ -45,37 +45,32 @@ process s str = (s0, o)
         CppIfdef name -> ifdef s name
         CppIf ifstr -> cppIf s ifstr
         CppIfndef name -> ifndef s name
-        CppElse -> undefined
-        CppEndif -> undefined
+        CppElse -> cppElse s
+        CppEndif -> popScope' s
+        CppDumpState -> undefined
 
 -- ---------------------------------------------------------------------
 
 define :: PpState -> String -> MacroDef -> PpState
-define s name toks = s{pp_defines = Map.insert (MacroName name Nothing) toks (pp_defines s)}
+define s name toks = addDefine' s (MacroName name Nothing) toks
 
 ifdef :: PpState -> String -> PpState
-ifdef s name =
-    case Map.lookup (MacroName name Nothing) (pp_defines s) of
-        Just _ -> s{pp_accepting = True}
-        _ -> s{pp_accepting = False}
+ifdef s name = pushAccepting' s (ppIsDefined' s (MacroName name Nothing))
 
 ifndef :: PpState -> String -> PpState
-ifndef s name =
-    case Map.lookup (MacroName name Nothing) (pp_defines s) of
-        Just _ -> s{pp_accepting = False}
-        _ -> s{pp_accepting = True}
+ifndef s name = pushAccepting' s (not $ ppIsDefined' s (MacroName name Nothing))
 
+--    We evaluate to an Int, which we convert to a bool
 cppIf :: PpState -> String -> PpState
-cppIf s str = r
+cppIf s str = pushAccepting' s (toBool v)
   where
     expanded = expand s str
-    -- toks0 = cppLex expanded
-    -- r = error (show toks0)
     v = case Parser.parseExpr expanded of
-        Left err -> error $ show err
+        Left err -> error $ "parseExpr:" ++ show (err, expanded)
         Right tree -> eval tree
-    --    We evaluate to an Int, which we convert to a bool
-    r = s{pp_accepting = toBool v}
+
+cppElse :: PpState -> PpState
+cppElse s = setAccepting' s (not $ getAccepting' s)
 
 -- ---------------------------------------------------------------------
 
@@ -84,7 +79,7 @@ expand s str = expanded
   where
     -- TODO: repeat until re-expand or fixpoint
     toks = case cppLex str of
-        Left err -> error err
+        Left err -> error $ "expand:" ++ show (err, str)
         Right tks -> tks
     expanded = concatMap (expandOne s) toks
 
@@ -95,7 +90,7 @@ expandOne s tok = r
     r =
         fromMaybe
             (t_str tok)
-            (Map.lookup (MacroName (t_str tok) Nothing) (pp_defines s))
+            (ppDefinition' s (MacroName (t_str tok) Nothing))
 
 -- ---------------------------------------------------------------------
 

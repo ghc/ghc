@@ -7,6 +7,7 @@ import GHC.Parser.Lexer (Token (..))
 import qualified GHC.Parser.Lexer as Lexer
 
 import PreProcess
+import State
 
 -- ---------------------------------------------------------------------
 

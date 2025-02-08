@@ -1,6 +1,7 @@
 module PreProcess where
 
 import Data.Char
+
 -- import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC
@@ -8,16 +9,16 @@ import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Data.StringBuffer
 import GHC.Parser.Errors.Ppr ()
-import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Types.SrcLoc
 
-import Debug.Trace
+import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
 
 import Macro
-
 import ParsePP
-import Types
+import State
+
+import Debug.Trace
 
 -- ---------------------------------------------------------------------
 
@@ -31,14 +32,12 @@ initParserState = Lexer.initParserState initPpState
 
 -- ---------------------------------------------------------------------
 
-data CppState
-    = CppIgnoring
-    | CppNormal
-    deriving (Show)
-
--- ---------------------------------------------------------------------
-
+-- | Continuation based lexer, provides input to GHC.Parser
+lexer :: Bool -> (Located Token -> PP a) -> PP a
 lexer = ppLexer
+
+-- | Debug version of @lexer@
+lexerDbg :: Bool -> (Located Token -> PP a) -> PP a
 lexerDbg = ppLexerDbg
 
 ppLexer, ppLexerDbg :: Bool -> (Located Token -> PP a) -> PP a
@@ -51,16 +50,16 @@ ppLexer queueComments cont =
         queueComments
         ( \tk ->
             let
-                contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
-                -- contPush = pushContext (unLoc tk) >> contIgnoreTok tk
+                -- contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
+                contInner t = cont t
                 contIgnoreTok (L l tok) = do
                     case l of
                         RealSrcSpan r (Strict.Just b) -> Lexer.queueIgnoredToken (L (PsSpan r b) tok)
                         _ -> return ()
                     ppLexer queueComments cont
              in
-                -- case tk of
-                case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
+                case tk of
+                    -- case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
                     L _ ITeof -> do
                         mInp <- popIncludeLoc
                         case mInp of
@@ -68,11 +67,18 @@ ppLexer queueComments cont =
                             Just inp -> do
                                 Lexer.setInput inp
                                 ppLexer queueComments cont
-                    L _ (ITcpp continuation s) -> do
+                    L l (ITcpp continuation s) -> do
                         if continuation
-                            then pushContinuation tk
-                            else processCppToks s
-                        contIgnoreTok tk
+                            then do
+                                pushContinuation tk
+                                contIgnoreTok tk
+                            else do
+                                mdump <- processCppToks s
+                                case mdump of
+                                    Just dump ->
+                                        -- We have a dump of the state, put it into an ignored token
+                                        contIgnoreTok (L l (ITcpp continuation (appendFS s (fsLit dump))))
+                                    Nothing -> contIgnoreTok tk
                     _ -> do
                         state <- getCppState
                         -- case (trace ("CPP state:" ++ show state) state) of
@@ -83,19 +89,7 @@ ppLexer queueComments cont =
 
 -- ---------------------------------------------------------------------
 
-type PP = P PpState
-
-preprocessElse :: PP ()
-preprocessElse = do
-    accepting <- getAccepting
-    setAccepting (not accepting)
-
-preprocessEnd :: PP ()
-preprocessEnd = do
-    -- TODO: nested context
-    setAccepting True
-
-processCppToks :: FastString -> PP ()
+processCppToks :: FastString -> PP (Maybe String)
 processCppToks fs = do
     let
         get (L _ (ITcpp _ s)) = s
@@ -103,91 +97,38 @@ processCppToks fs = do
     -- Combine any prior continuation tokens
     cs <- popContinuation
     processCpp (reverse $ fs : map get cs)
-    return ()
 
-processCpp :: [FastString] -> PP ()
+processCpp :: [FastString] -> PP (Maybe String)
 processCpp fs = do
-    let s = cppInitial fs
-    case parseDirective s of
-        Left err -> error $ show (err, s)
-        Right (CppInclude filename) -> do
-            ppInclude filename
-        Right (CppDefine name def) -> do
-            ppDefine name def
-        Right (CppIf cond) -> do
-            _ <- ppIf cond
-            return ()
-        Right (CppIfdef name) -> do
-            defined <- ppIsDefined name
-            setAccepting defined
-        Right (CppIfndef name) -> do
-            defined <- ppIsDefined name
-            setAccepting (not defined)
-        Right CppElse -> do
-            accepting <- getAccepting
-            setAccepting (not accepting)
-            return ()
-        Right CppEndif -> do
-            -- TODO: nested states
-            setAccepting True
-            return ()
-
-    return ()
-
--- ---------------------------------------------------------------------
--- Preprocessor state functions
-
-getCppState :: PP CppState
-getCppState = do
-    accepting <- getAccepting
-    if accepting
-        then return CppNormal
-        else return CppIgnoring
-
--- pp_context stack start -----------------
-
-pushContext :: Token -> PP ()
-pushContext new =
-    P $ \s -> POk s{pp = (pp s){pp_context = new : pp_context (pp s)}} ()
-
-popContext :: PP ()
-popContext =
-    P $ \s ->
-        let
-            new_context = case pp_context (pp s) of
-                [] -> []
-                (_ : t) -> t
-         in
-            POk s{pp = (pp s){pp_context = new_context}} ()
-
-peekContext :: PP Token
-peekContext =
-    P $ \s ->
-        let
-            r = case pp_context (pp s) of
-                [] -> ITeof -- Anthing really, for now, except a CPP one
-                (h : _) -> h
-         in
-            POk s r
-
-setAccepting :: Bool -> PP ()
-setAccepting on =
-    P $ \s -> POk s{pp = (pp s){pp_accepting = on}} ()
-
-getAccepting :: PP Bool
-getAccepting = P $ \s -> POk s (pp_accepting (pp s))
-
--- -------------------------------------
-
-pushContinuation :: Located Token -> PP ()
-pushContinuation new =
-    P $ \s -> POk s{pp = (pp s){pp_continuation = new : pp_continuation (pp s)}} ()
-
-popContinuation :: PP [Located Token]
-popContinuation =
-    P $ \s -> POk s{pp = (pp s){pp_continuation = []}} (pp_continuation (pp s))
-
--- pp_context stack end -------------------
+    let s = concatMap unpackFS fs
+    let directive = parseDirective s
+    if directive == Right CppDumpState
+        then return (Just "\ndumped state\n")
+        else do
+            case directive of
+                Left err -> error $ show (err, s)
+                Right (CppInclude filename) -> do
+                    ppInclude filename
+                Right (CppDefine name def) -> do
+                    ppDefine (MacroName name Nothing) def
+                Right (CppIf cond) -> do
+                    ppIf cond
+                Right (CppIfdef name) -> do
+                    defined <- ppIsDefined (MacroName name Nothing)
+                    pushAccepting defined
+                Right (CppIfndef name) -> do
+                    defined <- ppIsDefined (MacroName name Nothing)
+                    pushAccepting (not defined)
+                Right CppElse -> do
+                    accepting <- getAccepting
+                    setAccepting (not accepting)
+                Right CppEndif -> do
+                    popScope
+                Right CppDumpState -> do
+                    return ()
+            -- accepting <- getAccepting
+            -- return (trace ("processCpp:" ++ show (accepting,directive)) Nothing)
+            return Nothing
 
 -- pp_include start -----------------------
 
@@ -223,28 +164,18 @@ ppInclude filename = do
             let loc = PsLoc (mkRealSrcLoc (mkFastString filename) 1 1) (BufPos 0)
             Lexer.setInput (Lexer.AI loc src)
 
-ppDefine :: String -> String -> PP ()
-ppDefine name val = P $ \s ->
-    POk s{pp = (pp s){pp_defines = Map.insert (MacroName name Nothing) val (pp_defines (pp s))}} ()
-
-ppIsDefined :: String -> PP Bool
-ppIsDefined def = P $ \s ->
-    POk s (Map.member (MacroName def Nothing) (pp_defines (pp s)))
-
-ppIf :: String -> PP Bool
+ppIf :: String -> PP ()
 ppIf str = P $ \s ->
     let
         s' = cppIf (pp s) str
      in
-        POk s{pp = s'} (pp_accepting s')
+        POk s{pp = s'} ()
 
 -- =====================================================================
 
 {- | Do cpp initial processing, as per https://gcc.gnu.org/onlinedocs/cpp/Initial-processing.html
 See Note [GhcCPP Initial Processing]
 -}
-cppInitial :: [FastString] -> String
-cppInitial fs = concatMap unpackFS fs
 
 {-
 Note [GhcCPP Initial Processing]
@@ -260,5 +191,62 @@ directive.
 3. Continued lines are merged into a single line
    and is handled in the Lexer.
 4. All comments are replaced with a single space
+
+Note [GhcCPP Processing Overview]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC.Parser calls `GHC.PreProcess.lexer` to provide it with the next
+token to parse, until it gets the EOF token.
+
+Without GHC_CPP, this simply calls `GHC.Parser.Lexer.lexer` to get the
+next token. But `GHC.PreProcess.lexer` runs its own loop between the
+two.
+
+- It calls `GHC.Parser.Lexer.lexer`
+
+- If the GhcCpp option is not set, it returns a normal token, which is
+  passed to the parser.
+
+- If the GhcCpp option is set, it may in addition return an `ITcpp`
+  token.
+
+  This is either one containing a whole line starting with a
+  preprocessor directive, or a continuation of the prior line if it
+  was a directive ending with a backlash
+
+- The lexing loop in this file accumulates these continuation tokens
+  until it has a full preprocessor line.
+
+- It does basic token-based analysis of this, to determine the
+  specific PP directive it refers to
+
+- The preprocessor can be in one of two states: `CppNormal` or
+  `CppIgnoring`.
+
+  When it is in `CppNormal` it passes non-PP tokens to the parser as
+  normal.
+
+  When it is in `CppIgnoring` it does not pass the non-PP tokens to
+  the parser, but inserts them into the parser queued comments store,
+  as if each was a comment.
+
+- When it has a full preprocessor directive, this is processed as expected.
+  `#define` : records a macro definition in the PP state
+  `#include` : not currently processed
+
+  `#ifdef` / `#ifndef` : If the following token is the name of a macro, switch to
+  `CppNormal` or `CppIgnoring` as appropriate
+
+  `#if` : perform macro expansion on the text, until it reaches a
+  fixpoint. Then parse it with `GHC.Parser.PreProcess.Parser/Lexer` as
+  an expression, and evaluate it. Set the state according to the outcome.
+
+- The `#if` / `#ifdef` / `#ifndef` directives also open a new macro
+  scope. Any macros defined will be stored in this scope.
+
+- `#else` : flip the state between `CppIgnoring` and `CppNormal`, and
+  pop the scope. Start a new scope.
+
+- `#endif` : pop the scope, set the state according to the surrounding
+  scope.
 
 -}
