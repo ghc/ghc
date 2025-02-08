@@ -1,20 +1,20 @@
 module ParsePP (
-    cppLex,
     parseDirective,
+    cppLex,
+    -- Reduce warnings so long
+    t0,
+    t1,
+    t2,
+    t3,
 ) where
 
-import Data.Char
-
-import Control.Monad (void)
-import Data.Functor.Identity
-import Debug.Trace
-import GHC.Parser.Errors.Ppr ()
 import Data.List
-
-import qualified Parser
-import State
-import ParserM (Token(..),init_state)
+import GHC.Parser.Errors.Ppr ()
 import Lexer
+import ParserM (Token (..), init_state)
+import State
+
+-- import Debug.Trace
 
 -- =====================================================================
 -- First parse to CPP tokens, using a C++-like language spec
