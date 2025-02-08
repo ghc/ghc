@@ -88,5 +88,5 @@ type Dix9 :: RuntimeRep -> Type
 data family Dix9 r
 newtype instance Dix9 _r = Dix9 Int
 
-dix8 :: Dix9 FloatRep -> Int
-dix8 (Dix9 x) = x
+dix9 :: Dix9 FloatRep -> Int
+dix9 (Dix9 x) = x
