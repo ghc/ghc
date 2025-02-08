@@ -2584,8 +2584,9 @@ lhsPriority tv
              CycleBreakerTv -> 0
              TyVarTv        -> 1
              ConcreteTv {}  -> 2
-             TauTv          -> 3
-             RuntimeUnkTv   -> 4
+             WildCardTv     -> 3
+             TauTv          -> 4
+             RuntimeUnkTv   -> 5
 
 {- Note [Unification preconditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

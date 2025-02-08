@@ -2212,7 +2212,7 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
     --           esp the bullet on nested forall types
   = do { kv_details <- newTauTvDetailsAtLevel hole_lvl
        ; kv_name    <- newMetaTyVarName (fsLit "k")
-       ; wc_details <- newTauTvDetailsAtLevel hole_lvl
+       ; wc_details <- newWildCardTvDetailsAtLevel hole_lvl
        ; wc_name    <- newMetaTyVarName wc_nm
        ; let kv      = mkTcTyVar kv_name liftedTypeKind kv_details
              wc_kind = mkTyVarTy kv
