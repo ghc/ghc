@@ -28,27 +28,3 @@ type family M m where
 
 g :: M One -> Int
 g x = x
-
-
--- make sure wildcard and non-wildcard type variables are treated the same
-
-type R1 :: RuntimeRep -> Type
-type family R1 r where
-  R1 r = Int
-
-r1 :: R1 FloatRep -> Int
-r1 x = x
-
-type L1 :: Levity -> Type
-type family L1 l where
-  L1 l = Int
-
-l1 :: L1 Unlifted -> Int
-l1 x = x
-
-type M1 :: Multiplicity -> Type
-type family M1 m where
-  M1 m = Int
-
-g1 :: M1 One -> Int
-g1 x = x

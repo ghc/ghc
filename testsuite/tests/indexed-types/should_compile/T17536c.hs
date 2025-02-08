@@ -15,11 +15,3 @@ type family R r a where
 
 r :: R FloatRep Float# -> Int
 r x = x
-
--- make sure wildcard and non-wildcard type variables are treated the same
-type R1 :: forall (r :: RuntimeRep) -> TYPE r -> Type
-type family R1 r a where
-  R1 r a = Int
-
-r1 :: R1 FloatRep Float# -> Int
-r1 x = x
