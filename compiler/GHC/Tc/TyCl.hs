@@ -3253,7 +3253,7 @@ kcTyFamInstEqn tc_fam_tc
 
        ; discardResult $
          bindOuterFamEqnTKBndrs_Q_Tv outer_bndrs $
-         do { (_fam_app, res_kind) <- tcFamTyPats Nothing tc_fam_tc hs_pats
+         do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; tcCheckLHsTypeInContext hs_rhs_ty (TheKind res_kind) }
              -- Why "_Tv" here?  Consider (#14066)
              --  type family Bar x y where
@@ -3275,7 +3275,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                    , feqn_rhs    = hs_rhs_ty }))
   = setSrcSpanA loc $
     do { traceTc "tcTyFamInstEqn" $
-         vcat [ ppr loc, ppr fam_tc <+> ppr hs_pats <+> ppr outer_bndrs
+         vcat [ ppr loc, ppr fam_tc <+> ppr hs_pats
               , text "fam tc bndrs" <+> pprTyVars (tyConTyVars fam_tc)
               , case mb_clsinfo of
                   NotAssociated {} -> empty
@@ -3430,7 +3430,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        ; (tclvl, wanted, (outer_bndrs, (lhs_ty, rhs_ty)))
                <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
                   bindOuterFamEqnTKBndrs skol_info outer_hs_bndrs   $
-                  do { (lhs_ty, rhs_kind) <- tcFamTyPats (Just skol_info) fam_tc hs_pats
+                  do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
                        -- Ensure that the instance is consistent with its
                        -- parent class (#16008)
                      ; addConsistencyConstraints mb_clsinfo lhs_ty
