@@ -1,8 +1,5 @@
 module PreProcess where
 
-import Data.Char
-
--- import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC
 import GHC.Data.FastString
