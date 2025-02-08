@@ -22,7 +22,6 @@ details
 
 -- TODO: Parse tokens with original locations in them.
 
-import qualified Data.Map as Map
 import Data.Maybe
 
 import Eval

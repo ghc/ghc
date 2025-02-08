@@ -27,10 +27,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 
 -- Local simulation -----------------
-import Parser
 import ParsePP
-import ParseSimulate
-import PreProcess
 import PreProcess as PP
 import State
 
@@ -73,7 +70,6 @@ strGetToks dflags includes popts filename str = reverse $ lexAll pstate
     -- strGetToks includes popts filename str = reverse $ lexAll (trace ("pstate=" ++ show initState) pstate)
 
     includeMap = Map.fromList $ map (\(k, v) -> (k, stringToStringBuffer (intercalate "\n" v))) includes
-    macros = predefinedMacros dflags
     initState =
         initPpState
             { pp_includes = includeMap
@@ -165,7 +161,7 @@ ghcWrapper libdir a =
 -- ---------------------------------------------------------------------
 
 predefinedMacros :: DynFlags -> Map.Map MacroName MacroDef
-predefinedMacros df = Map.fromList
+predefinedMacros _df = Map.fromList
         [
             ( MacroName "__GLASGOW_HASKELL__" Nothing
             , projectVersionInt
@@ -338,10 +334,10 @@ t6 = do
 
 -- x = "got version"
 
--- t7 :: Maybe (String, [String])
+t7 :: Either String CppDirective
 t7 = parseDirective "#define VERSION_ghc_exactprint \"1.7.0.1\""
 
--- t8 :: Maybe (String, [String])
+t8 :: Either String CppDirective
 t8 = parseDirective "#define MIN_VERSION_ghc_exactprint(major1,major2,minor) (  (major1) <  1 ||   (major1) == 1 && (major2) <  7 ||   (major1) == 1 && (major2) == 7 && (minor) <= 0)"
 
 t9 :: Either String CppDirective

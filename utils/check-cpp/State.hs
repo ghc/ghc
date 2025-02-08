@@ -3,12 +3,11 @@ module State where
 import Data.List.NonEmpty (NonEmpty (..), (<|))
 import Data.List.NonEmpty qualified as NonEmpty
 import Data.Map (Map)
-import Data.Maybe
 import Data.Map qualified as Map
 import GHC.Data.StringBuffer
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
 import GHC.Parser.Lexer qualified as Lexer
-import GHC.Prelude
+-- import GHC.Prelude
 import GHC.Types.SrcLoc
 
 -- ---------------------------------------------------------------------
@@ -198,35 +197,35 @@ ppIsDefined :: MacroName -> PP Bool
 ppIsDefined name = do
     -- Look up the chain of scopes, until we find one that works, or end
     let
-        lookup [] = False
-        lookup (h : t) =
+        my_lookup [] = False
+        my_lookup (h : t) =
             if Map.member name (pp_defines h)
                 then True
-                else lookup t
+                else my_lookup t
     pp <- getPpState
     let scopes = NonEmpty.toList (pp_scope pp)
-    return $ lookup scopes
+    return $ my_lookup scopes
 
 ppIsDefined' :: PpState -> MacroName -> Bool
-ppIsDefined' s name = lookup scopes
+ppIsDefined' s name = my_lookup scopes
   where
     -- Look up the chain of scopes, until we find one that works, or end
-    lookup [] = False
-    lookup (h : t) =
+    my_lookup [] = False
+    my_lookup (h : t) =
         if Map.member name (pp_defines h)
             then True
-            else lookup t
+            else my_lookup t
     scopes = NonEmpty.toList (pp_scope s)
 
 ppDefinition' :: PpState -> MacroName -> Maybe MacroDef
-ppDefinition' s name = lookup scopes
+ppDefinition' s name = my_lookup scopes
   where
     -- Look up the chain of scopes, until we find one that works, or end
-    lookup [] = Nothing
-    lookup (h : t) =
+    my_lookup [] = Nothing
+    my_lookup (h : t) =
         if Map.member name (pp_defines h)
             then Map.lookup name (pp_defines h)
-            else lookup t
+            else my_lookup t
     scopes = NonEmpty.toList (pp_scope s)
 
 getPpState :: PP PpState
