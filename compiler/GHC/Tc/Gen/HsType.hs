@@ -2402,7 +2402,8 @@ kcCheckDeclHeader_cusk name flav
              -- skolemise and then quantify over.  We do not include spec_req_tvs
              -- because they are /already/ skolems
 
-       ; inferred <- quantifyTyVars skol_info $ candidates `delCandidates` spec_req_tkvs
+       ; inferred <- quantifyTyVars skol_info DefaultNonStandardTyVars $
+                     candidates `delCandidates` spec_req_tkvs
                      -- NB: 'inferred' comes back sorted in dependency order
 
        ; (scoped_kvs, tc_bndrs, res_kind) <- liftZonkM $
