@@ -933,7 +933,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
                bindOuterFamEqnTKBndrs skol_info hs_outer_bndrs    $  -- Binds skolem TcTyVars
                do { stupid_theta <- tcHsContext hs_ctxt
-                  ; (lhs_ty, lhs_kind) <- tcFamTyPats (Just skol_info) fam_tc hs_pats
+                  ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
                   ; (lhs_applied_ty, lhs_applied_kind)
                       <- tcInstInvisibleTyBinders lhs_ty lhs_kind
                       -- See Note [Data family/instance return kinds]

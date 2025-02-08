@@ -72,11 +72,3 @@ newtype instance Dix5 f = DIn5 (f (Dix5 f))
 data family Dix7 :: (k -> TYPE 'IntRep) -> k
 newtype instance Dix7 f = DIn7 (f (Dix7 f))
 
-
--- user written wildcards
-type Dix8 :: RuntimeRep -> Type
-data family Dix8 r
-newtype instance Dix8 _ = Dix8 Int
-
-dix8 :: Dix8 FloatRep -> Int
-dix8 (Dix8 x) = x
