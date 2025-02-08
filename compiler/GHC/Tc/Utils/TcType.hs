@@ -641,7 +641,7 @@ data MetaInfo
    = TauTv         -- ^ This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls.
-   | WildCardTv    -- ^ A variant of TauTv, except that is should not be
+   | WildCardTv    -- ^ A variant of TauTv, except that it should not be
                    -- defaulted.
    | TyVarTv       -- ^ A variant of TauTv, except that it should not be
                    --   unified with a type, only with a type variable
