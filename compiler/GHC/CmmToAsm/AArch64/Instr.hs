@@ -550,7 +550,6 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
 
       insert_dealloc insn r = case insn of
         J _ -> dealloc ++ (insn : r)
-        J_TBL {} -> dealloc ++ (insn : r)
         ANN _ (J _) -> dealloc ++ (insn : r)
         _other | jumpDestsOfInstr insn /= []
             -> patchJumpInstr insn retarget : r
