@@ -11,7 +11,7 @@ import GHC
 import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString
 import GHC.Data.StringBuffer
-import GHC.Driver.Config.Parser
+import GHC.Driver.Config.Parser hiding (predefinedMacros)
 import GHC.Driver.Errors.Types
 import qualified GHC.Driver.Errors.Types as GHC
 import qualified GHC.Driver.Session as GHC
@@ -26,19 +26,20 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 
--- import ParsePP
--- import ParseSimulate
--- import PreProcess
--- import Types
+-- Local simulation -----------------
+import Parser
+import ParsePP
+import ParseSimulate
+import PreProcess
+import PreProcess as PP
+import State
 
-import GHC.Parser.PreProcess.ParsePP
-
--- import GHC.Parser.ParseSimulate
-
-import GHC.Parser
-import GHC.Parser.PreProcess
-import GHC.Parser.PreProcess as PP
-import GHC.Parser.PreProcess.State
+-- The real thing -------------------
+-- import GHC.Parser
+-- import GHC.Parser.PreProcess
+-- import GHC.Parser.PreProcess as PP
+-- import GHC.Parser.PreProcess.ParsePP
+-- import GHC.Parser.PreProcess.State
 
 -- ---------------------------------------------------------------------
 
@@ -55,7 +56,6 @@ showAst ast =
 type LibDir = FilePath
 type Includes = [(String, [String])]
 
--- parseString :: LibDir -> String -> IO (WarningMessages, Either ErrorMessages [Located Token])
 parseString :: LibDir -> Includes -> String -> IO [Located Token]
 parseString libdir includes str = ghcWrapper libdir $ do
     dflags0 <- initDynFlags
@@ -161,6 +161,30 @@ ghcWrapper :: LibDir -> GHC.Ghc a -> IO a
 ghcWrapper libdir a =
     GHC.defaultErrorHandler GHC.defaultFatalMessager GHC.defaultFlushOut $
         GHC.runGhc (Just libdir) a
+
+-- ---------------------------------------------------------------------
+
+predefinedMacros :: DynFlags -> Map.Map MacroName MacroDef
+predefinedMacros df = Map.fromList
+        [
+            ( MacroName "__GLASGOW_HASKELL__" Nothing
+            , projectVersionInt
+            ),
+            ( MacroName "__GLASGOW_HASKELL_FULL_VERSION__" Nothing
+            , projectVersion
+            ),
+            ( MacroName  "__GLASGOW_HASKELL_PATCHLEVEL1__" Nothing
+            , projectPatchLevel1
+            ),
+            ( MacroName  "__GLASGOW_HASKELL_PATCHLEVEL2__" Nothing
+            , projectPatchLevel2
+            )
+        ]
+  where
+    projectVersionInt = "913"
+    projectVersion = "projectVersion"
+    projectPatchLevel1 = "pl1"
+    projectPatchLevel2 = "pl2"
 
 -- =====================================================================
 -- ---------------------------------------------------------------------
@@ -380,8 +404,7 @@ t12 = do
 t13 :: IO ()
 t13 = do
     doTest
-        [
-          "#if __GLASGOW_HASKELL__ != 913"
+        [ "#if __GLASGOW_HASKELL__ != 913"
         , "x = 1"
         , "#else"
         , "x = 5"
