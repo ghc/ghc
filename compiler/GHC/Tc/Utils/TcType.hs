@@ -51,7 +51,8 @@ module GHC.Tc.Utils.TcType (
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTvUnk,
   MetaDetails(Flexi, Indirect), MetaInfo(..), skolemSkolInfo,
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
-  tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
+  isWildCardMetaTyVar, tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,
+  isTyConableTyVar,
   ConcreteTvOrigin(..), isConcreteTyVar_maybe, isConcreteTyVar,
   isConcreteTyVarTy, isConcreteTyVarTy_maybe, concreteInfo_maybe,
   ConcreteTyVars, noConcreteTyVars,
@@ -640,7 +641,8 @@ data MetaInfo
    = TauTv         -- ^ This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls.
-
+   | WildCardTv    -- ^ A variant of TauTv, except that is should not be
+                   -- defaulted.
    | TyVarTv       -- ^ A variant of TauTv, except that it should not be
                    --   unified with a type, only with a type variable
                    -- See Note [TyVarTv] in GHC.Tc.Utils.TcMType
@@ -670,6 +672,8 @@ instance Outputable MetaInfo where
   ppr RuntimeUnkTv    = text "rutv"
   ppr CycleBreakerTv  = text "cbv"
   ppr (ConcreteTv {}) = text "conc"
+  ppr (WildCardTv)    = text "wc"
+
 
 -- | What caused us to create a 'ConcreteTv' metavariable?
 -- See Note [ConcreteTv] in GHC.Tc.Utils.Concrete.
@@ -1179,7 +1183,7 @@ isImmutableTyVar :: TyVar -> Bool
 isImmutableTyVar tv = isSkolemTyVar tv
 
 isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
-  isMetaTyVar, isAmbiguousTyVar, isCycleBreakerTyVar :: TcTyVar -> Bool
+  isMetaTyVar, isAmbiguousTyVar, isCycleBreakerTyVar, isWildCardMetaTyVar :: TcTyVar -> Bool
 
 isTyConableTyVar tv
         -- True of a meta-type variable that can be filled in
@@ -1218,6 +1222,13 @@ isMetaTyVar tv
   = case tcTyVarDetails tv of
         MetaTv {} -> True
         _         -> False
+  | otherwise = False
+
+isWildCardMetaTyVar tv
+  | isTyVar tv -- See Note [Coercion variables in free variable lists]
+  = case tcTyVarDetails tv of
+        MetaTv { mtv_info = WildCardTv } -> True
+        _                                 -> False
   | otherwise = False
 
 -- isAmbiguousTyVar is used only when reporting type errors

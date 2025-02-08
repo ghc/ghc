@@ -9,7 +9,7 @@ import GHC.Exts
 data D :: TYPE r -> Type where
   MkD :: p -> D p
 
--- But this was rejected
+-- now this is OK too
 data family Dix4 :: Type -> k
 data instance Dix4 Int :: TYPE r -> Type where
   DIn4 :: p -> Dix4 Int p
