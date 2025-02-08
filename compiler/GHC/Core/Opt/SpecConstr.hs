@@ -17,6 +17,7 @@ ToDo [Oct 2013]
 
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module GHC.Core.Opt.SpecConstr(
         specConstrProgram,
