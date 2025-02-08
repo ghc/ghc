@@ -2212,7 +2212,7 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
     --           esp the bullet on nested forall types
   = do { kv_details <- newTauTvDetailsAtLevel hole_lvl
        ; kv_name    <- newMetaTyVarName (fsLit "k")
-       ; wc_details <- newWildCardTvDetailsAtLevel hole_lvl
+       ; wc_details <- mk_wc_details hole_lvl
        ; wc_name    <- newMetaTyVarName wc_nm
        ; let kv      = mkTcTyVar kv_name liftedTypeKind kv_details
              wc_kind = mkTyVarTy kv
@@ -2231,11 +2231,11 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
        ; checkExpectedKind ty (mkTyVarTy wc_tv) wc_kind exp_kind }
   where
      -- See Note [Wildcard names]
-     wc_nm = case hole_mode of
-               HM_Sig      -> fsLit "w"
-               HM_FamPat   -> fsLit "_"
-               HM_VTA      -> fsLit "w"
-               HM_TyAppPat -> fsLit "_"
+     (wc_nm, mk_wc_details) = case hole_mode of
+               HM_Sig      -> (fsLit "w", newTauTvDetailsAtLevel)
+               HM_FamPat   -> (fsLit "_", newWildCardTvDetailsAtLevel)
+               HM_VTA      -> (fsLit "w", newTauTvDetailsAtLevel)
+               HM_TyAppPat -> (fsLit "_", newTauTvDetailsAtLevel)
 
      emit_holes = case hole_mode of
                      HM_Sig     -> True
@@ -2402,8 +2402,7 @@ kcCheckDeclHeader_cusk name flav
              -- skolemise and then quantify over.  We do not include spec_req_tvs
              -- because they are /already/ skolems
 
-       ; inferred <- quantifyTyVars skol_info DefaultNonStandardTyVars $
-                     candidates `delCandidates` spec_req_tkvs
+       ; inferred <- quantifyTyVars skol_info $ candidates `delCandidates` spec_req_tkvs
                      -- NB: 'inferred' comes back sorted in dependency order
 
        ; (scoped_kvs, tc_bndrs, res_kind) <- liftZonkM $
