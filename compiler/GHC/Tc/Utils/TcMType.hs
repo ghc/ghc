@@ -34,7 +34,7 @@ module GHC.Tc.Utils.TcMType (
 
   newMultiplicityVar,
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
-  newWildCardTvDetailsAtLevel, newTauTvDetailsAtLevel,
+  newNoDefTauTvDetailsAtLevel, newTauTvDetailsAtLevel,
   newMetaDetails, newMetaTyVarName,
   isFilledMetaTyVar_maybe, isFilledMetaTyVar, isUnfilledMetaTyVar,
 
@@ -693,14 +693,20 @@ the thinking.
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [WildCardTv]
+{- Note [NoDefTauTv]
 ~~~~~~~~~~~~~~~~~
-A WildCardTv behaves like a TauTv, except that it can not be defaulted.
+A NoDefTauTv behaves like a TauTv, except that when it is not unified
+with anything, it should not be defaulted.
 
-It is used for a anonymous wildcard in a type signature, e.g.
-  f :: _ -> Int
-  f = ...
+It is used for a anonymous wildcard in a type family, e.g.
+  type Dix8 :: RuntimeRep -> Type
+  data family Dix8 r
+  newtype instance Dix8 _ = Dix8 Int
+We want to keep `_` polymorphic, so it behaves like a named wildcard.
 
+When unified other type, it should be replaced by the other type, since
+the `not unified with anything` assumption is break. It's property no longer
+holds.
 -}
 
 {- Note [TyVarTv]
@@ -751,7 +757,7 @@ metaInfoToTyVarName :: MetaInfo -> FastString
 metaInfoToTyVarName  meta_info =
   case meta_info of
        TauTv          -> fsLit "t"
-       WildCardTv     -> fsLit "_"
+       NoDefTauTv     -> fsLit "n"
        TyVarTv        -> fsLit "a"
        RuntimeUnkTv   -> fsLit "r"
        CycleBreakerTv -> fsLit "b"
@@ -865,10 +871,10 @@ newTauTvDetailsAtLevel tclvl
                         , mtv_ref   = ref
                         , mtv_tclvl = tclvl }) }
 
-newWildCardTvDetailsAtLevel :: TcLevel -> TcM TcTyVarDetails
-newWildCardTvDetailsAtLevel tclvl
+newNoDefTauTvDetailsAtLevel :: TcLevel -> TcM TcTyVarDetails
+newNoDefTauTvDetailsAtLevel tclvl
   = do { ref <- newMutVar Flexi
-       ; return (MetaTv { mtv_info  = WildCardTv
+       ; return (MetaTv { mtv_info  = NoDefTauTv
                         , mtv_ref   = ref
                         , mtv_tclvl = tclvl }) }
 
@@ -1862,8 +1868,7 @@ defaultTyVar :: DefaultingStrategy
 defaultTyVar def_strat tv
   | not (isMetaTyVar tv )
   || isWildCardMetaTyVar tv
-    -- do not default WildcardTvs, wildcardTvs are are only meant to be unified
-    -- or be on its own but never defaulted.
+    -- do not default NoDefTauTvs see Note [NoDefTauTv]
   || isTyVarTyVar tv
     -- Do not default TyVarTvs. Doing so would violate the invariants
     -- on TyVarTvs; see Note [TyVarTv] in GHC.Tc.Utils.TcMType.
