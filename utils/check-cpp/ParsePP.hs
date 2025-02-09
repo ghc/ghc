@@ -47,10 +47,10 @@ combineToks ss = intercalate " " ss
 
 cppDefine :: [Token] -> Either String CppDirective
 cppDefine [] = Left "error:empty #define directive"
-cppDefine (TIdentifier n : def) = Right $ CppDefine n args def
+cppDefine (TIdentifier n : ts) = Right $ CppDefine n args def
   where
-    args = Nothing
-cppDefine (t:_) = Left $ "#define: expecting an identifier, got :" ++ show t
+    (args, def) = getArgs ts
+cppDefine (t : _) = Left $ "#define: expecting an identifier, got :" ++ show t
 
 cppInclude :: [String] -> CppDirective
 cppInclude ts = CppInclude (combineToks ts)
@@ -72,6 +72,28 @@ cppEndif _ts = CppEndif
 
 cppDumpState :: [String] -> CppDirective
 cppDumpState _ts = CppDumpState
+
+-- ---------------------------------------------------------------------
+
+-- Crack out the arguments to a #define. This is of the form of
+-- comma-separated identifiers between parens
+getArgs :: [Token] -> (Maybe [String], [Token])
+getArgs [] = (Nothing, [])
+getArgs (TOpenParen _ : ts) =
+    case parseDefineArgs [] ts of
+        Left err -> error err
+        Right (args, rest) -> (Just (reverse args), rest)
+getArgs ts = (Nothing, ts)
+
+parseDefineArgs ::
+    [String] ->
+    [Token] ->
+    Either String ([String], [Token])
+parseDefineArgs acc [] = Right (acc, [])
+parseDefineArgs acc (TCloseParen _ : ts) = Right (acc, ts)
+parseDefineArgs acc (TIdentifier n : TCloseParen _ : ts) = Right (n : acc, ts)
+parseDefineArgs acc (TIdentifier n : TComma _ : ts) = parseDefineArgs (n : acc) ts
+parseDefineArgs acc ts = Left $ "malformed macro args, expecting identifier followed by comma or ')', got:" ++ show ts ++ " after getting " ++ show (reverse acc)
 
 -- ---------------------------------------------------------------------
 
