@@ -2574,9 +2574,12 @@ lhsPriority tv
              CycleBreakerTv -> 0
              TyVarTv        -> 1
              ConcreteTv {}  -> 2
-             WildCardTv     -> 3
-             TauTv          -> 4
-             RuntimeUnkTv   -> 5
+             TauTv          -> 3
+             RuntimeUnkTv   -> 4
+             NoDefTauTv     -> 5 -- ^ when unifying with other, prefer to keep the other.
+                                 -- see Note [NoDefTauTv] for more details.
+                                -- NB. it is not clear to me(soulomoon), RuntimeUnkTv should
+                                -- be higher than NoDefTauTv or not.
 
 {- Note [Unification preconditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
