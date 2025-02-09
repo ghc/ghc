@@ -5,6 +5,7 @@
 {-# LANGUAGE TupleSections    #-}
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE MonadComprehensions  #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
@@ -869,20 +870,19 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
        ; mzip_op' <- unLoc `fmap` tcCheckPolyExpr (noLocA mzip_op) mzip_ty
 
         -- type dummies since we don't know all binder types yet
-       ; id_tys_s <- (mapM . mapM) (const (newFlexiTyVarTy liftedTypeKind))
-                       [ names | ParStmtBlock _ _ names _ <- bndr_stmts_s ]
+       ; tup_tys_and_bndr_stmts_s <- traverse (\ bndr_stmts@(ParStmtBlock _ _ names _) ->
+           [ (tup_tys, bndr_stmts)
+           | tup_tys <- mkBigCoreTupTy <$> traverse (const (newFlexiTyVarTy liftedTypeKind)) names ]) bndr_stmts_s
 
        -- Typecheck bind:
-       ; let tup_tys  = [ mkBigCoreTupTy id_tys | id_tys <- id_tys_s ]
-             tuple_ty = mk_tuple_ty tup_tys
+       ; let tuple_ty = mk_tuple_ty (fst <$> tup_tys_and_bndr_stmts_s)
 
        ; (((blocks', thing), inner_res_ty), bind_op')
            <- tcSyntaxOp MCompOrigin bind_op
                          [ synKnownType (m_ty `mkAppTy` tuple_ty)
                          , SynFun (synKnownType tuple_ty) SynRho ] res_ty $
               \ [inner_res_ty] _ ->
-              do { stuff <- loop m_ty (mkCheckExpType inner_res_ty)
-                                 tup_tys bndr_stmts_s
+              do { stuff <- loop m_ty (mkCheckExpType inner_res_ty) tup_tys_and_bndr_stmts_s
                  ; return (stuff, inner_res_ty) }
 
        ; return (ParStmt inner_res_ty blocks' mzip_op' bind_op', thing) }
@@ -895,12 +895,11 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
        --      -> [TcType]                              -- tup_tys
        --      -> [ParStmtBlock Name]
        --      -> TcM ([([LStmt GhcTc], [TcId])], thing)
-    loop _ inner_res_ty [] [] = do { thing <- thing_inside inner_res_ty
+    loop _ inner_res_ty [] = do { thing <- thing_inside inner_res_ty
                                    ; return ([], thing) }
                                    -- matching in the branches
 
-    loop m_ty inner_res_ty (tup_ty_in : tup_tys_in)
-                           (ParStmtBlock x stmts names return_op : pairs)
+    loop m_ty inner_res_ty ((tup_ty_in, ParStmtBlock x stmts names return_op) : xs)
       = do { let m_tup_ty = m_ty `mkAppTy` tup_ty_in
            ; (stmts', (ids, return_op', pairs', thing))
                 <- tcStmtsAndThen ctxt tcMcStmt stmts (mkCheckExpType m_tup_ty) $
@@ -911,10 +910,9 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
                           tcSyntaxOp MCompOrigin return_op
                                      [synKnownType tup_ty] m_tup_ty' $
                                      \ _ _ -> return ()
-                      ; (pairs', thing) <- loop m_ty inner_res_ty tup_tys_in pairs
+                      ; (pairs', thing) <- loop m_ty inner_res_ty xs
                       ; return (ids, return_op', pairs', thing) }
            ; return (ParStmtBlock x stmts' ids return_op' : pairs', thing) }
-    loop _ _ _ _ = panic "tcMcStmt.loop"
 
 tcMcStmt _ stmt _ _
   = pprPanic "tcMcStmt: unexpected Stmt" (ppr stmt)
