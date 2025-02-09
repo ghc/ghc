@@ -432,8 +432,11 @@ data PsMessage
    -- | Invalid rule activation marker
    | PsErrInvalidRuleActivationMarker
 
-   -- | Linear function found but LinearTypes not enabled
+   -- | Linear function found but neither Modifiers nor LinearTypes enabled
    | PsErrLinearFunction
+
+   -- | Other modifier syntax found but Modifiers not enabled
+   | PsErrModifierSyntax
 
    -- | Multi-way if-expression found but MultiWayIf not enabled
    | PsErrMultiWayIf

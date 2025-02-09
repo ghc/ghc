@@ -1276,7 +1276,8 @@ topdecl :: { LHsDecl GhcPs }
         | '{-# RULES' rules '#-}'               {% amsA' (sLL $1 $> $ RuleD noExtField (HsRules ((glR $1,glR $3), (getRULES_PRAGs $1)) (reverse $2))) }
         | annotation { $1 }
         | decl_no_th                            { $1 }
-        | modifiers1 ';' topdecl                {% do { decl <- addModifiersToDecl (fmap reverse $1) (unLoc $3)
+        | modifiers1 ';' topdecl                {% do { hintModifiers (getLoc $1)
+                                                      ; decl <- addModifiersToDecl (fmap reverse $1) (unLoc $3)
                                                       ; amsA' $ sLL $1 $3 decl }}
 
         -- Template Haskell Extension
@@ -1399,8 +1400,6 @@ modifiers1 :: { Located [HsModifier GhcPs] }
 --
 -- if we reduce, we resolve `modifiers` as []. By shifting we make sure it
 -- resolves as [%a].
---
--- Also can't make it `modifiersShift modifiers`.
 modifiersShift :: { Located [HsModifier GhcPs] }
   : modifiers %shift                { $1 }
 
@@ -2334,7 +2333,9 @@ infixtype :: { forall b. DisambTD b => PV (LocatedA b) }
 
 ftype :: { forall b. DisambTD b => PV (LocatedA b) }
         : atype                         { mkHsAppTyHeadPV $1 }
-        | modifiers1 atype              { amsA' (sLL $1 $2 $ HsModifiedTy noExtField (reverse $ unLoc $1) $2) >>= mkHsAppTyHeadPV }
+        | modifiers1 atype              { do { hintModifiers (getLoc $1)
+                                             ; ty <- amsA' $ sLL $1 $2 $ HsModifiedTy noExtField (reverse $ unLoc $1) $2
+                                             ; mkHsAppTyHeadPV ty } }
         | tyop                          { failOpFewArgs (fst $1) }
         | ftype tyarg                   { $1 >>= \ $1 ->
                                           mkHsAppTyPV $1 $2 }
@@ -2570,7 +2571,8 @@ gadt_constr :: { LConDecl GhcPs }
     -- Returns a list because of:   C,D :: ty
     -- TODO:AZ capture the optSemi. Why leading?
         : optSemi modifiers con_list '::' sigtype
-                {% mkGadtDecl (comb3 $2 $3 $>) (reverse $ unLoc $2) (unLoc $3) (epUniTok $4) $5 }
+                {% do { unless (null $ unLoc $2) $ hintModifiers (getLoc $2)
+                      ; mkGadtDecl (comb3 $2 $3 $>) (reverse $ unLoc $2) (unLoc $3) (epUniTok $4) $5 } }
 
 {- Note [Difference in parsing GADT and data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2596,7 +2598,8 @@ constrs1 :: { Located [LConDecl GhcPs] }
 
 constr :: { LConDecl GhcPs }
         : modifiersShift forall context '=>' constr_stuff
-                {% amsA' (let (con,details) = unLoc $5 in
+                {% unless (null $ unLoc $1) (hintModifiers (getLoc $1))
+                >> amsA' (let (con,details) = unLoc $5 in
                   (L (comb4 $2 $3 $4 $5) (mkConDeclH98
                                                        (epUniTok $4,(fst $ unLoc $2))
                                                        (reverse $ unLoc $1)
@@ -2605,7 +2608,8 @@ constr :: { LConDecl GhcPs }
                                                        (Just $3)
                                                        details))) }
         | modifiersShift forall constr_stuff
-                {% amsA' (let (con,details) = unLoc $3 in
+                {% unless (null $ unLoc $1) (hintModifiers (getLoc $1))
+                >> amsA' (let (con,details) = unLoc $3 in
                   (L (comb2 $2 $3) (mkConDeclH98 (noAnn, fst $ unLoc $2)
                                                       (reverse $ unLoc $1)
                                                       con
@@ -2639,13 +2643,14 @@ fielddecls1 :: { [LConDeclField GhcPs] }
 fielddecl :: { LConDeclField GhcPs }
                                               -- A list because of   f,g :: Int
         : sig_vars modifiers '::' ctype
-            {% amsA' (L (comb2 $1 $4)
+            {% do { unless (null $ unLoc $2) $ hintModifiers (getLoc $2)
+                  ; amsA' (L (comb2 $1 $4)
                       (ConDeclField (epUniTok $3)
                                     (reverse (map (\ln@(L l n)
                                                -> L (fromTrailingN l) $ FieldOcc noExtField (L (noTrailingN l) n)) (unLoc $1)))
                                     $4
                                     (reverse $ unLoc $2)
-                                    Nothing))}
+                                    Nothing))} }
 
 -- Reversed!
 maybe_derivings :: { Located (HsDeriving GhcPs) }
@@ -3033,9 +3038,10 @@ fexp    :: { ECP }
                                         amsA' (sLL $1 $> $ HsStatic (epTok $1) $2) }
 
         | aexp                       { $1 }
-        | modifiers1 aexp            { ECP $
-                                         unECP $2 >>= \ $2 ->
-                                         mkHsModifiedPV (comb2 $1 $2) (reverse $ unLoc $1) $2 }
+        | modifiers1 aexp            { ECP $ do
+                                         { hintModifiers (getLoc $1)
+                                         ; $2 <- unECP $2
+                                         ; mkHsModifiedPV (comb2 $1 $2) (reverse $ unLoc $1) $2 } }
 
 aexp    :: { ECP }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
@@ -4441,27 +4447,8 @@ fileSrcSpan = do
   let loc = mkSrcLoc (srcLocFile l) 1 1;
   return (mkSrcSpan loc loc)
 
--- There are places where we don't allow modifiers, but happy needs them to be
--- possible to avoid shift/reduce errors. Use this function to forbid them.
---
--- The problem is: suppose we expect either of
---
---     modifiers 'type' 'data' ...
---     'type' 'role' ...
---
--- When we've seen no modifiers and the next token is 'type', a shift locks us
--- out of the first option and a reduce locks us out of the second.
---
--- MODS_TODO: is that description accurate?
-forbidModifiers :: MonadP m => Located [HsModifier GhcPs] -> m ()
-forbidModifiers mods = unless (null $ unLoc mods) $ do
-  addError $ error "modifiers forbidden here" -- MODS_TODO need an actual error message
-
 -- Hint about linear types. These can be parsed given either -XLinearTypes or
 -- -XModifiers.
---
--- MODS_TODO: should other uses of modifiers be parsed with -XLinearTypes
--- -XNoModifiers and rejected later, or just not parsed?
 hintLinear :: MonadP m => SrcSpan -> m ()
 hintLinear span = do
   modifiersEnabled <- getBit ModifiersBit
@@ -4469,6 +4456,13 @@ hintLinear span = do
   unless (modifiersEnabled || linearEnabled) $
     -- MODS_TODO this error needs to be generalized to modifiers
     addError $ mkPlainErrorMsgEnvelope span $ PsErrLinearFunction
+
+-- Hint about enabling modifiers, somewhere that -XLinearTypes doesn't cover.
+hintModifiers :: MonadP m => SrcSpan -> m ()
+hintModifiers span = do
+  modifiersEnabled <- getBit ModifiersBit
+  unless modifiersEnabled $
+    addError $ mkPlainErrorMsgEnvelope span $ PsErrModifierSyntax
 
 -- Does this look like (a %m)?
 looksLikeMult :: LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> Bool

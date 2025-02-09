@@ -218,6 +218,8 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ text "A lambda requires at least one parameter"
     PsErrLinearFunction
       -> mkSimpleDecorated $ text "Illegal use of linear functions"
+    PsErrModifierSyntax
+      -> mkSimpleDecorated $ text "Illegal use of modifier syntax"
     PsErrOverloadedRecordUpdateNotEnabled
       -> mkSimpleDecorated $ text "Illegal overloaded record update"
     PsErrMultiWayIf
@@ -601,6 +603,7 @@ instance Diagnostic PsMessage where
     PsErrLambdaCase{}                             -> ErrorWithoutFlag
     PsErrEmptyLambda{}                            -> ErrorWithoutFlag
     PsErrLinearFunction{}                         -> ErrorWithoutFlag
+    PsErrModifierSyntax{}                         -> ErrorWithoutFlag
     PsErrMultiWayIf{}                             -> ErrorWithoutFlag
     PsErrOverloadedRecordUpdateNotEnabled{}       -> ErrorWithoutFlag
     PsErrNumUnderscores{}                         -> ErrorWithoutFlag
@@ -736,6 +739,7 @@ instance Diagnostic PsMessage where
     PsErrLambdaCase{}                             -> [suggestExtension LangExt.LambdaCase]
     PsErrEmptyLambda{}                            -> noHints
     PsErrLinearFunction{}                         -> [suggestExtension LangExt.LinearTypes]
+    PsErrModifierSyntax{}                         -> [suggestExtension LangExt.Modifiers]
     PsErrMultiWayIf{}                             -> [suggestExtension LangExt.MultiWayIf]
     PsErrOverloadedRecordUpdateNotEnabled{}       -> [suggestExtension LangExt.OverloadedRecordUpdate]
     PsErrNumUnderscores{}                         -> [suggestExtension LangExt.NumericUnderscores]

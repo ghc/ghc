@@ -198,6 +198,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrLambdaCase"                               = 51179
   GhcDiagnosticCode "PsErrEmptyLambda"                              = 71614
   GhcDiagnosticCode "PsErrLinearFunction"                           = 31574
+  GhcDiagnosticCode "PsErrModifierSyntax"                           = 61252
   GhcDiagnosticCode "PsErrMultiWayIf"                               = 28985
   GhcDiagnosticCode "PsErrOverloadedRecordUpdateNotEnabled"         = 82135
   GhcDiagnosticCode "PsErrNumUnderscores"                           = 62330

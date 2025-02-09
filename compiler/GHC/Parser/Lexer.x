@@ -1784,7 +1784,7 @@ varsym opws@OpWsPrefix = sym $ \span exts s ->
   if | s == fsLit "@" ->
          return ITtypeApp  -- regardless of TypeApplications for better error messages
      | s == fsLit "%" ->
-         if xtest LinearTypesBit exts
+         if xtest ModifiersBit exts || xtest LinearTypesBit exts
          then return ITpercent
          else warnExtConflict OperatorWhitespaceSymbol_PrefixPercent
      | s == fsLit "$" ->

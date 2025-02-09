@@ -1,4 +1,4 @@
-{-# LANGUAGE LinearTypes #-}
+{-# LANGUAGE Modifiers #-}
 
 module PprModifiers where
 
