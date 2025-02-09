@@ -9,7 +9,7 @@ import GHC.Parser.Errors.Ppr ()
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Types.SrcLoc
 
-import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
+import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token(..))
 
 import Macro
 import ParsePP
@@ -106,8 +106,8 @@ processCpp fs = do
                 Left err -> error $ show (err, s)
                 Right (CppInclude filename) -> do
                     ppInclude filename
-                Right (CppDefine name def) -> do
-                    ppDefine (MacroName name Nothing) def
+                Right (CppDefine name args def) -> do
+                    ppDefine (MacroName name args) def
                 Right (CppIf cond) -> do
                     ppIf cond
                 Right (CppIfdef name) -> do
