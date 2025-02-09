@@ -22,12 +22,13 @@ details
 
 -- TODO: Parse tokens with original locations in them.
 
+import qualified Data.Map as Map
 import Data.Maybe
 
 import Eval
 import ParsePP
-import ParserM
 import Parser
+import ParserM
 import State
 
 -- ---------------------------------------------------------------------
@@ -39,7 +40,7 @@ process s str = (s0, o)
         Left _ -> undefined
         Right r -> r
     s0 = case o of
-        CppDefine name rhs -> define s name rhs
+        CppDefine name args rhs -> define s name args rhs
         CppInclude _ -> undefined
         CppIfdef name -> ifdef s name
         CppIf ifstr -> cppIf s ifstr
@@ -50,8 +51,8 @@ process s str = (s0, o)
 
 -- ---------------------------------------------------------------------
 
-define :: PpState -> String -> MacroDef -> PpState
-define s name toks = addDefine' s (MacroName name Nothing) toks
+define :: PpState -> String -> Maybe ([String]) -> MacroDef -> PpState
+define s name args toks = addDefine' s (MacroName name args) toks
 
 ifdef :: PpState -> String -> PpState
 ifdef s name = pushAccepting' s (ppIsDefined' s (MacroName name Nothing))
@@ -80,16 +81,19 @@ expand s str = expanded
     toks = case cppLex str of
         Left err -> error $ "expand:" ++ show (err, str)
         Right tks -> tks
-    expanded = concatMap (expandOne s) toks
+    expanded = combineToks $ map t_str $ expandToks s toks
 
-expandOne :: PpState -> Token -> String
-expandOne s tok = r
+expandToks :: PpState -> [Token] -> [Token]
+expandToks _ [] = []
+expandToks s (TIdentifier n : ts) = expanded ++ expandToks s ts
   where
-    -- TODO: protect against looking up `define`
-    r =
-        fromMaybe
-            (t_str tok)
-            (ppDefinition' s (MacroName (t_str tok) Nothing))
+    expanded = case Map.lookup n (pp_defines s) of
+        Nothing -> [TIdentifier n]
+        Just defs -> r
+          where
+            -- Assume no args to start with
+            r = fromMaybe [TIdentifier n] (Map.lookup Nothing defs)
+expandToks s (t : ts) = t : expandToks s ts
 
 -- ---------------------------------------------------------------------
 

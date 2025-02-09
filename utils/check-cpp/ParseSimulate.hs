@@ -27,8 +27,8 @@ happyNewToken action sts stk =
         True
         ( \tk ->
             let cont i =
-                    trace ("happyNewToken:tk=" ++ show tk)
-                        $ happyDoAction i tk action sts stk
+                    trace ("happyNewToken:tk=" ++ show tk) $
+                        happyDoAction i tk action sts stk
              in case tk of
                     L _ ITeof -> happyDoAction 169 tk action sts stk
                     _ -> cont 5
@@ -53,8 +53,8 @@ happyDoAction num tk action sts stk =
 
 happyAccept :: Int -> Located Token -> Int -> [Int] -> [Located Token] -> PP [Located Token]
 happyAccept _j tk _st _sts stk =
-    trace ("happyAccept:" ++ show tk)
-        $ return stk
+    trace ("happyAccept:" ++ show tk) $
+        return stk
 
 -- happyReturn1 :: a -> P a
 -- happyReturn1 = return
@@ -68,8 +68,8 @@ happyShift new_state _i tk st sts stk = do
 
 happyFail :: [String] -> Int -> Located Token -> p2 -> p3 -> p4 -> PP a
 happyFail explist i tk _old_st _ _stk =
-    trace ("failing" ++ show explist)
-        $ happyError_ explist i tk
+    trace ("failing" ++ show explist) $
+        happyError_ explist i tk
 
 happyError_ :: [String] -> p1 -> Located Token -> PP a
 happyError_ explist _ tk = happyError' (tk, explist)

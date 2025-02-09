@@ -1,14 +1,18 @@
 module State where
 
-import Data.List.NonEmpty (NonEmpty (..), (<|))
-import Data.List.NonEmpty qualified as NonEmpty
+import Data.List.NonEmpty ((<|))
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map (Map)
-import Data.Map qualified as Map
+import qualified Data.Map as Map
+import Data.Maybe (isJust)
+import GHC.Base
 import GHC.Data.StringBuffer
-import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
-import GHC.Parser.Lexer qualified as Lexer
--- import GHC.Prelude
+import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..))
+import qualified GHC.Parser.Lexer as Lexer
 import GHC.Types.SrcLoc
+import ParserM (Token(..))
+
+-- import GHC.Prelude
 
 -- ---------------------------------------------------------------------
 
@@ -27,20 +31,21 @@ initPpState =
         { pp_includes = Map.empty
         , pp_include_stack = []
         , pp_continuation = []
-        , pp_scope = (PpScope Map.empty True) :| []
+        , pp_defines = Map.empty
+        , pp_scope = (PpScope True) :| []
         }
 
 data PpState = PpState
     { pp_includes :: !(Map String StringBuffer)
     , pp_include_stack :: ![Lexer.AlexInput]
-    , pp_continuation :: ![Located Token]
+    , pp_continuation :: ![Located Lexer.Token]
+    , pp_defines :: !MacroDefines
     , pp_scope :: !(NonEmpty PpScope)
     }
     deriving (Show)
 
 data PpScope = PpScope
-    { pp_defines :: !(Map MacroName MacroDef)
-    , pp_accepting :: !Bool
+    { pp_accepting :: !Bool
     }
     deriving (Show)
 
@@ -48,7 +53,8 @@ data PpScope = PpScope
 
 data CppDirective
     = CppInclude String
-    | CppDefine String String
+    | -- | name, optional args, replacement
+      CppDefine String (Maybe [String]) MacroDef
     | CppIfdef String
     | CppIfndef String
     | CppIf String
@@ -62,7 +68,9 @@ data CppDirective
 type MacroArgs = [String]
 data MacroName = MacroName String (Maybe MacroArgs)
     deriving (Show, Eq, Ord)
-type MacroDef = String
+type MacroDef = [Token]
+
+type MacroDefines = Map String (Map (Maybe MacroArgs) MacroDef)
 
 type Input = String
 type Output = CppDirective
@@ -163,10 +171,10 @@ setAccepting on = do
     setScope (scope{pp_accepting = on})
 
 pushAccepting :: Bool -> PP ()
-pushAccepting on = pushScope (PpScope Map.empty on)
+pushAccepting on = pushScope (PpScope on)
 
 pushAccepting' :: PpState -> Bool -> PpState
-pushAccepting' s on = pushScope' s (PpScope Map.empty on)
+pushAccepting' s on = pushScope' s (PpScope on)
 
 setAccepting' :: PpState -> Bool -> PpState
 setAccepting' s on = setScope' s (scope{pp_accepting = on})
@@ -181,64 +189,53 @@ getAccepting' s = pp_accepting (NonEmpty.head $ pp_scope s)
 
 addDefine :: MacroName -> MacroDef -> PP ()
 addDefine name def = do
-    scope <- getScope
-    setScope (scope{pp_defines = Map.insert name def (pp_defines scope)})
+    accepting <- getAccepting
+    when accepting $ do
+        s <- getPpState
+        setPpState $ addDefine' s name def
 
 addDefine' :: PpState -> MacroName -> MacroDef -> PpState
-addDefine' s name def = r
-  where
-    scope = getScope' s
-    r = setScope' s (scope{pp_defines = Map.insert name def (pp_defines scope)})
+addDefine' s name def =
+    s{pp_defines = insertMacroDef name def (pp_defines s)}
 
 ppDefine :: MacroName -> MacroDef -> PP ()
 ppDefine name val = addDefine name val
 
 ppIsDefined :: MacroName -> PP Bool
 ppIsDefined name = do
-    -- Look up the chain of scopes, until we find one that works, or end
-    let
-        my_lookup [] = False
-        my_lookup (h : t) =
-            if Map.member name (pp_defines h)
-                then True
-                else my_lookup t
-    pp <- getPpState
-    let scopes = NonEmpty.toList (pp_scope pp)
-    return $ my_lookup scopes
+    s <- getPpState
+    return $ ppIsDefined' s name
 
 ppIsDefined' :: PpState -> MacroName -> Bool
-ppIsDefined' s name = my_lookup scopes
-  where
-    -- Look up the chain of scopes, until we find one that works, or end
-    my_lookup [] = False
-    my_lookup (h : t) =
-        if Map.member name (pp_defines h)
-            then True
-            else my_lookup t
-    scopes = NonEmpty.toList (pp_scope s)
+ppIsDefined' s (MacroName name _args) =
+    isJust $ Map.lookup name (pp_defines s)
 
-ppDefinition' :: PpState -> MacroName -> Maybe MacroDef
-ppDefinition' s name = my_lookup scopes
-  where
-    -- Look up the chain of scopes, until we find one that works, or end
-    my_lookup [] = Nothing
-    my_lookup (h : t) =
-        if Map.member name (pp_defines h)
-            then Map.lookup name (pp_defines h)
-            else my_lookup t
-    scopes = NonEmpty.toList (pp_scope s)
+ppDefinition' :: PpState -> String -> Maybe (Map (Maybe MacroArgs) MacroDef)
+ppDefinition' s name = Map.lookup name (pp_defines s)
 
 getPpState :: PP PpState
 getPpState = P $ \s -> POk s (pp s)
 
+setPpState :: PpState -> PP ()
+setPpState pp' = P $ \s -> POk s{pp = pp'} ()
+
 -- ---------------------------------------------------------------------
 
-pushContinuation :: Located Token -> PP ()
+pushContinuation :: Located Lexer.Token -> PP ()
 pushContinuation new =
     P $ \s -> POk s{pp = (pp s){pp_continuation = new : pp_continuation (pp s)}} ()
 
-popContinuation :: PP [Located Token]
+popContinuation :: PP [Located Lexer.Token]
 popContinuation =
     P $ \s -> POk s{pp = (pp s){pp_continuation = []}} (pp_continuation (pp s))
+
+-- ---------------------------------------------------------------------
+-- Dealing with MacroDefines
+
+insertMacroDef :: MacroName -> MacroDef -> MacroDefines -> MacroDefines
+insertMacroDef (MacroName name args) def md =
+    case Map.lookup name md of
+        Nothing -> Map.insert name (Map.singleton args def) md
+        Just dm -> Map.insert name (Map.insert args def dm) md
 
 -- ---------------------------------------------------------------------
