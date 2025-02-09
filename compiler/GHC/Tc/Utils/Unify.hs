@@ -2575,11 +2575,13 @@ lhsPriority tv
              TyVarTv        -> 1
              ConcreteTv {}  -> 2
              TauTv          -> 3
-             RuntimeUnkTv   -> 4
-             NoDefTauTv     -> 5 -- ^ when unifying with other, prefer to keep the other.
-                                 -- see Note [NoDefTauTv] for more details.
-                                -- NB. it is not clear to me(soulomoon), RuntimeUnkTv should
-                                -- be higher than NoDefTauTv or not.
+             NoDefTauTv     -> 4 -- ^ when unifying with other, prefer to keep the other.
+                                 -- Since NoDefTauTv is more polymorphic than tau,
+                                 --  see Note [NoDefTauTv] for more details.
+
+                                 -- NB. it is not clear to me(soulomoon), RuntimeUnkTv should
+                                 -- be higher than NoDefTauTv or not.
+             RuntimeUnkTv   -> 5
 
 {- Note [Unification preconditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

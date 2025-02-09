@@ -695,18 +695,17 @@ the thinking.
 
 {- Note [NoDefTauTv]
 ~~~~~~~~~~~~~~~~~
-A NoDefTauTv behaves like a TauTv, except that when it is not unified
-with anything, it should not be defaulted.
+A NoDefTauTv behaves like a TauTv, except that it should not be defaulted.
+Making it more polymorphic than a TauTv which can be defaulted.
 
 It is used for a anonymous wildcard in a type family, e.g.
   type Dix8 :: RuntimeRep -> Type
   data family Dix8 r
   newtype instance Dix8 _ = Dix8 Int
-We want to keep `_` polymorphic, so it behaves like a named wildcard.
 
-When unified other type, it should be replaced by the other type, since
-the `not unified with anything` assumption is break. It's property no longer
-holds.
+We want to keep `_` polymorphic, so it behaves more like a named wildcard.
+
+NB. Should we default `_` if XNoPolyKind is on?
 -}
 
 {- Note [TyVarTv]
