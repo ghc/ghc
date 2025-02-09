@@ -438,3 +438,12 @@ t14 = do
 
 -- x = 1
 -- z = 5
+
+t15 :: IO ()
+t15 = do
+    doTest
+        [ "#define FOO() 5"
+        , "#define FOO1(a) a+5"
+        , "#define FOO2(a,b) a+b+5"
+        , "#define FOO3(a,b,c) a+b+c+5"
+        ]
