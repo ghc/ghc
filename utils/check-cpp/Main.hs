@@ -28,6 +28,7 @@ import GHC.Utils.Outputable
 
 -- Local simulation -----------------
 import ParsePP
+import qualified ParserM as PM
 import PreProcess as PP
 import State
 
@@ -73,7 +74,8 @@ strGetToks dflags includes popts filename str = reverse $ lexAll pstate
     initState =
         initPpState
             { pp_includes = includeMap
-            , pp_scope = (PpScope (predefinedMacros dflags) True) :| []
+            , pp_defines = predefinedMacros dflags
+            , pp_scope = (PpScope True) :| []
             }
     pstate = Lexer.initParserState initState popts buf loc
     loc = mkRealSrcLoc (mkFastString filename) 1 1
@@ -160,20 +162,24 @@ ghcWrapper libdir a =
 
 -- ---------------------------------------------------------------------
 
-predefinedMacros :: DynFlags -> Map.Map MacroName MacroDef
-predefinedMacros _df = Map.fromList
+predefinedMacros :: DynFlags -> MacroDefines
+predefinedMacros _df =
+    Map.fromList
         [
-            ( MacroName "__GLASGOW_HASKELL__" Nothing
-            , projectVersionInt
-            ),
-            ( MacroName "__GLASGOW_HASKELL_FULL_VERSION__" Nothing
-            , projectVersion
-            ),
-            ( MacroName  "__GLASGOW_HASKELL_PATCHLEVEL1__" Nothing
-            , projectPatchLevel1
-            ),
-            ( MacroName  "__GLASGOW_HASKELL_PATCHLEVEL2__" Nothing
-            , projectPatchLevel2
+            ( "__GLASGOW_HASKELL__"
+            , Map.singleton Nothing [PM.TInteger projectVersionInt]
+            )
+        ,
+            ( "__GLASGOW_HASKELL_FULL_VERSION__"
+            , Map.singleton Nothing [PM.TOther projectVersion]
+            )
+        ,
+            ( "__GLASGOW_HASKELL_PATCHLEVEL1__"
+            , Map.singleton Nothing [PM.TOther projectPatchLevel1]
+            )
+        ,
+            ( "__GLASGOW_HASKELL_PATCHLEVEL2__"
+            , Map.singleton Nothing [PM.TOther projectPatchLevel2]
             )
         ]
   where
@@ -408,3 +414,27 @@ t13 = do
         ]
 
 -- x = 1
+
+t14 :: IO ()
+t14 = do
+    doTest
+        [ "#define FOO 5"
+        , "#ifdef FOO"
+        , "#define BAR 6"
+        , "#else"
+        , "#define BAZ 6"
+        , "#endif"
+        , "#ifdef BAR"
+        , "x = 1"
+        , "#else"
+        , "x = 5"
+        , "#endif"
+        , "#ifdef BAZ"
+        , "z = 1"
+        , "#else"
+        , "z = 5"
+        , "#endif"
+        ]
+
+-- x = 1
+-- z = 5

@@ -17,7 +17,6 @@ evalLogicOp :: LogicOp -> Int -> Int -> Int
 evalLogicOp LogicalOr e1 e2 = fromBool $ (toBool e1) || (toBool e2)
 evalLogicOp LogicalAnd e1 e2 = fromBool $ (toBool e1) || (toBool e2)
 
-
 evalCompOp :: CompOp -> Int -> Int -> Int
 evalCompOp CmpEqual e1 e2 = fromBool $ e1 == e2
 evalCompOp CmpNotEqual e1 e2 = fromBool $ e1 /= e2
