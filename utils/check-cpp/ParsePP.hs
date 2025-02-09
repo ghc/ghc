@@ -1,6 +1,7 @@
 module ParsePP (
     parseDirective,
     cppLex,
+    combineToks,
     -- Reduce warnings so long
     t0,
     t1,
@@ -26,16 +27,16 @@ parseDirective s =
     case cppLex s of
         Left e -> Left e
         Right toks ->
-            case map t_str toks of
-                ("#" : "define" : ts) -> cppDefine ts
-                ("#" : "include" : ts) -> Right $ cppInclude ts
-                ("#" : "if" : ts) -> Right $ cppIf ts
-                ("#" : "ifndef" : ts) -> Right $ cppIfndef ts
-                ("#" : "ifdef" : ts) -> Right $ cppIfdef ts
-                ("#" : "else" : ts) -> Right $ cppElse ts
-                ("#" : "endif" : ts) -> Right $ cppEndif ts
-                ("#" : "dumpghccpp" : ts) -> Right $ cppDumpState ts
-                other -> Left ("unexpected directive: " ++ (combineToks other))
+            case toks of
+                (THash "#" : TIdentifier "define" : ts) -> cppDefine ts
+                (THash "#" : TIdentifier "include" : ts) -> Right $ cppInclude (map t_str ts)
+                (THash "#" : TIdentifier "if" : ts) -> Right $ cppIf (map t_str ts)
+                (THash "#" : TIdentifier "ifndef" : ts) -> Right $ cppIfndef (map t_str ts)
+                (THash "#" : TIdentifier "ifdef" : ts) -> Right $ cppIfdef (map t_str ts)
+                (THash "#" : TIdentifier "else" : ts) -> Right $ cppElse (map t_str ts)
+                (THash "#" : TIdentifier "endif" : ts) -> Right $ cppEndif (map t_str ts)
+                (THash "#" : TIdentifier "dumpghccpp" : ts) -> Right $ cppDumpState (map t_str ts)
+                _ -> Left ("unexpected directive: " ++ (show toks))
 
 {- | Comply with the CPP requirement to not combine adjacent tokens.
 This will automatically insert a space in place of a comment, as
@@ -44,9 +45,12 @@ comments cannot occur within a token.
 combineToks :: [String] -> String
 combineToks ss = intercalate " " ss
 
-cppDefine :: [String] -> Either String CppDirective
+cppDefine :: [Token] -> Either String CppDirective
 cppDefine [] = Left "error:empty #define directive"
-cppDefine (n : ts) = Right $ CppDefine n (combineToks ts)
+cppDefine (TIdentifier n : def) = Right $ CppDefine n args def
+  where
+    args = Nothing
+cppDefine (t:_) = Left $ "#define: expecting an identifier, got :" ++ show t
 
 cppInclude :: [String] -> CppDirective
 cppInclude ts = CppInclude (combineToks ts)
