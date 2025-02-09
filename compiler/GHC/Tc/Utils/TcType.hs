@@ -51,7 +51,7 @@ module GHC.Tc.Utils.TcType (
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTvUnk,
   MetaDetails(Flexi, Indirect), MetaInfo(..), skolemSkolInfo,
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
-  isWildCardMetaTyVar, tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,
+  isNoDefTauMetaTyVar, tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,
   isTyConableTyVar,
   ConcreteTvOrigin(..), isConcreteTyVar_maybe, isConcreteTyVar,
   isConcreteTyVarTy, isConcreteTyVarTy_maybe, concreteInfo_maybe,
@@ -1183,7 +1183,7 @@ isImmutableTyVar :: TyVar -> Bool
 isImmutableTyVar tv = isSkolemTyVar tv
 
 isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
-  isMetaTyVar, isAmbiguousTyVar, isCycleBreakerTyVar, isWildCardMetaTyVar :: TcTyVar -> Bool
+  isMetaTyVar, isAmbiguousTyVar, isCycleBreakerTyVar, isNoDefTauMetaTyVar :: TcTyVar -> Bool
 
 isTyConableTyVar tv
         -- True of a meta-type variable that can be filled in
@@ -1224,7 +1224,7 @@ isMetaTyVar tv
         _         -> False
   | otherwise = False
 
-isWildCardMetaTyVar tv
+isNoDefTauMetaTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   = case tcTyVarDetails tv of
         MetaTv { mtv_info = NoDefTauTv } -> True
