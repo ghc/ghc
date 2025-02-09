@@ -641,8 +641,8 @@ data MetaInfo
    = TauTv         -- ^ This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls.
-   | WildCardTv    -- ^ A variant of TauTv, except that it should not be
-                   -- defaulted.
+   | NoDefTauTv    -- ^ A variant of TauTv, except that it should not be
+                   -- defaulted during generalization. See Note [NoDefTauTv]
    | TyVarTv       -- ^ A variant of TauTv, except that it should not be
                    --   unified with a type, only with a type variable
                    -- See Note [TyVarTv] in GHC.Tc.Utils.TcMType
@@ -672,7 +672,7 @@ instance Outputable MetaInfo where
   ppr RuntimeUnkTv    = text "rutv"
   ppr CycleBreakerTv  = text "cbv"
   ppr (ConcreteTv {}) = text "conc"
-  ppr (WildCardTv)    = text "wc"
+  ppr (NoDefTauTv)    = text "ndtau"
 
 
 -- | What caused us to create a 'ConcreteTv' metavariable?
@@ -1227,7 +1227,7 @@ isMetaTyVar tv
 isWildCardMetaTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   = case tcTyVarDetails tv of
-        MetaTv { mtv_info = WildCardTv } -> True
+        MetaTv { mtv_info = NoDefTauTv } -> True
         _                                 -> False
   | otherwise = False
 
