@@ -543,6 +543,7 @@ pprInstr platform instr = case instr of
     | otherwise -> op3 (text "\taddi") o1 o2 (OpImm (ImmInt 0))
   ORI o1 o2 o3 -> op3 (text "\tori") o1 o2 o3
   XORI o1 o2 o3 -> op3 (text "\txori") o1 o2 o3
+  J o1 -> pprInstr platform (B o1)
   J_TBL _ _ r -> pprInstr platform (B (TReg r))
   B l | isLabel l -> line $ text "\tjal" <+> pprOp platform x0 <> comma <+> getLabel platform l
   B (TReg r) -> line $ text "\tjalr" <+> pprOp platform x0 <> comma <+> pprReg W64 r <> comma <+> text "0"
