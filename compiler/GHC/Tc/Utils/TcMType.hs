@@ -1866,7 +1866,7 @@ defaultTyVar :: DefaultingStrategy
              -> TcM Bool   -- True <=> defaulted away altogether
 defaultTyVar def_strat tv
   | not (isMetaTyVar tv )
-  || isWildCardMetaTyVar tv
+  || isNoDefTauMetaTyVar tv
     -- do not default NoDefTauTvs see Note [NoDefTauTv]
   || isTyVarTyVar tv
     -- Do not default TyVarTvs. Doing so would violate the invariants

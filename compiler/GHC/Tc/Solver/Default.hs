@@ -176,6 +176,8 @@ defaultTyVarTcS the_tv
     -- TyVarTvs should only be unified with a tyvar
     -- never with a type; c.f. GHC.Tc.Utils.TcMType.defaultTyVar
     -- and Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
+  || isNoDefTauMetaTyVar the_tv
+    -- do not default NoDefTauTvs see Note [NoDefTauTv]
   = return noUnification
   | isRuntimeRepVar the_tv
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
