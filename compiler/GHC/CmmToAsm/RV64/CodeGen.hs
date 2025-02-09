@@ -1481,7 +1481,7 @@ assignReg_FltCode = assignReg_IntCode
 genJump :: CmmExpr {-the branch target-} -> NatM InstrBlock
 genJump expr = do
   (target, _format, code) <- getSomeReg expr
-  return (code `appOL` unitOL (annExpr expr (B (TReg target))))
+  return (code `appOL` unitOL (annExpr expr (J (TReg target))))
 
 -- -----------------------------------------------------------------------------
 --  Unconditional branches
@@ -2217,6 +2217,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       -- jumps to registers have size 1
       BCOND {} -> long_bc_jump_size
       B (TBlock _) -> long_b_jump_size
+      J _ -> 1
       B (TReg _) -> 1
       BL _ _ -> 1
       J_TBL {} -> 1
