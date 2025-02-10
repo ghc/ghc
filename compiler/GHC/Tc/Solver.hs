@@ -909,7 +909,7 @@ simplifyInfer top_lvl rhs_tclvl infer_mode sigs name_taus wanteds
        ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
 
        ; skol_info <- mkSkolemInfo (InferSkol name_taus)
-       ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars dep_vars
+       ; qtkvs <- quantifyTyVars skol_info dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, False) }
 
@@ -1795,7 +1795,7 @@ defaultTyVarsAndSimplify rhs_tclvl candidates
        ; poly_kinds  <- xoptM LangExt.PolyKinds
        ; let default_kv | poly_kinds = default_tv
                         | otherwise  = defaultTyVar DefaultKindVars
-             default_tv = defaultTyVar (NonStandardDefaulting DefaultNonStandardTyVars)
+             default_tv = defaultTyVar NonStandardDefaulting
        ; mapM_ default_kv (dVarSetElems cand_kvs)
        ; mapM_ default_tv (dVarSetElems (cand_tvs `minusDVarSet` cand_kvs))
 
@@ -1857,7 +1857,7 @@ decideQuantifiedTyVars skol_info name_taus psigs candidates
            , text "grown_tcvs =" <+> ppr grown_tcvs
            , text "dvs =" <+> ppr dvs_plus])
 
-       ; quantifyTyVars skol_info DefaultNonStandardTyVars dvs_plus }
+       ; quantifyTyVars skol_info dvs_plus }
 
 ------------------
 getSeedTys :: [(Name,TcType)]    -- The type of each RHS in the group

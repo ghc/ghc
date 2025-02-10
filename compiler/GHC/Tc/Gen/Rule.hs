@@ -35,7 +35,7 @@ import GHC.Core.Predicate
 import GHC.Types.Id
 import GHC.Types.Var( EvVar, tyVarName )
 import GHC.Types.Var.Set
-import GHC.Types.Basic ( RuleName, NonStandardDefaultingStrategy(..) )
+import GHC.Types.Basic ( RuleName )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -160,7 +160,7 @@ tcRule (HsRule { rd_ext  = ext
        ; let weed_out = (`dVarSetMinusVarSet` dont_default)
              quant_cands = forall_tkvs { dv_kvs = weed_out (dv_kvs forall_tkvs)
                                        , dv_tvs = weed_out (dv_tvs forall_tkvs) }
-       ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars quant_cands
+       ; qtkvs <- quantifyTyVars skol_info quant_cands
        ; traceTc "tcRule" (vcat [ pprFullRuleName (snd ext) rname
                                 , text "forall_tkvs:" <+> ppr forall_tkvs
                                 , text "quant_cands:" <+> ppr quant_cands

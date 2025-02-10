@@ -141,8 +141,7 @@ import GHC.Builtin.Types
 import GHC.Types.Var.Env
 import GHC.Types.Unique.Set
 import GHC.Types.Basic ( TypeOrKind(..)
-                       , NonStandardDefaultingStrategy(..)
-                       , DefaultingStrategy(..), defaultNonStandardTyVars )
+                       , DefaultingStrategy(..))
 
 import GHC.Data.FastString
 import GHC.Data.Bag
@@ -694,18 +693,50 @@ the thinking.
 ********************************************************************* -}
 
 {- Note [NoDefTauTv]
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 A NoDefTauTv behaves like a TauTv, except that it should not be defaulted.
 Making it more polymorphic than a TauTv which can be defaulted.
 
-It is used for a anonymous wildcard in a type family, e.g.
+It is used for a anonymous wildcard in a type family, e.g. from T25647a
+
+  -- anonymous wildcards
   type Dix8 :: RuntimeRep -> Type
   data family Dix8 r
   newtype instance Dix8 _ = Dix8 Int
+  dix8 :: Dix8 FloatRep -> Int
+  dix8 (Dix8 x) = x
 
-We want to keep `_` polymorphic, so it behaves more like a named wildcard.
+  -- named wildcards
+  type Dix9 :: RuntimeRep -> Type
+  data family Dix9 r
+  newtype instance Dix9 _r = Dix9 Int
+  dix9 :: Dix9 FloatRep -> Int
+  dix9 (Dix9 x) = x
 
-NB. Should we default `_` if XNoPolyKind is on?
+We would expect we accept both `Dix8 FloatRep` and `Dix9 FloatRep`,
+when type checking data family instance header in `tcDataFamInstHeader`,
+`_r` would be bind by bindOuterFamEqnTKBndrs as a skolem, while a `_`
+is not in the bndrs and left to be handled by `tcAnonWildCardOcc` and
+a fresh meta var would be introduced. But a TauTv would be defaulted
+to `LiftedRep`, which is not what we want.
+
+Previously we are branching the defaulting strategy in `defaultTyVar`
+in `tcDataFamInstHeader`, to avoid such defaulting.
+(`TryNotToDefaultNonStandardTyVars` verse `DefaultNonStandardTyVars`).
+
+Such branching is too coarse, as we may want to default other type variables
+while simultaneously preventing `_` from being defaulted. See (GT4) in GHC.Tc.TyCl,
+Note [Generalising in tcTyFamInstEqnGuts].
+
+A more philosophical perspective is that, in general, a TauTv is both defaultable
+and unifiable. Defaultability makes it less polymorphic, while unifiability makes
+it more polymorphic. In contrast, a skolem is neither defaultable nor unifiable.
+In this sense, TauTv is simultaneously less polymorphic and more polymorphic than
+a skolem. Meanwhile, NoDefTauTv can be strictly more polymorphic than a skolem.
+
+NoDefTauTv is introduced to solve this problem.
+
+NB. Should we default `_` in general if XNoPolyKind is on?
 -}
 
 {- Note [TyVarTv]
@@ -1765,7 +1796,6 @@ Note [Deterministic UniqFM] in GHC.Types.Unique.DFM.
 -}
 
 quantifyTyVars :: SkolemInfo
-               -> NonStandardDefaultingStrategy
                -> CandidatesQTvs   -- See Note [Dependent type variables]
                                    -- Already zonked
                -> TcM [TcTyVar]
@@ -1776,7 +1806,7 @@ quantifyTyVars :: SkolemInfo
 -- invariants on CandidateQTvs, we do not have to filter out variables
 -- free in the environment here. Just quantify unconditionally, subject
 -- to the restrictions in Note [quantifyTyVars].
-quantifyTyVars skol_info ns_strat dvs
+quantifyTyVars skol_info dvs
        -- short-circuit common case
   | isEmptyCandidates dvs
   = do { traceTc "quantifyTyVars has nothing to quantify" empty
@@ -1784,10 +1814,9 @@ quantifyTyVars skol_info ns_strat dvs
 
   | otherwise
   = do { traceTc "quantifyTyVars {"
-           ( vcat [ text "ns_strat =" <+> ppr ns_strat
-                  , text "dvs =" <+> ppr dvs ])
+           ( vcat [ text "dvs =" <+> ppr dvs ])
 
-       ; undefaulted <- defaultTyVars ns_strat dvs
+       ; undefaulted <- defaultTyVars dvs
        ; final_qtvs  <- liftZonkM $ mapMaybeM zonk_quant undefaulted
 
        ; traceTc "quantifyTyVars }"
@@ -1876,19 +1905,16 @@ defaultTyVar def_strat tv
   = return False
 
   | isRuntimeRepVar tv
-  , default_ns_vars
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; liftZonkM $ writeMetaTyVar tv liftedRepTy
        ; return True }
 
   | isLevityVar tv
-  , default_ns_vars
   = do { traceTc "Defaulting a Levity var to Lifted" (ppr tv)
        ; liftZonkM $ writeMetaTyVar tv liftedDataConTy
        ; return True }
 
   | isMultiplicityVar tv
-  , default_ns_vars
   = do { traceTc "Defaulting a Multiplicity var to Many" (ppr tv)
        ; liftZonkM $ writeMetaTyVar tv manyDataConTy
        ; return True }
@@ -1911,8 +1937,6 @@ defaultTyVar def_strat tv
   = return False
 
   where
-    default_ns_vars :: Bool
-    default_ns_vars = defaultNonStandardTyVars def_strat
     default_kind_var :: TyVar -> TcM Bool
        -- defaultKindVar is used exclusively with -XNoPolyKinds
        -- See Note [Defaulting with -XNoPolyKinds]
@@ -1943,14 +1967,13 @@ defaultTyVar def_strat tv
 --  - 'Multiplicity' tyvars default to 'Many'
 --  - 'Type' tyvars from dv_kvs default to 'Type', when -XNoPolyKinds
 --    (under -XNoPolyKinds, non-defaulting vars in dv_kvs is an error)
-defaultTyVars :: NonStandardDefaultingStrategy
-              -> CandidatesQTvs    -- ^ all candidates for quantification
+defaultTyVars :: CandidatesQTvs    -- ^ all candidates for quantification
               -> TcM [TcTyVar]     -- ^ those variables not defaulted
-defaultTyVars ns_strat dvs
+defaultTyVars dvs
   = do { poly_kinds <- xoptM LangExt.PolyKinds
        ; let
            def_tvs, def_kvs :: DefaultingStrategy
-           def_tvs = NonStandardDefaulting ns_strat
+           def_tvs = NonStandardDefaulting
            def_kvs | poly_kinds = def_tvs
                    | otherwise  = DefaultKindVars
              -- As -XNoPolyKinds precludes polymorphic kind variables, we default them.
@@ -2132,7 +2155,7 @@ doNotQuantifyTyVars dvs where_found
 
   | otherwise
   = do { traceTc "doNotQuantifyTyVars" (ppr dvs)
-       ; undefaulted <- defaultTyVars DefaultNonStandardTyVars dvs
+       ; undefaulted <- defaultTyVars dvs
           -- could have regular TyVars here, in an associated type RHS, or
           -- bound by a type declaration head. So filter looking only for
           -- metavars. e.g. b and c in `class (forall a. a b ~ a c) => C b c`
