@@ -404,7 +404,6 @@ import GHC.Stg.Syntax
 import GHC.Stg.Utils
 import GHC.Stg.Make
 import GHC.Core.Type
-import GHC.Builtin.Types.Prim (intPrimTy)
 import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
@@ -1194,9 +1193,6 @@ tagAltTy i
 
 tagTyArg :: StgArg -> Type
 tagTyArg x = stgArgType x
-
-tagTy :: Id -> Type
-tagTy i = idType i
 
 voidArg :: StgArg
 voidArg = StgVarArg voidPrimId
