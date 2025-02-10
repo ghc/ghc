@@ -1539,4 +1539,3 @@ runTcPluginSolvers solvers all_cts
       CtGiven  {} -> (ct:givens, wanteds)
       CtWanted {} -> (givens, (ev,ct):wanteds)
 
-

@@ -38,4 +38,3 @@ instance Outputable PkgQual where
     ThisPkg u  -> doubleQuotes (ppr u)
     OtherPkg u -> doubleQuotes (ppr u)
 
-

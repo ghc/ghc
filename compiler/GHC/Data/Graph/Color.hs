@@ -380,5 +380,3 @@ selectColor colors graph u
 
    in   chooseColor
 
-
-

@@ -175,4 +175,3 @@ checkArgStatic msg MarkedStrict arg = whenCheckTags $
           then return ()
           else pprPanic "Arg not tagged as expected" (ppr msg <+> ppr arg)
 
-

@@ -14,4 +14,3 @@ data SptEntry = SptEntry Id Fingerprint
 instance Outputable SptEntry where
   ppr (SptEntry id fpr) = ppr id <> colon <+> ppr fpr
 
-
