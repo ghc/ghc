@@ -295,6 +295,9 @@ buildGhcStage booting opts cabal ghc0 dst = do
         | otherwise = 
            [ "ghc-bin:ghc"
            , "ghc-pkg:ghc-pkg"
+           , "genprimopcode:genprimopcode"
+           , "deriveConstants:deriveConstants"
+           , "genapply:genapply"
            , "unlit:unlit"
            , "hsc2hs:hsc2hs"
            , "hp2ps:hp2ps"
@@ -347,6 +350,12 @@ buildGhcStage booting opts cabal ghc0 dst = do
   copy_bin "ghc-pkg:ghc-pkg" "ghc-pkg"
   copy_bin "unlit:unlit"     "unlit"
   copy_bin "hsc2hs:hsc2hs"   "hsc2hs"
+  -- always install these tools: they are needed to build the ghc library (e.g.
+  -- for a different target)
+  copy_bin "deriveConstants:deriveConstants"     "deriveConstants"
+  copy_bin "genprimopcode:genprimopcode"         "genprimopcode"
+  copy_bin "genapply:genapply"                   "genapply"
+
   createDirectoryIfMissing True (dst </> "lib")
   cp (src </> "utils/hsc2hs/data/template-hsc.h") (dst </> "lib/template-hsc.h")
 
@@ -355,9 +364,6 @@ buildGhcStage booting opts cabal ghc0 dst = do
     copy_bin "hpc-bin:hpc"   "hpc"
 
   when booting $ do
-    copy_bin "deriveConstants:deriveConstants"     "deriveConstants"
-    copy_bin "genprimopcode:genprimopcode"         "genprimopcode"
-    copy_bin "genapply:genapply"                   "genapply"
     copy_bin "ghc-toolchain-bin:ghc-toolchain-bin" "ghc-toolchain"
 
   -- initialize empty global package database
@@ -455,8 +461,6 @@ buildBootLibraries :: Cabal -> Ghc -> GhcPkg -> DeriveConstants -> GenApply -> G
 buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst = do
   src <- makeAbsolute (dst </> "src")
   prepareGhcSources opts src
-
-  msg "  - Building boot libraries..."
 
   -- Build the RTS
   src_rts <- makeAbsolute (src </> "libraries/rts")
