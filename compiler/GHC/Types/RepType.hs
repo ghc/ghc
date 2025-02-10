@@ -233,7 +233,8 @@ ubxSumRepType constrs0
       -- constructors start at 1 (XXX is this correct?)
       tag_slot | length constrs0 < 256        = Word8Slot
                | length constrs0 < 65536      = Word16Slot
-               | length constrs0 < 4294967296 = Word32Slot
+--                | length constrs0 < 4294967296 = Word32Slot
+               | length constrs0 < 2147483647 = Word32Slot -- XXX temporary for 32 bit platforms
                | otherwise                    = WordSlot
 
       sumRep = tag_slot :| combine_alts (map rep constrs0)
