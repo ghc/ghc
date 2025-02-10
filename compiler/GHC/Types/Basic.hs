@@ -116,8 +116,7 @@ module GHC.Types.Basic (
 
         TyConFlavour(..), TypeOrData(..), NewOrData(..), tyConFlavourAssoc_maybe,
 
-        NonStandardDefaultingStrategy(..),
-        DefaultingStrategy(..), defaultNonStandardTyVars,
+        DefaultingStrategy(..),
 
         ForeignSrcLang (..)
    ) where
@@ -2334,19 +2333,6 @@ GHC.Iface.Type.defaultIfaceTyVarsOfKind
 
 -}
 
--- | Specify whether to default type variables of kind 'RuntimeRep'/'Levity'/'Multiplicity'.
-data NonStandardDefaultingStrategy
-  -- | Default type variables of the given kinds:
-  --
-  --   - default 'RuntimeRep' variables to 'LiftedRep'
-  --   - default 'Levity' variables to 'Lifted'
-  --   - default 'Multiplicity' variables to 'Many'
-  = DefaultNonStandardTyVars
-  -- | Try not to default type variables of the kinds 'RuntimeRep'/'Levity'/'Multiplicity'.
-  --
-  -- Note that these might get defaulted anyway, if they are kind variables
-  -- and `-XNoPolyKinds` is enabled.
-  | TryNotToDefaultNonStandardTyVars
 
 -- | Specify whether to default kind variables, and type variables
 -- of kind 'RuntimeRep'/'Levity'/'Multiplicity'.
@@ -2362,19 +2348,12 @@ data DefaultingStrategy
   --
   -- Usually, we pass this option when -XNoPolyKinds is enabled.
   = DefaultKindVars
-  -- | Default (or don't default) non-standard variables, of kinds
+  -- | Default non-standard variables, of kinds
   -- 'RuntimeRep', 'Levity' and 'Multiplicity'.
-  | NonStandardDefaulting NonStandardDefaultingStrategy
+  | NonStandardDefaulting
 
-defaultNonStandardTyVars :: DefaultingStrategy -> Bool
-defaultNonStandardTyVars DefaultKindVars                                          = True
-defaultNonStandardTyVars (NonStandardDefaulting DefaultNonStandardTyVars)         = True
-defaultNonStandardTyVars (NonStandardDefaulting TryNotToDefaultNonStandardTyVars) = False
 
-instance Outputable NonStandardDefaultingStrategy where
-  ppr DefaultNonStandardTyVars         = text "DefaultOnlyNonStandardTyVars"
-  ppr TryNotToDefaultNonStandardTyVars = text "TryNotToDefaultNonStandardTyVars"
 
 instance Outputable DefaultingStrategy where
   ppr DefaultKindVars            = text "DefaultKindVars"
-  ppr (NonStandardDefaulting ns) = text "NonStandardDefaulting" <+> ppr ns
+  ppr NonStandardDefaulting      = text "NonStandardDefaulting"
