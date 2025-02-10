@@ -40,3 +40,12 @@ jobs:
 
     - name: Build the bindist
       run: make
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: bindist
+        path: _build/bindist
+
+    - name: Run the testsuite
+      run: make test
