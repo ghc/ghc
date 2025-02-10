@@ -11,5 +11,5 @@ $(CABAL):
 clean:
 	rm -rf _build
 
-test:
+test: all
 	TEST_HC=`pwd`/_build/bindist/bin/ghc make -C testsuite/tests test

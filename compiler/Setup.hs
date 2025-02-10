@@ -98,7 +98,13 @@ ghcAutogen verbosity lbi@LocalBuildInfo{pkgDescrFile,withPrograms,componentNameM
         Nothing -> error "no target os in settings"
         Just os -> os
   createDirectoryIfMissingVerbose verbosity True (takeDirectory platformConstantsPath)
+#if MIN_VERSION_Cabal(3,15,0)
+  -- temp files are now always created in system temp directory
+  -- (cf 8161f5f99dbe5d6c7564d9e163754935ddde205d)
+  withTempFile "Constants_tmp.hs" $ \tmp h -> do
+#else
   withTempFile (takeDirectory platformConstantsPath) "Constants_tmp.hs" $ \tmp h -> do
+#endif
     hClose h
     callProcess "deriveConstants" ["--gen-haskell-type","-o",tmp,"--target-os",targetOS]
     renameFile tmp platformConstantsPath
