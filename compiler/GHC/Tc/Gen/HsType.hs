@@ -2402,8 +2402,7 @@ kcCheckDeclHeader_cusk name flav
              -- skolemise and then quantify over.  We do not include spec_req_tvs
              -- because they are /already/ skolems
 
-       ; inferred <- quantifyTyVars skol_info DefaultNonStandardTyVars $
-                     candidates `delCandidates` spec_req_tkvs
+       ; inferred <- quantifyTyVars skol_info $ candidates `delCandidates` spec_req_tkvs
                      -- NB: 'inferred' comes back sorted in dependency order
 
        ; (scoped_kvs, tc_bndrs, res_kind) <- liftZonkM $
@@ -3765,7 +3764,7 @@ kindGeneralizeSome skol_info wanted kind_or_type
          vcat [ text "type:" <+> ppr kind_or_type
               , text "dvs:" <+> ppr dvs
               , text "filtered_dvs:" <+> ppr filtered_dvs ]
-       ; quantifyTyVars skol_info DefaultNonStandardTyVars filtered_dvs }
+       ; quantifyTyVars skol_info filtered_dvs }
 
 filterConstrainedCandidates
   :: WantedConstraints    -- Don't quantify over variables free in these
@@ -3793,7 +3792,7 @@ kindGeneralizeAll :: SkolemInfo -> TcType -> TcM [KindVar]
 kindGeneralizeAll skol_info kind_or_type
   = do { traceTc "kindGeneralizeAll" (ppr kind_or_type)
        ; dvs <- candidateQTyVarsOfKind kind_or_type
-       ; quantifyTyVars skol_info DefaultNonStandardTyVars dvs }
+       ; quantifyTyVars skol_info dvs }
 
 -- | Specialized version of 'kindGeneralizeSome', but where no variables
 -- can be generalized, but perhaps some may need to be promoted.
