@@ -79,10 +79,11 @@ main = do
   -- easier for us to nuke the stage1 directory to remove only stage1's built
   -- libs without nuking the stage1 compiler which is slow to build.
   createDirectoryIfMissing True "_build/stage1/bin"
+  createDirectoryIfMissing True "_build/stage1/lib"
   cp "_build/stage0/bin/ghc" "_build/stage1/bin/ghc"
   cp "_build/stage0/bin/ghc-pkg" "_build/stage1/bin/ghc-pkg"
   cp "_build/stage0/bin/unlit" "_build/stage1/bin/unlit"
-  createDirectoryIfMissing True "_build/stage1/lib"
+  cp "_build/stage0/bin/hsc2hs" "_build/stage1/bin/hsc2hs"
   cp "_build/stage0/lib/settings" "_build/stage1/lib/settings"
   cp "_build/stage0/lib/template-hsc.h" "_build/stage1/lib/template-hsc.h"
 
@@ -93,18 +94,24 @@ main = do
 
   -- Reuse stage1 settings for stage2 and copy stage1's built boot package for
   -- stage2 to use.
+  createDirectoryIfMissing True "_build/stage2/lib/"
+  cp "_build/stage1/pkgs/*" "_build/stage2/pkgs"
+  cp "_build/stage1/lib/settings" "_build/stage2/lib/settings"
+
   -- TODO: in the future we want to generate different settings for cross
   -- targets and build boot libraries with stage2 using these settings. In any
   -- case, we need non-cross boot packages to build plugins for use with
   -- -fplugin-library.
-  createDirectoryIfMissing True "_build/stage2/lib/"
-  cp "_build/stage1/pkgs/*" "_build/stage2/pkgs"
-  cp "_build/stage1/pkgs/package.cache" "_build/stage2/pkgs/package.cache"
-     -- copy package.cache last to make the date younger than other files,
-     -- otherwise we get a load of warnings like this:
-     --   WARNING: cache is out of date: {..}/_build/stage2/lib/../pkgs/package.cache
-     --   ghc will see an old view of this package db. Use 'ghc-pkg recache' to fix.
-  cp "_build/stage1/lib/settings" "_build/stage2/lib/settings"
+
+
+  -- Finally create bindist directory
+  msg "Creating bindist"
+  createDirectoryIfMissing True "_build/bindist/lib/"
+  createDirectoryIfMissing True "_build/bindist/bin/"
+  createDirectoryIfMissing True "_build/bindist/pkgs/"
+  cp "_build/stage2/bin/*" "_build/bindist/bin/"
+  cp "_build/stage2/lib/*" "_build/bindist/lib/"
+  cp "_build/stage2/pkgs/*" "_build/bindist/pkgs/"
 
   msg "Done"
 
@@ -863,8 +870,13 @@ runGenApply (GenApply f) = proc f
 runGenPrimop :: GenPrimop -> [String] -> CreateProcess
 runGenPrimop (GenPrimop f) = proc f
 
+-- | Copy
+--
+-- Recursively, force overwrite, and preserve timestamps (important for package
+-- dbs)
 cp :: String -> String -> IO ()
-cp src dst = void (readCreateProcess (shell $ "cp -rf " ++ src ++ " " ++ dst) "")
+cp src dst = void (readCreateProcess (shell $ "cp -rfp " ++ src ++ " " ++ dst) "")
+
 
 makeCabalProject :: FilePath -> [String] -> IO ()
 makeCabalProject path xs = writeFile path $ unlines (xs ++ common)
