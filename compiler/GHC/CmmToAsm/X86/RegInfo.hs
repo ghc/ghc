@@ -68,4 +68,3 @@ normalRegColors platform =
 --             ,"#afafaf","#b6b6b6","#bdbdbd","#c4c4c4","#cbcbcb"
 --             ,"#d2d2d2","#d9d9d9","#e0e0e0"]
 
-

@@ -57,4 +57,3 @@ instance Binary PkgQual where
       2 -> do u <- get bh
               return (OtherPkg u)
       _ -> fail "instance Binary PkgQual: Invalid tag"
-

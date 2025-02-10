@@ -49,4 +49,3 @@ instance NFData ForAllTyFlag where
   rnf (Invisible spec) = rnf spec
   rnf Required = ()
 
-

@@ -128,4 +128,3 @@ hfIsLcl hf@(HoleFit {}) = case hfCand hf of
                             NameHFCand _  -> False
                             GreHFCand gre -> gre_lcl gre
 
-
