@@ -97,6 +97,89 @@ expandToks s (t : ts) = t : expandToks s ts
 
 -- ---------------------------------------------------------------------
 
+{-
+https://timsong-cpp.github.io/cppwp/n4140/cpp#replace-11
+
+The sequence of preprocessing tokens bounded by the outside-most
+matching parentheses forms the list of arguments for the function-like
+macro. The individual arguments within the list are separated by comma
+preprocessing tokens, but comma preprocessing tokens between matching
+inner parentheses do not separate arguments.
+-}
+
+{- | Look for possible arguments to a macro expansion.
+The only thing we look for are commas, open parens, and close parens.
+-}
+getExpandArgs :: [Token] -> (Maybe [[Token]], [Token])
+getExpandArgs ts =
+  case pArgs ts of
+    Left err -> error $ err
+    Right r -> r
+
+pArgs :: [Token] -> Either String (Maybe [[Token]], [Token])
+pArgs (TOpenParen _: ts) = do
+  (args, rest) <- pArgsList ts
+  case rest of
+    [] -> return (args, rest)
+    TCloseParen _:rest' -> return (args, rest')
+    _ -> Left $ "expected ')', got: " ++ show rest
+pArgs ts = Right (Nothing, ts)
+
+pArgsList :: [Token] -> Either String (Maybe [[Token]], [Token])
+pArgsList ts = do
+  (arg,rest) <- dArg ts
+  case rest of
+    [] -> return (Just [arg], rest)
+    TCloseParen _:_ -> return (Just [arg], rest)
+    TComma _:rest1 -> do
+      (args,rest2) <- pArgsList rest1
+      return (Just [arg] <> args,rest2)
+    _ -> Left $ "expected ',' or ')', got: " ++ show rest
+
+-- An arg is
+--  sequence of non-comma tokens, ending with ',' or ')'
+--  within that, (', anything, ')', possibly nested
+
+dArg :: [Token] -> Either String ([Token], [Token])
+dArg [] = Left "Empty input"
+dArg (t:ts) =
+  case t of
+    TComma _ -> Left $ "Unexpected ',' giving empty arg:" ++ show (t:ts)
+    TCloseParen _ -> return ([],ts)
+    TOpenParen _ -> do
+      (arg,rest) <- dArg ts
+      (t',rest') <- accept ")" rest
+      return (t:arg ++ [t'],rest')
+    _ -> do
+      (arg,rest') <- dArg ts
+      return (t:arg,rest')
+
+
+accept :: String -> [Token] -> Either String (Token,[Token])
+accept _ [] = Left "Empty input"
+accept s (t:ts) =
+  if s == t_str t
+    then return (t,ts)
+    else Left $ "Expected '" ++ s ++ "', got '" ++ t_str t ++ "'"
+
+pArg :: [Token] -> Either String ([Token], [Token])
+pArg (t:ts)
+  | isOther t = return $ pOtherRest [t] ts
+pArg ts = Left $ "expecting an Other, got: " ++ show ts
+
+pOtherRest :: [Token] -> [Token] -> ([Token], [Token])
+pOtherRest acc (t:ts)
+  | isOther t = pOtherRest (t:acc) ts
+pOtherRest acc ts = (reverse acc, ts)
+
+isOther :: Token -> Bool
+isOther (TComma _) = False
+isOther (TOpenParen _) = False
+isOther (TCloseParen _) = False
+isOther _ = True
+
+-- ---------------------------------------------------------------------
+
 m0 :: (PpState, Output)
 m0 = do
     let (s0, _) = process initPpState "#define FOO 3"
@@ -129,3 +212,10 @@ m3 = cppLex "#define FOO(m1,m2,m) ((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) =
 
 m4 :: Either String [Token]
 m4 = cppLex "#if (m < 1)"
+
+
+m5 :: Either String (Maybe [[Token]], [Token])
+m5 = do
+  -- toks <- cppLex "(43,foo(a)) some other stuff"
+  toks <- cppLex "( foo(), 4 )"
+  return $ getExpandArgs toks
