@@ -756,7 +756,9 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "ghc-boot"
         , "ghc-heap"
         , "ghci"
-        -- , "ghc" -- FIXME: somehow it breaks the build
+        -- , "ghc" -- FIXME: somehow it breaks the build: genprimopcode isn't
+        -- found. Maybe we should put it in path somehow? Or add it as a
+        -- build-depends?
         ]
 
   msg "  - Building boot libraries..."
