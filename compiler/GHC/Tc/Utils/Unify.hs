@@ -30,13 +30,14 @@ module GHC.Tc.Utils.Unify (
   dsInstantiate,
 
   -- Various unifications
-  unifyType, unifyKind, unifyInvisibleType,
+  uType, unifyType, unifyKind, unifyInvisibleType,
   unifyExprType, unifyTypeAndEmit, promoteTcType,
   swapOverTyVars, touchabilityTest, checkTopShape, lhsPriority,
-  UnifyEnv(..), updUEnvLoc, setUEnvRole,
-  uType,
   mightEqualLater,
   makeTypeConcrete,
+
+  UnifyEnv(..), updUEnvLoc, setUEnvRole,
+  WhatUnifications(..), recordUnification, recordUnifications, minTcTyVarSetLevel,
 
   --------------------------------
   -- Holes
@@ -2290,16 +2291,118 @@ unifyTypeAndEmit :: TypeOrKind -> CtOrigin -> TcType -> TcType -> TcM CoercionN
 unifyTypeAndEmit t_or_k orig ty1 ty2
   = do { ref <- newTcRef emptyBag
        ; loc <- getCtLocM orig (Just t_or_k)
+       ; cur_lvl <- getTcLevel
+           -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
+           -- Here we don't know about given equalities; so we treat
+           -- /any/ level outside this one as untouchable.  Hence cur_lvl.
        ; let env = UE { u_loc = loc, u_role = Nominal
+                      , u_given_eq_lvl = cur_lvl
                       , u_rewriters = emptyRewriterSet  -- ToDo: check this
-                      , u_defer = ref, u_unified = Nothing }
+                      , u_defer = ref, u_what = WU_None }
 
        -- The hard work happens here
        ; co <- uType env ty1 ty2
 
+       -- Emit any deferred constraints
        ; cts <- readTcRef ref
-       ; unless (null cts) (emitSimples cts)
+       ; emitSimples cts
+
        ; return co }
+
+
+{- *********************************************************************
+*                                                                      *
+                 WhatUnifications
+*                                                                      *
+**********************************************************************-}
+
+{- Note [WhatUnifications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We record what unifications have taken plance via the `WhatUnifications` flag:
+
+    data WhatUnifications
+      = WU_Coarse (TcRef TcLevel)
+      | WU_Fine   (TcRef TcTyVarSet)
+
+* For WL_Coarse, the TcLevel records the outermost (smallest) level at which
+  a unification has taken place.   It starts at `infiniteTcLevel`.
+
+* For WL_Fine, the TcTyVarSet records all the unification variables that have
+  been unified. This is a bit more expensive to maintain, but sometimes needed.
+
+The `WhatUnifications` flag is carried by:
+
+* The eager unifier, `uType` in this module.  In its `UnifyEnv` we have
+     u_what :: WhatUnificaions
+  where WU_None means "don't bother to record anything", which is useful
+  when the unifier is called during constraint generation
+
+* The `TcS` monad.  In its `TcSEnv` we have
+     tcs_what :: WhatUnifications
+
+Why do all this?  You can tell by looking for calls of
+      reportFineGrainUnifications   :: TcS a -> TcS (TcTyVarSet, a)
+      reportCoarseGrainUnifications :: TcS a -> TcS (Bool, a)
+Notably:
+
+ * Fine-grain: when the solver uses `uType` it must do `kickOutAfterUnifications`
+   on all the tyvars that `uType` unifies.
+   See `GHC.Tc.Solver.Monad.wrapUnifierAndEmit`.
+
+* Fine-grain: similarly after nestedly-solving constraints arising from
+  functional depenencies.  See GHC.Tc.Solver.FunDeps.solveFunDeps
+
+* Coarse-grain: when the solver uses `solveImplications` to look at a tree of
+  implications, it should iterate the current implication if that call did any
+  unifications.  See Note [When to iterate the solver: unifications] in
+  GHC.Tc.Solver.Solve
+-}
+
+
+data WhatUnifications
+  = WU_None  -- Don't track unifications at all
+             -- Used during /constraint generation/ when we have
+             -- no need to track unifications at all
+
+  -- The next two are used during constraint /solving/
+  -- Here we need to track unifications to govern kick-out (fine-grain)
+  -- and iteration of the solver (coarse-grain)
+
+  | WU_Coarse              -- Track unifications coarsely
+      (TcRef TcLevel)      -- infiniteTcLevel <=> no unifications yet
+
+  | WU_Fine                -- Track each unification individually
+      (TcRef TcTyVarSet)
+
+instance Outputable WhatUnifications where
+  ppr (WU_Coarse {}) = text "WU_Coarse"
+  ppr (WU_Fine   {}) = text "WU_Fine"
+  ppr (WU_None   {}) = text "WU_None"
+
+minTcTyVarSetLevel :: TcTyVarSet -> TcLevel
+minTcTyVarSetLevel tvs
+  = nonDetStrictFoldVarSet (minTcLevel . tcTyVarLevel) infiniteTcLevel tvs
+
+recordUnification :: WhatUnifications -> TcTyVar -> TcM ()
+recordUnification what tv = recordUnifications what (unitVarSet tv)
+
+recordUnifications :: WhatUnifications -> TcTyVarSet -> TcM ()
+recordUnifications WU_None _tvs
+  = return ()
+
+recordUnifications (WU_Coarse lvl_ref) tvs
+  = do { unif_lvl <- readTcRef lvl_ref
+       ; let tv_lvl = minTcTyVarSetLevel tvs
+       ; if tv_lvl `deeperThanOrSame` unif_lvl
+         then do { traceTc "set-uni-flag: no-op" $
+                   vcat [ text "lvl" <+> ppr tv_lvl, text "unif_lvl" <+> ppr unif_lvl ]
+                 ; return () }
+         else do { traceTc "set-uni-flag" (ppr tv_lvl)
+                 ; writeTcRef lvl_ref tv_lvl } }
+
+recordUnifications (WU_Fine tvs_ref) tvs
+  = updTcRef tvs_ref (`unionVarSet` tvs)
+
 
 {-
 %************************************************************************
@@ -2316,7 +2419,7 @@ The eager unifier, `uType`, is called by
     via the wrappers `unifyType`, `unifyKind` etc
 
   * The constraint solver (e.g. in GHC.Tc.Solver.Equality),
-    via `GHC.Tc.Solver.Monad.wrapUnifierTcS`.
+    via `GHC.Tc.Solver.Monad.wrapUnifie`.
 
 `uType` runs in the TcM monad, but it carries a UnifyEnv that tells it
 what to do when unifying a variable or deferring a constraint. Specifically,
@@ -2339,16 +2442,20 @@ A job for the future.
 -}
 
 data UnifyEnv
-  = UE { u_role      :: Role
-       , u_loc       :: CtLoc
-       , u_rewriters :: RewriterSet
+  = UE { u_role         :: Role
+       , u_loc          :: CtLoc
+       , u_rewriters    :: RewriterSet
 
-         -- Deferred constraints
+       -- `u_given_eq_lvl` is just like the `inert_given_eq_lvl`
+       -- field of GHC.Tc.Solver.InertSet.InertCans
+       , u_given_eq_lvl :: TcLevel
+
+       -- Deferred constraints; ones that could not be
+       -- solved by "on the fly" unification
        , u_defer     :: TcRef (Bag Ct)
 
-         -- Which variables are unified;
-         -- if Nothing, we don't care
-       , u_unified :: Maybe (TcRef [TcTyVar])
+       -- Track which variables are unified
+       , u_what :: WhatUnifications
     }
 
 setUEnvRole :: UnifyEnv -> Role -> UnifyEnv
@@ -2632,7 +2739,7 @@ Deferred unifications are of the form
 or              x ~ ...
 where F is a type function and x is a type variable.
 E.g.
-        id :: x ~ y => x -> y
+       id :: x ~ y => x -> y
         id e = e
 
 involves the unification x = y. It is deferred until we bring into account the
@@ -2712,15 +2819,22 @@ uUnfilledVar2 :: UnifyEnv       -- Precondition: u_role==Nominal
                                 --    definitely not a /filled/ meta-tyvar
               -> TcTauType      -- Type 2, zonked
               -> TcM CoercionN
-uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
-  = do { cur_lvl <- getTcLevel
-           -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
-           -- Here we don't know about given equalities; so we treat
-           -- /any/ level outside this one as untouchable.  Hence cur_lvl.
-       ; if simpleUnifyCheck UC_OnTheFly cur_lvl tv1 ty2 /= SUC_CanUnify
-         then not_ok_so_defer cur_lvl
-         else
-    do { def_eqs <- readTcRef def_eq_ref  -- Capture current state of def_eqs
+uUnfilledVar2 env@(UE { u_defer = def_eq_ref, u_given_eq_lvl = given_eq_lvl })
+              swapped tv1 ty2
+  | simpleUnifyCheck UC_OnTheFly given_eq_lvl tv1 ty2 /= SUC_CanUnify
+  = -- Simple unification check fails, so defer
+    do { traceTc "uUnfilledVar2 not ok" $
+             vcat [ text "tv1:" <+> ppr tv1
+                  , text "ty2:" <+> ppr ty2
+                  , text "simple-unify-chk:" <+> ppr (simpleUnifyCheck UC_OnTheFly given_eq_lvl tv1 ty2)
+                  ]
+               -- Occurs check or an untouchable: just defer
+               -- NB: occurs check isn't necessarily fatal:
+               --     eg tv1 occurred in type family parameter
+       ; defer }
+
+  | otherwise
+  = do { def_eqs <- readTcRef def_eq_ref  -- Capture current state of def_eqs
 
        -- Attempt to unify kinds
        -- When doing so, be careful to preserve orientation;
@@ -2740,10 +2854,7 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
            -- Only proceed if the kinds match
            -- NB: tv1 should still be unfilled, despite the kind unification
            --     because tv1 is not free in ty2' (or, hence, in its kind)
-         then do { liftZonkM $ writeMetaTyVar tv1 ty2
-                 ; case u_unified env of
-                     Nothing -> return ()
-                     Just uref -> updTcRef uref (tv1 :)
+         then do { unifyTyVar env tv1 ty2
                  ; return (mkNomReflCo ty2) }  -- Unification is always Nominal
 
          else -- The kinds don't match yet, so defer instead.
@@ -2753,21 +2864,17 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
                      -- Do this dicarding by simply restoring the previous state
                      -- of def_eqs; a bit imperative/yukky but works fine.
                  ; defer }
-         }}
+         }
   where
     ty1 = mkTyVarTy tv1
     defer = unSwap swapped (uType_defer env) ty1 ty2
 
-    not_ok_so_defer cur_lvl =
-      do { traceTc "uUnfilledVar2 not ok" $
-             vcat [ text "tv1:" <+> ppr tv1
-                  , text "ty2:" <+> ppr ty2
-                  , text "simple-unify-chk:" <+> ppr (simpleUnifyCheck UC_OnTheFly cur_lvl tv1 ty2)
-                  ]
-               -- Occurs check or an untouchable: just defer
-               -- NB: occurs check isn't necessarily fatal:
-               --     eg tv1 occurred in type family parameter
-          ; defer }
+unifyTyVar :: UnifyEnv -> TcTyVar -> TcType -> TcM ()
+-- Actually do the unification, and record it in WhatUnifications
+unifyTyVar (UE { u_what = what_unifications }) tv ty
+  = do { liftZonkM $ writeMetaTyVar tv ty
+       ; traceTc "unifyTyVar" (ppr what_unifications $$ ppr tv)
+       ; recordUnification what_unifications tv }
 
 swapOverTyVars :: Bool -> TcTyVar -> TcTyVar -> Bool
 swapOverTyVars is_given tv1 tv2
@@ -3010,8 +3117,14 @@ The most important thing is that we want to put tyvars with
 the deepest level on the left.  The reason to do so differs for
 Wanteds and Givens, but either way, deepest wins!  Simple.
 
-* Wanteds.  Putting the deepest variable on the left maximise the
+* Wanteds.  Putting the deepest variable on the left maximises the
   chances that it's a touchable meta-tyvar which can be solved.
+  It also /crucial/ for skolem escape.  Consider
+      [W] alpha[7] ~ beta[8]
+      [W] beta[8] ~ a[8]       -- `a` is a skolem
+  If we unify alpha[7]:=beta[8], we will then happily unify
+  beta[8]:=a[8].  But that's wrong because now alpha[7]
+  is unified with an inner skolem a[8].  Disaster.
 
 * Givens. Suppose we have something like
      forall a[2]. b[1] ~ a[2] => beta[1] ~ a[2]
