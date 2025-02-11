@@ -6,7 +6,10 @@ module GHC.Tc.Solver.Dict (
   checkInstanceOK,
   matchLocalInst, chooseInstance,
   makeSuperClasses, mkStrictSuperClasses,
-  solveCallStack    -- For GHC.Tc.Solver
+  solveCallStack,    -- For GHC.Tc.Solver
+
+  -- * Functional dependencies
+  generateTopFunDeps
   ) where
 
 import GHC.Prelude
@@ -29,7 +32,7 @@ import GHC.Hs.Type( HsIPName(..) )
 
 import GHC.Core
 import GHC.Core.Type
-import GHC.Core.InstEnv     ( DFunInstType, ClsInst(..) )
+import GHC.Core.InstEnv     ( InstEnvs, DFunInstType, ClsInst(..) )
 import GHC.Core.Class
 import GHC.Core.Predicate
 import GHC.Core.Multiplicity ( scaledThing )
@@ -1630,6 +1633,34 @@ as the fundeps.
 #7875 is a case in point.
 -}
 
+-- "RAE": Consider moving out of "Solver"
+
+generateTopFunDeps :: InstEnvs -> Cts -> [FunDepEqn (CtLoc, RewriterSet)]
+generateTopFunDeps inst_evs cts = fun_deps
+  where
+    fun_deps = foldMap do_top cts -- "RAE" `unionBags` interactions
+
+    do_top (CDictCan (DictCt { di_ev = ev, di_cls = cls, di_tys = xis }))
+      = assert (not (isGiven ev)) $
+        improveFromInstEnv inst_evs mk_ct_loc cls xis
+      where
+        dict_pred   = mkClassPred cls xis
+        dict_loc    = ctEvLoc ev
+        dict_origin = ctLocOrigin dict_loc
+
+        mk_ct_loc :: ClsInst  -- The instance decl
+                  -> (CtLoc, RewriterSet)
+        mk_ct_loc ispec
+          = ( dict_loc { ctl_origin = FunDepOrigin2 dict_pred dict_origin
+                                                    inst_pred inst_loc }
+            , ctEvRewriters ev )
+          where
+            inst_pred = mkClassPred cls (is_tys ispec)
+            inst_loc  = getSrcSpan (is_dfun ispec)
+
+    do_top _other = []
+
+
 doLocalFunDepImprovement :: DictCt -> SolverStage ()
 -- Add wanted constraints from type-class functional dependencies.
 doLocalFunDepImprovement dict_ct@(DictCt { di_ev = work_ev, di_cls = cls })
@@ -2166,7 +2197,7 @@ mk_superclasses_of fuel rec_clss ev tvs theta cls tys
     rec_clss'  = rec_clss `extendNameSet` cls_nm
 
     mk_this_ct :: ExpansionFuel -> Ct
-    -- We can't use CNonCanonical here because we need to tradk the fuel
+    -- We can't use CNonCanonical here because we need to track the fuel
     mk_this_ct fuel | null tvs, null theta
                     = CDictCan (DictCt { di_ev = ev, di_cls = cls
                                        , di_tys = tys, di_pend_sc = fuel })

@@ -23,6 +23,7 @@ import GHC.Tc.Types
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc( mkGivenLoc )
+import GHC.Tc.Instance.FunDeps ( FunDepEqn(..) )
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
 import GHC.Tc.Utils.Monad   as TcM
@@ -41,6 +42,8 @@ import GHC.Types.Var.Set
 import GHC.Types.Basic ( IntWithInf, intGtLimit )
 
 import GHC.Data.Bag
+import GHC.Data.Maybe
+import GHC.Data.Pair
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -131,41 +134,91 @@ simplify_loop n limit definitely_redo_implications
          -- Note [The Unification Level Flag] in GHC.Tc.Solver.Monad
        ; maybe_simplify_again (n+1) limit unif_happened wc2 }
 
+data NextAction
+  = NoProgress               -- just return the wc that we started with
+  | Done WantedConstraints   -- did a little work, but now we're done; return
+  | TryAgain WantedConstraints Bool  -- try again with the given wc
+                                     -- the Bool days whether to definitely redo
+                                     -- implications
+
 maybe_simplify_again :: Int -> IntWithInf -> Bool
                      -> WantedConstraints -> TcS WantedConstraints
 maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
-  | n `intGtLimit` limit
-  = do { -- Add an error (not a warning) if we blow the limit,
-         -- Typically if we blow the limit we are going to report some other error
-         -- (an unsolved constraint), and we don't want that error to suppress
-         -- the iteration limit warning!
-         addErrTcS $ TcRnSimplifierTooManyIterations simples limit wc
-       ; return wc }
+  = do { result <- firstJustsM [ check_limit
+                               , check_unif_happened
+                               , try_expanding_superclasses
+                               , try_fundeps ]
+       ; case result of
+           Nothing                -> return wc
+           Just NoProgress        -> return wc
+           Just (Done updated_wc) -> return updated_wc
+           Just (TryAgain updated_wc redo_implics)
+             -> simplify_loop n limit redo_implics updated_wc }
+  where
+    check_limit
+      | n `intGtLimit` limit
+      = do { -- Add an error (not a warning) if we blow the limit,
+             -- Typically if we blow the limit we are going to report some other error
+             -- (an unsolved constraint), and we don't want that error to suppress
+             -- the iteration limit warning!
+             addErrTcS $ TcRnSimplifierTooManyIterations simples limit wc
+           ; return (Just NoProgress) }
 
-  | unif_happened
-  = simplify_loop n limit True wc
+      | otherwise
+      = return Nothing
 
-  | superClassesMightHelp wc    -- Returns False quickly if wc is solved
-  = -- We still have unsolved goals, and apparently no way to solve them,
-    -- so try expanding superclasses at this level, both Given and Wanted
-    do { pending_given <- getPendingGivenScs
-       ; let (pending_wanted, simples1) = getPendingWantedScs simples
-       ; if null pending_given && null pending_wanted
-           then return wc  -- After all, superclasses did not help
-           else
-    do { new_given  <- makeSuperClasses pending_given
-       ; new_wanted <- makeSuperClasses pending_wanted
-       ; solveSimpleGivens new_given -- Add the new Givens to the inert set
-       ; traceTcS "maybe_simplify_again" (vcat [ text "pending_given" <+> ppr pending_given
-                                               , text "new_given" <+> ppr new_given
-                                               , text "pending_wanted" <+> ppr pending_wanted
-                                               , text "new_wanted" <+> ppr new_wanted ])
-       ; simplify_loop n limit (not (null pending_given)) $
-         wc { wc_simple = simples1 `unionBags` listToBag new_wanted } } }
-         -- (not (null pending_given)): see Note [Superclass iteration]
+    check_unif_happened
+      | unif_happened
+      = return (Just (TryAgain wc True))
 
-  | otherwise
-  = return wc
+      | otherwise
+      = return Nothing
+
+    try_expanding_superclasses
+      | superClassesMightHelp wc    -- Returns False quickly if wc is solved
+      = -- We still have unsolved goals, and apparently no way to solve them,
+        -- so try expanding superclasses at this level, both Given and Wanted
+        do { pending_given <- getPendingGivenScs
+           ; let (pending_wanted, simples1) = getPendingWantedScs simples
+           ; if null pending_given && null pending_wanted
+               then return Nothing  -- After all, superclasses did not help
+               else
+        do { new_given  <- makeSuperClasses pending_given
+           ; new_wanted <- makeSuperClasses pending_wanted
+           ; solveSimpleGivens new_given -- Add the new Givens to the inert set
+           ; traceTcS "try_expanding_superclasses"
+               (vcat [ text "pending_given" <+> ppr pending_given
+                     , text "new_given" <+> ppr new_given
+                     , text "pending_wanted" <+> ppr pending_wanted
+                     , text "new_wanted" <+> ppr new_wanted ])
+           ; let updated_wc =
+                    wc { wc_simple = simples1 `unionBags` listToBag new_wanted }
+           ; return (Just (TryAgain updated_wc (not (null pending_given)))) }}
+             -- (not (null pending_given)): see Note [Superclass iteration]
+
+      | otherwise
+      = return Nothing
+
+    try_fundeps
+      = do { inst_envs <- getInstEnvs
+           ; let fundeps = generateTopFunDeps inst_envs simples
+           ; if not (null fundeps)
+             then do { fundep_cts <- concatMapM instantiate fundeps
+                     ; let new_simples = simples `unionBags` listToBag fundep_cts
+                           wc_with_fundeps = wc { wc_simple = new_simples }
+         -- False: don't iterate over implications unless there is a unification
+         -- see Note [Superclass iteration]
+                     ; return (Just (TryAgain wc_with_fundeps False)) }
+           ; else return Nothing }
+
+    instantiate (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = (loc, rewriters) })
+      = do { insted_eqs <- wrapTcS (instantiateFunDepEqn tvs (reverse eqs))
+           ; evs <- mapM (mk_ev loc rewriters) insted_eqs
+           ; return (map mkNonCanonical evs) }
+
+    mk_ev loc rewriters (Pair ty1 ty2)
+      -- discards the evidence
+      = fst <$> newWantedEq loc rewriters Nominal ty1 ty2
 
 {- Note [Superclass iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -186,6 +239,9 @@ Hence the definitely_redo_implications flag to simplify_loop.  It's usually
 True, but False in the case where the only reason to iterate is new Wanted
 superclasses.  In that case we check whether the new Wanteds actually led to
 any new unifications, and iterate the implications only if so.
+
+"RAE": Add comment here about fundeps also using this mechanism. And probably
+update name of Note.
 -}
 
 {- Note [Expanding Recursive Superclasses and ExpansionFuel]
@@ -1538,5 +1594,3 @@ runTcPluginSolvers solvers all_cts
     addOne (givens, wanteds) (ev,ct) = case ctEvidence ct of
       CtGiven  {} -> (ct:givens, wanteds)
       CtWanted {} -> (givens, (ev,ct):wanteds)
-
-

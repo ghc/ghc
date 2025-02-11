@@ -122,7 +122,9 @@ module GHC.Tc.Solver.Monad (
     pprEq,
 
     -- Enforcing invariants for type equalities
-    checkTypeEq, checkTouchableTyVarEq
+    checkTypeEq, checkTouchableTyVarEq,
+
+    instantiateFunDepEqn -- "RAE": remove me
 ) where
 
 import GHC.Prelude
@@ -1570,7 +1572,7 @@ track of
 
 The iteration is done in the simplify_loop/maybe_simplify_again loop in GHC.Tc.Solver.
 
-It helpful not to iterate unless there is a chance of progress.  #8474 is
+It is helpful not to iterate unless there is a chance of progress.  #8474 is
 an example:
 
   * There's a deeply-nested chain of implication constraints.
@@ -1936,31 +1938,32 @@ emitFunDepWanteds ev fd_eqns
 
     do_one :: UnifyEnv -> FunDepEqn (CtLoc, RewriterSet) -> TcM ()
     do_one uenv (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = (loc, rewriters) })
-      = do { eqs' <- instantiate_eqs tvs (reverse eqs)
+      = do { eqs' <- instantiateFunDepEqn tvs (reverse eqs)
                      -- (reverse eqs): See Note [Reverse order of fundep equations]
            ; uPairsTcM env_one eqs' }
       where
         env_one = uenv { u_rewriters = u_rewriters uenv S.<> rewriters
                        , u_loc       = loc }
 
-    instantiate_eqs :: [TyVar] -> [TypeEqn] -> TcM [TypeEqn]
-    instantiate_eqs tvs eqs
-      | null tvs
-      = return eqs
-      | otherwise
-      = do { TcM.traceTc "emitFunDepWanteds 2" (ppr tvs $$ ppr eqs)
-           ; subst <- instFlexiXTcM emptySubst tvs  -- Takes account of kind substitution
-           ; return [ Pair (substTyUnchecked subst' ty1) ty2
-                           -- ty2 does not mention fd_qtvs, so no need to subst it.
-                           -- See GHC.Tc.Instance.Fundeps Note [Improving against instances]
-                           --     Wrinkle (1)
-                    | Pair ty1 ty2 <- eqs
-                    , let subst' = extendSubstInScopeSet subst (tyCoVarsOfType ty1) ]
-                          -- The free vars of ty1 aren't just fd_qtvs: ty1 is the result
-                          -- of matching with the [W] constraint. So we add its free
-                          -- vars to InScopeSet, to satisfy substTy's invariants, even
-                          -- though ty1 will never (currently) be a poytype, so this
-                          -- InScopeSet will never be looked at.
+-- "RAE": Move to somewhere more appropriate
+instantiateFunDepEqn :: [TyVar] -> [TypeEqn] -> TcM [TypeEqn]
+instantiateFunDepEqn tvs eqs
+  | null tvs
+  = return eqs
+  | otherwise
+  = do { TcM.traceTc "emitFunDepWanteds 2" (ppr tvs $$ ppr eqs)
+       ; subst <- instFlexiXTcM emptySubst tvs  -- Takes account of kind substitution
+       ; return [ Pair (substTyUnchecked subst' ty1) ty2
+                       -- ty2 does not mention fd_qtvs, so no need to subst it.
+                       -- See GHC.Tc.Instance.Fundeps Note [Improving against instances]
+                       --     Wrinkle (1)
+                | Pair ty1 ty2 <- eqs
+                , let subst' = extendSubstInScopeSet subst (tyCoVarsOfType ty1) ]
+                      -- The free vars of ty1 aren't just fd_qtvs: ty1 is the result
+                      -- of matching with the [W] constraint. So we add its free
+                      -- vars to InScopeSet, to satisfy substTy's invariants, even
+                      -- though ty1 will never (currently) be a poytype, so this
+                      -- InScopeSet will never be looked at.
            }
 
 {-
