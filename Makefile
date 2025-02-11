@@ -1,7 +1,6 @@
 export CABAL := $(shell cabal list-bin -v0 --project-dir libraries/Cabal cabal-install:exe:cabal)
 
 all: $(CABAL)
-	cabal install happy
 	GHC=ghc-9.8.4 ./Build.hs
 
 cabal: $(CABAL)
