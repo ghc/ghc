@@ -1,6 +1,5 @@
-
 tcfail122.hs:9:9: error: [GHC-18872]
-    • Couldn't match kind ‘* -> *’ with ‘*’
+    • Couldn't match kind ‘*’ with ‘* -> *’
       When matching types
         d0 :: * -> *
         b :: *
@@ -17,3 +16,4 @@ tcfail122.hs:9:9: error: [GHC-18872]
                undefined :: forall (c :: (* -> *) -> *) (d :: * -> *). c d]
     • Relevant bindings include
         foo :: [a b] (bound at tcfail122.hs:8:1)
+

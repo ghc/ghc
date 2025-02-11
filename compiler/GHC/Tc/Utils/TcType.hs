@@ -45,6 +45,7 @@ module GHC.Tc.Utils.TcType (
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
   strictlyDeeperThan, deeperThanOrSame, sameDepthAs,
   tcTypeLevel, tcTyVarLevel, maxTcLevel, minTcLevel,
+  infiniteTcLevel,
 
   --------------------------------
   -- MetaDetails
@@ -802,8 +803,8 @@ Invariant (GivenInv) is not essential, but it is easy to guarantee, and
 it is a useful extra piece of structure.  It ensures that the Givens of
 an implication don't change because of unifications /at the same level/
 caused by Wanteds.  (Wanteds can also cause unifications at an outer
-level, but that will iterate the entire implication; see GHC.Tc.Solver.Monad
-Note [The Unification Level Flag].)
+level, but that will iterate the entire implication; see GHC.Tc.Solver.Solve
+Note [When to iterate the solver: unifications].)
 
 Givens can certainly contain meta-tyvars from /outer/ levels.  E.g.
    data T a where
@@ -817,8 +818,8 @@ arising from the pattern match will look like this:
    forall[2] . Eq alpha[1] => (alpha[1] ~ Bool)
 
 But if we unify alpha (which in this case we will), we'll iterate
-the entire implication via Note [The Unification Level Flag] in
-GHC.Tc.Solver.Monad.  That isn't true of unifications at the /ambient/
+the entire implication via Note [When to iterate the solver: unifications]
+in GHC.Tc.Solver.Solve.  That isn't true of unifications at the /ambient/
 level.
 
 It would be entirely possible to weaken (GivenInv), to LESS THAN OR
@@ -843,6 +844,12 @@ the constraint (C alpha[3]) disobeys WantedInv:
 We can unify alpha:=b in the inner implication, because 'alpha' is
 touchable; but then 'b' has escaped its scope into the outer implication.
 -}
+
+infiniteTcLevel :: TcLevel
+-- It is sometimes helpful to be able to say "infinitely deep"
+-- Particularly as a unit for `minTcLevel`
+-- Happily QLInstVar behaves like infinity :-)
+infiniteTcLevel = QLInstVar
 
 maxTcLevel :: TcLevel -> TcLevel -> TcLevel
 maxTcLevel (TcLevel a) (TcLevel b)

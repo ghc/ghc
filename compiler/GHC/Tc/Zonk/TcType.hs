@@ -717,17 +717,6 @@ zonkTidyOrigin env (KindEqOrigin ty1 ty2 orig t_or_k)
        ; (env2, ty2')  <- zonkTidyTcType env1 ty2
        ; (env3, orig') <- zonkTidyOrigin env2 orig
        ; return (env3, KindEqOrigin ty1' ty2' orig' t_or_k) }
-zonkTidyOrigin env (FunDepOrigin1 p1 o1 l1 p2 o2 l2)
-  = do { (env1, p1') <- zonkTidyTcType env  p1
-       ; (env2, o1') <- zonkTidyOrigin env1 o1
-       ; (env3, p2') <- zonkTidyTcType env2 p2
-       ; (env4, o2') <- zonkTidyOrigin env3 o2
-       ; return (env4, FunDepOrigin1 p1' o1' l1 p2' o2' l2) }
-zonkTidyOrigin env (FunDepOrigin2 p1 o1 p2 l2)
-  = do { (env1, p1') <- zonkTidyTcType env  p1
-       ; (env2, p2') <- zonkTidyTcType env1 p2
-       ; (env3, o1') <- zonkTidyOrigin env2 o1
-       ; return (env3, FunDepOrigin2 p1' o1' p2' l2) }
 zonkTidyOrigin env (InjTFOrigin1 pred1 orig1 loc1 pred2 orig2 loc2)
   = do { (env1, pred1') <- zonkTidyTcType env  pred1
        ; (env2, orig1') <- zonkTidyOrigin env1 orig1

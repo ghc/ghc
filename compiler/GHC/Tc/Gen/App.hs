@@ -122,8 +122,12 @@ Note [Instantiation variables are short lived]
       argument (see calls to `zonkTcType` and "Crucial step" in tcValArg)..
   See Section 4.3 "Applications and instantiation" of the paper.
 
-* The constraint solver never sees an instantiation variable [not quite true;
-  see below]
+  TL;DR: instantiation variables are short-lived. So it is fine for them
+         to have an infinite level (=QLInstVar) because they are monomorphised
+         before do anything like skolem-escape checks.
+
+* The constraint solver never sees an instantiation variable
+  [not quite true; see below]
 
   However, the constraint solver can see a meta-type-variable filled
   in with a polytype (#18987). Suppose

@@ -8,6 +8,7 @@ RepPolyRightSection.hs:14:11: error: [GHC-55287]
         • *
       Cannot unify ‘r’ with the type variable ‘q0’
       because the former is not a concrete ‘RuntimeRep’.
-    • In the expression: `g` undefined
+    • In the expression: g
+      In the expression: `g` undefined
       In an equation for ‘test2’: test2 = (`g` undefined)
 

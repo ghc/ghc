@@ -236,13 +236,11 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            vcat [text "Multiple warning declarations for" <+> quotes (ppr rdr_name),
                  text "also at " <+> ppr (getLocA d)]
-    TcRnSimplifierTooManyIterations simples limit wc
+    TcRnSimplifierTooManyIterations limit wc
       -> mkSimpleDecorated $
            hang (text "solveWanteds: too many iterations"
                    <+> parens (text "limit =" <+> ppr limit))
-                2 (vcat [ text "Unsolved:" <+> ppr wc
-                        , text "Simples:"  <+> ppr simples
-                        ])
+                2 (text "Unsolved:" <+> ppr wc)
     TcRnIllegalPatSynDecl rdrname
       -> mkSimpleDecorated $
            hang (text "Illegal pattern synonym declaration for" <+> quotes (ppr rdrname))
