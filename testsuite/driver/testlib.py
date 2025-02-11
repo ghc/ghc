@@ -2937,6 +2937,11 @@ def normalise_errmsg(s: str) -> str:
     # hpc executable is given ghc suffix
     s = re.sub('hpc-ghc', 'hpc', s)
 
+    # backtrace paths contain the package path when building with Hadrian
+    s = re.sub(r'called at libraries/\w+(-\w+)*/', 'called at ', s)
+    s = re.sub(r'called at utils/\w+(-\w+)*/', 'called at ', s)
+    s = re.sub(r'called at compiler/', 'called at ', s)
+
     # The inplace ghc's are called ghc-stage[123] to avoid filename
     # collisions, so we need to normalise that to just "ghc"
     s = re.sub('ghc-stage[123]', 'ghc', s)
