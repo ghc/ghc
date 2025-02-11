@@ -2278,7 +2278,12 @@ unifyTypeAndEmit :: TypeOrKind -> CtOrigin -> TcType -> TcType -> TcM CoercionN
 unifyTypeAndEmit t_or_k orig ty1 ty2
   = do { ref <- newTcRef emptyBag
        ; loc <- getCtLocM orig (Just t_or_k)
+       ; cur_lvl <- getTcLevel
+           -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
+           -- Here we don't know about given equalities; so we treat
+           -- /any/ level outside this one as untouchable.  Hence cur_lvl.
        ; let env = UE { u_loc = loc, u_role = Nominal
+                      , u_given_eq_lvl = cur_lvl
                       , u_rewriters = emptyRewriterSet  -- ToDo: check this
                       , u_defer = ref, u_unified = Nothing }
 
@@ -2327,11 +2332,14 @@ A job for the future.
 -}
 
 data UnifyEnv
-  = UE { u_role      :: Role
-       , u_loc       :: CtLoc
-       , u_rewriters :: RewriterSet
+  = UE { u_role         :: Role
+       , u_loc          :: CtLoc
+       , u_rewriters    :: RewriterSet
+       , u_given_eq_lvl :: TcLevel  -- Just like the inert_given_eq_lvl field
+                                    -- of GHC.Tc.Solver.InertSet.InertCans
 
-         -- Deferred constraints
+         -- Deferred constraints; ones that could not be
+         -- solved by "on the fly" unification
        , u_defer     :: TcRef (Bag Ct)
 
          -- Which variables are unified;
@@ -2698,15 +2706,22 @@ uUnfilledVar2 :: UnifyEnv       -- Precondition: u_role==Nominal
                                 --    definitely not a /filled/ meta-tyvar
               -> TcTauType      -- Type 2, zonked
               -> TcM CoercionN
-uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
-  = do { cur_lvl <- getTcLevel
-           -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
-           -- Here we don't know about given equalities; so we treat
-           -- /any/ level outside this one as untouchable.  Hence cur_lvl.
-       ; if simpleUnifyCheck UC_OnTheFly cur_lvl tv1 ty2 /= SUC_CanUnify
-         then not_ok_so_defer cur_lvl
-         else
-    do { def_eqs <- readTcRef def_eq_ref  -- Capture current state of def_eqs
+uUnfilledVar2 env@(UE { u_defer = def_eq_ref, u_given_eq_lvl = given_eq_lvl })
+              swapped tv1 ty2
+  | simpleUnifyCheck UC_OnTheFly given_eq_lvl tv1 ty2 /= SUC_CanUnify
+  = -- Simple unification check fails, so defer
+    do { traceTc "uUnfilledVar2 not ok" $
+             vcat [ text "tv1:" <+> ppr tv1
+                  , text "ty2:" <+> ppr ty2
+                  , text "simple-unify-chk:" <+> ppr (simpleUnifyCheck UC_OnTheFly given_eq_lvl tv1 ty2)
+                  ]
+               -- Occurs check or an untouchable: just defer
+               -- NB: occurs check isn't necessarily fatal:
+               --     eg tv1 occurred in type family parameter
+       ; defer }
+
+  | otherwise
+  = do { def_eqs <- readTcRef def_eq_ref  -- Capture current state of def_eqs
 
        -- Attempt to unify kinds
        -- When doing so, be careful to preserve orientation;
@@ -2739,21 +2754,10 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
                      -- Do this dicarding by simply restoring the previous state
                      -- of def_eqs; a bit imperative/yukky but works fine.
                  ; defer }
-         }}
+         }
   where
     ty1 = mkTyVarTy tv1
     defer = unSwap swapped (uType_defer env) ty1 ty2
-
-    not_ok_so_defer cur_lvl =
-      do { traceTc "uUnfilledVar2 not ok" $
-             vcat [ text "tv1:" <+> ppr tv1
-                  , text "ty2:" <+> ppr ty2
-                  , text "simple-unify-chk:" <+> ppr (simpleUnifyCheck UC_OnTheFly cur_lvl tv1 ty2)
-                  ]
-               -- Occurs check or an untouchable: just defer
-               -- NB: occurs check isn't necessarily fatal:
-               --     eg tv1 occurred in type family parameter
-          ; defer }
 
 swapOverTyVars :: Bool -> TcTyVar -> TcTyVar -> Bool
 swapOverTyVars is_given tv1 tv2
