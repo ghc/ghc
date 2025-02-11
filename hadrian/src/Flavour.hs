@@ -32,6 +32,7 @@ import qualified Data.Map as M
 import qualified Data.Set as Set
 import Packages
 import Flavour.Type
+import Flavour.DocTargets
 import Settings.Parser
 
 import Text.Parsec.Prim as P

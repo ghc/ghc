@@ -28,14 +28,18 @@ import qualified Rules.SourceDist
 import qualified Rules.Test
 import qualified UserSettings
 import qualified Progress
+import ExternalWorker
+import qualified Rules.ExternalWorker
 
 main :: IO ()
 main = do
     -- Provide access to command line arguments and some user settings through
     -- Shake's type-indexed map 'shakeExtra'.
     argsMap <- CommandLine.cmdLineArgsMap
+    external_worker <- initExternalWorker
     let extra = insertExtra UserSettings.buildProgressColour
               $ insertExtra UserSettings.successColour
+              $ insertExtra external_worker
               $ argsMap
 
         BuildRoot buildRoot = CommandLine.lookupBuildRoot argsMap
@@ -112,13 +116,14 @@ main = do
             Rules.Test.testRules
             Rules.topLevelTargets
             Rules.toolArgsTarget
+            Rules.ExternalWorker.externalWorkerRules
 
     -- This IORef is used to communicate the result of shake parsing
     -- command line options (which happens in shakeArgsOptionsWith, but
     -- isn't exposed to the user) to the exception handler, which uses the
     -- verbosity and colour information to decide how much of the error to display.
     shake_opts_var <- newIORef options
-    handleShakeException shake_opts_var $ shakeArgsOptionsWith options CommandLine.optDescrs $ \shake_opts _ targets -> do
+    handleShakeException external_worker shake_opts_var $ shakeArgsOptionsWith options CommandLine.optDescrs $ \shake_opts _ targets -> do
         writeIORef  shake_opts_var shake_opts
         let targets' = filter (not . null) $ removeKVs targets
         Environment.setupEnvironment
@@ -126,14 +131,14 @@ main = do
                                       then rules
                                       else want targets' >> withoutActions rules)
 
-handleShakeException :: IORef ShakeOptions -> IO a -> IO a
-handleShakeException shake_opts_var shake_run = do
+handleShakeException :: ExternalWorker -> IORef ShakeOptions -> IO a -> IO a
+handleShakeException ew shake_opts_var shake_run = do
   args <- getArgs
   -- Using withArgs here is a bit of a hack but the API doesn't allow another way
   -- See https://github.com/ndmitchell/shake/issues/811
   -- Passing --exception means shake throws an exception rather than
   -- catching ShakeException and displaying the error itself to the user.
-  catch (withArgs ("--exception" : args) $ shake_run) $ \(_e :: ShakeException) -> do
+  catch (finally (withArgs ("--exception" : args) $ shake_run) (terminateExternalWorker ew)) $ \(_e :: ShakeException) -> do
     shake_opts <- readIORef shake_opts_var
     let
       FailureColour col = lookupExtra red (shakeExtra shake_opts)

@@ -1,0 +1,106 @@
+#! /usr/bin/env python3
+
+import socket
+import sys
+import subprocess
+import threading
+import select
+
+def start_server(path, args, host, port):
+    ghc_process = None
+    try:
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.bind((host, port))
+        server_socket.listen(1)
+
+        print(f"Server listening on {host}:{port}")
+
+        ghc_process = subprocess.Popen(
+            [path, "--interactive", "-v0"] + args,  # Or your specific ghc command
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        def print_ghc_output():  # Separate thread for printing GHC output
+            while True:
+                ready_err, _, _ = select.select([ghc_process.stderr], [], [], 60) # Check stderr
+                if ready_err:
+                    stderr_output = ghc_process.stderr.readline().strip()
+                    if stderr_output: # Check if line is not empty
+                        print(f"GHC stderr:\n{stderr_output}")
+
+                if ghc_process.poll() is not None: # Check if GHC has terminated
+                    break # Exit loop if GHC is finished
+
+
+        ghc_output_thread = threading.Thread(target=print_ghc_output)
+        ghc_output_thread.daemon = True # Important: Allow main thread to exit
+        ghc_output_thread.start()
+
+        def handle_client(client_socket):
+            buffer = ""
+            try:
+                while True:
+                    full_req = ""
+                    data = client_socket.recv(4096).decode()  # Initial blocking receive
+                    print(data)
+                    if not data: break
+
+                    buffer += data
+
+                    while "\n" in buffer:  # Process messages while newlines are present
+                        request, buffer = buffer.split("\n", 1)  # Split at the first newline
+                        print(f"Received from client: {request}")
+
+                        ghc_process.stdin.write(request + "\n")
+                        ghc_process.stdin.write("import GHC.Prelude" + "\n")
+                        ghc_process.stdin.write("print \"I_AM_DONE\"" + "\n")
+                        ghc_process.stdin.flush()
+
+                        lines = []
+                        # Block until "ghci>" is seen in stdout (or timeout)
+                        while True:
+                            ready, _, _ = select.select([ghc_process.stdout], [], [], 1000000.0) # 30-second timeout
+                            if ready:
+                                line = ghc_process.stdout.readline()
+                                print(line)
+                                if "I_AM_DONE" in line:
+                                    client_socket.sendall(("msg:" + "".join(lines)).encode()) # Send OK after ghci>
+                                    break  # Exit the loop once "ghci>" is found.
+                                lines.append(line)
+                            else: # Timeout
+                                client_socket.sendall("Timeout waiting for ghci>".encode())
+                                break
+
+
+            except Exception as e:
+                print(f"Error handling client: {e}")
+            finally:
+                client_socket.close()
+                print("Client connection closed.")
+
+        while True:
+            client_socket, addr = server_socket.accept()
+            print(f"Connection from {addr}")
+
+            client_thread = threading.Thread(target=handle_client, args=(client_socket,))
+            client_thread.daemon = True
+            client_thread.start()
+
+    except Exception as e:
+        print(f"Error starting server: {e}")
+    finally:
+        if ghc_process:
+            ghc_process.terminate()
+            print("GHC process terminated.")
+
+if __name__ == "__main__":
+    host = "127.0.0.1"
+    port = 8080
+
+    path = sys.argv[1]
+    args = sys.argv[2:]
+    start_server(path, args, host, port)
+

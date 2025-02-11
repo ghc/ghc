@@ -45,6 +45,8 @@ import GHC.ResponseFile
 import GHC.Toolchain (Target(..))
 import qualified GHC.Toolchain as Toolchain
 import GHC.Toolchain.Program
+import CommandLine
+import {-# SOURCE #-} ExternalWorker
 
 -- | C compiler can be used in two different modes:
 -- * Compile or preprocess a source file.
@@ -201,31 +203,33 @@ instance NFData   Builder
 -- | Some builders are built by this very build system, in which case
 -- 'builderProvenance' returns the corresponding build 'Context' (which includes
 -- 'Stage' and GHC 'Package').
-builderProvenance :: Builder -> Maybe Context
-builderProvenance = \case
-    DeriveConstants  -> context stage0Boot deriveConstants
-    GenApply {}      -> context stage0Boot genapply
-    GenPrimopCode    -> context stage0Boot genprimopcode
-    Ghc _ (Stage0 {})-> Nothing
-    Ghc _ stage      -> context (predStage stage) ghc
-    GhcPkg _ (Stage0 {}) -> Nothing
-    GhcPkg _ s       -> context (predStage s) ghcPkg
-    Haddock _        -> context Stage1 haddock
-    Hsc2Hs _         -> context stage0Boot hsc2hs
-    Unlit            -> context stage0Boot unlit
+builderProvenance :: Builder -> Action FilePath
+builderProvenance b = case b of
+    DeriveConstants  -> programPath $ context stage0Boot deriveConstants
+    GenApply {}      -> programPath $ context stage0Boot genapply
+    GenPrimopCode    -> programPath $ context stage0Boot genprimopcode
+    Ghc _ (Stage0 {})-> systemBuilderPath b
+    Ghc _ stage      -> do
+      external_worker <- cmdExternalWorker
+      if external_worker
+        then clientPath (predStage stage)
+        else programPath $ context (predStage stage) ghc
+    GhcPkg _ (Stage0 {}) -> systemBuilderPath b
+    GhcPkg _ s       -> programPath $ context (predStage s) ghcPkg
+    Haddock _        -> programPath $ context Stage1 haddock
+    Hsc2Hs _         -> programPath $ context stage0Boot hsc2hs
+    Unlit            -> programPath $ context stage0Boot unlit
 
     -- Never used
-    Hpc              -> context Stage1 hpcBin
-    Hp2Ps            -> context stage0Boot hp2ps
-    _                -> Nothing
+    Hpc              -> programPath $ context Stage1 hpcBin
+    Hp2Ps            -> programPath $ context stage0Boot hp2ps
+    _                -> systemBuilderPath b
   where
-    context s p = Just $ vanillaContext s p
+    context s p = vanillaContext s p
 
 instance H.Builder Builder where
     builderPath :: Builder -> Action FilePath
-    builderPath builder = case builderProvenance builder of
-        Nothing      -> systemBuilderPath builder
-        Just context -> programPath context
+    builderPath builder = builderProvenance builder
 
     runtimeDependencies :: Builder -> Action [FilePath]
     runtimeDependencies = \case
@@ -243,6 +247,8 @@ instance H.Builder Builder where
             distro_mingw <- settingsFileSetting ToolchainSetting_DistroMinGW
             libffi_adjustors <- useLibffiForAdjustors
             use_system_ffi <- flag UseSystemFfi
+            external_ghc <- cmdExternalWorker
+            when external_ghc $ ensureExternalWorkerRunning (predStage st)
 
             return $ [ unlitPath ]
                   ++ [ root -/- mingwStamp | windowsHost, distro_mingw == "NO" ]

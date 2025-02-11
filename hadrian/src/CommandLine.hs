@@ -1,6 +1,6 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2, lookupSkipDepends,
-    cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdCompleteSetting,
+    cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdCompleteSetting, cmdExternalWorker,
     cmdDocsArgs, cmdUnitIdHash, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
     cmdPrefix, DocArgs(..), defaultDocArgs
     ) where
@@ -9,7 +9,7 @@ import Data.Either
 import qualified Data.HashMap.Strict as Map
 import Data.List.Extra
 import Development.Shake hiding (Normal)
-import Flavour (DocTargets, DocTarget(..))
+import Flavour.DocTargets (DocTargets, DocTarget(..))
 import Hadrian.Utilities hiding (buildRoot)
 import Settings.Parser
 import System.Console.GetOpt
@@ -28,6 +28,7 @@ data CommandLineArgs = CommandLineArgs
     , freeze2        :: Bool
     , skipDepends    :: Bool
     , unitIdHash     :: Bool
+    , externalWorker :: Bool
     , bignum         :: Maybe String
     , bignumCheck    :: Bool
     , progressInfo   :: ProgressInfo
@@ -48,6 +49,7 @@ defaultCommandLineArgs = CommandLineArgs
     , freeze2        = False
     , skipDepends    = False
     , unitIdHash     = False
+    , externalWorker = False
     , bignum         = Nothing
     , bignumCheck    = False
     , progressInfo   = Brief
@@ -139,6 +141,9 @@ readSkipDepends = Right $ \flags -> flags { skipDepends = True }
 
 readUnitIdHash :: Either String (CommandLineArgs -> CommandLineArgs)
 readUnitIdHash = Right $ \flags -> flags { unitIdHash = True }
+
+readExternalWorker :: Either String (CommandLineArgs -> CommandLineArgs)
+readExternalWorker = Right $ \flags -> flags { externalWorker = True }
 
 readProgressInfo :: String -> Either String (CommandLineArgs -> CommandLineArgs)
 readProgressInfo ms =
@@ -275,6 +280,8 @@ optDescrs =
       "Freeze Stage2 GHC."
     , Option [] ["hash-unit-ids"] (NoArg readUnitIdHash)
       "Include package hashes in unit ids."
+    , Option [] ["external-worker"] (NoArg readExternalWorker)
+      "Use the ghci worker for compiling stage1"
     , Option [] ["skip-depends"] (NoArg readSkipDepends)
       "Skip rebuilding dependency information."
     , Option [] ["bignum"] (OptArg readBignum "BACKEND")
@@ -362,6 +369,7 @@ cmdLineArgsMap = do
            $ insertExtra allSettings           -- Accessed by Settings
            $ insertExtra args Map.empty
 
+
 cmdLineArgs :: Action CommandLineArgs
 cmdLineArgs = userSetting defaultCommandLineArgs
 
@@ -397,6 +405,9 @@ cmdBignumCheck = bignumCheck <$> cmdLineArgs
 
 cmdProgressInfo :: Action ProgressInfo
 cmdProgressInfo = progressInfo <$> cmdLineArgs
+
+cmdExternalWorker :: Action Bool
+cmdExternalWorker = externalWorker <$> cmdLineArgs
 
 cmdDocsArgs :: Action DocTargets
 cmdDocsArgs = docTargets <$> cmdLineArgs

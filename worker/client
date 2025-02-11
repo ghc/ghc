@@ -1,0 +1,53 @@
+#! /usr/bin/env python3
+
+import socket
+import sys
+import select
+import shlex
+
+def send_message(host, port, message):
+    """Sends a message to the server."""
+    try:
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((host, port))
+        client_socket.sendall((message + "\n").encode())
+
+        full_response = ""
+        data = client_socket.recv(4096).decode()  # Initial blocking receive
+
+        full_response = data  # Start accumulating the response
+
+        # Consume any remaining data (non-blocking)
+        while True:
+            ready, _, _ = select.select([client_socket], [], [], 0) # Non-blocking check
+            if ready:
+                data = client_socket.recv(4096).decode()
+                if not data: # Connection closed
+                    break
+                full_response += data
+            else:
+                break # No more data available
+
+        client_socket.close()
+        return full_response
+
+    except ConnectionRefusedError:
+        print(f"Connection to {host}:{port} refused. Is the server running?")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+
+if __name__ == "__main__":
+    host = "127.0.0.1"
+    port = 8080
+    args = sys.argv[1:]
+    quoted_command = map (lambda x: "\"\"" if not x else x, args)
+    message = ":set args " + ' '.join(quoted_command)
+    response = send_message(host, port, message)
+    message = "import Main"
+    response = send_message(host, port, message)
+    message = "main"
+    response = send_message(host, port, message)
+    print(response[4:])

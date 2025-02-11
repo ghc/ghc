@@ -46,7 +46,9 @@ executable hadrian
                        , Expression
                        , Expression.Type
                        , Flavour
+                       , ExternalWorker
                        , Flavour.Type
+                       , Flavour.DocTargets
                        , Hadrian.Builder
                        , Hadrian.Builder.Ar
                        , Hadrian.Builder.Sphinx
@@ -97,6 +99,7 @@ executable hadrian
                        , Rules.SourceDist
                        , Rules.Test
                        , Rules.ToolArgs
+                       , Rules.ExternalWorker
                        , Settings
                        , Settings.Builders.Alex
                        , Settings.Builders.Cabal
@@ -173,6 +176,7 @@ executable hadrian
                        , base16-bytestring    >= 0.1.1 && < 1.1.0.0
                        , ghc-platform
                        , ghc-toolchain
+                       , process
     ghc-options:       -Wall
                        -Wincomplete-record-updates
                        -Wredundant-constraints

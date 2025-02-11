@@ -15,7 +15,7 @@ module Packages (
     ghcPackages, isGhcPackage,
 
     -- * Package information
-    crossPrefix, programName, nonHsMainPackage, programPath, timeoutPath,
+    crossPrefix, programName, nonHsMainPackage, programPath, timeoutPath, clientPath, serverPath
     ) where
 
 import Hadrian.Package
@@ -216,6 +216,16 @@ timeoutPath = "testsuite/timeout/install-inplace/bin/timeout" <.> exe
 -- | Some program packages should not be linked with Haskell main function.
 nonHsMainPackage :: Package -> Bool
 nonHsMainPackage = (`elem` [hp2ps, iserv, unlit, ghciWrapper])
+
+clientPath :: Stage -> Action FilePath
+clientPath stage = do
+  root <- buildRoot
+  return $ root -/- stageString stage -/- "external" -/- "client"
+
+serverPath :: Stage -> Action FilePath
+serverPath stage = do
+  root <- buildRoot
+  return $ root -/- stageString stage -/- "external" -/- "server"
 
 
 {-

@@ -16,7 +16,7 @@ ghcInGhciFlavour = defaultFlavour
     -- include the dynamic way when we have a dynamic host GHC, but just
     -- checking for Windows seems simpler for now.
     , libraryWays = pure (Set.fromList [vanilla]) <> pure (Set.fromList [ dynamic | not windowsHost ])
-    , rtsWays     = pure (Set.fromList [vanilla]) <> (targetSupportsThreadedRts ? pure (Set.fromList [threaded])) <> pure (Set.fromList [ dynamic | not windowsHost ])
+    , rtsWays     = pure (Set.fromList [vanilla]) <> (targetSupportsThreadedRts ? pure (Set.fromList [threaded])) <> pure (Set.fromList [ dynamic, threadedDynamic ])
     }
 
 ghciArgs :: Args
