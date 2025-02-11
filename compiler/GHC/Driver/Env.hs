@@ -159,7 +159,7 @@ used.
 The target code interpreter to use can be selected per session via the
 `hsc_interp` field of `HscEnv`. There may be no interpreter available at all, in
 which case Template Haskell and GHCi will fail to run. The interpreter to use is
-configured via command-line flags (in `GHC.setSessionDynFlags`).
+configured via command-line flags (in `GHC.setTopSessionDynFlags`).
 
 
 -}

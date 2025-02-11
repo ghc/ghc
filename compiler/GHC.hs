@@ -706,7 +706,7 @@ setTopSessionDynFlags dflags = do
   logger  <- getLogger
   lookup_cache  <- liftIO $ mkInterpSymbolCache
 
-  -- Interpreter
+  -- see Note [Target code interpreter]
   interp <- if
     -- Wasm dynamic linker
     | ArchWasm32 <- platformArch $ targetPlatform dflags
