@@ -52,6 +52,7 @@ jobs:
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }} # upload test results even if the testsuite failed to pass
       with:
         name: testsuite-results
         path: |
