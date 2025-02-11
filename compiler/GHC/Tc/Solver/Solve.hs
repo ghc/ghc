@@ -924,20 +924,19 @@ solveSimpleWanteds simples
     go n limit wc
       | n `intGtLimit` limit
       = failTcS $ TcRnSimplifierTooManyIterations simples limit wc
-     | isEmptyBag (wc_simple wc)
-     = return (n,wc)
+      | isEmptyBag (wc_simple wc)
+      = return (n,wc)
+      | otherwise
+      = do { -- Solve
+             wc1 <- solve_simple_wanteds wc
 
-     | otherwise
-     = do { -- Solve
-            wc1 <- solve_simple_wanteds wc
+             -- Run plugins
+           ; (rerun_plugin, wc2) <- runTcPluginsWanted wc1
 
-            -- Run plugins
-          ; (rerun_plugin, wc2) <- runTcPluginsWanted wc1
-
-          ; if rerun_plugin
-            then do { traceTcS "solveSimple going round again:" (ppr rerun_plugin)
-                    ; go (n+1) limit wc2 }   -- Loop
-            else return (n, wc2) }           -- Done
+           ; if rerun_plugin
+             then do { traceTcS "solveSimple going round again:" (ppr rerun_plugin)
+                     ; go (n+1) limit wc2 }   -- Loop
+             else return (n, wc2) }           -- Done
 
 
 solve_simple_wanteds :: WantedConstraints -> TcS WantedConstraints

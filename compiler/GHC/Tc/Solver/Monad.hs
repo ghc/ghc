@@ -2130,7 +2130,7 @@ checkTouchableTyVarEq ev lhs_tv rhs
        -- We don't want to flatten that (F tys)!
        | Just (TyFamLHS tc tys) <- canTyFamEqLHS_maybe rhs
        = if is_concrete_lhs_tv
-         then failCheckWith (cteProblem cteConcrete)
+         then return $ PuFail (cteProblem cteConcrete)
          else recurseIntoTyConApp arg_flags tc tys
        | otherwise
        = checkTyEqRhs flags rhs
@@ -2141,15 +2141,15 @@ checkTouchableTyVarEq ev lhs_tv rhs
 
     arg_flags = famAppArgFlags flags
 
-    break_wanted :: FamAppBreaker Ct
+    break_wanted :: FamAppBreaker TcM Ct
     break_wanted fam_app
       -- Occurs check or skolem escape; so flatten
       = do { let fam_app_kind = typeKind fam_app
-           ; reason <- checkPromoteFreeVars cteInsolubleOccurs
+           ; reason <- checkPromoteFreeVars DoPromotion cteInsolubleOccurs
                          (tyVarName lhs_tv) lhs_tv_lvl
                          (tyCoVarsOfType fam_app_kind)
            ; if not (cterHasNoProblem reason)  -- Failed to promote free vars
-             then failCheckWith reason
+             then return $ PuFail reason
              else
         do { new_tv_ty <-
               case lhs_tv_info of
@@ -2209,7 +2209,7 @@ checkTypeEq ev eq_rel lhs rhs
 
     arg_flags = famAppArgFlags given_flags
 
-    given_flags :: TyEqFlags (TcTyVar,TcType)
+    given_flags :: TyEqFlags TcM (TcTyVar,TcType)
     given_flags = TEF { tef_task    = notUnifying_TEFTask occ_prob lhs
                       , tef_fam_app = mkTEFA_Break ev eq_rel break_given
                       }
@@ -2245,7 +2245,7 @@ checkTypeEq ev eq_rel lhs rhs
     -- See Detail (7) of the Note
     cb_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
 
-mkTEFA_Break :: CtEvidence -> EqRel -> FamAppBreaker a -> TyEqFamApp a
+mkTEFA_Break :: CtEvidence -> EqRel -> FamAppBreaker m a -> TyEqFamApp m a
 mkTEFA_Break ev eq_rel breaker
   | NomEq <- eq_rel
   , not cycle_breaker_origin

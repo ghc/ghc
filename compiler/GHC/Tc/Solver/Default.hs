@@ -449,11 +449,11 @@ defaultEquality ct
 
            -- checkTyEqRhs: check that we can in fact unify lhs_tv := rhs_ty
            -- See Note [Defaulting equalities]
-           ; let task :: TEFTask
+           ; let task :: TEFTask TcM
                  task = unifyingLHSMetaTyVar_TEFTask lhs_tv (LC_Promote True)
                     -- LC_Promote: promote deeper unification variables (DE4)
                     -- LC_Promote True: ...including under type families (DE5)
-                 flags :: TyEqFlags ()
+                 flags :: TyEqFlags TcM ()
                  flags = TEF { tef_task    = task
                              , tef_fam_app = TEFA_Recurse }
            ; res :: PuResult () Reduction <- wrapTcS (checkTyEqRhs flags rhs_ty)

@@ -33,6 +33,7 @@ module GHC.Tc.Utils.Unify (
   swapOverTyVars, touchabilityAndShapeTest, checkTopShape, lhsPriority,
   UnifyEnv(..), updUEnvLoc, setUEnvRole,
   uType,
+  mightEqualLater,
   makeTypeConcrete,
 
   --------------------------------
@@ -46,8 +47,9 @@ module GHC.Tc.Utils.Unify (
   matchActualFunTy, matchActualFunTys,
 
   checkTyEqRhs, recurseIntoTyConApp,
-  PuResult(..), failCheckWith, okCheckRefl, mapCheck,
+  PuResult(..), okCheckRefl, mapCheck,
   TyEqFlags(..), TEFTask(..),
+  DoPromotion(..),
   notUnifying_TEFTask, unifyingLHSMetaTyVar_TEFTask,
   LevelCheck(..), TyEqFamApp(..), FamAppBreaker,
   famAppArgFlags,  checkPromoteFreeVars,
@@ -75,12 +77,15 @@ import GHC.Tc.Types.CtLoc( CtLoc, mkKindEqLoc, adjustCtLoc )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Zonk.TcType
 
+import GHC.Tc.Solver.InertSet
+
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs( isInjectiveInType )
 import GHC.Core.TyCo.Ppr( debugPprType {- pprTyVar -} )
 import GHC.Core.TyCon
 import GHC.Core.Coercion
+import GHC.Core.Unify
 import GHC.Core.Predicate( mkEqPredRole )
 import GHC.Core.Multiplicity
 import GHC.Core.Reduction
@@ -96,16 +101,20 @@ import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
-import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
 import GHC.Driver.DynFlags
+
 import GHC.Data.Bag
 import GHC.Data.FastString
+import GHC.Data.Maybe (firstJusts)
+import GHC.Data.Pair
 
 import Control.Monad
+import Data.Functor.Identity (Identity(..))
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe (maybeToList, isJust)
 import Data.Monoid as DM ( Any(..) )
 import qualified Data.Semigroup as S ( (<>) )
@@ -3084,33 +3093,27 @@ instance (Outputable a, Outputable b) => Outputable (PuResult a b) where
                         (vcat [ text "redn:" <+> ppr x
                               , text "cts:" <+> ppr cts ])
 
-pprPur :: PuResult a b -> SDoc
--- For debugging
-pprPur (PuFail prob) = text "PuFail:" <> ppr prob
-pprPur (PuOK {})     = text "PuOK"
+okCheckRefl :: TcType -> PuResult a Reduction
+okCheckRefl ty = PuOK emptyBag (mkReflRedn Nominal ty)
 
-okCheckRefl :: TcType -> TcM (PuResult a Reduction)
-okCheckRefl ty = return (PuOK emptyBag (mkReflRedn Nominal ty))
-
-failCheckWith :: CheckTyEqResult -> TcM (PuResult a b)
-failCheckWith p = return (PuFail p)
-
-mapCheck :: (x -> TcM (PuResult a Reduction))
+mapCheck :: Monad m
+         => (x -> m (PuResult a Reduction))
          -> [x]
-         -> TcM (PuResult a Reductions)
+         -> m (PuResult a Reductions)
 mapCheck f xs
   = do { (ress :: [PuResult a Reduction]) <- mapM f xs
        ; return (unzipRedns <$> sequenceA ress) }
          -- sequenceA :: [PuResult a Reduction] -> PuResult a [Reduction]
          -- unzipRedns :: [Reduction] -> Reductions
+{-# INLINEABLE mapCheck #-}
 
 -----------------------------
 -- | Options describing how to deal with a type equality
 -- in the pure unifier. See 'checkTyEqRhs'
-data TyEqFlags a
-  = TEF { tef_task     :: TEFTask
+data TyEqFlags m a
+  = TEF { tef_task     :: TEFTask m
            -- ^ LHS structure, and which checks to perform on the RHS
-        , tef_fam_app  :: TyEqFamApp a
+        , tef_fam_app  :: TyEqFamApp m a
             -- ^ How to deal with type family applications
         }
 
@@ -3118,7 +3121,7 @@ data TyEqFlags a
 -- for an equality @lhs ~# rhs@.
 --
 -- See Note [TEFTask].
-data TEFTask
+data TEFTask m
   -- | LHS is a type family application; we are not unifying.
   = TEFTyFam
     { tefTyFam_occursCheck :: CheckTyEqProblem
@@ -3130,15 +3133,18 @@ data TEFTask
   -- | LHS is a 'TyVar'.
   | TEFTyVar
     { tefTyVar_occursCheck    :: Maybe (Name, CheckTyEqProblem)
-       -- ^ Occurs check: LHS 'TyVar' 'Name',
-       -- and which 'CheckTyEqProblem' to report for occurs-check failures
-       -- (soluble or insoluble)
+        -- ^ Occurs check: LHS 'TyVar' 'Name',
+        -- and which 'CheckTyEqProblem' to report for occurs-check failures
+        -- (soluble or insoluble)
     , tefTyVar_levelCheck     :: Maybe (TcLevel, LevelCheck)
-          -- ^ Level check: LHS 'TyVar' 'TcLevel',
-          -- and which 'LevelCheck' to perform
+        -- ^ Level check: LHS 'TyVar' 'TcLevel',
+        -- and which 'LevelCheck' to perform
     , tefTyVar_concreteCheck  :: Maybe ConcreteTvOrigin
-          -- ^ Concreteness check: LHS 'TyVar' 'ConcreteTvOrigin'
-          -- to use for the check
+        -- ^ Concreteness check: LHS 'TyVar' 'ConcreteTvOrigin'
+        -- to use for the check
+    , tefTyVar_doPromotion    :: DoPromotion m
+        -- ^ Whether to do promotion (requiring the 'TcM' monad)
+        -- or to keep the logic pure
     }
 
 {- Note [TEFTask]
@@ -3181,7 +3187,7 @@ different checks; this is achieved using the 'TEFTyVar' constructor to 'TEFTask'
 -- | Create a "not unifying" 'TEFTask' from a 'CanEqLHS'.
 --
 -- See use-case (1) in Note [TEFTask].
-notUnifying_TEFTask :: CheckTyEqProblem -> CanEqLHS -> TEFTask
+notUnifying_TEFTask :: CheckTyEqProblem -> CanEqLHS -> TEFTask m
 notUnifying_TEFTask occ_prob = \case
   TyFamLHS tc tys ->
     TEFTyFam occ_prob tc tys
@@ -3190,6 +3196,7 @@ notUnifying_TEFTask occ_prob = \case
       { tefTyVar_occursCheck   = Just (tyVarName tv, occ_prob)
       , tefTyVar_levelCheck    = Nothing
       , tefTyVar_concreteCheck = Nothing
+      , tefTyVar_doPromotion   = NoPromotion
       }
     -- We need an occurs-check here, but no level check.
     -- See Note [Promotion and level-checking] wrinkle (W1)
@@ -3197,24 +3204,25 @@ notUnifying_TEFTask occ_prob = \case
 -- | Create "unifying" 'TEFTask' from a 'TyVarLHS'.
 --
 -- Invariant: the argument 'TyVar' is a 'MetaTv'.
-unifyingLHSMetaTyVar_TEFTask :: TyVar -> LevelCheck -> TEFTask
+unifyingLHSMetaTyVar_TEFTask :: TyVar -> LevelCheck -> TEFTask TcM
 unifyingLHSMetaTyVar_TEFTask lhs_tv lc =
   TEFTyVar
     { tefTyVar_occursCheck   = Just (tyVarName lhs_tv, cteInsolubleOccurs)
     , tefTyVar_levelCheck    = Just (tcTyVarLevel lhs_tv, lc)
     , tefTyVar_concreteCheck = isConcreteTyVar_maybe lhs_tv
+    , tefTyVar_doPromotion   = DoPromotion
     }
 
 -- | Do we want to perform a concreteness check in 'checkTyEqRhs'?
-tefTaskConcrete_maybe :: TEFTask -> Maybe ConcreteTvOrigin
+tefTaskConcrete_maybe :: TEFTask m -> Maybe ConcreteTvOrigin
 tefTaskConcrete_maybe (TEFTyFam {}) = Nothing
 tefTaskConcrete_maybe (TEFTyVar { tefTyVar_concreteCheck = conc }) = conc
 
-instance Outputable TEFTask where
+instance Outputable (TEFTask m) where
   ppr = \case
     TEFTyFam occ tc tys ->
       text "TEFTyFam" <+> ppr occ <+> ppr (mkTyConApp tc tys)
-    TEFTyVar mb_occ mb_lc mb_conc ->
+    TEFTyVar mb_occ mb_lc mb_conc prom ->
       text "TEFTyVar" <+> hcat (punctuate comma fields)
       where
         fields = [ text "OccursCheck:" <+> ppr tv | (tv, _) <- maybeToList mb_occ ]
@@ -3222,16 +3230,21 @@ instance Outputable TEFTask where
                  [ text "LevelCheck:" <+> ppr lc | lc <- maybeToList mb_lc ]
                    ++
                  [ text "ConcreteCheck" | isJust mb_conc ]
+                   ++
+                 [ text "Promote" | case prom of { DoPromotion -> True; NoPromotion -> False } ]
 
 -- | What to do when encountering a type-family application while processing
 -- a type equality in the pure unifier.
 --
 -- See Note [Family applications in canonical constraints]
-data TyEqFamApp a
-  = TEFA_Fail                    -- ^ Always fail
-  | TEFA_Recurse                 -- ^ Just recurse
-  | TEFA_Break (FamAppBreaker a) -- ^ Recurse, but replace with cycle breaker if fails,
-                                 --   using the FamAppBreaker
+data TyEqFamApp m a
+  -- | Always fail
+  = TEFA_Fail
+  -- | Just recurse
+  | TEFA_Recurse
+  -- | Recurse, but replace with cycle breaker if fails,
+  --   using the FamAppBreaker
+  | TEFA_Break (FamAppBreaker m a)
 
 -- | What level check to perform, in a call to the pure unifier?
 data LevelCheck
@@ -3249,12 +3262,12 @@ data LevelCheck
       --   -  True <=> promote even under type families
       --             (see Note [Defaulting equalities] in GHC.Tc.Solver)
 
-instance Outputable (TyEqFlags a) where
+instance Outputable (TyEqFlags m a) where
   ppr (TEF { .. }) = text "TEF" <> braces (
                         vcat [ text "tef_task =" <+> ppr tef_task
                              , text "tef_fam_app =" <+> ppr tef_fam_app ])
 
-instance Outputable (TyEqFamApp a) where
+instance Outputable (TyEqFamApp m a) where
   ppr TEFA_Fail       = text "TEFA_Fail"
   ppr TEFA_Recurse    = text "TEFA_Recurse"
   ppr (TEFA_Break {}) = text "TEFA_Break"
@@ -3270,13 +3283,13 @@ instance Outputable LevelCheck where
 --     do not promote @beta[3]@, instead promote @(F beta[3])@.
 --  3. Occurs checks become potentially soluble (after additional type family
 --     reductions).
-famAppArgFlags :: TyEqFlags a -> TyEqFlags a
+famAppArgFlags :: TyEqFlags m a -> TyEqFlags m a
 famAppArgFlags flags@(TEF { tef_task = task })
   = flags { tef_fam_app  = TEFA_Recurse -- (1)
           , tef_task     = fam_app_task task
           }
   where
-    fam_app_task :: TEFTask -> TEFTask
+    fam_app_task :: TEFTask m -> TEFTask m
     fam_app_task task = case task of
       TEFTyFam {} ->
         task
@@ -3295,17 +3308,19 @@ famAppArgFlags flags@(TEF { tef_task = task })
         -> LC_Check
       lc -> lc
 
-type FamAppBreaker a = TcType -> TcM (PuResult a Reduction)
-     -- Given a family-application ty, return a Reduction :: ty ~ cvb
-     -- where 'cbv' is a fresh loop-breaker tyvar (for Given), or
-     -- just a fresh TauTv (for Wanted)
+type FamAppBreaker m a = TcType -> m (PuResult a Reduction)
+  -- ^ Given a family-application ty, return a @'Reduction' :: ty ~ cvb@
+  -- where @cbv@ is a fresh loop-breaker tyvar (for Given), or
+  -- just a fresh 'TauTv' (for Wanted)
 
-checkTyEqRhs :: forall a. TyEqFlags a
-                       -> TcType           -- Already zonked
-                       -> TcM (PuResult a Reduction)
+checkTyEqRhs :: forall m a
+             .  Monad m
+             => TyEqFlags m a
+             -> TcType           -- Already zonked
+             -> m (PuResult a Reduction)
 checkTyEqRhs flags ty
   = case ty of
-      LitTy {}        -> okCheckRefl ty
+      LitTy {}        -> return $ okCheckRefl ty
       TyConApp tc tys -> checkTyConApp flags ty tc tys
       TyVarTy tv      -> checkTyVar flags tv
         -- Don't worry about foralls inside the kind; see Note [Checking for foralls]
@@ -3314,7 +3329,7 @@ checkTyEqRhs flags ty
 
       FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r}
        | isInvisibleFunArg af  -- e.g.  Num a => blah
-       -> failCheckWith impredicativeProblem -- Not allowed (TyEq:F)
+       -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
        | otherwise
        -> do { w_res <- checkTyEqRhs flags w
              ; a_res <- checkTyEqRhs flags a
@@ -3332,10 +3347,11 @@ checkTyEqRhs flags ty
       CoercionTy co -> do { co_res <- checkCo flags co
                           ; return (mkReflCoRedn Nominal <$> co_res) }
 
-      ForAllTy {}   -> failCheckWith impredicativeProblem -- Not allowed (TyEq:F)
+      ForAllTy {}   -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
+{-# INLINEABLE checkTyEqRhs #-}
 
 -------------------
-checkCo :: TyEqFlags a -> Coercion -> TcM (PuResult a Coercion)
+checkCo :: Monad m => TyEqFlags m a -> Coercion -> m (PuResult a Coercion)
 -- See Note [checkCo]
 checkCo (TEF { tef_task = task }) co =
   case task of
@@ -3346,31 +3362,33 @@ checkCo (TEF { tef_task = task }) co =
       { tefTyVar_concreteCheck = mb_conc
       , tefTyVar_levelCheck    = mb_lc
       , tefTyVar_occursCheck   = mb_occ
+      , tefTyVar_doPromotion   = mb_prom
       }
         -- Coercions cannot appear in concrete types.
         --
         -- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
         | Just {} <- mb_conc
-        -> failCheckWith (cteProblem cteConcrete)
+        -> return $ PuFail (cteProblem cteConcrete)
 
         -- Check for coercion holes, if unifying.
         -- See (COERCION-HOLE) in Note [Unification preconditions]
         | Just {} <- mb_lc -- equivalent to "we are unifying"; see Note [TEFTask]
         , hasCoercionHoleCo co
-        -> failCheckWith (cteProblem cteCoercionHole)
+        -> return $ PuFail (cteProblem cteCoercionHole)
 
         -- Occurs check (can promote)
         | Just (lhs_tv, occ_prob) <- mb_occ
         , Just (lhs_tv_lvl, LC_Promote {}) <- mb_lc
-        -> do { reason <- checkPromoteFreeVars occ_prob lhs_tv lhs_tv_lvl (tyCoVarsOfCo co)
-              ; if cterHasNoProblem reason
-                then return (pure co)
-                else failCheckWith reason }
+        -> do { reason <- checkPromoteFreeVars mb_prom occ_prob lhs_tv lhs_tv_lvl (tyCoVarsOfCo co)
+              ; return $
+                if cterHasNoProblem reason
+                then pure co
+                else PuFail reason }
 
         -- Occurs check (no promotion)
         | Just (lhs_tv, occ_prob) <- mb_occ
         , nameUnique lhs_tv `elemVarSetByKey` tyCoVarsOfCo co
-        -> failCheckWith (cteProblem occ_prob)
+        -> return $ PuFail (cteProblem occ_prob)
 
         | otherwise
         -> return (pure co)
@@ -3488,9 +3506,10 @@ If we have  [W] alpha ~ Maybe (F (G alpha))
 -}
 
 -------------------
-checkTyConApp :: TyEqFlags a
+checkTyConApp :: Monad m
+              => TyEqFlags m a
               -> TcType -> TyCon -> [TcType]
-              -> TcM (PuResult a Reduction)
+              -> m (PuResult a Reduction)
 checkTyConApp flags@(TEF { tef_task = task })
               tc_app tc tys
   | isTypeFamilyTyCon tc
@@ -3501,7 +3520,6 @@ checkTyConApp flags@(TEF { tef_task = task })
                   fun_app                = mkTyConApp tc fun_args
             ; fun_res   <- checkFamApp flags fun_app tc fun_args
             ; extra_res <- mapCheck (checkTyEqRhs flags) extra_args
-            ; traceTc "Over-sat" (ppr tc <+> ppr tys $$ ppr arity $$ pprPur fun_res $$ pprPur extra_res)
             ; return (mkAppRedns <$> fun_res <*> extra_res) }
 
   | Just ty' <- rewriterView tc_app
@@ -3511,45 +3529,48 @@ checkTyConApp flags@(TEF { tef_task = task })
   = checkTyEqRhs flags ty'
 
   | not (isTauTyCon tc)
-  = failCheckWith impredicativeProblem
+  = return $ PuFail impredicativeProblem
 
   | Just {} <- tefTaskConcrete_maybe task
   , not (isConcreteTyCon tc)
-  = failCheckWith (cteProblem cteConcrete)
+  = return $ PuFail (cteProblem cteConcrete)
 
   | otherwise  -- Recurse on arguments
   = recurseIntoTyConApp flags tc tys
 
-recurseIntoTyConApp :: TyEqFlags a -> TyCon -> [TcType] -> TcM (PuResult a Reduction)
+recurseIntoTyConApp :: Monad m
+                    => TyEqFlags m a
+                    -> TyCon -> [TcType]
+                    -> m (PuResult a Reduction)
 recurseIntoTyConApp flags tc tys
   = do { tys_res <- mapCheck (checkTyEqRhs flags) tys
        ; return (mkTyConAppRedn Nominal tc <$> tys_res) }
 
 -------------------
-checkFamApp :: TyEqFlags a
+checkFamApp :: Monad m
+            => TyEqFlags m a
             -> TcType -> TyCon -> [TcType]  -- Saturated family application
-            -> TcM (PuResult a Reduction)
+            -> m (PuResult a Reduction)
 -- See Note [Family applications in canonical constraints]
 checkFamApp flags@(TEF { tef_task = task, tef_fam_app = fam_app_flag })
             fam_app tc tys
   = case fam_app_flag of
-      TEFA_Fail -> failCheckWith (cteProblem cteTypeFamily)
+      TEFA_Fail -> return $ PuFail (cteProblem cteTypeFamily)
 
       -- Occurs check: F ty ~ ...(F ty)...
       _ | TEFTyFam occ_prob lhs_tc lhs_tys <- task
         , tcEqTyConApps lhs_tc lhs_tys tc tys
         -> case fam_app_flag of
-             TEFA_Recurse       -> failCheckWith (cteProblem occ_prob)
+             TEFA_Recurse       -> return $ PuFail (cteProblem occ_prob)
              TEFA_Break breaker -> breaker fam_app
 
       _ | Just {} <- tefTaskConcrete_maybe task
         -> case fam_app_flag of
-             TEFA_Recurse       -> failCheckWith (cteProblem cteConcrete)
+             TEFA_Recurse       -> return $ PuFail (cteProblem cteConcrete)
              TEFA_Break breaker -> breaker fam_app
 
       TEFA_Recurse
         -> do { tys_res <- mapCheck (checkTyEqRhs arg_flags) tys
-              ; traceTc "under" (ppr tc $$ pprPur tys_res $$ ppr flags)
               ; return (mkTyConAppRedn Nominal tc <$> tys_res) }
 
       -- For TEFA_Break, try recursion; and break if there is a problem
@@ -3603,18 +3624,22 @@ combineMaybe f (Just a) (Just b) = Just (f a b)
 instance Monoid TyVarCheckResult where
   mempty = TyVarCheck_Success
 
-checkTyVar :: forall a. TyEqFlags a -> TcTyVar -> TcM (PuResult a Reduction)
+checkTyVar :: forall m a. Monad m => TyEqFlags m a -> TcTyVar -> m (PuResult a Reduction)
 checkTyVar flags@(TEF { tef_task = task }) occ_tv
   = case task of
-      TEFTyFam {}                   -> success   -- Nothing to do if the LHS is a type-family
-      TEFTyVar mb_occ mb_lc mb_conc -> check_tv mb_occ mb_lc mb_conc
+      TEFTyFam {}
+        -> success   -- Nothing to do if the LHS is a type-family
+      TEFTyVar mb_occ mb_lc mb_conc do_prom
+        -> check_tv mb_occ mb_lc mb_conc do_prom
   where
     lvl_occ = tcTyVarLevel occ_tv
-    success = okCheckRefl (mkTyVarTy occ_tv)
+    success = return $ okCheckRefl (mkTyVarTy occ_tv)
 
     ---------------------
-    check_tv mb_occ mb_lc mb_conc
-      = do { mb_done <- isFilledMetaTyVar_maybe occ_tv
+    check_tv mb_occ mb_lc mb_conc do_prom
+      = do { mb_done <- case do_prom of
+                           DoPromotion -> isFilledMetaTyVar_maybe occ_tv
+                           NoPromotion -> return (Nothing @TcType)
            ; case mb_done of
                Just {} -> success
                -- Already promoted; job done
@@ -3624,7 +3649,7 @@ checkTyVar flags@(TEF { tef_task = task }) occ_tv
                -- Remember, the entire process started with a fully zonked type
 
                Nothing ->
-                do_rhs_checks $
+                do_rhs_checks do_prom $
                   -- Occurs check
                   [ simple_occurs_check tv occ_prob | (tv, occ_prob) <- maybeToList mb_occ ]
                   ++
@@ -3663,17 +3688,17 @@ checkTyVar flags@(TEF { tef_task = task }) occ_tv
       = TyVarCheck_Success
 
     -- Combine the results of individual checks. See 'TyVarCheckResult'.
-    do_rhs_checks :: [TyVarCheckResult] -> TcM (PuResult a Reduction)
-    do_rhs_checks checks =
+    do_rhs_checks :: DoPromotion m -> [TyVarCheckResult] -> m (PuResult a Reduction)
+    do_rhs_checks do_prom checks =
       case mconcat checks of
         TyVarCheck_Success -> success
-        TyVarCheck_Promote mb_lvl mb_conc -> promote mb_lvl mb_conc
-        TyVarCheck_Error cte_prob -> failCheckWith cte_prob
+        TyVarCheck_Promote mb_lvl mb_conc -> promote mb_lvl mb_conc do_prom
+        TyVarCheck_Error cte_prob -> return $ PuFail cte_prob
 
     ---------------------
     -- occ_tv is definitely a MetaTyVar; we need to promote it/make it concrete
-    promote :: Maybe TcLevel -> Maybe ConcreteTvOrigin -> TcM (PuResult a Reduction)
-    promote mb_lhs_tv_lvl mb_conc
+    promote :: Maybe TcLevel -> Maybe ConcreteTvOrigin -> DoPromotion m -> m (PuResult a Reduction)
+    promote mb_lhs_tv_lvl mb_conc do_prom
       | MetaTv { mtv_info = info_occ, mtv_tclvl = lvl_occ } <- tcTyVarDetails occ_tv
       = do { let new_info | Just conc <- mb_conc = ConcreteTv conc
                           | otherwise            = info_occ
@@ -3695,31 +3720,45 @@ checkTyVar flags@(TEF { tef_task = task }) occ_tv
            --     'occ_tv' is concrete.   Test cases: T23051, T23176.
            ; let occ_kind = tyVarKind occ_tv
            ; kind_result <- checkTyEqRhs flags occ_kind
-           ; traceTc "checkTyVar: kind check" $
-               vcat [ text "occ_tv:" <+> ppr occ_tv <+> dcolon <+> ppr occ_kind
-                    , text "checkTyEqRHS result:" <+> pprPur kind_result
-                    ]
            ; for kind_result $ \ kind_redn ->
         do { let kind_co  = reductionCoercion kind_redn
                  new_kind = reductionReducedType kind_redn
-           ; new_tv_ty <- promote_meta_tyvar new_info new_lvl (setTyVarKind occ_tv new_kind)
+                 occ_tv'  = setTyVarKind occ_tv new_kind
+           ; new_tv_ty <- case do_prom of
+                DoPromotion -> promote_meta_tyvar new_info new_lvl occ_tv'
+                NoPromotion -> return $ mkTyVarTy $ setMetaTyVarTcLevel occ_tv' new_lvl
            ; return $ mkGReflLeftRedn Nominal new_tv_ty (mkSymCo kind_co)
            } }
 
       | otherwise = pprPanic "promote" (ppr occ_tv)
 
+
+-- | Whether to do promotion in 'checkTyEqRhs' or not.
+data DoPromotion m where
+  -- | Do promotion.
+  DoPromotion :: DoPromotion TcM
+  -- | Pure mode: don't do any promotion.
+  NoPromotion :: DoPromotion m
+
+deriving stock instance Show (DoPromotion m)
+instance Outputable (DoPromotion m) where
+  ppr do_prom = text (show do_prom)
+
 -------------------------
-checkPromoteFreeVars :: CheckTyEqProblem    -- What occurs check problem to report
+checkPromoteFreeVars :: forall m
+                     .  Monad m
+                     => DoPromotion m
+                     -> CheckTyEqProblem    -- What occurs check problem to report
                      -> Name -> TcLevel
-                     -> TyCoVarSet -> TcM CheckTyEqResult
+                     -> TyCoVarSet -> m CheckTyEqResult
 -- Check this set of TyCoVars for
 --   (a) occurs check
 --   (b) promote if necessary, or report skolem escape
-checkPromoteFreeVars occ_prob lhs_tv lhs_tv_lvl vs
+checkPromoteFreeVars do_prom occ_prob lhs_tv lhs_tv_lvl vs
   = do { oks <- mapM do_one (nonDetEltsUniqSet vs)
        ; return (mconcat oks) }
   where
-    do_one :: TyCoVar -> TcM CheckTyEqResult
+    do_one :: TyCoVar -> m CheckTyEqResult
     do_one v | isCoVar v             = return cteOK
              | tyVarName v == lhs_tv = return (cteProblem occ_prob)
              | no_promotion          = return cteOK
@@ -3733,8 +3772,15 @@ checkPromoteFreeVars occ_prob lhs_tv lhs_tv_lvl vs
     -- so the "intervening given equalities" test above will catch it
     -- Coercion holes get filled with coercions, so again no problem.
 
-    promote_one tv = do { _ <- promote_meta_tyvar TauTv lhs_tv_lvl tv
-                        ; return cteOK }
+    promote_one :: TyVar -> m CheckTyEqResult
+    promote_one tv =
+      case do_prom of
+        DoPromotion ->
+          do { _ <- promote_meta_tyvar TauTv lhs_tv_lvl tv
+             ; return cteOK }
+        NoPromotion ->
+          return cteOK
+{-# INLINEABLE checkPromoteFreeVars #-}
 
 promote_meta_tyvar :: MetaInfo -> TcLevel -> TcTyVar -> TcM TcType
 promote_meta_tyvar info dest_lvl occ_tv
@@ -3829,13 +3875,14 @@ makeTypeConcrete occ_fs conc_orig ty =
                           -- LHS is a fresh meta-tyvar: no occurs check needed
                       , tefTyVar_levelCheck    = Nothing
                       , tefTyVar_concreteCheck = Just conc_orig
+                      , tefTyVar_doPromotion   = DoPromotion
                       }
                  , tef_fam_app = TEFA_Fail
                  }
 
      -- NB: 'checkTyEqRhs' expects a fully zonked type as input.
      ; ty' <- liftZonkM $ zonkTcType ty
-     ; pu_res <- checkTyEqRhs @() ty_eq_flags ty'
+     ; pu_res <- checkTyEqRhs @TcM @() ty_eq_flags ty'
      -- NB: 'checkTyEqRhs' will also check the kind, thus upholding the
      -- invariant that the kind of a concrete type must also be a concrete type.
 
@@ -3902,3 +3949,107 @@ makeTypeConcrete occ_fs conc_orig ty =
     orig :: CtOrigin
     orig = case conc_orig of
       ConcreteFRR frr_orig -> FRROrigin frr_orig
+
+--------------------------------------------------------------------------------
+-- mightEqualLater
+
+mightEqualLater :: InertSet -> TcPredType -> CtLoc -> TcPredType -> CtLoc -> Maybe Subst
+-- See Note [What might equal later?]
+-- Used to implement logic in Note [Instance and Given overlap] in GHC.Tc.Solver.Dict
+mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
+  | prohibitedSuperClassSolve given_loc wanted_loc
+  = Nothing
+
+  | otherwise
+  = case tcUnifyTysFG bind_fun [flattened_given] [flattened_wanted] of
+      Unifiable subst
+        -> Just subst
+      MaybeApart reason subst
+        | MARInfinite <- reason -- see Example 7 in the Note.
+        -> Nothing
+        | otherwise
+        -> Just subst
+      SurelyApart -> Nothing
+
+  where
+    in_scope  = mkInScopeSet $ tyCoVarsOfTypes [given_pred, wanted_pred]
+
+    -- NB: flatten both at the same time, so that we can share mappings
+    -- from type family applications to variables, and also to guarantee
+    -- that the fresh variables are really fresh between the given and
+    -- the wanted. Flattening both at the same time is needed to get
+    -- Example 10 from the Note.
+    (Pair flattened_given flattened_wanted, var_mapping)
+      = flattenTysX in_scope (Pair given_pred wanted_pred)
+
+    bind_fun :: BindFun
+    bind_fun tv rhs_ty
+      | MetaTv { mtv_info = info } <- tcTyVarDetails tv
+      , ok_shape tv info rhs_ty
+      , can_unify
+      = BindMe
+
+         -- See Examples 4, 5, and 6 from the Note
+      | Just (_fam_tc, fam_args) <- lookupVarEnv var_mapping tv
+      , anyFreeVarsOfTypes mentions_meta_ty_var fam_args
+      = BindMe
+
+      | otherwise
+      = Apart
+      where
+        can_unify
+          | PuOK {} <- runIdentity $ checkTyEqRhs tyeq_flags rhs_ty
+          = True
+          | otherwise
+          = False
+        tyeq_flags = TEF { tef_task, tef_fam_app = TEFA_Recurse }
+        tef_task = TEFTyVar
+          { tefTyVar_occursCheck   = Just (tyVarName tv, cteInsolubleOccurs)
+          , tefTyVar_levelCheck    = Just (tcTyVarLevel tv, LC_Promote True)
+          , tefTyVar_concreteCheck = isConcreteTyVar_maybe tv
+          , tefTyVar_doPromotion   = NoPromotion
+          }
+
+    -- True for TauTv and TyVarTv (and RuntimeUnkTv) meta-tyvars
+    -- (as they can be unified)
+    -- and also for CycleBreakerTvs that mentions meta-tyvars
+    mentions_meta_ty_var :: TyVar -> Bool
+    mentions_meta_ty_var tv
+      | isMetaTyVar tv
+      = case metaTyVarInfo tv of
+          -- See Examples 8 and 9 in the Note
+          CycleBreakerTv
+            -> anyFreeVarsOfType mentions_meta_ty_var
+                 (lookupCycleBreakerVar tv inert_set)
+          _ -> True
+      | otherwise
+      = False
+
+    -- Like checkTopShape, but allows cbv variables to unify
+    ok_shape :: TcTyVar -> MetaInfo -> Type -> Bool
+    ok_shape _lhs_tv TyVarTv rhs_ty  -- see Example 3 from the Note
+      | Just rhs_tv <- getTyVar_maybe rhs_ty
+      = case tcTyVarDetails rhs_tv of
+          MetaTv { mtv_info = TyVarTv } -> True
+          MetaTv {}                     -> False  -- Could unify with anything
+          SkolemTv {}                   -> True
+          RuntimeUnk                    -> True
+      | otherwise  -- not a var on the RHS
+      = False
+    ok_shape lhs_tv _other _rhs_ty = mentions_meta_ty_var lhs_tv
+
+-- | Return the type family application a CycleBreakerTv maps to.
+lookupCycleBreakerVar :: TcTyVar    -- ^ cbv, must be a CycleBreakerTv
+                      -> InertSet
+                      -> TcType     -- ^ type family application the cbv maps to
+lookupCycleBreakerVar cbv (IS { inert_cycle_breakers = cbvs_stack })
+-- This function looks at every environment in the stack. This is necessary
+-- to avoid #20231. This function (and its one usage site) is the only reason
+-- that we store a stack instead of just the top environment.
+  | Just tyfam_app <- assert (isCycleBreakerTyVar cbv) $
+                      firstJusts (NE.map (lookupBag cbv) cbvs_stack)
+  = tyfam_app
+  | otherwise
+  = pprPanic "lookupCycleBreakerVar found an unbound cycle breaker" (ppr cbv $$ ppr cbvs_stack)
+
+--------------------------------------------------------------------------------
