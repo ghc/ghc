@@ -39,6 +39,14 @@ def start_server(path, args, host, port):
         ghc_output_thread.daemon = True # Important: Allow main thread to exit
         ghc_output_thread.start()
 
+        message = ":set args --worker"
+        ghc_process.stdin.write(message + "\n")
+        message = "import Main"
+        ghc_process.stdin.write(message + "\n")
+        message = "main"
+        ghc_process.stdin.write(message + "\n")
+        ghc_process.stdin.flush()
+
         def handle_client(client_socket):
             buffer = ""
             try:
@@ -55,24 +63,22 @@ def start_server(path, args, host, port):
                         print(f"Received from client: {request}")
 
                         ghc_process.stdin.write(request + "\n")
-                        ghc_process.stdin.write("import GHC.Prelude" + "\n")
-                        ghc_process.stdin.write("print \"I_AM_DONE\"" + "\n")
                         ghc_process.stdin.flush()
 
                         lines = []
                         # Block until "ghci>" is seen in stdout (or timeout)
                         while True:
-                            ready, _, _ = select.select([ghc_process.stdout], [], [], 1000000.0) # 30-second timeout
-                            if ready:
-                                line = ghc_process.stdout.readline()
-                                print(line)
-                                if "I_AM_DONE" in line:
-                                    client_socket.sendall(("msg:" + "".join(lines)).encode()) # Send OK after ghci>
-                                    break  # Exit the loop once "ghci>" is found.
-                                lines.append(line)
-                            else: # Timeout
-                                client_socket.sendall("Timeout waiting for ghci>".encode())
-                                break
+                            line = ghc_process.stdout.readline()
+                            if "worker:starting" in line:
+                                continue
+                            if "worker:done" in line:
+                                client_socket.sendall(("msg:" + "".join(lines)).encode()) # Send OK after ghci>
+                                break  # Exit the loop once "ghci>" is found.
+                            lines.append(line)
+                            #else: # Timeout
+                            #    client_socket.sendall("Timeout waiting for ghci>".encode())
+                            #    break
+
 
 
             except Exception as e:
@@ -93,6 +99,7 @@ def start_server(path, args, host, port):
         print(f"Error starting server: {e}")
     finally:
         if ghc_process:
+            ghc_process.terminate()
             ghc_process.terminate()
             print("GHC process terminated.")
 

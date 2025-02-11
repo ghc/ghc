@@ -27,12 +27,15 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Monad
 import GHC.Driver.Pipeline  ( oneShot, compileFile )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
 import GHC.Driver.Plugins
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Config.Diagnostic
+import Control.Monad.Catch
+import Control.Exception ( SomeAsyncException(..))
 
 import GHC.Platform
 import GHC.Platform.Ways
@@ -127,6 +130,12 @@ main = do
         mbMinusB | null minusB_args = Nothing
                  | otherwise = Just (drop 2 (last minusB_args))
 
+    runMain argv1 (getArchIO mbMinusB) (GHC.runGhc mbMinusB)
+
+
+-- runMain is used as the entry-point for the worker
+runMain :: [String] -> IO ArchOS -> ((Ghc () -> IO ())) -> IO ()
+runMain argv1 getArchOS k = do
     let argv2 = map (mkGeneralLocated "on the commandline") argv1
 
     -- 2. Parse the "mode" flags (--make, --interactive etc.)
@@ -143,13 +152,15 @@ main = do
     case mode of
         Left preStartupMode ->
             do case preStartupMode of
-                   ShowSupportedExtensions   -> showSupportedExtensions mbMinusB
+                   ShowSupportedExtensions   -> do
+                    archOS <- getArchOS
+                    showSupportedExtensions archOS
                    ShowVersion               -> showVersion
                    ShowNumVersion            -> putStrLn cProjectVersion
                    ShowOptions isInteractive -> showOptions isInteractive
         Right postStartupMode ->
             -- start our GHC session
-            GHC.runGhc mbMinusB $ do
+            k $ do
 
             dflags <- GHC.getSessionDynFlags
 
@@ -309,6 +320,12 @@ main' postLoadMode units dflags0 args flagWarnings = do
                                                     (hsc_NC     hsc_env)
                                                     f
        DoMake                 -> doMake units srcs
+       DoWorker               -> do
+        -- If the user passed source files with --worker then compile them during
+        -- an "initialisation" step.
+        unless (null units && null srcs) $ doMake units srcs
+        -- Start the worker to listen for requests
+        doWorker
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
        DoInteractive          -> ghciUI units srcs Nothing
@@ -320,6 +337,48 @@ main' postLoadMode units dflags0 args flagWarnings = do
        DoBackpack             -> doBackpack (map fst srcs)
 
   liftIO $ dumpFinalStats logger
+
+doWorker :: Ghc ()
+doWorker = do
+  liftIO $ hPutStrLn stderr "worker:ready"
+  init_flags <- getDynFlags
+  forever $
+    workerLoop init_flags
+
+isAsyncException :: Exception e => e -> Bool
+isAsyncException e =
+    case fromException (toException e) of
+        Just (SomeAsyncException _) -> True
+        Nothing -> False
+
+workerLoop :: DynFlags -> Ghc ()
+workerLoop init_dflags = do
+  raw_args <- words <$> liftIO getLine
+  let args = [ if x == "\"\"" then "" else x | x <- raw_args ]
+  liftIO $ hPutStrLn stderr $ ("starting with args" ++ show args)
+  liftIO $ putStrLn "worker:starting"
+  GHC.setSessionDynFlags init_dflags
+  err <- c $ handleErr $ reifyGhc $ \session -> runMain args (reflectGhc getArchGhc session) (\act -> reflectGhc act session)
+  case err of
+    Left err -> liftIO $ do
+      hPutStrLn stderr $ showException err
+      putStrLn "worker:done:err"
+    Right () -> do
+      liftIO $ putStrLn "worker:done:success"
+      liftIO $ hFlush stdout
+  where
+    c act = handle handler (Right <$> act)
+
+    handler :: SomeException -> Ghc (Either SomeException ())
+    handler e
+      | isAsyncException e = throwM e
+      | otherwise = pure $ Left e
+
+    handleErr =
+      handleSourceError (\e -> do
+         liftIO $ print "handling"
+         GHC.printException e)
+
 
 doRun :: [String] -> [(FilePath, Maybe Phase)] -> [Located String] -> Ghc ()
 doRun units srcs args = do
@@ -504,6 +563,7 @@ data PostLoadMode
   | DoMake                  -- ghc --make
   | DoBackpack              -- ghc --backpack foo.bkp
   | DoInteractive           -- ghc --interactive
+  | DoWorker                -- ghc --worker
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoRun                   -- ghc --run
   | DoAbiHash               -- ghc --abi-hash
@@ -511,10 +571,11 @@ data PostLoadMode
   | DoFrontend ModuleName   -- ghc --frontend Plugin.Module
 
 doMkDependHSMode, doMakeMode, doInteractiveMode, doRunMode,
-  doAbiHashMode, showUnitsMode :: Mode
+  doAbiHashMode, showUnitsMode, doWorkerMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
+doWorkerMode      = mkPostLoadMode DoWorker
 doRunMode = mkPostLoadMode DoRun
 doAbiHashMode = mkPostLoadMode DoAbiHash
 showUnitsMode = mkPostLoadMode ShowPackages
@@ -668,6 +729,7 @@ mode_flags =
   , defFlag "unit"         (SepArg   (\s -> addUnit s "-unit"))
   , defFlag "-backpack"    (PassFlag (setMode doBackpackMode))
   , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))
+  , defFlag "-worker"      (PassFlag (setMode doWorkerMode))
   , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
   , defFlag "-frontend"    (SepArg   (\s -> setMode (doFrontendMode s) "-frontend"))
@@ -989,15 +1051,20 @@ showInfo dflags = do
         let sq x = " [" ++ x ++ "\n ]"
         putStrLn $ sq $ intercalate "\n ," $ map show $ compilerInfo dflags
 
--- TODO use GHC.Utils.Error once that is disentangled from all the other GhcMonad stuff?
-showSupportedExtensions :: Maybe String -> IO ()
-showSupportedExtensions m_top_dir = do
+getArchGhc :: Ghc ArchOS
+getArchGhc = do
+  p <- targetPlatform <$> getDynFlags
+  pure $ platformArchOS p
+
+
+getArchIO :: Maybe FilePath -> IO ArchOS
+getArchIO m_top_dir = do
   res <- runExceptT $ do
     top_dir <- lift (tryFindTopDir m_top_dir) >>= \case
       Nothing -> throwE $ SettingsError_MissingData "Could not find the top directory, missing -B flag"
       Just dir -> pure dir
     initSettings top_dir
-  arch_os <- case res of
+  case res of
     Right s -> pure $ platformArchOS $ sTargetPlatform s
     Left (SettingsError_MissingData msg) -> do
       hPutStrLn stderr $ "WARNING: " ++ show msg
@@ -1006,6 +1073,10 @@ showSupportedExtensions m_top_dir = do
     Left (SettingsError_BadData msg) -> do
       hPutStrLn stderr msg
       exitWith $ ExitFailure 1
+
+-- TODO use GHC.Utils.Error once that is disentangled from all the other GhcMonad stuff?
+showSupportedExtensions :: ArchOS -> IO ()
+showSupportedExtensions arch_os = do
   mapM_ putStrLn $ supportedLanguagesAndExtensions arch_os
 
 showVersion :: IO ()

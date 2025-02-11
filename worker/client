@@ -44,10 +44,6 @@ if __name__ == "__main__":
     port = 8080
     args = sys.argv[1:]
     quoted_command = map (lambda x: "\"\"" if not x else x, args)
-    message = ":set args " + ' '.join(quoted_command)
-    response = send_message(host, port, message)
-    message = "import Main"
-    response = send_message(host, port, message)
-    message = "main"
-    response = send_message(host, port, message)
+    response = send_message(host, port, ' '.join(quoted_command))
+    print(response, file=sys.stderr)
     print(response[4:])
