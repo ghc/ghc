@@ -754,6 +754,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
           -- ghc related
         , "ghc-boot"
         , "ghc-heap"
+        , "ghc-platform"
         , "ghci"
         , "ghc"
         ]
