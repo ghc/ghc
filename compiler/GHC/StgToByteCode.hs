@@ -97,7 +97,7 @@ import GHC.CoreToIface
 import GHC.Types.Name.Env
 import GHC.Utils.Binary
 import GHC.Iface.Binary
-import GHC.ByteCode.Serialize ()
+import GHC.ByteCode.Serialize (addSerializableNameWriter, addSerializableNameReader)
 import GHC.Utils.TmpFs
 import System.FilePath
 
@@ -157,10 +157,12 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
               let fn = tmpdir </> "bar"
               appendFile "/tmp/test.log" "1"
               bh0 <- openBinMem (1024*1024)
-              putWithUserData QuietBinIFace NormalCompression bh0 cbc
-              writeBinMem bh0 fn
+              bh <- addSerializableNameWriter hsc_env bh0
+              putWithUserData QuietBinIFace NormalCompression bh cbc
+              writeBinMem bh fn
               bh1 <- readBinMem fn
-              getWithUserData (hsc_NC hsc_env) bh1
+              bh' <- addSerializableNameReader hsc_env bh1
+              getWithUserData (hsc_NC hsc_env) bh'
           _ -> pure cbc
 
         return cbc'
