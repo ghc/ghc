@@ -27,8 +27,8 @@ module GHC.Tc.Types.Evidence (
 
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
-  evId, evCoercion, evCast, evDFunApp,  evDictApp, evSelector, evDelayedError,
-  mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
+  evId, evCoercion, evCast, evCastExpr, evDFunApp,  evDictApp, evSelector, evDelayedError,
+  evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
   decomposeIP, evWrapIP, evUnwrapIP, evWrapUnaryDict,
 
   evTermCoercion, evTermCoercion_maybe,
@@ -519,10 +519,16 @@ evId = Var
 evCoercion :: TcCoercion -> EvTerm
 evCoercion co = EvExpr (Coercion co)
 
+evCast :: EvExpr -> TcCoercion -> EvTerm
+evCast et tc = EvExpr (evCastExpr et tc)
+
 -- | d |> co
-evCast :: EvExpr -> TcCoercion -> EvExpr
-evCast et tc | isReflCo tc = et
-             | otherwise   = Cast et tc
+evCastExpr :: EvExpr -> TcCoercion -> EvExpr
+evCastExpr ee co
+  | assertPpr (coercionRole co == Representational)
+              (vcat [text "Coercion of wrong role passed to evCastExpr:", ppr ee, ppr co]) $
+    isReflCo co = ee
+  | otherwise   = Cast ee co
 
 -- Dictionary instance application
 evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvTerm
@@ -800,13 +806,6 @@ Important Details:
   solved like a regular IP.
 
 -}
-
-mkEvCast :: EvExpr -> TcCoercion -> EvExpr
-mkEvCast ev lco
-  | assertPpr (coercionRole lco == Representational)
-              (vcat [text "Coercion of wrong role passed to mkEvCast:", ppr ev, ppr lco]) $
-    isReflCo lco = ev
-  | otherwise    = evCast ev lco
 
 mkEvScSelectors         -- Assume   class (..., D ty, ...) => C a b
   :: Class -> [TcType]  -- C ty1 ty2

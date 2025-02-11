@@ -44,7 +44,7 @@ solver :: [String]
 solver _args defs ev givens wanteds = do
   let pluginCo = mkUnivCo (PluginProv "CtIdPlugin") [] Representational  -- Empty is fine. This plugin does not use "givens".
   let substEvidence ct ct' =
-        EvExpr $ evCast (ctEvExpr $ ctEvidence ct') $ pluginCo (ctPred ct') (ctPred ct)
+        evCast (ctEvExpr $ ctEvidence ct') $ pluginCo (ctPred ct') (ctPred ct)
 
   if null wanteds
     then do
@@ -52,8 +52,7 @@ solver _args defs ev givens wanteds = do
       newGivens <- for (zip newGivenPredTypes givens) \case
         (Nothing, _) -> return Nothing
         (Just pred, ct) ->
-          let expr =
-                evCast (ctEvExpr $ ctEvidence ct) $ pluginCo (ctPred ct) pred
+          let expr = evCastE (ctEvExpr $ ctEvidence ct) $ pluginCo (ctPred ct) pred
           in Just . mkNonCanonical <$> newGiven ev (ctLoc ct) pred expr
       let removedGivens =
             [ (substEvidence ct ct', ct)

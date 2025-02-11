@@ -1257,8 +1257,8 @@ matchHasField dflags short_cut clas tys mb_ct_loc
                          -- into a HasField dictionary.
                          mk_ev (ev1:evs) = EvExpr                                $
                                            evWrapUnaryDict (classTyCon clas) tys $
-                                           evCast (evSelector sel_id tvs evs)
-                                                  (mkSubCo (evExprCoercion ev1))
+                                           evCastExpr (evSelector sel_id tvs evs)
+                                                      (mkSubCo (evExprCoercion ev1))
                          mk_ev [] = panic "matchHasField.mk_ev"
 
                      -- The selector must not be "naughty" (i.e. the field
