@@ -645,6 +645,8 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "  " ++ src </> "utils/ghc-pkg"
         , "  " ++ src </> "utils/hsc2hs"
         , "  " ++ src </> "utils/unlit"
+        , "  " ++ src </> "utils/genprimopcode"
+        , "  " ++ src </> "utils/deriveConstants"
         , "  " ++ src </> "libraries/array"
         , "  " ++ src </> "libraries/binary"
         , "  " ++ src </> "libraries/bytestring"
@@ -670,6 +672,8 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
           -- use alex from Hackage, not git, as it already has preprocessed
           -- alex/happy files.
         , "  https://hackage.haskell.org/package/alex-3.5.2.0/alex-3.5.2.0.tar.gz"
+        , "  https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz"
+        , "  https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz"
         , ""
         , "benchmarks: False"
         , "tests: False"
@@ -682,6 +686,10 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "  executable-profiling: False"
         , "  executable-dynamic: False"
         , "  executable-static: False"
+        , ""
+        , "package ghc"
+             -- Require genprimopcode, etc. used by Setup.hs
+        , "  flags: +build-tool-depends"
         , ""
         , "package ghc-internal"
              -- FIXME: make our life easier for now by using the native bignum backend
@@ -747,9 +755,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "ghc-boot"
         , "ghc-heap"
         , "ghci"
-        -- , "ghc" -- FIXME: somehow it breaks the build: genprimopcode isn't
-        -- found. Maybe we should put it in path somehow? Or add it as a
-        -- build-depends?
+        , "ghc"
         ]
 
   msg "  - Building boot libraries..."

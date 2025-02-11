@@ -107,7 +107,7 @@ ghcAutogen verbosity lbi@LocalBuildInfo{pkgDescrFile,withPrograms,componentNameM
 #endif
     hClose h
     callProcess "deriveConstants" ["--gen-haskell-type","-o",tmp,"--target-os",targetOS]
-    renameFile tmp platformConstantsPath
+    copyFile tmp platformConstantsPath
 
   let cProjectUnitId = case Map.lookup (CLibName LMainLibName) componentNameMap of
                          Just [LibComponentLocalBuildInfo{componentUnitId}] -> unUnitId componentUnitId
