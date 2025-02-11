@@ -49,3 +49,12 @@ jobs:
 
     - name: Run the testsuite
       run: make test
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: testsuite-results
+        path: |
+          _build/test-perf.csv
+          _build/test-summary.txt
+          _build/test-junit.xml

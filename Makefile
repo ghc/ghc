@@ -12,4 +12,8 @@ clean:
 	rm -rf _build
 
 test: all
-	TEST_HC=`pwd`/_build/bindist/bin/ghc make -C testsuite/tests test
+	TEST_HC=`pwd`/_build/bindist/bin/ghc \
+	METRICS_FILE=`pwd`/_build/test-perf.csv \
+	SUMMARY_FILE=`pwd`/_build/test-summary.txt \
+	JUNIT_FILE=`pwd`/_build/test-junit.xml \
+	make -C testsuite/tests test
