@@ -395,9 +395,9 @@ tryConstraintDefaulting wc
   | isEmptyWC wc
   = return wc
   | otherwise
-  = do { (n_unifs, better_wc) <- reportUnifications (go_wc wc)
+  = do { (unif_happened, better_wc) <- reportUnifications (go_wc wc)
          -- We may have done unifications; so solve again
-       ; solveAgainIf (n_unifs > 0) better_wc }
+       ; solveAgainIf unif_happened better_wc }
   where
     go_wc :: WantedConstraints -> TcS WantedConstraints
     go_wc wc@(WC { wc_simple = simples, wc_impl = implics })
