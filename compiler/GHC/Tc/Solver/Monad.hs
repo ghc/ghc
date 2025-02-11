@@ -19,9 +19,8 @@ module GHC.Tc.Solver.Monad (
     runTcS, runTcSEarlyAbort, runTcSWithEvBinds, runTcSInerts,
     failTcS, warnTcS, addErrTcS, wrapTcS, ctLocWarnTcS,
     runTcSEqualities,
-    nestTcS, nestImplicTcS, tryShortCutTcS,
+    nestTcS, nestImplicTcS, tryShortCutTcS, nestFunDepsTcS,
     setEvBindsTcS, setTcLevelTcS,
-    emitFunDepWanteds,
 
     selectNextWorkItem,
     getWorkList,
@@ -45,7 +44,6 @@ module GHC.Tc.Solver.Monad (
     panicTcS, traceTcS, tryEarlyAbortTcS,
     traceFireTcS, bumpStepCountTcS, csTraceTcS,
     wrapErrTcS, wrapWarnTcS,
-    resetUnificationFlag, setUnificationFlag,
 
     -- Evidence creation and transformation
     MaybeNew(..), freshGoals, isFresh, getEvExpr,
@@ -56,20 +54,17 @@ module GHC.Tc.Solver.Monad (
     newWanted,
     newWantedNC, newWantedEvVarNC,
     newBoundEvVarId,
-    unifyTyVar, reportUnifications,
+    unifyTyVar, reportFineGrainUnifications, reportCoarseGrainUnifications,
     setEvBind, setWantedEq,
     setWantedEvTerm, setEvBindIfWanted,
-    newEvVar, newGivenEvVar, emitNewGivens,
-    checkReductionDepth,
+    newEvVar, newGivenEv, emitNewGivens,
+    emitChildEqs, checkReductionDepth,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getLclEnv, setSrcSpan,
     getTcEvBindsVar, getTcLevel,
     getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
     tcLookupClass, tcLookupId, tcLookupTyCon,
-
-    getUnifiedRef,
-
 
     -- Inerts
     updInertSet, updInertCans,
@@ -85,7 +80,7 @@ module GHC.Tc.Solver.Monad (
     lookupInertDict,
 
     -- The Model
-    kickOutAfterUnification, kickOutRewritable,
+    recordUnification, kickOutRewritable, kickOutAfterUnification,
 
     -- Inert Safe Haskell safe-overlap failures
     insertSafeOverlapFailureTcS,
@@ -106,10 +101,10 @@ module GHC.Tc.Solver.Monad (
     instDFunType,
 
     -- Unification
-    wrapUnifierX, wrapUnifierTcS, unifyFunDeps, uPairsTcM, unifyForAllBody,
+    wrapUnifier, wrapUnifierAndEmit, uPairsTcM,
 
     -- MetaTyVars
-    newFlexiTcSTy, instFlexiX,
+    newFlexiTcSTy, instFlexiX, instFlexiXTcM,
     cloneMetaTyVar,
     tcInstSkolTyVarsX,
 
@@ -155,7 +150,6 @@ import qualified GHC.Tc.Zonk.TcType  as TcM
 import GHC.Driver.DynFlags
 
 import GHC.Tc.Instance.Class( safeOverlap, instanceReturnsDictCon )
-import GHC.Tc.Instance.FunDeps( FunDepEqn(..) )
 import GHC.Utils.Misc
 
 
@@ -215,15 +209,13 @@ import GHC.Data.Pair
 import GHC.Utils.Monad
 
 import GHC.Exts (oneShot)
+
 import Control.Monad
 import Data.Foldable hiding ( foldr1 )
 import Data.IORef
+import qualified Data.Set as Set
 import Data.Maybe( catMaybes )
 import Data.List ( mapAccumL )
-import Data.List.NonEmpty ( nonEmpty )
-import qualified Data.List.NonEmpty as NE
-import qualified Data.Semigroup as S
-import qualified Data.Set as Set
 
 #if defined(DEBUG)
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
@@ -455,24 +447,15 @@ kickOutRewritable ko_spec new_fr
                          , text "kicked_out =" <+> ppr kicked_out
                          , text "Residual inerts =" <+> ppr ics' ]) } }
 
-kickOutAfterUnification :: [TcTyVar] -> TcS ()
-kickOutAfterUnification tv_list = case nonEmpty tv_list of
-    Nothing -> return ()
-    Just tvs -> do
-       { let tv_set = mkVarSet tv_list
-
-       ; n_kicked <- kickOutRewritable (KOAfterUnify tv_set) (Given, NomEq)
+kickOutAfterUnification :: TcTyVarSet -> TcS ()
+kickOutAfterUnification tv_set
+  | isEmptyVarSet tv_set
+  = return ()
+  | otherwise
+  = do { n_kicked <- kickOutRewritable (KOAfterUnify tv_set) (Given, NomEq)
                      -- Given because the tv := xi is given; NomEq because
                      -- only nominal equalities are solved by unification
-
-       -- Set the unification flag if we have done outer unifications
-       -- that might affect an earlier implication constraint
-       ; let min_tv_lvl = foldr1 minTcLevel (NE.map tcTyVarLevel tvs)
-       ; ambient_lvl <- getTcLevel
-       ; when (ambient_lvl `strictlyDeeperThan` min_tv_lvl) $
-         setUnificationFlag min_tv_lvl
-
-       ; traceTcS "kickOutAfterUnification" (ppr tvs $$ text "n_kicked =" <+> ppr n_kicked)
+       ; traceTcS "kickOutAfterUnification" (ppr tv_set $$ text "n_kicked =" <+> ppr n_kicked)
        ; return n_kicked }
 
 kickOutAfterFillingCoercionHole :: CoercionHole -> TcS ()
@@ -958,28 +941,21 @@ The constraint solver can operate in different modes:
 
 data TcSEnv
   = TcSEnv {
-      tcs_ev_binds    :: EvBindsVar,
+      tcs_ev_binds  :: EvBindsVar,
 
-      tcs_unified     :: IORef Int,
-         -- The number of unification variables we have filled
-         -- The important thing is whether it is non-zero, so it
-         -- could equally well be a Bool instead of an Int.
+      tcs_what  :: WhatUnifications,
+         -- Level of the outermost meta-tyvar that we have unified
+         -- See Note [WhatUnifications] in GHC.Tc.Utils.Unify
 
-      tcs_unif_lvl  :: IORef (Maybe TcLevel),
-         -- The Unification Level Flag
-         -- Outermost level at which we have unified a meta tyvar
-         -- Starts at Nothing, then (Just i), then (Just j) where j<i
-         -- See Note [The Unification Level Flag]
+      tcs_count     :: TcRef Int, -- Global step count
 
-      tcs_count     :: IORef Int, -- Global step count
-
-      tcs_inerts    :: IORef InertSet, -- Current inert set
+      tcs_inerts    :: TcRef InertSet, -- Current inert set
 
       -- | The mode of operation for the constraint solver.
       -- See Note [TcSMode]
       tcs_mode :: TcSMode,
 
-      tcs_worklist :: IORef WorkList
+      tcs_worklist :: TcRef WorkList
     }
 
 ---------------
@@ -1154,8 +1130,7 @@ runTcSWithEvBinds' :: TcSMode
                    -> TcS a
                    -> TcM a
 runTcSWithEvBinds' mode ev_binds_var thing_inside
-  = do { unified_var <- TcM.newTcRef 0
-       ; step_count  <- TcM.newTcRef 0
+  = do { step_count  <- TcM.newTcRef 0
 
        -- Make a fresh, empty inert set
        -- Subtle point: see (TGE6) in Note [Tracking Given equalities]
@@ -1164,14 +1139,13 @@ runTcSWithEvBinds' mode ev_binds_var thing_inside
        ; inert_var   <- TcM.newTcRef (emptyInertSet tc_lvl)
 
        ; wl_var      <- TcM.newTcRef emptyWorkList
-       ; unif_lvl_var <- TcM.newTcRef Nothing
-       ; let env = TcSEnv { tcs_ev_binds           = ev_binds_var
-                          , tcs_unified            = unified_var
-                          , tcs_unif_lvl           = unif_lvl_var
-                          , tcs_count              = step_count
-                          , tcs_inerts             = inert_var
-                          , tcs_mode               = mode
-                          , tcs_worklist           = wl_var }
+       ; unif_lvl_var <- TcM.newTcRef infiniteTcLevel
+       ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
+                          , tcs_what     = WU_Coarse unif_lvl_var
+                          , tcs_count    = step_count
+                          , tcs_inerts   = inert_var
+                          , tcs_mode     = mode
+                          , tcs_worklist = wl_var }
 
              -- Run the computation
        ; res <- unTcS thing_inside env
@@ -1238,14 +1212,13 @@ nestImplicTcS ev_binds_var inner_tclvl (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = old_inert_var }) ->
     do { inerts <- TcM.readTcRef old_inert_var
 
-       -- Initialise the inert_cans from the inert_givens of the parent
-       -- so that the child is not polluted with the parent's inert Wanteds
+       -- resetInertcans: initialise the inert_cans from the inert_givens of the
+       -- parent so that the child is not polluted with the parent's inert Wanteds
        -- See Note [trySolveImplication] in GHC.Tc.Solver.Solve
        -- All other InertSet fields are inherited
-       ; let nest_inert = inerts { inert_cycle_breakers = pushCycleBreakerVarStack
-                                                            (inert_cycle_breakers inerts)
-                                 , inert_cans = (inert_givens inerts)
-                                                   { inert_given_eqs = False } }
+       ; let nest_inert = pushCycleBreakerVarStack $
+                          resetInertCans           $
+                          inerts
        ; new_inert_var <- TcM.newTcRef nest_inert
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
@@ -1262,6 +1235,31 @@ nestImplicTcS ev_binds_var inner_tclvl (TcS thing_inside)
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
        ; checkForCyclicBinds ev_binds
 #endif
+       ; return res }
+
+nestFunDepsTcS :: TcS a -> TcS a
+nestFunDepsTcS (TcS thing_inside)
+  = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var }) ->
+    TcM.pushTcLevelM_  $
+         -- pushTcLevelTcM: increase the level so that unification variables
+         -- allocated by the fundep-creation itself don't count as useful unifications
+         -- See Note [Deeper TcLevel for partial improvement unification variables]
+         --     in GHC.Tc.Solver.FunDeps
+    do { inerts <- TcM.readTcRef inerts_var
+       ; let nest_inerts = resetInertCans inerts
+                 -- resetInertCans: like nestImplicTcS
+       ; new_inert_var <- TcM.newTcRef nest_inerts
+       ; new_wl_var    <- TcM.newTcRef emptyWorkList
+       ; let nest_env = env { tcs_inerts   = new_inert_var
+                            , tcs_worklist = new_wl_var }
+
+       ; TcM.traceTc "nestFunDepsTcS {" empty
+       ; res <- thing_inside nest_env
+       ; TcM.traceTc "nestFunDepsTcS }" empty
+
+       -- Unlike nestTcS, do /not/ do `updateInertsWith`; we are going to
+       -- abandon everything about this sub-computation except its unifications
+
        ; return res }
 
 nestTcS :: TcS a -> TcS a
@@ -1370,9 +1368,6 @@ setTcSMode :: TcSMode -> TcS a -> TcS a
 setTcSMode mode thing_inside
   = TcS (\env -> unTcS thing_inside (env { tcs_mode = mode }))
 
-getUnifiedRef :: TcS (IORef Int)
-getUnifiedRef = TcS (return . tcs_unified)
-
 -- Getter of inerts and worklist
 getInertSetRef :: TcS (IORef InertSet)
 getInertSetRef = TcS (return . tcs_inerts)
@@ -1413,30 +1408,6 @@ getTcEvBindsMap ev_binds_var
 setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcS ()
 setTcEvBindsMap ev_binds_var binds
   = wrapTcS $ TcM.setTcEvBindsMap ev_binds_var binds
-
-unifyTyVar :: TcTyVar -> TcType -> TcS ()
--- Unify a meta-tyvar with a type
--- We keep track of how many unifications have happened in tcs_unified,
---
--- We should never unify the same variable twice!
-unifyTyVar tv ty
-  = assertPpr (isMetaTyVar tv) (ppr tv) $
-    TcS $ \ env ->
-    do { TcM.traceTc "unifyTyVar" (ppr tv <+> text ":=" <+> ppr ty)
-       ; TcM.liftZonkM $ TcM.writeMetaTyVar tv ty
-       ; TcM.updTcRef (tcs_unified env) (+1) }
-
-reportUnifications :: TcS a -> TcS (Int, a)
--- Record how many unifications are done by thing_inside
--- We could return a Bool instead of an Int;
--- all that matters is whether it is no-zero
-reportUnifications (TcS thing_inside)
-  = TcS $ \ env ->
-    do { inner_unified <- TcM.newTcRef 0
-       ; res <- thing_inside (env { tcs_unified = inner_unified })
-       ; n_unifs <- TcM.readTcRef inner_unified
-       ; TcM.updTcRef (tcs_unified env) (+ n_unifs)
-       ; return (n_unifs, res) }
 
 getDefaultInfo ::  TcS (DefaultEnv, Bool)
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
@@ -1799,93 +1770,95 @@ pushLevelNoWorkList _ (TcS thing_inside)
 
 {- *********************************************************************
 *                                                                      *
-*              The Unification Level Flag                              *
+*              Tracking unifications in TcS
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [The Unification Level Flag]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider a deep tree of implication constraints
-   forall[1] a.                              -- Outer-implic
-      C alpha[1]                               -- Simple
-      forall[2] c. ....(C alpha[1])....        -- Implic-1
-      forall[2] b. ....(alpha[1] ~ Int)....    -- Implic-2
+unifyTyVar :: TcTyVar -> TcType -> TcS ()
+-- Unify a meta-tyvar with a type
+-- We should never unify the same variable twice!
+-- C.f. GHC.Tc.Utils.Unify.unifyTyVar
+unifyTyVar tv ty
+  = assertPpr (isMetaTyVar tv) (ppr tv) $
+    do { liftZonkTcS (TcM.writeMetaTyVar tv ty)  -- Produces a trace message
+       ; what_uni <- getWhatUnifications
+       ; wrapTcS $ recordUnification what_uni tv }
 
-The (C alpha) is insoluble until we know alpha.  We solve alpha
-by unifying alpha:=Int somewhere deep inside Implic-2. But then we
-must try to solve the Outer-implic all over again. This time we can
-solve (C alpha) both in Outer-implic, and nested inside Implic-1.
+reportFineGrainUnifications :: TcS a -> TcS (TcTyVarSet, a)
+-- Record what unifications were done by thing_inside
+-- Remember to propagate the information to the enclosing context
+reportFineGrainUnifications (TcS thing_inside)
+  = TcS $ \ env@(TcSEnv { tcs_what = outer_wu }) ->
+    do { (unif_tvs, res) <- report_fine_grain_unifs env thing_inside
+       ; recordUnifications outer_wu unif_tvs
+       ; return (unif_tvs, res) }
 
-When should we iterate solving a level-n implication?
-Answer: if any unification of a tyvar at level n takes place
-        in the ic_implics of that implication.
+reportCoarseGrainUnifications :: TcS a -> TcS (Bool, a)
+-- Record whether any useful unifications are done by thing_inside
+-- Remember to propagate the information to the enclosing context
+reportCoarseGrainUnifications (TcS thing_inside)
+  = TcS $ \ env@(TcSEnv { tcs_what = outer_what }) ->
+    case outer_what of
+      WU_None
+        -> do { (unif_happened, _, res) <- report_coarse_grain_unifs env thing_inside
+              ; return (unif_happened, res) }
 
-* What if a unification takes place at level n-1? Then don't iterate
-  level n, because we'll iterate level n-1, and that will in turn iterate
-  level n.
+      WU_Coarse outer_ul_ref
+        -> do { (unif_happened, inner_ul, res) <- report_coarse_grain_unifs env thing_inside
 
-* What if a unification takes place at level n, in the ic_simples of
-  level n?  No need to track this, because the kick-out mechanism deals
-  with it.  (We can't drop kick-out in favour of iteration, because kick-out
-  works for skolem-equalities, not just unifications.)
+              -- Propagate to outer_ul_ref
+              ; outer_ul <- TcM.readTcRef outer_ul_ref
+              ; unless (inner_ul `deeperThanOrSame` outer_ul) $
+                TcM.writeTcRef outer_ul_ref inner_ul
 
-So the monad-global Unification Level Flag, kept in tcs_unif_lvl keeps
-track of
-  - Whether any unifications at all have taken place (Nothing => no unifications)
-  - If so, what is the outermost level that has seen a unification (Just lvl)
+              ; TcM.traceTc "reportCoarse(Coarse)" $
+                vcat [ text "outer_ul" <+> ppr outer_ul
+                     , text "inner_ul" <+> ppr inner_ul
+                     , text "unif_happened" <+> ppr unif_happened ]
+              ; return (unif_happened, res) }
 
-The iteration is done in the simplify_loop/maybe_simplify_again loop in GHC.Tc.Solver.
+      WU_Fine outer_tvs_ref
+        -> do { (unif_tvs,res) <- report_fine_grain_unifs env thing_inside
+              ; let unif_happened = not (isEmptyVarSet unif_tvs)
+              ; when unif_happened $
+                TcM.updTcRef outer_tvs_ref (`unionVarSet` unif_tvs)
+              ; TcM.traceTc "reportCoarse(Fine)" $
+                vcat [ text "unif_tvs" <+> ppr unif_tvs
+                     , text "unif_happened" <+> ppr unif_happened ]
+              ; return (unif_happened, res) }
 
-It helpful not to iterate unless there is a chance of progress.  #8474 is
-an example:
-
-  * There's a deeply-nested chain of implication constraints.
-       ?x:alpha => ?y1:beta1 => ... ?yn:betan => [W] ?x:Int
-
-  * From the innermost one we get a [W] alpha[1] ~ Int,
-    so we can unify.
-
-  * It's better not to iterate the inner implications, but go all the
-    way out to level 1 before iterating -- because iterating level 1
-    will iterate the inner levels anyway.
-
-(In the olden days when we "floated" thse Derived constraints, this was
-much, much more important -- we got exponential behaviour, as each iteration
-produced the same Derived constraint.)
--}
-
-
-resetUnificationFlag :: TcS Bool
--- We are at ambient level i
--- If the unification flag = Just i, reset it to Nothing and return True
--- Otherwise leave it unchanged and return False
-resetUnificationFlag
-  = TcS $ \env ->
-    do { let ref = tcs_unif_lvl env
+report_coarse_grain_unifs :: TcSEnv -> (TcSEnv -> TcM a)
+                          -> TcM (Bool, TcLevel, a)
+-- Returns (unif_happened, coarse_inner_ul, res)
+report_coarse_grain_unifs env thing_inside
+  = do { inner_ul_ref <- TcM.newTcRef infiniteTcLevel
+       ; res <- thing_inside (env { tcs_what = WU_Coarse inner_ul_ref })
+       ; inner_ul    <- TcM.readTcRef inner_ul_ref
        ; ambient_lvl <- TcM.getTcLevel
-       ; mb_lvl <- TcM.readTcRef ref
-       ; TcM.traceTc "resetUnificationFlag" $
-         vcat [ text "ambient:" <+> ppr ambient_lvl
-              , text "unif_lvl:" <+> ppr mb_lvl ]
-       ; case mb_lvl of
-           Nothing       -> return False
-           Just unif_lvl | ambient_lvl `strictlyDeeperThan` unif_lvl
-                         -> return False
-                         | otherwise
-                         -> do { TcM.writeTcRef ref Nothing
-                               ; return True } }
+       ; let unif_happened = ambient_lvl `deeperThanOrSame` inner_ul
+       ; return (unif_happened, inner_ul, res) }
 
-setUnificationFlag :: TcLevel -> TcS ()
--- (setUnificationFlag i) sets the unification level to (Just i)
--- unless it already is (Just j) where j <= i
-setUnificationFlag lvl
-  = TcS $ \env ->
-    do { let ref = tcs_unif_lvl env
-       ; mb_lvl <- TcM.readTcRef ref
-       ; case mb_lvl of
-           Just unif_lvl | lvl `deeperThanOrSame` unif_lvl
-                         -> return ()
-           _ -> TcM.writeTcRef ref (Just lvl) }
+
+report_fine_grain_unifs :: TcSEnv -> (TcSEnv -> TcM a)
+                        -> TcM (TcTyVarSet, a)
+report_fine_grain_unifs env thing_inside
+  = do { unif_tvs_ref <- TcM.newTcRef emptyVarSet
+
+       ; res <- thing_inside (env { tcs_what = WU_Fine unif_tvs_ref })
+
+       ; unif_tvs    <- TcM.readTcRef unif_tvs_ref
+       ; ambient_lvl <- TcM.getTcLevel
+
+       -- Keep only variables from this or outer levels
+       ; let is_interesting unif_tv
+                = ambient_lvl `deeperThanOrSame` tcTyVarLevel unif_tv
+             interesting_tvs = filterVarSet is_interesting unif_tvs
+       ; TcM.traceTc "report_fine" (ppr unif_tvs $$ ppr interesting_tvs)
+       ; return (interesting_tvs, res) }
+
+getWhatUnifications :: TcS WhatUnifications
+getWhatUnifications
+  = TcS $ \env -> return (tcs_what env)
 
 
 {- *********************************************************************
@@ -1907,15 +1880,15 @@ newFlexiTcSTy knd = wrapTcS (TcM.newFlexiTyVarTy knd)
 cloneMetaTyVar :: TcTyVar -> TcS TcTyVar
 cloneMetaTyVar tv = wrapTcS (TcM.cloneMetaTyVar tv)
 
-instFlexiX :: Subst -> [TKVar] -> TcS Subst
+instFlexiX :: Subst -> [TKVar] -> TcS ([TcTyVar], Subst)
 instFlexiX subst tvs = wrapTcS (instFlexiXTcM subst tvs)
 
-instFlexiXTcM :: Subst -> [TKVar] -> TcM Subst
+instFlexiXTcM :: Subst -> [TKVar] -> TcM ([TcTyVar], Subst)
 -- Makes fresh tyvar, extends the substitution, and the in-scope set
 -- Takes account of the case [k::Type, a::k, ...],
 -- where we must substitute for k in a's kind
 instFlexiXTcM subst []
-  = return subst
+  = return ([], subst)
 instFlexiXTcM subst (tv:tvs)
   = do { uniq <- TcM.newUnique
        ; details <- TcM.newMetaDetails TauTv
@@ -1923,7 +1896,8 @@ instFlexiXTcM subst (tv:tvs)
              kind   = substTyUnchecked subst (tyVarKind tv)
              tv'    = mkTcTyVar name kind details
              subst' = extendTvSubstWithClone subst tv tv'
-       ; instFlexiXTcM subst' tvs  }
+       ; (tvs', subst'') <- instFlexiXTcM subst' tvs
+       ; return (tv':tvs', subst'') }
 
 matchGlobalInst :: DynFlags -> Class -> [Type] -> CtLoc -> TcS TcM.ClsInstResult
 matchGlobalInst dflags cls tys loc
@@ -2022,12 +1996,12 @@ newNoTcEvBinds = wrapTcS TcM.newNoTcEvBinds
 newEvVar :: TcPredType -> TcS EvVar
 newEvVar pred = wrapTcS (TcM.newEvVar pred)
 
-newGivenEvVar :: CtLoc -> (TcPredType, EvTerm) -> TcS GivenCtEvidence
+newGivenEv :: CtLoc -> (TcPredType, EvTerm) -> TcS GivenCtEvidence
 -- Make a new variable of the given PredType,
 -- immediately bind it to the given term
 -- and return its CtEvidence
 -- See Note [Bind new Givens immediately] in GHC.Tc.Types.Constraint
-newGivenEvVar loc (pred, rhs)
+newGivenEv loc (pred, rhs)
   = do { new_ev <- newBoundEvVarId pred rhs
        ; return $ GivenCt { ctev_pred = pred, ctev_evar = new_ev, ctev_loc = loc } }
 
@@ -2042,7 +2016,7 @@ newBoundEvVarId pred rhs
 emitNewGivens :: CtLoc -> [(Role,TcCoercion)] -> TcS ()
 emitNewGivens loc pts
   = do { traceTcS "emitNewGivens" (ppr pts)
-       ; gs <- mapM (newGivenEvVar loc) $
+       ; gs <- mapM (newGivenEv loc) $
                 [ (mkEqPredRole role ty1 ty2, evCoercion co)
                 | (role, co) <- pts
                 , let Pair ty1 ty2 = coercionKind co
@@ -2055,6 +2029,19 @@ emitNewWantedEq loc rewriters role ty1 ty2
   = do { (wtd, co) <- newWantedEq loc rewriters role ty1 ty2
        ; updWorkListTcS (extendWorkListEq rewriters (mkNonCanonical $ CtWanted wtd))
        ; return co }
+
+emitChildEqs :: CtEvidence -> Cts -> TcS ()
+-- Emit a bunch of equalities into the work list
+-- See Note [Work-list ordering] in GHC.Tc.Solver.Equality
+--
+-- All the constraints in `cts` share the same rewriter set so,
+-- rather than looking at it one by one, we pass it to
+-- extendWorkListChildEqs; just a small optimisation.
+emitChildEqs ev eqs
+  | isEmptyBag eqs
+  = return ()
+  | otherwise
+  = updWorkListTcS (extendWorkListChildEqs ev eqs)
 
 -- | Create a new Wanted constraint holding a coercion hole
 -- for an equality between the two types at the given 'Role'.
@@ -2182,171 +2169,78 @@ solverDepthError loc ty
 {-
 ************************************************************************
 *                                                                      *
-              Emitting equalities arising from fundeps
-*                                                                      *
-************************************************************************
--}
-
-emitFunDepWanteds :: CtEvidence  -- The work item
-                  -> [FunDepEqn (CtLoc, RewriterSet)]
-                  -> TcS Bool  -- True <=> some unification happened
-
-emitFunDepWanteds _ [] = return False -- common case noop
--- See Note [FunDep and implicit parameter reactions] in GHC.Tc.Solver.Dict
-
-emitFunDepWanteds ev fd_eqns
-  = unifyFunDeps ev Nominal do_fundeps
-  where
-    do_fundeps :: UnifyEnv -> TcM ()
-    do_fundeps env = mapM_ (do_one env) fd_eqns
-
-    do_one :: UnifyEnv -> FunDepEqn (CtLoc, RewriterSet) -> TcM ()
-    do_one uenv (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = (loc, rewriters) })
-      = do { eqs' <- instantiate_eqs tvs (reverse eqs)
-                     -- (reverse eqs): See Note [Reverse order of fundep equations]
-           ; uPairsTcM env_one eqs' }
-      where
-        env_one = uenv { u_rewriters = u_rewriters uenv S.<> rewriters
-                       , u_loc       = loc }
-
-    instantiate_eqs :: [TyVar] -> [TypeEqn] -> TcM [TypeEqn]
-    instantiate_eqs tvs eqs
-      | null tvs
-      = return eqs
-      | otherwise
-      = do { TcM.traceTc "emitFunDepWanteds 2" (ppr tvs $$ ppr eqs)
-           ; subst <- instFlexiXTcM emptySubst tvs  -- Takes account of kind substitution
-           ; return [ Pair (substTyUnchecked subst' ty1) ty2
-                           -- ty2 does not mention fd_qtvs, so no need to subst it.
-                           -- See GHC.Tc.Instance.Fundeps Note [Improving against instances]
-                           --     Wrinkle (1)
-                    | Pair ty1 ty2 <- eqs
-                    , let subst' = extendSubstInScopeSet subst (tyCoVarsOfType ty1) ]
-                          -- The free vars of ty1 aren't just fd_qtvs: ty1 is the result
-                          -- of matching with the [W] constraint. So we add its free
-                          -- vars to InScopeSet, to satisfy substTy's invariants, even
-                          -- though ty1 will never (currently) be a poytype, so this
-                          -- InScopeSet will never be looked at.
-           }
-
-{-
-************************************************************************
-*                                                                      *
               Unification
 *                                                                      *
 ************************************************************************
 
-Note [wrapUnifierTcS]
-~~~~~~~~~~~~~~~~~~~
+Note [wrapUnifier]
+~~~~~~~~~~~~~~~~~~
 When decomposing equalities we often create new wanted constraints for
 (s ~ t).  But what if s=t?  Then it'd be faster to return Refl right away.
 
 Rather than making an equality test (which traverses the structure of the type,
-perhaps fruitlessly), we call uType (via wrapUnifierTcS) to traverse the common
+perhaps fruitlessly), we call uType (via wrapUnifier) to traverse the common
 structure, and bales out when it finds a difference by creating a new deferred
 Wanted constraint.  But where it succeeds in finding common structure, it just
 builds a coercion to reflect it.
 
 This is all much faster than creating a new constraint, putting it in the
 work list, picking it out, canonicalising it, etc etc.
-
-Note [unifyFunDeps]
-~~~~~~~~~~~~~~~~~~~
-The Bool returned by `unifyFunDeps` is True if we have unified a variable
-that occurs in the constraint we are trying to solve; it is not in the
-inert set so `wrapUnifierTcS` won't kick it out.  Instead we want to send it
-back to the start of the pipeline.  Hence the Bool.
-
-It's vital that we don't return (not (null unified)) because the fundeps
-may create fresh variables; unifying them (alone) should not make us send
-the constraint back to the start, or we'll get an infinite loop.  See
-Note [Fundeps with instances, and equality orientation] in GHC.Tc.Solver.Dict
-and Note [Improvement orientation] in GHC.Tc.Solver.Equality.
 -}
 
 uPairsTcM :: UnifyEnv -> [TypeEqn] -> TcM ()
 uPairsTcM uenv eqns = mapM_ (\(Pair ty1 ty2) -> uType uenv ty1 ty2) eqns
 
-unifyFunDeps :: CtEvidence -> Role
-             -> (UnifyEnv -> TcM ())
-             -> TcS Bool
-unifyFunDeps ev role do_unifications
-  = do { (_, _, unified) <- wrapUnifierTcS ev role do_unifications
-       ; return (any (`elemVarSet` fvs) unified) }
-         -- See Note [unifyFunDeps]
-  where
-    fvs = tyCoVarsOfType (ctEvPred ev)
-
-unifyForAllBody :: CtEvidence -> Role -> (UnifyEnv -> TcM a)
-                -> TcS (a, Cts)
--- We /return/ the equality constraints we generate,
--- rather than emitting them into the monad.
--- See See (SF5) in Note [Solving forall equalities] in GHC.Tc.Solver.Equality
-unifyForAllBody ev role unify_body
-  = do { (res, cts, unified) <- wrapUnifierX ev role unify_body
-
-       -- Kick out any inert constraint that we have unified
-       ; _ <- kickOutAfterUnification unified
-
-       ; return (res, cts) }
-
-wrapUnifierTcS :: CtEvidence -> Role
-               -> (UnifyEnv -> TcM a)  -- Some calls to uType
-               -> TcS (a, Bag Ct, [TcTyVar])
--- Invokes the do_unifications argument, with a suitable UnifyEnv.
--- Emit deferred equalities and kick-out from the inert set as a
--- result of any unifications.
--- Very good short-cut when the two types are equal, or nearly so
--- See Note [wrapUnifierTcS]
---
--- The [TcTyVar] is the list of unification variables that were
--- unified the process; the (Bag Ct) are the deferred constraints.
-
-wrapUnifierTcS ev role do_unifications
-  = do { (res, cts, unified) <- wrapUnifierX ev role do_unifications
+wrapUnifierAndEmit :: CtEvidence -> Role
+                   -> (UnifyEnv -> TcM a)  -- Some calls to uType
+                   -> TcS a
+-- Like wrapUnifier, but
+--    emits any unsolved equalities into the work-list
+--    kicks out any inert constraints that mention unified variables
+wrapUnifierAndEmit ev role do_unifications
+  = do { (unifs, (res, eqs)) <- reportFineGrainUnifications $
+                                wrapUnifier ev role do_unifications
 
        -- Emit the deferred constraints
-       -- See Note [Work-list ordering] in GHC.Tc.Solved.Equality
-       --
-       -- All the constraints in `cts` share the same rewriter set so,
-       -- rather than looking at it one by one, we pass it to
-       -- extendWorkListChildEqs; just a small optimisation.
-       ; unless (isEmptyBag cts) $
-         updWorkListTcS (extendWorkListChildEqs ev cts)
+       ; emitChildEqs ev eqs
 
-       -- And kick out any inert constraint that we have unified
-       ; _ <- kickOutAfterUnification unified
+       -- Kick out any inert constraints mentioning the unified variables
+       ; kickOutAfterUnification unifs
 
-       ; return (res, cts, unified) }
+       ; return res }
 
-wrapUnifierX :: CtEvidence -> Role
+wrapUnifier :: CtEvidence -> Role
              -> (UnifyEnv -> TcM a)  -- Some calls to uType
-             -> TcS (a, Bag Ct, [TcTyVar])
-wrapUnifierX ev role do_unifications
-  = do { unif_count_ref <- getUnifiedRef
+             -> TcS (a, Bag Ct)
+-- Invokes the do_unifications argument, with a suitable UnifyEnv.
+-- Very good short-cut when the two types are equal, or nearly so
+--    See Note [wrapUnifier]
+-- The (Bag Ct) are the deferred constraints; we emit them but
+-- also return them
+wrapUnifier ev role do_unifications
+  = do { given_eq_lvl <- getInnermostGivenEqLevel
+       ; what_uni     <- getWhatUnifications
+
        ; wrapTcS $
-         do { defer_ref   <- TcM.newTcRef emptyBag
-            ; unified_ref <- TcM.newTcRef []
-            ; let env = UE { u_role      = role
-                           , u_rewriters = ctEvRewriters ev
-                           , u_loc       = ctEvLoc ev
-                           , u_defer     = defer_ref
-                           , u_unified   = Just unified_ref}
+         do { defer_ref    <- TcM.newTcRef emptyBag
+            ; let env = UE { u_role         = role
+                           , u_given_eq_lvl = given_eq_lvl
+                           , u_rewriters    = ctEvRewriters ev
+                           , u_loc          = ctEvLoc ev
+                           , u_defer        = defer_ref
+                           , u_what         = what_uni }
               -- u_rewriters: the rewriter set and location from
               -- the parent constraint `ev` are inherited in any
               -- new constraints spat out by the unifier
+              --
+              -- u_what: likewise inherit the WhatUnifications flag,
+              --         so that unifications done here are visible
+              --         to the caller
 
             ; res <- do_unifications env
 
             ; cts     <- TcM.readTcRef defer_ref
-            ; unified <- TcM.readTcRef unified_ref
-
-            -- Don't forget to update the count of variables
-            -- unified, lest we forget to iterate (#24146)
-            ; unless (null unified) $
-              TcM.updTcRef unif_count_ref (+ (length unified))
-
-            ; return (res, cts, unified) } }
+            ; return (res, cts) } }
 
 
 {-
@@ -2398,7 +2292,7 @@ checkTypeEq ev eq_rel lhs rhs =
     ---------------------------
     mk_new_given :: (TcTyVar, TcType) -> TcS Ct
     mk_new_given (new_tv, fam_app)
-      = mkNonCanonical . CtGiven <$> newGivenEvVar cb_loc (given_pred, given_term)
+      = mkNonCanonical . CtGiven <$> newGivenEv cb_loc (given_pred, given_term)
       where
         new_ty     = mkTyVarTy new_tv
         given_pred = mkNomEqPred fam_app new_ty

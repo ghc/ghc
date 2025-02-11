@@ -6,7 +6,7 @@ module GHC.Tc.Solver.Dict (
   solveDict, solveDictNC, solveCallStack,
   checkInstanceOK,
   matchLocalInst, chooseInstance,
-  makeSuperClasses, mkStrictSuperClasses,
+  makeSuperClasses, mkStrictSuperClasses
   ) where
 
 import GHC.Prelude
@@ -14,12 +14,12 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
 import GHC.Tc.Errors.Types
-import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Class( matchEqualityInst )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Origin
+import GHC.Tc.Solver.FunDeps( tryDictFunDeps )
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
 import GHC.Tc.Solver.Types
@@ -31,9 +31,9 @@ import GHC.Hs.Type( HsIPName(..) )
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.Type
-import GHC.Core.InstEnv     ( DFunInstType, ClsInst(..) )
 import GHC.Core.Class
 import GHC.Core.Predicate
+import GHC.Core.InstEnv( DFunInstType )
 import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Core.Unify ( ruleMatchTyKiX )
 
@@ -48,7 +48,7 @@ import GHC.Types.SrcLoc
 
 import GHC.Builtin.Names( srcLocDataConName, pushCallStackName, emptyCallStackName )
 
-import GHC.Utils.Monad ( concatMapM, foldlM )
+import GHC.Utils.Monad ( concatMapM )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -90,16 +90,15 @@ solveDict dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = tys })
   = assertPpr (ctEvRewriteRole ev == Nominal) (ppr ev $$ ppr cls $$ ppr tys) $
     do { simpleStage $ traceTcS "solveDict" (ppr dict_ct)
 
+       -- Look in the inert dictionaries
        ; tryInertDicts dict_ct
+
+       -- Try top-level instances
        ; tryInstances dict_ct
 
        -- Try fundeps /after/ tryInstances:
        --     see (DFL2) in Note [Do fundeps last]
-       ; doLocalFunDepImprovement dict_ct
-           -- doLocalFunDepImprovement does StartAgain if there
-           -- are any fundeps: see (DFL1) in Note [Do fundeps last]
-
-       ; doTopFunDepImprovement dict_ct
+       ; tryDictFunDeps dict_ct
 
        ; simpleStage (updInertDicts dict_ct)
        ; stopWithStage (dictCtEvidence dict_ct) "Kept inert DictCt" }
@@ -474,8 +473,8 @@ solveEqualityDict ev cls tys
     do { let (role, t1, t2) = matchEqualityInst cls tys
          -- Unify t1~t2, putting anything that can't be solved
          -- immediately into the work list
-       ; (co, _, _) <- wrapUnifierTcS ev role $ \uenv ->
-                       uType uenv t1 t2
+       ; co <- wrapUnifierAndEmit ev role $ \uenv ->
+               uType uenv t1 t2
          -- Set  d :: (t1~t2) = Eq# co
        ; setWantedEvTerm dest EvCanonical $
          evDictApp cls tys [Coercion co]
@@ -487,7 +486,7 @@ solveEqualityDict ev cls tys
     do { let loc = ctEvLoc ev
              sc_pred = classMethodInstTy sel_id tys
              ev_expr = EvExpr $ Var sel_id `mkTyApps` tys `App` evId ev_id
-       ; given_ev <- newGivenEvVar loc (sc_pred, ev_expr)
+       ; given_ev <- newGivenEv loc (sc_pred, ev_expr)
        ; startAgainWith (mkNonCanonical $ CtGiven given_ev) }
   | otherwise
   = pprPanic "solveEqualityDict" (ppr cls)
@@ -699,69 +698,6 @@ on whether we apply this optimization when IncoherentInstances is in effect:
 The output of `main` if we avoid the optimization under the effect of
 IncoherentInstances is `1`. If we were to do the optimization, the output of
 `main` would be `2`.
-
-
-Note [No Given/Given fundeps]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We do not create constraints from:
-* Given/Given interactions via functional dependencies or type family
-  injectivity annotations.
-* Given/instance fundep interactions via functional dependencies or
-  type family injectivity annotations.
-
-In this Note, all these interactions are called just "fundeps".
-
-We ingore such fundeps for several reasons:
-
-1. These fundeps will never serve a purpose in accepting more
-   programs: Given constraints do not contain metavariables that could
-   be unified via exploring fundeps. They *could* be useful in
-   discovering inaccessible code. However, the constraints will be
-   Wanteds, and as such will cause errors (not just warnings) if they
-   go unsolved. Maybe there is a clever way to get the right
-   inaccessible code warnings, but the path forward is far from
-   clear. #12466 has further commentary.
-
-2. Furthermore, here is a case where a Given/instance interaction is actively
-   harmful (from dependent/should_compile/RaeJobTalk):
-
-       type family a == b :: Bool
-       type family Not a = r | r -> a where
-         Not False = True
-         Not True  = False
-
-       [G] Not (a == b) ~ True
-
-   Reacting this Given with the equations for Not produces
-
-      [W] a == b ~ False
-
-   This is indeed a true consequence, and would make sense as a fresh Given.
-   But we don't have a way to produce evidence for fundeps, as a Wanted it
-   is /harmful/: we can't prove it, and so we'll report an error and reject
-   the program. (Previously fundeps gave rise to Deriveds, which
-   carried no evidence, so it didn't matter that they could not be proved.)
-
-3. #20922 showed a subtle different problem with Given/instance fundeps.
-      type family ZipCons (as :: [k]) (bssx :: [[k]]) = (r :: [[k]]) | r -> as bssx where
-        ZipCons (a ': as) (bs ': bss) = (a ': bs) ': ZipCons as bss
-        ...
-
-      tclevel = 4
-      [G] ZipCons is1 iss ~ (i : is2) : jss
-
-   (The tclevel=4 means that this Given is at level 4.)  The fundep tells us that
-   'iss' must be of form (is2 : beta[4]) where beta[4] is a fresh unification
-   variable; we don't know what type it stands for. So we would emit
-      [W] iss ~ is2 : beta
-
-   Again we can't prove that equality; and worse we'll rewrite iss to
-   (is2:beta) in deeply nested constraints inside this implication,
-   where beta is untouchable (under other equality constraints), leading
-   to other insoluble constraints.
-
-The bottom line: since we have no evidence for them, we should ignore Given/Given
-and Given/instance fundeps entirely.
 -}
 
 tryInertDicts :: DictCt -> SolverStage ()
@@ -1387,331 +1323,6 @@ with the least superclass depth (see Note [Replacement vs keeping]),
 but that doesn't work for the example from #22216.
 -}
 
-{- *********************************************************************
-*                                                                      *
-*          Functional dependencies, instantiation of equations
-*                                                                      *
-************************************************************************
-
-When we spot an equality arising from a functional dependency,
-we now use that equality (a "wanted") to rewrite the work-item
-constraint right away.  This avoids two dangers
-
- Danger 1: If we send the original constraint on down the pipeline
-           it may react with an instance declaration, and in delicate
-           situations (when a Given overlaps with an instance) that
-           may produce new insoluble goals: see #4952
-
- Danger 2: If we don't rewrite the constraint, it may re-react
-           with the same thing later, and produce the same equality
-           again --> termination worries.
-
-To achieve this required some refactoring of GHC.Tc.Instance.FunDeps (nicer
-now!).
-
-Note [FunDep and implicit parameter reactions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Currently, our story of interacting two dictionaries (or a dictionary
-and top-level instances) for functional dependencies, and implicit
-parameters, is that we simply produce new Wanted equalities.  So for example
-
-        class D a b | a -> b where ...
-    Inert:
-        [G] d1 : D Int Bool
-    WorkItem:
-        [W] d2 : D Int alpha
-
-    We generate the extra work item
-        [W] cv : alpha ~ Bool
-    where 'cv' is currently unused.  However, this new item can perhaps be
-    spontaneously solved to become given and react with d2,
-    discharging it in favour of a new constraint d2' thus:
-        [W] d2' : D Int Bool
-        d2 := d2' |> D Int cv
-    Now d2' can be discharged from d1
-
-We could be more aggressive and try to *immediately* solve the dictionary
-using those extra equalities.
-
-If that were the case with the same inert set and work item we might discard
-d2 directly:
-
-        [W] cv : alpha ~ Bool
-        d2 := d1 |> D Int cv
-
-But in general it's a bit painful to figure out the necessary coercion,
-so we just take the first approach. Here is a better example. Consider:
-    class C a b c | a -> b
-And:
-     [G]  d1 : C T Int Char
-     [W] d2 : C T beta Int
-In this case, it's *not even possible* to solve the wanted immediately.
-So we should simply output the functional dependency and add this guy
-[but NOT its superclasses] back in the worklist. Even worse:
-     [G] d1 : C T Int beta
-     [W] d2: C T beta Int
-Then it is solvable, but its very hard to detect this on the spot.
-
-It's exactly the same with implicit parameters, except that the
-"aggressive" approach would be much easier to implement.
-
-Note [Fundeps with instances, and equality orientation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This Note describes a delicate interaction that constrains the orientation of
-equalities. This one is about fundeps, but the /exact/ same thing arises for
-type-family injectivity constraints: see Note [Improvement orientation].
-
-doTopFunDepImprovement compares the constraint with all the instance
-declarations, to see if we can produce any equalities. E.g
-   class C2 a b | a -> b
-   instance C Int Bool
-Then the constraint (C Int ty) generates the equality [W] ty ~ Bool.
-
-There is a nasty corner in #19415 which led to the typechecker looping:
-   class C s t b | s -> t
-   instance ... => C (T kx x) (T ky y) Int
-   T :: forall k. k -> Type
-
-   work_item: dwrk :: C (T @ka (a::ka)) (T @kb0 (b0::kb0)) Char
-      where kb0, b0 are unification vars
-
-   ==> {doTopFunDepImprovement: compare work_item with instance,
-        generate /fresh/ unification variables kfresh0, yfresh0,
-        emit a new Wanted, and add dwrk to inert set}
-
-   Suppose we emit this new Wanted from the fundep:
-       [W] T kb0 (b0::kb0) ~ T kfresh0 (yfresh0::kfresh0)
-
-   ==> {solve that equality kb0 := kfresh0, b0 := yfresh0}
-   Now kick out dwrk, since it mentions kb0
-   But now we are back to the start!  Loop!
-
-NB1: This example relies on an instance that does not satisfy the
-     coverage condition (although it may satisfy the weak coverage
-     condition), and hence whose fundeps generate fresh unification
-     variables.  Not satisfying the coverage condition is known to
-     lead to termination trouble, but in this case it's plain silly.
-
-NB2: In this example, the third parameter to C ensures that the
-     instance doesn't actually match the Wanted, so we can't use it to
-     solve the Wanted
-
-We solve the problem by (#21703):
-
-    carefully orienting the new Wanted so that all the
-    freshly-generated unification variables are on the LHS.
-
-    Thus we call unifyWanteds on
-       T kfresh0 (yfresh0::kfresh0) ~ T kb0 (b0::kb0)
-    and /NOT/
-       T kb0 (b0::kb0) ~ T kfresh0 (yfresh0::kfresh0)
-
-Now we'll unify kfresh0:=kb0, yfresh0:=b0, and all is well.  The general idea
-is that we want to preferentially eliminate those freshly-generated
-unification variables, rather than unifying older variables, which causes
-kick-out etc.
-
-Keeping younger variables on the left also gives very minor improvement in
-the compiler performance by having less kick-outs and allocations (-0.1% on
-average).  Indeed Historical Note [Eliminate younger unification variables]
-in GHC.Tc.Utils.Unify describes an earlier attempt to do so systematically,
-apparently now in abeyance.
-
-But this is is a delicate solution. We must take care to /preserve/
-orientation during solving. Wrinkles:
-
-(W1) We start with
-       [W] T kfresh0 (yfresh0::kfresh0) ~ T kb0 (b0::kb0)
-     Decompose to
-       [W] kfresh0 ~ kb0
-       [W] (yfresh0::kfresh0) ~ (b0::kb0)
-     Preserve orientation when decomposing!!
-
-(W2) Suppose we happen to tackle the second Wanted from (W1)
-     first. Then in canEqCanLHSHetero we emit a /kind/ equality, as
-     well as a now-homogeneous type equality
-       [W] kco : kfresh0 ~ kb0
-       [W] (yfresh0::kfresh0) ~ (b0::kb0) |> (sym kco)
-     Preserve orientation in canEqCanLHSHetero!!  (Failing to
-     preserve orientation here was the immediate cause of #21703.)
-
-(W3) There is a potential interaction with the swapping done by
-     GHC.Tc.Utils.Unify.swapOverTyVars.  We think it's fine, but it's
-     a slight worry.  See especially Note [TyVar/TyVar orientation] in
-     that module.
-
-The trouble is that "preserving orientation" is a rather global invariant,
-and sometimes we definitely do want to swap (e.g. Int ~ alpha), so we don't
-even have a precise statement of what the invariant is.  The advantage
-of the preserve-orientation plan is that it is extremely cheap to implement,
-and apparently works beautifully.
-
---- Alternative plan (1) ---
-Rather than have an ill-defined invariant, another possiblity is to
-elminate those fresh unification variables at birth, when generating
-the new fundep-inspired equalities.
-
-The key idea is to call `instFlexiX` in `emitFunDepWanteds` on only those
-type variables that are guaranteed to give us some progress. This means we
-have to locally (without calling emitWanteds) identify the type variables
-that do not give us any progress.  In the above example, we _know_ that
-emitting the two wanteds `kco` and `co` is fruitless.
-
-  Q: How do we identify such no-ops?
-
-  1. Generate a matching substitution from LHS to RHS
-        ɸ = [kb0 :-> k0, b0 :->  y0]
-  2. Call `instFlexiX` on only those type variables that do not appear in the domain of ɸ
-        ɸ' = instFlexiX ɸ (tvs - domain ɸ)
-  3. Apply ɸ' on LHS and then call emitWanteds
-        unifyWanteds ... (subst ɸ' LHS) RHS
-
-Why will this work?  The matching substitution ɸ will be a best effort
-substitution that gives us all the easy solutions. It can be generated with
-modified version of `Core/Unify.unify_tys` where we run it in a matching mode
-and never generate `SurelyApart` and always return a `MaybeApart Subst`
-instead.
-
-The same alternative plan would work for type-family injectivity constraints:
-see Note [Improvement orientation] in GHC.Tc.Solver.Equality.
---- End of Alternative plan (1) ---
-
---- Alternative plan (2) ---
-We could have a new flavour of TcTyVar (like `TauTv`, `TyVarTv` etc; see GHC.Tc.Utils.TcType.MetaInfo)
-for the fresh unification variables introduced by functional dependencies.  Say `FunDepTv`.  Then in
-GHC.Tc.Utils.Unify.swapOverTyVars we could arrange to keep a `FunDepTv` on the left if possible.
-Looks possible, but it's one more complication.
---- End of Alternative plan (2) ---
-
-
---- Historical note: Failed Alternative Plan (3) ---
-Previously we used a flag `cc_fundeps` in `CDictCan`. It would flip to False
-once we used a fun dep to hint the solver to break and to stop emitting more
-wanteds.  This solution was not complete, and caused a failures while trying
-to solve for transitive functional dependencies (test case: T21703)
--- End of Historical note: Failed Alternative Plan (3) --
-
-Note [Do fundeps last]
-~~~~~~~~~~~~~~~~~~~~~~
-Consider T4254b:
-  class FD a b | a -> b where { op :: a -> b }
-
-  instance FD Int Bool
-
-  foo :: forall a b. (a~Int,FD a b) => a -> Bool
-  foo = op
-
-(DFL1) Try local fundeps first.
-  From the ambiguity check on the type signature we get
-    [G] FD Int b
-    [W] FD Int beta
-  Interacting these gives beta:=b; then we start again and solve without
-  trying fundeps between the new [W] FD Int b and the top-level instance.
-  If we did, we'd generate [W] b ~ Bool, which fails.
-
-(DFL2) Try solving from top-level instances before fundeps
-  From the definition `foo = op` we get
-    [G] FD Int b
-    [W] FD Int Bool
-  We solve this from the top level instance before even trying fundeps.
-  If we did try fundeps, we'd generate [W] b ~ Bool, which fails.
-
-
-Note [Weird fundeps]
-~~~~~~~~~~~~~~~~~~~~
-Consider   class Het a b | a -> b where
-              het :: m (f c) -> a -> m b
-
-           class GHet (a :: * -> *) (b :: * -> *) | a -> b
-           instance            GHet (K a) (K [a])
-           instance Het a b => GHet (K a) (K b)
-
-The two instances don't actually conflict on their fundeps,
-although it's pretty strange.  So they are both accepted. Now
-try   [W] GHet (K Int) (K Bool)
-This triggers fundeps from both instance decls;
-      [W] K Bool ~ K [a]
-      [W] K Bool ~ K beta
-And there's a risk of complaining about Bool ~ [a].  But in fact
-the Wanted matches the second instance, so we never get as far
-as the fundeps.
-
-#7875 is a case in point.
--}
-
-doLocalFunDepImprovement :: DictCt -> SolverStage ()
--- Add wanted constraints from type-class functional dependencies.
-doLocalFunDepImprovement dict_ct@(DictCt { di_ev = work_ev, di_cls = cls })
-  = Stage $
-    do { inerts <- getInertCans
-       ; imp <- foldlM add_fds False (findDictsByClass (inert_dicts inerts) cls)
-       ; if imp then startAgainWith (CDictCan dict_ct)
-                     else continueWith () }
-  where
-    work_pred = ctEvPred work_ev
-    work_loc  = ctEvLoc work_ev
-
-    add_fds :: Bool -> DictCt -> TcS Bool
-    add_fds so_far (DictCt { di_ev = inert_ev })
-      | isGiven work_ev && isGiven inert_ev
-        -- Do not create FDs from Given/Given interactions: See Note [No Given/Given fundeps]
-      = return so_far
-      | otherwise
-      = do { traceTcS "doLocalFunDepImprovement" (vcat
-                [ ppr work_ev
-                , pprCtLoc work_loc, ppr (isGivenLoc work_loc)
-                , pprCtLoc inert_loc, ppr (isGivenLoc inert_loc)
-                , pprCtLoc derived_loc, ppr (isGivenLoc derived_loc) ])
-
-           ; unifs <- emitFunDepWanteds work_ev $
-                      improveFromAnother (derived_loc, inert_rewriters)
-                                         inert_pred work_pred
-           ; return (so_far || unifs)
-        }
-      where
-        inert_pred = ctEvPred inert_ev
-        inert_loc  = ctEvLoc inert_ev
-        inert_rewriters = ctEvRewriters inert_ev
-        derived_loc = work_loc { ctl_depth  = ctl_depth work_loc `maxSubGoalDepth`
-                                              ctl_depth inert_loc
-                               , ctl_origin = FunDepOrigin1 work_pred
-                                                            (ctLocOrigin work_loc)
-                                                            (ctLocSpan work_loc)
-                                                            inert_pred
-                                                            (ctLocOrigin inert_loc)
-                                                            (ctLocSpan inert_loc) }
-
-doTopFunDepImprovement :: DictCt -> SolverStage ()
--- Try to functional-dependency improvement between the constraint
--- and the top-level instance declarations
--- See Note [Fundeps with instances, and equality orientation]
--- See also Note [Weird fundeps]
-doTopFunDepImprovement dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
-  | isGiven ev     -- No improvement for Givens
-  = Stage $ continueWith ()
-  | otherwise
-  = Stage $
-    do { traceTcS "try_fundeps" (ppr dict_ct)
-       ; instEnvs <- getInstEnvs
-       ; let fundep_eqns = improveFromInstEnv instEnvs mk_ct_loc cls xis
-       ; imp <- emitFunDepWanteds ev fundep_eqns
-       ; if imp then startAgainWith (CDictCan dict_ct)
-                     else continueWith () }
-  where
-     dict_pred   = mkClassPred cls xis
-     dict_loc    = ctEvLoc ev
-     dict_origin = ctLocOrigin dict_loc
-
-     mk_ct_loc :: ClsInst   -- The instance decl
-               -> (CtLoc, RewriterSet)
-     mk_ct_loc ispec
-       = ( dict_loc { ctl_origin = FunDepOrigin2 dict_pred dict_origin
-                                                 inst_pred inst_loc }
-         , emptyRewriterSet )
-       where
-         inst_pred = mkClassPred cls (is_tys ispec)
-         inst_loc  = getSrcSpan (is_dfun ispec)
-
 
 {- *********************************************************************
 *                                                                      *
@@ -2051,7 +1662,7 @@ mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar }))
       = -- See Note [Equality superclasses in quantified constraints]
         return []
       | otherwise
-      = do { given_ev <- newGivenEvVar sc_loc $
+      = do { given_ev <- newGivenEv sc_loc $
                          mk_given_desc sel_id sc_pred
            ; assertFuelPrecondition fuel $
              mk_superclasses fuel rec_clss (CtGiven given_ev) tvs theta sc_pred }
@@ -2182,7 +1793,7 @@ mk_superclasses_of fuel rec_clss ev tvs theta cls tys
     rec_clss'  = rec_clss `extendNameSet` cls_nm
 
     mk_this_ct :: ExpansionFuel -> Ct
-    -- We can't use CNonCanonical here because we need to tradk the fuel
+    -- We can't use CNonCanonical here because we need to track the fuel
     mk_this_ct fuel | null tvs, null theta
                     = CDictCan (DictCt { di_ev = ev, di_cls = cls
                                        , di_tys = tys, di_pend_sc = fuel })

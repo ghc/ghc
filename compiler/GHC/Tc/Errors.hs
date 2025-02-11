@@ -750,7 +750,6 @@ suppressItem item
   | Wanted <- ei_flavour item
   , let orig = errorItemOrigin item
   = isWantedSuperclassOrigin orig       -- See (SCE1)
-    || isWantedWantedFunDepOrigin orig  -- See (SCE2)
   | otherwise
   = False
 
@@ -791,7 +790,12 @@ Which errors should be suppressed?
    We definitely want to report d1 and not d2!  Happily it's easy to filter out those
    superclass-Wanteds, becuase their Origin betrays them.
 
-(SCE2) Errors which arise from the interaction of two Wanted fun-dep constraints.
+Historical (SCE2).  Fundep constraints never "escape" into the
+   main solver and so never show up in error messages.
+   See (SOLVE-FD) in Note [Overview of functional dependencies in type inference]
+   in GHC.Tc.Solver.FunDeps.  So this wrinkle is now just a historical note.
+
+   Errors which arise from the interaction of two Wanted fun-dep constraints.
    Example:
 
      class C a b | a -> b where
@@ -819,17 +823,17 @@ Which errors should be suppressed?
    both are givens, the error represents unreachable code. For
    a Given/Wanted case, see #9612.
 
-Mechanism:
-
-We use the `suppress` function within reportWanteds to filter out these
-"suppress" cases, then report all other errors. After doing so, we return to these
-suppressed ones and report them only if there have been no errors so far.
+   End of historical (SCE2)
 
 (SCE3) How can it happen that there are /only/ suppressed errors?  See test T18851
    for an example of how it is (just, barely) possible for the /only/ errors to
    be superclass-of-Wanted constraints.
 
+Mechanism:
 
+We use the `suppress` function within reportWanteds to filter out these
+"suppress" cases, then report all other errors. After doing so, we return to these
+suppressed ones and report them only if there have been no errors so far.
 
 Note [Constraints to ignore]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

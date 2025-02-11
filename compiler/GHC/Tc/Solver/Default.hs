@@ -395,41 +395,47 @@ tryConstraintDefaulting wc
   | isEmptyWC wc
   = return wc
   | otherwise
-  = do { (n_unifs, better_wc) <- reportUnifications (go_wc wc)
+  = do { (unif_happened, better_wc) <- reportCoarseGrainUnifications $
+                                       go_wc False wc
          -- We may have done unifications; so solve again
-       ; solveAgainIf (n_unifs > 0) better_wc }
+       ; solveAgainIf unif_happened better_wc }
   where
-    go_wc :: WantedConstraints -> TcS WantedConstraints
-    go_wc wc@(WC { wc_simple = simples, wc_impl = implics })
-      = do { simples' <- mapMaybeBagM go_simple simples
-           ; implics' <- mapBagM go_implic implics
+    go_wc :: Bool -> WantedConstraints -> TcS WantedConstraints
+    -- Bool is true if there are enclosing given equalities
+    go_wc encl_eqs wc@(WC { wc_simple = simples, wc_impl = implics })
+      = do { simples' <- mapMaybeBagM (go_simple encl_eqs) simples
+           ; implics' <- mapBagM (go_implic encl_eqs) implics
            ; return (wc { wc_simple = simples', wc_impl = implics' }) }
 
-    go_simple :: Ct -> TcS (Maybe Ct)
-    go_simple ct = do { solved <- tryCtDefaultingStrategy ct
-                      ; if solved then return Nothing
-                                  else return (Just ct) }
+    go_simple :: Bool -> Ct -> TcS (Maybe Ct)
+    go_simple encl_eqs ct
+      = do { solved <- tryCtDefaultingStrategy encl_eqs ct
+           ; if solved then return Nothing
+                       else return (Just ct) }
 
-    go_implic :: Implication -> TcS Implication
-    -- The Maybe is because solving the CallStack constraint
-    -- may well allow us to discard the implication entirely
-    go_implic implic
-      | isSolvedStatus (ic_status implic)
+    go_implic :: Bool -> Implication -> TcS Implication
+    go_implic encl_eqs implic@(Implic { ic_status = status, ic_wanted = wanteds
+                                       , ic_given_eqs = given_eqs, ic_binds = binds })
+      | isSolvedStatus status
       = return implic  -- Nothing to solve inside here
       | otherwise
-      = do { wanteds <- setEvBindsTcS (ic_binds implic) $
-                        -- defaultCallStack sets a binding, so
-                        -- we must set the correct binding group
-                        go_wc (ic_wanted implic)
-           ; setImplicationStatus (implic { ic_wanted = wanteds }) }
+      = do { let encl_eqs' = encl_eqs || given_eqs /= NoGivenEqs
 
-tryCtDefaultingStrategy :: CtDefaultingStrategy
+           ; wanteds' <- setEvBindsTcS binds $
+                         -- defaultCallStack sets a binding, so
+                         -- we must set the correct binding group
+                         go_wc encl_eqs' wanteds
+
+           ; setImplicationStatus (implic { ic_wanted = wanteds' }) }
+
+tryCtDefaultingStrategy :: Bool -> CtDefaultingStrategy
 -- The composition of all the CtDefaultingStrategies we want
-tryCtDefaultingStrategy
+-- The Bool is True if there are enclosing equalities
+tryCtDefaultingStrategy encl_eqs
   = foldr1 combineStrategies
     ( defaultCallStack :|
       defaultExceptionContext :
-      defaultEquality :
+      defaultEquality encl_eqs :
       [] )
 
 -- | Default @ExceptionContext@ constraints to @emptyExceptionContext@.
@@ -459,62 +465,45 @@ defaultCallStack ct
   | otherwise
   = return False
 
-defaultEquality :: CtDefaultingStrategy
+defaultEquality :: Bool -> CtDefaultingStrategy
 -- See Note [Defaulting equalities]
-defaultEquality ct
+-- The Bool is True if there are enclosing equalities
+defaultEquality encl_eqs ct
   | EqPred eq_rel ty1 ty2 <- classifyPredType (ctPred ct)
   = do { -- Remember: `ct` may not be zonked;
          -- see (DE3) in Note [Defaulting equalities]
          z_ty1 <- TcS.zonkTcType ty1
        ; z_ty2 <- TcS.zonkTcType ty2
        ; case eq_rel of
-          { NomEq ->
-       -- Now see if either LHS or RHS is a bare type variable
-       -- You might think the type variable will only be on the LHS
-       -- but with a type function we might get   F t1 ~ alpha
-         case (getTyVar_maybe z_ty1, getTyVar_maybe z_ty2) of
-           (Just z_tv1, _) -> try_default_tv z_tv1 z_ty2
-           (_, Just z_tv2) -> try_default_tv z_tv2 z_ty1
-           _               -> return False ;
+           NomEq -> -- Now see if either LHS or RHS is a bare type variable
+                    -- You might think the type variable will only be on the LHS
+                    -- but with a type function we might get   F t1 ~ alpha
+                    case (getTyVar_maybe z_ty1, getTyVar_maybe z_ty2) of
+                      (Just z_tv1, _) -> try_default_tv_nom z_tv1 z_ty2
+                      (_, Just z_tv2) -> try_default_tv_nom z_tv2 z_ty1
+                      _               -> return False ;
 
-          ; ReprEq
-              -- See Note [Defaulting representational equalities]
-              | CIrredCan (IrredCt { ir_reason }) <- ct
-              , isInsolubleReason ir_reason
-              -- Don't do this for definitely insoluble representational
-              -- equalities such as Int ~R# Bool.
-              -> return False
-              | otherwise
-              ->
-       do { traceTcS "defaultEquality ReprEq {" $ vcat
-              [ text "ct:" <+> ppr ct
-              , text "z_ty1:" <+> ppr z_ty1
-              , text "z_ty2:" <+> ppr z_ty2
-              ]
-            -- Promote this representational equality to a nominal equality.
-            --
-            -- This handles cases such as @IO alpha[tau] ~R# IO Int@
-            -- by defaulting @alpha := Int@, which is useful in practice
-            -- (see Note [Defaulting representational equalities]).
-          ; (co, new_eqs, _unifs) <-
-              wrapUnifierX (ctEvidence ct) Nominal $
-              -- NB: nominal equality!
-                \ uenv -> uType uenv z_ty1 z_ty2
-            -- Only accept this solution if no new equalities are produced
-            -- by the unifier.
-            --
-            -- See Note [Defaulting representational equalities].
-          ; if null new_eqs
-            then do { setEvBindIfWanted (ctEvidence ct) EvCanonical $
-                       (evCoercion $ mkSubCo co)
-                    ; return True }
-            else return False
-          } } }
+           ReprEq -- See Note [Defaulting representational equalities]
+
+                  -- Don't even try this for definitely-insoluble representational
+                  -- equalities such as Int ~R# Bool.
+                  | CIrredCan (IrredCt { ir_reason }) <- ct
+                  , isInsolubleReason ir_reason
+                  -> return False
+
+                  -- Nor if there are enclosing equalities
+                  | encl_eqs
+                  -> return False
+
+                  | otherwise
+                  -> try_default_repr z_ty1 z_ty2
+        }
   | otherwise
   = return False
 
   where
-    try_default_tv lhs_tv rhs_ty
+    -- try_default_tv_nom: used for tv ~#N ty
+    try_default_tv_nom lhs_tv rhs_ty
       | MetaTv { mtv_info = info } <- tcTyVarDetails lhs_tv
       , tyVarKind lhs_tv `tcEqType` typeKind rhs_ty
       , checkTopShape info rhs_ty
@@ -556,6 +545,32 @@ defaultEquality ct
                ; return True
                }
 
+    try_default_repr z_ty1 z_ty2
+      = do { traceTcS "defaultEquality ReprEq {" $ vcat
+              [ text "ct:" <+> ppr ct
+              , text "z_ty1:" <+> ppr z_ty1
+              , text "z_ty2:" <+> ppr z_ty2
+              ]
+            -- Promote this representational equality to a nominal equality.
+            --
+            -- This handles cases such as @IO alpha[tau] ~R# IO Int@
+            -- by defaulting @alpha := Int@, which is useful in practice
+            -- (see Note [Defaulting representational equalities]).
+           ; (co, new_eqs) <- wrapUnifier (ctEvidence ct) Nominal $ \uenv ->
+                              -- NB: nominal equality!
+                              uType uenv z_ty1 z_ty2
+
+            -- Only accept this solution if no new equalities are produced
+            -- by the unifier.
+            --
+            -- See Note [Defaulting representational equalities].
+           ; if null new_eqs
+             then do { traceTcS "defaultEquality ReprEq } (yes)" empty
+                     ; setEvBindIfWanted (ctEvidence ct) EvCanonical $
+                       evCoercion $ mkSubCo co
+                     ; return True }
+             else do { traceTcS "defaultEquality ReprEq } (no)" empty
+                     ; return False } }
 
 combineStrategies :: CtDefaultingStrategy -> CtDefaultingStrategy -> CtDefaultingStrategy
 combineStrategies default1 default2 ct
@@ -741,7 +756,7 @@ is thus as follows:
 representational equalities into nominal ones; we only want to default a
 representational equality when we can fully solve it.
 
-Note that this does not threaten principle types. Recall that the original worry
+Note that this does not threaten principal types. Recall that the original worry
 (as per Note [Do not unify representational equalities]) was that we might have
 
     [W] alpha ~R# Int

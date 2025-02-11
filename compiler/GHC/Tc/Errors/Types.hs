@@ -619,8 +619,7 @@ data TcRnMessage where
      Test cases:
         None.
   -}
-  TcRnSimplifierTooManyIterations :: Cts
-                                  -> !IntWithInf
+  TcRnSimplifierTooManyIterations :: !IntWithInf
                                   -- ^ The limit.
                                   -> WantedConstraints
                                   -> TcRnMessage

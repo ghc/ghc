@@ -2,6 +2,9 @@
              ScopedTypeVariables, TypeFamilies, TypeApplications, NoPolyKinds,
              FlexibleContexts, AllowAmbiguousTypes #-}
 
+-- Sept 25: used to fail but now succeeds, because we don't complain
+--          about insolubles arising solely from fundeps
+
 module T18851b where
 
 -- NB: -XNoPolyKinds is important. Otherwise, we get IsInt :: forall k. k -> Constraint,

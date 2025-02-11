@@ -111,7 +111,8 @@ module GHC.Types.Basic (
 
         SuccessFlag(..), succeeded, failed, successIf,
 
-        IntWithInf, infinity, treatZeroAsInf, subWithInf, mkIntWithInf, intGtLimit,
+        IntWithInf, infinity, treatZeroAsInf, mkIntWithInf,
+        intGtLimit, subWithInf, mulWithInf,
 
         TypeOrKind(..), isTypeLevel, isKindLevel,
 
@@ -2166,8 +2167,8 @@ instance Outputable IntWithInf where
   ppr (Int n)  = int n
 
 instance Num IntWithInf where
-  (+) = plusWithInf
-  (*) = mulWithInf
+  (+) = plusWithInf2
+  (*) = mulWithInf2
 
   abs Infinity = Infinity
   abs (Int n)  = Int (abs n)
@@ -2184,16 +2185,21 @@ intGtLimit _ Infinity = False
 intGtLimit n (Int m)  = n > m
 
 -- | Add two 'IntWithInf's
-plusWithInf :: IntWithInf -> IntWithInf -> IntWithInf
-plusWithInf Infinity _        = Infinity
-plusWithInf _        Infinity = Infinity
-plusWithInf (Int a)  (Int b)  = Int (a + b)
+plusWithInf2 :: IntWithInf -> IntWithInf -> IntWithInf
+plusWithInf2 Infinity _        = Infinity
+plusWithInf2 _        Infinity = Infinity
+plusWithInf2 (Int a)  (Int b)  = Int (a + b)
 
 -- | Multiply two 'IntWithInf's
-mulWithInf :: IntWithInf -> IntWithInf -> IntWithInf
-mulWithInf Infinity _        = Infinity
-mulWithInf _        Infinity = Infinity
-mulWithInf (Int a)  (Int b)  = Int (a * b)
+mulWithInf2 :: IntWithInf -> IntWithInf -> IntWithInf
+mulWithInf2 Infinity _        = Infinity
+mulWithInf2 _        Infinity = Infinity
+mulWithInf2 (Int a)  (Int b)  = Int (a * b)
+
+-- | Multiply an 'IntWithInfo` by an 'Int'
+mulWithInf :: IntWithInf -> Int -> IntWithInf
+mulWithInf Infinity _ = Infinity
+mulWithInf (Int a)  b = Int (a * b)
 
 -- | Subtract an 'Int' from an 'IntWithInf'
 subWithInf :: IntWithInf -> Int -> IntWithInf

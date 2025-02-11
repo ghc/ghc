@@ -1,0 +1,15 @@
+T23162a.hs:28:30: error: [GHC-25897]
+    • Couldn't match expected type ‘a’ with actual type ‘Maybe a’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a. C Bool a => a -> Bool
+        at T23162a.hs:26:1-36
+    • In the second argument of ‘eq’, namely ‘(Just y)’
+      In the expression: eq x (Just y)
+      In the expression:
+        (eq x (Just y), const True (op @Bool @b True),
+         const True (op @Bool @a True))
+    • Relevant bindings include
+        y :: a (bound at T23162a.hs:27:21)
+        x :: a (bound at T23162a.hs:27:3)
+        f :: a -> Bool (bound at T23162a.hs:27:1)

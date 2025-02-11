@@ -1,5 +1,5 @@
 {-# LANGUAGE Haskell2010 #-}
-{-# LANGUAGE TypeFamilies, TypeFamilyDependencies #-}
+{-# LANGUAGE TypeFamilies, TypeFamilyDependencies, TypeOperators #-}
 module T13651 where
 
 type family F r s = f | f -> r s
@@ -15,22 +15,16 @@ foo :: (F cr cu ~ Bar h (Bar r u),
 foo = undefined
 
 {-  Typechecking this program used to /just/ succeed in GHC 8.2,
-    (see #14745 for why), but doesn't in 8.4.
+    (see #14745 for why), but fails in the ambiguity check for `foo` in 8.4.
 
-[G]  F cr cu ~ Bar h (Bar r u),
-     F cu cs ~ Bar (Foo h) (Bar u s))
+The ambiguity check gives:
 
+[G] F cr cu ~ Bar h (Bar r u),
+[G] F cu cs ~ Bar (Foo h) (Bar u s))
+[W] d1 : F cr cu0 ~ Bar h (Bar r u)
+[W] d2 : F cu0 cs ~ Bar (Foo h) (Bar u s)
 
-[W] F cr cu0 ~ Bar h (Bar r u)
-    --> (top-level fundeps)  cr ~ Bar h (Foo r)
-                             cu0 ~ Bar h (Foo u)
-        (local fundeps)      cu ~ cu0
-
-[W] F cu0 cs ~ Bar (Foo h) (Bar u s)
-    -->  (top-level fundeps)  cu0 ~ Bar (Foo h) (Foo u)
-                              cs  ~ Bar (Foo h) (Foo s)
-         (local fundeps)      cu0 ~ cu
-
-[W] F cr (Bar (Foo h) (Fo u)) ~ Bar h (Bar r u)
-
+Interacting with the local Given first gives cu~cu0, which
+solves it easily.  Do that before interacting with the top
+level instance.
 -}

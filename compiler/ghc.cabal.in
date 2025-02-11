@@ -863,6 +863,7 @@ Library
         GHC.Tc.Solver.Irred
         GHC.Tc.Solver.Equality
         GHC.Tc.Solver.Dict
+        GHC.Tc.Solver.FunDeps
         GHC.Tc.Solver.Monad
         GHC.Tc.Solver.Types
         GHC.Tc.TyCl

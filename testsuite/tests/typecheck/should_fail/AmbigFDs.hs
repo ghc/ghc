@@ -3,6 +3,9 @@
 -- But it is confusing, because we don't know whether b1 and b2 are really the
 -- same or not.
 
+-- Sept 25: used to fail but now succeeds, because we don't complain
+--          about insolubles arising solely from fundeps
+
 module AmbigFDs where
 
 class C a b | a -> b

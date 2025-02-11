@@ -16,7 +16,7 @@ module GHC.Tc.Solver.InertSet (
     -- * The inert set
     InertSet(..),
     InertCans(..),
-    emptyInertSet, emptyInertCans,
+    emptyInertSet, emptyInertCans, resetInertCans,
 
     noGivenNewtypeReprEqs, updGivenEqs,
     prohibitedSuperClassSolve,
@@ -76,7 +76,7 @@ import GHC.Utils.Panic
 import GHC.Data.Bag
 
 import Control.Monad      ( forM_ )
-import Data.List.NonEmpty ( NonEmpty(..), (<|) )
+import qualified Data.List.NonEmpty as NE
 import Data.Function      ( on )
 
 {-
@@ -305,7 +305,7 @@ instance Outputable WorkList where
 *                                                                      *
 ********************************************************************* -}
 
-type CycleBreakerVarStack = NonEmpty (Bag (TcTyVar, TcType))
+type CycleBreakerVarStack = NE.NonEmpty (Bag (TcTyVar, TcType))
    -- ^ a stack of (CycleBreakerTv, original family applications) lists
    -- first element in the stack corresponds to current implication;
    --   later elements correspond to outer implications
@@ -323,6 +323,7 @@ data InertSet
        , inert_givens :: InertCans
               -- A subset of inert_cans, containing only Givens
               -- Used to initialise inert_cans when recursing inside implications
+              -- See `resetInertCans`
 
        , inert_cycle_breakers :: CycleBreakerVarStack
 
@@ -378,12 +379,20 @@ emptyInertSet :: TcLevel -> InertSet
 emptyInertSet given_eq_lvl
   = IS { inert_cans           = empty_cans
        , inert_givens         = empty_cans
-       , inert_cycle_breakers = emptyBag :| []
+       , inert_cycle_breakers = emptyBag NE.:| []
        , inert_famapp_cache   = emptyFunEqs
        , inert_solved_dicts   = emptyDictMap
        , inert_safehask       = emptyDictMap }
   where
     empty_cans = emptyInertCans given_eq_lvl
+
+
+resetInertCans :: InertSet -> InertSet
+-- Reset the `inert_cans` to the saved `inert_givens :: InertCans`
+-- In effect, this just purges all Wanteds from the InertSet
+resetInertCans inerts@(IS { inert_givens = saved_givens })
+  = inerts { inert_cans = saved_givens }
+
 
 {- Note [Solved dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1801,7 +1810,7 @@ new equality, to maintain the inert-set invariants.
 NB: we could in principle avoid kick-out:
   a) When unifying a meta-tyvar from an outer level, because
      then the entire implication will be iterated; see
-     Note [The Unification Level Flag] in GHC.Tc.Solver.Monad.
+     Note [When to iterate the solver: unifications] in GHC.Tc.Solver.Solve
 
   b) For Givens, after a unification.  By (GivenInv) in GHC.Tc.Utils.TcType
      Note [TcLevel invariants], a Given can't include a meta-tyvar from
@@ -1914,8 +1923,9 @@ prohibitedSuperClassSolve given_loc wanted_loc
 
 -- | Push a fresh environment onto the cycle-breaker var stack. Useful
 -- when entering a nested implication.
-pushCycleBreakerVarStack :: CycleBreakerVarStack -> CycleBreakerVarStack
-pushCycleBreakerVarStack = (emptyBag <|)
+pushCycleBreakerVarStack :: InertSet -> InertSet
+pushCycleBreakerVarStack inerts@(IS { inert_cycle_breakers = cbs })
+  = inerts { inert_cycle_breakers = emptyBag NE.<| cbs }
 
 -- | Add a new cycle-breaker binding to the top environment on the stack.
 addCycleBreakerBindings :: Bag (TcTyVar, Type)   -- ^ (cbv,expansion) pairs
@@ -1924,14 +1934,14 @@ addCycleBreakerBindings prs ics
   = assertPpr (all (isCycleBreakerTyVar . fst) prs) (ppr prs) $
     ics { inert_cycle_breakers = add_to (inert_cycle_breakers ics) }
   where
-    add_to (top_env :| rest_envs) = (prs `unionBags` top_env) :| rest_envs
+    add_to (top_env NE.:| rest_envs) = (prs `unionBags` top_env) NE.:| rest_envs
 
 -- | Perform a monadic operation on all pairs in the top environment
 -- in the stack.
 forAllCycleBreakerBindings_ :: Monad m
                             => CycleBreakerVarStack
                             -> (TcTyVar -> TcType -> m ()) -> m ()
-forAllCycleBreakerBindings_ (top_env :| _rest_envs) action
+forAllCycleBreakerBindings_ (top_env NE.:| _rest_envs) action
   = forM_ top_env (uncurry action)
 {-# INLINABLE forAllCycleBreakerBindings_ #-}  -- to allow SPECIALISE later
 
