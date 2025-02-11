@@ -440,43 +440,45 @@ uncondInlineJoin bndrs body
   | exprIsTrivial body
   = True   -- Nullary constructors, literals
 
-  -- (DJ3)(b)
-  | (Var v, args) <- collectArgs body
-  , all exprIsTrivial args
-  , isJoinId v   -- Indirection to another join point; always inline
-  = True
-
-  -- (DJ3)(c)
-  | trivialAppWithoutFreeArgs
+  -- (DJ3)(b) and (DJ3)(c) combined
+  | indirectionOrAppWithoutFVs
   = True
 
   | otherwise
   = False
 
   where
+    -- (DJ3)(b):
+    -- - $j1 x = $j2 y x |> co  -- YES, inline indirection regardless of free vars
     -- (DJ3)(c):
     -- - $j1 x y = K y x |> co  -- YES, inline!
     -- - $j2 x = K f x          -- No, don't! (because f is free)
-    trivialAppWithoutFreeArgs = go body
+    indirectionOrAppWithoutFVs = go False body
 
-    go (App f a)
-      | go_arg a         = go f
-      | otherwise        = False
-    go (Cast e _)        = go e
-    go (Tick _ e)        = go e
-    go (Var v)
-      | isDataConId v    = True -- e.g. $j a b = K a b
-      | v `elem` bndrs   = True -- e.g. $j a b = b a
-    go _                 = False
+    go !seen_fv (App f a)
+      | Just has_fv <- go_arg a
+                          = go (seen_fv || has_fv) f
+      | otherwise         = False       -- Not trivial
+    go seen_fv (Var v)
+      | isJoinId v        = True        -- Indirection to another join point; always inline
+      | isDataConId v     = not seen_fv -- e.g. $j a b = K a b
+      | v `elem` bndrs    = not seen_fv -- e.g. $j a b = b a
+    go seen_fv (Cast e _) = go seen_fv e
+    go seen_fv (Tick _ e) = go seen_fv e
+    go _ _                = False
 
-    go_arg (Type {})     = True
-    go_arg (Coercion {}) = True
+    -- go_arg returns:
+    --  - `Nothing` if arg is not trivial
+    --  - `Just True` if arg is trivial and contains free var
+    --  - `Just False` if arg is trivial without free vars
+    go_arg (Type {})     = Just False
+    go_arg (Coercion {}) = Just False
     go_arg (Lit l)
-      | litIsTrivial l   = Just False   -- $j x = $j2 x 7 YES, but $j x = K x 7 NO
+      | litIsTrivial l   = Just False   -- e.g. $j x = $j2 x 7 YES, but $j x = K x 7 NO
     go_arg (App f a)
-    go_arg (Var f)       = f `elem` bndrs
-    go_arg _             = False
       | isTyCoArg a      = go_arg f     -- e.g. $j f = K (f @a)
+    go_arg (Var f)       = Just $! f `notElem` bndrs
+    go_arg _             = Nothing
 
 
 sizeExpr :: UnfoldingOpts
