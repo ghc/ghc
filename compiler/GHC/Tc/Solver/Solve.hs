@@ -42,10 +42,11 @@ import GHC.Types.Id(  idType )
 import GHC.Types.Var( EvVar, tyVarKind )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Basic ( IntWithInf, intGtLimit )
+import GHC.Types.Basic ( IntWithInf, mulWithInf, intGtLimit )
 import GHC.Types.Unique.Set( nonDetStrictFoldUniqSet )
 
 import GHC.Data.Bag
+import GHC.Data.Maybe
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -57,7 +58,6 @@ import GHC.Driver.Session
 import Control.Monad
 
 import Data.List( deleteFirstsBy )
-import Data.Maybe ( mapMaybe )
 import qualified Data.Semigroup as S
 import Data.Void( Void )
 
@@ -120,58 +120,88 @@ simplify_loop n limit definitely_redo_implications
                             , int (lengthBag simples) <+> text "simples to solve" ])
        ; traceTcS "simplify_loop: wc =" (ppr wc)
 
-       ; (unifs1, simples1) <- reportUnifications $  -- See Note [Superclass iteration]
-                               solveSimpleWanteds simples
+       ; (unif_happened, simples1) <- reportUnifications $  -- See Note [Superclass iteration]
+                                      solveSimpleWanteds simples
                 -- Any insoluble constraints are in 'simples' and so get rewritten
                 -- See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet
 
-       ; wc2 <- if not definitely_redo_implications  -- See Note [Superclass iteration]
-                   && unifs1 == 0                    -- for this conditional
+       ; wc2 <- if not (definitely_redo_implications  -- See Note [Superclass iteration]
+                        || unif_happened)             -- for this conditional
                 then return (wc { wc_simple = simples1 })  -- Short cut
                 else do { implics1 <- solveNestedImplications implics
                         ; return (wc { wc_simple = simples1
                                      , wc_impl   = implics1 }) }
 
-       ; unif_happened <- resetUnificationFlag
+       ; unif_happened <- getUnificationFlag
        ; csTraceTcS $ text "unif_happened" <+> ppr unif_happened
          -- Note [The Unification Level Flag] in GHC.Tc.Solver.Monad
        ; maybe_simplify_again (n+1) limit unif_happened wc2 }
 
+data NextAction
+  = NA_Stop                 -- Just return the WantedConstraints
+  | NA_TryAgain             -- Try again with the given wc
+        WantedConstraints   --    with these WantedConstraints
+        Bool                -- See `definitely_redo_implications` in the comment
+                            --    for `simplify_loop`
+
 maybe_simplify_again :: Int -> IntWithInf -> Bool
                      -> WantedConstraints -> TcS WantedConstraints
 maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
-  | n `intGtLimit` limit
-  = do { -- Add an error (not a warning) if we blow the limit,
-         -- Typically if we blow the limit we are going to report some other error
-         -- (an unsolved constraint), and we don't want that error to suppress
-         -- the iteration limit warning!
-         addErrTcS $ TcRnSimplifierTooManyIterations simples limit wc
-       ; return wc }
+  = do { -- Look for reasons to stop or continue
+         --   Nothing     => I don't have an opinion
+         --   Just action => Do this action
+         result <- firstJustsM [ check_limit
+                               , check_unif_happened
+                               , try_expanding_superclasses ]
+       ; case result of
+           Nothing      -> return wc
+           Just NA_Stop -> return wc
+           Just (NA_TryAgain updated_wc redo_implics)
+                       -> simplify_loop n limit redo_implics updated_wc }
+  where
+    check_limit :: TcS (Maybe NextAction)
+    check_limit
+      | n `intGtLimit` limit
+      = do { -- Add an error (not a warning) if we blow the limit,
+             -- Typically if we blow the limit we are going to report some other error
+             -- (an unsolved constraint), and we don't want that error to suppress
+             -- the iteration limit warning!
+             addErrTcS $ TcRnSimplifierTooManyIterations simples limit wc
+           ; return (Just NA_Stop) }
 
-  | unif_happened
-  = simplify_loop n limit True wc
+      | otherwise
+      = return Nothing
 
-  | superClassesMightHelp wc    -- Returns False quickly if wc is solved
-  = -- We still have unsolved goals, and apparently no way to solve them,
-    -- so try expanding superclasses at this level, both Given and Wanted
-    do { pending_given <- getPendingGivenScs
-       ; let (pending_wanted, simples1) = getPendingWantedScs simples
-       ; if null pending_given && null pending_wanted
-           then return wc  -- After all, superclasses did not help
-           else
-    do { new_given  <- makeSuperClasses pending_given
-       ; new_wanted <- makeSuperClasses pending_wanted
-       ; solveSimpleGivens new_given -- Add the new Givens to the inert set
-       ; traceTcS "maybe_simplify_again" (vcat [ text "pending_given" <+> ppr pending_given
-                                               , text "new_given" <+> ppr new_given
-                                               , text "pending_wanted" <+> ppr pending_wanted
-                                               , text "new_wanted" <+> ppr new_wanted ])
-       ; simplify_loop n limit (not (null pending_given)) $
-         wc { wc_simple = simples1 `unionBags` listToBag new_wanted } } }
-         -- (not (null pending_given)): see Note [Superclass iteration]
+    check_unif_happened :: TcS (Maybe NextAction)
+    check_unif_happened
+      | unif_happened = return (Just (NA_TryAgain wc True))
+      | otherwise     = return Nothing
 
-  | otherwise
-  = return wc
+    try_expanding_superclasses :: TcS (Maybe NextAction)
+    try_expanding_superclasses
+      | superClassesMightHelp wc    -- Returns False quickly if wc is solved
+      = -- We still have unsolved goals, and apparently no way to solve them,
+        -- so try expanding superclasses at this level, both Given and Wanted
+        do { pending_given <- getPendingGivenScs
+           ; let (pending_wanted, simples1) = getPendingWantedScs simples
+           ; if null pending_given && null pending_wanted
+               then return Nothing  -- After all, superclasses did not help
+               else
+        do { new_given  <- makeSuperClasses pending_given
+           ; new_wanted <- makeSuperClasses pending_wanted
+           ; solveSimpleGivens new_given -- Add the new Givens to the inert set
+           ; traceTcS "try_expanding_superclasses"
+               (vcat [ text "pending_given" <+> ppr pending_given
+                     , text "new_given" <+> ppr new_given
+                     , text "pending_wanted" <+> ppr pending_wanted
+                     , text "new_wanted" <+> ppr new_wanted ])
+           ; let updated_wc =
+                    wc { wc_simple = simples1 `unionBags` listToBag new_wanted }
+           ; return (Just (NA_TryAgain updated_wc (not (null pending_given)))) }}
+             -- (not (null pending_given)): see Note [Superclass iteration]
+
+      | otherwise
+      = return Nothing
 
 {- Note [Superclass iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -192,6 +222,9 @@ Hence the definitely_redo_implications flag to simplify_loop.  It's usually
 True, but False in the case where the only reason to iterate is new Wanted
 superclasses.  In that case we check whether the new Wanteds actually led to
 any new unifications, and iterate the implications only if so.
+
+"RAE": Add comment here about fundeps also using this mechanism. And probably
+update name of Note.
 -}
 
 {- Note [Expanding Recursive Superclasses and ExpansionFuel]
@@ -1010,45 +1043,55 @@ solveSimpleGivens givens
 
 solveSimpleWanteds :: Cts -> TcS Cts
 -- The result is not necessarily zonked
-solveSimpleWanteds simples
+solveSimpleWanteds wc
   = do { mode   <- getTcSMode
        ; dflags <- getDynFlags
        ; inerts <- getInertSet
+       ; let iteration_count_flag = solverIterations dflags
 
        ; traceTcS "solveSimpleWanteds {" $
          vcat [ text "Mode:" <+> ppr mode
               , text "Inerts:" <+> ppr inerts
-              , text "Wanteds to solve:" <+> ppr simples ]
+              , text "Wanteds to solve:" <+> ppr wc ]
 
-       ; (n,wc) <- go 1 (solverIterations dflags) simples
+       ; wc1 <- iterateToFixpoint iteration_count_flag
+                  (do_solve_and_plugins iteration_count_flag) wc
 
        ; traceTcS "solveSimpleWanteds end }" $
-             vcat [ text "iterations =" <+> ppr n
-                  , text "residual =" <+> ppr wc ]
-       ; return wc }
+             vcat [ text "residual =" <+> ppr wc1 ]
+       ; return wc1 }
   where
-    go :: Int -> IntWithInf -> Cts -> TcS (Int, Cts)
-    -- See Note [The solveSimpleWanteds loop]
-    go n limit wc
+    do_solve_and_plugins :: IntWithInf -> Cts -> TcS (Bool,Cts)
+    do_solve_and_plugins icf wc
+      = do { wc1 <- iterateToFixpoint (icf `mulWithInf` 10)
+                              do_solve wc
+           ; runTcPluginsWanted wc1 }
+
+    do_solve :: Cts -> TcS (Bool,Cts)
+    -- Try this repeatedly, until no unifications happen
+    -- This is potentially quadratic, because we might solve just one
+    -- constraint in each iteration but that seems inevitable
+    do_solve wc = reportUnifications (solve_simple_wanteds wc)
+
+
+iterateToFixpoint :: IntWithInf -> (Cts -> TcS (Bool,Cts)) -> Cts -> TcS Cts
+-- See Note [The solveSimpleWanteds loop]
+iterateToFixpoint limit do_it wc_orig
+  = go 1 wc_orig
+  where
+    go n wc
+      | isEmptyBag wc
+      = return wc
+
       | n `intGtLimit` limit
       = failTcS $ TcRnSimplifierTooManyIterations
-                         simples limit (emptyWC { wc_simple = wc })
-      | isEmptyBag wc
-      = return (n,wc)
+                         wc_orig limit (emptyWC { wc_simple = wc })
+
       | otherwise
-      = do { -- Solve
-             wc1 <- solve_simple_wanteds wc
-
-             -- Run plugins
-             -- NB: runTcPluginsWanted has a fast path for empty wc1,
-             --     which is the common case
-           ; (rerun_plugin, wc2) <- runTcPluginsWanted wc1
-
-           ; if rerun_plugin
-             then do { traceTcS "solveSimple going round again:" (ppr rerun_plugin)
-                     ; go (n+1) limit wc2 }   -- Loop
-             else return (n, wc2) }           -- Done
-
+      = do { (something_happened, wc1) <- do_it wc
+           ; if something_happened
+             then go (n+1) wc1
+             else return wc1 }
 
 solve_simple_wanteds :: Cts -> TcS Cts
 -- Try solving these constraints
@@ -1618,7 +1661,7 @@ finish_rewrite
              new_tm = assert (coercionRole co == ev_rw_role)
                       evCast (evId old_evar) $   -- evCast optimises ReflCo
                       downgradeRole Representational ev_rw_role co
-       ; new_ev <- newGivenEvVar loc (new_pred, new_tm)
+       ; new_ev <- newGivenEv loc (new_pred, new_tm)
        ; continueWith $ CtGiven new_ev }
 
 finish_rewrite
