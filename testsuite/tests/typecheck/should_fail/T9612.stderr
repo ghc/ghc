@@ -1,11 +1,11 @@
-
-T9612.hs:16:9: error: [GHC-18872]
-    • Couldn't match type: [(Int, a)]
-                     with: (Int, a)
-        arising from a functional dependency between:
-          constraint ‘MonadWriter (Int, a) (WriterT [(Int, a)] Identity)’
-            arising from a use of ‘tell’
-          instance ‘MonadWriter w (WriterT w m)’ at T9612.hs:20:10-59
+T9612.hs:16:9: error: [GHC-39999]
+    • Could not deduce ‘MonadWriter
+                          (Int, a) (WriterT [(Int, a)] Identity)’
+        arising from a use of ‘tell’
+      from the context: Eq a
+        bound by the type signature for:
+                   f :: forall a. Eq a => a -> (Int, a) -> Writer [(Int, a)] (Int, a)
+        at T9612.hs:13:1-57
     • In a stmt of a 'do' block: tell (n, x)
       In the expression:
         do tell (n, x)
@@ -14,8 +14,4 @@ T9612.hs:16:9: error: [GHC-18872]
           f y (n, x)
             = do tell (n, x)
                  return (1, y)
-    • Relevant bindings include
-        x :: a (bound at T9612.hs:14:8)
-        y :: a (bound at T9612.hs:14:3)
-        f :: a -> (Int, a) -> Writer [(Int, a)] (Int, a)
-          (bound at T9612.hs:14:1)
+

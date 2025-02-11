@@ -395,9 +395,9 @@ tryConstraintDefaulting wc
   | isEmptyWC wc
   = return wc
   | otherwise
-  = do { (n_unifs, better_wc) <- reportUnifications (go_wc wc)
+  = do { (unif_happened, better_wc) <- reportCoarseGrainUnifications (go_wc wc)
          -- We may have done unifications; so solve again
-       ; solveAgainIf (n_unifs > 0) better_wc }
+       ; solveAgainIf unif_happened better_wc }
   where
     go_wc :: WantedConstraints -> TcS WantedConstraints
     go_wc wc@(WC { wc_simple = simples, wc_impl = implics })
@@ -468,53 +468,29 @@ defaultEquality ct
          z_ty1 <- TcS.zonkTcType ty1
        ; z_ty2 <- TcS.zonkTcType ty2
        ; case eq_rel of
-          { NomEq ->
-       -- Now see if either LHS or RHS is a bare type variable
-       -- You might think the type variable will only be on the LHS
-       -- but with a type function we might get   F t1 ~ alpha
-         case (getTyVar_maybe z_ty1, getTyVar_maybe z_ty2) of
-           (Just z_tv1, _) -> try_default_tv z_tv1 z_ty2
-           (_, Just z_tv2) -> try_default_tv z_tv2 z_ty1
-           _               -> return False ;
+           NomEq -> -- Now see if either LHS or RHS is a bare type variable
+                    -- You might think the type variable will only be on the LHS
+                    -- but with a type function we might get   F t1 ~ alpha
+                    case (getTyVar_maybe z_ty1, getTyVar_maybe z_ty2) of
+                      (Just z_tv1, _) -> try_default_tv_nom z_tv1 z_ty2
+                      (_, Just z_tv2) -> try_default_tv_nom z_tv2 z_ty1
+                      _               -> return False ;
 
-          ; ReprEq
-              -- See Note [Defaulting representational equalities]
-              | CIrredCan (IrredCt { ir_reason }) <- ct
-              , isInsolubleReason ir_reason
-              -- Don't do this for definitely insoluble representational
-              -- equalities such as Int ~R# Bool.
-              -> return False
-              | otherwise
-              ->
-       do { traceTcS "defaultEquality ReprEq {" $ vcat
-              [ text "ct:" <+> ppr ct
-              , text "z_ty1:" <+> ppr z_ty1
-              , text "z_ty2:" <+> ppr z_ty2
-              ]
-            -- Promote this representational equality to a nominal equality.
-            --
-            -- This handles cases such as @IO alpha[tau] ~R# IO Int@
-            -- by defaulting @alpha := Int@, which is useful in practice
-            -- (see Note [Defaulting representational equalities]).
-          ; (co, new_eqs, _unifs) <-
-              wrapUnifierX (ctEvidence ct) Nominal $
-              -- NB: nominal equality!
-                \ uenv -> uType uenv z_ty1 z_ty2
-            -- Only accept this solution if no new equalities are produced
-            -- by the unifier.
-            --
-            -- See Note [Defaulting representational equalities].
-          ; if null new_eqs
-            then do { setEvBindIfWanted (ctEvidence ct) EvCanonical $
-                       (evCoercion $ mkSubCo co)
-                    ; return True }
-            else return False
-          } } }
+           ReprEq -- See Note [Defaulting representational equalities]
+                  | CIrredCan (IrredCt { ir_reason }) <- ct
+                  , isInsolubleReason ir_reason
+                  -- Don't do this for definitely insoluble representational
+                  -- equalities such as Int ~R# Bool.
+                  -> return False
+                  | otherwise
+                  -> try_default_repr z_ty1 z_ty2
+        }
   | otherwise
   = return False
 
   where
-    try_default_tv lhs_tv rhs_ty
+    -- try_default_tv_nom: used for tv ~#N ty
+    try_default_tv_nom lhs_tv rhs_ty
       | MetaTv { mtv_info = info } <- tcTyVarDetails lhs_tv
       , tyVarKind lhs_tv `tcEqType` typeKind rhs_ty
       , checkTopShape info rhs_ty
@@ -556,6 +532,32 @@ defaultEquality ct
                ; return True
                }
 
+    try_default_repr z_ty1 z_ty2
+      = do { traceTcS "defaultEquality ReprEq {" $ vcat
+              [ text "ct:" <+> ppr ct
+              , text "z_ty1:" <+> ppr z_ty1
+              , text "z_ty2:" <+> ppr z_ty2
+              ]
+            -- Promote this representational equality to a nominal equality.
+            --
+            -- This handles cases such as @IO alpha[tau] ~R# IO Int@
+            -- by defaulting @alpha := Int@, which is useful in practice
+            -- (see Note [Defaulting representational equalities]).
+           ; (co, new_eqs) <- wrapUnifier (ctEvidence ct) Nominal $ \uenv ->
+                              -- NB: nominal equality!
+                              uType uenv z_ty1 z_ty2
+
+            -- Only accept this solution if no new equalities are produced
+            -- by the unifier.
+            --
+            -- See Note [Defaulting representational equalities].
+           ; if null new_eqs
+             then do { traceTcS "defaultEquality ReprEq } (yes)" empty
+                     ; setEvBindIfWanted (ctEvidence ct) EvCanonical $
+                       evCoercion $ mkSubCo co
+                     ; return True }
+             else do { traceTcS "defaultEquality ReprEq } (no)" empty
+                     ; return False } }
 
 combineStrategies :: CtDefaultingStrategy -> CtDefaultingStrategy -> CtDefaultingStrategy
 combineStrategies default1 default2 ct

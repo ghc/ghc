@@ -1217,8 +1217,7 @@ insolubleWantedCt ct
       -- It has no rewriters; see (IW2) in Note [Insoluble Wanteds]
   , not (isGivenLoc loc)
       -- isGivenLoc: see (IW3) in Note [Insoluble Wanteds]
-  , not (isWantedWantedFunDepOrigin (ctLocOrigin loc))
-      -- origin check: see (IW4) in Note [Insoluble Wanteds]
+  -- See also historical (IW4) in Note [Insoluble Wanteds]
   = True
 
   | otherwise
@@ -1328,9 +1327,10 @@ can't be solved.  But not quite all such constraints; see wrinkles.
 (IW3) If the Wanted arises from a Given (how can that happen?), don't
    treat it as a Wanted insoluble (obviously).
 
-(IW4) If the Wanted came from a  Wanted/Wanted fundep interaction, don't
-   treat the constraint as insoluble. See Note [Suppressing confusing errors]
-   in GHC.Tc.Errors
+(IW4) Historical note: we used to have equalities arising from
+   Wanted/Wanted fundep interactions, which we did not want to treat
+   as insoluble.  But now such fundep constraints never escape.
+   See Note [Overview of functional dependencies in type inference]
 
 Note [Insoluble holes]
 ~~~~~~~~~~~~~~~~~~~~~~

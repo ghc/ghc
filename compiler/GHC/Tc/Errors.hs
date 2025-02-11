@@ -733,7 +733,6 @@ suppressItem item
   | Wanted <- ei_flavour item
   , let orig = errorItemOrigin item
   = isWantedSuperclassOrigin orig       -- See (SCE1)
-    || isWantedWantedFunDepOrigin orig  -- See (SCE2)
   | otherwise
   = False
 
@@ -777,7 +776,12 @@ Which errors are suppressed?
    See test T18851 for an example of how it is (just, barely) possible for the /only/
    errors to be superclass-of-Wanted constraints.
 
-(SCE2) Errors which arise from the interaction of two Wanted fun-dep constraints.
+Historical (SCE2).  Fundep constraints never "escape" into the
+   main solver and so never show up in error messages.
+   See (SOLVE-FD) in Note [Overview of functional dependencies in type inference]
+   in GHC.Tc.Solver.FunDeps.  So this wrinkle is now just a historical note.
+
+   Errors which arise from the interaction of two Wanted fun-dep constraints.
    Example:
 
      class C a b | a -> b where
@@ -804,6 +808,8 @@ Which errors are suppressed?
    This case applies only when both fundeps are *Wanted* fundeps; when
    both are givens, the error represents unreachable code. For
    a Given/Wanted case, see #9612.
+
+   End of historical (SCE2)
 
 Mechanism:
 
