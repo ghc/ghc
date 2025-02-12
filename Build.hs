@@ -261,7 +261,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , "allow-newer: ghc-boot-th"
         , ""
         , "package ghc"
-        , "  flags: +internal-interpreter"
+        , "  flags: +build-tool-depends +internal-interpreter"
         , ""
         , "package ghci"
         , "  flags: +internal-interpreter"
@@ -693,11 +693,17 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "  shared: False"
         , "  executable-profiling: False"
         , "  executable-dynamic: False"
-        , "  executable-static: False"
+        , "  executable-static: True"
         , ""
         , "package ghc"
-             -- Require genprimopcode, etc. used by Setup.hs
-        , "  flags: +build-tool-depends"
+             -- build-tool-depends: require genprimopcode, etc. used by Setup.hs
+             -- internal-interpreter: otherwise our compiler has the internal
+             -- interpreter but not the boot library we install
+             -- FIXME: we should really install the lib we used to build stage2
+        , "  flags: +build-tool-depends +internal-interpreter"
+        , ""
+        , "package ghci"
+        , "  flags: +internal-interpreter"
         , ""
         , "package ghc-internal"
              -- FIXME: make our life easier for now by using the native bignum backend
