@@ -34,6 +34,7 @@ import GHCi.BreakArray
 import GHCi.ResolvedBCO
 
 import GHC.LanguageExtensions
+import GHC.InfoProv
 import qualified GHC.Exts.Heap as Heap
 import GHC.ForeignSrcLang
 import GHC.Fingerprint
@@ -224,6 +225,12 @@ data Message a where
     :: HValueRef
     -> Message (Heap.GenClosure HValueRef)
 
+  -- | Remote interface to GHC.InfoProv.whereFrom. This is used by
+  -- the GHCi debugger to inspect the provenance of thunks for :print.
+  WhereFrom
+    :: HValueRef
+    -> Message (Maybe InfoProv)
+
   -- | Evaluate something. This is used to support :force in GHCi.
   Seq
     :: HValueRef
@@ -239,6 +246,7 @@ data Message a where
   NewBreakModule
    :: String
    -> Message (RemotePtr BreakModule)
+
 
 deriving instance Show (Message a)
 
@@ -515,6 +523,15 @@ instance Binary Heap.StgInfoTable
 instance Binary Heap.ClosureType
 instance Binary Heap.PrimType
 instance Binary a => Binary (Heap.GenClosure a)
+instance Binary InfoProv where
+#if MIN_VERSION_base(4,20,0)
+  get = InfoProv <$> get <*> get <*> get <*> get <*> get <*> get <*> get <*> get
+  put (InfoProv x1 x2 x3 x4 x5 x6 x7 x8)
+    = put x1 >> put x2 >> put x3 >> put x4 >> put x5 >> put x6 >> put x7 >> put x8
+#else
+  get = InfoProv <$> get <*> get <*> get <*> get <*> get <*> get <*> get
+  put (InfoProv x1 x2 x3 x4 x5 x6 x7) = put x1 >> put x2 >> put x3 >> put x4 >> put x5 >> put x6 >> put x7
+#endif
 
 data Msg = forall a . (Binary a, Show a) => Msg (Message a)
 
@@ -564,6 +581,7 @@ getMessage = do
       38 -> Msg <$> (ResumeSeq <$> get)
       39 -> Msg <$> (NewBreakModule <$> get)
       40 -> Msg <$> (LookupSymbolInDLL <$> get <*> get)
+      41 -> Msg <$> (WhereFrom <$> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -610,6 +628,7 @@ putMessage m = case m of
   ResumeSeq a                 -> putWord8 38 >> put a
   NewBreakModule name         -> putWord8 39 >> put name
   LookupSymbolInDLL dll str   -> putWord8 40 >> put dll >> put str
+  WhereFrom a                 -> putWord8 41 >> put a
 
 {-
 Note [Parallelize CreateBCOs serialization]
