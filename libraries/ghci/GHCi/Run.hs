@@ -19,6 +19,7 @@ import GHCi.CreateBCO
 import GHCi.InfoTable
 #endif
 
+import qualified GHC.InfoProv as InfoProv
 import GHCi.FFI
 import GHCi.Message
 import GHCi.ObjLink
@@ -115,6 +116,8 @@ run m = case m of
   GetClosure ref -> do
     clos <- Heap.getClosureData =<< localRef ref
     mapM (\(Heap.Box x) -> mkRemoteRef (HValue x)) clos
+  WhereFrom ref ->
+    InfoProv.whereFrom =<< localRef ref
   Seq ref -> doSeq ref
   ResumeSeq ref -> resumeSeq ref
 
