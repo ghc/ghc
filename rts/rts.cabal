@@ -1,4 +1,4 @@
-cabal-version: 3.4
+cabal-version: 3.8
 name: rts
 version: 1.0.3
 synopsis: The GHC runtime system
