@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -17,6 +18,7 @@ module GHC.Internal.InfoProv.Types
     , lookupIPE
     ) where
 
+import GHC.Internal.Generics
 import GHC.Internal.Base
 import GHC.Internal.Enum
 import GHC.Internal.Real (fromIntegral)
@@ -41,7 +43,7 @@ data InfoProv = InfoProv {
   ipMod :: String,
   ipSrcFile :: String,
   ipSrcSpan :: String
-} deriving (Eq, Show)
+} deriving (Eq, Show, Generic)
 
 ipLoc :: InfoProv -> String
 ipLoc ipe = ipSrcFile ipe ++ ":" ++ ipSrcSpan ipe
