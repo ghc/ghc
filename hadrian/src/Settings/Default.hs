@@ -80,6 +80,7 @@ stageBootPackages = return
 stage0Packages :: Action [Package]
 stage0Packages = do
     cross <- flag CrossCompiling
+    haveCurses <- any (/= "") <$> traverse setting [ CursesIncludeDir, CursesLibDir ]
     return $ [ cabalSyntax
              , cabal
              , compiler
@@ -116,8 +117,8 @@ stage0Packages = do
              -- that confused Hadrian, so we must make those a stage0 package as well.
              -- Once we drop `Win32`/`unix` it should be possible to drop those too.
              ]
-          ++ [ terminfo | not windowsHost, not cross ]
-          ++ [ timeout  | windowsHost                ]
+          ++ [ terminfo | not windowsHost, (not cross || haveCurses) ]
+          ++ [ timeout  | windowsHost                                ]
 
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
 stage1Packages :: Action [Package]
