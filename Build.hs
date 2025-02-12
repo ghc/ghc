@@ -457,6 +457,7 @@ prepareGhcSources opts dst = do
   subst_in (dst </> "utils/iserv/iserv.cabal") common_substs
 
   subst_in (dst </> "libraries/ghc-internal/ghc-internal.cabal") common_substs
+  subst_in (dst </> "libraries/ghc-experimental/ghc-experimental.cabal") common_substs
   subst_in (dst </> "libraries/base/base.cabal") common_substs
   subst_in (dst </> "libraries/rts/include/ghcversion.h") common_substs
 
@@ -624,7 +625,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   cp (dst_libffi </> "include" </> "*") (src_rts </> "include")
   cp (dst_libffi </> "lib" </> "libffi.a") (takeDirectory ghcplatform_dir </> "libCffi.a")
 
-  -- build boot libraries: ghc-internal, base... but not GHC itself
+  -- build boot libraries: ghc-internal, base...
   let cabal_project_bootlibs_path = dst </> "cabal-project-boot-libs"
   makeCabalProject cabal_project_bootlibs_path $
         [ "package-dbs: clear, global"
@@ -633,6 +634,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "  " ++ src </> "libraries/rts"
         , "  " ++ src </> "libraries/ghc-prim"
         , "  " ++ src </> "libraries/ghc-internal"
+        , "  " ++ src </> "libraries/ghc-experimental"
         , "  " ++ src </> "libraries/base"
         , "  " ++ src </> "libraries/ghc"
         , "  " ++ src </> "libraries/ghc-platform/"
@@ -724,6 +726,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "rts"
         , "ghc-internal"
         , "base"
+        , "ghc-experimental"
         , "stm"
           -- shallow compat packages over ghc-internal
         , "ghc-prim"
