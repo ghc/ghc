@@ -2233,7 +2233,7 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
      -- See Note [Wildcard names]
      (wc_nm, mk_wc_details) = case hole_mode of
                HM_Sig      -> (fsLit "w", newTauTvDetailsAtLevel)
-               HM_FamPat   -> (fsLit "_", newNoDefTauTvDetailsAtLevel)
+               HM_FamPat   -> (fsLit "_", newTyVarTvDetailsAtLevel)
                HM_VTA      -> (fsLit "w", newTauTvDetailsAtLevel)
                HM_TyAppPat -> (fsLit "_", newTauTvDetailsAtLevel)
 

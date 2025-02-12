@@ -94,5 +94,23 @@ dix9 (Dix9 x) = x
 -- anonymous wildcard should work
 class DixC10 a where
   type Dix10 a
-instance DixC10 Int where
+-- instance DixC10 Int where -- type is not allowed to match against a wildcard
+instance DixC10 a where
   type Dix10 _ = Bool
+
+-- wildcard can match with type variable however
+data Tree a = Leaf a | Node (Tree (G a a)) (Tree (G a a))
+class D a where
+  type G a b
+
+class C a where { type T a b }
+
+instance C (p,p) where
+    type T (_,_) b = Int
+
+instance C (Maybe [a]) where
+  type T (Maybe [a]) _ = a->a
+
+instance C (Tree a) where
+  type T (Tree _) b = b->b
+
