@@ -184,10 +184,10 @@ bindSuspensions t = do
                                     (term, names) <- t
                                     return (RefWrap ty term, names)
                       }
-        doSuspension hsc_env freeNames ct ty hval _name = do
+        doSuspension hsc_env freeNames ct ty hval _name ipe = do
           name <- atomicModifyIORef' freeNames (\(Inf x xs)->(xs, x))
           n <- newGrimName hsc_env name
-          return (Suspension ct ty hval (Just n), [(n,ty,hval)])
+          return (Suspension ct ty hval (Just n) ipe, [(n,ty,hval)])
 
 
 --  A custom Term printer to enable the use of Show instances

@@ -26,6 +26,7 @@ module GHC.Runtime.Interpreter
   , breakpointStatus
   , getBreakpointVar
   , getClosure
+  , whereFrom
   , getModBreaks
   , seqHValue
   , evalBreakpointToId
@@ -115,6 +116,7 @@ import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Directory
 import System.Process
+import qualified GHC.InfoProv as InfoProv
 
 import GHC.Builtin.Names
 import GHC.Types.Name
@@ -401,6 +403,11 @@ getClosure interp ref =
   withForeignRef ref $ \hval -> do
     mb <- interpCmd interp (GetClosure hval)
     mapM (mkFinalizedHValue interp) mb
+
+whereFrom :: Interp -> ForeignHValue -> IO (Maybe InfoProv.InfoProv)
+whereFrom interp ref =
+  withForeignRef ref $ \hval -> do
+    interpCmd interp (WhereFrom hval)
 
 -- | Send a Seq message to the iserv process to force a value      #2950
 seqHValue :: Interp -> UnitEnv -> ForeignHValue -> IO (EvalResult ())
