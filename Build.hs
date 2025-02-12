@@ -238,6 +238,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , "  " ++ src </> "utils/hp2ps"
         , "  " ++ src </> "utils/hpc"
         , "  " ++ src </> "utils/unlit"
+        , "  " ++ src </> "utils/iserv"
         , "  " ++ src </> "utils/genprimopcode/"
         , "  " ++ src </> "utils/genapply/"
         , "  " ++ src </> "utils/deriveConstants/"
@@ -302,6 +303,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
            , "hsc2hs:hsc2hs"
            , "hp2ps:hp2ps"
            , "hpc-bin:hpc"
+           , "iserv:iserv"
            ]
 
   let build_cmd = (runCabal cabal $
@@ -362,6 +364,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
   unless booting $ do
     copy_bin "hp2ps:hp2ps"   "hp2ps"
     copy_bin "hpc-bin:hpc"   "hpc"
+    copy_bin "iserv:iserv"   "ghc-iserv" -- vanilla iserv
 
   when booting $ do
     copy_bin "ghc-toolchain-bin:ghc-toolchain-bin" "ghc-toolchain"
@@ -451,6 +454,7 @@ prepareGhcSources opts dst = do
   subst_in (dst </> "libraries/ghc/GHC/CmmToLlvm/Version/Bounds.hs") llvm_substs
 
   subst_in (dst </> "utils/ghc-pkg/ghc-pkg.cabal") common_substs
+  subst_in (dst </> "utils/iserv/iserv.cabal") common_substs
 
   subst_in (dst </> "libraries/ghc-internal/ghc-internal.cabal") common_substs
   subst_in (dst </> "libraries/base/base.cabal") common_substs
