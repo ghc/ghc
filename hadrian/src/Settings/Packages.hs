@@ -24,6 +24,7 @@ packageArgs = do
         -- immediately and may lead to cyclic dependencies.
         -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
         cross = flag CrossCompiling
+        haveCurses = any (/= "") <$> traverse setting [ CursesIncludeDir, CursesLibDir ]
 
         -- Check if the bootstrap compiler has the same version as the one we
         -- are building. This is used to build cross-compilers
@@ -85,7 +86,7 @@ packageArgs = do
             -- backends at the moment, so we might as well disable it
             -- for cross GHC.
             [ andM [expr (ghcWithInterpreter stage), notCross] `cabalFlag` "internal-interpreter"
-            , notM cross `cabalFlag` "terminfo"
+            , orM [ notM cross, haveCurses ]  `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
             , flag UseLibzstd `cabalFlag` "with-libzstd"
             -- ROMES: While the boot compiler is not updated wrt -this-unit-id
@@ -120,7 +121,7 @@ packageArgs = do
 
         -------------------------------- ghcPkg --------------------------------
         , package ghcPkg ?
-          builder (Cabal Flags) ? notM cross `cabalFlag` "terminfo"
+          builder (Cabal Flags) ? orM [ notM cross, haveCurses ] `cabalFlag` "terminfo"
 
         -------------------------------- ghcBoot ------------------------------
         , package ghcBoot ?
@@ -202,10 +203,10 @@ packageArgs = do
         , package haskeline ?
           builder (Cabal Flags) ? arg "-examples"
         -- Don't depend upon terminfo when cross-compiling to avoid unnecessary
-        -- dependencies.
-        -- TODO: Perhaps the user should rather be responsible for this?
+        -- dependencies unless the user provided ncurses explicitly.
+        -- TODO: Perhaps the user should be able to explicitly enable/disable this.
         , package haskeline ?
-          builder (Cabal Flags) ? notM cross `cabalFlag` "terminfo"
+          builder (Cabal Flags) ? orM [ notM cross, haveCurses ] `cabalFlag` "terminfo"
 
         -------------------------------- terminfo ------------------------------
         , package terminfo ?
