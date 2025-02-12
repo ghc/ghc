@@ -714,7 +714,6 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "--lib"
         , "--package-env=" ++ boot_libs_env
         , "--force-reinstalls"
-        , "-v3"
         , "--project-file=" ++ cabal_project_bootlibs_path
         , "--with-compiler=" ++ ghcPath ghc
         , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg
@@ -725,8 +724,8 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
           -- targets
         , "rts"
         , "ghc-internal"
-        , "base"
         , "ghc-experimental"
+        , "base"
         , "stm"
           -- shallow compat packages over ghc-internal
         , "ghc-prim"
