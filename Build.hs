@@ -111,6 +111,8 @@ main = do
   cp "_build/stage2/bin/*" "_build/bindist/bin/"
   cp "_build/stage2/lib/*" "_build/bindist/lib/"
   cp "_build/stage2/pkgs/*" "_build/bindist/pkgs/"
+  cp "driver/ghc-usage.txt" "_build/bindist/lib/"
+  cp "driver/ghci-usage.txt" "_build/bindist/lib/"
 
   msg "Done"
 
