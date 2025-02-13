@@ -1,0 +1,11 @@
+Start some work
+10946
+Stack annotations:
+- ann_frame002.hs:18:7 in main:Main
+- ann_frame002.hs:12:11 in main:Main
+Finish some work
+Some more work in bar
+17711
+Stack annotations:
+- bar
+- ann_frame002.hs:23:7 in main:Main

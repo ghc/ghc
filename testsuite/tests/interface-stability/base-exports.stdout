@@ -3525,6 +3525,7 @@ module GHC.Base where
   andWord16# :: Word16# -> Word16# -> Word16#
   andWord32# :: Word32# -> Word32# -> Word32#
   andWord8# :: Word8# -> Word8# -> Word8#
+  annotateStack# :: forall {q :: RuntimeRep} b d (a :: TYPE q). b -> (State# d -> (# State# d, a #)) -> State# d -> (# State# d, a #)
   anyToAddr# :: forall a. a -> State# RealWorld -> (# State# RealWorld, Addr# #)
   ap :: forall (m :: * -> *) a b. Monad m => m (a -> b) -> m a -> m b
   asTypeOf :: forall a. a -> a -> a
@@ -5657,6 +5658,7 @@ module GHC.Exts where
   andWord16# :: Word16# -> Word16# -> Word16#
   andWord32# :: Word32# -> Word32# -> Word32#
   andWord8# :: Word8# -> Word8# -> Word8#
+  annotateStack# :: forall {q :: RuntimeRep} b d (a :: TYPE q). b -> (State# d -> (# State# d, a #)) -> State# d -> (# State# d, a #)
   anyToAddr# :: forall a. a -> State# RealWorld -> (# State# RealWorld, Addr# #)
   asinDouble# :: Double# -> Double#
   asinFloat# :: Float# -> Float#

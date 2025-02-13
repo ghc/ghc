@@ -65,6 +65,7 @@ RTS_RET(stg_stack_underflow_frame_d);
 RTS_RET(stg_stack_underflow_frame_v16);
 RTS_RET(stg_stack_underflow_frame_v32);
 RTS_RET(stg_stack_underflow_frame_v64);
+RTS_RET(stg_ann_frame);
 RTS_RET(stg_keepAlive_frame);
 RTS_RET(stg_restore_cccs_d);
 RTS_RET(stg_restore_cccs_v16);
@@ -608,6 +609,8 @@ RTS_FUN_DECL(stg_castWord64ToDoublezh);
 RTS_FUN_DECL(stg_castDoubleToWord64zh);
 RTS_FUN_DECL(stg_castWord32ToFloatzh);
 RTS_FUN_DECL(stg_castFloatToWord32zh);
+
+RTS_FUN_DECL(stg_annotateStackzh);
 
 /* Other misc stuff */
 // See wiki:commentary/compiler/backends/ppr-c#prototypes

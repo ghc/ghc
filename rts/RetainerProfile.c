@@ -217,6 +217,7 @@ isRetainer( const StgClosure *c )
     case RET_SMALL:
     case RET_BIG:
     case RET_FUN:
+    case ANN_FRAME:
         // other cases
     case IND:
     case INVALID_OBJECT:
