@@ -103,3 +103,5 @@ test('stack_misc_closures',
          ]
       , '-debug' # Debug RTS to use checkSTACK() (Sanity.c)
       ])
+
+test('ann_frame', normal, compile_and_run, [''])

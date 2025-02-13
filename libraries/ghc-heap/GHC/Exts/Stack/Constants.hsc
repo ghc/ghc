@@ -3,7 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module GHC.Exts.Stack.Constants where
 
-#if MIN_TOOL_VERSION_ghc(9,9,0)
+#if MIN_TOOL_VERSION_ghc(9,13,0)
 
 import           Prelude
 
@@ -87,6 +87,13 @@ offsetStgRetFunFramePayload = byteOffsetToWordOffset (#const OFFSET_StgRetFun_pa
 
 sizeStgRetFunFrame :: Int
 sizeStgRetFunFrame = bytesToWords (#const SIZEOF_StgRetFun)
+
+sizeStgAnnFrame :: Int
+sizeStgAnnFrame = bytesToWords (#const SIZEOF_StgAnnFrame)
+
+offsetStgAnnFrameAnn :: WordOffset
+offsetStgAnnFrameAnn = byteOffsetToWordOffset $
+  (#const OFFSET_StgAnnFrame_ann) + (#size StgHeader)
 
 offsetStgBCOFrameInstrs :: ByteOffset
 offsetStgBCOFrameInstrs = (#const OFFSET_StgBCO_instrs) + (#size StgHeader)
