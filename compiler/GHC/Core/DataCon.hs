@@ -1018,6 +1018,9 @@ instance Data.Data DataCon where
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "DataCon"
 
+instance Outputable HsSrcBang where
+    ppr (HsSrcBang _source_text bang) = ppr bang
+
 instance Outputable HsBang where
     ppr (HsBang prag mark) = ppr prag <+> ppr mark
 
