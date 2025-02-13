@@ -574,10 +574,14 @@ data GenStackFrame b =
       , retFunPayload       :: ![GenStackField b]
       }
 
-  |  RetBCO
+  | RetBCO
       { info_tbl            :: !StgInfoTable
       , bco                 :: !b -- ^ always a BCOClosure
       , bcoArgs             :: ![GenStackField b]
+      }
+  | AnnFrame
+      { info_tbl            :: !StgInfoTable
+      , annotation          :: !b
       }
   deriving (Foldable, Functor, Generic, Show, Traversable)
 
