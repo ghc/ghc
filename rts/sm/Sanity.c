@@ -128,6 +128,7 @@ checkStackFrame( StgPtr c )
     case UNDERFLOW_FRAME:
     case STOP_FRAME:
     case RET_SMALL:
+    case ANN_FRAME:
         size = BITMAP_SIZE(info->i.layout.bitmap);
         checkSmallBitmap((StgPtr)c + 1,
                          BITMAP_BITS(info->i.layout.bitmap), size);

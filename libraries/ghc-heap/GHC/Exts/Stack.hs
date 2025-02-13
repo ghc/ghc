@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-#if MIN_TOOL_VERSION_ghc(9,9,0)
+#if MIN_TOOL_VERSION_ghc(9,13,0)
 {-# LANGUAGE RecordWildCards #-}
 
 module GHC.Exts.Stack
@@ -30,6 +30,7 @@ stackFrameSize (RetFun {..}) = sizeStgRetFunFrame + length retFunPayload
 stackFrameSize (RetBCO {..}) = sizeStgClosure + 1 + length bcoArgs
 -- The one additional word is a pointer to the next stack chunk
 stackFrameSize (UnderflowFrame {}) = sizeStgClosure + 1
+stackFrameSize (AnnFrame {}) = sizeStgAnnFrame
 stackFrameSize _ = error "Unexpected stack frame type"
 
 #else

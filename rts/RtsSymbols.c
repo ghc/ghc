@@ -527,6 +527,7 @@ extern char **environ;
       SymI_HasDataProto(stg_catchRetryzh)                                   \
       SymI_HasDataProto(stg_catchSTMzh)                                     \
       SymI_HasDataProto(stg_clearCCSzh)                                     \
+      SymI_HasDataProto(stg_annotateStackzh)                                \
       SymI_HasDataProto(stg_compactAddWithSharingzh)                        \
       SymI_HasDataProto(stg_compactAddzh)                                   \
       SymI_HasDataProto(stg_compactNewzh)                                   \

@@ -1180,6 +1180,7 @@ trace_stack_ (MarkQueue *queue, StgPtr sp, StgPtr spBottom)
         case STOP_FRAME:
         case CATCH_FRAME:
         case RET_SMALL:
+        case ANN_FRAME:
         {
             StgWord bitmap = BITMAP_BITS(info->i.layout.bitmap);
             StgWord size   = BITMAP_SIZE(info->i.layout.bitmap);
