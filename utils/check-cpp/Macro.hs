@@ -1,4 +1,10 @@
-module Macro where
+module Macro
+ ( process,
+   cppIf,
+
+   -- Keep warnings in line
+   m0,m1,m2,m3,m4,m5
+ ) where
 
 -- From https://gcc.gnu.org/onlinedocs/cpp/Macros.html
 
@@ -30,6 +36,8 @@ import ParsePP
 import Parser
 import ParserM
 import State
+
+import Debug.Trace
 
 -- ---------------------------------------------------------------------
 
@@ -127,7 +135,7 @@ pArgs ts = Right (Nothing, ts)
 
 pArgsList :: [Token] -> Either String (Maybe [[Token]], [Token])
 pArgsList ts = do
-  (arg,rest) <- dArg ts
+  (arg,rest) <- pArg ts
   case rest of
     [] -> return (Just [arg], rest)
     TCloseParen _:_ -> return (Just [arg], rest)
@@ -136,36 +144,66 @@ pArgsList ts = do
       return (Just [arg] <> args,rest2)
     _ -> Left $ "expected ',' or ')', got: " ++ show rest
 
+
 -- An arg is
 --  sequence of non-comma tokens, ending with ',' or ')'
 --  within that, (', anything, ')', possibly nested
-
-dArg :: [Token] -> Either String ([Token], [Token])
-dArg [] = Left "Empty input"
-dArg (t:ts) =
-  case t of
-    TComma _ -> Left $ "Unexpected ',' giving empty arg:" ++ show (t:ts)
-    TCloseParen _ -> return ([],ts)
-    TOpenParen _ -> do
-      (arg,rest) <- dArg ts
-      (t',rest') <- accept ")" rest
-      return (t:arg ++ [t'],rest')
+pArg :: [Token] -> Either String ([Token], [Token])
+pArg ts = do
+  (frag, rest) <- pa_frag ts
+  case rest of
+    [] -> return (frag, rest)
+    TCloseParen _:_ -> return (frag, rest)
+    TComma _:_ -> return (frag, rest)
+    TOpenParen _:_ -> do
+      (frag', rest') <- pa_frag_inner rest
+      return (frag <> frag', rest')
     _ -> do
-      (arg,rest') <- dArg ts
-      return (t:arg,rest')
+      (frag', rest') <- pa_frag rest
+      return (frag <> frag', rest')
 
+pa_frag :: [Token] -> Either String ([Token], [Token])
+pa_frag [] = return ([],[])
+pa_frag (t:ts)
+  | isOther t = return $ pOtherRest [t] ts
+pa_frag (t:ts) =
+  case t of
+    TOpenParen _ -> do
+      (inner,rest') <- pa_frag_inner (t:ts)
+      (t',rest'') <- accept ")" rest'
+      return (t:inner++[t'],rest'')
+    _ -> return ([], (t:ts))
+
+pa_frag_inner :: [Token] -> Either String ([Token], [Token])
+pa_frag_inner [] = return ([],[])
+pa_frag_inner (t:ts)
+  -- | isInnerOther t = return $ pInnerOtherRest [t] ts
+  | isInnerOther t = return $ trace ("pa_frag_inner:other:t:ts" ++ show (t:ts)) (pInnerOtherRest [t] ts)
+pa_frag_inner (t:ts) =
+  -- error $ "pa_frag_inner:(t:ts)=" ++ show (t:ts)
+  case t of
+    TOpenParen _ -> do
+      -- (inner,rest') <- pa_frag_inner ts
+      (!inner,!rest') <- pa_frag_inner (trace ("pa_frag_inner:tts" ++ show (t:ts)) ts)
+      -- (t',rest'') <- accept ")" rest'
+      let !xxx = trace ("pa_frag_inner:(inner,t,rest')" ++ show (inner,t,rest')) rest'
+      -- (!t',!rest'') <- accept ")" (trace ("pa_frag_inner:(inner,t,rest')" ++ show (inner,t,rest')) rest')
+      (t',rest'') <- accept ")" xxx
+      return (t:inner++[t'],rest'')
+    -- _ -> return ([], (t:ts))
+    _ -> return ([], trace ("pa_frag_inner:fallthru:(t:ts)" ++ show (t:ts)) (t:ts))
 
 accept :: String -> [Token] -> Either String (Token,[Token])
 accept _ [] = Left "Empty input"
 accept s (t:ts) =
   if s == t_str t
     then return (t,ts)
-    else Left $ "Expected '" ++ s ++ "', got '" ++ t_str t ++ "'"
+    else Left $ "Expected '" ++ s ++ "', got '" ++ t_str t ++ "', ts=" ++ show ts
 
-pArg :: [Token] -> Either String ([Token], [Token])
-pArg (t:ts)
-  | isOther t = return $ pOtherRest [t] ts
-pArg ts = Left $ "expecting an Other, got: " ++ show ts
+-- pArg :: [Token] -> Either String ([Token], [Token])
+-- pArg (t:ts)
+--   | isOther t = return $ pOtherRest [t] ts
+-- pArg ts = Left $ "expecting an Other, got: " ++ show ts
 
 pOtherRest :: [Token] -> [Token] -> ([Token], [Token])
 pOtherRest acc (t:ts)
@@ -177,6 +215,17 @@ isOther (TComma _) = False
 isOther (TOpenParen _) = False
 isOther (TCloseParen _) = False
 isOther _ = True
+
+pInnerOtherRest :: [Token] -> [Token] -> ([Token], [Token])
+pInnerOtherRest acc (t:ts)
+  | isInnerOther t = pInnerOtherRest (t:acc) ts
+pInnerOtherRest acc ts = (reverse acc, ts)
+
+isInnerOther :: Token -> Bool
+isInnerOther (TComma _) = True
+isInnerOther (TOpenParen _) = False
+isInnerOther (TCloseParen _) = False
+isInnerOther _ = True
 
 -- ---------------------------------------------------------------------
 
@@ -217,5 +266,10 @@ m4 = cppLex "#if (m < 1)"
 m5 :: Either String (Maybe [[Token]], [Token])
 m5 = do
   -- toks <- cppLex "(43,foo(a)) some other stuff"
-  toks <- cppLex "( foo(), 4 )"
+  toks <- cppLex "( (ff()), 4 )"
   return $ getExpandArgs toks
+
+tt = case m5 of
+    Left err -> Left err
+    Right (Just a,b) -> Right (map (\k -> concatMap t_str k) a, concatMap t_str b)
+    Right (Nothing,_) -> error "oops"
