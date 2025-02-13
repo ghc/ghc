@@ -13,10 +13,12 @@ T25389.$WEx1 [InlPrag=INLINE[final] CONLIKE]
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
          Tmpl= \ (conrep [Occ=Once1] :: Int) ->
-                 T25389.Ex1 @True @~(<True>_N :: True GHC.Prim.~# True) conrep}]
+                 T25389.Ex1
+                   @True @~(<True>_N :: True GHC.Internal.Prim.~# True) conrep}]
 T25389.$WEx1
   = \ (conrep [Occ=Once1] :: Int) ->
-      T25389.Ex1 @True @~(<True>_N :: True GHC.Prim.~# True) conrep
+      T25389.Ex1
+        @True @~(<True>_N :: True GHC.Internal.Prim.~# True) conrep
 
 -- RHS size: {terms: 1, types: 1, coercions: 1, joins: 0/0}
 T25389.$WEx2 [InlPrag=INLINE[final] CONLIKE] :: Example False
@@ -24,9 +26,11 @@ T25389.$WEx2 [InlPrag=INLINE[final] CONLIKE] :: Example False
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)
-         Tmpl= T25389.Ex2 @False @~(<False>_N :: False GHC.Prim.~# False)}]
+         Tmpl= T25389.Ex2
+                 @False @~(<False>_N :: False GHC.Internal.Prim.~# False)}]
 T25389.$WEx2
-  = T25389.Ex2 @False @~(<False>_N :: False GHC.Prim.~# False)
+  = T25389.Ex2
+      @False @~(<False>_N :: False GHC.Internal.Prim.~# False)
 
 -- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
 expensive :: Int -> Int
@@ -38,12 +42,14 @@ expensive :: Int -> Int
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (v [Occ=Once1!] :: Int) ->
-                 case v of { GHC.Types.I# x [Occ=Once1] ->
-                 GHC.Types.I# (GHC.Prim.*# x 2#)
+                 case v of { GHC.Internal.Types.I# x [Occ=Once1] ->
+                 GHC.Internal.Types.I# (GHC.Internal.Prim.*# x 2#)
                  }}]
 expensive
   = \ (v :: Int) ->
-      case v of { GHC.Types.I# x -> GHC.Types.I# (GHC.Prim.*# x 2#) }
+      case v of { GHC.Internal.Types.I# x ->
+      GHC.Internal.Types.I# (GHC.Internal.Prim.*# x 2#)
+      }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T25389.op1 :: Int
@@ -51,7 +57,7 @@ T25389.op1 :: Int
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-T25389.op1 = GHC.Types.I# 0#
+T25389.op1 = GHC.Internal.Types.I# 0#
 
 -- RHS size: {terms: 5, types: 9, coercions: 0, joins: 0/0}
 T25389.op_$sop [InlPrag=INLINE (sat-args=1)]
