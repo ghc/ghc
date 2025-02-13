@@ -4751,6 +4751,7 @@ module GHC.PrimOps where
   andWord16# :: Word16# -> Word16# -> Word16#
   andWord32# :: Word32# -> Word32# -> Word32#
   andWord8# :: Word8# -> Word8# -> Word8#
+  annotateStack# :: forall {q :: RuntimeRep} b d (a :: TYPE q). b -> (State# d -> (# State# d, a #)) -> State# d -> (# State# d, a #)
   anyToAddr# :: forall a. a -> State# RealWorld -> (# State# RealWorld, Addr# #)
   asinDouble# :: Double# -> Double#
   asinFloat# :: Float# -> Float#
@@ -6385,6 +6386,32 @@ module GHC.RTS.Flags.Experimental where
   getRTSFlags :: GHC.Internal.Types.IO RTSFlags
   getTickyFlags :: GHC.Internal.Types.IO TickyFlags
   getTraceFlags :: GHC.Internal.Types.IO TraceFlags
+
+module GHC.Stack.Annotation.Experimental where
+  -- Safety: None
+  type CallStackAnnotation :: *
+  newtype CallStackAnnotation = CallStackAnnotation GHC.Internal.Stack.Types.CallStack
+  type ShowAnnotation :: *
+  data ShowAnnotation where
+    ShowAnnotation :: forall a. GHC.Internal.Show.Show a => a -> ShowAnnotation
+  type SomeStackAnnotation :: *
+  data SomeStackAnnotation where
+    SomeStackAnnotation :: forall a. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> SomeStackAnnotation
+  type StackAnnotation :: * -> Constraint
+  class StackAnnotation a where
+    displayStackAnnotation :: a -> GHC.Internal.Base.String
+    {-# MINIMAL displayStackAnnotation #-}
+  type StringAnnotation :: *
+  data StringAnnotation where
+    StringAnnotation :: GHC.Internal.Base.String -> StringAnnotation
+  annotateCallStack :: forall b. GHC.Internal.Stack.Types.HasCallStack => b -> b
+  annotateCallStackIO :: forall a. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Types.IO a -> GHC.Internal.Types.IO a
+  annotateStack :: forall a b. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> b -> b
+  annotateStackIO :: forall a b. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
+  annotateStackShow :: forall a b. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Show.Show a) => a -> b -> b
+  annotateStackShowIO :: forall a b. GHC.Internal.Show.Show a => a -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
+  annotateStackString :: forall b. GHC.Internal.Base.String -> b -> b
+  annotateStackStringIO :: forall b. GHC.Internal.Base.String -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
 
 module GHC.Stats.Experimental where
   -- Safety: Safe
@@ -10925,6 +10952,10 @@ module System.Mem.Experimental where
 
 
 -- Instances:
+instance GHC.Stack.Annotation.Experimental.StackAnnotation GHC.Stack.Annotation.Experimental.CallStackAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
+instance GHC.Stack.Annotation.Experimental.StackAnnotation GHC.Stack.Annotation.Experimental.ShowAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
+instance GHC.Stack.Annotation.Experimental.StackAnnotation GHC.Stack.Annotation.Experimental.SomeStackAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
+instance GHC.Stack.Annotation.Experimental.StackAnnotation GHC.Stack.Annotation.Experimental.StringAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
 instance GHC.Internal.Base.Alternative GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Alternative [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Alternative GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
@@ -11120,5 +11151,6 @@ instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.RTSFlags -- Defined in �
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.TickyFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.TraceFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
+instance GHC.Internal.Show.Show GHC.Stack.Annotation.Experimental.CallStackAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
 instance GHC.Internal.Show.Show GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
 instance GHC.Internal.Show.Show GHC.Internal.Stats.RTSStats -- Defined in ‘GHC.Internal.Stats’
