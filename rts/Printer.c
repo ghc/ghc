@@ -270,6 +270,17 @@ printClosure( const StgClosure *obj )
     case RET_FUN:
     */
 
+    case ANN_FRAME:
+        {
+            StgAnnFrame* frame = (StgAnnFrame*)obj;
+            debugBelch("ANN_FRAME(");
+            printPtr((StgPtr)GET_INFO((StgClosure *)frame));
+            debugBelch(",");
+            printPtr((StgPtr)frame->ann);
+            debugBelch(")\n");
+            break;
+        }
+
     case UPDATE_FRAME:
         {
             StgUpdateFrame* frame = (StgUpdateFrame*)obj;
@@ -1123,6 +1134,7 @@ const char *closure_type_names[] = {
  [RET_FUN]               = "RET_FUN",
  [UPDATE_FRAME]          = "UPDATE_FRAME",
  [CATCH_FRAME]           = "CATCH_FRAME",
+ [ANN_FRAME]             = "ANN_FRAME",
  [UNDERFLOW_FRAME]       = "UNDERFLOW_FRAME",
  [STOP_FRAME]            = "STOP_FRAME",
  [BLOCKING_QUEUE]        = "BLOCKING_QUEUE",
@@ -1155,7 +1167,7 @@ const char *closure_type_names[] = {
  [CONTINUATION]          = "CONTINUATION",
 };
 
-#if N_CLOSURE_TYPES != 65
+#if N_CLOSURE_TYPES != 66
 #error Closure types changed: update Printer.c!
 #endif
 

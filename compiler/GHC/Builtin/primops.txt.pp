@@ -3959,6 +3959,17 @@ primop  ClearCCSOp "clearCCS#" GenPrimOp
    out_of_line = True
 
 ------------------------------------------------------------------------
+section "Annotating call stacks"
+------------------------------------------------------------------------
+
+-- TODO: use a_reppoly here
+primop AnnotateStackOp "annotateStack#" GenPrimOp
+   b -> (State# s -> (# State# s, a #)) -> State# s -> (# State# s, a #)
+   { Pushes an annotation frame to the stack which can be reported by backtraces. }
+   with
+   out_of_line = True
+
+------------------------------------------------------------------------
 section "Info Table Origin"
 ------------------------------------------------------------------------
 primop WhereFromOp "whereFrom#" GenPrimOp

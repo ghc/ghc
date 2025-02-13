@@ -36,6 +36,7 @@ library
       GHC.TypeLits.Experimental
       GHC.TypeNats.Experimental
       GHC.RTS.Flags.Experimental
+      GHC.Stack.Annotation.Experimental
       GHC.Stats.Experimental
       Prelude.Experimental
       System.Mem.Experimental

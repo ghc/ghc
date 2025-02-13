@@ -2750,6 +2750,28 @@ stg_clearCCSzh (P_ arg)
     jump stg_ap_v_fast(arg);
 }
 
+#define ANN_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,ann) \
+  w_ info_ptr,                                     \
+  PROF_HDR_FIELDS(w_,p1,p2)                        \
+  p_ ann
+
+INFO_TABLE_RET (stg_ann_frame, ANN_FRAME,
+                ANN_FRAME_FIELDS(W_,P_, info_ptr, p1, p2, ann))
+    /* no args => explicit stack */
+{
+    unwind Sp = W_[Sp + SIZEOF_StgAnnFrame];
+    Sp = Sp + SIZEOF_StgAnnFrame;
+    jump %ENTRY_CODE(Sp(0)) GP_ARG_REGS; // NB. all GP arg regs live!
+}
+
+stg_annotateStackzh (P_ ann, P_ cont)
+{
+    STK_CHK_GEN();
+    jump stg_ap_v_fast
+        (ANN_FRAME_FIELDS(,,stg_ann_frame_info, CCCS, 0, ann))(cont);
+
+}
+
 stg_numSparkszh ()
 {
     W_ n;
