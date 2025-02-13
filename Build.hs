@@ -649,6 +649,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "  " ++ src </> "libraries/stm"
         , "  " ++ src </> "libraries/template-haskell"
         , "  " ++ src </> "libraries/hpc"
+        , "  " ++ src </> "libraries/system-cxx-std-lib"
         , "  " ++ src </> "ghc-bin/"
         , "  " ++ src </> "utils/ghc-pkg"
         , "  " ++ src </> "utils/hsc2hs"
@@ -735,6 +736,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "ghc-experimental"
         , "base"
         , "stm"
+        , "system-cxx-std-lib"
           -- shallow compat packages over ghc-internal
         , "ghc-prim"
         , "ghc-bignum"
