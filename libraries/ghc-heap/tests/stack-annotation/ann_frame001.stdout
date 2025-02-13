@@ -1,0 +1,12 @@
+Stack annotations:
+- (2,3)
+47
+Stack annotations:
+- "bar"
+- "foo"
+- "tailCallEx"
+Stack annotations:
+- "bar"
+- "foo"
+- "tailCallEx"
+40
