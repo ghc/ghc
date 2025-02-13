@@ -661,6 +661,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "  " ++ src </> "utils/unlit"
         , "  " ++ src </> "utils/genprimopcode"
         , "  " ++ src </> "utils/deriveConstants"
+        , "  " ++ src </> "utils/ghc-toolchain/"
         , "  " ++ src </> "libraries/array"
         , "  " ++ src </> "libraries/binary"
         , "  " ++ src </> "libraries/bytestring"
@@ -777,6 +778,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , "ghc-boot"
         , "ghc-heap"
         , "ghc-platform"
+        , "ghc-toolchain" -- some test requires this
         , "ghci"
         , "ghc"
         ]
