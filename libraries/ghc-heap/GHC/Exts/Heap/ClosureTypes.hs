@@ -84,6 +84,7 @@ data ClosureType
     | SMALL_MUT_ARR_PTRS_FROZEN_CLEAN
     | COMPACT_NFDATA
     | CONTINUATION
+    | ANN_FRAME
     | N_CLOSURE_TYPES
  deriving (Enum, Eq, Ord, Show, Generic)
 #endif

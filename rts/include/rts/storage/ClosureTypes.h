@@ -89,4 +89,5 @@
 #define SMALL_MUT_ARR_PTRS_FROZEN_CLEAN 62
 #define COMPACT_NFDATA                63
 #define CONTINUATION                  64
-#define N_CLOSURE_TYPES               65
+#define ANN_FRAME                     65
+#define N_CLOSURE_TYPES               66

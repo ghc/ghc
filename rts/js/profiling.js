@@ -333,3 +333,8 @@ function h$buildCCSPtr(o) {
 function h$clearCCS(a) {
   throw new Error("ClearCCSOp not implemented");
 }
+
+// we throw away the annotation here.
+function h$annotateStack(o) {
+    return o;
+}
