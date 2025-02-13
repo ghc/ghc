@@ -243,9 +243,6 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , "  executable-dynamic: False"
         , "  executable-static: True"
         , ""
-          -- allow template-haskell with newer ghc-boot-th
-        , "allow-newer: ghc-boot-th"
-        , ""
         , "package ghc-bin"
         , "  flags: +internal-interpreter"
         , ""
@@ -254,10 +251,6 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , ""
         , "package haskeline"
         , "  flags: -terminfo" -- FIXME: should be enabled but I don't have the static libs for terminfo on ArchLinux...
-        , ""
-        , "package text"
-             -- FIXME: avoid having to deal with system-cxx-std-lib fake package for now
-        , "  flags: -simdutf"
         , ""
         ]
 
