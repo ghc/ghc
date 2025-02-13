@@ -43,7 +43,6 @@ import GHC.Types.Unique.FM
 import GHC.Utils.Panic
 import GHC.Utils.Binary as Binary
 import GHC.Data.FastMutInt
-import GHC.Data.FastString (FastString)
 import GHC.Types.Unique
 import GHC.Utils.Outputable
 import GHC.Types.Name.Cache
@@ -321,18 +320,21 @@ putWithTables compressionLevel bh' put_payload = do
   (ifaceType_wt, ifaceTypeWriter) <- initWriteIfaceType compressionLevel
 
   -- Initialise the 'WriterUserData'.
-  let writerUserData = mkWriterUserData
-        [ mkSomeBinaryWriter @FastString fsWriter
-        , mkSomeBinaryWriter @Name nameWriter
-        -- We sometimes serialise binding and non-binding names differently, but
-        -- not during 'ModIface' serialisation. Here, we serialise both to the same
-        -- deduplication table.
-        --
-        -- See Note [Binary UserData]
-        , mkSomeBinaryWriter @BindingName  $ mkWriter (\bh name -> putEntry nameWriter bh (getBindingName name))
-        , mkSomeBinaryWriter @IfaceType ifaceTypeWriter
-        ]
-  let bh = setWriterUserData bh' writerUserData
+  --
+  -- Similar to how 'getTables' calls 'addReaderToUserData', here we
+  -- call 'addWriterToUserData' instead of 'setWriterUserData', to
+  -- avoid overwriting existing writers of other types in bh'.
+  let bh =
+        addWriterToUserData fsWriter
+          $ addWriterToUserData nameWriter
+          -- We sometimes serialise binding and non-binding names differently, but
+          -- not during 'ModIface' serialisation. Here, we serialise both to the same
+          -- deduplication table.
+          --
+          -- See Note [Binary UserData]
+          $ addWriterToUserData
+            (mkWriter $ \bh name -> putEntry nameWriter bh $ getBindingName name)
+          $ addWriterToUserData ifaceTypeWriter bh'
 
   ([fs_count, name_count, ifacetype_count] , r) <-
     -- The order of these entries matters!
