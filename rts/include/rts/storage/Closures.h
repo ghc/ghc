@@ -312,6 +312,15 @@ typedef struct {
     StgClosure *result;
 } StgDeadThreadFrame;
 
+// Stack frame annotating an execution context with a Haskell value
+// for backtrace purposes.
+//
+// Closure types: ANN_FRAME
+typedef struct {
+    StgHeader header;
+    StgClosure *ann;
+} StgAnnFrame;
+
 // A function return stack frame: used when saving the state for a
 // garbage collection at a function entry point.  The function
 // arguments are on the stack, and we also save the function (its

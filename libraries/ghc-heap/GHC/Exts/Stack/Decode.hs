@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-#if MIN_TOOL_VERSION_ghc(9,9,0)
+#if MIN_TOOL_VERSION_ghc(9,13,0)
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -376,6 +376,14 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
                 { info_tbl = info,
                   catchFrameCode = catchFrameCode',
                   handler = handler'
+                }
+        ANN_FRAME ->
+          let annotation = getClosureBox stackSnapshot# (index + offsetStgAnnFrameAnn)
+           in
+             pure $
+               AnnFrame
+                { info_tbl = info,
+                  annotation = annotation
                 }
         x -> error $ "Unexpected closure type on stack: " ++ show x
 
