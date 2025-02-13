@@ -1,0 +1,6 @@
+T25672.hs:12:7: warning: [GHC-40091]
+    • Ignoring unusable UNPACK pragma
+        on the first argument of ‘WrapIntOrWord’
+    • In the definition of data constructor ‘WrapIntOrWord’
+      In the data type declaration for ‘WrapIntOrWord’
+
