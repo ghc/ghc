@@ -213,28 +213,15 @@ buildGhcStage booting opts cabal ghc0 dst = do
 
   let stage2_project =
         [ "packages:"
+            -- ghc *library* mustn't be listed here: otherwise its unit-id becomes
+            -- ghc-9.xx-inplace and it's wrong when we load plugins
+            -- (wired-in thisGhcUnitId is wrong)
+            --
+            -- actually we don't need any of the boot packages we already
+            -- installed.
         , "  " ++ src </> "ghc-bin/"
-        , "  " ++ src </> "libraries/deepseq/"
-        , "  " ++ src </> "libraries/hpc/"
-        , "  " ++ src </> "libraries/stm/"
-        , "  " ++ src </> "libraries/text/"
-        , "  " ++ src </> "libraries/ghc/"
-        , "  " ++ src </> "libraries/directory/"
-        , "  " ++ src </> "libraries/file-io/"
-        , "  " ++ src </> "libraries/filepath/"
         , "  " ++ src </> "libraries/haskeline/"
         , "  " ++ src </> "libraries/terminfo/"
-        , "  " ++ src </> "libraries/ghc-platform/"
-        , "  " ++ src </> "libraries/ghc-boot/"
-        , "  " ++ src </> "libraries/ghc-boot-th/"
-        , "  " ++ src </> "libraries/ghc-heap"
-        , "  " ++ src </> "libraries/ghci"
-        , "  " ++ src </> "libraries/os-string/"
-        , "  " ++ src </> "libraries/process/"
-        , "  " ++ src </> "libraries/semaphore-compat"
-        , "  " ++ src </> "libraries/time"
-        , "  " ++ src </> "libraries/unix/"
-        , "  " ++ src </> "libraries/Win32/"
         , "  " ++ src </> "utils/ghc-pkg"
         , "  " ++ src </> "utils/hsc2hs"
         , "  " ++ src </> "utils/hp2ps"
@@ -260,12 +247,6 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , ""
           -- allow template-haskell with newer ghc-boot-th
         , "allow-newer: ghc-boot-th"
-        , ""
-        , "package ghc"
-        , "  flags: +build-tool-depends +internal-interpreter"
-        , ""
-        , "package ghci"
-        , "  flags: +internal-interpreter"
         , ""
         , "package ghc-bin"
         , "  flags: +internal-interpreter"
