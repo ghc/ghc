@@ -244,6 +244,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , "  " ++ src </> "utils/genprimopcode/"
         , "  " ++ src </> "utils/genapply/"
         , "  " ++ src </> "utils/deriveConstants/"
+        , "  " ++ src </> "utils/runghc/"
         , ""
         , "benchmarks: False"
         , "tests: False"
@@ -306,6 +307,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
            , "hp2ps:hp2ps"
            , "hpc-bin:hpc"
            , "iserv:iserv"
+           , "runghc:runghc"
            ]
 
   let build_cmd = (runCabal cabal $
@@ -366,6 +368,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
   unless booting $ do
     copy_bin "hp2ps:hp2ps"   "hp2ps"
     copy_bin "hpc-bin:hpc"   "hpc"
+    copy_bin "runghc:runghc" "runghc"
     copy_bin "iserv:iserv"   "ghc-iserv" -- vanilla iserv
 
   when booting $ do
@@ -457,6 +460,7 @@ prepareGhcSources opts dst = do
 
   subst_in (dst </> "utils/ghc-pkg/ghc-pkg.cabal") common_substs
   subst_in (dst </> "utils/iserv/iserv.cabal") common_substs
+  subst_in (dst </> "utils/runghc/runghc.cabal") common_substs
 
   subst_in (dst </> "libraries/ghc-internal/ghc-internal.cabal") common_substs
   subst_in (dst </> "libraries/ghc-experimental/ghc-experimental.cabal") common_substs
