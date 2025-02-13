@@ -235,8 +235,6 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , ""
         , "benchmarks: False"
         , "tests: False"
-        , "allow-boot-library-installs: True"
-          -- we need even after booting because cabal thinks `template-haskell` isn't reinstallable otherwise
         , ""
         , "package *"
         , "  library-vanilla: True"
