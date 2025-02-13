@@ -529,6 +529,7 @@ traverseGetChildren(StgClosure *c, StgClosure **first_child, bool *other_childre
     case RET_BCO:
     case RET_SMALL:
     case RET_BIG:
+    case ANN_FRAME:
         // invalid objects
     case IND:
     case INVALID_OBJECT:
@@ -832,6 +833,7 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data,
         case RET_BCO:
         case RET_SMALL:
         case RET_BIG:
+        case ANN_FRAME:
             // invalid objects
         case IND:
         case INVALID_OBJECT:
@@ -965,6 +967,7 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackElement *sep,
         case CATCH_RETRY_FRAME:
         case ATOMICALLY_FRAME:
         case RET_SMALL:
+        case ANN_FRAME:
             bitmap = BITMAP_BITS(info->i.layout.bitmap);
             size   = BITMAP_SIZE(info->i.layout.bitmap);
             p++;

@@ -1155,6 +1155,8 @@ genPrim prof bound ty op = case op of
 
 ------------------------------ Unhandled primops -------------------
 
+  AnnotateStackOp                   -> unhandledPrimop op
+
   NewPromptTagOp                    -> unhandledPrimop op
   PromptOp                          -> unhandledPrimop op
   Control0Op                        -> unhandledPrimop op

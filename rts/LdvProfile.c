@@ -154,6 +154,7 @@ processHeapClosureForDead( const StgClosure *c )
     case CATCH_STM_FRAME:
     case CATCH_RETRY_FRAME:
     case ATOMICALLY_FRAME:
+    case ANN_FRAME:
         // others
     case INVALID_OBJECT:
     case COMPACT_NFDATA:
