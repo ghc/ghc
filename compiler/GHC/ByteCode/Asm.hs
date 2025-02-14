@@ -29,7 +29,6 @@ import GHC.ByteCode.Instr
 import GHC.ByteCode.InfoTable
 import GHC.ByteCode.Types
 import GHCi.RemoteTypes
-import GHC.Runtime.Interpreter
 import GHC.Runtime.Heap.Layout ( fromStgWord, StgWord )
 
 import GHC.Types.Name
@@ -105,22 +104,21 @@ bcoFreeNames bco
 
 -- Top level assembler fn.
 assembleBCOs
-  :: Interp
-  -> Profile
+  :: Profile
   -> FlatBag (ProtoBCO Name)
   -> [TyCon]
   -> [(Name, ByteString)]
   -> Maybe ModBreaks
   -> [SptEntry]
   -> IO CompiledByteCode
-assembleBCOs interp profile proto_bcos tycons top_strs modbreaks spt_entries = do
+assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
-  itblenv <- mkITbls interp profile tycons
+  let itbls = mkITbls profile tycons
   bcos    <- mapM (assembleBCO (profilePlatform profile)) proto_bcos
   return CompiledByteCode
     { bc_bcos = bcos
-    , bc_itbls = itblenv
+    , bc_itbls = itbls
     , bc_ffis = concatMap protoBCOFFIs proto_bcos
     , bc_strs = top_strs
     , bc_breaks = modbreaks

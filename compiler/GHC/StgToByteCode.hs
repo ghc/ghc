@@ -135,7 +135,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
         let mod_breaks = case modBreaks of
              Nothing -> Nothing
              Just mb -> Just mb{ modBreaks_breakInfo = breakInfo }
-        cbc <- assembleBCOs interp profile proto_bcos tycs strings mod_breaks spt_entries
+        cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks spt_entries
 
         -- Squash space leaks in the CompiledByteCode.  This is really
         -- important, because when loading a set of modules into GHCi
@@ -149,7 +149,6 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
 
   where dflags  = hsc_dflags hsc_env
         logger  = hsc_logger hsc_env
-        interp  = hscInterp hsc_env
         profile = targetProfile dflags
 
 {- Note [Generating code for top-level string literal bindings]

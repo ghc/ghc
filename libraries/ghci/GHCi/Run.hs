@@ -74,7 +74,7 @@ run m = case m of
   UnloadObj str -> unloadObj str
   AddLibrarySearchPath str -> toRemotePtr <$> addLibrarySearchPath str
   RemoveLibrarySearchPath ptr -> removeLibrarySearchPath (fromRemotePtr ptr)
-  MkConInfoTable tc ptrs nptrs tag ptrtag desc ->
+  MkConInfoTable (ConInfoTable tc ptrs nptrs tag ptrtag desc) ->
     toRemotePtr <$> mkConInfoTable tc ptrs nptrs tag ptrtag desc
   ResolveObjs -> resolveObjs
   FindSystemLibrary str -> findSystemLibrary str
