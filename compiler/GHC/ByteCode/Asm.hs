@@ -119,7 +119,6 @@ assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
   return CompiledByteCode
     { bc_bcos = bcos
     , bc_itbls = itbls
-    , bc_ffis = concatMap protoBCOFFIs proto_bcos
     , bc_strs = top_strs
     , bc_breaks = modbreaks
     , bc_spt_entries = spt_entries
