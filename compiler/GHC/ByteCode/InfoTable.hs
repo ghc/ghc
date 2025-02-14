@@ -13,11 +13,11 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Platform.Profile
 
-import GHC.ByteCode.Types
 import GHC.Runtime.Interpreter
+import GHCi.RemoteTypes
+import qualified GHC.Exts.Heap as Heap
 
 import GHC.Types.Name       ( Name, getName )
-import GHC.Types.Name.Env
 import GHC.Types.RepType
 
 import GHC.Core.DataCon     ( DataCon, dataConRepArgTys, dataConIdentity )
@@ -35,33 +35,38 @@ import GHC.Utils.Panic
 -}
 
 -- Make info tables for the data decls in this module
-mkITbls :: Interp -> Profile -> [TyCon] -> IO ItblEnv
-mkITbls interp profile tcs =
-  foldr plusNameEnv emptyNameEnv <$>
-    mapM mkITbl (filter isDataTyCon tcs)
+mkITbls :: Profile -> [TyCon] -> [(Name, Message (RemotePtr Heap.StgInfoTable))]
+mkITbls profile tcs = concatMap mkITbl (filter isDataTyCon tcs)
  where
-  mkITbl :: TyCon -> IO ItblEnv
+  mkITbl :: TyCon -> [(Name, Message (RemotePtr Heap.StgInfoTable))]
   mkITbl tc
     | dcs `lengthIs` n -- paranoia; this is an assertion.
-    = make_constr_itbls interp profile dcs
+    = make_constr_itbls profile dcs
        where
           dcs = tyConDataCons tc
           n   = tyConFamilySize tc
   mkITbl _ = panic "mkITbl"
 
-mkItblEnv :: [(Name,ItblPtr)] -> ItblEnv
-mkItblEnv pairs = mkNameEnv [(n, (n,p)) | (n,p) <- pairs]
-
 -- Assumes constructors are numbered from zero, not one
-make_constr_itbls :: Interp -> Profile -> [DataCon] -> IO ItblEnv
-make_constr_itbls interp profile cons =
+make_constr_itbls :: Profile -> [DataCon] -> [(Name, Message (RemotePtr Heap.StgInfoTable))]
+make_constr_itbls profile cons =
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
-  mkItblEnv <$> mapM (uncurry mk_itbl) (zip cons [0..])
- where
-  mk_itbl :: DataCon -> Int -> IO (Name,ItblPtr)
-  mk_itbl dcon conNo = do
-     let rep_args = [ prim_rep
+  map (uncurry mk_itbl) (zip cons [0..])
+  where
+    mk_itbl :: DataCon -> Int -> (Name, Message (RemotePtr Heap.StgInfoTable))
+    mk_itbl dcon conNo =
+      ( getName dcon,
+        MkConInfoTable
+          tables_next_to_code
+          ptrs'
+          nptrs_really
+          conNo
+          (tagForCon platform dcon)
+          descr
+      )
+      where
+         rep_args = [ prim_rep
                     | arg <- dataConRepArgTys dcon
                     , prim_rep <- typePrimRep (scaledThing arg) ]
 
@@ -79,7 +84,3 @@ make_constr_itbls interp profile cons =
          platform = profilePlatform profile
          constants = platformConstants platform
          tables_next_to_code = platformTablesNextToCode platform
-
-     r <- interpCmd interp (MkConInfoTable tables_next_to_code ptrs' nptrs_really
-                              conNo (tagForCon platform dcon) descr)
-     return (getName dcon, ItblPtr r)
