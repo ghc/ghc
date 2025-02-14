@@ -199,9 +199,7 @@ data BCONPtr
   -- | A reference to a top-level string literal; see
   -- Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode.
   | BCONPtrAddr  !Name
-  -- | Only used internally in the assembler in an intermediate representation;
-  -- should never appear in a fully-assembled UnlinkedBCO.
-  -- Also see Note [Allocating string literals] in GHC.ByteCode.Asm.
+  -- | A top-level string literal.
   | BCONPtrStr   !ByteString
 
 instance NFData BCONPtr where
