@@ -6,7 +6,9 @@
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE MonadComprehensions  #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
+{-# OPTIONS_GHC -Wno-partial-type-signatures   #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 {-
@@ -74,6 +76,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import GHC.Types.Name
+import GHC.Types.Name.Reader (LocalRdrEnv)
 import GHC.Types.Id
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, isDoExpansionGenerated )
@@ -555,11 +558,9 @@ tcLcStmt m_tc ctxt (ParStmt _ bndr_stmts_s _ _) elt_ty thing_inside
         ; (pairs', thing) <- loop env [] bndr_stmts_s
         ; return (ParStmt unitTy pairs' noExpr noSyntaxExpr, thing) }
   where
-    -- loop :: LocalRdrEnv -- The original LocalRdrEnv
-    --      -> [Name]      -- Variables bound by earlier branches
-    --      -> [([LStmt GhcRn], [GhcRn])]
-    --      -> TcM ([([LStmt GhcTc], [GhcTc])], thing)
-    --
+    loop
+     :: LocalRdrEnv -> [Name] -> NonEmpty (ParStmtBlock GhcRn GhcRn)
+     -> TcM (NonEmpty (ParStmtBlock GhcTc GhcTc), _)
     -- Invariant: on entry to `loop`, the LocalRdrEnv is set to
     --            origEnv, the LocalRdrEnv for the entire comprehension
     loop origEnv priorBinds (ParStmtBlock x stmts names _ :| pairs)
@@ -571,6 +572,9 @@ tcLcStmt m_tc ctxt (ParStmt _ bndr_stmts_s _ _) elt_ty thing_inside
                       ; return (ids, pairs', thing) }
            ; return ( ParStmtBlock x stmts' ids noSyntaxExpr :| pairs', thing ) }
 
+    loop1
+     :: LocalRdrEnv -> [Name] -> [ParStmtBlock GhcRn GhcRn]
+     -> TcM ([ParStmtBlock GhcTc GhcTc], _)
     -- matching in the branches
     loop1 _ binds [] = [ ([], a) | a <- bindLocalNames binds (thing_inside elt_ty) ]
     loop1 env binds (x:xs) = [ (toList ys, a) | (ys, a) <- loop env binds (x:|xs) ]
@@ -892,11 +896,9 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
   where
     mk_tuple_ty tys = foldr1 (\tn tm -> mkBoxedTupleTy [tn, tm]) tys
 
-       -- loop :: Type                                  -- m_ty
-       --      -> ExpRhoType                            -- inner_res_ty
-       --      -> [TcType]                              -- tup_tys
-       --      -> [ParStmtBlock Name]
-       --      -> TcM ([([LStmt GhcTc], [TcId])], thing)
+    loop
+     :: Type -> ExpRhoType -> NonEmpty (Type, ParStmtBlock GhcRn GhcRn)
+     -> TcM (NonEmpty (ParStmtBlock GhcTc GhcTc), _)
     loop m_ty inner_res_ty ((tup_ty_in, ParStmtBlock x stmts names return_op) :| xs)
       = do { let m_tup_ty = m_ty `mkAppTy` tup_ty_in
            ; (stmts', (ids, return_op', pairs', thing))
@@ -912,6 +914,9 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
                       ; return (ids, return_op', pairs', thing) }
            ; return (ParStmtBlock x stmts' ids return_op' :| pairs', thing) }
 
+    loop1
+     :: Type -> ExpRhoType -> [(Type, ParStmtBlock GhcRn GhcRn)]
+     -> TcM ([ParStmtBlock GhcTc GhcTc], _)
     -- matching in the branches
     loop1 _ r [] = [ ([], a) | a <- thing_inside r ]
     loop1 m r (x:xs) = [ (toList ys, a) | (ys, a) <- loop m r (x:|xs) ]
