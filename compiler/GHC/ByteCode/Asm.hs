@@ -117,9 +117,8 @@ assembleBCOs interp profile proto_bcos tycons top_strs modbreaks spt_entries = d
   -- fixed for an interpreter
   itblenv <- mkITbls interp profile tycons
   bcos    <- mapM (assembleBCO (profilePlatform profile)) proto_bcos
-  bcos'   <- mallocStrings interp bcos
   return CompiledByteCode
-    { bc_bcos = bcos'
+    { bc_bcos = bcos
     , bc_itbls = itblenv
     , bc_ffis = concatMap protoBCOFFIs proto_bcos
     , bc_strs = top_strs
@@ -137,50 +136,17 @@ assembleBCOs interp profile proto_bcos tycons top_strs modbreaks spt_entries = d
 -- memory for them, and bake the resulting addresses into the instruction stream
 -- in the form of BCONPtrWord arguments.
 --
--- Since we do this when assembling, we only allocate the memory when we compile
--- the module, not each time we relink it. However, we do want to take care to
--- malloc the memory all in one go, since that is more efficient with
--- -fexternal-interpreter, especially when compiling in parallel.
+-- We used to allocate remote buffers for BCONPtrStr ByteStrings when
+-- assembling, but this gets in the way of bytecode serialization: we
+-- want the ability to serialize and reload assembled bytecode, so
+-- it's better to preserve BCONPtrStr as-is, and only perform the
+-- actual allocation at link-time.
 --
 -- Note that, as with top-level string literal bindings, this memory is never
 -- freed, so it just leaks if the BCO is unloaded. See Note [Generating code for
 -- top-level string literal bindings] in GHC.StgToByteCode for some discussion
 -- about why.
 --
-mallocStrings ::  Interp -> FlatBag UnlinkedBCO -> IO (FlatBag UnlinkedBCO)
-mallocStrings interp ulbcos = do
-  let bytestrings = reverse (MTL.execState (mapM_ collect ulbcos) [])
-  ptrs <- interpCmd interp (MallocStrings bytestrings)
-  return (MTL.evalState (mapM splice ulbcos) ptrs)
- where
-  splice bco@UnlinkedBCO{..} = do
-    lits <- mapM spliceLit unlinkedBCOLits
-    ptrs <- mapM splicePtr unlinkedBCOPtrs
-    return bco { unlinkedBCOLits = lits, unlinkedBCOPtrs = ptrs }
-
-  spliceLit (BCONPtrStr _) = do
-    rptrs <- MTL.get
-    case rptrs of
-      (RemotePtr p : rest) -> do
-        MTL.put rest
-        return (BCONPtrWord (fromIntegral p))
-      _ -> panic "mallocStrings:spliceLit"
-  spliceLit other = return other
-
-  splicePtr (BCOPtrBCO bco) = BCOPtrBCO <$> splice bco
-  splicePtr other = return other
-
-  collect UnlinkedBCO{..} = do
-    mapM_ collectLit unlinkedBCOLits
-    mapM_ collectPtr unlinkedBCOPtrs
-
-  collectLit (BCONPtrStr bs) = do
-    strs <- MTL.get
-    MTL.put (bs:strs)
-  collectLit _ = return ()
-
-  collectPtr (BCOPtrBCO bco) = collect bco
-  collectPtr _ = return ()
 
 data RunAsmReader = RunAsmReader { isn_array :: {-# UNPACK #-} !(Array.IOUArray Int Word16)
                                   , ptr_array :: {-# UNPACK #-} !(SmallMutableArrayIO BCOPtr)
