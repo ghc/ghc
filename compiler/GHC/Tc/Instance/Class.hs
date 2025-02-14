@@ -7,8 +7,8 @@ module GHC.Tc.Instance.Class (
      InstanceWhat(..), safeOverlap, instanceReturnsDictCon,
      AssocInstInfo(..), isNotAssociated,
      lookupHasFieldLabel, FamArgType(..), PartialAssocInstInfo,
-     buildAssocInstInfo, buildPatsArgTypes, buildPatsFreeArgTypes,
-     assocInstInfoPartialAssocInstInfo
+     buildAssocInstInfo, buildPatsArgTypes,
+     assocInstInfoPartialAssocInstInfo, buildPatsModeTypes
   ) where
 
 import GHC.Prelude
@@ -111,15 +111,15 @@ buildAssocInstInfo fam_tc (Just (cls, tvs, env)) = InClsInst cls tvs env argType
         toArgType _ = ClassArg
 
 buildPatsArgTypes :: (Outputable x) => AssocInstInfo -> [x] -> [(x, FamArgType)]
-buildPatsArgTypes NotAssociated xs = buildPatsFreeArgTypes xs
+buildPatsArgTypes NotAssociated xs = buildPatsModeTypes FreeArg xs
 buildPatsArgTypes (InClsInst {..}) xs =
   assertPpr ((length ai_arg_types) == length xs)
   (text "associated type family instance header patterns mismatch with ai_arg_types on length: "
   <+> text "Args: "<> ppr xs <+> text "ai_arg_types:" <+> ppr xs)
   $ zip xs ai_arg_types
 
-buildPatsFreeArgTypes :: [x] -> [(x, FamArgType)]
-buildPatsFreeArgTypes xs = (,FreeArg) <$> xs
+buildPatsModeTypes :: FamArgType -> [x] -> [(x, FamArgType)]
+buildPatsModeTypes fa xs = (,fa) <$> xs
 
 data FamArgType = ClassArg | FreeArg deriving (Eq, Show)
 
