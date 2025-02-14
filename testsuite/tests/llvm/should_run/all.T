@@ -14,3 +14,5 @@ def ignore_llvm_and_vortex( msg ):
 
 test('T22487', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile_and_run, [''])
 test('T22033', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile_and_run, [''])
+test('T25730', [req_c, unless(arch('x86_64'), skip), normalise_errmsg_fun(ignore_llvm_and_vortex)], compile_and_run, ['T25730C.c'])
+  # T25730C.c contains Intel instrinsics, so only run this test on x86

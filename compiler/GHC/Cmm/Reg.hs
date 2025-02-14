@@ -98,8 +98,8 @@ instance Outputable CmmReg where
 pprReg :: CmmReg -> SDoc
 pprReg r
    = case r of
-        CmmLocal  local                     -> pprLocalReg  local
-        CmmGlobal (GlobalRegUse global _ty) -> pprGlobalReg global
+        CmmLocal  local                   -> pprLocalReg  local
+        CmmGlobal (GlobalRegUse global _) -> pprGlobalReg global
 
 cmmRegType :: CmmReg -> CmmType
 cmmRegType (CmmLocal  reg) = localRegType reg

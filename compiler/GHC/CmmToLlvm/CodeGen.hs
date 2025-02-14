@@ -47,7 +47,7 @@ import Data.Foldable ( toList )
 import Data.List ( nub )
 import qualified Data.List as List
 import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
-import Data.Maybe ( catMaybes, isJust )
+import Data.Maybe ( catMaybes )
 
 type Atomic = Maybe MemoryOrdering
 type LlvmStatements = OrdList LlvmStatement
@@ -202,9 +202,8 @@ genCall (PrimTarget MO_Touch) _ _ =
     return (nilOL, [])
 
 genCall (PrimTarget (MO_UF_Conv w)) [dst] [e] = runStmtsDecls $ do
-    dstV <- getCmmRegW (CmmLocal dst)
-    let ty = cmmToLlvmType $ localRegType dst
-        width = widthToLlvmFloat w
+    (dstV, ty) <- getCmmRegW (CmmLocal dst)
+    let width = widthToLlvmFloat w
     castV <- lift $ mkLocalVar ty
     ve <- exprToVarW e
     statement $ Assignment castV $ Cast LM_Uitofp ve width
@@ -255,7 +254,7 @@ genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = runStmtsDecls $
     let targetTy = widthToLlvmInt width
         ptrExpr = Cast LM_Inttoptr addrVar (pLift targetTy)
     ptrVar <- doExprW (pLift targetTy) ptrExpr
-    dstVar <- getCmmRegW (CmmLocal dst)
+    (dstVar, _dst_ty) <- getCmmRegW (CmmLocal dst)
     let op = case amop of
                AMO_Add  -> LAO_Add
                AMO_Sub  -> LAO_Sub
@@ -267,7 +266,7 @@ genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = runStmtsDecls $
     statement $ Store retVar dstVar Nothing []
 
 genCall (PrimTarget (MO_AtomicRead _ mem_ord)) [dst] [addr] = runStmtsDecls $ do
-    dstV <- getCmmRegW (CmmLocal dst)
+    (dstV, _dst_ty) <- getCmmRegW (CmmLocal dst)
     v1 <- genLoadW (Just mem_ord) addr (localRegType dst) NaturallyAligned
     statement $ Store v1 dstV Nothing []
 
@@ -279,14 +278,14 @@ genCall (PrimTarget (MO_Cmpxchg _width))
     let targetTy = getVarType oldVar
         ptrExpr = Cast LM_Inttoptr addrVar (pLift targetTy)
     ptrVar <- doExprW (pLift targetTy) ptrExpr
-    dstVar <- getCmmRegW (CmmLocal dst)
+    (dstVar, _dst_ty) <- getCmmRegW (CmmLocal dst)
     retVar <- doExprW (LMStructU [targetTy,i1])
               $ CmpXChg ptrVar oldVar newVar SyncSeqCst SyncSeqCst
     retVar' <- doExprW targetTy $ ExtractV retVar 0
     statement $ Store retVar' dstVar Nothing []
 
 genCall (PrimTarget (MO_Xchg _width)) [dst] [addr, val] = runStmtsDecls $ do
-    dstV <- getCmmRegW (CmmLocal dst) :: WriterT LlvmAccum LlvmM LlvmVar
+    (dstV, _dst_ty) <- getCmmRegW (CmmLocal dst)
     addrVar <- exprToVarW addr
     valVar <- exprToVarW val
     let ptrTy = pLift $ getVarType valVar
@@ -352,8 +351,8 @@ genCall (PrimTarget (MO_U_Mul2 w)) [dstH, dstL] [lhs, rhs] = runStmtsDecls $ do
     retShifted <- doExprW width2x $ LlvmOp LM_MO_LShr retV widthLlvmLit
     -- And extract them into retH.
     retH <- doExprW width $ Cast LM_Trunc retShifted width
-    dstRegL <- getCmmRegW (CmmLocal dstL)
-    dstRegH <- getCmmRegW (CmmLocal dstH)
+    (dstRegL, _dstL_ty) <- getCmmRegW (CmmLocal dstL)
+    (dstRegH, _dstH_ty) <- getCmmRegW (CmmLocal dstH)
     statement $ Store retL dstRegL Nothing []
     statement $ Store retH dstRegH Nothing []
 
@@ -383,9 +382,9 @@ genCall (PrimTarget (MO_S_Mul2 w)) [dstC, dstH, dstL] [lhs, rhs] = runStmtsDecls
     retH' <- doExprW width $ LlvmOp LM_MO_AShr retL widthLlvmLitm1
     retC1  <- doExprW i1 $ Compare LM_CMP_Ne retH retH' -- Compare op returns a 1-bit value (i1)
     retC   <- doExprW width $ Cast LM_Zext retC1 width  -- so we zero-extend it
-    dstRegL <- getCmmRegW (CmmLocal dstL)
-    dstRegH <- getCmmRegW (CmmLocal dstH)
-    dstRegC <- getCmmRegW (CmmLocal dstC)
+    (dstRegL, _dstL_ty) <- getCmmRegW (CmmLocal dstL)
+    (dstRegH, _dstH_ty) <- getCmmRegW (CmmLocal dstH)
+    (dstRegC, _dstC_ty) <- getCmmRegW (CmmLocal dstC)
     statement $ Store retL dstRegL Nothing []
     statement $ Store retH dstRegH Nothing []
     statement $ Store retC dstRegC Nothing []
@@ -420,8 +419,8 @@ genCall (PrimTarget (MO_U_QuotRem2 w))
     let narrow var = doExprW width $ Cast LM_Trunc var width
     retDiv <- narrow retExtDiv
     retRem <- narrow retExtRem
-    dstRegQ <- lift $ getCmmReg (CmmLocal dstQ)
-    dstRegR <- lift $ getCmmReg (CmmLocal dstR)
+    (dstRegQ, _dstQ_ty) <- lift $ getCmmReg (CmmLocal dstQ)
+    (dstRegR, _dstR_ty) <- lift $ getCmmReg (CmmLocal dstR)
     statement $ Store retDiv dstRegQ Nothing []
     statement $ Store retRem dstRegR Nothing []
 
@@ -504,7 +503,6 @@ genCall target res args = do
     let funTy = \name -> LMFunction $ LlvmFunctionDecl name ExternallyVisible
                              lmconv retTy FixedArgs argTy (llvmFunAlign platform)
 
-
     argVars <- arg_varsW args_hints ([], nilOL, [])
     fptr    <- getFunPtrW funTy target
 
@@ -524,23 +522,21 @@ genCall target res args = do
                 ret_reg t = panic $ "genCall: Bad number of registers! Can only handle"
                                 ++ " 1, given " ++ show (length t) ++ "."
             let creg = ret_reg res
-            vreg <- getCmmRegW (CmmLocal creg)
-            if retTy == pLower (getVarType vreg)
-                then do
-                    statement $ Store v1 vreg Nothing []
-                    doReturn
-                else do
-                    let ty = pLower $ getVarType vreg
-                    let op = case ty of
-                            vt | isPointer vt -> LM_Bitcast
-                               | isInt     vt -> LM_Ptrtoint
-                               | otherwise    ->
-                                   panic $ "genCall: CmmReg bad match for"
-                                        ++ " returned type!"
-
-                    v2 <- doExprW ty $ Cast op v1 ty
-                    statement $ Store v2 vreg Nothing []
-                    doReturn
+            (vreg, ty) <- getCmmRegW (CmmLocal creg)
+            if retTy == ty
+            then do
+                statement $ Store v1 vreg Nothing []
+                doReturn
+            else do
+                let op = case ty of
+                        vt | isPointer vt -> LM_Bitcast
+                           | isInt     vt -> LM_Ptrtoint
+                           | otherwise    ->
+                               panic $ "genCall: CmmReg bad match for"
+                                    ++ " returned type!"
+                v2 <- doExprW ty $ Cast op v1 ty
+                statement $ Store v2 vreg Nothing []
+                doReturn
 
 -- | Generate a call to an LLVM intrinsic that performs arithmetic operation
 -- with overflow bit (i.e., returns a struct containing the actual result of the
@@ -566,8 +562,8 @@ genCallWithOverflow t@(PrimTarget op) w [dstV, dstO] [lhs, rhs] = do
     -- value is i<width>, but overflowBit is i1, so we need to cast (Cmm expects
     -- both to be i<width>)
     (overflow, zext) <- doExpr width $ Cast LM_Zext overflowBit width
-    dstRegV <- getCmmReg (CmmLocal dstV)
-    dstRegO <- getCmmReg (CmmLocal dstO)
+    (dstRegV, _dstV_ty) <- getCmmReg (CmmLocal dstV)
+    (dstRegO, _dstO_ty) <- getCmmReg (CmmLocal dstO)
     let storeV = Store value dstRegV Nothing []
         storeO = Store overflow dstRegO Nothing []
     return (stmts `snocOL` zext `snocOL` storeV `snocOL` storeO, top)
@@ -625,7 +621,7 @@ genCallSimpleCast w t@(PrimTarget op) [dst] args = do
     fname                       <- cmmPrimOpFunctions op
     (fptr, _, top3)             <- getInstrinct fname width [width]
 
-    dstV                        <- getCmmReg (CmmLocal dst)
+    (dstV, _dst_ty)             <- getCmmReg (CmmLocal dst)
 
     let (_, arg_hints) = foreignTargetHints t
     let args_hints = zip args arg_hints
@@ -657,7 +653,7 @@ genCallSimpleCast2 w t@(PrimTarget op) [dst] args = do
     fname                       <- cmmPrimOpFunctions op
     (fptr, _, top3)             <- getInstrinct fname width (const width <$> args)
 
-    dstV                        <- getCmmReg (CmmLocal dst)
+    (dstV, _dst_ty)             <- getCmmReg (CmmLocal dst)
 
     let (_, arg_hints) = foreignTargetHints t
     let args_hints = zip args arg_hints
@@ -1089,11 +1085,9 @@ genJump expr live = do
 -- these with registers when possible.
 genAssign :: CmmReg -> CmmExpr -> LlvmM StmtData
 genAssign reg val = do
-    vreg <- getCmmReg reg
+    (vreg, ty) <- getCmmReg reg
     (vval, stmts2, top2) <- exprToVar val
     let stmts = stmts2
-
-    let ty = (pLower . getVarType) vreg
     platform <- getPlatform
     case ty of
       -- Some registers are pointer types, so need to cast value to pointer
@@ -2047,42 +2041,58 @@ mkLoad atomic vptr alignment
 -- | Handle CmmReg expression. This will return a pointer to the stack
 -- location of the register. Throws an error if it isn't allocated on
 -- the stack.
-getCmmReg :: CmmReg -> LlvmM LlvmVar
+getCmmReg :: CmmReg -> LlvmM (LlvmVar, LlvmType)
 getCmmReg (CmmLocal (LocalReg un _))
   = do exists <- varLookup un
        case exists of
-         Just ety -> return (LMLocalVar un $ pLift ety)
+         Just ety -> return (LMLocalVar un $ pLift ety, ety)
          Nothing  -> pprPanic "getCmmReg: Cmm register " $
                         ppr un <> text " was not allocated!"
            -- This should never happen, as every local variable should
            -- have been assigned a value at some point, triggering
            -- "funPrologue" to allocate it on the stack.
 
-getCmmReg (CmmGlobal ru@(GlobalRegUse r _))
-  = do onStack  <- checkStackReg r
+getCmmReg (CmmGlobal (GlobalRegUse reg _reg_ty))
+  = do onStack  <- checkStackReg reg
        platform <- getPlatform
-       if onStack
-         then return (lmGlobalRegVar platform ru)
-         else pprPanic "getCmmReg: Cmm register " $
-                ppr r <> text " not stack-allocated!"
+       case onStack of
+          Just stack_ty -> do
+            let var = lmGlobalRegVar platform (GlobalRegUse reg stack_ty)
+            return (var, pLower $ getVarType var)
+          Nothing ->
+            pprPanic "getCmmReg: Cmm register " $
+              ppr reg <> text " not stack-allocated!"
 
 -- | Return the value of a given register, as well as its type. Might
 -- need to be load from stack.
 getCmmRegVal :: CmmReg -> LlvmM (LlvmVar, LlvmType, LlvmStatements)
 getCmmRegVal reg =
   case reg of
-    CmmGlobal g -> do
-      onStack <- checkStackReg (globalRegUse_reg g)
+    CmmGlobal gu@(GlobalRegUse g _) -> do
+      onStack <- checkStackReg g
       platform <- getPlatform
-      if onStack then loadFromStack else do
-        let r = lmGlobalRegArg platform g
-        return (r, getVarType r, nilOL)
+      case onStack of
+        Just {} ->
+          loadFromStack
+        Nothing -> do
+          let r = lmGlobalRegArg platform gu
+          return (r, getVarType r, nilOL)
     _ -> loadFromStack
- where loadFromStack = do
-         ptr <- getCmmReg reg
-         let ty = pLower $ getVarType ptr
-         (v, s) <- doExpr ty (Load ptr Nothing)
-         return (v, ty, unitOL s)
+ where
+    loadFromStack = do
+      platform <- getPlatform
+      (ptr, stack_reg_ty) <- getCmmReg reg
+      let reg_ty = case reg of
+            CmmGlobal g -> pLower $ getVarType $ lmGlobalRegVar platform g
+            CmmLocal {} -> stack_reg_ty
+      if reg_ty /= stack_reg_ty
+      then do
+        (v1, s1) <- doExpr stack_reg_ty (Load ptr Nothing)
+        (v2, s2) <- doExpr reg_ty (Cast LM_Bitcast v1 reg_ty)
+        return (v2, reg_ty, toOL [s1, s2])
+      else do
+        (v, s) <- doExpr reg_ty (Load ptr Nothing)
+        return (v, reg_ty, unitOL s)
 
 -- | Allocate a local CmmReg on the stack
 allocReg :: CmmReg -> (LlvmVar, LlvmStatements)
@@ -2215,15 +2225,29 @@ funPrologue live cmmBlocks = do
         let (newv, stmts) = allocReg reg
         varInsert un (pLower $ getVarType newv)
         return stmts
-      CmmGlobal ru@(GlobalRegUse r _) -> do
+      CmmGlobal ru@(GlobalRegUse r ty0) -> do
         let reg   = lmGlobalRegVar platform ru
-            arg   = lmGlobalRegArg platform ru
             ty    = (pLower . getVarType) reg
             trash = LMLitVar $ LMUndefLit ty
-            rval  = if isJust (mbLive r) then arg else trash
+            rval  = case mbLive r of
+              Just (GlobalRegUse _ ty') ->
+                lmGlobalRegArg platform (GlobalRegUse r ty')
+              _ -> trash
             alloc = Assignment reg $ Alloca (pLower $ getVarType reg) 1
-        markStackReg r
-        return $ toOL [alloc, Store rval reg Nothing []]
+        markStackReg ru
+        case mbLive r of
+          Just (GlobalRegUse _ ty')
+            | let llvm_ty  = cmmToLlvmType ty0
+                  llvm_ty' = cmmToLlvmType ty'
+            , llvm_ty /= llvm_ty'
+            -> do castV <- mkLocalVar (pLift llvm_ty')
+                  return $
+                    toOL [ alloc
+                         , Assignment castV $ Cast LM_Bitcast reg (pLift llvm_ty')
+                         , Store rval castV Nothing []
+                         ]
+          _ ->
+            return $ toOL [alloc, Store rval reg Nothing []]
 
   return (concatOL stmtss `snocOL` jumpToEntry, [])
   where
@@ -2387,7 +2411,7 @@ runStmtsDecls action = do
     LlvmAccum stmts decls <- execWriterT action
     return (stmts, decls)
 
-getCmmRegW :: CmmReg -> WriterT LlvmAccum LlvmM LlvmVar
+getCmmRegW :: CmmReg -> WriterT LlvmAccum LlvmM (LlvmVar, LlvmType)
 getCmmRegW = lift . getCmmReg
 
 genLoadW :: Atomic -> CmmExpr -> CmmType -> AlignmentSpec -> WriterT LlvmAccum LlvmM LlvmVar
