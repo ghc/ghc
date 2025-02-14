@@ -1,11 +1,14 @@
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module GHC.Tc.Instance.Class (
      matchGlobalInst, matchEqualityInst,
      ClsInstResult(..),
      InstanceWhat(..), safeOverlap, instanceReturnsDictCon,
      AssocInstInfo(..), isNotAssociated,
-     lookupHasFieldLabel
+     lookupHasFieldLabel, FamArgType(..), PartialAssocInstInfo,
+     buildAssocInstInfo, buildPatsArgTypes, buildPatsFreeArgTypes,
+     assocInstInfoPartialAssocInstInfo
   ) where
 
 import GHC.Prelude
@@ -36,7 +39,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
 import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name )
-import GHC.Types.Var.Env ( VarEnv )
+import GHC.Types.Var.Env ( VarEnv, lookupVarEnv )
 import GHC.Types.Id
 import GHC.Types.Var
 
@@ -89,7 +92,40 @@ data AssocInstInfo
                                             -- 'GHC.Tc.Validity.checkConsistentFamInst'
               , ai_inst_env :: VarEnv Type  -- ^ Maps /class/ tyvars to their instance types
                 -- See Note [Matching in the consistent-instantiation check]
+              , ai_arg_types :: [FamArgType] -- ^ The types of the arguments to the associated type
     }
+type PartialAssocInstInfo = Maybe (Class, [TyVar], VarEnv Type)
+
+assocInstInfoPartialAssocInstInfo :: AssocInstInfo -> PartialAssocInstInfo
+assocInstInfoPartialAssocInstInfo NotAssociated = Nothing
+assocInstInfoPartialAssocInstInfo (InClsInst {..}) = Just (ai_class, ai_tyvars, ai_inst_env)
+
+buildAssocInstInfo :: TyCon -> PartialAssocInstInfo -> AssocInstInfo
+buildAssocInstInfo _fam_tc Nothing = NotAssociated
+buildAssocInstInfo fam_tc (Just (cls, tvs, env)) = InClsInst cls tvs env argTypes
+  where
+    argTypes
+      = [ toArgType $ lookupVarEnv env fam_tc_tv | fam_tc_tv <- tyConTyVars fam_tc]
+      where
+        toArgType Nothing = FreeArg
+        toArgType _ = ClassArg
+
+buildPatsArgTypes :: (Outputable x) => AssocInstInfo -> [x] -> [(x, FamArgType)]
+buildPatsArgTypes NotAssociated xs = buildPatsFreeArgTypes xs
+buildPatsArgTypes (InClsInst {..}) xs =
+  assertPpr ((length ai_arg_types) == length xs)
+  (text "associated type family instance header patterns mismatch with ai_arg_types on length: "
+  <+> text "Args: "<> ppr xs <+> text "ai_arg_types:" <+> ppr xs)
+  $ zip xs ai_arg_types
+
+buildPatsFreeArgTypes :: [x] -> [(x, FamArgType)]
+buildPatsFreeArgTypes xs = (,FreeArg) <$> xs
+
+data FamArgType = ClassArg | FreeArg deriving (Eq, Show)
+
+instance Outputable FamArgType where
+  ppr ClassArg = text "ClassArg"
+  ppr FreeArg = text "FreeArg"
 
 isNotAssociated :: AssocInstInfo -> Bool
 isNotAssociated (NotAssociated {}) = True

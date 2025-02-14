@@ -49,7 +49,7 @@ import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1 )
 import {-# SOURCE #-} GHC.Tc.Module( checkBootDeclM )
 import GHC.Tc.Deriv (DerivInfo(..))
 import GHC.Tc.Gen.HsType
-import GHC.Tc.Instance.Class( AssocInstInfo(..) )
+import GHC.Tc.Instance.Class( AssocInstInfo(..), PartialAssocInstInfo)
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Instance.Family
@@ -3253,7 +3253,7 @@ kcTyFamInstEqn tc_fam_tc
 
        ; discardResult $
          bindOuterFamEqnTKBndrs_Q_Tv outer_bndrs $
-         do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
+         do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats NotAssociated
             ; tcCheckLHsTypeInContext hs_rhs_ty (TheKind res_kind) }
              -- Why "_Tv" here?  Consider (#14066)
              --  type family Bar x y where
@@ -3430,7 +3430,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        ; (tclvl, wanted, (outer_bndrs, (lhs_ty, rhs_ty)))
                <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
                   bindOuterFamEqnTKBndrs skol_info outer_hs_bndrs   $
-                  do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
+                  do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats mb_clsinfo
                        -- Ensure that the instance is consistent with its
                        -- parent class (#16008)
                      ; addConsistencyConstraints mb_clsinfo lhs_ty
@@ -5539,19 +5539,19 @@ tcAddDeclCtxt :: TyClDecl GhcRn -> TcM a -> TcM a
 tcAddDeclCtxt decl thing_inside
   = addErrCtxt (tcMkDeclCtxt decl) thing_inside
 
-tcAddOpenTyFamInstCtxt :: AssocInstInfo -> TyFamInstDecl GhcRn -> TcM a -> TcM a
+tcAddOpenTyFamInstCtxt :: PartialAssocInstInfo -> TyFamInstDecl GhcRn -> TcM a -> TcM a
 tcAddOpenTyFamInstCtxt mb_assoc decl
   = tcAddFamInstCtxt flav (tyFamInstDeclName decl)
   where
     assoc = case mb_assoc of
-      NotAssociated -> Nothing
-      InClsInst { ai_class = cls } -> Just $ classTyCon cls
+      Nothing -> Nothing
+      Just (cls,_, _) -> Just $ classTyCon cls
     flav = TyConInstFlavour
          { tyConInstFlavour = OpenFamilyFlavour IAmType assoc
          , tyConInstIsDefault = False
          }
 
-tcMkDataFamInstCtxt :: AssocInstInfo -> NewOrData -> DataFamInstDecl GhcRn -> ErrCtxtMsg
+tcMkDataFamInstCtxt :: PartialAssocInstInfo -> NewOrData -> DataFamInstDecl GhcRn -> ErrCtxtMsg
 tcMkDataFamInstCtxt mb_assoc new_or_data (DataFamInstDecl { dfid_eqn = eqn })
   = TyConInstCtxt (unLoc (feqn_tycon eqn))
       (TyConInstFlavour
@@ -5560,10 +5560,10 @@ tcMkDataFamInstCtxt mb_assoc new_or_data (DataFamInstDecl { dfid_eqn = eqn })
         })
   where
     assoc = case mb_assoc of
-      NotAssociated -> Nothing
-      InClsInst { ai_class = cls } -> Just $ classTyCon cls
+      Nothing -> Nothing
+      Just (cls,_,_) -> Just $ classTyCon cls
 
-tcAddDataFamInstCtxt :: AssocInstInfo -> NewOrData -> DataFamInstDecl GhcRn -> TcM a -> TcM a
+tcAddDataFamInstCtxt :: PartialAssocInstInfo -> NewOrData -> DataFamInstDecl GhcRn -> TcM a -> TcM a
 tcAddDataFamInstCtxt assoc new_or_data decl
   = addErrCtxt (tcMkDataFamInstCtxt assoc new_or_data decl)
 
