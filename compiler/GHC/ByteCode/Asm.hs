@@ -65,6 +65,7 @@ import Data.Array.Base  ( unsafeWrite )
 #endif
 
 import Foreign hiding (shiftL, shiftR)
+import Data.ByteString (ByteString)
 import Data.Char  (ord)
 import Data.Maybe (fromMaybe)
 import GHC.Float (castFloatToWord32, castDoubleToWord64)
@@ -108,7 +109,7 @@ assembleBCOs
   -> Profile
   -> FlatBag (ProtoBCO Name)
   -> [TyCon]
-  -> AddrEnv
+  -> [(Name, ByteString)]
   -> Maybe ModBreaks
   -> [SptEntry]
   -> IO CompiledByteCode
