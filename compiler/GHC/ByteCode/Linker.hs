@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -87,6 +88,9 @@ lookupLiteral interp pkgs_loaded le ptr = case ptr of
     return (W# (int2Word# (addr2Int# a#)))
   BCONPtrStr bs -> do
     RemotePtr p <- fmap head $ interpCmd interp $ MallocStrings [bs]
+    pure $ fromIntegral p
+  BCONPtrFFIInfo (FFIInfo {..}) -> do
+    RemotePtr p <- interpCmd interp $ PrepFFI ffiInfoArgs ffiInfoRet
     pure $ fromIntegral p
 
 lookupStaticPtr :: Interp -> FastString -> IO (Ptr ())
