@@ -142,6 +142,8 @@ import Data.List ( mapAccumL )
 import Control.Monad
 import Data.Tuple( swap )
 import GHC.Types.SourceText
+import GHC.Tc.Instance.Class (AssocInstInfo (..), FamArgType (..),
+  buildPatsArgTypes, buildPatsFreeArgTypes)
 
 {-
         ----------------------------
@@ -779,19 +781,20 @@ There is also the possibility of mentioning a wildcard
 
 tcFamTyPats :: TyCon
             -> HsFamEqnPats GhcRn                -- Patterns
+            -> AssocInstInfo                    -- Associated instance info
             -> TcM (TcType, TcKind)          -- (lhs_type, lhs_kind)
 -- Check the LHS of a type/data family instance
 -- e.g.   type instance F ty1 .. tyn = ...
 -- Used for both type and data families
-tcFamTyPats fam_tc hs_pats
+tcFamTyPats fam_tc hs_pats mb_clsinfo
   = do { traceTc "tcFamTyPats {" $
          vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity ]
 
-       ; mode <- mkHoleMode TypeLevel HM_FamPat
+       ; mode <- mkHoleMode TypeLevel (HM_FamPat FreeArg)
                  -- HM_FamPat: See Note [Wildcards in family instances] in
                  -- GHC.Rename.Module
        ; let fun_ty = mkTyConApp fam_tc []
-       ; (fam_app, res_kind) <- tcInferTyApps mode lhs_fun fun_ty hs_pats
+       ; (fam_app, res_kind) <- tcInferTyApps mode lhs_fun fun_ty (buildPatsArgTypes mb_clsinfo hs_pats)
 
        -- Hack alert: see Note [tcFamTyPats: zonking the result kind]
        ; res_kind <- liftZonkM $ zonkTcType res_kind
@@ -885,7 +888,7 @@ tcInferLHsTypeUnsaturated hs_ty
        ; case splitHsAppTys_maybe (unLoc hs_ty) of
            Just (hs_fun_ty, hs_args)
               -> do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
-                    ; tcInferTyApps_nosat mode hs_fun_ty fun_ty hs_args }
+                    ; tcInferTyApps_nosat mode hs_fun_ty fun_ty (buildPatsFreeArgTypes hs_args) }
                       -- Notice the 'nosat'; do not instantiate trailing
                       -- invisible arguments of a type family.
                       -- See Note [Dealing with :kind]
@@ -967,7 +970,7 @@ type HoleInfo = Maybe (TcLevel, HoleMode)
 -- HoleMode says how to treat the occurrences
 -- of anonymous wildcards; see tcAnonWildCardOcc
 data HoleMode = HM_Sig      -- Partial type signatures: f :: _ -> Int
-              | HM_FamPat   -- Family instances: F _ Int = Bool
+              | HM_FamPat FamArgType   -- Family instances: F _ Int = Bool
               | HM_VTA      -- Visible type and kind application:
                             --   f @(Maybe _)
                             --   Maybe @(_ -> _)
@@ -989,9 +992,17 @@ mkHoleMode tyki hm
        ; return (TcTyMode { mode_tyki  = tyki
                           , mode_holes = Just (lvl,hm) }) }
 
+updateFamArgType :: TcTyMode -> FamArgType -> TcTyMode
+updateFamArgType m@TcTyMode { mode_tyki = tyki, mode_holes =  mh } fam_arg
+  |Just (lvl, HM_FamPat _) <- mh
+  = (TcTyMode { mode_tyki = tyki
+              , mode_holes = Just (lvl,HM_FamPat fam_arg) })
+  | otherwise
+  = m
+
 instance Outputable HoleMode where
   ppr HM_Sig      = text "HM_Sig"
-  ppr HM_FamPat   = text "HM_FamPat"
+  ppr (HM_FamPat artType) = text ("HM_FamPat " ++ show artType)
   ppr HM_VTA      = text "HM_VTA"
   ppr HM_TyAppPat = text "HM_TyAppPat"
 
@@ -1537,7 +1548,7 @@ tcInferTyAppHead mode ty
 tc_app_ty :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
-       ; (ty, infered_kind) <- tcInferTyApps mode hs_fun_ty fun_ty hs_args
+       ; (ty, infered_kind) <- tcInferTyApps mode hs_fun_ty fun_ty (buildPatsArgTypes NotAssociated hs_args)
        ; checkExpKind rn_ty ty infered_kind exp_kind }
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
@@ -1558,7 +1569,7 @@ tcInferTyApps, tcInferTyApps_nosat
     :: TcTyMode
     -> LHsType GhcRn        -- ^ Function (for printing only)
     -> TcType               -- ^ Function
-    -> [LHsTypeArg GhcRn]   -- ^ Args
+    -> [(LHsTypeArg GhcRn, FamArgType)]   -- ^ Args
     -> TcM (TcType, TcKind) -- ^ (f args, result kind)
 tcInferTyApps mode hs_ty fun hs_args
   = do { (f_args, res_k) <- tcInferTyApps_nosat mode hs_ty fun hs_args
@@ -1590,7 +1601,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
        -> TcType          -- Function applied to some args
        -> Subst        -- Applies to function kind
        -> TcKind          -- Function kind
-       -> [LHsTypeArg GhcRn]    -- Un-type-checked args
+       -> [(LHsTypeArg GhcRn, FamArgType)]    -- Un-type-checked args
        -> TcM (TcType, TcKind)  -- Result type and its kind
     -- INVARIANT: in any call (go n fun subst fun_ki args)
     --               typeKind fun  =  subst(fun_ki)
@@ -1607,80 +1618,81 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
 
       ---------------- No user-written args left. We're done!
       ([], _) -> return (fun, substTy subst fun_ki)
+      ((arg,famArgTy):argtys, kb) -> do
+          case (arg, kb) of
+            ---------------- HsArgPar: We don't care about parens here
+            (HsArgPar _, _) -> go n fun subst fun_ki argtys
 
-      ---------------- HsArgPar: We don't care about parens here
-      (HsArgPar _ : args, _) -> go n fun subst fun_ki args
+            ---------------- HsTypeArg: a kind application (fun @ki)
+            (HsTypeArg _ hs_ki_arg, Just (ki_binder, inner_ki)) ->
+              case ki_binder of
 
-      ---------------- HsTypeArg: a kind application (fun @ki)
-      (HsTypeArg _ hs_ki_arg : hs_args, Just (ki_binder, inner_ki)) ->
-        case ki_binder of
+              -- FunTy with PredTy on LHS, or ForAllTy with Inferred
+              Named (Bndr kv Inferred)         -> instantiate kv inner_ki
 
-        -- FunTy with PredTy on LHS, or ForAllTy with Inferred
-        Named (Bndr kv Inferred)         -> instantiate kv inner_ki
+              Named (Bndr _ Specified) ->  -- Visible kind application
+                do { traceTc "tcInferTyApps (vis kind app)"
+                            (vcat [ ppr ki_binder, ppr hs_ki_arg
+                                  , ppr (piTyBinderType ki_binder)
+                                  , ppr subst ])
 
-        Named (Bndr _ Specified) ->  -- Visible kind application
-          do { traceTc "tcInferTyApps (vis kind app)"
-                       (vcat [ ppr ki_binder, ppr hs_ki_arg
-                             , ppr (piTyBinderType ki_binder)
-                             , ppr subst ])
+                  ; let exp_kind = substTy subst $ piTyBinderType ki_binder
+                  ; arg_mode <- mkHoleMode KindLevel HM_VTA
+                        -- HM_VKA: see Note [Wildcards in visible kind application]
+                  ; ki_arg <- addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty hs_ki_arg) n) $
+                              tc_check_lhs_type arg_mode hs_ki_arg exp_kind
 
-             ; let exp_kind = substTy subst $ piTyBinderType ki_binder
-             ; arg_mode <- mkHoleMode KindLevel HM_VTA
-                   -- HM_VKA: see Note [Wildcards in visible kind application]
-             ; ki_arg <- addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty hs_ki_arg) n) $
-                         tc_check_lhs_type arg_mode hs_ki_arg exp_kind
+                  ; traceTc "tcInferTyApps (vis kind app)" (ppr exp_kind)
+                  ; (subst', fun') <- mkAppTyM subst fun ki_binder ki_arg
+                  ; go (n+1) fun' subst' inner_ki argtys }
 
-             ; traceTc "tcInferTyApps (vis kind app)" (ppr exp_kind)
-             ; (subst', fun') <- mkAppTyM subst fun ki_binder ki_arg
-             ; go (n+1) fun' subst' inner_ki hs_args }
+              -- Attempted visible kind application (fun @ki), but fun_ki is
+              --   forall k -> blah   or   k1 -> k2
+              -- So we need a normal application.  Error.
+              _ -> ty_app_err hs_ki_arg $ substTy subst fun_ki
 
-        -- Attempted visible kind application (fun @ki), but fun_ki is
-        --   forall k -> blah   or   k1 -> k2
-        -- So we need a normal application.  Error.
-        _ -> ty_app_err hs_ki_arg $ substTy subst fun_ki
+            -- No binder; try applying the substitution, or fail if that's not possible
+            (HsTypeArg _ ki_arg, Nothing) -> try_again_after_substing_or $
+                                                ty_app_err ki_arg substed_fun_ki
 
-      -- No binder; try applying the substitution, or fail if that's not possible
-      (HsTypeArg _ ki_arg : _, Nothing) -> try_again_after_substing_or $
-                                           ty_app_err ki_arg substed_fun_ki
+            ---------------- HsValArg: a normal argument (fun ty)
+            (HsValArg _ arg, Just (ki_binder, inner_ki))
+              -- next binder is invisible; need to instantiate it
+              | Named (Bndr kv flag) <- ki_binder
+              , isInvisibleForAllTyFlag flag   -- ForAllTy with Inferred or Specified
+              -> instantiate kv inner_ki
 
-      ---------------- HsValArg: a normal argument (fun ty)
-      (HsValArg _ arg : args, Just (ki_binder, inner_ki))
-        -- next binder is invisible; need to instantiate it
-        | Named (Bndr kv flag) <- ki_binder
-        , isInvisibleForAllTyFlag flag   -- ForAllTy with Inferred or Specified
-         -> instantiate kv inner_ki
+              -- "normal" case
+              | otherwise
+              -> do { traceTc "tcInferTyApps (vis normal app)"
+                                (vcat [ ppr ki_binder
+                                      , ppr arg
+                                      , ppr (piTyBinderType ki_binder)
+                                      , ppr subst ])
+                      ; let exp_kind = substTy subst $ piTyBinderType ki_binder
+                      ; arg' <- addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty arg) n) $
+                                tc_check_lhs_type (updateFamArgType mode famArgTy) arg exp_kind
+                      ; traceTc "tcInferTyApps (vis normal app) 2" (ppr exp_kind)
+                      ; (subst', fun') <- mkAppTyM subst fun ki_binder arg'
+                      ; go (n+1) fun' subst' inner_ki argtys }
 
-        -- "normal" case
-        | otherwise
-         -> do { traceTc "tcInferTyApps (vis normal app)"
-                          (vcat [ ppr ki_binder
-                                , ppr arg
-                                , ppr (piTyBinderType ki_binder)
-                                , ppr subst ])
-                ; let exp_kind = substTy subst $ piTyBinderType ki_binder
-                ; arg' <- addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty arg) n) $
-                          tc_check_lhs_type mode arg exp_kind
-                ; traceTc "tcInferTyApps (vis normal app) 2" (ppr exp_kind)
-                ; (subst', fun') <- mkAppTyM subst fun ki_binder arg'
-                ; go (n+1) fun' subst' inner_ki args }
+                -- no binder; try applying the substitution, or infer another arrow in fun kind
+            (HsValArg _ _, Nothing)
+              -> try_again_after_substing_or $
+                do { let arrows_needed = n_initial_val_args (fst <$> all_args)
+                    ; co <- matchExpectedFunKind (HsTypeRnThing $ unLoc hs_ty) arrows_needed substed_fun_ki
 
-          -- no binder; try applying the substitution, or infer another arrow in fun kind
-      (HsValArg _ _ : _, Nothing)
-        -> try_again_after_substing_or $
-           do { let arrows_needed = n_initial_val_args all_args
-              ; co <- matchExpectedFunKind (HsTypeRnThing $ unLoc hs_ty) arrows_needed substed_fun_ki
+                    ; fun' <- liftZonkM $ zonkTcType (fun `mkCastTy` co)
+                          -- This zonk is essential, to expose the fruits
+                          -- of matchExpectedFunKind to the 'go' loop
 
-              ; fun' <- liftZonkM $ zonkTcType (fun `mkCastTy` co)
-                     -- This zonk is essential, to expose the fruits
-                     -- of matchExpectedFunKind to the 'go' loop
-
-              ; traceTc "tcInferTyApps (no binder)" $
-                   vcat [ ppr fun <+> dcolon <+> ppr fun_ki
-                        , ppr arrows_needed
-                        , ppr co
-                        , ppr fun' <+> dcolon <+> ppr (typeKind fun')]
-              ; go_init n fun' all_args }
-                -- Use go_init to establish go's INVARIANT
+                    ; traceTc "tcInferTyApps (no binder)" $
+                        vcat [ ppr fun <+> dcolon <+> ppr fun_ki
+                              , ppr arrows_needed
+                              , ppr co
+                              , ppr fun' <+> dcolon <+> ppr (typeKind fun')]
+                    ; go_init n fun' all_args }
+                      -- Use go_init to establish go's INVARIANT
       where
         instantiate ki_binder inner_ki
           = do { traceTc "tcInferTyApps (need to instantiate)"
@@ -1699,7 +1711,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
 
         zapped_subst   = zapSubst subst
         substed_fun_ki = substTy subst fun_ki
-        hs_ty          = appTypeToArg orig_hs_ty (take (n-1) orig_hs_args)
+        hs_ty          = appTypeToArg orig_hs_ty (take (n-1) $ fst <$> orig_hs_args)
 
     n_initial_val_args :: [HsArg p tm ty] -> Arity
     -- Count how many leading HsValArgs we have
@@ -2231,17 +2243,22 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
        ; checkExpectedKind ty (mkTyVarTy wc_tv) wc_kind exp_kind }
   where
      -- See Note [Wildcard names]
-     (wc_nm, mk_wc_details) = case hole_mode of
-               HM_Sig      -> (fsLit "w", newTauTvDetailsAtLevel)
-               HM_FamPat   -> (fsLit "_", newNoDefTauTvDetailsAtLevel)
-               HM_VTA      -> (fsLit "w", newTauTvDetailsAtLevel)
-               HM_TyAppPat -> (fsLit "_", newTauTvDetailsAtLevel)
-
+     wc_nm = case hole_mode of
+               HM_Sig       -> fsLit "w"
+               HM_FamPat _  -> fsLit "_"
+               HM_VTA       -> fsLit "w"
+               HM_TyAppPat  -> fsLit "_"
+     newSkolemTvDetailsAtLevel tclvl =
+              do { skol_info <- mkSkolemInfo FamInstSkol
+                  ; return (SkolemTv skol_info tclvl False) }
+     mk_wc_details = case hole_mode of
+                      HM_FamPat FreeArg -> newSkolemTvDetailsAtLevel
+                      _ -> newTauTvDetailsAtLevel
      emit_holes = case hole_mode of
-                     HM_Sig     -> True
-                     HM_FamPat  -> False
-                     HM_VTA     -> False
-                     HM_TyAppPat -> False
+                     HM_Sig       -> True
+                     HM_FamPat _  -> False
+                     HM_VTA       -> False
+                     HM_TyAppPat  -> False
 
 tcAnonWildCardOcc is_extra _ _ _
 -- mode_holes is Nothing. This means we have an anonymous wildcard
