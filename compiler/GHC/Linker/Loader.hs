@@ -54,7 +54,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GHC.Iface.Load
-import GHCi.Message (LoadedDLL)
+import GHCi.Message (ConInfoTable(..), LoadedDLL)
 
 import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
@@ -689,8 +689,9 @@ loadDecls interp hsc_env span linkable = do
         else do
           -- Link the expression itself
           let le  = linker_env pls
+          le2_itbl_env <- linkITbls interp (itbl_env le) (concat $ map bc_itbls cbcs)
           le2_addr_env <- foldlM (\env cbc -> allocateTopStrings interp (bc_strs cbc) env) (addr_env le) cbcs
-          let le2 = le { itbl_env = foldl' (\acc cbc -> plusNameEnv acc (bc_itbls cbc)) (itbl_env le) cbcs
+          let le2 = le { itbl_env = le2_itbl_env
                        , addr_env = le2_addr_env }
 
           -- Link the necessary packages and linkables
@@ -913,7 +914,7 @@ dynLinkBCOs interp pls bcos = do
 
 
             le1 = linker_env pls
-            ie2 = foldr plusNameEnv (itbl_env le1) (map bc_itbls cbcs)
+        ie2 <- linkITbls interp (itbl_env le1) (concatMap bc_itbls cbcs)
         ae2 <- foldlM (\env cbc -> allocateTopStrings interp (bc_strs cbc) env) (addr_env le1) cbcs
         let le2 = le1 { itbl_env = ie2, addr_env = ae2 }
 
@@ -959,6 +960,11 @@ makeForeignNamedHValueRefs
   :: Interp -> [(Name,HValueRef)] -> IO [(Name,ForeignHValue)]
 makeForeignNamedHValueRefs interp bindings =
   mapM (\(n, hvref) -> (n,) <$> mkFinalizedHValue interp hvref) bindings
+
+linkITbls :: Interp -> ItblEnv -> [(Name, ConInfoTable)] -> IO ItblEnv
+linkITbls interp = foldlM $ \env (nm, itbl) -> do
+  r <- interpCmd interp $ MkConInfoTable itbl
+  evaluate $ extendNameEnv env nm (nm, ItblPtr r)
 
 {- **********************************************************************
 
