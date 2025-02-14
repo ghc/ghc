@@ -117,9 +117,8 @@ assembleBCOs interp profile proto_bcos tycons top_strs modbreaks spt_entries = d
   -- fixed for an interpreter
   itblenv <- mkITbls interp profile tycons
   bcos    <- mapM (assembleBCO (profilePlatform profile)) proto_bcos
-  bcos'   <- mallocStrings interp bcos
   return CompiledByteCode
-    { bc_bcos = bcos'
+    { bc_bcos = bcos
     , bc_itbls = itblenv
     , bc_ffis = concatMap protoBCOFFIs proto_bcos
     , bc_strs = top_strs
@@ -147,40 +146,6 @@ assembleBCOs interp profile proto_bcos tycons top_strs modbreaks spt_entries = d
 -- top-level string literal bindings] in GHC.StgToByteCode for some discussion
 -- about why.
 --
-mallocStrings ::  Interp -> FlatBag UnlinkedBCO -> IO (FlatBag UnlinkedBCO)
-mallocStrings interp ulbcos = do
-  let bytestrings = reverse (MTL.execState (mapM_ collect ulbcos) [])
-  ptrs <- interpCmd interp (MallocStrings bytestrings)
-  return (MTL.evalState (mapM splice ulbcos) ptrs)
- where
-  splice bco@UnlinkedBCO{..} = do
-    lits <- mapM spliceLit unlinkedBCOLits
-    ptrs <- mapM splicePtr unlinkedBCOPtrs
-    return bco { unlinkedBCOLits = lits, unlinkedBCOPtrs = ptrs }
-
-  spliceLit (BCONPtrStr _) = do
-    rptrs <- MTL.get
-    case rptrs of
-      (RemotePtr p : rest) -> do
-        MTL.put rest
-        return (BCONPtrWord (fromIntegral p))
-      _ -> panic "mallocStrings:spliceLit"
-  spliceLit other = return other
-
-  splicePtr (BCOPtrBCO bco) = BCOPtrBCO <$> splice bco
-  splicePtr other = return other
-
-  collect UnlinkedBCO{..} = do
-    mapM_ collectLit unlinkedBCOLits
-    mapM_ collectPtr unlinkedBCOPtrs
-
-  collectLit (BCONPtrStr bs) = do
-    strs <- MTL.get
-    MTL.put (bs:strs)
-  collectLit _ = return ()
-
-  collectPtr (BCOPtrBCO bco) = collect bco
-  collectPtr _ = return ()
 
 data RunAsmReader = RunAsmReader { isn_array :: {-# UNPACK #-} !(Array.IOUArray Int Word16)
                                   , ptr_array :: {-# UNPACK #-} !(SmallMutableArrayIO BCOPtr)
