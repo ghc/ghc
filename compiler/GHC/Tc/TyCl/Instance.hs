@@ -517,7 +517,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
                           mini_subst = mkTvSubst (mkInScopeSet (mkVarSet skol_tvs)) mini_env
                           mb_info    = Just ( clas, visible_skol_tvs, mini_env)
                     ; df_stuff  <- mapAndRecoverM (tcDataFamInstDecl mb_info tv_skol_env) adts
-                    ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info)   ats
+                    ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info) ats
 
                       -- Check for missing associated types and build them
                       -- from their defaults (if available)

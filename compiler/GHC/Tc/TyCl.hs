@@ -3279,7 +3279,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
               , text "fam tc bndrs" <+> pprTyVars (tyConTyVars fam_tc)
               , case mb_clsinfo of
                   NotAssociated {} -> empty
-                  InClsInst { ai_class = cls } -> text "class" <+> ppr cls <+> pprTyVars (classTyVars cls) ]
+                  InClsInst { ai_class = cls, ai_arg_types = arg_types } -> text "class" <+> ppr cls <+> pprTyVars (classTyVars cls) <+> ppr arg_types]
 
        ; checkTyFamInstEqn fam_tc eqn_tc_name hs_pats
 
