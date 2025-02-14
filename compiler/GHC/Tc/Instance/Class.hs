@@ -112,11 +112,7 @@ buildAssocInstInfo fam_tc (Just (cls, tvs, env)) = InClsInst cls tvs env argType
 
 buildPatsArgTypes :: (Outputable x) => AssocInstInfo -> [x] -> [(x, FamArgType)]
 buildPatsArgTypes NotAssociated xs = buildPatsModeTypes FreeArg xs
-buildPatsArgTypes (InClsInst {..}) xs =
-  assertPpr ((length ai_arg_types) == length xs)
-  (text "associated type family instance header patterns mismatch with ai_arg_types on length: "
-  <+> text "Args: "<> ppr xs <+> text "ai_arg_types:" <+> ppr xs)
-  $ zip xs ai_arg_types
+buildPatsArgTypes (InClsInst {..}) xs = zip xs (ai_arg_types ++ cycle [FreeArg])
 
 buildPatsModeTypes :: FamArgType -> [x] -> [(x, FamArgType)]
 buildPatsModeTypes fa xs = (,fa) <$> xs
