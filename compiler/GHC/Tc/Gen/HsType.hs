@@ -788,7 +788,7 @@ tcFamTyPats :: TyCon
 -- Used for both type and data families
 tcFamTyPats fam_tc hs_pats mb_clsinfo
   = do { traceTc "tcFamTyPats {" $
-         vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity ]
+         vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity, text "pats:" <+> ppr hs_pats ]
 
        ; mode <- mkHoleMode TypeLevel (HM_FamPat FreeArg)
                  -- HM_FamPat: See Note [Wildcards in family instances] in
