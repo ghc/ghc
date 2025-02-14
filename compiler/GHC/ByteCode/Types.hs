@@ -74,8 +74,8 @@ data CompiledByteCode = CompiledByteCode
     -- "GHC.Iface.Tidy.StaticPtrTable".
   }
                 -- ToDo: we're not tracking strings that we malloc'd
-newtype FFIInfo = FFIInfo (RemotePtr C_ffi_cif)
-  deriving (Show, NFData)
+data FFIInfo = FFIInfo { ffiInfoArgs :: ![FFIType], ffiInfoRet :: !FFIType }
+  deriving (Show)
 
 instance Outputable CompiledByteCode where
   ppr CompiledByteCode{..} = ppr $ elemsFlatBag bc_bcos
@@ -198,6 +198,8 @@ data BCONPtr
   | BCONPtrAddr  !Name
   -- | A top-level string literal.
   | BCONPtrStr   !ByteString
+  -- | A libffi ffi_cif function prototype.
+  | BCONPtrFFIInfo !FFIInfo
 
 instance NFData BCONPtr where
   rnf x = x `seq` ()
