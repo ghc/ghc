@@ -51,9 +51,7 @@ data ProtoBCO a
         protoBCOBitmapSize :: Word,
         protoBCOArity      :: Int,
         -- what the BCO came from, for debugging only
-        protoBCOExpr       :: Either [CgStgAlt] CgStgRhs,
-        -- malloc'd pointers
-        protoBCOFFIs       :: [FFIInfo]
+        protoBCOExpr       :: Either [CgStgAlt] CgStgRhs
    }
 
 -- | A local block label (e.g. identifying a case alternative).
@@ -266,10 +264,9 @@ instance Outputable a => Outputable (ProtoBCO a) where
                  , protoBCOBitmap     = bitmap
                  , protoBCOBitmapSize = bsize
                  , protoBCOArity      = arity
-                 , protoBCOExpr       = origin
-                 , protoBCOFFIs       = ffis })
+                 , protoBCOExpr       = origin })
       = (text "ProtoBCO" <+> ppr name <> char '#' <> int arity
-                <+> text (show ffis) <> colon)
+                <> colon)
         $$ nest 3 (case origin of
                       Left alts ->
                         vcat (zipWith (<+>) (char '{' : repeat (char ';'))
