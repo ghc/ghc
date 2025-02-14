@@ -125,9 +125,6 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
              let flattened_binds = concatMap flattenBind (reverse lifted_binds)
              FlatBag.fromList (fromIntegral $ length flattened_binds) <$> mapM schemeTopBind flattened_binds
 
-        when (notNull ffis)
-             (panic "GHC.StgToByteCode.byteCodeGen: missing final emitBc?")
-
         putDumpFileMaybe logger Opt_D_dump_BCOs
            "Proto-BCOs" FormatByteCode
            (vcat (intersperse (char ' ') (map ppr $ elemsFlatBag proto_bcos)))
@@ -237,17 +234,15 @@ mkProtoBCO
    -> WordOff   -- ^ bitmap size
    -> [StgWord] -- ^ bitmap
    -> Bool      -- ^ True <=> is a return point, rather than a function
-   -> [FFIInfo]
    -> ProtoBCO Name
-mkProtoBCO platform _add_bco_name nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
+mkProtoBCO platform _add_bco_name nm instrs_ordlist origin arity bitmap_size bitmap is_ret
    = ProtoBCO {
         protoBCOName = nm,
         protoBCOInstrs = maybe_add_bco_name $ maybe_add_stack_check peep_d,
         protoBCOBitmap = bitmap,
         protoBCOBitmapSize = fromIntegral bitmap_size,
         protoBCOArity = arity,
-        protoBCOExpr = origin,
-        protoBCOFFIs = ffis
+        protoBCOExpr = origin
       }
      where
 #if MIN_VERSION_rts(1,0,3)
@@ -317,7 +312,7 @@ schemeTopBind (id, rhs)
         -- by just re-using the single top-level definition.  So
         -- for the worker itself, we must allocate it directly.
     -- ioToBc (putStrLn $ "top level BCO")
-    emitBc (mkProtoBCO platform add_bco_name
+    pure (mkProtoBCO platform add_bco_name
                        (getName id) (toOL [PACK data_con 0, RETURN P])
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
 
@@ -382,7 +377,7 @@ schemeR_wrk fvs nm original_body (args, body)
          bitmap = mkBitmap platform bits
      body_code <- schemeER_wrk sum_szsb_args p_init body
 
-     emitBc (mkProtoBCO platform add_bco_name nm body_code (Right original_body)
+     pure (mkProtoBCO platform add_bco_name nm body_code (Right original_body)
                  arity bitmap_size bitmap False{-not alts-})
 
 -- | Introduce break instructions for ticked expressions.
@@ -529,7 +524,7 @@ returnUnliftedReps d s szb reps = do
              -- otherwise use RETURN_TUPLE with a tuple descriptor
              nv_reps -> do
                let (call_info, args_offsets) = layoutNativeCall profile NativeTupleReturn 0 id nv_reps
-               tuple_bco <- emitBc (tupleBCO platform call_info args_offsets)
+                   tuple_bco = tupleBCO platform call_info args_offsets
                return $ PUSH_UBX (mkNativeCallInfoLit platform call_info) 1 `consOL`
                         PUSH_BCO tuple_bco `consOL`
                         unitOL RETURN_TUPLE
@@ -1080,16 +1075,15 @@ doCase d s p scrut bndr alts
      scrut_code <- schemeE (d + ret_frame_size_b + save_ccs_size_b)
                            (d + ret_frame_size_b + save_ccs_size_b)
                            p scrut
-     alt_bco' <- emitBc alt_bco
      if ubx_tuple_frame
-       then do tuple_bco <- emitBc (tupleBCO platform call_info args_offsets)
-               return (PUSH_ALTS_TUPLE alt_bco' call_info tuple_bco
+       then do let tuple_bco = tupleBCO platform call_info args_offsets
+               return (PUSH_ALTS_TUPLE alt_bco call_info tuple_bco
                        `consOL` scrut_code)
        else let scrut_rep = case non_void_arg_reps of
                   []    -> V
                   [rep] -> rep
                   _     -> panic "schemeE(StgCase).push_alts"
-            in return (PUSH_ALTS alt_bco' scrut_rep `consOL` scrut_code)
+            in return (PUSH_ALTS alt_bco scrut_rep `consOL` scrut_code)
 
 
 -- -----------------------------------------------------------------------------
@@ -1381,7 +1375,7 @@ Note [unboxed tuple bytecodes and tuple_BCO]
 
  -}
 
-tupleBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
+tupleBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> ProtoBCO Name
 tupleBCO platform args_info args =
   mkProtoBCO platform Nothing invented_name body_code (Left [])
              0{-no arity-} bitmap_size bitmap False{-is alts-}
@@ -1402,7 +1396,7 @@ tupleBCO platform args_info args =
     body_code = mkSlideW 0 1          -- pop frame header
                 `snocOL` RETURN_TUPLE -- and add it again
 
-primCallBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
+primCallBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> ProtoBCO Name
 primCallBCO platform args_info args =
   mkProtoBCO platform Nothing invented_name body_code (Left [])
              0{-no arity-} bitmap_size bitmap False{-is alts-}
@@ -1511,7 +1505,7 @@ generatePrimCall d s p target _mb_unit _result_ty args
                                           massert (off == dd + szb)
                                           go (dd + szb) (push:pushes) cs
      push_args <- go d [] shifted_args_offsets
-     args_bco <- emitBc (primCallBCO platform args_info prim_args_offsets)
+     let args_bco = primCallBCO platform args_info prim_args_offsets
      return $ mconcat push_args `appOL`
               (push_target `consOL`
                push_info `consOL`
@@ -1691,7 +1685,6 @@ generateCCall d0 s p (CCallSpec target _ safety) result_ty args
          ffiargs = map (primRepToFFIType platform) a_reps
      interp <- hscInterp <$> getHscEnv
      token <- ioToBc $ interpCmd interp (PrepFFI ffiargs ffires)
-     recordFFIBc token
 
      let
          -- do the call
@@ -2294,8 +2287,6 @@ data BcM_State
         { bcm_hsc_env :: HscEnv
         , thisModule  :: Module          -- current module (for breakpoints)
         , nextlabel   :: Word32          -- for generating local labels
-        , ffis        :: [FFIInfo]       -- ffi info blocks, to free later
-                                         -- Should be free()d when it is GCd
         , modBreaks   :: Maybe ModBreaks -- info about breakpoints
 
         , breakInfo   :: IntMap CgBreakInfo -- ^ Info at breakpoint occurrence.
@@ -2316,7 +2307,7 @@ runBc :: HscEnv -> Module -> Maybe ModBreaks
       -> BcM r
       -> IO (BcM_State, r)
 runBc hsc_env this_mod modBreaks (BcM m)
-   = m (BcM_State hsc_env this_mod 0 [] modBreaks IntMap.empty 0)
+   = m (BcM_State hsc_env this_mod 0 modBreaks IntMap.empty 0)
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
 thenBc (BcM expr) cont = BcM $ \st0 -> do
@@ -2358,14 +2349,6 @@ shouldAddBcoName = do
   if add
     then Just <$> getCurrentModule
     else return Nothing
-
-emitBc :: ([FFIInfo] -> ProtoBCO Name) -> BcM (ProtoBCO Name)
-emitBc bco
-  = BcM $ \st -> return (st{ffis=[]}, bco (ffis st))
-
-recordFFIBc :: RemotePtr C_ffi_cif -> BcM ()
-recordFFIBc a
-  = BcM $ \st -> return (st{ffis = FFIInfo a : ffis st}, ())
 
 getLabelBc :: BcM LocalLabel
 getLabelBc
