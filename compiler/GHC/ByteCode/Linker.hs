@@ -83,9 +83,9 @@ lookupLiteral interp pkgs_loaded le ptr = case ptr of
   BCONPtrAddr nm -> do
     Ptr a# <- lookupAddr interp pkgs_loaded (addr_env le) nm
     return (W# (int2Word# (addr2Int# a#)))
-  BCONPtrStr _ ->
-    -- should be eliminated during assembleBCOs
-    panic "lookupLiteral: BCONPtrStr"
+  BCONPtrStr bs -> do
+    RemotePtr p <- fmap head $ interpCmd interp $ MallocStrings [bs]
+    pure $ fromIntegral p
 
 lookupStaticPtr :: Interp -> FastString -> IO (Ptr ())
 lookupStaticPtr interp addr_of_label_string = do
