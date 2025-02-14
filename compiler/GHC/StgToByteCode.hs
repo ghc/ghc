@@ -1683,12 +1683,10 @@ generateCCall d0 s p (CCallSpec target _ safety) result_ty args
 
      let ffires = primRepToFFIType platform r_rep
          ffiargs = map (primRepToFFIType platform) a_reps
-     interp <- hscInterp <$> getHscEnv
-     token <- ioToBc $ interpCmd interp (PrepFFI ffiargs ffires)
 
      let
          -- do the call
-         do_call      = unitOL (CCALL stk_offset token flags)
+         do_call      = unitOL (CCALL stk_offset (FFIInfo ffiargs ffires) flags)
            where flags = case safety of
                            PlaySafe          -> 0x0
                            PlayInterruptible -> 0x1
