@@ -239,7 +239,7 @@ pVarLift :: LlvmVar -> LlvmVar
 pVarLift (LMGlobalVar s t l x a c) = LMGlobalVar s (pLift t) l x a c
 pVarLift (LMLocalVar  s t        ) = LMLocalVar  s (pLift t)
 pVarLift (LMNLocalVar s t        ) = LMNLocalVar s (pLift t)
-pVarLift (LMLitVar    _          ) = error $ "Can't lower a literal type!"
+pVarLift (LMLitVar    _          ) = error $ "Can't lift a literal type!"
 
 -- | Remove the pointer indirection of the supplied type. Only 'LMPointer'
 -- constructors can be lowered.
