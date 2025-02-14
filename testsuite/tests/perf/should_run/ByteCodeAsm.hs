@@ -49,11 +49,11 @@ instrs = [ STKCHECK 1234
          ++ [ PUSH_G appAName | _ <- [0..100] ]
          ++ [ PUSH_BCO fake_proto2 ]
 
-fake_proto = ProtoBCO appAName instrs [] 0 0 (Left []) []
+fake_proto = ProtoBCO appAName instrs [] 0 0 (Left [])
 
 instrs2 = [ STKCHECK 77, UNPACK 4, SLIDE 0 4, ENTER ]
 
-fake_proto2 = ProtoBCO appAName instrs2 [] 0 0 (Left []) []
+fake_proto2 = ProtoBCO appAName instrs2 [] 0 0 (Left [])
 
 main :: IO ()
 main = do

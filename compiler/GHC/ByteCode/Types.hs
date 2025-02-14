@@ -62,9 +62,6 @@ data CompiledByteCode = CompiledByteCode
   , bc_itbls  :: ![(Name, Message (RemotePtr Heap.StgInfoTable))]
     -- ^ Mapping from DataCons to their info tables
 
-  , bc_ffis   :: [FFIInfo]
-    -- ^ ffi blocks we allocated
-
   , bc_strs   :: ![(Name, ByteString)]
     -- ^ top-level strings (heap allocated)
 
@@ -89,7 +86,6 @@ seqCompiledByteCode :: CompiledByteCode -> ()
 seqCompiledByteCode CompiledByteCode{..} =
   rnf bc_bcos `seq`
   seq bc_itbls `seq`
-  rnf bc_ffis `seq`
   rnf bc_strs `seq`
   rnf (fmap seqModBreaks bc_breaks)
 
