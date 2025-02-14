@@ -405,11 +405,12 @@ Now a variant that unconditionally allocates a new unique.
 It also unconditionally zaps the OccInfo.
 -}
 
-cloneBndrs :: MonadUnique m => Subst -> [Var] -> m (Subst, [Var])
+cloneBndrs :: Traversable t => Subst -> UniqSupply -> t Var -> (Subst, t Var)
 -- Works for all kinds of variables (typically case binders)
 -- not just Ids
 cloneBndrs subst us vs
-  = mapAccumL (\subst (v, u) -> cloneBndr subst u v) subst (withUniques (flip (,)) us vs)
+  = mapAccumL (\subst (v, u) -> cloneBndr subst u v)
+              subst (withUniques (flip (,)) us vs)
 {-# SPECIALIZE cloneBndrs :: Subst -> UniqSupply -> [Var] -> (Subst, [Var]) #-}
 
 cloneBndrsM :: (Traversable t, MonadUnique m) => Subst -> t Var -> m (Subst, t Var)
