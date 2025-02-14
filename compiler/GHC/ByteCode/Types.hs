@@ -35,6 +35,7 @@ import GHC.Builtin.PrimOps
 import GHC.Types.SptEntry
 import GHC.Types.SrcLoc
 import GHCi.BreakArray
+import GHCi.Message
 import GHCi.RemoteTypes
 import GHCi.FFI
 import Control.DeepSeq
@@ -59,7 +60,7 @@ data CompiledByteCode = CompiledByteCode
   { bc_bcos   :: FlatBag UnlinkedBCO
     -- ^ Bunch of interpretable bindings
 
-  , bc_itbls  :: ItblEnv
+  , bc_itbls  :: [(Name, ConInfoTable)]
     -- ^ Mapping from DataCons to their info tables
 
   , bc_ffis   :: [FFIInfo]
@@ -88,7 +89,7 @@ instance Outputable CompiledByteCode where
 seqCompiledByteCode :: CompiledByteCode -> ()
 seqCompiledByteCode CompiledByteCode{..} =
   rnf bc_bcos `seq`
-  seqEltsNameEnv rnf bc_itbls `seq`
+  rnf bc_itbls `seq`
   rnf bc_ffis `seq`
   rnf bc_strs `seq`
   rnf (fmap seqModBreaks bc_breaks)
