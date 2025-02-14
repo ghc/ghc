@@ -144,6 +144,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Linker.Types
 
 import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.ForeignStubs
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -205,7 +206,7 @@ sptCreateStaticBinds opts this_mod binds = do
         Nothing      -> return (Nothing, (b, e))
         Just (_, t, info, arg) -> do
           (fp, e') <- mkStaticBind t info arg
-          return (Just (SptEntry b fp), (b, foldr Lam e' tvs))
+          return (Just (SptEntry (idName b) fp), (b, foldr Lam e' tvs))
 
     mkStaticBind :: Type -> CoreExpr -> CoreExpr
                  -> StateT Int IO (Fingerprint, CoreExpr)
@@ -257,11 +258,11 @@ sptModuleInitCode platform this_mod entries
         [  text "static StgWord64 k" <> int i <> text "[2] = "
            <> pprFingerprint fp <> semi
         $$ text "extern StgPtr "
-           <> (pprCLabel platform $ mkClosureLabel (idName n) (idCafInfo n)) <> semi
+           <> (pprCLabel platform $ mkClosureLabel n MayHaveCafRefs) <> semi
         $$ text "hs_spt_insert" <> parens
              (hcat $ punctuate comma
                 [ char 'k' <> int i
-                , char '&' <> pprCLabel platform (mkClosureLabel (idName n) (idCafInfo n))
+                , char '&' <> pprCLabel platform (mkClosureLabel n MayHaveCafRefs)
                 ]
              )
         <> semi
