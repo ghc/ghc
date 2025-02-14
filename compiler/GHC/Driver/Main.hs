@@ -2565,7 +2565,7 @@ hscAddSptEntries hsc_env entries = do
     let add_spt_entry :: SptEntry -> IO ()
         add_spt_entry (SptEntry i fpr) = do
             -- These are only names from the current module
-            (val, _, _) <- loadName interp hsc_env (idName i)
+            (val, _, _) <- loadName interp hsc_env i
             addSptEntry interp fpr val
     mapM_ add_spt_entry entries
 
