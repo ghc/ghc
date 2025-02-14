@@ -64,7 +64,7 @@ data CompiledByteCode = CompiledByteCode
   , bc_ffis   :: [FFIInfo]
     -- ^ ffi blocks we allocated
 
-  , bc_strs   :: AddrEnv
+  , bc_strs   :: ![(Name, ByteString)]
     -- ^ top-level strings (heap allocated)
 
   , bc_breaks :: Maybe ModBreaks
@@ -89,7 +89,7 @@ seqCompiledByteCode CompiledByteCode{..} =
   rnf bc_bcos `seq`
   seqEltsNameEnv rnf bc_itbls `seq`
   rnf bc_ffis `seq`
-  seqEltsNameEnv rnf bc_strs `seq`
+  rnf bc_strs `seq`
   rnf (fmap seqModBreaks bc_breaks)
 
 newtype ByteOff = ByteOff Int
