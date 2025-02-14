@@ -67,7 +67,6 @@ import GHC.Data.Bitmap
 import GHC.Data.FlatBag as FlatBag
 import GHC.Data.OrdList
 import GHC.Data.Maybe
-import GHC.Types.Name.Env (mkNameEnv)
 import GHC.Types.Tickish
 import GHC.Types.SptEntry
 
@@ -82,7 +81,6 @@ import GHC.Unit.Home.PackageTable (lookupHpt)
 
 import Data.Array
 import Data.Coerce (coerce)
-import Data.ByteString (ByteString)
 #if MIN_VERSION_rts(1,0,3)
 import qualified Data.ByteString.Char8 as BS
 #endif
@@ -118,10 +116,9 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
                 bnd <- binds
                 case bnd of
                   StgTopLifted bnd      -> [Right bnd]
-                  StgTopStringLit b str -> [Left (b, str)]
+                  StgTopStringLit b str -> [Left (getName b, str)]
             flattenBind (StgNonRec b e) = [(b,e)]
             flattenBind (StgRec bs)     = bs
-        stringPtrs <- allocateTopStrings interp strings
 
         (BcM_State{..}, proto_bcos) <-
            runBc hsc_env this_mod mb_modBreaks $ do
@@ -138,7 +135,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
         let mod_breaks = case modBreaks of
              Nothing -> Nothing
              Just mb -> Just mb{ modBreaks_breakInfo = breakInfo }
-        cbc <- assembleBCOs interp profile proto_bcos tycs stringPtrs mod_breaks spt_entries
+        cbc <- assembleBCOs interp profile proto_bcos tycs strings mod_breaks spt_entries
 
         -- Squash space leaks in the CompiledByteCode.  This is really
         -- important, because when loading a set of modules into GHCi
@@ -155,19 +152,6 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
         interp  = hscInterp hsc_env
         profile = targetProfile dflags
 
--- | see Note [Generating code for top-level string literal bindings]
-allocateTopStrings
-  :: Interp
-  -> [(Id, ByteString)]
-  -> IO AddrEnv
-allocateTopStrings interp topStrings = do
-  let !(bndrs, strings) = unzip topStrings
-  ptrs <- interpCmd interp $ MallocStrings strings
-  return $ mkNameEnv (zipWith mk_entry bndrs ptrs)
-  where
-    mk_entry bndr ptr = let nm = getName bndr
-                        in (nm, (nm, AddrPtr ptr))
-
 {- Note [Generating code for top-level string literal bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As described in Note [Compilation plan for top-level string literals]
@@ -178,9 +162,9 @@ the bytecode compiler: (1) compiling the bindings themselves, and
 we deal with them:
 
   1. Top-level string literal bindings are separated from the rest of
-     the module. Memory for them is allocated immediately, via
-     interpCmd, in allocateTopStrings, and the resulting AddrEnv is
-     recorded in the bc_strs field of the CompiledByteCode result.
+     the module. Memory is not allocated until bytecode link-time, the
+     bc_strs field of the CompiledByteCode result records [(Name, ByteString)]
+     directly.
 
   2. When we encounter a reference to a top-level string literal, we
      generate a PUSH_ADDR pseudo-instruction, which is assembled to
