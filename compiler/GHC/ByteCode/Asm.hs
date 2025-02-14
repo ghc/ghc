@@ -468,7 +468,7 @@ assembleI platform i = case i of
   ENTER                    -> emit bci_ENTER []
   RETURN rep               -> emit (return_non_tuple rep) []
   RETURN_TUPLE             -> emit bci_RETURN_T []
-  CCALL off m_addr i       -> do np <- addr m_addr
+  CCALL off ffi i          -> do np <- lit [BCONPtrFFIInfo ffi]
                                  emit bci_CCALL [wOp off, Op np, SmallOp i]
   PRIMCALL                 -> emit bci_PRIMCALL []
   BRK_FUN arr tick_mod tickx info_mod infox cc ->
