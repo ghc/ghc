@@ -97,6 +97,7 @@ import GHC.Linker.Types
 -- Standard libraries
 import Control.Monad
 
+import Data.ByteString (ByteString)
 import qualified Data.Set as Set
 import Data.Char (isSpace)
 import qualified Data.Foldable as Foldable
@@ -723,8 +724,9 @@ loadDecls interp hsc_env span linkable = do
         else do
           -- Link the expression itself
           let le  = linker_env pls
-              le2 = le { itbl_env = foldl' (\acc cbc -> plusNameEnv acc (bc_itbls cbc)) (itbl_env le) cbcs
-                       , addr_env = foldl' (\acc cbc -> plusNameEnv acc (bc_strs cbc)) (addr_env le) cbcs }
+          le2_addr_env <- foldlM (\env cbc -> allocateTopStrings interp (bc_strs cbc) env) (addr_env le) cbcs
+          let le2 = le { itbl_env = foldl' (\acc cbc -> plusNameEnv acc (bc_itbls cbc)) (itbl_env le) cbcs
+                       , addr_env = le2_addr_env }
 
           -- Link the necessary packages and linkables
           new_bindings <- linkSomeBCOs interp (pkgs_loaded pls) le2 cbcs
@@ -947,8 +949,8 @@ dynLinkBCOs interp pls bcos = do
 
             le1 = linker_env pls
             ie2 = foldr plusNameEnv (itbl_env le1) (map bc_itbls cbcs)
-            ae2 = foldr plusNameEnv (addr_env le1) (map bc_strs cbcs)
-            le2 = le1 { itbl_env = ie2, addr_env = ae2 }
+        ae2 <- foldlM (\env cbc -> allocateTopStrings interp (bc_strs cbc) env) (addr_env le1) cbcs
+        let le2 = le1 { itbl_env = ie2, addr_env = ae2 }
 
         names_and_refs <- linkSomeBCOs interp (pkgs_loaded pls) le2 cbcs
 
@@ -1649,3 +1651,13 @@ maybePutStr logger s = maybePutSDoc logger (text s)
 
 maybePutStrLn :: Logger -> String -> IO ()
 maybePutStrLn logger s = maybePutSDoc logger (text s <> text "\n")
+
+-- | see Note [Generating code for top-level string literal bindings]
+allocateTopStrings ::
+  Interp -> [(Name, ByteString)] -> AddrEnv -> IO AddrEnv
+allocateTopStrings interp topStrings prev_env = do
+  let (bndrs, strings) = unzip topStrings
+  ptrs <- interpCmd interp $ MallocStrings strings
+  evaluate $ extendNameEnvList prev_env (zipWith mk_entry bndrs ptrs)
+  where
+    mk_entry nm ptr = (nm, (nm, AddrPtr ptr))

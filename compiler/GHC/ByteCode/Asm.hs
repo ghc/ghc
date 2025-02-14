@@ -51,6 +51,7 @@ import qualified Data.Array.Unboxed as Array
 import Data.Array.Base  ( UArray(..) )
 
 import Foreign hiding (shiftL, shiftR)
+import Data.ByteString  ( ByteString )
 import Data.Char        ( ord )
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
@@ -92,7 +93,7 @@ assembleBCOs
   -> Profile
   -> FlatBag (ProtoBCO Name)
   -> [TyCon]
-  -> AddrEnv
+  -> [(Name, ByteString)]
   -> Maybe ModBreaks
   -> [SptEntry]
   -> IO CompiledByteCode
