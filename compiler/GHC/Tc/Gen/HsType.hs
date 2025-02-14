@@ -143,7 +143,7 @@ import Control.Monad
 import Data.Tuple( swap )
 import GHC.Types.SourceText
 import GHC.Tc.Instance.Class (AssocInstInfo (..), FamArgType (..),
-  buildPatsArgTypes, buildPatsFreeArgTypes)
+  buildPatsArgTypes, buildPatsModeTypes)
 
 {-
         ----------------------------
@@ -888,11 +888,17 @@ tcInferLHsTypeUnsaturated hs_ty
        ; case splitHsAppTys_maybe (unLoc hs_ty) of
            Just (hs_fun_ty, hs_args)
               -> do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
-                    ; tcInferTyApps_nosat mode hs_fun_ty fun_ty (buildPatsFreeArgTypes hs_args) }
+                    ; tcInferTyApps_nosat mode hs_fun_ty fun_ty (buildPatsModeTypes (tcTyModeFamArgType mode) hs_args) }
                       -- Notice the 'nosat'; do not instantiate trailing
                       -- invisible arguments of a type family.
                       -- See Note [Dealing with :kind]
            Nothing -> tc_infer_lhs_type mode hs_ty }
+
+tcTyModeFamArgType :: TcTyMode -> FamArgType
+tcTyModeFamArgType (TcTyMode { mode_holes = mh })
+  = case mh of
+      Just (_, HM_FamPat artType) -> artType
+      _ -> FreeArg
 
 {- Note [Dealing with :kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1548,7 +1554,8 @@ tcInferTyAppHead mode ty
 tc_app_ty :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
-       ; (ty, infered_kind) <- tcInferTyApps mode hs_fun_ty fun_ty (buildPatsArgTypes NotAssociated hs_args)
+       ; (ty, infered_kind) <- tcInferTyApps mode hs_fun_ty fun_ty
+                                 (buildPatsModeTypes (tcTyModeFamArgType mode) hs_args)
        ; checkExpKind rn_ty ty infered_kind exp_kind }
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
@@ -1667,6 +1674,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
               -> do { traceTc "tcInferTyApps (vis normal app)"
                                 (vcat [ ppr ki_binder
                                       , ppr arg
+                                      , ppr famArgTy
                                       , ppr (piTyBinderType ki_binder)
                                       , ppr subst ])
                       ; let exp_kind = substTy subst $ piTyBinderType ki_binder
