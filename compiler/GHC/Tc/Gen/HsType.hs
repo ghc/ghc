@@ -1293,7 +1293,7 @@ tcHsType mode rn_ty@(HsAppKindTy{}) exp_kind = tc_app_ty mode rn_ty exp_kind
 tcHsType mode rn_ty@(HsOpTy{})      exp_kind = tc_app_ty mode rn_ty exp_kind
 
 tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
-  = do { let mode' = (updateHoleMode HM_Sig $ mode { mode_tyki = KindLevel})
+  = do { let mode' = (updateFamArgType ClassArg $ mode { mode_tyki = KindLevel})
        ; sig' <- tc_lhs_kind_sig mode' KindSigCtxt sig
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
