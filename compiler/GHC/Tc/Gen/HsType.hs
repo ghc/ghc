@@ -2267,11 +2267,8 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
                HM_FamSig    -> fsLit "_"
                HM_VTA       -> fsLit "w"
                HM_TyAppPat  -> fsLit "_"
-     newSkolemTvDetailsAtLevel tclvl =
-              do { skol_info <- mkSkolemInfo FamInstSkol
-                  ; return (SkolemTv skol_info tclvl False) }
      mk_wc_details = case hole_mode of
-                      HM_FamPat FreeArg -> newSkolemTvDetailsAtLevel
+                      HM_FamPat FreeArg -> newTyVarMetaVarDetailsAtLevel
                       _ -> newTauTvDetailsAtLevel
      emit_holes = case hole_mode of
                      HM_Sig       -> True
