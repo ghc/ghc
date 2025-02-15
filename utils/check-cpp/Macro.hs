@@ -169,9 +169,7 @@ pa_frag (t:ts)
 pa_frag (t:ts) =
   case t of
     TOpenParen _ -> do
-      (inner,rest') <- pa_frag_inner (t:ts)
-      (t',rest'') <- accept ")" rest'
-      return (t:inner++[t'],rest'')
+      inside_parens 1 [t] ts
     _ -> return ([], (t:ts))
 
 pa_frag_inner :: [Token] -> Either String ([Token], [Token])
@@ -183,15 +181,27 @@ pa_frag_inner (t:ts) =
   -- error $ "pa_frag_inner:(t:ts)=" ++ show (t:ts)
   case t of
     TOpenParen _ -> do
-      -- (inner,rest') <- pa_frag_inner ts
-      (!inner,!rest') <- pa_frag_inner (trace ("pa_frag_inner:tts" ++ show (t:ts)) ts)
-      -- (t',rest'') <- accept ")" rest'
-      let !xxx = trace ("pa_frag_inner:(inner,t,rest')" ++ show (inner,t,rest')) rest'
-      -- (!t',!rest'') <- accept ")" (trace ("pa_frag_inner:(inner,t,rest')" ++ show (inner,t,rest')) rest')
-      (t',rest'') <- accept ")" xxx
+      (inner,rest') <- pa_frag_inner ts
+      (t',rest'') <- accept ")" rest'
       return (t:inner++[t'],rest'')
-    -- _ -> return ([], (t:ts))
-    _ -> return ([], trace ("pa_frag_inner:fallthru:(t:ts)" ++ show (t:ts)) (t:ts))
+    _ -> return ([], (t:ts))
+
+-- Process the part in an argument starting with parens
+inside_parens :: Int -> [Token] -> [Token] -> Either String ([Token], [Token])
+inside_parens pc acc [] =
+  if pc == 0
+    then return (reverse acc,[])
+    else Left $ "Unexpected end of input in arg, at: " ++ show (map t_str $ reverse acc)
+inside_parens pc acc (t:ts) =
+  case t of
+    TComma _ -> if pc == 0
+      then return (reverse acc, t:ts)
+      else inside_parens pc (t:acc) ts
+    TOpenParen _ -> inside_parens (pc+1) (t:acc) ts
+    TCloseParen _ -> if pc > 0
+      then inside_parens (pc-1) (t:acc) ts
+      else return (reverse acc, t:ts)
+    _ -> inside_parens pc (t:acc) ts
 
 accept :: String -> [Token] -> Either String (Token,[Token])
 accept _ [] = Left "Empty input"
@@ -266,7 +276,7 @@ m4 = cppLex "#if (m < 1)"
 m5 :: Either String (Maybe [[Token]], [Token])
 m5 = do
   -- toks <- cppLex "(43,foo(a)) some other stuff"
-  toks <- cppLex "( (ff()), 4 )"
+  toks <- cppLex "( ff(()), 4 )"
   return $ getExpandArgs toks
 
 tt = case m5 of
