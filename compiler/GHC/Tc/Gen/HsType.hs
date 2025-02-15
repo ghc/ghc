@@ -977,7 +977,6 @@ type HoleInfo = Maybe (TcLevel, HoleMode)
 -- of anonymous wildcards; see tcAnonWildCardOcc
 data HoleMode = HM_Sig      -- Partial type signatures: f :: _ -> Int
               | HM_FamPat FamArgType   -- Family instances: F _ Int = Bool
-              | HM_FamSig -- Family instances: F (a :: _) Int = Bool
               | HM_VTA      -- Visible type and kind application:
                             --   f @(Maybe _)
                             --   Maybe @(_ -> _)
@@ -1018,7 +1017,6 @@ updateFamArgType fam_arg m@TcTyMode { mode_tyki = tyki, mode_holes =  mh }
 instance Outputable HoleMode where
   ppr HM_Sig      = text "HM_Sig"
   ppr (HM_FamPat artType) = text ("HM_FamPat " ++ show artType)
-  ppr HM_FamSig   = text "HM_FamSig"
   ppr HM_VTA      = text "HM_VTA"
   ppr HM_TyAppPat = text "HM_TyAppPat"
 
@@ -1295,7 +1293,7 @@ tcHsType mode rn_ty@(HsAppKindTy{}) exp_kind = tc_app_ty mode rn_ty exp_kind
 tcHsType mode rn_ty@(HsOpTy{})      exp_kind = tc_app_ty mode rn_ty exp_kind
 
 tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
-  = do { let mode' = (updateHoleMode HM_FamSig $ mode { mode_tyki = KindLevel})
+  = do { let mode' = (updateHoleMode HM_Sig $ mode { mode_tyki = KindLevel})
        ; sig' <- tc_lhs_kind_sig mode' KindSigCtxt sig
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
@@ -2264,7 +2262,6 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
      wc_nm = case hole_mode of
                HM_Sig       -> fsLit "w"
                HM_FamPat _  -> fsLit "_"
-               HM_FamSig    -> fsLit "_"
                HM_VTA       -> fsLit "w"
                HM_TyAppPat  -> fsLit "_"
      mk_wc_details = case hole_mode of
@@ -2273,7 +2270,6 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
      emit_holes = case hole_mode of
                      HM_Sig       -> True
                      HM_FamPat _  -> False
-                     HM_FamSig    -> False
                      HM_VTA       -> False
                      HM_TyAppPat  -> False
 
