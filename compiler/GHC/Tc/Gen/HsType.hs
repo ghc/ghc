@@ -998,14 +998,6 @@ mkHoleMode tyki hm
        ; return (TcTyMode { mode_tyki  = tyki
                           , mode_holes = Just (lvl,hm) }) }
 
-updateHoleMode :: HoleMode -> TcTyMode -> TcTyMode
-updateHoleMode hm m@TcTyMode { mode_tyki = tyki, mode_holes =  mh }
-  |Just (lvl, _) <- mh
-  = (TcTyMode { mode_tyki = tyki
-              , mode_holes = Just (lvl, hm) })
-  | otherwise
-  = m
-
 updateFamArgType :: FamArgType -> TcTyMode -> TcTyMode
 updateFamArgType fam_arg m@TcTyMode { mode_tyki = tyki, mode_holes =  mh }
   |Just (lvl, HM_FamPat _) <- mh
