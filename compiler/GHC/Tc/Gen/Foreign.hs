@@ -279,7 +279,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
 
        -- We don't recognize any modifiers here, but we still need to make sure
        -- they type check and warn about them.
-       ; _ <- tcModifiers mods (const False)
+       ; _ <- tcModifiers mods (const $ Left DontSuggestLinear)
 
        ; let fi_decl = ForeignImport { fd_name = L nloc id
                                      , fd_sig_ty = undefined
@@ -429,7 +429,7 @@ tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spe
 
     -- We don't recognize any modifiers here, but we still need to make sure
     -- they type check and warn about them.
-    _ <- tcModifiers mods (const False)
+    _ <- tcModifiers mods (const $ Left DontSuggestLinear)
 
            -- we're exporting a function, but at a type possibly more
            -- constrained than its declared/inferred type. Hence the need

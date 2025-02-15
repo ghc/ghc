@@ -464,15 +464,17 @@ rnModifierWith :: (mPs -> Maybe mRn)
                -> HsModifierOf mPs GhcPs
                -> RnM (HsModifierOf mRn GhcRn, FreeVars)
 rnModifierWith acceptLiteral1 rn (HsModifier _ ty) = do
-  -- If we see a %1 modifier, treat it the same as %One. Only %1 counts, not
-  -- e.g. %01. See #18888.
-  --
-  -- MODS_TODO: With -XNoLiteralTypes, we likely want a warning for literal 1.
-  -- Maybe only if DataKinds is disabled? Maybe attached to the DataKinds error
-  -- message?
+  -- If we see a %1 modifier, and have LinearTypes enabled, treat it the same as
+  -- %One. Only %1 counts, not e.g. %01. See #18888. With NoLinearTypes, it's
+  -- not special and means the same as %(1 :: Nat), but we still mark it
+  -- ModifierPrintsAs1 so that later we can suggest enabling LinearTypes.
   linearEnabled <- xoptM LangExt.LinearTypes
-  case guard linearEnabled >> acceptLiteral1 ty of
-    Just literal1Rn -> return (HsModifier ModifierPrintsAs1 literal1Rn, mempty)
+  case acceptLiteral1 ty of
+    Just literal1Rn
+      | linearEnabled -> return (HsModifier ModifierPrintsAs1 literal1Rn, mempty)
+      | otherwise -> do
+          (ty', fvs) <- rn ty
+          return (HsModifier ModifierPrintsAs1 ty', fvs)
     Nothing -> do
       (ty', fvs) <- rn ty
       return (HsModifier ModifierPrintsAsSelf ty', fvs)
@@ -491,7 +493,11 @@ rnModifierAndWarn :: RnTyKiEnv -> HsModifier GhcPs -> RnM (HsModifier GhcRn, Fre
 rnModifierAndWarn env mod = do
   (mod', fvs) <- rnModifier env mod
   warn_unknown <- woptM Opt_WarnUnknownModifiers
-  diagnosticTc warn_unknown $ TcRnUnknownModifier mod'
+  let HsModifier modPrintsAs _ = mod'
+      suggestLinear = case modPrintsAs of
+        ModifierPrintsAs1 -> SuggestLinear
+        ModifierPrintsAsSelf -> DontSuggestLinear
+  diagnosticTc warn_unknown $ TcRnUnknownModifier mod' suggestLinear
   return (mod', fvs)
 
 rnModifiersWith :: (HsModifierOf mPs GhcPs -> RnM (HsModifierOf mRn GhcRn, FreeVars))

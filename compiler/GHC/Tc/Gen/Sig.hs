@@ -31,7 +31,7 @@ import GHC.Driver.Backend
 import GHC.Hs
 
 
-import GHC.Tc.Errors.Types ( FixedRuntimeRepProvenance(..), TcRnMessage(..) )
+import GHC.Tc.Errors.Types ( FixedRuntimeRepProvenance(..), TcRnMessage(..), SuggestLinear(..) )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Types
 import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
@@ -178,7 +178,7 @@ tcTySig (L loc (TypeSig _ names sig_ty mods))
                           | L _ name <- names ]
          -- We don't do anything with modifiers, but we do need to make sure
          -- they type check.
-       ; _ <- tcModifiers mods (const False)
+       ; _ <- tcModifiers mods (const $ Left DontSuggestLinear)
        ; return (map TcIdSig sigs) }
 
 tcTySig (L loc (PatSynSig _ names sig_ty))

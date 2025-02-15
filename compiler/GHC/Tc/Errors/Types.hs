@@ -119,6 +119,7 @@ module GHC.Tc.Errors.Types (
   , NonCanonical_Monad(..)
   , TypeSyntax(..)
   , typeSyntaxExtension
+  , SuggestLinear(..)
 
     -- * Errors for hs-boot and signature files
   , BadBootDecls(..)
@@ -4408,7 +4409,7 @@ data TcRnMessage where
          foo :: a %True -> b
   -}
   -- MODS_TODO should this be GhcTc?
-  TcRnUnknownModifier :: HsModifier GhcRn -> TcRnMessage
+  TcRnUnknownModifier :: HsModifier GhcRn -> SuggestLinear -> TcRnMessage
 
   {- | TcRnUnknownModifierKind is an error raised when a modifier is used with
        unknown kind.
@@ -6913,3 +6914,8 @@ typeSyntaxExtension TypeKeywordSyntax     = LangExt.ExplicitNamespaces
 typeSyntaxExtension ContextArrowSyntax    = LangExt.RequiredTypeArguments
 typeSyntaxExtension FunctionArrowSyntax   = LangExt.RequiredTypeArguments
 typeSyntaxExtension ForallTelescopeSyntax = LangExt.RequiredTypeArguments
+
+-- | Whether or not to add a hint about enabling -XLinearTypes.
+data SuggestLinear
+  = SuggestLinear
+  | DontSuggestLinear

@@ -726,7 +726,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
   ModifiedPat _ mods pat -> do
           -- We don't do anything with modifiers, but we do need to make sure
           -- they type check.
-        { _ <- tcModifiers mods (const False)
+        { _ <- tcModifiers mods (const $ Left DontSuggestLinear)
         ; (pat', res) <- tc_lpat pat_ty penv pat thing_inside
         ; return (ModifiedPat noExtField [] pat', res)
         }

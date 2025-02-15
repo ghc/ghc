@@ -2001,7 +2001,7 @@ instance Diagnostic TcRnMessage where
     TcRnUnexpectedTypeSyntaxInTerms syntax -> mkSimpleDecorated $
       text "Unexpected" <+> pprTypeSyntaxName syntax
 
-    TcRnUnknownModifier mod -> mkSimpleDecorated $
+    TcRnUnknownModifier mod _ -> mkSimpleDecorated $
       text "Unknown modifier" <+> pprHsModifier mod
 
     TcRnUnknownModifierKind mod -> mkSimpleDecorated $
@@ -3349,8 +3349,10 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnexpectedTypeSyntaxInTerms syntax
       -> [suggestExtension (typeSyntaxExtension syntax)]
-    TcRnUnknownModifier{}
-      -> noHints -- MODS_TODO sometimes there should be hints, right?
+    TcRnUnknownModifier _ sl
+      -> case sl of
+           SuggestLinear -> [suggestExtension LangExt.LinearTypes]
+           DontSuggestLinear -> noHints
     TcRnUnknownModifierKind{}
       -> noHints -- MODS_TODO sometimes there should be hints, right?
 

@@ -949,7 +949,9 @@ tcArrow = tc_arrow typeLevelMode
 tcMult :: [HsModifier GhcRn] -> TcM (Maybe Mult)
 tcMult = tc_mult typeLevelMode
 
-tcModifiers :: [HsModifier GhcRn] -> (TcKind -> Bool) -> TcM [TcType]
+tcModifiers :: [HsModifier GhcRn]
+            -> (TcKind -> Either SuggestLinear ())
+            -> TcM [TcType]
 tcModifiers = tc_modifiers typeLevelMode
 
 -- | Info about the context in which we're checking a type. Currently,
@@ -1286,7 +1288,7 @@ tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
 tcHsType mode rn_ty@(HsModifiedTy _ mods ty) exp_kind
   = do -- We don't recognize any modifiers here, but we still need to type check
        -- them in case of errors or unknown kinds.
-       _ <- tc_modifiers mode mods (const False)
+       _ <- tc_modifiers mode mods (const $ Left DontSuggestLinear)
        ty' <- tcLHsType mode ty exp_kind
        checkExpKind rn_ty ty' (typeKind ty') exp_kind
 
@@ -1396,9 +1398,15 @@ tc_mult mode mods = do
   modifiers <- xoptM LangExt.Modifiers
   linearTypes <- xoptM LangExt.LinearTypes
   case (linearTypes, modifiers) of
-    (False, _) -> go_infer (const False) -- MODS_TODO should we suggest enabling -XLinearTypes if there are any modifiers? Or maybe only if there are Multiplicity modifiers?
+    (False, _) ->
+      -- Suggest enabling -XLinearTypes without checking whether the
+      -- modifier is a Multiplicity.
+      go_infer (const $ Left SuggestLinear)
     (True, False) -> go_check
-    (True, True) -> go_infer isMultiplicityTy
+    (True, True) ->
+      go_infer $ \k -> if isMultiplicityTy k
+        then Right ()
+        else Left DontSuggestLinear
   where
     go_infer is_mult = do
       mults <- tc_modifiers mode mods is_mult
@@ -1421,8 +1429,11 @@ tc_arrow mode arr = case arr of
       Just _ -> error "MODS_TODO too many multiplicities"
       Nothing -> pure oneDataConTy
 
-tc_modifier :: TcTyMode -> HsModifier GhcRn -> (TcKind -> Bool) -> TcM (Maybe TcType)
-tc_modifier mode mod@(HsModifier _ ty) is_expected_kind = do
+tc_modifier :: TcTyMode
+            -> HsModifier GhcRn
+            -> (TcKind -> Either SuggestLinear ())
+            -> TcM (Maybe TcType)
+tc_modifier mode mod@(HsModifier modPrintsAs ty) check_expected_kind = do
   (inf_ty, inf_kind) <- tc_infer_lhs_type mode ty
   -- MODS_TODO zonking here means that
   --     Int %(m :: Multiplicity) -> Int %m -> Int
@@ -1430,19 +1441,31 @@ tc_modifier mode mod@(HsModifier _ ty) is_expected_kind = do
   --     Int %m -> Int %(m :: Multiplicity) -> Int
   -- is accepted, which is probably not what the user expects.
   inf_kind' <- liftZonkM $ zonkTcType inf_kind
-  if is_expected_kind inf_kind'
-    then return $ Just inf_ty
-    else case inf_kind' of
+  case check_expected_kind inf_kind' of
+    Right () -> return $ Just inf_ty
+    Left suggestLinear -> case inf_kind' of
+      -- A modifier of unknown kind always gives an error. If the kind is known,
+      -- then the caller can control whether or not we suggest enabling
+      -- LinearTypes. We always suggest enabling LinearTypes if the modifier is
+      -- %1, because that changes the meaning of the modifier.
+      --
       -- MODS_TODO This checks for a modifier of unknown kind. It doesn't detect
       -- poly-kinded modifiers. e.g. %Just and %Nothing don't fail here, and
       -- possibly they should.
       TyVarTy _ -> failWithTc $ TcRnUnknownModifierKind mod
       _ -> do
+        linearTypes <- xoptM LangExt.LinearTypes
         warn_unknown <- woptM Opt_WarnUnknownModifiers
-        diagnosticTc warn_unknown $ TcRnUnknownModifier mod
+        let suggestLinear' = case modPrintsAs of
+              ModifierPrintsAs1 | not linearTypes -> SuggestLinear
+              _ -> suggestLinear
+        diagnosticTc warn_unknown $ TcRnUnknownModifier mod suggestLinear'
         pure Nothing
 
-tc_modifiers :: TcTyMode -> [HsModifier GhcRn] -> (TcKind -> Bool) -> TcM [TcType]
+tc_modifiers :: TcTyMode
+             -> [HsModifier GhcRn]
+             -> (TcKind -> Either SuggestLinear ())
+             -> TcM [TcType]
 tc_modifiers mode mods is_expected_kind =
   catMaybes <$> mapM (\m -> tc_modifier mode m is_expected_kind) mods
 

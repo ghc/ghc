@@ -11,7 +11,7 @@ data D
   | %True D2 String
   | %False D3 { d3 %() :: () }
   | %Bool Int :* Bool
-  | (%Maybe Int) :** Bool
+  | (%Maybe Int) :** Bool -- MODS_TODO this warns twice for unclear reasons
 
 %()
 data D' where

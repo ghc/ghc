@@ -1,0 +1,40 @@
+ModifiersSuggestLinear.hs:6:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
+
+ModifiersSuggestLinear.hs:6:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %01
+
+ModifiersSuggestLinear.hs:6:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %1
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension
+
+ModifiersSuggestLinear.hs:7:10: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
+
+ModifiersSuggestLinear.hs:7:10: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %01
+
+ModifiersSuggestLinear.hs:7:10: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %1
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension
+
+ModifiersSuggestLinear.hs:9:6: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %()
+    • In the type signature: l :: Int %1 %01 %() -> Int
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension
+
+ModifiersSuggestLinear.hs:9:6: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %01
+    • In the type signature: l :: Int %1 %01 %() -> Int
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension
+
+ModifiersSuggestLinear.hs:9:6: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %1
+    • In the type signature: l :: Int %1 %01 %() -> Int
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension
+
