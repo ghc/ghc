@@ -2,8 +2,9 @@ module Macro
  ( process,
    cppIf,
 
-   -- Keep warnings in line
-   m0,m1,m2,m3,m4,m5
+   -- get rid of warnings for tests
+   m0,m1,m2,m3,m4,m5,
+   tt
  ) where
 
 -- From https://gcc.gnu.org/onlinedocs/cpp/Macros.html
@@ -155,8 +156,8 @@ pArg ts = do
     [] -> return (frag, rest)
     TCloseParen _:_ -> return (frag, rest)
     TComma _:_ -> return (frag, rest)
-    TOpenParen _:_ -> do
-      (frag', rest') <- pa_frag_inner rest
+    (t@TOpenParen {}):ts' -> do
+      (frag', rest') <- inside_parens 1 [t] ts'
       return (frag <> frag', rest')
     _ -> do
       (frag', rest') <- pa_frag rest
@@ -170,20 +171,6 @@ pa_frag (t:ts) =
   case t of
     TOpenParen _ -> do
       inside_parens 1 [t] ts
-    _ -> return ([], (t:ts))
-
-pa_frag_inner :: [Token] -> Either String ([Token], [Token])
-pa_frag_inner [] = return ([],[])
-pa_frag_inner (t:ts)
-  -- | isInnerOther t = return $ pInnerOtherRest [t] ts
-  | isInnerOther t = return $ trace ("pa_frag_inner:other:t:ts" ++ show (t:ts)) (pInnerOtherRest [t] ts)
-pa_frag_inner (t:ts) =
-  -- error $ "pa_frag_inner:(t:ts)=" ++ show (t:ts)
-  case t of
-    TOpenParen _ -> do
-      (inner,rest') <- pa_frag_inner ts
-      (t',rest'') <- accept ")" rest'
-      return (t:inner++[t'],rest'')
     _ -> return ([], (t:ts))
 
 -- Process the part in an argument starting with parens
@@ -203,18 +190,6 @@ inside_parens pc acc (t:ts) =
       else return (reverse acc, t:ts)
     _ -> inside_parens pc (t:acc) ts
 
-accept :: String -> [Token] -> Either String (Token,[Token])
-accept _ [] = Left "Empty input"
-accept s (t:ts) =
-  if s == t_str t
-    then return (t,ts)
-    else Left $ "Expected '" ++ s ++ "', got '" ++ t_str t ++ "', ts=" ++ show ts
-
--- pArg :: [Token] -> Either String ([Token], [Token])
--- pArg (t:ts)
---   | isOther t = return $ pOtherRest [t] ts
--- pArg ts = Left $ "expecting an Other, got: " ++ show ts
-
 pOtherRest :: [Token] -> [Token] -> ([Token], [Token])
 pOtherRest acc (t:ts)
   | isOther t = pOtherRest (t:acc) ts
@@ -225,17 +200,6 @@ isOther (TComma _) = False
 isOther (TOpenParen _) = False
 isOther (TCloseParen _) = False
 isOther _ = True
-
-pInnerOtherRest :: [Token] -> [Token] -> ([Token], [Token])
-pInnerOtherRest acc (t:ts)
-  | isInnerOther t = pInnerOtherRest (t:acc) ts
-pInnerOtherRest acc ts = (reverse acc, ts)
-
-isInnerOther :: Token -> Bool
-isInnerOther (TComma _) = True
-isInnerOther (TOpenParen _) = False
-isInnerOther (TCloseParen _) = False
-isInnerOther _ = True
 
 -- ---------------------------------------------------------------------
 
@@ -276,7 +240,7 @@ m4 = cppLex "#if (m < 1)"
 m5 :: Either String (Maybe [[Token]], [Token])
 m5 = do
   -- toks <- cppLex "(43,foo(a)) some other stuff"
-  toks <- cppLex "( ff(()), 4 )"
+  toks <- cppLex "( ff(bar(),baz), 4 )"
   return $ getExpandArgs toks
 
 tt = case m5 of
