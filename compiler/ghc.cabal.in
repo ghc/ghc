@@ -226,6 +226,7 @@ Library
         GHC.ByteCode.InfoTable
         GHC.ByteCode.Instr
         GHC.ByteCode.Linker
+        GHC.ByteCode.Serialize
         GHC.ByteCode.Types
         GHC.Cmm
         GHC.Cmm.BlockId
