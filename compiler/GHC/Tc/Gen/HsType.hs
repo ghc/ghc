@@ -998,8 +998,16 @@ mkHoleMode tyki hm
        ; return (TcTyMode { mode_tyki  = tyki
                           , mode_holes = Just (lvl,hm) }) }
 
-updateFamArgType :: TcTyMode -> FamArgType -> TcTyMode
-updateFamArgType m@TcTyMode { mode_tyki = tyki, mode_holes =  mh } fam_arg
+updateHoleMode :: HoleMode -> TcTyMode -> TcTyMode
+updateHoleMode hm m@TcTyMode { mode_tyki = tyki, mode_holes =  mh }
+  |Just (lvl, _) <- mh
+  = (TcTyMode { mode_tyki = tyki
+              , mode_holes = Just (lvl, hm) })
+  | otherwise
+  = m
+
+updateFamArgType :: FamArgType -> TcTyMode -> TcTyMode
+updateFamArgType fam_arg m@TcTyMode { mode_tyki = tyki, mode_holes =  mh }
   |Just (lvl, HM_FamPat _) <- mh
   = (TcTyMode { mode_tyki = tyki
               , mode_holes = Just (lvl,HM_FamPat fam_arg) })
@@ -1285,7 +1293,7 @@ tcHsType mode rn_ty@(HsAppKindTy{}) exp_kind = tc_app_ty mode rn_ty exp_kind
 tcHsType mode rn_ty@(HsOpTy{})      exp_kind = tc_app_ty mode rn_ty exp_kind
 
 tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
-  = do { let mode' = mode { mode_tyki = KindLevel }
+  = do { let mode' = (updateHoleMode HM_Sig $ mode { mode_tyki = KindLevel})
        ; sig' <- tc_lhs_kind_sig mode' KindSigCtxt sig
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
@@ -1679,7 +1687,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
                                       , ppr subst ])
                       ; let exp_kind = substTy subst $ piTyBinderType ki_binder
                       ; arg' <- addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty arg) n) $
-                                tc_check_lhs_type (updateFamArgType mode famArgTy) arg exp_kind
+                                tc_check_lhs_type (updateFamArgType famArgTy mode) arg exp_kind
                       ; traceTc "tcInferTyApps (vis normal app) 2" (ppr exp_kind)
                       ; (subst', fun') <- mkAppTyM subst fun ki_binder arg'
                       ; go (n+1) fun' subst' inner_ki argtys }
