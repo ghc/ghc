@@ -2950,4 +2950,5 @@ writeInterfaceOnlyMode dflags =
 
 initParserStateWithMacros :: DynFlags -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
 initParserStateWithMacros df
-  = Lexer.initParserState (initPpState { pp_scope = (PpScope (predefinedMacros df) True) :| [] })
+  = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
+                                       , pp_scope = (PpScope True) :| [] })

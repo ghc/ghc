@@ -90,82 +90,84 @@ init_state =
 
 data Token
     = TEOF {t_str :: String}
-    | TOpenBrace {t_str :: String}
-    | TCloseBrace {t_str :: String}
-    | TOpenBracket {t_str :: String}
-    | TCloseBracket {t_str :: String}
-    | THash {t_str :: String}
-    | THashHash {t_str :: String}
-    | TOpenParen {t_str :: String}
-    | TCloseParen {t_str :: String}
-    | TLtColon {t_str :: String}
-    | TColonGt {t_str :: String}
-    | TLtPercent {t_str :: String}
-    | TPercentGt {t_str :: String}
-    | TPercentColon {t_str :: String}
-    | TPercentColonTwice {t_str :: String}
-    | TSemi {t_str :: String}
-    | TColon {t_str :: String}
-    | TDotDotDot {t_str :: String}
-    | TNew {t_str :: String}
-    | TDelete {t_str :: String}
-    | TQuestion {t_str :: String}
-    | TColonColon {t_str :: String}
-    | TDot {t_str :: String}
-    | TDotStar {t_str :: String}
-    | TPlus {t_str :: String}
-    | TMinus {t_str :: String}
-    | TStar {t_str :: String}
-    | TSlash {t_str :: String}
-    | TPercent {t_str :: String}
-    | TUpArrow {t_str :: String}
-    | TAmpersand {t_str :: String}
-    | TPipe {t_str :: String}
-    | TTilde {t_str :: String}
-    | TExclamation {t_str :: String}
-    | TEqual {t_str :: String}
-    | TOpenAngle {t_str :: String}
-    | TCloseAngle {t_str :: String}
-    | TPlusEqual {t_str :: String}
-    | TMinusEqual {t_str :: String}
-    | TStarEqual {t_str :: String}
-    | TSlashEqual {t_str :: String}
-    | TPercentEqual {t_str :: String}
-    | TUpEqual {t_str :: String}
-    | TAmpersandEqual {t_str :: String}
-    | TPipeEqual {t_str :: String}
-    | TLtLt {t_str :: String}
-    | TGtGt {t_str :: String}
-    | TGtGtEqual {t_str :: String}
-    | TLtLtEqual {t_str :: String}
-    | TEqualEqual {t_str :: String}
-    | TExclaimEqual {t_str :: String}
-    | TLtEqual {t_str :: String}
-    | TGtEqual {t_str :: String}
-    | TAmpersandTwice {t_str :: String}
-    | TPipePipe {t_str :: String}
-    | TPlusPlus {t_str :: String}
-    | TMinusMinus {t_str :: String}
-    | TComma {t_str :: String}
-    | TMinusGtStar {t_str :: String}
-    | TMinusGt {t_str :: String}
-    | TAnd {t_str :: String}
-    | TAndEq {t_str :: String}
-    | TBitand {t_str :: String}
-    | TBitor {t_str :: String}
-    | TCompl {t_str :: String}
-    | TNot {t_str :: String}
-    | TNotEq {t_str :: String}
-    | TOr {t_str :: String}
-    | TOrEq {t_str :: String}
-    | TXor {t_str :: String}
-    | TXorEq {t_str :: String}
-    | TLowerName {t_str :: String}
-    | TUpperName {t_str :: String}
-    | TString {t_str :: String}
+    | TIdentifier {t_str :: String}
     | TInteger {t_str :: String}
+    | -- preprocessing-op-or-punc
+      -- https://timsong-cpp.github.io/cppwp/n4140/lex.operators#nt:preprocessing-op-or-punc
+      TOpenBrace {t_str :: String} -- '{'
+    | TCloseBrace {t_str :: String} -- '}'
+    | TOpenBracket {t_str :: String} -- '['
+    | TCloseBracket {t_str :: String} -- ']'
+    | THash {t_str :: String} -- '#'
+    | THashHash {t_str :: String} -- '##'
+    | TOpenParen {t_str :: String} -- '('
+    | TCloseParen {t_str :: String} -- ')'
+    | TLtColon {t_str :: String} -- '<:'
+    | TColonGt {t_str :: String} -- ':>'
+    | TLtPercent {t_str :: String} -- '<%'
+    | TPercentGt {t_str :: String} -- '%>'
+    | TPercentColon {t_str :: String} -- '%:'
+    | TPercentColonTwice {t_str :: String} -- '%:%:'
+    | TSemi {t_str :: String} -- ';'
+    | TColon {t_str :: String} -- ':'
+    | TDotDotDot {t_str :: String} -- '...'
+    | TNew {t_str :: String} -- 'new'
+    | TDelete {t_str :: String} -- 'delete'
+    | TQuestion {t_str :: String} -- '?'
+    | TColonColon {t_str :: String} -- '::'
+    | TDot {t_str :: String} -- '.'
+    | TDotStar {t_str :: String} -- '.*'
+    | TPlus {t_str :: String} -- '+'
+    | TMinus {t_str :: String} -- '-'
+    | TStar {t_str :: String} -- '*'
+    | TSlash {t_str :: String} -- '/'
+    | TPercent {t_str :: String} -- '%'
+    | TUpArrow {t_str :: String} -- '^'
+    | TAmpersand {t_str :: String} -- '&'
+    | TPipe {t_str :: String} -- '|'
+    | TTilde {t_str :: String} -- '~'
+    | TExclamation {t_str :: String} -- '!'
+    | TEqual {t_str :: String} -- '='
+    | TOpenAngle {t_str :: String} -- '<'
+    | TCloseAngle {t_str :: String} -- '>'
+    | TPlusEqual {t_str :: String} -- '+='
+    | TMinusEqual {t_str :: String} -- '-='
+    | TStarEqual {t_str :: String} -- '*='
+    | TSlashEqual {t_str :: String} -- '/='
+    | TPercentEqual {t_str :: String} -- '%='
+    | TUpEqual {t_str :: String} -- '^='
+    | TAmpersandEqual {t_str :: String} -- '&='
+    | TPipeEqual {t_str :: String} -- '|='
+    | TLtLt {t_str :: String} -- '<<'
+    | TGtGt {t_str :: String} -- '>>'
+    | TGtGtEqual {t_str :: String} -- '>>='
+    | TLtLtEqual {t_str :: String} -- '<<='
+    | TEqualEqual {t_str :: String} -- '=='
+    | TExclaimEqual {t_str :: String} -- '!='
+    | TLtEqual {t_str :: String} -- '<='
+    | TGtEqual {t_str :: String} -- '>-'
+    | TAmpersandTwice {t_str :: String} -- '&&'
+    | TPipePipe {t_str :: String} -- '||'
+    | TPlusPlus {t_str :: String} -- '++'
+    | TMinusMinus {t_str :: String} -- '--'
+    | TComma {t_str :: String} -- ','
+    | TMinusGtStar {t_str :: String} -- '->*'
+    | TMinusGt {t_str :: String} -- '->'
+    | TAnd {t_str :: String} -- 'and'
+    | TAndEq {t_str :: String} -- 'and_eq'
+    | TBitand {t_str :: String} -- 'bitand'
+    | TBitor {t_str :: String} -- 'bitor'
+    | TCompl {t_str :: String} -- 'compl'
+    | TNot {t_str :: String} -- 'not'
+    | TNotEq {t_str :: String} -- 'not_eq'
+    | TOr {t_str :: String} -- 'or'
+    | TOrEq {t_str :: String} -- 'or_eq'
+    | TXor {t_str :: String} -- 'xor'
+    | TXorEq {t_str :: String} -- 'xor_eq'
+    -- end of preprocessing-op-or-punc
+    | TString {t_str :: String}
     | TOther {t_str :: String}
-    deriving (Show)
+    deriving (Show, Eq)
 
 -- Actions
 
