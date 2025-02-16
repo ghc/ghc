@@ -16,7 +16,8 @@ import GHC.Driver.Session
 import GHC.Driver.Config.Diagnostic
 
 import GHC.Parser.Lexer
-import GHC.Parser.PreProcess.State (MacroName (..), MacroDef)
+import qualified GHC.Parser.PreProcess.ParserM as PM
+import GHC.Parser.PreProcess.State ( MacroDefines)
 
 -- | Extracts the flags needed for parsing
 initParserOpts :: DynFlags -> ParserOpts
@@ -36,20 +37,20 @@ supportedLanguagePragmas = supportedLanguagesAndExtensions . platformArchOS . ta
 -- Predefined macros, for use in GHC_CPP @PpState@
 -- Derived from the GHC source file `ghcversion.h.in`
 
-predefinedMacros :: DynFlags -> Map.Map MacroName MacroDef
+predefinedMacros :: DynFlags -> MacroDefines
 predefinedMacros df = Map.fromList
         [
-            ( MacroName "__GLASGOW_HASKELL__" Nothing
-            , projectVersionInt
+            ( "__GLASGOW_HASKELL__"
+            , Map.singleton Nothing (Nothing, [PM.TInteger projectVersionInt])
             ),
-            ( MacroName "__GLASGOW_HASKELL_FULL_VERSION__" Nothing
-            , projectVersion
+            ( "__GLASGOW_HASKELL_FULL_VERSION__"
+            , Map.singleton Nothing (Nothing, [PM.TOther projectVersion])
             ),
-            ( MacroName  "__GLASGOW_HASKELL_PATCHLEVEL1__" Nothing
-            , projectPatchLevel1
+            ( "__GLASGOW_HASKELL_PATCHLEVEL1__"
+            , Map.singleton Nothing (Nothing, [PM.TOther projectPatchLevel1])
             ),
-            ( MacroName  "__GLASGOW_HASKELL_PATCHLEVEL2__" Nothing
-            , projectPatchLevel2
+            ( "__GLASGOW_HASKELL_PATCHLEVEL2__"
+            , Map.singleton Nothing (Nothing, [PM.TOther projectPatchLevel2])
             )
         ]
   where

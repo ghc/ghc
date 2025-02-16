@@ -11,6 +11,8 @@ import GHC.Prelude
 }
 
 %name      expr
+%name      args
+%name      parameters
 %expect    0
 %tokentype { Token }
 %monad     { ParserM }
@@ -89,8 +91,7 @@ import GHC.Prelude
     'xor'              { TXor {} }
     'xor_eq'           { TXorEq {} }
 
-    lower_name         { TLowerName {} }
-    upper_name         { TUpperName {} }
+    identifier         { TIdentifier {} }
     integer            { TInteger {} }
     string             { TString {} }
     other              { TOther {} }
@@ -120,12 +121,35 @@ expr : variable           { $1 }
      | expr '>=' expr     { Comp CmpGtE $1 $3 }
      | expr '<'  expr     { Comp CmpLt $1 $3 }
      | expr '<=' expr     { Comp CmpLtE $1 $3 }
+     | expr '+' expr      { Plus $1 $3 }
+     | expr '-' expr      { Minus $1 $3 }
+     | expr '*' expr      { Times $1 $3 }
 
 variable :: {Expr}
 variable : name { Var $1 }
 
-name : lower_name { t_str $1 }
-     | upper_name { t_str $1 }
+name :: { String }
+name : identifier { t_str $1 }
+
+------------------------------------------------------------------------
+
+-- function-like macro args, in definition
+parameters :: { [String] }
+parameters : '(' param_list ')' { reverse $2 }
+
+param_list :: { [String] }
+param_list : param_list ',' name  { $3 : $1 }
+           | name                 { [$1] }
+
+-- function-like macro args, in call
+-- NOTE: according to https://timsong-cpp.github.io/cppwp/n4140/cpp#replace
+--       we should only be paying attention to parens and commas.
+args :: { [Expr] }
+args : '(' arg_list ')' { reverse $2 }
+
+arg_list :: { [Expr] }
+arg_list : arg_list ',' expr  { $3 : $1 }
+         | expr               { [$1] }
 
 {
 -- parseExpr :: String -> Either String Expr

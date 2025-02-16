@@ -115,8 +115,8 @@ processCpp fs = do
                 Left err -> error $ show (err, s)
                 Right (CppInclude filename) -> do
                     ppInclude filename
-                Right (CppDefine name def) -> do
-                    ppDefine (MacroName name Nothing) def
+                Right (CppDefine name args def) -> do
+                    ppDefine (MacroName name args) def
                 Right (CppIf cond) -> do
                     ppIf cond
                 Right (CppIfdef name) -> do
