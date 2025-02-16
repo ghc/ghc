@@ -95,19 +95,31 @@ expand s str = expanded
     expanded = combineToks $ map t_str $ expandToks s toks
 
 expandToks :: MacroDefines -> [Token] -> [Token]
-expandToks _ [] = []
-expandToks s (TIdentifier n : ts) = expanded ++ expandToks s ts'
+expandToks s ts =
+    let
+        (expansionDone, r) = doExpandToks False s ts
+     in
+        if expansionDone
+            then expandToks s r
+            else r
+
+doExpandToks :: Bool -> MacroDefines -> [Token] -> (Bool, [Token])
+doExpandToks ed _ [] = (ed, [])
+doExpandToks ed s (TIdentifier n : ts) = (ed'', expanded ++ rest)
   where
-    (expanded, ts') = case Map.lookup n s of
-        Nothing -> ([TIdentifier n], ts)
-        Just defs -> (r, rest)
+    (ed', expanded, ts') = case Map.lookup n s of
+        Nothing -> (ed, [TIdentifier n], ts)
+        Just defs -> (ed0, r, rest0)
           where
-            (args, rest) = getExpandArgs ts
+            (args, rest0) = getExpandArgs ts
             (m_args, rhs) = fromMaybe (Nothing, [TIdentifier n]) (Map.lookup (arg_arity args) defs)
-            r = case m_args of
-                Nothing -> rhs
-                Just _ -> replace_args args m_args rhs
-expandToks s (t : ts) = t : expandToks s ts
+            (ed0, r) = case m_args of
+                Nothing -> (True, rhs)
+                Just _ -> (True, replace_args args m_args rhs)
+    (ed'', rest) = doExpandToks ed' s ts'
+doExpandToks ed s (t : ts) = (ed', t : r)
+  where
+    (ed', r) = doExpandToks ed s ts
 
 -- ---------------------------------------------------------------------
 
