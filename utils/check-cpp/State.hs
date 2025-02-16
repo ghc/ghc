@@ -10,7 +10,7 @@ import GHC.Data.StringBuffer
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..))
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Types.SrcLoc
-import ParserM (Token(..))
+import ParserM (Token (..))
 
 -- import GHC.Prelude
 
@@ -70,7 +70,8 @@ data MacroName = MacroName String (Maybe MacroArgs)
     deriving (Show, Eq, Ord)
 type MacroDef = [Token]
 
-type MacroDefines = Map String (Map (Maybe MacroArgs) MacroDef)
+-- Indexed by name, and then arity
+type MacroDefines = Map String (Map (Maybe Int) ((Maybe MacroArgs), MacroDef))
 
 type Input = String
 type Output = CppDirective
@@ -84,6 +85,7 @@ data Expr
     | Var String
     | IntVal Int
     | Plus Expr Expr
+    | Minus Expr Expr
     | Times Expr Expr
     | Logic LogicOp Expr Expr
     | Comp CompOp Expr Expr
@@ -210,7 +212,7 @@ ppIsDefined' :: PpState -> MacroName -> Bool
 ppIsDefined' s (MacroName name _args) =
     isJust $ Map.lookup name (pp_defines s)
 
-ppDefinition' :: PpState -> String -> Maybe (Map (Maybe MacroArgs) MacroDef)
+ppDefinition' :: PpState -> String -> Maybe (Map (Maybe Int) ((Maybe MacroArgs), MacroDef))
 ppDefinition' s name = Map.lookup name (pp_defines s)
 
 getPpState :: PP PpState
@@ -232,10 +234,16 @@ popContinuation =
 -- ---------------------------------------------------------------------
 -- Dealing with MacroDefines
 
+arg_arity :: Maybe [t] -> Maybe Int
+arg_arity args = case args of
+    Nothing -> Nothing
+    Just as -> Just (length as)
+
 insertMacroDef :: MacroName -> MacroDef -> MacroDefines -> MacroDefines
 insertMacroDef (MacroName name args) def md =
-    case Map.lookup name md of
-        Nothing -> Map.insert name (Map.singleton args def) md
-        Just dm -> Map.insert name (Map.insert args def dm) md
+    let arity = arg_arity args
+     in case Map.lookup name md of
+            Nothing -> Map.insert name (Map.singleton arity (args, def)) md
+            Just dm -> Map.insert name (Map.insert arity (args, def) dm) md
 
 -- ---------------------------------------------------------------------
