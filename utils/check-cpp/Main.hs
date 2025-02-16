@@ -459,3 +459,15 @@ t16 = do
         , "#endif"
         ]
 -- x = 1
+
+t17 :: IO ()
+t17 = do
+    doTest
+        [ "#define FOO(A,B) A + B"
+        , "#if FOO(1,FOO(3,4)) == 8"
+        , "x = 1"
+        , "#else"
+        , "x = 5"
+        , "#endif"
+        ]
+-- x = 1
