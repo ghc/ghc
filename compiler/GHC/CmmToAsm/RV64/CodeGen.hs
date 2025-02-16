@@ -1202,6 +1202,25 @@ getRegister' config plat expr =
                   expr
                   (op (OpReg format dst) (OpReg format_x reg_x) (OpReg format_y reg_y))
 
+          vecExtract format = do
+            (reg_v, format_v, code_v) <- getSomeReg x
+            (reg_idx, format_idx, code_idx) <- getSomeReg y
+            tmp <- getNewRegNat format_v
+            pure $ Any format $ \dst ->
+              code_v
+                `appOL` code_idx
+                `snocOL`
+                -- Setup
+                annExpr
+                  expr
+                  -- Move selected element to index 0
+                  -- vslidedown.vi v8, v9, 2
+                  (VSLIDEDOWN (OpReg format_v tmp) (OpReg format_v reg_v) (OpReg format_idx reg_idx))
+                `snocOL`
+                -- Move to float register
+                -- vmv.x.s a0, v8
+                VMV (OpReg format dst) (OpReg format_v tmp)
+
       case op of
         -- Integer operations
         -- Add/Sub should only be Integer Options.
@@ -1254,8 +1273,8 @@ getRegister' config plat expr =
         MO_S_Shr w -> intOp True w (\d x y -> unitOL $ annExpr expr (SRA d x y))
 
         -- Vector operations
-        MO_VF_Extract length w -> vecOp (floatVecFormat length w) VSLIDEDOWN
-        MO_V_Extract length w -> vecOp (intVecFormat length w) VSLIDEDOWN
+        MO_VF_Extract length w -> vecExtract ((scalarFormatFormat . floatScalarFormat) w)
+        MO_V_Extract length w -> vecExtract ((scalarFormatFormat . intScalarFormat) w)
 
         MO_VF_Add length w -> vecOp (floatVecFormat length w) VADD
         MO_VF_Sub length w -> vecOp (floatVecFormat length w) VSUB
