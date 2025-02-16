@@ -354,7 +354,7 @@ mkSpillInstr _config (RegWithFormat reg fmt) delta slot =
       = scalarMoveFormat fmt
     mkStrSpImm imm =
       ANN (text "Spill@" <> int (off - delta))
-        $ STR fmt' (OpReg fmt' reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
+        $ assertFmtReg II64 reg (STR fmt' (OpReg II64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm))))
     movImmToTmp imm =
       ANN (text "Spill: TMP <- " <> int imm)
         $ MOV tmp (OpImm (ImmInt imm))
@@ -363,7 +363,7 @@ mkSpillInstr _config (RegWithFormat reg fmt) delta slot =
         $ ADD tmp tmp sp
     mkStrTmp =
       ANN (text "Spill@" <> int (off - delta))
-        $ STR fmt' (OpReg fmt' reg) (OpAddr (AddrReg tmpReg))
+        $ assertFmtReg II64 reg (STR fmt' (OpReg II64 reg) (OpAddr (AddrReg tmpReg)))
 
     off = spillSlotToOffset slot
 
@@ -953,17 +953,18 @@ isFloatOp :: Operand -> Bool
 isFloatOp op = isFloatRegOp op || isFloatImmOp op
 
 -- TODO: Hide OpReg (Operand) constructor and use this guard to ensure only sane fmt/reg combinations can be used
-assertFmtReg :: HasCallStack => Format -> Reg -> a -> a
-assertFmtReg fmt reg| fmtRegCombinationIsSane fmt reg = id  
-assertFmtReg fmt reg = pprPanic 
-                              "Format does not fit to register."
-                              (text "fmt" <> colon <+> ppr fmt <+> text "reg" <> colon <+> ppr reg)
+assertFmtReg :: (HasCallStack) => Format -> Reg -> a -> a
+assertFmtReg fmt reg | fmtRegCombinationIsSane fmt reg = id
+assertFmtReg fmt reg =
+  pprPanic
+    "Format does not fit to register."
+    (text "fmt" <> colon <+> ppr fmt <+> text "reg" <> colon <+> ppr reg)
 
 fmtRegCombinationIsSane :: Format -> Reg -> Bool
-fmtRegCombinationIsSane fmt reg = 
-                           (isFloatFormat fmt && isFloatReg reg) ||
-                           (isIntFormat fmt && isIntReg reg) ||
-                           (isVecFormat fmt && isVectorReg reg)
+fmtRegCombinationIsSane fmt reg =
+  (isFloatFormat fmt && isFloatReg reg)
+    || (isIntFormat fmt && isIntReg reg)
+    || (isVecFormat fmt && isVectorReg reg)
 
 isVectorRegOp :: Operand -> Bool
 isVectorRegOp (OpReg fmt reg) | isVectorReg reg = assertFmtReg fmt reg $ True
@@ -976,12 +977,12 @@ isFloatReg _ = False
 
 isIntReg :: Reg -> Bool
 isIntReg (RegReal (RealRegSingle i)) | isIntRegNo i = True
-isIntReg (RegVirtual (VirtualRegD _)) = True
+isIntReg (RegVirtual (VirtualRegI _)) = True
 isIntReg _ = False
 
 isVectorReg :: Reg -> Bool
 isVectorReg (RegReal (RealRegSingle i)) | isVectorRegNo i = True
-isVectorReg (RegVirtual (VirtualRegD _)) = True
+isVectorReg (RegVirtual (VirtualRegV128 _)) = True
 isVectorReg _ = False
 
 allVectorRegOps :: [Operand] -> Bool
