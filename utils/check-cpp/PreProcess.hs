@@ -9,7 +9,7 @@ import GHC.Parser.Errors.Ppr ()
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Types.SrcLoc
 
-import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token(..))
+import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
 
 import Macro
 import ParsePP
