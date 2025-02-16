@@ -339,22 +339,23 @@ mkSpillInstr ::
   Int ->
   [Instr]
 mkSpillInstr _config (RegWithFormat reg fmt) delta slot =
-  case off - delta of
-    imm | fitsIn12bitImm imm && not (isVecFormat fmt) -> [mkStrSpImm imm]
-    imm ->
-      [ movImmToTmp imm,
-        addSpToTmp,
-        mkStrTmp
-      ]
+  assertFmtReg fmt reg
+    $ case off - delta of
+      imm | fitsIn12bitImm imm && not (isVecFormat fmt) -> [mkStrSpImm imm]
+      imm ->
+        [ movImmToTmp imm,
+          addSpToTmp,
+          mkStrTmp
+        ]
   where
     fmt'
-      | isVecFormat fmt
-      = fmt
-      | otherwise
-      = scalarMoveFormat fmt
+      | isVecFormat fmt =
+          fmt
+      | otherwise =
+          scalarMoveFormat fmt
     mkStrSpImm imm =
       ANN (text "Spill@" <> int (off - delta))
-        $ assertFmtReg II64 reg (STR fmt' (OpReg II64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm))))
+        $ (STR fmt' (OpReg fmt reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm))))
     movImmToTmp imm =
       ANN (text "Spill: TMP <- " <> int imm)
         $ MOV tmp (OpImm (ImmInt imm))
@@ -363,8 +364,7 @@ mkSpillInstr _config (RegWithFormat reg fmt) delta slot =
         $ ADD tmp tmp sp
     mkStrTmp =
       ANN (text "Spill@" <> int (off - delta))
-        $ assertFmtReg II64 reg (STR fmt' (OpReg II64 reg) (OpAddr (AddrReg tmpReg)))
-
+        $ (STR fmt' (OpReg fmt reg) (OpAddr (AddrReg tmpReg)))
     off = spillSlotToOffset slot
 
 -- | Generate instructions to load a register from a spill slot.
