@@ -167,19 +167,19 @@ predefinedMacros _df =
     Map.fromList
         [
             ( "__GLASGOW_HASKELL__"
-            , Map.singleton Nothing [PM.TInteger projectVersionInt]
+            , Map.singleton Nothing (Nothing, [PM.TInteger projectVersionInt])
             )
         ,
             ( "__GLASGOW_HASKELL_FULL_VERSION__"
-            , Map.singleton Nothing [PM.TOther projectVersion]
+            , Map.singleton Nothing (Nothing, [PM.TOther projectVersion])
             )
         ,
             ( "__GLASGOW_HASKELL_PATCHLEVEL1__"
-            , Map.singleton Nothing [PM.TOther projectPatchLevel1]
+            , Map.singleton Nothing (Nothing, [PM.TOther projectPatchLevel1])
             )
         ,
             ( "__GLASGOW_HASKELL_PATCHLEVEL2__"
-            , Map.singleton Nothing [PM.TOther projectPatchLevel2]
+            , Map.singleton Nothing (Nothing, [PM.TOther projectPatchLevel2])
             )
         ]
   where
@@ -406,7 +406,7 @@ t12 = do
 t13 :: IO ()
 t13 = do
     doTest
-        [ "#if __GLASGOW_HASKELL__ != 913"
+        [ "#if __GLASGOW_HASKELL__ == 913"
         , "x = 1"
         , "#else"
         , "x = 5"
@@ -447,3 +447,15 @@ t15 = do
         , "#define FOO2(a,b) a+b+5"
         , "#define FOO3(a,b,c) a+b+c+5"
         ]
+
+t16 :: IO ()
+t16 = do
+    doTest
+        [ "#define FOO(A,B) A + B"
+        , "#if FOO(1,2) == 3"
+        , "x = 1"
+        , "#else"
+        , "x = 5"
+        , "#endif"
+        ]
+-- x = 1
