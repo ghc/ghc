@@ -1285,7 +1285,7 @@ tcHsType mode rn_ty@(HsAppKindTy{}) exp_kind = tc_app_ty mode rn_ty exp_kind
 tcHsType mode rn_ty@(HsOpTy{})      exp_kind = tc_app_ty mode rn_ty exp_kind
 
 tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
-  = do { let mode' = (updateFamArgType ClassArg $ mode { mode_tyki = KindLevel})
+  = do { let mode' = (updateFamArgType SigArg $ mode { mode_tyki = KindLevel})
        ; sig' <- tc_lhs_kind_sig mode' KindSigCtxt sig
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
@@ -2258,6 +2258,8 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
                HM_TyAppPat  -> fsLit "_"
      mk_wc_details = case hole_mode of
                       HM_FamPat FreeArg -> newTyVarMetaVarDetailsAtLevel
+                      HM_FamPat ClassArg -> newTyVarMetaVarDetailsAtLevel
+                      HM_FamPat SigArg -> newTauTvDetailsAtLevel
                       _ -> newTauTvDetailsAtLevel
      emit_holes = case hole_mode of
                      HM_Sig       -> True

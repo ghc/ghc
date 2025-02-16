@@ -5545,7 +5545,7 @@ tcAddOpenTyFamInstCtxt mb_assoc decl
   where
     assoc = case mb_assoc of
       Nothing -> Nothing
-      Just (cls,_, _) -> Just $ classTyCon cls
+      Just (cls,_,_) -> Just $ classTyCon cls
     flav = TyConInstFlavour
          { tyConInstFlavour = OpenFamilyFlavour IAmType assoc
          , tyConInstIsDefault = False

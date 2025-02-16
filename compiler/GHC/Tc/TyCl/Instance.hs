@@ -515,7 +515,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
              <- tcExtendNameTyVarEnv tv_skol_prs $
                 do  { let mini_env   = mkVarEnv (classTyVars clas `zip` substTys subst inst_tys)
                           mini_subst = mkTvSubst (mkInScopeSet (mkVarSet skol_tvs)) mini_env
-                          mb_info    = Just ( clas, visible_skol_tvs, mini_env)
+                          mb_info    = Just (clas, visible_skol_tvs, mini_env)
                     ; df_stuff  <- mapAndRecoverM (tcDataFamInstDecl mb_info tv_skol_env) adts
                     ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info) ats
 
