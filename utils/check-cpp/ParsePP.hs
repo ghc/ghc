@@ -21,7 +21,7 @@ import State
 -- First parse to CPP tokens, using a C++-like language spec
 -- https://gcc.gnu.org/onlinedocs/cpp/Tokenization.html
 
--- Parse a CPP directive, using tokens from the CPP lexer
+-- | Parse a CPP directive, using tokens from the CPP lexer
 parseDirective :: String -> Either String CppDirective
 parseDirective s =
     case cppLex s of
