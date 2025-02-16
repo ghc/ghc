@@ -426,15 +426,16 @@ getRegisterReg platform (CmmGlobal mid) =
 -- General things for putting together code sequences
 
 -- | Compute an expression into any register
-getSomeReg :: CmmExpr -> NatM (Reg, Format, InstrBlock)
+getSomeReg :: HasCallStack => CmmExpr -> NatM (Reg, Format, InstrBlock)
 getSomeReg expr = do
   r <- getRegister expr
-  case r of
-    Any rep code -> do
-      newReg <- getNewRegNat rep
-      return (newReg, rep, code newReg)
-    Fixed rep reg code ->
-      return (reg, rep, code)
+  res@(reg, fmt, _) <- case r of
+        Any rep code -> do
+          newReg <- getNewRegNat rep
+          pure (newReg, rep, code newReg)
+        Fixed rep reg code ->
+          pure (reg, rep, code)
+  pure $ assertFmtReg fmt reg res
 
 -- | Compute an expression into any floating-point register
 --
