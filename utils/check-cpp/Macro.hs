@@ -42,8 +42,6 @@ import Parser
 import ParserM
 import State
 
-import Debug.Trace
-
 -- ---------------------------------------------------------------------
 
 process :: PpState -> Input -> (PpState, Output)
@@ -77,7 +75,7 @@ ifndef s name = pushAccepting' s (not $ ppIsDefined' s (MacroName name Nothing))
 cppIf :: PpState -> String -> PpState
 cppIf s str = pushAccepting' s (toBool v)
   where
-    expanded = expand s str
+    expanded = expand (pp_defines s) str
     v = case Parser.parseExpr expanded of
         Left err -> error $ "parseExpr:" ++ show (err, expanded)
         Right tree -> eval tree
@@ -87,7 +85,7 @@ cppElse s = setAccepting' s (not $ getAccepting' s)
 
 -- ---------------------------------------------------------------------
 
-expand :: PpState -> String -> String
+expand :: MacroDefines -> String -> String
 expand s str = expanded
   where
     -- TODO: repeat until re-expand or fixpoint
@@ -96,17 +94,44 @@ expand s str = expanded
         Right tks -> tks
     expanded = combineToks $ map t_str $ expandToks s toks
 
-expandToks :: PpState -> [Token] -> [Token]
+expandToks :: MacroDefines -> [Token] -> [Token]
 expandToks _ [] = []
-expandToks s (TIdentifier n : ts) = expanded ++ expandToks s ts
+expandToks s (TIdentifier n : ts) = expanded ++ expandToks s ts'
   where
-    expanded = case Map.lookup n (pp_defines s) of
-        Nothing -> [TIdentifier n]
-        Just defs -> r
+    (expanded, ts') = case Map.lookup n s of
+        Nothing -> ([TIdentifier n], ts)
+        Just defs -> (r, rest)
           where
-            -- Assume no args to start with
-            r = fromMaybe [TIdentifier n] (Map.lookup Nothing defs)
+            (args, rest) = getExpandArgs ts
+            (m_args, rhs) = fromMaybe (Nothing, [TIdentifier n]) (Map.lookup (arg_arity args) defs)
+            r = case m_args of
+                Nothing -> rhs
+                Just _ -> replace_args args m_args rhs
 expandToks s (t : ts) = t : expandToks s ts
+
+-- ---------------------------------------------------------------------
+
+replace_args ::
+    Maybe [[Token]] ->
+    Maybe [String] ->
+    [Token] ->
+    [Token]
+replace_args Nothing Nothing rhs = rhs
+replace_args (Just args) (Just m_args) rhs = rhs'
+  where
+    -- At this point, the surrounding context should guarantee that the
+    -- args and m_args have the same arity
+    rhs' = foldl' (\acc (arg, m_arg) -> replace_arg arg m_arg acc) rhs (zip args m_args)
+replace_args args margs _ = error $ "replace_args: impossible, mismatch between: " ++ show (args, margs)
+
+-- The spec (https://timsong-cpp.github.io/cppwp/n4140/cpp#replace-10)
+-- says an arg can only be an identifier
+-- replace_arg arg m_arg acc = acc
+replace_arg :: [Token] -> String -> [Token] -> [Token]
+replace_arg _ _ [] = []
+replace_arg a ma (TIdentifier t : ts)
+    | ma == t = a <> replace_arg a ma ts
+replace_arg a ma (t : ts) = t : replace_arg a ma ts
 
 -- ---------------------------------------------------------------------
 
@@ -247,6 +272,7 @@ m5 = do
     toks <- cppLex "( ff(bar(),baz), 4 )"
     return $ getExpandArgs toks
 
+tt :: Either String ([[Char]], [Char])
 tt = case m5 of
     Left err -> Left err
     Right (Just a, b) -> Right (map (\k -> concatMap t_str k) a, concatMap t_str b)
