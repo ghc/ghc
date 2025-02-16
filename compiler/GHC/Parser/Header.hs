@@ -118,7 +118,8 @@ getImports dflags popts implicit_prelude buf filename source_filename = do
 
 initParserStateWithMacros :: DynFlags -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
 initParserStateWithMacros df
-  = Lexer.initParserState (initPpState { pp_scope = (PpScope (predefinedMacros df) True) NE.:| [] })
+  = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
+                                       , pp_scope = (PpScope  True) NE.:| [] })
 
 mkPrelImports :: ModuleName
               -> SrcSpan    -- Attribute the "import Prelude" to this location
