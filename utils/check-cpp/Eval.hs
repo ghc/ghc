@@ -9,6 +9,7 @@ eval (Parens e) = eval e
 eval (Var v) = error $ "need to look up :" ++ v
 eval (IntVal i) = i
 eval (Plus e1 e2) = (eval e1) + (eval e2)
+eval (Minus e1 e2) = (eval e1) - (eval e2)
 eval (Times e1 e2) = (eval e1) * (eval e2)
 eval (Logic op e1 e2) = evalLogicOp op (eval e1) (eval e2)
 eval (Comp op e1 e2) = evalCompOp op (eval e1) (eval e2)
