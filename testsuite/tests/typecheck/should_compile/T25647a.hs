@@ -92,7 +92,7 @@ dix9 :: Dix9 FloatRep -> Int
 dix9 (Dix9 x) = x
 
 -- anonymous wildcard should work
-class DixC10 a where
-  type Dix10 a
-instance DixC10 Int where
-  type Dix10 _ = Bool
+-- class DixC10 a where
+--   type Dix10 a
+-- instance DixC10 Int where
+--   type Dix10 _ = Bool
