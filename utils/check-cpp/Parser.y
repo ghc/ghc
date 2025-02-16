@@ -120,6 +120,9 @@ expr : variable           { $1 }
      | expr '>=' expr     { Comp CmpGtE $1 $3 }
      | expr '<'  expr     { Comp CmpLt $1 $3 }
      | expr '<=' expr     { Comp CmpLtE $1 $3 }
+     | expr '+' expr      { Plus $1 $3 }
+     | expr '-' expr      { Minus $1 $3 }
+     | expr '*' expr      { Times $1 $3 }
 
 variable :: {Expr}
 variable : name { Var $1 }
