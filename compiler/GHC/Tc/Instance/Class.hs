@@ -39,7 +39,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
 import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name )
-import GHC.Types.Var.Env ( VarEnv, lookupVarEnv )
+import GHC.Types.Var.Env ( VarEnv, lookupVarEnv, elemVarEnv )
 import GHC.Types.Id
 import GHC.Types.Var
 
@@ -102,13 +102,9 @@ assocInstInfoPartialAssocInstInfo (InClsInst {..}) = Just (ai_class, ai_tyvars, 
 
 buildAssocInstInfo :: TyCon -> PartialAssocInstInfo -> AssocInstInfo
 buildAssocInstInfo _fam_tc Nothing = NotAssociated
-buildAssocInstInfo fam_tc (Just (cls, tvs, env)) = InClsInst cls tvs env argTypes
-  where
-    argTypes
-      = [ toArgType $ lookupVarEnv env fam_tc_tv | fam_tc_tv <- tyConTyVars fam_tc]
-      where
-        toArgType Nothing = FreeArg
-        toArgType _ = ClassArg
+buildAssocInstInfo fam_tc (Just (cls, tvs, env))
+  = InClsInst cls tvs env
+  [ if elemVarEnv fam_tc_tv env then ClassArg else FreeArg  | fam_tc_tv <- tyConTyVars fam_tc]
 
 buildPatsArgTypes :: (Outputable x) => AssocInstInfo -> [x] -> [(x, FamArgType)]
 buildPatsArgTypes NotAssociated xs = buildPatsModeTypes FreeArg xs
@@ -117,11 +113,12 @@ buildPatsArgTypes (InClsInst {..}) xs = zip xs (ai_arg_types ++ cycle [FreeArg])
 buildPatsModeTypes :: FamArgType -> [x] -> [(x, FamArgType)]
 buildPatsModeTypes fa xs = (,fa) <$> xs
 
-data FamArgType = ClassArg | FreeArg deriving (Eq, Show)
+data FamArgType = ClassArg | FreeArg | SigArg deriving (Eq, Show)
 
 instance Outputable FamArgType where
   ppr ClassArg = text "ClassArg"
   ppr FreeArg = text "FreeArg"
+  ppr SigArg = text "SigArg"
 
 isNotAssociated :: AssocInstInfo -> Bool
 isNotAssociated (NotAssociated {}) = True
