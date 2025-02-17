@@ -171,6 +171,54 @@ tag functions as tag inference currently doesn't rely on those being properly ta
 #define SpW(n)       (*(StgWord*)(Sp_plusW(n)))
 #define SpB(n)       (*(StgWord*)(Sp_plusB(n)))
 
+#define WITHIN_CAP_CHUNK_BOUNDS(n)  WITHIN_CHUNK_BOUNDS(n, cap->r.rCurrentTSO->stackobj)
+
+#define WITHIN_CHUNK_BOUNDS(n, s)  \
+  (RTS_LIKELY((StgWord*)(Sp_plusW(n)) < ((s)->stack + (s)->stack_size - sizeofW(StgUnderflowFrame))))
+
+
+/* Note [PUSH_L underflow]
+   ~~~~~~~~~~~~~~~~~~~~~~~
+BCOs can be nested, resulting in nested BCO stack frames where the inner most
+stack frame can refer to variables stored on earlier stack frames via the
+PUSH_L instruction.
+
+|---------|
+|  BCO_1  | -<-┐
+|---------|
+ .........     |
+|---------|    | PUSH_L <n>
+|  BCO_N  | ->-┘
+|---------|
+
+Here BCO_N is syntactically nested within the code for BCO_1 and will result
+in code that references the prior stack frame of BCO_1 for some of it's local
+variables. If a stack overflow happens between the creation of the stack frame
+for BCO_1 and BCO_N the RTS might move BCO_N to a new stack chunk while leaving
+BCO_1 in place, invalidating a simple offset based reference to the outer stack
+frames.
+Therefore `ReadSpW` first performs a bounds check to ensure that accesses onto
+the stack will succeed. If the target address would not be a valid location for
+the current stack chunk then `slow_spw` function is called, which dereferences
+the underflow frame to adjust the offset before performing the lookup.
+
+               ┌->--x   |  CHK_1  |
+|  CHK_2  |    |    |   |---------|
+|---------|    |    └-> |  BCO_1  |
+| UD_FLOW | -- x        |---------|
+|---------|    |
+| ......  |    |
+|---------|    | PUSH_L <n>
+|  BCO_ N | ->-┘
+|---------|
+See ticket #25750
+
+*/
+
+#define ReadSpW(n)      \
+  ((WITHIN_CAP_CHUNK_BOUNDS(n)) ? SpW(n): slow_spw(Sp, cap->r.rCurrentTSO->stackobj, n))
+
+
 STATIC_INLINE StgPtr
 allocate_NONUPD (Capability *cap, int n_words)
 {
@@ -193,6 +241,8 @@ unsigned long it_retto_BCO;
 unsigned long it_retto_UPDATE;
 unsigned long it_retto_other;
 
+unsigned long it_underflow_lookups;
+
 unsigned long it_slides;
 unsigned long it_insns;
 unsigned long it_BCO_entries;
@@ -209,6 +259,7 @@ void interp_startup ( void )
    int i, j;
    it_retto_BCO = it_retto_UPDATE = it_retto_other = 0;
    it_total_entries = it_total_unknown_entries = 0;
+   it_underflow_lookups = 0;
    for (i = 0; i < N_CLOSURE_TYPES; i++)
       it_unknown_entries[i] = 0;
    it_slides = it_insns = it_BCO_entries = 0;
@@ -229,6 +280,7 @@ void interp_shutdown ( void )
                    it_retto_BCO, it_retto_UPDATE, it_retto_other );
    debugBelch("%lu total entries, %lu unknown entries \n",
                    it_total_entries, it_total_unknown_entries);
+   debugBelch("%lu lookups past the end of the stack frame\n", it_underflow_lookups);
    for (i = 0; i < N_CLOSURE_TYPES; i++) {
      if (it_unknown_entries[i] == 0) continue;
      debugBelch("   type %2d: unknown entries (%4.1f%%) == %lu\n",
@@ -320,6 +372,53 @@ StgClosure * copyPAP  (Capability *cap, StgPAP *oldpap)
 
 #endif
 
+// See Note [PUSH_L underflow] for in which situations this
+// slow lookup is needed
+static StgWord
+slow_spw(void *Sp, StgStack *cur_stack, StgWord offset){
+  // 1. If in range, access the item from the current stack chunk
+  if (WITHIN_CHUNK_BOUNDS(offset, cur_stack)) {
+    return SpW(offset);
+  }
+  // 2. Not in this stack chunk, so access the underflow frame.
+  else {
+    StgWord stackWords;
+    StgUnderflowFrame *frame;
+    StgStack *new_stack;
+
+    frame = (StgUnderflowFrame*)(cur_stack->stack + cur_stack->stack_size
+               - sizeofW(StgUnderflowFrame));
+
+    // 2a. Check it is an underflow frame (the top stack chunk won't have one).
+    if( frame->info == &stg_stack_underflow_frame_d_info
+       || frame->info == &stg_stack_underflow_frame_v16_info
+       || frame->info == &stg_stack_underflow_frame_v32_info
+       || frame->info == &stg_stack_underflow_frame_v64_info )
+    {
+
+      INTERP_TICK(it_underflow_lookups);
+
+      new_stack = (StgStack*)frame->next_chunk;
+
+      // How many words were on the stack
+      stackWords = (StgWord *)frame - (StgWord *) Sp;
+      ASSERT(offset > stackWords);
+
+      // Recursive, in the very unlikely case we have to traverse two
+      // stack chunks.
+      return slow_spw(new_stack->sp, new_stack, offset-stackWords);
+    }
+    // 2b. Access the element if there is no underflow frame, it must be right
+    // at the top of the stack.
+    else {
+        // Not actually in the underflow case
+        return SpW(offset);
+    }
+
+  }
+
+}
+
 // Compute the pointer tag for the constructor and tag the pointer;
 // see Note [Data constructor dynamic tags] in GHC.StgToCmm.Closure.
 //
@@ -401,7 +500,7 @@ interpretBCO (Capability* cap)
     //          +---------------+
     //
     else if (SpW(0) == (W_)&stg_apply_interp_info) {
-        obj = UNTAG_CLOSURE((StgClosure *)SpW(1));
+        obj = UNTAG_CLOSURE((StgClosure *)ReadSpW(1));
         Sp_addW(2);
         goto run_BCO_fun;
     }
@@ -413,7 +512,7 @@ interpretBCO (Capability* cap)
     //       do_return_pointer, below.
     //
     else if (SpW(0) == (W_)&stg_ret_p_info) {
-      tagged_obj = (StgClosure *)SpW(1);
+      tagged_obj = (StgClosure *)ReadSpW(1);
       Sp_addW(2);
       goto do_return_pointer;
     }
@@ -429,7 +528,7 @@ interpretBCO (Capability* cap)
 
     // Evaluate the object on top of the stack.
 eval:
-    tagged_obj = (StgClosure*)SpW(0); Sp_addW(1);
+    tagged_obj = (StgClosure*)ReadSpW(0); Sp_addW(1);
 
 eval_obj:
     obj = UNTAG_CLOSURE(tagged_obj);
@@ -630,7 +729,7 @@ do_return_pointer:
             info == (StgInfoTable *)&stg_restore_cccs_v32_info ||
             info == (StgInfoTable *)&stg_restore_cccs_v64_info ||
             info == (StgInfoTable *)&stg_restore_cccs_eval_info) {
-            cap->r.rCCCS = (CostCentreStack*)SpW(1);
+            cap->r.rCCCS = (CostCentreStack*)ReadSpW(1);
             Sp_addW(2);
             goto do_return_pointer;
         }
@@ -694,7 +793,7 @@ do_return_pointer:
         INTERP_TICK(it_retto_BCO);
         Sp_subW(1);
         SpW(0) = (W_)tagged_obj;
-        obj = (StgClosure*)SpW(2);
+        obj = (StgClosure*)ReadSpW(2);
         ASSERT(get_itbl(obj)->type == BCO);
         goto run_BCO_return_pointer;
 
@@ -741,12 +840,12 @@ do_return_nonpointer:
     {
         int offset;
 
-        ASSERT(    SpW(0) == (W_)&stg_ret_v_info
-                || SpW(0) == (W_)&stg_ret_n_info
-                || SpW(0) == (W_)&stg_ret_f_info
-                || SpW(0) == (W_)&stg_ret_d_info
-                || SpW(0) == (W_)&stg_ret_l_info
-                || SpW(0) == (W_)&stg_ret_t_info
+        ASSERT(    ReadSpW(0) == (W_)&stg_ret_v_info
+                || ReadSpW(0) == (W_)&stg_ret_n_info
+                || ReadSpW(0) == (W_)&stg_ret_f_info
+                || ReadSpW(0) == (W_)&stg_ret_d_info
+                || ReadSpW(0) == (W_)&stg_ret_l_info
+                || ReadSpW(0) == (W_)&stg_ret_t_info
             );
 
         IF_DEBUG(interpreter,
@@ -773,7 +872,7 @@ do_return_nonpointer:
             // so the returned value is at the top of the stack, and start
             // executing the BCO.
             INTERP_TICK(it_retto_BCO);
-            obj = (StgClosure*)SpW(offset+1);
+            obj = (StgClosure*)ReadSpW(offset+1);
             ASSERT(get_itbl(obj)->type == BCO);
             goto run_BCO_return_nonpointer;
 
@@ -835,7 +934,7 @@ do_apply:
                 // Shuffle the args for this function down, and put
                 // the appropriate info table in the gap.
                 for (i = 0; i < arity; i++) {
-                    SpW((int)i-1) = SpW(i);
+                    SpW((int)i-1) = ReadSpW(i);
                     // ^^^^^ careful, i-1 might be negative, but i is unsigned
                 }
                 SpW(arity-1) = app_ptrs_itbl[n-arity-1];
@@ -874,7 +973,7 @@ do_apply:
                     new_pap->payload[i] = pap->payload[i];
                 }
                 for (i = 0; i < m; i++) {
-                    new_pap->payload[pap->n_args + i] = (StgClosure *)SpW(i);
+                    new_pap->payload[pap->n_args + i] = (StgClosure *)ReadSpW(i);
                 }
                 // No write barrier is needed here as this is a new allocation
                 SET_HDR(new_pap,&stg_PAP_info,cap->r.rCCCS);
@@ -898,7 +997,7 @@ do_apply:
                 // Shuffle the args for this function down, and put
                 // the appropriate info table in the gap.
                 for (i = 0; i < arity; i++) {
-                    SpW((int)i-1) = SpW(i);
+                    SpW((int)i-1) = ReadSpW(i);
                     // ^^^^^ careful, i-1 might be negative, but i is unsigned
                 }
                 SpW(arity-1) = app_ptrs_itbl[n-arity-1];
@@ -917,7 +1016,7 @@ do_apply:
                 pap->fun = obj;
                 pap->n_args = m;
                 for (i = 0; i < m; i++) {
-                    pap->payload[i] = (StgClosure *)SpW(i);
+                    pap->payload[i] = (StgClosure *)ReadSpW(i);
                 }
                 // No write barrier is needed here as this is a new allocation
                 SET_HDR(pap, &stg_PAP_info,cap->r.rCCCS);
@@ -1034,7 +1133,7 @@ run_BCO_return_nonpointer:
      */
 
     if(SpW(0) == (W_)&stg_ret_t_info) {
-        cap->r.rCCCS = (CostCentreStack*)SpW(stack_frame_sizeW((StgClosure *)Sp) + 4);
+        cap->r.rCCCS = (CostCentreStack*)ReadSpW(stack_frame_sizeW((StgClosure *)Sp) + 4);
     }
 #endif
 
@@ -1101,7 +1200,7 @@ run_BCO:
                  if (0) { int i;
                  debugBelch("\n");
                  for (i = 8; i >= 0; i--) {
-                     debugBelch("%d  %p\n", i, (void *) SpW(i));
+                     debugBelch("%d  %p\n", i, (void *) ReadSpW(i));
                  }
                  debugBelch("\n");
                  }
@@ -1203,7 +1302,7 @@ run_BCO:
                   // copy the contents of the top stack frame into the AP_STACK
                   for (i = 2; i < size_words; i++)
                   {
-                     new_aps->payload[i] = (StgClosure *)SpW(i-2);
+                     new_aps->payload[i] = (StgClosure *)ReadSpW(i-2);
                   }
 
                   // No write barrier is needed here as this is a new allocation
@@ -1276,7 +1375,7 @@ run_BCO:
 
         case bci_PUSH_L: {
             W_ o1 = BCO_GET_LARGE_ARG;
-            SpW(-1) = SpW(o1);
+            SpW(-1) = ReadSpW(o1);
             Sp_subW(1);
             goto nextInsn;
         }
@@ -1284,8 +1383,8 @@ run_BCO:
         case bci_PUSH_LL: {
             W_ o1 = BCO_GET_LARGE_ARG;
             W_ o2 = BCO_GET_LARGE_ARG;
-            SpW(-1) = SpW(o1);
-            SpW(-2) = SpW(o2);
+            SpW(-1) = ReadSpW(o1);
+            SpW(-2) = ReadSpW(o2);
             Sp_subW(2);
             goto nextInsn;
         }
@@ -1294,9 +1393,9 @@ run_BCO:
             W_ o1 = BCO_GET_LARGE_ARG;
             W_ o2 = BCO_GET_LARGE_ARG;
             W_ o3 = BCO_GET_LARGE_ARG;
-            SpW(-1) = SpW(o1);
-            SpW(-2) = SpW(o2);
-            SpW(-3) = SpW(o3);
+            SpW(-1) = ReadSpW(o1);
+            SpW(-2) = ReadSpW(o2);
+            SpW(-3) = ReadSpW(o3);
             Sp_subW(3);
             goto nextInsn;
         }
@@ -1650,7 +1749,7 @@ run_BCO:
              * a_1 ... a_n, k
              */
             while(n-- > 0) {
-                SpW(n+by) = SpW(n);
+                SpW(n+by) = ReadSpW(n);
             }
             Sp_addW(by);
             INTERP_TICK(it_slides);
@@ -1702,9 +1801,9 @@ run_BCO:
             StgHalfWord i;
             W_ stkoff = BCO_GET_LARGE_ARG;
             StgHalfWord n_payload = BCO_GET_LARGE_ARG;
-            StgAP* ap = (StgAP*)SpW(stkoff);
+            StgAP* ap = (StgAP*)ReadSpW(stkoff);
             ASSERT(ap->n_args == n_payload);
-            ap->fun = (StgClosure*)SpW(0);
+            ap->fun = (StgClosure*)ReadSpW(0);
 
             // The function should be a BCO, and its bitmap should
             // cover the payload of the AP correctly.
@@ -1712,7 +1811,7 @@ run_BCO:
                    && BCO_BITMAP_SIZE(ap->fun) == ap->n_args);
 
             for (i = 0; i < n_payload; i++) {
-                ap->payload[i] = (StgClosure*)SpW(i+1);
+                ap->payload[i] = (StgClosure*)ReadSpW(i+1);
             }
             Sp_addW(n_payload+1);
             IF_DEBUG(interpreter,
@@ -1726,9 +1825,9 @@ run_BCO:
             StgHalfWord i;
             W_ stkoff = BCO_GET_LARGE_ARG;
             StgHalfWord n_payload = BCO_GET_LARGE_ARG;
-            StgPAP* pap = (StgPAP*)SpW(stkoff);
+            StgPAP* pap = (StgPAP*)ReadSpW(stkoff);
             ASSERT(pap->n_args == n_payload);
-            pap->fun = (StgClosure*)SpW(0);
+            pap->fun = (StgClosure*)ReadSpW(0);
 
             // The function should be a BCO
             if (get_itbl(pap->fun)->type != BCO) {
@@ -1739,7 +1838,7 @@ run_BCO:
             }
 
             for (i = 0; i < n_payload; i++) {
-                pap->payload[i] = (StgClosure*)SpW(i+1);
+                pap->payload[i] = (StgClosure*)ReadSpW(i+1);
             }
             Sp_addW(n_payload+1);
             IF_DEBUG(interpreter,
@@ -1753,7 +1852,7 @@ run_BCO:
             /* Unpack N ptr words from t.o.s constructor */
             W_ i;
             W_ n_words = BCO_GET_LARGE_ARG;
-            StgClosure* con = UNTAG_CLOSURE((StgClosure*)SpW(0));
+            StgClosure* con = UNTAG_CLOSURE((StgClosure*)ReadSpW(0));
             Sp_subW(n_words);
             for (i = 0; i < n_words; i++) {
                 SpW(i) = (W_)con->payload[i];
@@ -1777,7 +1876,7 @@ run_BCO:
             ASSERT(n_ptrs + n_nptrs > 0);
             //ASSERT(n_words > 0); // We shouldn't ever need to allocate nullary constructors
             for (W_ i = 0; i < n_words; i++) {
-                con->payload[i] = (StgClosure*)SpW(i);
+                con->payload[i] = (StgClosure*)ReadSpW(i);
             }
             Sp_addW(n_words);
             Sp_subW(1);
@@ -1799,7 +1898,7 @@ run_BCO:
         case bci_TESTLT_P: {
             unsigned int discr  = BCO_NEXT;
             int failto = BCO_GET_LARGE_ARG;
-            StgClosure* con = UNTAG_CLOSURE((StgClosure*)SpW(0));
+            StgClosure* con = UNTAG_CLOSURE((StgClosure*)ReadSpW(0));
             if (GET_TAG(con) >= discr) {
                 bciPtr = failto;
             }
@@ -1809,7 +1908,7 @@ run_BCO:
         case bci_TESTEQ_P: {
             unsigned int discr  = BCO_NEXT;
             int failto = BCO_GET_LARGE_ARG;
-            StgClosure* con = UNTAG_CLOSURE((StgClosure*)SpW(0));
+            StgClosure* con = UNTAG_CLOSURE((StgClosure*)ReadSpW(0));
             if (GET_TAG(con) != discr) {
                 bciPtr = failto;
             }
@@ -1819,7 +1918,7 @@ run_BCO:
         case bci_TESTLT_I: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            I_ stackInt = (I_)SpW(0);
+            I_ stackInt = (I_)ReadSpW(0);
             if (stackInt >= (I_)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
@@ -1864,7 +1963,7 @@ run_BCO:
         case bci_TESTEQ_I: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            I_ stackInt = (I_)SpW(0);
+            I_ stackInt = (I_)ReadSpW(0);
             if (stackInt != (I_)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -1914,7 +2013,7 @@ run_BCO:
         case bci_TESTLT_W: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            W_ stackWord = (W_)SpW(0);
+            W_ stackWord = (W_)ReadSpW(0);
             if (stackWord >= (W_)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
@@ -1959,7 +2058,7 @@ run_BCO:
         case bci_TESTEQ_W: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            W_ stackWord = (W_)SpW(0);
+            W_ stackWord = (W_)ReadSpW(0);
             if (stackWord != (W_)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -2068,7 +2167,7 @@ run_BCO:
             goto eval;
 
         case bci_RETURN_P:
-            tagged_obj = (StgClosure *)SpW(0);
+            tagged_obj = (StgClosure *)ReadSpW(0);
             Sp_addW(1);
             goto do_return_pointer;
 
@@ -2195,7 +2294,7 @@ run_BCO:
             }
 
             // this is the function we're going to call
-            fn = (void(*)(void))SpW(ret_size);
+            fn = (void(*)(void))ReadSpW(ret_size);
 
             // Restore the Haskell thread's current value of errno
             errno = cap->r.rCurrentTSO->saved_errno;
@@ -2246,7 +2345,7 @@ run_BCO:
             // Re-load the pointer to the BCO from the stg_ret_p frame,
             // it might have moved during the call.  Also reload the
             // pointers to the components of the BCO.
-            obj        = (StgClosure*)SpW(1);
+            obj        = (StgClosure*)ReadSpW(1);
               // N.B. this is a BCO and therefore is by definition not tagged
             bco        = (StgBCO*)obj;
             instrs     = (StgWord16*)(bco->instrs->payload);
