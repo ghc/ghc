@@ -470,6 +470,8 @@ test('InternalCounters',
     # The ways which build against the debug RTS are built with PROF_SPIN and
     # therefore differ in output
   , omit_ways(['nonmoving_thr_sanity', 'threaded2_sanity', 'sanity'])
+    # Likewise when ghc is linked with debug RTS using +debug_ghc
+  , when(debug_rts(), skip)
   ], makefile_test, ['InternalCounters'])
 test('alloccounter1', js_broken(22261), compile_and_run,
   [
