@@ -56,6 +56,11 @@ ExplicitForAllFams4b.hs:24:17: error: [GHC-30337]
     • In the associated type family instance declaration for ‘CT’
       In the instance declaration for ‘C Int’
 
+ExplicitForAllFams4b.hs:24:20: error: [GHC-34447]
+    Conflicting family instance declarations:
+      CT [a] (a, a) = Float -- Defined at ExplicitForAllFams4b.hs:24:20
+      CT _ _ = Bool -- Defined at ExplicitForAllFams4b.hs:32:18
+
 ExplicitForAllFams4b.hs:25:3: error: [GHC-95424]
     • Type indexes must match class instance head
       Expected: CD Int _
@@ -69,10 +74,34 @@ ExplicitForAllFams4b.hs:25:17: error: [GHC-30337]
     • In the associated data family instance declaration for ‘CD’
       In the instance declaration for ‘C Int’
 
+ExplicitForAllFams4b.hs:25:20: error: [GHC-34447]
+    Conflicting family instance declarations:
+      CD [a] (a, a) -- Defined at ExplicitForAllFams4b.hs:25:20
+      CD _ _ -- Defined at ExplicitForAllFams4b.hs:33:18
+
+ExplicitForAllFams4b.hs:28:3: error: [GHC-95424]
+    • Type indexes must match class instance head
+      Expected: CT Bool _
+        Actual: CT _ _
+    • In the associated type family instance declaration for ‘CT’
+      In the instance declaration for ‘C Bool’
+
 ExplicitForAllFams4b.hs:28:15: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but does not appear in any of the LHS patterns of the family instance.
     • In the associated type family instance declaration for ‘CT’
+      In the instance declaration for ‘C Bool’
+
+ExplicitForAllFams4b.hs:28:20: error: [GHC-34447]
+    Conflicting family instance declarations:
+      CT _ _ = Maybe b -- Defined at ExplicitForAllFams4b.hs:28:20
+      CT _ _ = Bool -- Defined at ExplicitForAllFams4b.hs:32:18
+
+ExplicitForAllFams4b.hs:29:3: error: [GHC-95424]
+    • Type indexes must match class instance head
+      Expected: CD Bool _
+        Actual: CD _ _
+    • In the associated data family instance declaration for ‘CD’
       In the instance declaration for ‘C Bool’
 
 ExplicitForAllFams4b.hs:29:15: error: [GHC-30337]
@@ -81,10 +110,29 @@ ExplicitForAllFams4b.hs:29:15: error: [GHC-30337]
     • In the associated data family instance declaration for ‘CD’
       In the instance declaration for ‘C Bool’
 
+ExplicitForAllFams4b.hs:29:20: error: [GHC-34447]
+    Conflicting family instance declarations:
+      CD _ _ -- Defined at ExplicitForAllFams4b.hs:29:20
+      CD _ _ -- Defined at ExplicitForAllFams4b.hs:33:18
+
+ExplicitForAllFams4b.hs:32:3: error: [GHC-95424]
+    • Type indexes must match class instance head
+      Expected: CT Double _
+        Actual: CT _ _
+    • In the associated type family instance declaration for ‘CT’
+      In the instance declaration for ‘C Double’
+
 ExplicitForAllFams4b.hs:32:15: error: [GHC-30337]
     • The type variable ‘b’ is bound by a forall,
       but it isn't used in the family instance.
     • In the associated type family instance declaration for ‘CT’
+      In the instance declaration for ‘C Double’
+
+ExplicitForAllFams4b.hs:33:3: error: [GHC-95424]
+    • Type indexes must match class instance head
+      Expected: CD Double _
+        Actual: CD _ _
+    • In the associated data family instance declaration for ‘CD’
       In the instance declaration for ‘C Double’
 
 ExplicitForAllFams4b.hs:33:15: error: [GHC-30337]
