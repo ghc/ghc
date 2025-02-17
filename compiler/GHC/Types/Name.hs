@@ -60,7 +60,7 @@ module GHC.Types.Name (
 
         pprName,
         nameSrcLoc, nameSrcSpan, pprNameDefnLoc, pprDefinedAt,
-        pprFullName, pprTickyName,
+        pprFullName, pprFullNameWithUnique, pprTickyName,
 
         -- ** Predicates on 'Name's
         isSystemName, isInternalName, isExternalName,
@@ -731,6 +731,18 @@ pprFullName this_mod Name{n_sort = sort, n_occ = occ} =
       in ftext (unitIdFS (moduleUnitId mod))
          <> colon    <> ftext (moduleNameFS $ moduleName mod)
          <> dot      <> ftext (occNameFS occ)
+
+-- | Print fully qualified name (with unit-id and module, with the unique)
+pprFullNameWithUnique :: Module -> Name -> SDoc
+pprFullNameWithUnique this_mod Name{n_sort = sort, n_uniq = u, n_occ = occ} =
+  let mod = case sort of
+        WiredIn  m _ _ -> m
+        External m     -> m
+        System         -> this_mod
+        Internal       -> this_mod
+      in ftext (unitIdFS (moduleUnitId mod))
+         <> colon    <> ftext (moduleNameFS $ moduleName mod)
+         <> dot      <> ftext (occNameFS occ) <> text "_" <> pprUniqueAlways u
 
 -- | Print a ticky ticky styled name
 --
