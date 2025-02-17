@@ -1,2 +1,5 @@
 :l T7388
 withCString "I am a working CApi FFI call\n" $ \str -> printfb str 0
+-- don't forget to flush, otherwise when ghc is statically linked, the C stdout
+-- buffer is never flushed.
+fflushb nullPtr
