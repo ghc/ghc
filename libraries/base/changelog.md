@@ -17,6 +17,9 @@
     * `Control.Concurrent.threadWaitWriteSTM`
     * `System.Timeout.timeout`
     * `GHC.Conc.Signal.runHandlers`
+  * The constructor of `Control.Exception.Backtrace.Backtraces` is now
+    exported, as specified in [CLC #199](https://github.com/haskell/core-libraries-committee/issues/199)
+    ([GHC #25753](https://gitlab.haskell.org/ghc/ghc/-/issues/25753)).
 
 ## 4.21.0.0 *TBA*
   * Change `SrcLoc` to be a strict and unboxed (finishing [CLC proposal #55](https://github.com/haskell/core-libraries-committee/issues/55))

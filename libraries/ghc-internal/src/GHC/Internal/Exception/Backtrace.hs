@@ -9,7 +9,7 @@ module GHC.Internal.Exception.Backtrace
     , getBacktraceMechanismState
     , setBacktraceMechanismState
       -- * Collecting backtraces
-    , Backtraces
+    , Backtraces(..)
     , displayBacktraces
     , collectBacktraces
     ) where
