@@ -23,7 +23,7 @@ import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
 import GHC.Tc.Solver.Types
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.Unify( uType )
+import GHC.Tc.Utils.Unify( uType, mightEqualLater )
 
 import GHC.Hs.Type( HsIPName(..) )
 
@@ -978,6 +978,25 @@ matchClassInst dflags inerts clas tys loc
                     ; return global_res } }
   where
     pred = mkClassPred clas tys
+
+-- | Returns True iff there are no Given constraints that might,
+-- potentially, match the given class constraint. This is used when checking to see if a
+-- Given might overlap with an instance. See Note [Instance and Given overlap]
+-- in GHC.Tc.Solver.Dict
+noMatchableGivenDicts :: InertSet -> CtLoc -> Class -> [TcType] -> Bool
+noMatchableGivenDicts inerts@(IS { inert_cans = inert_cans }) loc_w clas tys
+  = not $ anyBag matchable_given $
+    findDictsByClass (inert_dicts inert_cans) clas
+  where
+    pred_w = mkClassPred clas tys
+
+    matchable_given :: DictCt -> Bool
+    matchable_given (DictCt { di_ev = ev })
+      | CtGiven { ctev_loc = loc_g, ctev_pred = pred_g } <- ev
+      = isJust $ mightEqualLater inerts pred_g loc_g pred_w loc_w
+
+      | otherwise
+      = False
 
 {- Note [Implementation of deprecated instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
