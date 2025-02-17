@@ -859,10 +859,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
       = map (\(L _ m) -> (ldi_nablas, initNablasGRHSs ldi_nablas (m_grhss m))) ms
 
     initNablasGRHSs :: Nablas -> GRHSs GhcTc b -> NonEmpty Nablas
-    initNablasGRHSs ldi_nablas m
-      = expectJust "GRHSs non-empty"
-      $ NE.nonEmpty
-      $ replicate (length (grhssGRHSs m)) ldi_nablas
+    initNablasGRHSs ldi_nablas m = ldi_nablas <$ grhssGRHSs m
 
 {- Note [Long-distance information in matchWrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
