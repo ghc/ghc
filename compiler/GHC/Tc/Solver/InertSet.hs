@@ -17,9 +17,7 @@ module GHC.Tc.Solver.InertSet (
     InertCans(..),
     emptyInert,
 
-    noMatchableGivenDicts,
     noGivenNewtypeReprEqs, updGivenEqs,
-    mightEqualLater,
     prohibitedSuperClassSolve,
 
     -- * Inert equalities
@@ -66,22 +64,16 @@ import GHC.Types.Basic( SwapFlag(..) )
 
 import GHC.Core.Reduction
 import GHC.Core.Predicate
-import GHC.Core.TyCo.FVs
 import qualified GHC.Core.TyCo.Rep as Rep
-import GHC.Core.Class( Class )
 import GHC.Core.TyCon
 import GHC.Core.Class( classTyCon )
-import GHC.Core.Unify
 import GHC.Builtin.Names( eqPrimTyConKey, heqTyConKey, eqTyConKey )
 import GHC.Utils.Misc       ( partitionWith )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.Pair
-import GHC.Data.Maybe
 import GHC.Data.Bag
 
 import Data.List.NonEmpty ( NonEmpty(..), (<|) )
-import qualified Data.List.NonEmpty as NE
 import Data.Function ( on )
 
 import Control.Monad      ( forM_ )
@@ -1848,98 +1840,6 @@ noGivenNewtypeReprEqs tc inerts
              -> True
           _  -> False
 
--- | Returns True iff there are no Given constraints that might,
--- potentially, match the given class constraint. This is used when checking to see if a
--- Given might overlap with an instance. See Note [Instance and Given overlap]
--- in GHC.Tc.Solver.Dict
-noMatchableGivenDicts :: InertSet -> CtLoc -> Class -> [TcType] -> Bool
-noMatchableGivenDicts inerts@(IS { inert_cans = inert_cans }) loc_w clas tys
-  = not $ anyBag matchable_given $
-    findDictsByClass (inert_dicts inert_cans) clas
-  where
-    pred_w = mkClassPred clas tys
-
-    matchable_given :: DictCt -> Bool
-    matchable_given (DictCt { di_ev = ev })
-      | CtGiven { ctev_loc = loc_g, ctev_pred = pred_g } <- ev
-      = isJust $ mightEqualLater inerts pred_g loc_g pred_w loc_w
-
-      | otherwise
-      = False
-
-mightEqualLater :: InertSet -> TcPredType -> CtLoc -> TcPredType -> CtLoc -> Maybe Subst
--- See Note [What might equal later?]
--- Used to implement logic in Note [Instance and Given overlap] in GHC.Tc.Solver.Dict
-mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
-  | prohibitedSuperClassSolve given_loc wanted_loc
-  = Nothing
-
-  | otherwise
-  = case tcUnifyTysFG bind_fun [flattened_given] [flattened_wanted] of
-      Unifiable subst
-        -> Just subst
-      MaybeApart reason subst
-        | MARInfinite <- reason -- see Example 7 in the Note.
-        -> Nothing
-        | otherwise
-        -> Just subst
-      SurelyApart -> Nothing
-
-  where
-    in_scope  = mkInScopeSet $ tyCoVarsOfTypes [given_pred, wanted_pred]
-
-    -- NB: flatten both at the same time, so that we can share mappings
-    -- from type family applications to variables, and also to guarantee
-    -- that the fresh variables are really fresh between the given and
-    -- the wanted. Flattening both at the same time is needed to get
-    -- Example 10 from the Note.
-    (Pair flattened_given flattened_wanted, var_mapping)
-      = flattenTysX in_scope (Pair given_pred wanted_pred)
-
-    bind_fun :: BindFun
-    bind_fun tv rhs_ty
-      | isMetaTyVar tv
-      , can_unify tv (metaTyVarInfo tv) rhs_ty
-         -- this checks for CycleBreakerTvs and TyVarTvs; forgetting
-         -- the latter was #19106.
-      = BindMe
-
-         -- See Examples 4, 5, and 6 from the Note
-      | Just (_fam_tc, fam_args) <- lookupVarEnv var_mapping tv
-      , anyFreeVarsOfTypes mentions_meta_ty_var fam_args
-      = BindMe
-
-      | otherwise
-      = Apart
-
-    -- True for TauTv and TyVarTv (and RuntimeUnkTv) meta-tyvars
-    -- (as they can be unified)
-    -- and also for CycleBreakerTvs that mentions meta-tyvars
-    mentions_meta_ty_var :: TyVar -> Bool
-    mentions_meta_ty_var tv
-      | isMetaTyVar tv
-      = case metaTyVarInfo tv of
-          -- See Examples 8 and 9 in the Note
-          CycleBreakerTv
-            -> anyFreeVarsOfType mentions_meta_ty_var
-                 (lookupCycleBreakerVar tv inert_set)
-          _ -> True
-      | otherwise
-      = False
-
-    -- Like checkTopShape, but allows cbv variables to unify
-    can_unify :: TcTyVar -> MetaInfo -> Type -> Bool
-    can_unify _lhs_tv TyVarTv rhs_ty  -- see Example 3 from the Note
-      | Just rhs_tv <- getTyVar_maybe rhs_ty
-      = case tcTyVarDetails rhs_tv of
-          MetaTv { mtv_info = TyVarTv } -> True
-          MetaTv {}                     -> False  -- Could unify with anything
-          SkolemTv {}                   -> True
-          RuntimeUnk                    -> True
-      | otherwise  -- not a var on the RHS
-      = False
-    can_unify lhs_tv _other _rhs_ty = mentions_meta_ty_var lhs_tv
-
 -- | Is it (potentially) loopy to use the first @ct1@ to solve @ct2@?
 --
 -- Necessary (but not sufficient) conditions for this function to return @True@:
@@ -2095,20 +1995,6 @@ Test case: typecheck/should_compile/T21208.
     Cycle breakers
 *                                                                      *
 ********************************************************************* -}
-
--- | Return the type family application a CycleBreakerTv maps to.
-lookupCycleBreakerVar :: TcTyVar    -- ^ cbv, must be a CycleBreakerTv
-                      -> InertSet
-                      -> TcType     -- ^ type family application the cbv maps to
-lookupCycleBreakerVar cbv (IS { inert_cycle_breakers = cbvs_stack })
--- This function looks at every environment in the stack. This is necessary
--- to avoid #20231. This function (and its one usage site) is the only reason
--- that we store a stack instead of just the top environment.
-  | Just tyfam_app <- assert (isCycleBreakerTyVar cbv) $
-                      firstJusts (NE.map (lookupBag cbv) cbvs_stack)
-  = tyfam_app
-  | otherwise
-  = pprPanic "lookupCycleBreakerVar found an unbound cycle breaker" (ppr cbv $$ ppr cbvs_stack)
 
 -- | Push a fresh environment onto the cycle-breaker var stack. Useful
 -- when entering a nested implication.

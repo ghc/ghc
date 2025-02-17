@@ -2118,10 +2118,7 @@ checkTouchableTyVarEq ev lhs_tv rhs
                                 ; return (pure redn) } }
 
   where
-    (lhs_tv_info, lhs_tv_lvl) = case tcTyVarDetails lhs_tv of
-       MetaTv { mtv_info = info, mtv_tclvl = lvl } -> (info,lvl)
-       _ -> pprPanic "checkTouchableTyVarEq" (ppr lhs_tv)
-            -- lhs_tv should be a meta-tyvar
+    lhs_tv_info = metaTyVarInfo lhs_tv -- lhs_tv should be a meta-tyvar
 
     is_concrete_lhs_tv = isJust $ concreteInfo_maybe lhs_tv_info
 
@@ -2130,49 +2127,12 @@ checkTouchableTyVarEq ev lhs_tv rhs
        -- We don't want to flatten that (F tys)!
        | Just (TyFamLHS tc tys) <- canTyFamEqLHS_maybe rhs
        = if is_concrete_lhs_tv
-         then failCheckWith (cteProblem cteConcrete)
-         else recurseIntoTyConApp arg_flags tc tys
+         then return $ PuFail (cteProblem cteConcrete)
+         else recurseIntoFamTyConApp flags tc tys
        | otherwise
        = checkTyEqRhs flags rhs
 
-    flags = TEF { tef_task    = unifyingLHSMetaTyVar_TEFTask lhs_tv (LC_Promote False)
-                , tef_fam_app = mkTEFA_Break ev NomEq break_wanted
-                }
-
-    arg_flags = famAppArgFlags flags
-
-    break_wanted :: FamAppBreaker Ct
-    break_wanted fam_app
-      -- Occurs check or skolem escape; so flatten
-      = do { let fam_app_kind = typeKind fam_app
-           ; reason <- checkPromoteFreeVars cteInsolubleOccurs
-                         (tyVarName lhs_tv) lhs_tv_lvl
-                         (tyCoVarsOfType fam_app_kind)
-           ; if not (cterHasNoProblem reason)  -- Failed to promote free vars
-             then failCheckWith reason
-             else
-        do { new_tv_ty <-
-              case lhs_tv_info of
-                ConcreteTv conc_info ->
-                  -- Make a concrete tyvar if lhs_tv is concrete
-                  -- e.g.  alpha[2,conc] ~ Maybe (F beta[4])
-                  --       We want to flatten to
-                  --       alpha[2,conc] ~ Maybe gamma[2,conc]
-                  --       gamma[2,conc] ~ F beta[4]
-                  TcM.newConcreteTyVarTyAtLevel conc_info lhs_tv_lvl fam_app_kind
-                _ -> TcM.newMetaTyVarTyAtLevel lhs_tv_lvl fam_app_kind
-
-           ; let pty = mkNomEqPred fam_app new_tv_ty
-           ; hole <- TcM.newVanillaCoercionHole pty
-           ; let new_ev = CtWanted { ctev_pred      = pty
-                                   , ctev_dest      = HoleDest hole
-                                   , ctev_loc       = cb_loc
-                                   , ctev_rewriters = ctEvRewriters ev }
-           ; return (PuOK (singleCt (mkNonCanonical new_ev))
-                          (mkReduction (HoleCo hole) new_tv_ty)) } }
-
-    -- See Detail (7) of the Note
-    cb_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
+    flags = unifyingLHSMetaTyVar_TEFTask ev lhs_tv
 
 ------------------------
 checkTypeEq :: CtEvidence -> EqRel -> CanEqLHS -> TcType
@@ -2203,35 +2163,22 @@ checkTypeEq ev eq_rel lhs rhs
     check_given_rhs rhs
        -- See Note [Special case for top-level of Given equality]
        | Just (TyFamLHS tc tys) <- canTyFamEqLHS_maybe rhs
-       = recurseIntoTyConApp arg_flags tc tys
+       = recurseIntoFamTyConApp given_flags tc tys
        | otherwise
        = checkTyEqRhs given_flags rhs
 
-    arg_flags = famAppArgFlags given_flags
+    wanted_flags = notUnifying_TEFTask occ_prob lhs
+                   -- checkTypeEq deals only with the non-unifying case
 
-    given_flags :: TyEqFlags (TcTyVar,TcType)
-    given_flags = TEF { tef_task    = notUnifying_TEFTask occ_prob lhs
-                      , tef_fam_app = mkTEFA_Break ev eq_rel break_given
-                      }
+    given_flags :: TyEqFlags TcM (TcTyVar, TcType)
+    given_flags = wanted_flags { tef_fam_app = mkTEFA_Break ev eq_rel BreakGiven }
         -- TEFA_Break used for: [G] a ~ Maybe (F a)
         --                   or [W] F a ~ Maybe (F a)
-
-    wanted_flags = TEF { tef_task    = notUnifying_TEFTask occ_prob lhs
-                       , tef_fam_app = TEFA_Recurse
-                       }
-        -- TEFA_Recurse: see Note [Don't cycle-break Wanteds when not unifying]
 
     -- occ_prob: see Note [Occurs check and representational equality]
     occ_prob = case eq_rel of
                  NomEq  -> cteInsolubleOccurs
                  ReprEq -> cteSolubleOccurs
-
-    break_given :: TcType -> TcM (PuResult (TcTyVar,TcType) Reduction)
-    break_given fam_app
-      = do { new_tv <- TcM.newCycleBreakerTyVar (typeKind fam_app)
-           ; return (PuOK (unitBag (new_tv, fam_app))
-                          (mkReflRedn Nominal (mkTyVarTy new_tv))) }
-                    -- Why reflexive? See Detail (4) of the Note
 
     ---------------------------
     mk_new_given :: (TcTyVar, TcType) -> TcS Ct
@@ -2244,20 +2191,6 @@ checkTypeEq ev eq_rel lhs rhs
 
     -- See Detail (7) of the Note
     cb_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
-
-mkTEFA_Break :: CtEvidence -> EqRel -> FamAppBreaker a -> TyEqFamApp a
-mkTEFA_Break ev eq_rel breaker
-  | NomEq <- eq_rel
-  , not cycle_breaker_origin
-  = TEFA_Break breaker
-  | otherwise
-  = TEFA_Recurse
-  where
-    -- cycle_breaker_origin: see Detail (7) of Note [Type equality cycles]
-    -- in GHC.Tc.Solver.Equality
-    cycle_breaker_origin = case ctLocOrigin (ctEvLoc ev) of
-                              CycleBreakerOrigin {} -> True
-                              _                     -> False
 
 -------------------------
 -- | Fill in CycleBreakerTvs with the variables they stand for.
