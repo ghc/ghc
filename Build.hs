@@ -460,18 +460,14 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         [ "package rts"
         , def_string "ProjectVersion" (Text.unpack (gboVersionInt opts))
         , def_string "RtsWay"            "FIXME"
-        , def_string "HostPlatform"      "FIXME"
-        , def_string "HostArch"          "FIXME"
-        , def_string "HostOS"            "FIXME"
-        , def_string "HostVendor"        "FIXME"
+        , def_string "HostPlatform"      "x86_64-unknown-linux" -- FIXME
+        , def_string "HostArch"          "x86_64" -- FIXME: appropriate value required for the tests
+        , def_string "HostOS"            "linux" -- FIXME: appropriate value required for the tests
+        , def_string "HostVendor"        "unknown"
         , def_string "BuildPlatform"     "FIXME"
         , def_string "BuildArch"         "FIXME"
         , def_string "BuildOS"           "FIXME"
         , def_string "BuildVendor"       "FIXME"
-        , def_string "TargetPlatform"    "FIXME"
-        , def_string "TargetArch"        "FIXME"
-        , def_string "TargetOS"          "FIXME"
-        , def_string "TargetVendor"      "FIXME"
         , def_string "GhcUnregisterised" "FIXME"
         , def_string "TablesNextToCode"  "FIXME"
           -- Set the namespace for the rts fs functions
