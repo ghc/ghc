@@ -269,7 +269,7 @@ mkProtoBCO platform _add_bco_name nm instrs_ordlist origin arity bitmap_size bit
 #if MIN_VERSION_rts(1,0,3)
         maybe_add_bco_name instrs
           | Just cur_mod <- _add_bco_name =
-              let str = BS.pack $ showSDocOneLine defaultSDocContext (pprFullName cur_mod nm)
+              let str = BS.pack $ showSDocOneLine defaultSDocContext (pprFullNameWithUnique cur_mod nm)
               in BCO_NAME str : instrs
 #endif
         maybe_add_bco_name instrs = instrs
