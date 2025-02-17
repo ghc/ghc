@@ -185,21 +185,21 @@ int rts_stop_on_exception = 0;
 #define N_CODES 128
 
 /* Hacky stats, for tuning the interpreter ... */
-int it_unknown_entries[N_CLOSURE_TYPES];
-int it_total_unknown_entries;
-int it_total_entries;
+unsigned long it_unknown_entries[N_CLOSURE_TYPES];
+unsigned long it_total_unknown_entries;
 
-int it_retto_BCO;
-int it_retto_UPDATE;
-int it_retto_other;
+unsigned long it_total_entries;
+unsigned long it_retto_BCO;
+unsigned long it_retto_UPDATE;
+unsigned long it_retto_other;
 
-int it_slides;
-int it_insns;
-int it_BCO_entries;
+unsigned long it_slides;
+unsigned long it_insns;
+unsigned long it_BCO_entries;
 
-int it_ofreq[N_CODES];
-int it_oofreq[N_CODES][N_CODES];
-int it_lastopc;
+unsigned long it_ofreq[N_CODES];
+unsigned long it_oofreq[N_CODES][N_CODES];
+unsigned long it_lastopc;
 
 
 #define INTERP_TICK(n) (n)++
@@ -221,40 +221,46 @@ void interp_startup ( void )
 
 void interp_shutdown ( void )
 {
-   int i, j, k, o_max, i_max, j_max;
-   debugBelch("%d constrs entered -> (%d BCO, %d UPD, %d ??? )\n",
+   int i, j, k, i_max, j_max;
+   long unsigned o_max;
+   unsigned long copy_freq[N_CODES][N_CODES];
+   debugBelch("%lu constrs entered -> (%lu BCO, %lu UPD, %lu ??? )\n",
                    it_retto_BCO + it_retto_UPDATE + it_retto_other,
                    it_retto_BCO, it_retto_UPDATE, it_retto_other );
-   debugBelch("%d total entries, %d unknown entries \n",
+   debugBelch("%lu total entries, %lu unknown entries \n",
                    it_total_entries, it_total_unknown_entries);
    for (i = 0; i < N_CLOSURE_TYPES; i++) {
      if (it_unknown_entries[i] == 0) continue;
-     debugBelch("   type %2d: unknown entries (%4.1f%%) == %d\n",
+     debugBelch("   type %2d: unknown entries (%4.1f%%) == %lu\n",
              i, 100.0 * ((double)it_unknown_entries[i]) /
                         ((double)it_total_unknown_entries),
              it_unknown_entries[i]);
    }
-   debugBelch("%d insns, %d slides, %d BCO_entries\n",
+   debugBelch("%lu insns, %lu slides, %lu BCO_entries\n",
                    it_insns, it_slides, it_BCO_entries);
    for (i = 0; i < N_CODES; i++)
-      debugBelch("opcode %2d got %d\n", i, it_ofreq[i] );
+      debugBelch("opcode %2d got %lu\n", i, it_ofreq[i] );
+
+   for (i = 0; i < N_CODES; i++)
+     for (j = 0; j < N_CODES; j++)
+        copy_freq[i][j] = it_oofreq[i][j];
 
    for (k = 1; k < 20; k++) {
       o_max = 0;
       i_max = j_max = 0;
       for (i = 0; i < N_CODES; i++) {
          for (j = 0; j < N_CODES; j++) {
-            if (it_oofreq[i][j] > o_max) {
-               o_max = it_oofreq[i][j];
+            if (copy_freq[i][j] > o_max) {
+               o_max = copy_freq[i][j];
                i_max = i; j_max = j;
             }
          }
       }
 
-      debugBelch("%d:  count (%4.1f%%) %6d   is %d then %d\n",
+      debugBelch("%d:  count (%4.1f%%) %lu   is %d then %d\n",
                 k, ((double)o_max) * 100.0 / ((double)it_insns), o_max,
                    i_max, j_max );
-      it_oofreq[i_max][j_max] = 0;
+      copy_freq[i_max][j_max] = 0;
 
    }
 }
