@@ -1733,7 +1733,7 @@ async def do_test(name: TestName,
         dst_makefile = in_testdir('Makefile')
         if src_makefile.exists():
             makefile = src_makefile.read_text(encoding='UTF-8')
-            makefile = re.sub('TOP=.*', 'TOP=%s' % config.top, makefile, 1)
+            makefile = re.sub('TOP=.*', 'TOP=%s' % config.top, makefile, count=1)
             dst_makefile.write_text(makefile, encoding='UTF-8')
 
     if opts.pre_cmd:
