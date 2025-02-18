@@ -171,6 +171,7 @@ data BuildConfig
                 , validateNonmovingGc :: Bool
                 , textWithSIMDUTF :: Bool
                 , testsuiteUsePerf :: Bool
+                , testsuiteWays :: [String]
                 }
 
 -- Extra arguments to pass to ./configure due to the BuildConfig
@@ -240,6 +241,7 @@ vanilla = BuildConfig
   , validateNonmovingGc = False
   , textWithSIMDUTF = False
   , testsuiteUsePerf = False
+  , testsuiteWays = []
   }
 
 splitSectionsBroken :: BuildConfig -> BuildConfig
@@ -914,6 +916,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
                 ]
         in "RUNTEST_ARGS" =: (trim . unwords) runtestArgs
       , if testsuiteUsePerf buildConfig then "RUNTEST_ARGS" =: "--config perf_path=perf" else mempty
+      , "TEST_WAYS" =: unwords (testsuiteWays buildConfig)
       ]
 
     trim :: String -> String
