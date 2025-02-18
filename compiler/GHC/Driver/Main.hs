@@ -2807,12 +2807,14 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
 
     _ -> do
       {- Convert to BCOs -}
-      bcos <- byteCodeGen hsc_env
+      bcos' <- byteCodeGen hsc_env
                 this_mod
                 stg_binds
                 []
                 Nothing -- modbreaks
                 [] -- spt entries
+
+      bcos <- testBinByteCode hsc_env bcos'
 
       {- load it -}
       bco_time <- getCurrentTime
@@ -2820,7 +2822,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
         Linkable bco_time this_mod $ NE.singleton $ BCOs bcos
       {- Get the HValue for the root -}
       return (expectJust "hscCompileCoreExpr'"
-         $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed)
+         $ lookup (occName binding_id) [(occName fv, hv) | (fv, hv) <- fv_hvs], mods_needed, units_needed)
 
 
 
