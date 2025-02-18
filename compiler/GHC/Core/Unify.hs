@@ -35,27 +35,32 @@ import GHC.Builtin.Names( tYPETyConKey, cONSTRAINTTyConKey )
 import GHC.Core.Type     hiding ( getTvSubstEnv )
 import GHC.Core.Coercion hiding ( getCvSubstEnv )
 import GHC.Core.TyCon
+import GHC.Core.TyCon.Env
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Compare ( eqType, tcEqType )
 import GHC.Core.TyCo.FVs     ( tyCoVarsOfCoList, tyCoFVsOfTypes )
 import GHC.Core.TyCo.Subst   ( mkTvSubst, emptyIdSubstEnv )
 import GHC.Core.Map.Type
+import GHC.Core.Multiplicity
+
 import GHC.Utils.FV( FV, fvVarList )
 import GHC.Utils.Misc
-import GHC.Data.Pair
 import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Exts( oneShot )
 import GHC.Utils.Panic
+
+import GHC.Data.Pair
 import GHC.Data.FastString
+import GHC.Data.TrieMap
+import GHC.Data.Maybe( orElse )
 
 import Data.List ( mapAccumL )
 import Control.Monad
 import qualified Data.Semigroup as S
 import GHC.Builtin.Types.Prim (fUNTyCon)
-import GHC.Core.Multiplicity
 
 {-
 
@@ -604,8 +609,7 @@ tc_unify_tys bind_fn unif inj_check match_kis match_mults rn_env tv_env cv_env t
   = initUM tv_env cv_env $
     do { when match_kis $
          unify_tys env kis1 kis2
-       ; unify_tys env tys1 tys2
-       ; (,) <$> getTvSubstEnv <*> getCvSubstEnv }
+       ; unify_tys env tys1 tys2 }
   where
     env = UMEnv { um_bind_fun = bind_fn
                 , um_skols    = emptyVarSet
@@ -1170,34 +1174,18 @@ unify_ty env ty1 (TyVarTy tv2) kco
   | um_unif env  -- If unifying, can swap args
   = uVar (umSwapRn env) tv2 ty1 (mkSymCo kco)
 
-unify_ty env ty1 ty2 _kco
-
+unify_ty env ty1 ty2 kco
   -- Handle non-oversaturated type families first
   -- See Note [Unifying type applications]
   --
   -- (C1) If we have T x1 ... xn ~ T y1 ... yn, use injectivity information of T
   -- Note that both sides must not be oversaturated
   | Just (tc1, tys1) <- isSatTyFamApp mb_tc_app1
-  , Just (tc2, tys2) <- isSatTyFamApp mb_tc_app2
-  , tc1 == tc2
-  = do { let inj = case tyConInjectivityInfo tc1 of
-                          NotInjective -> repeat False
-                          Injective bs -> bs
+  = uSatFamApp env tc1 tys1 ty2 kco
 
-             (inj_tys1, noninj_tys1) = partitionByList inj tys1
-             (inj_tys2, noninj_tys2) = partitionByList inj tys2
-
-       ; unify_tys env inj_tys1 inj_tys2
-       ; unless (um_inj_tf env) $ -- See (end of) Note [Specification of unification]
-         don'tBeSoSure MARTypeFamily $ unify_tys env noninj_tys1 noninj_tys2 }
-
-  | Just _ <- isSatTyFamApp mb_tc_app1  -- (C2) A (not-over-saturated) type-family application
-  = maybeApart MARTypeFamily            -- behaves like a type variable; might match
-
-  | Just _ <- isSatTyFamApp mb_tc_app2  -- (C2) A (not-over-saturated) type-family application
-                                        -- behaves like a type variable; might unify
-                                        -- but doesn't match (as in the TyVarTy case)
-  = if um_unif env then maybeApart MARTypeFamily else surelyApart
+  | Just (tc2, tys2) <- isSatTyFamApp mb_tc_app2
+  , um_unif env
+  = uSatFamApp (umSwapRn env) tc2 tys2 ty1 (mkSymCo kco)
 
   -- Handle oversaturated type families.
   --
@@ -1345,6 +1333,7 @@ unify_tys env orig_xs orig_ys
       -- Possibly different saturations of a polykinded tycon
       -- See Note [Polykinded tycon applications]
 
+---------------------------------
 isSatTyFamApp :: Maybe (TyCon, [Type]) -> Maybe (TyCon, [Type])
 -- Return the argument if we have a saturated type family application
 -- If it is /over/ saturated then we return False.  E.g.
@@ -1355,6 +1344,41 @@ isSatTyFamApp tapp@(Just (tc, tys))
   && not (tys `lengthExceeds` tyConArity tc)  -- Not over-saturated
   = tapp
 isSatTyFamApp _ = Nothing
+
+uSatFamApp :: UMEnv
+           -> TyCon -> [Type]  -- A saturated type-family application
+           -> Type             -- Type to unify with
+           -> CoercionN        -- A coercion between their kinds
+                               -- See Note [Kind coercions in Unify]
+           -> UM ()
+uSatFamApp env tc1 tys1 ty2 kco
+  -- Start by attempting to decompose
+  | Just (tc2, tys2) <- isSatTyFamApp (splitTyConApp_maybe ty2)
+  , tc1 == tc2
+  = do { let inj = case tyConInjectivityInfo tc1 of
+                          NotInjective -> repeat False
+                          Injective bs -> bs
+
+             (inj_tys1, noninj_tys1) = partitionByList inj tys1
+             (inj_tys2, noninj_tys2) = partitionByList inj tys2
+
+       ; unify_tys env inj_tys1 inj_tys2
+       ; unless (um_inj_tf env) $ -- See (end of) Note [Specification of unification]
+         don'tBeSoSure MARTypeFamily $ unify_tys env noninj_tys1 noninj_tys2 }
+
+  -- When matching, meaning (F tys) is in the template, which probably never happens,
+  -- just return MaybeApart
+  | not (um_unif env)
+  = maybeApart MARTypeFamily
+
+  -- Otherwise try the um_fam_env
+  -- and extend it if necessary with (F tys1 ~ (ty2 |> kco))
+  | otherwise
+  = do { fam_map <- getFamSubstEnv
+       ; case lookupFamEnv fam_map tc1 tys1 of
+           Just ty1' -> unify_ty env ty1' ty2 kco
+           Nothing   -> do { extendFamEnv tc1 tys1 (ty2 `mkCastTy` kco)
+                           ; maybeApart MARTypeFamily } }
 
 ---------------------------------
 uVar :: UMEnv
@@ -1526,9 +1550,26 @@ data UMEnv
             -- for variables not in um_skols
           }
 
+type FamSubstEnv = TyConEnv (ListMap TypeMap Type)
+  -- Map a TyCon and a list of types to a type
+  -- Domain of FamSubstEnv is exactly-saturated type-family
+  -- applications (F t1...tn)
+
+lookupFamEnv :: FamSubstEnv -> TyCon -> [Type] -> Maybe Type
+lookupFamEnv env tc tys
+  = do { tys_map <- lookupTyConEnv env tc
+       ; lookupTM tys tys_map }
+
 data UMState = UMState
                    { um_tv_env   :: TvSubstEnv
-                   , um_cv_env   :: CvSubstEnv }
+                   , um_cv_env   :: CvSubstEnv
+                   , um_fam_env  :: FamSubstEnv }
+  -- um_fam_env is always empty when matching, because matching templates
+  --   never have type-family applications in them
+
+  -- NB: um_tv_env, um_cv_env, um_fam_env are all "global" substitutions;
+  -- that is, their domains do not mention any variables in um_skoles;
+  -- i.e. variables bound by foralls inside the types being unified
 
 newtype UM a
   = UM' { unUM :: UMState -> UnifyResultM (UMState, a) }
@@ -1560,15 +1601,18 @@ instance MonadFail UM where
 
 initUM :: TvSubstEnv  -- subst to extend
        -> CvSubstEnv
-       -> UM a -> UnifyResultM a
+       -> UM ()
+       -> UnifyResultM (TvSubstEnv, CvSubstEnv)
 initUM subst_env cv_subst_env um
   = case unUM um state of
-      Unifiable (_, subst)    -> Unifiable subst
-      MaybeApart r (_, subst) -> MaybeApart r subst
+      Unifiable (state, _)    -> Unifiable (get state)
+      MaybeApart r (state, _) -> MaybeApart r (get state)
       SurelyApart             -> SurelyApart
   where
     state = UMState { um_tv_env = subst_env
-                    , um_cv_env = cv_subst_env }
+                    , um_cv_env = cv_subst_env
+                    , um_fam_env = emptyTyConEnv }
+    get (UMState { um_tv_env = tv_env, um_cv_env = cv_env }) = (tv_env, cv_env)
 
 tvBindFlag :: UMEnv -> OutTyVar -> Type -> BindFlag
 tvBindFlag env tv rhs
@@ -1580,6 +1624,9 @@ getTvSubstEnv = UM $ \state -> Unifiable (state, um_tv_env state)
 
 getCvSubstEnv :: UM CvSubstEnv
 getCvSubstEnv = UM $ \state -> Unifiable (state, um_cv_env state)
+
+getFamSubstEnv :: UM FamSubstEnv
+getFamSubstEnv = UM $ \state -> Unifiable (state, um_fam_env state)
 
 getSubst :: UMEnv -> UM Subst
 getSubst env = do { tv_env <- getTvSubstEnv
@@ -1594,6 +1641,16 @@ extendTvEnv tv ty = UM $ \state ->
 extendCvEnv :: CoVar -> Coercion -> UM ()
 extendCvEnv cv co = UM $ \state ->
   Unifiable (state { um_cv_env = extendVarEnv (um_cv_env state) cv co }, ())
+
+extendFamEnv :: TyCon -> [Type] -> Type -> UM ()
+extendFamEnv tc tys ty = UM $ \state ->
+  Unifiable (state { um_fam_env = extend (um_fam_env state) tc }, ())
+  where
+    extend :: FamSubstEnv -> TyCon -> FamSubstEnv
+    extend = alterTyConEnv alter_tm
+
+    alter_tm :: Maybe (ListMap TypeMap Type) -> Maybe (ListMap TypeMap Type)
+    alter_tm m_elt = Just (alterTM tys (\_ -> Just ty) (m_elt `orElse` emptyTM))
 
 umRnBndr2 :: UMEnv -> TyCoVar -> TyCoVar -> UMEnv
 umRnBndr2 env v1 v2
