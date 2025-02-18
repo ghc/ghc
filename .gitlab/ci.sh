@@ -51,12 +51,10 @@ Common Modes:
   shell             Run an interactive shell with a configured build environment.
   save_test_output  Generate unexpected-test-output.tar.gz
   save_cache        Preserve the cabal cache
+  build_hadrian     Build GHC via the Hadrian build system
+  test_hadrian      Test GHC via the Hadrian build system
 
-Hadrian build system
-  build_hadrian Build GHC via the Hadrian build system
-  test_hadrian  Test GHC via the Hadrian build system
-
-Environment variables affecting both build systems:
+Environment variables affecting the build:
 
   CROSS_TARGET      Triple of cross-compilation target.
   VERBOSE           Set to non-empty for verbose build output
@@ -75,9 +73,6 @@ Environment variables affecting both build systems:
   NIX_SYSTEM        On Darwin, the target platform of the desired toolchain
                     (either "x86-64-darwin" or "aarch-darwin")
   NO_BOOT           Whether to run ./boot or not, used when testing the source dist
-
-Environment variables determining build configuration of Hadrian system:
-
   BUILD_FLAVOUR     Which flavour to build.
   REINSTALL_GHC     Build and test a reinstalled "stage3" ghc built using cabal-install
                     This tests the "reinstall" configuration
