@@ -362,6 +362,13 @@ def req_ghc_smp( name, opts ):
     if not config.ghc_has_smp:
         opts.skip = True
 
+def req_target_debug_rts( name, opts ):
+    """
+    Mark a test as requiring the debug rts (e.g. compile with -debug or -ticky)
+    """
+    if not config.debug_rts:
+        opts.skip = True
+
 def req_target_smp( name, opts ):
     """
     Mark a test as requiring smp when run on the target. If the target does

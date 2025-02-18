@@ -413,7 +413,7 @@ test('T10904', [ extra_run_opts('20000'), req_c ],
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
                compile_and_run, [''])
 
-test('T9405', [when(opsys('mingw32'), fragile(21361)), js_broken(22261)], makefile_test, ['T9405'])
+test('T9405', [when(opsys('mingw32'), fragile(21361)), req_target_debug_rts], makefile_test, ['T9405'])
 
 test('T11788', [ when(ghc_dynamic(), skip)
                , req_interp
@@ -625,7 +625,7 @@ test('T23221',
      compile_and_run,
      ['-O -with-rtsopts -T'])
 
-test('T23142', [unless(debug_rts(), skip), req_interp], makefile_test, ['T23142'])
+test('T23142', [req_target_debug_rts, req_interp], makefile_test, ['T23142'])
 
 test('T23400', [], compile_and_run, ['-with-rtsopts -A8k'])
 
