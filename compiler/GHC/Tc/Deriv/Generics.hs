@@ -350,7 +350,7 @@ gk2gkDC Gen1 dc tc_args = Gen1_DC $ assert (isTyVarTy last_dc_inst_univ)
                                   $ getTyVar last_dc_inst_univ
   where
     dc_inst_univs = dataConInstUnivs dc tc_args
-    last_dc_inst_univ = last $ expectNonEmpty "gk2gkDC" $ dc_inst_univs
+    last_dc_inst_univ = last $ expectNonEmpty dc_inst_univs
 
 
 -- Bindings for the Generic instance

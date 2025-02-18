@@ -118,7 +118,7 @@ genStaticLit = \case
                                      , IntLit 0 ]
   LitRubbish _ rep ->
     let prim_reps = runtimeRepPrimRep (text "GHC.StgToJS.Literal.genStaticLit") rep
-    in case expectOnly "GHC.StgToJS.Literal.genStaticLit" prim_reps of -- Note [Post-unarisation invariants]
+    in case expectOnly prim_reps of -- Note [Post-unarisation invariants]
         BoxedRep _  -> pure [ NullLit ]
         AddrRep     -> pure [ NullLit, IntLit 0 ]
         IntRep      -> pure [ IntLit 0 ]

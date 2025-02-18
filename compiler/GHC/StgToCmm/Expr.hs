@@ -177,7 +177,7 @@ cgLetNoEscapeRhs
 
 cgLetNoEscapeRhs join_id local_cc bndr rhs =
   do { (info, rhs_code) <- cgLetNoEscapeRhsBody local_cc bndr rhs
-     ; let (bid, _) = expectJust "cgLetNoEscapeRhs" $ maybeLetNoEscape info
+     ; let (bid, _) = expectJust $ maybeLetNoEscape info
      ; let code = do { (_, body) <- getCodeScoped rhs_code
                      ; emitOutOfLine bid (first (<*> mkBranch join_id) body) }
      ; return (info, code)

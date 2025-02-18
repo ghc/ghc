@@ -1367,7 +1367,7 @@ combineOcc (ScrutOcc xs) UnkOcc        = ScrutOcc xs
 combineOcc UnkOcc        UnkOcc        = UnkOcc
 
 combineOccs :: [ArgOcc] -> [ArgOcc] -> [ArgOcc]
-combineOccs xs ys = zipWithEqual "combineOccs" combineOcc xs ys
+combineOccs xs ys = zipWithEqual combineOcc xs ys
 
 setScrutOcc :: ScEnv -> ScUsage -> OutExpr -> ArgOcc -> ScUsage
 -- _Overwrite_ the occurrence info for the scrutinee, if the scrutinee
@@ -1474,7 +1474,7 @@ scBind top_lvl env (Rec prs) do_body
 
         ; let all_usg = (spec_usg `combineUsage` body_usg)  -- Note [spec_usg includes rhs_usg]
                         `delCallsFor` bndrs'
-              bind'   = Rec (concat (zipWithEqual "scExpr'" ruleInfoBinds rhs_infos specs))
+              bind'   = Rec (concat (zipWithEqual ruleInfoBinds rhs_infos specs))
                         -- zipWithEqual: length of returned [SpecInfo]
                         -- should be the same as incoming [RhsInfo]
 

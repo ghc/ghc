@@ -1805,7 +1805,7 @@ mkLoopBreakerNodes :: OccEnv -> TopLevelFlag
 --   d) adjust each RHS's usage details according to
 --      the binder's (new) shotness and join-point-hood
 mkLoopBreakerNodes !env lvl body_uds details_s
-  = WUD final_uds (zipWithEqual "mkLoopBreakerNodes" mk_lb_node details_s bndrs')
+  = WUD final_uds (zipWithEqual mk_lb_node details_s bndrs')
   where
     WUD final_uds bndrs' = tagRecBinders lvl body_uds details_s
 

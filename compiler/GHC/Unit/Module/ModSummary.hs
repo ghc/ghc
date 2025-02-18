@@ -146,14 +146,14 @@ ms_home_imps = home_imps . ms_imps
 -- the ms_hs_hash and imports can, of course, change
 
 msHsFilePath, msDynHiFilePath, msHiFilePath, msObjFilePath, msDynObjFilePath :: ModSummary -> FilePath
-msHsFilePath  ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
+msHsFilePath  ms = expectJust (ml_hs_file  (ms_location ms))
 msHiFilePath  ms = ml_hi_file  (ms_location ms)
 msDynHiFilePath ms = ml_dyn_hi_file (ms_location ms)
 msObjFilePath ms = ml_obj_file (ms_location ms)
 msDynObjFilePath ms = ml_dyn_obj_file (ms_location ms)
 
 msHsFileOsPath, msDynHiFileOsPath, msHiFileOsPath, msObjFileOsPath, msDynObjFileOsPath :: ModSummary -> OsPath
-msHsFileOsPath  ms = expectJust "msHsFilePath" (ml_hs_file_ospath  (ms_location ms))
+msHsFileOsPath  ms = expectJust (ml_hs_file_ospath  (ms_location ms))
 msHiFileOsPath  ms = ml_hi_file_ospath  (ms_location ms)
 msDynHiFileOsPath ms = ml_dyn_hi_file_ospath (ms_location ms)
 msObjFileOsPath ms = ml_obj_file_ospath (ms_location ms)

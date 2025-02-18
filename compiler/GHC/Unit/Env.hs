@@ -307,7 +307,7 @@ ue_unsafeHomeUnit ue = case ue_homeUnit ue of
   Just h  -> h
 
 ue_unitHomeUnit :: UnitId -> UnitEnv -> HomeUnit
-ue_unitHomeUnit uid = expectJust "ue_unitHomeUnit" . ue_unitHomeUnit_maybe uid
+ue_unitHomeUnit uid = expectJust . ue_unitHomeUnit_maybe uid
 
 ue_unitHomeUnit_maybe :: UnitId -> UnitEnv -> Maybe HomeUnit
 ue_unitHomeUnit_maybe uid ue_env =

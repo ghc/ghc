@@ -706,15 +706,15 @@ setDumpPrefixForce f d = d { dumpPrefixForce = f}
 -- XXX HACK: Prelude> words "'does not' work" ===> ["'does","not'","work"]
 -- Config.hs should really use Option.
 setPgmP   f = alterToolSettings (\s -> s { toolSettings_pgm_P   = (pgm, map Option args)})
-  where pgm:|args = expectNonEmpty "setPgmP" $ words f
+  where pgm:|args = expectNonEmpty $ words f
 -- XXX HACK: Prelude> words "'does not' work" ===> ["'does","not'","work"]
 -- Config.hs should really use Option.
 setPgmJSP   f = alterToolSettings (\s -> s { toolSettings_pgm_JSP   = (pgm, map Option args)})
-  where pgm:|args = expectNonEmpty "setPgmJSP" $ words f
+  where pgm:|args = expectNonEmpty $ words f
 -- XXX HACK: Prelude> words "'does not' work" ===> ["'does","not'","work"]
 -- Config.hs should really use Option.
 setPgmCmmP f = alterToolSettings (\s -> s { toolSettings_pgm_CmmP = (pgm, map Option args)})
-  where pgm:|args = expectNonEmpty "setPgmCmmP" $ words f
+  where pgm:|args = expectNonEmpty $ words f
 addOptl   f = alterToolSettings (\s -> s { toolSettings_opt_l   = f : toolSettings_opt_l s})
 addOptc   f = alterToolSettings (\s -> s { toolSettings_opt_c   = f : toolSettings_opt_c s})
 addOptcxx f = alterToolSettings (\s -> s { toolSettings_opt_cxx = f : toolSettings_opt_cxx s})

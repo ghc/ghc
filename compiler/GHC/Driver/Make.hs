@@ -615,7 +615,7 @@ createBuildPlan mod_graph maybe_top_mod =
             nodeKeyUnitId nk == uid  -- Cheap test
               && mgQuery mod_graph nk (NodeKey_Module (key IsBoot))) $
           Set.fromList $
-          expectJust "not_boot_dep"  (mgReachable mod_graph (NodeKey_Module (key NotBoot)))
+          expectJust (mgReachable mod_graph (NodeKey_Module (key NotBoot)))
           where
             key ib = ModNodeKeyWithUid (GWIB mn ib) uid
 
@@ -1062,7 +1062,7 @@ getBuildMap = gets buildDep
 
 getDependencies :: [NodeKey] -> BuildMap -> [BuildResult]
 getDependencies direct_deps build_map =
-  strictMap (expectJust "dep_map" . flip M.lookup build_map) direct_deps
+  strictMap (expectJust . flip M.lookup build_map) direct_deps
 
 type BuildM a = StateT BuildLoopState IO a
 
@@ -2303,7 +2303,7 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
     just_found location mod = do
                 -- Adjust location to point to the hs-boot source file,
                 -- hi file, object file, when is_boot says so
-        let src_fn = expectJust "summarise2" (ml_hs_file location)
+        let src_fn = expectJust (ml_hs_file location)
 
                 -- Check that it exists
                 -- It might have been deleted since the Finder last found it
@@ -2520,7 +2520,7 @@ multiRootsErr summs@(summ1:_)
     mkPlainErrorMsgEnvelope noSrcSpan $ DriverDuplicatedModuleDeclaration mod files
   where
     mod = ms_mod summ1
-    files = map (expectJust "checkDup" . ml_hs_file . ms_location) summs
+    files = map (expectJust . ml_hs_file . ms_location) summs
 
 cyclicModuleErr :: [ModuleGraphNode] -> MsgEnvelope GhcMessage
 -- From a strongly connected component we find
@@ -2699,7 +2699,7 @@ maybeRehydrateBefore hsc_env _ Nothing = return hsc_env
 maybeRehydrateBefore hsc_env mod (Just mns) = do
   knot_var <- initialise_knot_var hsc_env
   let hsc_env' = hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }
-  hmis <- mapM (fmap (expectJust "mr") . lookupHpt (hsc_HPT hsc_env')) mns
+  hmis <- mapM (fmap expectJust . lookupHpt (hsc_HPT hsc_env')) mns
   hmis' <- rehydrate hsc_env' hmis
   mapM_ (\hmi -> HUG.addHomeModInfoToHug hmi (hsc_HUG hsc_env')) hmis'
   return hsc_env'
@@ -2714,7 +2714,7 @@ rehydrateAfter :: HscEnv
   -> IO [HomeModInfo]
 rehydrateAfter hsc mns = do
   let hpt = hsc_HPT hsc
-  hmis <- mapM (fmap (expectJust "mrAfter") . lookupHpt hpt) mns
+  hmis <- mapM (fmap expectJust . lookupHpt hpt) mns
   rehydrate (hsc { hsc_type_env_vars = emptyKnotVars }) hmis
 
 {-

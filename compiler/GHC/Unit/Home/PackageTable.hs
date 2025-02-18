@@ -246,7 +246,7 @@ hptCollectObjects :: HomePackageTable -> IO [Linkable]
 hptCollectObjects HPT{table} = do
   hpt <- readIORef table
   return $
-    foldr ((:) . expectJust "collectObjects" . homeModInfoObject) [] hpt
+    foldr ((:) . expectJust . homeModInfoObject) [] hpt
 
 -- | Collect all module ifaces in the HPT
 --

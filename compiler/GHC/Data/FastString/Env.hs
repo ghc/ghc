@@ -82,7 +82,7 @@ delListFromFsEnv x y      = delListFromUFM x y
 filterFsEnv x y           = filterUFM x y
 mapMaybeFsEnv f x         = mapMaybeUFM f x
 
-lookupFsEnv_NF env n = expectJust "lookupFsEnv_NF" (lookupFsEnv env n)
+lookupFsEnv_NF env n = expectJust (lookupFsEnv env n)
 
 strictMapFsEnv :: (a -> b) -> FastStringEnv a -> FastStringEnv b
 strictMapFsEnv = strictMapUFM

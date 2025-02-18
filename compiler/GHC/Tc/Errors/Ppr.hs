@@ -3464,7 +3464,7 @@ pprHoleFit :: HoleFitDispConfig -> HoleFit -> SDoc
 pprHoleFit _ (RawHoleFit sd) = sd
 pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (TcHoleFit (HoleFit {..})) =
  hang display 2 provenance
- where tyApp = sep $ zipWithEqual "pprHoleFit" pprArg vars hfWrap
+ where tyApp = sep $ zipWithEqual pprArg vars hfWrap
          where pprArg b arg = case binderFlag b of
                                 Specified -> text "@" <> pprParendType arg
                                   -- Do not print type application for inferred
@@ -3473,8 +3473,7 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (TcHoleFit (HoleFit {..})) =
                                 Required  -> pprPanic "pprHoleFit: bad Required"
                                                          (ppr b <+> ppr arg)
        tyAppVars = sep $ punctuate comma $
-           zipWithEqual "pprHoleFit" (\v t -> ppr (binderVar v) <+>
-                                               text "~" <+> pprParendType t)
+           zipWithEqual (\v t -> ppr (binderVar v) <+> text "~" <+> pprParendType t)
            vars hfWrap
 
        vars = unwrapTypeVars hfType
@@ -5487,8 +5486,7 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
         -- expand further. The lengths of tys1 and tys2 must be equal;
         -- for example, with type S a = a, we don't want
         -- to zip (S Monad Int) and (S Bool).
-        let (tys1', tys2') =
-              unzip (zipWithEqual "expandSynonymsToMatch" go tys1 tys2)
+        let (tys1', tys2') = unzip (zipWithEqual go tys1 tys2)
          in (TyConApp tc1 tys1', TyConApp tc2 tys2')
 
     go (AppTy t1_1 t1_2) (AppTy t2_1 t2_2) =
@@ -5523,7 +5521,7 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
         dif        = abs (t1_exps - t2_exps)
       in
         followExpansions $
-          zipEqual "expandSynonymsToMatch.go"
+          zipEqual
             (if t1_exps > t2_exps then drop dif t1_exp_tys else t1_exp_tys)
             (if t2_exps > t1_exps then drop dif t2_exp_tys else t2_exp_tys)
 

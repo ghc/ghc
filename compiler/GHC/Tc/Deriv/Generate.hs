@@ -263,7 +263,7 @@ gen_Eq_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     ------------------------------------------------------------------
     nested_eq_expr []  [] [] = true_Expr
     nested_eq_expr tys as bs
-      = foldr1 and_Expr $ expectNonEmpty "nested_eq" $ zipWith3Equal "nested_eq" nested_eq tys as bs
+      = foldr1 and_Expr $ expectNonEmpty $ zipWith3Equal nested_eq tys as bs
       -- Using 'foldr1' here ensures that the derived code is correctly
       -- associated. See #10859.
       where
@@ -914,7 +914,7 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
           (noLocA [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed]) $
         noLocA (mkHsComp ListComp stmts con_expr)
       where
-        stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
+        stmts = zipWith3Equal mk_qual as_needed bs_needed cs_needed
 
         mk_qual a b c = noLocA $ mkPsBindStmt noAnn (nlVarPat c)
                                  (nlHsApp (nlHsVar range_RDR)
@@ -955,8 +955,8 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
              -- If the product type has no fields, inRange is trivially true
              -- (see #12853).
              then true_Expr
-             else foldl1 and_Expr $ expectNonEmpty "singlet_con_inRange" $
-                  zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed
+             else foldl1 and_Expr $ expectNonEmpty $
+                  zipWith3Equal in_range as_needed bs_needed cs_needed
       where
         in_range a b c
           = nlHsApps inRange_RDR [mkLHsVarTuple [a,b] noAnn, nlHsVar c]
@@ -1056,7 +1056,7 @@ gen_Read_binds get_fixity loc dit@(DerivInstTys{dit_rep_tc = tycon})
             = nlHsVar pfail_RDR
             | otherwise
             = nlHsApp (nlHsVar parens_RDR) $
-              foldr1 mk_alt $ expectNonEmpty "read_prec" $
+              foldr1 mk_alt $ expectNonEmpty $
               read_nullary_cons ++ read_non_nullary_cons
 
     read_non_nullary_cons = map read_non_nullary_con non_nullary_cons
@@ -1117,7 +1117,7 @@ gen_Read_binds get_fixity loc dit@(DerivInstTys{dit_rep_tc = tycon})
             ++ concat (intersperse [read_punc ","] field_stmts)
             ++ [read_punc "}"]
 
-        field_stmts  = zipWithEqual "lbl_stmts" read_field labels as_needed
+        field_stmts  = zipWithEqual read_field labels as_needed
 
         con_arity    = dataConSourceArity data_con
         labels       = map (field_label . flLabel) $ dataConFieldLabels data_con
@@ -1125,7 +1125,7 @@ gen_Read_binds get_fixity loc dit@(DerivInstTys{dit_rep_tc = tycon})
         is_infix     = dataConIsInfix data_con
         is_record    = labels `lengthExceeds` 0
         as_needed    = take con_arity as_RDRs
-        read_args    = zipWithEqual "gen_Read_binds" read_arg as_needed (derivDataConInstArgTys data_con dit)
+        read_args    = zipWithEqual read_arg as_needed (derivDataConInstArgTys data_con dit)
         (read_a1:read_a2:_) = read_args
 
         prefix_prec = appPrecedence
@@ -1269,7 +1269,7 @@ gen_Show_binds get_fixity loc dit@(DerivInstTys{ dit_rep_tc = tycon
                  where
                    nm       = wrapOpParens (unpackFS l)
 
-             show_args               = zipWithEqual "gen_Show_binds" show_arg bs_needed arg_tys
+             show_args               = zipWithEqual show_arg bs_needed arg_tys
              (show_arg1:show_arg2:_) = show_args
              show_prefix_args        = intersperse (nlHsVar showSpace_RDR) show_args
 
@@ -1278,8 +1278,7 @@ gen_Show_binds get_fixity loc dit@(DerivInstTys{ dit_rep_tc = tycon
              show_record_args = concat $
                                 intersperse [comma_space] $
                                 [ [show_label lbl, arg]
-                                | (lbl,arg) <- zipEqual "gen_Show_binds"
-                                                        labels show_args ]
+                                | (lbl,arg) <- zipEqual labels show_args ]
 
              show_arg :: RdrName -> Type -> LHsExpr GhcPs
              show_arg b arg_ty
@@ -2200,7 +2199,7 @@ genAuxBindSpecOriginal loc spec
       where
         tc_name = tyConName tycon
         tc_name_string = occNameFS (getOccName tc_name)
-        definition_mod_name = moduleNameFS (moduleName (expectJust "gen_bind DerivDataDataType" $ nameModule_maybe tc_name))
+        definition_mod_name = moduleNameFS (moduleName (expectJust $ nameModule_maybe tc_name))
         rhs = nlHsVar mkDataType_RDR
               `nlHsApp` nlHsLit (mkHsStringFS (concatFS [definition_mod_name, fsLit ".", tc_name_string]))
               `nlHsApp` nlList (map nlHsVar dataC_RDRs)

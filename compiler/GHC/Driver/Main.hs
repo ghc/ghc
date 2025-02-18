@@ -2816,8 +2816,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
       (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env srcspan $
         Linkable bco_time this_mod $ NE.singleton $ BCOs bcos
       {- Get the HValue for the root -}
-      return (expectJust "hscCompileCoreExpr'"
-         $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed)
+      return (expectJust $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed)
 
 
 

@@ -557,7 +557,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
                    HsigFile -> do
                      -- We need to create a REAL but empty .o file
                      -- because we are going to attempt to put it in a library
-                     let input_fn = expectJust "runPhase" (ml_hs_file location)
+                     let input_fn = expectJust (ml_hs_file location)
                          basename = dropExtension input_fn
                      compileEmptyStub dflags hsc_env basename location mod_name
 
@@ -962,7 +962,7 @@ llvmOptions llvm_config dflags =
 
   where target = platformMisc_llvmTarget $ platformMisc dflags
         target_os = platformOS (targetPlatform dflags)
-        LlvmTarget _ mcpu mattr = expectJust "llvmOptions" $ lookup target (llvmTargets llvm_config)
+        LlvmTarget _ mcpu mattr = expectJust $ lookup target (llvmTargets llvm_config)
 
         -- Relocation models
         rmodel |  gopt Opt_PIC dflags

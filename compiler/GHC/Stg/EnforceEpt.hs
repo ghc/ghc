@@ -432,7 +432,7 @@ inferTagExpr in_env (StgCase scrut bndr ty alts)
   | [GenStgAlt{alt_con=DataAlt con, alt_bndrs=bndrs, alt_rhs=rhs}] <- alts
   , isUnboxedTupleDataCon con
   , Just infos <- scrut_infos bndrs
-  , let bndrs' = zipWithEqual "inferTagExpr" mk_bndr bndrs infos
+  , let bndrs' = zipWithEqual mk_bndr bndrs infos
         mk_bndr :: BinderP p -> TagInfo -> (Id, TagSig)
         mk_bndr tup_bndr tup_info =
             --  pprTrace "mk_ubx_bndr_info" ( ppr bndr <+> ppr info ) $
@@ -537,7 +537,7 @@ inferTagBind in_env (StgRec pairs)
          in_bndrs = in_ids `zip` in_sigs
          out_bndrs = map updateBndr in_bndrs -- TODO: Keeps in_ids alive
          rhs_env = extendSigEnv go_env in_bndrs
-         (out_sigs, rhss') = unzip (zipWithEqual "inferTagBind" anaRhs in_ids go_rhss)
+         (out_sigs, rhss') = unzip (zipWithEqual anaRhs in_ids go_rhss)
          env' = makeTagged go_env
 
          anaRhs :: Id -> GenStgRhs q -> (TagSig, GenStgRhs 'InferTaggedBinders)
@@ -712,7 +712,7 @@ inferConTag env con args
     info
   where
     info = if any arg_needs_eval strictArgs then TagDunno else TagProper
-    strictArgs = zipEqual "inferTagRhs" args (dataConRuntimeRepStrictness con) :: ([(StgArg, StrictnessMark)])
+    strictArgs = zipEqual args (dataConRuntimeRepStrictness con) :: ([(StgArg, StrictnessMark)])
     arg_needs_eval (arg,strict)
       -- lazy args
       | not (isMarkedStrict strict) = False

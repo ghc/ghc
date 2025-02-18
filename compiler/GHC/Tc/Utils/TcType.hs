@@ -1653,7 +1653,7 @@ tcSplitFunTysN n ty
  = Left n
 
 tcSplitFunTy :: Type -> (Scaled Type, Type)
-tcSplitFunTy  ty = expectJust "tcSplitFunTy" (tcSplitFunTy_maybe ty)
+tcSplitFunTy  ty = expectJust (tcSplitFunTy_maybe ty)
 
 tcFunArgTy :: Type -> Scaled Type
 tcFunArgTy ty = fst (tcSplitFunTy ty)

@@ -2024,7 +2024,7 @@ getMinimalImports ie_decls
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
     to_ie rdr_env _ (Avail c)  -- Note [Overloaded field import]
       = do { let
-               gre = expectJust "getMinimalImports Avail" $ lookupGRE_Name rdr_env c
+               gre = expectJust $ lookupGRE_Name rdr_env c
            ; return $ [IEVar Nothing (to_ie_post_rn $ noLocA $ greName gre) Nothing] }
     to_ie _ _ avail@(AvailTC n [_])  -- Exporting the main decl and nothing else
       | availExportsDecl avail
@@ -2038,13 +2038,13 @@ getMinimalImports ie_decls
           | all_used xs
           -> return [IEThingAll (Nothing, noAnn) (to_ie_post_rn $ noLocA n) Nothing]
           | otherwise
-          -> do { let ns_gres = map (expectJust "getMinimalImports AvailTC" . lookupGRE_Name rdr_env) cs
+          -> do { let ns_gres = map (expectJust . lookupGRE_Name rdr_env) cs
                       ns = map greName ns_gres
                 ; return [IEThingWith (Nothing, noAnn) (to_ie_post_rn $ noLocA n) NoIEWildcard
                                  (map (to_ie_post_rn . noLocA) (filter (/= n) ns)) Nothing] }
                                        -- Note [Overloaded field import]
         _other
-          -> do { let infos = map (expectJust "getMinimalImports AvailTC" . lookupGRE_Name rdr_env) cs
+          -> do { let infos = map (expectJust . lookupGRE_Name rdr_env) cs
                       (ns_gres,fs_gres) = classifyGREs infos
                       ns = map greName (ns_gres ++ fs_gres)
                       fs = map fieldGREInfo fs_gres

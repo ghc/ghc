@@ -351,7 +351,7 @@ topologicalSortG graph = map (gr_vertex_to_node graph) result
 
 outgoingG :: Graph node -> node -> [node]
 outgoingG graph from = map (gr_vertex_to_node graph) result
-  where from_vertex = expectJust "outgoingG" (gr_node_to_vertex graph from)
+  where from_vertex = expectJust (gr_node_to_vertex graph from)
         result = gr_int_graph graph ! from_vertex
 
 -- | Given a list of roots, return all reachable nodes in topological order.
@@ -480,8 +480,8 @@ graphFromVerticesAndAdjacency []       _     = emptyGraph
 graphFromVerticesAndAdjacency vertices edges = Graph graph vertex_node (key_vertex . key_extractor)
   where key_extractor = node_key
         (bounds, vertex_node, key_vertex, _) = reduceNodesIntoVerticesOrd vertices key_extractor
-        key_vertex_pair (a, b) = (expectJust "graphFromVerticesAndAdjacency" $ key_vertex a,
-                                  expectJust "graphFromVerticesAndAdjacency" $ key_vertex b)
+        key_vertex_pair (a, b) = (expectJust $ key_vertex a,
+                                  expectJust $ key_vertex b)
         reduced_edges = map key_vertex_pair edges
         graph = G.buildG bounds reduced_edges
 

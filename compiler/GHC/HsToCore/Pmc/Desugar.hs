@@ -219,13 +219,13 @@ desugarPat x pat = case pat of
           Just l -> l
           Nothing -> pprPanic "failed to detect OverLit" (ppr olit)
     let lit' = case mb_neg of
-          Just _  -> expectJust "failed to negate lit" (negatePmLit lit)
+          Just _  -> expectJust (negatePmLit lit)
           Nothing -> lit
     mkPmLitGrds x lit'
 
   LitPat _ lit -> do
     core_expr <- dsLit lit
-    let lit = expectJust "failed to detect Lit" (coreExprAsPmLit core_expr)
+    let lit = expectJust (coreExprAsPmLit core_expr)
     mkPmLitGrds x lit
 
   TuplePat _tys pats boxity -> do
@@ -285,7 +285,7 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
         -- Unfortunately the label info is empty when the DataCon wasn't defined
         -- with record field labels, hence we desugar to field index.
         orig_lbls        = map flSelector $ conLikeFieldLabels con
-        lbl_to_index lbl = expectJust "lbl_to_index" $ elemIndex lbl orig_lbls
+        lbl_to_index lbl = expectJust $ elemIndex lbl orig_lbls
 
     go_field_pats tagged_pats = do
       -- The fields that appear might not be in the correct order. So

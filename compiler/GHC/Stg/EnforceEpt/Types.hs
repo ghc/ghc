@@ -42,7 +42,7 @@ combineAltInfo _                TagDunno       = TagDunno
 combineAltInfo (TagTuple {})    TagProper      = panic "Combining unboxed tuple with non-tuple result"
 combineAltInfo TagProper       (TagTuple {})   = panic "Combining unboxed tuple with non-tuple result"
 combineAltInfo TagProper        TagProper      = TagProper
-combineAltInfo (TagTuple is1)  (TagTuple is2)  = TagTuple (zipWithEqual "combineAltInfo" combineAltInfo is1 is2)
+combineAltInfo (TagTuple is1)  (TagTuple is2)  = TagTuple (zipWithEqual combineAltInfo is1 is2)
 combineAltInfo (TagTagged)      ti             = ti
 combineAltInfo ti               TagTagged      = ti
 

@@ -465,7 +465,7 @@ tc_lpats tys penv pats
   = assertPpr (equalLength pats tys) (ppr pats $$ ppr tys) $
     tcMultiple (\ penv' (p,t) -> tc_lpat t penv' p)
                penv
-               (zipEqual "tc_lpats" pats tys)
+               (zipEqual pats tys)
 
 --------------------
 checkManyPattern :: NonLinearPatternReason -> LPat GhcRn -> Scaled a -> TcM ()
@@ -1601,7 +1601,7 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
         { checkTc (con_arity == no_of_args)     -- Check correct arity
                   (TcRnArityMismatch (AConLike con_like) con_arity no_of_args)
 
-        ; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
+        ; let pats_w_tys = zipEqual arg_pats arg_tys
         ; (arg_pats', res) <- tcMultiple tcConArg penv pats_w_tys thing_inside
 
         ; return (PrefixCon type_args arg_pats', res) }

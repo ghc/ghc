@@ -1591,7 +1591,7 @@ mkFRRErr ctxt items
             -- Zonk/tidy to show useful variable names.
           nubOrdBy (nonDetCmpType `on` (frr_type . frr_info_origin)) $
             -- Remove duplicates: only one representation-polymorphism error per type.
-          map (expectJust "mkFRRErr" . fixedRuntimeRepOrigin_maybe) $
+          map (expectJust . fixedRuntimeRepOrigin_maybe) $
           toList items
        ; return $ important ctxt $ FixedRuntimeRepError frr_infos }
 

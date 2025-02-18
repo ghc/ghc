@@ -345,8 +345,8 @@ mgQuery :: ModuleGraph -- ^ @g@
         -> Bool -- ^ @b@ is reachable from @a@
 mgQuery mg nka nkb = isReachable td_map na nb where
   (td_map, lookup_node) = mg_graph mg
-  na = expectJust "mgQuery:a" $ lookup_node nka
-  nb = expectJust "mgQuery:b" $ lookup_node nkb
+  na = expectJust $ lookup_node nka
+  nb = expectJust $ lookup_node nkb
 
 -- | Many roots reachability Query.
 --
@@ -361,7 +361,7 @@ mgQueryMany :: ModuleGraph -- ^ @g@
 mgQueryMany mg roots nkb = isReachableMany td_map nroots nb where
   (td_map, lookup_node) = mg_graph mg
   nroots = mapMaybe lookup_node roots
-  nb = expectJust "mgQuery:b" $ lookup_node nkb
+  nb = expectJust $ lookup_node nkb
 
 --------------------------------------------------------------------------------
 -- ** Other operations (read haddocks on export list)

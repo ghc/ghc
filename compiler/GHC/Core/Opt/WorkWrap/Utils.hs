@@ -983,7 +983,7 @@ unbox_one_arg opts arg_var
              -- don't end up in lambda binders of the worker.
              -- See Note [Never put `OtherCon` unfoldings on lambda binders]
              arg_ids' = map zapIdUnfolding $
-                        zipWithEqual "unbox_one_arg" setIdDemandInfo arg_ids ds
+                        zipWithEqual setIdDemandInfo arg_ids ds
 
              unbox_fn = mkUnpackCase (Var arg_var) co (idMult arg_var)
                                      dc (ex_tvs' ++ arg_ids')

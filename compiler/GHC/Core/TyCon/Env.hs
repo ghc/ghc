@@ -103,7 +103,7 @@ filterTyConEnv x y       = filterUFM x y
 anyTyConEnv f x          = nonDetFoldUFM ((||) . f) False x
 disjointTyConEnv x y     = disjointUFM x y
 
-lookupTyConEnv_NF env n = expectJust "lookupTyConEnv_NF" (lookupTyConEnv env n)
+lookupTyConEnv_NF env n = expectJust (lookupTyConEnv env n)
 
 -- | Deterministic TyCon Environment
 --

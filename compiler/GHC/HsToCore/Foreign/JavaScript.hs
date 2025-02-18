@@ -265,7 +265,7 @@ dsJsFExportDynamic id co0 cconv = do
       (tvs,sans_foralls)            = tcSplitForAllTyVars ty
       ([scaled_arg_ty], fn_res_ty)  = tcSplitFunTys sans_foralls
       arg_ty                        = scaledThing scaled_arg_ty
-      (io_tc, res_ty)               = expectJust "dsJsFExportDynamic: IO type expected"
+      (io_tc, res_ty)               = expectJust
                                         -- Must have an IO type; hence Just
                                         $ tcSplitIOType_maybe fn_res_ty
     mod <- getModule

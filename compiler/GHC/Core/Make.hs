@@ -236,7 +236,7 @@ mkLitRubbish ty
   | otherwise
   = Just (Lit (LitRubbish torc rep) `mkTyApps` [ty])
   where
-    (torc, rep) = expectJust "mkLitRubbish" $ sORTKind_maybe (typeKind ty)
+    (torc, rep) = expectJust $ sORTKind_maybe (typeKind ty)
 
 {-
 ************************************************************************
@@ -618,7 +618,7 @@ mkBigTupleSelector vars the_var scrut_var scrut
           tpl_vs  = mkTemplateLocals tpl_tys
           (tpl_v, group) = case
             [ (tpl,gp)
-            | (tpl,gp) <- zipEqual "mkBigTupleSelector" tpl_vs vars_s
+            | (tpl,gp) <- zipEqual tpl_vs vars_s
             , the_var `elem` gp
             ] of
               [x] -> x
@@ -1289,7 +1289,7 @@ mkRuntimeErrorTy :: TypeOrConstraint -> Type
 mkRuntimeErrorTy torc = mkSpecForAllTys [runtimeRep1TyVar, tyvar] $
                         mkFunctionType ManyTy addrPrimTy (mkTyVarTy tyvar)
   where
-    tyvar:|_ = expectNonEmpty "mkRuntimeErrorTy" $ mkTemplateTyVars [kind]
+    tyvar:|_ = expectNonEmpty $ mkTemplateTyVars [kind]
     kind = case torc of
               TypeLike       -> mkTYPEapp       runtimeRep1Ty
               ConstraintLike -> mkCONSTRAINTapp runtimeRep1Ty

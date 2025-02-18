@@ -2021,13 +2021,13 @@ liftCoSubstWithEx :: Role          -- desired role for output coercion
                   -> [Type]        -- types and coercions to be bound to ex vars
                   -> (Type -> Coercion, [Type]) -- (lifting function, converted ex args)
 liftCoSubstWithEx role univs omegas exs rhos
-  = let theta = mkLiftingContext (zipEqual "liftCoSubstWithExU" univs omegas)
-        psi   = extendLiftingContextEx theta (zipEqual "liftCoSubstWithExX" exs rhos)
+  = let theta = mkLiftingContext (zipEqual univs omegas)
+        psi   = extendLiftingContextEx theta (zipEqual exs rhos)
     in (ty_co_subst psi role, substTys (lcSubstRight psi) (mkTyCoVarTys exs))
 
 liftCoSubstWith :: Role -> [TyCoVar] -> [Coercion] -> Type -> Coercion
 liftCoSubstWith r tvs cos ty
-  = liftCoSubst r (mkLiftingContext $ zipEqual "liftCoSubstWith" tvs cos) ty
+  = liftCoSubst r (mkLiftingContext $ zipEqual tvs cos) ty
 
 -- | @liftCoSubst role lc ty@ produces a coercion (at role @role@)
 -- that coerces between @lc_left(ty)@ and @lc_right(ty)@, where
@@ -2154,7 +2154,7 @@ ty_co_subst !lc role ty
     go r ty                 | Just ty' <- coreView ty
                             = go r ty'
     go Phantom ty           = lift_phantom ty
-    go r (TyVarTy tv)       = expectJust "ty_co_subst bad roles" $
+    go r (TyVarTy tv)       = expectJust $
                               liftCoSubstTyVar lc r tv
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys)  = mkTyConAppCo r tc (zipWith go (tyConRoleListX r tc) tys)

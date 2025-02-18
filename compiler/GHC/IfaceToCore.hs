@@ -384,7 +384,7 @@ d1 `withRolesFrom` d2
     = d1 { ifRoles = mergeRoles roles1 roles2 }
     | otherwise = d1
   where
-    mergeRoles roles1 roles2 = zipWithEqual "mergeRoles" max roles1 roles2
+    mergeRoles roles1 roles2 = zipWithEqual max roles1 roles2
 
 isRepInjectiveIfaceDecl :: IfaceDecl -> Bool
 isRepInjectiveIfaceDecl IfaceData{ ifCons = IfDataTyCon{} } = True

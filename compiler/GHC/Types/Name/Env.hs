@@ -166,7 +166,7 @@ anyNameEnv f x          = nonDetFoldUFM ((||) . f) False x
 disjointNameEnv x y     = disjointUFM x y
 seqEltsNameEnv seqElt x = seqEltsUFM seqElt x
 
-lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
+lookupNameEnv_NF env n = expectJust (lookupNameEnv env n)
 
 -- | Deterministic Name Environment
 --

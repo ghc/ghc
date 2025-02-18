@@ -89,7 +89,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
         -- adjust the current assignment to remove any vregs that are not live
         -- on entry to the destination block.
-        let live_set            = expectJust "joinToTargets'" $ mapLookup dest block_live
+        let live_set            = expectJust $ mapLookup dest block_live
         let still_live uniq _   = uniq `elemUniqSet_Directly` live_set
         let adjusted_assig      = filterUFM_Directly still_live assig
 

@@ -173,7 +173,7 @@ fiExpr platform to_drop ann_expr@(_,AnnApp {})
   = wrapFloats drop_here $
     mkTicks ticks $
     mkApps (fiExpr platform fun_drop ann_fun)
-           (zipWithEqual "fiExpr" (fiExpr platform) arg_drops ann_args)
+           (zipWithEqual (fiExpr platform) arg_drops ann_args)
            -- use zipWithEqual, we should have
            -- length ann_args = length arg_fvs = length arg_drops
   where
@@ -543,7 +543,7 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
   = wrapFloats drop_here1 $
     wrapFloats drop_here2 $
     Case (fiExpr platform scrut_drops scrut) case_bndr ty
-         (zipWithEqual "fiExpr" fi_alt alts_drops_s alts)
+         (zipWithEqual fi_alt alts_drops_s alts)
          -- use zipWithEqual, we should have length alts_drops_s = length alts
   where
         -- Float into the scrut and alts-considered-together just like App
@@ -640,7 +640,7 @@ fiBind platform to_drop (AnnRec bindings) body_fvs
 
     fi_bind to_drops pairs
       = [ (binder, fiRhs platform to_drop binder rhs)
-        | ((binder, rhs), to_drop) <- zipEqual "fi_bind" pairs to_drops ]
+        | ((binder, rhs), to_drop) <- zipEqual pairs to_drops ]
 
 ------------------
 fiRhs :: Platform -> RevFloatInBinds -> CoreBndr -> CoreExprWithFVs -> CoreExpr
@@ -821,7 +821,7 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
             | otherwise = floatIsCase bind || n_used_alts > 1
                              -- floatIsCase: see Note [Floating primops]
 
-          new_fork_boxes = zipWithEqual "FloatIn.sepBinds" insert_maybe
+          new_fork_boxes = zipWithEqual insert_maybe
                                         fork_boxes used_in_flags
 
           insert :: DropBox -> DropBox

@@ -242,34 +242,34 @@ are of equal length.  Alastair Reid thinks this should only happen if
 DEBUGging on; hey, why not?
 -}
 
-zipEqual        :: HasDebugCallStack => String -> [a] -> [b] -> [(a,b)]
-zipWithEqual    :: HasDebugCallStack => String -> (a->b->c) -> [a]->[b]->[c]
-zipWith3Equal   :: HasDebugCallStack => String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
-zipWith4Equal   :: HasDebugCallStack => String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
+zipEqual        :: HasDebugCallStack => [a] -> [b] -> [(a,b)]
+zipWithEqual    :: HasDebugCallStack => (a->b->c) -> [a]->[b]->[c]
+zipWith3Equal   :: HasDebugCallStack => (a->b->c->d) -> [a]->[b]->[c]->[d]
+zipWith4Equal   :: HasDebugCallStack => (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
 
 #if !defined(DEBUG)
-zipEqual      _ = zip
-zipWithEqual  _ = zipWith
-zipWith3Equal _ = zipWith3
-zipWith4Equal _ = List.zipWith4
+zipEqual      = zip
+zipWithEqual  = zipWith
+zipWith3Equal = zipWith3
+zipWith4Equal = List.zipWith4
 #else
-zipEqual _   []     []     = []
-zipEqual msg (a:as) (b:bs) = (a,b) : zipEqual msg as bs
-zipEqual msg _      _      = panic ("zipEqual: unequal lists: "++msg)
+zipEqual []     []     = []
+zipEqual (a:as) (b:bs) = (a,b) : zipEqual as bs
+zipEqual _      _      = panic "zipEqual: unequal lists"
 
-zipWithEqual msg z (a:as) (b:bs)=  z a b : zipWithEqual msg z as bs
-zipWithEqual _   _ [] []        =  []
-zipWithEqual msg _ _ _          =  panic ("zipWithEqual: unequal lists: "++msg)
+zipWithEqual z (a:as) (b:bs)=  z a b : zipWithEqual z as bs
+zipWithEqual _ [] []        =  []
+zipWithEqual _ _ _          =  panic "zipWithEqual: unequal lists"
 
-zipWith3Equal msg z (a:as) (b:bs) (c:cs)
-                                =  z a b c : zipWith3Equal msg z as bs cs
-zipWith3Equal _   _ [] []  []   =  []
-zipWith3Equal msg _ _  _   _    =  panic ("zipWith3Equal: unequal lists: "++msg)
+zipWith3Equal z (a:as) (b:bs) (c:cs)
+                                =  z a b c : zipWith3Equal z as bs cs
+zipWith3Equal _ [] []  []   =  []
+zipWith3Equal _ _  _   _    =  panic "zipWith3Equal: unequal lists"
 
-zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
-                                =  z a b c d : zipWith4Equal msg z as bs cs ds
-zipWith4Equal _   _ [] [] [] [] =  []
-zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists: "++msg)
+zipWith4Equal z (a:as) (b:bs) (c:cs) (d:ds)
+                                =  z a b c d : zipWith4Equal z as bs cs ds
+zipWith4Equal _ [] [] [] [] =  []
+zipWith4Equal _ _  _  _  _  =  panic "zipWith4Equal: unequal lists"
 #endif
 
 -- | 'filterByList' takes a list of Bools and a list of some elements and
@@ -468,14 +468,15 @@ only _ = panic "Util: only"
 -- | Extract the single element of a list and panic with the given message if
 -- there are more elements or the list was empty.
 -- Like 'expectJust', but for lists.
-expectOnly :: HasDebugCallStack => String -> [a] -> a
+expectOnly :: HasCallStack => [a] -> a
+-- always enable the call stack to get the location even on non-debug builds
 {-# INLINE expectOnly #-}
 #if defined(DEBUG)
-expectOnly _   [a]   = a
+expectOnly [a]   = a
 #else
-expectOnly _   (a:_) = a
+expectOnly (a:_) = a
 #endif
-expectOnly msg _     = panic ("expectOnly: " ++ msg)
+expectOnly _     = panic "expectOnly"
 
 -- | Compute all the ways of removing a single element from a list.
 --
@@ -491,13 +492,14 @@ changeLast [_]    x  = [x]
 changeLast (x:xs) x' = x : changeLast xs x'
 
 -- | Like @expectJust msg . nonEmpty@; a better alternative to 'NE.fromList'.
-expectNonEmpty :: HasDebugCallStack => String -> [a] -> NonEmpty a
+expectNonEmpty :: HasCallStack => [a] -> NonEmpty a
+-- always enable the call stack to get the location even on non-debug builds
 {-# INLINE expectNonEmpty #-}
-expectNonEmpty _   (x:xs) = x:|xs
-expectNonEmpty msg []     = expectNonEmptyPanic msg
+expectNonEmpty (x:xs) = x:|xs
+expectNonEmpty []     = expectNonEmptyPanic
 
-expectNonEmptyPanic :: String -> a
-expectNonEmptyPanic msg = panic ("expectNonEmpty: " ++ msg)
+expectNonEmptyPanic :: HasCallStack => a
+expectNonEmptyPanic = panic "expectNonEmpty"
 {-# NOINLINE expectNonEmptyPanic #-}
 
 whenNonEmpty :: Applicative m => [a] -> (NonEmpty a -> m ()) -> m ()

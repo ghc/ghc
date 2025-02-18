@@ -503,7 +503,7 @@ zipCoEnv cvs cos
   , not (all isCoVar cvs)
   = pprPanic "zipCoEnv" (ppr cvs <+> ppr cos)
   | otherwise
-  = mkVarEnv (zipEqual "zipCoEnv" cvs cos)
+  = mkVarEnv (zipEqual cvs cos)
 
 -- Pretty printing, for debugging only
 

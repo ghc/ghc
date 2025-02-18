@@ -418,7 +418,7 @@ seqHValue interp unit_env ref =
 
 evalBreakpointToId :: HomePackageTable -> EvalBreakpoint -> IO InternalBreakpointId
 evalBreakpointToId hpt eval_break =
-  let load_mod x = mi_module . hm_iface . expectJust "evalBreakpointToId" <$> lookupHpt hpt (mkModuleName x)
+  let load_mod x = mi_module . hm_iface . expectJust <$> lookupHpt hpt (mkModuleName x)
   in do
     tickl <- load_mod (eb_tick_mod eval_break)
     infol <- load_mod (eb_info_mod eval_break)
@@ -452,7 +452,7 @@ handleSeqHValueStatus interp unit_env eval_status =
 
           -- Just case: Stopped at a breakpoint, extract SrcSpan information
           -- from the breakpoint.
-          breaks_tick <- getModBreaks . expectJust "getSeqBpSpan" <$>
+          breaks_tick <- getModBreaks . expectJust <$>
                           lookupHpt (ue_hpt unit_env) (moduleName (ibi_tick_mod bi))
           put $ brackets . ppr $
             (modBreaks_locs breaks_tick) ! ibi_tick_index bi

@@ -720,7 +720,7 @@ getFCallArgs ::
 -- Precondition: args and typs have the same length
 -- See Note [Unlifted boxed arguments to foreign calls]
 getFCallArgs args typ
-  = do  { mb_cmms <- mapM get (zipEqual "getFCallArgs" args (collectStgFArgTypes typ))
+  = do  { mb_cmms <- mapM get (zipEqual args (collectStgFArgTypes typ))
         ; return (catMaybes mb_cmms) }
   where
     get (arg,typ)

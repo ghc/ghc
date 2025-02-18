@@ -111,7 +111,7 @@ satBind (Rec pairs) interesting_ids = do
     let (binders, rhss) = unzip pairs
     rhss_SATed <- mapM (\e -> satTopLevelExpr e interesting_ids) rhss
     let (rhss', sat_info_rhss') = unzip rhss_SATed
-    return (Rec (zipEqual "satBind" binders rhss'), mergeIdSATInfos sat_info_rhss')
+    return (Rec (zipEqual binders rhss'), mergeIdSATInfos sat_info_rhss')
 
 data App = VarApp Id | TypeApp Type | CoApp Coercion
 data Staticness a = Static a | NotStatic

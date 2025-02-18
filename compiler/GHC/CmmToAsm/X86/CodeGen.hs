@@ -4190,7 +4190,7 @@ loadOrPushArg config (stk_arg, mb_off) =
                 , LEA II64 (OpAddr (spRel platform off)) (OpReg tmp)
                 , MOV II64 (OpReg tmp) (OpAddr (spRel platform 0)) ]
           return (nilOL, push_code)
-      where off = expectJust "push_arg_win offset" mb_off
+      where off = expectJust mb_off
     where
       arg_ref_size = 8 -- passing a reference to the argument
       platform = ncgPlatform config

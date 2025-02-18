@@ -268,7 +268,7 @@ getOptions' opts supported toks
                   Right args -> fmap (args ++) (parseToks xs)
             where
               src_span      = getLoc open
-              real_src_span = expectJust "getOptions'" (srcSpanToRealSrcSpan src_span)
+              real_src_span = expectJust (srcSpanToRealSrcSpan src_span)
               starting_loc  = realSrcSpanStart real_src_span
           parseToks (open:close:xs)
               | ITinclude_prag str <- unLoc open

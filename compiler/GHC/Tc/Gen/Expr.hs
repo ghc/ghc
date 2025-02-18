@@ -1654,7 +1654,7 @@ tcRecordBinds con_like arg_tys (HsRecFields x rbinds dd)
         ; return (HsRecFields x (catMaybes mb_binds) dd) }
   where
     fields = map flSelector $ conLikeFieldLabels con_like
-    flds_w_tys = zipEqual "tcRecordBinds" fields arg_tys
+    flds_w_tys = zipEqual fields arg_tys
 
     do_bind :: LHsRecField GhcRn (LHsExpr GhcRn)
             -> TcM (Maybe (LHsRecField GhcTc (LHsExpr GhcTc)))

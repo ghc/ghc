@@ -624,9 +624,8 @@ schemeE d s p (StgLet _ext binds body) = do
          -- after the closures have been allocated in the heap (but not
          -- filled in), and pointers to them parked on the stack.
          offsets = mkStackOffsets d (genericReplicate n_binds (wordSize platform))
-         p' = Map.insertList (zipE xs offsets) p
+         p' = Map.insertList (zipEqual xs offsets) p
          d' = d + wordsToBytes platform n_binds
-         zipE = zipEqual "schemeE"
 
          -- ToDo: don't build thunks for things with no free variables
          build_thunk

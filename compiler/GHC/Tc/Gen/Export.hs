@@ -1000,7 +1000,7 @@ addDuplicateFieldExportErr :: (GlobalRdrElt, IE GhcPs)
                            -> RnM ()
 addDuplicateFieldExportErr gre others
   = do { rdr_env <- getGlobalRdrEnv
-       ; let lkup = expectJust "addDuplicateFieldExportErr" . lookupGRE_Name rdr_env
+       ; let lkup = expectJust . lookupGRE_Name rdr_env
              other_gres = fmap (first lkup) others
        ; addErr (TcRnDuplicateFieldExport gre other_gres) }
 

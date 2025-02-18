@@ -543,7 +543,7 @@ machOpResultType platform mop tys =
     MO_RelaxedRead w    -> cmmBits w
     MO_AlignmentCheck _ _ -> ty1
   where
-    ty1:|_ = expectNonEmpty "machOpResultType" tys
+    ty1:|_ = expectNonEmpty tys
 
 comparisonResultRep :: Platform -> CmmType
 comparisonResultRep = bWord  -- is it?

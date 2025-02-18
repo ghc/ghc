@@ -799,7 +799,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
         ; new_vars    <- case matches of
                            []    -> newSysLocalsDs arg_tys
                            (m:_) ->
-                            selectMatchVars (zipWithEqual "matchWrapper"
+                            selectMatchVars (zipWithEqual
                                               (\a b -> (scaledMult a, unLoc b))
                                                 arg_tys
                                                 (hsLMatchPats m))
@@ -1220,7 +1220,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
                           , syn_arg_wraps = arg_wraps2
                           , syn_res_wrap  = res_wrap2 })
       = exp expr1 expr2 &&
-        and (zipWithEqual "viewLExprEq" wrap arg_wraps1 arg_wraps2) &&
+        and (zipWithEqual wrap arg_wraps1 arg_wraps2) &&
         wrap res_wrap1 res_wrap2
     syn_exp NoSyntaxExprTc NoSyntaxExprTc = True
     syn_exp _              _              = False

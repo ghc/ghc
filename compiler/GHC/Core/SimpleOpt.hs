@@ -277,7 +277,7 @@ simple_opt_expr env expr
           _       -> foldr wrapLet (simple_opt_expr env' rhs) mb_prs
             where
               (env', mb_prs) = mapAccumL (simple_out_bind NotTopLevel) env $
-                               zipEqual "simpleOptExpr" bs es
+                               zipEqual bs es
 
          -- See Note [Getting the map/coerce RULE to work]
       | isDeadBinder b
@@ -1438,7 +1438,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
       = (in_scope', floats', ty_args ++ val_args')
       where
         (ty_args, val_args) = splitAtList (dataConUnivAndExTyCoVars dc) args
-        (in_scope', floats', val_args') = foldr do_one (in_scope, [], []) $ zipEqual "mkFieldSeqFloats" str_marks val_args
+        (in_scope', floats', val_args') = foldr do_one (in_scope, [], []) $ zipEqual str_marks val_args
         str_marks = dataConRepStrictness dc
         do_one (str, arg) (in_scope,floats,args)
           | NotMarkedStrict <- str   = no_seq

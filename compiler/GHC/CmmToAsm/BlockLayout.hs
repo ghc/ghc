@@ -508,8 +508,8 @@ mergeChains edges chains
               union cFrom new_point
             merge edges chains
           where
-            cFrom = expectJust "mergeChains:chainMap:from" $ mapLookup from chains
-            cTo = expectJust "mergeChains:chainMap:to"   $ mapLookup to   chains
+            cFrom = expectJust $ mapLookup from chains
+            cTo = expectJust $ mapLookup to   chains
 
 
 -- See Note [Chain based CFG serialization] for the general idea.
@@ -757,7 +757,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
             --pprTraceIt "placedBlocks" $
             -- ++ [] is still kinda expensive
             if null unplaced then blockList else blockList ++ unplaced
-        getBlock bid = expectJust "Block placement" $ mapLookup bid blockMap
+        getBlock bid = expectJust $ mapLookup bid blockMap
     in
         --Assert we placed all blocks given as input
         assert (all (\bid -> mapMember bid blockMap) placedBlocks) $

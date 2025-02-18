@@ -336,7 +336,7 @@ deSugarExpr hsc_env tc_expr = do
 
       -- mb_result is Nothing only when a failure happens in the type-checker,
       -- but mb_core_expr is Nothing when a failure happens in the desugarer
-    let (ds_msgs, mb_core_expr) = expectJust "deSugarExpr" mb_result
+    let (ds_msgs, mb_core_expr) = expectJust mb_result
 
     case mb_core_expr of
        Nothing   -> return ()

@@ -166,7 +166,7 @@ getHistorySpan hsc_env hist = do
 -- for each tick.
 findEnclosingDecls :: HscEnv -> InternalBreakpointId -> IO [String]
 findEnclosingDecls hsc_env ibi = do
-   hmi <- expectJust "findEnclosingDecls" <$> HUG.lookupHugByModule (ibi_tick_mod ibi) (hsc_HUG hsc_env)
+   hmi <- expectJust <$> HUG.lookupHugByModule (ibi_tick_mod ibi) (hsc_HUG hsc_env)
    return $
      modBreaks_decls (getModBreaks hmi) ! ibi_tick_index ibi
 
@@ -333,7 +333,7 @@ handleRunStatus step expr bindings final_ids status history0
        let interp = hscInterp hsc_env
        let dflags = hsc_dflags hsc_env
        ibi <- liftIO $ evalBreakpointToId (hsc_HPT hsc_env) eval_break
-       hmi <- liftIO $ expectJust "handleRunStatus" <$>
+       hmi <- liftIO $ expectJust <$>
                 lookupHpt (hsc_HPT hsc_env) (moduleName (ibi_tick_mod ibi))
        let breaks = getModBreaks hmi
 
@@ -467,7 +467,7 @@ resumeExec canLogSpan step mbCnt
 setupBreakpoint :: GhcMonad m => HscEnv -> BreakpointId -> Int -> m ()   -- #19157
 setupBreakpoint hsc_env bi cnt = do
   let modl = bi_tick_mod bi
-  modBreaks <- getModBreaks . expectJust "setupBreakpoint" <$>
+  modBreaks <- getModBreaks . expectJust <$>
                 liftIO (lookupHpt (hsc_HPT hsc_env) (moduleName modl))
   let breakarray = modBreaks_flags modBreaks
       interp = hscInterp hsc_env
@@ -561,13 +561,13 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just ibi) = do
        interp    = hscInterp hsc_env
 
        info_mod  = ibi_info_mod ibi
-   info_hmi <- expectJust "bindLocalsAtBreakpoint" <$> lookupHpt (hsc_HPT hsc_env) (moduleName info_mod)
+   info_hmi <- expectJust <$> lookupHpt (hsc_HPT hsc_env) (moduleName info_mod)
    let
        info_brks = getModBreaks info_hmi
-       info      = expectJust "bindLocalsAtBreakpoint2" $ IntMap.lookup (ibi_info_index ibi) (modBreaks_breakInfo info_brks)
+       info      = expectJust $ IntMap.lookup (ibi_info_index ibi) (modBreaks_breakInfo info_brks)
 
        tick_mod  = ibi_tick_mod ibi
-   tick_hmi <- expectJust "bindLocalsAtBreakpoint" <$> lookupHpt (hsc_HPT hsc_env) (moduleName tick_mod)
+   tick_hmi <- expectJust <$> lookupHpt (hsc_HPT hsc_env) (moduleName tick_mod)
    let
        tick_brks = getModBreaks tick_hmi
        occs      = modBreaks_vars tick_brks ! ibi_tick_index ibi
@@ -661,7 +661,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just ibi) = do
    syncOccs mbVs ocs = unzip3 $ catMaybes $ joinOccs mbVs ocs
      where
        joinOccs :: [Maybe (a,b)] -> [c] -> [Maybe (a,b,c)]
-       joinOccs = zipWithEqual "bindLocalsAtBreakpoint" joinOcc
+       joinOccs = zipWithEqual joinOcc
        joinOcc mbV oc = (\(a,b) c -> (a,b,c)) <$> mbV <*> pure oc
 
 rttiEnvironment :: HscEnv -> IO HscEnv
@@ -676,7 +676,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
      noSkolems = noFreeVarsOfType . idType
      improveTypes hsc_env@HscEnv{hsc_IC=ic} name = do
       let tmp_ids = [id | AnId id <- ic_tythings ic]
-          id = expectJust "rttiEnvironment" $ find (\i -> idName i == name) tmp_ids
+          id = expectJust $ find (\i -> idName i == name) tmp_ids
       if noSkolems id
          then return hsc_env
          else do

@@ -233,7 +233,7 @@ transitiveHomeDeps uid hug = case lookupHugUnit uid hug of
         | otherwise =
           let hue = homeUnitDepends
                     . homeUnitEnv_units
-                    . expectJust "transitiveHomeDeps: homeUnitDepends of unit not found in hug"
+                    . expectJust
                     $ lookupHugUnit uid hug
           in loop (Set.insert uid acc) (hue ++ uids)
 
@@ -311,7 +311,7 @@ unitEnv_foldWithKey :: (b -> UnitEnvGraphKey -> a -> b) -> b -> UnitEnvGraph a -
 unitEnv_foldWithKey f z (UnitEnvGraph g)= Map.foldlWithKey' f z g
 
 unitEnv_lookup :: UnitEnvGraphKey -> UnitEnvGraph v -> v
-unitEnv_lookup u env = expectJust "unitEnv_lookup" $ unitEnv_lookup_maybe u env
+unitEnv_lookup u env = expectJust $ unitEnv_lookup_maybe u env
 
 --------------------------------------------------------------------------------
 -- * Utilities

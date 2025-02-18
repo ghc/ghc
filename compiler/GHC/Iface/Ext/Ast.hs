@@ -305,7 +305,7 @@ mkHieFile :: MonadIO m
           -> TcGblEnv
           -> RenamedSource -> m HieFile
 mkHieFile ms ts rs = do
-  let src_file = expectJust "mkHieFile" (ml_hs_file $ ms_location ms)
+  let src_file = expectJust (ml_hs_file $ ms_location ms)
   src <- liftIO $ BS.readFile src_file
   pure $ mkHieFileWithSource src_file src ms ts rs
 

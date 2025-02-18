@@ -556,8 +556,7 @@ getStrictConArgs con args
                      text "Con" <> ppr con <+> text "is applied to" <+> ppr args $$
                      text "But seems to have arity" <> ppr (length repStrictness)) $
         [ arg | (arg,MarkedStrict)
-                    <- zipEqual "getStrictConArgs"
-                                args
+                    <- zipEqual args
                                 repStrictness]
         where
             repStrictness = (dataConRuntimeRepStrictness con)

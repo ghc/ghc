@@ -221,7 +221,7 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
       | otherwise
       = arg_vars
       where
-        fld_var_env = mkNameEnv $ zipEqual "get_arg_vars" fields1 arg_vars
+        fld_var_env = mkNameEnv $ zipEqual fields1 arg_vars
         lookup_fld (L _ rpat) = lookupNameEnv_NF fld_var_env
                                             (idName (hsRecFieldId rpat))
 
@@ -250,7 +250,7 @@ selectConMatchVars arg_tys con
       PrefixCon _ ps -> selectMatchVars (zipMults arg_tys ps)
       InfixCon p1 p2 -> selectMatchVars (zipMults arg_tys [p1, p2])
   where
-    zipMults = zipWithEqual "selectConMatchVar" (\a b -> (scaledMult a, unLoc b))
+    zipMults = zipWithEqual (\a b -> (scaledMult a, unLoc b))
 
 conArgPats :: [Scaled Type]-- Instantiated argument types
                           -- Used only to fill in the types of WildPats, which

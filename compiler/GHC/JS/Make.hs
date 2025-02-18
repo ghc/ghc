@@ -599,7 +599,7 @@ infixl 2 ||=, |=
 infixl 8 .!
 
 assignAllEqual :: HasDebugCallStack => [JStgExpr] -> [JStgExpr] -> JStgStat
-assignAllEqual xs ys = mconcat (zipWithEqual "assignAllEqual" (|=) xs ys)
+assignAllEqual xs ys = mconcat (zipWithEqual (|=) xs ys)
 
 assignAll :: [JStgExpr] -> [JStgExpr] -> JStgStat
 assignAll xs ys = mconcat (zipWith (|=) xs ys)

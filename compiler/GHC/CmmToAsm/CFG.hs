@@ -311,8 +311,8 @@ shortcutWeightMap cuts cfg
         cuts_vars <- traverse (\p -> (p,) <$> fresh (Just p)) (concatMap (\(a, b) -> [a] ++ maybe [] (:[]) b) cuts_list)
         let cuts_map = mapFromList cuts_vars :: LabelMap (Point s (Maybe BlockId))
         -- Then unify according to the rewrites in the cuts map
-        mapM_ (\(from, to) -> expectJust "shortcutWeightMap" (mapLookup from cuts_map)
-                              `union` expectJust "shortcutWeightMap" (maybe (Just null) (flip mapLookup cuts_map) to) ) cuts_list
+        mapM_ (\(from, to) -> expectJust (mapLookup from cuts_map)
+                              `union` expectJust (maybe (Just null) (flip mapLookup cuts_map) to) ) cuts_list
         -- Then recover the unique representative, which is the result of following
         -- the chain to the end.
         mapM find cuts_map
@@ -416,13 +416,10 @@ getEdgeInfo from to m
     = Nothing
 
 getEdgeWeight :: CFG -> BlockId -> BlockId -> EdgeWeight
-getEdgeWeight cfg from to =
-    edgeWeight $ expectJust "Edgeweight for nonexisting block" $
-                 getEdgeInfo from to cfg
+getEdgeWeight cfg from to = edgeWeight $ expectJust $ getEdgeInfo from to cfg
 
 getTransitionSource :: BlockId -> BlockId -> CFG -> TransitionSource
-getTransitionSource from to cfg = transitionSource $ expectJust "Source info for nonexisting block" $
-                        getEdgeInfo from to cfg
+getTransitionSource from to cfg = transitionSource $ expectJust $ getEdgeInfo from to cfg
 
 reverseEdges :: CFG -> CFG
 reverseEdges cfg = mapFoldlWithKey (\cfg from toMap -> go (addNode cfg from) from toMap) mapEmpty cfg
@@ -1004,7 +1001,7 @@ mkGlobalWeights root localCfg
     blockMapping = listArray (0,mapSize vertexMapping - 1) revOrder :: Array Int BlockId
     -- Map from blockId to indices starting at zero
     toVertex :: BlockId -> Int
-    toVertex   blockId  = expectJust "mkGlobalWeights" $ mapLookup blockId vertexMapping
+    toVertex   blockId  = expectJust $ mapLookup blockId vertexMapping
     -- Map from indices starting at zero to blockIds
     fromVertex :: Int -> BlockId
     fromVertex vertex   = blockMapping ! vertex

@@ -346,7 +346,7 @@ lookupIfaceByModule hug pit mod
    -- of its own, but it doesn't seem worth the bother.
 
 mainModIs :: HomeUnitEnv -> Module
-mainModIs hue = mkHomeModule (expectJust "mainModIs" $ homeUnitEnv_home_unit hue) (mainModuleNameIs (homeUnitEnv_dflags hue))
+mainModIs hue = mkHomeModule (expectJust $ homeUnitEnv_home_unit hue) (mainModuleNameIs (homeUnitEnv_dflags hue))
 
 -- | Retrieve the target code interpreter
 --

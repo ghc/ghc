@@ -465,7 +465,7 @@ matchWithDict [cls, mty]
                  (Var sv `Cast` mkTransCo (mkSubCo co2) (mkSymCo co))
 
        ; tc <- tcLookupTyCon withDictClassName
-       ; let withdict_data_con = expectJust "matchWithDict"
+       ; let withdict_data_con = expectJust
                  $ tyConSingleDataCon_maybe tc    -- "Data constructor"
                                                   -- for WithDict
              mk_ev [c] = evDataConApp withdict_data_con
@@ -1279,7 +1279,7 @@ matchHasField dflags short_cut clas tys mb_ct_loc
                                       `mkTransCo` mkSymCo co2
                          mk_ev [] = panic "matchHasField.mk_ev"
 
-                         (_, co2) = expectJust "matchHasField" $
+                         (_, co2) = expectJust $
                              tcInstNewTyCon_maybe (classTyCon clas) tys
 
                      -- The selector must not be "naughty" (i.e. the field

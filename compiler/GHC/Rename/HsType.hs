@@ -1346,7 +1346,7 @@ lookupField fl_env (FieldOcc _ (L lr rdr)) =
   where
     lbl = occNameFS $ rdrNameOcc rdr
     sel = flSelector
-        $ expectJust "lookupField"
+        $ expectJust
         $ lookupFsEnv fl_env lbl
 
 {-

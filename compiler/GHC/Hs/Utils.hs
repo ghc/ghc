@@ -287,8 +287,7 @@ mkHsSyntaxApps :: SrcSpanAnnA -> SyntaxExprTc -> [LHsExpr GhcTc]
 mkHsSyntaxApps ann (SyntaxExprTc { syn_expr      = fun
                                  , syn_arg_wraps = arg_wraps
                                  , syn_res_wrap  = res_wrap }) args
-  = mkLHsWrap res_wrap (foldl' mkHsApp (L ann fun) (zipWithEqual "mkHsSyntaxApps"
-                                                     mkLHsWrap arg_wraps args))
+  = mkLHsWrap res_wrap (foldl' mkHsApp (L ann fun) (zipWithEqual mkLHsWrap arg_wraps args))
 mkHsSyntaxApps _ NoSyntaxExprTc args = pprPanic "mkHsSyntaxApps" (ppr args)
   -- this function should never be called in scenarios where there is no
   -- syntax expr

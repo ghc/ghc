@@ -4672,7 +4672,7 @@ checkFieldCompat fld con1 con2 res1 res2 fty1 fty2
         ; checkTc (isJust mb_subst2) (TcRnCommonFieldTypeMismatch con1 con2 fld) }
   where
     mb_subst1 = tcMatchTy res1 res2
-    mb_subst2 = tcMatchTyX (expectJust "checkFieldCompat" mb_subst1) fty1 fty2
+    mb_subst2 = tcMatchTyX (expectJust mb_subst1) fty1 fty2
 
 -------------------------------
 checkValidDataCon :: DynFlags -> Bool -> TyCon -> DataCon -> TcM ()

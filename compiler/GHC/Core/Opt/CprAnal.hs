@@ -281,7 +281,7 @@ cprAnalAlt env scrut_ty (Alt con bndrs rhs)
             -> extendSigEnvAllSame env ids sig
           ForeachField field_cprs
             | let sigs = zipWith (mkCprSig . idArity) ids field_cprs
-            -> extendSigEnvList env (zipEqual "cprAnalAlt" ids sigs)
+            -> extendSigEnvList env (zipEqual ids sigs)
       | otherwise
       = extendSigEnvAllSame env ids topCprSig
     (rhs_ty, rhs') = cprAnal env_alt rhs

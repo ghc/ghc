@@ -732,7 +732,7 @@ unariseAlts rho (MultiValAlt _) bndr [GenStgAlt{ alt_con    = DEFAULT
 unariseAlts rho (MultiValAlt _) bndr alts
   | isUnboxedSumBndr bndr
   = do (rho_sum_bndrs, scrt_bndrs) <- unariseConArgBinder rho bndr
-       let tag_bndr:|real_bndrs = expectNonEmpty "unariseAlts" scrt_bndrs
+       let tag_bndr:|real_bndrs = expectNonEmpty scrt_bndrs
        alts' <- unariseSumAlts rho_sum_bndrs (map StgVarArg real_bndrs) alts
        let inner_case = StgCase (StgApp tag_bndr []) tag_bndr tagAltTy alts'
        return [GenStgAlt{ alt_con   = DataAlt (tupleDataCon Unboxed (length scrt_bndrs))
@@ -929,7 +929,7 @@ mkUbxSum dc ty_args args0 us
       layout'  = layoutUbxSum sum_slots field_slots
 
       tag_arg  = StgLitArg (LitNumber LitNumInt (fromIntegral tag))
-      arg_idxs = IM.fromList (zipEqual "mkUbxSum" layout' args0)
+      arg_idxs = IM.fromList (zipEqual layout' args0)
 
       ((_idx,_idx_map,_us,wrapper),slot_args)
         = assert (length arg_idxs <= length sum_slots ) $

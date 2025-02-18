@@ -374,7 +374,7 @@ isGcJump _something_else = False
 
 collectContInfo :: [CmmBlock] -> (ByteOff, LabelMap ByteOff)
 collectContInfo blocks
-  = (maximum (expectNonEmpty "collectContInfo" ret_offs), mapFromList (catMaybes mb_argss))
+  = (maximum (expectNonEmpty ret_offs), mapFromList (catMaybes mb_argss))
  where
   (mb_argss, ret_offs) = mapAndUnzip get_cont blocks
 

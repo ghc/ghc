@@ -581,7 +581,7 @@ restrictVarEnv env vs = filterUFM_Directly keep env
   where
     keep u _ = u `elemVarSetByKey` vs
 
-zipVarEnv tyvars tys   = mkVarEnv (zipEqual "zipVarEnv" tyvars tys)
+zipVarEnv tyvars tys   = mkVarEnv (zipEqual tyvars tys)
 lookupVarEnv_NF env id = case lookupVarEnv env id of
                          Just xx -> xx
                          Nothing -> panic "lookupVarEnv_NF: Nothing"

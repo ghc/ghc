@@ -112,9 +112,9 @@ cyclicGraphReachability (Graph g from to) =
 -- If you need a topologically sorted list, consider using the functions exposed from 'GHC.Data.Graph.Directed' on 'Graph' instead.
 allReachable :: ReachabilityIndex node -> node {-^ The @root@ node -} -> [node] {-^ All nodes reachable from @root@ -}
 allReachable (ReachabilityIndex index from to) root = map from result
-  where root_i = expectJust "reachableFrom" (to root)
+  where root_i = expectJust (to root)
         hits = {-# SCC "allReachable" #-} IM.lookup root_i index
-        result = IS.toList $! expectJust "reachableFrom" hits
+        result = IS.toList $! expectJust hits
 
 -- | 'allReachableMany' returns all nodes reachable from the many given @roots@.
 --
@@ -130,7 +130,7 @@ allReachableMany :: ReachabilityIndex node -> [node] {-^ The @roots@ -} -> [node
 allReachableMany (ReachabilityIndex index from to) roots = map from (IS.toList hits)
   where roots_i = [ v | Just v <- map to roots ]
         hits = {-# SCC "allReachableMany" #-}
-               IS.unions $ map (expectJust "reachablesG" . flip IM.lookup index) roots_i
+               IS.unions $ map (expectJust . flip IM.lookup index) roots_i
 
 -- | Fast reachability query.
 --
@@ -146,9 +146,9 @@ isReachable :: ReachabilityIndex node {-^ @g@ -}
             -> Bool -- ^ @b@ is reachable from @a@
 isReachable (ReachabilityIndex index _ to) a b =
     IS.member b_i $
-    expectJust "reachable" $ IM.lookup a_i index
-  where a_i = expectJust "reachable:node not in graph" $ to a
-        b_i = expectJust "reachable:node not in graph" $ to b
+    expectJust $ IM.lookup a_i index
+  where a_i = expectJust $ to a
+        b_i = expectJust $ to b
 
 -- | Fast reachability query with many roots.
 --
@@ -165,7 +165,7 @@ isReachableMany :: ReachabilityIndex node -- ^ @g@
 isReachableMany (ReachabilityIndex index _ to) roots b =
     IS.member b_i $
     IS.unions $
-    map (expectJust "reachablesQuery" . flip IM.lookup index) roots_i
+    map (expectJust . flip IM.lookup index) roots_i
   where roots_i = [ v | Just v <- map to roots ]
-        b_i = expectJust "reachablesQuery:node not in graph" $ to b
+        b_i = expectJust $ to b
 

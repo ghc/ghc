@@ -4352,7 +4352,7 @@ listModuleLine modl line = do
    case this of
      Nothing -> panic "listModuleLine"
      Just summ -> do
-           let filename = expectJust "listModuleLine" (ml_hs_file (GHC.ms_location summ))
+           let filename = expectJust (ml_hs_file (GHC.ms_location summ))
                loc = mkRealSrcLoc (mkFastString (filename)) line 0
            listAround (realSrcLocSpan loc) False
 

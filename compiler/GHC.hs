@@ -1769,7 +1769,7 @@ modNotLoadedError :: DynFlags -> Module -> ModLocation -> IO a
 modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc dflags $
    text "module is not loaded:" <+>
    quotes (ppr (moduleName m)) <+>
-   parens (text (expectJust "modNotLoadedError" (ml_hs_file loc)))
+   parens (text (expectJust (ml_hs_file loc)))
 
 renamePkgQualM :: GhcMonad m => ModuleName -> Maybe FastString -> m PkgQual
 renamePkgQualM mn p = withSession $ \hsc_env -> pure (renamePkgQual (hsc_unit_env hsc_env) mn p)

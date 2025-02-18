@@ -169,7 +169,7 @@ chooseSpill
 chooseSpill info graph
  = let  cost    = spillCost_length info graph
         node    = minimumBy (\n1 n2 -> compare (cost $ nodeId n1) (cost $ nodeId n2))
-                $ expectNonEmpty "chooseSpill" $ nonDetEltsUFM $ graphMap graph
+                $ expectNonEmpty $ nonDetEltsUFM $ graphMap graph
                 -- See Note [Unique Determinism and code generation]
 
    in   nodeId node

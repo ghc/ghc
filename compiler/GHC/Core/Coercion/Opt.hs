@@ -687,7 +687,7 @@ opt_univ1 env prov cvs' role oty1 oty2
 
 -------------
 opt_transList :: HasDebugCallStack => InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
-opt_transList is = zipWithEqual "opt_transList" (opt_trans is)
+opt_transList is = zipWithEqual (opt_trans is)
   -- The input lists must have identical length.
 
 opt_trans :: HasDebugCallStack => InScopeSet -> NormalCo -> NormalCo -> NormalCo

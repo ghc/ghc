@@ -334,7 +334,7 @@ buildUnit session cid insts lunit = do
         ok <- load' noIfaceCache LoadAllTargets mkUnknownDiagnostic (Just msg) mod_graph
         when (failed ok) (liftIO $ exitWith (ExitFailure 1))
 
-        let hi_dir = expectJust (panic "hiDir Backpack") $ hiDir dflags
+        let hi_dir = expectJust $ hiDir dflags
             export_mod ms = (ms_mod_name ms, ms_mod ms)
             -- Export everything!
             mods = [ export_mod ms | ms <- mgModSummaries mod_graph
@@ -344,7 +344,7 @@ buildUnit session cid insts lunit = do
         hsc_env <- getSession
         let takeLinkables x
               | mi_hsc_src (hm_iface x) == HsSrcFile
-              = [Just $ expectJust "bkp link" $ homeModInfoObject x]
+              = [Just $ expectJust $ homeModInfoObject x]
               | otherwise
               = [Nothing]
         linkables <- liftIO $ catMaybes <$> concatHpt takeLinkables (hsc_HPT hsc_env)

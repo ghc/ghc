@@ -252,7 +252,7 @@ compileOne' mHscMessage
 
  where lcl_dflags  = ms_hspp_opts summary
        location    = ms_location summary
-       input_fn    = expectJust "compile:hs" (ml_hs_file location)
+       input_fn    = expectJust (ml_hs_file location)
        input_fnpp  = ms_hspp_file summary
 
        pipelineOutput = backendPipelineOutput bcknd

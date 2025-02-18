@@ -1889,8 +1889,7 @@ lookupModuleInAllUnits pkgs m
   = case lookupModuleWithSuggestions pkgs m NoPkgQual of
       LookupFound a b -> [(a,fst b)]
       LookupMultiple rs -> map f rs
-        where f (m,_) = (m, expectJust "lookupModule" (lookupUnit pkgs
-                                                         (moduleUnit m)))
+        where f (m,_) = (m, expectJust (lookupUnit pkgs (moduleUnit m)))
       _ -> []
 
 -- | The result of performing a lookup

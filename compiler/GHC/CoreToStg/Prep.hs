@@ -1667,7 +1667,7 @@ maybeSaturate fn expr n_args unsat_ticks
     excess_arity  = (max fn_arity mark_arity) - n_args
     sat_expr      = cpeEtaExpand excess_arity expr
     applied_marks = n_args >= (length . dropWhile (not . isMarkedCbv) .
-                               reverse . expectJust "maybeSaturate" $ (idCbvMarks_maybe fn))
+                               reverse . expectJust $ (idCbvMarks_maybe fn))
     -- For join points we never eta-expand (See Note [Do not eta-expand join points])
     -- so we assert all arguments that need to be passed cbv are visible so that the
     -- backend can evalaute them if required..

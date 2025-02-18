@@ -719,7 +719,7 @@ makeFarBranches _platform info_env blocks
             = BCCFAR cond tgt p
             | otherwise
             = BCC cond tgt p
-            where targetAddr = expectJust "makeFarBranches" $ lookupUFM blockAddressMap tgt
+            where targetAddr = expectJust $ lookupUFM blockAddressMap tgt
         makeFar _ other            = other
 
         -- 8192 instructions are allowed; let's keep some distance, as

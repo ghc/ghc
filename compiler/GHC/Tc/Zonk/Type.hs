@@ -1440,7 +1440,7 @@ zonkStmt _zBody (XStmtLR (ApplicativeStmt body_ty args mb_join))
     zonk_args args
       = do { new_args_rev <- zonk_args_rev (reverse args)
            ; new_pats     <- zonkPats (map get_pat args)
-           ; return $ zipWithEqual "zonkStmt" replace_pat
+           ; return $ zipWithEqual replace_pat
                         new_pats (reverse new_args_rev) }
 
      -- these need to go backward, because if any operators are higher-rank,

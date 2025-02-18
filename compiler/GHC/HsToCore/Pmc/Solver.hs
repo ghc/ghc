@@ -679,7 +679,7 @@ addPhiTmCt nabla (PhiNotBotCt x)           = addNotBotCt nabla x
 
 filterUnliftedFields :: PmAltCon -> [Id] -> [Id]
 filterUnliftedFields con args =
-  [ arg | (arg, bang) <- zipEqual "addPhiCt" args (pmAltConImplBangs con)
+  [ arg | (arg, bang) <- zipEqual args (pmAltConImplBangs con)
         , isBanged bang || definitelyUnliftedType (idType arg) ]
 
 -- | Adds the constraint @x ~ ⊥@, e.g. that evaluation of a particular 'Id' @x@
@@ -786,7 +786,7 @@ addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args =
       let ty_cts = equateTys (map mkTyVarTy tvs) (map mkTyVarTy other_tvs)
       nabla' <- MaybeT $ addPhiCts nabla (listToBag ty_cts)
       let add_var_ct nabla (a, b) = addVarCt nabla a b
-      foldlM add_var_ct nabla' $ zipEqual "addConCt" args other_args
+      foldlM add_var_ct nabla' $ zipEqual args other_args
     Nothing -> do
       let pos' = PACA alt tvs args : pos
       let nabla_with bot' =
@@ -804,7 +804,7 @@ addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args =
 equateTys :: [Type] -> [Type] -> [PhiCt]
 equateTys ts us =
   [ PhiTyCt (mkNomEqPred t u)
-  | (t, u) <- zipEqual "equateTys" ts us
+  | (t, u) <- zipEqual ts us
   -- The following line filters out trivial Refl constraints, so that we don't
   -- need to initialise the type oracle that often
   , not (eqType t u)

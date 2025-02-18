@@ -520,7 +520,7 @@ dsExpr (RecordCon { rcon_con  = L _ con_like
 
        ; con_args <- if null labels
                      then mapM unlabelled_bottom (map scaledThing arg_tys)
-                     else mapM mk_arg (zipEqual "dsExpr:RecordCon" (map scaledThing arg_tys) labels)
+                     else mapM mk_arg (zipEqual (map scaledThing arg_tys) labels)
 
        ; return (mkCoreApps con_expr' con_args) }
 
@@ -899,7 +899,7 @@ dsSyntaxExpr (SyntaxExprTc { syn_expr      = expr
   = do { fun <- dsExpr expr
        ; dsHsWrappers arg_wraps $ \core_arg_wraps ->
          dsHsWrapper res_wrap   $ \core_res_wrap ->
-    do { let wrapped_args = zipWithEqual "dsSyntaxExpr" ($) core_arg_wraps arg_exprs
+    do { let wrapped_args = zipWithEqual ($) core_arg_wraps arg_exprs
        ; return $ core_res_wrap (mkCoreApps fun wrapped_args) } }
 dsSyntaxExpr NoSyntaxExprTc _ = panic "dsSyntaxExpr"
 

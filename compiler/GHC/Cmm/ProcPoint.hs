@@ -263,7 +263,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
 
   let liveness = cmmGlobalLiveness platform g
   let ppLiveness pp = filter (isArgReg . globalRegUse_reg) $ regSetToList $
-                        expectJust "ppLiveness" $ mapLookup pp liveness
+                        expectJust $ mapLookup pp liveness
   graphEnv <- return $ foldlGraphBlocks add_block mapEmpty g
 
   -- Build a map from proc point BlockId to pairs of:
@@ -325,7 +325,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
         (jumpEnv, jumpBlocks) <-
            foldM add_jump_block (mapEmpty, []) needed_jumps
             -- update the entry block
-        let b = expectJust "block in env" $ mapLookup ppId blockEnv
+        let b = expectJust $ mapLookup ppId blockEnv
             blockEnv' = mapInsert ppId b blockEnv
             -- replace branches to procpoints with branches to jumps
             blockEnv'' = toBlockMap $ replaceBranches jumpEnv $ ofBlockMap ppId blockEnv'
@@ -343,7 +343,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
                                stack_info = stack_info})
                      top_l live g'
           | otherwise
-          = case expectJust "pp label" $ mapLookup bid procLabels of
+          = case expectJust $ mapLookup bid procLabels of
               (lbl, Just info_lbl)
                  -> CmmProc (TopInfo { info_tbls = mapSingleton (g_entry g) (mkEmptyContInfoTable info_lbl)
                                      , stack_info=stack_info})
@@ -377,8 +377,8 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
           foldl' add_block_num (0::Int, mapEmpty :: LabelMap Int)
                 (revPostorder g)
   let sort_fn (bid, _) (bid', _) =
-        compare (expectJust "block_order" $ mapLookup bid  block_order)
-                (expectJust "block_order" $ mapLookup bid' block_order)
+        compare (expectJust $ mapLookup bid  block_order)
+                (expectJust $ mapLookup bid' block_order)
 
   return $ map to_proc $ sortBy sort_fn $ mapToList graphEnv
 

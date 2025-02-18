@@ -2365,7 +2365,7 @@ pprPanic s d = Panic.pprPanic ("GHC.CmmToLlvm.CodeGen." ++ s) d
 -- | Returns TBAA meta data by unique
 getTBAAMeta :: Unique -> LlvmM [MetaAnnot]
 getTBAAMeta u =
-    List.singleton . MetaAnnot tbaa . MetaNode . expectJust "getTBAAMeta" <$> getUniqMeta u
+    List.singleton . MetaAnnot tbaa . MetaNode . expectJust <$> getUniqMeta u
 
 -- | Returns TBAA meta data for given register
 getTBAARegMeta :: GlobalReg -> LlvmM [MetaAnnot]

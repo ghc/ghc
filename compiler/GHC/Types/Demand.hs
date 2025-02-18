@@ -1841,7 +1841,7 @@ lubDmdType d1 d2 = DmdType lub_fv lub_ds
     n = max (dmdTypeDepth d1) (dmdTypeDepth d2)
     (DmdType fv1 ds1) = etaExpandDmdType n d1
     (DmdType fv2 ds2) = etaExpandDmdType n d2
-    lub_ds  = zipWithEqual "lubDmdType" lubDmd ds1 ds2
+    lub_ds  = zipWithEqual lubDmd ds1 ds2
     lub_fv = lubDmdEnv fv1 fv2
 
 discardArgDmds :: DmdType -> DmdEnv
