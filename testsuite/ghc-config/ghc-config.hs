@@ -1,6 +1,7 @@
 import System.Environment
 import System.Process
 import Data.Maybe
+import Control.Monad
 
 main :: IO ()
 main = do
@@ -9,14 +10,24 @@ main = do
   info <- readProcess ghc ["+RTS", "--info"] ""
   let fields = read info :: [(String,String)]
   getGhcFieldOrFail fields "HostOS" "Host OS"
-  getGhcFieldOrFail fields "WORDSIZE" "Word size"
-  getGhcFieldOrFail fields "TARGETPLATFORM" "Target platform"
-  getGhcFieldOrFail fields "TargetOS_CPP" "Target OS"
-  getGhcFieldOrFail fields "TargetARCH_CPP" "Target architecture"
   getGhcFieldOrFail fields "RTSWay" "RTS way"
+
+  -- support for old GHCs (pre 9.13): infer target platform by querying the rts...
+  let query_rts = isJust (lookup "Target platform" fields)
+  when query_rts $ do
+    getGhcFieldOrFail fields "WORDSIZE" "Word size"
+    getGhcFieldOrFail fields "TARGETPLATFORM" "Target platform"
+    getGhcFieldOrFail fields "TargetOS_CPP" "Target OS"
+    getGhcFieldOrFail fields "TargetARCH_CPP" "Target architecture"
 
   info <- readProcess ghc ["--info"] ""
   let fields = read info :: [(String,String)]
+
+  unless query_rts $ do
+    getGhcFieldOrFail fields "WORDSIZE" "target word size in bits"
+    getGhcFieldOrFail fields "TARGETPLATFORM" "target platform string"
+    getGhcFieldOrFail fields "TargetOS_CPP" "target os string"
+    getGhcFieldOrFail fields "TargetARCH_CPP" "target arch string"
 
   getGhcFieldOrFail fields "GhcStage" "Stage"
   getGhcFieldOrFail fields "GhcDebugAssertions" "Debug on"

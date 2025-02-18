@@ -372,10 +372,6 @@ void printRtsInfo(const RtsConfig rts_config) {
     mkRtsInfoPair("Host architecture",       HostArch);
     mkRtsInfoPair("Host OS",                 HostOS);
     mkRtsInfoPair("Host vendor",             HostVendor);
-    mkRtsInfoPair("Target platform",         TargetPlatform);
-    mkRtsInfoPair("Target architecture",     TargetArch);
-    mkRtsInfoPair("Target OS",               TargetOS);
-    mkRtsInfoPair("Target vendor",           TargetVendor);
     mkRtsInfoPair("Word size",               TOSTRING(WORD_SIZE_IN_BITS));
     // TODO(@Ericson2314) This is a joint property of the RTS and generated
     // code. The compiler will soon be multi-target so it doesn't make sense to

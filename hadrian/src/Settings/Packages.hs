@@ -286,10 +286,6 @@ ghcInternalArgs = package ghcInternal ? do
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
     projectVersion <- getSetting ProjectVersion
-    hostPlatform   <- queryHost targetPlatformTriple
-    hostArch       <- queryHost queryArch
-    hostOs         <- queryHost queryOS
-    hostVendor     <- queryHost queryVendor
     buildPlatform  <- queryBuild targetPlatformTriple
     buildArch      <- queryBuild queryArch
     buildOs        <- queryBuild queryOS
@@ -371,18 +367,16 @@ rtsPackageArgs = package rts ? do
 
           , input "**/RtsUtils.c" ? pure
             [ "-DProjectVersion="            ++ show projectVersion
-            , "-DHostPlatform="              ++ show hostPlatform
-            , "-DHostArch="                  ++ show hostArch
-            , "-DHostOS="                    ++ show hostOs
-            , "-DHostVendor="                ++ show hostVendor
+              -- the RTS' host is the compiler's target (the target should be
+              -- per stage ideally...)
+            , "-DHostPlatform="              ++ show targetPlatform
+            , "-DHostArch="                  ++ show targetArch
+            , "-DHostOS="                    ++ show targetOs
+            , "-DHostVendor="                ++ show targetVendor
             , "-DBuildPlatform="             ++ show buildPlatform
             , "-DBuildArch="                 ++ show buildArch
             , "-DBuildOS="                   ++ show buildOs
             , "-DBuildVendor="               ++ show buildVendor
-            , "-DTargetPlatform="            ++ show targetPlatform
-            , "-DTargetArch="                ++ show targetArch
-            , "-DTargetOS="                  ++ show targetOs
-            , "-DTargetVendor="              ++ show targetVendor
             , "-DGhcUnregisterised="         ++ show (yesNo ghcUnreg)
             , "-DTablesNextToCode="          ++ show (yesNo ghcEnableTNC)
             , "-DRtsWay=\"rts_" ++ show way ++ "\""

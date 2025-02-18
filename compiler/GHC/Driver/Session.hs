@@ -236,6 +236,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Platform.Ways
 import GHC.Platform.Profile
+import GHC.Platform.ArchOS
 
 import GHC.Unit.Types
 import GHC.Unit.Parser
@@ -3455,6 +3456,9 @@ compilerInfo dflags
        ("Build platform",              cBuildPlatformString),
        ("Host platform",               cHostPlatformString),
        ("Target platform",             platformMisc_targetPlatformString $ platformMisc dflags),
+       ("target os string",            stringEncodeOS (platformOS (targetPlatform dflags))),
+       ("target arch string",          stringEncodeArch (platformArch (targetPlatform dflags))),
+       ("target word size in bits",    show (platformWordSizeInBits (targetPlatform dflags))),
        ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ platformMisc dflags),
        ("Object splitting supported",  showBool False),
        ("Have native code generator",  showBool $ platformNcgSupported platform),

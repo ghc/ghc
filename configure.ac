@@ -265,8 +265,8 @@ dnl we ask the bootstrapping compiler what platform it is for
 
 if test "${WithGhc}" != ""
 then
-        bootstrap_host=`"${WithGhc}" +RTS --info | grep '^ ,("Host platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
-        bootstrap_target=`"${WithGhc}" +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
+        bootstrap_host=`"${WithGhc}" --info | grep '^ ,("Host platform"' | sed -e 's/.*,"//' -e 's/")//' | tr -d '\r'`
+        bootstrap_target=`"${WithGhc}" --info | grep '^ ,("Target platform"' | sed -e 's/.*,"//' -e 's/")//' | tr -d '\r'`
         if test "$bootstrap_host" != "$bootstrap_target"
         then
                 echo "Bootstrapping GHC is a cross compiler. This probably isn't going to work"
