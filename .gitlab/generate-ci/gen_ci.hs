@@ -276,7 +276,7 @@ crossConfig triple emulator configure_wrapper =
             }
 
 llvm :: BuildConfig
-llvm = vanilla { llvmBootstrap = True }
+llvm = vanilla { llvmBootstrap = True, testsuiteWays = ["llvm", "optllvm"] }
 
 tsan :: BuildConfig
 tsan = vanilla { threadSanitiser = True }

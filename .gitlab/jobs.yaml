@@ -317,7 +317,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb12-validate+llvm",
-      "TEST_WAYS": ""
+      "TEST_WAYS": "llvm optllvm"
     }
   },
   "i386-linux-alpine3_20-validate": {
@@ -831,7 +831,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb12-validate+llvm",
-      "TEST_WAYS": "",
+      "TEST_WAYS": "llvm optllvm",
       "XZ_OPT": "-9"
     }
   },
@@ -2587,7 +2587,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-validate+llvm",
-      "TEST_WAYS": "",
+      "TEST_WAYS": "llvm optllvm",
       "XZ_OPT": "-9"
     }
   },
@@ -6908,7 +6908,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-validate+llvm",
-      "TEST_WAYS": ""
+      "TEST_WAYS": "llvm optllvm"
     }
   },
   "x86_64-linux-deb12-validate+thread_sanitizer_cmm": {
