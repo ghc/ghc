@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -27,6 +28,7 @@ import GHC.Prelude
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Bag
+import qualified GHC.Data.StringTrie as StringTrie
 import GHC.Types.SrcLoc
 import GHC.Types.Error
 import GHC.Utils.Error
@@ -34,8 +36,7 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.Errors.Ppr () -- instance Diagnostic DriverMessage
 import GHC.Utils.Outputable (text)
 
-import Data.Function
-import Data.List (sortBy, intercalate, stripPrefix)
+import Data.List (intercalate)
 import Data.Word
 
 import GHC.ResponseFile
@@ -182,6 +183,8 @@ processArgs spec args handleRespFile = do
     (errs, warns, spare) <- runEwM action
     return (spare, bagToList errs, warns)
   where
+    !trie = StringTrie.fromList [ (flagName flag, flag) | flag <- spec ]
+
     action = process args []
 
     -- process :: [Located String] -> [Located String] -> EwM m [Located String]
@@ -192,7 +195,7 @@ processArgs spec args handleRespFile = do
         process (resp_args ++ args) spare
 
     process (locArg@(L _ ('-' : arg)) : args) spare =
-        case findArg spec arg of
+        case findArg trie arg of
             Just (rest, opt_kind) ->
                 case processOneArg opt_kind rest arg args of
                     Left err ->
@@ -249,31 +252,27 @@ processOneArg opt_kind rest arg args
         OptPrefix f       -> Right (f rest_no_eq, args)
         AnySuffix f       -> Right (f dash_arg, args)
 
-findArg :: [Flag m] -> String -> Maybe (String, OptKind m)
-findArg spec arg =
-    case sortBy (compare `on` (length . fst)) -- prefer longest matching flag
-           [ (removeSpaces rest, optKind)
-           | flag <- spec,
-             let optKind  = flagOptKind flag,
-             Just rest <- [stripPrefix (flagName flag) arg],
-             arg_ok optKind rest arg ]
-    of
-        []      -> Nothing
-        (one:_) -> Just one
-
-arg_ok :: OptKind t -> [Char] -> String -> Bool
-arg_ok (NoArg           _)  rest _   = null rest
-arg_ok (HasArg          _)  _    _   = True
-arg_ok (SepArg          _)  rest _   = null rest
-arg_ok (Prefix          _)  _    _   = True -- Missing argument checked for in processOneArg t
-                                            -- to improve error message (#12625)
-arg_ok (OptIntSuffix    _)  _    _   = True
-arg_ok (IntSuffix       _)  _    _   = True
-arg_ok (Word64Suffix    _)  _    _   = True
-arg_ok (FloatSuffix     _)  _    _   = True
-arg_ok (OptPrefix       _)  _    _   = True
-arg_ok (PassFlag        _)  rest _   = null rest
-arg_ok (AnySuffix       _)  _    _   = True
+findArg :: StringTrie.StringTrie (Flag m) -> String -> Maybe (String, OptKind m)
+findArg trie arg =
+    case StringTrie.lookup' okay arg trie of
+        Nothing           -> Nothing
+        Just (flag, rest) -> Just (removeSpaces rest, flagOptKind flag)
+  where
+    okay :: Flag m -> String -> Bool
+    okay flag rest =
+      case flagOptKind flag of
+        NoArg _        -> null rest
+        HasArg _       -> True
+        SepArg _       -> null rest
+        Prefix _       -> True -- Missing argument checked for in processOneArg t
+                               -- to improve error message (#12625)
+        OptIntSuffix _ -> True
+        IntSuffix _    -> True
+        Word64Suffix _ -> True
+        FloatSuffix _  -> True
+        OptPrefix _    -> True
+        PassFlag _     -> null rest
+        AnySuffix _    -> True
 
 -- | Parse an Int
 --
