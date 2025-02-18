@@ -116,6 +116,7 @@ test('outofmem2',
 test('T2047',
      [ignore_stdout,
       extra_run_opts('+RTS -c -RTS'),
+      when(opsys('freebsd'), fragile(25751)),
       # Non-moving collector doesn't support -c
       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity', 'nonmoving_thr_ghc'])],
      compile_and_run, ['-package containers'])
