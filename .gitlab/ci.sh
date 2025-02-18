@@ -59,6 +59,7 @@ Environment variables affecting the build:
   CROSS_TARGET      Triple of cross-compilation target.
   VERBOSE           Set to non-empty for verbose build output
   RUNTEST_ARGS      Arguments passed to runtest.py
+  TEST_WAYS         Testsuite ways to run
   MSYSTEM           (Windows-only) Which platform to build from (CLANG64).
   IGNORE_PERF_FAILURES
                     Whether to ignore perf failures (one of "increases",
@@ -157,6 +158,8 @@ mkdir -p "$toolchain/bin"
 PATH="$toolchain/bin:$PATH"
 
 export METRICS_FILE="$TOP/performance-metrics.tsv"
+
+TEST_WAYS=( ${TEST_WAYS:-} )
 
 cores="$(mk/detect-cpu-count.sh)"
 
@@ -608,6 +611,7 @@ function test_hadrian() {
       --summary-junit=./junit.xml \
       --test-have-intree-files    \
       --docs=none                 \
+      ${TEST_WAYS[@]/#/--test-way=} \
       "runtest.opts+=${RUNTEST_ARGS:-}" \
       "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
       || fail "cross-compiled hadrian main testsuite"
@@ -615,6 +619,7 @@ function test_hadrian() {
     run_hadrian \
       test \
       --summary-junit=./junit.xml \
+      ${TEST_WAYS[@]/#/--test-way=} \
       "runtest.opts+=${RUNTEST_ARGS:-}" \
       "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
       || fail "hadrian main testsuite targetting $CROSS_TARGET"
@@ -633,6 +638,7 @@ function test_hadrian() {
       --test-compiler=stage-cabal \
       --test-root-dirs=testsuite/tests/perf \
       --test-root-dirs=testsuite/tests/typecheck \
+      ${TEST_WAYS[@]/#/--test-way=} \
       "runtest.opts+=${RUNTEST_ARGS:-}" \
       "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
       || fail "hadrian cabal-install test"
@@ -647,6 +653,7 @@ function test_hadrian() {
         test \
         --test-root-dirs=testsuite/tests/stage1 \
         --test-compiler=stage1 \
+        ${TEST_WAYS[@]/#/--test-way=} \
         "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian stage1 test"
       info "STAGE1_TEST=$?"
     fi
@@ -673,6 +680,7 @@ function test_hadrian() {
       --summary-junit=./junit.xml \
       --test-have-intree-files \
       --test-compiler="${test_compiler}" \
+      ${TEST_WAYS[@]/#/--test-way=} \
       "runtest.opts+=${RUNTEST_ARGS:-}" \
       "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
       || fail "hadrian main testsuite"

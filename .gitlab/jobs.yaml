@@ -63,7 +63,8 @@
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "aarch64-darwin",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "aarch64-darwin-validate"
+      "TEST_ENV": "aarch64-darwin-validate",
+      "TEST_WAYS": ""
     }
   },
   "aarch64-linux-alpine3_18-validate": {
@@ -126,7 +127,8 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-ignore-build-platform-mismatch --build=aarch64-unknown-linux --host=aarch64-unknown-linux --target=aarch64-unknown-linux --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "aarch64-linux-alpine3_18-validate"
+      "TEST_ENV": "aarch64-linux-alpine3_18-validate",
+      "TEST_WAYS": ""
     }
   },
   "aarch64-linux-deb10-validate": {
@@ -188,7 +190,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "aarch64-linux-deb10-validate"
+      "TEST_ENV": "aarch64-linux-deb10-validate",
+      "TEST_WAYS": ""
     }
   },
   "aarch64-linux-deb12-validate": {
@@ -250,7 +253,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "aarch64-linux-deb12-validate"
+      "TEST_ENV": "aarch64-linux-deb12-validate",
+      "TEST_WAYS": ""
     }
   },
   "aarch64-linux-deb12-validate+llvm": {
@@ -312,7 +316,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "aarch64-linux-deb12-validate+llvm"
+      "TEST_ENV": "aarch64-linux-deb12-validate+llvm",
+      "TEST_WAYS": ""
     }
   },
   "i386-linux-alpine3_20-validate": {
@@ -375,7 +380,8 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "i386-linux-alpine3_20-validate"
+      "TEST_ENV": "i386-linux-alpine3_20-validate",
+      "TEST_WAYS": ""
     }
   },
   "i386-linux-deb10-validate": {
@@ -437,7 +443,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "i386-linux-deb10-validate"
+      "TEST_ENV": "i386-linux-deb10-validate",
+      "TEST_WAYS": ""
     }
   },
   "i386-linux-deb12-validate": {
@@ -499,7 +506,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "i386-linux-deb12-validate"
+      "TEST_ENV": "i386-linux-deb12-validate",
+      "TEST_WAYS": ""
     }
   },
   "nightly-aarch64-darwin-validate": {
@@ -566,6 +574,7 @@
       "NIX_SYSTEM": "aarch64-darwin",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-darwin-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -630,6 +639,7 @@
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-alpine3_18-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -693,6 +703,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb10-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -756,6 +767,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb12-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -819,6 +831,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb12-validate+llvm",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -883,6 +896,7 @@
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "i386-linux-alpine3_20-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -946,6 +960,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "i386-linux-deb10-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1009,6 +1024,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "i386-linux-deb12-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1076,6 +1092,7 @@
       "NIX_SYSTEM": "x86_64-darwin",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-darwin-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9",
       "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
@@ -1145,6 +1162,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-freebsd14-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1209,6 +1227,7 @@
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-int_native-validate+fully_static",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1273,6 +1292,7 @@
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1337,6 +1357,7 @@
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1401,6 +1422,7 @@
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_20-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1465,6 +1487,7 @@
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1529,6 +1552,7 @@
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1593,6 +1617,7 @@
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1658,6 +1683,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-centos7-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1721,6 +1747,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1784,6 +1811,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+debug_info",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1849,6 +1877,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1915,6 +1944,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -1978,6 +2008,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2041,6 +2072,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-int_native-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2104,6 +2136,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-no_tntc-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2168,6 +2201,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-numa-slow-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2231,6 +2265,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": " --config perf_path=perf",
       "TEST_ENV": "x86_64-linux-deb12-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2296,6 +2331,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2359,6 +2395,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-unreg-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2422,6 +2459,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2485,6 +2523,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity",
       "TEST_ENV": "x86_64-linux-deb12-validate+boot_nonmoving_gc",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2548,6 +2587,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-validate+llvm",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2612,6 +2652,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-validate+thread_sanitizer_cmm",
+      "TEST_WAYS": "",
       "TSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions",
       "XZ_OPT": "-9"
     }
@@ -2676,6 +2717,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-zstd-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2739,6 +2781,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb9-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2804,6 +2847,7 @@
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2870,6 +2914,7 @@
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2935,6 +2980,7 @@
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-validate+debug_info",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -2998,6 +3044,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora38-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3061,6 +3108,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-rocky8-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3124,6 +3172,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu18_04-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3187,6 +3236,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu20_04-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3250,6 +3300,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu22_04-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3313,6 +3364,7 @@
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-windows-int_native-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3376,6 +3428,7 @@
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-windows-validate",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3444,6 +3497,7 @@
       "NIX_SYSTEM": "aarch64-darwin",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-darwin-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3510,6 +3564,7 @@
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-alpine3_18-release+no_split_sections",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3575,6 +3630,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb10-release+no_split_sections",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3640,6 +3696,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb12-release+no_split_sections",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3706,6 +3763,7 @@
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "i386-linux-alpine3_20-release+no_split_sections",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3771,6 +3829,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "i386-linux-deb10-release+no_split_sections",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3836,6 +3895,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "i386-linux-deb12-release+no_split_sections",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -3904,6 +3964,7 @@
       "NIX_SYSTEM": "x86_64-darwin",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-darwin-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9",
       "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
@@ -3975,6 +4036,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-freebsd14-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4041,6 +4103,7 @@
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-int_native-release+fully_static",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4107,6 +4170,7 @@
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-release+fully_static+no_split_sections",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4173,6 +4237,7 @@
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-release+no_split_sections",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4239,6 +4304,7 @@
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_20-release+no_split_sections",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4305,6 +4371,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-centos7-release+no_split_sections",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4370,6 +4437,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4435,6 +4503,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-release+debug_info",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4500,6 +4569,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4565,6 +4635,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4630,6 +4701,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb9-release+no_split_sections",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4697,6 +4769,7 @@
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4764,6 +4837,7 @@
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-release+debug_info",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4831,6 +4905,7 @@
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4896,6 +4971,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora38-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -4961,6 +5037,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-rocky8-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -5026,6 +5103,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu18_04-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -5091,6 +5169,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu20_04-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -5156,6 +5235,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu22_04-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -5220,6 +5300,7 @@
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-windows-int_native-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -5284,6 +5365,7 @@
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-windows-release",
+      "TEST_WAYS": "",
       "XZ_OPT": "-9"
     }
   },
@@ -5351,6 +5433,7 @@
       "NIX_SYSTEM": "x86_64-darwin",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-darwin-validate",
+      "TEST_WAYS": "",
       "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
       "ac_cv_func_utimensat": "no"
@@ -5418,7 +5501,8 @@
       "GHC_VERSION": "9.6.4",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-freebsd14-validate"
+      "TEST_ENV": "x86_64-freebsd14-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-alpine3_12-int_native-validate+fully_static": {
@@ -5481,7 +5565,8 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_12-int_native-validate+fully_static"
+      "TEST_ENV": "x86_64-linux-alpine3_12-int_native-validate+fully_static",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-alpine3_12-validate": {
@@ -5544,7 +5629,8 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_12-validate"
+      "TEST_ENV": "x86_64-linux-alpine3_12-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-alpine3_12-validate+fully_static": {
@@ -5607,7 +5693,8 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static"
+      "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-alpine3_20-validate": {
@@ -5670,7 +5757,8 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_20-validate"
+      "TEST_ENV": "x86_64-linux-alpine3_20-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf": {
@@ -5733,7 +5821,8 @@
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
+      "TEST_ENV": "x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf": {
@@ -5797,7 +5886,8 @@
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
+      "TEST_ENV": "x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf": {
@@ -5861,7 +5951,8 @@
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
+      "TEST_ENV": "x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-centos7-validate": {
@@ -5925,7 +6016,8 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-centos7-validate"
+      "TEST_ENV": "x86_64-linux-centos7-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb10-validate": {
@@ -5987,7 +6079,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb10-validate"
+      "TEST_ENV": "x86_64-linux-deb10-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb10-validate+debug_info": {
@@ -6049,7 +6142,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb10-validate+debug_info"
+      "TEST_ENV": "x86_64-linux-deb10-validate+debug_info",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate": {
@@ -6113,7 +6207,8 @@
       "CROSS_TARGET": "aarch64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
+      "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate": {
@@ -6178,7 +6273,8 @@
       "CROSS_TARGET": "javascript-unknown-ghcjs",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate"
+      "TEST_ENV": "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb11-validate": {
@@ -6240,7 +6336,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb11-validate"
+      "TEST_ENV": "x86_64-linux-deb11-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb12-int_native-validate": {
@@ -6302,7 +6399,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb12-int_native-validate"
+      "TEST_ENV": "x86_64-linux-deb12-int_native-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb12-no_tntc-validate": {
@@ -6365,7 +6463,8 @@
       "CONFIGURE_ARGS": "--disable-tables-next-to-code --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb12-no_tntc-validate"
+      "TEST_ENV": "x86_64-linux-deb12-no_tntc-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb12-numa-slow-validate": {
@@ -6428,7 +6527,8 @@
       "ENABLE_NUMA": "1",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb12-numa-slow-validate"
+      "TEST_ENV": "x86_64-linux-deb12-numa-slow-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb12-release-perf": {
@@ -6490,7 +6590,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": " --config perf_path=perf",
-      "TEST_ENV": "x86_64-linux-deb12-release"
+      "TEST_ENV": "x86_64-linux-deb12-release",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate": {
@@ -6554,7 +6655,8 @@
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate"
+      "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb12-unreg-validate": {
@@ -6616,7 +6718,8 @@
       "CONFIGURE_ARGS": "--enable-unregisterised --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb12-unreg-validate"
+      "TEST_ENV": "x86_64-linux-deb12-unreg-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb12-validate": {
@@ -6678,7 +6781,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb12-validate"
+      "TEST_ENV": "x86_64-linux-deb12-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb12-validate+boot_nonmoving_gc": {
@@ -6740,7 +6844,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity",
-      "TEST_ENV": "x86_64-linux-deb12-validate+boot_nonmoving_gc"
+      "TEST_ENV": "x86_64-linux-deb12-validate+boot_nonmoving_gc",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb12-validate+llvm": {
@@ -6802,7 +6907,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb12-validate+llvm"
+      "TEST_ENV": "x86_64-linux-deb12-validate+llvm",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb12-validate+thread_sanitizer_cmm": {
@@ -6867,6 +6973,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-validate+thread_sanitizer_cmm",
+      "TEST_WAYS": "",
       "TSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
     }
   },
@@ -6929,7 +7036,8 @@
       "CONFIGURE_ARGS": "--enable-ipe-data-compression --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb12-zstd-validate"
+      "TEST_ENV": "x86_64-linux-deb12-zstd-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-deb9-validate": {
@@ -6991,7 +7099,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb9-validate"
+      "TEST_ENV": "x86_64-linux-deb9-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-fedora33-release": {
@@ -7055,7 +7164,8 @@
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora33-release"
+      "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-fedora33-release-hackage": {
@@ -7120,7 +7230,8 @@
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora33-release"
+      "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-fedora33-validate+debug_info": {
@@ -7184,7 +7295,8 @@
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora33-validate+debug_info"
+      "TEST_ENV": "x86_64-linux-fedora33-validate+debug_info",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-fedora38-validate": {
@@ -7246,7 +7358,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora38-validate"
+      "TEST_ENV": "x86_64-linux-fedora38-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-rocky8-validate": {
@@ -7308,7 +7421,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-rocky8-validate"
+      "TEST_ENV": "x86_64-linux-rocky8-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-ubuntu18_04-validate": {
@@ -7370,7 +7484,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-ubuntu18_04-validate"
+      "TEST_ENV": "x86_64-linux-ubuntu18_04-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-ubuntu20_04-validate": {
@@ -7432,7 +7547,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-ubuntu20_04-validate"
+      "TEST_ENV": "x86_64-linux-ubuntu20_04-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-linux-ubuntu22_04-validate": {
@@ -7494,7 +7610,8 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-ubuntu22_04-validate"
+      "TEST_ENV": "x86_64-linux-ubuntu22_04-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-windows-int_native-validate": {
@@ -7556,7 +7673,8 @@
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-windows-int_native-validate"
+      "TEST_ENV": "x86_64-windows-int_native-validate",
+      "TEST_WAYS": ""
     }
   },
   "x86_64-windows-validate": {
@@ -7618,7 +7736,8 @@
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-windows-validate"
+      "TEST_ENV": "x86_64-windows-validate",
+      "TEST_WAYS": ""
     }
   }
 }
