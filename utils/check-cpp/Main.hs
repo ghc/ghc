@@ -6,12 +6,14 @@ import Data.Data hiding (Fixity)
 import Data.List
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
+import Data.Maybe
 import Debug.Trace
 import GHC
 import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString
 import GHC.Data.StringBuffer
 import GHC.Driver.Config.Parser hiding (predefinedMacros)
+import GHC.Driver.Env.Types
 import GHC.Driver.Errors.Types
 import qualified GHC.Driver.Errors.Types as GHC
 import qualified GHC.Driver.Session as GHC
@@ -21,8 +23,11 @@ import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer (P (..), ParseResult (..), Token (..))
 import qualified GHC.Parser.Lexer as GHC
 import qualified GHC.Parser.Lexer as Lexer
+import GHC.SysTools.Cpp
 import GHC.Types.Error
 import GHC.Types.SrcLoc
+import GHC.Unit.Env
+import GHC.Unit.State
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 
@@ -59,17 +64,50 @@ parseString libdir includes str = ghcWrapper libdir $ do
     dflags0 <- initDynFlags
     let dflags = dflags0{extensionFlags = EnumSet.insert LangExt.GhcCpp (extensionFlags dflags0)}
     let pflags = initParserOpts dflags
+    hsc <- getSession
+    liftIO $ putStrLn "-- hsc ----------"
+    liftIO $ putStrLn (show (length (unitPackages (hsc_unit_env hsc))))
+    liftIO $ putStrLn (cppMacroDefines (hsc_unit_env hsc))
     liftIO $ putStrLn "-- parsing ----------"
     liftIO $ putStrLn str
     liftIO $ putStrLn "---------------------"
     -- return $ strParserWrapper str dflags "fake_test_file.hs"
-    return $ strGetToks dflags includes pflags "fake_test_file.hs" str
+    return $ snd $ strGetToks dflags includes pflags "fake_test_file.hs" str
 
-strGetToks :: DynFlags -> Includes -> Lexer.ParserOpts -> FilePath -> String -> [Located Token]
-strGetToks dflags includes popts filename str = reverse $ lexAll pstate
+-- doDump :: LibDir -> String -> IO [Located Token]
+doDump libdir str = ghcWrapper libdir $ do
+    dflags0 <- initDynFlags
+    let dflags = dflags0{extensionFlags = EnumSet.insert LangExt.GhcCpp (extensionFlags dflags0)}
+    let pflags = initParserOpts dflags
+    hsc <- getSession
+    liftIO $ putStrLn "-- parsing ----------"
+    liftIO $ putStrLn str
+    liftIO $ putStrLn "---------------------"
+    -- let (!pst,!toks) = strGetToks dflags [] pflags "fake_test_file.hs" str
+    let !pst = getPState dflags [] pflags "fake_test_file.hs" str
+    liftIO $ putStrLn "-- dumpGhcCpp ----------"
+    liftIO $ putStrLn $ showPprUnsafe $ dumpGhcCpp pst
+    liftIO $ putStrLn "---------------------"
+
+
+-- return $ strGetToks dflags includes pflags "fake_test_file.hs" str
+
+unitPackages :: UnitEnv -> [UnitInfo]
+unitPackages unit_env = pkgs
   where
-    -- strGetToks includes popts filename str = reverse $ lexAll (trace ("pstate=" ++ show initState) pstate)
+    unit_state = ue_homeUnitState unit_env
+    uids = explicitUnits unit_state
+    pkgs = mapMaybe (lookupUnit unit_state . fst) uids
 
+strGetToks ::
+    DynFlags ->
+    Includes ->
+    Lexer.ParserOpts ->
+    FilePath ->
+    String ->
+    (Lexer.PState PpState, [Located Token])
+strGetToks dflags includes popts filename str = (final, reverse toks)
+  where
     includeMap = Map.fromList $ map (\(k, v) -> (k, stringToStringBuffer (intercalate "\n" v))) includes
     initState =
         initPpState
@@ -82,23 +120,76 @@ strGetToks dflags includes popts filename str = reverse $ lexAll pstate
     buf = stringToStringBuffer str
     -- cpp_enabled = Lexer.GhcCppBit `Lexer.xtest` Lexer.pExtsBitmap popts
 
+    lexAll :: Lexer.PState PpState -> (Lexer.PState PpState, [Located Token])
     lexAll state = case unP (PP.lexerDbg True return) state of
-        -- POk _ t@(L _ ITeof) -> [t]
-        POk s t@(L _ ITeof) -> trace ("lexall end:s=" ++ show (Lexer.pp s)) [t]
-        -- POk s t@(L _ ITeof) -> trace ("lexall end:s=" ++ showPprUnsafe (Lexer.comment_q s)) [t]
-        POk state' t -> t : lexAll state'
-        -- (trace ("lexAll: " ++ show (unLoc t)) state')
+        POk s t@(L _ ITeof) -> (s, [t])
+        POk state' t -> (ss, t : rest)
+          where
+            (ss, rest) = lexAll state'
         PFailed pst -> error $ "failed" ++ showErrorMessages (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
+    (final, toks) = lexAll pstate
 
--- _ -> [L (mkSrcSpanPs (last_loc state)) ITeof]
+getPState ::
+    DynFlags ->
+    Includes ->
+    Lexer.ParserOpts ->
+    FilePath ->
+    String ->
+    Lexer.PState PpState
+getPState dflags includes popts filename str = pstate
+  where
+    includeMap = Map.fromList $ map (\(k, v) -> (k, stringToStringBuffer (intercalate "\n" v))) includes
+    initState =
+        initPpState
+            { pp_includes = includeMap
+            , pp_defines = predefinedMacros dflags
+            , pp_scope = (PpScope True) :| []
+            }
+    pstate = Lexer.initParserState initState popts buf loc
+    loc = mkRealSrcLoc (mkFastString filename) 1 1
+    buf = stringToStringBuffer str
+    -- cpp_enabled = Lexer.GhcCppBit `Lexer.xtest` Lexer.pExtsBitmap popts
 
-showErrorMessages :: Messages GhcMessage -> String
-showErrorMessages msgs =
-    renderWithContext defaultSDocContext $
-        vcat $
-            pprMsgEnvelopeBagWithLocDefault $
-                getMessages $
-                    msgs
+    -- lexAll :: Lexer.PState PpState -> (Lexer.PState PpState, [Located Token])
+    -- lexAll state = case unP (PP.lexerDbg True return) state of
+    --     POk s t@(L _ ITeof) -> (s, [t])
+    --     POk state' t -> (ss, t : rest)
+    --       where
+    --         (ss, rest) = lexAll state'
+    --     PFailed pst -> error $ "failed" ++ showErrorMessages (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
+    -- (final, toks) = lexAll pstate
+
+-- ---------------------------------------------------------------------
+
+parseWith ::
+    DynFlags ->
+    FilePath ->
+    P PpState w ->
+    String ->
+    Either GHC.ErrorMessages (Lexer.PState PpState, w)
+parseWith dflags fileName parser s =
+    case runParser parser dflags fileName s of
+        PFailed pst ->
+            Left (GhcPsMessage <$> GHC.getPsErrorMessages pst)
+        POk pst pmod ->
+            Right (pst, pmod)
+
+runParser :: P PpState a -> DynFlags -> FilePath -> String -> ParseResult PpState a
+runParser parser flags filename str = unP parser parseState
+  where
+    location = mkRealSrcLoc (mkFastString filename) 1 1
+    buffer = stringToStringBuffer str
+    parseState = initParserState (initParserOpts flags) buffer location
+
+-- ---------------------------------------------------------------------
+
+-- showErrorMessages :: Messages GhcMessage -> String
+-- showErrorMessages msgs =
+--     renderWithContext defaultSDocContext $
+--         vcat $
+--             pprMsgEnvelopeBagWithLocDefault $
+--                 getMessages $
+--                     msgs
 
 -- strParserWrapper ::
 --     -- | Haskell module source text (full Unicode is supported)
@@ -200,6 +291,11 @@ printToks toks = mapM_ go toks
 
 libdirNow :: LibDir
 libdirNow = "/home/alanz/mysrc/git.haskell.org/worktree/bisect/_build/stage1/lib"
+
+dump :: [String] -> IO ()
+dump strings = do
+    let test = intercalate "\n" strings
+    doDump libdirNow test
 
 doTest :: [String] -> IO ()
 doTest strings = doTestWithIncludes [] strings
@@ -458,6 +554,7 @@ t16 = do
         , "x = 5"
         , "#endif"
         ]
+
 -- x = 1
 
 t17 :: IO ()
@@ -470,4 +567,18 @@ t17 = do
         , "x = 5"
         , "#endif"
         ]
+
 -- x = 1
+
+t18 :: IO ()
+t18 = do
+    dump
+        [ "#define FOO(A,B) A + B"
+        , "#define FOO(A,B,C) A + B + C"
+        , "#if FOO(1,FOO(3,4)) == 8"
+        , "-- a comment"
+        , "x = 1"
+        , "#else"
+        , "x = 5"
+        , "#endif"
+        ]
