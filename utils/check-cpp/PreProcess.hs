@@ -41,7 +41,8 @@ import Debug.Trace
 -- ---------------------------------------------------------------------
 
 dumpGhcCpp :: PState PpState -> SDoc
-dumpGhcCpp pst = text $ sep ++ defines ++ sep ++ comments ++ sep ++ orig ++ sep ++ final ++ sep ++ show startLoc ++ sep ++ show bare_toks ++ sep
+dumpGhcCpp pst = text $ sep ++ defines ++ sep ++ comments ++ sep ++ orig ++ sep ++ final ++ sep
+  -- ++ show startLoc ++ sep ++ show bare_toks ++ sep
   where
     -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
     (pst_final, bare_toks) = lexAll pst
@@ -56,7 +57,19 @@ dumpGhcCpp pst = text $ sep ++ defines ++ sep ++ comments ++ sep ++ orig ++ sep 
     final = renderCombinedToks toks (Lexer.comment_q pst_final)
 
 renderCombinedToks :: [(Located Token, String)] -> [LEpaComment] -> String
-renderCombinedToks toks ctoks = show toks ++ show ctoks
+renderCombinedToks toks ctoks = show toks1 ++ show ctoks
+  where
+    toks1 = map (\(L l _, s) -> (l,s)) toks
+    ctoks1 = map (\(L l t) -> (l, ghcCommentText t)) ctoks
+
+
+ghcCommentText :: EpaComment -> String
+ghcCommentText (GHC.EpaComment (EpaDocComment s) _)      = exactPrintHsDocString s
+ghcCommentText (GHC.EpaComment (EpaDocOptions s) _)      = s
+ghcCommentText (GHC.EpaComment (EpaLineComment s) _)     = s
+ghcCommentText (GHC.EpaComment (EpaBlockComment s) _)    = s
+ghcCommentText (GHC.EpaComment (EpaCppIgnored [L _ s]) _)= s
+ghcCommentText (GHC.EpaComment (EpaCppIgnored _) _)      = ""
 
 showDefines :: MacroDefines -> String
 showDefines defines = Map.foldlWithKey' (\acc k d -> acc ++ "\n" ++ renderDefine k d) "" defines
