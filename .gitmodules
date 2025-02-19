@@ -100,10 +100,6 @@
 	path = utils/hsc2hs
 	url = https://gitlab.haskell.org/ghc/hsc2hs.git
 	ignore = untracked
-[submodule "libffi-tarballs"]
-	path = libffi-tarballs
-	url = https://gitlab.haskell.org/ghc/libffi-tarballs.git
-	ignore = untracked
 [submodule "gmp-tarballs"]
 	path = libraries/ghc-internal/gmp/gmp-tarballs
 	url = https://gitlab.haskell.org/ghc/gmp-tarballs.git

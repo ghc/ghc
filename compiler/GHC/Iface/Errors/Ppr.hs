@@ -336,8 +336,8 @@ hiModuleNameMismatchWarn requested_mod read_mod
             ]
         ]
  | otherwise =
-  -- ToDo: This will fail to have enough qualification when the package IDs
-  -- are the same
+  -- Display fully qualified unit names by enabling ppr-debug
+  updSDocContext (\ctx -> ctx { sdocPprDebug = True}) $
   withPprStyle (mkUserStyle alwaysQualify AllTheWay) $
     -- we want the Modules below to be qualified with package names,
     -- so reset the NamePprCtx setting.
@@ -345,7 +345,6 @@ hiModuleNameMismatchWarn requested_mod read_mod
          , ppr requested_mod
          , text "differs from name found in the interface file"
          , ppr read_mod
-         , parens (text "if these names look the same, try again with -dppr-debug")
          ]
 
 dynamicHashMismatchError :: Module -> ModLocation -> SDoc

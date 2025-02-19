@@ -219,7 +219,7 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           [ text "The value", ppr name
                           , text "with type", ppr actual_type
                           , text "did not have the type"
-                          , text "GHC.Plugins.Plugin"
+                          , ppr (mkTyConTy plugin_tycon)
                           , text "as required"])
             Right (plugin, links, pkgs) -> return (plugin, mod_iface, links, pkgs) } } } } }
 

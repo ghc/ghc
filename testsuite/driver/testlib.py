@@ -369,6 +369,13 @@ def req_target_debug_rts( name, opts ):
     if not config.debug_rts:
         opts.skip = True
 
+def req_target_threaded_rts( name, opts ):
+    # FIXME: this is probably wrong: we should have a different flag for the
+    # compiler's rts and the target rts...
+    if not config.ghc_with_threaded_rts:
+        opts.skip = True
+
+
 def req_target_smp( name, opts ):
     """
     Mark a test as requiring smp when run on the target. If the target does
