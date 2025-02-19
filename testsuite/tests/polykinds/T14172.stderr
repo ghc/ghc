@@ -1,6 +1,6 @@
 T14172.hs:7:46: error: [GHC-88464]
-    • Found type wildcard ‘_’ standing for ‘a'1 :: k0’
-      Where: ‘k0’ is an ambiguous type variable
+    • Found type wildcard ‘_’ standing for ‘a'1 :: k30’
+      Where: ‘k30’ is an ambiguous type variable
              ‘a'1’ is an ambiguous type variable
       To use the inferred type, enable PartialTypeSignatures
     • In the first argument of ‘h’, namely ‘_’

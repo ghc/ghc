@@ -23,8 +23,8 @@ extra-deps:
    - Cabal-syntax-3.10.1.0
 
 # needed due to Hadrian's lower bound on directory
-- directory-1.3.9.0
-- file-io-0.1.4
-- filepath-1.4.300.2
-- process-1.6.25.0
-- unix-2.8.5.1
+   - directory-1.3.9.0
+   - file-io-0.1.4
+   - filepath-1.4.300.2
+   - process-1.6.25.0
+   - unix-2.8.5.1
