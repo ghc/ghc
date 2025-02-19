@@ -3296,7 +3296,7 @@ lexer queueComments cont = do
   --trace ("token: " ++ show tok) $ do
 
   if (queueComments && isComment tok)
-    then queueComment (L (psRealSpan span) tok) >> lexer queueComments cont
+    then queueComment (L span tok) >> lexer queueComments cont
     else cont (L (mkSrcSpanPs span) tok)
 
 -- Use this instead of 'lexer' in GHC.Parser to dump the tokens for debugging.
@@ -3716,7 +3716,7 @@ mkParensLocs ss = (EpaSpan (RealSrcSpan lo Strict.Nothing),
     lo = mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))
     lc = mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss)
 
-queueComment :: RealLocated Token -> P p ()
+queueComment :: PsLocated Token -> P p ()
 queueComment c = P $ \s -> POk s {
   comment_q = commentToAnnotation c : comment_q s
   } ()
@@ -3726,7 +3726,7 @@ queueIgnoredToken (L l tok) = do
   ll <- getLastLocIncludingComments
   let
      -- TODO:AZ: make the tok the right type
-     comment = mkLEpaComment (psRealSpan l) ll (EpaCppIgnored [L l (show tok)])
+     comment = mkLEpaComment l ll (EpaCppIgnored [L l (show tok)])
      push c = P $ \s  -> POk s {
           comment_q = c : comment_q s
           } ()
@@ -3798,7 +3798,7 @@ allocateFinalComments _ss comment_q mheader_comments =
     Strict.Nothing -> (Strict.Just (reverse comment_q), [], [])
     Strict.Just _ -> (mheader_comments, [], reverse comment_q)
 
-commentToAnnotation :: RealLocated Token -> LEpaComment
+commentToAnnotation :: PsLocated Token -> LEpaComment
 commentToAnnotation (L l (ITdocComment s ll))   = mkLEpaComment l ll (EpaDocComment s)
 commentToAnnotation (L l (ITdocOptions s ll))   = mkLEpaComment l ll (EpaDocOptions s)
 commentToAnnotation (L l (ITlineComment s ll))  = mkLEpaComment l ll (EpaLineComment s)
@@ -3806,8 +3806,8 @@ commentToAnnotation (L l (ITblockComment s ll)) = mkLEpaComment l ll (EpaBlockCo
 commentToAnnotation _                           = panic "commentToAnnotation"
 
 -- see Note [PsSpan in Comments]
-mkLEpaComment :: RealSrcSpan -> PsSpan -> EpaCommentTok -> LEpaComment
-mkLEpaComment l ll tok = L (realSpanAsAnchor l) (EpaComment tok (psRealSpan ll))
+mkLEpaComment :: PsSpan -> PsSpan -> EpaCommentTok -> LEpaComment
+mkLEpaComment l ll tok = L (spanAsAnchor (mkSrcSpanPs l)) (EpaComment tok (psRealSpan ll))
 
 -- ---------------------------------------------------------------------
 
