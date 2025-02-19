@@ -469,6 +469,8 @@ test('T14900',
 
 test('InternalCounters',
   [ js_skip # JS backend doesn't support internal counters
+    # Require threaded RTS
+  , req_target_smp
     # The ways which build against the debug RTS are built with PROF_SPIN and
     # therefore differ in output
   , omit_ways(['nonmoving_thr_sanity', 'threaded2_sanity', 'sanity'])
