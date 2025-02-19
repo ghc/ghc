@@ -102,6 +102,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Class
+import GHC.Stack
 
 
 import GHC.Unit.Module
@@ -143,6 +144,7 @@ import Control.Monad
 import Data.IORef
 import Data.List          ( intercalate )
 import qualified Data.List.NonEmpty as NE
+import qualified GHC.Unit.Home.Graph as HUG
 
 {- *********************************************************************
 *                                                                      *
@@ -346,9 +348,11 @@ tcLookupInstance cls tys
 tcGetInstEnvs :: TcM InstEnvs
 -- Gets both the external-package inst-env
 -- and the home-pkg inst env (includes module being compiled)
-tcGetInstEnvs = do { eps <- getEps
+tcGetInstEnvs = do { (eps, hug) <- getEpsAndHug
+                   ; dflags <- getDynFlags
+                   ; (hpt', _) <- liftIO $ if (isOneShot (ghcMode dflags)) then HUG.allInstances hug else return (emptyInstEnv, mempty)
                    ; env <- getGblEnv
-                   ; return (InstEnvs { ie_global  = eps_inst_env eps
+                   ; return (InstEnvs { ie_global  = eps_inst_env eps `unionInstEnv` hpt'
                                       , ie_local   = tcg_inst_env env
                                       , ie_visible = tcVisibleOrphanMods env }) }
 
@@ -400,7 +404,7 @@ failIllegalTyVal :: Name -> TcM a
 ************************************************************************
 -}
 
-setGlobalTypeEnv :: TcGblEnv -> TypeEnv -> TcM TcGblEnv
+setGlobalTypeEnv :: HasCallStack => TcGblEnv -> TypeEnv -> TcM TcGblEnv
 -- Use this to update the global type env
 -- It updates both  * the normal tcg_type_env field
 --                  * the tcg_type_env_var field seen by interface files

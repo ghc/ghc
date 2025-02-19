@@ -45,8 +45,12 @@ module GHC.Driver.Main
     , Messager, batchMsg, batchMultiMsg
     , HscBackendAction (..), HscRecompStatus (..)
     , initModDetails
+    , checkObjects
+    , checkByteCode
+    , LinkableTimes(..)
     , initWholeCoreBindings
     , loadIfaceByteCode
+    , loadIfaceByteCodeLazy
     , hscMaybeWriteIface
     , hscCompileCmmFile
 
@@ -863,13 +867,44 @@ hscRecompStatus
            -> do
               msg $ needsRecompileBecause THWithJS
               return $ HscRecompNeeded $ Just $ mi_iface_hash $ mi_final_exts $ checked_iface
-
+            -- In this branch, get the suitable linkables and check they are up to date
            | otherwise -> do
+                recomp_linkable_result <- checkLinkables hsc_env old_linkable checked_iface lcl_dflags (ms_location mod_summary) (msToLinkableTimes mod_summary)
+                case recomp_linkable_result of
+                  UpToDateItem linkable -> do
+                    msg $ UpToDate
+                    return $ HscUpToDate checked_iface $ linkable
+                  OutOfDateItem reason _ -> do
+                    msg $ NeedsRecompile reason
+                    return $ HscRecompNeeded $ Just $ mi_iface_hash $ mi_final_exts $ checked_iface
+
+
+-- NB these times exist when using --make mode but not oneshot mode.
+data LinkableTimes = LinkableTimes { o_time :: Maybe UTCTime
+                                   , dyn_o_time :: Maybe UTCTime
+                                   , bc_time :: Maybe UTCTime
+                                   , if_time :: Maybe UTCTime }
+
+msToLinkableTimes :: ModSummary -> LinkableTimes
+msToLinkableTimes ms = LinkableTimes { o_time = ms_obj_date ms
+                                     , dyn_o_time = ms_dyn_obj_date ms
+                                     , bc_time  = ms_iface_date ms
+                                     , if_time  = ms_iface_date ms
+                                     }
+
+-- Gather up the required linkables corresponding to an interface file
+-- and check that they are up to date.
+--
+-- The arguments are, the ModIface, the DynFlags the module is compiled under.
+-- The location of the .hs file and the time the linkable should be marked as being
+-- created.
+checkLinkables :: HscEnv -> HomeModLinkable -> ModIface -> DynFlags -> ModLocation -> LinkableTimes -> IO (MaybeValidated HomeModLinkable)
+checkLinkables hsc_env old_linkable iface dflags mod_loc times = do
                -- Do need linkable
                -- 1. Just check whether we have bytecode/object linkables and then
                -- we will decide if we need them or not.
-               bc_linkable <- checkByteCode checked_iface mod_summary (homeMod_bytecode old_linkable)
-               obj_linkable <- liftIO $ checkObjects lcl_dflags (homeMod_object old_linkable) mod_summary
+               bc_linkable <- checkByteCode iface mod_loc (bc_time times) (homeMod_bytecode old_linkable)
+               obj_linkable <- liftIO $ checkObjects iface dflags mod_loc (homeMod_object old_linkable) times
                trace_if (hsc_logger hsc_env) (vcat [text "BCO linkable", nest 2 (ppr bc_linkable), text "Object Linkable", ppr obj_linkable])
 
                let just_bc = justBytecode <$> bc_linkable
@@ -895,7 +930,7 @@ hscRecompStatus
 --               pprTraceM "recomp" (ppr just_bc <+> ppr just_o)
                -- 2. Decide which of the products we will need
                let recomp_linkable_result = case () of
-                     _ | backendCanReuseLoadedCode (backend lcl_dflags) ->
+                     _ | backendCanReuseLoadedCode (backend dflags) ->
                            case bc_linkable of
                              -- If bytecode is available for Interactive then don't load object code
                              UpToDateItem _ -> just_bc
@@ -904,33 +939,27 @@ hscRecompStatus
                                      UpToDateItem _ -> just_o
                                      _ -> outOfDateItemBecause MissingBytecode Nothing
                         -- Need object files for making object files
-                        | backendWritesFiles (backend lcl_dflags) ->
-                           if gopt Opt_ByteCodeAndObjectCode lcl_dflags
+                        | backendWritesFiles (backend dflags) ->
+                           if gopt Opt_ByteCodeAndObjectCode dflags
                              -- We say we are going to write both, so recompile unless we have both
                              then definitely_both_os
                              -- Only load the object file unless we are saying we need to produce both.
                              -- Unless we do this then you can end up using byte-code for a module you specify -fobject-code for.
                              else just_o
-                        | otherwise -> pprPanic "hscRecompStatus" (text $ show $ backend lcl_dflags)
-               case recomp_linkable_result of
-                 UpToDateItem linkable -> do
-                   msg $ UpToDate
-                   return $ HscUpToDate checked_iface $ linkable
-                 OutOfDateItem reason _ -> do
-                   msg $ NeedsRecompile reason
-                   return $ HscRecompNeeded $ Just $ mi_iface_hash $ mi_final_exts $ checked_iface
+                        | otherwise -> pprPanic "hscRecompStatus" (text $ show $ backend dflags)
+               return recomp_linkable_result
 
 -- | Check that the .o files produced by compilation are already up-to-date
 -- or not.
-checkObjects :: DynFlags -> Maybe Linkable -> ModSummary -> IO (MaybeValidated Linkable)
-checkObjects dflags mb_old_linkable summary = do
+checkObjects :: ModIface -> DynFlags -> ModLocation -> Maybe Linkable -> LinkableTimes -> IO (MaybeValidated Linkable)
+checkObjects iface dflags loc mb_old_linkable times = do
   let
     dt_enabled  = gopt Opt_BuildDynamicToo dflags
-    this_mod    = ms_mod summary
-    mb_obj_date = ms_obj_date summary
-    mb_dyn_obj_date = ms_dyn_obj_date summary
-    mb_if_date  = ms_iface_date summary
-    obj_fn      = ml_obj_file (ms_location summary)
+    this_mod    = mi_module iface
+    mb_obj_date = o_time times
+    mb_dyn_obj_date = dyn_o_time times
+    mb_if_date  = if_time times
+    obj_fn      = ml_obj_file loc
     -- dynamic-too *also* produces the dyn_o_file, so have to check
     -- that's there, and if it's not, regenerate both .o and
     -- .dyn_o
@@ -955,24 +984,23 @@ checkObjects dflags mb_old_linkable summary = do
 -- | Check to see if we can reuse the old linkable, by this point we will
 -- have just checked that the old interface matches up with the source hash, so
 -- no need to check that again here
-checkByteCode :: ModIface -> ModSummary -> Maybe Linkable -> IO (MaybeValidated Linkable)
-checkByteCode iface mod_sum mb_old_linkable =
+checkByteCode :: ModIface -> ModLocation -> Maybe UTCTime -> Maybe Linkable -> IO (MaybeValidated Linkable)
+checkByteCode iface mod_loc if_date mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
       | not (linkableIsNativeCodeOnly old_linkable)
       -> return $ (UpToDateItem old_linkable)
-    _ -> loadByteCode iface mod_sum
+    _ -> loadByteCode iface mod_loc if_date
 
-loadByteCode :: ModIface -> ModSummary -> IO (MaybeValidated Linkable)
-loadByteCode iface mod_sum = do
+loadByteCode :: ModIface -> ModLocation -> Maybe UTCTime -> IO (MaybeValidated Linkable)
+loadByteCode iface mod_loc if_date = do
     let
-      this_mod   = ms_mod mod_sum
-      if_date    = fromJust $ ms_iface_date mod_sum
+      this_mod   = mi_module iface
     case mi_extra_decls iface of
       Just extra_decls -> do
-          let fi = WholeCoreBindings extra_decls this_mod (ms_location mod_sum)
+          let fi = WholeCoreBindings extra_decls this_mod mod_loc
                    (mi_foreign iface)
-          return (UpToDateItem (Linkable if_date this_mod (NE.singleton (CoreBindings fi))))
+          return (UpToDateItem (Linkable (fromJust if_date) this_mod (NE.singleton (CoreBindings fi))))
       _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
 --------------------------------------------------------------
@@ -1053,6 +1081,24 @@ loadIfaceByteCode hsc_env iface location type_env =
     compile decls = do
       (bcos, fos) <- compileWholeCoreBindings hsc_env type_env decls
       linkable $ BCOs bcos :| [DotO fo ForeignObject | fo <- fos]
+
+    linkable parts = do
+      if_time <- modificationTimeIfExists (ml_hi_file location)
+      time <- maybe getCurrentTime pure if_time
+      return $! Linkable time (mi_module iface) parts
+
+loadIfaceByteCodeLazy ::
+  HscEnv ->
+  ModIface ->
+  ModLocation ->
+  TypeEnv ->
+  Maybe (IO Linkable)
+loadIfaceByteCodeLazy hsc_env iface location type_env =
+  compile <$> iface_core_bindings iface location
+  where
+    compile decls = do
+      ~(bcos, fos) <- unsafeInterleaveIO $ compileWholeCoreBindings hsc_env type_env decls
+      linkable $ NE.singleton (LazyBCOs bcos fos)
 
     linkable parts = do
       if_time <- modificationTimeIfExists (ml_hi_file location)

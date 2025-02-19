@@ -2187,7 +2187,7 @@ initIfaceTcRn thing_inside
                             if_rec_types =
                                 if is_instantiate
                                     then emptyKnotVars
-                                    else readTcRef <$> knot_vars
+                                    else mkTypeEnvLens <$> knot_vars
                             }
                          }
         ; setEnvs (if_env, ()) thing_inside }
@@ -2209,7 +2209,7 @@ initIfaceLoadModule :: HscEnv -> Module -> IfG a -> IO a
 initIfaceLoadModule hsc_env this_mod do_this
  = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceLoadModule",
-                        if_rec_types = readTcRef <$> knotVarsWithout this_mod (hsc_type_env_vars hsc_env)
+                        if_rec_types = mkTypeEnvLens <$> knotVarsWithout this_mod (hsc_type_env_vars hsc_env)
                     }
       initTcRnIf 'i' hsc_env gbl_env () do_this
 
@@ -2219,9 +2219,12 @@ initIfaceCheck :: SDoc -> HscEnv -> IfG a -> IO a
 initIfaceCheck doc hsc_env do_this
  = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceCheck" <+> doc,
-                        if_rec_types = readTcRef <$> hsc_type_env_vars hsc_env
+                        if_rec_types = mkTypeEnvLens <$> hsc_type_env_vars hsc_env
                     }
       initTcRnIf 'i' hsc_env gbl_env () do_this
+
+mkTypeEnvLens :: IORef TypeEnv -> (IfG TypeEnv, TypeEnv -> IfG ())
+mkTypeEnvLens ref = (readTcRef ref, writeTcRef ref)
 
 initIfaceLcl :: Module -> SDoc -> IsBootInterface -> IfL a -> IfM lcl a
 initIfaceLcl mod loc_doc hi_boot_file thing_inside

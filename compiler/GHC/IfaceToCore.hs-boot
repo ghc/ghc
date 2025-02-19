@@ -16,6 +16,8 @@ import GHC.Unit.Types      ( Module )
 import GHC.Fingerprint.Type
 
 import Data.List.NonEmpty ( NonEmpty )
+import GHC.Unit.Module.ModIface ( ModIface )
+import GHC.Unit.Module.ModDetails ( ModDetails )
 
 tcIfaceDecl            :: Bool -> IfaceDecl -> IfL TyThing
 tcIfaceRules           :: Bool -> [IfaceRule] -> IfL [CoreRule]
@@ -25,3 +27,4 @@ tcIfaceFamInst         :: IfaceFamInst -> IfL FamInst
 tcIfaceAnnotations     :: [IfaceAnnotation] -> IfL [Annotation]
 tcIfaceCompleteMatches :: [IfaceCompleteMatch] -> IfL CompleteMatches
 tcIfaceDecls           :: Bool -> [(Fingerprint, IfaceDecl)] -> IfL [(Name,TyThing)]
+typecheckIface         :: ModIface -> IfG ModDetails

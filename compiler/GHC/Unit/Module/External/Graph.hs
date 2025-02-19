@@ -9,7 +9,7 @@ module GHC.Unit.Module.External.Graph
     -- | A module graph for the EPS.
     ExternalModuleGraph, ExternalGraphNode(..)
   , ExternalKey(..), emptyExternalModuleGraph
-  , emgNodeKey, emgNodeDeps, emgLookupKey
+  , emgNodeKey, emgNodeDeps
 
     -- * Extending
     --
@@ -122,10 +122,6 @@ emgNodeDeps drop_hs_boot_nodes = \case
 emgNodeKey :: ExternalGraphNode -> ExternalKey
 emgNodeKey (NodeHomePackage k _) = ExternalModuleKey k
 emgNodeKey (NodeExternalPackage k _) = ExternalPackageKey k
-
--- | Lookup a key in the EMG.
-emgLookupKey :: ExternalKey -> ExternalModuleGraph -> Maybe ExternalGraphNode
-emgLookupKey k emg = node_payload <$> (snd (external_trans emg)) k
 
 --------------------------------------------------------------------------------
 -- * Extending

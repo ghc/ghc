@@ -1957,7 +1957,7 @@ tcUnfoldingRhs is_compulsory toplvl name expr
     get_in_scope
         = do { (gbl_env, lcl_env) <- getEnvs
              ; let type_envs = knotVarElems (if_rec_types gbl_env)
-             ; top_level_vars <- concat <$> mapM (fmap typeEnvIds . setLclEnv ())  type_envs
+             ; top_level_vars <- concat <$> mapM (fmap typeEnvIds . setLclEnv () . fst)  type_envs
              ; return (bindingsVars (if_tv_env lcl_env) `unionVarSet`
                        bindingsVars (if_id_env lcl_env) `unionVarSet`
                        mkVarSet top_level_vars) }
@@ -1989,19 +1989,11 @@ tcIfaceGlobal name
   = do { ifCheckWiredInThing thing; return thing }
 
   | otherwise
-  = do  { env <- getGblEnv
-        ; cur_mod <- if_mod <$> getLclEnv
-        ; case lookupKnotVars (if_rec_types env) (fromMaybe cur_mod (nameModule_maybe name))  of     -- Note [Tying the knot]
-            Just get_type_env
-                -> do           -- It's defined in a module in the hs-boot loop
-                { type_env <- setLclEnv () get_type_env         -- yuk
-                ; case lookupNameEnv type_env name of
-                    Just thing -> return thing
-                    -- See Note [Knot-tying fallback on boot]
-                    Nothing   -> via_external
-                }
-
-            _ -> via_external }
+  = do  { res <- setLclEnv () $ lookupInKnotVars name
+        ; case res of
+            Nothing -> via_external
+            Just res -> return res
+        }
   where
     via_external =  do
         { hsc_env <- getTopEnv

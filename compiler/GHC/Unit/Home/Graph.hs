@@ -40,6 +40,7 @@ module GHC.Unit.Home.Graph
 
   -- * Very important queries
   , allInstances
+  , allRules
   , allFamInstances
   , allAnns
   , allCompleteSigs
@@ -88,6 +89,8 @@ import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
 
+import GHC.Core
+
 
 -- | Get all 'CompleteMatches' (arising from COMPLETE pragmas) present across
 -- all home units.
@@ -103,6 +106,15 @@ allInstances :: HomeUnitGraph -> IO (InstEnv, [FamInst])
 allInstances hug = foldr go (pure (emptyInstEnv, [])) hug where
   go hue = liftA2 (\(a,b) (a',b') -> (a `unionInstEnv` a', b ++ b'))
                   (hptAllInstances (homeUnitEnv_hpt hue))
+
+-- | Find all the instance declarations (of classes and families) from
+-- the Home Package Table filtered by the provided predicate function.
+-- Used in @tcRnImports@, to select the instances that are in the
+-- transitive closure of imports from the currently compiled module.
+allRules :: HomeUnitGraph -> IO [CoreRule]
+allRules hug = foldr go (pure []) hug where
+  go hue = liftA2 (\b b' -> (b ++ b'))
+                  (hptAllRules (homeUnitEnv_hpt hue))
 
 allFamInstances :: HomeUnitGraph -> IO (ModuleEnv FamInstEnv)
 allFamInstances hug = foldr go (pure emptyModuleEnv) hug where

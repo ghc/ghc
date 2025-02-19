@@ -43,7 +43,7 @@ import GHC.Prelude hiding ( read )
 import GHC.Driver.DynFlags
 import GHC.Driver.Env
 
-import GHC.Core.Rules     ( RuleBase, RuleEnv, mkRuleEnv )
+import GHC.Core.Rules     ( RuleBase, RuleEnv, mkRuleEnv, extendRuleBaseList )
 import GHC.Core.Opt.Stats ( SimplCount, zeroSimplCount, plusSimplCount )
 
 import GHC.Types.Annotations
@@ -72,6 +72,7 @@ import Data.Maybe (listToMaybe)
 import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
+import qualified GHC.Unit.Home.Graph as HUG
 
 data FloatOutSwitches = FloatOutSwitches
   { floatOutLambdas   :: Maybe Int  -- ^ Just n <=> float lambdas to top level, if
@@ -255,7 +256,17 @@ initRuleEnv guts
        ; return (mkRuleEnv guts eps_rules hpt_rules) }
 
 getExternalRuleBase :: CoreM RuleBase
-getExternalRuleBase = eps_rule_base <$> get_eps
+getExternalRuleBase = do
+  eps_rules <- eps_rule_base <$> get_eps
+  hug <- hsc_HUG <$> getHscEnv
+
+  dflags <- getDynFlags
+  hpt_rules <- liftIO $ if (isOneShot (ghcMode dflags)) then HUG.allRules hug else return []
+  let final = extendRuleBaseList eps_rules hpt_rules
+  return final
+
+
+
 
 getNamePprCtx :: CoreM NamePprCtx
 getNamePprCtx = read cr_name_ppr_ctx

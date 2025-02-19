@@ -632,6 +632,7 @@ get_reachable_nodes hsc_env mods
     eps <- hscEPS hsc_env
     let
       emg = eps_module_graph eps
+      {-
       get_mod_info_eps (ModNodeKeyWithUid gwib uid)
         | uid == homeUnitId (ue_unsafeHomeUnit unit_env)
         = case lookupModuleEnv (eps_PIT eps) (Module (RealUnit $ Definite uid) (gwib_mod gwib)) of
@@ -639,13 +640,14 @@ get_reachable_nodes hsc_env mods
             Nothing -> moduleNotLoaded "(in EPS)" gwib uid
         | otherwise
         = return Nothing
+        -}
 
       get_mod_key m
         | moduleUnitId m == homeUnitId (ue_unsafeHomeUnit unit_env)
         = ExternalModuleKey (mkModuleNk m)
         | otherwise = ExternalPackageKey (moduleUnitId m)
 
-    go get_mod_key emgNodeKey (emgReachableLoopMany emg) (map emgProject) get_mod_info_eps
+    go get_mod_key emgNodeKey (emgReachableLoopMany emg) (map emgProject) get_mod_info_hug
 
   -- Reachability on 'ModuleGraph' (for --make mode)
   | otherwise

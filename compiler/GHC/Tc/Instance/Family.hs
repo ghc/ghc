@@ -34,7 +34,9 @@ import GHC.Tc.Utils.TcType
 import GHC.Unit.External
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.Deps
+import GHC.Unit.Home.ModInfo
 
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name.Reader
@@ -405,9 +407,12 @@ getFamInsts :: ModuleEnv FamInstEnv -> Module -> TcM FamInstEnv
 getFamInsts hpt_fam_insts mod
   | Just env <- lookupModuleEnv hpt_fam_insts mod = return env
   | otherwise = do { _ <- initIfaceTcRn (loadSysInterface doc mod)
-                   ; eps <- getEps
-                   ; return (expectJust "checkFamInstConsistency" $
-                             lookupModuleEnv (eps_mod_fam_inst_env eps) mod) }
+                   ; (eps, hug) <- getEpsAndHug
+                   ; hug_res <- liftIO $ HUG.lookupHugByModule mod hug
+                   ; case hug_res of
+                        Just hmi -> return $ extendFamInstEnvList emptyFamInstEnv (md_fam_insts (hm_details hmi))
+                        Nothing -> return (expectJust "checkFamInstConsistency" $
+                                    lookupModuleEnv (eps_mod_fam_inst_env eps) mod) }
   where
     doc = ppr mod <+> text "is a family-instance module"
 
@@ -541,8 +546,9 @@ tcExtendLocalFamInstEnv fam_insts thing_inside
 
         -- Now add the instances one by one
       ; env <- getGblEnv
-      ; (inst_env', fam_insts') <- foldlM addLocalFamInst
-                                       (tcg_fam_inst_env env, tcg_fam_insts env)
+      ; (external_fie, home_fie) <- tcGetFamInstEnvs
+      ; (inst_env', fam_insts') <- foldlM (addLocalFamInst external_fie)
+                                       (home_fie, tcg_fam_insts env)
                                        fam_insts
 
       ; let env' = env { tcg_fam_insts    = fam_insts'
@@ -589,10 +595,11 @@ the current module.
 -- and then add it to the home inst env
 -- This must be lazy in the fam_inst arguments, see Note [Lazy axiom match]
 -- in GHC.Core.FamInstEnv
-addLocalFamInst :: (FamInstEnv,[FamInst])
+addLocalFamInst :: FamInstEnv
+                -> (FamInstEnv,[FamInst])
                 -> FamInst
                 -> TcM (FamInstEnv, [FamInst])
-addLocalFamInst (home_fie, my_fis) fam_inst
+addLocalFamInst external_fie (home_fie, my_fis) fam_inst
         -- home_fie includes home package and this module
         -- my_fies is just the ones from this module
   = do { traceTc "addLocalFamInst" (ppr fam_inst)
@@ -609,8 +616,7 @@ addLocalFamInst (home_fie, my_fis) fam_inst
            -- those instances which are transitively imported
            -- by the current module, rather than every instance
            -- we've ever seen. Fixing this is part of #13102.
-       ; eps <- getEps
-       ; let inst_envs = (eps_fam_inst_env eps, home_fie)
+       ; let inst_envs = (external_fie, home_fie)
              home_fie' = extendFamInstEnv home_fie fam_inst
 
            -- Check for conflicting instance decls and injectivity violations
@@ -949,5 +955,8 @@ tcGetFamInstEnvs :: TcM FamInstEnvs
 -- Gets both the external-package inst-env
 -- and the home-pkg inst env (includes module being compiled)
 tcGetFamInstEnvs
-  = do { eps <- getEps; env <- getGblEnv
-       ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) }
+  = do { (eps, hug) <- getEpsAndHug; env <- getGblEnv
+
+       ; dflags <- getDynFlags
+       ; (_, fam_inst) <- liftIO $ if (isOneShot (ghcMode dflags)) then HUG.allInstances hug else return (undefined, mempty)
+       ; return (eps_fam_inst_env eps `extendFamInstEnvList` fam_inst, tcg_fam_inst_env env) }

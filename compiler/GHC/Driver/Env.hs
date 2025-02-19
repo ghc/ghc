@@ -321,7 +321,7 @@ lookupTypeInPTE hsc_env pte name = ty
             then mkHomeModule (hsc_home_unit hsc_env) (moduleName (nameModule name))
             else nameModule name
 
-    ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
+    ty = if False -- isOneShot (ghcMode (hsc_dflags hsc_env))
             -- in one-shot, we don't use the HPT
             then return $! lookupNameEnv pte name
             else HUG.lookupHugByModule mod hpt >>= \case

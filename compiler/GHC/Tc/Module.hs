@@ -457,6 +457,12 @@ isTypeSubsequenceOf (t1:t1s) (t2:t2s)
 ************************************************************************
 -}
 
+tcGetInstances :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> TcM (InstEnv, [FamInst])
+tcGetInstances hsc_env unitId mnwib = liftIO $ do
+  if isOneShot (ghcMode (hsc_dflags hsc_env))
+    then return (emptyInstEnv, mempty) --hugAllInstances (hsc_unit_env hsc_env)
+    else hugInstancesBelow hsc_env unitId mnwib
+
 tcRnImports :: HscEnv -> [(LImportDecl GhcPs, SDoc)] -> TcM ([NonEmpty ClassDefaults], TcGblEnv)
 tcRnImports hsc_env import_decls
   = do  { (rn_imports, imp_user_spec, rdr_env, imports, defaults, hpc_info) <- rnImports import_decls ;
@@ -472,8 +478,8 @@ tcRnImports hsc_env import_decls
                 -- filtering also ensures that we don't see instances from
                 -- modules batch (@--make@) compiled before this one, but
                 -- which are not below this one.
-              ; (home_insts, home_fam_insts) <- liftIO $
-                    hugInstancesBelow hsc_env unitId mnwib
+              ; (home_insts, home_fam_insts) <-
+                    tcGetInstances hsc_env unitId mnwib
 
                 -- Record boot-file info in the EPS, so that it's
                 -- visible to loadHiBootInterface in tcRnSrcDecls,

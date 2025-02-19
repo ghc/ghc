@@ -43,6 +43,7 @@ module GHC.Unit.Home.PackageTable
   , hptAllInstances
   , hptAllFamInstances
   , hptAllAnnotations
+  , hptAllRules
 
     -- ** More Traversal-based queries
   , hptCollectDependencies
@@ -95,6 +96,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Utils.Outputable
 import GHC.Types.Unique (getUnique, getKey)
 import qualified GHC.Data.Word64Set as W64
+import GHC.Core
 
 -- | Helps us find information about modules in the home package
 newtype HomePackageTable = HPT {
@@ -219,6 +221,10 @@ hptAllFamInstances = fmap mkModuleEnv . concatHpt (\hmi -> [(hmiModule hmi, hmiF
 -- | All annotations from the HPT
 hptAllAnnotations :: HomePackageTable -> IO AnnEnv
 hptAllAnnotations = fmap mkAnnEnv . concatHpt (md_anns . hm_details)
+
+-- | All annotations from the HPT
+hptAllRules :: HomePackageTable -> IO [CoreRule]
+hptAllRules = concatHpt (md_rules . hm_details)
 
 
 --------------------------------------------------------------------------------

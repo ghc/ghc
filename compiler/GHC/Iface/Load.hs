@@ -10,11 +10,12 @@
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE CPP #-}
 
 -- | Loading interface files
 module GHC.Iface.Load (
         -- Importing one thing
-        tcLookupImported_maybe, importDecl,
+        tcLookupImported_maybe, importDecl, lookupInKnotVars,
         checkWiredInTyCon, ifCheckWiredInThing,
 
         -- RnM/TcM functions
@@ -47,7 +48,7 @@ import GHC.Platform.Profile
 
 import {-# SOURCE #-} GHC.IfaceToCore
    ( tcIfaceDecls, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
-   , tcIfaceAnnotations, tcIfaceCompleteMatches )
+   , tcIfaceAnnotations, tcIfaceCompleteMatches, typecheckIface )
 
 import GHC.Driver.Config.Finder
 import GHC.Driver.Env
@@ -95,7 +96,6 @@ import GHC.Types.Fixity.Env
 import GHC.Types.SourceError
 import GHC.Types.SourceFile
 import GHC.Types.SafeHaskell
-import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
@@ -112,6 +112,7 @@ import GHC.Unit.Home.PackageTable
 import GHC.Unit.Finder
 import GHC.Unit.Env
 import GHC.Unit.Module.External.Graph
+import GHC.Unit.Home.ModInfo
 
 import GHC.Data.Maybe
 
@@ -120,12 +121,14 @@ import Data.Map ( toList )
 import System.FilePath
 import System.Directory
 import GHC.Driver.Env.KnotVars
-import {-# source #-} GHC.Driver.Main (loadIfaceByteCode)
+import {-# source #-} GHC.Driver.Main (loadIfaceByteCode, loadIfaceByteCodeLazy)
 import GHC.Iface.Errors.Types
 import Data.Function ((&))
 import qualified Data.Set as Set
 import GHC.Unit.Module.Graph
+import GHC.Unit.Module.ModDetails
 import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Stack
 
 {-
 ************************************************************************
@@ -162,7 +165,7 @@ tcLookupImported_maybe name
             Just thing -> return (Succeeded thing)
             Nothing    -> tcImportDecl_maybe name }
 
-tcImportDecl_maybe :: Name -> TcM (MaybeErr IfaceMessage TyThing)
+tcImportDecl_maybe :: HasCallStack => Name -> TcM (MaybeErr IfaceMessage TyThing)
 -- Entry point for *source-code* uses of importDecl
 tcImportDecl_maybe name
   | Just thing <- wiredInNameTyThing_maybe name
@@ -171,17 +174,36 @@ tcImportDecl_maybe name
                 -- See Note [Loading instances for wired-in things]
         ; return (Succeeded thing) }
   | otherwise
-  = initIfaceTcRn (importDecl name)
+  = do
+      initIfaceTcRn (importDecl name)
 
-importDecl :: Name -> IfM lcl (MaybeErr IfaceMessage TyThing)
+lookupInKnotVars :: Name -> IfM lcl (Maybe TyThing)
+lookupInKnotVars name = do
+        { env <- getGblEnv
+        ; case lookupKnotVars (if_rec_types env) =<< (nameModule_maybe name)  of     -- Note [Tying the knot]
+            Just (get_type_env, _)
+                -> do           -- It's defined in a module in the hs-boot loop
+                { type_env <- setLclEnv () get_type_env         -- yuk
+                ; case lookupNameEnv type_env name of
+                    Just thing -> return (Just thing)
+                    -- See Note [Knot-tying fallback on boot]
+                    Nothing   -> return Nothing
+                }
+
+            _ -> return Nothing }
+
+importDecl :: HasCallStack =>  Name -> IfM lcl (MaybeErr IfaceMessage TyThing)
 -- Get the TyThing for this Name from an interface file
 -- It's not a wired-in thing -- the caller caught that
 importDecl name
   = assert (not (isWiredInName name)) $
     do  { logger <- getLogger
-        ; liftIO $ trace_if logger nd_doc
+        ; liftIO $ trace_if logger (nd_doc $$ callStackDoc)
 
-        -- Load the interface, which should populate the PTE
+        -- Load the interface, which will end up in one of three places.
+        -- 1. KnotVar
+        -- 2. HPT
+        -- 3. PTE
         ; mb_iface <- assertPpr (isExternalName name) (ppr name) $
                       loadInterface nd_doc (nameModule name) ImportBySystem
         ; case mb_iface of
@@ -190,16 +212,21 @@ importDecl name
           ; Succeeded _ -> do
 
         -- Now look it up again; this time we should find it
-        { eps <- getEps
-        ; case lookupTypeEnv (eps_PTE eps) name of
+        { hsc_env <- getTopEnv
+        ; res <- lookupInKnotVars name
+        ; case res of
             Just thing -> return $ Succeeded thing
-            Nothing    -> return $ Failed $
-              Can'tFindNameInInterface name
-              (filter is_interesting $ nonDetNameEnvElts $ eps_PTE eps)
-    }}}
+            Nothing    -> do
+              { res <- liftIO $ lookupType hsc_env name
+              ; case res of
+                  Just thing -> return $ Succeeded thing
+                  Nothing    -> return $ Failed $
+                                  Can'tFindNameInInterface name
+                                    []--(filter is_interesting $ nonDetNameEnvElts $ eps_PTE eps)
+    }}}}
   where
     nd_doc = text "Need decl for" <+> ppr name
-    is_interesting thing = nameModule name == nameModule (getName thing)
+--    is_interesting thing = nameModule name == nameModule (getName thing)
 
 
 {-
@@ -448,11 +475,12 @@ loadExternalGraphModule msg home_unit in_progress mod
       loadExternalPackageBelow in_progress (moduleUnitId mod)
   | otherwise =  do
 
-      let key = ExternalModuleKey $ ModNodeKeyWithUid (GWIB (moduleName mod) NotBoot) (moduleUnitId mod)
+      let mnk = ModNodeKeyWithUid (GWIB (moduleName mod) NotBoot) (moduleUnitId mod)
+          key = ExternalModuleKey mnk
       graph <- eps_module_graph <$> getEps
 
       if (not (isFullyLoadedModule key graph || Set.member key in_progress))
-        then actuallyLoadExternalGraphModule msg home_unit in_progress key mod
+        then actuallyLoadExternalGraphModule msg home_unit in_progress mnk mod
         else return in_progress
 
 -- | Load the interface for a module, and all its transitive dependenices.
@@ -460,10 +488,10 @@ actuallyLoadExternalGraphModule
   :: (Module -> SDoc)
   -> HomeUnit
   -> Set.Set ExternalKey
-  -> ExternalKey
+  -> ModNodeKeyWithUid
   -> Module
   -> IOEnv (Env IfGblEnv lcl) (Set.Set ExternalKey)
-actuallyLoadExternalGraphModule msg home_unit in_progress key mod = do
+actuallyLoadExternalGraphModule msg home_unit in_progress mnk mod = do
   dflags <- getDynFlags
   let ctx = initSDocContext dflags defaultUserStyle
   iface <- withIfaceErr ctx $
@@ -472,6 +500,8 @@ actuallyLoadExternalGraphModule msg home_unit in_progress key mod = do
   let deps = mi_deps iface
       mod_deps = dep_direct_mods deps
       pkg_deps = dep_direct_pkgs deps
+
+      key = ExternalModuleKey mnk
 
   -- Do not attempt to load the same key again when traversing
   let in_progress' = Set.insert key in_progress
@@ -485,6 +515,7 @@ actuallyLoadExternalGraphModule msg home_unit in_progress key mod = do
   cache_pkgs <- foldM loadExternalPackageBelow cache_mods (Set.toList pkg_deps)
 
   registerFullyLoaded key
+  loadModuleIntoEPSGraph mnk (Set.toList cache_pkgs)
   return cache_pkgs
 
 registerFullyLoaded :: ExternalKey -> IfM lcl ()
@@ -519,6 +550,12 @@ loadPackageIntoEPSGraph uid dep_uids =
     eps { eps_module_graph =
       extendExternalModuleGraph (NodeExternalPackage uid
         (Set.fromList dep_uids)) (eps_module_graph eps) }
+
+loadModuleIntoEPSGraph :: ModNodeKeyWithUid -> [ExternalKey] -> IfM lcl ()
+loadModuleIntoEPSGraph mnk ek = do
+  updateEps_ $ \eps ->
+    eps { eps_module_graph =
+      extendExternalModuleGraph (NodeHomePackage mnk ek) (eps_module_graph eps) }
 
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
@@ -588,13 +625,60 @@ loadInterface doc_str mod from
         -- cause the system to load arbitrary interfaces (by supplying an appropriate
         -- Template Haskell original-name).
             Succeeded (iface, loc) ->
-        let
-            loc_doc = text (ml_hi_file loc)
-        in
-        initIfaceLcl (mi_semantic_module iface) loc_doc (mi_boot iface) $
+              if ( moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env
+                   && mod /= gHC_PRIM )
+                then do
+                  let bad_boot = mi_boot iface == IsBoot
+                              && isJust (lookupKnotVars (if_rec_types gbl_env) mod)
+                  if bad_boot
+                    then
+                      initIfaceLcl (mi_semantic_module iface) (text (ml_hi_file loc)) (mi_boot iface) $ do
+                        loadHiBootSelf iface
+                    else do
+                      details <- liftIfG $ typecheckIface iface
+                      mb_object <- liftIO $ findObjectLinkableMaybe (mi_module iface) loc
+                      mb_bytecode <- liftIO $ case loadIfaceByteCodeLazy hsc_env iface loc (md_types details) of
+                                      Just l -> Just <$> l
+                                      Nothing -> return Nothing
+                      let hm_linkable = HomeModLinkable mb_bytecode mb_object
+                      liftIO $ trace_if logger (text "Loaded into HPT:" <+> ppr mod <+> text (show $ mi_boot iface) <+> ppr from <+> ppr (isJust mb_object) <+> ppr (isJust mb_bytecode))
 
-        dontLeakTheHUG $ do
+                      liftIO $ hscInsertHPT (HomeModInfo iface details hm_linkable) hsc_env
 
+
+                  return (Succeeded iface)
+                else addIfaceToEPS hsc_env doc_str loc mod iface
+        }}}}
+
+loadHiBootSelf :: ModIface -> IfL ()
+loadHiBootSelf iface
+  = do  { env <- getGblEnv
+        ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
+        ; new_eps_decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
+        ; case lookupKnotVars (if_rec_types env) (mi_module iface)  of
+              Just (get_types, write_types) -> liftIfG $ do
+                ty_env <- get_types
+                write_types (addDeclsToPTE ty_env new_eps_decls)
+              Nothing -> pprPanic "Could not load self-boot" (ppr (mi_module iface))
+        }
+
+
+liftIfG :: IfG a -> IfM lcl a
+liftIfG x = setLclEnv () x
+
+addIfaceToEPS :: HscEnv
+              -> SDoc
+              -> ModLocation
+              -> Module
+              -> ModIface
+              -> IfM lcl (MaybeErr err ModIface)
+addIfaceToEPS hsc_env doc_str loc mod iface = do
+  let loc_doc = text (ml_hi_file loc)
+  initIfaceLcl (mi_semantic_module iface) loc_doc (mi_boot iface) $ do
+    (_,hug) <- getEpsAndHug
+    gbl_env <- getGblEnv
+    dontLeakTheHUG $ do
+         let mhome_unit = ue_homeUnit (hsc_unit_env hsc_env)
         --      Load the new ModIface into the External Package State
         -- Even home-package interfaces loaded by loadInterface
         --      (which only happens in OneShot mode; in Batch/Interactive
@@ -614,30 +698,29 @@ loadInterface doc_str mod from
         -- Crucial assertion that checks if you are trying to load a HPT module into the EPS.
         -- If you start loading HPT modules into the EPS then you get strange errors about
         -- overlapping instances.
-        ; massertPpr
-              ((isOneShot (ghcMode (hsc_dflags hsc_env)))
-                || moduleUnitId mod `notElem` hsc_all_home_unit_ids hsc_env
+         massertPpr
+              ( moduleUnitId mod `notElem` hsc_all_home_unit_ids hsc_env
                 || mod == gHC_PRIM)
                 (text "Attempting to load home package interface into the EPS" $$ ppr (HUG.allUnits hug) $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod))
-        ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
-        ; new_eps_decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
-        ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
-        ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
-        ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
-        ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
-        ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
-        ; purged_hsc_env <- getTopEnv
+         ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
+         new_eps_decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
+         new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
+         new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
+         new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
+         new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
+         new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
+         purged_hsc_env <- getTopEnv
 
-        ; let direct_deps = map (uncurry (flip ModNodeKeyWithUid)) $ (Set.toList (dep_direct_mods $ mi_deps iface))
-        ; let direct_pkg_deps = Set.toList $ dep_direct_pkgs $ mi_deps iface
-        ; let !module_graph_key =
+         let direct_deps = map (uncurry (flip ModNodeKeyWithUid)) $ (Set.toList (dep_direct_mods $ mi_deps iface))
+         let direct_pkg_deps = Set.toList $ dep_direct_pkgs $ mi_deps iface
+         let !module_graph_key =
                 if moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env
                                     --- ^ home unit mods in eps can only happen in oneshot mode
                   then Just $ NodeHomePackage (miKey iface) (map ExternalModuleKey direct_deps
                                                             ++ map ExternalPackageKey direct_pkg_deps)
                   else Nothing
 
-        ; let final_iface = iface
+         let final_iface = iface
                                & set_mi_decls     (panic "No mi_decls in PIT")
                                & set_mi_insts     (panic "No mi_insts in PIT")
                                & set_mi_fam_insts (panic "No mi_fam_insts in PIT")
@@ -645,7 +728,7 @@ loadInterface doc_str mod from
                                & set_mi_anns      (panic "No mi_anns in PIT")
                                & set_mi_extra_decls (panic "No mi_extra_decls in PIT")
 
-              bad_boot = mi_boot iface == IsBoot
+             bad_boot = mi_boot iface == IsBoot
                           && isJust (lookupKnotVars (if_rec_types gbl_env) mod)
                             -- Warn against an EPS-updating import
                             -- of one's own boot file! (one-shot only)
@@ -655,7 +738,7 @@ loadInterface doc_str mod from
               -- bindings.
               --
               -- See Note [Interface Files with Core Definitions]
-              add_bytecode old
+             add_bytecode old
                 | Just action <- loadIfaceByteCode purged_hsc_env iface loc (mkNameEnv new_eps_decls)
                 = extendModuleEnv old mod action
                 -- Don't add an entry if the iface doesn't have 'extra_decls'
@@ -663,7 +746,7 @@ loadInterface doc_str mod from
                 | otherwise
                 = old
 
-        ; warnPprTrace bad_boot "loadInterface" (ppr mod) $
+         warnPprTrace bad_boot "loadInterface" (ppr mod) $
           updateEps_  $ \ eps ->
            if elemModuleEnv mod (eps_PIT eps) || is_external_sig mhome_unit iface
                 then eps
@@ -704,11 +787,10 @@ loadInterface doc_str mod from
                                                    (length new_eps_insts)
                                                    (length new_eps_rules) }
 
-        ; -- invoke plugins with *full* interface, not final_iface, to ensure
-          -- that plugins have access to declarations, etc.
-          res <- withPlugins (hsc_plugins hsc_env) (\p -> interfaceLoadAction p) iface
-        ; return (Succeeded res)
-    }}}}
+         -- invoke plugins with *full* interface, not final_iface, to ensure
+         -- that plugins have access to declarations, etc.
+         res <- withPlugins (hsc_plugins hsc_env) (\p -> interfaceLoadAction p) iface
+         return (Succeeded res)
 
 {- Note [Loading your own hi-boot file]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -6,6 +6,7 @@ import GHC.Prelude.Basic
 import GHC.Types.TypeEnv (TypeEnv)
 import GHC.Unit.Module.Location (ModLocation)
 import GHC.Unit.Module.ModIface (ModIface)
+import GHC.Unit.Module.ModDetails (ModDetails)
 
 loadIfaceByteCode ::
   HscEnv ->
@@ -13,3 +14,13 @@ loadIfaceByteCode ::
   ModLocation ->
   TypeEnv ->
   Maybe (IO Linkable)
+
+loadIfaceByteCodeLazy ::
+  HscEnv ->
+  ModIface ->
+  ModLocation ->
+  TypeEnv ->
+  Maybe (IO Linkable)
+
+initModDetails :: HscEnv -> ModIface -> IO ModDetails
+
