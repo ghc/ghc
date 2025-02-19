@@ -78,7 +78,7 @@ data Ty
    | TyVar  TyVar
    | TyUTup [Ty]   -- unboxed tuples; just a TyCon really,
                    -- but convenient like this
-   deriving (Eq,Show)
+   deriving (Eq,Show, Ord)
 
 type TyVar = String
 type TyVarBinder = String

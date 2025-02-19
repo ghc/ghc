@@ -61,6 +61,7 @@ import GHC.Utils.Exception (evaluate)
 import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRepU,
                               addIdReps, addArgReps,
                               assertNonVoidIds, assertNonVoidStgArgs )
+import GHC.CmmToAsm.Config (platformWordWidth)
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
 import GHC.Data.Bitmap
@@ -733,8 +734,14 @@ schemeT d s p (StgOpApp (StgFCallOp (CCall ccall_spec) _ty) args result_ty)
       then generateCCall d s p ccall_spec result_ty args
       else unsupportedCConvException
 
-schemeT d s p (StgOpApp (StgPrimOp op) args _ty)
-   = doTailCall d s p (primOpId op) (reverse args)
+schemeT d s p (StgOpApp (StgPrimOp op) args _ty) = do
+  profile <- getProfile
+  let platform = profilePlatform profile
+  case doPrimOp platform op d s p args of
+    -- Can we do this right in the interpreter?
+    Just prim_code -> prim_code
+    -- Otherwise we have to do a call to the primop wrapper instead :(
+    _         -> doTailCall d s p (primOpId op) (reverse args)
 
 schemeT d s p (StgOpApp (StgPrimCallOp (PrimCall label unit)) args result_ty)
    = generatePrimCall d s p label (Just unit) result_ty args
@@ -828,6 +835,235 @@ doTailCall init_d s p fn args = do
     (push_code, sz) <- pushAtom d p arg
     (final_d, more_push_code) <- push_seq (d + sz) args
     return (final_d, push_code `appOL` more_push_code)
+
+doPrimOp  :: Platform
+          -> PrimOp
+          -> StackDepth
+          -> Sequel
+          -> BCEnv
+          -> [StgArg]
+          -> Maybe (BcM BCInstrList)
+doPrimOp platform op init_d s p args =
+  case op of
+    IntAddOp -> primOp OP_ADD
+    Int64AddOp -> primOp OP_ADD
+    WordAddOp -> primOp OP_ADD
+    Word64AddOp -> primOp OP_ADD
+    AddrAddOp -> primOp OP_ADD
+
+    IntSubOp -> primOp OP_SUB
+    WordSubOp -> primOp OP_SUB
+    Int64SubOp -> primOp OP_SUB
+    Word64SubOp -> primOp OP_SUB
+    AddrSubOp -> primOp OP_SUB
+
+    Int8SubOp   -> primOp OP_SUB
+    Word8SubOp  -> primOp OP_SUB
+    Int16SubOp  -> primOp OP_SUB
+    Word16SubOp -> primOp OP_SUB
+    Int32SubOp  -> primOp OP_SUB
+    Word32SubOp -> primOp OP_SUB
+
+    IntAndOp -> primOp OP_AND
+    WordAndOp -> primOp OP_AND
+    Word64AndOp -> primOp OP_AND
+
+    IntNotOp -> primOp OP_NOT
+    WordNotOp -> primOp OP_NOT
+    Word64NotOp -> primOp OP_NOT
+
+    IntXorOp -> primOp OP_XOR
+    WordXorOp -> primOp OP_XOR
+    Word64XorOp -> primOp OP_XOR
+
+    IntOrOp -> primOp OP_OR
+    WordOrOp -> primOp OP_OR
+    Word64OrOp -> primOp OP_OR
+
+    WordSllOp   -> primOp OP_SHL
+    Word64SllOp -> primOp OP_SHL
+    IntSllOp    -> primOp OP_SHL
+    Int64SllOp  -> primOp OP_SHL
+    Word64SrlOp -> primOp OP_LSR
+    WordSrlOp   -> primOp OP_LSR
+    IntSrlOp    -> primOp OP_ASR
+    Int64SrlOp  -> primOp OP_ASR
+
+    IntNeOp -> primOp OP_NEQ
+    WordNeOp -> primOp OP_NEQ
+    Word64NeOp -> primOp OP_NEQ
+    AddrNeOp -> primOp OP_NEQ
+
+    IntEqOp -> primOp OP_EQ
+    WordEqOp -> primOp OP_EQ
+    Word64EqOp -> primOp OP_EQ
+    AddrEqOp -> primOp OP_EQ
+    CharEqOp -> primOp OP_EQ
+
+    IntLtOp -> primOp OP_S_LT
+    WordLtOp -> primOp OP_U_LT
+    Word64LtOp -> primOp OP_U_LT
+    AddrLtOp -> primOp OP_U_LT
+
+    IntGeOp -> primOp OP_S_GE
+    WordGeOp -> primOp OP_U_GE
+    Word64GeOp -> primOp OP_U_GE
+    AddrGeOp -> primOp OP_U_GE
+
+    IntGtOp -> primOp OP_S_GT
+    WordGtOp -> primOp OP_U_GT
+    Word64GtOp -> primOp OP_U_GT
+    AddrGtOp -> primOp OP_U_GT
+
+    IntLeOp -> primOp OP_S_LE
+    WordLeOp -> primOp OP_U_LE
+    Word64LeOp -> primOp OP_U_LE
+    AddrLeOp -> primOp OP_U_LE
+
+    IntNegOp -> primOp OP_NEG
+    Int64NegOp -> primOp OP_NEG
+
+    IntToWordOp     -> no_op
+    WordToIntOp     -> no_op
+    Int8ToWord8Op   -> no_op
+    Word8ToInt8Op   -> no_op
+    Int16ToWord16Op -> no_op
+    Word16ToInt16Op -> no_op
+    Int32ToWord32Op -> no_op
+    Word32ToInt32Op -> no_op
+    Int64ToWord64Op -> no_op
+    Word64ToInt64Op -> no_op
+    IntToAddrOp     -> no_op
+    AddrToIntOp     -> no_op
+    ChrOp           -> no_op   -- Int# and Char# are rep'd the same
+    OrdOp           -> no_op
+
+    IndexOffAddrOp_Word8 -> primOpWithRep (OP_INDEX_ADDR W8) W8
+    IndexOffAddrOp_Word16 -> primOpWithRep (OP_INDEX_ADDR W16) W16
+    IndexOffAddrOp_Word32 -> primOpWithRep (OP_INDEX_ADDR W32) W32
+    IndexOffAddrOp_Word64 -> primOpWithRep (OP_INDEX_ADDR W64) W64
+
+    _ -> Nothing
+  where
+    primArg1Width arg
+      | rep <- (stgArgRepU arg)
+      = case rep of
+        AddrRep -> platformWordWidth platform
+        IntRep -> platformWordWidth platform
+        WordRep -> platformWordWidth platform
+
+        Int64Rep -> W64
+        Word64Rep -> W64
+
+        Int32Rep -> W32
+        Word32Rep -> W32
+
+        Int16Rep -> W16
+        Word16Rep -> W16
+
+        Int8Rep -> W8
+        Word8Rep -> W8
+
+        FloatRep -> unexpectedRep
+        DoubleRep -> unexpectedRep
+
+        BoxedRep{} -> unexpectedRep
+        VecRep{} -> unexpectedRep
+      where
+        unexpectedRep = panic "doPrimOp: Unexpected argument rep"
+
+
+    -- TODO: The slides for the result need to be two words on 32bit for 64bit ops.
+    mkNReturn width
+      | W64 <- width = RETURN L -- L works for 64 bit on any platform
+      | otherwise = RETURN N -- <64bit width, fits in word on all platforms
+
+    mkSlideWords width = if platformWordWidth platform < width then 2 else 1
+
+    -- Push args, execute primop, slide, return_N
+    primOp op_inst = Just $ do
+      let width = primArg1Width (head args)
+      prim_code <- mkPrimOpCode init_d s p (op_inst width) $ args
+      let slide = mkSlideW (mkSlideWords width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn width
+      return $ prim_code `appOL` slide
+
+    primOpWithRep :: BCInstr -> Width -> Maybe (BcM (OrdList BCInstr))
+    primOpWithRep op_inst width = Just $ do
+      prim_code <- mkPrimOpCode init_d s p op_inst $ args
+
+      let slide = mkSlideW (mkSlideWords width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn width
+      return $ prim_code `appOL` slide
+
+    no_op = Just $ do
+      let width = primArg1Width (head args)
+      prim_code <- terribleNoOp init_d s p undefined args
+      let slide = mkSlideW (mkSlideWords width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn width
+      return $ prim_code `appOL` slide
+
+-- It's horrible, but still better than calling intToWord ...
+terribleNoOp
+    :: StackDepth
+    -> Sequel
+    -> BCEnv
+    -> BCInstr                  -- The operator
+    -> [StgArg]                 -- Args, in *reverse* order (must be fully applied)
+    -> BcM BCInstrList
+terribleNoOp orig_d _ p _ args = app_code
+  where
+    app_code = do
+        profile <- getProfile
+        let --platform = profilePlatform profile
+
+            non_voids =
+                addArgReps (assertNonVoidStgArgs args)
+            (_, _, args_offsets) =
+                mkVirtHeapOffsetsWithPadding profile StdHeader non_voids
+
+            do_pushery !d (arg : args) = do
+                (push, arg_bytes) <- case arg of
+                    (Padding l _) -> return $! pushPadding (ByteOff l)
+                    (FieldOff a _) -> pushConstrAtom d p (fromNonVoid a)
+                more_push_code <- do_pushery (d + arg_bytes) args
+                return (push `appOL` more_push_code)
+            do_pushery !_d [] = do
+                -- let !n_arg_words = bytesToWords platform (d - orig_d)
+                return (nilOL)
+
+        -- Push on the stack in the reverse order.
+        do_pushery orig_d (reverse args_offsets)
+
+-- Push the arguments on the stack and emit the given instruction
+mkPrimOpCode
+    :: StackDepth
+    -> Sequel
+    -> BCEnv
+    -> BCInstr                  -- The operator
+    -> [StgArg]                 -- Args, in *reverse* order (must be fully applied)
+    -> BcM BCInstrList
+mkPrimOpCode orig_d _ p op_inst args = app_code
+  where
+    app_code = do
+        profile <- getProfile
+        let _platform = profilePlatform profile
+
+            non_voids =
+                addArgReps (assertNonVoidStgArgs args)
+            (_, _, args_offsets) =
+                mkVirtHeapOffsetsWithPadding profile StdHeader non_voids
+
+            do_pushery !d (arg : args) = do
+                (push, arg_bytes) <- case arg of
+                    (Padding l _) -> return $! pushPadding (ByteOff l)
+                    (FieldOff a _) -> pushConstrAtom d p (fromNonVoid a)
+                more_push_code <- do_pushery (d + arg_bytes) args
+                return (push `appOL` more_push_code)
+            do_pushery !_d [] = do
+                -- let !n_arg_words = bytesToWords platform (d - orig_d)
+                return (unitOL op_inst)
+
+        -- Push on the stack in the reverse order.
+        do_pushery orig_d (reverse args_offsets)
+
 
 -- v. similar to CgStackery.findMatch, ToDo: merge
 findPushSeq :: [ArgRep] -> (BCInstr, Int, [ArgRep])

@@ -1,540 +1,1050 @@
 Group ALL
-  Group Int
-    Group Integral
-      Running FromIntegral(Integer(a)) == a
-        Passed 100 iterations
-    Group Property
-      Running Eq
-        Passed 100 iterations
-      Running Show
-        Passed 100 iterations
-      Running Ord
-        Passed 100 iterations
-      Running <
-        Passed 100 iterations
-    Group Additive
-      Running a + azero == a
-        Passed 100 iterations
-      Running azero + a == a
-        Passed 100 iterations
-      Running a + b == b + a
-        Passed 100 iterations
-    Group Multiplicative
-      Running a * 1 == a
-        Passed 100 iterations
-      Running 1 * a == a
-        Passed 100 iterations
-      Running multiplication commutative
-        Passed 100 iterations
-      Running a * b == Integer(a) * Integer(b)
-        Passed 100 iterations
-    Group Divisible
-      Running (x `div` y) * y + (x `mod` y) == x
-        Passed 100 iterations
-    Group Precedence
-      Running + and - (1)
-        Passed 100 iterations
-      Running + and - (2)
-        Passed 100 iterations
-      Running + and * (1)
-        Passed 100 iterations
-      Running + and * (2)
-        Passed 100 iterations
-      Running - and * (1)
-        Passed 100 iterations
-      Running - and * (2)
-        Passed 100 iterations
-      Running * and ^ (1)
-        Passed 100 iterations
-      Running * and ^ (2)
-        Passed 100 iterations
-  Group Int8
-    Group Integral
-      Running FromIntegral(Integer(a)) == a
-        Passed 100 iterations
-    Group Property
-      Running Eq
-        Passed 100 iterations
-      Running Show
-        Passed 100 iterations
-      Running Ord
-        Passed 100 iterations
-      Running <
-        Passed 100 iterations
-    Group Additive
-      Running a + azero == a
-        Passed 100 iterations
-      Running azero + a == a
-        Passed 100 iterations
-      Running a + b == b + a
-        Passed 100 iterations
-    Group Multiplicative
-      Running a * 1 == a
-        Passed 100 iterations
-      Running 1 * a == a
-        Passed 100 iterations
-      Running multiplication commutative
-        Passed 100 iterations
-      Running a * b == Integer(a) * Integer(b)
-        Passed 100 iterations
-    Group Divisible
-      Running (x `div` y) * y + (x `mod` y) == x
-        Passed 100 iterations
-    Group Precedence
-      Running + and - (1)
-        Passed 100 iterations
-      Running + and - (2)
-        Passed 100 iterations
-      Running + and * (1)
-        Passed 100 iterations
-      Running + and * (2)
-        Passed 100 iterations
-      Running - and * (1)
-        Passed 100 iterations
-      Running - and * (2)
-        Passed 100 iterations
-      Running * and ^ (1)
-        Passed 100 iterations
-      Running * and ^ (2)
-        Passed 100 iterations
-  Group Int16
-    Group Integral
-      Running FromIntegral(Integer(a)) == a
-        Passed 100 iterations
-    Group Property
-      Running Eq
-        Passed 100 iterations
-      Running Show
-        Passed 100 iterations
-      Running Ord
-        Passed 100 iterations
-      Running <
-        Passed 100 iterations
-    Group Additive
-      Running a + azero == a
-        Passed 100 iterations
-      Running azero + a == a
-        Passed 100 iterations
-      Running a + b == b + a
-        Passed 100 iterations
-    Group Multiplicative
-      Running a * 1 == a
-        Passed 100 iterations
-      Running 1 * a == a
-        Passed 100 iterations
-      Running multiplication commutative
-        Passed 100 iterations
-      Running a * b == Integer(a) * Integer(b)
-        Passed 100 iterations
-    Group Divisible
-      Running (x `div` y) * y + (x `mod` y) == x
-        Passed 100 iterations
-    Group Precedence
-      Running + and - (1)
-        Passed 100 iterations
-      Running + and - (2)
-        Passed 100 iterations
-      Running + and * (1)
-        Passed 100 iterations
-      Running + and * (2)
-        Passed 100 iterations
-      Running - and * (1)
-        Passed 100 iterations
-      Running - and * (2)
-        Passed 100 iterations
-      Running * and ^ (1)
-        Passed 100 iterations
-      Running * and ^ (2)
-        Passed 100 iterations
-  Group Int32
-    Group Integral
-      Running FromIntegral(Integer(a)) == a
-        Passed 100 iterations
-    Group Property
-      Running Eq
-        Passed 100 iterations
-      Running Show
-        Passed 100 iterations
-      Running Ord
-        Passed 100 iterations
-      Running <
-        Passed 100 iterations
-    Group Additive
-      Running a + azero == a
-        Passed 100 iterations
-      Running azero + a == a
-        Passed 100 iterations
-      Running a + b == b + a
-        Passed 100 iterations
-    Group Multiplicative
-      Running a * 1 == a
-        Passed 100 iterations
-      Running 1 * a == a
-        Passed 100 iterations
-      Running multiplication commutative
-        Passed 100 iterations
-      Running a * b == Integer(a) * Integer(b)
-        Passed 100 iterations
-    Group Divisible
-      Running (x `div` y) * y + (x `mod` y) == x
-        Passed 100 iterations
-    Group Precedence
-      Running + and - (1)
-        Passed 100 iterations
-      Running + and - (2)
-        Passed 100 iterations
-      Running + and * (1)
-        Passed 100 iterations
-      Running + and * (2)
-        Passed 100 iterations
-      Running - and * (1)
-        Passed 100 iterations
-      Running - and * (2)
-        Passed 100 iterations
-      Running * and ^ (1)
-        Passed 100 iterations
-      Running * and ^ (2)
-        Passed 100 iterations
-  Group Int64
-    Group Integral
-      Running FromIntegral(Integer(a)) == a
-        Passed 100 iterations
-    Group Property
-      Running Eq
-        Passed 100 iterations
-      Running Show
-        Passed 100 iterations
-      Running Ord
-        Passed 100 iterations
-      Running <
-        Passed 100 iterations
-    Group Additive
-      Running a + azero == a
-        Passed 100 iterations
-      Running azero + a == a
-        Passed 100 iterations
-      Running a + b == b + a
-        Passed 100 iterations
-    Group Multiplicative
-      Running a * 1 == a
-        Passed 100 iterations
-      Running 1 * a == a
-        Passed 100 iterations
-      Running multiplication commutative
-        Passed 100 iterations
-      Running a * b == Integer(a) * Integer(b)
-        Passed 100 iterations
-    Group Divisible
-      Running (x `div` y) * y + (x `mod` y) == x
-        Passed 100 iterations
-    Group Precedence
-      Running + and - (1)
-        Passed 100 iterations
-      Running + and - (2)
-        Passed 100 iterations
-      Running + and * (1)
-        Passed 100 iterations
-      Running + and * (2)
-        Passed 100 iterations
-      Running - and * (1)
-        Passed 100 iterations
-      Running - and * (2)
-        Passed 100 iterations
-      Running * and ^ (1)
-        Passed 100 iterations
-      Running * and ^ (2)
-        Passed 100 iterations
-  Group Integer
-    Group Integral
-      Running FromIntegral(Integer(a)) == a
-        Passed 100 iterations
-    Group Property
-      Running Eq
-        Passed 100 iterations
-      Running Show
-        Passed 100 iterations
-      Running Ord
-        Passed 100 iterations
-      Running <
-        Passed 100 iterations
-    Group Additive
-      Running a + azero == a
-        Passed 100 iterations
-      Running azero + a == a
-        Passed 100 iterations
-      Running a + b == b + a
-        Passed 100 iterations
-    Group Multiplicative
-      Running a * 1 == a
-        Passed 100 iterations
-      Running 1 * a == a
-        Passed 100 iterations
-      Running multiplication commutative
-        Passed 100 iterations
-      Running a * b == Integer(a) * Integer(b)
-        Passed 100 iterations
-    Group Divisible
-      Running (x `div` y) * y + (x `mod` y) == x
-        Passed 100 iterations
-    Group Precedence
-      Running + and - (1)
-        Passed 100 iterations
-      Running + and - (2)
-        Passed 100 iterations
-      Running + and * (1)
-        Passed 100 iterations
-      Running + and * (2)
-        Passed 100 iterations
-      Running - and * (1)
-        Passed 100 iterations
-      Running - and * (2)
-        Passed 100 iterations
-      Running * and ^ (1)
-        Passed 100 iterations
-      Running * and ^ (2)
-        Passed 100 iterations
-  Group Word
-    Group Integral
-      Running FromIntegral(Integer(a)) == a
-        Passed 100 iterations
-    Group Property
-      Running Eq
-        Passed 100 iterations
-      Running Show
-        Passed 100 iterations
-      Running Ord
-        Passed 100 iterations
-      Running <
-        Passed 100 iterations
-    Group Additive
-      Running a + azero == a
-        Passed 100 iterations
-      Running azero + a == a
-        Passed 100 iterations
-      Running a + b == b + a
-        Passed 100 iterations
-    Group Multiplicative
-      Running a * 1 == a
-        Passed 100 iterations
-      Running 1 * a == a
-        Passed 100 iterations
-      Running multiplication commutative
-        Passed 100 iterations
-      Running a * b == Integer(a) * Integer(b)
-        Passed 100 iterations
-    Group Divisible
-      Running (x `div` y) * y + (x `mod` y) == x
-        Passed 100 iterations
-    Group Precedence
-      Running + and - (1)
-        Passed 100 iterations
-      Running + and - (2)
-        Passed 100 iterations
-      Running + and * (1)
-        Passed 100 iterations
-      Running + and * (2)
-        Passed 100 iterations
-      Running - and * (1)
-        Passed 100 iterations
-      Running - and * (2)
-        Passed 100 iterations
-      Running * and ^ (1)
-        Passed 100 iterations
-      Running * and ^ (2)
-        Passed 100 iterations
-  Group Word8
-    Group Integral
-      Running FromIntegral(Integer(a)) == a
-        Passed 100 iterations
-    Group Property
-      Running Eq
-        Passed 100 iterations
-      Running Show
-        Passed 100 iterations
-      Running Ord
-        Passed 100 iterations
-      Running <
-        Passed 100 iterations
-    Group Additive
-      Running a + azero == a
-        Passed 100 iterations
-      Running azero + a == a
-        Passed 100 iterations
-      Running a + b == b + a
-        Passed 100 iterations
-    Group Multiplicative
-      Running a * 1 == a
-        Passed 100 iterations
-      Running 1 * a == a
-        Passed 100 iterations
-      Running multiplication commutative
-        Passed 100 iterations
-      Running a * b == Integer(a) * Integer(b)
-        Passed 100 iterations
-    Group Divisible
-      Running (x `div` y) * y + (x `mod` y) == x
-        Passed 100 iterations
-    Group Precedence
-      Running + and - (1)
-        Passed 100 iterations
-      Running + and - (2)
-        Passed 100 iterations
-      Running + and * (1)
-        Passed 100 iterations
-      Running + and * (2)
-        Passed 100 iterations
-      Running - and * (1)
-        Passed 100 iterations
-      Running - and * (2)
-        Passed 100 iterations
-      Running * and ^ (1)
-        Passed 100 iterations
-      Running * and ^ (2)
-        Passed 100 iterations
-  Group Word16
-    Group Integral
-      Running FromIntegral(Integer(a)) == a
-        Passed 100 iterations
-    Group Property
-      Running Eq
-        Passed 100 iterations
-      Running Show
-        Passed 100 iterations
-      Running Ord
-        Passed 100 iterations
-      Running <
-        Passed 100 iterations
-    Group Additive
-      Running a + azero == a
-        Passed 100 iterations
-      Running azero + a == a
-        Passed 100 iterations
-      Running a + b == b + a
-        Passed 100 iterations
-    Group Multiplicative
-      Running a * 1 == a
-        Passed 100 iterations
-      Running 1 * a == a
-        Passed 100 iterations
-      Running multiplication commutative
-        Passed 100 iterations
-      Running a * b == Integer(a) * Integer(b)
-        Passed 100 iterations
-    Group Divisible
-      Running (x `div` y) * y + (x `mod` y) == x
-        Passed 100 iterations
-    Group Precedence
-      Running + and - (1)
-        Passed 100 iterations
-      Running + and - (2)
-        Passed 100 iterations
-      Running + and * (1)
-        Passed 100 iterations
-      Running + and * (2)
-        Passed 100 iterations
-      Running - and * (1)
-        Passed 100 iterations
-      Running - and * (2)
-        Passed 100 iterations
-      Running * and ^ (1)
-        Passed 100 iterations
-      Running * and ^ (2)
-        Passed 100 iterations
-  Group Word32
-    Group Integral
-      Running FromIntegral(Integer(a)) == a
-        Passed 100 iterations
-    Group Property
-      Running Eq
-        Passed 100 iterations
-      Running Show
-        Passed 100 iterations
-      Running Ord
-        Passed 100 iterations
-      Running <
-        Passed 100 iterations
-    Group Additive
-      Running a + azero == a
-        Passed 100 iterations
-      Running azero + a == a
-        Passed 100 iterations
-      Running a + b == b + a
-        Passed 100 iterations
-    Group Multiplicative
-      Running a * 1 == a
-        Passed 100 iterations
-      Running 1 * a == a
-        Passed 100 iterations
-      Running multiplication commutative
-        Passed 100 iterations
-      Running a * b == Integer(a) * Integer(b)
-        Passed 100 iterations
-    Group Divisible
-      Running (x `div` y) * y + (x `mod` y) == x
-        Passed 100 iterations
-    Group Precedence
-      Running + and - (1)
-        Passed 100 iterations
-      Running + and - (2)
-        Passed 100 iterations
-      Running + and * (1)
-        Passed 100 iterations
-      Running + and * (2)
-        Passed 100 iterations
-      Running - and * (1)
-        Passed 100 iterations
-      Running - and * (2)
-        Passed 100 iterations
-      Running * and ^ (1)
-        Passed 100 iterations
-      Running * and ^ (2)
-        Passed 100 iterations
-  Group Word64
-    Group Integral
-      Running FromIntegral(Integer(a)) == a
-        Passed 100 iterations
-    Group Property
-      Running Eq
-        Passed 100 iterations
-      Running Show
-        Passed 100 iterations
-      Running Ord
-        Passed 100 iterations
-      Running <
-        Passed 100 iterations
-    Group Additive
-      Running a + azero == a
-        Passed 100 iterations
-      Running azero + a == a
-        Passed 100 iterations
-      Running a + b == b + a
-        Passed 100 iterations
-    Group Multiplicative
-      Running a * 1 == a
-        Passed 100 iterations
-      Running 1 * a == a
-        Passed 100 iterations
-      Running multiplication commutative
-        Passed 100 iterations
-      Running a * b == Integer(a) * Integer(b)
-        Passed 100 iterations
-    Group Divisible
-      Running (x `div` y) * y + (x `mod` y) == x
-        Passed 100 iterations
-    Group Precedence
-      Running + and - (1)
-        Passed 100 iterations
-      Running + and - (2)
-        Passed 100 iterations
-      Running + and * (1)
-        Passed 100 iterations
-      Running + and * (2)
-        Passed 100 iterations
-      Running - and * (1)
-        Passed 100 iterations
-      Running - and * (2)
-        Passed 100 iterations
-      Running * and ^ (1)
-        Passed 100 iterations
-      Running * and ^ (2)
-        Passed 100 iterations
+  Group ALL
+    Group Int
+      Group Integral
+        Running FromIntegral(Integer(a)) == a
+          Passed 100 iterations
+      Group Property
+        Running Eq
+          Passed 100 iterations
+        Running Show
+          Passed 100 iterations
+        Running Ord
+          Passed 100 iterations
+        Running <
+          Passed 100 iterations
+      Group Additive
+        Running a + azero == a
+          Passed 100 iterations
+        Running azero + a == a
+          Passed 100 iterations
+        Running a + b == b + a
+          Passed 100 iterations
+      Group Multiplicative
+        Running a * 1 == a
+          Passed 100 iterations
+        Running 1 * a == a
+          Passed 100 iterations
+        Running multiplication commutative
+          Passed 100 iterations
+        Running a * b == Integer(a) * Integer(b)
+          Passed 100 iterations
+      Group Divisible
+        Running (x `div` y) * y + (x `mod` y) == x
+          Passed 100 iterations
+      Group Precedence
+        Running + and - (1)
+          Passed 100 iterations
+        Running + and - (2)
+          Passed 100 iterations
+        Running + and * (1)
+          Passed 100 iterations
+        Running + and * (2)
+          Passed 100 iterations
+        Running - and * (1)
+          Passed 100 iterations
+        Running - and * (2)
+          Passed 100 iterations
+        Running * and ^ (1)
+          Passed 100 iterations
+        Running * and ^ (2)
+          Passed 100 iterations
+    Group Int8
+      Group Integral
+        Running FromIntegral(Integer(a)) == a
+          Passed 100 iterations
+      Group Property
+        Running Eq
+          Passed 100 iterations
+        Running Show
+          Passed 100 iterations
+        Running Ord
+          Passed 100 iterations
+        Running <
+          Passed 100 iterations
+      Group Additive
+        Running a + azero == a
+          Passed 100 iterations
+        Running azero + a == a
+          Passed 100 iterations
+        Running a + b == b + a
+          Passed 100 iterations
+      Group Multiplicative
+        Running a * 1 == a
+          Passed 100 iterations
+        Running 1 * a == a
+          Passed 100 iterations
+        Running multiplication commutative
+          Passed 100 iterations
+        Running a * b == Integer(a) * Integer(b)
+          Passed 100 iterations
+      Group Divisible
+        Running (x `div` y) * y + (x `mod` y) == x
+          Passed 100 iterations
+      Group Precedence
+        Running + and - (1)
+          Passed 100 iterations
+        Running + and - (2)
+          Passed 100 iterations
+        Running + and * (1)
+          Passed 100 iterations
+        Running + and * (2)
+          Passed 100 iterations
+        Running - and * (1)
+          Passed 100 iterations
+        Running - and * (2)
+          Passed 100 iterations
+        Running * and ^ (1)
+          Passed 100 iterations
+        Running * and ^ (2)
+          Passed 100 iterations
+    Group Int16
+      Group Integral
+        Running FromIntegral(Integer(a)) == a
+          Passed 100 iterations
+      Group Property
+        Running Eq
+          Passed 100 iterations
+        Running Show
+          Passed 100 iterations
+        Running Ord
+          Passed 100 iterations
+        Running <
+          Passed 100 iterations
+      Group Additive
+        Running a + azero == a
+          Passed 100 iterations
+        Running azero + a == a
+          Passed 100 iterations
+        Running a + b == b + a
+          Passed 100 iterations
+      Group Multiplicative
+        Running a * 1 == a
+          Passed 100 iterations
+        Running 1 * a == a
+          Passed 100 iterations
+        Running multiplication commutative
+          Passed 100 iterations
+        Running a * b == Integer(a) * Integer(b)
+          Passed 100 iterations
+      Group Divisible
+        Running (x `div` y) * y + (x `mod` y) == x
+          Passed 100 iterations
+      Group Precedence
+        Running + and - (1)
+          Passed 100 iterations
+        Running + and - (2)
+          Passed 100 iterations
+        Running + and * (1)
+          Passed 100 iterations
+        Running + and * (2)
+          Passed 100 iterations
+        Running - and * (1)
+          Passed 100 iterations
+        Running - and * (2)
+          Passed 100 iterations
+        Running * and ^ (1)
+          Passed 100 iterations
+        Running * and ^ (2)
+          Passed 100 iterations
+    Group Int32
+      Group Integral
+        Running FromIntegral(Integer(a)) == a
+          Passed 100 iterations
+      Group Property
+        Running Eq
+          Passed 100 iterations
+        Running Show
+          Passed 100 iterations
+        Running Ord
+          Passed 100 iterations
+        Running <
+          Passed 100 iterations
+      Group Additive
+        Running a + azero == a
+          Passed 100 iterations
+        Running azero + a == a
+          Passed 100 iterations
+        Running a + b == b + a
+          Passed 100 iterations
+      Group Multiplicative
+        Running a * 1 == a
+          Passed 100 iterations
+        Running 1 * a == a
+          Passed 100 iterations
+        Running multiplication commutative
+          Passed 100 iterations
+        Running a * b == Integer(a) * Integer(b)
+          Passed 100 iterations
+      Group Divisible
+        Running (x `div` y) * y + (x `mod` y) == x
+          Passed 100 iterations
+      Group Precedence
+        Running + and - (1)
+          Passed 100 iterations
+        Running + and - (2)
+          Passed 100 iterations
+        Running + and * (1)
+          Passed 100 iterations
+        Running + and * (2)
+          Passed 100 iterations
+        Running - and * (1)
+          Passed 100 iterations
+        Running - and * (2)
+          Passed 100 iterations
+        Running * and ^ (1)
+          Passed 100 iterations
+        Running * and ^ (2)
+          Passed 100 iterations
+    Group Int64
+      Group Integral
+        Running FromIntegral(Integer(a)) == a
+          Passed 100 iterations
+      Group Property
+        Running Eq
+          Passed 100 iterations
+        Running Show
+          Passed 100 iterations
+        Running Ord
+          Passed 100 iterations
+        Running <
+          Passed 100 iterations
+      Group Additive
+        Running a + azero == a
+          Passed 100 iterations
+        Running azero + a == a
+          Passed 100 iterations
+        Running a + b == b + a
+          Passed 100 iterations
+      Group Multiplicative
+        Running a * 1 == a
+          Passed 100 iterations
+        Running 1 * a == a
+          Passed 100 iterations
+        Running multiplication commutative
+          Passed 100 iterations
+        Running a * b == Integer(a) * Integer(b)
+          Passed 100 iterations
+      Group Divisible
+        Running (x `div` y) * y + (x `mod` y) == x
+          Passed 100 iterations
+      Group Precedence
+        Running + and - (1)
+          Passed 100 iterations
+        Running + and - (2)
+          Passed 100 iterations
+        Running + and * (1)
+          Passed 100 iterations
+        Running + and * (2)
+          Passed 100 iterations
+        Running - and * (1)
+          Passed 100 iterations
+        Running - and * (2)
+          Passed 100 iterations
+        Running * and ^ (1)
+          Passed 100 iterations
+        Running * and ^ (2)
+          Passed 100 iterations
+    Group Integer
+      Group Integral
+        Running FromIntegral(Integer(a)) == a
+          Passed 100 iterations
+      Group Property
+        Running Eq
+          Passed 100 iterations
+        Running Show
+          Passed 100 iterations
+        Running Ord
+          Passed 100 iterations
+        Running <
+          Passed 100 iterations
+      Group Additive
+        Running a + azero == a
+          Passed 100 iterations
+        Running azero + a == a
+          Passed 100 iterations
+        Running a + b == b + a
+          Passed 100 iterations
+      Group Multiplicative
+        Running a * 1 == a
+          Passed 100 iterations
+        Running 1 * a == a
+          Passed 100 iterations
+        Running multiplication commutative
+          Passed 100 iterations
+        Running a * b == Integer(a) * Integer(b)
+          Passed 100 iterations
+      Group Divisible
+        Running (x `div` y) * y + (x `mod` y) == x
+          Passed 100 iterations
+      Group Precedence
+        Running + and - (1)
+          Passed 100 iterations
+        Running + and - (2)
+          Passed 100 iterations
+        Running + and * (1)
+          Passed 100 iterations
+        Running + and * (2)
+          Passed 100 iterations
+        Running - and * (1)
+          Passed 100 iterations
+        Running - and * (2)
+          Passed 100 iterations
+        Running * and ^ (1)
+          Passed 100 iterations
+        Running * and ^ (2)
+          Passed 100 iterations
+    Group Word
+      Group Integral
+        Running FromIntegral(Integer(a)) == a
+          Passed 100 iterations
+      Group Property
+        Running Eq
+          Passed 100 iterations
+        Running Show
+          Passed 100 iterations
+        Running Ord
+          Passed 100 iterations
+        Running <
+          Passed 100 iterations
+      Group Additive
+        Running a + azero == a
+          Passed 100 iterations
+        Running azero + a == a
+          Passed 100 iterations
+        Running a + b == b + a
+          Passed 100 iterations
+      Group Multiplicative
+        Running a * 1 == a
+          Passed 100 iterations
+        Running 1 * a == a
+          Passed 100 iterations
+        Running multiplication commutative
+          Passed 100 iterations
+        Running a * b == Integer(a) * Integer(b)
+          Passed 100 iterations
+      Group Divisible
+        Running (x `div` y) * y + (x `mod` y) == x
+          Passed 100 iterations
+      Group Precedence
+        Running + and - (1)
+          Passed 100 iterations
+        Running + and - (2)
+          Passed 100 iterations
+        Running + and * (1)
+          Passed 100 iterations
+        Running + and * (2)
+          Passed 100 iterations
+        Running - and * (1)
+          Passed 100 iterations
+        Running - and * (2)
+          Passed 100 iterations
+        Running * and ^ (1)
+          Passed 100 iterations
+        Running * and ^ (2)
+          Passed 100 iterations
+    Group Word8
+      Group Integral
+        Running FromIntegral(Integer(a)) == a
+          Passed 100 iterations
+      Group Property
+        Running Eq
+          Passed 100 iterations
+        Running Show
+          Passed 100 iterations
+        Running Ord
+          Passed 100 iterations
+        Running <
+          Passed 100 iterations
+      Group Additive
+        Running a + azero == a
+          Passed 100 iterations
+        Running azero + a == a
+          Passed 100 iterations
+        Running a + b == b + a
+          Passed 100 iterations
+      Group Multiplicative
+        Running a * 1 == a
+          Passed 100 iterations
+        Running 1 * a == a
+          Passed 100 iterations
+        Running multiplication commutative
+          Passed 100 iterations
+        Running a * b == Integer(a) * Integer(b)
+          Passed 100 iterations
+      Group Divisible
+        Running (x `div` y) * y + (x `mod` y) == x
+          Passed 100 iterations
+      Group Precedence
+        Running + and - (1)
+          Passed 100 iterations
+        Running + and - (2)
+          Passed 100 iterations
+        Running + and * (1)
+          Passed 100 iterations
+        Running + and * (2)
+          Passed 100 iterations
+        Running - and * (1)
+          Passed 100 iterations
+        Running - and * (2)
+          Passed 100 iterations
+        Running * and ^ (1)
+          Passed 100 iterations
+        Running * and ^ (2)
+          Passed 100 iterations
+    Group Word16
+      Group Integral
+        Running FromIntegral(Integer(a)) == a
+          Passed 100 iterations
+      Group Property
+        Running Eq
+          Passed 100 iterations
+        Running Show
+          Passed 100 iterations
+        Running Ord
+          Passed 100 iterations
+        Running <
+          Passed 100 iterations
+      Group Additive
+        Running a + azero == a
+          Passed 100 iterations
+        Running azero + a == a
+          Passed 100 iterations
+        Running a + b == b + a
+          Passed 100 iterations
+      Group Multiplicative
+        Running a * 1 == a
+          Passed 100 iterations
+        Running 1 * a == a
+          Passed 100 iterations
+        Running multiplication commutative
+          Passed 100 iterations
+        Running a * b == Integer(a) * Integer(b)
+          Passed 100 iterations
+      Group Divisible
+        Running (x `div` y) * y + (x `mod` y) == x
+          Passed 100 iterations
+      Group Precedence
+        Running + and - (1)
+          Passed 100 iterations
+        Running + and - (2)
+          Passed 100 iterations
+        Running + and * (1)
+          Passed 100 iterations
+        Running + and * (2)
+          Passed 100 iterations
+        Running - and * (1)
+          Passed 100 iterations
+        Running - and * (2)
+          Passed 100 iterations
+        Running * and ^ (1)
+          Passed 100 iterations
+        Running * and ^ (2)
+          Passed 100 iterations
+    Group Word32
+      Group Integral
+        Running FromIntegral(Integer(a)) == a
+          Passed 100 iterations
+      Group Property
+        Running Eq
+          Passed 100 iterations
+        Running Show
+          Passed 100 iterations
+        Running Ord
+          Passed 100 iterations
+        Running <
+          Passed 100 iterations
+      Group Additive
+        Running a + azero == a
+          Passed 100 iterations
+        Running azero + a == a
+          Passed 100 iterations
+        Running a + b == b + a
+          Passed 100 iterations
+      Group Multiplicative
+        Running a * 1 == a
+          Passed 100 iterations
+        Running 1 * a == a
+          Passed 100 iterations
+        Running multiplication commutative
+          Passed 100 iterations
+        Running a * b == Integer(a) * Integer(b)
+          Passed 100 iterations
+      Group Divisible
+        Running (x `div` y) * y + (x `mod` y) == x
+          Passed 100 iterations
+      Group Precedence
+        Running + and - (1)
+          Passed 100 iterations
+        Running + and - (2)
+          Passed 100 iterations
+        Running + and * (1)
+          Passed 100 iterations
+        Running + and * (2)
+          Passed 100 iterations
+        Running - and * (1)
+          Passed 100 iterations
+        Running - and * (2)
+          Passed 100 iterations
+        Running * and ^ (1)
+          Passed 100 iterations
+        Running * and ^ (2)
+          Passed 100 iterations
+    Group Word64
+      Group Integral
+        Running FromIntegral(Integer(a)) == a
+          Passed 100 iterations
+      Group Property
+        Running Eq
+          Passed 100 iterations
+        Running Show
+          Passed 100 iterations
+        Running Ord
+          Passed 100 iterations
+        Running <
+          Passed 100 iterations
+      Group Additive
+        Running a + azero == a
+          Passed 100 iterations
+        Running azero + a == a
+          Passed 100 iterations
+        Running a + b == b + a
+          Passed 100 iterations
+      Group Multiplicative
+        Running a * 1 == a
+          Passed 100 iterations
+        Running 1 * a == a
+          Passed 100 iterations
+        Running multiplication commutative
+          Passed 100 iterations
+        Running a * b == Integer(a) * Integer(b)
+          Passed 100 iterations
+      Group Divisible
+        Running (x `div` y) * y + (x `mod` y) == x
+          Passed 100 iterations
+      Group Precedence
+        Running + and - (1)
+          Passed 100 iterations
+        Running + and - (2)
+          Passed 100 iterations
+        Running + and * (1)
+          Passed 100 iterations
+        Running + and * (2)
+          Passed 100 iterations
+        Running - and * (1)
+          Passed 100 iterations
+        Running - and * (2)
+          Passed 100 iterations
+        Running * and ^ (1)
+          Passed 100 iterations
+        Running * and ^ (2)
+          Passed 100 iterations
+  Group primop
+    Running gtChar#
+      Passed 100 iterations
+    Running geChar#
+      Passed 100 iterations
+    Running eqChar#
+      Passed 100 iterations
+    Running neChar#
+      Passed 100 iterations
+    Running ltChar#
+      Passed 100 iterations
+    Running leChar#
+      Passed 100 iterations
+    Running ord#
+      Passed 100 iterations
+    Running int8ToInt#
+      Passed 100 iterations
+    Running intToInt8#
+      Passed 100 iterations
+    Running negateInt8#
+      Passed 100 iterations
+    Running plusInt8#
+      Passed 100 iterations
+    Running subInt8#
+      Passed 100 iterations
+    Running timesInt8#
+      Passed 100 iterations
+    Running quotInt8#
+      Passed 100 iterations
+    Running remInt8#
+      Passed 100 iterations
+    Running quotRemInt8#
+      Passed 100 iterations
+    Running uncheckedShiftLInt8#
+      Passed 100 iterations
+    Running uncheckedShiftRAInt8#
+      Passed 100 iterations
+    Running uncheckedShiftRLInt8#
+      Passed 100 iterations
+    Running int8ToWord8#
+      Passed 100 iterations
+    Running eqInt8#
+      Passed 100 iterations
+    Running geInt8#
+      Passed 100 iterations
+    Running gtInt8#
+      Passed 100 iterations
+    Running leInt8#
+      Passed 100 iterations
+    Running ltInt8#
+      Passed 100 iterations
+    Running neInt8#
+      Passed 100 iterations
+    Running word8ToWord#
+      Passed 100 iterations
+    Running wordToWord8#
+      Passed 100 iterations
+    Running plusWord8#
+      Passed 100 iterations
+    Running subWord8#
+      Passed 100 iterations
+    Running timesWord8#
+      Passed 100 iterations
+    Running quotWord8#
+      Passed 100 iterations
+    Running remWord8#
+      Passed 100 iterations
+    Running quotRemWord8#
+      Passed 100 iterations
+    Running andWord8#
+      Passed 100 iterations
+    Running orWord8#
+      Passed 100 iterations
+    Running xorWord8#
+      Passed 100 iterations
+    Running notWord8#
+      Passed 100 iterations
+    Running uncheckedShiftLWord8#
+      Passed 100 iterations
+    Running uncheckedShiftRLWord8#
+      Passed 100 iterations
+    Running word8ToInt8#
+      Passed 100 iterations
+    Running eqWord8#
+      Passed 100 iterations
+    Running geWord8#
+      Passed 100 iterations
+    Running gtWord8#
+      Passed 100 iterations
+    Running leWord8#
+      Passed 100 iterations
+    Running ltWord8#
+      Passed 100 iterations
+    Running neWord8#
+      Passed 100 iterations
+    Running int16ToInt#
+      Passed 100 iterations
+    Running intToInt16#
+      Passed 100 iterations
+    Running negateInt16#
+      Passed 100 iterations
+    Running plusInt16#
+      Passed 100 iterations
+    Running subInt16#
+      Passed 100 iterations
+    Running timesInt16#
+      Passed 100 iterations
+    Running quotInt16#
+      Passed 100 iterations
+    Running remInt16#
+      Passed 100 iterations
+    Running quotRemInt16#
+      Passed 100 iterations
+    Running uncheckedShiftLInt16#
+      Passed 100 iterations
+    Running uncheckedShiftRAInt16#
+      Passed 100 iterations
+    Running uncheckedShiftRLInt16#
+      Passed 100 iterations
+    Running int16ToWord16#
+      Passed 100 iterations
+    Running eqInt16#
+      Passed 100 iterations
+    Running geInt16#
+      Passed 100 iterations
+    Running gtInt16#
+      Passed 100 iterations
+    Running leInt16#
+      Passed 100 iterations
+    Running ltInt16#
+      Passed 100 iterations
+    Running neInt16#
+      Passed 100 iterations
+    Running word16ToWord#
+      Passed 100 iterations
+    Running wordToWord16#
+      Passed 100 iterations
+    Running plusWord16#
+      Passed 100 iterations
+    Running subWord16#
+      Passed 100 iterations
+    Running timesWord16#
+      Passed 100 iterations
+    Running quotWord16#
+      Passed 100 iterations
+    Running remWord16#
+      Passed 100 iterations
+    Running quotRemWord16#
+      Passed 100 iterations
+    Running andWord16#
+      Passed 100 iterations
+    Running orWord16#
+      Passed 100 iterations
+    Running xorWord16#
+      Passed 100 iterations
+    Running notWord16#
+      Passed 100 iterations
+    Running uncheckedShiftLWord16#
+      Passed 100 iterations
+    Running uncheckedShiftRLWord16#
+      Passed 100 iterations
+    Running word16ToInt16#
+      Passed 100 iterations
+    Running eqWord16#
+      Passed 100 iterations
+    Running geWord16#
+      Passed 100 iterations
+    Running gtWord16#
+      Passed 100 iterations
+    Running leWord16#
+      Passed 100 iterations
+    Running ltWord16#
+      Passed 100 iterations
+    Running neWord16#
+      Passed 100 iterations
+    Running int32ToInt#
+      Passed 100 iterations
+    Running intToInt32#
+      Passed 100 iterations
+    Running negateInt32#
+      Passed 100 iterations
+    Running plusInt32#
+      Passed 100 iterations
+    Running subInt32#
+      Passed 100 iterations
+    Running timesInt32#
+      Passed 100 iterations
+    Running quotInt32#
+      Passed 100 iterations
+    Running remInt32#
+      Passed 100 iterations
+    Running quotRemInt32#
+      Passed 100 iterations
+    Running uncheckedShiftLInt32#
+      Passed 100 iterations
+    Running uncheckedShiftRAInt32#
+      Passed 100 iterations
+    Running uncheckedShiftRLInt32#
+      Passed 100 iterations
+    Running int32ToWord32#
+      Passed 100 iterations
+    Running eqInt32#
+      Passed 100 iterations
+    Running geInt32#
+      Passed 100 iterations
+    Running gtInt32#
+      Passed 100 iterations
+    Running leInt32#
+      Passed 100 iterations
+    Running ltInt32#
+      Passed 100 iterations
+    Running neInt32#
+      Passed 100 iterations
+    Running word32ToWord#
+      Passed 100 iterations
+    Running wordToWord32#
+      Passed 100 iterations
+    Running plusWord32#
+      Passed 100 iterations
+    Running subWord32#
+      Passed 100 iterations
+    Running timesWord32#
+      Passed 100 iterations
+    Running quotWord32#
+      Passed 100 iterations
+    Running remWord32#
+      Passed 100 iterations
+    Running quotRemWord32#
+      Passed 100 iterations
+    Running andWord32#
+      Passed 100 iterations
+    Running orWord32#
+      Passed 100 iterations
+    Running xorWord32#
+      Passed 100 iterations
+    Running notWord32#
+      Passed 100 iterations
+    Running uncheckedShiftLWord32#
+      Passed 100 iterations
+    Running uncheckedShiftRLWord32#
+      Passed 100 iterations
+    Running word32ToInt32#
+      Passed 100 iterations
+    Running eqWord32#
+      Passed 100 iterations
+    Running geWord32#
+      Passed 100 iterations
+    Running gtWord32#
+      Passed 100 iterations
+    Running leWord32#
+      Passed 100 iterations
+    Running ltWord32#
+      Passed 100 iterations
+    Running neWord32#
+      Passed 100 iterations
+    Running int64ToInt#
+      Passed 100 iterations
+    Running intToInt64#
+      Passed 100 iterations
+    Running negateInt64#
+      Passed 100 iterations
+    Running plusInt64#
+      Passed 100 iterations
+    Running subInt64#
+      Passed 100 iterations
+    Running timesInt64#
+      Passed 100 iterations
+    Running quotInt64#
+      Passed 100 iterations
+    Running remInt64#
+      Passed 100 iterations
+    Running uncheckedIShiftL64#
+      Passed 100 iterations
+    Running uncheckedIShiftRA64#
+      Passed 100 iterations
+    Running uncheckedIShiftRL64#
+      Passed 100 iterations
+    Running int64ToWord64#
+      Passed 100 iterations
+    Running eqInt64#
+      Passed 100 iterations
+    Running geInt64#
+      Passed 100 iterations
+    Running gtInt64#
+      Passed 100 iterations
+    Running leInt64#
+      Passed 100 iterations
+    Running ltInt64#
+      Passed 100 iterations
+    Running neInt64#
+      Passed 100 iterations
+    Running word64ToWord#
+      Passed 100 iterations
+    Running wordToWord64#
+      Passed 100 iterations
+    Running plusWord64#
+      Passed 100 iterations
+    Running subWord64#
+      Passed 100 iterations
+    Running timesWord64#
+      Passed 100 iterations
+    Running quotWord64#
+      Passed 100 iterations
+    Running remWord64#
+      Passed 100 iterations
+    Running and64#
+      Passed 100 iterations
+    Running or64#
+      Passed 100 iterations
+    Running xor64#
+      Passed 100 iterations
+    Running not64#
+      Passed 100 iterations
+    Running uncheckedShiftL64#
+      Passed 100 iterations
+    Running uncheckedShiftRL64#
+      Passed 100 iterations
+    Running word64ToInt64#
+      Passed 100 iterations
+    Running eqWord64#
+      Passed 100 iterations
+    Running geWord64#
+      Passed 100 iterations
+    Running gtWord64#
+      Passed 100 iterations
+    Running leWord64#
+      Passed 100 iterations
+    Running ltWord64#
+      Passed 100 iterations
+    Running neWord64#
+      Passed 100 iterations
+    Running +#
+      Passed 100 iterations
+    Running -#
+      Passed 100 iterations
+    Running *#
+      Passed 100 iterations
+    Running timesInt2#
+      Passed 100 iterations
+    Running mulIntMayOflo#
+      Passed 100 iterations
+    Running quotInt#
+      Passed 100 iterations
+    Running remInt#
+      Passed 100 iterations
+    Running quotRemInt#
+      Passed 100 iterations
+    Running andI#
+      Passed 100 iterations
+    Running orI#
+      Passed 100 iterations
+    Running xorI#
+      Passed 100 iterations
+    Running notI#
+      Passed 100 iterations
+    Running negateInt#
+      Passed 100 iterations
+    Running addIntC#
+      Passed 100 iterations
+    Running subIntC#
+      Passed 100 iterations
+    Running >#
+      Passed 100 iterations
+    Running >=#
+      Passed 100 iterations
+    Running ==#
+      Passed 100 iterations
+    Running /=#
+      Passed 100 iterations
+    Running <#
+      Passed 100 iterations
+    Running <=#
+      Passed 100 iterations
+    Running chr#
+      Passed 100 iterations
+    Running int2Word#
+      Passed 100 iterations
+    Running uncheckedIShiftL#
+      Passed 100 iterations
+    Running uncheckedIShiftRA#
+      Passed 100 iterations
+    Running uncheckedIShiftRL#
+      Passed 100 iterations
+    Running plusWord#
+      Passed 100 iterations
+    Running addWordC#
+      Passed 100 iterations
+    Running subWordC#
+      Passed 100 iterations
+    Running plusWord2#
+      Passed 100 iterations
+    Running minusWord#
+      Passed 100 iterations
+    Running timesWord#
+      Passed 100 iterations
+    Running timesWord2#
+      Passed 100 iterations
+    Running quotWord#
+      Passed 100 iterations
+    Running remWord#
+      Passed 100 iterations
+    Running quotRemWord#
+      Passed 100 iterations
+    Running and#
+      Passed 100 iterations
+    Running or#
+      Passed 100 iterations
+    Running xor#
+      Passed 100 iterations
+    Running not#
+      Passed 100 iterations
+    Running uncheckedShiftL#
+      Passed 100 iterations
+    Running uncheckedShiftRL#
+      Passed 100 iterations
+    Running word2Int#
+      Passed 100 iterations
+    Running gtWord#
+      Passed 100 iterations
+    Running geWord#
+      Passed 100 iterations
+    Running eqWord#
+      Passed 100 iterations
+    Running neWord#
+      Passed 100 iterations
+    Running ltWord#
+      Passed 100 iterations
+    Running leWord#
+      Passed 100 iterations
+    Running popCnt8#
+      Passed 100 iterations
+    Running popCnt16#
+      Passed 100 iterations
+    Running popCnt32#
+      Passed 100 iterations
+    Running popCnt64#
+      Passed 100 iterations
+    Running popCnt#
+      Passed 100 iterations
+    Running pdep8#
+      Passed 100 iterations
+    Running pdep16#
+      Passed 100 iterations
+    Running pdep32#
+      Passed 100 iterations
+    Running pdep64#
+      Passed 100 iterations
+    Running pdep#
+      Passed 100 iterations
+    Running pext8#
+      Passed 100 iterations
+    Running pext16#
+      Passed 100 iterations
+    Running pext32#
+      Passed 100 iterations
+    Running pext64#
+      Passed 100 iterations
+    Running pext#
+      Passed 100 iterations
+    Running clz8#
+      Passed 100 iterations
+    Running clz16#
+      Passed 100 iterations
+    Running clz32#
+      Passed 100 iterations
+    Running clz64#
+      Passed 100 iterations
+    Running clz#
+      Passed 100 iterations
+    Running ctz8#
+      Passed 100 iterations
+    Running ctz16#
+      Passed 100 iterations
+    Running ctz32#
+      Passed 100 iterations
+    Running ctz64#
+      Passed 100 iterations
+    Running ctz#
+      Passed 100 iterations
+    Running byteSwap16#
+      Passed 100 iterations
+    Running byteSwap32#
+      Passed 100 iterations
+    Running byteSwap64#
+      Passed 100 iterations
+    Running byteSwap#
+      Passed 100 iterations
+    Running bitReverse8#
+      Passed 100 iterations
+    Running bitReverse16#
+      Passed 100 iterations
+    Running bitReverse32#
+      Passed 100 iterations
+    Running bitReverse64#
+      Passed 100 iterations
+    Running bitReverse#
+      Passed 100 iterations
+    Running narrow8Int#
+      Passed 100 iterations
+    Running narrow16Int#
+      Passed 100 iterations
+    Running narrow32Int#
+      Passed 100 iterations
+    Running narrow8Word#
+      Passed 100 iterations
+    Running narrow16Word#
+      Passed 100 iterations
+    Running narrow32Word#
+      Passed 100 iterations
