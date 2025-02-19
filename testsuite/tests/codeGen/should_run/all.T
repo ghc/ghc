@@ -226,7 +226,7 @@ test('T20640b', normal, compile_and_run, [''])
 test('T22296',[only_ways(llvm_ways)
               ,unless(arch('x86_64') or arch('aarch64'), skip)],compile_and_run,[''])
 test('T22798', normal, compile_and_run, ['-fregs-graph'])
-test('CheckBoundsOK', normal, compile_and_run, ['-fcheck-prim-bounds'])
+test('CheckBoundsOK', normal, compile_and_run, ['-fcheck-prim-bounds -funoptimized-core-for-interpreter -O'])
 test('OrigThunkInfo', normal, compile_and_run, ['-forig-thunk-info'])
 test('T24809', req_profiling, compile_and_run, ['-forig-thunk-info -prof'])
 
