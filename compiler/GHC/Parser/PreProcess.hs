@@ -10,6 +10,7 @@ module GHC.Parser.PreProcess (
     initParserState,
     initPragState,
     PpState,
+    dumpGhcCpp,
 ) where
 
 import Data.Map qualified as Map
@@ -25,6 +26,12 @@ import GHC.Parser.PreProcess.ParsePP
 import GHC.Parser.PreProcess.State
 import GHC.Prelude
 import GHC.Types.SrcLoc
+import GHC.Utils.Outputable (SDoc)
+
+-- ---------------------------------------------------------------------
+
+dumpGhcCpp :: PState PpState -> SDoc
+dumpGhcCpp pst = undefined
 
 -- ---------------------------------------------------------------------
 

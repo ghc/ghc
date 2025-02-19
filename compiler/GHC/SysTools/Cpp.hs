@@ -10,6 +10,7 @@ module GHC.SysTools.Cpp
   , getGhcVersionIncludeFlags
   , applyCDefs
   , offsetIncludePaths
+  , cppMacroDefines
   )
 where
 
@@ -231,6 +232,16 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
                        , GHC.SysTools.Option     "-o"
                        , GHC.SysTools.FileOption "" output_fn
                        ])
+
+-- ---------------------------------------------------------------------------
+-- Define all macros for use in GHC_CPP
+cppMacroDefines :: UnitEnv -> String
+cppMacroDefines unit_env = generatePackageVersionMacros pkgs
+  where
+    unit_state = ue_homeUnitState unit_env
+    uids = explicitUnits unit_state
+    pkgs = mapMaybe (lookupUnit unit_state . fst) uids
+
 
 -- ---------------------------------------------------------------------------
 -- Macros (cribbed from Cabal)
