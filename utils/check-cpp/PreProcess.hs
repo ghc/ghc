@@ -1,21 +1,90 @@
 module PreProcess where
 
+import Control.Monad.IO.Class
+import Data.Data hiding (Fixity)
+import Data.List
+import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
+import Data.Maybe
+import Debug.Trace
 import GHC
+import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Data.StringBuffer
+import GHC.Driver.Config.Parser hiding (predefinedMacros)
+import GHC.Driver.Env.Types
+import GHC.Driver.Errors.Types
+import qualified GHC.Driver.Errors.Types as GHC
+import qualified GHC.Driver.Session as GHC
+import GHC.Hs.Dump
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.Errors.Ppr ()
-import qualified GHC.Parser.Lexer as Lexer
-import GHC.Types.SrcLoc
-
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
+import qualified GHC.Parser.Lexer as GHC
+import qualified GHC.Parser.Lexer as Lexer
+import GHC.SysTools.Cpp
+import GHC.Types.Error
+import GHC.Types.SrcLoc
+import GHC.Unit.Env
+import GHC.Unit.State
+import GHC.Utils.Error
+import GHC.Utils.Outputable
 
 import Macro
 import ParsePP
+import qualified ParserM as PM
 import State
 
 import Debug.Trace
+
+-- ---------------------------------------------------------------------
+
+dumpGhcCpp :: PState PpState -> SDoc
+dumpGhcCpp pst = text $ sep ++ defines ++ sep ++ comments ++ sep ++ orig ++ sep ++ final ++ sep ++ show startLoc ++ sep ++ show bare_toks ++ sep
+  where
+    -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
+    (pst_final, bare_toks) = lexAll pst
+    defines = showDefines (pp_defines (pp pst_final))
+    sep = "\n------------------------------\n"
+    comments = showPprUnsafe (Lexer.comment_q pst_final)
+    buf = (buffer pst){cur = 0}
+    orig = lexemeToString buf (len buf)
+    startLoc = mkRealSrcLoc (srcLocFile (psRealLoc $ loc pst)) 1 1
+    buf1 = (buffer pst){cur = 0}
+    toks = GHC.addSourceToTokens startLoc buf1 bare_toks
+    final = renderCombinedToks toks (Lexer.comment_q pst_final)
+
+renderCombinedToks :: [(Located Token, String)] -> [LEpaComment] -> String
+renderCombinedToks toks ctoks = show toks ++ show ctoks
+
+showDefines :: MacroDefines -> String
+showDefines defines = Map.foldlWithKey' (\acc k d -> acc ++ "\n" ++ renderDefine k d) "" defines
+  where
+    renderDefine :: String -> (Map.Map (Maybe Int) ((Maybe MacroArgs), MacroDef)) -> String
+    renderDefine k defs = Map.foldl' (\acc d -> acc ++ "\n" ++ renderArity k d) "" defs
+
+    renderArity :: String -> ((Maybe MacroArgs), MacroDef) -> String
+    renderArity n (Nothing, rhs) =
+        "#define " ++ n ++ " " ++ (intercalate " " (map PM.t_str rhs))
+    renderArity n (Just args, rhs) =
+        "#define " ++ n ++ "(" ++ (intercalate "," args) ++ ") " ++ (intercalate " " (map PM.t_str rhs))
+
+lexAll :: Lexer.PState PpState -> (Lexer.PState PpState, [Located Token])
+lexAll state = case unP (lexerDbg True return) state of
+    POk s t@(L _ ITeof) -> (s, [t])
+    POk state' t -> (ss, t : rest)
+      where
+        (ss, rest) = lexAll state'
+    PFailed pst -> error $ "failed" ++ showErrorMessages (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
+
+showErrorMessages :: Messages GhcMessage -> String
+showErrorMessages msgs =
+    renderWithContext defaultSDocContext $
+        vcat $
+            pprMsgEnvelopeBagWithLocDefault $
+                getMessages $
+                    msgs
 
 -- ---------------------------------------------------------------------
 
