@@ -10,10 +10,11 @@ import Parser
 import Syntax
 
 import Data.Char
-import Data.List (union, intersperse, intercalate, nub)
-import Data.Maybe ( catMaybes )
+import Data.List (union, intersperse, intercalate, nub, sort)
+import Data.Maybe ( catMaybes, mapMaybe )
 import System.Environment ( getArgs )
 import System.IO ( hSetEncoding, stdin, stdout, utf8 )
+
 
 vecOptions :: Entry -> [(String,String,Int)]
 vecOptions i =
@@ -204,6 +205,9 @@ main = getArgs >>= \args ->
                       "--wired-in-deprecations"
                          -> putStr (gen_wired_in_deprecations p_o_specs)
 
+                      "--foundation-tests"
+                         -> putStr (gen_foundation_tests p_o_specs)
+
                       _ -> error "Should not happen, known_args out of sync?"
                    )
 
@@ -229,7 +233,8 @@ known_args
        "--make-haskell-source",
        "--make-latex-doc",
        "--wired-in-docs",
-       "--wired-in-deprecations"
+       "--wired-in-deprecations",
+       "--foundation-tests"
      ]
 
 ------------------------------------------------------------------
@@ -678,6 +683,72 @@ gen_wired_in_deprecations (Info _ entries)
           in Just $ "(" ++ mkOcc ++ " " ++ show poName ++ ", fsLit " ++ show depMsg ++ ")"
         | otherwise = Nothing
 
+
+gen_foundation_tests :: Info -> String
+gen_foundation_tests (Info _ entries)
+  = "tests =\n  [ "
+    ++ intercalate "\n  , " (catMaybes $ map mkTest entries)
+    ++ "\n  ]\n"
+    ++ "\n" ++ intercalate "\n" (map mkInstances testable_tys)
+  where
+    testable_tys = nub (sort (mapMaybe (\po -> ty po <$ mkTest po) entries))
+
+    mkInstances ty = unlines $
+      [ "instance TestPrimop (" ++ pprTy ty ++ ") where"
+      , "  testPrimop s l r = Property s $ \\ " ++ intercalate " " (zipWith mkArg [0..] (args ty)) ++ " -> " ++ mk_body "l" ++ " === " ++ mk_body "r" ]
+
+      where
+        n_args = length (args ty)
+
+        mk_body s = res_ty ty (" (" ++ s ++ " " ++ intercalate " " vs ++ ")")
+
+        vs = zipWith (\n _ -> "x" ++ show n) [0..] (args ty)
+
+    mkArg n t = "(" ++ unwrapper t  ++ "-> x" ++ show n ++ ")"
+
+
+    wrapper s = "w" ++ s
+    unwrapper s = "u" ++ s
+
+
+    args (TyF (TyApp (TyCon c) []) t2) = c : args t2
+    args (TyApp {}) = []
+    args (TyUTup {}) = []
+
+    res_ty (TyF _ t2) x = res_ty t2 x
+    res_ty (TyApp (TyCon c) []) x = wrapper c ++ x
+    res_ty (TyUTup args) x =
+      let wtup = case length args of
+                   2 -> "WTUP2"
+                   3 -> "WTUP3"
+      in wtup ++"(" ++ intercalate "," (map (\a -> res_ty a "") args ++ [x]) ++ ")"
+
+
+
+    wrap qual nm | isLower (head nm) = qual ++ "." ++ nm
+            | otherwise = "(" ++ qual ++ "." ++ nm ++ ")"
+    mkTest po
+      | Just poName <- getName po
+      , is_primop po
+      , not $ is_vector po
+      , poName /= "tagToEnum#"
+      , poName /= "quotRemWord2#"
+      , (testable (ty po))
+      = Just $ intercalate " " ["testPrimop", "\"" ++ poName ++ "\"", wrap "Primop" poName, wrap "Wrapper" poName]
+      | otherwise = Nothing
+
+
+
+    testable (TyF t1 t2) = testable t1 && testable t2
+    testable (TyC _  t2) = testable t2
+    testable (TyApp tc tys) = testableTyCon tc && all testable tys
+    testable (TyVar a)   = False
+    testable (TyUTup tys)  = all testable tys
+
+    testableTyCon (TyCon c) =
+      c `elem` ["Int#", "Word#", "Word8#", "Word16#", "Word32#", "Word64#"
+               , "Int8#", "Int16#", "Int32#", "Int64#", "Char#"]
+    testableTyCon _ = False
 
 ------------------------------------------------------------------
 -- Create PrimOpInfo text from PrimOpSpecs -----------------------
