@@ -338,7 +338,7 @@ print('Allowing performance changes in: ' + ', '.join(config.allowed_perf_change
 if config.rootdirs == []:
     config.rootdirs = ['.']
 
-t_files = list(findTFiles(config.rootdirs))
+t_files = sorted(list(findTFiles(config.rootdirs)))
 
 print('Found', len(t_files), '.T files...')
 
