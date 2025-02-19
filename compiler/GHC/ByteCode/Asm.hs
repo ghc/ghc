@@ -739,6 +739,143 @@ assembleI platform i = case i of
   CCALL off m_addr i       -> do np <- addr m_addr
                                  emit_ bci_CCALL [wOp off, Op np, SmallOp i]
   PRIMCALL                 -> emit_ bci_PRIMCALL []
+
+  OP_ADD w -> case w of
+    W64                   -> emit_ bci_OP_ADD_64 []
+    W32                   -> emit_ bci_OP_ADD_32 []
+    W16                   -> emit_ bci_OP_ADD_16 []
+    W8                    -> emit_ bci_OP_ADD_08 []
+    _                     -> unsupported_width
+  OP_SUB w -> case w of
+    W64                   -> emit_ bci_OP_SUB_64 []
+    W32                   -> emit_ bci_OP_SUB_32 []
+    W16                   -> emit_ bci_OP_SUB_16 []
+    W8                    -> emit_ bci_OP_SUB_08 []
+    _                     -> unsupported_width
+  OP_AND w -> case w of
+    W64                   -> emit_ bci_OP_AND_64 []
+    W32                   -> emit_ bci_OP_AND_32 []
+    W16                   -> emit_ bci_OP_AND_16 []
+    W8                    -> emit_ bci_OP_AND_08 []
+    _                     -> unsupported_width
+  OP_XOR w -> case w of
+    W64                   -> emit_ bci_OP_XOR_64 []
+    W32                   -> emit_ bci_OP_XOR_32 []
+    W16                   -> emit_ bci_OP_XOR_16 []
+    W8                    -> emit_ bci_OP_XOR_08 []
+    _                     -> unsupported_width
+  OP_OR w -> case w of
+    W64                    -> emit_ bci_OP_OR_64 []
+    W32                    -> emit_ bci_OP_OR_32 []
+    W16                    -> emit_ bci_OP_OR_16 []
+    W8                     -> emit_ bci_OP_OR_08 []
+    _                      -> unsupported_width
+  OP_NOT w -> case w of
+    W64                   -> emit_ bci_OP_NOT_64 []
+    W32                   -> emit_ bci_OP_NOT_32 []
+    W16                   -> emit_ bci_OP_NOT_16 []
+    W8                    -> emit_ bci_OP_NOT_08 []
+    _                     -> unsupported_width
+  OP_NEG w -> case w of
+    W64                   -> emit_ bci_OP_NEG_64 []
+    W32                   -> emit_ bci_OP_NEG_32 []
+    W16                   -> emit_ bci_OP_NEG_16 []
+    W8                    -> emit_ bci_OP_NEG_08 []
+    _                     -> unsupported_width
+  OP_MUL w -> case w of
+    W64                   -> emit_ bci_OP_MUL_64 []
+    W32                   -> emit_ bci_OP_MUL_32 []
+    W16                   -> emit_ bci_OP_MUL_16 []
+    W8                    -> emit_ bci_OP_MUL_08 []
+    _                     -> unsupported_width
+  OP_SHL w -> case w of
+    W64                   -> emit_ bci_OP_SHL_64 []
+    W32                   -> emit_ bci_OP_SHL_32 []
+    W16                   -> emit_ bci_OP_SHL_16 []
+    W8                    -> emit_ bci_OP_SHL_08 []
+    _                     -> unsupported_width
+  OP_ASR w -> case w of
+    W64                   -> emit_ bci_OP_ASR_64 []
+    W32                   -> emit_ bci_OP_ASR_32 []
+    W16                   -> emit_ bci_OP_ASR_16 []
+    W8                    -> emit_ bci_OP_ASR_08 []
+    _                     -> unsupported_width
+  OP_LSR w -> case w of
+    W64                   -> emit_ bci_OP_LSR_64 []
+    W32                   -> emit_ bci_OP_LSR_32 []
+    W16                   -> emit_ bci_OP_LSR_16 []
+    W8                    -> emit_ bci_OP_LSR_08 []
+    _                     -> unsupported_width
+
+  OP_NEQ w -> case w of
+    W64                   -> emit_ bci_OP_NEQ_64 []
+    W32                   -> emit_ bci_OP_NEQ_32 []
+    W16                   -> emit_ bci_OP_NEQ_16 []
+    W8                    -> emit_ bci_OP_NEQ_08 []
+    _                     -> unsupported_width
+  OP_EQ w -> case w of
+    W64                    -> emit_ bci_OP_EQ_64 []
+    W32                    -> emit_ bci_OP_EQ_32 []
+    W16                    -> emit_ bci_OP_EQ_16 []
+    W8                     -> emit_ bci_OP_EQ_08 []
+    _                      -> unsupported_width
+
+  OP_U_LT w -> case w of
+    W64                  -> emit_ bci_OP_U_LT_64 []
+    W32                  -> emit_ bci_OP_U_LT_32 []
+    W16                  -> emit_ bci_OP_U_LT_16 []
+    W8                   -> emit_ bci_OP_U_LT_08 []
+    _                    -> unsupported_width
+  OP_S_LT w -> case w of
+    W64                  -> emit_ bci_OP_S_LT_64 []
+    W32                  -> emit_ bci_OP_S_LT_32 []
+    W16                  -> emit_ bci_OP_S_LT_16 []
+    W8                   -> emit_ bci_OP_S_LT_08 []
+    _                    -> unsupported_width
+  OP_U_GE w -> case w of
+    W64                  -> emit_ bci_OP_U_GE_64 []
+    W32                  -> emit_ bci_OP_U_GE_32 []
+    W16                  -> emit_ bci_OP_U_GE_16 []
+    W8                   -> emit_ bci_OP_U_GE_08 []
+    _                    -> unsupported_width
+  OP_S_GE w -> case w of
+    W64                  -> emit_ bci_OP_S_GE_64 []
+    W32                  -> emit_ bci_OP_S_GE_32 []
+    W16                  -> emit_ bci_OP_S_GE_16 []
+    W8                   -> emit_ bci_OP_S_GE_08 []
+    _                    -> unsupported_width
+  OP_U_GT w -> case w of
+    W64                  -> emit_ bci_OP_U_GT_64 []
+    W32                  -> emit_ bci_OP_U_GT_32 []
+    W16                  -> emit_ bci_OP_U_GT_16 []
+    W8                   -> emit_ bci_OP_U_GT_08 []
+    _                    -> unsupported_width
+  OP_S_GT w -> case w of
+    W64                  -> emit_ bci_OP_S_GT_64 []
+    W32                  -> emit_ bci_OP_S_GT_32 []
+    W16                  -> emit_ bci_OP_S_GT_16 []
+    W8                   -> emit_ bci_OP_S_GT_08 []
+    _                    -> unsupported_width
+  OP_U_LE w -> case w of
+    W64                  -> emit_ bci_OP_U_LE_64 []
+    W32                  -> emit_ bci_OP_U_LE_32 []
+    W16                  -> emit_ bci_OP_U_LE_16 []
+    W8                   -> emit_ bci_OP_U_LE_08 []
+    _                    -> unsupported_width
+  OP_S_LE w -> case w of
+    W64                  -> emit_ bci_OP_S_LE_64 []
+    W32                  -> emit_ bci_OP_S_LE_32 []
+    W16                  -> emit_ bci_OP_S_LE_16 []
+    W8                   -> emit_ bci_OP_S_LE_08 []
+    _                    -> unsupported_width
+
+  OP_INDEX_ADDR w -> case w of
+    W64                  -> emit_ bci_OP_INDEX_ADDR_64 []
+    W32                  -> emit_ bci_OP_INDEX_ADDR_32 []
+    W16                  -> emit_ bci_OP_INDEX_ADDR_16 []
+    W8                   -> emit_ bci_OP_INDEX_ADDR_08 []
+    _                    -> unsupported_width
+
   BRK_FUN arr tick_mod tick_mod_id tickx info_mod info_mod_id infox cc ->
                               do p1 <- ptr (BCOPtrBreakArray arr)
                                  tick_addr <- addr tick_mod
@@ -760,6 +897,7 @@ assembleI platform i = case i of
 
 
   where
+    unsupported_width = panic "GHC.ByteCode.Asm: Unsupported Width"
     emit_ = emit word_size
 
     literal :: Literal -> m Word
