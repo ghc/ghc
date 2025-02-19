@@ -305,6 +305,7 @@ import GHC.Cmm.Config (CmmConfig)
 import Data.Bifunctor
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
+import GHC.Parser.PreProcess (dumpGhcCpp)
 
 {- **********************************************************************
 %*                                                                      *
@@ -529,6 +530,8 @@ hscParse' mod_summary
                         FormatHaskell (showAstData NoBlankSrcSpan
                                                    NoBlankEpAnnotations
                                                    rdr_module)
+            liftIO $ putDumpFileMaybe logger Opt_D_dump_ghc_cpp "After GHC_CPP"
+                        FormatHaskell (dumpGhcCpp (initParserStateWithMacros dflags (initParserOpts dflags) buf loc))
             liftIO $ putDumpFileMaybe logger Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
 
@@ -2678,6 +2681,8 @@ hscParseThingWithLocation source linenumber parser str = do
                             FormatHaskell (ppr thing)
                 liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed_ast "Parser AST"
                             FormatHaskell (showAstData NoBlankSrcSpan NoBlankEpAnnotations thing)
+                liftIO $ putDumpFileMaybe logger Opt_D_dump_ghc_cpp "After GHC_CPP"
+                            FormatHaskell (dumpGhcCpp (initParserStateWithMacros dflags (initParserOpts dflags) buf loc))
                 return thing
 
 hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
@@ -2950,6 +2955,8 @@ writeInterfaceOnlyMode dflags =
 
 -- -----------------------------------------------------------------------------
 
+-- initParserStateWithMacros :: DynFlags -> Maybe UnitEnv -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+-- initParserStateWithMacros df unit_env
 initParserStateWithMacros :: DynFlags -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
 initParserStateWithMacros df
   = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
