@@ -114,6 +114,107 @@
 
 #define bci_BCO_NAME                    88
 
+#define bci_OP_ADD_64                   90
+#define bci_OP_SUB_64                   91
+#define bci_OP_AND_64                   92
+#define bci_OP_XOR_64                   93
+#define bci_OP_NOT_64                   94
+#define bci_OP_NEG_64                   95
+#define bci_OP_MUL_64                   96
+#define bci_OP_SHL_64                   97
+#define bci_OP_ASR_64                   98
+#define bci_OP_LSR_64                   99
+#define bci_OP_OR_64                   100
+
+#define bci_OP_NEQ_64                  110
+#define bci_OP_EQ_64                   111
+#define bci_OP_U_GE_64                 112
+#define bci_OP_U_GT_64                 113
+#define bci_OP_U_LT_64                 114
+#define bci_OP_U_LE_64                 115
+#define bci_OP_S_GE_64                 116
+#define bci_OP_S_GT_64                 117
+#define bci_OP_S_LT_64                 118
+#define bci_OP_S_LE_64                 119
+
+
+#define bci_OP_ADD_32                  130
+#define bci_OP_SUB_32                  131
+#define bci_OP_AND_32                  132
+#define bci_OP_XOR_32                  133
+#define bci_OP_NOT_32                  134
+#define bci_OP_NEG_32                  135
+#define bci_OP_MUL_32                  136
+#define bci_OP_SHL_32                  137
+#define bci_OP_ASR_32                  138
+#define bci_OP_LSR_32                  139
+#define bci_OP_OR_32                   140
+
+#define bci_OP_NEQ_32                  150
+#define bci_OP_EQ_32                   151
+#define bci_OP_U_GE_32                 152
+#define bci_OP_U_GT_32                 153
+#define bci_OP_U_LT_32                 154
+#define bci_OP_U_LE_32                 155
+#define bci_OP_S_GE_32                 156
+#define bci_OP_S_GT_32                 157
+#define bci_OP_S_LT_32                 158
+#define bci_OP_S_LE_32                 159
+
+
+#define bci_OP_ADD_16                  170
+#define bci_OP_SUB_16                  171
+#define bci_OP_AND_16                  172
+#define bci_OP_XOR_16                  173
+#define bci_OP_NOT_16                  174
+#define bci_OP_NEG_16                  175
+#define bci_OP_MUL_16                  176
+#define bci_OP_SHL_16                  177
+#define bci_OP_ASR_16                  178
+#define bci_OP_LSR_16                  179
+#define bci_OP_OR_16                   180
+
+#define bci_OP_NEQ_16                  190
+#define bci_OP_EQ_16                   191
+#define bci_OP_U_GE_16                 192
+#define bci_OP_U_GT_16                 193
+#define bci_OP_U_LT_16                 194
+#define bci_OP_U_LE_16                 195
+#define bci_OP_S_GE_16                 196
+#define bci_OP_S_GT_16                 197
+#define bci_OP_S_LT_16                 198
+#define bci_OP_S_LE_16                 199
+
+
+#define bci_OP_ADD_08                  200
+#define bci_OP_SUB_08                  201
+#define bci_OP_AND_08                  202
+#define bci_OP_XOR_08                  203
+#define bci_OP_NOT_08                  204
+#define bci_OP_NEG_08                  205
+#define bci_OP_MUL_08                  206
+#define bci_OP_SHL_08                  207
+#define bci_OP_ASR_08                  208
+#define bci_OP_LSR_08                  209
+#define bci_OP_OR_08                   210
+
+#define bci_OP_NEQ_08                  220
+#define bci_OP_EQ_08                   221
+#define bci_OP_U_GE_08                 222
+#define bci_OP_U_GT_08                 223
+#define bci_OP_U_LT_08                 224
+#define bci_OP_U_LE_08                 225
+#define bci_OP_S_GE_08                 226
+#define bci_OP_S_GT_08                 227
+#define bci_OP_S_LT_08                 228
+#define bci_OP_S_LE_08                 229
+
+#define bci_OP_INDEX_ADDR_08           240
+#define bci_OP_INDEX_ADDR_16           241
+#define bci_OP_INDEX_ADDR_32           242
+#define bci_OP_INDEX_ADDR_64           243
+
+
 /* If you need to go past 255 then you will run into the flags */
 
 /* If you need to go below 0x0100 then you will run into the instructions */

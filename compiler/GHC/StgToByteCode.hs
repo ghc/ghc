@@ -58,6 +58,7 @@ import GHC.Builtin.Uniques
 import GHC.Data.FastString
 import GHC.Utils.Panic
 import GHC.Utils.Exception (evaluate)
+import GHC.CmmToAsm.Config (platformWordWidth)
 import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRepU,
                               addIdReps, addArgReps,
                               assertNonVoidIds, assertNonVoidStgArgs )
@@ -560,8 +561,7 @@ returnUnboxedTuple d s p es = do
 
 -- Compile code to apply the given expression to the remaining args
 -- on the stack, returning a HNF.
-schemeE
-    :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
+schemeE :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
 schemeE d s p (StgLit lit) = returnUnliftedAtom d s p (StgLitArg lit)
 schemeE d s p (StgApp x [])
    | isUnliftedType (idType x) = returnUnliftedAtom d s p (StgVarArg x)
@@ -712,8 +712,14 @@ schemeT d s p (StgOpApp (StgFCallOp (CCall ccall_spec) _ty) args result_ty)
       then generateCCall d s p ccall_spec result_ty args
       else unsupportedCConvException
 
-schemeT d s p (StgOpApp (StgPrimOp op) args _ty)
-   = doTailCall d s p (primOpId op) (reverse args)
+schemeT d s p (StgOpApp (StgPrimOp op) args _ty) = do
+  profile <- getProfile
+  let platform = profilePlatform profile
+  case doPrimOp platform op d s p args of
+    -- Can we do this right in the interpreter?
+    Just prim_code -> prim_code
+    -- Otherwise we have to do a call to the primop wrapper instead :(
+    _         -> doTailCall d s p (primOpId op) (reverse args)
 
 schemeT d s p (StgOpApp (StgPrimCallOp (PrimCall label unit)) args result_ty)
    = generatePrimCall d s p label (Just unit) result_ty args
@@ -807,6 +813,300 @@ doTailCall init_d s p fn args = do
     (push_code, sz) <- pushAtom d p arg
     (final_d, more_push_code) <- push_seq (d + sz) args
     return (final_d, push_code `appOL` more_push_code)
+
+doPrimOp  :: Platform
+          -> PrimOp
+          -> StackDepth
+          -> Sequel
+          -> BCEnv
+          -> [StgArg]
+          -> Maybe (BcM BCInstrList)
+doPrimOp platform op init_d s p args =
+  case op of
+    IntAddOp -> sizedPrimOp OP_ADD
+    Int64AddOp -> only64bit $ sizedPrimOp OP_ADD
+    Int32AddOp -> sizedPrimOp OP_ADD
+    Int16AddOp -> sizedPrimOp OP_ADD
+    Int8AddOp -> sizedPrimOp OP_ADD
+    WordAddOp -> sizedPrimOp OP_ADD
+    Word64AddOp -> only64bit $ sizedPrimOp OP_ADD
+    Word32AddOp -> sizedPrimOp OP_ADD
+    Word16AddOp -> sizedPrimOp OP_ADD
+    Word8AddOp -> sizedPrimOp OP_ADD
+    AddrAddOp -> sizedPrimOp OP_ADD
+
+    IntMulOp -> sizedPrimOp OP_MUL
+    Int64MulOp -> only64bit $ sizedPrimOp OP_MUL
+    Int32MulOp -> sizedPrimOp OP_MUL
+    Int16MulOp -> sizedPrimOp OP_MUL
+    Int8MulOp -> sizedPrimOp OP_MUL
+    WordMulOp -> sizedPrimOp OP_MUL
+    Word64MulOp -> only64bit $ sizedPrimOp OP_MUL
+    Word32MulOp -> sizedPrimOp OP_MUL
+    Word16MulOp -> sizedPrimOp OP_MUL
+    Word8MulOp -> sizedPrimOp OP_MUL
+
+    IntSubOp -> sizedPrimOp OP_SUB
+    WordSubOp -> sizedPrimOp OP_SUB
+    Int64SubOp -> only64bit $ sizedPrimOp OP_SUB
+    Int32SubOp -> sizedPrimOp OP_SUB
+    Int16SubOp -> sizedPrimOp OP_SUB
+    Int8SubOp -> sizedPrimOp OP_SUB
+    Word64SubOp -> only64bit $ sizedPrimOp OP_SUB
+    Word32SubOp -> sizedPrimOp OP_SUB
+    Word16SubOp -> sizedPrimOp OP_SUB
+    Word8SubOp -> sizedPrimOp OP_SUB
+    AddrSubOp -> sizedPrimOp OP_SUB
+
+    IntAndOp -> sizedPrimOp OP_AND
+    WordAndOp -> sizedPrimOp OP_AND
+    Word64AndOp -> only64bit $ sizedPrimOp OP_AND
+    Word32AndOp -> sizedPrimOp OP_AND
+    Word16AndOp -> sizedPrimOp OP_AND
+    Word8AndOp -> sizedPrimOp OP_AND
+
+    IntNotOp -> sizedPrimOp OP_NOT
+    WordNotOp -> sizedPrimOp OP_NOT
+    Word64NotOp -> only64bit $ sizedPrimOp OP_NOT
+    Word32NotOp -> sizedPrimOp OP_NOT
+    Word16NotOp -> sizedPrimOp OP_NOT
+    Word8NotOp -> sizedPrimOp OP_NOT
+
+    IntXorOp -> sizedPrimOp OP_XOR
+    WordXorOp -> sizedPrimOp OP_XOR
+    Word64XorOp -> only64bit $ sizedPrimOp OP_XOR
+    Word32XorOp -> sizedPrimOp OP_XOR
+    Word16XorOp -> sizedPrimOp OP_XOR
+    Word8XorOp -> sizedPrimOp OP_XOR
+
+    IntOrOp -> sizedPrimOp OP_OR
+    WordOrOp -> sizedPrimOp OP_OR
+    Word64OrOp -> only64bit $ sizedPrimOp OP_OR
+    Word32OrOp -> sizedPrimOp OP_OR
+    Word16OrOp -> sizedPrimOp OP_OR
+    Word8OrOp -> sizedPrimOp OP_OR
+
+    WordSllOp   -> sizedPrimOp OP_SHL
+    Word64SllOp -> only64bit $ sizedPrimOp OP_SHL -- check 32bit platform
+    Word32SllOp -> sizedPrimOp OP_SHL
+    Word16SllOp -> sizedPrimOp OP_SHL
+    Word8SllOp -> sizedPrimOp OP_SHL
+    IntSllOp    -> sizedPrimOp OP_SHL
+    Int64SllOp  -> only64bit $ sizedPrimOp OP_SHL
+    Int32SllOp  -> sizedPrimOp OP_SHL
+    Int16SllOp  -> sizedPrimOp OP_SHL
+    Int8SllOp  -> sizedPrimOp OP_SHL
+
+    WordSrlOp   -> sizedPrimOp OP_LSR
+    Word64SrlOp -> only64bit $ sizedPrimOp OP_LSR
+    Word32SrlOp -> sizedPrimOp OP_LSR
+    Word16SrlOp -> sizedPrimOp OP_LSR
+    Word8SrlOp -> sizedPrimOp OP_LSR
+    IntSrlOp    -> sizedPrimOp OP_LSR
+    Int64SrlOp  -> only64bit $ sizedPrimOp OP_LSR -- check 32bit platform
+    Int32SrlOp  -> sizedPrimOp OP_LSR
+    Int16SrlOp  -> sizedPrimOp OP_LSR
+    Int8SrlOp  -> sizedPrimOp OP_LSR
+
+    IntSraOp -> sizedPrimOp OP_ASR
+    Int64SraOp -> only64bit $ sizedPrimOp OP_ASR -- check 32bit platform
+    Int32SraOp -> sizedPrimOp OP_ASR
+    Int16SraOp -> sizedPrimOp OP_ASR
+    Int8SraOp -> sizedPrimOp OP_ASR
+
+
+    IntNeOp -> sizedPrimOp OP_NEQ
+    Int64NeOp -> only64bit $ sizedPrimOp OP_NEQ
+    Int32NeOp -> sizedPrimOp OP_NEQ
+    Int16NeOp -> sizedPrimOp OP_NEQ
+    Int8NeOp -> sizedPrimOp OP_NEQ
+    WordNeOp -> sizedPrimOp OP_NEQ
+    Word64NeOp -> only64bit $ sizedPrimOp OP_NEQ
+    Word32NeOp -> sizedPrimOp OP_NEQ
+    Word16NeOp -> sizedPrimOp OP_NEQ
+    Word8NeOp -> sizedPrimOp OP_NEQ
+    AddrNeOp -> sizedPrimOp OP_NEQ
+
+    IntEqOp -> sizedPrimOp OP_EQ
+    Int64EqOp -> only64bit $ sizedPrimOp OP_EQ
+    Int32EqOp -> sizedPrimOp OP_EQ
+    Int16EqOp -> sizedPrimOp OP_EQ
+    Int8EqOp -> sizedPrimOp OP_EQ
+    WordEqOp -> sizedPrimOp OP_EQ
+    Word64EqOp -> only64bit $ sizedPrimOp OP_EQ
+    Word32EqOp -> sizedPrimOp OP_EQ
+    Word16EqOp -> sizedPrimOp OP_EQ
+    Word8EqOp -> sizedPrimOp OP_EQ
+    AddrEqOp -> sizedPrimOp OP_EQ
+    CharEqOp -> sizedPrimOp OP_EQ
+
+    IntLtOp -> sizedPrimOp OP_S_LT
+    Int64LtOp -> only64bit $ sizedPrimOp OP_S_LT
+    Int32LtOp -> sizedPrimOp OP_S_LT
+    Int16LtOp -> sizedPrimOp OP_S_LT
+    Int8LtOp -> sizedPrimOp OP_S_LT
+    WordLtOp -> sizedPrimOp OP_U_LT
+    Word64LtOp -> only64bit $ sizedPrimOp OP_U_LT
+    Word32LtOp -> sizedPrimOp OP_U_LT
+    Word16LtOp -> sizedPrimOp OP_U_LT
+    Word8LtOp -> sizedPrimOp OP_U_LT
+    AddrLtOp -> sizedPrimOp OP_U_LT
+    CharLtOp -> sizedPrimOp OP_U_LT
+
+    IntGeOp -> sizedPrimOp OP_S_GE
+    Int64GeOp -> only64bit $ sizedPrimOp OP_S_GE
+    Int32GeOp -> sizedPrimOp OP_S_GE
+    Int16GeOp -> sizedPrimOp OP_S_GE
+    Int8GeOp -> sizedPrimOp OP_S_GE
+    WordGeOp -> sizedPrimOp OP_U_GE
+    Word64GeOp -> only64bit $ sizedPrimOp OP_U_GE
+    Word32GeOp -> sizedPrimOp OP_U_GE
+    Word16GeOp -> sizedPrimOp OP_U_GE
+    Word8GeOp -> sizedPrimOp OP_U_GE
+    AddrGeOp -> sizedPrimOp OP_U_GE
+    CharGeOp -> sizedPrimOp OP_U_GE
+
+    IntGtOp -> sizedPrimOp OP_S_GT
+    Int64GtOp -> only64bit $ sizedPrimOp OP_S_GT
+    Int32GtOp -> sizedPrimOp OP_S_GT
+    Int16GtOp -> sizedPrimOp OP_S_GT
+    Int8GtOp -> sizedPrimOp OP_S_GT
+    WordGtOp -> sizedPrimOp OP_U_GT
+    Word64GtOp -> only64bit $ sizedPrimOp OP_U_GT
+    Word32GtOp -> sizedPrimOp OP_U_GT
+    Word16GtOp -> sizedPrimOp OP_U_GT
+    Word8GtOp -> sizedPrimOp OP_U_GT
+    AddrGtOp -> sizedPrimOp OP_U_GT
+    CharGtOp -> sizedPrimOp OP_U_GT
+
+    IntLeOp -> sizedPrimOp OP_S_LE
+    Int64LeOp -> only64bit $ sizedPrimOp OP_S_LE
+    Int32LeOp -> sizedPrimOp OP_S_LE
+    Int16LeOp -> sizedPrimOp OP_S_LE
+    Int8LeOp -> sizedPrimOp OP_S_LE
+    WordLeOp -> sizedPrimOp OP_U_LE
+    Word64LeOp -> only64bit $ sizedPrimOp OP_U_LE
+    Word32LeOp -> sizedPrimOp OP_U_LE
+    Word16LeOp -> sizedPrimOp OP_U_LE
+    Word8LeOp -> sizedPrimOp OP_U_LE
+    AddrLeOp -> sizedPrimOp OP_U_LE
+    CharLeOp -> sizedPrimOp OP_U_LE
+
+    IntNegOp -> sizedPrimOp OP_NEG
+    Int64NegOp -> only64bit $ sizedPrimOp OP_NEG
+    Int32NegOp -> sizedPrimOp OP_NEG
+    Int16NegOp -> sizedPrimOp OP_NEG
+    Int8NegOp -> sizedPrimOp OP_NEG
+
+    IntToWordOp     -> mk_conv (platformWordWidth platform)
+    WordToIntOp     -> mk_conv (platformWordWidth platform)
+    Int8ToWord8Op   -> mk_conv W8
+    Word8ToInt8Op   -> mk_conv W8
+    Int16ToWord16Op -> mk_conv W16
+    Word16ToInt16Op -> mk_conv W16
+    Int32ToWord32Op -> mk_conv W32
+    Word32ToInt32Op -> mk_conv W32
+    Int64ToWord64Op -> only64bit $ mk_conv W64
+    Word64ToInt64Op -> only64bit $ mk_conv W64
+    IntToAddrOp     -> mk_conv (platformWordWidth platform)
+    AddrToIntOp     -> mk_conv (platformWordWidth platform)
+    ChrOp           -> mk_conv (platformWordWidth platform)   -- Int# and Char# are rep'd the same
+    OrdOp           -> mk_conv (platformWordWidth platform)
+
+    -- Memory primops, expand the ghci-mem-primops test if you add more.
+    IndexOffAddrOp_Word8 ->  primOpWithRep (OP_INDEX_ADDR W8) W8
+    IndexOffAddrOp_Word16 -> primOpWithRep (OP_INDEX_ADDR W16) W16
+    IndexOffAddrOp_Word32 -> primOpWithRep (OP_INDEX_ADDR W32) W32
+    IndexOffAddrOp_Word64 -> only64bit $ primOpWithRep (OP_INDEX_ADDR W64) W64
+
+    _ -> Nothing
+  where
+    only64bit = if platformWordWidth platform == W64 then id else const Nothing
+    primArg1Width :: StgArg -> Width
+    primArg1Width arg
+      | rep <- (stgArgRepU arg)
+      = case rep of
+        AddrRep -> platformWordWidth platform
+        IntRep -> platformWordWidth platform
+        WordRep -> platformWordWidth platform
+
+        Int64Rep -> W64
+        Word64Rep -> W64
+
+        Int32Rep -> W32
+        Word32Rep -> W32
+
+        Int16Rep -> W16
+        Word16Rep -> W16
+
+        Int8Rep -> W8
+        Word8Rep -> W8
+
+        FloatRep -> unexpectedRep
+        DoubleRep -> unexpectedRep
+
+        BoxedRep{} -> unexpectedRep
+        VecRep{} -> unexpectedRep
+      where
+        unexpectedRep = panic "doPrimOp: Unexpected argument rep"
+
+
+    -- TODO: The slides for the result need to be two words on 32bit for 64bit ops.
+    mkNReturn width
+      | W64 <- width = RETURN L -- L works for 64 bit on any platform
+      | otherwise = RETURN N -- <64bit width, fits in word on all platforms
+
+    mkSlideWords width = if platformWordWidth platform < width then 2 else 1
+
+    -- Push args, execute primop, slide, return_N
+    -- Decides width of operation based on first argument.
+    sizedPrimOp op_inst = Just $ do
+      let width = primArg1Width (head args)
+      prim_code <- mkPrimOpCode init_d s p (op_inst width) $ args
+      let slide = mkSlideW (mkSlideWords width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn width
+      return $ prim_code `appOL` slide
+
+    -- primOpWithRep op w => operation @op@ resulting in result @w@ wide.
+    primOpWithRep :: BCInstr -> Width -> Maybe (BcM (OrdList BCInstr))
+    primOpWithRep op_inst result_width = Just $ do
+      prim_code <- mkPrimOpCode init_d s p op_inst $ args
+      let slide = mkSlideW (mkSlideWords result_width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn result_width
+      return $ prim_code `appOL` slide
+
+    -- Coerce the argument, requires them to be the same size
+    mk_conv :: Width -> Maybe (BcM (OrdList BCInstr))
+    mk_conv target_width = Just $ do
+      let width = primArg1Width (head args)
+      massert (width == target_width)
+      (push_code, _bytes) <- pushAtom init_d p (head args)
+      let slide = mkSlideW (mkSlideWords target_width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn target_width
+      return $ push_code `appOL` slide
+
+-- Push the arguments on the stack and emit the given instruction
+-- Pushes at least one word per non void arg.
+mkPrimOpCode
+    :: StackDepth
+    -> Sequel
+    -> BCEnv
+    -> BCInstr                  -- The operator
+    -> [StgArg]                 -- Args, in *reverse* order (must be fully applied)
+    -> BcM BCInstrList
+mkPrimOpCode orig_d _ p op_inst args = app_code
+  where
+    app_code = do
+        profile <- getProfile
+        let _platform = profilePlatform profile
+
+            do_pushery :: StackDepth -> [StgArg] -> BcM BCInstrList
+            do_pushery !d (arg : args) = do
+                (push,arg_bytes) <- pushAtom d p arg
+                more_push_code <- do_pushery (d + arg_bytes) args
+                return (push `appOL` more_push_code)
+            do_pushery !_d [] = do
+                return (unitOL op_inst)
+
+        -- Push on the stack in the reverse order.
+        do_pushery orig_d (reverse args)
 
 -- v. similar to CgStackery.findMatch, ToDo: merge
 findPushSeq :: [ArgRep] -> (BCInstr, Int, [ArgRep])

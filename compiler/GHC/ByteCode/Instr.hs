@@ -14,11 +14,14 @@ module GHC.ByteCode.Instr (
 import GHC.Prelude
 
 import GHC.ByteCode.Types
+import GHC.Cmm.Type (Width)
 import GHCi.RemoteTypes
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Utils.Outputable
+import GHC.Unit.Types (UnitId)
 import GHC.Types.Name
 import GHC.Types.Literal
+import GHC.Types.Unique
 import GHC.Core.DataCon
 import GHC.Builtin.PrimOps
 import GHC.Runtime.Heap.Layout ( StgWord )
@@ -35,8 +38,6 @@ import GHC.Stack.CCS (CostCentre)
 import GHC.Stg.Syntax
 import GHCi.BreakArray (BreakArray)
 import Language.Haskell.Syntax.Module.Name (ModuleName)
-import GHC.Types.Unique
-import GHC.Unit.Types (UnitId)
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions
@@ -216,6 +217,39 @@ data BCInstr
                                 -- what the alignment constraints are.)
 
    | PRIMCALL
+
+   -- Primops - The actual interpreter instructions are flattened into 64/32/16/8 wide
+   -- instructions. But for generating code it's handy to have the width as argument
+   -- to avoid duplication.
+   | OP_ADD !Width
+   | OP_SUB !Width
+   | OP_AND !Width
+   | OP_XOR !Width
+   | OP_MUL !Width
+   | OP_SHL !Width
+   | OP_ASR !Width
+   | OP_LSR !Width
+   | OP_OR  !Width
+
+   | OP_NOT !Width
+   | OP_NEG !Width
+
+   | OP_NEQ !Width
+   | OP_EQ !Width
+
+   | OP_U_LT !Width
+   | OP_U_GE !Width
+   | OP_U_GT !Width
+   | OP_U_LE !Width
+
+   | OP_S_LT !Width
+   | OP_S_GE !Width
+   | OP_S_GT !Width
+   | OP_S_LE !Width
+
+   -- Always puts at least a machine word on the stack.
+   -- We zero extend the result we put on the stack according to host byte order.
+   | OP_INDEX_ADDR !Width
 
    -- For doing magic ByteArray passing to foreign calls
    | SWIZZLE          !WordOff -- to the ptr N words down the stack,
@@ -397,6 +431,32 @@ instance Outputable BCInstr where
                                                       0x2 -> text "(unsafe)"
                                                       _   -> empty)
    ppr PRIMCALL              = text "PRIMCALL"
+
+   ppr (OP_ADD w)            = text "OP_ADD_" <> ppr w
+   ppr (OP_SUB w)            = text "OP_SUB_" <> ppr w
+   ppr (OP_AND w)            = text "OP_AND_" <> ppr w
+   ppr (OP_XOR w)            = text "OP_XOR_" <> ppr w
+   ppr (OP_OR w)             = text "OP_OR_" <> ppr w
+   ppr (OP_NOT w)            = text "OP_NOT_" <> ppr w
+   ppr (OP_NEG w)            = text "OP_NEG_" <> ppr w
+   ppr (OP_MUL w)            = text "OP_MUL_" <> ppr w
+   ppr (OP_SHL w)            = text "OP_SHL_" <> ppr w
+   ppr (OP_ASR w)            = text "OP_ASR_" <> ppr w
+   ppr (OP_LSR w)            = text "OP_LSR_" <> ppr w
+
+   ppr (OP_EQ w)             = text "OP_EQ_" <> ppr w
+   ppr (OP_NEQ w)            = text "OP_NEQ_" <> ppr w
+   ppr (OP_S_LT w)           = text "OP_S_LT_" <> ppr w
+   ppr (OP_S_GE w)           = text "OP_S_GE_" <> ppr w
+   ppr (OP_S_GT w)           = text "OP_S_GT_" <> ppr w
+   ppr (OP_S_LE w)           = text "OP_S_LE_" <> ppr w
+   ppr (OP_U_LT w)           = text "OP_U_LT_" <> ppr w
+   ppr (OP_U_GE w)           = text "OP_U_GE_" <> ppr w
+   ppr (OP_U_GT w)           = text "OP_U_GT_" <> ppr w
+   ppr (OP_U_LE w)           = text "OP_U_LE_" <> ppr w
+
+   ppr (OP_INDEX_ADDR w)     = text "OP_INDEX_ADDR_" <> ppr w
+
    ppr (SWIZZLE stkoff n)    = text "SWIZZLE " <+> text "stkoff" <+> ppr stkoff
                                                <+> text "by" <+> ppr n
    ppr ENTER                 = text "ENTER"
@@ -505,6 +565,31 @@ bciStackUse RETURN{}              = 1 -- pushes stg_ret_X for some X
 bciStackUse RETURN_TUPLE{}        = 1 -- pushes stg_ret_t header
 bciStackUse CCALL{}               = 0
 bciStackUse PRIMCALL{}            = 1 -- pushes stg_primcall
+bciStackUse OP_ADD{}              = 0 -- We overestimate, it's -1 actually ...
+bciStackUse OP_SUB{}              = 0
+bciStackUse OP_AND{}              = 0
+bciStackUse OP_XOR{}              = 0
+bciStackUse OP_OR{}               = 0
+bciStackUse OP_NOT{}              = 0
+bciStackUse OP_NEG{}              = 0
+bciStackUse OP_MUL{}              = 0
+bciStackUse OP_SHL{}              = 0
+bciStackUse OP_ASR{}              = 0
+bciStackUse OP_LSR{}              = 0
+
+bciStackUse OP_NEQ{}              = 0
+bciStackUse OP_EQ{}               = 0
+bciStackUse OP_S_LT{}               = 0
+bciStackUse OP_S_GT{}               = 0
+bciStackUse OP_S_LE{}               = 0
+bciStackUse OP_S_GE{}               = 0
+bciStackUse OP_U_LT{}               = 0
+bciStackUse OP_U_GT{}               = 0
+bciStackUse OP_U_LE{}               = 0
+bciStackUse OP_U_GE{}               = 0
+
+bciStackUse OP_INDEX_ADDR{}         = 0
+
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0
 
