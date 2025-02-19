@@ -147,6 +147,7 @@ defaults
    fixity           = Nothing
    vector           = []
    deprecated_msg   = {}      -- A non-empty message indicates deprecation
+   div_like         = False   -- Second argument expected to be non zero - used for tests
 
 -- Note [When do out-of-line primops go in primops.txt.pp]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -296,14 +297,18 @@ primop Int8MulOp "timesInt8#" GenPrimOp Int8# -> Int8# -> Int8#
 primop Int8QuotOp "quotInt8#" GenPrimOp Int8# -> Int8# -> Int8#
   with
     effect = CanFail
+    div_like = True
 
 primop Int8RemOp "remInt8#" GenPrimOp Int8# -> Int8# -> Int8#
   with
     effect = CanFail
+    div_like = True
+
 
 primop Int8QuotRemOp "quotRemInt8#" GenPrimOp Int8# -> Int8# -> (# Int8#, Int8# #)
   with
     effect = CanFail
+    div_like = True
 
 primop Int8SllOp "uncheckedShiftLInt8#"  GenPrimOp Int8# -> Int# -> Int8#
 primop Int8SraOp "uncheckedShiftRAInt8#" GenPrimOp Int8# -> Int# -> Int8#
@@ -342,14 +347,17 @@ primop Word8MulOp "timesWord8#" GenPrimOp Word8# -> Word8# -> Word8#
 primop Word8QuotOp "quotWord8#" GenPrimOp Word8# -> Word8# -> Word8#
   with
     effect = CanFail
+    div_like = True
 
 primop Word8RemOp "remWord8#" GenPrimOp Word8# -> Word8# -> Word8#
   with
     effect = CanFail
+    div_like = True
 
 primop Word8QuotRemOp "quotRemWord8#" GenPrimOp Word8# -> Word8# -> (# Word8#, Word8# #)
   with
     effect = CanFail
+    div_like = True
 
 primop Word8AndOp "andWord8#" GenPrimOp Word8# -> Word8# -> Word8#
    with commutable = True
@@ -400,14 +408,17 @@ primop Int16MulOp "timesInt16#" GenPrimOp Int16# -> Int16# -> Int16#
 primop Int16QuotOp "quotInt16#" GenPrimOp Int16# -> Int16# -> Int16#
   with
     effect = CanFail
+    div_like = True
 
 primop Int16RemOp "remInt16#" GenPrimOp Int16# -> Int16# -> Int16#
   with
     effect = CanFail
+    div_like = True
 
 primop Int16QuotRemOp "quotRemInt16#" GenPrimOp Int16# -> Int16# -> (# Int16#, Int16# #)
   with
     effect = CanFail
+    div_like = True
 
 primop Int16SllOp "uncheckedShiftLInt16#"  GenPrimOp Int16# -> Int# -> Int16#
 primop Int16SraOp "uncheckedShiftRAInt16#" GenPrimOp Int16# -> Int# -> Int16#
@@ -446,14 +457,17 @@ primop Word16MulOp "timesWord16#" GenPrimOp Word16# -> Word16# -> Word16#
 primop Word16QuotOp "quotWord16#" GenPrimOp Word16# -> Word16# -> Word16#
   with
     effect = CanFail
+    div_like = True
 
 primop Word16RemOp "remWord16#" GenPrimOp Word16# -> Word16# -> Word16#
   with
     effect = CanFail
+    div_like = True
 
 primop Word16QuotRemOp "quotRemWord16#" GenPrimOp Word16# -> Word16# -> (# Word16#, Word16# #)
   with
     effect = CanFail
+    div_like = True
 
 primop Word16AndOp "andWord16#" GenPrimOp Word16# -> Word16# -> Word16#
    with commutable = True
@@ -504,14 +518,17 @@ primop Int32MulOp "timesInt32#" GenPrimOp Int32# -> Int32# -> Int32#
 primop Int32QuotOp "quotInt32#" GenPrimOp Int32# -> Int32# -> Int32#
   with
     effect = CanFail
+    div_like = True
 
 primop Int32RemOp "remInt32#" GenPrimOp Int32# -> Int32# -> Int32#
   with
     effect = CanFail
+    div_like = True
 
 primop Int32QuotRemOp "quotRemInt32#" GenPrimOp Int32# -> Int32# -> (# Int32#, Int32# #)
   with
     effect = CanFail
+    div_like = True
 
 primop Int32SllOp "uncheckedShiftLInt32#"  GenPrimOp Int32# -> Int# -> Int32#
 primop Int32SraOp "uncheckedShiftRAInt32#" GenPrimOp Int32# -> Int# -> Int32#
@@ -550,14 +567,17 @@ primop Word32MulOp "timesWord32#" GenPrimOp Word32# -> Word32# -> Word32#
 primop Word32QuotOp "quotWord32#" GenPrimOp Word32# -> Word32# -> Word32#
   with
     effect = CanFail
+    div_like = True
 
 primop Word32RemOp "remWord32#" GenPrimOp Word32# -> Word32# -> Word32#
   with
     effect = CanFail
+    div_like = True
 
 primop Word32QuotRemOp "quotRemWord32#" GenPrimOp Word32# -> Word32# -> (# Word32#, Word32# #)
   with
     effect = CanFail
+    div_like = True
 
 primop Word32AndOp "andWord32#" GenPrimOp Word32# -> Word32# -> Word32#
    with commutable = True
@@ -608,10 +628,12 @@ primop Int64MulOp "timesInt64#" GenPrimOp Int64# -> Int64# -> Int64#
 primop Int64QuotOp "quotInt64#" GenPrimOp Int64# -> Int64# -> Int64#
   with
     effect = CanFail
+    div_like = True
 
 primop Int64RemOp "remInt64#" GenPrimOp Int64# -> Int64# -> Int64#
   with
     effect = CanFail
+    div_like = True
 
 primop Int64SllOp "uncheckedIShiftL64#"  GenPrimOp Int64# -> Int# -> Int64#
 primop Int64SraOp "uncheckedIShiftRA64#" GenPrimOp Int64# -> Int# -> Int64#
@@ -650,10 +672,12 @@ primop Word64MulOp "timesWord64#" GenPrimOp Word64# -> Word64# -> Word64#
 primop Word64QuotOp "quotWord64#" GenPrimOp Word64# -> Word64# -> Word64#
   with
     effect = CanFail
+    div_like = True
 
 primop Word64RemOp "remWord64#" GenPrimOp Word64# -> Word64# -> Word64#
   with
     effect = CanFail
+    div_like = True
 
 primop Word64AndOp "and64#" GenPrimOp Word64# -> Word64# -> Word64#
    with commutable = True
@@ -737,6 +761,7 @@ primop   IntQuotOp    "quotInt#"    GenPrimOp
     zero.
    }
    with effect = CanFail
+        div_like = True
 
 primop   IntRemOp    "remInt#"    GenPrimOp
    Int# -> Int# -> Int#
@@ -744,11 +769,13 @@ primop   IntRemOp    "remInt#"    GenPrimOp
     behavior is undefined if the second argument is zero.
    }
    with effect = CanFail
+        div_like = True
 
 primop   IntQuotRemOp "quotRemInt#"    GenPrimOp
    Int# -> Int# -> (# Int#, Int# #)
    {Rounds towards zero.}
    with effect = CanFail
+        div_like = True
 
 primop   IntAndOp   "andI#"   GenPrimOp    Int# -> Int# -> Int#
    {Bitwise "and".}
@@ -886,19 +913,23 @@ primop   WordMul2Op  "timesWord2#"   GenPrimOp
 
 primop   WordQuotOp   "quotWord#"   GenPrimOp   Word# -> Word# -> Word#
    with effect = CanFail
+        div_like = True
 
 primop   WordRemOp   "remWord#"   GenPrimOp   Word# -> Word# -> Word#
    with effect = CanFail
+        div_like = True
 
 primop   WordQuotRemOp "quotRemWord#" GenPrimOp
    Word# -> Word# -> (# Word#, Word# #)
    with effect = CanFail
+        div_like = True
 
 primop   WordQuotRem2Op "quotRemWord2#" GenPrimOp
    Word# -> Word# -> Word# -> (# Word#, Word# #)
          { Takes high word of dividend, then low word of dividend, then divisor.
            Requires that high word < divisor.}
    with effect = CanFail
+        div_like = True
 
 primop   WordAndOp   "and#"   GenPrimOp   Word# -> Word# -> Word#
    with commutable = True
@@ -4166,6 +4197,7 @@ primop VecQuotOp "quot#" GenPrimOp
      Do not expect high performance. }
    with effect = CanFail
         vector = INT_VECTOR_TYPES
+        div_like = True
 
 primop VecRemOp "rem#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
@@ -4175,6 +4207,8 @@ primop VecRemOp "rem#" GenPrimOp
      Do not expect high performance. }
    with effect = CanFail
         vector = INT_VECTOR_TYPES
+        div_like = True
+
 
 primop VecNegOp "negate#" GenPrimOp
    VECTOR -> VECTOR

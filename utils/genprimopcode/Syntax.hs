@@ -53,6 +53,19 @@ is_primtype :: Entry -> Bool
 is_primtype (PrimTypeSpec {}) = True
 is_primtype _ = False
 
+is_divLikeOp :: Entry -> Bool
+is_divLikeOp entry = case entry of
+   PrimOpSpec{} -> has_div_like
+   PseudoOpSpec{} -> has_div_like
+   PrimVecOpSpec{} -> has_div_like
+   PrimTypeSpec{} -> False
+   PrimVecTypeSpec{} -> False
+   Section{} -> False
+   where
+      has_div_like = case lookup_attrib "div_like" (opts entry) of
+         Just (OptionTrue{}) -> True
+         _ -> False
+
 -- a binding of property to value
 data Option
    = OptionFalse  String          -- name = False
@@ -78,7 +91,7 @@ data Ty
    | TyVar  TyVar
    | TyUTup [Ty]   -- unboxed tuples; just a TyCon really,
                    -- but convenient like this
-   deriving (Eq,Show)
+   deriving (Eq,Show, Ord)
 
 type TyVar = String
 type TyVarBinder = String
