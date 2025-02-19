@@ -1,3 +1,9 @@
+{-# LANGUAGE UnboxedSums #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PatternSynonyms #-}
+
 module GHC.Data.StringTrie
   ( StringTrie
   , empty
@@ -31,29 +37,45 @@ insert k0 v = go k0
 lookup :: String -> StringTrie a -> Maybe (a, String)
 lookup = lookup' (\_ _ -> True)
 
+type Result a = (# (# #) | (# a, String #) #)
+
+pattern URNothing :: Result a
+pattern URNothing = (# (# #) | #)
+
+pattern URJust :: a -> String -> Result a
+pattern URJust x rest = (# | (# x, rest #) #)
+
+{-# COMPLETE URNothing, URJust #-}
+
 -- | Returns the value associated with the longest match prefix as well
--- as the non-matching suffix.
+-- as the non-matching suffix. Accepts a predicate to further filter matches.
 lookup'
-    :: (a -> String -> Bool)
+    :: forall a.
+       (a -> String -> Bool)
        -- ^ a predicate on the value and non-matching suffix
        -- filtering acceptable matches
     -> String
-       -- ^ key to llookup
+       -- ^ key to lookup
     -> StringTrie a
     -> Maybe (a, String)
-lookup' pred = go Nothing
+lookup' pred = \str trie ->
+    case go URNothing str trie of
+      URNothing -> Nothing
+      URJust v rest -> Just (v, rest)
   where
-    --go :: Maybe (a, String) -> String -> StringTrie a -> Maybe (a, String)
-    go _prev []       (STNode (Just v) _)   = Just (v, "")
+    go :: Result a -> String -> StringTrie a -> Result a
+    go _prev []       (STNode (Just v) _)   = URJust v ""
     go prev  []       (STNode Nothing  _)   = prev
     go prev  match@(c:rest) (STNode end children) =
       case M.lookup c children of
         Nothing    -> prev'
         Just child -> go prev' rest child
       where
+        prev' :: Result a
         prev' = case end of
-                  Just v | pred v match -> Just (v, match)
+                  Just v | pred v match -> URJust v match
                   _ -> prev
+
 
 fromList :: [(String, a)] -> StringTrie a
 fromList = foldl' (\trie (k,v) -> insert k v trie) empty
