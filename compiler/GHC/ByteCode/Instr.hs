@@ -214,6 +214,14 @@ data BCInstr
 
    | PRIMCALL
 
+   | OP_ADD
+   | OP_AND
+   | OP_XOR
+   | OP_NOT
+   | OP_NEQ
+
+   -- Primops
+
    -- For doing magic ByteArray passing to foreign calls
    | SWIZZLE          !WordOff -- to the ptr N words down the stack,
                       !Int     -- add M
@@ -393,6 +401,13 @@ instance Outputable BCInstr where
                                                       0x2 -> text "(unsafe)"
                                                       _   -> empty)
    ppr PRIMCALL              = text "PRIMCALL"
+
+   ppr OP_ADD                = text "OP_ADD"
+   ppr OP_AND                = text "OP_AND"
+   ppr OP_XOR                = text "OP_XOR"
+   ppr OP_NOT                = text "OP_NOT"
+   ppr OP_NEQ                = text "OP_NEQ"
+
    ppr (SWIZZLE stkoff n)    = text "SWIZZLE " <+> text "stkoff" <+> ppr stkoff
                                                <+> text "by" <+> ppr n
    ppr ENTER                 = text "ENTER"
@@ -501,6 +516,12 @@ bciStackUse RETURN{}              = 1 -- pushes stg_ret_X for some X
 bciStackUse RETURN_TUPLE{}        = 1 -- pushes stg_ret_t header
 bciStackUse CCALL{}               = 0
 bciStackUse PRIMCALL{}            = 1 -- pushes stg_primcall
+bciStackUse OP_ADD{}              = 0 -- We overestimate, it's -1 actually ...
+bciStackUse OP_AND{}              = 0
+bciStackUse OP_XOR{}              = 0
+bciStackUse OP_NOT{}              = 0
+bciStackUse OP_NEQ{}              = 0
+
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0
 

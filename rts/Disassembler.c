@@ -459,6 +459,27 @@ disInstr ( StgBCO *bco, int pc )
          break;
       }
 
+      case bci_OP_ADD:
+         debugBelch("OP_ADD\n");
+         break;
+
+      case bci_OP_AND:
+         debugBelch("OP_AND\n");
+         break;
+
+      case bci_OP_XOR:
+         debugBelch("OP_XOR\n");
+         break;
+
+      case bci_OP_NOT:
+         debugBelch("OP_NOT\n");
+         break;
+
+      case bci_OP_NEQ:
+         debugBelch("OP_NEQ\n");
+         break;
+
+
       default:
          barf("disInstr: unknown opcode %u", (unsigned int) instr);
    }

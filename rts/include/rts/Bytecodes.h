@@ -114,6 +114,12 @@
 
 #define bci_BCO_NAME                    88
 
+#define bci_OP_ADD                      89
+#define bci_OP_AND                      90
+#define bci_OP_XOR                      91
+#define bci_OP_NOT                      92
+#define bci_OP_NEQ                      93
+
 /* If you need to go past 255 then you will run into the flags */
 
 /* If you need to go below 0x0100 then you will run into the instructions */

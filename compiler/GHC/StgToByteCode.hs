@@ -734,7 +734,8 @@ schemeT d s p (StgOpApp (StgFCallOp (CCall ccall_spec) _ty) args result_ty)
       else unsupportedCConvException
 
 schemeT d s p (StgOpApp (StgPrimOp op) args _ty)
-   = doTailCall d s p (primOpId op) (reverse args)
+  | Just prim_code <- doPrimOp op d s p args = prim_code
+  | otherwise = doTailCall d s p (primOpId op) (reverse args)
 
 schemeT d s p (StgOpApp (StgPrimCallOp (PrimCall label unit)) args result_ty)
    = generatePrimCall d s p label (Just unit) result_ty args
@@ -828,6 +829,114 @@ doTailCall init_d s p fn args = do
     (push_code, sz) <- pushAtom d p arg
     (final_d, more_push_code) <- push_seq (d + sz) args
     return (final_d, push_code `appOL` more_push_code)
+
+doPrimOp  :: PrimOp
+          -> StackDepth
+          -> Sequel
+          -> BCEnv
+          -> [StgArg]
+          -> Maybe (BcM BCInstrList)
+doPrimOp op init_d s p args =
+  case op of
+    -- TODO: No idea if the argument order here is correct.
+    -- But it doesn't matter for the current set of primops.
+    IntAddOp -> primOp OP_ADD
+    WordAddOp -> primOp OP_ADD
+
+    IntAndOp -> primOp OP_AND
+    WordAndOp -> primOp OP_AND
+
+    IntNotOp -> primOp OP_NOT
+    WordNotOp -> primOp OP_NOT
+
+    IntXorOp -> primOp OP_XOR
+    WordXorOp -> primOp OP_XOR
+
+    IntNeOp -> primOp OP_NEQ
+    WordNeOp -> primOp OP_NEQ
+
+    IntToWordOp -> no_op
+    WordToIntOp -> no_op
+
+    _ -> Nothing
+    where
+      -- Push args, execute primop, slide, return_N
+      primOp op_inst = Just $ do
+        platform <- profilePlatform <$> getProfile
+        prim_code <- mkPrimOpCode init_d s p op_inst args
+        let slide = mkSlideW 1 (bytesToWords platform $ init_d - s) `snocOL` RETURN N
+        return $ prim_code `appOL` slide
+
+      no_op = Just $ do
+        platform <- profilePlatform <$> getProfile
+        prim_code <- terribleNoOp init_d s p undefined args
+        let slide = mkSlideW 1 (bytesToWords platform $ init_d - s) `snocOL` RETURN N
+        return $ prim_code `appOL` slide
+
+-- It's horrible, but still better than calling intToWord ...
+terribleNoOp
+    :: StackDepth
+    -> Sequel
+    -> BCEnv
+    -> BCInstr                  -- The operator
+    -> [StgArg]                 -- Args, in *reverse* order (must be fully applied)
+    -> BcM BCInstrList
+terribleNoOp orig_d _ p op_inst args = app_code
+  where
+    app_code = do
+        profile <- getProfile
+        let platform = profilePlatform profile
+
+            non_voids =
+                addArgReps (assertNonVoidStgArgs args)
+            (_, _, args_offsets) =
+                mkVirtHeapOffsetsWithPadding profile StdHeader non_voids
+
+            do_pushery !d (arg : args) = do
+                (push, arg_bytes) <- case arg of
+                    (Padding l _) -> return $! pushPadding (ByteOff l)
+                    (FieldOff a _) -> pushConstrAtom d p (fromNonVoid a)
+                more_push_code <- do_pushery (d + arg_bytes) args
+                return (push `appOL` more_push_code)
+            do_pushery !d [] = do
+                -- let !n_arg_words = bytesToWords platform (d - orig_d)
+                return (nilOL)
+
+        -- Push on the stack in the reverse order.
+        do_pushery orig_d (reverse args_offsets)
+
+-- Push the arguments on the stack and emit the given instruction
+mkPrimOpCode
+    :: StackDepth
+    -> Sequel
+    -> BCEnv
+    -> BCInstr                  -- The operator
+    -> [StgArg]                 -- Args, in *reverse* order (must be fully applied)
+    -> BcM BCInstrList
+mkPrimOpCode orig_d _ p op_inst args = app_code
+  where
+    app_code = do
+        profile <- getProfile
+        let platform = profilePlatform profile
+
+            non_voids =
+                addArgReps (assertNonVoidStgArgs args)
+            (_, _, args_offsets) =
+                mkVirtHeapOffsetsWithPadding profile StdHeader non_voids
+
+            do_pushery !d (arg : args) = do
+                (push, arg_bytes) <- case arg of
+                    (Padding l _) -> return $! pushPadding (ByteOff l)
+                    (FieldOff a _) -> pushConstrAtom d p (fromNonVoid a)
+                more_push_code <- do_pushery (d + arg_bytes) args
+                return (push `appOL` more_push_code)
+            do_pushery !d [] = do
+                -- let !n_arg_words = bytesToWords platform (d - orig_d)
+                return (unitOL op_inst)
+
+        -- Push on the stack in the reverse order.
+        do_pushery orig_d (reverse args_offsets)
+
 
 -- v. similar to CgStackery.findMatch, ToDo: merge
 findPushSeq :: [ArgRep] -> (BCInstr, Int, [ArgRep])

@@ -2110,6 +2110,40 @@ run_BCO:
             RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
         }
 
+        case bci_OP_ADD: {
+            StgWord r = (StgWord) SpW(0) + (StgWord) SpW(1);
+            SpW(1) = (W_)r;
+            Sp_addW(1);
+            goto nextInsn;
+        }
+
+        case bci_OP_AND: {
+            StgWord r = (StgWord) SpW(0) & (StgWord) SpW(1);
+            SpW(1) = (W_)r;
+            Sp_addW(1);
+            goto nextInsn;
+        }
+
+        case bci_OP_NOT: {
+            StgWord r = ~ (StgWord) SpW(0);
+            SpW(0) = (W_)r;
+            goto nextInsn;
+        }
+
+        case bci_OP_XOR: {
+            StgWord r = (StgWord) SpW(0) ^ (StgWord) SpW(1);
+            SpW(1) = (W_)r;
+            Sp_addW(1);
+            goto nextInsn;
+        }
+
+        case bci_OP_NEQ: {
+            StgWord r = (StgWord) SpW(0) != (StgWord) SpW(1);
+            SpW(1) = (W_)r;
+            Sp_addW(1);
+            goto nextInsn;
+        }
+
         case bci_CCALL: {
             void *tok;
             W_ stk_offset             = BCO_GET_LARGE_ARG;

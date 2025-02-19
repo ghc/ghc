@@ -508,6 +508,13 @@ assembleI platform i = case i of
   CCALL off m_addr i       -> do np <- addr m_addr
                                  emit bci_CCALL [wOp off, Op np, SmallOp i]
   PRIMCALL                 -> emit bci_PRIMCALL []
+
+  OP_ADD                   -> emit bci_OP_ADD []
+  OP_AND                   -> emit bci_OP_AND []
+  OP_XOR                   -> emit bci_OP_XOR []
+  OP_NOT                   -> emit bci_OP_NOT []
+  OP_NEQ                   -> emit bci_OP_NEQ []
+
   BRK_FUN arr tick_mod tickx info_mod infox cc ->
                               do p1 <- ptr (BCOPtrBreakArray arr)
                                  tick_addr <- addr tick_mod
