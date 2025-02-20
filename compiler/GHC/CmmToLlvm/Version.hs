@@ -1,9 +1,6 @@
 module GHC.CmmToLlvm.Version
   ( LlvmVersion(..)
-  , supportedLlvmVersionLowerBound
-  , supportedLlvmVersionUpperBound
   , parseLlvmVersion
-  , llvmVersionSupported
   , llvmVersionStr
   , llvmVersionList
   )
@@ -12,7 +9,6 @@ where
 import GHC.Prelude
 
 import GHC.CmmToLlvm.Version.Type
-import GHC.CmmToLlvm.Version.Bounds
 
 import Data.Char (isDigit)
 import Data.List (intercalate)
@@ -31,10 +27,6 @@ parseLlvmVersion =
       = reverse (read ver_str : vs)
       where
         (ver_str, rest) = span isDigit s
-
-llvmVersionSupported :: LlvmVersion -> Bool
-llvmVersionSupported v =
-  v >= supportedLlvmVersionLowerBound && v < supportedLlvmVersionUpperBound
 
 llvmVersionStr :: LlvmVersion -> String
 llvmVersionStr = intercalate "." . map show . llvmVersionList

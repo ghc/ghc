@@ -91,8 +91,7 @@ compiler = do
   let compilerDir    = "compiler"
   let ghcautoconf    = stage1RtsInc </> "ghcautoconf.h"
   let ghcplatform    = stage1RtsInc </> "ghcplatform.h"
-  let ghcLlvmVersion = compilerDir </> "GHC/CmmToLlvm/Version/Bounds.hs"
-  need $ mconcat [[ghcautoconf, ghcplatform, ghcLlvmVersion], hsIncls stage1Compiler, [machDeps]]
+  need $ mconcat [[ghcautoconf, ghcplatform], hsIncls stage1Compiler, [machDeps]]
   let includeDirs =
         [ stage1RtsInc
         , compilerDir

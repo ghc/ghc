@@ -29,7 +29,6 @@ initLlvmCgConfig logger config_cache dflags = do
                                       ArchX86    -> bmiVersion dflags
                                       _          -> Nothing
     , llvmCgLlvmVersion          = version
-    , llvmCgDoWarn               = wopt Opt_WarnUnsupportedLlvmVersion dflags
     , llvmCgLlvmTarget           = platformMisc_llvmTarget $! platformMisc dflags
     , llvmCgLlvmConfig           = llvm_config
     }

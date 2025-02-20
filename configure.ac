@@ -15,8 +15,6 @@ AC_ARG_WITH([project-version-for-lib], [AS_HELP_STRING([--with-project-version-f
 AC_ARG_WITH([project-patch-level], [AS_HELP_STRING([--with-project-patch-level=VER], [GHC patchlevel version (default: 0)])], [ProjectPatchLevel="$withval"], [ProjectPatchLevel="0"])
 AC_ARG_WITH([project-patch-level1], [AS_HELP_STRING([--with-project-patch-level1=VER], [GHC patchlevel1 version (default: 0)])], [ProjectPatchLevel1="$withval"], [ProjectPatchLevel1="0"])
 AC_ARG_WITH([project-patch-level2], [AS_HELP_STRING([--with-project-patch-level2=VER], [GHC patchlevel2 version (default: 0)])], [ProjectPatchLevel2="$withval"], [ProjectPatchLevel2="0"])
-AC_ARG_WITH([llvm-min-version], [AS_HELP_STRING([--with-llvm-min-version=VER], [Min LLVM version supported (default: 13)])], [LlvmMinVersion="$withval"], [LlvmMinVersion="13"])
-AC_ARG_WITH([llvm-max-version], [AS_HELP_STRING([--with-llvm-max-version=VER], [Max LLVM version supported (default: 20)])], [LlvmMaxVersion="$withval"], [LlvmMaxVersion="20"])
 
 # Export these variables for substitution by AC_SUBST
 AC_SUBST([ProjectVersion])
@@ -26,8 +24,6 @@ AC_SUBST([ProjectVersionForLib])
 AC_SUBST([ProjectPatchLevel])
 AC_SUBST([ProjectPatchLevel1])
 AC_SUBST([ProjectPatchLevel2])
-AC_SUBST([LlvmMinVersion])
-AC_SUBST([LlvmMaxVersion])
 
 # For ghc-boot-th.cabal.in
 AC_SUBST([Suffix],[""])
@@ -51,7 +47,6 @@ AC_CONFIG_FILES([
     libraries/ghc-heap/ghc-heap.cabal:libraries/ghc-heap/ghc-heap.cabal.in
     libraries/template-haskell/template-haskell.cabal:libraries/template-haskell/template-haskell.cabal.in
     libraries/ghci/ghci.cabal:libraries/ghci/ghci.cabal.in
-    compiler/GHC/CmmToLlvm/Version/Bounds.hs:compiler/GHC/CmmToLlvm/Version/Bounds.hs.in
     utils/ghc-pkg/ghc-pkg.cabal:utils/ghc-pkg/ghc-pkg.cabal.in
     utils/iserv/iserv.cabal:utils/iserv/iserv.cabal.in
     utils/runghc/runghc.cabal:utils/runghc/runghc.cabal.in

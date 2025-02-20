@@ -38,8 +38,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Logger
 import qualified GHC.Data.Stream as Stream
 
-import Control.Monad ( when, forM_ )
-import Data.Maybe ( fromMaybe, catMaybes, isNothing )
+import Control.Monad ( forM_ )
+import Data.Maybe ( catMaybes )
 import System.IO
 
 -- -----------------------------------------------------------------------------
@@ -57,36 +57,8 @@ llvmCodeGen logger cfg h dus cmm_stream
        -- Pass header
        showPass logger "LLVM CodeGen"
 
-       -- get llvm version, cache for later use
-       let mb_ver = llvmCgLlvmVersion cfg
-
-       -- warn if unsupported
-       forM_ mb_ver $ \ver -> do
-         debugTraceMsg logger 2
-              (text "Using LLVM version:" <+> text (llvmVersionStr ver))
-         let doWarn = llvmCgDoWarn cfg
-         when (not (llvmVersionSupported ver) && doWarn) $ putMsg logger $
-           "You are using an unsupported version of LLVM!" $$
-           "Currently only" <+> text (llvmVersionStr supportedLlvmVersionLowerBound) <+>
-           "up to" <+> text (llvmVersionStr supportedLlvmVersionUpperBound) <+> "(non inclusive) is supported." <+>
-           "System LLVM version: " <> text (llvmVersionStr ver) $$
-           "We will try though..."
-
-       when (isNothing mb_ver) $ do
-         let doWarn = llvmCgDoWarn cfg
-         when doWarn $ putMsg logger $
-           "Failed to detect LLVM version!" $$
-           "Make sure LLVM is installed correctly." $$
-           "We will try though..."
-
-       -- HACK: the Nothing case here is potentially wrong here but we
-       -- currently don't use the LLVM version to guide code generation
-       -- so this is okay.
-       let llvm_ver :: LlvmVersion
-           llvm_ver = fromMaybe supportedLlvmVersionLowerBound mb_ver
-
        -- run code generation
-       (a, _) <- runLlvm logger cfg llvm_ver bufh dus $
+       (a, _) <- runLlvm logger cfg bufh dus $
          llvmCodeGen' cfg cmm_stream
 
        bFlush bufh

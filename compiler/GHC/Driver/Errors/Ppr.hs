@@ -34,7 +34,6 @@ import GHC.HsToCore.Errors.Types (DsMessage)
 import GHC.Iface.Errors.Types
 import GHC.Tc.Errors.Ppr () -- instance Diagnostic TcRnMessage
 import GHC.Iface.Errors.Ppr () -- instance Diagnostic IfaceMessage
-import GHC.CmmToLlvm.Version (llvmVersionStr, supportedLlvmVersionLowerBound, supportedLlvmVersionUpperBound)
 
 --
 -- Suggestions
@@ -276,12 +275,7 @@ instance Diagnostic DriverMessage where
              , nest 2 $ ppr node ]
     DriverNoConfiguredLLVMToolchain ->
       mkSimpleDecorated $
-        text "GHC was not configured with a supported LLVM toolchain" $$
-          text ("Make sure you have installed LLVM between ["
-            ++ llvmVersionStr supportedLlvmVersionLowerBound
-            ++ " and "
-            ++ llvmVersionStr supportedLlvmVersionUpperBound
-            ++ ") and reinstall GHC to make -fllvm work")
+        text "GHC was not configured with a supported LLVM toolchain"
 
   diagnosticReason = \case
     DriverUnknownMessage m

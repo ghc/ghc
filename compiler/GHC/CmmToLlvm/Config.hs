@@ -25,7 +25,6 @@ data LlvmCgConfig = LlvmCgConfig
   , llvmCgAvxEnabled        :: !Bool
   , llvmCgBmiVersion        :: Maybe BmiVersion  -- ^ (x86) BMI instructions
   , llvmCgLlvmVersion       :: Maybe LlvmVersion -- ^ version of Llvm we're using
-  , llvmCgDoWarn            :: !Bool         -- ^ True ==> warn unsupported Llvm version
   , llvmCgLlvmTarget        :: !String       -- ^ target triple passed to LLVM
   , llvmCgLlvmConfig        :: !LlvmConfig   -- ^ Supported LLVM configurations.
                                              -- see Note [LLVM configuration]

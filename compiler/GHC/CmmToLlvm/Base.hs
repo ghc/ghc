@@ -18,7 +18,7 @@ module GHC.CmmToLlvm.Base (
         LlvmM,
         runLlvm, withClearVars, varLookup, varInsert,
         markStackReg, checkStackReg,
-        funLookup, funInsert, getLlvmVer,
+        funLookup, funInsert,
         dumpIfSetLlvm, renderLlvm, markUsedVar, getUsedVars,
         ghcInternalFunctions, getPlatform, getConfig,
 
@@ -277,8 +277,7 @@ llvmPtrBits platform = widthInBits $ typeWidth $ gcWord platform
 --
 
 data LlvmEnv = LlvmEnv
-  { envVersion   :: LlvmVersion      -- ^ LLVM version
-  , envConfig    :: !LlvmCgConfig    -- ^ Configuration for LLVM code gen
+  { envConfig    :: !LlvmCgConfig    -- ^ Configuration for LLVM code gen
   , envLogger    :: !Logger          -- ^ Logger
   , envOutput    :: BufHandle        -- ^ Output buffer
   , envTag       :: !Char            -- ^ Tag for creating unique values
@@ -331,8 +330,8 @@ liftUDSMT m = LlvmM $ \env -> do x <- m
                                  return (x, env)
 
 -- | Get initial Llvm environment.
-runLlvm :: Logger -> LlvmCgConfig -> LlvmVersion -> BufHandle -> DSM.DUniqSupply -> LlvmM a -> IO (a, DSM.DUniqSupply)
-runLlvm logger cfg ver out us m = do
+runLlvm :: Logger -> LlvmCgConfig -> BufHandle -> DSM.DUniqSupply -> LlvmM a -> IO (a, DSM.DUniqSupply)
+runLlvm logger cfg out us m = do
     ((a, _), us') <- DSM.runUDSMT us $ runLlvmM m env
     return (a, us')
   where env = LlvmEnv { envFunMap    = emptyUFM
@@ -340,7 +339,6 @@ runLlvm logger cfg ver out us m = do
                       , envStackRegs = []
                       , envUsedVars  = []
                       , envAliases   = emptyUniqSet
-                      , envVersion   = ver
                       , envConfig    = cfg
                       , envLogger    = logger
                       , envOutput    = out
@@ -387,10 +385,6 @@ checkStackReg r = do
 getMetaUniqueId :: LlvmM MetaId
 getMetaUniqueId = LlvmM $ \env ->
     return (envFreshMeta env, env { envFreshMeta = succ $ envFreshMeta env })
-
--- | Get the LLVM version we are generating code for
-getLlvmVer :: LlvmM LlvmVersion
-getLlvmVer = getEnv envVersion
 
 -- | Dumps the document if the corresponding flag has been set by the user
 dumpIfSetLlvm :: DumpFlag -> String -> DumpFormat -> Outp.SDoc -> LlvmM ()

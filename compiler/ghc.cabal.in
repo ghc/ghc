@@ -352,7 +352,6 @@ Library
         GHC.CmmToLlvm.Ppr
         GHC.CmmToLlvm.Regs
         GHC.CmmToLlvm.Version
-        GHC.CmmToLlvm.Version.Bounds
         GHC.CmmToLlvm.Version.Type
         GHC.Cmm.Dominators
         GHC.Cmm.Reducibility
