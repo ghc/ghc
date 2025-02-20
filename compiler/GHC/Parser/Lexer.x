@@ -1269,7 +1269,7 @@ cppToken code span buf len _buf2 =
      -- trace ("cppToken:" ++ show (code, t)) $ do return (L span t)
 
 cppTokenCont :: (FastString -> Token)-> Action p
-cppTokenCont code span buf len _buf2 =
+cppTokenCont _code span buf len _buf2 =
   do
      let tokStr = lexemeToFastString buf len
      -- check if the string ends with backslash and newline
