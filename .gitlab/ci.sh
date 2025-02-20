@@ -10,6 +10,7 @@ set -Eeuo pipefail
 # N.B. You may want to also update the index-state in hadrian/cabal.project.
 HACKAGE_INDEX_STATE="2025-02-03T15:14:19Z"
 MIN_HAPPY_VERSION="1.20"
+MAX_HAPPY_VERSION="1.21" # Exclusive upper bound
 MIN_ALEX_VERSION="3.2.6"
 
 TOP="$(pwd)"
@@ -361,7 +362,7 @@ function setup_toolchain() {
   esac
 
   info "Building happy..."
-  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION"
+  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION" --constraint="happy<$MAX_HAPPY_VERSION"
 
   info "Building alex..."
   $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
