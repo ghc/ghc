@@ -587,15 +587,15 @@ void rts_done (void);
 //      the base package itself.
 //
 #if defined(COMPILING_WINDOWS_DLL) && !defined(COMPILING_GHC_INTERNAL_PACKAGE)
-__declspec(dllimport) extern StgWord ghczminternal_GHCziInternalziTopHandler_runIO_closure[];
-__declspec(dllimport) extern StgWord ghczminternal_GHCziInternalziTopHandler_runNonIO_closure[];
+__declspec(dllimport) extern StgClosure ghczminternal_GHCziInternalziTopHandler_runIO_closure;
+__declspec(dllimport) extern StgClosure ghczminternal_GHCziInternalziTopHandler_runNonIO_closure;
 #else
-extern StgWord ghczminternal_GHCziInternalziTopHandler_runIO_closure[];
-extern StgWord ghczminternal_GHCziInternalziTopHandler_runNonIO_closure[];
+extern StgClosure ghczminternal_GHCziInternalziTopHandler_runIO_closure;
+extern StgClosure ghczminternal_GHCziInternalziTopHandler_runNonIO_closure;
 #endif
 
-#define runIO_closure     ghczminternal_GHCziInternalziTopHandler_runIO_closure
-#define runNonIO_closure  ghczminternal_GHCziInternalziTopHandler_runNonIO_closure
+#define runIO_closure     DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTopHandler_runIO_closure)
+#define runNonIO_closure  DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTopHandler_runNonIO_closure)
 
 /* ------------------------------------------------------------------------ */
 
