@@ -93,7 +93,7 @@ library
         ghc-prim         >= 0.5.0 && < 0.14,
         binary           == 0.8.*,
         bytestring       >= 0.10 && < 0.13,
-        containers       >= 0.5 && < 0.8,
+        containers       >= 0.5 && < 0.9,
         deepseq          >= 1.4 && < 1.6,
         filepath         >= 1.4 && < 1.6,
         ghc-boot         == @ProjectVersionMunged@,

@@ -77,7 +77,7 @@ instance MN2 SMPlus a where
     fail x = SMPlus $ Set.empty
 
 instance Prelude.Ord b => MN3 SMPlus a b where
-    m >>= f = SMPlus (Set.fold (Set.union . unSM . f) Set.empty (unSM m))
+    m >>= f = SMPlus (Set.foldr (Set.union . unSM . f) Set.empty (unSM m))
 
 -- We cannot forget the Ord constraint, because the typechecker
 -- will complain (and tell us exactly what we have forgotten).

@@ -121,7 +121,7 @@ Library
                    bytestring >= 0.11 && < 0.13,
                    binary     == 0.8.*,
                    time       >= 1.4 && < 1.15,
-                   containers >= 0.6.2.1 && < 0.8,
+                   containers >= 0.6.2.1 && < 0.9,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1.5 && < 1.6,
                    os-string  >= 2.0.1 && < 2.1,

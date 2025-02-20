@@ -20,10 +20,11 @@ T10999.hs:8:28: error: [GHC-39999]
       Relevant bindings include g :: [b1] (bound at T10999.hs:8:1)
       Probable fix: use a type annotation to specify what ‘b1’ should be.
       Potentially matching instances:
+        instance Ord a => Ord (Set.Intersection a)
+          -- Defined in ‘Data.Set.Internal’
         instance Ord a => Ord (Set.Set a) -- Defined in ‘Data.Set.Internal’
-        instance Ord Ordering -- Defined in ‘GHC.Internal.Classes’
-        ...plus 24 others
-        ...plus four instances involving out-of-scope types
+        ...plus 25 others
+        ...plus three instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the second argument of ‘($)’, namely ‘f ()’
       In the second argument of ‘($)’, namely ‘Set.toList $ f ()’

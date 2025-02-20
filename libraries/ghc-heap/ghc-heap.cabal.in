@@ -25,7 +25,7 @@ library
   build-depends:    base             >= 4.9.0 && < 5.0
                   , ghc-prim         > 0.2 && < 0.14
                   , rts              == 1.0.*
-                  , containers       >= 0.6.2.1 && < 0.8
+                  , containers       >= 0.6.2.1 && < 0.9
 
   if impl(ghc >= 9.9)
     build-depends:  ghc-internal     >= 9.900 && < @ProjectVersionForLib@.99999
