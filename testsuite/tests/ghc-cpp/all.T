@@ -1,0 +1,1 @@
+test('GhcCpp01',      normal, compile, ['-ddump-ghc-cpp -dkeep-comments'])
