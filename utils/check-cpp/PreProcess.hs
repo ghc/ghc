@@ -73,7 +73,7 @@ showCppTokenStream ts0 = go startLoc ts0 ""
                         . (str ++)
                         . go tokEnd ts
                 | otherwise ->
-                    ((replicate (tokLine - locLine) '\n') ++)
+                    ((replicateStr (tokLine - locLine) "  |\n") ++)
                         . (extra ++)
                         . ((replicate (tokCol - 1) ' ') ++)
                         . (str ++)
@@ -85,6 +85,9 @@ showCppTokenStream ts0 = go startLoc ts0 ""
                 extra = case tok of
                     ITunknown _ -> "- |"
                     _ -> "  |"
+
+replicateStr :: Int -> String -> String
+replicateStr n s = concat (replicate n s)
 
 showDefines :: MacroDefines -> String
 showDefines defines = Map.foldlWithKey' (\acc k d -> acc ++ "\n" ++ renderDefine k d) "" defines
