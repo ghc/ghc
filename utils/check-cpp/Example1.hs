@@ -1,6 +1,8 @@
 {-# LANGUAGE GHC_CPP #-}
+{-# OPTIONS -ddump-ghc-cpp -dkeep-comments #-}
 module Example1 where
 
+-- A comment
 y = 3
 
 #define FOO
