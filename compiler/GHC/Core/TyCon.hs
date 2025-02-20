@@ -2695,6 +2695,7 @@ tyConStupidTheta :: TyCon -> [PredType]
 tyConStupidTheta tc@(TyCon { tyConDetails = details })
   | AlgTyCon {algTcStupidTheta = stupid} <- details = stupid
   | PrimTyCon {} <- details                         = []
+  | PromotedDataCon {} <- details                   = []
   | otherwise = pprPanic "tyConStupidTheta" (ppr tc)
 
 -- | Extract the 'TyVar's bound by a vanilla type synonym
