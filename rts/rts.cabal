@@ -425,6 +425,7 @@ library
                  Libdw.c
                  LibdwPool.c
                  Linker.c
+                 LinkerDebug.c
                  ReportMemoryMap.c
                  Messages.c
                  OldARMAtomic.c

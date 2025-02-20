@@ -17,6 +17,15 @@
 #include <sys/mman.h>
 #endif
 
+void linkerDebug(const char *s, ...)
+   STG_PRINTF_ATTR(1, 2);
+
+void linkerDebugStart(const char *s, ...)
+   STG_PRINTF_ATTR(1, 2);
+
+void linkerDebugEnd(const char *s, ...)
+   STG_PRINTF_ATTR(1, 2);
+
 void printLoadedObjects(void);
 
 /* Which object file format are we targeting? */
