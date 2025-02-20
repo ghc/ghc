@@ -142,7 +142,7 @@ replace_args args margs _ = error $ "replace_args: impossible, mismatch between:
 replace_arg :: [Token] -> String -> [Token] -> [Token]
 replace_arg _ _ [] = []
 replace_arg a ma (TIdentifier t : ts)
-    | ma == t = a <> replace_arg a ma ts
+    | ma == t = a ++ replace_arg a ma ts
 replace_arg a ma (t : ts) = t : replace_arg a ma ts
 
 -- ---------------------------------------------------------------------
@@ -198,10 +198,10 @@ pArg ts = do
         TComma _ : _ -> return (frag, rest)
         (t@TOpenParen{}) : ts' -> do
             (frag', rest') <- inside_parens 1 [t] ts'
-            return (frag <> frag', rest')
+            return (frag ++ frag', rest')
         _ -> do
             (frag', rest') <- pa_frag rest
-            return (frag <> frag', rest')
+            return (frag ++ frag', rest')
 
 pa_frag :: [Token] -> Either String ([Token], [Token])
 pa_frag [] = return ([], [])
