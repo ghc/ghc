@@ -1,75 +1,100 @@
 module PreProcess where
 
-import Control.Monad.IO.Class
-import Data.Data hiding (Fixity)
 import Data.List
-import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
-import Data.Maybe
 import Debug.Trace
 import GHC
-import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Data.StringBuffer
-import GHC.Driver.Config.Parser hiding (predefinedMacros)
-import GHC.Driver.Env.Types
 import GHC.Driver.Errors.Types
 import qualified GHC.Driver.Errors.Types as GHC
-import qualified GHC.Driver.Session as GHC
-import GHC.Hs.Dump
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
 import qualified GHC.Parser.Lexer as GHC
 import qualified GHC.Parser.Lexer as Lexer
-import GHC.SysTools.Cpp
 import GHC.Types.Error
 import GHC.Types.SrcLoc
-import GHC.Unit.Env
-import GHC.Unit.State
 import GHC.Utils.Error
 import GHC.Utils.Outputable
+import GHC.Utils.Panic.Plain
 
 import Macro
 import ParsePP
 import qualified ParserM as PM
 import State
 
-import Debug.Trace
-
 -- ---------------------------------------------------------------------
 
 dumpGhcCpp :: PState PpState -> SDoc
-dumpGhcCpp pst = text $ sep ++ defines ++ sep ++ comments ++ sep ++ orig ++ sep ++ final ++ sep
-  -- ++ show startLoc ++ sep ++ show bare_toks ++ sep
+dumpGhcCpp pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
   where
     -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
     (pst_final, bare_toks) = lexAll pst
+    comments = reverse (Lexer.comment_q pst_final)
+    -- We are going to addSourceToTokens, only need the location
+    to_tok (L (EpaSpan l) _) = L l (ITunknown "-")
+    to_tok (L (EpaDelta l _ _) _) = L l (ITunknown "-")
+    comments_as_toks = map to_tok comments
     defines = showDefines (pp_defines (pp pst_final))
-    sep = "\n------------------------------\n"
-    comments = showPprUnsafe (Lexer.comment_q pst_final)
-    buf = (buffer pst){cur = 0}
-    orig = lexemeToString buf (len buf)
+    sepa = "\n------------------------------\n"
+    -- buf = (buffer pst){cur = 0}
+    -- orig = lexemeToString buf (len buf)
     startLoc = mkRealSrcLoc (srcLocFile (psRealLoc $ loc pst)) 1 1
     buf1 = (buffer pst){cur = 0}
-    toks = GHC.addSourceToTokens startLoc buf1 bare_toks
-    final = renderCombinedToks toks (Lexer.comment_q pst_final)
+    all_toks = sortBy cmpBs (bare_toks ++ comments_as_toks)
+    toks = GHC.addSourceToTokens startLoc buf1 all_toks
+    final = renderCombinedToks toks
 
-renderCombinedToks :: [(Located Token, String)] -> [LEpaComment] -> String
-renderCombinedToks toks ctoks = show toks1 ++ show ctoks
+cmpBs :: Located Token -> Located Token -> Ordering
+cmpBs (L (RealSrcSpan _ (Strict.Just bs1)) _) (L (RealSrcSpan _ (Strict.Just bs2)) _) =
+    compare bs1 bs2
+cmpBs (L (RealSrcSpan r1 _) _) (L (RealSrcSpan r2 _) _) =
+    compare r1 r2
+cmpBs _ _ = EQ
+
+renderCombinedToks :: [(Located Token, String)] -> String
+renderCombinedToks toks = showCppTokenStream toks
+
+-- Tweaked from showRichTokenStream
+showCppTokenStream :: [(Located Token, String)] -> String
+showCppTokenStream ts0 = go startLoc ts0 ""
   where
-    toks1 = map (\(L l _, s) -> (l,s)) toks
-    ctoks1 = map (\(L l t) -> (l, ghcCommentText t)) ctoks
-
+    sourceFile = getFile $ map (getLoc . fst) ts0
+    getFile [] = panic "showCppTokenStream: No source file found"
+    getFile (UnhelpfulSpan _ : xs) = getFile xs
+    getFile (RealSrcSpan s _ : _) = srcSpanFile s
+    startLoc = mkRealSrcLoc sourceFile 0 1
+    go _ [] = id
+    go loc ((L span' tok, str) : ts) =
+        case span' of
+            UnhelpfulSpan _ -> go loc ts
+            RealSrcSpan s _
+                | locLine == tokLine ->
+                    ((replicate (tokCol - locCol) ' ') ++)
+                        . (str ++)
+                        . go tokEnd ts
+                | otherwise ->
+                    ((replicate (tokLine - locLine) '\n') ++)
+                        . (extra ++)
+                        . ((replicate (tokCol - 1) ' ') ++)
+                        . (str ++)
+                        . go tokEnd ts
+              where
+                (locLine, locCol) = (srcLocLine loc, srcLocCol loc)
+                (tokLine, tokCol) = (srcSpanStartLine s, srcSpanStartCol s)
+                tokEnd = realSrcSpanEnd s
+                extra = case tok of
+                    ITunknown _ -> "- |"
+                    _ -> "  |"
 
 ghcCommentText :: EpaComment -> String
-ghcCommentText (GHC.EpaComment (EpaDocComment s) _)      = exactPrintHsDocString s
-ghcCommentText (GHC.EpaComment (EpaDocOptions s) _)      = s
-ghcCommentText (GHC.EpaComment (EpaLineComment s) _)     = s
-ghcCommentText (GHC.EpaComment (EpaBlockComment s) _)    = s
-ghcCommentText (GHC.EpaComment (EpaCppIgnored [L _ s]) _)= s
-ghcCommentText (GHC.EpaComment (EpaCppIgnored _) _)      = ""
+ghcCommentText (GHC.EpaComment (EpaDocComment s) _) = exactPrintHsDocString s
+ghcCommentText (GHC.EpaComment (EpaDocOptions s) _) = s
+ghcCommentText (GHC.EpaComment (EpaLineComment s) _) = s
+ghcCommentText (GHC.EpaComment (EpaBlockComment s) _) = s
+ghcCommentText (GHC.EpaComment (EpaCppIgnored [L _ s]) _) = s
+ghcCommentText (GHC.EpaComment (EpaCppIgnored _) _) = ""
 
 showDefines :: MacroDefines -> String
 showDefines defines = Map.foldlWithKey' (\acc k d -> acc ++ "\n" ++ renderDefine k d) "" defines
