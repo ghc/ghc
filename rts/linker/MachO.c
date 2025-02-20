@@ -51,7 +51,7 @@
 /* often times we need to extend some value of certain number of bits
  * int an int64_t for e.g. relative offsets.
  */
-int64_t signExtend(uint64_t val, uint8_t bits);
+static int64_t signExtend(uint64_t val, uint8_t bits);
 /* Helper functions to check some instruction properties */
 static bool isVectorOp(uint32_t *p);
 static bool isLoadStore(uint32_t *p);
@@ -60,17 +60,17 @@ static bool isLoadStore(uint32_t *p);
  * where we want to write the address offset to. Thus decoding as well
  * as encoding is needed.
  */
-bool fitsBits(size_t bits, int64_t value);
-int64_t decodeAddend(ObjectCode * oc, Section * section,
+static bool fitsBits(size_t bits, int64_t value);
+static int64_t decodeAddend(ObjectCode * oc, Section * section,
                      MachORelocationInfo * ri);
-void encodeAddend(ObjectCode * oc, Section * section,
+static void encodeAddend(ObjectCode * oc, Section * section,
                   MachORelocationInfo * ri, int64_t addend);
 
 /* Global Offset Table logic */
-bool isGotLoad(MachORelocationInfo * ri);
-bool needGotSlot(MachONList * symbol);
-bool makeGot(ObjectCode * oc);
-void freeGot(ObjectCode * oc);
+static bool isGotLoad(MachORelocationInfo * ri);
+static bool needGotSlot(MachONList * symbol);
+static bool makeGot(ObjectCode * oc);
+static void freeGot(ObjectCode * oc);
 #endif /* aarch64_HOST_ARCH */
 
 /*
@@ -265,7 +265,7 @@ resolveImports(
 #if defined(aarch64_HOST_ARCH)
 /* aarch64 linker by moritz angermann <moritz@lichtzwerge.de> */
 
-int64_t
+static int64_t
 signExtend(uint64_t val, uint8_t bits) {
     return (int64_t)(val << (64-bits)) >> (64-bits);
 }
@@ -280,7 +280,7 @@ isLoadStore(uint32_t *p) {
     return (*p & 0x3B000000) == 0x39000000;
 }
 
-int64_t
+static int64_t
 decodeAddend(ObjectCode * oc, Section * section, MachORelocationInfo * ri) {
 
     /* the instruction. It is 32bit wide */
@@ -350,7 +350,7 @@ decodeAddend(ObjectCode * oc, Section * section, MachORelocationInfo * ri) {
     barf("unsupported relocation type: %d\n", ri->r_type);
 }
 
-inline bool
+inline static bool
 fitsBits(size_t bits, int64_t value) {
     if(bits == 64) return true;
     if(bits > 64) barf("fits_bits with %zu bits and an 64bit integer!", bits);
@@ -358,7 +358,7 @@ fitsBits(size_t bits, int64_t value) {
         || -1 == (value >> bits);  // All bits on: -1
 }
 
-void
+static void
 encodeAddend(ObjectCode * oc, Section * section,
              MachORelocationInfo * ri, int64_t addend) {
     uint32_t * p = (uint32_t*)((uint8_t*)section->start + ri->r_address);
@@ -440,7 +440,7 @@ encodeAddend(ObjectCode * oc, Section * section,
     barf("unsupported relocation type: %d\n", ri->r_type);
 }
 
-bool
+static bool
 isGotLoad(struct relocation_info * ri) {
     return ri->r_type == ARM64_RELOC_GOT_LOAD_PAGE21
     ||  ri->r_type == ARM64_RELOC_GOT_LOAD_PAGEOFF12;
@@ -450,7 +450,7 @@ isGotLoad(struct relocation_info * ri) {
  * Check if we need a global offset table slot for a
  * given symbol
  */
-bool
+static bool
 needGotSlot(MachONList * symbol) {
     return (symbol->n_type & N_EXT)             /* is an external symbol      */
         && (N_UNDF == (symbol->n_type & N_TYPE) /* and is undefined           */
@@ -458,7 +458,7 @@ needGotSlot(MachONList * symbol) {
                                                  *        different section   */
 }
 
-bool
+static bool
 makeGot(ObjectCode * oc) {
     size_t got_slots = 0;
 
@@ -484,7 +484,7 @@ makeGot(ObjectCode * oc) {
     return EXIT_SUCCESS;
 }
 
-void
+static void
 freeGot(ObjectCode * oc) {
     /* sanity check */
     if(NULL != oc->info->got_start && oc->info->got_size > 0) {
