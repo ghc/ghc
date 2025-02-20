@@ -79,14 +79,14 @@ static int virtualQuery(void *baseAddr, PMEMORY_BASIC_INFORMATION info)
 {
     int res = VirtualQuery (baseAddr, info, sizeof (*info));
     IF_DEBUG(linker_verbose,
-        debugBelch("Probing region 0x%p (0x%p) - 0x%p (%" FMT_SizeT ") [%ld] with base 0x%p\n",
-                   baseAddr,
-                   info->BaseAddress,
-                   (uint8_t *) info->BaseAddress + info->RegionSize,
-                   info->RegionSize, info->State,
-                   info->AllocationBase));
+        linkerDebug("Probing region 0x%p (0x%p) - 0x%p (%" FMT_SizeT ") [%ld] with base 0x%p",
+                    baseAddr,
+                    info->BaseAddress,
+                    (uint8_t *) info->BaseAddress + info->RegionSize,
+                    info->RegionSize, info->State,
+                    info->AllocationBase));
     if (!res) {
-        IF_DEBUG(linker_verbose, debugBelch("Querying 0x%p failed. Aborting..\n", baseAddr));
+        IF_DEBUG(linker_verbose, linkerDebug("Querying 0x%p failed. Aborting..", baseAddr));
         return 1;
     }
     return 0;
@@ -108,7 +108,7 @@ static void *allocateBytes(void* baseAddr, void *endAddr, size_t sz, size_t *req
     SYSTEM_INFO sys;
     GetSystemInfo(&sys);
 
-    IF_DEBUG(linker_verbose, debugBelch("Requesting mapping of %" FMT_SizeT " bytes between %p and %p\n",
+    IF_DEBUG(linker_verbose, linkerDebug("Requesting mapping of %" FMT_SizeT " bytes between %p and %p",
                                 sz, baseAddr, endAddr));
 
     MEMORY_BASIC_INFORMATION info;
@@ -124,26 +124,26 @@ static void *allocateBytes(void* baseAddr, void *endAddr, size_t sz, size_t *req
         }
 
         if ((info.State & MEM_FREE) == MEM_FREE) {
-            IF_DEBUG(linker_verbose, debugBelch("Free range at 0x%p of %zu bytes\n",
+            IF_DEBUG(linker_verbose, linkerDebug("Free range at 0x%p of %zu bytes",
                                         info.BaseAddress, info.RegionSize));
 
             if (info.RegionSize >= sz) {
                 if (info.AllocationBase == 0) {
                     size_t needed_sz = round_up (sz, sys.dwAllocationGranularity);
                     if (info.RegionSize >= needed_sz) {
-                        IF_DEBUG(linker_verbose, debugBelch("Range is unmapped, Allocation "
-                                                    "required by granule...\n"));
+                        IF_DEBUG(linker_verbose, linkerDebug("Range is unmapped, Allocation "
+                                                    "required by granule..."));
                         *req = needed_sz;
                         region
                         = (void*)(uintptr_t)round_up ((uintptr_t)initialAddr,
                                                         sys.dwAllocationGranularity);
-                        IF_DEBUG(linker_verbose, debugBelch("Requested %" PRId64 ", rounded: %"
-                                                    PRId64 ".\n", sz, *req));
-                        IF_DEBUG(linker_verbose, debugBelch("Aligned region claimed 0x%p -> "
-                                                    "0x%p.\n", initialAddr, region));
+                        IF_DEBUG(linker_verbose, linkerDebug("Requested %" PRId64 ", rounded: %"
+                                                    PRId64 ".", sz, *req));
+                        IF_DEBUG(linker_verbose, linkerDebug("Aligned region claimed 0x%p -> "
+                                                    "0x%p.", initialAddr, region));
                     }
                 } else {
-                    IF_DEBUG(linker_verbose, debugBelch("Range is usable for us, claiming...\n"));
+                    IF_DEBUG(linker_verbose, linkerDebug("Range is usable for us, claiming..."));
                     *req = sz;
                     region = initialAddr;
                 }
@@ -292,13 +292,13 @@ doMmap(void *map_addr, size_t bytes, int prot, uint32_t flags, int fd, int offse
     flags |= MAP_PRIVATE;
 
     IF_DEBUG(linker_verbose,
-             debugBelch("mmapForLinker: \tprotection %#0x\n", prot));
+             linkerDebug("mmapForLinker: \tprotection %#0x", prot));
     IF_DEBUG(linker_verbose,
-             debugBelch("mmapForLinker: \tflags      %#0x\n", flags));
+             linkerDebug("mmapForLinker: \tflags      %#0x", flags));
     IF_DEBUG(linker_verbose,
-             debugBelch("mmapForLinker: \tsize       %#0zx\n", bytes));
+             linkerDebug("mmapForLinker: \tsize       %#0zx", bytes));
     IF_DEBUG(linker_verbose,
-             debugBelch("mmapForLinker: \tmap_addr   %p\n", map_addr));
+             linkerDebug("mmapForLinker: \tmap_addr   %p", map_addr));
 
     void * result = mmap(map_addr, bytes, prot, flags, fd, offset);
     if (result == MAP_FAILED) {
@@ -389,7 +389,7 @@ mmapForLinker (size_t bytes, MemoryAccess access, uint32_t flags, int fd, int of
     bytes = roundUpToPage(bytes);
     struct MemoryRegion *region;
 
-    IF_DEBUG(linker_verbose, debugBelch("mmapForLinker: start\n"));
+    IF_DEBUG(linker_verbose, linkerDebugStart("mmapForLinker"));
     if (RtsFlags.MiscFlags.linkerAlwaysPic) {
         /* make no attempt at mapping low memory if we are assuming PIC */
         region = NULL;
@@ -410,10 +410,10 @@ mmapForLinker (size_t bytes, MemoryAccess access, uint32_t flags, int fd, int of
         result = mmapAnywhere(bytes, access, flags, fd, offset);
     }
     IF_DEBUG(linker_verbose,
-             debugBelch("mmapForLinker: mapped %zd bytes starting at %p\n",
-                        bytes, result));
+             linkerDebug("mmapForLinker: mapped %zd bytes starting at %p",
+                         bytes, result));
     IF_DEBUG(linker_verbose,
-             debugBelch("mmapForLinker: done\n"));
+             linkerDebugEnd("mmapForLinker"));
     return result;
 }
 
@@ -475,8 +475,8 @@ void mprotectForLinker(void *start, size_t len, MemoryAccess mode)
         return;
     }
     IF_DEBUG(linker_verbose,
-             debugBelch("mprotectForLinker: protecting %" FMT_Word
-                        " bytes starting at %p as %s\n",
+             linkerDebug("mprotectForLinker: protecting %" FMT_Word
+                        " bytes starting at %p as %s",
                         (W_)len, start, memoryAccessDescription(mode)));
 
     int prot = memoryAccessToProt(mode);
