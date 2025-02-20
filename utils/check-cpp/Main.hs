@@ -511,6 +511,7 @@ t18 = do
         [ "#define FOO(A,B) A + B"
         , "#define FOO(A,B,C) A + B + C"
         , "#if FOO(1,FOO(3,4)) == 8"
+        , ""
         , "-- a comment"
         , "x = 1"
         , "#else"

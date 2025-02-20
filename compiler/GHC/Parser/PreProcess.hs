@@ -13,6 +13,7 @@ module GHC.Parser.PreProcess (
     dumpGhcCpp,
 ) where
 
+import Data.List (intercalate, sortBy)
 import Data.Map qualified as Map
 import Debug.Trace (trace)
 import GHC.Data.FastString
@@ -23,15 +24,126 @@ import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
 import GHC.Parser.Lexer qualified as Lexer
 import GHC.Parser.PreProcess.Macro
 import GHC.Parser.PreProcess.ParsePP
+import GHC.Parser.PreProcess.ParserM qualified as PM
 import GHC.Parser.PreProcess.State
 import GHC.Prelude
 import GHC.Types.SrcLoc
-import GHC.Utils.Outputable (SDoc)
+import GHC.Utils.Outputable (SDoc, text)
+import GHC.Utils.Panic.Plain (panic)
 
 -- ---------------------------------------------------------------------
 
 dumpGhcCpp :: PState PpState -> SDoc
-dumpGhcCpp pst = undefined
+dumpGhcCpp pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
+  where
+    -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
+    (pst_final, bare_toks) = lexAll pst
+    comments = reverse (Lexer.comment_q pst_final)
+    -- We are going to addSourceToTokens, only need the location
+    to_tok (L (EpaSpan l) _) = L l (ITunknown "-")
+    to_tok (L (EpaDelta l _ _) _) = L l (ITunknown "-")
+    comments_as_toks = map to_tok comments
+    defines = showDefines (pp_defines (pp pst_final))
+    sepa = "\n------------------------------\n"
+    startLoc = mkRealSrcLoc (srcLocFile (psRealLoc $ loc pst)) 1 1
+    buf1 = (buffer pst){cur = 0}
+    all_toks = sortBy cmpBs (bare_toks ++ comments_as_toks)
+    toks = addSourceToTokens startLoc buf1 all_toks
+    final = renderCombinedToks toks
+
+cmpBs :: Located Token -> Located Token -> Ordering
+cmpBs (L (RealSrcSpan _ (Strict.Just bs1)) _) (L (RealSrcSpan _ (Strict.Just bs2)) _) =
+    compare bs1 bs2
+cmpBs (L (RealSrcSpan r1 _) _) (L (RealSrcSpan r2 _) _) =
+    compare r1 r2
+cmpBs _ _ = EQ
+
+renderCombinedToks :: [(Located Token, String)] -> String
+renderCombinedToks toks = showCppTokenStream toks
+
+-- ---------------------------------------------------------------------
+-- addSourceToTokens copied here to unbreak an import loop.
+-- It should probably move somewhere else
+
+{- | Given a source location and a StringBuffer corresponding to this
+location, return a rich token stream with the source associated to the
+tokens.
+-}
+addSourceToTokens ::
+    RealSrcLoc ->
+    StringBuffer ->
+    [Located Token] ->
+    [(Located Token, String)]
+addSourceToTokens _ _ [] = []
+addSourceToTokens loc buf (t@(L span _) : ts) =
+    case span of
+        UnhelpfulSpan _ -> (t, "") : addSourceToTokens loc buf ts
+        RealSrcSpan s _ -> (t, str) : addSourceToTokens newLoc newBuf ts
+          where
+            (newLoc, newBuf, str) = go "" loc buf
+            start = realSrcSpanStart s
+            end = realSrcSpanEnd s
+            go acc loc buf
+                | loc < start = go acc nLoc nBuf
+                | start <= loc && loc < end = go (ch : acc) nLoc nBuf
+                | otherwise = (loc, buf, reverse acc)
+              where
+                (ch, nBuf) = nextChar buf
+                nLoc = advanceSrcLoc loc ch
+
+-- ---------------------------------------------------------------------
+
+-- Tweaked from showRichTokenStream
+showCppTokenStream :: [(Located Token, String)] -> String
+showCppTokenStream ts0 = go startLoc ts0 ""
+  where
+    sourceFile = getFile $ map (getLoc . fst) ts0
+    getFile [] = panic "showCppTokenStream: No source file found"
+    getFile (UnhelpfulSpan _ : xs) = getFile xs
+    getFile (RealSrcSpan s _ : _) = srcSpanFile s
+    startLoc = mkRealSrcLoc sourceFile 0 1
+    go _ [] = id
+    go loc ((L span' tok, str) : ts) =
+        case span' of
+            UnhelpfulSpan _ -> go loc ts
+            RealSrcSpan s _
+                | locLine == tokLine ->
+                    ((replicate (tokCol - locCol) ' ') ++)
+                        . (str ++)
+                        . go tokEnd ts
+                | otherwise ->
+                    ((replicate (tokLine - locLine) '\n') ++)
+                        . (extra ++)
+                        . ((replicate (tokCol - 1) ' ') ++)
+                        . (str ++)
+                        . go tokEnd ts
+              where
+                (locLine, locCol) = (srcLocLine loc, srcLocCol loc)
+                (tokLine, tokCol) = (srcSpanStartLine s, srcSpanStartCol s)
+                tokEnd = realSrcSpanEnd s
+                extra = case tok of
+                    ITunknown _ -> "- |"
+                    _ -> "  |"
+
+showDefines :: MacroDefines -> String
+showDefines defines = Map.foldlWithKey' (\acc k d -> acc ++ "\n" ++ renderDefine k d) "" defines
+  where
+    renderDefine :: String -> (Map.Map (Maybe Int) ((Maybe MacroArgs), MacroDef)) -> String
+    renderDefine k defs = Map.foldl' (\acc d -> acc ++ "\n" ++ renderArity k d) "" defs
+
+    renderArity :: String -> ((Maybe MacroArgs), MacroDef) -> String
+    renderArity n (Nothing, rhs) =
+        "#define " ++ n ++ " " ++ (intercalate " " (map PM.t_str rhs))
+    renderArity n (Just args, rhs) =
+        "#define " ++ n ++ "(" ++ (intercalate "," args) ++ ") " ++ (intercalate " " (map PM.t_str rhs))
+
+lexAll :: Lexer.PState PpState -> (Lexer.PState PpState, [Located Token])
+lexAll state = case unP (lexer True return) state of
+    POk s t@(L _ ITeof) -> (s, [t])
+    POk state' t -> (ss, t : rest)
+      where
+        (ss, rest) = lexAll state'
+    PFailed _pst -> panic $ "GHC.Parser.PreProcess.lexAll failed"
 
 -- ---------------------------------------------------------------------
 
