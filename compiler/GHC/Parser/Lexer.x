@@ -325,7 +325,6 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 <bol> {
   \n                                    ;
   -- Ghc CPP symbols
-  ^\# \ * @cppkeyword  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag }
   ^\# \ * @cppkeyword  .*    / { ifExtension GhcCppBit } { cppToken cpp_prag }
 
   ^\# line                              { begin line_prag1 }
@@ -343,7 +342,6 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \{ / { notFollowedBy '-' }            { hopefully_open_brace }
         -- we might encounter {-# here, but {- has been handled already
   \n                                    ;
-  ^\# \ * @cppkeyword  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag }
   ^\# \ * @cppkeyword  .*    / { ifExtension GhcCppBit } { cppToken cpp_prag }
 
   ^\# (line)?                           { begin line_prag1 }
@@ -371,9 +369,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
 -- CPP continuation lines. Keep concatenating, or exit
 <cpp_prag> {
-  .* \\ \n                   { cppTokenCont (ITcpp True) }
   .* \\                      { cppTokenCont (ITcpp True) }
-  -- .* \n                      { cppTokenPop  (ITcpp False) }
   .*                       { cppTokenPop  (ITcpp False) }
   -- () { popCpp }
 }
