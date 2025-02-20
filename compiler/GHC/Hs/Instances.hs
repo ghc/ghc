@@ -110,9 +110,6 @@ deriving instance Data (HsPatSynDir GhcPs)
 deriving instance Data (HsPatSynDir GhcRn)
 deriving instance Data (HsPatSynDir GhcTc)
 
-deriving instance Data (HsMultAnn GhcPs)
-deriving instance Data (HsMultAnn GhcRn)
-deriving instance Data (HsMultAnn GhcTc)
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Decls ----------------------------------
 
@@ -536,13 +533,13 @@ deriving instance Data (HsTyLit GhcPs)
 deriving instance Data (HsTyLit GhcRn)
 deriving instance Data (HsTyLit GhcTc)
 
--- deriving instance (Data mult, DataIdLR p p) => Data (HsMultAnnOn mult p)
-deriving instance Data (HsMultAnnOn (LocatedA (HsType GhcPs)) GhcPs)
-deriving instance Data (HsMultAnnOn (LocatedA (HsType GhcRn)) GhcRn)
-deriving instance Data (HsMultAnnOn (LocatedA (HsType GhcTc)) GhcTc)
-deriving instance Data (HsMultAnnOn (LocatedA (HsExpr GhcPs)) GhcPs)
-deriving instance Data (HsMultAnnOn (LocatedA (HsExpr GhcRn)) GhcRn)
-deriving instance Data (HsMultAnnOn (LocatedA (HsExpr GhcTc)) GhcTc)
+-- deriving instance (Data mult, DataIdLR p p) => Data (HsMultAnnOf mult p)
+deriving instance Data (HsMultAnnOf (LocatedA (HsType GhcPs)) GhcPs)
+deriving instance Data (HsMultAnnOf (LocatedA (HsType GhcRn)) GhcRn)
+deriving instance Data (HsMultAnnOf (LocatedA (HsType GhcRn)) GhcTc)
+deriving instance Data (HsMultAnnOf (LocatedA (HsExpr GhcPs)) GhcPs)
+deriving instance Data (HsMultAnnOf (LocatedA (HsExpr GhcRn)) GhcRn)
+deriving instance Data (HsMultAnnOf (LocatedA (HsExpr GhcTc)) GhcTc)
 
 -- deriving instance (Data a, Data b) => Data (HsArg p a b)
 deriving instance (Data a, Data b) => Data (HsArg GhcPs a b)

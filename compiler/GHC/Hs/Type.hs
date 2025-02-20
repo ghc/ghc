@@ -25,11 +25,11 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 
 module GHC.Hs.Type (
         Mult,
-        HsArrow, HsArrowOf, HsMultAnnOn(..), HsMultAnnOnWhat(..),
-        pattern HsUnrestrictedArrow, multAnnToHsType, expandHsMultAnnOn,
+        HsArrow, HsArrowOf, HsMultAnn, HsMultAnnOf(..), HsMultAnnOnWhat(..),
+        pattern HsUnrestrictedArrow, multAnnToHsType, expandHsMultAnnOf,
         EpLinear(..), EpArrowOrColon(..),
         hsNoMultAnn, isUnrestricted,
-        pprHsArrow,
+        pprHsArrow, pprHsMultAnn,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsTypeGhcPsExt(..),
@@ -525,6 +525,7 @@ from the data in HsConDeclField.
 data EpArrowOrColon
   = EpArrow !TokRarrow
   | EpColon !TokDcolon
+  | EpPatBind
   deriving Data
 
 data EpLinear
@@ -537,43 +538,47 @@ instance NoAnn EpLinear where
 
 type instance XUnannotated  _ GhcPs = EpArrowOrColon
 type instance XUnannotated  _ GhcRn = NoExtField
-type instance XUnannotated  _ GhcTc = NoExtField
+type instance XUnannotated  _ GhcTc = Mult
 
 type instance XLinearAnn    _ GhcPs = EpLinear
 type instance XLinearAnn    _ GhcRn = NoExtField
-type instance XLinearAnn    _ GhcTc = NoExtField
+type instance XLinearAnn    _ GhcTc = Mult
 
 type instance XExplicitMult _ GhcPs = (EpToken "%", EpArrowOrColon)
 type instance XExplicitMult _ GhcRn = NoExtField
-type instance XExplicitMult _ GhcTc = NoExtField
+type instance XExplicitMult _ GhcTc = Mult
 
 type instance XXMultAnnOn   _ (GhcPass _) = DataConCantHappen
 
-hsNoMultAnn :: HsMultAnnOnWhat -> HsMultAnnOn (LHsType GhcPs) GhcPs
+hsNoMultAnn :: HsMultAnnOnWhat -> HsMultAnnOf (LHsType GhcPs) GhcPs
 hsNoMultAnn OnArrow = HsUnannotated OnArrow (EpArrow noAnn)
 hsNoMultAnn OnConField = HsUnannotated OnConField (EpColon noAnn)
+hsNoMultAnn OnPatBind = HsUnannotated OnPatBind EpPatBind
 
 isUnrestricted :: HsArrow GhcRn -> Bool
 isUnrestricted (multAnnToHsType -> L _ (HsTyVar _ _ (L _ n))) = n == manyDataConName
 isUnrestricted _ = False
 
-multAnnToHsType :: HsMultAnnOn (LHsType GhcRn) GhcRn -> LHsType GhcRn
-multAnnToHsType = expandHsMultAnnOn (HsTyVar noAnn NotPromoted)
+multAnnToHsType :: HsMultAnn GhcRn -> LHsType GhcRn
+multAnnToHsType = expandHsMultAnnOf (HsTyVar noAnn NotPromoted)
 
 -- | Convert an multiplicity annotation into its corresponding multiplicity.
 -- In essence this erases the information of whether the programmer wrote an explicit
 -- multiplicity or a shorthand.
 -- In this polymorphic function, `t` can be `HsType` or `HsExpr`
-expandHsMultAnnOn :: (LocatedN Name -> t GhcRn)
-                  -> HsMultAnnOn (LocatedA (t GhcRn)) GhcRn
+expandHsMultAnnOf :: (LocatedN Name -> t GhcRn)
+                  -> HsMultAnnOf (LocatedA (t GhcRn)) GhcRn
                   -> LocatedA (t GhcRn)
-expandHsMultAnnOn mk_var (HsUnannotated onWhat _) = noLocA (mk_var (noLocA mult))
+expandHsMultAnnOf mk_var (HsUnannotated onWhat _) = noLocA (mk_var (noLocA mult))
   where
     mult = case onWhat of
       OnArrow    -> manyDataConName
       OnConField -> oneDataConName
-expandHsMultAnnOn mk_var (HsLinearAnn _) = noLocA (mk_var (noLocA oneDataConName))
-expandHsMultAnnOn _mk_var (HsExplicitMult _ p) = p
+      OnPatBind  -> manyDataConName
+        -- This last case is not used, and should actually be a unification variable.
+        -- See `tcMultAnnOnPatBind`.
+expandHsMultAnnOf mk_var (HsLinearAnn _) = noLocA (mk_var (noLocA oneDataConName))
+expandHsMultAnnOf _mk_var (HsExplicitMult _ p) = p
 
 instance
       (Outputable mult, OutputableBndrId pass) =>
@@ -586,6 +591,15 @@ pprHsArrow (HsUnannotated _ _)  = pprArrowWithMultiplicity visArgTypeLike (Left 
 pprHsArrow (HsLinearAnn _)      = pprArrowWithMultiplicity visArgTypeLike (Left True)
 pprHsArrow (HsExplicitMult _ p) = pprArrowWithMultiplicity visArgTypeLike (Right (ppr p))
 
+-- Used to print, for instance, let bindings:
+--   let %1 x = …
+-- and record field declarations:
+--   { x %1 :: … }
+pprHsMultAnn :: forall id. OutputableBndrId id => HsMultAnn (GhcPass id) -> SDoc
+pprHsMultAnn (HsUnannotated _ _) = empty
+pprHsMultAnn (HsLinearAnn _) = text "%1"
+pprHsMultAnn (HsExplicitMult _ p) = text "%" <> ppr p
+
 type instance XConDeclRecField  (GhcPass _) = NoExtField
 type instance XXConDeclRecField (GhcPass _) = DataConCantHappen
 
@@ -597,11 +611,8 @@ instance OutputableBndrId p
       ppr_names [n] = pprPrefixOcc n
       ppr_names ns = sep (punctuate comma (map pprPrefixOcc ns))
 
-      ppr_mult :: HsMultAnnOn (LHsType (GhcPass p)) (GhcPass p) -> SDoc -> SDoc
-      ppr_mult mult tyDoc = case mult of
-        HsUnannotated _ _ -> dcolon <+> tyDoc
-        HsLinearAnn _ -> text "%1" <+> dcolon <+> tyDoc
-        HsExplicitMult _ p -> text "%" <> ppr p <+> dcolon <+> tyDoc
+      ppr_mult :: HsMultAnn (GhcPass p) -> SDoc -> SDoc
+      ppr_mult mult tyDoc = pprHsMultAnn mult <+> dcolon <+> tyDoc
 
 ---------------------
 hsWcScopedTvs :: LHsSigWcType GhcRn -> [Name]
@@ -1308,7 +1319,7 @@ instance (Outputable tyarg, Outputable arg, Outputable rec)
   ppr (InfixCon l r)          = text "InfixCon:" <+> ppr [l, r]
 
 pprHsConDeclFieldWith :: (OutputableBndrId p)
-                      => (HsMultAnnOn (LHsType (GhcPass p)) (GhcPass p) -> SDoc -> SDoc)
+                      => (HsMultAnn (GhcPass p) -> SDoc -> SDoc)
                       -> HsConDeclField (GhcPass p) -> SDoc
 pprHsConDeclFieldWith ppr_mult (CDF _ prag mark mult ty doc) =
   pprMaybeWithDoc doc (ppr_mult mult (ppr prag <+> ppr mark <> ppr ty))
@@ -1319,7 +1330,7 @@ pprHsConDeclFieldNoMult = pprHsConDeclFieldWith (\_ d -> d)
 hsPlainTypeField :: LHsType GhcPs -> HsConDeclField GhcPs
 hsPlainTypeField = mkConDeclField (HsUnannotated OnConField (EpColon noAnn))
 
-mkConDeclField :: HsMultAnnOn (LHsType GhcPs) GhcPs -> LHsType GhcPs -> HsConDeclField GhcPs
+mkConDeclField :: HsMultAnn GhcPs -> LHsType GhcPs -> HsConDeclField GhcPs
 mkConDeclField mult (L _ (HsDocTy _ ty lds)) = (mkConDeclField mult ty) { cdf_doc = Just lds }
 mkConDeclField mult (L _ (XHsType (HsBangTy ann (HsSrcBang srcTxt unp str) t))) = CDF (ann, srcTxt) unp str mult t Nothing
 mkConDeclField mult t = CDF noAnn NoSrcUnpack NoSrcStrict mult t Nothing

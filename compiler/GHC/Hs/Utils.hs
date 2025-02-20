@@ -135,7 +135,7 @@ import GHC.Core.ConLike
 import GHC.Core.Make   ( mkChunkified )
 import GHC.Core.Type   ( Type, isUnliftedType )
 
-import GHC.Builtin.Types ( unitTy )
+import GHC.Builtin.Types ( unitTy, manyDataConTy )
 
 import GHC.Types.Id
 import GHC.Types.Name
@@ -632,7 +632,7 @@ nlHsFunTy a b = noLocA (HsFunTy noExtField (HsUnrestrictedArrow x) a b)
     x = case ghcPass @p of
       GhcPs -> EpArrow noAnn
       GhcRn -> noExtField
-      GhcTc -> noExtField
+      GhcTc -> manyDataConTy
 nlHsParTy t   = noLocA (HsParTy noAnn t)
 
 nlHsTyConApp :: forall p a. IsSrcSpanAnn p a

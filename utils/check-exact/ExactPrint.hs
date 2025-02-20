@@ -2319,8 +2319,7 @@ instance ExactPrint (HsBind GhcPs) where
     return (FunBind x fun_id' matches')
 
   exact (PatBind x pat q grhss) = do
-    q' <- markAnnotated q
-    pat' <- markAnnotated pat
+    (q', pat') <- markMultAnnOn q (markAnnotated pat)
     grhss' <- markAnnotated grhss
     return (PatBind x pat' q' grhss')
   exact (PatSynBind x bind) = do
@@ -2328,19 +2327,6 @@ instance ExactPrint (HsBind GhcPs) where
     return (PatSynBind x bind')
 
   exact x = error $ "HsBind: exact for " ++ showAst x
-
-instance ExactPrint (HsMultAnn GhcPs) where
-  getAnnotationEntry _ = NoEntryVal
-  setAnnotationAnchor a _ _ _ = a
-
-  exact (HsNoMultAnn x) = return (HsNoMultAnn x)
-  exact (HsPct1Ann tok) = do
-      tok' <- markEpToken tok
-      return (HsPct1Ann tok')
-  exact (HsMultAnn tok ty) = do
-      tok' <- markEpToken tok
-      ty' <- markAnnotated ty
-      return (HsMultAnn tok' ty')
 
 -- ---------------------------------------------------------------------
 
@@ -4397,7 +4383,7 @@ instance ExactPrint (HsConDeclField GhcPs) where
     (mult, (an, t)) <- markMultAnnOn cdf_multiplicity ((,) <$> exactBang cdf_ext cdf_bang <*> markAnnotated cdf_type)
     return (cdf { cdf_ext = an, cdf_multiplicity = mult, cdf_type = t })
 
-markMultAnnOn :: (Monad m, Monoid w, ExactPrint a) => HsMultAnnOn a GhcPs -> EP w m b -> EP w m (HsMultAnnOn a GhcPs, b)
+markMultAnnOn :: (Monad m, Monoid w, ExactPrint a) => HsMultAnnOf a GhcPs -> EP w m b -> EP w m (HsMultAnnOf a GhcPs, b)
 markMultAnnOn (HsUnannotated on arrOrCol) tyM = do
   ((), arrOrCol', ty') <- markArrOrCol (pure ()) arrOrCol tyM
   return (HsUnannotated on arrOrCol', ty')
@@ -4423,6 +4409,10 @@ markArrOrCol multM (EpColon col) tyM = do
   col' <- markEpUniToken col
   ty' <- tyM
   return (mult', EpColon col', ty')
+markArrOrCol multM EpPatBind patM = do
+  mult' <- multM
+  pat' <- patM
+  return (mult', EpPatBind, pat')
 
 exactBang :: (Monoid w, Monad m) => XConDeclField GhcPs -> SrcStrictness -> EP w m (XConDeclField GhcPs)
 exactBang ((o,c,tk), mt) str = do

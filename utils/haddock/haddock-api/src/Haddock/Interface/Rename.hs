@@ -340,7 +340,7 @@ renameMaybeInjectivityAnn
   -> RnM (Maybe (LInjectivityAnn DocNameI))
 renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
-renameMultAnnOn :: HsMultAnnOn (LHsType GhcRn) GhcRn -> RnM (HsMultAnnOn (LHsType DocNameI) DocNameI)
+renameMultAnnOn :: HsMultAnn GhcRn -> RnM (HsMultAnn DocNameI)
 renameMultAnnOn (HsUnannotated on _) = return (HsUnannotated on noExtField)
 renameMultAnnOn (HsLinearAnn _) = return (HsLinearAnn noExtField)
 renameMultAnnOn (HsExplicitMult _ p) = HsExplicitMult noExtField <$> renameLType p

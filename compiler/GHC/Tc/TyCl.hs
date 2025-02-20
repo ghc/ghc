@@ -4009,7 +4009,7 @@ tcRecHsConDeclRecFields exp_kind fields
     exploded = concatMap explode combined
     (_,btys) = unzip exploded
 
-tcDataConMult :: HsMultAnnOn (LHsType GhcRn) GhcRn -> TcM Mult
+tcDataConMult :: HsMultAnn GhcRn -> TcM Mult
 tcDataConMult arr@(HsUnrestrictedArrow _) = do
   -- See Note [Function arrows in GADT constructors]
   linearEnabled <- xoptM LangExt.LinearTypes

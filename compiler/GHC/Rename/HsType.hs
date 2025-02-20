@@ -14,7 +14,7 @@ module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
         rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType, rnHsTyLit, rnHsMultAnnOnWith,
+        rnHsSigType, rnHsWcType, rnHsTyLit, rnHsMultAnnWith,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsPatSigKind,
         newTyVarNameRn,
         rnHsConDeclRecFields,
@@ -457,7 +457,7 @@ rnHsConDeclField doc = rnHsConDeclFieldTyKi (mkTyKiEnv doc TypeLevel RnTypeBody)
 rnHsConDeclFieldTyKi :: RnTyKiEnv -> HsConDeclField GhcPs
                      -> RnM (HsConDeclField GhcRn, FreeVars)
 rnHsConDeclFieldTyKi env cdf@(CDF { cdf_multiplicity, cdf_type, cdf_doc }) = do
-  (w , fvs_w) <- rnHsMultAnnOn env cdf_multiplicity
+  (w , fvs_w) <- rnHsMultAnnWith (rnLHsTyKi env) cdf_multiplicity
   (ty, fvs) <- rnLHsTyKi env cdf_type
   doc <- traverse rnLHsDoc cdf_doc
   return (cdf { cdf_multiplicity = w, cdf_type = ty, cdf_doc = doc }, fvs `plusFV` fvs_w)
@@ -575,7 +575,7 @@ rnHsTyKi env (HsParTy _ ty)
 rnHsTyKi env (HsFunTy u mult ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
-       ; (mult', w_fvs) <- rnHsMultAnnOn env mult
+       ; (mult', w_fvs) <- rnHsMultAnnWith (rnLHsTyKi env) mult
        ; return (HsFunTy u mult' ty1' ty2'
                 , plusFVs [fvs1, fvs2, w_fvs]) }
 
@@ -700,15 +700,12 @@ rnHsTyLit tyLit@(HsNumTy x i) = do
 rnHsTyLit (HsCharTy x c) = pure (HsCharTy x c)
 
 
-rnHsMultAnnOn :: RnTyKiEnv -> HsMultAnnOn (LHsType GhcPs) GhcPs -> RnM (HsMultAnnOn (LHsType GhcRn) GhcRn, FreeVars)
-rnHsMultAnnOn env = rnHsMultAnnOnWith (rnLHsTyKi env)
-
-rnHsMultAnnOnWith :: (LocatedA (mult GhcPs) -> RnM (LocatedA (mult GhcRn), FreeVars))
-                  -> HsMultAnnOn (LocatedA (mult GhcPs)) GhcPs
-                  -> RnM (HsMultAnnOn (LocatedA (mult GhcRn)) GhcRn, FreeVars)
-rnHsMultAnnOnWith _rn (HsUnannotated on _) = pure (HsUnannotated on noExtField, emptyFVs)
-rnHsMultAnnOnWith _rn (HsLinearAnn _) = pure (HsLinearAnn noExtField, emptyFVs)
-rnHsMultAnnOnWith rn (HsExplicitMult _ p)
+rnHsMultAnnWith :: (LocatedA (mult GhcPs) -> RnM (LocatedA (mult GhcRn), FreeVars))
+                  -> HsMultAnnOf (LocatedA (mult GhcPs)) GhcPs
+                  -> RnM (HsMultAnnOf (LocatedA (mult GhcRn)) GhcRn, FreeVars)
+rnHsMultAnnWith _rn (HsUnannotated on _) = pure (HsUnannotated on noExtField, emptyFVs)
+rnHsMultAnnWith _rn (HsLinearAnn _) = pure (HsLinearAnn noExtField, emptyFVs)
+rnHsMultAnnWith rn (HsExplicitMult _ p)
   =  (\(mult, fvs) -> (HsExplicitMult noExtField mult, fvs)) <$> rn p
 
 {-
@@ -2050,7 +2047,7 @@ extract_scaled_ltys args acc = foldr extract_scaled_lty acc args
 extract_scaled_lty :: HsConDeclField GhcPs
                    -> FreeKiTyVars -> FreeKiTyVars
 extract_scaled_lty (CDF { cdf_multiplicity, cdf_type }) acc
-  = extract_lty cdf_type $ extract_hs_mult_ann_on cdf_multiplicity acc
+  = extract_lty cdf_type $ extract_hs_mult_ann cdf_multiplicity acc
 
 extract_ltys :: [LHsType GhcPs] -> FreeKiTyVars -> FreeKiTyVars
 extract_ltys tys acc = foldr extract_lty acc tys
@@ -2067,7 +2064,7 @@ extract_lty (L _ ty) acc
       HsTupleTy _ _ tys           -> extract_ltys tys acc
       HsSumTy _ tys               -> extract_ltys tys acc
       HsFunTy _ m ty1 ty2         -> extract_lty ty1 $
-                                     extract_hs_mult_ann_on m $ -- See Note [Ordering of implicit variables]
+                                     extract_hs_mult_ann m $ -- See Note [Ordering of implicit variables]
                                      extract_lty ty2 acc
       HsIParamTy _ _ ty           -> extract_lty ty acc
       HsOpTy _ _ ty1 tv ty2       -> extract_lty ty1 $
@@ -2108,9 +2105,9 @@ extract_lhs_sig_ty :: LHsSigType GhcPs -> FreeKiTyVars
 extract_lhs_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
   extractHsOuterTvBndrs outer_bndrs $ extract_lty body []
 
-extract_hs_mult_ann_on :: HsMultAnnOn (LHsType GhcPs) GhcPs -> FreeKiTyVars -> FreeKiTyVars
-extract_hs_mult_ann_on (HsExplicitMult _ p) acc = extract_lty p acc
-extract_hs_mult_ann_on _ acc = acc
+extract_hs_mult_ann :: HsMultAnn GhcPs -> FreeKiTyVars -> FreeKiTyVars
+extract_hs_mult_ann (HsExplicitMult _ p) acc = extract_lty p acc
+extract_hs_mult_ann _ acc = acc
 
 extract_hs_for_all_telescope :: HsForAllTelescope GhcPs
                              -> FreeKiTyVars -- Accumulator

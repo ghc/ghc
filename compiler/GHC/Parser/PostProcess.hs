@@ -1376,7 +1376,7 @@ checkValDef loc lhs (mult, Just (sigAnn, sig)) grhss
        checkPatBind loc lhs' grhss mult
 
 checkValDef loc lhs (mult_ann, Nothing) grhss
-  | HsNoMultAnn{} <- mult_ann
+  | HsUnannotated{} <- mult_ann
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
             Just (fun, is_infix, pats, ops, cps) -> do
@@ -1437,7 +1437,7 @@ checkPatBind :: SrcSpan
              -> HsMultAnn GhcPs
              -> P (HsBind GhcPs)
 checkPatBind loc (L _ (BangPat an (L _ (VarPat _ v))))
-                        (L _match_span grhss) (HsNoMultAnn _)
+                        (L _match_span grhss) (HsUnannotated _ _)
       = return (makeFunBind v (L (noAnnSrcSpan loc)
                 [L (noAnnSrcSpan loc) (m an v)]))
   where
@@ -3490,16 +3490,6 @@ mkLHsOpTy prom x op y =
   let loc = locA x `combineSrcSpans` locA op `combineSrcSpans` locA y
   in L (noAnnSrcSpan loc) (mkHsOpTy prom x op y)
 
-mkMultTy :: EpToken "%" -> LHsType GhcPs -> TokRarrow -> HsArrow GhcPs
-mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) arr
-  -- See #18888 for the use of (SourceText "1") above
-  = HsLinearAnn (EpPct1 pct1 (EpArrow arr))
-  where
-    -- The location of "%" combined with the location of "1".
-    pct1 :: EpToken "%1"
-    pct1 = epTokenWidenR pct (locA (getLoc t))
-mkMultTy pct t arr = HsExplicitMult (pct, EpArrow arr) t
-
 mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> TokRarrow -> HsArrowOf (LHsExpr GhcPs) GhcPs
 mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpackFS -> "1")) _ 1))))) arr
   -- See #18888 for the use of (SourceText "1") above
@@ -3510,25 +3500,21 @@ mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpac
     pct1 = epTokenWidenR pct (locA (getLoc t))
 mkMultExpr pct t arr = HsExplicitMult (pct, EpArrow arr) t
 
-mkMultAnn :: EpToken "%" -> LHsType GhcPs -> HsMultAnn GhcPs
-mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1)))
+mkMultTy :: EpToken "%" -> LHsType GhcPs -> TokRarrow -> HsArrow GhcPs
+mkMultTy pct t arr = mkMultAnn pct t (EpArrow arr)
+
+mkMultAnn :: EpToken "%" -> LHsType GhcPs -> EpArrowOrColon -> HsMultAnn GhcPs
+mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) ep
   -- See #18888 for the use of (SourceText "1") above
-  = HsPct1Ann pct1
+  = HsLinearAnn (EpPct1 pct1 ep)
   where
     -- The location of "%" combined with the location of "1".
     pct1 :: EpToken "%1"
     pct1 = epTokenWidenR pct (locA (getLoc t))
-mkMultAnn pct t = HsMultAnn pct t
+mkMultAnn pct t ep = HsExplicitMult (pct, ep) t
 
 mkMultField :: EpToken "%" -> LHsType GhcPs -> TokDcolon -> LHsType GhcPs -> HsConDeclField GhcPs
-mkMultField pct (L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) col t
-  -- See #18888 for the use of (SourceText "1") above
-  = mkConDeclField (HsLinearAnn (EpPct1 pct1 (EpColon col))) t
-  where
-    -- The location of "%" combined with the location of "1".
-    pct1 :: EpToken "%1"
-    pct1 = epTokenWidenR pct (locA (getLoc t))
-mkMultField pct mult col t = mkConDeclField (HsExplicitMult (pct, EpColon col) mult) t
+mkMultField pct mult col t = mkConDeclField (mkMultAnn pct mult (EpColon col)) t
 
 mkTokenLocation :: SrcSpan -> TokenLocation
 mkTokenLocation (UnhelpfulSpan _) = NoTokenLoc

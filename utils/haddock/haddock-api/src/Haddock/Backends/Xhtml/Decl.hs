@@ -1543,7 +1543,8 @@ ppSideBySideField subdocs unicode qual (HsConDeclRecField _ names ltype) =
           , let field = (foExt) name
           ]
       )
-      <+> ppRecFieldMultAnn unicode qual ltype (dcolon unicode)
+      <+> ppRecFieldMultAnn unicode qual ltype
+      <+> dcolon unicode
       <+> ppLType unicode qual HideEmptyContexts (hsConDeclFieldToHsTypeNoMult ltype)
   , mbDoc
   , []
@@ -1556,16 +1557,17 @@ ppSideBySideField subdocs unicode qual (HsConDeclRecField _ names ltype) =
 
 -- don't use cdf_doc for same reason we don't use con_doc above
 -- Where there is more than one name, they all have the same documentation
-ppRecFieldMultAnn :: Unicode -> Qualification -> HsConDeclField DocNameI -> Html -> Html
-ppRecFieldMultAnn unicode qual (CDF { cdf_multiplicity = ann }) following = case ann of
-  HsUnannotated _ _ -> following
-  HsLinearAnn _ -> toHtml "%1" <+> following
-  HsExplicitMult _ mult -> multAnnotation <> ppr_mono_lty mult unicode qual HideEmptyContexts <+> following
+ppRecFieldMultAnn :: Unicode -> Qualification -> HsConDeclField DocNameI -> Html
+ppRecFieldMultAnn unicode qual (CDF { cdf_multiplicity = ann }) = case ann of
+  HsUnannotated _ _ -> noHtml
+  HsLinearAnn _ -> toHtml "%1"
+  HsExplicitMult _ mult -> multAnnotation <> ppr_mono_lty mult unicode qual HideEmptyContexts
 
 ppShortField :: Bool -> Unicode -> Qualification -> HsConDeclRecField DocNameI -> Html
 ppShortField summary unicode qual (HsConDeclRecField _ names ltype) =
   hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . foExt . unLoc) names))
-    <+> ppRecFieldMultAnn unicode qual ltype (dcolon unicode)
+    <+> ppRecFieldMultAnn unicode qual ltype
+    <+> dcolon unicode
     <+> ppLType unicode qual HideEmptyContexts (hsConDeclFieldToHsTypeNoMult ltype)
 
 -- | Pretty print an expanded pattern (for bundled patterns)

@@ -989,7 +989,7 @@ synifyMult vs t = case t of
   ManyTy -> HsUnrestrictedArrow noExtField
   ty -> HsExplicitMult noExtField (synifyType WithinType vs ty)
 
-synifyMultRec :: [TyVar] -> Mult -> HsMultAnnOn (LHsType GhcRn) GhcRn
+synifyMultRec :: [TyVar] -> Mult -> HsMultAnn GhcRn
 synifyMultRec vs t = case t of
   OneTy -> HsUnannotated OnConField noExtField
   ty -> HsExplicitMult noExtField (synifyType WithinType vs ty)

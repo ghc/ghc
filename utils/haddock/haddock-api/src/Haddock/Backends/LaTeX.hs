@@ -1034,7 +1034,8 @@ ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> HsConDeclRecFiel
 ppSideBySideField subdocs unicode (HsConDeclRecField _ names ltype) =
   decltt
     ( cat (punctuate comma (map (ppBinder . rdrNameOcc . foExt . unLoc) names))
-        <+> ppRecFieldMultAnn unicode ltype (dcolon unicode)
+        <+> ppRecFieldMultAnn unicode ltype
+        <+> dcolon unicode
         <+> ppLType unicode (hsConDeclFieldToHsTypeNoMult ltype)
     )
     <-> rDoc mbDoc
@@ -1047,11 +1048,11 @@ ppSideBySideField subdocs unicode (HsConDeclRecField _ names ltype) =
 
 -- don't use cdf_doc for same reason we don't use con_doc above
 -- Where there is more than one name, they all have the same documentation
-ppRecFieldMultAnn :: Bool -> HsConDeclField DocNameI -> LaTeX -> LaTeX
-ppRecFieldMultAnn unicode (CDF { cdf_multiplicity = ann }) following = case ann of
-  HsUnannotated _ _ -> following
-  HsLinearAnn _ -> text "%1" <+> following
-  HsExplicitMult _ mult -> multAnnotation <> ppr_mono_lty mult unicode <+> following
+ppRecFieldMultAnn :: Bool -> HsConDeclField DocNameI -> LaTeX
+ppRecFieldMultAnn unicode (CDF { cdf_multiplicity = ann }) = case ann of
+  HsUnannotated _ _ -> empty
+  HsLinearAnn _ -> text "%1"
+  HsExplicitMult _ mult -> multAnnotation <> ppr_mono_lty mult unicode
 
 -- | Pretty-print a bundled pattern synonym
 ppSideBySidePat

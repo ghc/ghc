@@ -22,7 +22,7 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 module Language.Haskell.Syntax.Type (
-        HsArrow, HsArrowOf, HsMultAnnOn(..), HsMultAnnOnWhat(..),
+        HsArrow, HsArrowOf, HsMultAnn, HsMultAnnOf(..), HsMultAnnOnWhat(..),
         pattern HsUnrestrictedArrow,
         XUnannotated, XLinearAnn, XExplicitMult, XXMultAnnOn,
 
@@ -913,22 +913,23 @@ data HsTyLit pass
   | HsCharTy (XCharTy pass) Char
   | XTyLit   !(XXTyLit pass)
 
-type HsArrow pass = HsArrowOf (LHsType pass) pass
-type HsArrowOf = HsMultAnnOn
+type HsMultAnn pass = HsMultAnnOf (LHsType (NoGhcTc pass)) pass
+type HsArrow pass = HsMultAnn pass
+type HsArrowOf = HsMultAnnOf
 
-pattern HsUnrestrictedArrow :: XUnannotated mult pass -> HsMultAnnOn mult pass
+pattern HsUnrestrictedArrow :: XUnannotated mult pass -> HsMultAnnOf mult pass
 pattern HsUnrestrictedArrow a = HsUnannotated OnArrow a
 
--- HsMultAnnOn is used both to represent function arrows and multiplicity annotations
--- in the data declaration syntax. But the default multiplicity is different
--- between the two uses. In constructors, the default is One, but on arrows, the
--- default is Many. (But note that non-record GADT syntax follows the default of arrows.)
--- `HsMultAnnOnWhat` is used to distinguish between the two uses.
-data HsMultAnnOnWhat = OnArrow | OnConField
+-- HsMultAnnOf is used both to represent multiplicity annotations in various places.
+-- But the default multiplicity differs between the uses. In constructors, the default is One,
+-- on arrows, the default is Many and in pattern bindings the default is to be polymorphic.
+-- (Note that non-record GADT syntax follows the default of arrows.)
+-- `HsMultAnnOnWhat` is used to distinguish between the uses.
+data HsMultAnnOnWhat = OnArrow | OnConField | OnPatBind
   deriving Data
 
 -- | Denotes multiplicity annotations in the surface language
-data HsMultAnnOn mult pass
+data HsMultAnnOf mult pass
   = HsUnannotated !HsMultAnnOnWhat !(XUnannotated mult pass)
     -- ^ a -> b or a → b or { nm :: a }
 
@@ -1097,7 +1098,7 @@ data HsConDeclField pass
           -- E.g. data T a = MkT !a
           --   or data T a where MtT :: !a -> T a
 
-        , cdf_multiplicity :: HsMultAnnOn (LHsType pass) pass
+        , cdf_multiplicity :: HsMultAnn pass
           -- ^ User-specified multiplicity, if any
           -- E.g. data T a = MkT { t %Many :: a }
           --   or data T a where MtT :: a %1 -> T a
