@@ -38,8 +38,6 @@ dumpGhcCpp pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
     comments_as_toks = map to_tok comments
     defines = showDefines (pp_defines (pp pst_final))
     sepa = "\n------------------------------\n"
-    -- buf = (buffer pst){cur = 0}
-    -- orig = lexemeToString buf (len buf)
     startLoc = mkRealSrcLoc (srcLocFile (psRealLoc $ loc pst)) 1 1
     buf1 = (buffer pst){cur = 0}
     all_toks = sortBy cmpBs (bare_toks ++ comments_as_toks)
@@ -88,14 +86,6 @@ showCppTokenStream ts0 = go startLoc ts0 ""
                     ITunknown _ -> "- |"
                     _ -> "  |"
 
-ghcCommentText :: EpaComment -> String
-ghcCommentText (GHC.EpaComment (EpaDocComment s) _) = exactPrintHsDocString s
-ghcCommentText (GHC.EpaComment (EpaDocOptions s) _) = s
-ghcCommentText (GHC.EpaComment (EpaLineComment s) _) = s
-ghcCommentText (GHC.EpaComment (EpaBlockComment s) _) = s
-ghcCommentText (GHC.EpaComment (EpaCppIgnored [L _ s]) _) = s
-ghcCommentText (GHC.EpaComment (EpaCppIgnored _) _) = ""
-
 showDefines :: MacroDefines -> String
 showDefines defines = Map.foldlWithKey' (\acc k d -> acc ++ "\n" ++ renderDefine k d) "" defines
   where
@@ -109,7 +99,7 @@ showDefines defines = Map.foldlWithKey' (\acc k d -> acc ++ "\n" ++ renderDefine
         "#define " ++ n ++ "(" ++ (intercalate "," args) ++ ") " ++ (intercalate " " (map PM.t_str rhs))
 
 lexAll :: Lexer.PState PpState -> (Lexer.PState PpState, [Located Token])
-lexAll state = case unP (lexerDbg True return) state of
+lexAll state = case unP (lexer True return) state of
     POk s t@(L _ ITeof) -> (s, [t])
     POk state' t -> (ss, t : rest)
       where
