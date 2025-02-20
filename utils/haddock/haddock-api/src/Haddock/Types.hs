@@ -842,7 +842,7 @@ type instance XXBndrVis DocNameI = DataConCantHappen
 type instance XUnannotated _ DocNameI = NoExtField
 type instance XLinearAnn _ DocNameI = NoExtField
 type instance XExplicitMult _ DocNameI = NoExtField
-type instance XXMultAnnOn _ DocNameI = DataConCantHappen
+type instance XXMultAnnOf _ DocNameI = DataConCantHappen
 
 type instance XForAllTy DocNameI = EpAnn NoEpAnns
 type instance XQualTy DocNameI = EpAnn NoEpAnns

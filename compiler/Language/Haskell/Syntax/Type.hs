@@ -24,7 +24,7 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 module Language.Haskell.Syntax.Type (
         HsArrow, HsArrowOf, HsMultAnn, HsMultAnnOf(..), HsMultAnnOnWhat(..),
         pattern HsUnrestrictedArrow,
-        XUnannotated, XLinearAnn, XExplicitMult, XXMultAnnOn,
+        XUnannotated, XLinearAnn, XExplicitMult, XXMultAnnOf,
 
         HsType(..), LHsType, HsKind, LHsKind,
         HsBndrVis(..), XBndrRequired, XBndrInvisible, XXBndrVis,
@@ -943,12 +943,12 @@ data HsMultAnnOf mult pass
     -- `HsType` so as to preserve the syntax as written in the
     -- program.
 
-  | XMultAnnOn !(XXMultAnnOn mult pass)
+  | XMultAnnOf !(XXMultAnnOf mult pass)
 
 type family XUnannotated  mult p
 type family XLinearAnn    mult p
 type family XExplicitMult mult p
-type family XXMultAnnOn   mult p
+type family XXMultAnnOf   mult p
 
 {-
 Note [Unit tuples]
@@ -1121,7 +1121,7 @@ data HsConDeclField pass
 * GADT-style declarations with record syntax
   e.g.  data T3 a where MkT :: { x :: Maybe a, y :: !Int } -> T3 a
 
-These argument types are decorated with any user-defined
+Each argument type is decorated with any user-defined
   a) UNPACK pragma `cdf_unpack`
   b) strictness annotation `cdf_bang`
   c) multiplicity annotation `cdf_multiplicity`

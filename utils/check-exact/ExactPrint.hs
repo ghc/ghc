@@ -2319,7 +2319,7 @@ instance ExactPrint (HsBind GhcPs) where
     return (FunBind x fun_id' matches')
 
   exact (PatBind x pat q grhss) = do
-    (q', pat') <- markMultAnnOn q (markAnnotated pat)
+    (q', pat') <- markMultAnnOf q (markAnnotated pat)
     grhss' <- markAnnotated grhss
     return (PatBind x pat' q' grhss')
   exact (PatSynBind x bind) = do
@@ -3132,7 +3132,7 @@ instance ExactPrint (HsExpr GhcPs) where
     return (HsEmbTy toktype' t')
 
   exact (HsFunArr _ mult arg res) = do
-    (mult', arg') <- markMultAnnOn mult (markAnnotated arg)
+    (mult', arg') <- markMultAnnOf mult (markAnnotated arg)
     res' <- markAnnotated res
     return (HsFunArr noExtField mult' arg' res')
 
@@ -3940,7 +3940,7 @@ instance ExactPrint (HsType GhcPs) where
     ki' <- markAnnotated ki
     return (HsAppKindTy at' ty' ki')
   exact (HsFunTy an mult ty1 ty2) = do
-    (mult', ty1') <- markMultAnnOn mult (markAnnotated ty1)
+    (mult', ty1') <- markMultAnnOf mult (markAnnotated ty1)
     ty2' <- markAnnotated ty2
     return (HsFunTy an mult' ty1' ty2')
   exact (HsListTy an tys) = do
@@ -4380,21 +4380,21 @@ instance ExactPrint (HsConDeclField GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
   exact cdf@(CDF { cdf_ext, cdf_bang, cdf_multiplicity, cdf_type }) = do
-    (mult, (an, t)) <- markMultAnnOn cdf_multiplicity ((,) <$> exactBang cdf_ext cdf_bang <*> markAnnotated cdf_type)
+    (mult, (an, t)) <- markMultAnnOf cdf_multiplicity ((,) <$> exactBang cdf_ext cdf_bang <*> markAnnotated cdf_type)
     return (cdf { cdf_ext = an, cdf_multiplicity = mult, cdf_type = t })
 
-markMultAnnOn :: (Monad m, Monoid w, ExactPrint a) => HsMultAnnOf a GhcPs -> EP w m b -> EP w m (HsMultAnnOf a GhcPs, b)
-markMultAnnOn (HsUnannotated on arrOrCol) tyM = do
+markMultAnnOf :: (Monad m, Monoid w, ExactPrint a) => HsMultAnnOf a GhcPs -> EP w m b -> EP w m (HsMultAnnOf a GhcPs, b)
+markMultAnnOf (HsUnannotated on arrOrCol) tyM = do
   ((), arrOrCol', ty') <- markArrOrCol (pure ()) arrOrCol tyM
   return (HsUnannotated on arrOrCol', ty')
-markMultAnnOn (HsLinearAnn (EpPct1 pct1 arrOrCol)) tyM = do
+markMultAnnOf (HsLinearAnn (EpPct1 pct1 arrOrCol)) tyM = do
   (pct1', arrOrCol', ty') <- markArrOrCol (markEpToken pct1) arrOrCol tyM
   return (HsLinearAnn (EpPct1 pct1' arrOrCol'), ty')
-markMultAnnOn (HsLinearAnn (EpLolly arr)) tyM = do
+markMultAnnOf (HsLinearAnn (EpLolly arr)) tyM = do
   ty' <- tyM
   arr' <- markEpToken arr
   return (HsLinearAnn (EpLolly arr'), ty')
-markMultAnnOn (HsExplicitMult (pct, arrOrCol) t) tyM = do
+markMultAnnOf (HsExplicitMult (pct, arrOrCol) t) tyM = do
   ((pct', t'), arrOrCol', ty') <- markArrOrCol ((,) <$> markEpToken pct <*> markAnnotated t) arrOrCol tyM
   return (HsExplicitMult (pct', arrOrCol') t', ty')
 

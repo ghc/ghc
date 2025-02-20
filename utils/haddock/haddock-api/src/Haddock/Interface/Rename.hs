@@ -340,10 +340,10 @@ renameMaybeInjectivityAnn
   -> RnM (Maybe (LInjectivityAnn DocNameI))
 renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
-renameMultAnnOn :: HsMultAnn GhcRn -> RnM (HsMultAnn DocNameI)
-renameMultAnnOn (HsUnannotated on _) = return (HsUnannotated on noExtField)
-renameMultAnnOn (HsLinearAnn _) = return (HsLinearAnn noExtField)
-renameMultAnnOn (HsExplicitMult _ p) = HsExplicitMult noExtField <$> renameLType p
+renameMultAnn :: HsMultAnn GhcRn -> RnM (HsMultAnn DocNameI)
+renameMultAnn (HsUnannotated on _) = return (HsUnannotated on noExtField)
+renameMultAnn (HsLinearAnn _) = return (HsLinearAnn noExtField)
+renameMultAnn (HsExplicitMult _ p) = HsExplicitMult noExtField <$> renameLType p
 
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of
@@ -374,7 +374,7 @@ renameType t = case t of
   HsFunTy _ w a b -> do
     a' <- renameLType a
     b' <- renameLType b
-    w' <- renameMultAnnOn w
+    w' <- renameMultAnn w
     return (HsFunTy noAnn w' a' b')
   HsListTy _ ty -> return . (HsListTy noAnn) =<< renameLType ty
   HsIParamTy _ n ty -> liftM (HsIParamTy noAnn n) (renameLType ty)
@@ -720,7 +720,7 @@ renameHsConDeclField
   :: HsConDeclField GhcRn
   -> RnM (HsConDeclField DocNameI)
 renameHsConDeclField cdf = do
-  w <- renameMultAnnOn (cdf_multiplicity cdf)
+  w <- renameMultAnn (cdf_multiplicity cdf)
   ty <- renameLType (cdf_type cdf)
   doc <- mapM renameLDocHsSyn (cdf_doc cdf)
   return

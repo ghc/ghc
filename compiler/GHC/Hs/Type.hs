@@ -548,7 +548,7 @@ type instance XExplicitMult _ GhcPs = (EpToken "%", EpArrowOrColon)
 type instance XExplicitMult _ GhcRn = NoExtField
 type instance XExplicitMult _ GhcTc = Mult
 
-type instance XXMultAnnOn   _ (GhcPass _) = DataConCantHappen
+type instance XXMultAnnOf   _ (GhcPass _) = DataConCantHappen
 
 hsNoMultAnn :: HsMultAnnOnWhat -> HsMultAnnOf (LHsType GhcPs) GhcPs
 hsNoMultAnn OnArrow = HsUnannotated OnArrow (EpArrow noAnn)
