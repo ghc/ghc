@@ -627,6 +627,7 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                     barf("explicit_addend and addend can't be set at the same time.");
                 uint64_t pc = (uint64_t)section->start + ri->r_address;
                 uint64_t value = (uint64_t)(isGotLoad(ri) ? symbol->got_addr : symbol->addr);
+                ASSERT(!isGotLoad(ri) || (symbol->got_addr != 0));
                 encodeAddend(oc, section, ri, ((value + addend + explicit_addend) & (-4096)) - (pc & (-4096)));
 
                 // reset, just in case.
@@ -640,6 +641,7 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                 if(!(explicit_addend == 0 || addend == 0))
                     barf("explicit_addend and addend can't be set at the same time.");
                 uint64_t value = (uint64_t)(isGotLoad(ri) ? symbol->got_addr : symbol->addr);
+                ASSERT(!isGotLoad(ri) || (symbol->got_addr != 0));
                 encodeAddend(oc, section, ri, 0xFFF & (value + addend + explicit_addend));
 
                 // reset, just in case.
