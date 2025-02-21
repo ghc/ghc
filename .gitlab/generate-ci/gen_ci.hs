@@ -1276,7 +1276,7 @@ cross_jobs = [
     make_wasm_jobs cfg =
       modifyJobs
         ( delVariable "BROKEN_TESTS"
-            . setVariable "HADRIAN_ARGS" "--docs=none"
+            . setVariable "HADRIAN_ARGS" "--docs=no-sphinx-pdfs --docs=no-sphinx-man --haddock-for-hackage"
             . delVariable "INSTALL_CONFIGURE_ARGS"
         )
         $ addValidateRule WasmBackend $ validateBuilds Amd64 (Linux AlpineWasm) cfg
