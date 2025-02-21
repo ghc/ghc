@@ -1108,6 +1108,28 @@ lower_CMO_Un_Homo lbl op [reg] [x] = do
       x_instr `WasmConcat` WasmCCall op `WasmConcat` WasmLocalSet ty ri
 lower_CMO_Un_Homo _ _ _ _ = panic "lower_CMO_Un_Homo: unreachable"
 
+-- | Lower an unary homogeneous 'CallishMachOp' to a primitive operation.
+lower_CMO_Un_Homo_Prim ::
+  CLabel ->
+  ( forall pre t.
+    WasmTypeTag t ->
+    WasmInstr
+      w
+      (t : pre)
+      (t : pre)
+  ) ->
+  WasmTypeTag t ->
+  [CmmFormal] ->
+  [CmmActual] ->
+  WasmCodeGenM w (WasmStatements w)
+lower_CMO_Un_Homo_Prim lbl op ty [reg] [x] = do
+  (ri, _) <- onCmmLocalReg reg
+  WasmExpr x_instr <- lower_CmmExpr_Typed lbl ty x
+  pure $
+    WasmStatements $
+      x_instr `WasmConcat` op ty `WasmConcat` WasmLocalSet ty ri
+lower_CMO_Un_Homo_Prim _ _ _ _ _ = panic "lower_CMO_Bin_Homo_Prim: unreachable"
+
 -- | Lower a binary homogeneous 'CallishMachOp' to a ccall.
 lower_CMO_Bin_Homo ::
   CLabel ->
@@ -1211,8 +1233,8 @@ lower_CallishMachOp lbl MO_F64_Log rs xs = lower_CMO_Un_Homo lbl "log" rs xs
 lower_CallishMachOp lbl MO_F64_Log1P rs xs = lower_CMO_Un_Homo lbl "log1p" rs xs
 lower_CallishMachOp lbl MO_F64_Exp rs xs = lower_CMO_Un_Homo lbl "exp" rs xs
 lower_CallishMachOp lbl MO_F64_ExpM1 rs xs = lower_CMO_Un_Homo lbl "expm1" rs xs
-lower_CallishMachOp lbl MO_F64_Fabs rs xs = lower_CMO_Un_Homo lbl "fabs" rs xs
-lower_CallishMachOp lbl MO_F64_Sqrt rs xs = lower_CMO_Un_Homo lbl "sqrt" rs xs
+lower_CallishMachOp lbl MO_F64_Fabs rs xs = lower_CMO_Un_Homo_Prim lbl WasmAbs TagF64 rs xs
+lower_CallishMachOp lbl MO_F64_Sqrt rs xs = lower_CMO_Un_Homo_Prim lbl WasmSqrt TagF64 rs xs
 lower_CallishMachOp lbl MO_F32_Pwr rs xs = lower_CMO_Bin_Homo lbl "powf" rs xs
 lower_CallishMachOp lbl MO_F32_Sin rs xs = lower_CMO_Un_Homo lbl "sinf" rs xs
 lower_CallishMachOp lbl MO_F32_Cos rs xs = lower_CMO_Un_Homo lbl "cosf" rs xs
@@ -1235,8 +1257,8 @@ lower_CallishMachOp lbl MO_F32_Log1P rs xs =
 lower_CallishMachOp lbl MO_F32_Exp rs xs = lower_CMO_Un_Homo lbl "expf" rs xs
 lower_CallishMachOp lbl MO_F32_ExpM1 rs xs =
   lower_CMO_Un_Homo lbl "expm1f" rs xs
-lower_CallishMachOp lbl MO_F32_Fabs rs xs = lower_CMO_Un_Homo lbl "fabsf" rs xs
-lower_CallishMachOp lbl MO_F32_Sqrt rs xs = lower_CMO_Un_Homo lbl "sqrtf" rs xs
+lower_CallishMachOp lbl MO_F32_Fabs rs xs = lower_CMO_Un_Homo_Prim lbl WasmAbs TagF32 rs xs
+lower_CallishMachOp lbl MO_F32_Sqrt rs xs = lower_CMO_Un_Homo_Prim lbl WasmSqrt TagF32 rs xs
 lower_CallishMachOp lbl (MO_UF_Conv w0) rs xs = lower_MO_UF_Conv lbl w0 rs xs
 lower_CallishMachOp _ MO_AcquireFence _ _ = pure $ WasmStatements WasmNop
 lower_CallishMachOp _ MO_ReleaseFence _ _ = pure $ WasmStatements WasmNop
