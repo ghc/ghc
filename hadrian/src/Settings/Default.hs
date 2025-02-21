@@ -156,6 +156,7 @@ stage1Packages = do
         , ghcInternal
         , ghcPkg
         , ghcPrim
+        , haddock
         , haskeline
         , hp2ps
         , hsc2hs
@@ -174,8 +175,7 @@ stage1Packages = do
         , if winTarget then win32 else unix
         ]
       , when (not cross)
-        [ haddock
-        , hpcBin
+        [ hpcBin
         , iserv
         , runGhc
         , ghcToolchainBin
