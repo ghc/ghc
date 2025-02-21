@@ -11,6 +11,7 @@ import Data.List
   ( intercalate,
     stripPrefix,
   )
+import Data.List qualified
 import Data.Maybe
 import GHC.Builtin.Names
 import GHC.Builtin.Types
@@ -46,6 +47,9 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import Language.Haskell.Syntax.Basic
 
+data Synchronicity = Sync | Async
+  deriving (Eq)
+
 dsWasmJSImport ::
   Id ->
   Coercion ->
@@ -53,10 +57,15 @@ dsWasmJSImport ::
   Safety ->
   DsM ([Binding], CHeader, CStub, [Id])
 dsWasmJSImport id co (CFunction (StaticTarget _ js_src mUnitId _)) safety
-  | js_src == "wrapper" = dsWasmJSDynamicExport id co mUnitId
+  | js_src == "wrapper" = dsWasmJSDynamicExport Async id co mUnitId
+  | js_src == "wrapper sync" = dsWasmJSDynamicExport Sync id co mUnitId
   | otherwise = do
-      (bs, h, c) <- dsWasmJSStaticImport id co (unpackFS js_src) mUnitId safety
+      (bs, h, c) <- dsWasmJSStaticImport id co (unpackFS js_src) mUnitId sync
       pure (bs, h, c, [])
+  where
+    sync = case safety of
+      PlayRisky -> Sync
+      _ -> Async
 dsWasmJSImport _ _ _ _ = panic "dsWasmJSImport: unreachable"
 
 {-
@@ -77,17 +86,24 @@ We desugar it to three bindings under the hood:
 mk_wrapper_worker :: StablePtr HsFuncType -> HsFuncType
 mk_wrapper_worker sp = unsafeDupablePerformIO (deRefStablePtr sp)
 
-No need to bother with eta-expansion here. Also, the worker function
-is marked as a JSFFI static export.
+The worker function is marked as a JSFFI static export. It turns a
+dynamic export to a static one by prepending a StablePtr to the
+argument list.
+
+We don't actually generate a Core binding for the worker function
+though; the JSFFI static export C stub generation logic would just
+generate a function that doesn't need to refer to the worker Id's
+closure. This is not just for convenience, it's actually required for
+correctness, see #25473.
 
 2. The adjustor function
 
 foreign import javascript unsafe "(...args) => __exports.mk_wrapper_worker($1, ...args)"
   mk_wrapper_adjustor :: StablePtr HsFuncType -> IO JSVal
 
-It generates a JavaScript callback that captures the stable pointer.
-When the callback is invoked later, it calls our worker function and
-passes the stable pointer as well as the rest of the arguments.
+Now that mk_wrapper_worker is exported in __exports, we need to make a
+JavaScript callback that invokes mk_wrapper_worker with the right
+StablePtr as well as the rest of the arguments.
 
 3. The wrapper function
 
@@ -102,43 +118,47 @@ a StablePtr# field which is NULL by default, but for JSFFI dynamic
 exports, it's set to the Haskell function's stable pointer. This way,
 when we call freeJSVal, the Haskell function can be freed as well.
 
+By default, JSFFI exports are async JavaScript functions. One can use
+"wrapper sync" instead of "wrapper" to indicate the Haskell function
+is meant to be exported as a sync JavaScript function. All the
+comments above still hold, with only only difference:
+mk_wrapper_worker is exported as a sync function. See
+Note [Desugaring JSFFI static export] for further details.
+
 -}
 
 dsWasmJSDynamicExport ::
-  Id -> Coercion -> Maybe Unit -> DsM ([Binding], CHeader, CStub, [Id])
-dsWasmJSDynamicExport fn_id co mUnitId = do
+  Synchronicity ->
+  Id ->
+  Coercion ->
+  Maybe Unit ->
+  DsM ([Binding], CHeader, CStub, [Id])
+dsWasmJSDynamicExport sync fn_id co mUnitId = do
   sp_tycon <- dsLookupTyCon stablePtrTyConName
   let ty = coercionLKind co
       (tv_bndrs, fun_ty) = tcSplitForAllTyVarBinders ty
       ([Scaled ManyTy arg_ty], io_jsval_ty) = tcSplitFunTys fun_ty
       sp_ty = mkTyConApp sp_tycon [arg_ty]
-      (real_arg_tys, _) = tcSplitFunTys arg_ty
   sp_id <- newSysLocalMDs sp_ty
-  work_uniq <- newUnique
-  work_export_name <- uniqueCFunName
-  deRefStablePtr_id <- lookupGhcInternalVarId "GHC.Internal.Stable" "deRefStablePtr"
+  work_export_name <- unpackFS <$> uniqueCFunName
+  deRefStablePtr_id <-
+    lookupGhcInternalVarId
+      "GHC.Internal.Stable"
+      "deRefStablePtr"
   unsafeDupablePerformIO_id <-
     lookupGhcInternalVarId
       "GHC.Internal.IO.Unsafe"
       "unsafeDupablePerformIO"
-  let work_id =
-        mkExportedVanillaId
-          ( mkExternalName
-              work_uniq
-              (nameModule $ getName fn_id)
-              (mkVarOcc $ "jsffi_" ++ occNameString (getOccName fn_id) ++ "_work")
-              generatedSrcSpan
-          )
-          work_ty
-      work_rhs =
+  let work_rhs =
         mkCoreLams ([tv | Bndr tv _ <- tv_bndrs] ++ [sp_id])
           $ mkApps
             (Var unsafeDupablePerformIO_id)
             [Type arg_ty, mkApps (Var deRefStablePtr_id) [Type arg_ty, Var sp_id]]
       work_ty = exprType work_rhs
   (work_h, work_c, _, work_ids, work_bs) <-
-    dsWasmJSExport
-      work_id
+    dsWasmJSExport'
+      sync
+      Nothing
       (mkRepReflCo work_ty)
       work_export_name
   adjustor_uniq <- newUnique
@@ -157,21 +177,18 @@ dsWasmJSDynamicExport fn_id co mUnitId = do
           adjustor_ty
       adjustor_ty = mkForAllTys tv_bndrs $ mkVisFunTysMany [sp_ty] io_jsval_ty
       adjustor_js_src =
-        "("
-          ++ intercalate "," ["a" ++ show i | i <- [1 .. length real_arg_tys]]
-          ++ ") => __exports."
-          ++ unpackFS work_export_name
-          ++ "($1"
-          ++ mconcat [",a" ++ show i | i <- [1 .. length real_arg_tys]]
-          ++ ")"
+        "(...args) => __exports." ++ work_export_name ++ "($1, ...args)"
   (adjustor_bs, adjustor_h, adjustor_c) <-
     dsWasmJSStaticImport
       adjustor_id
       (mkRepReflCo adjustor_ty)
       adjustor_js_src
       mUnitId
-      PlayRisky
-  mkJSCallback_id <- lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Exports" "mkJSCallback"
+      Sync
+  mkJSCallback_id <-
+    lookupGhcInternalVarId
+      "GHC.Internal.Wasm.Prim.Exports"
+      "mkJSCallback"
   let wrap_rhs =
         mkCoreLams [tv | Bndr tv _ <- tv_bndrs]
           $ mkApps
@@ -182,7 +199,7 @@ dsWasmJSDynamicExport fn_id co mUnitId = do
                 [Type $ mkTyVarTy tv | Bndr tv _ <- tv_bndrs]
             ]
   pure
-    ( [(fn_id, Cast wrap_rhs co), (work_id, work_rhs)] ++ work_bs ++ adjustor_bs,
+    ( [(fn_id, Cast wrap_rhs co)] ++ work_bs ++ adjustor_bs,
       work_h `mappend` adjustor_h,
       work_c `mappend` adjustor_c,
       work_ids
@@ -194,7 +211,7 @@ Note [Desugaring JSFFI import]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The simplest case is JSFFI sync import, those marked as unsafe. It is
-implemented on top of C FFI unsafe import.
+implemented on top of C FFI safe import.
 
 Unlike C FFI which generates a worker/wrapper pair that unboxes the
 arguments and boxes the result in Haskell, we only desugar to a single
@@ -202,10 +219,11 @@ Haskell binding that case-binds the arguments to ensure they're
 evaluated, then passes the boxed arguments directly to C and receive
 the boxed result from C as well.
 
-This is of course less efficient than how C FFI does it, and unboxed
-FFI types aren't supported, but it's the easiest way to implement it,
+This is slightly less efficient than how C FFI does it, and unboxed
+FFI types aren't supported, but it's the simplest way to implement it,
 especially since leaving all the boxing/unboxing business to C unifies
-the implementation of JSFFI imports and exports.
+the implementation of JSFFI imports and exports
+(rts_mkJSVal/rts_getJSVal).
 
 Now, each sync import calls a generated C function with a unique
 symbol. The C function uses rts_get* to unbox the arguments, call into
@@ -240,6 +258,14 @@ module. Note that above is assembly source file, but we're only
 generating a C stub, so we need to smuggle the assembly code into C
 via __asm__.
 
+The C FFI import that calls the generated C function is always marked
+as safe. There is some extra overhead, but this allows re-entrance by
+Haskell -> JavaScript -> Haskell function calls with each call being a
+synchronous one. It's possible to steal the "interruptible" keyword to
+indicate async imports, "safe" for sync imports and "unsafe" for sync
+imports sans the safe C FFI overhead, but it's simply not worth the
+extra complexity.
+
 JSFFI async import is implemented on top of JSFFI sync import. We
 still desugar it to a single Haskell binding that calls C, with some
 subtle differences:
@@ -250,12 +276,6 @@ subtle differences:
   "($1, $2)". As you can see, it is the arrow function binder, and the
   post-linker will respect the async binder and allow await in the
   function body.
-- The C import is also marked as safe. This is required since the
-  JavaScript code may re-enter Haskell. If re-entrance only happens in
-  future event loop tasks, it's fine to mark the C import as unsafe
-  since the current Haskell execution context has already been freed
-  at that point, but there's no such guarantee, so better safe than
-  sorry here.
 
 Now we have the Promise JSVal, we apply stg_blockPromise to it to get
 a thunk with the desired return type. When the thunk is forced, it
@@ -270,9 +290,9 @@ dsWasmJSStaticImport ::
   Coercion ->
   String ->
   Maybe Unit ->
-  Safety ->
+  Synchronicity ->
   DsM ([Binding], CHeader, CStub)
-dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
+dsWasmJSStaticImport fn_id co js_src' mUnitId sync = do
   cfun_name <- uniqueCFunName
   let ty = coercionLKind co
       (tvs, fun_ty) = tcSplitForAllInvisTyVars ty
@@ -289,36 +309,30 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
               ++ ")"
         | otherwise =
             js_src'
-  case safety of
-    PlayRisky -> do
-      rhs <-
-        importBindingRHS
-          mUnitId
-          PlayRisky
-          cfun_name
-          tvs
-          arg_tys
-          orig_res_ty
-          id
+  case sync of
+    Sync -> do
+      rhs <- importBindingRHS mUnitId cfun_name tvs arg_tys orig_res_ty id
       pure
         ( [(fn_id, Cast rhs co)],
           CHeader commonCDecls,
-          importCStub
-            PlayRisky
-            cfun_name
-            (map scaledThing arg_tys)
-            res_ty
-            js_src
+          importCStub Sync cfun_name (map scaledThing arg_tys) res_ty js_src
         )
-    _ -> do
+    Async -> do
       io_tycon <- dsLookupTyCon ioTyConName
-      jsval_ty <- mkTyConTy <$> lookupGhcInternalTyCon "GHC.Internal.Wasm.Prim.Types" "JSVal"
+      jsval_ty <-
+        mkTyConTy
+          <$> lookupGhcInternalTyCon "GHC.Internal.Wasm.Prim.Types" "JSVal"
       bindIO_id <- dsLookupGlobalId bindIOName
       returnIO_id <- dsLookupGlobalId returnIOName
       promise_id <- newSysLocalMDs jsval_ty
-      blockPromise_id <- lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Imports" "stg_blockPromise"
+      blockPromise_id <-
+        lookupGhcInternalVarId
+          "GHC.Internal.Wasm.Prim.Imports"
+          "stg_blockPromise"
       msgPromise_id <-
-        lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Imports" $ "stg_messagePromise" ++ ffiType res_ty
+        lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Imports"
+          $ "stg_messagePromise"
+          ++ ffiType res_ty
       unsafeDupablePerformIO_id <-
         lookupGhcInternalVarId
           "GHC.Internal.IO.Unsafe"
@@ -326,7 +340,6 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
       rhs <-
         importBindingRHS
           mUnitId
-          PlaySafe
           cfun_name
           tvs
           arg_tys
@@ -357,12 +370,7 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
       pure
         ( [(fn_id, Cast rhs co)],
           CHeader commonCDecls,
-          importCStub
-            PlaySafe
-            cfun_name
-            (map scaledThing arg_tys)
-            jsval_ty
-            js_src
+          importCStub Async cfun_name (map scaledThing arg_tys) jsval_ty js_src
         )
 
 uniqueCFunName :: DsM FastString
@@ -372,92 +380,91 @@ uniqueCFunName = do
 
 importBindingRHS ::
   Maybe Unit ->
-  Safety ->
   FastString ->
   [TyVar] ->
   [Scaled Type] ->
   Type ->
   (CoreExpr -> CoreExpr) ->
   DsM CoreExpr
-importBindingRHS mUnitId safety cfun_name tvs arg_tys orig_res_ty res_trans =
-  do
-    ccall_uniq <- newUnique
-    args_unevaled <- newSysLocalsDs arg_tys
-    args_evaled <- newSysLocalsDs arg_tys
-    -- ccall_action_ty: type of the_call, State# RealWorld -> (# State# RealWorld, a #)
-    -- res_wrapper: turn the_call to (IO a) or a
-    (ccall_action_ty, res_wrapper) <- case tcSplitIOType_maybe orig_res_ty of
-      Just (io_tycon, res_ty) -> do
-        s0_id <- newSysLocalMDs realWorldStatePrimTy
-        s1_id <- newSysLocalMDs realWorldStatePrimTy
-        let io_data_con = tyConSingleDataCon io_tycon
-            toIOCon = dataConWorkId io_data_con
-            (ccall_res_ty, wrap)
-              | res_ty `eqType` unitTy =
-                  ( mkTupleTy Unboxed [realWorldStatePrimTy],
-                    \the_call ->
-                      mkApps
-                        (Var toIOCon)
-                        [ Type res_ty,
-                          Lam s0_id
-                            $ mkWildCase
-                              (App the_call (Var s0_id))
-                              (unrestricted ccall_res_ty)
-                              (mkTupleTy Unboxed [realWorldStatePrimTy, unitTy])
-                              [ Alt
-                                  (DataAlt (tupleDataCon Unboxed 1))
-                                  [s1_id]
-                                  (mkCoreUnboxedTuple [Var s1_id, unitExpr])
-                              ]
-                        ]
-                  )
-              | otherwise =
-                  ( mkTupleTy Unboxed [realWorldStatePrimTy, res_ty],
-                    \the_call -> mkApps (Var toIOCon) [Type res_ty, the_call]
-                  )
-        pure (realWorldStatePrimTy `mkVisFunTyMany` ccall_res_ty, wrap)
-      Nothing -> do
-        unsafeDupablePerformIO_id <-
-          lookupGhcInternalVarId
-            "GHC.Internal.IO.Unsafe"
-            "unsafeDupablePerformIO"
-        io_data_con <- dsLookupDataCon ioDataConName
-        let ccall_res_ty =
-              mkTupleTy Unboxed [realWorldStatePrimTy, orig_res_ty]
-            toIOCon = dataConWorkId io_data_con
-            wrap the_call =
-              mkApps
-                (Var unsafeDupablePerformIO_id)
-                [ Type orig_res_ty,
-                  mkApps (Var toIOCon) [Type orig_res_ty, the_call]
-                ]
-        pure (realWorldStatePrimTy `mkVisFunTyMany` ccall_res_ty, wrap)
-    let cfun_fcall =
-          CCall
-            ( CCallSpec
-                (StaticTarget NoSourceText cfun_name mUnitId True)
-                CCallConv
-                safety
-            )
-        call_app =
-          mkFCall ccall_uniq cfun_fcall (map Var args_evaled) ccall_action_ty
-        rhs =
-          mkCoreLams (tvs ++ args_unevaled)
-            $ foldr
-              (\(arg_u, arg_e) acc -> mkDefaultCase (Var arg_u) arg_e acc)
-              -- res_trans transforms the result. When desugaring
-              -- JSFFI sync imports, the result is just (IO a) or a,
-              -- and res_trans is id; for async cases, the result is
-              -- always (IO JSVal), and res_trans will wrap it in a
-              -- thunk that has the original return type. This way, we
-              -- can reuse most of the RHS generation logic for both
-              -- sync/async imports.
-              (res_trans $ res_wrapper call_app)
-              (zip args_unevaled args_evaled)
-    pure rhs
+importBindingRHS mUnitId cfun_name tvs arg_tys orig_res_ty res_trans = do
+  ccall_uniq <- newUnique
+  args_unevaled <- newSysLocalsDs arg_tys
+  args_evaled <- newSysLocalsDs arg_tys
+  -- ccall_action_ty: type of the_call, State# RealWorld -> (# State# RealWorld, a #)
+  -- res_wrapper: turn the_call to (IO a) or a
+  (ccall_action_ty, res_wrapper) <- case tcSplitIOType_maybe orig_res_ty of
+    Just (io_tycon, res_ty) -> do
+      s0_id <- newSysLocalMDs realWorldStatePrimTy
+      s1_id <- newSysLocalMDs realWorldStatePrimTy
+      let io_data_con = tyConSingleDataCon io_tycon
+          toIOCon = dataConWorkId io_data_con
+          (ccall_res_ty, wrap)
+            | res_ty `eqType` unitTy =
+                ( mkTupleTy Unboxed [realWorldStatePrimTy],
+                  \the_call ->
+                    mkApps
+                      (Var toIOCon)
+                      [ Type res_ty,
+                        Lam s0_id
+                          $ mkWildCase
+                            (App the_call (Var s0_id))
+                            (unrestricted ccall_res_ty)
+                            (mkTupleTy Unboxed [realWorldStatePrimTy, unitTy])
+                            [ Alt
+                                (DataAlt (tupleDataCon Unboxed 1))
+                                [s1_id]
+                                (mkCoreUnboxedTuple [Var s1_id, unitExpr])
+                            ]
+                      ]
+                )
+            | otherwise =
+                ( mkTupleTy Unboxed [realWorldStatePrimTy, res_ty],
+                  \the_call -> mkApps (Var toIOCon) [Type res_ty, the_call]
+                )
+      pure (realWorldStatePrimTy `mkVisFunTyMany` ccall_res_ty, wrap)
+    Nothing -> do
+      unsafeDupablePerformIO_id <-
+        lookupGhcInternalVarId
+          "GHC.Internal.IO.Unsafe"
+          "unsafeDupablePerformIO"
+      io_data_con <- dsLookupDataCon ioDataConName
+      let ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy, orig_res_ty]
+          toIOCon = dataConWorkId io_data_con
+          wrap the_call =
+            mkApps
+              (Var unsafeDupablePerformIO_id)
+              [ Type orig_res_ty,
+                mkApps (Var toIOCon) [Type orig_res_ty, the_call]
+              ]
+      pure (realWorldStatePrimTy `mkVisFunTyMany` ccall_res_ty, wrap)
+  let cfun_fcall =
+        CCall
+          ( CCallSpec
+              (StaticTarget NoSourceText cfun_name mUnitId True)
+              CCallConv
+              -- Same even for foreign import javascript unsafe, for
+              -- the sake of re-entrancy.
+              PlaySafe
+          )
+      call_app =
+        mkFCall ccall_uniq cfun_fcall (map Var args_evaled) ccall_action_ty
+      rhs =
+        mkCoreLams (tvs ++ args_unevaled)
+          $ foldr
+            (\(arg_u, arg_e) acc -> mkDefaultCase (Var arg_u) arg_e acc)
+            -- res_trans transforms the result. When desugaring
+            -- JSFFI sync imports, the result is just (IO a) or a,
+            -- and res_trans is id; for async cases, the result is
+            -- always (IO JSVal), and res_trans will wrap it in a
+            -- thunk that has the original return type. This way, we
+            -- can reuse most of the RHS generation logic for both
+            -- sync/async imports.
+            (res_trans $ res_wrapper call_app)
+            (zip args_unevaled args_evaled)
+  pure rhs
 
-importCStub :: Safety -> FastString -> [Type] -> Type -> String -> CStub
-importCStub safety cfun_name arg_tys res_ty js_src = CStub c_doc [] []
+importCStub :: Synchronicity -> FastString -> [Type] -> Type -> String -> CStub
+importCStub sync cfun_name arg_tys res_ty js_src = CStub c_doc [] []
   where
     import_name = fromJust $ stripPrefix "ghczuwasmzujsffi" (unpackFS cfun_name)
     import_asm =
@@ -465,18 +472,18 @@ importCStub safety cfun_name arg_tys res_ty js_src = CStub c_doc [] []
         <> parens
           ( vcat
               [ text (show l)
-                | l <-
-                    [ ".section .custom_section.ghc_wasm_jsffi,\"\",@\n",
-                      ".asciz \"" ++ import_name ++ "\"\n",
-                      ".asciz \""
-                        ++ ( case safety of
-                               PlayRisky -> "("
-                               _ -> "async ("
-                           )
-                        ++ intercalate "," ["$" ++ show i | i <- [1 .. length arg_tys]]
-                        ++ ")\"\n",
-                      ".asciz " ++ show js_src ++ "\n"
-                    ]
+              | l <-
+                  [ ".section .custom_section.ghc_wasm_jsffi,\"\",@\n",
+                    ".asciz \"" ++ import_name ++ "\"\n",
+                    ".asciz \""
+                      ++ ( case sync of
+                             Sync -> "("
+                             Async -> "async ("
+                         )
+                      ++ intercalate "," ["$" ++ show i | i <- [1 .. length arg_tys]]
+                      ++ ")\"\n",
+                    ".asciz " ++ show js_src ++ "\n"
+                  ]
               ]
           )
         <> semi
@@ -488,8 +495,8 @@ importCStub safety cfun_name arg_tys res_ty js_src = CStub c_doc [] []
                   ( punctuate
                       comma
                       [ text k <> parens (doubleQuotes (text v))
-                        | (k, v) <-
-                            [("import_module", "ghc_wasm_jsffi"), ("import_name", import_name)]
+                      | (k, v) <-
+                          [("import_module", "ghc_wasm_jsffi"), ("import_name", import_name)]
                       ]
                   )
               )
@@ -501,7 +508,7 @@ importCStub safety cfun_name arg_tys res_ty js_src = CStub c_doc [] []
       | otherwise = text ("Hs" ++ ffiType res_ty)
     import_arg_list =
       [ text ("Hs" ++ ffiType arg_ty) <+> char 'a' <> int i
-        | (i, arg_ty) <- zip [1 ..] arg_tys
+      | (i, arg_ty) <- zip [1 ..] arg_tys
       ]
     import_args = case import_arg_list of
       [] -> text "void"
@@ -528,7 +535,7 @@ importCStub safety cfun_name arg_tys res_ty js_src = CStub c_doc [] []
               ( punctuate
                   comma
                   [ cfun_make_arg arg_ty (char 'a' <> int n)
-                    | (arg_ty, n) <- zip arg_tys [1 ..]
+                  | (arg_ty, n) <- zip arg_tys [1 ..]
                   ]
               )
           )
@@ -554,7 +561,8 @@ Note [Desugaring JSFFI static export]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A JSFFI static export wraps a top-level Haskell binding as a wasm
-module export that can be called in JavaScript as an async function:
+module export that can be called in JavaScript as an async/sync
+function:
 
 foreign export javascript "plus"
   (+) :: Int -> Int -> Int
@@ -565,31 +573,26 @@ stub for a JSFFI export as well:
 __attribute__((export_name("plus")))
 HsJSVal plus(HsInt a1, HsInt a2) { ... }
 
+The generated C stub function would be exported as __exports.plus and
+can be called in JavaScript. By default, it's exported as an async
+function, so the C stub would always return an HsJSVal which
+represents the result Promise; in case of a sync export (using "plus
+sync" instead of "plus"), it returns the original result type.
+
+The C stub function body applies the function closure to arguments,
+wrap it with a runIO/runNonIO top handler function, then schedules
+Haskell computation to happen, then fetches the result. In case of an
+async export, the top handler creates a JavaScript Promise that stands
+for Haskell evaluation result, and the Promise will eventually be
+resolved with the result or rejected with an exception. That Promise
+is what we return in the C stub function. See
+Note [Async JSFFI scheduler] for detailed explanation.
+
 At link time, you need to pass -optl-Wl,--export=plus,--export=... to
 specify your entrypoint function symbols as roots of wasm-ld link-time
 garbage collection. As for the auto-generated exports when desugaring
 the JSFFI dynamic exports, they will be transitively included as well
 due to the export_name attribute.
-
-For each JSFFI static export, we create an internal worker function
-which takes the same arguments as the exported Haskell binding, but
-always returns (IO JSVal). Its RHS simply applies the arguments to the
-original binding, then applies a runIO/runNonIO top handler function
-to the result. The top handler creates a JavaScript Promise that
-stands for Haskell evaluation result, schedules Haskell computation to
-happen, and the Promise will eventually be resolved with the result or
-rejected with an exception. That Promise is what we return in the C
-stub function. See Note [Async JSFFI scheduler] for detailed
-explanation.
-
-There's nothing else to explain about the C stub function body; just
-like C FFI exports, it calls rts_mk* to box the arguments, rts_apply
-to apply them to the worker function, evaluates the result, then
-unboxes the resulting Promise using rts_getJSVal and returns it.
-
-Now, in JavaScript, once the wasm instance is initialized, you can
-directly call these exports and await them, as if they're real
-JavaScript async functions.
 
 -}
 
@@ -598,108 +601,140 @@ dsWasmJSExport ::
   Coercion ->
   CLabelString ->
   DsM (CHeader, CStub, String, [Id], [Binding])
-dsWasmJSExport fn_id co ext_name = do
-  work_uniq <- newUnique
+dsWasmJSExport fn_id co str = dsWasmJSExport' sync (Just fn_id) co ext_name
+  where
+    (sync, ext_name) = case words $ unpackFS str of
+      [ext_name] -> (Async, ext_name)
+      [ext_name, "sync"] -> (Sync, ext_name)
+      _ -> panic "dsWasmJSExport: unrecognized label string"
+
+dsWasmJSExport' ::
+  Synchronicity ->
+  Maybe Id ->
+  Coercion ->
+  String ->
+  DsM (CHeader, CStub, String, [Id], [Binding])
+dsWasmJSExport' sync m_fn_id co ext_name = do
   let ty = coercionRKind co
-      (tvs, fun_ty) = tcSplitForAllInvisTyVars ty
+      (_, fun_ty) = tcSplitForAllInvisTyVars ty
       (arg_tys, orig_res_ty) = tcSplitFunTys fun_ty
       (res_ty, is_io) = case tcSplitIOType_maybe orig_res_ty of
         Just (_, res_ty) -> (res_ty, True)
         Nothing -> (orig_res_ty, False)
-      (_, res_ty_args) = splitTyConApp res_ty
       res_ty_str = ffiType res_ty
-  args <- newSysLocalsDs arg_tys
+      top_handler_mod = case sync of
+        Sync -> "GHC.Internal.TopHandler"
+        Async -> "GHC.Internal.Wasm.Prim.Exports"
+      top_handler_name
+        | is_io = "runIO"
+        | otherwise = "runNonIO"
+  -- In case of sync export, we use the normal C FFI tophandler
+  -- functions. They would call flushStdHandles in case of uncaught
+  -- exception but not in normal cases, but we want flushStdHandles to
+  -- be called so that there are less run-time surprises for users,
+  -- and that's what our tophandler functions already do.
+  --
+  -- So for each sync export, we first wrap the computation with a C
+  -- FFI tophandler, and then sequence it with flushStdHandles using
+  -- (<*) :: IO a -> IO b -> IO a. But it's trickier to call (<*)
+  -- using RTS API given type class dictionary is involved, so we'll
+  -- just use finally.
+  finally_id <-
+    lookupGhcInternalVarId
+      "GHC.Internal.Control.Exception.Base"
+      "finally"
+  flushStdHandles_id <-
+    lookupGhcInternalVarId
+      "GHC.Internal.TopHandler"
+      "flushStdHandles"
   promiseRes_id <-
-    lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Exports" $ "js_promiseResolve" ++ res_ty_str
-  runIO_id <- lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Exports" "runIO"
-  runNonIO_id <- lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Exports" "runNonIO"
-  let work_id =
-        mkExportedVanillaId
-          ( mkExternalName
-              work_uniq
-              (nameModule $ getName fn_id)
-              (mkVarOcc $ "jsffi_" ++ occNameString (getOccName fn_id))
-              generatedSrcSpan
-          )
-          (exprType work_rhs)
-      work_rhs =
-        mkCoreLams (tvs ++ args)
-          $ mkApps
-            (Var $ if is_io then runIO_id else runNonIO_id)
-            [ Type res_ty,
-              mkApps (Var promiseRes_id) $ map Type res_ty_args,
-              mkApps (Cast (Var fn_id) co)
-                $ map (Type . mkTyVarTy) tvs
-                ++ map Var args
-            ]
-      work_closure = ppr work_id <> text "_closure"
-      work_closure_decl = text "extern StgClosure" <+> work_closure <> semi
+    lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Exports"
+      $ "js_promiseResolve"
+      ++ res_ty_str
+  top_handler_id <- lookupGhcInternalVarId top_handler_mod top_handler_name
+  let ppr_closure c = ppr c <> text "_closure"
+      mk_extern_closure_decl c =
+        text "extern StgClosure" <+> ppr_closure c <> semi
+      gc_root_closures = maybeToList m_fn_id ++ case sync of
+        -- In case of C FFI top handlers, they are already declared in
+        -- RtsAPI.h and registered as GC roots in initBuiltinGcRoots.
+        -- flushStdHandles is already registered but somehow the C
+        -- stub can't access its declaration, won't hurt to declare it
+        -- again here.
+        Sync -> [finally_id, flushStdHandles_id]
+        Async -> [top_handler_id, promiseRes_id]
+      extern_closure_decls = vcat $ map mk_extern_closure_decl gc_root_closures
       cstub_attr =
         text "__attribute__"
           <> parens
-            (parens $ text "export_name" <> parens (doubleQuotes $ ftext ext_name))
+            (parens $ text "export_name" <> parens (doubleQuotes $ text ext_name))
       cstub_arg_list =
         [ text ("Hs" ++ ffiType (scaledThing arg_ty)) <+> char 'a' <> int i
-          | (i, arg_ty) <- zip [1 ..] arg_tys
+        | (i, arg_ty) <- zip [1 ..] arg_tys
         ]
       cstub_args = case cstub_arg_list of
         [] -> text "void"
         _ -> hsep $ punctuate comma cstub_arg_list
-      cstub_proto = text "HsJSVal" <+> ftext ext_name <> parens cstub_args
+      cstub_proto
+        | Sync <- sync,
+          res_ty `eqType` unitTy =
+            text "void" <+> text ext_name <> parens cstub_args
+        | Sync <- sync =
+            text ("Hs" ++ res_ty_str) <+> text ext_name <> parens cstub_args
+        | Async <- sync =
+            text "HsJSVal" <+> text ext_name <> parens cstub_args
+      c_closure c = char '&' <> ppr_closure c
+      c_call fn args = text fn <> parens (hsep $ punctuate comma args)
+      c_rts_apply =
+        Data.List.foldl1' $ \fn arg -> c_call "rts_apply" [text "cap", fn, arg]
+      apply_top_handler expr = case sync of
+        Sync ->
+          c_rts_apply
+            [ c_closure finally_id,
+              c_rts_apply [c_closure top_handler_id, expr],
+              c_closure flushStdHandles_id
+            ]
+        Async ->
+          c_rts_apply [c_closure top_handler_id, c_closure promiseRes_id, expr]
+      cstub_ret
+        | Sync <- sync, res_ty `eqType` unitTy = empty
+        | Sync <- sync = text $ "return rts_get" ++ res_ty_str ++ "(ret);"
+        | Async <- sync = text "return rts_getJSVal(ret);"
+      (cstub_target, real_args)
+        | Just fn_id <- m_fn_id = (c_closure fn_id, zip [1 ..] arg_tys)
+        | otherwise = (text "(HaskellObj)deRefStablePtr(a1)", zip [2 ..] $ tail arg_tys)
       cstub_body =
         vcat
           [ lbrace,
             text "Capability *cap = rts_lock();",
             text "HaskellObj ret;",
-            -- rts_evalLazyIO is fine, the top handler always returns
-            -- an evaluated result
-            text "rts_evalLazyIO"
-              <> parens
-                ( hsep
-                    $ punctuate
-                      comma
-                      [ text "&cap",
-                        foldl'
-                          ( \acc (i, arg_ty) ->
-                              text "rts_apply"
-                                <> parens
-                                  ( hsep
-                                      $ punctuate
-                                        comma
-                                        [ text "cap",
-                                          acc,
-                                          text ("rts_mk" ++ ffiType (scaledThing arg_ty))
-                                            <> parens
-                                              (hsep $ punctuate comma [text "cap", char 'a' <> int i])
-                                        ]
-                                  )
-                          )
-                          (char '&' <> work_closure)
-                          $ zip [1 ..] arg_tys,
-                        text "&ret"
-                      ]
-                )
+            c_call
+              "rts_inCall"
+              [ text "&cap",
+                apply_top_handler
+                  $ c_rts_apply
+                  $ cstub_target
+                  : [ c_call
+                        ("rts_mk" ++ ffiType (scaledThing arg_ty))
+                        [text "cap", char 'a' <> int i]
+                    | (i, arg_ty) <- real_args
+                    ],
+                text "&ret"
+              ]
               <> semi,
-            text "rts_checkSchedStatus"
-              <> parens (doubleQuotes (ftext ext_name) <> comma <> text "cap")
+            c_call "rts_checkSchedStatus" [doubleQuotes (text ext_name), text "cap"]
               <> semi,
             text "rts_unlock(cap);",
-            text "return rts_getJSVal(ret);",
+            cstub_ret,
             rbrace
           ]
       cstub =
         commonCDecls
-          $+$ work_closure_decl
+          $+$ extern_closure_decls
           $+$ cstub_attr
           $+$ cstub_proto
           $+$ cstub_body
-  pure
-    ( CHeader commonCDecls,
-      CStub cstub [] [],
-      "",
-      [work_id],
-      [(work_id, work_rhs)]
-    )
+  pure (CHeader commonCDecls, CStub cstub [] [], "", gc_root_closures, [])
 
 lookupGhcInternalVarId :: FastString -> String -> DsM Id
 lookupGhcInternalVarId m v = do
