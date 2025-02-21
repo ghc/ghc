@@ -3,7 +3,6 @@
 module Main where
 
 import GHC
-import GHC.Paths
 import Unsafe.Coerce
 import Control.Monad.IO.Class
 import System.Environment (getArgs)
