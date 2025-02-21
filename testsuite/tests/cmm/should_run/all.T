@@ -31,6 +31,15 @@ test('T22871',
      multi_compile_and_run,
      ['T22871', [('T22871_cmm.cmm', '')], ''])
 
+test('JumpTableNoStackDealloc',
+     [    extra_run_opts('"' + config.libdir + '"')
+     ,    req_cmm 
+     ,    when(arch('wasm32'), skip) # wasm32 doesn't support the printf() calls
+     ,    when(arch('i386'), skip) # i386 doesn't support `MO_U_Rem W64` (`_c1::I64 % 10 :: W64`)
+     ],
+     multi_compile_and_run,
+     ['JumpTableNoStackDealloc', [('JumpTableNoStackDealloc_cmm.cmm', '')], ''])
+
 test('AtomicFetch',
      [    extra_run_opts('"' + config.libdir + '"')
      ,    req_cmm
