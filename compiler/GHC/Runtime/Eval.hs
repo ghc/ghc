@@ -242,7 +242,7 @@ execStmt' stmt stmt_text ExecOptions{..} = do
 
             size = ghciHistSize idflags'
 
-        handleRunStatus execSingleStep stmt_text bindings ids
+        handleRunStatus (const True) execSingleStep stmt_text bindings ids
                         status (emptyHistory size)
 
 runDecls :: GhcMonad m => String -> m [Name]
@@ -315,14 +315,17 @@ emptyHistory :: Int -> BoundedList History
 emptyHistory size = nilBL size
 
 handleRunStatus :: GhcMonad m
-                => SingleStep -> String
+                => (SrcSpan -> Bool)
+                -- ^ @True@ if we want to stop at a breakpoint with this
+                -- @SrcSpan@ (always true for :step, but not for :steplocal or :stepmodule)
+                -> SingleStep -> String
                 -> ResumeBindings
                 -> [Id]
                 -> EvalStatus_ [ForeignHValue] [HValueRef]
                 -> BoundedList History
                 -> m ExecResult
 
-handleRunStatus step expr bindings final_ids status history0
+handleRunStatus step_here step expr bindings final_ids status history0
   | RunAndLogSteps <- step = tracing
   | otherwise              = not_tracing
  where
@@ -351,7 +354,7 @@ handleRunStatus step expr bindings final_ids status history0
            fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
            let eval_opts = initEvalOpts dflags True
            status <- liftIO $ GHCi.resumeStmt interp eval_opts fhv
-           handleRunStatus RunAndLogSteps expr bindings final_ids
+           handleRunStatus step_here RunAndLogSteps expr bindings final_ids
                            status history'
     | otherwise
     = not_tracing
@@ -369,7 +372,7 @@ handleRunStatus step expr bindings final_ids status history0
            Just break -> fmap Just $ liftIO $
              evalBreakpointToId (hsc_HPT hsc_env) break
          (hsc_env1, names, span, decl) <- liftIO $
-           bindLocalsAtBreakpoint hsc_env apStack_fhv ibi
+           bindLocalsAtBreakpoint step_here hsc_env apStack_fhv ibi
          let
            resume = Resume
              { resumeStmt = expr
@@ -405,9 +408,14 @@ handleRunStatus step expr bindings final_ids status history0
     = return (ExecComplete (Left (fromSerializableException e)) alloc)
 
 
-resumeExec :: GhcMonad m => (SrcSpan->Bool) -> SingleStep -> Maybe Int
+resumeExec :: GhcMonad m
+           => (SrcSpan -> Bool)
+           -- ^ Returns True if the given Breakpoint SrcSpan is where we want
+           -- to step to. Always true for :step, but :steplocal and :stepmodule
+           -- don't stop at all locations.
+           -> SingleStep -> Maybe Int
            -> m ExecResult
-resumeExec canLogSpan step mbCnt
+resumeExec step_here step mbCnt
  = do
    hsc_env <- getSession
    let ic = hsc_IC hsc_env
@@ -458,11 +466,11 @@ resumeExec canLogSpan step mbCnt
                     hist' = case mb_brkpt of
                        Nothing -> pure prevHistoryLst
                        Just bi
-                         | not $ canLogSpan span -> pure prevHistoryLst
+                         | not $ step_here span -> pure prevHistoryLst
                          | otherwise -> do
                             hist1 <- liftIO (mkHistory hsc_env apStack bi)
                             return $ hist1 `consBL` fromListBL 50 hist
-                handleRunStatus step expr bindings final_ids status =<< hist'
+                handleRunStatus step_here step expr bindings final_ids status =<< hist'
 
 setupBreakpoint :: GhcMonad m => HscEnv -> BreakpointId -> Int -> m ()   -- #19157
 setupBreakpoint hsc_env bi cnt = do
@@ -499,7 +507,7 @@ moveHist fn = do
         let
           update_ic apStack mb_info = do
             (hsc_env1, names, span, decl) <-
-              liftIO $ bindLocalsAtBreakpoint hsc_env apStack mb_info
+              liftIO $ bindLocalsAtBreakpoint (const True) hsc_env apStack mb_info
             let ic = hsc_IC hsc_env1
                 r' = r { resumeHistoryIx = new_ix }
                 ic' = ic { ic_resume = r':rs }
@@ -528,7 +536,14 @@ result_fs :: FastString
 result_fs = fsLit "_result"
 
 bindLocalsAtBreakpoint
-        :: HscEnv
+        :: (SrcSpan -> Bool)
+        -- ^ @True@ if we want to stop at a breakpoint with this
+        -- @SrcSpan@ (always true for :step, but not for :steplocal or :stepmodule).
+        --
+        -- To avoid needless computation, we only actually compute the bindings
+        -- if we intend to use them. Thus, if @False@, @HscEnv@ is unchanged
+        -- from the input and @[Name]@ is empty.
+        -> HscEnv
         -> ForeignHValue
         -> Maybe InternalBreakpointId
         -> IO (HscEnv, [Name], SrcSpan, String)
@@ -537,7 +552,7 @@ bindLocalsAtBreakpoint
 -- breakpoint.  We have no location information or local variables to
 -- bind, all we can do is bind a local variable to the exception
 -- value.
-bindLocalsAtBreakpoint hsc_env apStack Nothing = do
+bindLocalsAtBreakpoint _step_here hsc_env apStack Nothing = do
    let exn_occ = mkVarOccFS (fsLit "_exception")
        span    = mkGeneralSrcSpan (fsLit "<unknown>")
    exn_name <- newInteractiveBinder hsc_env exn_occ span
@@ -556,75 +571,77 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
 
 -- Just case: we stopped at a breakpoint, we have information about the location
 -- of the breakpoint and the free variables of the expression.
-bindLocalsAtBreakpoint hsc_env apStack_fhv (Just ibi) = do
-   let
-       interp    = hscInterp hsc_env
+bindLocalsAtBreakpoint step_here hsc_env apStack_fhv (Just ibi) = do
+  let tick_mod  = ibi_tick_mod ibi
+  tick_hmi <- expectJust "bindLocalsAtBreakpoint" <$> lookupHpt (hsc_HPT hsc_env) (moduleName tick_mod)
+  let
+      tick_brks = getModBreaks tick_hmi
+      occs      = modBreaks_vars tick_brks ! ibi_tick_index ibi
+      span      = modBreaks_locs tick_brks ! ibi_tick_index ibi
+      decl      = intercalate "." $ modBreaks_decls tick_brks ! ibi_tick_index ibi
+  if step_here span then do
+     let
+         interp    = hscInterp hsc_env
 
-       info_mod  = ibi_info_mod ibi
-   info_hmi <- expectJust "bindLocalsAtBreakpoint" <$> lookupHpt (hsc_HPT hsc_env) (moduleName info_mod)
-   let
-       info_brks = getModBreaks info_hmi
-       info      = expectJust "bindLocalsAtBreakpoint2" $ IntMap.lookup (ibi_info_index ibi) (modBreaks_breakInfo info_brks)
+         info_mod  = ibi_info_mod ibi
+     info_hmi <- expectJust "bindLocalsAtBreakpoint" <$> lookupHpt (hsc_HPT hsc_env) (moduleName info_mod)
+     let
+         info_brks = getModBreaks info_hmi
+         info      = expectJust "bindLocalsAtBreakpoint2" $ IntMap.lookup (ibi_info_index ibi) (modBreaks_breakInfo info_brks)
 
-       tick_mod  = ibi_tick_mod ibi
-   tick_hmi <- expectJust "bindLocalsAtBreakpoint" <$> lookupHpt (hsc_HPT hsc_env) (moduleName tick_mod)
-   let
-       tick_brks = getModBreaks tick_hmi
-       occs      = modBreaks_vars tick_brks ! ibi_tick_index ibi
-       span      = modBreaks_locs tick_brks ! ibi_tick_index ibi
-       decl      = intercalate "." $ modBreaks_decls tick_brks ! ibi_tick_index ibi
+     -- Rehydrate to understand the breakpoint info relative to the current environment.
+     -- This design is critical to preventing leaks (#22530)
+     (mbVars, result_ty) <- initIfaceLoad hsc_env
+                              $ initIfaceLcl info_mod (text "debugger") NotBoot
+                              $ hydrateCgBreakInfo info
 
-  -- Rehydrate to understand the breakpoint info relative to the current environment.
-  -- This design is critical to preventing leaks (#22530)
-   (mbVars, result_ty) <- initIfaceLoad hsc_env
-                            $ initIfaceLcl info_mod (text "debugger") NotBoot
-                            $ hydrateCgBreakInfo info
+     let
 
-   let
+             -- Filter out any unboxed ids by changing them to Nothings;
+             -- we can't bind these at the prompt
+         mbPointers = nullUnboxed <$> mbVars
 
-           -- Filter out any unboxed ids by changing them to Nothings;
-           -- we can't bind these at the prompt
-       mbPointers = nullUnboxed <$> mbVars
+         (ids, offsets, occs') = syncOccs mbPointers occs
 
-       (ids, offsets, occs') = syncOccs mbPointers occs
+         free_tvs = tyCoVarsOfTypesWellScoped (result_ty:map idType ids)
 
-       free_tvs = tyCoVarsOfTypesWellScoped (result_ty:map idType ids)
+     -- It might be that getIdValFromApStack fails, because the AP_STACK
+     -- has been accidentally evaluated, or something else has gone wrong.
+     -- So that we don't fall over in a heap when this happens, just don't
+     -- bind any free variables instead, and we emit a warning.
+     mb_hValues <-
+        mapM (getBreakpointVar interp apStack_fhv . fromIntegral) offsets
+     when (any isNothing mb_hValues) $
+        debugTraceMsg (hsc_logger hsc_env) 1 $
+            text "Warning: _result has been evaluated, some bindings have been lost"
 
-   -- It might be that getIdValFromApStack fails, because the AP_STACK
-   -- has been accidentally evaluated, or something else has gone wrong.
-   -- So that we don't fall over in a heap when this happens, just don't
-   -- bind any free variables instead, and we emit a warning.
-   mb_hValues <-
-      mapM (getBreakpointVar interp apStack_fhv . fromIntegral) offsets
-   when (any isNothing mb_hValues) $
-      debugTraceMsg (hsc_logger hsc_env) 1 $
-          text "Warning: _result has been evaluated, some bindings have been lost"
+     us <- mkSplitUniqSupply 'I'   -- Dodgy; will give the same uniques every time
+     let tv_subst     = newTyVars us free_tvs
+         (filtered_ids, occs'') = unzip         -- again, sync the occ-names
+            [ (id, occ) | (id, Just _hv, occ) <- zip3 ids mb_hValues occs' ]
+         tidy_tys = tidyOpenTypes emptyTidyEnv $
+                    map (substTy tv_subst . idType) filtered_ids
 
-   us <- mkSplitUniqSupply 'I'   -- Dodgy; will give the same uniques every time
-   let tv_subst     = newTyVars us free_tvs
-       (filtered_ids, occs'') = unzip         -- again, sync the occ-names
-          [ (id, occ) | (id, Just _hv, occ) <- zip3 ids mb_hValues occs' ]
-       tidy_tys = tidyOpenTypes emptyTidyEnv $
-                  map (substTy tv_subst . idType) filtered_ids
+     new_ids     <- zipWith3M mkNewId occs'' tidy_tys filtered_ids
+     result_name <- newInteractiveBinder hsc_env (mkVarOccFS result_fs) span
 
-   new_ids     <- zipWith3M mkNewId occs'' tidy_tys filtered_ids
-   result_name <- newInteractiveBinder hsc_env (mkVarOccFS result_fs) span
+     let result_id = Id.mkVanillaGlobal result_name
+                       (substTy tv_subst result_ty)
+         result_ok = isPointer result_id
 
-   let result_id = Id.mkVanillaGlobal result_name
-                     (substTy tv_subst result_ty)
-       result_ok = isPointer result_id
+         final_ids | result_ok = result_id : new_ids
+                   | otherwise = new_ids
+         ictxt0 = hsc_IC hsc_env
+         ictxt1 = extendInteractiveContextWithIds ictxt0 final_ids
+         names  = map idName new_ids
 
-       final_ids | result_ok = result_id : new_ids
-                 | otherwise = new_ids
-       ictxt0 = hsc_IC hsc_env
-       ictxt1 = extendInteractiveContextWithIds ictxt0 final_ids
-       names  = map idName new_ids
-
-   let fhvs = catMaybes mb_hValues
-   Loader.extendLoadedEnv interp (zip names fhvs)
-   when result_ok $ Loader.extendLoadedEnv interp [(result_name, apStack_fhv)]
-   hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
-   return (hsc_env1, if result_ok then result_name:names else names, span, decl)
+     let fhvs = catMaybes mb_hValues
+     Loader.extendLoadedEnv interp (zip names fhvs)
+     when result_ok $ Loader.extendLoadedEnv interp [(result_name, apStack_fhv)]
+     hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
+     return (hsc_env1, if result_ok then result_name:names else names, span, decl)
+  else do
+     return (hsc_env, [], span, decl)
   where
         -- We need a fresh Unique for each Id we bind, because the linker
         -- state is single-threaded and otherwise we'd spam old bindings
