@@ -8,7 +8,7 @@ async function reallyGC() {
 }
 
 export default async (__exports) => {
-  await __exports.testDynExportFree(114, 514, 1919810);
+  __exports.testDynExportFree(114, 514, 1919810);
 
   const cont = await __exports.testDynExportGC(114, 514, 1919810);
   await reallyGC();
