@@ -717,11 +717,7 @@ setTopSessionDynFlags dflags = do
 #if defined(wasm32_HOST_ARCH)
         let libdir = sorry "cannot spawn child process on wasm"
 #else
-        libdir <- liftIO $ do
-          libdirs <- Loader.getGccSearchDirectory logger dflags "libraries"
-          case libdirs of
-            [_, libdir] -> pure libdir
-            _ -> panic "corrupted wasi-sdk installation"
+        libdir <- liftIO $ last <$> Loader.getGccSearchDirectory logger dflags "libraries"
 #endif
         let profiled = ways dflags `hasWay` WayProf
             way_tag = if profiled then "_p" else ""
