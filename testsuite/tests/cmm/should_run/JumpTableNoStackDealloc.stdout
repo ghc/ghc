@@ -1,0 +1,50 @@
+Before switch
+Inside branch 0
+Before jump 0
+Return
+Result: 0
+Before switch
+Inside branch 1
+Before jump 1
+Return
+Result: 0
+Before switch
+Inside branch 8
+Before jump 8
+Return
+Result: 0
+Before switch
+Inside default branch
+Before jump default
+Return
+Result: 6
+Before switch
+Inside branch 6
+Before jump 6
+Return
+Result: 0
+Before switch
+Inside branch 7
+Before jump 7
+Return
+Result: 2
+Before switch
+Inside branch 4
+Before jump 4
+Return
+Result: 0
+Before switch
+Inside branch 5
+Before jump 5
+Return
+Result: 4
+Before switch
+Inside branch 2
+Before jump 2
+Return
+Result: 0
+Before switch
+Inside branch 3
+Before jump 3
+Return
+Result: 0
