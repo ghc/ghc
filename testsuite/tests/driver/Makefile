@@ -813,3 +813,8 @@ T23339B:
 T25382:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c T25382.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) T25382.o -o main
+
+# Test we can compile C code with an empty package DB
+T26018:
+	touch foo.c
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c foo.c -clear-package-db

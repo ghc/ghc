@@ -478,7 +478,7 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
           -- very weakly typed, being derived from C--.
           ["-fno-strict-aliasing"]
 
-  ghcVersionH <- getGhcVersionPathName dflags unit_env
+  ghcVersionH <- getGhcVersionIncludeFlags dflags unit_env
 
   withAtomicRename output_fn $ \temp_outputFilename ->
     GHC.SysTools.runCc (phaseForeignLanguage cc_phase) logger tmpfs dflags (
@@ -525,7 +525,7 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
                        else [])
                  ++ verbFlags
                  ++ cc_opt
-                 ++ [ "-include", ghcVersionH ]
+                 ++ ghcVersionH
                  ++ framework_paths
                  ++ include_paths
                  ++ pkg_extra_cc_opts
