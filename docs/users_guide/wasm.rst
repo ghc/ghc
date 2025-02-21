@@ -231,15 +231,15 @@ There are two kinds of JSFFI imports: synchronous/asynchronous imports.
 ``unsafe`` indicates synchronous imports, which has the following
 caveats:
 
--  The calling thread as well as the entire runtime blocks on waiting
-   for the import result.
--  If the JavaScript code throws, the runtime crashes with the same
-   error. A JavaScript exception cannot be handled as a Haskell
-   exception here, so you need to use a JavaScript ``catch`` explicitly
-   shall the need arise.
--  Like ``unsafe`` C imports, re-entrance is not supported, the imported
-   foreign code must not call into Haskell again. Doing so would result
-   in a runtime panic.
+- The calling thread as well as the entire runtime blocks on waiting for
+  the import result.
+- If the JavaScript code throws, the runtime crashes with the same
+  error. A JavaScript exception cannot be handled as a Haskell exception
+  here, so you need to use a JavaScript ``catch`` explicitly shall the
+  need arise.
+- Unlike ``unsafe`` C imports, re-entrance is actually supported, the
+  imported JavaScript code can call into Haskell again, provided that
+  Haskell function is exported as a synchronous one.
 
 When a JSFFI import is marked as ``safe`` / ``interruptible`` or lacks
 safety annotation, then it’s treated as an asynchronous import. The
@@ -274,14 +274,12 @@ runtime, and resumed when the ``Promise`` actually resolves or rejects.
 Compared to synchronous JSFFI imports, asynchronous JSFFI imports have
 the following notable pros/cons:
 
--  Waiting for the result only blocks a single Haskell thread, other
-   threads can still make progress and garbage collection may still
-   happen.
--  If the ``Promise`` rejects, Haskell code can catch JavaScript errors
-   as ``JSException``\ s.
--  Re-entrance is supported. The JavaScript code may call into Haskell
-   again and vice versa.
--  Of course, it has higher overhead than synchronous JSFFI imports.
+- Waiting for the result only blocks a single Haskell thread, other
+  threads can still make progress and garbage collection may still
+  happen.
+- If the ``Promise`` rejects, Haskell code can catch JavaScript errors
+  as ``JSException``\ s.
+- It has higher overhead than synchronous JSFFI imports.
 
 Using thunks to encapsulate ``Promise`` result allows cheaper
 concurrency without even needing to fork Haskell threads just for
@@ -345,12 +343,17 @@ wrapper, and as long as the wasm instance is properly initialized, you
 can call ``await instance.exports.my_fib(10)`` to invoke the exported
 Haskell function and get the result.
 
-Unlike JSFFI imports which have synchronous/asynchronous flavors, JSFFI
-exports are always asynchronous. Calling them always return a
-``Promise`` in JavaScript that needs to be ``await``\ ed for the real
-result. If the Haskell function throws, the ``Promise`` is rejected with
-a ``WebAssembly.RuntimeError``, and the ``message`` field contains a
-JavaScript string of the Haskell exception.
+JSFFI exports are asynchronous by default. Calling an async export
+return a ``Promise`` in JavaScript that needs to be ``await``\ ed for
+the real result. If the Haskell function throws, the ``Promise`` is
+rejected with a ``WebAssembly.RuntimeError``, and the ``message`` field
+contains a JavaScript string of the Haskell exception.
+
+Additionally, sync exports are also supported by using ``"my_fib sync"``
+instead of ``"my_fib"``. With ``sync`` added alongside export function
+name, the JavaScript function would return the result synchronously. For
+the time being, sync exports don’t support propagating uncaught Haskell
+exception to a JavaScript exception at the call site yet.
 
 Above is the static flavor of JSFFI exports. It’s also possible to
 export a dynamically created Haskell function closure as a JavaScript
@@ -366,8 +369,9 @@ function and obtain its ``JSVal``:
 This is also much like ``foreign import ccall "wrapper"``, which wraps a
 Haskell function closure as a C function pointer. Note that ``unsafe`` /
 ``safe`` annotation is ignored here, since the ``JSVal`` that represent
-the exported function is always returned synchronously, but it is always
-an asynchronous JavaScript function, just like static JSFFI exports.
+the exported function is always returned synchronously. Likewise, you
+can use ``"wrapper sync"`` instead of ``"wrapper"`` to indicate the
+returned JavaScript function is sync instead of async.
 
 The ``JSVal`` callbacks created by dynamic JSFFI exports can be passed
 to the rest of JavaScript world to be invoked later. But wait, didn’t we
