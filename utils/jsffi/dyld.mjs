@@ -1,4 +1,4 @@
-#!/usr/bin/env -S node --disable-warning=ExperimentalWarning --experimental-wasm-type-reflection --max-old-space-size=8192 --no-turbo-fast-api-calls --wasm-lazy-validation
+#!/usr/bin/env -S node --disable-warning=ExperimentalWarning --experimental-wasm-type-reflection --max-old-space-size=65536 --no-turbo-fast-api-calls --wasm-lazy-validation
 
 // Note [The Wasm Dynamic Linker]
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
