@@ -31,6 +31,13 @@ test('T22871',
      multi_compile_and_run,
      ['T22871', [('T22871_cmm.cmm', '')], ''])
 
+test('JumpTableNoStackDealloc',
+     [    extra_run_opts('"' + config.libdir + '"')
+     ,    req_cmm
+     ],
+     multi_compile_and_run,
+     ['JumpTableNoStackDealloc', [('JumpTableNoStackDealloc_cmm.cmm', '')], ''])
+
 test('AtomicFetch',
      [    extra_run_opts('"' + config.libdir + '"')
      ,    req_cmm
