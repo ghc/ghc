@@ -310,6 +310,7 @@ data WasmInstr :: WasmType -> [WasmType] -> [WasmType] -> Type where
   WasmF32DemoteF64 :: WasmInstr w ('F64 : pre) ('F32 : pre)
   WasmF64PromoteF32 :: WasmInstr w ('F32 : pre) ('F64 : pre)
   WasmAbs :: WasmTypeTag t -> WasmInstr w (t : pre) (t : pre)
+  WasmSqrt :: WasmTypeTag t -> WasmInstr w (t : pre) (t : pre)
   WasmNeg :: WasmTypeTag t -> WasmInstr w (t : pre) (t : pre)
   WasmMin :: WasmTypeTag t -> WasmInstr w (t : t : pre) (t : pre)
   WasmMax :: WasmTypeTag t -> WasmInstr w (t : t : pre) (t : pre)
