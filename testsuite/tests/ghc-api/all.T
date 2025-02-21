@@ -42,3 +42,8 @@ test('T20757', [unless(opsys('mingw32'), skip), exit_code(1), normalise_version(
                compile_and_run,
                ['-package ghc'])
 test('PrimOpEffect_Sanity', normal, compile_and_run, ['-Wall -Werror -package ghc'])
+test('T25577', [ extra_run_opts(f'"{config.libdir}"')
+               # doesn't work in wasm/js due to lack of pipe(2)
+               # support
+               , when(arch('wasm32') or arch('javascript'), skip)
+               ], compile_and_run, ['-package ghc'])
