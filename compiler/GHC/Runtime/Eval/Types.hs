@@ -9,7 +9,8 @@
 module GHC.Runtime.Eval.Types (
         Resume(..), ResumeBindings, IcGlobalRdrEnv(..),
         History(..), ExecResult(..),
-        SingleStep(..), isStep, ExecOptions(..)
+        SingleStep(..), enableGhcStepMode, breakHere,
+        ExecOptions(..)
         ) where
 
 import GHC.Prelude
@@ -35,21 +36,59 @@ data ExecOptions
      , execWrap :: ForeignHValue -> EvalExpr ForeignHValue
      }
 
+-- | What kind of stepping are we doing?
 data SingleStep
    = RunToCompletion
-   | SingleStep
+
+   -- | :trace [expr]
    | RunAndLogSteps
 
-isStep :: SingleStep -> Bool
-isStep RunToCompletion = False
-isStep _ = True
+   -- | :step [expr]
+   | SingleStep
+
+   -- | :steplocal [expr]
+   | LocalStep
+      { breakAt :: SrcSpan }
+
+   -- | :stepmodule [expr]
+   | ModuleStep
+      { breakAt :: SrcSpan }
+
+-- | Whether this 'SingleStep' mode requires instructing the interpreter to
+-- step at every breakpoint.
+enableGhcStepMode :: SingleStep -> Bool
+enableGhcStepMode RunToCompletion = False
+enableGhcStepMode _ = True
+
+-- | Given a 'SingleStep' mode and the SrcSpan of a breakpoint we hit, return
+-- @True@ if based on the step-mode alone we should stop at this breakpoint.
+--
+-- In particular, this will always be @False@ for @'RunToCompletion'@ and
+-- @'RunAndLogSteps'@. We'd need further information e.g. about the user
+-- breakpoints to determine whether to break in those modes.
+breakHere :: SingleStep -> SrcSpan -> Bool
+breakHere step break_span = case step of
+  RunToCompletion -> False
+  RunAndLogSteps  -> False
+  SingleStep      -> True
+  LocalStep  span -> break_span `isSubspanOf` span
+  ModuleStep span -> srcSpanFileName_maybe span == srcSpanFileName_maybe break_span
 
 data ExecResult
+
+  -- | Execution is complete
   = ExecComplete
        { execResult :: Either SomeException [Name]
        , execAllocation :: Word64
        }
-  | ExecBreak
+
+    -- | Execution stopped at a breakpoint.
+    --
+    -- Note: `ExecBreak` is only returned by `handleRunStatus` when GHCi should
+    -- definitely stop at this breakpoint. GHCi is /not/ responsible for
+    -- subsequently deciding whether to really stop here.
+    -- `ExecBreak` always means GHCi breaks.
+    | ExecBreak
        { breakNames   :: [Name]
        , breakPointId :: Maybe InternalBreakpointId
        }

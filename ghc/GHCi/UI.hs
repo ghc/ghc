@@ -1310,7 +1310,7 @@ runStmt input step = do
            m_result <- GhciMonad.runStmt stmt input step
            case m_result of
                Nothing     -> return Nothing
-               Just result -> Just <$> afterRunStmt (const True) result
+               Just result -> Just <$> afterRunStmt step result
 
     -- `x = y` (a declaration) should be treated as `let x = y` (a statement).
     -- The reason is because GHCi wasn't designed to support `x = y`, but then
@@ -1342,7 +1342,7 @@ runStmt input step = do
       _ <- liftIO $ tryIO $ hFlushAll stdin
       m_result <- GhciMonad.runDecls' decls
       forM m_result $ \result ->
-        afterRunStmt (const True) (GHC.ExecComplete (Right result) 0)
+        afterRunStmt step (GHC.ExecComplete (Right result) 0)
 
     mk_stmt :: SrcSpan -> HsBind GhcPs -> GhciLStmt GhcPs
     mk_stmt loc bind =
@@ -1359,9 +1359,9 @@ runStmt input step = do
         modStr = moduleNameString $ moduleName $ icInteractiveModule $ ic
 
 -- | Clean up the GHCi environment after a statement has run
-afterRunStmt :: GhciMonad m
-             => (SrcSpan -> Bool) -> GHC.ExecResult -> m GHC.ExecResult
-afterRunStmt step_here run_result = do
+afterRunStmt :: GhciMonad m => SingleStep {-^ Type of step we took just before -}
+             -> GHC.ExecResult -> m GHC.ExecResult
+afterRunStmt step run_result = do
   resumes <- GHC.getResumeContext
   case run_result of
      GHC.ExecComplete{..} ->
@@ -1372,9 +1372,7 @@ afterRunStmt step_here run_result = do
             when show_types $ printTypeOfNames names
      GHC.ExecBreak names mb_info
          | first_resume : _ <- resumes
-         , isNothing  mb_info ||
-           step_here (GHC.resumeSpan first_resume) -> do
-               mb_id_loc <- toBreakIdAndLocation mb_info
+         -> do mb_id_loc <- toBreakIdAndLocation mb_info
                let bCmd = maybe "" ( \(_,l) -> onBreakCmd l ) mb_id_loc
                if (null bCmd)
                  then printStoppedAtBreakInfo first_resume names
@@ -1383,8 +1381,9 @@ afterRunStmt step_here run_result = do
                st <- getGHCiState
                enqueueCommands [stop st]
                return ()
-         | otherwise -> resume step_here GHC.SingleStep Nothing >>=
-                        afterRunStmt step_here >> return ()
+
+         | otherwise -> resume step Nothing >>=
+                        afterRunStmt step >> return ()
 
   flushInterpBuffers
   withSignalHandlers $ do
@@ -3810,7 +3809,7 @@ forceCmd  = pprintClosureCommand False True
 stepCmd :: GhciMonad m => String -> m ()
 stepCmd arg = withSandboxOnly ":step" $ step arg
   where
-  step []         = doContinue (const True) GHC.SingleStep
+  step []         = doContinue GHC.SingleStep
   step expression = runStmt expression GHC.SingleStep >> return ()
 
 stepLocalCmd :: GhciMonad m => String -> m ()
@@ -3829,7 +3828,7 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
         Just loc -> do
            md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
            current_toplevel_decl <- enclosingTickSpan md loc
-           doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl Strict.Nothing) GHC.SingleStep
+           doContinue (GHC.LocalStep (RealSrcSpan current_toplevel_decl Strict.Nothing))
 
 stepModuleCmd :: GhciMonad m => String -> m ()
 stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
@@ -3840,9 +3839,7 @@ stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
       mb_span <- getCurrentBreakSpan
       case mb_span of
         Nothing  -> stepCmd []
-        Just pan -> do
-           let f some_span = srcSpanFileName_maybe pan == srcSpanFileName_maybe some_span
-           doContinue f GHC.SingleStep
+        Just pan -> doContinue (GHC.ModuleStep pan)
 
 -- | Returns the span of the largest tick containing the srcspan given
 enclosingTickSpan :: GhciMonad m => Module -> SrcSpan -> m RealSrcSpan
@@ -3863,14 +3860,14 @@ traceCmd :: GhciMonad m => String -> m ()
 traceCmd arg
   = withSandboxOnly ":trace" $ tr arg
   where
-  tr []         = doContinue (const True) GHC.RunAndLogSteps
+  tr []         = doContinue GHC.RunAndLogSteps
   tr expression = runStmt expression GHC.RunAndLogSteps >> return ()
 
 continueCmd :: GhciMonad m => String -> m ()                  -- #19157
 continueCmd argLine = withSandboxOnly ":continue" $
   case contSwitch (words argLine) of
     Left sdoc   -> printForUser sdoc
-    Right mbCnt -> doContinue' (const True) GHC.RunToCompletion mbCnt
+    Right mbCnt -> doContinue' GHC.RunToCompletion mbCnt
     where
       contSwitch :: [String] -> Either SDoc (Maybe Int)
       contSwitch [ ] = Right Nothing
@@ -3878,13 +3875,13 @@ continueCmd argLine = withSandboxOnly ":continue" $
       contSwitch  _  = Left $
           text "After ':continue' only one ignore count is allowed"
 
-doContinue :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> m ()
-doContinue pre step = doContinue' pre step Nothing
+doContinue :: GhciMonad m => SingleStep -> m ()
+doContinue step = doContinue' step Nothing
 
-doContinue' :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> Maybe Int -> m ()
-doContinue' pre step mbCnt= do
-  runResult <- resume pre step mbCnt
-  _ <- afterRunStmt pre runResult
+doContinue' :: GhciMonad m => SingleStep -> Maybe Int -> m ()
+doContinue' step mbCnt= do
+  runResult <- resume step mbCnt
+  _ <- afterRunStmt step runResult
   return ()
 
 abandonCmd :: GhciMonad m => String -> m ()
@@ -4036,7 +4033,7 @@ backCmd arg
   | otherwise       = liftIO $ putStrLn "Syntax:  :back [num]"
   where
   back num = withSandboxOnly ":back" $ do
-      (names, _, pan, _) <- GHC.back num
+      (names, _, pan) <- GHC.back num
       printForUser $ text "Logged breakpoint at" <+> ppr pan
       printTypeOfNames names
        -- run the command set with ":set stop <cmd>"
@@ -4050,7 +4047,7 @@ forwardCmd arg
   | otherwise       = liftIO $ putStrLn "Syntax:  :forward [num]"
   where
   forward num = withSandboxOnly ":forward" $ do
-      (names, ix, pan, _) <- GHC.forward num
+      (names, ix, pan) <- GHC.forward num
       printForUser $ (if (ix == 0)
                         then text "Stopped at"
                         else text "Logged breakpoint at") <+> ppr pan
