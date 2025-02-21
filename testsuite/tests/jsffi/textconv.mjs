@@ -1,3 +1,3 @@
-export default async (__exports) => {
-  await __exports.main();
+export default (__exports) => {
+  __exports.main();
 }

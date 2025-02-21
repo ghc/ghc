@@ -45,7 +45,7 @@ textToJSString (Text (ByteArray ba#) (I# off#) (I# len#)) = unsafeDupablePerform
     (# s1, mba# #) -> case copyByteArray# ba# off# mba# 0# len# s1 of
       s2 -> keepAlive# mba# s2 $ unIO $ js_to_str (Ptr (mutableByteArrayContents# mba#)) $ I# len#
 
-foreign export javascript "main"
+foreign export javascript "main sync"
   main :: IO ()
 
 main :: IO ()
