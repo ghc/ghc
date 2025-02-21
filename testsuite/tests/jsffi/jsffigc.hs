@@ -10,17 +10,16 @@ import System.Mem
 
 type BinOp a = a -> a -> a
 
-foreign import javascript "wrapper"
+foreign import javascript "wrapper sync"
   js_from_hs :: BinOp Int -> IO JSVal
 
--- This must be safe since we intend to call back into Haskell again.
-foreign import javascript safe "dynamic"
+foreign import javascript unsafe "dynamic"
   js_to_hs :: JSVal -> BinOp Int
 
 foreign import javascript "wrapper"
   js_mk_cont :: IO () -> IO JSVal
 
-foreign export javascript "testDynExportFree"
+foreign export javascript "testDynExportFree sync"
   testDynExportFree :: Int -> Int -> Int -> IO ()
 
 -- JSVal uses Weak# under the hood for garbage collection support,
