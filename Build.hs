@@ -244,7 +244,8 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , "  executable-static: True"
         , ""
         , "package ghc-bin"
-        , "  flags: +internal-interpreter"
+             -- FIXME: we don't support the threaded rts way yet
+        , "  flags: +internal-interpreter -threaded"
         , ""
         , "package hsc2hs"
         , "  flags: +in-ghc-tree" -- allow finding template-hsc.h in GHC's /lib
@@ -459,7 +460,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   let rts_options =
         [ "package rts"
         , def_string "ProjectVersion" (Text.unpack (gboVersionInt opts))
-        , def_string "RtsWay"            "FIXME"
+        , def_string "RtsWay"            "v" -- FIXME
         , def_string "HostPlatform"      "x86_64-unknown-linux" -- FIXME
         , def_string "HostArch"          "x86_64" -- FIXME: appropriate value required for the tests
         , def_string "HostOS"            "linux" -- FIXME: appropriate value required for the tests
@@ -1030,5 +1031,6 @@ generateSettings ghc_toolchain Settings{..} dst = do
   kvs <- (Map.fromList . read) <$> readFile gen_settings_path :: IO (Map String String)
   let kvs' = Map.insert "Relative Global Package DB" "../pkgs"
              $ Map.insert "Support SMP" "NO" -- FIXME: this depends on the different ways used to build the RTS!
+             $ Map.insert "RTS ways" "v"     -- FIXME: this depends on the different ways used to build the RTS!
              $ kvs
   writeFile (dst </> "lib/settings") (show $ Map.toList kvs')

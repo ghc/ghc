@@ -235,9 +235,12 @@ unitHsLibs namever ways0 p = map (mkDynName . addSuffix . ST.unpack) (unitLibrar
         --
         -- This change elevates the need to add custom hooks
         -- and handling specifically for the `rts` package.
-        addSuffix rts@"HSrts"       = rts       ++ (expandTag rts_tag)
-        addSuffix rts@"HSrts-1.0.3" = rts       ++ (expandTag rts_tag)
-        addSuffix other_lib         = other_lib ++ (expandTag tag)
+        is_rts x = (x == "HSrts" || "HSrts-" `isPrefixOf` x)
+                   -- ensure we don't consider packages with names like "rts-foo"
+                   && unitPackageName p == PackageName (fsLit "rts")
+        addSuffix x
+          | is_rts x  = x ++ (expandTag rts_tag)
+          | otherwise = x ++ (expandTag tag)
 
         expandTag t | null t = ""
                     | otherwise = '_':t
