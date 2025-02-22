@@ -1,8 +1,11 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module GHC.Exts.Heap.InfoTable.Types
     ( StgInfoTable(..)
     , EntryFunPtr
-    , HalfWord
+    , HalfWord(..)
     , ItblCodes
     ) where
 
@@ -18,12 +21,15 @@ type ItblCodes = Either [Word8] [Word32]
 #include "ghcautoconf.h"
 -- Ultra-minimalist version specially for constructors
 #if SIZEOF_VOID_P == 8
-type HalfWord = Word32
+type HalfWord' = Word32
 #elif SIZEOF_VOID_P == 4
-type HalfWord = Word16
+type HalfWord' = Word16
 #else
 #error Unknown SIZEOF_VOID_P
 #endif
+
+newtype HalfWord = HalfWord HalfWord'
+    deriving newtype (Enum, Eq, Integral, Num, Ord, Real, Show, Storable)
 
 type EntryFunPtr = FunPtr (Ptr () -> IO (Ptr ()))
 
