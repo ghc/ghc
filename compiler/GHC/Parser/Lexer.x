@@ -371,10 +371,10 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
 -- CPP continuation lines. Keep concatenating, or exit
 <cpp_prag> {
-  .* \\ \n                   { cppTokenCont (ITcpp True) }
-  .* \\                      { cppTokenCont (ITcpp True) }
-  -- .* \n                    { cppTokenPop  (ITcpp False) }
-  .*                       { cppTokenPop  (ITcpp False) }
+  .* \\ \n                   { cppTokenCont }
+  .* \\                      { cppTokenCont }
+  -- .* \n                    { cppTokenPop (ITcpp False) }
+  .*                       { cppTokenPop  (ITcpp False)}
   -- () { popCpp }
 }
 
@@ -1267,17 +1267,31 @@ cppToken code span buf len _buf2 =
      return (L span (ITcpp continue $! lexemeToFastString buf len0))
      -- trace ("cppToken:" ++ show (code, t)) $ do return (L span t)
 
-cppTokenCont :: (FastString -> Token)-> Action p
-cppTokenCont _code span buf len _buf2 =
+cppTokenCont :: Action p
+cppTokenCont span buf len _buf2 =
   do
      let tokStr = lexemeToFastString buf len
      -- check if the string ends with backslash and newline
      -- NOTE: performance likely sucks, make it work for now
-     (len0, continue) <- case (reverse $ unpackFS tokStr) of
-        ('\n':'\\':_) -> return (len - 2, True)
-        ('\n':_) -> return (len - 1, False)
-        _ -> return (len, False)
-     return (L span (ITcpp continue $! lexemeToFastString buf len0))
+     (span0, len0, continue) <- case (reverse $ unpackFS tokStr) of
+        ('\n':'\\':_) -> return (shortenPsSpan span 2, len - 2, True)
+        ('\n':_) -> return (shortenPsSpan span 1, len - 1, False)
+        _ -> return (span, len, False)
+     return (L span0 (ITcpp continue $! lexemeToFastString buf len0))
+
+-- Subtract the amount from the end of the span.
+-- This is intended to be used in cppTokenCont only, where we know
+-- there is no line boundary in the part to be shortened, and the span
+-- is long enough
+shortenPsSpan :: PsSpan -> Int -> PsSpan
+shortenPsSpan span by = mkPsSpan (psSpanStart span) shorter
+  where
+    PsLoc sl (BufPos b) = psSpanEnd span
+    f = srcLocFile sl
+    l = srcLocLine sl
+    c = srcLocCol sl
+    r' = mkRealSrcLoc f l (c - by)
+    shorter = PsLoc r' (BufPos (b - by))
 
 cppTokenPop :: (FastString -> Token)-> Action p
 cppTokenPop t span buf len _buf2 =
