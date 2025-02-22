@@ -1,56 +1,8 @@
 {-# LANGUAGE Safe #-}
 
 -- | Monadic front-end to Text.PrettyPrint
-module Language.Haskell.TH.PprLib (
-    ($$),
-    ($+$),
-    (<+>),
-    (<>),
-    arrow,
-    braces,
-    brackets,
-    cat,
-    char,
-    colon,
-    comma,
-    dcolon,
-    double,
-    doubleQuotes,
-    empty,
-    equals,
-    fcat,
-    float,
-    fsep,
-    hang,
-    hcat,
-    hsep,
-    int,
-    integer,
-    isEmpty,
-    lbrace,
-    lbrack,
-    lparen,
-    nest,
-    parens,
-    pprName,
-    pprName',
-    ptext,
-    punctuate,
-    quotes,
-    rational,
-    rbrace,
-    rbrack,
-    rparen,
-    semi,
-    sep,
-    space,
-    text,
-    to_HPJ_Doc,
-    vcat,
-    Doc,
-    PprM,
-)
-where
+module Language.Haskell.TH.PprLib
+  ( module GHC.Boot.TH.PprLib )
+  where
 
-import GHC.Internal.TH.PprLib
-import Prelude ()
+import GHC.Boot.TH.PprLib

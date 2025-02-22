@@ -13,7 +13,7 @@ module GHC.Tc.Types.TH (
   ) where
 
 import GHCi.RemoteTypes
-import qualified GHC.Internal.TH.Syntax as TH
+import qualified GHC.Boot.TH.Syntax as TH
 import GHC.Tc.Types.Evidence
 import GHC.Utils.Outputable
 import GHC.Prelude
