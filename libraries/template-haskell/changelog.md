@@ -10,6 +10,9 @@
 
     They are replaced, respectively, by `SpecialiseEP`, `pragSpecED` and
     `pragSpecInlED`.
+  
+  * Remove the `Language.Haskell.TH.Lib.Internal` module. This module has long been deprecated, and exposes compiler internals.
+    Users should use `Language.Haskell.TH.Lib` instead, which exposes a stable version of this API.
 
 ## 2.23.0.0
 
