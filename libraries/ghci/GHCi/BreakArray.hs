@@ -30,11 +30,9 @@ module GHCi.BreakArray
     , setupBreakpoint
     , breakOn
     , breakOff
-    , showBreakArray
     ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
-import Control.Monad
 
 import GHC.Exts
 import GHC.IO ( IO(..) )
@@ -47,13 +45,6 @@ data BreakArray = BA (MutableByteArray# RealWorld)
 breakOff, breakOn :: Int
 breakOn  = 0
 breakOff = -1
-
-showBreakArray :: BreakArray -> IO ()
-showBreakArray array = do
-    forM_ [0 .. (size array - 1)] $ \i -> do
-        val <- readBreakArray array i
-        putStr $ ' ' : show val
-    putStr "\n"
 
 setupBreakpoint :: BreakArray -> Int -> Int -> IO Bool
 setupBreakpoint breakArray ind val
