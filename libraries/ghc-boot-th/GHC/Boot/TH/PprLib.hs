@@ -2,7 +2,7 @@
 
 -- | Monadic front-end to Text.PrettyPrint
 
-module GHC.Internal.TH.PprLib (
+module GHC.Boot.TH.PprLib (
 
         -- * The document type
         Doc,            -- Abstract, instance of Show
@@ -35,12 +35,12 @@ module GHC.Internal.TH.PprLib (
   ) where
 
 
-import GHC.Internal.TH.Syntax
+import GHC.Boot.TH.Syntax
     (Uniq, Name(..), showName', NameFlavour(..), NameIs(..))
 import qualified Text.PrettyPrint as HPJ
 import Control.Monad (liftM, liftM2, ap)
-import GHC.Internal.TH.Lib.Map ( Map )
-import qualified GHC.Internal.TH.Lib.Map as Map ( lookup, insert, empty )
+import GHC.Boot.TH.Lib.Map ( Map )
+import qualified GHC.Boot.TH.Lib.Map as Map ( lookup, insert, empty )
 import Prelude hiding ((<>))
 
 infixl 6 <>

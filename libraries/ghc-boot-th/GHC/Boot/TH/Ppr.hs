@@ -3,14 +3,14 @@
 -- | contains a prettyprinter for the
 -- Template Haskell datatypes
 
-module GHC.Internal.TH.Ppr where
+module GHC.Boot.TH.Ppr where
     -- All of the exports from this module should
     -- be "public" functions.  The main module TH
     -- re-exports them all.
 
 import Text.PrettyPrint (render)
-import GHC.Internal.TH.PprLib
-import GHC.Internal.TH.Syntax
+import GHC.Boot.TH.PprLib
+import GHC.Boot.TH.Syntax
 import Data.Word ( Word8 )
 import Data.Char ( toLower, chr )
 import Data.List ( intersperse )

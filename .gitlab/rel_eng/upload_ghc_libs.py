@@ -99,13 +99,7 @@ def prep_ghc_boot_th():
     # purposes.
     modify_file(PACKAGES['ghc-boot-th'], 'ghc-boot-th.cabal',
                 lambda s: s.replace('../ghc-internal/src', '')
-                           .replace('GHC.Internal.TH.Lib.Map', '')
-                           .replace('GHC.Internal.TH.PprLib', '')
-                           .replace('GHC.Internal.TH.Ppr', '')
-                           .replace('GHC.Internal.TH.Lib,', '')
                            .replace('GHC.Internal.TH.Lib', '')
-                           .replace('GHC.Internal.TH.Lift,', '')
-                           .replace('GHC.Internal.TH.Quote,', '')
                            .replace('GHC.Internal.TH.Syntax', '')
                            .replace('GHC.Internal.ForeignSrcLang', '')
                            .replace('GHC.Internal.LanguageExtensions', '')
