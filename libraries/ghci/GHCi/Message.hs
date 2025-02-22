@@ -498,6 +498,10 @@ instance Binary (FunPtr a) where
   put = put . castFunPtrToPtr
   get = castPtrToFunPtr <$> get
 
+instance Binary Heap.HalfWord where
+  put x = put (fromIntegral x :: Word32)
+  get = fromIntegral <$> (get :: Get Word32)
+
 -- Binary instances to support the GetClosure message
 #if MIN_VERSION_ghc_heap(8,11,0)
 instance Binary Heap.StgTSOProfInfo
