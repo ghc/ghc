@@ -45,7 +45,7 @@ import GHC.Tc.Zonk.Type
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.TyCl.Utils
 import GHC.Tc.TyCl.Class
-import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1 )
+import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tryTcInstDecls1, tcInstDecls1 )
 import {-# SOURCE #-} GHC.Tc.Module( checkBootDeclM )
 import GHC.Tc.Deriv (DerivInfo(..))
 import GHC.Tc.Gen.HsType
@@ -161,28 +161,45 @@ tcTyAndClassDecls tyclds_s
   -- The code recovers internally, but if anything gave rise to
   -- an error we'd better stop now, to avoid a cascade
   -- Type check each group in dependency order folding the global env
-  = checkNoErrs $ fold_env [] [] emptyNameEnv tyclds_s
+  = checkNoErrs $ fold_env [] [] [] emptyNameEnv tyclds_s
   where
-    fold_env :: [InstInfo GhcRn]
+    fold_env :: [LInstDecl GhcRn]
+             -> [InstInfo GhcRn]
              -> [DerivInfo]
              -> ThBindEnv
              -> [TyClGroup GhcRn]
              -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ThBindEnv)
-    fold_env inst_info deriv_info th_bndrs []
-      = do { gbl_env <- getGblEnv
-           ; return (gbl_env, inst_info, deriv_info, th_bndrs) }
-    fold_env inst_info deriv_info th_bndrs (tyclds:tyclds_s)
-      = do { (tcg_env, inst_info', deriv_info', th_bndrs')
-               <- tcTyClGroup tyclds
+    fold_env pending_instds inst_info deriv_info th_bndrs []
+      = do { (gbl_env, inst_info', deriv_info', th_bndrs') <- tcInstDecls1 pending_instds
+           ; return (gbl_env,
+                     inst_info' ++ inst_info,
+                     deriv_info' ++ deriv_info,
+                     th_bndrs' `plusNameEnv` th_bndrs) }
+    fold_env pending_instds inst_info deriv_info th_bndrs (tyclds:tyclds_s)
+      = do { (failed_instds, tcg_env, inst_info', deriv_info', th_bndrs') <- tcTyClGroup tyclds
+           ; let retry_pending = length failed_instds < length (group_instds tyclds)
+                                 -- if progress on instances has been made, we can retry the pending ones
+                 (pending_instds', tyclds_s')
+                   | retry_pending = ([], mkInstDeclGroup (pending_instds ++ failed_instds) : tyclds_s)
+                   | otherwise = (pending_instds ++ failed_instds, tyclds_s)
            ; setGblEnv tcg_env $
                -- remaining groups are typechecked in the extended global env.
-             fold_env (inst_info' ++ inst_info)
+             fold_env pending_instds'
+                      (inst_info' ++ inst_info)
                       (deriv_info' ++ deriv_info)
                       (th_bndrs' `plusNameEnv` th_bndrs)
-                      tyclds_s }
+                      tyclds_s' }
+
+mkInstDeclGroup :: [LInstDecl GhcRn] -> TyClGroup GhcRn
+mkInstDeclGroup instds =
+  TyClGroup { group_ext    = noExtField
+            , group_tyclds = []
+            , group_roles  = []
+            , group_kisigs = []
+            , group_instds = instds }
 
 tcTyClGroup :: TyClGroup GhcRn
-            -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ThBindEnv)
+            -> TcM ([LInstDecl GhcRn], TcGblEnv, [InstInfo GhcRn], [DerivInfo], ThBindEnv)
 -- Typecheck one strongly-connected component of type, class, and instance decls
 -- See Note [TyClGroups and dependency analysis] in GHC.Hs.Decls
 tcTyClGroup (TyClGroup { group_tyclds = tyclds
@@ -238,14 +255,14 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; (gbl_env, th_bndrs) <- addTyConsToGblEnv tyclss
 
            -- Step 4: check instance declarations
-       ; (gbl_env', inst_info, datafam_deriv_info, th_bndrs') <-
+       ; (failed_instds, gbl_env', inst_info, datafam_deriv_info, th_bndrs') <-
          setGblEnv gbl_env $
-         tcInstDecls1 instds
+         tryTcInstDecls1 instds
 
        ; let deriv_info = datafam_deriv_info ++ data_deriv_info
        ; let gbl_env'' = gbl_env'
                 { tcg_ksigs = tcg_ksigs gbl_env' `unionNameSet` kindless }
-       ; return (gbl_env'', inst_info, deriv_info,
+       ; return (failed_instds, gbl_env'', inst_info, deriv_info,
                  th_bndrs' `plusNameEnv` th_bndrs) }
 
 -- Gives the kind for every TyCon that has a standalone kind signature

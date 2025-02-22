@@ -14,7 +14,8 @@
 
 -- | Typechecking instance declarations
 module GHC.Tc.TyCl.Instance
-   ( tcInstDecls1
+   ( tryTcInstDecls1
+   , tcInstDecls1
    , tcInstDeclsDeriv
    , tcInstDecls2
    )
@@ -91,7 +92,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Data.Tuple
 import GHC.Data.Maybe
-import Data.List( mapAccumL )
+import Data.List( mapAccumL, unzip4 )
 
 
 {-
@@ -386,6 +387,39 @@ complained if 'b' is mentioned in <rhs>.
 Gather up the instance declarations from their various sources
 -}
 
+tryTcInstDecls1    -- Deal with both source-code and imported instance decls
+   :: [LInstDecl GhcRn]         -- Source code instance decls
+   -> TcM ([LInstDecl GhcRn],   -- Failed instances
+           TcGblEnv,            -- The full inst env
+           [InstInfo GhcRn],    -- Source-code instance decls to process;
+                                -- contains all dfuns for this module
+           [DerivInfo],         -- From data family instances
+           ThBindEnv)           -- TH binding levels
+
+tryTcInstDecls1 inst_decls
+  = do {    -- Do class and family instance declarations
+
+       ; traceTc "tryTcInstDecls1 {" (text "n=" <> ppr (length inst_decls))
+       ; stuff <- mapM tryTcLocalInstDecl inst_decls
+
+       ; let (failed_inst_decls_s, local_infos_s, fam_insts_s, datafam_deriv_infos_s) = unzip4 stuff
+             failed_inst_decls   = concat failed_inst_decls_s
+             fam_insts           = concat fam_insts_s
+             local_infos         = concat local_infos_s
+             datafam_deriv_infos = concat datafam_deriv_infos_s
+
+       ; (gbl_env, th_bndrs) <-
+           addClsInsts local_infos $
+           addFamInsts fam_insts
+
+       ; traceTc "} tryTcInstDecls1 " (text "failed:" <+> ppr failed_inst_decls)
+
+       ; return ( failed_inst_decls
+                , gbl_env
+                , local_infos
+                , datafam_deriv_infos
+                , th_bndrs ) }
+
 tcInstDecls1    -- Deal with both source-code and imported instance decls
    :: [LInstDecl GhcRn]         -- Source code instance decls
    -> TcM (TcGblEnv,            -- The full inst env
@@ -396,11 +430,13 @@ tcInstDecls1    -- Deal with both source-code and imported instance decls
 
 tcInstDecls1 inst_decls
   = do {    -- Do class and family instance declarations
+
        ; stuff <- mapAndRecoverM tcLocalInstDecl inst_decls
 
-       ; let (local_infos_s, fam_insts_s, datafam_deriv_infos) = unzip3 stuff
-             fam_insts   = concat fam_insts_s
-             local_infos = concat local_infos_s
+       ; let (local_infos_s, fam_insts_s, datafam_deriv_infos_s) = unzip3 stuff
+             fam_insts           = concat fam_insts_s
+             local_infos         = concat local_infos_s
+             datafam_deriv_infos = concat datafam_deriv_infos_s
 
        ; (gbl_env, th_bndrs) <-
            addClsInsts local_infos $
@@ -408,7 +444,7 @@ tcInstDecls1 inst_decls
 
        ; return ( gbl_env
                 , local_infos
-                , concat datafam_deriv_infos
+                , datafam_deriv_infos
                 , th_bndrs ) }
 
 -- | Use DerivInfo for data family instances (produced by tcInstDecls1),
@@ -482,6 +518,21 @@ tcLocalInstDecl (L loc (DataFamInstD { dfid_inst = decl }))
 tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
   = do { (insts, fam_insts, deriv_infos) <- tcClsInstDecl (L loc decl)
        ; return (insts, fam_insts, deriv_infos) }
+
+tryTcLocalInstDecl :: LInstDecl GhcRn
+                   -> TcM ([LInstDecl GhcRn], [InstInfo GhcRn], [FamInst], [DerivInfo])
+tryTcLocalInstDecl inst
+  | retriable = tryTcDiscardingErrs recover (success <$> tcLocalInstDecl inst)
+  | otherwise = rewrap <$> attemptM (tcLocalInstDecl inst)
+  where
+    retriable = case unLoc inst of
+      -- don't retry class instances to avoid extra work
+      ClsInstD{cid_inst=ClsInstDecl{cid_tyfam_insts=[],
+                                    cid_datafam_insts=[]}} -> False
+      _ -> True
+    rewrap = maybe ([], [], [], []) success
+    recover = return ([inst], [], [], [])
+    success (insts, fam_insts, deriv_infos) = ([], insts, fam_insts, deriv_infos)
 
 tcClsInstDecl :: LClsInstDecl GhcRn
               -> TcM ([InstInfo GhcRn], [FamInst], [DerivInfo])
