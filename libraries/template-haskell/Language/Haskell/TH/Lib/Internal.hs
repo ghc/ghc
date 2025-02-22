@@ -5,7 +5,7 @@
 -- part of the public API, and as such, there are no API guarantees for this
 -- module from version to version.
 
--- Why do we have both GHC.Internal.TH.Lib and
+-- Why do we have both GHC.Boot.TH.Lib and
 -- Language.Haskell.TH.Lib? Ultimately, it's because the functions in the
 -- former (which are tailored for GHC's use) need different type signatures
 -- than the ones in the latter. Syncing up the Internal type signatures would
@@ -14,7 +14,7 @@
 -- is safe to break things.
 
 module Language.Haskell.TH.Lib.Internal
-  ( module GHC.Internal.TH.Lib )
+  ( module GHC.Boot.TH.Lib )
   where
 
-import GHC.Internal.TH.Lib
+import GHC.Boot.TH.Lib

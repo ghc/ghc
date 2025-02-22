@@ -2,7 +2,7 @@
 
 -- | Monadic front-end to Text.PrettyPrint
 module Language.Haskell.TH.PprLib
-  ( module GHC.Internal.TH.PprLib )
+  ( module GHC.Boot.TH.PprLib )
   where
 
-import GHC.Internal.TH.PprLib
+import GHC.Boot.TH.PprLib

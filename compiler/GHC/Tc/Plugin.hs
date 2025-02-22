@@ -92,7 +92,7 @@ import GHC.Core.InstEnv     ( InstEnvs )
 import GHC.Types.Unique     ( Unique )
 import GHC.Types.PkgQual    ( PkgQual )
 
-import qualified GHC.Internal.TH.Syntax as TH
+import qualified GHC.Boot.TH.Syntax as TH
 
 -- | Perform some IO, typically to interact with an external tool.
 tcPluginIO :: IO a -> TcPluginM a

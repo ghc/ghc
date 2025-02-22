@@ -63,7 +63,7 @@ import Data.List.NonEmpty( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe( catMaybes, isNothing )
 import Data.Word (Word64)
-import GHC.Internal.TH.Syntax as TH
+import GHC.Boot.TH.Syntax as TH
 import Foreign.ForeignPtr
 import Foreign.Ptr
 import System.IO.Unsafe

@@ -20,9 +20,9 @@ module Language.Haskell.TH.Quote
   ,dataToQa, dataToExpQ, dataToPatQ
   ) where
 
-import GHC.Internal.TH.Syntax
-import GHC.Internal.TH.Quote
-import GHC.Internal.TH.Lift
+import GHC.Boot.TH.Syntax
+import GHC.Boot.TH.Quote
+import GHC.Boot.TH.Lift
 
 
 -- | 'quoteFile' takes a 'QuasiQuoter' and lifts it into one that read

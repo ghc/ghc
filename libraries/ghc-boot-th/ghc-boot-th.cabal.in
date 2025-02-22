@@ -42,9 +42,9 @@ Library
 
     exposed-modules:
             GHC.ForeignSrcLang.Type
-            GHC.Internal.TH.Lib.Map
-            GHC.Internal.TH.Ppr
-            GHC.Internal.TH.PprLib
+            GHC.Boot.TH.Lib.Map
+            GHC.Boot.TH.Ppr
+            GHC.Boot.TH.PprLib
             GHC.LanguageExtensions.Type
             GHC.Lexeme
 
@@ -58,9 +58,11 @@ Library
             ghc-prim
         hs-source-dirs: @SourceRoot@ ../ghc-internal/src
         exposed-modules:
+            GHC.Boot.TH.Lib
+            GHC.Boot.TH.Syntax
+        other-modules:
             GHC.Internal.TH.Lib
             GHC.Internal.TH.Syntax
-        other-modules:
             GHC.Internal.ForeignSrcLang
             GHC.Internal.LanguageExtensions
             GHC.Internal.Lexeme
@@ -68,8 +70,8 @@ Library
         hs-source-dirs: @SourceRoot@
         build-depends:
             ghc-internal
-        reexported-modules:
-            GHC.Internal.TH.Lib,
-            GHC.Internal.TH.Lift,
-            GHC.Internal.TH.Quote,
-            GHC.Internal.TH.Syntax
+        exposed-modules:
+            GHC.Boot.TH.Lib,
+            GHC.Boot.TH.Lift,
+            GHC.Boot.TH.Quote,
+            GHC.Boot.TH.Syntax

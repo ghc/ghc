@@ -142,8 +142,8 @@ import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
 
 -- THSyntax gives access to internal functions and data types
-import qualified GHC.Internal.TH.Syntax as TH
-import qualified GHC.Internal.TH.Ppr    as TH
+import qualified GHC.Boot.TH.Syntax as TH
+import qualified GHC.Boot.TH.Ppr    as TH
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import Unsafe.Coerce    ( unsafeCoerce )

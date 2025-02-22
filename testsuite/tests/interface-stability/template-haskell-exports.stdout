@@ -341,8 +341,8 @@ module Language.Haskell.TH where
   data Phases = AllPhases | FromPhase GHC.Internal.Types.Int | BeforePhase GHC.Internal.Types.Int
   type Ppr :: * -> Constraint
   class Ppr a where
-    ppr :: a -> GHC.Internal.TH.PprLib.Doc
-    ppr_list :: [a] -> GHC.Internal.TH.PprLib.Doc
+    ppr :: a -> GHC.Boot.TH.PprLib.Doc
+    ppr_list :: [a] -> GHC.Boot.TH.PprLib.Doc
     {-# MINIMAL ppr #-}
   type Pragma :: *
   data Pragma = InlineP Name Inline RuleMatch Phases | OpaqueP Name | SpecialiseP Name Type (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseInstP Type | RuleP GHC.Internal.Base.String (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases | AnnP AnnTarget Exp | LineP GHC.Internal.Types.Int GHC.Internal.Base.String | CompleteP [Name] (GHC.Internal.Maybe.Maybe Name) | SCCP Name (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
@@ -601,10 +601,10 @@ module Language.Haskell.TH where
   plainBndrTV :: forall (m :: * -> *). Quote m => Name -> BndrVis -> m (TyVarBndr BndrVis)
   plainInvisTV :: forall (m :: * -> *). Quote m => Name -> Specificity -> m (TyVarBndr Specificity)
   plainTV :: forall flag. DefaultBndrFlag flag => Name -> TyVarBndr flag
-  pprExp :: GHC.Internal.TH.Ppr.Precedence -> Exp -> GHC.Internal.TH.PprLib.Doc
-  pprLit :: GHC.Internal.TH.Ppr.Precedence -> Lit -> GHC.Internal.TH.PprLib.Doc
-  pprParendType :: Type -> GHC.Internal.TH.PprLib.Doc
-  pprPat :: GHC.Internal.TH.Ppr.Precedence -> Pat -> GHC.Internal.TH.PprLib.Doc
+  pprExp :: GHC.Boot.TH.Ppr.Precedence -> Exp -> GHC.Boot.TH.PprLib.Doc
+  pprLit :: GHC.Boot.TH.Ppr.Precedence -> Lit -> GHC.Boot.TH.PprLib.Doc
+  pprParendType :: Type -> GHC.Boot.TH.PprLib.Doc
+  pprPat :: GHC.Boot.TH.Ppr.Precedence -> Pat -> GHC.Boot.TH.PprLib.Doc
   pprint :: forall a. Ppr a => a -> GHC.Internal.Base.String
   pragAnnD :: forall (m :: * -> *). Quote m => AnnTarget -> m Exp -> m Dec
   pragCompleteD :: forall (m :: * -> *). Quote m => [Name] -> GHC.Internal.Maybe.Maybe Name -> m Dec
@@ -1557,93 +1557,93 @@ module Language.Haskell.TH.Ppr where
   data ForallVisFlag = ForallVis | ForallInvis
   type Ppr :: * -> Constraint
   class Ppr a where
-    ppr :: a -> GHC.Internal.TH.PprLib.Doc
-    ppr_list :: [a] -> GHC.Internal.TH.PprLib.Doc
+    ppr :: a -> GHC.Boot.TH.PprLib.Doc
+    ppr_list :: [a] -> GHC.Boot.TH.PprLib.Doc
     {-# MINIMAL ppr #-}
   type PprFlag :: * -> Constraint
   class PprFlag flag where
-    pprTyVarBndr :: GHC.Internal.TH.Syntax.TyVarBndr flag -> GHC.Internal.TH.PprLib.Doc
+    pprTyVarBndr :: GHC.Internal.TH.Syntax.TyVarBndr flag -> GHC.Boot.TH.PprLib.Doc
     {-# MINIMAL pprTyVarBndr #-}
   type Precedence :: *
   type Precedence = GHC.Internal.Types.Int
   type TypeArg :: *
   data TypeArg = TANormal GHC.Internal.TH.Syntax.Type | TyArg GHC.Internal.TH.Syntax.Kind
   appPrec :: Precedence
-  bar :: GHC.Internal.TH.PprLib.Doc
+  bar :: GHC.Boot.TH.PprLib.Doc
   bytesToString :: [GHC.Internal.Word.Word8] -> GHC.Internal.Base.String
-  commaSep :: forall a. Ppr a => [a] -> GHC.Internal.TH.PprLib.Doc
-  commaSepApplied :: [GHC.Internal.TH.Syntax.Name] -> GHC.Internal.TH.PprLib.Doc
-  commaSepWith :: forall a. (a -> GHC.Internal.TH.PprLib.Doc) -> [a] -> GHC.Internal.TH.PprLib.Doc
+  commaSep :: forall a. Ppr a => [a] -> GHC.Boot.TH.PprLib.Doc
+  commaSepApplied :: [GHC.Internal.TH.Syntax.Name] -> GHC.Boot.TH.PprLib.Doc
+  commaSepWith :: forall a. (a -> GHC.Boot.TH.PprLib.Doc) -> [a] -> GHC.Boot.TH.PprLib.Doc
   fromTANormal :: TypeArg -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Type
   funPrec :: Precedence
-  hashParens :: GHC.Internal.TH.PprLib.Doc -> GHC.Internal.TH.PprLib.Doc
+  hashParens :: GHC.Boot.TH.PprLib.Doc -> GHC.Boot.TH.PprLib.Doc
   isStarT :: GHC.Internal.TH.Syntax.Type -> GHC.Internal.Types.Bool
   isSymOcc :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.Types.Bool
   nestDepth :: GHC.Internal.Types.Int
   noPrec :: Precedence
   opPrec :: Precedence
-  parensIf :: GHC.Internal.Types.Bool -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.TH.PprLib.Doc
-  pprBangType :: GHC.Internal.TH.Syntax.BangType -> GHC.Internal.TH.PprLib.Doc
-  pprBndrVis :: GHC.Internal.TH.Syntax.BndrVis -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.TH.PprLib.Doc
-  pprBody :: GHC.Internal.Types.Bool -> GHC.Internal.TH.Syntax.Body -> GHC.Internal.TH.PprLib.Doc
-  pprClause :: GHC.Internal.Types.Bool -> GHC.Internal.TH.Syntax.Clause -> GHC.Internal.TH.PprLib.Doc
-  pprCtxWith :: forall a. Ppr a => (Precedence -> a -> GHC.Internal.TH.PprLib.Doc) -> [a] -> GHC.Internal.TH.PprLib.Doc
-  pprCxt :: GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.PprLib.Doc
-  pprExp :: Precedence -> GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.PprLib.Doc
-  pprFields :: [(GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Exp)] -> GHC.Internal.TH.PprLib.Doc
-  pprFixity :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Fixity -> GHC.Internal.TH.Syntax.NamespaceSpecifier -> GHC.Internal.TH.PprLib.Doc
-  pprForall :: [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity] -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.PprLib.Doc
-  pprForall' :: forall flag. PprFlag flag => ForallVisFlag -> [GHC.Internal.TH.Syntax.TyVarBndr flag] -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.PprLib.Doc
-  pprForallVis :: [GHC.Internal.TH.Syntax.TyVarBndr ()] -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.PprLib.Doc
-  pprFunArgType :: GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.PprLib.Doc
-  pprGadtRHS :: [(GHC.Internal.TH.Syntax.Strict, GHC.Internal.TH.Syntax.Type)] -> GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.PprLib.Doc
-  pprGuarded :: GHC.Internal.TH.PprLib.Doc -> (GHC.Internal.TH.Syntax.Guard, GHC.Internal.TH.Syntax.Exp) -> GHC.Internal.TH.PprLib.Doc
-  pprInfixExp :: GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.PprLib.Doc
-  pprInfixT :: Precedence -> GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.PprLib.Doc
-  pprLit :: Precedence -> GHC.Internal.TH.Syntax.Lit -> GHC.Internal.TH.PprLib.Doc
-  pprMatchPat :: GHC.Internal.TH.Syntax.Pat -> GHC.Internal.TH.PprLib.Doc
-  pprMaybeExp :: Precedence -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.PprLib.Doc
-  pprNamespaceSpecifier :: GHC.Internal.TH.Syntax.NamespaceSpecifier -> GHC.Internal.TH.PprLib.Doc
-  pprParendType :: GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.PprLib.Doc
-  pprParendTypeArg :: TypeArg -> GHC.Internal.TH.PprLib.Doc
-  pprPat :: Precedence -> GHC.Internal.TH.Syntax.Pat -> GHC.Internal.TH.PprLib.Doc
-  pprPatSynSig :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.PatSynType -> GHC.Internal.TH.PprLib.Doc
-  pprPatSynType :: GHC.Internal.TH.Syntax.PatSynType -> GHC.Internal.TH.PprLib.Doc
-  pprPrefixOcc :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.PprLib.Doc
-  pprRecFields :: [(GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Strict, GHC.Internal.TH.Syntax.Type)] -> GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.PprLib.Doc
-  pprStrictType :: (GHC.Internal.TH.Syntax.Strict, GHC.Internal.TH.Syntax.Type) -> GHC.Internal.TH.PprLib.Doc
-  pprString :: GHC.Internal.Base.String -> GHC.Internal.TH.PprLib.Doc
-  pprTyApp :: Precedence -> (GHC.Internal.TH.Syntax.Type, [TypeArg]) -> GHC.Internal.TH.PprLib.Doc
-  pprTyLit :: GHC.Internal.TH.Syntax.TyLit -> GHC.Internal.TH.PprLib.Doc
-  pprType :: Precedence -> GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.PprLib.Doc
-  pprVarBangType :: GHC.Internal.TH.Syntax.VarBangType -> GHC.Internal.TH.PprLib.Doc
-  pprVarStrictType :: (GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Strict, GHC.Internal.TH.Syntax.Type) -> GHC.Internal.TH.PprLib.Doc
-  ppr_bndrs :: forall flag. PprFlag flag => GHC.Internal.Maybe.Maybe [GHC.Internal.TH.Syntax.TyVarBndr flag] -> GHC.Internal.TH.PprLib.Doc
-  ppr_ctx_preds_with :: forall a. Ppr a => (Precedence -> a -> GHC.Internal.TH.PprLib.Doc) -> Precedence -> [a] -> GHC.Internal.TH.PprLib.Doc
-  ppr_cxt_preds :: Precedence -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.PprLib.Doc
-  ppr_data :: GHC.Internal.Types.Bool -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [GHC.Internal.TH.Syntax.Con] -> [GHC.Internal.TH.Syntax.DerivClause] -> GHC.Internal.TH.PprLib.Doc
-  ppr_dec :: GHC.Internal.Types.Bool -> GHC.Internal.TH.Syntax.Dec -> GHC.Internal.TH.PprLib.Doc
-  ppr_deriv_clause :: GHC.Internal.TH.Syntax.DerivClause -> GHC.Internal.TH.PprLib.Doc
-  ppr_deriv_strategy :: GHC.Internal.TH.Syntax.DerivStrategy -> GHC.Internal.TH.PprLib.Doc
-  ppr_newtype :: GHC.Internal.Types.Bool -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> GHC.Internal.TH.Syntax.Con -> [GHC.Internal.TH.Syntax.DerivClause] -> GHC.Internal.TH.PprLib.Doc
-  ppr_overlap :: GHC.Internal.TH.Syntax.Overlap -> GHC.Internal.TH.PprLib.Doc
-  ppr_sig :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.PprLib.Doc
-  ppr_tf_head :: GHC.Internal.TH.Syntax.TypeFamilyHead -> GHC.Internal.TH.PprLib.Doc
-  ppr_tySyn :: GHC.Internal.TH.PprLib.Doc -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.PprLib.Doc
-  ppr_type_data :: GHC.Internal.Types.Bool -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [GHC.Internal.TH.Syntax.Con] -> [GHC.Internal.TH.Syntax.DerivClause] -> GHC.Internal.TH.PprLib.Doc
-  ppr_typedef :: GHC.Internal.Base.String -> GHC.Internal.Types.Bool -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [GHC.Internal.TH.Syntax.Con] -> [GHC.Internal.TH.Syntax.DerivClause] -> GHC.Internal.TH.PprLib.Doc
+  parensIf :: GHC.Internal.Types.Bool -> GHC.Boot.TH.PprLib.Doc -> GHC.Boot.TH.PprLib.Doc
+  pprBangType :: GHC.Internal.TH.Syntax.BangType -> GHC.Boot.TH.PprLib.Doc
+  pprBndrVis :: GHC.Internal.TH.Syntax.BndrVis -> GHC.Boot.TH.PprLib.Doc -> GHC.Boot.TH.PprLib.Doc
+  pprBody :: GHC.Internal.Types.Bool -> GHC.Internal.TH.Syntax.Body -> GHC.Boot.TH.PprLib.Doc
+  pprClause :: GHC.Internal.Types.Bool -> GHC.Internal.TH.Syntax.Clause -> GHC.Boot.TH.PprLib.Doc
+  pprCtxWith :: forall a. Ppr a => (Precedence -> a -> GHC.Boot.TH.PprLib.Doc) -> [a] -> GHC.Boot.TH.PprLib.Doc
+  pprCxt :: GHC.Internal.TH.Syntax.Cxt -> GHC.Boot.TH.PprLib.Doc
+  pprExp :: Precedence -> GHC.Internal.TH.Syntax.Exp -> GHC.Boot.TH.PprLib.Doc
+  pprFields :: [(GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Exp)] -> GHC.Boot.TH.PprLib.Doc
+  pprFixity :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Fixity -> GHC.Internal.TH.Syntax.NamespaceSpecifier -> GHC.Boot.TH.PprLib.Doc
+  pprForall :: [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity] -> GHC.Internal.TH.Syntax.Cxt -> GHC.Boot.TH.PprLib.Doc
+  pprForall' :: forall flag. PprFlag flag => ForallVisFlag -> [GHC.Internal.TH.Syntax.TyVarBndr flag] -> GHC.Internal.TH.Syntax.Cxt -> GHC.Boot.TH.PprLib.Doc
+  pprForallVis :: [GHC.Internal.TH.Syntax.TyVarBndr ()] -> GHC.Internal.TH.Syntax.Cxt -> GHC.Boot.TH.PprLib.Doc
+  pprFunArgType :: GHC.Internal.TH.Syntax.Type -> GHC.Boot.TH.PprLib.Doc
+  pprGadtRHS :: [(GHC.Internal.TH.Syntax.Strict, GHC.Internal.TH.Syntax.Type)] -> GHC.Internal.TH.Syntax.Type -> GHC.Boot.TH.PprLib.Doc
+  pprGuarded :: GHC.Boot.TH.PprLib.Doc -> (GHC.Internal.TH.Syntax.Guard, GHC.Internal.TH.Syntax.Exp) -> GHC.Boot.TH.PprLib.Doc
+  pprInfixExp :: GHC.Internal.TH.Syntax.Exp -> GHC.Boot.TH.PprLib.Doc
+  pprInfixT :: Precedence -> GHC.Internal.TH.Syntax.Type -> GHC.Boot.TH.PprLib.Doc
+  pprLit :: Precedence -> GHC.Internal.TH.Syntax.Lit -> GHC.Boot.TH.PprLib.Doc
+  pprMatchPat :: GHC.Internal.TH.Syntax.Pat -> GHC.Boot.TH.PprLib.Doc
+  pprMaybeExp :: Precedence -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Exp -> GHC.Boot.TH.PprLib.Doc
+  pprNamespaceSpecifier :: GHC.Internal.TH.Syntax.NamespaceSpecifier -> GHC.Boot.TH.PprLib.Doc
+  pprParendType :: GHC.Internal.TH.Syntax.Type -> GHC.Boot.TH.PprLib.Doc
+  pprParendTypeArg :: TypeArg -> GHC.Boot.TH.PprLib.Doc
+  pprPat :: Precedence -> GHC.Internal.TH.Syntax.Pat -> GHC.Boot.TH.PprLib.Doc
+  pprPatSynSig :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.PatSynType -> GHC.Boot.TH.PprLib.Doc
+  pprPatSynType :: GHC.Internal.TH.Syntax.PatSynType -> GHC.Boot.TH.PprLib.Doc
+  pprPrefixOcc :: GHC.Internal.TH.Syntax.Name -> GHC.Boot.TH.PprLib.Doc
+  pprRecFields :: [(GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Strict, GHC.Internal.TH.Syntax.Type)] -> GHC.Internal.TH.Syntax.Type -> GHC.Boot.TH.PprLib.Doc
+  pprStrictType :: (GHC.Internal.TH.Syntax.Strict, GHC.Internal.TH.Syntax.Type) -> GHC.Boot.TH.PprLib.Doc
+  pprString :: GHC.Internal.Base.String -> GHC.Boot.TH.PprLib.Doc
+  pprTyApp :: Precedence -> (GHC.Internal.TH.Syntax.Type, [TypeArg]) -> GHC.Boot.TH.PprLib.Doc
+  pprTyLit :: GHC.Internal.TH.Syntax.TyLit -> GHC.Boot.TH.PprLib.Doc
+  pprType :: Precedence -> GHC.Internal.TH.Syntax.Type -> GHC.Boot.TH.PprLib.Doc
+  pprVarBangType :: GHC.Internal.TH.Syntax.VarBangType -> GHC.Boot.TH.PprLib.Doc
+  pprVarStrictType :: (GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Strict, GHC.Internal.TH.Syntax.Type) -> GHC.Boot.TH.PprLib.Doc
+  ppr_bndrs :: forall flag. PprFlag flag => GHC.Internal.Maybe.Maybe [GHC.Internal.TH.Syntax.TyVarBndr flag] -> GHC.Boot.TH.PprLib.Doc
+  ppr_ctx_preds_with :: forall a. Ppr a => (Precedence -> a -> GHC.Boot.TH.PprLib.Doc) -> Precedence -> [a] -> GHC.Boot.TH.PprLib.Doc
+  ppr_cxt_preds :: Precedence -> GHC.Internal.TH.Syntax.Cxt -> GHC.Boot.TH.PprLib.Doc
+  ppr_data :: GHC.Internal.Types.Bool -> GHC.Boot.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> GHC.Boot.TH.PprLib.Doc -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [GHC.Internal.TH.Syntax.Con] -> [GHC.Internal.TH.Syntax.DerivClause] -> GHC.Boot.TH.PprLib.Doc
+  ppr_dec :: GHC.Internal.Types.Bool -> GHC.Internal.TH.Syntax.Dec -> GHC.Boot.TH.PprLib.Doc
+  ppr_deriv_clause :: GHC.Internal.TH.Syntax.DerivClause -> GHC.Boot.TH.PprLib.Doc
+  ppr_deriv_strategy :: GHC.Internal.TH.Syntax.DerivStrategy -> GHC.Boot.TH.PprLib.Doc
+  ppr_newtype :: GHC.Internal.Types.Bool -> GHC.Boot.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> GHC.Boot.TH.PprLib.Doc -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> GHC.Internal.TH.Syntax.Con -> [GHC.Internal.TH.Syntax.DerivClause] -> GHC.Boot.TH.PprLib.Doc
+  ppr_overlap :: GHC.Internal.TH.Syntax.Overlap -> GHC.Boot.TH.PprLib.Doc
+  ppr_sig :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Type -> GHC.Boot.TH.PprLib.Doc
+  ppr_tf_head :: GHC.Internal.TH.Syntax.TypeFamilyHead -> GHC.Boot.TH.PprLib.Doc
+  ppr_tySyn :: GHC.Boot.TH.PprLib.Doc -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> GHC.Boot.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.Type -> GHC.Boot.TH.PprLib.Doc
+  ppr_type_data :: GHC.Internal.Types.Bool -> GHC.Boot.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> GHC.Boot.TH.PprLib.Doc -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [GHC.Internal.TH.Syntax.Con] -> [GHC.Internal.TH.Syntax.DerivClause] -> GHC.Boot.TH.PprLib.Doc
+  ppr_typedef :: GHC.Internal.Base.String -> GHC.Internal.Types.Bool -> GHC.Boot.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> GHC.Boot.TH.PprLib.Doc -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [GHC.Internal.TH.Syntax.Con] -> [GHC.Internal.TH.Syntax.DerivClause] -> GHC.Boot.TH.PprLib.Doc
   pprint :: forall a. Ppr a => a -> GHC.Internal.Base.String
   qualPrec :: Precedence
-  quoteParens :: GHC.Internal.TH.PprLib.Doc -> GHC.Internal.TH.PprLib.Doc
-  semiSep :: forall a. Ppr a => [a] -> GHC.Internal.TH.PprLib.Doc
-  semiSepWith :: forall a. (a -> GHC.Internal.TH.PprLib.Doc) -> [a] -> GHC.Internal.TH.PprLib.Doc
-  sepWith :: forall a. GHC.Internal.TH.PprLib.Doc -> (a -> GHC.Internal.TH.PprLib.Doc) -> [a] -> GHC.Internal.TH.PprLib.Doc
-  showtextl :: forall a. GHC.Internal.Show.Show a => a -> GHC.Internal.TH.PprLib.Doc
+  quoteParens :: GHC.Boot.TH.PprLib.Doc -> GHC.Boot.TH.PprLib.Doc
+  semiSep :: forall a. Ppr a => [a] -> GHC.Boot.TH.PprLib.Doc
+  semiSepWith :: forall a. (a -> GHC.Boot.TH.PprLib.Doc) -> [a] -> GHC.Boot.TH.PprLib.Doc
+  sepWith :: forall a. GHC.Boot.TH.PprLib.Doc -> (a -> GHC.Boot.TH.PprLib.Doc) -> [a] -> GHC.Boot.TH.PprLib.Doc
+  showtextl :: forall a. GHC.Internal.Show.Show a => a -> GHC.Boot.TH.PprLib.Doc
   sigPrec :: Precedence
   split :: GHC.Internal.TH.Syntax.Type -> (GHC.Internal.TH.Syntax.Type, [TypeArg])
-  unboxedSumBars :: GHC.Internal.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.SumAlt -> GHC.Internal.TH.Syntax.SumArity -> GHC.Internal.TH.PprLib.Doc
+  unboxedSumBars :: GHC.Boot.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.SumAlt -> GHC.Internal.TH.Syntax.SumArity -> GHC.Boot.TH.PprLib.Doc
   unopPrec :: Precedence
-  where_clause :: [GHC.Internal.TH.Syntax.Dec] -> GHC.Internal.TH.PprLib.Doc
+  where_clause :: [GHC.Internal.TH.Syntax.Dec] -> GHC.Boot.TH.PprLib.Doc
 
 module Language.Haskell.TH.PprLib where
   -- Safety: Safe
@@ -2217,51 +2217,51 @@ module Language.Haskell.TH.Syntax where
 
 
 -- Instances:
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Clause -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Con -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Dec -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.DecidedStrictness -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Exp -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.FamilyResultSig -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Foreign -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.FunDep -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Info -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.InjectivityAnn -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Inline -- Defined in ‘GHC.Internal.TH.Ppr’
-instance forall a. GHC.Internal.TH.Ppr.Ppr a => GHC.Internal.TH.Ppr.Ppr [a] -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Lit -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Loc -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Match -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Module -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.ModuleInfo -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Name -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Pat -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.PatSynArgs -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.PatSynDir -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Phases -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Pragma -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Range -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Role -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.RuleBndr -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.RuleMatch -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.SourceStrictness -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Stmt -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.TyLit -- Defined in ‘GHC.Internal.TH.Ppr’
-instance forall flag. GHC.Internal.TH.Ppr.PprFlag flag => GHC.Internal.TH.Ppr.Ppr (GHC.Internal.TH.Syntax.TyVarBndr flag) -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.Ppr GHC.Internal.TH.Ppr.TypeArg -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.PprFlag GHC.Internal.TH.Syntax.BndrVis -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.PprFlag GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Internal.TH.Ppr’
-instance GHC.Internal.TH.Ppr.PprFlag () -- Defined in ‘GHC.Internal.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Clause -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Con -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Dec -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.DecidedStrictness -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Exp -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.FamilyResultSig -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Foreign -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.FunDep -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Info -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.InjectivityAnn -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Inline -- Defined in ‘GHC.Boot.TH.Ppr’
+instance forall a. GHC.Boot.TH.Ppr.Ppr a => GHC.Boot.TH.Ppr.Ppr [a] -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Lit -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Loc -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Match -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Module -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.ModuleInfo -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Name -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Pat -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.PatSynArgs -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.PatSynDir -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Phases -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Pragma -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Range -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Role -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.RuleBndr -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.RuleMatch -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.SourceStrictness -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Stmt -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.TyLit -- Defined in ‘GHC.Boot.TH.Ppr’
+instance forall flag. GHC.Boot.TH.Ppr.PprFlag flag => GHC.Boot.TH.Ppr.Ppr (GHC.Internal.TH.Syntax.TyVarBndr flag) -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Boot.TH.Ppr.TypeArg -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.PprFlag GHC.Internal.TH.Syntax.BndrVis -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.PprFlag GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.PprFlag () -- Defined in ‘GHC.Boot.TH.Ppr’
 instance GHC.Internal.Base.Applicative GHC.Internal.TH.Syntax.Q -- Defined in ‘GHC.Internal.TH.Syntax’
-instance [safe] GHC.Internal.Base.Applicative GHC.Internal.TH.PprLib.PprM -- Defined in ‘GHC.Internal.TH.PprLib’
+instance [safe] GHC.Internal.Base.Applicative GHC.Boot.TH.PprLib.PprM -- Defined in ‘GHC.Boot.TH.PprLib’
 instance GHC.Internal.Base.Functor GHC.Internal.TH.Syntax.Q -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Base.Functor GHC.Internal.TH.Syntax.TyVarBndr -- Defined in ‘GHC.Internal.TH.Syntax’
-instance [safe] GHC.Internal.Base.Functor GHC.Internal.TH.PprLib.PprM -- Defined in ‘GHC.Internal.TH.PprLib’
+instance [safe] GHC.Internal.Base.Functor GHC.Boot.TH.PprLib.PprM -- Defined in ‘GHC.Boot.TH.PprLib’
 instance GHC.Internal.Base.Monad GHC.Internal.TH.Syntax.Q -- Defined in ‘GHC.Internal.TH.Syntax’
-instance [safe] GHC.Internal.Base.Monad GHC.Internal.TH.PprLib.PprM -- Defined in ‘GHC.Internal.TH.PprLib’
+instance [safe] GHC.Internal.Base.Monad GHC.Boot.TH.PprLib.PprM -- Defined in ‘GHC.Boot.TH.PprLib’
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.TH.Syntax.Q a) -- Defined in ‘GHC.Internal.TH.Syntax’
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.TH.Syntax.Q a) -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Syntax’
@@ -2557,8 +2557,8 @@ instance forall flag. GHC.Internal.Show.Show flag => GHC.Internal.Show.Show (GHC
 instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Show.Show GHC.Internal.LanguageExtensions.Extension -- Defined in ‘GHC.Internal.LanguageExtensions’
-instance GHC.Internal.Show.Show GHC.Internal.TH.Ppr.ForallVisFlag -- Defined in ‘GHC.Internal.TH.Ppr’
-instance [safe] GHC.Internal.Show.Show GHC.Internal.TH.PprLib.Doc -- Defined in ‘GHC.Internal.TH.PprLib’
+instance GHC.Internal.Show.Show GHC.Boot.TH.Ppr.ForallVisFlag -- Defined in ‘GHC.Boot.TH.Ppr’
+instance [safe] GHC.Internal.Show.Show GHC.Boot.TH.PprLib.Doc -- Defined in ‘GHC.Boot.TH.PprLib’
 instance GHC.Internal.Show.Show GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Addr# -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Lift’

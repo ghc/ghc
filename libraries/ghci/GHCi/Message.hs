@@ -57,7 +57,7 @@ import Data.Map (Map)
 import Foreign
 import GHC.Generics
 import GHC.Stack.CCS
-import qualified GHC.Internal.TH.Syntax        as TH
+import qualified GHC.Boot.TH.Syntax        as TH
 import System.Exit
 import System.IO
 import System.IO.Error

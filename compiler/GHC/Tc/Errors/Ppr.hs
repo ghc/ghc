@@ -37,12 +37,12 @@ module GHC.Tc.Errors.Ppr
 
 import GHC.Prelude
 
-import qualified GHC.Internal.TH.Syntax as TH
--- In stage1: import "ghc-boot-th-next" qualified GHC.Internal.TH.Syntax as TH
--- In stage2: import "ghc-boot-th"      qualified GHC.Internal.TH.Syntax as TH
---            which resolves to
+import qualified GHC.Boot.TH.Syntax as TH
+-- In stage1: import "ghc-boot-th-next" qualified GHC.Boot.TH.Syntax as TH
+-- In stage2: import "ghc-boot-th"      qualified GHC.Boot.TH.Syntax as TH
+--            which is a rexport of
 --            import "ghc-internal"     qualified GHC.Internal.TH.Syntax as TH
-import qualified GHC.Internal.TH.Ppr as TH
+import qualified GHC.Boot.TH.Ppr as TH
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon, pretendNameIsInScope )

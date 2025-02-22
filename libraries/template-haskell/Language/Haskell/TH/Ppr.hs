@@ -3,7 +3,7 @@
 -- | contains a prettyprinter for the
 -- Template Haskell datatypes
 module Language.Haskell.TH.Ppr
-  ( module GHC.Internal.TH.Ppr )
+  ( module GHC.Boot.TH.Ppr )
   where
 
-import GHC.Internal.TH.Ppr
+import GHC.Boot.TH.Ppr

@@ -42,7 +42,7 @@ import GHC.Utils.Outputable ( Outputable(..) )
 
 import Language.Haskell.Syntax.Basic ( FieldLabelString(..) )
 import Language.Haskell.Syntax
-import GHC.Internal.TH.Syntax qualified as TH
+import GHC.Boot.TH.Syntax qualified as TH
 
 import qualified Data.List.NonEmpty as NE
 
