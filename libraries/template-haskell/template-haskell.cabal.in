@@ -43,7 +43,6 @@ Library
     exposed-modules:
         Language.Haskell.TH
         Language.Haskell.TH.Lib
-        Language.Haskell.TH.Lib.Internal
         Language.Haskell.TH.Ppr
         Language.Haskell.TH.PprLib
         Language.Haskell.TH.Quote
