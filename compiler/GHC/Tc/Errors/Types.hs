@@ -241,7 +241,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable (Typeable)
-import qualified GHC.Internal.TH.Syntax as TH
+import qualified GHC.Boot.TH.Syntax as TH
 import Data.Map.Strict (Map)
 
 import GHC.Generics ( Generic )

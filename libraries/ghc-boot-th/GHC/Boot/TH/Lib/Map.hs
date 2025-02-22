@@ -10,11 +10,11 @@
 --
 -- The original code is BSD-licensed and copyrighted by Daan Leijen, Andriy Palamarchuk, et al.
 
-module GHC.Internal.TH.Lib.Map
+module GHC.Boot.TH.Lib.Map
     ( Map
     , empty
     , insert
-    , GHC.Internal.TH.Lib.Map.lookup
+    , GHC.Boot.TH.Lib.Map.lookup
     ) where
 
 import Prelude

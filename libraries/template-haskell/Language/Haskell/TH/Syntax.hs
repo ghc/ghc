@@ -3,22 +3,22 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE Trustworthy #-}
 module Language.Haskell.TH.Syntax
-  ( module GHC.Internal.TH.Syntax
+  ( module GHC.Boot.TH.Syntax
   , makeRelativeToProject
-  , module GHC.Internal.TH.Lift
+  , module GHC.Boot.TH.Lift
   , addrToByteArrayName
   , addrToByteArray
   )
 where
 
-import GHC.Internal.TH.Syntax
-import GHC.Internal.TH.Lift
+import GHC.Boot.TH.Syntax
+import GHC.Boot.TH.Lift
 import System.FilePath
 import Data.Array.Byte
 import GHC.Exts
 import GHC.ST
 
--- This module completely re-exports 'GHC.Internal.TH.Syntax',
+-- This module completely re-exports 'GHC.Boot.TH.Syntax',
 -- and exports additionally functions that depend on filepath.
 
 -- | The input is a filepath, which if relative is offset by the package root.

@@ -40,7 +40,7 @@ import GHC.HsToCore.Match.Literal
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Binds
 
-import qualified GHC.Internal.TH.Syntax as TH
+import qualified GHC.Boot.TH.Syntax as TH
 
 import GHC.Hs
 
