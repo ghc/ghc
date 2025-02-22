@@ -119,10 +119,11 @@
            (PrefixConGADT
             (NoExtField)
             [(HsScaled
-              (HsUnrestrictedArrow
+              (HsStandardArrow
                (EpUniTok
                 (EpaSpan { T18791.hs:5:14-15 })
-                (NormalSyntax)))
+                (NormalSyntax))
+               [])
               (L
                (EpAnn
                 (EpaSpan { T18791.hs:5:10-12 })
@@ -161,7 +162,9 @@
                 []))
               (Unqual
                {OccName: T}))))
+           []
            (Nothing)))])
-       []))))]))
+       [])
+      [])))]))
 
 

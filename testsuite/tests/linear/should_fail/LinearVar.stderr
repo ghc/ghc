@@ -1,13 +1,13 @@
-
-LinearVar.hs:5:5: error: [GHC-25897]
+LinearVar.hs:7:5: error: [GHC-25897]
     • Couldn't match type ‘m’ with ‘Many’
       Expected: a %m -> b
         Actual: a -> b
       ‘m’ is a rigid type variable bound by
         the type signature for:
-          f :: forall a (m :: GHC.Types.Multiplicity) b. a %m -> b
-        at LinearVar.hs:4:1-14
+          f :: forall a (m :: Multiplicity) b. a %m -> b
+        at LinearVar.hs:6:1-32
     • In the expression: undefined :: a -> b
       In an equation for ‘f’: f = undefined :: a -> b
     • Relevant bindings include
-        f :: a %m -> b (bound at LinearVar.hs:5:1)
+        f :: a %m -> b (bound at LinearVar.hs:7:1)
+

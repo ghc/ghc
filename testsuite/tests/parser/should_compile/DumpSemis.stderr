@@ -227,7 +227,8 @@
               (EpaSpan { DumpSemis.hs:9:11 })
               (EpaSpan { DumpSemis.hs:9:12 }))
              (HsBoxedOrConstraintTuple)
-             []))))))))))
+             [])))))))
+      [])))
   ,(L
     (EpAnn
      (EpaSpan { DumpSemis.hs:(10,1)-(12,3) })
@@ -534,7 +535,8 @@
               (EpaSpan { DumpSemis.hs:14:11 })
               (EpaSpan { DumpSemis.hs:14:12 }))
              (HsBoxedOrConstraintTuple)
-             []))))))))))
+             [])))))))
+      [])))
   ,(L
     (EpAnn
      (EpaSpan { DumpSemis.hs:(15,1)-(19,3) })
@@ -800,7 +802,8 @@
               (EpaSpan { DumpSemis.hs:21:11 })
               (EpaSpan { DumpSemis.hs:21:12 }))
              (HsBoxedOrConstraintTuple)
-             []))))))))))
+             [])))))))
+      [])))
   ,(L
     (EpAnn
      (EpaSpan { DumpSemis.hs:22:1-30 })
@@ -1450,10 +1453,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsStandardArrow
               (EpUniTok
                (EpaSpan { DumpSemis.hs:29:18-19 })
-               (NormalSyntax)))
+               (NormalSyntax))
+              [])
              (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:29:12-16 })
@@ -1492,6 +1496,7 @@
                   []))
                 (Unqual
                  {OccName: Int}))))))))))]
+      []
       []
       []
       []
@@ -1661,10 +1666,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsStandardArrow
               (EpUniTok
                (EpaSpan { DumpSemis.hs:31:27-28 })
-               (NormalSyntax)))
+               (NormalSyntax))
+              [])
              (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:31:25 })
@@ -1702,7 +1708,8 @@
                  (EpaComments
                   []))
                 (Unqual
-                 {OccName: a}))))))))))))))
+                 {OccName: a})))))))))))
+      [])))
   ,(L
     (EpAnn
      (EpaSpan { DumpSemis.hs:32:1-7 })

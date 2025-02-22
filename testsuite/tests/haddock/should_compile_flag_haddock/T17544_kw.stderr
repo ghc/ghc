@@ -150,6 +150,7 @@
                 []))
               (Unqual
                {OccName: Foo}))))
+           []
            (Just
             (L
              { T17544_kw.hs:15:10-35 }
@@ -163,7 +164,8 @@
                   " Bad comment for MkFoo"))
                 []))
               [])))))])
-       []))))
+       [])
+      [])))
   ,(L
     (EpAnn
      (EpaSpan { T17544_kw.hs:(18,1)-(19,26) })
@@ -245,10 +247,11 @@
           (PrefixConGADT
            (NoExtField)
            [(HsScaled
-             (HsUnrestrictedArrow
+             (HsStandardArrow
               (EpUniTok
                (EpaSpan { T17544_kw.hs:19:21-22 })
-               (NormalSyntax)))
+               (NormalSyntax))
+              [])
              (L
               (EpAnn
                (EpaSpan { T17544_kw.hs:19:18-19 })
@@ -282,6 +285,7 @@
                []))
              (Unqual
               {OccName: Bar}))))
+          []
           (Just
            (L
             { T17544_kw.hs:18:13-38 }
@@ -295,7 +299,8 @@
                  " Bad comment for MkBar"))
                []))
              []))))))
-       []))))
+       [])
+      [])))
   ,(L
     (EpAnn
      (EpaSpan { T17544_kw.hs:(21,1)-(24,18) })
@@ -439,6 +444,7 @@
               (HsDocStringChunk
                " Bad comment for clsmethod"))
              []))
-           []))))])))]))
+           []))))]
+      [])))]))
 
 

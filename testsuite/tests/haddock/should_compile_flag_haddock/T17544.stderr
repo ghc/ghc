@@ -148,10 +148,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsStandardArrow
               (EpUniTok
                (EpaSpan { T17544.hs:6:11-12 })
-               (NormalSyntax)))
+               (NormalSyntax))
+              [])
              (L
               (EpAnn
                (EpaSpan { T17544.hs:6:9 })
@@ -211,6 +212,7 @@
                      " comment on Int"))
                    []))
                  []))))))))))]
+      []
       []
       []
       []
@@ -326,10 +328,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsStandardArrow
               (EpUniTok
                (EpaSpan { T17544.hs:10:11-12 })
-               (NormalSyntax)))
+               (NormalSyntax))
+              [])
              (L
               (EpAnn
                (EpaSpan { T17544.hs:10:9 })
@@ -390,7 +393,8 @@
               (HsDocStringChunk
                " comment on f2"))
              []))
-           []))))])))
+           []))))]
+      [])))
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:(13,1)-(14,16) })
@@ -502,10 +506,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsStandardArrow
               (EpUniTok
                (EpaSpan { T17544.hs:14:11-12 })
-               (NormalSyntax)))
+               (NormalSyntax))
+              [])
              (L
               (EpAnn
                (EpaSpan { T17544.hs:14:9 })
@@ -544,6 +549,7 @@
                   []))
                 (Unqual
                  {OccName: Int}))))))))))]
+      []
       []
       []
       []
@@ -681,10 +687,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsStandardArrow
               (EpUniTok
                (EpaSpan { T17544.hs:18:11-12 })
-               (NormalSyntax)))
+               (NormalSyntax))
+              [])
              (L
               (EpAnn
                (EpaSpan { T17544.hs:18:9 })
@@ -767,10 +774,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsStandardArrow
               (EpUniTok
                (EpaSpan { T17544.hs:20:11-12 })
-               (NormalSyntax)))
+               (NormalSyntax))
+              [])
              (L
               (EpAnn
                (EpaSpan { T17544.hs:20:9 })
@@ -809,6 +817,7 @@
                   []))
                 (Unqual
                  {OccName: Int}))))))))))]
+      []
       []
       []
       []
@@ -956,6 +965,7 @@
           (NoSig
            (NoExtField)))
          (Nothing)))]
+      []
       []
       [])))
   ,(L
@@ -1192,9 +1202,11 @@
                        []))
                      (Unqual
                       {OccName: Int}))))))
+                []
                 (Nothing)))])
             []))))]
-       (Nothing)))))
+       (Nothing)
+       []))))
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:28:1-30 })
@@ -1338,6 +1350,7 @@
           (NoSig
            (NoExtField)))
          (Nothing)))]
+      []
       []
       [])))
   ,(L
@@ -1574,9 +1587,11 @@
                        []))
                      (Unqual
                       {OccName: Int}))))))
+                []
                 (Nothing)))])
             []))))]
-       (Nothing)))))
+       (Nothing)
+       []))))
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:34:1-30 })
@@ -1720,6 +1735,7 @@
           (NoSig
            (NoExtField)))
          (Nothing)))]
+      []
       []
       [])))
   ,(L
@@ -1956,9 +1972,11 @@
                        []))
                      (Unqual
                       {OccName: Int}))))))
+                []
                 (Nothing)))])
             []))))]
-       (Nothing)))))
+       (Nothing)
+       []))))
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:40:1-30 })
@@ -2102,6 +2120,7 @@
           (NoSig
            (NoExtField)))
          (Nothing)))]
+      []
       []
       [])))
   ,(L
@@ -2338,9 +2357,11 @@
                        []))
                      (Unqual
                       {OccName: Int}))))))
+                []
                 (Nothing)))])
             []))))]
-       (Nothing)))))
+       (Nothing)
+       []))))
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:46:1-30 })
@@ -2484,6 +2505,7 @@
           (NoSig
            (NoExtField)))
          (Nothing)))]
+      []
       []
       [])))
   ,(L
@@ -2720,9 +2742,11 @@
                        []))
                      (Unqual
                       {OccName: Int}))))))
+                []
                 (Nothing)))])
             []))))]
-       (Nothing)))))
+       (Nothing)
+       []))))
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:52:1-32 })
@@ -2866,6 +2890,7 @@
           (NoSig
            (NoExtField)))
          (Nothing)))]
+      []
       []
       [])))
   ,(L
@@ -3102,9 +3127,11 @@
                        []))
                      (Unqual
                       {OccName: Int}))))))
+                []
                 (Nothing)))])
             []))))]
-       (Nothing)))))
+       (Nothing)
+       []))))
   ,(L
     (EpAnn
      (EpaSpan { T17544.hs:56:1-38 })

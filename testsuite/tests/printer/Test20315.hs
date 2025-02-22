@@ -1,3 +1,5 @@
 {-# LANGUAGE LinearTypes #-}
 
-f = id :: a %(m n) -> a
+import GHC.Types
+
+f = id :: a %(m n :: Multiplicity) -> a

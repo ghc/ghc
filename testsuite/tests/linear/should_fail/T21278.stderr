@@ -1,13 +1,13 @@
-
-T21278.hs:7:11: error: [GHC-25897]
+T21278.hs:9:11: error: [GHC-25897]
     • Couldn't match type ‘p’ with ‘Many’
         arising from multiplicity of ‘x’
       ‘p’ is a rigid type variable bound by
         a pattern with constructor:
-          C :: forall a (p :: GHC.Types.Multiplicity). (a %p -> a) %1 -> C a,
+          C :: forall a (p :: Multiplicity). (a %p -> a) %1 -> C a,
         in a case alternative
-        at T21278.hs:7:26-28
+        at T21278.hs:9:26-28
     • In the first argument of ‘C’, namely
         ‘(\ x -> case b of C g -> g x)’
       In the expression: C (\ x -> case b of C g -> g x)
       In an equation for ‘f’: f b = C (\ x -> case b of C g -> g x)
+

@@ -8,5 +8,5 @@ import Data.Kind (Type)
 data T :: Multiplicity -> Type where
   MkT :: () %m-> T m
 
-unMkT :: T m %n-> ()
+unMkT :: T m %(n :: Multiplicity) -> ()
 unMkT (MkT x) = x

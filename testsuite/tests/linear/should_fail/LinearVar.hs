@@ -1,5 +1,7 @@
 {-# LANGUAGE LinearTypes #-}
 module LinearVar where
 
-f :: a %m -> b
+import GHC.Types (Multiplicity)
+
+f :: a %(m :: Multiplicity) -> b
 f = undefined :: a -> b

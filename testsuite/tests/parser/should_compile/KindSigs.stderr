@@ -819,10 +819,11 @@
             []))
           (HsFunTy
            (NoExtField)
-           (HsUnrestrictedArrow
+           (HsStandardArrow
             (EpUniTok
              (EpaSpan { KindSigs.hs:22:22-23 })
-             (NormalSyntax)))
+             (NormalSyntax))
+            [])
            (L
             (EpAnn
              (EpaSpan { KindSigs.hs:22:8-20 })
@@ -894,10 +895,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsStandardArrow
               (EpUniTok
                (EpaSpan { KindSigs.hs:22:30-31 })
-               (NormalSyntax)))
+               (NormalSyntax))
+              [])
              (L
               (EpAnn
                (EpaSpan { KindSigs.hs:22:25-28 })
@@ -973,7 +975,8 @@
                      (EpaComments
                       []))
                     (Unqual
-                     {OccName: Type}))))))))))))))))))
+                     {OccName: Type})))))))))))))))
+      [])))
   ,(L
     (EpAnn
      (EpaSpan { KindSigs.hs:23:1-12 })
@@ -1699,7 +1702,8 @@
                  (EpaComments
                   []))
                 (Unqual
-                 {OccName: Type}))))))))))))))
+                 {OccName: Type})))))))))))
+      [])))
   ,(L
     (EpAnn
      (EpaSpan { KindSigs.hs:35:1-11 })

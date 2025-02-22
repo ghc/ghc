@@ -188,6 +188,7 @@ module Language.Haskell.TH where
     | InstanceSigs
     | ApplicativeDo
     | LinearTypes
+    | Modifiers
     | RequiredTypeArguments
     | StandaloneDeriving
     | DeriveDataTypeable
@@ -792,6 +793,7 @@ module Language.Haskell.TH.LanguageExtensions where
     | InstanceSigs
     | ApplicativeDo
     | LinearTypes
+    | Modifiers
     | RequiredTypeArguments
     | StandaloneDeriving
     | DeriveDataTypeable
@@ -1871,6 +1873,7 @@ module Language.Haskell.TH.Syntax where
     | InstanceSigs
     | ApplicativeDo
     | LinearTypes
+    | Modifiers
     | RequiredTypeArguments
     | StandaloneDeriving
     | DeriveDataTypeable
@@ -2052,8 +2055,8 @@ module Language.Haskell.TH.Syntax where
     qAddForeignFilePath :: ForeignSrcLang -> GHC.Internal.Base.String -> m ()
     qAddModFinalizer :: Q () -> m ()
     qAddCorePlugin :: GHC.Internal.Base.String -> m ()
-    qGetQ :: forall a. ghc-internal-9.1001.0:GHC.Internal.Data.Typeable.Internal.Typeable a => m (GHC.Internal.Maybe.Maybe a)
-    qPutQ :: forall a. ghc-internal-9.1001.0:GHC.Internal.Data.Typeable.Internal.Typeable a => a -> m ()
+    qGetQ :: forall a. ghc-internal-9.1300.0:GHC.Internal.Data.Typeable.Internal.Typeable a => m (GHC.Internal.Maybe.Maybe a)
+    qPutQ :: forall a. ghc-internal-9.1300.0:GHC.Internal.Data.Typeable.Internal.Typeable a => a -> m ()
     qIsExtEnabled :: Extension -> m GHC.Types.Bool
     qExtsEnabled :: m [Extension]
     qPutDoc :: DocLoc -> GHC.Internal.Base.String -> m ()
@@ -2135,7 +2138,7 @@ module Language.Haskell.TH.Syntax where
   falseName :: Name
   getDoc :: DocLoc -> Q (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
   getPackageRoot :: Q GHC.Internal.IO.FilePath
-  getQ :: forall a. ghc-internal-9.1001.0:GHC.Internal.Data.Typeable.Internal.Typeable a => Q (GHC.Internal.Maybe.Maybe a)
+  getQ :: forall a. ghc-internal-9.1300.0:GHC.Internal.Data.Typeable.Internal.Typeable a => Q (GHC.Internal.Maybe.Maybe a)
   get_cons_names :: Con -> [Name]
   hoistCode :: forall (m :: * -> *) (n :: * -> *) (r :: GHC.Types.RuntimeRep) (a :: TYPE r). GHC.Internal.Base.Monad m => (forall x. m x -> n x) -> Code m a -> Code n a
   isExtEnabled :: Extension -> Q GHC.Types.Bool
@@ -2181,7 +2184,7 @@ module Language.Haskell.TH.Syntax where
   oneName :: Name
   pkgString :: PkgName -> GHC.Internal.Base.String
   putDoc :: DocLoc -> GHC.Internal.Base.String -> Q ()
-  putQ :: forall a. ghc-internal-9.1001.0:GHC.Internal.Data.Typeable.Internal.Typeable a => a -> Q ()
+  putQ :: forall a. ghc-internal-9.1300.0:GHC.Internal.Data.Typeable.Internal.Typeable a => a -> Q ()
   recover :: forall a. Q a -> Q a -> Q a
   reify :: Name -> Q Info
   reifyAnnotations :: forall a. GHC.Internal.Data.Data.Data a => AnnLookup -> Q [a]

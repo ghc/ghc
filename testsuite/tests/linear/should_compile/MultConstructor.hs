@@ -3,11 +3,11 @@ module MultConstructor where
 
 import GHC.Types
 
-data T p a where
+data T (p :: Multiplicity) a where
   MkT :: a %p -> T p a
 
 data Existential a where  -- #18790
-  MkE :: a %p -> Existential a
+  MkE :: a %(p :: Multiplicity) -> Existential a
 
 f1 :: forall (a :: Type). T 'Many a %1 -> (a,a)
 f1 (MkT x) = (x,x)
@@ -27,7 +27,7 @@ g2 (MkE x) = x
 vta :: Int %1 -> Existential Int
 vta x = MkE @Int @'One x
 
-h :: a %m -> b
+h :: a %(m :: Multiplicity) -> b
 h = h
 
 vta2 :: Int %1 -> Bool  -- see #23764

@@ -196,6 +196,7 @@
              (PrefixCon
               []
               [])
+             []
              (Nothing)))
           ,(L
             (EpAnn
@@ -221,7 +222,8 @@
               []
               [(HsScaled
                 (HsLinearArrow
-                 (NoExtField))
+                 (NoExtField)
+                 [])
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:9:26-30 })
@@ -240,8 +242,10 @@
                     (EpaComments
                      []))
                    {Name: DumpRenamedAst.Peano}))))])
+             []
              (Nothing)))])
-         [])))]
+         [])
+        []))]
      []
      []
      [])
@@ -636,8 +640,9 @@
              []))
            (HsFunTy
             (NoExtField)
-            (HsUnrestrictedArrow
-             (NoExtField))
+            (HsStandardArrow
+             (NoExtField)
+             [])
             (L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:11:16-18 })
@@ -743,8 +748,9 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
-              (NoExtField))
+             (HsStandardArrow
+              (NoExtField)
+              [])
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:16:20 })
@@ -772,8 +778,9 @@
                 []))
               (HsFunTy
                (NoExtField)
-               (HsUnrestrictedArrow
-                (NoExtField))
+               (HsStandardArrow
+                (NoExtField)
+                [])
                (L
                 (EpAnn
                  (EpaSpan { DumpRenamedAst.hs:16:25 })
@@ -890,8 +897,9 @@
                    []))
                  (HsFunTy
                   (NoExtField)
-                  (HsUnrestrictedArrow
-                   (NoExtField))
+                  (HsStandardArrow
+                   (NoExtField)
+                   [])
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:19:28 })
@@ -954,8 +962,9 @@
                []))
              (HsFunTy
               (NoExtField)
-              (HsUnrestrictedArrow
-               (NoExtField))
+              (HsStandardArrow
+               (NoExtField)
+               [])
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:19:42-52 })
@@ -976,8 +985,9 @@
                    []))
                  (HsFunTy
                   (NoExtField)
-                  (HsUnrestrictedArrow
-                   (NoExtField))
+                  (HsStandardArrow
+                   (NoExtField)
+                   [])
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:19:43 })
@@ -1066,8 +1076,9 @@
               (PrefixConGADT
                (NoExtField)
                [(HsScaled
-                 (HsUnrestrictedArrow
-                  (NoExtField))
+                 (HsStandardArrow
+                  (NoExtField)
+                  [])
                  (L
                   (EpAnn
                    (EpaSpan { DumpRenamedAst.hs:20:10-34 })
@@ -1131,8 +1142,9 @@
                         []))
                       (HsFunTy
                        (NoExtField)
-                       (HsUnrestrictedArrow
-                        (NoExtField))
+                       (HsStandardArrow
+                        (NoExtField)
+                        [])
                        (L
                         (EpAnn
                          (EpaSpan { DumpRenamedAst.hs:20:22-25 })
@@ -1295,6 +1307,7 @@
                     (EpaComments
                      []))
                    {Name: g})))))
+              []
               (Nothing))))
            [])))))])
    ,(TyClGroup
@@ -1439,7 +1452,8 @@
               []
               [(HsScaled
                 (HsLinearArrow
-                 (NoExtField))
+                 (NoExtField)
+                 [])
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:22:25-29 })
@@ -1496,8 +1510,10 @@
                         (EpaComments
                          []))
                        {Name: a}))))))))])
+             []
              (Nothing)))])
-         [])))]
+         [])
+        []))]
      []
      []
      [])
@@ -1807,8 +1823,9 @@
                  []))
                (HsFunTy
                 (NoExtField)
-                (HsUnrestrictedArrow
-                 (NoExtField))
+                (HsStandardArrow
+                 (NoExtField)
+                 [])
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:25:31 })
@@ -1911,8 +1928,9 @@
              []))
            (HsFunTy
             (NoExtField)
-            (HsUnrestrictedArrow
-             (NoExtField))
+            (HsStandardArrow
+             (NoExtField)
+             [])
             (L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:24:12 })
@@ -1940,8 +1958,9 @@
                []))
              (HsFunTy
               (NoExtField)
-              (HsUnrestrictedArrow
-               (NoExtField))
+              (HsStandardArrow
+               (NoExtField)
+               [])
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:24:17-27 })
@@ -1962,8 +1981,9 @@
                    []))
                  (HsFunTy
                   (NoExtField)
-                  (HsUnrestrictedArrow
-                   (NoExtField))
+                  (HsStandardArrow
+                   (NoExtField)
+                   [])
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:24:18 })
@@ -2170,6 +2190,7 @@
             (NoSig
              (NoExtField)))
            (Nothing)))]
+        []
         []
         []))]
      []
@@ -2408,7 +2429,8 @@
                     []))
                   {Name: b}))))))))]
          []
-         (Nothing))))])]
+         (Nothing)
+         [])))])]
    []
    []
    []

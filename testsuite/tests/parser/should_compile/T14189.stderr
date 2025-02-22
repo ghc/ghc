@@ -79,7 +79,8 @@
               []
               [(HsScaled
                 (HsLinearArrow
-                 (NoExtField))
+                 (NoExtField)
+                 [])
                 (L
                  (EpAnn
                   (EpaSpan { T14189.hs:6:18-20 })
@@ -98,6 +99,7 @@
                     (EpaComments
                      []))
                    {Name: GHC.Types.Int}))))])
+             []
              (Nothing)))
           ,(L
             (EpAnn
@@ -123,6 +125,7 @@
              (PrefixCon
               []
               [])
+             []
              (Nothing)))
           ,(L
             (EpAnn
@@ -205,9 +208,12 @@
                       (EpaComments
                        []))
                      {Name: GHC.Types.Int})))
+                  []
                   (Nothing)))]))
+             []
              (Nothing)))])
-         [])))]
+         [])
+        []))]
      []
      []
      [])]

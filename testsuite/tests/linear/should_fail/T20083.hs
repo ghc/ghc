@@ -2,7 +2,9 @@
 
 module T20083 where
 
-ap :: (a -> b) -> a %m -> b
+import GHC.Types (Multiplicity)
+
+ap :: (a -> b) -> a %(m :: Multiplicity) -> b
 ap f x = f x
 
 ap2 :: a %1-> ()

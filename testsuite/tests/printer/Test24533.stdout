@@ -281,7 +281,8 @@
        []
        []
        []
-       (Nothing)))))
+       (Nothing)
+       []))))
   ,(L
     (EpAnn
      (EpaSpan { Test24533.hs:11:1-99 })
@@ -414,6 +415,7 @@
               (Unqual
                {OccName: Type})))))))])
       (Prefix)
+      []
       []
       []
       []
@@ -666,7 +668,8 @@
        []
        []
        []
-       (Nothing)))))]))
+       (Nothing)
+       []))))]))
 
 
 
@@ -946,7 +949,8 @@
        []
        []
        []
-       (Nothing)))))
+       (Nothing)
+       []))))
   ,(L
     (EpAnn
      (EpaSpan { Test24533.ppr.hs:4:1-21 })
@@ -1032,6 +1036,7 @@
               (Unqual
                {OccName: Type})))))))])
       (Prefix)
+      []
       []
       []
       []
@@ -1264,6 +1269,7 @@
        []
        []
        []
-       (Nothing)))))]))
+       (Nothing)
+       []))))]))
 
 

@@ -156,8 +156,10 @@
            (PrefixCon
             []
             [])
+           []
            (Nothing)))])
-       []))))
+       [])
+      [])))
   ,(L
     (EpAnn
      (EpaSpan { T20452.hs:6:1-31 })
@@ -279,8 +281,10 @@
            (PrefixCon
             []
             [])
+           []
            (Nothing)))])
-       []))))
+       [])
+      [])))
   ,(L
     (EpAnn
      (EpaSpan { T20452.hs:8:1-85 })
@@ -512,6 +516,7 @@
                    (Unqual
                     {OccName: String}))))])))))))])
       (Prefix)
+      []
       []
       []
       []
@@ -755,6 +760,7 @@
                    (Unqual
                     {OccName: String}))))])))))))])
       (Prefix)
+      []
       []
       []
       []

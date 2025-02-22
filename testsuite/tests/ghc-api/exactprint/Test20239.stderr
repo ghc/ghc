@@ -162,9 +162,8 @@
               []
               [(HsScaled
                 (HsLinearArrow
-                 (EpPct1
-                  (NoEpTok)
-                  (NoEpUniTok)))
+                 (NoEpTok)
+                 [])
                 (L
                  (EpAnn
                   (EpaSpan { Test20239.hs:5:51-55 })
@@ -184,6 +183,7 @@
                      []))
                    (Unqual
                     {OccName: Query})))))])
+             []
              (Nothing)))
           ,(L
             (EpAnn
@@ -213,9 +213,8 @@
               []
               [(HsScaled
                 (HsLinearArrow
-                 (EpPct1
-                  (NoEpTok)
-                  (NoEpUniTok)))
+                 (NoEpTok)
+                 [])
                 (L
                  (EpAnn
                   (EpaSpan { Test20239.hs:7:50-86 })
@@ -238,10 +237,11 @@
                      []))
                    (HsFunTy
                     (NoExtField)
-                    (HsUnrestrictedArrow
+                    (HsStandardArrow
                      (EpUniTok
                       (EpaSpan { Test20239.hs:7:62-63 })
-                      (NormalSyntax)))
+                      (NormalSyntax))
+                     [])
                     (L
                      (EpAnn
                       (EpaSpan { Test20239.hs:7:51-60 })
@@ -372,6 +372,7 @@
                              (EpaSpan { Test20239.hs:7:84 }))
                             (HsBoxedOrConstraintTuple)
                             [])))))))))))))])
+             []
              (Nothing)))])
          []))))))]))
 

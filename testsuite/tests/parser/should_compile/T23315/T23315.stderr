@@ -106,7 +106,8 @@
             (EpaSpan { T23315.hsig:3:6 })
             (EpaSpan { T23315.hsig:3:7 }))
            (HsBoxedOrConstraintTuple)
-           []))))))))
+           [])))))
+      [])))
   ,(L
     (EpAnn
      (EpaSpan { T23315.hsig:4:1-14 })
