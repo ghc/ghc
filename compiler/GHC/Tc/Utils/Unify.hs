@@ -112,7 +112,6 @@ import GHC.Driver.DynFlags
 import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.Maybe (firstJusts)
-import GHC.Data.Pair
 
 import Control.Monad
 import Data.Functor.Identity (Identity(..))
