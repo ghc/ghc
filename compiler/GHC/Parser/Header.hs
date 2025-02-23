@@ -17,6 +17,8 @@ module GHC.Parser.Header
    , getOptions
    , toArgs
    , checkProcessArgsResult
+   -- TODO: This is here to break an import loop. Is this the right place?
+   , initParserStateWithMacros
    )
 where
 
@@ -66,6 +68,9 @@ import Text.Read (readPrec)
 import GHC.Driver.Session (DynFlags)
 import GHC.Driver.Config.Parser (predefinedMacros)
 import GHC.Unit.Env (UnitEnv)
+import GHC.SysTools.Cpp (cppMacroDefines)
+import qualified GHC.LanguageExtensions.Type as LangExt
+import GHC.Driver.DynFlags (xopt)
 
 ------------------------------------------------------------------------------
 
@@ -121,9 +126,24 @@ getImports dflags unit_env popts implicit_prelude buf filename source_filename =
 
 initParserStateWithMacros
   :: DynFlags -> Maybe UnitEnv -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
-initParserStateWithMacros df unit_env
-  = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df unit_env
+initParserStateWithMacros df Nothing opts buf pos
+  = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
                                        , pp_scope = (PpScope  True) NE.:| [] })
+                          opts buf pos
+initParserStateWithMacros df (Just unit_env) opts buf pos = p_state
+  where
+    macro_defs = cppMacroDefines unit_env
+    p_state0 = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
+                                                  , pp_scope = (PpScope  True) NE.:| [] })
+                                     opts (stringToStringBuffer macro_defs) pos
+    p_state =
+      if xopt LangExt.GhcCpp df
+        then case unP parseHeader p_state0 of
+               PFailed _ -> p_state0 { buffer = buf }
+               POk st _ -> p_state0 { buffer = buf
+                                    , pp = (pp p_state0) { pp_defines = pp_defines (pp st)}}
+        else p_state0 { buffer = buf }
+
 
 mkPrelImports :: ModuleName
               -> SrcSpan    -- Attribute the "import Prelude" to this location
