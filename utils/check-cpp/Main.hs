@@ -518,3 +518,15 @@ t18 = do
         , "x = 5"
         , "#endif"
         ]
+
+t19 :: IO ()
+t19 = do
+    dump
+        [ "#define MIN_VERSION_ghc_exactprint(major1,major2,minor) (\\"
+        , "  (major1) <  1 || \\"
+        , "  (major1) == 1 && (major2) <  7 || \\"
+        , "  (major1) == 1 && (major2) == 7 && (minor) <= 0)"
+        , "x = x"
+        ]
+
+-- x = x
