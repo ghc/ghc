@@ -524,7 +524,7 @@ hscParse' mod_summary
 
     hsc <- getHscEnv
     let unit_env = hsc_unit_env hsc
-    let p_state = (initParserStateWithMacros dflags (Just unit_env) (initParserOpts dflags) buf loc)
+    let p_state = initParserStateWithMacros dflags (Just unit_env) (initParserOpts dflags) buf loc
 
     case unP parseMod p_state of
         PFailed pst ->
@@ -2661,7 +2661,7 @@ hscParseThingWithLocation source linenumber parser str = do
 
         hsc <- getHscEnv
         let unit_env = hsc_unit_env hsc
-        let p_state = (initParserStateWithMacros dflags (Just unit_env) (initParserOpts dflags) buf loc)
+        let p_state = initParserStateWithMacros dflags (Just unit_env) (initParserOpts dflags) buf loc
 
         case unP parser p_state of
             PFailed pst ->
