@@ -19,6 +19,8 @@ import Debug.Trace (trace)
 import GHC.Data.FastString
 import GHC.Data.Strict qualified as Strict
 import GHC.Data.StringBuffer
+import GHC.Driver.DynFlags (DynFlags, xopt)
+import GHC.LanguageExtensions qualified as LangExt
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
 import GHC.Parser.Lexer qualified as Lexer
@@ -33,9 +35,12 @@ import GHC.Utils.Panic.Plain (panic)
 
 -- ---------------------------------------------------------------------
 
-dumpGhcCpp :: PState PpState -> SDoc
-dumpGhcCpp pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
+ttrace x s = trace s x
+
+dumpGhcCpp :: DynFlags -> PState PpState -> SDoc
+dumpGhcCpp dflags pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
   where
+    ghc_cpp_enabled = xopt LangExt.GhcCpp dflags
     -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
     (pst_final, bare_toks) = lexAll pst
     comments = reverse (Lexer.comment_q pst_final)
@@ -43,13 +48,21 @@ dumpGhcCpp pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
     to_tok (L (EpaSpan l) _) = L l (ITunknown "-")
     to_tok (L (EpaDelta l _ _) _) = L l (ITunknown "-")
     comments_as_toks = map to_tok comments
-    defines = showDefines (pp_defines (pp pst_final))
+    defines =
+        showDefines ((pp_defines (pp pst_final))
+            `ttrace` ("dumpGhcCpp: (pp_defines (pp pst_final))" ++ show (pp_defines (pp pst_final))))
     sepa = "\n------------------------------\n"
     startLoc = mkRealSrcLoc (srcLocFile (psRealLoc $ loc pst)) 1 1
     buf1 = (buffer pst){cur = 0}
-    all_toks = sortBy cmpBs (bare_toks ++ comments_as_toks)
-    toks = addSourceToTokens startLoc buf1 all_toks
-    final = renderCombinedToks toks
+    all_toks =
+        sortBy cmpBs ((bare_toks ++ comments_as_toks)
+            `ttrace` ("dumpGhcCpp: comments_as_toks" ++ show comments_as_toks))
+    toks =
+        addSourceToTokens startLoc buf1 (all_toks
+            `ttrace` ("dumpGhcCpp: all_toks" ++ show all_toks))
+    final =
+        renderCombinedToks (toks
+            `ttrace` ("dumpGhcCpp: toks" ++ show toks))
 
 cmpBs :: Located Token -> Located Token -> Ordering
 cmpBs (L (RealSrcSpan _ (Strict.Just bs1)) _) (L (RealSrcSpan _ (Strict.Just bs2)) _) =

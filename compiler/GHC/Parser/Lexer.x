@@ -408,10 +408,15 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
   -- ToDo: should only be valid inside a pragma:
   "#-}"                          { endPrag }
+  -- TODO: distinguish from the case above, to match the only allowed option, GHC_CPP
+  "!-}"                          { endPrag }
 }
 
 <option_prags> {
   "{-#"  $whitechar* $pragmachar+ / { known_pragma fileHeaderPrags }
+                                   { dispatch_pragmas fileHeaderPrags }
+  -- TODO: distinguish from case above, to check the end properly
+  "{-!"  $whitechar* $pragmachar+ / { known_pragma fileHeaderPrags }
                                    { dispatch_pragmas fileHeaderPrags }
 }
 
