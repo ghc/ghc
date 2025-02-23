@@ -535,7 +535,7 @@ hscParse' mod_summary
                                                    NoBlankEpAnnotations
                                                    rdr_module)
             liftIO $ putDumpFileMaybe logger Opt_D_dump_ghc_cpp "After GHC_CPP"
-                        FormatHaskell (dumpGhcCpp p_state)
+                        FormatHaskell (dumpGhcCpp dflags p_state)
             liftIO $ putDumpFileMaybe logger Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
 
@@ -2688,7 +2688,7 @@ hscParseThingWithLocation source linenumber parser str = do
                 liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed_ast "Parser AST"
                             FormatHaskell (showAstData NoBlankSrcSpan NoBlankEpAnnotations thing)
                 liftIO $ putDumpFileMaybe logger Opt_D_dump_ghc_cpp "After GHC_CPP"
-                            FormatHaskell (dumpGhcCpp p_state)
+                            FormatHaskell (dumpGhcCpp dflags p_state)
                 return thing
 
 hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
