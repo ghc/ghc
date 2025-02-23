@@ -46,10 +46,11 @@ module GHC.Tc.Types.Constraint (
         cterHasNoProblem, cterHasProblem, cterHasOnlyProblem, cterHasOnlyProblems,
         cterRemoveProblem, cterHasOccursCheck, cterFromKind,
 
-
+        -- Equality left-hand sides, re-exported from GHC.Core.Predicate
         CanEqLHS(..), canEqLHS_maybe, canTyFamEqLHS_maybe,
         canEqLHSKind, canEqLHSType, eqCanEqLHS,
 
+        -- Holes
         Hole(..), HoleSort(..), isOutOfScopeHole,
         DelayedError(..), NotConcreteError(..),
 
@@ -285,17 +286,6 @@ data EqCt -- An equality constraint; see Note [Canonical equalities]
       eq_rhs    :: Xi,         -- See invariants above
       eq_eq_rel :: EqRel       -- INVARIANT: cc_eq_rel = ctEvEqRel cc_ev
     }
-
--- | A 'CanEqLHS' is a type that can appear on the left of a canonical
--- equality: a type variable or /exactly-saturated/ type family application.
-data CanEqLHS
-  = TyVarLHS TcTyVar
-  | TyFamLHS TyCon  -- ^ TyCon of the family
-             [Xi]   -- ^ Arguments, /exactly saturating/ the family
-
-instance Outputable CanEqLHS where
-  ppr (TyVarLHS tv)              = ppr tv
-  ppr (TyFamLHS fam_tc fam_args) = ppr (mkTyConApp fam_tc fam_args)
 
 eqCtEvidence :: EqCt -> CtEvidence
 eqCtEvidence = eq_ev
@@ -776,45 +766,6 @@ instance Outputable Ct where
 
 instance Outputable EqCt where
   ppr (EqCt { eq_ev = ev }) = ppr ev
-
------------------------------------
--- | Is a type a canonical LHS? That is, is it a tyvar or an exactly-saturated
--- type family application?
--- Does not look through type synonyms.
-canEqLHS_maybe :: Xi -> Maybe CanEqLHS
-canEqLHS_maybe xi
-  | Just tv <- getTyVar_maybe xi
-  = Just $ TyVarLHS tv
-
-  | otherwise
-  = canTyFamEqLHS_maybe xi
-
-canTyFamEqLHS_maybe :: Xi -> Maybe CanEqLHS
-canTyFamEqLHS_maybe xi
-  | Just (tc, args) <- tcSplitTyConApp_maybe xi
-  , isTypeFamilyTyCon tc
-  , args `lengthIs` tyConArity tc
-  = Just $ TyFamLHS tc args
-
-  | otherwise
-  = Nothing
-
--- | Convert a 'CanEqLHS' back into a 'Type'
-canEqLHSType :: CanEqLHS -> TcType
-canEqLHSType (TyVarLHS tv) = mkTyVarTy tv
-canEqLHSType (TyFamLHS fam_tc fam_args) = mkTyConApp fam_tc fam_args
-
--- | Retrieve the kind of a 'CanEqLHS'
-canEqLHSKind :: CanEqLHS -> TcKind
-canEqLHSKind (TyVarLHS tv) = tyVarKind tv
-canEqLHSKind (TyFamLHS fam_tc fam_args) = piResultTys (tyConKind fam_tc) fam_args
-
--- | Are two 'CanEqLHS's equal?
-eqCanEqLHS :: CanEqLHS -> CanEqLHS -> Bool
-eqCanEqLHS (TyVarLHS tv1) (TyVarLHS tv2) = tv1 == tv2
-eqCanEqLHS (TyFamLHS fam_tc1 fam_args1) (TyFamLHS fam_tc2 fam_args2)
-  = tcEqTyConApps fam_tc1 fam_args1 fam_tc2 fam_args2
-eqCanEqLHS _ _ = False
 
 {-
 ************************************************************************

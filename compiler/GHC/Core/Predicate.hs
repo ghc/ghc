@@ -30,7 +30,11 @@ module GHC.Core.Predicate (
   isIPPred_maybe,
 
   -- Evidence variables
-  DictId, isEvVar, isDictId
+  DictId, isEvVar, isDictId,
+
+  -- Equality left-hand sides
+  CanEqLHS(..), canEqLHS_maybe, canTyFamEqLHS_maybe,
+  canEqLHSKind, canEqLHSType, eqCanEqLHS,
 
   ) where
 
@@ -38,7 +42,7 @@ import GHC.Prelude
 
 import GHC.Core.Type
 import GHC.Core.Class
-import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCo.Compare( eqType, tcEqTyConApps )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Types.Var
@@ -51,6 +55,13 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.FastString
+
+
+{- *********************************************************************
+*                                                                      *
+*                   Pred and PredType                                  *
+*                                                                      *
+********************************************************************* -}
 
 -- | A predicate in the solver. The solver tries to prove Wanted predicates
 -- from Given ones.
@@ -229,9 +240,12 @@ predTypeEqRel ty
   | isReprEqPred ty = ReprEq
   | otherwise       = NomEq
 
-{-------------------------------------------
-Predicates on PredType
---------------------------------------------}
+
+{- *********************************************************************
+*                                                                      *
+*                   Predicates on PredType                             *
+*                                                                      *
+********************************************************************* -}
 
 {-
 Note [Evidence for quantified constraints]
@@ -492,3 +506,61 @@ isEvVar var = isEvVarType (varType var)
 
 isDictId :: Id -> Bool
 isDictId id = isDictTy (varType id)
+
+
+{- *********************************************************************
+*                                                                      *
+*                   Equality left-hand sides
+*                                                                      *
+********************************************************************* -}
+
+-- | A 'CanEqLHS' is a type that can appear on the left of a canonical
+-- equality: a type variable or /exactly-saturated/ type family application.
+data CanEqLHS
+  = TyVarLHS TyVar
+  | TyFamLHS TyCon  -- ^ TyCon of the family
+             [Type]   -- ^ Arguments, /exactly saturating/ the family
+
+instance Outputable CanEqLHS where
+  ppr (TyVarLHS tv)              = ppr tv
+  ppr (TyFamLHS fam_tc fam_args) = ppr (mkTyConApp fam_tc fam_args)
+
+-----------------------------------
+-- | Is a type a canonical LHS? That is, is it a tyvar or an exactly-saturated
+-- type family application?
+-- Does not look through type synonyms.
+canEqLHS_maybe :: Type -> Maybe CanEqLHS
+canEqLHS_maybe xi
+  | Just tv <- getTyVar_maybe xi
+  = Just $ TyVarLHS tv
+
+  | otherwise
+  = canTyFamEqLHS_maybe xi
+
+canTyFamEqLHS_maybe :: Type -> Maybe CanEqLHS
+canTyFamEqLHS_maybe xi
+  | Just (tc, args) <- tcSplitTyConApp_maybe xi
+  , isTypeFamilyTyCon tc
+  , args `lengthIs` tyConArity tc
+  = Just $ TyFamLHS tc args
+
+  | otherwise
+  = Nothing
+
+-- | Convert a 'CanEqLHS' back into a 'Type'
+canEqLHSType :: CanEqLHS -> Type
+canEqLHSType (TyVarLHS tv) = mkTyVarTy tv
+canEqLHSType (TyFamLHS fam_tc fam_args) = mkTyConApp fam_tc fam_args
+
+-- | Retrieve the kind of a 'CanEqLHS'
+canEqLHSKind :: CanEqLHS -> Kind
+canEqLHSKind (TyVarLHS tv) = tyVarKind tv
+canEqLHSKind (TyFamLHS fam_tc fam_args) = piResultTys (tyConKind fam_tc) fam_args
+
+-- | Are two 'CanEqLHS's equal?
+eqCanEqLHS :: CanEqLHS -> CanEqLHS -> Bool
+eqCanEqLHS (TyVarLHS tv1) (TyVarLHS tv2) = tv1 == tv2
+eqCanEqLHS (TyFamLHS fam_tc1 fam_args1) (TyFamLHS fam_tc2 fam_args2)
+  = tcEqTyConApps fam_tc1 fam_args1 fam_tc2 fam_args2
+eqCanEqLHS _ _ = False
+

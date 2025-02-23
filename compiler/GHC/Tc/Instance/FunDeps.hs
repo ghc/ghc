@@ -663,19 +663,19 @@ checkFunDeps inst_envs (ClsInst { is_tvs = qtvs1, is_cls = cls
       | instanceCantMatch trimmed_tcs rough_tcs2
       = False
       | otherwise
-      = case tcUnifyTyKis bind_fn ltys1 ltys2 of
+      = case tcUnifyFunDeps qtvs ltys1 ltys2 of
           Nothing         -> False
           Just subst
             -> isNothing $   -- Bogus legacy test (#10675)
                              -- See Note [Bogus consistency check]
-               tcUnifyTyKis bind_fn (substTysUnchecked subst rtys1) (substTysUnchecked subst rtys2)
+               tcUnifyFunDeps qtvs (substTysUnchecked subst rtys1) (substTysUnchecked subst rtys2)
 
       where
         trimmed_tcs    = trimRoughMatchTcs cls_tvs fd rough_tcs1
         (ltys1, rtys1) = instFD fd cls_tvs tys1
         (ltys2, rtys2) = instFD fd cls_tvs tys2
         qtv_set2       = mkVarSet qtvs2
-        bind_fn        = matchBindFun (qtv_set1 `unionVarSet` qtv_set2)
+        qtvs           = qtv_set1 `unionVarSet` qtv_set2
 
     eq_inst i1 i2 = instanceDFunId i1 == instanceDFunId i2
         -- A single instance may appear twice in the un-nubbed conflict list

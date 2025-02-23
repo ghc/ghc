@@ -2756,7 +2756,7 @@ lintBranch this_co fam_tc branch arg_kinds
        ; _ <- foldlM check_ki (empty_subst, empty_subst)
                               (zip (ktvs ++ cvs) arg_kinds)
 
-       ; case check_no_conflict flattened_target incomps of
+       ; case check_no_conflict target incomps of
             Nothing -> return ()
             Just bad_branch -> failWithL $ bad_ax this_co $
                                text "inconsistent with" <+>
@@ -2782,15 +2782,12 @@ lintBranch this_co fam_tc branch arg_kinds
     subst        = zipTvSubst tvs tys `composeTCvSubst`
                    zipCvSubst cvs co_args
     target   = Type.substTys subst (coAxBranchLHS branch)
-    in_scope = mkInScopeSet $
-               unionVarSets (map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
-    flattened_target = flattenTys in_scope target
 
     check_no_conflict :: [Type] -> [CoAxBranch] -> Maybe CoAxBranch
     check_no_conflict _    [] = Nothing
     check_no_conflict flat (b@CoAxBranch { cab_lhs = lhs_incomp } : rest)
          -- See Note [Apartness] in GHC.Core.FamInstEnv
-      | SurelyApart <- tcUnifyTysFG alwaysBindFun flat lhs_incomp
+      | SurelyApart <- tcUnifyTysFG alwaysBindFam alwaysBindTv flat lhs_incomp
       = check_no_conflict flat rest
       | otherwise
       = Just b

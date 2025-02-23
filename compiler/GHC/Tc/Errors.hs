@@ -2240,7 +2240,8 @@ mkDictErr ctxt orig_items
 --     and the result of evaluating ...".
 mk_dict_err :: HasCallStack => SolverReportErrCtxt -> (ErrorItem, ClsInstLookupResult)
             -> TcM ( TcSolverReportMsg, ([ImportError], [GhcHint]) )
-mk_dict_err ctxt (item, (matches, pot_unifiers, unsafe_overlapped)) = case (NE.nonEmpty matches, NE.nonEmpty unsafe_overlapped) of
+mk_dict_err ctxt (item, (matches, pot_unifiers, unsafe_overlapped))
+  = case (NE.nonEmpty matches, NE.nonEmpty unsafe_overlapped) of
   (Nothing, _)  -> do -- No matches but perhaps several unifiers
     { (_, rel_binds, item) <- relevantBindings True ctxt item
     ; candidate_insts <- get_candidate_instances
