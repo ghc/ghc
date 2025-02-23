@@ -326,7 +326,6 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \n                                    ;
   -- Ghc CPP symbols
   ^\# \ * @cppkeyword  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag }
-  -- ^\# \ * @cppkeyword  .*    / { ifExtension GhcCppBit } { cppToken cpp_prag }
 
   ^\# line                              { begin line_prag1 }
   ^\# / { followedByDigit }             { begin line_prag1 }
@@ -344,7 +343,6 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
         -- we might encounter {-# here, but {- has been handled already
   \n                                    ;
   ^\# \ * @cppkeyword  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag }
-  -- ^\# \ * @cppkeyword  .*    / { ifExtension GhcCppBit } { cppToken cpp_prag }
 
   ^\# (line)?                           { begin line_prag1 }
 }
@@ -372,10 +370,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 -- CPP continuation lines. Keep concatenating, or exit
 <cpp_prag> {
   .* \\ \n                   { cppTokenCont }
-  -- .* \\                      { cppTokenCont }
-  .* \n                    { cppTokenPop (ITcpp False) }
-  -- .*                       { cppTokenPop (ITcpp False)}
-  -- () { popCpp }
+  .* \n                      { cppTokenPop (ITcpp False) }
 }
 
 -- single-line line pragmas, of the form
@@ -1260,12 +1255,11 @@ cppToken code span buf len _buf2 =
      -- check if the string ends with backslash and newline
      -- NOTE: performance likely sucks, make it work for now
      (len0, continue) <- case (reverse $ unpackFS tokStr) of
-        ('\\':_) -> pushLexState code >> return (len, True)
-        ('\n':'\\':_) -> pushLexState code >> return (len -2, True) -- TODO remove
-        ('\n':_) -> return (len - 1, False) -- TODO remove
+        ('\n':'\\':_) -> pushLexState code >> return (len -2, True)
+        ('\n':_) -> return (len - 1, False)
         _ -> return (len, False)
-     return (L span (ITcpp continue $! lexemeToFastString buf len0))
-     -- trace ("cppToken:" ++ show (code, t)) $ do return (L span t)
+     let span' = cppSpan span len0
+     return (L span' (ITcpp continue $! lexemeToFastString buf len0))
 
 cppTokenCont :: Action p
 cppTokenCont span buf len _buf2 =
@@ -1274,24 +1268,25 @@ cppTokenCont span buf len _buf2 =
      -- check if the string ends with backslash and newline
      -- NOTE: performance likely sucks, make it work for now
      (len0, continue) <- case (reverse $ unpackFS tokStr) of
-        ('\\':_) -> return (len - 1, True)
-        ('\n':'\\':_) -> return (len - 2, True) -- TODO: remove
-        ('\n':_) -> return (len - 1, False) -- TODO: remove
+        ('\n':'\\':_) -> return (len - 2, True)
+        ('\n':_) -> return (len - 1, False)
         _ -> return (len, False)
-     return (L span (ITcpp continue $! lexemeToFastString buf len0))
+     let span' = cppSpan span len0
+     return (L span' (ITcpp continue $! lexemeToFastString buf len0))
 
+cppSpan :: PsSpan -> Int -> PsSpan
+cppSpan span len = mkPsSpan start_loc end_loc
+  where
+     start_loc = psSpanStart span
+     file = srcLocFile (psRealLoc start_loc)
+     real_loc = mkRealSrcLoc file (srcLocLine (psRealLoc start_loc)) (len + 1)
+     BufPos sb = psBufPos start_loc
+     end_loc = PsLoc real_loc (BufPos (sb + len + 1))
 
 cppTokenPop :: (FastString -> Token)-> Action p
 cppTokenPop t span buf len _buf2 =
   do _ <- popLexState
-     -- return (L span (t $! lexemeToFastString buf (trace "cppTokenPop" len)))
      return (L span (t $! lexemeToFastString buf len))
-
-popCpp :: Action p
-popCpp _span _buf _len _buf2 =
-  do _ <- popLexState
-     -- lexToken
-     trace "pop" $ do lexToken
 
 -- See Note [Nested comment line pragmas]
 failLinePrag1 :: Action p
