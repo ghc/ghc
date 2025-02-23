@@ -1166,6 +1166,7 @@ lookupInstEnv' (InstEnv rm) vis_mods cls tys
           -- We consider MaybeApart to be a case where the instance might
           -- apply in the future. This covers an instance like C Int and
           -- a target like [W] C (F a), where F is a type family.
+          -- See (ATF1) in Note [Apartness and type families] in GHC.Core.Unify
             SurelyApart              -> check_unifiers items
               -- See Note [Infinitary substitution in lookup]
             MaybeApart MARInfinite _ -> check_unifiers items
