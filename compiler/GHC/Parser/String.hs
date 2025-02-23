@@ -127,7 +127,8 @@ collapseGaps = go
   where
     go = \case
       c1@(Char '\\') : c2@(Char c) : cs
-        | is_space c -> go $ dropGap cs
+        -- #25784: string gaps are semantically equivalent to "\&"
+        | is_space c -> c1 : setChar '&' c1 : go (dropGap cs)
         | otherwise  -> c1 : c2 : go cs
       c : cs -> c : go cs
       [] -> []
