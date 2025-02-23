@@ -117,7 +117,11 @@ doBackpack [src_filename] = do
 
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
-    case unP parseBackpack (initParserStateWithMacros dflags (initParserOpts dflags) buf loc) of
+    hsc <- getSession
+    let unit_env = hsc_unit_env hsc
+    let p_state = (initParserStateWithMacros dflags (Just unit_env) (initParserOpts dflags) buf loc)
+
+    case unP parseBackpack p_state of
         PFailed pst -> throwErrors (GhcPsMessage <$> getPsErrorMessages pst)
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an

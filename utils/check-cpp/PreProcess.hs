@@ -28,6 +28,8 @@ import State
 
 dumpGhcCpp :: PState PpState -> SDoc
 dumpGhcCpp pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
+                        -- ++ show comments_as_toks ++ sepa
+                        ++ show comments ++ sepa
   where
     -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
     (pst_final, bare_toks) = lexAll pst
