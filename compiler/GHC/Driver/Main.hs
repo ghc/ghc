@@ -126,7 +126,7 @@ import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
 import GHC.Driver.Config.CoreToStg
 import GHC.Driver.Config.CoreToStg.Prep
 import GHC.Driver.Config.Logger   (initLogFlags)
-import GHC.Driver.Config.Parser   (initParserOpts, predefinedMacros)
+import GHC.Driver.Config.Parser   (initParserOpts)
 import GHC.Driver.Config.Stg.Ppr  (initStgPprOpts)
 import GHC.Driver.Config.Stg.Pipeline (initStgPipelineOpts)
 import GHC.Driver.Config.StgToCmm  (initStgToCmmConfig)
@@ -194,8 +194,7 @@ import GHC.CoreToStg    ( coreToStg )
 import GHC.Parser.Errors.Types
 import GHC.Parser
 import GHC.Parser.Lexer as Lexer hiding (initParserState)
-import GHC.Parser.Lexer qualified as Lexer
-import GHC.Parser.PreProcess.State (PpState (..), initPpState, PpScope (..))
+import GHC.Parser.PreProcess.State (PpState (..))
 
 import GHC.Tc.Module
 import GHC.Tc.Utils.Monad
@@ -306,6 +305,7 @@ import Data.Bifunctor
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
 import GHC.Parser.PreProcess (dumpGhcCpp)
+import GHC.Parser.Header (initParserStateWithMacros)
 
 {- **********************************************************************
 %*                                                                      *
@@ -2958,10 +2958,3 @@ writeInterfaceOnlyMode :: DynFlags -> Bool
 writeInterfaceOnlyMode dflags =
  gopt Opt_WriteInterface dflags &&
  not (backendGeneratesCode (backend dflags))
-
--- -----------------------------------------------------------------------------
-
-initParserStateWithMacros :: DynFlags -> Maybe UnitEnv -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
-initParserStateWithMacros df unit_env
-  = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df unit_env
-                                       , pp_scope = (PpScope True) :| [] })
