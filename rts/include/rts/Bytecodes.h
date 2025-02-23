@@ -115,15 +115,36 @@
 #define bci_BCO_NAME                    88
 
 #define bci_OP_ADD                      89
-#define bci_OP_AND                      90
-#define bci_OP_XOR                      91
-#define bci_OP_NOT                      92
-#define bci_OP_NEQ                      93
+#define bci_OP_SUB                      90
+#define bci_OP_AND                      91
+#define bci_OP_XOR                      92
+#define bci_OP_NOT                      93
+#define bci_OP_NEG                      94
+#define bci_OP_MUL                      95
+#define bci_OP_SHL                      96
+#define bci_OP_ASR                      97
+#define bci_OP_LSR                      98
+
+#define bci_OP_NEQ                     110
+#define bci_OP_EQ                      111
+#define bci_OP_GE                      112
+#define bci_OP_GT                      113
+#define bci_OP_LT                      114
+#define bci_OP_LE                      115
+
+#define bci_OP_SIZED_SUB               130
+
 
 /* If you need to go past 255 then you will run into the flags */
 
 /* If you need to go below 0x0100 then you will run into the instructions */
 #define bci_FLAG_LARGE_ARGS 0x8000
+
+/* Width of primitiv operations if width-polymorphic. We use two bits to store
+ * the width.
+ * 0->Word8;1->Word16;2->Word32
+ * Word64 operations always should take the OP with fixed width instead. */
+#define bci_FLAG_WIDTH      0x6000
 
 /* If a BCO definitely requires less than this many words of stack,
    don't include an explicit STKCHECK insn in it.  The interpreter

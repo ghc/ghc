@@ -62,6 +62,7 @@ disInstr ( StgBCO *bco, int pc )
 #error Cannot cope with WORD_SIZE_IN_BITS being nether 32 nor 64
 #endif
 #define BCO_GET_LARGE_ARG ((instr & bci_FLAG_LARGE_ARGS) ? BCO_READ_NEXT_WORD : BCO_NEXT)
+#define BCO_GET_BCI_WIDTH(bci) ((bci & bci_FLAG_WIDTH) >> 13)
 
    switch (instr & 0xff) {
       case bci_BRK_FUN:
@@ -462,21 +463,56 @@ disInstr ( StgBCO *bco, int pc )
       case bci_OP_ADD:
          debugBelch("OP_ADD\n");
          break;
-
+      case bci_OP_SUB:
+         debugBelch("OP_SUB\n");
+         break;
       case bci_OP_AND:
          debugBelch("OP_AND\n");
          break;
-
       case bci_OP_XOR:
          debugBelch("OP_XOR\n");
          break;
-
       case bci_OP_NOT:
          debugBelch("OP_NOT\n");
+         break;
+      case bci_OP_NEG:
+         debugBelch("OP_NEG\n");
+         break;
+      case bci_OP_MUL:
+         debugBelch("OP_MUL\n");
+         break;
+      case bci_OP_SHL:
+         debugBelch("OP_SHL\n");
+         break;
+      case bci_OP_ASR:
+         debugBelch("OP_ASR\n");
+         break;
+      case bci_OP_LSR:
+         debugBelch("OP_LSR\n");
          break;
 
       case bci_OP_NEQ:
          debugBelch("OP_NEQ\n");
+         break;
+      case bci_OP_EQ:
+         debugBelch("OP_EQ\n");
+         break;
+
+      case bci_OP_GT:
+         debugBelch("OP_GT\n");
+         break;
+      case bci_OP_LE:
+         debugBelch("OP_LE\n");
+         break;
+      case bci_OP_GE:
+         debugBelch("OP_GE\n");
+         break;
+      case bci_OP_LT:
+         debugBelch("OP_LT\n");
+         break;
+
+      case bci_OP_SIZED_SUB:
+         debugBelch("OP_SIZED_SUB_%d\n",BCO_GET_BCI_WIDTH(instr));
          break;
 
 

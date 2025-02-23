@@ -838,28 +838,81 @@ doPrimOp  :: PrimOp
           -> Maybe (BcM BCInstrList)
 doPrimOp op init_d s p args =
   case op of
-    -- TODO: No idea if the argument order here is correct.
-    -- But it doesn't matter for the current set of primops.
+    -- TODO: IntAddOp and friends are only 64bit on 64bit platforms
     IntAddOp -> primOp OP_ADD
+    Int64AddOp -> primOp OP_ADD
     WordAddOp -> primOp OP_ADD
+    Word64AddOp -> primOp OP_ADD
+
+    IntSubOp -> primOp OP_SUB
+    WordSubOp -> primOp OP_SUB
+    Int64SubOp -> primOp OP_SUB
+    Word64SubOp -> primOp OP_SUB
+
+    Int8SubOp   -> primOp (OP_SIZED_SUB primArg1Width)
+    Word8SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
+    Int16SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
+    Word16SubOp -> primOp (OP_SIZED_SUB primArg1Width)
+    Int32SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
+    Word32SubOp -> primOp (OP_SIZED_SUB primArg1Width)
 
     IntAndOp -> primOp OP_AND
     WordAndOp -> primOp OP_AND
+    Word64AndOp -> primOp OP_AND
 
     IntNotOp -> primOp OP_NOT
     WordNotOp -> primOp OP_NOT
+    Word64NotOp -> primOp OP_NOT
 
     IntXorOp -> primOp OP_XOR
     WordXorOp -> primOp OP_XOR
+    Word64XorOp -> primOp OP_XOR
 
     IntNeOp -> primOp OP_NEQ
     WordNeOp -> primOp OP_NEQ
+    Word64NeOp -> primOp OP_NEQ
 
-    IntToWordOp -> no_op
-    WordToIntOp -> no_op
+    IntEqOp -> primOp OP_EQ
+    WordEqOp -> primOp OP_EQ
+    Word64EqOp -> primOp OP_EQ
+
+    IntLtOp -> primOp OP_LT
+    WordLtOp -> primOp OP_LT
+    Word64LtOp -> primOp OP_LT
+
+    IntGeOp -> primOp OP_GE
+    WordGeOp -> primOp OP_GE
+    Word64GeOp -> primOp OP_GE
+
+    IntGtOp -> primOp OP_GT
+    WordGtOp -> primOp OP_GT
+    Word64GtOp -> primOp OP_GT
+
+    IntLeOp -> primOp OP_LE
+    WordLeOp -> primOp OP_LE
+    Word64LeOp -> primOp OP_LE
+
+    IntNegOp -> primOp OP_NEG
+    Int64NegOp -> primOp OP_NEG
+
+    IntToWordOp     -> no_op
+    WordToIntOp     -> no_op
+    Int8ToWord8Op   -> no_op
+    Word8ToInt8Op   -> no_op
+    Int16ToWord16Op -> no_op
+    Word16ToInt16Op -> no_op
+    Int32ToWord32Op -> no_op
+    Word32ToInt32Op -> no_op
+    Int64ToWord64Op -> no_op
+    Word64ToInt64Op -> no_op
+    IntToAddrOp     -> no_op
+    AddrToIntOp     -> no_op
+    ChrOp           -> no_op   -- Int# and Char# are rep'd the same
+    OrdOp           -> no_op
 
     _ -> Nothing
     where
+      primArg1Width = (stgArgRepU $ head args) :: PrimRep
       -- Push args, execute primop, slide, return_N
       primOp op_inst = Just $ do
         platform <- profilePlatform <$> getProfile

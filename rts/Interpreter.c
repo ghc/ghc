@@ -95,6 +95,7 @@ tag functions as tag inference currently doesn't rely on those being properly ta
 #error Cannot cope with WORD_SIZE_IN_BITS being nether 32 nor 64
 #endif
 #define BCO_GET_LARGE_ARG ((bci & bci_FLAG_LARGE_ARGS) ? BCO_READ_NEXT_WORD : BCO_NEXT)
+#define BCO_GET_BCI_WIDTH(bci) ((bci & bci_FLAG_WIDTH) >> 13)
 
 #define BCO_PTR(n)    (W_)ptrs[n]
 #define BCO_LIT(n)    literals[n]
@@ -161,15 +162,45 @@ tag functions as tag inference currently doesn't rely on those being properly ta
 #define Sp_minusB(n) ((void *)((StgWord8*)Sp - (ptrdiff_t)(n)))
 
 #define Sp_plusW(n)  (Sp_plusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(W_)))
+#define Sp_plusW64(n)  (Sp_plusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(StgWord64)))
 #define Sp_minusW(n) (Sp_minusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(W_)))
 
 #define Sp_addB(n)   (Sp = Sp_plusB(n))
 #define Sp_subB(n)   (Sp = Sp_minusB(n))
 #define Sp_addW(n)   (Sp = Sp_plusW(n))
+#define Sp_addW64(n) (Sp = Sp_plusW64(n))
 #define Sp_subW(n)   (Sp = Sp_minusW(n))
 
 #define SpW(n)       (*(StgWord*)(Sp_plusW(n)))
+#define Sp_T(n,ty)   (*(ty*)(Sp_plusB(sizeof(ty))))
+#define SpW64(n)     (*(StgWord64*)(Sp_plusW64(n)))
 #define SpB(n)       (*(StgWord*)(Sp_plusB(n)))
+
+
+/* Note [Interpreter subword primops]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general the interpreter stack is host-platform word aligned.
+However we make two exceptions:
+
+When allocating a constructor we push subwords on the stack, which are
+cleaned up by the PACK instruction afterwards.
+
+Similarly when pushing arguments for subword primops we take the liberty
+of pushing those arguments in their actual size, and pop them in the actual
+primop implementation.
+
+For the subword operations the operation will push the result to the
+stack zero-extended to platform word size.
+
+*/
+
+#define BIN_OP(op,ty)                                               \
+    {                                                               \
+    (ty) r = (ty) Sp_T(0,ty) op (ty) *(ty*)(Sp_plusB(off+2));                   \
+    SpW64(1) = r;                                                   \
+    Sp_addB(sizeof(ty));                                            \
+    goto nextInsn;                                                  \
+    }                                                               \
 
 STATIC_INLINE StgPtr
 allocate_NONUPD (Capability *cap, int n_words)
@@ -1113,9 +1144,9 @@ run_BCO:
 #endif
 
         bci = BCO_NEXT;
-    /* We use the high 8 bits for flags, only the highest of which is
-     * currently allocated */
-    ASSERT((bci & 0xFF00) == (bci & 0x8000));
+    /* We use the high 8 bits for flags. The highest three of which are
+     * currently allocated to LARGE_ARGS and WIDTH */
+    ASSERT((bci & 0xFF00) == (bci & ( bci_FLAG_LARGE_ARGS | bci_FLAG_WIDTH )));
 
     switch (bci & 0xFF) {
 
@@ -2110,38 +2141,61 @@ run_BCO:
             RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
         }
 
-        case bci_OP_ADD: {
-            StgWord r = (StgWord) SpW(0) + (StgWord) SpW(1);
-            SpW(1) = (W_)r;
-            Sp_addW(1);
-            goto nextInsn;
+#define UN_SIZED_OP(op,ty)                                          \
+    {                                                               \
+    ty r = op (*(ty*) Sp_plusB(sizeof(ty)));                        \
+    if(sizeof(ty) > sizeof(StgWord)) {                              \
+        /* 64bit op on 32bit platforms */                           \
+        SpW64(0) = (StgWord64) r;                                   \
+    } else {                                                        \
+        SpW(0) = (StgWord) r;                                       \
+    }                                                               \
+    goto nextInsn;                                                  \
+    }
+
+#define SIZED_BIN_OP(op,ty)                                                     \
+        {                                                                       \
+            ty r = (*(ty*) Sp_plusB(0)) - (*(ty*) Sp_plusB(sizeof(ty)));        \
+            /* If the two arguments didn't fit in a single word we have to clean up the stack.*/ \
+            if(sizeof(ty)*2 > sizeof(StgWord)) {                                \
+                Sp_addW(sizeof(ty)*2/sizeof(StgWord) - 1); /*One word accounts for result*/ \
+            }                                                                   \
+            SpW(0) = (StgWord) r;                                               \
+            goto nextInsn;                                                      \
         }
 
-        case bci_OP_AND: {
-            StgWord r = (StgWord) SpW(0) & (StgWord) SpW(1);
-            SpW(1) = (W_)r;
-            Sp_addW(1);
-            goto nextInsn;
-        }
+#define UN_INT64_OP(op) UN_SIZED_OP(op,StgInt64)
+#define BIN_INT64_OP(op) SIZED_BIN_OP(op,StgInt64)
+#define BIN_WORD64_OP(op) SIZED_BIN_OP(op,StgWord64)
 
-        case bci_OP_NOT: {
-            StgWord r = ~ (StgWord) SpW(0);
-            SpW(0) = (W_)r;
-            goto nextInsn;
-        }
+        case bci_OP_ADD: BIN_INT64_OP(+)
+        case bci_OP_SUB: BIN_INT64_OP(-)
+        case bci_OP_AND: BIN_INT64_OP(&)
+        case bci_OP_XOR: BIN_INT64_OP(^)
+        case bci_OP_MUL: BIN_INT64_OP(^)
+        case bci_OP_SHL: BIN_WORD64_OP(<<)
+        case bci_OP_LSR: BIN_WORD64_OP(>>)
+        case bci_OP_ASR: BIN_INT64_OP(>>)
 
-        case bci_OP_XOR: {
-            StgWord r = (StgWord) SpW(0) ^ (StgWord) SpW(1);
-            SpW(1) = (W_)r;
-            Sp_addW(1);
-            goto nextInsn;
-        }
+        case bci_OP_NEQ: BIN_INT64_OP(!=)
+        case bci_OP_EQ: BIN_INT64_OP(!=)
+        case bci_OP_GT: BIN_INT64_OP(>)
+        case bci_OP_GE: BIN_INT64_OP(>=)
+        case bci_OP_LT: BIN_INT64_OP(<)
+        case bci_OP_LE: BIN_INT64_OP(<=)
 
-        case bci_OP_NEQ: {
-            StgWord r = (StgWord) SpW(0) != (StgWord) SpW(1);
-            SpW(1) = (W_)r;
-            Sp_addW(1);
-            goto nextInsn;
+        case bci_OP_NOT: UN_INT64_OP(~)
+        case bci_OP_NEG: UN_INT64_OP(-)
+
+        case bci_OP_SIZED_SUB:
+        {
+            StgWord width = BCO_GET_BCI_WIDTH(bci);
+            switch (width) {
+                case 0: SIZED_BIN_OP(-,StgInt8 )
+                case 1: SIZED_BIN_OP(-,StgInt16)
+                case 2: SIZED_BIN_OP(-,StgInt32)
+                default: barf("Unexpected bci width.");
+            };
         }
 
         case bci_CCALL: {

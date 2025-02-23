@@ -36,6 +36,7 @@ import GHC.Stack.CCS (CostCentre)
 import GHC.Stg.Syntax
 import GHCi.BreakArray (BreakArray)
 import Language.Haskell.Syntax.Module.Name (ModuleName)
+import GHC.Types.RepType (PrimRep)
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions
@@ -214,13 +215,29 @@ data BCInstr
 
    | PRIMCALL
 
+   -- Primops
    | OP_ADD
+   | OP_SUB
    | OP_AND
    | OP_XOR
-   | OP_NOT
-   | OP_NEQ
+   | OP_MUL
+   | OP_SHL
+   | OP_ASR
+   | OP_LSR
 
-   -- Primops
+   | OP_NOT
+   | OP_NEG
+
+   | OP_NEQ
+   | OP_EQ
+
+   | OP_LT
+   | OP_GE
+   | OP_GT
+   | OP_LE
+
+   | OP_SIZED_SUB PrimRep
+
 
    -- For doing magic ByteArray passing to foreign calls
    | SWIZZLE          !WordOff -- to the ptr N words down the stack,
@@ -403,10 +420,25 @@ instance Outputable BCInstr where
    ppr PRIMCALL              = text "PRIMCALL"
 
    ppr OP_ADD                = text "OP_ADD"
+   ppr OP_SUB                = text "OP_SUB"
    ppr OP_AND                = text "OP_AND"
    ppr OP_XOR                = text "OP_XOR"
    ppr OP_NOT                = text "OP_NOT"
-   ppr OP_NEQ                = text "OP_NEQ"
+   ppr OP_NEG                = text "OP_NEG"
+   ppr OP_MUL                = text "OP_MUL"
+   ppr OP_SHL                = text "OP_SHL"
+   ppr OP_ASR                = text "OP_ASR"
+   ppr OP_LSR                = text "OP_LSR"
+
+   ppr OP_EQ                = text "OP_EQ"
+   ppr OP_NEQ               = text "OP_NEQ"
+   ppr OP_LT                = text "OP_LT"
+   ppr OP_GE                = text "OP_GE"
+   ppr OP_GT                = text "OP_GT"
+   ppr OP_LE                = text "OP_LE"
+
+   ppr (OP_SIZED_SUB rep)   = text "OP_SIZED_SUB" <+> (ppr rep)
+
 
    ppr (SWIZZLE stkoff n)    = text "SWIZZLE " <+> text "stkoff" <+> ppr stkoff
                                                <+> text "by" <+> ppr n
@@ -517,10 +549,24 @@ bciStackUse RETURN_TUPLE{}        = 1 -- pushes stg_ret_t header
 bciStackUse CCALL{}               = 0
 bciStackUse PRIMCALL{}            = 1 -- pushes stg_primcall
 bciStackUse OP_ADD{}              = 0 -- We overestimate, it's -1 actually ...
+bciStackUse OP_SUB{}              = 0
 bciStackUse OP_AND{}              = 0
 bciStackUse OP_XOR{}              = 0
 bciStackUse OP_NOT{}              = 0
+bciStackUse OP_NEG{}              = 0
+bciStackUse OP_MUL{}              = 0
+bciStackUse OP_SHL{}              = 0
+bciStackUse OP_ASR{}              = 0
+bciStackUse OP_LSR{}              = 0
+
 bciStackUse OP_NEQ{}              = 0
+bciStackUse OP_EQ{}               = 0
+bciStackUse OP_LT{}               = 0
+bciStackUse OP_GT{}               = 0
+bciStackUse OP_LE{}               = 0
+bciStackUse OP_GE{}               = 0
+
+bciStackUse OP_SIZED_SUB{}        = 0
 
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0
