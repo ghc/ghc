@@ -1770,8 +1770,8 @@ instance Diagnostic TcRnMessage where
            <+> ppr arg
          where
            arg = case ty_app of
-            TypeApplication ty _ -> char '@' <> ppr ty
-            TypeApplicationInPattern ty_app -> ppr ty_app
+            TypeApplication ty _            -> char '@' <> ppr ty
+            TypeApplicationInPattern ty_app -> char '@' <> ppr ty_app
            what = case ty_app of
              TypeApplication _ ty_or_ki ->
               case ty_or_ki of

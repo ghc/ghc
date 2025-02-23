@@ -423,7 +423,7 @@ conArgDocs (ConDeclGADT{con_g_args = args, con_res_ty = res_ty}) =
 
 h98ConArgDocs :: HsConDeclH98Details GhcRn -> IntMap (HsDoc GhcRn)
 h98ConArgDocs con_args = case con_args of
-  PrefixCon _ args   -> con_arg_docs 0 $ map (unLoc . hsScaledThing) args
+  PrefixCon args     -> con_arg_docs 0 $ map (unLoc . hsScaledThing) args
   InfixCon arg1 arg2 -> con_arg_docs 0 [ unLoc (hsScaledThing arg1)
                                        , unLoc (hsScaledThing arg2) ]
   RecCon _           -> IM.empty

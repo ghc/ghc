@@ -599,9 +599,9 @@ push_bang_into_newtype_arg :: SrcSpanAnnA
                            -> HsConPatDetails GhcTc -> HsConPatDetails GhcTc
 -- See Note [Bang patterns and newtypes]
 -- We are transforming   !(N p)   into   (N !p)
-push_bang_into_newtype_arg l _ty (PrefixCon ts (arg:args))
+push_bang_into_newtype_arg l _ty (PrefixCon (arg:args))
   = assert (null args) $
-    PrefixCon ts [L l (BangPat noExtField arg)]
+    PrefixCon [L l (BangPat noExtField arg)]
 push_bang_into_newtype_arg l _ty (RecCon rf)
   | HsRecFields { rec_flds = L lf fld : flds } <- rf
   , HsFieldBind { hfbRHS = arg } <- fld
@@ -610,7 +610,7 @@ push_bang_into_newtype_arg l _ty (RecCon rf)
                                            = L l (BangPat noExtField arg) })] })
 push_bang_into_newtype_arg l ty (RecCon rf) -- If a user writes !(T {})
   | HsRecFields { rec_flds = [] } <- rf
-  = PrefixCon [] [L l (BangPat noExtField (noLocA (WildPat ty)))]
+  = PrefixCon [L l (BangPat noExtField (noLocA (WildPat ty)))]
 push_bang_into_newtype_arg _ _ cd
   = pprPanic "push_bang_into_newtype_arg" (pprConArgs cd)
 

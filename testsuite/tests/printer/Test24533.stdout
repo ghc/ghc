@@ -563,7 +563,6 @@
                     (Unqual
                      {OccName: Foo}))
                    (PrefixCon
-                    []
                     [])))
                 ,(L
                   (EpAnn
@@ -584,7 +583,6 @@
                     (Unqual
                      {OccName: Foo}))
                    (PrefixCon
-                    []
                     [])))])
                (GRHSs
                 (EpaComments
@@ -1122,7 +1120,6 @@
                     (Unqual
                      {OccName: Foo}))
                    (PrefixCon
-                    []
                     [])))
                 ,(L
                   (EpAnn
@@ -1143,7 +1140,6 @@
                     (Unqual
                      {OccName: Foo}))
                    (PrefixCon
-                    []
                     [])))])
                (GRHSs
                 (EpaComments

@@ -642,7 +642,7 @@ collectPatSynArgInfo :: HsPatSynDetails GhcRn
                      -> ([Name], Bool)
 collectPatSynArgInfo details =
   case details of
-    PrefixCon _ names    -> (map unLoc names, False)
+    PrefixCon names    -> (map unLoc names, False)
     InfixCon name1 name2 -> (map unLoc [name1, name2], True)
     RecCon names         -> (map (unLoc . recordPatSynPatVar) names, False)
 
@@ -954,7 +954,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
                                     (EmptyLocalBinds noExtField)
 
     args = case details of
-              PrefixCon _ args   -> args
+              PrefixCon args   -> args
               InfixCon arg1 arg2 -> [arg1, arg2]
               RecCon args        -> map recordPatSynPatVar args
 
@@ -1023,7 +1023,7 @@ tcPatToExpr args pat = go pat
     go1 :: Pat GhcRn -> Either PatSynInvalidRhsReason (HsExpr GhcRn)
     go1 (ConPat NoExtField con info)
       = case info of
-          PrefixCon _ ps -> mkPrefixConExpr con ps
+          PrefixCon ps -> mkPrefixConExpr con ps
           InfixCon l r   -> mkPrefixConExpr con [l,r]
           RecCon fields  -> mkRecordConExpr con fields
 
@@ -1248,7 +1248,7 @@ tcCollectEx pat = go pat
     go1 _                   = empty
 
     goConDetails :: HsConPatDetails GhcTc -> ([TyVar], [EvVar])
-    goConDetails (PrefixCon _ ps) = mergeMany . map go $ ps
+    goConDetails (PrefixCon ps) = mergeMany . map go $ ps
     goConDetails (InfixCon p1 p2) = go p1 `merge` go p2
     goConDetails (RecCon HsRecFields{ rec_flds = flds })
       = mergeMany . map goRecFd $ flds

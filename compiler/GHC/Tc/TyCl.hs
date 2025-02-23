@@ -1809,7 +1809,7 @@ kcConArgTys new_or_data res_kind arg_tys = do
 -- Kind-check the types of arguments to a Haskell98 data constructor.
 kcConH98Args :: NewOrData -> TcKind -> HsConDeclH98Details GhcRn -> TcM ()
 kcConH98Args new_or_data res_kind con_args = case con_args of
-  PrefixCon _ tys   -> kcConArgTys new_or_data res_kind tys
+  PrefixCon tys   -> kcConArgTys new_or_data res_kind tys
   InfixCon ty1 ty2  -> kcConArgTys new_or_data res_kind [ty1, ty2]
   RecCon (L _ flds) -> kcConArgTys new_or_data res_kind $
                        map (hsLinear . cd_fld_type . unLoc) flds
@@ -3902,7 +3902,7 @@ tcConH98Args :: ContextKind  -- expected kind of arguments
                              -- might have a specific kind
              -> HsConDeclH98Details GhcRn
              -> TcM [(Scaled TcType, HsSrcBang)]
-tcConH98Args exp_kind (PrefixCon _ btys)
+tcConH98Args exp_kind (PrefixCon btys)
   = mapM (tcConArg exp_kind) btys
 tcConH98Args exp_kind (InfixCon bty1 bty2)
   = do { bty1' <- tcConArg exp_kind bty1

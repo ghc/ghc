@@ -753,7 +753,7 @@ genSimpleConPat :: Name -> [LPat GhcRn] -> LPat GhcRn
 genSimpleConPat con pats
   = wrapGenSpan $ ConPat { pat_con_ext = noExtField
                          , pat_con     = wrapGenSpan con
-                         , pat_args    = PrefixCon [] pats }
+                         , pat_args    = PrefixCon pats }
 
 genVarPat :: Name -> LPat GhcRn
 genVarPat n = wrapGenSpan $ VarPat noExtField (wrapGenSpan n)

@@ -178,7 +178,6 @@
              []
              (Nothing)
              (PrefixCon
-              []
               [])
              (Nothing)))
           ,(L
@@ -202,7 +201,6 @@
              []
              (Nothing)
              (PrefixCon
-              []
               [(HsScaled
                 (HsLinearArrow
                  (NoExtField))
@@ -1336,7 +1334,6 @@
              []
              (Nothing)
              (PrefixCon
-              []
               [(HsScaled
                 (HsLinearArrow
                  (NoExtField))

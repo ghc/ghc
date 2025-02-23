@@ -775,10 +775,10 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
          -- so that the binding locations are reported
          -- from the left-hand side
             case details of
-               PrefixCon _ vars ->
+               PrefixCon vars ->
                    do { checkDupRdrNames vars
                       ; names <- mapM lookupPatSynBndr vars
-                      ; return ( (pat', PrefixCon noTypeArgs names)
+                      ; return ( (pat', PrefixCon names)
                                , mkFVs (map unLoc names)) }
                InfixCon var1 var2 ->
                    do { checkDupRdrNames [var1, var2]

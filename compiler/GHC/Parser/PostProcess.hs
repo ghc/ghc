@@ -743,9 +743,9 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr (locA loc) decl
            ; match <- case details of
-               PrefixCon _ pats -> return $ Match { m_ext = noAnn
-                                                  , m_ctxt = ctxt, m_pats = L l pats
-                                                  , m_grhss = rhs }
+               PrefixCon pats -> return $ Match { m_ext = noAnn
+                                                , m_ctxt = ctxt, m_pats = L l pats
+                                                , m_grhss = rhs }
                    where
                      l = listLocation pats
                      ctxt = FunRhs { mc_fun = ln
@@ -1263,38 +1263,34 @@ checkPattern = runPV . checkLPat
 checkPattern_details :: ParseContext -> PV (LocatedA (PatBuilder GhcPs)) -> P (LPat GhcPs)
 checkPattern_details extraDetails pp = runPV_details extraDetails (pp >>= checkLPat)
 
-checkLArgPat :: LocatedA (ArgPatBuilder GhcPs) -> PV (LPat GhcPs)
-checkLArgPat (L l (ArgPatBuilderVisPat p)) = checkLPat (L l p)
-checkLArgPat (L l (ArgPatBuilderArgPat p)) = return (L l p)
-
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
 checkLPat (L l@(EpAnn anc an _) p) = do
-  (L l' p', cs) <- checkPat (EpAnn anc an emptyComments) emptyComments (L l p) [] []
+  (L l' p', cs) <- checkPat (EpAnn anc an emptyComments) emptyComments (L l p) []
   return (L (addCommentsToEpAnn l' cs) p')
 
-checkPat :: SrcSpanAnnA -> EpAnnComments -> LocatedA (PatBuilder GhcPs) -> [HsConPatTyArg GhcPs] -> [LPat GhcPs]
+checkPat :: SrcSpanAnnA -> EpAnnComments -> LocatedA (PatBuilder GhcPs) -> [LPat GhcPs]
          -> PV (LPat GhcPs, EpAnnComments)
 -- SG: I think this function checks what Haskell2010 calls the `pat` and `lpat`
 -- productions
-checkPat loc cs (L l e@(PatBuilderVar (L ln c))) tyargs args
+checkPat loc cs (L l e@(PatBuilderVar (L ln c))) args
   | isRdrDataCon c || isRdrTc c
   = return (L loc $ ConPat
       { pat_con_ext = noAnn -- AZ: where should this come from?
       , pat_con = L ln c
-      , pat_args = PrefixCon tyargs args
+      , pat_args = PrefixCon args
       }, comments l Semi.<> cs)
   | (not (null args) && patIsRec c) = do
       ctx <- askParseContext
       patFail (locA l) . PsErrInPat e $ PEIP_RecPattern args YesPatIsRecursive ctx
-checkPat loc cs (L la (PatBuilderAppType f at t)) tyargs args =
-  checkPat loc (cs Semi.<> comments la) f (HsConPatTyArg at t : tyargs) args
-checkPat loc cs (L la (PatBuilderApp f e)) [] args = do
+-- checkPat loc cs (L la (PatBuilderAppType f inivs_pat)) args =
+--   checkPat loc (cs Semi.<> comments la) f (inivs_pat : args)
+checkPat loc cs (L la (PatBuilderApp f e)) args = do
   p <- checkLPat e
-  checkPat loc (cs Semi.<> comments la) f [] (p : args)
-checkPat loc cs (L l e) [] [] = do
+  checkPat loc (cs Semi.<> comments la) f (p : args)
+checkPat loc cs (L l e) [] = do
   p <- checkAPat loc e
   return (L l p, cs)
-checkPat loc _ e _ _ = do
+checkPat loc _ e _ = do
   details <- fromParseContext <$> askParseContext
   patFail (locA loc) (PsErrInPat (unLoc e) details)
 
@@ -1338,6 +1334,8 @@ checkAPat loc e0 = do
    PatBuilderPar lpar e rpar -> do
      p <- checkLPat e
      return (ParPat (lpar, rpar) p)
+
+   PatBuilderInvisPat p -> return p
 
    _           -> do
      details <- fromParseContext <$> askParseContext
@@ -1401,11 +1399,11 @@ checkFunBind :: SrcStrictness
              -> [AddEpAnn]
              -> LocatedN RdrName
              -> LexicalFixity
-             -> LocatedE [LocatedA (ArgPatBuilder GhcPs)]
+             -> LocatedE [LocatedA (PatBuilder GhcPs)]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P (HsBind GhcPs)
 checkFunBind strictness locF ann (L lf fun) is_infix (L lp pats) (L _ grhss)
-  = do  ps <- runPV_details extraDetails (mapM checkLArgPat pats)
+  = do  ps <- runPV_details extraDetails (mapM checkLPat pats)
         let match_span = noAnnSrcSpan $ locF
         return (makeFunBind (L (l2l lf) fun) (L (noAnnSrcSpan $ locA match_span)
                  [L match_span (Match { m_ext = ann
@@ -1484,12 +1482,11 @@ checkDoAndIfThenElse err guardExpr semiThen thenExpr semiElse elseExpr
 
 isFunLhs :: LocatedA (PatBuilder GhcPs)
       -> P (Maybe (LocatedN RdrName, LexicalFixity,
-                   [LocatedA (ArgPatBuilder GhcPs)],[AddEpAnn]))
+                   [LocatedA (PatBuilder GhcPs)],[AddEpAnn]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 isFunLhs e = go e [] [] []
  where
-   mk = fmap ArgPatBuilderVisPat
 
    go (L l (PatBuilderVar (L loc f))) es ops cps
        | not (isRdrDataCon f)        = do
@@ -1497,7 +1494,7 @@ isFunLhs e = go e [] [] []
            return (Just (L loc' f, Prefix, es, (reverse ops) ++ cps))
    go (L l (PatBuilderApp (L lf f) e))   es       ops cps = do
      let (_l, lf') = transferCommentsOnlyA l lf
-     go (L lf' f) (mk e:es) ops cps
+     go (L lf' f) (e:es) ops cps
    go (L l (PatBuilderPar _ (L le e) _)) es@(_:_) ops cps = go (L le' e) es (o:ops) (c:cps)
       -- NB: es@(_:_) means that there must be an arg after the parens for the
       -- LHS to be a function LHS. This corresponds to the Haskell Report's definition
@@ -1508,34 +1505,19 @@ isFunLhs e = go e [] [] []
    go (L loc (PatBuilderOpApp (L ll l) (L loc' op) r anns)) es ops cps
       | not (isRdrDataCon op)         -- We have found the function!
       = do { let (_l, ll') = transferCommentsOnlyA loc ll
-           ; return (Just (L loc' op, Infix, (mk (L ll' l):mk r:es), (anns ++ reverse ops ++ cps))) }
+           ; return (Just (L loc' op, Infix, (L ll' l:r:es), (anns ++ reverse ops ++ cps))) }
       | otherwise                     -- Infix data con; keep going
       = do { let (_l, ll') = transferCommentsOnlyA loc ll
            ; mb_l <- go (L ll' l) es ops cps
            ; return (reassociate =<< mb_l) }
         where
-          reassociate (op', Infix, j : L k_loc (ArgPatBuilderVisPat k) : es', anns')
+          reassociate (op', Infix, j : L k_loc k : es', anns')
             = Just (op', Infix, j : op_app : es', anns')
             where
-              op_app = mk $ L loc (PatBuilderOpApp (L k_loc k)
-                                    (L loc' op) r (reverse ops ++ cps))
+              op_app = L loc (PatBuilderOpApp (L k_loc k)
+                              (L loc' op) r (reverse ops ++ cps))
           reassociate _other = Nothing
-   go (L l (PatBuilderAppType (L lp pat) tok ty_pat@(HsTP _ (L (EpAnn anc ann cs) _)))) es ops cps
-             = go (L lp' pat) (L (EpAnn anc' ann cs) (ArgPatBuilderArgPat invis_pat) : es) ops cps
-             where invis_pat = InvisPat tok ty_pat
-                   anc' = case tok of
-                     NoEpTok -> anc
-                     EpTok l -> widenAnchor anc [AddEpAnn AnnAnyclass l]
-                   (_l, lp') = transferCommentsOnlyA l lp
    go _ _ _ _ = return Nothing
-
-data ArgPatBuilder p
-  = ArgPatBuilderVisPat (PatBuilder p)
-  | ArgPatBuilderArgPat (Pat p)
-
-instance Outputable (ArgPatBuilder GhcPs) where
-  ppr (ArgPatBuilderVisPat p) = ppr p
-  ppr (ArgPatBuilderArgPat p) = ppr p
 
 mkBangTy :: [AddEpAnn] -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs
 mkBangTy anns strictness =
@@ -2026,9 +2008,13 @@ instance DisambECP (PatBuilder GhcPs) where
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2      = return $ L l (PatBuilderApp p1 p2)
-  mkHsAppTypePV l p at t = do
-    !cs <- getCommentsFor (locA l)
-    return $ L (addCommentsToEpAnn l cs) (PatBuilderAppType p at (mkHsTyPat t))
+  mkHsAppTypePV l p at t@(L (EpAnn anc ann cs) _) = do
+    let anc' = case at of
+          NoEpTok -> anc
+          EpTok l -> widenAnchor anc [AddEpAnn AnnAnyclass l]
+        invis_pat = L (EpAnn anc' ann cs) (PatBuilderInvisPat (InvisPat at (mkHsTyPat t)))
+    !cs' <- getCommentsFor (locA l)
+    return $ L (addCommentsToEpAnn l cs') (PatBuilderApp p invis_pat)
   mkHsIfPV l _ _ _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrIfThenElseInPat
   mkHsDoPV l _ _ _       = addFatalError $ mkPlainErrorMsgEnvelope l PsErrDoNotationInPat
   mkHsParPV l lpar p rpar   = return $ L (noAnnSrcSpan l) (PatBuilderPar lpar p rpar)
@@ -2335,7 +2321,7 @@ dataConBuilderDetails (L _ (PrefixDataConBuilder flds _))
 
 -- Normal prefix constructor, e.g.  data T = MkT A B C
 dataConBuilderDetails (L _ (PrefixDataConBuilder flds _))
-  = PrefixCon noTypeArgs (map hsLinear (toList flds))
+  = PrefixCon (map hsLinear (toList flds))
 
 -- Infix constructor, e.g. data T = Int :! Bool
 dataConBuilderDetails (L (EpAnn _ _ csl) (InfixDataConBuilder (L (EpAnn anc ann csll) lhs) _ rhs))
@@ -2407,7 +2393,7 @@ checkNotPromotedDataCon IsPromoted (L l name) =
 
 mkUnboxedSumCon :: LHsType GhcPs -> ConTag -> Arity -> (LocatedN RdrName, HsConDeclH98Details GhcPs)
 mkUnboxedSumCon t tag arity =
-  (noLocA (getRdrName (sumDataCon tag arity)), PrefixCon noTypeArgs [hsLinear t])
+  (noLocA (getRdrName (sumDataCon tag arity)), PrefixCon [hsLinear t])
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

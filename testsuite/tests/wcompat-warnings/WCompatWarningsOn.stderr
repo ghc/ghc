@@ -1,4 +1,3 @@
-
 Template.hs:6:8: warning: [GHC-82347] [-Wcompat-unqualified-imports (in -Wcompat)]
     To ensure compatibility with future core libraries changes
     imports to Data.List should be
@@ -9,8 +8,9 @@ Template.hs:9:29: warning: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wcomp
     In the future GHC will no longer implicitly quantify over such variables
     Suggested fix: Bind ‘a’ on the LHS of the type declaration
 
-Template.hs:12:6: warning: [GHC-69797] [-Wdeprecated-type-abstractions (in -Wcompat)]
+Template.hs:12:11: warning: [GHC-69797] [-Wdeprecated-type-abstractions (in -Wcompat)]
     Type applications in constructor patterns will require
     the TypeAbstractions extension starting from GHC 9.14.
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension
+

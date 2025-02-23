@@ -774,9 +774,9 @@ pprConDecl (ConDeclH98 { con_name = L _ con
     ppr_details (InfixCon t1 t2) = hsep [ppr (hsScaledThing t1),
                                          pprInfixOcc con,
                                          ppr (hsScaledThing t2)]
-    ppr_details (PrefixCon _ tys) = hsep (pprPrefixOcc con
+    ppr_details (PrefixCon tys) = hsep (pprPrefixOcc con
                                     : map (pprHsType . unLoc . hsScaledThing) tys)
-    ppr_details (RecCon fields)  = pprPrefixOcc con
+    ppr_details (RecCon fields) = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
 
 pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs

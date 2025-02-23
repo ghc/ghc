@@ -2018,7 +2018,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
     -- their pattern-only bound right hand sides have different names,
     -- we want to treat them the same in TH. This is the reason why we
     -- need an adjusted mkGenArgSyms in the `RecCon` case below.
-    mkGenArgSyms (PrefixCon _ args)   = mkGenSyms (map unLoc args)
+    mkGenArgSyms (PrefixCon args)   = mkGenSyms (map unLoc args)
     mkGenArgSyms (InfixCon arg1 arg2) = mkGenSyms [unLoc arg1, unLoc arg2]
     mkGenArgSyms (RecCon fields)
       = do { let pats = map (unLoc . recordPatSynPatVar) fields
@@ -2046,7 +2046,7 @@ repPatSynD (MkC syn) (MkC args) (MkC dir) (MkC pat)
   = rep2 patSynDName [syn, args, dir, pat]
 
 repPatSynArgs :: HsPatSynDetails GhcRn -> MetaM (Core (M TH.PatSynArgs))
-repPatSynArgs (PrefixCon _ args)
+repPatSynArgs (PrefixCon args)
   = do { args' <- repList nameTyConName lookupLOcc args
        ; repPrefixPatSynArgs args' }
 repPatSynArgs (InfixCon arg1 arg2)
@@ -2151,10 +2151,12 @@ repP (SumPat _ p alt arity) = do { p1 <- repLP p
 repP (ConPat NoExtField dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of
-         PrefixCon tyargs ps -> do { qs <- repLPs ps
-                                   ; let unwrapTyArg (HsConPatTyArg _ t) = unLoc (hstp_body t)
-                                   ; ts <- repListM typeTyConName (repTy . unwrapTyArg) tyargs
-                                   ; repPcon con_str ts qs }
+         PrefixCon ps -> do { qs <- repLPs ps
+                            ; let unwrapTyArg (HsConPatTyArg _ t) = unLoc (hstp_body t)
+                            ; -- TODO (sand-witch): This change looks bad, we don't break the
+                              -- users, we just silently change the behaviour.
+                            ; ts <- repListM typeTyConName (repTy . unwrapTyArg) []
+                            ; repPcon con_str ts qs }
          RecCon rec   -> do { fps <- repListM fieldPatTyConName rep_fld (rec_flds rec)
                             ; repPrec con_str fps }
          InfixCon p1 p2 -> do { p1' <- repLP p1;
@@ -2817,7 +2819,7 @@ repH98DataCon :: LocatedN Name
 repH98DataCon con details
     = do con' <- lookupLOcc con -- See Note [Binders and occurrences]
          case details of
-           PrefixCon _ ps -> do
+           PrefixCon ps -> do
              arg_tys <- repPrefixConArgs ps
              rep2 normalCName [unC con', unC arg_tys]
            InfixCon st1 st2 -> do

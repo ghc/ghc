@@ -6116,7 +6116,7 @@ data TyFamsDisabledReason
 
 data TypeApplication
   = TypeApplication !(HsType GhcPs) !TypeOrKind
-  | TypeApplicationInPattern !(HsConPatTyArg GhcPs)
+  | TypeApplicationInPattern !(HsTyPat GhcPs)
   deriving Generic
 
 -- | Either `HsType p` or `HsSigType p`.

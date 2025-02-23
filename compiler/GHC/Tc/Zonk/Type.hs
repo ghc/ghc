@@ -826,8 +826,8 @@ zonkMultAnn (HsMultAnn mult hs_ty)
 
 zonkPatSynDetails :: HsPatSynDetails GhcTc
                   -> ZonkTcM (HsPatSynDetails GhcTc)
-zonkPatSynDetails (PrefixCon _ as)
-  = PrefixCon noTypeArgs <$> traverse zonkLIdOcc as
+zonkPatSynDetails (PrefixCon as)
+  = PrefixCon <$> traverse zonkLIdOcc as
 zonkPatSynDetails (InfixCon a1 a2)
   = InfixCon <$> zonkLIdOcc a1 <*> zonkLIdOcc a2
 zonkPatSynDetails (RecCon flds)
@@ -1620,9 +1620,9 @@ zonk_pat pat = pprPanic "zonk_pat" (ppr pat)
 ---------------------------
 zonkConStuff :: HsConPatDetails GhcTc
              -> ZonkBndrTcM (HsConPatDetails GhcTc)
-zonkConStuff (PrefixCon tyargs pats)
+zonkConStuff (PrefixCon pats)
   = do  { pats' <- zonkPats pats
-        ; return (PrefixCon tyargs pats') }
+        ; return (PrefixCon pats') }
 
 zonkConStuff (InfixCon p1 p2)
   = do  { p1' <- zonkPat p1

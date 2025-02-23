@@ -1,5 +1,5 @@
-
-T19109.hs:6:4: error: [GHC-17916]
+T19109.hs:6:13: error: [GHC-17916]
     Illegal visible type application in a pattern: @Int
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension
+

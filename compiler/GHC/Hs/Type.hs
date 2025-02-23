@@ -1204,9 +1204,9 @@ instance OutputableBndr HsIPName where
     pprInfixOcc  n = ppr n
     pprPrefixOcc n = ppr n
 
-instance (Outputable tyarg, Outputable arg, Outputable rec)
-         => Outputable (HsConDetails tyarg arg rec) where
-  ppr (PrefixCon tyargs args) = text "PrefixCon:" <+> hsep (map (\t -> text "@" <> ppr t) tyargs) <+> ppr args
+instance (Outputable arg, Outputable rec)
+         => Outputable (HsConDetails arg rec) where
+  ppr (PrefixCon args) = text "PrefixCon:" <+> ppr args
   ppr (RecCon rec)            = text "RecCon:" <+> ppr rec
   ppr (InfixCon l r)          = text "InfixCon:" <+> ppr [l, r]
 

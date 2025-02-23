@@ -75,7 +75,6 @@ import qualified Data.List.NonEmpty as NE
 import GHC.Data.List.SetOps ( getNth )
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
-import Data.List( partition )
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class
 
@@ -163,7 +162,7 @@ tcMatchPats match_ctxt pats pat_tys thing_inside
 
              -- ExpForAllPat: expecting a type pattern
              loop all_pats@(pat : pats) (ExpForAllPatTy (Bndr tv vis) : pat_tys)
-               | isVisibleForAllTyFlag vis
+               | isVisibleForAllTyFlag vis, isVisArgPat (unLoc pat)
                = do { (_p, (ps, res)) <- tc_forall_lpat tv penv pat $
                                          loop pats pat_tys
 
@@ -559,17 +558,18 @@ pat_to_type (ConPat _ lname (InfixCon left right))
        ; rty <- pat_to_type (unLoc right)
        ; let { t = noLocA (HsOpTy noAnn NotPromoted lty lname rty)}
        ; pure t }
-pat_to_type (ConPat _ lname (PrefixCon invis_args vis_args))
+pat_to_type (ConPat _ lname (PrefixCon args))
   = do { let { appHead = noLocA (HsTyVar noAnn NotPromoted lname)}
-       ; ty_invis <- foldM apply_invis_arg appHead invis_args
-       ; tys_vis <- traverse (pat_to_type . unLoc) vis_args
-       ; let t = foldl' mkHsAppTy ty_invis tys_vis
-       ; pure t }
+       ; foldM apply_arg appHead args }
       where
-        apply_invis_arg :: LHsType GhcRn -> HsConPatTyArg GhcRn -> WriterT HsTyPatRnBuilder TcM (LHsType GhcRn)
-        apply_invis_arg !t (HsConPatTyArg _ (HsTP argx arg))
+        -- @-application
+        apply_arg !t (L _ (InvisPat _ (HsTP argx arg)))
           = do { tell (builderFromHsTyPatRn argx)
                ; pure (mkHsAppKindTy noExtField t arg)}
+
+        apply_arg !t (L _ p)
+          = do { ty_p <- pat_to_type p
+               ; pure (mkHsAppTy t ty_p)}
 
 pat_to_type pat = lift $
   failWith $ TcRnIllformedTypePattern pat
@@ -1215,13 +1215,21 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
                                    , text "arg_tys':" <+> ppr arg_tys'
                                    , text "arg_pats" <+> ppr arg_pats ])
 
-        ; (univ_ty_args, ex_ty_args) <- splitConTyArgs con_like arg_pats
+        ; (univ_ty_args, ex_ty_args, val_pats)
+              <- splitConTyArgs
+                  (conLikeExTyCoVars con_like)
+                  (conLikePatTypes con_like arg_tys_scaled)
+                  arg_pats
+
+        ; traceTc "splitConTyArgs" (vcat [ text "univ_ty_args:" <+> ppr univ_ty_args
+                                         , text "ex_ty_args" <+> ppr ex_ty_args
+                                         , text "val_pats" <+> ppr val_pats])
 
         ; if null ex_tvs && null eq_spec && null theta
           then do { -- The common case; no class bindings etc
                     -- (see Note [Arrows and patterns])
                     (arg_pats', res) <- tcConTyArgs tenv penv univ_ty_args $
-                                        tcConValArgs con_like arg_tys_scaled
+                                        tcConValArgs con_like val_pats arg_tys_scaled
                                                      penv arg_pats thing_inside
                   ; let res_pat = ConPat { pat_con = header
                                          , pat_args = arg_pats'
@@ -1249,7 +1257,7 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
                 tcConTyArgs tenv penv univ_ty_args                       $
                 checkConstraints (getSkolemInfo skol_info) ex_tvs' given $
                 tcConTyArgs tenv penv ex_ty_args                         $
-                tcConValArgs con_like arg_tys_scaled penv arg_pats thing_inside
+                tcConValArgs con_like val_pats arg_tys_scaled penv arg_pats thing_inside
 
         ; let res_pat = ConPat
                 { pat_con   = header
@@ -1298,7 +1306,11 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
         ; mult_wrap <- checkManyPattern PatternSynonymReason nlWildPatName pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 
-        ; (univ_ty_args, ex_ty_args) <- splitConTyArgs con_like arg_pats
+        ; (univ_ty_args, ex_ty_args, val_args)
+            <- splitConTyArgs
+                (conLikeExTyCoVars con_like)
+                (conLikePatTypes con_like arg_tys_scaled)
+                arg_pats
 
         ; wrap <- tc_sub_type penv (scaledThing pat_ty) ty'
 
@@ -1338,7 +1350,7 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
                 tcConTyArgs tenv penv univ_ty_args                             $
                 checkConstraints (getSkolemInfo skol_info) ex_tvs' prov_dicts' $
                 tcConTyArgs tenv penv ex_ty_args                               $
-                tcConValArgs con_like arg_tys_scaled penv arg_pats             $
+                tcConValArgs con_like val_args arg_tys_scaled penv arg_pats    $
                 thing_inside
         ; traceTc "checkConstraints }" (ppr ev_binds)
 
@@ -1586,24 +1598,24 @@ However there are several quite tricky wrinkles.
      Where pattern synonyms are involved, this two-level split may not be
      enough.  See #22328 for the story.
 -}
-
+-- TODO (sand-witch): this is just wrong
 tcConValArgs :: ConLike
+             -> [(LPat GhcRn, Scaled TcSigmaTypeFRR)]
              -> [Scaled TcSigmaTypeFRR]
              -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcTc)
-tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
-  PrefixCon type_args arg_pats -> do
+tcConValArgs con_like pats_w_tys arg_tys penv con_args thing_inside = case con_args of
+  PrefixCon{} -> do
         -- NB: type_args already dealt with
         -- See Note [Type applications in patterns]
         { checkTc (con_arity == no_of_args)     -- Check correct arity
                   (TcRnArityMismatch (AConLike con_like) con_arity no_of_args)
 
-        ; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
         ; (arg_pats', res) <- tcMultiple tcConArg penv pats_w_tys thing_inside
 
-        ; return (PrefixCon type_args arg_pats', res) }
+        ; return (PrefixCon arg_pats', res) }
     where
       con_arity  = conLikeArity con_like
-      no_of_args = length arg_pats
+      no_of_args = length pats_w_tys
 
   InfixCon p1 p2 -> do
         { checkTc (con_arity == 2)      -- Check correct arity
@@ -1655,45 +1667,78 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
           -- dataConFieldLabels will be empty (and each field in the pattern
           -- will generate an error below).
 
+data ExpConPatType = ExpForAllConPatTy ForAllTyBinder | ExpValPatTy (Scaled TcSigmaTypeFRR)
 
-splitConTyArgs :: ConLike -> HsConPatDetails GhcRn
-               -> TcM ( [(HsConPatTyArg GhcRn, TyVar)]    -- Universals
-                      , [(HsConPatTyArg GhcRn, TyVar)] )  -- Existentials
+instance Outputable ExpConPatType where
+  ppr (ExpValPatTy t) = ppr t
+  ppr (ExpForAllConPatTy tv) = text "forall" <+> ppr tv
+
+
+conLikePatTypes :: ConLike -> [Scaled TcSigmaTypeFRR] -> [ExpConPatType]
+conLikePatTypes con_like val_pats = ty_pats ++ map ExpValPatTy val_pats where
+  ty_pats = map (ExpForAllConPatTy . tyVarSpecToBinder) (conLikeUserTyVarBinders con_like)
+
+splitConTyArgs :: [TyCoVar]                               -- Existential type vairables
+               -> [ExpConPatType]                         -- All pattern types
+               -> HsConPatDetails GhcRn
+               -> TcM ( [(LPat GhcRn, TyVar)]    -- Universals
+                      , [(LPat GhcRn, TyVar)]    -- Existentials
+                      , [(LPat GhcRn, Scaled TcSigmaTypeFRR)]) -- Value pattenrs
 -- See Note [Type applications in patterns] (W4)
 -- This function is monadic only because of the error check
 -- for too many type arguments
-splitConTyArgs con_like (PrefixCon type_args _)
-  = do { checkTc (type_args `leLength` con_spec_bndrs)
-                 (TcRnTooManyTyArgsInConPattern con_like
-                          (length con_spec_bndrs) (length type_args))
-       ; if null ex_tvs  -- Short cut common case
-         then return (bndr_ty_arg_prs, [])
-         else return (partition is_universal bndr_ty_arg_prs) }
+splitConTyArgs ex_tvs pat_types (PrefixCon args)
+  = go args pat_types
   where
-    ex_tvs = conLikeExTyCoVars con_like
-    con_spec_bndrs = [ tv | Bndr tv SpecifiedSpec <- conLikeUserTyVarBinders con_like ]
-        -- conLikeUserTyVarBinders: see (W3) in
-        --    Note [Type applications in patterns]
-        -- SpecifiedSpec: forgetting to filter out inferred binders led to #20443
+    go [] pat_tys = -- TODO (sand-witch): add an appropritate predicate
+      assertPpr (not (any (const False) pat_tys)) (ppr ex_tvs $$ ppr pat_types)
+      $ pure ([], [], [])
+    go (lpat@(L _ pat) : pats) (ExpForAllConPatTy (Bndr tv vis) : tys)
+      | InvisPat{} <- pat, isSpecifiedForAllTyFlag vis
+      = add_typat lpat tv $ go pats tys
+      | isVisibleForAllTyFlag vis, isVisArgPat pat
+      = add_typat lpat tv $ go pats tys
+      | otherwise
+      = go (lpat : pats) tys
+    go (L loc (InvisPat _ tp):_) _ =
+      failAt (locA loc) (TcRnInvisPatWithNoForAll tp)
+    go (lpat : pats) (ExpValPatTy ty : tys) = do
+      (univ, ex, val) <- go pats tys
+      pure (univ, ex, (lpat, ty) : val)
+    go pats@(_:_) [] = pprPanic "splitConTyArgs" (ppr pats)
 
-    bndr_ty_arg_prs = type_args `zip` con_spec_bndrs
-                      -- The zip truncates to length(type_args)
+    add_typat typat tv thing_inside =
+      if tv `elem` ex_tvs
+        then add_existential typat tv thing_inside
+        else add_universal typat tv thing_inside
 
-    is_universal (_, tv) = not (tv `elem` ex_tvs)
-         -- See Note [DataCon user type variable binders] in GHC.Core.DataCon
-         -- especially INVARIANT(dataConTyVars).
+    add_universal typat tyvar thing_inside = do
+      (univ, ex, val) <- thing_inside
+      pure ((typat, tyvar) : univ, ex, val)
 
-splitConTyArgs _ (RecCon {})   = return ([], []) -- No type args in RecCon
-splitConTyArgs _ (InfixCon {}) = return ([], []) -- No type args in InfixCon
+    add_existential typat tyvar thing_inside = do
+      (univ, ex, val) <- thing_inside
+      pure (univ, (typat, tyvar) : ex, val)
+    --  TODO (sand-witch): update notes
+    --     -- conLikeUserTyVarBinders: see (W3) in
+    --     --    Note [Type applications in patterns]
+    --     -- SpecifiedSpec: forgetting to filter out inferred binders led to #20443
 
-tcConTyArgs :: Subst -> PatEnv -> [(HsConPatTyArg GhcRn, TyVar)]
+    -- is_universal (_, tv) = not (tv `elem` ex_tvs)
+    --      -- See Note [DataCon user type variable binders] in GHC.Core.DataCon
+    --      -- especially INVARIANT(dataConTyVars).
+
+splitConTyArgs _ _ (RecCon {})   = return ([], [], []) -- No type args in RecCon
+splitConTyArgs _ _ (InfixCon {}) = return ([], [], []) -- No type args in InfixCon
+
+tcConTyArgs :: Subst -> PatEnv -> [(LPat GhcRn, TyVar)]
             -> TcM a -> TcM a
 tcConTyArgs tenv penv prs thing_inside
   = tcMultiple_ (tcConTyArg tenv) penv prs thing_inside
 
-tcConTyArg :: Subst -> Checker (HsConPatTyArg GhcRn, TyVar) ()
-tcConTyArg tenv penv (HsConPatTyArg _ rn_ty, con_tv) thing_inside
-  = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsTyPat rn_ty (substTy tenv (varType con_tv))
+tcConTyArg :: Subst -> Checker (LPat GhcRn, TyVar) ()
+tcConTyArg tenv penv (typat, con_tv) thing_inside
+  = do { (sig_wcs, sig_ibs, arg_ty) <- tc_con_ty_pat typat (substTy tenv (varType con_tv))
 
        ; case NE.nonEmpty sig_ibs of
            Just sig_ibs_ne | inPatBind penv ->
@@ -1716,6 +1761,12 @@ tcConTyArg tenv penv (HsConPatTyArg _ rn_ty, con_tv) thing_inside
              --     has dealt with all that.
 
        ; return ((), result) }
+  where
+    tc_con_ty_pat (L _ (InvisPat _ tp)) ty = do
+      tcHsTyPat tp ty
+    tc_con_ty_pat (L _ pat) ty = do
+      tp <- pat_to_type_pat pat
+      tcHsTyPat tp ty
 
 tcConArg :: Checker (LPat GhcRn, Scaled TcSigmaType) (LPat GhcTc)
 tcConArg penv (arg_pat, Scaled arg_mult arg_ty)
@@ -1880,4 +1931,3 @@ checkGADT conlike ex_tvs arg_tys = \case
   where
     has_existentials :: Bool
     has_existentials = any (`elemVarSet` tyCoVarsOfTypes arg_tys) ex_tvs
-

@@ -31,7 +31,7 @@ module GHC.Hs.Pat (
         HsPatExpansion(..),
         XXPatGhcTc(..),
 
-        HsConPatDetails, hsConPatArgs, hsConPatTyArgs,
+        HsConPatDetails, hsConPatArgs,
         HsConPatTyArg(..),
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
@@ -497,11 +497,10 @@ pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
 pprConArgs :: (OutputableBndrId p,
                      Outputable (Anno (IdGhcP p)))
            => HsConPatDetails (GhcPass p) -> SDoc
-pprConArgs (PrefixCon ts pats) = fsep (pprTyArgs ts : map (pprParendLPat appPrec) pats)
-  where pprTyArgs tyargs = fsep (map ppr tyargs)
-pprConArgs (InfixCon p1 p2)    = sep [ pprParendLPat appPrec p1
-                                     , pprParendLPat appPrec p2 ]
-pprConArgs (RecCon rpats)      = ppr rpats
+pprConArgs (PrefixCon pats) = fsep (map (pprParendLPat appPrec) pats)
+pprConArgs (InfixCon p1 p2) = sep [ pprParendLPat appPrec p1
+                                  , pprParendLPat appPrec p2 ]
+pprConArgs (RecCon rpats)   = ppr rpats
 
 {-
 ************************************************************************
@@ -516,7 +515,7 @@ mkPrefixConPat :: DataCon ->
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
   = noLocA $ ConPat { pat_con = noLocA (RealDataCon dc)
-                    , pat_args = PrefixCon [] pats
+                    , pat_args = PrefixCon pats
                     , pat_con_ext = ConPatTc
                       { cpt_tvs = []
                       , cpt_dicts = []
@@ -1148,12 +1147,12 @@ patNeedsParens p = go @p
 
 -- | @'conPatNeedsParens' p cp@ returns 'True' if the constructor patterns @cp@
 -- needs parentheses under precedence @p@.
-conPatNeedsParens :: PprPrec -> HsConDetails t a b -> Bool
+conPatNeedsParens :: PprPrec -> HsConDetails a b -> Bool
 conPatNeedsParens p = go
   where
-    go (PrefixCon ts args) = p >= appPrec && (not (null args) || not (null ts))
-    go (InfixCon {})       = p >= opPrec -- type args should be empty in this case
-    go (RecCon {})         = False
+    go (PrefixCon args) = p >= appPrec && (not (null args))
+    go (InfixCon {})    = p >= opPrec -- type args should be empty in this case
+    go (RecCon {})      = False
 
 
 -- | Parenthesize a pattern without token information

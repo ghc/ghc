@@ -139,7 +139,6 @@
              []
              (Nothing)
              (PrefixCon
-              []
               [(HsScaled
                 (HsLinearArrow
                  (EpPct1
@@ -187,7 +186,6 @@
              []
              (Nothing)
              (PrefixCon
-              []
               [(HsScaled
                 (HsLinearArrow
                  (EpPct1
@@ -351,6 +349,6 @@
          []))))))]))
 
 
-
 Test20239.hs:5:15: error: [GHC-76037]
     Not in scope: type constructor or class ‘Method’
+

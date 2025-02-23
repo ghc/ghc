@@ -561,28 +561,28 @@ nlConPat :: RdrName -> [LPat GhcPs] -> LPat GhcPs
 nlConPat con pats = noLocA $ ConPat
   { pat_con_ext = noAnn
   , pat_con = noLocA con
-  , pat_args = PrefixCon [] (map (parenthesizePat appPrec) pats)
+  , pat_args = PrefixCon (map (parenthesizePat appPrec) pats)
   }
 
 nlConPatName :: Name -> [LPat GhcRn] -> LPat GhcRn
 nlConPatName con pats = noLocA $ ConPat
   { pat_con_ext = noExtField
   , pat_con = noLocA con
-  , pat_args = PrefixCon [] (map (parenthesizePat appPrec) pats)
+  , pat_args = PrefixCon (map (parenthesizePat appPrec) pats)
   }
 
 nlNullaryConPat :: RdrName -> LPat GhcPs
 nlNullaryConPat con = noLocA $ ConPat
   { pat_con_ext = noAnn
   , pat_con = noLocA con
-  , pat_args = PrefixCon [] []
+  , pat_args = PrefixCon []
   }
 
 nlWildConPat :: DataCon -> LPat GhcPs
 nlWildConPat con = noLocA $ ConPat
   { pat_con_ext = noAnn
   , pat_con = noLocA $ getRdrName con
-  , pat_args = PrefixCon [] $
+  , pat_args = PrefixCon $
      replicate (dataConSourceArity con)
                nlWildPat
   }
@@ -1280,14 +1280,10 @@ collect_pat flag pat bndrs = case pat of
     CollWithDictBinders -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
                            ++ collectEvBinders (cpt_binds (pat_con_ext pat))
     CollVarTyVarBinders -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
-                           ++ concatMap collectConPatTyArgBndrs (hsConPatTyArgs ps)
 
 collectEvBinders :: TcEvBinds -> [Id]
 collectEvBinders (EvBinds bs)   = foldr add_ev_bndr [] bs
 collectEvBinders (TcEvBinds {}) = panic "ToDo: collectEvBinders"
-
-collectConPatTyArgBndrs :: HsConPatTyArg GhcRn -> [Name]
-collectConPatTyArgBndrs (HsConPatTyArg _ tp) = collectTyPatBndrs tp
 
 collect_ty_pat_bndrs :: CollectFlag p -> HsTyPat (NoGhcTc p) -> [IdP p] -> [IdP p]
 collect_ty_pat_bndrs CollNoDictBinders _ bndrs = bndrs
@@ -1639,7 +1635,7 @@ hsConDeclsBinders cons = go emptyFieldIndices cons
     get_flds_h98 :: FieldIndices p -> HsConDeclH98Details (GhcPass p)
                  -> (Maybe [Located Int], FieldIndices p)
     get_flds_h98 seen (RecCon flds) = first Just $ get_flds seen flds
-    get_flds_h98 seen (PrefixCon _ []) = (Just [], seen)
+    get_flds_h98 seen (PrefixCon []) = (Just [], seen)
     get_flds_h98 seen _ = (Nothing, seen)
 
     get_flds_gadt :: FieldIndices p -> HsConDeclGADTDetails (GhcPass p)
@@ -1836,7 +1832,7 @@ lPatImplicits = hs_lpat
     hs_pat _ = []
 
     details :: HsConPatDetails GhcRn -> [(SrcSpan, [ImplicitFieldBinders])]
-    details (PrefixCon _ ps) = hs_lpats ps
+    details (PrefixCon ps) = hs_lpats ps
     details (RecCon (HsRecFields { rec_dotdot = Nothing, rec_flds }))
       = hs_lpats $ map (hfbRHS . unLoc) rec_flds
     details (RecCon (HsRecFields { rec_dotdot = Just (L err_loc rec_dotdot), rec_flds }))

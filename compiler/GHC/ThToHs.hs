@@ -452,7 +452,7 @@ cvtDec (TH.PatSynD nm args dir pat)
        ; returnJustLA $ Hs.ValD noExtField $ PatSynBind noExtField $
            PSB noAnn nm' args' pat' dir' }
   where
-    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon noTypeArgs <$> mapM vNameN args
+    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon <$> mapM vNameN args
     cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixCon <$> vNameN a1 <*> vNameN a2
     cvtArgs (TH.RecordPatSyn sels)
       = do { let mk_fld = fldNameN (nameBase nm)
@@ -689,7 +689,7 @@ cvtConstr :: TH.Name -- ^ name of first constructor of parent type
 cvtConstr _ do_con_name (NormalC c strtys)
   = do  { c'   <- do_con_name c
         ; tys' <- mapM cvt_arg strtys
-        ; returnLA $ mkConDeclH98 noAnn c' Nothing Nothing (PrefixCon noTypeArgs (map hsLinear tys')) }
+        ; returnLA $ mkConDeclH98 noAnn c' Nothing Nothing (PrefixCon (map hsLinear tys')) }
 
 cvtConstr parent_con do_con_name (RecC c varstrtys)
   = do  { c'    <- do_con_name c
@@ -1474,11 +1474,11 @@ cvtp (ConP s ts ps)    = do { s' <- dNameN s
                             ; ps' <- cvtPats ps
                             ; ts' <- mapM cvtType ts
                             ; let pps = map (parenthesizePat appPrec) ps'
-                                  pts = map (\t -> HsConPatTyArg noAnn (mkHsTyPat t)) ts'
+                                  pts = map (\t -> L noAnn (InvisPat noAnn (mkHsTyPat t))) ts'
                             ; return $ ConPat
                                 { pat_con_ext = noAnn
                                 , pat_con = s'
-                                , pat_args = PrefixCon pts pps
+                                , pat_args = PrefixCon (pts ++ pps)
                                 }
                             }
 cvtp (InfixP p1 s p2)  = do { s' <- dNameN s; p1' <- cvtPat p1; p2' <- cvtPat p2

@@ -86,7 +86,7 @@ import Data.Foldable
 import Data.Function       ( on )
 import Data.Functor.Identity ( Identity (..) )
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe
+
 import Data.Ratio
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class
@@ -675,12 +675,23 @@ rnPatAndThen _ (EmbTyPat _ tp)
   = do { tp' <- rnHsTyPat HsTypePatCtx tp
        ; return (EmbTyPat noExtField tp') }
 rnPatAndThen _ (InvisPat _ tp)
-  = do { liftCps $ addErr (TcRnMisplacedInvisPat tp)
+  = do { liftCps $ check_lang_exts
          -- Invisible patterns are handled in `rnLArgPatAndThen`
-         -- so unconditionally emit error here
+         -- so we may be here only from a ConPat
        ; tp' <- rnHsTyPat HsTypePatCtx tp
        ; return (InvisPat noExtField tp')
        }
+  where
+    check_lang_exts :: RnM ()
+    check_lang_exts =
+        do { type_abs   <- xoptM LangExt.TypeAbstractions
+           ; type_app   <- xoptM LangExt.TypeApplications
+           ; scoped_tvs <- xoptM LangExt.ScopedTypeVariables
+           -- See Note [Deprecated type abstractions in constructor patterns]
+           ; if | type_abs -> return ()
+                | type_app && scoped_tvs -> addDiagnostic TcRnDeprecatedInvisTyArgInConPat
+                | otherwise -> addErrTc $ TcRnTypeApplicationsDisabled (TypeApplicationInPattern tp)
+           }
 
 --------------------
 rnConPatAndThen :: NameMaker
@@ -688,33 +699,34 @@ rnConPatAndThen :: NameMaker
                 -> HsConPatDetails GhcPs
                 -> CpsRn (Pat GhcRn)
 
-rnConPatAndThen mk con (PrefixCon tyargs pats)
+rnConPatAndThen mk con (PrefixCon pats)
   = do  { con' <- lookupConCps con
-        ; liftCps check_lang_exts
-        ; tyargs' <- mapM rnConPatTyArg tyargs
         ; pats' <- rnLPatsAndThen mk pats
         ; return $ ConPat
             { pat_con_ext = noExtField
             , pat_con = con'
-            , pat_args = PrefixCon tyargs' pats'
+            , pat_args = PrefixCon pats'
             }
         }
-  where
-    check_lang_exts :: RnM ()
-    check_lang_exts =
-      for_ (listToMaybe tyargs) $ \ arg ->
-        do { type_abs   <- xoptM LangExt.TypeAbstractions
-           ; type_app   <- xoptM LangExt.TypeApplications
-           ; scoped_tvs <- xoptM LangExt.ScopedTypeVariables
-           -- See Note [Deprecated type abstractions in constructor patterns]
-           ; if | type_abs -> return ()
-                | type_app && scoped_tvs -> addDiagnostic TcRnDeprecatedInvisTyArgInConPat
-                | otherwise -> addErrTc $ TcRnTypeApplicationsDisabled (TypeApplicationInPattern arg)
-           }
+    -- TODO (sand-witch): we actually need to do something with this check. As
+    -- https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0448-type-variable-scoping.rst
+    -- says,
+    -- > After 2 releases remove clause (b); -XTypeAbstractions will be the only way to enable this feature.
+    --
+    -- Is GHC 9.12 the time when we can remove the check? Or we have to wait one more release?
+    --
+    -- check_lang_exts :: RnM ()
+    -- check_lang_exts =
+    --   for_ (listToMaybe tyargs) $ \ arg ->
+    --     do { type_abs   <- xoptM LangExt.TypeAbstractions
+    --        ; type_app   <- xoptM LangExt.TypeApplications
+    --        ; scoped_tvs <- xoptM LangExt.ScopedTypeVariables
+    --        -- See Note [Deprecated type abstractions in constructor patterns]
+    --        ; if | type_abs -> return ()
+    --             | type_app && scoped_tvs -> addDiagnostic TcRnDeprecatedInvisTyArgInConPat
+    --             | otherwise -> addErrTc $ TcRnTypeApplicationsDisabled (TypeApplicationInPattern arg)
+    --        }
 
-    rnConPatTyArg (HsConPatTyArg _ t) = do
-      t' <- rnHsTyPat HsTypePatCtx t
-      return (HsConPatTyArg noExtField t')
 
 rnConPatAndThen mk con (InfixCon pat1 pat2)
   = do  { con' <- lookupConCps con

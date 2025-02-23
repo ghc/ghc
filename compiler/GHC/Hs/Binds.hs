@@ -620,7 +620,7 @@ instance (OutputableBndrId l, OutputableBndrId r)
                     GhcPs -> ppr v
                     GhcRn -> ppr v
                     GhcTc -> ppr v
-          PrefixCon _ vs -> hsep (pprPrefixOcc psyn : map ppr_v vs)
+          PrefixCon vs -> hsep (pprPrefixOcc psyn : map ppr_v vs)
             where
                 ppr_v v = case ghcPass @r of
                     GhcPs -> ppr v
