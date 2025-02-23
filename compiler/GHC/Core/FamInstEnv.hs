@@ -579,7 +579,7 @@ fails anyway.
 compatibleBranches :: CoAxBranch -> CoAxBranch -> Bool
 compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
                    (CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
-  = case tcUnifyTysFG alwaysBindFun commonlhs1 commonlhs2 of
+  = case tcUnifyTysFG alwaysBindFam alwaysBindTv commonlhs1 commonlhs2 of
       -- Here we need the cab_tvs of the two branches to be disinct.
       -- See Note [CoAxBranch type variables] in GHC.Core.Coercion.Axiom.
       SurelyApart     -> True
@@ -1251,15 +1251,12 @@ findBranch branches target_tys
 -- ('CoAxBranch') of a closed type family can be used to reduce a certain target
 -- type family application.
 apartnessCheck :: [Type]
-  -- ^ /flattened/ target arguments. Make sure they're flattened! See
-  -- Note [Flattening type-family applications when matching instances]
-  -- in GHC.Core.Unify.
-               -> CoAxBranch -- ^ the candidate equation we wish to use
+               -> CoAxBranch -- ^ The candidate equation we wish to use
                              -- Precondition: this matches the target
                -> Bool       -- ^ True <=> equation can fire
-apartnessCheck flattened_target (CoAxBranch { cab_incomps = incomps })
+apartnessCheck target (CoAxBranch { cab_incomps = incomps })
   = all (isSurelyApart
-         . tcUnifyTysFG alwaysBindFun flattened_target
+         . tcUnifyTysFG alwaysBindFam alwaysBindTv target
          . coAxBranchLHS) incomps
   where
     isSurelyApart SurelyApart = True

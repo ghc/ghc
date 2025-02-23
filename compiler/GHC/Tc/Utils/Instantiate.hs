@@ -590,7 +590,7 @@ tcSuperSkolTyVars :: TcLevel -> SkolemInfo -> [TyVar] -> (Subst, [TcTyVar])
 -- Make skolem constants, but do *not* give them new names, as above
 -- As always, allocate them one level in
 -- Moreover, make them "super skolems"; see GHC.Core.InstEnv
---    Note [Binding when looking up instances]
+--    Note [Super skolems: binding when looking up instances]
 -- See Note [Kind substitution when instantiating]
 -- Precondition: tyvars should be ordered by scoping
 tcSuperSkolTyVars tc_lvl skol_info = mapAccumL do_one emptySubst

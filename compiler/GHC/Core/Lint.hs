@@ -2790,7 +2790,7 @@ lintBranch this_co fam_tc branch arg_kinds
     check_no_conflict _    [] = Nothing
     check_no_conflict flat (b@CoAxBranch { cab_lhs = lhs_incomp } : rest)
          -- See Note [Apartness] in GHC.Core.FamInstEnv
-      | SurelyApart <- tcUnifyTysFG alwaysBindFun flat lhs_incomp
+      | SurelyApart <- tcUnifyTysFG alwaysBindFam alwaysBindTv flat lhs_incomp
       = check_no_conflict flat rest
       | otherwise
       = Just b
