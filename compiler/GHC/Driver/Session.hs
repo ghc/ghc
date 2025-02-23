@@ -3615,6 +3615,10 @@ makeDynFlagsConsistent dflags
  , Nothing <- outputFile dflags
  = pgmError "--output must be specified when using --merge-objs"
 
+ | xopt LangExt.Cpp dflags && xopt LangExt.GhcCpp dflags
+    = loop (xopt_unset dflags LangExt.Cpp)
+         "Disabling CPP, because GHC_CPP is also enabled"
+
  | otherwise = (dflags, mempty)
     where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")
           loop updated_dflags warning
