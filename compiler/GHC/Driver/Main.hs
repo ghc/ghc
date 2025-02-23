@@ -520,7 +520,11 @@ hscParse' mod_summary
                  = parseSignature
                  | otherwise = parseModule
 
-    case unP parseMod (initParserStateWithMacros dflags (initParserOpts dflags) buf loc) of
+    hsc <- getHscEnv
+    let unit_env = hsc_unit_env hsc
+    let p_state = (initParserStateWithMacros dflags (Just unit_env) (initParserOpts dflags) buf loc)
+
+    case unP parseMod p_state of
         PFailed pst ->
             handleWarningsThrowErrors (getPsMessages pst)
         POk pst rdr_module -> do
@@ -531,7 +535,7 @@ hscParse' mod_summary
                                                    NoBlankEpAnnotations
                                                    rdr_module)
             liftIO $ putDumpFileMaybe logger Opt_D_dump_ghc_cpp "After GHC_CPP"
-                        FormatHaskell (dumpGhcCpp (initParserStateWithMacros dflags (initParserOpts dflags) buf loc))
+                        FormatHaskell (dumpGhcCpp p_state)
             liftIO $ putDumpFileMaybe logger Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
 
@@ -2672,7 +2676,11 @@ hscParseThingWithLocation source linenumber parser str = do
         let buf = stringToStringBuffer str
             loc = mkRealSrcLoc (fsLit source) linenumber 1
 
-        case unP parser (initParserStateWithMacros dflags (initParserOpts dflags) buf loc) of
+        hsc <- getHscEnv
+        let unit_env = hsc_unit_env hsc
+        let p_state = (initParserStateWithMacros dflags (Just unit_env) (initParserOpts dflags) buf loc)
+
+        case unP parser p_state of
             PFailed pst ->
                 handleWarningsThrowErrors (getPsMessages pst)
             POk pst thing -> do
@@ -2682,7 +2690,7 @@ hscParseThingWithLocation source linenumber parser str = do
                 liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed_ast "Parser AST"
                             FormatHaskell (showAstData NoBlankSrcSpan NoBlankEpAnnotations thing)
                 liftIO $ putDumpFileMaybe logger Opt_D_dump_ghc_cpp "After GHC_CPP"
-                            FormatHaskell (dumpGhcCpp (initParserStateWithMacros dflags (initParserOpts dflags) buf loc))
+                            FormatHaskell (dumpGhcCpp p_state)
                 return thing
 
 hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
@@ -2956,9 +2964,7 @@ writeInterfaceOnlyMode dflags =
 
 -- -----------------------------------------------------------------------------
 
--- initParserStateWithMacros :: DynFlags -> Maybe UnitEnv -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
--- initParserStateWithMacros df unit_env
-initParserStateWithMacros :: DynFlags -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
-initParserStateWithMacros df
-  = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
+initParserStateWithMacros :: DynFlags -> Maybe UnitEnv -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+initParserStateWithMacros df unit_env
+  = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df unit_env
                                        , pp_scope = (PpScope True) :| [] })
