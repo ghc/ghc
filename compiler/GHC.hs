@@ -1880,7 +1880,7 @@ parser str dflags filename =
        loc  = mkRealSrcLoc (mkFastString filename) 1 1
        buf  = stringToStringBuffer str
    in
-   case unP Parser.parseModule (initParserStateWithMacros dflags (initParserOpts dflags) buf loc) of
+   case unP Parser.parseModule (initParserStateWithMacros dflags Nothing (initParserOpts dflags) buf loc) of
 
      PFailed pst ->
          let (warns,errs) = getPsMessages pst in
