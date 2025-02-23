@@ -65,6 +65,7 @@ import Text.ParserCombinators.ReadPrec (readPrec_to_P)
 import Text.Read (readPrec)
 import GHC.Driver.Session (DynFlags)
 import GHC.Driver.Config.Parser (predefinedMacros)
+import GHC.Unit.Env (UnitEnv)
 
 ------------------------------------------------------------------------------
 
@@ -72,6 +73,7 @@ import GHC.Driver.Config.Parser (predefinedMacros)
 --
 -- Throws a 'SourceError' if parsing fails.
 getImports :: DynFlags
+           -> Maybe UnitEnv
            -> ParserOpts   -- ^ Parser options
            -> Bool         -- ^ Implicit Prelude?
            -> StringBuffer -- ^ Parse this.
@@ -86,9 +88,9 @@ getImports :: DynFlags
                 Located ModuleName))
               -- ^ The source imports and normal imports (with optional package
               -- names from -XPackageImports), and the module name.
-getImports dflags popts implicit_prelude buf filename source_filename = do
+getImports dflags unit_env popts implicit_prelude buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
-  case unP parseHeader (initParserStateWithMacros dflags popts buf loc) of
+  case unP parseHeader (initParserStateWithMacros dflags unit_env popts buf loc) of
     PFailed pst ->
         -- assuming we're not logging warnings here as per below
       return $ Left $ getPsErrorMessages pst
@@ -117,9 +119,10 @@ getImports dflags popts implicit_prelude buf filename source_filename = do
                      , reLoc mod)
 
 
-initParserStateWithMacros :: DynFlags -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
-initParserStateWithMacros df
-  = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
+initParserStateWithMacros
+  :: DynFlags -> Maybe UnitEnv -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+initParserStateWithMacros df unit_env
+  = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df unit_env
                                        , pp_scope = (PpScope  True) NE.:| [] })
 
 mkPrelImports :: ModuleName
