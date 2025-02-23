@@ -33,6 +33,7 @@ import qualified GHC.Types.SrcLoc      as GHC
 import qualified GHC.Utils.Error       as GHC
 import qualified GHC.Utils.Fingerprint as GHC
 import qualified GHC.Utils.Outputable  as GHC
+import qualified GHC.Utils.Panic.Plain as GHC
 import GHC.Types.SrcLoc (mkSrcSpan, mkSrcLoc)
 import GHC.Data.FastString (mkFastString)
 
@@ -41,6 +42,7 @@ import Data.Maybe
 import Types
 import Utils
 import qualified Data.Set as Set
+import qualified GHC.Data.Strict as Strict
 
 
 -- import Debug.Trace
@@ -127,9 +129,9 @@ goodComment c = isGoodComment (tokComment c)
     isGoodComment [Comment "" _ _ _] = False
     isGoodComment _                  = True
 
-toRealLocated :: GHC.Located a -> GHC.RealLocated a
-toRealLocated (GHC.L (GHC.RealSrcSpan s _) x) = GHC.L s              x
-toRealLocated (GHC.L _ x)                     = GHC.L badRealSrcSpan x
+toRealLocated :: GHC.Located a -> GHC.PsLocated a
+toRealLocated (GHC.L (GHC.RealSrcSpan s (Strict.Just b)) x) = GHC.L (GHC.PsSpan s b) x
+toRealLocated (GHC.L _ _)                     = GHC.panic "toRealLocated"
 
 -- ---------------------------------------------------------------------
 
