@@ -14,6 +14,7 @@ import GHC.Data.StringBuffer
 import GHC.Driver.Config.Parser hiding (predefinedMacros)
 import GHC.Driver.Env.Types
 import GHC.Driver.Errors.Types
+import GHC.Driver.Main
 import qualified GHC.Driver.Errors.Types as GHC
 import qualified GHC.Driver.Session as GHC
 import GHC.Hs.Dump
@@ -27,6 +28,7 @@ import GHC.Types.SrcLoc
 import GHC.Unit.Env
 import GHC.Unit.State
 import GHC.Utils.Outputable
+import qualified GHC.Parser.PreProcess as GHCPP
 
 -- Local simulation -----------------
 import ParsePP
@@ -79,8 +81,13 @@ doDump libdir str = ghcWrapper libdir $ do
     -- hsc <- getSession
     liftIO $ putStrLn "-- parsing ----------"
     liftIO $ putStrLn str
-    liftIO $ putStrLn "---------------------"
+    liftIO $ putStrLn "-- dumpGhcCpp test ----------"
     -- let (!pst,!toks) = strGetToks dflags [] pflags "fake_test_file.hs" str
+    hsc <- getSession
+    let pst0 = initParserStateWithMacros dflags (Just (hsc_unit_env hsc)) pflags (stringToStringBuffer str)
+                       (mkRealSrcLoc (mkFastString "fake_test_file.hs") 1 1)
+    liftIO $ putStrLn $ showPprUnsafe $ GHCPP.dumpGhcCpp pst0
+    liftIO $ putStrLn "-- dumpGhcCpp test done ----------"
     let !pst = getPState dflags [] pflags "fake_test_file.hs" str
     liftIO $ putStrLn "-- dumpGhcCpp ----------"
     liftIO $ putStrLn $ showPprUnsafe $ dumpGhcCpp pst
