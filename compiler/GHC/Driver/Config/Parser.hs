@@ -18,7 +18,6 @@ import GHC.Driver.Config.Diagnostic
 import GHC.Parser.Lexer
 import qualified GHC.Parser.PreProcess.ParserM as PM
 import GHC.Parser.PreProcess.State ( MacroDefines)
-import GHC.Unit.Env (UnitEnv)
 
 -- | Extracts the flags needed for parsing
 initParserOpts :: DynFlags -> ParserOpts
@@ -38,10 +37,8 @@ supportedLanguagePragmas = supportedLanguagesAndExtensions . platformArchOS . ta
 -- Predefined macros, for use in GHC_CPP @PpState@
 -- Derived from the GHC source file `ghcversion.h.in`
 
-predefinedMacros :: DynFlags -> Maybe UnitEnv -> MacroDefines
-predefinedMacros df unit_env = Map.fromList
--- predefinedMacros :: DynFlags -> MacroDefines
--- predefinedMacros df = Map.fromList
+predefinedMacros :: DynFlags -> MacroDefines
+predefinedMacros df = Map.fromList
         [
             ( "__GLASGOW_HASKELL__"
             , Map.singleton Nothing (Nothing, [PM.TInteger projectVersionInt])
