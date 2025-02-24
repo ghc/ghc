@@ -97,3 +97,4 @@ test('T24115', just_ghci + [extra_run_opts("-e ':add T24115.hs'")], ghci_script,
 
 test('T10920', [only_ways(ghci_ways), extra_files(['LocalPrelude/Prelude.hs'])], ghci_script, ['T10920.script'])
 test('TopEnvIface', [only_ways(ghci_ways)], makefile_test, [])
+test('T25790', [only_ways(ghci_ways), extra_ways(["ghci-opt"])], ghci_script, ['T25790.script'])
