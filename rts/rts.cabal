@@ -276,9 +276,6 @@ flag librt
 flag libdl
   default: False
   manual: True
-flag use-system-libffi
-  default: False
-  manual: True
 flag libffi-adjustors
   default: False
   manual: True
@@ -402,18 +399,6 @@ library
                         stg/Types.h
 
     else
-      -- If we are using an in-tree libffi then we must declare it as a bundled
-      -- library to ensure that Cabal installs it.
-      if !flag(use-system-libffi)
-        if os(windows)
-          extra-bundled-libraries: Cffi-6
-        else
-          extra-bundled-libraries: Cffi
-
-        install-includes: ffi.h ffitarget.h
-        -- ^ see Note [Packaging libffi headers] in
-        -- GHC.Driver.CodeOutput.
-
       -- Here we declare several flavours to be available when passing the
       -- suitable (combination of) flag(s) when configuring the RTS from hadrian,
       -- using Cabal.
@@ -465,9 +450,6 @@ library
          extra-libraries: rt
       if flag(libdl)
          extra-libraries: dl
-      if flag(use-system-libffi)
-         extra-libraries: ffi
-         extra-libraries-static: ffi
       if os(windows)
          extra-libraries:
             -- for the linker
@@ -634,6 +616,8 @@ library
       -- Adjustor stuff
       if flag(libffi-adjustors)
         c-sources: adjustor/LibffiAdjustor.c
+        extra-libraries: ffi
+        extra-libraries-static: ffi
       else
         -- Use GHC's native adjustors
         if arch(i386)
@@ -646,6 +630,11 @@ library
           else
             asm-sources: adjustor/NativeAmd64Asm.S
             c-sources: adjustor/NativeAmd64.c
+        -- fall back to the LibffiAdjustor if neither i386, or x86_64
+        if !arch(x86_64) && !arch(i386)
+          c-sources: adjustor/LibffiAdjustor.c
+          extra-libraries: ffi
+          extra-libraries-static: ffi
 
       -- Use assembler STG entrypoint on architectures where it is used
       if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64) || arch(loongarch64)

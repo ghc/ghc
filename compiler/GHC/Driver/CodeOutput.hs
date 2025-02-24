@@ -255,12 +255,11 @@ outputJS _ _ _ _ _ = pgmError $ "codeOutput: Hit JavaScript case. We should neve
 -}
 
 {-
-Note [Packaging libffi headers]
+Note [libffi headers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The C code emitted by GHC for libffi adjustors must depend upon the ffi_arg type,
-defined in <ffi.h>. For this reason, we must ensure that <ffi.h> is available
-in binary distributions. To do so, we install these headers as part of the
-`rts` package.
+defined in <ffi.h>. On systems where GHC uses the libffi adjustors, the libffi
+library, and headers must be installed.
 -}
 
 outputForeignStubs
