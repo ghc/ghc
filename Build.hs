@@ -575,31 +575,6 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   writeFile (src </> "libraries/ghc-internal/src/GHC/Internal/Prim.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-source"]) primops
   writeFile (src </> "libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops
 
-  -- build libffi
-  msg "  - Building libffi..."
-  src_libffi <- makeAbsolute (src </> "libffi")
-  dst_libffi <- makeAbsolute (dst </> "libffi")
-  let libffi_version = "3.4.6"
-  createDirectoryIfMissing True src_libffi
-  createDirectoryIfMissing True dst_libffi
-  void $ readCreateProcess (shell ("tar -xvf libffi-tarballs/libffi-" ++ libffi_version ++ ".tar.gz -C " ++ src_libffi)) ""
-  let build_libffi = mconcat
-        [ "cd " ++ src_libffi </> "libffi-" ++ libffi_version ++ "; "
-        -- FIXME: pass the appropriate toolchain (CC, LD...)
-        , "./configure --disable-docs --with-pic=yes --disable-multi-os-directory --prefix=" ++ dst_libffi
-        , " && make install -j"
-        ]
-  (libffi_exit_code, libffi_stdout, libffi_stderr) <- readCreateProcessWithExitCode (shell build_libffi) ""
-  case libffi_exit_code of
-    ExitSuccess -> pure ()
-    ExitFailure r -> do
-      putStrLn $ "Failed to build libffi with error code " ++ show r
-      putStrLn libffi_stdout
-      putStrLn libffi_stderr
-      exitFailure
-  cp (dst_libffi </> "include" </> "*") (src_rts </> "include")
-  cp (dst_libffi </> "lib" </> "libffi.a") (takeDirectory ghcplatform_dir </> "libCffi.a")
-
   -- build boot libraries: ghc-internal, base...
   let cabal_project_bootlibs_path = dst </> "cabal-project-boot-libs"
   makeCabalProject cabal_project_bootlibs_path $
