@@ -4,7 +4,7 @@ module Test where
 
 import Data.Maybe
 import GHC.Exts
-import GHC.Internal.Wasm.Prim
+import GHC.Wasm.Prim
 import GHC.Weak
 import System.Mem
 
@@ -22,13 +22,6 @@ foreign import javascript "wrapper"
 foreign export javascript "testDynExportFree sync"
   testDynExportFree :: Int -> Int -> Int -> IO ()
 
--- JSVal uses Weak# under the hood for garbage collection support,
--- this exposes the internal Weak# to observe the liveliness of
--- JSVal#. Do not use this in your own codebase since this is purely
--- an implementation detail of JSVal and subject to change!
-jsvalWeak :: JSVal -> Weak JSVal
-jsvalWeak (JSVal _ w _) = Weak w
-
 probeWeak :: Weak v -> IO ()
 probeWeak wk = print =<< isJust <$> deRefWeak wk
 
@@ -42,7 +35,7 @@ testDynExportFree x y z = do
   -- wk_js observe the liveliness of the JavaScript callback on the
   -- Haskell heap. Make sure it's eagerly evaluated and isn't a thunk
   -- that retains cb.
-  let !wk_js = jsvalWeak cb
+  !wk_js <- mkWeakJSVal cb Nothing
   print $ js_to_hs cb x y
   -- Eagerly drop references to both the JavaScript callback and the
   -- Haskell function closure.
@@ -60,7 +53,7 @@ testDynExportGC x y z = do
   let fn a b = a * b + z
   wk_fn <- mkWeak fn () Nothing
   cb <- js_from_hs fn
-  let !wk_js = jsvalWeak cb
+  !wk_js <- mkWeakJSVal cb Nothing
   print $ js_to_hs cb x y
   -- Why performGC twice? The first run gathers some C finalizers
   -- which will be invoked in the second run to free the JSVal

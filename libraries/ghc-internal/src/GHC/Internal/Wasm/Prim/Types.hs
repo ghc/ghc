@@ -8,6 +8,7 @@ module GHC.Internal.Wasm.Prim.Types (
   JSVal# (..),
   JSVal (..),
   freeJSVal,
+  mkWeakJSVal,
   JSString (..),
   fromJSString,
   toJSString,
@@ -26,6 +27,7 @@ import GHC.Internal.IO.Encoding
 import GHC.Internal.Num
 import GHC.Internal.Show
 import GHC.Internal.Stable
+import GHC.Internal.Weak
 
 {-
 
@@ -93,6 +95,12 @@ freeJSVal v@(JSVal _ w sp) = do
     _ -> pure ()
   IO $ \s0 -> case finalizeWeak# w s0 of
     (# s1, _, _ #) -> (# s1, () #)
+
+mkWeakJSVal :: JSVal -> Maybe (IO ()) -> IO (Weak JSVal)
+mkWeakJSVal v@(JSVal k _ _) (Just (IO fin)) = IO $ \s0 ->
+  case mkWeak# k v fin s0 of
+    (# s1, w #) -> (# s1, Weak w #)
+mkWeakJSVal (JSVal _ w _) Nothing = pure $ Weak w
 
 foreign import javascript unsafe "if (!__ghc_wasm_jsffi_finalization_registry.unregister($1)) { throw new WebAssembly.RuntimeError('js_callback_unregister'); }"
   js_callback_unregister :: JSVal -> IO ()
