@@ -24,8 +24,8 @@ import Data.List
 
 printVarDecl :: Int -> IO ()
 printVarDecl i = do
-  putStrLn $ "  I64 i" ++ show i ++ ";"
-  putStrLn $ "  i" ++ show i ++ " = (" ++ show i ++ " " ++ op ++ " x) % 10;"
+  putStrLn $ "  I64 a" ++ show i ++ ";"
+  putStrLn $ "  a" ++ show i ++ " = (" ++ show i ++ " " ++ op ++ " x) % 10;"
   where
     -- Add some variance. Otherwise, GHC inlines the expressions.
     op = case i of
@@ -37,13 +37,13 @@ addVars :: [Int] -> String
 addVars = opVars "+"
   where
     opVars :: String -> [Int] -> String
-    opVars op is = concat $ intersperse op $ map ((++) "i" . show) is
+    opVars op is = concat $ intersperse op $ map ((++) "a" . show) is
 
 printCase :: Int -> IO ()
 printCase i = do
   putStrLn $ "    case " ++ show i ++ ": {"
   putStrLn $ "      ccall printf(\"Inside branch " ++ show i ++ "\\n\");"
-  putStrLn $ "      res = i" ++ show i ++ ";"
+  putStrLn $ "      res = a" ++ show i ++ ";"
   putStrLn $ "      ccall printf(\"Before jump " ++ show i ++ "\\n\");"
   putStrLn $ "      goto END;"
   putStrLn $ "    }"
@@ -70,6 +70,7 @@ main = do
   putStrLn "    }"
   putStrLn "  }"
   putStrLn "END:"
-  putStrLn "  ccall printf(\"End :) \\n\");"
+  putStrLn "  ccall printf(\"Return\\n\");"
+  putStrLn "  ccall fflush(NULL);"
   putStrLn $ "  return (res);"
   putStrLn "}"
