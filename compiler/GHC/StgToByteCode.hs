@@ -934,11 +934,11 @@ terribleNoOp
     -> BCInstr                  -- The operator
     -> [StgArg]                 -- Args, in *reverse* order (must be fully applied)
     -> BcM BCInstrList
-terribleNoOp orig_d _ p op_inst args = app_code
+terribleNoOp orig_d _ p _ args = app_code
   where
     app_code = do
         profile <- getProfile
-        let platform = profilePlatform profile
+        let --platform = profilePlatform profile
 
             non_voids =
                 addArgReps (assertNonVoidStgArgs args)
@@ -951,7 +951,7 @@ terribleNoOp orig_d _ p op_inst args = app_code
                     (FieldOff a _) -> pushConstrAtom d p (fromNonVoid a)
                 more_push_code <- do_pushery (d + arg_bytes) args
                 return (push `appOL` more_push_code)
-            do_pushery !d [] = do
+            do_pushery !_d [] = do
                 -- let !n_arg_words = bytesToWords platform (d - orig_d)
                 return (nilOL)
 
@@ -970,7 +970,7 @@ mkPrimOpCode orig_d _ p op_inst args = app_code
   where
     app_code = do
         profile <- getProfile
-        let platform = profilePlatform profile
+        let _platform = profilePlatform profile
 
             non_voids =
                 addArgReps (assertNonVoidStgArgs args)
@@ -983,7 +983,7 @@ mkPrimOpCode orig_d _ p op_inst args = app_code
                     (FieldOff a _) -> pushConstrAtom d p (fromNonVoid a)
                 more_push_code <- do_pushery (d + arg_bytes) args
                 return (push `appOL` more_push_code)
-            do_pushery !d [] = do
+            do_pushery !_d [] = do
                 -- let !n_arg_words = bytesToWords platform (d - orig_d)
                 return (unitOL op_inst)
 
