@@ -39,6 +39,9 @@ jobs:
       run: make cabal
 
     - name: Build the bindist
+      env:
+        CC: gcc
+        CXX: g++
       run: make
 
     - name: Upload artifacts
