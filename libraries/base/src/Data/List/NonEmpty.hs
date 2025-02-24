@@ -544,7 +544,9 @@ infixl 9 !!
 
 -- | The 'unzip' function is the inverse of the 'zip' function.
 unzip :: NonEmpty (a, b) -> (NonEmpty a, NonEmpty b)
-unzip xs = (fst <$> xs, snd <$> xs)
+unzip ((a, b) :| asbs) = (a :| as, b :| bs)
+  where
+    (as, bs) = List.unzip asbs
 
 -- | The 'nub' function removes duplicate elements from a list. In
 -- particular, it keeps only the first occurrence of each element.
