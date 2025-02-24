@@ -373,10 +373,15 @@ data EvBindsVar
     }
 
 instance Data.Data TcEvBinds where
-  -- Placeholder; we can't travers into TcEvBinds
+  -- Placeholder; we can't traverse into TcEvBinds
   toConstr _   = abstractConstr "TcEvBinds"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = Data.mkNoRepType "TcEvBinds"
+instance Data.Data EvBind where
+  -- Placeholder; we can't traverse into EvBind
+  toConstr _   = abstractConstr "TcEvBind"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = Data.mkNoRepType "EvBind"
 
 {- Note [Coercion evidence only]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -554,8 +554,8 @@ types/kinds are fully settled and zonked.
 
 -- | Do a topological sort on a list of tyvars,
 --   so that binders occur before occurrences
--- E.g. given  [ a::k, k::*, b::k ]
--- it'll return a well-scoped list [ k::*, a::k, b::k ]
+-- E.g. given  @[ a::k, k::Type, b::k ]@
+-- it'll return a well-scoped list @[ k::Type, a::k, b::k ]@.
 --
 -- This is a deterministic sorting operation
 -- (that is, doesn't depend on Uniques).

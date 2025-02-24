@@ -823,7 +823,7 @@ Notice that
      let { d = d2; d1 = $dfOrdInt } in f @Int @b (d2:Eq b)
   Do no inlining in this "simple optimiser" phase: use `simpleOptExprNoInline`.
   E.g. we don't want to turn
-     let { d1=d; d2=d } in f d d    -->    f d d
+     let { d1=d; d2=d } in f d1 d2    -->    f d d
   because the latter is harder to match.
 
 (SP2) the function `prepareSpecLHS` takes the simplified LHS `core_call` and
@@ -921,14 +921,19 @@ dsSpec poly_rhs (SpecPrag poly_id spec_co spec_inl)
                                rule_bndrs poly_id rule_lhs_args
                                spec_bndrs core_app spec_inl } }
 
-dsSpec poly_rhs (SpecPragE { spe_fn_nm  = poly_nm
-                           , spe_fn_id  = poly_id
-                           , spe_bndrs  = bndrs
-                           , spe_call   = the_call
-                           , spe_inl    = inl })
+dsSpec poly_rhs (
+  SpecPragE
+    { spe_fn_nm = poly_nm
+    , spe_fn_id = poly_id
+    , spe_inl   = inl
+    , spe_bndrs = bndrs
+    , spe_call  = the_call
+    })
   -- SpecPragE case: See Note [Handling new-form SPECIALISE pragmas] in GHC.Tc.Gen.Sig
-  = do { ds_call <- zapUnspecables $   -- zapUnspecables: see
-                    dsLExpr the_call   --   Note [Desugaring RULE left hand sides]
+  = do { ds_call <- unsetGOptM Opt_EnableRewriteRules $ -- Note [Desugaring RULE left hand sides]
+                    unsetWOptM Opt_WarnIdentities     $
+                    zapUnspecables $
+                      dsLExpr the_call
 
        -- Simplify the (desugared) call; see wrinkle (SP1)
        -- in Note [Desugaring SPECIALISE pragmas]
@@ -955,12 +960,16 @@ dsSpec poly_rhs (SpecPragE { spe_fn_nm  = poly_nm
 
        ; tracePm "dsSpec" (vcat [ text "poly_id" <+> ppr poly_id
                                 , text "bndrs"   <+> ppr bndrs
+                                , text "lhs_args" <+> ppr lhs_args
+                                , text "bndr_set" <+> ppr bndr_set
                                 , text "all_bndrs"   <+> ppr all_bndrs
+                                , text "rule_bndrs" <+> ppr rule_bndrs
                                 , text "const_bndrs"   <+> ppr const_bndrs
-                                , text "ds_call" <+> ppr ds_call
-                                , text "core_call" <+> ppr core_call
+                                , text "spec_bndrs" <+> ppr spec_bndrs
                                 , text "core_call fvs" <+> ppr (exprFreeVars core_call)
-                                , text "spec_const_binds" <+> ppr spec_const_binds ])
+                                , text "spec_const_binds" <+> ppr spec_const_binds
+                                , text "ds_call" <+> ppr ds_call
+                                , text "core_call" <+> ppr core_call ])
 
        ; finishSpecPrag poly_nm poly_rhs
                         rule_bndrs poly_id lhs_args
@@ -999,7 +1008,7 @@ prepareSpecLHS poly_id evs the_call
       = Nothing
 
     transfer_to_spec_rhs qevs rhs
-      = isEmptyVarSet (exprSomeFreeVars is_quant_id rhs)
+      = isEmptyVarSet $ exprSomeFreeVars is_quant_id rhs
       where
         is_quant_id v = isId v && v `elemVarSet` qevs
       -- See Note [Desugaring SPECIALISE pragmas] wrinkle (SP4)
@@ -1054,7 +1063,7 @@ finishSpecPrag poly_nm poly_rhs rule_bndrs poly_id rule_args
 
            ; tracePm "dsSpec" (vcat
                 [ text "fun:" <+> ppr poly_id
-                , text "spec_bndrs:" <+>  ppr spec_bndrs
+                , text "spec_bndrs:" <+> ppr spec_bndrs
                 , text "args:" <+>  ppr rule_args ])
            ; return (unitOL (spec_id, spec_rhs), rule) }
                 -- NB: do *not* use makeCorePair on (spec_id,spec_rhs), because
@@ -1077,7 +1086,7 @@ finishSpecPrag poly_nm poly_rhs rule_bndrs poly_id rule_args
 
       | all is_nop_arg rule_args, not (isInlinePragma spec_inl)
       -- The specialisation does nothing.
-      -- But don't compliain if it is SPECIALISE INLINE (#4444)
+      -- But don't complain if it is SPECIALISE INLINE (#4444)
       = Just UselessSpecialiseNoSpecialisation
 
       | otherwise

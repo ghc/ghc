@@ -824,7 +824,8 @@ instance NoAnn AnnSig where
 
 -- | Type checker Specialisation Pragmas
 --
--- 'TcSpecPrags' conveys @SPECIALISE@ pragmas from the type checker to the desugarer
+-- 'TcSpecPrags' conveys @SPECIALISE@ pragmas from the type checker
+-- to the desugarer
 data TcSpecPrags
   = IsDefaultMethod     -- ^ Super-specialised: a default method should
                         -- be macro-expanded at every call site
@@ -834,21 +835,36 @@ data TcSpecPrags
 type LTcSpecPrag = Located TcSpecPrag
 
 -- | Type checker Specialisation Pragma
--- This data type is used briefly, to communicate between the typechecker and renamer
+--
+-- This data type is used to communicate between the typechecker and
+-- the desugarer.
 data TcSpecPrag
-  = SpecPrag Id HsWrapper InlinePragma
-      -- ^ The Id to be specialised, a wrapper that specialises the
-      -- polymorphic function, and inlining spec for the specialised function
+  -- | Old-form specialise pragma
+  = SpecPrag
+      Id
+      -- ^ 'Id' to be specialised
+      HsWrapper
+      -- ^ wrapper that specialises the polymorphic function
+      InlinePragma
+      -- ^ inlining spec for the specialised function
+   -- | New-form specialise pragma
+   | SpecPragE
+     { spe_fn_nm :: Name
+       -- ^ 'Name' of the 'Id' being specialised
+     , spe_fn_id :: Id
+        -- ^ 'Id' being specialised
+        --
+        -- Note that 'spe_fn_nm' may differ from @'idName' 'spe_fn_id'@
+        -- in the case of instance methods, where the 'Name' is the
+        -- class-op selector but the 'spe_fn_id' is that for the local method
+     , spe_inl   :: InlinePragma
+        -- ^ (optional) INLINE annotation and activation phase annotation
 
-   | SpecPragE { spe_fn_nm :: Name           -- The Name of the Id being specialised
-               , spe_fn_id :: Id             -- The Id being specialised
-                    -- The spe_fn_name may differ from (idName spe_fn_id) in the
-                    -- case of instance methods, where the Name is the class-op
-                    -- selector but the spe_fn_id is that for the local method
-
-               , spe_bndrs :: [Var]          -- TyVars, EvVars, and Ids
-               , spe_call  :: LHsExpr GhcTc  -- The LHS of the RULE: a call of f
-               , spe_inl   :: InlinePragma }
+     , spe_bndrs :: [Var]
+        -- ^ TyVars, EvVars, and Ids
+     , spe_call  :: LHsExpr GhcTc
+        -- ^ The type-checked specialise expression
+     }
 
 noSpecPrags :: TcSpecPrags
 noSpecPrags = SpecPrags []
