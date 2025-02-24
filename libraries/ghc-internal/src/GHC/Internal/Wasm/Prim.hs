@@ -4,6 +4,7 @@ module GHC.Internal.Wasm.Prim (
   -- User-facing JSVal type and freeJSVal
   JSVal (..),
   freeJSVal,
+  mkWeakJSVal,
 
   -- The JSString type and conversion from/to Haskell String
   JSString (..),
