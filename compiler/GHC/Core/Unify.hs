@@ -31,7 +31,6 @@ import GHC.Prelude
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Name( Name, mkSysTvName, mkSystemVarName )
 import GHC.Builtin.Names( tYPETyConKey, cONSTRAINTTyConKey )
 import GHC.Core.Type     hiding ( getTvSubstEnv )
 import GHC.Core.Coercion hiding ( getCvSubstEnv )
@@ -40,7 +39,7 @@ import GHC.Core.TyCon.Env
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Compare ( eqType, tcEqType )
 import GHC.Core.TyCo.FVs     ( tyCoVarsOfCoList, tyCoFVsOfTypes )
-import GHC.Core.TyCo.Subst   ( mkTvSubst, emptyIdSubstEnv )
+import GHC.Core.TyCo.Subst   ( mkTvSubst )
 import GHC.Core.Map.Type
 import GHC.Core.Multiplicity
 
@@ -48,17 +47,14 @@ import GHC.Utils.FV( FV, fvVarList )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Types.Basic( SwapFlag(..), isSwapped )
-import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Exts( oneShot )
 import GHC.Utils.Panic
 
 import GHC.Data.Pair
-import GHC.Data.FastString
 import GHC.Data.TrieMap
 import GHC.Data.Maybe( orElse )
 
-import Data.List ( mapAccumL )
 import Control.Monad
 import qualified Data.Semigroup as S
 import GHC.Builtin.Types.Prim (fUNTyCon)
@@ -178,8 +174,8 @@ tcMatchTy ty1 ty2 = tcMatchTys [ty1] [ty2]
 
 tcMatchTyX_BM :: BindTvFun -> Subst
               -> Type -> Type -> Maybe Subst
-tcMatchTyX_BM bind_me subst ty1 ty2
-  = tc_match_tys_x bind_me False subst [ty1] [ty2]
+tcMatchTyX_BM bind_tv subst ty1 ty2
+  = tc_match_tys_x bind_tv False subst [ty1] [ty2]
 
 -- | Like 'tcMatchTy', but allows the kinds of the types to differ,
 -- and thus matches them as well.
@@ -517,6 +513,17 @@ Wrinkles
    Not only does this allow more programs to be accepted, it's also important
    for correctness. Not doing this was the root cause of the Core Lint error
    in #16995.
+
+(ATF5) Consider
+          instance (Generic1 f, Ord (Rep1 f a))
+                => Ord (Generically1 f a) where ...
+              -- The "..." gives rise to [W] Ord (Generically1 f a)
+   We must use the instance decl (recursively) to simplify the [W] constraint;
+   we do /not/ want to worry that the `[G] Ord (Rep1 f a)` might be an
+   alternative path.  So `noMatchableGivenDicts` must return False;
+   so `mightMatchLater` must return False; so when um_bind_fam_fun returns
+   `Apart`, the unifier must return `SurelyApart`, not `MaybeApart`.  See
+   `go_fam` in `uVarOrFam`
 
 SIDE NOTE.  The paper "Closed type families with overlapping equations"
 http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/axioms-extended.pdf
@@ -989,7 +996,7 @@ but only when using this algorithm for matching:
 
      Property M1 means that we must extend the substitution with,
      say (a ↦ a) when appropriate during matching.
-     See also Note [Self-substitution when matching].
+     See also Note [Self-substitution when unifying or matching].
 
 (M2) Completeness of matching.
      If θ(σ) = τ, then (match σ τ) = Unifiable φ,
@@ -1022,26 +1029,41 @@ of [ITF].)
 This extra parameter is a bit fiddly, perhaps, but seemingly less so than
 having two separate, almost-identical algorithms.
 
-Note [Self-substitution when matching]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-What should happen when we're *matching* (not unifying) a1 with a1? We
-should get a substitution [a1 |-> a1]. A successful match should map all
-the template variables (except ones that disappear when expanding synonyms).
-But when unifying, we don't want to do this, because we'll then fall into
-a loop.
+Note [Self-substitution when unifying or matching]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What happens when we are unifying or matching two identical type variables?
+     a ~ a
 
-This arrangement affects the code in three places:
- - If we're matching a refined template variable, don't recur. Instead, just
-   check for equality. That is, if we know [a |-> Maybe a] and are matching
-   (a ~? Maybe Int), we want to just fail.
+* When /unifying/, just succeed, without binding [a :-> a] in the substitution,
+  else we'd get an infinite substitution.  We need to make this check before
+  we do the occurs check, of course.
 
- - Skip the occurs check when matching. This comes up in two places, because
-   matching against variables is handled separately from matching against
-   full-on types.
+* When /matching/, and `a` is a bindable variable from the templase, we /do/
+  want to extend the substitution.  Remember, a successful match should map all
+  the template variables (except ones that disappear when expanding synonyms),
 
-Note that this arrangement was provoked by a real failure, where the same
-unique ended up in the template as in the target. (It was a rule firing when
-compiling Data.List.NonEmpty.)
+  Notice: no occurs check!  It's fine to match (a ~ Maybe a), because the
+  template vars of the template come from a different name space to the free
+  vars of the target.
+
+  Note that this arrangement was provoked by a real failure, where the same
+  unique ended up in the template as in the target. (It was a rule firing when
+  compiling Data.List.NonEmpty.)
+
+* What about matching a /non-bindable/ variable?  For example:
+      template-vars   : {a}
+      matching problem: (forall b. b -> a) ~ (forall c. c -> Int)
+  We want to emerge with the substitution [a :-> Int]
+  But on the way we will encounter (b ~ b), when we match the bits before the
+  arrow under the forall, having renamed `c` to `b`.  This match should just
+  succeeds, just like (Int ~ Int), withouth extending the substitution.
+
+  It's important to do this for /non-bindable/ variables, not just for
+  forall-bound ones.  In an associated tyep
+         instance C (Maybe a) where {  type F (Maybe a) = Int }
+  `checkConsistentFamInst` matches (Maybe a) from the header against (Maybe a)
+  from the type-family instance, with `a` marked as non-bindable.
+
 
 Note [Matching coercion variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1581,12 +1603,13 @@ uVarOrFam env ty1 ty2 kco
       | ty1 `tcEqType` rhs
       = return ()
 
-      -- OK so we can bind the (F tys) to the RHS
+      -- Now check if we can bind the (F tys) to the RHS
       | BindMe <- um_bind_fam_fun env tc tys1 ty2
       = do { extendFamEnv tc tys1 rhs
            ; maybeApart MARTypeFamily }
-      | otherwise
-      = maybeApart MARTypeFamily
+
+      | otherwise   -- See (ATF4) in Note [Apartness and type families]
+      = surelyApart
 
       where
         rhs = ty2 `mkCastTy` mkSymCo kco
@@ -1615,14 +1638,14 @@ uVarOrFam env ty1 ty2 kco
            | (ty1' `mkCastTy` kco) `tcEqType` ty2 -> return ()
            | otherwise                            -> surelyApart
 
-      -- If we are unifying a ~ a, just return immediately
-      -- Do not extend the substitution
-      -- See Note [Self-substitution when matching]
-      | um_unif env
-      , TyVarTy tv2 <- ty2
+      -- If we are matching or unifying a ~ a, w need to take care:
+      -- See Note [Self-substitution when unifying or matching]
+      | TyVarTy tv2 <- ty2
       , let tv2' = umRnOccR env tv2
       , tv1' == tv2'
-      = return ()
+      = if um_unif env
+        then return ()
+        else when tv1_is_bindable (extendTvEnv tv1' rhs)
 
       -- If either side mentions a forall-bound variable we are stuck
       | (tv1' `elemVarSet` um_skols env) ||
@@ -1631,7 +1654,7 @@ uVarOrFam env ty1 ty2 kco
 
       -- At this point we know that no renaming is needed for ty2
 
-      | BindMe <- um_bind_tv_fun env tv1' rhs
+      | tv1_is_bindable
       =   -- Occurs check, but only when unifying
            -- see Note [Fine-grained unification]
            -- Make sure you include 'kco' #14846
@@ -1639,7 +1662,7 @@ uVarOrFam env ty1 ty2 kco
          then maybeApart MARInfinite
          else extendTvEnv tv1' rhs
 
-      -- When unifiying, try swapping, in case the RHS is a saturated
+      -- When unifying, try swapping, in case the RHS is a saturated
       -- type family, e.g.   a[sk] ~ F p q
       -- Then we might succeed with go_fam
       | um_unif env
@@ -1651,10 +1674,11 @@ uVarOrFam env ty1 ty2 kco
       = surelyApart
 
       where
-        tv1'        = umRnOccL env tv1
-        free_tvs2   = tyCoVarsOfType ty2
-        all_rhs_fvs = free_tvs2 `unionVarSet` tyCoVarsOfCo kco
-        rhs         = ty2 `mkCastTy` mkSymCo kco
+        tv1'            = umRnOccL env tv1
+        free_tvs2       = tyCoVarsOfType ty2
+        all_rhs_fvs     = free_tvs2 `unionVarSet` tyCoVarsOfCo kco
+        rhs             = ty2 `mkCastTy` mkSymCo kco
+        tv1_is_bindable = um_bind_tv_fun env tv1' rhs == BindMe
 
 {-
 %************************************************************************

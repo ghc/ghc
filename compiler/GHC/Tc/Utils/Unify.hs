@@ -4147,12 +4147,13 @@ makeTypeConcrete occ_fs conc_orig ty =
 
 {- Note [What might equal later?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We must determine whether a Given might later equal a Wanted. We
-definitely need to account for the possibility that any metavariable
-might be arbitrarily instantiated. Yet we do *not* want
-to allow skolems in to be instantiated, as we've already rewritten
-with respect to any Givens. (We're solving a Wanted here, and so
-all Givens have already been processed.)
+We must determine whether a Given might later equal a Wanted:
+  see Note [Instance and Given overlap] in GHC.Tc.Solver.Dict
+
+We definitely need to account for the possibility that any metavariable might be
+arbitrarily instantiated. Yet we do *not* want to allow skolems in to be
+instantiated, as we've already rewritten with respect to any Givens. (We're
+solving a Wanted here, and so all Givens have already been processed.)
 
 This is best understood by example.
 
@@ -4163,12 +4164,16 @@ This is best understood by example.
 2. C a  ~?  C Int
 
    No. No new givens are going to arise that will get the `a` to rewrite
-   to Int.
+   to Int.  Example:
+      f :: forall a. C a => blah
+      f = rhs  -- Gives rise to [W] C Int
+   It would be silly to fail to solve ([W] C Int), just because we have
+   ([G] C a) in the Givens!
 
 3. C alpha[tv]   ~?  C Int
 
-   That alpha[tv] is a TyVarTv, unifiable only with other type variables.
-   It cannot equal later.
+   In this variant of (1) that alpha[tv] is a TyVarTv, unifiable only with
+   other type /variables/.  It cannot equal Int later.
 
 4. C (F alpha)   ~?   C Int
 
@@ -4181,17 +4186,18 @@ This is best understood by example.
    and F x x = Int. Remember: returning True doesn't commit ourselves to
    anything.
 
-6. C (F a)  ~?  C Int, where a is a super-skolem
+6. C (F a)  ~?  C Int, where a is a skolem.  For example
+      f :: forall a. C (F a) => blah
+      f = rhs  -- Gives rise to [W] C Int
 
    No, this won't match later. If we could rewrite (F a), we would
    have by now. But see also Red Herring below.
 
-   For example in GHC.Core.Ppr we see
+   This arises in instance decls too.  For example in GHC.Core.Ppr we see
      instance Outputable (XTickishId pass)
            => Outputable (GenTickish pass) where
    If we have [W] Outputable Int in the body, we don't want to fail to solve
    it because (XTickckishId pass) might simplify to Int.
-   See Note [Super skolems: binding when looking up instances] in GHC.Core.InstEnv.
 
 7. C (Maybe alpha)  ~?  C alpha
 
@@ -4241,9 +4247,9 @@ Red Herring
 ~~~~~~~~~~~
 In #21208, we have this scenario:
 
-instance forall b. C b
-[G] C a[sk]
-[W] C (F a[sk])
+  instance forall b. C b
+  [G] C a[sk]
+  [W] C (F a[sk])
 
 What should we do with that wanted? According to the logic above, the Given
 cannot match later (this is example 6), and so we use the global instance.
@@ -4262,9 +4268,9 @@ these possibilities.
 
 Here is an example, with no type families, that is perhaps clearer:
 
-instance forall b. C (Maybe b)
-[G] C (Maybe Int)
-[W] C (Maybe a)
+  instance forall b. C (Maybe b)
+  [G] C (Maybe Int)
+  [W] C (Maybe a)
 
 What to do? We *might* say that the Given could match later and should thus block
 us from using the global instance. But we don't do this. Instead, we rely on class
@@ -4316,10 +4322,8 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
     bind_fam :: BindFamFun
     -- See Examples (4), (5), and (6) from the Note, especially (6)
     bind_fam _fam_tc fam_args _rhs
-      | anyFreeVarsOfTypes mentions_meta_ty_var fam_args
-      = BindMe
-      | otherwise
-      = Apart
+      | anyFreeVarsOfTypes mentions_meta_ty_var fam_args = BindMe
+      | otherwise                                        = Apart
 
     can_unify :: TcTyVar -> TcType -> Bool
     can_unify tv rhs_ty
