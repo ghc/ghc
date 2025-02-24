@@ -692,53 +692,6 @@ the thinking.
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [NoDefTauTv]
-~~~~~~~~~~~~~~~~~~~~
-A NoDefTauTv behaves like a TauTv, except that it should not be defaulted.
-Making it more polymorphic than a TauTv which can be defaulted.
-
-It is used for a anonymous wildcard in a type family, e.g. from T25647a
-
-  -- anonymous wildcards
-  type Dix8 :: RuntimeRep -> Type
-  data family Dix8 r
-  newtype instance Dix8 _ = Dix8 Int
-  dix8 :: Dix8 FloatRep -> Int
-  dix8 (Dix8 x) = x
-
-  -- named wildcards
-  type Dix9 :: RuntimeRep -> Type
-  data family Dix9 r
-  newtype instance Dix9 _r = Dix9 Int
-  dix9 :: Dix9 FloatRep -> Int
-  dix9 (Dix9 x) = x
-
-We would expect we accept both `Dix8 FloatRep` and `Dix9 FloatRep`,
-when type checking data family instance header in `tcDataFamInstHeader`,
-`_r` would be bind by bindOuterFamEqnTKBndrs as a skolem, while a `_`
-is not in the bndrs and left to be handled by `tcAnonWildCardOcc` and
-a fresh meta var would be introduced. But a TauTv would be defaulted
-to `LiftedRep`, which is not what we want.
-
-Previously we are branching the defaulting strategy in `defaultTyVar`
-in `tcDataFamInstHeader`, to avoid such defaulting.
-(`TryNotToDefaultNonStandardTyVars` verse `DefaultNonStandardTyVars`).
-
-Such branching is too coarse, as we may want to default other type variables
-while simultaneously preventing `_` from being defaulted. See (GT4) in GHC.Tc.TyCl,
-Note [Generalising in tcTyFamInstEqnGuts].
-
-A more philosophical perspective is that, in general, a TauTv is both defaultable
-and unifiable. Defaultability makes it less polymorphic, while unifiability makes
-it more polymorphic. In contrast, a skolem is neither defaultable nor unifiable.
-In this sense, TauTv is simultaneously less polymorphic and more polymorphic than
-a skolem. Meanwhile, NoDefTauTv can be strictly more polymorphic than a skolem.
-
-NoDefTauTv is introduced to solve this problem.
-
-NB. Should we default `_` in general if XNoPolyKind is on?
--}
-
 {- Note [TyVarTv]
 ~~~~~~~~~~~~~~~~~
 A TyVarTv can unify with type *variables* only, including other TyVarTvs and
@@ -787,7 +740,6 @@ metaInfoToTyVarName :: MetaInfo -> FastString
 metaInfoToTyVarName  meta_info =
   case meta_info of
        TauTv          -> fsLit "t"
-       NoDefTauTv     -> fsLit "n"
        TyVarTv        -> fsLit "a"
        RuntimeUnkTv   -> fsLit "r"
        CycleBreakerTv -> fsLit "b"
@@ -1895,8 +1847,6 @@ defaultTyVar :: DefaultingStrategy
              -> TcM Bool   -- True <=> defaulted away altogether
 defaultTyVar def_strat tv
   | not (isMetaTyVar tv )
-  || isNoDefTauMetaTyVar tv
-    -- do not default NoDefTauTvs see Note [NoDefTauTv]
   || isTyVarTyVar tv
     -- Do not default TyVarTvs. Doing so would violate the invariants
     -- on TyVarTvs; see Note [TyVarTv] in GHC.Tc.Utils.TcMType.
