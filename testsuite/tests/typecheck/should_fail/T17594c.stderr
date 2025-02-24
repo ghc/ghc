@@ -1,6 +1,7 @@
-
 T17594c.hs:5:10: error: [GHC-14964]
-    • Invisible type pattern t has no associated forall
+    • Illegal invisible type pattern: @t
+      An invisible type pattern must be checked against a forall.
     • In the expression: \ @t -> undefined :: t
       In the expression: [\ @t -> undefined :: t]
       In an equation for ‘id'’: id' = [\ @t -> undefined :: t]
+

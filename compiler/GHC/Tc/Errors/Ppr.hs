@@ -1811,23 +1811,15 @@ instance Diagnostic TcRnMessage where
     TcRnQualifiedBinder rdr_name
       -> mkSimpleDecorated $
          text "Qualified name in binding position:" <+> ppr rdr_name
-    TcRnTypeApplicationsDisabled ty_app
+    TcRnTypeApplicationsDisabled ty ty_or_ki
       -> mkSimpleDecorated $
-         text "Illegal visible" <+> what <+> text "application" <+> ctx <> colon
+         text "Illegal visible" <+> what <+> text "application" <> colon
            <+> ppr arg
          where
-           arg = case ty_app of
-            TypeApplication ty _ -> char '@' <> ppr ty
-            TypeApplicationInPattern ty_app -> ppr ty_app
-           what = case ty_app of
-             TypeApplication _ ty_or_ki ->
-              case ty_or_ki of
-                TypeLevel -> text "type"
-                KindLevel -> text "kind"
-             TypeApplicationInPattern _ -> text "type"
-           ctx = case ty_app of
-            TypeApplicationInPattern _ -> text "in a pattern"
-            _                          -> empty
+           arg = char '@' <> ppr ty
+           what = case ty_or_ki of
+             TypeLevel -> text "type"
+             KindLevel -> text "kind"
     TcRnInvalidRecordField con field
       -> mkSimpleDecorated $
          hsep [text "Constructor" <+> quotes (ppr con),
@@ -1972,11 +1964,14 @@ instance Diagnostic TcRnMessage where
           WarningTxt{} -> text "WARNING"
           DeprecatedTxt{} -> text "DEPRECATED"
 
-    TcRnIllegalInvisibleTypePattern tp -> mkSimpleDecorated $
-      text "Illegal invisible type pattern:" <+> ppr tp
-
-    TcRnInvisPatWithNoForAll tp -> mkSimpleDecorated $
-      text "Invisible type pattern" <+> ppr tp <+> text "has no associated forall"
+    TcRnIllegalInvisibleTypePattern tp reason -> mkSimpleDecorated $
+      vcat [ hang (text "Illegal invisible type pattern:")
+                  2 (char '@' <> ppr tp)
+           , case reason of
+               InvisPatWithoutFlag -> empty
+               InvisPatNoForall  -> text "An invisible type pattern must be checked against a forall."
+               InvisPatMisplaced -> text "An invisible type pattern must occur in an argument position."
+           ]
 
     TcRnNamespacedFixitySigWithoutFlag sig@(FixitySig kw _ _) -> mkSimpleDecorated $
       vcat [ text "Illegal use of the" <+> quotes (ppr kw) <+> text "keyword:"
@@ -1995,9 +1990,6 @@ instance Diagnostic TcRnMessage where
           text "to bring it into scope."
         at_bndr     = char '@' <> ppr tv_name
         forall_bndr = text "forall" <+> ppr tv_name <> text "."
-
-    TcRnMisplacedInvisPat tp -> mkSimpleDecorated $
-      text "Invisible type pattern" <+> ppr tp <+> text "is not allowed here"
 
     TcRnUnexpectedTypeSyntaxInTerms syntax -> mkSimpleDecorated $
       text "Unexpected" <+> pprTypeSyntaxName syntax
@@ -2640,13 +2632,9 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalInvisibleTypePattern{}
       -> ErrorWithoutFlag
-    TcRnInvisPatWithNoForAll{}
-      -> ErrorWithoutFlag
     TcRnNamespacedFixitySigWithoutFlag{}
       -> ErrorWithoutFlag
     TcRnOutOfArityTyVar{}
-      -> ErrorWithoutFlag
-    TcRnMisplacedInvisPat{}
       -> ErrorWithoutFlag
     TcRnUnexpectedTypeSyntaxInTerms{}
       -> ErrorWithoutFlag
@@ -3269,12 +3257,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnQualifiedBinder{}
       -> noHints
-    TcRnTypeApplicationsDisabled ty_app
-      -> case ty_app of
-          TypeApplication {}
-            -> [suggestExtension LangExt.TypeApplications]
-          TypeApplicationInPattern {}
-            -> [suggestExtension LangExt.TypeAbstractions]
+    TcRnTypeApplicationsDisabled{}
+      -> [suggestExtension LangExt.TypeApplications]
     TcRnInvalidRecordField{}
       -> noHints
     TcRnTupleTooLarge{}
@@ -3325,15 +3309,14 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnNamespacedWarningPragmaWithoutFlag{}
       -> [suggestExtension LangExt.ExplicitNamespaces]
-    TcRnIllegalInvisibleTypePattern{}
-      -> [suggestExtension LangExt.TypeAbstractions]
-    TcRnInvisPatWithNoForAll{}
-      -> noHints
+    TcRnIllegalInvisibleTypePattern _ reason
+      -> case reason of
+          InvisPatWithoutFlag -> [suggestExtension LangExt.TypeAbstractions]
+          InvisPatNoForall    -> noHints
+          InvisPatMisplaced   -> noHints
     TcRnNamespacedFixitySigWithoutFlag{}
       -> [suggestExtension LangExt.ExplicitNamespaces]
     TcRnOutOfArityTyVar{}
-      -> noHints
-    TcRnMisplacedInvisPat{}
       -> noHints
     TcRnUnexpectedTypeSyntaxInTerms syntax
       -> [suggestExtension (typeSyntaxExtension syntax)]

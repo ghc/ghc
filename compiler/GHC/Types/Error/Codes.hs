@@ -681,20 +681,19 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnInvalidDefaultedTyVar"                     = 45625
   GhcDiagnosticCode "TcRnIllegalTermLevelUse"                       = 01928
   GhcDiagnosticCode "TcRnNamespacedWarningPragmaWithoutFlag"        = 14995
-  GhcDiagnosticCode "TcRnInvisPatWithNoForAll"                      = 14964
-  GhcDiagnosticCode "TcRnIllegalInvisibleTypePattern"               = 78249
   GhcDiagnosticCode "TcRnNamespacedFixitySigWithoutFlag"            = 78534
   GhcDiagnosticCode "TcRnOutOfArityTyVar"                           = 84925
-  GhcDiagnosticCode "TcRnMisplacedInvisPat"                         = 11983
   GhcDiagnosticCode "TcRnIllformedTypePattern"                      = 88754
   GhcDiagnosticCode "TcRnIllegalTypePattern"                        = 70206
   GhcDiagnosticCode "TcRnIllformedTypeArgument"                     = 29092
   GhcDiagnosticCode "TcRnIllegalTypeExpr"                           = 35499
   GhcDiagnosticCode "TcRnUnexpectedTypeSyntaxInTerms"               = 31244
+  GhcDiagnosticCode "TcRnTypeApplicationsDisabled"                  = 23482
 
-  -- TcRnTypeApplicationsDisabled
-  GhcDiagnosticCode "TypeApplication"                               = 23482
-  GhcDiagnosticCode "TypeApplicationInPattern"                      = 17916
+  -- TcRnIllegalInvisibleTypePattern
+  GhcDiagnosticCode "InvisPatWithoutFlag"                           = 78249
+  GhcDiagnosticCode "InvisPatNoForall"                              = 14964
+  GhcDiagnosticCode "InvisPatMisplaced"                             = 11983
 
   -- PatSynInvalidRhsReason
   GhcDiagnosticCode "PatSynNotInvertible"                           = 69317
@@ -1001,6 +1000,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnHsigNoIface"                               = Outdated 93010
   GhcDiagnosticCode "TcRnInterfaceLookupError"                      = Outdated 52243
   GhcDiagnosticCode "TcRnForallIdentifier"                          = Outdated 64088
+  GhcDiagnosticCode "TypeApplicationInPattern"                      = Outdated 17916
 
 {- *********************************************************************
 *                                                                      *
@@ -1078,7 +1078,7 @@ type family ConRecursInto con where
   ConRecursInto "TcRnUnusedImport"         = 'Just UnusedImportReason
   ConRecursInto "TcRnNonCanonicalDefinition" = 'Just NonCanonicalDefinition
   ConRecursInto "TcRnIllegalInstance"        = 'Just IllegalInstanceReason
-  ConRecursInto "TcRnTypeApplicationsDisabled" = 'Just TypeApplication
+  ConRecursInto "TcRnIllegalInvisibleTypePattern" = 'Just BadInvisPatReason
 
     -- Illegal instance reasons
   ConRecursInto "IllegalClassInstance"        = 'Just IllegalClassInstanceReason

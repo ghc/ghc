@@ -1,5 +1,5 @@
-T23776.hs:8:6: error: [GHC-17916]
-    Illegal visible type application in a pattern: @b
+T23776.hs:8:6: error: [GHC-78249]
+    Illegal invisible type pattern: @b
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension
 

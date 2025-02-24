@@ -102,7 +102,7 @@ module GHC.Tc.Errors.Types (
   , RoleValidationFailedReason(..)
   , DisabledClassExtension(..)
   , TyFamsDisabledReason(..)
-  , TypeApplication(..)
+  , BadInvisPatReason(..)
   , HsTypeOrSigType(..)
   , HsTyVarBndrExistentialFlag(..)
   , TySynCycleTyCons
@@ -4013,7 +4013,8 @@ data TcRnMessage where
     Test cases:
       T12411, T12446, T15527, T16133, T18251c
   -}
-  TcRnTypeApplicationsDisabled :: !TypeApplication -- ^ what kind of type application is it?
+  TcRnTypeApplicationsDisabled :: !(HsType GhcPs)
+                               -> !TypeOrKind
                                -> TcRnMessage
 
   {-| TcRnInvalidRecordField is an error indicating that a record field was
@@ -4303,10 +4304,16 @@ data TcRnMessage where
   -}
   TcRnNamespacedWarningPragmaWithoutFlag :: WarnDecl GhcPs -> TcRnMessage
 
-  {-| TcRnInvisPatWithNoForAll is an error raised when invisible type pattern
-      is used without associated `forall` in types
+  {-| TcRnIllegalInvisibleTypePattern is an error raised when an invisible
+      type pattern, i.e. a pattern of the form `@p`, is rejected.
 
-      Examples:
+      Example for InvisPatWithoutFlag:
+
+        {-# LANGUAGE NoTypeAbstractions #-}
+        id :: a -> a
+        id @t x = x
+
+      Examples for InvisPatNoForall:
 
         f :: Int
         f @t = 5
@@ -4314,22 +4321,27 @@ data TcRnMessage where
         g :: [a -> a]
         g = [\ @t x -> x :: t]
 
-      Test cases: T17694c T17594d
+      Examples for InvisPatMisplaced:
+
+        f (smth, $(invisP (varT (newName "blah")))) = ...
+
+        g = do
+          $(invisP (varT (newName "blah"))) <- aciton1
+          ...
+
+      Test cases:
+        T17694b          -- InvisPatWithoutFlag
+        T17694c          -- InvisPatNoForall
+        T17594d          -- InvisPatNoForall
+        T24557a          -- InvisPatMisplaced
+        T24557b          -- InvisPatMisplaced
+        T24557c          -- InvisPatMisplaced
+        T24557d          -- InvisPatMisplaced
   -}
-  TcRnInvisPatWithNoForAll :: HsTyPat GhcRn -> TcRnMessage
-
-  {-| TcRnIllegalInvisibleTypePattern is an error raised when invisible type pattern
-      is used without the TypeAbstractions extension enabled
-
-      Example:
-
-        {-# LANGUAGE NoTypeAbstractions #-}
-        id :: a -> a
-        id @t x = x
-
-      Test cases: T17694b
-  -}
-  TcRnIllegalInvisibleTypePattern :: HsTyPat GhcPs -> TcRnMessage
+  TcRnIllegalInvisibleTypePattern
+    :: !(HsTyPat GhcRn)     -- the rejected type pattern
+    -> !BadInvisPatReason   -- the reason for rejection
+    -> TcRnMessage
 
   {-| TcRnNamespacedFixitySigWithoutFlag is an error that occurs when
       a namespace specifier is used in fixity signatures
@@ -4371,24 +4383,6 @@ data TcRnMessage where
     :: Name -- ^ Type synonym's name
     -> Name -- ^ Type variable's name
     -> TcRnMessage
-
-  {- TcRnMisplacedInvisPat is an error raised when invisible @-pattern
-     appears in invalid context (e.g. pattern in case of or in do-notation)
-     or nested inside the pattern. Template Haskell seems to be the only
-     source for this diagnostic.
-
-     Examples:
-
-        f (smth, $(invisP (varT (newName "blah")))) = ...
-
-        g = do
-          $(invisP (varT (newName "blah"))) <- aciton1
-          ...
-
-     Test cases: T24557a T24557b T24557c T24557d
-
-  -}
-  TcRnMisplacedInvisPat :: HsTyPat GhcPs -> TcRnMessage
 
   {- TcRnUnexpectedTypeSyntaxInTerms is an error that occurs
      when type syntax is used in terms without -XRequiredTypeArguments
@@ -6182,10 +6176,12 @@ data TyFamsDisabledReason
   | TyFamsDisabledInstance !TyCon
   deriving (Generic)
 
-data TypeApplication
-  = TypeApplication !(HsType GhcPs) !TypeOrKind
-  | TypeApplicationInPattern !(HsConPatTyArg GhcPs)
-  deriving Generic
+-- | Why was an invisible pattern `@p` rejected?
+data BadInvisPatReason
+  = InvisPatWithoutFlag
+  | InvisPatNoForall
+  | InvisPatMisplaced
+  deriving (Generic)
 
 -- | Either `HsType p` or `HsSigType p`.
 --

@@ -1,7 +1,5 @@
-{-# LANGUAGE ScopedTypeVariables, ImpredicativeTypes, TemplateHaskell, NoTypeAbstractions #-}
+{-# LANGUAGE ScopedTypeVariables, ImpredicativeTypes, NoTypeAbstractions #-}
 module T17594b where
-
-import qualified Language.Haskell.TH as TH
 
 id1 :: forall a. a -> a
 id1 @t x = x
@@ -32,6 +30,3 @@ id8 = (\ @t x -> x, id1)
 
 id9 :: [forall a. a -> a]
 id9 = [\ @t x -> x, id1, id3, id5, id6, fst id8, snd id8]
-
-id10 :: a -> a
-id10 @($(TH.varT (TH.mkName "t"))) x = x :: t

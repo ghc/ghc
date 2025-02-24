@@ -91,7 +91,6 @@ import Data.Foldable
 import Data.Function       ( on )
 import Data.Functor.Identity ( Identity (..) )
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe
 import Data.Ratio
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class
@@ -509,9 +508,9 @@ rnLArgPatAndThen :: NameMaker -> LocatedA (Pat GhcPs) -> CpsRn (LocatedA (Pat Gh
 rnLArgPatAndThen mk = wrapSrcSpanCps rnArgPatAndThen where
 
   rnArgPatAndThen (InvisPat (_, spec) tp) = do
-    liftCps $ unlessXOptM LangExt.TypeAbstractions $
-      addErr (TcRnIllegalInvisibleTypePattern tp)
     tp' <- rnHsTyPat HsTypePatCtx tp
+    liftCps $ unlessXOptM LangExt.TypeAbstractions $
+      addErr (TcRnIllegalInvisibleTypePattern tp' InvisPatWithoutFlag)
     pure (InvisPat spec tp')
   rnArgPatAndThen p = rnPatAndThen mk p
 
@@ -679,10 +678,10 @@ rnPatAndThen _ (EmbTyPat _ tp)
   = do { tp' <- rnHsTyPat HsTypePatCtx tp
        ; return (EmbTyPat noExtField tp') }
 rnPatAndThen _ (InvisPat (_, spec) tp)
-  = do { liftCps $ addErr (TcRnMisplacedInvisPat tp)
-         -- Invisible patterns are handled in `rnLArgPatAndThen`
+  = do { -- Invisible patterns are handled in `rnLArgPatAndThen`
          -- so unconditionally emit error here
        ; tp' <- rnHsTyPat HsTypePatCtx tp
+       ; liftCps $ addErr (TcRnIllegalInvisibleTypePattern tp' InvisPatMisplaced)
        ; return (InvisPat spec tp')
        }
 
@@ -694,7 +693,6 @@ rnConPatAndThen :: NameMaker
 
 rnConPatAndThen mk con (PrefixCon tyargs pats)
   = do  { con' <- lookupConCps con
-        ; liftCps check_lang_exts
         ; tyargs' <- mapM rnConPatTyArg tyargs
         ; pats' <- rnLPatsAndThen mk pats
         ; return $ ConPat
@@ -704,16 +702,11 @@ rnConPatAndThen mk con (PrefixCon tyargs pats)
             }
         }
   where
-    check_lang_exts :: RnM ()
-    check_lang_exts =
-      for_ (listToMaybe tyargs) $ \ arg ->
-        unlessXOptM LangExt.TypeAbstractions $
-          addErrTc $
-            TcRnTypeApplicationsDisabled (TypeApplicationInPattern arg)
-
-    rnConPatTyArg (HsConPatTyArg _ t) = do
-      t' <- rnHsTyPat HsTypePatCtx t
-      return (HsConPatTyArg noExtField t')
+    rnConPatTyArg (HsConPatTyArg _ tp) = do
+      tp' <- rnHsTyPat HsTypePatCtx tp
+      liftCps $ unlessXOptM LangExt.TypeAbstractions $
+        addErr (TcRnIllegalInvisibleTypePattern tp' InvisPatWithoutFlag)
+      return (HsConPatTyArg noExtField tp')
 
 rnConPatAndThen mk con (InfixCon pat1 pat2)
   = do  { con' <- lookupConCps con
