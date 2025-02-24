@@ -1007,5 +1007,7 @@ generateSettings ghc_toolchain Settings{..} dst = do
   let kvs' = Map.insert "Relative Global Package DB" "../pkgs"
              $ Map.insert "Support SMP" "NO" -- FIXME: this depends on the different ways used to build the RTS!
              $ Map.insert "RTS ways" "v"     -- FIXME: this depends on the different ways used to build the RTS!
+             $ Map.insert "otool command" "otool" -- FIXME: this should just arguably be a default in the settings in GHC, and not require the settings file?
+             $ Map.insert "install_name_tool command" "install_name_tool"
              $ kvs
   writeFile (dst </> "lib/settings") (show $ Map.toList kvs')
