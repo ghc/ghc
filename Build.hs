@@ -269,7 +269,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
            , "unlit:unlit"
            , "hsc2hs:hsc2hs"
            ]
-        | otherwise = 
+        | otherwise =
            [ "ghc-bin:ghc"
            , "ghc-pkg:ghc-pkg"
            , "genprimopcode:genprimopcode"
@@ -357,7 +357,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
 prepareGhcSources :: GhcBuildOptions -> FilePath -> IO ()
 prepareGhcSources opts dst = do
   msg $ "  - Preparing sources in " ++ dst ++ "..."
-  createDirectoryIfMissing True dst 
+  createDirectoryIfMissing True dst
   createDirectoryIfMissing True (dst </> "libraries/ghc/MachRegs")
 
   cp "./libraries"    dst
@@ -451,6 +451,10 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   build_dir <- makeAbsolute (dst </> "cabal")
   ghcversionh <- makeAbsolute (src_rts </> "include/ghcversion.h")
 
+  -- FIXME: could we build a cross compiler, simply by not reading this from the boot compiler, but passing it in?
+  target_triple <- ghcTargetTriple ghc
+  let [arch,vendor,os] = words $ map (\c -> if c == '-' then ' ' else c) target_triple
+
   let cabal_project_rts_path = dst </> "cabal.project-rts"
       -- cabal's code handling escaping is bonkers. We need to wrap the whole
       -- option into \" otherwise it does weird things (like keeping only the
@@ -460,11 +464,11 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   let rts_options =
         [ "package rts"
         , def_string "ProjectVersion" (Text.unpack (gboVersionInt opts))
-        , def_string "RtsWay"            "v" -- FIXME
-        , def_string "HostPlatform"      "x86_64-unknown-linux" -- FIXME
-        , def_string "HostArch"          "x86_64" -- FIXME: appropriate value required for the tests
-        , def_string "HostOS"            "linux" -- FIXME: appropriate value required for the tests
-        , def_string "HostVendor"        "unknown"
+        , def_string "RtsWay"            "v"
+        , def_string "HostPlatform"      target_triple
+        , def_string "HostArch"          arch
+        , def_string "HostOS"            os
+        , def_string "HostVendor"        vendor
         , def_string "BuildPlatform"     "FIXME"
         , def_string "BuildArch"         "FIXME"
         , def_string "BuildOS"           "FIXME"
@@ -473,7 +477,12 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
         , def_string "TablesNextToCode"  "FIXME"
           -- Set the namespace for the rts fs functions
         , def "FS_NAMESPACE" "rts"
-        , "  flags: +use-system-libffi +tables-next-to-code"
+          -- This is stupid, I can't seem to figure out how to set this in cabal
+          -- this needs to be fixed in cabal.
+        , if os == "darwin"
+          then "  flags: +tables-next-to-code +leading-underscore"
+          else "  flags: +tables-next-to-code"
+          -- FIXME: we should
           -- FIXME: deal with libffi (add package?)
           --
           -- FIXME: we should make tables-next-to-code  optional here and in the
@@ -543,14 +552,20 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   -- deriving constants
   let derived_constants = src_rts </> "include/DerivedConstants.h"
   withSystemTempDirectory "derive-constants" $ \tmp_dir -> do
+    target <- getTarget ghc
     void $ readCreateProcess (runDeriveConstants derive_constants
       [ "--gen-header"
       , "-o",  derived_constants
-      , "--target-os", "linux" -- FIXME
+      , "--target-os", target
       , "--tmpdir", tmp_dir
-      , "--gcc-program", "gcc" -- FIXME
+      , "--gcc-program", "cc" -- FIXME
       , "--nm-program", "nm"   -- FIXME
       , "--objdump-program", "objdump" -- FIXME
+      -- pass `-fcommon` to force symbols into the common section. If they
+      -- end up in the ro data section `nm` won't list their size, and thus
+      -- derivedConstants will fail. Recent clang (e.g. 16) will by default
+      -- use `-fno-common`.
+      , "--gcc-flag", "-fcommon"
       , "--gcc-flag", "-I" ++ src_rts </> "include"
       , "--gcc-flag", "-I" ++ src_rts
       , "--gcc-flag", "-I" ++ ghcplatform_dir
@@ -570,7 +585,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   -- libraries that aren't built yet.
   let primops_txt    = src </> "libraries/ghc/GHC/Builtin/primops.txt"
   let primops_txt_pp = primops_txt <.> ".pp"
-  primops <- readCreateProcess (shell $ "gcc -E -undef -traditional -P -x c " ++ primops_txt_pp) ""
+  primops <- readCreateProcess (shell $ "$CC -E -undef -traditional -P -x c " ++ primops_txt_pp) ""
   writeFile primops_txt primops
   writeFile (src </> "libraries/ghc-internal/src/GHC/Internal/Prim.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-source"]) primops
   writeFile (src </> "libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops
@@ -901,6 +916,13 @@ ghcTargetArchOS ghc = do
   let os   = fromMaybe (error "Couldn't read 'target os' setting") (lookup "target os" is)
   pure (arch,os)
 
+-- | Retrieve GHC's target as linux, or darwin
+getTarget :: Ghc -> IO String
+getTarget ghc = ghcTargetArchOS ghc >>= \case
+  (_,"OSDarwin") -> pure "darwin"
+  (_,"OSLinux") -> pure "linux"
+  _ -> error "Unsupported target"
+
 -- | Retrieve GHC's target triple
 ghcTargetTriple :: Ghc -> IO String
 ghcTargetTriple ghc = do
@@ -979,10 +1001,17 @@ generateSettings ghc_toolchain Settings{..} dst = do
   createDirectoryIfMissing True (dst </> "lib")
 
   let gen_settings_path = dst </> "lib/settings.generated"
+
+  mbCC <- lookupEnv "CC" >>= \case
+    Just cc -> pure ["--cc", cc]
+    Nothing -> pure []
+  mbCXX <- lookupEnv "CXX" >>= \case
+    Just cxx -> pure ["--cxx", cxx]
+    Nothing -> pure []
   let common_args =
        [ "--output-settings"
        , "-o", gen_settings_path
-       ]
+       ] ++ mbCC ++ mbCXX
 
   let opt m f = fmap f m
   let args = mconcat (catMaybes
