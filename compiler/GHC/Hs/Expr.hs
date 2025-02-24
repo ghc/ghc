@@ -638,6 +638,12 @@ mkExpandedStmtTc
   -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
 mkExpandedStmtTc oStmt flav eExpr = XExpr (ExpandedThingTc (OrigStmt oStmt flav) eExpr)
 
+mkExpandedTc
+  :: HsThingRn
+  -> HsExpr GhcTc
+  -> HsExpr GhcTc
+mkExpandedTc o eExpr = XExpr (ExpandedThingTc o eExpr)
+
 {- *********************************************************************
 *                                                                      *
             Pretty-printing expressions

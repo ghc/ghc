@@ -178,10 +178,10 @@ tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
 tcInferSigma inst (L loc rn_expr)
   = addExprCtxt rn_expr $
     setSrcSpanA loc     $
-    do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps Nothing rn_expr
+    do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
        ; do_ql <- wantQuickLook rn_fun
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
-       ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst (tc_fun, fun_ctxt) fun_sigma rn_args
+       ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst (tc_fun, fun_ctxt, rn_expr) fun_sigma rn_args
        ; _ <- tcValArgs do_ql inst_args
        ; return app_res_sigma }
 
@@ -387,14 +387,13 @@ Unify result type /before/ typechecking the args
 The latter is much better. That is why we call checkResultType before tcValArgs.
 -}
 
-tcApp :: Maybe HsThingRn -- Just x <=> Expr is a compiler generated expression for x
-      -> HsExpr GhcRn
+tcApp :: HsExpr GhcRn
       -> ExpRhoType   -- When checking, -XDeepSubsumption <=> deeply skolemised
       -> TcM (HsExpr GhcTc)
 -- See Note [tcApp: typechecking applications]
-tcApp mb_oexpr rn_expr exp_res_ty
+tcApp rn_expr exp_res_ty
   = do { -- Step 1: Split the application chain
-         (fun@(rn_fun, fun_ctxt), rn_args) <- splitHsApps mb_oexpr rn_expr
+         (fun@(rn_fun, fun_ctxt), rn_args) <- splitHsApps rn_expr
        ; traceTc "tcApp {" $
            vcat [ text "rn_expr:" <+> ppr rn_expr
                 , text "rn_fun:" <+> ppr rn_fun
@@ -410,7 +409,7 @@ tcApp mb_oexpr rn_expr exp_res_ty
        ; (inst_args, app_res_rho)
               <- setQLInstLevel do_ql $  -- See (TCAPP1) and (TCAPP2) in
                                          -- Note [tcApp: typechecking applications]
-                 tcInstFun do_ql True tc_head fun_sigma rn_args
+                 tcInstFun do_ql True (tc_fun, fun_ctxt, rn_expr) fun_sigma rn_args
 
        ; case do_ql of
             NoQL -> do { traceTc "tcApp:NoQL" (ppr rn_fun $$ ppr app_res_rho)
@@ -515,7 +514,7 @@ checkResultTy rn_expr (tc_fun, fun_ctxt) inst_args app_res_rho (Check res_ty)
     -- Note [Handling overloaded and rebindable constructs] in GHC.Rename.Expr
     perhaps_add_res_ty_ctxt thing_inside
       | insideExpansion fun_ctxt
-      = addHeadCtxt fun_ctxt thing_inside
+      = thing_inside
       | otherwise
       = addFunResCtxt tc_fun inst_args app_res_rho (mkCheckExpType res_ty) $
         thing_inside
@@ -644,14 +643,14 @@ tcInstFun :: QLFlag
                     --    in tcInferSigma, which is used only to implement :type
                     -- Otherwise we do eager instantiation; in Fig 5 of the paper
                     --    |-inst returns a rho-type
-          -> (HsExpr GhcTc, AppCtxt)
+          -> (HsExpr GhcTc, AppCtxt, HsExpr GhcRn)
           -> TcSigmaType -> [HsExprArg 'TcpRn]
           -> TcM ( [HsExprArg 'TcpInst]
                  , TcSigmaType )
 -- This crucial function implements the |-inst judgement in Fig 4, plus the
 -- modification in Fig 5, of the QL paper:
 -- "A quick look at impredicativity" (ICFP'20).
-tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
+tcInstFun do_ql inst_final (tc_fun, fun_ctxt, e) fun_sigma rn_args
   = do { traceTc "tcInstFun" (vcat [ text "tc_fun" <+> ppr tc_fun
                                    , text "fun_sigma" <+> ppr fun_sigma
                                    , text "fun_ctxt" <+> ppr fun_ctxt
@@ -660,10 +659,8 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
        ; go 1 [] fun_sigma rn_args }
   where
     fun_orig = case fun_ctxt of
-      VAExpansion (OrigStmt{}) _    -> DoOrigin
-      VAExpansion (OrigPat pat _) _ -> DoPatOrigin pat
-      VAExpansion (OrigExpr e) _    -> exprCtOrigin e
-      VACall e _ _                  -> exprCtOrigin e
+      VAExpansion  -> exprCtOrigin e
+      VACall e' _ _ -> exprCtOrigin e'
 
     -- These are the type variables which must be instantiated to concrete
     -- types. See Note [Representation-polymorphic Ids with no binding]
@@ -741,7 +738,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
       = do { (_inst_tvs, wrap, fun_rho) <-
                 -- addHeadCtxt: important for the class constraints
                 -- that may be emitted from instantiating fun_sigma
-                addHeadCtxt fun_ctxt $
+
                 instantiateSigma fun_orig fun_conc_tvs tvs theta body2
                   -- See Note [Representation-polymorphism checking built-ins]
                   -- in GHC.Tc.Utils.Concrete.
@@ -905,10 +902,6 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
              -> do setSrcSpanA arg_loc                    $
                      addErrCtxt (FunAppCtxt (FunAppCtxtExpr fun arg) arg_no) $
                      thing_inside
-
-           VAExpansion (OrigStmt{}) _
-             -> setSrcSpanA arg_loc $
-                thing_inside -- Do nothing as we have pushed "In the stmt of .."
 
            _ -> setSrcSpanA arg_loc $
                   addExprCtxt arg     $  -- Auto-suppressed if arg_loc is generated
@@ -1722,7 +1715,7 @@ quickLookArg1 :: AppCtxt -> LHsExpr GhcRn
 quickLookArg1 ctxt larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_rho)
   = addArgCtxt ctxt larg $ -- Context needed for constraints
                            -- generated by calls in arg
-    do { ((rn_fun, fun_ctxt), rn_args) <- splitHsApps Nothing arg
+    do { ((rn_fun, fun_ctxt), rn_args) <- splitHsApps arg
 
        -- Step 1: get the type of the head of the argument
        ; (fun_ue, mb_fun_ty) <- tcCollectingUsage $ tcInferAppHead_maybe rn_fun
@@ -1746,7 +1739,7 @@ quickLookArg1 ctxt larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_rho)
        ; do_ql <- wantQuickLook rn_fun
        ; ((inst_args, app_res_rho), wanted)
              <- captureConstraints $
-                tcInstFun do_ql True tc_head fun_sigma rn_args
+                tcInstFun do_ql True (tc_fun, fun_ctxt, arg) fun_sigma rn_args
                 -- We must capture type-class and equality constraints here, but
                 -- not equality constraints.  See (QLA6) in Note [Quick Look at
                 -- value arguments]

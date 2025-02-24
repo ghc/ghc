@@ -6,5 +6,6 @@ _result :: Int = _
 y :: Int = _
 Stopped in Main.f, break029.hs:6:11-15
 _result :: Int = _
+
 y :: Int = _
 4

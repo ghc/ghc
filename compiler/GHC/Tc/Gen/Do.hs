@@ -335,9 +335,9 @@ They capture the essence of statement expansions as implemented in `expand_do_st
 
           (2) DO【 p <- e; ss 】 = if p is irrefutable
                                    then ‹ExpansionStmt (p <- e)›
-                                          (>>=) s ((\ p -> ‹PopExprCtxt› DO【 ss 】))
+                                          (>>=) e ((\ p -> ‹PopExprCtxt› DO【 ss 】))
                                    else ‹ExpansionStmt (p <- e)›
-                                          (>>=) s ((\case p -> ‹PopExprCtxt› DO【 ss 】
+                                          (>>=) e ((\case p -> ‹PopExprCtxt› DO【 ss 】
                                                           _ -> fail "pattern p failure"))
 
           (3) DO【 let x = e; ss 】
