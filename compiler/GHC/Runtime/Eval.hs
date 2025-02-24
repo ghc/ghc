@@ -130,14 +130,12 @@ import GHC.Tc.Zonk.Env ( ZonkFlexi (SkolemiseFlexi) )
 import GHC.IfaceToCore
 
 import Control.Monad
-import Control.Monad.Catch as MC
 import Data.Array
 import Data.Dynamic
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.List (find,intercalate)
 import Data.List.NonEmpty (NonEmpty)
-import System.Directory
 import Unsafe.Coerce ( unsafeCoerce )
 import qualified GHC.Unit.Home.Graph as HUG
 
@@ -232,10 +230,9 @@ execStmt' stmt stmt_text ExecOptions{..} = do
         updateFixityEnv fix_env
 
         status <-
-          withVirtualCWD $
-            liftIO $ do
-              let eval_opts = initEvalOpts idflags' (isStep execSingleStep)
-              evalStmt interp eval_opts (execWrap hval)
+          liftIO $ do
+            let eval_opts = initEvalOpts idflags' (isStep execSingleStep)
+            evalStmt interp eval_opts (execWrap hval)
 
         let ic = hsc_IC hsc_env
             bindings = (ic_tythings ic, ic_gre_cache ic)
@@ -281,32 +278,6 @@ clashes (in linker symbols).  That gives a convenient way to suppress
 them. The relevant predicate is OccName.isDerivedOccName.
 See #11051 for more background and examples.
 -}
-
-withVirtualCWD :: GhcMonad m => m a -> m a
-withVirtualCWD m = do
-  hsc_env <- getSession
-
-    -- a virtual CWD is only necessary when we're running interpreted code in
-    -- the same process as the compiler.
-  case interpInstance <$> hsc_interp hsc_env of
-    Just (ExternalInterp {}) -> m
-    _ -> do
-      let ic = hsc_IC hsc_env
-      let set_cwd = do
-            dir <- liftIO $ getCurrentDirectory
-            case ic_cwd ic of
-               Just dir -> liftIO $ setCurrentDirectory dir
-               Nothing  -> return ()
-            return dir
-
-          reset_cwd orig_dir = do
-            virt_dir <- liftIO $ getCurrentDirectory
-            hsc_env <- getSession
-            let old_IC = hsc_IC hsc_env
-            setSession hsc_env{  hsc_IC = old_IC{ ic_cwd = Just virt_dir } }
-            liftIO $ setCurrentDirectory orig_dir
-
-      MC.bracket set_cwd reset_cwd $ \_ -> m
 
 parseImportDecl :: GhcMonad m => String -> m (ImportDecl GhcPs)
 parseImportDecl expr = withSession $ \hsc_env -> liftIO $ hscImport hsc_env expr
@@ -445,7 +416,7 @@ resumeExec canLogSpan step mbCnt
                  , resumeBreakpointId = mb_brkpt
                  , resumeSpan = span
                  , resumeHistory = hist } ->
-               withVirtualCWD $ do
+               do
                 -- When the user specified a break ignore count, set it
                 -- in the interpreter
                 case (mb_brkpt, mbCnt) of
