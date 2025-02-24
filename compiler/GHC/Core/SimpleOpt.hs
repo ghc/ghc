@@ -89,6 +89,24 @@ functions called precisely once, without repeatedly optimising the same
 expression.  In fact, the simple optimiser is a good example of this
 little dance in action; the full Simplifier is a lot more complicated.
 
+Note [The InScopeSet for simpleOptExpr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Care must be taken to remove unfoldings from `Var`s collected by exprFreeVars
+before using them to construct an in-scope set hence `zapIdUnfolding` in `init_subst`.
+Consider calling `simpleOptExpr` on an expression like
+
+```
+ case x of (a,b) -> (x,a)
+```
+
+* One of those two occurrences of x has an unfolding (the one in (x,a), with
+unfolding x = (a,b)) and the other does not. (Inside a case GHC adds
+unfolding-info to the scrutinee's Id.)
+* But exprFreeVars just builds a set, so it's a bit random which occurrence is collected.
+* Then simpleOptExpr replaces each occurrence of x with the one in the in-scope set.
+* Bad bad bad: then the x in  case x of ... may be replaced with a version that has an unfolding.
+
+See ticket #25790
 -}
 
 -- | Simple optimiser options
@@ -135,14 +153,9 @@ simpleOptExpr opts expr
   = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr)
     simpleOptExprWith opts init_subst expr
   where
-    init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
-        -- It's potentially important to make a proper in-scope set
-        -- Consider  let x = ..y.. in \y. ...x...
-        -- Then we should remember to clone y before substituting
-        -- for x.  It's very unlikely to occur, because we probably
-        -- won't *be* substituting for x if it occurs inside a
-        -- lambda.
-        --
+    init_subst = mkEmptySubst (mkInScopeSet (mapVarSet zapIdUnfolding (exprFreeVars expr)))
+        -- zapIdUnfolding: see Note [The InScopeSet for simpleOptExpr]
+
         -- It's a bit painful to call exprFreeVars, because it makes
         -- three passes instead of two (occ-anal, and go)
 
