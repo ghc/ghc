@@ -1,3 +1,5 @@
+export CABAL := $(shell cabal update 2>&1 >/dev/null && cabal list-bin -v0 --project-dir libraries/Cabal cabal-install:exe:cabal)
+
 CPUS=$(shell mk/detect-cpu-count.sh)
 
 # Use CPU cores + 1 if not already set
