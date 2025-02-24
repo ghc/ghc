@@ -496,6 +496,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
           --  flags: +use-system-libffi
           --  flags: +tables-next-to-code
           -- Apparently it makes it ignore the first set of flags...
+          -- See https://github.com/haskell/cabal/issues/10767
         ]
 
   makeCabalProject cabal_project_rts_path $
