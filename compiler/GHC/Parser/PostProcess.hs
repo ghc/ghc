@@ -1257,10 +1257,6 @@ checkPattern = runPV . checkLPat
 checkPattern_details :: ParseContext -> PV (LocatedA (PatBuilder GhcPs)) -> P (LPat GhcPs)
 checkPattern_details extraDetails pp = runPV_details extraDetails (pp >>= checkLPat)
 
-checkLArgPat :: LocatedA (ArgPatBuilder GhcPs) -> PV (LPat GhcPs)
-checkLArgPat (L l (ArgPatBuilderVisPat p)) = checkLPat (L l p)
-checkLArgPat (L l (ArgPatBuilderArgPat p)) = return (L l p)
-
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
 checkLPat (L l@(EpAnn anc an _) p) = do
   (L l' p', cs) <- checkPat (EpAnn anc an emptyComments) emptyComments (L l p) [] []
@@ -1398,11 +1394,11 @@ checkFunBind :: SrcSpan
              -> AnnFunRhs
              -> LocatedN RdrName
              -> LexicalFixity
-             -> LocatedE [LocatedA (ArgPatBuilder GhcPs)]
+             -> LocatedE [LocatedA (PatBuilder GhcPs)]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P (HsBind GhcPs)
 checkFunBind locF ann_fun (L lf fun) is_infix (L lp pats) (L _ grhss)
-  = do  ps <- runPV_details extraDetails (mapM checkLArgPat pats)
+  = do  ps <- runPV_details extraDetails (mapM checkLPat pats)
         let match_span = noAnnSrcSpan $ locF
         return (makeFunBind (L (l2l lf) fun) (L (noAnnSrcSpan $ locA match_span)
                  [L match_span (Match { m_ext = noExtField
@@ -1483,20 +1479,18 @@ checkDoAndIfThenElse err guardExpr semiThen thenExpr semiElse elseExpr
 
 isFunLhs :: LocatedA (PatBuilder GhcPs)
       -> P (Maybe (LocatedN RdrName, LexicalFixity,
-                   [LocatedA (ArgPatBuilder GhcPs)],[EpToken "("],[EpToken ")"]))
+                   [LocatedA (PatBuilder GhcPs)],[EpToken "("],[EpToken ")"]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 isFunLhs e = go e [] [] []
  where
-   mk = fmap ArgPatBuilderVisPat
-
    go (L l (PatBuilderVar (L loc f))) es ops cps
        | not (isRdrDataCon f)        = do
            let (_l, loc') = transferCommentsOnlyA l loc
            return (Just (L loc' f, Prefix, es, (reverse ops), cps))
    go (L l (PatBuilderApp (L lf f) e))   es       ops cps = do
      let (_l, lf') = transferCommentsOnlyA l lf
-     go (L lf' f) (mk e:es) ops cps
+     go (L lf' f) (e:es) ops cps
    go (L l (PatBuilderPar _ (L le e) _)) es@(_:_) ops cps = go (L le' e) es (o:ops) (c:cps)
       -- NB: es@(_:_) means that there must be an arg after the parens for the
       -- LHS to be a function LHS. This corresponds to the Haskell Report's definition
@@ -1507,32 +1501,24 @@ isFunLhs e = go e [] [] []
    go (L loc (PatBuilderOpApp (L ll l) (L loc' op) r (os,cs))) es ops cps
       | not (isRdrDataCon op)         -- We have found the function!
       = do { let (_l, ll') = transferCommentsOnlyA loc ll
-           ; return (Just (L loc' op, Infix, (mk (L ll' l):mk r:es), (os ++ reverse ops), (cs ++ cps))) }
+           ; return (Just (L loc' op, Infix, ((L ll' l):r:es), (os ++ reverse ops), (cs ++ cps))) }
       | otherwise                     -- Infix data con; keep going
       = do { let (_l, ll') = transferCommentsOnlyA loc ll
            ; mb_l <- go (L ll' l) es ops cps
            ; return (reassociate =<< mb_l) }
         where
-          reassociate (op', Infix, j : L k_loc (ArgPatBuilderVisPat k) : es', ops', cps')
+          reassociate (op', Infix, j : L k_loc k : es', ops', cps')
             = Just (op', Infix, j : op_app : es', ops', cps')
             where
-              op_app = mk $ L loc (PatBuilderOpApp (L k_loc k)
+              op_app = L loc (PatBuilderOpApp (L k_loc k)
                                     (L loc' op) r (reverse ops, cps))
           reassociate _other = Nothing
    go (L l (PatBuilderAppType (L lp pat) tok ty_pat@(HsTP _ (L (EpAnn anc ann cs) _)))) es ops cps
-             = go (L lp' pat) (L (EpAnn anc' ann cs) (ArgPatBuilderArgPat invis_pat) : es) ops cps
+             = go (L lp' pat) (L (EpAnn anc' ann cs) (PatBuilderPat invis_pat) : es) ops cps
              where invis_pat = InvisPat (tok, SpecifiedSpec) ty_pat
                    anc' = widenAnchorT anc tok
                    (_l, lp') = transferCommentsOnlyA l lp
    go _ _ _ _ = return Nothing
-
-data ArgPatBuilder p
-  = ArgPatBuilderVisPat (PatBuilder p)
-  | ArgPatBuilderArgPat (Pat p)
-
-instance Outputable (ArgPatBuilder GhcPs) where
-  ppr (ArgPatBuilderVisPat p) = ppr p
-  ppr (ArgPatBuilderArgPat p) = ppr p
 
 mkBangTy :: EpaLocation -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs
 mkBangTy tok_loc strictness =
