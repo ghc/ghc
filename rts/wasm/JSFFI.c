@@ -198,7 +198,6 @@ HaskellObj rts_mkJSVal(Capability *cap, HsJSVal v) {
   SET_HDR(w, &stg_WEAK_info, CCS_SYSTEM);
   w->cfinalizers = (StgClosure *)cfin;
   w->key = p;
-  w->value = Unit_closure;
   w->finalizer = &stg_NO_FINALIZER_closure;
   w->link = cap->weak_ptr_list_hd;
   cap->weak_ptr_list_hd = w;
@@ -213,7 +212,9 @@ HaskellObj rts_mkJSVal(Capability *cap, HsJSVal v) {
   box->payload[0] = p;
   box->payload[1] = (HaskellObj)w;
   box->payload[2] = NULL;
-  return TAG_CLOSURE(1, box);
+
+  w->value = TAG_CLOSURE(1, box);
+  return w->value;
 }
 
 __attribute__((import_module("ghc_wasm_jsffi"), import_name("getJSVal")))
