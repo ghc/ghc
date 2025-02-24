@@ -50,7 +50,7 @@ import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env
 
 import GHC.Tc.Types.Origin
-import GHC.Tc.Types.Evidence( HsWrapper(..), (<.>), TcEvBinds(..) )
+import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 
 import GHC.Tc.Zonk.TcType
@@ -86,7 +86,6 @@ import Control.Monad( unless )
 import Data.Foldable ( toList )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe( mapMaybe )
-
 
 {- -------------------------------------------------------------
           Note [Overview of type signatures]
@@ -703,17 +702,18 @@ Note [Handling new-form SPECIALISE pragmas]
 New-form SPECIALISE pragmas are described by GHC Proposal #493.
 
 The pragma takes the form of a function application, possibly with intervening
-parens and type signatures, with a variable at the head.  It may have rule
-for-alls at the top.  e.g.
+parens and type signatures, with a variable at the head:
 
     {-# SPECIALISE f1 @Int 3 #-}
-    {-# SPECIALISE forall x xs. f2 (x:xs) #-}
-    {-# SPECIALISE f3 :: Int -> Int #-}
-    {-# SPECIALISE (f4 :: Int -> Int) 5 #-}
+    {-# SPECIALISE f2 :: Int -> Int #-}
+    {-# SPECIALISE (f3 :: Int -> Int) 5 #-}
+
+It may also have rule for-alls at the top, e.g.
+
+    {-# SPECIALISE forall x xs. f4 (x:xs) #-}
     {-# SPECIALISE forall a. forall x xs. f5 @a @a (x:xs) #-}
 
 See `GHC.Rename.Bind.checkSpecESigShape` for the shape-check.
-
 
 Example:
   f :: forall a b. (Eq a, Eq b, Eq c) => a -> b -> c -> Bool -> blah
@@ -734,8 +734,8 @@ Note that
 
 * The `rule_bndrs`, over which the RULE is quantified, are all the variables
   free in the call to `f`, /ignoring/ all dictionary simplification.  Why?
-  Because we want to make the rule maximimally applicable; provided the types
-  match, the dicionaries should match.
+  Because we want to make the rule maximally applicable; provided the types
+  match, the dictionaries should match.
 
     rule_bndrs = @p (d1::Eq Int) (d2::Eq p) (d3::Eq p) (x::Int) (y::p).
 
@@ -755,27 +755,104 @@ Note that
     spec_const_binds =  let d1 = $fEqInt
                             d3 = d2
 
-How it works:
+This is done in three parts.
 
-* `GHC.Tc.Gen.Sig.tcSpecPrag` just typechecks the expression, putting the results
-  into a `SpecPragE` record.  Nothing very exciting happens here.
+  A. Typechecker: `GHC.Tc.Gen.Sig.tcSpecPrag`
 
-* `GHC.Tc.Zonk.Type.zonkLTcSpecPrags` does a little extra work to collect any
-  free type variables of the LHS. See Note [Free tyvars on rule LHS] in
-  GHC.Tc.Zonk.Type.  These weren't conveniently available earlier.
+    (1) Typecheck the expression, capturing its constraints
 
-* `GHC.HsToCore.Binds.dsSpec` does the clever stuff:
+    (2) Clone these Wanteds, solve them, and zonk the original Wanteds.
+        This is the same thing that we do for RULES: see Step 1 in
+        Note [The SimplifyRule Plan].
 
-  * Simplifies the expression. This is important because a type signature in the
-    expression will have led to type/dictionary abstractions/applications.  Now
-    it should look like
-           let <dict-binds> in f e1 e1 e3
+    (3) Compute the constraints to quantify over.
 
-  * `prepareSpecLHS` identifies the `spec_const_binds` (see above), discards
-    the other dictionary bindings, and decomposes the call.
+        a. 'getRuleQuantCts' computes the initial quantification candidates
+        b. Filter out the fully soluble constraints; these are the constraints
+           we are specialising away.
+           See Note [Fully solving constraints for specialisation].
 
-  * Then it can build the RULE and specialised function.
+    (4) Emit the residual (non-quantified) constraints, and wrap the
+        expression in a let binding for those constraints.
 
+    (5) Store all the information in a 'SpecPragE' record, to be consumed
+        by the desugarer.
+
+  B. Zonker: `GHC.Tc.Zonk.Type.zonkLTcSpecPrags`
+
+    The zonker does a little extra work to collect any free type variables
+    of the LHS. See Note [Free tyvars on rule LHS] in GHC.Tc.Zonk.Type.
+    These weren't conveniently available earlier.
+
+  C. Desugarer: `GHC.HsToCore.Binds.dsSpec`.
+
+    See Note [Desugaring SPECIALISE pragmas] in GHC.HsToCore.Binds for details,
+    but in brief:
+
+    (1) Simplify the expression. This is important because a type signature in
+        the expression will have led to type/dictionary abstractions/applications.
+        Now it should look like
+            let <dict-binds> in f d1 d2 d3
+
+    (2) `prepareSpecLHS` identifies the `spec_const_binds`, discards the other
+        dictionary bindings, and decomposes the call.
+
+    (3) Then we build the specialised function $sf, and concoct a RULE
+        of the form:
+           forall @a @b d1 d2 d3. f d1 d2 d3 = $sf d1 d2 d3
+
+Note [Fully solving constraints for specialisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As far as specialisation is concerned, it is actively harmful to simplify
+constraints without fully solving them. Two key examples:
+
+f :: ∀ a t. (Eq a, ∀x. Eq x => Eq (t x)). t a -> Char
+{-# SPECIALISE f @Int #-}
+
+  Typechecking 'f' will result in [W] Eq Int, [W] ∀x. Eq x => Eq (t x).
+  We absolutely MUST leave the quantified constraint alone, because we want to
+  quantify over it. If we were to try to simplify it, we would emit an
+  implication and would thereafter never be able to quantify over the original
+  quantified constraint.
+
+  However, we still need to simplify quantified constraints that can be fully
+  solved from instances, otherwise we would never be able to specialise them
+  away. Example: {-# SPECIALISE f @a @[] #-}.
+
+g :: ∀ a. Eq a => a -> Bool
+{-# SPECIALISE g @[e] #-}
+
+  Typechecking 'g' will result in [W] Eq [e]. Were we to simplify this to
+  [W] Eq e, we would have difficulty generating a RULE for the specialisation:
+
+    $sg :: Eq e => [e] -> Bool
+
+    RULE ∀ e (d :: Eq [e]). g @[e] d = $sg @e (??? :: Eq e)
+      -- Can't fill in ??? because we can't run instances in reverse.
+
+    RULE ∀ e (d :: Eq e). g @[e] ($fEqList @e d) = $sg @e d
+      -- Bad RULE matching template: matches on the structure of a dictionary
+
+  Moreover, there is no real benefit to any of this, because the specialiser
+  can't do anything useful from the knowledge that a dictionary for 'Eq [e]' is
+  constructed from a dictionary for 'Eq e' using the 'Eq' instance for lists.
+
+  Note however that it is less important to tackle this problem in the typechecker,
+  as the desugarer would still be able to generate the correct RULE if we did
+  simplify 'Eq [e]' to 'Eq e'. See the second bullet point in (SP2) in
+  Note [Desugaring SPECIALISE pragmas] in GHC.HsToCore.Binds.
+
+The conclusion is this:
+
+  when solving the constraints that arise from a specialise pragma, following
+  the recipe described in Note [Handling new-form SPECIALISE pragmas], all
+  Wanteds should either be:
+    - fully solved (no free evidence variables), or
+    - left untouched.
+
+To achieve this, we quantify over all constraints that are **not fully soluble**
+(see 'fullySolveCt_maybe'), although we still call 'mkMinimalBySCs' on this set
+to avoid e.g. quantifying over both `Eq a` and `Ord a`.
 
 Note [Handling old-form SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -943,38 +1020,64 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
            ; return (SpecPrag poly_id wrap inl) }
 
 tcSpecPrag poly_id (SpecSigE nm rule_bndrs spec_e inl)
-  = do { -- Typecheck the expression, spec_e, capturing its constraints
+  -- For running commentary, see Note [Handling new-form SPECIALISE pragmas]
+  = do { -- (1) Typecheck the expression, spec_e, capturing its constraints
          let skol_info_anon = SpecESkol nm
-       ; traceTc "tcSpecPrag: specSigE1" (ppr nm $$ ppr spec_e)
+       ; traceTc "tcSpecPrag SpecSigE {" (ppr nm $$ ppr spec_e)
        ; skol_info <- mkSkolemInfo skol_info_anon
-       ; (rhs_tclvl, wanted, (rule_bndrs', (spec_e', _rho)))
+       ; (rhs_tclvl, spec_e_wanted, (rule_bndrs', (tc_spec_e, _rho)))
             <- tcRuleBndrs skol_info rule_bndrs $
                tcInferRho spec_e
 
-       -- Simplify the constraints
+         -- (2) Clone these Wanteds, solve them, and zonk the original
+         -- Wanteds, in order to benefit from any unifications.
+
+       ; throwaway_ev_binds_var <- newTcEvBinds
+       ; spec_e_wanted_clone <- cloneWC spec_e_wanted
+       ; _ <- setTcLevel rhs_tclvl $
+                runTcSWithEvBinds throwaway_ev_binds_var $
+                solveWanteds spec_e_wanted_clone
+       ; spec_e_wanted <- liftZonkM $ zonkWC spec_e_wanted
+
+         -- (3) Compute which constraints to quantify over.
+         --   (a) Compute quantification candidates
        ; ev_binds_var <- newTcEvBinds
-       ; wanted <- setTcLevel rhs_tclvl $
-                   runTcSWithEvBinds ev_binds_var $
-                   solveWanteds wanted
+       ; (quant_cands, residual_wc) <- getRuleQuantCts spec_e_wanted
 
-       -- Quantify over the the constraints
-       ; qevs <- mapM newEvVar $
-                 ctsPreds      $
-                 approximateWC False wanted
+        --    (b) Compute fully soluble constraints
+        --        See Note [Fully solving constraints for specialisation]
+       ; traceTc "tcSpecPrag SpecSigE: computing fully soluble Wanteds {" empty
+       ; fully_soluble_evids <-
+           setTcLevel rhs_tclvl $
+             mkVarSet <$>
+               mapMaybeM fullySolveCt_maybe (bagToList quant_cands)
+       ; let (fully_soluble_cts, quant_cts) = partitionBag ((`elemVarSet` fully_soluble_evids) . ctEvId) quant_cands
+       --    (c) Compute constraints to quantify over using 'mkMinimalBySCs'
+             qevs = map ctEvId (bagToList quant_cts)
+       ; traceTc "tcSpecPrag SpecSigE: computed fully soluble Wanteds }" (ppr fully_soluble_cts)
 
+         -- (4) Emit the residual constraints (that we are not quantifying over)
        ; let tv_bndrs = filter isTyVar rule_bndrs'
        ; emitResidualConstraints rhs_tclvl skol_info_anon ev_binds_var
                                  emptyVarSet tv_bndrs qevs
-                                 wanted
+                                 (residual_wc `addSimples` fully_soluble_cts)
+       ; let lhs_call = mkLHsWrap (WpLet (TcEvBinds ev_binds_var)) tc_spec_e
 
-       ; traceTc "tcSpecPrag:SpecSigE" $
+       ; traceTc "tcSpecPrag SpecSigE }" $
          vcat [ text "nm:" <+> ppr nm
               , text "rule_bndrs':" <+> ppr rule_bndrs'
               , text "qevs:" <+> ppr qevs
-              , text "spec_e:" <+> ppr spec_e'
-              , text "inl:" <+> ppr inl ]
+              , text "spec_e:" <+> ppr tc_spec_e
+              , text "inl:" <+> ppr inl
+              , text "spec_e_wanted:" <+> ppr spec_e_wanted
+              , text "quant_cts:" <+> ppr quant_cts
+              , text "residual_wc:" <+> ppr residual_wc
+              , text "fully_soluble_wanteds:" <+> ppr fully_soluble_cts
+              ]
 
-       ; let lhs_call = mkLHsWrap (WpLet (TcEvBinds ev_binds_var)) spec_e'
+         -- (5) Store the results in a SpecPragE record, which will be
+         -- zonked and then consumed by the desugarer.
+
        ; return [SpecPragE { spe_fn_nm = nm
                            , spe_fn_id = poly_id
                            , spe_bndrs = qevs ++ rule_bndrs' -- Dependency order
@@ -983,6 +1086,24 @@ tcSpecPrag poly_id (SpecSigE nm rule_bndrs spec_e inl)
                            , spe_inl   = inl }] }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
+
+-- | Try to fully solve a constraint.
+fullySolveCt_maybe :: Ct -> TcM (Maybe EvId)
+fullySolveCt_maybe ct = do
+  throwaway_ev_binds_var <- newTcEvBinds
+  res_wc <-
+    runTcSWithEvBinds throwaway_ev_binds_var $
+    solveWanteds $ emptyWC { wc_simple = unitBag ct }
+      -- NB: don't use 'solveSimpleWanteds', as this will not
+      -- fully solve quantified constraints.
+  traceTc "fullySolveCt_maybe" $
+    vcat [ text "ct:" <+> ppr ct
+         , text "res_wc:" <+> ppr res_wc
+         ]
+  return $
+    if isSolvedWC res_wc
+    then Just $ ctEvId ct
+    else Nothing
 
 --------------
 tcSpecWrapper :: UserTypeCtxt -> TcType -> TcType -> TcM HsWrapper
@@ -1406,9 +1527,9 @@ in `getRuleQuantCts`.  Why not?
  * Equality constraints are unboxed, and that leads to complications
    For example equality constraints from the LHS will emit coercion hole
    Wanteds.  These don't have a name, so we can't quantify over them directly.
-   Instead, in `mk_one` in `getRuleQuantCts` in we'd have to invent a new EvVar
-   for the coercion, fill the hole with the invented EvVar, and then quantify
-   over the EvVar. Here is old code from `mk_one`
+   Instead, in `getRuleQuantCts`, we'd have to invent a new EvVar for the
+   coercion, fill the hole with the invented EvVar, and then quantify over the
+   EvVar. Here is old code from `mk_one`
          do { ev_id <- newEvVar pred
             ; fillCoercionHole hole (mkCoVarCo ev_id)
             ; return ev_id }
@@ -1475,7 +1596,8 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
        ; lhs_wanted <- liftZonkM $ zonkWC lhs_wanted
 
        -- Note [The SimplifyRule Plan] step 3
-       ; (quant_evs, residual_lhs_wanted) <-getRuleQuantCts lhs_wanted
+       ; (quant_cts, residual_lhs_wanted) <- getRuleQuantCts lhs_wanted
+       ; let quant_evs = map ctEvId (bagToList quant_cts)
 
        ; traceTc "simplifyRule" $
          vcat [ text "LHS of rule" <+> doubleQuotes (ftext name)
@@ -1488,7 +1610,7 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
 
        ; return (quant_evs, residual_lhs_wanted, dont_default) }
 
-getRuleQuantCts :: WantedConstraints -> TcM ([EvVar], WantedConstraints)
+getRuleQuantCts :: WantedConstraints -> TcM (Cts, WantedConstraints)
 -- Extract all the constraints that we can quantify over,
 --   also returning the depleted WantedConstraints
 --
@@ -1496,20 +1618,17 @@ getRuleQuantCts :: WantedConstraints -> TcM ([EvVar], WantedConstraints)
 --   and attempt to solve them from the quantified constraints.  Instead
 --   we /partition/ the WantedConstraints into ones to quantify and ones
 --   we can't quantify.  We could use approximateWC instead, and leave
---   `wanted` unchanged; but then we'd have clone fresh binders and
+--   `wanted` unchanged; but then we'd have to clone fresh binders and
 --   generate silly identity bindings.  Seems more direct to do this.
---   Probably not a big eal wither way.
+--   Probably not a big deal wither way.
 --
 -- NB: we must look inside implications, because with
 --     -fdefer-type-errors we generate implications rather eagerly;
 --     see GHC.Tc.Utils.Unify.implicationNeeded. Not doing so caused #14732.
 
 getRuleQuantCts wc
-  = do { quant_evs <- mapM mk_one (bagToList quant_cts)
-       ; return (quant_evs, residual_wc) }
+  = return $ float_wc emptyVarSet wc
   where
-    (quant_cts, residual_wc) = float_wc emptyVarSet wc
-
     float_wc :: TcTyCoVarSet -> WantedConstraints -> (Cts, WantedConstraints)
     float_wc skol_tvs (WC { wc_simple = simples, wc_impl = implics, wc_errors = errs })
       = ( simple_yes `andCts` implic_yes
@@ -1533,17 +1652,6 @@ getRuleQuantCts wc
       = case classifyPredType (ctPred ct) of
            EqPred {} -> False  -- Note [RULE quantification over equalities]
            _         -> tyCoVarsOfCt ct `disjointVarSet` skol_tvs
-
-    mk_one :: Ct -> TcM EvVar
-    mk_one ct
-     | CtWanted { ctev_dest = dest } <- ctEvidence ct
-     , EvVarDest ev_id <- dest
-           -- HoleDest can't happen because we don't quantify
-           -- over EqPred: See rule_quant_ct above
-     = return ev_id
-
-     | otherwise
-     = pprPanic "getRuleQuantCts" (ppr ct)
 
 
 {- Note [Quantifying over equalities in RULES]

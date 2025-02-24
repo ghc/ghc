@@ -85,7 +85,7 @@ instance Diagnostic DsMessage where
               hang (text "Top-level" <+> text desc <+> text "aren't allowed:") 2 (ppr bind)
     DsUselessSpecialisePragma poly_nm is_dfun rea ->
       mkSimpleDecorated $
-        vcat [ what <+> pragma <+> text "pragma" <+> why
+        vcat [ what <+> pragma <+> text "pragma" <> why
              , additional ]
       where
         quoted_nm = quotes (ppr poly_nm)
@@ -99,13 +99,13 @@ instance Diagnostic DsMessage where
                  else text "SPECIALISE"
         why = case rea of
           UselessSpecialiseForClassMethodSelector ->
-            text "for class selector:" <+> quoted_nm
+            text " for class selector:" <+> quoted_nm
           UselessSpecialiseForNoInlineFunction ->
-            text "for NOINLINE function:" <+> quoted_nm
+            text " for NOINLINE function:" <+> quoted_nm
           UselessSpecialiseNoSpecialisation ->
             -- Omit the Name for a DFunId, as it will be internal and not
             -- very illuminating to users who don't know what a DFunId is.
-            (if is_dfun then empty else text "for" <+> quoted_nm) <> dot
+            (if is_dfun then empty else text " for" <+> quoted_nm) <> dot
 
         additional
           | uselessSpecialisePragmaKeepAnyway rea

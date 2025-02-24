@@ -863,12 +863,14 @@ zonkLTcSpecPrags ps
            ; skol_tvs_ref <- lift $ newTcRef []
            ; setZonkType (SkolemiseFlexi skol_tvs_ref) $
                -- SkolemiseFlexi: see Note [Free tyvars on rule LHS]
-             runZonkBndrT (zonkCoreBndrsX bndrs)       $ \bndrs' ->
+             runZonkBndrT (zonkCoreBndrsX bndrs)       $ \ bndrs' ->
              do { spec_e' <- zonkLExpr spec_e
                 ; skol_tvs <- lift $ readTcRef skol_tvs_ref
-                ; return (L loc (prag { spe_fn_id  = poly_id'
-                                      , spe_bndrs  = skol_tvs ++ bndrs'
-                                      , spe_call   = spec_e' })) } }
+                ; return (L loc (prag { spe_fn_id = poly_id'
+                                      , spe_bndrs = skol_tvs ++ bndrs'
+                                      , spe_call  = spec_e'
+                                      }))
+                }}
 
 {-
 ************************************************************************

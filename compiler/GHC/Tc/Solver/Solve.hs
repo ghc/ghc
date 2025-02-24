@@ -1052,7 +1052,7 @@ solveCt (CNonCanonical ev)                   = solveNC ev
 solveCt (CIrredCan (IrredCt { ir_ev = ev })) = solveNC ev
 
 solveCt (CEqCan (EqCt { eq_ev = ev, eq_eq_rel = eq_rel
-                           , eq_lhs = lhs, eq_rhs = rhs }))
+                      , eq_lhs = lhs, eq_rhs = rhs }))
   = solveEquality ev eq_rel (canEqLHSType lhs) rhs
 
 solveCt (CQuantCan (QCI { qci_ev = ev, qci_pend_sc = pend_sc }))
