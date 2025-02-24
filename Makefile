@@ -5,15 +5,20 @@ CPUS=$(shell mk/detect-cpu-count.sh)
 # Use CPU cores + 1 if not already set
 THREADS=${THREADS:-$((CPUS + 1))}
 
-all: $(CABAL)
+all: $(CABAL) ./booted
 	GHC=ghc-9.8.4 ./Build.hs
 
 cabal: $(CABAL)
-	
+
 $(CABAL):
 	cabal build --project-dir libraries/Cabal cabal-install:exe:cabal
 
+./booted:
+	./boot
+	touch $@
+
 clean:
+	rm -f ./booted
 	rm -rf _build
 
 test: all
