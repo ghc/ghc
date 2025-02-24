@@ -82,7 +82,7 @@ newtype JSVal#
   = JSVal# (Any :: UnliftedType)
 
 data JSVal
-  = forall a . JSVal JSVal# (Weak# JSVal#) (StablePtr# a)
+  = forall a . JSVal JSVal# (Weak# JSVal) (StablePtr# a)
 
 freeJSVal :: JSVal -> IO ()
 freeJSVal v@(JSVal _ w sp) = do

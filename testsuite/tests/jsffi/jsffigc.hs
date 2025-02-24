@@ -27,7 +27,7 @@ foreign export javascript "testDynExportFree sync"
 -- JSVal#. Do not use this in your own codebase since this is purely
 -- an implementation detail of JSVal and subject to change!
 jsvalWeak :: JSVal -> Weak JSVal
-jsvalWeak (JSVal _ w _) = Weak $ unsafeCoerce# Weak w
+jsvalWeak (JSVal _ w _) = Weak w
 
 probeWeak :: Weak v -> IO ()
 probeWeak wk = print =<< isJust <$> deRefWeak wk
