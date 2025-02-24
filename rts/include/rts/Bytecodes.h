@@ -127,10 +127,14 @@
 
 #define bci_OP_NEQ                     110
 #define bci_OP_EQ                      111
-#define bci_OP_GE                      112
-#define bci_OP_GT                      113
-#define bci_OP_LT                      114
-#define bci_OP_LE                      115
+#define bci_OP_U_GE                    112
+#define bci_OP_U_GT                    113
+#define bci_OP_U_LT                    114
+#define bci_OP_U_LE                    115
+#define bci_OP_S_GE                    116
+#define bci_OP_S_GT                    117
+#define bci_OP_S_LT                    118
+#define bci_OP_S_LE                    119
 
 #define bci_OP_SIZED_SUB               130
 

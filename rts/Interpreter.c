@@ -2155,12 +2155,19 @@ run_BCO:
 
 #define SIZED_BIN_OP(op,ty)                                                     \
         {                                                                       \
-            ty r = (*(ty*) Sp_plusB(0)) - (*(ty*) Sp_plusB(sizeof(ty)));        \
-            /* If the two arguments didn't fit in a single word we have to clean up the stack.*/ \
+            ty r = (*(ty*) Sp_plusB(0)) op (*(ty*) Sp_plusB(sizeof(ty)));       \
+            /* If the two arguments didn't fit in a single (host) word we have to clean up the stack.*/ \
             if(sizeof(ty)*2 > sizeof(StgWord)) {                                \
-                Sp_addW(sizeof(ty)*2/sizeof(StgWord) - 1); /*One word accounts for result*/ \
-            }                                                                   \
-            SpW(0) = (StgWord) r;                                               \
+                /* Invariant: Multiple of word size pushed.                     \
+                   Variations: 2x32bit on 32bit, 2x64 on 32bit, 2x64 on 64bit*/ \
+                Sp_addB(sizeof(ty)*2 - sizeof(ty));                             \
+            };                                                                  \
+            /* Host might be 32bit, so ensure we write as MAX(Word/Word64) */   \
+            if(sizeof(ty) == 8) {                                               \
+                SpW64(0) = (StgWord64) r;                                       \
+            } else {                                                            \
+                SpW(0) = (StgWord) r;                                           \
+            };                                                                  \
             goto nextInsn;                                                      \
         }
 
@@ -2172,17 +2179,23 @@ run_BCO:
         case bci_OP_SUB: BIN_INT64_OP(-)
         case bci_OP_AND: BIN_INT64_OP(&)
         case bci_OP_XOR: BIN_INT64_OP(^)
-        case bci_OP_MUL: BIN_INT64_OP(^)
+        case bci_OP_MUL: BIN_INT64_OP(*)
         case bci_OP_SHL: BIN_WORD64_OP(<<)
         case bci_OP_LSR: BIN_WORD64_OP(>>)
         case bci_OP_ASR: BIN_INT64_OP(>>)
 
-        case bci_OP_NEQ: BIN_INT64_OP(!=)
-        case bci_OP_EQ: BIN_INT64_OP(!=)
-        case bci_OP_GT: BIN_INT64_OP(>)
-        case bci_OP_GE: BIN_INT64_OP(>=)
-        case bci_OP_LT: BIN_INT64_OP(<)
-        case bci_OP_LE: BIN_INT64_OP(<=)
+        case bci_OP_NEQ:  BIN_INT64_OP(!=)
+        case bci_OP_EQ:   BIN_INT64_OP(==)
+        case bci_OP_U_GT: BIN_WORD64_OP(>)
+        case bci_OP_U_GE: BIN_WORD64_OP(>=)
+        case bci_OP_U_LT: BIN_WORD64_OP(<)
+        case bci_OP_U_LE: BIN_WORD64_OP(<=)
+
+        case bci_OP_S_GT: BIN_INT64_OP(>)
+        case bci_OP_S_GE: BIN_INT64_OP(>=)
+        case bci_OP_S_LT: BIN_INT64_OP(<)
+        case bci_OP_S_LE: BIN_INT64_OP(<=)
+
 
         case bci_OP_NOT: UN_INT64_OP(~)
         case bci_OP_NEG: UN_INT64_OP(-)

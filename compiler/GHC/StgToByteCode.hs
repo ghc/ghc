@@ -849,12 +849,12 @@ doPrimOp op init_d s p args =
     Int64SubOp -> primOp OP_SUB
     Word64SubOp -> primOp OP_SUB
 
-    Int8SubOp   -> primOp (OP_SIZED_SUB primArg1Width)
-    Word8SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
-    Int16SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
-    Word16SubOp -> primOp (OP_SIZED_SUB primArg1Width)
-    Int32SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
-    Word32SubOp -> primOp (OP_SIZED_SUB primArg1Width)
+    -- Int8SubOp   -> primOp (OP_SIZED_SUB primArg1Width)
+    -- Word8SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
+    -- Int16SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
+    -- Word16SubOp -> primOp (OP_SIZED_SUB primArg1Width)
+    -- Int32SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
+    -- Word32SubOp -> primOp (OP_SIZED_SUB primArg1Width)
 
     IntAndOp -> primOp OP_AND
     WordAndOp -> primOp OP_AND
@@ -876,21 +876,21 @@ doPrimOp op init_d s p args =
     WordEqOp -> primOp OP_EQ
     Word64EqOp -> primOp OP_EQ
 
-    IntLtOp -> primOp OP_LT
-    WordLtOp -> primOp OP_LT
-    Word64LtOp -> primOp OP_LT
+    IntLtOp -> primOp OP_S_LT
+    WordLtOp -> primOp OP_U_LT
+    Word64LtOp -> primOp OP_U_LT
 
-    IntGeOp -> primOp OP_GE
-    WordGeOp -> primOp OP_GE
-    Word64GeOp -> primOp OP_GE
+    IntGeOp -> primOp OP_S_GE
+    WordGeOp -> primOp OP_U_GE
+    Word64GeOp -> primOp OP_U_GE
 
-    IntGtOp -> primOp OP_GT
-    WordGtOp -> primOp OP_GT
-    Word64GtOp -> primOp OP_GT
+    IntGtOp -> primOp OP_S_GT
+    WordGtOp -> primOp OP_U_GT
+    Word64GtOp -> primOp OP_U_GT
 
-    IntLeOp -> primOp OP_LE
-    WordLeOp -> primOp OP_LE
-    Word64LeOp -> primOp OP_LE
+    IntLeOp -> primOp OP_S_LE
+    WordLeOp -> primOp OP_U_LE
+    Word64LeOp -> primOp OP_U_LE
 
     IntNegOp -> primOp OP_NEG
     Int64NegOp -> primOp OP_NEG

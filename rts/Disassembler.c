@@ -498,17 +498,30 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("OP_EQ\n");
          break;
 
-      case bci_OP_GT:
-         debugBelch("OP_GT\n");
+      case bci_OP_U_GT:
+         debugBelch("OP_U_GT\n");
          break;
-      case bci_OP_LE:
-         debugBelch("OP_LE\n");
+      case bci_OP_U_LE:
+         debugBelch("OP_U_LE\n");
          break;
-      case bci_OP_GE:
-         debugBelch("OP_GE\n");
+      case bci_OP_U_GE:
+         debugBelch("OP_U_GE\n");
          break;
-      case bci_OP_LT:
-         debugBelch("OP_LT\n");
+      case bci_OP_U_LT:
+         debugBelch("OP_U_LT\n");
+         break;
+
+      case bci_OP_S_GT:
+         debugBelch("OP_S_GT\n");
+         break;
+      case bci_OP_S_LE:
+         debugBelch("OP_S_LE\n");
+         break;
+      case bci_OP_S_GE:
+         debugBelch("OP_S_GE\n");
+         break;
+      case bci_OP_S_LT:
+         debugBelch("OP_S_LT\n");
          break;
 
       case bci_OP_SIZED_SUB:

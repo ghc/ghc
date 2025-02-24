@@ -231,10 +231,15 @@ data BCInstr
    | OP_NEQ
    | OP_EQ
 
-   | OP_LT
-   | OP_GE
-   | OP_GT
-   | OP_LE
+   | OP_U_LT
+   | OP_U_GE
+   | OP_U_GT
+   | OP_U_LE
+
+   | OP_S_LT
+   | OP_S_GE
+   | OP_S_GT
+   | OP_S_LE
 
    | OP_SIZED_SUB PrimRep
 
@@ -432,10 +437,14 @@ instance Outputable BCInstr where
 
    ppr OP_EQ                = text "OP_EQ"
    ppr OP_NEQ               = text "OP_NEQ"
-   ppr OP_LT                = text "OP_LT"
-   ppr OP_GE                = text "OP_GE"
-   ppr OP_GT                = text "OP_GT"
-   ppr OP_LE                = text "OP_LE"
+   ppr OP_S_LT                = text "OP_S_LT"
+   ppr OP_S_GE                = text "OP_S_GE"
+   ppr OP_S_GT                = text "OP_S_GT"
+   ppr OP_S_LE                = text "OP_S_LE"
+   ppr OP_U_LT                = text "OP_U_LT"
+   ppr OP_U_GE                = text "OP_U_GE"
+   ppr OP_U_GT                = text "OP_U_GT"
+   ppr OP_U_LE                = text "OP_U_LE"
 
    ppr (OP_SIZED_SUB rep)   = text "OP_SIZED_SUB" <+> (ppr rep)
 
@@ -561,10 +570,14 @@ bciStackUse OP_LSR{}              = 0
 
 bciStackUse OP_NEQ{}              = 0
 bciStackUse OP_EQ{}               = 0
-bciStackUse OP_LT{}               = 0
-bciStackUse OP_GT{}               = 0
-bciStackUse OP_LE{}               = 0
-bciStackUse OP_GE{}               = 0
+bciStackUse OP_S_LT{}               = 0
+bciStackUse OP_S_GT{}               = 0
+bciStackUse OP_S_LE{}               = 0
+bciStackUse OP_S_GE{}               = 0
+bciStackUse OP_U_LT{}               = 0
+bciStackUse OP_U_GT{}               = 0
+bciStackUse OP_U_LE{}               = 0
+bciStackUse OP_U_GE{}               = 0
 
 bciStackUse OP_SIZED_SUB{}        = 0
 

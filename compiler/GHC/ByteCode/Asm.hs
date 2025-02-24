@@ -554,10 +554,14 @@ assembleI platform i = case i of
   OP_NEQ                   -> emit bci_OP_NEQ []
   OP_EQ                    -> emit bci_OP_EQ []
 
-  OP_LT                    -> emit bci_OP_LT []
-  OP_GE                    -> emit bci_OP_GE []
-  OP_GT                    -> emit bci_OP_GT []
-  OP_LE                    -> emit bci_OP_LE []
+  OP_U_LT                  -> emit bci_OP_U_LT []
+  OP_S_LT                  -> emit bci_OP_S_LT []
+  OP_U_GE                  -> emit bci_OP_U_GE []
+  OP_S_GE                  -> emit bci_OP_S_GE []
+  OP_U_GT                  -> emit bci_OP_U_GT []
+  OP_S_GT                  -> emit bci_OP_S_GT []
+  OP_U_LE                  -> emit bci_OP_U_LE []
+  OP_S_LE                  -> emit bci_OP_S_LE []
 
   OP_SIZED_SUB rep         -> emit (sizedInstr platform bci_OP_SIZED_SUB rep) []
 
