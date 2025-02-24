@@ -2,7 +2,7 @@
 
 module GHC.Wasm.Prim (
   -- User-facing JSVal type and freeJSVal
-  JSVal (..),
+  JSVal,
   freeJSVal,
 
   -- The JSString type and conversion from/to Haskell String
@@ -20,4 +20,3 @@ module GHC.Wasm.Prim (
 ) where
 
 import GHC.Internal.Wasm.Prim
-
