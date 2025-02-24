@@ -4,7 +4,7 @@ module Test where
 
 import Data.Maybe
 import GHC.Exts
-import GHC.Wasm.Prim
+import GHC.Internal.Wasm.Prim
 import GHC.Weak
 import System.Mem
 
