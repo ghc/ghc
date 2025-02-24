@@ -1,4 +1,5 @@
-
 T17594g.hs:6:5: error: [GHC-14964]
-    • Invisible type pattern a has no associated forall
+    • Illegal invisible type pattern: @a
+      An invisible type pattern must be checked against a forall.
     • In an equation for ‘id'’: id' @a x = x
+

@@ -193,8 +193,9 @@ tcMatchPats match_ctxt pats pat_tys thing_inside
              --          f @a t = ... -- loop (InvisPat{} : _) (ExpForAllPatTy (Bndr _ Required) : _)
              --      4.  f :: forall {a}. Int
              --          f @a t = ... -- loop (InvisPat{} : _) (ExpForAllPatTy (Bndr _ Inferred) : _)
-             loop (L loc (InvisPat _ tp) : _) _ =
-                failAt (locA loc) (TcRnInvisPatWithNoForAll tp)
+             loop (L loc (InvisPat _ tp) : _) _
+              = setSrcSpanA loc $
+                failWithTc (TcRnIllegalInvisibleTypePattern tp InvisPatNoForall)
 
              -- ExpFunPatTy: expecting a value pattern
              -- tc_lpat will error if it sees a @t type pattern

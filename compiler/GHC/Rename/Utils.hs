@@ -672,7 +672,7 @@ badQualBndrErr :: RdrName -> TcRnMessage
 badQualBndrErr rdr_name = TcRnQualifiedBinder rdr_name
 
 typeAppErr :: TypeOrKind -> LHsType GhcPs -> TcRnMessage
-typeAppErr what (L _ k) = TcRnTypeApplicationsDisabled (TypeApplication k what)
+typeAppErr what (L _ k) = TcRnTypeApplicationsDisabled k what
 
 badFieldConErr :: Name -> FieldLabelString -> TcRnMessage
 badFieldConErr con field = TcRnInvalidRecordField con field
