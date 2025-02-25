@@ -13,8 +13,8 @@ master_doc = 'index'
 project = u'Haddock'
 copyright = u'2016, Simon Marlow'
 author = u'Simon Marlow'
-version = '1.0'
-release = '1.0'
+version = ''
+release = ''
 
 language = 'en'
 
