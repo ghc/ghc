@@ -85,6 +85,7 @@ settings-install_name_tool-command = @SettingsInstallNameToolCommand@
 settings-llc-command = @SettingsLlcCommand@
 settings-opt-command = @SettingsOptCommand@
 settings-llvm-as-command = @SettingsLlvmAsCommand@
+settings-llvm-as-flags = @SettingsLlvmAsFlags@
 settings-use-distro-mingw = @SettingsUseDistroMINGW@
 
 target-has-libm = @TargetHasLibm@

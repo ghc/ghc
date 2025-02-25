@@ -89,6 +89,7 @@ AC_DEFUN([FP_SETTINGS],
     SettingsLlcCommand="$LlcCmd"
     SettingsOptCommand="$OptCmd"
     SettingsLlvmAsCommand="$LlvmAsCmd"
+    SettingsLlvmAsFlags="$LlvmAsCmd"
 
     if test "$EnableDistroToolchain" = "YES"; then
         # If the user specified --enable-distro-toolchain then we just use the
@@ -131,6 +132,7 @@ AC_DEFUN([FP_SETTINGS],
         SUBST_TOOLDIR([SettingsLlcCommand])
         SUBST_TOOLDIR([SettingsOptCommand])
         SUBST_TOOLDIR([SettingsLlvmAsCommand])
+        SUBST_TOOLDIR([SettingsLlvmAsFlags])
     fi
 
     # Mac-only tools
@@ -171,5 +173,6 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
     AC_SUBST(SettingsLlvmAsCommand)
+    AC_SUBST(SettingsLlvmAsFlags)
     AC_SUBST(SettingsUseDistroMINGW)
 ])
