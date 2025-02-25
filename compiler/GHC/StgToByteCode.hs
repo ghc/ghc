@@ -843,18 +843,19 @@ doPrimOp op init_d s p args =
     Int64AddOp -> primOp OP_ADD
     WordAddOp -> primOp OP_ADD
     Word64AddOp -> primOp OP_ADD
+    AddrAddOp -> primOp OP_ADD
 
     IntSubOp -> primOp OP_SUB
     WordSubOp -> primOp OP_SUB
     Int64SubOp -> primOp OP_SUB
     Word64SubOp -> primOp OP_SUB
 
-    -- Int8SubOp   -> primOp (OP_SIZED_SUB primArg1Width)
-    -- Word8SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
-    -- Int16SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
-    -- Word16SubOp -> primOp (OP_SIZED_SUB primArg1Width)
-    -- Int32SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
-    -- Word32SubOp -> primOp (OP_SIZED_SUB primArg1Width)
+    Int8SubOp   -> primOp (OP_SIZED_SUB primArg1Width)
+    Word8SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
+    Int16SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
+    Word16SubOp -> primOp (OP_SIZED_SUB primArg1Width)
+    Int32SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
+    Word32SubOp -> primOp (OP_SIZED_SUB primArg1Width)
 
     IntAndOp -> primOp OP_AND
     WordAndOp -> primOp OP_AND
