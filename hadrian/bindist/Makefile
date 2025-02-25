@@ -131,6 +131,7 @@ lib/settings : config.mk
 	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
 	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
 	@echo ',("LLVM llvm-as command", "$(SettingsLlvmAsCommand)")' >> $@
+	@echo ',("LLVM llvm-as flags", "$(SettingsLlvmAsFlags)")' >> $@
 	@echo ',("Use inplace MinGW toolchain", "$(SettingsUseDistroMINGW)")' >> $@
 	@echo
 	@echo ',("target RTS linker only supports shared libraries", "$(TargetRTSLinkerOnlySupportsSharedLibs)")' >> $@
