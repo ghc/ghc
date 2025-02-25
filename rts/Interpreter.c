@@ -2143,7 +2143,7 @@ run_BCO:
 
 #define UN_SIZED_OP(op,ty)                                          \
     {                                                               \
-    ty r = op (*(ty*) Sp_plusB(sizeof(ty)));                        \
+    ty r = op (*(ty*) Sp_plusB(0));                                 \
     if(sizeof(ty) > sizeof(StgWord)) {                              \
         /* 64bit op on 32bit platforms */                           \
         SpW64(0) = (StgWord64) r;                                   \

@@ -913,7 +913,7 @@ doPrimOp op init_d s p args =
 
     _ -> Nothing
     where
-      --primArg1Width = (stgArgRepU $ head args) :: PrimRep
+      primArg1Width = (stgArgRepU $ head args) :: PrimRep
       -- Push args, execute primop, slide, return_N
       primOp op_inst = Just $ do
         platform <- profilePlatform <$> getProfile
