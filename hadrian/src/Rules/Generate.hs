@@ -528,6 +528,7 @@ generateSettings settingsFile = do
         , ("LLVM llc command", expr $ settingsFileSetting ToolchainSetting_LlcCommand)
         , ("LLVM opt command", expr $ settingsFileSetting ToolchainSetting_OptCommand)
         , ("LLVM llvm-as command", expr $ settingsFileSetting ToolchainSetting_LlvmAsCommand)
+        , ("LLVM llvm-as flags", expr $ settingsFileSetting ToolchainSetting_LlvmAsFlags)
         , ("Use inplace MinGW toolchain", expr $ settingsFileSetting ToolchainSetting_DistroMinGW)
 
         , ("target RTS linker only supports shared libraries", expr $ yesNo <$> targetRTSLinkerOnlySupportsSharedLibs)

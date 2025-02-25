@@ -214,6 +214,13 @@ FIND_LLVM_PROG([LLVMAS], [clang], [$LlvmMinVersion], [$LlvmMaxVersion])
 LlvmAsCmd="$LLVMAS"
 AC_SUBST([LlvmAsCmd])
 
+dnl We know that `clang` supports `--target` and it is necessary to pass it
+dnl lest we see #25793.
+if test -z "$LlvmAsFlags" ; then
+    LlvmAsFlags="--target=$LlvmTarget"
+fi
+AC_SUBST([LlvmAsFlags])
+
 dnl ** Check gcc version and flags we need to pass it **
 FP_GCC_VERSION
 FP_GCC_SUPPORTS_NO_PIE
