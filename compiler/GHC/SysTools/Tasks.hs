@@ -7,7 +7,26 @@
 -- (c) The GHC Team 2017
 --
 -----------------------------------------------------------------------------
-module GHC.SysTools.Tasks where
+module GHC.SysTools.Tasks
+  ( runUnlit
+  , SourceCodePreprocessor(..)
+  , runSourceCodePreprocessor
+  , runPp
+  , runCc
+  , askLd
+  , runAs
+  , runLlvmOpt
+  , runLlvmLlc
+  , runLlvmAs
+  , runEmscripten
+  , figureLlvmVersion
+  , runMergeObjects
+  , runAr
+  , askOtool
+  , runInstallNameTool
+  , runRanlib
+  , runWindres
+  ) where
 
 import GHC.Prelude
 import GHC.ForeignSrcLang
