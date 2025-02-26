@@ -241,6 +241,7 @@ test('return_mem_to_os', normal, compile_and_run, [''])
 test('T4850',
   [ when(opsys('mingw32'), expect_broken(4850))
   , js_broken(22261) # FFI "dynamic" convention unsupported
+  , req_target_debug_rts
   ], makefile_test, ['T4850'])
 
 def config_T5250(name, opts):
@@ -505,6 +506,7 @@ test('keep-cafs-fail',
     filter_stdout_lines('Evaluated a CAF|exit.*'),
     ignore_stderr, # on OS X the shell emits an "Abort trap" message to stderr
     req_rts_linker,
+    req_target_debug_rts
   ],
   makefile_test, ['KeepCafsFail'])
 
@@ -514,7 +516,8 @@ test('keep-cafs',
                  'KeepCafs2.hs', 'KeepCafsMain.hs']),
     when(opsys('mingw32'), expect_broken (5987)),
     when(opsys('freebsd') or opsys('openbsd'), expect_broken(16035)),
-    req_rts_linker
+    req_rts_linker,
+    req_target_debug_rts
   ],
   makefile_test, ['KeepCafs'])
 
@@ -524,7 +527,7 @@ test('T11829', [ req_c, check_errmsg("This is a test"), when(arch('wasm32'), fra
      ['T11829_c.cpp -package system-cxx-std-lib'])
 
 test('T16514', [req_c, omit_ghci], compile_and_run, ['T16514_c.c'])
-test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])
+test('test-zeroongc', [extra_run_opts('-DZ'), req_target_debug_rts], compile_and_run, ['-debug'])
 
 test('T13676',
      [when(opsys('mingw32'), expect_broken(17447)),
