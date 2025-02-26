@@ -241,14 +241,6 @@ data Message a where
     :: RemoteRef (ResumeContext ())
     -> Message (EvalStatus ())
 
-  -- | Allocate a string for a breakpoint module name.
-  -- This uses an empty dummy type because @ModuleName@ isn't available here.
-  NewBreakModule
-   :: String -- ^ @ModuleName@
-   -> BS.ShortByteString -- ^ @UnitId@ for the given @ModuleName@
-   -> Message (RemotePtr BreakModule, RemotePtr BreakUnitId)
-
-
 deriving instance Show (Message a)
 
 -- | Used to dynamically create a data constructor's info table at
@@ -601,9 +593,8 @@ getMessage = do
       36 -> Msg <$> (Seq <$> get)
       37 -> Msg <$> return RtsRevertCAFs
       38 -> Msg <$> (ResumeSeq <$> get)
-      39 -> Msg <$> (NewBreakModule <$> get <*> get)
-      40 -> Msg <$> (LookupSymbolInDLL <$> get <*> get)
-      41 -> Msg <$> (WhereFrom <$> get)
+      39 -> Msg <$> (LookupSymbolInDLL <$> get <*> get)
+      40 -> Msg <$> (WhereFrom <$> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -648,9 +639,8 @@ putMessage m = case m of
   Seq a                       -> putWord8 36 >> put a
   RtsRevertCAFs               -> putWord8 37
   ResumeSeq a                 -> putWord8 38 >> put a
-  NewBreakModule name unitid  -> putWord8 39 >> put name >> put unitid
-  LookupSymbolInDLL dll str   -> putWord8 40 >> put dll >> put str
-  WhereFrom a                 -> putWord8 41 >> put a
+  LookupSymbolInDLL dll str   -> putWord8 39 >> put dll >> put str
+  WhereFrom a                 -> putWord8 40 >> put a
 
 {-
 Note [Parallelize CreateBCOs serialization]

@@ -96,10 +96,6 @@ run m = case m of
   MkCostCentres mod ccs -> mkCostCentres mod ccs
   CostCentreStackInfo ptr -> ccsToStrings (fromRemotePtr ptr)
   NewBreakArray sz -> mkRemoteRef =<< newBreakArray sz
-  NewBreakModule name unitid -> do
-    namePtr <- newModuleName name
-    uidPtr <- newUnitId unitid
-    pure (namePtr, uidPtr)
   SetupBreakpoint ref ix cnt -> do
     arr <- localRef ref;
     _ <- setupBreakpoint arr ix cnt
@@ -440,13 +436,6 @@ mkString0 bs = B.unsafeUseAsCStringLen bs $ \(cstr,len) -> do
   pokeElemOff (ptr :: Ptr CChar) len 0
   return (castRemotePtr (toRemotePtr ptr))
 
-mkShortByteString0 :: BS.ShortByteString -> IO (RemotePtr ())
-mkShortByteString0 bs = BS.useAsCStringLen bs $ \(cstr,len) -> do
-  ptr <- mallocBytes (len+1)
-  copyBytes ptr cstr len
-  pokeElemOff (ptr :: Ptr CChar) len 0
-  return (castRemotePtr (toRemotePtr ptr))
-
 mkCostCentres :: String -> [(String,String)] -> IO [RemotePtr CostCentre]
 #if defined(PROFILING)
 mkCostCentres mod ccs = do
@@ -463,14 +452,6 @@ foreign import ccall unsafe "mkCostCentre"
 #else
 mkCostCentres _ _ = return []
 #endif
-
-newModuleName :: String -> IO (RemotePtr BreakModule)
-newModuleName name =
-  castRemotePtr . toRemotePtr <$> newCString name
-
-newUnitId :: BS.ShortByteString -> IO (RemotePtr BreakUnitId)
-newUnitId name =
-  castRemotePtr <$> mkShortByteString0 name
 
 getIdValFromApStack :: HValue -> Int -> IO (Maybe HValue)
 getIdValFromApStack apStack (I# stackDepth) = do
