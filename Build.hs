@@ -589,7 +589,7 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   -- libraries that aren't built yet.
   let primops_txt    = src </> "libraries/ghc/GHC/Builtin/primops.txt"
   let primops_txt_pp = primops_txt <.> ".pp"
-  primops <- readCreateProcess (shell $ "$CC -E -undef -traditional -P -x c " ++ primops_txt_pp) ""
+  primops <- readCreateProcess (shell $ "cc -E -undef -traditional -P -x c " ++ primops_txt_pp) ""
   writeFile primops_txt primops
   writeFile (src </> "libraries/ghc-internal/src/GHC/Internal/Prim.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-source"]) primops
   writeFile (src </> "libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops
