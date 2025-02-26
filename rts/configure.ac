@@ -553,8 +553,10 @@ dnl NOTE:  dnl pass `-fcommon` to force symbols into the common section. If they
 dnl up in the ro data section `nm` won't list their size, and thus derivedConstants
 dnl will fail. Recent clang (e.g. 16) will by default use `-fno-common`.
 dnl
-dnl FIXME: using a relative path here is TERRIBLE
+dnl FIXME: using a relative path here is TERRIBLE; Cabal should provide some
+dnl        env var for _build-dependencies_ headers!
 dnl
+
 if $DERIVE_CONSTANTS \
   --gen-header \
   -o include/DerivedConstants.h \
@@ -566,7 +568,8 @@ if $DERIVE_CONSTANTS \
   --gcc-flag "-fcommon" \
   --gcc-flag "-I$srcdir" \
   --gcc-flag "-I$srcdir/include" \
-  --gcc-flag "-Iinclude" ; then
+  --gcc-flag "-Iinclude" \
+  --gcc-flag "-I$srcdir/../rts-headers/include" ; then
   AC_MSG_RESULT([created])
 else
   AC_MSG_RESULT([failed to create])

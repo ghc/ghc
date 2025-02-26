@@ -68,7 +68,6 @@ extra-source-files:
     include/rts/Adjustor.h
     include/RtsAPI.h
     include/rts/BlockSignals.h
-    include/rts/Bytecodes.h
     include/rts/Config.h
     include/rts/Constants.h
     include/rts/EventLogFormat.h
@@ -105,9 +104,6 @@ extra-source-files:
     include/rts/StaticPtrTable.h
     include/rts/storage/Block.h
     include/rts/storage/ClosureMacros.h
-    include/rts/storage/Closures.h
-    include/rts/storage/ClosureTypes.h
-    include/rts/storage/FunTypes.h
     include/rts/storage/GC.h
     include/rts/storage/HeapAlloc.h
     include/rts/storage/Heap.h
@@ -124,16 +120,7 @@ extra-source-files:
     include/rts/Utils.h
     include/stg/DLL.h
     include/Stg.h
-    include/stg/MachRegs/arm32.h
-    include/stg/MachRegs/arm64.h
     include/stg/MachRegsForHost.h
-    include/stg/MachRegs.h
-    include/stg/MachRegs/loongarch64.h
-    include/stg/MachRegs/ppc.h
-    include/stg/MachRegs/riscv64.h
-    include/stg/MachRegs/s390x.h
-    include/stg/MachRegs/wasm32.h
-    include/stg/MachRegs/x86.h
     include/stg/MiscClosures.h
     include/stg/Prim.h
     include/stg/Regs.h
@@ -398,20 +385,8 @@ library
         js/time.js
 
       install-includes: HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
-                        ghcautoconf.h
-                        DerivedConstants.h
-                        ghcplatform.h
                         ghcconfig.h
                         ghcversion.h
-                        stg/MachRegs.h
-                        stg/MachRegs/arm32.h
-                        stg/MachRegs/arm64.h
-                        stg/MachRegs/loongarch64.h
-                        stg/MachRegs/ppc.h
-                        stg/MachRegs/riscv64.h
-                        stg/MachRegs/s390x.h
-                        stg/MachRegs/wasm32.h
-                        stg/MachRegs/x86.h
                         stg/MachRegsForHost.h
                         stg/Types.h
 
@@ -520,7 +495,6 @@ library
                         rts/Adjustor.h
                         rts/ExecPage.h
                         rts/BlockSignals.h
-                        rts/Bytecodes.h
                         rts/Config.h
                         rts/Constants.h
                         rts/EventLogFormat.h
@@ -562,9 +536,7 @@ library
                         rts/prof/LDV.h
                         rts/storage/Block.h
                         rts/storage/ClosureMacros.h
-                        rts/storage/ClosureTypes.h
                         rts/storage/Closures.h
-                        rts/storage/FunTypes.h
                         rts/storage/Heap.h
                         rts/storage/HeapAlloc.h
                         rts/storage/GC.h
@@ -572,16 +544,6 @@ library
                         rts/storage/MBlock.h
                         rts/storage/TSO.h
                         stg/DLL.h
-                        stg/MachRegs.h
-                        stg/MachRegs/arm32.h
-                        stg/MachRegs/arm64.h
-                        stg/MachRegs/loongarch64.h
-                        stg/MachRegs/ppc.h
-                        stg/MachRegs/riscv64.h
-                        stg/MachRegs/s390x.h
-                        stg/MachRegs/wasm32.h
-                        stg/MachRegs/x86.h
-                        stg/MachRegsForHost.h
                         stg/MiscClosures.h
                         stg/Prim.h
                         stg/Regs.h
@@ -828,6 +790,9 @@ library
                     -- ticker/*.c
                     -- We don't want to compile posix/ticker/*.c, these will be #included
                     -- from Ticker.c
+
+    build-depends:
+      rts-headers
 
 -- Note [Undefined symbols in the RTS]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

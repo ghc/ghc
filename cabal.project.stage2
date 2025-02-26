@@ -1,6 +1,7 @@
 package-dbs: clear, global
 
 packages:
+  rts-headers
   rts
 
   libraries/ghc-prim
@@ -54,18 +55,12 @@ packages:
   https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz
   https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz
 
-  ghc/
   libraries/haskeline/
   libraries/terminfo/
-  utils/ghc-pkg
-  utils/hsc2hs
   utils/hp2ps
   utils/hpc
-  utils/unlit
   utils/iserv
-  utils/genprimopcode/
   utils/genapply/
-  utils/deriveConstants/
   utils/runghc/
 
 
@@ -74,6 +69,10 @@ benchmarks: False
 tests: False
 allow-boot-library-installs: True
 active-repositories: :none
+
+constraints:
+  -- we do not want to use the rts-headers from stage1
+  rts-headers source
 
 package *
   library-vanilla: True

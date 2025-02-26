@@ -53,23 +53,18 @@ _build/booted: _build/prepare-sources
 # --- FIXME: This is nonsense and needs to die.
 _build/prepare-sources: $(CONFIGURED_FILES)
 	@echo ">>> Preparing sources (copying files)..."
-	mkdir -p compiler/MachRegs
+
 	mkdir -p libraries/ghc-internal/include
 	mkdir -p libraries/ghc-internal/cbits
 
-	cp -fp rts/include/rts/Bytecodes.h compiler/
-	cp -fp rts/include/rts/storage/ClosureTypes.h compiler/
-	cp -fp rts/include/rts/storage/FunTypes.h compiler/
-
-	cp -fp rts/include/stg/MachRegs.h compiler/
-	cp -fp rts/include/stg/MachRegs/*.h compiler/MachRegs/
-
 	cp -fp utils/fs/fs.h libraries/ghc-internal/include/
 	cp -fp utils/fs/fs.c libraries/ghc-internal/cbits/
+
 	cp -fp utils/fs/fs.c rts/
 	cp -fp utils/fs/fs.h rts/
 	cp -fp utils/fs/fs.c utils/unlit/
 	cp -fp utils/fs/fs.h utils/unlit/
+
 	@echo ">>> Source preparation complete."
 	mkdir -p _build
 	touch $@

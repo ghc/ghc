@@ -161,7 +161,8 @@ buildGhcStage booting opts cabal ghc0 dst = do
   -- the targets
   let targets
         | booting =
-           [ "ghc-bin:ghc"
+           [ "rts-headers:rts-headers"
+           , "ghc-bin:ghc"
            , "ghc-pkg:ghc-pkg"
            , "genprimopcode:genprimopcode"
            , "deriveConstants:deriveConstants"
@@ -172,6 +173,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
            ]
         | otherwise =
            [ "--with-ghc-pkg=" ++ ghcPkg
+           , "rts-headers:rts-headers"
            , "ghc-bin:ghc"
            , "ghc-pkg:ghc-pkg"
            , "genprimopcode:genprimopcode"

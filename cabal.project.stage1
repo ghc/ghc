@@ -1,4 +1,13 @@
 packages:
+  -- NOTE: we need rts-headers, because the _newly_ built compiler depends
+  --       on these potentially _new_ headers, we must not rely on those from
+  --       the rts as shipped with the bootstrap compiler. For the stage2
+  --       compiler we have the `rts` available, which would have the correct
+  --       headers around, now it has them through the rts -> rts-headers
+  --       dependency.
+  rts-headers
+
+  -- other packages.
   ghc/
   compiler/
   libraries/directory/
