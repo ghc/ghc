@@ -453,7 +453,10 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
 
   -- FIXME: could we build a cross compiler, simply by not reading this from the boot compiler, but passing it in?
   target_triple <- ghcTargetTriple ghc
-  let [arch,vendor,os] = words $ map (\c -> if c == '-' then ' ' else c) target_triple
+  let to_triple = \case
+        [arch,vendor,os] -> (arch,vendor,os)
+        t -> error $ "Triple expected but got: " ++ show t
+  let (arch,vendor,os) = to_triple $ words $ map (\c -> if c == '-' then ' ' else c) target_triple
 
   let cabal_project_rts_path = dst </> "cabal.project-rts"
       -- cabal's code handling escaping is bonkers. We need to wrap the whole
