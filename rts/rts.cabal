@@ -613,11 +613,13 @@ library
           Jumps_V32.cmm
           Jumps_V64.cmm
 
+      -- we always link against libffi, even without libffi-adjustors
+      extra-libraries: ffi
+      extra-libraries-static: ffi
+
       -- Adjustor stuff
       if flag(libffi-adjustors)
         c-sources: adjustor/LibffiAdjustor.c
-        extra-libraries: ffi
-        extra-libraries-static: ffi
       else
         -- Use GHC's native adjustors
         if arch(i386)
@@ -633,8 +635,6 @@ library
         -- fall back to the LibffiAdjustor if neither i386, or x86_64
         if !arch(x86_64) && !arch(i386)
           c-sources: adjustor/LibffiAdjustor.c
-          extra-libraries: ffi
-          extra-libraries-static: ffi
 
       -- Use assembler STG entrypoint on architectures where it is used
       if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64) || arch(loongarch64)
