@@ -1,0 +1,6 @@
+Breakpoint 0 activated at interpreter_steplocal.hs:3:8-21
+Stopped in Main.main, interpreter_steplocal.hs:3:8-21
+_result :: IO () = _
+Stopped in Main.main, interpreter_steplocal.hs:3:16-21
+_result :: Integer = _
+6765
