@@ -3,6 +3,5 @@ test('prog001',
       when(arch('arm'), fragile(17555)),
       cmd_prefix('ghciWayFlags=' + config.ghci_way_flags),
       req_interp,
-      unless(opsys('mingw32') or not config.have_RTS_linker, extra_ways(['ghci-ext'])),
-      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+      unless(opsys('mingw32') or not config.have_RTS_linker, extra_ways(['ghci-ext']))],
      ghci_script, ['prog001.script'])

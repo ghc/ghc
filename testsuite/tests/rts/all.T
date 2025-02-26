@@ -531,8 +531,7 @@ test('test-zeroongc', [extra_run_opts('-DZ'), req_target_debug_rts], compile_and
 
 test('T13676',
      [when(opsys('mingw32'), expect_broken(17447)),
-      extra_files(['T13676.hs']),
-      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+      extra_files(['T13676.hs'])],
      ghci_script, ['T13676.script'])
 test('InitEventLogging',
      [ only_ways(['normal'])

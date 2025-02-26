@@ -3,7 +3,6 @@ setTestOpts(req_dynamic_lib_support)
 test('load_short_name', [ extra_files(['A.c'])
                         , unless(doing_ghci, skip)
                         , req_c
-                        , when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))
                         ],
      makefile_test, ['load_short_name'])
 
@@ -12,8 +11,7 @@ test('T1407',
       unless(doing_ghci, skip),
       pre_cmd('$MAKE -s --no-print-directory compile_libT1407'),
       extra_hc_opts('-L"$PWD/T1407dir"'),
-      js_broken(22359),
-      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+      js_broken(22359)],
      makefile_test, [])
 
 test('T3242',
