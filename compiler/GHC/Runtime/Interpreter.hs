@@ -379,7 +379,7 @@ newBreakArray interp size = do
 
 newModuleName :: Interp -> ModuleName -> IO (RemotePtr ModuleName)
 newModuleName interp mod_name =
-  castRemotePtr <$> interpCmd interp (NewBreakModule (moduleNameString mod_name))
+  castRemotePtr . head <$> interpCmd interp (MallocStrings [bytesFS $ moduleNameFS mod_name])
 
 storeBreakpoint :: Interp -> ForeignRef BreakArray -> Int -> Int -> IO ()
 storeBreakpoint interp ref ix cnt = do                               -- #19157
