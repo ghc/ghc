@@ -1,0 +1,5 @@
+:l interpreter_steplocal.hs
+:break main
+main
+:steplocal
+:steplocal

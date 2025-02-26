@@ -788,3 +788,9 @@ test ('T24984',
       [ collect_compiler_stats('bytes allocated',5) ],
       compile,
       ['-O'])
+
+test('interpreter_steplocal',
+     [ collect_compiler_stats('bytes allocated', 5)
+     ],
+     ghci_script,
+     ['interpreter_steplocal.script'])
