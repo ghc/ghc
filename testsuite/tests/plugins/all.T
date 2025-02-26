@@ -131,7 +131,7 @@ test('T10294a',
       pre_cmd('$MAKE -s --no-print-directory -C annotation-plugin package.T10294a TOP={top}')],
      makefile_test, [])
 
-test('frontend01', [extra_files(['FrontendPlugin.hs']), when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+test('frontend01', [extra_files(['FrontendPlugin.hs'])],
      makefile_test, [])
 
 test('T11244',
@@ -360,9 +360,7 @@ test('plugins-external',
 
 test('test-phase-hooks-plugin',
      [extra_files(['hooks-plugin/']),
-      pre_cmd('$MAKE -s --no-print-directory -C hooks-plugin package.test-phase-hooks-plugin TOP={top}'),
-
-      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+      pre_cmd('$MAKE -s --no-print-directory -C hooks-plugin package.test-phase-hooks-plugin TOP={top}')],
      compile,
      ['-package-db hooks-plugin/pkg.test-phase-hooks-plugin/local.package.conf -fplugin Hooks.PhasePlugin -package hooks-plugin ' + config.plugin_way_flags])
 
