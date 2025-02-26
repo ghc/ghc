@@ -610,7 +610,7 @@ test('decodeMyStack_emptyListForMissingFlag',
 test('T20201a', [js_skip, exit_code(1)], compile_and_run, ['-with-rtsopts -AturtlesM'])
 test('T20201b', [js_skip, exit_code(1)], compile_and_run, ['-with-rtsopts -A64z'])
 
-test('T22012', [js_skip, extra_ways(['ghci'])], compile_and_run, ['T22012_c.c'])
+test('T22012', [js_skip, fragile(23043), extra_ways(['ghci'])], compile_and_run, ['T22012_c.c'])
 
 # Skip for JS platform as the JS RTS is always single threaded
 test('T22795a', [only_ways(['normal']), js_skip, req_ghc_with_threaded_rts], compile_and_run, ['-threaded'])
