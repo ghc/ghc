@@ -610,7 +610,8 @@ injectiveBranches injectivity
   -- See Note [Verifying injectivity annotation], case 1.
   = let getInjArgs  = filterByList injectivity
         in_scope    = mkInScopeSetList (tvs1 ++ tvs2)
-    in case tcUnifyTyWithTFs True in_scope rhs1 rhs2 of -- True = two-way pre-unification
+    in case tcUnifyTyForInjectivity True in_scope rhs1 rhs2 of
+             -- True = two-way pre-unification
        Nothing -> InjectivityAccepted
          -- RHS are different, so equations are injective.
          -- This is case 1A from Note [Verifying injectivity annotation]

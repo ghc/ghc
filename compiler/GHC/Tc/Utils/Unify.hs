@@ -4197,7 +4197,7 @@ This is best understood by example.
      instance Outputable (XTickishId pass)
            => Outputable (GenTickish pass) where
    If we have [W] Outputable Int in the body, we don't want to fail to solve
-   it because (XTickckishId pass) might simplify to Int.
+   it because (XTickishId pass) might simplify to Int.
 
 7. C (Maybe alpha)  ~?  C alpha
 
