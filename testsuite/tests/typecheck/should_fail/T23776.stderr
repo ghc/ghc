@@ -1,4 +1,4 @@
-T23776.hs:8:6: error: [GHC-78249]
+T23776.hs:8:11: error: [GHC-78249]
     Illegal invisible type pattern: @b
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension

@@ -1337,17 +1337,18 @@ Syntax of applications in HsExpr
 Syntax of abstractions in Pat
 -----------------------------
 * Type patterns are represented in Pat roughly like this
-     data Pat = ConPat   ConLike [HsTyPat] [Pat]  -- (Con @tp1 @tp2 p1 p2)  (constructor pattern)
-              | EmbTyPat HsTyPat                  -- (type tp)              (embed a type into a pattern with `type`)
+     data Pat = ConPat   ConLike [Pat]  -- (Con @tp1 @tp2 p1 p2)  (constructor pattern)
+              | EmbTyPat HsTyPat        -- (type tp)              (embed a type into a pattern with `type`)
+              | InvisPat HsTyPat        -- (@tp)                  (invisible type pattern)
               | ...
      data HsTyPat = HsTP LHsType
   (In ConPat, the type and term arguments are actually inside HsConPatDetails.)
 
-  * Similar to HsAppType in HsExpr, the [HsTyPat] in ConPat is used just for @ty arguments
+  * Similar to HsAppType in HsExpr, InvisPat in ConPat is used for @ty arguments
   * Similar to HsEmbTy   in HsExpr, EmbTyPat lets you embed a type in a pattern
 
 * Examples:
-      \ (MkT @a  (x :: a)) -> rhs    -- ConPat (c.o. Pat) and HsConPatTyArg (c.o. HsConPatTyArg)
+      \ (MkT @a  (x :: a)) -> rhs    -- ConPat (c.o. Pat) and InvisPat (c.o. Pat)
       \ (type a) (x :: a)  -> rhs    -- EmbTyPat (c.o. Pat)
       \ a        (x :: a)  -> rhs    -- VarPat (c.o. Pat)
       \ @a       (x :: a)  -> rhs    -- InvisPat (c.o. Pat)

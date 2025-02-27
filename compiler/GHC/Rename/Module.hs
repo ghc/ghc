@@ -54,7 +54,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
-import GHC.Types.Basic (Arity)
+import GHC.Types.Basic (VisArity)
 import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
@@ -1932,7 +1932,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
     is_strict (HsSrcBang _ (HsBang _ s)) = isSrcStrict s
 
     con_args (ConDeclGADT { con_g_args = PrefixConGADT _ args }) = args
-    con_args (ConDeclH98 { con_args = PrefixCon _ args }) = args
+    con_args (ConDeclH98 { con_args = PrefixCon args }) = args
     con_args (ConDeclH98 { con_args = InfixCon arg1 arg2 }) = [arg1, arg2]
     con_args _ = []
 
@@ -2481,9 +2481,9 @@ rnConDeclH98Details ::
    -> HsDocContext
    -> HsConDeclH98Details GhcPs
    -> RnM (HsConDeclH98Details GhcRn, FreeVars)
-rnConDeclH98Details _ doc (PrefixCon _ tys)
+rnConDeclH98Details _ doc (PrefixCon tys)
   = do { (new_tys, fvs) <- mapFvRn (rnScaledLHsType doc) tys
-       ; return (PrefixCon noTypeArgs new_tys, fvs) }
+       ; return (PrefixCon new_tys, fvs) }
 rnConDeclH98Details _ doc (InfixCon ty1 ty2)
   = do { (new_ty1, fvs1) <- rnScaledLHsType doc ty1
        ; (new_ty2, fvs2) <- rnScaledLHsType doc ty2
@@ -2551,20 +2551,20 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
           bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
           let field_occs = map ((\ f -> L (noAnnSrcSpan $ getLocA (foLabel f)) f) . recordPatSynField) as
           flds <- mapM (newRecordFieldLabel dup_fields_ok has_sel [bnd_name]) field_occs
-          let con_info = mkConInfo ConIsPatSyn (conDetailsArity length (RecCon as)) flds
+          let con_info = mkConInfo ConIsPatSyn (conDetailsVisArity (RecCon as)) flds
           return ((PatSynName bnd_name, con_info) : names)
       | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n, psb_args = as })) <- bind
       = do
         bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
-        let con_info = mkConInfo ConIsPatSyn (conDetailsArity length as) []
+        let con_info = mkConInfo ConIsPatSyn (conDetailsVisArity as) []
         return ((PatSynName bnd_name, con_info) : names)
       | otherwise
       = return names
 
-conDetailsArity :: (rec -> Arity) -> HsConDetails tyarg arg rec -> Arity
-conDetailsArity recToArity = \case
-  PrefixCon _ args -> length args
-  RecCon rec -> recToArity rec
+conDetailsVisArity :: HsPatSynDetails (GhcPass p) -> VisArity
+conDetailsVisArity = \case
+  PrefixCon args -> length args
+  RecCon rec -> length rec
   InfixCon _ _ -> 2
 
 {-

@@ -108,7 +108,6 @@
            []
            (Nothing)
            (PrefixCon
-            []
             [(HsScaled
               (HsLinearArrow
                (EpPct1
@@ -173,7 +172,6 @@
            []
            (Nothing)
            (PrefixCon
-            []
             [(HsScaled
               (HsLinearArrow
                (EpPct1

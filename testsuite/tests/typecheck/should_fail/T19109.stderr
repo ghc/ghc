@@ -1,4 +1,4 @@
-T19109.hs:6:4: error: [GHC-78249]
+T19109.hs:6:13: error: [GHC-78249]
     Illegal invisible type pattern: @Int
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension

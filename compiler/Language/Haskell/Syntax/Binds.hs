@@ -35,7 +35,6 @@ import Language.Haskell.Syntax.Basic ( Fixity )
 import GHC.Types.Basic (InlinePragma)
 import GHC.Types.SourceText (StringLiteral)
 
-import Data.Void
 import Data.Bool
 import Data.Maybe
 
@@ -461,7 +460,7 @@ isCompleteMatchSig _                            = False
 -}
 
 -- | Haskell Pattern Synonym Details
-type HsPatSynDetails pass = HsConDetails Void (LIdP pass) [RecordPatSynField pass]
+type HsPatSynDetails pass = HsConDetails (LIdP pass) [RecordPatSynField pass]
 
 -- See Note [Record PatSyn Fields]
 -- | Record Pattern Synonym Field
