@@ -50,7 +50,6 @@ import GHC.Types.Name.Cache
 import GHC.Types.SrcLoc
 import GHC.Platform
 import GHC.Settings.Constants
---import GHC.Utils.Fingerprint
 import GHC.Iface.Type (IfaceType(..), getIfaceType, putIfaceType, ifaceTypeSharedByte)
 
 import Control.Monad
@@ -175,7 +174,6 @@ readBinIface profile name_cache checkHiWay traceBinIface hi_path = do
     mod_iface <- getIfaceWithExtFields name_cache bh
 
     return $ mod_iface
---      & addSourceFingerprint src_hash
 
 
 getIfaceWithExtFields :: NameCache -> ReadBinHandle -> IO ModIface

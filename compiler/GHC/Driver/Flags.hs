@@ -1337,7 +1337,6 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnDataKindsTC,
         Opt_WarnTypeEqualityOutOfScope,
         Opt_WarnViewPatternSignatures,
-        Opt_WarnTypeEqualityRequiresOperators,
         Opt_WarnReifyModuleMissingInfo
       ]
 
