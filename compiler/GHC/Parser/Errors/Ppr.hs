@@ -461,12 +461,6 @@ instance Diagnostic PsMessage where
       -> let msg  = parse_error_in_pat
              body = case details of
                  PEIP_NegApp -> text "-" <> ppr s
-                 PEIP_TypeArgs peipd_tyargs
-                   | not (null peipd_tyargs) -> ppr s <+> vcat [
-                               hsep (map ppr peipd_tyargs)
-                             , text "Type applications in patterns are only allowed on data constructors."
-                             ]
-                   | otherwise -> ppr s
                  PEIP_OtherPatDetails (ParseContext (Just fun) _)
                   -> ppr s <+> text "In a function binding for the"
                                      <+> quotes (ppr fun)

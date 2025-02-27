@@ -558,17 +558,17 @@ pat_to_type (ConPat _ lname (InfixCon left right))
        ; rty <- pat_to_type (unLoc right)
        ; let { t = noLocA (HsOpTy noExtField NotPromoted lty lname rty)}
        ; pure t }
-pat_to_type (ConPat _ lname (PrefixCon invis_args vis_args))
-  = do { let { appHead = noLocA (HsTyVar noAnn NotPromoted lname)}
-       ; ty_invis <- foldM apply_invis_arg appHead invis_args
-       ; tys_vis <- traverse (pat_to_type . unLoc) vis_args
-       ; let t = foldl' mkHsAppTy ty_invis tys_vis
-       ; pure t }
+pat_to_type (ConPat _ lname (PrefixCon args))
+  = do { let { appHead = noLocA (HsTyVar noAnn NotPromoted lname) }
+       ; foldM apply_arg appHead args }
       where
-        apply_invis_arg :: LHsType GhcRn -> HsConPatTyArg GhcRn -> WriterT HsTyPatRnBuilder TcM (LHsType GhcRn)
-        apply_invis_arg !t (HsConPatTyArg _ (HsTP argx arg))
+        apply_arg :: LHsType GhcRn -> LPat GhcRn -> WriterT HsTyPatRnBuilder TcM (LHsType GhcRn)
+        apply_arg !t (L _ (InvisPat _ (HsTP argx arg)))
           = do { tell (builderFromHsTyPatRn argx)
                ; pure (mkHsAppKindTy noExtField t arg)}
+        apply_arg !t (L _ p)
+          = do { ty_p <- pat_to_type p
+               ; pure (mkHsAppTy t ty_p)}
 
 pat_to_type pat = lift $
   failWith $ TcRnIllformedTypePattern pat
@@ -1595,19 +1595,32 @@ tcConValArgs :: ConLike
              -> [Scaled TcSigmaTypeFRR]
              -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcTc)
 tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
-  PrefixCon type_args arg_pats -> do
-        -- NB: type_args already dealt with
+  PrefixCon arg_pats -> do
+        -- NB: Type arguments already dealt with by splitConTyArgs, tcConTyArgs.
         -- See Note [Type applications in patterns]
-        { checkTc (con_arity == no_of_args)     -- Check correct arity
-                  (TcRnArityMismatch (AConLike con_like) con_arity no_of_args)
+        { checkTc (con_arity == no_of_vis_args)     -- Check correct arity
+                  (TcRnArityMismatch (AConLike con_like) con_arity no_of_vis_args)
 
-        ; let pats_w_tys = zipEqual arg_pats arg_tys
+        -- Report /inner/ @-patterns as errors, e.g. in (ConP @t1 @t2 a @t3 b @t4)
+        -- that'd be @t3 and @t4. The prefix @t1 @t2 is handled outside tcConValArgs.
+        ; unless (null inner_invis_arg_pats) $ do
+            forM_ inner_invis_arg_pats $ \case
+              L loc (InvisPat _ tp) ->
+                setSrcSpanA loc $
+                addErrTc (TcRnIllegalInvisibleTypePattern tp InvisPatNoForall)
+              _ -> panic "tcConValArgs: expected InvisPat"
+            failM
+
+        ; let pats_w_tys = zipEqual vis_arg_pats arg_tys
         ; (arg_pats', res) <- tcMultiple tcConArg penv pats_w_tys thing_inside
 
-        ; return (PrefixCon type_args arg_pats', res) }
+        -- Return only /value/ patterns, all /type/ patterns are discarded.
+        -- This is also what tcMatchPats does, and Note [tcMatchPats] explains why.
+        ; return (PrefixCon arg_pats', res) }
     where
       con_arity  = conLikeArity con_like
-      no_of_args = length arg_pats
+      no_of_vis_args = length vis_arg_pats
+      (inner_invis_arg_pats, vis_arg_pats) = partition (isInvisArgPat . unLoc) (dropHsConPatTyArgs arg_pats)
 
   InfixCon p1 p2 -> do
         { checkTc (con_arity == 2)      -- Check correct arity
@@ -1677,12 +1690,12 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
 
 
 splitConTyArgs :: ConLike -> HsConPatDetails GhcRn
-               -> TcM ( [(HsConPatTyArg GhcRn, TyVar)]    -- Universals
-                      , [(HsConPatTyArg GhcRn, TyVar)] )  -- Existentials
+               -> TcM ( [(HsTyPat GhcRn, TyVar)]    -- Universals
+                      , [(HsTyPat GhcRn, TyVar)] )  -- Existentials
 -- See Note [Type applications in patterns] (W4)
 -- This function is monadic only because of the error check
 -- for too many type arguments
-splitConTyArgs con_like (PrefixCon type_args _)
+splitConTyArgs con_like (PrefixCon arg_pats)
   = do { checkTc (type_args `leLength` con_spec_bndrs)
                  (TcRnTooManyTyArgsInConPattern con_like
                           (length con_spec_bndrs) (length type_args))
@@ -1690,6 +1703,7 @@ splitConTyArgs con_like (PrefixCon type_args _)
          then return (bndr_ty_arg_prs, [])
          else return (partition is_universal bndr_ty_arg_prs) }
   where
+    type_args = takeHsConPatTyArgs arg_pats
     ex_tvs = conLikeExTyCoVars con_like
     con_spec_bndrs = [ tv | Bndr tv SpecifiedSpec <- conLikeUserTyVarBinders con_like ]
         -- conLikeUserTyVarBinders: see (W3) in
@@ -1706,13 +1720,13 @@ splitConTyArgs con_like (PrefixCon type_args _)
 splitConTyArgs _ (RecCon {})   = return ([], []) -- No type args in RecCon
 splitConTyArgs _ (InfixCon {}) = return ([], []) -- No type args in InfixCon
 
-tcConTyArgs :: Subst -> PatEnv -> [(HsConPatTyArg GhcRn, TyVar)]
+tcConTyArgs :: Subst -> PatEnv -> [(HsTyPat GhcRn, TyVar)]
             -> TcM a -> TcM a
 tcConTyArgs tenv penv prs thing_inside
   = tcMultiple_ (tcConTyArg tenv) penv prs thing_inside
 
-tcConTyArg :: Subst -> Checker (HsConPatTyArg GhcRn, TyVar) ()
-tcConTyArg tenv penv (HsConPatTyArg _ rn_ty, con_tv) thing_inside
+tcConTyArg :: Subst -> Checker (HsTyPat GhcRn, TyVar) ()
+tcConTyArg tenv penv (rn_ty, con_tv) thing_inside
   = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsTyPat rn_ty (substTy tenv (varType con_tv))
 
        ; case NE.nonEmpty sig_ibs of
