@@ -2015,6 +2015,8 @@ lookupGREInfo hsc_env nm
   -- and looks up the TyThing in the type environment.
   --
   -- See Note [Retrieving the GREInfo from interfaces] in GHC.Types.GREInfo.
+  -- Note: This function is very similar to 'tcIfaceGlobal', it would be better to
+  -- use that if possible.
   = case nameModule_maybe nm of
       Nothing  -> UnboundGRE
       Just mod ->
