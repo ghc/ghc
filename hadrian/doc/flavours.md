@@ -107,7 +107,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O2</td>
   </tr>
   <tr>
-    <th>release (same as perf with -haddock)</td>
+    <th>release (same as perf with -haddock and +no_self_recomp)</td>
     <td></td>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
@@ -328,6 +328,10 @@ The supported transformers are listed below:
     <tr>
         <td><code>dump_stg</code></td>
         <td>Dump STG of all modules compiled by a stage1 compiler to a file</td>
+    </tr>
+    <tr>
+        <td><code>no_self_recomp</code></td>
+        <td>Disable including self-recompilation information in interface files via <code>-fno-write-if-self-recomp</code>. If you are building a distribution you can enable this flag to produce more deterministic interface files.</td>
     </tr>
 </table>
 

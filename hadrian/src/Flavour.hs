@@ -16,6 +16,7 @@ module Flavour
   , disableProfiledLibs
   , enableLinting
   , enableHaddock
+  , disableSelfRecompInfo
   , enableHiCore
   , useNativeBignum
   , enableTextWithSIMDUTF
@@ -67,6 +68,7 @@ flavourTransformers = M.fromList
     , "debug_stage1_ghc" =: debugGhc Stage1
     , "lint"             =: enableLinting
     , "haddock"          =: enableHaddock
+    , "no_self_recomp"   =: disableSelfRecompInfo
     , "hi_core"          =: enableHiCore
     , "late_ccs"         =: enableLateCCS
     , "boot_nonmoving_gc" =: enableBootNonmovingGc
@@ -206,6 +208,17 @@ enableHaddock =
   where
     haddock = mconcat
       [ arg "-haddock"
+      ]
+
+-- | Disable self recompilation information in interface files
+disableSelfRecompInfo :: Flavour -> Flavour
+disableSelfRecompInfo =
+    addArgs $ stage1 ? mconcat
+      [ builder (Ghc CompileHs) ? selfRecomp
+      ]
+  where
+    selfRecomp = mconcat
+      [ arg "-fno-write-if-self-recomp"
       ]
 
 -- | Build stage2 dependencies with options to emit Core into
