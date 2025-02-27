@@ -1,0 +1,15 @@
+cabal-version:      3.0
+name:               rts-fs
+version:            1.0.0.0
+license:            NONE
+author:             Andrea Bedini
+maintainer:         andrea@andreabedini.com
+build-type:         Simple
+extra-doc-files:    README
+extra-source-files: fs.h
+
+library
+    c-sources:        fs.c
+    include-dirs:     .
+    install-includes: fs.h
+    default-language: Haskell2010

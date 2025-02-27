@@ -39,7 +39,6 @@ extra-source-files:
     include/HsBaseConfig.h.in
     include/ieee-flpt.h
     include/md5.h
-    include/fs.h
     include/winio_structs.h
     include/WordSize.h
     include/HsIntegerGmp.h.in
@@ -119,7 +118,8 @@ Library
         Unsafe
 
     build-depends:
-        rts == 1.0.*
+        rts == 1.0.*,
+        rts-fs == 1.0.*
 
     exposed-modules:
         GHC.Internal.ClosureTypes
@@ -434,7 +434,6 @@ Library
           cbits/md5.c
           cbits/primFloat.c
           cbits/sysconf.c
-          cbits/fs.c
           cbits/strerror.c
           cbits/atomic.c
           cbits/bswap.c

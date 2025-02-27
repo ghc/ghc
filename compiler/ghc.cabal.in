@@ -81,8 +81,6 @@ Library
     Exposed: False
 
     Includes: Unique.h
-              -- CodeGen.Platform.h -- invalid as C, skip
-              -- shared with rts via symlink
 
     if flag(build-tool-depends)
       build-tool-depends: alex:alex >= 3.2.6, happy:happy >= 1.20.0, genprimopcode:genprimopcode, deriveConstants:deriveConstants

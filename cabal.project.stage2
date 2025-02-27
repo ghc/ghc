@@ -2,6 +2,7 @@ package-dbs: clear, global
 
 packages:
   rts-headers
+  rts-fs
   rts
 
   libraries/ghc-prim
@@ -72,7 +73,7 @@ active-repositories: :none
 
 constraints:
   -- we do not want to use the rts-headers from stage1
-  rts-headers source
+  rts-headers source, rts-fs source
 
 package *
   library-vanilla: True

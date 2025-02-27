@@ -1,4 +1,2 @@
 This "fs" library, used by various ghc utilities is used to share some common
 I/O filesystem functions with different packages.
-
-This file is copied across the build-system by configure.

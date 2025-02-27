@@ -43,29 +43,9 @@ all: _build/booted # booted will depend on prepare-sources
 # --- Configuration ---
 
 # booted depends on successful source preparation
-_build/booted: _build/prepare-sources
+_build/booted:
 	@echo ">>> Running ./boot script..."
 	./boot
-	mkdir -p _build
-	touch $@
-
-# --- Prepare Sources Target (replaces Haskell's prepareGhcSources) ---
-# --- FIXME: This is nonsense and needs to die.
-_build/prepare-sources: $(CONFIGURED_FILES)
-	@echo ">>> Preparing sources (copying files)..."
-
-	mkdir -p libraries/ghc-internal/include
-	mkdir -p libraries/ghc-internal/cbits
-
-	cp -fp utils/fs/fs.h libraries/ghc-internal/include/
-	cp -fp utils/fs/fs.c libraries/ghc-internal/cbits/
-
-	cp -fp utils/fs/fs.c rts/
-	cp -fp utils/fs/fs.h rts/
-	cp -fp utils/fs/fs.c utils/unlit/
-	cp -fp utils/fs/fs.h utils/unlit/
-
-	@echo ">>> Source preparation complete."
 	mkdir -p _build
 	touch $@
 

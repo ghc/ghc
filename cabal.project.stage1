@@ -6,6 +6,7 @@ packages:
   --       headers around, now it has them through the rts -> rts-headers
   --       dependency.
   rts-headers
+  rts-fs
 
   -- other packages.
   ghc/

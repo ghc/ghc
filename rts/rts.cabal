@@ -55,7 +55,6 @@ extra-source-files:
     FileLock.h
     ForeignExports.h
     fs_rts.h
-    fs.h
     GetEnv.h
     GetTime.h
     Globals.h
@@ -747,7 +746,6 @@ library
                  sm/Scav_thr.c
                  sm/Storage.c
                  sm/Sweep.c
-                 fs.c
                  -- I wish we had wildcards..., this would be:
                  -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
 
@@ -792,7 +790,8 @@ library
                     -- from Ticker.c
 
     build-depends:
-      rts-headers
+      rts-headers,
+      rts-fs
 
 -- Note [Undefined symbols in the RTS]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
