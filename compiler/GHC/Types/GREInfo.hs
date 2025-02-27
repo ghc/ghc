@@ -263,7 +263,7 @@ instance NFData ConFieldInfo where
   rnf ConHasPositionalArgs = ()
   rnf (ConHasRecordFields flds) = rnf flds
 
-mkConInfo :: ConLikeInfo -> Arity -> [FieldLabel] -> ConInfo
+mkConInfo :: ConLikeInfo -> VisArity -> [FieldLabel] -> ConInfo
 mkConInfo con_ty n flds =
   ConInfo { conLikeInfo  = con_ty
           , conFieldInfo = mkConFieldInfo n flds }

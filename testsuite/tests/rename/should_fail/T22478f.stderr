@@ -1,8 +1,8 @@
-
-T22478f.hs:8:4: error: [GHC-49957] [-Wunticked-promoted-constructors, Werror=unticked-promoted-constructors]
+T22478f.hs:8:6: error: [GHC-49957] [-Wunticked-promoted-constructors, Werror=unticked-promoted-constructors]
     Unticked promoted list.
     Suggested fix: Add a promotion tick, e.g. '[x,y,z].
 
-T22478f.hs:9:4: error: [GHC-49957] [-Wunticked-promoted-constructors, Werror=unticked-promoted-constructors]
+T22478f.hs:9:6: error: [GHC-49957] [-Wunticked-promoted-constructors, Werror=unticked-promoted-constructors]
     Unticked promoted constructor: :-
     Suggested fix: Use ':- instead of :-
+

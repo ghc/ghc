@@ -1,3 +1,18 @@
+TyAppPat_MisplacedApplication.hs:10:13: error: [GHC-14964]
+    • Illegal invisible type pattern: @a
+      An invisible type pattern must be checked against a forall.
+    • In the pattern: MkT x @a y
+      In an equation for ‘foo1’: foo1 (MkT x @a y) = (x :: a)
 
-TyAppPat_MisplacedApplication.hs:9:6: error: [GHC-07626]
-    Parse error in pattern: MkT x
+TyAppPat_MisplacedApplication.hs:11:13: error: [GHC-14964]
+    • Illegal invisible type pattern: @a
+      An invisible type pattern must be checked against a forall.
+    • In the pattern: MkT x @a y @b
+      In an equation for ‘foo2’: foo2 (MkT x @a y @b) = (x :: a)
+
+TyAppPat_MisplacedApplication.hs:11:18: error: [GHC-14964]
+    • Illegal invisible type pattern: @b
+      An invisible type pattern must be checked against a forall.
+    • In the pattern: MkT x @a y @b
+      In an equation for ‘foo2’: foo2 (MkT x @a y @b) = (x :: a)
+

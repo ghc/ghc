@@ -729,7 +729,7 @@ renameH98Details
 renameH98Details (RecCon (L l fields)) = do
   fields' <- mapM renameConDeclFieldField fields
   return (RecCon (L (locA l) fields'))
-renameH98Details (PrefixCon ts ps) = PrefixCon ts <$> mapM renameHsScaled ps
+renameH98Details (PrefixCon ps) = PrefixCon <$> mapM renameHsScaled ps
 renameH98Details (InfixCon a b) = do
   a' <- renameHsScaled a
   b' <- renameHsScaled b

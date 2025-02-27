@@ -108,7 +108,6 @@ import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parse
 import Control.Monad
 import Control.Exception (assert)
 import Data.Data        hiding (TyCon, Fixity, Infix)
-import Data.Void
 import Data.Maybe
 import Data.String
 import Data.Eq
@@ -1116,7 +1115,7 @@ or contexts in two parts:
 
 -- | The arguments in a Haskell98-style data constructor.
 type HsConDeclH98Details pass
-   = HsConDetails Void (HsScaled pass (LBangType pass)) (XRec pass [LConDeclField pass])
+   = HsConDetails (HsScaled pass (LBangType pass)) (XRec pass [LConDeclField pass])
 -- The Void argument to HsConDetails here is a reflection of the fact that
 -- type applications are not allowed in data constructor declarations.
 

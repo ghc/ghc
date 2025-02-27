@@ -2364,11 +2364,10 @@ instance ExactPrint (PatSynBind GhcPs GhcPs) where
           psyn' <- markAnnotated psyn
           v2' <- markAnnotated v2
           return (ao, ac, psyn',InfixCon v1' v2')
-        PrefixCon tvs vs -> do
+        PrefixCon vs -> do
           psyn' <- markAnnotated psyn
-          tvs' <- markAnnotated tvs
           vs' <- markAnnotated vs
-          return (ao, ac, psyn', PrefixCon tvs' vs')
+          return (ao, ac, psyn', PrefixCon vs')
         RecCon vs -> do
           psyn' <- markAnnotated psyn
           ao' <- mapM markEpToken ao
@@ -4318,11 +4317,10 @@ instance ExactPrint (ConDecl GhcPs) where
         con' <- markAnnotated con
         t2' <- markAnnotated t2
         return (con', InfixCon t1' t2')
-      exact_details (PrefixCon tyargs tys) = do
+      exact_details (PrefixCon tys) = do
         con' <- markAnnotated con
-        tyargs' <- markAnnotated tyargs
         tys' <- markAnnotated tys
-        return (con', PrefixCon tyargs' tys')
+        return (con', PrefixCon tys')
       exact_details (RecCon fields) = do
         con' <- markAnnotated con
         fields' <- markAnnotated fields
@@ -4796,20 +4794,11 @@ exactUserCon (open,close) c details = do
   close' <- mapM markEpToken close
   return ((open', close'), c', details')
 
-instance ExactPrint (HsConPatTyArg GhcPs) where
-  getAnnotationEntry _ = NoEntryVal
-  setAnnotationAnchor a _ _ _ = a
-  exact (HsConPatTyArg at tyarg) = do
-    at' <- markEpToken at
-    tyarg' <- markAnnotated tyarg
-    return (HsConPatTyArg at' tyarg')
-
 exactConArgs :: (Monad m, Monoid w)
   => HsConPatDetails GhcPs -> EP w m (HsConPatDetails GhcPs)
-exactConArgs (PrefixCon tyargs pats) = do
-  tyargs' <- markAnnotated tyargs
+exactConArgs (PrefixCon pats) = do
   pats' <- markAnnotated pats
-  return (PrefixCon tyargs' pats')
+  return (PrefixCon pats')
 exactConArgs (InfixCon p1 p2) = do
   p1' <- markAnnotated p1
   p2' <- markAnnotated p2
