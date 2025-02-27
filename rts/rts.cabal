@@ -613,7 +613,9 @@ library
           Jumps_V32.cmm
           Jumps_V64.cmm
 
-      -- we always link against libffi, even without libffi-adjustors
+      -- we always link against libffi, even without libffi-adjustors enabled.
+      -- libffi is used by the Interpreter and some of its symbols are declared
+      -- in RtsSymbols.c
       extra-libraries: ffi
       extra-libraries-static: ffi
 
