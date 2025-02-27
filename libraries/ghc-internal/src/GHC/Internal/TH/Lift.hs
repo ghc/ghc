@@ -594,6 +594,6 @@ dataToPatQ = dataToQa id litP conP
             case nameSpace n of
                 Just DataName -> do
                     ps' <- sequence ps
-                    return (ConP n [] ps')
+                    return (ConP n ps')
                 _ -> error $ "Can't construct a pattern from name "
                           ++ showName n

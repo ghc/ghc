@@ -324,7 +324,7 @@ module Language.Haskell.TH where
   type ParentName :: *
   type ParentName = Name
   type Pat :: *
-  data Pat = LitP Lit | VarP Name | TupP [Pat] | UnboxedTupP [Pat] | UnboxedSumP Pat SumAlt SumArity | ConP Name [Type] [Pat] | InfixP Pat Name Pat | UInfixP Pat Name Pat | ParensP Pat | TildeP Pat | BangP Pat | AsP Name Pat | WildP | RecP Name [FieldPat] | ListP [Pat] | SigP Pat Type | ViewP Exp Pat | TypeP Type | InvisP Type | OrP (GHC.Internal.Base.NonEmpty Pat)
+  data Pat = LitP Lit | VarP Name | TupP [Pat] | UnboxedTupP [Pat] | UnboxedSumP Pat SumAlt SumArity | ConP Name [Pat] | InfixP Pat Name Pat | UInfixP Pat Name Pat | ParensP Pat | TildeP Pat | BangP Pat | AsP Name Pat | WildP | RecP Name [FieldPat] | ListP [Pat] | SigP Pat Type | ViewP Exp Pat | TypeP Type | InvisP Type | OrP (GHC.Internal.Base.NonEmpty Pat)
   type PatQ :: *
   type PatQ = Q Pat
   type PatSynArgs :: *
@@ -1324,7 +1324,7 @@ module Language.Haskell.TH.Lib.Internal where
   compE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Exp
   conE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Exp
   conK :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Kind
-  conP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Type] -> [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Pat
+  conP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Pat
   conT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type
   condE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   constrainedE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
@@ -2011,7 +2011,7 @@ module Language.Haskell.TH.Syntax where
   type ParentName :: *
   type ParentName = Name
   type Pat :: *
-  data Pat = LitP Lit | VarP Name | TupP [Pat] | UnboxedTupP [Pat] | UnboxedSumP Pat SumAlt SumArity | ConP Name [Type] [Pat] | InfixP Pat Name Pat | UInfixP Pat Name Pat | ParensP Pat | TildeP Pat | BangP Pat | AsP Name Pat | WildP | RecP Name [FieldPat] | ListP [Pat] | SigP Pat Type | ViewP Exp Pat | TypeP Type | InvisP Type | OrP (GHC.Internal.Base.NonEmpty Pat)
+  data Pat = LitP Lit | VarP Name | TupP [Pat] | UnboxedTupP [Pat] | UnboxedSumP Pat SumAlt SumArity | ConP Name [Pat] | InfixP Pat Name Pat | UInfixP Pat Name Pat | ParensP Pat | TildeP Pat | BangP Pat | AsP Name Pat | WildP | RecP Name [FieldPat] | ListP [Pat] | SigP Pat Type | ViewP Exp Pat | TypeP Type | InvisP Type | OrP (GHC.Internal.Base.NonEmpty Pat)
   type PatSynArgs :: *
   data PatSynArgs = PrefixPatSyn [Name] | InfixPatSyn Name Name | RecordPatSyn [Name]
   type PatSynDir :: *

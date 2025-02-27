@@ -1489,8 +1489,8 @@ cvtp (UnboxedSumP p alt arity)
                        = do { p' <- cvtPat p
                             ; unboxedSumChecks alt arity
                             ; return $ SumPat noAnn p' alt arity }
-cvtp (ConP s ts ps)    = do { s' <- dNameN s
-                            ; ps' <- cvtPats (map InvisP ts ++ ps)
+cvtp (ConP s ps)       = do { s' <- dNameN s
+                            ; ps' <- cvtPats ps
                             ; let pps = map (parenthesizePat appPrec) ps'
                             ; return $ ConPat
                                 { pat_con_ext = noAnn

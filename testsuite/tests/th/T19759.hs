@@ -20,6 +20,6 @@ $(do let mkT' = mkName "MkT'"
      pure [ PatSynSigD mkT' $ ForallT [] [] $ ForallT [PlainTV b SpecifiedSpec] []
                             $ ArrowT `AppT` VarT a `AppT` (ArrowT `AppT` VarT b `AppT` (ConT ''T `AppT` VarT a))
           , PatSynD mkT' (PrefixPatSyn [x, y]) ImplBidir $
-              ConP 'MkT [] [VarP x, VarP y]
+              ConP 'MkT [VarP x, VarP y]
           ])
 

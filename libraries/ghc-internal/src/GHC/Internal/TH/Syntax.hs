@@ -1774,7 +1774,7 @@ data Pat
   | TupP [Pat]                      -- ^ @{ (p1,p2) }@
   | UnboxedTupP [Pat]               -- ^ @{ (\# p1,p2 \#) }@
   | UnboxedSumP Pat SumAlt SumArity -- ^ @{ (\#|p|\#) }@
-  | ConP Name [Type] [Pat]          -- ^ @data T1 = C1 t1 t2; {C1 \@ty1 p1 p2} = e@
+  | ConP Name [Pat]                 -- ^ @data T1 = C1 t1 t2; {C1 \@ty1 p1 p2} = e@
   | InfixP Pat Name Pat             -- ^ @foo ({x :+ y}) = e@
   | UInfixP Pat Name Pat            -- ^ @foo ({x :+ y}) = e@
                                     --

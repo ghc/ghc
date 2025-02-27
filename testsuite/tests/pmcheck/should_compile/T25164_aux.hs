@@ -19,7 +19,7 @@ genDoBlock = do
   let doBlock =
         DoE Nothing
         [ BindS
-            ( ConP 'Value [ ] [ VarP argNm ] )
+            ( ConP 'Value [ VarP argNm ] )
             ( AppE ( ConE 'Identity ) ( AppE ( ConE 'Value ) ( ConE '() ) ) )
         , NoBindS $
             AppE ( VarE 'pure ) ( VarE argNm )

@@ -370,14 +370,13 @@ pprPat i (LitP l)     = pprLit i l
 pprPat _ (VarP v)     = pprName' Applied v
 pprPat i (TupP ps)
   | [_] <- ps
-  = pprPat i (ConP (tupleDataName 1) [] ps)
+  = pprPat i (ConP (tupleDataName 1) ps)
   | otherwise
   = parens (commaSep ps)
 pprPat _ (UnboxedTupP ps) = hashParens (commaSep ps)
 pprPat _ (UnboxedSumP p alt arity) = unboxedSumBars (ppr p) alt arity
-pprPat i (ConP s ts ps)  = parensIf (i >= appPrec) $
+pprPat i (ConP s ps)  = parensIf (i >= appPrec) $
       pprName' Applied s
-  <+> sep (map (\t -> char '@' <> pprParendType t) ts)
   <+> sep (map (pprPat appPrec) ps)
 pprPat _ (ParensP p)  = parens $ pprPat noPrec p
 pprPat i (UInfixP p1 n p2)

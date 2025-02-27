@@ -392,4 +392,4 @@ mdoE = Internal.mdoE Nothing
 -- * Patterns
 
 conP :: Quote m => Name -> [m Pat] -> m Pat
-conP n xs = Internal.conP n [] xs
+conP n xs = Internal.conP n xs

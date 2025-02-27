@@ -36,8 +36,8 @@ True
 True
 InfixE (Just (InfixE (Just (ConE TH_unresolvedInfix_Lib.N)) (ConE TH_unresolvedInfix_Lib.:*) (Just (ConE TH_unresolvedInfix_Lib.N)))) (ConE TH_unresolvedInfix_Lib.:+) (Just (ConE TH_unresolvedInfix_Lib.N))
 InfixE (Just (InfixE (Just (ConE TH_unresolvedInfix_Lib.N)) (ConE TH_unresolvedInfix_Lib.:*) (Just (ConE TH_unresolvedInfix_Lib.N)))) (ConE TH_unresolvedInfix_Lib.:+) (Just (ConE TH_unresolvedInfix_Lib.N))
-InfixP (InfixP (ConP TH_unresolvedInfix_Lib.N [] []) TH_unresolvedInfix_Lib.:* (ConP TH_unresolvedInfix_Lib.N [] [])) TH_unresolvedInfix_Lib.:+ (ConP TH_unresolvedInfix_Lib.N [] [])
-InfixP (InfixP (ConP TH_unresolvedInfix_Lib.N [] []) TH_unresolvedInfix_Lib.:* (ConP TH_unresolvedInfix_Lib.N [] [])) TH_unresolvedInfix_Lib.:+ (ConP TH_unresolvedInfix_Lib.N [] [])
+InfixP (InfixP (ConP TH_unresolvedInfix_Lib.N []) TH_unresolvedInfix_Lib.:* (ConP TH_unresolvedInfix_Lib.N [])) TH_unresolvedInfix_Lib.:+ (ConP TH_unresolvedInfix_Lib.N [])
+InfixP (InfixP (ConP TH_unresolvedInfix_Lib.N []) TH_unresolvedInfix_Lib.:* (ConP TH_unresolvedInfix_Lib.N [])) TH_unresolvedInfix_Lib.:+ (ConP TH_unresolvedInfix_Lib.N [])
 AppT (AppT (ConT TH_unresolvedInfix_Lib.+) (AppT (AppT (ConT TH_unresolvedInfix_Lib.*) (ConT GHC.Internal.Types.Int)) (ConT GHC.Internal.Types.Int))) (ConT GHC.Internal.Types.Int)
 AppT (AppT (ConT TH_unresolvedInfix_Lib.+) (AppT (AppT (ConT TH_unresolvedInfix_Lib.*) (ConT GHC.Internal.Types.Int)) (ConT GHC.Internal.Types.Int))) (ConT GHC.Internal.Types.Int)
 N :+ (N :+ N :+ N)
