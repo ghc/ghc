@@ -111,7 +111,6 @@ import GHC.Types.Fixity
 import GHC.Types.Fixity.Env
 import GHC.Types.HpcInfo
 import GHC.Types.Name
-import GHC.Types.Name.Reader (IfGlobalRdrEnv)
 import GHC.Types.SafeHaskell
 import GHC.Types.SourceFile
 import GHC.Types.Unique.DSet
@@ -299,20 +298,13 @@ data ModIface_ (phase :: ModIfacePhase)
         mi_defaults_ :: [IfaceDefault],
                 -- ^ default declarations exported by the module
 
-        mi_top_env_  :: !(Maybe IfaceTopEnv),
+        mi_top_env_  :: IfaceTopEnv,
                 -- ^ Just enough information to reconstruct the top level environment in
                 -- the /original source/ code for this module. which
                 -- is NOT the same as mi_exports, nor mi_decls (which
                 -- may contains declarations for things not actually
                 -- defined by the user).  Used for GHCi and for inspecting
                 -- the contents of modules via the GHC API only.
-                --
-                -- (We need the source file to figure out the
-                -- top-level environment, if we didn't compile this module
-                -- from source then this field contains @Nothing@).
-                --
-                -- Strictly speaking this field should live in the
-                -- 'HomeModInfo', but that leads to more plumbing.
 
                 -- Instance declarations and rules
         mi_insts_       :: [IfaceClsInst],     -- ^ Sorted class instance
@@ -365,12 +357,22 @@ data ModIface_ (phase :: ModIfacePhase)
 -- Enough information to reconstruct the top level environment for a module
 data IfaceTopEnv
   = IfaceTopEnv
-  { ifaceTopExports :: !IfGlobalRdrEnv -- ^ all top level things in this module, including unexported stuff
+  { ifaceTopExports :: !DetOrdAvails -- ^ all top level things in this module, including unexported stuff
   , ifaceImports :: ![IfaceImport]    -- ^ all the imports in this module
   }
 
 instance NFData IfaceTopEnv where
   rnf (IfaceTopEnv a b) = rnf a `seq` rnf b
+
+instance Binary IfaceTopEnv where
+  put_ bh (IfaceTopEnv exports imports) = do
+    put_ bh exports
+    put_ bh imports
+  get bh = do
+    exports <- get bh
+    imports <- get bh
+    return (IfaceTopEnv exports imports)
+
 
 {-
 Note [Strictness in ModIface]
@@ -479,6 +481,7 @@ instance Binary ModIface where
                  mi_trust_     = trust,
                  mi_trust_pkg_ = trust_pkg,
                  mi_complete_matches_ = complete_matches,
+                 mi_top_env_    = top_env,
                  mi_docs_      = docs,
                  mi_ext_fields_ = _ext_fields, -- Don't `put_` this in the instance so we
                                               -- can deal with it's pointer in the header
@@ -526,6 +529,7 @@ instance Binary ModIface where
         put_ bh trust
         put_ bh trust_pkg
         put_ bh complete_matches
+        lazyPut bh top_env
         lazyPutMaybe bh docs
 
    get bh = do
@@ -560,6 +564,7 @@ instance Binary ModIface where
         trust       <- get bh
         trust_pkg   <- get bh
         complete_matches <- get bh
+        top_env     <- lazyGet bh
         docs        <- lazyGetMaybe bh
         return (PrivateModIface {
                  mi_module_      = mod,
@@ -582,7 +587,6 @@ instance Binary ModIface where
                  mi_decls_       = decls,
                  mi_extra_decls_ = extra_decls,
                  mi_foreign_     = foreign_,
-                 mi_top_env_     = Nothing,
                  mi_defaults_    = defaults,
                  mi_insts_       = insts,
                  mi_fam_insts_   = fam_insts,
@@ -593,6 +597,7 @@ instance Binary ModIface where
                         -- And build the cached values
                  mi_complete_matches_ = complete_matches,
                  mi_docs_        = docs,
+                 mi_top_env_     = top_env,
                  mi_ext_fields_  = emptyExtensibleFields, -- placeholder because this is dealt
                                                          -- with specially when the file is read
                  mi_final_exts_ = ModIfaceBackend {
@@ -613,8 +618,6 @@ instance Binary ModIface where
                  }})
 
 
--- | The original names declared of a certain module that are exported
-type IfaceExport = AvailInfo
 
 emptyPartialModIface :: Module -> PartialModIface
 emptyPartialModIface mod
@@ -638,7 +641,7 @@ emptyPartialModIface mod
         mi_decls_       = [],
         mi_extra_decls_ = Nothing,
         mi_foreign_     = emptyIfaceForeign,
-        mi_top_env_     = Nothing,
+        mi_top_env_     = IfaceTopEnv emptyDetOrdAvails [] ,
         mi_hpc_         = False,
         mi_trust_       = noIfaceTrustInfo,
         mi_trust_pkg_   = False,
@@ -810,15 +813,14 @@ addSourceFingerprint val iface = iface { mi_src_hash_ = val }
 
 -- | Copy fields that aren't serialised to disk to the new 'ModIface_'.
 -- This includes especially hashes that are usually stored in the interface
--- file header and 'mi_top_env'.
+-- file header.
 --
 -- We need this function after calling 'shareIface', to make sure the
 -- 'ModIface_' doesn't lose any information. This function does not discard
 -- the in-memory byte array buffer 'mi_hi_bytes'.
 restoreFromOldModIface :: ModIface_ phase -> ModIface_ phase -> ModIface_ phase
 restoreFromOldModIface old new = new
-  { mi_top_env_ = mi_top_env_ old
-  , mi_hsc_src_ = mi_hsc_src_ old
+  { mi_hsc_src_ = mi_hsc_src_ old
   , mi_src_hash_ = mi_src_hash_ old
   }
 
@@ -879,7 +881,7 @@ set_mi_extra_decls val iface = clear_mi_hi_bytes $ iface { mi_extra_decls_ = val
 set_mi_foreign :: IfaceForeign -> ModIface_ phase -> ModIface_ phase
 set_mi_foreign foreign_ iface = clear_mi_hi_bytes $ iface { mi_foreign_ = foreign_ }
 
-set_mi_top_env :: Maybe IfaceTopEnv -> ModIface_ phase -> ModIface_ phase
+set_mi_top_env :: IfaceTopEnv -> ModIface_ phase -> ModIface_ phase
 set_mi_top_env val iface = clear_mi_hi_bytes $ iface { mi_top_env_ = val }
 
 set_mi_hpc :: AnyHpcUsage -> ModIface_ phase -> ModIface_ phase
@@ -996,7 +998,7 @@ pattern ModIface ::
   [IfaceExport] -> Bool -> [(OccName, Fixity)] -> IfaceWarnings ->
   [IfaceAnnotation] -> [IfaceDeclExts phase] ->
   Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] -> IfaceForeign ->
-  [IfaceDefault] -> Maybe IfaceTopEnv -> [IfaceClsInst] -> [IfaceFamInst] -> [IfaceRule] ->
+  [IfaceDefault] -> IfaceTopEnv -> [IfaceClsInst] -> [IfaceFamInst] -> [IfaceRule] ->
   AnyHpcUsage -> IfaceTrustInfo -> Bool -> [IfaceCompleteMatch] -> Maybe Docs ->
   IfaceBackendExts phase -> ExtensibleFields -> Fingerprint -> IfaceBinHandle phase ->
   ModIface_ phase

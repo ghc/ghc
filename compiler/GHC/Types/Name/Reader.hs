@@ -133,6 +133,7 @@ import GHC.Unit.Module
 import GHC.Utils.Misc as Utils
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Binary
 
 import Control.DeepSeq
 import Control.Monad ( guard )
@@ -1945,6 +1946,22 @@ data ImpDeclSpec
 
 instance NFData ImpDeclSpec where
   rnf = rwhnf -- Already strict in all fields
+
+instance Binary ImpDeclSpec where
+  put_ bh (ImpDeclSpec mod as pkg_qual qual _dloc isboot) = do
+    put_ bh mod
+    put_ bh as
+    put_ bh pkg_qual
+    put_ bh qual
+    put_ bh isboot
+
+  get bh = do
+    mod <- get bh
+    as <- get bh
+    pkg_qual <- get bh
+    qual <- get bh
+    isboot <- get bh
+    return (ImpDeclSpec mod as pkg_qual qual noSrcSpan isboot)
 
 -- | Import Item Specification
 --

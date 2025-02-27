@@ -206,7 +206,7 @@ data ImportUserSpec
 
 data ImpUserList
   = ImpUserAll -- ^ no user import list
-  | ImpUserExplicit !GlobalRdrEnv
+  | ImpUserExplicit ![AvailInfo]
   | ImpUserEverythingBut !NameSet
 
 -- | A 'NameShape' is a substitution on 'Name's that can be used
