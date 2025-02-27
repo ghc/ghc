@@ -104,6 +104,7 @@ import GHC.Types.SourceText
 import GHC.Types.Basic hiding ( SuccessFlag(..) )
 import GHC.Types.CompleteMatch
 import GHC.Types.SrcLoc
+import GHC.Types.Avail
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet ( mkUniqDSet )
@@ -114,7 +115,7 @@ import GHC.Types.Literal
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Name
-import GHC.Types.Name.Reader
+import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.DefaultEnv ( ClassDefaults(..), defaultEnv )
 import GHC.Types.Id
@@ -2242,9 +2243,7 @@ hydrateCgBreakInfo CgBreakInfo{..} = do
 
 -- | This function is only used to construct the environment for GHCi,
 -- so we make up fake locations
-tcIfaceImport :: HscEnv -> IfaceImport -> ImportUserSpec
-tcIfaceImport _ (IfaceImport spec ImpIfaceAll) = ImpUserSpec spec ImpUserAll
-tcIfaceImport _ (IfaceImport spec (ImpIfaceEverythingBut ns)) = ImpUserSpec spec (ImpUserEverythingBut ns)
-tcIfaceImport hsc_env (IfaceImport spec (ImpIfaceExplicit gre)) = ImpUserSpec spec (ImpUserExplicit (hydrateGlobalRdrEnv get_GRE_info gre))
-  where
-    get_GRE_info nm = tyThingGREInfo <$> lookupGlobal hsc_env nm
+tcIfaceImport :: IfaceImport -> ImportUserSpec
+tcIfaceImport (IfaceImport spec ImpIfaceAll) = ImpUserSpec spec ImpUserAll
+tcIfaceImport (IfaceImport spec (ImpIfaceEverythingBut ns)) = ImpUserSpec spec (ImpUserEverythingBut (mkNameSet ns))
+tcIfaceImport (IfaceImport spec (ImpIfaceExplicit gre)) = ImpUserSpec spec (ImpUserExplicit (getDetOrdAvails gre))

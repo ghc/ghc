@@ -53,7 +53,7 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Driver.Config
 
-import GHC.Rename.Names (importsFromIface)
+import GHC.Rename.Names (importsFromIface, gresFromAvails)
 
 import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter as GHCi
@@ -113,6 +113,7 @@ import GHC.Types.TyThing
 import GHC.Types.Breakpoint
 import GHC.Types.Unique.Map
 
+import GHC.Types.Avail
 import GHC.Unit
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModIface
@@ -122,7 +123,7 @@ import GHC.Unit.Home.PackageTable
 
 import GHC.Tc.Module ( runTcInteractive, tcRnType, loadUnqualIfaces )
 import GHC.Tc.Solver (simplifyWantedsTcM)
-import GHC.Tc.Utils.Env (tcGetInstEnvs, lookupGlobal)
+import GHC.Tc.Utils.Env (tcGetInstEnvs)
 import GHC.Tc.Utils.Instantiate (instDFunType)
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Zonk.Env ( ZonkFlexi (SkolemiseFlexi) )
@@ -848,21 +849,25 @@ mkTopLevEnv hsc_env modl
       Nothing -> pure $ Left "not a home module"
       Just details ->
          case mi_top_env (hm_iface details) of
-                Nothing  -> pure $ Left "not interpreted"
-                Just (IfaceTopEnv exports imports) -> do
+                (IfaceTopEnv exports imports) -> do
                   imports_env <-
                         runInteractiveHsc hsc_env
                       $ ioMsgMaybe $ hoistTcRnMessage $ runTcInteractive hsc_env
                       $ fmap (foldr plusGlobalRdrEnv emptyGlobalRdrEnv)
                       $ forM imports $ \iface_import -> do
-                        let ImpUserSpec spec details = tcIfaceImport hsc_env iface_import
+                        let ImpUserSpec spec details = tcIfaceImport iface_import
                         iface <- loadSrcInterface (text "imported by GHCi") (moduleName $ is_mod spec) (is_isboot spec) (is_pkg_qual spec)
                         pure $ case details of
                           ImpUserAll -> importsFromIface hsc_env iface spec Nothing
                           ImpUserEverythingBut ns -> importsFromIface hsc_env iface spec (Just ns)
-                          ImpUserExplicit x -> x
-                  let get_GRE_info nm = tyThingGREInfo <$> lookupGlobal hsc_env nm
-                  let exports_env = hydrateGlobalRdrEnv get_GRE_info exports
+                          ImpUserExplicit x ->
+                            -- TODO: Not quite right, is_explicit should refer to whether the user wrote A(..) or A(x,y).
+                            -- It is only used for error messages. It seems dubious even to add an import context to these GREs as
+                            -- they are not "imported" into the top-level scope of the REPL. I changed this for now so that
+                            -- the test case produce the same output as before.
+                            let spec' = ImpSpec { is_decl = spec, is_item = ImpSome { is_explicit = True, is_iloc = noSrcSpan } }
+                            in mkGlobalRdrEnv $ gresFromAvails hsc_env (Just spec') x
+                  let exports_env = mkGlobalRdrEnv $ gresFromAvails hsc_env Nothing (getDetOrdAvails exports)
                   pure $ Right $ plusGlobalRdrEnv imports_env exports_env
   where
     hpt = hsc_HPT hsc_env
@@ -880,8 +885,8 @@ moduleIsInterpreted :: GhcMonad m => Module -> m Bool
 moduleIsInterpreted modl = withSession $ \h ->
  if notHomeModule (hsc_home_unit h) modl
         then return False
-        else liftIO (lookupHpt (hsc_HPT h) (moduleName modl)) >>= \case
-              Just details       -> return (isJust (mi_top_env (hm_iface details)))
+        else liftIO (HUG.lookupHugByModule modl (hsc_HUG h)) >>= \case
+              Just hmi       -> return (isJust $ homeModInfoByteCode hmi)
               _not_a_home_module -> return False
 
 -- | Looks up an identifier in the current interactive context (for :info)
