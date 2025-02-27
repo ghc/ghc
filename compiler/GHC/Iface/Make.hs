@@ -47,7 +47,6 @@ import GHC.Core.RoughMap ( RoughMatchTc(..) )
 
 import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
-import GHC.Driver.Backend
 import GHC.Driver.DynFlags
 import GHC.Driver.Plugins
 
@@ -395,15 +394,12 @@ mkIface_ hsc_env
      -- Desugar.addExportFlagsAndRules).  The mi_top_env field is used
      -- by GHCi to decide whether the module has its full top-level
      -- scope available. (#5534)
-     maybeGlobalRdrEnv :: GlobalRdrEnv -> Maybe IfaceTopEnv
+     maybeGlobalRdrEnv :: GlobalRdrEnv -> IfaceTopEnv
      maybeGlobalRdrEnv rdr_env
-        | backendWantsGlobalBindings (backend dflags)
-        = Just $! let !exports = forceGlobalRdrEnv (globalRdrEnvLocal rdr_env)
-                      !imports = mkIfaceImports import_decls
-                  in IfaceTopEnv exports imports
-          -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
         | otherwise
-        = Nothing
+        = let !exports = sortAvails $ gresToAvailInfo $ globalRdrEnvElts $ globalRdrEnvLocal rdr_env
+              !imports = mkIfaceImports import_decls
+           in IfaceTopEnv exports imports
 
      ifFamInstTcName = ifFamInstFam
 
@@ -515,8 +511,8 @@ mkIfaceImports :: [ImportUserSpec] -> [IfaceImport]
 mkIfaceImports = map go
   where
     go (ImpUserSpec decl ImpUserAll) = IfaceImport decl ImpIfaceAll
-    go (ImpUserSpec decl (ImpUserExplicit env)) = IfaceImport decl (ImpIfaceExplicit (forceGlobalRdrEnv env))
-    go (ImpUserSpec decl (ImpUserEverythingBut ns)) = IfaceImport decl (ImpIfaceEverythingBut ns)
+    go (ImpUserSpec decl (ImpUserExplicit env)) = IfaceImport decl (ImpIfaceExplicit (sortAvails env))
+    go (ImpUserSpec decl (ImpUserEverythingBut ns)) = IfaceImport decl (ImpIfaceEverythingBut (nameSetElemsStable ns))
 
 mkIfaceExports :: [AvailInfo] -> [IfaceExport] -- Sort to make canonical
 mkIfaceExports as = case sortAvails as of DefinitelyDeterministicAvails sas -> sas

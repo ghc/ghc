@@ -1189,7 +1189,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
             (gres, imp_user_list) = case want_hiding of
               Exactly ->
                 let gre_env = mkGlobalRdrEnv $ concatMap (gresFromIE decl_spec) items2
-                in (gre_env, ImpUserExplicit gre_env)
+                in (gre_env, ImpUserExplicit (gresToAvailInfo $ globalRdrEnvElts $ gre_env))
               EverythingBut ->
                 let hidden_names = mkNameSet $ concatMap (map greName . snd) items2
                 in (importsFromIface hsc_env iface decl_spec (Just hidden_names), ImpUserEverythingBut hidden_names)
