@@ -732,9 +732,9 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
            -- conAnn should only be AnnOpenP, AnnCloseP, so the rest should be empty
            ; let ann_fun = mk_ann_funrhs [] []
            ; match <- case details of
-               PrefixCon _ pats -> return $ Match { m_ext = noExtField
-                                                  , m_ctxt = ctxt, m_pats = L l pats
-                                                  , m_grhss = rhs }
+               PrefixCon pats -> return $ Match { m_ext = noExtField
+                                                , m_ctxt = ctxt, m_pats = L l pats
+                                                , m_grhss = rhs }
                    where
                      l = listLocation pats
                      ctxt = FunRhs { mc_fun = ln
@@ -1259,34 +1259,41 @@ checkPattern_details extraDetails pp = runPV_details extraDetails (pp >>= checkL
 
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
 checkLPat (L l@(EpAnn anc an _) p) = do
-  (L l' p', cs) <- checkPat (EpAnn anc an emptyComments) emptyComments (L l p) [] []
+  (L l' p', cs) <- checkPat (EpAnn anc an emptyComments) emptyComments (L l p) []
   return (L (addCommentsToEpAnn l' cs) p')
 
-checkPat :: SrcSpanAnnA -> EpAnnComments -> LocatedA (PatBuilder GhcPs) -> [HsConPatTyArg GhcPs] -> [LPat GhcPs]
+checkPat :: SrcSpanAnnA -> EpAnnComments -> LocatedA (PatBuilder GhcPs) -> [LPat GhcPs]
          -> PV (LPat GhcPs, EpAnnComments)
 -- SG: I think this function checks what Haskell2010 calls the `pat` and `lpat`
 -- productions
-checkPat loc cs (L l e@(PatBuilderVar (L ln c))) tyargs args
+checkPat loc cs (L l e@(PatBuilderVar (L ln c))) args
   | isRdrDataCon c || isRdrTc c
   = return (L loc $ ConPat
       { pat_con_ext = noAnn -- AZ: where should this come from?
       , pat_con = L ln c
-      , pat_args = PrefixCon tyargs args
+      , pat_args = PrefixCon args
       }, comments l Semi.<> cs)
   | (not (null args) && patIsRec c) = do
       ctx <- askParseContext
       patFail (locA l) . PsErrInPat e $ PEIP_RecPattern args YesPatIsRecursive ctx
-checkPat loc cs (L la (PatBuilderAppType f at t)) tyargs args =
-  checkPat loc (cs Semi.<> comments la) f (HsConPatTyArg at t : tyargs) args
-checkPat loc cs (L la (PatBuilderApp f e)) [] args = do
+checkPat loc cs (L la (PatBuilderAppType f at t)) args =
+  checkPat loc (cs Semi.<> comments la) f (mkInvisLPat at t : args)
+checkPat loc cs (L la (PatBuilderApp f e)) args = do
   p <- checkLPat e
-  checkPat loc (cs Semi.<> comments la) f [] (p : args)
-checkPat loc cs (L l e) [] [] = do
+  checkPat loc (cs Semi.<> comments la) f (p : args)
+checkPat loc cs (L l e) [] = do
   p <- checkAPat loc e
   return (L l p, cs)
-checkPat loc _ e _ _ = do
+checkPat loc _ e _ = do
   details <- fromParseContext <$> askParseContext
   patFail (locA loc) (PsErrInPat (unLoc e) details)
+
+mkInvisLPat :: EpToken "@" -> HsTyPat GhcPs -> LPat GhcPs
+mkInvisLPat tok ty_pat = L l invis_pat
+  where
+    HsTP _ (L (EpAnn anc _ _) _) = ty_pat
+    l = EpAnn (widenAnchorT anc tok) noAnn emptyComments
+    invis_pat = InvisPat (tok, SpecifiedSpec) ty_pat
 
 checkAPat :: SrcSpanAnnA -> PatBuilder GhcPs -> PV (Pat GhcPs)
 checkAPat loc e0 = do
@@ -2322,7 +2329,7 @@ dataConBuilderDetails (L _ (PrefixDataConBuilder flds _))
 
 -- Normal prefix constructor, e.g.  data T = MkT A B C
 dataConBuilderDetails (L _ (PrefixDataConBuilder flds _))
-  = PrefixCon noTypeArgs (map hsLinear (toList flds))
+  = PrefixCon (map hsLinear (toList flds))
 
 -- Infix constructor, e.g. data T = Int :! Bool
 dataConBuilderDetails (L (EpAnn _ _ csl) (InfixDataConBuilder (L (EpAnn anc ann csll) lhs) _ rhs))
@@ -2394,7 +2401,7 @@ checkNotPromotedDataCon IsPromoted (L l name) =
 
 mkUnboxedSumCon :: LHsType GhcPs -> ConTag -> Arity -> (LocatedN RdrName, HsConDeclH98Details GhcPs)
 mkUnboxedSumCon t tag arity =
-  (noLocA (getRdrName (sumDataCon tag arity)), PrefixCon noTypeArgs [hsLinear t])
+  (noLocA (getRdrName (sumDataCon tag arity)), PrefixCon [hsLinear t])
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

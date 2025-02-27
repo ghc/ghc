@@ -733,13 +733,13 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
           getMixed :: HdkA (LocatedA (ConDecl GhcPs))
           getMixed =
             case con_args of
-              PrefixCon _ ts -> do
+              PrefixCon ts -> do
                 con_doc' <- getConDoc (getLocA con_name)
                 ts' <- traverse addHaddockConDeclFieldTy ts
                 pure $ L l_con_decl $
                   ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
                                con_doc = lexLHsDocString <$> con_doc',
-                               con_args = PrefixCon noTypeArgs ts' }
+                               con_args = PrefixCon ts' }
               InfixCon t1 t2 -> do
                 t1' <- addHaddockConDeclFieldTy t1
                 con_doc' <- getConDoc (getLocA con_name)

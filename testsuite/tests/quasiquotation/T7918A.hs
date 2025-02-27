@@ -19,7 +19,7 @@ qq = QuasiQuoter {
                          y = VarP (mkName "y")
                      in \str -> case str of
                                   "p1" -> return $ x
-                                  "p2" -> return $ ConP 'Just [] [x]
+                                  "p2" -> return $ ConP 'Just [x]
                                   "p3" -> return $ TupP [x, y]
                                   "p4" -> return $ y
        , quoteDec  = undefined

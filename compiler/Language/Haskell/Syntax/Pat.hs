@@ -23,8 +23,7 @@ module Language.Haskell.Syntax.Pat (
         ConLikeP, isInvisArgPat,
         isVisArgPat,
 
-        HsConPatDetails, hsConPatArgs, hsConPatTyArgs,
-        HsConPatTyArg(..), XConPatTyArg,
+        HsConPatDetails, hsConPatArgs,
         HsRecFields(..), XHsRecFields, HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
@@ -203,12 +202,6 @@ type family ConLikeP x
 
 -- ---------------------------------------------------------------------
 
--- | Type argument in a data constructor pattern,
---   e.g. the @\@a@ in @f (Just \@a x) = ...@.
-data HsConPatTyArg p = HsConPatTyArg !(XConPatTyArg p) (HsTyPat p)
-
-type family XConPatTyArg p
-
 isInvisArgPat :: Pat p -> Bool
 isInvisArgPat InvisPat{} = True
 isInvisArgPat _   = False
@@ -217,17 +210,12 @@ isVisArgPat :: Pat p -> Bool
 isVisArgPat = not . isInvisArgPat
 
 -- | Haskell Constructor Pattern Details
-type HsConPatDetails p = HsConDetails (HsConPatTyArg (NoGhcTc p)) (LPat p) (HsRecFields p (LPat p))
+type HsConPatDetails p = HsConDetails (LPat p) (HsRecFields p (LPat p))
 
 hsConPatArgs :: forall p . (UnXRec p) => HsConPatDetails p -> [LPat p]
-hsConPatArgs (PrefixCon _ ps) = ps
+hsConPatArgs (PrefixCon ps)   = ps
 hsConPatArgs (RecCon fs)      = Data.List.map (hfbRHS . unXRec @p) (rec_flds fs)
 hsConPatArgs (InfixCon p1 p2) = [p1,p2]
-
-hsConPatTyArgs :: forall p. HsConPatDetails p -> [HsConPatTyArg (NoGhcTc p)]
-hsConPatTyArgs (PrefixCon tyargs _) = tyargs
-hsConPatTyArgs (RecCon _)           = []
-hsConPatTyArgs (InfixCon _ _)       = []
 
 -- | Haskell Record Fields
 --

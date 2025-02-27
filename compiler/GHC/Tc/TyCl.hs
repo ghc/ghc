@@ -1818,7 +1818,7 @@ kcConH98Args :: ConArgKind                       -- Expected kind of the argumen
              -> HsConDeclH98Details GhcRn
              -> TcM ()
 kcConH98Args exp_kind con_args = case con_args of
-  PrefixCon _ tys   -> kcConArgTys exp_kind tys
+  PrefixCon tys     -> kcConArgTys exp_kind tys
   InfixCon ty1 ty2  -> kcConArgTys exp_kind [ty1, ty2]
   RecCon (L _ flds) -> kcConArgTys exp_kind $
                        map (hsLinear . cd_fld_type . unLoc) flds
@@ -3967,7 +3967,7 @@ tcConH98Args :: ConArgKind   -- expected kind of arguments
                              -- might have a specific kind
              -> HsConDeclH98Details GhcRn
              -> TcM [(Scaled TcType, HsSrcBang)]
-tcConH98Args exp_kind (PrefixCon _ btys)
+tcConH98Args exp_kind (PrefixCon btys)
   = mapM (tcConArg exp_kind) btys
 tcConH98Args exp_kind (InfixCon bty1 bty2)
   = do { bty1' <- tcConArg exp_kind bty1

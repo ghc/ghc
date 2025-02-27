@@ -35,7 +35,7 @@ assertVar expQ = do
   exp <- expQ
   case exp of
     LamE [SigP (VarP x) (AppT (ConT _) (VarT a))]
-         (CaseE (VarE x1) [Match (ConP _ [] [VarP y])
+         (CaseE (VarE x1) [Match (ConP _ [VarP y])
                                  (NormalB (SigE (VarE y1) (VarT a1))) []])
       | x1 == x &&
         y1 == y &&

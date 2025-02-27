@@ -524,6 +524,9 @@ rnLPatsAndThen mk = traverse (rnLPatAndThen mk)
 {-# SPECIALISE rnLPatsAndThen :: NameMaker -> [LPat GhcPs] -> CpsRn [LPat GhcRn] #-}
 {-# SPECIALISE rnLPatsAndThen :: NameMaker -> NE.NonEmpty (LPat GhcPs) -> CpsRn (NE.NonEmpty (LPat GhcRn)) #-}
 
+rnLArgPatsAndThen :: NameMaker -> [LPat GhcPs] -> CpsRn [LPat GhcRn]
+rnLArgPatsAndThen mk = traverse (rnLArgPatAndThen mk)
+
 --------------------
 -- The workhorse
 rnLPatAndThen :: NameMaker -> LPat GhcPs -> CpsRn (LPat GhcRn)
@@ -691,22 +694,15 @@ rnConPatAndThen :: NameMaker
                 -> HsConPatDetails GhcPs
                 -> CpsRn (Pat GhcRn)
 
-rnConPatAndThen mk con (PrefixCon tyargs pats)
+rnConPatAndThen mk con (PrefixCon pats)
   = do  { con' <- lookupConCps con
-        ; tyargs' <- mapM rnConPatTyArg tyargs
-        ; pats' <- rnLPatsAndThen mk pats
+        ; pats' <- rnLArgPatsAndThen mk pats
         ; return $ ConPat
             { pat_con_ext = noExtField
             , pat_con = con'
-            , pat_args = PrefixCon tyargs' pats'
+            , pat_args = PrefixCon pats'
             }
         }
-  where
-    rnConPatTyArg (HsConPatTyArg _ tp) = do
-      tp' <- rnHsTyPat HsTypePatCtx tp
-      liftCps $ unlessXOptM LangExt.TypeAbstractions $
-        addErr (TcRnIllegalInvisibleTypePattern tp' InvisPatWithoutFlag)
-      return (HsConPatTyArg noExtField tp')
 
 rnConPatAndThen mk con (InfixCon pat1 pat2)
   = do  { con' <- lookupConCps con
@@ -1504,7 +1500,7 @@ with lambdas:
 
 
 So we have at least three options where we could do free variable extraction:
-HsConPatTyArg, ConPat, or a Match (used to represent a function LHS). And none
+HsTyPat, ConPat, or a Match (used to represent a function LHS). And none
 of those would be general enough. Rather than make an arbitrary choice, we
 embrace left-to-right scoping in types and implement it with CPS, just like
 it's done for view patterns in terms.

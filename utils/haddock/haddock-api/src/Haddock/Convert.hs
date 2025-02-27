@@ -515,7 +515,7 @@ synifyDataCon use_gadt_syntax dc =
     mk_h98_arg_tys = case (use_named_field_syntax, use_infix_syntax) of
       (True, True) -> Left "synifyDataCon: contradiction!"
       (True, False) -> return $ RecCon (noLocA field_tys)
-      (False, False) -> return $ PrefixCon noTypeArgs (map hsUnrestricted linear_tys)
+      (False, False) -> return $ PrefixCon (map hsUnrestricted linear_tys)
       (False, True) -> case linear_tys of
         [a, b] -> return $ InfixCon (hsUnrestricted a) (hsUnrestricted b)
         _ -> Left "synifyDataCon: infix with non-2 args?"

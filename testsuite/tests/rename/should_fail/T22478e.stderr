@@ -1,34 +1,34 @@
-T22478e.hs:6:4: error: [GHC-78249]
+T22478e.hs:6:6: error: [GHC-78249]
     Illegal invisible type pattern: @[a, b]
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension
 
-T22478e.hs:6:4: error: [GHC-68567]
+T22478e.hs:6:6: error: [GHC-68567]
     Illegal type: ‘[a, b]’
     Suggested fix:
       Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
 
-T22478e.hs:7:4: error: [GHC-78249]
+T22478e.hs:7:6: error: [GHC-78249]
     Illegal invisible type pattern: @1
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension
 
-T22478e.hs:7:4: error: [GHC-68567]
+T22478e.hs:7:6: error: [GHC-68567]
     Illegal type: ‘1’
     Suggested fix:
       Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
 
-T22478e.hs:8:4: error: [GHC-78249]
+T22478e.hs:8:6: error: [GHC-78249]
     Illegal invisible type pattern: @(t @k)
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension
 
-T22478e.hs:8:4: error: [GHC-23482]
+T22478e.hs:8:6: error: [GHC-23482]
     Illegal visible kind application: @k
     Suggested fix:
       Perhaps you intended to use the ‘TypeApplications’ extension
 
-T22478e.hs:9:4: error: [GHC-78249]
+T22478e.hs:9:6: error: [GHC-78249]
     Illegal invisible type pattern: @(t :: k)
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension
@@ -39,42 +39,42 @@ T22478e.hs:9:13: error: [GHC-49378]
     Suggested fix:
       Perhaps you intended to use the ‘KindSignatures’ extension (implied by ‘TypeFamilies’ and ‘PolyKinds’)
 
-T22478e.hs:10:4: error: [GHC-78249]
+T22478e.hs:10:6: error: [GHC-78249]
     Illegal invisible type pattern: @('(a, b))
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension
 
-T22478e.hs:10:4: error: [GHC-68567]
+T22478e.hs:10:6: error: [GHC-68567]
     Illegal type: ‘'(a, b)’
     Suggested fix:
       Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
 
-T22478e.hs:11:4: error: [GHC-78249]
+T22478e.hs:11:6: error: [GHC-78249]
     Illegal invisible type pattern: @"str"
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension
 
-T22478e.hs:11:4: error: [GHC-68567]
+T22478e.hs:11:6: error: [GHC-68567]
     Illegal type: ‘"str"’
     Suggested fix:
       Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
 
-T22478e.hs:12:4: error: [GHC-78249]
+T22478e.hs:12:6: error: [GHC-78249]
     Illegal invisible type pattern: @'c'
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension
 
-T22478e.hs:12:4: error: [GHC-68567]
+T22478e.hs:12:6: error: [GHC-68567]
     Illegal type: ‘'c'’
     Suggested fix:
       Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
 
-T22478e.hs:13:4: error: [GHC-78249]
+T22478e.hs:13:6: error: [GHC-78249]
     Illegal invisible type pattern: @'True
     Suggested fix:
       Perhaps you intended to use the ‘TypeAbstractions’ extension
 
-T22478e.hs:13:4: error: [GHC-68567]
+T22478e.hs:13:6: error: [GHC-68567]
     Illegal type: ‘'True’
     Suggested fix:
       Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)
