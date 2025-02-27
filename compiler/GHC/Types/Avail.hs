@@ -22,7 +22,8 @@ module GHC.Types.Avail (
     filterAvails,
     nubAvails,
     sortAvails,
-    DetOrdAvails(DetOrdAvails, DefinitelyDeterministicAvails)
+    DetOrdAvails(DetOrdAvails, getDetOrdAvails, DefinitelyDeterministicAvails),
+    emptyDetOrdAvails
   ) where
 
 import GHC.Prelude
@@ -74,7 +75,7 @@ type Avails = [AvailInfo]
 -- We guarantee a deterministic order by either using the order explicitly
 -- given by the user (e.g. in an explicit constructor export list) or instead
 -- by sorting the avails with 'sortAvails'.
-newtype DetOrdAvails = DefinitelyDeterministicAvails Avails
+newtype DetOrdAvails = DefinitelyDeterministicAvails { getDetOrdAvails :: Avails }
   deriving newtype (Binary, Outputable, NFData)
 
 -- | It's always safe to match on 'DetOrdAvails'
@@ -245,3 +246,7 @@ instance Binary AvailInfo where
 instance NFData AvailInfo where
   rnf (Avail n) = rnf n
   rnf (AvailTC a b) = rnf a `seq` rnf b
+
+-- | Create an empty DetOrdAvails
+emptyDetOrdAvails :: DetOrdAvails
+emptyDetOrdAvails = DefinitelyDeterministicAvails []

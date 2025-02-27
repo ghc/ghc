@@ -26,7 +26,7 @@ module GHC.Iface.Syntax (
         IfaceCompleteMatch(..),
         IfaceLFInfo(..), IfaceTopBndrInfo(..),
         IfaceImport(..),
-        ImpIfaceList(..),
+        ImpIfaceList(..), IfaceExport,
 
         -- * Binding names
         IfaceTopBndr,
@@ -69,6 +69,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.CostCentre
 import GHC.Types.Literal
+import GHC.Types.Avail
 import GHC.Types.ForeignCall
 import GHC.Types.Annotations( AnnPayload, AnnTarget )
 import GHC.Types.Basic
@@ -112,12 +113,45 @@ infixl 3 &&&
 ************************************************************************
 -}
 
+type IfaceExport = AvailInfo
+
 data IfaceImport = IfaceImport ImpDeclSpec ImpIfaceList
 
 data ImpIfaceList
   = ImpIfaceAll -- ^ no user import list
-  | ImpIfaceExplicit !IfGlobalRdrEnv
-  | ImpIfaceEverythingBut !NameSet
+  | ImpIfaceExplicit !DetOrdAvails
+  | ImpIfaceEverythingBut ![Name]
+
+
+
+instance Binary IfaceImport where
+  put_ bh (IfaceImport declSpec ifaceList) = do
+    put_ bh declSpec
+    put_ bh ifaceList
+  get bh = do
+    declSpec <- get bh
+    ifaceList <- get bh
+    return (IfaceImport declSpec ifaceList)
+
+instance Binary ImpIfaceList where
+  put_ bh ImpIfaceAll = putByte bh 0
+  put_ bh (ImpIfaceExplicit env) = do
+    putByte bh 1
+    put_ bh env
+  put_ bh (ImpIfaceEverythingBut ns) = do
+    putByte bh 2
+    put_ @[Name] bh ns
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> return ImpIfaceAll
+      1 -> do
+        env <- get bh
+        return (ImpIfaceExplicit env)
+      2 -> do
+        ns <- get @[Name] bh
+        return (ImpIfaceEverythingBut ns)
+      _ -> fail "instance Binary ImpIfaceList: Invalid tag"
 
 -- | A binding top-level 'Name' in an interface file (e.g. the name of an
 -- 'IfaceDecl').
