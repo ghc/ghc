@@ -93,6 +93,19 @@ Compiler
 
 - Fixed incorrect behaviour that could occur when using ``control0#/prompt#`` ((:ghc-ticket:`25439`)) by making `prompt#` lazy.
 
+- Fixed a bug where ghc paniced during type checking. ((:ghc-ticket:`25325`))
+
+- Fix linearity for strict unit patterns in a local let bindings. ((:ghc-ticket:`25428`))
+
+- Improve the performance of type family consistency checks. ((:ghc-ticket:`25554`))
+
+- Fixed a bug where type checking failed to terminate. ((:ghc-ticket:`25597`))
+
+- Fixed a bug where ``__GLASGOW_HASKELL_LLVM__`` was not defined even if `-fllvm` was set. ((:ghc-ticket:`25606`))
+
+- Added flags to control speculative evaluation: ``-fspec-eval`` and ``-fspec-eval-dictfun``. This allows
+  users to work around cases where recent changes to speculative evaluation caused performance regressions. ((:ghc-ticket:`25606`))
+
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 
@@ -147,6 +160,7 @@ Runtime system
 
 - Fixed a bug in compacting gc that could result in program termination with ``update_fwd_large: unknown/strange object  38`` ((:ghc-ticket:`24791`)).
 
+- Fixed a bug where calling ``setNumCapabilities`` with a argument larger than 256 caused crashes. (:ghc-ticket:`25560`)
 
 Build system and packaging
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -164,6 +178,10 @@ Build system and packaging
 - Bindists: Fixed a bug in the Makefile which caused windows installs to duplicate files. ((:ghc-ticket:`24800`))
 
 - The packages ghc-internal and ghc-experimental are now versioned based on the GHC version they are shipped with.
+
+- Fixed a bug where running ``Xelatex`` concurrently failed. (:ghc-ticket:`25564`)
+
+- Fixed a bug where building ghc from source using ghc-9.8.4 failed with an error mentioning ``ghc_unique_counter64``. (:ghc-ticket:`25576`)
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
