@@ -49,20 +49,32 @@ dumpGhcCpp dflags pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
     to_tok (L (EpaDelta l _ _) _) = L l (ITunknown "-")
     comments_as_toks = map to_tok comments
     defines =
-        showDefines ((pp_defines (pp pst_final))
-            `ttrace` ("dumpGhcCpp: (pp_defines (pp pst_final))" ++ show (pp_defines (pp pst_final))))
+        showDefines
+            ( (pp_defines (pp pst_final))
+                -- `ttrace` ("dumpGhcCpp: (pp_defines (pp pst_final))" ++ show (pp_defines (pp pst_final))))
+                `ttrace` ("dumpGhcCpp: ghc_cpp_enabled" ++ show ghc_cpp_enabled)
+            )
     sepa = "\n------------------------------\n"
     startLoc = mkRealSrcLoc (srcLocFile (psRealLoc $ loc pst)) 1 1
     buf1 = (buffer pst){cur = 0}
     all_toks =
-        sortBy cmpBs ((bare_toks ++ comments_as_toks)
-            `ttrace` ("dumpGhcCpp: comments_as_toks" ++ show comments_as_toks))
+        sortBy
+            cmpBs
+            ( (bare_toks ++ comments_as_toks)
+                `ttrace` ("dumpGhcCpp: comments_as_toks" ++ show comments_as_toks)
+            )
     toks =
-        addSourceToTokens startLoc buf1 (all_toks
-            `ttrace` ("dumpGhcCpp: all_toks" ++ show all_toks))
+        addSourceToTokens
+            startLoc
+            buf1
+            ( all_toks
+                `ttrace` ("dumpGhcCpp: (startLoc,all_toks)" ++ show (startLoc, all_toks))
+            )
     final =
-        renderCombinedToks (toks
-            `ttrace` ("dumpGhcCpp: toks" ++ show toks))
+        renderCombinedToks
+            ( toks
+                `ttrace` ("dumpGhcCpp: toks" ++ show toks)
+            )
 
 cmpBs :: Located Token -> Located Token -> Ordering
 cmpBs (L (RealSrcSpan _ (Strict.Just bs1)) _) (L (RealSrcSpan _ (Strict.Just bs2)) _) =
@@ -89,7 +101,8 @@ addSourceToTokens ::
     [(Located Token, String)]
 addSourceToTokens _ _ [] = []
 addSourceToTokens loc buf (t@(L span _) : ts) =
-    case span of
+    -- case span of
+    case (trace ("addSourceToTokens:span=" ++ show span) span) of
         UnhelpfulSpan _ -> (t, "") : addSourceToTokens loc buf ts
         RealSrcSpan s _ -> (t, str) : addSourceToTokens newLoc newBuf ts
           where
@@ -206,17 +219,23 @@ ppLexer queueComments cont =
                                 Lexer.setInput inp
                                 ppLexer queueComments cont
                     L l (ITcpp continuation s) -> do
-                        if continuation
-                            then do
-                                pushContinuation tk
-                                contIgnoreTok tk
-                            else do
-                                mdump <- processCppToks s
-                                case mdump of
-                                    Just dump ->
-                                        -- We have a dump of the state, put it into an ignored token
-                                        contIgnoreTok (L l (ITcpp continuation (appendFS s (fsLit dump))))
-                                    Nothing -> contIgnoreTok tk
+                        ghcpp <- ghcCppEnabled
+                        -- Only process the directive if GhcCpp is explicitly enabled.
+                        -- Otherwise we are scanning for pragmas
+                        if ghcpp
+                            then
+                                if continuation
+                                    then do
+                                        pushContinuation tk
+                                        contIgnoreTok tk
+                                    else do
+                                        mdump <- processCppToks s
+                                        case mdump of
+                                            Just dump ->
+                                                -- We have a dump of the state, put it into an ignored token
+                                                contIgnoreTok (L l (ITcpp continuation (appendFS s (fsLit dump))))
+                                            Nothing -> contIgnoreTok tk
+                            else contInner tk
                     _ -> do
                         state <- getCppState
                         -- case (trace ("CPP state:" ++ show state) state) of

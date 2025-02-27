@@ -72,6 +72,8 @@ module GHC.Parser.Lexer (
    ExtBits(..),
    xtest, xunset, xset,
    disableHaddock,
+   enableGhcCpp,
+   ghcCppEnabled,
    lexTokenStream,
    mkParensEpToks,
    mkParensLocs,
@@ -408,16 +410,15 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
   -- ToDo: should only be valid inside a pragma:
   "#-}"                          { endPrag }
-  -- TODO: distinguish from the case above, to match the only allowed option, GHC_CPP
-  "!-}"                          { endPrag }
 }
 
 <option_prags> {
   "{-#"  $whitechar* $pragmachar+ / { known_pragma fileHeaderPrags }
                                    { dispatch_pragmas fileHeaderPrags }
-  -- TODO: distinguish from case above, to check the end properly
-  "{-!"  $whitechar* $pragmachar+ / { known_pragma fileHeaderPrags }
-                                   { dispatch_pragmas fileHeaderPrags }
+
+  -- This one does not check for GhcCpp being set, we use it to
+  -- terminate normal pragma processing
+  ^\# \ * @cppkeyword  .* \n { cppToken cpp_prag }
 }
 
 <0> {
@@ -3052,6 +3053,13 @@ disableHaddock opts = upd_bitmap (xunset HaddockBit)
   where
     upd_bitmap f = opts { pExtsBitmap = f (pExtsBitmap opts) }
 
+enableGhcCpp :: ParserOpts -> ParserOpts
+enableGhcCpp opts = upd_bitmap (xset GhcCppBit)
+  where
+    upd_bitmap f = opts { pExtsBitmap = f (pExtsBitmap opts) }
+
+ghcCppEnabled :: ParserOpts -> Bool
+ghcCppEnabled opts = xtest GhcCppBit (pExtsBitmap opts)
 
 -- | Set parser options for parsing OPTIONS pragmas
 initPragState :: p -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState p
