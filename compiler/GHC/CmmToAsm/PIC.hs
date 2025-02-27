@@ -180,29 +180,32 @@ cmmMakePicReference config lbl
 
   | OSAIX <- platformOS platform
   = CmmMachOp (MO_Add W32)
-          [ CmmReg (CmmGlobal $ GlobalRegUse PicBaseReg (bWord platform))
-          , CmmLit $ picRelative (wordWidth platform)
+          (TupleG2
+            (CmmReg (CmmGlobal $ GlobalRegUse PicBaseReg (bWord platform)))
+            (CmmLit $ picRelative (wordWidth platform)
                           (platformArch platform)
                           (platformOS   platform)
-                          lbl ]
+                          lbl ))
 
   -- both ABI versions default to medium code model
   | ArchPPC_64 _ <- platformArch platform
   = CmmMachOp (MO_Add W32) -- code model medium
-          [ CmmReg (CmmGlobal $ GlobalRegUse PicBaseReg (bWord platform))
-          , CmmLit $ picRelative (wordWidth platform)
+          (TupleG2
+            (CmmReg (CmmGlobal $ GlobalRegUse PicBaseReg (bWord platform)))
+            (CmmLit $ picRelative (wordWidth platform)
                           (platformArch platform)
                           (platformOS   platform)
-                          lbl ]
+                          lbl ))
 
   | (ncgPIC config || ncgExternalDynamicRefs config)
       && absoluteLabel lbl
   = CmmMachOp (MO_Add (wordWidth platform))
-          [ CmmReg (CmmGlobal $ GlobalRegUse PicBaseReg (bWord platform))
-          , CmmLit $ picRelative (wordWidth platform)
+          (TupleG2
+            (CmmReg (CmmGlobal $ GlobalRegUse PicBaseReg (bWord platform)))
+            (CmmLit $ picRelative (wordWidth platform)
                           (platformArch platform)
                           (platformOS   platform)
-                          lbl ]
+                          lbl ))
 
   | otherwise
   = CmmLit $ CmmLabel lbl

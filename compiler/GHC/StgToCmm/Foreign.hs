@@ -507,17 +507,16 @@ closeNursery profile tso = do
 
     let alloc =
            CmmMachOp (mo_wordSub platform)
-              [ cmmOffsetW platform (hpExpr platform) 1
-              , cmmLoadBWord platform (nursery_bdescr_start platform cnreg)
-              ]
+              (TupleG2 (cmmOffsetW platform (hpExpr platform) 1)
+                       (cmmLoadBWord platform (nursery_bdescr_start platform cnreg)))
 
         alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
     in
 
     -- tso->alloc_limit += alloc
     mkStore alloc_limit (CmmMachOp (MO_Sub W64)
-                               [ CmmLoad alloc_limit b64 NaturallyAligned
-                               , CmmMachOp (mo_WordTo64 platform) [alloc] ])
+                               (TupleG2 (CmmLoad alloc_limit b64 NaturallyAligned)
+                                        (CmmMachOp (mo_WordTo64 platform) (TupleG1 alloc) )))
    ]
 
 emitLoadThreadState :: FCode ()
@@ -620,25 +619,24 @@ openNursery profile tso = do
              (CmmReg bdstartreg)
              (cmmOffset platform
                (CmmMachOp (mo_wordMul platform)
-                 [ CmmMachOp (MO_SS_Conv W32 (wordWidth platform))
-                     [CmmLoad (nursery_bdescr_blocks platform cnreg) b32 NaturallyAligned]
-                 , mkIntExpr platform (pc_BLOCK_SIZE (platformConstants platform))
-                 ])
+                 (TupleG2 (CmmMachOp (MO_SS_Conv W32 (wordWidth platform))
+                                     (TupleG1 (CmmLoad (nursery_bdescr_blocks platform cnreg) b32 NaturallyAligned)))
+                          (mkIntExpr platform (pc_BLOCK_SIZE (platformConstants platform)))))
                (-1)
              )
          ),
 
      -- alloc = bd->free - bd->start
      let alloc =
-           CmmMachOp (mo_wordSub platform) [CmmReg bdfreereg, CmmReg bdstartreg]
+           CmmMachOp (mo_wordSub platform) (TupleG2 (CmmReg bdfreereg) (CmmReg bdstartreg))
 
          alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
      in
 
      -- tso->alloc_limit += alloc
      mkStore alloc_limit (CmmMachOp (MO_Add W64)
-                               [ CmmLoad alloc_limit b64 NaturallyAligned
-                               , CmmMachOp (mo_WordTo64 platform) [alloc] ])
+                               (TupleG2 (CmmLoad alloc_limit b64 NaturallyAligned)
+                                        (CmmMachOp (mo_WordTo64 platform) (TupleG1 alloc))))
 
    ]
 

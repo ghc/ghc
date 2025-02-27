@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.Cmm.MachOp
@@ -29,6 +30,7 @@ module GHC.Cmm.MachOp
 
     -- Fused multiply-add
     , FMASign(..), pprFMASign
+    , module GHC.Data.SizedTupleGADT
    )
 where
 
@@ -37,9 +39,9 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Cmm.Type
 import GHC.Utils.Outputable
-import GHC.Utils.Misc (expectNonEmpty)
+import GHC.Data.SizedTupleGADT
 
-import Data.List.NonEmpty (NonEmpty (..))
+import Data.Type.Ord
 
 -----------------------------------------------------------------------------
 --              MachOp
@@ -76,142 +78,145 @@ assume that the code produced for a MachOp does not introduce new blocks.
 -- architecture. So, the mid-term plan is to migrate to this
 -- interpretation/semantics.
 
-data MachOp
+data MachOp (arity :: Natural) where
   -- Integer operations (insensitive to signed/unsigned)
-  = MO_Add Width
-  | MO_Sub Width
-  | MO_Eq  Width
-  | MO_Ne  Width
-  | MO_Mul Width                -- low word of multiply
+  MO_Add :: Width -> MachOp 2
+  MO_Sub :: Width -> MachOp 2
+  MO_Eq  :: Width -> MachOp 2
+  MO_Ne  :: Width -> MachOp 2
+  MO_Mul :: Width -> MachOp 2 -- low word of multiply
 
   -- Signed multiply/divide
-  | MO_S_MulMayOflo Width       -- nonzero if signed multiply overflows. See
-                                -- Note [MO_S_MulMayOflo significant width]
-  | MO_S_Quot Width             -- signed / (same semantics as IntQuotOp)
-  | MO_S_Rem  Width             -- signed % (same semantics as IntRemOp)
-  | MO_S_Neg  Width             -- unary -
+  MO_S_MulMayOflo :: Width -> MachOp 2 -- nonzero if signed multiply overflows. See
+                                       -- Note [MO_S_MulMayOflo significant width]
+  MO_S_Quot :: Width -> MachOp 2 -- signed / (same semantics as IntQuotOp)
+  MO_S_Rem  :: Width -> MachOp 2 -- signed % (same semantics as IntRemOp)
+  MO_S_Neg  :: Width -> MachOp 1 -- unary negation
 
   -- Unsigned multiply/divide
-  | MO_U_Quot Width             -- unsigned / (same semantics as WordQuotOp)
-  | MO_U_Rem  Width             -- unsigned % (same semantics as WordRemOp)
+  MO_U_Quot :: Width -> MachOp 2 -- unsigned / (same semantics as WordQuotOp)
+  MO_U_Rem  :: Width -> MachOp 2 -- unsigned % (same semantics as WordRemOp)
 
   -- Signed comparisons
-  | MO_S_Ge Width
-  | MO_S_Le Width
-  | MO_S_Gt Width
-  | MO_S_Lt Width
+  MO_S_Ge :: Width -> MachOp 2
+  MO_S_Le :: Width -> MachOp 2
+  MO_S_Gt :: Width -> MachOp 2
+  MO_S_Lt :: Width -> MachOp 2
 
   -- Unsigned comparisons
-  | MO_U_Ge Width
-  | MO_U_Le Width
-  | MO_U_Gt Width
-  | MO_U_Lt Width
+  MO_U_Ge :: Width -> MachOp 2
+  MO_U_Le :: Width -> MachOp 2
+  MO_U_Gt :: Width -> MachOp 2
+  MO_U_Lt :: Width -> MachOp 2
 
   -- Floating point arithmetic
-  | MO_F_Add  Width
-  | MO_F_Sub  Width
-  | MO_F_Neg  Width             -- unary -
-  | MO_F_Mul  Width
-  | MO_F_Quot Width
+  MO_F_Add  :: Width -> MachOp 2
+  MO_F_Sub  :: Width -> MachOp 2
+  MO_F_Neg  :: Width -> MachOp 1 -- unary negation
+  MO_F_Mul  :: Width -> MachOp 2
+  MO_F_Quot :: Width -> MachOp 2
 
   -- Floating-point fused multiply-add operations
   -- | Fused multiply-add, see 'FMASign'.
-  | MO_FMA FMASign Length Width
+  MO_FMA :: FMASign -> Length -> Width -> MachOp 3
 
   -- Floating point comparison
-  | MO_F_Eq Width
-  | MO_F_Ne Width
-  | MO_F_Ge Width
-  | MO_F_Le Width
-  | MO_F_Gt Width
-  | MO_F_Lt Width
+  MO_F_Eq :: Width -> MachOp 2
+  MO_F_Ne :: Width -> MachOp 2
+  MO_F_Ge :: Width -> MachOp 2
+  MO_F_Le :: Width -> MachOp 2
+  MO_F_Gt :: Width -> MachOp 2
+  MO_F_Lt :: Width -> MachOp 2
 
-  | MO_F_Min Width
-  | MO_F_Max Width
+  MO_F_Min :: Width -> MachOp 2
+  MO_F_Max :: Width -> MachOp 2
 
   -- Bitwise operations.  Not all of these may be supported
   -- at all sizes, and only integral Widths are valid.
-  | MO_And   Width
-  | MO_Or    Width
-  | MO_Xor   Width
-  | MO_Not   Width
+  MO_And   :: Width -> MachOp 2
+  MO_Or    :: Width -> MachOp 2
+  MO_Xor   :: Width -> MachOp 2
+  MO_Not   :: Width -> MachOp 1
 
   -- Shifts. The shift amount must be in [0,widthInBits).
-  | MO_Shl   Width
-  | MO_U_Shr Width      -- unsigned shift right
-  | MO_S_Shr Width      -- signed shift right
+  -- (But see #23753.)
+  MO_Shl   :: Width -> MachOp 2
+  MO_U_Shr :: Width -> MachOp 2 -- unsigned shift right
+  MO_S_Shr :: Width -> MachOp 2 -- signed shift right
 
   -- Conversions.  Some of these will be NOPs.
   -- Floating-point conversions use the signed variant.
-  | MO_SF_Round    Width Width  -- Signed int -> Float
-  | MO_FS_Truncate Width Width  -- Float -> Signed int
-  | MO_SS_Conv Width Width      -- Signed int -> Signed int
-  | MO_UU_Conv Width Width      -- unsigned int -> unsigned int
-  | MO_XX_Conv Width Width      -- int -> int; puts no requirements on the
-                                -- contents of upper bits when extending;
-                                -- narrowing is simply truncation; the only
-                                -- expectation is that we can recover the
-                                -- original value by applying the opposite
-                                -- MO_XX_Conv, e.g.,
-                                --   MO_XX_CONV W64 W8 (MO_XX_CONV W8 W64 x)
-                                -- is equivalent to just x.
-  | MO_FF_Conv Width Width      -- Float  -> Float
+  MO_SF_Round    :: Width -> Width -> MachOp 1  -- Signed int -> Float
+  MO_FS_Truncate :: Width -> Width -> MachOp 1  -- Float -> Signed int
+  MO_SS_Conv :: Width -> Width -> MachOp 1      -- Signed int -> Signed int
+  MO_UU_Conv :: Width -> Width -> MachOp 1      -- unsigned int -> unsigned int
+  MO_XX_Conv :: Width -> Width -> MachOp 1
+    -- ^ int -> int conversion; puts no requirements
+    -- on the contents of upper bits when extending;
+    -- narrowing is simply truncation; the only
+    -- expectation is that we can recover the original
+    -- value by narrowing after extending, e.g.,
+    --   MO_XX_CONV W64 W8 (MO_XX_CONV W8 W64 x)
+    -- is equivalent to just x.
+  MO_FF_Conv :: Width -> Width -> MachOp 1      -- Float  -> Float
 
-  | MO_WF_Bitcast Width      -- Word32/Word64   -> Float/Double
-  | MO_FW_Bitcast Width      -- Float/Double  -> Word32/Word64
+  MO_WF_Bitcast :: Width -> MachOp 1            -- Word32/Word64   -> Float/Double
+  MO_FW_Bitcast :: Width -> MachOp 1            -- Float/Double  -> Word32/Word64
 
   -- Vector element insertion and extraction operations
-  | MO_V_Broadcast Length Width -- Broadcast a scalar into a vector
-  | MO_V_Insert    Length Width -- Insert scalar into vector
-  | MO_V_Extract   Length Width -- Extract scalar from vector
+  MO_V_Broadcast :: Length -> Width -> MachOp 1 -- Broadcast a scalar into a vector
+  MO_V_Insert    :: Length -> Width -> MachOp 3 -- Insert scalar into vector
+  MO_V_Extract   :: Length -> Width -> MachOp 2 -- Extract scalar from vector
 
   -- Integer vector operations
-  | MO_V_Add Length Width
-  | MO_V_Sub Length Width
-  | MO_V_Mul Length Width
+  MO_V_Add :: Length -> Width -> MachOp 2
+  MO_V_Sub :: Length -> Width -> MachOp 2
+  MO_V_Mul :: Length -> Width -> MachOp 2
 
   -- Signed vector multiply/divide
-  | MO_VS_Quot Length Width
-  | MO_VS_Rem  Length Width
-  | MO_VS_Neg  Length Width
+  MO_VS_Quot :: Length -> Width -> MachOp 2
+  MO_VS_Rem  :: Length -> Width -> MachOp 2
+  MO_VS_Neg  :: Length -> Width -> MachOp 1
 
   -- Unsigned vector multiply/divide
-  | MO_VU_Quot Length Width
-  | MO_VU_Rem  Length Width
+  MO_VU_Quot :: Length -> Width -> MachOp 2
+  MO_VU_Rem  :: Length -> Width -> MachOp 2
 
   -- Vector shuffles
-  | MO_V_Shuffle  Length Width [Int]
-  | MO_VF_Shuffle Length Width [Int]
+  MO_V_Shuffle  :: Length -> Width -> [Int] -> MachOp 2
+  MO_VF_Shuffle :: Length -> Width -> [Int] -> MachOp 2
 
   -- Floating point vector element insertion and extraction operations
-  | MO_VF_Broadcast Length Width   -- Broadcast a scalar into a vector
-  | MO_VF_Insert    Length Width   -- Insert scalar into vector
-  | MO_VF_Extract   Length Width   -- Extract scalar from vector
+  MO_VF_Broadcast :: Length -> Width -> MachOp 1   -- Broadcast a scalar into a vector
+  MO_VF_Insert    :: Length -> Width -> MachOp 3   -- Insert scalar into vector
+  MO_VF_Extract   :: Length -> Width -> MachOp 2   -- Extract scalar from vector
 
   -- Floating point vector operations
-  | MO_VF_Add  Length Width
-  | MO_VF_Sub  Length Width
-  | MO_VF_Neg  Length Width      -- unary negation
-  | MO_VF_Mul  Length Width
-  | MO_VF_Quot Length Width
+  MO_VF_Add  :: Length -> Width -> MachOp 2
+  MO_VF_Sub  :: Length -> Width -> MachOp 2
+  MO_VF_Neg  :: Length -> Width -> MachOp 1 -- unary negation
+  MO_VF_Mul  :: Length -> Width -> MachOp 2
+  MO_VF_Quot :: Length -> Width -> MachOp 2
 
   -- Min/max operations
-  | MO_VS_Min Length Width
-  | MO_VS_Max Length Width
-  | MO_VU_Min Length Width
-  | MO_VU_Max Length Width
-  | MO_VF_Min Length Width
-  | MO_VF_Max Length Width
+  MO_VS_Min :: Length -> Width -> MachOp 2
+  MO_VS_Max :: Length -> Width -> MachOp 2
+  MO_VU_Min :: Length -> Width -> MachOp 2
+  MO_VU_Max :: Length -> Width -> MachOp 2
+  MO_VF_Min :: Length -> Width -> MachOp 2
+  MO_VF_Max :: Length -> Width -> MachOp 2
 
-  -- | An atomic read with no memory ordering. Address msut
+  -- | An atomic read with no memory ordering. Address must
   -- be naturally aligned.
-  | MO_RelaxedRead Width
+  MO_RelaxedRead :: Width -> MachOp 1
 
   -- Alignment check (for -falignment-sanitisation)
-  | MO_AlignmentCheck Int Width
-  deriving (Eq, Show)
+  MO_AlignmentCheck :: Int -> Width -> MachOp 1
 
-pprMachOp :: MachOp -> SDoc
+deriving instance Eq (MachOp a)
+deriving instance Show (MachOp a)
+
+pprMachOp :: MachOp a -> SDoc
 pprMachOp mo = text (show mo)
 
 -- | Where are the signs in a fused multiply-add instruction?
@@ -247,18 +252,19 @@ pprFMASign = \case
 -- and the unit of allocation on the stack and the heap
 -- Any pointer is also guaranteed to be a wordRep.
 
-mo_wordAdd, mo_wordSub, mo_wordEq, mo_wordNe,mo_wordMul, mo_wordSQuot
-    , mo_wordSRem, mo_wordSNeg, mo_wordUQuot, mo_wordURem
+mo_wordAdd, mo_wordSub, mo_wordEq, mo_wordNe, mo_wordMul, mo_wordSQuot
+    , mo_wordSRem, mo_wordUQuot, mo_wordURem
     , mo_wordSGe, mo_wordSLe, mo_wordSGt, mo_wordSLt, mo_wordUGe
     , mo_wordULe, mo_wordUGt, mo_wordULt
-    , mo_wordAnd, mo_wordOr, mo_wordXor, mo_wordNot, mo_wordShl, mo_wordSShr, mo_wordUShr
-    , mo_u_8ToWord, mo_s_8ToWord, mo_u_16ToWord, mo_s_16ToWord, mo_u_32ToWord, mo_s_32ToWord
+    , mo_wordAnd, mo_wordOr, mo_wordXor, mo_wordShl, mo_wordSShr, mo_wordUShr
+    :: Platform -> MachOp 2
+mo_wordSNeg, mo_wordNot, mo_u_8ToWord, mo_s_8ToWord, mo_u_16ToWord, mo_s_16ToWord, mo_u_32ToWord, mo_s_32ToWord
     , mo_WordTo8, mo_WordTo16, mo_WordTo32, mo_WordTo64
-    :: Platform -> MachOp
+    :: Platform -> MachOp 1
 
 mo_u_8To32, mo_s_8To32, mo_u_16To32, mo_s_16To32
     , mo_32To8, mo_32To16
-    :: MachOp
+    :: MachOp 1
 
 mo_wordAdd      platform = MO_Add (wordWidth platform)
 mo_wordSub      platform = MO_Sub (wordWidth platform)
@@ -320,7 +326,7 @@ in the platform-independent Cmm optimisations.
 If in doubt, return 'False'.  This generates worse code on the
 native routes, but is otherwise harmless.
 -}
-isCommutableMachOp :: MachOp -> Bool
+isCommutableMachOp :: MachOp 2 -> Bool
 isCommutableMachOp mop =
   case mop of
         MO_Add _                -> True
@@ -347,11 +353,11 @@ This is used in the platform-independent Cmm optimisations.
 If in doubt, return 'False'.  This generates worse code on the
 native routes, but is otherwise harmless.
 -}
-isAssociativeMachOp :: MachOp -> Bool
+isAssociativeMachOp :: MachOp 2 -> Bool
 isAssociativeMachOp mop =
   case mop of
-        MO_Add {} -> True       -- NB: does not include
-        MO_Mul {} -> True --     floatint point!
+        MO_Add {} -> True -- NB: does not include
+        MO_Mul {} -> True -- floating point!
         MO_And {} -> True
         MO_Or  {} -> True
         MO_Xor {} -> True
@@ -367,7 +373,7 @@ Returns 'True' if the MachOp is a comparison.
 If in doubt, return False.  This generates worse code on the
 native routes, but is otherwise harmless.
 -}
-isComparisonMachOp :: MachOp -> Bool
+isComparisonMachOp :: MachOp arity -> Bool
 isComparisonMachOp mop =
   case mop of
     MO_Eq   _  -> True
@@ -392,7 +398,7 @@ isComparisonMachOp mop =
 Returns @Just w@ if the operation is an integer comparison with width
 @w@, or @Nothing@ otherwise.
 -}
-maybeIntComparison :: MachOp -> Maybe Width
+maybeIntComparison :: MachOp a -> Maybe Width
 maybeIntComparison mop =
   case mop of
     MO_Eq   w  -> Just w
@@ -407,7 +413,7 @@ maybeIntComparison mop =
     MO_U_Lt w  -> Just w
     _ -> Nothing
 
-isFloatComparison :: MachOp -> Bool
+isFloatComparison :: MachOp a -> Bool
 isFloatComparison mop =
   case mop of
     MO_F_Eq {} -> True
@@ -426,7 +432,7 @@ isFloatComparison mop =
 -- there exist floating-point values which return False for both senses
 -- of a condition (eg. !(NaN > NaN) && !(NaN /<= NaN)).
 
-maybeInvertComparison :: MachOp -> Maybe MachOp
+maybeInvertComparison :: MachOp arity -> Maybe (MachOp arity)
 maybeInvertComparison op
   = case op of  -- None of these Just cases include floating point
         MO_Eq w   -> Just (MO_Ne w)
@@ -447,7 +453,7 @@ maybeInvertComparison op
 {- |
 Returns the MachRep of the result of a MachOp.
 -}
-machOpResultType :: Platform -> MachOp -> [CmmType] -> CmmType
+machOpResultType :: forall a. Platform -> MachOp a -> SizedTupleGADT a CmmType -> CmmType
 machOpResultType platform mop tys =
   case mop of
     MO_Add {}           -> ty1  -- Preserve GC-ptr-hood
@@ -543,7 +549,8 @@ machOpResultType platform mop tys =
     MO_RelaxedRead w    -> cmmBits w
     MO_AlignmentCheck _ _ -> ty1
   where
-    ty1:|_ = expectNonEmpty tys
+    ty1 :: (a > 0) => CmmType
+    ty1 = firstOfTupleGADT tys
 
 comparisonResultRep :: Platform -> CmmType
 comparisonResultRep = bWord  -- is it?
@@ -557,102 +564,102 @@ comparisonResultRep = bWord  -- is it?
 -- its arguments are the same as the MachOp expects.  This is used when
 -- linting a CmmExpr.
 
-machOpArgReps :: Platform -> MachOp -> [Width]
+machOpArgReps :: Platform -> MachOp a -> SizedTupleGADT a Width
 machOpArgReps platform op =
   case op of
-    MO_Add    w         -> [w,w]
-    MO_Sub    w         -> [w,w]
-    MO_Eq     w         -> [w,w]
-    MO_Ne     w         -> [w,w]
-    MO_Mul    w         -> [w,w]
-    MO_S_MulMayOflo w   -> [w,w]
-    MO_S_Quot w         -> [w,w]
-    MO_S_Rem  w         -> [w,w]
-    MO_S_Neg  w         -> [w]
-    MO_U_Quot w         -> [w,w]
-    MO_U_Rem  w         -> [w,w]
+    MO_Add    w         -> TupleG2 w w
+    MO_Sub    w         -> TupleG2 w w
+    MO_Eq     w         -> TupleG2 w w
+    MO_Ne     w         -> TupleG2 w w
+    MO_Mul    w         -> TupleG2 w w
+    MO_S_MulMayOflo w   -> TupleG2 w w
+    MO_S_Quot w         -> TupleG2 w w
+    MO_S_Rem  w         -> TupleG2 w w
+    MO_S_Neg  w         -> TupleG1 w
+    MO_U_Quot w         -> TupleG2 w w
+    MO_U_Rem  w         -> TupleG2 w w
 
-    MO_S_Ge w           -> [w,w]
-    MO_S_Le w           -> [w,w]
-    MO_S_Gt w           -> [w,w]
-    MO_S_Lt w           -> [w,w]
+    MO_S_Ge w           -> TupleG2 w w
+    MO_S_Le w           -> TupleG2 w w
+    MO_S_Gt w           -> TupleG2 w w
+    MO_S_Lt w           -> TupleG2 w w
 
-    MO_U_Ge w           -> [w,w]
-    MO_U_Le w           -> [w,w]
-    MO_U_Gt w           -> [w,w]
-    MO_U_Lt w           -> [w,w]
+    MO_U_Ge w           -> TupleG2 w w
+    MO_U_Le w           -> TupleG2 w w
+    MO_U_Gt w           -> TupleG2 w w
+    MO_U_Lt w           -> TupleG2 w w
 
-    MO_F_Add w          -> [w,w]
-    MO_F_Sub w          -> [w,w]
-    MO_F_Mul w          -> [w,w]
-    MO_F_Quot w         -> [w,w]
-    MO_F_Neg w          -> [w]
-    MO_F_Min w          -> [w,w]
-    MO_F_Max w          -> [w,w]
+    MO_F_Add w          -> TupleG2 w w
+    MO_F_Sub w          -> TupleG2 w w
+    MO_F_Mul w          -> TupleG2 w w
+    MO_F_Quot w         -> TupleG2 w w
+    MO_F_Neg w          -> TupleG1 w
+    MO_F_Min w          -> TupleG2 w w
+    MO_F_Max w          -> TupleG2 w w
 
-    MO_FMA _ l w        -> [vecwidth l w, vecwidth l w, vecwidth l w]
+    MO_FMA _ l w        -> let !vw = vecwidth l w in TupleG3 vw vw vw
 
-    MO_F_Eq  w          -> [w,w]
-    MO_F_Ne  w          -> [w,w]
-    MO_F_Ge  w          -> [w,w]
-    MO_F_Le  w          -> [w,w]
-    MO_F_Gt  w          -> [w,w]
-    MO_F_Lt  w          -> [w,w]
+    MO_F_Eq  w          -> TupleG2 w w
+    MO_F_Ne  w          -> TupleG2 w w
+    MO_F_Ge  w          -> TupleG2 w w
+    MO_F_Le  w          -> TupleG2 w w
+    MO_F_Gt  w          -> TupleG2 w w
+    MO_F_Lt  w          -> TupleG2 w w
 
-    MO_And   w          -> [w,w]
-    MO_Or    w          -> [w,w]
-    MO_Xor   w          -> [w,w]
-    MO_Not   w          -> [w]
-    MO_Shl   w          -> [w, wordWidth platform]
-    MO_U_Shr w          -> [w, wordWidth platform]
-    MO_S_Shr w          -> [w, wordWidth platform]
+    MO_And   w          -> TupleG2 w w
+    MO_Or    w          -> TupleG2 w w
+    MO_Xor   w          -> TupleG2 w w
+    MO_Not   w          -> TupleG1 w
+    MO_Shl   w          -> TupleG2 w (wordWidth platform)
+    MO_U_Shr w          -> TupleG2 w (wordWidth platform)
+    MO_S_Shr w          -> TupleG2 w (wordWidth platform)
 
-    MO_SS_Conv from _     -> [from]
-    MO_UU_Conv from _     -> [from]
-    MO_XX_Conv from _     -> [from]
-    MO_SF_Round from _    -> [from]
-    MO_FS_Truncate from _ -> [from]
-    MO_FF_Conv from _     -> [from]
-    MO_WF_Bitcast w       -> [w]
-    MO_FW_Bitcast w       -> [w]
+    MO_SS_Conv from _     -> TupleG1 from
+    MO_UU_Conv from _     -> TupleG1 from
+    MO_XX_Conv from _     -> TupleG1 from
+    MO_SF_Round from _    -> TupleG1 from
+    MO_FS_Truncate from _ -> TupleG1 from
+    MO_FF_Conv from _     -> TupleG1 from
+    MO_WF_Bitcast w       -> TupleG1 w
+    MO_FW_Bitcast w       -> TupleG1 w
 
-    MO_V_Shuffle  l w _ -> [vecwidth l w, vecwidth l w]
-    MO_VF_Shuffle l w _ -> [vecwidth l w, vecwidth l w]
+    MO_V_Shuffle  l w _ -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_VF_Shuffle l w _ -> let !vw = vecwidth l w in TupleG2 vw vw
 
-    MO_V_Broadcast _ w  -> [w]
-    MO_V_Insert   l w   -> [vecwidth l w, w, W32]
-    MO_V_Extract  l w   -> [vecwidth l w, W32]
-    MO_VF_Broadcast _ w -> [w]
-    MO_VF_Insert  l w   -> [vecwidth l w, w, W32]
-    MO_VF_Extract l w   -> [vecwidth l w, W32]
+    MO_V_Broadcast _ w  -> TupleG1 w
+    MO_V_Insert   l w   -> TupleG3 (vecwidth l w) w W32
+    MO_V_Extract  l w   -> TupleG2 (vecwidth l w) W32
+    MO_VF_Broadcast _ w -> TupleG1 w
+    MO_VF_Insert  l w   -> TupleG3 (vecwidth l w) w W32
+    MO_VF_Extract l w   -> TupleG2 (vecwidth l w) W32
       -- SIMD vector indices are always 32 bit
 
-    MO_V_Add l w        -> [vecwidth l w, vecwidth l w]
-    MO_V_Sub l w        -> [vecwidth l w, vecwidth l w]
-    MO_V_Mul l w        -> [vecwidth l w, vecwidth l w]
+    MO_V_Add l w        -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_V_Sub l w        -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_V_Mul l w        -> let !vw = vecwidth l w in TupleG2 vw vw
 
-    MO_VS_Quot l w      -> [vecwidth l w, vecwidth l w]
-    MO_VS_Rem  l w      -> [vecwidth l w, vecwidth l w]
-    MO_VS_Neg  l w      -> [vecwidth l w]
-    MO_VS_Min  l w      -> [vecwidth l w, vecwidth l w]
-    MO_VS_Max  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VS_Quot l w      -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_VS_Rem  l w      -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_VS_Neg  l w      -> TupleG1 (vecwidth l w)
+    MO_VS_Min  l w      -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_VS_Max  l w      -> let !vw = vecwidth l w in TupleG2 vw vw
 
-    MO_VU_Quot l w      -> [vecwidth l w, vecwidth l w]
-    MO_VU_Rem  l w      -> [vecwidth l w, vecwidth l w]
-    MO_VU_Min  l w      -> [vecwidth l w, vecwidth l w]
-    MO_VU_Max  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VU_Quot l w      -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_VU_Rem  l w      -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_VU_Min  l w      -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_VU_Max  l w      -> let !vw = vecwidth l w in TupleG2 vw vw
 
     -- NOTE: The below is owing to the fact that floats use the SSE registers
-    MO_VF_Add  l w      -> [vecwidth l w, vecwidth l w]
-    MO_VF_Sub  l w      -> [vecwidth l w, vecwidth l w]
-    MO_VF_Mul  l w      -> [vecwidth l w, vecwidth l w]
-    MO_VF_Quot l w      -> [vecwidth l w, vecwidth l w]
-    MO_VF_Neg  l w      -> [vecwidth l w]
-    MO_VF_Min  l w      -> [vecwidth l w, vecwidth l w]
-    MO_VF_Max  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VF_Add  l w      -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_VF_Sub  l w      -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_VF_Mul  l w      -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_VF_Quot l w      -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_VF_Neg  l w      -> TupleG1 (vecwidth l w)
+    MO_VF_Min  l w      -> let !vw = vecwidth l w in TupleG2 vw vw
+    MO_VF_Max  l w      -> let !vw = vecwidth l w in TupleG2 vw vw
 
-    MO_RelaxedRead _    -> [wordWidth platform]
-    MO_AlignmentCheck _ w -> [w]
+    MO_RelaxedRead _    -> TupleG1 (wordWidth platform)
+    MO_AlignmentCheck _ w -> TupleG1 w
   where
     vecwidth l w = widthFromBytes (l * widthInBytes w)
 

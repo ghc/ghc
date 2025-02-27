@@ -257,7 +257,7 @@ jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
 -- CmmExprs into CmmRegOff?
 mangleIndexTree :: CmmExpr -> CmmExpr
 mangleIndexTree (CmmRegOff reg off)
-  = CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
+  = CmmMachOp (MO_Add width) (TupleG2 (CmmReg reg) (CmmLit (CmmInt (fromIntegral off) width)))
   where width = typeWidth (cmmRegType reg)
 
 mangleIndexTree _
@@ -356,7 +356,7 @@ iselExpr64 (CmmLit (CmmInt i _)) = do
                 ]
   return (RegCode64 code rhi rlo)
 
-iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
+iselExpr64 (CmmMachOp (MO_Add _) (TupleG2 e1 e2)) = do
    RegCode64 code1 r1hi r1lo <- iselExpr64 e1
    RegCode64 code2 r2hi r2lo <- iselExpr64 e2
    Reg64 rhi rlo <- getNewReg64
@@ -367,7 +367,7 @@ iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
                        ADDE rhi r1hi r2hi ]
    return (RegCode64 code rhi rlo)
 
-iselExpr64 (CmmMachOp (MO_Sub _) [e1,e2]) = do
+iselExpr64 (CmmMachOp (MO_Sub _) (TupleG2 e1 e2)) = do
    RegCode64 code1 r1hi r1lo <- iselExpr64 e1
    RegCode64 code2 r2hi r2lo <- iselExpr64 e2
    Reg64 rhi rlo <- getNewReg64
@@ -378,7 +378,7 @@ iselExpr64 (CmmMachOp (MO_Sub _) [e1,e2]) = do
                        SUBFE rhi r2hi r1hi ]
    return (RegCode64 code rhi rlo)
 
-iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
+iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) (TupleG1 expr)) = do
     (expr_reg,expr_code) <- getSomeReg expr
     Reg64 rhi rlo <- getNewReg64
     let mov_hi = LI rhi (ImmInt 0)
@@ -386,7 +386,7 @@ iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
     return $ RegCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
                        rhi rlo
 
-iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
+iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) (TupleG1 expr)) = do
     (expr_reg,expr_code) <- getSomeReg expr
     Reg64 rhi rlo <- getNewReg64
     let mov_hi = SRA II32 rhi expr_reg (RIImm (ImmInt 31))
@@ -428,23 +428,23 @@ getRegister' config platform tree@(CmmRegOff _ _)
     -- TO_W_(x), TO_W_(x >> 32)
 
 getRegister' _ platform (CmmMachOp (MO_UU_Conv W64 W32)
-                     [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
+                     (TupleG1 (CmmMachOp (MO_U_Shr W64) (TupleG2 x (CmmLit (CmmInt 32 _))))))
  | target32Bit platform = do
   RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
 getRegister' _ platform (CmmMachOp (MO_SS_Conv W64 W32)
-                     [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
+                     (TupleG1 (CmmMachOp (MO_U_Shr W64) (TupleG2 x (CmmLit (CmmInt 32 _))))))
  | target32Bit platform = do
   RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
-getRegister' _ platform (CmmMachOp (MO_UU_Conv W64 W32) [x])
+getRegister' _ platform (CmmMachOp (MO_UU_Conv W64 W32) (TupleG1 x))
  | target32Bit platform = do
   RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-getRegister' _ platform (CmmMachOp (MO_SS_Conv W64 W32) [x])
+getRegister' _ platform (CmmMachOp (MO_SS_Conv W64 W32) (TupleG1 x))
  | target32Bit platform = do
   RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
@@ -469,53 +469,53 @@ getRegister' _ platform (CmmLoad mem pk _)
         return (Any II64 code)
 
 -- catch simple cases of zero- or sign-extended load
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) (TupleG1 (CmmLoad mem _ _))) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II32 (\dst -> addr_code `snocOL` LD II8 dst addr))
 
-getRegister' _ _ (CmmMachOp (MO_XX_Conv W8 W32) [CmmLoad mem _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_XX_Conv W8 W32) (TupleG1 (CmmLoad mem _ _))) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II32 (\dst -> addr_code `snocOL` LD II8 dst addr))
 
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad mem _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W64) (TupleG1 (CmmLoad mem _ _))) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II64 (\dst -> addr_code `snocOL` LD II8 dst addr))
 
-getRegister' _ _ (CmmMachOp (MO_XX_Conv W8 W64) [CmmLoad mem _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_XX_Conv W8 W64) (TupleG1 (CmmLoad mem _ _))) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II64 (\dst -> addr_code `snocOL` LD II8 dst addr))
 
 -- Note: there is no Load Byte Arithmetic instruction, so no signed case here
 
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad mem _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W32) (TupleG1 (CmmLoad mem _ _))) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II32 (\dst -> addr_code `snocOL` LD II16 dst addr))
 
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad mem _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W32) (TupleG1 (CmmLoad mem _ _))) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II32 (\dst -> addr_code `snocOL` LA II16 dst addr))
 
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W64) [CmmLoad mem _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W64) (TupleG1 (CmmLoad mem _ _))) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II64 (\dst -> addr_code `snocOL` LD II16 dst addr))
 
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad mem _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W64) (TupleG1 (CmmLoad mem _ _))) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II64 (\dst -> addr_code `snocOL` LA II16 dst addr))
 
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad mem _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W32 W64) (TupleG1 (CmmLoad mem _ _))) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II64 (\dst -> addr_code `snocOL` LD II32 dst addr))
 
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad mem _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_SS_Conv W32 W64) (TupleG1 (CmmLoad mem _ _))) = do
     -- lwa is DS-form. See Note [Power instruction format]
     Amode addr addr_code <- getAmode DS mem
     return (Any II64 (\dst -> addr_code `snocOL` LA II32 dst addr))
 
-getRegister' config platform (CmmMachOp (MO_RelaxedRead w) [e]) =
+getRegister' config platform (CmmMachOp (MO_RelaxedRead w) (TupleG1 e)) =
       getRegister' config platform (CmmLoad e (cmmBits w) NaturallyAligned)
 
-getRegister' config platform (CmmMachOp mop [x]) -- unary MachOps
+getRegister' config platform (CmmMachOp mop (TupleG1 x)) -- unary MachOps
   = case mop of
       MO_Not rep   -> triv_ucode_int rep NOT
 
@@ -524,6 +524,8 @@ getRegister' config platform (CmmMachOp mop [x]) -- unary MachOps
 
       MO_FF_Conv W64 W32 -> trivialUCode  FF32 FRSP x
       MO_FF_Conv W32 W64 -> conversionNop FF64 x
+      MO_FF_Conv w1 w2 -> sorryDoc "PPC getRegister'" $
+        text ": Strange MO_FF_Conv widths:" <+> ppr w1 <+> ppr w2
 
       MO_FS_Truncate from to -> coerceFP2Int from to x
       MO_SF_Round    from to -> coerceInt2FP from to x
@@ -538,13 +540,17 @@ getRegister' config platform (CmmMachOp mop [x]) -- unary MachOps
 
       MO_XX_Conv _ to -> conversionNop (intFormat to) x
 
+      MO_WF_Bitcast {} -> notImplemented
+      MO_FW_Bitcast {} -> notImplemented
+      MO_AlignmentCheck {} -> notImplemented
+
       MO_V_Broadcast {} -> vectorsNeedLlvm
       MO_VF_Broadcast {} -> vectorsNeedLlvm
+      MO_VS_Neg {} -> vectorsNeedLlvm
       MO_VF_Neg {} -> vectorsNeedLlvm
-
-      _ -> panic "PPC.CodeGen.getRegister: no match"
-
     where
+        notImplemented = sorryDoc "PPC getRegister'" $
+          text "un-implemented unary MachOp:" <+> pprMachOp mop
         vectorsNeedLlvm =
             sorry "SIMD operations on PowerPC currently require the LLVM backend"
         triv_ucode_int   width instr = trivialUCode (intFormat    width) instr x
@@ -563,7 +569,7 @@ getRegister' config platform (CmmMachOp mop [x]) -- unary MachOps
                                  CLRLI arch_fmt dst src1 (arch_bits - size)
                  return (Any (intFormat to) code)
 
-getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
+getRegister' _ _ (CmmMachOp mop (TupleG2 x y)) -- dyadic PrimOps
   = case mop of
       MO_F_Eq _ -> condFltReg EQQ x y
       MO_F_Ne _ -> condFltReg NE  x y
@@ -663,13 +669,11 @@ getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_V_Mul {} -> vectorsNeedLlvm
       MO_VS_Quot {} -> vectorsNeedLlvm
       MO_VS_Rem {} -> vectorsNeedLlvm
-      MO_VS_Neg {} -> vectorsNeedLlvm
       MO_VU_Quot {} -> vectorsNeedLlvm
       MO_VU_Rem {} -> vectorsNeedLlvm
       MO_VF_Extract {} -> vectorsNeedLlvm
       MO_VF_Add {} -> vectorsNeedLlvm
       MO_VF_Sub {} -> vectorsNeedLlvm
-      MO_VF_Neg {} -> vectorsNeedLlvm
       MO_VF_Mul {} -> vectorsNeedLlvm
       MO_VF_Quot {} -> vectorsNeedLlvm
       MO_V_Shuffle {} -> vectorsNeedLlvm
@@ -680,8 +684,6 @@ getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_VS_Max {} -> vectorsNeedLlvm
       MO_VF_Min {} -> vectorsNeedLlvm
       MO_VF_Max {} -> vectorsNeedLlvm
-
-      _ -> panic "PPC.CodeGen.getRegister: no match"
 
   where
     vectorsNeedLlvm =
@@ -722,7 +724,7 @@ getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
                             ]
         return (Any (floatFormat w) code)
 
-getRegister' _ _ (CmmMachOp mop [x, y, z]) -- ternary PrimOps
+getRegister' _ _ (CmmMachOp mop (TupleG3 x y z)) -- ternary PrimOps
   = case mop of
 
       -- x86 fmadd    x * y + z <> PPC fmadd  rt =   ra * rc + rb
@@ -741,8 +743,6 @@ getRegister' _ _ (CmmMachOp mop [x, y, z]) -- ternary PrimOps
 
       MO_V_Insert {} -> vectorsNeedLlvm
       MO_VF_Insert {} -> vectorsNeedLlvm
-
-      _ -> panic "PPC.CodeGen.getRegister: no match"
   where
     vectorsNeedLlvm =
       sorry "SIMD operations on PowerPC currently require the LLVM backend"
@@ -790,10 +790,10 @@ getRegister' _ platform other = pprPanic "getRegister(ppc)" (pdoc platform other
     -- extend?Rep: wrap integer expression of type `from`
     -- in a conversion to `to`
 extendSExpr :: Width -> Width -> CmmExpr -> CmmExpr
-extendSExpr from to x = CmmMachOp (MO_SS_Conv from to) [x]
+extendSExpr from to x = CmmMachOp (MO_SS_Conv from to) (TupleG1 x)
 
 extendUExpr :: Width -> Width -> CmmExpr -> CmmExpr
-extendUExpr from to x = CmmMachOp (MO_UU_Conv from to) [x]
+extendUExpr from to x = CmmMachOp (MO_UU_Conv from to) (TupleG1 x)
 
 -- -----------------------------------------------------------------------------
 --  The 'Amode' type: Memory addressing modes passed up the tree.
@@ -834,33 +834,33 @@ getAmode :: InstrForm -> CmmExpr -> NatM Amode
 getAmode inf tree@(CmmRegOff _ _)
   = getAmode inf (mangleIndexTree tree)
 
-getAmode _ (CmmMachOp (MO_Sub W32) [x, CmmLit (CmmInt i _)])
+getAmode _ (CmmMachOp (MO_Sub W32) (TupleG2 x (CmmLit (CmmInt i _))))
   | Just off <- makeImmediate W32 True (-i)
   = do
         (reg, code) <- getSomeReg x
         return (Amode (AddrRegImm reg off) code)
 
 
-getAmode _ (CmmMachOp (MO_Add W32) [x, CmmLit (CmmInt i _)])
+getAmode _ (CmmMachOp (MO_Add W32) (TupleG2 x (CmmLit (CmmInt i _))))
   | Just off <- makeImmediate W32 True i
   = do
         (reg, code) <- getSomeReg x
         return (Amode (AddrRegImm reg off) code)
 
-getAmode D (CmmMachOp (MO_Sub W64) [x, CmmLit (CmmInt i _)])
+getAmode D (CmmMachOp (MO_Sub W64) (TupleG2 x (CmmLit (CmmInt i _))))
   | Just off <- makeImmediate W64 True (-i)
   = do
         (reg, code) <- getSomeReg x
         return (Amode (AddrRegImm reg off) code)
 
 
-getAmode D (CmmMachOp (MO_Add W64) [x, CmmLit (CmmInt i _)])
+getAmode D (CmmMachOp (MO_Add W64) (TupleG2 x (CmmLit (CmmInt i _))))
   | Just off <- makeImmediate W64 True i
   = do
         (reg, code) <- getSomeReg x
         return (Amode (AddrRegImm reg off) code)
 
-getAmode DS (CmmMachOp (MO_Sub W64) [x, CmmLit (CmmInt i _)])
+getAmode DS (CmmMachOp (MO_Sub W64) (TupleG2 x (CmmLit (CmmInt i _))))
   | Just off <- makeImmediate W64 True (-i)
   = do
         (reg, code) <- getSomeReg x
@@ -873,7 +873,7 @@ getAmode DS (CmmMachOp (MO_Sub W64) [x, CmmLit (CmmInt i _)])
                                   code `snocOL` ADD tmp reg (RIImm off))
         return (Amode (AddrRegImm reg' off') code')
 
-getAmode DS (CmmMachOp (MO_Add W64) [x, CmmLit (CmmInt i _)])
+getAmode DS (CmmMachOp (MO_Add W64) (TupleG2 x (CmmLit (CmmInt i _))))
   | Just off <- makeImmediate W64 True i
   = do
         (reg, code) <- getSomeReg x
@@ -888,7 +888,7 @@ getAmode DS (CmmMachOp (MO_Add W64) [x, CmmLit (CmmInt i _)])
 
    -- optimize addition with 32-bit immediate
    -- (needed for PIC)
-getAmode _ (CmmMachOp (MO_Add W32) [x, CmmLit lit])
+getAmode _ (CmmMachOp (MO_Add W32) (TupleG2 x (CmmLit lit)))
   = do
         platform <- getPlatform
         (src, srcCode) <- getSomeReg x
@@ -929,13 +929,13 @@ getAmode _ (CmmLit lit)
                           ]
                  return (Amode (AddrRegImm tmp (LO imm)) code)
 
-getAmode _ (CmmMachOp (MO_Add W32) [x, y])
+getAmode _ (CmmMachOp (MO_Add W32) (TupleG2 x y))
   = do
         (regX, codeX) <- getSomeReg x
         (regY, codeY) <- getSomeReg y
         return (Amode (AddrRegReg regX regY) (codeX `appOL` codeY))
 
-getAmode _ (CmmMachOp (MO_Add W64) [x, y])
+getAmode _ (CmmMachOp (MO_Add W64) (TupleG2 x y))
   = do
         (regX, codeX) <- getSomeReg x
         (regY, codeY) <- getSomeReg y
@@ -960,7 +960,7 @@ getCondCode :: CmmExpr -> NatM CondCode
 -- almost the same as everywhere else - but we need to
 -- extend small integers to 32 bit or 64 bit first
 
-getCondCode (CmmMachOp mop [x, y])
+getCondCode (CmmMachOp mop (TupleG2 x y))
   = case mop of
       MO_F_Eq W32 -> condFltCode EQQ x y
       MO_F_Ne W32 -> condFltCode NE  x y
@@ -1043,7 +1043,7 @@ condIntCode' True cond W64 x y
 
 -- optimize pointer tag checks. Operation andi. sets condition register
 -- so cmpi ..., 0 is redundant.
-condIntCode' _ cond _ (CmmMachOp (MO_And _) [x, CmmLit (CmmInt imm rep)])
+condIntCode' _ cond _ (CmmMachOp (MO_And _) (TupleG2 x (CmmLit (CmmInt imm rep))))
                  (CmmLit (CmmInt 0 _))
   | not $ condUnsigned cond,
     Just src2 <- makeImmediate rep False imm
@@ -1253,7 +1253,7 @@ genCCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                      , ISYNC
                      ]
          where
-           getAmodeIndex (CmmMachOp (MO_Add _) [x, y])
+           getAmodeIndex (CmmMachOp (MO_Add _) (TupleG2 x y))
              = do
                  (regX, codeX) <- getSomeReg x
                  (regY, codeY) <- getSomeReg y
@@ -1960,7 +1960,7 @@ genCCall' config gcp target dest_regs args
                               accumUsed
             where
                 arg_pro
-                   | isBitsType rep = CmmMachOp (conv_op (typeWidth rep) (wordWidth platform)) [arg]
+                   | isBitsType rep = CmmMachOp (conv_op (typeWidth rep) (wordWidth platform)) (TupleG1 arg)
                    | otherwise      = arg
                 format_pro
                    | isBitsType rep = intFormat (wordWidth platform)
@@ -2261,7 +2261,7 @@ genSwitch config expr targets
     -- We widen to a native-width register to sanitize the high bits
     indexExpr = CmmMachOp
       (MO_UU_Conv expr_w (platformWordWidth platform))
-      [indexExpr0]
+      (TupleG1 indexExpr0)
     expr_w = cmmExprWidth platform expr
     (offset, ids) = switchTargetsToTable targets
     platform      = ncgPlatform config

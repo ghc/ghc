@@ -232,7 +232,7 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 isSmall :: CmmExpr -> Bool
 isSmall (CmmReg (CmmLocal _)) = True  --
 isSmall (CmmLit _) = True
-isSmall (CmmMachOp (MO_Add _) [x,y]) = isTrivial x && isTrivial y
+isSmall (CmmMachOp (MO_Add _) (TupleG2 x y)) = isTrivial x && isTrivial y
 isSmall (CmmRegOff (CmmLocal _) _) = True
 isSmall _ = False
 -}
@@ -565,7 +565,7 @@ we can eliminate a comparison.
 -}
 improveConditional :: CmmNode O x -> CmmNode O x
 improveConditional
-  (CmmCondBranch (CmmMachOp mop [x, CmmLit (CmmInt 1 _)]) t f l)
+  (CmmCondBranch (CmmMachOp mop (TupleG2 x (CmmLit (CmmInt 1 _)))) t f l)
   | neLike mop, isComparisonExpr x
   = CmmCondBranch x f t (fmap not l)
   where
@@ -845,7 +845,7 @@ memConflicts _         _         = True
 
 exprMem :: Platform -> CmmExpr -> AbsMem
 exprMem platform (CmmLoad addr w _)  = bothMems (loadAddr platform addr (typeWidth w)) (exprMem platform addr)
-exprMem platform (CmmMachOp _ es)    = foldr bothMems NoMem (map (exprMem platform) es)
+exprMem platform (CmmMachOp _ es)    = foldr (bothMems . exprMem platform) NoMem es
 exprMem _        _                   = NoMem
 
 loadAddr :: Platform -> CmmExpr -> Width -> AbsMem

@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, GADTs #-}
+{-# LANGUAGE DataKinds, GADTs, RecordWildCards #-}
 module GHC.Cmm.LayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where
@@ -943,11 +943,11 @@ areaToSp platform _ _ _ (CmmMachOp (MO_U_Ge _) args)
 areaToSp _ _ _ _ other = other
 
 -- | Determine whether a stack check cannot fail.
-falseStackCheck :: [CmmExpr] -> Bool
-falseStackCheck [ CmmMachOp (MO_Sub _)
-                      [ CmmRegOff (CmmGlobal (GlobalRegUse Sp _)) x_off
-                      , CmmLit (CmmInt y_lit _)]
-                , CmmReg (CmmGlobal (GlobalRegUse SpLim _))]
+falseStackCheck :: SizedTupleGADT 2 CmmExpr -> Bool
+falseStackCheck (TupleG2 (CmmMachOp (MO_Sub _)
+                                    (TupleG2 (CmmRegOff (CmmGlobal (GlobalRegUse Sp _)) x_off)
+                                             (CmmLit (CmmInt y_lit _))))
+                         (CmmReg (CmmGlobal (GlobalRegUse SpLim _))))
   = fromIntegral x_off >= y_lit
 falseStackCheck _ = False
 

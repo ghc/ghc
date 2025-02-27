@@ -675,7 +675,7 @@ wrapRecExp :: (CmmExpr -> CmmExpr) -> CmmExpr -> CmmExpr
 -- Take a transformer on expressions and apply it recursively.
 -- (wrapRecExp f e) first recursively applies itself to sub-expressions of e
 --                  then  uses f to rewrite the resulting expression
-wrapRecExp f (CmmMachOp op es)       = f (CmmMachOp op $ map (wrapRecExp f) es)
+wrapRecExp f (CmmMachOp op es)       = f (CmmMachOp op $ fmap (wrapRecExp f) es)
 wrapRecExp f (CmmLoad addr ty align) = f (CmmLoad (wrapRecExp f addr) ty align)
 wrapRecExp f e                       = f e
 
@@ -706,7 +706,7 @@ mapForeignTargetM _ (PrimTarget _)      = Nothing
 wrapRecExpM :: (CmmExpr -> Maybe CmmExpr) -> (CmmExpr -> Maybe CmmExpr)
 -- (wrapRecExpM f e) first recursively applies itself to sub-expressions of e
 --                   then  gives f a chance to rewrite the resulting expression
-wrapRecExpM f n@(CmmMachOp op es)       = maybe (f n) (f . CmmMachOp op)    (mapListM (wrapRecExpM f) es)
+wrapRecExpM f n@(CmmMachOp op es)       = maybe (f n) (f . CmmMachOp op)    (mapSizedTupleGADT_maybe (wrapRecExpM f) es)
 wrapRecExpM f n@(CmmLoad addr ty align) = maybe (f n) (\addr' -> f $ CmmLoad addr' ty align) (wrapRecExpM f addr)
 wrapRecExpM f e                         = f e
 

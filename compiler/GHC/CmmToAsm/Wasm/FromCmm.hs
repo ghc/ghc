@@ -237,16 +237,15 @@ lower_MO_Un_Homo ::
   ) ->
   CLabel ->
   CmmType ->
-  [CmmExpr] ->
+  SizedTupleGADT 1 CmmExpr ->
   WasmCodeGenM w (SomeWasmExpr w)
-lower_MO_Un_Homo op lbl t0 [x] = case someWasmTypeFromCmmType t0 of
+lower_MO_Un_Homo op lbl t0 (TupleG1 x) = case someWasmTypeFromCmmType t0 of
   SomeWasmType ty -> do
     WasmExpr x_instr <- lower_CmmExpr_Typed lbl ty x
     pure $
       SomeWasmExpr ty $
         WasmExpr $
           x_instr `WasmConcat` op ty
-lower_MO_Un_Homo _ _ _ _ = panic "lower_MO_Un_Homo: unreachable"
 
 -- | Lower a binary homogeneous operation. Homogeneous: result type is
 -- the same with operand types.
@@ -260,9 +259,9 @@ lower_MO_Bin_Homo ::
   ) ->
   CLabel ->
   CmmType ->
-  [CmmExpr] ->
+  SizedTupleGADT 2 CmmExpr ->
   WasmCodeGenM w (SomeWasmExpr w)
-lower_MO_Bin_Homo op lbl t0 [x, y] = case someWasmTypeFromCmmType t0 of
+lower_MO_Bin_Homo op lbl t0 (TupleG2 x y) = case someWasmTypeFromCmmType t0 of
   SomeWasmType ty -> do
     WasmExpr x_instr <- lower_CmmExpr_Typed lbl ty x
     WasmExpr y_instr <- lower_CmmExpr_Typed lbl ty y
@@ -270,7 +269,6 @@ lower_MO_Bin_Homo op lbl t0 [x, y] = case someWasmTypeFromCmmType t0 of
       SomeWasmExpr ty $
         WasmExpr $
           x_instr `WasmConcat` y_instr `WasmConcat` op ty
-lower_MO_Bin_Homo _ _ _ _ = panic "lower_MO_Bin_Homo: unreachable"
 
 -- | Lower a binary homogeneous operation, and truncate the result if
 -- it's a subword.
@@ -278,9 +276,9 @@ lower_MO_Bin_Homo_Trunc ::
   (forall pre t. WasmTypeTag t -> WasmInstr w (t : t : pre) (t : pre)) ->
   CLabel ->
   Width ->
-  [CmmExpr] ->
+  SizedTupleGADT 2 CmmExpr ->
   WasmCodeGenM w (SomeWasmExpr w)
-lower_MO_Bin_Homo_Trunc op lbl w0 [x, y] =
+lower_MO_Bin_Homo_Trunc op lbl w0 (TupleG2 x y) =
   case someWasmTypeFromCmmType (cmmBits w0) of
     SomeWasmType ty -> do
       WasmExpr x_instr <- lower_CmmExpr_Typed lbl ty x
@@ -290,7 +288,6 @@ lower_MO_Bin_Homo_Trunc op lbl w0 [x, y] =
           truncSubword w0 ty $
             WasmExpr $
               x_instr `WasmConcat` y_instr `WasmConcat` op ty
-lower_MO_Bin_Homo_Trunc _ _ _ _ = panic "lower_MO_Bin_Homo_Trunc: unreachable"
 
 -- | Lower a binary homogeneous operation, first sign extending the
 -- operands, then truncating the result.
@@ -298,9 +295,9 @@ lower_MO_Bin_Homo_Ext_Trunc ::
   (forall pre t. WasmTypeTag t -> WasmInstr w (t : t : pre) (t : pre)) ->
   CLabel ->
   Width ->
-  [CmmExpr] ->
+  SizedTupleGADT 2 CmmExpr ->
   WasmCodeGenM w (SomeWasmExpr w)
-lower_MO_Bin_Homo_Ext_Trunc op lbl w0 [x, y] =
+lower_MO_Bin_Homo_Ext_Trunc op lbl w0 (TupleG2 x y) =
   case someWasmTypeFromCmmType (cmmBits w0) of
     SomeWasmType ty -> do
       WasmExpr x_instr <-
@@ -312,8 +309,6 @@ lower_MO_Bin_Homo_Ext_Trunc op lbl w0 [x, y] =
           truncSubword w0 ty $
             WasmExpr $
               x_instr `WasmConcat` y_instr `WasmConcat` op ty
-lower_MO_Bin_Homo_Ext_Trunc _ _ _ _ =
-  panic "lower_MO_Bin_Homo_Ext_Trunc: unreachable"
 
 -- | Lower a relational binary operation, first sign extending the
 -- operands. Relational: result type is a boolean (word type).
@@ -321,9 +316,9 @@ lower_MO_Bin_Rel_Ext ::
   (forall pre t. WasmTypeTag t -> WasmInstr w (t : t : pre) (w : pre)) ->
   CLabel ->
   Width ->
-  [CmmExpr] ->
+  SizedTupleGADT 2 CmmExpr ->
   WasmCodeGenM w (SomeWasmExpr w)
-lower_MO_Bin_Rel_Ext op lbl w0 [x, y] =
+lower_MO_Bin_Rel_Ext op lbl w0 (TupleG2 x y) =
   case someWasmTypeFromCmmType (cmmBits w0) of
     SomeWasmType ty -> do
       WasmExpr x_instr <-
@@ -335,7 +330,6 @@ lower_MO_Bin_Rel_Ext op lbl w0 [x, y] =
         SomeWasmExpr ty_word $
           WasmExpr $
             x_instr `WasmConcat` y_instr `WasmConcat` op ty
-lower_MO_Bin_Rel_Ext _ _ _ _ = panic "lower_MO_Bin_Rel_Ext: unreachable"
 
 -- | Lower a relational binary operation.
 lower_MO_Bin_Rel ::
@@ -348,9 +342,9 @@ lower_MO_Bin_Rel ::
   ) ->
   CLabel ->
   CmmType ->
-  [CmmExpr] ->
+  SizedTupleGADT 2 CmmExpr ->
   WasmCodeGenM w (SomeWasmExpr w)
-lower_MO_Bin_Rel op lbl t0 [x, y] = case someWasmTypeFromCmmType t0 of
+lower_MO_Bin_Rel op lbl t0 (TupleG2 x y) = case someWasmTypeFromCmmType t0 of
   SomeWasmType ty -> do
     WasmExpr x_instr <- lower_CmmExpr_Typed lbl ty x
     WasmExpr y_instr <- lower_CmmExpr_Typed lbl ty y
@@ -359,7 +353,6 @@ lower_MO_Bin_Rel op lbl t0 [x, y] = case someWasmTypeFromCmmType t0 of
       SomeWasmExpr ty_word $
         WasmExpr $
           x_instr `WasmConcat` y_instr `WasmConcat` op ty
-lower_MO_Bin_Rel _ _ _ _ = panic "lower_MO_Bin_Rel: unreachable"
 
 -- | Cast a shiftL/shiftR RHS to the same type as LHS. Because we may
 -- have a 64-bit LHS and 32-bit RHS, but wasm shift operators are
@@ -384,11 +377,11 @@ shiftRHSCast lbl t1 x = do
 lower_MO_Shl ::
   CLabel ->
   Width ->
-  [CmmExpr] ->
+  SizedTupleGADT 2 CmmExpr ->
   WasmCodeGenM
     w
     (SomeWasmExpr w)
-lower_MO_Shl lbl w0 [x, y] = case someWasmTypeFromCmmType (cmmBits w0) of
+lower_MO_Shl lbl w0 (TupleG2 x y) = case someWasmTypeFromCmmType (cmmBits w0) of
   SomeWasmType ty -> do
     WasmExpr x_instr <- lower_CmmExpr_Typed lbl ty x
     WasmExpr y_instr <- shiftRHSCast lbl ty y
@@ -397,17 +390,16 @@ lower_MO_Shl lbl w0 [x, y] = case someWasmTypeFromCmmType (cmmBits w0) of
         truncSubword w0 ty $
           WasmExpr $
             x_instr `WasmConcat` y_instr `WasmConcat` WasmShl ty
-lower_MO_Shl _ _ _ = panic "lower_MO_Shl: unreachable"
 
 -- | Lower a 'MO_U_Shr' operation.
 lower_MO_U_Shr ::
   CLabel ->
   Width ->
-  [CmmExpr] ->
+  SizedTupleGADT 2 CmmExpr ->
   WasmCodeGenM
     w
     (SomeWasmExpr w)
-lower_MO_U_Shr lbl w0 [x, y] = case someWasmTypeFromCmmType (cmmBits w0) of
+lower_MO_U_Shr lbl w0 (TupleG2 x y) = case someWasmTypeFromCmmType (cmmBits w0) of
   SomeWasmType ty -> do
     WasmExpr x_instr <- lower_CmmExpr_Typed lbl ty x
     WasmExpr y_instr <- shiftRHSCast lbl ty y
@@ -415,18 +407,17 @@ lower_MO_U_Shr lbl w0 [x, y] = case someWasmTypeFromCmmType (cmmBits w0) of
       SomeWasmExpr ty $
         WasmExpr $
           x_instr `WasmConcat` y_instr `WasmConcat` WasmShr Unsigned ty
-lower_MO_U_Shr _ _ _ = panic "lower_MO_U_Shr: unreachable"
 
 -- | Lower a 'MO_S_Shr' operation, first sign-extending the LHS, then
 -- truncating the result.
 lower_MO_S_Shr ::
   CLabel ->
   Width ->
-  [CmmExpr] ->
+  SizedTupleGADT 2 CmmExpr ->
   WasmCodeGenM
     w
     (SomeWasmExpr w)
-lower_MO_S_Shr lbl w0 [x, y] = case someWasmTypeFromCmmType (cmmBits w0) of
+lower_MO_S_Shr lbl w0 (TupleG2 x y) = case someWasmTypeFromCmmType (cmmBits w0) of
   SomeWasmType ty -> do
     WasmExpr x_instr <- extendSubword w0 ty <$> lower_CmmExpr_Typed lbl ty x
     WasmExpr y_instr <- shiftRHSCast lbl ty y
@@ -435,14 +426,13 @@ lower_MO_S_Shr lbl w0 [x, y] = case someWasmTypeFromCmmType (cmmBits w0) of
         truncSubword w0 ty $
           WasmExpr $
             x_instr `WasmConcat` y_instr `WasmConcat` WasmShr Signed ty
-lower_MO_S_Shr _ _ _ = panic "lower_MO_S_Shr: unreachable"
 
 -- | Lower a 'MO_MulMayOflo' operation. It's translated to a ccall to
 -- @hs_mulIntMayOflo@ function in @ghc-prim/cbits/mulIntMayOflo@,
 -- otherwise it's quite non-trivial to implement as inline assembly.
 lower_MO_MulMayOflo ::
-  CLabel -> Width -> [CmmExpr] -> WasmCodeGenM w (SomeWasmExpr w)
-lower_MO_MulMayOflo lbl w0 [x, y] = case someWasmTypeFromCmmType ty_cmm of
+  CLabel -> Width -> SizedTupleGADT 2 CmmExpr -> WasmCodeGenM w (SomeWasmExpr w)
+lower_MO_MulMayOflo lbl w0 (TupleG2 x y) = case someWasmTypeFromCmmType ty_cmm of
   SomeWasmType ty -> do
     WasmExpr x_instr <- lower_CmmExpr_Typed lbl ty x
     WasmExpr y_instr <- lower_CmmExpr_Typed lbl ty y
@@ -455,7 +445,6 @@ lower_MO_MulMayOflo lbl w0 [x, y] = case someWasmTypeFromCmmType ty_cmm of
             `WasmConcat` WasmCCall "hs_mulIntMayOflo"
   where
     ty_cmm = cmmBits w0
-lower_MO_MulMayOflo _ _ _ = panic "lower_MO_MulMayOflo: unreachable"
 
 -- | Lower an unary conversion operation.
 lower_MO_Un_Conv ::
@@ -467,27 +456,26 @@ lower_MO_Un_Conv ::
   CLabel ->
   CmmType ->
   CmmType ->
-  [CmmExpr] ->
+  SizedTupleGADT 1 CmmExpr ->
   WasmCodeGenM w (SomeWasmExpr w)
-lower_MO_Un_Conv op lbl t0 t1 [x] =
+lower_MO_Un_Conv op lbl t0 t1 (TupleG1 x) =
   case (# someWasmTypeFromCmmType t0, someWasmTypeFromCmmType t1 #) of
     (# SomeWasmType ty0, SomeWasmType ty1 #) -> do
       WasmExpr x_instr <- lower_CmmExpr_Typed lbl ty0 x
       pure $ SomeWasmExpr ty1 $ WasmExpr $ x_instr `WasmConcat` op ty0 ty1
-lower_MO_Un_Conv _ _ _ _ _ = panic "lower_MO_Un_Conv: unreachable"
 
 -- | Lower a 'MO_SS_Conv' operation.
 lower_MO_SS_Conv ::
   CLabel ->
   Width ->
   Width ->
-  [CmmExpr] ->
+  SizedTupleGADT 1 CmmExpr ->
   WasmCodeGenM
     w
     (SomeWasmExpr w)
-lower_MO_SS_Conv lbl w0 w1 [x]
+lower_MO_SS_Conv lbl w0 w1 (TupleG1 x)
   | w0 == w1 = lower_CmmExpr lbl x
-lower_MO_SS_Conv lbl w0 w1 [CmmLoad ptr _ align]
+lower_MO_SS_Conv lbl w0 w1 (TupleG1 (CmmLoad ptr _ align))
   | w0 < w1,
     w1 <= W32 = do
       (WasmExpr ptr_instr, o) <- lower_CmmExpr_Ptr lbl ptr
@@ -510,7 +498,7 @@ lower_MO_SS_Conv lbl w0 w1 [CmmLoad ptr _ align]
           TagI32
           (cmmBits w1)
           align
-lower_MO_SS_Conv lbl w0 W64 [CmmLoad ptr _ align] = do
+lower_MO_SS_Conv lbl w0 W64 (TupleG1 (CmmLoad ptr _ align)) = do
   (WasmExpr ptr_instr, o) <- lower_CmmExpr_Ptr lbl ptr
   pure $
     SomeWasmExpr TagI64 $
@@ -522,7 +510,7 @@ lower_MO_SS_Conv lbl w0 W64 [CmmLoad ptr _ align] = do
             Signed
             o
             align
-lower_MO_SS_Conv lbl w0 w1 [x]
+lower_MO_SS_Conv lbl w0 w1 (TupleG1 x)
   | w0 < w1,
     w1 <= W32 = do
       x_expr <- lower_CmmExpr_Typed lbl TagI32 x
@@ -534,20 +522,20 @@ lower_MO_SS_Conv lbl w0 w1 [x]
     w0 > w1 = do
       x_expr <- lower_CmmExpr_Typed lbl TagI32 x
       pure $ SomeWasmExpr TagI32 $ truncSubword w1 TagI32 x_expr
-lower_MO_SS_Conv lbl W32 W64 [x] = do
+lower_MO_SS_Conv lbl W32 W64 (TupleG1 x) = do
   WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagI32 x
   pure $
     SomeWasmExpr TagI64 $
       WasmExpr $
         x_instr `WasmConcat` WasmI64ExtendI32 Signed
-lower_MO_SS_Conv lbl w0 W64 [x] = do
+lower_MO_SS_Conv lbl w0 W64 (TupleG1 x) = do
   WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagI32 x
   pure $
     SomeWasmExpr TagI64 $
       extendSubword w0 TagI64 $
         WasmExpr $
           x_instr `WasmConcat` WasmI64ExtendI32 Unsigned
-lower_MO_SS_Conv lbl W64 w1 [x] = do
+lower_MO_SS_Conv lbl W64 w1 (TupleG1 x) = do
   WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagI64 x
   pure $
     SomeWasmExpr TagI32 $
@@ -561,11 +549,11 @@ lower_MO_UU_Conv ::
   CLabel ->
   Width ->
   Width ->
-  [CmmExpr] ->
+  SizedTupleGADT 1 CmmExpr ->
   WasmCodeGenM
     w
     (SomeWasmExpr w)
-lower_MO_UU_Conv lbl w0 w1 [CmmLoad ptr _ align] =
+lower_MO_UU_Conv lbl w0 w1 (TupleG1 (CmmLoad ptr _ align)) =
   case someWasmTypeFromCmmType (cmmBits w1) of
     SomeWasmType ty ->
       SomeWasmExpr ty
@@ -575,20 +563,20 @@ lower_MO_UU_Conv lbl w0 w1 [CmmLoad ptr _ align] =
           ty
           (cmmBits (min w0 w1))
           align
-lower_MO_UU_Conv lbl w0 w1 [x]
+lower_MO_UU_Conv lbl w0 w1 (TupleG1 x)
   | w0 == w1 = lower_CmmExpr lbl x
   | w0 < w1, w1 <= W32 = lower_CmmExpr lbl x
   | W32 >= w0,
     w0 > w1 = do
       x_expr <- lower_CmmExpr_Typed lbl TagI32 x
       pure $ SomeWasmExpr TagI32 $ truncSubword w1 TagI32 x_expr
-lower_MO_UU_Conv lbl _ W64 [x] = do
+lower_MO_UU_Conv lbl _ W64 (TupleG1 x) = do
   WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagI32 x
   pure $
     SomeWasmExpr TagI64 $
       WasmExpr $
         x_instr `WasmConcat` WasmI64ExtendI32 Unsigned
-lower_MO_UU_Conv lbl W64 w1 [x] = do
+lower_MO_UU_Conv lbl W64 w1 (TupleG1 x) = do
   WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagI64 x
   pure $
     SomeWasmExpr TagI32 $
@@ -602,17 +590,17 @@ lower_MO_FF_Conv ::
   CLabel ->
   Width ->
   Width ->
-  [CmmExpr] ->
+  SizedTupleGADT 1 CmmExpr ->
   WasmCodeGenM
     w
     (SomeWasmExpr w)
-lower_MO_FF_Conv lbl W32 W64 [x] = do
+lower_MO_FF_Conv lbl W32 W64 (TupleG1 x) = do
   WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagF32 x
   pure $
     SomeWasmExpr TagF64 $
       WasmExpr $
         x_instr `WasmConcat` WasmF64PromoteF32
-lower_MO_FF_Conv lbl W64 W32 [x] = do
+lower_MO_FF_Conv lbl W64 W32 (TupleG1 x) = do
   WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagF64 x
   pure $
     SomeWasmExpr TagF32 $
@@ -626,15 +614,15 @@ lower_MO_FF_Conv _ _ _ _ = panic "lower_MO_FF_Conv: unreachable"
 lower_MO_WF_Bitcast ::
   CLabel ->
   Width ->
-  [CmmActual] ->
+  SizedTupleGADT 1 CmmActual ->
   WasmCodeGenM w (SomeWasmExpr w)
-lower_MO_WF_Bitcast lbl W32 [x] = do
+lower_MO_WF_Bitcast lbl W32 (TupleG1 x) = do
   WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagI32 x
   pure $
     SomeWasmExpr TagF32 $
       WasmExpr  $
         x_instr `WasmConcat` WasmReinterpret TagI32 TagF32
-lower_MO_WF_Bitcast lbl W64 [x] = do
+lower_MO_WF_Bitcast lbl W64 (TupleG1 x) = do
   WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagI64 x
   pure $
     SomeWasmExpr TagF64 $
@@ -647,15 +635,15 @@ lower_MO_WF_Bitcast _ _ _ = panic "lower_MO_WF_Bitcast: unreachable"
 lower_MO_FW_Bitcast ::
   CLabel ->
   Width ->
-  [CmmActual] ->
+  SizedTupleGADT 1 CmmActual ->
   WasmCodeGenM w (SomeWasmExpr w)
-lower_MO_FW_Bitcast lbl W32 [x] = do
+lower_MO_FW_Bitcast lbl W32 (TupleG1 x) = do
   WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagF32 x
   pure $
     SomeWasmExpr TagI32 $
       WasmExpr  $
         x_instr `WasmConcat` WasmReinterpret TagF32 TagI32
-lower_MO_FW_Bitcast lbl W64 [x] = do
+lower_MO_FW_Bitcast lbl W64 (TupleG1 x) = do
   WasmExpr x_instr <- lower_CmmExpr_Typed lbl TagF64 x
   pure $
     SomeWasmExpr TagI64 $
@@ -666,12 +654,12 @@ lower_MO_FW_Bitcast _ _ _ = panic "lower_MO_FW_Bitcast: unreachable"
 -- | Lower a 'CmmMachOp'.
 lower_CmmMachOp ::
   CLabel ->
-  MachOp ->
-  [CmmExpr] ->
+  MachOp a ->
+  SizedTupleGADT a CmmExpr ->
   WasmCodeGenM
     w
     (SomeWasmExpr w)
-lower_CmmMachOp lbl (MO_RelaxedRead w0) [x] = lower_CmmExpr lbl (CmmLoad x (cmmBits w0) NaturallyAligned)
+lower_CmmMachOp lbl (MO_RelaxedRead w0) (TupleG1 x) = lower_CmmExpr lbl (CmmLoad x (cmmBits w0) NaturallyAligned)
 lower_CmmMachOp lbl (MO_Add w0) xs = lower_MO_Bin_Homo_Trunc WasmAdd lbl w0 xs
 lower_CmmMachOp lbl (MO_Sub w0) xs = lower_MO_Bin_Homo_Trunc WasmSub lbl w0 xs
 lower_CmmMachOp lbl (MO_Eq w0) xs = lower_MO_Bin_Rel WasmEq lbl (cmmBits w0) xs
@@ -690,11 +678,11 @@ lower_CmmMachOp lbl (MO_S_Rem w0) xs =
     lbl
     w0
     xs
-lower_CmmMachOp lbl (MO_S_Neg w0) [x] =
+lower_CmmMachOp lbl (MO_S_Neg w0) (TupleG1 x) =
   lower_CmmMachOp
     lbl
     (MO_Sub w0)
-    [CmmLit $ CmmInt 0 w0, x]
+    (TupleG2 (CmmLit $ CmmInt 0 w0) x)
 lower_CmmMachOp lbl (MO_U_Quot w0) xs =
   lower_MO_Bin_Homo
     (WasmDiv Unsigned)
@@ -846,11 +834,11 @@ lower_CmmMachOp lbl (MO_Xor w0) xs =
     lbl
     (cmmBits w0)
     xs
-lower_CmmMachOp lbl (MO_Not w0) [x] =
+lower_CmmMachOp lbl (MO_Not w0) (TupleG1 x) =
   lower_CmmMachOp
     lbl
     (MO_Xor w0)
-    [x, CmmLit $ CmmInt (widthMax w0) w0]
+    (TupleG2 x (CmmLit $ CmmInt (widthMax w0) w0))
 lower_CmmMachOp lbl (MO_Shl w0) xs = lower_MO_Shl lbl w0 xs
 lower_CmmMachOp lbl (MO_U_Shr w0) xs = lower_MO_U_Shr lbl w0 xs
 lower_CmmMachOp lbl (MO_S_Shr w0) xs = lower_MO_S_Shr lbl w0 xs
@@ -874,9 +862,41 @@ lower_CmmMachOp lbl (MO_XX_Conv w0 w1) xs = lower_MO_UU_Conv lbl w0 w1 xs
 lower_CmmMachOp lbl (MO_FF_Conv w0 w1) xs = lower_MO_FF_Conv lbl w0 w1 xs
 lower_CmmMachOp lbl (MO_FW_Bitcast w) xs  = lower_MO_FW_Bitcast lbl w xs
 lower_CmmMachOp lbl (MO_WF_Bitcast w) xs  = lower_MO_WF_Bitcast lbl w xs
-lower_CmmMachOp _ mop _ =
-  pprPanic "lower_CmmMachOp: unreachable" $
-    vcat [ text "offending MachOp:" <+> pprMachOp mop ]
+
+lower_CmmMachOp _ mop _ = case mop of
+  MO_FMA{} -> notImplemented
+  MO_V_Broadcast{} -> notImplemented
+  MO_V_Insert{} -> notImplemented
+  MO_V_Extract{} -> notImplemented
+  MO_V_Add{} -> notImplemented
+  MO_V_Sub{} -> notImplemented
+  MO_V_Mul{} -> notImplemented
+  MO_VS_Quot{} -> notImplemented
+  MO_VS_Rem{} -> notImplemented
+  MO_VS_Neg{} -> notImplemented
+  MO_VU_Quot{} -> notImplemented
+  MO_VU_Rem{} -> notImplemented
+  MO_V_Shuffle{} -> notImplemented
+  MO_VF_Shuffle{} -> notImplemented
+  MO_VF_Broadcast{} -> notImplemented
+  MO_VF_Insert{} -> notImplemented
+  MO_VF_Extract{} -> notImplemented
+  MO_VF_Add{} -> notImplemented
+  MO_VF_Sub{} -> notImplemented
+  MO_VF_Neg{} -> notImplemented
+  MO_VF_Mul{} -> notImplemented
+  MO_VF_Quot{} -> notImplemented
+  MO_VS_Min{} -> notImplemented
+  MO_VS_Max{} -> notImplemented
+  MO_VU_Min{} -> notImplemented
+  MO_VU_Max{} -> notImplemented
+  MO_VF_Min{} -> notImplemented
+  MO_VF_Max{} -> notImplemented
+  MO_AlignmentCheck{} -> notImplemented
+  where
+    notImplemented :: a
+    notImplemented = pprPanic "WASM lower_CmmMachOp" $
+      text "un-implemented MachOp:" <+> pprMachOp mop
 
 -- | Lower a 'CmmLit'. Note that we don't emit 'f32.const' or
 -- 'f64.const' for the time being, and instead emit their relative bit
@@ -1062,7 +1082,7 @@ lower_CmmExpr_Ptr lbl ptr = do
           | o >= 0 -> (CmmLit $ CmmLabel lbl, o)
         CmmRegOff reg o
           | o >= 0 -> (CmmReg reg, o)
-        CmmMachOp (MO_Add _) [base, CmmLit (CmmInt o _)]
+        CmmMachOp (MO_Add _) (TupleG2 base (CmmLit (CmmInt o _)))
           | o >= 0 -> (base, fromInteger o)
         _ -> (ptr, 0)
   instrs <- lower_CmmExpr_Typed lbl ty_word ptr'

@@ -461,6 +461,7 @@ Library
         GHC.Data.OrdList
         GHC.Data.OsPath
         GHC.Data.Pair
+        GHC.Data.SizedTupleGADT
         GHC.Data.SmallArray
         GHC.Data.Stream
         GHC.Data.Strict

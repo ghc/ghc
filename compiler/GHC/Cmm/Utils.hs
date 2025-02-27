@@ -239,7 +239,7 @@ mkLblExpr lbl = CmmLit (CmmLabel lbl)
 cmmOffsetExpr :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
 -- assumes base and offset have the same CmmType
 cmmOffsetExpr platform e (CmmLit (CmmInt n _)) = cmmOffset platform e (fromInteger n)
-cmmOffsetExpr platform e byte_off = CmmMachOp (MO_Add (cmmExprWidth platform e)) [e, byte_off]
+cmmOffsetExpr platform e byte_off = CmmMachOp (MO_Add (cmmExprWidth platform e)) (TupleG2 e byte_off)
 
 cmmOffset :: Platform -> CmmExpr -> Int -> CmmExpr
 cmmOffset _platform e 0        = e
@@ -249,12 +249,12 @@ cmmOffset platform  e byte_off = case e of
    CmmLit lit            -> CmmLit (cmmOffsetLit lit byte_off)
    CmmStackSlot area off -> CmmStackSlot area (off - byte_off)
   -- note stack area offsets increase towards lower addresses
-   CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt byte_off1 _rep)]
+   CmmMachOp (MO_Add rep) (TupleG2 expr (CmmLit (CmmInt byte_off1 _rep)))
       -> let !lit_off = (byte_off1 + toInteger byte_off)
-         in CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt lit_off rep)]
+         in CmmMachOp (MO_Add rep) (TupleG2 expr (CmmLit (CmmInt lit_off rep)))
    _ -> let !width = cmmExprWidth platform e
         in
-        CmmMachOp (MO_Add width) [e, CmmLit (CmmInt (toInteger byte_off) width)]
+        CmmMachOp (MO_Add width) (TupleG2 e (CmmLit (CmmInt (toInteger byte_off) width)))
 
 -- Smart constructor for CmmRegOff.  Same caveats as cmmOffset above.
 cmmRegOff :: CmmReg -> Int -> CmmExpr
@@ -294,7 +294,7 @@ cmmIndexExpr platform width base idx =
   cmmOffsetExpr platform base byte_off
   where
     idx_w = cmmExprWidth platform idx
-    byte_off = CmmMachOp (MO_Shl idx_w) [idx, mkIntExpr platform (widthInLog width)]
+    byte_off = CmmMachOp (MO_Shl idx_w) (TupleG2 idx (mkIntExpr platform (widthInLog width)))
 
 cmmLoadIndex :: Platform -> CmmType -> CmmExpr -> Int -> CmmExpr
 cmmLoadIndex platform ty expr ix =
@@ -355,30 +355,30 @@ cmmULtWord, cmmUGeWord, cmmUGtWord, cmmUShrWord,
   cmmOrWord, cmmAndWord,
   cmmSubWord, cmmAddWord, cmmMulWord, cmmQuotWord
   :: Platform -> CmmExpr -> CmmExpr -> CmmExpr
-cmmOrWord platform  e1 e2 = CmmMachOp (mo_wordOr platform)  [e1, e2]
-cmmAndWord platform e1 e2 = CmmMachOp (mo_wordAnd platform) [e1, e2]
-cmmNeWord platform  e1 e2 = CmmMachOp (mo_wordNe platform)  [e1, e2]
-cmmEqWord platform  e1 e2 = CmmMachOp (mo_wordEq platform)  [e1, e2]
-cmmULtWord platform e1 e2 = CmmMachOp (mo_wordULt platform) [e1, e2]
-cmmUGeWord platform e1 e2 = CmmMachOp (mo_wordUGe platform) [e1, e2]
-cmmUGtWord platform e1 e2 = CmmMachOp (mo_wordUGt platform) [e1, e2]
-cmmSLtWord platform e1 e2 = CmmMachOp (mo_wordSLt platform) [e1, e2]
-cmmUShrWord platform e1 e2 = CmmMachOp (mo_wordUShr platform) [e1, e2]
-cmmAddWord platform e1 e2 = CmmMachOp (mo_wordAdd platform) [e1, e2]
-cmmSubWord platform e1 e2 = CmmMachOp (mo_wordSub platform) [e1, e2]
-cmmMulWord platform e1 e2 = CmmMachOp (mo_wordMul platform) [e1, e2]
-cmmQuotWord platform e1 e2 = CmmMachOp (mo_wordUQuot platform) [e1, e2]
+cmmOrWord platform  e1 e2 = CmmMachOp (mo_wordOr platform)  (TupleG2 e1 e2)
+cmmAndWord platform e1 e2 = CmmMachOp (mo_wordAnd platform) (TupleG2 e1 e2)
+cmmNeWord platform  e1 e2 = CmmMachOp (mo_wordNe platform)  (TupleG2 e1 e2)
+cmmEqWord platform  e1 e2 = CmmMachOp (mo_wordEq platform)  (TupleG2 e1 e2)
+cmmULtWord platform e1 e2 = CmmMachOp (mo_wordULt platform) (TupleG2 e1 e2)
+cmmUGeWord platform e1 e2 = CmmMachOp (mo_wordUGe platform) (TupleG2 e1 e2)
+cmmUGtWord platform e1 e2 = CmmMachOp (mo_wordUGt platform) (TupleG2 e1 e2)
+cmmSLtWord platform e1 e2 = CmmMachOp (mo_wordSLt platform) (TupleG2 e1 e2)
+cmmUShrWord platform e1 e2 = CmmMachOp (mo_wordUShr platform) (TupleG2 e1 e2)
+cmmAddWord platform e1 e2 = CmmMachOp (mo_wordAdd platform) (TupleG2 e1 e2)
+cmmSubWord platform e1 e2 = CmmMachOp (mo_wordSub platform) (TupleG2 e1 e2)
+cmmMulWord platform e1 e2 = CmmMachOp (mo_wordMul platform) (TupleG2 e1 e2)
+cmmQuotWord platform e1 e2 = CmmMachOp (mo_wordUQuot platform) (TupleG2 e1 e2)
 
 cmmNegate :: Platform -> CmmExpr -> CmmExpr
 cmmNegate platform = \case
    (CmmLit (CmmInt n rep))
      -> CmmLit (CmmInt (-n) rep)
-   e -> CmmMachOp (MO_S_Neg (cmmExprWidth platform e)) [e]
+   e -> CmmMachOp (MO_S_Neg (cmmExprWidth platform e)) (TupleG1 e)
 
 cmmToWord :: Platform -> CmmExpr -> CmmExpr
 cmmToWord platform e
   | w == word  = e
-  | otherwise  = CmmMachOp (MO_UU_Conv w word) [e]
+  | otherwise  = CmmMachOp (MO_UU_Conv w word) (TupleG1 e)
   where
     w = cmmExprWidth platform e
     word = wordWidth platform

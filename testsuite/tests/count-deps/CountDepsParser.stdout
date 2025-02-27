@@ -78,6 +78,7 @@ GHC.Data.Maybe
 GHC.Data.OrdList
 GHC.Data.OsPath
 GHC.Data.Pair
+GHC.Data.SizedTupleGADT
 GHC.Data.SmallArray
 GHC.Data.Strict
 GHC.Data.StringBuffer

@@ -438,14 +438,14 @@ srtEscape platform = toStgHalfWord platform (-1)
 wordAligned :: Platform -> DoAlignSanitisation -> CmmExpr -> CmmExpr
 wordAligned platform align_check e
   | align_check
-  = CmmMachOp (MO_AlignmentCheck (platformWordSizeInBytes platform) (wordWidth platform)) [e]
+  = CmmMachOp (MO_AlignmentCheck (platformWordSizeInBytes platform) (wordWidth platform)) (TupleG1 e)
   | otherwise
   = e
 
 -- | Takes a closure pointer and returns the info table pointer
 closureInfoPtr :: Platform -> DoAlignSanitisation -> CmmExpr -> CmmExpr
 closureInfoPtr platform align_check e =
-    CmmMachOp (MO_RelaxedRead (wordWidth platform)) [wordAligned platform align_check e]
+    CmmMachOp (MO_RelaxedRead (wordWidth platform)) (TupleG1 (wordAligned platform align_check e))
 
 -- | Takes an info pointer (the first word of a closure) and returns its entry
 -- code
@@ -461,7 +461,7 @@ entryCode platform e =
 -- (constructors don't need SRTs).
 getConstrTag :: Profile -> DoAlignSanitisation -> CmmExpr -> CmmExpr
 getConstrTag profile align_check closure_ptr
-  = CmmMachOp (MO_UU_Conv (halfWordWidth platform) (wordWidth platform)) [infoTableConstrTag profile info_table]
+  = CmmMachOp (MO_UU_Conv (halfWordWidth platform) (wordWidth platform)) (TupleG1 (infoTableConstrTag profile info_table))
   where
     info_table = infoTable profile (closureInfoPtr platform align_check closure_ptr)
     platform   = profilePlatform profile
@@ -470,7 +470,7 @@ getConstrTag profile align_check closure_ptr
 -- obtained from the info table
 cmmGetClosureType :: Profile -> DoAlignSanitisation -> CmmExpr -> CmmExpr
 cmmGetClosureType profile align_check closure_ptr
-  = CmmMachOp (MO_UU_Conv (halfWordWidth platform) (wordWidth platform)) [infoTableClosureType profile info_table]
+  = CmmMachOp (MO_UU_Conv (halfWordWidth platform) (wordWidth platform)) (TupleG1 (infoTableClosureType profile info_table))
   where
     info_table = infoTable profile (closureInfoPtr platform align_check closure_ptr)
     platform   = profilePlatform profile

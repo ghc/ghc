@@ -30,6 +30,7 @@ import Control.Monad (unless)
 import Control.Monad.Trans.Except (ExceptT (..), Except)
 import Control.Monad.Trans.Reader (ReaderT (..))
 import Data.Functor.Identity (Identity (..))
+import qualified Data.Foldable as Foldable
 
 -- Things to check:
 --     - invariant on CmmBlock in GHC.Cmm.Expr (see comment there)
@@ -101,38 +102,46 @@ lintCmmExpr (CmmLoad expr rep _alignment) = do
 lintCmmExpr expr@(CmmMachOp op args) = do
   platform <- getPlatform
   tys <- mapM lintCmmExpr args
-  lintShiftOp op (zip args tys)
-  if map (typeWidth . cmmExprType platform) args == machOpArgReps platform op
+  lintShiftOp op args tys
+  if fmap (typeWidth . cmmExprType platform) args == machOpArgReps platform op
         then cmmCheckMachOp op args tys
-        else cmmLintMachOpErr expr (map (cmmExprType platform) args) (machOpArgReps platform op)
+        else cmmLintMachOpErr expr (fmap (cmmExprType platform) args) (machOpArgReps platform op)
 lintCmmExpr (CmmRegOff reg offset)
   = do let rep = typeWidth (cmmRegType reg)
        lintCmmExpr (CmmMachOp (MO_Add rep)
-                [CmmReg reg, CmmLit (CmmInt (fromIntegral offset) rep)])
+                (TupleG2 (CmmReg reg) (CmmLit (CmmInt (fromIntegral offset) rep))))
 lintCmmExpr expr =
   do platform <- getPlatform
      return (cmmExprType platform expr)
 
 -- | Check for obviously out-of-bounds shift operations
-lintShiftOp :: MachOp -> [(CmmExpr, CmmType)] -> CmmLint ()
-lintShiftOp op [(_, arg_ty), (CmmLit (CmmInt n _), _)]
+-- (It's not really clear we should be linting for this;
+-- these expressions can reasonably appear in dead branches.
+-- See discussion at #23753 and #23228.)
+lintShiftOp :: MachOp a -> SizedTupleGADT a CmmExpr -> SizedTupleGADT a CmmType -> CmmLint ()
+lintShiftOp op (TupleG2 _ (CmmLit (CmmInt nRaw nw))) (TupleG2 arg_ty _)
   | isShiftOp op
-  , n >= fromIntegral (widthInBits (typeWidth arg_ty))
+  , n <- narrowU nw nRaw
+  , n >= toInteger (widthInBits (typeWidth arg_ty))
   = cmmLintErr (text "Shift operation" <+> pprMachOp op
                 <+> text "has out-of-range offset" <+> ppr n
-                <> text ". This will result in undefined behavior")
-lintShiftOp _ _ = return ()
+                <> text ". This will result in unspecified behavior")
+lintShiftOp _ _ _ = return ()
 
-isShiftOp :: MachOp -> Bool
+isShiftOp :: MachOp a -> Bool
 isShiftOp (MO_Shl _)   = True
 isShiftOp (MO_U_Shr _) = True
 isShiftOp (MO_S_Shr _) = True
 isShiftOp _            = False
 
 -- Check for some common byte/word mismatches (eg. Sp + 1)
-cmmCheckMachOp   :: MachOp -> [CmmExpr] -> [CmmType] -> CmmLint CmmType
-cmmCheckMachOp op [lit@(CmmLit (CmmInt { })), reg@(CmmReg _)] tys
-  = cmmCheckMachOp op [reg, lit] tys
+cmmCheckMachOp
+  :: MachOp a
+  -> SizedTupleGADT a CmmExpr
+  -> SizedTupleGADT a CmmType
+  -> CmmLint CmmType
+cmmCheckMachOp op (TupleG2 lit@(CmmLit (CmmInt { })) reg@(CmmReg _)) tys
+  = cmmCheckMachOp op (TupleG2 reg lit) tys
 cmmCheckMachOp op _ tys
   = do platform <- getPlatform
        return (machOpResultType platform op tys)
@@ -277,14 +286,14 @@ addLintInfo info thing = CmmLint $ \platform ->
         Left err -> Left (hang info 2 err)
         Right a  -> Right a
 
-cmmLintMachOpErr :: CmmExpr -> [CmmType] -> [Width] -> CmmLint a
+cmmLintMachOpErr :: CmmExpr -> SizedTupleGADT n CmmType -> SizedTupleGADT n Width -> CmmLint a
 cmmLintMachOpErr expr argsRep opExpectsRep
      = do
        platform <- getPlatform
        cmmLintErr (text "in MachOp application: " $$
                    nest 2 (pdoc platform expr) $$
-                      (text "op is expecting: " <+> ppr opExpectsRep) $$
-                      (text "arguments provide: " <+> ppr argsRep))
+                      (text "op is expecting: " <+> ppr (Foldable.toList opExpectsRep)) $$
+                      (text "arguments provided: " <+> ppr (Foldable.toList argsRep)))
 
 cmmLintAssignErr :: CmmNode e x -> CmmType -> CmmType -> CmmLint a
 cmmLintAssignErr stmt e_ty r_ty

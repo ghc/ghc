@@ -157,7 +157,7 @@ cmmExprConFold referenceKind expr = do
 cmmExprCon :: NCGConfig -> CmmExpr -> CmmExpr
 cmmExprCon config (CmmLoad addr rep align) = CmmLoad (cmmExprCon config addr) rep align
 cmmExprCon config (CmmMachOp mop args)
-    = cmmMachOpFold (ncgPlatform config) mop (map (cmmExprCon config) args)
+    = cmmMachOpFold (ncgPlatform config) mop (fmap (cmmExprCon config) args)
 cmmExprCon _ other = other
 
 -- handles both PIC and non-PIC cases... a very strange mixture
@@ -187,10 +187,11 @@ cmmExprNative referenceKind expr = do
         CmmLit (CmmLabelOff lbl off)
           -> do dynRef <- cmmMakeDynamicReference config referenceKind lbl
                 -- need to optimize here, since it's late
-                return $ cmmMachOpFold platform (MO_Add (wordWidth platform)) [
-                    dynRef,
+                return $ cmmMachOpFold platform (MO_Add (wordWidth platform)) (
+                  TupleG2
+                    dynRef
                     (CmmLit $ CmmInt (fromIntegral off) (wordWidth platform))
-                  ]
+                  )
 
         -- On powerpc (non-PIC), it's easier to jump directly to a label than
         -- to use the register table, so we replace these registers

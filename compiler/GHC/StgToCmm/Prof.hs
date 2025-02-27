@@ -182,7 +182,8 @@ profAlloc words ccs
                        (CmmMachOp (MO_UU_Conv (wordWidth platform) (typeWidth alloc_rep))
                            -- subtract the "profiling overhead", which is the
                            -- profiling header in a closure.
-                           [CmmMachOp (mo_wordSub platform) [ words, mkIntExpr platform (profHdrSize profile)]]
+                           (TupleG1 (CmmMachOp (mo_wordSub platform) (
+                                        TupleG2 words (mkIntExpr platform (profHdrSize profile)))))
                        )
 
 -- -----------------------------------------------------------------------
@@ -346,16 +347,16 @@ dynErasInit platform = loadUserEra platform
 dynLdvInit :: Platform -> CmmExpr
 dynLdvInit platform =
 -- (era << LDV_SHIFT) | LDV_STATE_CREATE
-  CmmMachOp (mo_wordOr platform) [
-      CmmMachOp (mo_wordShl platform) [loadEra platform, mkIntExpr platform (pc_LDV_SHIFT (platformConstants platform))],
-      CmmLit (mkWordCLit platform (pc_ILDV_STATE_CREATE (platformConstants platform)))
-  ]
+  CmmMachOp (mo_wordOr platform) (TupleG2
+      (CmmMachOp (mo_wordShl platform) (TupleG2 (loadEra platform) (mkIntExpr platform (pc_LDV_SHIFT (platformConstants platform)))))
+      (CmmLit (mkWordCLit platform (pc_ILDV_STATE_CREATE (platformConstants platform))))
+  )
 
 
 -- | If LDV profiling the user_era = 0
 -- , if eras profiling then (ldv)era = 0, so we can initialise correctly by OR the two expressions.
 dynProfInit :: Platform -> CmmExpr
-dynProfInit platform = CmmMachOp (mo_wordOr platform) [(dynLdvInit platform), dynErasInit platform]
+dynProfInit platform = CmmMachOp (mo_wordOr platform) (TupleG2 (dynLdvInit platform) (dynErasInit platform))
 
 
 -- |  Initialise the profiling word of a new dynamic closure
@@ -366,8 +367,8 @@ profHeaderCreate closure = do
   platform <- getPlatform
   let prof_header_wd = profHeaderWord platform closure
 
-  let check_ldv = mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) [loadEra platform, CmmLit (zeroCLit platform)])
-  let check_eras = mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) [loadUserEra platform, CmmLit (zeroCLit platform)])
+  let check_ldv = mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) (TupleG2 (loadEra platform) (CmmLit (zeroCLit platform))))
+  let check_eras = mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) (TupleG2 (loadUserEra platform) (CmmLit (zeroCLit platform))))
   -- Case 2: user_era > 0, eras profiling is enabled
   check_1 <- check_eras (mkStore prof_header_wd (dynErasInit platform)) mkNop
   -- Case 1: era > 0, LDV profiling is enabled
@@ -407,7 +408,7 @@ ldvEnter cl_ptr = do
        -- if (era > 0) {
          --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
          --                era | LDV_STATE_USE }
-        emit =<< mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) [loadEra platform, CmmLit (zeroCLit platform)])
+        emit =<< mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) (TupleG2 (loadEra platform) (CmmLit (zeroCLit platform))))
                      (mkStore ldv_wd new_ldv_wd)
                      mkNop
 
@@ -415,9 +416,9 @@ ldvEnter cl_ptr = do
 
 loadEra :: Platform -> CmmExpr
 loadEra platform = CmmMachOp (MO_UU_Conv (cIntWidth platform) (wordWidth platform))
-    [CmmLoad (mkLblExpr (mkRtsCmmDataLabel (fsLit "era")))
-             (cInt platform)
-             NaturallyAligned]
+    (TupleG1 (CmmLoad (mkLblExpr (mkRtsCmmDataLabel (fsLit "era")))
+                      (cInt platform)
+                      NaturallyAligned))
 
 loadUserEra :: Platform -> CmmExpr
 loadUserEra platform = CmmLoad (mkLblExpr (mkRtsCmmDataLabel (fsLit "user_era")))

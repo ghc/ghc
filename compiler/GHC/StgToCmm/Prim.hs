@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 
@@ -48,9 +49,12 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe
+import qualified Data.Foldable as Foldable
 
 import Control.Monad (liftM, when, unless, zipWithM_)
 import GHC.Utils.Outputable
+import GHC.TypeNats
+import Data.Type.Ord
 
 ------------------------------------------------------------------------
 --      Primitive operations and foreign calls
@@ -339,7 +343,7 @@ emitPrimOp cfg primop =
   EqStablePtrOp -> opTranslate (mo_wordEq platform)
 
   ReallyUnsafePtrEqualityOp -> \[arg1, arg2] -> opIntoRegs $ \[res] ->
-    emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq platform) [arg1,arg2])
+    emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq platform) (TupleG2 arg1 arg2))
 
 --  #define addrToHValuezh(r,a) r=(P_)a
   AddrToAnyOp -> \[arg] -> opIntoRegs $ \[res] ->
@@ -1780,10 +1784,10 @@ emitPrimOp cfg primop =
 
   opNarrow
     :: [CmmExpr]
-    -> (Width -> Width -> MachOp, Width)
+    -> (Width -> Width -> MachOp 1, Width)
     -> PrimopCmmEmit
   opNarrow args (mop, rep) = opIntoRegs $ \[res] -> emitAssign (CmmLocal res) $
-    CmmMachOp (mop rep (wordWidth platform)) [CmmMachOp (mop (wordWidth platform) rep) [arg]]
+    CmmMachOp (mop rep (wordWidth platform)) (TupleG1 (CmmMachOp (mop (wordWidth platform) rep) (TupleG1 arg)))
     where [arg] = args
 
   -- These primops are implemented by CallishMachOps, because they sometimes
@@ -1791,19 +1795,22 @@ emitPrimOp cfg primop =
   opCallish :: CallishMachOp -> [CmmExpr] -> PrimopCmmEmit
   opCallish prim args = opIntoRegs $ \[res] -> emitPrimCall [res] prim args
 
-  opTranslate :: MachOp -> [CmmExpr] -> PrimopCmmEmit
+  opTranslate :: (KnownNat arity, arity < 4) => MachOp arity -> [CmmExpr] -> PrimopCmmEmit
   opTranslate mop args = opIntoRegs $ \[res] -> do
-    let stmt = mkAssign (CmmLocal res) (CmmMachOp mop args)
+    let !args' = fromMaybe (panic "opTranslate: bad arg count")
+                           (listToSizedTupleGADT_maybe args)
+        stmt = mkAssign (CmmLocal res) (CmmMachOp mop args')
     emit stmt
 
   opTranslate64
-    :: MachOp
+    :: (KnownNat arity, arity < 4)
+    => MachOp arity
     -> CallishMachOp
     -> [CmmExpr]
     -> PrimopCmmEmit
   opTranslate64 mop callish
     | allowArith64 = opTranslate mop
-    | otherwise    = opCallish callish
+    | otherwise    = opCallish callish . Foldable.toList
       -- backends not supporting 64-bit arithmetic primops: use callish machine
       -- ops
 
@@ -1891,9 +1898,9 @@ emitPrimOp cfg primop =
     where
       neg x
         | l == 1
-        = CmmMachOp (MO_F_Neg w) [x]
+        = CmmMachOp (MO_F_Neg w) (TupleG1 x)
         | otherwise
-        = CmmMachOp (MO_VF_Neg l w) [x]
+        = CmmMachOp (MO_VF_Neg l w) (TupleG1 x)
   fmaOp _ _ _ _ = panic "fmaOp: wrong number of arguments (expected 3)"
 
 data PrimopCmmEmit
@@ -1909,17 +1916,17 @@ type GenericOp = [CmmFormal] -> [CmmActual] -> FCode ()
 genericIntQuotRemOp :: Width -> GenericOp
 genericIntQuotRemOp width [res_q, res_r] [arg_x, arg_y]
    = emit $ mkAssign (CmmLocal res_q)
-              (CmmMachOp (MO_S_Quot width) [arg_x, arg_y]) <*>
+              (CmmMachOp (MO_S_Quot width) (TupleG2 arg_x arg_y)) <*>
             mkAssign (CmmLocal res_r)
-              (CmmMachOp (MO_S_Rem  width) [arg_x, arg_y])
+              (CmmMachOp (MO_S_Rem  width) (TupleG2 arg_x arg_y))
 genericIntQuotRemOp _ _ _ = panic "genericIntQuotRemOp"
 
 genericWordQuotRemOp :: Width -> GenericOp
 genericWordQuotRemOp width [res_q, res_r] [arg_x, arg_y]
     = emit $ mkAssign (CmmLocal res_q)
-               (CmmMachOp (MO_U_Quot width) [arg_x, arg_y]) <*>
+               (CmmMachOp (MO_U_Quot width) (TupleG2 arg_x arg_y)) <*>
              mkAssign (CmmLocal res_r)
-               (CmmMachOp (MO_U_Rem  width) [arg_x, arg_y])
+               (CmmMachOp (MO_U_Rem  width) (TupleG2 arg_x arg_y))
 genericWordQuotRemOp _ _ _ = panic "genericWordQuotRemOp"
 
 -- Based on the algorithm from LLVM's compiler-rt:
@@ -1933,17 +1940,17 @@ genericWordQuotRem2Op platform [res_q, res_r] [arg_u1, arg_u0, arg_v]
       emit $ mkAssign (CmmLocal v) arg_v
       go arg_u1 arg_u0 v
   where   ty = cmmExprType platform arg_u1
-          shl   x i = CmmMachOp (MO_Shl    (wordWidth platform)) [x, i]
-          shr   x i = CmmMachOp (MO_U_Shr  (wordWidth platform)) [x, i]
-          or    x y = CmmMachOp (MO_Or     (wordWidth platform)) [x, y]
-          ge    x y = CmmMachOp (MO_U_Ge   (wordWidth platform)) [x, y]
-          le    x y = CmmMachOp (MO_U_Le   (wordWidth platform)) [x, y]
-          eq    x y = CmmMachOp (MO_Eq     (wordWidth platform)) [x, y]
-          plus  x y = CmmMachOp (MO_Add    (wordWidth platform)) [x, y]
-          minus x y = CmmMachOp (MO_Sub    (wordWidth platform)) [x, y]
-          times x y = CmmMachOp (MO_Mul    (wordWidth platform)) [x, y]
-          udiv  x y = CmmMachOp (MO_U_Quot (wordWidth platform)) [x, y]
-          and   x y = CmmMachOp (MO_And    (wordWidth platform)) [x, y]
+          shl   x i = CmmMachOp (MO_Shl    (wordWidth platform)) (TupleG2 x i)
+          shr   x i = CmmMachOp (MO_U_Shr  (wordWidth platform)) (TupleG2 x i)
+          or    x y = CmmMachOp (MO_Or     (wordWidth platform)) (TupleG2 x y)
+          ge    x y = CmmMachOp (MO_U_Ge   (wordWidth platform)) (TupleG2 x y)
+          le    x y = CmmMachOp (MO_U_Le   (wordWidth platform)) (TupleG2 x y)
+          eq    x y = CmmMachOp (MO_Eq     (wordWidth platform)) (TupleG2 x y)
+          plus  x y = CmmMachOp (MO_Add    (wordWidth platform)) (TupleG2 x y)
+          minus x y = CmmMachOp (MO_Sub    (wordWidth platform)) (TupleG2 x y)
+          times x y = CmmMachOp (MO_Mul    (wordWidth platform)) (TupleG2 x y)
+          udiv  x y = CmmMachOp (MO_U_Quot (wordWidth platform)) (TupleG2 x y)
+          and   x y = CmmMachOp (MO_And    (wordWidth platform)) (TupleG2 x y)
           lit i     = CmmLit (CmmInt i (wordWidth platform))
           one       = lit 1
           zero      = lit 0
@@ -2102,11 +2109,11 @@ genericWordAdd2Op [res_h, res_l] [arg_x, arg_y]
   = do platform <- getPlatform
        r1 <- newTemp (cmmExprType platform arg_x)
        r2 <- newTemp (cmmExprType platform arg_x)
-       let topHalf x = CmmMachOp (MO_U_Shr (wordWidth platform)) [x, hww]
-           toTopHalf x = CmmMachOp (MO_Shl (wordWidth platform)) [x, hww]
-           bottomHalf x = CmmMachOp (MO_And (wordWidth platform)) [x, hwm]
-           add x y = CmmMachOp (MO_Add (wordWidth platform)) [x, y]
-           or x y = CmmMachOp (MO_Or (wordWidth platform)) [x, y]
+       let topHalf x = CmmMachOp (MO_U_Shr (wordWidth platform)) (TupleG2 x hww)
+           toTopHalf x = CmmMachOp (MO_Shl (wordWidth platform)) (TupleG2 x hww)
+           bottomHalf x = CmmMachOp (MO_And (wordWidth platform)) (TupleG2 x hwm)
+           add x y = CmmMachOp (MO_Add (wordWidth platform)) (TupleG2 x y)
+           or x y = CmmMachOp (MO_Or (wordWidth platform)) (TupleG2 x y)
            hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth platform)))
                                 (wordWidth platform))
            hwm = CmmLit (CmmInt (halfWordMask platform) (wordWidth platform))
@@ -2135,18 +2142,18 @@ genericWordAddCOp :: GenericOp
 genericWordAddCOp [res_r, res_c] [aa, bb]
  = do platform <- getPlatform
       emit $ catAGraphs [
-        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd platform) [aa,bb]),
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd platform) (TupleG2 aa bb)),
         mkAssign (CmmLocal res_c) $
-          CmmMachOp (mo_wordUShr platform) [
-            CmmMachOp (mo_wordOr platform) [
-              CmmMachOp (mo_wordAnd platform) [aa,bb],
-              CmmMachOp (mo_wordAnd platform) [
-                CmmMachOp (mo_wordOr platform) [aa,bb],
-                CmmMachOp (mo_wordNot platform) [CmmReg (CmmLocal res_r)]
-              ]
-            ],
-            mkIntExpr platform (platformWordSizeInBits platform - 1)
-          ]
+          CmmMachOp (mo_wordUShr platform) (TupleG2
+            (CmmMachOp (mo_wordOr platform) (TupleG2
+              (CmmMachOp (mo_wordAnd platform) (TupleG2 aa bb))
+              (CmmMachOp (mo_wordAnd platform) (TupleG2
+                (CmmMachOp (mo_wordOr platform) (TupleG2 aa bb))
+                (CmmMachOp (mo_wordNot platform) (TupleG1 (CmmReg (CmmLocal res_r))))
+              ))
+            ))
+            (mkIntExpr platform (platformWordSizeInBits platform - 1))
+          )
         ]
 genericWordAddCOp _ _ = panic "genericWordAddCOp"
 
@@ -2162,24 +2169,24 @@ genericWordSubCOp :: GenericOp
 genericWordSubCOp [res_r, res_c] [aa, bb]
  = do platform <- getPlatform
       emit $ catAGraphs [
-        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub platform) [aa,bb]),
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub platform) (TupleG2 aa bb)),
         mkAssign (CmmLocal res_c) $
-          CmmMachOp (mo_wordUShr platform) [
-            CmmMachOp (mo_wordOr platform) [
-              CmmMachOp (mo_wordAnd platform) [
-                CmmMachOp (mo_wordNot platform) [aa],
+          CmmMachOp (mo_wordUShr platform) (TupleG2
+            (CmmMachOp (mo_wordOr platform) (TupleG2
+              (CmmMachOp (mo_wordAnd platform) (TupleG2
+                (CmmMachOp (mo_wordNot platform) (TupleG1 aa))
                 bb
-              ],
-              CmmMachOp (mo_wordAnd platform) [
-                CmmMachOp (mo_wordOr platform) [
-                  CmmMachOp (mo_wordNot platform) [aa],
+              ))
+              (CmmMachOp (mo_wordAnd platform) (TupleG2
+                (CmmMachOp (mo_wordOr platform) (TupleG2
+                  (CmmMachOp (mo_wordNot platform) (TupleG1 aa))
                   bb
-                ],
-                CmmReg (CmmLocal res_r)
-              ]
-            ],
-            mkIntExpr platform (platformWordSizeInBits platform - 1)
-          ]
+                ))
+                (CmmReg (CmmLocal res_r))
+              ))
+            ))
+            (mkIntExpr platform (platformWordSizeInBits platform - 1))
+          )
         ]
 genericWordSubCOp _ _ = panic "genericWordSubCOp"
 
@@ -2207,15 +2214,15 @@ genericIntAddCOp [res_r, res_c] [aa, bb]
 -}
  = do platform <- getPlatform
       emit $ catAGraphs [
-        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd platform) [aa,bb]),
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd platform) (TupleG2 aa bb)),
         mkAssign (CmmLocal res_c) $
-          CmmMachOp (mo_wordUShr platform) [
-                CmmMachOp (mo_wordAnd platform) [
-                    CmmMachOp (mo_wordNot platform) [CmmMachOp (mo_wordXor platform) [aa,bb]],
-                    CmmMachOp (mo_wordXor platform) [aa, CmmReg (CmmLocal res_r)]
-                ],
-                mkIntExpr platform (platformWordSizeInBits platform - 1)
-          ]
+          CmmMachOp (mo_wordUShr platform) (TupleG2
+                (CmmMachOp (mo_wordAnd platform) (TupleG2
+                    (CmmMachOp (mo_wordNot platform) (TupleG1 (CmmMachOp (mo_wordXor platform) (TupleG2 aa bb))))
+                    (CmmMachOp (mo_wordXor platform) (TupleG2 aa (CmmReg (CmmLocal res_r))))
+                ))
+                (mkIntExpr platform (platformWordSizeInBits platform - 1))
+          )
         ]
 genericIntAddCOp _ _ = panic "genericIntAddCOp"
 
@@ -2232,15 +2239,15 @@ genericIntSubCOp [res_r, res_c] [aa, bb]
 -}
  = do platform <- getPlatform
       emit $ catAGraphs [
-        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub platform) [aa,bb]),
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub platform) (TupleG2 aa bb)),
         mkAssign (CmmLocal res_c) $
-          CmmMachOp (mo_wordUShr platform) [
-                CmmMachOp (mo_wordAnd platform) [
-                    CmmMachOp (mo_wordXor platform) [aa,bb],
-                    CmmMachOp (mo_wordXor platform) [aa, CmmReg (CmmLocal res_r)]
-                ],
-                mkIntExpr platform (platformWordSizeInBits platform - 1)
-          ]
+          CmmMachOp (mo_wordUShr platform) (TupleG2
+                (CmmMachOp (mo_wordAnd platform) (TupleG2
+                    (CmmMachOp (mo_wordXor platform) (TupleG2 aa bb))
+                    (CmmMachOp (mo_wordXor platform) (TupleG2 aa (CmmReg (CmmLocal res_r))))
+                ))
+                (mkIntExpr platform (platformWordSizeInBits platform - 1))
+          )
         ]
 genericIntSubCOp _ _ = panic "genericIntSubCOp"
 
@@ -2254,13 +2261,13 @@ genericWordMul2Op [res_h, res_l] [arg_x, arg_y]
       r    <- liftM CmmLocal $ newTemp t
       -- This generic implementation is very simple and slow. We might
       -- well be able to do better, but for now this at least works.
-      let topHalf x = CmmMachOp (MO_U_Shr (wordWidth platform)) [x, hww]
-          toTopHalf x = CmmMachOp (MO_Shl (wordWidth platform)) [x, hww]
-          bottomHalf x = CmmMachOp (MO_And (wordWidth platform)) [x, hwm]
-          add x y = CmmMachOp (MO_Add (wordWidth platform)) [x, y]
+      let topHalf x = CmmMachOp (MO_U_Shr (wordWidth platform)) (TupleG2 x hww)
+          toTopHalf x = CmmMachOp (MO_Shl (wordWidth platform)) (TupleG2 x hww)
+          bottomHalf x = CmmMachOp (MO_And (wordWidth platform)) (TupleG2 x hwm)
+          add x y = CmmMachOp (MO_Add (wordWidth platform)) (TupleG2 x y)
           sum = foldl1 add
-          mul x y = CmmMachOp (MO_Mul (wordWidth platform)) [x, y]
-          or x y = CmmMachOp (MO_Or (wordWidth platform)) [x, y]
+          mul x y = CmmMachOp (MO_Mul (wordWidth platform)) (TupleG2 x y)
+          or x y = CmmMachOp (MO_Or (wordWidth platform)) (TupleG2 x y)
           hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth platform)))
                                (wordWidth platform))
           hwm = CmmLit (CmmInt (halfWordMask platform) (wordWidth platform))
@@ -2300,10 +2307,10 @@ genericIntMul2Op [res_c, res_h, res_l] both_args@[arg_x, arg_y]
       _ <- withSequel (AssignTo [p, res_l] False) $
              cmmPrimOpApp cfg WordMul2Op both_args Nothing
       -- 2) correct the high bits of the unsigned result
-      let carryFill x = CmmMachOp (MO_S_Shr ww) [x, wwm1]
-          sub x y     = CmmMachOp (MO_Sub   ww) [x, y]
-          and x y     = CmmMachOp (MO_And   ww) [x, y]
-          neq x y     = CmmMachOp (MO_Ne    ww) [x, y]
+      let carryFill x = CmmMachOp (MO_S_Shr ww) (TupleG2 x wwm1)
+          sub x y     = CmmMachOp (MO_Sub   ww) (TupleG2 x y)
+          and x y     = CmmMachOp (MO_And   ww) (TupleG2 x y)
+          neq x y     = CmmMachOp (MO_Ne    ww) (TupleG2 x y)
           f   x y     = (carryFill x) `and` y
           wwm1        = CmmLit (CmmInt (fromIntegral (widthInBits ww - 1)) ww)
           rl x        = CmmReg (CmmLocal x)
@@ -2337,7 +2344,7 @@ alignmentFromTypes ty idx_ty
   | typeWidth ty <= typeWidth idx_ty = NaturallyAligned
   | otherwise                        = Unaligned
 
-doIndexOffAddrOp :: Maybe MachOp
+doIndexOffAddrOp :: Maybe (MachOp 1)
                  -> CmmType
                  -> [LocalReg]
                  -> [CmmExpr]
@@ -2347,7 +2354,7 @@ doIndexOffAddrOp maybe_post_read_cast rep [res] [addr,idx]
 doIndexOffAddrOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexOffAddrOp"
 
-doIndexOffAddrOpAs :: Maybe MachOp
+doIndexOffAddrOpAs :: Maybe (MachOp 1)
                    -> CmmType
                    -> CmmType
                    -> [LocalReg]
@@ -2359,7 +2366,7 @@ doIndexOffAddrOpAs maybe_post_read_cast rep idx_rep [res] [addr,idx]
 doIndexOffAddrOpAs _ _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexOffAddrOpAs"
 
-doIndexByteArrayOp :: Maybe MachOp
+doIndexByteArrayOp :: Maybe (MachOp 1)
                    -> CmmType
                    -> [LocalReg]
                    -> [CmmExpr]
@@ -2371,7 +2378,7 @@ doIndexByteArrayOp maybe_post_read_cast rep [res] [addr,idx]
 doIndexByteArrayOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexByteArrayOp"
 
-doIndexByteArrayOpAs :: Maybe MachOp
+doIndexByteArrayOpAs :: Maybe (MachOp 1)
                     -> CmmType
                     -> CmmType
                     -> [LocalReg]
@@ -2395,7 +2402,7 @@ doReadPtrArrayOp res addr idx
         doPtrArrayBoundsCheck idx addr
         mkBasicIndexedRead True NaturallyAligned (arrPtrsHdrSize profile) Nothing (gcWord platform) res addr (gcWord platform) idx
 
-doWriteOffAddrOp :: Maybe MachOp
+doWriteOffAddrOp :: Maybe (MachOp 1)
                  -> CmmType
                  -> [LocalReg]
                  -> [CmmExpr]
@@ -2405,7 +2412,7 @@ doWriteOffAddrOp castOp idx_ty [] [addr,idx, val]
 doWriteOffAddrOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doWriteOffAddrOp"
 
-doWriteByteArrayOp :: Maybe MachOp
+doWriteByteArrayOp :: Maybe (MachOp 1)
                    -> CmmType
                    -> [LocalReg]
                    -> [CmmExpr]
@@ -2446,13 +2453,14 @@ doWritePtrArrayOp addr idx val
          cmmOffsetExpr platform
           (cmmOffsetExprW platform (cmmOffsetB platform addr hdr_size)
                          (ptrArraySize platform profile addr))
-          (CmmMachOp (mo_wordUShr platform) [idx, mkIntExpr platform (pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform))])
+          (CmmMachOp (mo_wordUShr platform) (TupleG2 idx
+                                                     (mkIntExpr platform (pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform)))))
          ) (CmmLit (CmmInt 1 W8))
 
 mkBasicIndexedRead :: Bool         -- Should this imply an acquire barrier
                    -> AlignmentSpec
                    -> ByteOff      -- Initial offset in bytes
-                   -> Maybe MachOp -- Optional result cast
+                   -> Maybe (MachOp 1) -- Optional result cast
                    -> CmmType      -- Type of element we are accessing
                    -> LocalReg     -- Destination
                    -> CmmExpr      -- Base address
@@ -2473,7 +2481,7 @@ mkBasicIndexedRead barrier alignment off mb_cast ty res base idx_ty idx
 
         let casted =
               case mb_cast of
-                Just cast -> CmmMachOp cast [result]
+                Just cast -> CmmMachOp cast (TupleG1 result)
                 Nothing   -> result
         emitAssign (CmmLocal res) casted
 
@@ -2520,9 +2528,9 @@ cmmLoadIndexOffExpr platform alignment off ty base idx_ty idx
 setInfo :: CmmExpr -> CmmExpr -> CmmAGraph
 setInfo closure_ptr info_ptr = mkStore closure_ptr info_ptr
 
-maybeCast :: Maybe MachOp -> CmmExpr -> CmmExpr
+maybeCast :: Maybe (MachOp 1) -> CmmExpr -> CmmExpr
 maybeCast Nothing val = val
-maybeCast (Just cast) val = CmmMachOp cast [val]
+maybeCast (Just cast) val = CmmMachOp cast (TupleG1 val)
 
 ptrArraySize :: Platform -> Profile -> CmmExpr -> CmmExpr
 ptrArraySize platform profile arr =
@@ -2636,9 +2644,9 @@ doVecBroadcastOp :: CmmType       -- Type of vector
                  -> FCode ()
 doVecBroadcastOp ty e dst
   | isFloatType (vecElemType ty)
-  = emitAssign (CmmLocal dst) (CmmMachOp (MO_VF_Broadcast len wid) [e])
+  = emitAssign (CmmLocal dst) (CmmMachOp (MO_VF_Broadcast len wid) (TupleG1 e))
   | otherwise
-  = emitAssign (CmmLocal dst) (CmmMachOp (MO_V_Broadcast len wid) [e])
+  = emitAssign (CmmLocal dst) (CmmMachOp (MO_V_Broadcast len wid) (TupleG1 e))
   where
     len :: Length
     len = vecLength ty
@@ -2659,10 +2667,10 @@ doVecPackOp ty es dst = do
     vecPack e i
       | isFloatType (vecElemType ty)
       = emitAssign (CmmLocal dst) (CmmMachOp (MO_VF_Insert l w)
-                                             [CmmReg (CmmLocal dst), e, iLit])
+                                             (TupleG3 (CmmReg (CmmLocal dst)) e iLit))
       | otherwise
       = emitAssign (CmmLocal dst) (CmmMachOp (MO_V_Insert l w)
-                                             [CmmReg (CmmLocal dst), e, iLit])
+                                             (TupleG3 (CmmReg (CmmLocal dst)) e iLit))
       where
         -- vector indices are always 32-bits
         iLit = CmmLit (CmmInt (toInteger i) W32)
@@ -2688,9 +2696,9 @@ doVecUnpackOp ty e res = zipWithM_ vecUnpack res [0..]
     vecUnpack :: CmmFormal -> Int -> FCode ()
     vecUnpack r i
       | isFloatType (vecElemType ty)
-      = emitAssign (CmmLocal r) (CmmMachOp (MO_VF_Extract len wid) [e, iLit])
+      = emitAssign (CmmLocal r) (CmmMachOp (MO_VF_Extract len wid) (TupleG2 e iLit))
       | otherwise
-      = emitAssign (CmmLocal r) (CmmMachOp (MO_V_Extract len wid) [e, iLit])
+      = emitAssign (CmmLocal r) (CmmMachOp (MO_V_Extract  len wid) (TupleG2 e iLit))
       where
         -- vector indices are always 32-bits
         iLit = CmmLit (CmmInt (toInteger i) W32)
@@ -2711,10 +2719,10 @@ doVecInsertOp ty src e idx res = do
     platform <- getPlatform
     -- vector indices are always 32-bits
     let idx' :: CmmExpr
-        idx' = CmmMachOp (MO_SS_Conv (wordWidth platform) W32) [idx]
+        idx' = CmmMachOp (MO_SS_Conv (wordWidth platform) W32) (TupleG1 idx)
     if isFloatType (vecElemType ty)
-    then emitAssign (CmmLocal res) (CmmMachOp (MO_VF_Insert len wid) [src, e, idx'])
-    else emitAssign (CmmLocal res) (CmmMachOp (MO_V_Insert len wid) [src, e, idx'])
+    then emitAssign (CmmLocal res) (CmmMachOp (MO_VF_Insert len wid) (TupleG3 src e idx'))
+    else emitAssign (CmmLocal res) (CmmMachOp (MO_V_Insert  len wid) (TupleG3 src e idx'))
   where
 
     len :: Length
@@ -2732,7 +2740,7 @@ doShuffleOp ty (v1:v2:idxs) res
   = case mapMaybe idx_maybe idxs of
       is
         | length is == len
-        -> emitAssign (CmmLocal res) (CmmMachOp (mo is) [v1,v2])
+        -> emitAssign (CmmLocal res) (CmmMachOp (mo is) (TupleG2 v1 v2))
         | otherwise
         -> pprPanic "doShuffleOp" $
              vcat [ text "shuffle indices must be literals, 0 <= i <" <+> ppr (2 * len) ]
@@ -3564,7 +3572,7 @@ emitMemcmpCall res ptr1 ptr2 n align = do
       emit $ mkAssign (CmmLocal res)
                       (CmmMachOp
                          (mo_s_32ToWord platform)
-                         [(CmmReg (CmmLocal cres))])
+                         (TupleG1 (CmmReg (CmmLocal cres))))
 
 emitBSwapCall :: LocalReg -> CmmExpr -> Width -> FCode ()
 emitBSwapCall res x width =

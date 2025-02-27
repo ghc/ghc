@@ -616,14 +616,14 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
     -- See Note [Single stack check]
     sp_oflo sp_hwm =
          CmmMachOp (mo_wordULt platform)
-                  [CmmMachOp (MO_Sub (typeWidth (cmmRegType $ spReg platform)))
-                             [CmmStackSlot Old 0, sp_hwm],
-                   CmmReg $ spLimReg platform]
+                  (TupleG2 (CmmMachOp (MO_Sub (typeWidth (cmmRegType $ spReg platform)))
+                                      (TupleG2 (CmmStackSlot Old 0) sp_hwm))
+                           (CmmReg $ spLimReg platform))
 
     -- Hp overflow if (Hp > HpLim)
     -- (Hp has been incremented by now)
     -- HpLim points to the LAST WORD of valid allocation space.
-    hp_oflo = CmmMachOp (mo_wordUGt platform) [hpExpr platform, hpLimExpr platform]
+    hp_oflo = CmmMachOp (mo_wordUGt platform) (TupleG2 (hpExpr platform) (hpLimExpr platform))
 
   case mb_stk_hwm of
     Nothing -> return ()
@@ -650,8 +650,8 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
       when (checkYield && not omit_yields) $ do
          -- Yielding if HpLim == 0
          let yielding = CmmMachOp (mo_wordEq platform)
-                                  [CmmReg $ hpLimReg platform,
-                                   CmmLit (zeroCLit platform)]
+                                  (TupleG2 (CmmReg $ hpLimReg platform)
+                                           (CmmLit (zeroCLit platform)))
          emit =<< mkCmmIfGoto' yielding gc_id (Just False)
 
   tscope <- getTickScope

@@ -598,6 +598,11 @@ data LexErr
 -- | Errors from the Cmm parser
 data CmmParserError
    = CmmUnknownPrimitive    !FastString -- ^ Unknown Cmm primitive
+   | CmmBadPrimitiveArity
+     { cbpa_op_name :: !FastString
+     , cbpa_real_arity :: !Int
+     , cbpa_num_given_args :: !Int
+     }                                  -- ^ Cmm primitive used with incorrect arity
    | CmmUnknownMacro        !FastString -- ^ Unknown macro
    | CmmUnknownCConv        !String     -- ^ Unknown calling convention
    | CmmUnrecognisedSafety  !String     -- ^ Unrecognised safety

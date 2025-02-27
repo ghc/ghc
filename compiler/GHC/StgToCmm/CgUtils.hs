@@ -204,9 +204,9 @@ fixStgRegStmt platform stmt = fixAssign $ mapExpDeep fixExpr stmt
             --     register.
             case globalRegUse_reg reg `elem` activeStgRegs platform of
                 True  -> expr
-                False -> CmmMachOp (MO_Add (cmmRegWidth greg)) [
-                                    fixExpr (CmmReg greg),
-                                    CmmLit (CmmInt (fromIntegral offset)
-                                                   (cmmRegWidth greg))]
+                False -> CmmMachOp (MO_Add (cmmRegWidth greg)) (TupleG2
+                                    (fixExpr (CmmReg greg))
+                                    (CmmLit (CmmInt (fromIntegral offset)
+                                                    (cmmRegWidth greg))))
 
         other_expr -> other_expr

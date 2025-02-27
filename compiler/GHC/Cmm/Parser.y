@@ -17,7 +17,7 @@ error checking at all:
     from the native code generator.
 
   * Passing the wrong number of arguments or arguments of the wrong
-    type is not detected.
+    type is usually not detected.
 
 There are two ways to write .cmm code:
 
@@ -232,6 +232,7 @@ See Note [Heap memory barriers] in SMP.h for details.
 ----------------------------------------------------------------------------- -}
 
 {
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TupleSections #-}
 
 module GHC.Cmm.Parser ( parseCmmFile, CmmParserConfig(..) ) where
@@ -304,6 +305,9 @@ import Data.Array
 import Data.Char        ( ord )
 import System.Exit
 import Data.Maybe
+import Data.Type.Equality
+import Data.Type.Ord
+import GHC.TypeNats
 import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as BS8
 }
@@ -846,26 +850,25 @@ cond_likely :: { Maybe Bool }
 -- we have to write this out longhand so that Happy's precedence rules
 -- can kick in.
 expr    :: { CmmParse CmmExpr }
-        : expr '/' expr                 { mkMachOp MO_U_Quot [$1,$3] }
-        | expr '*' expr                 { mkMachOp MO_Mul [$1,$3] }
-        | expr '%' expr                 { mkMachOp MO_U_Rem [$1,$3] }
-        | expr '-' expr                 { mkMachOp MO_Sub [$1,$3] }
-        | expr '+' expr                 { mkMachOp MO_Add [$1,$3] }
-        | expr '>>' expr                { mkMachOp MO_U_Shr [$1,$3] }
-        | expr '<<' expr                { mkMachOp MO_Shl [$1,$3] }
-        | expr '&' expr                 { mkMachOp MO_And [$1,$3] }
-        | expr '^' expr                 { mkMachOp MO_Xor [$1,$3] }
-        | expr '|' expr                 { mkMachOp MO_Or [$1,$3] }
-        | expr '>=' expr                { mkMachOp MO_U_Ge [$1,$3] }
-        | expr '>' expr                 { mkMachOp MO_U_Gt [$1,$3] }
-        | expr '<=' expr                { mkMachOp MO_U_Le [$1,$3] }
-        | expr '<' expr                 { mkMachOp MO_U_Lt [$1,$3] }
-        | expr '!=' expr                { mkMachOp MO_Ne [$1,$3] }
-        | expr '==' expr                { mkMachOp MO_Eq [$1,$3] }
-        | '~' expr                      { mkMachOp MO_Not [$2] }
-        | '-' expr                      { mkMachOp MO_S_Neg [$2] }
-        | expr0 '`' NAME '`' expr0      {% do { mo <- nameToMachOp $3 ;
-                                                return (mkMachOp mo [$1,$5]) } }
+        : expr '/' expr                 { mkMachOp MO_U_Quot (TupleG2 $1 $3) }
+        | expr '*' expr                 { mkMachOp MO_Mul (TupleG2 $1 $3) }
+        | expr '%' expr                 { mkMachOp MO_U_Rem (TupleG2 $1 $3) }
+        | expr '-' expr                 { mkMachOp MO_Sub (TupleG2 $1 $3) }
+        | expr '+' expr                 { mkMachOp MO_Add (TupleG2 $1 $3) }
+        | expr '>>' expr                { mkMachOp MO_U_Shr (TupleG2 $1 $3) }
+        | expr '<<' expr                { mkMachOp MO_Shl (TupleG2 $1 $3) }
+        | expr '&' expr                 { mkMachOp MO_And (TupleG2 $1 $3) }
+        | expr '^' expr                 { mkMachOp MO_Xor (TupleG2 $1 $3) }
+        | expr '|' expr                 { mkMachOp MO_Or (TupleG2 $1 $3) }
+        | expr '>=' expr                { mkMachOp MO_U_Ge (TupleG2 $1 $3) }
+        | expr '>' expr                 { mkMachOp MO_U_Gt (TupleG2 $1 $3) }
+        | expr '<=' expr                { mkMachOp MO_U_Le (TupleG2 $1 $3) }
+        | expr '<' expr                 { mkMachOp MO_U_Lt (TupleG2 $1 $3) }
+        | expr '!=' expr                { mkMachOp MO_Ne (TupleG2 $1 $3) }
+        | expr '==' expr                { mkMachOp MO_Eq (TupleG2 $1 $3) }
+        | '~' expr                      { mkMachOp MO_Not (TupleG1 $2) }
+        | '-' expr                      { mkMachOp MO_S_Neg (TupleG1 $2) }
+        | expr0 '`' NAME '`' expr0      {% parseInfixMachOp $1 $3 $5 }
         | expr0                         { $1 }
 
 expr0   :: { CmmParse CmmExpr }
@@ -874,7 +877,7 @@ expr0   :: { CmmParse CmmExpr }
         | STRING                 { do s <- code (newStringCLit $1);
                                       return (CmmLit s) }
         | reg                    { $1 }
-        | type '!' '[' expr ']'  { do ptr <- $4; return (CmmMachOp (MO_RelaxedRead (typeWidth $1)) [ptr]) }
+        | type '!' '[' expr ']'  { do ptr <- $4; return (CmmMachOp (MO_RelaxedRead (typeWidth $1)) (TupleG1 ptr)) }
         | type '^' '[' expr ']'  { do ptr <- $4; return (CmmLoad ptr $1 Unaligned) }
         | type '[' expr ']'      { do ptr <- $3; return (CmmLoad ptr $1 NaturallyAligned) }
         | '%' NAME '(' exprs0 ')' {% exprOp $2 $4 }
@@ -989,18 +992,30 @@ mkString s = CmmString (BS8.pack s)
 -- argument.  We assume that this is correct: for MachOps that don't have
 -- symmetrical args (e.g. shift ops), the first arg determines the type of
 -- the op.
-mkMachOp :: (Width -> MachOp) -> [CmmParse CmmExpr] -> CmmParse CmmExpr
+mkMachOp :: (a > 0) => (Width -> MachOp a) -> SizedTupleGADT a (CmmParse CmmExpr) -> CmmParse CmmExpr
 mkMachOp fn args = do
   platform <- getPlatform
   arg_exprs <- sequence args
-  return (CmmMachOp (fn (typeWidth (cmmExprType platform (head arg_exprs)))) arg_exprs)
+  return (CmmMachOp (fn (typeWidth (cmmExprType platform (firstOfTupleGADT arg_exprs)))) arg_exprs)
+
+parseInfixMachOp :: CmmParse CmmExpr -> FastString -> CmmParse CmmExpr -> PD (CmmParse CmmExpr)
+parseInfixMachOp leftArg opName rightArg = do
+  MkWidthToMachOpWithArity mo arity <- nameToMachOp opName
+  case testEquality arity (SNat @2) of
+    Just Refl -> pure $ mkMachOp mo (TupleG2 leftArg rightArg)
+    Nothing   -> failMsgPD $ \span -> mkPlainErrorMsgEnvelope span $
+        PsErrCmmParser (CmmBadPrimitiveArity
+                             { cbpa_op_name = opName
+                             , cbpa_real_arity = fromIntegral @Natural @Int (fromSNat arity)
+                             , cbpa_num_given_args = 2
+                             })
 
 getLit :: CmmExpr -> CmmLit
 getLit (CmmLit l) = l
-getLit (CmmMachOp (MO_S_Neg _) [CmmLit (CmmInt i r)])  = CmmInt (negate i) r
+getLit (CmmMachOp (MO_S_Neg _) (TupleG1 (CmmLit (CmmInt i r))))  = CmmInt (negate i) r
 getLit _ = panic "invalid literal" -- TODO messy failure
 
-nameToMachOp :: FastString -> PD (Width -> MachOp)
+nameToMachOp :: FastString -> PD WidthToMachOpWithArity
 nameToMachOp name =
   case lookupUFM machOps name of
         Nothing -> failMsgPD $ \span -> mkPlainErrorMsgEnvelope span $ PsErrCmmParser (CmmUnknownPrimitive name)
@@ -1016,8 +1031,15 @@ exprOp name args_code = do
         args <- sequence args_code
         return (f args)
      Nothing -> do
-        mo <- nameToMachOp name
-        return $ mkMachOp mo args_code
+        MkWidthToMachOpWithArity mo arity <- nameToMachOp name
+        case listToSizedTupleGADT_maybe args_code of
+          Just args_code' -> return $ mkMachOp mo args_code'
+          Nothing -> failMsgPD $ \span -> mkPlainErrorMsgEnvelope span $
+            PsErrCmmParser (CmmBadPrimitiveArity
+                             { cbpa_op_name = name
+                             , cbpa_real_arity = fromIntegral @Natural @Int (fromSNat arity)
+                             , cbpa_num_given_args = length args_code
+                             })
 
 exprMacros :: Profile -> DoAlignSanitisation -> UniqFM FastString ([CmmExpr] -> CmmExpr)
 exprMacros profile align_check = listToUFM [
@@ -1035,82 +1057,93 @@ exprMacros profile align_check = listToUFM [
   where
     platform = profilePlatform profile
 
+data WidthToMachOpWithArity
+  = forall (arity :: Natural).
+  (KnownNat arity, arity > 0, arity < 4) =>
+  MkWidthToMachOpWithArity (Width -> MachOp arity) (SNat arity)
+
 -- we understand a subset of C-- primitives:
-machOps :: UniqFM FastString (Width -> MachOp)
+machOps :: UniqFM FastString WidthToMachOpWithArity
 machOps = listToUFM $
         map (\(x, y) -> (mkFastString x, y)) [
-        ( "add",        MO_Add ),
-        ( "sub",        MO_Sub ),
-        ( "eq",         MO_Eq ),
-        ( "ne",         MO_Ne ),
-        ( "mul",        MO_Mul ),
-        ( "mulmayoflo", MO_S_MulMayOflo ),
-        ( "neg",        MO_S_Neg ),
-        ( "quot",       MO_S_Quot ),
-        ( "rem",        MO_S_Rem ),
-        ( "divu",       MO_U_Quot ),
-        ( "modu",       MO_U_Rem ),
+        ( "add",        mk_op MO_Add ),
+        ( "sub",        mk_op MO_Sub ),
+        ( "eq",         mk_op MO_Eq ),
+        ( "ne",         mk_op MO_Ne ),
+        ( "mul",        mk_op MO_Mul ),
+        ( "mulmayoflo", mk_op MO_S_MulMayOflo ),
+        ( "neg",        mk_op MO_S_Neg ),
+        ( "quot",       mk_op MO_S_Quot ),
+        ( "rem",        mk_op MO_S_Rem ),
+        ( "divu",       mk_op MO_U_Quot ),
+        ( "modu",       mk_op MO_U_Rem ),
 
-        ( "ge",         MO_S_Ge ),
-        ( "le",         MO_S_Le ),
-        ( "gt",         MO_S_Gt ),
-        ( "lt",         MO_S_Lt ),
+        ( "ge",         mk_op MO_S_Ge ),
+        ( "le",         mk_op MO_S_Le ),
+        ( "gt",         mk_op MO_S_Gt ),
+        ( "lt",         mk_op MO_S_Lt ),
 
-        ( "geu",        MO_U_Ge ),
-        ( "leu",        MO_U_Le ),
-        ( "gtu",        MO_U_Gt ),
-        ( "ltu",        MO_U_Lt ),
+        ( "geu",        mk_op MO_U_Ge ),
+        ( "leu",        mk_op MO_U_Le ),
+        ( "gtu",        mk_op MO_U_Gt ),
+        ( "ltu",        mk_op MO_U_Lt ),
 
-        ( "and",        MO_And ),
-        ( "or",         MO_Or ),
-        ( "xor",        MO_Xor ),
-        ( "com",        MO_Not ),
-        ( "shl",        MO_Shl ),
-        ( "shrl",       MO_U_Shr ),
-        ( "shra",       MO_S_Shr ),
+        ( "and",        mk_op MO_And ),
+        ( "or",         mk_op MO_Or ),
+        ( "xor",        mk_op MO_Xor ),
+        ( "com",        mk_op MO_Not ),
+        ( "shl",        mk_op MO_Shl ),
+        ( "shrl",       mk_op MO_U_Shr ),
+        ( "shra",       mk_op MO_S_Shr ),
 
-        ( "fadd",       MO_F_Add ),
-        ( "fsub",       MO_F_Sub ),
-        ( "fneg",       MO_F_Neg ),
-        ( "fmul",       MO_F_Mul ),
-        ( "fquot",      MO_F_Quot ),
-        ( "fmin",       MO_F_Min ),
-        ( "fmax",       MO_F_Max ),
+        ( "fadd",       mk_op MO_F_Add ),
+        ( "fsub",       mk_op MO_F_Sub ),
+        ( "fneg",       mk_op MO_F_Neg ),
+        ( "fmul",       mk_op MO_F_Mul ),
+        ( "fquot",      mk_op MO_F_Quot ),
+        ( "fmin",       mk_op MO_F_Min ),
+        ( "fmax",       mk_op MO_F_Max ),
 
-        ( "fmadd" ,     MO_FMA FMAdd  1 ),
-        ( "fmsub" ,     MO_FMA FMSub  1 ),
-        ( "fnmadd",     MO_FMA FNMAdd 1 ),
-        ( "fnmsub",     MO_FMA FNMSub 1 ),
+        ( "fmadd" ,     mk_op (MO_FMA FMAdd  1) ),
+        ( "fmsub" ,     mk_op (MO_FMA FMSub  1) ),
+        ( "fnmadd",     mk_op (MO_FMA FNMAdd 1) ),
+        ( "fnmsub",     mk_op (MO_FMA FNMSub 1) ),
 
-        ( "feq",        MO_F_Eq ),
-        ( "fne",        MO_F_Ne ),
-        ( "fge",        MO_F_Ge ),
-        ( "fle",        MO_F_Le ),
-        ( "fgt",        MO_F_Gt ),
-        ( "flt",        MO_F_Lt ),
+        ( "feq",        mk_op MO_F_Eq ),
+        ( "fne",        mk_op MO_F_Ne ),
+        ( "fge",        mk_op MO_F_Ge ),
+        ( "fle",        mk_op MO_F_Le ),
+        ( "fgt",        mk_op MO_F_Gt ),
+        ( "flt",        mk_op MO_F_Lt ),
 
-        ( "lobits8",  flip MO_UU_Conv W8  ),
-        ( "lobits16", flip MO_UU_Conv W16 ),
-        ( "lobits32", flip MO_UU_Conv W32 ),
-        ( "lobits64", flip MO_UU_Conv W64 ),
+        ( "lobits8",  mk_op (flip MO_UU_Conv W8 ) ),
+        ( "lobits16", mk_op (flip MO_UU_Conv W16) ),
+        ( "lobits32", mk_op (flip MO_UU_Conv W32) ),
+        ( "lobits64", mk_op (flip MO_UU_Conv W64) ),
 
-        ( "zx16",     flip MO_UU_Conv W16 ),
-        ( "zx32",     flip MO_UU_Conv W32 ),
-        ( "zx64",     flip MO_UU_Conv W64 ),
+        ( "zx16",     mk_op (flip MO_UU_Conv W16) ),
+        ( "zx32",     mk_op (flip MO_UU_Conv W32) ),
+        ( "zx64",     mk_op (flip MO_UU_Conv W64) ),
 
-        ( "sx16",     flip MO_SS_Conv W16 ),
-        ( "sx32",     flip MO_SS_Conv W32 ),
-        ( "sx64",     flip MO_SS_Conv W64 ),
+        ( "sx16",     mk_op (flip MO_SS_Conv W16) ),
+        ( "sx32",     mk_op (flip MO_SS_Conv W32) ),
+        ( "sx64",     mk_op (flip MO_SS_Conv W64) ),
 
-        ( "f2f32",    flip MO_FF_Conv W32 ),  -- TODO; rounding mode
-        ( "f2f64",    flip MO_FF_Conv W64 ),  -- TODO; rounding mode
-        ( "f2i8",     flip MO_FS_Truncate W8 ),
-        ( "f2i16",    flip MO_FS_Truncate W16 ),
-        ( "f2i32",    flip MO_FS_Truncate W32 ),
-        ( "f2i64",    flip MO_FS_Truncate W64 ),
-        ( "i2f32",    flip MO_SF_Round W32 ),
-        ( "i2f64",    flip MO_SF_Round W64 )
+        ( "f2f32",    mk_op (flip MO_FF_Conv W32) ),  -- TODO; rounding mode
+        ( "f2f64",    mk_op (flip MO_FF_Conv W64) ),  -- TODO; rounding mode
+        ( "f2i8",     mk_op (flip MO_FS_Truncate W8) ),
+        ( "f2i16",    mk_op (flip MO_FS_Truncate W16) ),
+        ( "f2i32",    mk_op (flip MO_FS_Truncate W32) ),
+        ( "f2i64",    mk_op (flip MO_FS_Truncate W64) ),
+        ( "i2f32",    mk_op (flip MO_SF_Round W32) ),
+        ( "i2f64",    mk_op (flip MO_SF_Round W64) ),
+
+        ( "w2f_bitcast", mk_op (MO_WF_Bitcast) ),
+        ( "f2w_bitcast", mk_op (MO_FW_Bitcast) )
         ]
+  where mk_op :: forall (arity :: Natural). (KnownNat arity, arity > 0, arity < 4)
+              => (Width -> MachOp arity) -> WidthToMachOpWithArity
+        mk_op fun = MkWidthToMachOpWithArity fun SNat
 
 callishMachOps :: Platform -> UniqFM FastString ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
 callishMachOps platform = listToUFM $
@@ -1473,7 +1506,7 @@ doStore mem_ord rep addr_code val_code
        let val_width = typeWidth (cmmExprType platform val)
            rep_width = typeWidth rep
        let coerce_val
-                | val_width /= rep_width = CmmMachOp (MO_UU_Conv val_width rep_width) [val]
+                | val_width /= rep_width = CmmMachOp (MO_UU_Conv val_width rep_width) (TupleG1 val)
                 | otherwise              = val
        emitStore mem_ord addr coerce_val
 

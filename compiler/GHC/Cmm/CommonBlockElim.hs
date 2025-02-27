@@ -29,6 +29,7 @@ import GHC.Utils.Word64 (truncateWord64ToWord32)
 import Control.Arrow (first, second)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
+import Data.Type.Equality
 
 -- -----------------------------------------------------------------------------
 -- Eliminate common blocks
@@ -227,7 +228,10 @@ eqExprWith eqBid = eq
   CmmLoad e1 t1 a1   `eq` CmmLoad e2 t2 a2   = t1 `cmmEqType` t2 && e1 `eq` e2 && a1==a2
   CmmReg r1          `eq` CmmReg r2          = r1==r2
   CmmRegOff r1 i1    `eq` CmmRegOff r2 i2    = r1==r2 && i1==i2
-  CmmMachOp op1 es1  `eq` CmmMachOp op2 es2  = op1==op2 && liftEq eq es1 es2
+  CmmMachOp op1 es1  `eq` CmmMachOp op2 es2  =
+    case testEquality (sizeOfTupleGADT es1) (sizeOfTupleGADT es2) of
+      Just Refl -> op1==op2 && liftEq eq es1 es2
+      Nothing   -> False
   CmmStackSlot a1 i1 `eq` CmmStackSlot a2 i2 = eqArea a1 a2 && i1==i2
   _e1                `eq` _e2                = False
 

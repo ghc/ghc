@@ -588,8 +588,8 @@ closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
                 ; tickyEnterFun cl_info
                 ; enterCostCentreFun cc
                     (CmmMachOp (mo_wordSub platform)
-                         [ CmmReg (CmmLocal node) -- See [NodeReg clobbered with loopification]
-                         , mkIntExpr platform (funTag platform cl_info) ])
+                         (TupleG2 (CmmReg (CmmLocal node)) -- See [NodeReg clobbered with loopification]
+                                  (mkIntExpr platform (funTag platform cl_info)) ))
                 ; fv_bindings <- mapM bind_fv fv_details
                 -- Load free vars out of closure *after*
                 -- heap check, to reduce live vars over check

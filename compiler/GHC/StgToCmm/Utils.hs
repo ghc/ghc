@@ -121,7 +121,7 @@ addToMemE :: CmmType    -- rep of the counter
           -> CmmExpr    -- What to add (a word-typed expression)
           -> CmmAGraph
 addToMemE rep ptr n
-  = mkStore ptr (CmmMachOp (MO_Add (typeWidth rep)) [CmmLoad ptr rep NaturallyAligned, n])
+  = mkStore ptr (CmmMachOp (MO_Add (typeWidth rep)) (TupleG2 (CmmLoad ptr rep NaturallyAligned) n))
 
 -------------------------------------------------------------------------
 --      Atomic loads and stores
@@ -529,7 +529,7 @@ mk_float_switch rep scrut deflt _bounds [(lit,blk)]
   = do platform <- getPlatform
        return $ mkCbranch (cond platform) deflt blk Nothing
   where
-    cond platform = CmmMachOp ne [scrut, CmmLit cmm_lit]
+    cond platform = CmmMachOp ne (TupleG2 scrut (CmmLit cmm_lit))
       where
         cmm_lit = mkSimpleLit platform lit
         ne      = MO_F_Ne rep
@@ -545,7 +545,7 @@ mk_float_switch rep scrut deflt_blk_id (lo_bound, hi_bound) branches
     bounds_lo = (lo_bound, Just mid_lit)
     bounds_hi = (Just mid_lit, hi_bound)
 
-    cond platform = CmmMachOp lt [scrut, CmmLit cmm_lit]
+    cond platform = CmmMachOp lt (TupleG2 scrut (CmmLit cmm_lit))
       where
         cmm_lit = mkSimpleLit platform mid_lit
         lt      = MO_F_Lt rep

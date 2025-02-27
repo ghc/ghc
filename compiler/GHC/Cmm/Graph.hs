@@ -323,7 +323,7 @@ copyIn profile conv area formals extra_stk
                 | width == wordWidth platform
                 = (global, localRegType reg)
                 | width < wordWidth platform
-                = (CmmMachOp (MO_XX_Conv (wordWidth platform) width) [global]
+                = (CmmMachOp (MO_XX_Conv (wordWidth platform) width) (TupleG1 global)
                   ,setCmmTypeWidth (wordWidth platform) (localRegType reg))
                 | otherwise
                 = panic "Parameter width greater than word width"
@@ -343,7 +343,7 @@ copyIn profile conv area formals extra_stk
           stack_slot = CmmLoad (CmmStackSlot area off) (cmmBits $ wordWidth platform) NaturallyAligned
           local = CmmLocal reg
           width = cmmRegWidth local
-          expr  = CmmMachOp (MO_XX_Conv (wordWidth platform) width) [stack_slot]
+          expr  = CmmMachOp (MO_XX_Conv (wordWidth platform) width) (TupleG1 stack_slot)
         in CmmAssign local expr
 
       | otherwise =
@@ -391,7 +391,7 @@ copyOutOflow profile conv transfer area actuals updfr_off extra_stack_stuff
               -- See Note [Width of parameters]
                 | width == wordWidth platform = v
                 | width < wordWidth platform =
-                    CmmMachOp (MO_XX_Conv width (wordWidth platform)) [v]
+                    CmmMachOp (MO_XX_Conv width (wordWidth platform)) (TupleG1 v)
                 | otherwise = panic "Parameter width greater than word width"
             ru = GlobalRegUse r (cmmExprType platform value)
 
@@ -410,7 +410,7 @@ copyOutOflow profile conv transfer area actuals updfr_off extra_stack_stuff
     value v
       | isBitsType $ cmmExprType platform v
       , width v < wordWidth platform =
-        CmmMachOp (MO_XX_Conv (width v) (wordWidth platform)) [v]
+        CmmMachOp (MO_XX_Conv (width v) (wordWidth platform)) (TupleG1 v)
       | otherwise = v
 
     (setRA, init_offset) =

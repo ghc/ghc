@@ -1119,15 +1119,15 @@ genStore addr@(CmmReg (CmmGlobal r)) val alignment
 genStore addr@(CmmRegOff (CmmGlobal r) n) val alignment
     = genStore_fast addr r n val alignment
 
-genStore addr@(CmmMachOp (MO_Add _) [
-                            (CmmReg (CmmGlobal r)),
-                            (CmmLit (CmmInt n _))])
+genStore addr@(CmmMachOp (MO_Add _) (TupleG2
+                            (CmmReg (CmmGlobal r))
+                            (CmmLit (CmmInt n _))))
                 val alignment
     = genStore_fast addr r (fromInteger n) val alignment
 
-genStore addr@(CmmMachOp (MO_Sub _) [
-                            (CmmReg (CmmGlobal r)),
-                            (CmmLit (CmmInt n _))])
+genStore addr@(CmmMachOp (MO_Sub _) (TupleG2
+                            (CmmReg (CmmGlobal r))
+                            (CmmLit (CmmInt n _))))
                 val alignment
     = genStore_fast addr r (negate $ fromInteger n) val alignment
 
@@ -1407,11 +1407,83 @@ exprToVarOpt opt e = case e of
 
 
 -- | Handle CmmMachOp expressions
-genMachOp :: EOption -> MachOp -> [CmmExpr] -> LlvmM ExprData
+genMachOp :: EOption -> MachOp a -> SizedTupleGADT a CmmExpr -> LlvmM ExprData
+
+-- Handle GlobalRegs pointers
+genMachOp opt o@(MO_Add _) e@(TupleG2 (CmmReg (CmmGlobal r)) (CmmLit (CmmInt n _)))
+    = genMachOp_fast opt o r (fromInteger n) e
+
+genMachOp opt o@(MO_Sub _) e@(TupleG2 (CmmReg (CmmGlobal r)) (CmmLit (CmmInt n _)))
+    = genMachOp_fast opt o r (negate . fromInteger $ n) e
+
+-- Generic case
+genMachOp opt op e = genMachOp_slow opt op e
+
+
+-- | Handle CmmMachOp expressions
+-- This is a specialised method that handles Global register manipulations like
+-- 'Sp - 16', using the getelementptr instruction.
+genMachOp_fast :: EOption -> MachOp a -> GlobalRegUse -> Int -> SizedTupleGADT a CmmExpr
+               -> LlvmM ExprData
+genMachOp_fast opt op r n e
+  = do (gv, grt, s1) <- getCmmRegVal (CmmGlobal r)
+       platform <- getPlatform
+       let (ix,rem) = n `divMod` ((llvmWidthInBits platform . pLower) grt  `div` 8)
+       case isPointer grt && rem == 0 of
+            True -> do
+                (ptr, s2) <- doExpr grt $ GetElemPtr True gv [toI32 ix]
+                (var, s3) <- doExpr (llvmWord platform) $ Cast LM_Ptrtoint ptr (llvmWord platform)
+                return (var, s1 `snocOL` s2 `snocOL` s3, [])
+
+            False -> genMachOp_slow opt op e
+
+
+-- | Handle CmmMachOp expressions
+-- This handles all the cases not handle by the specialised genMachOp_fast.
+genMachOp_slow :: EOption -> MachOp a -> SizedTupleGADT a CmmExpr -> LlvmM ExprData
+
+-- Element extraction
+genMachOp_slow _ (MO_V_Extract l w) (TupleG2 val idx) = runExprData $ do
+    vval <- exprToVarW val
+    vidx <- exprToVarW idx
+    vval' <- singletonPanic "genMachOp_slow" <$>
+             castVarsW Signed [(vval, LMVector l ty)]
+    doExprW ty $ Extract vval' vidx
+  where
+    ty = widthToLlvmInt w
+
+genMachOp_slow _ (MO_VF_Extract l w) (TupleG2 val idx) = runExprData $ do
+    vval <- exprToVarW val
+    vidx <- exprToVarW idx
+    vval' <- singletonPanic "genMachOp_slow" <$>
+             castVarsW Signed [(vval, LMVector l ty)]
+    doExprW ty $ Extract vval' vidx
+  where
+    ty = widthToLlvmFloat w
+
+-- Element insertion
+genMachOp_slow _ (MO_V_Insert l w) (TupleG3 val elt idx) = runExprData $ do
+    vval <- exprToVarW val
+    velt <- exprToVarW elt
+    vidx <- exprToVarW idx
+    vval' <- singletonPanic "genMachOp_slow" <$>
+             castVarsW Signed [(vval, ty)]
+    doExprW ty $ Insert vval' velt vidx
+  where
+    ty = LMVector l (widthToLlvmInt w)
+
+genMachOp_slow _ (MO_VF_Insert l w) (TupleG3 val elt idx) = runExprData $ do
+    vval <- exprToVarW val
+    velt <- exprToVarW elt
+    vidx <- exprToVarW idx
+    vval' <- singletonPanic "genMachOp_slow" <$>
+             castVarsW Signed [(vval, ty)]
+    doExprW ty $ Insert vval' velt vidx
+  where
+    ty = LMVector l (widthToLlvmFloat w)
 
 -- Unary Machop
-genMachOp _ op [x] = case op of
-
+genMachOp_slow _ op (TupleG1 x) = case op of
     MO_Not w ->
         let all1 = mkIntLit (widthToLlvmInt w) (-1)
         in negate (widthToLlvmInt w) all1 LM_MO_Xor
@@ -1463,81 +1535,6 @@ genMachOp _ op [x] = case op of
 
     MO_AlignmentCheck _ _ -> panic "-falignment-sanitisation is not supported by -fllvm"
 
-    -- Handle unsupported cases explicitly so we get a warning
-    -- of missing case when new MachOps added
-    MO_Add _          -> panicOp
-    MO_Mul _          -> panicOp
-    MO_Sub _          -> panicOp
-    MO_S_MulMayOflo _ -> panicOp
-    MO_S_Quot _       -> panicOp
-    MO_S_Rem _        -> panicOp
-    MO_U_Quot _       -> panicOp
-    MO_U_Rem _        -> panicOp
-
-    MO_Eq  _          -> panicOp
-    MO_Ne  _          -> panicOp
-    MO_S_Ge _         -> panicOp
-    MO_S_Gt _         -> panicOp
-    MO_S_Le _         -> panicOp
-    MO_S_Lt _         -> panicOp
-    MO_U_Ge _         -> panicOp
-    MO_U_Gt _         -> panicOp
-    MO_U_Le _         -> panicOp
-    MO_U_Lt _         -> panicOp
-
-    MO_F_Add        _ -> panicOp
-    MO_F_Sub        _ -> panicOp
-    MO_F_Mul        _ -> panicOp
-    MO_F_Quot       _ -> panicOp
-    MO_F_Min        _ -> panicOp
-    MO_F_Max        _ -> panicOp
-
-    MO_FMA _ _ _      -> panicOp
-
-    MO_F_Eq         _ -> panicOp
-    MO_F_Ne         _ -> panicOp
-    MO_F_Ge         _ -> panicOp
-    MO_F_Gt         _ -> panicOp
-    MO_F_Le         _ -> panicOp
-    MO_F_Lt         _ -> panicOp
-
-    MO_And          _ -> panicOp
-    MO_Or           _ -> panicOp
-    MO_Xor          _ -> panicOp
-    MO_Shl          _ -> panicOp
-    MO_U_Shr        _ -> panicOp
-    MO_S_Shr        _ -> panicOp
-
-    MO_V_Insert   _ _ -> panicOp
-    MO_V_Extract  _ _ -> panicOp
-
-    MO_V_Add      _ _ -> panicOp
-    MO_V_Sub      _ _ -> panicOp
-    MO_V_Mul      _ _ -> panicOp
-
-    MO_VS_Quot    _ _ -> panicOp
-    MO_VS_Rem     _ _ -> panicOp
-    MO_VS_Min     _ _ -> panicOp
-    MO_VS_Max     _ _ -> panicOp
-
-    MO_VU_Quot    _ _ -> panicOp
-    MO_VU_Rem     _ _ -> panicOp
-    MO_VU_Min     _ _ -> panicOp
-    MO_VU_Max     _ _ -> panicOp
-
-    MO_VF_Insert  _ _ -> panicOp
-    MO_VF_Extract _ _ -> panicOp
-
-    MO_V_Shuffle {} -> panicOp
-    MO_VF_Shuffle {} -> panicOp
-
-    MO_VF_Add     _ _ -> panicOp
-    MO_VF_Sub     _ _ -> panicOp
-    MO_VF_Mul     _ _ -> panicOp
-    MO_VF_Quot    _ _ -> panicOp
-    MO_VF_Min     _ _ -> panicOp
-    MO_VF_Max     _ _ -> panicOp
-
     where
         negate ty v2 negOp = do
             (vx, stmts, top) <- exprToVar x
@@ -1570,84 +1567,8 @@ genMachOp _ op [x] = case op of
                  w | w > toWidth -> sameConv' reduce
                  _w              -> return x'
 
-        panicOp = panic $ "LLVM.CodeGen.genMachOp: non unary op encountered"
-                       ++ "with one argument! (" ++ show op ++ ")"
-
--- Handle GlobalRegs pointers
-genMachOp opt o@(MO_Add _) e@[(CmmReg (CmmGlobal r)), (CmmLit (CmmInt n _))]
-    = genMachOp_fast opt o r (fromInteger n) e
-
-genMachOp opt o@(MO_Sub _) e@[(CmmReg (CmmGlobal r)), (CmmLit (CmmInt n _))]
-    = genMachOp_fast opt o r (negate . fromInteger $ n) e
-
--- Generic case
-genMachOp opt op e = genMachOp_slow opt op e
-
-
--- | Handle CmmMachOp expressions
--- This is a specialised method that handles Global register manipulations like
--- 'Sp - 16', using the getelementptr instruction.
-genMachOp_fast :: EOption -> MachOp -> GlobalRegUse -> Int -> [CmmExpr]
-               -> LlvmM ExprData
-genMachOp_fast opt op r n e
-  = do (gv, grt, s1) <- getCmmRegVal (CmmGlobal r)
-       platform <- getPlatform
-       let (ix,rem) = n `divMod` ((llvmWidthInBits platform . pLower) grt  `div` 8)
-       case isPointer grt && rem == 0 of
-            True -> do
-                (ptr, s2) <- doExpr grt $ GetElemPtr True gv [toI32 ix]
-                (var, s3) <- doExpr (llvmWord platform) $ Cast LM_Ptrtoint ptr (llvmWord platform)
-                return (var, s1 `snocOL` s2 `snocOL` s3, [])
-
-            False -> genMachOp_slow opt op e
-
-
--- | Handle CmmMachOp expressions
--- This handles all the cases not handle by the specialised genMachOp_fast.
-genMachOp_slow :: EOption -> MachOp -> [CmmExpr] -> LlvmM ExprData
-
--- Element extraction
-genMachOp_slow _ (MO_V_Extract l w) [val, idx] = runExprData $ do
-    vval <- exprToVarW val
-    vidx <- exprToVarW idx
-    vval' <- singletonPanic "genMachOp_slow" <$>
-             castVarsW Signed [(vval, LMVector l ty)]
-    doExprW ty $ Extract vval' vidx
-  where
-    ty = widthToLlvmInt w
-
-genMachOp_slow _ (MO_VF_Extract l w) [val, idx] = runExprData $ do
-    vval <- exprToVarW val
-    vidx <- exprToVarW idx
-    vval' <- singletonPanic "genMachOp_slow" <$>
-             castVarsW Signed [(vval, LMVector l ty)]
-    doExprW ty $ Extract vval' vidx
-  where
-    ty = widthToLlvmFloat w
-
--- Element insertion
-genMachOp_slow _ (MO_V_Insert l w) [val, elt, idx] = runExprData $ do
-    vval <- exprToVarW val
-    velt <- exprToVarW elt
-    vidx <- exprToVarW idx
-    vval' <- singletonPanic "genMachOp_slow" <$>
-             castVarsW Signed [(vval, ty)]
-    doExprW ty $ Insert vval' velt vidx
-  where
-    ty = LMVector l (widthToLlvmInt w)
-
-genMachOp_slow _ (MO_VF_Insert l w) [val, elt, idx] = runExprData $ do
-    vval <- exprToVarW val
-    velt <- exprToVarW elt
-    vidx <- exprToVarW idx
-    vval' <- singletonPanic "genMachOp_slow" <$>
-             castVarsW Signed [(vval, ty)]
-    doExprW ty $ Insert vval' velt vidx
-  where
-    ty = LMVector l (widthToLlvmFloat w)
-
 -- Binary MachOp
-genMachOp_slow opt op [x, y] = case op of
+genMachOp_slow opt op (TupleG2 x y) = case op of
 
     MO_Eq _   -> genBinComp opt LM_CMP_Eq
     MO_Ne _   -> genBinComp opt LM_CMP_Ne
@@ -1686,8 +1607,6 @@ genMachOp_slow opt op [x, y] = case op of
     MO_F_Mul  _ -> genBinMach LM_MO_FMul
     MO_F_Quot _ -> genBinMach LM_MO_FDiv
 
-    MO_FMA _ _ _ -> panicOp
-
     MO_And _   -> genBinMach LM_MO_And
     MO_Or  _   -> genBinMach LM_MO_Or
     MO_Xor _   -> genBinMach LM_MO_Xor
@@ -1710,31 +1629,8 @@ genMachOp_slow opt op [x, y] = case op of
     MO_VF_Mul  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FMul
     MO_VF_Quot l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FDiv
 
-    MO_Not _       -> panicOp
-    MO_S_Neg _     -> panicOp
-    MO_F_Neg _     -> panicOp
-
-    MO_SF_Round    _ _ -> panicOp
-    MO_FS_Truncate _ _ -> panicOp
-    MO_SS_Conv _ _ -> panicOp
-    MO_UU_Conv _ _ -> panicOp
-    MO_XX_Conv _ _ -> panicOp
-    MO_FF_Conv _ _ -> panicOp
-
-    MO_WF_Bitcast _to ->  panicOp
-    MO_FW_Bitcast _to ->  panicOp
-
-    MO_VS_Neg {} -> panicOp
-
-    MO_VF_Broadcast {} -> panicOp
-    MO_V_Broadcast {} -> panicOp
-    MO_V_Insert  {} -> panicOp
-    MO_VF_Insert  {} -> panicOp
-
     MO_V_Shuffle _ _ is -> genShuffleOp is x y
     MO_VF_Shuffle _ _ is -> genShuffleOp is x y
-
-    MO_VF_Neg {} -> panicOp
 
     -- Min/max
     MO_F_Min  {} -> genMinMaxOp "minnum" x y
@@ -1745,10 +1641,6 @@ genMachOp_slow opt op [x, y] = case op of
     MO_VU_Max {} -> genMinMaxOp "umax"   x y
     MO_VS_Min {} -> genMinMaxOp "smin"   x y
     MO_VS_Max {} -> genMinMaxOp "smax"   x y
-
-    MO_RelaxedRead {} -> panicOp
-
-    MO_AlignmentCheck {} -> panicOp
 
     where
         binLlvmOp ty binOp allow_y_cast = do
@@ -1845,13 +1737,7 @@ genMachOp_slow opt op [x, y] = case op of
                     pprPanic "isSMulOK: Not bit type! " $
                         lparen <> ppr word <> rparen
 
-        panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: non-binary op encountered "
-                       ++ "with two arguments! (" ++ show op ++ ")"
-
-genMachOp_slow _opt op [x, y, z] = do
-  let
-    panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: non-ternary op encountered "
-                   ++ "with three arguments! (" ++ show op ++ ")"
+genMachOp_slow _opt op (TupleG3 x y z) = do
   case op of
     MO_FMA var lg width ->
       case var of
@@ -1865,13 +1751,9 @@ genMachOp_slow _opt op [x, y, z] = do
       where
         neg x
           | lg == 1
-          = CmmMachOp (MO_F_Neg width) [x]
+          = CmmMachOp (MO_F_Neg width) (TupleG1 x)
           | otherwise
-          = CmmMachOp (MO_VF_Neg lg width) [x]
-    _ -> panicOp
-
--- More than three expressions, invalid!
-genMachOp_slow _ _ _ = panic "genMachOp_slow: More than 3 expressions in MachOp!"
+          = CmmMachOp (MO_VF_Neg lg width) (TupleG1 x)
 
 genBroadcastOp :: Int -> Width -> CmmExpr -> LlvmM ExprData
 genBroadcastOp lg _width x = runExprData $ do
@@ -1939,15 +1821,15 @@ genLoad atomic e@(CmmReg (CmmGlobal r)) ty align
 genLoad atomic e@(CmmRegOff (CmmGlobal r) n) ty align
     = genLoad_fast atomic e r n ty align
 
-genLoad atomic e@(CmmMachOp (MO_Add _) [
-                            (CmmReg (CmmGlobal r)),
-                            (CmmLit (CmmInt n _))])
+genLoad atomic e@(CmmMachOp (MO_Add _) (TupleG2
+                            (CmmReg (CmmGlobal r))
+                            (CmmLit (CmmInt n _))))
                 ty align
     = genLoad_fast atomic e r (fromInteger n) ty align
 
-genLoad atomic e@(CmmMachOp (MO_Sub _) [
-                            (CmmReg (CmmGlobal r)),
-                            (CmmLit (CmmInt n _))])
+genLoad atomic e@(CmmMachOp (MO_Sub _) (TupleG2
+                            (CmmReg (CmmGlobal r))
+                            (CmmLit (CmmInt n _))))
                 ty align
     = genLoad_fast atomic e r (negate $ fromInteger n) ty align
 
@@ -2335,7 +2217,7 @@ expandCmmReg :: (CmmReg, Int) -> CmmExpr
 expandCmmReg (reg, off)
   = let width = typeWidth (cmmRegType reg)
         voff  = CmmLit $ CmmInt (fromIntegral off) width
-    in CmmMachOp (MO_Add width) [CmmReg reg, voff]
+    in CmmMachOp (MO_Add width) (TupleG2 (CmmReg reg) voff)
 
 
 -- | Convert a block id into a appropriate Llvm label

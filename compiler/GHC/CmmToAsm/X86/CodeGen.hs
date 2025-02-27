@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -495,7 +496,7 @@ jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
 -- CmmExprs into CmmRegOff?
 mangleIndexTree :: CmmReg -> Int -> CmmExpr
 mangleIndexTree reg off
-  = CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
+  = CmmMachOp (MO_Add width) (TupleG2 (CmmReg reg) (CmmLit (CmmInt (fromIntegral off) width)))
   where width = typeWidth (cmmRegType reg)
 
 -- | The dual to getAnyReg: compute an expression into a register, but
@@ -561,7 +562,7 @@ iselExpr64 (CmmReg (CmmLocal local_reg)) = do
   let Reg64 hi lo = localReg64 local_reg
   return (RegCode64 nilOL hi lo)
 
-iselExpr64 (CmmMachOp (MO_Add _) [e1, CmmLit (CmmInt i _)]) = do
+iselExpr64 (CmmMachOp (MO_Add _) (TupleG2 e1 (CmmLit (CmmInt i _)))) = do
    RegCode64 code1 r1hi r1lo <- iselExpr64 e1
    Reg64 rhi rlo <- getNewReg64
    let
@@ -574,7 +575,7 @@ iselExpr64 (CmmMachOp (MO_Add _) [e1, CmmLit (CmmInt i _)]) = do
                        ADC II32 (OpImm (ImmInteger q)) (OpReg rhi) ]
    return (RegCode64 code rhi rlo)
 
-iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
+iselExpr64 (CmmMachOp (MO_Add _) (TupleG2 e1 e2)) = do
    RegCode64 code1 r1hi r1lo <- iselExpr64 e1
    RegCode64 code2 r2hi r2lo <- iselExpr64 e2
    Reg64 rhi rlo <- getNewReg64
@@ -587,7 +588,7 @@ iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
                        ADC II32 (OpReg r2hi) (OpReg rhi) ]
    return (RegCode64 code rhi rlo)
 
-iselExpr64 (CmmMachOp (MO_Sub _) [e1,e2]) = do
+iselExpr64 (CmmMachOp (MO_Sub _) (TupleG2 e1 e2)) = do
    RegCode64 code1 r1hi r1lo <- iselExpr64 e1
    RegCode64 code2 r2hi r2lo <- iselExpr64 e2
    Reg64 rhi rlo <- getNewReg64
@@ -600,7 +601,7 @@ iselExpr64 (CmmMachOp (MO_Sub _) [e1,e2]) = do
                        SBB II32 (OpReg r2hi) (OpReg rhi) ]
    return (RegCode64 code rhi rlo)
 
-iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
+iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) (TupleG1 expr)) = do
      code <- getAnyReg expr
      Reg64 r_dst_hi r_dst_lo <- getNewReg64
      return $ RegCode64 (code r_dst_lo `snocOL`
@@ -608,7 +609,7 @@ iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
                           r_dst_hi
                           r_dst_lo
 
-iselExpr64 (CmmMachOp (MO_UU_Conv W16 W64) [expr]) = do
+iselExpr64 (CmmMachOp (MO_UU_Conv W16 W64) (TupleG1 expr)) = do
      (rsrc, code) <- getByteReg expr
      Reg64 r_dst_hi r_dst_lo <- getNewReg64
      return $ RegCode64 (code `appOL` toOL [
@@ -618,7 +619,7 @@ iselExpr64 (CmmMachOp (MO_UU_Conv W16 W64) [expr]) = do
                           r_dst_hi
                           r_dst_lo
 
-iselExpr64 (CmmMachOp (MO_UU_Conv W8 W64) [expr]) = do
+iselExpr64 (CmmMachOp (MO_UU_Conv W8 W64) (TupleG1 expr)) = do
      (rsrc, code) <- getByteReg expr
      Reg64 r_dst_hi r_dst_lo <- getNewReg64
      return $ RegCode64 (code `appOL` toOL [
@@ -628,7 +629,7 @@ iselExpr64 (CmmMachOp (MO_UU_Conv W8 W64) [expr]) = do
                           r_dst_hi
                           r_dst_lo
 
-iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
+iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) (TupleG1 expr)) = do
      code <- getAnyReg expr
      Reg64 r_dst_hi r_dst_lo <- getNewReg64
      return $ RegCode64 (code r_dst_lo `snocOL`
@@ -639,7 +640,7 @@ iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
                           r_dst_hi
                           r_dst_lo
 
-iselExpr64 (CmmMachOp (MO_SS_Conv W16 W64) [expr]) = do
+iselExpr64 (CmmMachOp (MO_SS_Conv W16 W64) (TupleG1 expr)) = do
      (r, code) <- getByteReg expr
      Reg64 r_dst_hi r_dst_lo <- getNewReg64
      return $ RegCode64 (code `appOL` toOL [
@@ -650,7 +651,7 @@ iselExpr64 (CmmMachOp (MO_SS_Conv W16 W64) [expr]) = do
                           r_dst_hi
                           r_dst_lo
 
-iselExpr64 (CmmMachOp (MO_SS_Conv W8 W64) [expr]) = do
+iselExpr64 (CmmMachOp (MO_SS_Conv W8 W64) (TupleG1 expr)) = do
      (r, code) <- getByteReg expr
      Reg64 r_dst_hi r_dst_lo <- getNewReg64
      return $ RegCode64 (code `appOL` toOL [
@@ -661,7 +662,7 @@ iselExpr64 (CmmMachOp (MO_SS_Conv W8 W64) [expr]) = do
                           r_dst_hi
                           r_dst_lo
 
-iselExpr64 (CmmMachOp (MO_S_Neg _) [expr]) = do
+iselExpr64 (CmmMachOp (MO_S_Neg _) (TupleG1 expr)) = do
    RegCode64 code rhi rlo <- iselExpr64 expr
    Reg64 rohi rolo <- getNewReg64
    let
@@ -681,7 +682,7 @@ iselExpr64 (CmmMachOp (MO_S_Neg _) [expr]) = do
 --
 -- Note that @(r1hi * r2hi) << 64@ can be dropped because it overflows completely.
 
-iselExpr64 (CmmMachOp (MO_Mul _) [e1,e2]) = do
+iselExpr64 (CmmMachOp (MO_Mul _) (TupleG2 e1 e2)) = do
    RegCode64 code1 r1hi r1lo <- iselExpr64 e1
    RegCode64 code2 r2hi r2lo <- iselExpr64 e2
    Reg64 rhi rlo <- getNewReg64
@@ -721,7 +722,7 @@ iselExpr64 (CmmMachOp (MO_S_MulMayOflo W64) _) = do
 -- their shifting. So if the sixth bit (0x32) is set then we additionally move
 -- the contents of @rlo@ to @rhi@ and clear @rlo@.
 
-iselExpr64 (CmmMachOp (MO_Shl _) [e1,e2]) = do
+iselExpr64 (CmmMachOp (MO_Shl _) (TupleG2 e1 e2)) = do
    RegCode64 code1 r1hi r1lo <- iselExpr64 e1
    code2 <- getAnyReg e2
    Reg64 rhi rlo <- getNewReg64
@@ -751,7 +752,7 @@ iselExpr64 (CmmMachOp (MO_Shl _) [e1,e2]) = do
 -- and if the sixth bit of %cl is set (so the shift amount is more than 32).
 -- To accomplish that we shift @rhi@ by 31.
 
-iselExpr64 (CmmMachOp (MO_S_Shr _) [e1,e2]) = do
+iselExpr64 (CmmMachOp (MO_S_Shr _) (TupleG2 e1 e2)) = do
    RegCode64 code1 r1hi r1lo <- iselExpr64 e1
    (r2, code2) <- getSomeReg e2
    Reg64 rhi rlo <- getNewReg64
@@ -778,7 +779,7 @@ iselExpr64 (CmmMachOp (MO_S_Shr _) [e1,e2]) = do
 
 -- Similar to the above.
 
-iselExpr64 (CmmMachOp (MO_U_Shr _) [e1,e2]) = do
+iselExpr64 (CmmMachOp (MO_U_Shr _) (TupleG2 e1 e2)) = do
    RegCode64 code1 r1hi r1lo <- iselExpr64 e1
    (r2, code2) <- getSomeReg e2
    Reg64 rhi rlo <- getNewReg64
@@ -803,11 +804,11 @@ iselExpr64 (CmmMachOp (MO_U_Shr _) [e1,e2]) = do
                      ]
    return (RegCode64 code rhi rlo)
 
-iselExpr64 (CmmMachOp (MO_And _) [e1,e2]) = iselExpr64ParallelBin AND e1 e2
-iselExpr64 (CmmMachOp (MO_Or  _) [e1,e2]) = iselExpr64ParallelBin OR  e1 e2
-iselExpr64 (CmmMachOp (MO_Xor _) [e1,e2]) = iselExpr64ParallelBin XOR e1 e2
+iselExpr64 (CmmMachOp (MO_And _) (TupleG2 e1 e2)) = iselExpr64ParallelBin AND e1 e2
+iselExpr64 (CmmMachOp (MO_Or  _) (TupleG2 e1 e2)) = iselExpr64ParallelBin OR  e1 e2
+iselExpr64 (CmmMachOp (MO_Xor _) (TupleG2 e1 e2)) = iselExpr64ParallelBin XOR e1 e2
 
-iselExpr64 (CmmMachOp (MO_Not _) [e1]) = do
+iselExpr64 (CmmMachOp (MO_Not _) (TupleG1 e1)) = do
    RegCode64 code1 r1hi r1lo <- iselExpr64 e1
    Reg64 rhi rlo <- getNewReg64
    let
@@ -873,107 +874,104 @@ getRegister' platform is32Bit (CmmReg reg)
 getRegister' platform is32Bit (CmmRegOff r n)
   = getRegister' platform is32Bit $ mangleIndexTree r n
 
-getRegister' platform is32Bit (CmmMachOp (MO_RelaxedRead w) [e])
+getRegister' platform is32Bit (CmmMachOp (MO_RelaxedRead w) (TupleG1 e))
   = getRegister' platform is32Bit (CmmLoad e (cmmBits w) NaturallyAligned)
 
-getRegister' platform is32Bit (CmmMachOp (MO_AlignmentCheck align _) [e])
+getRegister' platform is32Bit (CmmMachOp (MO_AlignmentCheck align _) (TupleG1 e))
   = addAlignmentCheck align <$> getRegister' platform is32Bit e
 
 -- for 32-bit architectures, support some 64 -> 32 bit conversions:
 -- TO_W_(x), TO_W_(x >> 32)
 
 getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W32)
-                     [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
+                     (TupleG1 (CmmMachOp (MO_U_Shr W64) (TupleG2 x (CmmLit (CmmInt 32 _))))))
  | is32Bit = do
   RegCode64 code rhi _rlo <- iselExpr64 x
   return $ Fixed II32 rhi code
 
 getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W64 W32)
-                     [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
+                     (TupleG1 (CmmMachOp (MO_U_Shr W64) (TupleG2 x (CmmLit (CmmInt 32 _))))))
  | is32Bit = do
   RegCode64 code rhi _rlo <- iselExpr64 x
   return $ Fixed II32 rhi code
 
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W32) [x])
+getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W32) (TupleG1 x))
  | is32Bit = do
   RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W64 W32) [x])
+getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W64 W32) (TupleG1 x))
  | is32Bit = do
   RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W8) [x])
+getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W8) (TupleG1 x))
  | is32Bit = do
   RegCode64 code _rhi rlo <- iselExpr64 x
   ro <- getNewRegNat II8
   return $ Fixed II8 ro (code `appOL` toOL [ MOVZxL II8 (OpReg rlo) (OpReg ro) ])
 
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W16) [x])
+getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W16) (TupleG1 x))
  | is32Bit = do
   RegCode64 code _rhi rlo <- iselExpr64 x
   ro <- getNewRegNat II16
   return $ Fixed II16 ro (code `appOL` toOL [ MOVZxL II16 (OpReg rlo) (OpReg ro) ])
 
 -- catch simple cases of zero- or sign-extended load
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad addr _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) (TupleG1 (CmmLoad addr _ _))) = do
   code <- intLoadCode (MOVZxL II8) addr
   return (Any II32 code)
 
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W8 W32) [CmmLoad addr _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_SS_Conv W8 W32) (TupleG1 (CmmLoad addr _ _))) = do
   code <- intLoadCode (MOVSxL II8) addr
   return (Any II32 code)
 
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad addr _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W32) (TupleG1 (CmmLoad addr _ _))) = do
   code <- intLoadCode (MOVZxL II16) addr
   return (Any II32 code)
 
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad addr _ _]) = do
+getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W32) (TupleG1 (CmmLoad addr _ _))) = do
   code <- intLoadCode (MOVSxL II16) addr
   return (Any II32 code)
 
 -- catch simple cases of zero- or sign-extended load
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad addr _ _])
+getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W8 W64) (TupleG1 (CmmLoad addr _ _)))
  | not is32Bit = do
   code <- intLoadCode (MOVZxL II8) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W8 W64) [CmmLoad addr _ _])
+getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W8 W64) (TupleG1 (CmmLoad addr _ _)))
  | not is32Bit = do
   code <- intLoadCode (MOVSxL II8) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W16 W64) [CmmLoad addr _ _])
+getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W16 W64) (TupleG1 (CmmLoad addr _ _)))
  | not is32Bit = do
   code <- intLoadCode (MOVZxL II16) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad addr _ _])
+getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W16 W64) (TupleG1 (CmmLoad addr _ _)))
  | not is32Bit = do
   code <- intLoadCode (MOVSxL II16) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad addr _ _])
+getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W32 W64) (TupleG1 (CmmLoad addr _ _)))
  | not is32Bit = do
   code <- intLoadCode (MOV II32) addr -- 32-bit loads zero-extend
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad addr _ _])
+getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W32 W64) (TupleG1 (CmmLoad addr _ _)))
  | not is32Bit = do
   code <- intLoadCode (MOVSxL II32) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _)),
-                                     CmmLit displacement])
+getRegister' _ is32Bit (CmmMachOp (MO_Add W64) (TupleG2 (CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _)))
+                                                        (CmmLit displacement)))
  | not is32Bit =
       return $ Any II64 (\dst -> unitOL $
         LEA II64 (OpAddr (ripRel (litToImm displacement))) (OpReg dst))
 
-getRegister' _ _ (CmmMachOp mop []) =
-  pprPanic "getRegister(x86): nullary MachOp" (text $ show mop)
-
-getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
+getRegister' platform is32Bit (CmmMachOp mop (TupleG1 x)) = do -- unary MachOps
     avx    <- avxEnabled
     avx2   <- avx2Enabled
     case mop of
@@ -1012,8 +1010,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_WF_Bitcast W32 -> bitcast II32 FF32 x
       MO_FW_Bitcast W64 -> bitcast FF64 II64 x
       MO_WF_Bitcast W64 -> bitcast II64 FF64 x
-      MO_WF_Bitcast {}  -> incorrectOperands
-      MO_FW_Bitcast {}  -> incorrectOperands
+      MO_WF_Bitcast {}  -> unsupportedOperationWidth mop
+      MO_FW_Bitcast {}  -> unsupportedOperationWidth mop
 
       -- widenings
       MO_UU_Conv W8  W32 -> integerExtend W8  W32 MOVZxL x
@@ -1082,73 +1080,6 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_V_Broadcast {}
         -> pprPanic "Unsupported integer vector broadcast operation for: " (pdoc platform x)
 
-      -- Binary MachOps
-      MO_Add {}    -> incorrectOperands
-      MO_Sub {}    -> incorrectOperands
-      MO_Eq {}     -> incorrectOperands
-      MO_Ne {}     -> incorrectOperands
-      MO_Mul {}    -> incorrectOperands
-      MO_S_MulMayOflo {} -> incorrectOperands
-      MO_S_Quot {} -> incorrectOperands
-      MO_S_Rem {}  -> incorrectOperands
-      MO_U_Quot {} -> incorrectOperands
-      MO_U_Rem {}  -> incorrectOperands
-      MO_S_Ge {}   -> incorrectOperands
-      MO_S_Le {}   -> incorrectOperands
-      MO_S_Gt {}   -> incorrectOperands
-      MO_S_Lt {}   -> incorrectOperands
-      MO_U_Ge {}   -> incorrectOperands
-      MO_U_Le {}   -> incorrectOperands
-      MO_U_Gt {}   -> incorrectOperands
-      MO_U_Lt {}   -> incorrectOperands
-      MO_F_Add {}  -> incorrectOperands
-      MO_F_Sub {}  -> incorrectOperands
-      MO_F_Mul {}  -> incorrectOperands
-      MO_F_Quot {} -> incorrectOperands
-      MO_F_Eq {}   -> incorrectOperands
-      MO_F_Ne {}   -> incorrectOperands
-      MO_F_Ge {}   -> incorrectOperands
-      MO_F_Le {}   -> incorrectOperands
-      MO_F_Gt {}   -> incorrectOperands
-      MO_F_Lt {}   -> incorrectOperands
-      MO_F_Min {}  -> incorrectOperands
-      MO_F_Max {}  -> incorrectOperands
-      MO_And {}    -> incorrectOperands
-      MO_Or {}     -> incorrectOperands
-      MO_Xor {}    -> incorrectOperands
-      MO_Shl {}    -> incorrectOperands
-      MO_U_Shr {}  -> incorrectOperands
-      MO_S_Shr {}  -> incorrectOperands
-
-      MO_V_Extract {}     -> incorrectOperands
-      MO_V_Add {}         -> incorrectOperands
-      MO_V_Sub {}         -> incorrectOperands
-      MO_V_Mul {}         -> incorrectOperands
-      MO_VS_Quot {}       -> incorrectOperands
-      MO_VS_Rem {}        -> incorrectOperands
-      MO_VU_Quot {}       -> incorrectOperands
-      MO_VU_Rem {}        -> incorrectOperands
-      MO_V_Shuffle {}     -> incorrectOperands
-      MO_VF_Shuffle {}    -> incorrectOperands
-      MO_VU_Min {}  -> incorrectOperands
-      MO_VU_Max {}  -> incorrectOperands
-      MO_VS_Min {}  -> incorrectOperands
-      MO_VS_Max {}  -> incorrectOperands
-      MO_VF_Min {}  -> incorrectOperands
-      MO_VF_Max {}  -> incorrectOperands
-
-      MO_VF_Extract {}    -> incorrectOperands
-      MO_VF_Add {}        -> incorrectOperands
-      MO_VF_Sub {}        -> incorrectOperands
-      MO_VF_Mul {}        -> incorrectOperands
-      MO_VF_Quot {}       -> incorrectOperands
-
-      -- Ternary MachOps
-      MO_FMA {}           -> incorrectOperands
-      MO_VF_Insert {}     -> incorrectOperands
-      MO_V_Insert {}      -> incorrectOperands
-
-      --_other -> pprPanic "getRegister" (pprMachOp mop)
    where
         triv_ucode :: (Format -> Operand -> Instr) -> Format -> NatM Register
         triv_ucode instr format = trivialUCode format (instr format) x
@@ -1307,7 +1238,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                                     (PUNPCKLQDQ fmt (OpReg dst) dst)
                                     )
 
-getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
+getRegister' platform is32Bit (CmmMachOp mop (TupleG2 x y)) = do -- dyadic MachOps
   sse4_1 <- sse4_1Enabled
   avx <- avxEnabled
   case mop of
@@ -1377,7 +1308,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_VF_Extract l W32   | avx       -> vector_float_extract l W32 x y
                             | otherwise -> vector_float_extract_sse l W32 x y
       MO_VF_Extract l W64               -> vector_float_extract l W64 x y
-      MO_VF_Extract {} -> incorrectOperands
+      MO_VF_Extract {} -> unsupportedOperationWidth mop
 
       MO_V_Extract 16 W8 | sse4_1 -> vector_int_extract_pextr 16 W8 x y
                          | otherwise -> vector_int8x16_extract_sse2 x y
@@ -1421,30 +1352,6 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_VU_Max {} -> needLlvm mop
       MO_VS_Min {} -> needLlvm mop
       MO_VS_Max {} -> needLlvm mop
-
-      -- Unary MachOps
-      MO_S_Neg {} -> incorrectOperands
-      MO_F_Neg {} -> incorrectOperands
-      MO_Not {} -> incorrectOperands
-      MO_SF_Round {} -> incorrectOperands
-      MO_FS_Truncate {} -> incorrectOperands
-      MO_SS_Conv {} -> incorrectOperands
-      MO_XX_Conv {} -> incorrectOperands
-      MO_FF_Conv {} -> incorrectOperands
-      MO_UU_Conv {} -> incorrectOperands
-      MO_WF_Bitcast {} -> incorrectOperands
-      MO_FW_Bitcast  {} -> incorrectOperands
-      MO_RelaxedRead {} -> incorrectOperands
-      MO_AlignmentCheck {} -> incorrectOperands
-      MO_VS_Neg {} -> incorrectOperands
-      MO_VF_Neg {} -> incorrectOperands
-      MO_V_Broadcast {} -> incorrectOperands
-      MO_VF_Broadcast {} -> incorrectOperands
-
-      -- Ternary MachOps
-      MO_FMA {} -> incorrectOperands
-      MO_V_Insert {} -> incorrectOperands
-      MO_VF_Insert {} -> incorrectOperands
 
   where
     --------------------
@@ -1607,8 +1514,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
             W16
             signed
             quotient
-            (CmmMachOp widen [x])
-            (CmmMachOp widen [y])
+            (CmmMachOp widen (TupleG1 x))
+            (CmmMachOp widen (TupleG1 y))
 
     div_code width signed quotient x y = do
            (y_op, y_code) <- getRegOrMem y -- cannot be clobbered
@@ -1902,7 +1809,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
         _ ->
           pprPanic "vector shuffle: unsupported format" (ppr fmt)
 
-getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
+getRegister' platform _is32Bit (CmmMachOp mop (TupleG3 x y z)) = do -- ternary MachOps
   avx    <- avxEnabled
   sse4_1 <- sse4_1Enabled
   case mop of
@@ -1914,13 +1821,15 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
         -> genFMA3Code l w var x y z
 
       -- Ternary vector operations
-      MO_VF_Insert l W32  | l == 4 -> vector_floatx4_insert_sse sse4_1 x y z
-                          | otherwise ->
+      MO_VF_Insert l w -> case w of
+        W32  | l == 4 -> vector_floatx4_insert_sse sse4_1 x y z
+             | otherwise ->
          sorry $ "FloatX" ++ show l ++ "# insert operations require -fllvm"
            -- SIMD NCG TODO:
            --
            --   - add support for FloatX8, FloatX16.
-      MO_VF_Insert l W64  -> vector_double_insert avx l x y z
+        W64  -> vector_double_insert avx l x y z
+        _ -> unsupportedOperationWidth mop
       MO_V_Insert 16 W8 | sse4_1 -> vector_int_insert_pinsr 16 W8 x y z
                         | otherwise -> vector_int8x16_insert_sse2 x y z
       MO_V_Insert 8 W16 -> vector_int_insert_pinsr 8 W16 x y z -- PINSRW (SSE2)
@@ -1929,9 +1838,6 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
       MO_V_Insert 2 W64 | sse4_1 -> vector_int_insert_pinsr 2 W64 x y z
                         | otherwise -> vector_int64x2_insert_sse2 x y z
       MO_V_Insert _ _ -> sorry "Unsupported integer vector insert operation; please use -fllvm"
-
-      _other -> pprPanic "getRegister(x86) - ternary CmmMachOp (1)"
-                  (pprMachOp mop)
 
   where
     -- SIMD NCG TODO:
@@ -2147,9 +2053,6 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
          in return $ Any fmt code
     vector_int64x2_insert_sse2 _ _ offset = pprPanic "MO_V_Insert Int64X2: unsupported offset" (pdoc platform offset)
 
-getRegister' _ _ (CmmMachOp mop (_:_:_:_:_)) =
-  pprPanic "getRegister(x86): MachOp with >= 4 arguments" (text $ show mop)
-
 getRegister' platform is32Bit load@(CmmLoad mem ty _)
   | isVecType ty
   = do
@@ -2257,7 +2160,7 @@ getRegister' platform is32Bit (CmmLit lit) = do
               broadcast = if isFloatScalarFormat sFmt
                           then MO_VF_Broadcast l w
                           else MO_V_Broadcast l w
-          valCode <- getAnyReg (CmmMachOp broadcast [CmmLit f])
+          valCode <- getAnyReg (CmmMachOp broadcast (TupleG1 (CmmLit f)))
           return $ Any fmt valCode
 
     -- Optimisation for loading small literals on x86_64: take advantage
@@ -2379,13 +2282,13 @@ getAmode e = do
       CmmRegOff r n
          -> getAmode $ mangleIndexTree r n
 
-      CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _)), CmmLit displacement]
+      CmmMachOp (MO_Add W64) (TupleG2 (CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _))) (CmmLit displacement))
          | not is32Bit
          -> return $ Amode (ripRel (litToImm displacement)) nilOL
 
       -- This is all just ridiculous, since it carefully undoes
       -- what mangleIndexTree has just done.
-      CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)]
+      CmmMachOp (MO_Sub _rep) (TupleG2 x (CmmLit lit@(CmmInt i _)))
          | is32BitLit platform lit
          -- assert (rep == II32)???
          -> do
@@ -2393,7 +2296,7 @@ getAmode e = do
             let off = ImmInt (-(fromInteger i))
             return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
-      CmmMachOp (MO_Add _rep) [x, CmmLit lit]
+      CmmMachOp (MO_Add _rep) (TupleG2 x (CmmLit lit))
          | is32BitLit platform lit
          -- assert (rep == II32)???
          -> do
@@ -2403,25 +2306,31 @@ getAmode e = do
 
       -- Turn (lit1 << n  + lit2) into  (lit2 + lit1 << n) so it will be
       -- recognised by the next rule.
-      CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _), b@(CmmLit _)]
-         -> getAmode (CmmMachOp (MO_Add rep) [b,a])
+      CmmMachOp (MO_Add rep) (TupleG2 a@(CmmMachOp (MO_Shl _) _) b@(CmmLit _))
+         -> getAmode (CmmMachOp (MO_Add rep) (TupleG2 b a))
 
       -- Matches: (x + offset) + (y << shift)
-      CmmMachOp (MO_Add _) [CmmRegOff x offset, CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)]]
+      CmmMachOp (MO_Add _) (TupleG2 (CmmRegOff x offset)
+                                    (CmmMachOp (MO_Shl _) (TupleG2 y (CmmLit (CmmInt shift _)))))
          | shift == 0 || shift == 1 || shift == 2 || shift == 3
          -> x86_complex_amode (CmmReg x) y shift (fromIntegral offset)
 
-      CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)]]
+      CmmMachOp (MO_Add _) (TupleG2 x (CmmMachOp (MO_Shl _) (TupleG2 y (CmmLit (CmmInt shift _)))))
          | shift == 0 || shift == 1 || shift == 2 || shift == 3
          -> x86_complex_amode x y shift 0
 
-      CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Add _) [CmmMachOp (MO_Shl _)
-                                                    [y, CmmLit (CmmInt shift _)], CmmLit (CmmInt offset _)]]
+      CmmMachOp (MO_Add _) (TupleG2
+                             x
+                             (CmmMachOp (MO_Add _) (TupleG2
+                               (CmmMachOp (MO_Shl _) (TupleG2 y (CmmLit (CmmInt shift _))))
+                               (CmmLit (CmmInt offset _))
+                             ))
+                           )
          | shift == 0 || shift == 1 || shift == 2 || shift == 3
          && is32BitInteger offset
          -> x86_complex_amode x y shift offset
 
-      CmmMachOp (MO_Add _) [x,y]
+      CmmMachOp (MO_Add _) (TupleG2 x y)
          | not (isLit y) -- we already handle valid literals above.
          -> x86_complex_amode x y 0 0
 
@@ -2445,13 +2354,13 @@ getAmode e = do
       -- (#15570). We already handled valid literals above so we don't have to
       -- test anything here.
       CmmLit (CmmLabelOff l off)
-         -> getAmode (CmmMachOp (MO_Add W64) [ CmmLit (CmmLabel l)
-                                             , CmmLit (CmmInt (fromIntegral off) W64)
-                                             ])
+         -> getAmode (CmmMachOp (MO_Add W64) (TupleG2
+                       (CmmLit (CmmLabel l))
+                       (CmmLit (CmmInt (fromIntegral off) W64))))
       CmmLit (CmmLabelDiffOff l1 l2 off w)
-         -> getAmode (CmmMachOp (MO_Add W64) [ CmmLit (CmmLabelDiffOff l1 l2 0 w)
-                                             , CmmLit (CmmInt (fromIntegral off) W64)
-                                             ])
+         -> getAmode (CmmMachOp (MO_Add W64) (TupleG2
+                       (CmmLit (CmmLabelDiffOff l1 l2 0 w))
+                       (CmmLit (CmmInt (fromIntegral off) W64))))
 
       -- in case we can't do something better, we just compute the expression
       -- and put the result in a register
@@ -2687,7 +2596,7 @@ getCondCode :: CmmExpr -> NatM CondCode
 
 -- yes, they really do seem to want exactly the same!
 
-getCondCode (CmmMachOp mop [x, y])
+getCondCode (CmmMachOp mop (TupleG2 x y))
   =
     case mop of
       MO_F_Eq W32 -> condFltCode EQQ x y
@@ -2712,7 +2621,7 @@ getCondCode other = do
    platform <- getPlatform
    pprPanic "getCondCode(2)(x86,x86_64)" (pdoc platform other)
 
-machOpToCond :: MachOp -> Cond
+machOpToCond :: MachOp 2 -> Cond
 machOpToCond mo = case mo of
   MO_Eq _   -> EQQ
   MO_Ne _   -> NE
@@ -2832,7 +2741,7 @@ condIntCode' platform cond (CmmLoad x ty _) (CmmLit lit)
 
 -- anything vs zero, using a mask
 -- TODO: Add some sanity checking!!!!
-condIntCode' platform cond (CmmMachOp (MO_And _) [x,o2]) (CmmLit (CmmInt 0 ty))
+condIntCode' platform cond (CmmMachOp (MO_And _) (TupleG2 x o2)) (CmmLit (CmmInt 0 ty))
     | (CmmLit lit@(CmmInt mask _)) <- o2, is32BitLit platform lit
     = do
       (x_reg, x_code) <- getSomeReg x
@@ -2932,8 +2841,8 @@ assignReg_VecCode ::           CmmReg  -> CmmExpr -> NatM InstrBlock
 -- specific case of adding/subtracting an integer to a particular address.
 -- ToDo: catch other cases where we can use an operation directly on a memory
 -- address.
-assignMem_IntCode ty addr (CmmMachOp op [CmmLoad addr2 _ _,
-                                                 CmmLit (CmmInt i _)])
+assignMem_IntCode ty addr (CmmMachOp op (TupleG2 (CmmLoad addr2 _ _)
+                                                 (CmmLit (CmmInt i _))))
    | addr == addr2, ty /= II64 || is32BitInteger i,
      Just instr <- check op
    = do Amode amode code_addr <- getAmode addr
@@ -2941,6 +2850,7 @@ assignMem_IntCode ty addr (CmmMachOp op [CmmLoad addr2 _ _,
                    instr ty (OpImm (ImmInt (fromIntegral i))) (OpAddr amode)
         return code
    where
+        check :: MachOp 2 -> Maybe (Format -> Operand -> Operand -> Instr)
         check (MO_Add _) = Just ADD
         check (MO_Sub _) = Just SUB
         check _ = Nothing
@@ -3502,8 +3412,8 @@ maybePromoteCArgToW32 platform (arg, hint)
     -- As wto=W32, we only need to handle integer conversions,
     -- never Float -> Double.
     case hint of
-      SignedHint -> CmmMachOp (MO_SS_Conv wfrom wto) [arg]
-      _          -> CmmMachOp (MO_UU_Conv wfrom wto) [arg]
+      SignedHint -> CmmMachOp (MO_SS_Conv wfrom wto) (TupleG1 arg)
+      _          -> CmmMachOp (MO_UU_Conv wfrom wto) (TupleG1 arg)
  | otherwise   = arg
  where
    ty = cmmExprType platform arg
@@ -4414,7 +4324,7 @@ genSwitch expr targets = do
       -- See Note [Sub-word subtlety during jump-table indexing].
       indexExpr = CmmMachOp
         (MO_UU_Conv expr_w (platformWordWidth platform))
-        [indexExpr0]
+        (TupleG1 indexExpr0)
   if ncgPIC config
   then do
         (reg,e_code) <- getNonClobberedReg indexExpr
@@ -4885,14 +4795,15 @@ sse2NegCode w x = do
   --
   return (Any fmt code)
 
-needLlvm :: MachOp -> NatM a
+needLlvm :: MachOp arity -> NatM a
 needLlvm mop =
   sorry $ unlines [ "Unsupported vector instruction for the native code generator:"
                   , show mop
                   , "Please use -fllvm." ]
 
-incorrectOperands :: NatM a
-incorrectOperands = sorry "Incorrect number of operands"
+unsupportedOperationWidth :: MachOp arity -> NatM a
+unsupportedOperationWidth mop
+  = sorry $ "x86 NCG: Unsupported width in MachOp: " ++ show mop
 
 invalidConversion :: Width -> Width -> NatM a
 invalidConversion from to =
@@ -5740,9 +5651,9 @@ genQuotRem width signed res_q res_r m_arg_x_high arg_x_low arg_y = do
       -- See Note [DIV/IDIV for bytes]
       let widen | signed = MO_SS_Conv W8 W16
                 | otherwise = MO_UU_Conv W8 W16
-          arg_x_low_16 = CmmMachOp widen [arg_x_low]
-          arg_y_16 = CmmMachOp widen [arg_y]
-          m_arg_x_high_16 = (\p -> CmmMachOp widen [p]) <$> m_arg_x_high
+          arg_x_low_16 = CmmMachOp widen (TupleG1 arg_x_low)
+          arg_y_16 = CmmMachOp widen (TupleG1 arg_y)
+          m_arg_x_high_16 = (\p -> CmmMachOp widen (TupleG1 p)) <$> m_arg_x_high
       genQuotRem W16 signed res_q res_r m_arg_x_high_16 arg_x_low_16 arg_y_16
 
     _ -> do

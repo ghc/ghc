@@ -62,6 +62,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC.Float
+import qualified Data.Foldable as Foldable
 
 -- --------------------------------------------------------------------------
 -- Now do some real work
@@ -382,7 +383,8 @@ pprExpr platform e = case e of
     CmmRegOff reg 0    -> pprCastReg reg
 
     -- CmmRegOff is an alias of MO_Add
-    CmmRegOff reg i    -> pprExpr platform $ CmmMachOp (MO_Add w) [CmmReg reg, CmmLit $ CmmInt (toInteger i) w]
+    CmmRegOff reg i    -> pprExpr platform $
+      CmmMachOp (MO_Add w) (TupleG2 (CmmReg reg) (CmmLit $ CmmInt (toInteger i) w))
       where w = cmmRegWidth reg
 
     CmmMachOp mop args -> pprMachOpApp platform mop args
@@ -425,19 +427,20 @@ pprExpr1 platform e = case e of
 -- --------------------------------------------------------------------------
 -- MachOp applications
 
-pprMachOpApp :: Platform -> MachOp -> [CmmExpr] -> SDoc
+pprMachOpApp :: Platform -> MachOp a -> SizedTupleGADT a CmmExpr -> SDoc
 
 pprMachOpApp platform op args
   | isMulMayOfloOp op
-  = text "mulIntMayOflo" <> parens (commafy (map (pprExpr platform) args))
+  = text "mulIntMayOflo" <> parens (commafy (map (pprExpr platform) args_list))
   where isMulMayOfloOp (MO_S_MulMayOflo _) = True
         isMulMayOfloOp _ = False
+        args_list = Foldable.toList args
 
-pprMachOpApp platform (MO_RelaxedRead w) [x]
+pprMachOpApp platform (MO_RelaxedRead w) (TupleG1 x)
   = pprExpr platform (CmmLoad x (cmmBits w) NaturallyAligned)
 
 pprMachOpApp platform mop args
-  | Just ty <- machOpNeedsCast platform mop (map (cmmExprType platform) args)
+  | Just ty <- machOpNeedsCast platform mop (fmap (cmmExprType platform) args)
   = ty <> parens (pprMachOpApp' platform mop args)
   | otherwise
   = pprMachOpApp' platform mop args
@@ -493,7 +496,7 @@ may affect the operation's semantics.
 -- | The result type of most operations is determined by the operands. However,
 -- there are a few exceptions: particularly operations which might get promoted
 -- to a signed result. For these we explicitly cast the result.
-machOpNeedsCast :: Platform -> MachOp -> [CmmType] -> Maybe SDoc
+machOpNeedsCast :: Platform -> MachOp a -> (SizedTupleGADT a CmmType) -> Maybe SDoc
 machOpNeedsCast platform mop args
     -- Comparisons in C have type 'int', but we want type W_ (this is what
     -- resultRepOfMachOp says).
@@ -529,29 +532,28 @@ machOpNeedsCast platform mop args
       let ty = machRep_U_CType platform w
       in Just $ parens ty
 
-pprMachOpApp' :: Platform -> MachOp -> [CmmExpr] -> SDoc
+pprMachOpApp' :: Platform -> MachOp a -> SizedTupleGADT a CmmExpr -> SDoc
 pprMachOpApp' platform mop args
  = case args of
 
     -- ternary
-    args@[_,_,_] ->
+    TupleG3 x y z ->
       let (_fixity, op) = pprMachOp_for_C platform mop
-      in op <> parens (pprWithCommas pprArg args)
+      in op <> parens (pprWithCommas pprArg [x,y,z])
 
     -- dyadic
-    args@[x,y] ->
+    TupleG2 x y ->
       let (fixity, op) = pprMachOp_for_C platform mop
       in case fixity of
             Infix -> pprArg x <+> op <+> pprArg y
-            Prefix -> op <> parens (pprWithCommas pprArg args)
+            Prefix -> op <> parens (pprWithCommas pprArg [x,y])
 
     -- unary
-    [x]   ->
+    TupleG1 x ->
       let (_fixity, op) = pprMachOp_for_C platform mop
       in op <> parens (pprArg x)
 
-    _     -> panic "PprC.pprMachOp : machop with wrong number of args"
-
+    TupleG0 -> case mop of {}
   where
     pprArg e
       | needsFCasts mop = cCast platform (machRep_F_CType width) e
@@ -711,7 +713,7 @@ pprBlockId b = char '_' <> ppr (getUnique b)
 data Fixity = Prefix | Infix
   deriving ( Eq, Show )
 
-pprMachOp_for_C :: Platform -> MachOp -> (Fixity, SDoc)
+pprMachOp_for_C :: Platform -> MachOp a -> (Fixity, SDoc)
 
 pprMachOp_for_C platform mop = case mop of
 
@@ -954,7 +956,7 @@ pprMachOp_for_C platform mop = case mop of
                                 (panic $ "PprC.pprMachOp_for_C: MO_VU_Max"
                                       ++ "unsupported by the unregisterised backend")
 
-signedOp :: MachOp -> Bool      -- Argument type(s) are signed ints
+signedOp :: MachOp a -> Bool      -- Argument type(s) are signed ints
 signedOp (MO_S_Quot _)    = True
 signedOp (MO_S_Rem  _)    = True
 signedOp (MO_S_Neg  _)    = True
@@ -967,13 +969,13 @@ signedOp (MO_SS_Conv _ _) = True
 signedOp (MO_SF_Round _ _) = True
 signedOp _                = False
 
-shiftOp :: MachOp -> Maybe Width
+shiftOp :: MachOp a -> Maybe Width
 shiftOp (MO_Shl w)        = Just w
 shiftOp (MO_U_Shr w)      = Just w
 shiftOp (MO_S_Shr w)      = Just w
 shiftOp _                 = Nothing
 
-floatComparison :: MachOp -> Bool  -- comparison between float args
+floatComparison :: MachOp a -> Bool  -- comparison between float args
 floatComparison (MO_F_Eq   _) = True
 floatComparison (MO_F_Ne   _) = True
 floatComparison (MO_F_Ge   _) = True

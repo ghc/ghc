@@ -320,7 +320,7 @@ nodeBody (BlockCC _first middle _last) = middle
 -- must be exactly word sized, hence the extension here. (#22871)
 smartExtend :: Platform -> CmmExpr -> CmmExpr
 smartExtend p e | w0 == w1 = e
-                | otherwise = CmmMachOp (MO_UU_Conv w0 w1) [e]
+                | otherwise = CmmMachOp (MO_UU_Conv w0 w1) (TupleG1 e)
   where
     w0 = cmmExprWidth p e
     w1 = wordWidth p
@@ -328,7 +328,7 @@ smartExtend p e | w0 == w1 = e
 smartPlus :: Platform -> CmmExpr -> Int -> CmmExpr
 smartPlus _ e 0 = e
 smartPlus platform e k =
-    CmmMachOp (MO_Add width) [e, CmmLit (CmmInt (toInteger k) width)]
+    CmmMachOp (MO_Add width) (TupleG2 e (CmmLit (CmmInt (toInteger k) width)))
   where width = cmmExprWidth platform e
 
 addToList :: ([a] -> [a]) -> Label -> LabelMap [a] -> LabelMap [a]

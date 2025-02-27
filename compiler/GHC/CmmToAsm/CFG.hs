@@ -1170,7 +1170,7 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
             , likely == Nothing
             , CmmMachOp mop args <- cond
             , MO_Eq {} <- mop
-            , not (null [x | x@CmmLit{} <- args])
+            , any isCmmLit args
             = if fst s1 == ltrue then Just 0.3 else Just 0.7
 
             | otherwise
@@ -1184,6 +1184,9 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
         chPredicts = const Nothing
         shPredicts = const Nothing
         rhPredicts = const Nothing
+
+        isCmmLit (CmmLit{}) = True
+        isCmmLit _ = False
 
 -- We normalize all edge weights as probabilities between 0 and 1.
 -- Ignoring rounding errors all outgoing edges sum up to 1.

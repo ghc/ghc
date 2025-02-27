@@ -8,3 +8,8 @@ test('T20142', normal, compile, [''])
 # We check this by telling the assembler to exit on warnings.
 test('T24556', [only_ways('optasm'), cmm_src], compile, ['-O -opta -Xassembler -opta --fatal-warnings'])
 
+test('T25771', [cmm_src, only_ways(['optasm']),
+                grep_errmsg(r'(12\.345|0\.6640625)',[1]),
+                ],
+     compile, ['-ddump-cmm-opt'])
+

@@ -254,7 +254,7 @@ genSwitch config expr targets = do
     indexExpr =
       CmmMachOp
         (MO_UU_Conv expr_w (platformWordWidth platform))
-        [indexExpr0]
+        (TupleG1 indexExpr0)
     expr_w = cmmExprWidth platform expr
     (offset, ids) = switchTargetsToTable targets
     platform = ncgPlatform config
@@ -610,11 +610,11 @@ getRegister' :: NCGConfig -> Platform -> CmmExpr -> NatM Register
 -- OPTIMIZATION WARNING: CmmExpr rewrites
 -- 1. Rewrite: Reg + (-n) => Reg - n
 --    TODO: this expression shouldn't even be generated to begin with.
-getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt i w1)]) | i < 0
-  = getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt (-i) w1)])
+getRegister' config plat (CmmMachOp (MO_Add w0) (TupleG2 x (CmmLit (CmmInt i w1)))) | i < 0
+  = getRegister' config plat (CmmMachOp (MO_Sub w0) (TupleG2 x (CmmLit (CmmInt (-i) w1))))
 
-getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt i w1)]) | i < 0
-  = getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt (-i) w1)])
+getRegister' config plat (CmmMachOp (MO_Sub w0) (TupleG2 x (CmmLit (CmmInt i w1)))) | i < 0
+  = getRegister' config plat (CmmMachOp (MO_Add w0) (TupleG2 x (CmmLit (CmmInt (-i) w1))))
 
 
 -- Generic case.
@@ -755,17 +755,17 @@ getRegister' config plat expr
       -- If we got here we will load the address into a register either way. So we might as well just expand
       -- and re-use the existing code path to handle "reg + off".
       let !width = cmmRegWidth reg
-      in getRegister' config plat (CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)])
+      in getRegister' config plat (CmmMachOp (MO_Add width) (TupleG2 (CmmReg reg) (CmmLit (CmmInt (fromIntegral off) width))))
 
     -- for MachOps, see GHC.Cmm.MachOp
     -- For CmmMachOp, see GHC.Cmm.Expr
 
     -- Handle MO_RelaxedRead as a normal CmmLoad, to allow
     -- non-trivial addressing modes to be used.
-    CmmMachOp (MO_RelaxedRead w) [e] ->
+    CmmMachOp (MO_RelaxedRead w) (TupleG1 e) ->
       getRegister (CmmLoad e (cmmBits w) NaturallyAligned)
 
-    CmmMachOp op [e] -> do
+    CmmMachOp op (TupleG1 e) -> do
       (reg, _format, code) <- getSomeReg e
       case op of
         MO_Not w -> return $ Any (intFormat w) $ \dst ->
@@ -792,77 +792,14 @@ getRegister' config plat expr
         -- Conversions
         MO_XX_Conv _from to -> swizzleRegisterRep (intFormat to) <$> getRegister e
 
-        MO_Eq {} -> notUnary
-        MO_Ne {} -> notUnary
-        MO_Mul {} -> notUnary
-        MO_S_MulMayOflo {} -> notUnary
-        MO_S_Quot {} -> notUnary
-        MO_S_Rem {} -> notUnary
-        MO_U_Quot {} -> notUnary
-        MO_U_Rem {} -> notUnary
-        MO_S_Ge {} -> notUnary
-        MO_S_Le {} -> notUnary
-        MO_S_Gt {} -> notUnary
-        MO_S_Lt {} -> notUnary
-        MO_U_Ge {} -> notUnary
-        MO_U_Le {} -> notUnary
-        MO_U_Gt {} -> notUnary
-        MO_U_Lt {} -> notUnary
-        MO_F_Add {} -> notUnary
-        MO_F_Sub {} -> notUnary
-        MO_F_Mul {} -> notUnary
-        MO_F_Quot {} -> notUnary
-        MO_FMA {} -> notUnary
-        MO_F_Eq {} -> notUnary
-        MO_F_Ne {} -> notUnary
-        MO_F_Ge {} -> notUnary
-        MO_F_Le {} -> notUnary
-        MO_F_Gt {} -> notUnary
-        MO_F_Lt {} -> notUnary
-        MO_And {} -> notUnary
-        MO_Or {} -> notUnary
-        MO_Xor {} -> notUnary
-        MO_Shl {} -> notUnary
-        MO_U_Shr {} -> notUnary
-        MO_S_Shr {} -> notUnary
-        MO_V_Insert {} -> notUnary
-        MO_V_Extract {} -> notUnary
-        MO_V_Add {} -> notUnary
-        MO_V_Sub {} -> notUnary
-        MO_V_Mul {} -> notUnary
-        MO_VS_Quot {} -> notUnary
-        MO_VS_Rem {} -> notUnary
-        MO_VS_Neg {} -> notUnary
-        MO_VU_Quot {} -> notUnary
-        MO_VU_Rem {} -> notUnary
-        MO_V_Shuffle {} -> notUnary
-        MO_VF_Shuffle  {} -> notUnary
-        MO_VF_Insert {} -> notUnary
-        MO_VF_Extract {} -> notUnary
-        MO_VF_Add {} -> notUnary
-        MO_VF_Sub {} -> notUnary
-        MO_VF_Mul {} -> notUnary
-        MO_VF_Quot {} -> notUnary
-        MO_Add {} -> notUnary
-        MO_Sub {} -> notUnary
-
-        MO_F_Min {} -> notUnary
-        MO_F_Max {} -> notUnary
-        MO_VU_Min {} -> notUnary
-        MO_VU_Max {} -> notUnary
-        MO_VS_Min {} -> notUnary
-        MO_VS_Max {} -> notUnary
-        MO_VF_Min {} -> notUnary
-        MO_VF_Max {} -> notUnary
-
         MO_AlignmentCheck {} ->
           pprPanic "getRegister' (monadic CmmMachOp):" (pdoc plat expr)
 
         MO_V_Broadcast {} -> vectorsNeedLlvm
         MO_VF_Broadcast {} -> vectorsNeedLlvm
         MO_VF_Neg {} -> vectorsNeedLlvm
+        MO_VS_Neg {} -> vectorsNeedLlvm
       where
-        notUnary = pprPanic "getRegister' (non-unary CmmMachOp with 1 argument):" (pdoc plat expr)
         vectorsNeedLlvm =
             sorry "SIMD operations on AArch64 currently require the LLVM backend"
         toImm W8 =  (OpImm (ImmInt 7))
@@ -904,17 +841,17 @@ getRegister' config plat expr
     --      fallthrough to alert us if things go wrong!
     -- OPTIMIZATION WARNING: Dyadic CmmMachOp destructuring
     -- 0. TODO This should not exist! Rewrite: Reg +- 0 -> Reg
-    CmmMachOp (MO_Add _) [expr'@(CmmReg (CmmGlobal _r)), CmmLit (CmmInt 0 _)] -> getRegister' config plat expr'
-    CmmMachOp (MO_Sub _) [expr'@(CmmReg (CmmGlobal _r)), CmmLit (CmmInt 0 _)] -> getRegister' config plat expr'
+    CmmMachOp (MO_Add _) (TupleG2 expr'@(CmmReg (CmmGlobal _r)) (CmmLit (CmmInt 0 _))) -> getRegister' config plat expr'
+    CmmMachOp (MO_Sub _) (TupleG2 expr'@(CmmReg (CmmGlobal _r)) (CmmLit (CmmInt 0 _))) -> getRegister' config plat expr'
     -- Immediates are handled via `getArithImm` in the generic code path.
 
-    CmmMachOp (MO_U_Quot w) [x, y] | w == W8 -> do
+    CmmMachOp (MO_U_Quot w) (TupleG2 x y) | w == W8 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       (reg_y, _format_y, code_y) <- getSomeReg y
       return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (UXTB (OpReg w reg_x) (OpReg w reg_x)) `snocOL`
                                                                         (UXTB (OpReg w reg_y) (OpReg w reg_y)) `snocOL`
                                                                         (UDIV (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
-    CmmMachOp (MO_U_Quot w) [x, y] | w == W16 -> do
+    CmmMachOp (MO_U_Quot w) (TupleG2 x y) | w == W16 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       (reg_y, _format_y, code_y) <- getSomeReg y
       return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (UXTH (OpReg w reg_x) (OpReg w reg_x)) `snocOL`
@@ -922,73 +859,73 @@ getRegister' config plat expr
                                                                         (UDIV (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
 
     -- 2. Shifts. x << n, x >> n.
-    CmmMachOp (MO_Shl w) [x, (CmmLit (CmmInt n _))]
+    CmmMachOp (MO_Shl w) (TupleG2 x (CmmLit (CmmInt n _)))
       | w == W32 || w == W64
       , 0 <= n, n < fromIntegral (widthInBits w) -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
-    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | w == W8, 0 <= n, n < 8 -> do
+    CmmMachOp (MO_S_Shr w) (TupleG2 x (CmmLit (CmmInt n _))) | w == W8, 0 <= n, n < 8 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SBFX (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)) (OpImm (ImmInteger (8-n)))))
-    CmmMachOp (MO_S_Shr w) [x, y] | w == W8 -> do
+    CmmMachOp (MO_S_Shr w) (TupleG2 x y) | w == W8 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       (reg_y, _format_y, code_y) <- getSomeReg y
       return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (SXTB (OpReg w reg_x) (OpReg w reg_x)) `snocOL`
                                                                          (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
 
-    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | w == W16, 0 <= n, n < 16 -> do
+    CmmMachOp (MO_S_Shr w) (TupleG2 x (CmmLit (CmmInt n _))) | w == W16, 0 <= n, n < 16 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SBFX (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)) (OpImm (ImmInteger (16-n)))))
-    CmmMachOp (MO_S_Shr w) [x, y] | w == W16 -> do
+    CmmMachOp (MO_S_Shr w) (TupleG2 x y) | w == W16 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       (reg_y, _format_y, code_y) <- getSomeReg y
       return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (SXTH (OpReg w reg_x) (OpReg w reg_x)) `snocOL`
                                                                          (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
 
-    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))]
+    CmmMachOp (MO_S_Shr w) (TupleG2 x (CmmLit (CmmInt n _)))
       | w == W32 || w == W64
       , 0 <= n, n < fromIntegral (widthInBits w) -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (ASR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
-    CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W8, 0 <= n, n < 8 -> do
+    CmmMachOp (MO_U_Shr w) (TupleG2 x (CmmLit (CmmInt n _))) | w == W8, 0 <= n, n < 8 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (UBFX (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)) (OpImm (ImmInteger (8-n)))))
-    CmmMachOp (MO_U_Shr w) [x, y] | w == W8 -> do
+    CmmMachOp (MO_U_Shr w) (TupleG2 x y) | w == W8 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       (reg_y, _format_y, code_y) <- getSomeReg y
       return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (UXTB (OpReg w reg_x) (OpReg w reg_x)) `snocOL`
                                                                         (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
 
-    CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W16, 0 <= n, n < 16 -> do
+    CmmMachOp (MO_U_Shr w) (TupleG2 x (CmmLit (CmmInt n _))) | w == W16, 0 <= n, n < 16 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (UBFX (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)) (OpImm (ImmInteger (16-n)))))
-    CmmMachOp (MO_U_Shr w) [x, y] | w == W16 -> do
+    CmmMachOp (MO_U_Shr w) (TupleG2 x y) | w == W16 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       (reg_y, _format_y, code_y) <- getSomeReg y
       return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (UXTH (OpReg w reg_x) (OpReg w reg_x))
                                                                 `snocOL` (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
 
-    CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))]
+    CmmMachOp (MO_U_Shr w) (TupleG2 x (CmmLit (CmmInt n _)))
       | w == W32 || w == W64
       , 0 <= n, n < fromIntegral (widthInBits w) -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
     -- 3. Logic &&, ||
-    CmmMachOp (MO_And w) [(CmmReg reg), CmmLit (CmmInt n _)] | isAArch64Bitmask (opRegWidth w') (fromIntegral n) ->
+    CmmMachOp (MO_And w) (TupleG2 (CmmReg reg) (CmmLit (CmmInt n _))) | isAArch64Bitmask (opRegWidth w') (fromIntegral n) ->
       return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (AND (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       where w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
             r' = getRegisterReg plat reg
 
-    CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | isAArch64Bitmask (opRegWidth w') (fromIntegral n) ->
+    CmmMachOp (MO_Or w) (TupleG2 (CmmReg reg) (CmmLit (CmmInt n _))) | isAArch64Bitmask (opRegWidth w') (fromIntegral n) ->
       return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (ORR (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       where w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
             r' = getRegisterReg plat reg
 
     -- Generic binary case.
-    CmmMachOp op [x, y] -> do
+    CmmMachOp op (TupleG2 x y) -> do
       -- alright, so we have an operation, and two expressions. And we want to essentially do
       -- ensure we get float regs (TODO(Ben): What?)
       let withTempIntReg w op = OpReg w <$> getNewRegNat (intFormat w) >>= op
@@ -1194,26 +1131,6 @@ getRegister' config plat expr
         MO_U_Shr w -> intOp False w (\d x y -> unitOL $ LSR d x y)
         MO_S_Shr w -> intOp True  w (\d x y -> unitOL $ ASR d x y)
 
-        -- Non-dyadic MachOp with 2 arguments
-        MO_S_Neg {} -> notDyadic
-        MO_F_Neg {} -> notDyadic
-        MO_FMA {} -> notDyadic
-        MO_Not {} -> notDyadic
-        MO_SF_Round {} -> notDyadic
-        MO_FS_Truncate {} -> notDyadic
-        MO_SS_Conv {} -> notDyadic
-        MO_UU_Conv {} -> notDyadic
-        MO_XX_Conv {} -> notDyadic
-        MO_FF_Conv {} -> notDyadic
-        MO_WF_Bitcast {} -> notDyadic
-        MO_FW_Bitcast {} -> notDyadic
-        MO_V_Broadcast {} -> notDyadic
-        MO_VF_Broadcast {} -> notDyadic
-        MO_V_Insert {} -> notDyadic
-        MO_VF_Insert {} -> notDyadic
-        MO_AlignmentCheck {} -> notDyadic
-        MO_RelaxedRead {} -> notDyadic
-
         -- Vector operations: currently unsupported in the AArch64 NCG.
         MO_V_Extract {} -> vectorsNeedLlvm
         MO_V_Add {} -> vectorsNeedLlvm
@@ -1221,13 +1138,11 @@ getRegister' config plat expr
         MO_V_Mul {} -> vectorsNeedLlvm
         MO_VS_Quot {} -> vectorsNeedLlvm
         MO_VS_Rem {} -> vectorsNeedLlvm
-        MO_VS_Neg {} -> vectorsNeedLlvm
         MO_VU_Quot {} -> vectorsNeedLlvm
         MO_VU_Rem {} -> vectorsNeedLlvm
         MO_VF_Extract {} -> vectorsNeedLlvm
         MO_VF_Add {} -> vectorsNeedLlvm
         MO_VF_Sub {} -> vectorsNeedLlvm
-        MO_VF_Neg {} -> vectorsNeedLlvm
         MO_VF_Mul {} -> vectorsNeedLlvm
         MO_VF_Quot {} -> vectorsNeedLlvm
         MO_V_Shuffle {} -> vectorsNeedLlvm
@@ -1239,14 +1154,11 @@ getRegister' config plat expr
         MO_VF_Min {} -> vectorsNeedLlvm
         MO_VF_Max {} -> vectorsNeedLlvm
         where
-          notDyadic =
-            pprPanic "getRegister' (non-dyadic CmmMachOp with 2 arguments): " $
-              (pprMachOp op) <+> text "in" <+> (pdoc plat expr)
           vectorsNeedLlvm =
             sorry "SIMD operations on AArch64 currently require the LLVM backend"
 
     -- Generic ternary case.
-    CmmMachOp op [x, y, z] ->
+    CmmMachOp op (TupleG3 x y z) ->
 
       case op of
 
@@ -1270,9 +1182,6 @@ getRegister' config plat expr
         MO_V_Insert {} -> vectorsNeedLlvm
         MO_VF_Insert {} -> vectorsNeedLlvm
 
-        _ -> pprPanic "getRegister' (unhandled ternary CmmMachOp): " $
-                (pprMachOp op) <+> text "in" <+> (pdoc plat expr)
-
       where
           vectorsNeedLlvm =
             sorry "SIMD operations on AArch64 currently require the LLVM backend"
@@ -1288,9 +1197,6 @@ getRegister' config plat expr
                 code_fy `appOL`
                 code_fz `appOL`
                 op (OpReg w dst) (OpReg w reg_fx) (OpReg w reg_fy) (OpReg w reg_fz)
-
-    CmmMachOp _op _xs
-      -> pprPanic "getRegister' (variadic CmmMachOp): " (pdoc plat expr)
 
   where
     isNbitEncodeable :: Int -> Integer -> Bool
@@ -1443,12 +1349,12 @@ getAmode platform w (CmmRegOff reg off)
 -- CmmStore (CmmMachOp (MO_Add w) [CmmLoad expr, CmmLit (CmmInt n w')]) (expr2)
 -- E.g. a CmmStoreOff really. This can be translated to `str $expr2, [$expr, #n ]
 -- for `n` in range.
-getAmode _platform w (CmmMachOp (MO_Add _w) [expr, CmmLit (CmmInt off _w')])
+getAmode _platform w (CmmMachOp (MO_Add _w) (TupleG2 expr (CmmLit (CmmInt off _w'))))
   | isOffsetImm (fromIntegral off) w
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrRegImm reg (ImmInteger off)) code
 
-getAmode _platform w (CmmMachOp (MO_Sub _w) [expr, CmmLit (CmmInt off _w')])
+getAmode _platform w (CmmMachOp (MO_Sub _w) (TupleG2 expr (CmmLit (CmmInt off _w'))))
   | isOffsetImm (fromIntegral $ -off) w
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrRegImm reg (ImmInteger $ -off)) code
@@ -1526,17 +1432,17 @@ genCondJump
 genCondJump bid expr = do
     case expr of
       -- Optimized == 0 case.
-      CmmMachOp (MO_Eq w) [x, CmmLit (CmmInt 0 _)] -> do
+      CmmMachOp (MO_Eq w) (TupleG2 x (CmmLit (CmmInt 0 _))) -> do
         (reg_x, _format_x, code_x) <- getSomeReg x
         return $ code_x `snocOL` (annExpr expr (CBZ (OpReg w reg_x) (TBlock bid)))
 
       -- Optimized /= 0 case.
-      CmmMachOp (MO_Ne w) [x, CmmLit (CmmInt 0 _)] -> do
+      CmmMachOp (MO_Ne w) (TupleG2 x (CmmLit (CmmInt 0 _))) -> do
         (reg_x, _format_x, code_x) <- getSomeReg x
         return $ code_x `snocOL`  (annExpr expr (CBNZ (OpReg w reg_x) (TBlock bid)))
 
       -- Generic case.
-      CmmMachOp mop [x, y] -> do
+      CmmMachOp mop (TupleG2 x y) -> do
 
         let ubcond w cmp = do
                 -- compute both sides.

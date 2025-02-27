@@ -93,7 +93,7 @@ implementSwitchPlan platform scope expr = go
 
         let lt | signed    = MO_S_Lt
                | otherwise = MO_U_Lt
-            scrut = CmmMachOp (lt width) [expr, CmmLit $ CmmInt i width]
+            scrut = CmmMachOp (lt width) (TupleG2 expr (CmmLit $ CmmInt i width))
             lastNode = CmmCondBranch scrut bid1 bid2 Nothing
             lastBlock = emptyBlock `blockJoinTail` lastNode
         return (lastBlock, newBlocks1++newBlocks2)
@@ -101,7 +101,7 @@ implementSwitchPlan platform scope expr = go
       = do
         (bid2, newBlocks2) <- go' ids2
 
-        let scrut = CmmMachOp (MO_Ne width) [expr, CmmLit $ CmmInt i width]
+        let scrut = CmmMachOp (MO_Ne width) (TupleG2 expr (CmmLit $ CmmInt i width))
             lastNode = CmmCondBranch scrut bid2 l Nothing
             lastBlock = emptyBlock `blockJoinTail` lastNode
         return (lastBlock, newBlocks2)

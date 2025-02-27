@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -49,6 +50,8 @@ import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric ( fromRat )
+import Data.Type.Equality
+import qualified Data.Foldable as Foldable
 
 import GHC.Types.Basic (Alignment, mkAlignment, alignmentOf)
 
@@ -62,7 +65,8 @@ data CmmExpr
   | CmmLoad !CmmExpr !CmmType !AlignmentSpec
                                 -- Read memory location
   | CmmReg !CmmReg              -- Contents of register
-  | CmmMachOp MachOp [CmmExpr]  -- Machine operation (+, -, *, etc.)
+  | forall (arity :: Natural). CmmMachOp !(MachOp arity) !(SizedTupleGADT arity CmmExpr)
+  -- ^ Machine operation (+, -, *, etc.)
   | CmmStackSlot Area {-# UNPACK #-} !Int
                                 -- Addressing expression of a stack slot
                                 -- See Note [CmmStackSlot aliasing]
@@ -71,14 +75,18 @@ data CmmExpr
         --        ** is shorthand only, meaning **
         -- CmmMachOp (MO_Add rep) [x, CmmLit (CmmInt (fromIntegral i) rep)]
         --      where rep = typeWidth (cmmRegType reg)
-  deriving Show
+
+deriving instance Show CmmExpr
 
 instance Eq CmmExpr where       -- Equality ignores the types
   CmmLit l1          == CmmLit l2          = l1==l2
   CmmLoad e1 _ _     == CmmLoad e2 _ _     = e1==e2
   CmmReg r1          == CmmReg r2          = r1==r2
   CmmRegOff r1 i1    == CmmRegOff r2 i2    = r1==r2 && i1==i2
-  CmmMachOp op1 es1  == CmmMachOp op2 es2  = op1==op2 && es1==es2
+  CmmMachOp op1 es1  == CmmMachOp op2 es2  =
+    case testEquality (sizeOfTupleGADT es1) (sizeOfTupleGADT es2) of
+      Just Refl -> op1==op2 && es1==es2
+      Nothing   -> False
   CmmStackSlot a1 i1 == CmmStackSlot a2 i2 = a1==a2 && i1==i2
   _e1                == _e2                = False
 
@@ -245,7 +253,7 @@ cmmExprType platform = \case
    (CmmLit lit)        -> cmmLitType platform lit
    (CmmLoad _ rep _)   -> rep
    (CmmReg reg)        -> cmmRegType reg
-   (CmmMachOp op args) -> machOpResultType platform op (map (cmmExprType platform) args)
+   (CmmMachOp op args) -> machOpResultType platform op (fmap (cmmExprType platform) args)
    (CmmRegOff reg _)   -> cmmRegType reg
    (CmmStackSlot _ _)  -> bWord platform -- an address
    -- Careful though: what is stored at the stack slot may be bigger than
@@ -417,6 +425,10 @@ instance UserOfRegs r a => UserOfRegs r [a] where
   foldRegsUsed platform f set as = foldl' (foldRegsUsed platform f) set as
   {-# INLINABLE foldRegsUsed #-}
 
+instance UserOfRegs r a => UserOfRegs r (SizedTupleGADT sz a) where
+  foldRegsUsed platform f set as = foldl' (foldRegsUsed platform f) set as
+  {-# INLINABLE foldRegsUsed #-}
+
 instance DefinerOfRegs r a => DefinerOfRegs r [a] where
   foldRegsDefd platform f set as = foldl' (foldRegsDefd platform f) set as
   {-# INLINABLE foldRegsDefd #-}
@@ -429,8 +441,8 @@ pprExpr :: Platform -> CmmExpr -> SDoc
 pprExpr platform e
     = case e of
         CmmRegOff reg i ->
-                pprExpr platform (CmmMachOp (MO_Add rep)
-                           [CmmReg reg, CmmLit (CmmInt (fromIntegral i) rep)])
+                pprExpr platform (CmmMachOp (MO_Add rep) $
+                           TupleG2 (CmmReg reg) (CmmLit (CmmInt (fromIntegral i) rep)))
                 where rep = typeWidth (cmmRegType reg)
         CmmLit lit -> pprLit platform lit
         _other     -> pprExpr1 platform e
@@ -450,12 +462,12 @@ pprExpr platform e
 
 -- %nonassoc '>=' '>' '<=' '<' '!=' '=='
 pprExpr1, pprExpr7, pprExpr8 :: Platform -> CmmExpr -> SDoc
-pprExpr1 platform (CmmMachOp op [x,y])
+pprExpr1 platform (CmmMachOp op (TupleG2 x y))
    | Just doc <- infixMachOp1 op
    = pprExpr7 platform x <+> doc <+> pprExpr7 platform y
 pprExpr1 platform e = pprExpr7 platform e
 
-infixMachOp1, infixMachOp7, infixMachOp8 :: MachOp -> Maybe SDoc
+infixMachOp1, infixMachOp7, infixMachOp8 :: MachOp a -> Maybe SDoc
 
 infixMachOp1 (MO_Eq     _) = Just (text "==")
 infixMachOp1 (MO_Ne     _) = Just (text "!=")
@@ -468,9 +480,9 @@ infixMachOp1 (MO_U_Lt   _) = Just (char '<')
 infixMachOp1 _             = Nothing
 
 -- %left '-' '+'
-pprExpr7 platform (CmmMachOp (MO_Add rep1) [x, CmmLit (CmmInt i rep2)]) | i < 0
-   = pprExpr7 platform (CmmMachOp (MO_Sub rep1) [x, CmmLit (CmmInt (negate i) rep2)])
-pprExpr7 platform (CmmMachOp op [x,y])
+pprExpr7 platform (CmmMachOp (MO_Add rep1) (TupleG2 x (CmmLit (CmmInt i rep2)))) | i < 0
+   = pprExpr7 platform (CmmMachOp (MO_Sub rep1) (TupleG2 x (CmmLit (CmmInt (negate i) rep2))))
+pprExpr7 platform (CmmMachOp op (TupleG2 x y))
    | Just doc <- infixMachOp7 op
    = pprExpr7 platform x <+> doc <+> pprExpr8 platform y
 pprExpr7 platform e = pprExpr8 platform e
@@ -480,7 +492,7 @@ infixMachOp7 (MO_Sub _)  = Just (char '-')
 infixMachOp7 _           = Nothing
 
 -- %left '/' '*' '%'
-pprExpr8 platform (CmmMachOp op [x,y])
+pprExpr8 platform (CmmMachOp op (TupleG2 x y))
    | Just doc <- infixMachOp8 op
    = pprExpr8 platform x <+> doc <+> pprExpr9 platform y
 pprExpr8 platform e = pprExpr9 platform e
@@ -505,43 +517,39 @@ pprExpr9 platform e =
         CmmStackSlot a off  -> parens (ppr a   <+> char '+' <+> int off)
         CmmMachOp mop args  -> genMachOp platform mop args
 
-genMachOp :: Platform -> MachOp -> [CmmExpr] -> SDoc
-genMachOp platform (MO_RelaxedRead w) [x] =
+genMachOp :: Platform -> MachOp a -> SizedTupleGADT a CmmExpr -> SDoc
+genMachOp platform (MO_RelaxedRead w) (TupleG1 x) =
     ppr (cmmBits w) <> text "!" <> brackets (pdoc platform x)
 genMachOp platform mop args
-   | Just doc <- infixMachOp mop = case args of
+   | Just (c, eq) <- infixMachOp mop = case (eq, args) of
         -- dyadic
-        [x,y] -> pprExpr9 platform x <+> doc <+> pprExpr9 platform y
+        (Left Refl, TupleG2 x y) -> pprExpr9 platform x <+> char c <+> pprExpr9 platform y
 
         -- unary
-        [x]   -> doc <> pprExpr9 platform x
-
-        _     -> pprTrace "GHC.Cmm.Expr.genMachOp: machop with strange number of args"
-                          (pprMachOp mop <+>
-                            parens (hcat $ punctuate comma (map (pprExpr platform) args)))
-                          empty
+        (Right Refl, TupleG1 x)  -> char c <> pprExpr9 platform x
 
    | isJust (infixMachOp1 mop)
    || isJust (infixMachOp7 mop)
    || isJust (infixMachOp8 mop)  = parens (pprExpr platform (CmmMachOp mop args))
 
-   | otherwise = char '%' <> ppr_op <> parens (commafy (map (pprExpr platform) args))
-        where ppr_op = text (map (\c -> if c == ' ' then '_' else c)
-                                 (show mop))
-                -- replace spaces in (show mop) with underscores,
+   | otherwise = char '%' <> ppr_op <> parens (commafy (printed_args_list))
+   where ppr_op = text (map (\c -> if c == ' ' then '_' else c)
+                            (show mop))
+           -- replace spaces in (show mop) with underscores,
+         printed_args_list = map (pprExpr platform) (Foldable.toList args)
 
 --
 -- Unsigned ops on the word size of the machine get nice symbols.
 -- All else get dumped in their ugly format.
 --
-infixMachOp :: MachOp -> Maybe SDoc
+infixMachOp :: MachOp a -> Maybe (Char, Either (a :~: 2) (a :~: 1))
 infixMachOp mop
         = case mop of
-            MO_And    _ -> Just $ char '&'
-            MO_Or     _ -> Just $ char '|'
-            MO_Xor    _ -> Just $ char '^'
-            MO_Not    _ -> Just $ char '~'
-            MO_S_Neg  _ -> Just $ char '-' -- there is no unsigned neg :)
+            MO_And    _ -> Just ('&', Left Refl)
+            MO_Or     _ -> Just ('|', Left Refl)
+            MO_Xor    _ -> Just ('^', Left Refl)
+            MO_Not    _ -> Just ('~', Right Refl)
+            MO_S_Neg  _ -> Just ('-', Right Refl) -- there is no unsigned neg :)
             _ -> Nothing
 
 -- --------------------------------------------------------------------------

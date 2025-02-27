@@ -174,6 +174,12 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ text "Cmm lexical error"
     PsErrCmmParser cmm_err -> mkSimpleDecorated $ case cmm_err of
       CmmUnknownPrimitive name     -> text "unknown primitive" <+> ftext name
+      CmmBadPrimitiveArity
+        { cbpa_op_name = name
+        , cbpa_real_arity = real_arity
+        , cbpa_num_given_args = num_args
+        } -> text "primitive" <+> ftext name <+> text "has arity" <+> int real_arity
+                 <+> text "but was given" <+> int num_args <+> "args"
       CmmUnknownMacro fun          -> text "unknown macro" <+> ftext fun
       CmmUnknownCConv cconv        -> text "unknown calling convention:" <+> text cconv
       CmmUnrecognisedSafety safety -> text "unrecognised safety" <+> text safety
