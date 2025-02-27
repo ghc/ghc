@@ -14,21 +14,22 @@ import GHC.Data.StringBuffer
 import GHC.Driver.Config.Parser hiding (predefinedMacros)
 import GHC.Driver.Env.Types
 import GHC.Driver.Errors.Types
-import GHC.Driver.Main
 import qualified GHC.Driver.Errors.Types as GHC
+import GHC.Driver.Main
 import qualified GHC.Driver.Session as GHC
 import GHC.Hs.Dump
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.Errors.Ppr ()
+import GHC.Parser.Header
 import GHC.Parser.Lexer (P (..), ParseResult (..))
 import qualified GHC.Parser.Lexer as GHC
 import qualified GHC.Parser.Lexer as Lexer
+import qualified GHC.Parser.PreProcess as GHCPP
 import GHC.SysTools.Cpp
 import GHC.Types.SrcLoc
 import GHC.Unit.Env
 import GHC.Unit.State
 import GHC.Utils.Outputable
-import qualified GHC.Parser.PreProcess as GHCPP
 
 -- Local simulation -----------------
 import ParsePP
@@ -84,9 +85,14 @@ doDump libdir str = ghcWrapper libdir $ do
     liftIO $ putStrLn "-- dumpGhcCpp test ----------"
     -- let (!pst,!toks) = strGetToks dflags [] pflags "fake_test_file.hs" str
     hsc <- getSession
-    let pst0 = initParserStateWithMacros dflags (Just (hsc_unit_env hsc)) pflags (stringToStringBuffer str)
-                       (mkRealSrcLoc (mkFastString "fake_test_file.hs") 1 1)
-    liftIO $ putStrLn $ showPprUnsafe $ GHCPP.dumpGhcCpp pst0
+    -- let pst0 =
+    --         initParserStateWithMacros
+    --             dflags
+    --             (Just (hsc_unit_env hsc))
+    --             pflags
+    --             (stringToStringBuffer str)
+    --             (mkRealSrcLoc (mkFastString "fake_test_file.hs") 1 1)
+    -- liftIO $ putStrLn $ showPprUnsafe $ GHCPP.dumpGhcCpp pst0
     liftIO $ putStrLn "-- dumpGhcCpp test done ----------"
     let !pst = getPState dflags [] pflags "fake_test_file.hs" str
     liftIO $ putStrLn "-- dumpGhcCpp ----------"
@@ -111,18 +117,6 @@ strGetToks ::
     (Lexer.PState PpState, [Located Token])
 strGetToks dflags includes popts filename str = (final, reverse toks)
   where
-    -- includeMap = Map.fromList $ map (\(k, v) -> (k, stringToStringBuffer (intercalate "\n" v))) includes
-    -- initState =
-    --     initPpState
-    --         { pp_includes = includeMap
-    --         , pp_defines = predefinedMacros dflags
-    --         , pp_scope = (PpScope True) :| []
-    --         }
-    -- pstate = Lexer.initParserState initState popts buf loc
-    -- loc = mkRealSrcLoc (mkFastString filename) 1 1
-    -- buf = stringToStringBuffer str
-    -- -- cpp_enabled = Lexer.GhcCppBit `Lexer.xtest` Lexer.pExtsBitmap popts
-
     pstate = getPState dflags includes popts filename str
     (final, toks) = lexAll pstate
 
@@ -142,7 +136,8 @@ getPState dflags includes popts filename str = pstate
             , pp_defines = predefinedMacros dflags
             , pp_scope = (PpScope True) :| []
             }
-    pstate = Lexer.initParserState initState popts buf loc
+    -- pstate = Lexer.initParserState initState popts buf loc
+    pstate = Lexer.initPragState initState popts buf loc
     loc = mkRealSrcLoc (mkFastString filename) 1 1
     buf = stringToStringBuffer str
 
@@ -537,3 +532,38 @@ t19 = do
         ]
 
 -- x = x
+
+initDynFlags2 :: (GHC.GhcMonad m) => FilePath -> m GHC.DynFlags
+initDynFlags2 file = do
+    -- Based on GHC backpack driver doBackPack
+    dflags0 <- GHC.getSessionDynFlags
+    let parser_opts0 = initParserOpts dflags0
+    (_, src_opts) <- liftIO $ getOptionsFromFile parser_opts0 (supportedLanguagePragmas dflags0) file
+    liftIO $ putStrLn $ "src_opts:" ++ show src_opts
+    (dflags1, _, _) <- GHC.parseDynamicFilePragma dflags0 src_opts
+    -- Turn this on last to avoid T10942
+    let dflags2 = dflags1 `GHC.gopt_set` GHC.Opt_KeepRawTokenStream
+    -- Prevent parsing of .ghc.environment.* "package environment files"
+    (dflags3, _, _) <-
+        GHC.parseDynamicFlagsCmdLine
+            dflags2
+            [GHC.noLoc "-hide-all-packages"]
+    _ <- GHC.setSessionDynFlags dflags3
+    return dflags3
+
+libdir = "/home/alanz/mysrc/git.haskell.org/worktree/bisect/_build/stage1/lib"
+ddd = ghcWrapper libdir $ do
+    dflags <- initDynFlags2 "Example4.hs"
+    return ()
+
+t20 :: IO ()
+t20 = do
+    dump
+        [
+        "{-# LANGUAGE CPP #-}",
+        "#if __GLASGOW_HASKELL__ >= 913",
+        "{-# LANGUAGE GHC_CPP #-}",
+        "#endif",
+        "",
+        "module Example4 where"
+        ]
