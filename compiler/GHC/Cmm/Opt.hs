@@ -63,18 +63,23 @@ cmmMachOpFoldM _ (MO_VF_Broadcast lg _w) exprs =
     [CmmLit l] -> Just $! CmmLit (CmmVec $ replicate lg l)
     _ -> Nothing
 cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
-  = Just $! case op of
-      MO_S_Neg _ -> CmmLit (CmmInt (narrowS rep (-x)) rep)
-      MO_Not _   -> CmmLit (CmmInt (complement x) rep)
+  = case op of
+      MO_S_Neg _ -> Just $! CmmLit (CmmInt (narrowS rep (-x)) rep)
+      MO_Not _   -> Just $! CmmLit (CmmInt (complement x) rep)
 
         -- these are interesting: we must first narrow to the
         -- "from" type, in order to truncate to the correct size.
         -- The final narrow/widen to the destination type
         -- is implicit in the CmmLit.
-      MO_SF_Round _frm to -> CmmLit (CmmFloat (fromInteger x) to)
-      MO_SS_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
-      MO_UU_Conv  from to -> CmmLit (CmmInt (narrowU from x) to)
-      MO_XX_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
+      MO_SF_Round _frm to -> Just $! CmmLit (CmmFloat (fromInteger x) to)
+      MO_SS_Conv  from to -> Just $! CmmLit (CmmInt (narrowS from x) to)
+      MO_UU_Conv  from to -> Just $! CmmLit (CmmInt (narrowU from x) to)
+      MO_XX_Conv  from to -> Just $! CmmLit (CmmInt (narrowS from x) to)
+
+      -- Not as simply as it seems, since CmmFloat uses Rational, so skipping those
+      -- for now ...
+      MO_WF_Bitcast _w -> Nothing
+      MO_FW_Bitcast _w -> Nothing
       _ -> panic $ "cmmMachOpFoldM: unknown unary op: " ++ show op
 
 -- Eliminate shifts that are wider than the shiftee
