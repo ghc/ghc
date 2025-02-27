@@ -659,7 +659,8 @@ getFileArgs hsc_env input_fn = do
   let dflags0 = hsc_dflags hsc_env
       logger  = hsc_logger hsc_env
       parser_opts = initParserOpts dflags0
-  (warns0, src_opts) <- getOptionsFromFile parser_opts (supportedLanguagePragmas dflags0) input_fn
+      unit_env = hsc_unit_env hsc_env
+  (warns0, src_opts) <- getOptionsFromFile dflags0 unit_env parser_opts (supportedLanguagePragmas dflags0) input_fn
   (dflags1, unhandled_flags, warns)
     <- parseDynamicFilePragma logger dflags0 src_opts
   checkProcessArgsResult unhandled_flags
