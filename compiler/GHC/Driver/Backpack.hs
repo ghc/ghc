@@ -98,9 +98,11 @@ doBackpack :: [FilePath] -> Ghc ()
 doBackpack [src_filename] = do
     -- Apply options from file to dflags
     dflags0 <- getDynFlags
+    hsc_env <- getSession
     let dflags1 = dflags0
     let parser_opts1 = initParserOpts dflags1
-    (p_warns, src_opts) <- liftIO $ getOptionsFromFile parser_opts1 (supportedLanguagePragmas dflags1) src_filename
+    let unit_env = hsc_unit_env hsc_env
+    (p_warns, src_opts) <- liftIO $ getOptionsFromFile dflags0 unit_env parser_opts1 (supportedLanguagePragmas dflags1) src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
     modifySession (hscSetFlags dflags)
     logger <- getLogger -- Get the logger after having set the session flags,

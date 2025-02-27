@@ -30,6 +30,7 @@ dumpGhcCpp :: PState PpState -> SDoc
 dumpGhcCpp pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
                         -- ++ show comments_as_toks ++ sepa
                         ++ show comments ++ sepa
+                        -- ++ show all_toks ++ sepa
   where
     -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
     (pst_final, bare_toks) = lexAll pst
@@ -39,7 +40,8 @@ dumpGhcCpp pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
     to_tok (L (EpaDelta l _ _) _) = L l (ITunknown "-")
     comments_as_toks = map to_tok comments
     defines = showDefines (pp_defines (pp pst_final))
-    sepa = "\n------------------------------\n"
+    -- sepa = "\n------------------------------\n"
+    sepa = "\n-------------x----------------\n"
     startLoc = mkRealSrcLoc (srcLocFile (psRealLoc $ loc pst)) 1 1
     buf1 = (buffer pst){cur = 0}
     all_toks = sortBy cmpBs (bare_toks ++ comments_as_toks)
