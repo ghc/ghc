@@ -123,7 +123,7 @@ main = do
 
   -- pretty-printing of unresolved infix expressions
   let ne = ConE $ mkName "N"
-      np = ConP (mkName "N") [] []
+      np = ConP (mkName "N") []
       nt = ConT (mkName "Int")
       plusE = ConE (mkName ":+")
       plusP = (mkName ":+")

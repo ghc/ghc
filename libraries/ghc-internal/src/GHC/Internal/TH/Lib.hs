@@ -141,10 +141,9 @@ unboxedTupP ps = do { ps1 <- sequenceA ps; pure (UnboxedTupP ps1)}
 unboxedSumP :: Quote m => m Pat -> SumAlt -> SumArity -> m Pat
 unboxedSumP p alt arity = do { p1 <- p; pure (UnboxedSumP p1 alt arity) }
 
-conP :: Quote m => Name -> [m Type] -> [m Pat] -> m Pat
-conP n ts ps = do ps' <- sequenceA ps
-                  ts' <- sequenceA ts
-                  pure (ConP n ts' ps')
+conP :: Quote m => Name -> [m Pat] -> m Pat
+conP n ps = do ps' <- sequenceA ps
+               pure (ConP n ps')
 infixP :: Quote m => m Pat -> Name -> m Pat -> m Pat
 infixP p1 n p2 = do p1' <- p1
                     p2' <- p2

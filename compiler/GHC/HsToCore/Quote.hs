@@ -2165,9 +2165,8 @@ repP (SumPat _ p alt arity) = do { p1 <- repLP p
 repP (ConPat NoExtField dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of
-         PrefixCon ps -> do { ts' <- repListM typeTyConName (repTy . unLoc . hstp_body) (takeHsConPatTyArgs ps)
-                            ; ps' <- repLPs (dropHsConPatTyArgs ps)
-                            ; repPcon con_str ts' ps' }
+         PrefixCon ps -> do { ps' <- repLPs ps
+                            ; repPcon con_str ps' }
          RecCon rec   -> do { fps <- repListM fieldPatTyConName rep_fld (rec_flds rec)
                             ; repPrec con_str fps }
          InfixCon p1 p2 -> do { p1' <- repLP p1;
@@ -2424,8 +2423,8 @@ repPunboxedSum (MkC p) alt arity
                              , mkIntExprInt platform alt
                              , mkIntExprInt platform arity ] }
 
-repPcon   :: Core TH.Name -> Core [(M TH.Type)] -> Core [(M TH.Pat)] -> MetaM (Core (M TH.Pat))
-repPcon (MkC s) (MkC ts) (MkC ps) = rep2 conPName [s, ts, ps]
+repPcon   :: Core TH.Name -> Core [(M TH.Pat)] -> MetaM (Core (M TH.Pat))
+repPcon (MkC s) (MkC ps) = rep2 conPName [s, ps]
 
 repPrec   :: Core TH.Name -> Core [M (TH.Name, TH.Pat)] -> MetaM (Core (M TH.Pat))
 repPrec (MkC c) (MkC rps) = rep2 recPName [c,rps]
