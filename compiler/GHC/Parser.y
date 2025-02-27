@@ -2313,7 +2313,7 @@ type :: { LHsType GhcPs }
                                        >> let arr = HsStandardArrow (epUniTok $3) (reverse $ unLoc $2)
                                           in amsA' (sLL $1 $> $ HsFunTy noExtField arr $1 $4) }
 
-        | btype modifiers '->.' ctype {% hintLinear (getLoc $2) >>
+        | btype modifiers '->.' ctype {% hintLinear (getLoc $3) >>
                                           amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow (epTok $3) (reverse $ unLoc $2)) $1 $4) }
                                               -- [mu AnnLollyU $2] }
 
