@@ -55,6 +55,8 @@ data Opts = Opts
     , optReadelf   :: ProgOpt
     , optMergeObjs :: ProgOpt
     , optWindres   :: ProgOpt
+    , optOtool     :: ProgOpt
+    , optInstallNameTool :: ProgOpt
     -- Note we don't actually configure LD into anything but
     -- see #23857 and #22550 for the very unfortunate story.
     , optLd        :: ProgOpt
@@ -103,6 +105,8 @@ emptyOpts = Opts
     , optReadelf   = po0
     , optMergeObjs = po0
     , optWindres   = po0
+    , optOtool     = po0
+    , optInstallNameTool = po0
     , optLd        = po0
     , optUnregisterised = Nothing
     , optTablesNextToCode = Nothing
@@ -131,6 +135,8 @@ _optNm      = Lens optNm      (\x o -> o {optNm=x})
 _optReadelf = Lens optReadelf (\x o -> o {optReadelf=x})
 _optMergeObjs = Lens optMergeObjs (\x o -> o {optMergeObjs=x})
 _optWindres = Lens optWindres (\x o -> o {optWindres=x})
+_optOtool = Lens optOtool (\x o -> o {optOtool =x})
+_optInstallNameTool = Lens optInstallNameTool (\x o -> o {optInstallNameTool=x})
 _optLd = Lens optLd (\x o -> o {optLd= x})
 
 _optTriple :: Lens Opts (Maybe String)
@@ -192,6 +198,8 @@ options =
     , progOpts "readelf" "readelf utility" _optReadelf
     , progOpts "merge-objs" "linker for merging objects" _optMergeObjs
     , progOpts "windres" "windres utility" _optWindres
+    , progOpts "otool" "otool utility" _optOtool
+    , progOpts "install-name-tool" "install_name_tool utility" _optOtool
     , progOpts "ld" "linker" _optLd
     ]
   where
@@ -458,6 +466,20 @@ mkTarget opts = do
             return (Just windres)
           _ -> return Nothing
 
+    otool <-
+        case archOS_OS archOs of
+          OSDarwin -> do
+            otool <- findProgram "otool" (optOtool opts) ["otool"]
+            return (Just otool)
+          _ -> return Nothing
+
+    install_name_tool <-
+        case archOS_OS archOs of
+          OSDarwin -> do
+            install_name_tool <- findProgram "install_name_tool" (optInstallNameTool opts) ["install_name_tool"]
+            return (Just install_name_tool)
+          _ -> return Nothing
+
     -- various other properties of the platform
     tgtWordSize <- checkWordSize cc
     tgtEndianness <- checkEndianness cc
@@ -495,6 +517,8 @@ mkTarget opts = do
                    , tgtNm = nm
                    , tgtMergeObjs = mergeObjs
                    , tgtWindres = windres
+                   , tgtOtool = otool
+                   , tgtInstallNameTool = install_name_tool
                    , tgtWordSize
                    , tgtEndianness
                    , tgtUnregisterised

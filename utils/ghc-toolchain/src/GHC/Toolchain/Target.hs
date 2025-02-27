@@ -74,6 +74,10 @@ data Target = Target
 
       -- Windows-specific tools
     , tgtWindres :: Maybe Program
+
+      -- Mac specific
+    , tgtOtool:: Maybe Program
+    , tgtInstallNameTool :: Maybe Program
     }
     deriving (Read, Eq, Ord)
 
@@ -122,5 +126,7 @@ instance Show Target where
     , ", tgtNm = " ++ show tgtNm
     , ", tgtMergeObjs = " ++ show tgtMergeObjs
     , ", tgtWindres = " ++ show tgtWindres
+    , ", tgtOtool = " ++ show tgtOtool
+    , ", tgtInstallNameTool = " ++ show tgtInstallNameTool
     , "}"
     ]
