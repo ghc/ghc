@@ -526,14 +526,16 @@ coreToStgApp f args ticks = do
         -- NB: f_arity is only consulted for LetBound things
         f_arity   = stgArity f how_bound
         saturated = f_arity <= n_val_args
+        exactly_saturated = f_arity == n_val_args
 
         res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
                 DataConWorkId dc
-                  | saturated    -> if isUnboxedSumDataCon dc then
-                                      StgConApp dc NoNumber args' (sumPrimReps args)
-                                    else
-                                      StgConApp dc NoNumber args' []
+                  | exactly_saturated
+                  ->  if isUnboxedSumDataCon dc then
+                        StgConApp dc NoNumber args' (sumPrimReps args)
+                      else
+                        StgConApp dc NoNumber args' []
 
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
