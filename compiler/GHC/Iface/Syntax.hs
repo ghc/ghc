@@ -26,6 +26,7 @@ module GHC.Iface.Syntax (
         IfaceCompleteMatch(..),
         IfaceLFInfo(..), IfaceTopBndrInfo(..),
         IfaceImport(..),
+        ifImpModule,
         ImpIfaceList(..), IfaceExport,
 
         -- * Binding names
@@ -123,6 +124,9 @@ data ImpIfaceList
   | ImpIfaceEverythingBut ![Name]
 
 
+-- | Extract the imported module from an IfaceImport
+ifImpModule :: IfaceImport -> Module
+ifImpModule (IfaceImport declSpec _) = is_mod declSpec
 
 instance Binary IfaceImport where
   put_ bh (IfaceImport declSpec ifaceList) = do
