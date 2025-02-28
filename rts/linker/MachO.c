@@ -68,9 +68,10 @@ static void encodeAddend(ObjectCode * oc, Section * section,
 
 /* Global Offset Table logic */
 static bool isGotLoad(MachORelocationInfo * ri);
-static bool needGotSlot(MachONList * symbol);
+static bool needGotSlot(MachOSymbol * symbol);
 static bool makeGot(ObjectCode * oc);
 static void freeGot(ObjectCode * oc);
+static void findInternalGotRefs(ObjectCode * oc);
 #endif /* aarch64_HOST_ARCH */
 
 /*
@@ -440,6 +441,48 @@ encodeAddend(ObjectCode * oc, Section * section,
     barf("unsupported relocation type: %d\n", ri->r_type);
 }
 
+/* Note [Symbols in need of GOT entries]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * As GOT entries require memory, we ideally want to avoid reserving
+ * them for symbols where they are unnecessary. Specifically, most internal
+ * symbols will not be referenced by the GOT, even in position independent code
+ * (since you can instead use direct PC-relative addressing).
+ *
+ * However, it is nevertheless possible for internal symbols to be referenced
+ * via the GOT. Consequently, we use the following strategy to determine whether
+ * a symbol needs a GOT slot:
+ *
+ *  a. all undefined external symbols are given GOT entries
+ *  b. all external symbols with cross-section refrences are given GOT entries
+ *  c. all internal symbols for which there are GOT relocations are given GOT
+ *     entries.
+ *
+ * Failing to consider (c) lead to #25577. For this we explicitly traverse
+ * the relocations in findInternalGotRefs() looking for GOT relocations
+ * referencing internal symbols, setting the MachOSymbol.needs_got flag for
+ * each.
+ */
+
+// See Note [Symbols in need of GOT entries]
+static void
+findInternalGotRefs(ObjectCode * oc)
+{
+    for (int curSection = 0; curSection < oc->n_sections; curSection++) {
+        Section * sect = &oc->sections[curSection];
+        if (sect->info == NULL)
+            continue;
+        MachOSection * msect = sect->info->macho_section; // for access convenience
+        MachORelocationInfo * relocs = sect->info->relocation_info;
+        for(uint32_t i = 0; i < msect->nreloc; i++) {
+            MachORelocationInfo *ri = &relocs[i];
+            if (isGotLoad(ri)) {
+                MachOSymbol* symbol = &oc->info->macho_symbols[ri->r_symbolnum];
+                symbol->needs_got = true;
+            }
+        }
+    }
+}
+
 static bool
 isGotLoad(struct relocation_info * ri) {
     return ri->r_type == ARM64_RELOC_GOT_LOAD_PAGE21
@@ -448,14 +491,19 @@ isGotLoad(struct relocation_info * ri) {
 
 /*
  * Check if we need a global offset table slot for a
- * given symbol
+ * given symbol. See Note [Symbols in need of GOT entries].
  */
 static bool
-needGotSlot(MachONList * symbol) {
-    return (symbol->n_type & N_EXT)             /* is an external symbol      */
-        && (N_UNDF == (symbol->n_type & N_TYPE) /* and is undefined           */
-            || NO_SECT != symbol->n_sect);      /*     or is defined in a
-                                                 *        different section   */
+needGotSlot(MachOSymbol * symbol) {
+    // Does it have any internal references?
+    if (symbol->needs_got) {
+        return true;
+    }
+
+    return (symbol->nlist->n_type & N_EXT)             /* is an external symbol    */
+        && (N_UNDF == (symbol->nlist->n_type & N_TYPE) /* and is undefined         */
+            || NO_SECT != symbol->nlist->n_sect);      /*     or is defined in a
+                                                        *        different section */
 }
 
 static bool
@@ -463,7 +511,7 @@ makeGot(ObjectCode * oc) {
     size_t got_slots = 0;
 
     for(size_t i=0; i < oc->info->n_macho_symbols; i++)
-        if(needGotSlot(oc->info->macho_symbols[i].nlist))
+        if(needGotSlot(&oc->info->macho_symbols[i]))
             got_slots += 1;
 
     if(got_slots > 0) {
@@ -476,7 +524,7 @@ makeGot(ObjectCode * oc) {
         /* update got_addr */
         size_t slot = 0;
         for(size_t i=0; i < oc->info->n_macho_symbols; i++)
-            if(needGotSlot(oc->info->macho_symbols[i].nlist))
+            if(needGotSlot(&oc->info->macho_symbols[i]))
                 oc->info->macho_symbols[i].got_addr
                     = ((uint8_t*)oc->info->got_start)
                     + (slot++ * sizeof(void *));
@@ -1452,6 +1500,8 @@ ocGetNames_MachO(ObjectCode* oc)
         }
     }
 #if defined(aarch64_HOST_ARCH)
+    findInternalGotRefs(oc);
+
     /* Setup the global offset table
      * This is for symbols that are external, and not defined here.
      * So that we can load their address indirectly.
@@ -1558,7 +1608,7 @@ ocResolve_MachO(ObjectCode* oc)
     /* fill the GOT table */
     for(size_t i = 0; i < oc->info->n_macho_symbols; i++) {
         MachOSymbol * symbol = &oc->info->macho_symbols[i];
-        if(needGotSlot(symbol->nlist)) {
+        if(needGotSlot(symbol)) {
             if(N_UNDF == (symbol->nlist->n_type & N_TYPE)) {
                 /* an undefined symbol. So we need to ensure we
                  * have the address.

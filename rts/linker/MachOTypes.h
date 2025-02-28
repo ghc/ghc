@@ -31,6 +31,7 @@ typedef struct _MachOSymbol {
     SymbolAddr * addr;  /* the final resting place of the symbol */
     void * got_addr;    /* address of the got slot for this symbol, if any */
     MachONList * nlist; /* the nlist symbol entry */
+    bool needs_got;     /* See Note [Symbols in need of GOT entries] */
 } MachOSymbol;
 
 struct ObjectCodeFormatInfo {
