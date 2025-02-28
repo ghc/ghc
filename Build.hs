@@ -47,7 +47,7 @@ main = do
       Nothing -> error ("Couldn't find cabal-install: " ++ show cabal_path)
       Just x  -> pure (Cabal x)
 
-  ghc0_version <- readCreateProcess (runGhc ghc0 ["--version"]) ""
+  ghc0_version <- readCreateProcess' (runGhc ghc0 ["--version"]) ""
   msg $ "Bootstrapping GHC version: " ++ init ghc0_version
 
   msg "Building stage1 GHC program and utility programs"
@@ -80,7 +80,7 @@ main = do
                           { settingsTriple = Just stage0_target_triple
                           }
 
-  void $ readCreateProcess (shell $ "rm -fR _build/stage1/pkgs; ln -s $(pwd)/_build/stage0/cabal/packagedb/ghc-* _build/stage1/pkgs") ""
+  void $ readCreateProcess' (shell $ "rm -fR _build/stage1/pkgs; ln -s $(pwd)/_build/stage0/cabal/packagedb/ghc-* _build/stage1/pkgs") ""
   generateSettings ghcToolchain stage1_settings "_build/stage1/"
 
   msg "Building boot libraries with stage1 compiler..."
@@ -93,7 +93,7 @@ main = do
   -- Reuse stage1 settings for stage2 and copy stage1's built boot package for
   -- stage2 to use.
   createDirectoryIfMissing True "_build/stage2/lib/"
-  void $ readCreateProcess (shell $ "rm -fR _build/stage2/pkgs; ln -s $(pwd)/_build/stage2/cabal/packagedb/ghc-* _build/stage2/pkgs") ""
+  void $ readCreateProcess' (shell $ "rm -fR _build/stage2/pkgs; ln -s $(pwd)/_build/stage2/cabal/packagedb/ghc-* _build/stage2/pkgs") ""
   cp "_build/stage1/lib/settings" "_build/stage2/lib/settings"
 
   -- TODO: in the future we want to generate different settings for cross
@@ -136,7 +136,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
   -- environment variable to ghc-boot's Setup.hs script.
   (arch,os) <- ghcTargetArchOS ghc0
   stage1_ghc_boot_settings <- do
-    commit_id <- readCreateProcess (proc "git" ["rev-parse", "HEAD"]) ""
+    commit_id <- readCreateProcess' (proc "git" ["rev-parse", "HEAD"]) ""
     -- we infer stage1's host platform from stage0's settings
     let settings =
           [ ("hostPlatformArch",    arch)
@@ -202,7 +202,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
               { env = Just stage1_env
               }
 
-  (exit_code, cabal_stdout, cabal_stderr) <- readCreateProcessWithExitCode build_cmd ""
+  (exit_code, cabal_stdout, cabal_stderr) <- readCreateProcessWithExitCode' build_cmd ""
   writeFile (dst </> "cabal.stdout") cabal_stdout
   writeFile (dst </> "cabal.stderr") cabal_stderr
   case exit_code of
@@ -224,7 +224,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
         , "-v0"
         ]
   let copy_bin target bin = do
-        (list_bin_exit_code, list_bin_stdout, list_bin_stderr) <- readCreateProcessWithExitCode (listbin_cmd target) ""
+        (list_bin_exit_code, list_bin_stdout, list_bin_stderr) <- readCreateProcessWithExitCode' (listbin_cmd target) ""
         case list_bin_exit_code of
           ExitSuccess
             | (bin_src:_) <- lines list_bin_stdout
@@ -284,46 +284,46 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop dst = do
 
   msg "  - Generating headers and sources..."
 
-  -- first run is expected to fail because of misssing headers
-  (_exit_code, rts_conf_stdout, rts_conf_stderr) <- readCreateProcessWithExitCode build_rts_cmd ""
-  writeFile (dst </> "rts-conf.stdout") rts_conf_stdout
-  writeFile (dst </> "rts-conf.stderr") rts_conf_stderr
-  ghcplatform_dir <- do
-    ghcplatform_h <- readCreateProcess (shell ("find " ++ build_dir ++ " -name ghcplatform.h")) ""
-    case ghcplatform_h of
-      "" -> do
-        putStrLn "Couldn't find ghcplatform.h"
-        exitFailure
-      d  -> pure (takeDirectory d)
+  -- -- first run is expected to fail because of misssing headers
+  -- (_exit_code, rts_conf_stdout, rts_conf_stderr) <- readCreateProcessWithExitCode' build_rts_cmd ""
+  -- writeFile (dst </> "rts-conf.stdout") rts_conf_stdout
+  -- writeFile (dst </> "rts-conf.stderr") rts_conf_stderr
+  -- ghcplatform_dir <- do
+  --   ghcplatform_h <- readCreateProcess' (shell ("find " ++ build_dir ++ " -name ghcplatform.h")) ""
+  --   case ghcplatform_h of
+  --     "" -> do
+  --       putStrLn "Couldn't find ghcplatform.h"
+  --       exitFailure
+  --     d  -> pure (takeDirectory d)
 
-  -- deriving constants
-  let derived_constants = src_rts </> "include/DerivedConstants.h"
-  withSystemTempDirectory "derive-constants" $ \tmp_dir -> do
-    target <- getTarget ghc
-    void $ readCreateProcess (runDeriveConstants derive_constants
-      [ "--gen-header"
-      , "-o",  derived_constants
-      , "--target-os", target
-      , "--tmpdir", tmp_dir
-      , "--gcc-program", "cc" -- FIXME
-      , "--nm-program", "nm"   -- FIXME
-      , "--objdump-program", "objdump" -- FIXME
-      -- pass `-fcommon` to force symbols into the common section. If they
-      -- end up in the ro data section `nm` won't list their size, and thus
-      -- derivedConstants will fail. Recent clang (e.g. 16) will by default
-      -- use `-fno-common`.
-      , "--gcc-flag", "-fcommon"
-      , "--gcc-flag", "-I" ++ src_rts </> "include"
-      , "--gcc-flag", "-I" ++ src_rts
-      , "--gcc-flag", "-I" ++ ghcplatform_dir
-      ]) ""
+  -- -- deriving constants
+  -- let derived_constants = src_rts </> "include/DerivedConstants.h"
+  -- withSystemTempDirectory "derive-constants" $ \tmp_dir -> do
+  --   target <- getTarget ghc
+  --   void $ readCreateProcess' (runDeriveConstants derive_constants
+  --     [ "--gen-header"
+  --     , "-o",  derived_constants
+  --     , "--target-os", target
+  --     , "--tmpdir", tmp_dir
+  --     , "--gcc-program", "cc" -- FIXME
+  --     , "--nm-program", "nm"   -- FIXME
+  --     , "--objdump-program", "objdump" -- FIXME
+  --     -- pass `-fcommon` to force symbols into the common section. If they
+  --     -- end up in the ro data section `nm` won't list their size, and thus
+  --     -- derivedConstants will fail. Recent clang (e.g. 16) will by default
+  --     -- use `-fno-common`.
+  --     , "--gcc-flag", "-fcommon"
+  --     , "--gcc-flag", "-I" ++ src_rts </> "include"
+  --     , "--gcc-flag", "-I" ++ src_rts
+  --     , "--gcc-flag", "-I" ++ ghcplatform_dir
+  --     ]) ""
 
-  -- Generate autoapply
-  let run_genapply args out = writeFile out =<< readCreateProcess (runGenApply genapply args) ""
-  run_genapply [derived_constants]         (src_rts </> "AutoApply.cmm")
-  run_genapply [derived_constants, "-V16"] (src_rts </> "AutoApply_V16.cmm")
-  run_genapply [derived_constants, "-V32"] (src_rts </> "AutoApply_V32.cmm")
-  run_genapply [derived_constants, "-V64"] (src_rts </> "AutoApply_V64.cmm")
+  -- -- Generate autoapply
+  -- let run_genapply args out = void $ readCreateProcessInto' out (runGenApply genapply args) ""
+  -- run_genapply [derived_constants]         (src_rts </> "AutoApply.cmm")
+  -- run_genapply [derived_constants, "-V16"] (src_rts </> "AutoApply_V16.cmm")
+  -- run_genapply [derived_constants, "-V32"] (src_rts </> "AutoApply_V32.cmm")
+  -- run_genapply [derived_constants, "-V64"] (src_rts </> "AutoApply_V64.cmm")
 
   -- Generate primop code for ghc-internal
   --
@@ -332,10 +332,9 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop dst = do
   -- libraries that aren't built yet.
   let primops_txt    = "compiler/GHC/Builtin/primops.txt"
   let primops_txt_pp = primops_txt <.> ".pp"
-  primops <- readCreateProcess (shell $ "cc -E -undef -traditional -P -x c " ++ primops_txt_pp) ""
-  writeFile primops_txt primops
-  writeFile ("libraries/ghc-internal/src/GHC/Internal/Prim.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-source"]) primops
-  writeFile ("libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops
+  void $ readCreateProcessInto' primops_txt (shell $ "cc -E -undef -traditional -P -x c " ++ primops_txt_pp) ""
+  void $ readCreateProcessIntoWithFile' "libraries/ghc-internal/src/GHC/Internal/Prim.hs" (runGenPrimop genprimop ["--make-haskell-source"]) primops_txt
+  void $ readCreateProcessIntoWithFile' "libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs" (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops_txt
 
 
 ---------------------------
@@ -427,7 +426,53 @@ runGenPrimop (GenPrimop f) = proc f
 -- Recursively, force overwrite, and preserve timestamps (important for package
 -- dbs)
 cp :: String -> String -> IO ()
-cp src dst = void (readCreateProcess (shell $ "cp -rfp " ++ src ++ " " ++ dst) "")
+cp src dst = void (readCreateProcess' (shell $ "cp -rfp " ++ src ++ " " ++ dst) "")
+
+readCreateProcessWithExitCode' :: CreateProcess -> String -> IO (ExitCode, String, String)
+readCreateProcessWithExitCode' p input = do
+  case p of
+    (CreateProcess { cmdspec = RawCommand path args }) -> do
+      msg $ " $ " ++ path ++ " " ++ unwords args
+    (CreateProcess { cmdspec = ShellCommand cmd }) -> do
+      msg $ " $ " ++ cmd
+  unless (null input) $ do
+    msg $ "Input: " ++ input
+  readCreateProcessWithExitCode p input
+
+readCreateProcess' :: CreateProcess -> String -> IO String
+readCreateProcess' p input = do
+  case p of
+    (CreateProcess { cmdspec = RawCommand path args }) -> do
+      msg $ " $ " ++ path ++ " " ++ unwords args
+    (CreateProcess { cmdspec = ShellCommand cmd }) -> do
+      msg $ " $ " ++ cmd
+  unless (null input) $ do
+    msg $ "Input: " ++ input
+  readCreateProcess p input
+
+readCreateProcessInto' :: FilePath -> CreateProcess -> String -> IO String
+readCreateProcessInto' dst p input = do
+  case p of
+    (CreateProcess { cmdspec = RawCommand path args }) -> do
+      msg $ " $ " ++ path ++ " " ++ unwords args ++ " > " ++ dst
+    (CreateProcess { cmdspec = ShellCommand cmd }) -> do
+      msg $ " $ " ++ cmd ++ " > " ++ dst
+  unless (null input) $ do
+    msg $ "Input: " ++ input
+  out <- readCreateProcess p input
+  writeFile dst out
+  pure out
+
+readCreateProcessIntoWithFile' :: FilePath -> CreateProcess -> FilePath -> IO String
+readCreateProcessIntoWithFile' dst p input = do
+  case p of
+    (CreateProcess { cmdspec = RawCommand path args }) -> do
+      msg $ " $ " ++ path ++ " " ++ unwords args ++ " < " ++ input ++ " > " ++ dst
+    (CreateProcess { cmdspec = ShellCommand cmd }) -> do
+      msg $ " $ " ++ cmd ++ " < " ++ input ++ " > " ++ dst
+  out <- readCreateProcess p =<< readFile input
+  writeFile dst out
+  pure out
 
 withSystemTempDirectory :: String -> (String -> IO a) -> IO a
 withSystemTempDirectory prefix = do
@@ -443,7 +488,7 @@ withSystemTempDirectory prefix = do
 -- | Retrieve GHC's target arch/os from ghc --info
 ghcTargetArchOS :: Ghc -> IO (String,String)
 ghcTargetArchOS ghc = do
-  is <- read <$> readCreateProcess (runGhc ghc ["--info"]) "" :: IO [(String,String)]
+  is <- read <$> readCreateProcess' (runGhc ghc ["--info"]) "" :: IO [(String,String)]
   let arch = fromMaybe (error "Couldn't read 'target arch' setting") (lookup "target arch" is)
   let os   = fromMaybe (error "Couldn't read 'target os' setting") (lookup "target os" is)
   pure (arch,os)
@@ -458,7 +503,7 @@ getTarget ghc = ghcTargetArchOS ghc >>= \case
 -- | Retrieve GHC's target triple
 ghcTargetTriple :: Ghc -> IO String
 ghcTargetTriple ghc = do
-  is <- read <$> readCreateProcess (runGhc ghc ["--info"]) "" :: IO [(String,String)]
+  is <- read <$> readCreateProcess' (runGhc ghc ["--info"]) "" :: IO [(String,String)]
   pure $ fromMaybe (error "Couldn't read 'Target platform setting") (lookup "Target platform" is)
 
 
@@ -551,7 +596,7 @@ generateSettings ghc_toolchain Settings{..} dst = do
        -- FIXME: add other options for ghc-toolchain from Settings
        ]) ++ common_args
 
-  (exit_code, toolchain_stdout, toolchain_stderr) <- readCreateProcessWithExitCode (runGhcToolchain ghc_toolchain args) ""
+  (exit_code, toolchain_stdout, toolchain_stderr) <- readCreateProcessWithExitCode' (runGhcToolchain ghc_toolchain args) ""
   writeFile (dst </> "ghc-toolchain.stdout") toolchain_stdout
   writeFile (dst </> "ghc-toolchain.stderr") toolchain_stderr
   case exit_code of

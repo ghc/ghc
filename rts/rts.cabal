@@ -350,6 +350,16 @@ library
     exposed: True
     exposed-modules:
 
+    autogen-includes:
+      ghcautoconf.h
+      ghcplatform.h
+      DerivedConstants.h
+
+    install-includes:
+      ghcautoconf.h
+      ghcplatform.h
+      DerivedConstants.h
+
     if arch(javascript)
 
       include-dirs: include
@@ -384,8 +394,11 @@ library
         js/time.js
 
       install-includes: HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
-                        ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
+                        ghcautoconf.h
                         DerivedConstants.h
+                        ghcplatform.h
+                        ghcconfig.h
+                        ghcversion.h
                         stg/MachRegs.h
                         stg/MachRegs/arm32.h
                         stg/MachRegs/arm64.h
@@ -500,7 +513,6 @@ library
       install-includes: Cmm.h HsFFI.h MachDeps.h Jumps.h Rts.h RtsAPI.h RtsSymbols.h Stg.h
                         ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                         -- ^ from include
-                        DerivedConstants.h
                         rts/EventLogConstants.h
                         rts/EventTypes.h
                         -- ^ generated
@@ -584,34 +596,38 @@ library
         if !arch(x86_64) && !arch(aarch64)
            ld-options: -read_only_relocs warning
 
-      cmm-sources: Apply.cmm
-                   Compact.cmm
-                   ContinuationOps.cmm
-                   Exception.cmm
-                   HeapStackCheck.cmm
-                   Jumps_D.cmm
-                   Jumps_V16.cmm
-                   PrimOps.cmm
-                   StgMiscClosures.cmm
-                   StgStartup.cmm
-                   StgStdThunks.cmm
-                   Updates.cmm
-                   -- AutoApply is generated
-                   AutoApply.cmm
-                   AutoApply_V16.cmm
+      cmm-sources:
+        Apply.cmm
+        Compact.cmm
+        ContinuationOps.cmm
+        Exception.cmm
+        HeapStackCheck.cmm
+        Jumps_D.cmm
+        Jumps_V16.cmm
+        PrimOps.cmm
+        StgMiscClosures.cmm
+        StgStartup.cmm
+        StgStdThunks.cmm
+        Updates.cmm
+
+      autogen-cmm-sources:
+        AutoApply.cmm
+        AutoApply_V16.cmm
 
       if arch(x86_64)
         cmm-sources:
-          AutoApply_V32.cmm (-mavx2)
-          AutoApply_V64.cmm (-mavx512f)
           Jumps_V32.cmm (-mavx2)
           Jumps_V64.cmm (-mavx512f)
+        autogen-cmm-sources:
+          AutoApply_V32.cmm (-mavx2)
+          AutoApply_V64.cmm (-mavx512f)
       else
         cmm-sources:
-          AutoApply_V32.cmm
-          AutoApply_V64.cmm
           Jumps_V32.cmm
           Jumps_V64.cmm
+        autogen-cmm-sources:
+          AutoApply_V32.cmm
+          AutoApply_V64.cmm
 
       -- we always link against libffi, even without libffi-adjustors enabled.
       -- libffi is used by the Interpreter and some of its symbols are declared

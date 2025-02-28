@@ -520,3 +520,94 @@ cat $srcdir/rts.buildinfo.in \
     || exit 1
 rm -f external-symbols.flags
 ]
+
+dnl --------------------------------------------------------------
+dnl Generate derived constants
+dnl --------------------------------------------------------------
+
+AC_ARG_VAR([NM], [Path to the nm program])
+AC_PATH_PROG([NM], nm)
+if test -z "$NM"; then
+	AC_MSG_ERROR([Cannot find nm])
+fi
+
+AC_ARG_VAR([OBJDUMP], [Path to the objdump program])
+AC_PATH_PROG([OBJDUMP], objdump)
+if test -z "$OBJDUMP"; then
+	AC_MSG_ERROR([Cannot find objdump])
+fi
+
+AC_ARG_VAR([DERIVE_CONSTANTS], [Path to the deriveConstants program])
+AC_PATH_PROG([DERIVE_CONSTANTS], deriveConstants)
+if test -z "$DERIVE_CONSTANTS"; then
+	AC_MSG_ERROR([Cannot find deriveConstants])
+fi
+
+AC_MSG_CHECKING([for DerivedConstants.h])
+dnl NOTE:  dnl pass `-fcommon` to force symbols into the common section. If they end
+dnl up in the ro data section `nm` won't list their size, and thus derivedConstants
+dnl will fail. Recent clang (e.g. 16) will by default use `-fno-common`.
+dnl
+dnl FIXME: using a relative path here is TERRIBLE
+dnl
+if $DERIVE_CONSTANTS \
+  --gen-header \
+  -o include/DerivedConstants.h \
+  --target-os "$BuildOS_CPP" \
+  --gcc-program "$CC" \
+  --nm-program "$NM" \
+  --objdump-program "$OBJDUMP" \
+  --tmpdir "$(mktemp -d)" \
+  --gcc-flag "-fcommon" \
+  --gcc-flag "-I$srcdir" \
+  --gcc-flag "-I$srcdir/include" \
+  --gcc-flag "-Iinclude" ; then
+  AC_MSG_RESULT([created])
+else
+  AC_MSG_RESULT([failed to create])
+  AC_MSG_ERROR([Failed to run $DERIVE_CONSTANTS --gen-header ...])
+fi
+
+AC_ARG_VAR([GENAPPLY], [Path to the genapply program])
+AC_PATH_PROG([GENAPPLY], genapply)
+if test -z "$GENAPPLY"; then
+	AC_MSG_ERROR([Cannot find genapply])
+fi
+
+AC_MSG_CHECKING([for AutoApply.cmm])
+if $GENAPPLY include/DerivedConstants.h > AutoApply.cmm; then
+  AC_MSG_RESULT([created])
+else
+  AC_MSG_RESULT([failed to create])
+  AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h > AutoApply.cmm])
+fi
+
+AC_MSG_CHECKING([for AutoApply_V16.cmm])
+if $GENAPPLY include/DerivedConstants.h -V16 > AutoApply_V16.cmm; then
+  AC_MSG_RESULT([created])
+else
+  AC_MSG_RESULT([failed to create])
+  AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h -V16 > AutoApply_V16.cmm])
+fi
+
+AC_MSG_CHECKING([for AutoApply_V32.cmm])
+if $GENAPPLY include/DerivedConstants.h -V32 > AutoApply_V32.cmm; then
+  AC_MSG_RESULT([created])
+else
+  AC_MSG_RESULT([failed to create])
+  AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h -V32 > AutoApply_V32.cmm])
+fi
+
+AC_MSG_CHECKING([for AutoApply_V64.cmm])
+if $GENAPPLY include/DerivedConstants.h -V64 > AutoApply_V64.cmm; then
+  AC_MSG_RESULT([created])
+else
+  AC_MSG_RESULT([failed to create])
+  AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h -V64 > AutoApply_V64.cmm])
+fi
+
+dnl --------------------------------------------------------------
+dnl ** Write config files
+dnl --------------------------------------------------------------
+
+AC_OUTPUT
