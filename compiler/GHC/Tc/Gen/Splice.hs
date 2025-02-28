@@ -124,7 +124,7 @@ import GHC.Serialized
 import GHC.Unit.Finder
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.Deps
+import GHC.Iface.Syntax
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic as Panic
@@ -2887,16 +2887,12 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
 
       reifyFromIface reifMod = do
         iface <- loadInterfaceForModule (text "reifying module from TH for" <+> ppr reifMod) reifMod
-        let usages = [modToTHMod m | usage <- mi_usages iface,
-                                     Just m <- [usageToModule (moduleUnit reifMod) usage] ]
+        let IfaceTopEnv _ imports = mi_top_env iface
+            -- Convert IfaceImport to module names
+            usages = [modToTHMod (ifImpModule imp) | imp <- imports]
         return $ TH.ModuleInfo usages
 
-      usageToModule :: Unit -> Usage -> Maybe Module
-      usageToModule _ (UsageFile {}) = Nothing
-      usageToModule this_pkg (UsageHomeModule { usg_mod_name = mn }) = Just $ mkModule this_pkg mn
-      usageToModule _ (UsagePackageModule { usg_mod = m }) = Just m
-      usageToModule _ (UsageMergedRequirement { usg_mod = m }) = Just m
-      usageToModule this_pkg (UsageHomeModuleInterface { usg_mod_name = mn }) = Just $ mkModule this_pkg mn
+
 
 ------------------------------
 mkThAppTs :: TH.Type -> [TH.Type] -> TH.Type
