@@ -221,6 +221,22 @@ import Control.Monad (ap)
 -- (For the gory details, see also the (unpublished) paper, “Practical
 -- aspects of evidence-based compilation in System FC.”)
 
+-- Note [Saturation of data constructors in STG]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- We guarantee that `StgConApp` is an exactly-saturated application of a data
+-- constructor worker.
+--
+-- * If the data constructor is /under/-saturated we just fall through to build
+--   a `StgApp`.  Remember, data constructor workers have a regular top-level definition
+--   (injected by GHC.CoreToStg.Prep.mkDataConWorkers) so we can partially apply
+--   that function.
+--
+-- * If the data constructor is /over/-saturated, which can happen (see #23865) we again
+--   fall through to `StgApp`.  That will fail horribly at runtime (by applying data
+--   constructor to an argument) but it should be in dead code, and at least the compiler
+--   itself won't crash.  (We could inject an error-thunk instead.)
+
+
 -- --------------------------------------------------------------
 -- Setting variable info: top-level, binds, RHSs
 -- --------------------------------------------------------------
@@ -526,14 +542,17 @@ coreToStgApp f args ticks = do
         -- NB: f_arity is only consulted for LetBound things
         f_arity   = stgArity f how_bound
         saturated = f_arity <= n_val_args
+        exactly_saturated = f_arity == n_val_args
 
         res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
                 DataConWorkId dc
-                  | saturated    -> if isUnboxedSumDataCon dc then
-                                      StgConApp dc NoNumber args' (sumPrimReps args)
-                                    else
-                                      StgConApp dc NoNumber args' []
+                  -- See Note [Saturation of data constructors in STG]
+                  | exactly_saturated
+                  ->  if isUnboxedSumDataCon dc then
+                        StgConApp dc NoNumber args' (sumPrimReps args)
+                      else
+                        StgConApp dc NoNumber args' []
 
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
