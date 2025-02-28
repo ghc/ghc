@@ -151,7 +151,7 @@ dontCareBindFam tc args rhs
   = pprPanic "dontCareBindFam" $
     vcat [ ppr tc <+> ppr args, text "rhs" <+> ppr rhs ]
 
--- | Allow the binding of a type-family application to any type
+-- | Don't allow the binding of a type-family application at all
 neverBindFam :: BindFamFun
 neverBindFam _tc _args _rhs = Apart
 
@@ -252,7 +252,7 @@ tc_match_tys_x :: HasDebugCallStack => BindTvFun
                -> [Type]
                -> Maybe Subst
 tc_match_tys_x bind_tv match_kis (Subst in_scope id_env tv_env cv_env) tys1 tys2
-  = case tc_unify_tys alwaysBindFam  -- (ATF7) in Note [Apartness and type famililes]
+  = case tc_unify_tys alwaysBindFam  -- (ATF7) in Note [Apartness and type families]
                       bind_tv
                       False  -- Matching, not unifying
                       False  -- Not an injectivity check
@@ -275,6 +275,11 @@ ruleMatchTyKiX
 ruleMatchTyKiX tmpl_tvs rn_env tenv tmpl target
 -- See Note [Kind coercions in Unify]
   = case tc_unify_tys neverBindFam (matchBindTv tmpl_tvs)
+      -- neverBindFam: a type family probably shouldn't appear
+      -- on the LHS of a RULE, although we don't currently prevent it.
+      -- But even if it did and we allowed it to bind, we would
+      -- never get Unifiable, which is all this function cares about.
+      -- So neverBindFam is fine here.
                       False    -- Matching, not unifying
                       False    -- No doing an injectivity check
                       True     -- Match the kinds
@@ -458,7 +463,7 @@ To achieve this, `go_fam` in `uVarOrFam` does this;
   in `um_fam_env`, alongside the regular [tyvar :-> type] substitution in
   `um_tv_env`.  See the `BindMe` case of `go_fam` in `uVarOrFam`.
 
-* When we later encounter (G Float) ~ Bool, we appply the family substitution,
+* When we later encounter (G Float) ~ Bool, we apply the family substitution,
   very much as we apply the conventional [tyvar :-> type] substitution
   when we encounter a type variable.  See the `lookupFamEnv` in `go_fam` in
   `uVarOrFam`.
@@ -467,6 +472,12 @@ To achieve this, `go_fam` in `uVarOrFam` does this;
 
 
 Wrinkles
+
+(ATF0) Once we encounter a type-family application, we only ever return
+             MaybeApart   or   SurelyApart
+  but never `Unifiable`.  Accordingly, we only return a TyCoVar substitution
+  from `tcUnifyTys` and friends; we dont' return a type-family substitution as
+  well.  (We could imagine doing so, though.)
 
 (ATF1) Exactly the same mechanism is used in class-instance checking.
     If we have
@@ -498,7 +509,7 @@ Wrinkles
    but that doesn't matter.  Fixing this would be possible, but would require
    quite a bit of head-scratching.
 
-(ATF4) The "family substitution only has /saturated/ family applications in
+(ATF4) The family substitution only has /saturated/ family applications in
    its domain. Consider the following concrete example from #16995:
 
      type family Param :: Type -> Type   -- arity 0
@@ -551,6 +562,10 @@ Wrinkles
   matching, where we enter via `tc_match_tys_x` we will never see a type-family
   in the template. But actually we do see that case in the specialiser: see
   the call to `tcMatchTy` in `GHC.Core.Opt.Specialise.beats_or_same`
+
+  Also: a user-written RULE could conceivably have a type-family application
+  in the template.  It might not be a good rule, but I don't think currently
+  check for this.
 
 SIDE NOTE.  The paper "Closed type families with overlapping equations"
 http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/axioms-extended.pdf
@@ -926,24 +941,6 @@ niFixSubst in_scope tenv
         tv' = updateTyVarKind (substTy subst) tv
 
 {-
-niSubstTvSet :: TvSubstEnv -> TyCoVarSet -> TyCoVarSet
--- Apply the non-idempotent substitution to a set of type variables,
--- remembering that the substitution isn't necessarily idempotent
--- This is used in the occurs check, before extending the substitution
-niSubstTvSet tsubst tvs
-  = nonDetStrictFoldUniqSet (unionVarSet . get) emptyVarSet tvs
-  -- It's OK to use a non-deterministic fold here because we immediately forget
-  -- the ordering by creating a set.
-  where
-    get tv
-      | Just ty <- lookupVarEnv tsubst tv
-      = niSubstTvSet tsubst (tyCoVarsOfType ty)
-
-      | otherwise
-      = unitVarSet tv
--}
-
-{-
 ************************************************************************
 *                                                                      *
                 unify_ty: the main workhorse
@@ -1082,10 +1079,10 @@ What happens when we are unifying or matching two identical type variables?
   We want to emerge with the substitution [a :-> Int]
   But on the way we will encounter (b ~ b), when we match the bits before the
   arrow under the forall, having renamed `c` to `b`.  This match should just
-  succeeds, just like (Int ~ Int), withouth extending the substitution.
+  succeed, just like (Int ~ Int), without extending the substitution.
 
   It's important to do this for /non-bindable/ variables, not just for
-  forall-bound ones.  In an associated tyep
+  forall-bound ones.  In an associated type
          instance C (Maybe a) where {  type F (Maybe a) = Int }
   `checkConsistentFamInst` matches (Maybe a) from the header against (Maybe a)
   from the type-family instance, with `a` marked as non-bindable.
@@ -1123,55 +1120,62 @@ just match/unify their kinds, either, because this might gratuitously
 fail. After all, `co` is the witness that the kinds are the same -- they
 may look nothing alike.
 
-So, we pass a kind coercion to the match/unify worker. This coercion witnesses
+So, we pass a kind coercion `kco` to the main `unify_ty`. This coercion witnesses
 the equality between the substed kind of the left-hand type and the substed
 kind of the right-hand type. Note that we do not unify kinds at the leaves
-(as we did previously). We thus have
+(as we did previously).
 
-Hence: (Unification Kind Invariant)
------------------------------------
-In the call
+Hence: (UKINV) Unification Kind Invariant
+* In the call
      unify_ty ty1 ty2 kco
-it must be that
+  it must be that
      subst(kco) :: subst(kind(ty1)) ~N subst(kind(ty2))
-where `subst` is the ambient substitution in the UM monad.  And in the call
+  where `subst` is the ambient substitution in the UM monad
+* In the call
      unify_tys tys1 tys2
-(which has no kco), after we unify any prefix of tys1,tys2, the kinds of the
-head of the remaining tys1,tys2 are identical after substitution.  This
-implies, for example, that the kinds of the head of tys1,tys2 are identical
-after substitution.
+  (which has no kco), after we unify any prefix of tys1,tys2, the kinds of the
+  head of the remaining tys1,tys2 are identical after substitution.  This
+  implies, for example, that the kinds of the head of tys1,tys2 are identical
+  after substitution.
 
-To get this coercion, we first have to match/unify
-the kinds before looking at the types. Happily, we need look only one level
-up, as all kinds are guaranteed to have kind *.
+Preserving (UKINV) takes a bit of work, governed by the `match_kis` flag in
+`tc_unify_tys`:
 
-When we're working with type applications (either TyConApp or AppTy) we
-need to worry about establishing INVARIANT, as the kinds of the function
-& arguments aren't (necessarily) included in the kind of the result.
-When unifying two TyConApps, this is easy, because the two TyCons are
-the same. Their kinds are thus the same. As long as we unify left-to-right,
-we'll be sure to unify types' kinds before the types themselves. (For example,
-think about Proxy :: forall k. k -> *. Unifying the first args matches up
-the kinds of the second args.)
+* When we're working with type applications (either TyConApp or AppTy) we
+  need to worry about establishing INVARIANT, as the kinds of the function
+  & arguments aren't (necessarily) included in the kind of the result.
+  When unifying two TyConApps, this is easy, because the two TyCons are
+  the same. Their kinds are thus the same. As long as we unify left-to-right,
+  we'll be sure to unify types' kinds before the types themselves. (For example,
+  think about Proxy :: forall k. k -> *. Unifying the first args matches up
+  the kinds of the second args.)
 
-For AppTy, we must unify the kinds of the functions, but once these are
-unified, we can continue unifying arguments without worrying further about
-kinds.
+* For AppTy, we must unify the kinds of the functions, but once these are
+  unified, we can continue unifying arguments without worrying further about
+  kinds.
 
-The interface to this module includes both "...Ty" functions and
-"...TyKi" functions. The former assume that INVARIANT is already
-established, either because the kinds are the same or because the
-list of types being passed in are the well-typed arguments to some
-type constructor (see two paragraphs above). The latter take a separate
-pre-pass over the kinds to establish INVARIANT. Sometimes, it's important
-not to take the second pass, as it caused #12442.
+* The interface to this module includes both "...Ty" functions and
+  "...TyKi" functions. The former assume that INVARIANT is already
+  established, either because the kinds are the same or because the
+  list of types being passed in are the well-typed arguments to some
+  type constructor (see two paragraphs above). The latter take a separate
+  pre-pass over the kinds to establish INVARIANT. Sometimes, it's important
+  not to take the second pass, as it caused #12442.
 
-We thought, at one point, that this was all unnecessary: why should
-casts be in types in the first place? But they are sometimes. In
-dependent/should_compile/KindEqualities2, we see, for example the
-constraint Num (Int |> (blah ; sym blah)).  We naturally want to find
-a dictionary for that constraint, which requires dealing with
-coercions in this manner.
+Wrinkles
+
+(KCU1) We never need to apply the RnEnv2 renaming to the accumulating `kco` argument.
+  Why not?  Because
+    * The `kco` arg is used /only/ when extending
+
+  xxx working here xxx
+
+(KCU2) We thought, at one point, that this was all unnecessary: why should
+    casts be in types in the first place? But they are sometimes. In
+    dependent/should_compile/KindEqualities2, we see, for example the
+    constraint Num (Int |> (blah ; sym blah)).  We naturally want to find
+    a dictionary for that constraint, which requires dealing with
+    coercions in this manner.
 
 Note [Matching in the presence of casts (1)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1367,27 +1371,30 @@ unify_ty env ty1 ty2 kco
   | Just ty2' <- coreView ty2 = unify_ty env ty1 ty2' kco
 
 unify_ty env (CastTy ty1 co1) ty2 kco
+  | mentionsForAllBoundTyVarsL env (tyCoVarsOfCo co1)
+  = surelyApart
+
   | um_unif env
   = unify_ty env ty1 ty2 (co1 `mkTransCo` kco)
     -- ToDo: what if co2 mentions forall-bound variables?
 
   | otherwise -- We are matching, not unifying
-              -- See Note [Matching in the presence of casts (1)]
   = do { subst <- getSubst env
        ; let co' = substCo subst co1
          -- We match left-to-right, so the free template vars of the
          -- coercion should already have been matched.
-         -- (This seems a rather tricky claim.)
+         -- See Note [Matching in the presence of casts (1)]
        ; unify_ty env ty1 ty2 (co' `mkTransCo` kco) }
 
 unify_ty env ty1 (CastTy ty2 co2) kco
+  | mentionsForAllBoundTyVarsR env (tyCoVarsOfCo co2)
+  = surelyApart
+  | otherwise
   = unify_ty env ty1 ty2 (kco `mkTransCo` mkSymCo co2)
     -- ToDo: what if co2 mentions forall-bound variables?
 
-        -- Applications need a bit of care!
-        -- They can match FunTy and TyConApp, so use splitAppTy_maybe
-        -- NB: we've already dealt with type variables,
-        -- so if one type is an App the other one jolly well better be too
+-- Applications need a bit of care!
+-- They can match FunTy and TyConApp, so use splitAppTy_maybe
 unify_ty env (AppTy ty1a ty1b) ty2 _kco
   | Just (ty2a, ty2b) <- tcSplitAppTyNoView_maybe ty2
   = unify_ty_app env ty1a [ty1b] ty2a [ty2b]
@@ -1410,16 +1417,16 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
            CoVarCo cv
              | not (um_unif env)
              , not (cv `elemVarEnv` c_subst)   -- Not forall-bound
-             , let (_, co_l, co_r) = decomposeFunCo kco
+             , let (_mult_co, co_l, co_r) = decomposeFunCo kco
                      -- Because the coercion is used in a type, it should be safe to
-                     -- ignore the multiplicity coercion.
+                     -- ignore the multiplicity coercion, _mult_co
                       -- cv :: t1 ~ t2
                       -- co2 :: s1 ~ s2
                       -- co_l :: t1 ~ s1
                       -- co_r :: t2 ~ s2
                    rhs_co = co_l `mkTransCo` co2 `mkTransCo` mkSymCo co_r
              , BindMe <- um_bind_tv_fun env cv (CoercionTy rhs_co)
-             -> if mentionsForAllBoundTyVars env (tyCoVarsOfCo rhs_co)
+             -> if mentionsForAllBoundTyVarsR env (tyCoVarsOfCo co2)
                 then surelyApart
                 else extendCvEnv cv rhs_co
 
@@ -1597,6 +1604,8 @@ uVarOrFam env ty1 ty2 kco
   where
     -- `go` takes two bites at the cherry; if the first one fails
     -- it swaps the arguments and tries again; and then it fails.
+    -- The SwapFlag argument tells `go` whether it is on the first
+    -- bite (NotSwapped) or the second (IsSwapped).
     -- E.g.    a ~ F p q
     --         Starts with: go a (F p q)
     --         if `a` not bindable, swap to: go (F p q) a
@@ -1646,7 +1655,8 @@ uVarOrFam env ty1 ty2 kco
            | otherwise       -> return ()
 
       | tv1_is_bindable
-      , not (mentionsForAllBoundTyVars env all_rhs_fvs)
+      , not (mentionsForAllBoundTyVarsR env rhs_fvs)
+            -- kco does not mention forall-bound vars
       , not occurs_check
       = -- No occurs check, nor skolem-escape; just bind the tv
         -- We don't need to rename `rhs` because it mentions no forall-bound vars
@@ -1665,8 +1675,8 @@ uVarOrFam env ty1 ty2 kco
 
       where
         tv1'            = umRnOccL env tv1
-        free_tvs2       = tyCoVarsOfType ty2
-        all_rhs_fvs     = free_tvs2 `unionVarSet` tyCoVarsOfCo kco
+        rhs_fvs         = tyCoVarsOfType ty2
+        all_rhs_fvs     = rhs_fvs `unionVarSet` tyCoVarsOfCo kco
         rhs             = ty2 `mkCastTy` mkSymCo kco
         tv1_is_bindable | not (tv1' `elemVarSet` um_foralls env)
                           -- tv1' is not forall-bound, so tv1==tv1'
@@ -1675,10 +1685,11 @@ uVarOrFam env ty1 ty2 kco
                         | otherwise
                         = False
 
-        occurs_check = um_unif env && (tv1 `elemVarSet` all_rhs_fvs)
+        occurs_check = um_unif env &&
+                       occursCheck (um_tv_env substs) tv1 all_rhs_fvs
           -- Occurs check, only when unifying
           -- see Note [Fine-grained unification]
-          -- Make sure you include 'kco' #14846
+          -- Make sure you include `kco` in all_rhs_tvs #14846
 
     -----------------------------
     -- go_fam: LHS is a saturated type-family application
@@ -1701,7 +1712,7 @@ uVarOrFam env ty1 ty2 kco
       = return ()
 
       -- Now check if we can bind the (F tys) to the RHS
-      | BindMe <- um_bind_fam_fun env tc tys1 ty2
+      | BindMe <- um_bind_fam_fun env tc tys1 rhs
       = -- ToDo: do we need an occurs check here?
         do { extendFamEnv tc tys1 rhs
            ; maybeApart MARTypeFamily }
@@ -1719,6 +1730,15 @@ uVarOrFam env ty1 ty2 kco
 
       where
         rhs = ty2 `mkCastTy` mkSymCo kco
+
+occursCheck :: TvSubstEnv -> TyVar -> TyCoVarSet -> Bool
+occursCheck env tv1 tvs
+  = anyVarSet bad tvs
+  where
+    bad tv | Just ty <- lookupVarEnv env tv
+           = anyVarSet bad (tyCoVarsOfType ty)
+           | otherwise
+           = tv == tv1
 
 {-
 %************************************************************************
@@ -1794,6 +1814,9 @@ data UMState = UMState
   -- um_tv_env, um_cv_env, um_fam_env are all "global" substitutions;
   -- that is, neither their domains nor their ranges mention any variables
   -- in um_foralls; i.e. variables bound by foralls inside the types being unified
+
+  -- When /matching/ um_fam_env is usually empty; but not quite always.
+  -- See (ATF6) and (ATF7) of Note [Apartness and type families]
 
 newtype UM a
   = UM' { unUM :: UMState -> UnifyResultM (UMState, a) }
@@ -1877,11 +1900,15 @@ umRnBndr2 env v1 v2
   where
     (rn_env', v') = rnBndr2_var (um_rn_env env) v1 v2
 
-mentionsForAllBoundTyVars :: UMEnv -> VarSet -> Bool
-mentionsForAllBoundTyVars env varset
-  | isEmptyVarSet (um_foralls env)              = False
-  | anyVarSet (inRnEnvR (um_rn_env env)) varset = True
-  | otherwise                                   = False
+mentionsForAllBoundTyVarsL, mentionsForAllBoundTyVarsR :: UMEnv -> VarSet -> Bool
+mentionsForAllBoundTyVarsL = mentions_forall_bound_tvs inRnEnvL
+mentionsForAllBoundTyVarsR = mentions_forall_bound_tvs inRnEnvR
+
+mentions_forall_bound_tvs :: (RnEnv2 -> TyVar -> Bool) -> UMEnv -> VarSet -> Bool
+mentions_forall_bound_tvs in_rn_env env varset
+  | isEmptyVarSet (um_foralls env)               = False
+  | anyVarSet (in_rn_env (um_rn_env env)) varset = True
+  | otherwise                                    = False
     -- NB: That isEmptyVarSet guard is a critical optimization;
     -- it means we don't have to calculate the free vars of
     -- the type, often saving quite a bit of allocation.

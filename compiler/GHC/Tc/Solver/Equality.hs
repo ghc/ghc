@@ -2446,10 +2446,9 @@ More details:
 
      However, we make no attempt to detect cases like a ~ (F a, F a) and use the
      same tyvar to replace F a. The constraint solver will common them up later!
-     (Cf. Note [Flattening type-family applications when matching instances] in
-     GHC.Core.Unify, which goes to this extra effort.) However, this is really
-     a very small corner case.  The investment to craft a clever, performant
-     solution seems unworthwhile.
+     (Cf. Note [Apartness and type families] in GHC.Core.Unify, which goes to
+     this extra effort.) However, this is really a very small corner case.  The
+     investment to craft a clever, performant solution seems unworthwhile.
 
  (6) We often get the predicate associated with a constraint from its evidence
      with ctPred. We thus must not only make sure the generated CEqCan's fields

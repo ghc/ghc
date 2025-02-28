@@ -4226,8 +4226,8 @@ This is best understood by example.
    This cannot equal later, because F a would have to equal both Bool and
    Int.
 
-To deal with type family applications, we use the Core flattener. See
-Note [Flattening type-family applications when matching instances] in GHC.Core.Unify.
+To deal with type family applications, we use the "fine-grain" Core unifier.
+See Note [Apartness and type families] in GHC.Core.Unify.
 The Core flattener replaces all type family applications with
 fresh variables. The next question: should we allow these fresh
 variables in the domain of a unifying substitution?

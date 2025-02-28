@@ -579,7 +579,7 @@ tcSkolDFunType dfun_ty
              ; (subst, inst_tvs) <- tcInstSuperSkolTyVars skol_info tvs
                      -- We instantiate the dfun_tyd with superSkolems.
                      -- See Note [Subtle interaction of recursion and overlap]
-                     -- and Note [Binding when looking up instances]
+                     -- and Note [Super skolems: binding when looking up instances]
              ; let inst_tys = substTys subst tys
                    skol_info_anon = mkClsInstSkol cls inst_tys }
 

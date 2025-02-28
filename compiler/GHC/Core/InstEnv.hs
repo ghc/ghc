@@ -1163,7 +1163,7 @@ instEnvMatchesAndUnifiers (InstEnv rm) vis_mods cls tys
                 -- Unification will break badly if the variables overlap
                 -- They shouldn't because we allocate separate uniques for them
                 -- See Note [Template tyvars are fresh]
-        case tcUnifyTysFG alwaysBindFam instanceBindFun tpl_tys tys of
+        case tcUnifyTysFG dontCareBindFam instanceBindFun tpl_tys tys of
           -- We consider MaybeApart to be a case where the instance might
           -- apply in the future. This covers an instance like C Int and
           -- a target like [W] C (F a), where F is a type family.

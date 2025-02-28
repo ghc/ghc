@@ -2782,9 +2782,6 @@ lintBranch this_co fam_tc branch arg_kinds
     subst        = zipTvSubst tvs tys `composeTCvSubst`
                    zipCvSubst cvs co_args
     target   = Type.substTys subst (coAxBranchLHS branch)
---    in_scope = mkInScopeSet $
---               unionVarSets (map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
---    flattened_target = flattenTys in_scope target
 
     check_no_conflict :: [Type] -> [CoAxBranch] -> Maybe CoAxBranch
     check_no_conflict _    [] = Nothing
