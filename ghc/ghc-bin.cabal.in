@@ -57,7 +57,7 @@ Executable ghc
         -- NB: this is never built by the bootstrapping GHC+libraries
         Build-depends:
             deepseq        >= 1.4 && < 1.6,
-            ghc-prim       >= 0.5.0 && < 0.12,
+            ghc-prim       >= 0.5.0 && < 0.13,
             ghci           == @ProjectVersionMunged@,
             haskeline      == 0.8.*,
             exceptions     == 0.10.*,

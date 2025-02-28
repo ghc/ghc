@@ -76,7 +76,7 @@ library
         rts,
         array            == 0.5.*,
         base             >= 4.8 && < 4.21,
-        ghc-prim         >= 0.5.0 && < 0.12,
+        ghc-prim         >= 0.5.0 && < 0.13,
         binary           == 0.8.*,
         bytestring       >= 0.10 && < 0.13,
         containers       >= 0.5 && < 0.8,
