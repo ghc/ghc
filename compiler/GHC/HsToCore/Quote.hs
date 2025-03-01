@@ -2900,12 +2900,15 @@ repGadtDataCons cons details res_ty
 verifyLinearFields :: [HsScaled GhcRn (LHsType GhcRn)] -> MetaM ()
 verifyLinearFields ps = do
   linear <- lift $ xoptM LangExt.LinearTypes
-  -- MODS_TODO this seems like maybe it breaks data declarations in some cases?
-  -- Try writing a GADT with explicit modifiers.
-  let allGood = all (\st -> case hsMult st of
-                              HsStandardArrow _ [] -> not linear
-                              HsLinearArrow _ _    -> True
-                              _                    -> False) ps
+  let linear_arrow mult = case mult of
+        -- MODS_TODO excess modifiers are assumed to be forbidden
+        -- multiplicities. Probably we instead want to give a "forbidden
+        -- modifier syntax" error.
+        HsStandardArrow _ []                               -> not linear
+        HsStandardArrow _ [HsModifier ModifierPrintsAs1 _] -> True
+        HsLinearArrow _ []                                 -> True
+        _                                                  -> False
+  let allGood = all (\st -> linear_arrow $ hsMult st) ps
   unless allGood $ notHandled ThNonLinearDataCon
 
 -- Desugar the arguments in a data constructor declared with prefix syntax.
