@@ -109,7 +109,7 @@ import GHC.Types.Literal      ( litIsTrivial )
 import GHC.Types.Demand       ( DmdSig, prependArgsDmdSig )
 import GHC.Types.Cpr          ( CprSig, prependArgsCprSig )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
-import GHC.Types.Name.Occurrence ( occNameFS )
+import GHC.Types.Name.Occurrence ( occNameFS, occNameString )
 import GHC.Types.Unique       ( hasKey )
 import GHC.Types.Tickish      ( tickishIsCode )
 import GHC.Types.Unique.Supply
@@ -126,6 +126,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Data.List ( intercalate )
 import Data.Maybe
 
 {-
@@ -635,7 +636,7 @@ lvlMFE env strict_ctxt ann_expr
   = do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive
                               is_bot_lam NotJoinPoint ann_expr
                   -- Treat the expr just like a right-hand side
-       ; var <- newLvlVar expr1 NotJoinPoint is_mk_static
+       ; var <- newLvlVar env expr1 NotJoinPoint is_mk_static
        ; let var2 = annotateBotStr var float_n_lams mb_bot_str
        ; return (Let (NonRec (TB var2 (FloatMe dest_lvl)) expr1)
                      (mkVarApps (Var var2) abs_vars)) }
@@ -656,7 +657,7 @@ lvlMFE env strict_ctxt ann_expr
                          Case expr1 (stayPut l1r ubx_bndr) box_ty
                              [Alt DEFAULT [] (App boxing_expr (Var ubx_bndr))]
 
-       ; var <- newLvlVar float_rhs NotJoinPoint is_mk_static
+       ; var <- newLvlVar env float_rhs NotJoinPoint is_mk_static
        ; let l1u      = incMinorLvlFrom env
              use_expr = Case (mkVarApps (Var var) abs_vars)
                              (stayPut l1u bx_bndr) expr_ty
@@ -1838,11 +1839,12 @@ newPolyBndrs dest_lvl
       | otherwise
       = new_bndr
 
-newLvlVar :: LevelledExpr        -- The RHS of the new binding
+newLvlVar :: LevelEnv
+          -> LevelledExpr        -- The RHS of the new binding
           -> JoinPointHood       -- Its join arity, if it is a join point
           -> Bool                -- True <=> the RHS looks like (makeStatic ...)
           -> LvlM Id
-newLvlVar lvld_rhs join_arity_maybe is_mk_static
+newLvlVar env lvld_rhs join_arity_maybe is_mk_static
   = do { uniq <- getUniqueM
        ; return (add_join_info (mk_id uniq rhs_ty))
        }
@@ -1857,7 +1859,12 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkSysLocal (mkFastString "lvl") uniq ManyTy rhs_ty
+      = mkSysLocal stem uniq ManyTy rhs_ty
+
+    stem =
+      case le_bind_ctxt env of
+        []  -> mkFastString "lvl"
+        ctx -> mkFastString $ intercalate "_" ("lvl" : map (occNameString . getOccName) ctx)
 
 -- | Clone the binders bound by a single-alternative case.
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
