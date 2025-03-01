@@ -1417,7 +1417,9 @@ tc_mult mode mods = do
 
     go_check = case mods of
       [] -> pure Nothing
-      [HsModifier _ m] -> Just <$> tc_check_lhs_type mode m multiplicityTy
+      [HsModifier _ m] ->
+        -- MODS_TODO is addTypeCtxt also useful for inference?
+        addTypeCtxt m $ Just <$> tc_check_lhs_type mode m multiplicityTy
       _ -> error "MODS_TODO too many multiplicities"
 
 tc_arrow :: TcTyMode -> HsArrow GhcRn -> TcM Mult

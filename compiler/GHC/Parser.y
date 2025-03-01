@@ -3039,7 +3039,7 @@ fexp    :: { ECP }
 
         | aexp                       { $1 }
         | modifiers1 aexp            { ECP $ do
-                                         { hintModifiers (getLoc $1)
+                                         { hintLinear (getLoc $1)
                                          ; $2 <- unECP $2
                                          ; mkHsModifiedPV (comb2 $1 $2) (reverse $ unLoc $1) $2 } }
 
