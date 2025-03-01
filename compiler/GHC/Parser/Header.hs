@@ -71,7 +71,6 @@ import GHC.Unit.Env (UnitEnv)
 import GHC.SysTools.Cpp (cppMacroDefines)
 import qualified GHC.LanguageExtensions.Type as LangExt
 import GHC.Driver.DynFlags (xopt)
-import Debug.Trace
 
 ------------------------------------------------------------------------------
 
@@ -334,8 +333,8 @@ getOptions' opts supported toks
           parseToks acpp (open:xs)
               | ITlanguage_prag <- unLoc open
               = parseLanguage acpp xs
-          parseToks _acpp (comment:xs) -- Skip over comments
-              | isCpp (unLoc comment)
+          parseToks _acpp (tok:xs) -- Skip over comments
+              | isCpp (unLoc tok)
               = parseToks True xs
           parseToks acpp (comment:xs) -- Skip over comments
               | isComment (unLoc comment)
@@ -382,10 +381,9 @@ getOptions' opts supported toks
 
           isCpp :: Token -> Bool
           isCpp c =
-            -- case c of
-            case (trace ("getOptions':isCpp:" ++ show (c, ghcpp)) c) of
-              (ITcpp {})          -> ghcpp == False
-              _                   -> False
+            case c of
+              (ITcpp {}) -> ghcpp == False
+              _          -> False
 
           isComment :: Token -> Bool
           isComment c =
