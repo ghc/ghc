@@ -35,12 +35,13 @@ import GHC.Utils.Panic.Plain (panic)
 
 -- ---------------------------------------------------------------------
 
-ttrace x s = trace s x
-
 dumpGhcCpp :: DynFlags -> PState PpState -> SDoc
-dumpGhcCpp dflags pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
+dumpGhcCpp dflags pst = output
   where
     ghc_cpp_enabled = xopt LangExt.GhcCpp dflags
+    output = if ghc_cpp_enabled
+                then text $ sepa ++ defines ++ sepa ++ final ++ sepa
+                else text "GHC_CPP not enabled"
     -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
     (pst_final, bare_toks) = lexAll pst
     comments = reverse (Lexer.comment_q pst_final)
@@ -49,32 +50,15 @@ dumpGhcCpp dflags pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
     to_tok (L (EpaDelta l _ _) _) = L l (ITunknown "-")
     comments_as_toks = map to_tok comments
     defines =
-        showDefines
-            ( (pp_defines (pp pst_final))
-                -- `ttrace` ("dumpGhcCpp: (pp_defines (pp pst_final))" ++ show (pp_defines (pp pst_final))))
-                `ttrace` ("dumpGhcCpp: ghc_cpp_enabled" ++ show ghc_cpp_enabled)
-            )
+        showDefines (pp_defines (pp pst_final))
     sepa = "\n------------------------------\n"
     startLoc = mkRealSrcLoc (srcLocFile (psRealLoc $ loc pst)) 1 1
     buf1 = (buffer pst){cur = 0}
     all_toks =
-        sortBy
-            cmpBs
-            ( (bare_toks ++ comments_as_toks)
-                `ttrace` ("dumpGhcCpp: comments_as_toks" ++ show comments_as_toks)
-            )
+        sortBy cmpBs (bare_toks ++ comments_as_toks)
     toks =
-        addSourceToTokens
-            startLoc
-            buf1
-            ( all_toks
-                `ttrace` ("dumpGhcCpp: (startLoc,all_toks)" ++ show (startLoc, all_toks))
-            )
-    final =
-        renderCombinedToks
-            ( toks
-                `ttrace` ("dumpGhcCpp: toks" ++ show toks)
-            )
+        addSourceToTokens startLoc buf1 all_toks
+    final = renderCombinedToks toks
 
 cmpBs :: Located Token -> Located Token -> Ordering
 cmpBs (L (RealSrcSpan _ (Strict.Just bs1)) _) (L (RealSrcSpan _ (Strict.Just bs2)) _) =
@@ -101,8 +85,7 @@ addSourceToTokens ::
     [(Located Token, String)]
 addSourceToTokens _ _ [] = []
 addSourceToTokens loc buf (t@(L span _) : ts) =
-    -- case span of
-    case (trace ("addSourceToTokens:span=" ++ show span) span) of
+    case span of
         UnhelpfulSpan _ -> (t, "") : addSourceToTokens loc buf ts
         RealSrcSpan s _ -> (t, str) : addSourceToTokens newLoc newBuf ts
           where
