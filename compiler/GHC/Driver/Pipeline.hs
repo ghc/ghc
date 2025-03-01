@@ -124,8 +124,6 @@ import Data.Time        ( getCurrentTime )
 import GHC.Iface.Recomp
 import GHC.Types.Unique.DSet
 
-import Debug.Trace
-
 -- Simpler type synonym for actions in the pipeline monad
 type P m = TPipelineClass TPhase m
 
@@ -720,8 +718,7 @@ preprocessPipeline pipe_env hsc_env input_fn = do
          then use (T_FileArgs (hscSetFlags dflags0 hsc_env) unlit_fn)
          else return (dflags0, p_warns0, warns0)
 
-  -- let hsc_env1 = hscSetFlags dflags1 hsc_env
-  let hsc_env1 = hscSetFlags dflags1 (trace ("preprocessPipeline:(CPP?, GhcCpp?)" ++ show (xopt LangExt.Cpp dflags1, xopt LangExt.GhcCpp dflags1)) hsc_env)
+  let hsc_env1 = hscSetFlags dflags1 hsc_env
 
   (cpp_fn, hsc_env2)
     <- runAfterFlag hsc_env1 (Cpp HsSrcFile) (xopt LangExt.Cpp) (unlit_fn, hsc_env1) $ do
