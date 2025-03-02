@@ -54,7 +54,8 @@ import qualified Control.Monad.IO.Class as GHC
 import qualified GHC.Data.FastString    as GHC
 import qualified GHC.Data.StringBuffer  as GHC
 import qualified GHC.Driver.Config.Parser as GHC
-import qualified GHC.Driver.Errors.Types as GHC
+import qualified GHC.Driver.Env.Types     as GHC
+import qualified GHC.Driver.Errors.Types  as GHC
 import qualified GHC.Driver.Session     as GHC
 import qualified GHC.Parser             as GHC
 import qualified GHC.Parser.Header      as GHC
@@ -64,6 +65,7 @@ import qualified GHC.Types.SrcLoc       as GHC
 
 import qualified GHC.LanguageExtensions as LangExt
 import qualified GHC.Parser.PreProcess as GHC
+import GHC (GhcMonad(getSession))
 
 -- ---------------------------------------------------------------------
 
@@ -350,7 +352,9 @@ initDynFlags file = do
   dflags0         <- GHC.getSessionDynFlags
   let parser_opts0 = GHC.initParserOpts dflags0
   logger <- GHC.getLogger
-  (_, src_opts)   <- GHC.liftIO $ GHC.getOptionsFromFile parser_opts0 (GHC.supportedLanguagePragmas dflags0) file
+  hsc <- GHC.getSession
+  let unit_env = GHC.hsc_unit_env hsc
+  (_, src_opts)   <- GHC.liftIO $ GHC.getOptionsFromFile dflags0 unit_env parser_opts0 (GHC.supportedLanguagePragmas dflags0) file
   (dflags1, _, _) <- GHC.parseDynamicFilePragma logger dflags0 src_opts
   -- Turn this on last to avoid T10942
   let dflags2 = dflags1 `GHC.gopt_set` GHC.Opt_KeepRawTokenStream
