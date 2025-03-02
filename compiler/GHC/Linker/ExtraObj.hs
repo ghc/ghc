@@ -63,8 +63,17 @@ mkExtraObj logger tmpfs dflags unit_state extn xs
       -- we're compiling C or assembler. When compiling C, we pass the usual
       -- set of include directories and PIC flags.
       cOpts = map Option (picCCOpts dflags)
-                    ++ map (FileOption "-I" . ST.unpack)
-                            (unitIncludeDirs $ unsafeLookupUnit unit_state rtsUnit)
+                    ++ map (FileOption "-I")
+                            (collectIncludeDirs $ depClosure unit_state [unsafeLookupUnit unit_state rtsUnit])
+      depClosure :: UnitState -> [UnitInfo] -> [UnitInfo]
+      depClosure us initial = go [] initial
+        where
+          go seen [] = seen
+          go seen (ui:uis)
+            | ui `elem` seen = go seen uis
+            | otherwise =
+                let deps = map (unsafeLookupUnitId us) (unitDepends ui)
+                in go (ui:seen) (deps ++ uis)
 
 -- When linking a binary, we need to create a C main() function that
 -- starts everything off.  This used to be compiled statically as part
