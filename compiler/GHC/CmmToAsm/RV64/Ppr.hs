@@ -17,6 +17,7 @@ import GHC.CmmToAsm.Utils
 import GHC.Platform
 import GHC.Platform.Reg
 import GHC.Prelude hiding (EQ)
+import GHC.Stack
 import GHC.Types.Basic (Alignment, alignmentBytes, mkAlignment)
 import GHC.Types.Unique (getUnique, pprUniqueAlways)
 import GHC.Utils.Outputable
@@ -142,7 +143,7 @@ pprBasicBlock ::
 pprBasicBlock config info_env (BasicBlock blockid instrs) =
   maybe_infotable
     $ pprLabel platform asmLbl
-    $$ vcat (map (pprInstr platform) (id {-detectTrivialDeadlock-} optInstrs))
+    $$ vcat (map (pprInstr platform) (id {-detectTrivialDeadlock-} instrs'))
     $$ ppWhen
       (ncgDwarfEnabled config)
       ( -- Emit both end labels since this may end up being a standalone
@@ -153,13 +154,72 @@ pprBasicBlock config info_env (BasicBlock blockid instrs) =
           )
       )
   where
+    instrs' = injectVectorConfig optInstrs
     -- TODO: Check if we can  filter more instructions here.
-    -- TODO: Shouldn't this be a more general check on a higher level?
+    -- TODO: Shouldn't this be a more general check on a higher level? And, is this still needed?
     -- Filter out identity moves. E.g. mov x18, x18 will be dropped.
     optInstrs = filter f instrs
       where
         f (MOV o1 o2) | o1 == o2 = False
         f _ = True
+
+    injectVectorConfig :: [Instr] -> [Instr]
+    injectVectorConfig instrs = fst $ foldl injectVectorConfig' ([], Nothing) instrs
+
+    -- TODO: Fuse this with optInstrs
+    -- TODO: Check config and only run this when vectors are configured
+    -- TODO: Check if vectorMinBits is sufficient for the vector config
+    injectVectorConfig' :: ([Instr], Maybe Format) -> Instr -> ([Instr], Maybe Format)
+    injectVectorConfig' (accInstr, configuredVecFmt) currInstr =
+      let configuredVecFmt' Nothing = Nothing
+          configuredVecFmt' (Just fmt') = if isJumpishInstr currInstr then Nothing else Just fmt'
+       in case (configuredVecFmt, instrVecFormat platform currInstr) of
+            (fmtA, Nothing) ->
+              -- no vector instruction
+              ( accInstr
+                  -- TODO: The performance of this appending is probably horrible. Check OrdList.
+                  ++ [ (MULTILINE_COMMENT (text "No vector instruction" <> colon <+> text (instrCon currInstr) <+> pprInstr platform currInstr <> dot <> text "Current context" <> colon <+> ppr fmtA <> comma <+> text "New context" <+> ppr (configuredVecFmt' configuredVecFmt))),
+                       currInstr
+                     ],
+                configuredVecFmt' configuredVecFmt
+              )
+            (Nothing, Just fmtB) ->
+              -- vector instruction, but no active config
+              ( accInstr
+                  -- TODO: The performance of this appending is probably horrible. Check OrdList.
+                  ++ [ COMMENT (text "No active vector config. Setting" <+> ppr fmtB),
+                       (configVec fmtB),
+                       currInstr
+                     ],
+                configuredVecFmt' (Just fmtB)
+              )
+            (Just fmtA, Just fmtB) ->
+              if fmtA == fmtB
+                then
+                  -- vectors already correctly configured
+                  ( accInstr
+                      -- TODO: The performance of this appending is probably horrible. Check OrdList.
+                      ++ [COMMENT (text "Active vector config. Keeping" <+> ppr fmtB), currInstr],
+                    configuredVecFmt' (Just fmtA)
+                  )
+                else
+                  -- re-configure
+                  ( accInstr
+                      -- TODO: The performance of this appending is probably horrible. Check OrdList.
+                      ++ [(COMMENT (text "Wrong active vector config. Setting" <+> ppr fmtB)), (configVec fmtB), currInstr],
+                    configuredVecFmt' (Just fmtB)
+                  )
+
+    configVec :: Format -> Instr
+    configVec (VecFormat length fmt) =
+      VSETIVLI
+        (OpReg II64 zeroReg)
+        (fromIntegral length)
+        ((formatToWidth . scalarFormatFormat) fmt)
+        M1
+        TA
+        MA
+    configVec fmt = pprPanic "Unsupported vector configuration" ((text . show) fmt)
 
     asmLbl = blockLbl blockid
     platform = ncgPlatform config
@@ -315,13 +375,13 @@ negOp (OpImm (ImmInt i)) = OpImm (ImmInt (negate i))
 negOp (OpImm (ImmInteger i)) = OpImm (ImmInteger (negate i))
 negOp op = pprPanic "RV64.negOp" (text $ show op)
 
-pprOps :: (IsLine doc) => Platform -> [Operand] -> doc
+pprOps :: (IsLine doc, HasCallStack) => Platform -> [Operand] -> doc
 pprOps platform = hsep . map (pprOp platform)
 
 -- | Pretty print an operand
-pprOp :: (IsLine doc) => Platform -> Operand -> doc
+pprOp :: (IsLine doc, HasCallStack) => Platform -> Operand -> doc
 pprOp plat op = case op of
-  OpReg w r -> pprReg w r
+  OpReg fmt r -> pprReg fmt r
   OpImm im -> pprOpImm plat im
   OpAddr (AddrRegImm r1 im) -> pprOpImm plat im <> char '(' <> pprReg II64 r1 <> char ')'
   OpAddr (AddrReg r1) -> text "0(" <+> pprReg II64 r1 <+> char ')'
@@ -330,7 +390,7 @@ pprOp plat op = case op of
 --
 -- This representation makes it easier to reason about the emitted assembly
 -- code.
-pprReg :: forall doc. (IsLine doc) => Format -> Reg -> doc
+pprReg :: forall doc. (IsLine doc, HasCallStack) => Format -> Reg -> doc
 pprReg fmt r = assertFmtReg fmt r $ case r of
   RegReal (RealRegSingle i) -> ppr_reg_no i
   -- virtual regs should not show up, but this is helpful for debugging.
@@ -484,7 +544,7 @@ getLabel _platform _other = panic "Cannot turn this into a label"
 --
 -- This function is partial and will panic if the `Instr` is not supported. This
 -- can happen due to invalid operands or unexpected meta instructions.
-pprInstr :: (IsDoc doc) => Platform -> Instr -> doc
+pprInstr :: (IsDoc doc, HasCallStack) => Platform -> Instr -> doc
 pprInstr platform instr = case instr of
   -- see Note [dualLine and dualDoc] in GHC.Utils.Outputable
   COMMENT s -> dualDoc (asmComment s) empty
@@ -511,7 +571,7 @@ pprInstr platform instr = case instr of
   ADD o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfadd." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
     -- This case is used for sign extension: SEXT.W op
-    | OpReg II64 _ <- o1, OpReg II32  _ <- o2, isImmOp o3 -> op3 (text "\taddiw") o1 o2 o3
+    | OpReg II64 _ <- o1, OpReg II32 _ <- o2, isImmOp o3 -> op3 (text "\taddiw") o1 o2 o3
     | otherwise -> op3 (text "\tadd") o1 o2 o3
   MUL o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfmul." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
@@ -555,7 +615,6 @@ pprInstr platform instr = case instr of
     | isIntRegOp o1 && isFloatRegOp o2 && isSingleOp o2 -> op2 (text "\tfmv.x.w") o1 o2
     | isIntRegOp o1 && isFloatRegOp o2 && isDoubleOp o2 -> op2 (text "\tfmv.x.d") o1 o2
     -- TODO: Why does this NOP (reg1 == reg2) happen?
-    -- TODO: Vector config missing
     | isVectorRegOp o1 && isVectorRegOp o2 -> op2 (text "\tvmv.v.v") o1 o2
     | (OpImm (ImmInteger i)) <- o2,
       fitsIn12bitImm i ->
@@ -659,12 +718,12 @@ pprInstr platform instr = case instr of
   STR II64 o1 o2 -> op2 (text "\tsd") o1 o2
   STR FF32 o1 o2 -> op2 (text "\tfsw") o1 o2
   STR FF64 o1 o2 -> op2 (text "\tfsd") o1 o2
-  STR fmt@(VecFormat _ FmtInt8) o1 o2 -> configVec fmt $$ op2 (text "\tvse8.v") o1 o2
-  STR fmt@(VecFormat _ FmtInt16) o1 o2 -> configVec fmt $$ op2 (text "\tvse16.v") o1 o2
-  STR fmt@(VecFormat _ FmtInt32) o1 o2 -> configVec fmt $$ op2 (text "\tvse32.v") o1 o2
-  STR fmt@(VecFormat _ FmtInt64) o1 o2 -> configVec fmt $$ op2 (text "\tvse64.v") o1 o2
-  STR fmt@(VecFormat _ FmtFloat) o1 o2 -> configVec fmt $$ op2 (text "\tvse32.v") o1 o2
-  STR fmt@(VecFormat _ FmtDouble) o1 o2 -> configVec fmt $$ op2 (text "\tvse64.v") o1 o2
+  STR (VecFormat _ FmtInt8) o1 o2 -> op2 (text "\tvse8.v") o1 o2
+  STR (VecFormat _ FmtInt16) o1 o2 -> op2 (text "\tvse16.v") o1 o2
+  STR (VecFormat _ FmtInt32) o1 o2 -> op2 (text "\tvse32.v") o1 o2
+  STR (VecFormat _ FmtInt64) o1 o2 -> op2 (text "\tvse64.v") o1 o2
+  STR (VecFormat _ FmtFloat) o1 o2 -> op2 (text "\tvse32.v") o1 o2
+  STR (VecFormat _ FmtDouble) o1 o2 -> op2 (text "\tvse64.v") o1 o2
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
     lines_
       [ text "\tla" <+> pprOp platform o1 <> comma <+> pprAsmLabel platform lbl,
@@ -678,12 +737,12 @@ pprInstr platform instr = case instr of
   LDR II64 o1 o2 -> op2 (text "\tld") o1 o2
   LDR FF32 o1 o2 -> op2 (text "\tflw") o1 o2
   LDR FF64 o1 o2 -> op2 (text "\tfld") o1 o2
-  LDR fmt@(VecFormat _ FmtInt8) o1 o2 -> configVec fmt $$ op2 (text "\tvle8.v") o1 o2
-  LDR fmt@(VecFormat _ FmtInt16) o1 o2 -> configVec fmt $$ op2 (text "\tvle16.v") o1 o2
-  LDR fmt@(VecFormat _ FmtInt32) o1 o2 -> configVec fmt $$ op2 (text "\tvle32.v") o1 o2
-  LDR fmt@(VecFormat _ FmtInt64) o1 o2 -> configVec fmt $$ op2 (text "\tvle64.v") o1 o2
-  LDR fmt@(VecFormat _ FmtFloat) o1 o2 -> configVec fmt $$ op2 (text "\tvle32.v") o1 o2
-  LDR fmt@(VecFormat _ FmtDouble) o1 o2 -> configVec fmt $$ op2 (text "\tvle64.v") o1 o2
+  LDR (VecFormat _ FmtInt8) o1 o2 -> op2 (text "\tvle8.v") o1 o2
+  LDR (VecFormat _ FmtInt16) o1 o2 -> op2 (text "\tvle16.v") o1 o2
+  LDR (VecFormat _ FmtInt32) o1 o2 -> op2 (text "\tvle32.v") o1 o2
+  LDR (VecFormat _ FmtInt64) o1 o2 -> op2 (text "\tvle64.v") o1 o2
+  LDR (VecFormat _ FmtFloat) o1 o2 -> op2 (text "\tvle32.v") o1 o2
+  LDR (VecFormat _ FmtDouble) o1 o2 -> op2 (text "\tvle64.v") o1 o2
   LDRU II8 o1 o2 -> op2 (text "\tlbu") o1 o2
   LDRU II16 o1 o2 -> op2 (text "\tlhu") o1 o2
   LDRU II32 o1 o2 -> op2 (text "\tlwu") o1 o2
@@ -694,12 +753,12 @@ pprInstr platform instr = case instr of
   LDRU FF64 o1 o2@(OpAddr (AddrReg _)) -> op2 (text "\tfld") o1 o2
   LDRU FF64 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tfld") o1 o2
   -- vectors
-  LDRU fmt@(VecFormat _ FmtInt8) o1 o2 -> configVec fmt $$ op2 (text "\tvle8.v") o1 o2
-  LDRU fmt@(VecFormat _ FmtInt16) o1 o2 -> configVec fmt $$ op2 (text "\tvle16.v") o1 o2
-  LDRU fmt@(VecFormat _ FmtInt32) o1 o2 -> configVec fmt $$ op2 (text "\tvle32.v") o1 o2
-  LDRU fmt@(VecFormat _ FmtInt64) o1 o2 -> configVec fmt $$ op2 (text "\tvle64.v") o1 o2
-  LDRU fmt@(VecFormat _ FmtFloat) o1 o2 -> configVec fmt $$ op2 (text "\tvle32.v") o1 o2
-  LDRU fmt@(VecFormat _ FmtDouble) o1 o2 -> configVec fmt $$ op2 (text "\tvle64.v") o1 o2
+  LDRU (VecFormat _ FmtInt8) o1 o2 -> op2 (text "\tvle8.v") o1 o2
+  LDRU (VecFormat _ FmtInt16) o1 o2 -> op2 (text "\tvle16.v") o1 o2
+  LDRU (VecFormat _ FmtInt32) o1 o2 -> op2 (text "\tvle32.v") o1 o2
+  LDRU (VecFormat _ FmtInt64) o1 o2 -> op2 (text "\tvle64.v") o1 o2
+  LDRU (VecFormat _ FmtFloat) o1 o2 -> op2 (text "\tvle32.v") o1 o2
+  LDRU (VecFormat _ FmtDouble) o1 o2 -> op2 (text "\tvle64.v") o1 o2
   LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text . show) f <+> pprOp platform o1 <+> pprOp platform o2)
   FENCE r w -> line $ text "\tfence" <+> pprFenceType r <> char ',' <+> pprFenceType w
   FCVT FloatToFloat o1@(OpReg FF32 _) o2@(OpReg FF64 _) -> op2 (text "\tfcvt.s.d") o1 o2
@@ -729,38 +788,41 @@ pprInstr platform instr = case instr of
   FMAX o1 o2 o3
     | isSingleOp o1 -> op3 (text "\tfmax.s") o1 o2 o3
     | isDoubleOp o2 -> op3 (text "\tfmax.d") o1 o2 o3
-  FMA variant d r1 r2 r3 | isFloatRegOp d ->
-    let fma = case variant of
-          FMAdd -> text "\tfmadd" <> dot <> floatPrecission d
-          FMSub -> text "\tfmsub" <> dot <> floatPrecission d
-          FNMAdd -> text "\tfnmadd" <> dot <> floatPrecission d
-          FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
-     in op4 fma d r1 r2 r3
-  VFMA variant o1@(OpReg fmt _reg) o2 o3 | VecFormat l fmt' <- fmt ->
-    let formatString = if (isFloatFormat . scalarFormatFormat) fmt' then text "f" else text ""
-        prefix = text "v" <> formatString
-        suffix = text "vv"
-        fma = case variant of
-            FMAdd -> text "madd"
-            FMSub -> text "msub" -- TODO: Works only for floats!
-            FNMAdd -> text "nmadd" -- TODO: Works only for floats!
-            FNMSub -> text "nmsub"
-     in op3 (tab <> prefix <> fma <> dot <> suffix) o1 o2 o3
+  FMA variant d r1 r2 r3
+    | isFloatRegOp d ->
+        let fma = case variant of
+              FMAdd -> text "\tfmadd" <> dot <> floatPrecission d
+              FMSub -> text "\tfmsub" <> dot <> floatPrecission d
+              FNMAdd -> text "\tfnmadd" <> dot <> floatPrecission d
+              FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
+         in op4 fma d r1 r2 r3
+  VFMA variant o1@(OpReg fmt _reg) o2 o3
+    | VecFormat l fmt' <- fmt ->
+        let formatString = if (isFloatFormat . scalarFormatFormat) fmt' then text "f" else text ""
+            prefix = text "v" <> formatString
+            suffix = text "vv"
+            fma = case variant of
+              FMAdd -> text "madd"
+              FMSub -> text "msub" -- TODO: Works only for floats!
+              FNMAdd -> text "nmadd" -- TODO: Works only for floats!
+              FNMSub -> text "nmsub"
+         in op3 (tab <> prefix <> fma <> dot <> suffix) o1 o2 o3
   VFMA _variant o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VFMA can only target registers." (pprOp platform o1)
-  VMV o1@(OpReg fmt _reg) o2 | isFloatOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
-                | isFloatOp o2 -> configVec fmt $$ op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "f") o1 o2
-                | isIntRegOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> text "x" <> dot <> text "s") o1 o2
-                | isIntRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "x") o1 o2
-                | isVectorRegOp o1 && isVectorRegOp o2 -> configVec fmt $$ op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "v") o1 o2
-                | True -> pprPanic "RV64.pprInstr - impossible vector move (VMV)" (pprOp platform o1 <+> pprOp platform o2 <+> text "fmt" <> colon <> (text . show) fmt)
-  VMV o1 _o2 -> pprPanic "RV64.pprInstr - VMV can only target registers." (pprOp platform o1)
-  VID op@(OpReg fmt _reg) -> configVec fmt $$ op1 (text "\tvid.v") op
+  VMV o1@(OpReg fmt _reg) o2
+    | isFloatOp o1 && isVectorRegOp o2 -> op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
+    | isVectorRegOp o1 && isFloatOp o2 -> op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "f") o1 o2
+    | isIntRegOp o1 && isVectorRegOp o2 -> op2 (text "\tvmv" <> dot <> text "x" <> dot <> text "s") o1 o2
+    | isVectorRegOp o1 && isIntRegOp o2 -> op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "x") o1 o2
+    | isVectorRegOp o1 && isVectorRegOp o2 -> op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "v") o1 o2
+    | True -> pprPanic "RV64.pprInstr - impossible vector move (VMV)" (pprOp platform o1 <+> pprOp platform o2 <+> text "fmt" <> colon <> (text . show) fmt)
+  VMV o1 o2 -> pprPanic "RV64.pprInstr - invalid VMV instruction" (text "VMV" <+> pprOp platform o1 <> comma <+> pprOp platform o2)
+  VID op | isVectorRegOp op -> op1 (text "\tvid.v") op
   VID op -> pprPanic "RV64.pprInstr - VID can only target registers." (pprOp platform op)
-  VMSEQ o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2] && isIntOp o3 -> configVec fmt $$ op3 (text "\tvmseq.vx") o1 o2 o3
+  VMSEQ o1 o2 o3 | allVectorRegOps [o1, o2] && isIntOp o3 -> op3 (text "\tvmseq.vx") o1 o2 o3
   VMSEQ o1 o2 o3 -> pprPanic "RV64.pprInstr - VMSEQ wrong operands." (pprOps platform [o1, o2, o3])
-  VMERGE o1@(OpReg fmt _reg) o2 o3 o4 | allVectorRegOps [o1, o2, o3, o4] -> configVec fmt $$ op4 (text "\tvmerge.vvm") o1 o2 o3 o4
+  VMERGE o1 o2 o3 o4 | allVectorRegOps [o1, o2, o3, o4] -> op4 (text "\tvmerge.vvm") o1 o2 o3 o4
   VMERGE o1 o2 o3 o4 -> pprPanic "RV64.pprInstr - VMERGE wrong operands." (pprOps platform [o1, o2, o3, o4])
-  VSLIDEDOWN o1@(OpReg fmt _reg) o2 o3 |allVectorRegOps [o1, o2] && isIntOp o3-> configVec fmt $$ op3 (text "\tvslidedown.vx") o1 o2 o3
+  VSLIDEDOWN o1 o2 o3 | allVectorRegOps [o1, o2] && isIntOp o3 -> op3 (text "\tvslidedown.vx") o1 o2 o3
   VSLIDEDOWN o1 o2 o3 -> pprPanic "RV64.pprInstr - VSLIDEDOWN wrong operands." (pprOps platform [o1, o2, o3])
   -- TODO: adjust VSETIVLI to contain only format?
   VSETIVLI (OpReg fmt dst) len width grouping ta ma ->
@@ -778,31 +840,32 @@ pprInstr platform instr = case instr of
       <> comma
       <+> pprMasking ma
   VSETIVLI o1 _ _ _ _ _ -> pprPanic "RV64.pprInstr - VSETIVLI wrong operands." (pprOp platform o1)
-  VNEG o1@(OpReg fmt _reg) o2 | allVectorRegOps [o1, o2] -> configVec fmt $$ op2 (text "\tvfneg.v") o1 o2
+  VNEG o1 o2 | allVectorRegOps [o1, o2] -> op2 (text "\tvfneg.v") o1 o2
   VNEG o1 o2 -> pprPanic "RV64.pprInstr - VNEG wrong operands." (pprOps platform [o1, o2])
-  VADD o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvfadd.vv") o1 o2 o3
+  VADD o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfadd.vv") o1 o2 o3
   VADD o1 o2 o3 -> pprPanic "RV64.pprInstr - VADD wrong operands." (pprOps platform [o1, o2, o3])
-  VSUB o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvfsub.vv") o1 o2 o3
+  VSUB o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfsub.vv") o1 o2 o3
   VSUB o1 o2 o3 -> pprPanic "RV64.pprInstr - VSUB wrong operands." (pprOps platform [o1, o2, o3])
-  VMUL o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvfmul.vv") o1 o2 o3
+  VMUL o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfmul.vv") o1 o2 o3
   VMUL o1 o2 o3 -> pprPanic "RV64.pprInstr - VMUL wrong operands." (pprOps platform [o1, o2, o3])
-  VQUOT o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvfdiv.vv") o1 o2 o3
+  VQUOT o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfdiv.vv") o1 o2 o3
   VQUOT o1 o2 o3 -> pprPanic "RV64.pprInstr - VQUOT wrong operands." (pprOps platform [o1, o2, o3])
-  VSMIN o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvmin.vv") o1 o2 o3
+  VSMIN o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvmin.vv") o1 o2 o3
   VSMIN o1 o2 o3 -> pprPanic "RV64.pprInstr - VSMIN wrong operands." (pprOps platform [o1, o2, o3])
-  VSMAX o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvmax.vv") o1 o2 o3
+  VSMAX o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvmax.vv") o1 o2 o3
   VSMAX o1 o2 o3 -> pprPanic "RV64.pprInstr - VSMAX wrong operands." (pprOps platform [o1, o2, o3])
-  VUMIN o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvminu.vv") o1 o2 o3
+  VUMIN o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvminu.vv") o1 o2 o3
   VUMIN o1 o2 o3 -> pprPanic "RV64.pprInstr - VUMIN wrong operands." (pprOps platform [o1, o2, o3])
-  VUMAX o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvmaxu.vv") o1 o2 o3
+  VUMAX o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvmaxu.vv") o1 o2 o3
   VUMAX o1 o2 o3 -> pprPanic "RV64.pprInstr - VUMAX wrong operands." (pprOps platform [o1, o2, o3])
-  VFMIN o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvfmin.vv") o1 o2 o3
+  VFMIN o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfmin.vv") o1 o2 o3
   VFMIN o1 o2 o3 -> pprPanic "RV64.pprInstr - VFMIN wrong operands." (pprOps platform [o1, o2, o3])
-  VFMAX o1@(OpReg fmt _reg) o2 o3 | allVectorRegOps [o1, o2, o3] -> configVec fmt $$ op3 (text "\tvfmax.vv") o1 o2 o3
+  VFMAX o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfmax.vv") o1 o2 o3
   VFMAX o1 o2 o3 -> pprPanic "RV64.pprInstr - VFMAX wrong operands." (pprOps platform [o1, o2, o3])
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
   where
     op1 op o1 = line $ op <+> pprOp platform o1
+    op2 :: (IsLine (Line t), IsDoc t, HasCallStack) => Line t -> Operand -> Operand -> t
     op2 op o1 o2 = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
     op3 op o1 o2 o3 = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
     op4 op o1 o2 o3 o4 = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
@@ -841,11 +904,6 @@ pprInstr platform instr = case instr of
     opToVInstrSuffix op | isVectorRegOp op = text "v"
     opToVInstrSuffix op = pprPanic "Unsupported operand for vector instruction" (pprOp platform op)
 
-    configVec :: (IsDoc doc) => Format -> doc
-    configVec (VecFormat length fmt) =
-      pprInstr platform (VSETIVLI (OpReg II64 zeroReg) (fromIntegral length) ((formatToWidth . scalarFormatFormat) fmt) M1 TA MA)
-    configVec fmt = pprPanic "Unsupported vector configuration" ((text . show) fmt)
-
 floatOpPrecision :: Platform -> Operand -> Operand -> String
 floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isSingleOp l && isSingleOp r = "s" -- single precision
 floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isDoubleOp l && isDoubleOp r = "d" -- double precision
@@ -872,3 +930,77 @@ pprBcond c = text "b" <> pprCond c
       UGT -> text "gtu"
       -- BCOND cannot handle floating point comparisons / registers
       _ -> panic $ "RV64.ppr: unhandled BCOND conditional: " ++ show c
+
+-- | Get the `Format` to configure for a vector operation (if any)
+--
+-- If an `Instr` is is a vector insruction, we have to configure the correct
+-- `Format` such that the vector registers are correctly interpreted by the CPU.
+instrVecFormat :: Platform -> Instr -> Maybe Format
+instrVecFormat platform instr = case instr of
+  ANN _doc instr' -> instrVecFormat platform instr'
+  STR fmt _o1 _o2 | isVecFormat fmt -> Just fmt
+  LDR fmt _o1 _o2 | isVecFormat fmt -> Just fmt
+  LDRU fmt _o1 _o2 | isVecFormat fmt -> Just fmt
+  MOV (OpReg fmt _reg) _o2
+    | isVecFormat fmt -> checkedJustFmt fmt
+  MOV _o1 (OpReg fmt _reg)
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VFMA _v (OpReg fmt _reg) _o2 _o3
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VMV (OpReg fmt _reg) _o2
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VMV _o1 (OpReg fmt _reg)
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VMV _o1 _o2 -> pprPanic "Did not match" (pprInstr platform instr)
+  VID (OpReg fmt _reg)
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VID _o1 -> pprPanic "Did not match" (pprInstr platform instr)
+  VMSEQ (OpReg fmt _reg) _o2 _o3
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VMSEQ _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VMERGE (OpReg fmt _reg) _o2 _o3 _o4
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VMERGE _o1 _o2 _o3 _o4 -> pprPanic "Did not match" (pprInstr platform instr)
+  VSLIDEDOWN (OpReg fmt _reg) _o2 _o3
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VSLIDEDOWN _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VNEG (OpReg fmt _reg) _o2
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VNEG _o1 _o2 -> pprPanic "Did not match" (pprInstr platform instr)
+  VADD (OpReg fmt _reg) _o2 _o3
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VADD _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VSUB (OpReg fmt _reg) _o2 _o3
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VSUB _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VMUL (OpReg fmt _reg) _o2 _o3
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VMUL _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VQUOT (OpReg fmt _reg) _o2 _o3
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VQUOT _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VSMIN (OpReg fmt _reg) _o2 _o3
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VSMIN _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VSMAX (OpReg fmt _reg) _o2 _o3
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VSMAX _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VUMIN (OpReg fmt _reg) _o2 _o3
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VUMIN _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VUMAX (OpReg fmt _reg) _o2 _o3
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VUMAX _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VFMIN (OpReg fmt _reg) _o2 _o3
+    | isVecFormat fmt -> checkedJustFmt fmt
+  VFMIN _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VFMAX (OpReg fmt _reg) _o2 _o3 -> checkedJustFmt fmt
+  VFMAX _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  _ -> Nothing
+  where
+    checkedJustFmt :: Format -> Maybe Format
+    checkedJustFmt fmt | isVecFormat fmt = Just fmt
+    checkedJustFmt fmt =
+      pprPanic
+        ("Vector format expected but got " ++ show fmt)
+        (pprInstr platform instr)
