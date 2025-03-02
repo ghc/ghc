@@ -35,9 +35,10 @@ import GHC.Builtin.Names( tYPETyConKey, cONSTRAINTTyConKey )
 import GHC.Core.Type     hiding ( getTvSubstEnv )
 import GHC.Core.Coercion hiding ( getCvSubstEnv )
 import GHC.Core.TyCon
+import GHC.Core.Predicate( CanEqLHS(..), canEqLHS_maybe )
 import GHC.Core.TyCon.Env
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Compare ( eqType, tcEqType )
+import GHC.Core.TyCo.Compare ( eqType, tcEqType, tcEqTyConApps )
 import GHC.Core.TyCo.FVs     ( tyCoVarsOfCoList, tyCoFVsOfTypes )
 import GHC.Core.TyCo.Subst   ( mkTvSubst )
 import GHC.Core.Map.Type
@@ -46,7 +47,7 @@ import GHC.Core.Multiplicity
 import GHC.Utils.FV( FV, fvVarList )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
-import GHC.Types.Basic( SwapFlag(..), isSwapped )
+import GHC.Types.Basic( SwapFlag(..) )
 import GHC.Types.Unique.FM
 import GHC.Exts( oneShot )
 import GHC.Utils.Panic
@@ -655,7 +656,7 @@ tcUnifyTyForInjectivity
 tcUnifyTyForInjectivity unif in_scope t1 t2
   = case tc_unify_tys alwaysBindFam alwaysBindTv
                        unif   -- Am I unifying?
-                       True   -- Do injetivity checks
+                       True   -- Do injectivity checks
                        False  -- Don't check outermost kinds
                        RespectMultiplicities
                        rn_env emptyTvSubstEnv emptyCvSubstEnv
@@ -1432,12 +1433,12 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
 
            _ -> return () }
 
-unify_ty env ty1@(TyVarTy {}) ty2 kco
-  = uVarOrFam env ty1 ty2 kco
+unify_ty env (TyVarTy tv1) ty2 kco
+  = uVarOrFam env (TyVarLHS tv1) ty2 kco
 
-unify_ty env ty1 ty2@(TyVarTy {}) kco
+unify_ty env ty1 (TyVarTy tv2) kco
   | um_unif env  -- If unifying, can swap args; but not when matching
-  = uVarOrFam (umSwapRn env) ty2 ty1 (mkSymCo kco)
+  = uVarOrFam (umSwapRn env) (TyVarLHS tv2) ty1 (mkSymCo kco)
 
 -- Deal with TyConApps
 unify_ty env ty1 ty2 kco
@@ -1460,12 +1461,12 @@ unify_ty env ty1 ty2 kco
        ; unless (um_inj_tf env) $ -- See (end of) Note [Specification of unification]
          don'tBeSoSure MARTypeFamily $ unify_tys env noninj_tys1 noninj_tys2 }
 
-  | Just {} <- mb_sat_fam_app1
-  = uVarOrFam env ty1 ty2 kco
+  | Just (tc,tys) <- mb_sat_fam_app1
+  = uVarOrFam env (TyFamLHS tc tys) ty2 kco
 
   | um_unif env
-  , Just {} <- mb_sat_fam_app2
-  = uVarOrFam (umSwapRn env) ty2 ty1 (mkSymCo kco)
+  , Just (tc,tys) <- mb_sat_fam_app2
+  = uVarOrFam (umSwapRn env) (TyFamLHS tc tys) ty1 (mkSymCo kco)
 
   -- Handle oversaturated type families. Suppose we have
   --     (F a b) ~ (c d)    where F has arity 1
@@ -1594,9 +1595,10 @@ isSatFamApp (TyConApp tc tys)
 isSatFamApp _ = Nothing
 
 ---------------------------------
-uVarOrFam :: UMEnv -> InType -> InType -> OutCoercion -> UM ()
+uVarOrFam :: UMEnv -> CanEqLHS -> InType -> OutCoercion -> UM ()
 -- Invariants: (a) ty1 is a TyVarTy or a saturated type-family application
 --             (b) If ty1 is a ty-fam-app, then ty2 is NOT a TyVarTy
+--             (c) both args have had coreView already applied
 -- Why saturated?  See (ATF4) in Note [Apartness and type families]
 uVarOrFam env ty1 ty2 kco
   = do { substs <- getSubstEnvs
@@ -1609,18 +1611,11 @@ uVarOrFam env ty1 ty2 kco
     -- E.g.    a ~ F p q
     --         Starts with: go a (F p q)
     --         if `a` not bindable, swap to: go (F p q) a
-    go swapped substs (TyVarTy tv1) ty2 kco
+    go swapped substs (TyVarLHS tv1) ty2 kco
       = go_tv swapped substs tv1 ty2 kco
 
-    go swapped substs ty1 ty2 kco
-      | Just (tc,tys) <- isSatFamApp ty1
-      = go_fam swapped substs ty1 tc tys ty2 kco
-
-    go swapped _ ty1 ty2 _
-      = assertPpr (isSwapped swapped) (ppr ty1 $$ ppr ty2) $
-        -- NB: uVarOrFam calls `go` with ty1=tyvar/tyfaapp,
-        --     but `go` may recurse having swapped
-        surelyApart
+    go swapped substs (TyFamLHS tc tys) ty2 kco
+      = go_fam swapped substs tc tys ty2 kco
 
     -----------------------------
     -- go_tv: LHS is a type variable
@@ -1663,12 +1658,13 @@ uVarOrFam env ty1 ty2 kco
         extendTvEnv tv1' rhs     -- Bind tv1:=rhs and continue
 
       -- When unifying, try swapping:
-      -- e.g.   a    ~ F p q       we might succeed with go_fam
-      -- e.g.   a    ~ beta        we might be able to bind `beta` but not `a`
+      -- e.g.   a    ~ F p q       with `a` not bindable: we might succeed with go_fam
+      -- e.g.   a    ~ beta        with `a` not bindable: we might be able to bind `beta`
       -- e.g.   beta ~ F beta Int  occurs check; but MaybeApart after swapping
       | um_unif env
       , NotSwapped <- swapped  -- If we have swapped already, don't do so again
-      = go IsSwapped substs ty2 ty1 (mkSymCo kco)
+      , Just lhs2 <- canEqLHS_maybe ty2
+      = go IsSwapped substs lhs2 (mkTyVarTy tv1) (mkSymCo kco)
 
       | occurs_check = maybeApart MARInfinite   -- Occurs check
       | otherwise    = surelyApart
@@ -1694,27 +1690,28 @@ uVarOrFam env ty1 ty2 kco
     -----------------------------
     -- go_fam: LHS is a saturated type-family application
     -- Invariant: ty2 is not a TyVarTy
-    go_fam swapped substs ty1 tc tys1 ty2 kco
+    go_fam swapped substs tc1 tys1 ty2 kco
       -- If we are under a forall, just give up and return MaybeApart
       -- see (ATF3) in Note [Apartness and type families]
       | not (isEmptyVarSet (um_foralls env))
       = maybeApart MARTypeFamily
 
       -- We are not under any foralls, so the RnEnv2 is empty
-      | Just ty1' <- lookupFamEnv (um_fam_env substs) tc tys1
+      | Just ty1' <- lookupFamEnv (um_fam_env substs) tc1 tys1
       = if | um_unif env                          -> unify_ty env ty1' ty2 kco
            | (ty1' `mkCastTy` kco) `tcEqType` ty2 -> maybeApart MARTypeFamily
            | otherwise                            -> surelyApart
 
       -- Check for equality  F tys ~ F tys
       -- otherwise we'd build an infinite substitution
-      | ty1 `tcEqType` rhs
+      | TyConApp tc2 tys2 <- ty2
+      , tcEqTyConApps tc1 tys1 tc2 tys2
       = return ()
 
       -- Now check if we can bind the (F tys) to the RHS
-      | BindMe <- um_bind_fam_fun env tc tys1 rhs
+      | BindMe <- um_bind_fam_fun env tc1 tys1 rhs
       = -- ToDo: do we need an occurs check here?
-        do { extendFamEnv tc tys1 rhs
+        do { extendFamEnv tc1 tys1 rhs
            ; maybeApart MARTypeFamily }
 
       -- Swap in case of (F a b) ~ (G c d e)
@@ -1723,7 +1720,8 @@ uVarOrFam env ty1 ty2 kco
       --     see (ATF6) in Note [Apartness and type families]
       | um_unif env
       , NotSwapped <- swapped
-      = go IsSwapped substs ty2 ty1 (mkSymCo kco)
+      , Just lhs2 <- canEqLHS_maybe ty2
+      = go IsSwapped substs lhs2 (mkTyConApp tc1 tys1) (mkSymCo kco)
 
       | otherwise   -- See (ATF4) in Note [Apartness and type families]
       = surelyApart

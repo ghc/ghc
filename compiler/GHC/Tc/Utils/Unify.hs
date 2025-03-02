@@ -88,7 +88,7 @@ import GHC.Core.TyCo.Ppr( debugPprType {- pprTyVar -} )
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Unify
-import GHC.Core.Predicate( EqRel(..), mkEqPredRole, mkNomEqPred )
+import GHC.Core.Predicate( EqRel(..), CanEqLHS(..), mkEqPredRole, mkNomEqPred )
 import GHC.Core.Multiplicity
 import GHC.Core.Reduction
 
