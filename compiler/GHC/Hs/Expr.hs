@@ -530,18 +530,13 @@ type instance XXExpr GhcTc = XXExprGhcTc
 --   See Note [Handling overloaded and rebindable constructs] in `GHC.Rename.Expr`
 data HsThingRn = OrigExpr (HsExpr GhcRn)                -- ^ The source, user written, expression
                | OrigStmt (ExprLStmt GhcRn) HsDoFlavour -- ^ which kind of do-block did this statement come from
-               | OrigPat  (LPat GhcRn)              -- ^ The source, user written, pattern
-                          HsDoFlavour               -- ^ which kind of do-block did this statement come from
 
-isHsThingRnExpr, isHsThingRnStmt, isHsThingRnPat :: HsThingRn -> Bool
+isHsThingRnExpr, isHsThingRnStmt :: HsThingRn -> Bool
 isHsThingRnExpr (OrigExpr{}) = True
 isHsThingRnExpr _ = False
 
 isHsThingRnStmt (OrigStmt{}) = True
 isHsThingRnStmt _ = False
-
-isHsThingRnPat (OrigPat{}) = True
-isHsThingRnPat _ = False
 
 data XXExprGhcRn
   = ExpandedThingRn { xrn_orig     :: HsThingRn       -- The original source thing to be used for error messages
@@ -577,14 +572,6 @@ mkExpandedStmt
   -> HsExpr GhcRn         -- ^ expanded expression
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
 mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigStmt oStmt flav
-                                                         , xrn_expanded = eExpr })
-
-mkExpandedPatRn
-  :: LPat   GhcRn             -- ^ source pattern
-  -> HsDoFlavour              -- ^ source statement do flavour
-  -> HsExpr GhcRn             -- ^ expanded expression
-  -> HsExpr GhcRn             -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedPatRn oPat flav eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigPat oPat flav
                                                          , xrn_expanded = eExpr })
 
 data XXExprGhcTc
@@ -899,7 +886,6 @@ instance Outputable HsThingRn where
     = case thing of
         OrigExpr x     -> ppr_builder "<OrigExpr>:" x
         OrigStmt x _   -> ppr_builder "<OrigStmt>:" x
-        OrigPat  x _   -> ppr_builder "<OrigPat>:"  x
     where ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens (ppr x))) (ppr x)
 
 instance Outputable XXExprGhcRn where

@@ -255,7 +255,9 @@ mk_failable_expr doFlav lpat expr@(L _exprloc _) fail_op =
        else wrapGenSpan <$> mk_fail_block doFlav lpat expr fail_op
      }
 
--- makes the fail block with a given fail_op
+-- | Makes the fail block with a given fail_op
+-- mk_fail_block pat rhs fail builds
+-- \x. case x of {pat -> rhs; _ -> fail "Pattern match failure..."}
 mk_fail_block :: HsDoFlavour
               -> LPat GhcRn -> LHsExpr GhcRn -> FailOperator GhcRn -> TcM (HsExpr GhcRn)
 mk_fail_block doFlav pat@(L ploc _) e (Just (SyntaxExprRn fail_op)) =
@@ -267,12 +269,11 @@ mk_fail_block doFlav pat@(L ploc _) e (Just (SyntaxExprRn fail_op)) =
         where
           fail_alt_case :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> LMatch GhcRn (LHsExpr GhcRn)
           fail_alt_case dflags pat fail_op = genHsCaseAltDoExp doFlav (L ploc $ WildPat noExtField) $
-                                             L ploc (fail_op_expr dflags pat fail_op)
+                                             wrapGenSpan (fail_op_expr dflags pat fail_op)
 
           fail_op_expr :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
           fail_op_expr dflags pat fail_op
-            = mkExpandedPatRn pat doFlav $
-                    genHsApp fail_op (mk_fail_msg_expr dflags pat)
+            = genHsApp fail_op (mk_fail_msg_expr dflags pat)
 
           mk_fail_msg_expr :: DynFlags -> LPat GhcRn -> LHsExpr GhcRn
           mk_fail_msg_expr dflags pat
