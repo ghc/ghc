@@ -258,12 +258,15 @@ setEntryDP (L (EpAnn (EpaSpan ss) an (EpaComments [])) a) dp
 setEntryDP (L (EpAnn (EpaDelta ss d csd) an cs) a) dp
   = L (EpAnn (EpaDelta ss d' csd') an cs') a
   where
+    -- I suspect we should assume the comments are already in the
+    -- right place, and just set the entry DP for this case. This
+    -- avoids surprises from the caller.
     (d', csd', cs') = case cs of
       EpaComments (h:t) ->
         let
           (dp0,c') = go h
         in
-          (dp0, c':t++csd, EpaComments [])
+          (dp0, csd, EpaComments (c':t))
       EpaComments [] ->
           (dp, csd, cs)
       EpaCommentsBalanced (h:t) ts ->
@@ -299,7 +302,9 @@ setEntryDP (L (EpAnn (EpaSpan ss@(RealSrcSpan r _)) an cs) a) dp
                 line = getDeltaLine delta
                 col = deltaColumn delta
                 edp' = if line == 0 then SameLine col
-                                    else DifferentLine line col
+                                    else DifferentLine line (col - 1)
+                                         -- At the top level the layout offset is 1, adjust for it
+                                         -- TODO: what about the layout offset for nested items?
                 edp = edp' `debug` ("setEntryDP :" ++ showGhc (edp', (ss2pos $ epaLocationRealSrcSpan $ getLoc lc), r))
 
 
@@ -330,17 +335,23 @@ setEntryDPFromAnchor  off (EpaSpan (RealSrcSpan anc _)) ll@(L la _) = setEntryDP
 
 -- ---------------------------------------------------------------------
 
--- |Take the annEntryDelta associated with the first item and associate it with the second.
--- Also transfer any comments occurring before it.
+-- |Take the annEntryDelta associated with the first item and
+-- associate it with the second. Also transfer any comments occurring
+-- before it.
 transferEntryDP :: (Typeable t1, Typeable t2)
   => LocatedAn t1 a -> LocatedAn t2 b -> (LocatedAn t2 b)
-transferEntryDP (L (EpAnn anc1 an1 cs1) _) (L (EpAnn _anc2 an2 cs2) b) =
+transferEntryDP (L (EpAnn anc1 an1 cs1) _) (L (EpAnn anc2 an2 cs2) b) =
+  -- Note: the EpaDelta version of an EpaLocation contains the original
+  -- SrcSpan. We must preserve that.
+  let anc1' = case (anc1,anc2) of
+          (EpaDelta _ dp cs, EpaDelta ss2 _ _) -> EpaDelta ss2 dp cs
+          (_, _) -> anc1
   -- Problem: if the original had preceding comments, blindly
   -- transferring the location is not correct
-  case priorComments cs1 of
-    [] -> (L (EpAnn anc1 (combine an1 an2) cs2) b)
+  in case priorComments cs1 of
+    [] -> (L (EpAnn anc1' (combine an1 an2) cs2) b)
     -- TODO: what happens if the receiving side already has comments?
-    (L _ _:_) -> (L (EpAnn anc1 (combine an1 an2) (cs1 <> cs2)) b)
+    (L _ _:_) -> (L (EpAnn anc1' (combine an1 an2) (cs1 <> cs2)) b)
 
 
 -- |If a and b are the same type return first arg, else return second
@@ -519,7 +530,7 @@ balanceCommentsA la1 la2 = (la1', la2')
     anc2 = comments an2
 
     (p1,m1,f1) = splitComments (anchorFromLocatedA la1) anc1
-    cs1p = priorCommentsDeltas    (anchorFromLocatedA la1) p1
+    cs1p = priorCommentsDeltas (anchorFromLocatedA la1) p1
 
     -- Split cs1 following comments into those before any
     -- TrailingAnn's on an1, and any after
@@ -1103,8 +1114,8 @@ oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = an'
 newWhereAnnotation :: WithWhere -> (EpAnn (AnnList (EpToken "where")))
 newWhereAnnotation ww = an
   where
-  anc  = EpaDelta noSrcSpan (DifferentLine 1 3) []
-  anc2 = EpaDelta noSrcSpan (DifferentLine 1 5) []
+  anc  = EpaDelta noSrcSpan (DifferentLine 1 2) []
+  anc2 = EpaDelta noSrcSpan (DifferentLine 1 4) []
   w = case ww of
     WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
     WithoutWhere -> NoEpTok

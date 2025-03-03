@@ -533,7 +533,7 @@ changeLocalDecls libdir (L l p) = do
             os' = setEntryDP os (DifferentLine 2 0)
         let sortKey = captureOrderBinds decls
         let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
-        let van' = (EpAnn anc (AnnList (Just (EpaDelta noSrcSpan (DifferentLine 1 5) [])) a b c dd) cs)
+        let van' = (EpAnn anc (AnnList (Just (EpaDelta noSrcSpan (DifferentLine 1 4) [])) a b c dd) cs)
         let binds' = (HsValBinds van'
                           (ValBinds sortKey (decl':oldBinds)
                                           (sig':os':oldSigs)))
@@ -557,8 +557,8 @@ changeLocalDecls2 libdir (L l p) = do
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
-        let anc = (EpaDelta noSrcSpan (DifferentLine 1 3) [])
-        let anc2 = (EpaDelta noSrcSpan (DifferentLine 1 5) [])
+        let anc = (EpaDelta noSrcSpan (DifferentLine 1 2) [])
+        let anc2 = (EpaDelta noSrcSpan (DifferentLine 1 4) [])
         let an = EpAnn anc
                         (AnnList (Just anc2) ListNone
                                  []
@@ -937,13 +937,13 @@ addClassMethod :: Changer
 addClassMethod libdir lp = do
   Right sig  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
   Right decl <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
-  let decl' = setEntryDP decl (DifferentLine 1 3)
-  let  sig' = setEntryDP sig  (DifferentLine 2 3)
+  let decl' = setEntryDP decl (DifferentLine 1 2)
+  let  sig' = setEntryDP sig  (DifferentLine 2 2)
   let doAddMethod = do
         let
           [cd] = hsDecls lp
           (f1:f2s:f2d:_) = hsDecls cd
-          f2s' = setEntryDP f2s  (DifferentLine 2 3)
+          f2s' = setEntryDP f2s  (DifferentLine 2 2)
           cd' = replaceDecls cd [f1, sig', decl', f2s', f2d]
           lp' = replaceDecls lp [cd']
         return lp'

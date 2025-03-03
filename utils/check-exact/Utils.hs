@@ -141,7 +141,7 @@ undelta (l,_) (DifferentLine dl dc) (LayoutStartCol co) = (fl,fc)
 -- ---------------------------------------------------------------------
 
 adjustDeltaForOffset :: LayoutStartCol -> DeltaPos -> DeltaPos
-adjustDeltaForOffset _colOffset                      dp@(SameLine _) = dp
+adjustDeltaForOffset _colOffset              dp@(SameLine _) = dp
 adjustDeltaForOffset (LayoutStartCol colOffset) (DifferentLine l c)
   = DifferentLine l (c - colOffset)
 
@@ -196,14 +196,17 @@ isPointSrcSpan ss = spanLength ss == 0
 -- does not already have one.
 commentOrigDelta :: LEpaComment -> LEpaComment
 commentOrigDelta (L (EpaSpan ss@(RealSrcSpan la _)) (GHC.EpaComment t pp))
-  = (L (EpaDelta ss dp NoComments) (GHC.EpaComment t pp))
-                  `debug` ("commentOrigDelta: (la, pp, r,c, dp)=" ++ showAst (la, pp, r,c, dp))
+  = (L (EpaDelta ss dp' NoComments) (GHC.EpaComment t pp))
+                  `debug` ("commentOrigDelta: (la, pp, r,c, dp, dp')=" ++ showAst (la, pp, r,c, dp, dp'))
   where
         (r,c) = ss2posEnd pp
 
         dp = if r == 0
                then (ss2delta (r,c+1) la)
                else (ss2delta (r,c)   la)
+        dp' = case dp of
+            SameLine _ -> dp
+            DifferentLine l cc -> DifferentLine l (cc - 1)
 commentOrigDelta c = c
 
 origDelta :: RealSrcSpan -> RealSrcSpan -> DeltaPos
