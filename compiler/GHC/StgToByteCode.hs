@@ -734,9 +734,14 @@ schemeT d s p (StgOpApp (StgFCallOp (CCall ccall_spec) _ty) args result_ty)
       then generateCCall d s p ccall_spec result_ty args
       else unsupportedCConvException
 
-schemeT d s p (StgOpApp (StgPrimOp op) args _ty)
-  | Just prim_code <- doPrimOp op d s p args = prim_code
-  | otherwise = doTailCall d s p (primOpId op) (reverse args)
+schemeT d s p (StgOpApp (StgPrimOp op) args _ty) = do
+  profile <- getProfile
+  let platform = profilePlatform profile
+  case doPrimOp platform op d s p args of
+    -- Can we do this right in the interpreter?
+    Just prim_code -> prim_code
+    -- Otherwise we have to do a call to the primop wrapper instead :(
+    _         -> doTailCall d s p (primOpId op) (reverse args)
 
 schemeT d s p (StgOpApp (StgPrimCallOp (PrimCall label unit)) args result_ty)
    = generatePrimCall d s p label (Just unit) result_ty args
@@ -831,15 +836,15 @@ doTailCall init_d s p fn args = do
     (final_d, more_push_code) <- push_seq (d + sz) args
     return (final_d, push_code `appOL` more_push_code)
 
-doPrimOp  :: PrimOp
+doPrimOp  :: Platform
+          -> PrimOp
           -> StackDepth
           -> Sequel
           -> BCEnv
           -> [StgArg]
           -> Maybe (BcM BCInstrList)
-doPrimOp op init_d s p args =
+doPrimOp platform op init_d s p args =
   case op of
-    -- TODO: IntAddOp and friends are only 64bit on 64bit platforms
     IntAddOp -> primOp OP_ADD
     Int64AddOp -> primOp OP_ADD
     WordAddOp -> primOp OP_ADD
@@ -850,6 +855,7 @@ doPrimOp op init_d s p args =
     WordSubOp -> primOp OP_SUB
     Int64SubOp -> primOp OP_SUB
     Word64SubOp -> primOp OP_SUB
+    AddrSubOp -> primOp OP_SUB
 
     Int8SubOp   -> primOp OP_SUB
     Word8SubOp  -> primOp OP_SUB
@@ -886,26 +892,33 @@ doPrimOp op init_d s p args =
     IntNeOp -> primOp OP_NEQ
     WordNeOp -> primOp OP_NEQ
     Word64NeOp -> primOp OP_NEQ
+    AddrNeOp -> primOp OP_NEQ
 
     IntEqOp -> primOp OP_EQ
     WordEqOp -> primOp OP_EQ
     Word64EqOp -> primOp OP_EQ
+    AddrEqOp -> primOp OP_EQ
+    CharEqOp -> primOp OP_EQ
 
     IntLtOp -> primOp OP_S_LT
     WordLtOp -> primOp OP_U_LT
     Word64LtOp -> primOp OP_U_LT
+    AddrLtOp -> primOp OP_U_LT
 
     IntGeOp -> primOp OP_S_GE
     WordGeOp -> primOp OP_U_GE
     Word64GeOp -> primOp OP_U_GE
+    AddrGeOp -> primOp OP_U_GE
 
     IntGtOp -> primOp OP_S_GT
     WordGtOp -> primOp OP_U_GT
     Word64GtOp -> primOp OP_U_GT
+    AddrGtOp -> primOp OP_U_GT
 
     IntLeOp -> primOp OP_S_LE
     WordLeOp -> primOp OP_U_LE
     Word64LeOp -> primOp OP_U_LE
+    AddrLeOp -> primOp OP_U_LE
 
     IntNegOp -> primOp OP_NEG
     Int64NegOp -> primOp OP_NEG
@@ -925,9 +938,14 @@ doPrimOp op init_d s p args =
     ChrOp           -> no_op   -- Int# and Char# are rep'd the same
     OrdOp           -> no_op
 
+    IndexOffAddrOp_Word8 -> primOpWithRep (OP_INDEX_ADDR W8) W8
+    IndexOffAddrOp_Word16 -> primOpWithRep (OP_INDEX_ADDR W16) W16
+    IndexOffAddrOp_Word32 -> primOpWithRep (OP_INDEX_ADDR W32) W32
+    IndexOffAddrOp_Word64 -> primOpWithRep (OP_INDEX_ADDR W64) W64
+
     _ -> Nothing
   where
-    primArg1Width platform (arg:_)
+    primArg1Width arg
       | rep <- (stgArgRepU arg)
       = case rep of
         AddrRep -> platformWordWidth platform
@@ -953,19 +971,33 @@ doPrimOp op init_d s p args =
         VecRep{} -> unexpectedRep
       where
         unexpectedRep = panic "doPrimOp: Unexpected argument rep"
-    primArg1Width _ _  = panic "doPrimOp: Unexpected argument count"
+
+
+    -- TODO: The slides for the result need to be two words on 32bit for 64bit ops.
+    mkNReturn width
+      | W64 <- width = RETURN L -- L works for 64 bit on any platform
+      | otherwise = RETURN N -- <64bit width, fits in word on all platforms
+
+    mkSlideWords width = if platformWordWidth platform < width then 2 else 1
 
     -- Push args, execute primop, slide, return_N
     primOp op_inst = Just $ do
-      platform <- profilePlatform <$> getProfile
-      prim_code <- mkPrimOpCode init_d s p (op_inst $ primArg1Width platform args) $ args
-      let slide = mkSlideW 1 (bytesToWords platform $ init_d - s) `snocOL` RETURN N
+      let width = primArg1Width (head args)
+      prim_code <- mkPrimOpCode init_d s p (op_inst width) $ args
+      let slide = mkSlideW (mkSlideWords width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn width
+      return $ prim_code `appOL` slide
+
+    primOpWithRep :: BCInstr -> Width -> Maybe (BcM (OrdList BCInstr))
+    primOpWithRep op_inst width = Just $ do
+      prim_code <- mkPrimOpCode init_d s p op_inst $ args
+
+      let slide = mkSlideW (mkSlideWords width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn width
       return $ prim_code `appOL` slide
 
     no_op = Just $ do
-      platform <- profilePlatform <$> getProfile
+      let width = primArg1Width (head args)
       prim_code <- terribleNoOp init_d s p undefined args
-      let slide = mkSlideW 1 (bytesToWords platform $ init_d - s) `snocOL` RETURN N
+      let slide = mkSlideW (mkSlideWords width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn width
       return $ prim_code `appOL` slide
 
 -- It's horrible, but still better than calling intToWord ...

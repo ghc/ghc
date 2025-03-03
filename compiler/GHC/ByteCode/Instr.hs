@@ -36,7 +36,6 @@ import GHC.Stack.CCS (CostCentre)
 import GHC.Stg.Syntax
 import GHCi.BreakArray (BreakArray)
 import Language.Haskell.Syntax.Module.Name (ModuleName)
-import GHC.Types.RepType (PrimRep)
 import GHC.Cmm.Type (Width)
 
 -- ----------------------------------------------------------------------------
@@ -245,6 +244,10 @@ data BCInstr
    | OP_S_GT !Width
    | OP_S_LE !Width
 
+   -- Always puts at least a machine word on the stack, with the low part of the stack containing the result.
+   -- We zero extend the result we put on the stack.
+   | OP_INDEX_ADDR !Width
+
    -- For doing magic ByteArray passing to foreign calls
    | SWIZZLE          !WordOff -- to the ptr N words down the stack,
                       !Int     -- add M
@@ -448,6 +451,8 @@ instance Outputable BCInstr where
    ppr (OP_U_GT w)           = text "OP_U_GT_" <> ppr w
    ppr (OP_U_LE w)           = text "OP_U_LE_" <> ppr w
 
+   ppr (OP_INDEX_ADDR w)     = text "OP_INDEX_ADDR_" <> ppr w
+
    ppr (SWIZZLE stkoff n)    = text "SWIZZLE " <+> text "stkoff" <+> ppr stkoff
                                                <+> text "by" <+> ppr n
    ppr ENTER                 = text "ENTER"
@@ -578,6 +583,7 @@ bciStackUse OP_U_LT{}               = 0
 bciStackUse OP_U_GT{}               = 0
 bciStackUse OP_U_LE{}               = 0
 bciStackUse OP_U_GE{}               = 0
+bciStackUse OP_INDEX_ADDR{}         = 0
 
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0

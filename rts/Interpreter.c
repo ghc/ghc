@@ -2274,6 +2274,40 @@ run_BCO:
         case bci_OP_NOT_08: UN_SIZED_OP(~, StgWord8)
         case bci_OP_NEG_08: UN_SIZED_OP(-, StgInt8)
 
+        case bci_OP_INDEX_ADDR_64:
+        {
+            StgWord64* addr = (StgWord64*) SpW(1);
+            StgWord offset =     (StgWord) SpW(0);
+            if(sizeof(StgPtr) == sizeof(StgWord64)) {
+                Sp_addW(1);
+            }
+            SpW64(0) = *(addr+offset);
+            goto nextInsn;
+        }
+
+        case bci_OP_INDEX_ADDR_32:
+        {
+            StgWord32* addr = (StgWord32*) SpW(1);
+            StgWord offset =     (StgWord) SpW(0);
+            Sp_addW(1);
+            SpW(0) = (StgWord) *(addr+offset);
+            goto nextInsn;
+        }
+        case bci_OP_INDEX_ADDR_16:
+        {
+            StgWord16* addr = (StgWord16*) SpW(0);
+            SpW(0) = (StgWord) *addr;
+            goto nextInsn;
+        }
+        case bci_OP_INDEX_ADDR_08:
+        {
+            StgWord8* addr = (StgWord8*) SpW(1);
+            StgWord offset =   (StgWord) SpW(0);
+            Sp_addW(1);
+            SpW(0) = (StgWord) *(addr+offset);
+            goto nextInsn;
+        }
+
         case bci_CCALL: {
             void *tok;
             W_ stk_offset             = BCO_GET_LARGE_ARG;

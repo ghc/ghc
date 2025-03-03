@@ -209,6 +209,11 @@
 #define bci_OP_S_LT_08                 228
 #define bci_OP_S_LE_08                 229
 
+#define bci_OP_INDEX_ADDR_08           240
+#define bci_OP_INDEX_ADDR_16           241
+#define bci_OP_INDEX_ADDR_32           242
+#define bci_OP_INDEX_ADDR_64           243
+
 
 /* If you need to go past 255 then you will run into the flags */
 

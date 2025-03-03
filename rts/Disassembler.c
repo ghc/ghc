@@ -487,6 +487,8 @@ disInstr ( StgBCO *bco, int pc )
       BELCH_INSTR_NAME_ALL_SIZES(OP_S_GE);
       BELCH_INSTR_NAME_ALL_SIZES(OP_S_LT);
 
+      BELCH_INSTR_NAME_ALL_SIZES(OP_INDEX_ADDR);
+
       default:
          barf("disInstr: unknown opcode %u", (unsigned int) instr);
    }
