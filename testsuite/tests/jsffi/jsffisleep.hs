@@ -20,8 +20,8 @@ foreign export ccall "testWouldBlock"
 -- non-main exports in C FFI. In JSFFI, it's always done automatically
 -- for every export though.
 testWouldBlock :: IO ()
-testWouldBlock = catch (threadDelay 1000000) $ \WouldBlockException -> do
-  print WouldBlockException
+testWouldBlock = catch (threadDelay 1000000) $ \(WouldBlockException err) -> do
+  print $ WouldBlockException err
   flushStdHandles
 
 foreign export javascript "testLazySleep"
