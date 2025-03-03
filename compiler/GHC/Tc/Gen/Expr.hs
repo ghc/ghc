@@ -528,7 +528,7 @@ Not using 'sup' caused #23814.
 -}
 
 tcExpr (HsMultiIf _ alts) res_ty
-  = do { alts' <- tcGRHSList IfAlt tcBody alts res_ty
+  = do { alts' <- tcGRHSNE IfAlt tcBody alts res_ty
                   -- See Note [MultiWayIf linearity checking]
        ; res_ty <- readExpType res_ty
        ; return (HsMultiIf res_ty alts') }
@@ -748,7 +748,6 @@ tcXExpr (ExpandedThingRn o e) res_ty
        mkExpandedTc o <$> -- necessary for breakpoints
        tcExpr e res_ty
 
--- tcXExpr (HsRecSelRn  _ ) ty = pprPanic "tcExpr:HsRecSelRn" (ppr ty)
 -- For record selection, etc
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
 

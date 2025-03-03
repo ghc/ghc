@@ -210,8 +210,6 @@ data EWrap = EPar    AppCtxt
 
 data AppCtxt
   = VAExpansion
-       HsThingRn
-       SrcSpan
 
   | VACall
        (HsExpr GhcRn) Int  -- In the third argument of function f
@@ -247,7 +245,7 @@ a second time.
 -}
 
 appCtxtLoc :: AppCtxt -> SrcSpan
-appCtxtLoc (VAExpansion _ l) = l
+appCtxtLoc VAExpansion = generatedSrcSpan
 appCtxtLoc (VACall _ _ l)    = l
 
 insideExpansion :: AppCtxt -> Bool
@@ -259,7 +257,7 @@ instance Outputable QLFlag where
   ppr NoQL = text "NoQL"
 
 instance Outputable AppCtxt where
-  ppr (VAExpansion e l) = text "VAExpansion" <+> ppr e <+> ppr l
+  ppr VAExpansion       = text "VAExpansion"
   ppr (VACall f n l)    = text "VACall" <+> int n <+> ppr f  <+> ppr l
 
 type family XPass (p :: TcPass) where
@@ -282,6 +280,7 @@ addArgWrap wrap args
  | isIdHsWrapper wrap = args
  | otherwise          = EWrap (EHsWrap wrap) : args
 
+
 splitHsApps :: HsExpr GhcRn
             -> TcM ( (HsExpr GhcRn, AppCtxt)  -- Head
                    , [HsExprArg 'TcpRn])      -- Args
@@ -301,10 +300,9 @@ splitHsApps e = go e (top_ctxt 0 e) []
     top_ctxt n (HsPragE _ _ fun)           = top_lctxt n fun
     top_ctxt n (HsAppType _ fun _)         = top_lctxt (n+1) fun
     top_ctxt n (HsApp _ fun _)             = top_lctxt (n+1) fun
-    -- top_ctxt n (XExpr (ExpandedThingRn (OrigExpr fun) _))
-    --                                          = VACall fun  n noSrcSpan
     top_ctxt n other_fun                   = VACall other_fun n noSrcSpan
 
+    top_lctxt :: Int -> LHsExpr GhcRn -> AppCtxt
     top_lctxt n (L _ fun) = top_ctxt n fun
 
     go :: HsExpr GhcRn -> AppCtxt -> [HsExprArg 'TcpRn]
@@ -324,11 +322,6 @@ splitHsApps e = go e (top_ctxt 0 e) []
         ctxt' = case splice of
             HsUntypedSpliceExpr _ (L l _) -> set l ctxt -- l :: SrcAnn AnnListItem
             HsQuasiQuote _ _ (L l _)      -> set l ctxt -- l :: SrcAnn NoEpAnns
-
-    -- See Note [Looking through ExpandedThingRn]
-    -- go (XExpr (ExpandedThingRn o e)) ctxt args
-    --   = go e (VAExpansion o (appCtxtLoc ctxt))
-    --            (EWrap (EExpand o) : args)
 
     -- See Note [Desugar OpApp in the typechecker]
     go e@(OpApp _ arg1 (L l op) arg2) _ args
@@ -379,8 +372,6 @@ rebuildHsApps (fun, ctxt) (arg : args)
         -> rebuildHsApps (mkExpandedExprTc oe fun, ctxt) args
         | OrigStmt stmt flav <- orig
         -> rebuildHsApps (mkExpandedStmtTc stmt flav fun, ctxt) args
-        | otherwise
-        -> rebuildHsApps (fun, ctxt) args
       EWrap (EHsWrap wrap)
         -> rebuildHsApps (mkHsWrap wrap fun, ctxt) args
   where
@@ -556,14 +547,6 @@ tcInferAppHead_maybe fun
 
 addHeadCtxt :: AppCtxt -> TcM a -> TcM a
 addHeadCtxt fun_ctxt thing_inside = setSrcSpan fun_loc thing_inside
-  -- | not (isGoodSrcSpan fun_loc)   -- noSrcSpan => no arguments
-  -- = thing_inside                  -- => context is already set
-  -- | otherwise
-  -- = setSrcSpan fun_loc $
-  --   do case fun_ctxt of
-  --        VAExpansion (OrigExpr orig) _
-  --          -> addExprCtxt orig thing_inside
-  --        _ -> thing_inside
   where
     fun_loc = appCtxtLoc fun_ctxt
 
@@ -1248,22 +1231,19 @@ addStmtCtxt stmt flav =
   addErrCtxt (StmtErrCtxt (HsDoStmt flav) stmt)
 
 addThingCtxt :: HsThingRn -> TcRn a -> TcRn a
-
 addThingCtxt (OrigStmt (L loc stmt) flav) thing_inside = do
   setSrcSpanA loc $
     addStmtCtxt stmt flav $
     setInGeneratedCode
     thing_inside
--- addThingCtxt (OrigExpr e) thing_inside = addExprCtxt e thing_inside
-addThingCtxt _ thing_inside = thing_inside
+addThingCtxt (OrigExpr e) thing_inside = addExprCtxt e thing_inside
 
 addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside
   = case e of
-      HsUnboundVar {} -> thing_inside
-      XExpr (ExpandedThingRn (OrigStmt{}) _) -> thing_inside
-      _ -> addErrCtxt (ExprCtxt e) thing_inside
-   -- The HsUnboundVar special case addresses situations like
+     -- The HsUnboundVar special case addresses situations like
    --    f x = _
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself
+      HsUnboundVar {} -> thing_inside
+      _ -> addErrCtxt (ExprCtxt e) thing_inside

@@ -84,7 +84,7 @@ import GHC.Types.Basic( VisArity, isDoExpansionGenerated )
 import qualified GHC.Data.List.NonEmpty as NE
 
 import Control.Monad
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty(..), toList)
 import Data.Maybe (mapMaybe)
 
 import qualified GHC.LanguageExtensions as LangExt
