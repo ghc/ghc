@@ -199,7 +199,7 @@ options =
     , progOpts "merge-objs" "linker for merging objects" _optMergeObjs
     , progOpts "windres" "windres utility" _optWindres
     , progOpts "otool" "otool utility" _optOtool
-    , progOpts "install-name-tool" "install_name_tool utility" _optOtool
+    , progOpts "install-name-tool" "install_name_tool utility" _optInstallNameTool
     , progOpts "ld" "linker" _optLd
     ]
   where
@@ -564,9 +564,9 @@ targetToSettings tgt@Target{..} =
   , ("ar supports at file", arSupportsAtFile')
   , ("ar supports -L",      arSupportsDashL')
   , ("ranlib command", ranlibPath)
-  , ("otool command", otool_cmd)
-  , ("install_name_tool command", install_name_cmd)
-  , ("windres command", (maybe "/bin/false" prgPath tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
+  , ("otool command", maybe "otool" prgPath tgtOtool)
+  , ("install_name_tool command", maybe "install_name_tool" prgPath tgtInstallNameTool)
+  , ("windres command", maybe "/bin/false" prgPath tgtWindres) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
   , ("unlit command", "$topdir/../bin/unlit") -- FIXME
   , ("cross compiling", yesNo False) -- FIXME: why do we need this settings at all?
   , ("target platform string", targetPlatformTriple tgt)
@@ -602,8 +602,6 @@ targetToSettings tgt@Target{..} =
     wordSize = show (wordSize2Bytes tgtWordSize)
     isBigEndian = yesNo $ (\case BigEndian -> True; LittleEndian -> False) tgtEndianness
 
-    otool_cmd = "" -- FIXME
-    install_name_cmd = "" -- FIXME
     has_libm = "NO" -- FIXME
     llc_cmd = "llc" -- FIXME
     llvm_opt_cmd = "opt" -- FIXME
