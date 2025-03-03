@@ -757,7 +757,6 @@ exprCtOrigin (HsQual {})         = Shouldn'tHappenOrigin "constraint context"  -
 exprCtOrigin (HsFunArr {})       = Shouldn'tHappenOrigin "function arrow"      -- See Note [Types in terms]
 exprCtOrigin (XExpr (ExpandedThingRn thing _)) | OrigExpr a <- thing = exprCtOrigin a
                                                | OrigStmt _ _ <- thing = DoOrigin
-                                               | OrigPat p _ <- thing = DoPatOrigin p
 exprCtOrigin (XExpr (PopErrCtxt {})) = Shouldn'tHappenOrigin "PopErrCtxt"
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel (foExt f)
 
