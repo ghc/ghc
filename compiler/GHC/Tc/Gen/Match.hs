@@ -389,13 +389,13 @@ tcDoStmts ListComp (L l stmts) res_ty
 tcDoStmts doExpr@(DoExpr _) ss@(L _ stmts) res_ty
   = do  { expanded_expr <- expandDoStmts doExpr stmts -- Do expansion on the fly
         ; let orig = HsDo noExtField doExpr ss
-        ; mkExpandedExprTc orig <$> tcExpr (Just (OrigExpr orig)) expanded_expr res_ty
+        ; mkExpandedExprTc orig <$> tcExpr expanded_expr res_ty
         }
 
 tcDoStmts mDoExpr@(MDoExpr _) ss@(L _ stmts) res_ty
   = do  { expanded_expr <- expandDoStmts mDoExpr stmts -- Do expansion on the fly
         ; let orig = HsDo noExtField mDoExpr ss
-        ; mkExpandedExprTc orig <$> tcExpr (Just (OrigExpr orig)) expanded_expr res_ty  }
+        ; mkExpandedExprTc orig <$> tcExpr expanded_expr res_ty  }
 
 tcDoStmts MonadComp (L l stmts) res_ty
   = do  { stmts' <- tcStmts (HsDoStmt MonadComp) tcMcStmt stmts res_ty
