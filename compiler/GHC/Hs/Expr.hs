@@ -639,6 +639,12 @@ mkExpandedStmtTc
   -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
 mkExpandedStmtTc oStmt flav eExpr = XExpr (ExpandedThingTc (OrigStmt oStmt flav) eExpr)
 
+mkExpandedTc
+  :: HsThingRn        -- ^ source do statement
+  -> HsExpr GhcTc           -- ^ expanded typechecked expression
+  -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedTc o e = XExpr (ExpandedThingTc o e)
+
 {- *********************************************************************
 *                                                                      *
             Pretty-printing expressions
