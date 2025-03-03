@@ -147,7 +147,7 @@ alwaysBindTv _tv _ty = BindMe
 alwaysBindFam :: BindFamFun
 alwaysBindFam _tc _args _rhs = BindMe
 
-dontCareBindFam :: HasDebugCallStack => BindFamFun
+dontCareBindFam :: HasCallStack => BindFamFun
 dontCareBindFam tc args rhs
   = pprPanic "dontCareBindFam" $
     vcat [ ppr tc <+> ppr args, text "rhs" <+> ppr rhs ]
@@ -1374,10 +1374,11 @@ unify_ty env ty1 ty2 kco
 unify_ty env (CastTy ty1 co1) ty2 kco
   | mentionsForAllBoundTyVarsL env (tyCoVarsOfCo co1)
   = surelyApart
+    -- xxx todo ... MaybeApart perhaps?   F a b, where b is forall-bound, but a is not
+    --                                  and F Int b = Int
 
   | um_unif env
   = unify_ty env ty1 ty2 (co1 `mkTransCo` kco)
-    -- ToDo: what if co2 mentions forall-bound variables?
 
   | otherwise -- We are matching, not unifying
   = do { subst <- getSubst env
@@ -1596,9 +1597,8 @@ isSatFamApp _ = Nothing
 
 ---------------------------------
 uVarOrFam :: UMEnv -> CanEqLHS -> InType -> OutCoercion -> UM ()
--- Invariants: (a) ty1 is a TyVarTy or a saturated type-family application
---             (b) If ty1 is a ty-fam-app, then ty2 is NOT a TyVarTy
---             (c) both args have had coreView already applied
+-- Invariants: (a) If ty1 is a TyFamLHS, then ty2 is NOT a TyVarTy
+--             (b) both args have had coreView already applied
 -- Why saturated?  See (ATF4) in Note [Apartness and type families]
 uVarOrFam env ty1 ty2 kco
   = do { substs <- getSubstEnvs
@@ -1646,12 +1646,12 @@ uVarOrFam env ty1 ty2 kco
       , let tv2' = umRnOccR env tv2
       , tv1' == tv2'
       = if | um_unif env     -> return ()
-           | tv1_is_bindable -> extendTvEnv tv1 ty2
+           | tv1_is_bindable -> extendTvEnv tv1' ty2
            | otherwise       -> return ()
 
       | tv1_is_bindable
-      , not (mentionsForAllBoundTyVarsR env rhs_fvs)
-            -- kco does not mention forall-bound vars
+      , not (mentionsForAllBoundTyVarsR env ty2_fvs)
+            -- ty2_fvs: kco does not mention forall-bound vars
       , not occurs_check
       = -- No occurs check, nor skolem-escape; just bind the tv
         -- We don't need to rename `rhs` because it mentions no forall-bound vars
@@ -1671,21 +1671,23 @@ uVarOrFam env ty1 ty2 kco
 
       where
         tv1'            = umRnOccL env tv1
-        rhs_fvs         = tyCoVarsOfType ty2
-        all_rhs_fvs     = rhs_fvs `unionVarSet` tyCoVarsOfCo kco
+        ty2_fvs         = tyCoVarsOfType ty2
+        rhs_fvs         = ty2_fvs `unionVarSet` tyCoVarsOfCo kco
         rhs             = ty2 `mkCastTy` mkSymCo kco
         tv1_is_bindable | not (tv1' `elemVarSet` um_foralls env)
-                          -- tv1' is not forall-bound, so tv1==tv1'
-                        , BindMe <- um_bind_tv_fun env tv1 rhs
+                          -- tv1' is not forall-bound, but tv1 can still differ
+                          -- from tv1; see Note [Cloning the template binders]
+                          -- in GHC.Core.Rules.  So give tv1' to um_bind_tv_fun.
+                        , BindMe <- um_bind_tv_fun env tv1' rhs
                         = True
                         | otherwise
                         = False
 
         occurs_check = um_unif env &&
-                       occursCheck (um_tv_env substs) tv1 all_rhs_fvs
+                       occursCheck (um_tv_env substs) tv1 rhs_fvs
           -- Occurs check, only when unifying
           -- see Note [Fine-grained unification]
-          -- Make sure you include `kco` in all_rhs_tvs #14846
+          -- Make sure you include `kco` in rhs_tvs #14846
 
     -----------------------------
     -- go_fam: LHS is a saturated type-family application

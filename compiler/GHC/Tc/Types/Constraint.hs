@@ -46,7 +46,11 @@ module GHC.Tc.Types.Constraint (
         cterHasNoProblem, cterHasProblem, cterHasOnlyProblem, cterHasOnlyProblems,
         cterRemoveProblem, cterHasOccursCheck, cterFromKind,
 
+        -- Equality left-hand sides, re-exported from GHC.Core.Predicate
+        CanEqLHS(..), canEqLHS_maybe, canTyFamEqLHS_maybe,
+        canEqLHSKind, canEqLHSType, eqCanEqLHS,
 
+        -- Holes
         Hole(..), HoleSort(..), isOutOfScopeHole,
         DelayedError(..), NotConcreteError(..),
 
