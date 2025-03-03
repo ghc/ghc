@@ -79,9 +79,9 @@ filled is generated via raiseJSException.
 
 -}
 
-stg_blockPromise :: JSVal -> (JSVal -> StablePtr Any -> IO ()) -> r
-stg_blockPromise p msg_p = unsafeDupablePerformIO $ IO $ \s0 ->
-  case stg_jsffi_check (unsafeCoerce# $ toException WouldBlockException) s0 of
+stg_blockPromise :: String -> JSVal -> (JSVal -> StablePtr Any -> IO ()) -> r
+stg_blockPromise err_msg p msg_p = unsafeDupablePerformIO $ IO $ \s0 ->
+  case stg_jsffi_check (unsafeCoerce# $ toException $ WouldBlockException err_msg) s0 of
     (# s1 #) -> case myThreadId# s1 of
       (# s2, tso #) -> case makeStablePtr# tso s2 of
         (# s3, sp #) ->

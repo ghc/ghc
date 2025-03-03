@@ -139,8 +139,8 @@ foreign import javascript unsafe "`${$1.stack ? $1.stack : $1}`"
 
 instance Exception JSException
 
-data WouldBlockException
-  = WouldBlockException
+newtype WouldBlockException
+  = WouldBlockException String
   deriving (Show)
 
 instance Exception WouldBlockException
