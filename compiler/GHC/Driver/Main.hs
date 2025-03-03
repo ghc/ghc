@@ -142,6 +142,7 @@ import GHC.Runtime.Interpreter
 import GHC.Runtime.Interpreter.JS
 import GHC.Runtime.Loader      ( initializePlugins )
 import GHCi.RemoteTypes
+import GHC.ByteCode.Linker
 import GHC.ByteCode.Types
 
 import GHC.Linker.Loader
@@ -1052,7 +1053,8 @@ loadIfaceByteCode hsc_env iface location type_env =
   where
     compile decls = do
       (bcos, fos) <- compileWholeCoreBindings hsc_env type_env decls
-      linkable $ BCOs bcos :| [DotO fo ForeignObject | fo <- fos]
+      mb <- initModBreaks (hscInterp hsc_env) bcos
+      linkable $ BCOs bcos mb :| [DotO fo ForeignObject | fo <- fos]
 
     linkable parts = do
       if_time <- modificationTimeIfExists (ml_hi_file location)
@@ -1087,9 +1089,11 @@ initWholeCoreBindings hsc_env iface details (Linkable utc_time this_mod uls) = d
     go hsc_env' = \case
       CoreBindings wcb -> do
         add_iface_to_hpt iface details hsc_env
-        ~(bco, fos) <- unsafeInterleaveIO $
-                       compileWholeCoreBindings hsc_env' type_env wcb
-        pure (LazyBCOs bco fos)
+        ~(bco, fos, mb) <- unsafeInterleaveIO $ do
+                        (bco, fos) <- compileWholeCoreBindings hsc_env' type_env wcb
+                        mb <- initModBreaks (hscInterp hsc_env) bco
+                        pure (bco, fos, mb)
+        pure (LazyBCOs bco fos mb)
       l -> pure l
 
     type_env = md_types details
@@ -2201,10 +2205,11 @@ generateFreshByteCode :: HscEnv
 generateFreshByteCode hsc_env mod_name cgguts mod_location = do
   bco_time <- getCurrentTime
   (bcos, fos) <- generateByteCode hsc_env cgguts mod_location
+  mb <- initModBreaks (hscInterp hsc_env) bcos
   return $!
     Linkable bco_time
     (mkHomeModule (hsc_home_unit hsc_env) mod_name)
-    (BCOs bcos :| [DotO fo ForeignObject | fo <- fos])
+    (BCOs bcos mb :| [DotO fo ForeignObject | fo <- fos])
 ------------------------------
 
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)
@@ -2814,7 +2819,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
       {- load it -}
       bco_time <- getCurrentTime
       (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env srcspan $
-        Linkable bco_time this_mod $ NE.singleton $ BCOs bcos
+        Linkable bco_time this_mod $ NE.singleton $ BCOs bcos emptyModBreaks
       {- Get the HValue for the root -}
       return (expectJust $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed)
 

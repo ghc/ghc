@@ -15,6 +15,7 @@ module GHC.ByteCode.Linker
   , lookupStaticPtr
   , lookupIE
   , linkFail
+  , initModBreaks
   )
 where
 
@@ -221,3 +222,8 @@ primopToCLabel primop suffix = concat
     , zString (zEncodeFS (occNameFS (primOpOcc primop)))
     , '_':suffix
     ]
+
+initModBreaks :: Interp -> CompiledByteCode -> IO ModBreaks
+initModBreaks _ CompiledByteCode {..}
+  | Just mb <- bc_breaks = pure mb
+  | otherwise = pure emptyModBreaks

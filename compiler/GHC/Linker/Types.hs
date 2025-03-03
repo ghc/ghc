@@ -50,7 +50,7 @@ where
 
 import GHC.Prelude
 import GHC.Unit                ( UnitId, Module )
-import GHC.ByteCode.Types      ( ItblEnv, AddrEnv, CompiledByteCode )
+import GHC.ByteCode.Types      ( ItblEnv, AddrEnv, CompiledByteCode, ModBreaks )
 import GHCi.RemoteTypes        ( ForeignHValue, RemotePtr )
 import GHCi.Message            ( LoadedDLL )
 
@@ -295,9 +295,11 @@ data LinkablePart
       -- WholeCoreBindings, see Note [Interface Files with Core Definitions]
       [FilePath]
       -- ^ Objects containing foreign stubs and files
+      ModBreaks
 
   | BCOs CompiledByteCode
     -- ^ A byte-code object, lives only in memory.
+      ModBreaks
 
 instance Outputable LinkablePart where
   ppr (DotO path sort)   = text "DotO" <+> text path <+> pprSort sort
@@ -307,7 +309,7 @@ instance Outputable LinkablePart where
         ForeignObject -> brackets (text "foreign")
   ppr (DotA path)       = text "DotA" <+> text path
   ppr (DotDLL path)     = text "DotDLL" <+> text path
-  ppr (BCOs bco)        = text "BCOs" <+> ppr bco
+  ppr (BCOs bco _)      = text "BCOs" <+> ppr bco
   ppr (LazyBCOs{})      = text "LazyBCOs"
   ppr (CoreBindings {}) = text "CoreBindings"
 
@@ -319,7 +321,7 @@ linkableIsNativeCodeOnly l = all isNativeCode (NE.toList (linkableParts l))
 --
 -- This excludes the LazyBCOs and the CoreBindings parts
 linkableBCOs :: Linkable -> [CompiledByteCode]
-linkableBCOs l = [ cbc | BCOs cbc <- NE.toList (linkableParts l) ]
+linkableBCOs l = [ cbc | BCOs cbc _ <- NE.toList (linkableParts l) ]
 
 -- | List the native linkable parts (.o/.so/.dll) of a linkable
 linkableNativeParts :: Linkable -> [LinkablePart]
@@ -381,7 +383,7 @@ linkablePartNativePaths = \case
   DotA fn         -> [fn]
   DotDLL fn       -> [fn]
   CoreBindings {} -> []
-  LazyBCOs _ fos  -> fos
+  LazyBCOs _ fos _ -> fos
   BCOs {}         -> []
 
 -- | Return the paths of all object files (.o) contained in this 'LinkablePart'.
@@ -391,7 +393,7 @@ linkablePartObjectPaths = \case
   DotA _ -> []
   DotDLL _ -> []
   CoreBindings {} -> []
-  LazyBCOs _ fos -> fos
+  LazyBCOs _ fos _ -> fos
   BCOs {} -> []
 
 -- | Retrieve the compiled byte-code from the linkable part.
@@ -399,8 +401,8 @@ linkablePartObjectPaths = \case
 -- Contrary to linkableBCOs, this includes byte-code from LazyBCOs.
 linkablePartAllBCOs :: LinkablePart -> [CompiledByteCode]
 linkablePartAllBCOs = \case
-  BCOs bco    -> [bco]
-  LazyBCOs bcos _ -> [bcos]
+  BCOs bco _  -> [bco]
+  LazyBCOs bcos _ _ -> [bcos]
   _           -> []
 
 linkableFilter :: (LinkablePart -> [LinkablePart]) -> Linkable -> Maybe Linkable
@@ -413,13 +415,13 @@ linkablePartNative = \case
   u@DotO {}  -> [u]
   u@DotA {} -> [u]
   u@DotDLL {} -> [u]
-  LazyBCOs _ os -> [DotO f ForeignObject | f <- os]
+  LazyBCOs _ os _ -> [DotO f ForeignObject | f <- os]
   _ -> []
 
 linkablePartByteCode :: LinkablePart -> [LinkablePart]
 linkablePartByteCode = \case
   u@BCOs {}  -> [u]
-  LazyBCOs bcos _ -> [BCOs bcos]
+  LazyBCOs bcos _ mb -> [BCOs bcos mb]
   _ -> []
 
 -- | Transform the 'LinkablePart' list in this 'Linkable' to contain only

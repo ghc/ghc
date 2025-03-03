@@ -111,6 +111,7 @@ import Data.Binary
 import Data.ByteString (ByteString)
 import Data.Array ((!))
 import Data.IORef
+import qualified Data.List.NonEmpty as NE
 import Foreign hiding (void)
 import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
@@ -747,8 +748,8 @@ getModBreaks :: HomeModInfo -> ModBreaks
 getModBreaks hmi
   | Just linkable <- homeModInfoByteCode hmi,
     -- The linkable may have 'DotO's as well; only consider BCOs. See #20570.
-    [cbc] <- linkableBCOs linkable
-  = fromMaybe emptyModBreaks (bc_breaks cbc)
+    BCOs _ mb <- NE.head $ linkableParts linkable
+  = mb
   | otherwise
   = emptyModBreaks -- probably object code
 
