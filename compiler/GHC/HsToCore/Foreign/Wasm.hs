@@ -318,6 +318,7 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId sync = do
           importCStub Sync cfun_name (map scaledThing arg_tys) res_ty js_src
         )
     Async -> do
+      err_msg <- mkStringExpr $ js_src
       io_tycon <- dsLookupTyCon ioTyConName
       jsval_ty <-
         mkTyConTy
@@ -363,7 +364,7 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId sync = do
                         [ Type res_ty,
                           mkApps
                             (Var blockPromise_id)
-                            [Type res_ty, Var promise_id, Var msgPromise_id]
+                            [Type res_ty, err_msg, Var promise_id, Var msgPromise_id]
                         ]
                   ]
             )
