@@ -37,6 +37,7 @@ import GHC.Stg.Syntax
 import GHCi.BreakArray (BreakArray)
 import Language.Haskell.Syntax.Module.Name (ModuleName)
 import GHC.Types.RepType (PrimRep)
+import GHC.Cmm.Type (Width)
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions
@@ -215,34 +216,34 @@ data BCInstr
 
    | PRIMCALL
 
-   -- Primops
-   | OP_ADD
-   | OP_SUB
-   | OP_AND
-   | OP_XOR
-   | OP_MUL
-   | OP_SHL
-   | OP_ASR
-   | OP_LSR
+   -- Primops - The actual interpreter instructions are flattened into 64/32/16/8 wide
+   -- instructions. But for generating code it's handy to have the width as argument
+   -- to avoid duplication.
+   | OP_ADD !Width
+   | OP_SUB !Width
+   | OP_AND !Width
+   | OP_XOR !Width
+   | OP_MUL !Width
+   | OP_SHL !Width
+   | OP_ASR !Width
+   | OP_LSR !Width
+   | OP_OR  !Width
 
-   | OP_NOT
-   | OP_NEG
+   | OP_NOT !Width
+   | OP_NEG !Width
 
-   | OP_NEQ
-   | OP_EQ
+   | OP_NEQ !Width
+   | OP_EQ !Width
 
-   | OP_U_LT
-   | OP_U_GE
-   | OP_U_GT
-   | OP_U_LE
+   | OP_U_LT !Width
+   | OP_U_GE !Width
+   | OP_U_GT !Width
+   | OP_U_LE !Width
 
-   | OP_S_LT
-   | OP_S_GE
-   | OP_S_GT
-   | OP_S_LE
-
-   | OP_SIZED_SUB PrimRep
-
+   | OP_S_LT !Width
+   | OP_S_GE !Width
+   | OP_S_GT !Width
+   | OP_S_LE !Width
 
    -- For doing magic ByteArray passing to foreign calls
    | SWIZZLE          !WordOff -- to the ptr N words down the stack,
@@ -424,30 +425,28 @@ instance Outputable BCInstr where
                                                       _   -> empty)
    ppr PRIMCALL              = text "PRIMCALL"
 
-   ppr OP_ADD                = text "OP_ADD"
-   ppr OP_SUB                = text "OP_SUB"
-   ppr OP_AND                = text "OP_AND"
-   ppr OP_XOR                = text "OP_XOR"
-   ppr OP_NOT                = text "OP_NOT"
-   ppr OP_NEG                = text "OP_NEG"
-   ppr OP_MUL                = text "OP_MUL"
-   ppr OP_SHL                = text "OP_SHL"
-   ppr OP_ASR                = text "OP_ASR"
-   ppr OP_LSR                = text "OP_LSR"
+   ppr (OP_ADD w)            = text "OP_ADD_" <> ppr w
+   ppr (OP_SUB w)            = text "OP_SUB_" <> ppr w
+   ppr (OP_AND w)            = text "OP_AND_" <> ppr w
+   ppr (OP_XOR w)            = text "OP_XOR_" <> ppr w
+   ppr (OP_OR w)             = text "OP_OR_" <> ppr w
+   ppr (OP_NOT w)            = text "OP_NOT_" <> ppr w
+   ppr (OP_NEG w)            = text "OP_NEG_" <> ppr w
+   ppr (OP_MUL w)            = text "OP_MUL_" <> ppr w
+   ppr (OP_SHL w)            = text "OP_SHL_" <> ppr w
+   ppr (OP_ASR w)            = text "OP_ASR_" <> ppr w
+   ppr (OP_LSR w)            = text "OP_LSR_" <> ppr w
 
-   ppr OP_EQ                = text "OP_EQ"
-   ppr OP_NEQ               = text "OP_NEQ"
-   ppr OP_S_LT                = text "OP_S_LT"
-   ppr OP_S_GE                = text "OP_S_GE"
-   ppr OP_S_GT                = text "OP_S_GT"
-   ppr OP_S_LE                = text "OP_S_LE"
-   ppr OP_U_LT                = text "OP_U_LT"
-   ppr OP_U_GE                = text "OP_U_GE"
-   ppr OP_U_GT                = text "OP_U_GT"
-   ppr OP_U_LE                = text "OP_U_LE"
-
-   ppr (OP_SIZED_SUB rep)   = text "OP_SIZED_SUB" <+> (ppr rep)
-
+   ppr (OP_EQ w)             = text "OP_EQ_" <> ppr w
+   ppr (OP_NEQ w)            = text "OP_NEQ_" <> ppr w
+   ppr (OP_S_LT w)           = text "OP_S_LT_" <> ppr w
+   ppr (OP_S_GE w)           = text "OP_S_GE_" <> ppr w
+   ppr (OP_S_GT w)           = text "OP_S_GT_" <> ppr w
+   ppr (OP_S_LE w)           = text "OP_S_LE_" <> ppr w
+   ppr (OP_U_LT w)           = text "OP_U_LT_" <> ppr w
+   ppr (OP_U_GE w)           = text "OP_U_GE_" <> ppr w
+   ppr (OP_U_GT w)           = text "OP_U_GT_" <> ppr w
+   ppr (OP_U_LE w)           = text "OP_U_LE_" <> ppr w
 
    ppr (SWIZZLE stkoff n)    = text "SWIZZLE " <+> text "stkoff" <+> ppr stkoff
                                                <+> text "by" <+> ppr n
@@ -561,6 +560,7 @@ bciStackUse OP_ADD{}              = 0 -- We overestimate, it's -1 actually ...
 bciStackUse OP_SUB{}              = 0
 bciStackUse OP_AND{}              = 0
 bciStackUse OP_XOR{}              = 0
+bciStackUse OP_OR{}               = 0
 bciStackUse OP_NOT{}              = 0
 bciStackUse OP_NEG{}              = 0
 bciStackUse OP_MUL{}              = 0
@@ -578,8 +578,6 @@ bciStackUse OP_U_LT{}               = 0
 bciStackUse OP_U_GT{}               = 0
 bciStackUse OP_U_LE{}               = 0
 bciStackUse OP_U_GE{}               = 0
-
-bciStackUse OP_SIZED_SUB{}        = 0
 
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0

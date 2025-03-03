@@ -60,6 +60,7 @@ import GHC.Utils.Exception (evaluate)
 import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRepU,
                               addIdReps, addArgReps,
                               assertNonVoidIds, assertNonVoidStgArgs )
+import GHC.CmmToAsm.Config (platformWordWidth)
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
 import GHC.Data.Bitmap
@@ -850,12 +851,12 @@ doPrimOp op init_d s p args =
     Int64SubOp -> primOp OP_SUB
     Word64SubOp -> primOp OP_SUB
 
-    Int8SubOp   -> primOp (OP_SIZED_SUB primArg1Width)
-    Word8SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
-    Int16SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
-    Word16SubOp -> primOp (OP_SIZED_SUB primArg1Width)
-    Int32SubOp  -> primOp (OP_SIZED_SUB primArg1Width)
-    Word32SubOp -> primOp (OP_SIZED_SUB primArg1Width)
+    Int8SubOp   -> primOp OP_SUB
+    Word8SubOp  -> primOp OP_SUB
+    Int16SubOp  -> primOp OP_SUB
+    Word16SubOp -> primOp OP_SUB
+    Int32SubOp  -> primOp OP_SUB
+    Word32SubOp -> primOp OP_SUB
 
     IntAndOp -> primOp OP_AND
     WordAndOp -> primOp OP_AND
@@ -868,6 +869,19 @@ doPrimOp op init_d s p args =
     IntXorOp -> primOp OP_XOR
     WordXorOp -> primOp OP_XOR
     Word64XorOp -> primOp OP_XOR
+
+    IntOrOp -> primOp OP_OR
+    WordOrOp -> primOp OP_OR
+    Word64OrOp -> primOp OP_OR
+
+    WordSllOp   -> primOp OP_SHL
+    Word64SllOp -> primOp OP_SHL
+    IntSllOp    -> primOp OP_SHL
+    Int64SllOp  -> primOp OP_SHL
+    Word64SrlOp -> primOp OP_LSR
+    WordSrlOp   -> primOp OP_LSR
+    IntSrlOp    -> primOp OP_ASR
+    Int64SrlOp  -> primOp OP_ASR
 
     IntNeOp -> primOp OP_NEQ
     WordNeOp -> primOp OP_NEQ
@@ -912,20 +926,47 @@ doPrimOp op init_d s p args =
     OrdOp           -> no_op
 
     _ -> Nothing
-    where
-      primArg1Width = (stgArgRepU $ head args) :: PrimRep
-      -- Push args, execute primop, slide, return_N
-      primOp op_inst = Just $ do
-        platform <- profilePlatform <$> getProfile
-        prim_code <- mkPrimOpCode init_d s p op_inst args
-        let slide = mkSlideW 1 (bytesToWords platform $ init_d - s) `snocOL` RETURN N
-        return $ prim_code `appOL` slide
+  where
+    primArg1Width platform (arg:_)
+      | rep <- (stgArgRepU arg)
+      = case rep of
+        AddrRep -> platformWordWidth platform
+        IntRep -> platformWordWidth platform
+        WordRep -> platformWordWidth platform
 
-      no_op = Just $ do
-        platform <- profilePlatform <$> getProfile
-        prim_code <- terribleNoOp init_d s p undefined args
-        let slide = mkSlideW 1 (bytesToWords platform $ init_d - s) `snocOL` RETURN N
-        return $ prim_code `appOL` slide
+        Int64Rep -> W64
+        Word64Rep -> W64
+
+        Int32Rep -> W32
+        Word32Rep -> W32
+
+        Int16Rep -> W16
+        Word16Rep -> W16
+
+        Int8Rep -> W8
+        Word8Rep -> W8
+
+        FloatRep -> unexpectedRep
+        DoubleRep -> unexpectedRep
+
+        BoxedRep{} -> unexpectedRep
+        VecRep{} -> unexpectedRep
+      where
+        unexpectedRep = panic "doPrimOp: Unexpected argument rep"
+    primArg1Width _ _  = panic "doPrimOp: Unexpected argument count"
+
+    -- Push args, execute primop, slide, return_N
+    primOp op_inst = Just $ do
+      platform <- profilePlatform <$> getProfile
+      prim_code <- mkPrimOpCode init_d s p (op_inst $ primArg1Width platform args) $ args
+      let slide = mkSlideW 1 (bytesToWords platform $ init_d - s) `snocOL` RETURN N
+      return $ prim_code `appOL` slide
+
+    no_op = Just $ do
+      platform <- profilePlatform <$> getProfile
+      prim_code <- terribleNoOp init_d s p undefined args
+      let slide = mkSlideW 1 (bytesToWords platform $ init_d - s) `snocOL` RETURN N
+      return $ prim_code `appOL` slide
 
 -- It's horrible, but still better than calling intToWord ...
 terribleNoOp

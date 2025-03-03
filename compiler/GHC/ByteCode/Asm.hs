@@ -540,30 +540,113 @@ assembleI platform i = case i of
                                  emit bci_CCALL [wOp off, Op np, SmallOp i]
   PRIMCALL                 -> emit bci_PRIMCALL []
 
-  OP_ADD                   -> emit bci_OP_ADD []
-  OP_SUB                   -> emit bci_OP_SUB []
-  OP_AND                   -> emit bci_OP_AND []
-  OP_XOR                   -> emit bci_OP_XOR []
-  OP_NOT                   -> emit bci_OP_NOT []
-  OP_NEG                   -> emit bci_OP_NEG []
-  OP_MUL                   -> emit bci_OP_MUL []
-  OP_SHL                   -> emit bci_OP_SHL []
-  OP_ASR                   -> emit bci_OP_ASR []
-  OP_LSR                   -> emit bci_OP_LSR []
+  OP_ADD w -> case w of
+    W64                   -> emit bci_OP_ADD_64 []
+    W32                   -> emit bci_OP_ADD_32 []
+    W16                   -> emit bci_OP_ADD_16 []
+    W8                   -> emit bci_OP_ADD_08 []
+  OP_SUB w -> case w of
+    W64                   -> emit bci_OP_SUB_64 []
+    W32                   -> emit bci_OP_SUB_32 []
+    W16                   -> emit bci_OP_SUB_16 []
+    W8                   -> emit bci_OP_SUB_08 []
+  OP_AND w -> case w of
+    W64                   -> emit bci_OP_AND_64 []
+    W32                   -> emit bci_OP_AND_32 []
+    W16                   -> emit bci_OP_AND_16 []
+    W8                   -> emit bci_OP_AND_08 []
+  OP_XOR w -> case w of
+    W64                   -> emit bci_OP_XOR_64 []
+    W32                   -> emit bci_OP_XOR_32 []
+    W16                   -> emit bci_OP_XOR_16 []
+    W8                   -> emit bci_OP_XOR_08 []
+  OP_OR w -> case w of
+    W64                    -> emit bci_OP_OR_64 []
+    W32                    -> emit bci_OP_OR_32 []
+    W16                    -> emit bci_OP_OR_16 []
+    W8                    -> emit bci_OP_OR_08 []
+  OP_NOT w -> case w of
+    W64                   -> emit bci_OP_NOT_64 []
+    W32                   -> emit bci_OP_NOT_32 []
+    W16                   -> emit bci_OP_NOT_16 []
+    W8                   -> emit bci_OP_NOT_08 []
+  OP_NEG w -> case w of
+    W64                   -> emit bci_OP_NEG_64 []
+    W32                   -> emit bci_OP_NEG_32 []
+    W16                   -> emit bci_OP_NEG_16 []
+    W8                   -> emit bci_OP_NEG_08 []
+  OP_MUL w -> case w of
+    W64                   -> emit bci_OP_MUL_64 []
+    W32                   -> emit bci_OP_MUL_32 []
+    W16                   -> emit bci_OP_MUL_16 []
+    W8                   -> emit bci_OP_MUL_08 []
+  OP_SHL w -> case w of
+    W64                   -> emit bci_OP_SHL_64 []
+    W32                   -> emit bci_OP_SHL_32 []
+    W16                   -> emit bci_OP_SHL_16 []
+    W8                   -> emit bci_OP_SHL_08 []
+  OP_ASR w -> case w of
+    W64                   -> emit bci_OP_ASR_64 []
+    W32                   -> emit bci_OP_ASR_32 []
+    W16                   -> emit bci_OP_ASR_16 []
+    W8                   -> emit bci_OP_ASR_08 []
+  OP_LSR w -> case w of
+    W64                   -> emit bci_OP_LSR_64 []
+    W32                   -> emit bci_OP_LSR_32 []
+    W16                   -> emit bci_OP_LSR_16 []
+    W8                   -> emit bci_OP_LSR_08 []
 
-  OP_NEQ                   -> emit bci_OP_NEQ []
-  OP_EQ                    -> emit bci_OP_EQ []
+  OP_NEQ w -> case w of
+    W64                   -> emit bci_OP_NEQ_64 []
+    W32                   -> emit bci_OP_NEQ_32 []
+    W16                   -> emit bci_OP_NEQ_16 []
+    W8                   -> emit bci_OP_NEQ_08 []
+  OP_EQ w -> case w of
+    W64                    -> emit bci_OP_EQ_64 []
+    W32                    -> emit bci_OP_EQ_32 []
+    W16                    -> emit bci_OP_EQ_16 []
+    W8                    -> emit bci_OP_EQ_08 []
 
-  OP_U_LT                  -> emit bci_OP_U_LT []
-  OP_S_LT                  -> emit bci_OP_S_LT []
-  OP_U_GE                  -> emit bci_OP_U_GE []
-  OP_S_GE                  -> emit bci_OP_S_GE []
-  OP_U_GT                  -> emit bci_OP_U_GT []
-  OP_S_GT                  -> emit bci_OP_S_GT []
-  OP_U_LE                  -> emit bci_OP_U_LE []
-  OP_S_LE                  -> emit bci_OP_S_LE []
-
-  OP_SIZED_SUB rep         -> emit (sizedInstr platform bci_OP_SIZED_SUB rep) []
+  OP_U_LT w -> case w of
+    W64                  -> emit bci_OP_U_LT_64 []
+    W32                  -> emit bci_OP_U_LT_32 []
+    W16                  -> emit bci_OP_U_LT_16 []
+    W8                  -> emit bci_OP_U_LT_08 []
+  OP_S_LT w -> case w of
+    W64                  -> emit bci_OP_S_LT_64 []
+    W32                  -> emit bci_OP_S_LT_32 []
+    W16                  -> emit bci_OP_S_LT_16 []
+    W8                  -> emit bci_OP_S_LT_08 []
+  OP_U_GE w -> case w of
+    W64                  -> emit bci_OP_U_GE_64 []
+    W32                  -> emit bci_OP_U_GE_32 []
+    W16                  -> emit bci_OP_U_GE_16 []
+    W8                  -> emit bci_OP_U_GE_08 []
+  OP_S_GE w -> case w of
+    W64                  -> emit bci_OP_S_GE_64 []
+    W32                  -> emit bci_OP_S_GE_32 []
+    W16                  -> emit bci_OP_S_GE_16 []
+    W8                  -> emit bci_OP_S_GE_08 []
+  OP_U_GT w -> case w of
+    W64                  -> emit bci_OP_U_GT_64 []
+    W32                  -> emit bci_OP_U_GT_32 []
+    W16                  -> emit bci_OP_U_GT_16 []
+    W8                  -> emit bci_OP_U_GT_08 []
+  OP_S_GT w -> case w of
+    W64                  -> emit bci_OP_S_GT_64 []
+    W32                  -> emit bci_OP_S_GT_32 []
+    W16                  -> emit bci_OP_S_GT_16 []
+    W8                  -> emit bci_OP_S_GT_08 []
+  OP_U_LE w -> case w of
+    W64                  -> emit bci_OP_U_LE_64 []
+    W32                  -> emit bci_OP_U_LE_32 []
+    W16                  -> emit bci_OP_U_LE_16 []
+    W8                  -> emit bci_OP_U_LE_08 []
+  OP_S_LE w -> case w of
+    W64                  -> emit bci_OP_S_LE_64 []
+    W32                  -> emit bci_OP_S_LE_32 []
+    W16                  -> emit bci_OP_S_LE_16 []
+    W8                  -> emit bci_OP_S_LE_08 []
 
   BRK_FUN arr tick_mod tickx info_mod infox cc ->
                               do p1 <- ptr (BCOPtrBreakArray arr)

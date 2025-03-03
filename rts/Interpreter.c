@@ -1144,9 +1144,9 @@ run_BCO:
 #endif
 
         bci = BCO_NEXT;
-    /* We use the high 8 bits for flags. The highest three of which are
-     * currently allocated to LARGE_ARGS and WIDTH */
-    ASSERT((bci & 0xFF00) == (bci & ( bci_FLAG_LARGE_ARGS | bci_FLAG_WIDTH )));
+    /* We use the high 8 bits for flags. The highest of which is
+     * currently allocated to LARGE_ARGS */
+    ASSERT((bci & 0xFF00) == (bci & ( bci_FLAG_LARGE_ARGS )));
 
     switch (bci & 0xFF) {
 
@@ -2171,45 +2171,108 @@ run_BCO:
             goto nextInsn;                                                      \
         }
 
-#define UN_INT64_OP(op) UN_SIZED_OP(op,StgInt64)
-#define BIN_INT64_OP(op) SIZED_BIN_OP(op,StgInt64)
-#define BIN_WORD64_OP(op) SIZED_BIN_OP(op,StgWord64)
+        case bci_OP_ADD_64: SIZED_BIN_OP(+, StgInt64)
+        case bci_OP_SUB_64: SIZED_BIN_OP(-, StgInt64)
+        case bci_OP_AND_64: SIZED_BIN_OP(&, StgInt64)
+        case bci_OP_XOR_64: SIZED_BIN_OP(^, StgInt64)
+        case bci_OP_OR_64:  SIZED_BIN_OP(|, StgInt64)
+        case bci_OP_MUL_64: SIZED_BIN_OP(*, StgInt64)
+        case bci_OP_SHL_64: SIZED_BIN_OP(<<, StgWord64)
+        case bci_OP_LSR_64: SIZED_BIN_OP(>>, StgWord64)
+        case bci_OP_ASR_64: SIZED_BIN_OP(>>, StgInt64)
 
-        case bci_OP_ADD: BIN_INT64_OP(+)
-        case bci_OP_SUB: BIN_INT64_OP(-)
-        case bci_OP_AND: BIN_INT64_OP(&)
-        case bci_OP_XOR: BIN_INT64_OP(^)
-        case bci_OP_MUL: BIN_INT64_OP(*)
-        case bci_OP_SHL: BIN_WORD64_OP(<<)
-        case bci_OP_LSR: BIN_WORD64_OP(>>)
-        case bci_OP_ASR: BIN_INT64_OP(>>)
+        case bci_OP_NEQ_64:  SIZED_BIN_OP(!=, StgWord64)
+        case bci_OP_EQ_64:   SIZED_BIN_OP(==, StgWord64)
+        case bci_OP_U_GT_64: SIZED_BIN_OP(>, StgWord64)
+        case bci_OP_U_GE_64: SIZED_BIN_OP(>=, StgWord64)
+        case bci_OP_U_LT_64: SIZED_BIN_OP(<, StgWord64)
+        case bci_OP_U_LE_64: SIZED_BIN_OP(<=, StgWord64)
 
-        case bci_OP_NEQ:  BIN_INT64_OP(!=)
-        case bci_OP_EQ:   BIN_INT64_OP(==)
-        case bci_OP_U_GT: BIN_WORD64_OP(>)
-        case bci_OP_U_GE: BIN_WORD64_OP(>=)
-        case bci_OP_U_LT: BIN_WORD64_OP(<)
-        case bci_OP_U_LE: BIN_WORD64_OP(<=)
+        case bci_OP_S_GT_64: SIZED_BIN_OP(>, StgInt64)
+        case bci_OP_S_GE_64: SIZED_BIN_OP(>=, StgInt64)
+        case bci_OP_S_LT_64: SIZED_BIN_OP(<, StgInt64)
+        case bci_OP_S_LE_64: SIZED_BIN_OP(<=, StgInt64)
 
-        case bci_OP_S_GT: BIN_INT64_OP(>)
-        case bci_OP_S_GE: BIN_INT64_OP(>=)
-        case bci_OP_S_LT: BIN_INT64_OP(<)
-        case bci_OP_S_LE: BIN_INT64_OP(<=)
+        case bci_OP_NOT_64: UN_SIZED_OP(~, StgWord64)
+        case bci_OP_NEG_64: UN_SIZED_OP(-, StgInt64)
 
 
-        case bci_OP_NOT: UN_INT64_OP(~)
-        case bci_OP_NEG: UN_INT64_OP(-)
+        case bci_OP_ADD_32: SIZED_BIN_OP(+, StgInt32)
+        case bci_OP_SUB_32: SIZED_BIN_OP(-, StgInt32)
+        case bci_OP_AND_32: SIZED_BIN_OP(&, StgInt32)
+        case bci_OP_XOR_32: SIZED_BIN_OP(^, StgInt32)
+        case bci_OP_OR_32:  SIZED_BIN_OP(|, StgInt32)
+        case bci_OP_MUL_32: SIZED_BIN_OP(*, StgInt32)
+        case bci_OP_SHL_32: SIZED_BIN_OP(<<, StgWord32)
+        case bci_OP_LSR_32: SIZED_BIN_OP(>>, StgWord32)
+        case bci_OP_ASR_32: SIZED_BIN_OP(>>, StgInt32)
 
-        case bci_OP_SIZED_SUB:
-        {
-            StgWord width = BCO_GET_BCI_WIDTH(bci);
-            switch (width) {
-                case 0: SIZED_BIN_OP(-,StgInt8 )
-                case 1: SIZED_BIN_OP(-,StgInt16)
-                case 2: SIZED_BIN_OP(-,StgInt32)
-                default: barf("Unexpected bci width.");
-            };
-        }
+        case bci_OP_NEQ_32:  SIZED_BIN_OP(!=, StgWord32)
+        case bci_OP_EQ_32:   SIZED_BIN_OP(==, StgWord32)
+        case bci_OP_U_GT_32: SIZED_BIN_OP(>, StgWord32)
+        case bci_OP_U_GE_32: SIZED_BIN_OP(>=, StgWord32)
+        case bci_OP_U_LT_32: SIZED_BIN_OP(<, StgWord32)
+        case bci_OP_U_LE_32: SIZED_BIN_OP(<=, StgWord32)
+
+        case bci_OP_S_GT_32: SIZED_BIN_OP(>, StgInt32)
+        case bci_OP_S_GE_32: SIZED_BIN_OP(>=, StgInt32)
+        case bci_OP_S_LT_32: SIZED_BIN_OP(<, StgInt32)
+        case bci_OP_S_LE_32: SIZED_BIN_OP(<=, StgInt32)
+
+        case bci_OP_NOT_32: UN_SIZED_OP(~, StgWord32)
+        case bci_OP_NEG_32: UN_SIZED_OP(-, StgInt32)
+
+
+        case bci_OP_ADD_16: SIZED_BIN_OP(+, StgInt16)
+        case bci_OP_SUB_16: SIZED_BIN_OP(-, StgInt16)
+        case bci_OP_AND_16: SIZED_BIN_OP(&, StgInt16)
+        case bci_OP_XOR_16: SIZED_BIN_OP(^, StgInt16)
+        case bci_OP_OR_16:  SIZED_BIN_OP(|, StgInt16)
+        case bci_OP_MUL_16: SIZED_BIN_OP(*, StgInt16)
+        case bci_OP_SHL_16: SIZED_BIN_OP(<<, StgWord16)
+        case bci_OP_LSR_16: SIZED_BIN_OP(>>, StgWord16)
+        case bci_OP_ASR_16: SIZED_BIN_OP(>>, StgInt16)
+
+        case bci_OP_NEQ_16:  SIZED_BIN_OP(!=, StgWord16)
+        case bci_OP_EQ_16:   SIZED_BIN_OP(==, StgWord16)
+        case bci_OP_U_GT_16: SIZED_BIN_OP(>, StgWord16)
+        case bci_OP_U_GE_16: SIZED_BIN_OP(>=, StgWord16)
+        case bci_OP_U_LT_16: SIZED_BIN_OP(<, StgWord16)
+        case bci_OP_U_LE_16: SIZED_BIN_OP(<=, StgWord16)
+
+        case bci_OP_S_GT_16: SIZED_BIN_OP(>, StgInt16)
+        case bci_OP_S_GE_16: SIZED_BIN_OP(>=, StgInt16)
+        case bci_OP_S_LT_16: SIZED_BIN_OP(<, StgInt16)
+        case bci_OP_S_LE_16: SIZED_BIN_OP(<=, StgInt16)
+
+        case bci_OP_NOT_16: UN_SIZED_OP(~, StgWord16)
+        case bci_OP_NEG_16: UN_SIZED_OP(-, StgInt16)
+
+
+        case bci_OP_ADD_08: SIZED_BIN_OP(+, StgInt8)
+        case bci_OP_SUB_08: SIZED_BIN_OP(-, StgInt8)
+        case bci_OP_AND_08: SIZED_BIN_OP(&, StgInt8)
+        case bci_OP_XOR_08: SIZED_BIN_OP(^, StgInt8)
+        case bci_OP_OR_08:  SIZED_BIN_OP(|, StgInt8)
+        case bci_OP_MUL_08: SIZED_BIN_OP(*, StgInt8)
+        case bci_OP_SHL_08: SIZED_BIN_OP(<<, StgWord8)
+        case bci_OP_LSR_08: SIZED_BIN_OP(>>, StgWord8)
+        case bci_OP_ASR_08: SIZED_BIN_OP(>>, StgInt8)
+
+        case bci_OP_NEQ_08:  SIZED_BIN_OP(!=, StgWord8)
+        case bci_OP_EQ_08:   SIZED_BIN_OP(==, StgWord8)
+        case bci_OP_U_GT_08: SIZED_BIN_OP(>, StgWord8)
+        case bci_OP_U_GE_08: SIZED_BIN_OP(>=, StgWord8)
+        case bci_OP_U_LT_08: SIZED_BIN_OP(<, StgWord8)
+        case bci_OP_U_LE_08: SIZED_BIN_OP(<=, StgWord8)
+
+        case bci_OP_S_GT_08: SIZED_BIN_OP(>, StgInt8)
+        case bci_OP_S_GE_08: SIZED_BIN_OP(>=, StgInt8)
+        case bci_OP_S_LT_08: SIZED_BIN_OP(<, StgInt8)
+        case bci_OP_S_LE_08: SIZED_BIN_OP(<=, StgInt8)
+
+        case bci_OP_NOT_08: UN_SIZED_OP(~, StgWord8)
+        case bci_OP_NEG_08: UN_SIZED_OP(-, StgInt8)
 
         case bci_CCALL: {
             void *tok;

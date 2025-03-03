@@ -63,6 +63,26 @@ disInstr ( StgBCO *bco, int pc )
 #endif
 #define BCO_GET_LARGE_ARG ((instr & bci_FLAG_LARGE_ARGS) ? BCO_READ_NEXT_WORD : BCO_NEXT)
 #define BCO_GET_BCI_WIDTH(bci) ((bci & bci_FLAG_WIDTH) >> 13)
+// For brevity
+#define BELCH_INSTR_NAME(OP_NAME) \
+   case bci_ ## OP_NAME: \
+      debugBelch("OP_NAME\n"); \
+      break
+
+#define BELCH_INSTR_NAME_ALL_SIZES(OP_NAME) \
+   case bci_ ## OP_NAME ## _64: \
+      debugBelch("#OP_NAME" "_64\n"); \
+      break; \
+   case bci_ ## OP_NAME ## _32: \
+      debugBelch("#OP_NAME" "_32\n"); \
+      break; \
+   case bci_ ## OP_NAME ## _16: \
+      debugBelch("#OP_NAME" "_16\n"); \
+      break; \
+   case bci_ ## OP_NAME ## _08: \
+      debugBelch("#OP_NAME" "_08\n"); \
+      break;
+
 
    switch (instr & 0xff) {
       case bci_BRK_FUN:
@@ -420,38 +440,20 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("TESTEQ_P  %d, fail to %d\n", instrs[pc],
                                                       instrs[pc+1]);
          pc += 2; break;
-      case bci_CASEFAIL:
-         debugBelch("CASEFAIL\n" );
-         break;
+      BELCH_INSTR_NAME(CASEFAIL);
       case bci_JMP:
          debugBelch("JMP to    %d\n", instrs[pc]);
          pc += 1; break;
 
-      case bci_ENTER:
-         debugBelch("ENTER\n");
-         break;
+      BELCH_INSTR_NAME(ENTER);
+      BELCH_INSTR_NAME(RETURN_P);
+      BELCH_INSTR_NAME(RETURN_N);
+      BELCH_INSTR_NAME(RETURN_F);
+      BELCH_INSTR_NAME(RETURN_D);
+      BELCH_INSTR_NAME(RETURN_L);
+      BELCH_INSTR_NAME(RETURN_V);
+      BELCH_INSTR_NAME(RETURN_T);
 
-      case bci_RETURN_P:
-         debugBelch("RETURN_P\n" );
-         break;
-      case bci_RETURN_N:
-         debugBelch("RETURN_N\n" );
-         break;
-      case bci_RETURN_F:
-         debugBelch("RETURN_F\n" );
-         break;
-      case bci_RETURN_D:
-         debugBelch("RETURN_D\n" );
-         break;
-      case bci_RETURN_L:
-         debugBelch("RETURN_L\n" );
-         break;
-      case bci_RETURN_V:
-         debugBelch("RETURN_V\n" );
-         break;
-      case bci_RETURN_T:
-         debugBelch("RETURN_T\n ");
-         break;
 
       case bci_BCO_NAME: {
          const char *name = (const char*) literals[instrs[pc]];
@@ -460,74 +462,30 @@ disInstr ( StgBCO *bco, int pc )
          break;
       }
 
-      case bci_OP_ADD:
-         debugBelch("OP_ADD\n");
-         break;
-      case bci_OP_SUB:
-         debugBelch("OP_SUB\n");
-         break;
-      case bci_OP_AND:
-         debugBelch("OP_AND\n");
-         break;
-      case bci_OP_XOR:
-         debugBelch("OP_XOR\n");
-         break;
-      case bci_OP_NOT:
-         debugBelch("OP_NOT\n");
-         break;
-      case bci_OP_NEG:
-         debugBelch("OP_NEG\n");
-         break;
-      case bci_OP_MUL:
-         debugBelch("OP_MUL\n");
-         break;
-      case bci_OP_SHL:
-         debugBelch("OP_SHL\n");
-         break;
-      case bci_OP_ASR:
-         debugBelch("OP_ASR\n");
-         break;
-      case bci_OP_LSR:
-         debugBelch("OP_LSR\n");
-         break;
+      BELCH_INSTR_NAME_ALL_SIZES(OP_ADD);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_SUB);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_AND);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_XOR);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_OR);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_NOT);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_NEG);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_MUL);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_SHL);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_ASR);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_LSR);
 
-      case bci_OP_NEQ:
-         debugBelch("OP_NEQ\n");
-         break;
-      case bci_OP_EQ:
-         debugBelch("OP_EQ\n");
-         break;
+      BELCH_INSTR_NAME_ALL_SIZES(OP_NEQ);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_EQ);
 
-      case bci_OP_U_GT:
-         debugBelch("OP_U_GT\n");
-         break;
-      case bci_OP_U_LE:
-         debugBelch("OP_U_LE\n");
-         break;
-      case bci_OP_U_GE:
-         debugBelch("OP_U_GE\n");
-         break;
-      case bci_OP_U_LT:
-         debugBelch("OP_U_LT\n");
-         break;
+      BELCH_INSTR_NAME_ALL_SIZES(OP_U_GT);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_U_LE);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_U_GE);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_U_LT);
 
-      case bci_OP_S_GT:
-         debugBelch("OP_S_GT\n");
-         break;
-      case bci_OP_S_LE:
-         debugBelch("OP_S_LE\n");
-         break;
-      case bci_OP_S_GE:
-         debugBelch("OP_S_GE\n");
-         break;
-      case bci_OP_S_LT:
-         debugBelch("OP_S_LT\n");
-         break;
-
-      case bci_OP_SIZED_SUB:
-         debugBelch("OP_SIZED_SUB_%d\n",BCO_GET_BCI_WIDTH(instr));
-         break;
-
+      BELCH_INSTR_NAME_ALL_SIZES(OP_S_GT);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_S_LE);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_S_GE);
+      BELCH_INSTR_NAME_ALL_SIZES(OP_S_LT);
 
       default:
          barf("disInstr: unknown opcode %u", (unsigned int) instr);
