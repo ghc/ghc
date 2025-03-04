@@ -155,6 +155,7 @@ import GHC.Real                 ( Ratio(..) )
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
+import GHC.Utils.Compress
 
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -505,7 +506,9 @@ writeBinMem (WriteBinMem _ ix_r _ arr_r) fn = do
   h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
-  unsafeWithForeignPtr arr $ \p -> hPutBuf h p ix
+  unsafeWithForeignPtr arr $ \p ->
+    compressPtr 3 p ix $ \compressedSize dstPtr ->
+      hPutBuf h dstPtr compressedSize
   hClose h
 
 readBinMem :: FilePath -> IO ReadBinHandle
@@ -526,15 +529,18 @@ readBinMemN size filename = do
 
 readBinMem_ :: Int -> Handle -> IO ReadBinHandle
 readBinMem_ filesize h = do
-  arr <- mallocForeignPtrBytes filesize
-  count <- unsafeWithForeignPtr arr $ \p -> hGetBuf h p filesize
-  when (count /= filesize) $
-       error ("Binary.readBinMem: only read " ++ show count ++ " bytes")
+  arr1 <- mallocForeignPtrBytes filesize
+  (arr, c2) <- unsafeWithForeignPtr arr1 $ \p -> do
+    c1 <- hGetBuf h p filesize
+    (fp, c2) <- decompressPtr p filesize
+    when (c1 /= filesize) $
+         error ("Binary.readBinMem: only read " ++ show c1 ++ " bytes")
+    return (fp, c2)
   ix_r <- newFastMutInt 0
   return ReadBinMem
     { rbm_userData = noReaderUserData
     , rbm_off_r = ix_r
-    , rbm_sz_r = filesize
+    , rbm_sz_r = c2
     , rbm_arr_r = arr
     }
 
