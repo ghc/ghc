@@ -38,6 +38,9 @@ Target
 , tgtRanlib = Nothing
 , tgtNm = Nm {nmProgram = Program {prgPath = "", prgFlags = []}}
 , tgtMergeObjs = Just (MergeObjs {mergeObjsProgram = Program {prgPath = "@LD_STAGE0@", prgFlags = ["-r"]}, mergeObjsSupportsResponseFiles = False})
+, tgtLlc = Nothing
+, tgtOpt = Nothing
+, tgtLlvmAs = Nothing
 , tgtWindres = Nothing
 , tgtOtool = Nothing
 , tgtInstallNameTool = Nothing
