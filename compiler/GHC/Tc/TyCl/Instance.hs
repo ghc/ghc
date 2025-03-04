@@ -43,7 +43,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Instance.Class( AssocInstInfo(..), isNotAssociated, PartialAssocInstInfo, buildAssocInstInfo, assocInstInfoPartialAssocInstInfo )
+import GHC.Tc.Instance.Class( AssocInstInfo(..), isNotAssociated )
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Tc.Instance.Family
@@ -472,11 +472,11 @@ tcLocalInstDecl :: LInstDecl GhcRn
         --
         -- We check for respectable instance type, and context
 tcLocalInstDecl (L loc (TyFamInstD { tfid_inst = decl }))
-  = do { fam_inst <- tcTyFamInstDecl Nothing (L loc decl)
+  = do { fam_inst <- tcTyFamInstDecl NotAssociated (L loc decl)
        ; return ([], [fam_inst], []) }
 
 tcLocalInstDecl (L loc (DataFamInstD { dfid_inst = decl }))
-  = do { (fam_inst, m_deriv_info) <- tcDataFamInstDecl Nothing emptyVarEnv (L loc decl)
+  = do { (fam_inst, m_deriv_info) <- tcDataFamInstDecl NotAssociated emptyVarEnv (L loc decl)
        ; return ([], [fam_inst], maybeToList m_deriv_info) }
 
 tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
@@ -515,7 +515,9 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
              <- tcExtendNameTyVarEnv tv_skol_prs $
                 do  { let mini_env   = mkVarEnv (classTyVars clas `zip` substTys subst inst_tys)
                           mini_subst = mkTvSubst (mkInScopeSet (mkVarSet skol_tvs)) mini_env
-                          mb_info    = Just (clas, visible_skol_tvs, mini_env)
+                          mb_info    = InClsInst { ai_class = clas
+                                                 , ai_tyvars = visible_skol_tvs
+                                                 , ai_inst_env = mini_env }
                     ; df_stuff  <- mapAndRecoverM (tcDataFamInstDecl mb_info tv_skol_env) adts
                     ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info) ats
 
@@ -585,16 +587,15 @@ lot of kinding and type checking code with ordinary algebraic data types (and
 GADTs).
 -}
 
-tcTyFamInstDecl ::  PartialAssocInstInfo
+tcTyFamInstDecl :: AssocInstInfo
                 -> LTyFamInstDecl GhcRn -> TcM FamInst
   -- "type instance"; open type families only
   -- See Note [Associated type instances]
-tcTyFamInstDecl partial_mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
+tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
   = setSrcSpanA loc                        $
-    tcAddOpenTyFamInstCtxt partial_mb_clsinfo decl $
+    tcAddOpenTyFamInstCtxt mb_clsinfo decl $
     do { let fam_lname = feqn_tycon eqn
        ; fam_tc <- tcLookupLocatedTyCon fam_lname
-       ; let mb_clsinfo = buildAssocInstInfo fam_tc partial_mb_clsinfo
        ; tcFamInstDeclChecks mb_clsinfo IAmType fam_tc
 
          -- (0) Check it's an open type family
@@ -681,7 +682,7 @@ than type family instances
 -}
 
 tcDataFamInstDecl ::
-     PartialAssocInstInfo
+     AssocInstInfo
   -> TyVarEnv Name -- If this is an associated data family instance, maps the
                    -- parent class's skolemized type variables to their
                    -- original Names. If this is a non-associated instance,
@@ -689,7 +690,7 @@ tcDataFamInstDecl ::
                    -- See Note [Associated data family instances and di_scoped_tvs].
   -> LDataFamInstDecl GhcRn -> TcM (FamInst, Maybe DerivInfo)
   -- "newtype instance" and "data instance"
-tcDataFamInstDecl partial_mb_clsinfo tv_skol_env
+tcDataFamInstDecl mb_clsinfo tv_skol_env
     (L loc decl@(DataFamInstDecl { dfid_eqn =
       FamEqn { feqn_bndrs  = outer_bndrs
              , feqn_pats   = hs_pats
@@ -701,9 +702,9 @@ tcDataFamInstDecl partial_mb_clsinfo tv_skol_env
                                         , dd_kindSig = m_ksig
                                         , dd_derivs  = derivs } }}))
   = setSrcSpanA loc                      $
-    tcAddDataFamInstCtxt partial_mb_clsinfo new_or_data decl $
+    tcAddDataFamInstCtxt mb_clsinfo new_or_data decl $
     do { fam_tc <- tcLookupLocatedTyCon lfam_name
-       ; let mb_clsinfo = buildAssocInstInfo fam_tc partial_mb_clsinfo
+
        ; tcFamInstDeclChecks mb_clsinfo (IAmData new_or_data) fam_tc
 
        -- Check that the family declaration is for the right kind
@@ -843,7 +844,7 @@ tcDataFamInstDecl partial_mb_clsinfo tv_skol_env
                  Just $ DerivInfo { di_rep_tc     = rep_tc
                                   , di_scoped_tvs = scoped_tvs
                                   , di_clauses    = preds
-                                  , di_ctxt       = tcMkDataFamInstCtxt (assocInstInfoPartialAssocInstInfo mb_clsinfo) new_or_data decl
+                                  , di_ctxt       = tcMkDataFamInstCtxt mb_clsinfo new_or_data decl
                                   }
 
        ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
@@ -933,7 +934,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
                bindOuterFamEqnTKBndrs skol_info hs_outer_bndrs    $  -- Binds skolem TcTyVars
                do { stupid_theta <- tcHsContext hs_ctxt
-                  ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats mb_clsinfo
+                  ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
                   ; (lhs_applied_ty, lhs_applied_kind)
                       <- tcInstInvisibleTyBinders lhs_ty lhs_kind
                       -- See Note [Data family/instance return kinds]

@@ -17,6 +17,7 @@ module GHC.Core.TyCon(
         AlgTyConFlav(..), isNoParent,
         FamTyConFlav(..), Role(..), Injectivity(..),
         PromDataConInfo(..), TyConFlavour(..),
+        FamArgFlavour(..),
 
         -- * TyConBinder
         TyConBinder, TyConBndrVis(..),
@@ -109,6 +110,7 @@ module GHC.Core.TyCon(
         tcTyConScopedTyVars, isMonoTcTyCon,
         tyConHasClosedResKind,
         mkTyConTagMap,
+        tyConFamArgFlavours,
 
         -- ** Manipulating TyCons
         ExpandSynResult(..),
@@ -740,6 +742,7 @@ instance Binary TyConBndrVis where
 -}
 
 
+
 -- | TyCons represent type constructors. Type constructors are introduced by
 -- things such as:
 --
@@ -881,7 +884,7 @@ data TyConDetails =
                                       -- abstract, built-in. See comments for
                                       -- FamTyConFlav
 
-        famTcParent  :: Maybe TyCon,  -- ^ For *associated* type/data families
+        famTcParent  :: Maybe (TyCon, [FamArgFlavour]),  -- ^ For *associated* type/data families
                                       -- The class tycon in which the family is declared
                                       -- See Note [Associated families and their parent class]
 
@@ -1948,8 +1951,17 @@ mkFamilyTyCon name binders res_kind resVar flav parent inj
   = mkTyCon name binders res_kind (constRoles binders Nominal) $
     FamilyTyCon { famTcResVar  = resVar
                 , famTcFlav    = flav
-                , famTcParent  = classTyCon <$> parent
+                , famTcParent  = genfamTcParent <$> parent
                 , famTcInj     = inj }
+    where
+      genfamTcParent cls = (classTyCon cls, argFlavours)
+        where clsArgs = classTyVars cls
+              argFlavours = [if b `elem` clsArgs then ClassArg else FreeArg | b <- binderVars binders]
+
+tyConFamArgFlavours :: TyCon -> [FamArgFlavour]
+tyConFamArgFlavours (TyCon { tyConDetails = details })
+  | FamilyTyCon { famTcParent = Just (_, argFlavours) } <- details = argFlavours
+  | otherwise = []
 
 -- | Create a promoted data constructor 'TyCon'
 -- Somewhat dodgily, we give it the same Name
@@ -2846,8 +2858,8 @@ tyConFlavour (TyCon { tyConDetails = details })
 
   | FamilyTyCon { famTcFlav = flav, famTcParent = parent } <- details
   = case flav of
-      DataFamilyTyCon{}            -> OpenFamilyFlavour (IAmData DataType) parent
-      OpenSynFamilyTyCon           -> OpenFamilyFlavour IAmType parent
+      DataFamilyTyCon{}            -> OpenFamilyFlavour (IAmData DataType) (fst <$> parent)
+      OpenSynFamilyTyCon           -> OpenFamilyFlavour IAmType (fst <$> parent)
       ClosedSynFamilyTyCon{}       -> ClosedTypeFamilyFlavour
       AbstractClosedSynFamilyTyCon -> ClosedTypeFamilyFlavour
       BuiltInSynFamTyCon{}         -> ClosedTypeFamilyFlavour
@@ -2965,3 +2977,45 @@ tyConSkolem = isHoleName . tyConName
 --
 -- This is why the test is on the original name of the TyCon,
 -- not whether it is abstract or not.
+
+
+
+{- Note [FamArgFlavour and type checking]
+~~~~~~~~~~~~~~~~~~~~~~~
+The FamArgFlavour is used to distinguish the different kinds of arguments that may
+appear in an associated type family declaration. In an associated type family,
+some arguments come directly from the parent class (the “class arguments”) while
+others are provided freely by the user (the “free arguments”). For example, consider:
+
+    class C a b c where
+      type F x y a   -- Here, 'x' and 'y' are free arguments, while 'a' comes from the class.
+      type G p c b   -- Here, 'p' is free and both 'c' and 'b' are class arguments.
+
+The idea is to conceptually attach a bit–vector to the type family – one bit per argument –
+marking each as a ClassArg or FreeArg (with a possible extra SigArg to flag signature-derived
+arguments). With such a scheme, when type-checking an instance we can treat wildcards differently
+based on their position:
+
+  - In free arguments, a wildcard is interpreted as a skolem type variable.
+  - In class arguments, a wildcard is treated as a tau–variable.
+  - In signature arguments, a wildcard is treated as a tau–variable.
+
+For instance, for an instance declaration like
+
+    instance C Int [x] Bool where
+       type F _ _ (_ :: _) = Int
+
+the first two underscores (free arguments) would yield SkolemTv’s while the last tow underscores (a class
+argument and a signature argument) would produce a TauTv. This approach avoids introducing a new category
+of meta–type variable and lets the same infrastructure be used by simply flipping the interpretation based
+on the bit-vector. For non-associated type families (when there is no parent class) all arguments default
+to free.
+-}
+
+-- see Note [FamArgFlavour]
+data FamArgFlavour = ClassArg | FreeArg | SigArg deriving (Eq, Show)
+
+instance Outputable FamArgFlavour where
+  ppr ClassArg = text "ClassArg"
+  ppr FreeArg = text "FreeArg"
+  ppr SigArg = text "SigArg"

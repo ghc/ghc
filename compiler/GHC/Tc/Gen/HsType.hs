@@ -142,8 +142,6 @@ import Data.List ( mapAccumL )
 import Control.Monad
 import Data.Tuple( swap )
 import GHC.Types.SourceText
-import GHC.Tc.Instance.Class (AssocInstInfo (..), FamArgType (..),
-  buildPatsArgTypes, buildPatsModeTypes)
 
 {-
         ----------------------------
@@ -781,20 +779,23 @@ There is also the possibility of mentioning a wildcard
 
 tcFamTyPats :: TyCon
             -> HsFamEqnPats GhcRn                -- Patterns
-            -> AssocInstInfo                    -- Associated instance info
             -> TcM (TcType, TcKind)          -- (lhs_type, lhs_kind)
 -- Check the LHS of a type/data family instance
 -- e.g.   type instance F ty1 .. tyn = ...
 -- Used for both type and data families
-tcFamTyPats fam_tc hs_pats mb_clsinfo
+tcFamTyPats fam_tc hs_pats
   = do { traceTc "tcFamTyPats {" $
-         vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity, text "pats:" <+> ppr hs_pats ]
+         vcat [ ppr fam_tc,
+                text "arity:" <+> ppr fam_arity,
+                text "pats:" <+> ppr hs_pats,
+                text "famArgs:" <+> ppr patsArgFlavours
+                ]
 
        ; mode <- mkHoleMode TypeLevel (HM_FamPat FreeArg)
                  -- HM_FamPat: See Note [Wildcards in family instances] in
                  -- GHC.Rename.Module
        ; let fun_ty = mkTyConApp fam_tc []
-       ; (fam_app, res_kind) <- tcInferTyApps mode lhs_fun fun_ty (buildPatsArgTypes mb_clsinfo hs_pats)
+       ; (fam_app, res_kind) <- tcInferTyApps mode lhs_fun fun_ty patsArgFlavours
 
        -- Hack alert: see Note [tcFamTyPats: zonking the result kind]
        ; res_kind <- liftZonkM $ zonkTcType res_kind
@@ -807,6 +808,7 @@ tcFamTyPats fam_tc hs_pats mb_clsinfo
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
     lhs_fun   = noLocA (HsTyVar noAnn NotPromoted (noLocA fam_name))
+    patsArgFlavours = zip hs_pats (tyConFamArgFlavours fam_tc ++ cycle [FreeArg])
 
 {- Note [tcFamTyPats: zonking the result kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -888,14 +890,14 @@ tcInferLHsTypeUnsaturated hs_ty
        ; case splitHsAppTys_maybe (unLoc hs_ty) of
            Just (hs_fun_ty, hs_args)
               -> do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
-                    ; tcInferTyApps_nosat mode hs_fun_ty fun_ty (buildPatsModeTypes (tcTyModeFamArgType mode) hs_args) }
+                    ; tcInferTyApps_nosat mode hs_fun_ty fun_ty (zip hs_args (cycle [FreeArg])) }
                       -- Notice the 'nosat'; do not instantiate trailing
                       -- invisible arguments of a type family.
                       -- See Note [Dealing with :kind]
            Nothing -> tc_infer_lhs_type mode hs_ty }
 
-tcTyModeFamArgType :: TcTyMode -> FamArgType
-tcTyModeFamArgType (TcTyMode { mode_holes = mh })
+tcTyModeFamArgFlavour :: TcTyMode -> FamArgFlavour
+tcTyModeFamArgFlavour (TcTyMode { mode_holes = mh })
   = case mh of
       Just (_, HM_FamPat artType) -> artType
       _ -> FreeArg
@@ -976,7 +978,7 @@ type HoleInfo = Maybe (TcLevel, HoleMode)
 -- HoleMode says how to treat the occurrences
 -- of anonymous wildcards; see tcAnonWildCardOcc
 data HoleMode = HM_Sig      -- Partial type signatures: f :: _ -> Int
-              | HM_FamPat FamArgType   -- Family instances: F _ Int = Bool
+              | HM_FamPat FamArgFlavour   -- Family instances: F _ Int = Bool
               | HM_VTA      -- Visible type and kind application:
                             --   f @(Maybe _)
                             --   Maybe @(_ -> _)
@@ -998,8 +1000,8 @@ mkHoleMode tyki hm
        ; return (TcTyMode { mode_tyki  = tyki
                           , mode_holes = Just (lvl,hm) }) }
 
-updateFamArgType :: FamArgType -> TcTyMode -> TcTyMode
-updateFamArgType fam_arg m@TcTyMode { mode_tyki = tyki, mode_holes =  mh }
+updateFamArgFlavour :: FamArgFlavour -> TcTyMode -> TcTyMode
+updateFamArgFlavour fam_arg m@TcTyMode { mode_tyki = tyki, mode_holes =  mh }
   |Just (lvl, HM_FamPat _) <- mh
   = (TcTyMode { mode_tyki = tyki
               , mode_holes = Just (lvl,HM_FamPat fam_arg) })
@@ -1285,7 +1287,7 @@ tcHsType mode rn_ty@(HsAppKindTy{}) exp_kind = tc_app_ty mode rn_ty exp_kind
 tcHsType mode rn_ty@(HsOpTy{})      exp_kind = tc_app_ty mode rn_ty exp_kind
 
 tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
-  = do { let mode' = (updateFamArgType SigArg $ mode { mode_tyki = KindLevel})
+  = do { let mode' = (updateFamArgFlavour SigArg $ mode { mode_tyki = KindLevel})
        ; sig' <- tc_lhs_kind_sig mode' KindSigCtxt sig
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
@@ -1555,7 +1557,7 @@ tc_app_ty :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
        ; (ty, infered_kind) <- tcInferTyApps mode hs_fun_ty fun_ty
-                                 (buildPatsModeTypes (tcTyModeFamArgType mode) hs_args)
+                                 (zip hs_args (cycle [FreeArg]))
        ; checkExpKind rn_ty ty infered_kind exp_kind }
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
@@ -1576,7 +1578,7 @@ tcInferTyApps, tcInferTyApps_nosat
     :: TcTyMode
     -> LHsType GhcRn        -- ^ Function (for printing only)
     -> TcType               -- ^ Function
-    -> [(LHsTypeArg GhcRn, FamArgType)]   -- ^ Args
+    -> [(LHsTypeArg GhcRn, FamArgFlavour)]   -- ^ Args
     -> TcM (TcType, TcKind) -- ^ (f args, result kind)
 tcInferTyApps mode hs_ty fun hs_args
   = do { (f_args, res_k) <- tcInferTyApps_nosat mode hs_ty fun hs_args
@@ -1608,7 +1610,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
        -> TcType          -- Function applied to some args
        -> Subst        -- Applies to function kind
        -> TcKind          -- Function kind
-       -> [(LHsTypeArg GhcRn, FamArgType)]    -- Un-type-checked args
+       -> [(LHsTypeArg GhcRn, FamArgFlavour)]    -- Un-type-checked args
        -> TcM (TcType, TcKind)  -- Result type and its kind
     -- INVARIANT: in any call (go n fun subst fun_ki args)
     --               typeKind fun  =  subst(fun_ki)
@@ -1679,7 +1681,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
                                       , ppr subst ])
                       ; let exp_kind = substTy subst $ piTyBinderType ki_binder
                       ; arg' <- addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty arg) n) $
-                                tc_check_lhs_type (updateFamArgType famArgTy mode) arg exp_kind
+                                tc_check_lhs_type (updateFamArgFlavour famArgTy mode) arg exp_kind
                       ; traceTc "tcInferTyApps (vis normal app) 2" (ppr exp_kind)
                       ; (subst', fun') <- mkAppTyM subst fun ki_binder arg'
                       ; go (n+1) fun' subst' inner_ki argtys }
