@@ -103,6 +103,7 @@ module GHC.Tc.Errors.Types (
   , DisabledClassExtension(..)
   , TyFamsDisabledReason(..)
   , BadInvisPatReason(..)
+  , BadEmptyCaseReason(..)
   , HsTypeOrSigType(..)
   , HsTyVarBndrExistentialFlag(..)
   , TySynCycleTyCons
@@ -223,7 +224,7 @@ import GHC.Core.InstEnv (LookupInstanceErrReason, ClsInst, DFunId)
 import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate (EqRel, predTypeEqRel)
 import GHC.Core.TyCon (TyCon, Role, FamTyConFlav, AlgTyConRhs)
-import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType, ForAllTyFlag)
+import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType, ForAllTyFlag, ForAllTyBinder)
 
 import GHC.Driver.Backend (Backend)
 
@@ -3081,13 +3082,27 @@ data TcRnMessage where
       a case expression with an empty list of alternatives without
       enabling the EmptyCase extension.
 
-     Example(s):
+     Example for EmptyCaseWithoutFlag:
 
-       case () of
+       {-# LANGUAGE NoEmptyCase #-}
+       f :: Void -> a
+       f = \case {}    -- extension not enabled
+
+     Example for EmptyCaseDisallowedCtxt:
+
+       f = \cases {}   -- multi-case requires n>0 alternatives
+
+     Example for EmptyCaseForall:
+
+       f :: forall (xs :: Type) -> ()
+       f = \case {}    -- can't match on a type argument
 
      Test cases: rename/should_fail/RnEmptyCaseFail
+                 typecheck/should_fail/T25004
   -}
-  TcRnEmptyCase :: HsMatchContextRn -> TcRnMessage
+  TcRnEmptyCase :: !HsMatchContextRn
+                -> !BadEmptyCaseReason
+                -> TcRnMessage
 
   {-| TcRnNonStdGuards is a warning thrown when a user uses
       non-standard guards (e.g. patterns in guards) without
@@ -6182,6 +6197,12 @@ data BadInvisPatReason
   | InvisPatNoForall
   | InvisPatMisplaced
   deriving (Generic)
+
+-- | Why was the empty case rejected?
+data BadEmptyCaseReason
+  = EmptyCaseWithoutFlag
+  | EmptyCaseDisallowedCtxt
+  | EmptyCaseForall ForAllTyBinder
 
 -- | Either `HsType p` or `HsSigType p`.
 --
