@@ -2990,10 +2990,10 @@ tyConSkolem = isHoleName . tyConName
 
 
 
-{- Note [FamArgFlavour and type checking]
-~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [FamArgFlavour and family instance decl type checking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The FamArgFlavour is used to distinguish the different kinds of arguments that may
-appear in an associated type family declaration. In an associated type family,
+appear in an associated type family declaration/instance. In an associated type family,
 some arguments come directly from the parent class (the “class arguments”) while
 others are provided freely by the user (the “free arguments”). For example, consider:
 
@@ -3001,28 +3001,38 @@ others are provided freely by the user (the “free arguments”). For example, 
       type F x y a   -- Here, 'x' and 'y' are free arguments, while 'a' comes from the class.
       type G p c b   -- Here, 'p' is free and both 'c' and 'b' are class arguments.
 
-The idea is to conceptually attach a bit–vector to the type family – one bit per argument –
-marking each as a ClassArg or FreeArg (with a possible extra SigArg to flag signature-derived
-arguments). With such a scheme, when type-checking an instance we can treat wildcards differently
-based on their position:
+We can conceptually view the kinds of arguments for a type family as a famArgFlavour–vector,
+with one flavour per argument of the family. Each flavour indicates whether the corresponding
+argument is a ClassArg or a FreeArg. We also introduce a third flavour, SigArg,
+to flag arguments that appear only in a kind signature for a type instance (i.e. when
+a wildcard is provided along with a kind annotation, as in @(_ :: _)@).
 
-  - In free arguments, a wildcard is interpreted as a skolem type variable.
-  - In class arguments, a wildcard is treated as a tau–variable.
-  - In signature arguments, a wildcard is treated as a tau–variable.
+Under the current design, when type-checking an instance the interpretation of wildcards
+depends on their position:
+
+  - In free arguments, a wildcard is interpreted as a TyVarTv-variable type variable.
+  - In class arguments, a wildcard is interpreted as a Tau–variable.
+  - In signature arguments, a wildcard is similarly treated as a Tau–variable.
 
 For instance, for an instance declaration like
 
     instance C Int [x] Bool where
        type F _ _ (_ :: _) = Int
 
-the first two underscores (free arguments) would yield SkolemTv’s while the last tow underscores (a class
-argument and a signature argument) would produce a TauTv. This approach avoids introducing a new category
-of meta–type variable and lets the same infrastructure be used by simply flipping the interpretation based
-on the bit-vector. For non-associated type families (when there is no parent class) all arguments default
-to free.
+the first two underscores (free arguments) would yield TyVarTv’s while the last two underscores (a class
+argument and a signature argument) would produce TauTv's.
+
+This design provides flexibility in handling wildcards in type families.
+
+Side note:
+we maintain diffirent flavours between class arguments and signature arguments because
+we might want to be able to flip only the class arguments to use TyVarTv without affecting
+the signature arguments.
+
+For more discussion, see #13908.
 -}
 
--- see Note [FamArgFlavour]
+-- see Note [FamArgFlavour and family instance decl type checking]
 data FamArgFlavour = ClassArg | FreeArg | SigArg deriving (Eq, Show)
 
 instance Outputable FamArgFlavour where
