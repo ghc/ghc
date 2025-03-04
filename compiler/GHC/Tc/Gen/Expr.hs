@@ -493,7 +493,7 @@ tcExpr (HsCase ctxt scrut matches) res_ty
         ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRho scrut
 
         ; hasFixedRuntimeRep_syntactic FRRCase scrut_ty
-        ; matches' <- tcCaseMatches tcBody (Scaled mult scrut_ty) matches res_ty
+        ; matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches res_ty
         ; return (HsCase ctxt scrut' matches') }
 
 tcExpr (HsIf x pred b1 b2) res_ty

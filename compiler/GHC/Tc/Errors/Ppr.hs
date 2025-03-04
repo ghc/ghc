@@ -62,7 +62,7 @@ import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
 import GHC.Core.TyCo.Rep (Type(..))
 import GHC.Core.TyCo.Ppr (pprWithInvisibleBitsWhen, pprSourceTyCon,
-                          pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType)
+                          pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType, pprForAll)
 import GHC.Core.PatSyn ( patSynName, pprPatSynType )
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -1359,24 +1359,27 @@ instance Diagnostic TcRnMessage where
       text "Orphan COMPLETE pragmas not supported" $$
       text "A COMPLETE pragma must mention at least one data constructor" $$
       text "or pattern synonym defined in the same module."
-    TcRnEmptyCase ctxt -> mkSimpleDecorated message
-      where
-        pp_ctxt = case ctxt of
-          CaseAlt                                -> text "case expression"
-          LamAlt LamCase                         -> text "\\case expression"
-          ArrowMatchCtxt (ArrowLamAlt LamSingle) -> text "kappa abstraction"
-          ArrowMatchCtxt (ArrowLamAlt LamCase)   -> text "\\case command"
-          ArrowMatchCtxt ArrowCaseAlt            -> text "case command"
-          _                                      -> text "(unexpected)"
-                                                    <+> pprMatchContextNoun ctxt
-
-        message = case ctxt of
-          LamAlt LamCases -> lcases_msg <+> text "expression"
-          ArrowMatchCtxt (ArrowLamAlt LamCases) -> lcases_msg <+> text "command"
-          _ -> text "Empty list of alternatives in" <+> pp_ctxt
-
-        lcases_msg =
-          text "Empty list of alternatives is not allowed in \\cases"
+    TcRnEmptyCase ctxt reason -> mkSimpleDecorated $
+      case reason of
+        EmptyCaseWithoutFlag ->
+          text "Empty list of alternatives in" <+> pp_ctxt
+        EmptyCaseDisallowedCtxt ->
+          text "Empty list of alternatives is not allowed in" <+> pp_ctxt
+        EmptyCaseForall tvb ->
+          vcat [ text "Empty list of alternatives in" <+> pp_ctxt
+               , hang (text "checked against a forall-type:")
+                      2 (pprForAll [tvb] <+> text "...")
+               ]
+        where
+          pp_ctxt = case ctxt of
+            CaseAlt                                -> text "case expression"
+            LamAlt LamCase                         -> text "\\case expression"
+            LamAlt LamCases                        -> text "\\cases expression"
+            ArrowMatchCtxt (ArrowLamAlt LamSingle) -> text "kappa abstraction"
+            ArrowMatchCtxt (ArrowLamAlt LamCase)   -> text "\\case command"
+            ArrowMatchCtxt (ArrowLamAlt LamCases)  -> text "\\cases command"
+            ArrowMatchCtxt ArrowCaseAlt            -> text "case command"
+            ctxt                                   -> text "(unexpected)" <+> pprMatchContextNoun ctxt
     TcRnNonStdGuards (NonStandardGuards guards) -> mkSimpleDecorated $
       text "accepting non-standard pattern guards" $$
       nest 4 (interpp'SP guards)
@@ -3062,10 +3065,11 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnOrphanCompletePragma{}
       -> noHints
-    TcRnEmptyCase ctxt -> case ctxt of
-      LamAlt LamCases -> noHints -- cases syntax doesn't support empty case.
-      ArrowMatchCtxt (ArrowLamAlt LamCases) -> noHints
-      _ -> [suggestExtension LangExt.EmptyCase]
+    TcRnEmptyCase _ reason ->
+      case reason of
+        EmptyCaseWithoutFlag{}    -> [suggestExtension LangExt.EmptyCase]
+        EmptyCaseDisallowedCtxt{} -> noHints
+        EmptyCaseForall{}         -> noHints
     TcRnNonStdGuards{}
       -> [suggestExtension LangExt.PatternGuards]
     TcRnDuplicateSigDecl{}

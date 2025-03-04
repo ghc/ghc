@@ -103,6 +103,7 @@ module GHC.Tc.Errors.Types (
   , DisabledClassExtension(..)
   , TyFamsDisabledReason(..)
   , BadInvisPatReason(..)
+  , BadEmptyCaseReason(..)
   , HsTypeOrSigType(..)
   , HsTyVarBndrExistentialFlag(..)
   , TySynCycleTyCons
@@ -223,7 +224,7 @@ import GHC.Core.InstEnv (LookupInstanceErrReason, ClsInst, DFunId)
 import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate (EqRel, predTypeEqRel)
 import GHC.Core.TyCon (TyCon, Role, FamTyConFlav, AlgTyConRhs)
-import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType, ForAllTyFlag)
+import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType, ForAllTyFlag, ForAllTyBinder)
 
 import GHC.Driver.Backend (Backend)
 
@@ -3086,8 +3087,11 @@ data TcRnMessage where
        case () of
 
      Test cases: rename/should_fail/RnEmptyCaseFail
+                 testsuite/tests/typecheck/should_fail/T25004
   -}
-  TcRnEmptyCase :: HsMatchContextRn -> TcRnMessage
+  TcRnEmptyCase :: !HsMatchContextRn
+                -> !BadEmptyCaseReason
+                -> TcRnMessage
 
   {-| TcRnNonStdGuards is a warning thrown when a user uses
       non-standard guards (e.g. patterns in guards) without
@@ -6182,6 +6186,12 @@ data BadInvisPatReason
   | InvisPatNoForall
   | InvisPatMisplaced
   deriving (Generic)
+
+-- | Why was the empty case rejected?
+data BadEmptyCaseReason
+  = EmptyCaseWithoutFlag
+  | EmptyCaseDisallowedCtxt
+  | EmptyCaseForall ForAllTyBinder
 
 -- | Either `HsType p` or `HsSigType p`.
 --

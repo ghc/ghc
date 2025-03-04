@@ -318,8 +318,9 @@ tcCmdMatches :: CmdEnv
              -> CmdType
              -> TcM (MatchGroup GhcTc (LHsCmd GhcTc))
 tcCmdMatches env scrut_ty matches (stk, res_ty)
-  = tcCaseMatches tc_body (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
+  = tcCaseMatches ctxt tc_body (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
   where
+    ctxt = ArrowMatchCtxt ArrowCaseAlt
     tc_body body res_ty' = do { res_ty' <- expTypeToType res_ty'
                               ; tcCmd env body (stk, res_ty') }
 
