@@ -971,6 +971,7 @@ Library
         GHC.Utils.Binary.Typeable
         GHC.Utils.BufHandle
         GHC.Utils.CliOption
+        GHC.Utils.Compress
         GHC.Utils.Constants
         GHC.Utils.Containers.Internal.BitUtil
         GHC.Utils.Containers.Internal.StrictPair

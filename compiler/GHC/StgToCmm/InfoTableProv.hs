@@ -4,11 +4,6 @@ module GHC.StgToCmm.InfoTableProv (emitIpeBufferListNode) where
 
 import Foreign
 
-#if defined(HAVE_LIBZSTD)
-import Foreign.C.Types
-import qualified Data.ByteString.Internal as BSI
-import GHC.IO (unsafePerformIO)
-#endif
 
 import GHC.Prelude
 import GHC.Platform
@@ -17,6 +12,7 @@ import GHC.Types.Unique.DSM
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Data.FastString (fastStringToShortText, unpackFS, LexicalFastString(..))
+import GHC.Utils.Compress
 
 import GHC.Cmm
 import GHC.Cmm.CLabel
@@ -270,46 +266,6 @@ lookupStringTable str = state $ \st ->
               res = fromIntegral (stLength st)
           in (res, st')
 
-do_compress :: Int
-compress    :: Int -> BS.ByteString -> BS.ByteString
-#if !defined(HAVE_LIBZSTD)
-do_compress   = 0
-compress _ bs = bs
-#else
-do_compress = 1
-
-compress clvl (BSI.PS srcForeignPtr off len) = unsafePerformIO $
-    withForeignPtr srcForeignPtr $ \srcPtr -> do
-      maxCompressedSize <- zstd_compress_bound $ fromIntegral len
-      dstForeignPtr <- BSI.mallocByteString (fromIntegral maxCompressedSize)
-      withForeignPtr dstForeignPtr $ \dstPtr -> do
-        compressedSize <- fromIntegral <$>
-          zstd_compress
-            dstPtr
-            maxCompressedSize
-            (srcPtr `plusPtr` off)
-            (fromIntegral len)
-            (fromIntegral clvl)
-        BSI.create compressedSize $ \p -> copyBytes p dstPtr compressedSize
-
-foreign import ccall unsafe "ZSTD_compress"
-    zstd_compress ::
-         Ptr dst -- ^ Destination buffer
-      -> CSize   -- ^ Capacity of destination buffer
-      -> Ptr src -- ^ Source buffer
-      -> CSize   -- ^ Size of source buffer
-      -> CInt    -- ^ Compression level
-      -> IO CSize
-
--- | Compute the maximum compressed size for a given source buffer size
-foreign import ccall unsafe "ZSTD_compressBound"
-    zstd_compress_bound ::
-         CSize -- ^ Size of source buffer
-      -> IO CSize
-#endif
-
-defaultCompressionLevel :: Int
-defaultCompressionLevel = 3
 
 newtype DList a = DList ([a] -> [a])
 
