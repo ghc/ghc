@@ -19,9 +19,11 @@ import GHC.Cmm
 import GHC.Utils.Misc
 
 import GHC.Utils.Panic
+import GHC.Utils.Outputable
 import GHC.Platform
 
 import Data.Maybe
+import GHC.Float
 
 
 constantFoldNode :: Platform -> CmmNode e x -> CmmNode e x
@@ -63,24 +65,51 @@ cmmMachOpFoldM _ (MO_VF_Broadcast lg _w) exprs =
     [CmmLit l] -> Just $! CmmLit (CmmVec $ replicate lg l)
     _ -> Nothing
 cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
-  = case op of
-      MO_S_Neg _ -> Just $! CmmLit (CmmInt (narrowS rep (-x)) rep)
-      MO_Not _   -> Just $! CmmLit (CmmInt (complement x) rep)
+  | MO_WF_Bitcast width <- op = case width of
+      W32 | res <- castWord32ToFloat (fromInteger x)
+          -- Since we store float literals as Rationals
+          -- we must check for the usual tricky cases first
+          , not (isNegativeZero res || isNaN res || isInfinite res)
+          -- (round-tripping subnormals is not a problem)
+          , !res_rat <- toRational res
+            -> Just (CmmLit (CmmFloat res_rat W32))
+
+      W64 | res <- castWord64ToDouble (fromInteger x)
+          -- Since we store float literals as Rationals
+          -- we must check for the usual tricky cases first
+          , not (isNegativeZero res || isNaN res || isInfinite res)
+          -- (round-tripping subnormals is not a problem)
+          , !res_rat <- toRational res
+            -> Just (CmmLit (CmmFloat res_rat W64))
+
+      _ -> Nothing
+  | otherwise
+  = Just $! case op of
+      MO_S_Neg _ -> CmmLit (CmmInt (narrowS rep (-x)) rep)
+      MO_Not _   -> CmmLit (CmmInt (complement x) rep)
 
         -- these are interesting: we must first narrow to the
         -- "from" type, in order to truncate to the correct size.
         -- The final narrow/widen to the destination type
         -- is implicit in the CmmLit.
-      MO_SF_Round _frm to -> Just $! CmmLit (CmmFloat (fromInteger x) to)
-      MO_SS_Conv  from to -> Just $! CmmLit (CmmInt (narrowS from x) to)
-      MO_UU_Conv  from to -> Just $! CmmLit (CmmInt (narrowU from x) to)
-      MO_XX_Conv  from to -> Just $! CmmLit (CmmInt (narrowS from x) to)
+      MO_SF_Round _frm to -> CmmLit (CmmFloat (fromInteger x) to)
+      MO_SS_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
+      MO_UU_Conv  from to -> CmmLit (CmmInt (narrowU from x) to)
+      MO_XX_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
 
-      -- Not as simply as it seems, since CmmFloat uses Rational, so skipping those
-      -- for now ...
-      MO_WF_Bitcast _w -> Nothing
-      MO_FW_Bitcast _w -> Nothing
+      MO_F_Neg{}          -> invalidArgPanic
+      MO_FS_Truncate{}    -> invalidArgPanic
+      MO_FF_Conv{}        -> invalidArgPanic
+      MO_FW_Bitcast{}     -> invalidArgPanic
+      MO_VS_Neg{}         -> invalidArgPanic
+      MO_VF_Neg{}         -> invalidArgPanic
+      MO_RelaxedRead{}    -> invalidArgPanic
+      MO_AlignmentCheck{} -> invalidArgPanic
+
       _ -> panic $ "cmmMachOpFoldM: unknown unary op: " ++ show op
+      where invalidArgPanic = pprPanic "cmmMachOpFoldM" $
+              text "Found" <+> pprMachOp op
+                <+> text "illegally applied to an int literal"
 
 -- Eliminate shifts that are wider than the shiftee
 cmmMachOpFoldM _ op [_shiftee, CmmLit (CmmInt shift _)]
