@@ -3409,8 +3409,7 @@ without treating the explicitly-quantified ones specially. Wrinkles:
     In step 1 we do /not/ want to get
        newtype instance forall r .  Fix2 (f :: TYPE r -> TYPE r) :: TYPE r where
     If we do, we'll get that same "newtype must not be GADT" error as for N above.
-    Rather, we want to default the RuntimeRep variable r := LiftedRep. Hence
-    the use of `DefaultNonStandardTyVars` in `tcDataFamInstHeader`.  The key thing
+    Rather, we want to default the RuntimeRep variable r := LiftedRep. The key thing
     is that we must make the /same/ choice here as we do in kind-checking the data
     constructor's type.
 
