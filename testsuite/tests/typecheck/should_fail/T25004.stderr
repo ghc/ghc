@@ -1,0 +1,6 @@
+T25004.hs:9:5: error: [GHC-48010]
+    • Empty list of alternatives in \case expression
+      checked against a forall-type: forall xs -> ...
+    • In the expression: \case
+      In an equation for ‘f’: f = \case
+
