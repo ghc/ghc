@@ -977,7 +977,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
        -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
        ; dvs  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
        ; qtvs <- quantifyTyVars skol_info dvs
-                 -- DefaultNonStandardTyVars: see (GT4) in
+                 -- see (GT4) in
                  -- GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
 
        ; let final_tvs = scopedSort (qtvs ++ outer_tvs)

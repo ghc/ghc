@@ -2980,7 +2980,7 @@ tyConSkolem = isHoleName . tyConName
 
 
 
-{- Note [FamArgFlavour and family instance decl type checking]
+{- Note [FamArgFlavour]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The FamArgFlavour is used to distinguish the different kinds of arguments that may
 appear in an associated type family declaration/instance. In an associated type family,
@@ -3022,7 +3022,7 @@ the signature arguments.
 For more discussion, see #13908.
 -}
 
--- see Note [FamArgFlavour and family instance decl type checking]
+-- see Note [FamArgFlavour]
 data FamArgFlavour = ClassArg | FreeArg | SigArg deriving (Eq, Show)
 
 instance Outputable FamArgFlavour where
