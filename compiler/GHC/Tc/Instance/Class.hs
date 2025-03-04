@@ -6,9 +6,7 @@ module GHC.Tc.Instance.Class (
      ClsInstResult(..),
      InstanceWhat(..), safeOverlap, instanceReturnsDictCon,
      AssocInstInfo(..), isNotAssociated,
-     lookupHasFieldLabel, FamArgType(..), PartialAssocInstInfo,
-     buildAssocInstInfo, buildPatsArgTypes,
-     assocInstInfoPartialAssocInstInfo, buildPatsModeTypes
+     lookupHasFieldLabel
   ) where
 
 import GHC.Prelude
@@ -92,33 +90,7 @@ data AssocInstInfo
                                             -- 'GHC.Tc.Validity.checkConsistentFamInst'
               , ai_inst_env :: VarEnv Type  -- ^ Maps /class/ tyvars to their instance types
                 -- See Note [Matching in the consistent-instantiation check]
-              , ai_arg_types :: [FamArgType] -- ^ The types of the arguments to the associated type
     }
-type PartialAssocInstInfo = Maybe (Class, [TyVar], VarEnv Type)
-
-assocInstInfoPartialAssocInstInfo :: AssocInstInfo -> PartialAssocInstInfo
-assocInstInfoPartialAssocInstInfo NotAssociated = Nothing
-assocInstInfoPartialAssocInstInfo (InClsInst {..}) = Just (ai_class, ai_tyvars, ai_inst_env)
-
-buildAssocInstInfo :: TyCon -> PartialAssocInstInfo -> AssocInstInfo
-buildAssocInstInfo _fam_tc Nothing = NotAssociated
-buildAssocInstInfo fam_tc (Just (cls, tvs, env))
-  = InClsInst cls tvs env
-  [ if elemVarEnv fam_tc_tv env then ClassArg else FreeArg  | fam_tc_tv <- tyConTyVars fam_tc]
-
-buildPatsArgTypes :: (Outputable x) => AssocInstInfo -> [x] -> [(x, FamArgType)]
-buildPatsArgTypes NotAssociated xs = buildPatsModeTypes FreeArg xs
-buildPatsArgTypes (InClsInst {..}) xs = zip xs (ai_arg_types ++ cycle [FreeArg])
-
-buildPatsModeTypes :: FamArgType -> [x] -> [(x, FamArgType)]
-buildPatsModeTypes fa xs = (,fa) <$> xs
-
-data FamArgType = ClassArg | FreeArg | SigArg deriving (Eq, Show)
-
-instance Outputable FamArgType where
-  ppr ClassArg = text "ClassArg"
-  ppr FreeArg = text "FreeArg"
-  ppr SigArg = text "SigArg"
 
 isNotAssociated :: AssocInstInfo -> Bool
 isNotAssociated (NotAssociated {}) = True
