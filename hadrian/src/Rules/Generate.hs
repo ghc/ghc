@@ -525,10 +525,10 @@ generateSettings settingsFile = do
         , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
         , ("Unregisterised", queryTarget (yesNo . tgtUnregisterised))
         , ("LLVM target", queryTarget tgtLlvmTarget)
-        , ("LLVM llc command", expr $ settingsFileSetting ToolchainSetting_LlcCommand)
-        , ("LLVM opt command", expr $ settingsFileSetting ToolchainSetting_OptCommand)
-        , ("LLVM llvm-as command", expr $ settingsFileSetting ToolchainSetting_LlvmAsCommand)
-        , ("LLVM llvm-as flags", expr $ settingsFileSetting ToolchainSetting_LlvmAsFlags)
+        , ("LLVM llc command", queryTarget llcPath)
+        , ("LLVM opt command", queryTarget optPath)
+        , ("LLVM llvm-as command", queryTarget llvmAsPath)
+        , ("LLVM llvm-as flags", queryTarget llvmAsFlags)
         , ("Use inplace MinGW toolchain", expr $ settingsFileSetting ToolchainSetting_DistroMinGW)
 
         , ("target RTS linker only supports shared libraries", expr $ yesNo <$> targetRTSLinkerOnlySupportsSharedLibs)
@@ -571,6 +571,10 @@ generateSettings settingsFile = do
     linkSupportsFilelist        = yesNo . ccLinkSupportsFilelist . tgtCCompilerLink
     linkSupportsCompactUnwind   = yesNo . ccLinkSupportsCompactUnwind . tgtCCompilerLink
     linkIsGnu                   = yesNo . ccLinkIsGnu . tgtCCompilerLink
+    llcPath = maybe "" prgPath . tgtLlc
+    optPath = maybe "" prgPath . tgtOpt
+    llvmAsPath = maybe "" prgPath . tgtLlvmAs
+    llvmAsFlags = escapeArgs . maybe [] prgFlags . tgtLlvmAs
     arPath  = prgPath . arMkArchive . tgtAr
     arFlags = escapeArgs . prgFlags . arMkArchive . tgtAr
     arSupportsAtFile' = yesNo . arSupportsAtFile . tgtAr

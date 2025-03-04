@@ -107,6 +107,9 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN],
     echo "--merge-objs=$MergeObjsCmd" >> acargs
     echo "--readelf=$READELF" >> acargs
     echo "--windres=$WindresCmd" >> acargs
+    echo "--llc=$LlcCmd" >> acargs
+    echo "--opt=$OptCmd" >> acargs
+    echo "--llvm-as=$LlvmAsCmd" >> acargs
 
     if test -n "$USER_LD"; then
       echo "--ld=$USER_LD" >> acargs
