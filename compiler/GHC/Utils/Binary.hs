@@ -532,7 +532,7 @@ readBinMem_ filesize h = do
   arr1 <- mallocForeignPtrBytes filesize
   (arr, c2) <- unsafeWithForeignPtr arr1 $ \p -> do
     c1 <- hGetBuf h p filesize
-    (fp, c2) <- decompressPtr p filesize
+    (fp, c2) <- decompressPtr arr1 filesize
     when (c1 /= filesize) $
          error ("Binary.readBinMem: only read " ++ show c1 ++ " bytes")
     return (fp, c2)
