@@ -2444,8 +2444,6 @@ commonly used commands.
 
 .. ghci-cmd:: :doc; ⟨name⟩
 
-    (Experimental: This command will likely change significantly in GHC 8.8.)
-
     Displays the documentation for the given name. Currently the command is
     restricted to displaying the documentation directly on the declaration
     in question, ignoring documentation for arguments, constructors etc.
