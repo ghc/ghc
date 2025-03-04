@@ -1109,7 +1109,10 @@ machOps = listToUFM $
         ( "f2i32",    flip MO_FS_Truncate W32 ),
         ( "f2i64",    flip MO_FS_Truncate W64 ),
         ( "i2f32",    flip MO_SF_Round W32 ),
-        ( "i2f64",    flip MO_SF_Round W64 )
+        ( "i2f64",    flip MO_SF_Round W64 ),
+
+        ( "w2f_bitcast", MO_WF_Bitcast ),
+        ( "f2w_bitcast", MO_FW_Bitcast )
         ]
 
 callishMachOps :: Platform -> UniqFM FastString ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
