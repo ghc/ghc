@@ -827,7 +827,7 @@ cloneAnonMetaTyVar info tv kind
   = do  { details <- newMetaDetails info
         ; name    <- cloneMetaTyVarName (tyVarName tv)
         ; let tyvar = mkTcTyVar name kind details
-        ; traceTc "cloneAnonMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar))
+        ; traceTc "cloneAnonMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar) <+> text "from" <+> ppr tv)
         ; return tyvar }
 
 -- Make a new CycleBreakerTv. See Note [Type equality cycles]
