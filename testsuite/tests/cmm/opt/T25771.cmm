@@ -1,0 +1,8 @@
+// The point of this test is that the bitcast operations
+// should be successfully constant-folded, without panicking.
+
+func (float64 x) {
+  x = %fadd(x, %w2f_bitcast(0x4028b0a3d70a3d71 :: bits64));
+  x = %fadd(x, %f2f64(%w2f_bitcast(0x3f2a0000 :: bits32)));
+  return (x);
+}
