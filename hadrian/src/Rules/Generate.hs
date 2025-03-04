@@ -508,9 +508,9 @@ generateSettings settingsFile = do
         , ("ar flags",            queryTarget arFlags)
         , ("ar supports at file", queryTarget arSupportsAtFile')
         , ("ar supports -L",      queryTarget arSupportsDashL')
-        , ("ranlib command", queryTarget ranlibPath)
-        , ("otool command", expr $ settingsFileSetting ToolchainSetting_OtoolCommand)
-        , ("install_name_tool command", expr $ settingsFileSetting ToolchainSetting_InstallNameToolCommand)
+        , ("ranlib command",      queryTarget ranlibPath)
+        , ("otool command",       queryTarget otoolPath)
+        , ("install_name_tool command", queryTarget installNameToolPath)
         , ("windres command", queryTarget (maybe "/bin/false" prgPath . tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
         , ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
         , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
@@ -575,6 +575,8 @@ generateSettings settingsFile = do
     arFlags = escapeArgs . prgFlags . arMkArchive . tgtAr
     arSupportsAtFile' = yesNo . arSupportsAtFile . tgtAr
     arSupportsDashL' = yesNo . arSupportsDashL . tgtAr
+    otoolPath = maybe "" prgPath . tgtOtool
+    installNameToolPath = maybe "" prgPath . tgtInstallNameTool
     ranlibPath  = maybe "" (prgPath . ranlibProgram) . tgtRanlib
     mergeObjsSupportsResponseFiles' = maybe "NO" (yesNo . mergeObjsSupportsResponseFiles) . tgtMergeObjs
 
