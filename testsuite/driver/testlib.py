@@ -628,24 +628,15 @@ def collect_size ( deviation, path ):
 
 def get_dir_size(path):
     total = 0
-    try:
-        with os.scandir(path) as it:
-            for entry in it:
-                if entry.is_file():
-                    total += entry.stat().st_size
-                elif entry.is_dir():
-                    total += get_dir_size(entry.path)
-        return total
-    except FileNotFoundError:
-        print("Exception: Could not find: " + path)
+    with os.scandir(path) as it:
+        for entry in it:
+            if entry.is_file():
+                total += entry.stat().st_size
+            elif entry.is_dir():
+                total += get_dir_size(entry.path)
+    return total
 
 def collect_size_dir ( deviation, path ):
-
-    ## os.path.join joins the path with slashes (not backslashes) on windows
-    ## CI...for some reason, so we manually detect it here
-    sep = r"/"
-    if on_windows():
-        sep = r"\\"
     return collect_generic_stat ( 'size', deviation, lambda way: get_dir_size(path) )
 
 # Read a number from a specific file
@@ -662,92 +653,7 @@ def collect_generic_stats ( metric_info ):
         return _collect_generic_stat(name, opts, metric_info)
     return f
 
-# wrap the call to collect_size_dir with path_from_ghcPkg in a function. Python
-# is call-by-value so if we placed the call in an all.T file then the python
-# interpreter would evaluate the call to path_from_ghcPkg
-def collect_size_ghc_pkg (deviation, library):
-    return collect_size_dir(deviation, path_from_ghcPkg(library, "library-dirs"))
-
-# same for collect_size and find_so
-def collect_object_size (deviation, library, use_non_inplace=False):
-    if use_non_inplace:
-        return collect_size(deviation, find_non_inplace_so(library))
-    else:
-        return collect_size(deviation, find_so(library))
-
-def path_from_ghcPkg (library, field):
-    """Find the field as a path for a library via a call to ghc-pkg. This is a
-    testsuite wrapper around a call to ghc-pkg field {library} {field}.
-    """
-
-    ### example output from ghc-pkg:
-    ###  $ ./ghc-pkg field Cabal library-dirs
-    ###    library-dirs: /home/doyougnu/programming/haskell/ghc/_build/stage1/lib/../lib/x86_64-linux-ghc-9.11.20240424/Cabal-3.11.0.0-inplace
-    ###    so we split the string and drop the 'library-dirs'
-    ghcPkgCmd = fr"{config.ghc_pkg} field {library} {field}"
-
-    try:
-        result = subprocess.run(ghcPkgCmd, capture_output=True, shell=True)
-
-        # check_returncode throws an exception if the return code is not 0.
-        result.check_returncode()
-
-        # if we get here then the call worked and we have the path we split by
-        # whitespace and then return the path which becomes the second element
-        # in the array
-        return re.split(r'\s+', result.stdout.decode("utf-8"))[1]
-    except Exception as e:
-        message = f"""
-        Attempt to find {field} of {library} using ghc-pkg failed.
-        ghc-pkg path: {config.ghc_pkg}
-        error" {e}
-        """
-        print(message)
-
-
-def _find_so(lib, directory, in_place):
-    """Find a shared object file (.so) for lib in directory. We deliberately
-    keep the regex simple, just removing the ghc version and project version.
-    Example:
-
-    _find_so("Cabal-syntax-3.11.0.0", path-from-ghc-pkg, True) ==>
-    /builds/ghc/ghc/_build/install/lib/ghc-9.11.20240410/lib/x86_64-linux-ghc-9.11.20240410/libHSCabal-syntax-3.11.0.0-inplace-ghc9.11.20240410.so
-    """
-
-    # produce the suffix for the CI operating system
-    suffix = "so"
-    if config.os == "mingw32":
-        suffix = "dll"
-    elif config.os == "darwin":
-        suffix = "dylib"
-
-    # Most artfacts are of the form foo-inplace, except for the rts.
-    if in_place:
-        to_match = r'libHS{}-\d+(\.\d+)+-inplace-\S+\.' + suffix
-    else:
-        to_match = r'libHS{}-\d+(\.\d+)+\S+\.' + suffix
-
-    matches = []
-    # wrap this in some exception handling, hadrian test will error out because
-    # these files don't exist yet, so we pass when this occurs
-    try:
-        for f in os.listdir(directory):
-            if f.endswith(suffix):
-                pattern = re.compile(to_match.format(re.escape(lib)))
-                match   = re.match(pattern, f)
-                if match:
-                    matches.append(match.group())
-        return os.path.join(directory, matches[0])
-    except:
-        failBecause('Could not find shared object file: ' + lib)
-
-def find_so(lib):
-    return _find_so(lib,path_from_ghcPkg(lib, "dynamic-library-dirs"),True)
-
-def find_non_inplace_so(lib):
-    return _find_so(lib,path_from_ghcPkg(lib, "dynamic-library-dirs"),False)
-
-# Define a generic stat test, which computes the statistic by calling the function
+# Define the a generic stat test, which computes the statistic by calling the function
 # given as the third argument.
 def collect_generic_stat ( metric, deviation, get_stat ):
     return collect_generic_stats ( { metric: { 'deviation': deviation, 'current': get_stat } } )
