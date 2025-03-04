@@ -724,16 +724,21 @@ data MaybeApartReason
   | MARTypeVsConstraint  -- ^ matching Type ~? Constraint or the arrow types
     -- See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim
 
+  | MARCast         -- ^ Very obscure.
+    -- See (KCU2) in Note [Kind coercions in Unify]
+
 instance Outputable MaybeApartReason where
   ppr MARTypeFamily       = text "MARTypeFamily"
   ppr MARInfinite         = text "MARInfinite"
   ppr MARTypeVsConstraint = text "MARTypeVsConstraint"
+  ppr MARCast             = text "MARCast"
 
 instance Semigroup MaybeApartReason where
-  -- see end of Note [Unification result] for why
-  MARTypeFamily       <> r = r
-  MARInfinite         <> _ = MARInfinite
+  -- See end of Note [Unification result] for why
+  MARInfinite         <> _ = MARInfinite   -- MARInfinite wins
+  MARTypeFamily       <> r = r             -- Otherwise it doesn't really matter
   MARTypeVsConstraint <> r = r
+  MARCast             <> r = r
 
 instance Applicative UnifyResultM where
   pure  = Unifiable
@@ -1165,13 +1170,35 @@ Preserving (UKINV) takes a bit of work, governed by the `match_kis` flag in
 
 Wrinkles
 
-(KCU1) We never need to apply the RnEnv2 renaming to the accumulating `kco` argument.
-  Why not?  Because
-    * The `kco` arg is used /only/ when extending
+(KCU1) We ensure that the `kco` argument never mentions variables in the
+  domain of either RnEnvL or RnEnvR.  Why?
 
-  xxx working here xxx
+  * `kco` is used only to build the final well-kinded substitution
+         a :-> ty |> kco
+    The range of the substitution never mentions forall-bound variables,
+    so `kco` cannot either.
 
-(KCU2) We thought, at one point, that this was all unnecessary: why should
+  * `kco` mixes up types from both left and right arguments of
+    `unify_ty`, which have different renamings in the RnEnv2.
+
+  The easiest thing is to insist that `kco` does not need renaming with
+  the RnEnv2; it mentions no forall-bound variables.
+
+  To achieve this we do a `mentionsForAllBoundTyVars` test in the
+  `CastTy` cases of `unify_ty`.
+
+(KCU2) Suppose we are unifying
+            (forall a. x |> (...F a b...) ~ (forall a. y)
+  We can't bind y :-> x |> (...F a b...), becuase of that free `a`.
+
+  But if we later learn that b=Int, and F a Int = Bool,
+  that free `a` might disappear, so we could unify with
+      y :-> x |> (...Bool...)
+
+  Conclusion: if there is a free forall-bound variable in a cast,
+  return MaybeApart, with a MaybeApartReason of MARCast.
+
+(KCU3) We thought, at one point, that this was all unnecessary: why should
     casts be in types in the first place? But they are sometimes. In
     dependent/should_compile/KindEqualities2, we see, for example the
     constraint Num (Int |> (blah ; sym blah)).  We naturally want to find
@@ -1373,9 +1400,8 @@ unify_ty env ty1 ty2 kco
 
 unify_ty env (CastTy ty1 co1) ty2 kco
   | mentionsForAllBoundTyVarsL env (tyCoVarsOfCo co1)
-  = surelyApart
-    -- xxx todo ... MaybeApart perhaps?   F a b, where b is forall-bound, but a is not
-    --                                  and F Int b = Int
+    -- See (KCU1) in Note [Kind coercions in Unify]
+  = maybeApart MARCast  -- See (KCU2)
 
   | um_unif env
   = unify_ty env ty1 ty2 (co1 `mkTransCo` kco)
@@ -1390,7 +1416,8 @@ unify_ty env (CastTy ty1 co1) ty2 kco
 
 unify_ty env ty1 (CastTy ty2 co2) kco
   | mentionsForAllBoundTyVarsR env (tyCoVarsOfCo co2)
-  = surelyApart
+    -- See (KCU1) in Note [Kind coercions in Unify]
+  = maybeApart MARCast  -- See (KCU2)
   | otherwise
   = unify_ty env ty1 ty2 (kco `mkTransCo` mkSymCo co2)
     -- ToDo: what if co2 mentions forall-bound variables?
