@@ -81,16 +81,6 @@ AC_DEFUN([FP_FIND_LIBZSTD],
     fi
 
     # libzstd >= 1.4.0 is required for IPE data compression
-    fp_libzstd_version="`pkg-config --modversion libzstd`"
-    FP_COMPARE_VERSIONS(
-        [$fp_libzstd_version],
-        [-lt],
-        [1.4.0],
-        [AC_MSG_ERROR(
-            [Need at least libzstd version 1.4.0 for
-            --enable-ipe-data-compression])
-          ]
-      )
 
     CFLAGS="$CFLAGS2"
     LDFLAGS="$LDFLAGS2"
