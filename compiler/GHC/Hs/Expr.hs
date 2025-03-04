@@ -1538,9 +1538,15 @@ instance (OutputableBndrId p) => Outputable (HsCmdTop (GhcPass p)) where
 ************************************************************************
 -}
 
-type instance XMG         GhcPs b = Origin
-type instance XMG         GhcRn b = Origin -- See Note [Generated code and pattern-match checking]
+type instance XMG         GhcPs b = Origin  -- See Note [Generated code and pattern-match checking]
+type instance XMG         GhcRn b = MatchGroupRn
 type instance XMG         GhcTc b = MatchGroupTc
+
+data MatchGroupRn
+  = MatchGroupRn
+       { mg_rn_ctxt   :: HsMatchContextRn
+       , mg_rn_origin :: Origin  -- Origin (Generated vs FromSource)
+       }
 
 data MatchGroupTc
   = MatchGroupTc

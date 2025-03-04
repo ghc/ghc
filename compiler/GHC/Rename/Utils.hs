@@ -770,22 +770,30 @@ genFunBind :: LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
            -> HsBind GhcRn
 genFunBind fn ms
   = FunBind { fun_id = fn
-            , fun_matches = mkMatchGroup (Generated OtherExpansion SkipPmc) (wrapGenSpan ms)
+            , fun_matches = MG { mg_ext = MatchGroupRn ctxt origin
+                               , mg_alts = wrapGenSpan ms }
             , fun_ext = emptyNameSet
             }
+  where
+    ctxt   = mkPrefixFunRhs fn noAnn
+    origin = Generated OtherExpansion SkipPmc
 
 genHsLet :: HsLocalBindsLR GhcRn GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
 genHsLet bindings body = HsLet noExtField bindings body
 
-genHsLamDoExp :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
+genHsLamDoExp :: forall p. (IsPass p, p ~ NoGhcTcPass p)
         => HsDoFlavour
         -> [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> LHsExpr (GhcPass p)
 genHsLamDoExp doFlav pats body = mkHsPar (wrapGenSpan $ HsLam noAnn LamSingle matches)
   where
-    matches = mkMatchGroup (doExpansionOrigin doFlav)
-                           (wrapGenSpan [genSimpleMatch (StmtCtxt (HsDoStmt doFlav)) pats' body])
+    ctxt    = StmtCtxt (HsDoStmt doFlav)
+    origin  = doExpansionOrigin doFlav
+    mg_ext  = case ghcPass @p of
+      GhcPs -> origin
+      GhcRn -> MatchGroupRn ctxt origin
+    matches = MG { mg_ext, mg_alts = wrapGenSpan [genSimpleMatch ctxt pats' body] }
     pats' = map (parenthesizePat appPrec) pats
 
 

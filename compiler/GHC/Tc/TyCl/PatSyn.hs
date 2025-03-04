@@ -943,11 +943,13 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
            Unidirectional -> panic "tcPatSynBuilderBind"
 
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
-    mk_mg body = mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA [builder_match])
+    mk_mg body = MG (MatchGroupRn ctxt origin) (noLocA [builder_match])
           where
+            ctxt          = mkPrefixFunRhs ps_lname noAnn
+            origin        = Generated OtherExpansion SkipPmc
             builder_args  = noLocA [(L (l2l loc) (VarPat noExtField (L loc n)))
                                    | L loc n <- args]
-            builder_match = mkMatch (mkPrefixFunRhs ps_lname noAnn)
+            builder_match = mkMatch ctxt
                                     builder_args body
                                     (EmptyLocalBinds noExtField)
 

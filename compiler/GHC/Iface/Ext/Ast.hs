@@ -910,7 +910,7 @@ instance ( HiePass p
         , toHie alts
         ]
     where origin = case hiePass @p of
-             HieRn -> mg_ext mg
+             HieRn -> mg_rn_origin $ mg_ext mg
              HieTc -> mg_origin $ mg_ext mg
 
 setOrigin :: Origin -> NodeOrigin -> NodeOrigin

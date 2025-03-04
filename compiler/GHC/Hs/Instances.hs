@@ -400,6 +400,8 @@ deriving instance Data HsArrowMatchContext
 deriving instance Data fn => Data (HsStmtContext fn)
 deriving instance Data fn => Data (HsMatchContext fn)
 
+deriving instance Data MatchGroupRn
+
 -- deriving instance (DataIdLR p p) => Data (HsUntypedSplice p)
 deriving instance Data (HsUntypedSplice GhcPs)
 deriving instance Data (HsUntypedSplice GhcRn)

@@ -164,7 +164,7 @@ tcLambdaMatches e lam_variant matches invis_pat_tys res_ty
     herald = ExpectedFunTyLam lam_variant e
              -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
 
-    tc_body | isDoExpansionGenerated (mg_ext matches)
+    tc_body | isDoExpansionGenerated (mg_rn_origin $ mg_ext matches)
               -- See Part 3. B. of Note [Expanding HsDo with XXExprGhcRn] in
               -- `GHC.Tc.Gen.Do`. Testcase: Typeable1
             = tcBodyNC -- NB: Do not add any error contexts
@@ -229,16 +229,21 @@ tcMatches :: (AnnoBody body, Outputable (body GhcTc))
           -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
 
 tcMatches tc_body pat_tys rhs_ty (MG { mg_alts = L l matches
-                                     , mg_ext = origin })
+                                     , mg_ext = MatchGroupRn ctxt origin })
   | null matches  -- Deal with case e of {}
     -- Since there are no branches, no one else will fill in rhs_ty
     -- when in inference mode, so we must do it ourselves,
     -- here, using expTypeToType
   = do { tcEmitBindingUsage bottomUE
-       ; pat_tys <- mapM scaledExpTypeToType (filter_out_forall_pat_tys pat_tys)
+       ; pat_ty  <- case pat_tys of
+           [ExpFunPatTy t]      -> scaledExpTypeToType t
+           [ExpForAllPatTy tvb] -> failWithTc $ TcRnEmptyCase ctxt (EmptyCaseForall tvb)
+           -- It should be impossible to trigger the panics because the renamer rejects \cases{}
+           []                   -> panic "tcMatches: no arguments in EmptyCase"
+           _t1:(_t2:_ts)        -> panic "tcMatches: multiple arguments in EmptyCase"
        ; rhs_ty  <- expTypeToType rhs_ty
        ; return (MG { mg_alts = L l []
-                    , mg_ext = MatchGroupTc pat_tys rhs_ty origin
+                    , mg_ext = MatchGroupTc [pat_ty] rhs_ty origin
                     }) }
 
   | otherwise
