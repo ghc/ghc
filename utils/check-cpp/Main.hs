@@ -15,7 +15,7 @@ import GHC.Driver.Config.Parser hiding (predefinedMacros)
 import GHC.Driver.Env.Types
 import GHC.Driver.Errors.Types
 import qualified GHC.Driver.Errors.Types as GHC
-import GHC.Driver.Main
+-- import GHC.Driver.Main
 import qualified GHC.Driver.Session as GHC
 import GHC.Hs.Dump
 import qualified GHC.LanguageExtensions as LangExt
@@ -24,7 +24,7 @@ import GHC.Parser.Header
 import GHC.Parser.Lexer (P (..), ParseResult (..))
 import qualified GHC.Parser.Lexer as GHC
 import qualified GHC.Parser.Lexer as Lexer
-import qualified GHC.Parser.PreProcess as GHCPP
+-- import qualified GHC.Parser.PreProcess as GHCPP
 import GHC.SysTools.Cpp
 import GHC.Types.SrcLoc
 import GHC.Unit.Env
@@ -84,7 +84,7 @@ doDump libdir str = ghcWrapper libdir $ do
     liftIO $ putStrLn str
     liftIO $ putStrLn "-- dumpGhcCpp test ----------"
     -- let (!pst,!toks) = strGetToks dflags [] pflags "fake_test_file.hs" str
-    hsc <- getSession
+    -- hsc <- getSession
     -- let pst0 =
     --         initParserStateWithMacros
     --             dflags
@@ -96,7 +96,7 @@ doDump libdir str = ghcWrapper libdir $ do
     liftIO $ putStrLn "-- dumpGhcCpp test done ----------"
     let !pst = getPState dflags [] pflags "fake_test_file.hs" str
     liftIO $ putStrLn "-- dumpGhcCpp ----------"
-    liftIO $ putStrLn $ showPprUnsafe $ dumpGhcCpp pst
+    liftIO $ putStrLn $ showPprUnsafe $ dumpGhcCpp dflags pst
     liftIO $ putStrLn "---------------------"
 
 -- return $ strGetToks dflags includes pflags "fake_test_file.hs" str
@@ -538,7 +538,9 @@ initDynFlags2 file = do
     -- Based on GHC backpack driver doBackPack
     dflags0 <- GHC.getSessionDynFlags
     let parser_opts0 = initParserOpts dflags0
-    (_, src_opts) <- liftIO $ getOptionsFromFile parser_opts0 (supportedLanguagePragmas dflags0) file
+    hsc_env <- getSession
+    let unit_env = hsc_unit_env hsc_env
+    (_, src_opts) <- liftIO $ getOptionsFromFile dflags0 unit_env parser_opts0 (supportedLanguagePragmas dflags0) file
     liftIO $ putStrLn $ "src_opts:" ++ show src_opts
     (dflags1, _, _) <- GHC.parseDynamicFilePragma dflags0 src_opts
     -- Turn this on last to avoid T10942
@@ -551,9 +553,9 @@ initDynFlags2 file = do
     _ <- GHC.setSessionDynFlags dflags3
     return dflags3
 
-libdir = "/home/alanz/mysrc/git.haskell.org/worktree/bisect/_build/stage1/lib"
-ddd = ghcWrapper libdir $ do
-    dflags <- initDynFlags2 "Example4.hs"
+ddd :: IO ()
+ddd = ghcWrapper libdirNow $ do
+    _dflags <- initDynFlags2 "Example4.hs"
     return ()
 
 t20 :: IO ()
