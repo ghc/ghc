@@ -2659,68 +2659,79 @@ tcClassDecl1 :: RolesInfo -> Name -> Maybe (LHsContext GhcRn)
              -> [LFamilyDecl GhcRn] -> [LTyFamDefltDecl GhcRn]
              -> TcM Class
 tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
-  = fixM $ \ clas -> -- We need the knot because 'clas' is passed into tcClassATs
-    bindTyClTyVars class_name $ \ tc_bndrs res_kind ->
-    do { checkClassKindSig res_kind
-       ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr tc_bndrs)
-       ; let tycon_name = class_name        -- We use the same name
-             roles = roles_info tycon_name  -- for TyCon and Class
+  = do { cls <-
+          fixM $ \ clas -> -- We need the knot because 'clas' is passed into tcClassATs
+          bindTyClTyVars class_name $ \ tc_bndrs res_kind ->
+          do { checkClassKindSig res_kind
+             ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr tc_bndrs)
+             ; let tycon_name = class_name        -- We use the same name
+                   roles = roles_info tycon_name  -- for TyCon and Class
 
-       ; (ctxt, fds, sig_stuff, at_stuff)
-            <- pushLevelAndSolveEqualities skol_info tc_bndrs $
-               -- The (binderVars tc_bndrs) is needed bring into scope the
-               -- skolems bound by the class decl header (#17841)
-               do { ctxt <- tcHsContext hs_ctxt
-                  ; fds  <- mapM (addLocM tc_fundep) fundeps
-                  ; sig_stuff <- tcClassSigs class_name sigs meths
-                  ; at_stuff  <- tcClassATs class_name clas ats at_defs
-                  ; return (ctxt, fds, sig_stuff, at_stuff) }
+             ; (ctxt, fds, sig_stuff, at_stuff)
+                   <- pushLevelAndSolveEqualities skol_info tc_bndrs $
+                     -- The (binderVars tc_bndrs) is needed bring into scope the
+                     -- skolems bound by the class decl header (#17841)
+                     do { ctxt <- tcHsContext hs_ctxt
+                        ; fds  <- mapM (addLocM tc_fundep) fundeps
+                        ; sig_stuff <- tcClassSigs class_name sigs meths
+                        ; at_stuff  <- tcClassATs class_name clas ats at_defs
+                        ; return (ctxt, fds, sig_stuff, at_stuff) }
 
-       -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
-       -- Example: (typecheck/should_fail/T17562)
-       --   type C :: Type -> Type -> Constraint
-       --   class (forall a. a b ~ a c) => C b c
-       -- The kind of `a` is unconstrained.
-       ; dvs <- candidateQTyVarsOfTypes ctxt
-       ; let err_ctx tidy_env = do { (tidy_env2, ctxt) <- zonkTidyTcTypes tidy_env ctxt
-                                   ; return (tidy_env2, UninfTyCtx_ClassContext ctxt) }
-       ; doNotQuantifyTyVars dvs err_ctx
+             -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
+             -- Example: (typecheck/should_fail/T17562)
+             --   type C :: Type -> Type -> Constraint
+             --   class (forall a. a b ~ a c) => C b c
+             -- The kind of `a` is unconstrained.
+             ; dvs <- candidateQTyVarsOfTypes ctxt
+             ; let err_ctx tidy_env = do { (tidy_env2, ctxt) <- zonkTidyTcTypes tidy_env ctxt
+                                         ; return (tidy_env2, UninfTyCtx_ClassContext ctxt) }
+             ; doNotQuantifyTyVars dvs err_ctx
 
-       -- The pushLevelAndSolveEqualities will report errors for any
-       -- unsolved equalities, so these zonks should not encounter
-       -- any unfilled coercion variables unless there is such an error
-       -- The zonk also squeeze out the TcTyCons, and converts
-       -- Skolems to tyvars.
-       ; (bndrs, ctxt, sig_stuff) <- initZonkEnv NoFlexi $
-         runZonkBndrT (zonkTyVarBindersX tc_bndrs) $ \ bndrs ->
-           do { ctxt        <- zonkTcTypesToTypesX ctxt
-              ; sig_stuff   <- mapM zonkTcMethInfoToMethInfoX sig_stuff
-                -- ToDo: do we need to zonk at_stuff?
-              ; return (bndrs, ctxt, sig_stuff) }
+             -- The pushLevelAndSolveEqualities will report errors for any
+             -- unsolved equalities, so these zonks should not encounter
+             -- any unfilled coercion variables unless there is such an error
+             -- The zonk also squeeze out the TcTyCons, and converts
+             -- Skolems to tyvars.
+             ; (bndrs, ctxt, sig_stuff) <- initZonkEnv NoFlexi $
+               runZonkBndrT (zonkTyVarBindersX tc_bndrs) $ \ bndrs ->
+                 do { ctxt        <- zonkTcTypesToTypesX ctxt
+                     ; sig_stuff   <- mapM zonkTcMethInfoToMethInfoX sig_stuff
+                       -- ToDo: do we need to zonk at_stuff?
+                     ; return (bndrs, ctxt, sig_stuff) }
 
-       -- TODO: Allow us to distinguish between abstract class,
-       -- and concrete class with no methods (maybe by
-       -- specifying a trailing where or not
+             -- TODO: Allow us to distinguish between abstract class,
+             -- and concrete class with no methods (maybe by
+             -- specifying a trailing where or not
 
-       ; mindef <- tcClassMinimalDef class_name sigs sig_stuff
-       ; is_boot <- tcIsHsBootOrSig
-       ; let body | is_boot, isNothing hs_ctxt, null at_stuff, null sig_stuff
-                  -- We use @isNothing hs_ctxt@ rather than @null ctxt@,
-                  -- so that a declaration in an hs-boot file such as:
-                  --
-                  -- class () => C a b | a -> b
-                  --
-                  -- is not considered abstract; it's sometimes useful
-                  -- to be able to declare such empty classes in hs-boot files.
-                  -- See #20661.
-                  = Nothing
-                  | otherwise
-                  = Just (ctxt, at_stuff, sig_stuff, mindef)
+             ; mindef <- tcClassMinimalDef class_name sigs sig_stuff
+             ; is_boot <- tcIsHsBootOrSig
+             ; let body | is_boot, isNothing hs_ctxt, null at_stuff, null sig_stuff
+                         -- We use @isNothing hs_ctxt@ rather than @null ctxt@,
+                         -- so that a declaration in an hs-boot file such as:
+                         --
+                         -- class () => C a b | a -> b
+                         --
+                         -- is not considered abstract; it's sometimes useful
+                         -- to be able to declare such empty classes in hs-boot files.
+                         -- See #20661.
+                         = Nothing
+                         | otherwise
+                         = Just (ctxt, at_stuff, sig_stuff, mindef)
 
-       ; clas <- buildClass class_name bndrs roles fds body
-       ; traceTc "tcClassDecl" (ppr fundeps $$ ppr bndrs $$
-                                ppr fds)
-       ; return clas }
+             ; clas <- buildClass class_name bndrs roles fds body
+             ; traceTc "tcClassDecl" (ppr fundeps $$ ppr bndrs $$ ppr fds)
+             ; return clas }
+       ; mapM_
+          (\tc ->
+            traceTc "tcClassDecl assoc type class:"
+                  (vcat
+                  [ ppr tc
+                    , text "tyConBinders:" <+> ppr (tyConBinders tc)
+                    , text "tyConTyVars:" <+> ppr (tyConTyVars tc)
+                    , text "tyConFamArgFlavours:" <+> ppr (tyConFamArgFlavours tc)
+                  ]))
+          $ map (\(ATI ty _) -> ty) $ classATItems cls
+       ; return cls }
   where
     skol_info = TyConSkol ClassFlavour class_name
 

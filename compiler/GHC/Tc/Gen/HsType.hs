@@ -787,15 +787,14 @@ tcFamTyPats fam_tc hs_pats
   = do { traceTc "tcFamTyPats {" $
          vcat [ ppr fam_tc,
                 text "arity:" <+> ppr fam_arity,
-                text "pats:" <+> ppr hs_pats,
-                text "famArgs:" <+> ppr patsArgFlavours
+                text "pats:" <+> ppr hs_pats
                 ]
 
        ; mode <- mkHoleMode TypeLevel (HM_FamPat FreeArg)
                  -- HM_FamPat: See Note [Wildcards in family instances] in
                  -- GHC.Rename.Module
        ; let fun_ty = mkTyConApp fam_tc []
-       ; (fam_app, res_kind) <- tcInferTyApps mode lhs_fun fun_ty patsArgFlavours
+       ; (fam_app, res_kind) <- tcInferTyApps mode lhs_fun fun_ty hs_pats (tyConFamArgFlavours fam_tc ++ cycle [FreeArg])
 
        -- Hack alert: see Note [tcFamTyPats: zonking the result kind]
        ; res_kind <- liftZonkM $ zonkTcType res_kind
@@ -808,7 +807,6 @@ tcFamTyPats fam_tc hs_pats
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
     lhs_fun   = noLocA (HsTyVar noAnn NotPromoted (noLocA fam_name))
-    patsArgFlavours = zip hs_pats (tyConFamArgFlavours fam_tc ++ cycle [FreeArg])
 
 {- Note [tcFamTyPats: zonking the result kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -890,7 +888,7 @@ tcInferLHsTypeUnsaturated hs_ty
        ; case splitHsAppTys_maybe (unLoc hs_ty) of
            Just (hs_fun_ty, hs_args)
               -> do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
-                    ; tcInferTyApps_nosat mode hs_fun_ty fun_ty (zip hs_args (cycle [FreeArg])) }
+                    ; tcInferTyApps_nosat mode hs_fun_ty fun_ty hs_args (cycle [FreeArg])}
                       -- Notice the 'nosat'; do not instantiate trailing
                       -- invisible arguments of a type family.
                       -- See Note [Dealing with :kind]
@@ -1557,7 +1555,7 @@ tc_app_ty :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
        ; (ty, infered_kind) <- tcInferTyApps mode hs_fun_ty fun_ty
-                                 (zip hs_args (cycle [FreeArg]))
+                                 hs_args (cycle [FreeArg])
        ; checkExpKind rn_ty ty infered_kind exp_kind }
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
@@ -1578,15 +1576,16 @@ tcInferTyApps, tcInferTyApps_nosat
     :: TcTyMode
     -> LHsType GhcRn        -- ^ Function (for printing only)
     -> TcType               -- ^ Function
-    -> [(LHsTypeArg GhcRn, FamArgFlavour)]   -- ^ Args
+    -> [LHsTypeArg GhcRn]   -- ^ Args
+    -> [FamArgFlavour]   -- ^ Args
     -> TcM (TcType, TcKind) -- ^ (f args, result kind)
-tcInferTyApps mode hs_ty fun hs_args
-  = do { (f_args, res_k) <- tcInferTyApps_nosat mode hs_ty fun hs_args
+tcInferTyApps mode hs_ty fun hs_args famArgFlvs
+  = do { (f_args, res_k) <- tcInferTyApps_nosat mode hs_ty fun hs_args famArgFlvs
        ; saturateFamApp f_args res_k }
 
-tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
+tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args fam_arg_flvs
   = do { traceTc "tcInferTyApps {" (ppr orig_hs_ty $$ ppr orig_hs_args)
-       ; (f_args, res_k) <- go_init 1 fun orig_hs_args
+       ; (f_args, res_k) <- go_init 1 fun orig_hs_args fam_arg_flvs
        ; traceTc "tcInferTyApps }" (ppr f_args <+> dcolon <+> ppr res_k)
        ; return (f_args, res_k) }
   where
@@ -1610,7 +1609,8 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
        -> TcType          -- Function applied to some args
        -> Subst        -- Applies to function kind
        -> TcKind          -- Function kind
-       -> [(LHsTypeArg GhcRn, FamArgFlavour)]    -- Un-type-checked args
+       -> [LHsTypeArg GhcRn]    -- Un-type-checked args
+       -> [FamArgFlavour]    -- Un-type-checked args
        -> TcM (TcType, TcKind)  -- Result type and its kind
     -- INVARIANT: in any call (go n fun subst fun_ki args)
     --               typeKind fun  =  subst(fun_ki)
@@ -1623,14 +1623,14 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
     -- is apply 'fun' to an argument type.
 
     -- Dispatch on all_args first, for performance reasons
-    go n fun subst fun_ki all_args = case (all_args, tcSplitPiTy_maybe fun_ki) of
-
+    go n fun subst fun_ki all_args [] = error "tcInferTyApps_nosat: empty all_args"
+    go n fun subst fun_ki all_args arg_flvs@(arg_flv:rest_arg_flvs) = case (all_args, tcSplitPiTy_maybe fun_ki) of
       ---------------- No user-written args left. We're done!
       ([], _) -> return (fun, substTy subst fun_ki)
-      ((arg,famArgTy):argtys, kb) -> do
+      (arg:argtys, kb) -> do
           case (arg, kb) of
             ---------------- HsArgPar: We don't care about parens here
-            (HsArgPar _, _) -> go n fun subst fun_ki argtys
+            (HsArgPar _, _) -> go n fun subst fun_ki argtys arg_flvs
 
             ---------------- HsTypeArg: a kind application (fun @ki)
             (HsTypeArg _ hs_ki_arg, Just (ki_binder, inner_ki)) ->
@@ -1642,6 +1642,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
               Named (Bndr _ Specified) ->  -- Visible kind application
                 do { traceTc "tcInferTyApps (vis kind app)"
                             (vcat [ ppr ki_binder, ppr hs_ki_arg
+                                  , ppr arg_flv
                                   , ppr (piTyBinderType ki_binder)
                                   , ppr subst ])
 
@@ -1653,7 +1654,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
 
                   ; traceTc "tcInferTyApps (vis kind app)" (ppr exp_kind)
                   ; (subst', fun') <- mkAppTyM subst fun ki_binder ki_arg
-                  ; go (n+1) fun' subst' inner_ki argtys }
+                  ; go (n+1) fun' subst' inner_ki argtys rest_arg_flvs }
 
               -- Attempted visible kind application (fun @ki), but fun_ki is
               --   forall k -> blah   or   k1 -> k2
@@ -1676,20 +1677,20 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
               -> do { traceTc "tcInferTyApps (vis normal app)"
                                 (vcat [ ppr ki_binder
                                       , ppr arg
-                                      , ppr famArgTy
+                                      , ppr arg_flv
                                       , ppr (piTyBinderType ki_binder)
                                       , ppr subst ])
                       ; let exp_kind = substTy subst $ piTyBinderType ki_binder
                       ; arg' <- addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty arg) n) $
-                                tc_check_lhs_type (updateFamArgFlavour famArgTy mode) arg exp_kind
+                                tc_check_lhs_type (updateFamArgFlavour arg_flv mode) arg exp_kind
                       ; traceTc "tcInferTyApps (vis normal app) 2" (ppr exp_kind)
                       ; (subst', fun') <- mkAppTyM subst fun ki_binder arg'
-                      ; go (n+1) fun' subst' inner_ki argtys }
+                      ; go (n+1) fun' subst' inner_ki argtys rest_arg_flvs}
 
                 -- no binder; try applying the substitution, or infer another arrow in fun kind
             (HsValArg _ _, Nothing)
               -> try_again_after_substing_or $
-                do { let arrows_needed = n_initial_val_args (fst <$> all_args)
+                do { let arrows_needed = n_initial_val_args all_args
                     ; co <- matchExpectedFunKind (HsTypeRnThing $ unLoc hs_ty) arrows_needed substed_fun_ki
 
                     ; fun' <- liftZonkM $ zonkTcType (fun `mkCastTy` co)
@@ -1701,27 +1702,27 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
                               , ppr arrows_needed
                               , ppr co
                               , ppr fun' <+> dcolon <+> ppr (typeKind fun')]
-                    ; go_init n fun' all_args }
+                    ; go_init n fun' all_args arg_flvs}
                       -- Use go_init to establish go's INVARIANT
       where
         instantiate ki_binder inner_ki
           = do { traceTc "tcInferTyApps (need to instantiate)"
-                         (vcat [ ppr ki_binder, ppr subst])
+                         (vcat [ ppr ki_binder, ppr arg_flv, ppr subst ])
                ; (subst', arg') <- tcInstInvisibleTyBinder subst ki_binder
-               ; go n (mkAppTy fun arg') subst' inner_ki all_args }
+               ; go n (mkAppTy fun arg') subst' inner_ki all_args rest_arg_flvs}
                  -- Because tcInvisibleTyBinder instantiate ki_binder,
                  -- the kind of arg' will have the same shape as the kind
                  -- of ki_binder.  So we don't need mkAppTyM here.
 
         try_again_after_substing_or fallthrough
           | not (isEmptyTCvSubst subst)
-          = go n fun zapped_subst substed_fun_ki all_args
+          = go n fun zapped_subst substed_fun_ki all_args arg_flvs
           | otherwise
           = fallthrough
 
         zapped_subst   = zapSubst subst
         substed_fun_ki = substTy subst fun_ki
-        hs_ty          = appTypeToArg orig_hs_ty (take (n-1) $ fst <$> orig_hs_args)
+        hs_ty          = appTypeToArg orig_hs_ty (take (n-1) orig_hs_args)
 
     n_initial_val_args :: [HsArg p tm ty] -> Arity
     -- Count how many leading HsValArgs we have
@@ -2260,7 +2261,7 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
                HM_TyAppPat  -> fsLit "_"
      mk_wc_details = case hole_mode of
                       HM_FamPat FreeArg -> newTyVarMetaVarDetailsAtLevel
-                      HM_FamPat ClassArg -> newTyVarMetaVarDetailsAtLevel
+                      HM_FamPat ClassArg -> newTauTvDetailsAtLevel
                       HM_FamPat SigArg -> newTauTvDetailsAtLevel
                       _ -> newTauTvDetailsAtLevel
      emit_holes = case hole_mode of
