@@ -1323,14 +1323,38 @@ rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContextRn
              -> RnM (MatchGroup GhcRn (LocatedA (body GhcRn)), FreeVars)
 rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_ext = origin })
          -- see Note [Empty MatchGroups]
-  = do { whenM ((null ms &&) <$> mustn't_be_empty) (addErr (TcRnEmptyCase ctxt))
+  = do { when (null ms) $ checkEmptyCase ctxt
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
        ; return (mkMatchGroup origin (L lm new_ms), ms_fvs) }
+
+-- Check the validity of a MatchGroup with an empty list of alternatives.
+--
+--  1. Normal `case x of {}` passes this check as long as EmptyCase is enabled.
+--     Ditto lambda-case `\case {}`.
+--
+--  2. Multi-case with no alternatives `\cases {}` is never valid.
+--
+--  3. Other MatchGroup contexts (FunRhs, LamAlt LamSingle, etc) are not
+--     considered here because there is no syntax to construct them with
+--     no alternatives.
+--
+-- Test case: rename/should_fail/RnEmptyCaseFail
+--
+-- Validation continues in the type checker, namely in tcMatches.
+-- See Note [Pattern types for EmptyCase] in GHC.Tc.Gen.Match
+checkEmptyCase :: HsMatchContextRn -> RnM ()
+checkEmptyCase ctxt
+  | disallowed_ctxt =
+      addErr (TcRnEmptyCase ctxt EmptyCaseDisallowedCtxt)
+  | otherwise =
+      unlessXOptM LangExt.EmptyCase $
+        addErr (TcRnEmptyCase ctxt EmptyCaseWithoutFlag)
   where
-    mustn't_be_empty = case ctxt of
-      LamAlt LamCases -> return True
-      ArrowMatchCtxt (ArrowLamAlt LamCases) -> return True
-      _ -> not <$> xoptM LangExt.EmptyCase
+    disallowed_ctxt =
+      case ctxt of
+        LamAlt LamCases -> True
+        ArrowMatchCtxt (ArrowLamAlt LamCases) -> True
+        _ -> False
 
 rnMatch :: AnnoBody body
         => HsMatchContextRn
