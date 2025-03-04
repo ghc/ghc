@@ -72,6 +72,12 @@ data Target = Target
     , tgtMergeObjs :: Maybe MergeObjs
     -- ^ We don't need a merge objects tool if we @Ar@ supports @-L@
 
+      -- LLVM backend toolchain
+    , tgtLlc :: Program
+    , tgtOpt :: Program
+    , tgtLlvmAs :: Program
+    -- ^ assembler used to assemble LLVM backend output; typically @clang@
+
       -- Windows-specific tools
     , tgtWindres :: Maybe Program
 
@@ -125,6 +131,9 @@ instance Show Target where
     , ", tgtRanlib = " ++ show tgtRanlib
     , ", tgtNm = " ++ show tgtNm
     , ", tgtMergeObjs = " ++ show tgtMergeObjs
+    , ", tgtLlc = " ++ show tgtLlc
+    , ", tgtOpt = " ++ show tgtOpt
+    , ", tgtLlvmAs = " ++ show tgtLlvmAs
     , ", tgtWindres = " ++ show tgtWindres
     , ", tgtOtool = " ++ show tgtOtool
     , ", tgtInstallNameTool = " ++ show tgtInstallNameTool
