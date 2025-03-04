@@ -39,4 +39,6 @@ Target
 , tgtNm = Nm {nmProgram = Program {prgPath = "@NmCmd@", prgFlags = []}}
 , tgtMergeObjs = @MergeObjsCmdMaybe@
 , tgtWindres = @WindresCmdMaybeProg@
+, tgtOtool = @OtoolCmdMaybeProg@
+, tgtInstallNameTool = @InstallNameToolCmdMaybeProg@
 }
