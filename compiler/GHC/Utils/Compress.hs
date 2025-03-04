@@ -3,13 +3,15 @@ module GHC.Utils.Compress where
 
 import GHC.Prelude
 import qualified Data.ByteString as BS
+import GHC.Ptr(Ptr)
+import Foreign.ForeignPtr (ForeignPtr)
 
 #if defined(HAVE_LIBZSTD)
 import Foreign.C.Types
 import qualified Data.ByteString.Internal as BSI
 import GHC.IO (unsafePerformIO)
-import GHC.Ptr
-import Foreign.ForeignPtr
+import GHC.Ptr (plusPtr, castPtr)
+import Foreign.ForeignPtr (plusForeignPtr, withForeignPtr)
 import Foreign.Marshal.Utils
 import Data.Word
 import Foreign.Storable
@@ -20,11 +22,14 @@ compress    :: Int -> BS.ByteString -> BS.ByteString
 compressPtr :: Int -> Ptr src -> Int -> (Int -> Ptr src -> IO b) -> IO b
 
 decompress :: BS.ByteString -> BS.ByteString
-decompressPtr :: Ptr src -> Int -> IO (ForeignPtr src, Int)
+decompressPtr :: ForeignPtr src -> Int -> IO (ForeignPtr src, Int)
 #if !defined(HAVE_LIBZSTD)
 do_compress   = 0
 compress _ bs = bs
 compressPtr _ srcPtr len k = k len srcPtr
+decompress bs = bs
+decompressPtr p len = return (p, len)
+
 #else
 do_compress = 1
 
@@ -46,20 +51,20 @@ compressPtr clvl srcPtr len k = do
         (fromIntegral @Int clvl)
     k compressedSize dstPtr
 
-decompress (BSI.PS srcForeignPtr off len) = unsafePerformIO $
-    withForeignPtr srcForeignPtr $ \srcPtr -> do
-      (fptr, actualSize) <- decompressPtr (srcPtr `plusPtr` off) (fromIntegral len)
+decompress (BSI.PS srcForeignPtr off len) = unsafePerformIO $ do
+      (fptr, actualSize) <- decompressPtr (srcForeignPtr `plusForeignPtr` off) (fromIntegral len)
       withForeignPtr fptr $ \dstPtr ->
         BSI.create actualSize (\p -> copyBytes p dstPtr actualSize)
 
 
-decompressPtr srcPtr srcSize = do
-  decompressedSizeM <- getDecompressedSize srcPtr (fromIntegral srcSize)
-  print decompressedSizeM
-  printFirstBytes srcPtr
-  case decompressedSizeM of
-    Nothing -> error "Decompression failed"
-    Just decompressedSize -> do
+decompressPtr srcForeignPtr srcSize = do
+  withForeignPtr srcForeignPtr $ \srcPtr -> do
+    decompressedSizeM <- getDecompressedSize srcPtr (fromIntegral srcSize)
+    print decompressedSizeM
+    printFirstBytes srcPtr
+    case decompressedSizeM of
+      Nothing -> error "Decompression failed"
+      Just decompressedSize -> do
           dstForeignPtr <- BSI.mallocByteString (fromIntegral decompressedSize)
           withForeignPtr dstForeignPtr $ \dstPtr -> do
             decompressedSize <- fromIntegral <$> zstd_decompress dstPtr (fromIntegral decompressedSize) srcPtr (fromIntegral srcSize)
