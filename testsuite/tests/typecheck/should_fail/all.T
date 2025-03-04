@@ -728,3 +728,4 @@ test('T24553', normal, compile_fail, [''])
 test('T23739b', normal, compile_fail, [''])
 
 test('T25325', normal, compile_fail, [''])
+test('T25004', normal, compile_fail, [''])
