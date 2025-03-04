@@ -3409,9 +3409,10 @@ without treating the explicitly-quantified ones specially. Wrinkles:
     In step 1 we do /not/ want to get
        newtype instance forall r .  Fix2 (f :: TYPE r -> TYPE r) :: TYPE r where
     If we do, we'll get that same "newtype must not be GADT" error as for N above.
-    Rather, we want to default the RuntimeRep variable r := LiftedRep. The key thing
-    is that we must make the /same/ choice here as we do in kind-checking the data
-    constructor's type.
+    Rather, we want to default the RuntimeRep variable r := LiftedRep. See the call
+    to `quantifyTyVars` in `tcDataFamInstHeader`. The key thing is that we must make
+    the /same/ choice here as we do in kind-checking the data constructor's type
+    in `kindGeneralizeAll` in `tcConDecl`.
 
 See also Note [Re-quantify type variables in rules] in GHC.Tc.Gen.Rule, which
 explains a /very/ similar design when generalising over the type of a rewrite
@@ -4034,10 +4035,10 @@ tcConArg :: ConArgKind   -- expected kind for args; always OpenKind for datatype
                          -- but might be an unlifted type with UnliftedNewtypes
          -> HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
 tcConArg exp_kind (HsScaled w bty)
-  = do  { traceTc "tcConArg 1" (ppr bty)
+  = do  { traceTc "tcConArg 1: " (ppr bty <+> ppr exp_kind)
         ; arg_ty <- tcCheckLHsTypeInContext (getBangType bty) exp_kind
         ; w' <- tcDataConMult w
-        ; traceTc "tcConArg 2" (ppr bty)
+        ; traceTc "tcConArg 2: " (ppr bty <+> ppr arg_ty)
         ; return (Scaled w' arg_ty, getBangStrictness bty) }
 
 tcRecConDeclFields :: ConArgKind
