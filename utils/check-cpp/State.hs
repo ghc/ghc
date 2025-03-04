@@ -189,6 +189,9 @@ getAccepting = P $ \s -> POk s (pp_accepting (NonEmpty.head $ pp_scope (pp s)))
 getAccepting' :: PpState -> Bool
 getAccepting' s = pp_accepting (NonEmpty.head $ pp_scope s)
 
+ghcCppEnabled :: PP Bool
+ghcCppEnabled = P $ \s -> POk s (Lexer.ghcCppEnabled (options s))
+
 addDefine :: MacroName -> MacroDef -> PP ()
 addDefine name def = do
     accepting <- getAccepting
