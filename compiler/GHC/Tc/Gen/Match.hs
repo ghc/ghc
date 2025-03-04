@@ -120,17 +120,14 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
                    -- Makes sure that if the binding is unrestricted, it counts as
                    -- consuming its rhs Many times.
 
-                do { traceTc "tcFunBindMatches 2" $
-                     vcat [ text "ctxt:" <+> pprUserTypeCtxt ctxt
-                          , text "arity:" <+> ppr arity
-                          , text "invis_pat_tys:" <+> ppr invis_pat_tys
-                          , text "pat_tys:" <+> ppr pat_tys
-                          , text "rhs_ty:" <+> ppr rhs_ty ]
-                   ; tcMatches tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches }
+                do { traceTc "tcFunBindMatches 2" (vcat [ pprUserTypeCtxt ctxt, ppr invis_pat_tys
+                                                      , ppr pat_tys $$ ppr rhs_ty ])
+                   ; tcMatches mctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches }
 
         ; return (wrap_fun <.> wrap_mult, r) }
   where
     herald = ExpectedFunTyMatches (NameThing fun_name) matches
+    mctxt  = mkPrefixFunRhs (noLocA fun_name) noAnn
 
 funBindPrecondition :: MatchGroup GhcRn (LHsExpr GhcRn) -> Bool
 funBindPrecondition (MG { mg_alts = L _ alts })
@@ -150,10 +147,11 @@ tcLambdaMatches e lam_variant matches invis_pat_tys res_ty
 
         ; (wrapper, (mult_co_wrap, r))
             <- matchExpectedFunTys herald GenSigCtxt arity res_ty $ \ pat_tys rhs_ty ->
-               tcMatches tc_body (invis_pat_tys ++ pat_tys) rhs_ty matches
+               tcMatches ctxt tc_body (invis_pat_tys ++ pat_tys) rhs_ty matches
 
         ; return (wrapper <.> mult_co_wrap, r) }
   where
+    ctxt   = LamAlt lam_variant
     herald = ExpectedFunTyLam lam_variant e
              -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
 
@@ -171,7 +169,8 @@ parser guarantees that each equation has exactly one argument.
 -}
 
 tcCaseMatches :: (AnnoBody body, Outputable (body GhcTc))
-              => TcMatchAltChecker body    -- ^ Typecheck the alternative RHSS
+              => HsMatchContextRn
+              -> TcMatchAltChecker body    -- ^ Typecheck the alternative RHSS
               -> Scaled TcSigmaTypeFRR     -- ^ Type of scrutinee
               -> MatchGroup GhcRn (LocatedA (body GhcRn)) -- ^ The case alternatives
               -> ExpRhoType                               -- ^ Type of the whole case expression
@@ -179,8 +178,8 @@ tcCaseMatches :: (AnnoBody body, Outputable (body GhcTc))
                 -- Translated alternatives
                 -- wrapper goes from MatchGroup's ty to expected ty
 
-tcCaseMatches tc_body (Scaled scrut_mult scrut_ty) matches res_ty
-  = tcMatches tc_body [ExpFunPatTy (Scaled scrut_mult (mkCheckExpType scrut_ty))] res_ty matches
+tcCaseMatches ctxt tc_body (Scaled scrut_mult scrut_ty) matches res_ty
+  = tcMatches ctxt tc_body [ExpFunPatTy (Scaled scrut_mult (mkCheckExpType scrut_ty))] res_ty matches
 
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 tcGRHSsPat :: Mult -> GRHSs GhcRn (LHsExpr GhcRn) -> ExpRhoType
@@ -227,23 +226,28 @@ type AnnoBody body
 
 -- | Type-check a MatchGroup.
 tcMatches :: (AnnoBody body, Outputable (body GhcTc))
-          => TcMatchAltChecker body
+          => HsMatchContextRn
+          -> TcMatchAltChecker body
           -> [ExpPatType]             -- ^ Expected pattern types.
           -> ExpRhoType               -- ^ Expected result-type of the Match.
           -> MatchGroup GhcRn (LocatedA (body GhcRn))
           -> TcM (HsWrapper, MatchGroup GhcTc (LocatedA (body GhcTc)))
 
-tcMatches tc_body pat_tys rhs_ty (MG { mg_alts = L l matches
-                                     , mg_ext = origin })
+tcMatches ctxt tc_body pat_tys rhs_ty (MG { mg_alts = L l matches
+                                          , mg_ext = origin })
   | null matches  -- Deal with case e of {}
     -- Since there are no branches, no one else will fill in rhs_ty
     -- when in inference mode, so we must do it ourselves,
     -- here, using expTypeToType
   = do { tcEmitBindingUsage bottomUE
-       ; pat_tys <- mapM scaledExpTypeToType (filter_out_forall_pat_tys pat_tys)
+       ; pat_ty <- case pat_tys of -- See Note [Pattern types for EmptyCase]
+           [ExpFunPatTy t]      -> scaledExpTypeToType t
+           [ExpForAllPatTy tvb] -> failWithTc $ TcRnEmptyCase ctxt (EmptyCaseForall tvb)
+           []                   -> panic "tcMatches: no arguments in EmptyCase"
+           _t1:(_t2:_ts)        -> panic "tcMatches: multiple arguments in EmptyCase"
        ; rhs_ty  <- expTypeToType rhs_ty
        ; return (idHsWrapper, MG { mg_alts = L l []
-                                 , mg_ext = MatchGroupTc pat_tys rhs_ty origin
+                                 , mg_ext = MatchGroupTc [pat_ty] rhs_ty origin
                                  }) }
 
   | otherwise
@@ -265,6 +269,36 @@ tcMatches tc_body pat_tys rhs_ty (MG { mg_alts = L l matches
       where
         match_fun_pat_ty (ExpFunPatTy t)  = Just t
         match_fun_pat_ty ExpForAllPatTy{} = Nothing
+
+{- Note [Pattern types for EmptyCase]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In tcMatches, we might encounter an empty list of matches if the user wrote
+`case x of {}` or `\case {}`.
+
+* First of all, both `case x of {}` and `\case {}` match on exactly one
+  argument, so we expect pat_tys to be a singleton list [pat_ty] and panic otherwise.
+
+  Multi-case `\cases {}` can't violate this assumption in `tcMatches` because it
+  must have been rejected earlier in `rnMatchGroup`.
+
+  Other MatchGroup contexts (function equations `f x = ...`, lambdas `\a b -> ...`,
+  etc) are not considered here because there is no syntax to construct them with
+  an empty list of alternatives.
+
+* With lambda-case, we run the risk of trying to match on a type argument:
+
+    f :: forall (xs :: Type) -> ()
+    f = \case {}
+
+  This is not valid and it used to trigger a panic in pmcMatches (#25004).
+  We reject it by inspecting the expected pattern type:
+
+    ; pat_ty <- case pat_tys of
+        [ExpFunPatTy t]      -> ...    -- value argument, ok
+        [ExpForAllPatTy tvb] -> ...    -- type argument, error!
+
+  Test case: typecheck/should_fail/T25004
+-}
 
 -------------
 tcMatch :: (AnnoBody body)
