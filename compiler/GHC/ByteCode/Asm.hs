@@ -360,37 +360,6 @@ inspectAsm platform long_jumps initial_offset
 largeArgInstr :: Word16 -> Word16
 largeArgInstr bci = bci_FLAG_LARGE_ARGS .|. bci
 
-sizedInstr :: Platform -> Word16 -> PrimRep -> Word16
-sizedInstr platform bci rep =
-  bci .|. ((interpreterWidth rep) `shiftL` 13)
-  where
-    -- For operations currently not used or supported by the interpreter.
-    not_supported = panic "sizedInstr: Trying to get width for rep not supported by interpreter"
-    -- For performance reasons 64bit wide operations should always use fixed width operations.
-    err_w64 = panic "sizedInstr: Trying to get width for a W64 rep, these should use fixed rep instructions instead"
-    interpreterWidth rep =
-      case rep of
-        Int8Rep -> 0
-        Int16Rep -> 1
-        Int32Rep -> 2
-        Int64Rep -> err_w64
-        IntRep -> case platformWordSize platform of
-          PW4 -> 2
-          PW8 -> err_w64
-        Word8Rep -> 0
-        Word16Rep -> 1
-        Word32Rep -> 2
-        Word64Rep -> err_w64
-        WordRep -> case platformWordSize platform of
-          PW4 -> 2
-          PW8 -> err_w64
-        AddrRep -> err_w64
-        FloatRep -> not_supported
-        DoubleRep -> not_supported
-        VecRep{} -> not_supported
-        BoxedRep{} -> not_supported
-
-
 largeArg :: Platform -> Word64 -> [Word16]
 largeArg platform w = case platformWordSize platform of
    PW8 -> [fromIntegral (w `shiftR` 48),
