@@ -25,8 +25,6 @@ data Endianness = LittleEndian | BigEndian
 -- TODO(#23674): Move the remaining relevant `settings-xxx` to Target:
 -- * llc command
 -- * opt command
--- * install_name_tool
--- * otool command
 --
 -- Those are all things that are put into GHC's settings, and that might be
 -- different across targets
@@ -74,6 +72,10 @@ data Target = Target
 
       -- Windows-specific tools
     , tgtWindres :: Maybe Program
+
+      -- Darwin-specific tools
+    , tgtOtool   :: Maybe Program
+    , tgtInstallNameTool :: Maybe Program
     }
     deriving (Read, Eq, Ord)
 
@@ -122,5 +124,7 @@ instance Show Target where
     , ", tgtNm = " ++ show tgtNm
     , ", tgtMergeObjs = " ++ show tgtMergeObjs
     , ", tgtWindres = " ++ show tgtWindres
+    , ", tgtOtool = " ++ show tgtOtool
+    , ", tgtInstallNameTool = " ++ show tgtInstallNameTool
     , "}"
     ]

@@ -53,6 +53,8 @@ data Opts = Opts
     , optReadelf   :: ProgOpt
     , optMergeObjs :: ProgOpt
     , optWindres   :: ProgOpt
+    , optOtool     :: ProgOpt
+    , optInstallNameTool :: ProgOpt
     -- Note we don't actually configure LD into anything but
     -- see #23857 and #22550 for the very unfortunate story.
     , optLd        :: ProgOpt
@@ -101,6 +103,8 @@ emptyOpts = Opts
     , optMergeObjs = po0
     , optWindres   = po0
     , optLd        = po0
+    , optOtool     = po0
+    , optInstallNameTool = po0
     , optUnregisterised = Nothing
     , optTablesNextToCode = Nothing
     , optUseLibFFIForAdjustors = Nothing
@@ -112,7 +116,8 @@ emptyOpts = Opts
     po0 = emptyProgOpt
 
 _optCc, _optCxx, _optCpp, _optHsCpp, _optJsCpp, _optCmmCpp, _optCcLink, _optAr,
-    _optRanlib, _optNm, _optReadelf, _optMergeObjs, _optWindres, _optLd
+    _optRanlib, _optNm, _optReadelf, _optMergeObjs, _optWindres, _optLd,
+    _optOtool, _optInstallNameTool
     :: Lens Opts ProgOpt
 _optCc      = Lens optCc      (\x o -> o {optCc=x})
 _optCxx     = Lens optCxx     (\x o -> o {optCxx=x})
@@ -127,7 +132,9 @@ _optNm      = Lens optNm      (\x o -> o {optNm=x})
 _optReadelf = Lens optReadelf (\x o -> o {optReadelf=x})
 _optMergeObjs = Lens optMergeObjs (\x o -> o {optMergeObjs=x})
 _optWindres = Lens optWindres (\x o -> o {optWindres=x})
-_optLd = Lens optLd (\x o -> o {optLd= x})
+_optLd      = Lens optLd (\x o -> o {optLd=x})
+_optOtool   = Lens optOtool (\x o -> o {optOtool=x})
+_optInstallNameTool = Lens optInstallNameTool (\x o -> o {optInstallNameTool=x})
 
 _optTriple :: Lens Opts (Maybe String)
 _optTriple = Lens optTriple (\x o -> o {optTriple=x})
@@ -185,6 +192,8 @@ options =
     , progOpts "merge-objs" "linker for merging objects" _optMergeObjs
     , progOpts "windres" "windres utility" _optWindres
     , progOpts "ld" "linker" _optLd
+    , progOpts "otool" "otool utility" _optOtool
+    , progOpts "install-name-tool" "install-name-tool utility" _optInstallNameTool
     ]
   where
     progOpts :: String -> String -> Lens Opts ProgOpt -> [OptDescr (Opts -> Opts)]
@@ -444,6 +453,15 @@ mkTarget opts = do
             return (Just windres)
           _ -> return Nothing
 
+    -- Darwin-specific utilities
+    (otool, installNameTool) <-
+        case archOS_OS archOs of
+          OSDarwin -> do
+            otool <- findProgram "otool" (optOtool opts) ["otool"]
+            installNameTool <- findProgram "install_name_tool" (optInstallNameTool opts) ["install_name_tool"]
+            return (Just otool, Just installNameTool)
+          _ -> return (Nothing, Nothing)
+
     -- various other properties of the platform
     tgtWordSize <- checkWordSize cc
     tgtEndianness <- checkEndianness cc
@@ -481,6 +499,8 @@ mkTarget opts = do
                    , tgtNm = nm
                    , tgtMergeObjs = mergeObjs
                    , tgtWindres = windres
+                   , tgtOtool = otool
+                   , tgtInstallNameTool = installNameTool
                    , tgtWordSize
                    , tgtEndianness
                    , tgtUnregisterised

@@ -80,8 +80,6 @@ project-git-commit-id  = @ProjectGitCommitId@
 # might become redundant.
 # See Note [tooldir: How GHC finds mingw on Windows]
 
-settings-otool-command = @SettingsOtoolCommand@
-settings-install_name_tool-command = @SettingsInstallNameToolCommand@
 settings-llc-command = @SettingsLlcCommand@
 settings-opt-command = @SettingsOptCommand@
 settings-llvm-as-command = @SettingsLlvmAsCommand@
