@@ -210,7 +210,9 @@ test('T16846', [only_ways(['optasm']), exit_code(1)], compile_and_run, [''])
 test('T17920', [cmm_src], compile_and_run, [''])
 test('T18527', req_c, compile_and_run, ['T18527FFI.c'])
 test('T19149', [req_c,only_ways('sanity')], compile_and_run, ['T19149_c.c'])
-test('T20275', normal, compile_and_run, [''])
+test('T20275', [unless(js_arch(),extra_ways(['optasm']))], compile_and_run, [''])
+               # Also tested with optimizations because
+               # that's the original reproducer for #25771
 
 test('CallConv', [when(unregisterised(), skip),
                   unless(arch('x86_64') or arch('aarch64'), skip),
