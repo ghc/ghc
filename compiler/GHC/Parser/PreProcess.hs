@@ -84,12 +84,12 @@ addSourceToTokens ::
     [Located Token] ->
     [(Located Token, String)]
 addSourceToTokens _ _ [] = []
-addSourceToTokens loc buf (t@(L span _) : ts) =
-    case span of
-        UnhelpfulSpan _ -> (t, "") : addSourceToTokens loc buf ts
+addSourceToTokens loc0 buf0 (t@(L sp _) : ts) =
+    case sp of
+        UnhelpfulSpan _ -> (t, "") : addSourceToTokens loc0 buf0 ts
         RealSrcSpan s _ -> (t, str) : addSourceToTokens newLoc newBuf ts
           where
-            (newLoc, newBuf, str) = go "" loc buf
+            (newLoc, newBuf, str) = go "" loc0 buf0
             start = realSrcSpanStart s
             end = realSrcSpanEnd s
             go acc loc buf

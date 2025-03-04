@@ -3,12 +3,14 @@ module PreProcess where
 import Data.List
 import qualified Data.Map as Map
 import Debug.Trace
-import GHC
+import GHC hiding (addSourceToTokens)
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Data.StringBuffer
+import GHC.Driver.DynFlags (xopt)
 import GHC.Driver.Errors.Types
 import qualified GHC.Driver.Errors.Types as GHC
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
 import qualified GHC.Parser.Lexer as GHC
@@ -26,12 +28,26 @@ import State
 
 -- ---------------------------------------------------------------------
 
-dumpGhcCpp :: PState PpState -> SDoc
-dumpGhcCpp pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
-                        -- ++ show comments_as_toks ++ sepa
-                        ++ show comments ++ sepa
-                        -- ++ show all_toks ++ sepa
+dumpGhcCpp :: DynFlags -> PState PpState -> SDoc
+dumpGhcCpp dflags pst = output
   where
+    -- ++ show all_toks ++ sepa
+
+    ghc_cpp_enabled = xopt LangExt.GhcCpp dflags
+    output =
+        if not ghc_cpp_enabled
+            then text "GHC_CPP not enabled"
+            else
+                text $
+                    sepa
+                        ++ defines
+                        ++ sepa
+                        ++ final
+                        ++ sepa
+                        -- ++ show comments_as_toks ++ sepa
+                        ++ show comments
+                        ++ sepa
+    -- ++ show all_toks ++ sepa
     -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
     (pst_final, bare_toks) = lexAll pst
     comments = reverse (Lexer.comment_q pst_final)
@@ -44,8 +60,10 @@ dumpGhcCpp pst = text $ sepa ++ defines ++ sepa ++ final ++ sepa
     sepa = "\n-------------x----------------\n"
     startLoc = mkRealSrcLoc (srcLocFile (psRealLoc $ loc pst)) 1 1
     buf1 = (buffer pst){cur = 0}
-    all_toks = sortBy cmpBs (bare_toks ++ comments_as_toks)
-    toks = GHC.addSourceToTokens startLoc buf1 all_toks
+    all_toks =
+        sortBy cmpBs (bare_toks ++ comments_as_toks)
+    toks =
+        addSourceToTokens startLoc buf1 all_toks
     final = renderCombinedToks toks
 
 cmpBs :: Located Token -> Located Token -> Ordering
@@ -57,6 +75,38 @@ cmpBs _ _ = EQ
 
 renderCombinedToks :: [(Located Token, String)] -> String
 renderCombinedToks toks = showCppTokenStream toks
+
+-- ---------------------------------------------------------------------
+-- addSourceToTokens copied here to unbreak an import loop.
+-- It should probably move somewhere else
+
+{- | Given a source location and a StringBuffer corresponding to this
+location, return a rich token stream with the source associated to the
+tokens.
+-}
+addSourceToTokens ::
+    RealSrcLoc ->
+    StringBuffer ->
+    [Located Token] ->
+    [(Located Token, String)]
+addSourceToTokens _ _ [] = []
+addSourceToTokens loc0 buf0 (t@(L sp _) : ts) =
+    case sp of
+        UnhelpfulSpan _ -> (t, "") : addSourceToTokens loc0 buf0 ts
+        RealSrcSpan s _ -> (t, str) : addSourceToTokens newLoc newBuf ts
+          where
+            (newLoc, newBuf, str) = go "" loc0 buf0
+            start = realSrcSpanStart s
+            end = realSrcSpanEnd s
+            go acc loc buf
+                | loc < start = go acc nLoc nBuf
+                | start <= loc && loc < end = go (ch : acc) nLoc nBuf
+                | otherwise = (loc, buf, reverse acc)
+              where
+                (ch, nBuf) = nextChar buf
+                nLoc = advanceSrcLoc loc ch
+
+-- ---------------------------------------------------------------------
 
 -- Tweaked from showRichTokenStream
 showCppTokenStream :: [(Located Token, String)] -> String
@@ -106,9 +156,11 @@ showDefines defines = Map.foldlWithKey' (\acc k d -> acc ++ "\n" ++ renderDefine
         "#define " ++ n ++ "(" ++ (intercalate "," args) ++ ") " ++ (intercalate " " (map PM.t_str rhs))
 
 lexAll :: Lexer.PState PpState -> (Lexer.PState PpState, [Located Token])
-lexAll state = case unP (lexer True return) state of
+-- lexAll state = case unP (lexer True return) state of
+lexAll state = case unP (lexerDbg True return) state of
     POk s t@(L _ ITeof) -> (s, [t])
-    POk state' t -> (ss, t : rest)
+    -- POk state' t -> (ss, t : rest)
+    POk state' t -> (ss, trace ("lexAll:" ++ show t) t : rest)
       where
         (ss, rest) = lexAll state'
     PFailed pst -> error $ "failed" ++ showErrorMessages (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
@@ -169,17 +221,23 @@ ppLexer queueComments cont =
                                 Lexer.setInput inp
                                 ppLexer queueComments cont
                     L l (ITcpp continuation s) -> do
-                        if continuation
-                            then do
-                                pushContinuation tk
-                                contIgnoreTok tk
-                            else do
-                                mdump <- processCppToks s
-                                case mdump of
-                                    Just dump ->
-                                        -- We have a dump of the state, put it into an ignored token
-                                        contIgnoreTok (L l (ITcpp continuation (appendFS s (fsLit dump))))
-                                    Nothing -> contIgnoreTok tk
+                        ghcpp <- ghcCppEnabled
+                        -- Only process the directive if GhcCpp is explicitly enabled.
+                        -- Otherwise we are scanning for pragmas
+                        if ghcpp
+                            then
+                                if continuation
+                                    then do
+                                        pushContinuation tk
+                                        contIgnoreTok tk
+                                    else do
+                                        mdump <- processCppToks s
+                                        case mdump of
+                                            Just dump ->
+                                                -- We have a dump of the state, put it into an ignored token
+                                                contIgnoreTok (L l (ITcpp continuation (appendFS s (fsLit dump))))
+                                            Nothing -> contIgnoreTok tk
+                            else contInner tk
                     _ -> do
                         state <- getCppState
                         -- case (trace ("CPP state:" ++ show state) state) of
