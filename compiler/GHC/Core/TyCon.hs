@@ -3050,14 +3050,14 @@ For instance, for an instance declaration like
     instance C Int [x] Bool where
        type F _ _ (_ :: _) = Int
 
-the first two underscores (free arguments) would yield TyVarTv’s while the last two underscores (a class
-argument and a signature argument) would produce TauTv's.
+the first two underscores (free arguments) would yield TyVarTv’s while the last two
+underscores (a class argument and a signature argument) would produce TauTv's.
 
 <Implemenation Detail>
-The ClassArg and FreeArg are generated in `mkFamilyTyCon` and store at `famTcParent` field at `FamilyTyCon`.
-When typechecking type families, the `FamArgFlavour's passed in `tcAnonWildCardOcc` when dancing around
-inside `tcInferTyApps` and `SigArg` is passed down at `HsKindSig` branch of `tcHsType` in the dance.
-
+The ClassArg and FreeArg are generated in `mkFamilyTyCon` and store at `famTcParent`
+field at `FamilyTyCon`. When typechecking type families, the `FamArgFlavour's passed
+in `tcAnonWildCardOcc` when dancing around inside `tcInferTyApps` and `SigArg` is
+passed down at `HsKindSig` branch of `tcHsType` in the dance.
 
 <More on SigArg>
 Example from T14366
