@@ -2265,6 +2265,7 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
                       HM_FamPat ClassArg -> newTauTvDetailsAtLevel
                       HM_FamPat SigArg -> newTauTvDetailsAtLevel
                       _ -> newTauTvDetailsAtLevel
+                      -- see Note [WildCards in type families]
      emit_holes = case hole_mode of
                      HM_Sig       -> True
                      HM_FamPat _  -> False
