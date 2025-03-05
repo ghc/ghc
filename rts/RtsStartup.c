@@ -347,8 +347,10 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     /* Initialise the adjustors subsystem */
     initAdjustors();
 
+#if RTS_LINKER_USE_MMAP
     /* Initialise mmapForLinker */
     initLinkerMMap();
+#endif
 
     /* Initialise the stats department, phase 1 */
     initStats1();
