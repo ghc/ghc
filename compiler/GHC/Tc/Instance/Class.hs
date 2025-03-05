@@ -37,7 +37,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
 import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name )
-import GHC.Types.Var.Env ( VarEnv, elemVarEnv )
+import GHC.Types.Var.Env ( VarEnv )
 import GHC.Types.Id
 import GHC.Types.Var
 
