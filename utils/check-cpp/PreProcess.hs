@@ -243,7 +243,7 @@ ppLexer queueComments cont =
                     _ -> do
                         state <- getCppState
                         case (trace ("CPP state:" ++ show state) state) of
-                        -- case state of
+                            -- case state of
                             CppIgnoring -> contIgnoreTok tk
                             _ -> contInner tk
         )
