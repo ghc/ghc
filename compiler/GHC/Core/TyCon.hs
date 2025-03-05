@@ -2979,14 +2979,17 @@ tyConSkolem = isHoleName . tyConName
 -- not whether it is abstract or not.
 
 
-{- Note [WildCards in type families]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Implementation tweak for wildCards in family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Wildcards in type families are used to represent type/kind information that
-are not specified by the user. It is controversial how to interpret wildcards
-in type families. Hence We classify kinds of wildcards in type families into
-three categories represented by the FamArgFlavour data type: ClassArg, FreeArg,
-and SigArg, see Note [FamArgFlavour] for more detail. This flexibility allows
-us to flip the interpretation of wildcards in type families.
+are not specified by the user. See Note [Wildcards in family instances] for
+more intuition.
+
+It is controversial how to interpret wildcards in type families. Hence We
+classify kinds of wildcards in type families into three categories represented
+by the FamArgFlavour data type: ClassArg, FreeArg, and SigArg, see Note [FamArgFlavour]
+for more detail. This flexibility allows us to flip the interpretation of wildcards in
+type families.
 
 Some common agreements:
 
@@ -3014,8 +3017,15 @@ If maintaining backward compatibility from 8.6.4 to 9.10.2, the picks would be:
 - TauTv for ClassArg
 - TauTv for SigArg
 
+<Implemenation Detail>
+The ClassArg and FreeArg are generated in `mkFamilyTyCon` and store at `famTcParent`
+field at `FamilyTyCon`. When typechecking type families, the `FamArgFlavour's passed
+in `tcAnonWildCardOcc` when dancing around inside `tcInferTyApps` and `SigArg` is
+passed down at `HsKindSig` branch of `tcHsType` in the dance.
+
 See <More on SigArg> session in Note [FamArgFlavour] for why not just merge SigArg
 and ClassArg.
+See also Note [Wildcards in family instances] for more intuition.
 
 For more discussion, see #13908.
 -}
@@ -3053,12 +3063,6 @@ For instance, for an instance declaration like
 the first two underscores (free arguments) would yield TyVarTv’s while the last two
 underscores (a class argument and a signature argument) would produce TauTv's.
 
-<Implemenation Detail>
-The ClassArg and FreeArg are generated in `mkFamilyTyCon` and store at `famTcParent`
-field at `FamilyTyCon`. When typechecking type families, the `FamArgFlavour's passed
-in `tcAnonWildCardOcc` when dancing around inside `tcInferTyApps` and `SigArg` is
-passed down at `HsKindSig` branch of `tcHsType` in the dance.
-
 <More on SigArg>
 Example from T14366
 
@@ -3070,10 +3074,9 @@ now let's consider _ here as a FreeArg then TyVarTv, then it would not match Typ
 Say if we assign ClassArg to _ here, if we want to flip class arguments in associated
 type family to only match Type variables. Then this example would not work.
 
-Another reason is that it is really hard for us to know if wildcard in signature in an
+More over, it is really hard for us to know if wildcard in signature in an
 associated type family corresponding to a class argument or a free argument.
-For example, in the following
-  code:
+For example, in the following code:
 
 class C a b c where
   type F a (d :: TYPE a) (e :: TYPE k) f
@@ -3102,6 +3105,8 @@ THe best way I can think of is to mark them as SigArg and treat them as TauTv.
 
 Hence we maintain three different flavours of wildcards in type families. This provides
 a flexibility to interpret wildcards in type families.
+See Note [Implementation tweak for wildCards in family instances] for how we can explore
+different design spaces.
 
 For more discussion, see #13908.
 -}

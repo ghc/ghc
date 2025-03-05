@@ -910,9 +910,14 @@ This is implemented as follows: Unnamed wildcards remain unchanged after
 the renamer, and then given fresh meta-variables during typechecking, and
 it is handled pretty much the same way as the ones in partial type signatures.
 We however don't want to emit hole constraints on wildcards in family
-instances, so we turn on PartialTypeSignatures and turn off warning flag to
-let typechecker know this.
+instances, We use special hole_mode `HM_FamPat` to indicate that.
+
 See related Note [Wildcards in visible kind application] in GHC.Tc.Gen.HsType
+
+But over the develoment wildcards have became unintentionally more powerful
+in associated type family instances since it's relation to the parent class
+variables. It become confusing, See Note [Implementation tweak for wildCards in family instances]
+for how we can explore the design space to make it more consistent.
 
 Note [Unused type variables in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
