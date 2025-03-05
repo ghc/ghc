@@ -399,10 +399,7 @@ library
       if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64) || arch(loongarch64)
         asm-sources: StgCRunAsm.S
 
-      c-sources: Adjustor.c
-                 adjustor/AdjustorPool.c
-                 ExecPage.c
-                 Arena.c
+      c-sources: Arena.c
                  Capability.c
                  CheckUnload.c
                  CheckVectorSupport.c
@@ -425,7 +422,6 @@ library
                  Libdw.c
                  LibdwPool.c
                  Linker.c
-                 ReportMemoryMap.c
                  Messages.c
                  OldARMAtomic.c
                  PathUtils.c
@@ -446,8 +442,6 @@ library
                  RtsMain.c
                  RtsMessages.c
                  RtsStartup.c
-                 RtsSymbolInfo.c
-                 RtsSymbols.c
                  RtsUtils.c
                  STM.c
                  Schedule.c
@@ -481,28 +475,6 @@ library
                  hooks/OnExit.c
                  hooks/OutOfHeap.c
                  hooks/StackOverflow.c
-                 linker/CacheFlush.c
-                 linker/Elf.c
-                 linker/InitFini.c
-                 linker/LoadArchive.c
-                 linker/LoadNativeObjPosix.c
-                 linker/M32Alloc.c
-                 linker/MMap.c
-                 linker/MachO.c
-                 linker/macho/plt.c
-                 linker/macho/plt_aarch64.c
-                 linker/PEi386.c
-                 linker/SymbolExtras.c
-                 linker/elf_got.c
-                 linker/elf_plt.c
-                 linker/elf_plt_aarch64.c
-                 linker/elf_plt_riscv64.c
-                 linker/elf_plt_arm.c
-                 linker/elf_reloc.c
-                 linker/elf_reloc_aarch64.c
-                 linker/elf_reloc_riscv64.c
-                 linker/elf_tlsgd.c
-                 linker/elf_util.c
                  sm/BlockAlloc.c
                  sm/CNF.c
                  sm/Compact.c
@@ -528,6 +500,49 @@ library
                  fs.c
                  -- I wish we had wildcards..., this would be:
                  -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
+
+      -- These source files are not actually used by the wasm backend
+      -- RTS. There's no point in building them, and they actually
+      -- break certain configurations (e.g. LLVM LTO).
+      if !arch(wasm32)
+        c-sources:
+          -- Wasm code is not in linear memory space
+          adjustor/AdjustorPool.c
+          Adjustor.c
+          ExecPage.c
+
+          -- Wasm dyld does not need these to be linked into
+          -- rts
+          RtsSymbolInfo.c
+          RtsSymbols.c
+
+          -- Wasm has no real mmap
+          ReportMemoryMap.c
+
+          -- Wasm dyld does not use any existing RTS linker
+          -- logic
+          linker/CacheFlush.c
+          linker/Elf.c
+          linker/InitFini.c
+          linker/LoadArchive.c
+          linker/LoadNativeObjPosix.c
+          linker/M32Alloc.c
+          linker/MMap.c
+          linker/MachO.c
+          linker/macho/plt.c
+          linker/macho/plt_aarch64.c
+          linker/PEi386.c
+          linker/SymbolExtras.c
+          linker/elf_got.c
+          linker/elf_plt.c
+          linker/elf_plt_aarch64.c
+          linker/elf_plt_riscv64.c
+          linker/elf_plt_arm.c
+          linker/elf_reloc.c
+          linker/elf_reloc_aarch64.c
+          linker/elf_reloc_riscv64.c
+          linker/elf_tlsgd.c
+          linker/elf_util.c
 
       if os(windows)
          c-sources: win32/AsyncMIO.c
