@@ -15,7 +15,6 @@ import GHC.Driver.Config.Parser hiding (predefinedMacros)
 import GHC.Driver.Env.Types
 import GHC.Driver.Errors.Types
 import qualified GHC.Driver.Errors.Types as GHC
--- import GHC.Driver.Main
 import qualified GHC.Driver.Session as GHC
 import GHC.Hs.Dump
 import qualified GHC.LanguageExtensions as LangExt
@@ -24,7 +23,6 @@ import GHC.Parser.Header
 import GHC.Parser.Lexer (P (..), ParseResult (..))
 import qualified GHC.Parser.Lexer as GHC
 import qualified GHC.Parser.Lexer as Lexer
--- import qualified GHC.Parser.PreProcess as GHCPP
 import GHC.SysTools.Cpp
 import GHC.Types.SrcLoc
 import GHC.Unit.Env
@@ -118,7 +116,7 @@ strGetToks ::
 strGetToks dflags includes popts filename str = (final, reverse toks)
   where
     pstate = getPState dflags includes popts filename str
-    (final, toks) = lexAll pstate
+    (final, toks) = PP.lexAll pstate
 
 getPState ::
     DynFlags ->
@@ -243,6 +241,12 @@ doTestWithIncludes includes strings = do
     !tks <- parseString libdirNow includes test
     putStrLn "-----------------------------------------"
     printToks (reverse tks)
+
+t00 :: IO ()
+t00 = do
+    doTest
+        [ "x + 1"
+        ]
 
 t0 :: IO ()
 t0 = do
@@ -561,11 +565,15 @@ ddd = ghcWrapper libdirNow $ do
 t20 :: IO ()
 t20 = do
     dump
-        [
-        "{-# LANGUAGE CPP #-}",
-        "#if __GLASGOW_HASKELL__ >= 913",
-        "{-# LANGUAGE GHC_CPP #-}",
-        "#endif",
-        "",
-        "module Example4 where"
+        [ "{-# LANGUAGE CPP #-}"
+        , "#if __GLASGOW_HASKELL__ >= 913"
+        , "{-# LANGUAGE GHC_CPP #-}"
+        , "#endif"
+        , ""
+        , "module Example4 where"
         ]
+
+t21 :: IO ()
+t21 = do
+    dump
+        ["x = 1"]

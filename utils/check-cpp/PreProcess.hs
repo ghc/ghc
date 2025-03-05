@@ -47,6 +47,8 @@ dumpGhcCpp dflags pst = output
                         -- ++ show comments_as_toks ++ sepa
                         ++ show comments
                         ++ sepa
+                        ++ show bare_toks
+                        ++ sepa
     -- ++ show all_toks ++ sepa
     -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
     (pst_final, bare_toks) = lexAll pst
@@ -203,16 +205,16 @@ ppLexer queueComments cont =
         queueComments
         ( \tk ->
             let
-                -- contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
-                contInner t = cont t
+                contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
+                -- contInner t = cont t
                 contIgnoreTok (L l tok) = do
                     case l of
                         RealSrcSpan r (Strict.Just b) -> Lexer.queueIgnoredToken (L (PsSpan r b) tok)
                         _ -> return ()
                     ppLexer queueComments cont
              in
-                case tk of
-                    -- case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
+                -- case tk of
+                case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
                     L _ ITeof -> do
                         mInp <- popIncludeLoc
                         case mInp of
@@ -240,8 +242,8 @@ ppLexer queueComments cont =
                             else contInner tk
                     _ -> do
                         state <- getCppState
-                        -- case (trace ("CPP state:" ++ show state) state) of
-                        case state of
+                        case (trace ("CPP state:" ++ show state) state) of
+                        -- case state of
                             CppIgnoring -> contIgnoreTok tk
                             _ -> contInner tk
         )
