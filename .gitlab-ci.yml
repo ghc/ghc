@@ -1159,8 +1159,6 @@ ghcup-metadata-nightly:
   needs:
     - job: nightly-x86_64-linux-fedora33-release
       artifacts: false
-    - job: nightly-x86_64-linux-centos7-validate
-      artifacts: false
     - job: nightly-x86_64-linux-ubuntu22_04-validate
       artifacts: false
     - job: nightly-x86_64-linux-ubuntu20_04-validate
