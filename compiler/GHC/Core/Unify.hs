@@ -422,16 +422,14 @@ tcUnifyTys bind_fn tys1 tys2
       Unifiable result -> Just result
       _                -> Nothing
 
--- | @tcUnifyTysFG bind_tv tys1 tys2@ attempts to find a substitution @s@ (whose
--- domain elements all respond 'BindMe' to @bind_tv@) such that
--- @s(tys1)@ and that of @s(tys2)@ are equal, as witnessed by the returned
--- Coercions. This version requires that the kinds of the types are the same,
--- if you unify left-to-right.
+-- | `tcUnifyTysFG` does "fine-grained" unification of `tys1` and `tys2`
+-- See Note [Fine-grained unification].
+-- This version requires that the kinds of the types are the same,
+-- provided you unify them left-to-right.
 tcUnifyTysFG :: BindFamFun -> BindTvFun
              -> [Type] -> [Type]
              -> UnifyResult
-tcUnifyTysFG bind_fam bind_tv tys1 tys2
-  = tc_unify_tys_fg False bind_fam bind_tv tys1 tys2
+tcUnifyTysFG = tc_unify_tys_fg False  -- False: don't match kinds
 
 tc_unify_tys_fg :: Bool
                 -> BindFamFun -> BindTvFun
