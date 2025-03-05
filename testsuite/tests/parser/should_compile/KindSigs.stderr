@@ -1003,19 +1003,19 @@
          []))
        (Unqual
         {OccName: qux}))
-      (MG
-       (FromSource)
-       (L
-        (EpAnn
-         (EpaSpan { KindSigs.hs:23:1-12 })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
-          [])
-         (EpaComments
-          []))
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:23:1-12 })
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         [])
+        (EpaComments
+         []))
+       (MG
+        (FromSource)
         [(L
           (EpAnn
            (EpaSpan { KindSigs.hs:23:1-12 })
@@ -1739,19 +1739,19 @@
          []))
        (Unqual
         {OccName: true}))
-      (MG
-       (FromSource)
-       (L
-        (EpAnn
-         (EpaSpan { KindSigs.hs:35:1-11 })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
-          [])
-         (EpaComments
-          []))
+      (L
+       (EpAnn
+        (EpaSpan { KindSigs.hs:35:1-11 })
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         [])
+        (EpaComments
+         []))
+       (MG
+        (FromSource)
         [(L
           (EpAnn
            (EpaSpan { KindSigs.hs:35:1-11 })

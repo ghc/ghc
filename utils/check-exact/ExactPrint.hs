@@ -2333,7 +2333,7 @@ instance ExactPrint (HsBind GhcPs) where
   exact (FunBind x fid matches) = do
     matches' <- markAnnotated matches
     let
-      fun_id' = case unLoc (mg_alts matches') of
+      fun_id' = case mg_alts (unLoc matches') of
         [] -> fid
         (L _ m:_) -> case m_ctxt m of
           FunRhs f _ _ _ -> f
@@ -3262,23 +3262,23 @@ instance ExactPrint (HsUntypedSplice GhcPs) where
 -- ---------------------------------------------------------------------
 
 -- TODO:AZ: combine these instances
-instance ExactPrint (MatchGroup GhcPs (LocatedA (HsExpr GhcPs))) where
+instance ExactPrint (LocatedLW (MatchGroup GhcPs (LocatedA (HsExpr GhcPs)))) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
-  exact (MG x matches) = do
+  exact (L l (MG x matches)) = do
     -- TODO:AZ use SortKey, in MG ann.
-    matches' <- markAnnotated matches
-    return (MG x matches')
+    L l' matches' <- markAnnotated (L l matches)
+    return (L l' (MG x matches'))
 
-instance ExactPrint (MatchGroup GhcPs (LocatedA (HsCmd GhcPs))) where
+instance ExactPrint (LocatedLW (MatchGroup GhcPs (LocatedA (HsCmd GhcPs)))) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
-  exact (MG x matches) = do
+  exact (L l (MG x matches)) = do
     -- TODO:AZ use SortKey, in MG ann.
-    matches' <- if notDodgy matches
-      then markAnnotated matches
-      else return matches
-    return (MG x matches')
+    L l' matches' <- if notDodgy (L l matches)
+      then markAnnotated (L l matches)
+      else return (L l matches)
+    return (L l' (MG x matches'))
 
 -- ---------------------------------------------------------------------
 

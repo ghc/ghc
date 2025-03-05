@@ -15,7 +15,7 @@ import {-# SOURCE #-} GHC.Hs.Pat () -- for Outputable
 import Language.Haskell.Syntax.Expr
   ( HsExpr, LHsExpr
   , HsCmd
-  , MatchGroup
+  , LMatchGroup
   , GRHSs
   , HsUntypedSplice
   )
@@ -41,7 +41,7 @@ pprPatBind :: forall bndr p . (OutputableBndrId bndr,
            => LPat (GhcPass bndr) -> GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> SDoc
 
 pprFunBind :: (OutputableBndrId idR)
-           => MatchGroup (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc
+           => LMatchGroup (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc
 
 data ThModFinalizers
 type role HsUntypedSpliceResult representational

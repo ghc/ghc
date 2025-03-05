@@ -510,8 +510,8 @@ tidy1 _ _ (OrPat ty lpats)
   --   ((\case 1 -> True; 2 -> True; 3 -> True; _ -> False) -> True)
   = return (idDsWrapper, ViewPat ty (noLocA (HsLam noAnn LamCase mg)) (mkPrefixConPat trueDataCon [] []))
   where
-    mg :: MatchGroup GhcTc (LHsExpr GhcTc)
-    mg = MG mgtc (noLocA (map match_true (NE.toList lpats) ++ [match_false (noLocA $ WildPat ty)]))
+    mg :: LMatchGroup GhcTc (LHsExpr GhcTc)
+    mg = noLocA $ MG mgtc (map match_true (NE.toList lpats) ++ [match_false (noLocA $ WildPat ty)])
     mgtc = MatchGroupTc
        { mg_arg_tys = [tymult ty]
        , mg_res_ty = boolTy
@@ -764,7 +764,7 @@ matchWrapper
   :: HsMatchContextRn                  -- ^ For shadowing warning messages
   -> Maybe [LHsExpr GhcTc]             -- ^ Scrutinee(s)
                                        -- see Note [matchWrapper scrutinees]
-  -> MatchGroup GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared
+  -> LMatchGroup GhcTc (LHsExpr GhcTc) -- ^ Matches being desugared
   -> DsM ([Id], CoreExpr)              -- ^ Results (usually passed to 'match')
 
 {-
@@ -791,9 +791,9 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 -}
 
-matchWrapper ctxt scrs (MG { mg_alts = L _ matches
-                           , mg_ext = MatchGroupTc arg_tys rhs_ty origin
-                           })
+matchWrapper ctxt scrs (L _ (MG { mg_alts = matches
+                                , mg_ext = MatchGroupTc arg_tys rhs_ty origin
+                                }))
   = do  { dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
         ; new_vars    <- case matches of

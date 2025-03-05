@@ -500,7 +500,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdCase _ exp match) env_ids = do
     stack_id <- newSysLocalMDs stack_ty
     (match', core_choices)
       <- dsCases ids local_vars stack_id stack_ty res_ty match
-    let MG{ mg_ext = MatchGroupTc _ sum_ty _ } = match'
+    let L _ (MG{ mg_ext = MatchGroupTc _ sum_ty _ }) = match'
         in_ty = envStackType env_ids stack_ty
 
     core_body <- dsExpr (HsCase (ArrowMatchCtxt ArrowCaseAlt) exp match')
@@ -528,14 +528,14 @@ multiple scrutinees)
 
 -}
 dsCmd ids local_vars stack_ty res_ty
-        (HsCmdLam _ LamSingle (MG { mg_alts
-          = (L _ [L _ (Match { m_pats  = L _ pats
-                             , m_grhss = GRHSs _ (L _ (GRHS _ [] body) :| _) _ })]) }))
+        (HsCmdLam _ LamSingle (L _ (MG { mg_alts
+          = [L _ (Match { m_pats  = L _ pats
+                             , m_grhss = GRHSs _ (L _ (GRHS _ [] body) :| _) _ })] })))
         env_ids
   = dsCmdLam ids local_vars stack_ty res_ty pats body env_ids
 
 dsCmd ids local_vars stack_ty res_ty
-      (HsCmdLam _ lam_variant match@MG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } )
+      (HsCmdLam _ lam_variant match@(L _ MG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} }) )
       env_ids = do
     arg_ids <- newSysLocalsDs arg_tys
 
@@ -550,7 +550,7 @@ dsCmd ids local_vars stack_ty res_ty
       (match', core_choices)
         <- dsCases ids local_vars' stack_id stack_ty' res_ty match
 
-      let MG{ mg_ext = MatchGroupTc _ sum_ty _ } = match'
+      let L _ MG{ mg_ext = MatchGroupTc _ sum_ty _ } = match'
           in_ty = envStackType env_ids stack_ty'
           discrims = map nlHsVar arg_ids
       (discrim_vars, matching_code)
@@ -756,13 +756,13 @@ dsCases :: DsCmdEnv                               -- arrow combinators
         -> Id                                     -- stack id
         -> Type                                   -- type of the stack (right-nested tuple)
         -> Type                                   -- return type of the command
-        -> MatchGroup GhcTc (LHsCmd GhcTc)        -- match group to desugar
-        -> DsM (MatchGroup GhcTc (LHsExpr GhcTc), -- match group with choice tree
+        -> LMatchGroup GhcTc (LHsCmd GhcTc)        -- match group to desugar
+        -> DsM (LMatchGroup GhcTc (LHsExpr GhcTc), -- match group with choice tree
                 CoreExpr)                         -- desugared choices
 dsCases ids local_vars stack_id stack_ty res_ty
-        (MG { mg_alts = L l matches
-            , mg_ext = MatchGroupTc arg_tys _ origin
-            }) = do
+        (L l (MG { mg_alts = matches
+                 , mg_ext = MatchGroupTc arg_tys _ origin
+                 })) = do
 
   -- Extract and desugar the leaf commands in the case, building tuple
   -- expressions that will (after tagging) replace these leaves
@@ -809,9 +809,9 @@ dsCases ids local_vars stack_id stack_ty res_ty
     -- implemented as `arr \case {}`.
     Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
       dsExpr (HsLam noAnn LamCase
-        (MG { mg_alts = noLocA []
-            , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated OtherExpansion SkipPmc)
-            }))
+        (noLocA (MG { mg_alts = []
+                    , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated OtherExpansion SkipPmc)
+                    })))
 
       -- Replace the commands in the case with these tagged tuples,
       -- yielding a HsExpr Id we can feed to dsExpr.
@@ -820,9 +820,9 @@ dsCases ids local_vars stack_id stack_ty res_ty
 
   -- Note that we replace the MatchGroup result type by sum_ty,
   -- which is the type of matches'
-  return (MG { mg_alts = L l matches'
-             , mg_ext = MatchGroupTc arg_tys sum_ty origin
-             },
+  return (L l (MG { mg_alts = matches'
+                  , mg_ext = MatchGroupTc arg_tys sum_ty origin
+                  }),
           core_choices)
 
 {-

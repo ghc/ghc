@@ -116,7 +116,7 @@ hard_hole_fits.hs:20:36: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In an equation for ‘testMe’: testMe (HsLam xlc lc_variant mg) = _
     • Relevant bindings include
-        mg :: MatchGroup GhcPs (LHsExpr GhcPs)
+        mg :: LMatchGroup GhcPs (LHsExpr GhcPs)
           (bound at hard_hole_fits.hs:20:30)
         lc_variant :: HsLamVariant (bound at hard_hole_fits.hs:20:19)
         xlc :: Language.Haskell.Syntax.Extension.XLam GhcPs
@@ -318,7 +318,7 @@ hard_hole_fits.hs:30:28: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In an equation for ‘testMe’: testMe (HsCase xc gl mg) = _
     • Relevant bindings include
-        mg :: MatchGroup GhcPs (LHsExpr GhcPs)
+        mg :: LMatchGroup GhcPs (LHsExpr GhcPs)
           (bound at hard_hole_fits.hs:30:22)
         gl :: LHsExpr GhcPs (bound at hard_hole_fits.hs:30:19)
         xc :: Language.Haskell.Syntax.Extension.XCase GhcPs

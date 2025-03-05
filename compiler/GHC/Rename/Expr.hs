@@ -1027,8 +1027,8 @@ methodNamesCmd (HsCmdLam _ _         matches) = methodNamesMatch matches `addOne
    -- The type checker will complain later
 
 ---------------------------------------------------
-methodNamesMatch :: MatchGroup GhcRn (LHsCmd GhcRn) -> FreeVars
-methodNamesMatch (MG { mg_alts = L _ ms })
+methodNamesMatch :: LMatchGroup GhcRn (LHsCmd GhcRn) -> FreeVars
+methodNamesMatch (L _ (MG { mg_alts = ms }))
   = plusFVs (map do_one ms)
  where
     do_one (L _ (Match { m_grhss = grhss })) = methodNamesGRHSs grhss

@@ -797,22 +797,23 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     L (getLoc lpat) $
                     HsCase PatSyn (nlHsVar scrutinee) $
-                    MG{ mg_alts = L (l2l $ getLoc lpat) cases
+                    L (l2l $ getLoc lpat) $
+                    MG{ mg_alts = cases
                       , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty gen
                       }
              body' = noLocA $
                      HsLam noAnn LamSingle $
-                     MG{ mg_alts = noLocA [mkSimpleMatch (LamAlt LamSingle)
-                                                         args
-                                                         body]
+                     noLocA $
+                     MG{ mg_alts = [mkSimpleMatch (LamAlt LamSingle) args body]
                        , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty gen
                        }
              match = mkMatch (mkPrefixFunRhs (L loc (idName patsyn_id)) noAnn) (noLocA [])
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
                                        req_dicts body')
                              (EmptyLocalBinds noExtField)
-             mg :: MatchGroup GhcTc (LHsExpr GhcTc)
-             mg = MG{ mg_alts = L (l2l $ getLoc match) [match]
+             mg :: LMatchGroup GhcTc (LHsExpr GhcTc)
+             mg = L (l2l $ getLoc match) $
+                  MG{ mg_alts = [match]
                     , mg_ext = MatchGroupTc [] res_ty gen
                     }
              matcher_arity = length req_theta + 3
@@ -942,8 +943,8 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
            ImplicitBidirectional -> fmap mk_mg (tcPatToExpr args lpat)
            Unidirectional -> panic "tcPatSynBuilderBind"
 
-    mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
-    mk_mg body = mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA [builder_match])
+    mk_mg :: LHsExpr GhcRn -> LMatchGroup GhcRn (LHsExpr GhcRn)
+    mk_mg body = noLocA $ mkMatchGroup (Generated OtherExpansion SkipPmc) [builder_match]
           where
             builder_args  = noLocA [(L (l2l loc) (VarPat noExtField (L loc n)))
                                    | L loc n <- args]
@@ -956,13 +957,13 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
               InfixCon arg1 arg2 -> [arg1, arg2]
               RecCon args        -> map recordPatSynPatVar args
 
-    add_dummy_arg :: MatchGroup GhcRn (LHsExpr GhcRn)
-                  -> MatchGroup GhcRn (LHsExpr GhcRn)
-    add_dummy_arg mg@(MG { mg_alts =
-                           (L l [L loc match@(Match { m_pats = L lp pats })]) })
-      = mg { mg_alts = L l [L loc (match { m_pats = L lp $ nlWildPatName : pats })] }
+    add_dummy_arg :: LMatchGroup GhcRn (LHsExpr GhcRn)
+                  -> LMatchGroup GhcRn (LHsExpr GhcRn)
+    add_dummy_arg (L l mg@(MG { mg_alts =
+                           [L loc match@(Match { m_pats = L lp pats })] }))
+      = L l (mg { mg_alts = [L loc (match { m_pats = L lp $ nlWildPatName : pats })] })
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
-                             pprMatches other_mg
+                             pprLMatches other_mg
 
 patSynBuilderOcc :: PatSyn -> Maybe (HsExpr GhcTc, TcSigmaType)
 patSynBuilderOcc ps

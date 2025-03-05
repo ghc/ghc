@@ -27,19 +27,19 @@
             (EpaComments
              []))
            {Name: DumpRenamedAst.main})
-          (MG
-           (FromSource)
-           (L
-            (EpAnn
-             (EpaSpan { DumpRenamedAst.hs:35:1-23 })
-             (AnnList
-              (Nothing)
-              (ListNone)
-              []
-              (NoEpTok)
-              [])
-             (EpaComments
-              []))
+          (L
+           (EpAnn
+            (EpaSpan { DumpRenamedAst.hs:35:1-23 })
+            (AnnList
+             (Nothing)
+             (ListNone)
+             []
+             (NoEpTok)
+             [])
+            (EpaComments
+             []))
+           (MG
+            (FromSource)
             [(L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:35:1-23 })

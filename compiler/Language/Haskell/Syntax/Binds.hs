@@ -24,7 +24,7 @@ module Language.Haskell.Syntax.Binds where
 
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   ( LHsExpr
-  , MatchGroup
+  , LMatchGroup
   , GRHSs )
 import {-# SOURCE #-} Language.Haskell.Syntax.Pat( LPat )
 import Language.Haskell.Syntax.BooleanFormula (LBooleanFormula)
@@ -206,7 +206,7 @@ data HsBindLR idL idR
 
         fun_id :: LIdP idL, -- Note [fun_id in Match] in GHC.Hs.Expr
 
-        fun_matches :: MatchGroup idR (LHsExpr idR)  -- ^ The payload
+        fun_matches :: LMatchGroup idR (LHsExpr idR)  -- ^ The payload
 
     }
 
@@ -506,4 +506,4 @@ making the distinction between the two names clear.
 data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
-  | ExplicitBidirectional (MatchGroup id (LHsExpr id))
+  | ExplicitBidirectional (LMatchGroup id (LHsExpr id))

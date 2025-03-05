@@ -146,19 +146,19 @@
          []))
        (Unqual
         {OccName: foo}))
-      (MG
-       (FromSource)
-       (L
-        (EpAnn
-         (EpaSpan { <combineSrcSpans: files differ> })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
-          [])
-         (EpaComments
-          []))
+      (L
+       (EpAnn
+        (EpaSpan { <combineSrcSpans: files differ> })
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         [])
+        (EpaComments
+         []))
+       (MG
+        (FromSource)
         [(L
           (EpAnn
            (EpaSpan { T15279.hs-incl:1:1-13 })
@@ -201,7 +201,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { T15279.hs-incl:1:9-13 })
                (NoEpAnns)
@@ -229,7 +230,8 @@
                  (NoExtField)
                  (HsChar
                   (SourceText 'b')
-                  ('b'))))))]
+                  ('b'))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))
         ,(L
@@ -274,7 +276,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { T15279.hs-incl:2:9-13 })
                (NoEpAnns)
@@ -302,7 +305,8 @@
                  (NoExtField)
                  (HsChar
                   (SourceText 'c')
-                  ('c'))))))]
+                  ('c'))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))
         ,(L
@@ -344,7 +348,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { T15279.hs:7:7-11 })
                (NoEpAnns)
@@ -372,7 +377,8 @@
                  (NoExtField)
                  (HsChar
                   (SourceText 'a')
-                  ('a'))))))]
+                  ('a'))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
 

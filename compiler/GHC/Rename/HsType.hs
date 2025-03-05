@@ -1542,12 +1542,12 @@ not_op_pat (ConPat NoExtField _ (InfixCon _ _)) = False
 not_op_pat _                                    = True
 
 --------------------------------------
-checkPrecMatch :: Name -> MatchGroup GhcRn body -> RnM ()
+checkPrecMatch :: Name -> LMatchGroup GhcRn body -> RnM ()
   -- Check precedence of a function binding written infix
   --   eg  a `op` b `C` c = ...
   -- See comments with rnExpr (OpApp ...) about "deriving"
 
-checkPrecMatch op (MG { mg_alts = (L _ ms) })
+checkPrecMatch op (L _ (MG { mg_alts = ms }))
   = mapM_ check ms
   where
     check (L _ (Match { m_pats = L _ ( (L l1 p1)

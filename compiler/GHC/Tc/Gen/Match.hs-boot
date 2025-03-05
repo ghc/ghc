@@ -1,5 +1,5 @@
 module GHC.Tc.Gen.Match where
-import GHC.Hs           ( GRHSs, MatchGroup, LHsExpr, Mult )
+import GHC.Hs           ( GRHSs, LMatchGroup, LHsExpr, Mult )
 import GHC.Tc.Utils.TcType( ExpSigmaType, ExpRhoType, ExpPatType )
 import GHC.Tc.Types     ( TcM )
 import GHC.Tc.Types.Origin  ( UserTypeCtxt )
@@ -15,7 +15,7 @@ tcGRHSsPat    :: Mult
 tcFunBindMatches  :: UserTypeCtxt
                   -> Name
                   -> Mult
-                  -> MatchGroup GhcRn (LHsExpr GhcRn)
+                  -> LMatchGroup GhcRn (LHsExpr GhcRn)
                   -> [ExpPatType]
                   -> ExpSigmaType
-                  -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
+                  -> TcM (HsWrapper, LMatchGroup GhcTc (LHsExpr GhcTc))

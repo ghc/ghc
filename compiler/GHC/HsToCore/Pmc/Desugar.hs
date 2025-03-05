@@ -384,10 +384,10 @@ desugarLocalBinds (HsValBinds _ (XValBindsLR (NValBinds binds _))) =
   sequenceGrdDagMapM (sequenceGrdDagMapM go) (map snd binds)
   where
     go :: LHsBind GhcTc -> DsM GrdDag
-    go (L _ FunBind{fun_id = L _ x, fun_matches = mg})
+    go (L _ FunBind{fun_id = L _ x, fun_matches = L _ mg})
       -- See Note [Long-distance information for HsLocalBinds] for why this
       -- pattern match is so very specific.
-      | L _ [L _ Match{m_pats = L _ [], m_grhss = grhss}] <- mg_alts mg
+      | [L _ Match{m_pats = L _ [], m_grhss = grhss}] <- mg_alts mg
       , GRHSs{grhssGRHSs = L _ (GRHS _ _grds rhs) :| []} <- grhss = do
           core_rhs <- dsLExpr rhs
           return (GdOne (PmLet x core_rhs))

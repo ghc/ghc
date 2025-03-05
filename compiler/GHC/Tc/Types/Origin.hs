@@ -724,7 +724,7 @@ exprCtOrigin (ExplicitList {})    = ListOrigin
 exprCtOrigin (HsIPVar _ ip)       = IPOccOrigin ip
 exprCtOrigin (HsOverLit _ lit)    = LiteralOrigin lit
 exprCtOrigin (HsLit {})           = Shouldn'tHappenOrigin "concrete literal"
-exprCtOrigin (HsLam _ _ ms)       = matchesCtOrigin ms
+exprCtOrigin (HsLam _ _ (L _ ms)) = matchesCtOrigin ms
 exprCtOrigin (HsApp _ e1 _)       = lexprCtOrigin e1
 exprCtOrigin (HsAppType _ e1 _)   = lexprCtOrigin e1
 exprCtOrigin (OpApp _ _ op _)     = lexprCtOrigin op
@@ -735,7 +735,7 @@ exprCtOrigin (SectionL _ _ _)     = SectionOrigin
 exprCtOrigin (SectionR _ _ _)     = SectionOrigin
 exprCtOrigin (ExplicitTuple {})   = Shouldn'tHappenOrigin "explicit tuple"
 exprCtOrigin ExplicitSum{}        = Shouldn'tHappenOrigin "explicit sum"
-exprCtOrigin (HsCase _ _ matches) = matchesCtOrigin matches
+exprCtOrigin (HsCase _ _ (L _ ms)) = matchesCtOrigin ms
 exprCtOrigin (HsIf {})           = IfThenElseOrigin
 exprCtOrigin (HsMultiIf _ rhs)   = lGRHSCtOrigin rhs
 exprCtOrigin (HsLet _ _ e)       = lexprCtOrigin e
@@ -764,7 +764,7 @@ exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel (foExt f)
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
 matchesCtOrigin (MG { mg_alts = alts })
-  | L _ [L _ match] <- alts
+  | [L _ match] <- alts
   , Match { m_grhss = grhss } <- match
   = grhssCtOrigin grhss
 
@@ -1453,7 +1453,7 @@ data ExpectedFunTyOrigin
   | ExpectedFunTyMatches
       !TypedThing
         -- ^ name of the function
-      !(MatchGroup GhcRn (LHsExpr GhcRn))
+      !(LMatchGroup GhcRn (LHsExpr GhcRn))
        -- ^ equations
 
   -- | Ensure that a lambda abstraction has a function type.
@@ -1482,7 +1482,7 @@ pprExpectedFunTyOrigin funTy_origin i =
           , quotes (ppr arg)
           , text "of"
           , quotes (ppr fun) ]
-    ExpectedFunTyMatches fun (MG { mg_alts = L _ alts })
+    ExpectedFunTyMatches fun (L _ (MG { mg_alts = alts }))
       | null alts
       -> the_arg_of <+> quotes (ppr fun)
       | otherwise
@@ -1504,7 +1504,7 @@ pprExpectedFunTyHerald (ExpectedFunTyViewPat {})
 pprExpectedFunTyHerald (ExpectedFunTyArg fun _)
   = sep [ text "The function" <+> quotes (ppr fun)
         , text "is applied to" ]
-pprExpectedFunTyHerald (ExpectedFunTyMatches fun (MG { mg_alts = L _ alts }))
+pprExpectedFunTyHerald (ExpectedFunTyMatches fun (L _ (MG { mg_alts = alts })))
   = text "The equation" <> plural alts <+> text "for" <+> quotes (ppr fun) <+> hasOrHave alts
 pprExpectedFunTyHerald (ExpectedFunTyLam lam_variant expr)
   = sep [ text "The" <+> lamCaseKeyword lam_variant <+> text "expression"

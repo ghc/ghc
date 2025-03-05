@@ -273,7 +273,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches
   -- We don't want to generate code for blacklisted positions
   -- We don't want redundant ticks on simple pattern bindings
   -- We don't want to tick non-exported bindings in TickExportedFunctions
-  let simple = matchGroupArity matches == 0
+  let simple = matchGroupArity (unLoc matches) == 0
                   -- A binding is a "simple pattern binding" if it is a
                   -- funbind with zero patterns
       toplev = null decl_path
@@ -630,13 +630,13 @@ addTickTupArg (Present x e)  = do { e' <- addTickLHsExpr e
 addTickTupArg (Missing ty) = return (Missing ty)
 
 
-addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup GhcTc (LHsExpr GhcTc)
-                  -> TM (MatchGroup GhcTc (LHsExpr GhcTc))
-addTickMatchGroup is_lam mg@(MG { mg_alts = L l matches, mg_ext = ctxt }) = do
+addTickMatchGroup :: Bool{-is lambda-} -> LMatchGroup GhcTc (LHsExpr GhcTc)
+                  -> TM (LMatchGroup GhcTc (LHsExpr GhcTc))
+addTickMatchGroup is_lam (L l (mg@(MG { mg_alts = matches, mg_ext = ctxt }))) = do
   let isOneOfMany = matchesOneOfMany matches
       isDoExp     = isDoExpansionGenerated $ mg_origin ctxt
   matches' <- mapM (traverse (addTickMatch isOneOfMany is_lam isDoExp)) matches
-  return $ mg { mg_alts = L l matches' }
+  return $ L l (mg { mg_alts = matches' })
 
 addTickMatch :: Bool -> Bool -> Bool {-Is this Do Expansion-} ->  Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))
@@ -895,11 +895,11 @@ addTickHsCmd (XCmd (HsWrap w cmd)) =
 -- Others should never happen in a command context.
 --addTickHsCmd e  = pprPanic "addTickHsCmd" (ppr e)
 
-addTickCmdMatchGroup :: MatchGroup GhcTc (LHsCmd GhcTc)
-                     -> TM (MatchGroup GhcTc (LHsCmd GhcTc))
-addTickCmdMatchGroup mg@(MG { mg_alts = (L l matches) }) = do
+addTickCmdMatchGroup :: LMatchGroup GhcTc (LHsCmd GhcTc)
+                     -> TM (LMatchGroup GhcTc (LHsCmd GhcTc))
+addTickCmdMatchGroup (L l mg@(MG { mg_alts = matches })) = do
   matches' <- mapM (traverse addTickCmdMatch) matches
-  return $ mg { mg_alts = L l matches' }
+  return $ L l (mg { mg_alts = matches' })
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
 addTickCmdMatch match@(Match { m_pats = L _ pats, m_grhss = gRHSs }) =

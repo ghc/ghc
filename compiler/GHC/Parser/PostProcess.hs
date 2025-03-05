@@ -569,7 +569,7 @@ getMonoBind :: LHsBind GhcPs -> [LHsDecl GhcPs]
 
 getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
                              , fun_matches =
-                               MG { mg_alts = (L _ m1@[L _ mtchs1]) } }))
+                               L _ (MG { mg_alts = m1@[L _ mtchs1] }) }))
             binds
   | has_args m1
   = go [L loc1 mtchs1] (noAnnSrcSpan $ locA loc1) binds []
@@ -583,7 +583,7 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
     go mtchs loc
        ((L loc2 (ValD _ (FunBind { fun_id = (L _ f2)
                                  , fun_matches =
-                                    MG { mg_alts = (L _ [L lm2 mtchs2]) } })))
+                                    L _ (MG { mg_alts = [L lm2 mtchs2] }) })))
          : binds) _
         | f1 == f2 =
           let (loc2', lm2') = transferAnnsA loc2 lm2
@@ -718,11 +718,11 @@ tyConToDataCon (L loc tc)
 
 mkPatSynMatchGroup :: LocatedN RdrName
                    -> LocatedLW (OrdList (LHsDecl GhcPs))
-                   -> P (MatchGroup GhcPs (LHsExpr GhcPs))
+                   -> P (LMatchGroup GhcPs (LHsExpr GhcPs))
 mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
     do { matches <- mapM fromDecl (fromOL decls)
        ; when (null matches) (wrongNumberErr (locA loc))
-       ; return $ mkMatchGroup FromSource (L ld matches) }
+       ; return $ L ld (mkMatchGroup FromSource matches) }
   where
     fromDecl (L loc decl@(ValD _ (PatBind _
                          pat@(L _ (ConPat _conAnn ln@(L _ name) details))
@@ -1419,10 +1419,10 @@ checkFunBind locF ann_fun (L lf fun) is_infix (L lp pats) (L _ grhss)
 makeFunBind :: LocatedN RdrName -> LocatedLW [LMatch GhcPs (LHsExpr GhcPs)]
             -> HsBind GhcPs
 -- Like GHC.Hs.Utils.mkFunBind, but we need to be able to set the fixity too
-makeFunBind fn ms
+makeFunBind fn (L l ms)
   = FunBind { fun_ext = noExtField,
               fun_id = fn,
-              fun_matches = mkMatchGroup FromSource ms }
+              fun_matches = L l (mkMatchGroup FromSource ms) }
 
 -- See Note [FunBind vs PatBind]
 checkPatBind :: SrcSpan
@@ -1610,7 +1610,7 @@ instance DisambInfixOp RdrName where
 
 type AnnoBody b
   = ( Anno (GRHS GhcPs (LocatedA (Body b GhcPs))) ~ EpAnnCO
-    , Anno [LocatedA (Match GhcPs (LocatedA (Body b GhcPs)))] ~ SrcSpanAnnLW
+    , Anno (MatchGroup GhcPs (LocatedA (Body b GhcPs))) ~ SrcSpanAnnLW
     , Anno (Match GhcPs (LocatedA (Body b GhcPs))) ~ SrcSpanAnnA
     , Anno (StmtLR GhcPs GhcPs (LocatedA (Body (Body b GhcPs) GhcPs))) ~ SrcSpanAnnA
     , Anno [LocatedA (StmtLR GhcPs GhcPs
@@ -1792,7 +1792,7 @@ instance DisambECP (HsCmd GhcPs) where
                                                  PsErrOverloadedRecordDotInvalid
   mkHsLamPV l lam_variant (L lm m) anns = do
     !cs <- getCommentsFor l
-    let mg = mkLamCaseMatchGroup FromSource lam_variant (L lm m)
+    let mg = L lm (mkLamCaseMatchGroup FromSource lam_variant m)
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdLam anns lam_variant mg)
 
   mkHsLetPV l tkLet bs tkIn e = do
@@ -1810,7 +1810,7 @@ instance DisambECP (HsCmd GhcPs) where
 
   mkHsCasePV l c (L lm m) anns = do
     !cs <- getCommentsFor l
-    let mg = mkMatchGroup FromSource (L lm m)
+    let mg = L lm (mkMatchGroup FromSource m)
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdCase anns c mg)
 
   type FunArg (HsCmd GhcPs) = HsExpr GhcPs
@@ -1874,8 +1874,8 @@ instance DisambECP (HsCmd GhcPs) where
 cmdFail :: SrcSpan -> SDoc -> PV a
 cmdFail loc e = addFatalError $ mkPlainErrorMsgEnvelope loc $ PsErrParseErrorInCmd e
 
-checkLamMatchGroup :: SrcSpan -> HsLamVariant -> MatchGroup GhcPs (LHsExpr GhcPs) -> PV ()
-checkLamMatchGroup l LamSingle (MG { mg_alts = (L _ (matches:_))}) = do
+checkLamMatchGroup :: SrcSpan -> HsLamVariant -> LMatchGroup GhcPs (LHsExpr GhcPs) -> PV ()
+checkLamMatchGroup l LamSingle (L _ (MG { mg_alts = (matches:_)})) = do
   when (null (hsLMatchPats matches)) $ addError $ mkPlainErrorMsgEnvelope l PsErrEmptyLambda
 checkLamMatchGroup _ _ _ = return ()
 
@@ -1901,11 +1901,11 @@ instance DisambECP (HsExpr GhcPs) where
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) $ OpApp noExtField e1 (reLoc op) e2
   mkHsCasePV l e (L lm m) anns = do
     !cs <- getCommentsFor l
-    let mg = mkMatchGroup FromSource (L lm m)
+    let mg = L lm (mkMatchGroup FromSource m)
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCase anns e mg)
   mkHsLamPV l lam_variant (L lm m) anns = do
     !cs <- getCommentsFor l
-    let mg = mkLamCaseMatchGroup FromSource lam_variant (L lm m)
+    let mg = L lm (mkLamCaseMatchGroup FromSource lam_variant m)
     checkLamMatchGroup l lam_variant mg
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsLam anns lam_variant mg)
   type FunArg (HsExpr GhcPs) = HsExpr GhcPs

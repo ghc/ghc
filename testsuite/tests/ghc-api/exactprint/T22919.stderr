@@ -63,19 +63,19 @@
          []))
        (Unqual
         {OccName: foo}))
-      (MG
-       (FromSource)
-       (L
-        (EpAnn
-         (EpaSpan { T22919.hs:2:1-9 })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
-          [])
-         (EpaComments
-          []))
+      (L
+       (EpAnn
+        (EpaSpan { T22919.hs:2:1-9 })
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         [])
+        (EpaComments
+         []))
+       (MG
+        (FromSource)
         [(L
           (EpAnn
            (EpaSpan { T22919.hs:2:1-9 })

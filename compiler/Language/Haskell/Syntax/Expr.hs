@@ -362,7 +362,7 @@ data HsExpr p
   -- | Lambda, Lambda-case, and Lambda-cases
   | HsLam     (XLam p)
               HsLamVariant -- ^ Tells whether this is for lambda, \case, or \cases
-              (MatchGroup p (LHsExpr p))
+              (LMatchGroup p (LHsExpr p))
                        -- ^ LamSingle: one match of arity >= 1
                        --   LamCase: many arity-1 matches
                        --   LamCases: many matches of uniform arity >= 1
@@ -420,7 +420,7 @@ data HsExpr p
 
   | HsCase      (XCase p)
                 (LHsExpr p)
-                (MatchGroup p (LHsExpr p))
+                (LMatchGroup p (LHsExpr p))
 
   | HsIf        (XIf p)        -- GhcPs: this is a Bool; False <=> do not use
                                --  rebindable syntax
@@ -785,14 +785,14 @@ data HsCmd id
   -- | Lambda-case
   --
   | HsCmdLam (XCmdLamCase id) HsLamVariant
-             (MatchGroup id (LHsCmd id)) -- bodies are HsCmd's
+             (LMatchGroup id (LHsCmd id)) -- bodies are HsCmd's
 
   | HsCmdPar    (XCmdPar id)
                 (LHsCmd id)                     -- parenthesised command
 
   | HsCmdCase   (XCmdCase id)
                 (LHsExpr id)
-                (MatchGroup id (LHsCmd id))     -- bodies are HsCmd's
+                (LMatchGroup id (LHsCmd id))     -- bodies are HsCmd's
 
   | HsCmdIf     (XCmdIf id)
                 (SyntaxExpr id)         -- cond function
@@ -869,9 +869,12 @@ a function defined by pattern matching must have the same number of
 patterns in each equation.
 -}
 
+-- | Located MatchGroup
+type LMatchGroup p body = XRec p (MatchGroup p body)
+
 data MatchGroup p body
   = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result, and origin
-       , mg_alts    :: XRec p [LMatch p body]
+       , mg_alts    :: [LMatch p body]
          -- The alternatives, see Note [Empty mg_alts] for what it means if 'mg_alts' is empty.
        }
      -- The type is the type of the entire group

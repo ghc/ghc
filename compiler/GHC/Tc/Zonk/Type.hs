@@ -869,17 +869,17 @@ zonkLTcSpecPrags ps
 
 zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnCO
                => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
-               -> MatchGroup GhcTc (LocatedA (body GhcTc))
-               -> ZonkTcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
-zonkMatchGroup zBody (MG { mg_alts = L l ms
-                         , mg_ext = MatchGroupTc arg_tys res_ty origin
-                         })
+               -> LMatchGroup GhcTc (LocatedA (body GhcTc))
+               -> ZonkTcM (LMatchGroup GhcTc (LocatedA (body GhcTc)))
+zonkMatchGroup zBody (L l (MG { mg_alts = ms
+                              , mg_ext = MatchGroupTc arg_tys res_ty origin
+                              }))
   = do  { ms' <- mapM (zonkMatch zBody) ms
         ; arg_tys' <- zonkScaledTcTypesToTypesX arg_tys
         ; res_ty'  <- zonkTcTypeToTypeX res_ty
-        ; return (MG { mg_alts = L l ms'
-                     , mg_ext = MatchGroupTc arg_tys' res_ty' origin
-                     }) }
+        ; return (L l (MG { mg_alts = ms'
+                          , mg_ext = MatchGroupTc arg_tys' res_ty' origin
+                          })) }
 
 zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnCO
           => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))

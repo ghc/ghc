@@ -212,7 +212,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
             force_var
                 -- Bindings are strict when -XStrict is enabled
               | xopt LangExt.Strict dflags
-              , matchGroupArity matches == 0 -- no need to force lambdas
+              , matchGroupArity (unLoc matches) == 0 -- no need to force lambdas
               = [id]
               | isBangedHsBind b
               = [id]

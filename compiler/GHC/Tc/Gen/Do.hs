@@ -214,10 +214,11 @@ mk_failable_expr doFlav pat@(L loc _) expr fail_op =
 mk_fail_block :: HsDoFlavour -> LPat GhcRn -> LHsExpr GhcRn -> FailOperator GhcRn -> TcM (HsExpr GhcRn)
 mk_fail_block doFlav pat@(L ploc _) e (Just (SyntaxExprRn fail_op)) =
   do  dflags <- getDynFlags
-      return $ HsLam noAnn LamCases $ mkMatchGroup (doExpansionOrigin doFlav) -- \
-                (wrapGenSpan [ genHsCaseAltDoExp doFlav pat e                 --  pat -> expr
-                             , fail_alt_case dflags pat fail_op               --  _   -> fail "fail pattern"
-                             ])
+      return $ HsLam noAnn LamCases $ wrapGenSpan $
+              mkMatchGroup (doExpansionOrigin doFlav)            -- \
+                [ genHsCaseAltDoExp doFlav pat e                 --  pat -> expr
+                , fail_alt_case dflags pat fail_op               --  _   -> fail "fail pattern"
+                ]
         where
           fail_alt_case :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> LMatch GhcRn (LHsExpr GhcRn)
           fail_alt_case dflags pat fail_op = genHsCaseAltDoExp doFlav genWildPat $

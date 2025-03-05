@@ -22,6 +22,7 @@ data MatchGroup (a :: Type) (body :: Type)
 data GRHSs (a :: Type) (body :: Type)
 type family SyntaxExpr (i :: Type)
 
+type LMatchGroup a body = XRec a (MatchGroup a body)
 type LHsExpr a = XRec a (HsExpr a)
 
 data HsDoFlavour

@@ -2137,19 +2137,19 @@
          []))
        (Unqual
         {OccName: main}))
-      (MG
-       (FromSource)
-       (L
-        (EpAnn
-         (EpaSpan { DumpParsedAst.hs:25:1-23 })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
-          [])
-         (EpaComments
-          []))
+      (L
+       (EpAnn
+        (EpaSpan { DumpParsedAst.hs:25:1-23 })
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         [])
+        (EpaComments
+         []))
+       (MG
+        (FromSource)
         [(L
           (EpAnn
            (EpaSpan { DumpParsedAst.hs:25:1-23 })

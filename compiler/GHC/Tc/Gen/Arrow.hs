@@ -314,9 +314,9 @@ tc_cmd env cmd@(HsCmdArrForm fixity expr f cmd_args) (cmd_stk, res_ty)
 -- | Typechecking for case command alternatives. Used for 'HsCmdCase'.
 tcCmdMatches :: CmdEnv
              -> TcTypeFRR -- ^ Type of the scrutinee.
-             -> MatchGroup GhcRn (LHsCmd GhcRn)  -- ^ case alternatives
+             -> LMatchGroup GhcRn (LHsCmd GhcRn)  -- ^ case alternatives
              -> CmdType
-             -> TcM (MatchGroup GhcTc (LHsCmd GhcTc))
+             -> TcM (LMatchGroup GhcTc (LHsCmd GhcTc))
 tcCmdMatches env scrut_ty matches (stk, res_ty)
   = tcCaseMatches tc_body (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
   where
@@ -327,11 +327,11 @@ tcCmdMatches env scrut_ty matches (stk, res_ty)
 tcCmdMatchLambda :: CmdEnv
                  -> HsArrowMatchContext
                  -> Arity
-                 -> MatchGroup GhcRn (LHsCmd GhcRn)
+                 -> LMatchGroup GhcRn (LHsCmd GhcRn)
                  -> CmdType
-                 -> TcM (HsWrapper, MatchGroup GhcTc (LHsCmd GhcTc))
+                 -> TcM (HsWrapper, LMatchGroup GhcTc (LHsCmd GhcTc))
 tcCmdMatchLambda env ctxt arity
-                 mg@MG { mg_alts = L l matches, mg_ext = origin }
+                 (L l mg@MG { mg_alts = matches, mg_ext = origin })
                  (cmd_stk, res_ty)
   = do { (co, arg_tys, cmd_stk') <- matchExpectedCmdArgs arity cmd_stk
 
@@ -340,8 +340,8 @@ tcCmdMatchLambda env ctxt arity
            addErrCtxt . MatchInCtxt . unLoc <*> tc_match check_arg_tys cmd_stk'
 
        ; let arg_tys' = map unrestricted arg_tys
-             mg' = mg { mg_alts = L l matches'
-                      , mg_ext = MatchGroupTc arg_tys' res_ty origin }
+             mg' = L l $ mg { mg_alts = matches'
+                            , mg_ext = MatchGroupTc arg_tys' res_ty origin }
 
        ; return (mkWpCastN co, mg') }
   where

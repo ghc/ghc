@@ -75,19 +75,19 @@
          []))
        (Unqual
         {OccName: a}))
-      (MG
-       (FromSource)
-       (L
-        (EpAnn
-         (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
-          [])
-         (EpaComments
-          []))
+      (L
+       (EpAnn
+        (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         [])
+        (EpaComments
+         []))
+       (MG
+        (FromSource)
         [(L
           (EpAnn
            (EpaSpan { ZeroWidthSemi.hs:6:1-5 })

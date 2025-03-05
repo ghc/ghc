@@ -63,7 +63,7 @@ data PatBuilder p
 
 -- These instances are here so that they are not orphans
 type instance Anno (GRHS GhcPs (LocatedA (PatBuilder GhcPs)))             = EpAnnCO
-type instance Anno [LocatedA (Match GhcPs (LocatedA (PatBuilder GhcPs)))] = SrcSpanAnnLW
+type instance Anno (MatchGroup GhcPs (LocatedA (PatBuilder GhcPs)))       = SrcSpanAnnLW
 type instance Anno (Match GhcPs (LocatedA (PatBuilder GhcPs)))            = SrcSpanAnnA
 type instance Anno (StmtLR GhcPs GhcPs (LocatedA (PatBuilder GhcPs)))     = SrcSpanAnnA
 

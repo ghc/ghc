@@ -85,19 +85,19 @@
          []))
        (Unqual
         {OccName: main}))
-      (MG
-       (FromSource)
-       (L
-        (EpAnn
-         (EpaSpan { mod185.hs:5:1-24 })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
-          [])
-         (EpaComments
-          []))
+      (L
+       (EpAnn
+        (EpaSpan { mod185.hs:5:1-24 })
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         [])
+        (EpaComments
+         []))
+       (MG
+        (FromSource)
         [(L
           (EpAnn
            (EpaSpan { mod185.hs:5:1-24 })

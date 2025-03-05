@@ -543,19 +543,19 @@
              []))
            (Unqual
             {OccName: ==}))
-          (MG
-           (FromSource)
-           (L
-            (EpAnn
-             (EpaSpan { Test24533.hs:16:3-19 })
-             (AnnList
-              (Nothing)
-              (ListNone)
-              []
-              (NoEpTok)
-              [])
-             (EpaComments
-              []))
+          (L
+           (EpAnn
+            (EpaSpan { Test24533.hs:16:3-19 })
+            (AnnList
+             (Nothing)
+             (ListNone)
+             []
+             (NoEpTok)
+             [])
+            (EpaComments
+             []))
+           (MG
+            (FromSource)
             [(L
               (EpAnn
                (EpaSpan { Test24533.hs:16:3-19 })
@@ -1149,19 +1149,19 @@
              []))
            (Unqual
             {OccName: ==}))
-          (MG
-           (FromSource)
-           (L
-            (EpAnn
-             (EpaSpan { Test24533.ppr.hs:6:3-19 })
-             (AnnList
-              (Nothing)
-              (ListNone)
-              []
-              (NoEpTok)
-              [])
-             (EpaComments
-              []))
+          (L
+           (EpAnn
+            (EpaSpan { Test24533.ppr.hs:6:3-19 })
+            (AnnList
+             (Nothing)
+             (ListNone)
+             []
+             (NoEpTok)
+             [])
+            (EpaComments
+             []))
+           (MG
+            (FromSource)
             [(L
               (EpAnn
                (EpaSpan { Test24533.ppr.hs:6:3-19 })

@@ -787,16 +787,13 @@ ppr_expr (ExplicitSum _ alt arity expr)
 
 ppr_expr (HsLam _ lam_variant matches)
   = case lam_variant of
-       LamSingle -> pprMatches matches
+       LamSingle -> pprLMatches matches
        _         -> sep [ sep [lamCaseKeyword lam_variant]
-                        , nest 2 (pprMatches matches) ]
+                        , nest 2 (pprLMatches matches) ]
 
-ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ alts }))
+ppr_expr (HsCase _ expr matches)
   = sep [ sep [text "case", nest 4 (ppr expr), text "of"],
-          pp_alts ]
-  where
-    pp_alts | null alts = text "{}"
-            | otherwise = nest 2 (pprMatches matches)
+          nest 2 (pprLMatches matches) ]
 
 ppr_expr (HsIf _ e1 e2 e3)
   = sep [hsep [text "if", nest 2 (ppr e1), text "then"],
@@ -1461,13 +1458,13 @@ ppr_cmd (HsCmdApp _ c e)
     collect_args fun args = (fun, args)
 
 ppr_cmd (HsCmdLam _ LamSingle matches)
-  = pprMatches matches
+  = pprLMatches matches
 ppr_cmd (HsCmdLam _ lam_variant matches)
-  = sep [ lamCaseKeyword lam_variant, nest 2 (pprMatches matches) ]
+  = sep [ lamCaseKeyword lam_variant, nest 2 (pprLMatches matches) ]
 
 ppr_cmd (HsCmdCase _ expr matches)
   = sep [ sep [text "case", nest 4 (ppr expr), text "of"],
-          nest 2 (pprMatches matches) ]
+          nest 2 (pprLMatches matches) ]
 
 ppr_cmd (HsCmdIf _ _ e ct ce)
   = sep [hsep [text "if", nest 2 (ppr e), text "then"],
@@ -1559,7 +1556,7 @@ instance (OutputableBndrId pr, Outputable body)
   ppr = pprMatch
 
 isEmptyMatchGroup :: MatchGroup (GhcPass p) body -> Bool
-isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unLoc ms
+isEmptyMatchGroup (MG { mg_alts = ms }) = null ms
 
 -- | Is there only one RHS in this list of matches?
 isSingletonMatchGroup :: [LMatch (GhcPass p) body] -> Bool
@@ -1572,8 +1569,8 @@ isSingletonMatchGroup matches
 
 matchGroupArity :: MatchGroup (GhcPass id) body -> Arity
 -- This is called before type checking, when mg_arg_tys is not set
-matchGroupArity MG { mg_alts = L _ [] } = 1 -- See Note [Empty mg_alts]
-matchGroupArity MG { mg_alts = L _ (alt1 : _) } = count (isVisArgPat . unLoc) (hsLMatchPats alt1)
+matchGroupArity MG { mg_alts = [] } = 1 -- See Note [Empty mg_alts]
+matchGroupArity MG { mg_alts = (alt1 : _) } = count (isVisArgPat . unLoc) (hsLMatchPats alt1)
 
 hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
 hsLMatchPats (L _ (Match { m_pats = L _ pats })) = pats
@@ -1606,16 +1603,22 @@ type instance XCGRHS (GhcPass _) _ = EpAnn GrhsAnn
 
 type instance XXGRHS (GhcPass _) b = DataConCantHappen
 
+pprLMatches :: (OutputableBndrId idR, Outputable body)
+            => LMatchGroup (GhcPass idR) body -> SDoc
+pprLMatches = pprMatches . unLoc
+
 pprMatches :: (OutputableBndrId idR, Outputable body)
            => MatchGroup (GhcPass idR) body -> SDoc
+pprMatches MG { mg_alts = [] }
+    = text "{}"
 pprMatches MG { mg_alts = matches }
-    = vcat (map pprMatch (map unLoc (unLoc matches)))
+    = vcat (map (pprMatch . unLoc) matches)
       -- Don't print the type; it's only a place-holder before typechecking
 
 -- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
 pprFunBind :: (OutputableBndrId idR)
-           => MatchGroup (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc
-pprFunBind matches = pprMatches matches
+           => LMatchGroup (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc
+pprFunBind matches = pprLMatches matches
 
 -- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
 pprPatBind :: forall bndr p . (OutputableBndrId bndr,
@@ -2489,8 +2492,8 @@ type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd 
 type instance Anno (HsCmd (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno (HsCmdTop (GhcPass p)) = EpAnnCO
-type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnLW
-type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnLW
+type instance Anno (MatchGroup (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnLW
+type instance Anno (MatchGroup (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnLW
 type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
 type instance Anno [LocatedA (Pat (GhcPass p))] = EpaLocation

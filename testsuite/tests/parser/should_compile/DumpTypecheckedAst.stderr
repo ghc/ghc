@@ -1916,26 +1916,26 @@
          (EpaComments
           []))
         {Var: main})
-       (MG
-        (MatchGroupTc
-         []
-         (TyConApp
-          ({abstract:TyCon})
-          [(TyConApp
-            ({abstract:TyCon})
-            [])])
-         (FromSource))
-        (L
-         (EpAnn
-          (EpaSpan { DumpTypecheckedAst.hs:20:1-23 })
-          (AnnList
-           (Nothing)
-           (ListNone)
-           []
-           (NoEpTok)
-           [])
-          (EpaComments
-           []))
+       (L
+        (EpAnn
+         (EpaSpan { DumpTypecheckedAst.hs:20:1-23 })
+         (AnnList
+          (Nothing)
+          (ListNone)
+          []
+          (NoEpTok)
+          [])
+         (EpaComments
+          []))
+        (MG
+         (MatchGroupTc
+          []
+          (TyConApp
+           ({abstract:TyCon})
+           [(TyConApp
+             ({abstract:TyCon})
+             [])])
+          (FromSource))
          [(L
            (EpAnn
             (EpaSpan { DumpTypecheckedAst.hs:20:1-23 })

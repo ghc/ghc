@@ -212,13 +212,13 @@ unguardedRHS an loc rhs = NE.singleton $ L (noAnnSrcSpan loc) (GRHS an [] rhs)
 
 type AnnoBody p body
   = ( XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ Origin
-    , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))] ~ SrcSpanAnnLW
+    , Anno (MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnLW
     , Anno (Match (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnA
     )
 
 mkMatchGroup :: AnnoBody p body
              => Origin
-             -> LocatedLW [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
+             -> [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
              -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
 mkMatchGroup origin matches = MG { mg_ext = origin
                                  , mg_alts = matches }
@@ -226,10 +226,10 @@ mkMatchGroup origin matches = MG { mg_ext = origin
 mkLamCaseMatchGroup :: AnnoBody p body
                     => Origin
                     -> HsLamVariant
-                    -> LocatedLW [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
+                    -> [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
                     -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
-mkLamCaseMatchGroup origin lam_variant (L l matches)
-  = mkMatchGroup origin (L l $ map fixCtxt matches)
+mkLamCaseMatchGroup origin lam_variant matches
+  = mkMatchGroup origin (map fixCtxt matches)
   where fixCtxt (L a match) = L a match{m_ctxt = LamAlt lam_variant}
 
 mkLocatedList :: (Semigroup a, NoAnn an)
@@ -274,8 +274,8 @@ mkHsLam :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
         -> LHsExpr (GhcPass p)
 mkHsLam (L l pats) body = mkHsPar (L (getLoc body) (HsLam noAnn LamSingle matches))
   where
-    matches = mkMatchGroup (Generated OtherExpansion SkipPmc)
-                           (noLocA [mkSimpleMatch (LamAlt LamSingle) (L l pats') body])
+    matches = noLocA $ mkMatchGroup (Generated OtherExpansion SkipPmc)
+                           [mkSimpleMatch (LamAlt LamSingle) (L l pats') body]
     pats' = map (parenthesizePat appPrec) pats
 
 mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr GhcTc -> LHsExpr GhcTc
@@ -603,8 +603,8 @@ nlHsCase :: LHsExpr GhcPs -> [LMatch GhcPs (LHsExpr GhcPs)]
          -> LHsExpr GhcPs
 nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
 
-nlHsLam match = noLocA $ HsLam noAnn LamSingle
-                  $ mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA [match])
+nlHsLam match = noLocA $ HsLam noAnn LamSingle $
+           noLocA $ mkMatchGroup (Generated OtherExpansion SkipPmc) [match]
 
 nlHsPar e     = noLocA (gHsPar e)
 
@@ -614,7 +614,7 @@ nlHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 nlHsIf cond true false = noLocA (HsIf noAnn cond true false)
 
 nlHsCase expr matches
-  = noLocA (HsCase noAnn expr (mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA matches)))
+  = noLocA (HsCase noAnn expr (noLocA (mkMatchGroup (Generated OtherExpansion SkipPmc) matches)))
 nlList exprs          = noLocA (ExplicitList noAnn exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
@@ -829,7 +829,7 @@ mkFunBind :: Origin -> LocatedN RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
 -- ^ Not infix, with place holders for coercion and free vars
 mkFunBind origin fn ms
   = FunBind { fun_id = fn
-            , fun_matches = mkMatchGroup origin (noLocA ms)
+            , fun_matches = noLocA (mkMatchGroup origin ms)
             , fun_ext = noExtField
             }
 
@@ -837,7 +837,7 @@ mkTopFunBind :: Origin -> LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
              -> HsBind GhcRn
 -- ^ In Name-land, with empty bind_fvs
 mkTopFunBind origin fn ms = FunBind { fun_id = fn
-                                    , fun_matches = mkMatchGroup origin (noLocA ms)
+                                    , fun_matches = noLocA (mkMatchGroup origin ms)
                                     , fun_ext  = emptyNameSet -- NB: closed
                                                               --     binding
                                     }
@@ -863,8 +863,8 @@ mkPatSynBind name details lpat dir anns = PatSynBind noExtField psb
 -- |If any of the matches in the 'FunBind' are infix, the 'FunBind' is
 -- considered infix.
 isInfixFunBind :: HsBindLR (GhcPass p1) (GhcPass p2) -> Bool
-isInfixFunBind (FunBind { fun_matches = MG _ matches })
-  = any (isInfixMatch . unLoc) (unLoc matches)
+isInfixFunBind (FunBind { fun_matches = L _ (MG _ matches) })
+  = any (isInfixMatch . unLoc) matches
 isInfixFunBind _ = False
 
 -- |Return the 'SrcSpan' encompassing the contents of any enclosed binds
@@ -1049,7 +1049,7 @@ isBangedHsBind :: HsBind GhcTc -> Bool
 isBangedHsBind (XHsBindsLR (AbsBinds { abs_binds = binds }))
   = any (isBangedHsBind . unLoc) binds
 isBangedHsBind (FunBind {fun_matches = matches})
-  | [L _ match] <- unLoc $ mg_alts matches
+  | [L _ match] <- mg_alts (unLoc matches)
   , FunRhs{mc_strictness = SrcStrict} <- m_ctxt match
   = True
 isBangedHsBind (PatBind {pat_lhs = pat})

@@ -848,7 +848,7 @@ instance ToHie (Context (Located NoExtField)) where
 type AnnoBody p body
   = ( Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                    ~ SrcSpanAnnA
-    , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
+    , Anno (MatchGroup (GhcPass p) (LocatedA (body (GhcPass p))))
                    ~ SrcSpanAnnLW
     , Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                    ~ EpAnn NoEpAnns
@@ -902,9 +902,9 @@ instance HiePass p => ToHie (BindContext (LocatedA (HsBind (GhcPass p)))) where
 instance ( HiePass p
          , AnnoBody p body
          , ToHie (LocatedA (body (GhcPass p)))
-         ) => ToHie (MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))) where
-  toHie mg = case mg of
-    MG{ mg_alts = (L span alts) } ->
+         ) => ToHie (LocatedLW (MatchGroup (GhcPass p) (LocatedA (body (GhcPass p))))) where
+  toHie (L span mg) = case mg of
+    MG{ mg_alts = alts } ->
       local (setOrigin origin) $ concatM
         [ locOnly (locA span)
         , toHie alts

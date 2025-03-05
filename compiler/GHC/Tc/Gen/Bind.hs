@@ -812,7 +812,7 @@ checkMonomorphismRestriction mbis lbinds
     -- The Haskell 98 monomorphism restriction
     restricted :: HsBindLR GhcRn GhcRn -> Bool
     restricted (PatBind {})                              = True
-    restricted (FunBind { fun_id = v, fun_matches = m }) = restricted_match m
+    restricted (FunBind { fun_id = v, fun_matches = m }) = restricted_match (unLoc m)
                                                            && mr_needed_for (unLoc v)
     restricted (VarBind { var_ext = x })                 = dataConCantHappen x
     restricted b@(PatSynBind {}) = pprPanic "isRestrictedGroup/unrestricted" (ppr b)
@@ -1507,7 +1507,7 @@ switch to inference when we have no signature for any of the binders.
 -- it; hence the TcMonoBind data type in which the LHS is done but the RHS isn't
 
 data TcMonoBind         -- Half completed; LHS done, RHS not done
-  = TcFunBind  MonoBindInfo  SrcSpan Mult (MatchGroup GhcRn (LHsExpr GhcRn))
+  = TcFunBind  MonoBindInfo  SrcSpan Mult (LMatchGroup GhcRn (LHsExpr GhcRn))
   | TcPatBind [MonoBindInfo] (LPat GhcTc) Mult (HsMultAnn GhcRn) (GRHSs GhcRn (LHsExpr GhcRn))
               TcSigmaTypeFRR
 

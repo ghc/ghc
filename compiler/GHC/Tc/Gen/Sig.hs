@@ -594,7 +594,7 @@ add_inl_arity ar prag@(InlinePragma { inl_inline = inl_spec })
   = prag
 
 lhsBindArity :: LHsBind GhcRn -> NameEnv Arity -> NameEnv Arity
-lhsBindArity (L _ (FunBind { fun_id = id, fun_matches = ms })) env
+lhsBindArity (L _ (FunBind { fun_id = id, fun_matches = L _ ms })) env
   = extendNameEnv env (unLoc id) (matchGroupArity ms)
 lhsBindArity _ env = env        -- PatBind/VarBind
 

@@ -1,8 +1,8 @@
-
 RepPolyMatch.hs:11:9: error: [GHC-55287]
     • The binder of the \case expression
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE rep
-    • In the expression: \case
-      In an equation for ‘match’: match = \case
+    • In the expression: \case {}
+      In an equation for ‘match’: match = \case {}
+

@@ -83,19 +83,19 @@
          []))
        (Unqual
         {OccName: bar}))
-      (MG
-       (FromSource)
-       (L
-        (EpAnn
-         (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
-          [])
-         (EpaComments
-          []))
+      (L
+       (EpAnn
+        (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         [])
+        (EpaComments
+         []))
+       (MG
+        (FromSource)
         [(L
           (EpAnn
            (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
@@ -204,19 +204,19 @@
          []))
        (Unqual
         {OccName: foo}))
-      (MG
-       (FromSource)
-       (L
-        (EpAnn
-         (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
-          [])
-         (EpaComments
-          []))
+      (L
+       (EpAnn
+        (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         [])
+        (EpaComments
+         []))
+       (MG
+        (FromSource)
         [(L
           (EpAnn
            (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
@@ -357,19 +357,19 @@
          []))
        (Unqual
         {OccName: main}))
-      (MG
-       (FromSource)
-       (L
-        (EpAnn
-         (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
-         (AnnList
-          (Nothing)
-          (ListNone)
-          []
-          (NoEpTok)
-          [])
-         (EpaComments
-          []))
+      (L
+       (EpAnn
+        (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (NoEpTok)
+         [])
+        (EpaComments
+         []))
+       (MG
+        (FromSource)
         [(L
           (EpAnn
            (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
