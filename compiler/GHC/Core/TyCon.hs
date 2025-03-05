@@ -2985,11 +2985,15 @@ Wildcards in type families are used to represent type/kind information that
 are not specified by the user. See Note [Wildcards in family instances] for
 more intuition.
 
-It is controversial how to interpret wildcards in type families. Hence We
-classify kinds of wildcards in type families into three categories represented
-by the FamArgFlavour data type: ClassArg, FreeArg, and SigArg, see Note [FamArgFlavour]
-for more detail. This flexibility allows us to flip the interpretation of wildcards in
-type families.
+It is controversial how to interpret wildcards in type families because of their
+close connection with the class arguments of associated families. The main challenge
+arises from the fact that some wildcard occurrences correspond to arguments provided
+by the parent class (class arguments), while others are supplied freely by the user.
+To resolve this ambiguity, we classify wildcards into three categories using the
+FamArgFlavour data type—namely, ClassArg, FreeArg, and SigArg. This categorization
+provides the flexibility to adjust the interpretation of wildcards in type families,
+allowing us to experiment with different behaviors. See Note [FamArgFlavour] for more
+details.
 
 Some common agreements:
 
@@ -3031,7 +3035,7 @@ For more discussion, see #13908.
 -}
 
 {- Note [FamArgFlavour]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 The FamArgFlavour is used to distinguish the different kinds of arguments that may
 appear in an type family declaration/instance. In an associated type family,
 some arguments come directly from the parent class (the “class arguments”) while
