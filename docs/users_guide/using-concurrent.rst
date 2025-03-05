@@ -157,7 +157,7 @@ use the RTS :rts-flag:`-N ⟨x⟩` options.
 .. note::
 
     The maximum number of capabilities supported by the GHC runtime system is
-    determined when at RTS startup to be either 256, the value given by
+    determined at RTS startup to be either 256, the value given by
     :rts-flag:`-N ⟨x⟩`, or the number of logical CPU cores, whichever is
     greater.
 
