@@ -2995,27 +2995,31 @@ Wildcards in type families are used to represent type/kind information that
 are not specified by the user. It is controversial how to interpret wildcards
 in type families. Hence We classify kinds of wildcards in type families into
 three categories represented by the FamArgFlavour data type: ClassArg, FreeArg,
-and SigArg, see Note [FamArgFlavour] for more detail.  This flexibility allows
+and SigArg, see Note [FamArgFlavour] for more detail. This flexibility allows
 us to flip the interpretation of wildcards in type families.
 
 Some common agreements:
 
-* Wildcards should be not defaulted.
+* FreeArg wildcards should be not defaulted.
 
-* For `ClassArg`, it should be able to represent atleast arbitrary type variables, it is
+* For `ClassArg`, it should be able to represent at least arbitrary type variables, it is
   used in our codebase.
 
     instance (HasDefaultDiagnosticOpts opts, Outputable hint) => Diagnostic (UnknownDiagnostic opts hint) where
       type DiagnosticOpts (UnknownDiagnostic opts _) = opts
       type DiagnosticHint (UnknownDiagnostic _ hint) = hint
 
-* For `SigArg`, it should be able to represent atleast arbitrary type variables.
+By picking different type var for different flavours of wildcards in `tcAnonWildCardOcc`, we can
+explore different design spaces. For example, we can have the following design spaces:
+1. Wildcards can represet arbitrary types, including type variables, picks TauTv.
+2. Wildcards can only represent type variables, picks TyVarTv.
+3. Wildcards stand alone, pick skolemTv variables.
+... and so on.
 
-We have two design choices:
-1. Wildcards can represet arbitrary types, including type variables.
-2. Wildcards can only represent type variables.
-
-... todo add more
+Maintaining backward compatibility, the current picks:
+- TyVarTv for FreeArg
+- TauTv for ClassArg
+- TauTv for SigArg
 
 For more discussion, see #13908.
 -}
@@ -3053,22 +3057,19 @@ For instance, for an instance declaration like
 the first two underscores (free arguments) would yield TyVarTv’s while the last two underscores (a class
 argument and a signature argument) would produce TauTv's.
 
-This design provides flexibility in handling wildcards in type families.
-
 [More on SigArg]
 Example from T14366
 
 type family F (a :: Type) :: Type where
   F (a :: _) = a
 
-Imagine without SigArg, since F is non-associated, every argument is freeVar,
-now let's consider _ here as a freeVar then TyVarTv, then it would not match Type.
+Imagine without SigArg, since F is non-associated, every argument is FreeArg,
+now let's consider _ here as a FreeArg then TyVarTv, then it would not match Type.
 Say if we assign ClassArg to _ here, if we want to flip class arguments in associated
 type family to only match Type variables. Then this example would not work.
 
-Hence we maintain diffirent flavours between class arguments and signature arguments
-because we want to be able to flip only the true class arguments without affecting
-the signature arguments.
+Hence we maintain three different flavours of wildcards in type families. This provides
+a flexibility to interpret wildcards in type families.
 
 For more discussion, see #13908.
 -}
