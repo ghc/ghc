@@ -888,7 +888,7 @@ tcInferLHsTypeUnsaturated hs_ty
        ; case splitHsAppTys_maybe (unLoc hs_ty) of
            Just (hs_fun_ty, hs_args)
               -> do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
-                    ; tcInferTyApps_nosat mode hs_fun_ty fun_ty hs_args (cycle [FreeArg])}
+                    ; tcInferTyApps_nosat mode hs_fun_ty fun_ty hs_args (cycle [tcTyModeFamArgFlavour mode])}
                       -- Notice the 'nosat'; do not instantiate trailing
                       -- invisible arguments of a type family.
                       -- See Note [Dealing with :kind]
@@ -1286,6 +1286,7 @@ tcHsType mode rn_ty@(HsOpTy{})      exp_kind = tc_app_ty mode rn_ty exp_kind
 
 tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
   = do { let mode' = (updateFamArgFlavour SigArg $ mode { mode_tyki = KindLevel})
+       ; traceTc "tcHsType:sig0" (ppr ty <+> ppr (mode_holes mode'))
        ; sig' <- tc_lhs_kind_sig mode' KindSigCtxt sig
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
@@ -1555,7 +1556,7 @@ tc_app_ty :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
        ; (ty, infered_kind) <- tcInferTyApps mode hs_fun_ty fun_ty
-                                 hs_args (cycle [FreeArg])
+                                 hs_args (cycle [tcTyModeFamArgFlavour mode])
        ; checkExpKind rn_ty ty infered_kind exp_kind }
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
@@ -1610,7 +1611,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args fam_arg_flvs
        -> Subst        -- Applies to function kind
        -> TcKind          -- Function kind
        -> [LHsTypeArg GhcRn]    -- Un-type-checked args
-       -> [FamArgFlavour]    -- Un-type-checked args
+       -> [FamArgFlavour]    -- Flavours of the args see Note [FamArgFlavour]
        -> TcM (TcType, TcKind)  -- Result type and its kind
     -- INVARIANT: in any call (go n fun subst fun_ki args)
     --               typeKind fun  =  subst(fun_ki)
@@ -1623,7 +1624,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args fam_arg_flvs
     -- is apply 'fun' to an argument type.
 
     -- Dispatch on all_args first, for performance reasons
-    go n fun subst fun_ki all_args [] = error "tcInferTyApps_nosat: empty all_args"
+    go _ _ _ _ _ [] = error "tcInferTyApps: FamArgFlavour should be infinite"
     go n fun subst fun_ki all_args arg_flvs@(arg_flv:rest_arg_flvs) = case (all_args, tcSplitPiTy_maybe fun_ki) of
       ---------------- No user-written args left. We're done!
       ([], _) -> return (fun, substTy subst fun_ki)
@@ -2241,7 +2242,7 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
              wc_kind = mkTyVarTy kv
              wc_tv   = mkTcTyVar wc_name wc_kind wc_details
 
-       ; traceTc "tcAnonWildCardOcc" (ppr hole_lvl <+> ppr emit_holes)
+       ; traceTc "tcAnonWildCardOcc" (ppr hole_lvl <+> ppr emit_holes <+> ppr hole_mode)
        ; when emit_holes $
          emitAnonTypeHole is_extra wc_tv
          -- Why the 'when' guard?
