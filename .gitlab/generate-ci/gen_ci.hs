@@ -122,7 +122,6 @@ data LinuxDistro
   | Ubuntu2204
   | Ubuntu2004
   | Ubuntu1804
-  | Centos7
   | Alpine312
   | Alpine318
   | Alpine320
@@ -322,7 +321,6 @@ distroName Fedora38      = "fedora38"
 distroName Ubuntu1804    = "ubuntu18_04"
 distroName Ubuntu2004    = "ubuntu20_04"
 distroName Ubuntu2204    = "ubuntu22_04"
-distroName Centos7       = "centos7"
 distroName Alpine312     = "alpine3_12"
 distroName Alpine318     = "alpine3_18"
 distroName Alpine320     = "alpine3_20"
@@ -500,9 +498,6 @@ distroVariables :: Arch -> LinuxDistro -> Variables
 distroVariables arch Alpine312 = alpineVariables arch
 distroVariables arch Alpine318 = alpineVariables arch
 distroVariables arch Alpine320 = alpineVariables arch
-distroVariables _    Centos7   = mconcat [ "HADRIAN_ARGS" =: "--docs=no-sphinx"
-                                         , brokenTest "T22012" "#23979"
-                                         ]
 distroVariables _    Fedora33  = mconcat
   -- LLC/OPT do not work for some reason in our fedora images
   -- These tests fail with this error: T11649 T5681 T7571 T8131b
@@ -1195,8 +1190,7 @@ ubuntu_x86 =
 
 rhel_x86 :: [JobGroup Job]
 rhel_x86 =
-  [ disableValidate (standardBuildsWithConfig Amd64 (Linux Centos7) (splitSectionsBroken vanilla))
-  , disableValidate (standardBuilds Amd64 (Linux Rocky8))
+  [ disableValidate (standardBuilds Amd64 (Linux Rocky8))
   ]
 
 fedora_x86 :: [JobGroup Job]
