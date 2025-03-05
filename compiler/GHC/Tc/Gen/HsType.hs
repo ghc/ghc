@@ -1286,6 +1286,7 @@ tcHsType mode rn_ty@(HsOpTy{})      exp_kind = tc_app_ty mode rn_ty exp_kind
 
 tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
   = do { let mode' = (updateFamArgFlavour SigArg $ mode { mode_tyki = KindLevel})
+        --  see Note [FamArgFlavour]
        ; traceTc "tcHsType:sig0" (ppr ty <+> ppr (mode_holes mode'))
        ; sig' <- tc_lhs_kind_sig mode' KindSigCtxt sig
                  -- We must typecheck the kind signature, and solve all
@@ -1578,7 +1579,7 @@ tcInferTyApps, tcInferTyApps_nosat
     -> LHsType GhcRn        -- ^ Function (for printing only)
     -> TcType               -- ^ Function
     -> [LHsTypeArg GhcRn]   -- ^ Args
-    -> [FamArgFlavour]   -- ^ Args
+    -> [FamArgFlavour]      -- ^ Args flavours see Note [FamArgFlavour] and
     -> TcM (TcType, TcKind) -- ^ (f args, result kind)
 tcInferTyApps mode hs_ty fun hs_args famArgFlvs
   = do { (f_args, res_k) <- tcInferTyApps_nosat mode hs_ty fun hs_args famArgFlvs
