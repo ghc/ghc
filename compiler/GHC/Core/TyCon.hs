@@ -2989,7 +2989,7 @@ tyConSkolem = isHoleName . tyConName
 -- not whether it is abstract or not.
 
 
-{- Note [WildCard in type families]
+{- Note [WildCards in type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Wildcards in type families are used to represent type/kind information that
 are not specified by the user. It is controversial how to interpret wildcards
@@ -3016,10 +3016,13 @@ explore different design spaces. For example, we can have the following design s
 3. Wildcards stand alone, pick skolemTv variables.
 ... and so on.
 
-Maintaining backward compatibility, the current picks:
+Maintaining backward compatibility from 8.6.4 to 9.10.2, the picks would be:
 - TyVarTv for FreeArg
 - TauTv for ClassArg
 - TauTv for SigArg
+
+See <More on SigArg> session in Note [FamArgFlavour] for why not just merge SigArg
+and ClassArg.
 
 For more discussion, see #13908.
 -}
@@ -3039,7 +3042,7 @@ We can conceptually view the kinds of arguments for a type family as a famArgFla
 with one flavour per argument of the family. Each flavour indicates whether the corresponding
 argument is a ClassArg or a FreeArg. We also introduce a third flavour, SigArg,
 to flag arguments that appear only in a kind signature for a type instance (i.e. when
-a wildcard is provided along with a kind annotation, as in @(_ :: _)@). See [More on SigArg]
+a wildcard is provided along with a kind annotation, as in @(_ :: _)@). See <More on SigArg>
 Session.
 
 Under the current design, when type-checking an instance the interpretation of wildcards
@@ -3057,7 +3060,7 @@ For instance, for an instance declaration like
 the first two underscores (free arguments) would yield TyVarTv’s while the last two underscores (a class
 argument and a signature argument) would produce TauTv's.
 
-[More on SigArg]
+<More on SigArg>
 Example from T14366
 
 type family F (a :: Type) :: Type where
