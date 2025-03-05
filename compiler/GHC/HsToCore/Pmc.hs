@@ -35,7 +35,7 @@
 --     'ldiMatch'. See Section 4.1 of the paper.
 module GHC.HsToCore.Pmc (
         -- Checking and printing
-        pmcPatBind, pmcMatches, pmcGRHSs, pmcRecSel,
+        pmcPatBind, pmcMatches, pmcEmptyMatches, pmcGRHSs, pmcRecSel,
         isMatchContextPmChecked, isMatchContextPmChecked_SinglePat,
 
         -- See Note [Long-distance information]
@@ -165,8 +165,8 @@ pmcMatches
   :: Origin
   -> DsMatchContext                  -- ^ Match context, for warnings messages
   -> [Id]                            -- ^ Match variables, i.e. x and y above
-  -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
-  -> DsM [(Nablas, NonEmpty Nablas)] -- ^ One covered 'Nablas' per Match and
+  -> NonEmpty (LMatch GhcTc (LHsExpr GhcTc))  -- ^ List of matches
+  -> DsM (NonEmpty (Nablas, NonEmpty Nablas)) -- ^ One covered 'Nablas' per Match and
                                      --   GRHS, for long distance info.
 pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-} do
   -- We have to force @missing@ before printing out the trace message,
@@ -177,26 +177,36 @@ pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-} do
           hang (vcat [ppr origin, ppr ctxt, ppr vars, text "Matches:"])
                2
                ((ppr matches) $$ (text "missing:" <+> ppr missing))
-  case NE.nonEmpty matches of
-    Nothing -> do
-      -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
-      let var = only vars
-      empty_case <- noCheckDs $ desugarEmptyCase var
-      result <- unCA (checkEmptyCase empty_case) missing
-      tracePm "}: " (ppr (cr_uncov result))
-      formatReportWarnings ReportEmptyCase ctxt vars result
-      return []
-    Just matches -> do
-      matches <- {-# SCC "desugarMatches" #-}
-                 noCheckDs $ desugarMatches vars matches
-      tracePm "desugared matches" (ppr matches)
-      result  <- {-# SCC "checkMatchGroup" #-}
-                 unCA (checkMatchGroup matches) missing
-      tracePm "}: " (ppr (cr_uncov result))
-      unless (isDoExpansionGenerated origin) -- Do expansion generated code shouldn't emit overlapping warnings
-        ({-# SCC "formatReportWarnings" #-}
-        formatReportWarnings ReportMatchGroup ctxt vars result)
-      return (NE.toList (ldiMatchGroup (cr_ret result)))
+  matches <- {-# SCC "desugarMatches" #-}
+             noCheckDs $ desugarMatches vars matches
+  tracePm "desugared matches" (ppr matches)
+  result  <- {-# SCC "checkMatchGroup" #-}
+             unCA (checkMatchGroup matches) missing
+  tracePm "}: " (ppr (cr_uncov result))
+  unless (isDoExpansionGenerated origin) -- Do expansion generated code shouldn't emit overlapping warnings
+    ({-# SCC "formatReportWarnings" #-}
+    formatReportWarnings ReportMatchGroup ctxt vars result)
+  return (ldiMatchGroup (cr_ret result))
+
+-- This must be an -XEmptyCase. See Note [Checking EmptyCase]
+pmcEmptyMatches
+  :: Origin
+  -> DsMatchContext                  -- ^ Match context, for warnings messages
+  -> Id                              -- ^ Match variable
+  -> DsM ()
+pmcEmptyMatches origin ctxt var = {-# SCC "pmcEmptyMatches" #-} do
+  -- We have to force @missing@ before printing out the trace message,
+  -- otherwise we get interleaved output from the solver. This function
+  -- should be strict in @missing@ anyway!
+  !missing <- getLdiNablas
+  tracePm "pmcEmptyMatches {" $
+          hang (vcat [ppr origin, ppr ctxt, ppr var])
+               2
+               ((text "missing:" <+> ppr missing))
+  empty_case <- noCheckDs $ desugarEmptyCase var
+  result <- unCA (checkEmptyCase empty_case) missing
+  tracePm "}: " (ppr (cr_uncov result))
+  formatReportWarnings ReportEmptyCase ctxt [var] result
 
 {-
 Note [Detecting incomplete record selectors]

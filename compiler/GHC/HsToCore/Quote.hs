@@ -1548,14 +1548,15 @@ repE (HsOverLabel _ s) = repOverLabel s
         -- HsOverlit can definitely occur
 repE (HsOverLit _ l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit _ l)     = do { a <- repLiteral l;           repLit a }
-repE (HsLam _ LamSingle (L _ (MG { mg_alts = [m] }))) = repLambda m
-repE e@(HsLam _ LamSingle (L _ (MG { mg_alts = _ }))) = pprPanic "repE: HsLam with multiple alternatives" (ppr e)
-repE (HsLam _ LamCase (L _ (MG { mg_alts = ms })))
-                   = do { ms' <- mapM repMatchTup ms
+repE e@(HsLam _ LamSingle (L _ mg))
+ | MG { mg_alts = m :| [] } <- mg = repLambda m
+ | otherwise = pprPanic "repE: HsLam with multiple alternatives" (ppr e)
+repE (HsLam _ LamCase (L _ mg))
+                   = do { ms' <- mapM repMatchTup (matchGroupAlts mg)
                         ; core_ms <- coreListM matchTyConName ms'
                         ; repLamCase core_ms }
-repE (HsLam _ LamCases (L _ (MG { mg_alts = ms })))
-                   = do { ms' <- mapM repClauseTup ms
+repE (HsLam _ LamCases (L _ mg))
+                   = do { ms' <- mapM repClauseTup (matchGroupAlts mg)
                         ; core_ms <- coreListM matchTyConName ms'
                         ; repLamCases core_ms }
 repE (HsApp _ x y)   = do {a <- repLE x; b <- repLE y; repApp a b}
@@ -1575,9 +1576,9 @@ repE (NegApp _ x _)      = do
 repE (HsPar _ x)            = repLE x
 repE (SectionL _ x y)       = do { a <- repLE x; b <- repLE y; repSectionL a b }
 repE (SectionR _ x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b }
-repE (HsCase _ e (L _ (MG { mg_alts = ms })))
+repE (HsCase _ e (L _ mg))
                           = do { arg <- repLE e
-                               ; ms2 <- mapM repMatchTup ms
+                               ; ms2 <- mapM repMatchTup (matchGroupAlts mg)
                                ; core_ms2 <- coreListM matchTyConName ms2
                                ; repCaseE arg core_ms2 }
 repE (HsIf _ x y z)       = do
@@ -1977,13 +1978,13 @@ rep_bind :: LHsBind GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 rep_bind (L loc (FunBind
                  { fun_id = fn,
                    fun_matches = L _ (MG { mg_alts
-                           = [L _ (Match
+                           = L _ (Match
                                    { m_pats = L _ []
                                    , m_grhss = GRHSs _ guards wheres
                                    -- For a variable declaration I'm pretty
                                    -- sure we always have a FunRhs
                                    , m_ctxt = FunRhs { mc_strictness = strictessAnn }
-                                   } )] }) }))
+                                   } ) :| [] }) }))
  = do { (ss,wherecore) <- repBinds wheres
         ; guardcore <- addBinds ss (repGuards guards)
         ; fn'  <- lookupNBinder fn
@@ -1996,8 +1997,8 @@ rep_bind (L loc (FunBind
         ; return (locA loc, ans') }
 
 rep_bind (L loc (FunBind { fun_id = fn
-                         , fun_matches = L _ (MG { mg_alts = ms }) }))
- =   do { ms1 <- mapM repClauseTup ms
+                         , fun_matches = L _ mg }))
+ =   do { ms1 <- mapM repClauseTup (matchGroupAlts mg)
         ; fn' <- lookupNBinder fn
         ; ans <- repFun fn' (nonEmptyCoreList ms1)
         ; return (locA loc, ans) }
@@ -2087,7 +2088,7 @@ repPatSynDir Unidirectional        = rep2 unidirPatSynName []
 repPatSynDir ImplicitBidirectional = rep2 implBidirPatSynName []
 repPatSynDir (ExplicitBidirectional (L _ (MG { mg_alts = clauses })))
   = do { clauses' <- mapM repClauseTup clauses
-       ; repExplBidirPatSynDir (nonEmptyCoreList clauses') }
+       ; repExplBidirPatSynDir (nonEmptyCoreList' clauses') }
 
 repExplBidirPatSynDir :: Core [(M TH.Clause)] -> MetaM (Core (M TH.PatSynDir))
 repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]

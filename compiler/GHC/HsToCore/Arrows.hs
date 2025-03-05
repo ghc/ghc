@@ -500,7 +500,9 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdCase _ exp match) env_ids = do
     stack_id <- newSysLocalMDs stack_ty
     (match', core_choices)
       <- dsCases ids local_vars stack_id stack_ty res_ty match
-    let L _ (MG{ mg_ext = MatchGroupTc _ sum_ty _ }) = match'
+    let sum_ty = case match' of
+          L _ (MG     { mg_ext = MatchGroupTc _ sum_ty _ }) -> sum_ty
+          L _ (EmptyMG{ mg_ext = MatchGroupTc _ sum_ty _ }) -> sum_ty
         in_ty = envStackType env_ids stack_ty
 
     core_body <- dsExpr (HsCase (ArrowMatchCtxt ArrowCaseAlt) exp match')
@@ -529,14 +531,18 @@ multiple scrutinees)
 -}
 dsCmd ids local_vars stack_ty res_ty
         (HsCmdLam _ LamSingle (L _ (MG { mg_alts
-          = [L _ (Match { m_pats  = L _ pats
-                             , m_grhss = GRHSs _ (L _ (GRHS _ [] body) :| _) _ })] })))
+          = L _ (Match { m_pats  = L _ pats
+                       , m_grhss = GRHSs _ (L _ (GRHS _ [] body) :| _) _ }) :| [] })))
         env_ids
   = dsCmdLam ids local_vars stack_ty res_ty pats body env_ids
 
 dsCmd ids local_vars stack_ty res_ty
-      (HsCmdLam _ lam_variant match@(L _ MG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} }) )
+      (HsCmdLam _ lam_variant match)
       env_ids = do
+
+    let arg_tys = case match of
+          L _ MG      { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } -> arg_tys
+          L _ EmptyMG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } -> arg_tys
     arg_ids <- newSysLocalsDs arg_tys
 
     let match_ctxt = ArrowLamAlt lam_variant
@@ -550,7 +556,9 @@ dsCmd ids local_vars stack_ty res_ty
       (match', core_choices)
         <- dsCases ids local_vars' stack_id stack_ty' res_ty match
 
-      let L _ MG{ mg_ext = MatchGroupTc _ sum_ty _ } = match'
+      let sum_ty = case match' of
+            L _ MG     { mg_ext = MatchGroupTc _ sum_ty _ } -> sum_ty
+            L _ EmptyMG{ mg_ext = MatchGroupTc _ sum_ty _ } -> sum_ty
           in_ty = envStackType env_ids stack_ty'
           discrims = map nlHsVar arg_ids
       (discrim_vars, matching_code)
@@ -759,6 +767,19 @@ dsCases :: DsCmdEnv                               -- arrow combinators
         -> LMatchGroup GhcTc (LHsCmd GhcTc)        -- match group to desugar
         -> DsM (LMatchGroup GhcTc (LHsExpr GhcTc), -- match group with choice tree
                 CoreExpr)                         -- desugared choices
+dsCases ids _ _ _ res_ty (L l (EmptyMG { mg_ext = MatchGroupTc arg_tys _ origin })) = do
+  void_ty <- mkTyConTy <$> dsLookupTyCon voidTyConName
+  (sum_ty, core_choices) <-
+    -- when the case command has no alternatives, the sum type from
+    -- Note [Desugaring HsCmdCase] becomes the empty sum type,
+    -- i.e. Void. The choices then effectively become `arr absurd`,
+    -- implemented as `arr \case {}`.
+    (void_ty,) . do_arr ids void_ty res_ty <$>
+      dsExpr (HsLam noAnn LamCase
+        (noLocA (EmptyMG { mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated OtherExpansion SkipPmc)
+                         })))
+  return (L l (EmptyMG { mg_ext = MatchGroupTc arg_tys sum_ty origin }),
+          core_choices)
 dsCases ids local_vars stack_id stack_ty res_ty
         (L l (MG { mg_alts = matches
                  , mg_ext = MatchGroupTc arg_tys _ origin
@@ -767,7 +788,8 @@ dsCases ids local_vars stack_id stack_ty res_ty
   -- Extract and desugar the leaf commands in the case, building tuple
   -- expressions that will (after tagging) replace these leaves
 
-  let leaves = concatMap leavesMatch matches
+  let leaves :: NonEmpty (LHsCmd GhcTc, IdSet)
+      leaves = matches >>= leavesMatch
       make_branch (leaf, bound_vars) = do
           (core_leaf, _fvs, leaf_ids)
              <- dsfixCmd ids (bound_vars `unionVarSet` local_vars) stack_ty
@@ -780,7 +802,6 @@ dsCases ids local_vars stack_id stack_ty res_ty
   either_con <- dsLookupTyCon eitherTyConName
   left_con <- dsLookupDataCon leftDataConName
   right_con <- dsLookupDataCon rightDataConName
-  void_ty <- mkTyConTy <$> dsLookupTyCon voidTyConName
   let
       left_id  = mkConLikeTc (RealDataCon left_con)
       right_id = mkConLikeTc (RealDataCon right_con)
@@ -801,22 +822,13 @@ dsCases ids local_vars stack_id stack_ty res_ty
               map (right_expr in_ty1 in_ty2) builds2,
            mkTyConApp either_con [in_ty1, in_ty2],
            do_choice ids in_ty1 in_ty2 res_ty core_exp1 core_exp2)
-  (leaves', sum_ty, core_choices) <- case nonEmpty branches of
-    Just bs -> return $ foldb merge_branches bs
-    -- when the case command has no alternatives, the sum type from
-    -- Note [Desugaring HsCmdCase] becomes the empty sum type,
-    -- i.e. Void. The choices then effectively become `arr absurd`,
-    -- implemented as `arr \case {}`.
-    Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
-      dsExpr (HsLam noAnn LamCase
-        (noLocA (MG { mg_alts = []
-                    , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated OtherExpansion SkipPmc)
-                    })))
+
+      (leaves', sum_ty, core_choices) = foldb merge_branches branches
 
       -- Replace the commands in the case with these tagged tuples,
       -- yielding a HsExpr Id we can feed to dsExpr.
 
-  let (_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
+      (_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
 
   -- Note that we replace the MatchGroup result type by sum_ty,
   -- which is the type of matches'
@@ -1204,18 +1216,17 @@ matchSimplys _ _ _ _ _ = panic "matchSimplys"
 -- List of leaf expressions, with set of variables bound in each
 
 leavesMatch :: LMatch GhcTc (LocatedA (body GhcTc))
-            -> [(LocatedA (body GhcTc), IdSet)]
+            -> NonEmpty (LocatedA (body GhcTc), IdSet)
 leavesMatch (L _ (Match { m_pats = L _ pats
                         , m_grhss = GRHSs _ grhss binds }))
   = let
         defined_vars = mkVarSet (collectPatsBinders CollWithDictBinders pats)
                         `unionVarSet`
                        mkVarSet (collectLocalBinders CollWithDictBinders binds)
-    in
-    [(body,
-      mkVarSet (collectLStmtsBinders CollWithDictBinders stmts)
-        `unionVarSet` defined_vars)
-    | L _ (GRHS _ stmts body) <- toList grhss]
+        mk_leave (L _ (GRHS _ stmts body)) =
+          (body, mkVarSet (collectLStmtsBinders CollWithDictBinders stmts)
+                  `unionVarSet` defined_vars)
+    in fmap mk_leave grhss
 
 -- Replace the leaf commands in a match
 

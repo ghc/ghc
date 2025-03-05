@@ -556,8 +556,8 @@ checkCanonicalInstances cls poly_ty mbinds = do
     -- test whether MatchGroup represents a trivial \"lhsName = rhsName\"
     -- binding, and return @Just rhsName@ if this is the case
     isAliasMG :: LMatchGroup GhcRn (LHsExpr GhcRn) -> Maybe Name
-    isAliasMG (L _ (MG {mg_alts = [L _ (Match { m_pats = L _ []
-                                              , m_grhss = grhss })]}))
+    isAliasMG (L _ (MG {mg_alts = (L _ (Match { m_pats = L _ []
+                                              , m_grhss = grhss })) :| []}))
         | GRHSs _ (L _ (GRHS _ [] body) :| []) lbinds <- grhss
         , EmptyLocalBinds _ <- lbinds
         , HsVar _ lrhsName  <- unLoc body  = Just (unLoc lrhsName)

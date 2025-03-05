@@ -220,8 +220,10 @@ mkMatchGroup :: AnnoBody p body
              => Origin
              -> [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
              -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
-mkMatchGroup origin matches = MG { mg_ext = origin
-                                 , mg_alts = matches }
+mkMatchGroup origin matches =
+  case nonEmpty matches of
+    Nothing -> EmptyMG { mg_ext = origin }
+    Just ms -> MG { mg_ext = origin, mg_alts = ms }
 
 mkLamCaseMatchGroup :: AnnoBody p body
                     => Origin
@@ -1049,7 +1051,7 @@ isBangedHsBind :: HsBind GhcTc -> Bool
 isBangedHsBind (XHsBindsLR (AbsBinds { abs_binds = binds }))
   = any (isBangedHsBind . unLoc) binds
 isBangedHsBind (FunBind {fun_matches = matches})
-  | [L _ match] <- mg_alts (unLoc matches)
+  | [L _ match] <- matchGroupAlts (unLoc matches)
   , FunRhs{mc_strictness = SrcStrict} <- m_ctxt match
   = True
 isBangedHsBind (PatBind {pat_lhs = pat})

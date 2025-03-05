@@ -4,6 +4,7 @@
 {-# LANGUAGE TypeFamilies     #-}
 module Main where
 
+import Data.List.NonEmpty (NonEmpty(..))
 import System.IO
 import GHC
 import GHC.Utils.Monad
@@ -39,7 +40,7 @@ main = do
       isDataCon (L _ (XHsBindsLR (AbsBinds { abs_binds = bs })))
         = not (null (filter isDataCon bs))
       isDataCon (L l (f@FunBind {}))
-        | (L _ (MG _ (m:_))) <- fun_matches f,
+        | (L _ (MG _ (m:|_))) <- fun_matches f,
           ((L _ c@ConPat{}):_)<-hsLMatchPats m,
           (L l _) <- pat_con c
         = isGoodSrcSpan (locA l) -- Check that the source location is a good one

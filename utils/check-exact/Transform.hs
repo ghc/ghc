@@ -180,9 +180,12 @@ captureMatchLineSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
 captureMatchLineSpacing (L l (ValD x (FunBind a b (L d (MG c ms )))))
                        = L l (ValD x (FunBind a b (L d (MG c ms'))))
     where
-      ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
-      ms' = captureLineSpacing ms
+      ms' :: NonEmpty (LMatch GhcPs (LHsExpr GhcPs))
+      ms' = captureLineSpacingNE ms
 captureMatchLineSpacing d = d
+
+captureLineSpacingNE :: NonEmpty (LocatedA e) -> NonEmpty (LocatedA e)
+captureLineSpacingNE = NE.fromList . captureLineSpacing . NE.toList
 
 captureLineSpacing :: [LocatedA e] -> [LocatedA e]
 captureLineSpacing [] = []
@@ -240,10 +243,9 @@ setEntryDPDecl decl@(L _  (ValD x (FunBind a b (L d (MG c ms ))))) dp
                    = L l' (ValD x (FunBind a b (L d (MG c ms'))))
     where
       L l' _ = setEntryDP decl dp
-      ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
+      ms' :: NonEmpty (LMatch GhcPs (LHsExpr GhcPs))
       ms' = case ms of
-        [] -> []
-        (m0':ms0) -> setEntryDP m0' dp : ms0
+        (m0':|ms0) -> setEntryDP m0' dp :| ms0
 setEntryDPDecl d dp = setEntryDP d dp
 
 -- ---------------------------------------------------------------------
@@ -362,10 +364,9 @@ pushDeclDP (ValD x (FunBind a b (L d  (MG c ms )))) dp
           = ValD x (FunBind a b (L d' (MG c ms')))
     where
       L d' _ = setEntryDP (L d ms) dp
-      ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
+      ms' :: NonEmpty (LMatch GhcPs (LHsExpr GhcPs))
       ms' = case ms of
-        [] -> []
-        (m0':ms0) -> setEntryDP m0' dp : ms0
+        (m0':|ms0) -> setEntryDP m0' dp :| ms0
 pushDeclDP d _dp = d
 
 -- ---------------------------------------------------------------------
@@ -431,22 +432,20 @@ balanceCommentsFB (L lf (FunBind x n (L lm (MG o matches)))) second
               getFollowingComments $ comments lf)
 
     lf' = setCommentsEpAnn lf (EpaComments before)
-    matches' :: [LocatedA (Match GhcPs (LHsExpr GhcPs))]
+    matches' :: NonEmpty (LocatedA (Match GhcPs (LHsExpr GhcPs)))
     matches' = case matches of
-                  (L lm' m0:ms') ->
-                    (L (addCommentsToEpAnn lm' (EpaComments middle )) m0:ms')
-                  _ -> error "balanceCommentsFB"
-    matches'' = balanceCommentsListA matches'
-    (m,ms) = case reverse matches'' of
-               (L lm' m0:ms') ->
+                  (L lm' m0:|ms') ->
+                    (L (addCommentsToEpAnn lm' (EpaComments middle )) m0:|ms')
+    matches'' = balanceCommentsNonEmptyA matches'
+    (m,ms) = case NE.reverse matches'' of
+               (L lm' m0:|ms') ->
                  (L (addCommentsToEpAnn lm' (EpaCommentsBalanced [] after)) m0,ms')
-               _ -> error "balanceCommentsFB4"
     (m',second') = balanceCommentsA m second
     m'' = balanceCommentsMatch m'
     (m''',lf'') = case ms of
       [] -> moveLeadingComments m'' lf'
       _  -> (m'',lf')
-    bind = L lf'' (FunBind x n (L lm (MG o (reverse (m''':ms)))))
+    bind = L lf'' (FunBind x n (L lm (MG o (NE.reverse (m''':|ms)))))
 balanceCommentsFB f s = balanceCommentsA f s
 
 -- | Move comments on the same line as the end of the match into the
@@ -494,6 +493,8 @@ pushTrailingComments w cs lb@(HsValBinds an _) = (True, HsValBinds an' vb)
       (HsValBinds _ vb') -> vb'
       _ -> ValBinds NoAnnSortKey [] []
 
+balanceCommentsNonEmptyA :: NonEmpty (LocatedA a) -> NonEmpty (LocatedA a)
+balanceCommentsNonEmptyA = NE.fromList . balanceCommentsListA . NE.toList
 
 balanceCommentsListA :: [LocatedA a] -> [LocatedA a]
 balanceCommentsListA [] = []
@@ -1006,8 +1007,8 @@ instance HasDecls (LocatedA (Stmt GhcPs (LocatedA (HsExpr GhcPs)))) where
 
 -- |Push leading and trailing top level annotations into the @[LMatch GhcPs]@
 unpackFunBind :: LHsBind GhcPs -> LHsBind GhcPs
-unpackFunBind (L loc (FunBind x1 fid (L lg (MG x2 (L lm m:matches)))))
-  = (L loc'' (FunBind x1 fid (L lg (MG x2 (reverse (L llm' lmtch:ms))))))
+unpackFunBind (L loc (FunBind x1 fid (L lg (MG x2 (L lm m:|matches)))))
+  = (L loc'' (FunBind x1 fid (L lg (MG x2 (NE.reverse (L llm' lmtch:|ms))))))
      -- `debug` ("unpackFunBind: ="
      --          ++ showAst (("loc",loc), ("loc'",loc'), ("loc''",loc''),
      --                      ("lm'",lm'), ("llm",llm), ("llm'", llm')))
@@ -1025,8 +1026,8 @@ unpackFunBind d = d
 -- |Pull leading and trailing annotations from the @[LMatch GhcPs]@ to
 -- the top level.
 packFunBind :: LHsBind GhcPs -> LHsBind GhcPs
-packFunBind (L loc (FunBind x1 fid (L lg (MG x2 (L lm m:matches)))))
-  = (L loc'' (FunBind x1 fid (L lg (MG x2 (reverse (L llm' lmtch:ms))))))
+packFunBind (L loc (FunBind x1 fid (L lg (MG x2 (L lm m:|matches)))))
+  = (L loc'' (FunBind x1 fid (L lg (MG x2 (NE.reverse (L llm' lmtch:|ms))))))
      -- `debug` ("packFunBind: ="
      --          ++ showAst (("loc",loc), ("loc'",loc'), ("loc''",loc''),
      --                      ("lm'",lm'), ("llm",llm), ("llm'", llm')))

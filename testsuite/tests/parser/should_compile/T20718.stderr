@@ -110,7 +110,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { T20718.hs:8:1-5 })
            (AnnListItem
@@ -177,6 +178,7 @@
                     (1))))))))
              [])
             (EmptyLocalBinds
-             (NoExtField)))))])))))]))
+             (NoExtField)))))
+         []))))))]))
 
 

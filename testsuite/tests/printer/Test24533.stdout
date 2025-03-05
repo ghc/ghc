@@ -556,7 +556,8 @@
              []))
            (MG
             (FromSource)
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { Test24533.hs:16:3-19 })
                (AnnListItem
@@ -670,7 +671,8 @@
                        {OccName: True}))))))
                  [])
                 (EmptyLocalBinds
-                 (NoExtField)))))]))))]
+                 (NoExtField)))))
+             [])))))]
        []
        []
        []
@@ -1162,7 +1164,8 @@
              []))
            (MG
             (FromSource)
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { Test24533.ppr.hs:6:3-19 })
                (AnnListItem
@@ -1276,7 +1279,8 @@
                        {OccName: True}))))))
                  [])
                 (EmptyLocalBinds
-                 (NoExtField)))))]))))]
+                 (NoExtField)))))
+             [])))))]
        []
        []
        []

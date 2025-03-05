@@ -1936,7 +1936,8 @@
              ({abstract:TyCon})
              [])])
           (FromSource))
-         [(L
+         (:|
+          (L
            (EpAnn
             (EpaSpan { DumpTypecheckedAst.hs:20:1-23 })
             (AnnListItem
@@ -2023,7 +2024,8 @@
                      {FastString: "hello"})))))))
               [])
              (EmptyLocalBinds
-              (NoExtField)))))]))))]
+              (NoExtField)))))
+          [])))))]
     (False))))]
 
 

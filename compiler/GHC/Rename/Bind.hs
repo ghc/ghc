@@ -1321,16 +1321,18 @@ rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContextRn
              -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
              -> LMatchGroup GhcPs (LocatedA (body GhcPs))
              -> RnM (LMatchGroup GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnMatchGroup ctxt rnBody (L lm (MG { mg_alts = ms, mg_ext = origin }))
+rnMatchGroup ctxt _ (L lm (EmptyMG { mg_ext = origin }))
          -- see Note [Empty MatchGroups]
-  = do { whenM ((null ms &&) <$> mustn't_be_empty) (addErr (TcRnEmptyCase ctxt))
-       ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
-       ; return (L lm (mkMatchGroup origin new_ms), ms_fvs) }
+  = do { whenM mustn't_be_empty (addErr (TcRnEmptyCase ctxt))
+       ; return (L lm (EmptyMG { mg_ext = origin }), emptyFVs) }
   where
     mustn't_be_empty = case ctxt of
       LamAlt LamCases -> return True
       ArrowMatchCtxt (ArrowLamAlt LamCases) -> return True
       _ -> not <$> xoptM LangExt.EmptyCase
+rnMatchGroup ctxt rnBody (L lm (MG { mg_alts = ms, mg_ext = origin }))
+  = do { (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
+       ; return (L lm (MG { mg_alts = new_ms, mg_ext = origin }), ms_fvs) }
 
 rnMatch :: AnnoBody body
         => HsMatchContextRn

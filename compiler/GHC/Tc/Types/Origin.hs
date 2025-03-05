@@ -763,8 +763,8 @@ exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel (foExt f)
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
-matchesCtOrigin (MG { mg_alts = alts })
-  | [L _ match] <- alts
+matchesCtOrigin mg
+  | [L _ match] <- matchGroupAlts mg
   , Match { m_grhss = grhss } <- match
   = grhssCtOrigin grhss
 
@@ -1482,12 +1482,11 @@ pprExpectedFunTyOrigin funTy_origin i =
           , quotes (ppr arg)
           , text "of"
           , quotes (ppr fun) ]
-    ExpectedFunTyMatches fun (L _ (MG { mg_alts = alts }))
-      | null alts
-      -> the_arg_of <+> quotes (ppr fun)
-      | otherwise
-      -> text "The" <+> speakNth i <+> text "pattern in the equation" <> plural alts
-     <+> text "for" <+> quotes (ppr fun)
+    ExpectedFunTyMatches fun (L _ mg)
+      | null alts -> the_arg_of <+> quotes (ppr fun)
+      | otherwise -> text "The" <+> speakNth i <+> text "pattern in the equation" <> plural alts
+                 <+> text "for" <+> quotes (ppr fun)
+      where alts = matchGroupAlts mg
     ExpectedFunTyLam lam_variant _ -> binder_of $ lamCaseKeyword lam_variant
   where
     the_arg_of :: SDoc
@@ -1504,8 +1503,9 @@ pprExpectedFunTyHerald (ExpectedFunTyViewPat {})
 pprExpectedFunTyHerald (ExpectedFunTyArg fun _)
   = sep [ text "The function" <+> quotes (ppr fun)
         , text "is applied to" ]
-pprExpectedFunTyHerald (ExpectedFunTyMatches fun (L _ (MG { mg_alts = alts })))
+pprExpectedFunTyHerald (ExpectedFunTyMatches fun (L _ mg))
   = text "The equation" <> plural alts <+> text "for" <+> quotes (ppr fun) <+> hasOrHave alts
+  where alts = matchGroupAlts mg
 pprExpectedFunTyHerald (ExpectedFunTyLam lam_variant expr)
   = sep [ text "The" <+> lamCaseKeyword lam_variant <+> text "expression"
                      <+> quotes (pprSetDepth (PartWay 1) (ppr expr))

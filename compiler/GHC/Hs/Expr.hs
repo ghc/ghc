@@ -1556,21 +1556,17 @@ instance (OutputableBndrId pr, Outputable body)
   ppr = pprMatch
 
 isEmptyMatchGroup :: MatchGroup (GhcPass p) body -> Bool
-isEmptyMatchGroup (MG { mg_alts = ms }) = null ms
-
--- | Is there only one RHS in this list of matches?
-isSingletonMatchGroup :: [LMatch (GhcPass p) body] -> Bool
-isSingletonMatchGroup matches
-  | [L _ match] <- matches
-  , Match { m_grhss = GRHSs { grhssGRHSs = _ :| [] } } <- match
-  = True
-  | otherwise
-  = False
+isEmptyMatchGroup EmptyMG{} = True
+isEmptyMatchGroup MG{}      = False
 
 matchGroupArity :: MatchGroup (GhcPass id) body -> Arity
 -- This is called before type checking, when mg_arg_tys is not set
-matchGroupArity MG { mg_alts = [] } = 1 -- See Note [Empty mg_alts]
-matchGroupArity MG { mg_alts = (alt1 : _) } = count (isVisArgPat . unLoc) (hsLMatchPats alt1)
+matchGroupArity EmptyMG{} = 1 -- See Note [Empty mg_alts]
+matchGroupArity MG { mg_alts = (alt1 :| _) } = count (isVisArgPat . unLoc) (hsLMatchPats alt1)
+
+matchGroupAlts :: MatchGroup (GhcPass p) body -> [LMatch (GhcPass p) body]
+matchGroupAlts EmptyMG{} = []
+matchGroupAlts MG { mg_alts = alts } = toList alts
 
 hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
 hsLMatchPats (L _ (Match { m_pats = L _ pats })) = pats
@@ -1609,10 +1605,8 @@ pprLMatches = pprMatches . unLoc
 
 pprMatches :: (OutputableBndrId idR, Outputable body)
            => MatchGroup (GhcPass idR) body -> SDoc
-pprMatches MG { mg_alts = [] }
-    = text "{}"
-pprMatches MG { mg_alts = matches }
-    = vcat (map (pprMatch . unLoc) matches)
+pprMatches EmptyMG{} = text "{}"
+pprMatches mg = vcat (map (pprMatch . unLoc) (matchGroupAlts mg))
       -- Don't print the type; it's only a place-holder before typechecking
 
 -- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext

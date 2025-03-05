@@ -76,10 +76,11 @@ import GHC.Data.FastString
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 
-import Control.Monad ( zipWithM, unless )
+import Control.Monad ( unless, when )
 import Data.List.NonEmpty (NonEmpty(..), nonEmpty)
-import qualified Data.List.NonEmpty as NE
+import qualified GHC.Data.List.NonEmpty as NE
 import qualified Data.Map as Map
+import qualified Data.Semigroup as S
 
 {-
 ************************************************************************
@@ -511,7 +512,7 @@ tidy1 _ _ (OrPat ty lpats)
   = return (idDsWrapper, ViewPat ty (noLocA (HsLam noAnn LamCase mg)) (mkPrefixConPat trueDataCon [] []))
   where
     mg :: LMatchGroup GhcTc (LHsExpr GhcTc)
-    mg = noLocA $ MG mgtc (map match_true (NE.toList lpats) ++ [match_false (noLocA $ WildPat ty)])
+    mg = noLocA $ MG mgtc (fmap match_true lpats S.<> NE.singleton (match_false (noLocA $ WildPat ty)))
     mgtc = MatchGroupTc
        { mg_arg_tys = [tymult ty]
        , mg_res_ty = boolTy
@@ -791,18 +792,27 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 -}
 
-matchWrapper ctxt scrs (L _ (MG { mg_alts = matches
-                                , mg_ext = MatchGroupTc arg_tys rhs_ty origin
-                                }))
+matchWrapper ctxt scrs (L _ EmptyMG { mg_ext = MatchGroupTc arg_tys rhs_ty origin })
   = do  { dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
-        ; new_vars    <- case matches of
-                           []    -> newSysLocalsDs arg_tys
-                           (m:_) ->
-                            selectMatchVars (zipWithEqual
-                                              (\a b -> (scaledMult a, unLoc b))
-                                                arg_tys
-                                                (hsLMatchPats m))
+        ; new_vars <- newSysLocalsDs arg_tys
+        ; tracePm "matchWrapper (empty match group)"
+          (vcat [ ppr ctxt
+                , text "scrs" <+> ppr scrs
+                , text "matchPmChecked" <+> ppr (isMatchContextPmChecked dflags origin ctxt)])
+        ; when (isMatchContextPmChecked dflags origin ctxt) $
+          addHsScrutTmCs (concat scrs) new_vars $
+          pmcEmptyMatches origin (DsMatchContext ctxt locn) (only new_vars)
+        ; result_expr <- discardWarningsIfSkipPMC origin $
+                         matchEquations ctxt new_vars [] rhs_ty
+        ; return (new_vars, result_expr) }
+matchWrapper ctxt scrs (L _ MG { mg_alts = matches, mg_ext = MatchGroupTc arg_tys rhs_ty origin })
+  = do  { dflags <- getDynFlags
+        ; locn   <- getSrcSpanDs
+        ; new_vars <- selectMatchVars (zipWithEqual
+                                        (\a b -> (scaledMult a, unLoc b))
+                                          arg_tys
+                                          (hsLMatchPats (NE.head matches)))
 
         -- Pattern match check warnings for /this match-group/.
         -- @rhss_nablas@ is a flat list of covered Nablas for each RHS.
@@ -827,16 +837,16 @@ matchWrapper ctxt scrs (L _ (MG { mg_alts = matches
             else do { ldi_nablas <- getLdiNablas
                     ; pure $ initNablasMatches ldi_nablas matches }
 
-        ; eqns_info   <- zipWithM mk_eqn_info matches matches_nablas
+        ; eqns_info   <- NE.zipWithM (mk_eqn_info rhs_ty) matches matches_nablas
 
-        ; result_expr <- discard_warnings_if_skip_pmc origin $
-                         matchEquations ctxt new_vars eqns_info rhs_ty
+        ; result_expr <- discardWarningsIfSkipPMC origin $
+                         matchEquations ctxt new_vars (NE.toList eqns_info) rhs_ty
 
         ; return (new_vars, result_expr) }
   where
     -- Called once per equation in the match, or alternative in the case
-    mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
-    mk_eqn_info (L _ (Match { m_pats = L _ pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
+    mk_eqn_info :: Type -> LMatch GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
+    mk_eqn_info rhs_ty (L _ (Match { m_pats = L _ pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
       = do { dflags <- getDynFlags
            ; let upats = map (decideBangHood dflags) pats
            -- pat_nablas is the covered set *after* matching the pattern, but
@@ -847,17 +857,18 @@ matchWrapper ctxt scrs (L _ (MG { mg_alts = matches
                              dsGRHSs ctxt grhss rhs_ty rhss_nablas
            ; return $ mkEqnInfo upats match_result }
 
-    discard_warnings_if_skip_pmc orig =
-      if requiresPMC orig
-      then id
-      else discardWarningsDs
-
-    initNablasMatches :: Nablas -> [LMatch GhcTc b] -> [(Nablas, NonEmpty Nablas)]
+    initNablasMatches :: Nablas -> NonEmpty (LMatch GhcTc b) -> NonEmpty (Nablas, NonEmpty Nablas)
     initNablasMatches ldi_nablas ms
-      = map (\(L _ m) -> (ldi_nablas, initNablasGRHSs ldi_nablas (m_grhss m))) ms
+      = fmap (\(L _ m) -> (ldi_nablas, initNablasGRHSs ldi_nablas (m_grhss m))) ms
 
     initNablasGRHSs :: Nablas -> GRHSs GhcTc b -> NonEmpty Nablas
     initNablasGRHSs ldi_nablas m = ldi_nablas <$ grhssGRHSs m
+
+discardWarningsIfSkipPMC :: Origin -> DsM a -> DsM a
+discardWarningsIfSkipPMC orig =
+  if requiresPMC orig
+  then id
+  else discardWarningsDs
 
 {- Note [Long-distance information in matchWrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

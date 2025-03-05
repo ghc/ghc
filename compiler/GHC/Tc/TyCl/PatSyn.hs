@@ -69,7 +69,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition, mapAccumL )
-import Data.List.NonEmpty (NonEmpty, nonEmpty)
+import Data.List.NonEmpty (NonEmpty(..), nonEmpty)
 
 {-
 ************************************************************************
@@ -789,10 +789,10 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
 
              args = noLocA $ map nlVarPat [scrutinee, cont, fail]
              lwpat = noLocA $ WildPat pat_ty
-             cases = if isIrrefutableHsPat is_strict (irrefutableConLikeTc comps) lpat
-                     then [mkHsCaseAlt lpat  cont']
-                     else [mkHsCaseAlt lpat  cont',
-                           mkHsCaseAlt lwpat fail']
+             cases = mkHsCaseAlt lpat  cont' :|
+                     if isIrrefutableHsPat is_strict (irrefutableConLikeTc comps) lpat
+                     then []
+                     else [mkHsCaseAlt lwpat fail']
              gen = Generated OtherExpansion SkipPmc
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     L (getLoc lpat) $
@@ -804,7 +804,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              body' = noLocA $
                      HsLam noAnn LamSingle $
                      noLocA $
-                     MG{ mg_alts = [mkSimpleMatch (LamAlt LamSingle) args body]
+                     MG{ mg_alts = mkSimpleMatch (LamAlt LamSingle) args body :| []
                        , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty gen
                        }
              match = mkMatch (mkPrefixFunRhs (L loc (idName patsyn_id)) noAnn) (noLocA [])
@@ -813,7 +813,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                              (EmptyLocalBinds noExtField)
              mg :: LMatchGroup GhcTc (LHsExpr GhcTc)
              mg = L (l2l $ getLoc match) $
-                  MG{ mg_alts = [match]
+                  MG{ mg_alts = match :| []
                     , mg_ext = MatchGroupTc [] res_ty gen
                     }
              matcher_arity = length req_theta + 3
@@ -960,8 +960,8 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
     add_dummy_arg :: LMatchGroup GhcRn (LHsExpr GhcRn)
                   -> LMatchGroup GhcRn (LHsExpr GhcRn)
     add_dummy_arg (L l mg@(MG { mg_alts =
-                           [L loc match@(Match { m_pats = L lp pats })] }))
-      = L l (mg { mg_alts = [L loc (match { m_pats = L lp $ nlWildPatName : pats })] })
+                           L loc match@(Match { m_pats = L lp pats }) :| [] }))
+      = L l (mg { mg_alts = L loc (match { m_pats = L lp $ nlWildPatName : pats }) :| [] })
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprLMatches other_mg
 

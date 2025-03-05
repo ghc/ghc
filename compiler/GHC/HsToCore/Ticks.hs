@@ -632,6 +632,8 @@ addTickTupArg (Missing ty) = return (Missing ty)
 
 addTickMatchGroup :: Bool{-is lambda-} -> LMatchGroup GhcTc (LHsExpr GhcTc)
                   -> TM (LMatchGroup GhcTc (LHsExpr GhcTc))
+addTickMatchGroup _ (L l EmptyMG { mg_ext = ctxt }) =
+  return (L l EmptyMG { mg_ext = ctxt })
 addTickMatchGroup is_lam (L l (mg@(MG { mg_alts = matches, mg_ext = ctxt }))) = do
   let isOneOfMany = matchesOneOfMany matches
       isDoExp     = isDoExpansionGenerated $ mg_origin ctxt
@@ -897,6 +899,7 @@ addTickHsCmd (XCmd (HsWrap w cmd)) =
 
 addTickCmdMatchGroup :: LMatchGroup GhcTc (LHsCmd GhcTc)
                      -> TM (LMatchGroup GhcTc (LHsCmd GhcTc))
+addTickCmdMatchGroup (L l mg@EmptyMG{}) = return (L l mg)
 addTickCmdMatchGroup (L l mg@(MG { mg_alts = matches })) = do
   matches' <- mapM (traverse addTickCmdMatch) matches
   return $ L l (mg { mg_alts = matches' })
@@ -1271,8 +1274,8 @@ mkBinTickBoxHpc boxLabel pos e = do
 hpcSrcSpan :: SrcSpan
 hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")
 
-matchesOneOfMany :: [LMatch GhcTc body] -> Bool
-matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
+matchesOneOfMany :: NonEmpty (LMatch GhcTc body) -> Bool
+matchesOneOfMany lmatches = sum (fmap matchCount lmatches) > 1
   where
         matchCount :: LMatch GhcTc body -> Int
         matchCount (L _ (Match { m_grhss = GRHSs _ grhss _ }))

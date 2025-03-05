@@ -2150,7 +2150,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { DumpParsedAst.hs:25:1-23 })
            (AnnListItem
@@ -2240,6 +2241,7 @@
                     {FastString: "hello"})))))))
              [])
             (EmptyLocalBinds
-             (NoExtField)))))])))))]))
+             (NoExtField)))))
+         []))))))]))
 
 

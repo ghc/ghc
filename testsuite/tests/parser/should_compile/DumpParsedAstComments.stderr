@@ -96,7 +96,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
            (AnnListItem
@@ -163,7 +164,8 @@
                     (1))))))))
              [])
             (EmptyLocalBinds
-             (NoExtField)))))])))))
+             (NoExtField)))))
+         []))))))
   ,(L
     (EpAnn
      (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
@@ -217,7 +219,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
            (AnnListItem
@@ -330,7 +333,8 @@
                      (NoExtField)))])))))
              [])
             (EmptyLocalBinds
-             (NoExtField)))))])))))
+             (NoExtField)))))
+         []))))))
   ,(L
     (EpAnn
      (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
@@ -370,7 +374,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
            (AnnListItem
@@ -460,6 +465,7 @@
                     {FastString: "hello"})))))))
              [])
             (EmptyLocalBinds
-             (NoExtField)))))])))))]))
+             (NoExtField)))))
+         []))))))]))
 
 

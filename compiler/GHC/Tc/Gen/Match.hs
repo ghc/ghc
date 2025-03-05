@@ -140,8 +140,9 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
     herald = ExpectedFunTyMatches (NameThing fun_name) matches
 
 funBindPrecondition :: LMatchGroup GhcRn (LHsExpr GhcRn) -> Bool
+funBindPrecondition (L _ EmptyMG{}) = False
 funBindPrecondition (L _ (MG { mg_alts = alts }))
-  = not (null alts) && all is_fun_rhs alts
+  = all is_fun_rhs alts
   where
     is_fun_rhs (L _ (Match { m_ctxt = FunRhs {} })) = True
     is_fun_rhs _                                    = False
@@ -228,20 +229,23 @@ tcMatches :: (AnnoBody body, Outputable (body GhcTc))
           -> LMatchGroup GhcRn (LocatedA (body GhcRn))
           -> TcM (LMatchGroup GhcTc (LocatedA (body GhcTc)))
 
-tcMatches tc_body pat_tys rhs_ty (L l (MG { mg_alts = matches
-                                          , mg_ext = origin }))
-  | null matches  -- Deal with case e of {}
+tcMatches _ pat_tys rhs_ty (L l (EmptyMG { mg_ext = origin }))
+    -- Deal with case e of {}
     -- Since there are no branches, no one else will fill in rhs_ty
     -- when in inference mode, so we must do it ourselves,
     -- here, using expTypeToType
   = do { tcEmitBindingUsage bottomUE
-       ; pat_tys <- mapM scaledExpTypeToType (filter_out_forall_pat_tys pat_tys)
+       ; pat_ty  <- case pat_tys of
+           [ExpFunPatTy t]      -> scaledExpTypeToType t
+           [ExpForAllPatTy tvb] -> pprPanic "tcMatches: required type argument (#25004)" (ppr tvb)
+           -- It should be impossible to trigger the panics because the renamer rejects \cases{}
+           []                   -> panic "tcMatches: no arguments in EmptyCase"
+           _t1:(_t2:_ts)        -> panic "tcMatches: multiple arguments in EmptyCase"
        ; rhs_ty  <- expTypeToType rhs_ty
-       ; return (L l (MG { mg_alts = []
-                         , mg_ext = MatchGroupTc pat_tys rhs_ty origin
-                         })) }
+       ; return (L l (EmptyMG { mg_ext = MatchGroupTc [pat_ty] rhs_ty origin })) }
 
-  | otherwise
+tcMatches tc_body pat_tys rhs_ty (L l (MG { mg_alts = matches
+                                          , mg_ext = origin }))
   = do { umatches <- mapM (tcCollectingUsage . tcMatch tc_body pat_tys rhs_ty) matches
        ; let (usages, matches') = unzip umatches
        ; tcEmitBindingUsage $ supUEs usages
@@ -1240,12 +1244,12 @@ the variables they bind into scope, and typecheck the thing_inside.
 checkArgCounts :: AnnoBody body
                => LMatchGroup GhcRn (LocatedA (body GhcRn))
                -> TcM VisArity
-checkArgCounts (L _ (MG { mg_alts = [] }))
+checkArgCounts (L _ EmptyMG{})
     = return 1 -- See Note [Empty MatchGroups] in GHC.Rename.Bind
                --   case e of {} or \case {}
                -- Both have arity 1
 
-checkArgCounts (L _ (MG { mg_alts = (match1:matches) }))
+checkArgCounts (L _ (MG { mg_alts = (match1:|matches) }))
     | null matches  -- There was only one match; nothing to check
     = return n_args1
 

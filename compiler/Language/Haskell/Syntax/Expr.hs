@@ -874,12 +874,14 @@ type LMatchGroup p body = XRec p (MatchGroup p body)
 
 data MatchGroup p body
   = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result, and origin
-       , mg_alts    :: [LMatch p body]
+       , mg_alts    :: NonEmpty (LMatch p body)
          -- The alternatives, see Note [Empty mg_alts] for what it means if 'mg_alts' is empty.
        }
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
      -- where there are n patterns
+
+  | EmptyMG { mg_ext :: XMG p body }
 
   | XMatchGroup !(XXMatchGroup p body)
 

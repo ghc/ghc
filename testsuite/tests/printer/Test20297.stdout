@@ -76,7 +76,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { Test20297.hs:(5,1)-(7,7) })
            (AnnListItem
@@ -166,7 +167,8 @@
              (ValBinds
               (NoAnnSortKey)
               []
-              [])))))])))))
+              [])))))
+         []))))))
   ,(L
     (EpAnn
      (EpaSpan { Test20297.hs:(9,1)-(11,26) })
@@ -206,7 +208,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { Test20297.hs:(9,1)-(11,26) })
            (AnnListItem
@@ -326,7 +329,8 @@
                     []))
                   (MG
                    (FromSource)
-                   [(L
+                   (:|
+                    (L
                      (EpAnn
                       (EpaSpan { Test20297.hs:11:9-26 })
                       (AnnListItem
@@ -435,8 +439,10 @@
                                 (NoExtField)))])))))
                         [])
                        (EmptyLocalBinds
-                        (NoExtField)))))]))))]
-              [])))))])))))]))
+                        (NoExtField)))))
+                    [])))))]
+              [])))))
+         []))))))]))
 
 
 
@@ -517,7 +523,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { Test20297.ppr.hs:(3,1)-(5,7) })
            (AnnListItem
@@ -601,7 +608,8 @@
              (ValBinds
               (NoAnnSortKey)
               []
-              [])))))])))))
+              [])))))
+         []))))))
   ,(L
     (EpAnn
      (EpaSpan { Test20297.ppr.hs:(6,1)-(9,24) })
@@ -635,7 +643,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { Test20297.ppr.hs:(6,1)-(9,24) })
            (AnnListItem
@@ -749,7 +758,8 @@
                     []))
                   (MG
                    (FromSource)
-                   [(L
+                   (:|
+                    (L
                      (EpAnn
                       (EpaSpan { Test20297.ppr.hs:9:7-24 })
                       (AnnListItem
@@ -858,7 +868,9 @@
                                 (NoExtField)))])))))
                         [])
                        (EmptyLocalBinds
-                        (NoExtField)))))]))))]
-              [])))))])))))]))
+                        (NoExtField)))))
+                    [])))))]
+              [])))))
+         []))))))]))
 
 

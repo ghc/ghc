@@ -903,11 +903,10 @@ instance ( HiePass p
          , AnnoBody p body
          , ToHie (LocatedA (body (GhcPass p)))
          ) => ToHie (LocatedLW (MatchGroup (GhcPass p) (LocatedA (body (GhcPass p))))) where
-  toHie (L span mg) = case mg of
-    MG{ mg_alts = alts } ->
+  toHie (L span mg) =
       local (setOrigin origin) $ concatM
         [ locOnly (locA span)
-        , toHie alts
+        , toHie (matchGroupAlts mg)
         ]
     where origin = case hiePass @p of
              HieRn -> mg_ext mg

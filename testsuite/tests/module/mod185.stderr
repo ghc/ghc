@@ -98,7 +98,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { mod185.hs:5:1-24 })
            (AnnListItem
@@ -168,6 +169,7 @@
                    {OccName: undefined}))))))
              [])
             (EmptyLocalBinds
-             (NoExtField)))))])))))]))
+             (NoExtField)))))
+         []))))))]))
 
 

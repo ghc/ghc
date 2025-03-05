@@ -88,7 +88,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
            (AnnListItem
@@ -155,6 +156,7 @@
                     (0))))))))
              [])
             (EmptyLocalBinds
-             (NoExtField)))))])))))]))
+             (NoExtField)))))
+         []))))))]))
 
 

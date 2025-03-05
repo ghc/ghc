@@ -1028,8 +1028,8 @@ methodNamesCmd (HsCmdLam _ _         matches) = methodNamesMatch matches `addOne
 
 ---------------------------------------------------
 methodNamesMatch :: LMatchGroup GhcRn (LHsCmd GhcRn) -> FreeVars
-methodNamesMatch (L _ (MG { mg_alts = ms }))
-  = plusFVs (map do_one ms)
+methodNamesMatch (L _ mg)
+  = plusFVs (map do_one (matchGroupAlts mg))
  where
     do_one (L _ (Match { m_grhss = grhss })) = methodNamesGRHSs grhss
 

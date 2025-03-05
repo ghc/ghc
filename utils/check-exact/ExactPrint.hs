@@ -2333,7 +2333,7 @@ instance ExactPrint (HsBind GhcPs) where
   exact (FunBind x fid matches) = do
     matches' <- markAnnotated matches
     let
-      fun_id' = case mg_alts (unLoc matches') of
+      fun_id' = case matchGroupAlts (unLoc matches') of
         [] -> fid
         (L _ m:_) -> case m_ctxt m of
           FunRhs f _ _ _ -> f
@@ -3263,22 +3263,42 @@ instance ExactPrint (HsUntypedSplice GhcPs) where
 
 -- TODO:AZ: combine these instances
 instance ExactPrint (LocatedLW (MatchGroup GhcPs (LocatedA (HsExpr GhcPs)))) where
-  getAnnotationEntry = const NoEntryVal
-  setAnnotationAnchor a _ _ _ = a
-  exact (L l (MG x matches)) = do
+  getAnnotationEntry = entryFromLocatedA
+  setAnnotationAnchor = setAnchorAn
+  exact (L an mg) =
     -- TODO:AZ use SortKey, in MG ann.
-    L l' matches' <- markAnnotated (L l matches)
-    return (L l' (MG x matches'))
+    if notDodgy (L an mg) then do
+      debugM $ "LocatedLW MatchGroup"
+      an0 <- markLensFun' an lal_rest markEpToken
+      an1 <- markLensBracketsO an0 lal_brackets
+      an2 <- markEpAnnAllLT an1 lal_semis
+      mg' <- case mg of
+        EmptyMG x -> return (EmptyMG x)
+        MG x matches -> do
+          matches' <- markAnnotated matches
+          return (MG x matches')
+      an3 <- markLensBracketsC an2 lal_brackets
+      return (L an3 mg')
+    else return (L an mg)
 
 instance ExactPrint (LocatedLW (MatchGroup GhcPs (LocatedA (HsCmd GhcPs)))) where
-  getAnnotationEntry = const NoEntryVal
-  setAnnotationAnchor a _ _ _ = a
-  exact (L l (MG x matches)) = do
+  getAnnotationEntry = entryFromLocatedA
+  setAnnotationAnchor = setAnchorAn
+  exact (L an mg) =
     -- TODO:AZ use SortKey, in MG ann.
-    L l' matches' <- if notDodgy (L l matches)
-      then markAnnotated (L l matches)
-      else return (L l matches)
-    return (L l' (MG x matches'))
+    if notDodgy (L an mg) then do
+      debugM $ "LocatedLW MatchGroup"
+      an0 <- markLensFun' an lal_rest markEpToken
+      an1 <- markLensBracketsO an0 lal_brackets
+      an2 <- markEpAnnAllLT an1 lal_semis
+      mg' <- case mg of
+        EmptyMG x -> return (EmptyMG x)
+        MG x matches -> do
+          matches' <- markAnnotated matches
+          return (MG x matches')
+      an3 <- markLensBracketsC an2 lal_brackets
+      return (L an3 mg')
+    else return (L an mg)
 
 -- ---------------------------------------------------------------------
 
@@ -4485,20 +4505,6 @@ instance ExactPrint (LocatedLI [LocatedA (IE GhcPs)]) where
     debugM $ "LocatedL [LIE:p=" ++ showPprUnsafe p
     (an1, ies') <- markAnnList an0 (markAnnotated (filter notIEDoc ies))
     return (L an1 ies')
-
-instance (ExactPrint (Match GhcPs (LocatedA body)))
-   => ExactPrint (LocatedLW [LocatedA (Match GhcPs (LocatedA body))]) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
-  exact (L an a) = do
-    debugM $ "LocatedL [LMatch"
-    -- TODO: markAnnList?
-    an0 <- markLensFun' an lal_rest markEpToken
-    an1 <- markLensBracketsO an0 lal_brackets
-    an2 <- markEpAnnAllLT an1 lal_semis
-    a' <- markAnnotated a
-    an3 <- markLensBracketsC an2 lal_brackets
-    return (L an3 a')
 
 instance ExactPrint (LocatedLW [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsExpr GhcPs)))]) where
   getAnnotationEntry = entryFromLocatedA

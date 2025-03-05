@@ -1016,7 +1016,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { KindSigs.hs:23:1-12 })
            (AnnListItem
@@ -1107,7 +1108,8 @@
                    {Name: ()}))))))
              [])
             (EmptyLocalBinds
-             (NoExtField)))))])))))
+             (NoExtField)))))
+         []))))))
   ,(L
     (EpAnn
      (EpaSpan { KindSigs.hs:26:1-29 })
@@ -1752,7 +1754,8 @@
          []))
        (MG
         (FromSource)
-        [(L
+        (:|
+         (L
           (EpAnn
            (EpaSpan { KindSigs.hs:35:1-11 })
            (AnnListItem
@@ -1821,6 +1824,7 @@
                    {OccName: True}))))))
              [])
             (EmptyLocalBinds
-             (NoExtField)))))])))))]))
+             (NoExtField)))))
+         []))))))]))
 
 

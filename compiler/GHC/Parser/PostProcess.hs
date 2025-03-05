@@ -569,7 +569,7 @@ getMonoBind :: LHsBind GhcPs -> [LHsDecl GhcPs]
 
 getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
                              , fun_matches =
-                               L _ (MG { mg_alts = m1@[L _ mtchs1] }) }))
+                               L _ (MG { mg_alts = m1@(L _ mtchs1:|[]) }) }))
             binds
   | has_args m1
   = go [L loc1 mtchs1] (noAnnSrcSpan $ locA loc1) binds []
@@ -583,7 +583,7 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
     go mtchs loc
        ((L loc2 (ValD _ (FunBind { fun_id = (L _ f2)
                                  , fun_matches =
-                                    L _ (MG { mg_alts = [L lm2 mtchs2] }) })))
+                                    L _ (MG { mg_alts = L lm2 mtchs2 :| [] }) })))
          : binds) _
         | f1 == f2 =
           let (loc2', lm2') = transferAnnsA loc2 lm2
@@ -656,9 +656,8 @@ getMonoBindAll (L l (ValD _ b) : ds) =
   in L l' (ValD noExtField b') : getMonoBindAll ds'
 getMonoBindAll (d : ds) = d : getMonoBindAll ds
 
-has_args :: [LMatch GhcPs (LHsExpr GhcPs)] -> Bool
-has_args []                                  = panic "GHC.Parser.PostProcess.has_args"
-has_args (L _ (Match { m_pats = L _ args }) : _) = not (null args)
+has_args :: NonEmpty (LMatch GhcPs (LHsExpr GhcPs)) -> Bool
+has_args (L _ (Match { m_pats = L _ args }) :| _) = not (null args)
         -- Don't group together FunBinds if they have
         -- no arguments.  This is necessary now that variable bindings
         -- with no arguments are now treated as FunBinds rather
@@ -1875,7 +1874,7 @@ cmdFail :: SrcSpan -> SDoc -> PV a
 cmdFail loc e = addFatalError $ mkPlainErrorMsgEnvelope loc $ PsErrParseErrorInCmd e
 
 checkLamMatchGroup :: SrcSpan -> HsLamVariant -> LMatchGroup GhcPs (LHsExpr GhcPs) -> PV ()
-checkLamMatchGroup l LamSingle (L _ (MG { mg_alts = (matches:_)})) = do
+checkLamMatchGroup l LamSingle (L _ (MG { mg_alts = (matches:|_)})) = do
   when (null (hsLMatchPats matches)) $ addError $ mkPlainErrorMsgEnvelope l PsErrEmptyLambda
 checkLamMatchGroup _ _ _ = return ()
 

@@ -77,6 +77,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import Control.Monad
 import qualified Data.Set as S
+import Data.List.NonEmpty(NonEmpty(..))
 
 {-
 ************************************************************************
@@ -1132,9 +1133,9 @@ dsDo ctx stmts res_ty
         mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
         match_group  = MatchGroupTc [unrestricted tup_ty] body_ty (Generated OtherExpansion SkipPmc)
         mfix_arg     = noLocA $ HsLam noAnn LamSingle
-                              $ noLocA $ MG { mg_alts = [mkSimpleMatch
+                              $ noLocA $ MG { mg_alts = mkSimpleMatch
                                                    (LamAlt LamSingle)
-                                                   (noLocA [mfix_pat]) body]
+                                                   (noLocA [mfix_pat]) body :| []
                                             , mg_ext = match_group
                                             }
         mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats

@@ -40,7 +40,8 @@
              []))
            (MG
             (FromSource)
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:35:1-23 })
                (AnnListItem
@@ -127,7 +128,8 @@
                         {FastString: "hello"})))))))
                  [])
                 (EmptyLocalBinds
-                 (NoExtField)))))]))))])]
+                 (NoExtField)))))
+             [])))))])]
      []))
    []
    [(TyClGroup
