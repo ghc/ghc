@@ -2261,12 +2261,13 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
                HM_FamPat _  -> fsLit "_"
                HM_VTA       -> fsLit "w"
                HM_TyAppPat  -> fsLit "_"
+
+     -- see Note [Implementation tweak for wildCards in family instances]
      mk_wc_details = case hole_mode of
                       HM_FamPat FreeArg -> newTyVarMetaVarDetailsAtLevel
                       HM_FamPat ClassArg -> newTauTvDetailsAtLevel
                       HM_FamPat SigArg -> newTauTvDetailsAtLevel
                       _ -> newTauTvDetailsAtLevel
-                      -- see Note [Implementation tweak for wildCards in family instances]
      emit_holes = case hole_mode of
                      HM_Sig       -> True
                      HM_FamPat _  -> False
