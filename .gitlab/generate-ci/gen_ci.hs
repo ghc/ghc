@@ -113,7 +113,6 @@ data LinuxDistro
   | Fedora38
   | Ubuntu2004
   | Ubuntu1804
-  | Centos7
   | Alpine312
   | Alpine318
   | AlpineWasm
@@ -293,7 +292,6 @@ distroName Fedora33  = "fedora33"
 distroName Fedora38  = "fedora38"
 distroName Ubuntu1804 = "ubuntu18_04"
 distroName Ubuntu2004 = "ubuntu20_04"
-distroName Centos7    = "centos7"
 distroName Alpine312  = "alpine3_12"
 distroName Alpine318  = "alpine3_18"
 distroName AlpineWasm = "alpine3_18-wasm"
@@ -445,10 +443,6 @@ alpineVariables = mconcat
 distroVariables :: LinuxDistro -> Variables
 distroVariables Alpine312 = alpineVariables
 distroVariables Alpine318 = alpineVariables
-distroVariables Centos7 = mconcat [
-    "HADRIAN_ARGS" =: "--docs=no-sphinx"
-  , "BROKEN_TESTS" =: "T22012" -- due to #23979
-  ]
 distroVariables Fedora33 = mconcat
   -- LLC/OPT do not work for some reason in our fedora images
   -- These tests fail with this error: T11649 T5681 T7571 T8131b
@@ -984,7 +978,6 @@ job_groups =
      , disableValidate (standardBuilds Amd64 (Linux Ubuntu1804))
      , disableValidate (standardBuilds Amd64 (Linux Ubuntu2004))
      , disableValidate (standardBuilds Amd64 (Linux Rocky8))
-     , disableValidate (standardBuildsWithConfig Amd64 (Linux Centos7) (splitSectionsBroken vanilla))
      -- Fedora33 job is always built with perf so there's one job in the normal
      -- validate pipeline which is built with perf.
      , fastCI (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig)
