@@ -1581,8 +1581,8 @@ tcInferTyApps, tcInferTyApps_nosat
     -> [LHsTypeArg GhcRn]   -- ^ Args
     -> [FamArgFlavour]      -- ^ Args flavours see Note [FamArgFlavour] and
     -> TcM (TcType, TcKind) -- ^ (f args, result kind)
-tcInferTyApps mode hs_ty fun hs_args famArgFlvs
-  = do { (f_args, res_k) <- tcInferTyApps_nosat mode hs_ty fun hs_args famArgFlvs
+tcInferTyApps mode hs_ty fun hs_args fam_arg_flvs
+  = do { (f_args, res_k) <- tcInferTyApps_nosat mode hs_ty fun hs_args fam_arg_flvs
        ; saturateFamApp f_args res_k }
 
 tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args fam_arg_flvs
