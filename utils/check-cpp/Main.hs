@@ -134,8 +134,8 @@ getPState dflags includes popts filename str = pstate
             , pp_defines = predefinedMacros dflags
             , pp_scope = (PpScope True) :| []
             }
-    -- pstate = Lexer.initParserState initState popts buf loc
-    pstate = Lexer.initPragState initState popts buf loc
+    pstate = Lexer.initParserState initState popts buf loc
+    -- pstate = Lexer.initPragState initState popts buf loc
     loc = mkRealSrcLoc (mkFastString filename) 1 1
     buf = stringToStringBuffer str
 
