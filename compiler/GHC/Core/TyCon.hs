@@ -3011,12 +3011,15 @@ Some common agreements:
 
 By picking different type var for different flavours of wildcards in `tcAnonWildCardOcc`, we can
 explore different design spaces. For example, we can have the following design spaces:
-1. Wildcards can represet arbitrary types, including type variables, picks TauTv.
-2. Wildcards can only represent type variables, picks TyVarTv.
-3. Wildcards stand alone, pick skolemTv variables.
+
+* 1. For Wildcards can represet arbitrary types, including type variables, picks TauTv.
+     But we need to taking care of not defaulting it unexpectively.
+* 2. For Wildcards can only represent type variables, picks TyVarTv.
+     Unlike skolemTv, it should help us to equalize two _ if there is such a need.
+* 3. For Wildcards stand alone, pick skolemTv variables.
 ... and so on.
 
-Maintaining backward compatibility from 8.6.4 to 9.10.2, the picks would be:
+If maintaining backward compatibility from 8.6.4 to 9.10.2, the picks would be:
 - TyVarTv for FreeArg
 - TauTv for ClassArg
 - TauTv for SigArg
@@ -3030,7 +3033,7 @@ For more discussion, see #13908.
 {- Note [FamArgFlavour]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The FamArgFlavour is used to distinguish the different kinds of arguments that may
-appear in an associated type family declaration/instance. In an associated type family,
+appear in an type family declaration/instance. In an associated type family,
 some arguments come directly from the parent class (the “class arguments”) while
 others are provided freely by the user (the “free arguments”). For example, consider:
 
@@ -3070,6 +3073,36 @@ Imagine without SigArg, since F is non-associated, every argument is FreeArg,
 now let's consider _ here as a FreeArg then TyVarTv, then it would not match Type.
 Say if we assign ClassArg to _ here, if we want to flip class arguments in associated
 type family to only match Type variables. Then this example would not work.
+
+Another reason is that it is really hard for us to know if wildcard in signature in an
+associated type family corresponding to a class argument or a free argument.
+For example, in the following
+  code:
+
+class C a b c where
+  type F a (d :: TYPE a) (e :: TYPE k) f
+instance C LiftedRep Int c where
+  type F _  (_ :: TYPE _) (_ :: TYPE _) (_ :: TYPE _) = Int
+
+we have:
+
+tyConBinders: [[spec] (@(k_a7h :: RuntimeRep)),
+                [req] (@(a_a7e :: RuntimeRep)), AnonTCB (@(d_a7i :: TYPE a_a7e)),
+                AnonTCB (@(e_a7j :: TYPE k_a7h)), AnonTCB (@f_a7k)]
+tyConTyVars: [k_a7h, a_a7e, d_a7i, e_a7j, f_a7k]
+tyConFamArgFlavours: [FreeArg, ClassArg, FreeArg, FreeArg, FreeArg]
+
+* The first `TYPE _` is bounded to classArg `a` while its' binder `d` occurs freely.
+* The second `TYPE _` is not bounded to a class argument and its' binder `e` occurs freely.
+* The third `TYPE _` is not bounded to a class argument, does not appear in `tyConBinders`
+
+It is rather hard to distinguish them during typechecking.
+THe best way I can think of is to mark them as SigArg and treat them as TauTv.
+
+* For the first two, let the explicit type application or implicit instantiation of the
+  `tyConBinders` to decide the final type for them.
+* For the third one, it default it LiftedRep. It is more of a trade off, because I think
+  it is the best if we do not default any wildCard.
 
 Hence we maintain three different flavours of wildcards in type families. This provides
 a flexibility to interpret wildcards in type families.
