@@ -220,7 +220,8 @@ A wildcard in a type can be
         written '_'
     In HsType this is represented by HsWildCardTy.
     The renamer leaves it untouched, and it is later given a fresh
-    meta tyvar in the typechecker.
+    meta tyvar in the typechecker. The wildcard in type families can
+    be cumbersome to deal with, See Note [Implementation tweak for wildCards in family instances].
 
   * A named wildcard,
         written '_a', '_foo', etc

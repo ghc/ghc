@@ -1295,7 +1295,7 @@ tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
                  -- to be fully determined (#14904)
        ; traceTc "tcHsType:sig" (ppr ty $$ ppr sig')
        ; ty' <- tcAddKindSigPlaceholders sig $
-                tc_check_lhs_type mode' ty sig'
+                tc_check_lhs_type mode ty sig'
        ; checkExpKind rn_ty ty' sig' exp_kind }
 
 -- See Note [Typechecking HsCoreTys]
@@ -2266,7 +2266,7 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
                       HM_FamPat ClassArg -> newTauTvDetailsAtLevel
                       HM_FamPat SigArg -> newTauTvDetailsAtLevel
                       _ -> newTauTvDetailsAtLevel
-                      -- see Note [WildCards in type families]
+                      -- see Note [Implementation tweak for wildCards in family instances]
      emit_holes = case hole_mode of
                      HM_Sig       -> True
                      HM_FamPat _  -> False
