@@ -60,8 +60,6 @@ decompress (BSI.PS srcForeignPtr off len) = unsafePerformIO $ do
 decompressPtr srcForeignPtr srcSize = do
   withForeignPtr srcForeignPtr $ \srcPtr -> do
     decompressedSizeM <- getDecompressedSize srcPtr (fromIntegral srcSize)
-    print decompressedSizeM
-    printFirstBytes srcPtr
     case decompressedSizeM of
       Nothing -> error "Decompression failed"
       Just decompressedSize -> do
