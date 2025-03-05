@@ -1,4 +1,4 @@
-#!/usr/bin/env -S node --disable-warning=ExperimentalWarning --experimental-wasm-type-reflection --max-old-space-size=65536 --no-turbo-fast-api-calls --wasm-lazy-validation
+#!/usr/bin/env -S node --disable-warning=ExperimentalWarning --max-old-space-size=65536 --no-turbo-fast-api-calls --wasm-lazy-validation
 
 // Note [The Wasm Dynamic Linker]
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -693,30 +693,15 @@ class DyLD {
             continue;
           }
 
-          // For lazy GOT.func entries we can do better than poison:
-          // insert a stub in the table, so we at least get an error
-          // message that includes the missing function's name, not a
-          // mysterious table trap. The function type is Cmm function
-          // type as a best effort guess, if there's a type mismatch
-          // then call_indirect would trap.
-          //
-          // Also set a __poison field since we can't compare value
-          // against DyLD.#poison.
+          // Can't find this function, so poison it like GOT.mem.
+          // TODO: when wasm type reflection is widely available in
+          // browsers, use the WebAssembly.Function constructor to
+          // dynamically create a stub function that does better error
+          // reporting
           this.#gotFunc[name] = new WebAssembly.Global(
             { value: "i32", mutable: true },
-            this.#table.grow(
-              1,
-              new WebAssembly.Function(
-                { parameters: [], results: ["i32"] },
-                () => {
-                  throw new WebAssembly.RuntimeError(
-                    `non-existent function ${name}`
-                  );
-                }
-              )
-            )
+            DyLD.#poison
           );
-          this.#gotFunc[name].__poison = true;
           continue;
         }
 
@@ -754,8 +739,7 @@ class DyLD {
           if (this.#gotFunc[k]) {
             // ghc-prim/ghc-internal may export functions imported by
             // rts
-            assert(this.#gotFunc[k].__poison);
-            delete this.#gotFunc[k].__poison;
+            assert(this.#gotFunc[k].value === DyLD.#poison);
             this.#table.set(this.#gotFunc[k].value, v);
           }
           continue;
@@ -830,7 +814,7 @@ class DyLD {
     if (this.#gotMem[sym] && this.#gotMem[sym].value !== DyLD.#poison) {
       return this.#gotMem[sym].value;
     }
-    if (this.#gotFunc[sym] && !this.#gotFunc[sym].__poison) {
+    if (this.#gotFunc[sym] && this.#gotFunc[sym].value !== DyLD.#poison) {
       return this.#gotFunc[sym].value;
     }
     // Not in GOT.func yet, create the entry on demand
