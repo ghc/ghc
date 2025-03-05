@@ -1294,7 +1294,7 @@ tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
                  -- to be fully determined (#14904)
        ; traceTc "tcHsType:sig" (ppr ty $$ ppr sig')
        ; ty' <- tcAddKindSigPlaceholders sig $
-                tc_check_lhs_type mode ty sig'
+                tc_check_lhs_type mode' ty sig'
        ; checkExpKind rn_ty ty' sig' exp_kind }
 
 -- See Note [Typechecking HsCoreTys]
