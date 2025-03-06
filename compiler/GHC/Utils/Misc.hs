@@ -1452,13 +1452,9 @@ mapMaybe' f = foldr g []
       | otherwise     = rest
 
 foldr1WithDefault :: Foldable f => a -> (a -> a -> a) -> f a -> a
-foldr1WithDefault defaultA f xs = case nonEmpty (toList xs) of
-    Nothing -> defaultA
-    Just (xs1 :: NonEmpty a) -> foldr1 f xs1
+foldr1WithDefault defaultA f = foldr f defaultA
 {-# SPECIALIZE foldr1WithDefault :: a -> (a -> a -> a) -> [a] -> a #-}
 
 foldl1WithDefault' :: Foldable f => a -> (a -> a -> a) -> f a -> a
-foldl1WithDefault' defaultA f xs = case nonEmpty (toList xs) of
-    Nothing -> defaultA
-    Just (xs1 :: NonEmpty a) -> foldl1' f xs1
+foldl1WithDefault' defaultA f = foldl' f defaultA
 {-# SPECIALIZE foldl1WithDefault' :: a -> (a -> a -> a) -> [a] -> a #-}
