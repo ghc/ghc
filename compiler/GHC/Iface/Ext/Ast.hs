@@ -813,7 +813,8 @@ data HiePassEv p where
   HieRn :: HiePassEv 'Renamed
   HieTc :: HiePassEv 'Typechecked
 
-class ( HiePass (NoGhcTcPass p)
+class ( IsPass p
+      , HiePass (NoGhcTcPass p)
       , NoGhcTcPass p ~ 'Renamed
       , ModifyState (IdGhcP p)
       , Data (GRHS  (GhcPass p) (LocatedA (HsExpr (GhcPass p))))
@@ -908,9 +909,7 @@ instance ( HiePass p
         [ locOnly (locA span)
         , toHie (matchGroupAlts mg)
         ]
-    where origin = case hiePass @p of
-             HieRn -> mg_ext mg
-             HieTc -> mg_origin $ mg_ext mg
+    where origin = matchGroupOrigin mg
 
 setOrigin :: Origin -> NodeOrigin -> NodeOrigin
 setOrigin FromSource _ = SourceInfo

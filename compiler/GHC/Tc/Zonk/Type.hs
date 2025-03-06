@@ -871,10 +871,10 @@ zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnCO
                => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
                -> LMatchGroup GhcTc (LocatedA (body GhcTc))
                -> ZonkTcM (LMatchGroup GhcTc (LocatedA (body GhcTc)))
-zonkMatchGroup _ (L l (EmptyMG { mg_ext = MatchGroupTc arg_tys res_ty origin }))
-  = do  { arg_tys' <- zonkScaledTcTypesToTypesX arg_tys
-        ; res_ty'  <- zonkTcTypeToTypeX res_ty
-        ; return (L l (EmptyMG { mg_ext = MatchGroupTc arg_tys' res_ty' origin })) }
+zonkMatchGroup _ (L l (EmptyMG (EmptyMatchGroupTc arg_ty res_ty origin)))
+  = do  { arg_ty' <- zonkScaledTcTypeToTypeX arg_ty
+        ; res_ty' <- zonkTcTypeToTypeX res_ty
+        ; return (L l (EmptyMG (EmptyMatchGroupTc arg_ty' res_ty' origin))) }
 zonkMatchGroup zBody (L l (MG { mg_alts = ms
                               , mg_ext = MatchGroupTc arg_tys res_ty origin
                               }))

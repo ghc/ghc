@@ -1539,11 +1539,22 @@ type instance XMG         GhcPs b = Origin
 type instance XMG         GhcRn b = Origin -- See Note [Generated code and pattern-match checking]
 type instance XMG         GhcTc b = MatchGroupTc
 
+type instance XEmptyMG    GhcPs b = Origin
+type instance XEmptyMG    GhcRn b = Origin -- See Note [Generated code and pattern-match checking]
+type instance XEmptyMG    GhcTc b = EmptyMatchGroupTc
+
 data MatchGroupTc
   = MatchGroupTc
        { mg_arg_tys :: [Scaled Type]  -- Types of the arguments, t1..tn
        , mg_res_ty  :: Type    -- Type of the result, tr
        , mg_origin  :: Origin  -- Origin (Generated vs FromSource)
+       } deriving Data
+
+data EmptyMatchGroupTc
+  = EmptyMatchGroupTc
+       { emg_arg_ty :: Scaled Type  -- Type of the argument, t1
+       , emg_res_ty :: Type    -- Type of the result, tr
+       , emg_origin :: Origin  -- Origin (Generated vs FromSource)
        } deriving Data
 
 type instance XXMatchGroup (GhcPass _) b = DataConCantHappen
@@ -1567,6 +1578,18 @@ matchGroupArity MG { mg_alts = (alt1 :| _) } = count (isVisArgPat . unLoc) (hsLM
 matchGroupAlts :: MatchGroup (GhcPass p) body -> [LMatch (GhcPass p) body]
 matchGroupAlts EmptyMG{} = []
 matchGroupAlts MG { mg_alts = alts } = toList alts
+
+matchGroupOrigin :: forall p body. IsPass p => MatchGroup (GhcPass p) body -> Origin
+matchGroupOrigin (EmptyMG x) =
+  case ghcPass @p of
+    GhcPs -> x
+    GhcRn -> x
+    GhcTc -> emg_origin x
+matchGroupOrigin (MG { mg_ext = x }) =
+  case ghcPass @p of
+    GhcPs -> x
+    GhcRn -> x
+    GhcTc -> mg_origin x
 
 hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
 hsLMatchPats (L _ (Match { m_pats = L _ pats })) = pats

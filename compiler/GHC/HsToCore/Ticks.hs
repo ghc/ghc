@@ -632,8 +632,8 @@ addTickTupArg (Missing ty) = return (Missing ty)
 
 addTickMatchGroup :: Bool{-is lambda-} -> LMatchGroup GhcTc (LHsExpr GhcTc)
                   -> TM (LMatchGroup GhcTc (LHsExpr GhcTc))
-addTickMatchGroup _ (L l EmptyMG { mg_ext = ctxt }) =
-  return (L l EmptyMG { mg_ext = ctxt })
+addTickMatchGroup _ (L l (EmptyMG ctxt)) =
+  return (L l (EmptyMG ctxt))
 addTickMatchGroup is_lam (L l (mg@(MG { mg_alts = matches, mg_ext = ctxt }))) = do
   let isOneOfMany = matchesOneOfMany matches
       isDoExp     = isDoExpansionGenerated $ mg_origin ctxt

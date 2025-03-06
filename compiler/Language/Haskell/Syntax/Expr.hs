@@ -881,7 +881,7 @@ data MatchGroup p body
      --      t1 -> ... -> tn -> tr
      -- where there are n patterns
 
-  | EmptyMG { mg_ext :: XMG p body }
+  | EmptyMG (XEmptyMG p body)
 
   | XMatchGroup !(XXMatchGroup p body)
 

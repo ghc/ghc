@@ -2086,6 +2086,7 @@ repRecordPatSynArgs (MkC sels) = rep2 recordPatSynName [sels]
 repPatSynDir :: HsPatSynDir GhcRn -> MetaM (Core (M TH.PatSynDir))
 repPatSynDir Unidirectional        = rep2 unidirPatSynName []
 repPatSynDir ImplicitBidirectional = rep2 implBidirPatSynName []
+repPatSynDir (ExplicitBidirectional (L _ EmptyMG{})) = panic "repPatSynDir: EmptyMG"
 repPatSynDir (ExplicitBidirectional (L _ (MG { mg_alts = clauses })))
   = do { clauses' <- mapM repClauseTup clauses
        ; repExplBidirPatSynDir (nonEmptyCoreList' clauses') }

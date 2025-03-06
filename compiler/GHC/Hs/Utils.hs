@@ -212,6 +212,7 @@ unguardedRHS an loc rhs = NE.singleton $ L (noAnnSrcSpan loc) (GRHS an [] rhs)
 
 type AnnoBody p body
   = ( XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ Origin
+    , XEmptyMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ Origin
     , Anno (MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnLW
     , Anno (Match (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnA
     )
@@ -222,7 +223,7 @@ mkMatchGroup :: AnnoBody p body
              -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
 mkMatchGroup origin matches =
   case nonEmpty matches of
-    Nothing -> EmptyMG { mg_ext = origin }
+    Nothing -> EmptyMG origin
     Just ms -> MG { mg_ext = origin, mg_alts = ms }
 
 mkLamCaseMatchGroup :: AnnoBody p body
@@ -276,8 +277,8 @@ mkHsLam :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
         -> LHsExpr (GhcPass p)
 mkHsLam (L l pats) body = mkHsPar (L (getLoc body) (HsLam noAnn LamSingle matches))
   where
-    matches = noLocA $ mkMatchGroup (Generated OtherExpansion SkipPmc)
-                           [mkSimpleMatch (LamAlt LamSingle) (L l pats') body]
+    matches = noLocA $ MG { mg_ext = Generated OtherExpansion SkipPmc
+                          , mg_alts = mkSimpleMatch (LamAlt LamSingle) (L l pats') body :| [] }
     pats' = map (parenthesizePat appPrec) pats
 
 mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr GhcTc -> LHsExpr GhcTc

@@ -494,6 +494,7 @@ type family XXCmdTop x
 -- -------------------------------------
 -- MatchGroup type families
 type family XMG           x b
+type family XEmptyMG      x b
 type family XXMatchGroup  x b
 
 -- -------------------------------------

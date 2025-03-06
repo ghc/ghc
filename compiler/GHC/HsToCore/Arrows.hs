@@ -500,9 +500,9 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdCase _ exp match) env_ids = do
     stack_id <- newSysLocalMDs stack_ty
     (match', core_choices)
       <- dsCases ids local_vars stack_id stack_ty res_ty match
-    let sum_ty = case match' of
-          L _ (MG     { mg_ext = MatchGroupTc _ sum_ty _ }) -> sum_ty
-          L _ (EmptyMG{ mg_ext = MatchGroupTc _ sum_ty _ }) -> sum_ty
+    let sum_ty = case unLoc match' of
+          MG { mg_ext = MatchGroupTc _ sum_ty _ } -> sum_ty
+          EmptyMG (EmptyMatchGroupTc _ sum_ty _)  -> sum_ty
         in_ty = envStackType env_ids stack_ty
 
     core_body <- dsExpr (HsCase (ArrowMatchCtxt ArrowCaseAlt) exp match')
@@ -540,9 +540,9 @@ dsCmd ids local_vars stack_ty res_ty
       (HsCmdLam _ lam_variant match)
       env_ids = do
 
-    let arg_tys = case match of
-          L _ MG      { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } -> arg_tys
-          L _ EmptyMG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } -> arg_tys
+    let arg_tys = case unLoc match of
+          MG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } -> arg_tys
+          EmptyMG (EmptyMatchGroupTc {emg_arg_ty = arg_ty})   -> [arg_ty]
     arg_ids <- newSysLocalsDs arg_tys
 
     let match_ctxt = ArrowLamAlt lam_variant
@@ -556,9 +556,9 @@ dsCmd ids local_vars stack_ty res_ty
       (match', core_choices)
         <- dsCases ids local_vars' stack_id stack_ty' res_ty match
 
-      let sum_ty = case match' of
-            L _ MG     { mg_ext = MatchGroupTc _ sum_ty _ } -> sum_ty
-            L _ EmptyMG{ mg_ext = MatchGroupTc _ sum_ty _ } -> sum_ty
+      let sum_ty = case unLoc match' of
+            MG{ mg_ext = MatchGroupTc _ sum_ty _ } -> sum_ty
+            EmptyMG (EmptyMatchGroupTc _ sum_ty _) -> sum_ty
           in_ty = envStackType env_ids stack_ty'
           discrims = map nlHsVar arg_ids
       (discrim_vars, matching_code)
@@ -767,7 +767,7 @@ dsCases :: DsCmdEnv                               -- arrow combinators
         -> LMatchGroup GhcTc (LHsCmd GhcTc)        -- match group to desugar
         -> DsM (LMatchGroup GhcTc (LHsExpr GhcTc), -- match group with choice tree
                 CoreExpr)                         -- desugared choices
-dsCases ids _ _ _ res_ty (L l (EmptyMG { mg_ext = MatchGroupTc arg_tys _ origin })) = do
+dsCases ids _ _ _ res_ty (L l (EmptyMG (EmptyMatchGroupTc arg_ty _ origin))) = do
   void_ty <- mkTyConTy <$> dsLookupTyCon voidTyConName
   (sum_ty, core_choices) <-
     -- when the case command has no alternatives, the sum type from
@@ -776,9 +776,8 @@ dsCases ids _ _ _ res_ty (L l (EmptyMG { mg_ext = MatchGroupTc arg_tys _ origin 
     -- implemented as `arr \case {}`.
     (void_ty,) . do_arr ids void_ty res_ty <$>
       dsExpr (HsLam noAnn LamCase
-        (noLocA (EmptyMG { mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated OtherExpansion SkipPmc)
-                         })))
-  return (L l (EmptyMG { mg_ext = MatchGroupTc arg_tys sum_ty origin }),
+        (noLocA (EmptyMG (EmptyMatchGroupTc (Scaled ManyTy void_ty) res_ty (Generated OtherExpansion SkipPmc)))))
+  return (L l (EmptyMG (EmptyMatchGroupTc arg_ty sum_ty origin)),
           core_choices)
 dsCases ids local_vars stack_id stack_ty res_ty
         (L l (MG { mg_alts = matches

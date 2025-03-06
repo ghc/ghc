@@ -785,8 +785,8 @@ genHsLamDoExp :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
 genHsLamDoExp doFlav pats body = mkHsPar (wrapGenSpan $ HsLam noAnn LamSingle matches)
   where
     matches = wrapGenSpan $
-              mkMatchGroup (doExpansionOrigin doFlav)
-                           ([genSimpleMatch (StmtCtxt (HsDoStmt doFlav)) pats' body])
+      MG { mg_ext = doExpansionOrigin doFlav
+         , mg_alts = genSimpleMatch (StmtCtxt (HsDoStmt doFlav)) pats' body NE.:| [] }
     pats' = map (parenthesizePat appPrec) pats
 
 

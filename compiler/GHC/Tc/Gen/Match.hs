@@ -165,7 +165,7 @@ tcLambdaMatches e lam_variant matches invis_pat_tys res_ty
     herald = ExpectedFunTyLam lam_variant e
              -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
 
-    tc_body | isDoExpansionGenerated (mg_ext (unLoc matches))
+    tc_body | isDoExpansionGenerated (matchGroupOrigin (unLoc matches))
               -- See Part 3. B. of Note [Expanding HsDo with XXExprGhcRn] in
               -- `GHC.Tc.Gen.Do`. Testcase: Typeable1
             = tcBodyNC -- NB: Do not add any error contexts
@@ -229,7 +229,7 @@ tcMatches :: (AnnoBody body, Outputable (body GhcTc))
           -> LMatchGroup GhcRn (LocatedA (body GhcRn))
           -> TcM (LMatchGroup GhcTc (LocatedA (body GhcTc)))
 
-tcMatches _ pat_tys rhs_ty (L l (EmptyMG { mg_ext = origin }))
+tcMatches _ pat_tys rhs_ty (L l (EmptyMG origin))
     -- Deal with case e of {}
     -- Since there are no branches, no one else will fill in rhs_ty
     -- when in inference mode, so we must do it ourselves,
@@ -242,7 +242,7 @@ tcMatches _ pat_tys rhs_ty (L l (EmptyMG { mg_ext = origin }))
            []                   -> panic "tcMatches: no arguments in EmptyCase"
            _t1:(_t2:_ts)        -> panic "tcMatches: multiple arguments in EmptyCase"
        ; rhs_ty  <- expTypeToType rhs_ty
-       ; return (L l (EmptyMG { mg_ext = MatchGroupTc [pat_ty] rhs_ty origin })) }
+       ; return (L l (EmptyMG (EmptyMatchGroupTc pat_ty rhs_ty origin))) }
 
 tcMatches tc_body pat_tys rhs_ty (L l (MG { mg_alts = matches
                                           , mg_ext = origin }))

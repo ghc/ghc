@@ -1321,10 +1321,10 @@ rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContextRn
              -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
              -> LMatchGroup GhcPs (LocatedA (body GhcPs))
              -> RnM (LMatchGroup GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnMatchGroup ctxt _ (L lm (EmptyMG { mg_ext = origin }))
+rnMatchGroup ctxt _ (L lm (EmptyMG origin))
          -- see Note [Empty MatchGroups]
   = do { whenM mustn't_be_empty (addErr (TcRnEmptyCase ctxt))
-       ; return (L lm (EmptyMG { mg_ext = origin }), emptyFVs) }
+       ; return (L lm (EmptyMG origin), emptyFVs) }
   where
     mustn't_be_empty = case ctxt of
       LamAlt LamCases -> return True

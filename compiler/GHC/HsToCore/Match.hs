@@ -792,20 +792,20 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 -}
 
-matchWrapper ctxt scrs (L _ EmptyMG { mg_ext = MatchGroupTc arg_tys rhs_ty origin })
+matchWrapper ctxt scrs (L _ (EmptyMG (EmptyMatchGroupTc arg_ty rhs_ty origin)))
   = do  { dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
-        ; new_vars <- newSysLocalsDs arg_tys
+        ; new_var <- newSysLocalDs arg_ty
         ; tracePm "matchWrapper (empty match group)"
           (vcat [ ppr ctxt
                 , text "scrs" <+> ppr scrs
                 , text "matchPmChecked" <+> ppr (isMatchContextPmChecked dflags origin ctxt)])
         ; when (isMatchContextPmChecked dflags origin ctxt) $
-          addHsScrutTmCs (concat scrs) new_vars $
-          pmcEmptyMatches origin (DsMatchContext ctxt locn) (only new_vars)
+          addHsScrutTmCs (concat scrs) [new_var] $
+          pmcEmptyMatches origin (DsMatchContext ctxt locn) new_var
         ; result_expr <- discardWarningsIfSkipPMC origin $
-                         matchEquations ctxt new_vars [] rhs_ty
-        ; return (new_vars, result_expr) }
+                         matchEquations ctxt [new_var] [] rhs_ty
+        ; return ([new_var], result_expr) }
 matchWrapper ctxt scrs (L _ MG { mg_alts = matches, mg_ext = MatchGroupTc arg_tys rhs_ty origin })
   = do  { dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
