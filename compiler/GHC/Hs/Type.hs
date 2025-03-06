@@ -1169,8 +1169,8 @@ instance Outputable OpName where
 -- | There's no 'Outputable' instance for 'HsModifierOf', because it's rare to
 -- want to ppr just one of them. For a list, 'pprHsModifiers' gives the expected
 -- output: @%a %b@ rather than @[%a, %b]@.
-pprHsModifier :: forall p ty . (OutputableBndrId p, Outputable ty) => HsModifierOf ty (GhcPass p) -> SDoc
-pprHsModifier (HsModifier x ty) = char '%' <> case ghcPass @p of
+pprHsModifier :: forall p ty . (OutputableBndrId p, Outputable ty) => LHsModifierOf ty (GhcPass p) -> SDoc
+pprHsModifier (L _ (HsModifier x ty)) = char '%' <> case ghcPass @p of
   GhcPs -> ppr ty
   GhcRn -> maybe_as_1 x ty
   GhcTc -> maybe_as_1 x ty
@@ -1178,7 +1178,7 @@ pprHsModifier (HsModifier x ty) = char '%' <> case ghcPass @p of
     maybe_as_1 ModifierPrintsAs1 _ = char '1'
     maybe_as_1 ModifierPrintsAsSelf ty = ppr ty
 
-pprHsModifiers :: (OutputableBndrId p, Outputable ty) => [HsModifierOf ty (GhcPass p)] -> SDoc
+pprHsModifiers :: (OutputableBndrId p, Outputable ty) => [LHsModifierOf ty (GhcPass p)] -> SDoc
 pprHsModifiers mods = hsep $ pprHsModifier <$> mods
 
 instance OutputableBndrId p => Outputable (HsBndrVar (GhcPass p)) where
@@ -1596,3 +1596,4 @@ type instance Anno HsIPName = EpAnnCO
 type instance Anno (ConDeclField (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno (FieldOcc (GhcPass p)) = SrcSpanAnnA
+type instance Anno (HsModifierOf ty (GhcPass p)) = SrcSpanAnnA

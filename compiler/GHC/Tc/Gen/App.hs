@@ -987,7 +987,7 @@ expr_to_type earg =
           go_arrow = case mult of
             HsStandardArrow _ mods -> HsStandardArrow noExtField <$> mapM go_modifier mods
             HsLinearArrow _ mods -> HsLinearArrow noExtField <$> mapM go_modifier mods
-          go_modifier (HsModifier x ty) = HsModifier x <$> go ty
+          go_modifier (L l (HsModifier x ty)) = L l <$> HsModifier x <$> go ty
     go (L l (HsForAll _ tele expr)) =
       do { ty <- go expr
          ; return (L l (HsForAllTy noExtField tele ty))}

@@ -1451,7 +1451,7 @@ repTy (HsFunTy _ w f a) = do f1   <- repLTy f
     -- warn for the others?
     mMult = case w of
       HsStandardArrow _ [] -> Nothing
-      HsStandardArrow _ [HsModifier _ m] -> Just m
+      HsStandardArrow _ [L _ (HsModifier _ m)] -> Just m
       HsStandardArrow _ _ -> error "MODS_TODO too many modifiers"
       HsLinearArrow _ [] -> Just $ noLocA $ mk_var $ noLocA oneDataConName
       HsLinearArrow _ _ -> error "MODS_TODO too many modifiers"
@@ -1751,7 +1751,7 @@ repFunArr arr = case arr of
   -- MODS_TODO how do we figure out which modifiers are multiplicities and warn
   -- for the others?
   HsStandardArrow _ [] -> repConName unrestrictedFunTyConName
-  HsStandardArrow _ [HsModifier _ m] -> do
+  HsStandardArrow _ [L _ (HsModifier _ m)] -> do
     fun <- repConName fUNTyConName
     mult' <- repLE m
     repApp fun mult'
@@ -2904,10 +2904,10 @@ verifyLinearFields ps = do
         -- MODS_TODO excess modifiers are assumed to be forbidden
         -- multiplicities. Probably we instead want to give a "forbidden
         -- modifier syntax" error.
-        HsStandardArrow _ []                               -> not linear
-        HsStandardArrow _ [HsModifier ModifierPrintsAs1 _] -> True
-        HsLinearArrow _ []                                 -> True
-        _                                                  -> False
+        HsStandardArrow _ []                                     -> not linear
+        HsStandardArrow _ [L _ (HsModifier ModifierPrintsAs1 _)] -> True
+        HsLinearArrow _ []                                       -> True
+        _                                                        -> False
   let allGood = all (\st -> linear_arrow $ hsMult st) ps
   unless allGood $ notHandled ThNonLinearDataCon
 

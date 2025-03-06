@@ -946,10 +946,10 @@ concern things that the renamer can't handle.
 tcArrow :: HsArrow GhcRn -> TcM Mult
 tcArrow = tc_arrow typeLevelMode
 
-tcMult :: [HsModifier GhcRn] -> TcM (Maybe Mult)
+tcMult :: [LHsModifier GhcRn] -> TcM (Maybe Mult)
 tcMult = tc_mult typeLevelMode
 
-tcModifiers :: [HsModifier GhcRn]
+tcModifiers :: [LHsModifier GhcRn]
             -> (TcKind -> Either SuggestLinear ())
             -> TcM [TcType]
 tcModifiers = tc_modifiers typeLevelMode
@@ -1393,7 +1393,7 @@ Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in "GHC.Core.TyCo
 -- -XLinearTypes -XNoModifiers, there must be at most one modifier, and we check
 -- that it's a Multiplicity rather than inferring (so less need for kind
 -- annotations).
-tc_mult :: TcTyMode -> [HsModifier GhcRn] -> TcM (Maybe Mult)
+tc_mult :: TcTyMode -> [LHsModifier GhcRn] -> TcM (Maybe Mult)
 tc_mult mode mods = do
   modifiers <- xoptM LangExt.Modifiers
   linearTypes <- xoptM LangExt.LinearTypes
@@ -1417,7 +1417,7 @@ tc_mult mode mods = do
 
     go_check = case mods of
       [] -> pure Nothing
-      [HsModifier _ m] ->
+      [L _ (HsModifier _ m)] ->
         -- MODS_TODO is addTypeCtxt also useful for inference?
         addTypeCtxt m $ Just <$> tc_check_lhs_type mode m multiplicityTy
       _ -> error "MODS_TODO too many multiplicities"
@@ -1432,10 +1432,10 @@ tc_arrow mode arr = case arr of
       Nothing -> pure oneDataConTy
 
 tc_modifier :: TcTyMode
-            -> HsModifier GhcRn
+            -> LHsModifier GhcRn
             -> (TcKind -> Either SuggestLinear ())
             -> TcM (Maybe TcType)
-tc_modifier mode mod@(HsModifier modPrintsAs ty) check_expected_kind = do
+tc_modifier mode mod@(L _ (HsModifier modPrintsAs ty)) check_expected_kind = do
   (inf_ty, inf_kind) <- tc_infer_lhs_type mode ty
   -- MODS_TODO zonking here means that
   --     Int %(m :: Multiplicity) -> Int %m -> Int
@@ -1465,7 +1465,7 @@ tc_modifier mode mod@(HsModifier modPrintsAs ty) check_expected_kind = do
         pure Nothing
 
 tc_modifiers :: TcTyMode
-             -> [HsModifier GhcRn]
+             -> [LHsModifier GhcRn]
              -> (TcKind -> Either SuggestLinear ())
              -> TcM [TcType]
 tc_modifiers mode mods is_expected_kind =

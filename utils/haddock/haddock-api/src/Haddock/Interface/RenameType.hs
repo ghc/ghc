@@ -122,10 +122,10 @@ renameType t@(HsTyLit _ _) = pure t
 renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
 renameType (HsModifiedTy x mods ty) = HsModifiedTy x <$> renameModifiers mods <*> renameLType ty
 
-renameModifier :: HsModifier GhcRn -> Rename (IdP GhcRn) (HsModifier GhcRn)
-renameModifier (HsModifier x ty) = HsModifier x <$> renameLType ty
+renameModifier :: LHsModifier GhcRn -> Rename (IdP GhcRn) (LHsModifier GhcRn)
+renameModifier (L l (HsModifier x ty)) = L l <$> HsModifier x <$> renameLType ty
 
-renameModifiers :: [HsModifier GhcRn] -> Rename (IdP GhcRn) [HsModifier GhcRn]
+renameModifiers :: [LHsModifier GhcRn] -> Rename (IdP GhcRn) [LHsModifier GhcRn]
 renameModifiers = mapM renameModifier
 
 renameHsArrow :: HsArrow GhcRn -> Rename (IdP GhcRn) (HsArrow GhcRn)

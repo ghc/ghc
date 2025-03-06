@@ -60,7 +60,7 @@ data PatBuilder p
                     (LocatedA (PatBuilder p)) ([EpToken "("], [EpToken ")"])
   | PatBuilderVar (LocatedN RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
-  | PatBuilderModifiers [HsModifier p] (LocatedA (PatBuilder p))
+  | PatBuilderModifiers [LHsModifier p] (LocatedA (PatBuilder p))
 
 -- These instances are here so that they are not orphans
 type instance Anno (GRHS GhcPs (LocatedA (PatBuilder GhcPs)))             = EpAnnCO

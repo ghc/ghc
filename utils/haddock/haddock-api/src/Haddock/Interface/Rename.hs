@@ -337,10 +337,10 @@ renameMaybeInjectivityAnn
   -> RnM (Maybe (LInjectivityAnn DocNameI))
 renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
-renameModifier :: HsModifier GhcRn -> RnM (HsModifier DocNameI)
-renameModifier (HsModifier _ ty) = HsModifier noExtField <$> renameLType ty
+renameModifier :: LHsModifier GhcRn -> RnM (LHsModifier DocNameI)
+renameModifier (L l (HsModifier _ ty)) = L l <$> HsModifier noExtField <$> renameLType ty
 
-renameModifiers :: [HsModifier GhcRn] -> RnM [HsModifier DocNameI]
+renameModifiers :: [LHsModifier GhcRn] -> RnM [LHsModifier DocNameI]
 renameModifiers = mapM renameModifier
 
 renameArrow :: HsArrow GhcRn -> RnM (HsArrow DocNameI)

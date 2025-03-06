@@ -439,7 +439,7 @@ data TyClDecl pass
                               -- See Note [TyVar binders for associated decls]
              , tcdFixity   :: LexicalFixity        -- ^ Fixity used in the declaration
              , tcdDataDefn :: HsDataDefn pass
-             , tcdModifiers :: [HsModifier pass] }
+             , tcdModifiers :: [LHsModifier pass] }
 
     -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnClass',
     --           'GHC.Parser.Annotation.AnnWhere','GHC.Parser.Annotation.AnnOpen',
@@ -459,7 +459,7 @@ data TyClDecl pass
                 tcdATs     :: [LFamilyDecl pass],       -- ^ Associated types;
                 tcdATDefs  :: [LTyFamDefltDecl pass],   -- ^ Associated type defaults
                 tcdDocs    :: [LDocDecl pass],          -- ^ Haddock docs
-                tcdModifiers :: [HsModifier pass]       -- ^ Modifiers
+                tcdModifiers :: [LHsModifier pass]       -- ^ Modifiers
     }
   | XTyClDecl !(XXTyClDecl pass)
 
@@ -1063,7 +1063,7 @@ data ConDecl pass
       , con_mb_cxt  :: Maybe (LHsContext pass)   -- ^ User-written context (if any)
       , con_g_args  :: HsConDeclGADTDetails pass -- ^ Arguments; never infix
       , con_res_ty  :: LHsType pass              -- ^ Result type
-      , con_modifiers :: [HsModifier pass]
+      , con_modifiers :: [LHsModifier pass]
 
       , con_doc     :: Maybe (LHsDoc pass) -- ^ A possible Haddock
                                                  -- comment.
@@ -1081,7 +1081,7 @@ data ConDecl pass
       , con_ex_tvs :: [LHsTyVarBndr Specificity pass] -- ^ Existentials only
       , con_mb_cxt :: Maybe (LHsContext pass)         -- ^ User-written context (if any)
       , con_args   :: HsConDeclH98Details pass        -- ^ Arguments; can be infix
-      , con_modifiers :: [HsModifier pass]
+      , con_modifiers :: [LHsModifier pass]
 
       , con_doc    :: Maybe (LHsDoc pass) -- ^ A possible Haddock comment.
       }
@@ -1392,7 +1392,7 @@ data ClsInstDecl pass
          --                                    'GHC.Parser.Annotation.AnnClose',
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-      , cid_modifiers     :: [HsModifier pass]
+      , cid_modifiers     :: [LHsModifier pass]
       }
   | XClsInstDecl !(XXClsInstDecl pass)
 
@@ -1495,7 +1495,7 @@ data DefaultDecl pass
       { defd_ext      :: XCDefaultDecl pass
       , defd_class    :: Maybe (LIdP pass)  -- Nothing in absence of NamedDefaults
       , defd_defaults :: [LHsType pass]
-      , defd_modifiers :: [HsModifier pass] }
+      , defd_modifiers :: [LHsModifier pass] }
         -- ^ - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnDefault',
         --          'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose'
 
@@ -1526,14 +1526,14 @@ data ForeignDecl pass
       , fd_name   :: LIdP pass             -- defines this name
       , fd_sig_ty :: LHsSigType pass       -- sig_ty
       , fd_fi     :: ForeignImport pass
-      , fd_modifiers :: [HsModifier pass] }
+      , fd_modifiers :: [LHsModifier pass] }
 
   | ForeignExport
       { fd_e_ext  :: XForeignExport pass   -- Post typechecker, rep_ty ~ sig_ty
       , fd_name   :: LIdP pass             -- uses this name
       , fd_sig_ty :: LHsSigType pass       -- sig_ty
       , fd_fe     :: ForeignExport pass
-      , fd_modifiers :: [HsModifier pass] }
+      , fd_modifiers :: [LHsModifier pass] }
         -- ^
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnForeign',
         --           'GHC.Parser.Annotation.AnnImport','GHC.Parser.Annotation.AnnExport',

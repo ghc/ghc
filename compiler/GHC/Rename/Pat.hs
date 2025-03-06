@@ -1443,10 +1443,10 @@ rn_ty_pat ty@(XHsType{}) = do
   liftRnFV $ rnHsType ctxt ty
 
 -- MODS_TODO does this need to handle %1?
-rn_modifier_pat :: HsModifier GhcPs -> TPRnM (HsModifier GhcRn)
-rn_modifier_pat (HsModifier _ ty) = HsModifier ModifierPrintsAsSelf <$> rn_lty_pat ty
+rn_modifier_pat :: LHsModifier GhcPs -> TPRnM (LHsModifier GhcRn)
+rn_modifier_pat (L l (HsModifier _ ty)) = L l <$> HsModifier ModifierPrintsAsSelf <$> rn_lty_pat ty
 
-rn_modifiers_pat :: [HsModifier GhcPs] -> TPRnM [HsModifier GhcRn]
+rn_modifiers_pat :: [LHsModifier GhcPs] -> TPRnM [LHsModifier GhcRn]
 rn_modifiers_pat mods = traverse rn_modifier_pat mods
 
 rn_ty_pat_arrow :: HsArrow GhcPs -> TPRnM (HsArrow GhcRn)

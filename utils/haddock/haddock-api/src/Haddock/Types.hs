@@ -819,6 +819,7 @@ type instance Anno (HsDecl DocNameI) = SrcSpanAnnA
 type instance Anno (FamilyResultSig DocNameI) = EpAnn NoEpAnns
 type instance Anno (HsOuterTyVarBndrs Specificity DocNameI) = SrcSpanAnnA
 type instance Anno (HsSigType DocNameI) = SrcSpanAnnA
+type instance Anno (HsModifierOf ty DocNameI) = SrcSpanAnnA
 
 type XRecCond a =
   ( XParTy a ~ (EpToken "(", EpToken ")")

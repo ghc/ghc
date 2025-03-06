@@ -775,7 +775,7 @@ recordPatSynErr loc pat =
     addFatalError $ mkPlainErrorMsgEnvelope loc $
       (PsErrRecordSyntaxInPatSynDecl pat)
 
-mkConDeclH98 :: (TokDarrow, (TokForall, EpToken ".")) -> [HsModifier GhcPs]
+mkConDeclH98 :: (TokDarrow, (TokForall, EpToken ".")) -> [LHsModifier GhcPs]
              -> LocatedN RdrName -> Maybe [LHsTyVarBndr Specificity GhcPs]
                 -> Maybe (LHsContext GhcPs) -> HsConDeclH98Details GhcPs
                 -> ConDecl GhcPs
@@ -798,7 +798,7 @@ mkConDeclH98 (tdarrow, (tforall,tdot)) mods name mb_forall mb_cxt args
 --   records whether this is a prefix or record GADT constructor. See
 --   Note [GADT abstract syntax] in "GHC.Hs.Decls" for more details.
 mkGadtDecl :: SrcSpan
-           -> [HsModifier GhcPs]
+           -> [LHsModifier GhcPs]
            -> NonEmpty (LocatedN RdrName)
            -> TokDcolon
            -> LHsSigType GhcPs
@@ -1377,7 +1377,7 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 -- Binding: let %m p = ... (PatBuilderModifiers ...)
 -- Pattern: let (%m p) = ... (PatBuilderPar (PatBuilderModifiers ...))
 extract_pat_builder_modifiers
-  :: LocatedA (PatBuilder p) -> (LocatedA (PatBuilder p), [HsModifier p])
+  :: LocatedA (PatBuilder p) -> (LocatedA (PatBuilder p), [LHsModifier p])
 extract_pat_builder_modifiers = \case
   L _ (PatBuilderModifiers m p) -> (p, m)
   x -> (x, [])
@@ -1749,7 +1749,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     :: SrcSpan -> ArrowParsingMode lhs b -> LocatedA lhs -> HsArrowOf (LocatedA b) GhcPs -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "%m" to the left of "->" (multiplicity)
   mkHsMultPV
-    :: Located [HsModifierOf (LocatedA b) GhcPs] -> EpUniToken "->" "→" -> PV (HsArrowOf (LocatedA b) GhcPs)
+    :: Located [LHsModifierOf (LocatedA b) GhcPs] -> EpUniToken "->" "→" -> PV (HsArrowOf (LocatedA b) GhcPs)
   -- | Disambiguate "forall a. b" and "forall a -> b" (forall telescope)
   mkHsForallPV :: SrcSpan -> HsForAllTelescope GhcPs -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "(a,b,c)" to the left of "=>" (constraint list)
@@ -1770,7 +1770,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsEmbTyPV :: SrcSpan -> EpToken "type" -> LHsType GhcPs -> PV (LocatedA b)
   -- | Disambiguate modifiers (%a)
   mkHsModifiedPV
-    :: SrcSpan -> [HsModifier GhcPs] -> LocatedA b -> PV (LocatedA b)
+    :: SrcSpan -> [LHsModifier GhcPs] -> LocatedA b -> PV (LocatedA b)
   -- | Validate infixexp LHS to reject unwanted {-# SCC ... #-} pragmas
   rejectPragmaPV :: LocatedA b -> PV ()
 
@@ -3668,7 +3668,7 @@ mkListSyntaxTy1 brkOpen t brkClose =
     annsKeyword = (NoEpTok, EpTok brkOpen, EpTok brkClose)
     annParen = AnnParen AnnParensSquare brkOpen brkClose
 
-addModifiersToDecl :: Located [HsModifier GhcPs]
+addModifiersToDecl :: Located [LHsModifier GhcPs]
                    -> HsDecl GhcPs
                    -> P (HsDecl GhcPs)
 addModifiersToDecl (L _ mods) = \case

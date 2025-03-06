@@ -40,7 +40,7 @@ module Language.Haskell.Syntax.Type (
         HsTyPat(..), LHsTyPat,
         HsTupleSort(..),
         HsContext, LHsContext,
-        HsModifierOf(..), HsModifier, XModifier,
+        HsModifierOf(..), LHsModifierOf, HsModifier, LHsModifier, XModifier,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), XValArg, XTypeArg, XArgPar, XXArg,
@@ -308,6 +308,8 @@ type HsContext pass = [LHsType pass]
 data HsModifierOf ty pass = HsModifier !(XModifier pass) ty
 type family XModifier pass
 
+type LHsModifierOf ty pass = XRec pass (HsModifierOf ty pass)
+type LHsModifier pass = XRec pass (HsModifier pass)
 type HsModifier pass = HsModifierOf (LHsType (NoGhcTc pass)) (NoGhcTc pass)
 
 -- | Located Haskell Type
@@ -1015,7 +1017,7 @@ data HsType pass
 
   | HsModifiedTy -- Modifiers attached to a type.
         (XModifiedTy pass)
-        [HsModifier pass]
+        [LHsModifier pass]
         (LHsType pass)
 
   -- Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
@@ -1034,10 +1036,10 @@ type HsArrow pass = HsArrowOf (LHsType pass) pass
 
 -- | Denotes the type of arrows in the surface language
 data HsArrowOf ty pass
-  = HsStandardArrow !(XStandardArrow ty pass) [HsModifierOf ty pass]
+  = HsStandardArrow !(XStandardArrow ty pass) [LHsModifierOf ty pass]
     -- ^ a -> b or a → b, optionally with modifiers (including a %1 -> b).
 
-  | HsLinearArrow !(XLinearArrow ty pass) [HsModifierOf ty pass]
+  | HsLinearArrow !(XLinearArrow ty pass) [LHsModifierOf ty pass]
     -- ^ a ⊸ b, optionally with modifiers. Can also show up in places where no
     -- arrow is written explicitly.
 
@@ -1165,7 +1167,7 @@ data ConDeclField pass  -- Record fields have Haddock docs on them
                    cd_fld_names :: [LFieldOcc pass],
                                    -- ^ See Note [ConDeclField pass]
                    cd_fld_type :: LBangType pass,
-                   cd_fld_modifiers :: [HsModifier pass],
+                   cd_fld_modifiers :: [LHsModifier pass],
                    cd_fld_doc  :: Maybe (LHsDoc pass)}
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
 

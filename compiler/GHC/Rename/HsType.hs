@@ -453,17 +453,17 @@ isRnKindLevel _                                 = False
 -- MODS_TODO will any callers of these functions care about free vars in
 -- modifiers? Probably yes, since they currently care about free vars in
 -- HsExplicitMult arrows.
-rnModifiersContext :: HsDocContext -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
+rnModifiersContext :: HsDocContext -> [LHsModifier GhcPs] -> RnM ([LHsModifier GhcRn], FreeVars)
 rnModifiersContext ctxt = rnModifiers (mkTyKiEnv ctxt TypeLevel RnTypeBody)
 
-rnModifiersContextAndWarn :: HsDocContext -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
+rnModifiersContextAndWarn :: HsDocContext -> [LHsModifier GhcPs] -> RnM ([LHsModifier GhcRn], FreeVars)
 rnModifiersContextAndWarn ctxt = rnModifiersAndWarn (mkTyKiEnv ctxt TypeLevel RnTypeBody)
 
 rnModifierWith :: (mPs -> Maybe mRn)
                -> (mPs -> RnM (mRn, FreeVars))
-               -> HsModifierOf mPs GhcPs
-               -> RnM (HsModifierOf mRn GhcRn, FreeVars)
-rnModifierWith acceptLiteral1 rn (HsModifier _ ty) = do
+               -> LHsModifierOf mPs GhcPs
+               -> RnM (LHsModifierOf mRn GhcRn, FreeVars)
+rnModifierWith acceptLiteral1 rn (L l (HsModifier _ ty)) = do
   -- If we see a %1 modifier, and have LinearTypes enabled, treat it the same as
   -- %One. Only %1 counts, not e.g. %01. See #18888. With NoLinearTypes, it's
   -- not special and means the same as %(1 :: Nat), but we still mark it
@@ -471,15 +471,15 @@ rnModifierWith acceptLiteral1 rn (HsModifier _ ty) = do
   linearEnabled <- xoptM LangExt.LinearTypes
   case acceptLiteral1 ty of
     Just literal1Rn
-      | linearEnabled -> return (HsModifier ModifierPrintsAs1 literal1Rn, mempty)
+      | linearEnabled -> return (L l (HsModifier ModifierPrintsAs1 literal1Rn), mempty)
       | otherwise -> do
           (ty', fvs) <- rn ty
-          return (HsModifier ModifierPrintsAs1 ty', fvs)
+          return (L l (HsModifier ModifierPrintsAs1 ty'), fvs)
     Nothing -> do
       (ty', fvs) <- rn ty
-      return (HsModifier ModifierPrintsAsSelf ty', fvs)
+      return (L l (HsModifier ModifierPrintsAsSelf ty'), fvs)
 
-rnModifier :: RnTyKiEnv -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
+rnModifier :: RnTyKiEnv -> LHsModifier GhcPs -> RnM (LHsModifier GhcRn, FreeVars)
 rnModifier env =
   rnModifierWith (\ty -> if isLiteral1 ty then Just oneType else Nothing)
                  (rnLHsTyKi env)
@@ -489,28 +489,28 @@ rnModifier env =
       _ -> False
     oneType = noLocA $ HsTyVar noAnn NotPromoted $ noLocA oneDataConName
 
-rnModifierAndWarn :: RnTyKiEnv -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
+rnModifierAndWarn :: RnTyKiEnv -> LHsModifier GhcPs -> RnM (LHsModifier GhcRn, FreeVars)
 rnModifierAndWarn env mod = do
   (mod', fvs) <- rnModifier env mod
   warn_unknown <- woptM Opt_WarnUnknownModifiers
-  let HsModifier modPrintsAs _ = mod'
+  let L _ (HsModifier modPrintsAs _) = mod'
       suggestLinear = case modPrintsAs of
         ModifierPrintsAs1 -> SuggestLinear
         ModifierPrintsAsSelf -> DontSuggestLinear
   diagnosticTc warn_unknown $ TcRnUnknownModifier mod' suggestLinear
   return (mod', fvs)
 
-rnModifiersWith :: (HsModifierOf mPs GhcPs -> RnM (HsModifierOf mRn GhcRn, FreeVars))
-                -> [HsModifierOf mPs GhcPs]
-                -> RnM ([HsModifierOf mRn GhcRn], FreeVars)
+rnModifiersWith :: (LHsModifierOf mPs GhcPs -> RnM (LHsModifierOf mRn GhcRn, FreeVars))
+                -> [LHsModifierOf mPs GhcPs]
+                -> RnM ([LHsModifierOf mRn GhcRn], FreeVars)
 rnModifiersWith rnSingle mods = do
   (mods', fvs) <- unzip <$> traverse rnSingle mods
   return (mods', mconcat fvs)
 
-rnModifiers :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
+rnModifiers :: RnTyKiEnv -> [LHsModifier GhcPs] -> RnM ([LHsModifier GhcRn], FreeVars)
 rnModifiers env = rnModifiersWith (rnModifier env)
 
-rnModifiersAndWarn :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
+rnModifiersAndWarn :: RnTyKiEnv -> [LHsModifier GhcPs] -> RnM ([LHsModifier GhcRn], FreeVars)
 rnModifiersAndWarn env = rnModifiersWith (rnModifierAndWarn env)
 
 rnLHsType  :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeVars)
@@ -779,7 +779,7 @@ rnHsTyLit (HsCharTy x c) = pure (HsCharTy x c)
 rnHsArrow :: RnTyKiEnv -> HsArrow GhcPs -> RnM (HsArrow GhcRn, FreeVars)
 rnHsArrow env = rnHsArrowWith (rnModifier env)
 
-rnHsArrowWith :: (HsModifierOf multPs GhcPs -> RnM (HsModifierOf multRn GhcRn, FreeVars))
+rnHsArrowWith :: (LHsModifierOf multPs GhcPs -> RnM (LHsModifierOf multRn GhcRn, FreeVars))
               -> HsArrowOf multPs GhcPs
               -> RnM (HsArrowOf multRn GhcRn, FreeVars)
 rnHsArrowWith rn arr = case arr of
@@ -2174,7 +2174,7 @@ extract_lty (L _ ty) acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
       HsModifiedTy _ mods ty      -> extract_lty ty $
-                                     foldr (\(HsModifier _ ty') -> extract_lty ty')
+                                     foldr (\(L _ (HsModifier _ ty')) -> extract_lty ty')
                                            acc
                                            mods
 
@@ -2195,10 +2195,10 @@ extract_lhs_sig_ty :: LHsSigType GhcPs -> FreeKiTyVars
 extract_lhs_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
   extractHsOuterTvBndrs outer_bndrs $ extract_lty body []
 
-extract_hs_modifier :: HsModifier GhcPs -> FreeKiTyVars -> FreeKiTyVars
-extract_hs_modifier (HsModifier _ ty) acc = extract_lty ty acc
+extract_hs_modifier :: LHsModifier GhcPs -> FreeKiTyVars -> FreeKiTyVars
+extract_hs_modifier (L _ (HsModifier _ ty)) acc = extract_lty ty acc
 
-extract_hs_modifiers :: [HsModifier GhcPs] -> FreeKiTyVars -> FreeKiTyVars
+extract_hs_modifiers :: [LHsModifier GhcPs] -> FreeKiTyVars -> FreeKiTyVars
 extract_hs_modifiers mods acc = foldr extract_hs_modifier acc mods
 
 extract_hs_arrow :: HsArrow GhcPs -> FreeKiTyVars -> FreeKiTyVars

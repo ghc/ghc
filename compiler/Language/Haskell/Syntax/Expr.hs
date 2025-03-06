@@ -663,7 +663,7 @@ data HsExpr p
   | HsFunArr (XFunArr p) (HsArrowOf (LHsExpr p) p) (LHsExpr p) (LHsExpr p)
 
   -- | Modifiers attached to an expression.
-  | HsModifiedExpr (XModifiedExpr p) [HsModifier p] (LHsExpr p)
+  | HsModifiedExpr (XModifiedExpr p) [LHsModifier p] (LHsExpr p)
 
   | XExpr       !(XXExpr p)
   -- Note [Trees That Grow] in Language.Haskell.Syntax.Extension for the

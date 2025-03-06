@@ -307,7 +307,7 @@ no_anon_wc_ty lty = go lty
       XHsType{} -> True       -- HsCoreTy, which does not have any wildcard
 
     gos = all go
-    go_mod (HsModifier _ ty) = go ty
+    go_mod (L _ (HsModifier _ ty)) = go ty
 
 no_anon_wc_tele :: HsForAllTelescope GhcRn -> Bool
 no_anon_wc_tele tele = case tele of

@@ -4409,7 +4409,7 @@ data TcRnMessage where
          foo :: a %True -> b
   -}
   -- MODS_TODO should this be GhcTc?
-  TcRnUnknownModifier :: HsModifier GhcRn -> SuggestLinear -> TcRnMessage
+  TcRnUnknownModifier :: LHsModifier GhcRn -> SuggestLinear -> TcRnMessage
 
   {- | TcRnUnknownModifierKind is an error raised when a modifier is used with
        unknown kind.
@@ -4419,7 +4419,7 @@ data TcRnMessage where
          foo :: a %m -> b
   -}
   -- MODS_TODO should this be GhcTc?
-  TcRnUnknownModifierKind :: HsModifier GhcRn -> TcRnMessage
+  TcRnUnknownModifierKind :: LHsModifier GhcRn -> TcRnMessage
   deriving Generic
 
 ----

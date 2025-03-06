@@ -1966,13 +1966,12 @@ instance ToHie (LocatedA (HsType GhcRn)) where
          toHie ty : (toHie <$> mods)
       XHsType _ -> []
 
-instance ToHie ty => ToHie (HsModifierOf ty pass) where
-  toHie (HsModifier _ ty) = toHie ty
+instance ToHie ty => ToHie (LocatedA (HsModifierOf ty (GhcPass p))) where
+  toHie (L _ (HsModifier _ ty)) = toHie ty
 
-instance ToHie ty => ToHie (HsArrowOf ty pass) where
+instance ToHie ty => ToHie (HsArrowOf ty (GhcPass p)) where
   toHie (HsStandardArrow _ mods) = concatM $ toHie <$> mods
   toHie (HsLinearArrow _ mods) = concatM $ toHie <$> mods
-  toHie (XArrow _) = pure []
 
 instance (ToHie tm, ToHie ty) => ToHie (HsArg (GhcPass p) tm ty) where
   toHie (HsValArg _ tm) = toHie tm

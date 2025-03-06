@@ -289,7 +289,7 @@ data PatSynBind idL idR
 -- variable if there is no annotation) during type-checking. The resolved
 -- multiplicity is stored in the extension field.
 data HsMultAnn pass
-  = HsMultAnn !(XMultAnn pass) [HsModifier pass]
+  = HsMultAnn !(XMultAnn pass) [LHsModifier pass]
 
 type family XMultAnn p
 
@@ -368,7 +368,7 @@ data Sig pass
        (XTypeSig pass)
        [LIdP pass]           -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
-       [HsModifier pass]     -- Attached modifiers
+       [LHsModifier pass]    -- Attached modifiers
 
       -- | A pattern synonym type signature
       --

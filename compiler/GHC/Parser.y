@@ -1376,16 +1376,16 @@ sks_vars :: { Located [LocatedN RdrName] }  -- Returned in reverse order
              return (sLL $1 $> ($3 : h' : t)) }
   | oqtycon { sL1 $1 [$1] }
 
-modifier :: { Located (HsModifier GhcPs) }
-  : PREFIX_PERCENT atype            { sLL $1 $2 (HsModifier (epTok $1) $2) }
+modifier :: { LocatedA (HsModifier GhcPs) }
+  : PREFIX_PERCENT atype            {% amsA' $ sLL $1 $2 (HsModifier (epTok $1) $2) }
 
 -- | Modifiers attached inline.
-modifiers :: { Located [HsModifier GhcPs] }
+modifiers :: { Located [LHsModifier GhcPs] }
   : modifiers1                      { $1 }
   | {- empty -}                     { sL0 [] }
 
-modifiers1 :: { Located [HsModifier GhcPs] }
-  : modifiers modifier              { sLL $1 $2 (unLoc $2 : unLoc $1) }
+modifiers1 :: { Located [LHsModifier GhcPs] }
+  : modifiers modifier              { sLL $1 $2 ($2 : unLoc $1) }
 
 -- MODS_TODO explain this. Short version is that in
 --
@@ -1400,24 +1400,24 @@ modifiers1 :: { Located [HsModifier GhcPs] }
 --
 -- if we reduce, we resolve `modifiers` as []. By shifting we make sure it
 -- resolves as [%a].
-modifiersShift :: { Located [HsModifier GhcPs] }
+modifiersShift :: { Located [LHsModifier GhcPs] }
   : modifiers %shift                { $1 }
 
-expModifier :: { forall b. DisambECP b => PV (Located (HsModifierOf (LocatedA b) GhcPs)) }
+expModifier :: { forall b. DisambECP b => PV (LocatedA (HsModifierOf (LocatedA b) GhcPs)) }
 expmodifier : PREFIX_PERCENT aexp   { unECP $2 >>= \ $2 ->
-                                      return $ sLL $1 $2 (HsModifier (epTok $1) $2) }
+                                      amsA' $ sLL $1 $2 (HsModifier (epTok $1) $2) }
 
 -- | Modifiers that hold Exprs instead of Types (attached to expression arrows).
-expModifiers :: { forall b. DisambECP b => PV (Located [HsModifierOf (LocatedA b) GhcPs]) }
+expModifiers :: { forall b. DisambECP b => PV (Located [LHsModifierOf (LocatedA b) GhcPs]) }
   : expModifiers expModifier        { $1 >>= \ $1 ->
                                       $2 >>= \ $2 ->
-                                      return $ sLL $1 $2 (unLoc $2 : unLoc $1) }
+                                      return $ sLL $1 $2 ($2 : unLoc $1) }
   | {- empty -}                     { return $ sL0 [] }
 
-expModifiers1 :: { forall b. DisambECP b => PV (Located [HsModifierOf (LocatedA b) GhcPs]) }
+expModifiers1 :: { forall b. DisambECP b => PV (Located [LHsModifierOf (LocatedA b) GhcPs]) }
   : expModifiers expModifier        { $1 >>= \ $1 ->
                                       $2 >>= \ $2 ->
-                                      return $ sLL $1 $2 (unLoc $2 : unLoc $1) }
+                                      return $ sLL $1 $2 ($2 : unLoc $1) }
 
 inst_decl :: { LInstDecl GhcPs }
         : 'instance' maybe_warning_pragma overlap_pragma inst_type where_inst

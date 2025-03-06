@@ -1869,7 +1869,7 @@ hsTypeToArrow w = case unLoc w of
                      HsTyVar _ _ (L _ (isExact_maybe -> Just n))
                         | n == oneDataConName -> HsLinearArrow noAnn []
                         | n == manyDataConName -> HsStandardArrow noAnn []
-                     _ -> HsStandardArrow noAnn [HsModifier noAnn w]
+                     _ -> HsStandardArrow noAnn [noLocA $ HsModifier noAnn w]
 
 -- ConT/InfixT can contain both data constructor (i.e., promoted) names and
 -- other (i.e, unpromoted) names, as opposed to PromotedT, which can only
