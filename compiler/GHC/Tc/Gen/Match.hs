@@ -229,6 +229,7 @@ tcMatches :: (AnnoBody body, Outputable (body GhcTc))
           -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
 
 tcMatches tc_body pat_tys rhs_ty (MG { mg_alts = L l matches
+                                     , mg_ctxt = ctxt
                                      , mg_ext = origin })
   | null matches  -- Deal with case e of {}
     -- Since there are no branches, no one else will fill in rhs_ty
@@ -238,6 +239,7 @@ tcMatches tc_body pat_tys rhs_ty (MG { mg_alts = L l matches
        ; pat_tys <- mapM scaledExpTypeToType (filter_out_forall_pat_tys pat_tys)
        ; rhs_ty  <- expTypeToType rhs_ty
        ; return (MG { mg_alts = L l []
+                    , mg_ctxt = ctxt
                     , mg_ext = MatchGroupTc pat_tys rhs_ty origin
                     }) }
 
@@ -249,6 +251,7 @@ tcMatches tc_body pat_tys rhs_ty (MG { mg_alts = L l matches
        ; rhs_ty   <- readExpType rhs_ty
        ; traceTc "tcMatches" (ppr matches' $$ ppr pat_tys $$ ppr rhs_ty)
        ; return (MG { mg_alts   = L l matches'
+                    , mg_ctxt   = ctxt
                     , mg_ext    = MatchGroupTc pat_tys rhs_ty origin
                     }) }
   where

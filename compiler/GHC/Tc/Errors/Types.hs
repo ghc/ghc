@@ -3087,7 +3087,7 @@ data TcRnMessage where
 
      Test cases: rename/should_fail/RnEmptyCaseFail
   -}
-  TcRnEmptyCase :: HsMatchContextRn -> TcRnMessage
+  TcRnEmptyCase :: HsMatchGroupContextRn -> TcRnMessage
 
   {-| TcRnNonStdGuards is a warning thrown when a user uses
       non-standard guards (e.g. patterns in guards) without

@@ -1982,7 +1982,7 @@ rep_bind (L loc (FunBind
                                    , m_grhss = GRHSs _ guards wheres
                                    -- For a variable declaration I'm pretty
                                    -- sure we always have a FunRhs
-                                   , m_ctxt = FunRhs { mc_strictness = strictessAnn }
+                                   , m_ctxt = FunRhs (FunCtxtInfo { fci_strictness = strictessAnn })
                                    } )]) } }))
  = do { (ss,wherecore) <- repBinds wheres
         ; guardcore <- addBinds ss (repGuards guards)

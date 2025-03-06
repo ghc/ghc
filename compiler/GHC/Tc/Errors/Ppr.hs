@@ -1368,7 +1368,6 @@ instance Diagnostic TcRnMessage where
           ArrowMatchCtxt (ArrowLamAlt LamCase)   -> text "\\case command"
           ArrowMatchCtxt ArrowCaseAlt            -> text "case command"
           _                                      -> text "(unexpected)"
-                                                    <+> pprMatchContextNoun ctxt
 
         message = case ctxt of
           LamAlt LamCases -> lcases_msg <+> text "expression"

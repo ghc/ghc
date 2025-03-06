@@ -761,6 +761,7 @@ dsCases :: DsCmdEnv                               -- arrow combinators
                 CoreExpr)                         -- desugared choices
 dsCases ids local_vars stack_id stack_ty res_ty
         (MG { mg_alts = L l matches
+            , mg_ctxt = ctxt
             , mg_ext = MatchGroupTc arg_tys _ origin
             }) = do
 
@@ -810,6 +811,7 @@ dsCases ids local_vars stack_id stack_ty res_ty
     Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
       dsExpr (HsLam noAnn LamCase
         (MG { mg_alts = noLocA []
+            , mg_ctxt = LamAlt LamCase
             , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated OtherExpansion SkipPmc)
             }))
 
@@ -821,6 +823,7 @@ dsCases ids local_vars stack_id stack_ty res_ty
   -- Note that we replace the MatchGroup result type by sum_ty,
   -- which is the type of matches'
   return (MG { mg_alts = L l matches'
+             , mg_ctxt = ctxt
              , mg_ext = MatchGroupTc arg_tys sum_ty origin
              },
           core_choices)

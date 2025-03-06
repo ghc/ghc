@@ -1925,6 +1925,8 @@
             ({abstract:TyCon})
             [])])
          (FromSource))
+        (FunRhs
+         {Name: main})
         (L
          (EpAnn
           (EpaSpan { DumpTypecheckedAst.hs:20:1-23 })
@@ -1946,20 +1948,21 @@
            (Match
             (NoExtField)
             (FunRhs
-             (L
-              (EpAnn
-               (EpaSpan { DumpTypecheckedAst.hs:20:1-4 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              {Name: main})
-             (Prefix)
-             (NoSrcStrict)
-             (AnnFunRhs
-              (NoEpTok)
-              []
-              []))
+             (FunCtxtInfo
+              (L
+               (EpAnn
+                (EpaSpan { DumpTypecheckedAst.hs:20:1-4 })
+                (NameAnnTrailing
+                 [])
+                (EpaComments
+                 []))
+               {Name: main})
+              (Prefix)
+              (NoSrcStrict)
+              (AnnFunRhs
+               (NoEpTok)
+               []
+               [])))
             (L
              (EpaSpan { <no location info> })
              [])

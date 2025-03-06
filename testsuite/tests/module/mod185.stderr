@@ -87,6 +87,9 @@
         {OccName: main}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: main}))
        (L
         (EpAnn
          (EpaSpan { mod185.hs:5:1-24 })
@@ -108,21 +111,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { mod185.hs:5:1-4 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: main}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { mod185.hs:5:1-4 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: main}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])

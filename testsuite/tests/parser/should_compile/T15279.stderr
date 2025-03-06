@@ -148,6 +148,9 @@
         {OccName: foo}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: foo}))
        (L
         (EpAnn
          (EpaSpan { <combineSrcSpans: files differ> })
@@ -169,21 +172,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { T15279.hs-incl:1:1-3 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: foo}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { T15279.hs-incl:1:1-3 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: foo}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { T15279.hs-incl:1:5-7 })
             [(L
@@ -201,7 +205,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { T15279.hs-incl:1:9-13 })
                (NoEpAnns)
@@ -229,7 +234,8 @@
                  (NoExtField)
                  (HsChar
                   (SourceText 'b')
-                  ('b'))))))]
+                  ('b'))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))
         ,(L
@@ -242,21 +248,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { T15279.hs-incl:2:1-3 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: foo}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { T15279.hs-incl:2:1-3 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: foo}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { T15279.hs-incl:2:5-7 })
             [(L
@@ -274,7 +281,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { T15279.hs-incl:2:9-13 })
                (NoEpAnns)
@@ -302,7 +310,8 @@
                  (NoExtField)
                  (HsChar
                   (SourceText 'c')
-                  ('c'))))))]
+                  ('c'))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))
         ,(L
@@ -315,21 +324,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { T15279.hs:7:1-3 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: foo}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { T15279.hs:7:1-3 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: foo}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { T15279.hs:7:5 })
             [(L
@@ -344,7 +354,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { T15279.hs:7:7-11 })
                (NoEpAnns)
@@ -372,7 +383,8 @@
                  (NoExtField)
                  (HsChar
                   (SourceText 'a')
-                  ('a'))))))]
+                  ('a'))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
 

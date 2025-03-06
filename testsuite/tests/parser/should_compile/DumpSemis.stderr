@@ -274,6 +274,9 @@
         {OccName: foo}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: foo}))
        (L
         (EpAnn
          (EpaSpan { DumpSemis.hs:(10,1)-(12,3) })
@@ -295,21 +298,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpSemis.hs:10:1-3 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: foo}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpSemis.hs:10:1-3 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: foo}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -587,6 +591,9 @@
         {OccName: bar}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: bar}))
        (L
         (EpAnn
          (EpaSpan { DumpSemis.hs:(15,1)-(19,3) })
@@ -608,21 +615,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpSemis.hs:15:1-3 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: bar}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpSemis.hs:15:1-3 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: bar}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -852,6 +860,9 @@
         {OccName: baz}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: baz}))
        (L
         (EpAnn
          (EpaSpan { DumpSemis.hs:22:1-30 })
@@ -873,21 +884,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpSemis.hs:22:1-3 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: baz}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpSemis.hs:22:1-3 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: baz}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -1070,6 +1082,9 @@
         {OccName: a}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: a}))
        (L
         (EpAnn
          (EpaSpan { DumpSemis.hs:24:1-13 })
@@ -1091,21 +1106,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpSemis.hs:24:1 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: a}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpSemis.hs:24:1 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: a}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -1173,6 +1189,9 @@
         {OccName: b}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: b}))
        (L
         (EpAnn
          (EpaSpan { DumpSemis.hs:25:1-13 })
@@ -1194,21 +1213,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpSemis.hs:25:1 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: b}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpSemis.hs:25:1 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: b}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -1278,6 +1298,9 @@
         {OccName: s}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: s}))
        (L
         (EpAnn
          (EpaSpan { DumpSemis.hs:26:1-13 })
@@ -1299,21 +1322,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpSemis.hs:26:1 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: s}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpSemis.hs:26:1 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: s}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -1783,6 +1807,9 @@
         {OccName: f}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: f}))
        (L
         (EpAnn
          (EpaSpan { DumpSemis.hs:32:1-7 })
@@ -1804,21 +1831,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpSemis.hs:32:1 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: f}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpSemis.hs:32:1 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: f}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { DumpSemis.hs:32:3 })
             [(L
@@ -1908,6 +1936,9 @@
         {OccName: x}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: x}))
        (L
         (EpAnn
          (EpaSpan { DumpSemis.hs:34:8-35 })
@@ -1929,21 +1960,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpSemis.hs:34:8 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: x}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpSemis.hs:34:8 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: x}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -2031,6 +2063,9 @@
                         {OccName: y}))
                       (MG
                        (FromSource)
+                       (FunRhs
+                        (Unqual
+                         {OccName: y}))
                        (L
                         (EpAnn
                          (EpaSpan { DumpSemis.hs:34:19-21 })
@@ -2052,21 +2087,22 @@
                           (Match
                            (NoExtField)
                            (FunRhs
-                            (L
-                             (EpAnn
-                              (EpaSpan { DumpSemis.hs:34:19 })
-                              (NameAnnTrailing
-                               [])
-                              (EpaComments
-                               []))
-                             (Unqual
-                              {OccName: y}))
-                            (Prefix)
-                            (NoSrcStrict)
-                            (AnnFunRhs
-                             (NoEpTok)
-                             []
-                             []))
+                            (FunCtxtInfo
+                             (L
+                              (EpAnn
+                               (EpaSpan { DumpSemis.hs:34:19 })
+                               (NameAnnTrailing
+                                [])
+                               (EpaComments
+                                []))
+                              (Unqual
+                               {OccName: y}))
+                             (Prefix)
+                             (NoSrcStrict)
+                             (AnnFunRhs
+                              (NoEpTok)
+                              []
+                              [])))
                            (L
                             (EpaSpan { <no location info> })
                             [])
@@ -2141,6 +2177,9 @@
                         {OccName: z}))
                       (MG
                        (FromSource)
+                       (FunRhs
+                        (Unqual
+                         {OccName: z}))
                        (L
                         (EpAnn
                          (EpaSpan { DumpSemis.hs:34:24-26 })
@@ -2162,21 +2201,22 @@
                           (Match
                            (NoExtField)
                            (FunRhs
-                            (L
-                             (EpAnn
-                              (EpaSpan { DumpSemis.hs:34:24 })
-                              (NameAnnTrailing
-                               [])
-                              (EpaComments
-                               []))
-                             (Unqual
-                              {OccName: z}))
-                            (Prefix)
-                            (NoSrcStrict)
-                            (AnnFunRhs
-                             (NoEpTok)
-                             []
-                             []))
+                            (FunCtxtInfo
+                             (L
+                              (EpAnn
+                               (EpaSpan { DumpSemis.hs:34:24 })
+                               (NameAnnTrailing
+                                [])
+                               (EpaComments
+                                []))
+                              (Unqual
+                               {OccName: z}))
+                             (Prefix)
+                             (NoSrcStrict)
+                             (AnnFunRhs
+                              (NoEpTok)
+                              []
+                              [])))
                            (L
                             (EpaSpan { <no location info> })
                             [])
@@ -2266,6 +2306,9 @@
         {OccName: fot}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: fot}))
        (L
         (EpAnn
          (EpaSpan { DumpSemis.hs:(36,1)-(44,4) })
@@ -2287,21 +2330,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpSemis.hs:36:1-3 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: fot}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpSemis.hs:36:1-3 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: fot}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { DumpSemis.hs:36:5 })
             [(L
@@ -2376,6 +2420,7 @@
                      {OccName: x}))))
                  (MG
                   (FromSource)
+                  (CaseAlt)
                   (L
                    (EpAnn
                     (EpaSpan { DumpSemis.hs:(38,4)-(44,4) })

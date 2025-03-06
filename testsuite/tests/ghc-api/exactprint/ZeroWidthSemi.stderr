@@ -77,6 +77,9 @@
         {OccName: a}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: a}))
        (L
         (EpAnn
          (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
@@ -98,21 +101,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { ZeroWidthSemi.hs:6:1 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: a}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { ZeroWidthSemi.hs:6:1 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: a}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])

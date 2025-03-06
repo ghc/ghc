@@ -798,6 +798,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                     L (getLoc lpat) $
                     HsCase PatSyn (nlHsVar scrutinee) $
                     MG{ mg_alts = L (l2l $ getLoc lpat) cases
+                      , mg_ctxt = CaseAlt
                       , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty gen
                       }
              body' = noLocA $
@@ -805,16 +806,20 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                      MG{ mg_alts = noLocA [mkSimpleMatch (LamAlt LamSingle)
                                                          args
                                                          body]
+                       , mg_ctxt = LamAlt LamSingle
                        , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty gen
                        }
-             match = mkMatch (mkPrefixFunRhs (L loc (idName patsyn_id)) noAnn) (noLocA [])
+             match = mkMatch match_ctxt (noLocA [])
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
                                        req_dicts body')
                              (EmptyLocalBinds noExtField)
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
              mg = MG{ mg_alts = L (l2l $ getLoc match) [match]
+                    , mg_ctxt = match_group_ctxt
                     , mg_ext = MatchGroupTc [] res_ty gen
                     }
+             match_ctxt = mkPrefixFunRhs (L loc (idName patsyn_id)) noAnn
+             match_group_ctxt = FunRhs (idName patsyn_id)
              matcher_arity = length req_theta + 3
              -- See Note [Pragmas for pattern synonyms]
 

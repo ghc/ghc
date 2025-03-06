@@ -2336,7 +2336,7 @@ instance ExactPrint (HsBind GhcPs) where
       fun_id' = case unLoc (mg_alts matches') of
         [] -> fid
         (L _ m:_) -> case m_ctxt m of
-          FunRhs f _ _ _ -> f
+          FunRhs (FunCtxtInfo f _ _ _) -> f
           _ -> fid
     return (FunBind x fun_id' matches')
 
@@ -2453,7 +2453,7 @@ exactMatch (Match an mctxt pats grhss) = do
 
   (mctxt', pats') <-
     case mctxt of
-      FunRhs fun fixity strictness (AnnFunRhs strict opens closes) -> do
+      FunRhs (FunCtxtInfo fun fixity strictness (AnnFunRhs strict opens closes)) -> do
         debugM $ "exact Match FunRhs:" ++ showPprUnsafe fun
         strict' <- markEpToken strict
         case fixity of
@@ -2462,7 +2462,7 @@ exactMatch (Match an mctxt pats grhss) = do
             epTokensToComments ")" closes
             fun' <- markAnnotated fun
             pats' <- markAnnotated pats
-            return (FunRhs fun' fixity strictness (AnnFunRhs strict' [] []), pats')
+            return (FunRhs (FunCtxtInfo fun' fixity strictness (AnnFunRhs strict' [] [])), pats')
           Infix ->
             case pats of
               L l (p1:p2:rest)
@@ -2470,7 +2470,7 @@ exactMatch (Match an mctxt pats grhss) = do
                     p1'  <- markAnnotated p1
                     fun' <- markAnnotated fun
                     p2'  <- markAnnotated p2
-                    return (FunRhs fun' fixity strictness (AnnFunRhs strict' [] []), L l [p1',p2'])
+                    return (FunRhs (FunCtxtInfo fun' fixity strictness (AnnFunRhs strict' [] [])), L l [p1',p2'])
                 | otherwise -> do
                     opens' <- markEpToken1 opens
                     p1'  <- markAnnotated p1
@@ -2478,7 +2478,7 @@ exactMatch (Match an mctxt pats grhss) = do
                     p2'  <- markAnnotated p2
                     closes' <- markEpToken1 closes
                     rest' <- mapM markAnnotated rest
-                    return (FunRhs fun' fixity strictness (AnnFunRhs strict' opens' closes'), L l (p1':p2':rest'))
+                    return (FunRhs (FunCtxtInfo fun' fixity strictness (AnnFunRhs strict' opens' closes')), L l (p1':p2':rest'))
               _ -> panic "FunRhs"
 
       LamAlt v -> do
@@ -3265,20 +3265,20 @@ instance ExactPrint (HsUntypedSplice GhcPs) where
 instance ExactPrint (MatchGroup GhcPs (LocatedA (HsExpr GhcPs))) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
-  exact (MG x matches) = do
+  exact (MG x ctxt matches) = do
     -- TODO:AZ use SortKey, in MG ann.
     matches' <- markAnnotated matches
-    return (MG x matches')
+    return (MG x ctxt matches')
 
 instance ExactPrint (MatchGroup GhcPs (LocatedA (HsCmd GhcPs))) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
-  exact (MG x matches) = do
+  exact (MG x ctxt matches) = do
     -- TODO:AZ use SortKey, in MG ann.
     matches' <- if notDodgy matches
       then markAnnotated matches
       else return matches
-    return (MG x matches')
+    return (MG x ctxt matches')
 
 -- ---------------------------------------------------------------------
 

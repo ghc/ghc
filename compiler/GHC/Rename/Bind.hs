@@ -72,7 +72,7 @@ import GHC.Data.Maybe          ( orElse, mapMaybe )
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Syntax.Basic
 
 import Control.Monad
 import Data.List          ( partition )
@@ -521,17 +521,15 @@ rnBind _ bind@(PatBind { pat_lhs = pat
         ; fvs' `seq` -- See Note [Free-variable space leak]
           return (bind', bndrs, all_fvs) }
 
-rnBind sig_fn bind@(FunBind { fun_id = name
+rnBind sig_fn bind@(FunBind { fun_id = L _ name
                             , fun_matches = matches })
        -- invariant: no free vars here when it's a FunBind
-  = do  { let plain_name = unLoc name
-
-        ; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
+  = do  { (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn name) $
                                 -- bindSigTyVars tests for LangExt.ScopedTyVars
-                                 rnMatchGroup (mkPrefixFunRhs name noAnn)
+                                 rnMatchGroup (FunRhs name)
                                               rnLExpr matches
         ; let is_infix = isInfixFunBind bind
-        ; when is_infix $ checkPrecMatch plain_name matches'
+        ; when is_infix $ checkPrecMatch name matches'
 
         ; mod <- getModule
         ; let fvs' = filterNameSet (nameIsLocalOrFrom mod) rhs_fvs
@@ -542,7 +540,7 @@ rnBind sig_fn bind@(FunBind { fun_id = name
         ; fvs' `seq` -- See Note [Free-variable space leak]
           return (bind { fun_matches = matches'
                        , fun_ext     = fvs' },
-                  [plain_name], rhs_fvs)
+                  [name], rhs_fvs)
       }
 
 rnBind sig_fn (PatSynBind x bind)
@@ -759,7 +757,7 @@ rnHsMultAnn (HsMultAnn _ p) = do
 rnPatSynBind :: (Name -> [Name])           -- Signature tyvar function
              -> PatSynBind GhcRn GhcPs
              -> RnM (PatSynBind GhcRn GhcRn, [Name], Uses)
-rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
+rnPatSynBind sig_fn bind@(PSB { psb_id = L _ name
                               , psb_args = details
                               , psb_def = pat
                               , psb_dir = dir })
@@ -806,8 +804,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
             ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
             ExplicitBidirectional mg ->
                 do { (mg', fvs) <- bindSigTyVarsFV scoped_tvs $
-                                   rnMatchGroup (mkPrefixFunRhs (L l name) noAnn)
-                                                rnLExpr mg
+                                   rnMatchGroup (FunRhs name) rnLExpr mg
                    ; return (ExplicitBidirectional mg', fvs) }
 
         ; mod <- getModule
@@ -1317,7 +1314,7 @@ type AnnoBody body
 -- \cases expressions or commands. In that case, or if we encounter an empty
 -- MatchGroup but -XEmptyCases is disabled, we add an error.
 
-rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContextRn
+rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchGroupContextRn
              -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
              -> MatchGroup GhcPs (LocatedA (body GhcPs))
              -> RnM (MatchGroup GhcRn (LocatedA (body GhcRn)), FreeVars)
@@ -1333,27 +1330,31 @@ rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_ext = origin })
       _ -> not <$> xoptM LangExt.EmptyCase
 
 rnMatch :: AnnoBody body
-        => HsMatchContextRn
+        => HsMatchGroupContextRn
         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
         -> LMatch GhcPs (LocatedA (body GhcPs))
         -> RnM (LMatch GhcRn (LocatedA (body GhcRn)), FreeVars)
 rnMatch ctxt rnBody = wrapLocFstMA (rnMatch' ctxt rnBody)
 
 rnMatch' :: (AnnoBody body)
-         => HsMatchContextRn
+         => HsMatchGroupContextRn
          -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
          -> Match GhcPs (LocatedA (body GhcPs))
          -> RnM (Match GhcRn (LocatedA (body GhcRn)), FreeVars)
 rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = L l pats, m_grhss = grhss })
-  = rnPats ctxt pats $ \ pats' -> do
-        { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
-        ; let mf' = case (ctxt, mf) of
-                      (FunRhs { mc_fun = L _ funid }, FunRhs { mc_fun = L lf _ })
-                                            -> mf { mc_fun = L lf funid }
-                      _                     -> ctxt
-        ; return (Match { m_ext = noExtField, m_ctxt = mf', m_pats = L l pats'
+  = rnPats ctxt' pats $ \ pats' -> do
+        { (grhss', grhss_fvs) <- rnGRHSs ctxt' rnBody grhss
+        ; return (Match { m_ext = noExtField, m_ctxt = ctxt', m_pats = L l pats'
                         , m_grhss = grhss'}, grhss_fvs ) }
+  where
+    ctxt' = rnMatchContext ctxt mf
 
+rnMatchContext :: HsMatchGroupContextRn -> HsMatchContextPs -> HsMatchContextRn
+rnMatchContext (FunRhs funid) (FunRhs fci)
+  | FunCtxtInfo { fci_fun = L lf _ } <- fci
+  = FunRhs (fci { fci_fun = L lf funid })
+rnMatchContext ctxt _ = fmap mk_dummy_fci ctxt
+  where mk_dummy_fci name = mkPrefixFunCtxtInfo (noLocA name) noAnn
 
 {-
 ************************************************************************

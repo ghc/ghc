@@ -177,8 +177,8 @@ srcSpanStartLine' _ = 0
 -- ---------------------------------------------------------------------
 
 captureMatchLineSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
-captureMatchLineSpacing (L l (ValD x (FunBind a b (MG c (L d ms )))))
-                       = L l (ValD x (FunBind a b (MG c (L d ms'))))
+captureMatchLineSpacing (L l (ValD x (FunBind a b (MG c ctxt (L d ms )))))
+                       = L l (ValD x (FunBind a b (MG c ctxt (L d ms'))))
     where
       ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
       ms' = captureLineSpacing ms
@@ -236,8 +236,8 @@ captureTypeSigSpacing s = s
 -- ---------------------------------------------------------------------
 
 setEntryDPDecl :: LHsDecl GhcPs -> DeltaPos -> LHsDecl GhcPs
-setEntryDPDecl decl@(L _  (ValD x (FunBind a b (MG c (L d ms ))))) dp
-                   = L l' (ValD x (FunBind a b (MG c (L d ms'))))
+setEntryDPDecl decl@(L _  (ValD x (FunBind a b (MG c ctxt (L d ms ))))) dp
+                   = L l' (ValD x (FunBind a b (MG c ctxt (L d ms'))))
     where
       L l' _ = setEntryDP decl dp
       ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
@@ -358,8 +358,8 @@ transferEntryDP' la lb =
 
 
 pushDeclDP :: HsDecl GhcPs -> DeltaPos -> HsDecl GhcPs
-pushDeclDP (ValD x (FunBind a b (MG c (L d  ms )))) dp
-          = ValD x (FunBind a b (MG c (L d' ms')))
+pushDeclDP (ValD x (FunBind a b (MG c ctxt (L d  ms )))) dp
+          = ValD x (FunBind a b (MG c ctxt (L d' ms')))
     where
       L d' _ = setEntryDP (L d ms) dp
       ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
@@ -409,7 +409,7 @@ balanceComments first second =
 -- 'FunBind', these need to be pushed down from the top level to the last
 -- 'Match' if that 'Match' needs to be manipulated.
 balanceCommentsFB :: LHsBind GhcPs -> LocatedA b -> (LHsBind GhcPs, LocatedA b)
-balanceCommentsFB (L lf (FunBind x n (MG o (L lm matches)))) second
+balanceCommentsFB (L lf (FunBind x n (MG o ctxt (L lm matches)))) second
   = balanceCommentsA (packFunBind bind) second'
   -- There are comments on lf.  We need to
   -- + Keep the prior ones here
@@ -446,7 +446,7 @@ balanceCommentsFB (L lf (FunBind x n (MG o (L lm matches)))) second
     (m''',lf'') = case ms of
       [] -> moveLeadingComments m'' lf'
       _  -> (m'',lf')
-    bind = L lf'' (FunBind x n (MG o (L lm (reverse (m''':ms)))))
+    bind = L lf'' (FunBind x n (MG o ctxt (L lm (reverse (m''':ms)))))
 balanceCommentsFB f s = balanceCommentsA f s
 
 -- | Move comments on the same line as the end of the match into the
@@ -1006,8 +1006,8 @@ instance HasDecls (LocatedA (Stmt GhcPs (LocatedA (HsExpr GhcPs)))) where
 
 -- |Push leading and trailing top level annotations into the @[LMatch GhcPs]@
 unpackFunBind :: LHsBind GhcPs -> LHsBind GhcPs
-unpackFunBind (L loc (FunBind x1 fid (MG x2 (L lg (L lm m:matches)))))
-  = (L loc'' (FunBind x1 fid (MG x2 (L lg (reverse (L llm' lmtch:ms))))))
+unpackFunBind (L loc (FunBind x1 fid (MG x2 ctxt (L lg (L lm m:matches)))))
+  = (L loc'' (FunBind x1 fid (MG x2 ctxt (L lg (reverse (L llm' lmtch:ms))))))
      -- `debug` ("unpackFunBind: ="
      --          ++ showAst (("loc",loc), ("loc'",loc'), ("loc''",loc''),
      --                      ("lm'",lm'), ("llm",llm), ("llm'", llm')))
@@ -1025,8 +1025,8 @@ unpackFunBind d = d
 -- |Pull leading and trailing annotations from the @[LMatch GhcPs]@ to
 -- the top level.
 packFunBind :: LHsBind GhcPs -> LHsBind GhcPs
-packFunBind (L loc (FunBind x1 fid (MG x2 (L lg (L lm m:matches)))))
-  = (L loc'' (FunBind x1 fid (MG x2 (L lg (reverse (L llm' lmtch:ms))))))
+packFunBind (L loc (FunBind x1 fid (MG x2 ctxt (L lg (L lm m:matches)))))
+  = (L loc'' (FunBind x1 fid (MG x2 ctxt (L lg (reverse (L llm' lmtch:ms))))))
      -- `debug` ("packFunBind: ="
      --          ++ showAst (("loc",loc), ("loc'",loc'), ("loc''",loc''),
      --                      ("lm'",lm'), ("llm",llm), ("llm'", llm')))

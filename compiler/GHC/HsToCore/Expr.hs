@@ -1131,10 +1131,12 @@ dsDo ctx stmts res_ty
         rets         = map noLocA rec_rets
         mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
         match_group  = MatchGroupTc [unrestricted tup_ty] body_ty (Generated OtherExpansion SkipPmc)
+        match_ctxt   = LamAlt LamSingle
         mfix_arg     = noLocA $ HsLam noAnn LamSingle
                            (MG { mg_alts = noLocA [mkSimpleMatch
-                                                    (LamAlt LamSingle)
+                                                    match_ctxt
                                                     (noLocA [mfix_pat]) body]
+                               , mg_ctxt = match_ctxt
                                , mg_ext = match_group
                                })
         mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats

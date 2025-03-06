@@ -713,7 +713,7 @@ addLocaLDecl6 libdir lp = do
           [de1'',d2] = balanceCommentsList decls0
 
           de1 = captureMatchLineSpacing de1''
-          L _ (ValD _ (FunBind _ _ (MG _ (L _ ms)))) = de1
+          L _ (ValD _ (FunBind _ _ (MG _ _ (L _ ms)))) = de1
           [ma1,_ma2] = ms
 
           (de1',_) = modifyValD (getLocA ma1) de1 $ \_m decls ->

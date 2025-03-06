@@ -317,7 +317,7 @@ pprContext singular kind msg rest_of_msg_fun
 
     (ppr_match, pref)
         = case kind of
-             FunRhs { mc_fun = L _ fun }
+             FunRhs (FunCtxtInfo { fci_fun = L _ fun })
                   -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
              _    -> (pprMatchContext kind, \ pp -> pp)
 

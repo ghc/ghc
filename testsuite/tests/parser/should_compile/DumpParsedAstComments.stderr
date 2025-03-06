@@ -85,6 +85,9 @@
         {OccName: bar}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: bar}))
        (L
         (EpAnn
          (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
@@ -106,21 +109,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpParsedAstComments.hs:9:1-3 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: bar}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpParsedAstComments.hs:9:1-3 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: bar}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -206,6 +210,9 @@
         {OccName: foo}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: foo}))
        (L
         (EpAnn
          (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
@@ -227,21 +234,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpParsedAstComments.hs:14:1-3 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: foo}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpParsedAstComments.hs:14:1-3 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: foo}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -359,6 +367,9 @@
         {OccName: main}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: main}))
        (L
         (EpAnn
          (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
@@ -380,21 +391,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpParsedAstComments.hs:19:1-4 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: main}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpParsedAstComments.hs:19:1-4 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: main}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])

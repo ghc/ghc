@@ -29,6 +29,8 @@
            {Name: DumpRenamedAst.main})
           (MG
            (FromSource)
+           (FunRhs
+            {Name: DumpRenamedAst.main})
            (L
             (EpAnn
              (EpaSpan { DumpRenamedAst.hs:35:1-23 })
@@ -50,20 +52,21 @@
               (Match
                (NoExtField)
                (FunRhs
-                (L
-                 (EpAnn
-                  (EpaSpan { DumpRenamedAst.hs:35:1-4 })
-                  (NameAnnTrailing
-                   [])
-                  (EpaComments
-                   []))
-                 {Name: DumpRenamedAst.main})
-                (Prefix)
-                (NoSrcStrict)
-                (AnnFunRhs
-                 (NoEpTok)
-                 []
-                 []))
+                (FunCtxtInfo
+                 (L
+                  (EpAnn
+                   (EpaSpan { DumpRenamedAst.hs:35:1-4 })
+                   (NameAnnTrailing
+                    [])
+                   (EpaComments
+                    []))
+                  {Name: DumpRenamedAst.main})
+                 (Prefix)
+                 (NoSrcStrict)
+                 (AnnFunRhs
+                  (NoEpTok)
+                  []
+                  [])))
                (L
                 (EpaSpan { <no location info> })
                 [])

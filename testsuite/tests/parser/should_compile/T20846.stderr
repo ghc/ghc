@@ -88,6 +88,9 @@
         {OccName: ++++}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: ++++}))
        (L
         (EpAnn
          (EpaSpan { T20846.hs:4:1-18 })
@@ -109,27 +112,28 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { T20846.hs:4:1-6 })
-              (NameAnn
-               (NameParens
-                (EpTok
-                 (EpaSpan { T20846.hs:4:1 }))
-                (EpTok
-                 (EpaSpan { T20846.hs:4:6 })))
-               (EpaSpan { T20846.hs:4:2-5 })
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: ++++}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { T20846.hs:4:1-6 })
+               (NameAnn
+                (NameParens
+                 (EpTok
+                  (EpaSpan { T20846.hs:4:1 }))
+                 (EpTok
+                  (EpaSpan { T20846.hs:4:6 })))
+                (EpaSpan { T20846.hs:4:2-5 })
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: ++++}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])

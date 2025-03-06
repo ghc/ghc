@@ -45,7 +45,9 @@ module GHC.Hs.Utils(
   mkHsPar, mkHsApp, mkHsAppWith, mkHsApps, mkHsAppsWith, mkHsSyntaxApps,
   mkHsAppType, mkHsAppTypes, mkHsCaseAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
-  mkMatchGroup, mkLamCaseMatchGroup, mkMatch, mkPrefixFunRhs, mkHsLam, mkHsIf,
+  mkMatchGroup, mkLamCaseMatchGroup, mkMatch,
+  mkPrefixFunRhs, mkPrefixFunCtxtInfo,
+  mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
   mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsDoAnns, mkHsComp, mkHsCompAnns,
@@ -185,7 +187,7 @@ mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA,
                   Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ EpAnn NoEpAnns)
-              => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
+              => HsMatchContext (FunCtxtInfo (LIdP (NoGhcTc (GhcPass p))))
               -> LocatedE [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 mkSimpleMatch ctxt (L l pats) rhs
@@ -221,7 +223,12 @@ mkMatchGroup :: AnnoBody p body
              -> LocatedLW [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
              -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
 mkMatchGroup origin matches = MG { mg_ext = origin
+                                 , mg_ctxt = ctxt
                                  , mg_alts = matches }
+  where
+    ctxt = case unLoc matches of
+      []    -> CaseAlt  -- for \case{}, this will be fixed in post-processing
+      (m:_) -> fmap (unLoc . fci_fun) (m_ctxt (unLoc m))
 
 mkLamCaseMatchGroup :: AnnoBody p body
                     => Origin
@@ -229,8 +236,12 @@ mkLamCaseMatchGroup :: AnnoBody p body
                     -> LocatedLW [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
                     -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
 mkLamCaseMatchGroup origin lam_variant (L l matches)
-  = mkMatchGroup origin (L l $ map fixCtxt matches)
-  where fixCtxt (L a match) = L a match{m_ctxt = LamAlt lam_variant}
+  = (mkMatchGroup origin (L l matches')) { mg_ctxt = ctxt }
+  where
+    matches' = map fix_match_ctxt matches
+    fix_match_ctxt (L a match) = L a match{m_ctxt = ctxt}
+    ctxt :: forall fn. HsMatchContext fn
+    ctxt = LamAlt lam_variant
 
 mkLocatedList :: (Semigroup a, NoAnn an)
   => [GenLocated (EpAnn a) e2] -> LocatedAn an [GenLocated (EpAnn a) e2]
@@ -863,7 +874,7 @@ mkPatSynBind name details lpat dir anns = PatSynBind noExtField psb
 -- |If any of the matches in the 'FunBind' are infix, the 'FunBind' is
 -- considered infix.
 isInfixFunBind :: HsBindLR (GhcPass p1) (GhcPass p2) -> Bool
-isInfixFunBind (FunBind { fun_matches = MG _ matches })
+isInfixFunBind (FunBind { fun_matches = MG { mg_alts = matches } })
   = any (isInfixMatch . unLoc) (unLoc matches)
 isInfixFunBind _ = False
 
@@ -900,15 +911,19 @@ mkSimpleGeneratedFunBind loc fun pats expr
     ctxt = mkPrefixFunRhs (L (noAnnSrcSpan loc) fun) noAnn
 
 -- | Make a prefix, non-strict function 'HsMatchContext'
-mkPrefixFunRhs :: fn -> AnnFunRhs -> HsMatchContext fn
-mkPrefixFunRhs n an = FunRhs { mc_fun        = n
-                          , mc_fixity     = Prefix
-                          , mc_strictness = NoSrcStrict
-                          , mc_an         = an }
+mkPrefixFunRhs :: fn -> AnnFunRhs -> HsMatchContext (FunCtxtInfo fn)
+mkPrefixFunRhs n an = FunRhs (mkPrefixFunCtxtInfo n an)
+
+mkPrefixFunCtxtInfo :: fn -> AnnFunRhs -> FunCtxtInfo fn
+mkPrefixFunCtxtInfo n an =
+  FunCtxtInfo { fci_fun        = n
+              , fci_fixity     = Prefix
+              , fci_strictness = NoSrcStrict
+              , fci_an         = an }
 
 ------------
 mkMatch :: forall p. IsPass p
-        => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
+        => HsMatchContext (FunCtxtInfo (LIdP (NoGhcTc (GhcPass p))))
         -> LocatedE [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> HsLocalBinds (GhcPass p)
@@ -1050,7 +1065,7 @@ isBangedHsBind (XHsBindsLR (AbsBinds { abs_binds = binds }))
   = any (isBangedHsBind . unLoc) binds
 isBangedHsBind (FunBind {fun_matches = matches})
   | [L _ match] <- unLoc $ mg_alts matches
-  , FunRhs{mc_strictness = SrcStrict} <- m_ctxt match
+  , FunRhs (FunCtxtInfo {fci_strictness = SrcStrict}) <- m_ctxt match
   = True
 isBangedHsBind (PatBind {pat_lhs = pat})
   = isBangedLPat pat

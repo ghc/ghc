@@ -545,6 +545,9 @@
             {OccName: ==}))
           (MG
            (FromSource)
+           (FunRhs
+            (Unqual
+             {OccName: ==}))
            (L
             (EpAnn
              (EpaSpan { Test24533.hs:16:3-19 })
@@ -566,21 +569,22 @@
               (Match
                (NoExtField)
                (FunRhs
-                (L
-                 (EpAnn
-                  (EpaSpan { Test24533.hs:16:7-8 })
-                  (NameAnnTrailing
-                   [])
-                  (EpaComments
-                   []))
-                 (Unqual
-                  {OccName: ==}))
-                (Infix)
-                (NoSrcStrict)
-                (AnnFunRhs
-                 (NoEpTok)
-                 []
-                 []))
+                (FunCtxtInfo
+                 (L
+                  (EpAnn
+                   (EpaSpan { Test24533.hs:16:7-8 })
+                   (NameAnnTrailing
+                    [])
+                   (EpaComments
+                    []))
+                  (Unqual
+                   {OccName: ==}))
+                 (Infix)
+                 (NoSrcStrict)
+                 (AnnFunRhs
+                  (NoEpTok)
+                  []
+                  [])))
                (L
                 (EpaSpan { Test24533.hs:16:3-12 })
                 [(L
@@ -1151,6 +1155,9 @@
             {OccName: ==}))
           (MG
            (FromSource)
+           (FunRhs
+            (Unqual
+             {OccName: ==}))
            (L
             (EpAnn
              (EpaSpan { Test24533.ppr.hs:6:3-19 })
@@ -1172,21 +1179,22 @@
               (Match
                (NoExtField)
                (FunRhs
-                (L
-                 (EpAnn
-                  (EpaSpan { Test24533.ppr.hs:6:7-8 })
-                  (NameAnnTrailing
-                   [])
-                  (EpaComments
-                   []))
-                 (Unqual
-                  {OccName: ==}))
-                (Infix)
-                (NoSrcStrict)
-                (AnnFunRhs
-                 (NoEpTok)
-                 []
-                 []))
+                (FunCtxtInfo
+                 (L
+                  (EpAnn
+                   (EpaSpan { Test24533.ppr.hs:6:7-8 })
+                   (NameAnnTrailing
+                    [])
+                   (EpaComments
+                    []))
+                  (Unqual
+                   {OccName: ==}))
+                 (Infix)
+                 (NoSrcStrict)
+                 (AnnFunRhs
+                  (NoEpTok)
+                  []
+                  [])))
                (L
                 (EpaSpan { Test24533.ppr.hs:6:3-12 })
                 [(L

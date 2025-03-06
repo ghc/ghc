@@ -737,10 +737,11 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                                                   , m_grhss = rhs }
                    where
                      l = listLocation pats
-                     ctxt = FunRhs { mc_fun = ln
-                                   , mc_fixity = Prefix
-                                   , mc_strictness = NoSrcStrict
-                                   , mc_an = ann_fun }
+                     ctxt = FunRhs $
+                       FunCtxtInfo { fci_fun = ln
+                                   , fci_fixity = Prefix
+                                   , fci_strictness = NoSrcStrict
+                                   , fci_an = ann_fun }
 
                InfixCon p1 p2 -> return $ Match { m_ext = noExtField
                                                 , m_ctxt = ctxt
@@ -748,10 +749,11 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                                                 , m_grhss = rhs }
                    where
                      l = listLocation [p1, p2]
-                     ctxt = FunRhs { mc_fun = ln
-                                   , mc_fixity = Infix
-                                   , mc_strictness = NoSrcStrict
-                                   , mc_an = ann_fun }
+                     ctxt = FunRhs $
+                       FunCtxtInfo { fci_fun = ln
+                                   , fci_fixity = Infix
+                                   , fci_strictness = NoSrcStrict
+                                   , fci_an = ann_fun }
 
                RecCon{} -> recordPatSynErr (locA loc) pat
            ; return $ L loc match }
@@ -1402,11 +1404,11 @@ checkFunBind locF ann_fun (L lf fun) is_infix (L lp pats) (L _ grhss)
         let match_span = noAnnSrcSpan $ locF
         return (makeFunBind (L (l2l lf) fun) (L (noAnnSrcSpan $ locA match_span)
                  [L match_span (Match { m_ext = noExtField
-                                      , m_ctxt = FunRhs
-                                          { mc_fun    = L lf fun
-                                          , mc_fixity = is_infix
-                                          , mc_strictness = NoSrcStrict
-                                          , mc_an = ann_fun }
+                                      , m_ctxt = FunRhs $
+                                          FunCtxtInfo { fci_fun    = L lf fun
+                                                      , fci_fixity = is_infix
+                                                      , fci_strictness = NoSrcStrict
+                                                      , fci_an = ann_fun }
                                       , m_pats = L lp ps
                                       , m_grhss = grhss })]))
         -- The span of the match covers the entire equation.
@@ -1436,10 +1438,11 @@ checkPatBind loc (L _ (BangPat an (L _ (VarPat _ v))))
                 [L (noAnnSrcSpan loc) (m an v)]))
   where
     m a v = Match { m_ext = noExtField
-                  , m_ctxt = FunRhs { mc_fun    = v
-                                    , mc_fixity = Prefix
-                                    , mc_strictness = SrcStrict
-                                    , mc_an = AnnFunRhs a [] [] }
+                  , m_ctxt = FunRhs $
+                      FunCtxtInfo { fci_fun    = v
+                                  , fci_fixity = Prefix
+                                  , fci_strictness = SrcStrict
+                                  , fci_an = AnnFunRhs a [] [] }
                   , m_pats = noLocA []
                  , m_grhss = grhss }
 

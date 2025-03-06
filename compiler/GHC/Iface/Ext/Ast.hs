@@ -960,11 +960,11 @@ instance ( HiePass p
       , toHie grhss
       ]
 
-toHieHsMatchContext :: forall p. HiePass p => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
+toHieHsMatchContext :: forall p. HiePass p => HsMatchContext (FunCtxtInfo (LIdP (NoGhcTc (GhcPass p))))
                                            -> HieM [HieAST Type]
 toHieHsMatchContext ctxt
   = case ctxt of
-      FunRhs{mc_fun=name} -> toHie $ C MatchBind (get_name name)
+      FunRhs (FunCtxtInfo {fci_fun=name}) -> toHie $ C MatchBind (get_name name)
       StmtCtxt a          -> toHieHsStmtContext @p a
       _                   -> pure []
   where
@@ -974,7 +974,7 @@ toHieHsMatchContext ctxt
                       HieRn -> name
                       HieTc -> name
 
-toHieHsStmtContext :: forall p. HiePass p => HsStmtContext (LIdP (NoGhcTc (GhcPass p)))
+toHieHsStmtContext :: forall p. HiePass p => HsStmtContext (FunCtxtInfo (LIdP (NoGhcTc (GhcPass p))))
                                           -> HieM [HieAST Type]
 toHieHsStmtContext ctxt
   = case ctxt of

@@ -511,7 +511,7 @@ tidy1 _ _ (OrPat ty lpats)
   = return (idDsWrapper, ViewPat ty (noLocA (HsLam noAnn LamCase mg)) (mkPrefixConPat trueDataCon [] []))
   where
     mg :: MatchGroup GhcTc (LHsExpr GhcTc)
-    mg = MG mgtc (noLocA (map match_true (NE.toList lpats) ++ [match_false (noLocA $ WildPat ty)]))
+    mg = MG mgtc CaseAlt (noLocA (map match_true (NE.toList lpats) ++ [match_false (noLocA $ WildPat ty)]))
     mgtc = MatchGroupTc
        { mg_arg_tys = [tymult ty]
        , mg_res_ty = boolTy

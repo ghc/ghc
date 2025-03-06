@@ -2139,6 +2139,9 @@
         {OccName: main}))
       (MG
        (FromSource)
+       (FunRhs
+        (Unqual
+         {OccName: main}))
        (L
         (EpAnn
          (EpaSpan { DumpParsedAst.hs:25:1-23 })
@@ -2160,21 +2163,22 @@
           (Match
            (NoExtField)
            (FunRhs
-            (L
-             (EpAnn
-              (EpaSpan { DumpParsedAst.hs:25:1-4 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: main}))
-            (Prefix)
-            (NoSrcStrict)
-            (AnnFunRhs
-             (NoEpTok)
-             []
-             []))
+            (FunCtxtInfo
+             (L
+              (EpAnn
+               (EpaSpan { DumpParsedAst.hs:25:1-4 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: main}))
+             (Prefix)
+             (NoSrcStrict)
+             (AnnFunRhs
+              (NoEpTok)
+              []
+              [])))
            (L
             (EpaSpan { <no location info> })
             [])

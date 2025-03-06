@@ -41,6 +41,7 @@ import Data.Bool
 import Data.Eq
 import Data.Maybe
 import Data.List.NonEmpty ( NonEmpty )
+import Data.Functor
 import GHC.Types.Name.Reader
 
 {- Note [RecordDotSyntax field updates]
@@ -871,6 +872,7 @@ patterns in each equation.
 
 data MatchGroup p body
   = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result, and origin
+       , mg_ctxt    :: HsMatchContext (IdP (NoGhcTc p))  -- See Note [Match(Group) ctxt field]
        , mg_alts    :: XRec p [LMatch p body]
          -- The alternatives, see Note [Empty mg_alts] for what it means if 'mg_alts' is empty.
        }
@@ -886,15 +888,15 @@ type LMatch id body = XRec id (Match id body)
 data Match p body
   = Match {
         m_ext   :: XCMatch p body,
-        m_ctxt  :: HsMatchContext (LIdP (NoGhcTc p)), -- See Note [m_ctxt in Match]
+        m_ctxt  :: HsMatchContext (FunCtxtInfo (LIdP (NoGhcTc p))), -- See Note [Match(Group) ctxt field]
         m_pats  :: XRec p [LPat p],                   -- The patterns
         m_grhss :: (GRHSs p body)
   }
   | XMatch !(XXMatch p body)
 
 {-
-Note [m_ctxt in Match]
-~~~~~~~~~~~~~~~~~~~~~~
+Note [Match(Group) ctxt field]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A Match can occur in a number of contexts, such as a FunBind, HsCase, HsLam and
 so on.
 
@@ -924,6 +926,9 @@ annotations
     xs    &&&   [] =  xs
     (  &&&  ) [] ys =  ys
 
+This forces us to store one HsMatchContext per Match. At the same time, it is
+possible to have a MatchGroup with no matches (e.g. \case{}, see Note [Empty mg_alts]),
+so we store an HsMatchContext in the MatchGroup, too.
 
 Note [Empty mg_alts]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1379,17 +1384,7 @@ data ArithSeqInfo id
 -- Context of a pattern match. This is more subtle than it would seem. See
 -- Note [FunBind vs PatBind].
 data HsMatchContext fn
-  = FunRhs
-    -- ^ A pattern matching on an argument of a
-    -- function binding
-      { mc_fun        :: fn    -- ^ function binder of @f@
-                               -- See Note [mc_fun field of FunRhs]
-                               -- See #20415 for a long discussion about this field
-      , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
-      , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
-                                       -- See Note [FunBind vs PatBind]
-      , mc_an         :: XFunRhs
-      }
+  = FunRhs fn                   -- ^A pattern matching on an argument of a function binding
   | CaseAlt                     -- ^Patterns and guards in a case alternative
   | LamAlt HsLamVariant         -- ^Patterns and guards in @\@, @\case@ and @\cases@
   | IfAlt                       -- ^Guards of a multi-way if alternative
@@ -1411,6 +1406,18 @@ data HsMatchContext fn
   | ThPatQuote             -- ^A Template Haskell pattern quotation [p| (a,b) |]
   | PatSyn                 -- ^A pattern synonym declaration
   | LazyPatCtx             -- ^An irrefutable pattern
+  deriving (Functor)
+
+data FunCtxtInfo name =
+  FunCtxtInfo
+      { fci_fun        :: name  -- ^ function binder of @f@
+                                -- See Note [mc_fun field of FunRhs]
+                                -- See #20415 for a long discussion about this field
+      , fci_fixity     :: LexicalFixity -- ^ fixing of @f@
+      , fci_strictness :: SrcStrictness -- ^ was @f@ banged?
+                                       -- See Note [FunBind vs PatBind]
+      , fci_an         :: XFunRhs
+      }
 
 {- Note [mc_fun field of FunRhs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1428,7 +1435,7 @@ See Note [NoGhcTc] in GHC.Hs.Extension.
   * Using an `Id` involves knot-tying in the monad, which led to #22695.
 
 * Why a /located/ name?  Because we want to record the location of the Id
-  on the LHS of /this/ match.  See Note [m_ctxt in Match].  Example:
+  on the LHS of /this/ match.  See Note [Match(Group) ctxt field].  Example:
     (&&&) [] [] = []
     xs  &&&  [] = xs
   The two occurrences of `&&&` have different locations.
@@ -1449,6 +1456,7 @@ data HsStmtContext fn
   | ParStmtCtxt (HsStmtContext fn)    -- ^ A branch of a parallel stmt
   | TransStmtCtxt (HsStmtContext fn)  -- ^ A branch of a transform stmt
   | ArrowExpr                         -- ^ do-notation in an arrow-command context
+  deriving (Functor)
 
 -- | Haskell arrow match context.
 data HsArrowMatchContext
