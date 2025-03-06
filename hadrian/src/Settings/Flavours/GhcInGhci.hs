@@ -11,7 +11,10 @@ import {-# SOURCE #-} Settings.Default
 ghcInGhciFlavour :: Flavour
 ghcInGhciFlavour = defaultFlavour
     { name        = "ghc-in-ghci"
-    , extraArgs        = ghciArgs
+    , extraArgs        = mconcat [
+                            ghciArgs
+                            , builder (Cabal Flags) ? arg "+internal-interpreter"
+                            ]
     -- We can't build DLLs on Windows (yet). Actually we should only
     -- include the dynamic way when we have a dynamic host GHC, but just
     -- checking for Windows seems simpler for now.

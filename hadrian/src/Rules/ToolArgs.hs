@@ -164,6 +164,8 @@ toolTargets = [ cabalSyntax
               , ghci
               , ghcPkg  -- # executable
               , haddock -- # depends on ghc library
+              , haskeline
+              , terminfo
               , haddockApi
               , haddockLibrary
               , hsc2hs  -- # executable
