@@ -96,9 +96,6 @@ def darwin(arch):
 windowsArtifact = PlatformSpec ( 'x86_64-windows'
                                , 'ghc-{version}-x86_64-unknown-mingw32' )
 
-def centos(n, arch='x86_64'):
-    return linux_platform(arch, "x86_64-linux-centos{n}".format(n=n))
-
 def fedora(n, arch='x86_64'):
     return linux_platform(arch, "x86_64-linux-fedora{n}".format(n=n))
 
@@ -195,7 +192,6 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     ubuntu1804 = mk(ubuntu("18_04"))
     ubuntu2004 = mk(ubuntu("20_04"))
     rocky8 = mk(rocky("8"))
-    centos7 = mk(centos(7))
     fedora33 = mk(fedora(33))
     darwin_x86 = mk(darwin("x86_64"))
     darwin_arm64 = mk(darwin("aarch64"))
@@ -228,11 +224,8 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
           , "Linux_Mint"   : { "< 20": ubuntu1804
                              , ">= 20": ubuntu2004
                              , "unknown_versioning": ubuntu2004 }
-          , "Linux_CentOS"  : { "( >= 7 && < 8 )" : centos7
-                              , "unknown_versioning" : centos7  }
-          , "Linux_Fedora"  : { ">= 33": fedora33
-                              , "unknown_versioning": centos7 }
-          , "Linux_RedHat"  : { "< 9": centos7
+          , "Linux_Fedora"  : { ">= 33": fedora33 }
+          , "Linux_RedHat"  : { "< 9": rocky8
                               , ">= 9": fedora33
                               , "unknown_versioning": fedora33 }
           , "Linux_UnknownLinux" : { "unknown_versioning": rocky8 }
