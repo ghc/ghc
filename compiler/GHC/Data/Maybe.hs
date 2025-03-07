@@ -34,6 +34,8 @@ import Control.Exception (SomeException(..))
 import Data.Maybe
 import Data.Foldable ( foldlM, for_ )
 import GHC.Utils.Misc (HasCallStack)
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
 import Data.List.NonEmpty ( NonEmpty )
 import Control.Applicative( Alternative( (<|>) ) )
 
@@ -72,7 +74,7 @@ expectJust :: HasCallStack => Maybe a -> a
 expectJust = fromMaybe expectJustError
 
 expectJustError :: HasCallStack => a
-expectJustError = error "expectJust"
+expectJustError = pprPanic "expectJust" empty
 {-# NOINLINE expectJustError #-}
 
 whenIsJust :: Monad m => Maybe a -> (a -> m ()) -> m ()
