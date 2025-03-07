@@ -2414,7 +2414,7 @@ prepareAlts :: OutExpr -> InId -> [InAlt] -> SimplM ([AltCon], [InAlt])
 -- Note that case_bndr is an InId; see Note [Shadowing in prepareAlts]
 prepareAlts scrut case_bndr alts
   | Just (tc, tys) <- splitTyConApp_maybe (idType case_bndr)
-  = do { us <- getUniqueListM
+  = do { us <- getUniquesM
        ; let (idcs1, alts1) = filterAlts tc tys imposs_cons alts
              (yes2,  alts2) = refineDefaultAlt us (idMult case_bndr) tc tys idcs1 alts1
                -- The multiplicity on case_bndr's is the multiplicity of the
@@ -2765,7 +2765,7 @@ mkCase2 mode scrut bndr alts_ty alts
       | not (isNullaryRepDataCon dc)
       = -- For non-nullary data cons we must invent some fake binders
         -- See Note [caseRules for dataToTag] in GHC.Core.Opt.ConstantFold
-        do { us <- getUniqueListM
+        do { us <- getUniquesM
            ; let (ex_tvs, arg_ids) = dataConRepInstPat us (idMult new_bndr) dc
                                         (tyConAppArgs (idType new_bndr))
            ; return (ex_tvs ++ arg_ids) }

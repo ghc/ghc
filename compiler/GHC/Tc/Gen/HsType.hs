@@ -3939,7 +3939,9 @@ splitTyConKind skol_info in_scope avoid_occs kind
                         name   = mkInternalName uniq occ loc
                         tv     = mkTcTyVar name arg' details
                         subst' = extendSubstInScope subst tv
-                        Inf uniq uniqs' = uniqs
+                        (uniq,uniqs') = case uniqs of
+                            uniq:uniqs' -> (uniq,uniqs')
+                            _           -> panic "impossible"
                         Inf occ occs' = occs
 
                     Just (Named (Bndr tv vis), kind')

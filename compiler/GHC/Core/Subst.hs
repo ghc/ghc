@@ -415,23 +415,20 @@ cloneIdBndr subst us old_id
 -- | Applies 'cloneIdBndr' to a number of 'Id's, accumulating a final
 -- substitution from left to right
 -- Discards non-Stable unfoldings
-cloneIdBndrs :: Traversable t => Subst -> UniqSupply -> t Id -> (Subst, t Id)
+cloneIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
 cloneIdBndrs subst us ids
-  = mapAccumL (clone_id subst) subst (withUniques (flip (,)) us ids)
-{-# SPECIALIZE cloneIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id]) #-}
+  = mapAccumL (clone_id subst) subst (ids `zip` uniqsFromSupply us)
 
-cloneBndrs :: Traversable t => Subst -> UniqSupply -> t Var -> (Subst, t Var)
+cloneBndrs :: Subst -> UniqSupply -> [Var] -> (Subst, [Var])
 -- Works for all kinds of variables (typically case binders)
 -- not just Ids
 cloneBndrs subst us vs
-  = mapAccumL (\subst (v, u) -> cloneBndr subst u v) subst (withUniques (flip (,)) us vs)
-{-# SPECIALIZE cloneBndrs :: Subst -> UniqSupply -> [Var] -> (Subst, [Var]) #-}
+  = mapAccumL (\subst (v, u) -> cloneBndr subst u v) subst (vs `zip` uniqsFromSupply us)
 
-cloneBndrsM :: (Traversable t, MonadUnique m) => Subst -> t Var -> m (Subst, t Var)
+cloneBndrsM :: MonadUnique m => Subst -> [Var] -> m (Subst, [Var])
 -- Works for all kinds of variables (typically case binders)
 -- not just Ids
 cloneBndrsM subst vs = cloneBndrs subst `flip` vs <$> getUniqueSupplyM
-{-# INLINE cloneBndrsM #-}
 
 cloneBndr :: Subst -> Unique -> Var -> (Subst, Var)
 cloneBndr subst uniq v
@@ -439,16 +436,14 @@ cloneBndr subst uniq v
   | otherwise = clone_id subst subst (v,uniq)  -- Works for coercion variables too
 
 -- | Clone a mutually recursive group of 'Id's
-cloneRecIdBndrs :: Traversable t => Subst -> UniqSupply -> t Id -> (Subst, t Id)
+cloneRecIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
 cloneRecIdBndrs subst us ids =
-    let x@(subst', _) = mapAccumL (clone_id subst') subst (withUniques (flip (,)) us ids)
+    let x@(subst', _) = mapAccumL (clone_id subst') subst (ids `zip` uniqsFromSupply us)
     in x
-{-# SPECIALIZE cloneRecIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id]) #-}
 
 -- | Clone a mutually recursive group of 'Id's
-cloneRecIdBndrsM :: (Traversable t, MonadUnique m) => Subst -> t Id -> m (Subst, t Id)
+cloneRecIdBndrsM :: MonadUnique m => Subst -> [Id] -> m (Subst, [Id])
 cloneRecIdBndrsM subst ids = cloneRecIdBndrs subst `flip` ids <$> getUniqueSupplyM
-{-# INLINE cloneRecIdBndrsM #-}
 
 -- Just like substIdBndr, except that it always makes a new unique
 -- It is given the unique to use
