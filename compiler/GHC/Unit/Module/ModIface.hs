@@ -16,7 +16,6 @@ module GHC.Unit.Module.ModIface
       , mi_hsc_src
       , mi_deps
       , mi_exports
-      , mi_used_th
       , mi_fixities
       , mi_warns
       , mi_anns
@@ -46,7 +45,6 @@ module GHC.Unit.Module.ModIface
    , set_mi_hi_bytes
    , set_mi_deps
    , set_mi_exports
-   , set_mi_used_th
    , set_mi_fixities
    , set_mi_warns
    , set_mi_anns
@@ -257,11 +255,6 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- Kept sorted by (mod,occ), to make version comparisons easier
                 -- Records the modules that are the declaration points for things
                 -- exported by this module, and the 'OccName's of those things
-
-
-        mi_used_th_  :: !Bool,
-                -- ^ Module required TH splices when it was compiled.
-                -- This disables recompilation avoidance (see #481).
 
         mi_fixities_ :: [(OccName,Fixity)],
                 -- ^ Fixities
@@ -479,7 +472,6 @@ instance Binary ModIface where
                                             -- See Note [Private fields in ModIface]
                  mi_deps_      = deps,
                  mi_exports_   = exports,
-                 mi_used_th_   = used_th,
                  mi_fixities_  = fixities,
                  mi_warns_     = warns,
                  mi_anns_      = anns,
@@ -519,7 +511,6 @@ instance Binary ModIface where
         lazyPut bh deps
         put_ bh exports
         put_ bh exp_hash
-        put_ bh used_th
         put_ bh fixities
         lazyPut bh warns
         lazyPut bh anns
@@ -550,7 +541,6 @@ instance Binary ModIface where
         deps        <- lazyGet bh
         exports     <- {-# SCC "bin_exports" #-} get bh
         exp_hash    <- get bh
-        used_th     <- get bh
         fixities    <- {-# SCC "bin_fixities" #-} get bh
         warns       <- {-# SCC "bin_warns" #-} lazyGet bh
         anns        <- {-# SCC "bin_anns" #-} lazyGet bh
@@ -579,7 +569,6 @@ instance Binary ModIface where
                                    FullIfaceBinHandle Strict.Nothing,
                  mi_deps_        = deps,
                  mi_exports_     = exports,
-                 mi_used_th_     = used_th,
                  mi_anns_        = anns,
                  mi_fixities_    = fixities,
                  mi_warns_       = warns,
@@ -623,7 +612,6 @@ emptyPartialModIface mod
         mi_hi_bytes_    = PartialIfaceBinHandle,
         mi_deps_        = noDependencies,
         mi_exports_     = [],
-        mi_used_th_     = False,
         mi_fixities_    = [],
         mi_warns_       = IfWarnSome [] [],
         mi_anns_        = [],
@@ -684,7 +672,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
          ) => NFData (ModIface_ phase) where
   rnf (PrivateModIface
                { mi_module_, mi_sig_of_, mi_hsc_src_, mi_hi_bytes_, mi_deps_
-               , mi_exports_, mi_used_th_, mi_fixities_, mi_warns_, mi_anns_
+               , mi_exports_,  mi_fixities_, mi_warns_, mi_anns_
                , mi_decls_, mi_defaults_, mi_extra_decls_, mi_foreign_, mi_top_env_, mi_insts_
                , mi_fam_insts_, mi_rules_, mi_hpc_, mi_trust_, mi_trust_pkg_
                , mi_complete_matches_, mi_docs_, mi_final_exts_
@@ -695,7 +683,6 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq`     mi_hi_bytes_
     `seq`     mi_deps_
     `seq`     mi_exports_
-    `seq` rnf mi_used_th_
     `seq`     mi_fixities_
     `seq` rnf mi_warns_
     `seq` rnf mi_anns_
@@ -807,9 +794,6 @@ set_mi_deps val iface = clear_mi_hi_bytes $ iface { mi_deps_ = val }
 
 set_mi_exports :: [IfaceExport] -> ModIface_ phase -> ModIface_ phase
 set_mi_exports val iface = clear_mi_hi_bytes $ iface { mi_exports_ = val }
-
-set_mi_used_th :: Bool -> ModIface_ phase -> ModIface_ phase
-set_mi_used_th val iface = clear_mi_hi_bytes $ iface { mi_used_th_ = val }
 
 set_mi_fixities :: [(OccName, Fixity)] -> ModIface_ phase -> ModIface_ phase
 set_mi_fixities val iface = clear_mi_hi_bytes $ iface { mi_fixities_ = val }
@@ -930,7 +914,6 @@ However, with the pragma, the correct core is generated:
 {-# INLINE mi_hsc_src #-}
 {-# INLINE mi_deps #-}
 {-# INLINE mi_exports #-}
-{-# INLINE mi_used_th #-}
 {-# INLINE mi_fixities #-}
 {-# INLINE mi_warns #-}
 {-# INLINE mi_anns #-}
@@ -953,7 +936,7 @@ However, with the pragma, the correct core is generated:
 
 pattern ModIface ::
   Module -> Maybe Module -> HscSource -> Dependencies ->
-  [IfaceExport] -> Bool -> [(OccName, Fixity)] -> IfaceWarnings ->
+  [IfaceExport] -> [(OccName, Fixity)] -> IfaceWarnings ->
   [IfaceAnnotation] -> [IfaceDeclExts phase] ->
   Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] -> IfaceForeign ->
   [IfaceDefault] -> IfaceTopEnv -> [IfaceClsInst] -> [IfaceFamInst] -> [IfaceRule] ->
@@ -966,7 +949,6 @@ pattern ModIface
   , mi_hsc_src
   , mi_deps
   , mi_exports
-  , mi_used_th
   , mi_fixities
   , mi_warns
   , mi_anns
@@ -993,7 +975,6 @@ pattern ModIface
     , mi_hsc_src_ = mi_hsc_src
     , mi_deps_ = mi_deps
     , mi_exports_ = mi_exports
-    , mi_used_th_ = mi_used_th
     , mi_fixities_ = mi_fixities
     , mi_warns_ = mi_warns
     , mi_anns_ = mi_anns

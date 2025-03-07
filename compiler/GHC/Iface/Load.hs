@@ -1280,7 +1280,6 @@ pprModIface unit_state iface
                 ]
         , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash exts))
         , nest 2 (text "sig of:" <+> ppr (mi_sig_of iface))
-        , nest 2 (text "used TH splices:" <+> ppr (mi_used_th iface))
         , nest 2 (text "where")
         , text "exports:"
         , nest 2 (vcat (map pprExport (mi_exports iface)))
