@@ -1,4 +1,5 @@
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -73,10 +74,10 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.Bag
 
-import Data.List.NonEmpty ( NonEmpty(..), (<|) )
-import Data.Function ( on )
-
 import Control.Monad      ( forM_ )
+import Data.List.NonEmpty ( NonEmpty(..), (<|) )
+import Data.Function      ( on )
+
 
 {-
 ************************************************************************
