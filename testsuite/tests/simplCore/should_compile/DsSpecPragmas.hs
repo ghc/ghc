@@ -17,7 +17,6 @@ import Data.Proxy
 
 f1 :: ( Num a, Eq b ) => a -> b -> Int
 f1 _ _ = 111
-
 -- Make sure we don't generate a rule with an LHS of the form
 --
 --  forall @e (d :: Eq e). f1 @[e] ($fEqList d) = ...
@@ -56,12 +55,18 @@ f3 z = z == z
 
 --------------------------------------------------------------------------------
 
-f4 :: Monad m => a -> m a
+f4 :: (Eq a, Monad m) => a -> m a
 f4 = return
 
 -- Check we can deal with locally quantified variables in constraints,
 -- in this case 'Monad (ST s)'.
-{-# SPECIALISE f4 :: b -> ST s b #-}
+{-# SPECIALISE f4 :: forall s b. Eq b => b -> ST s b #-}
+
+f4_qc :: (Eq a, forall m. Monad m => Monad (t m)) => t m a -> ()
+f4_qc _ = ()
+
+-- Like 'f4' but with a quantified constraint.
+{-# SPECIALISE f4_qc :: forall r n b. (forall m. Monad m => Monad (r m)) => r n Int -> () #-}
 
 --------------------------------------------------------------------------------
 

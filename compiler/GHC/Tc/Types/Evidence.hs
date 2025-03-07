@@ -15,7 +15,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
-  EvBindMap(..), emptyEvBindMap, extendEvBinds,
+  EvBindMap(..), emptyEvBindMap, extendEvBinds, unionEvBindMap,
   lookupEvBind, evBindMapBinds,
   foldEvBindMap, nonDetStrictFoldEvBindMap,
   filterEvBindMap,

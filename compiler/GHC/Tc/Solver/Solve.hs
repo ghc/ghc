@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecursiveDo #-}
 
 module GHC.Tc.Solver.Solve (
@@ -5,6 +6,7 @@ module GHC.Tc.Solver.Solve (
      solveWanteds,        -- Solves WantedConstraints
      solveSimpleGivens,   -- Solves [Ct]
      solveSimpleWanteds,  -- Solves Cts
+     solveCompletelyIfRequired,
 
      setImplicationStatus
   ) where
@@ -51,6 +53,7 @@ import GHC.Driver.Session
 import Data.List( deleteFirstsBy )
 
 import Control.Monad
+import Data.Foldable ( for_, traverse_ )
 import qualified Data.Semigroup as S
 import Data.Void( Void )
 
@@ -1217,6 +1220,12 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
     -- This setSrcSpan is important: the emitImplicationTcS uses that
     -- TcLclEnv for the implication, and that in turn sets the location
     -- for the Givens when solving the constraint (#21006)
+
+    -- We are about to do something irreversible (turning a quantified constraint
+    -- into an implication), so wrap the inner call in solveCompletelyIfRequired
+    -- to ensure we can roll back if we can't solve the implication fully.
+    -- See Note [TcSFullySolve] in GHC.Tc.Solver.Monad.
+    solveCompletelyIfRequired (Left ev) $
     do { let empty_subst = mkEmptySubst $ mkInScopeSet $
                            tyCoVarsOfTypes (pred:theta) `delVarSetList` tvs
              is_qc = IsQC (ctLocOrigin loc)
@@ -1298,7 +1307,7 @@ Note [Solving a Given forall-constraint]
 For a Given constraint
   [G] df :: forall ab. (Eq a, Ord b) => C x a b
 we just add it to TcS's local InstEnv of known instances,
-via addInertForall.  Then, if we look up (C x Int Bool), say,
+via addInertForAll.  Then, if we look up (C x Int Bool), say,
 we'll find a match in the InstEnv.
 
 
@@ -1539,3 +1548,109 @@ runTcPluginSolvers solvers all_cts
       CtWanted {} -> (givens, (ev,ct):wanteds)
 
 
+--------------------------------------------------------------------------------
+
+-- | If the mode is 'TcSFullySolve', attempt to fully solve the Wanted
+-- constraints that arise from 'thing_inside'; returning whether this was
+-- successful.
+--
+-- If not in 'TcSFullySolve' mode, simply run 'thing_inside'.
+--
+-- See Note [TcSFullySolve] in GHC.Tc.Solver.Monad.
+solveCompletelyIfRequired :: Either CtEvidence DictCt -> TcS (StopOrContinue a) -> TcS (StopOrContinue a)
+solveCompletelyIfRequired dict_or_qc (TcS thing_inside)
+  = TcS $ \ env@(TcSEnv { tcs_ev_binds = outer_ev_binds_var
+                        , tcs_unified  = outer_unified_var
+                        , tcs_inerts   = outer_inert_var
+                        , tcs_count    = outer_count
+                        , tcs_mode     = mode
+                        }) ->
+  case mode of
+    TcSFullySolve ->
+      do { traceTc "solveCompletelyIfRequired {" empty
+           -- Create a fresh environment for the inner computation
+         ; outer_inerts <- TcM.readTcRef outer_inert_var
+         ; let outer_givens = inertGivens outer_inerts
+           -- Keep the ambient Given inerts, but drop the Wanteds.
+         ; new_inert_var    <- TcM.newTcRef outer_givens
+         ; new_wl_var       <- TcM.newTcRef emptyWorkList
+         ; new_ev_binds_var <- TcM.newTcEvBinds
+         ; new_unified_var  <- TcM.newTcRef 0
+         ; new_count        <- TcM.newTcRef 0
+         ; new_unif_lvl     <- TcM.newTcRef Nothing
+
+         ; let
+            inner_env =
+              TcSEnv
+                -- KEY part: recur with TcSVanilla
+                { tcs_mode     = TcSVanilla
+
+                -- Use new variables for the inner computation, because
+                -- we may want to discard its state entirely.
+                , tcs_count    = new_count
+                , tcs_unif_lvl = new_unif_lvl
+                , tcs_ev_binds = new_ev_binds_var
+                , tcs_unified  = new_unified_var
+                , tcs_inerts   = new_inert_var
+                , tcs_worklist = new_wl_var
+                }
+
+           -- Solve the constraint
+         ; let
+            ct = case dict_or_qc of
+                   Left qci_ev -> mkNonCanonical qci_ev
+                   Right dict_ct -> CDictCan dict_ct
+            wc = emptyWC { wc_simple = unitBag ct }
+         ; traceTc "solveCompletelyIfRequired solveWanteds" $
+            vcat [ text "ct:" <+> ppr ct
+                 ]
+         ; solved_wc <- unTcS (solveWanteds wc) inner_env
+
+         ; if isSolvedWC solved_wc
+           then
+             do { -- The constraint was fully solved. Continue with
+                  -- the inner solver state.
+                ; traceTc "solveCompletelyIfRequired: fully solved }" $
+                   vcat [ text "ct:" <+> ppr ct
+                        , text "solved_wc:" <+> ppr solved_wc ]
+
+                  -- Add new evidence bindings to the existing ones
+                ; inner_ev_binds <- TcM.getTcEvBindsMap new_ev_binds_var
+                ; outer_ev_binds <- TcM.getTcEvBindsMap outer_ev_binds_var
+                ; let merged_ev_binds = outer_ev_binds `unionEvBindMap` inner_ev_binds
+                ; TcM.setTcEvBindsMap outer_ev_binds_var merged_ev_binds
+
+                  -- Update the outer unified, count, and unif_lvl variables
+                ; inner_unified  <- TcM.readTcRef new_unified_var
+                ; inner_count    <- TcM.readTcRef new_count
+                ; inner_unif_lvl <- TcM.readTcRef new_unif_lvl
+                ; TcM.updTcRef outer_unified_var (+ inner_unified)
+                ; TcM.updTcRef outer_count       (+ inner_count)
+                ; for_ inner_unif_lvl $ \inner_lvl ->
+                    unTcS (setUnificationFlag inner_lvl) env
+
+                  -- Keep the outer inert set and work list: the inner work
+                  -- list is empty, and there are no leftover unsolved
+                  -- Wanteds.
+                  -- However, we **must not** drop solved implications, due
+                  -- to Note [Free vars of EvFun] in GHC.Tc.Types.Evidence.
+                ; traverse_ ( ( `unTcS` env ) . TcS.emitImplication ) $ wc_impl solved_wc
+                ; return $ Stop (ctEvidence ct) (text "Fully solved:" <+> ppr ct)
+                }
+           else
+             do { traceTc "solveCompletelyIfRequired: unsolved }" $
+                   vcat [ text "ct:" <+> ppr ct
+                        , text "solved_wc:" <+> ppr solved_wc ]
+                  -- Failed to fully solve the constraint:
+                  --
+                  --  - discard the inner solver state,
+                  --  - add the original constraint as an inert.
+                ; ( `unTcS` env ) $ case dict_or_qc of
+                    Left qci_ev ->
+                      updInertIrreds (IrredCt qci_ev IrredShapeReason)
+                    Right dict_ct ->
+                      updInertDicts dict_ct
+                 ; return $ Stop (ctEvidence ct) (text "Not fully solved; kept as inert:" <+> ppr ct)
+                 } }
+    _notFullySolveMode ->
+      thing_inside env
