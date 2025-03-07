@@ -14,6 +14,7 @@ module GHC.Tc.Solver.Types (
 
     TcAppMap, emptyTcAppMap, isEmptyTcAppMap,
     insertTcApp, alterTcApp, filterTcAppMap,
+    mapMaybeTcAppMap,
     tcAppMapToBag, foldTcAppMap, delTcApp,
 
     EqualCtList, filterEqualCtList, addToEqualCtList
@@ -113,6 +114,16 @@ filterTcAppMap f m = mapMaybeDTyConEnv one_tycon m
       | otherwise             = Just filtered_tm
       where
         filtered_tm = filterTM f tm
+
+mapMaybeTcAppMap :: forall a b. (a -> Maybe b) -> TcAppMap a -> TcAppMap b
+mapMaybeTcAppMap f m = mapMaybeDTyConEnv one_tycon m
+  where
+    one_tycon :: ListMap LooseTypeMap a -> Maybe (ListMap LooseTypeMap b)
+    one_tycon tm
+      | isEmptyTM mapped_tm = Nothing
+      | otherwise           = Just mapped_tm
+      where
+        mapped_tm = mapMaybeTM f tm
 
 tcAppMapToBag :: TcAppMap a -> Bag a
 tcAppMapToBag m = foldTcAppMap consBag m emptyBag

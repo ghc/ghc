@@ -74,7 +74,8 @@ module GHC.Types.Var.Env (
 
         -- * TidyEnv and its operation
         TidyEnv,
-        emptyTidyEnv, mkEmptyTidyEnv, delTidyEnvList
+        emptyTidyEnv, mkEmptyTidyEnv, delTidyEnvList,
+        mapMaybeDVarEnv
     ) where
 
 import GHC.Prelude
@@ -655,6 +656,9 @@ mapDVarEnv = mapUDFM
 
 filterDVarEnv      :: (a -> Bool) -> DVarEnv a -> DVarEnv a
 filterDVarEnv = filterUDFM
+
+mapMaybeDVarEnv :: (a -> Maybe b) -> DVarEnv a -> DVarEnv b
+mapMaybeDVarEnv f = mapMaybeUDFM f
 
 alterDVarEnv :: (Maybe a -> Maybe a) -> DVarEnv a -> Var -> DVarEnv a
 alterDVarEnv = alterUDFM
