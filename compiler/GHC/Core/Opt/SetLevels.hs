@@ -1,5 +1,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -118,16 +120,12 @@ import GHC.Builtin.Types
 import GHC.Builtin.Names      ( runRWKey )
 
 import GHC.Data.FastString
-import GHC.Data.Pair ( Pair (..) )
 
 import GHC.Utils.FV
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import Data.Foldable ( toList )
-import Data.Functor.Identity ( Identity (..) )
-import Data.List.NonEmpty ( NonEmpty (..) )
 import Data.Maybe
 
 {-
@@ -453,14 +451,14 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
   , ManyTy <- idMult case_bndr     -- See Note [Floating linear case]
   =     -- Always float the case if possible
         -- Unlike lets we don't insist that it escapes a value lambda
-    do { (env1, case_bndr' :| bs') <- cloneCaseBndrs env dest_lvl (case_bndr :| bs)
+    do { (env1, (case_bndr' : bs')) <- cloneCaseBndrs env dest_lvl (case_bndr : bs)
        ; let rhs_env = extendCaseBndrEnv env1 case_bndr scrut'
        ; body' <- lvlMFE rhs_env True body
        ; let alt' = Alt con (map (stayPut dest_lvl) bs') body'
        ; return (Case scrut' (TB case_bndr' (FloatMe dest_lvl)) ty' [alt']) }
 
   | otherwise     -- Stays put
-  = do { let (alts_env1, Identity case_bndr') = substAndLvlBndrs NonRecursive env incd_lvl (Identity case_bndr)
+  = do { let (alts_env1, [case_bndr']) = substAndLvlBndrs NonRecursive env incd_lvl [case_bndr]
              alts_env = extendCaseBndrEnv alts_env1 case_bndr scrut'
        ; alts' <- mapM (lvl_alt alts_env) alts
        ; return (Case scrut' case_bndr' ty' alts') }
@@ -651,7 +649,7 @@ lvlMFE env strict_ctxt ann_expr
                          -- See Note [Test cheapness with exprOkForSpeculation]
   , BI_Box { bi_data_con = box_dc, bi_inst_con = boxing_expr
            , bi_boxed_type = box_ty } <- boxingDataCon expr_ty
-  , let Pair bx_bndr ubx_bndr = mkTemplateLocals (Pair box_ty expr_ty)
+  , let [bx_bndr, ubx_bndr] = mkTemplateLocals [box_ty, expr_ty]
   = do { expr1 <- lvlExpr rhs_env ann_expr
        ; let l1r       = incMinorLvlFrom rhs_env
              float_rhs = mkLams abs_vars_w_lvls $
@@ -1229,7 +1227,7 @@ lvlBind env (AnnNonRec bndr rhs)
   = -- No float
     do { rhs' <- lvlRhs env NonRecursive is_bot_lam mb_join_arity rhs
        ; let  bind_lvl        = incMinorLvl (le_ctxt_lvl env)
-              (env', Identity bndr') = substAndLvlBndrs NonRecursive env bind_lvl (Identity bndr)
+              (env', [bndr']) = substAndLvlBndrs NonRecursive env bind_lvl [bndr]
        ; return (NonRec bndr' rhs', env') }
 
   -- Otherwise we are going to float
@@ -1237,7 +1235,7 @@ lvlBind env (AnnNonRec bndr rhs)
   = do {  -- No type abstraction; clone existing binder
          rhs' <- lvlFloatRhs [] dest_lvl env NonRecursive
                              is_bot_lam NotJoinPoint rhs
-       ; (env', Identity bndr') <- cloneLetVars NonRecursive env dest_lvl (Identity bndr)
+       ; (env', [bndr']) <- cloneLetVars NonRecursive env dest_lvl [bndr]
        ; let bndr2 = annotateBotStr bndr' 0 mb_bot_str
        ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
 
@@ -1245,7 +1243,7 @@ lvlBind env (AnnNonRec bndr rhs)
   = do {  -- Yes, type abstraction; create a new binder, extend substitution, etc
          rhs' <- lvlFloatRhs abs_vars dest_lvl env NonRecursive
                              is_bot_lam NotJoinPoint rhs
-       ; (env', Identity bndr') <- newPolyBndrs dest_lvl env abs_vars (Identity bndr)
+       ; (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars [bndr]
        ; let bndr2 = annotateBotStr bndr' n_extra mb_bot_str
        ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
 
@@ -1303,13 +1301,13 @@ lvlBind env (AnnRec pairs)
     let (rhs_env, abs_vars_w_lvls) = lvlLamBndrs env dest_lvl abs_vars
         rhs_lvl = le_ctxt_lvl rhs_env
 
-    (rhs_env', Identity new_bndr) <- cloneLetVars Recursive rhs_env rhs_lvl (Identity bndr)
+    (rhs_env', [new_bndr]) <- cloneLetVars Recursive rhs_env rhs_lvl [bndr]
     let
         (lam_bndrs, rhs_body)   = collectAnnBndrs rhs
         (body_env1, lam_bndrs1) = substBndrsSL NonRecursive rhs_env' lam_bndrs
         (body_env2, lam_bndrs2) = lvlLamBndrs body_env1 rhs_lvl lam_bndrs1
     new_rhs_body <- lvlRhs body_env2 Recursive is_bot NotJoinPoint rhs_body
-    (poly_env, Identity poly_bndr) <- newPolyBndrs dest_lvl env abs_vars (Identity bndr)
+    (poly_env, [poly_bndr]) <- newPolyBndrs dest_lvl env abs_vars [bndr]
     return (Rec [(TB poly_bndr (FloatMe dest_lvl)
                  , mkLams abs_vars_w_lvls $
                    mkLams lam_bndrs2 $
@@ -1481,26 +1479,24 @@ Use lvlExpr otherwise.  A little subtle, and I got it wrong at least twice
 ************************************************************************
 -}
 
-substAndLvlBndrs :: Traversable f => RecFlag -> LevelEnv -> Level -> f InVar -> (LevelEnv, f LevelledBndr)
+substAndLvlBndrs :: RecFlag -> LevelEnv -> Level -> [InVar] -> (LevelEnv, [LevelledBndr])
 substAndLvlBndrs is_rec env lvl bndrs
   = lvlBndrs subst_env lvl subst_bndrs
   where
     (subst_env, subst_bndrs) = substBndrsSL is_rec env bndrs
-{-# INLINE substAndLvlBndrs #-}
 
-substBndrsSL :: Traversable f => RecFlag -> LevelEnv -> f InVar -> (LevelEnv, f OutVar)
+substBndrsSL :: RecFlag -> LevelEnv -> [InVar] -> (LevelEnv, [OutVar])
 -- So named only to avoid the name clash with GHC.Core.Subst.substBndrs
 substBndrsSL is_rec env@(LE { le_subst = subst, le_env = id_env }) bndrs
   = ( env { le_subst    = subst'
-          , le_env      = foldl' add_id  id_env (toList bndrs `zip` toList bndrs') }
+          , le_env      = foldl' add_id  id_env (bndrs `zip` bndrs') }
     , bndrs')
   where
     (subst', bndrs') = case is_rec of
                          NonRecursive -> substBndrs    subst bndrs
                          Recursive    -> substRecBndrs subst bndrs
-{-# INLINE substBndrsSL #-}
 
-lvlLamBndrs :: Traversable f => LevelEnv -> Level -> f OutVar -> (LevelEnv, f LevelledBndr)
+lvlLamBndrs :: LevelEnv -> Level -> [OutVar] -> (LevelEnv, [LevelledBndr])
 -- Compute the levels for the binders of a lambda group
 lvlLamBndrs env lvl bndrs
   = lvlBndrs env new_lvl bndrs
@@ -1514,18 +1510,17 @@ lvlLamBndrs env lvl bndrs
        -- true of a type variable -- there is no point in floating
        -- out of a big lambda.
        -- See Note [Computing one-shot info] in GHC.Types.Demand
-{-# INLINE lvlLamBndrs #-}
 
-lvlJoinBndrs :: Traversable f => LevelEnv -> Level -> RecFlag -> f OutVar
-             -> (LevelEnv, f LevelledBndr)
-lvlJoinBndrs env lvl rec = lvlBndrs env new_lvl
+lvlJoinBndrs :: LevelEnv -> Level -> RecFlag -> [OutVar]
+             -> (LevelEnv, [LevelledBndr])
+lvlJoinBndrs env lvl rec bndrs
+  = lvlBndrs env new_lvl bndrs
   where
     new_lvl | isRec rec = incMajorLvl lvl
             | otherwise = incMinorLvl lvl
       -- Non-recursive join points are one-shot; recursive ones are not
-{-# INLINE lvlJoinBndrs #-}
 
-lvlBndrs :: Traversable f => LevelEnv -> Level -> f CoreBndr -> (LevelEnv, f LevelledBndr)
+lvlBndrs :: LevelEnv -> Level -> [CoreBndr] -> (LevelEnv, [LevelledBndr])
 -- The binders returned are exactly the same as the ones passed,
 -- apart from applying the substitution, but they are now paired
 -- with a (StayPut level)
@@ -1538,8 +1533,7 @@ lvlBndrs :: Traversable f => LevelEnv -> Level -> f CoreBndr -> (LevelEnv, f Lev
 lvlBndrs env@(LE { le_lvl_env = lvl_env }) new_lvl bndrs
   = ( env { le_ctxt_lvl = new_lvl
           , le_lvl_env  = addLvls new_lvl lvl_env bndrs }
-    , fmap (stayPut new_lvl) bndrs)
-{-# INLINE lvlBndrs #-}
+    , map (stayPut new_lvl) bndrs)
 
 stayPut :: Level -> OutVar -> LevelledBndr
 stayPut new_lvl bndr = TB bndr (StayPut new_lvl)
@@ -1699,8 +1693,8 @@ initialEnv float_lams binds
 addLvl :: Level -> VarEnv Level -> OutVar -> VarEnv Level
 addLvl dest_lvl env v' = extendVarEnv env v' dest_lvl
 
-addLvls :: Foldable f => Level -> VarEnv Level -> f OutVar -> VarEnv Level
-addLvls = foldl' . addLvl
+addLvls :: Level -> VarEnv Level -> [OutVar] -> VarEnv Level
+addLvls dest_lvl env vs = foldl' (addLvl dest_lvl) env vs
 
 floatLams :: LevelEnv -> Maybe Int
 floatLams le = floatOutLambdas (le_switches le)
@@ -1798,15 +1792,17 @@ type LvlM result = UniqSM result
 initLvl :: UniqSupply -> UniqSM a -> a
 initLvl = initUs_
 
-newPolyBndrs :: (MonadUnique m, Traversable t) => Level -> LevelEnv -> [OutVar] -> t InId -> m (LevelEnv, t OutId)
+newPolyBndrs :: Level -> LevelEnv -> [OutVar] -> [InId]
+             -> LvlM (LevelEnv, [OutId])
 -- The envt is extended to bind the new bndrs to dest_lvl, but
 -- the le_ctxt_lvl is unaffected
 newPolyBndrs dest_lvl
              env@(LE { le_lvl_env = lvl_env, le_subst = subst, le_env = id_env })
              abs_vars bndrs
  = assert (all (not . isCoVar) bndrs) $   -- What would we add to the CoSubst in this case. No easy answer.
-   do { bndr_prs <- withUniquesM (\ uniq bndr -> (bndr, mk_poly_bndr bndr uniq)) bndrs
-      ; let new_bndrs = fmap snd bndr_prs
+   do { uniqs <- getUniquesM
+      ; let new_bndrs = zipWith mk_poly_bndr bndrs uniqs
+            bndr_prs  = bndrs `zip` new_bndrs
             env' = env { le_lvl_env = addLvls dest_lvl lvl_env new_bndrs
                        , le_subst   = foldl' add_subst subst   bndr_prs
                        , le_env     = foldl' add_id    id_env  bndr_prs }
@@ -1832,10 +1828,6 @@ newPolyBndrs dest_lvl
       = new_bndr `asJoinId` join_arity + length abs_vars
       | otherwise
       = new_bndr
-{-# SPECIALIZE newPolyBndrs :: (MonadUnique m) => Level -> LevelEnv -> [OutVar] -> [InId] -> m (LevelEnv, [OutId]) #-}
-{-# SPECIALIZE newPolyBndrs :: (MonadUnique m) => Level -> LevelEnv -> [OutVar] -> Identity InId -> m (LevelEnv, Identity OutId) #-}
-{-# SPECIALIZE newPolyBndrs :: (MonadUnique m) => Level -> LevelEnv -> [OutVar] -> NonEmpty InId -> m (LevelEnv, NonEmpty OutId) #-}
-{-# SPECIALIZE newPolyBndrs :: (MonadUnique m) => Level -> LevelEnv -> [OutVar] -> Pair InId -> m (LevelEnv, Pair OutId) #-}
 
 newLvlVar :: LevelledExpr        -- The RHS of the new binding
           -> JoinPointHood       -- Its join arity, if it is a join point
@@ -1859,7 +1851,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkSysLocal (mkFastString "lvl") uniq ManyTy rhs_ty
 
 -- | Clone the binders bound by a single-alternative case.
-cloneCaseBndrs :: Traversable t => LevelEnv -> Level -> t Var -> LvlM (LevelEnv, t Var)
+cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
 cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })
                new_lvl vs
   = do { (subst', vs') <- cloneBndrsM subst vs
@@ -1868,11 +1860,12 @@ cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env
              -- See Note [Setting levels when floating single-alternative cases].
        ; let env' = env { le_lvl_env   = addLvls new_lvl lvl_env vs'
                         , le_subst     = subst'
-                        , le_env       = foldl' add_id id_env (toList vs `zip` toList vs') }
+                        , le_env       = foldl' add_id id_env (vs `zip` vs') }
+
        ; return (env', vs') }
 
-cloneLetVars
- :: Traversable t => RecFlag -> LevelEnv -> Level -> t InVar -> LvlM (LevelEnv, t OutVar)
+cloneLetVars :: RecFlag -> LevelEnv -> Level -> [InVar]
+             -> LvlM (LevelEnv, [OutVar])
 -- See Note [Need for cloning during float-out]
 -- Works for Ids bound by let(rec)
 -- The dest_lvl is attributed to the binders in the new env,
@@ -1880,12 +1873,12 @@ cloneLetVars
 cloneLetVars is_rec
           env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })
           dest_lvl vs
-  = do { let vs1  = fmap zap vs
+  = do { let vs1  = map zap vs
        ; (subst', vs2) <- case is_rec of
                             NonRecursive -> cloneBndrsM      subst vs1
                             Recursive    -> cloneRecIdBndrsM subst vs1
 
-       ; let prs  = toList vs `zip` toList vs2
+       ; let prs  = vs `zip` vs2
              env' = env { le_lvl_env = addLvls dest_lvl lvl_env vs2
                         , le_subst   = subst'
                         , le_env     = foldl' add_id id_env prs }
@@ -1901,10 +1894,6 @@ cloneLetVars is_rec
     -- See Note [Zapping JoinId when floating]
     zap_join | isTopLvl dest_lvl = zapJoinId
              | otherwise         = id
-{-# SPECIALIZE cloneLetVars :: RecFlag -> LevelEnv -> Level -> [InVar] -> LvlM (LevelEnv, [OutVar]) #-}
-{-# SPECIALIZE cloneLetVars :: RecFlag -> LevelEnv -> Level -> Identity InVar -> LvlM (LevelEnv, Identity OutVar) #-}
-{-# SPECIALIZE cloneLetVars :: RecFlag -> LevelEnv -> Level -> NonEmpty InVar -> LvlM (LevelEnv, NonEmpty OutVar) #-}
-{-# SPECIALIZE cloneLetVars :: RecFlag -> LevelEnv -> Level -> Pair InVar -> LvlM (LevelEnv, Pair OutVar) #-}
 
 add_id :: IdEnv ([Var], LevelledExpr) -> (Var, Var) -> IdEnv ([Var], LevelledExpr)
 add_id id_env (v, v1)

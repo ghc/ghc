@@ -1722,7 +1722,7 @@ tcIfaceAlt scrut mult (tycon, inst_tys) (IfaceAlt (IfaceDataAlt data_occ) arg_st
 tcIfaceDataAlt :: Mult -> DataCon -> [Type] -> [IfLclName] -> IfaceExpr
                -> IfL CoreAlt
 tcIfaceDataAlt mult con inst_tys arg_strs rhs
-  = do  { uniqs <- getUniqueListM
+  = do  { uniqs <- getUniquesM
         ; let (ex_tvs, arg_ids)
                       = dataConRepFSInstPat (map ifLclNameFS arg_strs) uniqs mult con inst_tys
 
