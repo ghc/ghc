@@ -74,6 +74,7 @@ module GHC.Tc.Solver.Monad (
     getUnsolvedInerts,
     removeInertCts, getPendingGivenScs,
     insertFunEq, addInertForAll,
+    updInertDicts, updInertIrreds,
     emitWorkNC, emitWork,
     lookupInertDict,
 
@@ -369,6 +370,31 @@ duplicates, is explained in Note [Use only the best matching quantified constrai
 in GHC.Tc.Solver.Dict.
 -}
 
+updInertDicts :: DictCt -> TcS ()
+updInertDicts dict_ct@(DictCt { di_cls = cls, di_ev = ev, di_tys = tys })
+  = do { traceTcS "Adding inert dict" (ppr dict_ct $$ ppr cls  <+> ppr tys)
+
+       ; if |  isGiven ev, Just (str_ty, _) <- isIPPred_maybe cls tys
+            -> -- See (SIP1) and (SIP2) in Note [Shadowing of implicit parameters]
+               -- Update /both/ inert_cans /and/ inert_solved_dicts.
+               updInertSet $ \ inerts@(IS { inert_cans = ics, inert_solved_dicts = solved }) ->
+               inerts { inert_cans         = updDicts (filterDicts (not_ip_for str_ty)) ics
+                      , inert_solved_dicts = filterDicts (not_ip_for str_ty) solved }
+            |  otherwise
+            -> return ()
+
+       -- Add the new constraint to the inert set
+       ; updInertCans (updDicts (addDict dict_ct)) }
+  where
+    not_ip_for :: Type -> DictCt -> Bool
+    not_ip_for str_ty (DictCt { di_cls = cls, di_tys = tys })
+      = not (mentionsIP str_ty cls tys)
+
+updInertIrreds :: IrredCt -> TcS ()
+updInertIrreds irred
+  = do { tc_lvl <- getTcLevel
+       ; updInertCans $ addIrredToCans tc_lvl irred }
+
 {- *********************************************************************
 *                                                                      *
                   Kicking out
@@ -579,7 +605,7 @@ getInertGivens :: TcS [Ct]
 getInertGivens
   = do { inerts <- getInertCans
        ; let all_cts = foldIrreds ((:) . CIrredCan) (inert_irreds inerts)
-                     $ foldDicts  ((:) . CDictCan) (inert_dicts inerts)
+                     $ foldDicts  ((:) . CDictCan)  (inert_dicts inerts)
                      $ foldFunEqs ((:) . CEqCan)    (inert_funeqs inerts)
                      $ foldTyEqs  ((:) . CEqCan)    (inert_eqs inerts)
                      $ []
