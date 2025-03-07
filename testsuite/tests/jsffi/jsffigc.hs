@@ -68,7 +68,7 @@ testDynExportGC x y z = do
   -- Return a continuation to be called after the JavaScript side
   -- finishes garbage collection.
   js_mk_cont $ do
-    -- The JavaScript FinalizerRegistry logic only frees the stable
+    -- The JavaScript FinalizationRegistry logic only frees the stable
     -- pointer that pins fn. So we need to invoke Haskell garbage
     -- collection again.
     performGC
