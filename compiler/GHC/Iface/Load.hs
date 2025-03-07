@@ -1265,7 +1265,6 @@ pprModIface unit_state iface
                 <+> (withSelfRecomp iface empty $ \_ -> text "[self-recomp]")
                 <+> (if mi_orphan exts then text "[orphan module]" else Outputable.empty)
                 <+> (if mi_finsts exts then text "[family instance module]" else Outputable.empty)
-                <+> (if mi_hpc iface then text "[hpc]" else Outputable.empty)
                 <+> integer hiVersion
         , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash exts))
         , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash (mi_final_exts iface)))

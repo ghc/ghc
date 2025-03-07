@@ -27,7 +27,6 @@ module GHC.Unit.Module.ModIface
       , mi_insts
       , mi_fam_insts
       , mi_rules
-      , mi_hpc
       , mi_trust
       , mi_trust_pkg
       , mi_complete_matches
@@ -56,7 +55,6 @@ module GHC.Unit.Module.ModIface
    , set_mi_extra_decls
    , set_mi_foreign
    , set_mi_top_env
-   , set_mi_hpc
    , set_mi_trust
    , set_mi_trust_pkg
    , set_mi_complete_matches
@@ -114,7 +112,6 @@ import GHC.Unit.Module.WholeCoreBindings (IfaceForeign (..), emptyIfaceForeign)
 import GHC.Types.Avail
 import GHC.Types.Fixity
 import GHC.Types.Fixity.Env
-import GHC.Types.HpcInfo
 import GHC.Types.Name
 import GHC.Types.SafeHaskell
 import GHC.Types.SourceFile
@@ -301,8 +298,6 @@ data ModIface_ (phase :: ModIfacePhase)
         mi_fam_insts_   :: [IfaceFamInst],  -- ^ Sorted family instances
         mi_rules_       :: [IfaceRule],     -- ^ Sorted rules
 
-        mi_hpc_       :: !AnyHpcUsage,
-                -- ^ True if this program uses Hpc at any point in the program.
 
         mi_trust_     :: !IfaceTrustInfo,
                 -- ^ Safe Haskell Trust information for this module.
@@ -482,7 +477,6 @@ instance Binary ModIface where
                  mi_insts_     = insts,
                  mi_fam_insts_ = fam_insts,
                  mi_rules_     = rules,
-                 mi_hpc_       = hpc_info,
                  mi_trust_     = trust,
                  mi_trust_pkg_ = trust_pkg,
                  mi_complete_matches_ = complete_matches,
@@ -522,7 +516,6 @@ instance Binary ModIface where
         put_ bh fam_insts
         lazyPut bh rules
         put_ bh orphan_hash
-        put_ bh hpc_info
         put_ bh trust
         put_ bh trust_pkg
         put_ bh complete_matches
@@ -552,7 +545,6 @@ instance Binary ModIface where
         fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
         rules       <- {-# SCC "bin_rules" #-} lazyGet bh
         orphan_hash <- get bh
-        hpc_info    <- get bh
         trust       <- get bh
         trust_pkg   <- get bh
         complete_matches <- get bh
@@ -579,7 +571,6 @@ instance Binary ModIface where
                  mi_insts_       = insts,
                  mi_fam_insts_   = fam_insts,
                  mi_rules_       = rules,
-                 mi_hpc_         = hpc_info,
                  mi_trust_       = trust,
                  mi_trust_pkg_   = trust_pkg,
                         -- And build the cached values
@@ -623,7 +614,6 @@ emptyPartialModIface mod
         mi_extra_decls_ = Nothing,
         mi_foreign_     = emptyIfaceForeign,
         mi_top_env_     = IfaceTopEnv emptyDetOrdAvails [] ,
-        mi_hpc_         = False,
         mi_trust_       = noIfaceTrustInfo,
         mi_trust_pkg_   = False,
         mi_complete_matches_ = [],
@@ -674,7 +664,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
                { mi_module_, mi_sig_of_, mi_hsc_src_, mi_hi_bytes_, mi_deps_
                , mi_exports_,  mi_fixities_, mi_warns_, mi_anns_
                , mi_decls_, mi_defaults_, mi_extra_decls_, mi_foreign_, mi_top_env_, mi_insts_
-               , mi_fam_insts_, mi_rules_, mi_hpc_, mi_trust_, mi_trust_pkg_
+               , mi_fam_insts_, mi_rules_, mi_trust_, mi_trust_pkg_
                , mi_complete_matches_, mi_docs_, mi_final_exts_
                , mi_ext_fields_ })
     =     rnf mi_module_
@@ -694,7 +684,6 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq` rnf mi_insts_
     `seq` rnf mi_fam_insts_
     `seq` rnf mi_rules_
-    `seq` rnf mi_hpc_
     `seq`     mi_trust_
     `seq` rnf mi_trust_pkg_
     `seq` rnf mi_complete_matches_
@@ -828,9 +817,6 @@ set_mi_foreign foreign_ iface = clear_mi_hi_bytes $ iface { mi_foreign_ = foreig
 set_mi_top_env :: IfaceTopEnv -> ModIface_ phase -> ModIface_ phase
 set_mi_top_env val iface = clear_mi_hi_bytes $ iface { mi_top_env_ = val }
 
-set_mi_hpc :: AnyHpcUsage -> ModIface_ phase -> ModIface_ phase
-set_mi_hpc val iface = clear_mi_hi_bytes $ iface { mi_hpc_ = val }
-
 set_mi_trust :: IfaceTrustInfo -> ModIface_ phase -> ModIface_ phase
 set_mi_trust val iface = clear_mi_hi_bytes $ iface { mi_trust_ = val }
 
@@ -924,7 +910,6 @@ However, with the pragma, the correct core is generated:
 {-# INLINE mi_insts #-}
 {-# INLINE mi_fam_insts #-}
 {-# INLINE mi_rules #-}
-{-# INLINE mi_hpc #-}
 {-# INLINE mi_trust #-}
 {-# INLINE mi_trust_pkg #-}
 {-# INLINE mi_complete_matches #-}
@@ -940,7 +925,7 @@ pattern ModIface ::
   [IfaceAnnotation] -> [IfaceDeclExts phase] ->
   Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] -> IfaceForeign ->
   [IfaceDefault] -> IfaceTopEnv -> [IfaceClsInst] -> [IfaceFamInst] -> [IfaceRule] ->
-  AnyHpcUsage -> IfaceTrustInfo -> Bool -> [IfaceCompleteMatch] -> Maybe Docs ->
+  IfaceTrustInfo -> Bool -> [IfaceCompleteMatch] -> Maybe Docs ->
   IfaceBackendExts phase -> ExtensibleFields -> IfaceBinHandle phase -> Maybe ModIfaceSelfRecomp ->
   ModIface_ phase
 pattern ModIface
@@ -960,7 +945,6 @@ pattern ModIface
   , mi_insts
   , mi_fam_insts
   , mi_rules
-  , mi_hpc
   , mi_trust
   , mi_trust_pkg
   , mi_complete_matches
@@ -986,7 +970,6 @@ pattern ModIface
     , mi_insts_ = mi_insts
     , mi_fam_insts_ = mi_fam_insts
     , mi_rules_ = mi_rules
-    , mi_hpc_ = mi_hpc
     , mi_trust_ = mi_trust
     , mi_trust_pkg_ = mi_trust_pkg
     , mi_complete_matches_ = mi_complete_matches

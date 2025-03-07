@@ -358,7 +358,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_zany_n         = zany_n_var,
                 tcg_keep           = keep_var,
                 tcg_hdr_info        = (Nothing,Nothing),
-                tcg_hpc            = False,
                 tcg_main           = Nothing,
                 tcg_self_boot      = NoSelfBoot,
                 tcg_safe_infer     = infer_var,

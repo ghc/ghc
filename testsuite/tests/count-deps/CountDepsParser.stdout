@@ -187,7 +187,6 @@ GHC.Types.ForeignStubs
 GHC.Types.GREInfo
 GHC.Types.Hint
 GHC.Types.Hint.Ppr
-GHC.Types.HpcInfo
 GHC.Types.Id
 GHC.Types.Id.Info
 GHC.Types.Id.Make
