@@ -2,7 +2,16 @@ Named ``default`` declarations
 ==============================
 
 .. extension:: NamedDefaults
-    :shortdesc: Enable ``default`` declarations with explicitly named class.
+    :shortdesc:
+      Enable ``default`` declarations with explicitly named class,
+      extending :ref:`class_defaulting`.
+
+The ``NamedDefaults`` extension extends the type-class defaulting mechanism
+described in :ref:`class_defaulting`, allowing default types to be specified
+on a per-class basis, and to be imported and exported.
+
+Motivation
+----------
 
 Haskell 2010 `language report
 <https://www.haskell.org/onlinereport/haskell2010/haskellch4.html#x10-790004.3.4>`__

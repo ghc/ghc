@@ -1064,39 +1064,22 @@ For example:
       ghci> reverse ([] :: [Int])
       []
 
-However, it is tiresome for the user to have to specify the type, so
-GHCi extends Haskell's type-defaulting rules (Section 4.3.4 of the
-Haskell 2010 Report) as follows. The standard rules take each group of
-constraints ``(C1 a, C2 a, ..., Cn a)`` for each type variable ``a``,
-and defaults the type variable if
+However, it is tiresome for the user to have to specify the type, so at the GHCi
+prompt, or with GHC if the :extension:`ExtendedDefaultRules` flag is given,
+the usual defaulting rules are relaxed (see :ref:`extended-class-defaulting`
+for more details on the precise algorithm used):
 
-1. The type variable ``a`` appears in no other constraints
+-  Instead of only considering numeric classes (e.g. ``Num``, ``RealFloat`` etc),
+   any **interactive class** (defined below) is allowed.
 
-2. All the classes ``Ci`` are standard.
-
-3. At least one of the classes ``Ci`` is numeric.
-
-At the GHCi prompt, or with GHC if the :extension:`ExtendedDefaultRules` flag
-is given, the types are instead resolved with the following method:
-
-Find all the unsolved constraints. Then:
-
--  Find those that are of form ``(C a)`` where ``a`` is a type variable, and
-   partition those constraints into groups that share a common type variable ``a``.
-
--  Keep only the groups in which at least one of the classes is an
-   **interactive class** (defined below).
-
--  Now, for each remaining group G, try each type ``ty`` from the default-type list
-   in turn; if setting ``a = ty`` would allow the constraints in G to be completely
-   solved. If so, default ``a`` to ``ty``.
+-  Only consider constraints of the form ``C v``, for an interactive class ``C``,
+   when deciding what to default.
+   In particular, drop the requirement that the type variable must not appear
+   in non-unary or non-standard constraints; instead, such constraints will
+   simply not be considered when assigning a default type.
 
 -  The unit type ``()`` and the list type ``[]`` are added to the start of
    the standard list of types which are tried when doing type defaulting.
-
-Note that any multi-parameter constraints ``(D a b)`` or ``(D [a] Int)`` do not
-participate in the process (either to help or to hinder); but they must of course
-be soluble once the defaulting process is complete.
 
 The last point means that, for example, this program: ::
 

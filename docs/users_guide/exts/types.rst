@@ -11,6 +11,7 @@ Types
     infix_tycons
     type_operators
     liberal_type_synonyms
+    type_defaulting
     existential_quantification
     gadt_syntax
     gadt
