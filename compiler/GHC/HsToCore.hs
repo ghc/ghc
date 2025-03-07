@@ -138,7 +138,6 @@ deSugar hsc_env
                             tcg_default_exports = defaults,
                             tcg_insts        = insts,
                             tcg_fam_insts    = fam_insts,
-                            tcg_hpc          = other_hpc_info,
                             tcg_complete_matches = complete_matches,
                             tcg_self_boot    = self_boot
                             })
@@ -179,7 +178,7 @@ deSugar hsc_env
                 then writeMixEntries (hpcDir dflags) mod ticks orig_file2
                 else return 0 -- dummy hash when none are written
               pure $ HpcInfo (fromIntegral $ sizeSS ticks) hashNo
-            _ -> pure $ emptyHpcInfo other_hpc_info
+            _ -> pure $ emptyHpcInfo
 
         ; (msgs, mb_res) <- initDs hsc_env tcg_env $
                        do { dsEvBinds ev_binds $ \ ds_ev_binds -> do

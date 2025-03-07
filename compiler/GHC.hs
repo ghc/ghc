@@ -116,7 +116,6 @@ module GHC (
           mi_decls,
           mi_extra_decls,
           mi_top_env,
-          mi_hpc,
           mi_trust,
           mi_trust_pkg,
           mi_complete_matches,
