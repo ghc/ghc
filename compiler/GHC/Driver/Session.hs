@@ -3587,7 +3587,38 @@ makeDynFlagsConsistent dflags
 
  | LinkMergedObj <- ghcLink dflags
  , Nothing <- outputFile dflags
- = pgmError "--output must be specified when using --merge-objs"
+    = pgmError "--output must be specified when using --merge-objs"
+
+#if MIN_VERSION_GLASGOW_HASKELL(9,13,0,0)
+  -- When we do ghci, force using dyn ways if the target RTS linker
+  -- only supports dynamic code
+ | LinkInMemory <- ghcLink dflags
+ , sTargetRTSLinkerOnlySupportsSharedLibs $ settings dflags
+ , not (dynamicNow dflags) || not (gopt Opt_ExternalInterpreter dflags)
+    = flip loop "Forcing dyn ways, because doing GHCi and target RTS linker only supports dynamic code" $
+        setDynamicNow $
+        -- See checkOptions below, -fexternal-interpreter is
+        -- required when using --interactive with a non-standard
+        -- way (-prof, -static, or -dynamic).
+        setGeneralFlag' Opt_ExternalInterpreter $
+        -- Use .o for dynamic object, otherwise it gets dropped
+        -- with "Warning: ignoring unrecognised input", see
+        -- objish_suffixes
+        dflags { dynObjectSuf_ = objectSuf dflags }
+#endif
+
+ | backendNeedsFullWays (backend dflags)
+ , not (gopt Opt_ExternalInterpreter dflags)
+ , targetWays_ dflags /= hostFullWays
+    = flip loop "Enabling options for all ways, required by the backend" $
+        let dflags_a = dflags { targetWays_ = hostFullWays }
+            dflags_b = foldl gopt_set dflags_a
+                     $ concatMap (wayGeneralFlags platform)
+                                 hostFullWays
+            dflags_c = foldl gopt_unset dflags_b
+                     $ concatMap (wayUnsetGeneralFlags platform)
+                                 hostFullWays
+        in dflags_c
 
  | otherwise = (dflags, mempty)
     where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")

@@ -224,40 +224,8 @@ main' postLoadMode units dflags0 args flagWarnings = do
 
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files
-  (dflags3', fileish_args, dynamicFlagWarnings) <-
+  (dflags4, fileish_args, dynamicFlagWarnings) <-
       GHC.parseDynamicFlags logger2 dflags2 args'
-
-  -- When we do ghci, force using dyn ways if the target RTS linker
-  -- only supports dynamic code
-  let dflags3
-        | LinkInMemory <- link,
-          sTargetRTSLinkerOnlySupportsSharedLibs $ settings dflags3'
-            = setDynamicNow $
-              -- See checkOptions below, -fexternal-interpreter is
-              -- required when using --interactive with a non-standard
-              -- way (-prof, -static, or -dynamic).
-              setGeneralFlag' Opt_ExternalInterpreter $
-              -- Use .o for dynamic object, otherwise it gets dropped
-              -- with "Warning: ignoring unrecognised input", see
-              -- objish_suffixes
-              dflags3' { dynObjectSuf_ = objectSuf dflags3' }
-        | otherwise
-            = dflags3'
-
-  let dflags4 = if backendNeedsFullWays bcknd &&
-                   not (gopt Opt_ExternalInterpreter dflags3)
-                then
-                    let platform = targetPlatform dflags3
-                        dflags3a = dflags3 { targetWays_ = hostFullWays }
-                        dflags3b = foldl gopt_set dflags3a
-                                 $ concatMap (wayGeneralFlags platform)
-                                             hostFullWays
-                        dflags3c = foldl gopt_unset dflags3b
-                                 $ concatMap (wayUnsetGeneralFlags platform)
-                                             hostFullWays
-                    in dflags3c
-                else
-                    dflags3
 
   let logger4 = setLogFlags logger2 (initLogFlags dflags4)
 
