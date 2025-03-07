@@ -537,6 +537,7 @@ Library
         GHC.Driver.Plugins.External
         GHC.Driver.Ppr
         GHC.Driver.Session
+        GHC.Driver.Session.Units
         GHC.Hs
         GHC.Hs.Basic
         GHC.Hs.Binds
