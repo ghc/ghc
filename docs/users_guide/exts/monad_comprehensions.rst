@@ -9,6 +9,8 @@ Monad comprehensions
 .. extension:: MonadComprehensions
     :shortdesc: Allow list comprehension syntax to be used at monads other than ``List``.
 
+    :implies: :extension:`ParallelListComp`
+
     :since: 7.2.1
 
     Enable list comprehension syntax for arbitrary monads.

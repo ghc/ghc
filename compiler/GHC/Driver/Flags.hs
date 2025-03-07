@@ -330,7 +330,7 @@ impliedXFlags
     , (LangExt.RecordWildCards,     On LangExt.DisambiguateRecordFields)
 
     , (LangExt.ParallelArrays, On LangExt.ParallelListComp)
-
+    , (LangExt.MonadComprehensions, On LangExt.ParallelListComp)
     , (LangExt.JavaScriptFFI, On LangExt.InterruptibleFFI)
 
     , (LangExt.DeriveTraversable, On LangExt.DeriveFunctor)

@@ -2,4 +2,4 @@
 readFail038.hs:5:9: error: [GHC-42026]
     Unexpected parallel statement in a list comprehension
     Suggested fix:
-      Perhaps you intended to use the ‘ParallelListComp’ extension (implied by ‘ParallelArrays’)
+      Perhaps you intended to use the ‘ParallelListComp’ extension (implied by ‘ParallelArrays’ and ‘MonadComprehensions’)

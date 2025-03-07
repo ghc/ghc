@@ -10,6 +10,8 @@ Parallel List Comprehensions
 .. extension:: ParallelListComp
     :shortdesc: Allow parallel list comprehension syntax.
 
+    :implied by: :extension:`MonadComprehensions`
+
     :since: 6.8.1
 
     Allow parallel list comprehension syntax.
