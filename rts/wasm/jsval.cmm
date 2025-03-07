@@ -1,10 +1,33 @@
 #include "Cmm.h"
 
-// This defines the unlifted JSVal# type. See Note [JSVal
-// representation for wasm] for detailed explanation.
+// This defines the unlifted JSVal# type. See
+// Note [JSVal representation for wasm] for
+// detailed explanation.
 
-INFO_TABLE(stg_JSVAL, 0, 1, PRIM, "JSVAL", "JSVAL")
+INFO_TABLE(stg_JSVAL, 1, 2, PRIM, "JSVAL", "JSVAL")
   (P_ node)
 {
   return (node);
+}
+
+stg_setJSVALsp (P_ p, W_ sp)
+{
+  W_[p + SIZEOF_StgHeader + WDS(2)] = sp;
+  return ();
+}
+
+stg_freeJSVAL (P_ p)
+{
+  P_ w;
+  W_ sp;
+
+  w = P_[p + SIZEOF_StgHeader];
+  sp = W_[p + SIZEOF_StgHeader + WDS(2)];
+
+  if (sp != NULL) {
+    ccall freeStablePtr(sp);
+    W_[p + SIZEOF_StgHeader + WDS(2)] = NULL;
+  }
+
+  jump stg_finalizzeWeakzh (w);
 }

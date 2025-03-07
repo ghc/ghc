@@ -43,10 +43,14 @@ import GHC.Internal.Word
 mkJSCallback :: (StablePtr a -> IO JSVal) -> a -> IO JSVal
 mkJSCallback adjustor f = do
   sp@(StablePtr sp#) <- newStablePtr f
-  JSVal v w _ <- adjustor sp
-  let r = JSVal v w sp#
-  js_callback_register r sp
-  pure r
+  v@(JSVal p) <- adjustor sp
+  IO $ \s0 -> case stg_setJSVALsp p sp# s0 of
+    (# s1 #) -> (# s1, () #)
+  js_callback_register v sp
+  pure v
+
+foreign import prim "stg_setJSVALsp"
+  stg_setJSVALsp :: JSVal# -> StablePtr# a -> State# RealWorld -> (# State# RealWorld #)
 
 foreign import javascript unsafe "__ghc_wasm_jsffi_finalization_registry.register($1, $2, $1)"
   js_callback_register :: JSVal -> StablePtr a -> IO ()

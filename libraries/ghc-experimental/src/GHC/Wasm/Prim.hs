@@ -1,22 +1,21 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module GHC.Wasm.Prim (
-  -- User-facing JSVal type and freeJSVal
+  -- * User-facing 'JSVal' and related utilities
   JSVal,
   freeJSVal,
   mkWeakJSVal,
 
-  -- The JSString type and conversion from/to Haskell String
+  -- * 'JSString' and conversion from/to Haskell 'String'
   JSString (..),
   fromJSString,
   toJSString,
 
-  -- Exception types related to JSFFI
+  -- * Exception types related to JSFFI
   JSException (..),
   WouldBlockException (..),
-  PromisePendingException (..),
 
-  -- Is JSFFI used in the current wasm module?
+  -- * Is JSFFI used in the current wasm module?
   isJSFFIUsed
 ) where
 
