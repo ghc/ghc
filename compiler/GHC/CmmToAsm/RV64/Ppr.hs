@@ -1,3 +1,5 @@
+-- To keep the style consistent: Please format this file with Ormolu
+-- (https://github.com/tweag/ormolu).
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module GHC.CmmToAsm.RV64.Ppr (pprNatCmmDecl, pprInstr) where
@@ -59,7 +61,6 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
               -- elimination, it might be the target of a goto.
               ( if platformHasSubsectionsViaSymbols platform
                   then -- See Note [Subsections Via Symbols]
-
                     line
                       $ text "\t.long "
                       <+> pprAsmLabel platform info_lbl
@@ -666,10 +667,12 @@ pprInstr platform instr = case instr of
       $ line (pprOp platform o1 <> text "->" <> pprOp platform o2)
   FABS o1 o2 | isSingleOp o2 -> op2 (text "\tfabs.s") o1 o2
   FABS o1 o2 | isDoubleOp o2 -> op2 (text "\tfabs.d") o1 o2
-  FMIN o1 o2 o3 | isSingleOp o1 -> op3 (text "\tfmin.s") o1 o2 o3
-                | isDoubleOp o2 -> op3 (text "\tfmin.d") o1 o2 o3
-  FMAX o1 o2 o3 | isSingleOp o1 -> op3 (text "\tfmax.s") o1 o2 o3
-                | isDoubleOp o2 -> op3 (text "\tfmax.d") o1 o2 o3
+  FMIN o1 o2 o3
+    | isSingleOp o1 -> op3 (text "\tfmin.s") o1 o2 o3
+    | isDoubleOp o2 -> op3 (text "\tfmin.d") o1 o2 o3
+  FMAX o1 o2 o3
+    | isSingleOp o1 -> op3 (text "\tfmax.s") o1 o2 o3
+    | isDoubleOp o2 -> op3 (text "\tfmax.d") o1 o2 o3
   FMA variant d r1 r2 r3 ->
     let fma = case variant of
           FMAdd -> text "\tfmadd" <> dot <> floatPrecission d

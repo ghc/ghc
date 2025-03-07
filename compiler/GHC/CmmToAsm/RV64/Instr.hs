@@ -1,3 +1,5 @@
+-- To keep the style consistent: Please format this file with Ormolu
+-- (https://github.com/tweag/ormolu).
 -- All instructions will be rendered eventually. Thus, there's no benefit in
 -- being lazy in data types.
 {-# LANGUAGE StrictData #-}
@@ -20,8 +22,8 @@ import GHC.CmmToAsm.Utils
 import GHC.Data.FastString (LexicalFastString)
 import GHC.Platform
 import GHC.Platform.Reg
-import GHC.Platform.Regs
 import GHC.Platform.Reg.Class.Separate
+import GHC.Platform.Regs
 import GHC.Prelude
 import GHC.Stack
 import GHC.Types.Unique.DSM
@@ -122,18 +124,18 @@ regUsageOfInstr platform instr = case instr of
         (map mkFmt $ filter (interesting platform) srcRegs)
         (map mkFmt $ filter (interesting platform) dstRegs)
 
-      -- SIMD NCG TODO: the format here is used for register spilling/unspilling.
-      -- As the RISCV64 NCG does not currently support SIMD registers,
-      -- this simple logic is OK.
+    -- SIMD NCG TODO: the format here is used for register spilling/unspilling.
+    -- As the RISCV64 NCG does not currently support SIMD registers,
+    -- this simple logic is OK.
     mkFmt r = RegWithFormat r fmt
       where
         fmt = case cls of
-                RcInteger -> II64
-                RcFloat   -> FF64
-                RcVector  -> sorry "The RISCV64 NCG does not (yet) support vectors; please use -fllvm."
+          RcInteger -> II64
+          RcFloat -> FF64
+          RcVector -> sorry "The RISCV64 NCG does not (yet) support vectors; please use -fllvm."
         cls = case r of
-                RegVirtual vr -> classOfVirtualReg (platformArch platform) vr
-                RegReal rr -> classOfRealReg rr
+          RegVirtual vr -> classOfVirtualReg (platformArch platform) vr
+          RegReal rr -> classOfRealReg rr
 
     regAddr :: AddrMode -> [Reg]
     regAddr (AddrRegImm r1 _imm) = [r1]
@@ -607,13 +609,11 @@ data Instr
     FCVT FcvtVariant Operand Operand
   | -- | Floating point ABSolute value
     FABS Operand Operand
-
   | -- | Min
     -- dest = min(r1)
     FMIN Operand Operand Operand
   | -- | Max
     FMAX Operand Operand Operand
-
   | -- | Floating-point fused multiply-add instructions
     --
     -- - fmadd : d =   r1 * r2 + r3

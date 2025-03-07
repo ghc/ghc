@@ -1,3 +1,5 @@
+-- To keep the style consistent: Please format this file with Ormolu
+-- (https://github.com/tweag/ormolu).
 module GHC.CmmToAsm.RV64.Regs where
 
 import GHC.Cmm
@@ -201,25 +203,27 @@ realRegSqueeze cls rr =
     RcInteger ->
       case rr of
         RealRegSingle regNo
-          | regNo < d0RegNo
-          -> 1
-          | otherwise
-          -> 0
+          | regNo < d0RegNo ->
+              1
+          | otherwise ->
+              0
     RcFloat ->
       case rr of
         RealRegSingle regNo
-          |  regNo < d0RegNo
-          || regNo > d31RegNo
-          -> 0
-          | otherwise
-          -> 1
+          | regNo
+              < d0RegNo
+              || regNo
+              > d31RegNo ->
+              0
+          | otherwise ->
+              1
     RcVector ->
       case rr of
         RealRegSingle regNo
-          | regNo > d31RegNo
-          -> 1
-          | otherwise
-          -> 0
+          | regNo > d31RegNo ->
+              1
+          | otherwise ->
+              0
 
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format

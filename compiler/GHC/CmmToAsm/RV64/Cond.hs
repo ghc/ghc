@@ -1,3 +1,5 @@
+-- To keep the style consistent: Please format this file with Ormolu
+-- (https://github.com/tweag/ormolu).
 module GHC.CmmToAsm.RV64.Cond
   ( Cond (..),
   )

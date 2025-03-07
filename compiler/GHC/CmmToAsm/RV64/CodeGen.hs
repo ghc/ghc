@@ -1,3 +1,5 @@
+-- To keep the style consistent: Please format this file with Ormolu
+-- (https://github.com/tweag/ormolu).
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE GADTs #-}
@@ -265,7 +267,6 @@ annExpr e {- debugIsOn -} = ANN (text . show $ e)
 -- I.e. the relative offset calculations are done by the linker via relocations.
 -- This seems to be PIC compatible; at least `scanelf` (pax-utils) does not
 -- complain.
-
 
 -- | Generate jump to jump table target
 --
@@ -776,9 +777,8 @@ getRegister' config plat expr =
               )
         MO_SS_Conv from to -> ss_conv from to reg code
         MO_FF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` annExpr e (FCVT FloatToFloat (OpReg to dst) (OpReg from reg)))
-        MO_WF_Bitcast w    -> return $ Any (floatFormat w)  (\dst -> code `snocOL` MOV (OpReg w dst) (OpReg w reg))
-        MO_FW_Bitcast w    -> return $ Any (intFormat w)    (\dst -> code `snocOL` MOV (OpReg w dst) (OpReg w reg))
-
+        MO_WF_Bitcast w -> return $ Any (floatFormat w) (\dst -> code `snocOL` MOV (OpReg w dst) (OpReg w reg))
+        MO_FW_Bitcast w -> return $ Any (intFormat w) (\dst -> code `snocOL` MOV (OpReg w dst) (OpReg w reg))
         -- Conversions
         -- TODO: Duplication with MO_UU_Conv
         MO_XX_Conv from to
@@ -1137,14 +1137,14 @@ getRegister' config plat expr =
         -- x86 fnmadd - x * y + z <=> RISCV64 fmsub : d = - r1 * r2 + r3
         -- x86 fnmsub - x * y - z <=> RISCV64 fnmadd: d = - r1 * r2 - r3
         MO_FMA var l w
-          | l == 1
-          -> case var of
+          | l == 1 ->
+              case var of
                 FMAdd -> float3Op w (\d n m a -> unitOL $ FMA FMAdd d n m a)
                 FMSub -> float3Op w (\d n m a -> unitOL $ FMA FMSub d n m a)
                 FNMAdd -> float3Op w (\d n m a -> unitOL $ FMA FNMSub d n m a)
                 FNMSub -> float3Op w (\d n m a -> unitOL $ FMA FNMAdd d n m a)
-          | otherwise
-          -> sorry "The RISCV64 backend does not (yet) support vectors."
+          | otherwise ->
+              sorry "The RISCV64 backend does not (yet) support vectors."
         _ ->
           pprPanic "getRegister' (unhandled ternary CmmMachOp): "
             $ pprMachOp op

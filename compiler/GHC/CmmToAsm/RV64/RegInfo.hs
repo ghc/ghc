@@ -1,3 +1,6 @@
+-- To keep the style consistent: Please format this file with Ormolu
+-- (https://github.com/tweag/ormolu).
+
 -- | Minimum viable implementation of jump short-cutting: No short-cutting.
 --
 -- The functions here simply implement the no-short-cutting case. Implementing
