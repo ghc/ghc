@@ -655,57 +655,50 @@ mkIfaceHashCache pairs
 emptyIfaceHashCache :: OccName -> Maybe (OccName, Fingerprint)
 emptyIfaceHashCache _occ = Nothing
 
--- Take care, this instance only forces to the degree necessary to
--- avoid major space leaks.
+-- ModIface is completely forced since it will live in memory for a long time.
+-- If forcing it uses a lot of memory, then store less things in ModIface.
 instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
          , NFData (IfaceDeclExts (phase :: ModIfacePhase))
          ) => NFData (ModIface_ phase) where
-  rnf (PrivateModIface
-               { mi_module_, mi_sig_of_, mi_hsc_src_, mi_hi_bytes_, mi_deps_
-               , mi_exports_,  mi_fixities_, mi_warns_, mi_anns_
-               , mi_decls_, mi_defaults_, mi_extra_decls_, mi_foreign_, mi_top_env_, mi_insts_
-               , mi_fam_insts_, mi_rules_, mi_trust_, mi_trust_pkg_
-               , mi_complete_matches_, mi_docs_, mi_final_exts_
-               , mi_ext_fields_ })
-    =     rnf mi_module_
-    `seq` rnf mi_sig_of_
-    `seq`     mi_hsc_src_
-    `seq`     mi_hi_bytes_
-    `seq`     mi_deps_
-    `seq`     mi_exports_
-    `seq`     mi_fixities_
-    `seq` rnf mi_warns_
-    `seq` rnf mi_anns_
-    `seq` rnf mi_decls_
-    `seq` rnf mi_defaults_
-    `seq` rnf mi_extra_decls_
-    `seq` rnf mi_foreign_
-    `seq` rnf mi_top_env_
-    `seq` rnf mi_insts_
-    `seq` rnf mi_fam_insts_
-    `seq` rnf mi_rules_
-    `seq`     mi_trust_
-    `seq` rnf mi_trust_pkg_
-    `seq` rnf mi_complete_matches_
-    `seq` rnf mi_docs_
-    `seq`     mi_final_exts_
-    `seq`     mi_ext_fields_
-    `seq` ()
+  rnf (PrivateModIface a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 a18 a19 a20 a21 a22 a23 a24)
+    = rnf a1
+    `seq` rnf a2
+    `seq` rnf a3
+    `seq` rnf a4
+    `seq` rnf a5
+    `seq` rnf a6
+    `seq` rnf a7
+    `seq` rnf a8
+    `seq` rnf a9
+    `seq` rnf a10
+    `seq` rnf a11
+    `seq` rnf a12
+    `seq` rnf a13
+    `seq` rnf a14
+    `seq` rnf a15
+    `seq` rnf a16
+    `seq` rnf a17
+    `seq` rnf a18
+    `seq` rnf a19
+    `seq` rnf a20
+    `seq` rnf a21
+    `seq` rnf a22
+    -- IfaceBinHandle
+    `seq` (a23 :: IfaceBinHandle phase)
+    `seq` rnf a24
 
-instance NFData (ModIfaceBackend) where
-  rnf (ModIfaceBackend{ mi_mod_hash
-                      ,  mi_orphan, mi_finsts, mi_exp_hash
-                      , mi_orphan_hash, mi_decl_warn_fn, mi_export_warn_fn, mi_fix_fn
-                      , mi_hash_fn})
-    =  rnf mi_mod_hash
-    `seq` rnf mi_orphan
-    `seq` rnf mi_finsts
-    `seq` rnf mi_exp_hash
-    `seq` rnf mi_orphan_hash
-    `seq` rnf mi_decl_warn_fn
-    `seq` rnf mi_export_warn_fn
-    `seq` rnf mi_fix_fn
-    `seq` rnf mi_hash_fn
+instance NFData ModIfaceBackend where
+  rnf (ModIfaceBackend a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
+    =  rnf a1
+    `seq` rnf a2
+    `seq` rnf a3
+    `seq` rnf a4
+    `seq` rnf a5
+    `seq` rnf a6
+    `seq` rnf a7
+    `seq` rnf a8
+    `seq` rnf a9
+    `seq` rnf a10
 
 
 forceModIface :: ModIface -> IO ()

@@ -2,11 +2,11 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 module Language.Haskell.Syntax.Basic where
 
-import Data.Data
+import Data.Data (Data)
 import Data.Eq
 import Data.Ord
 import Data.Bool
-import Data.Int (Int)
+import Prelude
 
 import GHC.Data.FastString (FastString)
 import Control.DeepSeq
@@ -134,5 +134,13 @@ data FixityDirection
    | InfixN
    deriving (Eq, Data)
 
+instance NFData FixityDirection where
+  rnf InfixL = ()
+  rnf InfixR = ()
+  rnf InfixN = ()
+
 data Fixity = Fixity Int FixityDirection
   deriving (Eq, Data)
+
+instance NFData Fixity where
+  rnf (Fixity i d) = rnf i `seq` rnf d `seq` ()

@@ -994,6 +994,11 @@ instance Outputable FunSel where
   ppr SelArg  = text "arg"
   ppr SelRes  = text "res"
 
+instance NFData FunSel where
+  rnf SelMult = ()
+  rnf SelArg  = ()
+  rnf SelRes  = ()
+
 instance Binary CoSel where
    put_ bh (SelTyCon n r)   = do { putByte bh 0; put_ bh n; put_ bh r }
    put_ bh SelForAll        = putByte bh 1
@@ -1010,9 +1015,9 @@ instance Binary CoSel where
                    _ -> return (SelFun SelRes) }
 
 instance NFData CoSel where
-  rnf (SelTyCon n r) = n `seq` r `seq` ()
+  rnf (SelTyCon n r) = rnf n `seq` rnf r `seq` ()
   rnf SelForAll      = ()
-  rnf (SelFun fs)    = fs `seq` ()
+  rnf (SelFun fs)    = rnf fs `seq` ()
 
 -- | A semantically more meaningful type to represent what may or may not be a
 -- useful 'Coercion'.

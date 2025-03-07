@@ -126,12 +126,6 @@ data GREInfo
 
     deriving Data
 
-instance NFData GREInfo where
-  rnf Vanilla = ()
-  rnf UnboundGRE = ()
-  rnf (IAmTyCon tc) = rnf tc
-  rnf (IAmConLike info) = rnf info
-  rnf (IAmRecField info) = rnf info
 
 plusGREInfo :: GREInfo -> GREInfo -> GREInfo
 plusGREInfo Vanilla Vanilla = Vanilla

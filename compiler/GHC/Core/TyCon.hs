@@ -181,6 +181,7 @@ import GHC.Settings.Constants
 import GHC.Utils.Misc
 import GHC.Types.Unique.Set
 import GHC.Unit.Module
+import Control.DeepSeq
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
@@ -730,6 +731,11 @@ instance Binary TyConBndrVis where
               ; case h of
                   0 -> return AnonTCB
                   _ -> do { vis <- get bh; return (NamedTCB vis) } }
+
+instance NFData TyConBndrVis where
+  rnf AnonTCB        = ()
+  rnf (NamedTCB vis) = rnf vis
+
 
 
 {- *********************************************************************
@@ -2915,6 +2921,10 @@ instance Binary Injectivity where
                     0 -> return NotInjective
                     _ -> do { xs <- get bh
                             ; return (Injective xs) } }
+
+instance NFData Injectivity where
+  rnf NotInjective = ()
+  rnf (Injective xs) = rnf xs
 
 -- | Returns whether or not this 'TyCon' is definite, or a hole
 -- that may be filled in at some later point.  See Note [Skolem abstract data]

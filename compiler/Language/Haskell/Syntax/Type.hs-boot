@@ -4,6 +4,8 @@ import Data.Bool
 import Data.Eq
 import Data.Ord
 
+import Control.DeepSeq
+
 {-
 ************************************************************************
 *                                                                      *
@@ -19,5 +21,6 @@ data PromotionFlag
 
 instance Eq PromotionFlag
 instance Ord PromotionFlag
+instance NFData PromotionFlag
 
 isPromoted :: PromotionFlag -> Bool

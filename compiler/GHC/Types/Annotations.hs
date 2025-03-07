@@ -31,7 +31,7 @@ import Control.Monad
 import Data.Maybe
 import Data.Typeable
 import Data.Word        ( Word8 )
-
+import Control.DeepSeq
 
 -- | Represents an annotation after it has been sufficiently desugared from
 -- it's initial form of 'GHC.Hs.Decls.AnnDecl'
@@ -70,6 +70,10 @@ instance Binary name => Binary (AnnTarget name) where
         case h of
             0 -> liftM NamedTarget  $ get bh
             _ -> liftM ModuleTarget $ get bh
+
+instance NFData name => NFData (AnnTarget name) where
+  rnf (NamedTarget n) = rnf n
+  rnf (ModuleTarget m) = rnf m
 
 instance Outputable Annotation where
     ppr ann = ppr (ann_target ann)
