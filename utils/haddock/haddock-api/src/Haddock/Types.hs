@@ -987,15 +987,6 @@ instance NFData RdrName where
   rnf (Orig m on) = m `deepseq` on `deepseq` ()
   rnf (Exact n) = rnf n
 
-instance NFData FixityDirection where
-  rnf InfixL = ()
-  rnf InfixR = ()
-  rnf InfixN = ()
-
-instance NFData Fixity where
-  rnf (Fixity n dir) =
-    n `deepseq` dir `deepseq` ()
-
 instance NFData (EpAnn NameAnn) where
   rnf (EpAnn en ann cs) = en `deepseq` ann `deepseq` cs `deepseq` ()
 
@@ -1065,15 +1056,6 @@ instance NFData EpaCommentTok where
   rnf (EpaLineComment s) = rnf s
   rnf (EpaBlockComment s) = rnf s
 
-instance NFData a => NFData (Strict.Maybe a) where
-  rnf Strict.Nothing = ()
-  rnf (Strict.Just x) = rnf x
-
-instance NFData BufSpan where
-  rnf (BufSpan p1 p2) = p1 `deepseq` p2 `deepseq` ()
-
-instance NFData BufPos where
-  rnf (BufPos n) = rnf n
 
 instance NFData DeltaPos where
   rnf (SameLine n) = rnf n

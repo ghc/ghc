@@ -58,6 +58,7 @@ import GHC.Types.SrcLoc
 import qualified Data.Data as Data
 import Data.Array
 import Data.List ( mapAccumL )
+import Control.DeepSeq
 
 {-
 Note [Coercion axiom branches]
@@ -558,6 +559,11 @@ instance Binary Role where
                           2 -> return Representational
                           3 -> return Phantom
                           _ -> panic ("get Role " ++ show tag)
+
+instance NFData Role where
+  rnf Nominal = ()
+  rnf Representational = ()
+  rnf Phantom = ()
 
 {-
 ************************************************************************

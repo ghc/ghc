@@ -84,6 +84,7 @@ import Data.Char
 import Data.Data ( Data )
 import GHC.Exts( isTrue#, dataToTag#, (<#) )
 import Numeric ( fromRat )
+import Control.DeepSeq
 
 {-
 ************************************************************************
@@ -204,6 +205,20 @@ instance Binary LitNumType where
       h <- getByte bh
       return (toEnum (fromIntegral h))
 
+instance NFData LitNumType where
+    rnf (LitNumBigNat) = ()
+    rnf (LitNumInt) = ()
+    rnf (LitNumInt8) = ()
+    rnf (LitNumInt16) = ()
+    rnf (LitNumInt32) = ()
+    rnf (LitNumInt64) = ()
+    rnf (LitNumWord) = ()
+    rnf (LitNumWord8) = ()
+    rnf (LitNumWord16) = ()
+    rnf (LitNumWord32) = ()
+    rnf (LitNumWord64) = ()
+
+
 {-
 Note [BigNum literals]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -288,6 +303,16 @@ instance Binary Literal where
                     return (LitNumber nt i)
               _ -> pprPanic "Binary:Literal" (int (fromIntegral h))
 
+instance NFData Literal where
+    rnf (LitChar c) = rnf c
+    rnf (LitNumber nt i) = rnf nt `seq` rnf i
+    rnf (LitString s) = rnf s
+    rnf LitNullAddr = ()
+    rnf (LitFloat r) = rnf r
+    rnf (LitDouble r) = rnf r
+    rnf (LitLabel l1 k2) = rnf l1 `seq` rnf k2
+    rnf (LitRubbish {}) = () -- LitRubbish is not contained within interface files.
+                             -- See Note [Rubbish literals].
 
 instance Outputable Literal where
     ppr = pprLiteral id

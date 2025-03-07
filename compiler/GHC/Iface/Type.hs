@@ -2577,6 +2577,11 @@ instance Binary (DefMethSpec IfaceType) where
               0 -> return VanillaDM
               _ -> do { t <- get bh; return (GenericDM t) }
 
+instance NFData (DefMethSpec IfaceType) where
+  rnf = \case
+    VanillaDM -> ()
+    GenericDM t -> rnf t
+
 instance NFData IfaceType where
   rnf = \case
     IfaceFreeTyVar f1 -> f1 `seq` ()

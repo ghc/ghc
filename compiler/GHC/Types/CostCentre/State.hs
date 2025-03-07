@@ -15,6 +15,7 @@ import GHC.Data.FastString.Env
 
 import Data.Data
 import GHC.Utils.Binary
+import Control.DeepSeq
 
 -- | Per-module state for tracking cost centre indices.
 --
@@ -28,6 +29,9 @@ newCostCentreState = CostCentreState emptyFsEnv
 -- | An index into a given cost centre module,name,flavour set
 newtype CostCentreIndex = CostCentreIndex { unCostCentreIndex :: Int }
   deriving (Eq, Ord, Data, Binary)
+
+instance NFData CostCentreIndex where
+  rnf (CostCentreIndex i) = rnf i
 
 -- | Get a new index for a given cost centre name.
 getCCIndex :: FastString

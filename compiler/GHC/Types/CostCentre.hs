@@ -36,6 +36,7 @@ import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Data.FastString
 import GHC.Types.CostCentre.State
+import Control.DeepSeq
 
 import Data.Data
 
@@ -394,6 +395,21 @@ instance Binary CostCentre where
     -- ok, because we only need the SrcSpan when declaring the
     -- CostCentre in the original module, it is not used by importing
     -- modules.
+
+instance NFData CostCentre where
+  rnf (NormalCC aa ab ac ad) = rnf aa `seq` rnf ab `seq` rnf ac `seq` rnf ad
+  rnf (AllCafsCC ae ad) = rnf ae `seq` rnf ad
+
+instance NFData CCFlavour where
+  rnf CafCC = ()
+  rnf (IndexedCC flav i) = rnf flav `seq` rnf i
+
+instance NFData IndexedCCFlavour where
+  rnf ExprCC = ()
+  rnf DeclCC = ()
+  rnf HpcCC = ()
+  rnf LateCC = ()
+  rnf CallerCC = ()
 
 getAllCAFsCC :: Module -> (CostCentre, CostCentreStack)
 getAllCAFsCC this_mod =
