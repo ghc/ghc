@@ -189,9 +189,9 @@ use of ``freeJSVal`` when you’re sure about a ``JSVal``\ ’s lifetime,
 especially for the temporary ``JSVal``\ s. This will help reducing the
 memory footprint at runtime.
 
-Note that ``freeJSVal`` is not idempotent and it’s only safe to call it
-exactly once or not at all. Once it’s called, any subsequent usage of
-that ``JSVal`` results in a runtime panic.
+Note that ``freeJSVal`` is idempotent and it’s safe to call it more
+than once. After it’s called, any subsequent usage of that ``JSVal``
+by passing to the JavaScript side results in a runtime panic.
 
 .. _wasm-jsffi-import:
 
@@ -390,7 +390,7 @@ callback and intends to call it later, so the Haskell function closure
 is still retained by default.
 
 Still, the runtime can gradually drop these retainers by using
-``FinalizerRegistry`` to invoke the finalizers to free the underlying
+``FinalizationRegistry`` to invoke the finalizers to free the underlying
 stable pointers once the JavaScript callbacks are recycled.
 
 One last corner case is cyclic reference between the two heaps: if a

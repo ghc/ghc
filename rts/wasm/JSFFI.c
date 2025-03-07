@@ -162,7 +162,7 @@ void __ghc_wasm_jsffi_init(void) {
 }
 
 typedef __externref_t HsJSVal;
-typedef StgWord JSValKey;
+typedef StgInt JSValKey;
 
 extern const StgInfoTable stg_JSVAL_info;
 
@@ -182,9 +182,10 @@ HaskellObj rts_mkJSVal(Capability*, HsJSVal);
 HaskellObj rts_mkJSVal(Capability *cap, HsJSVal v) {
   JSValKey k = __imported_newJSVal(v);
 
-  HaskellObj p = (HaskellObj)allocate(cap, CONSTR_sizeW(0, 1));
+  HaskellObj p = (HaskellObj)allocate(cap, CONSTR_sizeW(1, 2));
   SET_HDR(p, &stg_JSVAL_info, CCS_SYSTEM);
-  p->payload[0] = (HaskellObj)k;
+  p->payload[1] = (HaskellObj)k;
+  p->payload[2] = NULL;
 
   StgCFinalizerList *cfin =
       (StgCFinalizerList *)allocate(cap, sizeofW(StgCFinalizerList));
@@ -198,6 +199,7 @@ HaskellObj rts_mkJSVal(Capability *cap, HsJSVal v) {
   SET_HDR(w, &stg_WEAK_info, CCS_SYSTEM);
   w->cfinalizers = (StgClosure *)cfin;
   w->key = p;
+  w->value = Unit_closure;
   w->finalizer = &stg_NO_FINALIZER_closure;
   w->link = cap->weak_ptr_list_hd;
   cap->weak_ptr_list_hd = w;
@@ -210,11 +212,8 @@ HaskellObj rts_mkJSVal(Capability *cap, HsJSVal v) {
   HaskellObj box = (HaskellObj)allocate(cap, CONSTR_sizeW(1, 0));
   SET_HDR(box, ghc_hs_iface->JSVal_con_info, CCS_SYSTEM);
   box->payload[0] = p;
-  box->payload[1] = (HaskellObj)w;
-  box->payload[2] = NULL;
 
-  w->value = TAG_CLOSURE(1, box);
-  return w->value;
+  return TAG_CLOSURE(1, box);
 }
 
 __attribute__((import_module("ghc_wasm_jsffi"), import_name("getJSVal")))
@@ -222,7 +221,7 @@ HsJSVal __imported_getJSVal(JSValKey);
 
 STATIC_INLINE HsJSVal rts_getJSValzh(HaskellObj p) {
   ASSERT(p->header.info == &stg_JSVAL_info);
-  return __imported_getJSVal((JSValKey)p->payload[0]);
+  return __imported_getJSVal((JSValKey)p->payload[1]);
 }
 
 HsJSVal rts_getJSVal(HaskellObj);
