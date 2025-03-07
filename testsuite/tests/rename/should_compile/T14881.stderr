@@ -1,6 +1,6 @@
 [1 of 2] Compiling T14881Aux        ( T14881Aux.hs, T14881Aux.o )
 [2 of 2] Compiling T14881           ( T14881.hs, T14881.o )
-
-T14881.hs:3:1: warning: [GHC-38856] [-Wunused-imports (in -Wextra)]
+T14881.hs:3:45: warning: [GHC-38856] [-Wunused-imports (in -Wextra)]
     The qualified import of ‘adjust, length, L(tail), L(x)’
     from module ‘T14881Aux’ is redundant
+

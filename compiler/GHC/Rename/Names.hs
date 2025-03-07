@@ -93,6 +93,7 @@ import GHC.Data.FastString.Env
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps ( removeDups )
 
+import Control.Arrow    ( second )
 import Control.Monad
 import Data.Foldable    ( for_ )
 import Data.IntMap      ( IntMap )
@@ -100,6 +101,8 @@ import qualified Data.IntMap as IntMap
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
+import Data.Semigroup   ( Any(..) )
+import qualified Data.Semigroup as S
 import Data.List        ( partition, find, sortBy )
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
@@ -107,6 +110,7 @@ import Data.Function    ( on )
 import qualified Data.Set as S
 import System.FilePath  ((</>))
 import System.IO
+
 
 {-
 ************************************************************************
@@ -1842,21 +1846,21 @@ findImportUsage imports used_gres
                                -- srcSpanEnd: see Note [The ImportMap]
                     `orElse` []
 
-        used_names   = mkNameSet (map      greName        used_gres)
+        used_gre_env = mkGlobalRdrEnv used_gres
         used_parents = mkNameSet (mapMaybe greParent_maybe used_gres)
 
         unused_imps   -- Not trivial; see eg #7454
           = case imps of
               Just (Exactly, L _ imp_ies) ->
-                                 foldr (add_unused . unLoc) emptyNameSet imp_ies
+                let unused = foldr (add_unused . unLoc) (UnusedNames emptyNameSet emptyFsEnv) imp_ies
+                in  collectUnusedNames unused
               _other -> emptyNameSet -- No explicit import list => no unused-name list
 
-        add_unused :: IE GhcRn -> NameSet -> NameSet
-        add_unused (IEVar _ n _)    acc   = add_unused_name (lieWrappedName n) acc
-        add_unused (IEThingAbs _ n _) acc = add_unused_name (lieWrappedName n) acc
+        add_unused :: IE GhcRn -> UnusedNames -> UnusedNames
+        add_unused (IEVar _ n _)      acc = add_unused_name (lieWrappedName n) True acc
+        add_unused (IEThingAbs _ n _) acc = add_unused_name (lieWrappedName n) False acc
         add_unused (IEThingAll _ n _) acc = add_unused_all  (lieWrappedName n) acc
-        add_unused (IEThingWith _ p wc ns _) acc =
-          add_wc_all (add_unused_with pn xs acc)
+        add_unused (IEThingWith _ p wc ns _) acc = add_wc_all (add_unused_with pn xs acc)
           where pn = lieWrappedName p
                 xs = map lieWrappedName ns
                 add_wc_all = case wc of
@@ -1864,21 +1868,115 @@ findImportUsage imports used_gres
                             IEWildcard _ -> add_unused_all pn
         add_unused _ acc = acc
 
-        add_unused_name n acc
-          | n `elemNameSet` used_names = acc
-          | otherwise                  = acc `extendNameSet` n
-        add_unused_all n acc
-          | n `elemNameSet` used_names   = acc
-          | n `elemNameSet` used_parents = acc
-          | otherwise                    = acc `extendNameSet` n
-        add_unused_with p ns acc
-          | all (`elemNameSet` acc1) ns = add_unused_name p acc1
-          | otherwise = acc1
+        add_unused_name :: Name -> Bool -> UnusedNames -> UnusedNames
+        add_unused_name n is_ie_var acc@(UnusedNames acc_ns acc_fs)
+          | is_ie_var
+          , isFieldName n
+          -- See Note [Reporting unused imported duplicate record fields]
+          = let
+              fs = getOccFS n
+              (flds, flds_used) = lookupFsEnv acc_fs fs `orElse` (emptyNameSet, Any False)
+              acc_fs' = extendFsEnv acc_fs fs (extendNameSet flds n, Any used S.<> flds_used)
+            in UnusedNames acc_ns acc_fs'
+          | used
+          = acc
+          | otherwise
+          = UnusedNames (acc_ns `extendNameSet` n) acc_fs
           where
-            acc1 = foldr add_unused_name acc ns
-       -- If you use 'signum' from Num, then the user may well have
-       -- imported Num(signum).  We don't want to complain that
-       -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
+            used = isJust $ lookupGRE_Name used_gre_env n
+
+        add_unused_all :: Name -> UnusedNames -> UnusedNames
+        add_unused_all n (UnusedNames acc_ns acc_fs)
+          | Just {} <- lookupGRE_Name used_gre_env n = UnusedNames acc_ns acc_fs
+          | n `elemNameSet` used_parents             = UnusedNames acc_ns acc_fs
+          | otherwise                                = UnusedNames (acc_ns `extendNameSet` n) acc_fs
+
+        add_unused_with :: Name -> [Name] -> UnusedNames -> UnusedNames
+        add_unused_with p ns acc
+          | all (`elemNameSet` acc1_ns) ns = add_unused_name p False acc1
+          | otherwise                      = acc1
+          where
+            acc1@(UnusedNames acc1_ns _acc1_fs) = foldr (\n acc' -> add_unused_name n False acc') acc ns
+        -- If you use 'signum' from Num, then the user may well have
+        -- imported Num(signum).  We don't want to complain that
+        -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
+
+
+-- | An accumulator for unused names in an import list.
+--
+-- See Note [Reporting unused imported duplicate record fields].
+data UnusedNames =
+  UnusedNames
+    { unused_names :: NameSet
+       -- ^ Unused 'Name's in an import list, not including record fields
+       -- that are plain 'IEVar' imports
+    , rec_fld_uses :: FastStringEnv (NameSet, Any)
+      -- ^ Record fields imported without a parent (i.e. an 'IEVar' import).
+      --
+      -- The 'Any' value records whether any of the record fields
+      -- sharing the same underlying 'FastString' have been used.
+    }
+instance Outputable UnusedNames where
+  ppr (UnusedNames nms flds) =
+    text "UnusedNames" <+>
+      braces (ppr nms <+> ppr (fmap (second getAny) flds))
+
+-- | Collect all unused names from a 'UnusedNames' value.
+collectUnusedNames :: UnusedNames -> NameSet
+collectUnusedNames (UnusedNames { unused_names = nms, rec_fld_uses = flds })
+  = nms S.<> unused_flds
+  where
+    unused_flds = nonDetFoldFsEnv collect_unused emptyNameSet flds
+    collect_unused :: (NameSet, Any) -> NameSet -> NameSet
+    collect_unused (nms, Any at_least_one_name_is_used) acc
+      | at_least_one_name_is_used = acc
+      | otherwise                 = unionNameSet nms acc
+
+{- Note [Reporting unused imported duplicate record fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have (#24035):
+
+  {-# LANGUAGE DuplicateRecordFields #-}
+  module M1 (R1(..), R2(..)) where
+    data R1 = MkR1 { fld :: Int }
+    data R2 = MkR2 { fld :: Int }
+
+  {-# LANGUAGE DuplicateRecordFields #-}
+  module M2 where
+    import M1 (R1(MkR1), R2, fld)
+    f :: R1 -> Int
+    f (MkR1 { fld = x }) = x
+    g :: R2 -> Int
+    g _ = 3
+
+In the import of 'M1' in 'M2', the 'fld' import resolves to two separate GREs,
+namely R1(fld) and R2(fld). From the perspective of the renamer, and in particular
+the 'findImportUsage' function, it's as if the user had imported the two names
+separately (even though no source syntax allows that).
+
+This means that we need to be careful when reporting unused imports: the R2(fld)
+import is indeed unused, but because R1(fld) is used, we should not report
+fld as unused altogether.
+
+To achieve this, we keep track of record field imports without a parent (i.e.
+using the IEVar constructor) separately from other import items, using the
+UnusedNames datatype.
+Once we have accumulated usages, we emit warnings for unused record fields
+without parents one whole group (of record fields sharing the same textual name)
+at a time, and only if *all* of the record fields in the group are unused;
+see 'collectUnusedNames'.
+
+Note that this only applies to record fields imported without a parent. If we
+had:
+
+  import M1 (R1(MkR1, fld), R2(fld))
+    f :: R1 -> Int
+    f (MkR1 { fld = x }) = x
+    g :: R2 -> Int
+    g _ = 3
+
+then of course we should report the second 'fld' as unused.
+-}
 
 
 {- Note [The ImportMap]
@@ -1945,12 +2043,15 @@ warnUnusedImport rdr_env (L loc decl, used, unused)
   | null unused
   = return ()
 
-  -- Only one import is unused, with `SrcSpan` covering only the unused item instead of
-  -- the whole import statement
+  -- Some imports are unused: make the `SrcSpan` cover only the unused
+  -- items instead of the whole import statement
   | Just (_, L _ imports) <- ideclImportList decl
-  , length unused == 1
-  , Just (L loc _) <- find (\(L _ ie) -> ((ieName ie) :: Name) `elem` unused) imports
-  = addDiagnosticAt (locA loc) (TcRnUnusedImport decl (UnusedImportSome sort_unused))
+  , let unused_locs = [ locA loc | L loc ie <- imports
+                                 , name <- ieNames ie
+                                 , name `elem` unused ]
+  , loc1 : locs <- unused_locs
+  , let span = foldr1 combineSrcSpans ( loc1 NE.:| locs )
+  = addDiagnosticAt span (TcRnUnusedImport decl (UnusedImportSome sort_unused))
 
   -- Some imports are unused
   | otherwise
@@ -2263,3 +2364,4 @@ addDupDeclErr gres@(gre :| _)
 checkConName :: RdrName -> TcRn ()
 checkConName name
   = checkErr (isRdrDataCon name || isRdrTc name) (TcRnIllegalDataCon name)
+
