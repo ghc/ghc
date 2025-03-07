@@ -286,9 +286,9 @@ extendWorkListCts :: Cts -> WorkList -> WorkList
 extendWorkListCts cts wl = foldr extendWorkListCt wl cts
 
 isEmptyWorkList :: WorkList -> Bool
-isEmptyWorkList (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
+isEmptyWorkList (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs
                     , wl_rest = rest, wl_implics = implics })
-  = null eqs_N && null eqs_X && null rest && isEmptyBag implics
+  = null eqs_N && null eqs_X && null rw_eqs && null rest && isEmptyBag implics
 
 emptyWorkList :: WorkList
 emptyWorkList = WL { wl_eqs_N = [], wl_eqs_X = []
