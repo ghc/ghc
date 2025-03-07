@@ -3148,7 +3148,7 @@ newDynFlags interactive_only minus_opts = do
 
       logger <- getLogger
       idflags0 <- GHC.getInteractiveDynFlags
-      (idflags1, leftovers, warns) <- DynFlags.parseDynamicFlagsCmdLine idflags0 lopts
+      (idflags1, leftovers, warns) <- DynFlags.parseDynamicFlagsCmdLine logger idflags0 lopts
 
       liftIO $ printOrThrowDiagnostics logger (initPrintConfig idflags1) (initDiagOpts idflags1) (GhcDriverMessage <$> warns)
       when (not $ null leftovers) (unknownFlagsErr $ map unLoc leftovers)
@@ -3161,7 +3161,7 @@ newDynFlags interactive_only minus_opts = do
       dflags0 <- getDynFlags
 
       when (not interactive_only) $ do
-        (dflags1, _, _) <- liftIO $ DynFlags.parseDynamicFlagsCmdLine dflags0 lopts
+        (dflags1, _, _) <- liftIO $ DynFlags.parseDynamicFlagsCmdLine logger dflags0 lopts
         must_reload <- GHC.setProgramDynFlags dflags1
 
         -- if the package flags changed, reset the context and link

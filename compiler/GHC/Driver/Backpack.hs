@@ -100,8 +100,9 @@ doBackpack [src_filename] = do
     dflags0 <- getDynFlags
     let dflags1 = dflags0
     let parser_opts1 = initParserOpts dflags1
+    logger0 <- getLogger
     (p_warns, src_opts) <- liftIO $ getOptionsFromFile parser_opts1 (supportedLanguagePragmas dflags1) src_filename
-    (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
+    (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma logger0 dflags1 src_opts
     modifySession (hscSetFlags dflags)
     logger <- getLogger -- Get the logger after having set the session flags,
                         -- so that logger options are correctly set.

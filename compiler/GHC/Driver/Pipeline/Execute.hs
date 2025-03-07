@@ -655,10 +655,11 @@ runUnlitPhase hsc_env input_fn output_fn = do
 getFileArgs :: HscEnv -> FilePath -> IO ((DynFlags, Messages PsMessage, Messages DriverMessage))
 getFileArgs hsc_env input_fn = do
   let dflags0 = hsc_dflags hsc_env
+      logger  = hsc_logger hsc_env
       parser_opts = initParserOpts dflags0
   (warns0, src_opts) <- getOptionsFromFile parser_opts (supportedLanguagePragmas dflags0) input_fn
   (dflags1, unhandled_flags, warns)
-    <- parseDynamicFilePragma dflags0 src_opts
+    <- parseDynamicFilePragma logger dflags0 src_opts
   checkProcessArgsResult unhandled_flags
   return (dflags1, warns0, warns)
 
