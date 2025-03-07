@@ -276,6 +276,12 @@ class DataSource:
 			return _run_and_get_stdout(['lsprop', ibm_features[0]])
 
 	@staticmethod
+	def riscv_isa():
+    	# Expect all cores to support an equal ISA.
+		riscv_isa = '/proc/device-tree/cpus/cpu@0/riscv,isa'
+		return _run_and_get_stdout(['cat', riscv_isa])
+
+	@staticmethod
 	def wmic_cpu():
 		return _run_and_get_stdout(['wmic', 'cpu', 'get', 'Name,CurrentClockSpeed,L2CacheSize,L3CacheSize,Description,Caption,Manufacturer', '/format:list'])
 
@@ -2118,6 +2124,28 @@ def _get_cpu_info_from_ibm_pa_features():
 		g_trace.fail(err)
 		return {}
 
+def _get_cpu_info_from_riscv_isa():
+	'''
+	Returns the CPU info gathered from 'cat /proc/device-tree/cpus/cpu@0/riscv,isa'
+	Returns {} if this file does not exist (i.e. we're not on RISC-V Linux)
+	'''
+	g_trace.header('Tying to get info from lsprop ...')
+
+	try:
+		returncode, output = DataSource.riscv_isa()
+		if output is None or returncode != 0:
+			g_trace.fail('Failed to cat /proc/device-tree/cpus/cpu@0/riscv,isa. Skipping ...')
+			return {}
+
+		info = {
+			'flags' : output.split('_')
+		}
+		info = _filter_dict_keys_with_empty_values(info)
+		g_trace.success()
+		return info
+	except Exception as err:
+		g_trace.fail(err)
+		return {}
 
 def _get_cpu_info_from_cat_var_run_dmesg_boot():
 	'''
@@ -2716,6 +2744,9 @@ def _get_cpu_info_internal():
 
 	# Try lsprop ibm,pa-features
 	_copy_new_fields(info, _get_cpu_info_from_ibm_pa_features())
+
+	# Try device-tree riscv,isa
+	_copy_new_fields(info, _get_cpu_info_from_riscv_isa())
 
 	# Try sysinfo
 	_copy_new_fields(info, _get_cpu_info_from_sysinfo())
