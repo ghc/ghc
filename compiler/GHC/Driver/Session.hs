@@ -247,6 +247,7 @@ import GHC.Driver.Plugins.External
 import GHC.Settings.Config
 import GHC.Core.Unfold
 import GHC.Driver.CmdLine
+import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Constants (debugIsOn)
@@ -265,7 +266,7 @@ import GHC.Data.FastString
 import GHC.Utils.TmpFs
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
-import GHC.Utils.Error (emptyDiagOpts)
+import GHC.Utils.Error (emptyDiagOpts, logInfo)
 import GHC.Settings
 import GHC.CmmToAsm.CFG.Weight
 import GHC.Core.Opt.CallerCC
@@ -806,7 +807,7 @@ updOptLevel n = fst . updOptLevelChanged n
 -- the parsed 'DynFlags', the left-over arguments, and a list of warnings.
 -- Throws a 'UsageError' if errors occurred during parsing (such as unknown
 -- flags or missing arguments).
-parseDynamicFlagsCmdLine :: MonadIO m => DynFlags -> [Located String]
+parseDynamicFlagsCmdLine :: MonadIO m => Logger -> DynFlags -> [Located String]
                          -> m (DynFlags, [Located String], Messages DriverMessage)
                             -- ^ Updated 'DynFlags', left-over arguments, and
                             -- list of warnings.
@@ -816,7 +817,7 @@ parseDynamicFlagsCmdLine = parseDynamicFlagsFull flagsAll True
 -- | Like 'parseDynamicFlagsCmdLine' but does not allow the package flags
 -- (-package, -hide-package, -ignore-package, -hide-all-packages, -package-db).
 -- Used to parse flags set in a modules pragma.
-parseDynamicFilePragma :: MonadIO m => DynFlags -> [Located String]
+parseDynamicFilePragma :: MonadIO m => Logger -> DynFlags -> [Located String]
                        -> m (DynFlags, [Located String], Messages DriverMessage)
                           -- ^ Updated 'DynFlags', left-over arguments, and
                           -- list of warnings.
@@ -865,10 +866,11 @@ parseDynamicFlagsFull
     :: forall m. MonadIO m
     => [Flag (CmdLineP DynFlags)]    -- ^ valid flags to match against
     -> Bool                          -- ^ are the arguments from the command line?
+    -> Logger                        -- ^ logger
     -> DynFlags                      -- ^ current dynamic flags
     -> [Located String]              -- ^ arguments to parse
     -> m (DynFlags, [Located String], Messages DriverMessage)
-parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
+parseDynamicFlagsFull activeFlags cmdline logger dflags0 args = do
   ((leftover, errs, cli_warns), dflags1) <- processCmdLineP activeFlags dflags0 args
 
   -- See Note [Handling errors when parsing command-line flags]
@@ -884,7 +886,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
       throwGhcExceptionIO (CmdLineError ("combination not supported: " ++
                                intercalate "/" (map wayDesc (Set.toAscList theWays))))
 
-  let (dflags3, consistency_warnings) = makeDynFlagsConsistent dflags2
+  let (dflags3, consistency_warnings, infoverb) = makeDynFlagsConsistent dflags2
 
   -- Set timer stats & heap size
   when (enableTimeStats dflags3) $ liftIO enableTimingStats
@@ -897,6 +899,9 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   -- create message envelopes using final DynFlags: #23402
   let diag_opts = initDiagOpts dflags3
       warns = warnsToMessages diag_opts $ mconcat [consistency_warnings, sh_warns, cli_warns]
+
+  when (logVerbAtLeast logger 3) $
+    mapM_ (\(L _loc m) -> liftIO $ logInfo logger m) infoverb
 
   return (dflags3, leftover, warns)
 
@@ -3513,12 +3518,35 @@ combination when parsing flags, we also need to check when we update
 the flags; this is because API clients may parse flags but update the
 DynFlags afterwords, before finally running code inside a session (see
 T10052 and #10052).
+
+Host ways vs Build ways mismatch
+--------------------------------
+Many consistency checks aim to fix the situation where the wanted build ways
+are not compatible with the ways the compiler is built in. This happens when
+using the interpreter, TH, and the runtime linker, where the compiler cannot
+load objects compiled for ways not matching its own.
+
+For instance, a profiled-dynamic object can only be loaded by a
+profiled-dynamic compiler (and not any other kind of compiler).
+
+This incompatibility is traditionally solved in either of two ways:
+
+(1) Force the "wanted" build ways to match the compiler ways exactly,
+    guaranteeing they match.
+
+(2) Force the use of the external interpreter. When interpreting is offloaded
+    to the external interpreter it no longer matters what are the host compiler ways.
+
+In the checks and fixes performed by `makeDynFlagsConsistent`, the choice
+between the two does not seem uniform. TODO: Make this choice more evident and uniform.
 -}
 
 -- | Resolve any internal inconsistencies in a set of 'DynFlags'.
 -- Returns the consistent 'DynFlags' as well as a list of warnings
--- to report to the user.
-makeDynFlagsConsistent :: DynFlags -> (DynFlags, [Warn])
+-- to report to the user, and a list of verbose info msgs.
+--
+-- See Note [DynFlags consistency]
+makeDynFlagsConsistent :: DynFlags -> (DynFlags, [Warn], [Located SDoc])
 -- Whenever makeDynFlagsConsistent does anything, it starts over, to
 -- ensure that a later change doesn't invalidate an earlier check.
 -- Be careful not to introduce potential loops!
@@ -3609,13 +3637,41 @@ makeDynFlagsConsistent dflags
 
  | LinkMergedObj <- ghcLink dflags
  , Nothing <- outputFile dflags
- = pgmError "--output must be specified when using --merge-objs"
+    = pgmError "--output must be specified when using --merge-objs"
 
- | otherwise = (dflags, mempty)
+  -- When we do ghci, force using dyn ways if the target RTS linker
+  -- only supports dynamic code
+ | LinkInMemory <- ghcLink dflags
+ , sTargetRTSLinkerOnlySupportsSharedLibs $ settings dflags
+ , not (ways dflags `hasWay` WayDyn && gopt Opt_ExternalInterpreter dflags)
+    = flip loopNoWarn "Forcing dynamic way because target RTS linker only supports dynamic code" $
+        -- See checkOptions, -fexternal-interpreter is
+        -- required when using --interactive with a non-standard
+        -- way (-prof, -static, or -dynamic).
+        setGeneralFlag' Opt_ExternalInterpreter $
+        addWay' WayDyn dflags
+
+ | LinkInMemory <- ghcLink dflags
+ , not (gopt Opt_ExternalInterpreter dflags)
+ , targetWays_ dflags /= hostFullWays
+    = flip loopNoWarn "Forcing build ways to match the compiler ways because we're using the internal interpreter" $
+        let dflags_a = dflags { targetWays_ = hostFullWays }
+            dflags_b = foldl gopt_set dflags_a
+                     $ concatMap (wayGeneralFlags platform)
+                                 hostFullWays
+            dflags_c = foldl gopt_unset dflags_b
+                     $ concatMap (wayUnsetGeneralFlags platform)
+                                 hostFullWays
+        in dflags_c
+
+ | otherwise = (dflags, mempty, mempty)
     where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")
           loop updated_dflags warning
               = case makeDynFlagsConsistent updated_dflags of
-                (dflags', ws) -> (dflags', L loc (DriverInconsistentDynFlags warning) : ws)
+                (dflags', ws, is) -> (dflags', L loc (DriverInconsistentDynFlags warning) : ws, is)
+          loopNoWarn updated_dflags doc
+              = case makeDynFlagsConsistent updated_dflags of
+                (dflags', ws, is) -> (dflags', ws, L loc (text doc):is)
           platform = targetPlatform dflags
           arch = platformArch platform
           os   = platformOS   platform
