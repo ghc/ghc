@@ -121,7 +121,6 @@ deSugar hsc_env
                             tcg_imports      = imports,
                             tcg_exports      = exports,
                             tcg_keep         = keep_var,
-                            tcg_th_splice_used = tc_splice_used,
                             tcg_rdr_env      = rdr_env,
                             tcg_fix_env      = fix_env,
                             tcg_inst_env     = inst_env,
@@ -232,7 +231,6 @@ deSugar hsc_env
                                     (tcg_imports tcg_env)
                                     (map mi_module pluginModules)
 
-        ; used_th <- readIORef tc_splice_used
         ; safe_mode <- finalSafeMode dflags tcg_env
 
         ; usages <- mkRecompUsageInfo hsc_env tcg_env
@@ -254,7 +252,6 @@ deSugar hsc_env
                 mg_exports      = exports,
                 mg_usages       = usages,
                 mg_deps         = deps,
-                mg_used_th      = used_th,
                 mg_rdr_env      = rdr_env,
                 mg_fix_env      = fix_env,
                 mg_warns        = warns,

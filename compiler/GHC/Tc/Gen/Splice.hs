@@ -1196,8 +1196,6 @@ runMeta' :: Bool                 -- Whether code should be printed in the except
          -> TcM hs_syn           -- Of type t
 runMeta' show_code ppr_hs run_and_convert expr
   = do  { traceTc "About to run" (ppr expr)
-        ; recordThSpliceUse -- seems to be the best place to do this,
-                            -- we catch all kinds of splices and annotations.
 
         -- Check that we've had no errors of any sort so far.
         -- For example, if we found an error in an earlier defn f, but
