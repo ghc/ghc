@@ -29,7 +29,8 @@ module GHC.Rename.HsType (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
-        bindHsOuterTyVarBndrs, bindHsForAllTelescope,
+        RnBindFam(..),
+        bindHsOuterTyVarBndrs, bindHsOuterTyVarBndrs', bindHsForAllTelescope,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
         rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars,
         FreeKiTyVars, filterInScopeM,
@@ -1091,6 +1092,7 @@ an LHsQTyVars can be semantically significant. As a result, we suppress
 -Wunused-foralls warnings in exactly one place: in bindHsQTyVars.
 -}
 
+data RnBindFam = BindFam | NotBindFam
 bindHsOuterTyVarBndrs :: OutputableBndrFlag flag 'Renamed
                       => HsDocContext
                       -> Maybe assoc
@@ -1099,7 +1101,18 @@ bindHsOuterTyVarBndrs :: OutputableBndrFlag flag 'Renamed
                       -> HsOuterTyVarBndrs flag GhcPs
                       -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
                       -> RnM (a, FreeVars)
-bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
+bindHsOuterTyVarBndrs = bindHsOuterTyVarBndrs' NotBindFam
+
+bindHsOuterTyVarBndrs' :: OutputableBndrFlag flag 'Renamed
+                      => RnBindFam
+                      -> HsDocContext
+                      -> Maybe assoc
+                         -- ^ @'Just' _@ => an associated type decl
+                      -> FreeKiTyVars
+                      -> HsOuterTyVarBndrs flag GhcPs
+                      -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
+                      -> RnM (a, FreeVars)
+bindHsOuterTyVarBndrs' bind_fam doc mb_cls implicit_vars outer_bndrs thing_inside =
   case outer_bndrs of
     HsOuterImplicit{} ->
       rnImplicitTvOccs mb_cls implicit_vars $ \implicit_vars' ->
@@ -1110,9 +1123,15 @@ bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
       -- scope here. This is an explicit forall, so we want fresh names, not
       -- class variables. Thus: always pass Nothing.
       bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' -> do
-        checkForAllTelescopeWildcardBndrs doc exp_bndrs'
-        thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
-                                       , hso_bndrs     = exp_bndrs' }
+        rnImplicitTvOccs mb_cls fam_implicit_vars $ \implicit_vars' -> do
+          checkForAllTelescopeWildcardBndrs doc exp_bndrs'
+          thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
+                                        , hso_bndrs     = exp_bndrs'
+                                        , hso_ximplicit = implicit_vars' }
+  where
+    fam_implicit_vars = case bind_fam of
+      BindFam -> filterFreeVarsToBind (mapMaybe hsLTyVarLocName $ hso_bndrs outer_bndrs) implicit_vars
+      NotBindFam -> []
 
 -- See Note [Term variable capture and implicit quantification]
 warn_term_var_capture :: LocatedN RdrName -> RnM ()

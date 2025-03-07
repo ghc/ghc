@@ -325,7 +325,9 @@ mkHsOuterImplicit = HsOuterImplicit{hso_ximplicit = noExtField}
 mkHsOuterExplicit :: EpAnnForallInvis -> [LHsTyVarBndr flag GhcPs]
                   -> HsOuterTyVarBndrs flag GhcPs
 mkHsOuterExplicit an bndrs = HsOuterExplicit { hso_xexplicit = an
-                                             , hso_bndrs     = bndrs }
+                                             , hso_bndrs     = bndrs
+                                             , hso_ximplicit = NoExtField
+                                             }
 
 mkHsImplicitSigType :: LHsType GhcPs -> HsSigType GhcPs
 mkHsImplicitSigType body =
@@ -1243,8 +1245,12 @@ instance (OutputableBndrFlag flag p,
         GhcPs -> ppr imp_tvs
         GhcRn -> ppr imp_tvs
         GhcTc -> ppr imp_tvs
-    ppr (HsOuterExplicit{hso_bndrs = exp_tvs}) =
+    ppr (HsOuterExplicit{hso_bndrs = exp_tvs, hso_ximplicit=imp_tvs}) =
       text "HsOuterExplicit:" <+> ppr exp_tvs
+                              <+> case ghcPass @p of
+                                    GhcPs -> ppr imp_tvs
+                                    GhcRn -> ppr imp_tvs
+                                    GhcTc -> ppr imp_tvs
 
 instance OutputableBndrId p
        => Outputable (HsForAllTelescope (GhcPass p)) where

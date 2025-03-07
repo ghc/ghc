@@ -3298,7 +3298,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
            <- tcTyFamInstEqnGuts fam_tc mb_clsinfo
                 outer_bndrs hs_pats hs_rhs_ty
        -- Don't print results they may be knot-tied
-       -- (tcFamInstEqnGuts zonks to Type)
+       -- (tcTyFamInstEqnGuts zonks to Type)
 
        ; let ax = mkCoAxBranch qtvs [] [] pats rhs_ty
                     (map (const Nominal) qtvs)

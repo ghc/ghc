@@ -700,7 +700,7 @@ rnFamEqn doc atfi
          -- bound by the instance head with filterInScopeM (#19649).
        ; all_imp_vars <- filterInScopeM $ (pat_kity_vars ++ payload_kvs)
 
-       ; bindHsOuterTyVarBndrs doc mb_cls all_imp_vars outer_bndrs $ \rn_outer_bndrs ->
+       ; bindHsOuterTyVarBndrs' BindFam doc mb_cls all_imp_vars outer_bndrs $ \rn_outer_bndrs ->
     do { (pats', pat_fvs) <- rnLHsTypeArgs (FamPatCtx tycon) pats
        ; (payload', rhs_fvs) <- rn_payload doc payload
 
@@ -717,6 +717,7 @@ rnFamEqn doc atfi
 
              groups :: [NonEmpty (LocatedN RdrName)]
              groups = equivClasses cmpLocated pat_kity_vars
+       ; traceRn "rnFamEqn: rn_outer_bndrs: " (ppr outer_bndrs <+> ppr rn_outer_bndrs')
        ; nms_dups <- mapM (lookupOccRn . unLoc) $
                         [ tv | (tv :| (_:_)) <- groups ]
              -- Add to the used variables

@@ -386,8 +386,27 @@ data HsOuterTyVarBndrs flag pass
                     --    @f :: forall a b. a -> b -> b@
     { hso_xexplicit :: XHsOuterExplicit pass flag
     , hso_bndrs     :: [LHsTyVarBndr flag (NoGhcTc pass)]
+    , hso_ximplicit :: XHsOuterImplicit pass
+    -- used only for Type family instances
     }
   | XHsOuterTyVarBndrs !(XXHsOuterTyVarBndrs pass)
+
+-- data HsOuterTyVarBndrs flag pass where
+--   HsOuterImplicit ::
+--     { hso_ximplicit :: XHsOuterImplicit pass
+--     } -> HsOuterTyVarBndrs flag pass
+--   HsOuterExplicit ::
+--     { hso_xexplicit :: XHsOuterExplicit pass Specificity
+--     , hso_bndrs     :: [LHsTyVarBndr Specificity (NoGhcTc pass)]
+--     } -> HsOuterTyVarBndrs Specificity pass
+--   HsOuterExplicitFam ::
+--     { hso_xexplicit_fam :: XHsOuterExplicit pass ()
+--     , hso_bndrs_fam     :: [LHsTyVarBndr () (NoGhcTc pass)]
+--     , hso_ximplicit_fam :: XHsOuterImplicit pass
+--     } -> HsOuterTyVarBndrs () pass
+--   XHsOuterTyVarBndrs ::
+--     { unXHsOuterTyVarBndrs :: XXHsOuterTyVarBndrs pass
+--     } -> HsOuterTyVarBndrs flag pass
 
 -- | Used for signatures, e.g.,
 --
