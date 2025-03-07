@@ -132,6 +132,7 @@ import GHC.Utils.Panic
 
 import GHC.Hs.Specificity ()
 import Language.Haskell.Syntax.Specificity
+import Control.DeepSeq
 
 import Data.Data
 
@@ -499,6 +500,12 @@ instance Binary FunTyFlag where
       2 -> return FTF_C_T
       _ -> return FTF_C_C
 
+instance NFData FunTyFlag where
+  rnf FTF_T_T = ()
+  rnf FTF_T_C = ()
+  rnf FTF_C_T = ()
+  rnf FTF_C_C = ()
+
 mkFunTyFlag :: TypeOrConstraint -> TypeOrConstraint -> FunTyFlag
 mkFunTyFlag TypeLike       torc = visArg torc
 mkFunTyFlag ConstraintLike torc = invisArg torc
@@ -733,6 +740,9 @@ instance (Binary tv, Binary vis) => Binary (VarBndr tv vis) where
   put_ bh (Bndr tv vis) = do { put_ bh tv; put_ bh vis }
 
   get bh = do { tv <- get bh; vis <- get bh; return (Bndr tv vis) }
+
+instance (NFData tv, NFData vis) => NFData (VarBndr tv vis) where
+  rnf (Bndr tv vis) = rnf tv `seq` rnf vis
 
 instance NamedThing tv => NamedThing (VarBndr tv flag) where
   getName (Bndr tv _) = getName tv

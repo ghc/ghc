@@ -148,6 +148,7 @@ import qualified GHC.Boot.TH.Ppr    as TH
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import Unsafe.Coerce    ( unsafeCoerce )
 import GHC.Desugar ( AnnotationWrapper(..) )
+import Control.DeepSeq
 #endif
 
 import Control.Monad
@@ -1039,11 +1040,7 @@ convertAnnotationWrapper fhv = do
                -- annotation are exposed at this point.  This is also why we are
                -- doing all this stuff inside the context of runMeta: it has the
                -- facilities to deal with user error in a meta-level expression
-               seqSerialized serialized `seq` serialized
-
--- | Force the contents of the Serialized value so weknow it doesn't contain any bottoms
-seqSerialized :: Serialized -> ()
-seqSerialized (Serialized the_type bytes) = the_type `seq` bytes `seqList` ()
+               rnf serialized `seq` serialized
 
 #endif
 

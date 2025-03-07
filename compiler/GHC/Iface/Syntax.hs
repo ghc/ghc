@@ -94,7 +94,7 @@ import GHC.Utils.Binary.Typeable () -- instance Binary AnnPayload
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
-                       seqList, zipWithEqual )
+                       zipWithEqual )
 
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
 
@@ -538,6 +538,14 @@ instance Binary IfaceLFInfo where
             3 -> IfLFUnknown <$> get bh
             4 -> pure IfLFUnlifted
             _ -> panic "Invalid byte"
+
+instance NFData IfaceLFInfo where
+  rnf = \case
+    IfLFReEntrant arity -> rnf arity
+    IfLFThunk updatable mb_fun -> rnf updatable `seq` rnf mb_fun
+    IfLFCon con -> rnf con
+    IfLFUnknown fun_flag -> rnf fun_flag
+    IfLFUnlifted -> ()
 
 {-
 Note [Versioning of instances]
@@ -2767,6 +2775,10 @@ getUnfoldingCache bh = do
     return (UnfoldingCache { uf_is_value = hnf, uf_is_conlike = conlike
                            , uf_is_work_free = wf, uf_expandable = exp })
 
+seqUnfoldingCache :: IfUnfoldingCache -> ()
+seqUnfoldingCache (UnfoldingCache hnf conlike wf exp) =
+    rnf hnf `seq` rnf conlike `seq` rnf wf `seq` rnf exp `seq` ()
+
 infixl 9 .<<|.
 (.<<|.) :: (Num a, Bits a) => a -> Bool -> a
 x .<<|. b = (if b then (`setBit` 0) else id) (x `shiftL` 1)
@@ -2837,12 +2849,10 @@ instance Binary IfaceExpr where
         putByte bh 13
         put_ bh a
         put_ bh b
-    put_ bh (IfaceLitRubbish TypeLike r) = do
+    put_ bh (IfaceLitRubbish torc r) = do
         putByte bh 14
         put_ bh r
-    put_ bh (IfaceLitRubbish ConstraintLike r) = do
-        putByte bh 15
-        put_ bh r
+        put_ bh torc
     get bh = do
         h <- getByte bh
         case h of
@@ -2886,9 +2896,8 @@ instance Binary IfaceExpr where
                      b <- get bh
                      return (IfaceECase a b)
             14 -> do r <- get bh
-                     return (IfaceLitRubbish TypeLike r)
-            15 -> do r <- get bh
-                     return (IfaceLitRubbish ConstraintLike r)
+                     torc <- get bh
+                     return (IfaceLitRubbish torc r)
             _ -> panic ("get IfaceExpr " ++ show h)
 
 instance Binary IfaceTickish where
@@ -3047,31 +3056,31 @@ instance NFData IfaceDecl where
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
 
     IfaceData f1 f2 f3 f4 f5 f6 f7 f8 f9 ->
-      f1 `seq` seqList f2 `seq` f3 `seq` f4 `seq` f5 `seq`
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq`
       rnf f6 `seq` rnf f7 `seq` rnf f8 `seq` rnf f9
 
     IfaceSynonym f1 f2 f3 f4 f5 ->
-      rnf f1 `seq` f2 `seq` seqList f3 `seq` rnf f4 `seq` rnf f5
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5
 
     IfaceFamily f1 f2 f3 f4 f5 f6 ->
-      rnf f1 `seq` rnf f2 `seq` seqList f3 `seq` rnf f4 `seq` rnf f5 `seq` f6 `seq` ()
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq` ()
 
     IfaceClass f1 f2 f3 f4 f5 ->
-      rnf f1 `seq` f2 `seq` seqList f3 `seq` rnf f4 `seq` rnf f5
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5
 
     IfaceAxiom nm tycon role ax ->
       rnf nm `seq`
       rnf tycon `seq`
-      role `seq`
+      rnf role `seq`
       rnf ax
 
     IfacePatSyn f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 ->
-      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` f5 `seq` f6 `seq`
-      rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` f11 `seq` ()
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq`
+      rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` rnf f11 `seq` ()
 
 instance NFData IfaceAxBranch where
   rnf (IfaceAxBranch f1 f2 f3 f4 f5 f6 f7) =
-    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` f5 `seq` rnf f6 `seq` rnf f7
+    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq` rnf f7
 
 instance NFData IfaceClassBody where
   rnf = \case
@@ -3089,7 +3098,7 @@ instance NFData IfaceAT where
   rnf (IfaceAT f1 f2) = rnf f1 `seq` rnf f2
 
 instance NFData IfaceClassOp where
-  rnf (IfaceClassOp f1 f2 f3) = rnf f1 `seq` rnf f2 `seq` f3 `seq` ()
+  rnf (IfaceClassOp f1 f2 f3) = rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` ()
 
 instance NFData IfaceTyConParent where
   rnf = \case
@@ -3104,19 +3113,22 @@ instance NFData IfaceConDecls where
 
 instance NFData IfaceConDecl where
   rnf (IfCon f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11) =
-    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` f5 `seq` rnf f6 `seq`
-    rnf f7 `seq` rnf f8 `seq` f9 `seq` rnf f10 `seq` rnf f11
+    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq`
+    rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` rnf f11
 
 instance NFData IfaceSrcBang where
-  rnf (IfSrcBang f1 f2) = f1 `seq` f2 `seq` ()
+  rnf (IfSrcBang f1 f2) = rnf f1 `seq` rnf f2 `seq` ()
 
 instance NFData IfaceBang where
-  rnf x = x `seq` ()
+  rnf IfNoBang = ()
+  rnf IfStrict = ()
+  rnf IfUnpack = ()
+  rnf (IfUnpackCo co) = rnf co
 
 instance NFData IfaceIdDetails where
   rnf = \case
     IfVanillaId -> ()
-    IfWorkerLikeId dmds -> dmds `seqList` ()
+    IfWorkerLikeId dmds -> rnf dmds `seq` ()
     IfRecSelId (Left tycon) b c d -> rnf tycon `seq` rnf b `seq` rnf c `seq` rnf d
     IfRecSelId (Right decl) b c d -> rnf decl `seq` rnf b `seq` rnf c `seq` rnf d
     IfDFunId -> ()
@@ -3125,23 +3137,22 @@ instance NFData IfaceInfoItem where
   rnf = \case
     HsArity a -> rnf a
     HsDmdSig str -> seqDmdSig str
-    HsInline p -> p `seq` () -- TODO: seq further?
+    HsInline p -> rnf p `seq` ()
     HsUnfold b unf -> rnf b `seq` rnf unf
     HsNoCafRefs -> ()
-    HsCprSig cpr -> cpr `seq` ()
-    HsLFInfo lf_info -> lf_info `seq` () -- TODO: seq further?
-    HsTagSig sig -> sig `seq` ()
+    HsCprSig cpr -> seqCprSig cpr `seq` ()
+    HsLFInfo lf_info -> rnf lf_info `seq` ()
+    HsTagSig sig -> seqTagSig sig `seq` ()
 
 instance NFData IfGuidance where
   rnf = \case
     IfNoGuidance -> ()
-    IfWhen a b c -> a `seq` b `seq` c `seq` ()
+    IfWhen a b c -> rnf a `seq` rnf b `seq` rnf c `seq` ()
 
 instance NFData IfaceUnfolding where
   rnf = \case
-    IfCoreUnfold src cache guidance expr -> src `seq` cache `seq` rnf guidance `seq` rnf expr
+    IfCoreUnfold src cache guidance expr -> rnf src `seq` seqUnfoldingCache cache `seq` rnf guidance `seq` rnf expr
     IfDFunUnfold bndrs exprs             -> rnf bndrs `seq` rnf exprs
-    -- See Note [UnfoldingCache] in GHC.Core for why it suffices to merely `seq` on cache
 
 instance NFData IfaceExpr where
   rnf = \case
@@ -3149,16 +3160,16 @@ instance NFData IfaceExpr where
     IfaceExt nm -> rnf nm
     IfaceType ty -> rnf ty
     IfaceCo co -> rnf co
-    IfaceTuple sort exprs -> sort `seq` rnf exprs
+    IfaceTuple sort exprs -> rnf sort `seq` rnf exprs
     IfaceLam bndr expr -> rnf bndr `seq` rnf expr
     IfaceApp e1 e2 -> rnf e1 `seq` rnf e2
-    IfaceCase e nm alts -> rnf e `seq` nm `seq` rnf alts
+    IfaceCase e nm alts -> rnf e `seq` rnf nm `seq` rnf alts
     IfaceECase e ty -> rnf e `seq` rnf ty
     IfaceLet bind e -> rnf bind `seq` rnf e
     IfaceCast e co -> rnf e `seq` rnf co
-    IfaceLit l -> l `seq` () -- FIXME
-    IfaceLitRubbish tc r -> tc `seq` rnf r `seq` ()
-    IfaceFCall fc ty -> fc `seq` rnf ty
+    IfaceLit l -> rnf l `seq` ()
+    IfaceLitRubbish tc r -> rnf tc `seq` rnf r `seq` ()
+    IfaceFCall fc ty -> rnf fc `seq` rnf ty
     IfaceTick tick e -> rnf tick `seq` rnf e
 
 instance NFData IfaceAlt where
@@ -3170,7 +3181,7 @@ instance (NFData b, NFData a) => NFData (IfaceBindingX a b) where
     IfaceRec binds -> rnf binds
 
 instance NFData IfaceTopBndrInfo where
-  rnf (IfGblTopBndr n) = n `seq` ()
+  rnf (IfGblTopBndr n) = rnf n `seq` ()
   rnf (IfLclTopBndr fs ty info dets) = rnf fs `seq` rnf ty `seq` rnf info `seq` rnf dets `seq` ()
 
 instance NFData IfaceMaybeRhs where
@@ -3192,22 +3203,22 @@ instance NFData IfaceFamTyConFlav where
 instance NFData IfaceTickish where
   rnf = \case
     IfaceHpcTick m i -> rnf m `seq` rnf i
-    IfaceSCC cc b1 b2 -> cc `seq` rnf b1 `seq` rnf b2
-    IfaceSource src str -> src `seq` rnf str
+    IfaceSCC cc b1 b2 -> rnf cc `seq` rnf b1 `seq` rnf b2
+    IfaceSource src str -> rnf src `seq` rnf str
     IfaceBreakpoint m i fvs -> rnf m `seq` rnf i `seq` rnf fvs
 
 instance NFData IfaceConAlt where
   rnf = \case
     IfaceDefaultAlt -> ()
     IfaceDataAlt nm -> rnf nm
-    IfaceLitAlt lit -> lit `seq` ()
+    IfaceLitAlt lit -> rnf lit `seq` ()
 
 instance NFData IfaceCompleteMatch where
   rnf (IfaceCompleteMatch f1 mtc) = rnf f1 `seq` rnf mtc
 
 instance NFData IfaceRule where
   rnf (IfaceRule f1 f2 f3 f4 f5 f6 f7 f8) =
-    rnf f1 `seq` f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq` rnf f7 `seq` f8 `seq` ()
+    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq` rnf f7 `seq` rnf f8 `seq` ()
 
 instance NFData IfaceDefault where
   rnf (IfaceDefault f1 f2 f3) =
@@ -3215,11 +3226,11 @@ instance NFData IfaceDefault where
 
 instance NFData IfaceFamInst where
   rnf (IfaceFamInst f1 f2 f3 f4) =
-    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` ()
+    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` ()
 
 instance NFData IfaceClsInst where
   rnf (IfaceClsInst f1 f2 f3 f4 f5 f6) =
-    f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` f5 `seq` rnf f6
+    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6
 
 instance NFData IfaceWarnings where
   rnf = \case
@@ -3227,12 +3238,12 @@ instance NFData IfaceWarnings where
       IfWarnSome vs ds -> rnf vs `seq` rnf ds
 
 instance NFData IfaceWarningTxt where
-    rnf = \case
-        IfWarningTxt f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
-        IfDeprecatedTxt f1 f2 -> rnf f1 `seq` rnf f2
+  rnf = \case
+    IfWarningTxt f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
+    IfDeprecatedTxt f1 f2 -> rnf f1 `seq` rnf f2
 
 instance NFData IfaceStringLiteral where
-    rnf (IfStringLiteral f1 f2) = rnf f1 `seq` rnf f2
+  rnf (IfStringLiteral f1 f2) = rnf f1 `seq` rnf f2
 
 instance NFData IfaceAnnotation where
-  rnf (IfaceAnnotation f1 f2) = f1 `seq` f2 `seq` ()
+  rnf (IfaceAnnotation f1 f2) = rnf f1 `seq` rnf f2 `seq` ()

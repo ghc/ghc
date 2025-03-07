@@ -120,6 +120,8 @@ import Data.List.NonEmpty (nonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Word
 
+import Control.DeepSeq
+
 infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`, `App`, `mkCoApps`
 -- Left associative, so that we can say (f `mkTyApps` xs `mkVarApps` ys)
 
@@ -1184,6 +1186,10 @@ instance Binary IsOrphan where
             _ -> do
                 n <- get bh
                 return $ NotOrphan n
+
+instance NFData IsOrphan where
+  rnf IsOrphan = ()
+  rnf (NotOrphan n) = rnf n
 
 {-
 Note [Orphans]

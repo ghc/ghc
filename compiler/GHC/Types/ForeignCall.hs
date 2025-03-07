@@ -30,6 +30,8 @@ import GHC.Types.SourceText ( SourceText, pprWithSourceText )
 import Data.Char
 import Data.Data
 
+import Control.DeepSeq (NFData(..))
+
 {-
 ************************************************************************
 *                                                                      *
@@ -344,3 +346,31 @@ instance Binary Header where
     get bh = do s <- get bh
                 h <- get bh
                 return (Header s h)
+
+instance NFData ForeignCall where
+  rnf (CCall c) = rnf c
+
+instance NFData Safety where
+  rnf PlaySafe = ()
+  rnf PlayInterruptible = ()
+  rnf PlayRisky = ()
+
+instance NFData CCallSpec where
+  rnf (CCallSpec t c s) = rnf t `seq` rnf c `seq` rnf s
+
+instance NFData CCallTarget where
+  rnf (StaticTarget s a b c) = rnf s `seq` rnf a `seq` rnf b `seq` rnf c
+  rnf DynamicTarget = ()
+
+instance NFData CCallConv where
+  rnf CCallConv = ()
+  rnf StdCallConv = ()
+  rnf PrimCallConv = ()
+  rnf CApiConv = ()
+  rnf JavaScriptCallConv = ()
+
+instance NFData CType where
+  rnf (CType s mh fs) = rnf s `seq` rnf mh `seq` rnf fs
+
+instance NFData Header where
+  rnf (Header s h) = rnf s `seq` rnf h
