@@ -39,6 +39,7 @@ import Data.List (sortBy, sort, partition)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Bifunctor
+import Control.DeepSeq
 
 -- | Dependency information about ALL modules and packages below this one
 -- in the import hierarchy. This is the serialisable version of `ImportAvails`.
@@ -103,6 +104,18 @@ data Dependencies = Deps
    deriving( Eq )
         -- Equality used only for old/new comparison in GHC.Iface.Recomp.addFingerprints
         -- See 'GHC.Tc.Utils.ImportAvails' for details on dependencies.
+
+instance NFData Dependencies where
+  rnf (Deps dmods dpkgs ppkgs hsigms tps bmods orphs finsts)
+    = rnf dmods
+        `seq` rnf dpkgs
+        `seq` rnf ppkgs
+        `seq` rnf hsigms
+        `seq` rnf tps
+        `seq` rnf bmods
+        `seq` rnf orphs
+        `seq` rnf finsts
+        `seq` ()
 
 
 -- | Extract information from the rename and typecheck phases to produce
@@ -325,6 +338,13 @@ data Usage
         --                      import M()
         -- And of course, for modules that aren't imported directly we don't
         -- depend on their export lists
+
+instance NFData Usage where
+  rnf (UsagePackageModule mod hash safe) = rnf mod `seq` rnf hash `seq` rnf safe `seq` ()
+  rnf (UsageHomeModule mod uid hash entities exports safe) = rnf mod `seq` rnf uid `seq` rnf hash `seq` rnf entities `seq` rnf exports `seq` rnf safe `seq` ()
+  rnf (UsageFile file hash label) = rnf file `seq` rnf hash `seq` rnf label `seq` ()
+  rnf (UsageMergedRequirement mod hash) = rnf mod `seq` rnf hash `seq` ()
+  rnf (UsageHomeModuleInterface mod uid hash) = rnf mod `seq` rnf uid `seq` rnf hash `seq` ()
 
 instance Binary Usage where
     put_ bh usg@UsagePackageModule{} = do

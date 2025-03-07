@@ -223,7 +223,8 @@ data RealSrcLoc
 -- We use 'BufPos' in in GHC.Parser.PostProcess.Haddock to associate Haddock
 -- comments with parts of the AST using location information (#17544).
 newtype BufPos = BufPos { bufPos :: Int }
-  deriving (Eq, Ord, Show, Data)
+  deriving (Eq, Ord, Show, Data, NFData)
+
 
 -- | Source Location
 data SrcLoc
@@ -373,10 +374,12 @@ data RealSrcSpan
         }
   deriving Eq
 
--- | StringBuffer Source Span
 data BufSpan =
   BufSpan { bufSpanStart, bufSpanEnd :: {-# UNPACK #-} !BufPos }
   deriving (Eq, Ord, Show, Data)
+
+instance NFData BufSpan where
+  rnf (BufSpan a1 a2) = rnf a1 `seq` rnf a2
 
 instance Semigroup BufSpan where
   BufSpan start1 end1 <> BufSpan start2 end2 =
@@ -439,8 +442,19 @@ instance ToJson RealSrcSpan where
           end = JSObject [ ("line", JSInt srcSpanELine),
                            ("column", JSInt srcSpanECol) ]
 
+instance NFData RealSrcSpan where
+  rnf (RealSrcSpan' file line col endLine endCol) = rnf file `seq` rnf line `seq` rnf col `seq` rnf endLine `seq` rnf endCol
+
 instance NFData SrcSpan where
-  rnf x = x `seq` ()
+  rnf (RealSrcSpan a1 a2) = rnf a1 `seq` rnf a2
+  rnf (UnhelpfulSpan a1) = rnf a1
+
+instance NFData UnhelpfulSpanReason where
+  rnf (UnhelpfulNoLocationInfo) = ()
+  rnf (UnhelpfulWiredIn) = ()
+  rnf (UnhelpfulInteractive) = ()
+  rnf (UnhelpfulGenerated) = ()
+  rnf (UnhelpfulOther a1) = rnf a1
 
 getBufSpan :: SrcSpan -> Strict.Maybe BufSpan
 getBufSpan (RealSrcSpan _ mbspan) = mbspan

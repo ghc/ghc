@@ -167,6 +167,11 @@ instance Binary LeftOrRight where
                    0 -> return CLeft
                    _ -> return CRight }
 
+instance NFData LeftOrRight where
+  rnf CLeft  = ()
+  rnf CRight = ()
+
+
 
 {-
 ************************************************************************
@@ -529,6 +534,10 @@ instance Binary FunctionOrData where
           1 -> return IsData
           _ -> panic "Binary FunctionOrData"
 
+instance NFData FunctionOrData where
+  rnf IsFunction = ()
+  rnf IsData = ()
+
 {-
 ************************************************************************
 *                                                                      *
@@ -611,6 +620,11 @@ instance Binary CbvMark where
            0 -> return NotMarkedCbv
            1 -> return MarkedCbv
            _ -> panic "Invalid binary format"
+
+instance NFData CbvMark where
+  rnf MarkedCbv    = ()
+  rnf NotMarkedCbv = ()
+
 
 isMarkedCbv :: CbvMark -> Bool
 isMarkedCbv MarkedCbv = True
@@ -871,6 +885,9 @@ data OverlapMode  -- See Note [Rules for instance lookup] in GHC.Core.InstEnv
 instance Outputable OverlapFlag where
    ppr flag = ppr (overlapMode flag) <+> pprSafeOverlap (isSafeOverlap flag)
 
+instance NFData OverlapFlag where
+  rnf (OverlapFlag mode safe) = rnf mode `seq` rnf safe
+
 instance Outputable OverlapMode where
    ppr (NoOverlap    _) = empty
    ppr (Overlappable _) = text "[overlappable]"
@@ -878,6 +895,14 @@ instance Outputable OverlapMode where
    ppr (Overlaps     _) = text "[overlap ok]"
    ppr (Incoherent   _) = text "[incoherent]"
    ppr (NonCanonical _) = text "[noncanonical]"
+
+instance NFData OverlapMode where
+  rnf (NoOverlap s) = rnf s
+  rnf (Overlappable s) = rnf s
+  rnf (Overlapping s) = rnf s
+  rnf (Overlaps s) = rnf s
+  rnf (Incoherent s) = rnf s
+  rnf (NonCanonical s) = rnf s
 
 instance Binary OverlapMode where
     put_ bh (NoOverlap    s) = putByte bh 0 >> put_ bh s
@@ -1031,6 +1056,11 @@ instance Binary TupleSort where
         0 -> return BoxedTuple
         1 -> return UnboxedTuple
         _ -> return ConstraintTuple
+
+instance NFData TupleSort where
+  rnf BoxedTuple      = ()
+  rnf UnboxedTuple    = ()
+  rnf ConstraintTuple = ()
 
 
 tupleSortBoxity :: TupleSort -> Boxity
@@ -1860,6 +1890,14 @@ instance Binary Activation where
                       ab <- get bh
                       return (ActiveAfter src ab)
 
+instance NFData Activation where
+  rnf = \case
+    AlwaysActive -> ()
+    NeverActive -> ()
+    ActiveBefore src aa -> rnf src `seq` rnf aa
+    ActiveAfter src ab -> rnf src `seq` rnf ab
+    FinalActive -> ()
+
 instance Outputable RuleMatchInfo where
    ppr ConLike = text "CONLIKE"
    ppr FunLike = text "FUNLIKE"
@@ -1871,6 +1909,11 @@ instance Binary RuleMatchInfo where
             h <- getByte bh
             if h == 1 then return ConLike
                       else return FunLike
+
+instance NFData RuleMatchInfo where
+  rnf = \case
+    ConLike -> ()
+    FunLike -> ()
 
 instance Outputable InlineSpec where
     ppr (Inline          src)  = text "INLINE" <+> pprWithSourceText src empty
@@ -1906,6 +1949,14 @@ instance Binary InlineSpec where
                         s <- get bh
                         return (Opaque s)
 
+instance NFData InlineSpec where
+  rnf = \case
+    Inline s -> rnf s
+    NoInline s -> rnf s
+    Inlinable s -> rnf s
+    Opaque s -> rnf s
+    NoUserInlinePrag -> ()
+
 instance Outputable InlinePragma where
   ppr = pprInline
 
@@ -1924,6 +1975,9 @@ instance Binary InlinePragma where
            c <- get bh
            d <- get bh
            return (InlinePragma s a b c d)
+
+instance NFData InlinePragma where
+  rnf (InlinePragma s a b c d) = rnf s `seq` rnf a `seq` rnf b `seq` rnf c `seq` rnf d
 
 -- | Outputs string for pragma name for any of INLINE/INLINABLE/NOINLINE. This
 -- differs from the Outputable instance for the InlineSpec type where the pragma
@@ -2016,6 +2070,13 @@ instance Binary UnfoldingSource where
             1 -> return StableUserSrc
             2 -> return StableSystemSrc
             _ -> return VanillaSrc
+
+instance NFData UnfoldingSource where
+  rnf = \case
+    CompulsorySrc -> ()
+    StableUserSrc -> ()
+    StableSystemSrc -> ()
+    VanillaSrc -> ()
 
 instance Outputable UnfoldingSource where
   ppr CompulsorySrc     = text "Compulsory"
@@ -2161,6 +2222,19 @@ data TypeOrConstraint
   = TypeLike | ConstraintLike
   deriving( Eq, Ord, Data )
 
+instance Binary TypeOrConstraint where
+  put_ bh = \case
+    TypeLike -> putByte bh 0
+    ConstraintLike -> putByte bh 1
+  get bh = getByte bh >>= \case
+    0 -> pure TypeLike
+    1 -> pure ConstraintLike
+    _ -> panic "TypeOrConstraint.get: invalid value"
+
+instance NFData TypeOrConstraint where
+  rnf = \case
+    TypeLike -> ()
+    ConstraintLike -> ()
 
 {- *********************************************************************
 *                                                                      *
@@ -2209,18 +2283,6 @@ instance Outputable (TyConFlavour tc) where
       go BuiltInTypeFlavour      = "built-in type"
       go PromotedDataConFlavour  = "promoted data constructor"
 
-instance NFData tc => NFData (TyConFlavour tc) where
-  rnf ClassFlavour = ()
-  rnf (TupleFlavour !_) = ()
-  rnf SumFlavour = ()
-  rnf DataTypeFlavour = ()
-  rnf NewtypeFlavour = ()
-  rnf AbstractTypeFlavour = ()
-  rnf (OpenFamilyFlavour !_ mb_tc) = rnf mb_tc
-  rnf ClosedTypeFamilyFlavour = ()
-  rnf TypeSynonymFlavour = ()
-  rnf BuiltInTypeFlavour = ()
-  rnf PromotedDataConFlavour = ()
 
 -- | Get the enclosing class TyCon (if there is one) for the given TyConFlavour
 tyConFlavourAssoc_maybe :: TyConFlavour tc -> Maybe tc

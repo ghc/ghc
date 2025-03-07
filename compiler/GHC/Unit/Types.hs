@@ -517,6 +517,9 @@ newtype UnitId = UnitId
   }
   deriving (Data)
 
+instance NFData UnitId where
+  rnf (UnitId fs) = rnf fs `seq` ()
+
 instance Binary UnitId where
   put_ bh (UnitId fs) = put_ bh fs
   get bh = do fs <- get bh; return (UnitId fs)
@@ -703,6 +706,9 @@ data GenWithIsBoot mod = GWIB
   -- the Ord instance must ensure that we first sort by Module and then by
   -- IsBootInterface: this is assumed to perform filtering of non-boot modules,
   -- e.g. in GHC.Driver.Env.hptModulesBelow
+
+instance NFData mod => NFData (GenWithIsBoot mod) where
+  rnf (GWIB mod isBoot) = rnf mod `seq` rnf isBoot `seq` ()
 
 type ModuleNameWithIsBoot = GenWithIsBoot ModuleName
 

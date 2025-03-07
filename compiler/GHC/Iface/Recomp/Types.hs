@@ -111,7 +111,5 @@ instance Outputable ModIfaceSelfRecomp where
                            ])]
 
 instance NFData ModIfaceSelfRecomp where
-  -- Note (MP): does not deeply force Usages but the old ModIface logic didn't either, so
-  -- I left it as a shallow force.
   rnf (ModIfaceSelfRecomp src_hash usages flag_hash opt_hash hpc_hash plugin_hash)
-    = src_hash `seq` usages `seq` flag_hash `seq` opt_hash `seq` hpc_hash `seq` plugin_hash `seq` ()
+    = rnf src_hash `seq` rnf usages `seq` rnf flag_hash `seq` rnf opt_hash `seq` rnf hpc_hash `seq` rnf plugin_hash `seq` ()

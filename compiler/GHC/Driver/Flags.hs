@@ -76,7 +76,10 @@ instance Binary Language where
   get bh = toEnum <$> get bh
 
 instance NFData Language where
-  rnf x = x `seq` ()
+  rnf Haskell98 = ()
+  rnf Haskell2010 = ()
+  rnf GHC2021 = ()
+  rnf GHC2024 = ()
 
 data OnOff a = On a
              | Off a

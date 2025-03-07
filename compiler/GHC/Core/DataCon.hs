@@ -112,6 +112,7 @@ import qualified Data.ByteString.Lazy    as LBS
 import qualified Data.Data as Data
 import Data.Char
 import Data.List( find )
+import Control.DeepSeq
 
 {-
 Note [Data constructor representation]
@@ -1077,6 +1078,16 @@ instance Binary SrcUnpackedness where
            0 -> return SrcNoUnpack
            1 -> return SrcUnpack
            _ -> return NoSrcUnpack
+
+instance NFData SrcStrictness where
+  rnf SrcLazy = ()
+  rnf SrcStrict = ()
+  rnf NoSrcStrict = ()
+
+instance NFData SrcUnpackedness where
+  rnf SrcNoUnpack = ()
+  rnf SrcUnpack = ()
+  rnf NoSrcUnpack = ()
 
 -- | Compare strictness annotations
 eqHsBang :: HsImplBang -> HsImplBang -> Bool

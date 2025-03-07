@@ -79,6 +79,7 @@ import Data.Bool
 import Data.Char
 import Prelude (Integer)
 import Data.Ord (Ord)
+import Control.DeepSeq
 
 {-
 ************************************************************************
@@ -97,6 +98,10 @@ data PromotionFlag
 isPromoted :: PromotionFlag -> Bool
 isPromoted IsPromoted  = True
 isPromoted NotPromoted = False
+
+instance NFData PromotionFlag where
+  rnf NotPromoted = ()
+  rnf IsPromoted  = ()
 
 {-
 ************************************************************************

@@ -13,6 +13,7 @@ where
 import GHC.Prelude
 import GHC.Utils.Binary
 import GHC.Unit.Types
+import Control.DeepSeq
 
 {- Note [HscSource types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -53,6 +54,10 @@ data HsBootOrSig
   | Hsig   -- ^ .hsig file
    deriving (Eq, Ord, Show)
 
+instance NFData HsBootOrSig where
+  rnf HsBoot = ()
+  rnf Hsig = ()
+
 data HscSource
    -- | .hs file
    = HsSrcFile
@@ -72,6 +77,10 @@ pattern HsigFile   = HsBootOrSig Hsig
 hscSourceToIsBoot :: HscSource -> IsBootInterface
 hscSourceToIsBoot HsBootFile = IsBoot
 hscSourceToIsBoot _ = NotBoot
+
+instance NFData HscSource where
+  rnf HsSrcFile = ()
+  rnf (HsBootOrSig h) = rnf h
 
 instance Binary HscSource where
     put_ bh HsSrcFile = putByte bh 0

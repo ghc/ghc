@@ -22,10 +22,14 @@ import Prelude -- See note [Why do we import Prelude here?]
 import Data.Bits
 import Data.Word        ( Word8 )
 import Data.Data
+import Control.DeepSeq
 
 
 -- | Represents a serialized value of a particular type. Attempts can be made to deserialize it at certain types
 data Serialized = Serialized TypeRep [Word8]
+
+instance NFData Serialized where
+  rnf (Serialized tr ws) = rnf tr `seq` rnf ws
 
 -- | Put a Typeable value that we are able to actually turn into bytes into a 'Serialized' value ready for deserialization later
 toSerialized :: forall a. Typeable a => (a -> [Word8]) -> a -> Serialized

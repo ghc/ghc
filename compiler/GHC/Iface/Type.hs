@@ -2577,18 +2577,23 @@ instance Binary (DefMethSpec IfaceType) where
               0 -> return VanillaDM
               _ -> do { t <- get bh; return (GenericDM t) }
 
+instance NFData (DefMethSpec IfaceType) where
+  rnf = \case
+    VanillaDM -> ()
+    GenericDM t -> rnf t
+
 instance NFData IfaceType where
   rnf = \case
     IfaceFreeTyVar f1 -> f1 `seq` ()
     IfaceTyVar f1 -> rnf f1
     IfaceLitTy f1 -> rnf f1
     IfaceAppTy f1 f2 -> rnf f1 `seq` rnf f2
-    IfaceFunTy f1 f2 f3 f4 -> f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
-    IfaceForAllTy f1 f2 -> f1 `seq` rnf f2
+    IfaceFunTy f1 f2 f3 f4 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
+    IfaceForAllTy f1 f2 -> rnf f1 `seq` rnf f2
     IfaceTyConApp f1 f2 -> rnf f1 `seq` rnf f2
     IfaceCastTy f1 f2 -> rnf f1 `seq` rnf f2
     IfaceCoercionTy f1 -> rnf f1
-    IfaceTupleTy f1 f2 f3 -> f1 `seq` f2 `seq` rnf f3
+    IfaceTupleTy f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
 
 instance NFData IfaceTyLit where
   rnf = \case
@@ -2599,21 +2604,25 @@ instance NFData IfaceTyLit where
 instance NFData IfaceCoercion where
   rnf = \case
     IfaceReflCo f1 -> rnf f1
-    IfaceGReflCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
-    IfaceFunCo f1 f2 f3 f4 -> f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
-    IfaceTyConAppCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
+    IfaceGReflCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
+    IfaceFunCo f1 f2 f3 f4 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
+    IfaceTyConAppCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
     IfaceAppCo f1 f2 -> rnf f1 `seq` rnf f2
     IfaceForAllCo f1 f2 f3 f4 f5 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5
     IfaceCoVarCo f1 -> rnf f1
     IfaceAxiomCo f1 f2 -> rnf f1 `seq` rnf f2
-    IfaceUnivCo f1 f2 f3 f4 deps -> rnf f1 `seq` f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf deps
+    IfaceUnivCo f1 f2 f3 f4 deps -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf deps
     IfaceSymCo f1 -> rnf f1
     IfaceTransCo f1 f2 -> rnf f1 `seq` rnf f2
     IfaceSelCo f1 f2 -> rnf f1 `seq` rnf f2
-    IfaceLRCo f1 f2 -> f1 `seq` rnf f2
+    IfaceLRCo f1 f2 -> rnf f1 `seq` rnf f2
     IfaceInstCo f1 f2 -> rnf f1 `seq` rnf f2
     IfaceKindCo f1 -> rnf f1
     IfaceSubCo f1 -> rnf f1
+    -- These are not deeply forced because they are not used in ModIface,
+    -- these constructors are for pretty-printing.
+    -- See Note [Free TyVars and CoVars in IfaceType]
+    -- See Note [Holes in IfaceCoercion]
     IfaceFreeCoVar f1 -> f1 `seq` ()
     IfaceHoleCo f1 -> f1 `seq` ()
 
@@ -2624,15 +2633,17 @@ instance NFData IfaceAxiomRule where
     IfaceAR_B n i -> rnf n `seq` rnf i
 
 instance NFData IfaceMCoercion where
-  rnf x = seq x ()
+  rnf IfaceMRefl = ()
+  rnf (IfaceMCo c) = rnf c
 
 instance NFData IfaceOneShot where
-  rnf x = seq x ()
+  rnf IfaceOneShot = ()
+  rnf IfaceNoOneShot = ()
 
 instance NFData IfaceTyConSort where
   rnf = \case
     IfaceNormalTyCon -> ()
-    IfaceTupleTyCon arity sort -> rnf arity `seq` sort `seq` ()
+    IfaceTupleTyCon arity sort -> rnf arity `seq` rnf sort `seq` ()
     IfaceSumTyCon arity -> rnf arity
     IfaceEqualityTyCon -> ()
 
@@ -2640,7 +2651,7 @@ instance NFData IfLclName where
   rnf (IfLclName lfs) = rnf lfs
 
 instance NFData IfaceTyConInfo where
-  rnf (IfaceTyConInfo f s) = f `seq` rnf s
+  rnf (IfaceTyConInfo f s) = rnf f `seq` rnf s
 
 instance NFData IfaceTyCon where
   rnf (IfaceTyCon nm info) = rnf nm `seq` rnf info
@@ -2653,4 +2664,4 @@ instance NFData IfaceBndr where
 instance NFData IfaceAppArgs where
   rnf = \case
     IA_Nil -> ()
-    IA_Arg f1 f2 f3 -> rnf f1 `seq` f2 `seq` rnf f3
+    IA_Arg f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
