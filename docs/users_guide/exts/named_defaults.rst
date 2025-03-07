@@ -6,6 +6,8 @@ Named ``default`` declarations
       Enable ``default`` declarations with explicitly named class,
       extending :ref:`class_defaulting`.
 
+    :since: 9.12.1
+
 The ``NamedDefaults`` extension extends the type-class defaulting mechanism
 described in :ref:`class_defaulting`, allowing default types to be specified
 on a per-class basis, and to be imported and exported.
@@ -181,8 +183,10 @@ is, the repeats can be discarded.
 Rules for disambiguation at the use site
 ----------------------------------------
 
-The disambiguation rules are a conservative extension of the existing rules in
-Haskell 2010, which state that ambiguous type variable *v* is defaultable if:
+The disambiguation rules are a conservative extension of the existing rules from
+the (`Haskell Report, Section 4.3.4 <https://www.haskell.org/onlinereport/decls.html#sect4.3.4>`__).
+These are described in :ref:`class_defaulting`, but to recap: an ambiguous type
+variable *v* is defaultable if:
 
     - *v* appears only in constraints of the form *C* *v*, where *C* is a class,
       and
@@ -196,10 +200,9 @@ Haskell 2010, which state that ambiguous type variable *v* is defaultable if:
     that is an instance of all the ambiguous variable’s classes. It is a static
     error if no such type is found.
 
-The new rules instead require only that 
-
-- *v* appears in at least one constraint of the form *C* *v*, where *C* is a
-  single-parameter class.
+The new rules relax the last two criteria to include any classes for which there
+is a named default declaration (local or imported). Note that this includes
+modules in which the :extension:`NamedDefaults` extension is **not** enabled!
 
 Informally speaking, the type selected for defaulting is the first type from the
 ``default`` list for class *C* that satisfies all constraints on type variable
@@ -228,3 +231,7 @@ Let *S* be the complete set of unsolved constraints, and initialize *S*\
 5. If there is precisely one type *T* in the resulting type set, resolve the
    ambiguity by adding a ``v ~ T``\ `i`:subscript: constraint to a set *S*\
    `x`:subscript:; otherwise report a static error.
+
+As explained in :ref:`extended-class-defaulting`, the :extension:`ExtendedDefaultRules`
+extension allows these rules to be relaxed even further, allowing defaulting
+to take place in more circumstances.
