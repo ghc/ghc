@@ -162,7 +162,7 @@ class RelativeMetricAcceptanceWindow(MetricAcceptanceWindow):
         return (lowerBound, upperBound)
 
     def describe(self) -> str:
-        return '+/- %1.1f%%' % (100*self.__tol)
+        return '+/- %1.1f%%' % (self.__tol)
 
 def parse_perf_stat(stat_str: str) -> PerfStat:
     field_vals = stat_str.strip('\t').split('\t')
