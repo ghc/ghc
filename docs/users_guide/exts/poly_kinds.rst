@@ -987,6 +987,8 @@ Note that in the last example, it's impossible to learn that ``a`` depends on ``
 body of the ``forall`` (that is, the ``Sing k -> Sing a -> ()``). And so GHC rejects
 the program.
 
+.. _kind-defaulting:
+
 Kind defaulting without :extension:`PolyKinds`
 -----------------------------------------------
 
