@@ -483,8 +483,8 @@ reparenOuterTyVarBndrs
   => HsOuterTyVarBndrs flag a
   -> HsOuterTyVarBndrs flag a
 reparenOuterTyVarBndrs imp@HsOuterImplicit{} = imp
-reparenOuterTyVarBndrs (HsOuterExplicit x exp_bndrs) =
-  HsOuterExplicit x (map (mapXRec @(NoGhcTc a) reparenTyVar) exp_bndrs)
+reparenOuterTyVarBndrs (HsOuterExplicit x exp_bndrs imp_bndrs) =
+  HsOuterExplicit x (map (mapXRec @(NoGhcTc a) reparenTyVar) exp_bndrs) imp_bndrs
 reparenOuterTyVarBndrs v@XHsOuterTyVarBndrs{} = v
 
 -- | Add parentheses around the types in an 'HsForAllTelescope' (see 'reparenTypePrec')

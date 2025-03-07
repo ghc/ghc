@@ -2264,7 +2264,7 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
 
      -- see Note [Implementation tweak for wildCards in family instances]
      mk_wc_details = case hole_mode of
-                      HM_FamPat FreeArg -> newTyVarMetaVarDetailsAtLevel
+                      HM_FamPat FreeArg -> newTauTvDetailsAtLevel
                       HM_FamPat ClassArg -> newTauTvDetailsAtLevel
                       HM_FamPat SigArg -> newTauTvDetailsAtLevel
                       _ -> newTauTvDetailsAtLevel
@@ -3286,10 +3286,34 @@ bindOuterTKBndrsX skol_mode outer_bndrs thing_inside
         do { (imp_tvs', thing) <- bindImplicitTKBndrsX skol_mode imp_tvs thing_inside
            ; return ( HsOuterImplicit{hso_ximplicit = imp_tvs'}
                     , thing) }
-      HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-        do { (exp_tvs', thing) <- bindExplicitTKBndrsX skol_mode exp_bndrs thing_inside
+      HsOuterExplicit{hso_bndrs = exp_bndrs, hso_ximplicit = imp_tvs} ->
+        do { (exp_tvs', (imp_tvs', thing)) <-
+                bindExplicitTKBndrsX skol_mode exp_bndrs
+                $ bindImplicitTKBndrsX (skol_mode {sm_tvtv=SMDTauTv}) imp_tvs thing_inside
            ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
-                                      , hso_bndrs     = exp_bndrs }
+                                      , hso_bndrs     = exp_bndrs
+                                      , hso_ximplicit = imp_tvs'
+                                      }
+                    , thing) }
+
+bindOuterTKBndrsXFam :: SkolemMode
+                  -> HsOuterFamEqnTyVarBndrs GhcRn
+                  -> TcM a
+                  -> TcM (HsOuterFamEqnTyVarBndrs GhcTc, a)
+bindOuterTKBndrsXFam skol_mode outer_bndrs thing_inside
+  = case outer_bndrs of
+      HsOuterImplicit{hso_ximplicit = imp_tvs} ->
+        do { (imp_tvs', thing) <- bindImplicitTKBndrsX skol_mode imp_tvs thing_inside
+           ; return ( HsOuterImplicit{hso_ximplicit = imp_tvs'}
+                    , thing) }
+      HsOuterExplicit{hso_bndrs = exp_bndrs, hso_ximplicit = imp_tvs} ->
+        do { (exp_tvs', (imp_tvs', thing)) <-
+                bindExplicitTKBndrsX skol_mode exp_bndrs
+                $ bindImplicitTKBndrsX (skol_mode {sm_tvtv=SMDTauTv}) imp_tvs thing_inside
+           ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
+                                      , hso_bndrs     = exp_bndrs
+                                      , hso_ximplicit = imp_tvs'
+                                      }
                     , thing) }
 
 ---------------
@@ -3544,6 +3568,7 @@ newTyVarBndr (SM { sm_clone = clone, sm_tvtv = tvtv }) name kind
                          ; return (setNameUnique name uniq) }
               False -> return name
        ; details <- case tvtv of
+                 SMDTauTv    -> newMetaDetails TauTv
                  SMDTyVarTv  -> newMetaDetails TyVarTv
                  SMDSkolemTv skol_info ->
                   do { lvl <- getTcLevel
@@ -3636,6 +3661,7 @@ data SkolemMode
 data SkolemModeDetails
   = SMDTyVarTv
   | SMDSkolemTv SkolemInfo
+  | SMDTauTv
 
 
 smVanilla :: HasDebugCallStack => SkolemMode

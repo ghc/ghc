@@ -1872,7 +1872,10 @@ instance ToHie (TScoped (LocatedA (HsSigType GhcRn))) where
 instance Data flag => ToHie (TVScoped (HsOuterTyVarBndrs flag GhcRn)) where
   toHie (TVS tsc sc bndrs) = case bndrs of
     HsOuterImplicit xs -> bindingsOnly $ map (C $ TyVarBind sc tsc) xs
-    HsOuterExplicit _ xs -> toHie $ tvScopes tsc sc xs
+    HsOuterExplicit _ xs ys -> do
+      implicits <- bindingsOnly (map (C $ TyVarBind sc tsc) ys)
+      explicits <- toHie (tvScopes tsc sc xs);
+      pure $ implicits ++ explicits
 
 toHieForAllTele ::  HsForAllTelescope GhcRn -> SrcSpan -> HieM [HieAST Type]
 toHieForAllTele (HsForAllVis { hsf_vis_bndrs = bndrs }) loc =
