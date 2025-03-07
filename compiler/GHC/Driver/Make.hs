@@ -1962,6 +1962,8 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
   mgMapM enable_code_gen mg
   where
     defaultBackendOf ms = platformDefaultBackend (targetPlatform $ ue_unitFlags (ms_unitid ms) unit_env)
+    -- FIXME: Strong resemblance and some duplication between this and `makeDynFlagsConsistent`.
+    -- It would be good to consider how to make these checks more uniform and not duplicated.
     enable_code_gen :: ModSummary -> IO ModSummary
     enable_code_gen ms
       | ModSummary
@@ -2022,6 +2024,11 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
                let ms' = ms
                      { ms_hspp_opts = gopt_set (ms_hspp_opts ms) Opt_ExternalInterpreter
                      }
+               -- Recursive call to catch the other cases
+               enable_code_gen ms'
+
+         | needs_full_ways dflags -> do
+               let ms' = ms { ms_hspp_opts = set_full_ways dflags }
                -- Recursive call to catch the other cases
                enable_code_gen ms'
 
@@ -2119,6 +2126,22 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
         , isTemplateHaskellOrQQNonBoot ms
         , gopt Opt_UseBytecodeRatherThanObjects (ms_hspp_opts ms)
         ]
+
+    -- FIXME: Duplicated from makeDynFlagsConsistent
+    needs_full_ways dflags
+      = ghcLink dflags == LinkInMemory &&
+        not (gopt Opt_ExternalInterpreter dflags) &&
+        targetWays_ dflags /= hostFullWays
+    set_full_ways dflags =
+        let platform = targetPlatform dflags
+            dflags_a = dflags { targetWays_ = hostFullWays }
+            dflags_b = foldl gopt_set dflags_a
+                     $ concatMap (wayGeneralFlags platform)
+                                 hostFullWays
+            dflags_c = foldl gopt_unset dflags_b
+                     $ concatMap (wayUnsetGeneralFlags platform)
+                                 hostFullWays
+        in dflags_c
 
 -- | Populate the Downsweep cache with the root modules.
 mkRootMap

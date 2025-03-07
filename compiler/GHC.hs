@@ -931,7 +931,7 @@ parseDynamicFlags
     -> [Located String]
     -> m (DynFlags, [Located String], Messages DriverMessage)
 parseDynamicFlags logger dflags cmdline = do
-  (dflags1, leftovers, warns) <- parseDynamicFlagsCmdLine dflags cmdline
+  (dflags1, leftovers, warns) <- parseDynamicFlagsCmdLine logger dflags cmdline
   -- flags that have just been read are used by the logger when loading package
   -- env (this is checked by T16318)
   let logger1 = setLogFlags logger (initLogFlags dflags1)
@@ -1028,11 +1028,13 @@ normalise_hyp fp
 checkNewDynFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
 checkNewDynFlags logger dflags = do
   -- See Note [DynFlags consistency]
-  let (dflags', warnings) = makeDynFlagsConsistent dflags
+  let (dflags', warnings, infoverb) = makeDynFlagsConsistent dflags
   let diag_opts = initDiagOpts dflags
       print_config = initPrintConfig dflags
   liftIO $ printOrThrowDiagnostics logger print_config diag_opts
     $ fmap GhcDriverMessage $ warnsToMessages diag_opts warnings
+  when (logVerbAtLeast logger 3) $
+    mapM_ (\(L _loc m) -> liftIO $ logInfo logger m) infoverb
   return dflags'
 
 checkNewInteractiveDynFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
