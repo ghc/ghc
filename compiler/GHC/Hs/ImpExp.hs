@@ -259,7 +259,6 @@ ieNames (IEVar       _ (L _ n) _)      = [ieWrappedName n]
 ieNames (IEThingAbs  _ (L _ n) _)      = [ieWrappedName n]
 ieNames (IEThingAll  _ (L _ n) _)      = [ieWrappedName n]
 ieNames (IEThingWith _ (L _ n) _ ns _) = ieWrappedName n : map (ieWrappedName . unLoc) ns
--- NB the above case does not include names of field selectors
 ieNames (IEModuleContents {})     = []
 ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []

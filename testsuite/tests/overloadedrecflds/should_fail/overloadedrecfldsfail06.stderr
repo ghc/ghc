@@ -1,5 +1,4 @@
 [1 of 3] Compiling OverloadedRecFldsFail06_A ( OverloadedRecFldsFail06_A.hs, OverloadedRecFldsFail06_A.o )
-
 OverloadedRecFldsFail06_A.hs:9:15: warning: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: data constructor ‘MkUnused’
 
@@ -8,9 +7,9 @@ OverloadedRecFldsFail06_A.hs:9:42: warning: [GHC-40910] [-Wunused-top-binds (in 
 
 OverloadedRecFldsFail06_A.hs:9:59: warning: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: record field of MkUnused ‘used_locally’
-[2 of 3] Compiling Main             ( overloadedrecfldsfail06.hs, overloadedrecfldsfail06.o )
 
-overloadedrecfldsfail06.hs:7:1: error: [GHC-38856] [-Wunused-imports (in -Wextra), Werror=unused-imports]
+[2 of 3] Compiling Main             ( overloadedrecfldsfail06.hs, overloadedrecfldsfail06.o )
+overloadedrecfldsfail06.hs:7:35: error: [GHC-38856] [-Wunused-imports (in -Wextra), Werror=unused-imports]
     The import of ‘MkV, Unused, Unused(unused), V(x), U(y)’
     from module ‘OverloadedRecFldsFail06_A’ is redundant
 
@@ -19,11 +18,11 @@ overloadedrecfldsfail06.hs:8:1: error: [GHC-66111] [-Wunused-imports (in -Wextra
       except perhaps to import instances from ‘OverloadedRecFldsFail06_A’
     To import instances alone, use: import OverloadedRecFldsFail06_A()
 
-overloadedrecfldsfail06.hs:9:1: error: [GHC-38856] [-Wunused-imports (in -Wextra), Werror=unused-imports]
+overloadedrecfldsfail06.hs:9:50: error: [GHC-38856] [-Wunused-imports (in -Wextra), Werror=unused-imports]
     The qualified import of ‘V(y)’
     from module ‘OverloadedRecFldsFail06_A’ is redundant
 
-overloadedrecfldsfail06.hs:10:1: error: [GHC-38856] [-Wunused-imports (in -Wextra), Werror=unused-imports]
+overloadedrecfldsfail06.hs:10:50: error: [GHC-38856] [-Wunused-imports (in -Wextra), Werror=unused-imports]
     The qualified import of ‘U, U(x)’
     from module ‘OverloadedRecFldsFail06_A’ is redundant
 
@@ -36,3 +35,4 @@ overloadedrecfldsfail06.hs:18:28: error: [GHC-02256] [-Wambiguous-fields (in -Wd
     Ambiguous record update with parent type constructor ‘V’.
     This type-directed disambiguation mechanism will not be supported by -XDuplicateRecordFields in future releases of GHC.
     Consider disambiguating using module qualification instead.
+
