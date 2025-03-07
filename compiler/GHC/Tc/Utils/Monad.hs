@@ -114,7 +114,7 @@ module GHC.Tc.Utils.Monad(
   emitNamedTypeHole, IsExtraConstraint(..), emitAnonTypeHole,
 
   -- * Template Haskell context
-  recordThUse, recordThSpliceUse, recordThNeededRuntimeDeps,
+  recordThUse, recordThNeededRuntimeDeps,
   keepAlive, getStage, getStageAndBindLevel, setStage,
   addModFinalizersWithLclEnv,
 
@@ -262,7 +262,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
  = do { keep_var     <- newIORef emptyNameSet ;
         used_gre_var <- newIORef [] ;
         th_var       <- newIORef False ;
-        th_splice_var<- newIORef False ;
         infer_var    <- newIORef True ;
         infer_reasons_var <- newIORef emptyMessages ;
         dfun_n_var   <- newIORef emptyOccSet ;
@@ -325,7 +324,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_fam_inst_env   = emptyFamInstEnv,
                 tcg_ann_env        = emptyAnnEnv,
                 tcg_th_used        = th_var,
-                tcg_th_splice_used = th_splice_var,
                 tcg_th_needed_deps = th_needed_deps_var,
                 tcg_exports        = [],
                 tcg_imports        = emptyImportAvails,
@@ -2065,9 +2063,6 @@ solution: make GHC.Tc.Utils.Unify.uType spot manifestly-insoluble constraints.
 
 recordThUse :: TcM ()
 recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
-
-recordThSpliceUse :: TcM ()
-recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) True }
 
 recordThNeededRuntimeDeps :: [Linkable] -> PkgsLoaded -> TcM ()
 recordThNeededRuntimeDeps new_links new_pkgs

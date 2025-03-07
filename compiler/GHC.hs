@@ -107,7 +107,6 @@ module GHC (
           mi_hi_bytes,
           mi_deps,
           mi_exports,
-          mi_used_th,
           mi_fixities,
           mi_warns,
           mi_anns,

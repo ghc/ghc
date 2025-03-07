@@ -556,11 +556,6 @@ data TcGblEnv
           -- is implicit rather than explicit, so we have to zap a
           -- mutable variable.
 
-        tcg_th_splice_used :: TcRef Bool,
-          -- ^ @True@ \<=> A Template Haskell splice was used.
-          --
-          -- Splices disable recompilation avoidance (see #481)
-
         tcg_th_needed_deps :: TcRef ([Linkable], PkgsLoaded),
           -- ^ The set of runtime dependencies required by this module
           -- See Note [Object File Dependencies]
