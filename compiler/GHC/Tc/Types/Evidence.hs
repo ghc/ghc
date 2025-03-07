@@ -433,6 +433,11 @@ extendEvBinds bs ev_bind
                                                (eb_lhs ev_bind)
                                                ev_bind }
 
+-- | Union two evidence binding maps
+unionEvBindMap :: EvBindMap -> EvBindMap -> EvBindMap
+unionEvBindMap (EvBindMap env1) (EvBindMap env2) =
+  EvBindMap { ev_bind_varenv = plusDVarEnv env1 env2 }
+
 isEmptyEvBindMap :: EvBindMap -> Bool
 isEmptyEvBindMap (EvBindMap m) = isEmptyDVarEnv m
 

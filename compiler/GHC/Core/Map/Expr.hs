@@ -122,6 +122,7 @@ instance TrieMap CoreMap where
     alterTM k f (CoreMap m) = CoreMap (alterTM (deBruijnize k) f m)
     foldTM k (CoreMap m) = foldTM k m
     filterTM f (CoreMap m) = CoreMap (filterTM f m)
+    mapMaybeTM f (CoreMap m) = CoreMap (mapMaybeTM f m)
 
 -- | @CoreMapG a@ is a map from @DeBruijn CoreExpr@ to @a@.  The extended
 -- key makes it suitable for recursive traversal, since it can track binders,
@@ -271,6 +272,7 @@ instance TrieMap CoreMapX where
    alterTM  = xtE
    foldTM   = fdE
    filterTM = ftE
+   mapMaybeTM = mpE
 
 --------------------------
 ftE :: (a->Bool) -> CoreMapX a -> CoreMapX a
@@ -286,6 +288,20 @@ ftE f (CM { cm_var = cvar, cm_lit = clit
        , cm_lam = fmap (filterTM f) clam, cm_letn = fmap (fmap (filterTM f)) cletn
        , cm_letr = fmap (fmap (filterTM f)) cletr, cm_case = fmap (filterTM f) ccase
        , cm_ecase = fmap (filterTM f) cecase, cm_tick = fmap (filterTM f) ctick }
+
+mpE :: (a -> Maybe b) -> CoreMapX a -> CoreMapX b
+mpE f (CM { cm_var = cvar, cm_lit = clit
+          , cm_co = cco, cm_type = ctype
+          , cm_cast = ccast , cm_app = capp
+          , cm_lam = clam, cm_letn = cletn
+          , cm_letr = cletr, cm_case = ccase
+          , cm_ecase = cecase, cm_tick = ctick })
+  = CM { cm_var = mapMaybeTM f cvar, cm_lit = mapMaybeTM f clit
+       , cm_co = mapMaybeTM f cco, cm_type = mapMaybeTM f ctype
+       , cm_cast = fmap (mapMaybeTM f) ccast, cm_app = fmap (mapMaybeTM f) capp
+       , cm_lam = fmap (mapMaybeTM f) clam, cm_letn = fmap (fmap (mapMaybeTM f)) cletn
+       , cm_letr = fmap (fmap (mapMaybeTM f)) cletr, cm_case = fmap (mapMaybeTM f) ccase
+       , cm_ecase = fmap (mapMaybeTM f) cecase, cm_tick = fmap (mapMaybeTM f) ctick }
 
 --------------------------
 lookupCoreMap :: CoreMap a -> CoreExpr -> Maybe a
@@ -409,6 +425,7 @@ instance TrieMap AltMap where
    alterTM  = xtA emptyCME
    foldTM   = fdA
    filterTM = ftA
+   mapMaybeTM = mpA
 
 instance Eq (DeBruijn CoreAlt) where
   D env1 a1 == D env2 a2 = go a1 a2 where
@@ -446,3 +463,9 @@ fdA :: (a -> b -> b) -> AltMap a -> b -> b
 fdA k m = foldTM k (am_deflt m)
         . foldTM (foldTM k) (am_data m)
         . foldTM (foldTM k) (am_lit m)
+
+mpA :: (a -> Maybe b) -> AltMap a -> AltMap b
+mpA f (AM { am_deflt = adeflt, am_data = adata, am_lit = alit })
+  = AM { am_deflt = mapMaybeTM f adeflt
+       , am_data = fmap (mapMaybeTM f) adata
+       , am_lit = fmap (mapMaybeTM f) alit }

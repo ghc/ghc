@@ -63,6 +63,7 @@ module GHC.Cmm.Dataflow.Label
     , mapToList
     , mapFromList
     , mapFromListWith
+    , mapMapMaybe
     ) where
 
 import GHC.Prelude
@@ -280,6 +281,9 @@ mapFromList assocs = LM (M.fromList [(lblToUnique k, v) | (k, v) <- assocs])
 mapFromListWith :: (v -> v -> v) -> [(Label, v)] -> LabelMap v
 mapFromListWith f assocs = LM (M.fromListWith f [(lblToUnique k, v) | (k, v) <- assocs])
 
+mapMapMaybe :: (a -> Maybe b) -> LabelMap a -> LabelMap b
+mapMapMaybe f (LM m) = LM (M.mapMaybe f m)
+
 -----------------------------------------------------------------------------
 -- Instances
 
@@ -298,7 +302,8 @@ instance TrieMap LabelMap where
   lookupTM k m  = mapLookup k m
   alterTM k f m = mapAlter f k m
   foldTM k m z  = mapFoldr k z m
-  filterTM f m  = mapFilter f m
+  filterTM f    = mapFilter f
+  mapMaybeTM f  = mapMapMaybe f
 
 -----------------------------------------------------------------------------
 -- FactBase

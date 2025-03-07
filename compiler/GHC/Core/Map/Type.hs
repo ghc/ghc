@@ -96,6 +96,7 @@ instance TrieMap CoercionMap where
    alterTM k f (CoercionMap m) = CoercionMap (alterTM (deBruijnize k) f m)
    foldTM k    (CoercionMap m) = foldTM k m
    filterTM f  (CoercionMap m) = CoercionMap (filterTM f m)
+   mapMaybeTM f (CoercionMap m) = CoercionMap (mapMaybeTM f m)
 
 type CoercionMapG = GenMap CoercionMapX
 newtype CoercionMapX a = CoercionMapX (TypeMapX a)
@@ -112,6 +113,7 @@ instance TrieMap CoercionMapX where
   alterTM  = xtC
   foldTM f (CoercionMapX core_tm) = foldTM f core_tm
   filterTM f (CoercionMapX core_tm) = CoercionMapX (filterTM f core_tm)
+  mapMaybeTM f (CoercionMapX core_tm) = CoercionMapX (mapMaybeTM f core_tm)
 
 instance Eq (DeBruijn Coercion) where
   D env1 co1 == D env2 co2
@@ -189,6 +191,7 @@ instance TrieMap TypeMapX where
    alterTM  = xtT
    foldTM   = fdT
    filterTM = filterT
+   mapMaybeTM = mpT
 
 instance Eq (DeBruijn Type) where
   (==) = eqDeBruijnType
@@ -380,6 +383,7 @@ instance TrieMap TyLitMap where
    alterTM  = xtTyLit
    foldTM   = foldTyLit
    filterTM = filterTyLit
+   mapMaybeTM = mpTyLit
 
 emptyTyLitMap :: TyLitMap a
 emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = emptyUFM, tlm_char = Map.empty }
@@ -406,6 +410,10 @@ foldTyLit l m = flip (nonDetFoldUFM l) (tlm_string m)
 filterTyLit :: (a -> Bool) -> TyLitMap a -> TyLitMap a
 filterTyLit f (TLM { tlm_number = tn, tlm_string = ts, tlm_char = tc })
   = TLM { tlm_number = Map.filter f tn, tlm_string = filterUFM f ts, tlm_char = Map.filter f tc }
+
+mpTyLit :: (a -> Maybe b) -> TyLitMap a -> TyLitMap b
+mpTyLit f (TLM { tlm_number = tn, tlm_string = ts, tlm_char = tc })
+  = TLM { tlm_number = Map.mapMaybe f tn, tlm_string = mapMaybeUFM f ts, tlm_char = Map.mapMaybe f tc }
 
 -------------------------------------------------
 -- | @TypeMap a@ is a map from 'Type' to @a@.  If you are a client, this
@@ -435,6 +443,7 @@ instance TrieMap TypeMap where
     alterTM k f m = xtTT (deBruijnize k) f m
     foldTM k (TypeMap m) = foldTM (foldTM k) m
     filterTM f (TypeMap m) = TypeMap (fmap (filterTM f) m)
+    mapMaybeTM f (TypeMap m) = TypeMap (fmap (mapMaybeTM f) m)
 
 foldTypeMap :: (a -> b -> b) -> b -> TypeMap a -> b
 foldTypeMap k z m = foldTM k m z
@@ -479,6 +488,7 @@ instance TrieMap LooseTypeMap where
   alterTM k f (LooseTypeMap m) = LooseTypeMap (alterTM (deBruijnize k) f m)
   foldTM f (LooseTypeMap m) = foldTM f m
   filterTM f (LooseTypeMap m) = LooseTypeMap (filterTM f m)
+  mapMaybeTM f (LooseTypeMap m) = LooseTypeMap (mapMaybeTM f m)
 
 {-
 ************************************************************************
@@ -558,10 +568,13 @@ instance TrieMap BndrMap where
    alterTM  = xtBndr emptyCME
    foldTM   = fdBndrMap
    filterTM = ftBndrMap
+   mapMaybeTM = mpBndrMap
 
 fdBndrMap :: (a -> b -> b) -> BndrMap a -> b -> b
 fdBndrMap f (BndrMap tm) = foldTM (foldTM f) tm
 
+mpBndrMap :: (a -> Maybe b) -> BndrMap a -> BndrMap b
+mpBndrMap f (BndrMap tm) = BndrMap (fmap (mapMaybeTM f) tm)
 
 -- We need to use 'BndrMap' for 'Coercion', 'CoreExpr' AND 'Type', since all
 -- of these data types have binding forms.
@@ -594,6 +607,7 @@ instance TrieMap VarMap where
    alterTM  = xtVar emptyCME
    foldTM   = fdVar
    filterTM = ftVar
+   mapMaybeTM = mpVar
 
 lkVar :: CmEnv -> Var -> VarMap a -> Maybe a
 lkVar env v
@@ -619,9 +633,24 @@ ftVar :: (a -> Bool) -> VarMap a -> VarMap a
 ftVar f (VM { vm_bvar = bv, vm_fvar = fv })
   = VM { vm_bvar = filterTM f bv, vm_fvar = filterTM f fv }
 
+mpVar :: (a -> Maybe b) -> VarMap a -> VarMap b
+mpVar f (VM { vm_bvar = bv, vm_fvar = fv })
+  = VM { vm_bvar = mapMaybeTM f bv, vm_fvar = mapMaybeTM f fv }
+
 -------------------------------------------------
 lkDNamed :: NamedThing n => n -> DNameEnv a -> Maybe a
 lkDNamed n env = lookupDNameEnv env (getName n)
 
 xtDNamed :: NamedThing n => n -> XT a -> DNameEnv a -> DNameEnv a
 xtDNamed tc f m = alterDNameEnv f m (getName tc)
+
+mpT :: (a -> Maybe b) -> TypeMapX a -> TypeMapX b
+mpT f (TM { tm_var  = tvar, tm_app = tapp, tm_tycon = ttycon
+          , tm_forall = tforall, tm_tylit = tlit
+          , tm_coerce = tcoerce })
+  = TM { tm_var    = mapMaybeTM f tvar
+       , tm_app    = fmap (mapMaybeTM f) tapp
+       , tm_tycon  = mapMaybeTM f ttycon
+       , tm_forall = fmap (mapMaybeTM f) tforall
+       , tm_tylit  = mapMaybeTM f tlit
+       , tm_coerce = tcoerce >>= f }
