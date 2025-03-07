@@ -1,5 +1,5 @@
 [1 of 2] Compiling T11970A1         ( T11970A1.hs, T11970A1.o )
 [2 of 2] Compiling T11970A          ( T11970A.hs, T11970A.o )
-
-T11970A.hs:3:1: warning: [GHC-38856] [-Wunused-imports (in -Wextra)]
+T11970A.hs:3:19: warning: [GHC-38856] [-Wunused-imports (in -Wextra)]
     The import of ‘Fail(b)’ from module ‘T11970A1’ is redundant
+
