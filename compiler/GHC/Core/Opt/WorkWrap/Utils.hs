@@ -971,7 +971,7 @@ unbox_one_arg :: WwOpts
 unbox_one_arg opts arg_var
               DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                                 , dcpc_co = co, dcpc_args = ds }
-  = do { pat_bndrs_uniqs <- getUniqueListM
+  = do { pat_bndrs_uniqs <- getUniquesM
        ; let ex_name_fss = map getOccFS $ dataConExTyCoVars dc
 
              -- Create new arguments we get when unboxing dc
@@ -1563,7 +1563,7 @@ unbox_one_result opts res_bndr
   --   ( case i of I# a ->          )    |
   --   ( case j of I# b ->          )    |     (      (<i>, <j>)      )
   --   ( <hole>                     )    |
-  pat_bndrs_uniqs <- getUniqueListM
+  pat_bndrs_uniqs <- getUniquesM
   let (_exs, arg_ids) =
         dataConRepFSInstPat (repeat ww_prefix) pat_bndrs_uniqs cprCaseBndrMult dc tc_args
   massert (null _exs) -- Should have been caught by canUnboxResult
