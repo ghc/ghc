@@ -66,7 +66,6 @@ import GHC.Types.Unique.DSet
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
 import GHC.Types.TyThing
-import GHC.Types.HpcInfo
 import GHC.Types.CompleteMatch
 import GHC.Types.Name.Cache
 
@@ -120,14 +119,13 @@ mkPartialIface hsc_env core_prog mod_details mod_summary import_decls
          , mg_rdr_env      = rdr_env
          , mg_fix_env      = fix_env
          , mg_warns        = warns
-         , mg_hpc_info     = hpc_info
          , mg_safe_haskell = safe_mode
          , mg_trust_pkg    = self_trust
          , mg_docs         = docs
          }
   = do
       self_recomp <- traverse (mkSelfRecomp hsc_env this_mod (ms_hs_hash mod_summary)) usages
-      return $ mkIface_ hsc_env this_mod core_prog hsc_src deps rdr_env import_decls fix_env warns hpc_info self_trust
+      return $ mkIface_ hsc_env this_mod core_prog hsc_src deps rdr_env import_decls fix_env warns self_trust
                 safe_mode self_recomp docs mod_details
 
 -- | Fully instantiate an interface. Adds fingerprints and potentially code
@@ -237,8 +235,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
                       tcg_import_decls = import_decls,
                       tcg_rdr_env = rdr_env,
                       tcg_fix_env = fix_env,
-                      tcg_warns = warns,
-                      tcg_hpc = other_hpc_info
+                      tcg_warns = warns
                     }
   = do
           let pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))
@@ -247,7 +244,6 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
                                     (tcg_mod tc_result)
                                     (tcg_imports tc_result)
                                     (map mi_module pluginModules)
-          let hpc_info = emptyHpcInfo other_hpc_info
 
           usage <- mkRecompUsageInfo hsc_env tc_result
           docs <- extractDocs (ms_hspp_opts mod_summary) tc_result
@@ -256,7 +252,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
           let partial_iface = mkIface_ hsc_env
                    this_mod (fromMaybe [] mb_program) hsc_src
                    deps rdr_env import_decls
-                   fix_env warns hpc_info
+                   fix_env warns
                    (imp_trust_own_pkg imports) safe_mode self_recomp
                    docs
                    mod_details
@@ -290,7 +286,7 @@ mkRecompUsageInfo hsc_env tc_result = do
 
 mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Dependencies -> GlobalRdrEnv -> [ImportUserSpec]
-         -> NameEnv FixItem -> Warnings GhcRn -> HpcInfo
+         -> NameEnv FixItem -> Warnings GhcRn
          -> Bool
          -> SafeHaskellMode
          -> Maybe ModIfaceSelfRecomp
@@ -299,7 +295,7 @@ mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> PartialModIface
 mkIface_ hsc_env
          this_mod core_prog hsc_src deps rdr_env import_decls fix_env src_warns
-         hpc_info pkg_trust_req safe_mode self_recomp
+         pkg_trust_req safe_mode self_recomp
          docs
          ModDetails{  md_defaults  = defaults,
                       md_insts     = insts,
@@ -375,7 +371,6 @@ mkIface_ hsc_env
           & set_mi_top_env          rdrs
           & set_mi_decls            decls
           & set_mi_extra_decls      extra_decls
-          & set_mi_hpc              (isHpcUsed hpc_info)
           & set_mi_trust            trust_info
           & set_mi_trust_pkg        pkg_trust_req
           & set_mi_complete_matches (icomplete_matches)

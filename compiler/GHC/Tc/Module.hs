@@ -459,7 +459,7 @@ isTypeSubsequenceOf (t1:t1s) (t2:t2s)
 
 tcRnImports :: HscEnv -> [(LImportDecl GhcPs, SDoc)] -> TcM ([NonEmpty ClassDefaults], TcGblEnv)
 tcRnImports hsc_env import_decls
-  = do  { (rn_imports, imp_user_spec, rdr_env, imports, defaults, hpc_info) <- rnImports import_decls ;
+  = do  { (rn_imports, imp_user_spec, rdr_env, imports, defaults) <- rnImports import_decls ;
 
         ; this_mod <- getModule
         ; gbl_env <- getGblEnv
@@ -494,8 +494,7 @@ tcRnImports hsc_env import_decls
               tcg_default      = foldMap subsume tc_defaults,
               tcg_inst_env     = tcg_inst_env gbl `unionInstEnv` home_insts,
               tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl)
-                                                      home_fam_insts,
-              tcg_hpc          = hpc_info
+                                                      home_fam_insts
             }) $ do {
 
         ; traceRn "rn1" (ppr (imp_direct_dep_mods imports))

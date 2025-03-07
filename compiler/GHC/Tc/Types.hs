@@ -154,7 +154,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
 import GHC.Types.Basic
 import GHC.Types.CostCentre.State
-import GHC.Types.HpcInfo
 
 import GHC.Data.IOEnv
 import GHC.Data.Bag
@@ -640,10 +639,6 @@ data TcGblEnv
 
         tcg_hdr_info   :: (Maybe (LHsDoc GhcRn), Maybe (XRec GhcRn ModuleName)),
         -- ^ Maybe Haddock header docs and Maybe located module name
-
-        tcg_hpc       :: !AnyHpcUsage,       -- ^ @True@ if any part of the
-                                             --  prog uses hpc instrumentation.
-           -- NB. BangPattern is to fix a leak, see #15111
 
         tcg_self_boot :: SelfBootInfo,       -- ^ Whether this module has a
                                              -- corresponding hi-boot file
