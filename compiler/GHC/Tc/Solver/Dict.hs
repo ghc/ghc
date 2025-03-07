@@ -61,6 +61,7 @@ import Data.Void( Void )
 import Control.Monad.Trans.Maybe( MaybeT, runMaybeT )
 import Control.Monad.Trans.Class( lift )
 import Control.Monad
+import {-# SOURCE #-} GHC.Tc.Solver.Solve (solveCompletelyIfRequired)
 
 
 {- *********************************************************************
@@ -848,7 +849,13 @@ shortCutSolver dflags ev_w ev_i
 tryInstances :: DictCt -> SolverStage ()
 tryInstances dict_ct
   = Stage $ do { inerts <- getInertSet
-               ; try_instances inerts dict_ct }
+
+                 -- We are about to do something irreversible (using an instance
+                 -- declaration), so we wrap 'try_instances' in solveCompletelyIfRequired
+                 -- to ensure we can roll back if we can't solve the constraint fully.
+                 -- See Note [TcSFullySolve] in GHC.Tc.Solver.Monad.
+               ; solveCompletelyIfRequired (CDictCan dict_ct) $
+                 try_instances inerts dict_ct }
 
 try_instances :: InertSet -> DictCt -> TcS (StopOrContinue ())
 -- Try to use type-class instance declarations to simplify the constraint

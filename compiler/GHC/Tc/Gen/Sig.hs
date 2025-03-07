@@ -39,7 +39,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Solver( reportUnsolvedEqualities, pushLevelAndSolveEqualitiesX
                     , emitResidualConstraints )
 import GHC.Tc.Solver.Solve( solveWanteds )
-import GHC.Tc.Solver.Monad( runTcS, runTcSWithEvBinds )
+import GHC.Tc.Solver.Monad( runTcS, runTcSFullySolve )
 import GHC.Tc.Validity ( checkValidType )
 
 import GHC.Tc.Utils.Monad
@@ -761,16 +761,11 @@ This is done in three parts.
 
     (1) Typecheck the expression, capturing its constraints
 
-    (2) Clone these Wanteds, solve them, and zonk the original Wanteds.
-        This is the same thing that we do for RULES: see Step 1 in
-        Note [The SimplifyRule Plan].
+    (2) Solve these constraints, but in special TcSFullySolve mode which ensures
+        each original Wanted is either fully solved or left untouched.
+        See Note [Fully solving constraints for specialisation].
 
-    (3) Compute the constraints to quantify over.
-
-        a. 'getRuleQuantCts' computes the initial quantification candidates
-        b. Filter out the fully soluble constraints; these are the constraints
-           we are specialising away.
-           See Note [Fully solving constraints for specialisation].
+    (3) Compute the constraints to quantify over, using `getRuleQuantCts`.
 
     (4) Emit the residual (non-quantified) constraints, and wrap the
         expression in a let binding for those constraints.
@@ -850,9 +845,8 @@ The conclusion is this:
     - fully solved (no free evidence variables), or
     - left untouched.
 
-To achieve this, we quantify over all constraints that are **not fully soluble**
-(see 'fullySolveCt_maybe'), although we still call 'mkMinimalBySCs' on this set
-to avoid e.g. quantifying over both `Eq a` and `Ord a`.
+To achieve this, we run the solver in a special "all-or-nothing" solving mode,
+described in Note [TcSFullySolve] in GHC.Tc.Solver.Monad.
 
 Note [Handling old-form SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1029,39 +1023,25 @@ tcSpecPrag poly_id (SpecSigE nm rule_bndrs spec_e inl)
             <- tcRuleBndrs skol_info rule_bndrs $
                tcInferRho spec_e
 
-         -- (2) Clone these Wanteds, solve them, and zonk the original
-         -- Wanteds, in order to benefit from any unifications.
-
-       ; throwaway_ev_binds_var <- newTcEvBinds
-       ; spec_e_wanted_clone <- cloneWC spec_e_wanted
-       ; _ <- setTcLevel rhs_tclvl $
-                runTcSWithEvBinds throwaway_ev_binds_var $
-                solveWanteds spec_e_wanted_clone
+         -- (2) Solve the resulting wanteds in TcSFullySolve mode.
+       ; ev_binds_var <- newTcEvBinds
+       ; spec_e_wanted <- setTcLevel rhs_tclvl $
+                          runTcSFullySolve ev_binds_var $
+                          solveWanteds spec_e_wanted
        ; spec_e_wanted <- liftZonkM $ zonkWC spec_e_wanted
 
          -- (3) Compute which constraints to quantify over.
-         --   (a) Compute quantification candidates
-       ; ev_binds_var <- newTcEvBinds
        ; (quant_cands, residual_wc) <- getRuleQuantCts spec_e_wanted
-
-        --    (b) Compute fully soluble constraints
-        --        See Note [Fully solving constraints for specialisation]
-       ; traceTc "tcSpecPrag SpecSigE: computing fully soluble Wanteds {" empty
-       ; fully_soluble_evids <-
-           setTcLevel rhs_tclvl $
-             mkVarSet <$>
-               mapMaybeM fullySolveCt_maybe (bagToList quant_cands)
-       ; let (fully_soluble_cts, quant_cts) = partitionBag ((`elemVarSet` fully_soluble_evids) . ctEvId) quant_cands
-       --    (c) Compute constraints to quantify over using 'mkMinimalBySCs'
-             qevs = map ctEvId (bagToList quant_cts)
-       ; traceTc "tcSpecPrag SpecSigE: computed fully soluble Wanteds }" (ppr fully_soluble_cts)
 
          -- (4) Emit the residual constraints (that we are not quantifying over)
        ; let tv_bndrs = filter isTyVar rule_bndrs'
+             qevs = map ctEvId (bagToList quant_cands)
        ; emitResidualConstraints rhs_tclvl skol_info_anon ev_binds_var
                                  emptyVarSet tv_bndrs qevs
-                                 (residual_wc `addSimples` fully_soluble_cts)
+                                 residual_wc
        ; let lhs_call = mkLHsWrap (WpLet (TcEvBinds ev_binds_var)) tc_spec_e
+
+       ; ev_binds <- getTcEvBindsMap ev_binds_var
 
        ; traceTc "tcSpecPrag SpecSigE }" $
          vcat [ text "nm:" <+> ppr nm
@@ -1070,9 +1050,11 @@ tcSpecPrag poly_id (SpecSigE nm rule_bndrs spec_e inl)
               , text "spec_e:" <+> ppr tc_spec_e
               , text "inl:" <+> ppr inl
               , text "spec_e_wanted:" <+> ppr spec_e_wanted
-              , text "quant_cts:" <+> ppr quant_cts
+              , text "quant_cands:" <+> ppr quant_cands
               , text "residual_wc:" <+> ppr residual_wc
-              , text "fully_soluble_wanteds:" <+> ppr fully_soluble_cts
+              , text (replicate 80 '-')
+              , text "ev_binds_var:" <+> ppr ev_binds_var
+              , text "ev_binds:" <+> ppr ev_binds
               ]
 
          -- (5) Store the results in a SpecPragE record, which will be
@@ -1086,24 +1068,6 @@ tcSpecPrag poly_id (SpecSigE nm rule_bndrs spec_e inl)
                            , spe_inl   = inl }] }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
-
--- | Try to fully solve a constraint.
-fullySolveCt_maybe :: Ct -> TcM (Maybe EvId)
-fullySolveCt_maybe ct = do
-  throwaway_ev_binds_var <- newTcEvBinds
-  res_wc <-
-    runTcSWithEvBinds throwaway_ev_binds_var $
-    solveWanteds $ emptyWC { wc_simple = unitBag ct }
-      -- NB: don't use 'solveSimpleWanteds', as this will not
-      -- fully solve quantified constraints.
-  traceTc "fullySolveCt_maybe" $
-    vcat [ text "ct:" <+> ppr ct
-         , text "res_wc:" <+> ppr res_wc
-         ]
-  return $
-    if isSolvedWC res_wc
-    then Just $ ctEvId ct
-    else Nothing
 
 --------------
 tcSpecWrapper :: UserTypeCtxt -> TcType -> TcType -> TcM HsWrapper

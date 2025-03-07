@@ -231,7 +231,7 @@ simplifyAndEmitFlatConstraints wanted
                                         -- it's OK to use unkSkol    |  we must increase the TcLevel,
                                         -- because we don't bind     |  as explained in
                                         -- any skolem variables here |  Note [Wrapping failing kind equalities]
-                         ; emitImplication implic
+                         ; TcM.emitImplication implic
                          ; failM }
            Just (simples, errs)
               -> do { _ <- promoteTyVarSet (tyCoVarsOfCts simples)

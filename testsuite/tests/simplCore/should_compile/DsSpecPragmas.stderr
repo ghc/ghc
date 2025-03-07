@@ -26,10 +26,17 @@
     forall (@c) (df :: forall x. Eq x => Eq [x]) ($dEq :: Eq c).
       f3 @c @[] $dEq df
       = f3_$sf1 @c $dEq
-"USPEC f4 @(ST s) @_"
-    forall (@b) (@s) ($dMonad :: Monad (ST s)).
-      f4 @(ST s) @b $dMonad
+"USPEC f4 @_ @(ST s)"
+    forall (@s) (@b) ($dMonad :: Monad (ST s)) ($dEq :: Eq b).
+      f4 @b @(ST s) $dEq $dMonad
       = $fApplicativeST_$cpure @s @b
+"USPEC f4_qc @Int @_ @_"
+    forall (@(n :: * -> *))
+           (@(r :: (* -> *) -> * -> *))
+           (df :: forall (m :: * -> *). Monad m => Monad (r m))
+           ($dEq :: Eq Int).
+      f4_qc @Int @r @n $dEq df
+      = \ _ [Occ=Dead] -> ()
 "USPEC f5 @(D Int)"
     forall ($dEq :: Eq (D Int)). f5 @(D Int) $dEq = f5_$sf5
 "USPEC f5_qc @Int @D"
