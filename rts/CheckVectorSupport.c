@@ -72,9 +72,6 @@ int checkVectorSupport(void) {
     // __riscv_v ensures we only get here when the compiler target (arch)
     // supports vectors.
 
-    // TODO: Check the machine supports V extension 1.0. Or, implement the older
-    // command versions.
-
     unsigned vlenb = __riscv_vlenb();
 
     // VLENB gives the length in bytes
