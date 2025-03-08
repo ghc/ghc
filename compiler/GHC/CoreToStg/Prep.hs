@@ -1037,6 +1037,8 @@ instance Outputable ArgInfo where
 
 {- Note [Ticks and mandatory eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ----TODO: Does the motivating example here still cause problems
+  ----after the TagToEnum-related changes?
 Something like
     `foo x = ({-# SCC foo #-} tagToEnum#) x :: Bool`
 caused a compiler panic in #20938. Why did this happen?

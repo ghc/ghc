@@ -438,8 +438,8 @@ asInfix nm | isAlpha (head nm) = "`" ++ nm ++ "`"
            | otherwise         = nm
 
 
-{- Note [OPTIONS_GHC in GHC.PrimopWrappers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [OPTIONS_GHC in GHC.Internal.PrimopWrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In PrimopWrappers we set some crucial GHC options
 
 * Eta reduction: -fno-do-eta-reduction

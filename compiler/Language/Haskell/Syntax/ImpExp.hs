@@ -40,7 +40,10 @@ data ImportDeclQualifiedStyle
    -- This ^^ Eq instance doesn't type-check if we insist that all
    -- constructors must be in scope for TagToEnum's magic to kick in.
    -- Reason: Not all constructors of Bool are in scope in this module.
-   -- Seems sketchy. TODO: Think about this.
+   -- Seems sketchy.
+   --
+   -- Planned fix: Use isTrue# in derived instances,
+   -- instead of using tagToEnum# @Bool directly
 
 -- | Indicates whether a module name is referring to a boot interface (hs-boot
 -- file) or regular module (hs file). We need to treat boot modules specially

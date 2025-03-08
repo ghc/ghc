@@ -678,8 +678,8 @@ mergeCaseAlts outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
        = do { alts' <- mapM do_one inner_alts
             ; return ([], alts') }
 
-    -- Deal with tagToEnum# See Note [Merge Nested Cases] wrinkle (MC3)
-    go (App (App (Var f) (Type type_arg)) (Var v))
+    -- Deal with tagToEnumPrim# See Note [Merge Nested Cases] wrinkle (MC3)
+    go (App (App (Var f) (Type type_arg)) (Var v)) -- TODO: Fix this pattern match
       | v == outer_bndr
       , Just TagToEnumOp <- isPrimOpId_maybe f
       , Just tc  <- tyConAppTyCon_maybe type_arg
@@ -861,7 +861,7 @@ Wrinkles
     ===>
        case x of
          ...outer-alts...
-         a -> case y of (a,b) -> rhs1
+         A -> case y of (a,b) -> rhs1
          B -> case y of (a,b) -> rhs2
 
     This duplicates the `case y` but it removes the case x; so it is a win
@@ -877,8 +877,8 @@ Wrinkles
               case y of y1 { __DEFAULT ->
               case x1 of {
                 IS x2 -> case y1 of {
-                           __DEFAULT -> GHC.Types.False;
-                           IS y2     -> tagToEnum# @Bool (==# x2 y2) };
+                    __DEFAULT -> GHC.Types.False;
+                    IS y2     -> tagToEnumPrim# @Lifted @Bool (==# x2 y2) };
                 IP x2 -> ...
                 IN x2 -> ...
     We want to merge the outer `case x` with the inner `case x1`.
@@ -895,7 +895,7 @@ Wrinkles
       Note [Which transformations are innocuous] in GHC.Core.Opt.Stats.
 
 (MC3) Consider
-         case f x of (r::Int#) -> tagToEnum# r :: Bool
+         case f x of (r::Int#) -> tagToEnumPrim# r :: Bool
       `mergeCaseAlts` as a special case to treat this as if it was
          case f x of r ->
            case r of { 0# -> False; 1# -> True }
@@ -903,14 +903,18 @@ Wrinkles
          case f x of { 0# -> False; 1# -> True }
 
       To see why this is important, return to
-         case f x of (r::Int#) -> tagToEnum# r :: Bool
+         case f x of (r::Int#) -> tagToEnumPrim# r :: Bool
       and supppose `f` inlines to a case expression.  Then then we get
-         let $j r = tagToEnum# r
+         let $j r = tagToEnumPrim# r
          case .. of { .. jump $j 0#; ...jump $j 1# ... }
       Now if the entire expression is consumed by another case-expression,
-      that outer case will only see (tagToEnum# r) which it can't do much
+      that outer case will only see (tagToEnumPrim# r) which it can't do much
       with.  Whereas the result of the above case-merge generates much better
       code: no branching on Int#
+
+      QUESTION: What happens if we instead consider the "tagToEnumPrim# r"
+        expression to scrutinize r, so that we are likely to inline
+        the join point $j if its argument becomes a literal?
 
 (MC4) Consider
           case f x of r ->
