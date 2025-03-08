@@ -1128,10 +1128,10 @@ bindHsOuterTyVarBndrs' bind_fam doc mb_cls implicit_vars outer_bndrs thing_insid
           thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
                                         , hso_bndrs     = exp_bndrs'
                                         , hso_ximplicit = implicit_vars' }
-  where
-    fam_implicit_vars = case bind_fam of
-      BindFam -> filterFreeVarsToBind (mapMaybe hsLTyVarLocName $ hso_bndrs outer_bndrs) implicit_vars
-      NotBindFam -> []
+        where
+          fam_implicit_vars = case bind_fam of
+            BindFam -> filterFreeVarsToBind (mapMaybe hsLTyVarLocName exp_bndrs) implicit_vars
+            NotBindFam -> []
 
 -- See Note [Term variable capture and implicit quantification]
 warn_term_var_capture :: LocatedN RdrName -> RnM ()
