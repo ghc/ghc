@@ -20,6 +20,7 @@ module GHC.Tc.Zonk.TcType
   , zonkTcTyVarToTcTyVar, zonkTcTyVarsToTcTyVars
   , zonkInvisTVBinder
   , zonkCo
+  , zonkTcTyVarsToTcTyVarsMaybe
 
     -- ** Zonking 'TyCon's
   , zonkTcTyCon
@@ -83,7 +84,7 @@ import GHC.Core.Predicate
 import GHC.Utils.Constants
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
-import GHC.Utils.Monad ( mapAccumLM )
+import GHC.Utils.Monad ( mapAccumLM, mapMaybeM )
 import GHC.Utils.Panic
 
 import GHC.Data.Bag
@@ -268,6 +269,9 @@ zonkTcTyVar tv
 -- Should be used only on skolems and TyVarTvs
 zonkTcTyVarsToTcTyVars :: HasDebugCallStack => [TcTyVar] -> ZonkM [TcTyVar]
 zonkTcTyVarsToTcTyVars = mapM zonkTcTyVarToTcTyVar
+
+zonkTcTyVarsToTcTyVarsMaybe :: HasDebugCallStack => [TcTyVar] -> ZonkM [TcTyVar]
+zonkTcTyVarsToTcTyVarsMaybe = mapMaybeM (fmap getTyVar_maybe . zonkTcTyVar)
 
 zonkTcTyVarToTcTyVar :: HasDebugCallStack => TcTyVar -> ZonkM TcTyVar
 zonkTcTyVarToTcTyVar tv

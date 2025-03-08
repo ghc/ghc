@@ -1224,7 +1224,7 @@ addHsOuterSigTyVarBinds outer_bndrs thing_inside = case outer_bndrs of
   HsOuterImplicit{hso_ximplicit = imp_tvs} ->
     do th_nil <- coreListM tyVarBndrSpecTyConName []
        addSimpleTyVarBinds FreshNamesOnly imp_tvs $ thing_inside th_nil
-  HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+  HsOuterExplicit{hso_bndrs = exp_bndrs, hso_ximplicit= imp_tvs} ->
     addHsTyVarBinds FreshNamesOnly exp_bndrs thing_inside
 
 -- | If a type implicitly quantifies its outermost type variables, return

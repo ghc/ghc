@@ -312,7 +312,7 @@ dropWildCards sig_ty = hswc_body sig_ty
 
 hsOuterTyVarNames :: HsOuterTyVarBndrs flag GhcRn -> [Name]
 hsOuterTyVarNames (HsOuterImplicit{hso_ximplicit = imp_tvs}) = imp_tvs
-hsOuterTyVarNames (HsOuterExplicit{hso_bndrs = bndrs})       = hsLTyVarNames bndrs
+hsOuterTyVarNames (HsOuterExplicit{hso_bndrs = bndrs, hso_ximplicit= imp_tvs}) = hsLTyVarNames bndrs ++ imp_tvs
 
 hsOuterExplicitBndrs :: HsOuterTyVarBndrs flag (GhcPass p)
                      -> [LHsTyVarBndr flag (NoGhcTc (GhcPass p))]
