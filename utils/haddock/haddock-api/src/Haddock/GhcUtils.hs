@@ -166,6 +166,7 @@ mkEmptySigType lty@(L loc ty) = L loc $ case ty of
             HsOuterExplicit
               { hso_xexplicit = noExtField
               , hso_bndrs = bndrs
+              , hso_ximplicit = []
               }
         , sig_body = body
         }
