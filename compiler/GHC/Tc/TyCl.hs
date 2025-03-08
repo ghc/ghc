@@ -3448,7 +3448,8 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
                      ; rhs_ty <- tcCheckLHsTypeInContext hs_rhs_ty (TheKind rhs_kind)
                      ; return (lhs_ty, rhs_ty) }
 
-       ; outer_bndrs <- scopedSortOuter outer_bndrs
+       ; traceTc "tcTyFamInstEqnGuts 0" (ppr outer_bndrs $$ ppr skol_info)
+       ; outer_bndrs <- scopedSortOuterFam outer_bndrs
        ; let outer_tvs = outerTyVars outer_bndrs
        ; checkFamTelescope tclvl outer_hs_bndrs outer_tvs
 
@@ -3461,9 +3462,9 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        -- check there too!
 
        -- See Note [Generalising in tcTyFamInstEqnGuts]
-       ; dvs  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
+       ; dvs  <- candidateQTyVarsOfType lhs_ty
        ; qtvs <- quantifyTyVars skol_info dvs
-       ; let final_tvs = scopedSort (qtvs ++ outer_tvs)
+       ; let final_tvs = scopedSort qtvs
              -- This scopedSort is important: the qtvs may be /interleaved/ with
              -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
        ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted

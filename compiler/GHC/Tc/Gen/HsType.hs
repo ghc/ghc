@@ -44,7 +44,7 @@ module GHC.Tc.Gen.HsType (
         etaExpandAlgTyCon,
 
           -- tyvars
-        zonkAndScopedSort,
+        zonkAndScopedSort, zonkAndScopedSortFam,
 
         -- Kind-checking types
         -- No kind generalisation, no checkValidType
@@ -72,7 +72,7 @@ module GHC.Tc.Gen.HsType (
         HoleMode(..),
 
         -- Utils
-        tyLitFromLit, tyLitFromOverloadedLit,
+        tyLitFromLit, tyLitFromOverloadedLit, scopedSortOuterFam,
 
    ) where
 
@@ -3274,42 +3274,31 @@ tcTKTelescope mode tele thing_inside = case tele of
 --------------------------------------
 --    HsOuterTyVarBndrs
 --------------------------------------
-
-bindOuterTKBndrsX :: OutputableBndrFlag flag 'Renamed  -- Only to support traceTc
-                  => SkolemMode
+bindOuterTKBndrsX' :: OutputableBndrFlag flag 'Renamed  -- Only to support traceTc
+                  =>
+                  SkolemMode
                   -> HsOuterTyVarBndrs flag GhcRn
                   -> TcM a
                   -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
-bindOuterTKBndrsX skol_mode outer_bndrs thing_inside
-  = case outer_bndrs of
-      HsOuterImplicit{hso_ximplicit = imp_tvs} ->
-        do { (imp_tvs', thing) <- bindImplicitTKBndrsX skol_mode imp_tvs thing_inside
-           ; return ( HsOuterImplicit{hso_ximplicit = imp_tvs'}
-                    , thing) }
-      HsOuterExplicit{hso_bndrs = exp_bndrs, hso_ximplicit = imp_tvs} ->
-        do { (exp_tvs', (imp_tvs', thing)) <-
-                bindExplicitTKBndrsX skol_mode exp_bndrs
-                $ bindImplicitTKBndrsX (skol_mode {sm_tvtv=SMDTauTv}) imp_tvs thing_inside
-           ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
-                                      , hso_bndrs     = exp_bndrs
-                                      , hso_ximplicit = imp_tvs'
-                                      }
-                    , thing) }
+bindOuterTKBndrsX' x = bindOuterTKBndrsX x x
 
-bindOuterTKBndrsXFam :: SkolemMode
-                  -> HsOuterFamEqnTyVarBndrs GhcRn
+bindOuterTKBndrsX :: OutputableBndrFlag flag 'Renamed  -- Only to support traceTc
+                  =>
+                  SkolemMode -- implicit
+                  -> SkolemMode -- explict
+                  -> HsOuterTyVarBndrs flag GhcRn
                   -> TcM a
-                  -> TcM (HsOuterFamEqnTyVarBndrs GhcTc, a)
-bindOuterTKBndrsXFam skol_mode outer_bndrs thing_inside
+                  -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
+bindOuterTKBndrsX i_skol_mode e_skol_mode outer_bndrs thing_inside
   = case outer_bndrs of
       HsOuterImplicit{hso_ximplicit = imp_tvs} ->
-        do { (imp_tvs', thing) <- bindImplicitTKBndrsX skol_mode imp_tvs thing_inside
+        do { (imp_tvs', thing) <- bindImplicitTKBndrsX i_skol_mode imp_tvs thing_inside
            ; return ( HsOuterImplicit{hso_ximplicit = imp_tvs'}
                     , thing) }
       HsOuterExplicit{hso_bndrs = exp_bndrs, hso_ximplicit = imp_tvs} ->
         do { (exp_tvs', (imp_tvs', thing)) <-
-                bindExplicitTKBndrsX skol_mode exp_bndrs
-                $ bindImplicitTKBndrsX (skol_mode {sm_tvtv=SMDTauTv}) imp_tvs thing_inside
+                bindExplicitTKBndrsX e_skol_mode exp_bndrs
+                $ bindImplicitTKBndrsX i_skol_mode imp_tvs thing_inside
            ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
                                       , hso_bndrs     = exp_bndrs
                                       , hso_ximplicit = imp_tvs'
@@ -3321,30 +3310,44 @@ outerTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
 -- The returned [TcTyVar] is not necessarily in dependency order
 -- at least for the HsOuterImplicit case
 outerTyVars (HsOuterImplicit { hso_ximplicit = tvs })  = tvs
-outerTyVars (HsOuterExplicit { hso_xexplicit = tvbs }) = binderVars tvbs
+outerTyVars (HsOuterExplicit { hso_xexplicit = tvbs, hso_ximplicit = tvs }) = binderVars tvbs ++ tvs
 
 ---------------
 outerTyVarBndrs :: HsOuterTyVarBndrs Specificity GhcTc -> [InvisTVBinder]
 outerTyVarBndrs (HsOuterImplicit{hso_ximplicit = imp_tvs}) = [Bndr tv SpecifiedSpec | tv <- imp_tvs]
-outerTyVarBndrs (HsOuterExplicit{hso_xexplicit = exp_tvs}) = exp_tvs
+outerTyVarBndrs (HsOuterExplicit{hso_xexplicit = exp_tvs, hso_ximplicit = imp_tvs}) = exp_tvs ++ [Bndr tv SpecifiedSpec | tv <- imp_tvs]
 
 ---------------
-scopedSortOuter :: HsOuterTyVarBndrs flag GhcTc -> TcM (HsOuterTyVarBndrs flag GhcTc)
+scopedSortOuter :: HsOuterSigTyVarBndrs GhcTc -> TcM (HsOuterSigTyVarBndrs GhcTc)
 -- Sort any /implicit/ binders into dependency order
 --     (zonking first so we can see the dependencies)
 -- /Explicit/ ones are already in the right order
 scopedSortOuter (HsOuterImplicit{hso_ximplicit = imp_tvs})
   = do { imp_tvs <- zonkAndScopedSort imp_tvs
        ; return (HsOuterImplicit { hso_ximplicit = imp_tvs }) }
-scopedSortOuter bndrs@(HsOuterExplicit{})
+scopedSortOuter bndrs@(HsOuterExplicit{ hso_ximplicit =imp_tvs })
   = -- No need to dependency-sort (or zonk) explicit quantifiers
-    return bndrs
+   do { imp_tvs <- zonkAndScopedSort imp_tvs
+      ; return bndrs{ hso_ximplicit = imp_tvs } }
+
+---------------
+scopedSortOuterFam :: HsOuterFamEqnTyVarBndrs GhcTc -> TcM (HsOuterFamEqnTyVarBndrs GhcTc)
+-- Sort any /implicit/ binders into dependency order
+--     (zonking first so we can see the dependencies)
+-- /Explicit/ ones are already in the right order
+scopedSortOuterFam (HsOuterImplicit{hso_ximplicit = imp_tvs})
+  = do { imp_tvs <- zonkAndScopedSortFam imp_tvs
+       ; return (HsOuterImplicit { hso_ximplicit = imp_tvs }) }
+scopedSortOuterFam bndrs@(HsOuterExplicit{ hso_ximplicit =imp_tvs })
+  = -- No need to dependency-sort (or zonk) explicit quantifiers
+   do { imp_tvs <- zonkAndScopedSortFam imp_tvs
+      ; return bndrs{ hso_ximplicit = imp_tvs } }
 
 ---------------
 bindOuterSigTKBndrs_Tv :: HsOuterSigTyVarBndrs GhcRn
                        -> TcM a -> TcM (HsOuterSigTyVarBndrs GhcTc, a)
 bindOuterSigTKBndrs_Tv
-  = bindOuterTKBndrsX (smVanilla { sm_clone = True, sm_tvtv = SMDTyVarTv })
+  = bindOuterTKBndrsX' (smVanilla { sm_clone = True, sm_tvtv = SMDTyVarTv })
 
 bindOuterSigTKBndrs_Tv_M :: TcTyMode
                          -> HsOuterSigTyVarBndrs GhcRn
@@ -3354,14 +3357,14 @@ bindOuterSigTKBndrs_Tv_M :: TcTyMode
 --    Note [Using TyVarTvs for kind-checking GADTs] in GHC.Tc.TyCl
 --    Note [Checking partial type signatures]
 bindOuterSigTKBndrs_Tv_M mode
-  = bindOuterTKBndrsX (smVanilla { sm_clone = True, sm_tvtv = SMDTyVarTv
+  = bindOuterTKBndrsX' (smVanilla { sm_clone = True, sm_tvtv = SMDTyVarTv
                                  , sm_holes = mode_holes mode })
 
 bindOuterFamEqnTKBndrs_Q_Tv :: HsOuterFamEqnTyVarBndrs GhcRn
                             -> TcM a
                             -> TcM (HsOuterFamEqnTyVarBndrs GhcTc, a)
 bindOuterFamEqnTKBndrs_Q_Tv hs_bndrs thing_inside
-  = bindOuterTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
+  = bindOuterTKBndrsX' (smVanilla { sm_clone = False, sm_parent = True
                                  , sm_tvtv = SMDTyVarTv })
                       hs_bndrs thing_inside
     -- sm_clone=False: see Note [Cloning for type variable binders]
@@ -3371,15 +3374,17 @@ bindOuterFamEqnTKBndrs :: SkolemInfo
                        -> TcM a
                        -> TcM (HsOuterFamEqnTyVarBndrs GhcTc, a)
 bindOuterFamEqnTKBndrs skol_info
-  = bindOuterTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
-                                 , sm_tvtv = SMDSkolemTv skol_info })
+  = bindOuterTKBndrsX
+      (smVanilla { sm_clone = False, sm_parent = True
+                                   , sm_tvtv = SMDTauTv })
+      (smVanilla { sm_clone = False, sm_parent = True
+                                      , sm_tvtv = SMDSkolemTv skol_info })
     -- sm_clone=False: see Note [Cloning for type variable binders]
 
 ---------------
-tcOuterTKBndrs :: OutputableBndrFlag flag 'Renamed   -- Only to support traceTc
-               => SkolemInfo
-               -> HsOuterTyVarBndrs flag GhcRn
-               -> TcM a -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
+tcOuterTKBndrs :: SkolemInfo
+               -> HsOuterSigTyVarBndrs GhcRn
+               -> TcM a -> TcM (HsOuterSigTyVarBndrs GhcTc, a)
 tcOuterTKBndrs skol_info
   = tcOuterTKBndrsX (smVanilla { sm_clone = False
                                , sm_tvtv = SMDSkolemTv skol_info })
@@ -3387,10 +3392,10 @@ tcOuterTKBndrs skol_info
   -- Do not clone the outer binders
   -- See Note [Cloning for type variable binders] under "must not"
 
-tcOuterTKBndrsX :: OutputableBndrFlag flag 'Renamed   -- Only to support traceTc
-                => SkolemMode -> SkolemInfo
-                -> HsOuterTyVarBndrs flag GhcRn
-                -> TcM a -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
+tcOuterTKBndrsX ::
+                SkolemMode -> SkolemInfo
+                -> HsOuterSigTyVarBndrs GhcRn
+                -> TcM a -> TcM (HsOuterSigTyVarBndrs GhcTc, a)
 -- Push level, capture constraints, make implication
 tcOuterTKBndrsX skol_mode skol_info outer_bndrs thing_inside
   = case outer_bndrs of
@@ -3401,8 +3406,12 @@ tcOuterTKBndrsX skol_mode skol_info outer_bndrs thing_inside
       HsOuterExplicit{hso_bndrs = exp_bndrs} ->
         do { (exp_tvs', thing) <- tcExplicitTKBndrsX skol_mode exp_bndrs thing_inside
            ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
-                                      , hso_bndrs     = exp_bndrs }
-                    , thing) }
+                                      , hso_bndrs     = exp_bndrs
+                                      -- note nothing should be here since
+                                      -- sig
+                                      , hso_ximplicit = [] }
+                    , thing)
+          }
 
 --------------------------------------
 --    Explicit tyvar binders
@@ -3416,7 +3425,7 @@ tcExplicitTKBndrs :: OutputableBndrFlag flag 'Renamed    -- Only to suppor trace
 tcExplicitTKBndrs skol_info
   = tcExplicitTKBndrsX (smVanilla { sm_clone = True, sm_tvtv = SMDSkolemTv skol_info })
 
-tcExplicitTKBndrsX :: OutputableBndrFlag flag 'Renamed    -- Only to suppor traceTc
+tcExplicitTKBndrsX :: forall flag a. OutputableBndrFlag flag 'Renamed    -- Only to suppor traceTc
                    => SkolemMode
                    -> [LHsTyVarBndr flag GhcRn]
                    -> TcM a
@@ -3779,6 +3788,17 @@ bindTyClTyVarsAndZonk tycon_name thing_inside
 zonkAndScopedSort :: [TcTyVar] -> TcM [TcTyVar]
 zonkAndScopedSort spec_tkvs
   = do { spec_tkvs <- liftZonkM $ zonkTcTyVarsToTcTyVars spec_tkvs
+         -- Zonk the kinds, to we can do the dependency analysis
+
+       -- Do a stable topological sort, following
+       -- Note [Ordering of implicit variables] in GHC.Rename.HsType
+       ; return (scopedSort spec_tkvs) }
+
+-- zonkAndScopedSortFam is a version of zonkAndScopedSort that works does not check
+-- the zonking result is still a TcTyVar
+zonkAndScopedSortFam :: [TcTyVar] -> TcM [TcTyVar]
+zonkAndScopedSortFam spec_tkvs
+  = do { spec_tkvs <- liftZonkM $ zonkTcTyVarsToTcTyVarsMaybe spec_tkvs
          -- Zonk the kinds, to we can do the dependency analysis
 
        -- Do a stable topological sort, following

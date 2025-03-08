@@ -964,7 +964,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                            , lhs_applied_kind
                            , res_kind ) }
 
-       ; outer_bndrs <- scopedSortOuter outer_bndrs
+       ; outer_bndrs <- scopedSortOuterFam outer_bndrs
        ; let outer_tvs = outerTyVars outer_bndrs
        ; checkFamTelescope tclvl hs_outer_bndrs outer_tvs
 
@@ -975,14 +975,14 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
        -- check there too!
 
        -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
-       ; dvs  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
+       ; dvs  <- candidateQTyVarsOfType lhs_ty
        ; qtvs <- quantifyTyVars skol_info dvs
                  -- Have to make a same defaulting choice for reuslt kind here
                  -- and the `kindGeneralizeAll` in `tcConDecl`.
                  -- see (GT4) in
                  -- GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
 
-       ; let final_tvs = scopedSort (qtvs ++ outer_tvs)
+       ; let final_tvs = scopedSort qtvs
              -- This scopedSort is important: the qtvs may be /interleaved/ with
              -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
        ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
