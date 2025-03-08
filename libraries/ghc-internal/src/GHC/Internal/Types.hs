@@ -261,10 +261,10 @@ type ZeroBitType = TYPE ZeroBitRep
 data Multiplicity = Many | One
 
 type family MultMul (a :: Multiplicity) (b :: Multiplicity) :: Multiplicity where
-  MultMul 'One x = x
-  MultMul x 'One = x
-  MultMul 'Many x = 'Many
-  MultMul x 'Many = 'Many
+  forall x. MultMul 'One x = x
+  forall x. MultMul x 'One = x
+  forall x. MultMul 'Many x = 'Many
+  forall x. MultMul x 'Many = 'Many
 
 {- *********************************************************************
 *                                                                      *
