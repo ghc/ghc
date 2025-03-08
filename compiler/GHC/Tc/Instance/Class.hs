@@ -628,17 +628,24 @@ Some further observations about `withDict`:
 
 Note [TagToEnum overview]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-The class `TagToEnum` is defined as follows, in GHC.Magic.TagToEnum:
+The class `TagToEnum` is defined as follows, in GHC.Internal.Magic.TagToEnum:
 
 type TagToEnum :: forall {lev :: Levity}.
                   TYPE (BoxedRep lev) -> Constraint
 class TagToEnum a where
    tagToEnum# :: Int# -> a
 
+As its name suggests, `tagToEnum#` is used to produce values of
+enumeration-like types from (unboxed) integer tags. For example,
+given this declaration:
+    data Ordering = LT | EQ | GT
+`tagToEnum#` maps 0# to LT, 1# to EQ, and 2# to GT.  (Any other input
+results in undefined behavior.)
+
 Users cannot define instances for `TagToEnum`; see
 `GHC.Tc.Validity.check_special_inst_head`.
 Instead, GHC's constraint solver has built-in solving behaviour,
- implemented in `GHC.Tc.Instance.Class.matchGlobalInst`.
+implemented in `GHC.Tc.Instance.Class.matchGlobalInst`.
 
 (#20441: This common handling of special typeclasses is a bit of a
 mess and could use some love, and a dedicated Note.)
@@ -646,28 +653,31 @@ mess and could use some love, and a dedicated Note.)
 GHC solves a wanted constraint `TagToEnum @{lev} dty`
 when all of the following conditions are met:
 
-C1: `dty` is an algebraic data type, i.e. `dty` matches any of:
-       * a "data" declaration,
-       * a "data instance" declaration,
-       * a boxed tuple type
-      "type data" declarations are NOT included; see also wrinkle W1
-      of Note [Type data declarations] in GHC.Rename.Module.
+ (C1) `dty` is an algebraic data type, i.e. `dty` matches any of:
+         * a "data" declaration,
+         * a "data instance" declaration,
+         * a boxed tuple type
+        "type data" declarations are NOT included; see also wrinkle W1
+        of Note [Type data declarations] in GHC.Rename.Module.
 
-C2: That declaration has at least one data constructor.
-    (In principle we could lift this restriction.)
+ (C2) That declaration has at least one data constructor.
+      (In principle we could lift this restriction, but there seems to
+      be little purpose in doing so.  The resulting empty closure
+      tables also caused spurious linker warnings in #2578.)
 
-C3: Every data constructor in that declaration has a nullary wrapper.
-    Equivalently, it has no ordinary fields and no
-    ExistentialQuantification constraints ("theta").
-     * GADT "eq_spec" evidence is OK: only the worker takes such evidence
-     * DatatypeContexts "stupid theta" is also OK: any stupid theta on
-       the declaration is ignored by each constructor because they
-       have no fields.
+ (C3) Every data constructor in that declaration has a nullary wrapper.
+      Equivalently, it has no ordinary fields and no
+      ExistentialQuantification constraints ("theta").
+       * GADT "eq_spec" evidence is OK: Only the worker takes such
+         evidence.  (Supporting tagToEnum# with GADTs is #16989.)
+       * DatatypeContexts "stupid theta" is also OK: any stupid theta on
+         the declaration is ignored by each constructor because they
+         have no fields.
 
 Every instance looks like this:
 
-   instance TagToEnum Bool where
-     tagToEnum# = tagToEnumPrim#
+  instance TagToEnum Bool where
+    tagToEnum# = tagToEnumPrim#
 
 The primop `tagToEnumPrim#` claims to have the following type:
 
@@ -675,27 +685,87 @@ The primop `tagToEnumPrim#` claims to have the following type:
 
 But this is a lie.  In fact it is not polymorphic at all.
 To generate code for `tagToEnumPrim#`:
-  * If a declaration satisfies conditions C2 and C3, we emit a
-    static array containing pointers to each data constructor
-    worker in that declaration.  See GHC.StgToCmm.cgEnumerationTyCon
-  * For a call `tagToEnumPrim# x :: ty` we can just read the x'th
-    element of the static array we emitted for the declaration ty
-    matches.
-  * But to do that we need to know which TyCon's closure
-    table to read from!  So we insist on this invariant:
+ (G1) If a declaration satisfies conditions C2 and C3, we emit a
+      static array containing pointers to each data constructor
+      wrapper in that declaration.  See GHC.StgToCmm.cgEnumerationTyCon
+ (G2) For a call `tagToEnumPrim# x :: ty` we can just read the x'th
+      element of the static array we emitted for the declaration `ty`
+      matches.
+ (G3) But to do that we need to know which TyCon's closure
+      table to read from!  So we insist on this invariant:
 
 INVARIANT:
- (TTE) Every occurrence of `tagToEnumPrim#` has two type arguments:
-       `tagToEnumPrim# @{lev} @ty`, and the second type argument `ty`
-       must match an enumeration TyCon with constructors satisfying
-       conditions C1-C3 above.
 
-This is checked in Core Lint: see checkSpecialPrimOpTypeArg.
-The `tagToEnumPrim#` primop is not exported from GHC.Prim,
+ (TTE-I)
+    Every occurrence of `tagToEnumPrim#` has two type arguments:
+    `tagToEnumPrim# @{lev} @ty`, and the second type argument `ty`
+    must be headed by an enumeration TyCon, with `tyConEnumSort` of
+    either `NormalEnum` or `ExoticEnum`.
+
+    What does that mean, exactly? It means that the TyCon in question
+    has data constructors that satisfy conditions C2 and C3 above and
+    it satisfies a variant of condition C1 above by corresponding to
+    one of the following things:
+      * A boxed tuple Ty
+      * A "data" declaration (but NOT a "type data" declaration)
+      * The /representation type/ of a "data instance" declaration
+        (but NOT the data family TyCon itself)
+    (These matches DTT2 in Note [DataToTag overview].)
+
+This is checked in Core Lint: see `checkSpecialPrimOpTypeArg`.
+The `tagToEnumPrim#` primop is not exported from GHC.Internal.Prim,
 which keeps users from easily breaking this invariant by mis-using it.
-(Test case: ...)
+(Test case: TODO)
 
-...more stuff goes here...
+The tagToEnumPrim# primop has special handling in many places:
+
+ (H1) Core Lint (specifically `checkSpecialPrimOpTypeArgs`) verifies
+      that applications of `tagToEnumPrim#` satisfy invariant TTE-I.
+
+ (H2) tagToEnumPrim# has a built-in rewrite rule,
+      that fires when it is applied to a literal.
+      See GHC.Core.Opt.ConstantFold.dataToTagRule.
+
+ (H3) The simplifier rewrites most case expressions
+      scrutinizing the result of a tagToEnumPrim# call.
+      See Note [caseRules for tagToEnumPrim#] in GHC.Core.Opt.ConstantFold.
+
+ (H4) StgToByteCode has a special case for tagToEnumPrim#;
+      see Wrinkle W2 for why.
+
+
+Wrinkles:
+
+ (W1) TagToEnum instances for "data instance" types require some care.
+  Consider the following declarations:
+      data family D a
+      data instance D (Either p q) = DE1 | DE2
+  Now suppose we want to solve the constraint
+      [W] TagToEnum (D (Either t1 t2))
+  The type `D (Either t1 t2)` clearly satisfies conditions C1-C3, so
+  we must solve this, and do so by producing a built-in instance:
+
+      instance TagToEnum (D (Either t1 t2)) where
+          tagToEnum# = tagToEnumPrim# @{Lifted} @(R:DEither t1 t2)
+                         |> (Int# -> sym (ax:DEither t1 t2))
+
+  To satisfy invariant TTE-I, we must apply the `tagToEnumPrim#`
+  primop at the (compiler-internal) /representation type/ for the
+  "data instance" declaration (`R:DEither t1 t2`) rather than directly
+  applying it at the type `D (Either t1 t2)` which is headed by the
+  (user-visible) data family TyCon.  And then to make the types line
+  up we must cast the resulting function using the axiom `ax:DEither`
+  which relates these two types:
+      ax:DEither p q :: D (Either p q) ~R# (R:DEither p q)
+
+ (W2) Almost every primop has a corresponding "primop wrapper" in
+  GHC.Internal.PrimopWrappers; these are used by StgToByteCode when
+  producing code for most primops.  But we cannot produce a suitable
+  wrapper for `tagToEnumPrim#`: Recall that `tagToEnumPrim#` is not
+  actually polymorphic!  (TTE-I)
+
+  So GHC.StgToByteCode has a special case in `schemeT` detecting uses
+  of tagToEnumPrim#. See also its Note [Implementing tagToEnumPrim#].
 
 
 
@@ -712,10 +782,10 @@ Class `DataToTag` is defined like this, in GHC.Magic:
 constructor used to build that argument.  Clearly, `dataToTag#` cannot
 work on /any/ type, only on data types, hence the type-class constraint.
 
-Users cannot define instances of `DataToTag`
+Users cannot define instances of `DataToTag`.
 (see `GHC.Tc.Validity.check_special_inst_head`).
 Instead, GHC's constraint solver has built-in solving behaviour,
- implemented in `GHC.Tc.Instance.Class.matchGlobalInst`.
+implemented in `GHC.Tc.Instance.Class.matchGlobalInst`.
 
 (#20441: This common handling of special typeclasses is a bit of a
 mess and could use some love, and a dedicated Note.)
@@ -823,10 +893,10 @@ Wrinkles:
      [W] DataToTag (D (Either t1 t2))
   GHC uses the built-in instance
      instance DataToTag (D (Either p q)) where
-        dataToTag# x = dataToTagSmall# @Lifted @(R:DEither p q)
+        dataToTag# x = dataToTagSmall# @{Lifted} @(R:DEither p q)
                                        (x |> sym (ax:DEither p q))
   where `ax:DEither` is the axiom arising from the `data instance`:
-    ax:DEither p q :: D (Either p q) ~ R:DEither p q
+    ax:DEither p q :: D (Either p q) ~R# (R:DEither p q)
 
   Notice that we cast `x` before giving it to `dataToTagSmall#`, so
   that (DTT2) is satisfied.
@@ -920,19 +990,22 @@ Wrinkles:
   of that constructor is always exposed via pointer tagging and via
   the object's info table.
 
-(DTW7) Currently, the generated module GHC.PrimopWrappers in ghc-prim
-  contains the following non-sense definitions:
+(DTW7) Currently, the generated module GHC.Internal.PrimopWrappers
+  in ghc-internal contains the following non-sense definitions:
 
     {-# NOINLINE dataToTagSmall# #-}
     dataToTagSmall# :: a_levpoly -> Int#
-    dataToTagSmall# a1 = GHC.Prim.dataToTagSmall# a1
+    dataToTagSmall# a1 = GHC.Internal.Prim.dataToTagSmall# a1
     {-# NOINLINE dataToTagLarge# #-}
     dataToTagLarge# :: a_levpoly -> Int#
-    dataToTagLarge# a1 = GHC.Prim.dataToTagLarge# a1
+    dataToTagLarge# a1 = GHC.Internal.Prim.dataToTagLarge# a1
 
-  Why do these exist? GHCi uses these symbols for... something.  There
-  is on-going work to get rid of them.  See also #24169, #20155, and !6245.
-  Their continued existence makes it difficult to do several nice things:
+  Why do these exist? GHC's bytecode generator (used for GHCi and
+  TemplateHaskell) uses these primop wrapper symbols to generate code
+  for almost every primop, currently including `dataToTagSmall#` and
+  `dataToTagLarge#`.  There is on-going work to get rid of them.  See
+  also #24169, #20155, and !6245.  Their continued existence makes it
+  difficult to do several nice things:
 
    * As explained in DTW6, the dataToTag# primops are very internal.
      We would like to hide them from GHC.Prim entirely to prevent
@@ -986,6 +1059,7 @@ matchTagToEnum tagToEnumClass [levity, dty] = do
              = tcLookupDataFamInst famEnvs rawTyCon rawTyConArgs
 
      , not (isTypeDataTyCon repTyCon)
+     -- Check conditions C1-C3 all at once:
      , case tyConEnumSort repTyCon of
          NotAnEnum -> False
          ExoticEnum -> True
@@ -999,6 +1073,9 @@ matchTagToEnum tagToEnumClass [levity, dty] = do
 
      , let  !repTy = mkTyConApp repTyCon repArgs
             !ttePrimOp = primOpId TagToEnumOp
+
+            -- See wrinkle (W1).  We must apply the primop
+            -- at the representation type and then cast it.
             methodRep = Var ttePrimOp `App` Type levity `App` Type repTy
             methodCo = mkFunCo Representational
                                FTF_T_T

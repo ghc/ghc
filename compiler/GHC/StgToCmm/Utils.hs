@@ -170,7 +170,8 @@ mkTaggedObjectLoad platform reg base offset tag
 -------------------------------------------------------------------------
 --
 --      Converting a closure tag to a closure for enumeration types
---      (this is the implementation of tagToEnumPrim#).
+--      (This is the implementation of tagToEnumPrim#;
+--       see (G1) in Note [TagToEnum overview].)
 --
 -------------------------------------------------------------------------
 

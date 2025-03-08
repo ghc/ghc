@@ -1897,8 +1897,10 @@ data PrimopCmmEmit
   -- (presumably) C--.
   = PrimopCmmEmit_External
   -- | Real primop turned into inline C--.
-  | PrimopCmmEmit_Internal (Type -- the return type, some primops are specialized to it
-                            -> FCode [CmmExpr]) -- just for TagToEnum for now
+  | PrimopCmmEmit_Internal (Type -- The return type.  Some primops use this for code generation:
+                                 -- tagToEnumPrim# and the primops with unboxed-tuple results
+                                 -- (This could probably be removed without unreasonable effort.)
+                            -> FCode [CmmExpr])
 
 type GenericOp = [CmmFormal] -> [CmmActual] -> FCode ()
 

@@ -2534,7 +2534,7 @@ Wrinkle 1:
 
 Wrinkle 2:
   The type of the scrutinee might change.  E.g.
-        case tagToEnum (x :: Int#) of (b::Bool)
+        case tagToEnumPrim# (x :: Int#) of (b::Bool)
           False -> e1
           True -> e2
   ==>
@@ -2790,17 +2790,17 @@ mkCase2 mode scrut bndr alts_ty alts
 {- Note [Literal cases]
 ~~~~~~~~~~~~~~~~~~~~~~~
 If we have
-  case tagToEnum (a ># b) of
+  case tagToEnumPrim# (a ># b) of
      False -> e1
      True  -> e2
 
 then caseRules for TagToEnum will turn it into
-  case tagToEnum (a ># b) of
+  case a ># b of
      0# -> e1
      1# -> e2
 
 Since the case is exhaustive (all cases are) we can convert it to
-  case tagToEnum (a ># b) of
+  case a ># b of
      DEFAULT -> e1
      1#      -> e2
 

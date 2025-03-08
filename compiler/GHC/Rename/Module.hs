@@ -1997,9 +1997,12 @@ Wrinkles:
        type data Letter = A | B | C
 
        f :: Letter
-       f = tagToEnum# 0#
+       f = tagToEnum# 0# -- equivalent to "f = A"
+                         -- (but doesn't directly mention A)
 
-     See Note [TagToEnum overview] in GHC.Tc.Instance.Class.
+     We do so by refusing to solve the `TagToEnum Letter` constraint
+     that this code generates.  See Note [TagToEnum overview] in
+     GHC.Tc.Instance.Class, and condition (C1) in particular.
 
 (W2) Although `type data` data constructors do not exist at the value level,
      it is still possible to match on a value whose type is headed by a `type data`

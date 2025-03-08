@@ -700,7 +700,7 @@ schemeE d s p (StgCase scrut bndr _ alts)
 -- and enter.  Four cases:
 --
 -- 0.  (Nasty hack).
---     An application "GHC.Prim.tagToEnum# <type> unboxed-int".
+--     An application "GHC.Internal.Prim.tagToEnumPrim# <type> unboxed-int".
 --     The int will be on the stack.  Generate a code sequence
 --     to convert it to the relevant constructor, SLIDE and ENTER.
 --
@@ -1818,8 +1818,8 @@ maybe_is_tagToEnum_call (StgOpApp (StgPrimOp TagToEnumOp) [StgVarArg v] t)
 maybe_is_tagToEnum_call _ = Nothing
 
 {- -----------------------------------------------------------------------------
-Note [Implementing tagToEnum#]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Implementing tagToEnumPrim#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (implement_tagToId arg names) compiles code which takes an argument
 'arg', (call it i), and enters the i'th closure in the supplied list
 as a consequence.  The [Name] is a list of the constructors of this
@@ -1854,7 +1854,7 @@ implement_tagToId
     -> Id
     -> [Name]
     -> BcM BCInstrList
--- See Note [Implementing tagToEnum#]
+-- See Note [Implementing tagToEnumPrim#]
 implement_tagToId d s p arg names
   = assert (notNull names) $
     do (push_arg, arg_bytes) <- pushAtom d p (StgVarArg arg)

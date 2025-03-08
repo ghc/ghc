@@ -1581,7 +1581,7 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
   -- Handwritten instances of KnownNat/KnownChar/KnownSymbol
   -- are forbidden outside of signature files (#12837).
   -- Derived instances are forbidden completely (#21087).
-     -- FIXME: DataToTag instances in signature files don't actually work yet
+     -- DataToTag instances in signature files don't actually work yet
      -- FIXME: TagToEnum instances likewise. See <ticket reference>.
   | clas_nm `elem` [ knownNatClassName, knownSymbolClassName, knownCharClassName
                    , dataToTagClassName, tagToEnumClassName]

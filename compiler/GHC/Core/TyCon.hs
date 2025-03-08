@@ -1366,23 +1366,35 @@ via the PromotedDataCon alternative in GHC.Core.TyCon.
 
 Note [Enumeration types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-We define datatypes with no constructors to *not* be
-enumerations; this fixes #2578,  Otherwise we
-end up generating an empty table for
-  <mod>_<type>_closure_tbl
-which is used by tagToEnumPrim# to map Int# to constructors
-in an enumeration. The empty table apparently upset
-the linker.
-
-Moreover, all the data constructor must be enumerations, meaning
-they have type  (forall abc. T a b c).  GADTs are not enumerations.
-For example consider
+A data type is only suitable for use with the Enum typeclass if all of
+its data constructors are nullary and have a type like
+    (forall a b c. T a b c).
+In particular, GADT constructors are not acceptable.  Consider:
     data T a where
       T1 :: T Int
       T2 :: T Bool
       T3 :: T a
-What would [T1 ..] be?  [T1,T3] :: T Int? Easiest thing is to exclude them.
-See #4528.
+What would [T1 ..] be?  [T1,T3] :: T Int? Easiest thing is to exclude them.  See #4528.
+
+But we DO allow the lower-level and more dangerous tagToEnum# to be
+used with otherwise enum-like GADTs; this has some legitimate uses
+such as with dependent IntMap-like types as described in the feature
+request ticket #16989.  For this reason we distinguish between the
+`NormalEnum` types which are suitable for use with the `Enum` class
+and the more general `ExoticEnum` types which can still be used
+with tagToEnum#. (See also Note [TagToEnum overview] in
+GHC.Tc.Instance.Class).
+
+For both the Enum class and tagToEnum#, we disallow data types with no
+constructors; they have no values to enumerate over anyway! It was
+also seen in #2578 that generating an empty table <mod>_<type>_closure_tbl
+to support tagToEnum# at an empty types can cause spurious linker
+warnings.  (That is, proper support for Enum or tagToEnum# with empty
+types would be more than a one-line change!)
+
+(There is no particular reason for us to distinguish
+between `VacuouslyEnum` and `NotAnEnum` types.)
+
 
 Note [Newtype coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2212,7 +2224,8 @@ data TyConEnumSort
   | ExoticEnum -- ^ TyCon is an enum, but has at least one constructor
                -- with an existential tyvar or GADT equality evidence
   | NormalEnum
-  | VacuouslyEnum -- ^ TyCon is an enumeration because it has no @DataCon@s
+  | VacuouslyEnum -- ^ TyCon could reasonably be considered an
+                  -- enumeration because it has no @DataCon@s
   deriving Eq
 
 -- | Is this an algebraic 'TyCon' which is just an enumeration of values?

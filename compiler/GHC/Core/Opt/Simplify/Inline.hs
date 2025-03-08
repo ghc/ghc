@@ -496,7 +496,7 @@ without (2):
        _DEFAULT -> jump fail GHC.Prim.(##);
        IS x1    -> case y of {
                      _DEFAULT -> jump fail GHC.Prim.(##);
-                     IS y1 -> tagToEnum# @Bool (># x1 y1)
+                     IS y1 -> tagToEnumPrim# @Lifted @Bool (># x1 y1)
 
 If we inline `fail` we get /much/ better code.  The only clue is that
 `x` and `y` (a) are not evaluated at the definition site, and (b) are
@@ -682,7 +682,7 @@ However, watch out:
    a significant disadvantage.  Hence some_val_args in the Stop case
 
 Note [Interaction of exprIsWorkFree and lone variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The lone-variable test says "don't inline if a case expression
 scrutinises a lone variable whose unfolding is cheap".  It's very
 important that, under these circumstances, exprIsConApp_maybe

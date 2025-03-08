@@ -44,15 +44,15 @@ if it matches a @data@ or @data instance@ declaration where
 GADT constructors are allowed. @DatatypeContexts@ are ignored. For example,
 
 @
-data X a where
+data X t where
   XInt  :: X Int
-  XBool :: X Bool
+  XPair :: forall a b. X (a, b)
 
 x1 :: X Int
 x1 = tagToEnum# 0#  -- equivalent to "x1 = XInt"
 
-x2 :: X Bool
-x2 = tagToEnum# 1#  -- equivalent to "x2 = XBool"
+x2 :: X (Bool, Char)
+x2 = tagToEnum# 1#  -- equivalent to "x2 = XPair"
 
 x3 :: forall a. X a
 x3 = tagToEnum# 0#  -- equivalent to "x3 = unsafeCoerce XInt"

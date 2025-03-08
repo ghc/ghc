@@ -1986,8 +1986,9 @@ tagToEnumRule = do
   [_lev, Type ty, Lit (LitNumber LitNumInt i)] <- getArgs
   case splitTyConApp_maybe ty of
     Just (tycon, tc_args) -> case tyConEnumSort tycon of
-      VacuouslyEnum -> pprPanic "tagToEnumPrim# used at empty enumeration type" (ppr ty)
-                       -- TODO: point to invariant in the Note
+      VacuouslyEnum -- Forbidden per invariant TTE-I
+        -> pprPanic "tagToEnumPrim# used at empty enumeration type" (ppr ty)
+
       ExoticEnum -> mzero -- We would need to fabricate existentials
                           -- and equality evidence to rewrite here.
       NormalEnum -> do
@@ -1997,11 +1998,11 @@ tagToEnumRule = do
         massert (null rest)
         return $ mkTyApps (Var (dataConWorkId dc)) tc_args
 
-      NotAnEnum -> pprPanic "tagToEnumPrim# used at non-enumeration type" (ppr ty)
-                   -- TODO: point to invariant in the Note
+      NotAnEnum -- Forbidden per invariant TTE-I
+        -> pprPanic "tagToEnumPrim# used at non-enumeration type" (ppr ty)
 
-    _ -> pprPanic "tagToEnumPrim# used at non-enumeration type" (ppr ty)
-         -- TODO: point to invariant in the Note
+    _ -- Forbidden per invariant TTE-I
+      -> pprPanic "tagToEnumPrim# used at non-enumeration type" (ppr ty)
 
 ------------------------------
 dataToTagRule :: RuleM CoreExpr
@@ -3541,7 +3542,7 @@ we generate
   case tagToEnumPrim# (x ># y) of
     False -> e1
     True  -> e2
-and it is nice to then get rid of the tagToEnum#.
+and it is nice to then get rid of the tagToEnumPrim#.
 
 Beware (#14768): avoid the temptation to map constructor 0 to
 DEFAULT, in the hope of getting this
@@ -3550,7 +3551,7 @@ DEFAULT, in the hope of getting this
     1#      -> e2
 That fails utterly in the case of
    data Colour = Red | Green | Blue
-   case tagToEnum x of
+   case tagToEnumPrim# x of
       DEFAULT -> e1
       Red     -> e2
 
