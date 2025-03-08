@@ -1,0 +1,28 @@
+{-# LANGUAGE DataKinds, TypeFamilies, PolyKinds, MagicHash #-}
+
+module T25647d where
+
+import GHC.Exts
+import Data.Kind
+import GHC.Exts (RuntimeRep)
+import Data.Type.Equality ((:~:)(Refl) )
+
+type Cast0 :: forall (r :: RuntimeRep) (s :: RuntimeRep) (a :: RuntimeRep) (b :: RuntimeRep) -> (a :~: IntRep) -> (b :~: IntRep) -> Type -> Type
+type family Cast0 r s a b c d p where
+  Cast0 _ c _ _ Refl Refl (p->q) = Int
+
+type Cast1 :: forall (r :: RuntimeRep) (s :: RuntimeRep) (a :: RuntimeRep) (b :: RuntimeRep) -> (a :~: IntRep) -> (b :~: IntRep) -> Type -> Type
+type family Cast1 r s a b c d p where
+  Cast1 _ c _ b Refl Refl (p->q) = Int
+
+type Cast2 :: forall (r :: RuntimeRep) (s :: RuntimeRep) (a :: RuntimeRep) (b :: RuntimeRep) -> (a :~: IntRep) -> (b :~: IntRep) -> Type -> Type
+type family Cast2 r s a b c d p where
+  Cast2 _ c _ b Refl Refl (p->q) = Int
+
+type Cast3 :: forall (r :: RuntimeRep) (s :: RuntimeRep) (a :: RuntimeRep) (b :: RuntimeRep) -> (a :~: IntRep) -> (b :~: IntRep) -> Type -> Type
+type family Cast3 r s a b c d p where
+  forall. Cast3 _ c _ b Refl Refl (p->q) = Int
+
+type Cast4 :: forall (r :: RuntimeRep) (s :: RuntimeRep) (a :: RuntimeRep) (b :: RuntimeRep) -> (a :~: IntRep) -> (b :~: IntRep) -> Type -> Type
+type family Cast4 r s a b c d p where
+  forall aa cc. Cast4 aa cc _ b Refl Refl (p->q) = Int
