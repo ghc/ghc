@@ -449,6 +449,7 @@ mkRegRegMoveInstr fmt src dst = ANN desc instr
 takeRegRegMoveInstr :: Instr -> Maybe (Reg, Reg)
 takeRegRegMoveInstr (MOV (OpReg width dst) (OpReg width' src))
   | width == width' && (isFloatReg dst == isFloatReg src) = pure (src, dst)
+-- TODO: Add VMV case
 takeRegRegMoveInstr _ = Nothing
 
 -- | Make an unconditional jump instruction.
@@ -666,9 +667,9 @@ data Instr
     -- - fnmadd: d = - r1 * r2 - r3
     FMA FMASign Operand Operand Operand Operand
 
-  -- TODO: Care about the variants (<instr>.x.y) -> sum type
-  | VMV Operand Operand
-  | VID Operand 
+  | -- TODO: Care about the variants (<instr>.x.y) -> sum type
+    VMV Operand Operand
+  | VID Operand
   | VMSEQ Operand Operand Operand
   | VMERGE Operand Operand Operand Operand
   | VSLIDEDOWN Operand Operand Operand
