@@ -679,7 +679,7 @@ mergeCaseAlts outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
             ; return ([], alts') }
 
     -- Deal with tagToEnumPrim# See Note [Merge Nested Cases] wrinkle (MC3)
-    go (App (App (Var f) (Type type_arg)) (Var v)) -- TODO: Fix this pattern match
+    go (Var f `App` _levity_arg `App` Type type_arg `App` Var v)
       | v == outer_bndr
       , Just TagToEnumOp <- isPrimOpId_maybe f
       , Just tc  <- tyConAppTyCon_maybe type_arg
