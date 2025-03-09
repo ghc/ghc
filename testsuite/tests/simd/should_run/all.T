@@ -34,7 +34,8 @@ def riscvVlen():
 # produce ABI-incompatible code, e.g. when compiling usage of YMM registers
 # with or without -mavx2.
 setTestOpts([
-    when(arch('riscv64'), extra_hc_opts('-mriscv-vlen' + str(riscvVlen()) + " -opta=-march=rv64gv"))
+    # TODO: -optc and -opta should not be required, but provided by the GHC pipeline
+    when(arch('riscv64'), extra_hc_opts('-mriscv-vlen' + str(riscvVlen()) + " -optc=-march=rv64gv -opta=-march=rv64gv"))
   ])
 
 test('simd_insert_baseline', [], compile_and_run, [''])
@@ -98,7 +99,9 @@ test('simd011', [ req_fma_cpu
 test('simd012', [], compile_and_run, [''])
 test('simd013',
      [ req_c
-     , unless((arch('x86_64') or arch('riscv64')), skip) # because the C file uses architecture-dependent intrinsics
+     , unless((arch('x86_64') or arch('riscv64')), skip)
+      # ^ Because the C file uses architecture-dependent intrinsics.
+      # Requires GCC >= 14 on RISC-V.
      ],
      compile_and_run, ['simd013C.c'])
 test('simd014',
