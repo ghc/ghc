@@ -81,6 +81,7 @@ module GHC.Tc.Utils.TcMType (
   defaultTyVar, promoteMetaTyVarTo, promoteTyVarSet,
   quantifyTyVars, doNotQuantifyTyVars,
   zonkAndSkolemise, skolemiseQuantifiedTyVar,
+  quantifyTyVars',
 
   candidateQTyVarsOfType,  candidateQTyVarsOfKind,
   candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
@@ -1751,6 +1752,14 @@ quantifyTyVars :: SkolemInfo
                -> CandidatesQTvs   -- See Note [Dependent type variables]
                                    -- Already zonked
                -> TcM [TcTyVar]
+quantifyTyVars = quantifyTyVars' []
+
+quantifyTyVars' ::
+               [TcTyVar]
+               -> SkolemInfo
+               -> CandidatesQTvs   -- See Note [Dependent type variables]
+                                   -- Already zonked
+               -> TcM [TcTyVar]
 -- See Note [quantifyTyVars]
 -- Can be given a mixture of TcTyVars and TyVars, in the case of
 --   associated type declarations. Also accepts covars, but *never* returns any.
@@ -1758,9 +1767,9 @@ quantifyTyVars :: SkolemInfo
 -- invariants on CandidateQTvs, we do not have to filter out variables
 -- free in the environment here. Just quantify unconditionally, subject
 -- to the restrictions in Note [quantifyTyVars].
-quantifyTyVars skol_info dvs
+quantifyTyVars' cvs skol_info dvs
        -- short-circuit common case
-  | isEmptyCandidates dvs
+  | isEmptyCandidates dvs && null cvs
   = do { traceTc "quantifyTyVars has nothing to quantify" empty
        ; return [] }
 
@@ -1769,7 +1778,7 @@ quantifyTyVars skol_info dvs
            ( vcat [ text "dvs =" <+> ppr dvs ])
 
        ; undefaulted <- defaultTyVars dvs
-       ; final_qtvs  <- liftZonkM $ mapMaybeM zonk_quant undefaulted
+       ; final_qtvs  <- liftZonkM $ mapMaybeM zonk_quant (undefaulted++cvs)
 
        ; traceTc "quantifyTyVars }"
            (vcat [ text "undefaulted:" <+> pprTyVars undefaulted

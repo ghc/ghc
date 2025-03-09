@@ -975,8 +975,8 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
        -- check there too!
 
        -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
-       ; dvs  <- candidateQTyVarsOfType lhs_ty
-       ; qtvs <- quantifyTyVars skol_info dvs
+       ; dvs  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
+       ; qtvs <- quantifyTyVars' outer_tvs skol_info dvs
                  -- Have to make a same defaulting choice for reuslt kind here
                  -- and the `kindGeneralizeAll` in `tcConDecl`.
                  -- see (GT4) in
