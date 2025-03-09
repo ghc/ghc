@@ -406,6 +406,28 @@ def req_ls_files(name, opts):
     if not has_ls_files:
         skip(name, opts)
 
+def req_basic_simd_cpu( name, opts ):
+    """
+    Require basic SIMD support.
+    Architectures which support at least 128 bit wide SIMD vectors:
+     - X86 with SSE2
+     - AArch64 (which includes NEON)
+     - RISC-V with vector extension (VLEN >= 128bit)
+     - PowerPC with AltiVec (not currently supported)
+    """
+
+    if not (arch('aarch64') or have_cpu_feature('sse2') or  have_cpu_feature('zvl128b')):
+        opts.skip = True
+
+def req_fma_cpu( name, opts ):
+    """
+    Require FMA support.
+    """
+
+    # RISC-V: Imply float and double extensions, so we only have to change for vectors.
+    if not(have_cpu_feature('avx') or have_cpu_feature('zvl128b')):
+        opts.skip = True
+
 def ignore_stdout(name, opts):
     opts.ignore_stdout = True
 

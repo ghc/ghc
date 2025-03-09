@@ -11,7 +11,10 @@ SUPPORTED_CPU_FEATURES = {
     'sse', 'sse2', 'sse3', 'ssse3', 'sse4_1', 'sse4_2',
     'avx', 'avx2', 'avx512f',
     'fma',
-    'popcnt', 'bmi1', 'bmi2'
+    'popcnt', 'bmi1', 'bmi2',
+
+    # riscv:
+    'zvl128b', 'zvl256b', 'zvl512b'
 }
 
 cpu_feature_cache = None
