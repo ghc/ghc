@@ -106,6 +106,8 @@ mkExtraObjToLinkIntoBinary logger tmpfs dflags unit_state = do
     exeMain = vcat [
         text "#include <Rts.h>",
         text "extern StgClosure ZCMain_main_closure;",
+        text "extern int vectorSupportGlobalVar;",
+        text "void setVectorSupport(void);",
         text "int main(int argc, char *argv[])",
         char '{',
         text " RtsConfig __conf = defaultRtsConfig;",
@@ -124,6 +126,9 @@ mkExtraObjToLinkIntoBinary logger tmpfs dflags unit_state = do
             Just opts -> text "    __conf.rts_opts= " <>
                           text (show opts) <> semi,
         text " __conf.rts_hs_main = true;",
+        text " /* Set the supported level of vector registers */",
+        text " setVectorSupport();",
+        riscvVectorCheck,
         text " return hs_main(argc,argv,&ZCMain_main_closure,__conf);",
         char '}',
         char '\n' -- final newline, to keep gcc happy
@@ -145,6 +150,30 @@ mkExtraObjToLinkIntoBinary logger tmpfs dflags unit_state = do
         text "}",
         char '\n' -- final newline, to keep gcc happy
         ]
+
+    -- RISC-V compensates for too small registers by simply returning smaller
+    -- vectors. This allows clever tricks to become register width agnostic.
+    -- However, we currently cannot cope with that, so we check the register
+    -- size on startup (here.)
+    riscvVectorCheck :: SDoc
+    riscvVectorCheck
+      | (platformArch (targetPlatform dflags) == ArchRISCV64) =
+          vcat
+            [ text " if(vectorSupportGlobalVar < " <> int riscvExpectedVSize <> text ")",
+              text "  errorBelch(\"Configured vector register width (%d) not supported by CPU (%d).\", "
+                <> int riscvExpectedVSize
+                <> text ", vectorSupportGlobalVar);"
+            ]
+      | otherwise = Outputable.empty
+
+    riscvExpectedVSize :: Int
+    riscvExpectedVSize = case (vectorMinBits dflags) of
+      Nothing -> 0
+      Just w
+        | w >= 512 -> 3
+        | w >= 256 -> 2
+        | w >= 128 -> 1
+        | otherwise -> 0
 
 -- Write out the link info section into a new assembly file. Previously
 -- this was included as inline assembly in the main.c file but this
