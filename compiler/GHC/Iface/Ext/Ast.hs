@@ -1739,8 +1739,11 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
             HsOuterImplicit{hso_ximplicit = imp_vars} ->
               bindingsOnly $ map (C $ TyVarBind (mkScope outer_bndrs_loc) resScope)
                              imp_vars
-            HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-              toHie $ tvScopes resScope NoScope exp_bndrs
+            HsOuterExplicit{hso_bndrs = exp_bndrs,hso_ximplicit = imp_vars} -> do
+              exps <- toHie $ tvScopes resScope NoScope exp_bndrs
+              imps <- bindingsOnly $ map (C $ TyVarBind (mkScope outer_bndrs_loc) resScope)
+                             imp_vars
+              pure $ exps ++ imps
         , toHie ctx
         , toHie args
         , toHie typ

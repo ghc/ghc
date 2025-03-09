@@ -3403,13 +3403,13 @@ tcOuterTKBndrsX skol_mode skol_info outer_bndrs thing_inside
         do { (imp_tvs', thing) <- tcImplicitTKBndrsX skol_mode skol_info imp_tvs thing_inside
            ; return ( HsOuterImplicit{hso_ximplicit = imp_tvs'}
                     , thing) }
-      HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-        do { (exp_tvs', thing) <- tcExplicitTKBndrsX skol_mode exp_bndrs thing_inside
+      HsOuterExplicit{hso_bndrs = exp_bndrs,hso_ximplicit = imp_tvs} ->
+        do { (exp_tvs', (imp_tvs', thing)) <- tcExplicitTKBndrsX skol_mode exp_bndrs $ tcImplicitTKBndrsX skol_mode skol_info imp_tvs thing_inside
            ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
                                       , hso_bndrs     = exp_bndrs
                                       -- note nothing should be here since
                                       -- sig
-                                      , hso_ximplicit = [] }
+                                      , hso_ximplicit = imp_tvs' }
                     , thing)
           }
 
