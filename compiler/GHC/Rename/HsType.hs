@@ -1130,7 +1130,8 @@ bindHsOuterTyVarBndrs' bind_fam doc mb_cls implicit_vars outer_bndrs thing_insid
                                         , hso_ximplicit = implicit_vars' }
         where
           fam_implicit_vars = case bind_fam of
-            BindFam -> filterFreeVarsToBind (mapMaybe hsLTyVarLocName exp_bndrs) implicit_vars
+            -- BindFam -> filterFreeVarsToBind (mapMaybe hsLTyVarLocName exp_bndrs) implicit_vars
+            BindFam -> []
             NotBindFam -> []
 
 -- See Note [Term variable capture and implicit quantification]
