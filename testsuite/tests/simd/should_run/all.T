@@ -2,7 +2,7 @@ setTestOpts(
   # Currently, the only GHC backends to support SIMD are:
   #   - the X86 NCG
   #   - LLVM (any architecture)
-  [ unless(arch('x86_64') or arch('riscv64'), only_ways(llvm_ways))
+  [ unless(arch('x86_64'), only_ways(llvm_ways))
 
   # Architectures which support at least 128 bit wide SIMD vectors:
   #  - X86 with SSE2
@@ -61,16 +61,15 @@ setTestOpts(
   , when(have_cpu_feature('avx512f'), extra_hc_opts('-mavx512f'))
   ])
 
-# TODO: Revert debug trace dumps
-test('simd000', [], compile_and_run, ['-opta=-march=rv64gv -dppr-debug -ddump-to-file -ddump-asm'])
-test('simd001', [], compile_and_run, ['-opta=-march=rv64gv -dppr-debug -ddump-to-file -ddump-asm'])
-test('simd002', [], compile_and_run, ['-opta=-march=rv64gv -dppr-debug -ddump-to-file -ddump-asm'])
-test('simd003', [], compile_and_run, ['-opta=-march=rv64gv -dppr-debug -ddump-to-file -ddump-asm'])
-test('simd004', [], compile_and_run, ['-opta=-march=rv64gv -dppr-debug -ddump-to-file -ddump-asm -O2'])
-test('simd005', [], compile_and_run, ['-opta=-march=rv64gv -dppr-debug -ddump-to-file -ddump-asm'])
-test('simd006', [], compile_and_run, ['-opta=-march=rv64gv -dppr-debug -ddump-to-file -ddump-asm'])
-test('simd007', [], compile_and_run, ['-opta=-march=rv64gv -dppr-debug -ddump-to-file -ddump-asm'])
-test('simd008', [], compile_and_run, ['-opta=-march=rv64gv -dppr-debug -ddump-to-file -ddump-asm'])
+test('simd000', [], compile_and_run, [''])
+test('simd001', [], compile_and_run, [''])
+test('simd002', [], compile_and_run, [''])
+test('simd003', [], compile_and_run, [''])
+test('simd004', [], compile_and_run, ['-O2'])
+test('simd005', [], compile_and_run, [''])
+test('simd006', [], compile_and_run, [''])
+test('simd007', [], compile_and_run, [''])
+test('simd008', [], compile_and_run, [''])
 test('simd009', [ req_th
                 , extra_files(['Simd009b.hs', 'Simd009c.hs'])
                 , unless(have_cpu_feature('avx'), skip)
