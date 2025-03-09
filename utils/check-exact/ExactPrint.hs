@@ -4373,17 +4373,17 @@ instance ExactPrint Void where
 
 instance ExactPrintTVFlag flag => ExactPrint (HsOuterTyVarBndrs flag GhcPs) where
   getAnnotationEntry (HsOuterImplicit _) = NoEntryVal
-  getAnnotationEntry (HsOuterExplicit an _) = fromAnn an
+  getAnnotationEntry (HsOuterExplicit an _ _) = fromAnn an
 
   setAnnotationAnchor (HsOuterImplicit a) _ _ _ = HsOuterImplicit a
-  setAnnotationAnchor (HsOuterExplicit an a) anc ts cs = HsOuterExplicit (setAnchorEpa an anc ts cs) a
+  setAnnotationAnchor (HsOuterExplicit an a b) anc ts cs = HsOuterExplicit (setAnchorEpa an anc ts cs) a b
 
   exact b@(HsOuterImplicit _) = pure b
-  exact (HsOuterExplicit (EpAnn l (f,d) cs) bndrs) = do
+  exact (HsOuterExplicit (EpAnn l (f,d) cs) bndrs imps) = do
     f' <- markEpUniToken f
     bndrs' <- markAnnotated bndrs
     d' <- markEpToken d
-    return (HsOuterExplicit (EpAnn l (f',d') cs) bndrs')
+    return (HsOuterExplicit (EpAnn l (f',d') cs) bndrs' imps)
 
 -- ---------------------------------------------------------------------
 
