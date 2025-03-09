@@ -29,7 +29,7 @@ g :: Int -> N Int
 g x = MkN x
 
 data family D :: Type -> k -> k
-newtype instance D Int (a::TYPE r) = MkD a
+newtype instance forall r. D Int (a::TYPE r) = MkD a
 
 f1 :: Int# -> D Int Int#
 f1 x = MkD x
