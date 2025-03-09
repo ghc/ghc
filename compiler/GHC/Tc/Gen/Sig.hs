@@ -401,7 +401,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
              univ_bndrs   :: [TcInvisTVBinder]
              (implicit_tvs, univ_bndrs) = case outer_bndrs of
                HsOuterImplicit{hso_ximplicit = implicit_tvs} -> (implicit_tvs, [])
-               HsOuterExplicit{hso_xexplicit = univ_bndrs}   -> ([], univ_bndrs)
+               HsOuterExplicit{hso_xexplicit = univ_bndrs,hso_ximplicit = implicit_tvs}   -> (implicit_tvs, univ_bndrs)
 
        ; implicit_tvs <- zonkAndScopedSort implicit_tvs
        ; let implicit_bndrs = mkTyVarBinders SpecifiedSpec implicit_tvs

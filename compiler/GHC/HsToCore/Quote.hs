@@ -1212,9 +1212,10 @@ addHsOuterFamEqnTyVarBinds outer_bndrs thing_inside = do
     HsOuterImplicit{hso_ximplicit = imp_tvs} ->
       addSimpleTyVarBinds ReuseBoundNames imp_tvs $
       thing_inside $ coreNothingList elt_ty
-    HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+    HsOuterExplicit{hso_bndrs = exp_bndrs,hso_ximplicit = imp_tvs} ->
       addHsTyVarBinds FreshNamesOnly exp_bndrs $ \th_exp_bndrs ->
-      thing_inside $ coreJustList elt_ty th_exp_bndrs
+        addSimpleTyVarBinds ReuseBoundNames imp_tvs $
+        thing_inside $ coreJustList elt_ty th_exp_bndrs
 
 addHsOuterSigTyVarBinds ::
      HsOuterSigTyVarBndrs GhcRn
