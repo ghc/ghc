@@ -5,3 +5,4 @@ opts = [ extra_files(['A.hs', 'B1.hs', 'B2.hs', 'C.hs']),
 test('dynamicToo001', [opts], makefile_test, [])
 test('dynamicToo001MakeA', [opts], makefile_test, [])
 test('dynamicToo001MakeB', [opts], makefile_test, [])
+test('T25837', [opts], makefile_test, [])
