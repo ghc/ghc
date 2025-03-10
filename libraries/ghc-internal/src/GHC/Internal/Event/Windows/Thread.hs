@@ -12,6 +12,7 @@ import GHC.Internal.Base
 import GHC.Internal.Event.Windows
 import GHC.Internal.IO
 import GHC.Internal.IOPort
+import GHC.Internal.STM (TVar, newTVarIO, writeTVar, atomically)
 
 ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning = wakeupIOManager

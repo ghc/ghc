@@ -60,6 +60,7 @@ module GHC.Internal.Conc.IO
 
 import GHC.Internal.Base
 import GHC.Internal.Conc.Sync as Sync
+import GHC.Internal.STM as STM
 import GHC.Internal.Real ( fromIntegral )
 import GHC.Internal.System.Posix.Types
 
@@ -142,17 +143,17 @@ threadWaitWrite fd
 -- to read from a file descriptor. The second returned value
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
-threadWaitReadSTM :: Fd -> IO (Sync.STM (), IO ())
+threadWaitReadSTM :: Fd -> IO (STM.STM (), IO ())
 threadWaitReadSTM fd
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
   | threaded  = Event.threadWaitReadSTM fd
 #endif
   | otherwise = do
-      m <- Sync.newTVarIO False
+      m <- STM.newTVarIO False
       t <- Sync.forkIO $ do
         threadWaitRead fd
-        Sync.atomically $ Sync.writeTVar m True
-      let waitAction = do b <- Sync.readTVar m
+        STM.atomically $ STM.writeTVar m True
+      let waitAction = do b <- STM.readTVar m
                           if b then return () else retry
       let killAction = Sync.killThread t
       return (waitAction, killAction)
@@ -161,17 +162,17 @@ threadWaitReadSTM fd
 -- can be written to a file descriptor. The second returned value
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
-threadWaitWriteSTM :: Fd -> IO (Sync.STM (), IO ())
+threadWaitWriteSTM :: Fd -> IO (STM.STM (), IO ())
 threadWaitWriteSTM fd
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
   | threaded  = Event.threadWaitWriteSTM fd
 #endif
   | otherwise = do
-      m <- Sync.newTVarIO False
+      m <- STM.newTVarIO False
       t <- Sync.forkIO $ do
         threadWaitWrite fd
-        Sync.atomically $ Sync.writeTVar m True
-      let waitAction = do b <- Sync.readTVar m
+        STM.atomically $ STM.writeTVar m True
+      let waitAction = do b <- STM.readTVar m
                           if b then return () else retry
       let killAction = Sync.killThread t
       return (waitAction, killAction)
