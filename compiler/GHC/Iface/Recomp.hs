@@ -1301,18 +1301,14 @@ addFingerprints hsc_env iface0
 
    -- The interface hash depends on:
    --   - the ABI hash, plus
-   --   - the source file hash,
+   --   - the things which can affect whether a module is recompiled
    --   - the module level annotations,
-   --   - usages
    --   - deps (home and external packages, dependent files)
-   --   - hpc
    iface_hash <- computeFingerprint putNameLiterally
                         (mod_hash,
-                         mi_src_hash iface0,
                          ann_fn (mkVarOccFS (fsLit "module")),  -- See mkIfaceAnnCache
-                         mi_usages iface0,
-                         sorted_deps,
-                         mi_hpc iface0)
+                         mi_self_recomp_info iface0,
+                         sorted_deps )
 
    let
     final_iface_exts = ModIfaceBackend
