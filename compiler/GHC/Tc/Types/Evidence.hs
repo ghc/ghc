@@ -30,6 +30,7 @@ module GHC.Tc.Types.Evidence (
   evId, evCoercion, evCast, evCastExpr, evDFunApp,  evDictApp, evSelector, evDelayedError,
   evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
   decomposeIP, evWrapIP, evUnwrapIP, evWrapUnaryDict,
+  mkEvCast,
 
   evTermCoercion, evTermCoercion_maybe,
   evExprCoercion, evExprCoercion_maybe,
