@@ -1107,7 +1107,6 @@ getRegister' config plat expr =
       | fitsIn12bitImm n ->
           return $ Any toFmt (\d -> unitOL $ annExpr expr (ORI (OpReg toFmt d) (OpReg fromFmt r') (OpImm (ImmInteger n))))
       where
-        w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
         r' = getRegisterReg plat reg
         toFmt = intFormat w
         fromFmt = (cmmTypeFormat (cmmRegType reg))
@@ -1274,8 +1273,8 @@ getRegister' config plat expr =
         MO_S_Shr w -> intOp True w (\d x y -> unitOL $ annExpr expr (SRA d x y))
 
         -- Vector operations
-        MO_VF_Extract length w -> vecExtract ((scalarFormatFormat . floatScalarFormat) w)
-        MO_V_Extract length w -> vecExtract ((scalarFormatFormat . intScalarFormat) w)
+        MO_VF_Extract _length w -> vecExtract ((scalarFormatFormat . floatScalarFormat) w)
+        MO_V_Extract _length w -> vecExtract ((scalarFormatFormat . intScalarFormat) w)
 
         MO_VF_Add length w -> vecOp (floatVecFormat length w) VADD
         MO_VF_Sub length w -> vecOp (floatVecFormat length w) VSUB
@@ -1433,7 +1432,7 @@ getRegister' config plat expr =
     -- Return 0 when the operation cannot overflow, /= 0 otherwise
     do_mul_may_oflo :: Width -> CmmExpr -> CmmExpr -> NatM Register
     do_mul_may_oflo w _x _y | w > W64 = pprPanic "Cannot multiply larger than 64bit" (ppr w)
-    do_mul_may_oflo w@W64 x y = do
+    do_mul_may_oflo W64 x y = do
       (reg_x, format_x, code_x) <- getSomeReg x
       (reg_y, format_y, code_y) <- getSomeReg y
       -- TODO: Can't we clobber reg_x and reg_y to save registers?
@@ -1762,12 +1761,12 @@ genCondJump ::
 genCondJump bid expr = do
   case expr of
     -- Optimized == 0 case.
-    CmmMachOp (MO_Eq w) [x, CmmLit (CmmInt 0 _)] -> do
+    CmmMachOp (MO_Eq _w) [x, CmmLit (CmmInt 0 _)] -> do
       (reg_x, format_x, code_x) <- getSomeReg x
       return $ code_x `snocOL` annExpr expr (BCOND EQ zero (OpReg format_x reg_x) (TBlock bid))
 
     -- Optimized /= 0 case.
-    CmmMachOp (MO_Ne w) [x, CmmLit (CmmInt 0 _)] -> do
+    CmmMachOp (MO_Ne _w) [x, CmmLit (CmmInt 0 _)] -> do
       (reg_x, format_x, code_x) <- getSomeReg x
       return $ code_x `snocOL` annExpr expr (BCOND NE zero (OpReg format_x reg_x) (TBlock bid))
 
@@ -1811,8 +1810,8 @@ genCondJump bid expr = do
                       `appOL` unitOL (annExpr expr (BCOND cmp x' y' (TBlock bid)))
               _ -> code_x `appOL` code_y `appOL` unitOL (annExpr expr (BCOND cmp x' y' (TBlock bid)))
 
-          fbcond :: Width -> Cond -> NatM (OrdList Instr)
-          fbcond w cmp = do
+          fbcond :: Cond -> NatM (OrdList Instr)
+          fbcond cmp = do
             -- ensure we get float regs
             (reg_fx, format_fx, code_fx) <- getFloatReg x
             (reg_fy, format_fy, code_fy) <- getFloatReg y
@@ -1825,12 +1824,12 @@ genCondJump bid expr = do
               `snocOL` BCOND EQ condOpReg (OpReg II64 oneReg) (TBlock bid)
 
       case mop of
-        MO_F_Eq w -> fbcond w EQ
-        MO_F_Ne w -> fbcond w NE
-        MO_F_Gt w -> fbcond w FGT
-        MO_F_Ge w -> fbcond w FGE
-        MO_F_Lt w -> fbcond w FLT
-        MO_F_Le w -> fbcond w FLE
+        MO_F_Eq _w -> fbcond EQ
+        MO_F_Ne _w -> fbcond NE
+        MO_F_Gt _w -> fbcond FGT
+        MO_F_Ge _w -> fbcond FGE
+        MO_F_Lt _w -> fbcond FLT
+        MO_F_Le _w -> fbcond FLE
         MO_Eq w -> sbcond w EQ
         MO_Ne w -> sbcond w NE
         MO_S_Gt w -> sbcond w SGT
@@ -2029,7 +2028,7 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
       passArguments gpRegs fpRegs vRegs args stackSpaceWords (vReg : accumRegs) accumCode'
 
     -- No more vector regs, and we want to pass a vector argument.
-    passArguments gpRegs fpRegs (vReg : vRegs) ((r, format, _hint, code_r) : args) stackSpaceWords accumRegs accumCode
+    passArguments _gpRegs _fpRegs (_vReg : _vRegs) ((_r, format, _hint, _code_r) : _args) _stackSpaceWords _accumRegs _accumCode
       | isVecFormat format =
           pprPanic "passArguments" (text "TODO: Implement and test vector argument passing on the stack.")
     passArguments _ _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
@@ -2217,7 +2216,7 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
               format = intFormat w
           return code
       | otherwise -> panic "mal-formed AtomicRead"
-    mo@(MO_AtomicWrite w ord)
+    mo@(MO_AtomicWrite _w ord)
       | [p_reg, val_reg] <- arg_regs -> do
           (p, _fmt_p, code_p) <- getSomeReg p_reg
           (val, fmt_val, code_val) <- getSomeReg val_reg

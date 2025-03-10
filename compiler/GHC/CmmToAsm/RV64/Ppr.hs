@@ -797,7 +797,7 @@ pprInstr platform instr = case instr of
               FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
          in op4 fma d r1 r2 r3
   VFMA variant o1@(OpReg fmt _reg) o2 o3
-    | VecFormat l fmt' <- fmt ->
+    | VecFormat _l fmt' <- fmt ->
         let formatString = if (isFloatFormat . scalarFormatFormat) fmt' then text "f" else text ""
             prefix = text "v" <> formatString
             suffix = text "vv"

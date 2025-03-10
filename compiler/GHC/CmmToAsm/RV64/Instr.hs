@@ -20,7 +20,6 @@ import GHC.CmmToAsm.Utils
 import GHC.Data.FastString (LexicalFastString)
 import GHC.Platform
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class.Separate
 import GHC.Platform.Regs
 import GHC.Prelude
 import GHC.Stack
