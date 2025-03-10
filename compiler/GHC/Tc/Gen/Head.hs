@@ -1252,5 +1252,4 @@ addExprCtxt e thing_inside
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself
       HsUnboundVar {} -> thing_inside
-      XExpr (ExpandedThingRn {}) -> thing_inside
       _ -> addErrCtxt (ExprCtxt e) thing_inside

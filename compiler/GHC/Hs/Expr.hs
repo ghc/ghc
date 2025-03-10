@@ -531,13 +531,6 @@ type instance XXExpr GhcTc = XXExprGhcTc
 data HsThingRn = OrigExpr (HsExpr GhcRn)                -- ^ The source, user written, expression
                | OrigStmt (ExprLStmt GhcRn) HsDoFlavour -- ^ which kind of do-block did this statement come from
 
-isHsThingRnExpr, isHsThingRnStmt :: HsThingRn -> Bool
-isHsThingRnExpr (OrigExpr{}) = True
-isHsThingRnExpr _ = False
-
-isHsThingRnStmt (OrigStmt{}) = True
-isHsThingRnStmt _ = False
-
 data XXExprGhcRn
   = ExpandedThingRn { xrn_orig     :: HsThingRn       -- The original source thing to be used for error messages
                     , xrn_expanded :: HsExpr GhcRn    -- The compiler generated expanded thing
