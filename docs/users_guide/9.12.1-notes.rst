@@ -61,6 +61,12 @@ Language
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0409-exportable-named-default.rst>`__
   for details.
 
+  Note that the rules for defaulting have been relaxed, even in modules in which
+  the :extension:`NamedDefaults` extension is not in effect. Now, a type variable
+  is no longer required to only appear in "standard" classes (such as ``Eq``, ``Ord`` etc);
+  it may also appear in classes for which there is a named default declaration
+  in scope.
+
 - GHC now takes ``COMPLETE`` pragmas into consideration when deciding whether
   pattern matches in do notation are fallible.
 
