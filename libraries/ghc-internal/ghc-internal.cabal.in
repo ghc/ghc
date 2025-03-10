@@ -326,8 +326,6 @@ Library
         GHC.Internal.Type.Reflection
         GHC.Internal.Type.Reflection.Unsafe
         GHC.Internal.Unsafe.Coerce
-        -- TODO: remove
-        GHC.Internal.IOPort
 
         GHC.Internal.CString
         GHC.Internal.Classes
@@ -363,7 +361,6 @@ Library
         GHC.Internal.Event.IntVar
         GHC.Internal.Event.PSQ
         GHC.Internal.Event.Unique
-        -- GHC.Internal.IOPort -- TODO: hide again after debug
         GHC.Internal.Unicode.Bits
         GHC.Internal.Unicode.Char.DerivedCoreProperties
         GHC.Internal.Unicode.Char.UnicodeData.GeneralCategory

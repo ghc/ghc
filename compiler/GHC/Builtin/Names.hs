@@ -1812,7 +1812,7 @@ addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey,
     weakPrimTyConKey, mutableArrayPrimTyConKey,
     mutableByteArrayPrimTyConKey, orderingTyConKey, mVarPrimTyConKey,
     ratioTyConKey, rationalTyConKey, realWorldTyConKey, stablePtrPrimTyConKey,
-    stablePtrTyConKey, eqTyConKey, heqTyConKey, ioPortPrimTyConKey,
+    stablePtrTyConKey, eqTyConKey, heqTyConKey,
     smallArrayPrimTyConKey, smallMutableArrayPrimTyConKey,
     stringTyConKey,
     ccArrowTyConKey, ctArrowTyConKey, tcArrowTyConKey :: Unique
@@ -1849,7 +1849,7 @@ mutableArrayPrimTyConKey                = mkPreludeTyConUnique 30
 mutableByteArrayPrimTyConKey            = mkPreludeTyConUnique 31
 orderingTyConKey                        = mkPreludeTyConUnique 32
 mVarPrimTyConKey                        = mkPreludeTyConUnique 33
-ioPortPrimTyConKey                      = mkPreludeTyConUnique 34
+-- ioPortPrimTyConKey (34) was killed
 ratioTyConKey                           = mkPreludeTyConUnique 35
 rationalTyConKey                        = mkPreludeTyConUnique 36
 realWorldTyConKey                       = mkPreludeTyConUnique 37

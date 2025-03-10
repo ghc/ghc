@@ -1,6 +1,7 @@
 ## 0.14.0
 
 - ghc-prim's modules have been merged into ghc-internal and ghc-prim is now deprecated.
+- `IOPort#` and its related operations have been removed ([CLC #213](https://github.com/haskell/core-libraries-committee/issues/213))
 
 ## 0.13.0
 

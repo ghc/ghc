@@ -1159,10 +1159,6 @@ genPrim prof bound ty op = case op of
   PromptOp                          -> unhandledPrimop op
   Control0Op                        -> unhandledPrimop op
 
-  NewIOPortOp                       -> unhandledPrimop op
-  ReadIOPortOp                      -> unhandledPrimop op
-  WriteIOPortOp                     -> unhandledPrimop op
-
   GetSparkOp                        -> unhandledPrimop op
   AnyToAddrOp                       -> unhandledPrimop op
   MkApUpd0_Op                       -> unhandledPrimop op
