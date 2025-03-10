@@ -26,6 +26,7 @@ module GHC.Internal.STM
 
 import GHC.Internal.Base
 import GHC.Internal.Exception (Exception, toException, fromException)
+import GHC.Internal.Stack
 
 -- TVars are shared memory locations which support atomic memory
 -- transactions.
@@ -179,8 +180,13 @@ orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 -- raise an exception within the 'STM' monad because it guarantees
 -- ordering with respect to other 'STM' operations, whereas 'throw'
 -- does not.
-throwSTM :: Exception e => e -> STM a
-throwSTM e = STM $ raiseIO# (toException e)
+throwSTM :: (HasCallStack, Exception e) => e -> STM a
+throwSTM e = do
+    -- N.B. Typically use of unsafeIOToSTM is very much frowned upon as this
+    -- is an easy way to end up with nested transactions. However, we can be
+    -- certain that toExceptionWithBacktrace will not initiate a transaction.
+    se <- unsafeIOToSTM (toExceptionWithBacktrace e)
+    STM $ raiseIO# se
 
 -- | Exception handling within STM actions.
 --
