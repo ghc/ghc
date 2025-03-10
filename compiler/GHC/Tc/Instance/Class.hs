@@ -1,5 +1,4 @@
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module GHC.Tc.Instance.Class (
      matchGlobalInst, matchEqualityInst,

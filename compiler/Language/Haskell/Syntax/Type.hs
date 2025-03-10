@@ -220,8 +220,7 @@ A wildcard in a type can be
         written '_'
     In HsType this is represented by HsWildCardTy.
     The renamer leaves it untouched, and it is later given a fresh
-    meta tyvar in the typechecker. The wildcard in type families can
-    be cumbersome to deal with, See Note [Implementation tweak for wildCards in family instances].
+    meta tyvar in the typechecker.
 
   * A named wildcard,
         written '_a', '_foo', etc
@@ -386,8 +385,6 @@ data HsOuterTyVarBndrs flag pass
                     --    @f :: forall a b. a -> b -> b@
     { hso_xexplicit :: XHsOuterExplicit pass flag
     , hso_bndrs     :: [LHsTyVarBndr flag (NoGhcTc pass)]
-    , hso_ximplicit :: XHsOuterImplicit pass
-    -- used only for Type family instances
     }
   | XHsOuterTyVarBndrs !(XXHsOuterTyVarBndrs pass)
 

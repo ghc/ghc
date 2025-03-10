@@ -17,7 +17,6 @@ module GHC.Core.TyCon(
         AlgTyConFlav(..), isNoParent,
         FamTyConFlav(..), Role(..), Injectivity(..),
         PromDataConInfo(..), TyConFlavour(..),
-        FamArgFlavour(..),
 
         -- * TyConBinder
         TyConBinder, TyConBndrVis(..),
@@ -110,7 +109,6 @@ module GHC.Core.TyCon(
         tcTyConScopedTyVars, isMonoTcTyCon,
         tyConHasClosedResKind,
         mkTyConTagMap,
-        tyConFamArgFlavours,
 
         -- ** Manipulating TyCons
         ExpandSynResult(..),
@@ -748,7 +746,6 @@ instance NFData TyConBndrVis where
 -}
 
 
-
 -- | TyCons represent type constructors. Type constructors are introduced by
 -- things such as:
 --
@@ -890,7 +887,7 @@ data TyConDetails =
                                       -- abstract, built-in. See comments for
                                       -- FamTyConFlav
 
-        famTcParent  :: Maybe (TyCon, [FamArgFlavour]),  -- ^ For *associated* type/data families
+        famTcParent  :: Maybe TyCon,  -- ^ For *associated* type/data families
                                       -- The class tycon in which the family is declared
                                       -- See Note [Associated families and their parent class]
 
@@ -1957,17 +1954,8 @@ mkFamilyTyCon name binders res_kind resVar flav parent inj
   = mkTyCon name binders res_kind (constRoles binders Nominal) $
     FamilyTyCon { famTcResVar  = resVar
                 , famTcFlav    = flav
-                , famTcParent  = genfamTcParent <$> parent
+                , famTcParent  = classTyCon <$> parent
                 , famTcInj     = inj }
-    where
-      genfamTcParent cls = (classTyCon cls, argFlavours)
-        where clsArgs = classTyVars cls
-              argFlavours = [if b `elem` clsArgs then ClassArg else FreeArg | b <- binderVars binders]
-
-tyConFamArgFlavours :: TyCon -> [FamArgFlavour]
-tyConFamArgFlavours (TyCon { tyConDetails = details })
-  | FamilyTyCon { famTcParent = Just (_, argFlavours) } <- details = argFlavours
-  | otherwise = []
 
 -- | Create a promoted data constructor 'TyCon'
 -- Somewhat dodgily, we give it the same Name
@@ -2864,8 +2852,8 @@ tyConFlavour (TyCon { tyConDetails = details })
 
   | FamilyTyCon { famTcFlav = flav, famTcParent = parent } <- details
   = case flav of
-      DataFamilyTyCon{}            -> OpenFamilyFlavour (IAmData DataType) (fst <$> parent)
-      OpenSynFamilyTyCon           -> OpenFamilyFlavour IAmType (fst <$> parent)
+      DataFamilyTyCon{}            -> OpenFamilyFlavour (IAmData DataType) parent
+      OpenSynFamilyTyCon           -> OpenFamilyFlavour IAmType parent
       ClosedSynFamilyTyCon{}       -> ClosedTypeFamilyFlavour
       AbstractClosedSynFamilyTyCon -> ClosedTypeFamilyFlavour
       BuiltInSynFamTyCon{}         -> ClosedTypeFamilyFlavour
@@ -2987,148 +2975,3 @@ tyConSkolem = isHoleName . tyConName
 --
 -- This is why the test is on the original name of the TyCon,
 -- not whether it is abstract or not.
-
-
-{- Note [Implementation tweak for wildCards in family instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Wildcards in type families are used to represent type/kind information that
-are not specified by the user. See Note [Wildcards in family instances] for
-more intuition.
-
-It is controversial how to interpret wildcards in type families because of their
-close connection with the class arguments of associated families. The main challenge
-arises from the fact that some wildcard occurrences correspond to arguments provided
-by the parent class (class arguments), while others are supplied freely by the user.
-To resolve this ambiguity, we classify wildcards into three categories using the
-FamArgFlavour data type—namely, ClassArg, FreeArg, and SigArg. This categorization
-provides the flexibility to adjust the interpretation of wildcards in type families,
-allowing us to experiment with different behaviors. See Note [FamArgFlavour] for more
-details.
-
-Some common agreements:
-
-* FreeArg wildcards should be not defaulted.
-
-* For `ClassArg`, it should be able to represent at least arbitrary type variables, it is
-  used in our codebase.
-
-    instance (HasDefaultDiagnosticOpts opts, Outputable hint) => Diagnostic (UnknownDiagnostic opts hint) where
-      type DiagnosticOpts (UnknownDiagnostic opts _) = opts
-      type DiagnosticHint (UnknownDiagnostic _ hint) = hint
-
-By picking different type var for different flavours of wildcards in `tcAnonWildCardOcc`, we can
-explore different design spaces. For example, we can have the following design spaces:
-
-* 1. For Wildcards can represet arbitrary types, including type variables, picks TauTv.
-     But we need to taking care of not defaulting it unexpectively.
-* 2. For Wildcards can only represent type variables, picks TyVarTv.
-     Unlike skolemTv, it should help us to equalize two _ if there is such a need.
-* 3. For Wildcards stand alone, pick skolemTv variables.
-... and so on.
-
-If maintaining backward compatibility from 8.6.4 to 9.10.2, the picks would be:
-- TyVarTv for FreeArg
-- TauTv for ClassArg
-- TauTv for SigArg
-
-<Implemenation Detail>
-The ClassArg and FreeArg are generated in `mkFamilyTyCon` and store at `famTcParent`
-field at `FamilyTyCon`. When typechecking type families, the `FamArgFlavour's passed
-in `tcAnonWildCardOcc` when dancing around inside `tcInferTyApps` and `SigArg` is
-passed down at `HsKindSig` branch of `tcHsType` in the dance.
-
-See <More on SigArg> session in Note [FamArgFlavour] for why not just merge SigArg
-and ClassArg.
-See also Note [Wildcards in family instances] for more intuition.
-
-For more discussion, see #13908.
--}
-
-{- Note [FamArgFlavour]
-~~~~~~~~~~~~~~~~~~~~~~~
-The FamArgFlavour is used to distinguish the different kinds of arguments that may
-appear in an type family declaration/instance. In an associated type family,
-some arguments come directly from the parent class (the “class arguments”) while
-others are provided freely by the user (the “free arguments”). For example, consider:
-
-    class C a b c where
-      type F x y a   -- Here, 'x' and 'y' are free arguments, while 'a' comes from the class.
-      type G p c b   -- Here, 'p' is free and both 'c' and 'b' are class arguments.
-
-We can conceptually view the kinds of arguments for a type family as a famArgFlavour–vector,
-with one flavour per argument of the family. Each flavour indicates whether the corresponding
-argument is a ClassArg or a FreeArg. We also introduce a third flavour, SigArg,
-to flag arguments that appear only in a kind signature for a type instance (i.e. when
-a wildcard is provided along with a kind annotation, as in @(_ :: _)@). See <More on SigArg>
-Session.
-
-Under the current design, when type-checking an instance the interpretation of wildcards
-depends on their position:
-
-  - In free arguments, a wildcard is interpreted as a TyVarTv-variable type variable.
-  - In class arguments, a wildcard is interpreted as a Tau–variable.
-  - In signature arguments, a wildcard is similarly treated as a Tau–variable.
-
-For instance, for an instance declaration like
-
-    instance C Int [x] Bool where
-       type F _ _ (_ :: _) = Int
-
-the first two underscores (free arguments) would yield TyVarTv’s while the last two
-underscores (a class argument and a signature argument) would produce TauTv's.
-
-<More on SigArg>
-Example from T14366
-
-type family F (a :: Type) :: Type where
-  F (a :: _) = a
-
-Imagine without SigArg, since F is non-associated, every argument is FreeArg,
-now let's consider _ here as a FreeArg then TyVarTv, then it would not match Type.
-Say if we assign ClassArg to _ here, if we want to flip class arguments in associated
-type family to only match Type variables. Then this example would not work.
-
-More over, it is really hard for us to know if wildcard in signature in an
-associated type family corresponding to a class argument or a free argument.
-For example, in the following code:
-
-class C a b c where
-  type F a (d :: TYPE a) (e :: TYPE k) f
-instance C LiftedRep Int c where
-  type F _  (_ :: TYPE _) (_ :: TYPE _) (_ :: TYPE _) = Int
-
-we have:
-
-tyConBinders: [[spec] (@(k_a7h :: RuntimeRep)),
-                [req] (@(a_a7e :: RuntimeRep)), AnonTCB (@(d_a7i :: TYPE a_a7e)),
-                AnonTCB (@(e_a7j :: TYPE k_a7h)), AnonTCB (@f_a7k)]
-tyConTyVars: [k_a7h, a_a7e, d_a7i, e_a7j, f_a7k]
-tyConFamArgFlavours: [FreeArg, ClassArg, FreeArg, FreeArg, FreeArg]
-
-* The first `TYPE _` is bounded to classArg `a` while its' binder `d` occurs freely.
-* The second `TYPE _` is not bounded to a class argument and its' binder `e` occurs freely.
-* The third `TYPE _` is not bounded to a class argument, does not appear in `tyConBinders`
-
-It is rather hard to distinguish them during typechecking.
-THe best way I can think of is to mark them as SigArg and treat them as TauTv.
-
-* For the first two, let the explicit type application or implicit instantiation of the
-  `tyConBinders` to decide the final type for them.
-* For the third one, it default it LiftedRep. It is more of a trade off, because I think
-  it is the best if we do not default any wildCard.
-
-Hence we maintain three different flavours of wildcards in type families. This provides
-a flexibility to interpret wildcards in type families.
-See Note [Implementation tweak for wildCards in family instances] for how we can explore
-different design spaces.
-
-For more discussion, see #13908.
--}
-
--- see Note [FamArgFlavour]
-data FamArgFlavour = ClassArg | FreeArg | SigArg deriving (Eq, Show)
-
-instance Outputable FamArgFlavour where
-  ppr ClassArg = text "ClassArg"
-  ppr FreeArg = text "FreeArg"
-  ppr SigArg = text "SigArg"

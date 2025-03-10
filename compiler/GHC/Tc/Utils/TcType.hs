@@ -51,8 +51,7 @@ module GHC.Tc.Utils.TcType (
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTvUnk,
   MetaDetails(Flexi, Indirect), MetaInfo(..), skolemSkolInfo,
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
-  tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,
-  isTyConableTyVar,
+  tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
   ConcreteTvOrigin(..), isConcreteTyVar_maybe, isConcreteTyVar,
   isConcreteTyVarTy, isConcreteTyVarTy_maybe, concreteInfo_maybe,
   ConcreteTyVars, noConcreteTyVars,
@@ -641,6 +640,7 @@ data MetaInfo
    = TauTv         -- ^ This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls.
+
    | TyVarTv       -- ^ A variant of TauTv, except that it should not be
                    --   unified with a type, only with a type variable
                    -- See Note [TyVarTv] in GHC.Tc.Utils.TcMType
@@ -670,7 +670,6 @@ instance Outputable MetaInfo where
   ppr RuntimeUnkTv    = text "rutv"
   ppr CycleBreakerTv  = text "cbv"
   ppr (ConcreteTv {}) = text "conc"
-
 
 -- | What caused us to create a 'ConcreteTv' metavariable?
 -- See Note [ConcreteTv] in GHC.Tc.Utils.Concrete.

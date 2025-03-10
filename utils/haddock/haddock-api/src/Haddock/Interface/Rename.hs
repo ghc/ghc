@@ -939,8 +939,8 @@ renameOuterTyVarBndrs
   -> RnM (HsOuterTyVarBndrs flag DocNameI)
 renameOuterTyVarBndrs (HsOuterImplicit{}) =
   pure $ HsOuterImplicit{hso_ximplicit = noExtField}
-renameOuterTyVarBndrs (HsOuterExplicit{hso_bndrs = exp_bndrs}) = do
-  HsOuterExplicit noExtField <$> mapM (renameLTyVarBndr return) exp_bndrs <*> pure NoExtField
+renameOuterTyVarBndrs (HsOuterExplicit{hso_bndrs = exp_bndrs}) =
+  HsOuterExplicit noExtField <$> mapM (renameLTyVarBndr return) exp_bndrs
 
 renameWc
   :: (in_thing -> RnM out_thing)

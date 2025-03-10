@@ -175,6 +175,7 @@ pushLevelAndSolveEqualities skol_info_anon tcbs thing_inside
        ; report_unsolved_equalities skol_info_anon (binderVars tcbs) tclvl wanted
        ; return res }
 
+
 pushLevelAndSolveEqualitiesX :: String -> TcM a
                              -> TcM (TcLevel, WantedConstraints, a)
 -- Push the level, gather equality constraints, and then solve them.

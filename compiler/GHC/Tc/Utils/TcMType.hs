@@ -34,8 +34,7 @@ module GHC.Tc.Utils.TcMType (
 
   newMultiplicityVar,
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
-  newTyVarMetaVarDetailsAtLevel, newTauTvDetailsAtLevel,
-  newMetaDetails, newMetaTyVarName,
+  newTauTvDetailsAtLevel, newMetaDetails, newMetaTyVarName,
   isFilledMetaTyVar_maybe, isFilledMetaTyVar, isUnfilledMetaTyVar,
 
   --------------------------------
@@ -851,13 +850,6 @@ newTauTvDetailsAtLevel :: TcLevel -> TcM TcTyVarDetails
 newTauTvDetailsAtLevel tclvl
   = do { ref <- newMutVar Flexi
        ; return (MetaTv { mtv_info  = TauTv
-                        , mtv_ref   = ref
-                        , mtv_tclvl = tclvl }) }
-
-newTyVarMetaVarDetailsAtLevel :: TcLevel -> TcM TcTyVarDetails
-newTyVarMetaVarDetailsAtLevel tclvl
-  = do { ref <- newMutVar Flexi
-       ; return (MetaTv { mtv_info  = TyVarTv
                         , mtv_ref   = ref
                         , mtv_tclvl = tclvl }) }
 

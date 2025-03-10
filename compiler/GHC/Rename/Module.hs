@@ -700,7 +700,7 @@ rnFamEqn doc atfi
          -- bound by the instance head with filterInScopeM (#19649).
        ; all_imp_vars <- filterInScopeM $ (pat_kity_vars ++ payload_kvs)
 
-       ; bindHsOuterTyVarBndrs' BindFam doc mb_cls all_imp_vars outer_bndrs $ \rn_outer_bndrs ->
+       ; bindHsOuterTyVarBndrs doc mb_cls all_imp_vars outer_bndrs $ \rn_outer_bndrs ->
     do { (pats', pat_fvs) <- rnLHsTypeArgs (FamPatCtx tycon) pats
        ; (payload', rhs_fvs) <- rn_payload doc payload
 
@@ -914,11 +914,6 @@ We however don't want to emit hole constraints on wildcards in family
 instances, We use special hole_mode `HM_FamPat` to indicate that.
 
 See related Note [Wildcards in visible kind application] in GHC.Tc.Gen.HsType
-
-But over the develoment wildcards have became unintentionally more powerful
-in associated type family instances since it's relation to the parent class
-variables. It become confusing, See Note [Implementation tweak for wildCards in family instances]
-for how we can explore the design space to make it more consistent.
 
 Note [Unused type variables in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

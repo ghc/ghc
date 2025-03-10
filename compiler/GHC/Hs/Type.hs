@@ -312,7 +312,7 @@ dropWildCards sig_ty = hswc_body sig_ty
 
 hsOuterTyVarNames :: HsOuterTyVarBndrs flag GhcRn -> [Name]
 hsOuterTyVarNames (HsOuterImplicit{hso_ximplicit = imp_tvs}) = imp_tvs
-hsOuterTyVarNames (HsOuterExplicit{hso_bndrs = bndrs, hso_ximplicit= imp_tvs}) = hsLTyVarNames bndrs ++ imp_tvs
+hsOuterTyVarNames (HsOuterExplicit{hso_bndrs = bndrs})       = hsLTyVarNames bndrs
 
 hsOuterExplicitBndrs :: HsOuterTyVarBndrs flag (GhcPass p)
                      -> [LHsTyVarBndr flag (NoGhcTc (GhcPass p))]
@@ -325,9 +325,7 @@ mkHsOuterImplicit = HsOuterImplicit{hso_ximplicit = noExtField}
 mkHsOuterExplicit :: EpAnnForallInvis -> [LHsTyVarBndr flag GhcPs]
                   -> HsOuterTyVarBndrs flag GhcPs
 mkHsOuterExplicit an bndrs = HsOuterExplicit { hso_xexplicit = an
-                                             , hso_bndrs     = bndrs
-                                             , hso_ximplicit = NoExtField
-                                             }
+                                             , hso_bndrs     = bndrs }
 
 mkHsImplicitSigType :: LHsType GhcPs -> HsSigType GhcPs
 mkHsImplicitSigType body =
@@ -1245,12 +1243,8 @@ instance (OutputableBndrFlag flag p,
         GhcPs -> ppr imp_tvs
         GhcRn -> ppr imp_tvs
         GhcTc -> ppr imp_tvs
-    ppr (HsOuterExplicit{hso_bndrs = exp_tvs, hso_ximplicit=imp_tvs}) =
+    ppr (HsOuterExplicit{hso_bndrs = exp_tvs}) =
       text "HsOuterExplicit:" <+> ppr exp_tvs
-                              <+> case ghcPass @p of
-                                    GhcPs -> ppr imp_tvs
-                                    GhcRn -> ppr imp_tvs
-                                    GhcTc -> ppr imp_tvs
 
 instance OutputableBndrId p
        => Outputable (HsForAllTelescope (GhcPass p)) where

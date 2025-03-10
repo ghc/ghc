@@ -484,7 +484,6 @@ synifyDataCon use_gadt_syntax dc =
           HsOuterExplicit
             { hso_xexplicit = noExtField
             , hso_bndrs = map synifyTyVarBndr user_tvbndrs
-            , hso_ximplicit = []
             }
 
     -- skip any EqTheta, use 'orig'inal syntax

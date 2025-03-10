@@ -818,7 +818,7 @@ mkGadtDecl loc names dcol ty = do
 
   let bndrs_loc = case outer_bndrs of
         HsOuterImplicit{} -> getLoc ty
-        HsOuterExplicit an _ _ -> EpAnn (entry an) noAnn emptyComments
+        HsOuterExplicit an _ -> EpAnn (entry an) noAnn emptyComments
 
   let l = EpAnn (spanAsAnchor loc) noAnn csa
 

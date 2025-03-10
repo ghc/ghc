@@ -1739,11 +1739,8 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
             HsOuterImplicit{hso_ximplicit = imp_vars} ->
               bindingsOnly $ map (C $ TyVarBind (mkScope outer_bndrs_loc) resScope)
                              imp_vars
-            HsOuterExplicit{hso_bndrs = exp_bndrs,hso_ximplicit = imp_vars} -> do
-              exps <- toHie $ tvScopes resScope NoScope exp_bndrs
-              imps <- bindingsOnly $ map (C $ TyVarBind (mkScope outer_bndrs_loc) resScope)
-                             imp_vars
-              pure $ exps ++ imps
+            HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+              toHie $ tvScopes resScope NoScope exp_bndrs
         , toHie ctx
         , toHie args
         , toHie typ
@@ -1861,10 +1858,7 @@ instance ToHie (TScoped (LocatedA (HsSigType GhcRn))) where
 instance Data flag => ToHie (TVScoped (HsOuterTyVarBndrs flag GhcRn)) where
   toHie (TVS tsc sc bndrs) = case bndrs of
     HsOuterImplicit xs -> bindingsOnly $ map (C $ TyVarBind sc tsc) xs
-    HsOuterExplicit _ xs ys -> do
-      implicits <- bindingsOnly (map (C $ TyVarBind sc tsc) ys)
-      explicits <- toHie (tvScopes tsc sc xs);
-      pure $ implicits ++ explicits
+    HsOuterExplicit _ xs -> toHie $ tvScopes tsc sc xs
 
 toHieForAllTele ::  HsForAllTelescope GhcRn -> SrcSpan -> HieM [HieAST Type]
 toHieForAllTele (HsForAllVis { hsf_vis_bndrs = bndrs }) loc =
