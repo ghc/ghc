@@ -18,7 +18,7 @@ import GHC.Tc.Solver.Rewrite( rewrite, rewriteType )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
-import GHC.Tc.Types.CtLoc( ctLocEnv, ctLocOrigin, setCtLocOrigin )
+import GHC.Tc.Types.CtLoc( ctLocEnv, ctLocOrigin, setCtLocOrigin, CtLoc )
 import GHC.Tc.Types
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
@@ -51,6 +51,7 @@ import GHC.Driver.Session
 import Data.List( deleteFirstsBy )
 
 import Control.Monad
+import Data.Maybe (mapMaybe)
 import qualified Data.Semigroup as S
 import Data.Void( Void )
 
@@ -1181,39 +1182,84 @@ type signature.
 
 -}
 
+-- | Solve a quantified constraint that came from @CNonCanonical@ (which means
+-- that superclasses have not yet been expanded).
+--
+-- Precondition: the constraint has already been rewritten by the inert set.
 solveForAllNC :: CtEvidence -> [TcTyVar] -> TcThetaType -> TcPredType
               -> TcS (StopOrContinue Void)
--- NC: this came from CNonCanonical, so we have not yet expanded superclasses
--- Precondition: already rewritten by inert set
 solveForAllNC ev tvs theta pred
-  | isGiven ev  -- See Note [Eagerly expand given superclasses]
-  , Just (cls, tys) <- cls_pred_tys_maybe
+  | Just (cls,tys) <- getClassPredTys_maybe pred
+  , classHasSCs cls
   = do { dflags <- getDynFlags
-       ; sc_cts <- mkStrictSuperClasses (givensFuel dflags) ev tvs theta cls tys
-       -- givensFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
-       ; emitWork (listToBag sc_cts)
-       ; solveForAll ev tvs theta pred doNotExpand }
-       -- doNotExpand: as we have already (eagerly) expanded superclasses for this class
+       -- Either expand superclasses (Givens) or provide fuel to do so (Wanteds)
+       ; if isGiven ev
+         then
+           -- See Note [Eagerly expand given superclasses]
+           -- givensFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
+           do { sc_cts <- mkStrictSuperClasses (givensFuel dflags) ev tvs theta cls tys
+              ; emitWork (listToBag sc_cts)
+              ; solveForAll ev tvs theta pred doNotExpand }
+         else
+           -- See invariants (a) and (b) in QCI.qci_pend_sc
+           -- qcsFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
+           -- See Note [Quantified constraints]
+           do { solveForAll ev tvs theta pred (qcsFuel dflags) }
+       }
 
   | otherwise
-  = do { dflags <- getDynFlags
-       ; let fuel | Just (cls, _) <- cls_pred_tys_maybe
-                  , classHasSCs cls = qcsFuel dflags
-                  -- See invariants (a) and (b) in QCI.qci_pend_sc
-                  -- qcsFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
-                  -- See Note [Quantified constraints]
-                  | otherwise = doNotExpand
-       ; solveForAll ev tvs theta pred fuel }
-  where
-    cls_pred_tys_maybe = getClassPredTys_maybe pred
+  = solveForAll ev tvs theta pred doNotExpand
 
+-- | Solve a canonical quantified constraint.
+--
+-- Precondition: the constraint has already been rewritten by the inert set.
 solveForAll :: CtEvidence -> [TcTyVar] -> TcThetaType -> PredType -> ExpansionFuel
             -> TcS (StopOrContinue Void)
--- Precondition: already rewritten by inert set
-solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_loc = loc })
-            tvs theta pred _fuel
-  = -- See Note [Solving a Wanted forall-constraint]
-    TcS.setSrcSpan (getCtLocEnvLoc $ ctLocEnv loc) $
+solveForAll ev tvs theta pred fuel =
+  case ev of
+    CtGiven {} ->
+      -- See Note [Solving a Given forall-constraint]
+      do { addInertForAll qci
+         ; stopWith ev "Given forall-constraint" }
+    CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_loc = loc } ->
+      -- See Note [Solving a Wanted forall-constraint]
+      runSolverStage $
+      do { tryInertQCs qci
+         ; simpleStage $ solveWantedForAll_implic dest rewriters loc tvs theta pred
+         ; stopWithStage ev "Wanted forall-constraint (implication)"
+         }
+  where
+    qci = QCI { qci_ev = ev, qci_tvs = tvs
+              , qci_pred = pred, qci_pend_sc = fuel }
+
+
+tryInertQCs :: QCInst -> SolverStage ()
+tryInertQCs qc
+  = Stage $
+    do { inerts <- getInertCans
+       ; try_inert_qcs qc (inert_insts inerts) }
+
+try_inert_qcs :: QCInst -> [QCInst] -> TcS (StopOrContinue ())
+try_inert_qcs (QCI { qci_ev = ev_w }) inerts =
+  case mapMaybe matching_inert inerts of
+    [] -> continueWith ()
+    ev_i:_ ->
+      do { traceTcS "tryInertQCs:KeepInert" (ppr ev_i)
+         ; setEvBindIfWanted ev_w EvCanonical (ctEvTerm ev_i)
+         ; stopWith ev_w "Solved Wanted forall-constraint from inert" }
+  where
+    matching_inert (QCI { qci_ev = ev_i })
+      | ctEvPred ev_i `tcEqType` ctEvPred ev_w
+      = Just ev_i
+      | otherwise
+      = Nothing
+
+-- | Solve a (canonical) Wanted quantified constraint by emitting an implication.
+--
+-- See Note [Solving a Wanted forall-constraint]
+solveWantedForAll_implic :: TcEvDest -> RewriterSet -> CtLoc -> [TcTyVar] -> TcThetaType -> PredType -> TcS ()
+solveWantedForAll_implic dest rewriters loc tvs theta pred
+  = TcS.setSrcSpan (getCtLocEnvLoc $ ctLocEnv loc) $
     -- This setSrcSpan is important: the emitImplicationTcS uses that
     -- TcLclEnv for the implication, and that in turn sets the location
     -- for the Givens when solving the constraint (#21006)
@@ -1248,8 +1294,7 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
       ; setWantedEvTerm dest EvCanonical $
         EvFun { et_tvs = skol_tvs, et_given = given_ev_vars
               , et_binds = ev_binds, et_body = w_id }
-
-      ; stopWith ev "Wanted forall-constraint" }
+      }
   where
     -- Getting the size of the head is a bit horrible
     -- because of the special treament for class predicates
@@ -1257,24 +1302,23 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
                       ClassPred cls tys -> pSizeClassPred cls tys
                       _                 -> pSizeType pred
 
- -- See Note [Solving a Given forall-constraint]
-solveForAll ev@(CtGiven {}) tvs _theta pred fuel
-  = do { addInertForAll qci
-       ; stopWith ev "Given forall-constraint" }
-  where
-    qci = QCI { qci_ev = ev, qci_tvs = tvs
-              , qci_pred = pred, qci_pend_sc = fuel }
-
 {- Note [Solving a Wanted forall-constraint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Solving a wanted forall (quantified) constraint
-  [W] df :: forall ab. (Eq a, Ord b) => C x a b
+  [W] df :: forall a b. (Eq a, Ord b) => C x a b
 is delightfully easy.   Just build an implication constraint
     forall ab. (g1::Eq a, g2::Ord b) => [W] d :: C x a
 and discharge df thus:
     df = /\ab. \g1 g2. let <binds> in d
 where <binds> is filled in by solving the implication constraint.
 All the machinery is to hand; there is little to do.
+
+We can take a more straightforward parth when there is a matching Given, e.g.
+  [W] dg :: forall c d. (Eq c, Ord d) => C x c d
+In this case, it's better to directly solve the Wanted from the Given, instead
+of building an implication. This is more than a simple optimisation; see
+Note [Solving Wanted QCs from Given QCs].
+
 
 The tricky point is about termination: see #19690.  We want to maintain
 the invariant (QC-INV):
@@ -1301,6 +1345,39 @@ we just add it to TcS's local InstEnv of known instances,
 via addInertForall.  Then, if we look up (C x Int Bool), say,
 we'll find a match in the InstEnv.
 
+Note [Solving Wanted QCs from Given QCs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we are about to solve a Wanted quantified constraint, and there is a
+Given quantified constraint with the same type, we should directly solve the
+Wanted from the Given (instead of building an implication).
+
+Not only is this more direct and efficient, sometimes it is also /necessary/.
+Consider:
+
+  f :: forall a k. (Eq a, forall x. Eq x => Eq k x) => a -> blah
+  {-# SPECIALISE (f :: forall k. (forall x. Eq x => Eq k x) => Int -> blah #-}
+
+Here we specialise the `a` parameter to `f`, leaving the quantified constraint
+untouched.  We want to get a rule like:
+
+  RULE  forall @k (d :: forall x. Eq x => Eq k x).
+            f @Int @k d = $sf @k d
+
+But when we typecheck that expression-with-a-type-signature, if we don't solve
+Wanted forall constraints directly, we will do so indirectly and end up with
+this as the LHS of the RULE:
+
+  (/\k \(df::forall x.Eq x => Eq k x). f @Int @k (/\x \(d:Eq x). df @x d))
+     @kk dd
+
+We run the simple optimiser on that, which eliminates the beta-redex. However,
+it may not eta-reduce that `/\x \(d:Eq x)...`, because we are cautious about
+eta-reduction. So we may be left with an over-complicated and hard-to-match
+RULE LHS. It's all a bit silly, because the implication constraint is /identical/;
+we just need to spot it.
+
+This came up while implementing GHC proposal 493 (allowing expresions in
+SPECIALISE pragmas).
 
 ************************************************************************
 *                                                                      *
