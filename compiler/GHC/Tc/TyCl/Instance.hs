@@ -92,7 +92,6 @@ import Control.Monad
 import Data.Tuple
 import GHC.Data.Maybe
 import Data.List( mapAccumL )
-import GHC.Core.TyCo.Ppr (pprTyVars)
 
 
 {-
@@ -969,6 +968,7 @@ tcDataFamInstDecl is processing a non-associated data family instance, this
 TyVarEnv will simply be empty, and there is nothing to worry about.
 -}
 
+
 -----------------------
 tcDataFamInstHeader
     :: AssocInstInfo -> SkolemInfo -> TyCon -> HsOuterFamEqnTyVarBndrs GhcRn
@@ -1017,37 +1017,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                            , lhs_applied_kind
                            , res_kind ) }
 
-       -- This code (and the stuff immediately above) is very similar
-       -- to that in tcTyFamInstEqnGuts.  Maybe we should abstract the
-       -- common code; but for the moment I concluded that it's
-       -- clearer to duplicate it.  Still, if you fix a bug here,
-       -- check there too!
-
-       -- See Note [Type variables in type families instance decl]
-       ; let outer_tvs = (outerTyVars outer_bndrs)
-       ; checkFamTelescope tclvl hs_outer_bndrs outer_tvs
-       ; outer_tvs <- liftZonkM $ zonkTcTyVarsToTcTyVarsMaybe $ outer_tvs ++ wcs
-
-       -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
-       ; (dvs, cqdvs)  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
-       ; qtvs <- quantifyTyVarsWithBinders cqdvs skol_info dvs
-                 -- Have to make a same defaulting choice for reuslt kind here
-                 -- and the `kindGeneralizeAll` in `tcConDecl`.
-                 -- see (GT4) in
-                 -- GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
-
-       ; let final_tvs = scopedSort qtvs
-       ; traceTc "tcDataFamInstHeader 1" $
-          vcat [
-            text "skol_info:" <+> ppr skol_info,
-            text "outer_tvs:" <+> pprTyVars outer_tvs,
-            text "dvs:" <+> ppr dvs,
-            text "wcs:" <+> ppr wcs,
-            text "final_tvs:" <+> ppr final_tvs
-            ]
-             -- This scopedSort is important: the qtvs may be /interleaved/ with
-             -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
-       ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
+       ; (final_tvs, qtvs) <- tcFamInsLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted
 
        ; (final_tvs, non_user_tvs, lhs_ty, master_res_kind, instance_res_kind, stupid_theta) <-
           liftZonkM $ do

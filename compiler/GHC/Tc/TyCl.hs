@@ -21,7 +21,7 @@ module GHC.Tc.TyCl (
         tcFamTyPats, tcTyFamInstEqn,
         tcAddOpenTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
         unravelFamInstPats, addConsistencyConstraints,
-        checkFamTelescope
+        checkFamTelescope, tcFamInsLHSBinders
     ) where
 
 import GHC.Prelude
@@ -39,7 +39,7 @@ import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Unify( unifyType, emitResidualTvConstraint )
-import GHC.Tc.Types.Constraint( emptyWC )
+import GHC.Tc.Types.Constraint( emptyWC, WantedConstraints )
 import GHC.Tc.Validity
 import GHC.Tc.Zonk.Type
 import GHC.Tc.Zonk.TcType
@@ -247,6 +247,51 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
                 { tcg_ksigs = tcg_ksigs gbl_env' `unionNameSet` kindless }
        ; return (gbl_env'', inst_info, deriv_info,
                  th_bndrs' `plusNameEnv` th_bndrs) }
+
+
+-- tcFamInsLHSBinders :: FamEqn TyVar Name -> TcM [TyVar]
+tcFamInsLHSBinders :: TcLevel -> SkolemInfo -> HsOuterFamEqnTyVarBndrs GhcTc -> HsOuterFamEqnTyVarBndrs GhcRn
+  -> [TcTyVar] -> Type -> WantedConstraints -> IOEnv (Env TcGblEnv TcLclEnv) ([TyCoVar], [TcTyVar])
+tcFamInsLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted = do
+       -- This code (and the stuff immediately above) is very similar
+       -- to that in tcTyFamInstEqnGuts.  Maybe we should abstract the
+       -- common code; but for the moment I concluded that it's
+       -- clearer to duplicate it.  Still, if you fix a bug here,
+       -- check there too!
+
+       -- See Note [Type variables in type families instance decl]
+       ; let outer_exp_tvs = scopedSort $ expliciteOuterTyVars outer_bndrs
+       ; let outer_imp_tvs = impliciteOuterTyVars outer_bndrs
+       ; checkFamTelescope tclvl hs_outer_bndrs outer_exp_tvs
+       ; outer_imp_wc_tvs <- liftZonkM $ zonkTcTyVarsToTcTyVarsMaybe $ outer_imp_tvs ++ wcs
+       -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
+       ; (dvs, cqdvs)  <- candidateQTyVarsWithBinders (outer_imp_wc_tvs ++ outer_exp_tvs) lhs_ty
+       ; qtvs <- quantifyTyVarsWithBinders cqdvs skol_info dvs
+                 -- Have to make a same defaulting choice for reuslt kind here
+                 -- and the `kindGeneralizeAll` in `tcConDecl`.
+                 -- see (GT4) in
+                 -- GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
+
+       ; let final_tvs = scopedSort (qtvs ++ outer_exp_tvs)
+
+       ; traceTc "tcFamInsLHSBinders" $
+         vcat [
+          -- ppr fam_tc
+              text "lhs_ty:"    <+> ppr lhs_ty
+              , text "final_tvs:" <+> pprTyVars final_tvs
+              , text "outer_imp_tvs:" <+> pprTyVars outer_imp_tvs
+              , text "outer_exp_tvs:" <+> pprTyVars outer_exp_tvs
+              , text "wcs:" <+> pprTyVars wcs
+              , text "outer_imp_wc_tvs:" <+> pprTyVars outer_imp_wc_tvs
+              , text "outer_bndrs:" <+> ppr outer_bndrs
+              , text "qtvs:"      <+> pprTyVars qtvs
+              , text "cqdvs:"    <+> pprTyVars cqdvs
+              , text "dvs:"       <+> ppr dvs
+              ]
+             -- This scopedSort is important: the qtvs may be /interleaved/ with
+             -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
+       ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
+       return (final_tvs, qtvs)
 
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind
@@ -3439,37 +3484,8 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
 
        ; traceTc "tcTyFamInstEqnGuts 0" (ppr outer_bndrs $$ ppr skol_info)
 
-       -- See Note [Type variables in type families instance decl]
-       ; let outer_tvs = (outerTyVars outer_bndrs)
-       ; checkFamTelescope tclvl outer_hs_bndrs outer_tvs
-       ; outer_tvs <- liftZonkM $ zonkTcTyVarsToTcTyVarsMaybe $ outer_tvs ++ wcs
-
-       ; traceTc "tcTyFamInstEqnGuts 1" (
-          vcat [
-            text "wildcards" <+> ppr wcs,
-            text "outer_tvs" <+> pprTyVars outer_tvs,
-            ppr skol_info
-          ]
-          )
-
-       -- This code (and the stuff immediately above) is very similar
-       -- to that in tcDataFamInstHeader.  Maybe we should abstract the
-       -- common code; but for the moment I concluded that it's
-       -- clearer to duplicate it.  Still, if you fix a bug here,
-       -- check there too!
-
-       -- See Note [Generalising in tcTyFamInstEqnGuts]
-       ; (dvs, cqdvs)  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
-       ; qtvs <- quantifyTyVarsWithBinders cqdvs skol_info dvs
-       ; let final_tvs = scopedSort qtvs
-             -- This scopedSort is important: the qtvs may be /interleaved/ with
-             -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
-       ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
-
-       ; traceTc "tcTyFamInstEqnGuts 2" $
-         vcat [ ppr fam_tc
-              , text "lhs_ty:"    <+> ppr lhs_ty
-              , text "final_tvs:" <+> pprTyVars final_tvs ]
+      --  -- See Note [Type variables in type families instance decl]
+       ; (final_tvs, qtvs) <- tcFamInsLHSBinders tclvl skol_info outer_bndrs outer_hs_bndrs wcs lhs_ty wanted
 
        -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
        -- Example: typecheck/should_fail/T17301
@@ -3509,7 +3525,7 @@ checkFamTelescope tclvl hs_outer_bndrs outer_tvs
   , let b_last    = last bndrs
   = do { skol_info <- mkSkolemInfo (ForAllSkol $ HsTyVarBndrsRn (map unLoc bndrs))
        ; setSrcSpan (combineSrcSpans (getLocA b_first) (getLocA b_last)) $ do
-         emitResidualTvConstraint skol_info (scopedSort outer_tvs) tclvl emptyWC }
+         emitResidualTvConstraint skol_info outer_tvs tclvl emptyWC }
   | otherwise
   = return ()
 

@@ -72,7 +72,7 @@ module GHC.Tc.Gen.HsType (
         HoleMode(..),
 
         -- Utils
-        tyLitFromLit, tyLitFromOverloadedLit,
+        tyLitFromLit, tyLitFromOverloadedLit, expliciteOuterTyVars, impliciteOuterTyVars,
 
    ) where
 
@@ -3280,6 +3280,19 @@ outerTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
 -- at least for the HsOuterImplicit case
 outerTyVars (HsOuterImplicit { hso_ximplicit = tvs })  = tvs
 outerTyVars (HsOuterExplicit { hso_xexplicit = tvbs }) = binderVars tvbs
+
+expliciteOuterTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
+-- The returned [TcTyVar] is not necessarily in dependency order
+-- at least for the HsOuterImplicit case
+expliciteOuterTyVars (HsOuterImplicit {})  = []
+expliciteOuterTyVars (HsOuterExplicit { hso_xexplicit = tvbs }) = binderVars tvbs
+
+impliciteOuterTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
+-- The returned [TcTyVar] is not necessarily in dependency order
+impliciteOuterTyVars (HsOuterImplicit { hso_ximplicit = tvs })  = tvs
+impliciteOuterTyVars (HsOuterExplicit {}) = []
+
+
 
 ---------------
 outerTyVarBndrs :: HsOuterTyVarBndrs Specificity GhcTc -> [InvisTVBinder]
