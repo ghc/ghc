@@ -1133,7 +1133,27 @@ bindHsOuterTyVarBndrs' bind_fam doc mb_cls implicit_vars outer_bndrs thing_insid
             -- BindFam -> filterFreeVarsToBind (mapMaybe hsLTyVarLocName exp_bndrs) implicit_vars
             BindFam -> []
             NotBindFam -> []
+{- Note [Vars Bindings of Type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The current behaviours:
+* In rename phase, All user written type variables are in binders except for whitecard binders.
+* In typecheck phase, user written type variables are treated as skolems hence skip defaulting and quantification.
+  wildcard binders are given TauVars and treated as same as inferred kind variables.
 
+Design:
+1. For whitecard binders and other user written type variables, allows them to arbitrary unify with other types.
+But skip defaulting and only do quantification.
+Plan to implement this:
+* In rename phase, collect also wildcard binders and other user written type variables.
+* Give them TauVars in typecheck phase, skip defaulting, do quantification along with other inffered type variables.
+
+2. Most liberal way.
+Plan to implement this:
+* In rename phase, collect user written type variables.
+* Give them TauVars in typecheck phase, do defaulting and quantification along with other inffered type variables.
+
+
+-}
 -- See Note [Term variable capture and implicit quantification]
 warn_term_var_capture :: LocatedN RdrName -> RnM ()
 warn_term_var_capture lVar = do

@@ -92,6 +92,7 @@ import Control.Monad
 import Data.Tuple
 import GHC.Data.Maybe
 import Data.List( mapAccumL )
+import GHC.Core.TyCo.Ppr (pprTyVars)
 
 
 {-
@@ -977,6 +978,12 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
        -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
        ; dvs  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
        ; qtvs <- quantifyTyVars' outer_tvs skol_info dvs
+       ; traceTc "tcDataFamInstHeader 1" $
+          vcat [
+            text "skol_info:" <+> ppr skol_info,
+            text "outer_tvs:" <+> pprTyVars outer_tvs,
+            text "dvs:" <+> ppr dvs
+            ]
                  -- Have to make a same defaulting choice for reuslt kind here
                  -- and the `kindGeneralizeAll` in `tcConDecl`.
                  -- see (GT4) in
