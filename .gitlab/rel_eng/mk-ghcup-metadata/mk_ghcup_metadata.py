@@ -43,9 +43,8 @@ import json
 import urllib.parse
 import fetch_gitlab
 
-def eprint(*args, **kwargs):
+def eprint(*args, **kwargs) -> None:
     print(*args, file=sys.stderr, **kwargs)
-
 
 gl = gitlab.Gitlab('https://gitlab.haskell.org', per_page=100)
 
@@ -60,6 +59,10 @@ with open(metadata_file, 'r') as f:
 
 eprint(f"Supported platforms: {job_mapping.keys()}")
 
+# Mapping from job name to its corresponding Job
+JobMap = Dict[str, gitlab.Job]
+
+GhcupDist = object
 
 # Artifact precisely specifies a job what the bindist to download is called.
 class Artifact(NamedTuple):
@@ -86,32 +89,32 @@ test_artifact = Artifact('source-tarball'
                         , 'ghc-{version}/testsuite'
                         , 'ghc{version}-testsuite')
 
-def debian(n, arch='x86_64'):
-    return linux_platform(arch, "{arch}-linux-deb{n}".format(arch=arch, n=n))
-
-def darwin(arch):
+def darwin(arch: str) -> PlatformSpec:
     return PlatformSpec ( '{arch}-darwin'.format(arch=arch)
                         , 'ghc-{version}-{arch}-apple-darwin'.format(arch=arch, version="{version}") )
 
 windowsArtifact = PlatformSpec ( 'x86_64-windows'
                                , 'ghc-{version}-x86_64-unknown-mingw32' )
 
-def centos(n, arch='x86_64'):
+def debian(n: int, arch: str='x86_64') -> PlatformSpec:
+    return linux_platform(arch, "{arch}-linux-deb{n}".format(arch=arch, n=n))
+
+def centos(n: int, arch='x86_64') -> PlatformSpec:
     return linux_platform(arch, "{arch}-linux-centos{n}".format(n=n,arch=arch))
 
-def fedora(n, arch='x86_64'):
+def fedora(n: int, arch='x86_64') -> PlatformSpec:
     return linux_platform(arch, "{arch}-linux-fedora{n}".format(n=n,arch=arch))
 
-def alpine(n, arch='x86_64'):
+def alpine(n: str, arch='x86_64') -> PlatformSpec:
     return linux_platform(arch, "{arch}-linux-alpine{n}".format(n=n,arch=arch))
 
-def rocky(n, arch='x86_64'):
+def rocky(n: int, arch='x86_64') -> PlatformSpec:
     return linux_platform(arch, "{arch}-linux-rocky{n}".format(n=n,arch=arch))
 
-def ubuntu(n, arch='x86_64'):
+def ubuntu(n: str, arch='x86_64') -> PlatformSpec:
     return linux_platform(arch, "{arch}-linux-ubuntu{n}".format(n=n,arch=arch))
 
-def linux_platform(arch, opsys):
+def linux_platform(arch: str, opsys: str) -> PlatformSpec:
     return PlatformSpec( opsys, 'ghc-{version}-{arch}-unknown-linux'.format(version="{version}", arch=arch) )
 
 
@@ -135,10 +138,10 @@ def download_and_hash(url):
     hash_cache[url] = digest
     return digest
 
-uri_to_anchor_cache=dict()
+uri_to_anchor_cache = {} # type: Dict[str, str]
 
 # Make the metadata for one platform.
-def mk_one_metadata(release_mode, version, job_map, artifact):
+def mk_one_metadata(release_mode: bool, version: str, job_map: JobMap, artifact: Artifact) -> GhcupDist:
     job_id = job_map[artifact.job_name].id
 
     url = base_url.format(job_id=job_id, artifact_name=urllib.parse.quote_plus(artifact.download_name.format(version=version)))
@@ -181,7 +184,7 @@ def mk_one_metadata(release_mode, version, job_map, artifact):
 
 # Turns a platform into an Artifact respecting pipeline_type
 # Looks up the right job to use from the .gitlab/jobs-metadata.json file
-def mk_from_platform(pipeline_type, platform):
+def mk_from_platform(pipeline_type: str, platform: PlatformSpec) -> Artifact:
     info = job_mapping[platform.name][pipeline_type]
     eprint(f"From {platform.name} / {pipeline_type} selecting {info['name']}")
     return Artifact(info['name']
@@ -192,7 +195,7 @@ def mk_from_platform(pipeline_type, platform):
 
 
 # Generate the new metadata for a specific GHC mode etc
-def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
+def mk_new_yaml(release_mode: bool, version: str, date: str, pipeline_type, job_map: JobMap) -> object:
     def mk(platform):
         eprint("\n=== " + platform.name + " " + ('=' * (75 - len(platform.name))))
         return mk_one_metadata(release_mode, version, job_map, mk_from_platform(pipeline_type, platform))
@@ -201,7 +204,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     ubuntu1804 = mk(ubuntu("18_04"))
     ubuntu2004 = mk(ubuntu("20_04"))
     ubuntu2204 = mk(ubuntu("22_04"))
-    rocky8 = mk(rocky("8"))
+    rocky8 = mk(rocky(8))
     centos7 = mk(centos(7))
     fedora33 = mk(fedora(33))
     darwin_x86 = mk(darwin("x86_64"))
@@ -301,14 +304,14 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
         }
 
 
-def setNightlyTags(ghcup_metadata):
+def setNightlyTags(ghcup_metadata: dict) -> None:
     for version in ghcup_metadata['ghcupDownloads']['GHC']:
         if "LatestNightly" in ghcup_metadata['ghcupDownloads']['GHC'][version]["viTags"]:
             ghcup_metadata['ghcupDownloads']['GHC'][version]["viTags"].remove("LatestNightly")
             ghcup_metadata['ghcupDownloads']['GHC'][version]["viTags"].append("Nightly")
 
 
-def mk_dumper(version):
+def mk_dumper(version: str) -> yaml.Dumper:
   class CustomAliasDumper(yaml.Dumper):
       def __init__(self, *args, **kwargs):
           super().__init__(*args, **kwargs)
