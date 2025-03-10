@@ -5121,7 +5121,7 @@ module GHC.Conc where
   threadWaitReadSTM :: GHC.Internal.System.Posix.Types.Fd -> GHC.Internal.Types.IO (STM (), GHC.Internal.Types.IO ())
   threadWaitWrite :: GHC.Internal.System.Posix.Types.Fd -> GHC.Internal.Types.IO ()
   threadWaitWriteSTM :: GHC.Internal.System.Posix.Types.Fd -> GHC.Internal.Types.IO (STM (), GHC.Internal.Types.IO ())
-  throwSTM :: forall e a. GHC.Internal.Exception.Type.Exception e => e -> STM a
+  throwSTM :: forall e a. (GHC.Internal.Stack.Types.HasCallStack, GHC.Internal.Exception.Type.Exception e) => e -> STM a
   throwTo :: forall e. GHC.Internal.Exception.Type.Exception e => ThreadId -> e -> GHC.Internal.Types.IO ()
   toWin32ConsoleEvent :: forall a. (GHC.Internal.Classes.Eq a, GHC.Internal.Num.Num a) => a -> GHC.Internal.Maybe.Maybe ConsoleEvent
   unsafeIOToSTM :: forall a. GHC.Internal.Types.IO a -> STM a
@@ -5213,7 +5213,7 @@ module GHC.Conc.Sync where
   threadCapability :: ThreadId -> GHC.Internal.Types.IO (GHC.Internal.Types.Int, GHC.Internal.Types.Bool)
   threadLabel :: ThreadId -> GHC.Internal.Types.IO (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
   threadStatus :: ThreadId -> GHC.Internal.Types.IO ThreadStatus
-  throwSTM :: forall e a. GHC.Internal.Exception.Type.Exception e => e -> STM a
+  throwSTM :: forall e a. (GHC.Internal.Stack.Types.HasCallStack, GHC.Internal.Exception.Type.Exception e) => e -> STM a
   throwTo :: forall e. GHC.Internal.Exception.Type.Exception e => ThreadId -> e -> GHC.Internal.Types.IO ()
   unsafeIOToSTM :: forall a. GHC.Internal.Types.IO a -> STM a
   withMVar :: forall a b. GHC.Internal.MVar.MVar a -> (a -> GHC.Internal.Types.IO b) -> GHC.Internal.Types.IO b
