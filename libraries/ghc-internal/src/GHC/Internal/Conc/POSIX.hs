@@ -56,6 +56,7 @@ import GHC.Internal.MVar
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Ptr
 import GHC.Internal.Real (div, fromIntegral)
+import GHC.Internal.STM (TVar, atomically, newTVar, writeTVar)
 import GHC.Internal.Word (Word32, Word64)
 import GHC.Internal.Windows
 

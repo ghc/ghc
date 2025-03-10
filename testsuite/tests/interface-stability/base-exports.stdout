@@ -146,9 +146,9 @@ module Control.Concurrent where
   threadCapability :: ThreadId -> GHC.Internal.Types.IO (GHC.Internal.Types.Int, GHC.Internal.Types.Bool)
   threadDelay :: GHC.Internal.Types.Int -> GHC.Internal.Types.IO ()
   threadWaitRead :: GHC.Internal.System.Posix.Types.Fd -> GHC.Internal.Types.IO ()
-  threadWaitReadSTM :: GHC.Internal.System.Posix.Types.Fd -> GHC.Internal.Types.IO (GHC.Internal.Conc.Sync.STM (), GHC.Internal.Types.IO ())
+  threadWaitReadSTM :: GHC.Internal.System.Posix.Types.Fd -> GHC.Internal.Types.IO (GHC.Internal.STM.STM (), GHC.Internal.Types.IO ())
   threadWaitWrite :: GHC.Internal.System.Posix.Types.Fd -> GHC.Internal.Types.IO ()
-  threadWaitWriteSTM :: GHC.Internal.System.Posix.Types.Fd -> GHC.Internal.Types.IO (GHC.Internal.Conc.Sync.STM (), GHC.Internal.Types.IO ())
+  threadWaitWriteSTM :: GHC.Internal.System.Posix.Types.Fd -> GHC.Internal.Types.IO (GHC.Internal.STM.STM (), GHC.Internal.Types.IO ())
   throwTo :: forall e. GHC.Internal.Exception.Type.Exception e => ThreadId -> e -> GHC.Internal.Types.IO ()
   tryPutMVar :: forall a. MVar a -> a -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
   tryReadMVar :: forall a. MVar a -> GHC.Internal.Types.IO (GHC.Internal.Maybe.Maybe a)
@@ -11117,12 +11117,12 @@ instance GHC.Internal.Base.Alternative GHC.Internal.Maybe.Maybe -- Defined in �
 instance GHC.Internal.Base.Alternative GHC.Internal.Functor.ZipList.ZipList -- Defined in ‘GHC.Internal.Functor.ZipList’
 instance forall (a :: * -> * -> *). GHC.Internal.Control.Arrow.ArrowPlus a => GHC.Internal.Base.Alternative (GHC.Internal.Control.Arrow.ArrowMonad a) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance forall (m :: * -> *) a. GHC.Internal.Base.Alternative m => GHC.Internal.Base.Alternative (GHC.Internal.Control.Arrow.Kleisli m a) -- Defined in ‘GHC.Internal.Control.Arrow’
-instance GHC.Internal.Base.Alternative GHC.Internal.Conc.Sync.STM -- Defined in ‘GHC.Internal.Conc.Sync’
 instance GHC.Internal.Base.Alternative GHC.Internal.Data.Proxy.Proxy -- Defined in ‘GHC.Internal.Data.Proxy’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Alternative f, GHC.Internal.Base.Applicative g) => GHC.Internal.Base.Alternative (Data.Functor.Compose.Compose f g) -- Defined in ‘Data.Functor.Compose’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Alternative f, GHC.Internal.Base.Alternative g) => GHC.Internal.Base.Alternative (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
 instance forall (f :: * -> *). GHC.Internal.Base.Alternative f => GHC.Internal.Base.Alternative (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall (f :: * -> *). GHC.Internal.Base.Alternative f => GHC.Internal.Base.Alternative (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Data.Monoid’
+instance GHC.Internal.Base.Alternative GHC.Internal.STM.STM -- Defined in ‘GHC.Internal.STM’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Alternative f, GHC.Internal.Base.Alternative g) => GHC.Internal.Base.Alternative (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Alternative f, GHC.Internal.Base.Applicative g) => GHC.Internal.Base.Alternative (f GHC.Internal.Generics.:.: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *). (GHC.Internal.Generics.Generic1 f, GHC.Internal.Base.Alternative (GHC.Internal.Generics.Rep1 f)) => GHC.Internal.Base.Alternative (GHC.Internal.Generics.Generically1 f) -- Defined in ‘GHC.Internal.Generics’
@@ -11146,7 +11146,6 @@ instance forall m. GHC.Internal.Base.Monoid m => GHC.Internal.Base.Applicative (
 instance GHC.Internal.Base.Applicative GHC.Internal.Functor.ZipList.ZipList -- Defined in ‘GHC.Internal.Functor.ZipList’
 instance forall (a :: * -> * -> *). GHC.Internal.Control.Arrow.Arrow a => GHC.Internal.Base.Applicative (GHC.Internal.Control.Arrow.ArrowMonad a) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance forall (m :: * -> *) a. GHC.Internal.Base.Applicative m => GHC.Internal.Base.Applicative (GHC.Internal.Control.Arrow.Kleisli m a) -- Defined in ‘GHC.Internal.Control.Arrow’
-instance GHC.Internal.Base.Applicative GHC.Internal.Conc.Sync.STM -- Defined in ‘GHC.Internal.Conc.Sync’
 instance forall s. GHC.Internal.Base.Applicative (GHC.Internal.ST.ST s) -- Defined in ‘GHC.Internal.ST’
 instance forall s. GHC.Internal.Base.Applicative (GHC.Internal.Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘GHC.Internal.Control.Monad.ST.Lazy.Imp’
 instance GHC.Internal.Base.Applicative Data.Complex.Complex -- Defined in ‘Data.Complex’
@@ -11168,6 +11167,7 @@ instance GHC.Internal.Base.Applicative Data.Semigroup.First -- Defined in ‘Dat
 instance GHC.Internal.Base.Applicative Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Applicative Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Applicative Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
+instance GHC.Internal.Base.Applicative GHC.Internal.STM.STM -- Defined in ‘GHC.Internal.STM’
 instance GHC.Internal.Base.Applicative GHC.Internal.GHCi.NoIO -- Defined in ‘GHC.Internal.GHCi’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Applicative f, GHC.Internal.Base.Applicative g) => GHC.Internal.Base.Applicative (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Applicative f, GHC.Internal.Base.Applicative g) => GHC.Internal.Base.Applicative (f GHC.Internal.Generics.:.: g) -- Defined in ‘GHC.Internal.Generics’
@@ -11197,7 +11197,6 @@ instance forall m. GHC.Internal.Base.Functor (GHC.Internal.Data.Functor.Const.Co
 instance GHC.Internal.Base.Functor GHC.Internal.Functor.ZipList.ZipList -- Defined in ‘GHC.Internal.Functor.ZipList’
 instance forall (a :: * -> * -> *). GHC.Internal.Control.Arrow.Arrow a => GHC.Internal.Base.Functor (GHC.Internal.Control.Arrow.ArrowMonad a) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance forall (m :: * -> *) a. GHC.Internal.Base.Functor m => GHC.Internal.Base.Functor (GHC.Internal.Control.Arrow.Kleisli m a) -- Defined in ‘GHC.Internal.Control.Arrow’
-instance GHC.Internal.Base.Functor GHC.Internal.Conc.Sync.STM -- Defined in ‘GHC.Internal.Conc.Sync’
 instance GHC.Internal.Base.Functor GHC.Internal.Control.Exception.Handler -- Defined in ‘GHC.Internal.Control.Exception’
 instance forall s. GHC.Internal.Base.Functor (GHC.Internal.ST.ST s) -- Defined in ‘GHC.Internal.ST’
 instance forall s. GHC.Internal.Base.Functor (GHC.Internal.Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘GHC.Internal.Control.Monad.ST.Lazy.Imp’
@@ -11223,6 +11222,7 @@ instance GHC.Internal.Base.Functor Data.Semigroup.Last -- Defined in ‘Data.Sem
 instance GHC.Internal.Base.Functor Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Functor Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
 instance forall i. GHC.Internal.Base.Functor (GHC.Internal.Arr.Array i) -- Defined in ‘GHC.Internal.Arr’
+instance GHC.Internal.Base.Functor GHC.Internal.STM.STM -- Defined in ‘GHC.Internal.STM’
 instance GHC.Internal.Base.Functor GHC.Internal.GHCi.NoIO -- Defined in ‘GHC.Internal.GHCi’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Functor f, GHC.Internal.Base.Functor g) => GHC.Internal.Base.Functor (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Functor f, GHC.Internal.Base.Functor g) => GHC.Internal.Base.Functor (f GHC.Internal.Generics.:+: g) -- Defined in ‘GHC.Internal.Generics’
@@ -11257,7 +11257,6 @@ instance forall a b. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b) =>
 instance forall a b c. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b, GHC.Internal.Base.Monoid c) => GHC.Internal.Base.Monad ((,,,) a b c) -- Defined in ‘GHC.Internal.Base’
 instance forall (a :: * -> * -> *). GHC.Internal.Control.Arrow.ArrowApply a => GHC.Internal.Base.Monad (GHC.Internal.Control.Arrow.ArrowMonad a) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance forall (m :: * -> *) a. GHC.Internal.Base.Monad m => GHC.Internal.Base.Monad (GHC.Internal.Control.Arrow.Kleisli m a) -- Defined in ‘GHC.Internal.Control.Arrow’
-instance GHC.Internal.Base.Monad GHC.Internal.Conc.Sync.STM -- Defined in ‘GHC.Internal.Conc.Sync’
 instance forall s. GHC.Internal.Base.Monad (GHC.Internal.ST.ST s) -- Defined in ‘GHC.Internal.ST’
 instance forall s. GHC.Internal.Base.Monad (GHC.Internal.Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘GHC.Internal.Control.Monad.ST.Lazy.Imp’
 instance GHC.Internal.Base.Monad Data.Complex.Complex -- Defined in ‘Data.Complex’
@@ -11278,6 +11277,7 @@ instance GHC.Internal.Base.Monad Data.Semigroup.First -- Defined in ‘Data.Semi
 instance GHC.Internal.Base.Monad Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Monad Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Monad Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
+instance GHC.Internal.Base.Monad GHC.Internal.STM.STM -- Defined in ‘GHC.Internal.STM’
 instance GHC.Internal.Base.Monad GHC.Internal.GHCi.NoIO -- Defined in ‘GHC.Internal.GHCi’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Monad f, GHC.Internal.Base.Monad g) => GHC.Internal.Base.Monad (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *) i (c :: GHC.Internal.Generics.Meta). GHC.Internal.Base.Monad f => GHC.Internal.Base.Monad (GHC.Internal.Generics.M1 i c f) -- Defined in ‘GHC.Internal.Generics’
@@ -11292,11 +11292,11 @@ instance GHC.Internal.Base.MonadPlus [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.MonadPlus GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
 instance forall (a :: * -> * -> *). (GHC.Internal.Control.Arrow.ArrowApply a, GHC.Internal.Control.Arrow.ArrowPlus a) => GHC.Internal.Base.MonadPlus (GHC.Internal.Control.Arrow.ArrowMonad a) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance forall (m :: * -> *) a. GHC.Internal.Base.MonadPlus m => GHC.Internal.Base.MonadPlus (GHC.Internal.Control.Arrow.Kleisli m a) -- Defined in ‘GHC.Internal.Control.Arrow’
-instance GHC.Internal.Base.MonadPlus GHC.Internal.Conc.Sync.STM -- Defined in ‘GHC.Internal.Conc.Sync’
 instance GHC.Internal.Base.MonadPlus GHC.Internal.Data.Proxy.Proxy -- Defined in ‘GHC.Internal.Data.Proxy’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.MonadPlus f, GHC.Internal.Base.MonadPlus g) => GHC.Internal.Base.MonadPlus (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
 instance forall (f :: * -> *). GHC.Internal.Base.MonadPlus f => GHC.Internal.Base.MonadPlus (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall (f :: * -> *). GHC.Internal.Base.MonadPlus f => GHC.Internal.Base.MonadPlus (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Data.Monoid’
+instance GHC.Internal.Base.MonadPlus GHC.Internal.STM.STM -- Defined in ‘GHC.Internal.STM’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.MonadPlus f, GHC.Internal.Base.MonadPlus g) => GHC.Internal.Base.MonadPlus (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *) i (c :: GHC.Internal.Generics.Meta). GHC.Internal.Base.MonadPlus f => GHC.Internal.Base.MonadPlus (GHC.Internal.Generics.M1 i c f) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *). GHC.Internal.Base.MonadPlus f => GHC.Internal.Base.MonadPlus (GHC.Internal.Generics.Rec1 f) -- Defined in ‘GHC.Internal.Generics’
@@ -11316,7 +11316,6 @@ instance forall a b c d. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b
 instance forall a b c d e. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b, GHC.Internal.Base.Monoid c, GHC.Internal.Base.Monoid d, GHC.Internal.Base.Monoid e) => GHC.Internal.Base.Monoid (a, b, c, d, e) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Monoid () -- Defined in ‘GHC.Internal.Base’
 instance forall a k (b :: k). GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
-instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Conc.Sync.STM a) -- Defined in ‘GHC.Internal.Conc.Sync’
 instance GHC.Internal.Base.Monoid GHC.Internal.Exception.Context.ExceptionContext -- Defined in ‘GHC.Internal.Exception.Context’
 instance forall a s. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.ST.ST s a) -- Defined in ‘GHC.Internal.ST’
 instance forall a s. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Control.Monad.ST.Lazy.Imp.ST s a) -- Defined in ‘GHC.Internal.Control.Monad.ST.Lazy.Imp’
@@ -11347,6 +11346,7 @@ instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.I
 instance forall a. (GHC.Internal.Classes.Ord a, GHC.Internal.Enum.Bounded a) => GHC.Internal.Base.Monoid (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
 instance forall a. (GHC.Internal.Classes.Ord a, GHC.Internal.Enum.Bounded a) => GHC.Internal.Base.Monoid (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
 instance forall m. GHC.Internal.Base.Monoid m => GHC.Internal.Base.Monoid (Data.Semigroup.WrappedMonoid m) -- Defined in ‘Data.Semigroup’
+instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.STM.STM a) -- Defined in ‘GHC.Internal.STM’
 instance GHC.Internal.Base.Monoid ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types.Event -- Defined in ‘ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types’
 instance GHC.Internal.Base.Monoid ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types.EventLifetime -- Defined in ‘ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types’
 instance GHC.Internal.Base.Monoid ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types.Lifetime -- Defined in ‘ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types’
@@ -11371,7 +11371,6 @@ instance forall a b c d e. (GHC.Internal.Base.Semigroup a, GHC.Internal.Base.Sem
 instance GHC.Internal.Base.Semigroup () -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Semigroup GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Base’
 instance forall a k (b :: k). GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
-instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Conc.Sync.STM a) -- Defined in ‘GHC.Internal.Conc.Sync’
 instance GHC.Internal.Base.Semigroup GHC.Internal.Exception.Context.ExceptionContext -- Defined in ‘GHC.Internal.Exception.Context’
 instance forall a s. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.ST.ST s a) -- Defined in ‘GHC.Internal.ST’
 instance forall a s. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Control.Monad.ST.Lazy.Imp.ST s a) -- Defined in ‘GHC.Internal.Control.Monad.ST.Lazy.Imp’
@@ -11409,6 +11408,7 @@ instance forall a. GHC.Internal.Base.Semigroup (Data.Semigroup.Last a) -- Define
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Base.Semigroup (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Base.Semigroup (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
 instance forall m. GHC.Internal.Base.Monoid m => GHC.Internal.Base.Semigroup (Data.Semigroup.WrappedMonoid m) -- Defined in ‘Data.Semigroup’
+instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.STM.STM a) -- Defined in ‘GHC.Internal.STM’
 instance GHC.Internal.Base.Semigroup ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types.Event -- Defined in ‘ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types’
 instance GHC.Internal.Base.Semigroup ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types.EventLifetime -- Defined in ‘ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types’
 instance GHC.Internal.Base.Semigroup ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types.Lifetime -- Defined in ‘ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types’
@@ -11510,7 +11510,6 @@ instance forall a. GHC.Internal.Classes.Eq a => GHC.Internal.Classes.Eq (GHC.Int
 instance forall a. GHC.Internal.Classes.Eq (Control.Concurrent.Chan.Chan a) -- Defined in ‘Control.Concurrent.Chan’
 instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.MVar.MVar a) -- Defined in ‘GHC.Internal.MVar’
 instance GHC.Internal.Classes.Eq GHC.Internal.Conc.Sync.BlockReason -- Defined in ‘GHC.Internal.Conc.Sync’
-instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.Conc.Sync.TVar a) -- Defined in ‘GHC.Internal.Conc.Sync’
 instance GHC.Internal.Classes.Eq GHC.Internal.Conc.Sync.ThreadId -- Defined in ‘GHC.Internal.Conc.Sync’
 instance GHC.Internal.Classes.Eq GHC.Internal.Conc.Sync.ThreadStatus -- Defined in ‘GHC.Internal.Conc.Sync’
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.Exception.ArrayException -- Defined in ‘GHC.Internal.IO.Exception’
@@ -11640,6 +11639,7 @@ instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.Foreign.C.ConstPtr.Cons
 instance forall i e. (GHC.Internal.Ix.Ix i, GHC.Internal.Classes.Eq e) => GHC.Internal.Classes.Eq (GHC.Internal.Arr.Array i e) -- Defined in ‘GHC.Internal.Arr’
 instance forall s i e. GHC.Internal.Classes.Eq (GHC.Internal.Arr.STArray s i e) -- Defined in ‘GHC.Internal.Arr’
 instance GHC.Internal.Classes.Eq GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
+instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.STM.TVar a) -- Defined in ‘GHC.Internal.STM’
 instance GHC.Internal.Classes.Eq ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types.Event -- Defined in ‘ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types’
 instance GHC.Internal.Classes.Eq ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types.EventLifetime -- Defined in ‘ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types’
 instance GHC.Internal.Classes.Eq ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types.Lifetime -- Defined in ‘ghc-internal-9.1500.0:GHC.Internal.Event.Internal.Types’

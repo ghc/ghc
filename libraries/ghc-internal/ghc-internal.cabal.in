@@ -293,6 +293,7 @@ Library
         GHC.Internal.StaticPtr
         GHC.Internal.STRef
         GHC.Internal.Show
+        GHC.Internal.STM
         GHC.Internal.Stable
         GHC.Internal.StableName
         GHC.Internal.Stack

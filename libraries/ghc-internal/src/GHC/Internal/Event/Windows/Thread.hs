@@ -7,11 +7,11 @@ module GHC.Internal.Event.Windows.Thread (
     registerDelay,
 ) where
 
-import GHC.Internal.Conc.Sync
 import GHC.Internal.Base
 import GHC.Internal.Event.Windows
 import GHC.Internal.IO
 import GHC.Internal.MVar
+import GHC.Internal.STM
 
 ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning = wakeupIOManager
@@ -36,4 +36,3 @@ registerDelay usecs = do
     mgr <- getSystemManager
     _ <- registerTimeout mgr usecs $ atomically $ writeTVar t True
     return t
-

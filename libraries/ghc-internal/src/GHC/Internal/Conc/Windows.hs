@@ -42,12 +42,12 @@ module GHC.Internal.Conc.Windows
        ) where
 
 import GHC.Internal.Base
-import GHC.Internal.Conc.Sync
 import qualified GHC.Internal.Conc.POSIX as POSIX
 import qualified GHC.Internal.Event.Windows.Thread as WINIO
 import GHC.Internal.Event.Windows.ConsoleEvent
 import GHC.Internal.IO.SubSystem ((<!>))
 import GHC.Internal.Ptr
+import GHC.Internal.STM
 
 -- ----------------------------------------------------------------------------
 -- Thread waiting
