@@ -1278,44 +1278,6 @@ freeReg REG_XMM5    = False
 freeReg REG_XMM6    = False
 # endif
 
-# if defined(REG_YMM1)
-freeReg REG_YMM1    = False
-# endif
-# if defined(REG_YMM2)
-freeReg REG_YMM2    = False
-# endif
-# if defined(REG_YMM3)
-freeReg REG_YMM3    = False
-# endif
-# if defined(REG_YMM4)
-freeReg REG_YMM4    = False
-# endif
-# if defined(REG_YMM5)
-freeReg REG_YMM5    = False
-# endif
-# if defined(REG_YMM6)
-freeReg REG_YMM6    = False
-# endif
-
-# if defined(REG_ZMM1)
-freeReg REG_ZMM1    = False
-# endif
-# if defined(REG_ZMM2)
-freeReg REG_ZMM2    = False
-# endif
-# if defined(REG_ZMM3)
-freeReg REG_ZMM3    = False
-# endif
-# if defined(REG_ZMM4)
-freeReg REG_ZMM4    = False
-# endif
-# if defined(REG_ZMM5)
-freeReg REG_ZMM5    = False
-# endif
-# if defined(REG_ZMM6)
-freeReg REG_ZMM6    = False
-# endif
-
 freeReg _ = True
 
 #elif defined(MACHREGS_loongarch64)
