@@ -119,6 +119,7 @@ module GHC.Conc
 
 import GHC.Internal.Conc.IO
 import GHC.Internal.Conc.Sync
+import GHC.Internal.STM
 
 #if !defined(mingw32_HOST_OS)
 import GHC.Internal.Conc.Signal

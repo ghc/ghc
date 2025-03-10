@@ -38,11 +38,11 @@ import GHC.Internal.Foreign.C.Types (CInt(..), CUInt(..))
 import GHC.Internal.Foreign.Ptr (Ptr)
 import GHC.Internal.Base
 import GHC.Internal.List (zipWith, zipWith3)
-import GHC.Internal.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
-                      labelThread, modifyMVar_, withMVar, newTVar, sharedCAF,
+import GHC.Internal.STM (TVar, atomically, newTVar, writeTVar, newTVarIO, readTVar, retry, throwSTM, STM)
+import GHC.Internal.Conc.Sync (ThreadId, ThreadStatus(..), forkIO,
+                      labelThread, modifyMVar_, withMVar, sharedCAF,
                       getNumCapabilities, threadCapability, myThreadId, forkOn,
-                      threadStatus, writeTVar, newTVarIO, readTVar, retry,
-                      throwSTM, STM, yield)
+                      threadStatus, yield)
 import GHC.Internal.IO (mask_, uninterruptibleMask_, onException)
 import GHC.Internal.IO.Exception (ioError)
 import GHC.Internal.IOArray (IOArray, newIOArray, readIOArray, writeIOArray,
