@@ -15,14 +15,6 @@ type Cast1 :: forall (r :: RuntimeRep) (s :: RuntimeRep) (a :: RuntimeRep) (b ::
 type family Cast1 r s a b c d p where
   Cast1 _ c _ b Refl Refl (p->q) = Int
 
-type Cast2 :: forall (r :: RuntimeRep) (s :: RuntimeRep) (a :: RuntimeRep) (b :: RuntimeRep) -> (a :~: IntRep) -> (b :~: IntRep) -> Type -> Type
+type Cast2 :: forall (r :: RuntimeRep) (s :: RuntimeRep) (a :: RuntimeRep) (b :: RuntimeRep) -> (a :~: a) -> (b :~: b) -> Type -> Type
 type family Cast2 r s a b c d p where
-  Cast2 _ c _ b Refl Refl (p->q) = Int
-
-type Cast3 :: forall (r :: RuntimeRep) (s :: RuntimeRep) (a :: RuntimeRep) (b :: RuntimeRep) -> (a :~: IntRep) -> (b :~: IntRep) -> Type -> Type
-type family Cast3 r s a b c d p where
-  forall. Cast3 _ c _ b Refl Refl (p->q) = Int
-
-type Cast4 :: forall (r :: RuntimeRep) (s :: RuntimeRep) (a :: RuntimeRep) (b :: RuntimeRep) -> (a :~: IntRep) -> (b :~: IntRep) -> Type -> Type
-type family Cast4 r s a b c d p where
-  forall aa cc. Cast4 aa cc _ b Refl Refl (p->q) = Int
+  forall c b p q.Cast2 _ c _ b Refl Refl (p->q) = Int
