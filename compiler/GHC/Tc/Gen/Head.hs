@@ -1236,12 +1236,13 @@ addStmtCtxt stmt flav =
   addErrCtxt (StmtErrCtxt (HsDoStmt flav) stmt)
 
 addThingCtxt :: HsThingRn -> TcRn a -> TcRn a
-addThingCtxt (OrigStmt (L loc stmt) flav) thing_inside = do
+addThingCtxt (OrigStmt (L loc stmt) flav) thing_inside =
   setSrcSpanA loc $
     addStmtCtxt stmt flav $
-    setInGeneratedCode
-    thing_inside
-addThingCtxt (OrigExpr e) thing_inside = addExprCtxt e thing_inside
+    setInGeneratedCode thing_inside
+addThingCtxt (OrigExpr e) thing_inside =
+  addExprCtxt e $
+      setInGeneratedCode thing_inside
 
 addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside
