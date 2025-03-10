@@ -2030,7 +2030,7 @@ liftCoSubstWithEx :: [TyVar]       -- universally quantified tyvars
                       -- Returned coercion has Representational role
 liftCoSubstWithEx univs omegas exs rhos
   = let theta = mkLiftingContext (zipEqual univs omegas)
-        psi   = extendLiftingContextEx theta (zipEqual "liftCoSubstWithExX" exs rhos)
+        psi   = extendLiftingContextEx theta (zipEqual exs rhos)
     in (ty_co_subst psi Representational, substTys (lcSubstRight psi) (mkTyCoVarTys exs))
 
 liftCoSubstWith :: Role -> [TyCoVar] -> [Coercion] -> Type -> Coercion
