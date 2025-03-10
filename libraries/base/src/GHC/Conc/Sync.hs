@@ -89,3 +89,4 @@ module GHC.Conc.Sync
         ) where
 
 import GHC.Internal.Conc.Sync
+import GHC.Internal.STM
