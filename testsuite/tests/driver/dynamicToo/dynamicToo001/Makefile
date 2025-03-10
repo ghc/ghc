@@ -39,14 +39,15 @@ dynamicToo001MakeA:
 # Should notice that B.hi and B.dyn_hi are different, and recompile B
 .PHONY: dynamicToo001MakeB
 dynamicToo001MakeB:
-	"$(TEST_HC)" $(TEST_HC_OPTS)                     -O -c A.hs
-	"$(TEST_HC)" $(TEST_HC_OPTS) $(TEST_HC_OPTS_DYN) -O -c A.hs
+	# Pass `-fPIC` to avoid platform dependency issues (#25836)
+	"$(TEST_HC)" $(TEST_HC_OPTS) -fPIC               -O -c A.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(TEST_HC_OPTS_DYN) -fPIC -O -c A.hs
 	cp B1.hs B.hs
-	"$(TEST_HC)" $(TEST_HC_OPTS)                     -O -c B.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -fPIC               -O -c B.hs
 	cp B2.hs B.hs
-	"$(TEST_HC)" $(TEST_HC_OPTS) $(TEST_HC_OPTS_DYN) -O -c B.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(TEST_HC_OPTS_DYN) -fPIC -O -c B.hs
 	cp B1.hs B.hs
-	"$(TEST_HC)" $(TEST_HC_OPTS) -O  C.hs -dynamic-too
+	"$(TEST_HC)" $(TEST_HC_OPTS) -fPIC -O  C.hs -dynamic-too
 
 .PHONY: T25837
 # Test that -dynamic-too notices when interface files were compiled with different flags
