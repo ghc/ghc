@@ -183,7 +183,7 @@ def mk_from_platform(release_mode, pipeline_type, platform):
                    , f"ghc{{version}}-{platform.name}")
 
 # Generate the new metadata for a specific GHC mode etc
-def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
+def mk_new_yaml(release_mode, version, date, pipeline_type, job_map) -> object:
     def mk(platform):
         eprint("\n=== " + platform.name + " " + ('=' * (75 - len(platform.name))))
         return mk_one_metadata(release_mode, version, job_map, mk_from_platform(release_mode, pipeline_type, platform))
@@ -231,8 +231,8 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
           , "Linux_UnknownLinux" : { "unknown_versioning": rocky8 }
           , "Darwin" : { "unknown_versioning" : darwin_x86 }
           , "Windows" : { "unknown_versioning" :  windows }
-          , "Linux_Alpine" : { "( >= 3.12 && < 3.18 )": alpine_3_12
-                             , ">= 3.18": alpine_3_18
+          , "Linux_Alpine" : { "( >= 3.12 && < 3.18 )": alpine3_12
+                             , ">= 3.18": alpine3_18
                              , "unknown_versioning": alpine3_12 }
 
           }
