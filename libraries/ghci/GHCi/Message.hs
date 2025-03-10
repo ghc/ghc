@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
     GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards,
-    CPP #-}
+    CPP, NamedFieldPuns #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
 -- |
@@ -21,7 +21,7 @@ module GHCi.Message
   , ResumeContext(..)
   , QState(..)
   , getMessage, putMessage, getTHMessage, putTHMessage
-  , Pipe(..), remoteCall, remoteTHCall, readPipe, writePipe
+  , Pipe, mkPipeFromHandles, remoteCall, remoteTHCall, readPipe, writePipe
   , BreakModule
   , LoadedDLL
   ) where
@@ -49,6 +49,7 @@ import Data.Binary.Get
 import Data.Binary.Put
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic
 import Data.Typeable (TypeRep)
@@ -661,47 +662,52 @@ serializeBCOs rbcos = parMap doChunk (chunkList 100 rbcos)
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages
 
+-- | An opaque pipe for bidirectional binary data transmission.
 data Pipe = Pipe
-  { pipeRead :: Handle
-  , pipeWrite ::  Handle
-  , pipeLeftovers :: IORef (Maybe ByteString)
+  { getSome :: !(IO ByteString)
+  , putAll :: !(B.Builder -> IO ())
+  , pipeLeftovers :: !(IORef (Maybe ByteString))
   }
+
+-- | Make a 'Pipe' from a 'Handle' to read and a 'Handle' to write.
+mkPipeFromHandles :: Handle -> Handle -> IO Pipe
+mkPipeFromHandles pipeRead pipeWrite = do
+  let getSome = B.hGetSome pipeRead (32*1024)
+      putAll b = do
+        B.hPutBuilder pipeWrite b
+        hFlush pipeWrite
+  pipeLeftovers <- newIORef Nothing
+  pure $ Pipe { getSome, putAll, pipeLeftovers }
 
 remoteCall :: Binary a => Pipe -> Message a -> IO a
 remoteCall pipe msg = do
   writePipe pipe (putMessage msg)
   readPipe pipe get
 
+writePipe :: Pipe -> Put -> IO ()
+writePipe Pipe{..} put = putAll $ execPut put
+
 remoteTHCall :: Binary a => Pipe -> THMessage a -> IO a
 remoteTHCall pipe msg = do
   writePipe pipe (putTHMessage msg)
   readPipe pipe get
 
-writePipe :: Pipe -> Put -> IO ()
-writePipe Pipe{..} put
-  | LB.null bs = return ()
-  | otherwise  = do
-    LB.hPut pipeWrite bs
-    hFlush pipeWrite
- where
-  bs = runPut put
-
 readPipe :: Pipe -> Get a -> IO a
 readPipe Pipe{..} get = do
   leftovers <- readIORef pipeLeftovers
-  m <- getBin pipeRead get leftovers
+  m <- getBin getSome get leftovers
   case m of
     Nothing -> throw $
-      mkIOError eofErrorType "GHCi.Message.remoteCall" (Just pipeRead) Nothing
+      mkIOError eofErrorType "GHCi.Message.readPipe" Nothing Nothing
     Just (result, new_leftovers) -> do
       writeIORef pipeLeftovers new_leftovers
       return result
 
 getBin
-  :: Handle -> Get a -> Maybe ByteString
+  :: (IO ByteString) -> Get a -> Maybe ByteString
   -> IO (Maybe (a, Maybe ByteString))
 
-getBin h get leftover = go leftover (runGetIncremental get)
+getBin getsome get leftover = go leftover (runGetIncremental get)
  where
    go Nothing (Done leftover _ msg) =
      return (Just (msg, if B.null leftover then Nothing else Just leftover))
@@ -710,7 +716,7 @@ getBin h get leftover = go leftover (runGetIncremental get)
      go Nothing (fun (Just leftover))
    go Nothing (Partial fun) = do
      -- putStrLn "before hGetSome"
-     b <- B.hGetSome h (32*1024)
+     b <- getsome
      -- putStrLn $ "hGetSome: " ++ show (B.length b)
      if B.null b
         then return Nothing

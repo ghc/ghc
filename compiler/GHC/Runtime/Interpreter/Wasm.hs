@@ -10,7 +10,6 @@ import GHC.Runtime.Interpreter.Types
 #if !defined(mingw32_HOST_OS)
 
 import Control.Concurrent.MVar
-import Data.IORef
 import GHC.Data.FastString
 import qualified GHC.Data.ShortText as ST
 import GHC.Platform
@@ -60,7 +59,7 @@ spawnWasmInterp WasmInterpConfig {..} = do
   wh <- Posix.fdToHandle wfd2
   hSetBuffering wh NoBuffering
   hSetBuffering rh NoBuffering
-  lo_ref <- newIORef Nothing
+  interpPipe <- mkPipeFromHandles rh wh
   pending_frees <- newMVar []
   lock <- newMVar ()
   pure
@@ -68,7 +67,7 @@ spawnWasmInterp WasmInterpConfig {..} = do
       { instProcess =
           InterpProcess
             { interpHandle = ph,
-              interpPipe = Pipe {pipeRead = rh, pipeWrite = wh, pipeLeftovers = lo_ref},
+              interpPipe,
               interpLock = lock
             },
         instPendingFrees = pending_frees,

@@ -129,12 +129,11 @@ startTHRunnerProcess interp_js settings = do
                                            (nodeExtraArgs settings)
   std_in <- readIORef interp_in
 
-  lo_ref <- newIORef Nothing
+  interpPipe <- mkPipeFromHandles rh wh
   lock <- newMVar ()
-  let pipe = Pipe { pipeRead = rh, pipeWrite = wh, pipeLeftovers = lo_ref }
   let proc = InterpProcess
               { interpHandle = hdl
-              , interpPipe   = pipe
+              , interpPipe
               , interpLock   = lock
               }
   pure (std_in, proc)

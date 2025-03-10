@@ -19,7 +19,6 @@ import Control.Exception
 import Control.Monad
 import Control.Concurrent (threadDelay)
 import Data.Binary
-import Data.IORef
 
 import Text.Printf
 import System.Environment (getProgName, getArgs)
@@ -127,8 +126,7 @@ defaultServer = do
   installSignalHandlers
 #endif
 
-  lo_ref <- newIORef Nothing
-  let pipe = Pipe{pipeRead = inh, pipeWrite = outh, pipeLeftovers = lo_ref}
+  pipe <- mkPipeFromHandles inh outh
 
   when wait $ do
     when verbose $
