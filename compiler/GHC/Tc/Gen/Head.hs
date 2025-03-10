@@ -296,11 +296,11 @@ splitHsApps e = go e (top_ctxt 0 e) []
     -- to initialise the argument splitting in 'go'
     -- See Note [AppCtxt]
 
-    top_ctxt n (HsPar _ fun)             = top_lctxt n fun
-    top_ctxt n (HsPragE _ _ fun)           = top_lctxt n fun
-    top_ctxt n (HsAppType _ fun _)         = top_lctxt (n+1) fun
-    top_ctxt n (HsApp _ fun _)             = top_lctxt (n+1) fun
-    top_ctxt n other_fun                   = VACall other_fun n noSrcSpan
+    top_ctxt n (HsPar _ fun)        = top_lctxt n fun
+    top_ctxt n (HsPragE _ _ fun)    = top_lctxt n fun
+    top_ctxt n (HsAppType _ fun _)  = top_lctxt (n+1) fun
+    top_ctxt n (HsApp _ fun _)      = top_lctxt (n+1) fun
+    top_ctxt n other_fun            = VACall other_fun n noSrcSpan
 
     top_lctxt :: Int -> LHsExpr GhcRn -> AppCtxt
     top_lctxt n (L _ fun) = top_ctxt n fun
@@ -539,16 +539,21 @@ tcInferAppHead_maybe :: HsExpr GhcRn
 -- Returns Nothing for a complicated head
 tcInferAppHead_maybe fun
   = case fun of
-      HsVar _ nm                -> Just <$> tcInferId nm
-      XExpr (HsRecSelRn f)      -> Just <$> tcInferRecSelId f
-      ExprWithTySig _ e hs_ty   -> Just <$> tcExprWithSig e hs_ty
-      HsOverLit _ lit           -> Just <$> tcInferOverLit lit
-      _                         -> return Nothing
+      HsVar _ nm                  -> Just <$> tcInferId nm
+      XExpr (HsRecSelRn f)        -> Just <$> tcInferRecSelId f
+      XExpr (ExpandedThingRn _ e) -> tcInferAppHead_maybe e
+      XExpr (PopErrCtxt e)        -> tcInferAppHead_maybe e
+      ExprWithTySig _ e hs_ty     -> Just <$> tcExprWithSig e hs_ty
+      HsOverLit _ lit             -> Just <$> tcInferOverLit lit
+      _                           -> return Nothing
 
 addHeadCtxt :: AppCtxt -> TcM a -> TcM a
-addHeadCtxt fun_ctxt thing_inside = setSrcSpan fun_loc thing_inside
-  where
-    fun_loc = appCtxtLoc fun_ctxt
+addHeadCtxt fun_ctxt thing_inside
+  | not (isGoodSrcSpan fun_loc)       -- noSrcSpan => no arguments
+  = thing_inside                      -- => context is already set
+  | otherwise
+  = setSrcSpan fun_loc thing_inside
+  where fun_loc = appCtxtLoc fun_ctxt
 
 
 {- *********************************************************************
@@ -1246,4 +1251,5 @@ addExprCtxt e thing_inside
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself
       HsUnboundVar {} -> thing_inside
+      XExpr (ExpandedThingRn {}) -> thing_inside
       _ -> addErrCtxt (ExprCtxt e) thing_inside
