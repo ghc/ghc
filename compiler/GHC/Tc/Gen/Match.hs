@@ -79,7 +79,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader (LocalRdrEnv)
 import GHC.Types.Id
 import GHC.Types.SrcLoc
-import GHC.Types.Basic( VisArity, isDoExpansionGenerated )
+import GHC.Types.Basic( VisArity )
 
 import qualified GHC.Data.List.NonEmpty as NE
 
@@ -156,21 +156,13 @@ tcLambdaMatches e lam_variant matches invis_pat_tys res_ty
 
         ; (wrapper, r)
             <- matchExpectedFunTys herald GenSigCtxt arity res_ty $ \ pat_tys rhs_ty ->
-               tcMatches ctxt tc_body (invis_pat_tys ++ pat_tys) rhs_ty matches
+               tcMatches ctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches
 
         ; return (wrapper, r) }
   where
     ctxt   = LamAlt lam_variant
     herald = ExpectedFunTyLam lam_variant e
              -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
-
-    tc_body | isDoExpansionGenerated (mg_ext matches)
-              -- See Part 3. B. of Note [Expanding HsDo with XXExprGhcRn] in
-              -- `GHC.Tc.Gen.Do`. Testcase: Typeable1
-            = tcBodyNC -- NB: Do not add any error contexts
-                       -- It has already been done
-            | otherwise
-            = tcBody
 
 {-
 @tcCaseMatches@ doesn't do the argument-count check because the
@@ -407,12 +399,6 @@ tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
 tcBody body res_ty
   = do  { traceTc "tcBody" (ppr res_ty)
         ; tcPolyLExpr body res_ty
-        }
-
-tcBodyNC :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
-tcBodyNC body res_ty
-  = do  { traceTc "tcBodyNC" (ppr res_ty)
-        ; tcMonoExprNC body res_ty
         }
 
 {-
