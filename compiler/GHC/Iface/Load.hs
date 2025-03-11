@@ -59,7 +59,6 @@ import GHC.Driver.Plugins
 import GHC.Iface.Warnings
 import GHC.Iface.Syntax
 import GHC.Iface.Ext.Fields
-import GHC.Iface.Flags
 import GHC.Iface.Binary
 import GHC.Iface.Rename
 import GHC.Iface.Env
@@ -74,7 +73,6 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
-import GHC.Utils.Fingerprint( Fingerprint )
 
 import GHC.Settings.Constants
 
@@ -644,7 +642,7 @@ loadInterface doc_str mod from
                                & set_mi_fam_insts (panic "No mi_fam_insts in PIT")
                                & set_mi_rules     (panic "No mi_rules in PIT")
                                & set_mi_anns      (panic "No mi_anns in PIT")
-                               & set_mi_extra_decls (panic "No mi_extra_decls in PIT")
+                               & set_mi_simplified_core (panic "No mi_simplified_core in PIT")
 
               bad_boot = mi_boot iface == IsBoot
                           && isJust (lookupKnotVars (if_rec_types gbl_env) mod)
@@ -1083,7 +1081,7 @@ load_dynamic_too :: Logger -> NameCache -> UnitState -> DynFlags
 load_dynamic_too logger name_cache unit_state dflags wanted_mod iface loc = do
   read_file logger name_cache unit_state dflags wanted_mod (ml_dyn_hi_file loc) >>= \case
     Succeeded (dynIface, _)
-     | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface)
+     | mi_mod_hash iface == mi_mod_hash dynIface
      -> return (Succeeded ())
      | otherwise ->
         do return $ (Failed $ DynamicHashMismatchError wanted_mod loc)
@@ -1174,11 +1172,10 @@ ghcPrimIface
       & set_mi_exports  ghcPrimExports
       & set_mi_decls    []
       & set_mi_fixities ghcPrimFixities
-      & set_mi_final_exts ((mi_final_exts empty_iface)
-          { mi_fix_fn = mkIfaceFixCache ghcPrimFixities
-          , mi_decl_warn_fn = mkIfaceDeclWarnCache ghcPrimWarns
-          , mi_export_warn_fn = mkIfaceExportWarnCache ghcPrimWarns
-          })
+      & set_mi_fix_fn (mkIfaceFixCache ghcPrimFixities)
+      & set_mi_decl_warn_fn (mkIfaceDeclWarnCache ghcPrimWarns)
+      & set_mi_export_warn_fn (mkIfaceExportWarnCache ghcPrimWarns)
+      & set_mi_fix_fn (mkIfaceFixCache ghcPrimFixities)
       & set_mi_docs (Just ghcPrimDeclDocs) -- See Note [GHC.Prim Docs] in GHC.Builtin.Utils
       & set_mi_warns (toIfaceWarnings ghcPrimWarns) -- See Note [GHC.Prim Deprecations] in GHC.Builtin.Utils
 
@@ -1263,21 +1260,14 @@ pprModIface unit_state iface
  = vcat $ [ text "interface"
                 <+> ppr (mi_module iface) <+> pp_hsc_src (mi_hsc_src iface)
                 <+> (withSelfRecomp iface empty $ \_ -> text "[self-recomp]")
-                <+> (if mi_orphan exts then text "[orphan module]" else Outputable.empty)
-                <+> (if mi_finsts exts then text "[family instance module]" else Outputable.empty)
+                <+> (if mi_orphan iface then text "[orphan module]" else Outputable.empty)
+                <+> (if mi_finsts iface then text "[family instance module]" else Outputable.empty)
                 <+> integer hiVersion
-        , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash exts))
-        , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash (mi_final_exts iface)))
-        , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash exts))
-        , withSelfRecomp iface empty $ \(ModIfaceSelfRecomp src usages flag_hash opt_hash hpc_hash plugin_hash) -> vcat
-                [ nest 2 (text "src_hash:" <+> ppr src)
-                , nest 2 (text "flags:" <+> pprIfaceDynFlags flag_hash)
-                , nest 2 (text "opt_hash:" <+> ppr opt_hash)
-                , nest 2 (text "hpc_hash:" <+> ppr hpc_hash)
-                , nest 2 (text "plugin_hash:" <+> ppr plugin_hash)
-                , vcat (map pprUsage usages)
-                ]
-        , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash exts))
+        , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash iface))
+        , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash iface))
+        , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash iface))
+        , withSelfRecomp iface empty ppr
+        , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash iface))
         , nest 2 (text "sig of:" <+> ppr (mi_sig_of iface))
         , nest 2 (text "where")
         , text "exports:"
@@ -1288,10 +1278,14 @@ pprModIface unit_state iface
         , vcat (map pprIfaceAnnotation (mi_anns iface))
         , pprFixities (mi_fixities iface)
         , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls iface]
-        , case mi_extra_decls iface of
+        , case mi_simplified_core iface of
             Nothing -> empty
-            Just eds -> text "extra decls:"
-                          $$ nest 2 (vcat ([ppr bs | bs <- eds]))
+            Just (IfaceSimplifiedCore eds fs) ->
+              vcat [ text "extra decls:"
+                           $$ nest 2 (vcat ([ppr bs | bs <- eds]))
+                   , text "foreign stubs:"
+                           $$ nest 2 (ppr fs)
+                   ]
         , vcat (map ppr (mi_insts iface))
         , vcat (map ppr (mi_fam_insts iface))
         , vcat (map ppr (mi_rules iface))
@@ -1303,7 +1297,6 @@ pprModIface unit_state iface
         , text "extensible fields:" $$ nest 2 (pprExtensibleFields (mi_ext_fields iface))
         ]
   where
-    exts = mi_final_exts iface
 
     pp_hsc_src HsBootFile = text "[boot]"
     pp_hsc_src HsigFile   = text "[hsig]"
@@ -1329,35 +1322,6 @@ pprExport avail@(AvailTC n _) =
     pp_export []    = Outputable.empty
     pp_export names = braces (hsep (map ppr names))
 
-pprUsage :: Usage -> SDoc
-pprUsage UsagePackageModule{ usg_mod = mod, usg_mod_hash = hash, usg_safe = safe }
-  = pprUsageImport mod hash safe
-pprUsage UsageHomeModule{ usg_unit_id = unit_id, usg_mod_name = mod_name
-                              , usg_mod_hash = hash, usg_safe = safe
-                              , usg_exports = exports, usg_entities = entities }
-  = pprUsageImport (mkModule unit_id mod_name) hash safe $$
-    nest 2 (
-        maybe Outputable.empty (\v -> text "exports: " <> ppr v) exports $$
-        vcat [ ppr n <+> ppr v | (n,v) <- entities ]
-        )
-pprUsage usage@UsageFile{}
-  = hsep [text "addDependentFile",
-          doubleQuotes (ftext (usg_file_path usage)),
-          ppr (usg_file_hash usage)]
-pprUsage usage@UsageMergedRequirement{}
-  = hsep [text "merged", ppr (usg_mod usage), ppr (usg_mod_hash usage)]
-pprUsage usage@UsageHomeModuleInterface{}
-  = hsep [text "implementation", ppr (usg_mod_name usage)
-                               , ppr (usg_unit_id usage)
-                               , ppr (usg_iface_hash usage)]
-
-pprUsageImport :: Outputable mod => mod -> Fingerprint -> IsSafeImport -> SDoc
-pprUsageImport mod hash safe
-  = hsep [ text "import", pp_safe, ppr mod
-         , ppr hash ]
-    where
-        pp_safe | safe      = text "safe"
-                | otherwise = text " -/ "
 
 pprFixities :: [(OccName, Fixity)] -> SDoc
 pprFixities []    = Outputable.empty

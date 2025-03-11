@@ -107,6 +107,9 @@ module GHC.Utils.Binary
    simpleBindingNameReader,
    FullBinData(..), freezeBinHandle, thawBinHandle, putFullBinData,
    BinArray,
+
+   -- * FingerprintWithValue
+   FingerprintWithValue(..)
   ) where
 
 import GHC.Prelude
@@ -2105,3 +2108,36 @@ source location as part of a larger structure.
 instance (Binary v) => Binary (IntMap v) where
   put_ bh m = put_ bh (IntMap.toAscList m)
   get bh = IntMap.fromAscList <$> get bh
+
+
+{- Note [FingerprintWithValue]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+FingerprintWithValue is a wrapper which allows us to store a fingerprint and
+optionally the value which was used to create the fingerprint.
+
+This is useful for storing information in interface files, where we want to
+store the fingerprint of the interface file, but also the value which was used
+to create the fingerprint (e.g. the DynFlags).
+
+The wrapper is useful to ensure that the fingerprint can be read quickly without
+having to deserialise the value itself.
+-}
+
+-- | A wrapper which allows us to store a fingerprint and optionally the value which
+-- was used to create the fingerprint.
+data FingerprintWithValue a = FingerprintWithValue !Fingerprint (Maybe a)
+  deriving Functor
+
+instance Binary a => Binary (FingerprintWithValue a) where
+  put_ bh (FingerprintWithValue fp val) = do
+    put_ bh fp
+    lazyPutMaybe bh val
+
+  get bh = do
+    fp <- get bh
+    val <- lazyGetMaybe bh
+    return $ FingerprintWithValue fp val
+
+instance NFData a => NFData (FingerprintWithValue a) where
+  rnf (FingerprintWithValue fp mflags)
+    = rnf fp `seq` rnf mflags `seq` ()

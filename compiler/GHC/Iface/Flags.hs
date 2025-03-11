@@ -41,34 +41,28 @@ data IfaceDynFlags = IfaceDynFlags
         , ifaceCallerCCFilters :: [CallerCcFilter]
         }
 
-pprIfaceDynFlags :: (Fingerprint, Maybe IfaceDynFlags) -> SDoc
-pprIfaceDynFlags (f, mflags) =
-  vcat $
-    [ text "fingerprint:" <+> (ppr f)
-    ]
-    ++ case mflags of
-        Nothing -> [missingExtraFlagInfo]
-        Just (IfaceDynFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14) ->
-          [ text "main-is:" <+> (ppr $ fmap (fmap (text @SDoc)) a1)
-          , text "safe-mode:" <+> ppr a2
-          , text "lang:" <+> ppr a3
-          , text "exts:" <+> ppr a4
-          , text "cpp-options:"
-          , nest 2 $ ppr a5
-          , text "js-options:"
-          , nest 2 $ ppr a6
-          , text "cmm-options:"
-          , nest 2 $ ppr a7
-          , text "paths:" <+> hcat (map text a8)
-          , text "prof:"  <+> ppr a9
-          , text "ticky:"
-          , nest 2 $ vcat (map ppr a10)
-          , text "codegen:"
-          , nest 2 $ vcat (map ppr a11)
-          , text "fat-iface:" <+> ppr a12
-          , text "debug-level:" <+> ppr a13
-          , text "caller-cc-filters:" <+> ppr a14
-          ]
+pprIfaceDynFlags :: IfaceDynFlags -> SDoc
+pprIfaceDynFlags (IfaceDynFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14) =
+  vcat [ text "main-is:" <+> (ppr $ fmap (fmap (text @SDoc)) a1)
+       , text "safe-mode:" <+> ppr a2
+       , text "lang:" <+> ppr a3
+       , text "exts:" <+> ppr a4
+       , text "cpp-options:"
+       , nest 2 $ ppr a5
+       , text "js-options:"
+       , nest 2 $ ppr a6
+       , text "cmm-options:"
+       , nest 2 $ ppr a7
+       , text "paths:" <+> hcat (map text a8)
+       , text "prof:"  <+> ppr a9
+       , text "ticky:"
+       , nest 2 $ vcat (map ppr a10)
+       , text "codegen:"
+       , nest 2 $ vcat (map ppr a11)
+       , text "fat-iface:" <+> ppr a12
+       , text "debug-level:" <+> ppr a13
+       , text "caller-cc-filters:" <+> ppr a14
+       ]
 
 missingExtraFlagInfo :: SDoc
 missingExtraFlagInfo = text "flags: no detailed info, recompile with -fwrite-if-self-recomp-flags"
