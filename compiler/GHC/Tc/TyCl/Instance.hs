@@ -31,7 +31,7 @@ import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
 import GHC.Tc.TyCl.Class ( tcClassDecl2, tcATDefault,
                            HsSigFun, mkHsSigFun, findMethodBind,
                            instantiateMethod )
-import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
+import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX )
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Validity
