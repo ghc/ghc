@@ -25,10 +25,6 @@
 #include "MachDeps.h"
 #include "SMPClosureOps.h"
 
-#if defined(__PIC__)
-import pthread_mutex_lock;
-import pthread_mutex_unlock;
-#endif
 import CLOSURE ghczminternal_GHCziInternalziControlziExceptionziBase_nestedAtomically_closure;
 import CLOSURE ghczminternal_GHCziInternalziIOziException_heapOverflow_closure;
 import CLOSURE ghczminternal_GHCziInternalziIOziException_blockedIndefinitelyOnMVar_closure;

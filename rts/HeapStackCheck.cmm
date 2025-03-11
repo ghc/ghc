@@ -14,9 +14,6 @@
 #include "Updates.h"
 #include "SMPClosureOps.h"
 
-#if defined(__PIC__)
-import pthread_mutex_unlock;
-#endif
 import AcquireSRWLockExclusive;
 import ReleaseSRWLockExclusives;
 
