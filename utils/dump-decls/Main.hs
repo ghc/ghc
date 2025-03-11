@@ -71,8 +71,7 @@ ignoredModules =
     ]
   where
     unstableModules =
-        [ "GHC.Prim"
-        , "GHC.Conc.POSIX"
+        [ "GHC.Conc.POSIX"
         , "GHC.Conc.IO"
         ]
     platformDependentModules =

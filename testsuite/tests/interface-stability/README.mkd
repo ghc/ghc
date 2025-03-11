@@ -6,9 +6,18 @@ utility to dump all exported declarations of all exposed modules for the
 following packages:
 
   * `base`
+  * `ghc-experimental`
+  * `template-haskell`
+  * `ghc-prim`
 
 These are compared against the expected exports in the test's corresponding
 `.stdout` file.
+
+Stability expectations vary between these packages: Changes to the
+interface of `base` normally need a [CLC proposal](https://github.com/haskell/core-libraries-committee).
+The interfaces for the other packages listed are tracked primarily to
+prevent _accidental_ changes to them when making changes in
+`ghc-internal`, from which they re-export many things.
 
 
 ## Updating expected output
