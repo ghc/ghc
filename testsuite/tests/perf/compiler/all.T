@@ -794,3 +794,19 @@ test('interpreter_steplocal',
      ],
      ghci_script,
      ['interpreter_steplocal.script'])
+
+
+def ifaceRecompTest(name, iterations, target):
+  return test(name,
+            [collect_stats('bytes allocated', 5)
+            , extra_run_opts(' '.join(['"' + config.libdir + '"', str(iterations), target]))
+            , pre_cmd('$MAKE -s --no-print-directory ' + name)
+            , only_ways(['normal'])
+            , extra_files(['IfaceRecomp.hs', 'IfaceRecompTest.hs'])
+            , copy_files
+            ],
+            multimod_compile_and_run,
+            ['IfaceRecomp', '-O -Wall -Werror -package ghc'])
+
+ifaceRecompTest("IfaceRecomp", 10000, "full")
+ifaceRecompTest("IfaceRecompSrcChanged", 10000, "src")
