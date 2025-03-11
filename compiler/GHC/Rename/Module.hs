@@ -717,7 +717,7 @@ rnFamEqn doc atfi
 
              groups :: [NonEmpty (LocatedN RdrName)]
              groups = equivClasses cmpLocated pat_kity_vars
-       ; traceRn "rnFamEqn: rn_outer_bndrs: " (ppr outer_bndrs <+> ppr rn_outer_bndrs')
+       ; traceRn "rnFamEqn: rn_outer_bndrs: " (ppr rn_outer_bndrs')
        ; nms_dups <- mapM (lookupOccRn . unLoc) $
                         [ tv | (tv :| (_:_)) <- groups ]
              -- Add to the used variables

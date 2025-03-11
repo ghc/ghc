@@ -21,7 +21,7 @@ module GHC.Tc.TyCl (
         tcFamTyPats, tcTyFamInstEqn,
         tcAddOpenTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
         unravelFamInstPats, addConsistencyConstraints,
-        checkFamTelescope, tcFamInsLHSBinders
+        checkFamTelescope, tcFamInstLHSBinders
     ) where
 
 import GHC.Prelude
@@ -249,10 +249,10 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
                  th_bndrs' `plusNameEnv` th_bndrs) }
 
 
--- tcFamInsLHSBinders :: FamEqn TyVar Name -> TcM [TyVar]
-tcFamInsLHSBinders :: TcLevel -> SkolemInfo -> HsOuterFamEqnTyVarBndrs GhcTc -> HsOuterFamEqnTyVarBndrs GhcRn
+-- tcFamInstLHSBinders :: FamEqn TyVar Name -> TcM [TyVar]
+tcFamInstLHSBinders :: TcLevel -> SkolemInfo -> HsOuterFamEqnTyVarBndrs GhcTc -> HsOuterFamEqnTyVarBndrs GhcRn
   -> [TcTyVar] -> Type -> WantedConstraints -> IOEnv (Env TcGblEnv TcLclEnv) ([TyCoVar], [TcTyVar])
-tcFamInsLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted = do
+tcFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted = do
        -- This code (and the stuff immediately above) is very similar
        -- to that in tcTyFamInstEqnGuts.  Maybe we should abstract the
        -- common code; but for the moment I concluded that it's
@@ -260,8 +260,8 @@ tcFamInsLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted 
        -- check there too!
 
        -- See Note [Type variables in type families instance decl]
-       ; let outer_exp_tvs = scopedSort $ expliciteOuterTyVars outer_bndrs
-       ; let outer_imp_tvs = impliciteOuterTyVars outer_bndrs
+       ; let outer_exp_tvs = scopedSort $ explicitOuterTyVars outer_bndrs
+       ; let outer_imp_tvs = implicitOuterTyVars outer_bndrs
        ; checkFamTelescope tclvl hs_outer_bndrs outer_exp_tvs
        ; outer_imp_wc_tvs <- liftZonkM $ zonkTcTyVarsToTcTyVarsMaybe $ outer_imp_tvs ++ wcs
        -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
@@ -274,7 +274,7 @@ tcFamInsLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted 
 
        ; let final_tvs = scopedSort (qtvs ++ outer_exp_tvs)
 
-       ; traceTc "tcFamInsLHSBinders" $
+       ; traceTc "tcFamInstLHSBinders" $
          vcat [
           -- ppr fam_tc
               text "lhs_ty:"    <+> ppr lhs_ty
@@ -3485,7 +3485,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        ; traceTc "tcTyFamInstEqnGuts 0" (ppr outer_bndrs $$ ppr skol_info)
 
       --  -- See Note [Type variables in type families instance decl]
-       ; (final_tvs, qtvs) <- tcFamInsLHSBinders tclvl skol_info outer_bndrs outer_hs_bndrs wcs lhs_ty wanted
+       ; (final_tvs, qtvs) <- tcFamInstLHSBinders tclvl skol_info outer_bndrs outer_hs_bndrs wcs lhs_ty wanted
 
        -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
        -- Example: typecheck/should_fail/T17301

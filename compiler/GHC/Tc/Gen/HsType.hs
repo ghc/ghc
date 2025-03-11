@@ -72,7 +72,7 @@ module GHC.Tc.Gen.HsType (
         HoleMode(..),
 
         -- Utils
-        tyLitFromLit, tyLitFromOverloadedLit, expliciteOuterTyVars, impliciteOuterTyVars,
+        tyLitFromLit, tyLitFromOverloadedLit, explicitOuterTyVars, implicitOuterTyVars,
 
    ) where
 
@@ -3281,16 +3281,16 @@ outerTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
 outerTyVars (HsOuterImplicit { hso_ximplicit = tvs })  = tvs
 outerTyVars (HsOuterExplicit { hso_xexplicit = tvbs }) = binderVars tvbs
 
-expliciteOuterTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
+explicitOuterTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
 -- The returned [TcTyVar] is not necessarily in dependency order
 -- at least for the HsOuterImplicit case
-expliciteOuterTyVars (HsOuterImplicit {})  = []
-expliciteOuterTyVars (HsOuterExplicit { hso_xexplicit = tvbs }) = binderVars tvbs
+explicitOuterTyVars (HsOuterImplicit {})  = []
+explicitOuterTyVars (HsOuterExplicit { hso_xexplicit = tvbs }) = binderVars tvbs
 
-impliciteOuterTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
+implicitOuterTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
 -- The returned [TcTyVar] is not necessarily in dependency order
-impliciteOuterTyVars (HsOuterImplicit { hso_ximplicit = tvs })  = tvs
-impliciteOuterTyVars (HsOuterExplicit {}) = []
+implicitOuterTyVars (HsOuterImplicit { hso_ximplicit = tvs })  = tvs
+implicitOuterTyVars (HsOuterExplicit {}) = []
 
 
 

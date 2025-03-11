@@ -1017,7 +1017,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                            , lhs_applied_kind
                            , res_kind ) }
 
-       ; (final_tvs, qtvs) <- tcFamInsLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted
+       ; (final_tvs, qtvs) <- tcFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted
 
        ; (final_tvs, non_user_tvs, lhs_ty, master_res_kind, instance_res_kind, stupid_theta) <-
           liftZonkM $ do
