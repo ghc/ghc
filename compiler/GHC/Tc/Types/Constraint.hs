@@ -75,7 +75,7 @@ module GHC.Tc.Types.Constraint (
         isWanted, isGiven,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
         ctEvExpr, ctEvTerm,
-        ctEvCoercion, givenCtEvCoercion,
+        ctEvCoercion, wantedCtEvCoercion, givenCtEvCoercion,
         ctEvEvId, wantedCtEvEvId,
         ctEvRewriters, ctEvCoHoleSet, setWantedCtEvRewriters,
         ctEvUnique, tcEvDestUnique,
@@ -1041,6 +1041,12 @@ data WantedConstraints
        , wc_impl   :: Bag Implication
        , wc_errors :: Bag DelayedError
     }
+
+instance S.Semigroup WantedConstraints where
+  (<>) = andWC
+instance Monoid WantedConstraints where
+  mempty  = emptyWC
+  mappend = (S.<>)
 
 emptyWC :: WantedConstraints
 emptyWC = WC { wc_simple = emptyBag
@@ -2430,24 +2436,24 @@ ctEvExpr (CtWanted (WantedCt { ctev_dest = HoleDest hole }))
             = Coercion $ mkHoleCo hole
 ctEvExpr ev = evId (ctEvEvId ev)
 
-givenCtEvCoercion :: GivenCtEvidence -> TcCoercion
+givenCtEvCoercion :: HasDebugCallStack => GivenCtEvidence -> TcCoercion
 givenCtEvCoercion _given@(GivenCt { ctev_evar = ev_id })
   = assertPpr (isCoVar ev_id)
     (text "givenCtEvCoercion used on non-equality Given constraint:" <+> ppr _given)
   $ mkCoVarCo ev_id
 
-ctEvCoercion :: HasDebugCallStack => CtEvidence -> TcCoercion
-ctEvCoercion (CtGiven _given@(GivenCt { ctev_evar = ev_id }))
-  = assertPpr (isCoVar ev_id)
-    (text "ctEvCoercion used on non-equality Given constraint:" <+> ppr (CtGiven _given))
-  $ mkCoVarCo ev_id
-ctEvCoercion (CtWanted (WantedCt { ctev_dest = dest }))
+wantedCtEvCoercion :: HasDebugCallStack => WantedCtEvidence -> TcCoercion
+wantedCtEvCoercion _wanted@(WantedCt { ctev_dest = dest })
   | HoleDest hole <- dest
-  = -- ctEvCoercion is only called on type equalities
+  = -- wantedCtEvCoercion is only called on type equalities
     -- and they always have HoleDests
     mkHoleCo hole
-ctEvCoercion ev
-  = pprPanic "ctEvCoercion" (ppr ev)
+  | otherwise
+  = pprPanic "wantedCtEvCoercion used on non-equality Wanted constraint" (ppr _wanted)
+
+ctEvCoercion :: HasDebugCallStack => CtEvidence -> TcCoercion
+ctEvCoercion (CtGiven  given ) = givenCtEvCoercion  given
+ctEvCoercion (CtWanted wanted) = wantedCtEvCoercion wanted
 
 ctEvEvId :: CtEvidence -> EvVar
 ctEvEvId (CtWanted wtd)                         = wantedCtEvEvId wtd

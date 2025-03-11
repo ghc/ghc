@@ -1,10 +1,7 @@
 T15801.hs:52:10: error: [GHC-18872]
-    • Couldn't match representation of type: op_a --> b
-                               with that of: UnOp op_a -> UnOp b
-        arising (via a quantified constraint) from
-          the superclasses of an instance declaration
-      When trying to solve the quantified constraint
-        forall (op_a :: Op (*)) (b :: Op (*)). op_a -#- b
-        arising from the superclasses of an instance declaration
+    • Couldn't match kind ‘*’ with ‘Op (*)’
+      When matching types
+        b :: Op (*)
+        UnOp b :: *
     • In the instance declaration for ‘OpRíki (Op (*))’
 

@@ -385,9 +385,8 @@ This allows us to indirectly box constraints with different representations
 *                                                                               *
 ****************************************************************************** -}
 
--- | A 'TcS' action which can may solve a `Ct`
-type CtDefaultingStrategy = Ct -> TcS Bool
-  -- True <=> I solved the constraint
+-- | A 'TcS' action which may solve a 'Ct' or emit new 'Cts'
+type CtDefaultingStrategy = Ct -> TcS WantedConstraints
 
 tryConstraintDefaulting :: WantedConstraints -> TcS WantedConstraints
 -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
@@ -404,16 +403,12 @@ tryConstraintDefaulting wc
   where
     go_wc :: Bool -> WantedConstraints -> TcS WantedConstraints
     -- Bool is true if there are enclosing given equalities
-    go_wc encl_eqs wc@(WC { wc_simple = simples, wc_impl = implics })
-      = do { simples' <- mapMaybeBagM (go_simple encl_eqs) simples
-           ; implics' <- mapBagM (go_implic encl_eqs) implics
-           ; return (wc { wc_simple = simples', wc_impl = implics' }) }
-
-    go_simple :: Bool -> Ct -> TcS (Maybe Ct)
-    go_simple encl_eqs ct
-      = do { solved <- tryCtDefaultingStrategy encl_eqs ct
-           ; if solved then return Nothing
-                       else return (Just ct) }
+    go_wc encl_eqs (WC { wc_simple = simples, wc_impl = implics, wc_errors = errs })
+      = do { new_wc <- foldMapM (tryCtDefaultingStrategy encl_eqs) simples
+           ; new_implics <- mapBagM (go_implic encl_eqs) implics
+           ; return $
+               new_wc `addImplics` new_implics `addDelayedErrors` errs
+           }
 
     go_implic :: Bool -> Implication -> TcS Implication
     go_implic encl_eqs implic@(Implic { ic_tclvl = tclvl
@@ -443,6 +438,10 @@ tryCtDefaultingStrategy encl_eqs
       defaultEquality encl_eqs :
       [] )
 
+-- | Don't default; keep the constraint as is.
+noDefaulting :: Ct -> TcS WantedConstraints
+noDefaulting ct = return (emptyWC { wc_simple = unitBag ct })
+
 -- | Default @ExceptionContext@ constraints to @emptyExceptionContext@.
 defaultExceptionContext :: CtDefaultingStrategy
 defaultExceptionContext ct
@@ -455,9 +454,9 @@ defaultExceptionContext ct
        ; setDictIfWanted ev EvCanonical ev_tm
          -- EvCanonical: see Note [CallStack and ExceptionContext hack]
          --              in GHC.Tc.Solver.Dict
-       ; return True }
+       ; return emptyWC }
   | otherwise
-  = return False
+  = noDefaulting ct
 
 -- | Default any remaining @CallStack@ constraints to empty @CallStack@s.
 -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
@@ -466,9 +465,9 @@ defaultCallStack ct
   | ClassPred cls tys <- classifyPredType (ctPred ct)
   , isJust (isCallStackPred cls tys)
   = do { solveCallStack (ctEvidence ct) EvCsEmpty
-       ; return True }
+       ; return emptyWC }
   | otherwise
-  = return False
+  = noDefaulting ct
 
 defaultEquality :: Bool -> CtDefaultingStrategy
 -- See Note [Defaulting equalities]
@@ -486,7 +485,7 @@ defaultEquality encl_eqs ct
                     case (getTyVar_maybe z_ty1, getTyVar_maybe z_ty2) of
                       (Just z_tv1, _) -> try_default_tv_nom z_tv1 z_ty2
                       (_, Just z_tv2) -> try_default_tv_nom z_tv2 z_ty1
-                      _               -> return False ;
+                      _               -> noDefaulting ct ;
 
            ReprEq -- See Note [Defaulting representational equalities]
 
@@ -494,18 +493,18 @@ defaultEquality encl_eqs ct
                   -- representational equalities such as Int ~R# Bool.
                   | CIrredCan (IrredCt { ir_reason }) <- ct
                   , isInsolubleReason ir_reason
-                  -> return False
+                  -> noDefaulting ct
 
                   -- Nor if there are enclosing equalities
                   -- See (DRE1) in Note [Defaulting representational equalities]
                   | encl_eqs
-                  -> return False
+                  -> noDefaulting ct
 
                   | otherwise
                   -> try_default_repr z_ty1 z_ty2
         }
   | otherwise
-  = return False
+  = noDefaulting ct
 
   where
     ev  = ctEvidence ct
@@ -543,7 +542,7 @@ defaultEquality encl_eqs ct
                  vcat [ ppr lhs_tv <+> char '~' <+>  ppr rhs_ty
                       , ppr (tyVarKind lhs_tv)
                       , ppr (typeKind rhs_ty) ]
-               ; return False }
+               ; noDefaulting ct }
 
         -- All tests passed: do the unification
         default_tv
@@ -551,42 +550,55 @@ defaultEquality encl_eqs ct
                ; unifyTyVar lhs_tv rhs_ty  -- NB: unifyTyVar adds to the
                                            -- TcS unification counter
                ; setEqIfWanted ev (mkReflCPH NomEq rhs_ty)
-               ; return True
+               ; return emptyWC
                }
 
     try_default_repr z_ty1 z_ty2
       = do { traceTcS "defaultEquality ReprEq {" $ vcat
               [ text "ct:" <+> ppr ct
-              , text "z_ty1:" <+> ppr z_ty1
-              , text "z_ty2:" <+> ppr z_ty2
+              , text "ty1:" <+> ppr z_ty1
+              , text "ty2:" <+> ppr z_ty2
               ]
             -- Promote this representational equality to a nominal equality.
             --
             -- This handles cases such as @IO alpha[tau] ~R# IO Int@
             -- by defaulting @alpha := Int@, which is useful in practice
             -- (see Note [Defaulting representational equalities]).
-           ; (co, new_eqs) <- wrapUnifier rws loc Nominal $ \uenv ->
-                              -- NB: nominal equality!
-                              uType uenv z_ty1 z_ty2
+           ; nom_ev <- newWantedNC loc rws $ mkNomEqPred z_ty1 z_ty2
 
-            -- Only accept this solution if no new equalities are produced
-            -- by the unifier.
-            --
-            -- See Note [Defaulting representational equalities].
-           ; if null new_eqs
-             then do { traceTcS "defaultEquality ReprEq } (yes)" empty
-                     ; setEqIfWanted ev $
-                       CPH { cph_co = mkSubCo co, cph_holes = emptyCoHoleSet }
-                     ; return True }
-             else do { traceTcS "defaultEquality ReprEq } (no)" empty
-                     ; return False } }
+            -- Call the solver on this nominal equality
+           ; residual_wc <-
+               nestTcS $
+                 solveWanteds (emptyWC { wc_simple = unitBag (mkNonCanonical $ CtWanted nom_ev) })
+
+           ; traceTcS "defaultEquality ReprEq }" $ vcat
+               [ text "ct:" <+> ppr ct
+               , text "ty1:" <+> ppr z_ty1
+               , text "ty2:" <+> ppr z_ty2
+               , text "ev:" <+> ppr ev
+               , text "nom_ev:" <+> ppr nom_ev
+               , text "residual_wc:" <+> ppr residual_wc
+               ]
+
+             -- Solve the representational equality from the nominal one
+             -- using mkSubCo
+           ; let nom_co = wantedCtEvCoercion nom_ev
+           ; setEqIfWanted ev $
+              CPH { cph_co = mkSubCo nom_co, cph_holes = emptyCoHoleSet }
+           ; return residual_wc }
 
 combineStrategies :: CtDefaultingStrategy -> CtDefaultingStrategy -> CtDefaultingStrategy
 combineStrategies default1 default2 ct
-  = do { solved <- default1 ct
-       ; case solved of
-           True  -> return True  -- default1 solved it!
-           False -> default2 ct  -- default1 failed, try default2
+  = do { wc1@(WC { wc_simple = simples1, wc_impl = implics1, wc_errors = errs1 })
+           <- default1 ct
+       ; if isEmptyWC wc1
+         then return emptyWC  -- default1 solved it!
+         else
+            -- Apply default2 to each simple constraint returned by default1
+            do { new_wc <- foldMapM default2 simples1
+               ; return $
+                   new_wc `addImplics` implics1 `addDelayedErrors` errs1
+               }
        }
 
 
@@ -749,15 +761,10 @@ user to provide additional type applications:
     sequenceNested_ = coerce $ sequence_ @( Compose f1 f2 ) @IO @()
 
 The plan for defaulting a representational equality, say [W] ty1 ~R# ty2,
-is thus as follows:
+is as follows:
 
-  1. attempt to unify ty1 ~# ty2 (at nominal role)
-  2. a. if this succeeds without deferring any constraints, accept this solution
-     b. otherwise, keep the original constraint.
-
-(2b) ensures that we don't degrade all error messages by always turning unsolved
-representational equalities into nominal ones; we only want to default a
-representational equality when we can fully solve it.
+  1. call the solver on the nominal equality ty1 ~# ty2
+  2. continue with any remaining constraints
 
 Note that this does not threaten principal types. Recall that the original worry
 (as per Note [Do not unify representational equalities]) was that we might have
@@ -768,6 +775,17 @@ Note that this does not threaten principal types. Recall that the original worry
 in which case unifying alpha := Int would be wrong, as the correct solution is
 alpha := Age. This worry doesn't concern us in top-level defaulting, because
 defaulting takes place after generalisation; it is fully monomorphic.
+
+This strategy is designed to handle situations such as:
+
+  type family F a = r | r -> a
+  type instance F Int = Bool
+
+  [W] F beta ~R Bool
+
+Here, we need to use the injectivity annotation to figure out that beta := Int
+is a valid solution. This means we need to invoke the solver, and not just
+the eager unifier (which does not make use of injectivity annotations).
 
 (DRE1) Suppose we have (see test UnliftedNewtypesCoerceFail)
          [G] Coercible a b

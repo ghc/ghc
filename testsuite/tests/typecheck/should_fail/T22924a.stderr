@@ -1,7 +1,5 @@
-
-T22924a.hs:9:5: error: [GHC-10283]
-    • Couldn't match representation of type ‘a’ with that of ‘[R]’
-        arising from a use of ‘coerce’
+T22924a.hs:9:5: error: [GHC-25897]
+    • Couldn't match type ‘a’ with ‘[R]’ arising from a use of ‘coerce’
       ‘a’ is a rigid type variable bound by
         the type signature for:
           f :: forall a. a -> [R]
@@ -9,3 +7,4 @@ T22924a.hs:9:5: error: [GHC-10283]
     • In the expression: coerce
       In an equation for ‘f’: f = coerce
     • Relevant bindings include f :: a -> [R] (bound at T22924a.hs:9:1)
+

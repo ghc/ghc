@@ -1,6 +1,7 @@
 T25679.hs:16:28: error: [GHC-39999]
     • No instance for ‘HasField "bar" Foo String’
         arising from a use of ‘getField’
+      NB: ‘Foo’ does not have a record field named ‘bar’.
     • In the second argument of ‘($)’, namely
         ‘getField @"bar" (Foo {foo = "hi"})’
       In the second argument of ‘($)’, namely
