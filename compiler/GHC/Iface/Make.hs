@@ -88,13 +88,13 @@ import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Deps
-import GHC.Unit.Module.WholeCoreBindings (encodeIfaceForeign)
+import GHC.Unit.Module.WholeCoreBindings (encodeIfaceForeign, emptyIfaceForeign)
 
 import Data.Function
 import Data.List ( sortBy )
 import Data.Ord
 import Data.IORef
-
+import Data.Traversable
 
 {-
 ************************************************************************
@@ -143,11 +143,13 @@ mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos stubs foreign_files 
           = updateDecl (mi_decls partial_iface) mb_stg_infos mb_cmm_infos
 
     -- See Note [Foreign stubs and TH bytecode linking]
-    foreign_ <- encodeIfaceForeign (hsc_logger hsc_env) (hsc_dflags hsc_env) stubs foreign_files
+    mi_simplified_core <- for (mi_simplified_core partial_iface) $ \simpl_core -> do
+        fs <- encodeIfaceForeign (hsc_logger hsc_env) (hsc_dflags hsc_env) stubs foreign_files
+        return $ (simpl_core { mi_sc_foreign = fs })
 
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env $ set_mi_foreign foreign_ $ set_mi_decls decls partial_iface
+      addFingerprints hsc_env $ set_mi_simplified_core mi_simplified_core $ set_mi_decls decls partial_iface
 
     -- Debug printing
     let unit_state = hsc_units hsc_env
@@ -289,7 +291,7 @@ mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> NameEnv FixItem -> Warnings GhcRn
          -> Bool
          -> SafeHaskellMode
-         -> Maybe ModIfaceSelfRecomp
+         -> Maybe IfaceSelfRecomp
          -> Maybe Docs
          -> ModDetails
          -> PartialModIface
@@ -316,8 +318,8 @@ mkIface_ hsc_env
         entities = typeEnvElts type_env
         show_linear_types = xopt LangExt.LinearTypes (hsc_dflags hsc_env)
 
-        extra_decls = if gopt Opt_WriteIfSimplifiedCore dflags then Just [ toIfaceTopBind b | b <- core_prog ]
-                                                               else Nothing
+        simplified_core = if gopt Opt_WriteIfSimplifiedCore dflags then Just (IfaceSimplifiedCore [ toIfaceTopBind b | b <- core_prog ] emptyIfaceForeign)
+                                                                   else Nothing
         decls  = [ tyThingToIfaceDecl show_linear_types entity
                  | entity <- entities,
                    let name = getName entity,
@@ -370,12 +372,12 @@ mkIface_ hsc_env
           & set_mi_anns             annotations
           & set_mi_top_env          rdrs
           & set_mi_decls            decls
-          & set_mi_extra_decls      extra_decls
+          & set_mi_simplified_core  simplified_core
           & set_mi_trust            trust_info
           & set_mi_trust_pkg        pkg_trust_req
           & set_mi_complete_matches (icomplete_matches)
           & set_mi_docs             docs
-          & set_mi_final_exts       ()
+          & set_mi_abi_hashes       ()
           & set_mi_ext_fields       emptyExtensibleFields
           & set_mi_hi_bytes         PartialIfaceBinHandle
 

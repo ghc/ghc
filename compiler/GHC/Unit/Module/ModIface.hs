@@ -11,18 +11,20 @@
 module GHC.Unit.Module.ModIface
    ( ModIface
    , ModIface_
-      ( mi_module
+      ( mi_mod_info
+      , mi_module
       , mi_sig_of
       , mi_hsc_src
+      , mi_iface_hash
       , mi_deps
+      , mi_public
       , mi_exports
       , mi_fixities
       , mi_warns
       , mi_anns
       , mi_decls
       , mi_defaults
-      , mi_extra_decls
-      , mi_foreign
+      , mi_simplified_core
       , mi_top_env
       , mi_insts
       , mi_fam_insts
@@ -31,12 +33,17 @@ module GHC.Unit.Module.ModIface
       , mi_trust_pkg
       , mi_complete_matches
       , mi_docs
-      , mi_final_exts
+      , mi_abi_hashes
       , mi_ext_fields
       , mi_hi_bytes
       , mi_self_recomp_info
+      , mi_fix_fn
+      , mi_decl_warn_fn
+      , mi_export_warn_fn
+      , mi_hash_fn
       )
    , pattern ModIface
+   , set_mi_mod_info
    , set_mi_module
    , set_mi_sig_of
    , set_mi_hsc_src
@@ -52,24 +59,34 @@ module GHC.Unit.Module.ModIface
    , set_mi_rules
    , set_mi_decls
    , set_mi_defaults
-   , set_mi_extra_decls
-   , set_mi_foreign
+   , set_mi_simplified_core
    , set_mi_top_env
    , set_mi_trust
    , set_mi_trust_pkg
    , set_mi_complete_matches
    , set_mi_docs
-   , set_mi_final_exts
+   , set_mi_abi_hashes
    , set_mi_ext_fields
+   , set_mi_caches
+   , set_mi_decl_warn_fn
+   , set_mi_export_warn_fn
+   , set_mi_fix_fn
+   , set_mi_hash_fn
    , completePartialModIface
    , IfaceBinHandle(..)
    , PartialModIface
-   , ModIfaceBackend (..)
-   , ModIfaceSelfRecomp (..)
+   , IfaceAbiHashes (..)
+   , IfaceSelfRecomp (..)
+   , IfaceCache (..)
+   , IfaceSimplifiedCore (..)
    , withSelfRecomp
    , IfaceDeclExts
-   , IfaceBackendExts
+   , IfaceAbiHashesExts
    , IfaceExport
+   , IfacePublic_(..)
+   , IfacePublic
+   , PartialIfacePublic
+   , IfaceModInfo(..)
    , WhetherHasOrphans
    , WhetherHasFamInst
    , IfaceTopEnv (..)
@@ -77,6 +94,7 @@ module GHC.Unit.Module.ModIface
    , mi_boot
    , mi_fix
    , mi_semantic_module
+   , mi_mod_info_semantic_module
    , mi_free_holes
    , mi_mnwib
    , mi_flag_hash
@@ -85,6 +103,11 @@ module GHC.Unit.Module.ModIface
    , mi_plugin_hash
    , mi_src_hash
    , mi_usages
+   , mi_mod_hash
+   , mi_orphan
+   , mi_finsts
+   , mi_exp_hash
+   , mi_orphan_hash
    , renameFreeHoles
    , emptyPartialModIface
    , emptyFullModIface
@@ -106,7 +129,7 @@ import GHC.Iface.Recomp.Types
 import GHC.Unit
 import GHC.Unit.Module.Deps
 import GHC.Unit.Module.Warnings
-import GHC.Unit.Module.WholeCoreBindings (IfaceForeign (..), emptyIfaceForeign)
+import GHC.Unit.Module.WholeCoreBindings (IfaceForeign (..))
 
 
 import GHC.Types.Avail
@@ -147,36 +170,36 @@ We can build a full interface file two ways:
 type PartialModIface = ModIface_ 'ModIfaceCore
 type ModIface = ModIface_ 'ModIfaceFinal
 
--- | Extends a PartialModIface with information which is either:
--- * Computed after codegen
--- * Or computed just before writing the iface to disk. (Hashes)
--- In order to fully instantiate it.
-data ModIfaceBackend = ModIfaceBackend
-  { mi_mod_hash :: !Fingerprint
+type PartialIfacePublic = IfacePublic_ 'ModIfaceCore
+type IfacePublic = IfacePublic_ 'ModIfaceFinal
+
+-- | Extends a PartialModIface with hashes of the ABI.
+--
+-- * The mi_mod_hash is the hash of the entire ABI
+-- * THe other fields are more specific hashes of parts of the ABI
+data IfaceAbiHashes = IfaceAbiHashes
+  { mi_abi_mod_hash :: !Fingerprint
     -- ^ Hash of the ABI only
-  , mi_iface_hash :: !Fingerprint
-    -- ^ Hash of the whole interface
-  , mi_orphan :: !WhetherHasOrphans
+  , mi_abi_orphan :: !WhetherHasOrphans
     -- ^ Whether this module has orphans
-  , mi_finsts :: !WhetherHasFamInst
+  , mi_abi_finsts :: !WhetherHasFamInst
     -- ^ Whether this module has family instances. See Note [The type family
     -- instance consistency story].
-  , mi_exp_hash :: !Fingerprint
+  , mi_abi_exp_hash :: !Fingerprint
     -- ^ Hash of export list
-  , mi_orphan_hash :: !Fingerprint
+  , mi_abi_orphan_hash :: !Fingerprint
     -- ^ Hash for orphan rules, class and family instances combined
+    -- NOT transitive
+  }
 
-    -- Cached environments for easy lookup. These are computed (lazily) from
-    -- other fields and are not put into the interface file.
-    -- Not really produced by the backend but there is no need to create them
-    -- any earlier.
-  , mi_decl_warn_fn :: !(OccName -> Maybe (WarningTxt GhcRn))
+data IfaceCache = IfaceCache
+  { mi_cache_decl_warn_fn :: !(OccName -> Maybe (WarningTxt GhcRn))
     -- ^ Cached lookup for 'mi_warns' for declaration deprecations
-  , mi_export_warn_fn :: !(Name -> Maybe (WarningTxt GhcRn))
+  , mi_cache_export_warn_fn :: !(Name -> Maybe (WarningTxt GhcRn))
     -- ^ Cached lookup for 'mi_warns' for export deprecations
-  , mi_fix_fn :: !(OccName -> Maybe Fixity)
+  , mi_cache_fix_fn :: !(OccName -> Maybe Fixity)
     -- ^ Cached lookup for 'mi_fixities'
-  , mi_hash_fn :: !(OccName -> Maybe (OccName, Fingerprint))
+  , mi_cache_hash_fn :: !(OccName -> Maybe (OccName, Fingerprint))
     -- ^ Cached lookup for 'mi_decls'. The @Nothing@ in 'mi_hash_fn' means that
     -- the thing isn't in decls. It's useful to know that when seeing if we are
     -- up to date wrt. the old interface. The 'OccName' is the parent of the
@@ -195,9 +218,9 @@ type family IfaceDeclExts (phase :: ModIfacePhase) = decl | decl -> phase where
   IfaceDeclExts 'ModIfaceCore = IfaceDecl
   IfaceDeclExts 'ModIfaceFinal = (Fingerprint, IfaceDecl)
 
-type family IfaceBackendExts (phase :: ModIfacePhase) = bk | bk -> phase where
-  IfaceBackendExts 'ModIfaceCore = ()
-  IfaceBackendExts 'ModIfaceFinal = ModIfaceBackend
+type family IfaceAbiHashesExts (phase :: ModIfacePhase) = bk | bk -> phase where
+  IfaceAbiHashesExts 'ModIfaceCore = ()
+  IfaceAbiHashesExts 'ModIfaceFinal = IfaceAbiHashes
 
 -- | In-memory byte array representation of a 'ModIface'.
 --
@@ -212,7 +235,7 @@ data IfaceBinHandle (phase :: ModIfacePhase) where
   FullIfaceBinHandle :: !(Strict.Maybe FullBinData) -> IfaceBinHandle 'ModIfaceFinal
 
 
-withSelfRecomp :: ModIface_ phase -> r -> (ModIfaceSelfRecomp -> r) -> r
+withSelfRecomp :: ModIface_ phase -> r -> (IfaceSelfRecomp -> r) -> r
 withSelfRecomp iface nk jk =
   case mi_self_recomp_info iface of
     Nothing -> nk
@@ -220,34 +243,80 @@ withSelfRecomp iface nk jk =
 
 
 
--- | A 'ModIface' plus a 'ModDetails' summarises everything we know
--- about a compiled module.  The 'ModIface' is the stuff *before* linking,
--- and can be written out to an interface file. The 'ModDetails is after
--- linking and can be completely recovered from just the 'ModIface'.
+-- | A 'ModIface' summarises everything we know
+-- about a compiled module.
 --
--- When we read an interface file, we also construct a 'ModIface' from it,
--- except that we explicitly make the 'mi_decls' and a few other fields empty;
--- as when reading we consolidate the declarations etc. into a number of indexed
--- maps and environments in the 'ExternalPackageState'.
+-- See Note [Structure of ModIface] for information about what belongs in each field.
 --
--- See Note [Strictness in ModIface] to learn about why some fields are
--- strict and others are not.
+-- See Note [Strictness in ModIface] to learn about why all the fields are lazy.
 --
 -- See Note [Private fields in ModIface] to learn why we don't export any of the
 -- fields.
 data ModIface_ (phase :: ModIfacePhase)
   = PrivateModIface {
-        mi_module_     :: !Module,             -- ^ Name of the module we are for
-        mi_sig_of_     :: !(Maybe Module),     -- ^ Are we a sig of another mod?
+        mi_hi_bytes_ :: !(IfaceBinHandle phase),
+                -- ^ A serialised in-memory buffer of this 'ModIface'.
+                -- If this handle is given, we can avoid serialising the 'ModIface'
+                -- when writing this 'ModIface' to disk, and write this buffer to disk instead.
+                -- See Note [Sharing of ModIface].
+        mi_iface_hash_  :: Fingerprint, -- A hash of the whole interface
 
-        mi_hsc_src_    :: !HscSource,          -- ^ Boot? Signature?
+        mi_mod_info_     :: IfaceModInfo,
+                -- ^ Meta information about the module the interface file is for
 
         mi_deps_     :: Dependencies,
                 -- ^ The dependencies of the module.  This is
                 -- consulted for directly-imported modules, but not
                 -- for anything else (hence lazy)
+                -- MP: Needs to be refactored (#25844)
 
-        mi_exports_  :: ![IfaceExport],
+        mi_public_ :: IfacePublic_ phase,
+                -- ^ The parts of interface which are used by other modules when
+                -- importing this module. The main, original part of an interface.
+
+
+        mi_self_recomp_ :: Maybe IfaceSelfRecomp,
+                -- ^ Information needed for checking self-recompilation.
+                -- See Note [Self recompilation information in interface files]
+
+        mi_simplified_core_ :: Maybe IfaceSimplifiedCore,
+                -- ^ The part of the interface written when `-fwrite-if-simplified-core` is enabled.
+                -- These parts are used to restart bytecode generation.
+
+        mi_docs_ :: Maybe Docs,
+                -- ^ Docstrings and related data for use by haddock, the ghci
+                -- @:doc@ command, and other tools.
+                --
+                -- @Just _@ @<=>@ the module was built with @-haddock@.
+
+        mi_top_env_  :: IfaceTopEnv,
+                -- ^ Just enough information to reconstruct the top level environment in
+                -- the /original source/ code for this module. which
+                -- is NOT the same as mi_exports, nor mi_decls (which
+                -- may contains declarations for things not actually
+                -- defined by the user).  Used for GHCi and for inspecting
+                -- the contents of modules via the GHC API only.
+
+        mi_ext_fields_ :: ExtensibleFields
+                -- ^ Additional optional fields, where the Map key represents
+                -- the field name, resulting in a (size, serialized data) pair.
+                -- Because the data is intended to be serialized through the
+                -- internal `Binary` class (increasing compatibility with types
+                -- using `Name` and `FastString`, such as HIE), this format is
+                -- chosen over `ByteString`s.
+     }
+
+-- | Meta information about the module the interface file is for
+data IfaceModInfo = IfaceModInfo {
+  mi_mod_info_module :: Module, -- ^ Name of the module we are for
+  mi_mod_info_sig_of :: Maybe Module, -- ^ Are we a sig of another mod?
+  mi_mod_info_hsc_src :: HscSource -- ^ Boot? Signature?
+}
+
+-- | The public interface of a module which are used by other modules when importing this module.
+-- The ABI of a module.
+data IfacePublic_ phase = IfacePublic {
+        mi_exports_  :: [IfaceExport],
                 -- ^ Exports
                 -- Kept sorted by (mod,occ), to make version comparisons easier
                 -- Records the modules that are the declaration points for things
@@ -273,25 +342,10 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- Ditto data constructors, class operations, except that
                 -- the hash of the parent class/tycon changes
 
-        mi_extra_decls_ :: Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo],
-                -- ^ Extra variable definitions which are **NOT** exposed but when
-                -- combined with mi_decls allows us to restart code generation.
-                -- See Note [Interface Files with Core Definitions] and Note [Interface File with Core: Sharing RHSs]
-
-        mi_foreign_ :: !IfaceForeign,
-                -- ^ Foreign stubs and files to supplement 'mi_extra_decls_'.
-                -- See Note [Foreign stubs and TH bytecode linking]
 
         mi_defaults_ :: [IfaceDefault],
                 -- ^ default declarations exported by the module
 
-        mi_top_env_  :: IfaceTopEnv,
-                -- ^ Just enough information to reconstruct the top level environment in
-                -- the /original source/ code for this module. which
-                -- is NOT the same as mi_exports, nor mi_decls (which
-                -- may contains declarations for things not actually
-                -- defined by the user).  Used for GHCi and for inspecting
-                -- the contents of modules via the GHC API only.
 
                 -- Instance declarations and rules
         mi_insts_       :: [IfaceClsInst],     -- ^ Sorted class instance
@@ -299,53 +353,81 @@ data ModIface_ (phase :: ModIfacePhase)
         mi_rules_       :: [IfaceRule],     -- ^ Sorted rules
 
 
-        mi_trust_     :: !IfaceTrustInfo,
+        mi_trust_     :: IfaceTrustInfo,
                 -- ^ Safe Haskell Trust information for this module.
 
-        mi_trust_pkg_ :: !Bool,
+        mi_trust_pkg_ :: Bool,
                 -- ^ Do we require the package this module resides in be trusted
                 -- to trust this module? This is used for the situation where a
                 -- module is Safe (so doesn't require the package be trusted
                 -- itself) but imports some trustworthy modules from its own
                 -- package (which does require its own package be trusted).
                 -- See Note [Trust Own Package] in GHC.Rename.Names
-        mi_complete_matches_ :: ![IfaceCompleteMatch],
+        mi_complete_matches_ :: [IfaceCompleteMatch],
+                -- ^ {-# COMPLETE #-} declarations
 
-        mi_docs_ :: !(Maybe Docs),
-                -- ^ Docstrings and related data for use by haddock, the ghci
-                -- @:doc@ command, and other tools.
-                --
-                -- @Just _@ @<=>@ the module was built with @-haddock@.
+        mi_caches_ :: IfaceCache,
+                -- ^ Cached lookups of some parts of mi_public
 
-        mi_final_exts_ :: !(IfaceBackendExts phase),
-                -- ^ Either `()` or `ModIfaceBackend` for
+        mi_abi_hashes_ :: (IfaceAbiHashesExts phase)
+                -- ^ Either `()` or `IfaceAbiHashes` for
                 -- a fully instantiated interface.
+                -- These fields are hashes of different parts of the public interface.
+}
 
-        mi_ext_fields_ :: !ExtensibleFields,
-                -- ^ Additional optional fields, where the Map key represents
-                -- the field name, resulting in a (size, serialized data) pair.
-                -- Because the data is intended to be serialized through the
-                -- internal `Binary` class (increasing compatibility with types
-                -- using `Name` and `FastString`, such as HIE), this format is
-                -- chosen over `ByteString`s.
-                --
+mkIfacePublic :: [IfaceExport]
+                  -> [IfaceDeclExts 'ModIfaceFinal]
+                  -> [(OccName, Fixity)]
+                  -> IfaceWarnings
+                  -> [IfaceAnnotation]
+                  -> [IfaceDefault]
+                  -> [IfaceClsInst]
+                  -> [IfaceFamInst]
+                  -> [IfaceRule]
+                  -> IfaceTrustInfo
+                  -> Bool
+                  -> [IfaceCompleteMatch]
+                  -> IfaceAbiHashes
+                  -> IfacePublic
+mkIfacePublic exports decls fixities warns anns defaults insts fam_insts rules trust trust_pkg complete_matches abi_hashes = IfacePublic {
+  mi_exports_ = exports,
+  mi_decls_ = decls,
+  mi_fixities_ = fixities,
+  mi_warns_ = warns,
+  mi_anns_ = anns,
+  mi_defaults_ = defaults,
+  mi_insts_ = insts,
+  mi_fam_insts_ = fam_insts,
+  mi_rules_ = rules,
+  mi_trust_ = trust,
+  mi_trust_pkg_ = trust_pkg,
+  mi_complete_matches_ = complete_matches,
+  mi_caches_ = IfaceCache {
+    mi_cache_decl_warn_fn = mkIfaceDeclWarnCache $ fromIfaceWarnings warns,
+    mi_cache_export_warn_fn = mkIfaceExportWarnCache $ fromIfaceWarnings warns,
+    mi_cache_fix_fn = mkIfaceFixCache fixities,
+    mi_cache_hash_fn = mkIfaceHashCache decls
+  },
+  mi_abi_hashes_ = abi_hashes
+}
 
-        mi_hi_bytes_ :: !(IfaceBinHandle phase),
-                -- ^ A serialised in-memory buffer of this 'ModIface'.
-                -- If this handle is given, we can avoid serialising the 'ModIface'
-                -- when writing this 'ModIface' to disk, and write this buffer to disk instead.
-                -- See Note [Sharing of ModIface].
-
-        mi_self_recomp_info_ :: !(Maybe ModIfaceSelfRecomp)
-                -- ^ Information needed for checking self-recompilation.
-                -- See Note [Self recompilation information in interface files]
-     }
+-- | The information needed to restart bytecode generation.
+-- Enabled by `-fwrite-if-simplified-core`.
+data IfaceSimplifiedCore = IfaceSimplifiedCore {
+  mi_sc_extra_decls :: [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo]
+  -- ^ Extra variable definitions which are **NOT** exposed but when
+  -- combined with mi_decls allows us to restart code generation.
+  -- See Note [Interface Files with Core Definitions] and Note [Interface File with Core: Sharing RHSs]
+  , mi_sc_foreign :: IfaceForeign
+  -- ^ Foreign stubs and files to supplement 'mi_extra_decls_'.
+  -- See Note [Foreign stubs and TH bytecode linking]
+}
 
 -- Enough information to reconstruct the top level environment for a module
 data IfaceTopEnv
   = IfaceTopEnv
-  { ifaceTopExports :: !DetOrdAvails -- ^ all top level things in this module, including unexported stuff
-  , ifaceImports :: ![IfaceImport]    -- ^ all the imports in this module
+  { ifaceTopExports :: DetOrdAvails -- ^ all top level things in this module, including unexported stuff
+  , ifaceImports :: [IfaceImport]    -- ^ all the imports in this module
   }
 
 instance NFData IfaceTopEnv where
@@ -362,6 +444,35 @@ instance Binary IfaceTopEnv where
 
 
 {-
+Note [Structure of ModIface]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ModIface structure is divided into several logical parts:
+
+1. mi_mod_info: Basic module metadata (name, version, etc.)
+
+2. mi_public: The public interface of the module, which includes:
+   - Exports, declarations, fixities, warnings, annotations
+   - Class and type family instances
+   - Rewrite rules and COMPLETE pragmas
+   - Safe Haskell and package trust information
+   - ABI hashes for recompilation checking
+
+4. mi_self_recomp: Information needed for self-recompilation checking
+   (see Note [Self recompilation information in interface files])
+
+5. mi_simplified_core: Optional simplified Core for bytecode generation
+   (only present when -fwrite-if-simplified-core is enabled)
+
+6. mi_docs: Optional documentation (only present when -haddock is enabled)
+
+7. mi_top_env: Information about the top-level environment of the original source
+
+8. mi_ext_fields: Additional fields for extensibility
+
+This structure helps organize the interface data according to its purpose and usage
+patterns. Different parts of the compiler use different fields. By separating them
+logically in the interface we can arrange to only deserialize the fields that are needed.
+
 Note [Strictness in ModIface]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -371,7 +482,7 @@ The ModIface is the Haskell representation of an interface (.hi) file.
   that we have just compiled
 * For packages that we depend on we load the ModIface from disk.
 
-Some fields in the ModIface are deliberately lazy because when we read
+All fields in the ModIface are deliberately lazy because when we read
 an interface file we don't always need all the parts. For example, an
 interface file contains information about documentation which is often
 not needed during compilation. This is achieved using the lazyPut/lazyGet pair.
@@ -384,23 +495,43 @@ That's why in GHC.Driver.Main.hscMaybeWriteIface there is the call to
 forceModIface.
 -}
 
-mi_flag_hash :: ModIface_ phase -> Maybe (Fingerprint, Maybe IfaceDynFlags)
-mi_flag_hash = fmap mi_sr_flag_hash . mi_self_recomp_info_
+mi_flag_hash :: ModIface_ phase -> Maybe (FingerprintWithValue IfaceDynFlags)
+mi_flag_hash = fmap mi_sr_flag_hash . mi_self_recomp_
 
 mi_opt_hash :: ModIface_ phase -> Maybe Fingerprint
-mi_opt_hash = fmap mi_sr_opt_hash . mi_self_recomp_info_
+mi_opt_hash = fmap mi_sr_opt_hash . mi_self_recomp_
 
 mi_hpc_hash :: ModIface_ phase -> Maybe Fingerprint
-mi_hpc_hash = fmap mi_sr_hpc_hash . mi_self_recomp_info_
+mi_hpc_hash = fmap mi_sr_hpc_hash . mi_self_recomp_
 
 mi_src_hash :: ModIface_ phase -> Maybe Fingerprint
-mi_src_hash = fmap mi_sr_src_hash . mi_self_recomp_info_
+mi_src_hash = fmap mi_sr_src_hash . mi_self_recomp_
 
 mi_usages :: ModIface_ phase -> Maybe [Usage]
-mi_usages = fmap mi_sr_usages . mi_self_recomp_info_
+mi_usages = fmap mi_sr_usages . mi_self_recomp_
 
 mi_plugin_hash :: ModIface_ phase -> Maybe Fingerprint
-mi_plugin_hash = fmap mi_sr_plugin_hash . mi_self_recomp_info_
+mi_plugin_hash = fmap mi_sr_plugin_hash . mi_self_recomp_
+
+-- | Accessor for the module hash of the ABI from a ModIface.
+mi_mod_hash :: ModIface -> Fingerprint
+mi_mod_hash iface = mi_abi_mod_hash (mi_abi_hashes iface)
+
+-- | Accessor for whether this module has orphans from a ModIface.
+mi_orphan :: ModIface -> WhetherHasOrphans
+mi_orphan iface = mi_abi_orphan (mi_abi_hashes iface)
+
+-- | Accessor for whether this module has family instances from a ModIface.
+mi_finsts :: ModIface -> WhetherHasFamInst
+mi_finsts iface = mi_abi_finsts (mi_abi_hashes iface)
+
+-- | Accessor for the hash of the export list from a ModIface.
+mi_exp_hash :: ModIface -> Fingerprint
+mi_exp_hash iface = mi_abi_exp_hash (mi_abi_hashes iface)
+
+-- | Accessor for the hash of orphan rules, class and family instances combined from a ModIface.
+mi_orphan_hash :: ModIface -> Fingerprint
+mi_orphan_hash iface = mi_abi_orphan_hash (mi_abi_hashes iface)
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
 -- file.
@@ -415,15 +546,18 @@ mi_mnwib iface = GWIB (moduleName $ mi_module iface) (mi_boot iface)
 -- | Lookups up a (possibly cached) fixity from a 'ModIface'. If one cannot be
 -- found, 'defaultFixity' is returned instead.
 mi_fix :: ModIface -> OccName -> Fixity
-mi_fix iface name = mi_fix_fn (mi_final_exts iface) name `orElse` defaultFixity
+mi_fix iface name = mi_fix_fn iface name `orElse` defaultFixity
 
 -- | The semantic module for this interface; e.g., if it's a interface
 -- for a signature, if 'mi_module' is @p[A=<A>]:A@, 'mi_semantic_module'
 -- will be @<A>@.
-mi_semantic_module :: ModIface_ a -> Module
-mi_semantic_module iface = case mi_sig_of iface of
-                            Nothing -> mi_module iface
+mi_mod_info_semantic_module :: IfaceModInfo -> Module
+mi_mod_info_semantic_module iface = case mi_mod_info_sig_of iface of
+                            Nothing -> mi_mod_info_module iface
                             Just mod -> mod
+
+mi_semantic_module :: ModIface_ a -> Module
+mi_semantic_module iface = mi_mod_info_semantic_module (mi_mod_info iface)
 
 -- | The "precise" free holes, e.g., the signatures that this
 -- 'ModIface' depends on.
@@ -455,191 +589,229 @@ renameFreeHoles fhs insts =
 
 -- See Note [Strictness in ModIface] about where we use lazyPut vs put
 instance Binary ModIface where
-   put_ bh (PrivateModIface {
-                 mi_module_    = mod,
-                 mi_sig_of_    = sig_of,
-                 mi_hsc_src_   = hsc_src,
-                 mi_hi_bytes_  = _hi_bytes, -- We don't serialise the 'mi_hi_bytes_', as it itself
+   put_ bh (PrivateModIface
+                { mi_hi_bytes_  = _hi_bytes, -- We don't serialise the 'mi_hi_bytes_', as it itself
                                             -- may contain an in-memory byte array buffer for this
                                             -- 'ModIface'. If we used 'put_' on this 'ModIface', then
                                             -- we likely have a good reason, and do not want to reuse
                                             -- the byte array.
                                             -- See Note [Private fields in ModIface]
+                 mi_mod_info_    = mod_info,
+                 mi_iface_hash_ = iface_hash,
                  mi_deps_      = deps,
-                 mi_exports_   = exports,
-                 mi_fixities_  = fixities,
-                 mi_warns_     = warns,
-                 mi_anns_      = anns,
-                 mi_decls_     = decls,
-                 mi_extra_decls_ = extra_decls,
-                 mi_foreign_   = foreign_,
-                 mi_defaults_  = defaults,
-                 mi_insts_     = insts,
-                 mi_fam_insts_ = fam_insts,
-                 mi_rules_     = rules,
-                 mi_trust_     = trust,
-                 mi_trust_pkg_ = trust_pkg,
-                 mi_complete_matches_ = complete_matches,
+                 mi_public_    = public,
                  mi_top_env_    = top_env,
                  mi_docs_      = docs,
                  mi_ext_fields_ = _ext_fields, -- Don't `put_` this in the instance so we
                                               -- can deal with it's pointer in the header
                                               -- when we write the actual file
-                 mi_self_recomp_info_ = self_recomp,
-                 mi_final_exts_ = ModIfaceBackend {
-                   mi_mod_hash = mod_hash,
-                   mi_iface_hash = iface_hash,
-                   mi_orphan = orphan,
-                   mi_finsts = hasFamInsts,
-                   mi_exp_hash = exp_hash,
-                   mi_orphan_hash = orphan_hash
-                 }}) = do
-        put_ bh mod
-        put_ bh sig_of
-        put_ bh hsc_src
-        put_ bh self_recomp
-        put_ bh mod_hash
+                 mi_self_recomp_ = self_recomp,
+                 mi_simplified_core_ = simplified_core
+                 }) = do
+        put_ bh mod_info
         put_ bh iface_hash
-        put_ bh orphan
-        put_ bh hasFamInsts
         lazyPut bh deps
-        put_ bh exports
-        put_ bh exp_hash
-        put_ bh fixities
-        lazyPut bh warns
-        lazyPut bh anns
-        put_ bh decls
-        put_ bh extra_decls
-        put_ bh defaults
-        put_ bh foreign_
-        put_ bh insts
-        put_ bh fam_insts
-        lazyPut bh rules
-        put_ bh orphan_hash
-        put_ bh trust
-        put_ bh trust_pkg
-        put_ bh complete_matches
+        lazyPut bh public
         lazyPut bh top_env
         lazyPutMaybe bh docs
+        lazyPutMaybe bh self_recomp
+        lazyPutMaybe bh simplified_core
 
    get bh = do
-        mod         <- get bh
-        sig_of      <- get bh
-        hsc_src     <- get bh
-        self_recomp_info <- get bh
-        mod_hash    <- get bh
+        mod_info    <- get bh
         iface_hash  <- get bh
-        orphan      <- get bh
-        hasFamInsts <- get bh
         deps        <- lazyGet bh
-        exports     <- {-# SCC "bin_exports" #-} get bh
-        exp_hash    <- get bh
-        fixities    <- {-# SCC "bin_fixities" #-} get bh
-        warns       <- {-# SCC "bin_warns" #-} lazyGet bh
-        anns        <- {-# SCC "bin_anns" #-} lazyGet bh
-        decls       <- {-# SCC "bin_tycldecls" #-} get bh
-        extra_decls <- get bh
-        defaults    <- get bh
-        foreign_    <- get bh
-        insts       <- {-# SCC "bin_insts" #-} get bh
-        fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
-        rules       <- {-# SCC "bin_rules" #-} lazyGet bh
-        orphan_hash <- get bh
-        trust       <- get bh
-        trust_pkg   <- get bh
-        complete_matches <- get bh
+        public      <- lazyGet bh
         top_env     <- lazyGet bh
         docs        <- lazyGetMaybe bh
+        self_recomp <- lazyGetMaybe bh
+        simplified_core <- lazyGetMaybe bh
+
         return (PrivateModIface {
-                 mi_module_      = mod,
-                 mi_sig_of_      = sig_of,
-                 mi_hsc_src_     = hsc_src,
-                 mi_hi_bytes_    =
-                                   -- We can't populate this field here, as we are
-                                   -- missing the 'mi_ext_fields_' field, which is
-                                   -- handled in 'getIfaceWithExtFields'.
-                                   FullIfaceBinHandle Strict.Nothing,
+                 mi_mod_info_   = mod_info,
+                 mi_iface_hash_ = iface_hash,
                  mi_deps_        = deps,
-                 mi_exports_     = exports,
-                 mi_anns_        = anns,
-                 mi_fixities_    = fixities,
-                 mi_warns_       = warns,
-                 mi_decls_       = decls,
-                 mi_extra_decls_ = extra_decls,
-                 mi_foreign_     = foreign_,
-                 mi_defaults_    = defaults,
-                 mi_insts_       = insts,
-                 mi_fam_insts_   = fam_insts,
-                 mi_rules_       = rules,
-                 mi_trust_       = trust,
-                 mi_trust_pkg_   = trust_pkg,
-                        -- And build the cached values
-                 mi_complete_matches_ = complete_matches,
+                 mi_public_      = public,
+                 mi_simplified_core_ = simplified_core,
                  mi_docs_        = docs,
                  mi_top_env_     = top_env,
-                 mi_ext_fields_  = emptyExtensibleFields, -- placeholder because this is dealt
-                                                         -- with specially when the file is read
-                 mi_self_recomp_info_ = self_recomp_info,
-                 mi_final_exts_ = ModIfaceBackend {
-                   mi_mod_hash = mod_hash,
-                   mi_iface_hash = iface_hash,
-                   mi_orphan = orphan,
-                   mi_finsts = hasFamInsts,
-                   mi_exp_hash = exp_hash,
-                   mi_orphan_hash = orphan_hash,
-                   mi_decl_warn_fn = mkIfaceDeclWarnCache $ fromIfaceWarnings warns,
-                   mi_export_warn_fn = mkIfaceExportWarnCache $ fromIfaceWarnings warns,
-                   mi_fix_fn = mkIfaceFixCache fixities,
-                   mi_hash_fn = mkIfaceHashCache decls
-                 }})
+                 mi_self_recomp_ = self_recomp,
+                -- placeholder because this is dealt
+                -- with specially when the file is read
+                 mi_ext_fields_  = emptyExtensibleFields,
+                 -- We can't populate this field here, as we are
+                 -- missing the 'mi_ext_fields_' field, which is
+                 -- handled in 'getIfaceWithExtFields'.
+                 mi_hi_bytes_    = FullIfaceBinHandle Strict.Nothing
+                 })
 
+instance Binary IfaceModInfo where
+  put_ bh (IfaceModInfo { mi_mod_info_module = mod
+                        , mi_mod_info_sig_of = sig_of
+                        , mi_mod_info_hsc_src = hsc_src
+                        }) = do
+    put_ bh mod
+    put_ bh sig_of
+    put_ bh hsc_src
+
+  get bh = do
+    mod <- get bh
+    sig_of <- get bh
+    hsc_src <- get bh
+    return (IfaceModInfo { mi_mod_info_module = mod
+                         , mi_mod_info_sig_of = sig_of
+                         , mi_mod_info_hsc_src = hsc_src
+                         })
+
+
+instance Binary (IfacePublic_ 'ModIfaceFinal) where
+  put_ bh (IfacePublic { mi_exports_ = exports
+                       , mi_decls_ = decls
+                       , mi_fixities_ = fixities
+                       , mi_warns_ = warns
+                       , mi_anns_ = anns
+                       , mi_defaults_ = defaults
+                       , mi_insts_ = insts
+                       , mi_fam_insts_ = fam_insts
+                       , mi_rules_ = rules
+                       , mi_trust_ = trust
+                       , mi_trust_pkg_ = trust_pkg
+                       , mi_complete_matches_ = complete_matches
+                       , mi_abi_hashes_ = abi_hashes
+                       }) = do
+
+    lazyPut bh exports
+    lazyPut bh decls
+    lazyPut bh fixities
+    lazyPut bh warns
+    lazyPut bh anns
+    lazyPut bh defaults
+    lazyPut bh insts
+    lazyPut bh fam_insts
+    lazyPut bh rules
+    lazyPut bh trust
+    lazyPut bh trust_pkg
+    lazyPut bh complete_matches
+    lazyPut bh abi_hashes
+
+  get bh = do
+    exports <- lazyGet bh
+    decls <- lazyGet bh
+    fixities <- lazyGet bh
+    warns <- lazyGet bh
+    anns <- lazyGet bh
+    defaults <- lazyGet bh
+    insts <- lazyGet bh
+    fam_insts <- lazyGet bh
+    rules <- lazyGet bh
+    trust <- lazyGet bh
+    trust_pkg <- lazyGet bh
+    complete_matches <- lazyGet bh
+    abi_hashes <- lazyGet bh
+    return (mkIfacePublic exports decls fixities warns anns defaults insts fam_insts rules trust trust_pkg complete_matches abi_hashes)
+
+instance Binary IfaceAbiHashes where
+  put_ bh (IfaceAbiHashes { mi_abi_mod_hash = mod_hash
+                              , mi_abi_orphan = orphan
+                              , mi_abi_finsts = hasFamInsts
+                              , mi_abi_exp_hash = exp_hash
+                              , mi_abi_orphan_hash = orphan_hash
+                              }) = do
+    put_ bh mod_hash
+    put_ bh orphan
+    put_ bh hasFamInsts
+    put_ bh exp_hash
+    put_ bh orphan_hash
+  get bh =  do
+    mod_hash <- get bh
+    orphan <- get bh
+    hasFamInsts <- get bh
+    exp_hash <- get bh
+    orphan_hash <- get bh
+    return $ IfaceAbiHashes  {
+                   mi_abi_mod_hash = mod_hash,
+                   mi_abi_orphan = orphan,
+                   mi_abi_finsts = hasFamInsts,
+                   mi_abi_exp_hash = exp_hash,
+                   mi_abi_orphan_hash = orphan_hash
+                   }
+
+instance Binary IfaceSimplifiedCore where
+  put_ bh (IfaceSimplifiedCore eds fs) = do
+    put_ bh eds
+    put_ bh fs
+
+  get bh = do
+    eds <- get bh
+    fs <- get bh
+    return (IfaceSimplifiedCore eds fs)
 
 emptyPartialModIface :: Module -> PartialModIface
 emptyPartialModIface mod
   = PrivateModIface
-      { mi_module_      = mod,
-        mi_sig_of_      = Nothing,
-        mi_hsc_src_     = HsSrcFile,
+      { mi_mod_info_    = emptyIfaceModInfo mod,
+        mi_iface_hash_  = fingerprint0,
         mi_hi_bytes_    = PartialIfaceBinHandle,
         mi_deps_        = noDependencies,
-        mi_exports_     = [],
-        mi_fixities_    = [],
-        mi_warns_       = IfWarnSome [] [],
-        mi_anns_        = [],
-        mi_defaults_    = [],
-        mi_insts_       = [],
-        mi_fam_insts_   = [],
-        mi_rules_       = [],
-        mi_decls_       = [],
-        mi_extra_decls_ = Nothing,
-        mi_foreign_     = emptyIfaceForeign,
+        mi_public_      = emptyPublicModIface (),
+        mi_simplified_core_ = Nothing,
         mi_top_env_     = IfaceTopEnv emptyDetOrdAvails [] ,
-        mi_trust_       = noIfaceTrustInfo,
-        mi_trust_pkg_   = False,
-        mi_complete_matches_ = [],
         mi_docs_        = Nothing,
-        mi_final_exts_  = (),
-        mi_ext_fields_  = emptyExtensibleFields,
-        mi_self_recomp_info_ = Nothing
+        mi_self_recomp_ = Nothing,
+        mi_ext_fields_ = emptyExtensibleFields
+
       }
+
+emptyIfaceModInfo :: Module -> IfaceModInfo
+emptyIfaceModInfo mod = IfaceModInfo
+  { mi_mod_info_module = mod
+  , mi_mod_info_sig_of = Nothing
+  , mi_mod_info_hsc_src = HsSrcFile
+  }
+
+
+emptyPublicModIface :: IfaceAbiHashesExts phase -> IfacePublic_ phase
+emptyPublicModIface abi_hashes = IfacePublic
+  { mi_exports_ = []
+  , mi_decls_ = []
+  , mi_fixities_ = []
+  , mi_warns_ = IfWarnSome [] []
+  , mi_anns_ = []
+  , mi_defaults_ = []
+  , mi_insts_ = []
+  , mi_fam_insts_ = []
+  , mi_rules_ = []
+  , mi_abi_hashes_ = abi_hashes
+  , mi_trust_ = noIfaceTrustInfo
+  , mi_trust_pkg_ = False
+  , mi_caches_ = emptyModIfaceCache
+  , mi_complete_matches_ = []
+  }
+
+emptyModIfaceCache :: IfaceCache
+emptyModIfaceCache = IfaceCache {
+  mi_cache_decl_warn_fn = emptyIfaceWarnCache,
+  mi_cache_export_warn_fn = emptyIfaceWarnCache,
+  mi_cache_fix_fn = emptyIfaceFixCache,
+  mi_cache_hash_fn = emptyIfaceHashCache
+}
+
+emptyIfaceBackend :: IfaceAbiHashes
+emptyIfaceBackend = IfaceAbiHashes
+        { mi_abi_mod_hash = fingerprint0,
+          mi_abi_orphan = False,
+          mi_abi_finsts = False,
+          mi_abi_exp_hash = fingerprint0,
+          mi_abi_orphan_hash = fingerprint0
+        }
 
 emptyFullModIface :: Module -> ModIface
 emptyFullModIface mod =
     (emptyPartialModIface mod)
-      { mi_decls_ = []
-      , mi_self_recomp_info_ = Nothing
+      { mi_public_ = emptyPublicModIface emptyIfaceBackend
       , mi_hi_bytes_ = FullIfaceBinHandle Strict.Nothing
-      , mi_final_exts_ = ModIfaceBackend
-        { mi_mod_hash = fingerprint0,
-          mi_iface_hash = fingerprint0,
-          mi_orphan = False,
-          mi_finsts = False,
-          mi_exp_hash = fingerprint0,
-          mi_orphan_hash = fingerprint0,
-          mi_decl_warn_fn = emptyIfaceWarnCache,
-          mi_export_warn_fn = emptyIfaceWarnCache,
-          mi_fix_fn = emptyIfaceFixCache,
-          mi_hash_fn = emptyIfaceHashCache } }
+      }
+
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
 mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
@@ -657,11 +829,42 @@ emptyIfaceHashCache _occ = Nothing
 
 -- ModIface is completely forced since it will live in memory for a long time.
 -- If forcing it uses a lot of memory, then store less things in ModIface.
-instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
+instance ( NFData (IfaceAbiHashesExts (phase :: ModIfacePhase))
          , NFData (IfaceDeclExts (phase :: ModIfacePhase))
          ) => NFData (ModIface_ phase) where
-  rnf (PrivateModIface a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 a18 a19 a20 a21 a22 a23 a24)
-    = rnf a1
+  rnf (PrivateModIface a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
+    = (a1 :: IfaceBinHandle phase)
+    `seq` rnf a2
+    `seq` rnf a3
+    `seq` rnf a4
+    `seq` rnf a5
+    `seq` rnf a6
+    `seq` rnf a7
+    `seq` rnf a8
+    `seq` rnf a9
+    `seq` rnf a10
+
+instance NFData IfaceModInfo where
+  rnf (IfaceModInfo a1 a2 a3)
+    =  rnf a1
+    `seq` rnf a2
+    `seq` rnf a3
+
+
+instance NFData IfaceSimplifiedCore where
+  rnf (IfaceSimplifiedCore eds fs) = rnf eds `seq` rnf fs
+
+instance NFData IfaceAbiHashes where
+  rnf (IfaceAbiHashes a1 a2 a3 a4 a5)
+    =  rnf a1
+    `seq` rnf a2
+    `seq` rnf a3
+    `seq` rnf a4
+    `seq` rnf a5
+
+instance (NFData (IfaceAbiHashesExts phase), NFData (IfaceDeclExts phase)) => NFData (IfacePublic_ phase) where
+  rnf (IfacePublic a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14)
+    =  rnf a1
     `seq` rnf a2
     `seq` rnf a3
     `seq` rnf a4
@@ -675,30 +878,14 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq` rnf a12
     `seq` rnf a13
     `seq` rnf a14
-    `seq` rnf a15
-    `seq` rnf a16
-    `seq` rnf a17
-    `seq` rnf a18
-    `seq` rnf a19
-    `seq` rnf a20
-    `seq` rnf a21
-    `seq` rnf a22
-    -- IfaceBinHandle
-    `seq` (a23 :: IfaceBinHandle phase)
-    `seq` rnf a24
 
-instance NFData ModIfaceBackend where
-  rnf (ModIfaceBackend a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
+instance NFData IfaceCache where
+  rnf (IfaceCache a1 a2 a3 a4)
     =  rnf a1
     `seq` rnf a2
     `seq` rnf a3
     `seq` rnf a4
-    `seq` rnf a5
-    `seq` rnf a6
-    `seq` rnf a7
-    `seq` rnf a8
-    `seq` rnf a9
-    `seq` rnf a10
+
 
 
 forceModIface :: ModIface -> IO ()
@@ -745,28 +932,38 @@ to serialise the 'ModIface' to disk again.
 -- | Given a 'PartialModIface', turn it into a 'ModIface' by completing
 -- missing fields.
 completePartialModIface :: PartialModIface
+  -> Fingerprint
   -> [(Fingerprint, IfaceDecl)]
-  -> Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo]
-  -> ModIfaceBackend
+  -> Maybe IfaceSimplifiedCore
+  -> IfaceAbiHashes
+  -> IfaceCache
   -> ModIface
-completePartialModIface partial decls extra_decls final_exts = partial
-  { mi_decls_ = decls
-  , mi_extra_decls_ = extra_decls
-  , mi_final_exts_ = final_exts
+completePartialModIface partial iface_hash decls extra_decls final_exts cache = partial
+  { mi_public_ = completePublicModIface decls final_exts cache (mi_public_ partial)
+  , mi_simplified_core_ = extra_decls
   , mi_hi_bytes_ = FullIfaceBinHandle Strict.Nothing
+  , mi_iface_hash_ = iface_hash
+  }
+  where
+
+-- | Given a 'PartialIfacePublic', turn it into an 'IfacePublic' by completing
+-- missing fields.
+completePublicModIface :: [(Fingerprint, IfaceDecl)]
+                       -> IfaceAbiHashes
+                       -> IfaceCache
+                       -> PartialIfacePublic
+                       -> IfacePublic
+completePublicModIface decls abi_hashes cache partial = partial
+  { mi_decls_ = decls
+  , mi_abi_hashes_  = abi_hashes
+  , mi_caches_ = cache
   }
 
-set_mi_module :: Module -> ModIface_ phase -> ModIface_ phase
-set_mi_module val iface = clear_mi_hi_bytes $ iface { mi_module_ = val }
+set_mi_mod_info :: IfaceModInfo -> ModIface_ phase -> ModIface_ phase
+set_mi_mod_info val iface = clear_mi_hi_bytes $ iface { mi_mod_info_ = val }
 
-set_mi_sig_of :: Maybe Module -> ModIface_ phase -> ModIface_ phase
-set_mi_sig_of val iface = clear_mi_hi_bytes $ iface { mi_sig_of_ = val }
-
-set_mi_hsc_src :: HscSource -> ModIface_ phase -> ModIface_ phase
-set_mi_hsc_src val iface = clear_mi_hi_bytes $ iface { mi_hsc_src_ = val }
-
-set_mi_self_recomp :: Maybe ModIfaceSelfRecomp-> ModIface_ phase -> ModIface_ phase
-set_mi_self_recomp val iface = clear_mi_hi_bytes $ iface { mi_self_recomp_info_ = val }
+set_mi_self_recomp :: Maybe IfaceSelfRecomp-> ModIface_ phase -> ModIface_ phase
+set_mi_self_recomp val iface = clear_mi_hi_bytes $ iface { mi_self_recomp_ = val }
 
 set_mi_hi_bytes :: IfaceBinHandle phase -> ModIface_ phase -> ModIface_ phase
 set_mi_hi_bytes val iface = iface { mi_hi_bytes_ = val }
@@ -774,59 +971,100 @@ set_mi_hi_bytes val iface = iface { mi_hi_bytes_ = val }
 set_mi_deps :: Dependencies -> ModIface_ phase -> ModIface_ phase
 set_mi_deps val iface = clear_mi_hi_bytes $ iface { mi_deps_ = val }
 
-set_mi_exports :: [IfaceExport] -> ModIface_ phase -> ModIface_ phase
-set_mi_exports val iface = clear_mi_hi_bytes $ iface { mi_exports_ = val }
+set_mi_public :: (IfacePublic_ phase -> IfacePublic_ phase) -> ModIface_ phase -> ModIface_ phase
+set_mi_public f iface = clear_mi_hi_bytes $ iface { mi_public_ = f (mi_public_ iface) }
 
-set_mi_fixities :: [(OccName, Fixity)] -> ModIface_ phase -> ModIface_ phase
-set_mi_fixities val iface = clear_mi_hi_bytes $ iface { mi_fixities_ = val }
-
-set_mi_warns :: IfaceWarnings -> ModIface_ phase -> ModIface_ phase
-set_mi_warns val iface = clear_mi_hi_bytes $ iface { mi_warns_ = val }
-
-set_mi_anns :: [IfaceAnnotation] -> ModIface_ phase -> ModIface_ phase
-set_mi_anns val iface = clear_mi_hi_bytes $ iface { mi_anns_ = val }
-
-set_mi_insts :: [IfaceClsInst] -> ModIface_ phase -> ModIface_ phase
-set_mi_insts val iface = clear_mi_hi_bytes $ iface { mi_insts_ = val }
-
-set_mi_fam_insts :: [IfaceFamInst] -> ModIface_ phase -> ModIface_ phase
-set_mi_fam_insts val iface = clear_mi_hi_bytes $ iface { mi_fam_insts_ = val }
-
-set_mi_rules :: [IfaceRule] -> ModIface_ phase -> ModIface_ phase
-set_mi_rules val iface = clear_mi_hi_bytes $ iface { mi_rules_ = val }
-
-set_mi_decls :: [IfaceDeclExts phase] -> ModIface_ phase -> ModIface_ phase
-set_mi_decls val iface = clear_mi_hi_bytes $ iface { mi_decls_ = val }
-
-set_mi_defaults :: [IfaceDefault] -> ModIface_ phase -> ModIface_ phase
-set_mi_defaults val iface = clear_mi_hi_bytes $ iface { mi_defaults_ = val }
-
-set_mi_extra_decls :: Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] -> ModIface_ phase -> ModIface_ phase
-set_mi_extra_decls val iface = clear_mi_hi_bytes $ iface { mi_extra_decls_ = val }
-
-set_mi_foreign :: IfaceForeign -> ModIface_ phase -> ModIface_ phase
-set_mi_foreign foreign_ iface = clear_mi_hi_bytes $ iface { mi_foreign_ = foreign_ }
+set_mi_simplified_core :: Maybe IfaceSimplifiedCore -> ModIface_ phase -> ModIface_ phase
+set_mi_simplified_core val iface = clear_mi_hi_bytes $ iface { mi_simplified_core_ = val }
 
 set_mi_top_env :: IfaceTopEnv -> ModIface_ phase -> ModIface_ phase
 set_mi_top_env val iface = clear_mi_hi_bytes $ iface { mi_top_env_ = val }
 
-set_mi_trust :: IfaceTrustInfo -> ModIface_ phase -> ModIface_ phase
-set_mi_trust val iface = clear_mi_hi_bytes $ iface { mi_trust_ = val }
-
-set_mi_trust_pkg :: Bool -> ModIface_ phase -> ModIface_ phase
-set_mi_trust_pkg val iface = clear_mi_hi_bytes $ iface { mi_trust_pkg_ = val }
-
-set_mi_complete_matches :: [IfaceCompleteMatch] -> ModIface_ phase -> ModIface_ phase
-set_mi_complete_matches val iface = clear_mi_hi_bytes $ iface { mi_complete_matches_ = val }
-
 set_mi_docs :: Maybe Docs -> ModIface_ phase -> ModIface_ phase
 set_mi_docs val iface = clear_mi_hi_bytes $  iface { mi_docs_ = val }
 
-set_mi_final_exts :: IfaceBackendExts phase -> ModIface_ phase -> ModIface_ phase
-set_mi_final_exts val iface = clear_mi_hi_bytes $ iface { mi_final_exts_ = val }
-
 set_mi_ext_fields :: ExtensibleFields -> ModIface_ phase -> ModIface_ phase
 set_mi_ext_fields val iface = clear_mi_hi_bytes $ iface { mi_ext_fields_ = val }
+
+{- Settings for mi_public interface fields -}
+
+set_mi_exports :: [IfaceExport] -> ModIface_ phase -> ModIface_ phase
+set_mi_exports val = set_mi_public (\iface -> iface { mi_exports_ = val })
+
+set_mi_fixities :: [(OccName, Fixity)] -> ModIface_ phase -> ModIface_ phase
+set_mi_fixities val = set_mi_public (\iface -> iface { mi_fixities_ = val })
+
+set_mi_warns :: IfaceWarnings -> ModIface_ phase -> ModIface_ phase
+set_mi_warns val = set_mi_public (\iface -> iface { mi_warns_ = val })
+
+set_mi_anns :: [IfaceAnnotation] -> ModIface_ phase -> ModIface_ phase
+set_mi_anns val = set_mi_public (\iface -> iface { mi_anns_ = val })
+
+set_mi_insts :: [IfaceClsInst] -> ModIface_ phase -> ModIface_ phase
+set_mi_insts val = set_mi_public (\iface -> iface { mi_insts_ = val })
+
+set_mi_fam_insts :: [IfaceFamInst] -> ModIface_ phase -> ModIface_ phase
+set_mi_fam_insts val = set_mi_public (\iface -> iface { mi_fam_insts_ = val })
+
+set_mi_rules :: [IfaceRule] -> ModIface_ phase -> ModIface_ phase
+set_mi_rules val = set_mi_public (\iface -> iface { mi_rules_ = val })
+
+set_mi_decls :: [IfaceDeclExts phase] -> ModIface_ phase -> ModIface_ phase
+set_mi_decls val = set_mi_public (\iface -> iface { mi_decls_ = val })
+
+set_mi_defaults :: [IfaceDefault] -> ModIface_ phase -> ModIface_ phase
+set_mi_defaults val = set_mi_public (\iface -> iface { mi_defaults_ = val })
+
+set_mi_trust :: IfaceTrustInfo -> ModIface_ phase -> ModIface_ phase
+set_mi_trust val = set_mi_public (\iface -> iface { mi_trust_ = val })
+
+set_mi_trust_pkg :: Bool -> ModIface_ phase -> ModIface_ phase
+set_mi_trust_pkg val = set_mi_public (\iface -> iface { mi_trust_pkg_ = val })
+
+set_mi_complete_matches :: [IfaceCompleteMatch] -> ModIface_ phase -> ModIface_ phase
+set_mi_complete_matches val = set_mi_public (\iface -> iface { mi_complete_matches_ = val })
+
+set_mi_abi_hashes :: IfaceAbiHashesExts phase -> ModIface_ phase -> ModIface_ phase
+set_mi_abi_hashes val = set_mi_public (\iface -> iface { mi_abi_hashes_ = val })
+
+{- Setters for mi_caches interface fields -}
+
+set_mi_decl_warn_fn :: (OccName -> Maybe (WarningTxt GhcRn)) -> ModIface_ phase -> ModIface_ phase
+set_mi_decl_warn_fn val = set_mi_public (\iface -> iface { mi_caches_ = (mi_caches_ iface) { mi_cache_decl_warn_fn = val } })
+
+set_mi_export_warn_fn :: (Name -> Maybe (WarningTxt GhcRn)) -> ModIface_ phase -> ModIface_ phase
+set_mi_export_warn_fn val = set_mi_public (\iface -> iface { mi_caches_ = (mi_caches_ iface) { mi_cache_export_warn_fn = val } })
+
+set_mi_fix_fn :: (OccName -> Maybe Fixity) -> ModIface_ phase -> ModIface_ phase
+set_mi_fix_fn val = set_mi_public (\iface -> iface { mi_caches_ = (mi_caches_ iface) { mi_cache_fix_fn = val } })
+
+set_mi_hash_fn :: (OccName -> Maybe (OccName, Fingerprint)) -> ModIface_ phase -> ModIface_ phase
+set_mi_hash_fn val = set_mi_public (\iface -> iface { mi_caches_ = (mi_caches_ iface) { mi_cache_hash_fn = val } })
+
+set_mi_caches :: IfaceCache -> ModIface_ phase -> ModIface_ phase
+set_mi_caches val = set_mi_public (\iface -> iface { mi_caches_ = val })
+
+{-
+
+-}
+
+{- Setters for mi_mod_info interface fields -}
+
+set_mi_module :: Module -> ModIface_ phase -> ModIface_ phase
+set_mi_module val = set_mi_mod_info_field (\info -> info { mi_mod_info_module = val })
+
+set_mi_sig_of :: Maybe Module -> ModIface_ phase -> ModIface_ phase
+set_mi_sig_of val = set_mi_mod_info_field (\info -> info { mi_mod_info_sig_of = val })
+
+set_mi_hsc_src :: HscSource -> ModIface_ phase -> ModIface_ phase
+set_mi_hsc_src val = set_mi_mod_info_field (\info -> info { mi_mod_info_hsc_src = val })
+
+-- | Helper function for setting fields in mi_mod_info_
+set_mi_mod_info_field :: (IfaceModInfo -> IfaceModInfo) -> ModIface_ phase -> ModIface_ phase
+set_mi_mod_info_field f iface = clear_mi_hi_bytes $ iface { mi_mod_info_ = f (mi_mod_info_ iface) }
+
+
+
 
 -- | Invalidate any byte array buffer we might have.
 clear_mi_hi_bytes :: ModIface_ phase -> ModIface_ phase
@@ -887,18 +1125,20 @@ However, with the pragma, the correct core is generated:
 
 -- See Note [Inline Pattern synonym of ModIface] for why we have all these
 -- inline pragmas.
-{-# INLINE ModIface #-}
+{-# INLINE mi_mod_info #-}
+{-# INLINE mi_iface_hash #-}
 {-# INLINE mi_module #-}
 {-# INLINE mi_sig_of #-}
 {-# INLINE mi_hsc_src #-}
 {-# INLINE mi_deps #-}
+{-# INLINE mi_public #-}
 {-# INLINE mi_exports #-}
 {-# INLINE mi_fixities #-}
 {-# INLINE mi_warns #-}
 {-# INLINE mi_anns #-}
 {-# INLINE mi_decls #-}
-{-# INLINE mi_extra_decls #-}
-{-# INLINE mi_foreign #-}
+{-# INLINE mi_simplified_core #-}
+{-# INLINE mi_defaults #-}
 {-# INLINE mi_top_env #-}
 {-# INLINE mi_insts #-}
 {-# INLINE mi_fam_insts #-}
@@ -907,32 +1147,63 @@ However, with the pragma, the correct core is generated:
 {-# INLINE mi_trust_pkg #-}
 {-# INLINE mi_complete_matches #-}
 {-# INLINE mi_docs #-}
-{-# INLINE mi_final_exts #-}
+{-# INLINE mi_abi_hashes #-}
 {-# INLINE mi_ext_fields #-}
 {-# INLINE mi_hi_bytes #-}
+{-# INLINE mi_self_recomp_info #-}
+{-# INLINE mi_fix_fn #-}
+{-# INLINE mi_hash_fn #-}
+{-# INLINE mi_decl_warn_fn #-}
+{-# INLINE mi_export_warn_fn #-}
+{-# INLINE ModIface #-}
 {-# COMPLETE ModIface #-}
 
 pattern ModIface ::
-  Module -> Maybe Module -> HscSource -> Dependencies ->
-  [IfaceExport] -> [(OccName, Fixity)] -> IfaceWarnings ->
-  [IfaceAnnotation] -> [IfaceDeclExts phase] ->
-  Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] -> IfaceForeign ->
-  [IfaceDefault] -> IfaceTopEnv -> [IfaceClsInst] -> [IfaceFamInst] -> [IfaceRule] ->
-  IfaceTrustInfo -> Bool -> [IfaceCompleteMatch] -> Maybe Docs ->
-  IfaceBackendExts phase -> ExtensibleFields -> IfaceBinHandle phase -> Maybe ModIfaceSelfRecomp ->
+  IfaceModInfo
+  -> Module
+  -> Maybe Module
+  -> HscSource
+  -> Fingerprint
+  -> Dependencies
+  -> IfacePublic_ phase
+  -> [IfaceExport]
+  -> [(OccName, Fixity)]
+  -> IfaceWarnings
+  -> [IfaceAnnotation]
+  -> [IfaceDeclExts phase]
+  -> Maybe IfaceSimplifiedCore
+  -> [IfaceDefault]
+  -> IfaceTopEnv
+  -> [IfaceClsInst]
+  -> [IfaceFamInst]
+  -> [IfaceRule]
+  -> IfaceTrustInfo
+  -> Bool
+  -> [IfaceCompleteMatch]
+  -> Maybe Docs
+  -> IfaceAbiHashesExts phase
+  -> ExtensibleFields
+  -> IfaceBinHandle phase
+  -> Maybe IfaceSelfRecomp
+  -> (OccName -> Maybe Fixity)
+  -> (OccName -> Maybe (OccName, Fingerprint))
+  -> (OccName -> Maybe (WarningTxt GhcRn))
+  -> (Name -> Maybe (WarningTxt GhcRn)) ->
   ModIface_ phase
 pattern ModIface
-  { mi_module
+  { mi_mod_info
+  , mi_module
   , mi_sig_of
   , mi_hsc_src
+  , mi_iface_hash
   , mi_deps
+  , mi_public
   , mi_exports
   , mi_fixities
   , mi_warns
   , mi_anns
   , mi_decls
-  , mi_extra_decls
-  , mi_foreign
+  , mi_simplified_core
   , mi_defaults
   , mi_top_env
   , mi_insts
@@ -942,33 +1213,45 @@ pattern ModIface
   , mi_trust_pkg
   , mi_complete_matches
   , mi_docs
-  , mi_final_exts
+  , mi_abi_hashes
   , mi_ext_fields
   , mi_hi_bytes
   , mi_self_recomp_info
+  , mi_fix_fn
+  , mi_hash_fn
+  , mi_decl_warn_fn
+  , mi_export_warn_fn
   } <- PrivateModIface
-    { mi_module_ = mi_module
-    , mi_sig_of_ = mi_sig_of
-    , mi_hsc_src_ = mi_hsc_src
+    { mi_mod_info_ = mi_mod_info@IfaceModInfo { mi_mod_info_module = mi_module
+                                              , mi_mod_info_sig_of = mi_sig_of
+                                              , mi_mod_info_hsc_src = mi_hsc_src }
+    , mi_iface_hash_ = mi_iface_hash
     , mi_deps_ = mi_deps
-    , mi_exports_ = mi_exports
-    , mi_fixities_ = mi_fixities
-    , mi_warns_ = mi_warns
-    , mi_anns_ = mi_anns
-    , mi_decls_ = mi_decls
-    , mi_extra_decls_ = mi_extra_decls
-    , mi_foreign_ = mi_foreign
-    , mi_defaults_ = mi_defaults
-    , mi_top_env_ = mi_top_env
-    , mi_insts_ = mi_insts
-    , mi_fam_insts_ = mi_fam_insts
-    , mi_rules_ = mi_rules
-    , mi_trust_ = mi_trust
-    , mi_trust_pkg_ = mi_trust_pkg
-    , mi_complete_matches_ = mi_complete_matches
+    , mi_public_ = mi_public@IfacePublic {
+        mi_exports_ = mi_exports
+      , mi_fixities_ = mi_fixities
+      , mi_warns_ = mi_warns
+      , mi_anns_ = mi_anns
+      , mi_decls_ = mi_decls
+      , mi_defaults_ = mi_defaults
+      , mi_insts_ = mi_insts
+      , mi_fam_insts_ = mi_fam_insts
+      , mi_rules_ = mi_rules
+      , mi_trust_ = mi_trust
+      , mi_trust_pkg_ = mi_trust_pkg
+      , mi_complete_matches_ = mi_complete_matches
+      , mi_caches_ = IfaceCache {
+          mi_cache_decl_warn_fn = mi_decl_warn_fn,
+          mi_cache_export_warn_fn = mi_export_warn_fn,
+          mi_cache_fix_fn = mi_fix_fn,
+          mi_cache_hash_fn = mi_hash_fn
+        }
+      , mi_abi_hashes_ = mi_abi_hashes
+    }
     , mi_docs_ = mi_docs
-    , mi_final_exts_ = mi_final_exts
     , mi_ext_fields_ = mi_ext_fields
     , mi_hi_bytes_ = mi_hi_bytes
-    , mi_self_recomp_info_ = mi_self_recomp_info
+    , mi_self_recomp_ = mi_self_recomp_info
+    , mi_simplified_core_ = mi_simplified_core
+    , mi_top_env_ = mi_top_env
     }

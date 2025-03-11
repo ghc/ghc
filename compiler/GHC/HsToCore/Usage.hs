@@ -185,7 +185,7 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
           case miface of
             Nothing -> pprPanic "mkObjectUsage" (ppr m)
             Just iface ->
-              return $ UsageHomeModuleInterface (moduleName m) (toUnitId $ moduleUnit m) (mi_iface_hash (mi_final_exts iface))
+              return $ UsageHomeModuleInterface (moduleName m) (toUnitId $ moduleUnit m) (mi_iface_hash iface)
 
     librarySpecToUsage :: LibrarySpec -> IO [Usage]
     librarySpecToUsage (Objects os) = traverse (fing Nothing) os
@@ -278,10 +278,10 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports used_names
                       usg_entities = Map.toList ent_hashs,
                       usg_safe     = imp_safe }
       where
-        finsts_mod   = mi_finsts (mi_final_exts iface)
-        hash_env     = mi_hash_fn (mi_final_exts iface)
-        mod_hash     = mi_mod_hash (mi_final_exts iface)
-        export_hash | depend_on_exports = Just (mi_exp_hash (mi_final_exts iface))
+        finsts_mod   = mi_finsts iface
+        hash_env     = mi_hash_fn iface
+        mod_hash     = mi_mod_hash iface
+        export_hash | depend_on_exports = Just (mi_exp_hash iface)
                     | otherwise         = Nothing
 
         by_is_safe (ImportedByUser imv) = imv_is_safe imv

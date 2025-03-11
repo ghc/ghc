@@ -844,7 +844,7 @@ hscRecompStatus
     case recomp_if_result of
       OutOfDateItem reason mb_checked_iface -> do
         msg $ NeedsRecompile reason
-        return $ HscRecompNeeded $ fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
+        return $ HscRecompNeeded $ fmap mi_iface_hash mb_checked_iface
       UpToDateItem checked_iface -> do
         let lcl_dflags = ms_hspp_opts mod_summary
         if | not (backendGeneratesCode (backend lcl_dflags)) -> do
@@ -862,7 +862,7 @@ hscRecompStatus
            , xopt LangExt.TemplateHaskell lcl_dflags
            -> do
               msg $ needsRecompileBecause THWithJS
-              return $ HscRecompNeeded $ Just $ mi_iface_hash $ mi_final_exts $ checked_iface
+              return $ HscRecompNeeded $ Just $ mi_iface_hash $ checked_iface
 
            | otherwise -> do
                -- Do need linkable
@@ -918,7 +918,7 @@ hscRecompStatus
                    return $ HscUpToDate checked_iface $ linkable
                  OutOfDateItem reason _ -> do
                    msg $ NeedsRecompile reason
-                   return $ HscRecompNeeded $ Just $ mi_iface_hash $ mi_final_exts $ checked_iface
+                   return $ HscRecompNeeded $ Just $ mi_iface_hash $ checked_iface
 
 -- | Check that the .o files produced by compilation are already up-to-date
 -- or not.
@@ -968,10 +968,8 @@ loadByteCode iface mod_sum = do
     let
       this_mod   = ms_mod mod_sum
       if_date    = fromJust $ ms_iface_date mod_sum
-    case mi_extra_decls iface of
-      Just extra_decls -> do
-          let fi = WholeCoreBindings extra_decls this_mod (ms_location mod_sum)
-                   (mi_foreign iface)
+    case iface_core_bindings iface (ms_location mod_sum) of
+      Just fi -> do
           return (UpToDateItem (Linkable if_date this_mod (NE.singleton (CoreBindings fi))))
       _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
@@ -1019,15 +1017,15 @@ compile_for_interpreter hsc_env use =
 -- | Assemble 'WholeCoreBindings' if the interface contains Core bindings.
 iface_core_bindings :: ModIface -> ModLocation -> Maybe WholeCoreBindings
 iface_core_bindings iface wcb_mod_location =
-  mi_extra_decls <&> \ wcb_bindings ->
+  mi_simplified_core <&> \(IfaceSimplifiedCore bindings foreign') ->
     WholeCoreBindings {
-      wcb_bindings,
+      wcb_bindings = bindings,
       wcb_module = mi_module,
       wcb_mod_location,
-      wcb_foreign = mi_foreign
+      wcb_foreign = foreign'
     }
   where
-    ModIface {mi_module, mi_extra_decls, mi_foreign} = iface
+    ModIface {mi_module, mi_simplified_core} = iface
 
 -- | Return an 'IO' that hydrates Core bindings and compiles them to bytecode if
 -- the interface contains any, using the supplied type env for typechecking.
@@ -1376,7 +1374,7 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
       --    dynamic interfaces. Hopefully both the dynamic and the non-dynamic
       --    interfaces stay in sync...
       --
-      let change = old_iface /= Just (mi_iface_hash (mi_final_exts iface))
+      let change = old_iface /= Just (mi_iface_hash iface)
 
       let dt = dynamicTooState dflags
 

@@ -97,7 +97,7 @@ checkHsigDeclM sig_iface sig_thing real_thing = do
     -- implementation cases.
     checkBootDeclM Hsig sig_thing real_thing
     real_fixity <- lookupFixityRn name
-    let sig_fixity = case mi_fix_fn (mi_final_exts sig_iface) (occName name) of
+    let sig_fixity = case mi_fix_fn sig_iface (occName name) of
                         Nothing -> defaultFixity
                         Just f -> f
     when (real_fixity /= sig_fixity) $
@@ -850,7 +850,7 @@ mergeSignatures
                 if outer_mod == mi_module iface
                     -- Don't add ourselves!
                     then tcg_merged tcg_env
-                    else (mi_module iface, mi_mod_hash (mi_final_exts iface)) : tcg_merged tcg_env
+                    else (mi_module iface, mi_mod_hash iface) : tcg_merged tcg_env
             }
 
     -- Note [Signature merging DFuns]

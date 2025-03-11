@@ -1133,6 +1133,8 @@ abiHash strs = do
 
   mods <- mapM find_it strs
 
+  -- MP: loadUserInterface is inefficient here since we will never find a cached
+  -- interface. computeInterface is probably better.
   let get_iface modl = loadUserInterface NotBoot (text "abiHash") modl
   ifaces <- initIfaceCheck (text "abiHash") hsc_env $ mapM get_iface mods
 
@@ -1140,7 +1142,7 @@ abiHash strs = do
   put_ bh hiVersion
     -- package hashes change when the compiler version changes (for now)
     -- see #5328
-  mapM_ (put_ bh . mi_mod_hash . mi_final_exts) ifaces
+  mapM_ (put_ bh . mi_mod_hash) ifaces
   f <- fingerprintBinMem bh
 
   putStrLn (showPpr dflags f)

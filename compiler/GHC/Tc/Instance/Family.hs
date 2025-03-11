@@ -308,7 +308,7 @@ checkFamInstConsistency directlyImpMods
                  ifc <- modIface mod
                  deps <- dep_finsts . mi_deps <$> modIface mod
                  pure $
-                   if mi_finsts (mi_final_exts ifc)
+                   if mi_finsts ifc
                       then mod:deps
                       else deps
 

@@ -1,18 +1,20 @@
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 -- | Dependencies and Usage of a module
 module GHC.Unit.Module.Deps
-   ( Dependencies
-   , mkDependencies
-   , noDependencies
-   , dep_direct_mods
-   , dep_direct_pkgs
-   , dep_sig_mods
-   , dep_trusted_pkgs
-   , dep_orphs
-   , dep_plugin_pkgs
-   , dep_finsts
-   , dep_boot_mods
+   ( Dependencies(dep_direct_mods
+                  , dep_direct_pkgs
+                  , dep_sig_mods
+                  , dep_trusted_pkgs
+                  , dep_orphs
+                  , dep_plugin_pkgs
+                  , dep_finsts
+                  , dep_boot_mods
+                  , Dependencies)
    , dep_orphs_update
    , dep_finsts_update
+   , mkDependencies
+   , noDependencies
    , pprDeps
    , Usage (..)
    , ImportAvails (..)
@@ -52,38 +54,38 @@ import Control.DeepSeq
 --
 -- See Note [Transitive Information in Dependencies]
 data Dependencies = Deps
-   { dep_direct_mods :: Set (UnitId, ModuleNameWithIsBoot)
+   { dep_direct_mods_ :: Set (UnitId, ModuleNameWithIsBoot)
       -- ^ All home-package modules which are directly imported by this one.
       -- This may include modules from other units when using multiple home units
 
-   , dep_direct_pkgs :: Set UnitId
+   , dep_direct_pkgs_ :: Set UnitId
       -- ^ All packages directly imported by this module
       -- I.e. packages to which this module's direct imports belong.
       -- Does not include other home units when using multiple home units.
       -- Modules from these units will go in `dep_direct_mods`
 
-   , dep_plugin_pkgs :: Set UnitId
+   , dep_plugin_pkgs_ :: Set UnitId
       -- ^ All units needed for plugins
 
     ------------------------------------
     -- Transitive information below here
 
-   , dep_sig_mods :: ![ModuleName]
+   , dep_sig_mods_ :: ![ModuleName]
     -- ^ Transitive closure of hsig files in the home package
 
 
-   , dep_trusted_pkgs :: Set UnitId
+   , dep_trusted_pkgs_ :: Set UnitId
       -- Packages which we are required to trust
       -- when the module is imported as a safe import
       -- (Safe Haskell). See Note [Tracking Trust Transitively] in GHC.Rename.Names
 
-   , dep_boot_mods :: Set (UnitId, ModuleNameWithIsBoot)
+   , dep_boot_mods_ :: Set (UnitId, ModuleNameWithIsBoot)
       -- ^ All modules which have boot files below this one, and whether we
       -- should use the boot file or not.
       -- This information is only used to populate the eps_is_boot field.
       -- See Note [Structure of dep_boot_mods]
 
-   , dep_orphs  :: [Module]
+   , dep_orphs_ :: [Module]
       -- ^ Transitive closure of orphan modules (whether
       -- home or external pkg).
       --
@@ -93,7 +95,7 @@ data Dependencies = Deps
       -- which relies on dep_orphs having the complete list!)
       -- This does NOT include us, unlike 'imp_orphs'.
 
-   , dep_finsts :: [Module]
+   , dep_finsts_ :: [Module]
       -- ^ Transitive closure of depended upon modules which
       -- contain family instances (whether home or external).
       -- This is used by 'checkFamInstConsistency'.  This
@@ -104,6 +106,26 @@ data Dependencies = Deps
    deriving( Eq )
         -- Equality used only for old/new comparison in GHC.Iface.Recomp.addFingerprints
         -- See 'GHC.Tc.Utils.ImportAvails' for details on dependencies.
+
+pattern Dependencies :: Set (UnitId, ModuleNameWithIsBoot)
+             -> Set UnitId
+             -> Set UnitId
+             -> [ModuleName]
+             -> Set UnitId
+             -> Set (UnitId, ModuleNameWithIsBoot)
+             -> [Module]
+             -> [Module]
+             -> Dependencies
+pattern Dependencies {dep_direct_mods, dep_direct_pkgs, dep_plugin_pkgs, dep_sig_mods, dep_trusted_pkgs, dep_boot_mods, dep_orphs, dep_finsts}
+          <- Deps {dep_direct_mods_ = dep_direct_mods
+                 , dep_direct_pkgs_ = dep_direct_pkgs
+                 , dep_plugin_pkgs_ = dep_plugin_pkgs
+                 , dep_sig_mods_ = dep_sig_mods
+                 , dep_trusted_pkgs_ = dep_trusted_pkgs
+                 , dep_boot_mods_ = dep_boot_mods
+                 , dep_orphs_ = dep_orphs
+                 , dep_finsts_ = dep_finsts}
+{-# COMPLETE Dependencies #-}
 
 instance NFData Dependencies where
   rnf (Deps dmods dpkgs ppkgs hsigms tps bmods orphs finsts)
@@ -158,14 +180,14 @@ mkDependencies home_unit mod imports plugin_mods =
 
       sig_mods = filter (/= (moduleName mod)) $ imp_sig_mods imports
 
-  in Deps { dep_direct_mods  = direct_mods
-          , dep_direct_pkgs  = direct_pkgs
-          , dep_plugin_pkgs  = plugin_units
-          , dep_sig_mods     = sort sig_mods
-          , dep_trusted_pkgs = trust_pkgs
-          , dep_boot_mods    = source_mods
-          , dep_orphs        = sortBy stableModuleCmp dep_orphs
-          , dep_finsts       = sortBy stableModuleCmp (imp_finsts imports)
+  in Deps { dep_direct_mods_   = direct_mods
+          , dep_direct_pkgs_  = direct_pkgs
+          , dep_plugin_pkgs_  = plugin_units
+          , dep_sig_mods_     = sort sig_mods
+          , dep_trusted_pkgs_ = trust_pkgs
+          , dep_boot_mods_    = source_mods
+          , dep_orphs_        = sortBy stableModuleCmp dep_orphs
+          , dep_finsts_       = sortBy stableModuleCmp (imp_finsts imports)
             -- sort to get into canonical order
             -- NB. remember to use lexicographic ordering
           }
@@ -174,14 +196,13 @@ mkDependencies home_unit mod imports plugin_mods =
 dep_orphs_update :: Monad m => Dependencies -> ([Module] -> m [Module]) -> m Dependencies
 dep_orphs_update deps f = do
   r <- f (dep_orphs deps)
-  pure (deps { dep_orphs = sortBy stableModuleCmp r })
+  pure (deps { dep_orphs_ = sortBy stableModuleCmp r })
 
 -- | Update module dependencies containing family instances (used by Backpack)
 dep_finsts_update :: Monad m => Dependencies -> ([Module] -> m [Module]) -> m Dependencies
 dep_finsts_update deps f = do
   r <- f (dep_finsts deps)
-  pure (deps { dep_finsts = sortBy stableModuleCmp r })
-
+  pure (deps { dep_finsts_ = sortBy stableModuleCmp r })
 
 instance Binary Dependencies where
     put_ bh deps = do put_ bh (dep_direct_mods deps)
@@ -201,36 +222,36 @@ instance Binary Dependencies where
                 sms <- get bh
                 os <- get bh
                 fis <- get bh
-                return (Deps { dep_direct_mods = dms
-                             , dep_direct_pkgs = dps
-                             , dep_plugin_pkgs = plugin_pkgs
-                             , dep_sig_mods = hsigms
-                             , dep_boot_mods = sms
-                             , dep_trusted_pkgs = tps
-                             , dep_orphs = os,
-                               dep_finsts = fis })
+                return (Deps { dep_direct_mods_ = dms
+                             , dep_direct_pkgs_ = dps
+                             , dep_plugin_pkgs_ = plugin_pkgs
+                             , dep_sig_mods_ = hsigms
+                             , dep_boot_mods_ = sms
+                             , dep_trusted_pkgs_ = tps
+                             , dep_orphs_ = os,
+                               dep_finsts_ = fis })
 
 noDependencies :: Dependencies
 noDependencies = Deps
-  { dep_direct_mods  = Set.empty
-  , dep_direct_pkgs  = Set.empty
-  , dep_plugin_pkgs  = Set.empty
-  , dep_sig_mods     = []
-  , dep_boot_mods    = Set.empty
-  , dep_trusted_pkgs = Set.empty
-  , dep_orphs        = []
-  , dep_finsts       = []
+  { dep_direct_mods_  = Set.empty
+  , dep_direct_pkgs_  = Set.empty
+  , dep_plugin_pkgs_  = Set.empty
+  , dep_sig_mods_     = []
+  , dep_boot_mods_    = Set.empty
+  , dep_trusted_pkgs_ = Set.empty
+  , dep_orphs_        = []
+  , dep_finsts_       = []
   }
 
 -- | Pretty-print unit dependencies
 pprDeps :: UnitState -> Dependencies -> SDoc
-pprDeps unit_state (Deps { dep_direct_mods = dmods
-                         , dep_boot_mods = bmods
-                         , dep_plugin_pkgs = plgns
-                         , dep_orphs = orphs
-                         , dep_direct_pkgs = pkgs
-                         , dep_trusted_pkgs = tps
-                         , dep_finsts = finsts
+pprDeps unit_state (Deps { dep_direct_mods_ = dmods
+                         , dep_boot_mods_ = bmods
+                         , dep_plugin_pkgs_ = plgns
+                         , dep_orphs_ = orphs
+                         , dep_direct_pkgs_ = pkgs
+                         , dep_trusted_pkgs_ = tps
+                         , dep_finsts_ = finsts
                          })
   = pprWithUnitState unit_state $
     vcat [text "direct module dependencies:"  <+> ppr_set ppr_mod dmods,

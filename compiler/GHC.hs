@@ -100,29 +100,37 @@ module GHC (
         findGlobalAnns,
         mkNamePprCtxForModule,
         ModIface,
-        ModIface_(
-          mi_module,
-          mi_sig_of,
-          mi_hsc_src,
-          mi_hi_bytes,
-          mi_deps,
-          mi_exports,
-          mi_fixities,
-          mi_warns,
-          mi_anns,
-          mi_insts,
-          mi_fam_insts,
-          mi_rules,
-          mi_decls,
-          mi_extra_decls,
-          mi_top_env,
-          mi_trust,
-          mi_trust_pkg,
-          mi_complete_matches,
-          mi_docs,
-          mi_final_exts,
-          mi_ext_fields
-        ),
+        ModIface_( mi_mod_info
+                 , mi_module
+                 , mi_sig_of
+                 , mi_hsc_src
+                 , mi_iface_hash
+                 , mi_deps
+                 , mi_public
+                 , mi_exports
+                 , mi_fixities
+                 , mi_warns
+                 , mi_anns
+                 , mi_decls
+                 , mi_defaults
+                 , mi_simplified_core
+                 , mi_top_env
+                 , mi_insts
+                 , mi_fam_insts
+                 , mi_rules
+                 , mi_trust
+                 , mi_trust_pkg
+                 , mi_complete_matches
+                 , mi_docs
+                 , mi_abi_hashes
+                 , mi_ext_fields
+                 , mi_hi_bytes
+                 , mi_self_recomp_info
+                 , mi_fix_fn
+                 , mi_decl_warn_fn
+                 , mi_export_warn_fn
+                 , mi_hash_fn
+                 ),
         pattern ModIface,
         SafeHaskellMode(..),
 
