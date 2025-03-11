@@ -2149,7 +2149,17 @@ exprIsHNF = exprIsHNFlike isDataConWorkId isEvaldUnfolding
 -- data constructors. Conlike arguments are considered interesting by the
 -- inliner.
 exprIsConLike :: CoreExpr -> Bool       -- True => lambda, conlike, PAP
--- exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
+exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
+
+{- FOR SOME REASON I TRIED THIS VARIANT, BUT I CAN'T REMEMBER WHY
+   It means, for example, that constructors with wappers don't count
+   as con-like:
+    T23307a.$WCons
+      = \ (@a_ahj) (conrep_ai4 [Occ=Once1!] :: Unconsed a_ahj) ->
+        case conrep_ai4 of
+        { Unconsed unbx_ai5 [Occ=Once1] unbx1_ai6 [Occ=Once1] ->
+            T23307a.Cons @a_ahj unbx_ai5 unbx1_ai6  }
+
 -- Trying: just a constructor application
 exprIsConLike (Var v)       = isConLikeId v
 exprIsConLike (Lit l)       = not (isLitRubbish l)
@@ -2165,6 +2175,7 @@ exprIsConLike (Let {})      = False
 exprIsConLike (Case {})     = False
 exprIsConLike (Type {})     = False
 exprIsConLike (Coercion {}) = False
+-}
 
 -- | Returns true for values or value-like expressions. These are lambdas,
 -- constructors / CONLIKE functions (as determined by the function argument)
