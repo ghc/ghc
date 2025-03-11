@@ -3,9 +3,7 @@ TYPE SIGNATURES
   m :: forall a. C a => a -> ()
 TYPE CONSTRUCTORS
   class C{1} :: * -> Constraint
-COERCION AXIOMS
-  axiom T12763.N:C :: C a = a -> ()
 CLASS INSTANCES
   instance C Int -- Defined at T12763.hs:9:10
 Dependent modules: []
-Dependent packages: [base-4.17.0.0]
+Dependent packages: [base-4.21.0.0]
