@@ -281,7 +281,7 @@ simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
   | Just env' <- preInlineUnconditionally env (bindContextLevel bind_cxt)
                                           old_bndr rhs env
   = {-#SCC "simplRecOrTopPair-pre-inline-uncond" #-}
-    simplTrace "SimplBindr:inline-uncond" (ppr old_bndr) $
+    simplTrace "SimplBindr:inline-uncond1" (ppr old_bndr) $
     do { tick (PreInlineUnconditionally old_bndr)
        ; return ( emptyFloats env, env' ) }
 
@@ -1179,7 +1179,7 @@ simplExprF1 _ (Type ty) cont
     -- The (Type ty) case is handled separately by simplExpr
     -- and by the other callers of simplExprF
 
-simplExprF1 env (Var v)        cont = {-#SCC "simplIdF" #-} simplIdF env v cont
+simplExprF1 env (Var v)        cont = {-#SCC "simplInId" #-} simplInId env v cont
 simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-} rebuild env (Lit lit) cont
 simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t expr cont
 simplExprF1 env (Cast body co) cont = {-#SCC "simplCast" #-} simplCast env body co cont
@@ -1252,7 +1252,8 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
   | Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs env
     -- Because of the let-can-float invariant, it's ok to
     -- inline freely, or to drop the binding if it is dead.
-  = do { tick (PreInlineUnconditionally bndr)
+  = do { simplTrace "SimplBindr:inline-uncond2" (ppr bndr) $
+         tick (PreInlineUnconditionally bndr)
        ; simplExprF env' body cont }
 
   -- Now check for a join point.  It's better to do the preInlineUnconditionally
@@ -1826,17 +1827,21 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
              --      It's wrong to err in either direction
              --      But fun_ty is an OutType, so is fully substituted
 
-       ; if | isSimplified dup  -- Don't re-simplify if we've simplified it once
+       ; if | Just env' <- preInlineUnconditionally env NotTopLevel bndr arg arg_se
+            , not (needsCaseBindingL arg_levity arg)
+            , not ( isSimplified dup &&
+                    not (exprIsTrivial arg) &&
+                    not (isDeadOcc (idOccInfo bndr)) )
+              -- Ok to test arg::InExpr in needsCaseBinding because
+              -- exprOkForSpeculation is stable under simplification
+            -> do { simplTrace "SimplBindr:inline-uncond3" (ppr bndr) $
+                    tick (PreInlineUnconditionally bndr)
+                  ; simplLam env' body cont }
+
+            | isSimplified dup  -- Don't re-simplify if we've simplified it once
                                 -- Including don't preInlineUnconditionally
                                 -- See Note [Avoiding simplifying repeatedly]
             -> completeBindX env from_what bndr arg body cont
-
-            | Just env' <- preInlineUnconditionally env NotTopLevel bndr arg arg_se
-            , not (needsCaseBindingL arg_levity arg)
-              -- Ok to test arg::InExpr in needsCaseBinding because
-              -- exprOkForSpeculation is stable under simplification
-            -> do { tick (PreInlineUnconditionally bndr)
-                  ; simplLam env' body cont }
 
             | otherwise
             -> simplNonRecE env from_what bndr (arg, arg_se) body cont }
@@ -2221,9 +2226,9 @@ Some programs have a /lot/ of data constructors in the source program
 valuable.
 -}
 
-simplVar :: SimplEnv -> InVar -> SimplM OutExpr
+simplInVar :: SimplEnv -> InVar -> SimplM OutExpr
 -- Look up an InVar in the environment
-simplVar env var
+simplInVar env var
   -- Why $! ? See Note [Bangs in the Simplifier]
   | isTyVar var = return $! Type $! (substTyVar env var)
   | isCoVar var = return $! Coercion $! (substCoVar env var)
@@ -2234,8 +2239,8 @@ simplVar env var
         DoneId var1          -> return (Var var1)
         DoneEx e _           -> return e
 
-simplIdF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
-simplIdF env var cont
+simplInId :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
+simplInId env var cont
   | Just dc <- isDataConWorkId_maybe var
   , isLazyDataConRep dc                    -- See Note [Fast path for lazy data constructors]
   = rebuild env (Var var) cont
@@ -2247,16 +2252,37 @@ simplIdF env var cont
         where
           env' = setSubstEnv env tvs cvs ids
 
-      DoneId var1 ->
-        do { rule_base <- getSimplRules
-           ; let cont' = trimJoinCont var1 (idJoinPointHood var1) cont
-                 info  = mkArgInfo env rule_base var1 cont'
-           ; rebuildCall env info cont' }
+      DoneId out_id -> simplOutId env out_id cont
 
       DoneEx e mb_join -> simplExprF env' e cont'
         where
           cont' = trimJoinCont var mb_join cont
           env'  = zapSubstEnv env  -- See Note [zapSubstEnv]
+
+---------------------------------------------------------
+simplOutId :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
+simplOutId env fun cont
+  = do { rule_base <- getSimplRules
+       ; let rules_for_me = getRules rule_base fun
+
+       ; mb_match <- tryRules zapped_env rules_for_me fun cont1
+       ; case mb_match of {
+             Just (rhs, cont2) -> simplExprF zapped_env rhs cont2 ;
+             Nothing ->
+
+    do { logger <- getLogger
+       ; mb_inline <- tryInlining env logger fun cont1
+       ; case mb_inline of{
+            Just expr -> do { checkedTick (UnfoldingDone fun)
+                            ; simplExprF zapped_env expr cont1 } ;
+            Nothing ->
+
+    do { let arg_info = mkArgInfo env rules_for_me fun cont1
+       ; rebuildCall zapped_env arg_info cont1
+    } } } } }
+  where
+    zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
+    cont1      = trimJoinCont fun (idJoinPointHood fun) cont
 
 ---------------------------------------------------------
 --      Dealing with a call site
@@ -2285,6 +2311,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) con
     res     = argInfoExpr fun rev_args
     cont_ty = contResultType cont
 
+{-
 ---------- Try inlining, if ai_rewrite = TryInlining --------
 -- In the TryInlining case we try inlining immediately, before simplifying
 -- any (more) arguments. Why?  See Note [Rewrite rules and inlining].
@@ -2303,7 +2330,9 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
                             ; simplExprF env1 expr full_cont }
             Nothing -> rebuildCall env (info { ai_rewrite = TryNothing }) cont
        }
+-}
 
+{-
 ---------- Try rewrite RULES, if ai_rewrite = TryRules --------------
 -- See Note [Rewrite rules and inlining]
 -- See also Note [Trying rewrite rules]
@@ -2325,6 +2354,7 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
                       ApplyToTy  {} -> False
                       ApplyToVal {} -> False
                       _             -> True
+-}
 
 ---------- Simplify type applications and casts --------------
 rebuildCall env info (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
@@ -2574,42 +2604,41 @@ See Note [No free join points in arityType] in GHC.Core.Opt.Arity
 -}
 
 tryRules :: SimplEnv -> [CoreRule]
-         -> Id
-         -> [ArgSpec]   -- In /normal, forward/ order
+         -> OutId
          -> SimplCont
-         -> SimplM (Maybe (SimplEnv, CoreExpr, SimplCont))
+         -> SimplM (Maybe (CoreExpr, SimplCont))
 
-tryRules env rules fn args call_cont
+tryRules env rules fn cont
   | null rules
   = return Nothing
 
-  | Just (rule, rule_rhs) <- lookupRule ropts (getUnfoldingInRuleMatch env)
+  | Just (rule, rule_rhs) <- pprTrace "tryRules" (ppr fn) $
+                             lookupRule ropts (getUnfoldingInRuleMatch env)
                                         (activeRule (seMode env)) fn
-                                        (argInfoAppArgs args) rules
+                                        (contOutArgs cont) rules
   -- Fire a rule for the function
-  = do { logger <- getLogger
+  = pprTrace "tryRules:success" (ppr fn) $
+    do { logger <- getLogger
        ; checkedTick (RuleFired (ruleName rule))
-       ; let cont' = pushSimplifiedArgs zapped_env
-                                        (drop (ruleArity rule) args)
-                                        call_cont
+       ; let cont' = dropContArgs (ruleArity rule) cont
                      -- (ruleArity rule) says how
                      -- many args the rule consumed
 
              occ_anald_rhs = occurAnalyseExpr rule_rhs
                  -- See Note [Occurrence-analyse after rule firing]
        ; dump logger rule rule_rhs
-       ; return (Just (zapped_env, occ_anald_rhs, cont')) }
+       ; return (Just (occ_anald_rhs, cont')) }
             -- The occ_anald_rhs and cont' are all Out things
             -- hence zapping the environment
 
   | otherwise  -- No rule fires
-  = do { logger <- getLogger
+  = pprTrace "tryRules:fail" (ppr fn) $
+    do { logger <- getLogger
        ; nodump logger  -- This ensures that an empty file is written
        ; return Nothing }
 
   where
-    ropts      = seRuleOpts env
-    zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
+    ropts = seRuleOpts env
 
     printRuleModule rule
       = parens (maybe (text "BUILTIN")
@@ -2621,10 +2650,9 @@ tryRules env rules fn args call_cont
       = log_rule Opt_D_dump_rule_rewrites "Rule fired" $ vcat
           [ text "Rule:" <+> ftext (ruleName rule)
           , text "Module:" <+>  printRuleModule rule
-          , text "Before:" <+> hang (ppr fn) 2 (sep (map ppr args))
-          , text "After: " <+> hang (pprCoreExpr rule_rhs) 2
-                               (sep $ map ppr $ drop (ruleArity rule) args)
-          , text "Cont:  " <+> ppr call_cont ]
+          , text "Full arity:" <+>  ppr (ruleArity rule)
+          , text "Before:" <+> hang (ppr fn) 2 (ppr cont)
+          , text "After: " <+> pprCoreExpr rule_rhs ]
 
       | logHasDumpFlag logger Opt_D_dump_rule_firings
       = log_rule Opt_D_dump_rule_firings "Rule fired:" $
@@ -2658,11 +2686,19 @@ trySeqRules :: SimplEnv
             -> SimplCont
             -> SimplM (Maybe (SimplEnv, CoreExpr, SimplCont))
 -- See Note [User-defined RULES for seq]
+-- `in_env` applies to `rhs :: InExpr` but not to `scrut :: OutExpr`
 trySeqRules in_env scrut rhs cont
   = do { rule_base <- getSimplRules
-       ; tryRules in_env (getRules rule_base seqId) seqId out_args rule_cont }
+       ; let seq_rules = getRules rule_base seqId
+       ; mb_match <- tryRules out_env seq_rules seqId rule_cont
+       ; return $ case mb_match of
+           Just (rhs,cont') -> Just (out_env, rhs, cont')
+           Nothing          -> Nothing }
   where
+    out_env   = zapSubstEnv in_env
     no_cast_scrut = drop_casts scrut
+
+    -- All these are OutTypes
     scrut_ty  = exprType no_cast_scrut
     seq_id_ty = idType seqId                    -- forall r a (b::TYPE r). a -> b -> b
     res1_ty   = piResultTy seq_id_ty rhs_rep    -- forall a (b::TYPE rhs_rep). a -> b -> b
@@ -2671,18 +2707,14 @@ trySeqRules in_env scrut rhs cont
     res4_ty   = funResultTy res3_ty             -- rhs_ty -> rhs_ty
     rhs_ty    = substTy in_env (exprType rhs)
     rhs_rep   = getRuntimeRep rhs_ty
-    out_args  = [ TyArg { as_arg_ty  = rhs_rep
-                        , as_hole_ty = seq_id_ty }
-                , TyArg { as_arg_ty  = scrut_ty
-                        , as_hole_ty = res1_ty }
-                , TyArg { as_arg_ty  = rhs_ty
-                        , as_hole_ty = res2_ty }
-                , ValArg { as_arg = no_cast_scrut
-                         , as_dmd = seqDmd
-                         , as_hole_ty = res3_ty } ]
-    rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
-                           , sc_env = in_env, sc_cont = cont
-                           , sc_hole_ty = res4_ty }
+
+    rule_cont  = ApplyToTy  { sc_arg_ty = rhs_rep,    sc_hole_ty = seq_id_ty, sc_cont = rule_cont1 }
+    rule_cont1 = ApplyToTy  { sc_arg_ty = scrut_ty,   sc_hole_ty = res1_ty,   sc_cont = rule_cont2 }
+    rule_cont2 = ApplyToTy  { sc_arg_ty = rhs_ty,     sc_hole_ty = res2_ty,   sc_cont = rule_cont3 }
+    rule_cont3 = ApplyToVal { sc_arg = no_cast_scrut, sc_hole_ty = res3_ty,   sc_cont = rule_cont4
+                            , sc_dup = Simplified, sc_env = out_env }
+    rule_cont4 = ApplyToVal { sc_arg = rhs, sc_hole_ty = res4_ty,             sc_cont = cont
+                            , sc_dup = NoDup, sc_env = in_env }
 
     -- Lazily evaluated, so we don't do most of this
 
@@ -3161,8 +3193,8 @@ rebuildCase env scrut case_bndr alts@[Alt _ bndrs rhs] cont
   | is_plain_seq
   = do { mb_rule <- trySeqRules env scrut rhs cont
        ; case mb_rule of
-           Just (env', rule_rhs, cont') -> simplExprF env' rule_rhs cont'
-           Nothing                      -> reallyRebuildCase env scrut case_bndr alts cont }
+           Just (env',rule_rhs, cont') -> simplExprF env' rule_rhs cont'
+           Nothing                     -> reallyRebuildCase env scrut case_bndr alts cont }
 
 --------------------------------------------------
 --      3. Primop-related case-rules
@@ -3726,7 +3758,7 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
       | exprIsTrivial scrut = return (emptyFloats env
                                      , extendIdSubst env bndr (DoneEx scrut NotJoinPoint))
                               -- See Note [Do not duplicate constructor applications]
-      | otherwise           = do { dc_args <- mapM (simplVar env) bs
+      | otherwise           = do { dc_args <- mapM (simplInVar env) bs
                                          -- dc_ty_args are already OutTypes,
                                          -- but bs are InBndrs
                                  ; let con_app = Var (dataConWorkId dc)

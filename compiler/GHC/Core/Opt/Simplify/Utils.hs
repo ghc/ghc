@@ -25,7 +25,7 @@ module GHC.Core.Opt.Simplify.Utils (
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
         contIsTrivial, contArgs, contIsRhs,
-        countArgs,
+        countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
 
@@ -55,7 +55,6 @@ import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
 import GHC.Core.FVs
 import GHC.Core.Utils
-import GHC.Core.Rules( RuleEnv, getRules )
 import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
@@ -86,6 +85,7 @@ import Control.Monad    ( when )
 import Data.List        ( sortBy )
 import GHC.Types.Name.Env
 import Data.Graph
+import Data.Maybe
 
 {- *********************************************************************
 *                                                                      *
@@ -324,6 +324,7 @@ data ArgInfo
   = ArgInfo {
         ai_fun   :: OutId,      -- The function
         ai_args  :: [ArgSpec],  -- ...applied to these args (which are in *reverse* order)
+                                -- NB: all these argumennts are already simplified
 
         ai_rewrite :: RewriteCall,  -- What transformation to try next for this call
              -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
@@ -432,6 +433,7 @@ argInfoExpr fun rev_args
     go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
     go (CastBy co                : as) = mkCast (go as) co
 
+{-
 mkRewriteCall :: Id -> RuleEnv -> RewriteCall
 -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
 -- We try to skip any unnecessary stages:
@@ -447,6 +449,7 @@ mkRewriteCall fun rule_env
   where
     rules = getRules rule_env fun
     unf   = idUnfolding fun
+-}
 
 {-
 ************************************************************************
@@ -585,6 +588,24 @@ contArgs cont
                    -- Do *not* use short-cutting substitution here
                    -- because we want to get as much IdInfo as possible
 
+contOutArgs :: SimplCont -> [OutExpr]
+-- Get the leading arguments from the `SimplCont`, as /OutExprs/
+contOutArgs (ApplyToTy { sc_arg_ty = ty, sc_cont = cont })
+  = Type ty : contOutArgs cont
+contOutArgs (ApplyToVal { sc_dup = dup, sc_arg = arg, sc_env = env, sc_cont = cont })
+  | isSimplified dup
+  = arg : contOutArgs cont
+  | otherwise
+  = GHC.Core.Subst.substExprSC (getSubst env) arg : contOutArgs cont
+contOutArgs _
+  = []
+
+dropContArgs :: FullArgCount -> SimplCont -> SimplCont
+dropContArgs 0 cont = cont
+dropContArgs n (ApplyToTy  { sc_cont = cont }) = dropContArgs (n-1) cont
+dropContArgs n (ApplyToVal { sc_cont = cont }) = dropContArgs (n-1) cont
+dropContArgs n cont = pprPanic "dropContArgs" (ppr n $$ ppr cont)
+
 -- | Describes how the 'SimplCont' will evaluate the hole as a 'SubDemand'.
 -- This can be more insightful than the limited syntactic context that
 -- 'SimplCont' provides, because the 'Stop' constructor might carry a useful
@@ -616,9 +637,9 @@ contEvalContext k = case k of
     -- and case binder dmds, see addCaseBndrDmd. No priority right now.
 
 -------------------
-mkArgInfo :: SimplEnv -> RuleEnv -> Id -> SimplCont -> ArgInfo
+mkArgInfo :: SimplEnv -> [CoreRule] -> Id -> SimplCont -> ArgInfo
 
-mkArgInfo env rule_base fun cont
+mkArgInfo env rules_for_fun fun cont
   | n_val_args < idArity fun            -- Note [Unsaturated functions]
   = ArgInfo { ai_fun = fun, ai_args = []
             , ai_rewrite = fun_rewrite
@@ -633,11 +654,10 @@ mkArgInfo env rule_base fun cont
             , ai_dmds  = add_type_strictness (idType fun) arg_dmds
             , ai_discs = arg_discounts }
   where
-    n_val_args    = countValArgs cont
-    fun_rewrite   = mkRewriteCall fun rule_base
-    fun_has_rules = case fun_rewrite of
-                      TryRules {} -> True
-                      _           -> False
+    n_val_args  = countValArgs cont
+    fun_rewrite = TryNothing
+
+    fun_has_rules = not (null rules_for_fun)
 
     vanilla_discounts, arg_discounts :: [Int]
     vanilla_discounts = repeat 0
@@ -1454,6 +1474,10 @@ preInlineUnconditionally
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 preInlineUnconditionally env top_lvl bndr rhs rhs_env
+ = pprTrace "preInlineUnconditionally" (ppr bndr <+> ppr (isJust res)) $
+   res
+ where
+ res
   | not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
@@ -1508,6 +1532,10 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     canInlineInLam (Lit _)    = True
     canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
     canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
+    canInlineInLam (Var v)    = case idOccInfo v of
+                                  OneOcc { occ_in_lam = IsInsideLam } -> True
+                                  ManyOccs {}                         -> True
+                                  _                                   -> False
     canInlineInLam _          = False
       -- not ticks.  Counting ticks cannot be duplicated, and non-counting
       -- ticks around a Lam will disappear anyway.
