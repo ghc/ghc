@@ -1392,7 +1392,7 @@ partitionCandidates dvs@(DV { dv_kvs = kvs, dv_tvs = tvs }) pred
     (extracted_tvs, rest_tvs) = partitionDVarSet pred tvs
     extracted = dVarSetToVarSet extracted_kvs `unionVarSet` dVarSetToVarSet extracted_tvs
 
-candidateQTyVarsWithBinders :: [TyVar] -> Type -> TcM (CandidatesQTvs, [TyVar])
+candidateQTyVarsWithBinders :: [TyVar] -> [TyVar] -> Type -> TcM (CandidatesQTvs, [TyVar])
 -- (candidateQTyVarsWithBinders tvs ty) returns the candidateQTyVars
 -- of (forall tvs. ty), but do not treat 'tvs' as bound for the purpose
 -- of Note [Naughty quantification candidates].  Why?
@@ -1402,11 +1402,12 @@ candidateQTyVarsWithBinders :: [TyVar] -> Type -> TcM (CandidatesQTvs, [TyVar])
 -- also return the bound variables that need to be quantified
 -- since they can be come from implicit binders and wildcards
 -- See Note [Type variables in type families instance decl]
-candidateQTyVarsWithBinders bound_tvs ty
+candidateQTyVarsWithBinders imp_bound_tvs exp_bound_tvs ty
   = do { kvs     <- candidateQTyVarsOfKinds (map tyVarKind bound_tvs)
        ; cur_lvl <- getTcLevel
        ; all_tvs <- collect_cand_qtvs ty False cur_lvl emptyVarSet kvs ty
-       ; return (all_tvs `delCandidates` bound_tvs, boundedCandidates all_tvs bound_tvs) }
+       ; return (all_tvs `delCandidates` bound_tvs, boundedCandidates all_tvs imp_bound_tvs) }
+      where bound_tvs = imp_bound_tvs ++ exp_bound_tvs
 
 
 -- | Gathers free variables to use as quantification candidates (in

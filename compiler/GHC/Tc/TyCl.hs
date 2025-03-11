@@ -265,7 +265,7 @@ tcFamInsLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted 
        ; checkFamTelescope tclvl hs_outer_bndrs outer_exp_tvs
        ; outer_imp_wc_tvs <- liftZonkM $ zonkTcTyVarsToTcTyVarsMaybe $ outer_imp_tvs ++ wcs
        -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
-       ; (dvs, cqdvs)  <- candidateQTyVarsWithBinders (outer_imp_wc_tvs ++ outer_exp_tvs) lhs_ty
+       ; (dvs, cqdvs)  <- candidateQTyVarsWithBinders outer_imp_wc_tvs outer_exp_tvs lhs_ty
        ; qtvs <- quantifyTyVarsWithBinders cqdvs skol_info dvs
                  -- Have to make a same defaulting choice for reuslt kind here
                  -- and the `kindGeneralizeAll` in `tcConDecl`.
