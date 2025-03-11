@@ -473,7 +473,8 @@ gen_wrappers (Info defaults entries)
         -- Dependencies on Prelude must be explicit in libraries/base, but we
         -- don't need the Prelude here so we add NoImplicitPrelude.
      ++ "{-# OPTIONS_GHC -Wno-deprecations -O0 -fno-do-eta-reduction #-}\n"
-        -- Very important OPTIONS_GHC!  See Note [OPTIONS_GHC in GHC.PrimopWrappers]
+        -- Very important OPTIONS_GHC!
+        -- See Note [OPTIONS_GHC in GHC.Internal.PrimopWrappers]
      ++ "module GHC.Internal.PrimopWrappers where\n"
      ++ "import qualified GHC.Internal.Prim\n"
      ++ "import GHC.Internal.Tuple ()\n"
