@@ -50,3 +50,8 @@ T22744:
 	./genT22744
 	'$(TEST_HC)' $(TEST_HC_OPTS) T22744.hs
 
+IfaceRecomp:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -fno-code -fwrite-interface -fwrite-if-simplified-core -haddock   -O -v0 -c IfaceRecompTest.hs -fwrite-if-self-recomp-flags
+
+IfaceRecompSrcChanged: IfaceRecomp
+	echo "-- change src hash" >> IfaceRecompTest.hs
