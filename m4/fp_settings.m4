@@ -136,14 +136,7 @@ AC_DEFUN([FP_SETTINGS],
     fi
 
     # Mac-only tools
-    if test -z "$OtoolCmd"; then
-        OtoolCmd="otool"
-    fi
     SettingsOtoolCommand="$OtoolCmd"
-
-    if test -z "$InstallNameToolCmd"; then
-        InstallNameToolCmd="install_name_tool"
-    fi
     SettingsInstallNameToolCommand="$InstallNameToolCmd"
 
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
