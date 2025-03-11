@@ -5,11 +5,8 @@ TYPE CONSTRUCTORS
   class C1{1} :: * -> Constraint
   class C3{1} :: * -> Constraint
   type synonym Syn1{1} :: * -> *
-COERCION AXIOMS
-  axiom Roles4.N:C1 :: C1 a = a -> a
-  axiom Roles4.N:C3 :: C3 a = a -> Syn1 a
 Dependent modules: []
-Dependent packages: [base-4.20.0.0]
+Dependent packages: [base-4.21.0.0]
 
 ==================== Typechecker ====================
 Roles4.$tcC3
