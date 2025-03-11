@@ -10,3 +10,4 @@ def check_package(pkg_name):
 check_package('base')
 check_package('ghc-experimental')
 check_package('template-haskell')
+check_package('ghc-prim')
