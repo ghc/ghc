@@ -15,7 +15,7 @@ module GHC.Core.Opt.Simplify.Env (
         seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seCastSwizzle,
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
         seOptCoercionOpts, sePhase, sePlatform, sePreInline,
-        seRuleOpts, seRules, seUnfoldingOpts,
+        seRuleOpts, seRules, seUnfoldingOpts, seHasEmptySubst,
         mkSimplEnv, extendIdSubst, extendCvIdSubst,
         extendTvSubst, extendCvSubst,
         zapSubstEnv, setSubstEnv, bumpCaseDepth,
@@ -252,6 +252,10 @@ seRules env = sm_rules (seMode env)
 
 seUnfoldingOpts :: SimplEnv -> UnfoldingOpts
 seUnfoldingOpts env = sm_uf_opts (seMode env)
+
+seHasEmptySubst :: SimplEnv -> Bool
+seHasEmptySubst (SimplEnv { seIdSubst = id_env, seTvSubst = tv_env, seCvSubst = cv_env })
+  = isEmptyVarEnv id_env && isEmptyVarEnv tv_env && isEmptyVarEnv cv_env
 
 -- See Note [The environments of the Simplify pass]
 data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad

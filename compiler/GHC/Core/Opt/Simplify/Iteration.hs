@@ -1520,15 +1520,22 @@ simplTick env tickish expr cont
 ************************************************************************
 -}
 
+type SimplEnvIS = SimplEnv
+-- Invariant: the substition is empty
+
 rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
--- At this point the substitution in the SimplEnv should be irrelevant;
--- only the in-scope set matters
-rebuild env expr cont
-  = case cont of
+-- At this point the substitution in the SimplEnv is empty.
+-- Only the in-scope set matters, plus the flags
+rebuild env expr cont = rebuild_go (zapSubstEnv env) expr cont
+
+rebuild_go :: SimplEnvIS -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
+rebuild_go env expr cont
+  = assertPpr (seHasEmptySubst env) (ppr (getFullSubst env) $$ ppr expr) $
+    case cont of
       Stop {}          -> return (emptyFloats env, expr)
-      TickIt t cont    -> rebuild env (mkTick t expr) cont
+      TickIt t cont    -> rebuild_go env (mkTick t expr) cont
       CastIt { sc_co = co, sc_opt = opt, sc_cont = cont }
-        -> rebuild env (mkCast expr co') cont
+        -> rebuild_go env (mkCast expr co') cont
            -- NB: mkCast implements the (Coercion co |> g) optimisation
         where
           co' = optOutCoercion env co opt
@@ -1544,13 +1551,13 @@ rebuild env expr cont
         -> completeBindX (se `setInScopeFromE` env) from_what b expr body cont
 
       ApplyToTy  { sc_arg_ty = ty, sc_cont = cont}
-        -> rebuild env (App expr (Type ty)) cont
+        -> rebuild_go env (App expr (Type ty)) cont
 
       ApplyToVal { sc_arg = arg, sc_env = se, sc_dup = dup_flag
                  , sc_cont = cont, sc_hole_ty = fun_ty }
         -- See Note [Avoid redundant simplification]
         -> do { (_, _, arg') <- simplLazyArg env dup_flag fun_ty Nothing se arg
-              ; rebuild env (App expr arg') cont }
+              ; rebuild_go env (App expr arg') cont }
 
 completeBindX :: SimplEnv
               -> FromWhat
@@ -1748,7 +1755,8 @@ simplCast env body co0 cont0
           -- See Note [Representation polymorphism invariants] in GHC.Core
           -- test: typecheck/should_run/EtaExpandLevPoly
 
-simplLazyArg :: SimplEnv -> DupFlag
+simplLazyArg :: SimplEnv                -- ^ Used only for its InScopeSet
+             -> DupFlag
              -> OutType                 -- ^ Type of the function applied to this arg
              -> Maybe ArgInfo           -- ^ Just <=> This arg `ai` occurs in an app
                                         --   `f a1 ... an` where we have ArgInfo on
@@ -1829,7 +1837,10 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
              --      But fun_ty is an OutType, so is fully substituted
 
        ; if | Just env' <- let res = preInlineUnconditionally env NotTopLevel bndr arg arg_se
-                           in pprTrace "simpl_lam" (ppr arg $$ ppr (isJust res)) res
+                           in pprTrace "simpl_lam"
+                                 (vcat [ ppr bndr, ppr arg, ppr (seIdSubst arg_se)
+                                       , ppr (isJust res) ]) $
+                              res
             , not (needsCaseBindingL arg_levity arg)
             , not ( isSimplified dup &&
                     not (exprIsTrivial arg) &&
@@ -2323,7 +2334,8 @@ simplOutId env fun cont
                      then tryRules zapped_env rules_for_me fun cont1
                      else return Nothing
        ; case mb_match of {
-             Just (rhs, cont2) -> simplExprF zapped_env rhs cont2 ;
+             Just (rhs, cont2) -> pprTrace "tryRules1" (ppr fun) $
+                                  simplExprF zapped_env rhs cont2 ;
              Nothing ->
 
     do { logger <- getLogger
@@ -2343,11 +2355,18 @@ simplOutId env fun cont
 ---------------------------------------------------------
 --      Dealing with a call site
 
-rebuildCall :: SimplEnv -> ArgInfo -> SimplCont
-            -> SimplM (SimplFloats, OutExpr)
+rebuildCall, rebuildCall_go :: SimplEnv -> ArgInfo -> SimplCont
+                            -> SimplM (SimplFloats, OutExpr)
+-- At this point the substitution in the SimplEnv is irrelevant;
+-- it is usually empty, and regardless should be ignored.
+-- Only the in-scope set matters, plus the seMode flags
+
+reubildCall env arg_info cont
+  = assertPpr (seHasEmptySubst env) (ppr (getFullSubst env) $$ ppr expr) $
+    rebuildCall_go env arg_info cont
 
 ---------- Bottoming applications --------------
-rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) cont
+rebuildCall_go env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) cont
   -- When we run out of strictness args, it means
   -- that the call is definitely bottom; see GHC.Core.Opt.Simplify.Utils.mkArgInfo
   -- Then we want to discard the entire strict continuation.  E.g.
@@ -2413,16 +2432,16 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
 -}
 
 ---------- Simplify type applications and casts --------------
-rebuildCall env info (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
+rebuildCall_go env info (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
   = rebuildCall env (addCastTo info co') cont
   where
     co' = optOutCoercion env co opt
 
-rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
+rebuildCall-go env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
   = rebuildCall env (addTyArgTo info arg_ty hole_ty) cont
 
 ---------- Simplify value arguments --------------------
-rebuildCall env fun_info
+rebuildCall_go env fun_info
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
                         , sc_dup = dup_flag, sc_hole_ty = fun_ty
                         , sc_cont = cont })
@@ -2451,14 +2470,15 @@ rebuildCall env fun_info
         ; rebuildCall env (addValArgTo fun_info  arg' fun_ty) cont }
 
 ---------- No further useful info, revert to generic rebuild ------------
-rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
+rebuildCall_go env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
   | null rules
   = rebuild env (argInfoExpr fun rev_args) cont
   | otherwise  -- Try rules again
   = do { let full_cont = pushSimplifiedRevArgs env rev_args cont
        ; mb_match <- tryRules env rules fun full_cont
        ; case mb_match of
-           Just (rhs, cont2) -> simplExprF env rhs cont2
+           Just (rhs, cont2) -> pprTrace "tryRules2" (ppr fun $$ ppr (seIdSubst env)) $
+                                simplExprF env rhs cont2
            Nothing -> rebuild env (argInfoExpr fun rev_args) cont }
 
 -----------------------------------
@@ -2701,18 +2721,15 @@ tryRules env rules fn cont
 trySeqRules :: SimplEnv
             -> OutExpr -> InExpr   -- Scrutinee and RHS
             -> SimplCont
-            -> SimplM (Maybe (SimplEnv, CoreExpr, SimplCont))
+            -> SimplM (Maybe (CoreExpr, SimplCont))
 -- See Note [User-defined RULES for seq]
 -- `in_env` applies to `rhs :: InExpr` but not to `scrut :: OutExpr`
 trySeqRules in_env scrut rhs cont
   = do { rule_base <- getSimplRules
        ; let seq_rules = getRules rule_base seqId
-       ; mb_match <- tryRules out_env seq_rules seqId rule_cont
-       ; return $ case mb_match of
-           Just (rhs,cont') -> Just (out_env, rhs, cont')
-           Nothing          -> Nothing }
+       ; tryRules out_env seq_rules seqId rule_cont }
   where
-    out_env   = zapSubstEnv in_env
+    out_env       = zapSubstEnv in_env
     no_cast_scrut = drop_casts scrut
 
     -- All these are OutTypes
@@ -3210,8 +3227,8 @@ rebuildCase env scrut case_bndr alts@[Alt _ bndrs rhs] cont
   | is_plain_seq
   = do { mb_rule <- trySeqRules env scrut rhs cont
        ; case mb_rule of
-           Just (env',rule_rhs, cont') -> simplExprF env' rule_rhs cont'
-           Nothing                     -> reallyRebuildCase env scrut case_bndr alts cont }
+           Just (rule_rhs, cont') -> simplExprF (zapSubstEnv env) rule_rhs cont'
+           Nothing                -> reallyRebuildCase env scrut case_bndr alts cont }
 
 --------------------------------------------------
 --      3. Primop-related case-rules
@@ -3262,7 +3279,7 @@ reallyRebuildCase env scrut case_bndr alts cont
                             --    Note [Case-of-case and full laziness]
   = do { case_expr <- simplAlts env scrut case_bndr alts
                                 (mkBoringStop (contHoleType cont))
-       ; rebuild env case_expr cont }
+       ; rebuild (zapSubstEnv env) case_expr cont }
 
   | otherwise
   = do { (floats, env', cont') <- mkDupableCaseCont env alts cont
