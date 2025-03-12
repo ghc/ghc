@@ -1267,7 +1267,7 @@ dynCompileExpr expr = do
   return (unsafeCoerce hval :: Dynamic)
 
 -----------------------------------------------------------------------------
--- show a module and it's source/object filenames
+-- show a module and its source/object filenames
 
 showModule :: GhcMonad m => ModSummary -> m String
 showModule mod_summary =
