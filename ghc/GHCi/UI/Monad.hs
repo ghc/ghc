@@ -56,10 +56,10 @@ import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import GHC.Hs.Utils
 import GHC.Utils.Misc
 import GHC.Utils.Logger
+import GHC.Runtime.Debugger.Breakpoints
 
 import GHC.Utils.Exception hiding (uninterruptibleMask, mask, catch)
 import Numeric
-import Data.Array
 import Data.IORef
 import Data.Time
 import System.Environment
@@ -163,8 +163,6 @@ data GHCiState = GHCiState
             -- ^ @hSetBuffering NoBuffering@ for stdin/stdout/stderr
         ifaceCache :: ModIfaceCache
      }
-
-type TickArray = Array Int [(GHC.BreakIndex,RealSrcSpan)]
 
 -- | A GHCi command
 data Command

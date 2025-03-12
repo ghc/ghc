@@ -40,6 +40,7 @@ import GHCi.Leak
 import GHCi.UI.Print
 
 import GHC.Runtime.Debugger
+import GHC.Runtime.Debugger.Breakpoints
 import GHC.Runtime.Eval (mkTopLevEnv)
 
 -- The GHC interface
@@ -3853,9 +3854,6 @@ enclosingTickSpan md (RealSrcSpan src _) = do
   return . minimumBy leftmostLargestRealSrcSpan $ enclosing_spans
  where
 
-leftmostLargestRealSrcSpan :: RealSrcSpan -> RealSrcSpan -> Ordering
-leftmostLargestRealSrcSpan = on compare realSrcSpanStart S.<> on (flip compare) realSrcSpanEnd
-
 traceCmd :: GhciMonad m => String -> m ()
 traceCmd arg
   = withSandboxOnly ":trace" $ tr arg
@@ -4089,7 +4087,7 @@ breakByModuleLine :: GhciMonad m => Module -> Int -> [String] -> m ()
 breakByModuleLine md line args
    | [] <- args = findBreakAndSet md $ maybeToList . findBreakByLine line
    | [col] <- args, all isDigit col =
-        findBreakAndSet md $ maybeToList . findBreakByCoord Nothing (line, read col)
+        findBreakAndSet md $ maybeToList . findBreakByCoord (line, read col)
    | otherwise = breakSyntax
 
 -- Set a breakpoint for an identifier
@@ -4113,7 +4111,7 @@ breakById inp = do
           let modBreaks = case mb_mod_info of
                 (Just mod_info) -> GHC.modInfoModBreaks mod_info
                 Nothing         -> emptyModBreaks
-          findBreakAndSet (fromJust mb_mod) $ findBreakForBind fun_str modBreaks
+          findBreakAndSet (fromJust mb_mod) $ \_ -> findBreakForBind fun_str modBreaks
   where
     -- Try to lookup the module for an identifier that is in scope.
     -- `parseName` throws an exception, if the identifier is not in scope
@@ -4180,68 +4178,6 @@ findBreakAndSet md lookupTickTree = do
             if alreadySet
                then text " was already set at " <> ppr pan
                else text " activated at " <> ppr pan
-
--- When a line number is specified, the current policy for choosing
--- the best breakpoint is this:
---    - the leftmost complete subexpression on the specified line, or
---    - the leftmost subexpression starting on the specified line, or
---    - the rightmost subexpression enclosing the specified line
---
-findBreakByLine :: Int -> TickArray -> Maybe (BreakIndex,RealSrcSpan)
-findBreakByLine line arr
-  | not (inRange (bounds arr) line) = Nothing
-  | otherwise =
-    listToMaybe (sortBy (leftmostLargestRealSrcSpan `on` snd)  comp)   `mplus`
-    listToMaybe (sortBy (compare `on` snd) incomp) `mplus`
-    listToMaybe (sortBy (flip compare `on` snd) ticks)
-  where
-        ticks = arr ! line
-
-        starts_here = [ (ix,pan) | (ix, pan) <- ticks,
-                        GHC.srcSpanStartLine pan == line ]
-
-        (comp, incomp) = partition ends_here starts_here
-            where ends_here (_,pan) = GHC.srcSpanEndLine pan == line
-
--- The aim is to find the breakpoints for all the RHSs of the
--- equations corresponding to a binding.  So we find all breakpoints
--- for
---   (a) this binder only (it maybe a top-level or a nested declaration)
---   (b) that do not have an enclosing breakpoint
-findBreakForBind :: String -> GHC.ModBreaks -> TickArray
-                 -> [(BreakIndex,RealSrcSpan)]
-findBreakForBind str_name modbreaks _ = filter (not . enclosed) ticks
-  where
-    ticks = [ (index, span)
-            | (index, decls) <- assocs (GHC.modBreaks_decls modbreaks),
-              str_name == declPath decls,
-              RealSrcSpan span _ <- [GHC.modBreaks_locs modbreaks ! index] ]
-    enclosed (_,sp0) = any subspan ticks
-      where subspan (_,sp) = sp /= sp0 &&
-                         realSrcSpanStart sp <= realSrcSpanStart sp0 &&
-                         realSrcSpanEnd sp0 <= realSrcSpanEnd sp
-
-findBreakByCoord :: Maybe FastString -> (Int,Int) -> TickArray
-                 -> Maybe (BreakIndex,RealSrcSpan)
-findBreakByCoord mb_file (line, col) arr
-  | not (inRange (bounds arr) line) = Nothing
-  | otherwise =
-    listToMaybe (sortBy (flip compare `on` snd) contains ++
-                 sortBy (compare `on` snd) after_here)
-  where
-        ticks = arr ! line
-
-        -- the ticks that span this coordinate
-        contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan Strict.Nothing `spans` (line,col),
-                            is_correct_file pan ]
-
-        is_correct_file pan
-                 | Just f <- mb_file = GHC.srcSpanFile pan == f
-                 | otherwise         = True
-
-        after_here = [ tick | tick@(_,pan) <- ticks,
-                              GHC.srcSpanStartLine pan == line,
-                              GHC.srcSpanStartCol pan >= col ]
 
 -- For now, use ANSI bold on terminals that we know support it.
 -- Otherwise, we add a line of carets under the active expression instead.
@@ -4327,7 +4263,7 @@ list2 [arg] = do
             RealSrcLoc l _ ->
                do tickArray <- assert (isExternalName name) $
                                getTickArray (GHC.nameModule name)
-                  let mb_span = findBreakByCoord (Just (GHC.srcLocFile l))
+                  let mb_span = findBreakByCoord
                                         (GHC.srcLocLine l, GHC.srcLocCol l)
                                         tickArray
                   case mb_span of
@@ -4435,21 +4371,12 @@ getTickArray modl = do
    case lookupModuleEnv arrmap modl of
       Just arr -> return arr
       Nothing  -> do
-        (ticks, _) <- getModBreak modl
-        let arr = mkTickArray (assocs ticks)
+        arr <- fromMaybe (panic "getTickArray") <$> makeModuleLineMap modl
         setGHCiState st{tickarrays = extendModuleEnv arrmap modl arr}
         return arr
 
 discardTickArrays :: GhciMonad m => m ()
 discardTickArrays = modifyGHCiState (\st -> st {tickarrays = emptyModuleEnv})
-
-mkTickArray :: [(BreakIndex,SrcSpan)] -> TickArray
-mkTickArray ticks
-  = accumArray (flip (:)) [] (1, max_line)
-        [ (line, (nm,pan)) | (nm,RealSrcSpan pan _) <- ticks, line <- srcSpanLines pan ]
-    where
-        max_line = foldr max 0 [ GHC.srcSpanEndLine sp | (_, RealSrcSpan sp _) <- ticks ]
-        srcSpanLines pan = [ GHC.srcSpanStartLine pan ..  GHC.srcSpanEndLine pan ]
 
 -- don't reset the counter back to zero?
 discardActiveBreakPoints :: GhciMonad m => m ()
