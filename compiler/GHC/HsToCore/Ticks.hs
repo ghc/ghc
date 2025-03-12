@@ -586,8 +586,7 @@ addTickHsExpr (HsProc x pat cmdtop) =
 addTickHsExpr (XExpr (WrapExpr w e)) =
         liftM (XExpr . WrapExpr w) $
               (addTickHsExpr e)        -- Explicitly no tick on inside
-addTickHsExpr (XExpr (ExpandedThingTc o e)) =
-        liftM (XExpr . ExpandedThingTc o) $ addTickHsExpr e
+addTickHsExpr (XExpr (ExpandedThingTc o e)) = addTickHsExpanded o e
 
 addTickHsExpr e@(XExpr (ConLikeTc {})) = return e
   -- We used to do a freeVar on a pat-syn builder, but actually
@@ -606,9 +605,24 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
   = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())
        ; return (HsDo srcloc cxt (L l stmts')) }
   where
-        forQual = case cxt of
+    forQual = case cxt of
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
+
+addTickHsExpanded :: HsThingRn -> HsExpr GhcTc -> TM (HsExpr GhcTc)
+addTickHsExpanded o@(OrigStmt (L pos LastStmt{}) _) e
+  -- LastStmt always gets a tick for breakpoint and hpc coverage
+  = do d <- getDensity
+       case d of
+          TickForCoverage    -> liftM (XExpr . ExpandedThingTc o) $ tick_it e
+          TickForBreakPoints -> liftM (XExpr . ExpandedThingTc o) $ tick_it e
+          _                  -> liftM (XExpr . ExpandedThingTc o) $ addTickHsExpr e
+  where
+    tick_it e  = unLoc <$> allocTickBox (ExpBox False) False False (locA pos)
+                               (addTickHsExpr e)
+addTickHsExpanded o e
+  = liftM (XExpr . ExpandedThingTc o) $ addTickHsExpr e
+
 
 addTickTupArg :: HsTupArg GhcTc -> TM (HsTupArg GhcTc)
 addTickTupArg (Present x e)  = do { e' <- addTickLHsExpr e
