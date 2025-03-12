@@ -876,7 +876,7 @@ looks_like_type_arg _ = False
 
 addArgCtxt :: AppCtxt -> LHsExpr GhcRn
            -> TcM a -> TcM a
--- There are 3 cases:
+-- There are 2 cases:
 -- 1. In the normal case, we add an informative context
 --          "In the third argument of f, namely blah"
 -- 2. If we are deep inside generated code (`isGeneratedCode` is `True`)
@@ -885,9 +885,6 @@ addArgCtxt :: AppCtxt -> LHsExpr GhcRn
 --          "In the expression: arg"
 --   Unless the arg is also a generated thing, in which case do nothing.
 --   See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
--- 3. We are in an expanded `do`-block statement
---      Do nothing as we have already added the error
---      context in GHC.Tc.Do.tcXExpr
 --  See Note [Expanding HsDo with XXExprGhcRn] in GHC.Tc.Gen.Do
 addArgCtxt ctxt (L arg_loc arg) thing_inside
   = do { in_generated_code <- inGeneratedCode
