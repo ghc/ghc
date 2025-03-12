@@ -69,6 +69,7 @@ import GHC.Utils.Misc
 
 import Control.Monad
 import Data.List.NonEmpty (NonEmpty (..))
+import Data.Maybe
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -1827,7 +1828,8 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
              --      It's wrong to err in either direction
              --      But fun_ty is an OutType, so is fully substituted
 
-       ; if | Just env' <- preInlineUnconditionally env NotTopLevel bndr arg arg_se
+       ; if | Just env' <- let res = preInlineUnconditionally env NotTopLevel bndr arg arg_se
+                           in pprTrace "simpl_lam" (ppr arg $$ ppr (isJust res)) res
             , not (needsCaseBindingL arg_levity arg)
             , not ( isSimplified dup &&
                     not (exprIsTrivial arg) &&
@@ -1838,7 +1840,8 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
                     tick (PreInlineUnconditionally bndr)
                   ; simplLam env' body cont }
 
-            | isSimplified dup  -- Don't re-simplify if we've simplified it once
+            | pprTrace "simpl_lam2" (ppr arg) $
+              isSimplified dup  -- Don't re-simplify if we've simplified it once
                                 -- Including don't preInlineUnconditionally
                                 -- See Note [Avoiding simplifying repeatedly]
             -> completeBindX env from_what bndr arg body cont
@@ -2452,8 +2455,11 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules })
   | null rules
   = rebuild env (argInfoExpr fun rev_args) cont
   | otherwise  -- Try rules again
-  = do { let args = argInfoAppArgs rev_args
-       ; mb_match <- tryRules env rules run args
+  = do { let full_cont = pushSimplifiedRevArgs env rev_args cont
+       ; mb_match <- tryRules env rules fun full_cont
+       ; case mb_match of
+           Just (rhs, cont2) -> simplExprF env rhs cont2
+           Nothing -> rebuild env (argInfoExpr fun rev_args) cont }
 
 -----------------------------------
 tryInlining :: SimplEnv -> Logger -> OutId -> SimplCont -> SimplM (Maybe OutExpr)
@@ -4030,7 +4036,7 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
   | otherwise
   = do { join_bndr <- newJoinId [arg_bndr] res_ty
        ; let arg_info = ArgInfo { ai_fun   = join_bndr
-                                , ai_rewrite = TryNothing, ai_args  = []
+                                , ai_rules = [], ai_args  = []
                                 , ai_encl  = False, ai_dmds  = repeat topDmd
                                 , ai_discs = repeat 0 }
        ; return ( addJoinFloats (emptyFloats env) $
