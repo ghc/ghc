@@ -13,7 +13,7 @@ module GHC.Core.TyCo.Subst
         Subst(..), TvSubstEnv, CvSubstEnv, IdSubstEnv,
         emptyIdSubstEnv, emptyTvSubstEnv, emptyCvSubstEnv, composeTCvSubst,
         emptySubst, mkEmptySubst, isEmptyTCvSubst, isEmptySubst,
-        mkTCvSubst, mkTvSubst, mkCvSubst, mkIdSubst,
+        mkSubst, mkTCvSubst, mkTvSubst, mkCvSubst, mkIdSubst,
         getTvSubstEnv, getIdSubstEnv,
         getCvSubstEnv, substInScopeSet, setInScope, getSubstRangeTyCoFVs,
         isInScope, elemSubst, notElemSubst, zapSubst,
@@ -272,6 +272,9 @@ isEmptySubst (Subst _ id_env tv_env cv_env)
 isEmptyTCvSubst :: Subst -> Bool
 isEmptyTCvSubst (Subst _ _ tv_env cv_env)
   = isEmptyVarEnv tv_env && isEmptyVarEnv cv_env
+
+mkSubst :: InScopeSet -> IdSubstEnv -> TvSubstEnv -> CvSubstEnv -> Subst
+mkSubst = Subst
 
 mkTCvSubst :: InScopeSet -> TvSubstEnv -> CvSubstEnv -> Subst
 mkTCvSubst in_scope tvs cvs = Subst in_scope emptyIdSubstEnv tvs cvs

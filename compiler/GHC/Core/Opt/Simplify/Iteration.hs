@@ -1159,14 +1159,14 @@ simplExprF :: SimplEnv
            -> SimplM (SimplFloats, OutExpr)
 
 simplExprF !env e !cont -- See Note [Bangs in the Simplifier]
-  = {- pprTrace "simplExprF" (vcat
-      [ ppr e
-      , text "cont =" <+> ppr cont
-      , text "inscope =" <+> ppr (seInScope env)
-      , text "tvsubst =" <+> ppr (seTvSubst env)
-      , text "idsubst =" <+> ppr (seIdSubst env)
-      , text "cvsubst =" <+> ppr (seCvSubst env)
-      ]) $ -}
+  = -- pprTrace "simplExprF" (vcat
+    --  [ ppr e
+    --  , text "cont =" <+> ppr cont
+    --  , text "inscope =" <+> ppr (seInScope env)
+    --  , text "tvsubst =" <+> ppr (seTvSubst env)
+    --  , text "idsubst =" <+> ppr (seIdSubst env)
+    --  , text "cvsubst =" <+> ppr (seCvSubst env)
+    --  ]) $
     simplExprF1 env e cont
 
 simplExprF1 :: HasDebugCallStack
@@ -1358,7 +1358,7 @@ simplCoercion env co
              -- See Note [Inline depth] in GHC.Core.Opt.Simplify.Env
        ; seqCo opt_co `seq` return opt_co }
   where
-    subst = getSubst env
+    subst = getTCvSubst env
     opts  = seOptCoercionOpts env
 
 -----------------------------------
@@ -2261,11 +2261,64 @@ simplInId env var cont
 
 ---------------------------------------------------------
 simplOutId :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
+
+---------- The runRW# rule ------
+-- See Note [Simplification of runRW#] in GHC.CoreToSTG.Prep.
+--
+-- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
+-- K[ runRW# @rr @hole_ty body ]   -->   runRW @rr' @ty' (\s. K[ body s ])
+simplOutId env fun cont
+  | fun `hasKey` runRWKey
+  , ApplyToTy  { sc_cont = cont1 } <- cont
+  , ApplyToTy  { sc_cont = cont2, sc_arg_ty = hole_ty } <- cont1
+  , ApplyToVal { sc_cont = cont3, sc_arg = arg
+               , sc_env = arg_se, sc_hole_ty = fun_ty } <- cont2
+  -- Do this even if (contIsStop cont), or if seCaseCase is off.
+  -- See Note [No eta-expansion in runRW#]
+  = do { let arg_env = arg_se `setInScopeFromE` env
+
+             overall_res_ty = contResultType cont3
+             -- hole_ty is the type of the current runRW# application
+             (outer_cont, new_runrw_res_ty, inner_cont)
+                | seCaseCase env = (mkBoringStop overall_res_ty, overall_res_ty, cont3)
+                | otherwise      = (cont3, hole_ty, mkBoringStop hole_ty)
+                -- Only when case-of-case is on. See GHC.Driver.Config.Core.Opt.Simplify
+                --    Note [Case-of-case and full laziness]
+
+       -- If the argument is a literal lambda already, take a short cut
+       -- This isn't just efficiency:
+       --    * If we don't do this we get a beta-redex every time, so the
+       --      simplifier keeps doing more iterations.
+       --    * Even more important: see Note [No eta-expansion in runRW#]
+       ; arg' <- case arg of
+           Lam s body -> do { (env', s') <- simplBinder arg_env s
+                            ; body' <- simplExprC env' body inner_cont
+                            ; return (Lam s' body') }
+                            -- Important: do not try to eta-expand this lambda
+                            -- See Note [No eta-expansion in runRW#]
+
+           _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
+                   ; let (m,_,_) = splitFunTy fun_ty
+                         env'  = arg_env `addNewInScopeIds` [s']
+                         cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s'
+                                            , sc_env = env', sc_cont = inner_cont
+                                            , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy new_runrw_res_ty }
+                                -- cont' applies to s', then K
+                   ; body' <- simplExprC env' arg cont'
+                   ; return (Lam s' body') }
+
+       ; let rr'   = getRuntimeRep new_runrw_res_ty
+             call' = mkApps (Var fun) [mkTyArg rr', mkTyArg new_runrw_res_ty, arg']
+       ; rebuild env call' outer_cont }
+
+
 simplOutId env fun cont
   = do { rule_base <- getSimplRules
        ; let rules_for_me = getRules rule_base fun
 
-       ; mb_match <- tryRules zapped_env rules_for_me fun cont1
+       ; mb_match <- if activeUnfolding (seMode env) fun
+                     then tryRules zapped_env rules_for_me fun cont1
+                     else return Nothing
        ; case mb_match of {
              Just (rhs, cont2) -> simplExprF zapped_env rhs cont2 ;
              Nothing ->
@@ -2365,54 +2418,6 @@ rebuildCall env info (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
 rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
   = rebuildCall env (addTyArgTo info arg_ty hole_ty) cont
 
----------- The runRW# rule. Do this after absorbing all arguments ------
--- See Note [Simplification of runRW#] in GHC.CoreToSTG.Prep.
---
--- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
--- K[ runRW# rr ty body ]   -->   runRW rr' ty' (\s. K[ body s ])
-rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
-            (ApplyToVal { sc_arg = arg, sc_env = arg_se
-                        , sc_cont = cont, sc_hole_ty = fun_ty })
-  | fun_id `hasKey` runRWKey
-  , [ TyArg { as_arg_ty = hole_ty }, TyArg {} ] <- rev_args
-  -- Do this even if (contIsStop cont), or if seCaseCase is off.
-  -- See Note [No eta-expansion in runRW#]
-  = do { let arg_env = arg_se `setInScopeFromE` env
-
-             overall_res_ty  = contResultType cont
-             -- hole_ty is the type of the current runRW# application
-             (outer_cont, new_runrw_res_ty, inner_cont)
-                | seCaseCase env = (mkBoringStop overall_res_ty, overall_res_ty, cont)
-                | otherwise      = (cont, hole_ty, mkBoringStop hole_ty)
-                -- Only when case-of-case is on. See GHC.Driver.Config.Core.Opt.Simplify
-                --    Note [Case-of-case and full laziness]
-
-       -- If the argument is a literal lambda already, take a short cut
-       -- This isn't just efficiency:
-       --    * If we don't do this we get a beta-redex every time, so the
-       --      simplifier keeps doing more iterations.
-       --    * Even more important: see Note [No eta-expansion in runRW#]
-       ; arg' <- case arg of
-           Lam s body -> do { (env', s') <- simplBinder arg_env s
-                            ; body' <- simplExprC env' body inner_cont
-                            ; return (Lam s' body') }
-                            -- Important: do not try to eta-expand this lambda
-                            -- See Note [No eta-expansion in runRW#]
-
-           _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
-                   ; let (m,_,_) = splitFunTy fun_ty
-                         env'  = arg_env `addNewInScopeIds` [s']
-                         cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s'
-                                            , sc_env = env', sc_cont = inner_cont
-                                            , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy new_runrw_res_ty }
-                                -- cont' applies to s', then K
-                   ; body' <- simplExprC env' arg cont'
-                   ; return (Lam s' body') }
-
-       ; let rr'   = getRuntimeRep new_runrw_res_ty
-             call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg new_runrw_res_ty, arg']
-       ; rebuild env call' outer_cont }
-
 ---------- Simplify value arguments --------------------
 rebuildCall env fun_info
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
@@ -2443,8 +2448,12 @@ rebuildCall env fun_info
         ; rebuildCall env (addValArgTo fun_info  arg' fun_ty) cont }
 
 ---------- No further useful info, revert to generic rebuild ------------
-rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
+  | null rules
   = rebuild env (argInfoExpr fun rev_args) cont
+  | otherwise  -- Try rules again
+  = do { let args = argInfoAppArgs rev_args
+       ; mb_match <- tryRules env rules run args
 
 -----------------------------------
 tryInlining :: SimplEnv -> Logger -> OutId -> SimplCont -> SimplM (Maybe OutExpr)
@@ -2612,12 +2621,11 @@ tryRules env rules fn cont
   | null rules
   = return Nothing
 
-  | Just (rule, rule_rhs) <- pprTrace "tryRules" (ppr fn) $
-                             lookupRule ropts (getUnfoldingInRuleMatch env)
-                                        (activeRule (seMode env)) fn
-                                        (contOutArgs cont) rules
+  | Just (rule, rule_rhs) <- -- pprTrace "tryRules" (ppr fn) $
+                             lookupRule ropts in_scope_env
+                                        act_fun fn out_args rules
   -- Fire a rule for the function
-  = pprTrace "tryRules:success" (ppr fn) $
+  = -- pprTrace "tryRules:success" (ppr fn) $
     do { logger <- getLogger
        ; checkedTick (RuleFired (ruleName rule))
        ; let cont' = dropContArgs (ruleArity rule) cont
@@ -2632,13 +2640,16 @@ tryRules env rules fn cont
             -- hence zapping the environment
 
   | otherwise  -- No rule fires
-  = pprTrace "tryRules:fail" (ppr fn) $
+  = -- pprTrace "tryRules:fail" (ppr fn) $
     do { logger <- getLogger
        ; nodump logger  -- This ensures that an empty file is written
        ; return Nothing }
 
   where
-    ropts = seRuleOpts env
+    ropts        = seRuleOpts env :: RuleOpts
+    in_scope_env = getUnfoldingInRuleMatch env :: InScopeEnv
+    out_args     = contOutArgs cont :: [OutExpr]
+    act_fun      = activeRule (seMode env) :: Activation -> Bool
 
     printRuleModule rule
       = parens (maybe (text "BUILTIN")

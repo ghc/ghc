@@ -85,7 +85,6 @@ import Control.Monad    ( when )
 import Data.List        ( sortBy )
 import GHC.Types.Name.Env
 import Data.Graph
-import Data.Maybe
 
 {- *********************************************************************
 *                                                                      *
@@ -283,9 +282,9 @@ instance Outputable SimplCont where
     = (text "TickIt" <+> ppr t) $$ ppr cont
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
     = (text "ApplyToTy" <+> pprParendType ty) $$ ppr cont
-  ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont, sc_hole_ty = hole_ty })
-    = (hang (text "ApplyToVal" <+> ppr dup <+> text "hole" <+> ppr hole_ty)
-          2 (pprParendExpr arg))
+  ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont, sc_hole_ty = hole_ty, sc_env = env })
+    = (hang (text "ApplyToVal" <+> ppr dup <+> text "hole-ty:" <+> pprParendType hole_ty)
+          2 (ppr (seIdSubst env) $$ pprParendExpr arg))
       $$ ppr cont
   ppr (StrictBind { sc_bndr = b, sc_cont = cont })
     = (text "StrictBind" <+> ppr b) $$ ppr cont
@@ -326,9 +325,10 @@ data ArgInfo
         ai_args  :: [ArgSpec],  -- ...applied to these args (which are in *reverse* order)
                                 -- NB: all these argumennts are already simplified
 
-        ai_rewrite :: RewriteCall,  -- What transformation to try next for this call
-             -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
+--        ai_rewrite :: RewriteCall,  -- What transformation to try next for this call
+--             -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
 
+        ai_rules :: [CoreRule], -- Rules for this function
         ai_encl :: Bool,        -- Flag saying whether this function
                                 -- or an enclosing one has rules (recursively)
                                 --      True => be keener to inline in all args
@@ -596,7 +596,8 @@ contOutArgs (ApplyToVal { sc_dup = dup, sc_arg = arg, sc_env = env, sc_cont = co
   | isSimplified dup
   = arg : contOutArgs cont
   | otherwise
-  = GHC.Core.Subst.substExprSC (getSubst env) arg : contOutArgs cont
+  = -- pprTrace "contOutArgs" (ppr arg $$ ppr (seIdSubst env)) $
+    GHC.Core.Subst.substExprSC (getFullSubst env) arg : contOutArgs cont
 contOutArgs _
   = []
 
@@ -642,20 +643,19 @@ mkArgInfo :: SimplEnv -> [CoreRule] -> Id -> SimplCont -> ArgInfo
 mkArgInfo env rules_for_fun fun cont
   | n_val_args < idArity fun            -- Note [Unsaturated functions]
   = ArgInfo { ai_fun = fun, ai_args = []
-            , ai_rewrite = fun_rewrite
+            , ai_rules = rules_for_fun
             , ai_encl = False
             , ai_dmds = vanilla_dmds
             , ai_discs = vanilla_discounts }
   | otherwise
   = ArgInfo { ai_fun   = fun
             , ai_args  = []
-            , ai_rewrite = fun_rewrite
+            , ai_rules = rules_for_fun
             , ai_encl  = fun_has_rules || contHasRules cont
             , ai_dmds  = add_type_strictness (idType fun) arg_dmds
             , ai_discs = arg_discounts }
   where
     n_val_args  = countValArgs cont
-    fun_rewrite = TryNothing
 
     fun_has_rules = not (null rules_for_fun)
 
@@ -1474,10 +1474,6 @@ preInlineUnconditionally
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 preInlineUnconditionally env top_lvl bndr rhs rhs_env
- = pprTrace "preInlineUnconditionally" (ppr bndr <+> ppr (isJust res)) $
-   res
- where
- res
   | not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]

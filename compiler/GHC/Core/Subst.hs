@@ -239,11 +239,7 @@ substExprSC :: HasDebugCallStack => Subst -> CoreExpr -> CoreExpr
 -- their canonical representatives in the in-scope set
 substExprSC subst orig_expr
   | isEmptySubst subst = orig_expr
-  | otherwise          = pprTrace "enter subst-expr" (ppr subst $$ ppr orig_expr) $
-                         pprTrace "result subst-expr" (ppr res) $
-                         res
-                       where
-                         res = substExpr subst orig_expr
+  | otherwise          = substExpr subst orig_expr
 
 -- | substExpr applies a substitution to an entire 'CoreExpr'. Remember,
 -- you may only apply the substitution /once/:
