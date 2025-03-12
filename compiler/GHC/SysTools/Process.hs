@@ -6,7 +6,14 @@
 -- (c) The GHC Team 2017
 --
 -----------------------------------------------------------------------------
-module GHC.SysTools.Process where
+module GHC.SysTools.Process
+  ( readCreateProcessWithExitCode'
+  , getGccEnv
+  , runSomething
+  , runSomethingResponseFile
+  , runSomethingFiltered
+  , runSomethingWith
+  ) where
 
 import GHC.Prelude
 
@@ -75,26 +82,6 @@ readCreateProcessWithExitCode' proc = do
     ex <- waitForProcess pid
 
     return (ex, output)
-
-replaceVar :: (String, String) -> [(String, String)] -> [(String, String)]
-replaceVar (var, value) env =
-    (var, value) : filter (\(var',_) -> var /= var') env
-
--- | Version of @System.Process.readProcessWithExitCode@ that takes a
--- key-value tuple to insert into the environment.
-readProcessEnvWithExitCode
-    :: String -- ^ program path
-    -> [String] -- ^ program args
-    -> (String, String) -- ^ addition to the environment
-    -> IO (ExitCode, String, String) -- ^ (exit_code, stdout, stderr)
-readProcessEnvWithExitCode prog args env_update = do
-    current_env <- getEnvironment
-    readCreateProcessWithExitCode (proc prog args) {
-        env = Just (replaceVar env_update current_env) } ""
-
--- Don't let gcc localize version info string, #8825
-c_locale_env :: (String, String)
-c_locale_env = ("LANGUAGE", "C")
 
 -- If the -B<dir> option is set, add <dir> to PATH.  This works around
 -- a bug in gcc on Windows Vista where it can't find its auxiliary
