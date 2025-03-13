@@ -271,7 +271,8 @@ tcFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted
              -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
        ; traceTc "tcFamInstLHSBinders" $
          vcat [
-              text "outer_bndrs:" <+> ppr outer_bndrs
+               text "lhs_ty:" <+> ppr lhs_ty
+              , text "outer_bndrs:" <+> ppr outer_bndrs
               , text "outer_imp_tvs:" <+> pprTyVars outer_imp_tvs
               , text "outer_exp_tvs:" <+> pprTyVars outer_exp_tvs
               , text "wcs:" <+> pprTyVars wcs
@@ -3503,7 +3504,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
              -- so that any strange coercions inside lhs_ty
              -- have been solved before we attempt to unravel it
 
-       ; traceTc "tcTyFamInstEqnGuts }" (vcat [ ppr pats, ppr fam_tc, pprTyVars final_tvs ])
+       ; traceTc "tcTyFamInstEqnGuts }" (vcat [ ppr fam_tc, pprTyVars final_tvs ])
                  -- Don't try to print 'pats' here, because lhs_ty involves
                  -- a knot-tied type constructor, so we get a black hole
 
