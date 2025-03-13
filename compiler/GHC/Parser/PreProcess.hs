@@ -201,7 +201,7 @@ ppLexer queueComments cont =
                             Just inp -> do
                                 Lexer.setInput inp
                                 ppLexer queueComments cont
-                    L l (ITcpp continuation s) -> do
+                    L l (ITcpp continuation s sp) -> do
                         ghcpp <- ghcCppEnabled
                         -- Only process the directive if GhcCpp is explicitly enabled.
                         -- Otherwise we are scanning for pragmas
@@ -216,7 +216,7 @@ ppLexer queueComments cont =
                                         case mdump of
                                             Just dump ->
                                                 -- We have a dump of the state, put it into an ignored token
-                                                contIgnoreTok (L l (ITcpp continuation (appendFS s (fsLit dump))))
+                                                contIgnoreTok (L l (ITcpp continuation (appendFS s (fsLit dump)) sp))
                                             Nothing -> contIgnoreTok tk
                             else contInner tk
                     _ -> do
@@ -232,7 +232,7 @@ ppLexer queueComments cont =
 processCppToks :: FastString -> PP (Maybe String)
 processCppToks fs = do
     let
-        get (L _ (ITcpp _ s)) = s
+        get (L _ (ITcpp _ s _)) = s
         get _ = error "should not"
     -- Combine any prior continuation tokens
     cs <- popContinuation
