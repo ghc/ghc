@@ -282,7 +282,7 @@ instance Outputable SimplCont where
     = (text "TickIt" <+> ppr t) $$ ppr cont
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
     = (text "ApplyToTy" <+> pprParendType ty) $$ ppr cont
-  ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont, sc_hole_ty = hole_ty, sc_env = env })
+  ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont, sc_hole_ty = hole_ty })
     = (hang (text "ApplyToVal" <+> ppr dup <+> text "hole-ty:" <+> pprParendType hole_ty)
           2 (pprParendExpr arg))
       $$ ppr cont
@@ -588,17 +588,19 @@ contArgs cont
                    -- Do *not* use short-cutting substitution here
                    -- because we want to get as much IdInfo as possible
 
-contOutArgs :: SimplCont -> [OutExpr]
+contOutArgs :: GHC.Core.Subst.InScopeSet -> SimplCont -> [OutExpr]
 -- Get the leading arguments from the `SimplCont`, as /OutExprs/
-contOutArgs (ApplyToTy { sc_arg_ty = ty, sc_cont = cont })
-  = Type ty : contOutArgs cont
-contOutArgs (ApplyToVal { sc_dup = dup, sc_arg = arg, sc_env = env, sc_cont = cont })
+contOutArgs in_scope (ApplyToTy { sc_arg_ty = ty, sc_cont = cont })
+  = Type ty : contOutArgs in_scope cont
+contOutArgs in_scope (ApplyToVal { sc_dup = dup, sc_arg = arg, sc_env = env, sc_cont = cont })
   | isSimplified dup
-  = arg : contOutArgs cont
+  = arg : contOutArgs in_scope cont
   | otherwise
   = -- pprTrace "contOutArgs" (ppr arg $$ ppr (seIdSubst env)) $
-    GHC.Core.Subst.substExprSC (getFullSubst env) arg : contOutArgs cont
-contOutArgs _
+    GHC.Core.Subst.substExpr (getFullSubst in_scope env) arg : contOutArgs in_scope cont
+      -- NOT substExprSC: we want to get the benefit of knowing what is
+      --                  evaluated etc, via the in-scope set
+contOutArgs _ _
   = []
 
 dropContArgs :: FullArgCount -> SimplCont -> SimplCont

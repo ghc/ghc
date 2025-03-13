@@ -15,7 +15,7 @@ module GHC.Core.Opt.Simplify.Env (
         seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seCastSwizzle,
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
         seOptCoercionOpts, sePhase, sePlatform, sePreInline,
-        seRuleOpts, seRules, seUnfoldingOpts, seHasEmptySubst,
+        seRuleOpts, seRules, seUnfoldingOpts,
         mkSimplEnv, extendIdSubst, extendCvIdSubst,
         extendTvSubst, extendCvSubst,
         zapSubstEnv, setSubstEnv, bumpCaseDepth,
@@ -23,6 +23,8 @@ module GHC.Core.Opt.Simplify.Env (
         setInScopeSet, modifyInScope, addNewInScopeIds,
         getSimplRules, enterRecGroupRHSs,
         reSimplifying,
+
+        SimplEnvIS,  checkSimplEnvIS, pprBadSimplEnvIS,
 
         -- * Substitution results
         SimplSR(..), mkContEx, substId, lookupRecBndr,
@@ -202,6 +204,19 @@ data SimplEnv
                                -- See Note [Inline depth]
     }
 
+type SimplEnvIS = SimplEnv
+     -- Invariant: the substitution is empty
+     -- We want this SimplEnv for its InScopeSet and flags
+
+checkSimplEnvIS :: SimplEnvIS -> Bool
+-- Check the invariant for SimplEnvIS
+checkSimplEnvIS (SimplEnv { seIdSubst = id_env, seTvSubst = tv_env, seCvSubst = cv_env })
+  = isEmptyVarEnv id_env && isEmptyVarEnv tv_env && isEmptyVarEnv cv_env
+
+pprBadSimplEnvIS :: SimplEnvIS -> SDoc
+-- Print a SimplEnv that fails checkSimplEnvIS
+pprBadSimplEnvIS env = ppr (getFullSubst (seInScope env) env)
+
 seArityOpts :: SimplEnv -> ArityOpts
 seArityOpts env = sm_arity_opts (seMode env)
 
@@ -252,10 +267,6 @@ seRules env = sm_rules (seMode env)
 
 seUnfoldingOpts :: SimplEnv -> UnfoldingOpts
 seUnfoldingOpts env = sm_uf_opts (seMode env)
-
-seHasEmptySubst :: SimplEnv -> Bool
-seHasEmptySubst (SimplEnv { seIdSubst = id_env, seTvSubst = tv_env, seCvSubst = cv_env })
-  = isEmptyVarEnv id_env && isEmptyVarEnv tv_env && isEmptyVarEnv cv_env
 
 -- See Note [The environments of the Simplify pass]
 data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad
@@ -1267,8 +1278,8 @@ getTCvSubst :: SimplEnv -> Subst
 getTCvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env })
   = mkSubst in_scope emptyVarEnv tv_env cv_env
 
-getFullSubst :: SimplEnv -> Subst
-getFullSubst (SimplEnv { seInScope = in_scope, seIdSubst = id_env, seTvSubst = tv_env, seCvSubst = cv_env })
+getFullSubst :: InScopeSet -> SimplEnv -> Subst
+getFullSubst in_scope (SimplEnv { seIdSubst = id_env, seTvSubst = tv_env, seCvSubst = cv_env })
   = mk_full_subst in_scope tv_env cv_env id_env
 
 mk_full_subst :: InScopeSet -> TvSubstEnv -> CvSubstEnv -> SimplIdSubst -> Subst

@@ -69,7 +69,6 @@ import GHC.Utils.Misc
 
 import Control.Monad
 import Data.List.NonEmpty (NonEmpty (..))
-import Data.Maybe
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -1520,17 +1519,15 @@ simplTick env tickish expr cont
 ************************************************************************
 -}
 
-type SimplEnvIS = SimplEnv
--- Invariant: the substition is empty
-
 rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
--- At this point the substitution in the SimplEnv is empty.
--- Only the in-scope set matters, plus the flags
+-- At this point the substitution in the SimplEnv is irrelevant;
+-- only the in-scope set matters, plus the flags.
+-- So zap it before calling `rebuild_go`
 rebuild env expr cont = rebuild_go (zapSubstEnv env) expr cont
 
 rebuild_go :: SimplEnvIS -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
 rebuild_go env expr cont
-  = assertPpr (seHasEmptySubst env) (ppr (getFullSubst env) $$ ppr expr) $
+  = assertPpr (checkSimplEnvIS env) (pprBadSimplEnvIS env) $
     case cont of
       Stop {}          -> return (emptyFloats env, expr)
       TickIt t cont    -> rebuild_go env (mkTick t expr) cont
@@ -1667,7 +1664,7 @@ on each successive composition -- that's at least quadratic.  So:
 -}
 
 
-optOutCoercion :: SimplEnv -> OutCoercion -> Bool -> OutCoercion
+optOutCoercion :: SimplEnvIS -> OutCoercion -> Bool -> OutCoercion
 -- See Note [Avoid re-simplifying coercions]
 optOutCoercion env co already_optimised
   | already_optimised = co  -- See Note [Avoid re-simplifying coercions]
@@ -1717,7 +1714,7 @@ simplCast env body co0 cont0
                                           , sc_dup = dup, sc_cont = tail
                                           , sc_hole_ty = fun_ty })
           | not opt  -- pushCoValArg duplicates the coercion, so optimise first
-          = addCoerce (optOutCoercion env co opt) True cont
+          = addCoerce (optOutCoercion (zapSubstEnv env) co opt) True cont
 
           | Just (m_co1, m_co2) <- pushCoValArg co
           , fixed_rep m_co1
@@ -1837,9 +1834,9 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
              --      But fun_ty is an OutType, so is fully substituted
 
        ; if | Just env' <- let res = preInlineUnconditionally env NotTopLevel bndr arg arg_se
-                           in pprTrace "simpl_lam"
-                                 (vcat [ ppr bndr, ppr arg, ppr (seIdSubst arg_se)
-                                       , ppr (isJust res) ]) $
+                           in -- pprTrace "simpl_lam"
+                              --   (vcat [ ppr bndr, ppr arg, ppr (seIdSubst arg_se)
+                              --         , ppr (isJust res) ]) $
                               res
             , not (needsCaseBindingL arg_levity arg)
             , not ( isSimplified dup &&
@@ -1851,8 +1848,7 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
                     tick (PreInlineUnconditionally bndr)
                   ; simplLam env' body cont }
 
-            | pprTrace "simpl_lam2" (ppr arg) $
-              isSimplified dup  -- Don't re-simplify if we've simplified it once
+            | isSimplified dup  -- Don't re-simplify if we've simplified it once
                                 -- Including don't preInlineUnconditionally
                                 -- See Note [Avoiding simplifying repeatedly]
             -> completeBindX env from_what bndr arg body cont
@@ -2330,11 +2326,12 @@ simplOutId env fun cont
   = do { rule_base <- getSimplRules
        ; let rules_for_me = getRules rule_base fun
 
-       ; mb_match <- if activeUnfolding (seMode env) fun
-                     then tryRules zapped_env rules_for_me fun cont1
-                     else return Nothing
+       ; mb_match <- -- if activeUnfolding (seMode env) fun
+                     -- then 
+                     -- else return Nothing
+                     tryRules zapped_env rules_for_me fun cont1
        ; case mb_match of {
-             Just (rhs, cont2) -> pprTrace "tryRules1" (ppr fun) $
+             Just (rhs, cont2) -> -- pprTrace "tryRules1" (ppr fun) $
                                   simplExprF zapped_env rhs cont2 ;
              Nothing ->
 
@@ -2355,18 +2352,19 @@ simplOutId env fun cont
 ---------------------------------------------------------
 --      Dealing with a call site
 
-rebuildCall, rebuildCall_go :: SimplEnv -> ArgInfo -> SimplCont
-                            -> SimplM (SimplFloats, OutExpr)
+rebuildCall :: SimplEnvIS -> ArgInfo -> SimplCont
+            -> SimplM (SimplFloats, OutExpr)
 -- At this point the substitution in the SimplEnv is irrelevant;
 -- it is usually empty, and regardless should be ignored.
 -- Only the in-scope set matters, plus the seMode flags
 
-reubildCall env arg_info cont
-  = assertPpr (seHasEmptySubst env) (ppr (getFullSubst env) $$ ppr expr) $
-    rebuildCall_go env arg_info cont
+-- Check the invariant
+rebuildCall env arg_info _cont
+  | assertPpr (checkSimplEnvIS env) (pprBadSimplEnvIS env $$ ppr arg_info) False
+  = pprPanic "rebuildCall" empty
 
 ---------- Bottoming applications --------------
-rebuildCall_go env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) cont
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) cont
   -- When we run out of strictness args, it means
   -- that the call is definitely bottom; see GHC.Core.Opt.Simplify.Utils.mkArgInfo
   -- Then we want to discard the entire strict continuation.  E.g.
@@ -2432,16 +2430,16 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
 -}
 
 ---------- Simplify type applications and casts --------------
-rebuildCall_go env info (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
+rebuildCall env info (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
   = rebuildCall env (addCastTo info co') cont
   where
     co' = optOutCoercion env co opt
 
-rebuildCall-go env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
+rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
   = rebuildCall env (addTyArgTo info arg_ty hole_ty) cont
 
 ---------- Simplify value arguments --------------------
-rebuildCall_go env fun_info
+rebuildCall env fun_info
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
                         , sc_dup = dup_flag, sc_hole_ty = fun_ty
                         , sc_cont = cont })
@@ -2470,14 +2468,14 @@ rebuildCall_go env fun_info
         ; rebuildCall env (addValArgTo fun_info  arg' fun_ty) cont }
 
 ---------- No further useful info, revert to generic rebuild ------------
-rebuildCall_go env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
   | null rules
   = rebuild env (argInfoExpr fun rev_args) cont
   | otherwise  -- Try rules again
   = do { let full_cont = pushSimplifiedRevArgs env rev_args cont
        ; mb_match <- tryRules env rules fun full_cont
        ; case mb_match of
-           Just (rhs, cont2) -> pprTrace "tryRules2" (ppr fun $$ ppr (seIdSubst env)) $
+           Just (rhs, cont2) -> -- pprTrace "tryRules2" (ppr fun $$ ppr (seIdSubst env)) $
                                 simplExprF env rhs cont2
            Nothing -> rebuild env (argInfoExpr fun rev_args) cont }
 
@@ -2647,7 +2645,7 @@ tryRules env rules fn cont
   | null rules
   = return Nothing
 
-  | Just (rule, rule_rhs) <- -- pprTrace "tryRules" (ppr fn) $
+  | Just (rule, rule_rhs) <- -- pprTrace "tryRules" (ppr fn <+> vcat (map ppr out_args)) $
                              lookupRule ropts in_scope_env
                                         act_fun fn out_args rules
   -- Fire a rule for the function
@@ -2674,7 +2672,7 @@ tryRules env rules fn cont
   where
     ropts        = seRuleOpts env :: RuleOpts
     in_scope_env = getUnfoldingInRuleMatch env :: InScopeEnv
-    out_args     = contOutArgs cont :: [OutExpr]
+    out_args     = contOutArgs (seInScope env) cont :: [OutExpr]
     act_fun      = activeRule (seMode env) :: Activation -> Bool
 
     printRuleModule rule
@@ -3883,13 +3881,17 @@ mkDupableCont :: SimplEnv
                                        --   extra let/join-floats and in-scope variables
                         , SimplCont)   -- dup_cont: duplicable continuation
 mkDupableCont env cont
-  = mkDupableContWithDmds env (repeat topDmd) cont
+  = mkDupableContWithDmds (zapSubstEnv env) (repeat topDmd) cont
 
 mkDupableContWithDmds
-   :: SimplEnv  -> [Demand]  -- Demands on arguments; always infinite
+   :: SimplEnvIS  -> [Demand]  -- Demands on arguments; always infinite
    -> SimplCont -> SimplM ( SimplFloats, SimplCont)
 
 mkDupableContWithDmds env _ cont
+  -- Check the invariant
+  | assertPpr (checkSimplEnvIS env) (pprBadSimplEnvIS env) False
+  = pprPanic "mkDupableContWithDmds" empty
+
   | contIsDupable cont
   = return (emptyFloats env, cont)
 
