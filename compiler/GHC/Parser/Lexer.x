@@ -1009,7 +1009,7 @@ data Token
   | ITblockComment String      PsSpan -- ^ comment in {- -}
 
   -- GHC CPP extension. See Note [GhcCPP Token]
-  | ITcpp Bool FastString   -- ^ CPP #-prefixed line, or continuation.
+  | ITcpp Bool FastString      PsSpan -- ^ CPP #-prefixed line, or continuation.
   deriving Show
 
 instance Outputable Token where
@@ -1267,6 +1267,7 @@ cppTokenCont = doCppToken Nothing
 doCppToken :: (Maybe Int) -> Action p
 doCppToken code span buf len _buf2 =
   do
+    lt <- getLastLocIncludingComments
     let
       pushLexStateMaybe Nothing = return ()
       pushLexStateMaybe (Just code) = pushLexState code
@@ -1280,7 +1281,8 @@ doCppToken code span buf len _buf2 =
        ('\n':_) -> return (len - 1, False)
        _ -> return (len, False)
     let span' = cppSpan span len0
-    return (L span' (ITcpp continue $! lexemeToFastString buf len0))
+    let !s = lexemeToFastString buf len0
+    return (L span' (ITcpp continue s lt))
 
 
 -- cppToken :: Int -> Action p
@@ -1318,10 +1320,12 @@ cppSpan span len = mkPsSpan start_loc end_loc
      BufPos sb = psBufPos start_loc
      end_loc = PsLoc real_loc (BufPos (sb + len + 1))
 
-cppTokenPop :: (FastString -> Token)-> Action p
+cppTokenPop :: (FastString -> PsSpan -> Token)-> Action p
 cppTokenPop t span buf len _buf2 =
   do _ <- popLexState
-     return (L span (t $! lexemeToFastString buf len))
+     lt <- getLastLocIncludingComments
+     let !s = lexemeToFastString buf len
+     return (L span (t s lt))
 
 -- See Note [Nested comment line pragmas]
 failLinePrag1 :: Action p
@@ -3837,6 +3841,7 @@ commentToAnnotation (L l (ITdocComment s ll))   = mkLEpaComment l ll (EpaDocComm
 commentToAnnotation (L l (ITdocOptions s ll))   = mkLEpaComment l ll (EpaDocOptions s)
 commentToAnnotation (L l (ITlineComment s ll))  = mkLEpaComment l ll (EpaLineComment s)
 commentToAnnotation (L l (ITblockComment s ll)) = mkLEpaComment l ll (EpaBlockComment s)
+commentToAnnotation (L l (ITcpp _ s ll))        = mkLEpaComment l ll (EpaLineComment (unpackFS s))
 commentToAnnotation _                           = panic "commentToAnnotation"
 
 -- see Note [PsSpan in Comments]

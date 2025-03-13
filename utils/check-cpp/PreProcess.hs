@@ -49,6 +49,8 @@ dumpGhcCpp dflags pst = output
                         ++ sepa
                         ++ show bare_toks
                         ++ sepa
+                        ++ show lll
+                        ++ sepa
     -- ++ show all_toks ++ sepa
     -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
     (pst_final, bare_toks) = lexAll pst
@@ -67,6 +69,9 @@ dumpGhcCpp dflags pst = output
     toks =
         addSourceToTokens startLoc buf1 all_toks
     final = renderCombinedToks toks
+    lll = case Lexer.lexTokenStream () (options pst) (buffer pst) startLoc of
+      POk _ x -> x
+      _ -> error $ "wtf"
 
 cmpBs :: Located Token -> Located Token -> Ordering
 cmpBs (L (RealSrcSpan _ (Strict.Just bs1)) _) (L (RealSrcSpan _ (Strict.Just bs2)) _) =
@@ -158,8 +163,9 @@ showDefines defines = Map.foldlWithKey' (\acc k d -> acc ++ "\n" ++ renderDefine
         "#define " ++ n ++ "(" ++ (intercalate "," args) ++ ") " ++ (intercalate " " (map PM.t_str rhs))
 
 lexAll :: Lexer.PState PpState -> (Lexer.PState PpState, [Located Token])
--- lexAll state = case unP (lexer True return) state of
-lexAll state = case unP (lexerDbg True return) state of
+lexAll state = case unP (lexer True return) state of
+-- lexAll state = case unP (lexerDbg True return) state of
+-- lexAll state = case unP (Lexer.lexerDbg True return) state of
     POk s t@(L _ ITeof) -> (s, [t])
     -- POk state' t -> (ss, t : rest)
     POk state' t -> (ss, trace ("lexAll:" ++ show t) t : rest)
