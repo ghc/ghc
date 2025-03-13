@@ -1392,23 +1392,18 @@ partitionCandidates dvs@(DV { dv_kvs = kvs, dv_tvs = tvs }) pred
     (extracted_tvs, rest_tvs) = partitionDVarSet pred tvs
     extracted = dVarSetToVarSet extracted_kvs `unionVarSet` dVarSetToVarSet extracted_tvs
 
-candidateQTyVarsWithBinders :: [TyVar] -> [TyVar] -> Type -> TcM (CandidatesQTvs, [TyVar])
+candidateQTyVarsWithBinders :: [TyVar] -> Type -> TcM CandidatesQTvs
 -- (candidateQTyVarsWithBinders tvs ty) returns the candidateQTyVars
 -- of (forall tvs. ty), but do not treat 'tvs' as bound for the purpose
 -- of Note [Naughty quantification candidates].  Why?
 -- Because we are going to scoped-sort the quantified variables
 -- in among the tvs
 
--- also return the bound variables that need to be quantified
--- since they can be come from implicit binders and wildcards
--- See Note [Type variables in type families instance decl]
-candidateQTyVarsWithBinders imp_bound_tvs exp_bound_tvs ty
+candidateQTyVarsWithBinders bound_tvs ty
   = do { kvs     <- candidateQTyVarsOfKinds (map tyVarKind bound_tvs)
        ; cur_lvl <- getTcLevel
        ; all_tvs <- collect_cand_qtvs ty False cur_lvl emptyVarSet kvs ty
-       ; return (all_tvs `delCandidates` bound_tvs, boundedCandidates all_tvs imp_bound_tvs) }
-      where bound_tvs = imp_bound_tvs ++ exp_bound_tvs
-
+       ; return (all_tvs `delCandidates` bound_tvs)}
 
 -- | Gathers free variables to use as quantification candidates (in
 -- 'quantifyTyVarsWithBinders). This might output the same var
@@ -1758,14 +1753,15 @@ quantifyTyVars :: SkolemInfo
                -> CandidatesQTvs   -- See Note [Dependent type variables]
                                    -- Already zonked
                -> TcM [TcTyVar]
-quantifyTyVars = quantifyTyVarsWithBinders []
+quantifyTyVars ski tvs = fst <$> quantifyTyVarsWithBinders [] [] ski tvs
 
 quantifyTyVarsWithBinders ::
                [TcTyVar]
+               -> [TcTyVar]
                -> SkolemInfo
                -> CandidatesQTvs   -- See Note [Dependent type variables]
                                    -- Already zonked
-               -> TcM [TcTyVar]
+               -> TcM ([TcTyVar], [TcTyVar])
 -- See Note [quantifyTyVars]
 -- Can be given a mixture of TcTyVars and TyVars, in the case of
 --   associated type declarations. Also accepts covars, but *never* returns any.
@@ -1773,31 +1769,41 @@ quantifyTyVarsWithBinders ::
 -- invariants on CandidateQTvs, we do not have to filter out variables
 -- free in the environment here. Just quantify unconditionally, subject
 -- to the restrictions in Note [quantifyTyVars].
-quantifyTyVarsWithBinders cvs skol_info dvs
+
+-- for wildcards, do not default, just skolemise add to the list of quantified
+-- for outer_imp_qtvs, do not default and skolemise, and return separately
+quantifyTyVarsWithBinders wc_itvs outer_imp_itvs skol_info dvs
        -- short-circuit common case
-  | isEmptyCandidates dvs && null cvs
+  | isEmptyCandidates dvs && null wc_itvs && null outer_imp_itvs
   = do { traceTc "quantifyTyVars has nothing to quantify" empty
-       ; return [] }
+       ; return ([], []) }
 
   | otherwise
   = do { traceTc "quantifyTyVars {"
            ( vcat [
             text "dvs =" <+> ppr dvs,
-            text "cvs =" <+> ppr cvs
+            text "wc_qtvs =" <+> ppr wc_itvs,
+            text "outer_imp_qtvs =" <+> ppr outer_imp_itvs
             ])
 
        ; undefaulted <- defaultTyVars dvs
-       ; final_qtvs  <- liftZonkM $ mapMaybeM zonk_quant (undefaulted++cvs)
+       ; (final_qtvs, out_imp_qtvs)  <- liftZonkM $ do
+            qtvs <- mapMaybeM zonk_quant undefaulted
+            wc_qtv <- mapMaybeM zonk_quant wc_itvs
+            out_imp_qtvs <- mapMaybeM zonk_quant outer_imp_itvs
+            return (qtvs ++ wc_qtv, out_imp_qtvs)
 
        ; traceTc "quantifyTyVars }"
            (vcat [ text "undefaulted:" <+> pprTyVars undefaulted
-                 , text "final_qtvs:"  <+> pprTyVars final_qtvs ])
+                 , text "final_qtvs:" <+> pprTyVars final_qtvs
+                 , text "out_imp_qtvs:" <+> pprTyVars out_imp_qtvs
+                  ])
 
        -- We should never quantify over coercion variables; check this
        ; let co_vars = filter isCoVar final_qtvs
        ; massertPpr (null co_vars) (ppr co_vars)
 
-       ; return final_qtvs }
+       ; return (final_qtvs, out_imp_qtvs) }
   where
     -- zonk_quant returns a tyvar if it should be quantified over;
     -- otherwise, it returns Nothing. The latter case happens for

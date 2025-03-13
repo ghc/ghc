@@ -20,7 +20,7 @@ module GHC.Tc.Zonk.TcType
   , zonkTcTyVarToTcTyVar, zonkTcTyVarsToTcTyVars
   , zonkInvisTVBinder
   , zonkCo
-  , zonkTcTyVarsToTcTyVarsMaybe
+  , zonkInvariants
 
     -- ** Zonking 'TyCon's
   , zonkTcTyCon
@@ -270,8 +270,13 @@ zonkTcTyVar tv
 zonkTcTyVarsToTcTyVars :: HasDebugCallStack => [TcTyVar] -> ZonkM [TcTyVar]
 zonkTcTyVarsToTcTyVars = mapM zonkTcTyVarToTcTyVar
 
-zonkTcTyVarsToTcTyVarsMaybe :: HasDebugCallStack => [TcTyVar] -> ZonkM [TcTyVar]
-zonkTcTyVarsToTcTyVarsMaybe = mapMaybeM (fmap getTyVar_maybe . zonkTcTyVar)
+-- let x = zonked and y = unzonked
+-- take intersection of x and y
+zonkInvariants :: HasDebugCallStack => [TcTyVar] -> ZonkM [TcTyVar]
+zonkInvariants y = do
+  x <- mapMaybeM (fmap getTyVar_maybe . zonkTcTyVar) y
+  return $ dVarSetElems $ mkDVarSet y `intersectDVarSet` mkDVarSet x
+
 
 zonkTcTyVarToTcTyVar :: HasDebugCallStack => TcTyVar -> ZonkM TcTyVar
 zonkTcTyVarToTcTyVar tv

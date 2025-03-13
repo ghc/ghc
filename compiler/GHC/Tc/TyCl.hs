@@ -249,47 +249,43 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
                  th_bndrs' `plusNameEnv` th_bndrs) }
 
 
--- tcFamInstLHSBinders :: FamEqn TyVar Name -> TcM [TyVar]
 tcFamInstLHSBinders :: TcLevel -> SkolemInfo -> HsOuterFamEqnTyVarBndrs GhcTc -> HsOuterFamEqnTyVarBndrs GhcRn
   -> [TcTyVar] -> Type -> WantedConstraints -> IOEnv (Env TcGblEnv TcLclEnv) ([TyCoVar], [TcTyVar])
 tcFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted = do
-       -- This code (and the stuff immediately above) is very similar
-       -- to that in tcTyFamInstEqnGuts.  Maybe we should abstract the
-       -- common code; but for the moment I concluded that it's
-       -- clearer to duplicate it.  Still, if you fix a bug here,
-       -- check there too!
 
        -- See Note [Type variables in type families instance decl]
        ; let outer_exp_tvs = scopedSort $ explicitOuterTyVars outer_bndrs
        ; let outer_imp_tvs = implicitOuterTyVars outer_bndrs
        ; checkFamTelescope tclvl hs_outer_bndrs outer_exp_tvs
-       ; outer_imp_wc_tvs <- liftZonkM $ zonkTcTyVarsToTcTyVarsMaybe $ outer_imp_tvs ++ wcs
+       ; wc_itvs <- liftZonkM $ zonkInvariants wcs
+       ; outer_imp_itvs <- liftZonkM $ zonkInvariants outer_imp_tvs
        -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
-       ; (dvs, cqdvs)  <- candidateQTyVarsWithBinders outer_imp_wc_tvs outer_exp_tvs lhs_ty
-       ; qtvs <- quantifyTyVarsWithBinders cqdvs skol_info dvs
-                 -- Have to make a same defaulting choice for reuslt kind here
+       ; dvs  <- candidateQTyVarsWithBinders (outer_exp_tvs ++ outer_imp_tvs ++ wcs) lhs_ty
+       ; (qtvs, outer_imp_qtvs) <- quantifyTyVarsWithBinders wc_itvs outer_imp_itvs skol_info dvs
+                 -- Have to make a same defaulting choice for result kind here
                  -- and the `kindGeneralizeAll` in `tcConDecl`.
                  -- see (GT4) in
                  -- GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
-
-       ; let final_tvs = scopedSort (qtvs ++ outer_exp_tvs)
-
+       ; let final_tvs = scopedSort (qtvs ++ outer_exp_tvs ++ outer_imp_qtvs)
+             -- This scopedSort is important: the qtvs may be /interleaved/ with
+             -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
        ; traceTc "tcFamInstLHSBinders" $
          vcat [
-          -- ppr fam_tc
-              text "lhs_ty:"    <+> ppr lhs_ty
-              , text "final_tvs:" <+> pprTyVars final_tvs
+              text "outer_bndrs:" <+> ppr outer_bndrs
               , text "outer_imp_tvs:" <+> pprTyVars outer_imp_tvs
               , text "outer_exp_tvs:" <+> pprTyVars outer_exp_tvs
               , text "wcs:" <+> pprTyVars wcs
-              , text "outer_imp_wc_tvs:" <+> pprTyVars outer_imp_wc_tvs
-              , text "outer_bndrs:" <+> ppr outer_bndrs
-              , text "qtvs:"      <+> pprTyVars qtvs
-              , text "cqdvs:"    <+> pprTyVars cqdvs
-              , text "dvs:"       <+> ppr dvs
+
+              -- after zonking
+              , text "wc_itvs:" <+> pprTyVars wc_itvs
+              , text "outer_imp_itvs:" <+> pprTyVars outer_imp_itvs
+              , text "dvs:" <+> ppr dvs
+
+              -- after quantification
+              , text "qtvs(include wildcards):" <+> pprTyVars qtvs
+              , text "outer_imp_qtvs:" <+> pprTyVars outer_imp_qtvs
+              , text "final_tvs:" <+> pprTyVars final_tvs
               ]
-             -- This scopedSort is important: the qtvs may be /interleaved/ with
-             -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
        ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
        return (final_tvs, qtvs)
 
