@@ -1369,6 +1369,11 @@ candidateVars (DV { dv_kvs = dep_kv_set, dv_tvs = nondep_tkv_set })
 candidateKindVars :: CandidatesQTvs -> TyVarSet
 candidateKindVars dvs = dVarSetToVarSet (dv_kvs dvs)
 
+intersectCandidates :: CandidatesQTvs -> [Var] -> [Var]
+intersectCandidates (DV { dv_kvs = kvs, dv_tvs = tvs }) varList
+  = dVarSetElems $ kvs `intersectDVarSet` vars `unionDVarSet` (tvs `intersectDVarSet` vars)
+  where vars = mkDVarSet varList
+
 delCandidates :: CandidatesQTvs -> [Var] -> CandidatesQTvs
 delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
   = DV { dv_kvs = kvs `delDVarSetList` vars
@@ -1384,21 +1389,23 @@ partitionCandidates dvs@(DV { dv_kvs = kvs, dv_tvs = tvs }) pred
     (extracted_tvs, rest_tvs) = partitionDVarSet pred tvs
     extracted = dVarSetToVarSet extracted_kvs `unionVarSet` dVarSetToVarSet extracted_tvs
 
-candidateQTyVarsWithBinders :: [TyVar] -> Type -> TcM CandidatesQTvs
+candidateQTyVarsWithBinders :: [TyVar] -> [TyVar] -> [TyVar] -> Type -> TcM (CandidatesQTvs, [TyVar], [TyVar])
 -- (candidateQTyVarsWithBinders tvs ty) returns the candidateQTyVars
 -- of (forall tvs. ty), but do not treat 'tvs' as bound for the purpose
 -- of Note [Naughty quantification candidates].  Why?
 -- Because we are going to scoped-sort the quantified variables
 -- in among the tvs
 
-candidateQTyVarsWithBinders bound_tvs ty
+candidateQTyVarsWithBinders outer_exp_tvs outer_imp_tvs wcs ty
   = do { kvs     <- candidateQTyVarsOfKinds (map tyVarKind bound_tvs)
        ; cur_lvl <- getTcLevel
        ; all_tvs <- collect_cand_qtvs ty False cur_lvl emptyVarSet kvs ty
-       ; return (all_tvs `delCandidates` bound_tvs)}
+       ; return (all_tvs `delCandidates` bound_tvs, intersectCandidates all_tvs outer_imp_tvs, intersectCandidates all_tvs wcs) }
+       where
+          bound_tvs = outer_exp_tvs ++ outer_imp_tvs ++ wcs
 
 -- | Gathers free variables to use as quantification candidates (in
--- 'quantifyTyVarsWithBinders). This might output the same var
+-- 'quantifyTyVarsWithBinders'). This might output the same var
 -- in both sets, if it's used in both a type and a kind.
 -- The variables to quantify must have a TcLevel strictly greater than
 -- the ambient level. (See Wrinkle in Note [Naughty quantification candidates])
@@ -1763,7 +1770,7 @@ quantifyTyVarsWithBinders ::
 -- to the restrictions in Note [quantifyTyVars].
 
 -- for wildcards, do not default, just skolemise add to the list of quantified
--- for outer_imp_qtvs, do not default and skolemise, and return separately
+-- for outer_imp_qtvs, do not default, just skolemise, and return separately
 quantifyTyVarsWithBinders wc_itvs outer_imp_itvs skol_info dvs
        -- short-circuit common case
   | isEmptyCandidates dvs && null wc_itvs && null outer_imp_itvs
@@ -1780,10 +1787,9 @@ quantifyTyVarsWithBinders wc_itvs outer_imp_itvs skol_info dvs
 
        ; undefaulted <- defaultTyVars dvs
        ; (final_qtvs, out_imp_qtvs)  <- liftZonkM $ do
-            qtvs <- mapMaybeM zonk_quant undefaulted
-            wc_qtv <- mapMaybeM zonk_quant wc_itvs
+            qtvs <- mapMaybeM zonk_quant (undefaulted ++ wc_itvs)
             out_imp_qtvs <- mapMaybeM zonk_quant outer_imp_itvs
-            return (qtvs ++ wc_qtv, out_imp_qtvs)
+            return (qtvs, out_imp_qtvs)
 
        ; traceTc "quantifyTyVars }"
            (vcat [ text "undefaulted:" <+> pprTyVars undefaulted
@@ -1792,7 +1798,7 @@ quantifyTyVarsWithBinders wc_itvs outer_imp_itvs skol_info dvs
                   ])
 
        -- We should never quantify over coercion variables; check this
-       ; let co_vars = filter isCoVar final_qtvs
+       ; let co_vars = filter isCoVar (final_qtvs ++ out_imp_qtvs)
        ; massertPpr (null co_vars) (ppr co_vars)
 
        ; return (final_qtvs, out_imp_qtvs) }

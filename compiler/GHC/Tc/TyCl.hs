@@ -253,14 +253,12 @@ tcFamInstLHSBinders :: TcLevel -> SkolemInfo -> HsOuterFamEqnTyVarBndrs GhcTc ->
   -> [TcTyVar] -> Type -> WantedConstraints -> IOEnv (Env TcGblEnv TcLclEnv) ([TyCoVar], [TcTyVar])
 tcFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted = do
 
-       -- See Note [Type variables in type families instance decl]
        ; let outer_exp_tvs = scopedSort $ explicitOuterTyVars outer_bndrs
        ; let outer_imp_tvs = implicitOuterTyVars outer_bndrs
        ; checkFamTelescope tclvl hs_outer_bndrs outer_exp_tvs
-       ; wc_itvs <- liftZonkM $ zonkInvariants wcs
-       ; outer_imp_itvs <- liftZonkM $ zonkInvariants outer_imp_tvs
        -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
-       ; dvs  <- candidateQTyVarsWithBinders (outer_exp_tvs ++ outer_imp_tvs ++ wcs) lhs_ty
+       -- See Note [Type variables in type families instance decl]
+       ; (dvs, wc_itvs, outer_imp_itvs)  <- candidateQTyVarsWithBinders outer_exp_tvs outer_imp_tvs wcs lhs_ty
        ; (qtvs, outer_imp_qtvs) <- quantifyTyVarsWithBinders wc_itvs outer_imp_itvs skol_info dvs
                  -- Have to make a same defaulting choice for result kind here
                  -- and the `kindGeneralizeAll` in `tcConDecl`.
