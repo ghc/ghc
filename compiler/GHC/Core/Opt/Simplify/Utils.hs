@@ -30,9 +30,9 @@ module GHC.Core.Opt.Simplify.Utils (
         interestingCallContext,
 
         -- ArgInfo
-        ArgInfo(..), ArgSpec(..), RewriteCall(..), mkArgInfo,
-        addValArgTo, addCastTo, addTyArgTo,
-        argInfoExpr, argInfoAppArgs,
+        ArgInfo(..), ArgSpec(..), mkArgInfo,
+        addValArgTo, addTyArgTo,
+        argInfoExpr, argSpecArg,
         pushSimplifiedArgs, pushSimplifiedRevArgs,
         isStrictArgInfo, lazyArgContext,
 
@@ -325,11 +325,8 @@ data ArgInfo
         ai_args  :: [ArgSpec],  -- ...applied to these args (which are in *reverse* order)
                                 -- NB: all these argumennts are already simplified
 
---        ai_rewrite :: RewriteCall,  -- What transformation to try next for this call
---             -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
-
         ai_rules :: [CoreRule], -- Rules for this function
-        ai_encl :: Bool,        -- Flag saying whether this function
+        ai_encl  :: Bool,       -- Flag saying whether this function
                                 -- or an enclosing one has rules (recursively)
                                 --      True => be keener to inline in all args
 
@@ -343,12 +340,6 @@ data ArgInfo
                                 --   Always infinite
     }
 
-data RewriteCall  -- What rewriting to try next for this call
-                  -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
-  = TryRules [CoreRule]
-  | TryInlining
-  | TryNothing
-
 data ArgSpec
   = ValArg { as_dmd  :: Demand        -- Demand placed on this argument
            , as_arg  :: OutExpr       -- Apply to this (coercion or value); c.f. ApplyToVal
@@ -356,9 +347,6 @@ data ArgSpec
 
   | TyArg { as_arg_ty  :: OutType     -- Apply to this type; c.f. ApplyToTy
           , as_hole_ty :: OutType }   -- Type of the function (presumably forall a. blah)
-
-  | CastBy OutCoercion                -- Cast by this; c.f. CastIt
-                                      -- Coercion is optimised
 
 instance Outputable ArgInfo where
   ppr (ArgInfo { ai_fun = fun, ai_args = args, ai_dmds = dmds })
@@ -370,7 +358,6 @@ instance Outputable ArgInfo where
 instance Outputable ArgSpec where
   ppr (ValArg { as_arg = arg })  = text "ValArg" <+> ppr arg
   ppr (TyArg { as_arg_ty = ty }) = text "TyArg" <+> ppr ty
-  ppr (CastBy c)                 = text "CastBy" <+> ppr c
 
 addValArgTo :: ArgInfo ->  OutExpr -> OutType -> ArgInfo
 addValArgTo ai arg hole_ty
@@ -389,20 +376,11 @@ addTyArgTo ai arg_ty hole_ty = ai { ai_args    = arg_spec : ai_args ai }
   where
     arg_spec = TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
 
-addCastTo :: ArgInfo -> OutCoercion -> ArgInfo
-addCastTo ai co = ai { ai_args = CastBy co : ai_args ai }
-
 isStrictArgInfo :: ArgInfo -> Bool
 -- True if the function is strict in the next argument
 isStrictArgInfo (ArgInfo { ai_dmds = dmds })
   | dmd:_ <- dmds = isStrUsedDmd dmd
   | otherwise     = False
-
-argInfoAppArgs :: [ArgSpec] -> [OutExpr]
-argInfoAppArgs []                              = []
-argInfoAppArgs (CastBy {}                : _)  = []  -- Stop at a cast
-argInfoAppArgs (ValArg { as_arg = arg }  : as) = arg     : argInfoAppArgs as
-argInfoAppArgs (TyArg { as_arg_ty = ty } : as) = Type ty : argInfoAppArgs as
 
 pushSimplifiedArgs, pushSimplifiedRevArgs
   :: SimplEnv
@@ -419,8 +397,10 @@ pushSimplifiedArg env (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
   = ApplyToVal { sc_arg = arg, sc_env = env, sc_dup = Simplified
                  -- The SubstEnv will be ignored since sc_dup=Simplified
                , sc_hole_ty = hole_ty, sc_cont = cont }
-pushSimplifiedArg _ (CastBy c) cont
-  = CastIt { sc_co = c, sc_cont = cont, sc_opt = True }
+
+argSpecArg :: ArgSpec -> OutExpr
+argSpecArg (ValArg { as_arg = arg })   = arg
+argSpecArg (TyArg  { as_arg_ty = ty }) = Type ty
 
 argInfoExpr :: OutId -> [ArgSpec] -> OutExpr
 -- NB: the [ArgSpec] is reversed so that the first arg
@@ -431,25 +411,6 @@ argInfoExpr fun rev_args
     go []                              = Var fun
     go (ValArg { as_arg = arg }  : as) = go as `App` arg
     go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
-    go (CastBy co                : as) = mkCast (go as) co
-
-{-
-mkRewriteCall :: Id -> RuleEnv -> RewriteCall
--- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
--- We try to skip any unnecessary stages:
---    No rules     => skip TryRules
---    No unfolding => skip TryInlining
--- This skipping is "just" for efficiency.  But rebuildCall is
--- quite a heavy hammer, so skipping stages is a good plan.
--- And it's extremely simple to do.
-mkRewriteCall fun rule_env
-  | not (null rules) = TryRules rules
-  | canUnfold unf    = TryInlining
-  | otherwise        = TryNothing
-  where
-    rules = getRules rule_env fun
-    unf   = idUnfolding fun
--}
 
 {-
 ************************************************************************
@@ -588,20 +549,24 @@ contArgs cont
                    -- Do *not* use short-cutting substitution here
                    -- because we want to get as much IdInfo as possible
 
-contOutArgs :: GHC.Core.Subst.InScopeSet -> SimplCont -> [OutExpr]
+contOutArgs :: SimplEnv -> SimplCont -> [OutExpr]
 -- Get the leading arguments from the `SimplCont`, as /OutExprs/
-contOutArgs in_scope (ApplyToTy { sc_arg_ty = ty, sc_cont = cont })
-  = Type ty : contOutArgs in_scope cont
-contOutArgs in_scope (ApplyToVal { sc_dup = dup, sc_arg = arg, sc_env = env, sc_cont = cont })
-  | isSimplified dup
-  = arg : contOutArgs in_scope cont
-  | otherwise
-  = -- pprTrace "contOutArgs" (ppr arg $$ ppr (seIdSubst env)) $
-    GHC.Core.Subst.substExpr (getFullSubst in_scope env) arg : contOutArgs in_scope cont
-      -- NOT substExprSC: we want to get the benefit of knowing what is
-      --                  evaluated etc, via the in-scope set
-contOutArgs _ _
-  = []
+contOutArgs env cont
+  = go cont
+  where
+    in_scope = seInScope env
+
+    go (ApplyToTy { sc_arg_ty = ty, sc_cont = cont })
+      = Type ty : go cont
+
+    go (ApplyToVal { sc_dup = dup, sc_arg = arg, sc_env = env, sc_cont = cont })
+      | isSimplified dup = arg : go cont
+      | otherwise        = GHC.Core.Subst.substExpr (getFullSubst in_scope env) arg : go cont
+          -- NOT substExprSC: we want to get the benefit of knowing what is
+         --                   evaluated etc, via the in-scope set
+
+    -- No more arguments
+    go _ = []
 
 dropContArgs :: FullArgCount -> SimplCont -> SimplCont
 dropContArgs 0 cont = cont
@@ -640,9 +605,8 @@ contEvalContext k = case k of
     -- and case binder dmds, see addCaseBndrDmd. No priority right now.
 
 -------------------
-mkArgInfo :: SimplEnv -> [CoreRule] -> Id -> SimplCont -> ArgInfo
-
-mkArgInfo env rules_for_fun fun cont
+mkArgInfo :: SimplEnv -> Id -> [CoreRule] -> SimplCont -> ArgInfo
+mkArgInfo env fun rules_for_fun cont
   | n_val_args < idArity fun            -- Note [Unsaturated functions]
   = ArgInfo { ai_fun = fun, ai_args = []
             , ai_rules = rules_for_fun

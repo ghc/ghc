@@ -799,8 +799,8 @@ makeTrivialArg :: HasDebugCallStack => SimplEnv -> ArgSpec -> SimplM (LetFloats,
 makeTrivialArg env arg@(ValArg { as_arg = e, as_dmd = dmd })
   = do { (floats, e') <- makeTrivial env NotTopLevel dmd (fsLit "arg") e
        ; return (floats, arg { as_arg = e' }) }
-makeTrivialArg _ arg
-  = return (emptyLetFloats, arg)  -- CastBy, TyArg
+makeTrivialArg _ arg@(TyArg {})
+  = return (emptyLetFloats, arg)
 
 makeTrivial :: HasDebugCallStack
             => SimplEnv -> TopLevelFlag -> Demand
@@ -1520,12 +1520,11 @@ simplTick env tickish expr cont
 -}
 
 rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
--- At this point the substitution in the SimplEnv is irrelevant;
--- only the in-scope set matters, plus the flags.
--- So zap it before calling `rebuild_go`
 rebuild env expr cont = rebuild_go (zapSubstEnv env) expr cont
 
 rebuild_go :: SimplEnvIS -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
+-- SimplEnvIS: at this point the substitution in the SimplEnv is irrelevant;
+-- only the in-scope set matters, plus the flags.
 rebuild_go env expr cont
   = assertPpr (checkSimplEnvIS env) (pprBadSimplEnvIS env) $
     case cont of
@@ -2323,18 +2322,19 @@ simplOutId env fun cont
 
 
 simplOutId env fun cont
-  = do { rule_base <- getSimplRules
-       ; let rules_for_me = getRules rule_base fun
+  = do { let cont1 = trimJoinCont fun (idJoinPointHood fun) cont
 
-       ; mb_match <- -- if activeUnfolding (seMode env) fun
-                     -- then 
-                     -- else return Nothing
-                     tryRules zapped_env rules_for_me fun cont1
+       -- Try rewrite rules
+       ; rule_base <- getSimplRules
+       ; let rules_for_me = getRules rule_base fun
+             out_args     = contOutArgs env cont1 :: [OutExpr]
+       ; mb_match <- tryRules zapped_env rules_for_me fun out_args
        ; case mb_match of {
-             Just (rhs, cont2) -> -- pprTrace "tryRules1" (ppr fun) $
-                                  simplExprF zapped_env rhs cont2 ;
+             Just (rule_arity, rhs) -> simplExprF zapped_env rhs $
+                                       dropContArgs rule_arity cont1 ;
              Nothing ->
 
+       -- Try inlining
     do { logger <- getLogger
        ; mb_inline <- tryInlining env logger fun cont1
        ; case mb_inline of{
@@ -2342,19 +2342,19 @@ simplOutId env fun cont
                             ; simplExprF zapped_env expr cont1 } ;
             Nothing ->
 
-    do { let arg_info = mkArgInfo env rules_for_me fun cont1
+       -- Neither worked, so just rebuild
+    do { let arg_info = mkArgInfo env fun rules_for_me cont1
        ; rebuildCall zapped_env arg_info cont1
     } } } } }
   where
     zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
-    cont1      = trimJoinCont fun (idJoinPointHood fun) cont
 
 ---------------------------------------------------------
 --      Dealing with a call site
 
 rebuildCall :: SimplEnvIS -> ArgInfo -> SimplCont
             -> SimplM (SimplFloats, OutExpr)
--- At this point the substitution in the SimplEnv is irrelevant;
+-- SimplEnvIS: at this point the substitution in the SimplEnv is irrelevant;
 -- it is usually empty, and regardless should be ignored.
 -- Only the in-scope set matters, plus the seMode flags
 
@@ -2384,57 +2384,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) con
     res     = argInfoExpr fun rev_args
     cont_ty = contResultType cont
 
-{-
----------- Try inlining, if ai_rewrite = TryInlining --------
--- In the TryInlining case we try inlining immediately, before simplifying
--- any (more) arguments. Why?  See Note [Rewrite rules and inlining].
---
--- If there are rewrite rules we'll skip this case until we have
--- simplified enough args to satisfy nr_wanted==0 in the TryRules case below
--- Then we'll try the rules, and if that fails, we'll do TryInlining
-rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
-                              , ai_rewrite = TryInlining }) cont
-  = do { logger <- getLogger
-       ; let full_cont = pushSimplifiedRevArgs env rev_args cont
-       ; mb_inline <- tryInlining env logger fun full_cont
-       ; case mb_inline of
-            Just expr -> do { checkedTick (UnfoldingDone fun)
-                            ; let env1 = zapSubstEnv env
-                            ; simplExprF env1 expr full_cont }
-            Nothing -> rebuildCall env (info { ai_rewrite = TryNothing }) cont
-       }
--}
-
-{-
----------- Try rewrite RULES, if ai_rewrite = TryRules --------------
--- See Note [Rewrite rules and inlining]
--- See also Note [Trying rewrite rules]
-rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
-                              , ai_rewrite = TryRules rules }) cont
-  | no_more_args
-  = -- We've accumulated a simplified call in <fun,rev_args>
-    -- so try rewrite rules; see Note [RULES apply to simplified arguments]
-    -- See also Note [Rules for recursive functions]
-    do { mb_match <- tryRules env rules fun (reverse rev_args) cont
-       ; case mb_match of
-             Just (env', rhs, cont') -> simplExprF env' rhs cont'
-             Nothing -> rebuildCall env (info { ai_rewrite = TryInlining }) cont }
-  where
-    -- If we have run out of arguments, just try the rules; there might
-    -- be some with lower arity.  Casts get in the way -- they aren't
-    -- allowed on rule LHSs
-    no_more_args = case cont of
-                      ApplyToTy  {} -> False
-                      ApplyToVal {} -> False
-                      _             -> True
--}
-
----------- Simplify type applications and casts --------------
-rebuildCall env info (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
-  = rebuildCall env (addCastTo info co') cont
-  where
-    co' = optOutCoercion env co opt
-
+---------- Simplify type applications --------------
 rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
   = rebuildCall env (addTyArgTo info arg_ty hole_ty) cont
 
@@ -2472,11 +2422,11 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules })
   | null rules
   = rebuild env (argInfoExpr fun rev_args) cont
   | otherwise  -- Try rules again
-  = do { let full_cont = pushSimplifiedRevArgs env rev_args cont
-       ; mb_match <- tryRules env rules fun full_cont
+  = do { let args = reverse rev_args
+       ; mb_match <- tryRules env rules fun (map argSpecArg args)
        ; case mb_match of
-           Just (rhs, cont2) -> -- pprTrace "tryRules2" (ppr fun $$ ppr (seIdSubst env)) $
-                                simplExprF env rhs cont2
+           Just (rule_arity, rhs) -> simplExprF env rhs $
+                                     pushSimplifiedArgs env (drop rule_arity args) cont
            Nothing -> rebuild env (argInfoExpr fun rev_args) cont }
 
 -----------------------------------
@@ -2637,31 +2587,24 @@ See Note [No free join points in arityType] in GHC.Core.Opt.Arity
 -}
 
 tryRules :: SimplEnv -> [CoreRule]
-         -> OutId
-         -> SimplCont
-         -> SimplM (Maybe (CoreExpr, SimplCont))
+         -> OutId -> [OutExpr]
+         -> SimplM (Maybe (FullArgCount, CoreExpr))
 
-tryRules env rules fn cont
+tryRules env rules fn args
   | null rules
   = return Nothing
 
   | Just (rule, rule_rhs) <- -- pprTrace "tryRules" (ppr fn <+> vcat (map ppr out_args)) $
                              lookupRule ropts in_scope_env
-                                        act_fun fn out_args rules
+                                        act_fun fn args rules
   -- Fire a rule for the function
   = -- pprTrace "tryRules:success" (ppr fn) $
     do { logger <- getLogger
        ; checkedTick (RuleFired (ruleName rule))
-       ; let cont' = dropContArgs (ruleArity rule) cont
-                     -- (ruleArity rule) says how
-                     -- many args the rule consumed
-
-             occ_anald_rhs = occurAnalyseExpr rule_rhs
+       ; let occ_anald_rhs = occurAnalyseExpr rule_rhs
                  -- See Note [Occurrence-analyse after rule firing]
        ; dump logger rule rule_rhs
-       ; return (Just (occ_anald_rhs, cont')) }
-            -- The occ_anald_rhs and cont' are all Out things
-            -- hence zapping the environment
+       ; return (Just (ruleArity rule, occ_anald_rhs)) }
 
   | otherwise  -- No rule fires
   = -- pprTrace "tryRules:fail" (ppr fn) $
@@ -2672,7 +2615,6 @@ tryRules env rules fn cont
   where
     ropts        = seRuleOpts env :: RuleOpts
     in_scope_env = getUnfoldingInRuleMatch env :: InScopeEnv
-    out_args     = contOutArgs (seInScope env) cont :: [OutExpr]
     act_fun      = activeRule (seMode env) :: Activation -> Bool
 
     printRuleModule rule
@@ -2686,7 +2628,7 @@ tryRules env rules fn cont
           [ text "Rule:" <+> ftext (ruleName rule)
           , text "Module:" <+>  printRuleModule rule
           , text "Full arity:" <+>  ppr (ruleArity rule)
-          , text "Before:" <+> hang (ppr fn) 2 (ppr cont)
+          , text "Before:" <+> hang (ppr fn) 2 (sep (map ppr args))
           , text "After: " <+> pprCoreExpr rule_rhs ]
 
       | logHasDumpFlag logger Opt_D_dump_rule_firings
@@ -2725,9 +2667,14 @@ trySeqRules :: SimplEnv
 trySeqRules in_env scrut rhs cont
   = do { rule_base <- getSimplRules
        ; let seq_rules = getRules rule_base seqId
-       ; tryRules out_env seq_rules seqId rule_cont }
+       ; mb_match <- tryRules in_env seq_rules seqId out_args
+       ; case mb_match of
+            Nothing                -> return Nothing
+            Just (rule_arity, rhs) -> return (Just (rhs, cont'))
+                where
+                  cont' = pushSimplifiedArgs in_env (drop rule_arity out_arg_specs) rule_cont
+       }
   where
-    out_env       = zapSubstEnv in_env
     no_cast_scrut = drop_casts scrut
 
     -- All these are OutTypes
@@ -2740,16 +2687,22 @@ trySeqRules in_env scrut rhs cont
     rhs_ty    = substTy in_env (exprType rhs)
     rhs_rep   = getRuntimeRep rhs_ty
 
-    rule_cont  = ApplyToTy  { sc_arg_ty = rhs_rep,    sc_hole_ty = seq_id_ty, sc_cont = rule_cont1 }
-    rule_cont1 = ApplyToTy  { sc_arg_ty = scrut_ty,   sc_hole_ty = res1_ty,   sc_cont = rule_cont2 }
-    rule_cont2 = ApplyToTy  { sc_arg_ty = rhs_ty,     sc_hole_ty = res2_ty,   sc_cont = rule_cont3 }
-    rule_cont3 = ApplyToVal { sc_arg = no_cast_scrut, sc_hole_ty = res3_ty,   sc_cont = rule_cont4
-                            , sc_dup = Simplified, sc_env = out_env }
-    rule_cont4 = ApplyToVal { sc_arg = rhs, sc_hole_ty = res4_ty,             sc_cont = cont
-                            , sc_dup = NoDup, sc_env = in_env }
+    out_args = [Type rhs_rep, Type scrut_ty, Type rhs_ty, no_cast_scrut]
+               -- Cheaper than (map argSpecArg out_arg_specs)
+    out_arg_specs  = [ TyArg { as_arg_ty  = rhs_rep
+                        , as_hole_ty = seq_id_ty }
+                     , TyArg { as_arg_ty  = scrut_ty
+                             , as_hole_ty = res1_ty }
+                     , TyArg { as_arg_ty  = rhs_ty
+                             , as_hole_ty = res2_ty }
+                     , ValArg { as_arg = no_cast_scrut
+                              , as_dmd = seqDmd
+                              , as_hole_ty = res3_ty } ]
+    rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
+                           , sc_env = in_env, sc_cont = cont
+                           , sc_hole_ty = res4_ty }
 
     -- Lazily evaluated, so we don't do most of this
-
     drop_casts (Cast e _) = drop_casts e
     drop_casts e          = e
 
