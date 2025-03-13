@@ -809,7 +809,7 @@ type family GhcDiagnosticCode c = n | n -> c where
 
     -- IllegalInstanceHead
   GhcDiagnosticCode "InstHeadAbstractClass"                         = 51758
-  GhcDiagnosticCode "InstHeadNonClass"                              = 53946
+  GhcDiagnosticCode "InstHeadNonClassHead"                          = 53946
   GhcDiagnosticCode "InstHeadTySynArgs"                             = 93557
   GhcDiagnosticCode "InstHeadNonTyVarArgs"                          = 48406
   GhcDiagnosticCode "InstHeadMultiParam"                            = 91901
@@ -992,7 +992,7 @@ type family GhcDiagnosticCode c = n | n -> c where
 
   GhcDiagnosticCode "TcRnIllegalInstanceHeadDecl"                   = Outdated 12222
   GhcDiagnosticCode "TcRnNoClassInstHead"                           = Outdated 56538
-    -- The above two are subsumed by InstHeadNonClass [GHC-53946]
+    -- The above two are subsumed by InstHeadNonClassHead [GHC-53946]
 
   GhcDiagnosticCode "TcRnNameByTemplateHaskellQuote"                = Outdated 40027
   GhcDiagnosticCode "TcRnIllegalBindingOfBuiltIn"                   = Outdated 69639

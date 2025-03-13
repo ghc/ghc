@@ -1564,7 +1564,7 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
   | isAbstractClass clas
   , hs_src == HsSrcFile
   = fail_with_inst_err $ IllegalInstanceHead
-                       $ InstHeadAbstractClass clas
+                       $ InstHeadAbstractClass (className clas)
 
   -- Complain about hand-written instances of built-in classes
   -- Typeable, KnownNat, KnownSymbol, Coercible, HasField.
@@ -2111,9 +2111,10 @@ checkValidInstance ctxt hs_type ty = case tau of
         ; traceTc "End checkValidInstance }" empty }
     | otherwise
     -> failWithTc $ mk_err $ IllegalInstanceHead
-                           $ InstHeadNonClass (Just tc)
+                           $ InstHeadNonClassHead
+                           $ InstNonClassTyCon (tyConName tc) (fmap tyConName $ tyConFlavour tc)
   _ -> failWithTc $ mk_err $ IllegalInstanceHead
-                           $ InstHeadNonClass Nothing
+                           $ InstHeadNonClassHead InstNonTyCon
   where
     (theta, tau) = splitInstTyForValidity ty
 

@@ -1,6 +1,7 @@
 
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -8,6 +9,7 @@
 {-# LANGUAGE LambdaCase          #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -56,7 +58,7 @@ import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Types.Basic  ( VisArity, TypeOrKind(..), RuleName )
+import GHC.Types.Basic  ( VisArity, TyConFlavour(..), TypeOrKind(..), RuleName )
 import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
 import GHC.Types.Hint (SigLike(..))
 import GHC.Types.Unique.Set
@@ -587,22 +589,45 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
              ; (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inst_ty
              ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
              }
-       ; let -- Check if there are any nested `forall`s or contexts, which are
-             -- illegal in the type of an instance declaration (see
-             -- Note [No nested foralls or contexts in instance types] in
-             -- GHC.Hs.Type)...
-             mb_nested_msg = noNestedForallsContextsErr NFC_InstanceHead head_ty'
-             -- ...then check that the instance head is actually headed by a
-             -- class type constructor...
-             eith_cls = case hsTyGetAppHead_maybe head_ty' of
-               Just (L _ cls) -> Right cls
-               Nothing        ->
-                  Left
-                   ( getLocA head_ty'
-                   , TcRnIllegalInstance $
-                       IllegalClassInstance (HsTypeRnThing $ unLoc head_ty') $
-                       IllegalInstanceHead $ InstHeadNonClass Nothing
-                   )
+      ; env <- getGlobalRdrEnv
+      ; let
+          -- Check if there are any nested `forall`s or contexts, which are
+          -- illegal in the type of an instance declaration (see
+          -- Note [No nested foralls or contexts in instance types] in
+          -- GHC.Hs.Type)...
+          mb_nested_msg = noNestedForallsContextsErr NFC_InstanceHead head_ty'
+          -- ...then check if the instance head is actually headed by a
+          -- class type constructor...
+          instance_head :: Either IllegalInstanceHeadReason Name
+          instance_head =
+           case hsTyGetAppHead_maybe head_ty' of
+             Just (L _ nm) ->
+               case lookupGRE_Name env nm of
+                 Just (GRE { gre_info = IAmTyCon flav }) ->
+                   if
+                     | flav == ClassFlavour
+                     -> Right nm
+                     | flav == AbstractTypeFlavour
+                     -> Left $ InstHeadAbstractClass nm
+                     | otherwise
+                     -> Left $ InstHeadNonClassHead $ InstNonClassTyCon nm flav
+                 _ ->
+                  -- The head of the instance head is out of scope;
+                  -- we'll deal with that later. Continue for now.
+                  Right nm
+
+             Nothing ->
+               Left $ InstHeadNonClassHead InstNonTyCon
+          eith_cls =
+            case instance_head of
+              Right cls -> Right cls
+              Left illegal_head_reason ->
+                 Left
+                  ( getLocA head_ty'
+                  , TcRnIllegalInstance $
+                      IllegalClassInstance (HsTypeRnThing $ unLoc head_ty') $
+                      IllegalInstanceHead illegal_head_reason
+                  )
          -- ...finally, attempt to retrieve the class type constructor, failing
          -- with an error message if there isn't one. To avoid excessive
          -- amounts of error messages, we will only report one of the errors

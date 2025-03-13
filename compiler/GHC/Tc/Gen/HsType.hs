@@ -675,8 +675,10 @@ tcHsDeriv hs_ty
              failWithTc $ TcRnIllegalInstance
                         $ IllegalClassInstance (TypeThing ty)
                         $ IllegalInstanceHead
-                        $ InstHeadNonClass
-                        $ Just tyCon
+                        $ InstHeadNonClassHead
+                        $ InstNonClassTyCon
+                            (tyConName tyCon)
+                            (fmap tyConName $ tyConFlavour tyCon)
            Right result -> return result }
 
 -- | Typecheck a deriving strategy. For most deriving strategies, this is a

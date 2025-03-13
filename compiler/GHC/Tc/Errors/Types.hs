@@ -147,6 +147,7 @@ module GHC.Tc.Errors.Types (
   , InvalidFamInstQTv(..), InvalidFamInstQTvReason(..)
   , InvalidAssoc(..), InvalidAssocInstance(..)
   , InvalidAssocDefault(..), AssocDefaultBadArgs(..)
+  , InstHeadNonClassHead(..)
 
     -- * Template Haskell errors
   , THError(..), THSyntaxError(..), THNameError(..)
@@ -4809,7 +4810,7 @@ data IllegalInstanceHeadReason
   --      f :: a
   --
   -- Test cases: typecheck/should_fail/T13068
-  = InstHeadAbstractClass !Class
+  = InstHeadAbstractClass !Name -- ^ name of the abstract 'Class'
   -- | An instance whose head is not a class.
   --
   -- Examples(s):
@@ -4829,10 +4830,7 @@ data IllegalInstanceHeadReason
   --             rename/should_fail/T18240a
   --             polykinds/T13267
   --             deriving/should_fail/T23522
-  | InstHeadNonClass
-    !(Maybe TyCon) -- ^ the 'TyCon' at the head of the instance head,
-                   -- or 'Nothing' if the instance head is not even headed
-                   -- by a 'TyCon'
+  | InstHeadNonClassHead InstHeadNonClassHead
 
   -- | Instance head was headed by a type synonym.
   --
@@ -4862,6 +4860,13 @@ data IllegalInstanceHeadReason
   | InstHeadMultiParam
   deriving Generic
 
+
+-- | What was at the head of an instance head, when we expected a class?
+data InstHeadNonClassHead
+  -- | A 'TyCon' that isn't a class was at the head
+  = InstNonClassTyCon Name (TyConFlavour Name)
+  -- | Something else than a 'TyCon' was at the head
+  | InstNonTyCon
 
 -- | Why is a (type or data) family instance invalid?
 data IllegalFamilyInstanceReason

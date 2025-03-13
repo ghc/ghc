@@ -6364,10 +6364,10 @@ pprIllegalInstanceHeadReason head_ty = \case
     text "and each type variable appears at most once in the instance head."]
   InstHeadMultiParam -> with_illegal_instance_header head_ty $ parens $
     text "Only one type can be given in an instance head."
-  InstHeadAbstractClass clas ->
+  InstHeadAbstractClass cls ->
     text "Cannot define instance for abstract class" <+>
-    quotes (ppr (className clas))
-  InstHeadNonClass bad_head ->
+    quotes (ppr cls)
+  InstHeadNonClassHead bad_head ->
     vcat [ text "Illegal" <+> what_illegal <> dot
          , text "Instance heads must be of the form"
          , nest 2 $ text "C ty_1 ... ty_n"
@@ -6375,9 +6375,9 @@ pprIllegalInstanceHeadReason head_ty = \case
          ]
     where
       what_illegal = case bad_head of
-        Just tc ->
-          text "instance for" <+> ppr (tyConFlavour tc) <+> quotes (ppr $ tyConName tc)
-        Nothing ->
+        InstNonClassTyCon tc_nm flav ->
+          text "instance for" <+> ppr flav <+> quotes (ppr tc_nm)
+        InstNonTyCon ->
           text "head of an instance declaration:" <+> quotes (ppr head_ty)
 
 with_illegal_instance_header :: TypedThing -> SDoc -> SDoc
@@ -6479,7 +6479,7 @@ illegalInstanceHeadHints = \case
     [suggestExtension LangExt.MultiParamTypeClasses]
   InstHeadAbstractClass {} ->
     noHints
-  InstHeadNonClass {} ->
+  InstHeadNonClassHead {} ->
     noHints
 
 illegalInstanceHeadReason :: IllegalInstanceHeadReason -> DiagnosticReason
@@ -6487,7 +6487,7 @@ illegalInstanceHeadReason = \case
   -- These are serious
   InstHeadAbstractClass {} ->
     ErrorWithoutFlag
-  InstHeadNonClass {} ->
+  InstHeadNonClassHead {} ->
     ErrorWithoutFlag
 
   -- These are less serious (enable an extension)
