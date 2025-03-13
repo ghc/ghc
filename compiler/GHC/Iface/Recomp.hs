@@ -1077,7 +1077,7 @@ addAbiHashes hsc_env info iface_public deps = do
 
       -- MP: TODO: Existing bug where defaults, trust_pkg and complete are not taken into account
       -- when computing the ABI hash.
-      IfacePublic exports fixities warns anns decls _defaults insts fam_insts rules trust _trust_pkg _complete _cache () = iface_public
+      IfacePublic exports fixities warns anns decls defaults insts fam_insts rules trust _trust_pkg _complete _cache () = iface_public
       -- And these fields of deps should be in IfacePublic, but in good time.
       Dependencies _ _ _ sig_mods trusted_pkgs boot_mods orph_mods fis_mods  = deps
       decl_warn_fn = mkIfaceDeclWarnCache (fromIfaceWarnings warns)
@@ -1287,10 +1287,14 @@ addAbiHashes hsc_env info iface_public deps = do
                        -- See Note [Export hash depends on non-orphan family instances]
                        fis_mods )
 
+  -- The export list hash doesn't depend on the fingerprints of
+  -- the Names it mentions, only the Names themselves, hence putNameLiterally.
+
   -- The export hash is for things which is anything changes, modules which depend on
   -- it will be recompiled.
   let !export_hash = computeFingerprint putNameLiterally
                       (exports,
+                       defaults,
                        orphan_hash,
                        dep_hash,
                        dep_orphan_hashes,
