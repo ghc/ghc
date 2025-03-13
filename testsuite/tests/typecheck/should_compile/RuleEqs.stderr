@@ -1,0 +1,7 @@
+RuleEqs.hs:24:11: warning: [GHC-53522] [-Wrule-lhs-equalities (in -Wdefault)]
+    Discarding RULE "ointercalate list".
+    The LHS of this rule gave rise to equality constraints
+    that GHC was unable to quantify over:
+        [a0] ~ Element mono0
+    NB: this warning will become an error starting from GHC 9.18
+

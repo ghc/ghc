@@ -1426,6 +1426,16 @@ instance Diagnostic TcRnMessage where
         err = case errReason of
           UnboundVariable uv nis -> pprScopeError uv nis
           IllegalExpression -> text "Illegal expression:" <+> ppr bad_e
+    TcRnRuleLhsEqualities ruleName _lhs cts -> mkSimpleDecorated $
+      text "Discarding RULE" <+> doubleQuotes (ftext ruleName) <> dot
+      $$
+      hang
+        (sep [ text "The LHS of this rule gave rise to equality constraints"
+             , text "that GHC was unable to quantify over:" ]
+        )
+        4 (pprWithArising $ NE.toList cts)
+      $$
+      text "NB: this warning will become an error starting from GHC 9.18"
     TcRnDuplicateRoleAnnot list -> mkSimpleDecorated $
       hang (text "Duplicate role annotations for" <+>
             quotes (ppr $ roleAnnotDeclName first_decl) <> colon)
@@ -2424,6 +2434,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalRuleLhs{}
       -> ErrorWithoutFlag
+    TcRnRuleLhsEqualities{}
+      -> WarningWithFlag Opt_WarnRuleLhsEqualities
     TcRnDuplicateRoleAnnot{}
       -> ErrorWithoutFlag
     TcRnDuplicateKindSig{}
@@ -3096,6 +3108,8 @@ instance Diagnostic TcRnMessage where
     TcRnUnexpectedStandaloneKindSig{}
       -> [suggestExtension LangExt.StandaloneKindSignatures]
     TcRnIllegalRuleLhs{}
+      -> noHints
+    TcRnRuleLhsEqualities{}
       -> noHints
     TcRnDuplicateRoleAnnot{}
       -> noHints

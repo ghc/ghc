@@ -3302,9 +3302,21 @@ data TcRnMessage where
   -}
   TcRnIllegalRuleLhs
     :: RuleLhsErrReason
-    -> FastString -- Rule name
-    -> LHsExpr GhcRn -- Full expression
-    -> HsExpr GhcRn -- Bad expression
+    -> FastString -- ^ Rule name
+    -> LHsExpr GhcRn -- ^ Full expression
+    -> HsExpr GhcRn -- ^ Bad expression
+    -> TcRnMessage
+
+  {-| TcRnRuleLhsEqualities is a warning, controlled by '-Wrule-lhs-equalities',
+      that is triggered by a RULE whose LHS contains equality constraints
+      (of a certain form, such as @F a ~ b@ for a type family @F@).
+
+      Test case: typecheck/should_compile/RuleEqs
+  -}
+  TcRnRuleLhsEqualities
+    :: FastString -- ^ rule name
+    -> LHsExpr GhcRn -- ^ LHS expression
+    -> NE.NonEmpty Ct -- ^ LHS equality constraints
     -> TcRnMessage
 
   {-| TcRnDuplicateRoleAnnot is an error triggered by two or more role
