@@ -1,0 +1,2 @@
+Test 1: Removing fixity pragma, causes failure
+Test succeeded, recompilation occured

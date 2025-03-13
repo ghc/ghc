@@ -1077,7 +1077,7 @@ addAbiHashes hsc_env info iface_public deps = do
 
       -- MP: TODO: Existing bug where defaults, trust_pkg and complete are not taken into account
       -- when computing the ABI hash.
-      IfacePublic exports fixities warns anns decls defaults insts fam_insts rules trust _trust_pkg _complete _cache () = iface_public
+      IfacePublic exports fixities warns anns decls defaults insts fam_insts rules trust _trust_pkg complete _cache () = iface_public
       -- And these fields of deps should be in IfacePublic, but in good time.
       Dependencies _ _ _ sig_mods trusted_pkgs boot_mods orph_mods fis_mods  = deps
       decl_warn_fn = mkIfaceDeclWarnCache (fromIfaceWarnings warns)
@@ -1089,6 +1089,7 @@ addAbiHashes hsc_env info iface_public deps = do
       (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph    insts
       (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph    rules
       (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph fam_insts
+      complete_matches = mkIfaceCompleteMap complete
       ann_fn = mkIfaceAnnCache anns
 
         -- The ABI of a declaration represents everything that is made
@@ -1099,7 +1100,7 @@ addAbiHashes hsc_env info iface_public deps = do
        -- See also Note [Identity versus semantic module]
       declABI decl = (this_mod, decl, extras)
         where extras = declExtras fix_fn ann_fn non_orph_rules non_orph_insts
-                                  non_orph_fis top_lvl_name_env decl
+                                  non_orph_fis top_lvl_name_env complete_matches decl
 
        -- This is used for looking up the Name of a default method
        -- from its OccName. See Note [default method Name]
@@ -1290,8 +1291,10 @@ addAbiHashes hsc_env info iface_public deps = do
   -- The export list hash doesn't depend on the fingerprints of
   -- the Names it mentions, only the Names themselves, hence putNameLiterally.
 
-  -- The export hash is for things which is anything changes, modules which depend on
-  -- it will be recompiled.
+  -- The export hash is for things which require downstream modules to be recompiled
+  -- whenever they change, e.g.:
+  --  - a change in the export list (adding a new export might cause a name clash)
+  --  - a change in exported instances (whether orphans or not)
   let !export_hash = computeFingerprint putNameLiterally
                       (exports,
                        defaults,
@@ -1471,6 +1474,8 @@ data IfaceDeclExtras
 
   | IfaceFamilyExtras   (Maybe Fixity) [IfaceInstABI] [AnnPayload]
 
+  | IfacePatSynExtras (Maybe Fixity) [IfaceCompleteMatchABI] -- ^ COMPLETE pragmas that this PatSyn appears in
+
   | IfaceOtherDeclExtras
 
 data IfaceIdExtras
@@ -1478,12 +1483,16 @@ data IfaceIdExtras
        (Maybe Fixity)           -- Fixity of the Id (if it exists)
        [IfaceRule]              -- Rules for the Id
        [AnnPayload]             -- Annotations for the Id
+       [IfaceCompleteMatchABI]  -- See Note [Fingerprinting complete matches] for why this is in IdExtras
 
 -- When hashing a class or family instance, we hash only the
 -- DFunId or CoAxiom, because that depends on all the
 -- information about the instance.
 --
 type IfaceInstABI = IfExtName   -- Name of DFunId or CoAxiom that is evidence for the instance
+
+-- See Note [Fingerprinting complete matches]
+type IfaceCompleteMatchABI = (Fingerprint, Maybe IfExtName)
 
 abiDecl :: IfaceDeclABI -> IfaceDecl
 abiDecl (_, decl, _) = decl
@@ -1508,22 +1517,34 @@ freeNamesDeclExtras (IfaceSynonymExtras _ _)
   = emptyNameSet
 freeNamesDeclExtras (IfaceFamilyExtras _ insts _)
   = mkNameSet insts
+freeNamesDeclExtras (IfacePatSynExtras _ complete)
+  = unionNameSets (map freeNamesIfaceCompleteABI complete)
 freeNamesDeclExtras IfaceOtherDeclExtras
   = emptyNameSet
 
 freeNamesIdExtras :: IfaceIdExtras -> NameSet
-freeNamesIdExtras (IdExtras _ rules _) = unionNameSets (map freeNamesIfRule rules)
+freeNamesIdExtras (IdExtras _ rules _ complete) =
+  unionNameSets (map freeNamesIfRule rules ++ map freeNamesIfaceCompleteABI complete)
+
+-- | Extract free names from a COMPLETE pragma ABI
+freeNamesIfaceCompleteABI :: IfaceCompleteMatchABI -> NameSet
+freeNamesIfaceCompleteABI (_, mb_ty) = case mb_ty of
+  Nothing -> emptyNameSet
+  Just ty -> unitNameSet ty
+
 
 instance Outputable IfaceDeclExtras where
   ppr IfaceOtherDeclExtras       = Outputable.empty
   ppr (IfaceIdExtras  extras)    = ppr_id_extras extras
   ppr (IfaceSynonymExtras fix anns) = vcat [ppr fix, ppr anns]
   ppr (IfaceFamilyExtras fix finsts anns) = vcat [ppr fix, ppr finsts, ppr anns]
-  ppr (IfaceDataExtras fix insts anns stuff) = vcat [ppr fix, ppr_insts insts, ppr anns,
-                                                ppr_id_extras_s stuff]
+  ppr (IfaceDataExtras fix insts anns stuff)
+                    = vcat [ppr fix, ppr_insts insts, ppr anns,
+                            ppr_id_extras_s stuff]
   ppr (IfaceClassExtras fix insts anns stuff defms) =
     vcat [ppr fix, ppr_insts insts, ppr anns,
           ppr_id_extras_s stuff, ppr defms]
+  ppr (IfacePatSynExtras fix complete) = vcat [ppr fix, ppr complete]
 
 ppr_insts :: [IfaceInstABI] -> SDoc
 ppr_insts _ = text "<insts>"
@@ -1532,7 +1553,7 @@ ppr_id_extras_s :: [IfaceIdExtras] -> SDoc
 ppr_id_extras_s stuff = vcat (map ppr_id_extras stuff)
 
 ppr_id_extras :: IfaceIdExtras -> SDoc
-ppr_id_extras (IdExtras fix rules anns) = ppr fix $$ vcat (map ppr rules) $$ vcat (map ppr anns)
+ppr_id_extras (IdExtras fix rules anns complete) = ppr fix $$ vcat (map ppr rules) $$ vcat (map ppr anns) $$ vcat (map ppr complete)
 
 -- This instance is used only to compute fingerprints
 instance Binary IfaceDeclExtras where
@@ -1552,11 +1573,13 @@ instance Binary IfaceDeclExtras where
    putByte bh 4; put_ bh fix; put_ bh anns
   put_ bh (IfaceFamilyExtras fix finsts anns) = do
    putByte bh 5; put_ bh fix; put_ bh finsts; put_ bh anns
-  put_ bh IfaceOtherDeclExtras = putByte bh 6
+  put_ bh (IfacePatSynExtras fix complete) = do
+   putByte bh 6; put_ bh fix; put_ bh complete
+  put_ bh IfaceOtherDeclExtras = putByte bh 7
 
 instance Binary IfaceIdExtras where
   get _bh = panic "no get for IfaceIdExtras"
-  put_ bh (IdExtras fix rules anns)= do { put_ bh fix; put_ bh rules; put_ bh anns }
+  put_ bh (IdExtras fix rules anns complete) = do { put_ bh fix; put_ bh rules; put_ bh anns; put_ bh complete }
 
 declExtras :: (OccName -> Maybe Fixity)
            -> (AnnCacheKey -> [AnnPayload])
@@ -1564,10 +1587,11 @@ declExtras :: (OccName -> Maybe Fixity)
            -> OccEnv [IfaceClsInst]
            -> OccEnv [IfaceFamInst]
            -> OccEnv IfExtName          -- lookup default method names
+           -> OccEnv [IfaceCompleteMatchABI]          -- lookup complete matches
            -> IfaceDecl
            -> IfaceDeclExtras
 
-declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env decl
+declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env complete_env decl
   = case decl of
       IfaceId{} -> IfaceIdExtras (id_extras n)
       IfaceData{ifCons=cons} ->
@@ -1594,11 +1618,14 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env decl
       IfaceFamily{} -> IfaceFamilyExtras (fix_fn n)
                         (map ifFamInstAxiom (lookupOccEnvL fi_env n))
                         (ann_fn (AnnOccName n))
+      IfacePatSyn{} -> IfacePatSynExtras (fix_fn n) (lookup_complete_match n)
       _other -> IfaceOtherDeclExtras
   where
         n = getOccName decl
-        id_extras occ = IdExtras (fix_fn occ) (lookupOccEnvL rule_env occ) (ann_fn (AnnOccName occ))
+        id_extras occ = IdExtras (fix_fn occ) (lookupOccEnvL rule_env occ) (ann_fn (AnnOccName occ)) (lookup_complete_match occ)
         at_extras (IfaceAT decl _) = lookupOccEnvL inst_env (getOccName decl)
+
+        lookup_complete_match occ = lookupOccEnvL complete_env occ
 
 {- Note [default method Name] (see also #15970)
    ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1715,11 +1742,83 @@ mkHashFun hsc_env eps name
         return $ snd (mi_hash_fn iface occ `orElse`
                   pprPanic "lookupVers1" (ppr mod <+> ppr occ))
 
+{- Note [Fingerprinting complete matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The presence or absence of COMPLETE pragmas influences the programs we generate,
+and not just error messages, because pattern fallibility information feeds into
+the desugaring of do notation (e.g. whether to use 'fail' from 'MonadFail').
+
+As far as recompilation checking is concerned, there are two questions we need
+to answer:
+
+  Usage: When is a COMPLETE pragma used?
+  Fingerprinting: What is the Fingerprint of a COMPLETE pragma, i.e. when
+                  do we consider a COMPLETE pragma to have changed?
+
+Usage
+
+  There isn't a straightforward way to compute which COMPLETE pragmas are
+  "used" during pattern-match checking. So we have to come up with a conservative
+  approximation.
+
+  The most conservative option is to consider a COMPLETE pragma to always be
+  used, much like we treat class instances today. This means that any change at
+  all would require recompilation.
+
+  A slightly finer grained option, which is what is currently implemented, is to
+  consider a COMPLETE pragma to be used only when the importing module actually
+  mentions at least one of the constructors in the COMPLETE pragma.
+
+Fingerprinting
+
+  Most conservatively, the fingerprint of a COMPLETE pragma would be the hash of
+  all the constructors it mentions (together with the hash of the result TyCon,
+  if any).
+
+  However, for the purposes of the pattern-match checker, we only really care
+  about the Names of the constructors in a COMPLETE pragma; it doesn't matter
+  what the definitions of the constructors are. The above criterion would
+  pessimistically lead to recompilation in the following scenario:
+
+    module M where
+      pattern MyNothing :: Maybe a
+      pattern MyNothing = Nothing
+      {-# COMPLETE Just, MyNothing #-}
+
+    module N where
+      import M
+      f :: Maybe Int -> Int
+      f (Just x) = x; f Nothing = 0
+
+  In this example, if we change the definition of the 'MyNothing' pattern, then
+  we will recompile 'M', because 'N' uses the 'Just' constructor, 'Just' appears
+  in the imported {-# COMPLETE Just, MyNothing #-} pragma, and 'MyNothing' has
+  changed.
+
+  However, this is needless: the RHS of the pattern synonym declaration for
+  'MyNothing' is completely irrelevant to 'N'. So, to avoid this extraneous
+  recompilation, we implement the following finer-grained criterion: the
+  Fingerprint of a COMPLETE pragma is the hash of the 'Name's of the mentioned
+  constructors (hashed together with the Fingerprint of the result TyCon, if any).
+-}
+
+-- | Make a map from OccNames of pattern synonyms or data constructors to a list
+-- of COMPLETE pragmas relevant for that OccName.
+-- See Note [Fingerprinting complete matches]
+mkIfaceCompleteMap :: [IfaceCompleteMatch] -> OccEnv [IfaceCompleteMatchABI]
+mkIfaceCompleteMap complete =
+  mkOccEnv_C (++) $
+    concatMap (\m@(IfaceCompleteMatch syns _) ->
+                  let complete_abi = mkIfaceCompleteMatchABI m
+                  in [(getOccName syn, [complete_abi]) | syn <- syns]
+    ) complete
+  where
+    mkIfaceCompleteMatchABI (IfaceCompleteMatch syns ty) =
+      (computeFingerprint putNameLiterally syns, ty)
 
 data AnnCacheKey = AnnModule | AnnOccName OccName
 
 -- | Creates cached lookup for the 'mi_anns' field of ModIface
--- Hackily, we use "module" as the OccName for any module-level annotations
 mkIfaceAnnCache :: [IfaceAnnotation] -> AnnCacheKey -> [AnnPayload]
 mkIfaceAnnCache anns
   = \n -> case n of
