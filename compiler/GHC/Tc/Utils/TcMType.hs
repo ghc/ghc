@@ -827,7 +827,7 @@ cloneAnonMetaTyVar info tv kind
   = do  { details <- newMetaDetails info
         ; name    <- cloneMetaTyVarName (tyVarName tv)
         ; let tyvar = mkTcTyVar name kind details
-        ; traceTc "cloneAnonMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar) <+> text "from" <+> ppr tv)
+        ; traceTc "cloneAnonMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar))
         ; return tyvar }
 
 -- Make a new CycleBreakerTv. See Note [Type equality cycles]
@@ -1374,14 +1374,6 @@ delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
   = DV { dv_kvs = kvs `delDVarSetList` vars
        , dv_tvs = tvs `delDVarSetList` vars
        , dv_cvs = cvs `delVarSetList`  vars }
-
-boundedCandidates :: CandidatesQTvs -> [Var] -> [Var]
-boundedCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = _cvs }) vars
-  =  dVarSetElems $
-          (kvs `intersectDVarSet` dvars)
-          `unionDVarSet` (tvs `intersectDVarSet` dvars)
-  where dvars = extendDVarSetList emptyDVarSet vars
-
 
 partitionCandidates :: CandidatesQTvs -> (TyVar -> Bool) -> (TyVarSet, CandidatesQTvs)
 -- The selected TyVars are returned as a non-deterministic TyVarSet
