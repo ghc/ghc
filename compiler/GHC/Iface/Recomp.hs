@@ -1078,7 +1078,7 @@ addAbiHashes hsc_env info iface_public deps = do
 
       -- MP: TODO: Existing bug where defaults, trust_pkg and complete are not taken into account
       -- when computing the ABI hash.
-      IfacePublic exports fixities warns anns decls defaults insts fam_insts rules trust _trust_pkg _complete _cache () = iface_public
+      IfacePublic exports fixities warns anns decls defaults insts fam_insts rules trust _trust_pkg complete _cache () = iface_public
       -- And these fields of deps should be in IfacePublic, but in good time.
       Dependencies _ _ _ sig_mods trusted_pkgs boot_mods orph_mods fis_mods  = deps
       decl_warn_fn = mkIfaceDeclWarnCache (fromIfaceWarnings warns)
@@ -1090,6 +1090,7 @@ addAbiHashes hsc_env info iface_public deps = do
       (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph    insts
       (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph    rules
       (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph fam_insts
+      non_complete_matches = mkIfaceCompleteMap complete
       ann_fn = mkIfaceAnnCache anns
 
         -- The ABI of a declaration represents everything that is made
@@ -1100,7 +1101,7 @@ addAbiHashes hsc_env info iface_public deps = do
        -- See also Note [Identity versus semantic module]
       declABI decl = (this_mod, decl, extras)
         where extras = declExtras fix_fn ann_fn non_orph_rules non_orph_insts
-                                  non_orph_fis top_lvl_name_env decl
+                                  non_orph_fis top_lvl_name_env non_complete_matches decl
 
        -- This is used for looking up the Name of a default method
        -- from its OccName. See Note [default method Name]
@@ -1453,6 +1454,7 @@ data IfaceDeclExtras
                                 -- See Note [Orphans] in GHC.Core.InstEnv
        [AnnPayload]             -- Annotations of the type itself
        [IfaceIdExtras]          -- For each constructor: fixity, RULES and annotations
+       [IfaceCompleteMatch]     -- COMPLETE pragmas for the type
 
   | IfaceClassExtras
        (Maybe Fixity)           -- Fixity of the class itself (if it exists)
@@ -1471,6 +1473,8 @@ data IfaceDeclExtras
   | IfaceSynonymExtras (Maybe Fixity) [AnnPayload]
 
   | IfaceFamilyExtras   (Maybe Fixity) [IfaceInstABI] [AnnPayload]
+
+  | IfacePatSynExtras (Maybe Fixity) [IfaceCompleteMatch]
 
   | IfaceOtherDeclExtras
 
@@ -1500,8 +1504,8 @@ freeNamesDeclABI (_mod, decl, extras) =
 freeNamesDeclExtras :: IfaceDeclExtras -> NameSet
 freeNamesDeclExtras (IfaceIdExtras id_extras)
   = freeNamesIdExtras id_extras
-freeNamesDeclExtras (IfaceDataExtras  _ insts _ subs)
-  = unionNameSets (mkNameSet insts : map freeNamesIdExtras subs)
+freeNamesDeclExtras (IfaceDataExtras  _ insts _ subs complete)
+  = unionNameSets (mkNameSet insts : map freeNamesIdExtras subs ++ map freeNamesIfCompleteMatch complete)
 freeNamesDeclExtras (IfaceClassExtras _ insts _ subs defms)
   = unionNameSets $
       mkNameSet insts : mkNameSet defms : map freeNamesIdExtras subs
@@ -1509,8 +1513,14 @@ freeNamesDeclExtras (IfaceSynonymExtras _ _)
   = emptyNameSet
 freeNamesDeclExtras (IfaceFamilyExtras _ insts _)
   = mkNameSet insts
+freeNamesDeclExtras (IfacePatSynExtras _ complete)
+  = foldMap freeNamesIfCompleteMatch complete
 freeNamesDeclExtras IfaceOtherDeclExtras
   = emptyNameSet
+
+freeNamesIfCompleteMatch :: IfaceCompleteMatch -> NameSet
+freeNamesIfCompleteMatch (IfaceCompleteMatch syns ty)
+  = mkNameSet syns `unionNameSet` maybe emptyNameSet unitNameSet ty
 
 freeNamesIdExtras :: IfaceIdExtras -> NameSet
 freeNamesIdExtras (IdExtras _ rules _) = unionNameSets (map freeNamesIfRule rules)
@@ -1520,11 +1530,13 @@ instance Outputable IfaceDeclExtras where
   ppr (IfaceIdExtras  extras)    = ppr_id_extras extras
   ppr (IfaceSynonymExtras fix anns) = vcat [ppr fix, ppr anns]
   ppr (IfaceFamilyExtras fix finsts anns) = vcat [ppr fix, ppr finsts, ppr anns]
-  ppr (IfaceDataExtras fix insts anns stuff) = vcat [ppr fix, ppr_insts insts, ppr anns,
-                                                ppr_id_extras_s stuff]
+  ppr (IfaceDataExtras fix insts anns stuff complete)
+                    = vcat [ppr fix, ppr_insts insts, ppr anns,
+                            ppr_id_extras_s stuff, ppr complete]
   ppr (IfaceClassExtras fix insts anns stuff defms) =
     vcat [ppr fix, ppr_insts insts, ppr anns,
           ppr_id_extras_s stuff, ppr defms]
+  ppr (IfacePatSynExtras fix complete) = vcat [ppr fix, ppr complete]
 
 ppr_insts :: [IfaceInstABI] -> SDoc
 ppr_insts _ = text "<insts>"
@@ -1540,8 +1552,8 @@ instance Binary IfaceDeclExtras where
   get _bh = panic "no get for IfaceDeclExtras"
   put_ bh (IfaceIdExtras extras) = do
    putByte bh 1; put_ bh extras
-  put_ bh (IfaceDataExtras fix insts anns cons) = do
-   putByte bh 2; put_ bh fix; put_ bh insts; put_ bh anns; put_ bh cons
+  put_ bh (IfaceDataExtras fix insts anns cons complete) = do
+   putByte bh 2; put_ bh fix; put_ bh insts; put_ bh anns; put_ bh cons; put_ bh complete
   put_ bh (IfaceClassExtras fix insts anns methods defms) = do
    putByte bh 3
    put_ bh fix
@@ -1553,7 +1565,9 @@ instance Binary IfaceDeclExtras where
    putByte bh 4; put_ bh fix; put_ bh anns
   put_ bh (IfaceFamilyExtras fix finsts anns) = do
    putByte bh 5; put_ bh fix; put_ bh finsts; put_ bh anns
-  put_ bh IfaceOtherDeclExtras = putByte bh 6
+  put_ bh (IfacePatSynExtras fix complete) = do
+   putByte bh 6; put_ bh fix; put_ bh complete
+  put_ bh IfaceOtherDeclExtras = putByte bh 7
 
 instance Binary IfaceIdExtras where
   get _bh = panic "no get for IfaceIdExtras"
@@ -1565,10 +1579,11 @@ declExtras :: (OccName -> Maybe Fixity)
            -> OccEnv [IfaceClsInst]
            -> OccEnv [IfaceFamInst]
            -> OccEnv IfExtName          -- lookup default method names
+           -> OccEnv [IfaceCompleteMatch]          -- lookup complete matches
            -> IfaceDecl
            -> IfaceDeclExtras
 
-declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env decl
+declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env complete_env decl
   = case decl of
       IfaceId{} -> IfaceIdExtras (id_extras n)
       IfaceData{ifCons=cons} ->
@@ -1577,6 +1592,7 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env decl
                          map ifDFun         (lookupOccEnvL inst_env n))
                         (ann_fn (AnnOccName n))
                         (map (id_extras . occName . ifConName) (visibleIfConDecls cons))
+                        (lookupOccEnvL complete_env n)
       IfaceClass{ifBody = IfConcreteClass { ifSigs=sigs, ifATs=ats }} ->
                      IfaceClassExtras (fix_fn n) insts (ann_fn (AnnOccName n)) meths defms
           where
@@ -1595,6 +1611,7 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env decl
       IfaceFamily{} -> IfaceFamilyExtras (fix_fn n)
                         (map ifFamInstAxiom (lookupOccEnvL fi_env n))
                         (ann_fn (AnnOccName n))
+      IfacePatSyn{} -> IfacePatSynExtras (fix_fn n) (lookupOccEnvL complete_env n)
       _other -> IfaceOtherDeclExtras
   where
         n = getOccName decl
@@ -1716,11 +1733,12 @@ mkHashFun hsc_env eps name
         return $ snd (mi_hash_fn iface occ `orElse`
                   pprPanic "lookupVers1" (ppr mod <+> ppr occ))
 
+mkIfaceCompleteMap :: [IfaceCompleteMatch] -> OccEnv [IfaceCompleteMatch]
+mkIfaceCompleteMap complete = mkOccEnv_C (++) $ concatMap (\m@(IfaceCompleteMatch syns _) -> [(getOccName syn, [m]) | syn <- syns] ) complete
 
 data AnnCacheKey = AnnModule | AnnOccName OccName
 
 -- | Creates cached lookup for the 'mi_anns' field of ModIface
--- Hackily, we use "module" as the OccName for any module-level annotations
 mkIfaceAnnCache :: [IfaceAnnotation] -> AnnCacheKey -> [AnnPayload]
 mkIfaceAnnCache anns
   = \n -> case n of

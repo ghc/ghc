@@ -1,0 +1,6 @@
+Test 1: Adding COMPLETE causes recompilation
+Test 2: Adding irrelevant COMPLETE does not cause recompilation
+compilation IS NOT required
+Test 3: Modifying relevant COMPLETE does cause recompilation
+Test 4: Changing order of COMPLETE does not cause recompilation
+compilation IS NOT required
