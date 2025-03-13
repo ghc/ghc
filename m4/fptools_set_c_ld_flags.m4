@@ -108,6 +108,10 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $5="$$5 -D_THREAD_SAFE"
         ;;
 
+    loongarch64*linux*)
+        $2="$$2 -mcmodel=medium"
+        ;;
+
     esac
 
     AC_MSG_RESULT([done])
