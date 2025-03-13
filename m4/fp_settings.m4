@@ -89,7 +89,7 @@ AC_DEFUN([FP_SETTINGS],
     SettingsLlcCommand="$LlcCmd"
     SettingsOptCommand="$OptCmd"
     SettingsLlvmAsCommand="$LlvmAsCmd"
-    SettingsLlvmAsFlags="$LlvmAsCmd"
+    SettingsLlvmAsFlags="$LlvmAsFlags"
 
     if test "$EnableDistroToolchain" = "YES"; then
         # If the user specified --enable-distro-toolchain then we just use the
