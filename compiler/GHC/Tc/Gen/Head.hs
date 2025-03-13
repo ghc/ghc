@@ -24,7 +24,7 @@ module GHC.Tc.Gen.Head
 
        , tcInferAppHead, tcInferAppHead_maybe
        , tcInferId, tcCheckId, tcInferConLike, obviousSig
-       , tyConOf, tyConOfET, fieldNotInType
+       , tyConOf, tyConOfET
        , nonBidirectionalErr
 
        , pprArgInst
@@ -66,9 +66,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 
 import GHC.Types.Id
-import GHC.Types.Id.Info
 import GHC.Types.Name
-import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error
@@ -651,12 +649,6 @@ tyConOf fam_inst_envs ty0
 -- Variant of tyConOf that works for ExpTypes
 tyConOfET :: FamInstEnvs -> ExpRhoType -> Maybe TyCon
 tyConOfET fam_inst_envs ty0 = tyConOf fam_inst_envs =<< checkingExpType_maybe ty0
-
-fieldNotInType :: RecSelParent -> RdrName -> TcRnMessage
-fieldNotInType p rdr
-  = mkTcRnNotInScope rdr $
-    UnknownSubordinate (text "field of type" <+> quotes (ppr p))
-
 
 {- *********************************************************************
 *                                                                      *

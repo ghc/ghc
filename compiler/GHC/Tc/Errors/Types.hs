@@ -6,6 +6,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Tc.Errors.Types (
   -- * Main types
@@ -77,6 +78,7 @@ module GHC.Tc.Errors.Types (
   , PromotionErr(..), pprPECategory, peCategory
   , TermLevelUseErr(..), teCategory
   , NotInScopeError(..), mkTcRnNotInScope
+  , Subordinate(..), pprSubordinate
   , ImportError(..)
   , HoleError(..)
   , CoercibleMsg(..)
@@ -192,7 +194,7 @@ import GHC.Tc.Utils.TcType (TcType, TcSigmaType, TcPredType,
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Avail
-import GHC.Types.Hint (UntickedPromotedThing(..), AssumedDerivingStrategy(..))
+import GHC.Types.Hint (UntickedPromotedThing(..), AssumedDerivingStrategy(..), SigLike)
 import GHC.Types.ForeignCall (CLabelString)
 import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name (NamedThing(..), Name, OccName, getSrcLoc, getSrcSpan)
@@ -2062,10 +2064,9 @@ data TcRnMessage where
 
       Test cases: rnfail042, T14907b, T15124, T15233.
   -}
-  TcRnIllegalBuiltinSyntax :: SDoc -- ^ what kind of thing this is (a binding, fixity declaration, ...)
+  TcRnIllegalBuiltinSyntax :: SigLike -- ^ what kind of thing this is (a binding, fixity declaration, ...)
                            -> RdrName
                            -> TcRnMessage
-    -- TODO: remove the SDoc argument.
 
   {-| TcRnWarnDefaulting is a warning (controlled by -Wtype-defaults)
       that is triggered whenever a Wanted typeclass constraint
@@ -5041,7 +5042,7 @@ data InvalidAssocDefault
     --
     -- Test cases: none.
   | AssocMultipleDefaults !Name
-    -- | Invalid arguments in an associated family instance.
+    -- | Invalid arguments in an associated family instance default declaration.
     --
     -- See t'AssocDefaultBadArgs'.
   | AssocDefaultBadArgs !TyCon ![Type] AssocDefaultBadArgs
@@ -5814,6 +5815,24 @@ data BadImportKind
   | BadImportAvailVar
   deriving Generic
 
+-- | Describes what category of subordinate we are dealing with, e.g.
+-- a method of a class, a field of a record, etc.
+data Subordinate
+  = MethodOfClass          -- ^ A method of a class
+  | AssociatedTypeOfClass  -- ^ An associated type of a class
+  | FieldOfConstructor     -- ^ A field of a constructor
+
+  deriving Generic
+
+pprSubordinate :: Name -> Subordinate -> SDoc
+pprSubordinate parent_nm = \case
+  MethodOfClass ->
+    text "method of class" <+> quotes (ppr parent_nm)
+  AssociatedTypeOfClass  ->
+    text "associated type of class" <+> quotes (ppr parent_nm)
+  FieldOfConstructor ->
+    text "field of constructor" <+> quotes (ppr parent_nm)
+
 -- | Some form of @"not in scope"@ error. See also the 'OutOfScopeHole'
 -- constructor of 'HoleError'.
 data NotInScopeError
@@ -5841,8 +5860,7 @@ data NotInScopeError
 
   -- A type signature, fixity declaration, pragma, standalone kind signature...
   -- is missing an associated binding.
-  | MissingBinding SDoc [GhcHint]
-    -- TODO: remove the SDoc argument.
+  | MissingBinding SigLike [GhcHint]
 
   -- | Couldn't find a top-level binding.
   --
@@ -5855,7 +5873,9 @@ data NotInScopeError
   -- | A class doesn't have a method with this name,
   -- or, a class doesn't have an associated type with this name,
   -- or, a record doesn't have a record field with this name.
-  | UnknownSubordinate SDoc
+  | UnknownSubordinate
+      Name -- ^ name of the parent
+      Subordinate -- ^ the kind of subordinate
 
   -- | A name is not in scope during type checking but passed the renamer.
   --

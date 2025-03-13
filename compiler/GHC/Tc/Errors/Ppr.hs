@@ -89,7 +89,7 @@ import GHC.Types.DefaultEnv (ClassDefaults(ClassDefaults, cd_types, cd_module))
 import GHC.Types.Error
 import GHC.Types.Error.Codes
 import GHC.Types.Hint
-import GHC.Types.Hint.Ppr () -- Outputable GhcHint
+import GHC.Types.Hint.Ppr ( pprSigLike ) -- & Outputable GhcHint
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RecSelParent(..) )
@@ -874,9 +874,9 @@ instance Diagnostic TcRnMessage where
                  let con      = pprUntickedConstructor fixity nm
                      bare_sym = isBareSymbol fixity nm
                  in text "constructor:" <+> con <> if bare_sym then empty else dot
-    TcRnIllegalBuiltinSyntax what rdr_name
+    TcRnIllegalBuiltinSyntax sig rdr_name
       -> mkSimpleDecorated $
-           hsep [text "Illegal", what, text "of built-in syntax:", ppr rdr_name]
+           hsep [text "Illegal", pprSigLike sig, text "of built-in syntax:", ppr rdr_name]
     TcRnWarnDefaulting tidy_wanteds tidy_tv default_ty
       -> mkSimpleDecorated $
            hang (hsep $ [ text "Defaulting" ]
@@ -4993,15 +4993,15 @@ pprScopeError rdr_name scope_err =
           = hang (pprNameSpace (occNameSpace (getOccName name))
                   <+> quotes (ppr name) <> comma)
                2 (text "declared at:" <+> ppr (nameSrcLoc name))
-    MissingBinding thing _ ->
-      sep [ text "The" <+> thing
+    MissingBinding sig _ ->
+      sep [ text "The" <+> pprSigLike sig
                <+> text "for" <+> quotes (ppr rdr_name)
           , nest 2 $ text "lacks an accompanying binding" ]
     NoTopLevelBinding ->
       hang (text "No top-level binding for")
         2 (what <+> quotes (ppr rdr_name) <+> text "in this module")
-    UnknownSubordinate doc ->
-      quotes (ppr rdr_name) <+> text "is not a (visible)" <+> doc
+    UnknownSubordinate parent_nm sub ->
+      quotes (ppr rdr_name) <+> text "is not a (visible)" <+> pprSubordinate parent_nm sub
     NotInScopeTc env ->
       vcat[text "GHC internal error:" <+> quotes (ppr rdr_name) <+>
       text "is not in scope during type checking, but it passed the renamer",

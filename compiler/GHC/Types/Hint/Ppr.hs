@@ -4,7 +4,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}   {- instance Outputable GhcHint -}
 
 module GHC.Types.Hint.Ppr (
-  perhapsAsPat
+  perhapsAsPat, pprSigLike
   -- also, and more interesting: instance Outputable GhcHint
   ) where
 
@@ -31,6 +31,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Hs.Binds (hsSigDoc)
 
 instance Outputable GhcHint where
   ppr = \case
@@ -187,8 +188,8 @@ instance Outputable GhcHint where
 
     SuggestAddTick UntickedExplicitList
       -> text "Add a promotion tick, e.g." <+> text "'[x,y,z]" <> dot
-    SuggestMoveToDeclarationSite what rdr_name
-      -> text "Move the" <+> what <+> text "to the declaration site of"
+    SuggestMoveToDeclarationSite sig rdr_name
+      -> text "Move the" <+> pprSigLike sig <+> text "to the declaration site of"
          <+> quotes (ppr rdr_name) <> dot
     SuggestSimilarNames tried_rdr_name similar_names
       -> case similar_names of
@@ -410,3 +411,16 @@ pprImpliedExtensions extension = case implied of
 pprPrefixUnqual :: Name -> SDoc
 pprPrefixUnqual name =
   pprPrefixOcc (getOccName name)
+
+pprSigLike :: SigLike -> SDoc
+pprSigLike = \case
+  SigLikeSig sig ->
+    hsSigDoc sig
+  SigLikeStandaloneKindSig ->
+    text "standalone kind signature"
+  SigLikeDeprecation ->
+    text "deprecation"
+  SigLikeFixitySig ->
+    text "fixity signature"
+  SigLikeRoleAnnotation ->
+    text "role annotation"

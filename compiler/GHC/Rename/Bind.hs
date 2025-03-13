@@ -46,7 +46,13 @@ import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils
 import GHC.Driver.DynFlags
-import GHC.Unit.Module
+
+import GHC.Data.BooleanFormula ( bfTraverse )
+import GHC.Data.Graph.Directed ( SCC(..) )
+import GHC.Data.Maybe          ( orElse, mapMaybe )
+import GHC.Data.OrdList
+import GHC.Data.List.SetOps    ( findDupsEq )
+
 
 import GHC.Types.Error
 import GHC.Types.FieldLabel
@@ -57,20 +63,17 @@ import GHC.Types.Name.Reader ( RdrName, rdrNameOcc )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
-import GHC.Data.Graph.Directed ( SCC(..) )
 
+import GHC.Types.CompleteMatch
+import GHC.Types.Hint ( SigLike(..) )
+import GHC.Types.Unique.DSet ( mkUniqDSet )
 import GHC.Types.Unique.Set
+
+import GHC.Unit.Module
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-
-import GHC.Types.CompleteMatch
-
-import GHC.Data.Maybe          ( orElse, mapMaybe )
-import GHC.Data.List.SetOps    ( findDupsEq )
-
-import GHC.Data.OrdList
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -79,8 +82,6 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import Control.Monad
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
-import GHC.Types.Unique.DSet (mkUniqDSet)
-import GHC.Data.BooleanFormula (bfTraverse)
 
 {-
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
@@ -1014,7 +1015,7 @@ rnMethodBindLHS :: Bool -> Name
                 -> RnM (LHsBindsLR GhcRn GhcPs)
 rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
   = setSrcSpanA loc $ do
-    do { sel_name <- wrapLocMA (lookupInstDeclBndr cls (text "method")) name
+    do { sel_name <- wrapLocMA (lookupInstDeclBndr cls MethodOfClass) name
                      -- We use the selector name as the binder
        ; let bind' = bind { fun_id = sel_name, fun_ext = noExtField }
        ; return (L loc bind' : rest ) }
@@ -1522,9 +1523,8 @@ rnSrcFixityDecl sig_ctxt = rn_decl
       = setSrcSpanA name_loc $
                     -- This lookup will fail if the name is not defined in the
                     -- same binding group as this fixity declaration.
-        do names <- lookupLocalTcNames sig_ctxt what ns_spec rdr_name
+        do names <- lookupLocalTcNames sig_ctxt SigLikeFixitySig ns_spec rdr_name
            return [ L name_loc name | (_, name) <- names ]
-    what = text "fixity signature"
 
 {-
 ************************************************************************

@@ -81,7 +81,6 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Avail
 import GHC.Types.Hint
-import GHC.Types.Error
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Core.ConLike
@@ -385,7 +384,7 @@ lookupLocalExactGRE name
            -- Ugh!  See Note [Template Haskell ambiguity] }
 
 -----------------------------------------------
-lookupInstDeclBndr :: Name -> SDoc -> RdrName -> RnM Name
+lookupInstDeclBndr :: Name -> Subordinate -> RdrName -> RnM Name
 -- This is called on the method name on the left-hand side of an
 -- instance declaration binding. eg.  instance Functor T where
 --                                       fmap = ...
@@ -400,7 +399,7 @@ lookupInstDeclBndr :: Name -> SDoc -> RdrName -> RnM Name
 --
 -- The "what" parameter says "method" or "associated type",
 -- depending on what we are looking up
-lookupInstDeclBndr cls what rdr
+lookupInstDeclBndr cls what_subordinate rdr
   = do { when (isQual rdr)
               (addErr (badQualBndrErr rdr))
                 -- In an instance decl you aren't allowed
@@ -412,13 +411,11 @@ lookupInstDeclBndr cls what rdr
                                 -- warnings when a deprecated class
                                 -- method is defined. We only warn
                                 -- when it's used
-                          cls doc rdr
+                          cls what_subordinate rdr
        ; case mb_name of
            Left err -> do { addErr (mkTcRnNotInScope rdr err)
                           ; return (mkUnboundNameRdr rdr) }
            Right nm -> return nm }
-  where
-    doc = what <+> text "of class" <+> quotes (ppr cls)
 
 -----------------------------------------------
 lookupFamInstName :: Maybe Name -> LocatedN RdrName
@@ -426,7 +423,7 @@ lookupFamInstName :: Maybe Name -> LocatedN RdrName
 -- Used for TyData and TySynonym family instances only,
 -- See Note [Family instance binders]
 lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f GHC.Rename.Bind.rnMethodBind
-  = wrapLocMA (lookupInstDeclBndr cls (text "associated type")) tc_rdr
+  = wrapLocMA (lookupInstDeclBndr cls AssociatedTypeOfClass) tc_rdr
 lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
   = lookupLocatedOccRnConstr tc_rdr
 
@@ -835,22 +832,23 @@ instance Outputable ChildLookupResult where
 
 lookupSubBndrOcc :: DeprecationWarnings
                  -> Name     -- Parent
-                 -> SDoc
+                 -> Subordinate
                  -> RdrName
                  -> RnM (Either NotInScopeError Name)
 -- ^ Find all the things the 'RdrName' maps to,
 -- and pick the one with the right 'Parent' 'Name'.
-lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name =
+lookupSubBndrOcc warn_if_deprec the_parent what_subordinate rdr_name =
   lookupExactOrOrig rdr_name (Right . greName) $
     -- This happens for built-in classes, see mod052 for example
     do { child <- lookupSubBndrOcc_helper True warn_if_deprec the_parent rdr_name what_lkup
        ; return $ case child of
            FoundChild g       -> Right (greName g)
-           NameNotFound       -> Left (UnknownSubordinate doc)
-           IncorrectParent {} -> Left (UnknownSubordinate doc) }
+           NameNotFound       -> Left unknown_sub
+           IncorrectParent {} -> Left unknown_sub }
        -- See [Mismatched class methods and associated type families]
        -- in TcInstDecls.
   where
+    unknown_sub = UnknownSubordinate the_parent what_subordinate
     what_lkup = LookupChild { wantedParent        = the_parent
                             , lookupDataConFirst  = False
                             , prioritiseParent    = True -- See T23664.
@@ -2121,12 +2119,11 @@ lookupSigOccRn :: HsSigCtxt
                -> Sig GhcPs
                -> GenLocated (EpAnn ann) RdrName
                -> RnM (GenLocated (EpAnn ann) Name)
-lookupSigOccRn ctxt sig = lookupSigCtxtOccRn ctxt (hsSigDoc sig)
+lookupSigOccRn ctxt sig = lookupSigCtxtOccRn ctxt (SigLikeSig sig)
 
 -- | Lookup a name in relation to the names in a 'HsSigCtxt'
 lookupSigCtxtOccRn :: HsSigCtxt
-                   -> SDoc         -- ^ description of thing we're looking up,
-                                   -- like "type family"
+                   -> SigLike -- ^ what are we looking for, e.g. a type family
                    -> GenLocated (EpAnn ann) RdrName
                    -> RnM (GenLocated (EpAnn ann) Name)
 lookupSigCtxtOccRn ctxt what
@@ -2144,7 +2141,7 @@ lookupSigCtxtOccRn ctxt what
        }
 
 lookupBindGroupOcc :: HsSigCtxt
-                   -> SDoc
+                   -> SigLike -- ^ what kind of thing are we looking for?
                    -> RdrName -- ^ what to look up
                    -> Bool -- ^ if the 'RdrName' we are looking up is in
                            -- a value 'NameSpace', should we also look up
@@ -2197,9 +2194,8 @@ lookupBindGroupOcc ctxt what rdr_name also_try_tycon_ns ns_spec
     succeed_with n = return $ NE.singleton $ Right n
 
     lookup_cls_op cls
-      = NE.singleton <$> lookupSubBndrOcc AllDeprecationWarnings cls doc rdr_name
-      where
-        doc = text "method of class" <+> quotes (ppr cls)
+      = NE.singleton <$>
+        lookupSubBndrOcc AllDeprecationWarnings cls MethodOfClass rdr_name
 
     lookup_inst occ_env  -- See Note [Signatures in instance decls]
       = case lookupOccEnv occ_env occ of
@@ -2251,7 +2247,7 @@ lookupBindGroupOcc ctxt what rdr_name also_try_tycon_ns ns_spec
 
 
 ---------------
-lookupLocalTcNames :: HsSigCtxt -> SDoc -> NamespaceSpecifier -> RdrName -> RnM [(RdrName, Name)]
+lookupLocalTcNames :: HsSigCtxt -> SigLike -> NamespaceSpecifier -> RdrName -> RnM [(RdrName, Name)]
 -- GHC extension: look up both the tycon and data con or variable.
 -- Used for top-level fixity signatures and deprecations.
 -- Complain if neither is in scope.

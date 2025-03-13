@@ -57,6 +57,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Basic  ( VisArity, TypeOrKind(..), RuleName )
 import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
+import GHC.Types.Hint (SigLike(..))
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc as SrcLoc
 
@@ -296,7 +297,7 @@ rnSrcWarnDecls bndr_set decls'
 
    rn_deprec w@(Warning (ns_spec, _) rdr_names txt)
        -- ensures that the names are defined locally
-     = do { names <- concatMapM (lookupLocalTcNames sig_ctxt what ns_spec . unLoc)
+     = do { names <- concatMapM (lookupLocalTcNames sig_ctxt SigLikeDeprecation ns_spec . unLoc)
                                 rdr_names
           ; unlessXOptM LangExt.ExplicitNamespaces $
             when (ns_spec /= NoNamespaceSpecifier) $
@@ -306,8 +307,6 @@ rnSrcWarnDecls bndr_set decls'
   -- Use the OccName from the Name we looked up, rather than from the RdrName,
   -- as we might hit multiple different NameSpaces when looking up
   -- (e.g. deprecating both a variable and a record field).
-
-   what = text "deprecation"
 
    warn_rdr_dups = find_dup_warning_names
                    $ concatMap (\(L _ (Warning (ns_spec, _) ns _)) -> (ns_spec,) <$> ns) decls
@@ -1513,7 +1512,7 @@ rnStandaloneKindSignature
 rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
   = do  { standalone_ki_sig_ok <- xoptM LangExt.StandaloneKindSignatures
         ; unless standalone_ki_sig_ok $ addErr TcRnUnexpectedStandaloneKindSig
-        ; new_v <- lookupSigCtxtOccRn (TopSigCtxt tc_names) (text "standalone kind signature") v
+        ; new_v <- lookupSigCtxtOccRn (TopSigCtxt tc_names) SigLikeStandaloneKindSig v
         ; let doc = StandaloneKindSigCtx (ppr v)
         ; (new_ki, fvs) <- rnHsSigType doc KindLevel ki
         ; return (StandaloneKindSig noExtField new_v new_ki, fvs)
@@ -1582,7 +1581,7 @@ rnRoleAnnots tc_names role_annots
       = do {  -- the name is an *occurrence*, but look it up only in the
               -- decls defined in this group (see #10263)
              tycon' <- lookupSigCtxtOccRn (RoleAnnotCtxt tc_names)
-                                          (text "role annotation")
+                                          SigLikeRoleAnnotation
                                           tycon
            ; return $ RoleAnnotDecl noExtField tycon' roles }
 
