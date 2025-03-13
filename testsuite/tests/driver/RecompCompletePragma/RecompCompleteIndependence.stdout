@@ -1,0 +1,4 @@
+Test 1: First compilation with C1.hs
+Test 2: Changing pattern Q implementation should not cause recompilation
+compilation IS NOT required
+Test 3: Changing COMPLETE pragma structure should cause recompilation

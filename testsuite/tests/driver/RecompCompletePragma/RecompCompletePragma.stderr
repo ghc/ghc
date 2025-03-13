@@ -1,0 +1,31 @@
+RecompCompletePragmaB.hs:7:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘usePattern’:
+        Patterns of type ‘Int’ not matched: p where p is not one of {P}
+
+RecompCompletePragmaB.hs:10:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘usePattern2’:
+        Patterns of type ‘Bool’ not matched:
+            False
+            True
+
+RecompCompletePragmaB.hs:10:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘usePattern2’:
+        Patterns of type ‘Bool’ not matched:
+            False
+            True
+
+RecompCompletePragmaB.hs:7:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘usePattern’:
+        Patterns of type ‘Int’ not matched: p where p is not one of {P}
+
+RecompCompletePragmaB.hs:10:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘usePattern2’:
+        Patterns of type ‘Bool’ not matched:
+            False
+            True
+

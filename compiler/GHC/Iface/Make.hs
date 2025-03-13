@@ -489,7 +489,9 @@ coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn,
 
 mkIfaceCompleteMatch :: CompleteMatch -> IfaceCompleteMatch
 mkIfaceCompleteMatch (CompleteMatch cls mtc) =
-  IfaceCompleteMatch (uniqDSetToList cls) mtc
+  -- NB: Sorting here means that COMPLETE {P, Q} and COMPLETE {Q, P} are
+  -- considered identical, in particular for recompilation checking.
+  IfaceCompleteMatch (sortBy stableNameCmp $ uniqDSetToList cls) mtc
 
 
 {-
