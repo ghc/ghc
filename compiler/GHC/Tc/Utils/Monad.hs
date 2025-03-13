@@ -1347,7 +1347,8 @@ captureWildCards thing_inside
        ; res <- updLclEnv (\ env -> env { tcl_wcs = wcs_var}) $
                 thing_inside
        ; wcs <- readTcRef wcs_var
-       ; return (wcs, res) }
+       -- Reverse the list to preserve the order in which the wildcards were added
+       ; return (reverse wcs, res) }
 
 capture_messages :: TcM r -> TcM (r, Messages TcRnMessage)
 -- capture_messages simply captures and returns the

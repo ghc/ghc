@@ -258,13 +258,14 @@ tcFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted
        ; checkFamTelescope tclvl hs_outer_bndrs outer_exp_tvs
        -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
        -- See Note [Type variables in type families instance decl]
-       ; (dvs, wc_itvs, outer_imp_itvs)  <- candidateQTyVarsWithBinders outer_exp_tvs outer_imp_tvs wcs lhs_ty
-       ; (qtvs, outer_imp_qtvs) <- quantifyTyVarsWithBinders wc_itvs outer_imp_itvs skol_info dvs
+       ; (dvs, outer_wcs_imp_dvs) <- candidateQTyVarsWithBinders outer_exp_tvs (outer_imp_tvs ++ wcs) lhs_ty
+       ; qtvs <- quantifyTyVarsWithBinders skol_info dvs outer_wcs_imp_dvs
                  -- Have to make a same defaulting choice for result kind here
                  -- and the `kindGeneralizeAll` in `tcConDecl`.
                  -- see (GT4) in
                  -- GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
-       ; let final_tvs = scopedSort (qtvs ++ outer_exp_tvs ++ outer_imp_qtvs)
+       ; let final_tvs = scopedSort (qtvs ++ outer_exp_tvs)
+       ; let non_user_tvs = dVarSetElems $ mkDVarSet qtvs `delDVarSetList` outer_wcs_imp_dvs
              -- This scopedSort is important: the qtvs may be /interleaved/ with
              -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
        ; traceTc "tcFamInstLHSBinders" $
@@ -276,17 +277,16 @@ tcFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted
               , text "wcs:" <+> pprTyVars wcs
 
               -- after zonking
-              , text "wc_itvs:" <+> pprTyVars wc_itvs
-              , text "outer_imp_itvs:" <+> pprTyVars outer_imp_itvs
               , text "dvs:" <+> ppr dvs
+              , text "outer_wcs_imp_dvs:" <+> pprTyVars outer_wcs_imp_dvs
 
               -- after quantification
-              , text "qtvs(include wildcards):" <+> pprTyVars qtvs
-              , text "outer_imp_qtvs:" <+> pprTyVars outer_imp_qtvs
+              , text "qtvs:" <+> pprTyVars qtvs
+              , text "non_user_tvs:" <+> pprTyVars non_user_tvs
               , text "final_tvs:" <+> pprTyVars final_tvs
               ]
        ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
-       return (final_tvs, qtvs)
+       return (final_tvs, non_user_tvs)
 
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind

@@ -83,7 +83,7 @@ import GHC.Core.Predicate
 import GHC.Utils.Constants
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
-import GHC.Utils.Monad ( mapAccumLM, mapMaybeM )
+import GHC.Utils.Monad ( mapAccumLM )
 import GHC.Utils.Panic
 
 import GHC.Data.Bag
@@ -268,7 +268,6 @@ zonkTcTyVar tv
 -- Should be used only on skolems and TyVarTvs
 zonkTcTyVarsToTcTyVars :: HasDebugCallStack => [TcTyVar] -> ZonkM [TcTyVar]
 zonkTcTyVarsToTcTyVars = mapM zonkTcTyVarToTcTyVar
-
 
 zonkTcTyVarToTcTyVar :: HasDebugCallStack => TcTyVar -> ZonkM TcTyVar
 zonkTcTyVarToTcTyVar tv
