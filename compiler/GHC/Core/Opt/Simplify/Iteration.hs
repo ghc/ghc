@@ -2008,8 +2008,8 @@ So we go to some effort to avoid repeatedly simplifying the same thing:
 * We go to some efforts to avoid unnecessarily simplifying ApplyToVal,
   in at least two places
     - In simplCast/addCoerce, where we check for isReflCo
-    - In rebuildCall we avoid simplifying arguments before we have to
-      (see Note [Trying rewrite rules])
+    - We sometimes try rewrite RULES befoe simplifying arguments;
+      see Note [Plan (BEFORE)]
 
 All that said /postInlineUnconditionally/ (called in `completeBind`) does
 fire in the above (f BIG) situation.  See Note [Post-inline for single-use
@@ -2325,7 +2325,7 @@ simplOutId env fun cont
 
 -- Normal case for (f e1 .. en)
 simplOutId env fun cont
-  = -- Try rewrite rules
+  = -- Try rewrite rules: Plan (BEFORE) in Note [When to apply rewrite rules]
     do { rule_base <- getSimplRules
        ; let rules_for_me = getRules rule_base fun
              out_args     = contOutArgs env cont :: [OutExpr]
@@ -2422,7 +2422,7 @@ rebuildCall env fun_info
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
   | null rules
   = rebuild env (argInfoExpr fun rev_args) cont
-  | otherwise  -- Try rules again
+  | otherwise  -- Try rules again: Plan (AFTER) in Note [When to apply rewrite rules]
   = do { let args = reverse rev_args
        ; mb_match <- tryRules env rules fun (map argSpecArg args)
        ; case mb_match of
@@ -2462,83 +2462,90 @@ tryInlining env logger var cont
                               text "Cont:  " <+> ppr cont])]
 
 
-{- Note [Trying rewrite rules]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider an application (f e1 e2 e3) where the e1,e2,e3 are not yet
-simplified.  We want to simplify enough arguments to allow the rules
-to apply, but it's more efficient to avoid simplifying e2,e3 if e1 alone
-is sufficient.  Example: class ops
-   (+) dNumInt e2 e3
-If we rewrite ((+) dNumInt) to plusInt, we can take advantage of the
-latter's strictness when simplifying e2, e3.  Moreover, suppose we have
-  RULE  f Int = \x. x True
+{- Note [When to apply rewrite rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Should we apply rewrite rules before simplifying the arguments, or after?
+Both are plausible: see
+  - Note [Plan (BEFORE): try RULES /before/ simplifying arguments]
+  - Note [Plan (AFTER):  try RULES /after/  simplifying arguments]
 
-Then given (f Int e1) we rewrite to
-   (\x. x True) e1
-without simplifying e1.  Now we can inline x into its unique call site,
-and absorb the True into it all in the same pass.  If we simplified
-e1 first, we couldn't do that; see Note [Avoiding simplifying repeatedly].
+So we do both!
+  - Plan (BEFORE) selectively, in `simplOutId`
+  - Plan (AFTER) always, in the finishing-up case of `rebuildCall`
 
-So we try to apply rules if either
-  (a) no_more_args: we've run out of argument that the rules can "see"
-  (b) nr_wanted: none of the rules wants any more arguments
+The "selectively" in Plan (BEFORE) is a bit ad-hoc:
+
+* We want Plan (BEFORE) for class ops (see Note [Plan (BEFORE)]).
+
+* We do NOT want Plan (BEFORE) for primops, because the constant-folding rules
+  are quite complicated and expeensive, and we don't want to try them twice.
+  Moreover the beneifts of Plan (BEFORE), described in the Note, don't apply to
+  primops.
 
 
-Note [RULES apply to simplified arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's very desirable to try RULES once the arguments have been simplified, because
-doing so ensures that rule cascades work in one pass.  Consider
+Note [Plan (BEFORE): try RULES /before/ simplifying arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It is sometimes desirable to apply RULES before simplifying the function
+arguments.  Two particuar cases:
+
+* Class ops
+     (+) dNumInt e2 e3
+  If we rewrite ((+) dNumInt) to plusInt, we can take advantage of the
+  latter's strictness when simplifying e2, e3.  Moreover, if
+      (+) dNumInt e2 e3   -->    (\x y -> ....) e2 e3
+  Frequently `x` is used just once in the body of the (\x y -> ...).
+  If `e2` is un-simplified we can preInlineUnconditinally and that saves
+  simplifying `e2` twice. See Note [Avoiding simplifying repeatedly].
+
+* Specialisation RULES.  In general we try to arrange that inlining is disabled
+  (via a pragma) if a rewrite rule should apply, so that the rule has a decent
+  chance to fire before we inline the function.
+
+  But it turns out that (especially when type-class specialisation or
+  SpecConstr is involved) it is very helpful for the the rewrite rule to
+  "win" over inlining when both are active at once: see #21851, #22097.
+
+  So we want to try RULES before we try inlining.
+
+Wrinkles:
+
+(BF1) Each un-simplified argument has its own static environment, stored
+  in its `ApplyToVal` nodes.   So we can't just match on the un-simplified
+  arguments: we  have to apply that static environment as a substitution
+  first!  This is done lazily in `contOutArgs`, so it'll be done just enough
+  to allow the rule to match, or not.
+
+Note [Plan (AFTER): try RULES /after/ simplifying arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's very desirable to try RULES once the arguments have been simplified,
+because doing so ensures that rule cascades work in one pass.  Consider
+
    {-# RULES g (h x) = k x
              f (k x) = x #-}
    ...f (g (h x))...
 Then we want to rewrite (g (h x)) to (k x) and only then try f's rules. If
 we match f's rules against the un-simplified RHS, it won't match.  This
-makes a particularly big difference when superclass selectors are involved:
+makes a particularly big difference for
+
+* Superclass selectors
         op ($p1 ($p2 (df d)))
-We want all this to unravel in one sweep.
+  We want all this to unravel in one sweep
 
-Note [Rewrite rules and inlining]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In general we try to arrange that inlining is disabled (via a pragma) if
-a rewrite rule should apply, so that the rule has a decent chance to fire
-before we inline the function.
-
-But it turns out that (especially when type-class specialisation or
-SpecConstr is involved) it is very helpful for the the rewrite rule to
-"win" over inlining when both are active at once: see #21851, #22097.
-
-The simplifier arranges to do this, as follows. In effect, the ai_rewrite
-field of the ArgInfo record is the state of a little state-machine:
-
-* mkArgInfo sets the ai_rewrite field to TryRules if there are any rewrite
-  rules avaialable for that function.
-
-* rebuildCall simplifies arguments until enough are simplified to match the
-  rule with greatest arity.  See Note [RULES apply to simplified arguments]
-  and the first field of `TryRules`.
-
-  But no more! As soon as we have simplified enough arguments to satisfy the
-  maximum-arity rules, we try the rules; see Note [Trying rewrite rules].
-
-* Once we have tried rules (or immediately if there are no rules) set
-  ai_rewrite to TryInlining, and the Simplifier will try to inline the
-  function.  We want to try this immediately (before simplifying any (more)
-  arguments). Why? Consider
-      f BIG      where   f = \x{OneOcc}. ...x...
-  If we inline `f` before simplifying `BIG` well use preInlineUnconditionally,
-  and we'll simplify BIG once, at x's occurrence, rather than twice.
-
-* GHC.Core.Opt.Simplify.Utils. mkRewriteCall: if there are no rules, and no
-  unfolding, we can skip both TryRules and TryInlining, which saves work.
+* Constant folding
+        +# 3# (+# 4# 5#)
+  We want this to happen in one pass
 
 Note [Avoid redundant simplification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Because RULES apply to simplified arguments, there's a danger of repeatedly
-simplifying already-simplified arguments.  An important example is that of
-        (>>=) d e1 e2
-Here e1, e2 are simplified before the rule is applied, but don't really
-participate in the rule firing. So we mark them as Simplified to avoid
-re-simplifying them.
+Because RULES often apply to simplified arguments (see Note [Plan (AFTER)]),
+there's a danger of simplifying already-simplified arguments.  For example,
+suppose we have
+   RULE f (x,y) = $sf x  y
+and the expression
+   f (p,q) e1 e2
+With Plan (AFTER) by the time the rule fires, we will have already simplified e1, e2,
+and we want to avoid doing so a second time.  So ApplyToVal records if the argument
+is already Simplified.
 
 Note [Shadowing in the Simplifier]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -562,8 +562,11 @@ contOutArgs env cont
     go (ApplyToVal { sc_dup = dup, sc_arg = arg, sc_env = env, sc_cont = cont })
       | isSimplified dup = arg : go cont
       | otherwise        = GHC.Core.Subst.substExpr (getFullSubst in_scope env) arg : go cont
-          -- NOT substExprSC: we want to get the benefit of knowing what is
-         --                   evaluated etc, via the in-scope set
+        -- Make sure we apply the static environment `sc_env` as a substitution
+        --   to get an OutExpr.  See (BF1) in Note [Plan (BEFORE)]
+        --   in GHC.Core.Opt.Simplify.Iteration
+        -- NB: we use substExpr, not substExprSC: we want to get the benefit of
+        --     knowing what is evaluated etc, via the in-scope set
 
     -- No more arguments
     go _ = []

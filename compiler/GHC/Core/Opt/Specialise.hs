@@ -1379,7 +1379,7 @@ version of `g` will contain the call `f @Int`; but in the subsequent run of
 the Simplifier, there will be a competition between:
 * The user-supplied SPECIALISE rule for `f`
 * The inlining of the wrapper for `f`
-In fact, the latter wins -- see Note [Rewrite rules and inlining] in
+In fact, the latter wins -- see Note [Plan (BEFORE): try RULES /before/ simplifying arguments]
 GHC.Core.Opt.Simplify.Iteration.  However, it a bit fragile.
 
 Moreover consider (test T21851_2):
@@ -1409,10 +1409,10 @@ we load it up just once, in `initRuleEnv`, called at the beginning of
 `specProgram`.
 
 NB: you might wonder if running rules in the specialiser (this Note)
-renders Note [Rewrite rules and inlining] in the Simplifier redundant.
-That is, if we run rules in the specialiser, does it matter if we make
-rules "win" over inlining in the Simplifier?  Yes, it does!  See the
-discussion in #21851.
+renders Note [Plan (BEFORE): try RULES /before/ simplifying arguments]
+in the Simplifier (partly) redundant.  That is, if we run rules in the
+specialiser, does it matter if we make rules "win" over inlining in
+the Simplifier?  Yes, it does!  See the discussion in #21851.
 
 Note [Floating dictionaries out of cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
