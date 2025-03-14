@@ -606,7 +606,14 @@ pprFunDep (FunDep _ us vs) = hsep [interppSP us, arrow, interppSP vs]
 *                                                                      *
 ********************************************************************* -}
 
-type instance XCTyClGroup (GhcPass _) = NoExtField
+type instance XCTyClGroup GhcPs = NoExtField
+
+type instance XCTyClGroup GhcRn = NameSet     -- Lexical dependencies of an SCC
+  -- What names exactly are in this NameSet? See Note [Prepare TyClGroup FVs] in GHC.Rename.Module
+  -- How is this NameSet used? See Note [Retrying TyClGroups] in GHC.Tc.TyCl
+
+type instance XCTyClGroup GhcTc = DataConCantHappen
+
 type instance XXTyClGroup (GhcPass _) = DataConCantHappen
 
 

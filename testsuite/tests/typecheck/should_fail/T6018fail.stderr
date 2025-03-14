@@ -3,7 +3,6 @@
 [3 of 5] Compiling T6018Cfail       ( T6018Cfail.hs, T6018Cfail.o )
 [4 of 5] Compiling T6018Dfail       ( T6018Dfail.hs, T6018Dfail.o )
 [5 of 5] Compiling T6018fail        ( T6018fail.hs, T6018fail.o )
-
 T6018fail.hs:15:15: error: [GHC-05175]
     Type family equation right-hand sides overlap; this violates
     the family's injectivity annotation:
@@ -81,11 +80,11 @@ T6018fail.hs:72:15: error: [GHC-05175]
       forall {k} {a :: k} {b :: k}.
         Gc @k a b = Int -- Defined at T6018fail.hs:72:15
 
-T6018fail.hs:76:15: error: [GHC-05175]
+T6018fail.hs:77:15: error: [GHC-05175]
     Type family equation right-hand sides overlap; this violates
     the family's injectivity annotation:
-      F1 [a] = Maybe (GF1 a) -- Defined at T6018fail.hs:76:15
       F1 (Maybe a) = Maybe (GF2 a) -- Defined at T6018fail.hs:77:15
+      F1 [a] = Maybe (GF1 a) -- Defined at T6018fail.hs:76:15
 
 T6018fail.hs:89:15: error: [GHC-05175]
     Type family equation violates the family's injectivity annotation.
@@ -166,3 +165,4 @@ module T6018Afail: error: [GHC-05175]
     the family's injectivity annotation:
       G Char Bool Int = Int -- Defined in module T6018Afail
       G Bool Int Char = Int -- Defined at T6018fail.hs:17:15
+

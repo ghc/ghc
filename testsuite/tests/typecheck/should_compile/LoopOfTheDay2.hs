@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
              FlexibleContexts #-}
 

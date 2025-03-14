@@ -75,7 +75,9 @@ module GHC.Tc.Utils.Monad(
   -- * Shared error message stuff: renamer and typechecker
   recoverM, mapAndRecoverM, mapAndReportM, foldAndRecoverM,
   attemptM, tryTc,
-  askNoErrs, discardErrs, tryTcDiscardingErrs,
+  askNoErrs, discardErrs,
+  tryTcDiscardingErrs,
+  tryTcDiscardingErrs',
   checkNoErrs, whenNoErrs,
   ifErrsM, failIfErrsM,
 
@@ -1517,21 +1519,37 @@ tryTcDiscardingErrs :: TcM r -> TcM r -> TcM r
 --      if 'main' succeeds with no error messages, it's the answer
 --      otherwise discard everything from 'main', including errors,
 --          and try 'recover' instead.
-tryTcDiscardingErrs recover thing_inside
+tryTcDiscardingErrs recover =
+  tryTcDiscardingErrs'
+    (\_ _ _ -> True)     -- No validation
+    recover recover      -- Discard all errors and warnings
+                         -- and unsolved constraints entirely
+
+tryTcDiscardingErrs' :: (WantedConstraints -> Messages TcRnMessage -> r -> Bool)  -- Validation
+                     -> TcM r  -- Recover from validation error
+                     -> TcM r  -- Recover from failure
+                     -> TcM r  -- Action to try
+                     -> TcM r
+-- (tryTcDiscardingErrs' validate recover_invalid recover_error thing_inside) tries 'thing_inside';
+--      if 'thing_inside' succeeds and validation produces no errors, it's the answer
+--      otherwise discard everything from 'thing_inside', including errors,
+--          and try 'recover' instead.
+tryTcDiscardingErrs' validate recover_invalid recover_error thing_inside
   = do { ((mb_res, lie), msgs) <- capture_messages    $
                                   capture_constraints $
                                   tcTryM thing_inside
         ; case mb_res of
             Just res | not (errorsFound msgs)
                      , not (insolubleWC lie)
-              -> -- 'main' succeeded with no errors
-                 do { addMessages msgs  -- msgs might still have warnings
-                    ; emitConstraints lie
-                    ; return res }
+                    -- 'thing_inside' succeeded with no errors
+              -> if validate lie msgs res
+                 then do { addMessages msgs  -- msgs might still have warnings
+                         ; emitConstraints lie
+                         ; return res }
+                 else recover_invalid
 
-            _ -> -- 'main' failed, or produced an error message
-                 recover     -- Discard all errors and warnings
-                             -- and unsolved constraints entirely
+            _ -> -- 'thing_inside' failed, or produced an error message
+                 recover_error
         }
 
 {-

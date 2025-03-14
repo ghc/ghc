@@ -1,9 +1,9 @@
 type A :: * -> * -> *
 type family A a b
   	-- Defined at T4175.hs:8:1
-type instance A (B a) b = () 	-- Defined at T4175.hs:11:15
 type instance A Int Int = () 	-- Defined at T4175.hs:9:15
 type instance A (Maybe a) a = a 	-- Defined at T4175.hs:10:15
+type instance A (B a) b = () 	-- Defined at T4175.hs:11:15
 type B :: * -> *
 data family B a
   	-- Defined at T4175.hs:13:1

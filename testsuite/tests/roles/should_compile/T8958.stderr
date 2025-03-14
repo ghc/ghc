@@ -14,11 +14,11 @@ DATA CONSTRUCTORS
            (Nominal k, Representational v) =>
            [(k, v)] -> Map k v
 CLASS INSTANCES
+  instance [incoherent] Nominal a -- Defined at T8958.hs:8:10
   instance [incoherent] Representational a
     -- Defined at T8958.hs:11:10
-  instance [incoherent] Nominal a -- Defined at T8958.hs:8:10
 Dependent modules: []
-Dependent packages: [base-4.20.0.0]
+Dependent packages: [base-4.21.0.0]
 
 ==================== Typechecker ====================
 T8958.$tcMap
@@ -88,6 +88,14 @@ T8958.$trModule
       (GHC.Internal.Types.TrNameS "main"#)
       (GHC.Internal.Types.TrNameS "T8958"#)
 AbsBinds [a] []
+  {Exports: [T8958.$fNominala <= $dNominal
+               wrap: <>]
+   Exported types: T8958.$fNominala [InlPrag=CONLIKE]
+                     :: forall a. Nominal a
+                   [LclIdX[DFunId], Unf=DFun: \ (@a) -> T8958.C:Nominal TYPE: a]
+   Binds: $dNominal = T8958.C:Nominal @a
+   Evidence: [EvBinds{}]}
+AbsBinds [a] []
   {Exports: [T8958.$fRepresentationala <= $dRepresentational
                wrap: <>]
    Exported types: T8958.$fRepresentationala [InlPrag=CONLIKE]
@@ -96,29 +104,5 @@ AbsBinds [a] []
                     Unf=DFun: \ (@a) -> T8958.C:Representational TYPE: a]
    Binds: $dRepresentational = T8958.C:Representational @a
    Evidence: [EvBinds{}]}
-AbsBinds [a] []
-  {Exports: [T8958.$fNominala <= $dNominal
-               wrap: <>]
-   Exported types: T8958.$fNominala [InlPrag=CONLIKE]
-                     :: forall a. Nominal a
-                   [LclIdX[DFunId], Unf=DFun: \ (@a) -> T8958.C:Nominal TYPE: a]
-   Binds: $dNominal = T8958.C:Nominal @a
-   Evidence: [EvBinds{}]}
 
-
-T8958.hs:14:54: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
-    • The constraint ‘Representational v’ matches
-        instance Representational a -- Defined at T8958.hs:11:10
-      This makes type inference for inner bindings fragile;
-        either use MonoLocalBinds, or simplify it using the instance
-    • In the definition of data constructor ‘MkMap’
-      In the newtype declaration for ‘Map’
-
-T8958.hs:14:54: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
-    • The constraint ‘Nominal k’ matches
-        instance Nominal a -- Defined at T8958.hs:8:10
-      This makes type inference for inner bindings fragile;
-        either use MonoLocalBinds, or simplify it using the instance
-    • In the definition of data constructor ‘MkMap’
-      In the newtype declaration for ‘Map’
 
