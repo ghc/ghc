@@ -2635,6 +2635,13 @@ match_inline _ = Nothing
 --------------------------------------------------------
 -- Note [Constant folding through nested expressions]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- GHC has some support for constant folding through nested expressions (i.e.
+-- when constants are not only arguments of the considered App node but to one
+-- of its own argument (an App node too), see examples below).
+--
+-- For performance reason, this optimization is only enabled with -O1 and above.
+-- As with all optimizations, it can also be independently enabled with its own
+-- command-line flag too: -fnum-constant-folding (grep Opt_NumConstantFolding).
 --
 -- We use rewrites rules to perform constant folding. It means that we don't
 -- have a global view of the expression we are trying to optimise. As a
