@@ -135,6 +135,7 @@ import Data.ByteString (ByteString, copy)
 import Data.Coerce
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
+import qualified Data.ByteString.Short.Internal as SBS
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.List.NonEmpty       ( NonEmpty(..))
@@ -1771,7 +1772,7 @@ type SymbolTable a = Array Int a
 ---------------------------------------------------------
 
 putFS :: WriteBinHandle -> FastString -> IO ()
-putFS bh fs = putBS bh $ bytesFS fs
+putFS bh fs = putSBS bh $ fastStringToShortByteString fs
 
 getFS :: ReadBinHandle -> IO FastString
 getFS bh = do
@@ -1791,6 +1792,18 @@ getByteString bh l =
   BS.create l $ \dest -> do
     getPrim bh l (\src -> copyBytes dest src l)
 
+putSBS :: WriteBinHandle -> SBS.ShortByteString -> IO ()
+putSBS bh sbs = do
+  let l = SBS.length sbs
+  put_ bh l
+  putPrim bh l (\p -> SBS.copyToPtr sbs 0 p l)
+
+
+getSBS :: ReadBinHandle -> IO SBS.ShortByteString
+getSBS bh = do
+  l <- get bh :: IO Int
+  getPrim bh l (\src -> SBS.createFromPtr src l)
+
 putBS :: WriteBinHandle -> ByteString -> IO ()
 putBS bh bs =
   BS.unsafeUseAsCStringLen bs $ \(ptr, l) -> do
@@ -1802,6 +1815,10 @@ getBS bh = do
   l <- get bh :: IO Int
   BS.create l $ \dest -> do
     getPrim bh l (\src -> copyBytes dest src l)
+
+instance Binary SBS.ShortByteString where
+  put_ bh f = putSBS bh f
+  get bh = getSBS bh
 
 instance Binary ByteString where
   put_ bh f = putBS bh f
