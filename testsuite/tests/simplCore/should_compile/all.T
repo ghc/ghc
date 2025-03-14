@@ -209,9 +209,8 @@ test('T11232', normal, compile, ['-O2'])
 test('T11562', normal, compile, ['-O2'])
 test('T11742', normal, compile, ['-O2'])
 test('T11644', normal, compile, ['-O2'])
-test('T3990',
-     normal,
-     makefile_test, ['T3990'])
+test('T3990', normal, makefile_test, ['T3990'])
+test('T3990b', normal, makefile_test, ['T3990b'])
 
 test('T12076', [], multimod_compile, ['T12076', '-v0'])
 test('T12076lit', normal, compile, ['-O'])

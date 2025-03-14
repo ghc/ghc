@@ -39,8 +39,8 @@ instance GHC.Internal.Generics.Generic [T]
   -- Defined in ‘GHC.Internal.Generics’
 instance Monoid [T] -- Defined in ‘GHC.Internal.Base’
 instance Semigroup [T] -- Defined in ‘GHC.Internal.Base’
-instance [safe] MyShow [T] -- Defined at ghci064.hs:8:10
 instance [safe] MyShow [T] -- Defined at ghci064.hs:16:10
+instance [safe] MyShow [T] -- Defined at ghci064.hs:8:10
 instance GHC.Internal.Generics.SingKind Bool
   -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic Bool

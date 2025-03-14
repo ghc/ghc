@@ -67,14 +67,14 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.DynFlags
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
 
-import GHC.Utils.Misc   ( lengthExceeds, partitionWith )
+import GHC.Utils.Misc   ( lengthExceeds )
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
 
 import GHC.Data.FastString
 import GHC.Data.List.SetOps ( findDupsEq, removeDupsOn, equivClasses )
-import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
-                               , stronglyConnCompFromEdgedVerticesUniq )
+import GHC.Data.Graph.Directed ( SCC, flattenSCC, Node(..)
+                               , stronglyConnCompFromEdgedVerticesUniqR )
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.DataCon ( isSrcStrict )
@@ -82,7 +82,6 @@ import GHC.Core.DataCon ( isSrcStrict )
 import Control.Monad
 import Control.Arrow ( first )
 import Data.Foldable ( toList, for_ )
-import Data.List ( mapAccumL )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Maybe ( isNothing, fromMaybe, mapMaybe, maybeToList )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
@@ -1450,53 +1449,37 @@ rnTyClDecls tycl_ds
              role_annot_env = mkRoleAnnotEnv role_annots
              (kisig_env, kisig_fv_env) = mkKindSig_fv_env kisigs_w_fvs
 
-             inst_ds_map = mkInstDeclFreeVarsMap rdr_env tc_names instds_w_fvs
-             (init_inst_ds, rest_inst_ds) = getInsts [] inst_ds_map
-
-             first_group
-               | null init_inst_ds = []
-               | otherwise = [TyClGroup { group_ext    = noExtField
-                                        , group_tyclds = []
-                                        , group_kisigs = []
-                                        , group_roles  = []
-                                        , group_instds = init_inst_ds }]
-
-             (final_inst_ds, groups)
-                = mapAccumL (mk_group role_annot_env kisig_env) rest_inst_ds tycl_sccs
+             groups = map (mk_group tc_names role_annot_env kisig_env) tycl_sccs
+             inst_groups = mkInstGroups rdr_env tc_names instds_w_fvs
 
              all_fvs = foldr (plusFV . snd) emptyFVs tycls_w_fvs  `plusFV`
                        foldr (plusFV . snd) emptyFVs instds_w_fvs `plusFV`
                        foldr (plusFV . snd) emptyFVs kisigs_w_fvs
 
-             all_groups = first_group ++ groups
-
-       ; massertPpr (null final_inst_ds)
-                    (ppr instds_w_fvs
-                     $$ ppr inst_ds_map
-                     $$ ppr (flattenSCCs tycl_sccs)
-                     $$ ppr final_inst_ds)
+             all_groups = groups ++ inst_groups
 
        ; traceRn "rnTycl dependency analysis made groups" (ppr all_groups)
        ; return (all_groups, all_fvs) }
   where
-    mk_group :: RoleAnnotEnv
+    mk_group :: NameSet
+             -> RoleAnnotEnv
              -> KindSigEnv
-             -> InstDeclFreeVarsMap
-             -> SCC (LTyClDecl GhcRn)
-             -> (InstDeclFreeVarsMap, TyClGroup GhcRn)
-    mk_group role_env kisig_env inst_map scc
-      = (inst_map', group)
+             -> SCC (Node Name (LTyClDecl GhcRn))
+             -> TyClGroup GhcRn
+    mk_group tc_names role_env kisig_env scc = group
       where
-        tycl_ds              = flattenSCC scc
+        nodes                = flattenSCC scc
+        nodes_fvs            = mkNameSet (concatMap node_dependencies nodes)
+        tycl_ds              = map node_payload nodes
         bndrs                = map (tcdName . unLoc) tycl_ds
+        deps                 = delFVs bndrs (nodes_fvs `intersectFVs` tc_names)
         roles                = getRoleAnnots bndrs role_env
         kisigs               = getKindSigs   bndrs kisig_env
-        (inst_ds, inst_map') = getInsts      bndrs inst_map
-        group = TyClGroup { group_ext    = noExtField
+        group = TyClGroup { group_ext    = deps
                           , group_tyclds = tycl_ds
                           , group_kisigs = kisigs
                           , group_roles  = roles
-                          , group_instds = inst_ds }
+                          , group_instds = [] }
 
 -- | Free variables of standalone kind signatures.
 newtype KindSig_FV_Env = KindSig_FV_Env (NameEnv FreeVars)
@@ -1545,10 +1528,10 @@ rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
 depAnalTyClDecls :: GlobalRdrEnv
                  -> KindSig_FV_Env
                  -> [(LTyClDecl GhcRn, FreeVars)]
-                 -> [SCC (LTyClDecl GhcRn)]
+                 -> [SCC (Node Name (LTyClDecl GhcRn))]
 -- See Note [Dependency analysis of type, class, and instance decls]
 depAnalTyClDecls rdr_env kisig_fv_env ds_w_fvs
-  = stronglyConnCompFromEdgedVerticesUniq edges
+  = stronglyConnCompFromEdgedVerticesUniqR edges
   where
     edges :: [ Node Name (LTyClDecl GhcRn) ]
     edges = [ DigraphNode d name (map (getParent rdr_env) (nonDetEltsUniqSet deps))
@@ -1643,43 +1626,23 @@ lookupGlobalOccRn led to #8485).
 ****************************************************** -}
 
 ----------------------------------------------------------
--- | 'InstDeclFreeVarsMap is an association of an
---   @InstDecl@ with @FreeVars@. The @FreeVars@ are
---   the tycon names that are both
---     a) free in the instance declaration
---     b) bound by this group of type/class/instance decls
-type InstDeclFreeVarsMap = [(LInstDecl GhcRn, FreeVars)]
-
--- | Construct an @InstDeclFreeVarsMap@ by eliminating any @Name@s from the
---   @FreeVars@ which are *not* the binders of a @TyClDecl@.
-mkInstDeclFreeVarsMap :: GlobalRdrEnv
-                      -> NameSet
-                      -> [(LInstDecl GhcRn, FreeVars)]
-                      -> InstDeclFreeVarsMap
-mkInstDeclFreeVarsMap rdr_env tycl_bndrs inst_ds_fvs
-  = [ (inst_decl, toParents rdr_env fvs `intersectFVs` tycl_bndrs)
-    | (inst_decl, fvs) <- inst_ds_fvs ]
-
--- | Get the @LInstDecl@s which have empty @FreeVars@ sets, and the
---   @InstDeclFreeVarsMap@ with these entries removed.
--- We call (getInsts tcs instd_map) when we've completed the declarations
--- for 'tcs'.  The call returns (inst_decls, instd_map'), where
---   inst_decls are the instance declarations all of
---              whose free vars are now defined
---   instd_map' is the inst-decl map with 'tcs' removed from
---               the free-var set
-getInsts :: [Name] -> InstDeclFreeVarsMap
-         -> ([LInstDecl GhcRn], InstDeclFreeVarsMap)
-getInsts bndrs inst_decl_map
-  = partitionWith pick_me inst_decl_map
+-- | Construct a @TyClGroup@ for each @InstDecl@.
+mkInstGroups :: GlobalRdrEnv
+             -> NameSet
+             -> [(LInstDecl GhcRn, FreeVars)]
+             -> [TyClGroup GhcRn]
+mkInstGroups rdr_env tycl_bndrs inst_ds_fvs
+  = [ mk_inst_group fvs' inst_decl
+    | (inst_decl, fvs) <- inst_ds_fvs
+    , let fvs' = toParents rdr_env fvs `intersectFVs` tycl_bndrs ]
   where
-    pick_me :: (LInstDecl GhcRn, FreeVars)
-            -> Either (LInstDecl GhcRn) (LInstDecl GhcRn, FreeVars)
-    pick_me (decl, fvs)
-      | isEmptyNameSet depleted_fvs = Left decl
-      | otherwise                   = Right (decl, depleted_fvs)
-      where
-        depleted_fvs = delFVs bndrs fvs
+    mk_inst_group :: FreeVars -> LInstDecl GhcRn -> TyClGroup GhcRn
+    mk_inst_group fvs inst_d =
+      TyClGroup { group_ext = fvs
+                , group_tyclds = []
+                , group_kisigs = []
+                , group_roles  = []
+                , group_instds = [inst_d] }
 
 {- ******************************************************
 *                                                       *
@@ -2670,8 +2633,8 @@ add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD _ d) ds
 add gp l (DocD _ d) ds
   = addl (gp { hs_docs = (L l d) : (hs_docs gp) })  ds
 
-add_tycld :: LTyClDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
-          -> [TyClGroup (GhcPass p)]
+add_tycld :: LTyClDecl GhcPs -> [TyClGroup GhcPs]
+          -> [TyClGroup GhcPs]
 add_tycld d []       = [TyClGroup { group_ext    = noExtField
                                   , group_tyclds = [d]
                                   , group_kisigs = []
@@ -2682,8 +2645,8 @@ add_tycld d []       = [TyClGroup { group_ext    = noExtField
 add_tycld d (ds@(TyClGroup { group_tyclds = tyclds }):dss)
   = ds { group_tyclds = d : tyclds } : dss
 
-add_instd :: LInstDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
-          -> [TyClGroup (GhcPass p)]
+add_instd :: LInstDecl GhcPs -> [TyClGroup GhcPs]
+          -> [TyClGroup GhcPs]
 add_instd d []       = [TyClGroup { group_ext    = noExtField
                                   , group_tyclds = []
                                   , group_kisigs = []
@@ -2694,8 +2657,8 @@ add_instd d []       = [TyClGroup { group_ext    = noExtField
 add_instd d (ds@(TyClGroup { group_instds = instds }):dss)
   = ds { group_instds = d : instds } : dss
 
-add_role_annot :: LRoleAnnotDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
-               -> [TyClGroup (GhcPass p)]
+add_role_annot :: LRoleAnnotDecl GhcPs -> [TyClGroup GhcPs]
+               -> [TyClGroup GhcPs]
 add_role_annot d [] = [TyClGroup { group_ext    = noExtField
                                  , group_tyclds = []
                                  , group_kisigs = []
@@ -2706,8 +2669,8 @@ add_role_annot d [] = [TyClGroup { group_ext    = noExtField
 add_role_annot d (tycls@(TyClGroup { group_roles = roles }) : rest)
   = tycls { group_roles = d : roles } : rest
 
-add_kisig :: LStandaloneKindSig (GhcPass p)
-         -> [TyClGroup (GhcPass p)] -> [TyClGroup (GhcPass p)]
+add_kisig :: LStandaloneKindSig GhcPs
+         -> [TyClGroup GhcPs] -> [TyClGroup GhcPs]
 add_kisig d [] = [TyClGroup { group_ext    = noExtField
                             , group_tyclds = []
                             , group_kisigs = [d]
