@@ -91,6 +91,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps( minusList, equivClasses )
+import GHC.Data.Bag
 
 import GHC.Unit
 import GHC.Unit.Module.ModDetails
@@ -110,6 +111,7 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Traversable ( for )
 import Data.Tuple( swap )
+import qualified Data.Semigroup as S
 
 {-
 ************************************************************************
@@ -147,6 +149,22 @@ Thus, we take two passes over the resulting tycons, first checking for general
 validity and then checking for valid role annotations.
 -}
 
+data TcTyClGroupsAccum =
+  TcTyClGroupsAccum
+    { ttcga_inst_info   :: !(Bag (InstInfo GhcRn)) -- Source-code instance decls info
+    , ttcga_deriv_info  :: !(Bag DerivInfo)        -- Deriving info
+    , ttcga_th_bndrs    :: !ThBindEnv              -- TH binding levels
+    }
+
+instance S.Semigroup TcTyClGroupsAccum where
+  (TcTyClGroupsAccum a1 b1 c1) <> (TcTyClGroupsAccum a2 b2 c2) =
+    TcTyClGroupsAccum (a1 `unionBags` a2)
+                      (b1 `unionBags` b2)
+                      (c1 `plusNameEnv` c2)
+
+instance Monoid TcTyClGroupsAccum where
+  mempty = TcTyClGroupsAccum emptyBag emptyBag emptyNameEnv
+
 tcTyAndClassDecls :: [TyClGroup GhcRn]      -- Mutually-recursive groups in
                                             -- dependency order
                   -> TcM ( TcGblEnv         -- Input env extended by types and
@@ -161,28 +179,141 @@ tcTyAndClassDecls tyclds_s
   -- The code recovers internally, but if anything gave rise to
   -- an error we'd better stop now, to avoid a cascade
   -- Type check each group in dependency order folding the global env
-  = checkNoErrs $ fold_env [] [] emptyNameEnv tyclds_s
+  = checkNoErrs $ go_prefix_pass mempty tyclds_s
   where
-    fold_env :: [InstInfo GhcRn]
-             -> [DerivInfo]
-             -> ThBindEnv
-             -> [TyClGroup GhcRn]
-             -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ThBindEnv)
-    fold_env inst_info deriv_info th_bndrs []
+    done :: TcTyClGroupsAccum ->
+        TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ThBindEnv)
+    done acc
       = do { gbl_env <- getGblEnv
-           ; return (gbl_env, inst_info, deriv_info, th_bndrs) }
-    fold_env inst_info deriv_info th_bndrs (tyclds:tyclds_s)
-      = do { (tcg_env, inst_info', deriv_info', th_bndrs')
-               <- tcTyClGroup tyclds
-           ; setGblEnv tcg_env $
-               -- remaining groups are typechecked in the extended global env.
-             fold_env (inst_info' ++ inst_info)
-                      (deriv_info' ++ deriv_info)
-                      (th_bndrs' `plusNameEnv` th_bndrs)
-                      tyclds_s }
+           ; return (gbl_env, bagToList inst_info, bagToList deriv_info, th_bndrs) }
+      where
+        TcTyClGroupsAccum{ ttcga_inst_info  = inst_info
+                         , ttcga_deriv_info = deriv_info
+                         , ttcga_th_bndrs   = th_bndrs
+                         } = acc
+
+    go_prefix_pass, go_selection_pass, go_failure_pass ::
+        TcTyClGroupsAccum ->
+        [TyClGroup GhcRn] ->
+        TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ThBindEnv)
+
+    go_prefix_pass acc [] = done acc
+    go_prefix_pass acc gs
+      = do { (tcg_env, acc', gs') <- tcTyClGroupsPrefixPass gs
+           ; setGblEnv tcg_env $ go_selection_pass (acc' S.<> acc) gs' }
+
+    go_selection_pass acc [] = done acc
+    go_selection_pass acc gs
+      = do { (tcg_env, acc', n, gs') <- tcTyClGroupsSelectionPass gs
+           ; let go_next_pass | n == 0    = go_failure_pass
+                              | otherwise = go_prefix_pass
+           ; setGblEnv tcg_env $ go_next_pass (acc' S.<> acc) gs' }
+
+    go_failure_pass acc [] = done acc
+    go_failure_pass acc (g:gs)
+      = do { (tg_env, acc') <- tcTyClGroup g
+           ; setGblEnv tg_env $ go_failure_pass (acc' S.<> acc) gs }
+
+-- Typecheck the well-kinded prefix of TyClGroups and return the remaining ones.
+-- This is the "happy" path. The list of remaining TyClGroups is empty if both
+-- conditions hold:
+--   1. The program is kind-correct
+--   2. All dependencies between type declarations are lexical
+-- Non-lexical dependencies may arise due to type instances.
+tcTyClGroupsPrefixPass :: [TyClGroup GhcRn]    -- Mutually-recursive groups in
+                                               -- lexical dependency order
+  -> TcM ( TcGblEnv           -- Input env extended by types and classes
+                              -- and their implicit Ids,DataCons
+         , TcTyClGroupsAccum
+         , [TyClGroup GhcRn]  -- The remaining groups in lexical dependency order
+         )
+tcTyClGroupsPrefixPass = go 0 [] mempty
+  where
+    go :: Int
+       -> [Name]
+       -> TcTyClGroupsAccum
+       -> [TyClGroup GhcRn]
+       -> TcM (TcGblEnv, TcTyClGroupsAccum, [TyClGroup GhcRn])
+    go !n _ acc [] = do
+      gbl_env <- getGblEnv
+      traceTc "tcTyClGroupsPrefixPass done" (ppr n)
+      return (gbl_env, acc, [])
+    go !n bndrs acc (g:gs) = do
+      let (bndrs', _) = group_ext g
+      m_result <- tryTcTyClGroup g
+      case m_result of
+        Nothing -> do
+          gbl_env <- getGblEnv
+          traceTc "tcTyClGroupsPrefixPass stopped" (ppr n)
+          let gs' = map (delTyClGroupDeps bndrs) (g:gs)
+          return (gbl_env, acc, gs')
+        Just (tcg_env, acc') ->
+          setGblEnv tcg_env $
+          go (n+1) (bndrs' ++ bndrs) (acc' S.<> acc) gs
+
+-- Typecheck the well-kinded selection of TyClGroups and return the remaining ones.
+-- This is the "unhappy" path that exists due to non-lexical dependencies arising
+-- from type instances.
+tcTyClGroupsSelectionPass :: [TyClGroup GhcRn] -- Mutually-recursive groups in
+                                               -- lexical dependency order
+  -> TcM ( TcGblEnv           -- Input env extended by types and classes
+                              -- and their implicit Ids,DataCons
+         , TcTyClGroupsAccum
+         , Int                -- Number of successfully checked groups
+         , [TyClGroup GhcRn]  -- The remaining groups in lexical dependency order
+         )
+tcTyClGroupsSelectionPass all_gs = go 0 [] mempty [] ready_gs
+  where
+    ready_gs, blocked_gs :: [TyClGroup GhcRn]
+    (ready_gs, blocked_gs) = selectReadyTyClGroups all_gs
+
+    go :: Int
+       -> [Name]
+       -> TcTyClGroupsAccum
+       -> [TyClGroup GhcRn]
+       -> [TyClGroup GhcRn]
+       -> TcM (TcGblEnv, TcTyClGroupsAccum, Int, [TyClGroup GhcRn])
+    go !n bndrs acc failed_gs [] = do
+      gbl_env <- getGblEnv
+      traceTc "tcTyClGroupsSelectionPass done" (ppr n)
+      let blocked_gs' = map (delTyClGroupDeps bndrs) blocked_gs
+      return (gbl_env, acc, n, reverse failed_gs ++ blocked_gs')
+    go !n bndrs acc failed_gs (g:gs) = do
+      let (bndrs', _) = group_ext g
+      m_result <- tryTcTyClGroup g
+      case m_result of
+        Nothing -> go n bndrs acc (g:failed_gs) gs
+        Just (tcg_env, acc') ->
+          setGblEnv tcg_env $
+          go (n+1) (bndrs' ++ bndrs) (acc' S.<> acc) failed_gs gs
+
+selectReadyTyClGroups :: [TyClGroup GhcRn] -> ([TyClGroup GhcRn], [TyClGroup GhcRn])
+selectReadyTyClGroups gs = (ready_inst_gs ++ ready_noinst_gs, blocked_gs)
+  where
+    (ready_inst_gs, ready_noinst_gs, blocked_gs) = foldr classify ([], [], []) gs
+        -- ready_inst_gs: most likely to unblock further type checking
+        -- ready_noinst_gs: might indirectly unblock further type checking
+        -- blocked_gs: unusable
+
+    classify :: TyClGroup GhcRn -> ([TyClGroup GhcRn], [TyClGroup GhcRn], [TyClGroup GhcRn])
+                                -> ([TyClGroup GhcRn], [TyClGroup GhcRn], [TyClGroup GhcRn])
+    classify g@TyClGroup{ group_ext = (_, deps)
+                        , group_instds = inst_ds }
+             ~(xs, ys, zs)
+      | not ready    = (xs, ys, g:zs)
+      | null inst_ds = (xs, g:ys, zs)
+      | otherwise    = (g:xs, ys, zs)
+      where ready = isEmptyNameSet deps
+
+tryTcTyClGroup :: TyClGroup GhcRn -> TcM (Maybe (TcGblEnv, TcTyClGroupsAccum))
+tryTcTyClGroup g = tryTcDiscardingErrs (return Nothing) (Just <$> tcTyClGroup g)
+
+delTyClGroupDeps :: [Name] -> TyClGroup GhcRn -> TyClGroup GhcRn
+delTyClGroupDeps names g@TyClGroup{group_ext = (bndrs, deps)}
+  = g {group_ext = (bndrs, delListFromNameSet deps names)}
 
 tcTyClGroup :: TyClGroup GhcRn
-            -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ThBindEnv)
+            -> TcM (TcGblEnv, TcTyClGroupsAccum)
 -- Typecheck one strongly-connected component of type, class, and instance decls
 -- See Note [TyClGroups and dependency analysis] in GHC.Hs.Decls
 tcTyClGroup (TyClGroup { group_tyclds = tyclds
@@ -245,8 +376,10 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; let deriv_info = datafam_deriv_info ++ data_deriv_info
        ; let gbl_env'' = gbl_env'
                 { tcg_ksigs = tcg_ksigs gbl_env' `unionNameSet` kindless }
-       ; return (gbl_env'', inst_info, deriv_info,
-                 th_bndrs' `plusNameEnv` th_bndrs) }
+       ; let acc = TcTyClGroupsAccum{ ttcga_inst_info  = listToBag inst_info
+                                    , ttcga_deriv_info = listToBag deriv_info
+                                    , ttcga_th_bndrs   = th_bndrs' `plusNameEnv` th_bndrs }
+       ; return (gbl_env'', acc) }
 
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind
