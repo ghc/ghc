@@ -27,6 +27,7 @@ import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Core.DataCon
 import GHC.Core.Utils
+import GHC.Core.TyCon( isUnaryClassTyCon )
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -84,6 +85,15 @@ mkSimpleUnfolding !opts rhs
 
 mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops
+  | isUnaryClassTyCon (dataConTyCon con)
+  = mkDataConUnfolding $
+    mkLams bndrs  $
+    mkApps (Var (dataConWrapId con)) ops
+                -- This application will satisfy the Core invariants
+                -- from Note [Representation polymorphism invariants] in GHC.Core,
+                -- because typeclass method types are never unlifted.
+
+  | otherwise
   = DFunUnfolding { df_bndrs = bndrs
                   , df_con = con
                   , df_args = map occurAnalyseExpr ops }
