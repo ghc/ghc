@@ -2261,7 +2261,10 @@ simplInId env var cont
         where
           env' = setSubstEnv env tvs cvs ids
 
-      DoneId out_id -> simplOutId env out_id cont
+      DoneId out_id -> simplOutId env' out_id cont'
+        where
+          cont' = trimJoinCont var (idJoinPointHood var) cont
+          env'  = zapSubstEnv env  -- See Note [zapSubstEnv]
 
       DoneEx e mb_join -> simplExprF env' e cont'
         where
@@ -2269,7 +2272,7 @@ simplInId env var cont
           env'  = zapSubstEnv env  -- See Note [zapSubstEnv]
 
 ---------------------------------------------------------
-simplOutId :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
+simplOutId :: SimplEnvIS -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 
 ---------- The runRW# rule ------
 -- See Note [Simplification of runRW#] in GHC.CoreToSTG.Prep.
@@ -2320,36 +2323,32 @@ simplOutId env fun cont
              call' = mkApps (Var fun) [mkTyArg rr', mkTyArg new_runrw_res_ty, arg']
        ; rebuild env call' outer_cont }
 
-
+-- Normal case for (f e1 .. en)
 simplOutId env fun cont
-  = do { let cont1 = trimJoinCont fun (idJoinPointHood fun) cont
-
-       -- Try rewrite rules
-       ; rule_base <- getSimplRules
+  = -- Try rewrite rules
+    do { rule_base <- getSimplRules
        ; let rules_for_me = getRules rule_base fun
-             out_args     = contOutArgs env cont1 :: [OutExpr]
-       ; mb_match <- if not (isPrimOpId fun)
-                     then tryRules zapped_env rules_for_me fun out_args
+             out_args     = contOutArgs env cont :: [OutExpr]
+       ; mb_match <- if isClassOpId fun || activeUnfolding (seMode env) fun
+                     then tryRules env rules_for_me fun out_args
                      else return Nothing
        ; case mb_match of {
-             Just (rule_arity, rhs) -> simplExprF zapped_env rhs $
-                                       dropContArgs rule_arity cont1 ;
+             Just (rule_arity, rhs) -> simplExprF env rhs $
+                                       dropContArgs rule_arity cont ;
              Nothing ->
 
-       -- Try inlining
+    -- Try inlining
     do { logger <- getLogger
-       ; mb_inline <- tryInlining env logger fun cont1
+       ; mb_inline <- tryInlining env logger fun cont
        ; case mb_inline of{
             Just expr -> do { checkedTick (UnfoldingDone fun)
-                            ; simplExprF zapped_env expr cont1 } ;
+                            ; simplExprF env expr cont } ;
             Nothing ->
 
-       -- Neither worked, so just rebuild
-    do { let arg_info = mkArgInfo env fun rules_for_me cont1
-       ; rebuildCall zapped_env arg_info cont1
+    -- Neither worked, so just rebuild
+    do { let arg_info = mkArgInfo env fun rules_for_me cont
+       ; rebuildCall env arg_info cont
     } } } } }
-  where
-    zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
 
 ---------------------------------------------------------
 --      Dealing with a call site
