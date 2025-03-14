@@ -498,8 +498,6 @@ isOffsetImm off w
     byte_width = widthInBytes w
 
 
-
-
 -- TODO OPT: we might be able give getRegister
 --          a hint, what kind of register we want.
 getFloatReg :: HasDebugCallStack => CmmExpr -> NatM (Reg, Format, InstrBlock)

@@ -1093,8 +1093,6 @@ load_dynamic_too logger name_cache unit_state dflags wanted_mod iface loc = do
           --((text "Failed to load dynamic interface file for" <+> ppr wanted_mod <> colon) $$ err))
 
 
-
-
 read_file :: Logger -> NameCache -> UnitState -> DynFlags
           -> Module -> FilePath
           -> IO (MaybeErr ReadInterfaceError (ModIface, FilePath))

@@ -143,7 +143,6 @@ flattenCmmAGraph id (stmts_t, tscope) =
       flatten1 stmts (blockJoinHead (CmmEntry id tscp) emptyBlock) blocks
 
 
-
 ---------- AGraph manipulation
 
 (<*>)          :: CmmAGraph -> CmmAGraph -> CmmAGraph
@@ -276,8 +275,6 @@ mkUnwind     :: GlobalReg -> CmmExpr -> CmmAGraph
 mkUnwind r e  = mkMiddle $ CmmUnwind [(r, Just e)]
 
 --------------------------------------------------------------------------
-
-
 
 
 -- Why are we inserting extra blocks that simply branch to the successors?

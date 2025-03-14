@@ -239,8 +239,6 @@ hostIsTracing = rtsIsTracing_ /= 0
 foreign import ccall unsafe "rts_isTracing" rtsIsTracing_ :: Int
 
 
-
-
 -- | Host ways.
 hostWays :: Ways
 hostWays = Set.unions

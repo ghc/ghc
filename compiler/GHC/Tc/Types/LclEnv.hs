@@ -184,7 +184,6 @@ modifyLclCtxt upd env =
   in env { tcl_lcl_ctxt = res }
 
 
-
 type TcTypeEnv = NameEnv TcTyThing
 
 type ThBindEnv = NameEnv (TopLevelFlag, ThLevel)

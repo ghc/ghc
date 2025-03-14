@@ -88,7 +88,6 @@ so I don't know if the number of proc points chosen is the
 minimum---but the set will be minimal.
 
 
-
 Note [Proc-point analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -466,7 +465,6 @@ The join operation makes it a proc point when in fact it needn't be,
 because its immediate dominator L1 is already a proc point and there
 are no other proc points that directly reach L2.
 -}
-
 
 
 {- Note [Separate Adams optimization]

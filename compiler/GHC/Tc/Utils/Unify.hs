@@ -1221,7 +1221,6 @@ unification variable.  We discard the evidence.
 -}
 
 
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1272,7 +1271,6 @@ rejecting types as ambiguous that weren't ambiguous before.  So, as a
 holding decision, we /always/ use SimpleSubsumption for the ambiguity check
 (erring on the side accepting more programs). Hence tcSubTypeAmbiguity.
 -}
-
 
 
 -----------------
@@ -3990,7 +3988,6 @@ promote_meta_tyvar info dest_lvl occ_tv
        ; liftZonkM $ writeMetaTyVar occ_tv (mkTyVarTy new_tv)
        ; traceTc "promoteTyVar" (ppr occ_tv <+> text "-->" <+> ppr new_tv)
        ; return (mkTyVarTy new_tv) } } }
-
 
 
 -------------------------

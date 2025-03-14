@@ -137,7 +137,6 @@ import Data.Word  ( Word8 )
 import Data.List  ( intersperse )
 
 
-
 {-
 ************************************************************************
 *                                                                      *
@@ -2128,7 +2127,6 @@ pprEvVarTheta ev_vars = pprTheta (map evVarPred ev_vars)
 
 pprEvVarWithType :: EvVar -> SDoc
 pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
-
 
 
 wrapType :: Type -> [TyVar] -> [PredType] -> Type

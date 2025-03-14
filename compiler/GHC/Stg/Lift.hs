@@ -121,7 +121,6 @@ import Data.Maybe ( isNothing )
 -- @
 
 
-
 -- | Lambda lifts bindings to top-level deemed worth lifting (see 'goodToLift').
 --
 -- (Mostly) textbook instance of the lambda lifting transformation, selecting

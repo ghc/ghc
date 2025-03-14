@@ -694,8 +694,6 @@ setUnitDynFlagsNoCheck uid dflags1 = do
   invalidateModSummaryCache
 
 
-
-
 setTopSessionDynFlags :: GhcMonad m => DynFlags -> m ()
 setTopSessionDynFlags dflags = do
   hsc_env <- getSession
@@ -1307,7 +1305,6 @@ desugarModule tcm = do
        dm_typechecked_module = tcm,
        dm_core_module        = guts
      }
-
 
 
 -- %************************************************************************

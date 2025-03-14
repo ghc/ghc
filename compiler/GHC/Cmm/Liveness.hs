@@ -133,8 +133,6 @@ noLiveOnEntryL bid in_fact x =
         reg_uniques = elemsLRegSet in_fact
 
 
-
-
 gen_killL
     :: (DefinerOfRegs LocalReg n, UserOfRegs LocalReg n)
     => Platform -> n -> LRegSet -> LRegSet

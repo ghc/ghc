@@ -3802,7 +3802,6 @@ lookupOccInfoByUnique (UD { ud_env       = env
         | otherwise                     = ti
 
 
-
 -------------------
 -- See Note [Adjusting right-hand sides]
 

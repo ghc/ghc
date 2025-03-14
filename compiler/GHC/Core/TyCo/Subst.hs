@@ -5,7 +5,6 @@ Type and Coercion - friends' interface
 -}
 
 
-
 -- | Substitution into types and coercions.
 module GHC.Core.TyCo.Subst
   (
@@ -637,7 +636,6 @@ substCoWithUnchecked :: [TyVar] -> [Type] -> Coercion -> Coercion
 substCoWithUnchecked tvs tys
   = assert (tvs `equalLength` tys )
     substCoUnchecked (zipTvSubst tvs tys)
-
 
 
 -- | Substitute covars within a type

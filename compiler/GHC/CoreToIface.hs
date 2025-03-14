@@ -676,7 +676,6 @@ toIfaceVar v
                 | otherwise                      = noinlineIdName
 
 
-
 ---------------------
 toIfaceLFInfo :: Name -> LambdaFormInfo -> IfaceLFInfo
 toIfaceLFInfo nm lfi = case lfi of

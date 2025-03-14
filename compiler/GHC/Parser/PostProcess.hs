@@ -345,7 +345,6 @@ mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
                           , feqn_rhs    = defn })))) }
 
 
-
 mkTyFamInst :: SrcSpan
             -> TyFamInstEqn GhcPs
             -> EpToken "type"
@@ -912,7 +911,6 @@ data_con_ty_con dc
 
   | otherwise  -- See Note [setRdrNameSpace for wired-in names]
   = Unqual (setOccNameSpace tcClsName (getOccName dc))
-
 
 
 {- Note [setRdrNameSpace for wired-in names]
@@ -3056,7 +3054,6 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
           , fd_sig_ty = ty
           , fd_fi     = spec
           }
-
 
 
 -- the string "foo" is ambiguous: either a header or a C identifier.  The

@@ -5,7 +5,6 @@ The simplifier utilities
 -}
 
 
-
 module GHC.Core.Opt.Simplify.Utils (
         -- Rebuilding
         rebuildLam, mkCase, prepareAlts,

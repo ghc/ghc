@@ -73,7 +73,6 @@ import GHC.Utils.Panic
 import GHC.Data.FastString
 
 
-
 --------------------------------------------------------------------------------
 -- It gets called by the cmmToCmm pass for every CmmLabel in the Cmm
 -- code. It does The Right Thing(tm) to convert the CmmLabel into a
@@ -208,7 +207,6 @@ cmmMakePicReference config lbl
   = CmmLit $ CmmLabel lbl
   where
     platform = ncgPlatform config
-
 
 
 absoluteLabel :: CLabel -> Bool
@@ -432,7 +430,6 @@ howToAccessLabel config _arch _os _kind _lbl
         = panic "howToAccessLabel: PIC not defined for this platform"
 
 
-
 -- -------------------------------------------------------------------
 -- | Says what we have to add to our 'PIC base register' in order to
 --      get the address of a label.
@@ -489,7 +486,6 @@ picRelative _ _ _ _
         = panic "GHC.CmmToAsm.PIC.picRelative undefined for this platform"
 
 
-
 --------------------------------------------------------------------------------
 
 needImportedSymbols :: NCGConfig -> Bool
@@ -533,7 +529,6 @@ gotLabel
         = mkForeignLabel
                 (fsLit ".LCTOC1")
                 ForeignLabelInThisPackage IsData
-
 
 
 -- Emit GOT declaration
@@ -598,7 +593,6 @@ pprImportedSymbol :: NCGConfig -> CLabel -> HDoc
 pprImportedSymbol config importedLbl = case (arch,os) of
    (ArchAArch64, OSDarwin)
         -> empty
-
 
 
    -- XCOFF / AIX
@@ -703,7 +697,6 @@ pprImportedSymbol config importedLbl = case (arch,os) of
 -- i386 version:
 --          call 1f
 --      1:  popl %picReg
-
 
 
 -- Get a pointer to our own fake GOT, which is defined on a per-module basis.

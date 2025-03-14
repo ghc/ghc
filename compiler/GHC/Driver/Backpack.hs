@@ -705,7 +705,6 @@ convertHsModuleId (HsModuleVar (L _ modname)) = mkHoleModule modname
 convertHsModuleId (HsModuleId (L _ hsuid) (L _ modname)) = mkModule (convertHsComponentId hsuid) modname
 
 
-
 {-
 ************************************************************************
 *                                                                      *

@@ -924,7 +924,6 @@ data PkgDbRef
   deriving Eq
 
 
-
 -- An argument to --reexported-module which can optionally specify a module renaming.
 data ReexportedModule = ReexportedModule { reexportFrom :: ModuleName
                                          , reexportTo   :: ModuleName

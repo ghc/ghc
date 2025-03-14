@@ -53,7 +53,6 @@ dumpNode node
         $$ space
 
 
-
 -- | Pretty print a graph in graphviz .dot format.
 --      Conflicts get solid edges.
 --      Coalescences get dashed edges.

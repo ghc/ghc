@@ -732,7 +732,6 @@ data FamilyResultSig pass = -- see Note [FamilyResultSig]
   | XFamilyResultSig !(XXFamilyResultSig pass)
 
 
-
 -- | Located type Family Declaration
 type LFamilyDecl pass = XRec pass (FamilyDecl pass)
 

@@ -63,7 +63,6 @@ occNameMatches pat = go pat . occNameString
     go _ _  = False
 
 
-
 type Parser = P.ReadP
 
 parseNamePattern :: Parser NamePattern

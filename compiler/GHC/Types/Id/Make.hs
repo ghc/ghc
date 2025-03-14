@@ -1539,7 +1539,6 @@ shouldUnpackArgTy bang_opts prag fam_envs arg_ty
     is_sum _       = False
 
 
-
 unpackable_type_datacons :: Type -> Maybe [DataCon]
 -- Given a type already assumed to have been normalized by topNormaliseType,
 --    unpackable_type_datacons (T ty1 .. tyn) = Just datacons

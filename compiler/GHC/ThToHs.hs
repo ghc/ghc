@@ -361,8 +361,6 @@ cvtDec (InstanceD o ctxt ty decs)
       TH.Incoherent    -> Hs.Incoherent   (SourceText $ fsLit "{-# INCOHERENT")
 
 
-
-
 cvtDec (ForeignD ford)
   = do { ford' <- cvtForD ford
        ; returnJustLA $ ForD noExtField ford' }

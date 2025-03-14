@@ -376,7 +376,6 @@ which brings appropriate tyvars into scope. This happens for both
 complained if 'b' is mentioned in <rhs>.
 
 
-
 ************************************************************************
 *                                                                      *
 \subsection{Extracting instance decls}

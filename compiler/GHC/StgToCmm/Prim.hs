@@ -2543,7 +2543,6 @@ byteArraySize platform profile arr =
                + pc_OFFSET_StgArrBytes_bytes (platformConstants platform)
 
 
-
 ------------------------------------------------------------------------------
 -- Helpers for translating vector primops.
 

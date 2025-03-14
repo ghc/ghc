@@ -150,7 +150,6 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
            pprLabel platform info_lbl
 
 
-
 pprDatas :: IsDoc doc => Platform -> RawCmmStatics -> doc
 -- See Note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
 pprDatas platform (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
@@ -208,7 +207,6 @@ pprReg r
          | i <= 31   = int i      -- GPRs
          | i <= 63   = int (i-32) -- FPRs
          | otherwise = text "very naughty powerpc register"
-
 
 
 pprFormat :: IsLine doc => Format -> doc

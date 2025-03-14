@@ -413,7 +413,6 @@ instance Outputable BCInstr where
 #endif
 
 
-
 -- -----------------------------------------------------------------------------
 -- The stack use, in words, of each bytecode insn.  These _must_ be
 -- correct, or overestimates of reality, to be safe.

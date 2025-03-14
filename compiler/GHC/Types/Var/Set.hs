@@ -4,7 +4,6 @@
 -}
 
 
-
 module GHC.Types.Var.Set (
         -- * Var, Id and TyVar set types
         VarSet, IdSet, TyVarSet, CoVarSet, TyCoVarSet,

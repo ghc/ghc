@@ -189,7 +189,6 @@ spRel platform n
 -- allocator.
 
 
-
 firstxmm :: RegNo
 firstxmm  = 16
 
@@ -206,7 +205,6 @@ lastint platform
 
 intregnos :: Platform -> [RegNo]
 intregnos platform = [0 .. lastint platform]
-
 
 
 xmmregnos :: Platform -> [RegNo]
@@ -264,8 +262,6 @@ esi   = regSingle 4
 edi   = regSingle 5
 ebp   = regSingle 6
 esp   = regSingle 7
-
-
 
 
 {-
@@ -346,8 +342,6 @@ esp = rsp
 
 xmm :: RegNo -> Reg
 xmm n = regSingle (firstxmm+n)
-
-
 
 
 -- | these are the regs which we cannot assume stay alive over a C call.

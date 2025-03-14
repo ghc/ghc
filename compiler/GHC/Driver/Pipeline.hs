@@ -656,7 +656,6 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
       pure ()
 
 
-
 {- Environment Initialisation -}
 
 mkPipeEnv :: StopPhase -- End phase

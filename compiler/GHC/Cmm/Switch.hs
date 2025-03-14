@@ -440,7 +440,6 @@ buildTree signed sl = IfLT signed m (buildTree signed sl1) (buildTree signed sl2
     (sl1, m, sl2) = divideSL sl
 
 
-
 --
 -- Utility data type: Non-empty lists with extra markers in between each
 -- element:

@@ -1062,7 +1062,6 @@ lintIdOcc in_id nargs
         ; return (out_ty, usage) }
 
 
-
 lintCoreFun :: CoreExpr
             -> Int                          -- Number of arguments (type or val) being passed
             -> LintM (OutType, UsageEnv) -- Returns type of the *function*
@@ -1531,7 +1530,6 @@ checkCaseLinearity ue case_bndr var_w bndr = do
     case_bndr_w = idMult case_bndr
     case_bndr_usage = lookupUE ue case_bndr
     bndr_usage = lookupUE ue bndr
-
 
 
 -----------------

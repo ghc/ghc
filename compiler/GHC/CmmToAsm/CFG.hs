@@ -220,7 +220,6 @@ hasNode m node =
       found = mapMember node m
 
 
-
 -- | Check if the nodes in the cfg and the set of blocks are the same.
 --   In a case of a mismatch we panic and show the difference.
 sanityCheckCfg :: CFG -> LabelSet -> SDoc -> Bool

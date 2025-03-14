@@ -555,7 +555,6 @@ data XXExprGhcRn
                            -- Note [Record selectors in the AST]
 
 
-
 -- | Wrap a located expression with a `PopErrCtxt`
 mkPopErrCtxtExpr :: LHsExpr GhcRn -> HsExpr GhcRn
 mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)

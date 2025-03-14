@@ -872,7 +872,6 @@ data HsImplBang
   deriving Data.Data
 
 
-
 -------------------------
 -- StrictnessMark is used to indicate strictness
 -- of the DataCon *worker* fields

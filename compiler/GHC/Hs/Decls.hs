@@ -350,7 +350,6 @@ instance Outputable SpliceDecoration where
   ppr x = text $ show x
 
 
-
 {-
 ************************************************************************
 *                                                                      *
@@ -702,7 +701,6 @@ instance OutputableBndrId p
               Nothing   -> text ".."
               Just eqns -> vcat $ map (ppr_fam_inst_eqn . unLoc) eqns )
         _ -> (empty, empty)
-
 
 
 {- *********************************************************************

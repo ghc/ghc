@@ -262,8 +262,6 @@ instance OutputableP Platform LiveInfo where
         $$ text "# liveSlotsOnEntry = " <> ppr liveSlotsOnEntry
 
 
-
-
 -- | map a function across all the basic blocks in this code
 --
 mapBlockTop
@@ -928,7 +926,6 @@ livenessSCCs platform blockmap done
               where a' = mapToList a
                     b' = mapToList b
                     -- See Note [Unique Determinism and code generation]
-
 
 
 -- | Annotate a basic block with register liveness information.

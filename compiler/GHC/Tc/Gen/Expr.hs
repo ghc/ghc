@@ -1482,7 +1482,6 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
         ; return (ds_expr, ds_res_ty, RecordUpdCtxt relevant_cons upd_fld_names ex_tvs) }
 
 
-
 {- *********************************************************************
 *                                                                      *
                  Record bindings

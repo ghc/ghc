@@ -1836,7 +1836,6 @@ repUpdFields = repListM fieldExpTyConName rep_fld
                  }
 
 
-
 -----------------------------------------------------------------------------
 -- Representing Stmt's is tricky, especially if bound variables
 -- shadow each other. Consider:  [| do { x <- f 1; x <- f x; g x } |]

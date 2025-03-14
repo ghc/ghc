@@ -20,7 +20,6 @@ module GHC.Driver.Backend.Internal
 where
 
 
-
 import GHC.Prelude
 
 data BackendName

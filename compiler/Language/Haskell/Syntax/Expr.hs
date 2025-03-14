@@ -347,7 +347,6 @@ data HsExpr p
                              --   solving. See Note [Holes] in GHC.Tc.Types.Constraint.
 
 
-
   | HsOverLabel (XOverLabel p) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
 

@@ -119,10 +119,6 @@ emitForeign mbSpan pat safety cconv arg_tys res_ty = modifyGroup mod_group
                 Nothing -> "<unknown>"
 
 
-
-
-
-
 -- | start with a new binding group
 resetGroup :: G ()
 resetGroup = State.modify (\s -> s { gsGroup = defaultGenGroupState })
@@ -135,7 +131,6 @@ emptyGlobalIdCache = GlobalIdCache emptyUFM
 
 emptyIdCache :: IdCache
 emptyIdCache = IdCache M.empty
-
 
 
 assertRtsStat :: G JStgStat -> G JStgStat

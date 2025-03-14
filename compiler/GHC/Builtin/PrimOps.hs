@@ -559,7 +559,6 @@ Duplicate              YES        YES            YES                NO
     However, it's fine to duplicate a CanFail or ThrowsException primop.
 
 
-
 Note [Implementation: how PrimOpEffect affects transformations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 How do we ensure that floating/duplication/discarding are done right
@@ -692,7 +691,6 @@ primOpIsDiv op = case op of
   FloatDivOp      -> True
   DoubleDivOp     -> True
   _               -> False
-
 
 
 {-

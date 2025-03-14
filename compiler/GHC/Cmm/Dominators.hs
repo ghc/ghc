@@ -65,7 +65,6 @@ instance Outputable DominatorSet where
   ppr (ImmediateDominator l parent) = ppr l <+> text "->" <+> ppr parent
 
 
-
 -- | Reverse postorder number of a node in a CFG
 newtype RPNum = RPNum Int
   deriving (Eq, Ord)
@@ -77,7 +76,6 @@ instance Show RPNum where
 instance Outputable RPNum where
   ppr (RPNum i) = hcat [text "RP", int i]
    -- using `(<>)` would conflict with Semigroup
-
 
 
 dominatorsMember :: Label -> DominatorSet -> Bool

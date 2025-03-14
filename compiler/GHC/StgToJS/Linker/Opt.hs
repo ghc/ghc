@@ -95,8 +95,6 @@ hexDoc v = text $ go v
            : go (n `shiftR` 8)
 
 
-
-
 -- attempt to resugar some of the common constructs
 ghcjsRenderJsS :: JsRender doc => RenderJs doc -> JStat -> doc
 ghcjsRenderJsS r s = renderJsS defaultRenderJs r s

@@ -2493,8 +2493,6 @@ x86_complex_amode base index shift offset
                code)
 
 
-
-
 -- -----------------------------------------------------------------------------
 -- getOperand: sometimes any operand will do.
 
@@ -2882,7 +2880,6 @@ condIntCode' platform cond x y = do
   return (CondCode False cond code)
 
 
-
 --------------------------------------------------------------------------------
 condFltCode :: Cond -> CmmExpr -> CmmExpr -> NatM CondCode
 
@@ -3036,7 +3033,6 @@ genJump expr regs = do
 
 genBranch :: BlockId -> InstrBlock
 genBranch = toOL . mkJumpInstr
-
 
 
 -- -----------------------------------------------------------------------------
@@ -5133,7 +5129,6 @@ genCtzGeneric width dst src = do
       return instrs
 
 
-
 -- | Copy memory
 --
 -- Unroll memcpy calls if the number of bytes to copy isn't too large (cf
@@ -5160,7 +5155,6 @@ genMemCpy bid align dst src arg_n = do
 
     -- not a literal size argument: call the C function
     _ -> libc_memcpy
-
 
 
 genMemCpyInlineMaybe

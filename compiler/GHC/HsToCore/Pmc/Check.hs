@@ -166,7 +166,6 @@ checkGrd grd = CA $ \inc -> case grd of
                      , cr_approx = Precise }
 
 
-
 checkGrdDag :: GrdDag -> CheckAction RedSets
 checkGrdDag (GdOne g)     = checkGrd g
 checkGrdDag GdEnd         = matchSucceeded

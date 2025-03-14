@@ -755,7 +755,6 @@ initCts :: Platform -> IdEnv HowBound -> CtsM a -> a
 initCts platform env m = unCtsM m platform env
 
 
-
 {-# INLINE thenCts #-}
 {-# INLINE returnCts #-}
 

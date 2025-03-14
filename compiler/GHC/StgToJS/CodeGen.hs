@@ -105,7 +105,6 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
   writeBinMem bh output_fn
 
 
-
 -- | Generate the ingredients for the linkable units for this module
 genUnits :: HasDebugCallStack
          => Module

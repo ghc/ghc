@@ -37,7 +37,6 @@ inclusiveInterval lo hi
 -- N.B. Fallthrough can't be optimized away because of type checking.
 
 
-
 -- Syntactic sugar.
 pattern WasmIf :: WasmFunctionType pre post
                -> e

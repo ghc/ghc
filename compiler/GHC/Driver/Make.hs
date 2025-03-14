@@ -462,8 +462,6 @@ newIfaceCache = do
       }
 
 
-
-
 -- | Try to load the program.  See 'LoadHowMuch' for the different modes.
 --
 -- This function implements the core of GHC's @--make@ mode.  It preprocesses,
@@ -796,7 +794,6 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
           loadFinish upsweep_ok
 
 
-
 -- | Finish up after a load.
 loadFinish :: GhcMonad m => SuccessFlag -> m SuccessFlag
 -- Empty the interactive context and set the module context to the topmost
@@ -1065,8 +1062,6 @@ getDependencies direct_deps build_map =
   strictMap (expectJust . flip M.lookup build_map) direct_deps
 
 type BuildM a = StateT BuildLoopState IO a
-
-
 
 
 -- | Environment used when compiling a module

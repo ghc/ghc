@@ -2665,7 +2665,6 @@ inertsCanDischarge inerts (EqCt { eq_lhs = lhs_w, eq_rhs = rhs_w
 inertsCanDischarge _ _ = Nothing
 
 
-
 {- Note [Do not unify Givens]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this GADT match

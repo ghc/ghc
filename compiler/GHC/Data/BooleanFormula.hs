@@ -66,7 +66,6 @@ bfTraverse f = go
     go (Parens bf ) = Parens <$> traverse go bf
 
 
-
 {-
 Note [Simplification of BooleanFormulas]
 ~~~~~~~~~~~~~~~~~~~~~~

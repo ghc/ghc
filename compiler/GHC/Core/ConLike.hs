@@ -6,7 +6,6 @@
 -}
 
 
-
 module GHC.Core.ConLike (
           ConLike(..)
         , conLikeConLikeName

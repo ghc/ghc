@@ -97,7 +97,6 @@ maybeLetNoEscape CgIdInfo { cg_loc = LneLoc blk_id args} = Just (blk_id, args)
 maybeLetNoEscape _other                                      = Nothing
 
 
-
 ---------------------------------------------------------
 --        The binding environment
 --

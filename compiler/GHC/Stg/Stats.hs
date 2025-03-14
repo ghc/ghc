@@ -22,7 +22,6 @@ The program gather statistics about
 -}
 
 
-
 module GHC.Stg.Stats ( showStgStats ) where
 
 import GHC.Prelude

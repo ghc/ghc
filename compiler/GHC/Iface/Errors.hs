@@ -77,7 +77,6 @@ cantFindInstalledErr unit_state mhome_unit profile mod_name find_result
        = MissingPackageFiles pkg files
 
 
-
 cannotFindModule :: HscEnv -> ModuleName -> FindResult -> MissingInterfaceError
 cannotFindModule hsc_env = cannotFindModule'
     (hsc_unit_env hsc_env)

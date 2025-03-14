@@ -736,7 +736,6 @@ If the module has NO main function:
 --
 
 
-
 lookupChildrenExport :: Name -> [LIEWrappedName GhcPs]
                      -> RnM ([(LIEWrappedName GhcRn, GlobalRdrElt)])
 lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items

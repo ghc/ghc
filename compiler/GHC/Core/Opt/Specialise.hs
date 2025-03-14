@@ -3013,7 +3013,6 @@ singleCall spec_env id args
         else specArgFreeVars
 
 
-
         -- specArgFreeIds: we specifically look for free Ids, not TyVars
         --    see (MP1) in Note [Specialising polymorphic dictionaries]
         --

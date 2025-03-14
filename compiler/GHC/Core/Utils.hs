@@ -2489,7 +2489,6 @@ cheapEqExpr' ignoreTick e1 e2
     go _ _ = False
 
 
-
 -- Used by diffBinds, which is itself only used in GHC.Core.Lint.lintAnnots
 eqTickish :: RnEnv2 -> CoreTickish -> CoreTickish -> Bool
 eqTickish env (Breakpoint lext lid lids lmod) (Breakpoint rext rid rids rmod)

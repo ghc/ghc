@@ -56,8 +56,6 @@ import Control.Monad
 -- and {A.g} to impl:C.g
 
 
-
-
 -- The 'NameShape' type is defined in GHC.Tc.Types, because GHC.Tc.Types
 -- needs to refer to NameShape, and having GHC.Tc.Types import
 -- NameShape (even by SOURCE) would cause a large number of

@@ -5,7 +5,6 @@
 -}
 
 
-
 module GHC.Core.TyCon.Set (
         -- * TyCons set type
         TyConSet,

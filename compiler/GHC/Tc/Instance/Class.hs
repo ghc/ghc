@@ -624,7 +624,6 @@ Some further observations about `withDict`:
       See test-case T21575b.
 
 
-
 Note [DataToTag overview]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Class `DataToTag` is defined like this, in GHC.Magic:
@@ -884,7 +883,6 @@ Wrinkles:
      evaluating such an expression is always undefined behavior anyway!
 
 
-
 Historical note:
 During its time as a primop, `dataToTag#` underwent several changes,
 mostly relating to under what circumstances it evaluates its argument.
@@ -951,7 +949,6 @@ matchDataToTag dataToTagClass [levity, dty] = do
      | otherwise -> pure NoInstance
 
 matchDataToTag _ _ = pure NoInstance
-
 
 
 {- ********************************************************************

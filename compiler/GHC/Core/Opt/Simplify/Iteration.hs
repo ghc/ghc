@@ -188,7 +188,6 @@ I neither have the time to go through all of the core and some cases are
 too small to show up in benchmarks.
 
 
-
 ************************************************************************
 *                                                                      *
 \subsection{Bindings}
@@ -4512,7 +4511,6 @@ It's a bit silly to add the realWorld dummy arg in this case, making
 There's a slight infelicity here: we pass the overall
 case_bndr to all the join points if it's used in *any* RHS,
 because we don't know its usage in each RHS separately
-
 
 
 ************************************************************************

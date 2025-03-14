@@ -1199,7 +1199,6 @@ zonkCmd (HsCmdDo ty (L l stmts))
        return (HsCmdDo new_ty (L l new_stmts))
 
 
-
 zonkCmdTop :: LHsCmdTop GhcTc -> ZonkTcM (LHsCmdTop GhcTc)
 zonkCmdTop cmd = wrapLocZonkMA (zonk_cmd_top) cmd
 

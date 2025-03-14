@@ -356,7 +356,6 @@ runAsPhase =
   runGenericAsPhase runAs []
 
 
-
 -- Note [JS Backend .o file procedure]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -1155,10 +1154,8 @@ linkDynLibCheck logger tmpfs dflags unit_env o_files dep_units = do
   linkDynLib logger tmpfs dflags unit_env o_files dep_units
 
 
-
 -- -----------------------------------------------------------------------------
 -- Misc.
-
 
 
 touchObjectFile :: FilePath -> IO ()

@@ -472,7 +472,6 @@ ext1 :: (Data a, Typeable t)
 ext1 def ext = maybe def id (dataCast1 ext)
 
 
-
 -- | Flexible type extension
 ext2 :: (Data a, Typeable t)
      => c a

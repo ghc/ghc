@@ -382,7 +382,6 @@ saveThreadState profile = do
     ]
 
 
-
 -- | Save STG registers
 --
 -- STG registers must be saved around a C call, just in case the STG

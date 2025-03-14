@@ -398,7 +398,6 @@ slowArgs platform args sccProfilingEnabled  -- careful: reps contains voids (V),
             _   -> "d"
 
 
-
 -------------------------------------------------------------------------
 ----        Laying out objects on the heap and stack
 -------------------------------------------------------------------------

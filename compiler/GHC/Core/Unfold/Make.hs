@@ -42,7 +42,6 @@ import Data.Maybe ( fromMaybe )
 import {-# SOURCE #-} GHC.Core.SimpleOpt
 
 
-
 mkFinalUnfolding :: UnfoldingOpts -> UnfoldingSource -> DmdSig -> CoreExpr -> Unfolding
 -- "Final" in the sense that this is a GlobalId that will not be further
 -- simplified; so the unfolding should be occurrence-analysed

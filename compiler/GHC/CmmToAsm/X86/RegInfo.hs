@@ -58,7 +58,6 @@ normalRegColors platform =
             ,"#e0e0e0"]
 
 
-
 --     32 shades of grey - use for avx 512 if we ever need it
 --     greys = ["#070707","#0e0e0e","#151515","#1c1c1c"
 --             ,"#232323","#2a2a2a","#313131","#383838","#3f3f3f"

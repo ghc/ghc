@@ -198,7 +198,6 @@ checkHsigIface tcg_env gre_env sig_iface
 -- tcg_rn_exports to figure out where the reexport came from.
 
 
-
 -- | Checks if a 'ClsInst' is "defined". In general, for hsig files we can't
 -- assume that the implementing file actually implemented the instances (they
 -- may be reexported from elsewhere).  Where should we look for the instances?

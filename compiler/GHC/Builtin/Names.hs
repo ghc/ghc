@@ -1076,7 +1076,6 @@ mappendName        = varQual gHC_INTERNAL_BASE       (fsLit "mappend")   mappend
 mconcatName        = varQual gHC_INTERNAL_BASE       (fsLit "mconcat")   mconcatClassOpKey
 
 
-
 -- AMP additions
 
 joinMName, alternativeClassName :: Name
@@ -1257,7 +1256,6 @@ integerBitName            = bniVarQual "integerBit#"               integerBitIdK
 integerTestBitName        = bniVarQual "integerTestBit#"           integerTestBitIdKey
 integerShiftLName         = bniVarQual "integerShiftL#"            integerShiftLIdKey
 integerShiftRName         = bniVarQual "integerShiftR#"            integerShiftRIdKey
-
 
 
 ---------------------------------

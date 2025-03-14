@@ -6,7 +6,6 @@
 -}
 
 
-
 -- |
 -- #name_types#
 -- GHC uses several kinds of name internally:

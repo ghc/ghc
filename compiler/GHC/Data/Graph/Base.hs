@@ -64,7 +64,6 @@ graphMapModify f graph
         = graph { graphMap      = f (graphMap graph) }
 
 
-
 -- | Graph nodes.
 --      Represents a thing that can conflict with another thing.
 --      For the register allocater the nodes represent registers.

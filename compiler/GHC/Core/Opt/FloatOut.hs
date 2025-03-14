@@ -7,7 +7,6 @@
 -}
 
 
-
 module GHC.Core.Opt.FloatOut ( floatOutwards ) where
 
 import GHC.Prelude

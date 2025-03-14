@@ -1309,7 +1309,6 @@ For a real example of this, see ./rts/StgStdThunks.cmm
 -}
 
 
-
 -- | Switch branch
 genSwitch :: UnreachableBlockId -> CmmExpr -> SwitchTargets -> LlvmM StmtData
 genSwitch (UnreachableBlockId ubid) cond ids = do
@@ -1340,7 +1339,6 @@ genSwitch (UnreachableBlockId ubid) cond ids = do
 -- genSwitch. See #24717
 --
 -- [1] https://reviews.llvm.org/D68131
-
 
 
 -- -----------------------------------------------------------------------------

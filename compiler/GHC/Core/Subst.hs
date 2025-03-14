@@ -647,7 +647,6 @@ This rule was attached to `transpose`, but also mentions itself in the RHS so we
 to be careful to not force the `IdInfo` for transpose when dealing with the RHS of the rule.
 
 
-
 Note [substTickish]
 ~~~~~~~~~~~~~~~~~~~~~~
 A Breakpoint contains a list of Ids.  What happens if we ever want to

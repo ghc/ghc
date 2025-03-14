@@ -499,7 +499,6 @@ tc_lhs_sig_type skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
            ; return (tidy_env2, UninfTyCtx_Sig exp_kind full_hs_ty) }
 
 
-
 {- Note [Escaping kind in type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider kind-checking the signature for `foo` (#19495, #24686):
@@ -2172,7 +2171,6 @@ addTypeCtxt :: LHsType GhcRn -> TcM a -> TcM a
         -- Omit invisible ones and ones user's won't grok
 addTypeCtxt (L _ (HsWildCardTy _)) thing = thing   -- "In the type '_'" just isn't helpful.
 addTypeCtxt ty thing = addErrCtxt (TypeCtxt ty) thing
-
 
 
 {- *********************************************************************

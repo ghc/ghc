@@ -295,7 +295,6 @@ assignColors colors graph ks
                 = Nothing
 
 
-
 -- | Select a color for a certain node
 --      taking into account preferences, neighbors and exclusions.
 --      returns Nothing if no color can be assigned to this node.

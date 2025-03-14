@@ -159,7 +159,6 @@ https://rgrig.blogspot.com/2009/10/dtfloatleftclearleft-summary-of-some.html
 -}
 
 
-
 type Seq = Seq.Seq
 
 -- | A "supernode" contains a single-entry, multiple-exit, reducible subgraph.
@@ -187,7 +186,6 @@ instance Supernode CmmSuper NullCollapseViz where
 -- | Return all labels defined within a supernode.
 definedLabels :: CmmSuper -> Seq Label
 definedLabels = fmap entryLabel . blocks
-
 
 
 -- | Map the given function over every use and definition of a label

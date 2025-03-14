@@ -99,7 +99,6 @@ regSpill platform code slotsFree slotCount regs
                         ( stateUS state' )
 
 
-
 -- | Spill some registers to stack slots in a top-level thing.
 regSpill_top
         :: Instruction instr

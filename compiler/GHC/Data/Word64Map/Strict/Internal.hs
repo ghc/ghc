@@ -563,7 +563,6 @@ updateLookupWithKey f0 !k0 t0 = toPair $ go f0 k0 t0
         Nil -> (Nothing :*: Nil)
 
 
-
 -- | \(O(\min(n,W))\). The expression (@'alter' f k map@) alters the value @x@ at @k@, or absence thereof.
 -- 'alter' can be used to insert, delete, or update a value in an 'Word64Map'.
 -- In short : @'lookup' k ('alter' f k m) = f ('lookup' k m)@.

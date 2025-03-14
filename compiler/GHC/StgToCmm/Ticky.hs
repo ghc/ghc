@@ -681,7 +681,6 @@ tickyDynAlloc mb_id rep lf = ifTicky $ do
      | otherwise      -> panic "How is this heap object not a con, thunk, or fun?"
 
 
-
 tickyAllocHeap ::
   Bool -> -- is this a genuine allocation? As opposed to
           -- GHC.StgToCmm.Layout.adjustHpBackwards

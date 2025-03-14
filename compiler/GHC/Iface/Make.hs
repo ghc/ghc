@@ -216,8 +216,6 @@ updateDecl decls m_stg_infos m_cmm_infos
       = decl
 
 
-
-
 -- | Make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
 -- object code at all ('NoBackend').

@@ -5,7 +5,6 @@
 -}
 
 
-
 module GHC.Core.Opt.Simplify.Env (
         -- * The simplifier mode
         SimplMode(..), updMode, smPlatform,

@@ -737,7 +737,6 @@ instance NFData TyConBndrVis where
   rnf (NamedTCB vis) = rnf vis
 
 
-
 {- *********************************************************************
 *                                                                      *
                The TyCon type

@@ -405,7 +405,6 @@ Hence: Two basic plans for
 -}
 
 
-
 -------------------------------------
 data GcPlan
   = GcInAlts            -- Put a GC check at the start the case alternatives,

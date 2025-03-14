@@ -1036,8 +1036,6 @@ scSubstId :: ScEnv -> InId -> OutExpr
 scSubstId env v = lookupIdSubst (sc_subst env) v
 
 
-
-
 -- The !subst ensures that we force the selection `(sc_subst env)`, which avoids
 -- retaining all of `env` when we only need `subst`.  The `Solo` means that the
 -- substitution itself is lazy, because that type is often discarded.

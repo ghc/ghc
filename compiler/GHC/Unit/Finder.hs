@@ -727,7 +727,6 @@ mkHiePath fopts basename mod_basename = hie_basename <.> hiesuf
                              | otherwise          = basename
 
 
-
 -- -----------------------------------------------------------------------------
 -- Filenames of the stub files
 

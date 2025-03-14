@@ -735,8 +735,6 @@ saveClobberedTemps clobbered dying
                   return (new_assign, (spill ++ instrs))
 
 
-
-
 -- | Mark all these real regs as allocated,
 --      and kick out their vreg assignments.
 --

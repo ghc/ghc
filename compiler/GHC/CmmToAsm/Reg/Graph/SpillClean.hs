@@ -59,7 +59,6 @@ import Data.IntSet              (IntSet)
 import qualified Data.IntSet    as IntSet
 
 
-
 -- | The identification number of a spill slot.
 --   A value is stored in a spill slot when we don't have a free
 --   register to hold it.
@@ -137,7 +136,6 @@ cleanBlockForward config (BasicBlock blockId instrs)
 
         instrs_reload   <- cleanForward config blockId assoc [] instrs
         return  $ BasicBlock blockId instrs_reload
-
 
 
 -- | Clean out unneeded reload instructions.
@@ -219,7 +217,6 @@ cleanForward config blockId assoc acc (li : instrs)
         , RU _ written          <- regUsageOfInstr (ncgPlatform config) instr
         = let assoc'    = foldr delAssoc assoc (map SReg $ nub $ map regWithFormat_reg written)
           in  cleanForward config blockId assoc' (li : acc) instrs
-
 
 
 -- | Try and rewrite a reload instruction to something more pleasing
@@ -326,7 +323,6 @@ cleanBlockBackward
 cleanBlockBackward liveSlotsOnEntry (BasicBlock blockId instrs)
  = do   instrs_spill    <- cleanBackward liveSlotsOnEntry  emptyUniqSet  [] instrs
         return  $ BasicBlock blockId instrs_spill
-
 
 
 cleanBackward

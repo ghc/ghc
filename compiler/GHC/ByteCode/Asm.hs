@@ -514,7 +514,6 @@ inspectAsm long_jumps initial_offset (InspectAsm s) =
 {-# INLINE inspectAsm #-}
 
 
-
 instance MonadAssembler InspectAsm where
   ioptr _ = do
     s <- get_
@@ -746,7 +745,6 @@ assembleI platform i = case i of
   BCO_NAME name            -> do np <- lit1 (BCONPtrStr name)
                                  emit_ bci_BCO_NAME [Op np]
 #endif
-
 
 
   where

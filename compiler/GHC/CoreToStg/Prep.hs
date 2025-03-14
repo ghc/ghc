@@ -606,7 +606,6 @@ As such, it will be dropped, resulting in memory unsoundness.
 This unsoundness lead to the introduction of keepAlive#.
 
 
-
 Other related tickets:
 
  - #15544

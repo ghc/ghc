@@ -56,7 +56,6 @@ foreign import ccall unsafe saccessor                          \
   accessor :: Ptr (IORef a) -> IO (Ptr (IORef a));
 
 
-
 SHARED_GLOBAL_VAR( v_unsafeHasPprDebug
                  , getOrSetLibHSghcGlobalHasPprDebug
                  , "getOrSetLibHSghcGlobalHasPprDebug"

@@ -832,7 +832,6 @@ wildCardsAllowed env
        _                   -> False
 
 
-
 ---------------
 -- | Ensures either that we're in a type or that -XPolyKinds is set
 checkPolyKinds :: RnTyKiEnv

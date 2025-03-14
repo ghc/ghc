@@ -215,7 +215,6 @@ type OutTyCoVar = TyCoVar
 type OutId      = Id
 
 
-
 {- Note [Evidence: EvIds and CoVars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * An EvId (evidence Id) is a term-level evidence variable
@@ -1003,7 +1002,6 @@ See also Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
 * Inferred variables correspond to "generalized" variables from the
   Visible Type Applications paper (ESOP'16).
 -}
-
 
 
 {-

@@ -615,7 +615,6 @@ fixupStack old_stack new_stack = concatMap move new_locs
                                NaturallyAligned]
 
 
-
 setupStackFrame
              :: Platform
              -> BlockId                 -- label of continuation

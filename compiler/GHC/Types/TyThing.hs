@@ -111,7 +111,6 @@ tyThingCategory (AConLike (RealDataCon _)) = "data constructor"
 tyThingCategory (AConLike (PatSynCon _))  = "pattern synonym"
 
 
-
 {-
 Note [Implicit TyThings]
 ~~~~~~~~~~~~~~~~~~~~~~~~

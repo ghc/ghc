@@ -186,7 +186,6 @@ import Data.Foldable ( for_ )
 import Data.Traversable ( for )
 
 
-
 {-
 ************************************************************************
 *                                                                      *
@@ -232,8 +231,6 @@ tcRnModule hsc_env mod_sum save_rn_syntax
 
       | otherwise   -- 'module M where' is omitted
       = (mkHomeModule home_unit mAIN_NAME, srcLocSpan (srcSpanStart loc))
-
-
 
 
 tcRnModuleTcRnM :: HscEnv
@@ -2964,7 +2961,6 @@ loadUnqualIfaces hsc_env ictxt
                   , isTcOcc (nameOccName name)   -- Types and classes only
                   , unQualOK gre ]               -- In scope unqualified
     doc = text "Need interface for module whose export(s) are in scope unqualified"
-
 
 
 {-

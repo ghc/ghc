@@ -433,7 +433,6 @@ checkVersions hsc_env mod_summary iface self_recomp
     home_unit = hsc_home_unit hsc_env
 
 
-
 -- | Check if any plugins are requesting recompilation
 checkPlugins :: Plugins -> ModIfaceSelfRecomp -> IfG RecompileRequired
 checkPlugins plugins self_recomp = liftIO $ do

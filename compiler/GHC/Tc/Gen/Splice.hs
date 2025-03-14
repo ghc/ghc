@@ -169,7 +169,6 @@ import GHC.Parser (parseIdentifier)
 import GHC.Rename.Doc (rnHsDoc)
 
 
-
 {-
 Note [Template Haskell state diagram]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1323,7 +1322,6 @@ context and are unified correctly.
 This is implemented by storing the arguments we need for running the splice
 in a `DelayedSplice`. In the zonker, the arguments are passed to
 `GHC.Tc.Gen.Splice.runTopSplice` and the expression inserted into the AST as normal.
-
 
 
 Note [Exceptions in TH]
@@ -2886,7 +2884,6 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
             -- Convert IfaceImport to module names
             usages = [modToTHMod (ifImpModule imp) | imp <- imports]
         return $ TH.ModuleInfo usages
-
 
 
 ------------------------------

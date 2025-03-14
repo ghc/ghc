@@ -3579,7 +3579,6 @@ none. The role of the kind signature (a :: Maybe k) is to add a constraint
 that 'a' must have that kind, and to bring 'k' into scope.
 
 
-
 ************************************************************************
 *                                                                      *
                Data types

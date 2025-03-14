@@ -578,7 +578,6 @@ chooseDumpFile logflags ways flag
                  Nothing ->       f
 
 
-
 -- | Default action for 'traceAction' hook
 defaultTraceAction :: TraceAction a
 defaultTraceAction logflags title doc x =

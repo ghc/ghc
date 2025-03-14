@@ -7,7 +7,6 @@ Desugaring foreign calls
 -}
 
 
-
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.HsToCore.Foreign.Call

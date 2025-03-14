@@ -6,7 +6,6 @@ This module contains inlining logic used by the simplifier.
 -}
 
 
-
 module GHC.Core.Opt.Simplify.Inline (
         -- * Cheap and cheerful inlining checks.
         couldBeSmallEnoughToInline,

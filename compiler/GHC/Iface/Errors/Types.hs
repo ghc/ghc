@@ -31,7 +31,6 @@ import GHC.Unit.Types ( IsBootInterface )
 import Language.Haskell.Syntax.Module.Name ( ModuleName )
 
 
-
 import GHC.Generics ( Generic )
 import GHC.Unit.Module.Location
 

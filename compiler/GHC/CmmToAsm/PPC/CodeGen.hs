@@ -249,7 +249,6 @@ jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
     where blockLabel = blockLbl blockid
 
 
-
 -- -----------------------------------------------------------------------------
 -- General things for putting together code sequences
 
@@ -1090,7 +1089,6 @@ condFltCode cond x y = do
     return (CondCode True cond code'')
 
 
-
 -- -----------------------------------------------------------------------------
 -- Generating assignments
 
@@ -1127,11 +1125,9 @@ assignReg_IntCode _ reg src
             Fixed _ freg fcode -> fcode `snocOL` MR dst freg
 
 
-
 -- Easy, isn't it?
 assignMem_FltCode = assignMem_IntCode
 assignReg_FltCode = assignReg_IntCode
-
 
 
 genJump :: CmmExpr{-the branch target-} -> [RegWithFormat] -> NatM InstrBlock
@@ -1194,7 +1190,6 @@ genCondJump
 genCondJump id bool prediction = do
   CondCode _ cond code <- getCondCode bool
   return (code `snocOL` BCC cond id prediction)
-
 
 
 -- -----------------------------------------------------------------------------
@@ -2289,7 +2284,6 @@ generateJumpTableForInstr _ _ = Nothing
 -- the right hand side of an assignment).
 
 
-
 condReg :: NatM CondCode -> NatM Register
 condReg getCond = do
     CondCode _ cond cond_code <- getCond
@@ -2329,7 +2323,6 @@ condFltReg :: Cond -> CmmExpr -> CmmExpr -> NatM Register
 condFltReg cond x y = condReg (condFltCode cond x y)
 
 
-
 -- -----------------------------------------------------------------------------
 -- 'trivial*Code': deal with trivial instructions
 
@@ -2341,7 +2334,6 @@ condFltReg cond x y = condReg (condFltCode cond x y)
 -- Similarly, for unary instructions, we don't have to worry about
 -- matching an StInt as the argument, because genericOpt will already
 -- have handled the constant-folding.
-
 
 
 {-

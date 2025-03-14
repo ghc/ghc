@@ -7,7 +7,6 @@
 -}
 
 
-
 -- | Set-like operations on lists
 --
 -- Avoid using them as much as possible
@@ -52,7 +51,6 @@ getNth xs n = assertPpr (xs `lengthExceeds` n) (ppr n $$ ppr xs) $
 *                                                                      *
 ************************************************************************
 -}
-
 
 
 -- | Combines the two lists while keeping their order, placing the first argument

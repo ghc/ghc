@@ -710,7 +710,6 @@ instance Fractional JStgExpr where
     fromRational x = ValExpr (JDouble (realToFrac x))
 
 
-
 --------------------------------------------------------------------------------
 -- New Identifiers
 --------------------------------------------------------------------------------

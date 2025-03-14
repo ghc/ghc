@@ -519,7 +519,6 @@ getLocalBindings tidy_orig ct_loc
         keep_it id = go env (id:sofar) tc_bndrs
 
 
-
 -- See Note [Valid hole fits include ...]
 findValidHoleFits :: TidyEnv        -- ^ The tidy_env for zonking
                   -> [Implication]  -- ^ Enclosing implications for givens
@@ -819,8 +818,6 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
                             , hfDoc = Nothing }
 
 
-
-
     unfoldWrapper :: HsWrapper -> [Type]
     unfoldWrapper = reverse . unfWrp'
       where unfWrp' (WpTyApp ty) = [ty]
@@ -897,7 +894,6 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
            else return Nothing }
      where fvs = mkFVs ref_vars `unionFV` hole_fvs `unionFV` tyCoFVsOfType ty
            hole = typed_hole { th_hole = Nothing }
-
 
 
 -- | Checks whether a MetaTyVar is flexible or not.

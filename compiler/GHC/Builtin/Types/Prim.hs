@@ -1144,7 +1144,6 @@ We just need to have something to put on that last line. You probably
 don't need to worry about it.
 
 
-
 Note [The State# TyCon]
 ~~~~~~~~~~~~~~~~~~~~~~~
 State# is the primitive, unlifted type of states.  It has one type parameter,

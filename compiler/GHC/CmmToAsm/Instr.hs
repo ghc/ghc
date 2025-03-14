@@ -133,7 +133,6 @@ class Instruction instr where
                 -> Bool
 
 
-
         -- | Copy the value in a register to another one.
         --      Must work for all register classes.
         mkRegRegMoveInstr

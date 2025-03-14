@@ -482,7 +482,6 @@ The particular case that cropped up when we tried this in #15544 was:
   doesn't visit X, and catastrophe ensues.
 
 
-
 Note [Ticky labels in SRT analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Raw Cmm data (CmmStaticsRaw) can't contain pointers so they're considered

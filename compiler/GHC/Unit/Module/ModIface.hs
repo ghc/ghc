@@ -219,7 +219,6 @@ withSelfRecomp iface nk jk =
     Just x -> jk x
 
 
-
 -- | A 'ModIface' plus a 'ModDetails' summarises everything we know
 -- about a compiled module.  The 'ModIface' is the stuff *before* linking,
 -- and can be written out to an interface file. The 'ModDetails is after

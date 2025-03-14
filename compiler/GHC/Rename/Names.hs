@@ -1984,7 +1984,6 @@ x,y to avoid name-shadowing warnings.  Example (#9061)
    f x = log where log = ()
 
 
-
 Note [Printing minimal imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To print the minimal imports we walk over the user-supplied import

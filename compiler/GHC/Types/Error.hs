@@ -240,8 +240,6 @@ defaultDiagnosticOpts :: forall opts . HasDefaultDiagnosticOpts (DiagnosticOpts 
 defaultDiagnosticOpts = defaultOpts @(DiagnosticOpts opts)
 
 
-
-
 -- | A class identifying a diagnostic.
 -- Dictionary.com defines a diagnostic as:
 --

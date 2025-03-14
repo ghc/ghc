@@ -930,7 +930,6 @@ mkBinaryTickBox ixT ixF e = do
        return $ mkIfThenElse e trueBox falseBox
 
 
-
 -- *******************************************************************
 
 {- Note [decideBangHood]

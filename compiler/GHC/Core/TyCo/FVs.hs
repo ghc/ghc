@@ -773,7 +773,6 @@ almost_devoid_co_var_of_types (ty:tys) cv
   && almost_devoid_co_var_of_types tys cv
 
 
-
 {-
 %************************************************************************
 %*                                                                      *

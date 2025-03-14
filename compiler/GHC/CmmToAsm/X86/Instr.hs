@@ -879,9 +879,6 @@ patchJumpInstr insn patchF
         patchJumpDest _ dest             = dest
 
 
-
-
-
 -- -----------------------------------------------------------------------------
 -- | Make a spill instruction.
 mkSpillInstr

@@ -375,11 +375,6 @@ profHeaderCreate closure = do
   emit check_2
 
 
-
-
-
-
-
 --
 -- | Called when a closure is entered, marks the closure as having
 -- been "used".  The closure is not an "inherently used" one.  The
@@ -410,7 +405,6 @@ ldvEnter cl_ptr = do
         emit =<< mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) [loadEra platform, CmmLit (zeroCLit platform)])
                      (mkStore ldv_wd new_ldv_wd)
                      mkNop
-
 
 
 loadEra :: Platform -> CmmExpr

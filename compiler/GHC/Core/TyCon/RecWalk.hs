@@ -7,7 +7,6 @@ Check for recursive type constructors.
 -}
 
 
-
 module GHC.Core.TyCon.RecWalk (
 
         -- * Recursion breaking

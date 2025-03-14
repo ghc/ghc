@@ -2019,7 +2019,6 @@ hscGenHardCode hsc_env cgguts location output_filename = do
           -- but we don't generate any code for newtypes
 
 
-
         -------------------
         -- PREPARE FOR CODE GENERATION
         -- Do saturation and convert to A-normal form
@@ -2817,7 +2816,6 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
         Linkable bco_time this_mod $ NE.singleton $ BCOs bcos
       {- Get the HValue for the root -}
       return (expectJust $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed)
-
 
 
 -- | Generate JS code for the given bindings and return the HValue for the given id

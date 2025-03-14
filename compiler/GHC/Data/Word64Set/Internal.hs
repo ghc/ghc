@@ -406,7 +406,6 @@ lookupGE !x t = case t of
     go def Nil = unsafeFindMin def
 
 
-
 -- Helper function for lookupGE and lookupGT. It assumes that if a Bin node is
 -- given, it has m > 0.
 unsafeFindMin :: Word64Set -> Maybe Key
@@ -565,7 +564,6 @@ difference t1@(Tip kx bm) t2 = differenceTip t2
         differenceTip Nil = t1
 
 difference Nil _     = Nil
-
 
 
 {--------------------------------------------------------------------
@@ -1579,7 +1577,6 @@ takeWhileAntitoneBits prefix predicate bitmap =
           then ((2 `shiftLL` b) - 1)
           else ((1 `shiftLL` b) - 1)
   in bitmap .&. m
-
 
 
 {--------------------------------------------------------------------

@@ -87,7 +87,6 @@ import Control.Monad
 import GHC.Rename.Unbound (WhatLooking(WL_Anything))
 
 
-
 {- *********************************************************************
 *                                                                      *
               HsExprArg: auxiliary data type

@@ -64,7 +64,6 @@ module GHC.Driver.Backend
    , BackendName
 
 
-
      -- * Properties of back ends
    , backendDescription
    , backendWritesFiles
@@ -322,8 +321,6 @@ noBackend = Named NoBackend
 ---------------------------------------------------------------------------------
 
 
-
-
 -- | This enumeration type specifies how the back end wishes GHC's
 -- primitives to be implemented.  (Module "GHC.StgToCmm.Prim" provides
 -- a generic implementation of every primitive, but some primitives,
@@ -407,7 +404,6 @@ data DefunctionalizedCDefs
               -- LLVM version.
 
 ---------------------------------------------------------------------------------
-
 
 
 -- | An informal description of the back end, for use in
@@ -823,7 +819,6 @@ backendName (Named Interpreter) = Interpreter
 backendName (Named NoBackend)   = NoBackend
 
 
-
 -- | A list of all back ends.  They are ordered as we wish them to
 -- appear when they are enumerated in error messages.
 
@@ -852,8 +847,6 @@ backendValidityOfCExport backend =
         IsValid
     else
         NotValid $ filter backendSupportsCExport allBackends
-
-
 
 
 {-

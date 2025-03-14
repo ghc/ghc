@@ -209,7 +209,6 @@ spawnJSInterp cfg = do
   pure inst
 
 
-
 ---------------------------------------------------------
 -- Interpreter commands
 ---------------------------------------------------------
@@ -322,7 +321,6 @@ jsLinkObjects logger tmpfs tmp_dir cfg unit_env inst objs is_root = do
   ar_cache <- newArchiveCache
   link_plan <- computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
   jsLinkPlan logger tmpfs tmp_dir ar_cache link_cfg cfg inst link_plan
-
 
 
 -- | Link an object file using the given functions as roots

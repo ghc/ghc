@@ -284,7 +284,6 @@ lintStgExpr e@(StgApp fun args) = do
   lintStgAppReps fun args
 
 
-
 lintStgExpr app@(StgConApp con _n args _arg_tys) = do
     -- unboxed sums should vanish during unarise
     lf <- getLintFlags

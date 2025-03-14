@@ -2278,7 +2278,6 @@ instance Binary IfaceAppArgs where
 --           Eq (a, b, c, d, e, f, g, h, i, j, k, l)
 
 
-
 -- | Prints "(C a, D b) =>", including the arrow.
 -- Used when we want to print a context in a type, so we
 -- use 'funPrec' to decide whether to parenthesise a singleton

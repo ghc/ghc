@@ -6,7 +6,6 @@
 -}
 
 
-
 module GHC.Core.PatSyn (
         -- * Main data types
         PatSyn, PatSynMatcher, PatSynBuilder, mkPatSyn,

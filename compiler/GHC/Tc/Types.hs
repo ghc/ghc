@@ -733,7 +733,6 @@ bootExports boot =
       in availsToNameSet exports
 
 
-
 {- Note [Tracking unused binding and imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We gather three sorts of usage information

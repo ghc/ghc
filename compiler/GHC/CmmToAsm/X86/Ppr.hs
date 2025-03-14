@@ -497,7 +497,6 @@ pprImm platform = \case
    ImmConstantDiff a b -> pprImm platform a <> char '-' <> lparen <> pprImm platform b <> rparen
 
 
-
 pprAddr :: IsLine doc => Platform -> AddrMode -> doc
 pprAddr platform (ImmAddr imm off)
   = let pp_imm = pprImm platform imm
@@ -1068,7 +1067,6 @@ pprInstr platform i = case i of
    gsp   = char ' '
 
 
-
    pprX87 :: Instr -> Line doc -> doc
    pprX87 fake actual
       = line (char '#' <> pprX87Instr fake) $$ line actual
@@ -1263,7 +1261,6 @@ pprInstr platform i = case i of
            comma,
            pprReg platform format reg3
        ]
-
 
 
    pprFormatAddr :: Line doc -> Format -> AddrMode -> Line doc

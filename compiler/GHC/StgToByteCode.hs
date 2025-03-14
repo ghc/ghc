@@ -2280,7 +2280,6 @@ mkSlideW !n !ws
     = unitOL (SLIDE n $ fromIntegral ws)
 
 
-
 atomRep :: Platform -> StgArg -> ArgRep
 atomRep platform e = toArgRepOrV platform (stgArgRep1 e)
 

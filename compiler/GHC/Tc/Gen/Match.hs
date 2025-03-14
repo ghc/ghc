@@ -1081,7 +1081,6 @@ tcDoStmt _ stmt _ _
   = pprPanic "tcDoStmt: unexpected Stmt" (ppr stmt)
 
 
-
 ---------------------------------------------------
 -- MonadFail Proposal warnings
 ---------------------------------------------------

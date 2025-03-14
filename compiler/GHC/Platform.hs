@@ -259,7 +259,6 @@ platformHasRTSLinker p = case archOS_arch (platformArchOS p) of
   _                 -> True
 
 
-
 --------------------------------------------------
 -- Instruction sets
 --------------------------------------------------

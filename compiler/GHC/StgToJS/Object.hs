@@ -147,7 +147,6 @@ wasmHeader :: B.ByteString
 wasmHeader = unsafePerformIO $ B.unsafePackAddressLen 4 "\0asm"#
 
 
-
 ------------------------------------------------
 -- HS objects
 --
@@ -717,7 +716,6 @@ splitOnComma s = cons $ case break (== ',') s of
                                                     _:s''   -> splitOnComma s'')
   where
     cons ~(h, t)        =  h : t
-
 
 
 -- | Get the JS option pragmas from .js files

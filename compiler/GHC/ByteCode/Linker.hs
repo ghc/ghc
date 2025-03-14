@@ -206,10 +206,6 @@ linkFail who what
                 ])
 
 
-
-
-
-
 -- See Note [Primop wrappers] in GHC.Builtin.PrimOps
 primopToCLabel :: PrimOp -> String -> String
 primopToCLabel primop suffix = concat

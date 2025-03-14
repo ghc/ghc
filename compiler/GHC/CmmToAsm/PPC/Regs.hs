@@ -122,7 +122,6 @@ regDotColor reg
         RcFloatOrVector -> text "red"
 
 
-
 -- immediates ------------------------------------------------------------------
 data Imm
         = ImmInt        Int

@@ -4,7 +4,6 @@
 -- The @Class@ datatype
 
 
-
 module GHC.Core.Class (
         Class,
         ClassOpItem,

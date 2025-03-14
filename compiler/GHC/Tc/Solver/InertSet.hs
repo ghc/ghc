@@ -1401,7 +1401,6 @@ addFunEqs eq_ct@(EqCt { eq_lhs = TyFamLHS tc args }) fun_eqs
 addFunEqs other _ = pprPanic "extendFunEqs" (ppr other)
 
 
-
 {- *********************************************************************
 *                                                                      *
                    Inert Dicts

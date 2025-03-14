@@ -641,7 +641,6 @@ checkNode graph node
         = True
 
 
-
 -- | Slurp out a map of how many nodes had a certain number of conflict neighbours
 
 slurpNodeConflictCount

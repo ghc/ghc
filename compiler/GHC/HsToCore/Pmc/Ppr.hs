@@ -1,6 +1,5 @@
 
 
-
 -- | Provides facilities for pretty-printing 'Nabla's in a way appropriate for
 -- user facing pattern match warnings.
 module GHC.HsToCore.Pmc.Ppr (

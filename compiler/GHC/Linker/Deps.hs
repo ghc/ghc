@@ -205,7 +205,6 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                 pprPanic "Unhydrated core bindings" (ppr wcb_module)
 
 
-
 {-
 Note [Using Byte Code rather than Object Code for Template Haskell]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
