@@ -1783,10 +1783,10 @@ quantifyTyVarsWithBinders skol_info dvs outer_wcs_imp_tvs
             text "outer_wc_imp_qtvs=" <+> ppr outer_wcs_imp_tvs
             ])
 
-       ; undefaulted <- defaultTyVars $ dvs `delCandidates` outer_wcs_imp_tvs
+       ; undefaulted <- defaultTyVars dvs
        ; final_qtvs  <- liftZonkM $ do
             -- resume order and then skolemise
-            qtvs <- mapMaybeM zonk_quant $ undefaulted ++ outer_wcs_imp_tvs
+            qtvs <- mapMaybeM zonk_quant undefaulted
             return qtvs
 
        ; traceTc "quantifyTyVars }"
