@@ -1705,6 +1705,11 @@ as such you shouldn't need to set any of them explicitly. A flag
     as if it we were compiling for a 64-bit target even if fields are larger
     than a pointer on those platforms.
 
+    Also note: in modules that introduce type or data family instances,
+    GHC will not automatically use those instances for unpacking fields of other
+    declarations in the same module. To work around the issue, the use of
+    explicit ``UNPACK`` pragmas is advised.
+
 .. ghc-flag:: -funbox-strict-fields
     :shortdesc: Flatten strict constructor fields
     :type: dynamic
@@ -1731,6 +1736,11 @@ as such you shouldn't need to set any of them explicitly. A flag
 
     Alternatively you can use :ghc-flag:`-funbox-small-strict-fields` to only
     unbox strict fields which are "small".
+
+    Note: in modules that introduce type or data family instances,
+    GHC will not automatically use those instances for unpacking fields of other
+    declarations in the same module. To work around the issue, the use of
+    explicit ``UNPACK`` pragmas is advised.
 
 .. ghc-flag:: -funfolding-creation-threshold=⟨n⟩
     :shortdesc: *default: 750.* Tweak unfolding settings.

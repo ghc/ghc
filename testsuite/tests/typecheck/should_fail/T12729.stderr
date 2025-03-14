@@ -1,6 +1,12 @@
-
 T12729.hs:7:1: error: [GHC-55233]
     • Newtype has non-* return kind ‘TYPE IntRep’
     • In the newtype declaration for ‘A’
     Suggested fix:
       Perhaps you intended to use the ‘UnliftedNewtypes’ extension
+
+T12729.hs:10:1: error: [GHC-55233]
+    • Newtype has non-* return kind ‘TYPE IntRep’
+    • In the newtype declaration for ‘B’
+    Suggested fix:
+      Perhaps you intended to use the ‘UnliftedNewtypes’ extension
+

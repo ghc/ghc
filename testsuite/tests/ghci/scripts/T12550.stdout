@@ -65,12 +65,12 @@ instance Functor Par1 -- Defined in ‘GHC.Internal.Generics’
 instance ∀ (f ∷ ★ → ★). Functor f ⇒ Functor (Rec1 f)
   -- Defined in ‘GHC.Internal.Generics’
 instance Functor U1 -- Defined in ‘GHC.Internal.Generics’
-instance Functor (URec Char) -- Defined in ‘GHC.Internal.Generics’
+instance Functor (URec Word) -- Defined in ‘GHC.Internal.Generics’
+instance Functor (URec Int) -- Defined in ‘GHC.Internal.Generics’
+instance Functor (URec Float) -- Defined in ‘GHC.Internal.Generics’
 instance Functor (URec Double)
   -- Defined in ‘GHC.Internal.Generics’
-instance Functor (URec Float) -- Defined in ‘GHC.Internal.Generics’
-instance Functor (URec Int) -- Defined in ‘GHC.Internal.Generics’
-instance Functor (URec Word) -- Defined in ‘GHC.Internal.Generics’
+instance Functor (URec Char) -- Defined in ‘GHC.Internal.Generics’
 instance Functor V1 -- Defined in ‘GHC.Internal.Generics’
 datatypeName
   ∷ ∀ {k} (d ∷ k) k1 (t ∷ k → (k1 → ★) → k1 → ★) (f ∷ k1 → ★)

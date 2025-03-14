@@ -85,6 +85,14 @@ Compiler
 
 - An improved error message is introduced to refer users to the heap-controlling flags of the RTS when there is a heap overflow during compilation. (#25198)
 
+- The kind checker now does a better job of finding type family instances for
+  use in the kinds of other declarations in the same module. This fixes a number
+  of tickets:
+  :ghc-ticket:`12088`, :ghc-ticket:`12239`, :ghc-ticket:`14668`, :ghc-ticket:`15561`,
+  :ghc-ticket:`16410`, :ghc-ticket:`16448`, :ghc-ticket:`16693`, :ghc-ticket:`19611`,
+  :ghc-ticket:`20875`, :ghc-ticket:`21172`, :ghc-ticket:`22257`, :ghc-ticket:`25238`,
+  :ghc-ticket:`25834`.
+
 GHCi
 ~~~~
 

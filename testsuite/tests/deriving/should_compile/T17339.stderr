@@ -4,12 +4,12 @@ Result size of Tidy Core
   = {terms: 8, types: 20, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 2, coercions: 0, joins: 0/0}
-T17339.$fClsA1B1 :: Cls A1 B1
-T17339.$fClsA1B1 = T17339.C:Cls @A1 @B1
-
--- RHS size: {terms: 1, types: 2, coercions: 0, joins: 0/0}
 T17339.$fClsA2B1 :: Cls A2 B1
 T17339.$fClsA2B1 = T17339.C:Cls @A2 @B1
+
+-- RHS size: {terms: 1, types: 2, coercions: 0, joins: 0/0}
+T17339.$fClsA1B1 :: Cls A1 B1
+T17339.$fClsA1B1 = T17339.C:Cls @A1 @B1
 
 -- RHS size: {terms: 1, types: 2, coercions: 0, joins: 0/0}
 T17339.$fClsA1B2 :: Cls A1 B2

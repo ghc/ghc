@@ -234,17 +234,16 @@ hsGroupTopLevelFixitySigs (HsGroup{ hs_fixds = fixds, hs_tyclds = tyclds }) =
 hsGroupInstDecls :: HsGroup (GhcPass p) -> [LInstDecl (GhcPass p)]
 hsGroupInstDecls = (=<<) group_instds . hs_tyclds
 
+-- Helpers to flatten TyClGroups.
+-- See (TCDEP1) in Note [Dependency analysis of type and class decls] in GHC.Rename.Module
 tyClGroupTyClDecls :: [TyClGroup (GhcPass p)] -> [LTyClDecl (GhcPass p)]
-tyClGroupTyClDecls = Data.List.concatMap group_tyclds
-
 tyClGroupInstDecls :: [TyClGroup (GhcPass p)] -> [LInstDecl (GhcPass p)]
-tyClGroupInstDecls = Data.List.concatMap group_instds
-
 tyClGroupRoleDecls :: [TyClGroup (GhcPass p)] -> [LRoleAnnotDecl (GhcPass p)]
+tyClGroupKindSigs  :: [TyClGroup (GhcPass p)] -> [LStandaloneKindSig (GhcPass p)]
+tyClGroupTyClDecls = Data.List.concatMap group_tyclds
+tyClGroupInstDecls = Data.List.concatMap group_instds
 tyClGroupRoleDecls = Data.List.concatMap group_roles
-
-tyClGroupKindSigs :: [TyClGroup (GhcPass p)] -> [LStandaloneKindSig (GhcPass p)]
-tyClGroupKindSigs = Data.List.concatMap group_kisigs
+tyClGroupKindSigs  = Data.List.concatMap group_kisigs
 
 appendGroups :: HsGroup (GhcPass p) -> HsGroup (GhcPass p)
              -> HsGroup (GhcPass p)
@@ -606,7 +605,14 @@ pprFunDep (FunDep _ us vs) = hsep [interppSP us, arrow, interppSP vs]
 *                                                                      *
 ********************************************************************* -}
 
-type instance XCTyClGroup (GhcPass _) = NoExtField
+type instance XCTyClGroup GhcPs = NoExtField
+
+type instance XCTyClGroup GhcRn = NameSet     -- Lexical dependencies of an SCC
+  -- What names exactly are in this NameSet? See Note [Prepare TyClGroup FVs] in GHC.Rename.Module
+  -- How is this NameSet used? See Note [Retrying TyClGroups] in GHC.Tc.TyCl
+
+type instance XCTyClGroup GhcTc = DataConCantHappen
+
 type instance XXTyClGroup (GhcPass _) = DataConCantHappen
 
 

@@ -621,25 +621,26 @@ NOTE THAT
 
 {- Note [TyClGroups and dependency analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A TyClGroup represents a strongly connected components of type/class/instance
-decls, together with the role annotations for the type/class declarations.
+A TyClGroup represents a strongly connected component of type/class/instance
+decls, together with the role annotations and standalone kind signatures for the
+type/class declarations.
 
 The hs_tyclds :: [TyClGroup] field of a HsGroup is a dependency-order
 sequence of strongly-connected components.
 
 Invariants
- * The type and class declarations, group_tyclds, may depend on each
-   other, or earlier TyClGroups, but not on later ones
+ * The type and class declarations, group_tyclds, may lexically depend
+   on each other, or earlier TyClGroups, but not on later ones
 
  * The role annotations, group_roles, are role-annotations for some or
    all of the types and classes in group_tyclds (only).
 
  * The instance declarations, group_instds, may (and usually will)
-   depend on group_tyclds, or on earlier TyClGroups, but not on later
-   ones.
+   lexically depend on group_tyclds, or on earlier TyClGroups, but
+   not on later ones.
 
-See Note [Dependency analysis of type, class, and instance decls]
-in GHC.Rename.Module for more info.
+See Note [Dependency analysis of type and class decls] in GHC.Rename.Module
+for more info.
 -}
 
 -- | Type or Class Group

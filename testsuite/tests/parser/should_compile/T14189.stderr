@@ -11,7 +11,8 @@
      []))
    []
    [(TyClGroup
-     (NoExtField)
+     {NameSet:
+      []}
      [(L
        (EpAnn
         (EpaSpan { T14189.hs:6:1-42 })

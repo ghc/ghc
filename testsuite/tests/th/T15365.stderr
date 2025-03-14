@@ -14,9 +14,9 @@ T15365.hs:(9,2)-(31,7): Splicing declarations
         type family (###) where
           (###) = Int
         
-        instance (???)
+        type instance (^^^) = Int
         data instance ($$$)
-        type instance (^^^) = Int |]
+        instance (???) |]
   ======>
     type (|||) = Either
     (&&&) :: Bool -> Bool -> Bool
