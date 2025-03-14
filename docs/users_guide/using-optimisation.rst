@@ -132,6 +132,36 @@ as such you shouldn't need to set any of them explicitly. A flag
     Enables Core-level constant folding, i.e. propagation of values
     that can be computed at compile time.
 
+.. ghc-flag:: -fnum-constant-folding
+    :shortdesc: Enable constant folding on nested numerical expressions. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-num-constant-folding
+    :category:
+
+    :default: off but enabled by :ghc-flag:`-O`.
+
+    When enabled, the compiler uses associativity, commutativity, and
+    distributivity laws of numerical primops to perform constant folding on
+    nested numerical expressions.
+
+    Examples:
+
+        (10 + x) + 10
+        ===> 20 + x
+
+        5 + x + (y + (z + (t + 5)))
+        ===> 10 + (x + (y + (z + t)))
+
+        (5 + x) * 6
+        ===> 30 + 6*x
+
+        5 + x + (x + (x + (x + 5)))
+        ===> 10 + (4 * x)
+
+        (5 + 4*x) - (3*x + 2)
+        ===> 3 + x
+
+
 .. ghc-flag:: -fcase-merge
     :shortdesc: Enable case-merging. Implied by :ghc-flag:`-O`.
     :type: dynamic

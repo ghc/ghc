@@ -57,7 +57,6 @@
 -fmax-errors
 -fmax-pmcheck-iterations
 -fmonomorphism-restriction
--fnum-constant-folding
 -fpre-inlining
 -fprint-bind-contents
 -freduction-depth

@@ -678,7 +678,7 @@ data GeneralFlag
    | Opt_SolveConstantDicts
    | Opt_AlignmentSanitisation
    | Opt_CatchNonexhaustiveCases
-   | Opt_NumConstantFolding
+   | Opt_NumConstantFolding   -- ^ See Note [Constant folding through nested expressions] in GHC.Core.Opt.ConstantFold
    | Opt_CoreConstantFolding
    | Opt_FastPAPCalls                  -- #6084
    | Opt_SpecEval
