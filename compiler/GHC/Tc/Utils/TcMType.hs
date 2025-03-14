@@ -142,7 +142,8 @@ import GHC.Builtin.Types
 import GHC.Types.Var.Env
 import GHC.Types.Unique.Set
 import GHC.Types.Basic ( TypeOrKind(..)
-                       , DefaultingStrategy(..))
+                       , NonStandardDefaultingStrategy(..)
+                       , DefaultingStrategy(..), defaultNonStandardTyVars )
 
 import GHC.Data.FastString
 import GHC.Data.Bag
@@ -1370,10 +1371,13 @@ candidateVars (DV { dv_kvs = dep_kv_set, dv_tvs = nondep_tkv_set })
 candidateKindVars :: CandidatesQTvs -> TyVarSet
 candidateKindVars dvs = dVarSetToVarSet (dv_kvs dvs)
 
-intersectCandidates :: CandidatesQTvs -> [Var] -> [Var]
-intersectCandidates (DV { dv_kvs = kvs, dv_tvs = tvs }) varList
-  = dVarSetElems $ kvs `intersectDVarSet` vars `unionDVarSet` (tvs `intersectDVarSet` vars)
-  where vars = mkDVarSet varList
+intersectCandidates :: CandidatesQTvs -> [Var] -> CandidatesQTvs
+intersectCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) varList
+  = DV { dv_kvs = kvs `intersectDVarSet` vars
+       , dv_tvs = tvs `intersectDVarSet` vars
+       , dv_cvs = cvs `intersectVarSet` mkVarSet varList }
+  where
+    vars = mkDVarSet varList
 
 delCandidates :: CandidatesQTvs -> [Var] -> CandidatesQTvs
 delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
@@ -1390,7 +1394,7 @@ partitionCandidates dvs@(DV { dv_kvs = kvs, dv_tvs = tvs }) pred
     (extracted_tvs, rest_tvs) = partitionDVarSet pred tvs
     extracted = dVarSetToVarSet extracted_kvs `unionVarSet` dVarSetToVarSet extracted_tvs
 
-candidateQTyVarsWithBinders :: [TyVar] -> [TyVar] -> Type -> TcM (CandidatesQTvs, [TyVar])
+candidateQTyVarsWithBinders :: [TyVar] -> [TyVar] -> Type -> TcM (CandidatesQTvs, CandidatesQTvs)
 -- (candidateQTyVarsWithBinders tvs ty) returns the candidateQTyVars
 -- of (forall tvs. ty), but do not treat 'tvs' as bound for the purpose
 -- of Note [Naughty quantification candidates].  Why?
@@ -1753,14 +1757,14 @@ quantifyTyVars :: SkolemInfo
                -> CandidatesQTvs   -- See Note [Dependent type variables]
                                    -- Already zonked
                -> TcM [TcTyVar]
-quantifyTyVars ski tvs = quantifyTyVarsWithBinders ski tvs []
+quantifyTyVars ski tvs = fst <$> quantifyTyVarsWithBinders ski tvs mempty
 
 quantifyTyVarsWithBinders ::
                SkolemInfo
                -> CandidatesQTvs   -- See Note [Dependent type variables]
                                    -- Already zonked
-               -> [TcTyVar]
-               -> TcM [TcTyVar]
+               -> CandidatesQTvs   -- try not to default
+               -> TcM ([TcTyVar], [TcTyVar])
 -- See Note [quantifyTyVars]
 -- Can be given a mixture of TcTyVars and TyVars, in the case of
 --   associated type declarations. Also accepts covars, but *never* returns any.
@@ -1770,35 +1774,38 @@ quantifyTyVarsWithBinders ::
 -- to the restrictions in Note [quantifyTyVars].
 
 -- for outer_wcs_imp_tvs, do not default, just skolemise add to the list of quantified
-quantifyTyVarsWithBinders skol_info dvs outer_wcs_imp_tvs
+quantifyTyVarsWithBinders skol_info dvs outer_wcs_imp_dvs
        -- short-circuit common case
-  | isEmptyCandidates dvs && null outer_wcs_imp_tvs
+  | isEmptyCandidates dvs && isEmptyCandidates outer_wcs_imp_dvs
   = do { traceTc "quantifyTyVars has nothing to quantify" empty
-       ; return [] }
+       ; return ([], []) }
 
   | otherwise
   = do { traceTc "quantifyTyVars {"
            ( vcat [
             text "dvs =" <+> ppr dvs,
-            text "outer_wc_imp_qtvs=" <+> ppr outer_wcs_imp_tvs
+            text "outer_wc_imp_qtvs=" <+> ppr outer_wcs_imp_dvs
             ])
 
-       ; undefaulted <- defaultTyVars dvs
-       ; final_qtvs  <- liftZonkM $ do
+       ; undefaulted <- defaultTyVars DefaultNonStandardTyVars dvs
+       ; undefaulted_outer_wcs_imp_tvs <- defaultTyVars TryNotToDefaultNonStandardTyVars outer_wcs_imp_dvs
+       ; (final_qtvs, final_outer_wcs_imp_qtvs)  <- liftZonkM $ do
             -- resume order and then skolemise
-            qtvs <- mapMaybeM zonk_quant undefaulted
-            return qtvs
+            qtvs <- mapMaybeM zonk_quant $ undefaulted
+            outer_wcs_imp_qtvs <- mapMaybeM zonk_quant $ undefaulted_outer_wcs_imp_tvs
+            return (qtvs, outer_wcs_imp_qtvs)
 
        ; traceTc "quantifyTyVars }"
            (vcat [ text "undefaulted:" <+> pprTyVars undefaulted
+                 , text "final_outer_wcs_imp_qtvs:" <+> pprTyVars final_outer_wcs_imp_qtvs
                  , text "final_qtvs:" <+> pprTyVars final_qtvs
                   ])
 
        -- We should never quantify over coercion variables; check this
-       ; let co_vars = filter isCoVar final_qtvs
+       ; let co_vars = filter isCoVar (final_qtvs ++ final_outer_wcs_imp_qtvs)
        ; massertPpr (null co_vars) (ppr co_vars)
 
-       ; return final_qtvs }
+       ; return (final_qtvs, final_outer_wcs_imp_qtvs) }
   where
     -- zonk_quant returns a tyvar if it should be quantified over;
     -- otherwise, it returns Nothing. The latter case happens for
@@ -1865,7 +1872,7 @@ defaultTyVar :: DefaultingStrategy
              -> TcTyVar    -- If it's a MetaTyVar then it is unbound
              -> TcM Bool   -- True <=> defaulted away altogether
 defaultTyVar def_strat tv
-  | not (isMetaTyVar tv )
+  | not (isMetaTyVar tv)
   || isTyVarTyVar tv
     -- Do not default TyVarTvs. Doing so would violate the invariants
     -- on TyVarTvs; see Note [TyVarTv] in GHC.Tc.Utils.TcMType.
@@ -1874,16 +1881,19 @@ defaultTyVar def_strat tv
   = return False
 
   | isRuntimeRepVar tv
+  , default_ns_vars
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; liftZonkM $ writeMetaTyVar tv liftedRepTy
        ; return True }
 
   | isLevityVar tv
+  , default_ns_vars
   = do { traceTc "Defaulting a Levity var to Lifted" (ppr tv)
        ; liftZonkM $ writeMetaTyVar tv liftedDataConTy
        ; return True }
 
   | isMultiplicityVar tv
+  , default_ns_vars
   = do { traceTc "Defaulting a Multiplicity var to Many" (ppr tv)
        ; liftZonkM $ writeMetaTyVar tv manyDataConTy
        ; return True }
@@ -1906,6 +1916,8 @@ defaultTyVar def_strat tv
   = return False
 
   where
+    default_ns_vars :: Bool
+    default_ns_vars = defaultNonStandardTyVars def_strat
     default_kind_var :: TyVar -> TcM Bool
        -- defaultKindVar is used exclusively with -XNoPolyKinds
        -- See Note [Defaulting with -XNoPolyKinds]
@@ -1936,13 +1948,14 @@ defaultTyVar def_strat tv
 --  - 'Multiplicity' tyvars default to 'Many'
 --  - 'Type' tyvars from dv_kvs default to 'Type', when -XNoPolyKinds
 --    (under -XNoPolyKinds, non-defaulting vars in dv_kvs is an error)
-defaultTyVars :: CandidatesQTvs    -- ^ all candidates for quantification
+defaultTyVars :: NonStandardDefaultingStrategy
+              -> CandidatesQTvs    -- ^ all candidates for quantification
               -> TcM [TcTyVar]     -- ^ those variables not defaulted
-defaultTyVars dvs
+defaultTyVars ns_strat dvs
   = do { poly_kinds <- xoptM LangExt.PolyKinds
        ; let
            def_tvs, def_kvs :: DefaultingStrategy
-           def_tvs = NonStandardDefaulting
+           def_tvs = NonStandardDefaulting ns_strat
            def_kvs | poly_kinds = def_tvs
                    | otherwise  = DefaultKindVars
              -- As -XNoPolyKinds precludes polymorphic kind variables, we default them.
@@ -2124,7 +2137,7 @@ doNotQuantifyTyVars dvs where_found
 
   | otherwise
   = do { traceTc "doNotQuantifyTyVars" (ppr dvs)
-       ; undefaulted <- defaultTyVars dvs
+       ; undefaulted <- defaultTyVars DefaultNonStandardTyVars dvs
           -- could have regular TyVars here, in an associated type RHS, or
           -- bound by a type declaration head. So filter looking only for
           -- metavars. e.g. b and c in `class (forall a. a b ~ a c) => C b c`

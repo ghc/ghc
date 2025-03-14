@@ -1795,7 +1795,7 @@ defaultTyVarsAndSimplify rhs_tclvl candidates
        ; poly_kinds  <- xoptM LangExt.PolyKinds
        ; let default_kv | poly_kinds = default_tv
                         | otherwise  = defaultTyVar DefaultKindVars
-             default_tv = defaultTyVar NonStandardDefaulting
+             default_tv = defaultTyVar (NonStandardDefaulting DefaultNonStandardTyVars)
        ; mapM_ default_kv (dVarSetElems cand_kvs)
        ; mapM_ default_tv (dVarSetElems (cand_tvs `minusDVarSet` cand_kvs))
 
