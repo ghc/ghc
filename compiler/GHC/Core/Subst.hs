@@ -404,7 +404,7 @@ Now a variant that unconditionally allocates a new unique.
 It also unconditionally zaps the OccInfo.
 -}
 
-cloneBndrs :: Traversable t => Subst -> UniqSupply -> t Var -> (Subst, t Var)
+cloneBndrs :: Subst -> UniqSupply -> [Var] -> (Subst, [Var])
 -- Works for all kinds of variables (typically case binders)
 -- not just Ids
 cloneBndrs subst us vs
