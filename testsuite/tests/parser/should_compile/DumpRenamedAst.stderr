@@ -816,6 +816,12 @@
          (Nothing))))]
      []
      []
+     [])
+   ,(TyClGroup
+     (NoExtField)
+     []
+     []
+     []
      [(L
        (EpAnn
         (EpaSpan { DumpRenamedAst.hs:(19,1)-(20,45) })
@@ -2174,6 +2180,12 @@
            (Nothing)))]
         []
         []))]
+     []
+     []
+     [])
+   ,(TyClGroup
+     (NoExtField)
+     []
      []
      []
      [(L

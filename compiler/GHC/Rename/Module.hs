@@ -1467,13 +1467,7 @@ rnTyClDecls tycl_ds
              inst_ds_map = mkInstDeclFreeVarsMap rdr_env tc_names instds_w_fvs
              (init_inst_ds, rest_inst_ds) = getInsts [] inst_ds_map
 
-             first_group
-               | null init_inst_ds = []
-               | otherwise = [TyClGroup { group_ext    = noExtField
-                                        , group_tyclds = []
-                                        , group_kisigs = []
-                                        , group_roles  = []
-                                        , group_instds = init_inst_ds }]
+             first_group = mk_inst_groups init_inst_ds
 
              (final_inst_ds, groups)
                 = mapAccumL (mk_group role_annot_env kisig_env) rest_inst_ds tycl_sccs
@@ -1482,7 +1476,7 @@ rnTyClDecls tycl_ds
                        foldr (plusFV . snd) emptyFVs instds_w_fvs `plusFV`
                        foldr (plusFV . snd) emptyFVs kisigs_w_fvs
 
-             all_groups = first_group ++ groups
+             all_groups = first_group ++ concat groups
 
        ; massertPpr (null final_inst_ds)
                     (ppr instds_w_fvs
@@ -1497,7 +1491,7 @@ rnTyClDecls tycl_ds
              -> KindSigEnv
              -> InstDeclFreeVarsMap
              -> SCC (LTyClDecl GhcRn)
-             -> (InstDeclFreeVarsMap, TyClGroup GhcRn)
+             -> (InstDeclFreeVarsMap, [TyClGroup GhcRn])
     mk_group role_env kisig_env inst_map scc
       = (inst_map', group)
       where
@@ -1510,7 +1504,17 @@ rnTyClDecls tycl_ds
                           , group_tyclds = tycl_ds
                           , group_kisigs = kisigs
                           , group_roles  = roles
-                          , group_instds = inst_ds }
+                          , group_instds = [] }
+                : mk_inst_groups inst_ds
+
+    mk_inst_groups :: [LInstDecl GhcRn] -> [TyClGroup GhcRn]
+    mk_inst_groups inst_ds =
+      [ TyClGroup { group_ext = noExtField
+                  , group_tyclds = []
+                  , group_kisigs = []
+                  , group_roles  = []
+                  , group_instds = [inst_d] }
+      | inst_d <- inst_ds ]
 
 -- | Free variables of standalone kind signatures.
 newtype KindSig_FV_Env = KindSig_FV_Env (NameEnv FreeVars)
