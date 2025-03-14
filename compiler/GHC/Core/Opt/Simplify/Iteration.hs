@@ -2252,7 +2252,7 @@ simplInId :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplInId env var cont
   | Just dc <- isDataConWorkId_maybe var
   , isLazyDataConRep dc                    -- See Note [Fast path for lazy data constructors]
-  = rebuild env (Var var) cont
+  = rebuild zapped_env (Var var) cont
   | otherwise
   = case substId env var of
       ContEx tvs cvs ids e -> simplExprF env' e cont
@@ -2261,15 +2261,15 @@ simplInId env var cont
         where
           env' = setSubstEnv env tvs cvs ids
 
-      DoneId out_id -> simplOutId env' out_id cont'
+      DoneId out_id -> simplOutId zapped_env out_id cont'
         where
-          cont' = trimJoinCont var (idJoinPointHood var) cont
-          env'  = zapSubstEnv env  -- See Note [zapSubstEnv]
+          cont' = trimJoinCont out_id (idJoinPointHood out_id) cont
 
-      DoneEx e mb_join -> simplExprF env' e cont'
+      DoneEx e mb_join -> simplExprF zapped_env e cont'
         where
           cont' = trimJoinCont var mb_join cont
-          env'  = zapSubstEnv env  -- See Note [zapSubstEnv]
+  where
+    zapped_env =  zapSubstEnv env  -- See Note [zapSubstEnv]
 
 ---------------------------------------------------------
 simplOutId :: SimplEnvIS -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
