@@ -1819,7 +1819,7 @@ type LvlM result = UniqSM result
 initLvl :: UniqSupply -> UniqSM a -> a
 initLvl = initUs_
 
-newPolyBndrs :: Level -> LevelEnv -> AbsVars -> [InId] -> LvlM (LevelEnv, t OutId)
+newPolyBndrs :: Level -> LevelEnv -> AbsVars -> [InId] -> LvlM (LevelEnv, [OutId])
 -- The envt is extended to bind the new bndrs to dest_lvl, but
 -- the le_ctxt_lvl is unaffected
 newPolyBndrs dest_lvl
