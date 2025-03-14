@@ -11,7 +11,10 @@
      []))
    []
    [(TyClGroup
-     (NoExtField)
+     ((,)
+      [{Name: T14189.MyType}]
+      {NameSet:
+       []})
      [(L
        (EpAnn
         (EpaSpan { T14189.hs:6:1-42 })
