@@ -2328,7 +2328,7 @@ simplOutId env fun cont
        ; rule_base <- getSimplRules
        ; let rules_for_me = getRules rule_base fun
              out_args     = contOutArgs env cont1 :: [OutExpr]
-       ; mb_match <- if isClassOpId fun
+       ; mb_match <- if not (isPrimOpId fun)
                      then tryRules zapped_env rules_for_me fun out_args
                      else return Nothing
        ; case mb_match of {
