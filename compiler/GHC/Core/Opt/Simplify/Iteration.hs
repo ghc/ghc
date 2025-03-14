@@ -1540,7 +1540,7 @@ rebuild_go env expr cont
         -> rebuildCase (se `setInScopeFromE` env) expr bndr alts cont
 
       StrictArg { sc_fun = fun, sc_cont = cont, sc_fun_ty = fun_ty }
-        -> rebuildCall env (addValArgTo fun expr fun_ty ) cont
+        -> rebuildCall env (addValArgTo fun expr fun_ty) cont
 
       StrictBind { sc_bndr = b, sc_body = body, sc_env = se
                  , sc_cont = cont, sc_from = from_what }
@@ -2328,7 +2328,9 @@ simplOutId env fun cont
        ; rule_base <- getSimplRules
        ; let rules_for_me = getRules rule_base fun
              out_args     = contOutArgs env cont1 :: [OutExpr]
-       ; mb_match <- tryRules zapped_env rules_for_me fun out_args
+       ; mb_match <- if isClassOpId fun
+                     then tryRules zapped_env rules_for_me fun out_args
+                     else return Nothing
        ; case mb_match of {
              Just (rule_arity, rhs) -> simplExprF zapped_env rhs $
                                        dropContArgs rule_arity cont1 ;
