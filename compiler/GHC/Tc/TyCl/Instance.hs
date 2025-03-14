@@ -44,48 +44,53 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Class( AssocInstInfo(..), isNotAssociated )
-import GHC.Core.Multiplicity
-import GHC.Core.InstEnv
 import GHC.Tc.Instance.Family
-import GHC.Core.FamInstEnv
+
 import GHC.Tc.Deriv
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Unify
+import GHC.Tc.Types.Evidence
+
 import GHC.Builtin.Names ( unsatisfiableIdName )
+
 import GHC.Core        ( Expr(..), mkVarApps )
 import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
--- import GHC.Core.Unfold.Make ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
-import GHC.Core.Unfold.Make (mkDFunUnfolding )
+import GHC.Core.Unfold.Make ( mkDFunUnfolding )
+import GHC.Core.FamInstEnv
 import GHC.Core.Type
--- import GHC.Core.SimpleOpt
+import GHC.Core.Multiplicity
+import GHC.Core.InstEnv
 import GHC.Core.Predicate( classMethodInstTy )
-import GHC.Tc.Types.Evidence
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.Class
+
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Types.Fixity
-import GHC.Driver.DynFlags
-import GHC.Driver.Ppr
-import GHC.Utils.Logger
-import GHC.Data.FastString
 import GHC.Types.Id
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
-import GHC.Data.List.SetOps
 import GHC.Types.Name
 import GHC.Types.Name.Set
+import GHC.Types.SrcLoc
+
+import GHC.Driver.DynFlags
+import GHC.Driver.Ppr
+
+import GHC.Utils.Logger
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.SrcLoc
 import GHC.Utils.Misc
+
+import GHC.Data.FastString
+import GHC.Data.List.SetOps
+import GHC.Data.Bag
 import GHC.Data.BooleanFormula ( isUnsatisfied )
 import qualified GHC.LanguageExtensions as LangExt
 

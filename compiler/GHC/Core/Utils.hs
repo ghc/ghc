@@ -73,6 +73,7 @@ import GHC.Core
 import GHC.Core.Ppr
 import GHC.Core.FVs( bindFreeVars )
 import GHC.Core.DataCon
+import GHC.Core.Class( classTyCon )
 import GHC.Core.Type as Type
 import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.FamInstEnv
@@ -1301,7 +1302,10 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     go (Lit l)    | litIsTrivial l        = k_lit l
     go (Type _)                           = k_triv
     go (Coercion _)                       = k_triv
-    go (App f t)  | not (isRuntimeArg t)  = go f
+    go (App f t)
+      | not (isRuntimeArg t)              = go f
+      | is_unary_cls_op f                 = go t
+      | otherwise                         = k_not_triv
     go (Lam b e)  | not (isRuntimeVar b)  = go e
     go (Tick t e) | not (tickishIsCode t) = go e              -- See Note [Tick trivial]
     go (Cast e _)                         = go e
@@ -1311,6 +1315,12 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
       | Just rhs <- isUnsafeEqualityCase e b as
       = go rhs   -- See (U2) of Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
     go _                                  = k_not_triv
+
+    is_unary_cls_op (App f (Type {}))       = is_unary_cls_op f
+    is_unary_cls_op (Var v)
+      | Just cls <- isClassOpId_maybe v     = isUnaryClassTyCon (classTyCon cls)
+      | Just dc  <- isDataConWorkId_maybe v = isUnaryClassTyCon (dataConTyCon dc)
+    is_unary_cls_op _                       = False
 
 exprIsTrivial :: CoreExpr -> Bool
 exprIsTrivial e = trivial_expr_fold (const True) (const True) True False e
