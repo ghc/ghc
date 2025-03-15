@@ -894,11 +894,6 @@ To begin with, let's clarify the terminology:
 * NonStandardTyVars: RuntimeRep, Multiplicity, Levity
 * UTVQ and UTVNQ would not be both present in the same equation. see Note [forall-or-nothing rule]
 
-The old implementation:
-* We are not doing any type variables defaulting for NonStandardTyVars at all.
-  But ITV are defaulted in other places.
-* In rename phase, UTVQ or UTVNQ are collected to binders except WC.
-* In typecheck phase, UTVQ or UTVNQ are treated as skolems, WC and ITV are given TauVars.
 
 Main goal:
 We want ITV defaulting happens in general just as we do in other places(Be it NonStandardTyVars or not).
@@ -932,8 +927,8 @@ Implementation plan:
   * In typecheck phase, collect wildcards in local typecheck env,
   1. emit wildcard type variables to the typecheck env using addWildCards in `tcAnonWildCardOcc`
   2. we use captureWildCards to collect them.
-* ITV: Assign them TauVars, do defaulting and quantification.
-* WC and UTVNQ: Assign them TauVars, but skip defaulting, but quantify just like ITV.
+* ITV: Assign them TauVars, do defaulting(DefaultNonStandardTyVars) and quantification.
+* WC and UTVNQ: Assign them TauVars, but try to skip defaulting(TryNotToDefaultNonStandardTyVars), but quantify just like ITV.
 -}
 
 {-
@@ -1016,7 +1011,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                            , lhs_applied_kind
                            , res_kind ) }
 
-       ; (final_tvs, qtvs) <- tcFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted
+       ; (final_tvs, qtvs) <- quantifyFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted
 
        ; (final_tvs, non_user_tvs, lhs_ty, master_res_kind, instance_res_kind, stupid_theta) <-
           liftZonkM $ do

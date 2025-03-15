@@ -21,7 +21,7 @@ module GHC.Tc.TyCl (
         tcFamTyPats, tcTyFamInstEqn,
         tcAddOpenTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
         unravelFamInstPats, addConsistencyConstraints,
-        checkFamTelescope, tcFamInstLHSBinders
+        checkFamTelescope, quantifyFamInstLHSBinders
     ) where
 
 import GHC.Prelude
@@ -249,9 +249,9 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
                  th_bndrs' `plusNameEnv` th_bndrs) }
 
 
-tcFamInstLHSBinders :: TcLevel -> SkolemInfo -> HsOuterFamEqnTyVarBndrs GhcTc -> HsOuterFamEqnTyVarBndrs GhcRn
+quantifyFamInstLHSBinders :: TcLevel -> SkolemInfo -> HsOuterFamEqnTyVarBndrs GhcTc -> HsOuterFamEqnTyVarBndrs GhcRn
   -> [TcTyVar] -> Type -> WantedConstraints -> IOEnv (Env TcGblEnv TcLclEnv) ([TyCoVar], [TcTyVar])
-tcFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted = do
+quantifyFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted = do
 
        ; let outer_exp_tvs = scopedSort $ explicitOuterTyVars outer_bndrs
        ; let outer_imp_tvs = implicitOuterTyVars outer_bndrs
@@ -267,7 +267,7 @@ tcFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted
        ; let final_tvs = scopedSort (qtvs ++ outer_wcs_imp_qtvs ++ outer_exp_tvs)
              -- This scopedSort is important: the qtvs may be /interleaved/ with
              -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
-       ; traceTc "tcFamInstLHSBinders" $
+       ; traceTc "quantifyFamInstLHSBinders" $
          vcat [
                text "lhs_ty:" <+> ppr lhs_ty
               , text "outer_bndrs:" <+> ppr outer_bndrs
@@ -3479,7 +3479,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        ; traceTc "tcTyFamInstEqnGuts 0" (ppr outer_bndrs $$ ppr skol_info)
 
       --  -- See Note [Type variables in type families instance decl]
-       ; (final_tvs, qtvs) <- tcFamInstLHSBinders tclvl skol_info outer_bndrs outer_hs_bndrs wcs lhs_ty wanted
+       ; (final_tvs, qtvs) <- quantifyFamInstLHSBinders tclvl skol_info outer_bndrs outer_hs_bndrs wcs lhs_ty wanted
 
        -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
        -- Example: typecheck/should_fail/T17301
