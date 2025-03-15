@@ -489,7 +489,7 @@ mkDictSelId name clas
 
     pred_ty = mkClassPred clas (mkTyVarTys (binderVars tyvars))
     res_ty  = scaledThing (getNth arg_tys val_index)
-    sel_ty  = mkInvisForAllTys tyvars $
+    sel_ty  = mkForAllTys tyvars $
               mkFunctionType ManyTy pred_ty res_ty
              -- See Note [Type classes and linear types]
 
@@ -857,8 +857,8 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
              wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding wrap_rhs
                         -- See Note [Compulsory newtype unfolding]
                       | otherwise        = mkDataConUnfolding wrap_rhs
-             wrap_rhs = mkLams wrap_tvs $
-                        mkLams wrap_args $
+             wrap_rhs = mkCoreTyLams wrap_tvbs $
+                        mkCoreLams wrap_args $
                         wrapFamInstBody tycon res_ty_args $
                         wrap_body
 
@@ -871,7 +871,7 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
     (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
                  = dataConFullSig data_con
     stupid_theta = dataConStupidTheta data_con
-    wrap_tvs     = dataConUserTyVars data_con
+    wrap_tvbs    = dataConUserTyVarBinders data_con
     res_ty_args  = dataConResRepTyArgs data_con
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
@@ -928,7 +928,7 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
 
       || isFamInstTyCon tycon -- Cast result
 
-      || dataConUserTyVarsNeedWrapper data_con
+      || dataConUserTyVarBindersNeedWrapper data_con
                      -- If the data type was written with GADT syntax and
                      -- orders the type variables differently from what the
                      -- worker expects, it needs a data con wrapper to reorder

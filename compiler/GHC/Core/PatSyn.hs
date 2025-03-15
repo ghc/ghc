@@ -12,7 +12,8 @@ module GHC.Core.PatSyn (
         PatSyn, PatSynMatcher, PatSynBuilder, mkPatSyn,
 
         -- ** Type deconstruction
-        patSynName, patSynArity, patSynIsInfix, patSynResultType,
+        patSynName, patSynArity, patSynVisArity,
+        patSynIsInfix, patSynResultType,
         isVanillaPatSyn,
         patSynArgs,
         patSynMatcher, patSynBuilder,
@@ -421,6 +422,13 @@ patSynIsInfix = psInfix
 -- | Arity of the pattern synonym
 patSynArity :: PatSyn -> Arity
 patSynArity = psArity
+
+-- | Number of visible arguments of the pattern synonym
+patSynVisArity :: PatSyn -> VisArity
+patSynVisArity ps = n_of_required_ty_args + n_of_val_args
+  where
+    n_of_val_args = psArity ps
+    n_of_required_ty_args = 0   -- no visible forall in pattern synonyms yet (#23704)
 
 -- | Is this a \'vanilla\' pattern synonym (no existentials, no provided constraints)?
 isVanillaPatSyn :: PatSyn -> Bool

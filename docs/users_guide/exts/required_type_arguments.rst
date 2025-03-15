@@ -427,3 +427,70 @@ coming from dependently-typed languages or proof assistants.
 The :extension:`RequiredTypeArguments` extension does not add dependent
 functions, which would be a much bigger step. Rather :extension:`RequiredTypeArguments`
 just makes it possible for the type arguments of a function to be compulsory.
+
+.. _visible-forall-in-gadts:
+
+Visible forall in GADTs
+~~~~~~~~~~~~~~~~~~~~~~~
+
+**Since:** GHC 9.14
+
+When :extension:`RequiredTypeArguments` is in effect, the use of ``forall a ->``
+in data constructor declarations is allowed: ::
+
+  data T a where
+    Typed :: forall a -> a -> T a
+
+There are no restrictions placed on the flavour of the parent declaration:
+the data constructor may be introduced as part of a ``data``, ``data instance``,
+``newtype``, or ``newtype instance`` declaration.
+
+The use of visible forall in the type of a data constructor imposes no
+restrictions on where the data constructor may occur.  Examples:
+
+* in expressions ::
+
+      t1 = Typed Int 42
+      t2 = Typed String "hello"
+      t3 = Typed (Int -> Bool) even
+
+* in patterns ::
+
+      f1 (Typed a x) = x :: a
+      f2 (Typed Int n) = n*2
+      f3 (Typed ((->) w Bool) g) = not . g
+
+* in types (with :extension:`DataKinds`) ::
+
+      type T1 = Typed Nat 42
+      type T2 = Typed Symbol "hello"
+      type T3 = Typed (Type -> Constraint) Num
+
+At the moment, all foralls in the type of a data constructor (including visible
+foralls) must occur before constraints or value arguments: ::
+
+  data D x where
+    -- OK (one forall at the front of the type)
+    MkD1 :: forall a b ->
+            a ->
+            b ->
+            D (a, b)
+
+    -- OK (multpile foralls at the front of the type)
+    MkD2 :: forall a.
+            forall b ->
+            a ->
+            b ->
+            D (a, b)
+
+    -- Rejected (forall after a value argument)
+    MkD3 :: forall a ->
+            a ->
+            forall b ->
+            b ->
+            D (a, b)
+
+This restriction is intended to be lifted in the future (:ghc-ticket:`18389`).
+
+The use of visible forall instead of invisible forall has no effect on how data
+is represented on the heap.

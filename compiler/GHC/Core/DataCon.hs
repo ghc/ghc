@@ -45,7 +45,7 @@ module GHC.Core.DataCon (
         dataConInstUnivs,
         dataConFieldLabels, dataConFieldType, dataConFieldType_maybe,
         dataConSrcBangs,
-        dataConSourceArity, dataConRepArity,
+        dataConSourceArity, dataConVisArity, dataConRepArity,
         dataConIsInfix,
         dataConWorkId, dataConWrapId, dataConWrapId_maybe,
         dataConImplicitTyThings,
@@ -61,7 +61,7 @@ module GHC.Core.DataCon (
         isUnboxedSumDataCon, isCovertGadtDataCon,
         isVanillaDataCon, isNewDataCon, isTypeDataCon,
         classDataCon, dataConCannotMatch,
-        dataConUserTyVarsNeedWrapper, checkDataConTyVars,
+        dataConUserTyVarBindersNeedWrapper, checkDataConTyVars,
         isBanged, isUnpacked, isMarkedStrict, cbvFromStrictMark, eqHsBang, isSrcStrict, isSrcUnpacked,
         specialPromotedDc,
 
@@ -80,7 +80,7 @@ import GHC.Core.Coercion
 import GHC.Core.Unify
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Subst
-import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCo.Compare( eqType, eqForAllVis )
 import GHC.Core.Multiplicity
 import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Types.FieldLabel
@@ -463,7 +463,7 @@ data DataCon
         --    with the set of dcUnivTyVars whose tyvars do not appear in dcEqSpec
         -- So dcUserTyVarBinders is a subset of (dcUnivTyVars ++ dcExTyCoVars)
         -- See Note [DataCon user type variable binders]
-        dcUserTyVarBinders :: [InvisTVBinder],
+        dcUserTyVarBinders :: [TyVarBinder],
 
         dcEqSpec :: [EqSpec],   -- Equalities derived from the result type,
                                 -- _as written by the programmer_.
@@ -580,22 +580,8 @@ data DataCon
   }
 
 
-{- Note [TyVarBinders in DataCons]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For the TyVarBinders in a DataCon and PatSyn,
-each argument flag is either Inferred or Specified, never Required.
-Lifting this restriction is tracked at #18389 (DataCon) and #23704 (PatSyn).
-
-Why do we need the TyVarBinders, rather than just the TyVars?  So that
-we can construct the right type for the DataCon with its foralls
-attributed the correct visibility.  That in turn governs whether you
-can use visible type application at a call of the data constructor.
-
-See also [DataCon user type variable binders] for an extended discussion on the
-order in which TyVarBinders appear in a DataCon.
-
-Note [Existential coercion variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Existential coercion variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For now (Aug 2018) we can't write coercion quantifications in source Haskell, but
 we can in Core. Consider having:
 
@@ -656,12 +642,17 @@ Note [DataCon user type variable binders]
 A DataCon has two different sets of type variables:
 
 * dcUserTyVarBinders, for the type variables binders in the order in which they
-  originally arose in the user-written type signature.
+  originally arose in the user-written type signature, and with user-specified
+  visibilities.
 
   - They are the forall'd binders of the data con /wrapper/, which the user calls.
 
-  - Their order *does* matter for TypeApplications, so they are full TyVarBinders,
-    complete with visibilities.
+  - With RequiredTypeArguments, some of the foralls may be visible, e.g.
+      MkT :: forall a b. forall c -> (a, b, c) -> T a b c
+    so the binders are full TyVarBinders, complete with visibilities.
+
+  - Even if we only consider invisible foralls, the order and specificity of
+    binders matter for TypeApplications.
 
 * dcUnivTyVars and dcExTyCoVars, for the "true underlying" (i.e. of the data
   con worker) universal type variable and existential type/coercion variables,
@@ -669,12 +660,24 @@ A DataCon has two different sets of type variables:
 
   - They (i.e. univ ++ ex) are the forall'd variables of the data con /worker/
 
-  - Their order is irrelevant for the purposes of TypeApplications,
-    and as a consequence, they do not come equipped with visibilities
-    (that is, they are TyVars/TyCoVars instead of ForAllTyBinders).
+  - They do not come equipped with visibilities:
+        dcUnivTyVars :: [TyVar]     -- not [TyVarBinder]
+        dcExTyCoVars :: [TyCoVar]   -- not [ForAllTyBinder]
+    Instead, we treat them as having the Specified (coreTyLamForAllTyFlag)
+    visibility. For example:
+        wrapper type: forall {a} b. forall c -> ...
+        worker type:  forall a b c. ...
+    This is a design choice. Reasons:
+      * Workers are never called by the user. They are part of the Core
+        language where visibilities don't matter as much.
+      * Consistency with type lambdas in Core. As Note [Required foralls in Core]
+        in GHC.Core.TyCo.Rep explains, (/\a. e) :: (forall a. e_ty), and we need
+        a coercion to cast it to (forall a -> e_ty).
+    As a consequence, we may need to adjust visibilities with a cast in the
+    wrapper. See Note [Flag cast in data con wrappers].
 
-Often (dcUnivTyVars ++ dcExTyCoVars) = dcUserTyVarBinders; but they may differ
-for two reasons, coming next:
+Often (dcUnivTyVars ++ dcExTyCoVars) = binderVars dcUserTyVarBinders; but they
+may differ for two reasons, coming next:
 
 --- Reason (R1): Order of quantification in GADT syntax ---
 
@@ -1144,9 +1147,7 @@ mkDataCon :: Name
           -> ConcreteTyVars
                                 -- ^ TyVars which must be instantiated with
                                 -- concrete types
-          -> [InvisTVBinder]    -- ^ User-written 'TyVarBinder's.
-                                --   These must be Inferred/Specified.
-                                --   See @Note [TyVarBinders in DataCons]@
+          -> [TyVarBinder]      -- ^ User-written 'TyVarBinder's
           -> [EqSpec]           -- ^ GADT equalities
           -> KnotTied ThetaType -- ^ Theta-type occurring before the arguments proper
           -> [KnotTied (Scaled Type)]    -- ^ Original argument types
@@ -1225,8 +1226,8 @@ mkDataCon name declared_infix prom_info
                  -- Hence using mkScaledFunctionTys.
 
       -- See Note [Promoted data constructors] in GHC.Core.TyCon
-    prom_tv_bndrs = [ mkNamedTyConBinder (Invisible spec) tv
-                    | Bndr tv spec <- user_tvbs ]
+    prom_tv_bndrs = [ mkNamedTyConBinder vis tv
+                    | Bndr tv vis <- user_tvbs ]
 
     fresh_names = freshNames (map getName user_tvbs)
       -- fresh_names: make sure that the "anonymous" tyvars don't
@@ -1323,9 +1324,9 @@ dataConUserTyVars :: DataCon -> [TyVar]
 dataConUserTyVars (MkData { dcUserTyVarBinders = tvbs }) = binderVars tvbs
 
 -- See Note [DataCon user type variable binders]
--- | 'InvisTVBinder's for the type variables of the constructor, in the order the
+-- | 'TyVarBinder's for the type variables of the constructor, in the order the
 -- user wrote them
-dataConUserTyVarBinders :: DataCon -> [InvisTVBinder]
+dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
 dataConUserTyVarBinders = dcUserTyVarBinders
 
 -- | Dependent (kind-level) equalities in a constructor.
@@ -1412,9 +1413,17 @@ dataConFieldType_maybe con label
 dataConSrcBangs :: DataCon -> [HsSrcBang]
 dataConSrcBangs = dcSrcBangs
 
--- | Source-level arity of the data constructor
+-- | Number of value arguments of the data constructor
 dataConSourceArity :: DataCon -> Arity
 dataConSourceArity (MkData { dcSourceArity = arity }) = arity
+
+-- | Number of visible arguments of the data constructor
+dataConVisArity :: DataCon -> VisArity
+dataConVisArity (MkData { dcUserTyVarBinders = tvbs, dcSourceArity = arity })
+  = n_of_required_ty_args + n_of_val_args
+  where
+    n_of_val_args         = arity
+    n_of_required_ty_args = count isVisibleForAllTyBinder tvbs
 
 -- | Gives the number of value arguments (including zero-width coercions)
 -- stored by the given `DataCon`'s worker in its Core representation. This may
@@ -1574,7 +1583,7 @@ dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
                              dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                              dcOrigResTy = res_ty,
                              dcStupidTheta = stupid_theta })
-  = mkInvisForAllTys user_tvbs $
+  = mkForAllTys user_tvbs $
     mkInvisFunTys (stupid_theta ++ theta) $
     mkScaledFunTys arg_tys $
     res_ty
@@ -1586,7 +1595,7 @@ dataConNonlinearType (MkData { dcUserTyVarBinders = user_tvbs,
                                dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                                dcOrigResTy = res_ty,
                                dcStupidTheta = stupid_theta })
-  = mkInvisForAllTys user_tvbs $
+  = mkForAllTys user_tvbs $
     mkInvisFunTys (stupid_theta ++ theta) $
     mkScaledFunTys arg_tys' $
     res_ty
@@ -1904,21 +1913,53 @@ checkDataConTyVars dc@(MkData { dcUnivTyVars = univ_tvs
 
     wrapper_vars = dataConUserTyVars dc
 
-dataConUserTyVarsNeedWrapper :: DataCon -> Bool
--- Check whether the worker and wapper have the same type variables
--- in the same order. If not, we need a wrapper to swizzle them.
+dataConUserTyVarBindersNeedWrapper :: DataCon -> Bool
+-- Check whether the worker and wrapper have the same type variables
+-- in the same order and with the same visibility. If not, we need a
+-- wrapper to swizzle them.
 -- See Note [DataCon user type variable binders], as well as
 -- Note [Data con wrappers and GADT syntax] for an explanation of what
 -- mkDataConRep is doing with this function.
-dataConUserTyVarsNeedWrapper dc@(MkData { dcUnivTyVars = univ_tvs
-                                        , dcExTyCoVars = ex_tvs
-                                        , dcEqSpec = eq_spec })
+dataConUserTyVarBindersNeedWrapper (MkData { dcUnivTyVars = univ_tvs
+                                           , dcExTyCoVars = ex_tvs
+                                           , dcUserTyVarBinders = user_tvbs
+                                           , dcEqSpec = eq_spec })
   = assert (null eq_spec || answer)  -- all GADTs should say "yes" here
     answer
   where
-    answer = (univ_tvs ++ ex_tvs) /= dataConUserTyVars dc
-              -- Worker tyvars         Wrapper tyvars
+    answer = need_reorder || need_flag_cast
+    need_reorder   = (univ_tvs ++ ex_tvs) /= binderVars user_tvbs
+    need_flag_cast = any (not . eqForAllVis coreTyLamForAllTyFlag)
+                         (binderFlags user_tvbs)
+      -- See Note [Flag cast in data con wrappers]
 
+{- Note [Flag cast in data con wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the data declaration
+
+  data G a where
+    MkG :: forall a -> a -> G a
+
+The user-facing type of MkG has a 'Required' forall. Workers, on the other hand,
+always use 'Specified' foralls (coreTyLamForAllTyFlag). So we need a wrapper:
+
+  wrapper type: forall a -> a -> G a
+  worker type:  forall a.   a -> G a
+
+Concretely, it looks like this:
+
+   $WMkG = /\a. \(x:a). MkG a x |> co
+
+where 'co' is a coercion constructed by GHC.Core.Coercion.mkForAllVisCos.
+The cast is added by the call to mkCoreTyLams in GHC.Types.Id.Make.mkDataConRep.
+
+In general, wrappers may use 'Inferred', 'Specified', or 'Required' foralls.
+However, we do /not/ need a cast to convert 'Inferred' to 'Specified' because they are
+'eqType'-equal. Only a 'Required' forall necessitates a cast in the wrapper.
+
+See Note [ForAllTy and type equality], Note [Comparing visibility],
+and Note [Required foralls in Core].
+-}
 
 {-
 %************************************************************************

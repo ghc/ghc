@@ -20,8 +20,9 @@
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 module Language.Haskell.Syntax.Pat (
         Pat(..), LPat,
-        ConLikeP, isInvisArgPat,
-        isVisArgPat,
+        ConLikeP,
+        isInvisArgPat, isInvisArgLPat,
+        isVisArgPat, isVisArgLPat,
 
         HsConPatDetails, hsConPatArgs,
         takeHsConPatTyArgs, dropHsConPatTyArgs,
@@ -207,8 +208,14 @@ isInvisArgPat :: Pat p -> Bool
 isInvisArgPat InvisPat{} = True
 isInvisArgPat _   = False
 
+isInvisArgLPat :: forall p. (UnXRec p) => LPat p -> Bool
+isInvisArgLPat = isInvisArgPat . unXRec @p
+
 isVisArgPat :: Pat p -> Bool
 isVisArgPat = not . isInvisArgPat
+
+isVisArgLPat :: forall p. (UnXRec p) => LPat p -> Bool
+isVisArgLPat = isVisArgPat . unXRec @p
 
 -- | Haskell Constructor Pattern Details
 type HsConPatDetails p = HsConDetails (LPat p) (HsRecFields p (LPat p))
