@@ -15,8 +15,7 @@ module GHC.Internal.Wasm.Prim.Types (
   fromJSString,
   toJSString,
   JSException (..),
-  WouldBlockException (..),
-  PromisePendingException (..)
+  WouldBlockException (..)
 ) where
 
 import GHC.Internal.Base
@@ -255,9 +254,3 @@ newtype WouldBlockException
   deriving (Show)
 
 instance Exception WouldBlockException
-
-data PromisePendingException
-  = PromisePendingException
-  deriving (Show)
-
-instance Exception PromisePendingException
