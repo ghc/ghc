@@ -900,11 +900,15 @@ pprConDecl (ConDeclH98 { con_name = L _ con
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                     <+> pprHsConDeclRecFields (unLoc fields)
 
-pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
+pprConDecl (ConDeclGADT { con_names = cons
+                        , con_outer_bndrs = L _ outer_bndrs
+                        , con_inner_bndrs = inner_bndrs
                         , con_mb_cxt = mcxt, con_g_args = args
                         , con_res_ty = res_ty, con_doc = doc })
   = pprMaybeWithDoc doc $ ppr_con_names (toList cons) <+> dcolon
-    <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext mcxt,
+    <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs
+                <+> hsep (map pprHsForAllTelescope inner_bndrs)
+                <+> pprLHsContext mcxt,
               sep (ppr_args args ++ [ppr res_ty]) ])
   where
     ppr_args (PrefixConGADT _ args) = map (pprHsConDeclFieldWith (\arr tyDoc -> tyDoc <+> ppr_arr arr)) args

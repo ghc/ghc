@@ -478,14 +478,40 @@ synifyDataCon use_gadt_syntax dc =
     -- con_qvars means a different thing depending on gadt-syntax
     (_univ_tvs, ex_tvs, _eq_spec, theta, arg_tys, res_ty) = dataConFullSig dc
     user_tvbndrs = dataConUserTyVarBinders dc -- Used for GADT data constructors
+
+    split_invis_tvbs :: [TyVarBinder] -> ([InvisTVBinder], [TyVarBinder])
+    split_invis_tvbs (Bndr tv (Invisible spec) : bs) =
+      let ~(invis, other) = split_invis_tvbs bs
+      in (Bndr tv spec : invis, other)
+    split_invis_tvbs bs = ([], bs)
+
+    split_req_tvbs :: [TyVarBinder] -> ([ReqTVBinder], [TyVarBinder])
+    split_req_tvbs (Bndr tv Required : bs) =
+      let ~(req, other) = split_req_tvbs bs
+      in (Bndr tv () : req, other)
+    split_req_tvbs bs = ([], bs)
+
+    (outer_tvbs, inner_tvbs) = split_invis_tvbs user_tvbndrs
+
     outer_bndrs
-      | null user_tvbndrs =
+      | null outer_tvbs =
           HsOuterImplicit{hso_ximplicit = []}
       | otherwise =
           HsOuterExplicit
             { hso_xexplicit = noExtField
-            , hso_bndrs = map synifyTyVarBndr user_tvbndrs
+            , hso_bndrs = map synifyTyVarBndr outer_tvbs
             }
+
+    inner_bndrs = mk_telescopes inner_tvbs
+
+    mk_telescopes bs
+      | (invis, other) <- split_invis_tvbs bs, not (null invis)
+      = mkHsForAllInvisTele noAnn (map synifyTyVarBndr invis) : mk_telescopes other
+
+      | (req, other) <- split_req_tvbs bs, not (null req)
+      = mkHsForAllVisTele noAnn (map synifyTyVarBndr req) : mk_telescopes other
+
+      | otherwise = []
 
     -- skip any EqTheta, use 'orig'inal syntax
     ctx
@@ -533,7 +559,8 @@ synifyDataCon use_gadt_syntax dc =
             ConDeclGADT
               { con_g_ext = noExtField
               , con_names = pure name
-              , con_bndrs = noLocA outer_bndrs
+              , con_outer_bndrs = noLocA outer_bndrs
+              , con_inner_bndrs = inner_bndrs
               , con_mb_cxt = ctx
               , con_g_args = hat
               , con_res_ty = synifyType WithinType [] res_ty

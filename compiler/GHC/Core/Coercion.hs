@@ -41,7 +41,7 @@ module GHC.Core.Coercion (
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo,
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
-        mkNakedForAllCo, mkForAllCo, mkHomoForAllCos,
+        mkNakedForAllCo, mkForAllCo, mkForAllVisCos, mkHomoForAllCos,
         mkPhantomCo,
         mkHoleCo, mkUnivCo, mkSubCo,
         mkProofIrrelCo,
@@ -947,6 +947,15 @@ mkForAllCo v visL visR kind_co co
 
   | otherwise
   = mkForAllCo_NoRefl v visL visR kind_co co
+
+-- mkForAllVisCos [tv{vis}] constructs a cast
+--   forall tv. res  ~R#   forall tv{vis} res`.
+-- See Note [Required foralls in Core] in GHC.Core.TyCo.Rep
+mkForAllVisCos :: HasDebugCallStack => [ForAllTyBinder] -> Coercion -> Coercion
+mkForAllVisCos bndrs orig_co = foldr go orig_co bndrs
+  where
+    go (Bndr tv vis)
+      = mkForAllCo tv coreTyLamForAllTyFlag vis (mkNomReflCo (varType tv))
 
 -- | Make a Coercion quantified over a type/coercion variable;
 -- the variable has the same kind and visibility in both sides of the coercion

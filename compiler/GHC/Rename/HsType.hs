@@ -30,6 +30,7 @@ module GHC.Rename.HsType (
 
         -- Binding related stuff
         bindHsOuterTyVarBndrs, bindHsForAllTelescope,
+        bindHsForAllTelescopes,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
         rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars,
         FreeKiTyVars, filterInScopeM,
@@ -37,6 +38,7 @@ module GHC.Rename.HsType (
         extractHsTysRdrTyVars, extractRdrKindSigVars,
         extractConDeclGADTDetailsTyVars, extractDataDefnKindVars,
         extractHsOuterTvBndrs, extractHsTyArgRdrKiTyVars,
+        extractHsForAllTelescopes,
         nubL, nubN,
 
         -- Error helpers
@@ -1140,6 +1142,17 @@ bindHsForAllTelescope doc tele thing_inside =
         checkForAllTelescopeWildcardBndrs doc bndrs'
         thing_inside $ mkHsForAllInvisTele noAnn bndrs'
 
+bindHsForAllTelescopes :: HsDocContext
+                       -> [HsForAllTelescope GhcPs]
+                       -> ([HsForAllTelescope GhcRn] -> RnM (a, FreeVars))
+                       -> RnM (a, FreeVars)
+bindHsForAllTelescopes _ [] thing_inside =
+  thing_inside []
+bindHsForAllTelescopes doc (tele:teles) thing_inside =
+  bindHsForAllTelescope  doc tele  $ \tele'  ->
+  bindHsForAllTelescopes doc teles $ \teles' ->
+    thing_inside (tele':teles')
+
 -- See Note [Wildcard binders in disallowed contexts] in GHC.Hs.Type
 checkForAllTelescopeWildcardBndrs :: HsDocContext
                                   -> [LHsTyVarBndr flag (GhcPass p)]
@@ -2130,6 +2143,14 @@ extractHsOuterTvBndrs outer_bndrs body_fvs =
   case outer_bndrs of
     HsOuterImplicit{}                  -> body_fvs
     HsOuterExplicit{hso_bndrs = bndrs} -> extract_hs_tv_bndrs bndrs [] body_fvs
+
+extractHsForAllTelescopes :: [HsForAllTelescope GhcPs]
+                          -> FreeKiTyVars -- Free in body
+                          -> FreeKiTyVars -- Free in result
+extractHsForAllTelescopes []           body_fvs = body_fvs
+extractHsForAllTelescopes (tele:teles) body_fvs =
+  extract_hs_for_all_telescope tele [] $
+  extractHsForAllTelescopes teles body_fvs
 
 extract_hs_tv_bndrs :: [LHsTyVarBndr flag GhcPs]
                     -> FreeKiTyVars  -- Accumulator

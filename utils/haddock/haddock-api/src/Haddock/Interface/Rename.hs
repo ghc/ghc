@@ -709,14 +709,16 @@ renameCon
 renameCon
   ConDeclGADT
     { con_names = lnames
-    , con_bndrs = bndrs
+    , con_outer_bndrs = outer_bndrs
+    , con_inner_bndrs = inner_bndrs
     , con_mb_cxt = lcontext
     , con_g_args = details
     , con_res_ty = res_ty
     , con_doc = mbldoc
     } = do
     lnames' <- mapM renameNameL lnames
-    bndrs' <- mapM renameOuterTyVarBndrs bndrs
+    outer_bndrs' <- mapM renameOuterTyVarBndrs outer_bndrs
+    inner_bndrs' <- mapM renameHsForAllTelescope inner_bndrs
     lcontext' <- traverse renameLContext lcontext
     details' <- renameGADTDetails details
     res_ty' <- renameLType res_ty
@@ -725,7 +727,8 @@ renameCon
       ( ConDeclGADT
           { con_g_ext = noExtField
           , con_names = lnames'
-          , con_bndrs = bndrs'
+          , con_outer_bndrs = outer_bndrs'
+          , con_inner_bndrs = inner_bndrs'
           , con_mb_cxt = lcontext'
           , con_g_args = details'
           , con_res_ty = res_ty'

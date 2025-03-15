@@ -115,6 +115,7 @@
               []))
             (HsOuterImplicit
              (NoExtField)))
+           []
            (Nothing)
            (PrefixConGADT
             (NoExtField)

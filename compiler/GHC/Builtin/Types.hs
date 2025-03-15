@@ -714,7 +714,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
                 []      -- No labelled fields
                 tyvars ex_tyvars
                 conc_tyvars
-                (mkTyVarBinders SpecifiedSpec user_tyvars)
+                (mkTyVarBinders Specified user_tyvars)
                 []      -- No equality spec
                 theta
                 arg_tys (mkTyConApp tycon (mkTyVarTys tyvars))
