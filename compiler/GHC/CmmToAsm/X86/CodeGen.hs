@@ -1666,14 +1666,20 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                         -> CmmExpr
                         -> NatM Register
     vector_float_op_sse op l w expr1 expr2 = do
-      (reg1, exp1) <- getSomeReg expr1
-      (reg2, exp2) <- getSomeReg expr2
+      -- This function is similar to genTrivialCode, but re-using it would require
+      -- handling alignment correctly: SSE vector instructions typically require 16-byte
+      -- alignment for their memory operand (this restriction is relaxed with VEX-encoded
+      -- instructions).
+      -- For now, we always load the value into a register and avoid the alignment issue.
+      exp1_code <- getAnyReg expr1
+      (reg2, exp2_code) <- getSomeReg expr2
       let format   = case w of
                        W32 -> VecFormat l FmtFloat
                        W64 -> VecFormat l FmtDouble
                        _ -> pprPanic "Floating-point SSE vector operation not supported at this width"
                              (text "width:" <+> ppr w)
-          code dst = case op of
+      tmp <- getNewRegNat format
+      let code dst = case op of
             VA_Add -> arithInstr ADD
             VA_Sub -> arithInstr SUB
             VA_Mul -> arithInstr MUL
@@ -1683,9 +1689,13 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
             where
               -- opcode src2 src1 <==> src1 = src1 `opcode` src2
               arithInstr instr
-                = exp1 `appOL` exp2 `snocOL`
-                  (MOVU format (OpReg reg1) (OpReg dst)) `snocOL`
-                  (instr format (OpReg reg2) (OpReg dst))
+                | dst == reg2 = exp2_code `snocOL`
+                                (MOVU format (OpReg reg2) (OpReg tmp)) `appOL`
+                                exp1_code dst `snocOL`
+                                instr format (OpReg tmp) (OpReg dst)
+                | otherwise = exp2_code `appOL`
+                              exp1_code dst `snocOL`
+                              instr format (OpReg reg2) (OpReg dst)
       return (Any format code)
     --------------------
     vector_float_extract :: Length
