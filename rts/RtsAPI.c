@@ -946,8 +946,13 @@ void rts_done (void)
    User's Guide.
    -------------------------------------------------------------------------- */
 
-void hs_try_putmvar (/* in */ int capability,
-                     /* in */ HsStablePtr mvar)
+void hs_try_putmvar (int capability, HsStablePtr sp) {
+    hs_try_putmvar_with_value(capability, sp, TAG_CLOSURE(1, Unit_closure));
+}
+
+void hs_try_putmvar_with_value (/* in */ int capability,
+                     /* in */ HsStablePtr mvar,
+                     StgClosure *value)
 {
     Task *task = getMyTask();
     Capability *cap;
@@ -963,7 +968,7 @@ void hs_try_putmvar (/* in */ int capability,
 
 #if !defined(THREADED_RTS)
 
-    performTryPutMVar(cap, (StgMVar*)deRefStablePtr(mvar), Unit_closure);
+    performTryPutMVar(cap, (StgMVar*)deRefStablePtr(mvar), value);
     freeStablePtr(mvar);
 
 #else
