@@ -9,6 +9,7 @@ following packages:
   * `ghc-experimental`
   * `template-haskell`
   * `ghc-prim`
+  * `ghc-bignum`
 
 These are compared against the expected exports in the test's corresponding
 `.stdout` file.

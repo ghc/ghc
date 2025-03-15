@@ -1,0 +1,502 @@
+
+module GHC.Num.Backend where
+
+-- ignored
+
+
+module GHC.Num.Backend.Native where
+  -- Safety: None
+  backendName :: [GHC.Internal.Types.Char]
+  bignat_add :: forall s. GHC.Internal.Bignum.WordArray.MutableWordArray# s -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  bignat_add_word :: GHC.Internal.Bignum.WordArray.MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  bignat_and :: GHC.Internal.Bignum.WordArray.MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  bignat_and_not :: GHC.Internal.Bignum.WordArray.MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  bignat_compare :: GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Int#
+  bignat_encode_double :: GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Double#
+  bignat_gcd :: forall s. GHC.Internal.Bignum.WordArray.MutableWordArray# s -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  bignat_gcd_word :: GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  bignat_gcd_word_word :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  bignat_mul :: GHC.Internal.Bignum.WordArray.MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  bignat_mul_word :: GHC.Internal.Bignum.WordArray.MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  bignat_or :: GHC.Internal.Bignum.WordArray.MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  bignat_popcount :: GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word#
+  bignat_powmod :: GHC.Internal.Bignum.WordArray.MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  bignat_powmod_word :: GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  bignat_powmod_words :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  bignat_quot :: GHC.Internal.Bignum.WordArray.MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  bignat_quot_word :: forall s. GHC.Internal.Bignum.WordArray.MutableWordArray# s -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  bignat_quotrem :: forall s. GHC.Internal.Bignum.WordArray.MutableWordArray# s -> GHC.Internal.Bignum.WordArray.MutableWordArray# s -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  bignat_quotrem_normalized :: forall s. GHC.Internal.Bignum.WordArray.MutableWordArray# s -> GHC.Internal.Bignum.WordArray.MutableWordArray# s -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  bignat_quotrem_word :: forall s. GHC.Internal.Bignum.WordArray.MutableWordArray# s -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  bignat_rem :: GHC.Internal.Bignum.WordArray.MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  bignat_rem_word :: GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  bignat_shiftl :: forall s. GHC.Internal.Bignum.WordArray.MutableWordArray# s -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  bignat_shiftr :: forall s. GHC.Internal.Bignum.WordArray.MutableWordArray# s -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  bignat_shiftr_neg :: forall s. GHC.Internal.Bignum.WordArray.MutableWordArray# s -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  bignat_sub :: GHC.Internal.Bignum.WordArray.MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, GHC.Internal.Bignum.Primitives.Bool# #)
+  bignat_sub_word :: GHC.Internal.Bignum.WordArray.MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, GHC.Internal.Bignum.Primitives.Bool# #)
+  bignat_xor :: GHC.Internal.Bignum.WordArray.MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  count_words_bits :: GHC.Internal.Prim.Word# -> (# GHC.Internal.Prim.Word#, GHC.Internal.Prim.Word# #)
+  count_words_bits_int :: GHC.Internal.Prim.Word# -> (# GHC.Internal.Prim.Int#, GHC.Internal.Prim.Int# #)
+  integer_gcde :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> (# GHC.Internal.Bignum.Integer.Integer, GHC.Internal.Bignum.Integer.Integer, GHC.Internal.Bignum.Integer.Integer #)
+  integer_powmod :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural
+  integer_recip_mod :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Natural.Natural -> (# GHC.Internal.Bignum.Natural.Natural | () #)
+
+module GHC.Num.Backend.Selected where
+
+-- ignored
+
+
+module GHC.Num.BigNat where
+  -- Safety: None
+  type BigNat :: *
+  data BigNat = BN# {unBigNat :: BigNat#}
+  type BigNat# :: GHC.Internal.Types.UnliftedType
+  type BigNat# = GHC.Internal.Bignum.WordArray.WordArray#
+  bigNatAdd :: BigNat# -> BigNat# -> BigNat#
+  bigNatAddWord :: BigNat# -> GHC.Internal.Types.Word -> BigNat#
+  bigNatAddWord# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatAnd :: BigNat# -> BigNat# -> BigNat#
+  bigNatAndInt# :: BigNat# -> GHC.Internal.Prim.Int# -> BigNat#
+  bigNatAndNot :: BigNat# -> BigNat# -> BigNat#
+  bigNatAndNotWord# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatAndWord# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatBit :: GHC.Internal.Types.Word -> BigNat#
+  bigNatBit# :: GHC.Internal.Prim.Word# -> BigNat#
+  bigNatCheck :: BigNat# -> GHC.Internal.Types.Bool
+  bigNatCheck# :: BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatClearBit# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatCompare :: BigNat# -> BigNat# -> GHC.Internal.Types.Ordering
+  bigNatCompareWord :: BigNat# -> GHC.Internal.Types.Word -> GHC.Internal.Types.Ordering
+  bigNatCompareWord# :: BigNat# -> GHC.Internal.Prim.Word# -> GHC.Internal.Types.Ordering
+  bigNatComplementBit# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatCtz :: BigNat# -> GHC.Internal.Types.Word
+  bigNatCtz# :: BigNat# -> GHC.Internal.Prim.Word#
+  bigNatCtzWord :: BigNat# -> GHC.Internal.Types.Word
+  bigNatCtzWord# :: BigNat# -> GHC.Internal.Prim.Word#
+  bigNatEncodeDouble# :: BigNat# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Double#
+  bigNatEq :: BigNat# -> BigNat# -> GHC.Internal.Types.Bool
+  bigNatEq# :: BigNat# -> BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatEqWord# :: BigNat# -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatFromAbsInt# :: GHC.Internal.Prim.Int# -> BigNat#
+  bigNatFromAddr# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, BigNat# #)
+  bigNatFromAddrBE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, BigNat# #)
+  bigNatFromAddrLE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, BigNat# #)
+  bigNatFromByteArray# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.ByteArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, BigNat# #)
+  bigNatFromByteArrayBE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.ByteArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, BigNat# #)
+  bigNatFromByteArrayLE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.ByteArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, BigNat# #)
+  bigNatFromWord :: GHC.Internal.Types.Word -> BigNat#
+  bigNatFromWord# :: GHC.Internal.Prim.Word# -> BigNat#
+  bigNatFromWord2# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatFromWord64# :: GHC.Internal.Prim.Word64# -> BigNat#
+  bigNatFromWordArray :: GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> BigNat
+  bigNatFromWordArray# :: GHC.Internal.Bignum.WordArray.WordArray# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatFromWordList :: [GHC.Internal.Types.Word] -> BigNat#
+  bigNatFromWordList# :: [GHC.Internal.Types.Word] -> GHC.Internal.Bignum.WordArray.WordArray#
+  bigNatFromWordListUnsafe :: [GHC.Internal.Types.Word] -> BigNat#
+  bigNatGcd :: BigNat# -> BigNat# -> BigNat#
+  bigNatGcdWord# :: BigNat# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  bigNatGe :: BigNat# -> BigNat# -> GHC.Internal.Types.Bool
+  bigNatGe# :: BigNat# -> BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatGt :: BigNat# -> BigNat# -> GHC.Internal.Types.Bool
+  bigNatGt# :: BigNat# -> BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatGtWord :: BigNat# -> GHC.Internal.Types.Word -> GHC.Internal.Types.Bool
+  bigNatGtWord# :: BigNat# -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatIndex :: BigNat# -> GHC.Internal.Prim.Int# -> GHC.Internal.Types.Word
+  bigNatIndex# :: BigNat# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Word#
+  bigNatIsOne :: BigNat# -> GHC.Internal.Types.Bool
+  bigNatIsOne# :: BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatIsPowerOf2# :: BigNat# -> (# (# #) | GHC.Internal.Prim.Word# #)
+  bigNatIsTwo :: BigNat# -> GHC.Internal.Types.Bool
+  bigNatIsTwo# :: BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatIsZero :: BigNat# -> GHC.Internal.Types.Bool
+  bigNatIsZero# :: BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatLcm :: BigNat# -> BigNat# -> BigNat#
+  bigNatLcmWord# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatLcmWordWord# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatLe :: BigNat# -> BigNat# -> GHC.Internal.Types.Bool
+  bigNatLe# :: BigNat# -> BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatLeWord :: BigNat# -> GHC.Internal.Types.Word -> GHC.Internal.Types.Bool
+  bigNatLeWord# :: BigNat# -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatLog2 :: BigNat# -> GHC.Internal.Types.Word
+  bigNatLog2# :: BigNat# -> GHC.Internal.Prim.Word#
+  bigNatLogBase :: BigNat# -> BigNat# -> GHC.Internal.Types.Word
+  bigNatLogBase# :: BigNat# -> BigNat# -> GHC.Internal.Prim.Word#
+  bigNatLogBaseWord :: GHC.Internal.Types.Word -> BigNat# -> GHC.Internal.Types.Word
+  bigNatLogBaseWord# :: GHC.Internal.Prim.Word# -> BigNat# -> GHC.Internal.Prim.Word#
+  bigNatLt :: BigNat# -> BigNat# -> GHC.Internal.Types.Bool
+  bigNatLt# :: BigNat# -> BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatMul :: BigNat# -> BigNat# -> BigNat#
+  bigNatMulWord :: BigNat# -> GHC.Internal.Types.Word -> BigNat#
+  bigNatMulWord# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatNe :: BigNat# -> BigNat# -> GHC.Internal.Types.Bool
+  bigNatNe# :: BigNat# -> BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatOne :: BigNat
+  bigNatOne# :: (# #) -> BigNat#
+  bigNatOr :: BigNat# -> BigNat# -> BigNat#
+  bigNatOrWord# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatPopCount :: BigNat# -> GHC.Internal.Types.Word
+  bigNatPopCount# :: BigNat# -> GHC.Internal.Prim.Word#
+  bigNatPowMod :: BigNat# -> BigNat# -> BigNat# -> BigNat#
+  bigNatPowModWord# :: BigNat# -> BigNat# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  bigNatQuot :: BigNat# -> BigNat# -> BigNat#
+  bigNatQuotRem# :: BigNat# -> BigNat# -> (# BigNat#, BigNat# #)
+  bigNatQuotRemWord# :: BigNat# -> GHC.Internal.Prim.Word# -> (# BigNat#, GHC.Internal.Prim.Word# #)
+  bigNatQuotWord :: BigNat# -> GHC.Internal.Types.Word -> BigNat#
+  bigNatQuotWord# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatRem :: BigNat# -> BigNat# -> BigNat#
+  bigNatRemWord :: BigNat# -> GHC.Internal.Types.Word -> GHC.Internal.Types.Word
+  bigNatRemWord# :: BigNat# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  bigNatSetBit# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatShiftL :: BigNat# -> GHC.Internal.Types.Word -> BigNat#
+  bigNatShiftL# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatShiftR :: BigNat# -> GHC.Internal.Types.Word -> BigNat#
+  bigNatShiftR# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatShiftRNeg# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatSize :: BigNat# -> GHC.Internal.Types.Word
+  bigNatSize# :: BigNat# -> GHC.Internal.Prim.Int#
+  bigNatSizeInBase :: GHC.Internal.Types.Word -> BigNat# -> GHC.Internal.Types.Word
+  bigNatSizeInBase# :: GHC.Internal.Prim.Word# -> BigNat# -> GHC.Internal.Prim.Word#
+  bigNatSqr :: BigNat# -> BigNat#
+  bigNatSub :: BigNat# -> BigNat# -> (# (# #) | BigNat# #)
+  bigNatSubUnsafe :: BigNat# -> BigNat# -> BigNat#
+  bigNatSubWord# :: BigNat# -> GHC.Internal.Prim.Word# -> (# (# #) | BigNat# #)
+  bigNatSubWordUnsafe :: BigNat# -> GHC.Internal.Types.Word -> BigNat#
+  bigNatSubWordUnsafe# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatTestBit :: BigNat# -> GHC.Internal.Types.Word -> GHC.Internal.Types.Bool
+  bigNatTestBit# :: BigNat# -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  bigNatToAddr :: BigNat# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Types.IO GHC.Internal.Types.Word
+  bigNatToAddr# :: forall s. BigNat# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  bigNatToAddrBE# :: forall s. BigNat# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  bigNatToAddrLE# :: forall s. BigNat# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  bigNatToInt :: BigNat# -> GHC.Internal.Types.Int
+  bigNatToInt# :: BigNat# -> GHC.Internal.Prim.Int#
+  bigNatToMutableByteArray# :: forall s. BigNat# -> GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  bigNatToMutableByteArrayBE# :: forall s. BigNat# -> GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  bigNatToMutableByteArrayLE# :: forall s. BigNat# -> GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  bigNatToWord :: BigNat# -> GHC.Internal.Types.Word
+  bigNatToWord# :: BigNat# -> GHC.Internal.Prim.Word#
+  bigNatToWord64# :: BigNat# -> GHC.Internal.Prim.Word64#
+  bigNatToWordList :: BigNat# -> [GHC.Internal.Types.Word]
+  bigNatToWordMaybe# :: BigNat# -> (# (# #) | GHC.Internal.Prim.Word# #)
+  bigNatXor :: BigNat# -> BigNat# -> BigNat#
+  bigNatXorWord# :: BigNat# -> GHC.Internal.Prim.Word# -> BigNat#
+  bigNatZero :: BigNat
+  bigNatZero# :: (# #) -> BigNat#
+  gcdInt :: GHC.Internal.Types.Int -> GHC.Internal.Types.Int -> GHC.Internal.Types.Int
+  gcdInt# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+  gcdWord :: GHC.Internal.Types.Word -> GHC.Internal.Types.Word -> GHC.Internal.Types.Word
+  gcdWord# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  powModWord# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  raiseDivZero_BigNat :: (# #) -> BigNat#
+
+module GHC.Num.Integer where
+  -- Safety: None
+  type Integer :: *
+  data Integer = IS GHC.Internal.Prim.Int# | IP GHC.Internal.Prim.ByteArray# | IN GHC.Internal.Prim.ByteArray#
+  integerAbs :: Integer -> Integer
+  integerAdd :: Integer -> Integer -> Integer
+  integerAnd :: Integer -> Integer -> Integer
+  integerBit :: GHC.Internal.Types.Word -> Integer
+  integerBit# :: GHC.Internal.Prim.Word# -> Integer
+  integerCheck :: Integer -> GHC.Internal.Types.Bool
+  integerCheck# :: Integer -> GHC.Internal.Bignum.Primitives.Bool#
+  integerCompare :: Integer -> Integer -> GHC.Internal.Types.Ordering
+  integerComplement :: Integer -> Integer
+  integerDecodeDouble# :: GHC.Internal.Prim.Double# -> (# Integer, GHC.Internal.Prim.Int# #)
+  integerDiv :: Integer -> Integer -> Integer
+  integerDivMod :: Integer -> Integer -> (Integer, Integer)
+  integerDivMod# :: Integer -> Integer -> (# Integer, Integer #)
+  integerEncodeDouble :: Integer -> GHC.Internal.Types.Int -> GHC.Internal.Types.Double
+  integerEncodeDouble# :: Integer -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Double#
+  integerEncodeFloat# :: Integer -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Float#
+  integerEq :: Integer -> Integer -> GHC.Internal.Types.Bool
+  integerEq# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
+  integerFromAddr :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Types.IO Integer
+  integerFromAddr# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, Integer #)
+  integerFromBigNat# :: GHC.Internal.Bignum.BigNat.BigNat# -> Integer
+  integerFromBigNatNeg# :: GHC.Internal.Bignum.BigNat.BigNat# -> Integer
+  integerFromBigNatSign# :: GHC.Internal.Prim.Int# -> GHC.Internal.Bignum.BigNat.BigNat# -> Integer
+  integerFromByteArray :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.ByteArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> Integer
+  integerFromByteArray# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.ByteArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, Integer #)
+  integerFromInt :: GHC.Internal.Types.Int -> Integer
+  integerFromInt# :: GHC.Internal.Prim.Int# -> Integer
+  integerFromInt64# :: GHC.Internal.Prim.Int64# -> Integer
+  integerFromNatural :: GHC.Internal.Bignum.Natural.Natural -> Integer
+  integerFromWord :: GHC.Internal.Types.Word -> Integer
+  integerFromWord# :: GHC.Internal.Prim.Word# -> Integer
+  integerFromWord64# :: GHC.Internal.Prim.Word64# -> Integer
+  integerFromWordList :: GHC.Internal.Types.Bool -> [GHC.Internal.Types.Word] -> Integer
+  integerFromWordNeg# :: GHC.Internal.Prim.Word# -> Integer
+  integerFromWordSign# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Word# -> Integer
+  integerGcd :: Integer -> Integer -> Integer
+  integerGcde :: Integer -> Integer -> (Integer, Integer, Integer)
+  integerGcde# :: Integer -> Integer -> (# Integer, Integer, Integer #)
+  integerGe :: Integer -> Integer -> GHC.Internal.Types.Bool
+  integerGe# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
+  integerGt :: Integer -> Integer -> GHC.Internal.Types.Bool
+  integerGt# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
+  integerIsNegative :: Integer -> GHC.Internal.Types.Bool
+  integerIsNegative# :: Integer -> GHC.Internal.Bignum.Primitives.Bool#
+  integerIsOne :: Integer -> GHC.Internal.Types.Bool
+  integerIsPowerOf2# :: Integer -> (# (# #) | GHC.Internal.Prim.Word# #)
+  integerIsZero :: Integer -> GHC.Internal.Types.Bool
+  integerLcm :: Integer -> Integer -> Integer
+  integerLe :: Integer -> Integer -> GHC.Internal.Types.Bool
+  integerLe# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
+  integerLog2 :: Integer -> GHC.Internal.Types.Word
+  integerLog2# :: Integer -> GHC.Internal.Prim.Word#
+  integerLogBase :: Integer -> Integer -> GHC.Internal.Types.Word
+  integerLogBase# :: Integer -> Integer -> GHC.Internal.Prim.Word#
+  integerLogBaseWord :: GHC.Internal.Types.Word -> Integer -> GHC.Internal.Types.Word
+  integerLogBaseWord# :: GHC.Internal.Prim.Word# -> Integer -> GHC.Internal.Prim.Word#
+  integerLt :: Integer -> Integer -> GHC.Internal.Types.Bool
+  integerLt# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
+  integerMod :: Integer -> Integer -> Integer
+  integerMul :: Integer -> Integer -> Integer
+  integerNe :: Integer -> Integer -> GHC.Internal.Types.Bool
+  integerNe# :: Integer -> Integer -> GHC.Internal.Bignum.Primitives.Bool#
+  integerNegate :: Integer -> Integer
+  integerOne :: Integer
+  integerOr :: Integer -> Integer -> Integer
+  integerPopCount# :: Integer -> GHC.Internal.Prim.Int#
+  integerPowMod# :: Integer -> Integer -> GHC.Internal.Bignum.Natural.Natural -> (# GHC.Internal.Bignum.Natural.Natural | () #)
+  integerQuot :: Integer -> Integer -> Integer
+  integerQuotRem :: Integer -> Integer -> (Integer, Integer)
+  integerQuotRem# :: Integer -> Integer -> (# Integer, Integer #)
+  integerRecipMod# :: Integer -> GHC.Internal.Bignum.Natural.Natural -> (# GHC.Internal.Bignum.Natural.Natural | () #)
+  integerRem :: Integer -> Integer -> Integer
+  integerShiftL :: Integer -> GHC.Internal.Types.Word -> Integer
+  integerShiftL# :: Integer -> GHC.Internal.Prim.Word# -> Integer
+  integerShiftR :: Integer -> GHC.Internal.Types.Word -> Integer
+  integerShiftR# :: Integer -> GHC.Internal.Prim.Word# -> Integer
+  integerSignum :: Integer -> Integer
+  integerSignum# :: Integer -> GHC.Internal.Prim.Int#
+  integerSizeInBase# :: GHC.Internal.Prim.Word# -> Integer -> GHC.Internal.Prim.Word#
+  integerSqr :: Integer -> Integer
+  integerSub :: Integer -> Integer -> Integer
+  integerTestBit :: Integer -> GHC.Internal.Types.Word -> GHC.Internal.Types.Bool
+  integerTestBit# :: Integer -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  integerToAddr :: Integer -> GHC.Internal.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Types.IO GHC.Internal.Types.Word
+  integerToAddr# :: forall s. Integer -> GHC.Internal.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  integerToBigNatClamp# :: Integer -> GHC.Internal.Bignum.BigNat.BigNat#
+  integerToBigNatSign# :: Integer -> (# GHC.Internal.Prim.Int#, GHC.Internal.Bignum.BigNat.BigNat# #)
+  integerToInt :: Integer -> GHC.Internal.Types.Int
+  integerToInt# :: Integer -> GHC.Internal.Prim.Int#
+  integerToInt64# :: Integer -> GHC.Internal.Prim.Int64#
+  integerToMutableByteArray :: Integer -> GHC.Internal.Prim.MutableByteArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Types.IO GHC.Internal.Types.Word
+  integerToMutableByteArray# :: forall s. Integer -> GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  integerToNatural :: Integer -> GHC.Internal.Bignum.Natural.Natural
+  integerToNaturalClamp :: Integer -> GHC.Internal.Bignum.Natural.Natural
+  integerToNaturalThrow :: Integer -> GHC.Internal.Bignum.Natural.Natural
+  integerToWord :: Integer -> GHC.Internal.Types.Word
+  integerToWord# :: Integer -> GHC.Internal.Prim.Word#
+  integerToWord64# :: Integer -> GHC.Internal.Prim.Word64#
+  integerXor :: Integer -> Integer -> Integer
+  integerZero :: Integer
+
+module GHC.Num.Natural where
+  -- Safety: None
+  type Natural :: *
+  data Natural = NS GHC.Internal.Prim.Word# | NB GHC.Internal.Prim.ByteArray#
+  naturalAdd :: Natural -> Natural -> Natural
+  naturalAnd :: Natural -> Natural -> Natural
+  naturalAndNot :: Natural -> Natural -> Natural
+  naturalBit :: GHC.Internal.Types.Word -> Natural
+  naturalBit# :: GHC.Internal.Prim.Word# -> Natural
+  naturalCheck :: Natural -> GHC.Internal.Types.Bool
+  naturalCheck# :: Natural -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalClearBit :: Natural -> GHC.Internal.Types.Word -> Natural
+  naturalClearBit# :: Natural -> GHC.Internal.Prim.Word# -> Natural
+  naturalCompare :: Natural -> Natural -> GHC.Internal.Types.Ordering
+  naturalComplementBit :: Natural -> GHC.Internal.Types.Word -> Natural
+  naturalComplementBit# :: Natural -> GHC.Internal.Prim.Word# -> Natural
+  naturalEncodeDouble# :: Natural -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Double#
+  naturalEncodeFloat# :: Natural -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Float#
+  naturalEq :: Natural -> Natural -> GHC.Internal.Types.Bool
+  naturalEq# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalFromAddr :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Types.IO Natural
+  naturalFromAddr# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, Natural #)
+  naturalFromBigNat# :: GHC.Internal.Bignum.BigNat.BigNat# -> Natural
+  naturalFromByteArray# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.ByteArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, Natural #)
+  naturalFromWord :: GHC.Internal.Types.Word -> Natural
+  naturalFromWord# :: GHC.Internal.Prim.Word# -> Natural
+  naturalFromWord2# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> Natural
+  naturalFromWordList :: [GHC.Internal.Types.Word] -> Natural
+  naturalGcd :: Natural -> Natural -> Natural
+  naturalGe :: Natural -> Natural -> GHC.Internal.Types.Bool
+  naturalGe# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalGt :: Natural -> Natural -> GHC.Internal.Types.Bool
+  naturalGt# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalIsOne :: Natural -> GHC.Internal.Types.Bool
+  naturalIsPowerOf2# :: Natural -> (# (# #) | GHC.Internal.Prim.Word# #)
+  naturalIsZero :: Natural -> GHC.Internal.Types.Bool
+  naturalLcm :: Natural -> Natural -> Natural
+  naturalLe :: Natural -> Natural -> GHC.Internal.Types.Bool
+  naturalLe# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalLog2 :: Natural -> GHC.Internal.Types.Word
+  naturalLog2# :: Natural -> GHC.Internal.Prim.Word#
+  naturalLogBase :: Natural -> Natural -> GHC.Internal.Types.Word
+  naturalLogBase# :: Natural -> Natural -> GHC.Internal.Prim.Word#
+  naturalLogBaseWord :: GHC.Internal.Types.Word -> Natural -> GHC.Internal.Types.Word
+  naturalLogBaseWord# :: GHC.Internal.Prim.Word# -> Natural -> GHC.Internal.Prim.Word#
+  naturalLt :: Natural -> Natural -> GHC.Internal.Types.Bool
+  naturalLt# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalMul :: Natural -> Natural -> Natural
+  naturalNe :: Natural -> Natural -> GHC.Internal.Types.Bool
+  naturalNe# :: Natural -> Natural -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalNegate :: Natural -> Natural
+  naturalOne :: Natural
+  naturalOr :: Natural -> Natural -> Natural
+  naturalPopCount :: Natural -> GHC.Internal.Types.Word
+  naturalPopCount# :: Natural -> GHC.Internal.Prim.Word#
+  naturalPowMod :: Natural -> Natural -> Natural -> Natural
+  naturalQuot :: Natural -> Natural -> Natural
+  naturalQuotRem :: Natural -> Natural -> (Natural, Natural)
+  naturalQuotRem# :: Natural -> Natural -> (# Natural, Natural #)
+  naturalRem :: Natural -> Natural -> Natural
+  naturalSetBit :: Natural -> GHC.Internal.Types.Word -> Natural
+  naturalSetBit# :: Natural -> GHC.Internal.Prim.Word# -> Natural
+  naturalShiftL :: Natural -> GHC.Internal.Types.Word -> Natural
+  naturalShiftL# :: Natural -> GHC.Internal.Prim.Word# -> Natural
+  naturalShiftR :: Natural -> GHC.Internal.Types.Word -> Natural
+  naturalShiftR# :: Natural -> GHC.Internal.Prim.Word# -> Natural
+  naturalSignum :: Natural -> Natural
+  naturalSizeInBase# :: GHC.Internal.Prim.Word# -> Natural -> GHC.Internal.Prim.Word#
+  naturalSqr :: Natural -> Natural
+  naturalSub :: Natural -> Natural -> (# (# #) | Natural #)
+  naturalSubThrow :: Natural -> Natural -> Natural
+  naturalSubUnsafe :: Natural -> Natural -> Natural
+  naturalTestBit :: Natural -> GHC.Internal.Types.Word -> GHC.Internal.Types.Bool
+  naturalTestBit# :: Natural -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalToAddr :: Natural -> GHC.Internal.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Types.IO GHC.Internal.Types.Word
+  naturalToAddr# :: forall s. Natural -> GHC.Internal.Prim.Addr# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  naturalToBigNat# :: Natural -> GHC.Internal.Bignum.BigNat.BigNat#
+  naturalToMutableByteArray# :: forall s. Natural -> GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  naturalToWord :: Natural -> GHC.Internal.Types.Word
+  naturalToWord# :: Natural -> GHC.Internal.Prim.Word#
+  naturalToWordClamp :: Natural -> GHC.Internal.Types.Word
+  naturalToWordClamp# :: Natural -> GHC.Internal.Prim.Word#
+  naturalToWordMaybe# :: Natural -> (# (# #) | GHC.Internal.Prim.Word# #)
+  naturalXor :: Natural -> Natural -> Natural
+  naturalZero :: Natural
+
+module GHC.Num.Primitives where
+  -- Safety: None
+  (&&#) :: Bool# -> Bool# -> Bool#
+  type Bool# :: TYPE GHC.Internal.Types.IntRep
+  type Bool# = GHC.Internal.Prim.Int#
+  absI# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+  andNot# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  bitW# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Word#
+  cmpI# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+  cmpW# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Types.Ordering
+  intEncodeDouble# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Double#
+  ioBool :: GHC.Internal.Types.IO GHC.Internal.Types.Bool -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, Bool# #)
+  ioInt# :: GHC.Internal.Types.IO GHC.Internal.Types.Int -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, GHC.Internal.Prim.Int# #)
+  ioVoid :: forall a. GHC.Internal.Types.IO a -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  ioWord# :: GHC.Internal.Types.IO GHC.Internal.Types.Word -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, GHC.Internal.Prim.Word# #)
+  maxI# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+  maxW# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  minI# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+  minW# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  notB# :: Bool# -> Bool#
+  plusWord12# :: GHC.Internal.Prim.Word# -> (# GHC.Internal.Prim.Word#, GHC.Internal.Prim.Word# #) -> (# GHC.Internal.Prim.Word#, GHC.Internal.Prim.Word# #)
+  plusWord3# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> (# GHC.Internal.Prim.Word#, GHC.Internal.Prim.Word# #)
+  popCntI# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Word#
+  quotRemWord3# :: (# GHC.Internal.Prim.Word#, GHC.Internal.Prim.Word# #) -> GHC.Internal.Prim.Word# -> (# (# GHC.Internal.Prim.Word#, GHC.Internal.Prim.Word# #), GHC.Internal.Prim.Word# #)
+  raiseDivZero :: forall a. a
+  raiseDivZero_Word# :: (# #) -> GHC.Internal.Prim.Word#
+  raiseUnderflow :: forall a. a
+  raiseUnderflow_Word# :: (# #) -> GHC.Internal.Prim.Word#
+  sgnI# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+  shiftRW# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  testBitI# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Word# -> Bool#
+  testBitW# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> Bool#
+  unexpectedValue :: forall a. a
+  unexpectedValue_Int# :: (# #) -> GHC.Internal.Prim.Int#
+  unexpectedValue_Word# :: (# #) -> GHC.Internal.Prim.Word#
+  wordEncodeDouble# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Double#
+  wordFromAbsInt# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Word#
+  wordFromAddr# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  wordFromAddrBE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  wordFromAddrLE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  wordFromByteArray# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.ByteArray# -> GHC.Internal.Prim.Word# -> Bool# -> GHC.Internal.Prim.Word#
+  wordFromByteArrayBE# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.ByteArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  wordFromByteArrayLE# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.ByteArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  wordIsPowerOf2# :: GHC.Internal.Prim.Word# -> (# (# #) | GHC.Internal.Prim.Word# #)
+  wordLog2# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  wordLogBase# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  wordReverseBits# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  wordReverseBits32# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  wordReverseBytes# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  wordSizeInBase# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
+  wordToAddr# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  wordToAddrBE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  wordToAddrLE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  wordToMutableByteArray# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Word# -> Bool# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  wordToMutableByteArrayBE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  wordToMutableByteArrayLE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  wordWriteAddrBE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  wordWriteAddrLE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  wordWriteMutableByteArrayBE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  wordWriteMutableByteArrayLE# :: forall s. GHC.Internal.Prim.Word# -> GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  (||#) :: Bool# -> Bool# -> Bool#
+
+module GHC.Num.WordArray where
+  -- Safety: None
+  type role MutableWordArray nominal
+  type MutableWordArray :: * -> *
+  data MutableWordArray s = MutableWordArray (MutableWordArray# s)
+  type MutableWordArray# :: * -> GHC.Internal.Types.UnliftedType
+  type MutableWordArray# = GHC.Internal.Prim.MutableByteArray#
+  type WordArray :: *
+  data WordArray = WordArray WordArray#
+  type WordArray# :: GHC.Internal.Types.UnliftedType
+  type WordArray# = GHC.Internal.Prim.ByteArray#
+  bytesToWords# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+  mwaAddInplaceArray :: forall d. MutableWordArray# d -> GHC.Internal.Prim.Int# -> WordArray# -> GHC.Internal.Prim.State# d -> GHC.Internal.Prim.State# d
+  mwaAddInplaceWord# :: forall d. MutableWordArray# d -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# d -> GHC.Internal.Prim.State# d
+  mwaArrayCopy# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> WordArray# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  mwaClz :: forall s. MutableWordArray# s -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Int# #)
+  mwaClzAt :: forall s. MutableWordArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Int# #)
+  mwaFill# :: forall s. MutableWordArray# s -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  mwaInitArrayBinOp :: forall s. MutableWordArray# s -> WordArray# -> WordArray# -> (GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#) -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  mwaInitArrayPlusWord :: forall s. MutableWordArray# s -> WordArray# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  mwaInitCopyShrink# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> WordArray# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  mwaRead# :: forall s. MutableWordArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  mwaReadOrZero :: forall s. MutableWordArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Word# #)
+  mwaSetSize# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  mwaShrink# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  mwaSize# :: forall s. MutableWordArray# s -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Int# #)
+  mwaSubInplaceArray :: forall d. MutableWordArray# d -> GHC.Internal.Prim.Int# -> WordArray# -> GHC.Internal.Prim.State# d -> (# GHC.Internal.Prim.State# d, GHC.Internal.Bignum.Primitives.Bool# #)
+  mwaSubInplaceArrayTrim :: forall d. MutableWordArray# d -> GHC.Internal.Prim.Int# -> WordArray# -> GHC.Internal.Prim.State# d -> GHC.Internal.Prim.State# d
+  mwaSubInplaceMutableArray :: forall d. MutableWordArray# d -> GHC.Internal.Prim.Int# -> MutableWordArray# d -> GHC.Internal.Prim.State# d -> (# GHC.Internal.Prim.State# d, GHC.Internal.Bignum.Primitives.Bool# #)
+  mwaSubInplaceWord# :: forall d. MutableWordArray# d -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# d -> (# GHC.Internal.Prim.State# d, GHC.Internal.Bignum.Primitives.Bool# #)
+  mwaTrimCompare :: forall s. GHC.Internal.Prim.Int# -> MutableWordArray# s -> WordArray# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Types.Ordering #)
+  mwaTrimZeroes# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  mwaWrite# :: forall s. MutableWordArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  mwaWriteMostSignificant :: forall s. MutableWordArray# s -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  mwaWriteOrShrink :: forall s. MutableWordArray# s -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  newWordArray# :: forall s. GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, MutableWordArray# s #)
+  waClzAt :: WordArray# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+  withNewWordArray# :: GHC.Internal.Prim.Int# -> (MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld) -> WordArray#
+  withNewWordArray2# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> (MutableWordArray# GHC.Internal.Prim.RealWorld -> MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld) -> (# WordArray#, WordArray# #)
+  withNewWordArray2Trimmed# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> (MutableWordArray# GHC.Internal.Prim.RealWorld -> MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld) -> (# WordArray#, WordArray# #)
+  withNewWordArrayTrimmed# :: GHC.Internal.Prim.Int# -> (MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld) -> WordArray#
+  withNewWordArrayTrimmedMaybe# :: GHC.Internal.Prim.Int# -> (MutableWordArray# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, GHC.Internal.Bignum.Primitives.Bool# #)) -> (# (# #) | WordArray# #)
+  wordArrayCompareMSWords :: WordArray# -> WordArray# -> GHC.Internal.Types.Ordering
+  wordArrayFromWord# :: GHC.Internal.Prim.Word# -> WordArray#
+  wordArrayFromWord2# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> WordArray#
+  wordArrayLast# :: WordArray# -> GHC.Internal.Prim.Word#
+  wordArraySize# :: WordArray# -> GHC.Internal.Prim.Int#
+  wordsToBytes# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+
+
+-- Instances:
+instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.BigNat.BigNat -- Defined in ‘GHC.Internal.Bignum.BigNat’
+instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
+instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Bignum.Natural’
+instance GHC.Internal.Classes.Ord GHC.Internal.Bignum.BigNat.BigNat -- Defined in ‘GHC.Internal.Bignum.BigNat’
+instance GHC.Internal.Classes.Ord GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
+instance GHC.Internal.Classes.Ord GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Bignum.Natural’
