@@ -7,6 +7,8 @@
 
 extern HsBool rts_JSFFI_flag;
 extern HsStablePtr rts_threadDelay_impl;
+extern StgClosure ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure;
+extern StgClosure ghczminternal_GHCziInternalziWasmziPrimziConcziInternal_threadDelay_closure;
 
 int __main_void(void);
 
@@ -19,6 +21,7 @@ int __main_argc_argv(int argc, char *argv[]) {
   hs_init_ghc(&argc, &argv, __conf);
   // See Note [threadDelay on wasm] for details.
   rts_JSFFI_flag = HS_BOOL_TRUE;
+  getStablePtr((StgPtr)&ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure);
   rts_threadDelay_impl = getStablePtr((StgPtr)&ghczminternal_GHCziInternalziWasmziPrimziConcziInternal_threadDelay_closure);
   return 0;
 }
@@ -236,7 +239,6 @@ INLINE_HEADER void pushClosure   (StgTSO *tso, StgWord c) {
 }
 
 extern const StgInfoTable stg_scheduler_loop_info;
-extern StgClosure ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure;
 
 // schedule a future round of RTS scheduler loop via setImmediate(),
 // to avoid jamming the JavaScript main thread
