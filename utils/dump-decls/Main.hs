@@ -77,6 +77,8 @@ ignoredModules =
     platformDependentModules =
         [ "System.Posix.Types"
         , "Foreign.C.Types"
+        , "GHC.Num.Backend"
+        , "GHC.Num.Backend.Selected"
         ]
 
 ignoredOccNames :: [OccName]
