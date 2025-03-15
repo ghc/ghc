@@ -199,6 +199,8 @@ instance Diagnostic DsMessage where
                -> mkMsg "Splices within declaration brackets" empty
              ThNonLinearDataCon
                -> mkMsg "Non-linear fields in data constructors" empty
+             ThDataConVisibleForall
+               -> mkMsg "Visible forall in data constructors" empty
          where
            mkMsg what doc =
              mkSimpleDecorated $

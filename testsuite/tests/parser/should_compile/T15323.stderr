@@ -133,49 +133,52 @@
              (Unqual
               {OccName: TestParens}))
             [])
-           (L
-            (EpAnn
-             (EpaSpan { T15323.hs:6:20-29 })
-             (AnnListItem
-              [])
-             (EpaComments
-              []))
-            (HsOuterExplicit
+           (HsGadtConTyVarBndrs
+            (NoExtField)
+            (L
              (EpAnn
               (EpaSpan { T15323.hs:6:20-29 })
-              ((,)
-               (EpUniTok (EpaSpan { T15323.hs:6:20-25 }) NormalSyntax)
-               (EpTok
-                (EpaSpan { T15323.hs:6:29 })))
+              (AnnListItem
+               [])
               (EpaComments
                []))
-             [(L
-               (EpAnn
-                (EpaSpan { T15323.hs:6:27 })
-                (AnnListItem
-                 [])
-                (EpaComments
-                 []))
-               (HsTvb
-                (AnnTyVarBndr
-                 []
-                 []
-                 (NoEpTok)
-                 (NoEpUniTok))
-                (SpecifiedSpec)
-                (HsBndrVar
-                 (NoExtField)
-                 (L
-                  (EpAnn
-                   (EpaSpan { T15323.hs:6:27 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (Unqual
-                   {OccName: v})))
-                (HsBndrNoKind
-                 (NoExtField))))]))
+             (HsOuterExplicit
+              (EpAnn
+               (EpaSpan { T15323.hs:6:20-29 })
+               ((,)
+                (EpUniTok (EpaSpan { T15323.hs:6:20-25 }) NormalSyntax)
+                (EpTok
+                 (EpaSpan { T15323.hs:6:29 })))
+               (EpaComments
+                []))
+              [(L
+                (EpAnn
+                 (EpaSpan { T15323.hs:6:27 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  []))
+                (HsTvb
+                 (AnnTyVarBndr
+                  []
+                  []
+                  (NoEpTok)
+                  (NoEpUniTok))
+                 (SpecifiedSpec)
+                 (HsBndrVar
+                  (NoExtField)
+                  (L
+                   (EpAnn
+                    (EpaSpan { T15323.hs:6:27 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     []))
+                   (Unqual
+                    {OccName: v})))
+                 (HsBndrNoKind
+                  (NoExtField))))]))
+            [])
            (Just
             (L
              (EpAnn

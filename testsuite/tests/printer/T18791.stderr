@@ -106,15 +106,18 @@
              (Unqual
               {OccName: MkT}))
             [])
-           (L
-            (EpAnn
-             (EpaSpan { T18791.hs:5:10-17 })
-             (AnnListItem
-              [])
-             (EpaComments
-              []))
-            (HsOuterImplicit
-             (NoExtField)))
+           (HsGadtConTyVarBndrs
+            (NoExtField)
+            (L
+             (EpAnn
+              (EpaSpan { T18791.hs:5:10-17 })
+              (AnnListItem
+               [])
+              (EpaComments
+               []))
+             (HsOuterImplicit
+              (NoExtField)))
+            [])
            (Nothing)
            (PrefixConGADT
             (NoExtField)

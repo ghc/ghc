@@ -960,6 +960,9 @@ type instance XHsOuterExplicit DocNameI _ = NoExtField
 type instance XHsOuterImplicit DocNameI = NoExtField
 type instance XXHsOuterTyVarBndrs DocNameI = DataConCantHappen
 
+type instance XHsGadtConTyVarBndrs DocNameI = NoExtField
+type instance XXHsGadtConTyVarBndrs DocNameI = DataConCantHappen
+
 type instance XHsSig DocNameI = NoExtField
 type instance XXHsSigType DocNameI = DataConCantHappen
 

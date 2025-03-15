@@ -1,4 +1,5 @@
-
-T16326_Fail6.hs:9:12: error: [GHC-51580]
+T16326_Fail6.hs:9:3: error: [GHC-51580]
     • Illegal visible, dependent quantification in the type of a term
     • In the definition of data constructor ‘MkFoo’
+      In the data type declaration for ‘Foo’
+

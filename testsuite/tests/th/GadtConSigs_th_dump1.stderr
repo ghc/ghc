@@ -1,0 +1,13 @@
+GadtConSigs_th_dump1.hs:(10,2)-(14,7): Splicing declarations
+    [d| data G a
+          where
+            G1 :: forall a b. (a, b) -> G a
+            G2 :: forall a. forall b. (a, b) -> G a
+            G3 :: forall a {b}. forall c d. forall e {f} g.
+                  G (a, b, c, d, e, f, g) |]
+  ======>
+    data G a
+      where
+        G1 :: forall a b. (a, b) -> G a
+        G2 :: forall a b. (a, b) -> G a
+        G3 :: forall a {b} c d e {f} g. G (a, b, c, d, e, f, g)

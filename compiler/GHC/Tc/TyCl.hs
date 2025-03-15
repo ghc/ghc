@@ -1869,14 +1869,16 @@ kcConDecl new_or_data tc_res_kind
 kcConDecl new_or_data _tc_res_kind
                       -- NB: _tc_res_kind is unused.   See (KCD3) in
                       -- Note [kcConDecls: kind-checking data type decls]
-          (ConDeclGADT { con_names = names, con_bndrs = L _ outer_bndrs
-                       , con_mb_cxt = cxt, con_g_args = args, con_res_ty = res_ty })
+          (ConDeclGADT { con_names = names
+                       , con_outer_bndrs = L _ outer_bndrs
+                       , con_inner_bndrs = inner_bndrs
+                       , con_mb_cxt = cxt
+                       , con_g_args = args
+                       , con_res_ty = res_ty })
   = -- See Note [kcConDecls: kind-checking data type decls]
     addErrCtxt (DataConDefCtxt names) $
-    discardResult                      $
     -- Not sure this is right, should just extend rather than skolemise but no test
-    bindOuterSigTKBndrs_Tv outer_bndrs $
-        -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
+    bind_con_tvbs outer_bndrs inner_bndrs $
     do { _ <- tcHsContext cxt
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
        ; con_res_kind <- newOpenTypeKind
@@ -1890,6 +1892,12 @@ kcConDecl new_or_data _tc_res_kind
 
        ; traceTc "kcConDecl:GADT }" (ppr names $$ ppr arg_exp_kind)
        ; return () }
+  where
+    bind_con_tvbs outer_bndrs inner_bndrs thing_inside
+      -- Why "_Tv"? See Note [Using TyVarTvs for kind-checking GADTs]
+      = discardResult $ bindOuterSigTKBndrs_Tv outer_bndrs $
+                        bindExplicitTKBndrs_Tv (concatMap hsForAllTelescopeBndrs inner_bndrs) $
+                        thing_inside
 
 {- Note [kcConDecls: kind-checking data type decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3760,16 +3768,17 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   -- NB: don't use res_kind here, as it's ill-scoped. Instead,
   -- we get the res_kind by typechecking the result type.
           (ConDeclGADT { con_names = names
-                       , con_bndrs = L _ outer_hs_bndrs
+                       , con_outer_bndrs = L _ outer_bndrs
+                       , con_inner_bndrs = inner_bndrs
                        , con_mb_cxt = cxt, con_g_args = hs_args
                        , con_res_ty = hs_res_ty })
   = addErrCtxt (DataConDefCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let L _ name :| _ = names
        ; skol_info <- mkSkolemInfo (DataConSkol name)
-       ; (tclvl, wanted, (outer_bndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
+       ; (tclvl, wanted, (tvbs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
-              tcOuterTKBndrs skol_info outer_hs_bndrs       $
+              tcGadtConTyVarBndrs skol_info outer_bndrs inner_bndrs $
               do { ctxt <- tcHsContext cxt
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]
@@ -3796,18 +3805,20 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
 
-       ; outer_bndrs <- scopedSortOuter outer_bndrs
-       ; let outer_tv_bndrs = outerTyVarBndrs outer_bndrs
-
        ; tkvs <- kindGeneralizeAll skol_info
-                    (mkInvisForAllTys outer_tv_bndrs $
-                     tcMkPhiTy ctxt                  $
-                     tcMkScaledFunTys arg_tys        $
+                    (mkForAllTys tvbs         $
+                     tcMkPhiTy ctxt           $
+                     tcMkScaledFunTys arg_tys $
                      res_ty)
        ; traceTc "tcConDecl:GADT" (ppr names $$ ppr res_ty $$ ppr tkvs)
        ; reportUnsolvedEqualities skol_info tkvs tclvl wanted
 
-       ; let tvbndrs =  mkTyVarBinders InferredSpec tkvs ++ outer_tv_bndrs
+       -- No visible forall in data constructors yet (tracking issue: #25127)
+       ; tvbs' <- forM tvbs $ \case
+           Bndr v (Invisible spec) -> return (Bndr v spec)
+           Bndr _ Required -> failWithTc (TcRnVDQInTermType Nothing)
+
+       ; let tvbndrs = mkTyVarBinders InferredSpec tkvs ++ tvbs'
 
        -- Zonk to Types
        ; (tvbndrs, arg_tys, ctxt, res_ty) <- initZonkEnv NoFlexi $
@@ -3836,6 +3847,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
              ; rep_nm   <- newTyConRepName name
 
              ; let bang_opts = SrcBangOpts (initBangOpts dflags)
+
              ; buildDataCon fam_envs bang_opts name is_infix
                             rep_nm stricts field_lbls
                             univ_tvs ex_tvs tvbndrs' eq_preds

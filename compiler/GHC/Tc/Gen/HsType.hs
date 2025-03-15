@@ -33,6 +33,7 @@ module GHC.Tc.Gen.HsType (
 
         bindOuterFamEqnTKBndrs_Q_Tv, bindOuterFamEqnTKBndrs,
         tcOuterTKBndrs, scopedSortOuter, outerTyVars, outerTyVarBndrs,
+        tcGadtConTyVarBndrs,
         bindOuterSigTKBndrs_Tv,
         tcExplicitTKBndrs,
         bindNamedWildCardBinders,
@@ -3343,6 +3344,20 @@ tcOuterTKBndrsX skol_mode skol_info outer_bndrs thing_inside
            ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
                                       , hso_bndrs     = exp_bndrs }
                     , thing) }
+
+---------------
+tcGadtConTyVarBndrs :: SkolemInfo
+                    -> HsOuterSigTyVarBndrs GhcRn
+                    -> [HsForAllTelescope GhcRn]
+                    -> TcM a -> TcM ([TcTyVarBinder], a)
+tcGadtConTyVarBndrs skol_info outer inner thing_inside
+  = do { (outer_bndrs, (inner_tvbs, a)) <-
+            tcOuterTKBndrs skol_info outer $
+            tcExplicitTKBndrs skol_info (concatMap hsForAllTelescopeBndrs inner) $
+            thing_inside
+       ; outer_bndrs <- scopedSortOuter outer_bndrs
+       ; let outer_tvbs = tyVarSpecToBinders (outerTyVarBndrs outer_bndrs)
+       ; return (outer_tvbs ++ inner_tvbs, a) }
 
 --------------------------------------
 --    Explicit tyvar binders

@@ -1137,15 +1137,18 @@
                   (Unqual
                    {OccName: MkD5}))
                  [])
-                (L
-                 (EpAnn
-                  (EpaSpan { T17544.hs:25:13-18 })
-                  (AnnListItem
-                   [])
-                  (EpaComments
-                   []))
-                 (HsOuterImplicit
-                  (NoExtField)))
+                (HsGadtConTyVarBndrs
+                 (NoExtField)
+                 (L
+                  (EpAnn
+                   (EpaSpan { T17544.hs:25:13-18 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsOuterImplicit
+                   (NoExtField)))
+                 [])
                 (Nothing)
                 (PrefixConGADT
                  (NoExtField)
@@ -1519,15 +1522,18 @@
                   (Unqual
                    {OccName: MkD6}))
                  [])
-                (L
-                 (EpAnn
-                  (EpaSpan { T17544.hs:31:13-18 })
-                  (AnnListItem
-                   [])
-                  (EpaComments
-                   []))
-                 (HsOuterImplicit
-                  (NoExtField)))
+                (HsGadtConTyVarBndrs
+                 (NoExtField)
+                 (L
+                  (EpAnn
+                   (EpaSpan { T17544.hs:31:13-18 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsOuterImplicit
+                   (NoExtField)))
+                 [])
                 (Nothing)
                 (PrefixConGADT
                  (NoExtField)
@@ -1901,15 +1907,18 @@
                   (Unqual
                    {OccName: MkD7}))
                  [])
-                (L
-                 (EpAnn
-                  (EpaSpan { T17544.hs:37:13-18 })
-                  (AnnListItem
-                   [])
-                  (EpaComments
-                   []))
-                 (HsOuterImplicit
-                  (NoExtField)))
+                (HsGadtConTyVarBndrs
+                 (NoExtField)
+                 (L
+                  (EpAnn
+                   (EpaSpan { T17544.hs:37:13-18 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsOuterImplicit
+                   (NoExtField)))
+                 [])
                 (Nothing)
                 (PrefixConGADT
                  (NoExtField)
@@ -2283,15 +2292,18 @@
                   (Unqual
                    {OccName: MkD8}))
                  [])
-                (L
-                 (EpAnn
-                  (EpaSpan { T17544.hs:43:13-18 })
-                  (AnnListItem
-                   [])
-                  (EpaComments
-                   []))
-                 (HsOuterImplicit
-                  (NoExtField)))
+                (HsGadtConTyVarBndrs
+                 (NoExtField)
+                 (L
+                  (EpAnn
+                   (EpaSpan { T17544.hs:43:13-18 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsOuterImplicit
+                   (NoExtField)))
+                 [])
                 (Nothing)
                 (PrefixConGADT
                  (NoExtField)
@@ -2665,15 +2677,18 @@
                   (Unqual
                    {OccName: MkD9}))
                  [])
-                (L
-                 (EpAnn
-                  (EpaSpan { T17544.hs:49:13-18 })
-                  (AnnListItem
-                   [])
-                  (EpaComments
-                   []))
-                 (HsOuterImplicit
-                  (NoExtField)))
+                (HsGadtConTyVarBndrs
+                 (NoExtField)
+                 (L
+                  (EpAnn
+                   (EpaSpan { T17544.hs:49:13-18 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsOuterImplicit
+                   (NoExtField)))
+                 [])
                 (Nothing)
                 (PrefixConGADT
                  (NoExtField)
@@ -3047,15 +3062,18 @@
                   (Unqual
                    {OccName: MkD10}))
                  [])
-                (L
-                 (EpAnn
-                  (EpaSpan { T17544.hs:55:14-20 })
-                  (AnnListItem
-                   [])
-                  (EpaComments
-                   []))
-                 (HsOuterImplicit
-                  (NoExtField)))
+                (HsGadtConTyVarBndrs
+                 (NoExtField)
+                 (L
+                  (EpAnn
+                   (EpaSpan { T17544.hs:55:14-20 })
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    []))
+                  (HsOuterImplicit
+                   (NoExtField)))
+                 [])
                 (Nothing)
                 (PrefixConGADT
                  (NoExtField)

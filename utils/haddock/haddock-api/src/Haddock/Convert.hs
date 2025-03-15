@@ -532,7 +532,8 @@ synifyDataCon use_gadt_syntax dc =
             ConDeclGADT
               { con_g_ext = noExtField
               , con_names = pure name
-              , con_bndrs = noLocA outer_bndrs
+              , con_outer_bndrs = noLocA outer_bndrs
+              , con_inner_bndrs = []
               , con_mb_cxt = ctx
               , con_g_args = hat
               , con_res_ty = synifyType WithinType [] res_ty

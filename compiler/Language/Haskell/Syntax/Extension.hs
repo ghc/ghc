@@ -620,6 +620,11 @@ type family XHsOuterExplicit    x flag
 type family XXHsOuterTyVarBndrs x
 
 -- -------------------------------------
+-- HsGadtConTyVarBndrs type families
+type family XHsGadtConTyVarBndrs p
+type family XXHsGadtConTyVarBndrs p
+
+-- -------------------------------------
 -- HsSigType type families
 type family XHsSig      x
 type family XXHsSigType x

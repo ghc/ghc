@@ -1881,15 +1881,18 @@
               (Unqual
                {OccName: Nat}))
              [])
-            (L
-             (EpAnn
-              (EpaSpan { DumpParsedAst.hs:23:10-45 })
-              (AnnListItem
-               [])
-              (EpaComments
-               []))
-             (HsOuterImplicit
-              (NoExtField)))
+            (HsGadtConTyVarBndrs
+             (NoExtField)
+             (L
+              (EpAnn
+               (EpaSpan { DumpParsedAst.hs:23:10-45 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (HsOuterImplicit
+               (NoExtField)))
+             [])
             (Nothing)
             (PrefixConGADT
              (NoExtField)

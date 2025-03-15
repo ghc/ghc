@@ -4279,7 +4279,8 @@ instance ExactPrint (ConDecl GhcPs) where
 
   exact (ConDeclGADT { con_g_ext = AnnConDeclGADT ops cps dcol
                      , con_names = cons
-                     , con_bndrs = bndrs
+                     , con_outer_bndrs = outer_bndrs
+                     , con_inner_bndrs = inner_bndrs
                      , con_mb_cxt = mcxt, con_g_args = args
                      , con_res_ty = res_ty, con_doc = doc }) = do
     cons' <- mapM markAnnotated cons
@@ -4288,9 +4289,11 @@ instance ExactPrint (ConDecl GhcPs) where
     epTokensToComments ")" cps
 
     -- Work around https://gitlab.haskell.org/ghc/ghc/-/issues/20558
-    bndrs' <- case bndrs of
-      L _ (HsOuterImplicit _) -> return bndrs
-      _ -> markAnnotated bndrs
+    outer_bndrs' <- case outer_bndrs of
+      L _ (HsOuterImplicit _) -> return outer_bndrs
+      _ -> markAnnotated outer_bndrs
+
+    inner_bndrs' <- mapM markAnnotated inner_bndrs
 
     mcxt' <- mapM markAnnotated mcxt
     args' <-
@@ -4305,7 +4308,8 @@ instance ExactPrint (ConDecl GhcPs) where
     res_ty' <- markAnnotated res_ty
     return (ConDeclGADT { con_g_ext = AnnConDeclGADT [] [] dcol'
                         , con_names = cons'
-                        , con_bndrs = bndrs'
+                        , con_outer_bndrs = outer_bndrs'
+                        , con_inner_bndrs = inner_bndrs'
                         , con_mb_cxt = mcxt', con_g_args = args'
                         , con_res_ty = res_ty', con_doc = doc })
 

@@ -210,7 +210,8 @@ getGADTConType :: ConDecl DocNameI -> LHsSigType DocNameI
 -- 'undefined's
 getGADTConType
   ( ConDeclGADT
-      { con_bndrs = L _ outer_bndrs
+      { con_outer_bndrs = outer_bndrs
+      , con_inner_bndrs = inner_bndrs
       , con_mb_cxt = mcxt
       , con_g_args = args
       , con_res_ty = res_ty
@@ -219,24 +220,37 @@ getGADTConType
     noLocA
       ( HsSig
           { sig_ext = noExtField
-          , sig_bndrs = outer_bndrs
-          , sig_body = theta_ty
+          , sig_bndrs = unLoc outer_bndrs
+          , sig_body = mkForallTys inner_bndrs phi_ty
           }
       )
     where
-      theta_ty
-        | Just theta <- mcxt =
-            noLocA (HsQualTy{hst_xqual = noAnn, hst_ctxt = theta, hst_body = tau_ty})
-        | otherwise =
-            tau_ty
+      phi_ty :: LHsType DocNameI
+      phi_ty = case mcxt of
+        Nothing    -> tau_ty
+        Just theta -> mkQualTy theta tau_ty
 
-      --  tau_ty :: LHsType DocNameI
+      tau_ty :: LHsType DocNameI
       tau_ty = case args of
         RecConGADT _ flds -> mkFunTy (noLocA (XHsType (HsRecTy (unLoc flds)))) res_ty
         PrefixConGADT _ pos_args -> foldr hsConDeclFieldToFunTy res_ty pos_args
 
       mkFunTy :: LHsType DocNameI -> LHsType DocNameI -> LHsType DocNameI
       mkFunTy a b = noLocA (HsFunTy noAnn (HsUnannotated noExtField) a b)
+
+      mkQualTy :: LHsContext DocNameI -> LHsType DocNameI -> LHsType DocNameI
+      mkQualTy ctxt body =
+        noLocA (HsQualTy{ hst_xqual = noAnn
+                        , hst_ctxt = ctxt, hst_body = body})
+
+      mkForallTy :: HsForAllTelescope DocNameI -> LHsType DocNameI -> LHsType DocNameI
+      mkForallTy tele body =
+        noLocA (HsForAllTy { hst_xforall = noAnn
+                           , hst_tele = tele, hst_body = body })
+
+      mkForallTys :: [HsForAllTelescope DocNameI] -> LHsType DocNameI -> LHsType DocNameI
+      mkForallTys = flip (foldr mkForallTy)
+
 getGADTConType (ConDeclH98{}) = panic "getGADTConType"
 
 -- Should only be called on ConDeclGADT

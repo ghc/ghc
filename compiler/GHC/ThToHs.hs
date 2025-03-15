@@ -729,10 +729,15 @@ cvtConstr parent_con do_con_name (ForallC tvs ctxt con)
     add_cxt (L loc cxt1) (Just (L _ cxt2))
       = Just (L loc (cxt1 ++ cxt2))
 
+    -- Nested foralls end up flattened (see tests/th/GadtConSigs_th_dump1.stderr)
+    -- but it doesn't seem to matter.
     add_forall :: [LHsTyVarBndr Hs.Specificity GhcPs] -> LHsContext GhcPs
                -> ConDecl GhcPs -> ConDecl GhcPs
-    add_forall tvs' cxt' con@(ConDeclGADT { con_bndrs = L l outer_bndrs, con_mb_cxt = cxt })
-      = con { con_bndrs  = L l outer_bndrs'
+    add_forall tvs' cxt' con@(ConDeclGADT { con_outer_bndrs = L l outer_bndrs
+                                          , con_inner_bndrs = inner_bndrs
+                                          , con_mb_cxt = cxt })
+      = con { con_outer_bndrs = L l outer_bndrs'
+            , con_inner_bndrs = inner_bndrs
             , con_mb_cxt = add_cxt cxt' cxt }
       where
         outer_bndrs'
@@ -770,11 +775,12 @@ cvtConstr parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
 mk_gadt_decl :: NonEmpty (LocatedN RdrName) -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs
              -> CvtM (LConDecl GhcPs)
 mk_gadt_decl names args res_ty
-  = do bndrs <- returnLA mkHsOuterImplicit
+  = do outer_bndrs <- returnLA mkHsOuterImplicit
        returnLA $ ConDeclGADT
                    { con_g_ext  = noAnn
                    , con_names  = names
-                   , con_bndrs  = bndrs
+                   , con_outer_bndrs = outer_bndrs
+                   , con_inner_bndrs = []
                    , con_mb_cxt = Nothing
                    , con_g_args = args
                    , con_res_ty = res_ty

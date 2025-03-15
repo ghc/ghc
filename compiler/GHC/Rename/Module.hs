@@ -2410,7 +2410,8 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                   all_fvs) }}
 
 rnConDecl (ConDeclGADT { con_names   = names
-                       , con_bndrs   = L l outer_bndrs
+                       , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
+                       , con_inner_bndrs = inner_bndrs
                        , con_mb_cxt  = mcxt
                        , con_g_args  = args
                        , con_res_ty  = res_ty
@@ -2425,6 +2426,7 @@ rnConDecl (ConDeclGADT { con_names   = names
               -- See #14808.
               implicit_bndrs =
                 extractHsOuterTvBndrs outer_bndrs           $
+                extractHsForAllTelescopes inner_bndrs       $
                 extractHsTysRdrTyVars (hsConDeclTheta mcxt) $
                 extractConDeclGADTDetailsTyVars args        $
                 extractHsTysRdrTyVars [res_ty] []
@@ -2432,6 +2434,7 @@ rnConDecl (ConDeclGADT { con_names   = names
         ; let ctxt = ConDeclCtx (toList new_names)
 
         ; bindHsOuterTyVarBndrs ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->
+          bindHsForAllTelescopes ctxt inner_bndrs $ \inner_bndrs' ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclGADTDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
@@ -2445,10 +2448,12 @@ rnConDecl (ConDeclGADT { con_names   = names
         ; let all_fvs = fvs1 `plusFV` fvs2 `plusFV` fvs3
 
         ; traceRn "rnConDecl (ConDeclGADT)"
-            (ppr names $$ ppr outer_bndrs')
+            (ppr names $$ ppr outer_bndrs' $$ ppr inner_bndrs')
         ; new_mb_doc <- traverse rnLHsDoc mb_doc
         ; return (ConDeclGADT { con_g_ext = noExtField, con_names = new_names
-                              , con_bndrs = L l outer_bndrs', con_mb_cxt = new_cxt
+                              , con_outer_bndrs = L outer_bndrs_loc outer_bndrs'
+                              , con_inner_bndrs = inner_bndrs'
+                              , con_mb_cxt = new_cxt
                               , con_g_args = new_args, con_res_ty = new_res_ty
                               , con_doc = new_mb_doc },
                   all_fvs) } }
