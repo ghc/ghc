@@ -917,7 +917,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                                                   -- A slight hack!
 
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
-           | otherwise  = mkForAllTys (tyVarSpecToBinders sel_tvbs) $
+           | otherwise  = mkForAllTys sel_tvbs $
                           -- Urgh! See Note [The stupid context] in GHC.Core.DataCon
                           mkPhiTy (conLikeStupidTheta con1) $
                           -- req_theta is empty for normal DataCon

@@ -260,7 +260,7 @@ tyConToIfaceDecl env tycon
           -- tidying produced. Therefore, tidying the user-written tyvars is a
           -- simple matter of looking up each variable in the substitution,
           -- which tidyTyCoVarOcc accomplishes.
-          tidyUserForAllTyBinder :: TidyEnv -> InvisTVBinder -> InvisTVBinder
+          tidyUserForAllTyBinder :: TidyEnv -> TyVarBinder -> TyVarBinder
           tidyUserForAllTyBinder env (Bndr tv vis) =
             Bndr (tidyTyCoVarOcc env tv) vis
 

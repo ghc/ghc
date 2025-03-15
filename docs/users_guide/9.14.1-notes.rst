@@ -87,6 +87,18 @@ Language
 
 * The :extension:`MonadComprehensions` extension now implies :extension:`ParallelListComp` as was originally intended (see `Monad Comprehensions <https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/monad_comprehensions.html>`_).
 
+* In accordance with `GHC Proposal #281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_,
+  section 4.7 "Data constructors", the :extension:`RequiredTypeArguments`
+  extension now allows visible forall in types of data constructors
+  (:ghc-ticket:`25127`). The following declaration is now accepted by GHC:
+
+  ::
+
+    data T a where
+      Typed :: forall a -> a -> T a
+
+  See :ref:`visible-forall-in-gadts` for details.
+
 Compiler
 ~~~~~~~~
 

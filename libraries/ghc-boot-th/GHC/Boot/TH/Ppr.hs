@@ -719,31 +719,27 @@ instance Ppr Clause where
 
 ------------------------------
 instance Ppr Con where
-    ppr (NormalC c sts) = pprName' Applied c <+> sep (map pprBangType sts)
-
-    ppr (RecC c vsts)
-        = pprName' Applied c <+> braces (sep (punctuate comma $ map pprVarBangType vsts))
-
-    ppr (InfixC st1 c st2) = pprBangType st1
-                         <+> pprName' Infix c
-                         <+> pprBangType st2
-
-    ppr (ForallC ns ctxt (GadtC cs sts ty))
-        = commaSepApplied cs <+> dcolon <+> pprForall ns ctxt
-      <+> pprGadtRHS sts ty
-
-    ppr (ForallC ns ctxt (RecGadtC cs vsts ty))
-        = commaSepApplied cs <+> dcolon <+> pprForall ns ctxt
-      <+> pprRecFields vsts ty
-
-    ppr (ForallC ns ctxt con)
-        = pprForall ns ctxt <+> ppr con
-
-    ppr (GadtC cs sts ty)
-        = commaSepApplied cs <+> dcolon <+> pprGadtRHS sts ty
-
-    ppr (RecGadtC cs vsts ty)
-        = commaSepApplied cs <+> dcolon <+> pprRecFields vsts ty
+  ppr = ppr_con id
+    where
+      ppr_con :: (Doc -> Doc) -> Con -> Doc
+      ppr_con ppr_foralls (NormalC c sts) =
+        ppr_foralls $ pprName' Applied c <+> sep (map pprBangType sts)
+      ppr_con ppr_foralls (RecC c vsts) =
+        ppr_foralls $ pprName' Applied c <+> ppr_rec vsts
+        where
+          ppr_rec :: [VarBangType] -> Doc
+          ppr_rec = braces . sep . punctuate comma . map pprVarBangType
+      ppr_con ppr_foralls (InfixC st1 c st2) =
+        ppr_foralls $
+              pprBangType st1
+          <+> pprName' Infix c
+          <+> pprBangType st2
+      ppr_con ppr_foralls (ForallC ns ctxt con)
+        = ppr_con (\d -> ppr_foralls $ sep [pprForall ns ctxt, d]) con
+      ppr_con ppr_foralls (GadtC cs sts ty)
+        = commaSepApplied cs <+> dcolon <+> ppr_foralls (pprGadtRHS sts ty)
+      ppr_con ppr_foralls (RecGadtC cs vsts ty)
+        = commaSepApplied cs <+> dcolon <+> ppr_foralls (pprRecFields vsts ty)
 
 instance Ppr PatSynDir where
   ppr Unidir        = text "<-"

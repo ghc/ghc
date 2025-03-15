@@ -818,22 +818,23 @@ mkGadtDecl loc names dcol ty = do
        let ((ops, cps), cs, arg_types, res_type) = splitHsFunType body_ty
        return (PrefixConGADT noExtField arg_types, res_type, (ops,cps), cs)
 
-  let bndrs_loc = case outer_bndrs of
-        HsOuterImplicit{} -> getLoc ty
-        HsOuterExplicit an _ -> EpAnn (entry an) noAnn emptyComments
-
   let l = EpAnn (spanAsAnchor loc) noAnn csa
 
   pure $ L l ConDeclGADT
                      { con_g_ext  = AnnConDeclGADT ops cps dcol
                      , con_names  = names
-                     , con_bndrs  = L bndrs_loc outer_bndrs
+                     , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
+                     , con_inner_bndrs = inner_bndrs
                      , con_mb_cxt = mcxt
                      , con_g_args = args
                      , con_res_ty = res_ty
                      , con_doc    = Nothing }
   where
-    (outer_bndrs, mcxt, body_ty) = splitLHsGadtTy ty
+    (outer_bndrs, inner_bndrs, mcxt, body_ty) = splitLHsGadtTy ty
+    outer_bndrs_loc = case outer_bndrs of
+      HsOuterImplicit{} -> getLoc ty
+      HsOuterExplicit an _ -> EpAnn (entry an) noAnn emptyComments
+
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.

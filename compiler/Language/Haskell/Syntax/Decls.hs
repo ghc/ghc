@@ -969,10 +969,13 @@ data ConDecl pass
       , con_names   :: NonEmpty (LIdP pass)
       -- The following fields describe the type after the '::'
       -- See Note [GADT abstract syntax]
-      , con_bndrs   :: XRec pass (HsOuterSigTyVarBndrs pass)
-        -- ^ The outermost type variable binders, be they explicit or
-        --   implicit.  The 'XRec' is used to anchor exact print
-        --   annotations, AnnForall and AnnDot.
+      , con_outer_bndrs :: XRec pass (HsOuterSigTyVarBndrs pass)
+        -- ^ The outermost type variable binders, be they explicit or implicit;
+        --   cf. HsSigType that also stores the outermost sig_bndrs separately
+        --   from the forall telescopes in sig_body.
+        --   See Note [Representing type signatures] in Language.Haskell.Syntax.Type
+      , con_inner_bndrs :: [HsForAllTelescope pass]
+        -- ^ The forall telescopes other than the outermost invisible forall.
       , con_mb_cxt  :: Maybe (LHsContext pass)   -- ^ User-written context (if any)
       , con_g_args  :: HsConDeclGADTDetails pass -- ^ Arguments; never infix
       , con_res_ty  :: LHsType pass              -- ^ Result type

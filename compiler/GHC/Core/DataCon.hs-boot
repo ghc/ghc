@@ -1,7 +1,7 @@
 module GHC.Core.DataCon where
 
 import GHC.Prelude
-import {-# SOURCE #-} GHC.Types.Var( Id, TyVar, TyCoVar, InvisTVBinder )
+import {-# SOURCE #-} GHC.Types.Var( Id, TyVar, TyCoVar, TyVarBinder )
 import {-# SOURCE #-} GHC.Types.Name( Name, NamedThing )
 import {-# SOURCE #-} GHC.Core.TyCon( TyCon )
 import GHC.Types.FieldLabel ( FieldLabel )
@@ -19,7 +19,7 @@ dataConWorkId    :: DataCon -> Id
 dataConTyCon     :: DataCon -> TyCon
 dataConExTyCoVars :: DataCon -> [TyCoVar]
 dataConUserTyVars :: DataCon -> [TyVar]
-dataConUserTyVarBinders :: DataCon -> [InvisTVBinder]
+dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
 dataConSourceArity  :: DataCon -> Arity
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConInstOrigArgTys  :: DataCon -> [Type] -> [Scaled Type]

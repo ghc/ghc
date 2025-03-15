@@ -1205,11 +1205,12 @@ It has type
    forall a. e_ty
 Note the Specified visibility of (forall a. e_ty); the Core type just isn't able
 to express more than one visiblity, and we pick `Specified`.  See `exprType` and
-`mkLamType` in GHC.Core.Utils, and `GHC.Type.Var.coreLamForAllTyFlag`.
+`mkLamType` in GHC.Core.Utils, and `GHC.Type.Var.coreTyLamForAllTyFlag`.
 
 So how can we ever get a term of type (forall a -> e_ty)?  Answer: /only/ via a
-cast built with ForAllCo.  See `GHC.Tc.Types.Evidence.mkWpForAllCast`.  This does
-not seem very satisfying, but it does the job.
+cast built with ForAllCo.  See `GHC.Core.Coercion.mkForAllVisCos`,
+`GHC.Tc.Types.Evidence.mkWpForAllCast` and `GHC.Core.Make.mkCoreTyLams`.
+This does not seem very satisfying, but it does the job.
 
 An alternative would be to put a visibility flag into `Lam` (a huge change),
 or into a `TyVar` (a more plausible change), but we leave that for the future.

@@ -12,6 +12,7 @@ module GHC.Core.ConLike (
         , conLikeConLikeName
         , isVanillaConLike
         , conLikeArity
+        , conLikeVisArity
         , conLikeFieldLabels
         , conLikeConInfo
         , conLikeInstOrigArgTys
@@ -112,10 +113,15 @@ instance Data.Data ConLike where
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "ConLike"
 
--- | Number of arguments
+-- | Number of value arguments
 conLikeArity :: ConLike -> Arity
 conLikeArity (RealDataCon data_con) = dataConSourceArity data_con
 conLikeArity (PatSynCon pat_syn)    = patSynArity pat_syn
+
+-- | Number of visible arguments
+conLikeVisArity :: ConLike -> VisArity
+conLikeVisArity (RealDataCon data_con) = dataConVisArity data_con
+conLikeVisArity (PatSynCon pat_syn)    = patSynVisArity pat_syn
 
 -- | Names of fields used for selectors
 conLikeFieldLabels :: ConLike -> [FieldLabel]
@@ -147,10 +153,11 @@ conLikeInstOrigArgTys (PatSynCon pat_syn) tys =
 -- followed by the existentially quantified type variables. For data
 -- constructors, the situation is slightly more complicated—see
 -- @Note [DataCon user type variable binders]@ in "GHC.Core.DataCon".
-conLikeUserTyVarBinders :: ConLike -> [InvisTVBinder]
+conLikeUserTyVarBinders :: ConLike -> [TyVarBinder]
 conLikeUserTyVarBinders (RealDataCon data_con) =
     dataConUserTyVarBinders data_con
 conLikeUserTyVarBinders (PatSynCon pat_syn) =
+    tyVarSpecToBinders $
     patSynUnivTyVarBinders pat_syn ++ patSynExTyVarBinders pat_syn
     -- The order here is because of the order in `GHC.Tc.TyCl.PatSyn`.
 

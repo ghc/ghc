@@ -2586,21 +2586,6 @@ data TcRnMessage where
   -}
   TcRnCannotBindTyVarsInPatBind :: !(NE.NonEmpty (Name, TcTyVar)) -> TcRnMessage
 
-  {-| TcRnTooManyTyArgsInConPattern is an error occurring when a constructor pattern
-     has more than the expected number of type arguments
-
-     Example(s):
-     f (Just @Int @Bool x) = x
-
-    Test cases: typecheck/should_fail/TyAppPat_TooMany
-                typecheck/should_fail/T20443b
-  -}
-  TcRnTooManyTyArgsInConPattern
-    :: !ConLike
-    -> !Int -- ^ Expected number of args
-    -> !Int -- ^ Actual number of args
-    -> TcRnMessage
-
   {-| TcRnMultipleInlinePragmas is a warning signifying that multiple inline pragmas
      reference the same definition.
 
@@ -6991,6 +6976,7 @@ data LookupTHInstNameErrReason
 data UnrepresentableTypeDescr
   = LinearInvisibleArgument
   | CoercionsInTypes
+  | DataConVisibleForall
 
 -- FFI error types
 data IllegalForeignTypeReason

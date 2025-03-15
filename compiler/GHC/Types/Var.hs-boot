@@ -2,7 +2,7 @@
 module GHC.Types.Var where
 
 import {-# SOURCE #-} GHC.Types.Name
-import Language.Haskell.Syntax.Specificity (Specificity)
+import Language.Haskell.Syntax.Specificity (Specificity, ForAllTyFlag)
 
 data FunTyFlag
 data Var
@@ -13,3 +13,4 @@ type Id    = Var
 type TyCoVar = Id
 type TcTyVar = Var
 type InvisTVBinder = VarBndr TyVar Specificity
+type TyVarBinder   = VarBndr TyVar ForAllTyFlag

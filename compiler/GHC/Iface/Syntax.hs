@@ -333,7 +333,7 @@ data IfaceConDecl
         -- So this guarantee holds for IfaceConDecl, but *not* for DataCon
 
         ifConExTCvs   :: [IfaceBndr],  -- Existential ty/covars
-        ifConUserTvBinders :: [IfaceForAllSpecBndr],
+        ifConUserTvBinders :: [IfaceForAllBndr],
           -- The tyvars, in the order the user wrote them
           -- INVARIANT: the set of tyvars in ifConUserTvBinders is exactly the
           --            set of tyvars (*not* covars) of ifConExTCvs, unioned
@@ -1569,9 +1569,9 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- the visibilities of the existential tyvar binders, we can simply drop
     -- the universal tyvar binders from user_tvbs.
     ex_tvbs = dropList tc_binders user_tvbs
-    ppr_ex_quant = pprIfaceForAllPartMust (ifaceForAllSpecToBndrs ex_tvbs) ctxt
+    ppr_ex_quant = pprIfaceForAllPartMust ex_tvbs ctxt
     pp_gadt_res_ty = mk_user_con_res_ty eq_spec
-    ppr_gadt_ty = pprIfaceForAllPart (ifaceForAllSpecToBndrs user_tvbs) ctxt pp_tau
+    ppr_gadt_ty = pprIfaceForAllPart user_tvbs ctxt pp_tau
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
         -- because we don't have a Name for the tycon, only an OccName

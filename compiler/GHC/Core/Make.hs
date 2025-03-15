@@ -3,7 +3,8 @@ module GHC.Core.Make (
         -- * Constructing normal syntax
         mkCoreLet, mkCoreLets,
         mkCoreApp, mkCoreApps, mkCoreConApps, mkCoreConWrapApps,
-        mkCoreLams, mkWildCase, mkIfThenElse,
+        mkCoreLams, mkCoreTyLams,
+        mkWildCase, mkIfThenElse,
         mkWildValBinder,
         mkSingleAltCase,
         sortQuantVars, castBottomExpr,
@@ -63,11 +64,11 @@ import GHC.Types.Literal
 import GHC.Types.Unique.Supply
 
 import GHC.Core
-import GHC.Core.Utils ( exprType, mkSingleAltCase, bindNonRec )
+import GHC.Core.Utils ( exprType, mkSingleAltCase, bindNonRec, mkCast )
 import GHC.Core.Type
 import GHC.Core.Predicate    ( scopedSort, isCoVarType )
 import GHC.Core.TyCo.Compare ( eqType )
-import GHC.Core.Coercion     ( isCoVar )
+import GHC.Core.Coercion     ( isCoVar, mkRepReflCo, mkForAllVisCos )
 import GHC.Core.DataCon      ( DataCon, dataConWorkId, dataConWrapId )
 import GHC.Core.Multiplicity
 
@@ -121,6 +122,14 @@ mkCoreLet bind body
 -- lambda in the result
 mkCoreLams :: [CoreBndr] -> CoreExpr -> CoreExpr
 mkCoreLams = mkLams
+
+-- | Create a type lambda (/\a b c. e) and apply a cast to fix up visibilities
+-- if needed. See Note [Required foralls in Core]
+mkCoreTyLams :: [TyVarBinder] -> CoreExpr -> CoreExpr
+mkCoreTyLams binders body = mkCast lam co
+  where
+    lam = mkCoreLams (binderVars binders) body
+    co  = mkForAllVisCos binders (mkRepReflCo (exprType body))
 
 -- | Bind a list of binding groups over an expression. The leftmost binding
 -- group becomes the outermost group in the resulting expression

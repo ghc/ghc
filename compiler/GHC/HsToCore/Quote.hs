@@ -128,7 +128,7 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
           -- Only used for the defensive assertion that the selector has
           -- the expected type
           tyvars = dataConUserTyVarBinders (classDataCon cls)
-          expected_ty = mkInvisForAllTys tyvars $
+          expected_ty = mkForAllTys tyvars $
                         mkFunTy invisArgConstraintLike ManyTy
                                 (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
                                 (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
@@ -891,28 +891,45 @@ repC (L _ (ConDeclH98 { con_name = con
               else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c'])
             }
 
-repC (L _ (ConDeclGADT { con_names  = cons
-                       , con_bndrs  = L _ outer_bndrs
+repC (L l (ConDeclGADT { con_names  = cons
+                       , con_outer_bndrs = L _ outer_bndrs
+                       , con_inner_bndrs = inner_bndrs
                        , con_mb_cxt = mcxt
                        , con_g_args = args
                        , con_res_ty = res_ty }))
-  | null_outer_imp_tvs && null_outer_exp_tvs
-                                 -- No implicit or explicit variables
-  , Nothing <- mcxt              -- No context
-                                 -- ==> no need for a forall
-  = repGadtDataCons cons args res_ty
+  | no_explicit_forall, no_context
+  -- No explicit variables, no context  ==>  No need for a ForallC
+  -- See Note [Don't quantify implicit type variables in quotes]
+  = addSimpleTyVarBinds FreshNamesOnly (hsOuterTyVarNames outer_bndrs) $
+    repGadtDataCons cons args res_ty
 
-  | otherwise
+  | Just invis_inner_bndrs <- m_invis_inner_bndrs
   = addHsOuterSigTyVarBinds outer_bndrs $ \ outer_bndrs' ->
-             -- See Note [Don't quantify implicit type variables in quotes]
-    do { c'    <- repGadtDataCons cons args res_ty
-       ; ctxt' <- repMbContext mcxt
-       ; if null_outer_exp_tvs && isNothing mcxt
-         then return c'
-         else rep2 forallCName ([unC outer_bndrs', unC ctxt', unC c']) }
+    -- the context is attached to the innermost ForallC
+    let loop last_bndrs' [] = do
+          ctxt' <- repMbContext mcxt
+          c'    <- repGadtDataCons cons args res_ty
+          rep2 forallCName ([unC last_bndrs', unC ctxt', unC c'])
+        loop last_bndrs' (bndrs : bndrs_s) =
+          addHsTyVarBinds FreshNamesOnly bndrs $ \bndrs' -> do
+            body_c' <- loop bndrs' bndrs_s
+            ctxt' <- repContext []
+            rep2 forallCName [unC last_bndrs', unC ctxt', unC body_c']
+    in loop outer_bndrs' invis_inner_bndrs
+
+  | Nothing <- m_invis_inner_bndrs
+  = notHandledL (locA l) ThDataConVisibleForall
+
   where
-    null_outer_imp_tvs = nullOuterImplicit outer_bndrs
-    null_outer_exp_tvs = nullOuterExplicit outer_bndrs
+    no_explicit_forall = nullOuterExplicit outer_bndrs && null inner_bndrs
+    no_context         = isNothing mcxt
+
+    m_invis_inner_bndrs :: Maybe [[LHsTyVarBndr Specificity GhcRn]]
+    m_invis_inner_bndrs = traverse get_invis_bndrs inner_bndrs
+
+    get_invis_bndrs :: HsForAllTelescope GhcRn -> Maybe [LHsTyVarBndr Specificity GhcRn]
+    get_invis_bndrs HsForAllVis{} = Nothing
+    get_invis_bndrs HsForAllInvis { hsf_invis_bndrs = tvbs } = Just tvbs
 
 repMbContext :: Maybe (LHsContext GhcRn) -> MetaM (Core (M TH.Cxt))
 repMbContext Nothing          = repContext []
@@ -1249,17 +1266,6 @@ addHsOuterSigTyVarBinds outer_bndrs thing_inside = case outer_bndrs of
        addSimpleTyVarBinds FreshNamesOnly imp_tvs $ thing_inside th_nil
   HsOuterExplicit{hso_bndrs = exp_bndrs} ->
     addHsTyVarBinds FreshNamesOnly exp_bndrs thing_inside
-
--- | If a type implicitly quantifies its outermost type variables, return
--- 'True' if the list of implicitly bound type variables is empty. If a type
--- explicitly quantifies its outermost type variables, always return 'True'.
---
--- This is used in various places to determine if a Template Haskell 'Type'
--- should be headed by a 'ForallT' or not.
-nullOuterImplicit :: HsOuterSigTyVarBndrs GhcRn -> Bool
-nullOuterImplicit (HsOuterImplicit{hso_ximplicit = imp_tvs}) = null imp_tvs
-nullOuterImplicit (HsOuterExplicit{})                        = True
-  -- Vacuously true, as there is no implicit quantification
 
 -- | If a type explicitly quantifies its outermost type variables, return
 -- 'True' if the list of explicitly bound type variables is empty. If a type

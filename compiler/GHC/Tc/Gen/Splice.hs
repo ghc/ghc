@@ -2367,12 +2367,20 @@ reifyDataCon isGadtDataCon tys dc
              ret_con | null ex_tvs' && null theta' = return main_con
                      | otherwise                   = do
                          { cxt <- reifyCxt theta'
-                         ; ex_tvs'' <- reifyTyVarBndrs ex_tvs'
+                         ; ex_tvs'' <- case to_invis_bndrs ex_tvs' of
+                             Nothing  -> noTH DataConVisibleForall (dataConDisplayType False dc)
+                             Just tvs -> reifyTyVarBndrs tvs
                          ; return (TH.ForallC ex_tvs'' cxt main_con) }
        ; assert (r_arg_tys `equalLength` dcdBangs)
          ret_con }
   where
-    mk_specified tv = Bndr tv SpecifiedSpec
+    mk_specified tv = Bndr tv Specified
+
+    to_invis_bndrs :: [TyVarBinder] -> Maybe [InvisTVBinder]
+    to_invis_bndrs = traverse $ \(Bndr tv vis) ->
+      case vis of
+        Invisible spec -> Just (Bndr tv spec)
+        Required -> Nothing
 
     subst_tv_binders subst tv_bndrs =
       let tvs            = binderVars tv_bndrs

@@ -77,7 +77,9 @@ module GHC.Hs.Type (
         hsScopedTvs, hsScopedKvs, hsWcScopedTvs, dropWildCards,
         hsTyVarLName, hsTyVarName,
         hsAllLTyVarNames, hsLTyVarLocNames,
-        hsLTyVarName, hsLTyVarNames, hsForAllTelescopeNames,
+        hsLTyVarName, hsLTyVarNames,
+        hsForAllTelescopeBndrs,
+        hsForAllTelescopeNames,
         hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
@@ -90,7 +92,7 @@ module GHC.Hs.Type (
         setHsTyVarBndrFlag, hsTyVarBndrFlag, updateHsTyVarBndrFlag,
 
         -- Printing
-        pprHsType, pprHsForAll,
+        pprHsType, pprHsForAll, pprHsForAllTelescope,
         pprHsOuterFamEqnTyVarBndrs, pprHsOuterSigTyVarBndrs,
         pprLHsContext,
         hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
@@ -635,6 +637,10 @@ hsLTyVarName = hsTyVarName . unLoc
 hsLTyVarNames :: [LHsTyVarBndr flag (GhcPass p)] -> [IdP (GhcPass p)]
 hsLTyVarNames = mapMaybe hsLTyVarName
 
+hsForAllTelescopeBndrs :: HsForAllTelescope (GhcPass p) -> [LHsTyVarBndr ForAllTyFlag (GhcPass p)]
+hsForAllTelescopeBndrs (HsForAllVis   _ bndrs) = map (fmap (setHsTyVarBndrFlag Required)) bndrs
+hsForAllTelescopeBndrs (HsForAllInvis _ bndrs) = map (fmap (updateHsTyVarBndrFlag Invisible)) bndrs
+
 hsForAllTelescopeNames :: HsForAllTelescope (GhcPass p) -> [IdP (GhcPass p)]
 hsForAllTelescopeNames (HsForAllVis _ bndrs) = hsLTyVarNames bndrs
 hsForAllTelescopeNames (HsForAllInvis _ bndrs) = hsLTyVarNames bndrs
@@ -907,15 +913,28 @@ splitLHsSigmaTyInvis ty
 -- "GHC.Hs.Decls" for why this is important.
 splitLHsGadtTy ::
      LHsSigType GhcPs
-  -> (HsOuterSigTyVarBndrs GhcPs, Maybe (LHsContext GhcPs), LHsType GhcPs)
+  -> (HsOuterSigTyVarBndrs GhcPs, [HsForAllTelescope GhcPs], Maybe (LHsContext GhcPs), LHsType GhcPs)
 splitLHsGadtTy (L _ sig_ty)
-  | (outer_bndrs, rho_ty) <- split_bndrs sig_ty
-  , (mb_ctxt, tau_ty)     <- splitLHsQualTy_KP rho_ty
-  = (outer_bndrs, mb_ctxt, tau_ty)
+  | (outer_bndrs, sigma_ty) <- split_outer_bndrs sig_ty
+  , (inner_bndrs, phi_ty)   <- split_inner_bndrs sigma_ty
+  , (mb_ctxt, rho_ty)       <- splitLHsQualTy_KP phi_ty
+  = case rho_ty of
+      L _ (HsFunTy _ _ (L _ (XHsType HsRecTy{})) _) | not (null inner_bndrs)
+        -- Bad! Record GADTs are not allowed to have inner_bndrs,
+        -- undo the split to get a proper error message later
+        -> (outer_bndrs, [], Nothing, sigma_ty)
+      _ -> (outer_bndrs, inner_bndrs, mb_ctxt, rho_ty)
   where
-    split_bndrs :: HsSigType GhcPs -> (HsOuterSigTyVarBndrs GhcPs, LHsType GhcPs)
-    split_bndrs (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty}) =
+    split_outer_bndrs :: HsSigType GhcPs -> (HsOuterSigTyVarBndrs GhcPs, LHsType GhcPs)
+    split_outer_bndrs (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty}) =
       (outer_bndrs, body_ty)
+
+    split_inner_bndrs :: LHsType GhcPs -> ([HsForAllTelescope GhcPs], LHsType GhcPs)
+    split_inner_bndrs (L _ HsForAllTy { hst_tele = tele
+                                      , hst_body = body })
+      = let ~(teles, t) = split_inner_bndrs body
+        in (tele:teles, t)
+    split_inner_bndrs t = ([], t)
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that
@@ -1223,6 +1242,15 @@ instance OutputableBndrFlag (HsBndrVis (GhcPass p')) p where
             HsBndrRequired  _ -> parens_if_kind bkind d
             HsBndrInvisible _ -> char '@' <> parens_if_kind bkind d
 
+instance OutputableBndrFlag ForAllTyFlag p where
+  pprTyVarBndr (HsTvb _ spec bvar bkind) =
+      text "forall" <+> decorate (ppr_hs_tvb bvar bkind)
+    where decorate :: SDoc -> SDoc
+          decorate d = case spec of
+            Inferred  -> braces d <> dot
+            Specified -> parens_if_kind bkind d <> dot
+            Required  -> parens_if_kind bkind d <+> text "->"
+
 ppr_hs_tvb :: OutputableBndrId p => HsBndrVar (GhcPass p) -> HsBndrKind (GhcPass p) -> SDoc
 ppr_hs_tvb bvar (HsBndrNoKind _) = ppr bvar
 ppr_hs_tvb bvar (HsBndrKind _ k) = hsep [ppr bvar, dcolon, ppr k]
@@ -1348,7 +1376,7 @@ pprHsOuterSigTyVarBndrs :: OutputableBndrId p
                         => HsOuterSigTyVarBndrs (GhcPass p) -> SDoc
 pprHsOuterSigTyVarBndrs (HsOuterImplicit{}) = empty
 pprHsOuterSigTyVarBndrs (HsOuterExplicit{hso_bndrs = bndrs}) =
-  pprHsForAll (mkHsForAllInvisTele noAnn bndrs) Nothing
+  pprHsForAllTelescope (mkHsForAllInvisTele noAnn bndrs)
 
 -- | Prints a forall; When passed an empty list, prints @forall .@/@forall ->@
 -- only when @-dppr-debug@ is enabled.
@@ -1356,13 +1384,16 @@ pprHsForAll :: forall p. OutputableBndrId p
             => HsForAllTelescope (GhcPass p)
             -> Maybe (LHsContext (GhcPass p)) -> SDoc
 pprHsForAll tele cxt
-  = pp_tele tele <+> pprLHsContext cxt
-  where
-    pp_tele :: HsForAllTelescope (GhcPass p) -> SDoc
-    pp_tele tele = case tele of
+  = pprHsForAllTelescope tele <+> pprLHsContext cxt
+
+pprHsForAllTelescope :: forall p. OutputableBndrId p
+                     => HsForAllTelescope (GhcPass p)
+                     -> SDoc
+pprHsForAllTelescope tele =
+  case tele of
       HsForAllVis   { hsf_vis_bndrs   = qtvs } -> pp_forall (space <> arrow) qtvs
       HsForAllInvis { hsf_invis_bndrs = qtvs } -> pp_forall dot qtvs
-
+  where
     pp_forall :: forall flag p. (OutputableBndrId p, OutputableBndrFlag flag p)
               => SDoc -> [LHsTyVarBndr flag (GhcPass p)] -> SDoc
     pp_forall separator qtvs

@@ -1135,10 +1135,6 @@ instance Diagnostic TcRnMessage where
     TcRnCannotBindTyVarsInPatBind _offenders
       -> mkSimpleDecorated $
            text "Binding type variables is not allowed in pattern bindings"
-    TcRnTooManyTyArgsInConPattern con_like expected_number actual_number
-      -> mkSimpleDecorated $
-           text "Too many type arguments in constructor pattern for" <+> quotes (ppr con_like) $$
-           text "Expected no more than" <+> ppr expected_number <> semi <+> text "got" <+> ppr actual_number
     TcRnMultipleInlinePragmas poly_id fst_inl_prag inl_prags
       -> mkSimpleDecorated $
            hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
@@ -2347,8 +2343,6 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnCannotBindTyVarsInPatBind{}
       -> ErrorWithoutFlag
-    TcRnTooManyTyArgsInConPattern{}
-      -> ErrorWithoutFlag
     TcRnMultipleInlinePragmas{}
       -> WarningWithoutFlag
     TcRnUnexpectedPragmas{}
@@ -3010,8 +3004,6 @@ instance Diagnostic TcRnMessage where
     TcRnCannotBindScopedTyVarInPatSig{}
       -> noHints
     TcRnCannotBindTyVarsInPatBind{}
-      -> noHints
-    TcRnTooManyTyArgsInConPattern{}
       -> noHints
     TcRnMultipleInlinePragmas{}
       -> noHints
@@ -6976,14 +6968,14 @@ pprTHReifyError = \case
        text "No roles associated with" <+> (ppr thing)
   CannotRepresentType sort ty
     -> mkSimpleDecorated $
-       hsep [text "Can't represent" <+> sort_doc <+>
-             text "in Template Haskell:",
-               nest 2 (ppr ty)]
+       hang (text "Can't represent" <+> sort_doc <+> text "in Template Haskell:")
+          2 (ppr ty)
      where
        sort_doc = text $
          case sort of
            LinearInvisibleArgument -> "linear invisible argument"
            CoercionsInTypes -> "coercions in types"
+           DataConVisibleForall -> "visible forall in the type of a data constructor"
 
 pprTypedTHError :: TypedTHError -> DecoratedSDoc
 pprTypedTHError = \case

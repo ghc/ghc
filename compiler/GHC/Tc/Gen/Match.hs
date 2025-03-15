@@ -1308,4 +1308,4 @@ checkArgCounts (MG { mg_alts = L _ (match1:matches) })
 
     reqd_args_in_match :: LocatedA (Match GhcRn body1) -> VisArity
     -- Counts the number of /required/ (aka visible) args in the match
-    reqd_args_in_match (L _ (Match { m_pats = L _ pats })) = count (isVisArgPat . unLoc) pats
+    reqd_args_in_match (L _ (Match { m_pats = L _ pats })) = count isVisArgLPat pats

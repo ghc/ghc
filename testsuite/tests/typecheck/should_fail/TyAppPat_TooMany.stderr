@@ -1,6 +1,6 @@
-TyAppPat_TooMany.hs:7:4: error: [GHC-01629]
-    • Too many type arguments in constructor pattern for ‘Just’
-      Expected no more than 1; got 2
+TyAppPat_TooMany.hs:7:14: error: [GHC-14964]
+    • Illegal invisible type pattern: @Bool
+      An invisible type pattern must be checked against a forall.
     • In the pattern: Just @Int @Bool x
       In an equation for ‘f’: f (Just @Int @Bool x) = x
 

@@ -10,56 +10,46 @@ module T23739a where
 import Data.Tuple.Experimental
 import GHC.TypeLits
 
-{-
-This code aims to test pattern-to-type transformation
-(See Note [Pattern to type (P2T) conversion] in GHC.Tc.Gen.Pat)
+data VisProxy a where
+  VP :: forall a -> VisProxy a
 
-However it relies on a questionable feature, that allows us to have
-equality constraint in scope of type pattern checking. The test
-doesn't establish such behavior, it just abuses it to examine P2T
-transformation.
+f1 :: VisProxy (Int, Bool) -> Unit
+f1 (VP (b,c)) = ()
 
-In the happy future with `forall->` in GADTs we should
-rewrite this test using it.
--}
+f2 :: VisProxy (Int : Bool : Double : []) -> Unit
+f2 (VP [a,b,c]) = ()
 
-f1 :: forall a -> a ~ (Int, Bool) => Unit
-f1 (b,c) = ()
+f3 :: VisProxy [Int, Bool, Double] -> Unit
+f3 (VP [a,b,c]) = ()
 
-f2 :: forall a -> a ~ (Int : Bool : Double : []) => Unit
-f2 [a,b,c] = ()
+f4 :: VisProxy [Int, Bool, Double] -> Unit
+f4 (VP (a : b : c : [])) = ()
 
-f3 :: forall a -> a ~ [Int, Bool, Double] => Unit
-f3 [a,b,c] = ()
+f5 :: VisProxy "blah" -> Unit
+f5 (VP "blah") = ()
 
-f4 :: forall a -> a ~ [Int, Bool, Double] => Unit
-f4 (a : b : c : []) = ()
+f6 :: VisProxy 'c' -> Unit
+f6 (VP 'c') = ()
 
-f5 :: forall a -> a ~ "blah" => Unit
-f5 "blah" = ()
+f7 :: VisProxy (UnconsSymbol "blah") -> Unit
+f7 (VP (Just ('b', "lah"))) = ()
 
-f6 :: forall a -> a ~ 'c' => Unit
-f6 'c' = ()
+f8 :: VisProxy a -> Unit
+f8 (VP _) = ()
 
-f7 :: forall a -> a ~ UnconsSymbol "blah" => Unit
-f7 (Just ('b', "lah")) = ()
+f9 :: VisProxy 42 -> Unit
+f9 (VP 42) = ()
 
-f8 :: forall a -> Unit
-f8 _ = ()
+f10 :: VisProxy () -> Unit
+f10 (VP ()) = ()
 
-f9 :: forall a -> a ~ 42 => Unit
-f9 42 = ()
+f11 :: VisProxy Int -> Unit
+f11 (VP Int) = ()
 
-f10 :: forall a -> a ~ () => Unit
-f10 () = ()
-
-f11 :: forall a -> a ~ Int => Unit
-f11 Int = ()
-
-f12 :: forall a -> a ~ (Left @Bool @(Maybe b) True) => Unit
-f12 (Left @Bool @(Maybe a) True) = ()
+f12 :: VisProxy (Left @Bool @(Maybe b) True) -> Unit
+f12 (VP (Left @Bool @(Maybe a) True)) = ()
 
 data Tup a = MkTup a a
 
-f13 :: forall a -> a ~ (Int, MkTup 'f' 'g', 42, True, [1,2,3,4,5], (), "blah", "wombat", 'd', UnconsSymbol "corner") => Unit
-f13 (Int, 'f' `MkTup` 'g', 42, True, 1 : 2 : 3 : [4,5], () ,"blah", x, 'd', Just ('c', "orner")) = ()
+f13 :: VisProxy (Int, MkTup 'f' 'g', 42, True, [1,2,3,4,5], (), "blah", "wombat", 'd', UnconsSymbol "corner") -> Unit
+f13 (VP (Int, 'f' `MkTup` 'g', 42, True, 1 : 2 : 3 : [4,5], () ,"blah", x, 'd', Just ('c', "orner"))) = ()

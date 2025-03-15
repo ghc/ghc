@@ -176,6 +176,7 @@
                    {OccName: v})))
                 (HsBndrNoKind
                  (NoExtField))))]))
+           []
            (Just
             (L
              (EpAnn

@@ -945,7 +945,7 @@ tcInferDataCon con
                 -- in GHC.Core.DataCon.
 
        ; return ( XExpr (ConLikeTc (RealDataCon con) tvs all_arg_tys)
-                , mkInvisForAllTys tvbs $ mkPhiTy full_theta $
+                , mkForAllTys tvbs $ mkPhiTy full_theta $
                   mkScaledFunTys scaled_arg_tys res ) }
   where
     linear_to_poly :: Scaled Type -> TcM (Scaled Type)

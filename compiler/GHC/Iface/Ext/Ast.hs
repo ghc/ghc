@@ -43,7 +43,7 @@ import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTy
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.Name.Reader      ( RecFieldInfo(..), WithUserRdr(..) )
 import GHC.Types.SrcLoc
-import GHC.Core.Type              ( Type )
+import GHC.Core.Type              ( Type, ForAllTyFlag(..) )
 import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
 import GHC.Core.Predicate
 import GHC.Core.InstEnv
@@ -1738,16 +1738,18 @@ instance ToHie (LocatedP OverlapMode) where
 
 instance ToHie (LocatedA (ConDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
-      ConDeclGADT { con_names = names, con_bndrs = L outer_bndrs_loc outer_bndrs
-                  , con_mb_cxt = ctx, con_g_args = args, con_res_ty = typ
+      ConDeclGADT { con_names = names
+                  , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
+                  , con_inner_bndrs = inner_bndrs
+                  , con_mb_cxt = ctx
+                  , con_g_args = args
+                  , con_res_ty = typ
                   , con_doc = doc} ->
         [ toHie $ C (Decl ConDec $ getRealSpanA span) <$> names
-        , case outer_bndrs of
-            HsOuterImplicit{hso_ximplicit = imp_vars} ->
-              bindingsOnly $ map (C $ TyVarBind (mkScope outer_bndrs_loc) resScope)
-                             imp_vars
-            HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-              toHie $ tvScopes resScope NoScope exp_bndrs
+        , bindingsOnly $  -- implicit forall
+            map (C $ TyVarBind (mkScope outer_bndrs_loc) (ResolvedScopes [sigmaScope]))
+                imp_vars
+        , toHie $ tvScopes (ResolvedScopes [phiScope]) NoScope exp_bndrs
         , toHie ctx
         , toHie args
         , toHie typ
@@ -1760,7 +1762,14 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
             PrefixConGADT _ xs -> scaled_args_scope xs
             RecConGADT _ x     -> mkScope x
           tyScope = mkScope typ
-          resScope = ResolvedScopes [ctxScope, rhsScope]
+          phiScope = combineScopes ctxScope rhsScope
+          sigmaScope = foldr combineScopes phiScope (map (mkScope . getLoc) exp_bndrs)
+          imp_vars = case outer_bndrs of
+            HsOuterImplicit{hso_ximplicit = imp_vars} -> imp_vars
+            HsOuterExplicit{} -> []
+          exp_bndrs =
+            [ L l (updateHsTyVarBndrFlag Invisible b) | L l b <- hsOuterExplicitBndrs outer_bndrs ]
+            ++ concatMap hsForAllTelescopeBndrs inner_bndrs
       ConDeclH98 { con_name = name, con_ex_tvs = qvars
                  , con_mb_cxt = ctx, con_args = dets
                  , con_doc = doc} ->
