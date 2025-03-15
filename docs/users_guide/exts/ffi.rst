@@ -976,6 +976,8 @@ wake up a Haskell thread from C/C++.
 
   void hs_try_putmvar (int capability, HsStablePtr sp);
 
+  void hs_try_putmvar_with_value (int capability, HsStablePtr sp, StgClosure *value);
+
 The C call ``hs_try_putmvar(cap, mvar)`` is equivalent to the Haskell
 call ``tryPutMVar mvar ()``, except that it is
 
@@ -987,6 +989,15 @@ call ``tryPutMVar mvar ()``, except that it is
   whether the put succeeded.  It is your responsibility to ensure that
   the ``MVar`` is empty; if it is full, ``hs_try_putmvar()`` will have
   no effect.
+
+The C call ``hs_try_putmvar_with_value(cap, mvar, value)`` takes an
+additional ``value`` argument, which is an RTS closure pointer of the
+value to be put into the MVar. It works the same way as
+``hs_try_putmvar`` while offering a bit more flexibility: for a C
+value to be passed to Haskell, you can directly call one of the
+``rts_mk`` functions to wrap the C value and put it into the MVar,
+instead of writing it to a heap location and peeking it from a pointer
+in Haskell.
 
 **Example**. Suppose we have a C/C++ function to call that will return and then
 invoke a callback at some point in the future, passing us some data.
