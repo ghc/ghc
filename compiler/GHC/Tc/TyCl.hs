@@ -259,11 +259,13 @@ quantifyFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty 
        -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
        -- See Note [Type variables in type families instance decl]
        ; (dvs, outer_wcs_imp_dvs) <- candidateQTyVarsWithBinders outer_exp_tvs (outer_imp_tvs ++ wcs) lhs_ty
-       ; (qtvs, outer_wcs_imp_qtvs) <- quantifyTyVarsWithBinders skol_info dvs outer_wcs_imp_dvs
+       ; (qtvs, outer_wcs_imp_qtvs') <- quantifyTyVarsWithBinders skol_info dvs outer_wcs_imp_dvs
                  -- Have to make a same defaulting choice for result kind here
                  -- and the `kindGeneralizeAll` in `tcConDecl`.
                  -- see (GT4) in
                  -- GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
+       ; let outer_wcs_imp_qtvs_set = mkVarSet outer_wcs_imp_qtvs'
+       ; let outer_wcs_imp_qtvs = [v | v <- outer_wcs_imp_qtvs, v `elemVarSet` outer_wcs_imp_qtvs_set]
        ; let final_tvs = scopedSort (qtvs ++ outer_wcs_imp_qtvs ++ outer_exp_tvs)
              -- This scopedSort is important: the qtvs may be /interleaved/ with
              -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]

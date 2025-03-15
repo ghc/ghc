@@ -1790,7 +1790,6 @@ quantifyTyVarsWithBinders skol_info dvs outer_wcs_imp_dvs
        ; undefaulted <- defaultTyVars DefaultNonStandardTyVars dvs
        ; undefaulted_outer_wcs_imp_tvs <- defaultTyVars TryNotToDefaultNonStandardTyVars outer_wcs_imp_dvs
        ; (final_qtvs, final_outer_wcs_imp_qtvs)  <- liftZonkM $ do
-            -- resume order and then skolemise
             qtvs <- mapMaybeM zonk_quant $ undefaulted
             outer_wcs_imp_qtvs <- mapMaybeM zonk_quant $ undefaulted_outer_wcs_imp_tvs
             return (qtvs, outer_wcs_imp_qtvs)
