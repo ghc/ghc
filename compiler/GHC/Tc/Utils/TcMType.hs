@@ -1784,7 +1784,7 @@ quantifyTyVarsWithBinders skol_info dvs outer_wcs_imp_dvs
   = do { traceTc "quantifyTyVars {"
            ( vcat [
             text "dvs =" <+> ppr dvs,
-            text "outer_wc_imp_qtvs=" <+> ppr outer_wcs_imp_dvs
+            text "outer_wcs_imp_dvs=" <+> ppr outer_wcs_imp_dvs
             ])
 
        ; undefaulted <- defaultTyVars DefaultNonStandardTyVars dvs
