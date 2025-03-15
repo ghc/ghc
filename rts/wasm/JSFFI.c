@@ -1,6 +1,8 @@
 #include "Rts.h"
 #include "Prelude.h"
+#include "RaiseAsync.h"
 #include "Schedule.h"
+#include "Threads.h"
 #include "sm/Sanity.h"
 
 #if defined(__wasm_reference_types__)
@@ -211,6 +213,27 @@ __attribute__((export_name("rts_promiseReject")))
 void rts_promiseReject(HsStablePtr, HsJSVal);
 void rts_promiseReject(HsStablePtr sp, HsJSVal js_err)
   mk_rtsPromiseCallback(rts_apply(cap, &ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure, rts_mkJSVal(cap, js_err)))
+
+__attribute__((export_name("rts_promiseThrowTo")))
+void rts_promiseThrowTo(HsStablePtr, HsJSVal);
+void rts_promiseThrowTo(HsStablePtr sp, HsJSVal js_err) {
+  Capability *cap = &MainCapability;
+  StgWeak *w = (StgWeak *)deRefStablePtr(sp);
+  if (w->header.info == &stg_DEAD_WEAK_info) {
+    return;
+  }
+  ASSERT(w->header.info == &stg_WEAK_info);
+  StgTSO *tso = (StgTSO *)w->key;
+  ASSERT(tso->header.info == &stg_TSO_info);
+  throwToSelf(
+      cap, tso,
+      rts_apply(
+          cap,
+          &ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure,
+          rts_mkJSVal(cap, js_err)));
+  tryWakeupThread(cap, tso);
+  rts_schedulerLoop();
+}
 
 __attribute__((export_name("rts_freeStablePtr")))
 void rts_freeStablePtr(HsStablePtr);
