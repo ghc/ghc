@@ -16,6 +16,8 @@ setTestOpts(
 
 test('simd_insert_baseline', [], compile_and_run, [''])
 test('simd_insert_array_baseline', [], compile_and_run, [''])
+test('floatx4_arith_baseline', [], compile_and_run, [''])
+test('doublex2_arith_baseline', [], compile_and_run, [''])
 
 test('T25658', [], compile_and_run, ['']) # #25658 is a bug with SSE2 code generation
 
@@ -64,6 +66,13 @@ test('simd014',
 
 test('simd_insert', [], compile_and_run, [''])
 test('simd_insert_array', [], compile_and_run, [''])
+test('doublex2_arith', [], compile_and_run, [''])
+test('floatx4_fma', [ unless(have_cpu_feature('fma'), skip)
+                    , extra_hc_opts('-mfma')
+                    ], compile_and_run, [''])
+test('doublex2_fma', [ unless(have_cpu_feature('fma'), skip)
+                     , extra_hc_opts('-mfma')
+                     ], compile_and_run, [''])
 
 test('T22187', [],compile,[''])
 test('T22187_run', [],compile_and_run,[''])
