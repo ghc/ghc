@@ -204,6 +204,7 @@ data ThRejectionReason
   | ThWarningAndDeprecationPragmas [LIdP GhcRn]
   | ThSplicesWithinDeclBrackets
   | ThNonLinearDataCon
+  | ThDataConVisibleForall
 
 -- | Why is a @SPECIALISE@ pragmas useless?
 data UselessSpecialisePragmaReason

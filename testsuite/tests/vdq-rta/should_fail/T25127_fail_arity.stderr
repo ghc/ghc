@@ -1,0 +1,25 @@
+T25127_fail_arity.hs:16:4: error: [GHC-27346]
+    • The data constructor ‘K’ should have 2 arguments, but has been given none
+    • In the pattern: K
+      In an equation for ‘f0’: f0 K = ()
+
+T25127_fail_arity.hs:17:5: error: [GHC-27346]
+    • The data constructor ‘K’ should have 2 arguments, but has been given 1
+    • In the pattern: K a
+      In an equation for ‘f1’: f1 (K a) = ()
+
+T25127_fail_arity.hs:19:5: error: [GHC-27346]
+    • The data constructor ‘K’ should have 2 arguments, but has been given 3
+    • In the pattern: K a b c
+      In an equation for ‘f3’: f3 (K a b c) = ()
+
+T25127_fail_arity.hs:21:4: error: [GHC-27346]
+    • The data constructor ‘V’ should have 1 argument, but has been given none
+    • In the pattern: V
+      In an equation for ‘g0’: g0 V = ()
+
+T25127_fail_arity.hs:23:5: error: [GHC-27346]
+    • The data constructor ‘V’ should have 1 argument, but has been given 2
+    • In the pattern: V a b
+      In an equation for ‘g2’: g2 (V a b) = ()
+

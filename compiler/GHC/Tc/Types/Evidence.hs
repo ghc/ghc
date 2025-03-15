@@ -266,12 +266,7 @@ mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
 -- but in that case we refrain from calling it.
 mkWpForAllCast :: [ForAllTyBinder] -> Type -> HsWrapper
 mkWpForAllCast bndrs res_ty
-  = mkWpCastR (go bndrs)
-  where
-    go []                 = mkRepReflCo res_ty
-    go (Bndr tv vis : bs) = mkForAllCo tv coreTyLamForAllTyFlag vis kind_co (go bs)
-      where
-        kind_co = mkNomReflCo (varType tv)
+  = mkWpCastR (mkForAllVisCos bndrs (mkRepReflCo res_ty))
 
 mkWpEvLams :: [Var] -> HsWrapper
 mkWpEvLams ids = mk_co_lam_fn WpEvLam ids

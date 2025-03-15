@@ -24,7 +24,8 @@
 
 module GHC.Hs.Pat (
         Pat(..), LPat,
-        isInvisArgPat, isVisArgPat,
+        isInvisArgPat, isInvisArgLPat,
+        isVisArgPat, isVisArgLPat,
         EpAnnSumPat(..),
         ConPatTc (..),
         ConLikeP,

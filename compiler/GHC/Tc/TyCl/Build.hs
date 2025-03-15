@@ -154,7 +154,7 @@ buildDataCon :: FamInstEnvs
            -> [FieldLabel]             -- Field labels
            -> [TyVar]                  -- Universals
            -> [TyCoVar]                -- Existentials
-           -> [InvisTVBinder]          -- User-written 'TyVarBinder's
+           -> [TyVarBinder]            -- User-written 'TyVarBinder's
            -> [EqSpec]                 -- Equality spec
            -> KnotTied ThetaType       -- Does not include the "stupid theta"
                                        -- or the GADT equalities
@@ -348,7 +348,7 @@ buildClass tycon_name binders roles fds
               op_tys     = [ty | (_,ty,_) <- sig_stuff]
               op_names   = [op | (op,_,_) <- sig_stuff]
               rec_tycon  = classTyCon rec_clas
-              univ_bndrs = tyConInvisTVBinders binders
+              univ_bndrs = tyVarSpecToBinders $ tyConInvisTVBinders binders
               univ_tvs   = binderVars univ_bndrs
               bang_opts  = FixedBangOpts (map (const HsLazy) args)
 
