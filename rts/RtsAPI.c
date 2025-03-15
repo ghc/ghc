@@ -942,12 +942,23 @@ void rts_done (void)
    it would be very difficult for the caller to arrange to free the StablePtr
    in all circumstances.
 
+   There's also hs_try_putmvar_with_value(cap, mvar, value) which
+   allows putting a custom value other than () in the MVar, typically
+   a closure created by one of rts_mk*() functions.
+
    For more details, see the section "Waking up Haskell threads from C" in the
    User's Guide.
    -------------------------------------------------------------------------- */
 
 void hs_try_putmvar (/* in */ int capability,
                      /* in */ HsStablePtr mvar)
+{
+    hs_try_putmvar_with_value(capability, mvar, TAG_CLOSURE(1, Unit_closure));
+}
+
+void hs_try_putmvar_with_value (/* in */ int capability,
+                                /* in */ HsStablePtr mvar,
+                                /* in */ StgClosure *value)
 {
     Task *task = getMyTask();
     Capability *cap;
@@ -963,7 +974,7 @@ void hs_try_putmvar (/* in */ int capability,
 
 #if !defined(THREADED_RTS)
 
-    performTryPutMVar(cap, (StgMVar*)deRefStablePtr(mvar), Unit_closure);
+    performTryPutMVar(cap, (StgMVar*)deRefStablePtr(mvar), value);
     freeStablePtr(mvar);
 
 #else
@@ -976,7 +987,7 @@ void hs_try_putmvar (/* in */ int capability,
         task->cap = cap;
         RELEASE_LOCK(&cap->lock);
 
-        performTryPutMVar(cap, (StgMVar*)deRefStablePtr(mvar), Unit_closure);
+        performTryPutMVar(cap, (StgMVar*)deRefStablePtr(mvar), value);
 
         freeStablePtr(mvar);
 

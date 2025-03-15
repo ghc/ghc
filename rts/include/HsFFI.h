@@ -21,6 +21,7 @@ extern "C" {
 
 /* get types from GHC's runtime system */
 #include "ghcconfig.h"
+#include "rts/Types.h"
 #include "stg/Types.h"
 
 /* get limits for floating point types */
@@ -138,6 +139,7 @@ extern int hs_spt_keys(StgPtr keys[], int szKeys);
 extern int hs_spt_key_count (void);
 
 extern void hs_try_putmvar (int capability, HsStablePtr sp);
+extern void hs_try_putmvar_with_value (int capability, HsStablePtr sp, StgClosure *value);
 
 /* -------------------------------------------------------------------------- */
 

@@ -597,6 +597,7 @@ extern char **environ;
       SymI_HasProto(hs_hpc_module)                                      \
       SymI_HasProto(hs_thread_done)                                     \
       SymI_HasProto(hs_try_putmvar)                                     \
+      SymI_HasProto(hs_try_putmvar_with_value)                          \
       SymI_HasProto(defaultRtsConfig)                                   \
       SymI_HasProto(initLinker)                                         \
       SymI_HasProto(initLinker_)                                        \
