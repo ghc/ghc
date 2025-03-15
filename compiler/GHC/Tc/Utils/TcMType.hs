@@ -1405,7 +1405,7 @@ candidateQTyVarsWithBinders outer_exp_tvs outer_wcs_imp_tvs ty
   = do { kvs     <- candidateQTyVarsOfKinds (map tyVarKind bound_tvs)
        ; cur_lvl <- getTcLevel
        ; all_tvs <- collect_cand_qtvs ty False cur_lvl emptyVarSet kvs ty
-       ; return (all_tvs `delCandidates` outer_exp_tvs, all_tvs `intersectCandidates` outer_wcs_imp_tvs) }
+       ; return (all_tvs `delCandidates` bound_tvs, all_tvs `intersectCandidates` outer_wcs_imp_tvs) }
        where
           bound_tvs = outer_exp_tvs ++ outer_wcs_imp_tvs
 
