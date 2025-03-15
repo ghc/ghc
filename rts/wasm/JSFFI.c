@@ -144,7 +144,6 @@ INLINE_HEADER void pushClosure   (StgTSO *tso, StgWord c) {
   tso->stackobj->sp[0] = (W_) c;
 }
 
-extern const StgInfoTable stg_jsffi_block_info;
 extern const StgInfoTable stg_scheduler_loop_info;
 extern StgClosure ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure;
 
@@ -173,19 +172,7 @@ void rts_schedulerLoop(void) {
 #define mk_rtsPromiseCallback(obj)                         \
   {                                                        \
   Capability *cap = &MainCapability;                       \
-  StgTSO *tso = (StgTSO*)deRefStablePtr(sp);               \
-  IF_DEBUG(sanity, checkTSO(tso));                         \
-  hs_free_stable_ptr(sp);                                  \
-                                                           \
-  StgStack *stack = tso->stackobj;                         \
-  IF_DEBUG(sanity, checkSTACK(stack));                     \
-                                                           \
-  if (stack->sp[0] == (StgWord)&stg_jsffi_block_info) {    \
-    dirty_TSO(cap, tso);                                   \
-    dirty_STACK(cap, stack);                               \
-    stack->sp[1] = (StgWord)(obj);                         \
-  }                                                        \
-  scheduleThreadNow(cap, tso);                             \
+  hs_try_putmvar_with_value(cap->no, sp, obj);             \
   rts_schedulerLoop();                                     \
   }
 

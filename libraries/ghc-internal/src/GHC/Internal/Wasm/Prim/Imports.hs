@@ -82,8 +82,8 @@ filled is generated via raiseJSException.
 stg_blockPromise :: String -> JSVal -> (JSVal -> StablePtr Any -> IO ()) -> r
 stg_blockPromise err_msg p msg_p = unsafeDupablePerformIO $ IO $ \s0 ->
   case stg_jsffi_check (unsafeCoerce# $ toException $ WouldBlockException err_msg) s0 of
-    (# s1 #) -> case myThreadId# s1 of
-      (# s2, tso #) -> case makeStablePtr# tso s2 of
+    (# s1 #) -> case newMVar# s1 of
+      (# s2, mv# #) -> case makeStablePtr# mv# s2 of
         (# s3, sp #) ->
           case unIO (msg_p p $ StablePtr $ unsafeCoerce# sp) s3 of
             -- Since we eagerly free the Promise here, we must return
@@ -104,14 +104,10 @@ stg_blockPromise err_msg p msg_p = unsafeDupablePerformIO $ IO $ \s0 ->
                 -- the Promise to resolve or reject, and also mark it
                 -- as OPAQUE just to be sure.
                 keepAlive# raiseJSException s5 $
-                  stg_jsffi_block $
-                    throw PromisePendingException
+                  readMVar# mv#
 
 foreign import prim "stg_jsffi_check"
   stg_jsffi_check :: Any -> State# RealWorld -> (# State# RealWorld #)
-
-foreign import prim "stg_jsffi_block"
-  stg_jsffi_block :: Any -> State# RealWorld -> (# State# RealWorld, r #)
 
 foreign import javascript unsafe "$1.then(() => __exports.rts_promiseResolveUnit($2), err => __exports.rts_promiseReject($2, err))"
   stg_messagePromiseUnit :: JSVal -> StablePtr Any -> IO ()
