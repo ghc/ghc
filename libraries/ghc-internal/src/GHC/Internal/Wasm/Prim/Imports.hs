@@ -5,6 +5,7 @@
 {-# LANGUAGE UnliftedFFITypes #-}
 
 module GHC.Internal.Wasm.Prim.Imports (
+  raiseJSException,
   stg_blockPromise,
   stg_messagePromiseUnit,
   stg_messagePromiseJSVal,
@@ -94,13 +95,7 @@ stg_blockPromise err_msg p msg_p = unsafeDupablePerformIO $ IO $ \s0 ->
             --    and prevents dmdanal from being naughty
             (# s4, _ #) -> case unIO (freeJSVal p) s4 of
               (# s5, _ #) ->
-                -- raiseJSException_closure is used by the RTS in case
-                -- the Promise is rejected, and it is likely a CAF. So
-                -- we need to keep it alive when we block waiting for
-                -- the Promise to resolve or reject, and also mark it
-                -- as OPAQUE just to be sure.
-                keepAlive# raiseJSException s5 $
-                  readMVar# mv#
+                readMVar# mv# s5
 
 foreign import prim "stg_jsffi_check"
   stg_jsffi_check :: Any -> State# RealWorld -> (# State# RealWorld #)
