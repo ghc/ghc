@@ -61,13 +61,13 @@
 // 3. The main thread "scheduler loop" does one simple thing: check if
 //    the thread run queue is non-empty and if so, yield to other
 //    threads for execution, otherwise exit the loop.
-// 4. When a thread blocks for a JSFFI async import result, it pins
-//    the current TSO via a stable pointer, and calls Promise.then()
-//    on the particular Promise it's blocked on. When that Promise is
-//    fulfilled in the future, it will call back into the RTS, fetches
-//    the TSO indexed by that stable pointer, passes the result and
-//    wakes up the TSO, then finally does another round of scheduler
-//    loop. This is handled by stg_blockPromise.
+// 4. When a thread blocks for a JSFFI async import result, it pins an
+//    MVar to a stable pointer, calls Promise.then() on the particular
+//    Promise it's blocked on, then finally blocks by readMVar. When
+//    that Promise is fulfilled in the future, the Promise.then()
+//    callback writes the result to MVar and wakes up the TSO, then
+//    finally does another round of scheduler loop. This is handled by
+//    stg_blockPromise.
 //
 // The async JSFFI scheduler is idempotent, it's safe to run it
 // multiple times, now or later, though it's not safe to forget to run

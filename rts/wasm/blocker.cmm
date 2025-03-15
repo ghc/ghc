@@ -1,35 +1,5 @@
 #include "Cmm.h"
 
-#if !defined(UnregisterisedCompiler)
-import CLOSURE STK_CHK_ctr;
-import CLOSURE stg_jsffi_block_info;
-#endif
-
-// The ret field will be the boxed result that the JSFFI async import
-// actually returns. Or a bottom closure that throws JSException in
-// case of Promise rejection.
-INFO_TABLE_RET ( stg_jsffi_block, RET_SMALL, W_ info_ptr, P_ ret )
-  return ()
-{
-  jump %ENTRY_CODE(Sp(0)) (ret);
-}
-
-// Push a stg_jsffi_block frame and suspend the current thread. bottom
-// is a placeholder that throws PromisePendingException, though in
-// theory the user should never see PromisePendingException since that
-// indicates a thread blocked for async JSFFI is mistakenly resumed
-// somehow.
-stg_jsffi_block (P_ bottom)
-{
-  Sp_adj(-2);
-  Sp(0) = stg_jsffi_block_info;
-  Sp(1) = bottom;
-
-  ASSERT(SpLim - WDS(RESERVED_STACK_WORDS) <= Sp);
-
-  jump stg_block_noregs ();
-}
-
 // Check that we're in a forked thread at the moment, since main
 // threads that are bound to an InCall frame cannot block waiting for
 // a Promise to fulfill. err is the SomeException closure of

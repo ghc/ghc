@@ -582,18 +582,11 @@ caveats:
    registered on that ``Promise`` will no longer be invoked. For
    simplicity of implementation, we aren’t using those for the time
    being.
--  Normally, ``throwTo`` would block until the async exception has been
-   delivered. In the case of JSFFI, ``throwTo`` would always return
-   successfully immediately, while the target thread is still left in a
-   suspended state. The target thread will only be waken up when the
-   ``Promise`` actually resolves or rejects, though the ``Promise``
-   result will be discarded at that point.
-
-The current way async exceptions are handled in JSFFI is subject to
-change though. Ideally, once the exception is delivered, the target
-thread can be waken up immediately and continue execution, and the
-pending ``Promise`` will drop reference to that thread and no longer
-invoke any continuations.
+-  When a thread blocks for a ``Promise`` to settle while masking
+   async exceptions, ``throwTo`` would block the caller until the
+   ``Promise`` is settled. If the target thread isn't masking async
+   exceptions, ``throwTo`` would cancel its blocking on the
+   ``Promise`` and resume its execution.
 
 .. _wasm-jsffi-cffi:
 
