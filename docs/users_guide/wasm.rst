@@ -715,3 +715,14 @@ JavaScript.
 Finally, in JavaScript, you can use ``await __exports.my_func()`` to
 call your exported ``my_func`` function and get its result, pass
 arguments, do error handling, etc etc.
+
+For each async export, the returned ``Promise`` value contains a
+``promise.throwTo()`` callback. The value passed to
+``promise.throwTo()`` will be wrapped as a ``JSException`` and raised
+as an async exception in that thread. This can be useful for
+interrupting Haskell computation in JavaScript. ``promise.throwTo()``
+doesn't block the JavaScript caller like Haskell ``throwTo``. It
+doesn't necessarily result in ``promise`` being rejected since the
+Haskell thread can handle the async exception, and it can be called
+multiple time. It has no effect when the respective Haskell thread has
+already run to completion.
