@@ -716,6 +716,11 @@ if (isMain()) {
   const reader = in_stream.getReader();
   const writer = out_stream.getWriter();
 
+  const cb_sig = (cb) => {
+    process.on("SIGINT", cb);
+    process.on("SIGQUIT", cb);
+  };
+
   const cb_recv = async () => {
     const { done, value } = await reader.read();
     if (done) {
@@ -727,5 +732,5 @@ if (isMain()) {
     writer.write(new Uint8Array(buf));
   };
 
-  await dyld.exportFuncs.defaultServer(cb_recv, cb_send);
+  await dyld.exportFuncs.defaultServer(cb_sig, cb_recv, cb_send);
 }

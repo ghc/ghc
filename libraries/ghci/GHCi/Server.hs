@@ -7,6 +7,7 @@ where
 
 import Prelude
 import GHCi.Run
+import GHCi.Signals
 import GHCi.TH
 import GHCi.Message
 #if defined(wasm32_HOST_ARCH)
@@ -19,7 +20,6 @@ import Foreign
 import Foreign.ForeignPtr.Unsafe
 import GHC.Wasm.Prim
 #else
-import GHCi.Signals
 import GHCi.Utils
 #endif
 
@@ -107,8 +107,8 @@ serv verbose hook pipe restore = loop
 
 -- | Default server
 #if defined(wasm32_HOST_ARCH)
-defaultServer :: Callback (IO JSUint8Array) -> Callback (JSUint8Array -> IO ()) -> IO ()
-defaultServer cb_recv cb_send = do
+defaultServer :: Callback (JSVal -> IO ()) -> Callback (IO JSUint8Array) -> Callback (JSUint8Array -> IO ()) -> IO ()
+defaultServer cb_sig cb_recv cb_send = do
   args <- getArgs
   let rest = args
 #else
@@ -136,6 +136,8 @@ defaultServer = do
     dieWithUsage
 
 #if defined(wasm32_HOST_ARCH)
+  -- See Note [wasm ghci signal handlers] for details
+  installSignalHandlers $ js_register_signal_handler cb_sig
   pipe <- mkPipeFromContinuations (recv_buf cb_recv) (send_buf cb_send)
 #else
   when verbose $
@@ -186,6 +188,9 @@ send_buf cb b = do
   buf <- evaluate $ LB.toStrict $ B.toLazyByteString b
   B.unsafeUseAsCStringLen buf $ \(ptr, len) -> js_send_buf cb ptr len
 
+foreign import javascript unsafe "dynamic"
+  js_register_signal_handler :: Callback (JSVal -> IO ()) -> JSVal -> IO ()
+
 foreign import javascript "dynamic"
   js_recv_buf :: Callback (IO JSUint8Array) -> IO JSUint8Array
 
@@ -199,6 +204,6 @@ foreign import javascript unsafe "$1(new Uint8Array(__exports.memory.buffer, $2,
   js_send_buf :: Callback (JSUint8Array -> IO ()) -> Ptr a -> Int -> IO ()
 
 foreign export javascript "defaultServer"
-  defaultServer :: Callback (IO JSUint8Array) -> Callback (JSUint8Array -> IO ()) -> IO ()
+  defaultServer :: Callback (JSVal -> IO ()) -> Callback (IO JSUint8Array) -> Callback (JSUint8Array -> IO ()) -> IO ()
 
 #endif
