@@ -93,7 +93,7 @@ import fs from "node:fs";
 import path from "node:path";
 import stream from "node:stream";
 import { WASI } from "node:wasi";
-import { JSValManager } from "./prelude.mjs";
+import { JSValManager, setImmediate } from "./prelude.mjs";
 import { parseRecord, parseSections } from "./post-link.mjs";
 
 // Make a consumer callback from a buffer. See Parser class
