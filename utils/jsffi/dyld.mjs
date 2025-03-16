@@ -96,35 +96,80 @@ import { WASI } from "node:wasi";
 import { JSValManager } from "./prelude.mjs";
 import { parseRecord, parseSections } from "./post-link.mjs";
 
+// Make a consumer callback from a buffer. See Parser class
+// constructor comments for what a consumer is.
+function makeBufferConsumer(buf) {
+  return (len) => {
+    if (len > buf.length) {
+      throw new Error("not enough bytes");
+    }
+
+    const r = buf.subarray(0, len);
+    buf = buf.subarray(len);
+    return r;
+  };
+}
+
+// Make a consumer callback from a ReadableStreamDefaultReader.
+function makeStreamConsumer(reader) {
+  let buf = new Uint8Array();
+
+  return async (len) => {
+    while (buf.length < len) {
+      const { done, value } = await reader.read();
+      if (done) {
+        throw new Error("not enough bytes");
+      }
+      if (buf.length === 0) {
+        buf = value;
+        continue;
+      }
+      const tmp = new Uint8Array(buf.length + value.length);
+      tmp.set(buf, 0);
+      tmp.set(value, buf.length);
+      buf = tmp;
+    }
+
+    const r = buf.subarray(0, len);
+    buf = buf.subarray(len);
+    return r;
+  };
+}
+
 // A simple binary parser
 class Parser {
-  #buf;
-  #offset = 0;
+  #cb;
+  #consumed = 0;
+  #limit;
 
-  constructor(buf) {
-    this.#buf = buf;
+  // cb is a consumer callback that returns a buffer with exact N
+  // bytes for await cb(N). limit indicates how many bytes the Parser
+  // may consume at most; it's optional and only used by eof().
+  constructor(cb, limit) {
+    this.#cb = cb;
+    this.#limit = limit;
   }
 
   eof() {
-    return this.#offset === this.#buf.length;
+    return this.#consumed >= this.#limit;
   }
 
-  skip(len) {
-    this.#offset += len;
-    console.assert(this.#offset <= this.#buf.length);
+  async skip(len) {
+    await this.#cb(len);
+    this.#consumed += len;
   }
 
-  readUInt8() {
-    const r = this.#buf[this.#offset];
-    this.#offset += 1;
+  async readUInt8() {
+    const r = (await this.#cb(1))[0];
+    this.#consumed += 1;
     return r;
   }
 
-  readULEB128() {
+  async readULEB128() {
     let acc = 0n,
       shift = 0n;
     while (true) {
-      const byte = this.readUInt8();
+      const byte = await this.readUInt8();
       acc |= BigInt(byte & 0x7f) << shift;
       shift += 7n;
       if (byte >> 7 === 0) {
@@ -134,41 +179,44 @@ class Parser {
     return Number(acc);
   }
 
-  readBuffer() {
-    const len = this.readULEB128();
-    const r = this.#buf.subarray(this.#offset, this.#offset + len);
-    this.#offset += len;
-    console.assert(this.#offset <= this.#buf.length);
+  async readBuffer() {
+    const len = await this.readULEB128();
+    const r = await this.#cb(len);
+    this.#consumed += len;
     return r;
   }
 
-  readString() {
-    return new TextDecoder("utf-8", { fatal: true }).decode(this.readBuffer());
+  async readString() {
+    return new TextDecoder("utf-8", { fatal: true }).decode(
+      await this.readBuffer()
+    );
   }
 }
 
 // Parse the dylink.0 section of a wasm module
-function parseDyLink0(buf) {
-  const p0 = new Parser(buf);
+async function parseDyLink0(reader) {
+  const p0 = new Parser(makeStreamConsumer(reader));
   // magic, version
-  p0.skip(8);
+  await p0.skip(8);
   // section id
-  console.assert(p0.readUInt8() === 0);
-  const p1 = new Parser(p0.readBuffer());
+  console.assert((await p0.readUInt8()) === 0);
+  const p1_buf = await p0.readBuffer();
+  const p1 = new Parser(makeBufferConsumer(p1_buf), p1_buf.length);
   // custom section name
-  console.assert(p1.readString() === "dylink.0");
+  console.assert((await p1.readString()) === "dylink.0");
 
   const r = { neededSos: [], exportInfo: [], importInfo: [] };
   while (!p1.eof()) {
-    const subsection_type = p1.readUInt8();
-    const p2 = new Parser(p1.readBuffer());
+    const subsection_type = await p1.readUInt8();
+    const p2_buf = await p1.readBuffer();
+    const p2 = new Parser(makeBufferConsumer(p2_buf), p2_buf.length);
     switch (subsection_type) {
       case 1: {
         // WASM_DYLINK_MEM_INFO
-        r.memSize = p2.readULEB128();
-        r.memP2Align = p2.readULEB128();
-        r.tableSize = p2.readULEB128();
-        r.tableP2Align = p2.readULEB128();
+        r.memSize = await p2.readULEB128();
+        r.memP2Align = await p2.readULEB128();
+        r.tableSize = await p2.readULEB128();
+        r.tableP2Align = await p2.readULEB128();
         break;
       }
       case 2: {
@@ -176,10 +224,10 @@ function parseDyLink0(buf) {
         //
         // There may be duplicate entries. Not a big deal to not
         // dedupe, but why not.
-        const n = p2.readULEB128();
+        const n = await p2.readULEB128();
         const acc = new Set();
         for (let i = 0; i < n; ++i) {
-          acc.add(p2.readString());
+          acc.add(await p2.readString());
         }
         r.neededSos = [...acc];
         break;
@@ -189,10 +237,10 @@ function parseDyLink0(buf) {
         //
         // Not actually used yet, kept for completeness in case of
         // future usage.
-        const n = p2.readULEB128();
+        const n = await p2.readULEB128();
         for (let i = 0; i < n; ++i) {
-          const name = p2.readString();
-          const flags = p2.readULEB128();
+          const name = await p2.readString();
+          const flags = await p2.readULEB128();
           r.exportInfo.push({ name, flags });
         }
         break;
@@ -201,11 +249,11 @@ function parseDyLink0(buf) {
         // WASM_DYLINK_IMPORT_INFO
         //
         // Same.
-        const n = p2.readULEB128();
+        const n = await p2.readULEB128();
         for (let i = 0; i < n; ++i) {
-          const module = p2.readString();
-          const name = p2.readString();
-          const flags = p2.readULEB128();
+          const module = await p2.readString();
+          const name = await p2.readString();
+          const flags = await p2.readULEB128();
           r.importInfo.push({ module, name, flags });
         }
         break;
@@ -393,13 +441,15 @@ class DyLD {
       p = await this.findSystemLibrary(p);
     }
 
-    const buf = await fs.promises.readFile(p);
-    const modp = WebAssembly.compile(buf);
+    const resp = new Response(stream.Readable.toWeb(fs.createReadStream(p)), {
+      headers: { "Content-Type": "application/wasm" },
+    });
+    const resp2 = resp.clone();
+    const modp = WebAssembly.compileStreaming(resp);
     // Parse dylink.0 from the raw buffer, not via
-    // WebAssembly.Module.customSections(). At this point we only care
-    // about WASM_DYLINK_NEEDED, but might as well do the rest of the
-    // parsing anyway.
-    const r = parseDyLink0(buf);
+    // WebAssembly.Module.customSections(). This should return asap
+    // without waiting for rest of the wasm module binary data.
+    const r = await parseDyLink0(resp2.body.getReader());
     r.modp = modp;
     r.soname = soname;
     let acc = [];
