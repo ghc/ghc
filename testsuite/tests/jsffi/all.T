@@ -11,6 +11,8 @@ setTestOpts([
   extra_ways(['compacting_gc', 'nonmoving', 'sanity'])
 ])
 
+test('cancel', [], compile_and_run, ['-optl-Wl,--export=setTimeout'])
+
 test('gameover', [], compile_and_run, ['-optl-Wl,--export=testJSException,--export=testHSException'])
 
 test('http', [], compile_and_run, ['-optl-Wl,--export=main'])
