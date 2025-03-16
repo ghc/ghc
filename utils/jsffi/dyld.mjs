@@ -285,6 +285,69 @@ if (isNode) {
   );
 }
 
+// A subset of dyld logic that can only be run in the host node
+// process and has full access to local filesystem
+class DyLDHost {
+  // Deduped absolute paths of directories where we lookup .so files
+  #rpaths = new Set();
+
+  constructor() {
+    // Inherited pipe file descriptors from GHC
+    const out_fd = Number.parseInt(process.argv[4]),
+      in_fd = Number.parseInt(process.argv[5]);
+
+    this.readStream = stream.Readable.toWeb(
+      fs.createReadStream(undefined, { fd: in_fd })
+    );
+    this.writeStream = stream.Writable.toWeb(
+      fs.createWriteStream(undefined, { fd: out_fd })
+    );
+  }
+
+  installSignalHandlers(cb) {
+    process.on("SIGINT", cb);
+    process.on("SIGQUIT", cb);
+  }
+
+  // removeLibrarySearchPath is a no-op in ghci. If you have a use
+  // case where it's actually needed, I would like to hear..
+  async addLibrarySearchPath(p) {
+    this.#rpaths.add(path.resolve(p));
+    return null;
+  }
+
+  // f can be either just soname or an absolute path, will be
+  // canonicalized and checked for file existence here. Throws if
+  // non-existent.
+  async findSystemLibrary(f) {
+    if (path.isAbsolute(f)) {
+      await fs.promises.access(f, fs.promises.constants.R_OK);
+      return f;
+    }
+    const r = (
+      await Promise.allSettled(
+        [...this.#rpaths].map(async (p) => {
+          const r = path.resolve(p, f);
+          await fs.promises.access(r, fs.promises.constants.R_OK);
+          return r;
+        })
+      )
+    ).find(({ status }) => status === "fulfilled");
+    console.assert(
+      r,
+      `findSystemLibrary(${f}): not found in ${[...this.#rpaths]}`
+    );
+    return r.value;
+  }
+
+  // returns a Response for a .so absolute path
+  async fetchWasm(p) {
+    return new Response(stream.Readable.toWeb(fs.createReadStream(p)), {
+      headers: { "Content-Type": "application/wasm" },
+    });
+  }
+}
+
 // The real stuff
 class DyLD {
   // Wasm page size.
@@ -307,6 +370,10 @@ class DyLD {
     "__wasm_call_ctors",
   ]);
 
+  // Handles RPC logic back to host in a browser, or just do plain
+  // function calls in node
+  #rpc;
+
   // The WASI instance to provide wasi imports, shared across all wasm
   // instances
   #wasi;
@@ -326,9 +393,6 @@ class DyLD {
 
   // The JSVal manager
   #jsvalManager = new JSValManager();
-
-  // Deduped absolute paths of directories where we lookup .so files
-  #rpaths = new Set();
 
   // sonames of loaded sos.
   //
@@ -361,7 +425,9 @@ class DyLD {
   // Global STG registers
   #regs = {};
 
-  constructor({ args }) {
+  constructor({ args, rpc }) {
+    this.#rpc = rpc;
+
     if (isNode) {
       this.#wasi = new wasi.WASI({
         version: "preview1",
@@ -417,34 +483,12 @@ class DyLD {
     }
   }
 
-  // removeLibrarySearchPath is a no-op in ghci. If you have a use
-  // case where it's actually needed, I would like to hear..
-  addLibrarySearchPath(p) {
-    this.#rpaths.add(path.resolve(p));
+  async addLibrarySearchPath(p) {
+    return this.#rpc.addLibrarySearchPath(p);
   }
 
-  // f can be either just soname or an absolute path, will be
-  // canonicalized and checked for file existence here. Throws if
-  // non-existent.
   async findSystemLibrary(f) {
-    if (path.isAbsolute(f)) {
-      await fs.promises.access(f, fs.promises.constants.R_OK);
-      return f;
-    }
-    const r = (
-      await Promise.allSettled(
-        [...this.#rpaths].map(async (p) => {
-          const r = path.resolve(p, f);
-          await fs.promises.access(r, fs.promises.constants.R_OK);
-          return r;
-        })
-      )
-    ).find(({ status }) => status === "fulfilled");
-    console.assert(
-      r,
-      `findSystemLibrary(${f}): not found in ${[...this.#rpaths]}`
-    );
-    return r.value;
+    return this.#rpc.findSystemLibrary(f);
   }
 
   // When we do loadDLL, we first perform "downsweep" which return a
@@ -476,14 +520,12 @@ class DyLD {
       // libghc_tmp_1.so in a temporary directory without adding that
       // directory via addLibrarySearchPath
       toks.pop();
-      this.addLibrarySearchPath(toks.join("/"));
+      await this.addLibrarySearchPath(toks.join("/"));
     } else {
       p = await this.findSystemLibrary(p);
     }
 
-    const resp = new Response(stream.Readable.toWeb(fs.createReadStream(p)), {
-      headers: { "Content-Type": "application/wasm" },
-    });
+    const resp = await this.#rpc.fetchWasm(p);
     const resp2 = resp.clone();
     const modp = WebAssembly.compileStreaming(resp);
     // Parse dylink.0 from the raw buffer, not via
@@ -779,6 +821,8 @@ class DyLD {
   }
 }
 
+const rpc = new DyLDHost();
+
 if (isNode) {
   // sysroot libdir that contains libc.so etc
   const libdir = process.argv[2],
@@ -786,27 +830,16 @@ if (isNode) {
 
   const dyld = new DyLD({
     args: ["dyld.so", ...process.argv.slice(6)],
+    rpc,
   });
-  dyld.addLibrarySearchPath(libdir);
+  await dyld.addLibrarySearchPath(libdir);
   await dyld.loadDLL(ghci_so_path);
 
-  // Inherited pipe file descriptors from GHC
-  const out_fd = Number.parseInt(process.argv[4]),
-    in_fd = Number.parseInt(process.argv[5]);
-
-  const in_stream = stream.Readable.toWeb(
-    fs.createReadStream(undefined, { fd: in_fd })
-  );
-  const out_stream = stream.Writable.toWeb(
-    fs.createWriteStream(undefined, { fd: out_fd })
-  );
-
-  const reader = in_stream.getReader();
-  const writer = out_stream.getWriter();
+  const reader = rpc.readStream.getReader();
+  const writer = rpc.writeStream.getWriter();
 
   const cb_sig = (cb) => {
-    process.on("SIGINT", cb);
-    process.on("SIGQUIT", cb);
+    rpc.installSignalHandlers(cb);
   };
 
   const cb_recv = async () => {
