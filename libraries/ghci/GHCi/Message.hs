@@ -21,7 +21,7 @@ module GHCi.Message
   , ResumeContext(..)
   , QState(..)
   , getMessage, putMessage, getTHMessage, putTHMessage
-  , Pipe, mkPipeFromHandles, remoteCall, remoteTHCall, readPipe, writePipe
+  , Pipe, mkPipeFromHandles, mkPipeFromContinuations, remoteCall, remoteTHCall, readPipe, writePipe
   , BreakModule
   , LoadedDLL
   ) where
@@ -676,6 +676,12 @@ mkPipeFromHandles pipeRead pipeWrite = do
       putAll b = do
         B.hPutBuilder pipeWrite b
         hFlush pipeWrite
+  pipeLeftovers <- newIORef Nothing
+  pure $ Pipe { getSome, putAll, pipeLeftovers }
+
+-- | Make a 'Pipe' from a reader function and a writer function.
+mkPipeFromContinuations :: IO ByteString -> (B.Builder -> IO ()) -> IO Pipe
+mkPipeFromContinuations getSome putAll = do
   pipeLeftovers <- newIORef Nothing
   pure $ Pipe { getSome, putAll, pipeLeftovers }
 

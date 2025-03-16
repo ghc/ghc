@@ -90,9 +90,9 @@
 // to dump the iserv messages.
 
 import assert from "node:assert/strict";
-import fs from "node:fs/promises";
-import fsSync from "node:fs";
+import fs from "node:fs";
 import path from "node:path";
+import stream from "node:stream";
 import { WASI } from "node:wasi";
 import { JSValManager } from "./prelude.mjs";
 import { parseRecord, parseSections } from "./post-link.mjs";
@@ -242,22 +242,9 @@ class DyLD {
     "__wasm_call_ctors",
   ]);
 
-  // Virtual file descriptors designated for IPC logic and passed to
-  // iserv main. uvwasi doesn't support preopening host file
-  // descriptors as wasi file descriptors so we designate them and
-  // hook certain wasi syscalls on them, so that the pipe file
-  // descriptors passed from GHC can be used to communicate with the
-  // wasm side.
-  static read_fd = 0x7ffffffe;
-  static write_fd = 0x7fffffff;
-
   // The WASI instance to provide wasi imports, shared across all wasm
   // instances
   #wasi;
-
-  // The actual wasi_snapshot_preview1 import object, after hooking
-  // the wasi syscalls provided by uvwasi.
-  #wasiImport;
 
   // Wasm memory & table
   #memory = new WebAssembly.Memory({ initial: 1 });
@@ -309,141 +296,13 @@ class DyLD {
   // Global STG registers
   #regs = {};
 
-  constructor({ args, out_fd, in_fd }) {
+  constructor({ args }) {
     this.#wasi = new WASI({
       version: "preview1",
       args,
       env: { PATH: "", PWD: process.cwd() },
       preopens: { "/": "/" },
     });
-
-    this.#wasiImport = {};
-
-    // https://gitlab.haskell.org/ghc/wasi-libc/-/blob/master/libc-bottom-half/headers/public/wasi/api.h
-    for (const k in this.#wasi.wasiImport) {
-      switch (k) {
-        case "fd_fdstat_get": {
-          this.#wasiImport[k] = (fd, retptr0) => {
-            switch (fd) {
-              case DyLD.read_fd: {
-                const fdstat = new DataView(this.#memory.buffer, retptr0, 24);
-                fdstat.setUint8(0, 6); // __wasi_filetype_t fs_filetype;
-                fdstat.setUint16(2, 0, true); //  __wasi_fdflags_t fs_flags;
-                fdstat.setBigUint64(8, (1n << 1n) | (1n << 21n), true); // __wasi_rights_t fs_rights_base;
-                fdstat.setBigUint64(16, (1n << 1n) | (1n << 21n), true); // __wasi_rights_t fs_rights_inheriting;
-                return 0;
-              }
-              case DyLD.write_fd: {
-                const fdstat = new DataView(this.#memory.buffer, retptr0, 24);
-                fdstat.setUint8(0, 6); // __wasi_filetype_t fs_filetype;
-                fdstat.setUint16(2, 0, true); //  __wasi_fdflags_t fs_flags;
-                fdstat.setBigUint64(8, (1n << 6n) | (1n << 21n), true); // __wasi_rights_t fs_rights_base;
-                fdstat.setBigUint64(16, (1n << 1n) | (1n << 21n), true); // __wasi_rights_t fs_rights_inheriting;
-                return 0;
-              }
-              default: {
-                return this.#wasi.wasiImport[k](fd, retptr0);
-              }
-            }
-          };
-          break;
-        }
-
-        case "fd_filestat_get": {
-          this.#wasiImport[k] = (fd, retptr0) => {
-            switch (fd) {
-              case DyLD.read_fd: {
-                const filestat = new DataView(this.#memory.buffer, retptr0, 64);
-                filestat.setBigUint64(0, 109n, true); // __wasi_device_t dev;
-                filestat.setBigUint64(8, BigInt(DyLD.read_fd), true); // __wasi_inode_t ino;
-                filestat.setUint8(16, 6); // __wasi_filetype_t filetype;
-                filestat.setBigUint64(24, 1n, true); // __wasi_linkcount_t nlink;
-                filestat.setBigUint64(32, 0n, true); // __wasi_filesize_t size;
-                filestat.setBigUint64(40, 0n, true); // __wasi_timestamp_t atim;
-                filestat.setBigUint64(48, 0n, true); // __wasi_timestamp_t mtim;
-                filestat.setBigUint64(56, 0n, true); // __wasi_timestamp_t ctim;
-                return 0;
-              }
-              case DyLD.write_fd: {
-                const filestat = new DataView(this.#memory.buffer, retptr0, 64);
-                filestat.setBigUint64(0, 109n, true); // __wasi_device_t dev;
-                filestat.setBigUint64(8, BigInt(DyLD.read_fd), true); // __wasi_inode_t ino;
-                filestat.setUint8(16, 6); // __wasi_filetype_t filetype;
-                filestat.setBigUint64(24, 1n, true); // __wasi_linkcount_t nlink;
-                filestat.setBigUint64(32, 0n, true); // __wasi_filesize_t size;
-                filestat.setBigUint64(40, 0n, true); // __wasi_timestamp_t atim;
-                filestat.setBigUint64(48, 0n, true); // __wasi_timestamp_t mtim;
-                filestat.setBigUint64(56, 0n, true); // __wasi_timestamp_t ctim;
-                return 0;
-              }
-              default: {
-                return this.#wasi.wasiImport[k](fd, retptr0);
-              }
-            }
-          };
-          break;
-        }
-
-        case "fd_read": {
-          this.#wasiImport[k] = (fd, iovs, iovs_len, retptr0) => {
-            switch (fd) {
-              case DyLD.read_fd: {
-                assert(iovs_len === 1);
-                const iov = new DataView(this.#memory.buffer, iovs, 8);
-                const buf = iov.getUint32(0, true),
-                  buf_len = iov.getUint32(4, true);
-                const bytes_read = fsSync.readSync(
-                  in_fd,
-                  new Uint8Array(this.#memory.buffer, buf, buf_len)
-                );
-                new DataView(this.#memory.buffer, retptr0, 4).setUint32(
-                  0,
-                  bytes_read,
-                  true
-                );
-                return 0;
-              }
-              default: {
-                return this.#wasi.wasiImport[k](fd, iovs, iovs_len, retptr0);
-              }
-            }
-          };
-          break;
-        }
-
-        case "fd_write": {
-          this.#wasiImport[k] = (fd, iovs, iovs_len, retptr0) => {
-            switch (fd) {
-              case DyLD.write_fd: {
-                assert(iovs_len === 1);
-                const iov = new DataView(this.#memory.buffer, iovs, 8);
-                const buf = iov.getUint32(0, true),
-                  buf_len = iov.getUint32(4, true);
-                const bytes_written = fsSync.writeSync(
-                  out_fd,
-                  new Uint8Array(this.#memory.buffer, buf, buf_len)
-                );
-                new DataView(this.#memory.buffer, retptr0, 4).setUint32(
-                  0,
-                  bytes_written,
-                  true
-                );
-                return 0;
-              }
-              default: {
-                return this.#wasi.wasiImport[k](fd, iovs, iovs_len, retptr0);
-              }
-            }
-          };
-          break;
-        }
-
-        default: {
-          this.#wasiImport[k] = (...args) => this.#wasi.wasiImport[k](...args);
-          break;
-        }
-      }
-    }
 
     // Keep this in sync with rts/wasm/Wasm.S!
     for (let i = 1; i <= 10; ++i) {
@@ -485,14 +344,14 @@ class DyLD {
   // non-existent.
   async findSystemLibrary(f) {
     if (path.isAbsolute(f)) {
-      await fs.access(f, fs.constants.R_OK);
+      await fs.promises.access(f, fs.promises.constants.R_OK);
       return f;
     }
     const r = (
       await Promise.allSettled(
         [...this.#rpaths].map(async (p) => {
           const r = path.resolve(p, f);
-          await fs.access(r, fs.constants.R_OK);
+          await fs.promises.access(r, fs.promises.constants.R_OK);
           return r;
         })
       )
@@ -532,7 +391,7 @@ class DyLD {
       p = await this.findSystemLibrary(p);
     }
 
-    const buf = await fs.readFile(p);
+    const buf = await fs.promises.readFile(p);
     const modp = WebAssembly.compile(buf);
     // Parse dylink.0 from the raw buffer, not via
     // WebAssembly.Module.customSections(). At this point we only care
@@ -560,7 +419,7 @@ class DyLD {
       soname,
     } of await this.#downsweep(p)) {
       const import_obj = {
-        wasi_snapshot_preview1: this.#wasiImport,
+        wasi_snapshot_preview1: this.#wasi.wasiImport,
         env: {
           memory: this.#memory,
           __indirect_function_table: this.#table,
@@ -837,17 +696,36 @@ if (isMain()) {
   const libdir = process.argv[2],
     ghci_so_path = process.argv[3];
 
-  // Inherited pipe file descriptors from GHC
-  const out_fd = Number.parseInt(process.argv[4]),
-    in_fd = Number.parseInt(process.argv[5]);
-
   const dyld = new DyLD({
-    args: ["dyld.so", DyLD.write_fd, DyLD.read_fd, ...process.argv.slice(6)],
-    out_fd,
-    in_fd,
+    args: ["dyld.so", ...process.argv.slice(6)],
   });
   dyld.addLibrarySearchPath(libdir);
   await dyld.loadDLL(ghci_so_path);
 
-  await dyld.exportFuncs.defaultServer();
+  // Inherited pipe file descriptors from GHC
+  const out_fd = Number.parseInt(process.argv[4]),
+    in_fd = Number.parseInt(process.argv[5]);
+
+  const in_stream = stream.Readable.toWeb(
+    fs.createReadStream(undefined, { fd: in_fd })
+  );
+  const out_stream = stream.Writable.toWeb(
+    fs.createWriteStream(undefined, { fd: out_fd })
+  );
+
+  const reader = in_stream.getReader();
+  const writer = out_stream.getWriter();
+
+  const cb_recv = async () => {
+    const { done, value } = await reader.read();
+    if (done) {
+      throw new Error("not enough bytes");
+    }
+    return value;
+  };
+  const cb_send = (buf) => {
+    writer.write(new Uint8Array(buf));
+  };
+
+  await dyld.exportFuncs.defaultServer(cb_recv, cb_send);
 }
