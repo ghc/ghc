@@ -60,7 +60,7 @@ import GHC.Types.Fixity (Fixity (..))
 import GHC.Types.Name (stableNameCmp)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (RdrName (..))
-import GHC.Types.SrcLoc (BufPos (..), BufSpan (..), srcSpanToRealSrcSpan, PsSpan(..))
+import GHC.Types.SrcLoc (srcSpanToRealSrcSpan, PsSpan(..))
 import GHC.Types.Var (Specificity)
 import GHC.Utils.Outputable
 

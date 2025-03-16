@@ -20,13 +20,11 @@ import qualified Control.Monad.IO.Class as GHC
 import qualified GHC.Data.FastString   as GHC
 import qualified GHC.Data.StringBuffer as GHC
 import qualified GHC.Driver.Config.Parser as GHC
-import qualified GHC.Driver.DynFlags   as GHC
 import qualified GHC.Driver.Env        as GHC
 import qualified GHC.Driver.Errors.Types as GHC
 import qualified GHC.Driver.Phases     as GHC
 import qualified GHC.Driver.Pipeline   as GHC
 import qualified GHC.Parser.Lexer      as GHC
-import qualified GHC.Parser.PreProcess.State as GHC
 import qualified GHC.Settings          as GHC
 import qualified GHC.Types.Error       as GHC
 import qualified GHC.Types.SourceError as GHC
@@ -39,17 +37,12 @@ import qualified GHC.Utils.Panic.Plain as GHC
 import GHC.Types.SrcLoc (mkSrcSpan, mkSrcLoc)
 import GHC.Data.FastString (mkFastString)
 
-import Data.List (isPrefixOf, partition)
+import Data.List (isPrefixOf)
 import Data.Maybe
 import Types
 import Utils
 import qualified Data.Set as Set
 import qualified GHC.Data.Strict as Strict
-
-
-import Debug.Trace
-import qualified GHC.LanguageExtensions as LangExt
---
 
 -- ---------------------------------------------------------------------
 
@@ -110,26 +103,16 @@ getCppTokensAsComments cppOptions sourceFile = do
   let startLoc = GHC.mkRealSrcLoc (GHC.mkFastString sourceFile) 1 1
   (_txt,strSrcBuf,flags2') <- getPreprocessedSrcDirectPrim cppOptions sourceFile
 
-  let flags2g  = GHC.xopt_set flags2' LangExt.GhcCpp
   let flags2 = GHC.initParserOpts flags2'
-  let flags2'' = GHC.initParserOpts flags2g
-  -- let flags2'' = flags2 { GHC.pExtsBitmap = GHC.xset GHC.GhcCppBit (GHC.pExtsBitmap flags2)}
   -- hash-ifdef tokens
-  -- directiveToks <- GHC.liftIO $ getPreprocessorAsComments sourceFile
+  directiveToks <- GHC.liftIO $ getPreprocessorAsComments (GHC.enableGhcCpp flags2) source startLoc
   -- Tokens without hash-ifdef
   nonDirectiveToks <- tokeniseOriginalSrc startLoc flags2 source
-  case GHC.lexTokenStream () (GHC.enableGhcCpp flags2) source startLoc of
+  case GHC.lexTokenStream () flags2 strSrcBuf startLoc of
         GHC.POk _ ts ->
                do
-                  let
-                      isCppTok (GHC.L _ (GHC.ITcpp _ _ _)) = True
-                      isCppTok _                           = False
-                      toks = GHC.addSourceToTokens startLoc source
-                                (trace ("bitmap:" ++ show (GHC.pExtsBitmap flags2)) ts)
-                      (directiveToks, toks') = partition (\(t,_) -> isCppTok t) toks
-                      -- (directiveToks, toks') = partition (\(t,_) -> isCppTok t)
-                      --                 (trace ("toks:" ++ show toks) toks)
-                      cppCommentToks = getCppTokens directiveToks nonDirectiveToks toks'
+                  let toks = GHC.addSourceToTokens startLoc source ts
+                      cppCommentToks = getCppTokens directiveToks nonDirectiveToks toks
                   return $ filter goodComment
                          $  map (GHC.commentToAnnotation . toRealLocated . fst) cppCommentToks
         GHC.PFailed pst -> parseError pst
@@ -164,9 +147,8 @@ getCppTokens ::
   -> [(GHC.Located GHC.Token, String)]
   -> [(GHC.Located GHC.Token, String)]
   -> [(GHC.Located GHC.Token, String)]
-getCppTokens directiveToks' origSrcToks postCppToks = toks
+getCppTokens directiveToks origSrcToks postCppToks = toks
   where
-    directiveToks = trace ("directiveToks: " ++ show directiveToks') directiveToks'
     locFn (GHC.L l1 _,_) (GHC.L l2 _,_) = compare (rs l1) (rs l2)
     m1Toks = mergeBy locFn postCppToks directiveToks
 
@@ -279,51 +261,18 @@ alterToolSettings f dynFlags = dynFlags { GHC.toolSettings = f (GHC.toolSettings
 
 -- | Get the preprocessor directives as comment tokens from the
 -- source.
-getPreprocessorAsComments' :: FilePath -> IO [(GHC.Located GHC.Token, String)]
-getPreprocessorAsComments' srcFile = do
-  fcontents <- readFileGhc srcFile
-  let directives = filter (\(_lineNum,line) -> case line of '#' : _ -> True; _ -> False)
-                    $ zip [1..] (lines fcontents)
-
-  let mkTok (lineNum,line) = (GHC.L l (GHC.ITlineComment line (makeBufSpan l)),line)
-       where
-         start = GHC.mkSrcLoc (GHC.mkFastString srcFile) lineNum 1
-         end   = GHC.mkSrcLoc (GHC.mkFastString srcFile) lineNum (length line)
-         l = GHC.mkSrcSpan start end
-
-  let toks = map mkTok directives
-  return toks
-
--- | Get the preprocessor directives as comment tokens from the
--- source.
-getPreprocessorAsComments :: FilePath -> IO [(GHC.Located GHC.Token, String)]
-getPreprocessorAsComments srcFile = do
-  fcontents <- readFileGhc srcFile
-  let directives = filter (\(_lineNum,line) -> case line of '#' : _ -> True; _ -> False)
-                    $ zip [1..] (lines fcontents)
-
-  let mkTok (lineNum,line) = (GHC.L l (GHC.ITlineComment line (makeBufSpan l)),line)
-       where
-         start = GHC.mkSrcLoc (GHC.mkFastString srcFile) lineNum 1
-         end   = GHC.mkSrcLoc (GHC.mkFastString srcFile) lineNum (length line)
-         l = GHC.mkSrcSpan start end
-
-  let toks = map mkTok directives
-  return toks
-
--- TODO: possibly use the one from GHC.Parser.PreProcess, depending on
--- which lexer it ends up using. Or have specific versions of lexAll
--- for the two lexers.
-lexAll :: GHC.PState GHC.PpState -> (GHC.PState GHC.PpState, [GHC.Located GHC.Token])
-lexAll state = case GHC.unP (GHC.lexer True return) state of
--- lexAll state = case unP (lexerDbg True return) state of
--- lexAll state = case unP (Lexer.lexerDbg True return) state of
-    GHC.POk s t@(GHC.L _ GHC.ITeof) -> (s, [t])
-    -- POk state' t -> (ss, t : rest)
-    GHC.POk state' t -> (ss, trace ("lexAll:" ++ show t) t : rest)
-      where
-        (ss, rest) = lexAll state'
-    GHC.PFailed _pst -> GHC.panic $ "GHC.Parser.PreProcess.lexAll failed"
+getPreprocessorAsComments :: GHC.ParserOpts -> GHC.StringBuffer -> GHC.RealSrcLoc -> IO [(GHC.Located GHC.Token, String)]
+getPreprocessorAsComments opts source startLoc = do
+  case GHC.lexTokenStream () opts source startLoc of
+        GHC.POk _ ts ->
+               do
+                  let
+                      isCppTok (GHC.L _ (GHC.ITcpp _ _ _)) = True
+                      isCppTok _                           = False
+                      toks = GHC.addSourceToTokens startLoc source ts
+                      directiveToks = filter (\(t,_) -> isCppTok t) toks
+                  return directiveToks
+        GHC.PFailed pst -> parseError pst
 
 makeBufSpan :: GHC.SrcSpan -> GHC.PsSpan
 makeBufSpan (GHC.RealSrcSpan s (Strict.Just bs)) = GHC.PsSpan s bs
