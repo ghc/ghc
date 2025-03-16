@@ -7,10 +7,6 @@
 // foo.js", as well as an exported postLink function that takes a
 // WebAssembly.Module object and returns the ESM module content.
 
-import fs from "node:fs/promises";
-import path from "node:path";
-import util from "node:util";
-
 // Each record in the ghc_wasm_jsffi custom section are 3
 // NUL-terminated strings: name, binder, body. We try to parse the
 // body as an expression and fallback to statements, and return the
@@ -94,6 +90,9 @@ export function parseSections(mod) {
 // immediately invokes it by passing the right magic variables.
 
 export async function postLink(mod) {
+  const fs = (await import("node:fs/promises")).default;
+  const path = (await import("node:path")).default;
+
   let src = (
     await fs.readFile(path.join(import.meta.dirname, "prelude.mjs"), {
       encoding: "utf-8",
@@ -116,10 +115,17 @@ export async function postLink(mod) {
 }
 
 function isMain() {
+  if (!globalThis?.process?.versions?.node) {
+    return false;
+  }
+
   return import.meta.filename === process.argv[1];
 }
 
 async function main() {
+  const fs = (await import("node:fs/promises")).default;
+  const util = (await import("node:util")).default;
+
   const { input, output } = util.parseArgs({
     options: {
       input: {
