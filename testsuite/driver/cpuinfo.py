@@ -277,7 +277,7 @@ class DataSource:
 
 	@staticmethod
 	def riscv_isa():
-    	# Expect all cores to support an equal ISA.
+		# Expect all cores to support an equal ISA.
 		riscv_isa = '/proc/device-tree/cpus/cpu@0/riscv,isa'
 		return _run_and_get_stdout(['cat', riscv_isa])
 
@@ -2129,7 +2129,33 @@ def _get_cpu_info_from_riscv_isa():
 	Returns the CPU info gathered from 'cat /proc/device-tree/cpus/cpu@0/riscv,isa'
 	Returns {} if this file does not exist (i.e. we're not on RISC-V Linux)
 	'''
-	g_trace.header('Tying to get info from lsprop ...')
+
+	def remove_prefix(prefix, text):
+		if text.startswith(prefix):
+			return text[len(prefix):]
+		return text
+
+	def run_asm(*machine_code):
+		asm = ASM(ctypes.c_uint32, (), machine_code)
+		asm.compile()
+		retval = asm.run()
+		asm.free()
+		return retval
+
+	def unique_items(original_list):
+		unique_list = []
+		seen = set()
+		for item in original_list:
+			if item not in seen:
+				unique_list.append(item)
+				seen.add(item)
+		return unique_list
+
+    # Big endian is easier to read, but RISC-V is little endian
+	def bigToLittleEndian(w):
+		return int.from_bytes(w, byteorder='big').to_bytes(4, byteorder='little')
+
+	g_trace.header('Tying to get info from device-tree ...')
 
 	try:
 		returncode, output = DataSource.riscv_isa()
@@ -2137,8 +2163,48 @@ def _get_cpu_info_from_riscv_isa():
 			g_trace.fail('Failed to cat /proc/device-tree/cpus/cpu@0/riscv,isa. Skipping ...')
 			return {}
 
+		flags = output.split('_')
+
+		# The usage of the Zvl* extensions in the industry is very
+		# inconsistent. Though, they are useful to communicate the VLEN. So, if
+		# they are not provided by the system, we try to figure them out on our
+		# own.
+
+		# E.g. rv64imafdcvh
+		arch_string = flags[0]
+		profile_features = remove_prefix('rv64', remove_prefix('rv32', arch_string))
+		additional_flags = []
+		if 'v' in profile_features and not '_zvl' in output:
+			vlen = 0
+
+		if arch_string.startswith('rv32'):
+			vlen = run_asm(
+				bigToLittleEndian(b"\xc2\x20\x25\x73"), # csrr a0, 0xc22
+				bigToLittleEndian(b"\x00\x00\x80\x67")  # ret
+			)
+		elif arch_string.startswith('rv64'):
+			vlen = run_asm(
+				bigToLittleEndian(b"\xc2\x20\x25\x73"), # csrr  a0, 0xc22
+				bigToLittleEndian(b"\x00\x05\x05\x1b"), # sext.w a0, a0
+				bigToLittleEndian(b"\x00\x00\x80\x67")  # ret
+			)
+
+			if vlen >= 32:
+				additional_flags.append('zvl32b')
+			if vlen >= 64:
+				additional_flags.append('zvl64b')
+			if vlen >= 128:
+				additional_flags.append('zvl128b')
+			if vlen >= 256:
+				additional_flags.append('zvl256b')
+			if vlen >= 512:
+				additional_flags.append('zvl512b')
+			if vlen >= 1024:
+				additional_flags.append('zvl1024b')
+
+		flags.extend(additional_flags)
 		info = {
-			'flags' : output.split('_')
+			'flags' : unique_items(flags)
 		}
 		info = _filter_dict_keys_with_empty_values(info)
 		g_trace.success()
