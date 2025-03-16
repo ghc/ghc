@@ -89,10 +89,6 @@
 // -opti GHC flag to pass process arguments, like RTS flags or -opti-v
 // to dump the iserv messages.
 
-import fs from "node:fs";
-import path from "node:path";
-import stream from "node:stream";
-import { WASI } from "node:wasi";
 import { JSValManager, setImmediate } from "./prelude.mjs";
 import { parseRecord, parseSections } from "./post-link.mjs";
 
@@ -267,6 +263,28 @@ async function parseDyLink0(reader) {
   return r;
 }
 
+// Browser/node portable code stays above this watermark.
+const isNode = Boolean(globalThis?.process?.versions?.node);
+
+// Too cumbersome to only import at use sites. Too troublesome to
+// factor out browser-only/node-only logic into different modules. For
+// now, just make these global let bindings optionally initialized if
+// isNode and be careful to not use them in browser-only logic.
+let fs, path, require, stream, wasi;
+
+if (isNode) {
+  require = (await import("node:module")).createRequire(import.meta.url);
+
+  fs = require("fs");
+  path = require("path");
+  stream = require("stream");
+  wasi = require("wasi");
+} else {
+  wasi = await import(
+    "https://cdn.jsdelivr.net/npm/@bjorn3/browser_wasi_shim@0.4.1/dist/index.js"
+  );
+}
+
 // The real stuff
 class DyLD {
   // Wasm page size.
@@ -344,12 +362,31 @@ class DyLD {
   #regs = {};
 
   constructor({ args }) {
-    this.#wasi = new WASI({
-      version: "preview1",
-      args,
-      env: { PATH: "", PWD: process.cwd() },
-      preopens: { "/": "/" },
-    });
+    if (isNode) {
+      this.#wasi = new wasi.WASI({
+        version: "preview1",
+        args,
+        env: { PATH: "", PWD: process.cwd() },
+        preopens: { "/": "/" },
+      });
+    } else {
+      this.#wasi = new wasi.WASI(
+        args,
+        [],
+        [
+          new wasi.OpenFile(
+            new wasi.File(new Uint8Array(), { readonly: true })
+          ),
+          wasi.ConsoleStdout.lineBuffered((msg) =>
+            console.log(`[WASI stdout] ${msg}`)
+          ),
+          wasi.ConsoleStdout.lineBuffered((msg) =>
+            console.warn(`[WASI stderr] ${msg}`)
+          ),
+        ],
+        { debug: false }
+      );
+    }
 
     // Keep this in sync with rts/wasm/Wasm.S!
     for (let i = 1; i <= 10; ++i) {
@@ -742,11 +779,7 @@ class DyLD {
   }
 }
 
-function isMain() {
-  return import.meta.filename === process.argv[1];
-}
-
-if (isMain()) {
+if (isNode) {
   // sysroot libdir that contains libc.so etc
   const libdir = process.argv[2],
     ghci_so_path = process.argv[3];
