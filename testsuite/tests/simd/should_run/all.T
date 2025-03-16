@@ -26,7 +26,7 @@ def riscvVlen():
     elif have_cpu_feature('zvl512b'):
         return 512
     else:
-        raise Exception("Vectors not supported by CPU")
+        raise Exception("Vector extension not supported by CPU or VLEN too small.")
 
 # Ensure we set the CPU features we have available.
 #
