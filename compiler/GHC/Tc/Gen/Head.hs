@@ -205,7 +205,7 @@ type family XEVAType (p :: TcPass) where   -- Value arguments
 data QLFlag = DoQL | NoQL
 
 data EWrap = EPar    AppCtxt
-           | EExpand HsThingRn
+           | EExpand (HsExpr GhcRn)
            | EHsWrap HsWrapper
 
 data AppCtxt
@@ -316,7 +316,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
     -- See Note [Looking through Template Haskell splices in splitHsApps]
     go e@(HsUntypedSplice splice_res splice) ctxt args
       = do { fun <- getUntypedSpliceBody splice_res
-           ; go fun ctxt' (EWrap (EExpand (OrigExpr e)) : args) }
+           ; go fun ctxt' (EWrap (EExpand e) : args) }
       where
         ctxt' :: AppCtxt
         ctxt' = case splice of
@@ -330,7 +330,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
                : mkEValArg (VACall op 2 generatedSrcSpan) arg2
                     -- generatedSrcSpan because this the span of the call,
                     -- and its hard to say exactly what that is
-               : EWrap (EExpand (OrigExpr e))
+               : EWrap (EExpand e)
                : args )
 
     go e ctxt args = pure ((e,ctxt), args)
@@ -367,11 +367,8 @@ rebuildHsApps (fun, ctxt) (arg : args)
         -> rebuildHsApps (HsPragE noExtField p lfun, ctxt') args
       EWrap (EPar ctxt')
         -> rebuildHsApps (gHsPar lfun, ctxt') args
-      EWrap (EExpand orig)
-        | OrigExpr oe <- orig
-        -> rebuildHsApps (mkExpandedExprTc oe fun, ctxt) args
-        | OrigStmt stmt flav <- orig
-        -> rebuildHsApps (mkExpandedStmtTc stmt flav fun, ctxt) args
+      EWrap (EExpand o)
+        -> rebuildHsApps (mkExpandedExprTc o fun, ctxt) args
       EWrap (EHsWrap wrap)
         -> rebuildHsApps (mkHsWrap wrap fun, ctxt) args
   where
