@@ -5607,8 +5607,8 @@ inHsDocContext ctxt = text "In" <+> pprHsDocContext ctxt
 
 pprHsDocContext :: HsDocContext -> SDoc
 pprHsDocContext (GenericCtx doc)      = doc
-pprHsDocContext (TypeSigCtx doc)      = text "the type signature for" <+> doc
-pprHsDocContext (StandaloneKindSigCtx doc) = text "the standalone kind signature for" <+> doc
+pprHsDocContext (TypeSigCtx vs)       = text "the type signature for" <+> ppr_sig_bndrs vs
+pprHsDocContext (StandaloneKindSigCtx v)= text "the standalone kind signature for" <+> quotes (ppr v)
 pprHsDocContext PatCtx                = text "a pattern type-signature"
 pprHsDocContext SpecInstSigCtx        = text "a SPECIALISE instance pragma"
 pprHsDocContext DefaultDeclCtx        = text "a `default' declaration"
@@ -5626,7 +5626,13 @@ pprHsDocContext HsTypeCtx             = text "a type argument"
 pprHsDocContext HsTypePatCtx          = text "a type argument in a pattern"
 pprHsDocContext GHCiCtx               = text "GHCi input"
 pprHsDocContext (SpliceTypeCtx hs_ty) = text "the spliced type" <+> quotes (ppr hs_ty)
-pprHsDocContext ClassInstanceCtx      = text "GHC.Tc.Gen.Splice.reifyInstances"
+pprHsDocContext ReifyInstancesCtx      = text "GHC.Tc.Gen.Splice.reifyInstances"
+pprHsDocContext (ClassInstanceCtx inst_ty) =
+  text "the instance declaration for" <+> quotes (ppr inst_ty)
+pprHsDocContext (ClassMethodSigCtx name) = text "a class method signature for" <+> quotes (ppr name)
+pprHsDocContext (SpecialiseSigCtx name) = text "a SPECIALISE signature for" <+> quotes (ppr name)
+pprHsDocContext (PatSynSigCtx vs) =
+  text "a pattern synonym signature for" <+> ppr_sig_bndrs vs
 
 pprHsDocContext (ForeignDeclCtx name)
    = text "the foreign declaration for" <+> quotes (ppr name)
@@ -5634,6 +5640,9 @@ pprHsDocContext (ConDeclCtx [name])
    = text "the definition of data constructor" <+> quotes (ppr name)
 pprHsDocContext (ConDeclCtx names)
    = text "the definition of data constructors" <+> interpp'SP names
+
+ppr_sig_bndrs :: [LocatedN RdrName] -> SDoc
+ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
 
 pprConversionFailReason :: ConversionFailReason -> SDoc
 pprConversionFailReason = \case

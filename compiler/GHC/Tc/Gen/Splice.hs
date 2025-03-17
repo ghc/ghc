@@ -1929,7 +1929,7 @@ reifyInstances' th_nm th_tys
                      ; return $ Right (tc, map fim_instance matches) }
             _  -> bale_out $ TcRnTHError $ THReifyError $ CannotReifyInstance ty }
   where
-    doc = ClassInstanceCtx
+    doc = ReifyInstancesCtx
     bale_out msg = failWithTc msg
 
     cvt :: EnumSet LangExt.Extension -> Origin -> SrcSpan -> TH.Type -> TcM (LHsType GhcPs)

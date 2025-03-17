@@ -1066,7 +1066,7 @@ renameSigs ctxt sigs
 renameSig :: HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeVars)
 renameSig ctxt sig@(TypeSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
-        ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
+        ; let doc = TypeSigCtx vs
         ; (new_ty, fvs) <- rnHsSigWcType doc ty
         ; return (TypeSig noAnn new_vs new_ty, fvs) }
 
@@ -1079,8 +1079,7 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
         ; return (ClassOpSig noAnn is_deflt new_v new_ty, fvs) }
   where
     v1:|_ = expectNonEmpty vs
-    ty_ctxt = GenericCtx (text "a class method signature for"
-                          <+> quotes (ppr v1))
+    ty_ctxt = ClassMethodSigCtx v1
 
 renameSig _ (SpecInstSig (_, src) ty)
   = do  { checkInferredVars doc ty
@@ -1106,10 +1105,8 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
         ; (new_ty, fvs) <- foldM do_one ([],emptyFVs) tys
         ; return (SpecSig noAnn new_v new_ty inl, fvs) }
   where
-    ty_ctxt = GenericCtx (text "a SPECIALISE signature for"
-                          <+> quotes (ppr v))
     do_one (tys,fvs) ty
-      = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt TypeLevel ty
+      = do { (new_ty, fvs_ty) <- rnHsSigType (SpecialiseSigCtx v) TypeLevel ty
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
 renameSig _ctxt (SpecSigE _ bndrs spec_e inl)
@@ -1136,8 +1133,7 @@ renameSig ctxt sig@(PatSynSig _ vs ty)
         ; (ty', fvs) <- rnHsSigType ty_ctxt TypeLevel ty
         ; return (PatSynSig noAnn new_vs ty', fvs) }
   where
-    ty_ctxt = GenericCtx (text "a pattern synonym signature for"
-                          <+> ppr_sig_bndrs vs)
+    ty_ctxt = PatSynSigCtx vs
 
 renameSig ctxt sig@(SCCFunSig (_, st) v s)
   = do  { new_v <- lookupSigOccRn ctxt sig v
@@ -1194,9 +1190,6 @@ pragmas that could be relevant to this pattern match.
 For now we simply disallow orphan COMPLETE pragmas, as the added
 complexity of supporting them properly doesn't seem worthwhile.
 -}
-
-ppr_sig_bndrs :: [LocatedN RdrName] -> SDoc
-ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
 
 okHsSig :: HsSigCtxt -> LSig (GhcPass a) -> Bool
 okHsSig ctxt (L _ sig)

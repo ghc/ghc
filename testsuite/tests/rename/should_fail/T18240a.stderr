@@ -1,43 +1,43 @@
-
 T18240a.hs:11:11: error: [GHC-71492]
     • Instance head cannot contain nested ‘forall’s or contexts
-    • In an instance declaration
+    • In the instance declaration for ‘(forall a. C [a])’
 
 T18240a.hs:12:15: error: [GHC-76037]
     Not in scope: type variable ‘a’
 
 T18240a.hs:14:11: error: [GHC-71492]
     • Instance head cannot contain nested ‘forall’s or contexts
-    • In an instance declaration
+    • In the instance declaration for ‘(Eq a => C [a])’
 
 T18240a.hs:17:11: error: [GHC-71492]
     • Instance head cannot contain nested ‘forall’s or contexts
-    • In an instance declaration
+    • In the instance declaration for ‘(forall a. C (Either a b))’
 
 T18240a.hs:18:22: error: [GHC-76037]
     Not in scope: type variable ‘a’
 
 T18240a.hs:20:21: error: [GHC-71492]
     • Instance head cannot contain nested ‘forall’s or contexts
-    • In an instance declaration
+    • In the instance declaration for ‘(forall b. C (Either a b))’
 
 T18240a.hs:21:24: error: [GHC-76037]
     Not in scope: type variable ‘b’
 
 T18240a.hs:23:19: error: [GHC-71492]
     • Instance head cannot contain nested ‘forall’s or contexts
-    • In an instance declaration
+    • In the instance declaration for ‘(Eq b => C (Either a b))’
 
 T18240a.hs:28:10: error: [GHC-53946]
     • Illegal head of an instance declaration: ‘42’.
       Instance heads must be of the form
         C ty_1 ... ty_n
       where ‘C’ is a class.
-    • In an instance declaration
+    • In the instance declaration for ‘42’
 
 T18240a.hs:29:10: error: [GHC-53946]
     • Illegal head of an instance declaration: ‘Int -> Int’.
       Instance heads must be of the form
         C ty_1 ... ty_n
       where ‘C’ is a class.
-    • In an instance declaration
+    • In the instance declaration for ‘Int -> Int’
+

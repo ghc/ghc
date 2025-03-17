@@ -6024,11 +6024,13 @@ data FixedRuntimeRepErrorInfo
 ************************************************************************
 -}
 
--- AZ:TODO: Change these all to be Name instead of RdrName.
---          Merge TcType.UserTypeContext in to it.
+-- | An error message context, for errors in the renamer.
+--
+-- TODO: this should probably get merged in some way with 'ErrCtxtMsg',
+-- but that's a battle for another day.
 data HsDocContext
-  = TypeSigCtx SDoc
-  | StandaloneKindSigCtx SDoc
+  = TypeSigCtx [LocatedN RdrName]
+  | StandaloneKindSigCtx (LocatedN RdrName)
   | PatCtx
   | SpecInstSigCtx
   | DefaultDeclCtx
@@ -6048,7 +6050,16 @@ data HsDocContext
   | HsTypePatCtx
   | GHCiCtx
   | SpliceTypeCtx (LHsType GhcPs)
-  | ClassInstanceCtx
+  | ReifyInstancesCtx
+  | ClassInstanceCtx (LHsType GhcRn)
+  | ClassMethodSigCtx (LocatedN RdrName)  -- ^ Class method signature
+  | SpecialiseSigCtx (LocatedN RdrName)   -- ^ SPECIALISE signature
+  | PatSynSigCtx [LocatedN RdrName]       -- ^ Pattern synonym signature
+
+  -- | Escape hatch, for GHC plugins and other GHC API users.
+  --
+  -- Not for use within GHC; add a new constructor to 'HsDocContext'
+  -- if you need to add a new renamer error context.
   | GenericCtx SDoc
 
 -- | Context for a mismatch in the number of arguments

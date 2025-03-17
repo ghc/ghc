@@ -1,4 +1,4 @@
-
 T5951.hs:9:8: error: [GHC-71492]
-    Instance head cannot contain nested ‘forall’s or contexts
-    In an instance declaration
+    • Instance head cannot contain nested ‘forall’s or contexts
+    • In the instance declaration for ‘B => C’
+

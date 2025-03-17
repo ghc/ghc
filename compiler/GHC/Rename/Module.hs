@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE LambdaCase          #-}
@@ -581,16 +582,17 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                            , cid_sigs = uprags, cid_tyfam_insts = ats
                            , cid_overlap_mode = oflag
                            , cid_datafam_insts = adts })
-  = do { checkInferredVars ctxt inst_ty
-       ; (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inst_ty
-       ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
-             -- Check if there are any nested `forall`s or contexts, which are
+  = do { rec { let ctxt = ClassInstanceCtx head_ty'
+             ; checkInferredVars ctxt inst_ty
+             ; (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inst_ty
+             ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
+             }
+       ; let -- Check if there are any nested `forall`s or contexts, which are
              -- illegal in the type of an instance declaration (see
              -- Note [No nested foralls or contexts in instance types] in
              -- GHC.Hs.Type)...
-             mb_nested_msg = noNestedForallsContextsErr
-                               NFC_InstanceHead head_ty'
-             -- ...then check if the instance head is actually headed by a
+             mb_nested_msg = noNestedForallsContextsErr NFC_InstanceHead head_ty'
+             -- ...then check that the instance head is actually headed by a
              -- class type constructor...
              eith_cls = case hsTyGetAppHead_maybe head_ty' of
                Just (L _ cls) -> Right cls
@@ -607,8 +609,8 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
          -- from mb_nested_msg or eith_cls at a time.
        ; cls <- case (mb_nested_msg, eith_cls) of
            (Nothing,   Right cls) -> pure cls
-           (Just err1, _)         -> bail_out err1
-           (_,         Left err2) -> bail_out err2
+           (Just err1, _)         -> bail_out ctxt err1
+           (_,         Left err2) -> bail_out ctxt err2
 
           -- Rename the bindings
           -- The typechecker (not the renamer) checks that all
@@ -648,14 +650,12 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
              --     strange, but should not matter (and it would be more work
              --     to remove the context).
   where
-    ctxt    = GenericCtx $ text "an instance declaration"
-
     -- The instance is malformed. We'd still like to make *some* progress
     -- (rather than failing outright), so we report an error and continue for
     -- as long as we can. Importantly, this error should be thrown before we
     -- reach the typechecker, lest we encounter different errors that are
     -- hopelessly confusing (such as the one in #16114).
-    bail_out (l, err_msg) = do
+    bail_out ctxt (l, err_msg) = do
       addErrAt l $ TcRnWithHsDocContext ctxt err_msg
       pure $ mkUnboundName (mkTcOccFS (fsLit "<class>"))
 
@@ -1513,8 +1513,7 @@ rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
   = do  { standalone_ki_sig_ok <- xoptM LangExt.StandaloneKindSignatures
         ; unless standalone_ki_sig_ok $ addErr TcRnUnexpectedStandaloneKindSig
         ; new_v <- lookupSigCtxtOccRn (TopSigCtxt tc_names) SigLikeStandaloneKindSig v
-        ; let doc = StandaloneKindSigCtx (ppr v)
-        ; (new_ki, fvs) <- rnHsSigType doc KindLevel ki
+        ; (new_ki, fvs) <- rnHsSigType (StandaloneKindSigCtx v) KindLevel ki
         ; return (StandaloneKindSig noExtField new_v new_ki, fvs)
         }
 
@@ -1883,8 +1882,8 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
            }
 
     has_labelled_fields (ConDeclGADT { con_g_args = RecConGADT _ _ }) = True
-    has_labelled_fields (ConDeclH98 { con_args = RecCon rec })
-      = not (null (unLoc rec))
+    has_labelled_fields (ConDeclH98 { con_args = RecCon flds })
+      = not (null (unLoc flds))
     has_labelled_fields _ = False
 
     has_strictness_flags condecl
@@ -2523,7 +2522,7 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
 conDetailsVisArity :: HsPatSynDetails (GhcPass p) -> VisArity
 conDetailsVisArity = \case
   PrefixCon args -> length args
-  RecCon rec -> length rec
+  RecCon flds -> length flds
   InfixCon _ _ -> 2
 
 {-

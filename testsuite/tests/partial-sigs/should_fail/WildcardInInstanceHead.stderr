@@ -1,4 +1,4 @@
-
 WildcardInInstanceHead.hs:7:14: error: [GHC-65507]
     • Wildcard ‘_’ not allowed
-    • In an instance declaration
+    • In the instance declaration for ‘Foo _’
+
