@@ -263,6 +263,13 @@ async function parseDyLink0(reader) {
   return r;
 }
 
+// Formats a server.address() result to a URL origin with correct
+// handling for IPv6 hostname
+function originFromServerAddress({ address, family, port }) {
+  const hostname = family === "IPv6" ? `[${address}]` : address;
+  return `http://${hostname}:${port}`;
+}
+
 // Browser/node portable code stays above this watermark.
 const isNode = Boolean(globalThis?.process?.versions?.node);
 
@@ -270,15 +277,21 @@ const isNode = Boolean(globalThis?.process?.versions?.node);
 // factor out browser-only/node-only logic into different modules. For
 // now, just make these global let bindings optionally initialized if
 // isNode and be careful to not use them in browser-only logic.
-let fs, path, require, stream, wasi;
+let fs, http, path, require, stream, wasi, ws;
 
 if (isNode) {
   require = (await import("node:module")).createRequire(import.meta.url);
 
   fs = require("fs");
+  http = require("http");
   path = require("path");
   stream = require("stream");
   wasi = require("wasi");
+
+  // Optional npm dependencies loaded via NODE_PATH
+  try {
+    ws = require("ws");
+  } catch {}
 } else {
   wasi = await import(
     "https://cdn.jsdelivr.net/npm/@bjorn3/browser_wasi_shim@0.4.1/dist/index.js"
@@ -303,6 +316,8 @@ class DyLDHost {
       fs.createWriteStream(undefined, { fd: out_fd })
     );
   }
+
+  close() {}
 
   installSignalHandlers(cb) {
     process.on("SIGINT", cb);
@@ -345,6 +360,230 @@ class DyLDHost {
     return new Response(stream.Readable.toWeb(fs.createReadStream(p)), {
       headers: { "Content-Type": "application/wasm" },
     });
+  }
+}
+
+// Fulfill the same functionality as DyLDHost by doing fetch() calls
+// to respective RPC endpoints of a host http server. Also manages
+// WebSocket connections back to host.
+export class DyLDRPC {
+  #origin;
+  #wsPipe;
+  #wsSig;
+
+  constructor({ origin }) {
+    this.#origin = origin;
+
+    const ws_url = this.#origin.replace("http://", "ws://");
+
+    this.#wsPipe = new WebSocket(ws_url, "pipe");
+    this.#wsPipe.binaryType = "arraybuffer";
+
+    this.readStream = new ReadableStream({
+      start: (controller) => {
+        this.#wsPipe.addEventListener("message", (ev) =>
+          controller.enqueue(new Uint8Array(ev.data))
+        );
+        this.#wsPipe.addEventListener("error", (ev) => controller.error(ev));
+        this.#wsPipe.addEventListener("close", () => controller.close());
+      },
+    });
+
+    this.writeStream = new WritableStream({
+      start: (controller) => {
+        this.#wsPipe.addEventListener("error", (ev) => controller.error(ev));
+      },
+      write: (buf) => this.#wsPipe.send(buf),
+    });
+
+    this.#wsSig = new WebSocket(ws_url, "sig");
+    this.#wsSig.binaryType = "arraybuffer";
+
+    this.opened = Promise.all(
+      [this.#wsPipe, this.#wsSig].map(
+        (ws) =>
+          new Promise((res, rej) => {
+            ws.addEventListener("open", res);
+            ws.addEventListener("error", rej);
+          })
+      )
+    );
+  }
+
+  close() {
+    this.#wsPipe.close();
+    this.#wsSig.close();
+  }
+
+  async #rpc(endpoint, ...args) {
+    const r = await fetch(`${this.#origin}/rpc/${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(args),
+    });
+    if (!r.ok) {
+      throw new Error(await r.text());
+    }
+    return r.json();
+  }
+
+  installSignalHandlers(cb) {
+    this.#wsSig.addEventListener("message", cb);
+  }
+
+  async addLibrarySearchPath(p) {
+    return this.#rpc("addLibrarySearchPath", p);
+  }
+
+  async findSystemLibrary(f) {
+    return this.#rpc("findSystemLibrary", f);
+  }
+
+  async fetchWasm(p) {
+    return fetch(`${this.#origin}/fs${p}`);
+  }
+}
+
+// Actual implementation of endpoints used by DyLDRPC
+class DyLDRPCServer {
+  #dyldHost = new DyLDHost();
+  #server;
+  #wss;
+
+  constructor({ host, port, dyldPath, libdir, ghciSoPath, args }) {
+    this.#server = http.createServer(async (req, res) => {
+      const origin = originFromServerAddress(await this.listening);
+
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Headers", "*");
+
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      if (req.url === "/main.html") {
+        res.writeHead(200, {
+          "Content-Type": "text/html",
+        });
+        res.end(
+          `
+<!DOCTYPE html>
+<title>wasm ghci</title>
+<script type="module" src="./main.js"></script>
+`
+        );
+        return;
+      }
+
+      if (req.url === "/main.js") {
+        res.writeHead(200, {
+          "Content-Type": "application/javascript",
+        });
+        res.end(
+          `
+import { DyLDRPC, main } from "./fs${dyldPath}";
+const args = ${JSON.stringify({ libdir, ghciSoPath, args })};
+args.rpc = new DyLDRPC({origin: "${origin}"});
+args.rpc.opened.then(() => main(args));
+`
+        );
+        return;
+      }
+
+      if (req.url.startsWith("/fs")) {
+        const p = req.url.replace("/fs", "");
+
+        res.setHeader(
+          "Content-Type",
+          {
+            ".mjs": "application/javascript",
+            ".so": "application/wasm",
+          }[path.extname(p)] || "application/octet-stream"
+        );
+
+        const buf = Buffer.from(await fs.promises.readFile(p));
+        const etag = `sha512-${Buffer.from(
+          await crypto.subtle.digest("SHA-512", buf)
+        ).toString("base64")}`;
+
+        res.setHeader("ETag", etag);
+
+        if (req.headers["if-none-match"] === etag) {
+          res.writeHead(304);
+          res.end();
+          return;
+        }
+
+        res.writeHead(200);
+        res.end(buf);
+        return;
+      }
+
+      if (req.url.startsWith("/rpc")) {
+        const endpoint = req.url.replace("/rpc/", "");
+
+        let body = "";
+        for await (const chunk of req) {
+          body += chunk;
+        }
+
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+        });
+        res.end(
+          JSON.stringify(await this.#dyldHost[endpoint](...JSON.parse(body)))
+        );
+        return;
+      }
+
+      res.writeHead(404, {
+        "Content-Type": "text/plain",
+      });
+      res.end("not found");
+    });
+
+    this.closed = new Promise((res) => this.#server.on("close", res));
+
+    this.#wss = new ws.WebSocketServer({ server: this.#server });
+    this.#wss.on("connection", (ws) => {
+      ws.addEventListener("error", () => {
+        this.#wss.close();
+        this.#server.close();
+      });
+
+      ws.addEventListener("close", () => {
+        this.#wss.close();
+        this.#server.close();
+      });
+
+      if (ws.protocol === "pipe") {
+        (async () => {
+          for await (const buf of this.#dyldHost.readStream) {
+            ws.send(buf);
+          }
+        })();
+        const writer = this.#dyldHost.writeStream.getWriter();
+        ws.addEventListener("message", (ev) =>
+          writer.write(new Uint8Array(ev.data))
+        );
+        return;
+      }
+
+      if (ws.protocol === "sig") {
+        this.#dyldHost.installSignalHandlers(() => ws.send(new Uint8Array(0)));
+        return;
+      }
+
+      throw new Error(`unknown protocol ${ws.protocol}`);
+    });
+
+    this.listening = new Promise((res) =>
+      this.#server.listen({ host, port }, () => res(this.#server.address()))
+    );
   }
 }
 
@@ -821,37 +1060,76 @@ class DyLD {
   }
 }
 
-const rpc = new DyLDHost();
+export async function main({ rpc, libdir, ghciSoPath, args }) {
+  try {
+    const dyld = new DyLD({
+      args: ["dyld.so", ...args],
+      rpc,
+    });
+    await dyld.addLibrarySearchPath(libdir);
+    await dyld.loadDLL(ghciSoPath);
 
-if (isNode) {
-  // sysroot libdir that contains libc.so etc
-  const libdir = process.argv[2],
-    ghci_so_path = process.argv[3];
+    const reader = rpc.readStream.getReader();
+    const writer = rpc.writeStream.getWriter();
 
-  const dyld = new DyLD({
-    args: ["dyld.so", ...process.argv.slice(6)],
-    rpc,
-  });
-  await dyld.addLibrarySearchPath(libdir);
-  await dyld.loadDLL(ghci_so_path);
+    const cb_sig = (cb) => {
+      rpc.installSignalHandlers(cb);
+    };
 
-  const reader = rpc.readStream.getReader();
-  const writer = rpc.writeStream.getWriter();
+    const cb_recv = async () => {
+      const { done, value } = await reader.read();
+      if (done) {
+        throw new Error("not enough bytes");
+      }
+      return value;
+    };
+    const cb_send = (buf) => {
+      writer.write(new Uint8Array(buf));
+    };
 
-  const cb_sig = (cb) => {
-    rpc.installSignalHandlers(cb);
-  };
-
-  const cb_recv = async () => {
-    const { done, value } = await reader.read();
-    if (done) {
-      throw new Error("not enough bytes");
-    }
-    return value;
-  };
-  const cb_send = (buf) => {
-    writer.write(new Uint8Array(buf));
-  };
-
-  await dyld.exportFuncs.defaultServer(cb_sig, cb_recv, cb_send);
+    await dyld.exportFuncs.defaultServer(cb_sig, cb_recv, cb_send);
+  } finally {
+    rpc.close();
+  }
 }
+
+(async () => {
+  if (!isNode) {
+    return;
+  }
+
+  const libdir = process.argv[2];
+  const ghciSoPath = process.argv[3];
+  const args = process.argv.slice(6);
+
+  if (!process.env.GHCI_BROWSER) {
+    const rpc = new DyLDHost();
+    await main({
+      rpc,
+      libdir,
+      ghciSoPath,
+      args,
+    });
+    return;
+  }
+
+  if (!ws) {
+    throw new Error(
+      "Please install ws and ensure it's available via NODE_PATH"
+    );
+  }
+
+  const server = new DyLDRPCServer({
+    host: process.env.GHCI_BROWSER_HOST || "127.0.0.1",
+    port: process.env.GHCI_BROWSER_PORT || 0,
+    dyldPath: import.meta.filename,
+    libdir,
+    ghciSoPath,
+    args,
+  });
+  const origin = originFromServerAddress(await server.listening);
+
+  console.log(
+    `Open ${origin}/main.html or import ${origin}/main.js to boot ghci`
+  );
+})();
