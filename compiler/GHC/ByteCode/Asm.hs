@@ -730,7 +730,7 @@ assembleI platform i = case i of
   RETURN rep               -> emit_ (return_non_tuple rep) []
   RETURN_TUPLE             -> emit_ bci_RETURN_T []
   CCALL off m_addr i       -> do np <- addr m_addr
-                                 _emit bci_CCALL [wOp off, Op np, SmallOp i]
+                                 emit_ bci_CCALL [wOp off, Op np, SmallOp i]
   PRIMCALL                 -> emit_ bci_PRIMCALL []
 
   OP_ADD w -> case w of
