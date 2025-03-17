@@ -42,12 +42,12 @@ import GHCi.UI.Print
 import GHC.Runtime.Debugger
 import GHC.Runtime.Debugger.Breakpoints
 import GHC.Runtime.Eval (mkTopLevEnv)
+import GHC.Runtime.Eval.Utils
 
 -- The GHC interface
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GHCi.BreakArray( breakOn, breakOff )
-import GHC.ByteCode.Types
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.PatSyn
@@ -130,7 +130,7 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
-import Data.List ( elemIndices, find, intercalate, intersperse, minimumBy,
+import Data.List ( find, intercalate, intersperse, minimumBy,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
@@ -4094,62 +4094,12 @@ breakByModuleLine md line args
 -- See Note [Setting Breakpoints by Id]
 breakById :: GhciMonad m => String -> m ()                          -- #3000
 breakById inp = do
-    let (mod_str, top_level, fun_str) = splitIdent inp
-        mod_top_lvl = combineModIdent mod_str top_level
-    mb_mod <- catch (lookupModuleInscope mod_top_lvl)
-                    (\(_ :: SomeException) -> lookupModuleInGraph mod_str)
-      -- If the top-level name is not in scope, `lookupModuleInscope` will
-      -- throw an exception, then lookup the module name in the module graph.
-    mb_err_msg <- validateBP mod_str fun_str mb_mod
-    case mb_err_msg of
-        Just err_msg -> printForUser $
-          text "Cannot set breakpoint on" <+> quotes (text inp)
-          <> text ":" <+> err_msg
-        Nothing -> do
-          -- No errors found, go and set the breakpoint
-          mb_mod_info  <- GHC.getModuleInfo $ fromJust mb_mod
-          let modBreaks = case mb_mod_info of
-                (Just mod_info) -> GHC.modInfoModBreaks mod_info
-                Nothing         -> emptyModBreaks
-          findBreakAndSet (fromJust mb_mod) $ \_ -> findBreakForBind fun_str modBreaks
-  where
-    -- Try to lookup the module for an identifier that is in scope.
-    -- `parseName` throws an exception, if the identifier is not in scope
-    lookupModuleInscope :: GhciMonad m => String -> m (Maybe Module)
-    lookupModuleInscope mod_top_lvl = do
-        names <- GHC.parseName mod_top_lvl
-        pure $ Just $ NE.head $ GHC.nameModule <$> names
-
-    -- Lookup the Module of a module name in the module graph
-    lookupModuleInGraph :: GhciMonad m => String -> m (Maybe Module)
-    lookupModuleInGraph mod_str = do
-        graph <- GHC.getModuleGraph
-        let hmods = ms_mod <$> GHC.mgModSummaries graph
-        pure $ find ((== mod_str) . showModule) hmods
-
-    -- Check validity of an identifier to set a breakpoint:
-    --  1. The module of the identifier must exist
-    --  2. the identifier must be in an interpreted module
-    --  3. the ModBreaks array for module `mod` must have an entry
-    --     for the function
-    validateBP :: GhciMonad m => String -> String -> Maybe Module
-                       -> m (Maybe SDoc)
-    validateBP mod_str fun_str Nothing = pure $ Just $ quotes (text
-        (combineModIdent mod_str (Prelude.takeWhile (/= '.') fun_str)))
-        <+> text "not in scope"
-    validateBP _ "" (Just _) = pure $ Just $ text "Function name is missing"
-    validateBP _ fun_str (Just modl) = do
-        isInterpr <- GHC.moduleIsInterpreted modl
-        (_, decls) <- getModBreak modl
-        mb_err_msg <- case isInterpr of
-          False -> pure $ Just $ text "Module" <+> quotes (ppr modl)
-                        <+> text "is not interpreted"
-          True -> case fun_str `elem` (declPath <$> elems decls) of
-                False -> pure $ Just $
-                   text "No breakpoint found for" <+> quotes (text fun_str)
-                   <+> "in module" <+> quotes (ppr modl)
-                True  -> pure Nothing
-        pure mb_err_msg
+  mb_error <- resolveFunctionBreakpoint inp
+  case mb_error of
+    Left sdoc -> printForUser sdoc
+    Right (mod, mod_info, fun_str) -> do
+      let modBreaks = GHC.modInfoModBreaks mod_info
+      findBreakAndSet mod $ \_ -> findBreakForBind fun_str modBreaks
 
 breakSyntax :: a
 breakSyntax = throwGhcException $ CmdLineError ("Syntax: :break [<mod>.]<func>[.<func>]\n"
@@ -4427,15 +4377,6 @@ turnBreakOnOff onOff loc
       setBreakFlag (breakModule loc) (breakTick loc)  onOff
       return loc { breakEnabled = onOff }
 
-getModBreak :: GHC.GhcMonad m
-            => Module -> m (Array Int SrcSpan, Array Int [String])
-getModBreak m = do
-   mod_info      <- fromMaybe (panic "getModBreak") <$> GHC.getModuleInfo m
-   let modBreaks  = GHC.modInfoModBreaks mod_info
-   let ticks      = GHC.modBreaks_locs  modBreaks
-   let decls      = GHC.modBreaks_decls modBreaks
-   return (ticks, decls)
-
 setBreakFlag :: GhciMonad m => Module -> Int -> Bool ->m ()
 setBreakFlag  md ix enaDisa = do
   let enaDisaToCount True = breakOn
@@ -4601,38 +4542,3 @@ clearCaches = discardActiveBreakPoints
               >> disableUnusedPackages
               >> clearHPTs
 
-
-
--- Split up a string with an eventually qualified declaration name into 3 components
---   1. module name
---   2. top-level decl
---   3. full-name of the eventually nested decl, but without module qualification
--- eg  "foo"           = ("", "foo", "foo")
---     "A.B.C.foo"     = ("A.B.C", "foo", "foo")
---     "M.N.foo.bar"   = ("M.N", "foo", "foo.bar")
-splitIdent :: String -> (String, String, String)
-splitIdent [] = ("", "", "")
-splitIdent inp@(a : _)
-    | (isUpper a) = case fixs of
-        []            -> (inp, "", "")
-        (i1 : [] )    -> (upto i1, from i1, from i1)
-        (i1 : i2 : _) -> (upto i1, take (i2 - i1 - 1) (from i1), from i1)
-    | otherwise = case ixs of
-        []            -> ("", inp, inp)
-        (i1 : _)      -> ("", upto i1, inp)
-  where
-    ixs = elemIndices '.' inp        -- indices of '.' in whole input
-    fixs = dropWhile isNextUc ixs    -- indices of '.' in function names              --
-    isNextUc ix = isUpper $ safeInp !! (ix+1)
-    safeInp = inp ++ " "
-    upto i = take i inp
-    from i = drop (i + 1) inp
-
--- Qualify an identifier name with a module name
--- combineModIdent "A" "foo"  =  "A.foo"
--- combineModIdent ""  "foo"  =  "foo"
-combineModIdent :: String -> String -> String
-combineModIdent mod ident
-          | null mod   = ident
-          | null ident = mod
-          | otherwise  = mod ++ "." ++ ident
