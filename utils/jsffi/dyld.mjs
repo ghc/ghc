@@ -1129,6 +1129,84 @@ export async function main({ rpc, libdir, ghciSoPath, args }) {
   });
   const origin = originFromServerAddress(await server.listening);
 
+  // https://pptr.dev/api/puppeteer.consolemessage
+  // https://playwright.dev/docs/api/class-consolemessage
+  const on_console_msg = (msg) => {
+    switch (msg.type()) {
+      case "error":
+      case "warn":
+      case "warning":
+      case "trace":
+      case "assert": {
+        console.error(msg.text());
+        break;
+      }
+      default: {
+        console.log(msg.text());
+        break;
+      }
+    }
+  };
+
+  if (process.env.GHCI_BROWSER_PUPPETEER_LAUNCH_OPTS) {
+    let puppeteer;
+    try {
+      puppeteer = require("puppeteer");
+    } catch {
+      puppeteer = require("puppeteer-core");
+    }
+
+    // https://pptr.dev/api/puppeteer.puppeteernode.launch
+    const browser = await puppeteer.launch(
+      JSON.parse(process.env.GHCI_BROWSER_PUPPETEER_LAUNCH_OPTS)
+    );
+    try {
+      const page = await browser.newPage();
+
+      // https://pptr.dev/api/puppeteer.pageevent
+      page.on("console", on_console_msg);
+      page.on("error", (err) => console.error(err));
+      page.on("pageerror", (err) => console.error(err));
+
+      await page.goto(`${origin}/main.html`);
+      await server.closed;
+      return;
+    } finally {
+      await browser.close();
+    }
+  }
+
+  if (process.env.GHCI_BROWSER_PLAYWRIGHT_BROWSER_TYPE) {
+    let playwright;
+    try {
+      playwright = require("playwright");
+    } catch {
+      playwright = require("playwright-core");
+    }
+
+    // https://playwright.dev/docs/api/class-browsertype#browser-type-launch
+    const browser = await playwright[
+      process.env.GHCI_BROWSER_PLAYWRIGHT_BROWSER_TYPE
+    ].launch(
+      process.env.GHCI_BROWSER_PLAYWRIGHT_LAUNCH_OPTS
+        ? JSON.parse(process.env.GHCI_BROWSER_PLAYWRIGHT_LAUNCH_OPTS)
+        : {}
+    );
+    try {
+      const page = await browser.newPage();
+
+      // https://playwright.dev/docs/api/class-page#events
+      page.on("console", on_console_msg);
+      page.on("pageerror", (err) => console.error(err));
+
+      await page.goto(`${origin}/main.html`);
+      await server.closed;
+      return;
+    } finally {
+      await browser.close();
+    }
+  }
+
   console.log(
     `Open ${origin}/main.html or import ${origin}/main.js to boot ghci`
   );
