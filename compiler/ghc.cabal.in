@@ -699,6 +699,7 @@ Library
         GHC.Runtime.Debugger.Breakpoints
         GHC.Runtime.Eval
         GHC.Runtime.Eval.Types
+        GHC.Runtime.Eval.Utils
         GHC.Runtime.Heap.Inspect
         GHC.Runtime.Heap.Layout
         GHC.Runtime.Interpreter
