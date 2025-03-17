@@ -423,7 +423,9 @@ class DyLD {
   // WebAssembly.Module in loadDLL logic. This way we can harness some
   // background parallelism.
   async #downsweep(p) {
-    const soname = path.basename(p);
+    const toks = p.split("/");
+
+    const soname = toks[toks.length - 1];
 
     if (this.#loadedSos.has(soname)) {
       return [];
@@ -432,11 +434,12 @@ class DyLD {
     // Do this before loading dependencies to break potential cycles.
     this.#loadedSos.add(soname);
 
-    if (path.isAbsolute(p)) {
+    if (p.startsWith("/")) {
       // GHC may attempt to load libghc_tmp_2.so that needs
       // libghc_tmp_1.so in a temporary directory without adding that
       // directory via addLibrarySearchPath
-      this.addLibrarySearchPath(path.dirname(p));
+      toks.pop();
+      this.addLibrarySearchPath(toks.join("/"));
     } else {
       p = await this.findSystemLibrary(p);
     }
