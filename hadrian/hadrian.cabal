@@ -191,4 +191,4 @@ executable hadrian
     if flag(selftest)
       other-modules:   Rules.Selftest
       cpp-options:     -DHADRIAN_ENABLE_SELFTEST
-      build-depends:   QuickCheck           >= 2.6     && < 2.15
+      build-depends:   QuickCheck           >= 2.6     && < 2.16
