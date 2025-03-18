@@ -365,9 +365,12 @@ ppAst :: Data a => a -> String
 ppAst ast = showSDocUnsafe $ showAstData BlankSrcSpanFile NoBlankEpAnnotations ast
 
 
+useGhcCpp :: Bool
+useGhcCpp = True
+
 parseOneFile :: FilePath -> FilePath -> IO (ParsedSource, [Located Token])
 parseOneFile libdir fileName = do
-  res <- parseModuleEpAnnsWithCpp libdir defaultCppOptions fileName
+  res <- parseModuleEpAnnsWithCpp libdir useGhcCpp defaultCppOptions fileName
   case res of
     Left m -> error (showErrorMessages m)
     Right (injectedComments, _dflags, pmod) -> do

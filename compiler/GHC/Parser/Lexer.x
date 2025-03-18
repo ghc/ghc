@@ -1010,6 +1010,7 @@ data Token
 
   -- GHC CPP extension. See Note [GhcCPP Token]
   | ITcpp Bool FastString      PsSpan -- ^ CPP #-prefixed line, or continuation.
+  | ITcppIgnored               PsSpan -- ^ Token being ignored by GHC_CPP. We only care about the locations.
   deriving Show
 
 instance Outputable Token where
@@ -3755,7 +3756,11 @@ queueIgnoredToken (L l tok) = do
   ll <- getLastLocIncludingComments
   let
      -- TODO:AZ: make the tok the right type
-     comment = mkLEpaComment l ll (EpaCppIgnored [L l (show tok)])
+     -- comment = mkLEpaComment l ll (EpaCppIgnored [L l (show tok)])
+     -- comment = commentToAnnotation tok
+     comment = case tok of
+                 ITcpp{} -> commentToAnnotation (L l tok)
+                 _       -> commentToAnnotation (L l (ITcppIgnored ll))
      push c = P $ \s  -> POk s {
           comment_q = c : comment_q s
           } ()
@@ -3832,8 +3837,19 @@ commentToAnnotation (L l (ITdocComment s ll))   = mkLEpaComment l ll (EpaDocComm
 commentToAnnotation (L l (ITdocOptions s ll))   = mkLEpaComment l ll (EpaDocOptions s)
 commentToAnnotation (L l (ITlineComment s ll))  = mkLEpaComment l ll (EpaLineComment s)
 commentToAnnotation (L l (ITblockComment s ll)) = mkLEpaComment l ll (EpaBlockComment s)
-commentToAnnotation (L l (ITcpp _ s ll))        = mkLEpaComment l ll (EpaLineComment (unpackFS s))
+commentToAnnotation (L l (ITcpp _ s ll))        = mkLEpaComment l ll (EpaCpp (unpackFS s))
+commentToAnnotation (L l (ITcppIgnored ll))     = mkLEpaComment l ll (EpaCppIgnored "")
 commentToAnnotation _                           = panic "commentToAnnotation"
+
+{-
+Note [ITcppIgnored]
+~~~~~~~~~~~~~~~~~~~
+This is injected by the GHC_CPP preprocessor to store the locations of
+tokens skipped from a CPP conditional. Most tokens do not have source
+with them, we simply record that it has occurred, with its location
+and the prior token location. The post-processing in exact printing
+adds the appropriate source string.
+-}
 
 -- see Note [PsSpan in Comments]
 mkLEpaComment :: PsSpan -> PsSpan -> EpaCommentTok -> LEpaComment
