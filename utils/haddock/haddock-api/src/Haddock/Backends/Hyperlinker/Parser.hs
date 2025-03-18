@@ -194,6 +194,7 @@ classify tok =
     ITas -> TkKeyword
     ITcase -> TkKeyword
     ITcpp{} -> TkCpp
+    ITcppIgnored{} -> TkCpp
     ITclass -> TkKeyword
     ITdata -> TkKeyword
     ITdefault -> TkKeyword
