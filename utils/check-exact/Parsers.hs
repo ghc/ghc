@@ -104,7 +104,8 @@ runParser parser flags filename str = GHC.unP parser parseState
     where
       location = GHC.mkRealSrcLoc (GHC.mkFastString filename) 1 1
       buffer = GHC.stringToStringBuffer str
-      parseState = GHC.initParserState (GHC.initParserOpts flags) buffer location
+      -- parseState = GHC.initParserState (GHC.initParserOpts flags) buffer location
+      parseState = GHC.initParserStateWithMacros flags Nothing (GHC.initParserOpts flags) buffer location
 
 -- ---------------------------------------------------------------------
 
@@ -207,7 +208,7 @@ parseModuleWithCpp
   -> FilePath -- ^ File to be parsed
   -> IO (ParseResult GHC.ParsedSource)
 parseModuleWithCpp libdir cpp fp = do
-  res <- parseModuleEpAnnsWithCpp libdir cpp fp
+  res <- parseModuleEpAnnsWithCpp libdir False cpp fp
   return $ postParseTransform res
 
 -- ---------------------------------------------------------------------
@@ -217,6 +218,7 @@ parseModuleWithCpp libdir cpp fp = do
 -- this function.
 parseModuleEpAnnsWithCpp
   :: LibDir -- ^ GHC libdir
+  -> Bool -- ^ Use GhcCpp
   -> CppOptions
   -> FilePath -- ^ File to be parsed
   -> IO
@@ -224,15 +226,55 @@ parseModuleEpAnnsWithCpp
            GHC.ErrorMessages
            ([GHC.LEpaComment], GHC.DynFlags, GHC.ParsedSource)
        )
-parseModuleEpAnnsWithCpp libdir cppOptions file = ghcWrapper libdir $ do
+parseModuleEpAnnsWithCpp libdir useGhcCpp cppOptions file = ghcWrapper libdir $ do
   dflags <- initDynFlags file
-  parseModuleEpAnnsWithCppInternal cppOptions dflags file
+  if useGhcCpp
+     then parseModuleEpAnnsWithGhcCppInternal cppOptions dflags file
+     else parseModuleEpAnnsWithCppInternal cppOptions dflags file
 
 -- | Internal function. Default runner of GHC.Ghc action in IO.
 ghcWrapper :: LibDir -> GHC.Ghc a -> IO a
 ghcWrapper libdir a =
   GHC.defaultErrorHandler GHC.defaultFatalMessager GHC.defaultFlushOut
     $ GHC.runGhc (Just libdir) a
+
+
+-- | Internal function. Exposed if you want to muck with DynFlags
+-- before parsing.
+parseModuleEpAnnsWithGhcCppInternal
+  :: GHC.GhcMonad m
+  => CppOptions
+  -> GHC.DynFlags
+  -> FilePath
+  -> m
+       ( Either
+           GHC.ErrorMessages
+           ([GHC.LEpaComment], GHC.DynFlags, GHC.ParsedSource)
+       )
+parseModuleEpAnnsWithGhcCppInternal cppOptions dflags file = do
+  let useCpp = GHC.xopt LangExt.Cpp dflags
+  (fileContents, injectedComments, dflags') <-
+    if useCpp
+      then do
+        -- (contents,dflags1) <- getPreprocessedSrcDirect cppOptions file
+        -- cppComments <- getCppTokensAsComments cppOptions file
+        -- return (contents,cppComments,dflags1)
+        txt <- GHC.liftIO $ readFileGhc file
+        -- let (contents1,lp) = stripLinePragmas txt
+        let (contents1,lp) = (txt, [])
+        let no_cpp_dflags = GHC.xopt_unset dflags  LangExt.GhcCpp
+        return (contents1, lp, GHC.xopt_set no_cpp_dflags LangExt.GhcCpp)
+      else do
+        txt <- GHC.liftIO $ readFileGhc file
+        let (contents1,lp) = stripLinePragmas txt
+        return (contents1,lp,dflags)
+  return $
+    case parseFile dflags' file fileContents of
+      GHC.PFailed pst
+        -> Left (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
+      GHC.POk _ pmod
+        -> Right $ (injectedComments, dflags', fixModuleComments pmod)
+
 
 -- | Internal function. Exposed if you want to muck with DynFlags
 -- before parsing.

@@ -445,8 +445,8 @@ ghcCommentText (L _ (GHC.EpaComment (EpaDocComment s) _))      = exactPrintHsDoc
 ghcCommentText (L _ (GHC.EpaComment (EpaDocOptions s) _))      = s
 ghcCommentText (L _ (GHC.EpaComment (EpaLineComment s) _))     = s
 ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s
-ghcCommentText (L _ (GHC.EpaComment (EpaCppIgnored [L _ s]) _))= s
-ghcCommentText (L _ (GHC.EpaComment (EpaCppIgnored _) _))      = ""
+ghcCommentText (L _ (GHC.EpaComment (EpaCpp s) _))             = s
+ghcCommentText (L _ (GHC.EpaComment (EpaCppIgnored s) _))      = s
 
 tokComment :: LEpaComment -> [Comment]
 tokComment t@(L lt c) =
