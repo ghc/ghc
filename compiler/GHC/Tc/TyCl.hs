@@ -3744,7 +3744,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
                 -- For H98 datatypes, the user-written tyvar binders are precisely
                 -- the universals followed by the existentials.
                 -- See Note [DataCon user type variable binders] in GHC.Core.DataCon.
-             user_tvbs = univ_tvbs ++ ex_tvbs
+             user_tvbs = tyVarSpecToBinders $ univ_tvbs ++ ex_tvbs
              user_res_ty = mkDDHeaderTy dd_info rep_tycon tc_bndrs
 
        ; traceTc "tcConDecl 2" (ppr name)
@@ -3813,12 +3813,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; traceTc "tcConDecl:GADT" (ppr names $$ ppr res_ty $$ ppr tkvs)
        ; reportUnsolvedEqualities skol_info tkvs tclvl wanted
 
-       -- No visible forall in data constructors yet (tracking issue: #25127)
-       ; tvbs' <- forM tvbs $ \case
-           Bndr v (Invisible spec) -> return (Bndr v spec)
-           Bndr _ Required -> failWithTc (TcRnVDQInTermType Nothing)
-
-       ; let tvbndrs = mkTyVarBinders InferredSpec tkvs ++ tvbs'
+       ; let tvbndrs = mkTyVarBinders Inferred tkvs ++ tvbs
 
        -- Zonk to Types
        ; (tvbndrs, arg_tys, ctxt, res_ty) <- initZonkEnv NoFlexi $
@@ -4106,11 +4101,11 @@ errors reported in one pass.  See #7175, and #10836.
 rejigConRes :: [KnotTied TyConBinder]  -- Template for result type; e.g.
             -> KnotTied Type           -- data instance T [a] b c ...
                                        --      gives template ([a,b,c], T [a] b c)
-            -> [InvisTVBinder]    -- The constructor's type variables (both inferred and user-written)
+            -> [TyVarBinder]      -- The constructor's type variables (both inferred and user-written)
             -> KnotTied Type      -- res_ty
             -> ([TyVar],          -- Universal
                 [TyVar],          -- Existential (distinct OccNames from univs)
-                [InvisTVBinder],  -- The constructor's rejigged, user-written
+                [TyVarBinder],    -- The constructor's rejigged, user-written
                                   -- type variables
                 [EqSpec],         -- Equality predicates
                 Subst)            -- Substitution to apply to argument types

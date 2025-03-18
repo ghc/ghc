@@ -489,7 +489,7 @@ mkDictSelId name clas
 
     pred_ty = mkClassPred clas (mkTyVarTys (binderVars tyvars))
     res_ty  = scaledThing (getNth arg_tys val_index)
-    sel_ty  = mkInvisForAllTys tyvars $
+    sel_ty  = mkForAllTys tyvars $
               mkFunctionType ManyTy pred_ty res_ty
              -- See Note [Type classes and linear types]
 

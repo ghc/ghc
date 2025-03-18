@@ -463,7 +463,7 @@ data DataCon
         --    with the set of dcUnivTyVars whose tyvars do not appear in dcEqSpec
         -- So dcUserTyVarBinders is a subset of (dcUnivTyVars ++ dcExTyCoVars)
         -- See Note [DataCon user type variable binders]
-        dcUserTyVarBinders :: [InvisTVBinder],
+        dcUserTyVarBinders :: [TyVarBinder],
 
         dcEqSpec :: [EqSpec],   -- Equalities derived from the result type,
                                 -- _as written by the programmer_.
@@ -1144,7 +1144,7 @@ mkDataCon :: Name
           -> ConcreteTyVars
                                 -- ^ TyVars which must be instantiated with
                                 -- concrete types
-          -> [InvisTVBinder]    -- ^ User-written 'TyVarBinder's.
+          -> [TyVarBinder]      -- ^ User-written 'TyVarBinder's.
                                 --   These must be Inferred/Specified.
                                 --   See @Note [TyVarBinders in DataCons]@
           -> [EqSpec]           -- ^ GADT equalities
@@ -1225,8 +1225,8 @@ mkDataCon name declared_infix prom_info
                  -- Hence using mkScaledFunctionTys.
 
       -- See Note [Promoted data constructors] in GHC.Core.TyCon
-    prom_tv_bndrs = [ mkNamedTyConBinder (Invisible spec) tv
-                    | Bndr tv spec <- user_tvbs ]
+    prom_tv_bndrs = [ mkNamedTyConBinder vis tv
+                    | Bndr tv vis <- user_tvbs ]
 
     fresh_names = freshNames (map getName user_tvbs)
       -- fresh_names: make sure that the "anonymous" tyvars don't
@@ -1323,9 +1323,9 @@ dataConUserTyVars :: DataCon -> [TyVar]
 dataConUserTyVars (MkData { dcUserTyVarBinders = tvbs }) = binderVars tvbs
 
 -- See Note [DataCon user type variable binders]
--- | 'InvisTVBinder's for the type variables of the constructor, in the order the
+-- | 'TyVarBinder's for the type variables of the constructor, in the order the
 -- user wrote them
-dataConUserTyVarBinders :: DataCon -> [InvisTVBinder]
+dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
 dataConUserTyVarBinders = dcUserTyVarBinders
 
 -- | Dependent (kind-level) equalities in a constructor.
@@ -1574,7 +1574,7 @@ dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
                              dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                              dcOrigResTy = res_ty,
                              dcStupidTheta = stupid_theta })
-  = mkInvisForAllTys user_tvbs $
+  = mkForAllTys user_tvbs $
     mkInvisFunTys (stupid_theta ++ theta) $
     mkScaledFunTys arg_tys $
     res_ty
@@ -1586,7 +1586,7 @@ dataConNonlinearType (MkData { dcUserTyVarBinders = user_tvbs,
                                dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                                dcOrigResTy = res_ty,
                                dcStupidTheta = stupid_theta })
-  = mkInvisForAllTys user_tvbs $
+  = mkForAllTys user_tvbs $
     mkInvisFunTys (stupid_theta ++ theta) $
     mkScaledFunTys arg_tys' $
     res_ty

@@ -128,7 +128,7 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
           -- Only used for the defensive assertion that the selector has
           -- the expected type
           tyvars = dataConUserTyVarBinders (classDataCon cls)
-          expected_ty = mkInvisForAllTys tyvars $
+          expected_ty = mkForAllTys tyvars $
                         mkFunTy invisArgConstraintLike ManyTy
                                 (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
                                 (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
