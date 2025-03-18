@@ -502,7 +502,9 @@ mkDictSelId name clas
                 `setCprSigInfo` topCprSig
 
     info = base_info `setRuleInfo` mkRuleInfo [rule]
-           -- No unfolding for dictionary selectors
+           -- No unfolding for a dictionary selector; the RULE does the work,
+           -- Its curried definition is added by GHC.Iface.Tidy.getClassImplicitBinds,
+           -- using `mkDictSelRhs` below
 
     -- This is the built-in rule that goes
     --      op (dfT d1 d2) --->  opT d1 d2
