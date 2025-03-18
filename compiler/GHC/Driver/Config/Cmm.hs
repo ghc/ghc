@@ -24,5 +24,17 @@ initCmmConfig dflags = CmmConfig
   , cmmDoCmmSwitchPlans    = not (backendHasNativeSwitch (backend dflags))
   , cmmSplitProcPoints     = not (backendSupportsUnsplitProcPoints (backend dflags))
                              || not (platformTablesNextToCode platform)
+  , cmmAllowMul2           = (ncg && x86ish) || llvm
+  , cmmOptConstDivision    = not llvm
   }
   where platform                = targetPlatform dflags
+        -- Copied from StgToCmm
+        (ncg, llvm) = case backendPrimitiveImplementation (backend dflags) of
+                          GenericPrimitives -> (False, False)
+                          NcgPrimitives -> (True, False)
+                          LlvmPrimitives -> (False, True)
+                          JSPrimitives -> (False, False)
+        x86ish  = case platformArch platform of
+                    ArchX86    -> True
+                    ArchX86_64 -> True
+                    _          -> False

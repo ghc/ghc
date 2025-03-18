@@ -7,6 +7,7 @@ module GHC.Cmm.MachOp
     , pprMachOp, isCommutableMachOp, isAssociativeMachOp
     , isComparisonMachOp, maybeIntComparison, machOpResultType
     , machOpArgReps, maybeInvertComparison, isFloatComparison
+    , isCommutableCallishMachOp
 
     -- MachOp builders
     , mo_wordAdd, mo_wordSub, mo_wordEq, mo_wordNe,mo_wordMul, mo_wordSQuot
@@ -845,3 +846,17 @@ machOpMemcpyishAlign op = case op of
   MO_Memmove align -> Just align
   MO_Memcmp  align -> Just align
   _                -> Nothing
+
+isCommutableCallishMachOp :: CallishMachOp -> Bool
+isCommutableCallishMachOp op =
+  case op of
+    MO_x64_Add  -> True
+    MO_x64_Mul  -> True
+    MO_x64_Eq   -> True
+    MO_x64_Ne   -> True
+    MO_x64_And  -> True
+    MO_x64_Or   -> True
+    MO_x64_Xor  -> True
+    MO_S_Mul2 _ -> True
+    MO_U_Mul2 _ -> True
+    _ -> False
