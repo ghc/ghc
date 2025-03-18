@@ -20,6 +20,8 @@ import GHC.Platform.Regs
 
 import GHC.Platform
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.DSM
+import GHC.Cmm.Config
 
 import Data.List (partition)
 import Data.Maybe
@@ -150,9 +152,10 @@ type Assignments = [Assignment]
   --     y = e2
   --     x = e1
 
-cmmSink :: Platform -> CmmGraph -> CmmGraph
-cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
+cmmSink :: CmmConfig -> CmmGraph -> UniqDSM CmmGraph
+cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink mapEmpty blocks
   where
+  platform = cmmPlatform cfg
   liveness = cmmLocalLivenessL platform graph
   getLive l = mapFindWithDefault emptyLRegSet l liveness
 
@@ -160,11 +163,41 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
   join_pts = findJoinPoints blocks
 
-  sink :: LabelMap Assignments -> [CmmBlock] -> [CmmBlock]
-  sink _ [] = []
-  sink sunk (b:bs) =
-    -- pprTrace "sink" (ppr lbl) $
-    blockJoin first final_middle final_last : sink sunk' bs
+  sink :: LabelMap Assignments -> [CmmBlock] -> UniqDSM [CmmBlock]
+  sink _ [] = pure []
+  sink sunk (b:bs) = do
+    -- Now sink and inline in this block
+    (prepend, last_fold) <- runOpt cfg $ constantFoldNode last
+
+    (middle', assigs) <- walk cfg (ann_middles ++ annotate platform live_middle prepend) (mapFindWithDefault [] lbl sunk)
+
+    let (final_last, assigs') = tryToInline platform live last_fold assigs
+        -- Now, drop any assignments that we will not sink any further.
+        (dropped_last, assigs'') = dropAssignments platform drop_if init_live_sets assigs'
+        drop_if :: (LocalReg, CmmExpr, AbsMem)
+                      -> [LRegSet] -> (Bool, [LRegSet])
+        drop_if a@(r,rhs,_) live_sets = (should_drop, live_sets')
+            where
+              should_drop =  conflicts platform a final_last
+                          || not (isTrivial platform rhs) && live_in_multi live_sets r
+                          || r `elemLRegSet` live_in_joins
+
+              live_sets' | should_drop = live_sets
+                        | otherwise   = map upd live_sets
+
+              upd set | r `elemLRegSet` set = set `unionLRegSet` live_rhs
+                      | otherwise           = set
+
+              live_rhs = foldRegsUsed platform (flip insertLRegSet) emptyLRegSet rhs
+
+        final_middle = foldl' blockSnoc middle' dropped_last
+
+        sunk' = mapUnion sunk $
+                  mapFromList [ (l, filterAssignments platform (getLive l) assigs'')
+                              | l <- succs ]
+
+    (blockJoin first final_middle final_last :) <$> sink sunk' bs
+
     where
       lbl = entryLabel b
       (first, middle, last) = blockSplit b
@@ -177,11 +210,6 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       live = unionsLRegSet (map getLive succs)
       live_middle = gen_killL platform last live
       ann_middles = annotate platform live_middle (blockToList middle)
-
-      -- Now sink and inline in this block
-      (middle', assigs) = walk platform ann_middles (mapFindWithDefault [] lbl sunk)
-      fold_last = constantFoldNode platform last
-      (final_last, assigs') = tryToInline platform live fold_last assigs
 
       -- We cannot sink into join points (successors with more than
       -- one predecessor), so identify the join points and the set
@@ -199,31 +227,6 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
          case filter (elemLRegSet r) live_sets of
            (_one:_two:_) -> True
            _ -> False
-
-      -- Now, drop any assignments that we will not sink any further.
-      (dropped_last, assigs'') = dropAssignments platform drop_if init_live_sets assigs'
-
-      drop_if :: (LocalReg, CmmExpr, AbsMem)
-                      -> [LRegSet] -> (Bool, [LRegSet])
-      drop_if a@(r,rhs,_) live_sets = (should_drop, live_sets')
-          where
-            should_drop =  conflicts platform a final_last
-                        || not (isTrivial platform rhs) && live_in_multi live_sets r
-                        || r `elemLRegSet` live_in_joins
-
-            live_sets' | should_drop = live_sets
-                       | otherwise   = map upd live_sets
-
-            upd set | r `elemLRegSet` set = set `unionLRegSet` live_rhs
-                    | otherwise          = set
-
-            live_rhs = foldRegsUsed platform (flip insertLRegSet) emptyLRegSet rhs
-
-      final_middle = foldl' blockSnoc middle' dropped_last
-
-      sunk' = mapUnion sunk $
-                 mapFromList [ (l, filterAssignments platform (getLive l) assigs'')
-                             | l <- succs ]
 
 {- TODO: enable this later, when we have some good tests in place to
    measure the effect and tune it.
@@ -299,7 +302,7 @@ filterAssignments platform live assigs = reverse (go assigs [])
 --    * a list of assignments that will be placed *after* that block.
 --
 
-walk :: Platform
+walk :: CmmConfig
      -> [(LRegSet, CmmNode O O)]    -- nodes of the block, annotated with
                                         -- the set of registers live *after*
                                         -- this node.
@@ -309,36 +312,39 @@ walk :: Platform
                                         -- Earlier assignments may refer
                                         -- to later ones.
 
-     -> ( Block CmmNode O O             -- The new block
-        , Assignments                   -- Assignments to sink further
-        )
+     -> UniqDSM ( Block CmmNode O O             -- The new block
+               , Assignments                   -- Assignments to sink further
+               )
 
-walk platform nodes assigs = go nodes emptyBlock assigs
+walk cfg nodes assigs = go nodes emptyBlock assigs
  where
-   go []               block as = (block, as)
+   platform = cmmPlatform cfg
+   go []               block as = pure (block, as)
    go ((live,node):ns) block as
     -- discard nodes representing dead assignment
     | shouldDiscard node live             = go ns block as
-    -- sometimes only after simplification we can tell we can discard the node.
-    -- See Note [Discard simplified nodes]
-    | noOpAssignment node2                = go ns block as
-    -- Pick up interesting assignments
-    | Just a <- shouldSink platform node2 = go ns block (a : as1)
-    -- Try inlining, drop assignments and move on
-    | otherwise                           = go ns block' as'
-    where
-      -- Simplify node
-      node1 = constantFoldNode platform node
+    | otherwise = do
+      (prepend, node1) <- runOpt cfg $ constantFoldNode node
+      if not (null prepend)
+        then go (annotate platform live (prepend ++ [node1]) ++ ns) block as
+        else do
+          let -- Inline assignments
+              (node2, as1) = tryToInline platform live node1 as
+              -- Drop any earlier assignments conflicting with node2
+              (dropped, as') = dropAssignmentsSimple platform
+                                (\a -> conflicts platform a node2) as1
+              -- Walk over the rest of the block. Includes dropped assignments
+              block' = foldl' blockSnoc block dropped `blockSnoc` node2
 
-      -- Inline assignments
-      (node2, as1) = tryToInline platform live node1 as
-
-      -- Drop any earlier assignments conflicting with node2
-      (dropped, as') = dropAssignmentsSimple platform
-                          (\a -> conflicts platform a node2) as1
-
-      -- Walk over the rest of the block. Includes dropped assignments
-      block' = foldl' blockSnoc block dropped `blockSnoc` node2
+          (prepend2, node3) <- runOpt cfg $ constantFoldNode node2
+          if | not (null prepend2)                 -> go (annotate platform live (prepend2 ++ [node3]) ++ ns) block as
+             -- sometimes only after simplification we can tell we can discard the node.
+             -- See Note [Discard simplified nodes]
+             | noOpAssignment node3                -> go ns block as
+             -- Pick up interesting assignments
+             | Just a <- shouldSink platform node3 -> go ns block (a : as1)
+             -- Try inlining, drop assignments and move on
+             | otherwise                           -> go ns block' as'
 
 {- Note [Discard simplified nodes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
