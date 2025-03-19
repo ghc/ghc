@@ -1065,6 +1065,7 @@ instance NFData EpaCommentTok where
   rnf (EpaLineComment s) = rnf s
   rnf (EpaBlockComment s) = rnf s
   rnf (EpaCppIgnored s) = rnf s
+  rnf (EpaCpp s) = rnf s
 
 instance NFData PsSpan where
   rnf (PsSpan _l b) = {- l `deepseq` -} b `deepseq` ()
