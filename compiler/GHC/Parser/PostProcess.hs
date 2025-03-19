@@ -1028,7 +1028,7 @@ mkRuleBndrs ann tvbs tmbs
     cvt_sig Nothing    = HsBndrNoKind noExtField
     cvt_sig (Just sig) = HsBndrKind   noExtField sig
 
-checkRuleTyVarBndrNames :: [LRuleTyTmVar] -> P ()
+checkRuleTyVarBndrNames :: [LRuleTyTmVar] -> P p ()
 -- See Note [Parsing explicit foralls in Rules] in Parser.y
 checkRuleTyVarBndrNames bndrs
    = sequence_ [ check lname | L _ (RuleTyTmVar _ lname _) <- bndrs ]
@@ -1049,7 +1049,7 @@ mkSpecSig :: InlinePragma
           -> Maybe (RuleBndrs GhcPs)
           -> LHsExpr GhcPs
           -> Maybe (Located (TokDcolon, OrdList (LHsSigType GhcPs)))
-          -> P (Sig GhcPs)
+          -> P p (Sig GhcPs)
 mkSpecSig inl_prag activation_anns m_rule_binds expr m_sigtypes_ascr
   = case m_sigtypes_ascr of
       Nothing
