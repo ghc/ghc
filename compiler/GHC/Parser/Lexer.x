@@ -1010,7 +1010,7 @@ data Token
 
   -- GHC CPP extension. See Note [GhcCPP Token]
   | ITcpp Bool FastString      PsSpan -- ^ CPP #-prefixed line, or continuation.
-  | ITcppIgnored               PsSpan -- ^ Token being ignored by GHC_CPP. We only care about the locations.
+  | ITcppIgnored FastString    PsSpan -- ^ Token being ignored by GHC_CPP. We only care about the locations.
   deriving Show
 
 instance Outputable Token where
@@ -3762,19 +3762,27 @@ queueComment c = P $ \s -> POk s {
 
 queueIgnoredToken :: PsLocated Token -> P p ()
 queueIgnoredToken (L l tok) = do
-  ll <- getLastLocIncludingComments
+  comment <- case tok of
+               ITcpp{} -> return $ commentToAnnotation (L l tok)
+               _       -> do
+                 ll <- getLastLocIncludingComments
+                 str <- psSpanText l
+                 return $ commentToAnnotation (L l (ITcppIgnored str ll))
   let
-     -- TODO:AZ: make the tok the right type
-     -- comment = mkLEpaComment l ll (EpaCppIgnored [L l (show tok)])
-     -- comment = commentToAnnotation tok
-     comment = case tok of
-                 ITcpp{} -> commentToAnnotation (L l tok)
-                 _       -> commentToAnnotation (L l (ITcppIgnored ll))
      push c = P $ \s  -> POk s {
           comment_q = c : comment_q s
           } ()
   push comment
 
+psSpanText :: PsSpan -> P p FastString
+psSpanText l = do
+  (AI _ b) <- getInput
+  let
+    start_loc = bufPos $ bufSpanStart $ psBufSpan l
+    end_loc = bufPos $ bufSpanEnd $ psBufSpan l
+    len = end_loc - start_loc
+    b' = b { cur = start_loc }
+  return (lexemeToFastString b' len)
 
 allocateComments
   :: RealSrcSpan
@@ -3847,7 +3855,7 @@ commentToAnnotation (L l (ITdocOptions s ll))   = mkLEpaComment l ll (EpaDocOpti
 commentToAnnotation (L l (ITlineComment s ll))  = mkLEpaComment l ll (EpaLineComment s)
 commentToAnnotation (L l (ITblockComment s ll)) = mkLEpaComment l ll (EpaBlockComment s)
 commentToAnnotation (L l (ITcpp _ s ll))        = mkLEpaComment l ll (EpaCpp (unpackFS s))
-commentToAnnotation (L l (ITcppIgnored ll))     = mkLEpaComment l ll (EpaCppIgnored "")
+commentToAnnotation (L l (ITcppIgnored s ll))     = mkLEpaComment l ll (EpaCppIgnored (unpackFS s))
 commentToAnnotation _                           = panic "commentToAnnotation"
 
 {-
