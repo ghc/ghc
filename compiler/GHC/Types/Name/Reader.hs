@@ -457,6 +457,10 @@ lookupLocalRdrEnv (LRE { lre_env = env, lre_in_scope = ns }) rdr
   = Just name
 
   | otherwise
+  -- A qualified name is either imported, or refers to a top-level declaration
+  -- in the current module. This means that qualified names can't appear in the LocalRdrEnv.
+  --
+  -- See section 5.5.1 of the Haskell 2010 Report (www.haskell.org/onlinereport/haskell2010/haskellch5.html#x11-980005).
   = Nothing
 
 lookupLocalRdrOcc :: LocalRdrEnv -> OccName -> Maybe Name
