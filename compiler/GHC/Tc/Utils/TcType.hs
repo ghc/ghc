@@ -606,7 +606,8 @@ data TcTyVarDetails
                   --     how this level number is used
        Bool       -- True <=> this skolem type variable can be overlapped
                   --          when looking up instances
-                  -- See Note [Binding when looking up instances] in GHC.Core.InstEnv
+                  -- See Note [Super skolems: binding when looking up instances]
+                  --     in GHC.Core.InstEnv
 
   | RuntimeUnk    -- Stands for an as-yet-unknown type in the GHCi
                   -- interactive context

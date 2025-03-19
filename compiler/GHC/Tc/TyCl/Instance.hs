@@ -352,10 +352,9 @@ does the same thing; it shows up in module Fraction.hs.
 
 Conclusion: when typechecking the methods in a C [a] instance, we want to
 treat the 'a' as an *existential* type variable, in the sense described
-by Note [Binding when looking up instances].  That is why isOverlappableTyVar
-responds True to an InstSkol, which is the kind of skolem we use in
-tcInstDecl2.
-
+by Note [Super skolems: binding when looking up instances] in GHC.Core.InstEnv
+That is why isOverlappableTyVar responds True to an InstSkol, which is the kind
+of skolem we use in tcInstDecl2.
 
 Note [Tricky type variable scoping]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

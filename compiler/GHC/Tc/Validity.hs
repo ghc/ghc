@@ -2612,7 +2612,7 @@ checkConsistentFamInst (InClsInst { ai_class = clas
     -- The /scoped/ type variables from the class-instance header
     -- should not be alpha-renamed.  Inferred ones can be.
     no_bind_set = mkVarSet inst_tvs
-    bind_me tv _ty | tv `elemVarSet` no_bind_set = Apart
+    bind_me tv _ty | tv `elemVarSet` no_bind_set = DontBindMe
                    | otherwise                   = BindMe
 
 

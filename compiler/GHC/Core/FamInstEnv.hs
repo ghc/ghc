@@ -488,8 +488,8 @@ Here is how we do it:
 apart(target, pattern) = not (unify(flatten(target), pattern))
 
 where flatten (implemented in flattenTys, below) converts all type-family
-applications into fresh variables. (See
-Note [Flattening type-family applications when matching instances] in GHC.Core.Unify.)
+applications into fresh variables. (See Note [Apartness and type families]
+in GHC.Core.Unify.)
 
 Note [Compatibility]
 ~~~~~~~~~~~~~~~~~~~~
@@ -513,11 +513,11 @@ might be Int and therefore 'F a' should be Bool. We can simplify 'F a' to Int
 only when we can be sure that 'a' is not Int.
 
 To achieve this, after finding a possible match within the equations, we have to
-go back to all previous equations and check that, under the
-substitution induced by the match, other branches are surely apart. (See
-Note [Apartness].) This is similar to what happens with class
-instance selection, when we need to guarantee that there is only a match and
-no unifiers. The exact algorithm is different here because the
+go back to all previous equations and check that, under the substitution induced
+by the match, other branches are surely apart, using `tcUnifyTysFG`. (See
+Note [Apartness and type families] in GHC.Core.Unify.) This is similar to what
+happens with class instance selection, when we need to guarantee that there is
+only a match and no unifiers. The exact algorithm is different here because the
 potentially-overlapping group is closed.
 
 As another example, consider this:
@@ -580,7 +580,7 @@ fails anyway.
 compatibleBranches :: CoAxBranch -> CoAxBranch -> Bool
 compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
                    (CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
-  = case tcUnifyTysFG alwaysBindFun commonlhs1 commonlhs2 of
+  = case tcUnifyTysFG alwaysBindFam alwaysBindTv commonlhs1 commonlhs2 of
       -- Here we need the cab_tvs of the two branches to be disinct.
       -- See Note [CoAxBranch type variables] in GHC.Core.Coercion.Axiom.
       SurelyApart     -> True
@@ -611,7 +611,8 @@ injectiveBranches injectivity
   -- See Note [Verifying injectivity annotation], case 1.
   = let getInjArgs  = filterByList injectivity
         in_scope    = mkInScopeSetList (tvs1 ++ tvs2)
-    in case tcUnifyTyWithTFs True in_scope rhs1 rhs2 of -- True = two-way pre-unification
+    in case tcUnifyTyForInjectivity True in_scope rhs1 rhs2 of
+             -- True = two-way pre-unification
        Nothing -> InjectivityAccepted
          -- RHS are different, so equations are injective.
          -- This is case 1A from Note [Verifying injectivity annotation]
@@ -1229,22 +1230,16 @@ findBranch branches target_tys
        -> Maybe (BranchIndex, [Type], [Coercion])
     go (index, branch) other
       = let (CoAxBranch { cab_tvs = tpl_tvs, cab_cvs = tpl_cvs
-                        , cab_lhs = tpl_lhs
-                        , cab_incomps = incomps }) = branch
-            in_scope = mkInScopeSet (unionVarSets $
-                            map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
-            -- See Note [Flattening type-family applications when matching instances]
-            -- in GHC.Core.Unify
-            flattened_target = flattenTys in_scope target_tys
+                        , cab_lhs = tpl_lhs }) = branch
         in case tcMatchTys tpl_lhs target_tys of
-        Just subst -- matching worked. now, check for apartness.
-          |  apartnessCheck flattened_target branch
-          -> -- matching worked & we're apart from all incompatible branches.
+        Just subst -- Matching worked. now, check for apartness.
+          |  apartnessCheck target_tys branch
+          -> -- Matching worked & we're apart from all incompatible branches.
              -- success
              assert (all (isJust . lookupCoVar subst) tpl_cvs) $
              Just (index, substTyVars subst tpl_tvs, substCoVars subst tpl_cvs)
 
-        -- failure. keep looking
+        -- Failure. keep looking
         _ -> other
 
 -- | Do an apartness check, as described in the "Closed Type Families" paper
@@ -1252,15 +1247,12 @@ findBranch branches target_tys
 -- ('CoAxBranch') of a closed type family can be used to reduce a certain target
 -- type family application.
 apartnessCheck :: [Type]
-  -- ^ /flattened/ target arguments. Make sure they're flattened! See
-  -- Note [Flattening type-family applications when matching instances]
-  -- in GHC.Core.Unify.
-               -> CoAxBranch -- ^ the candidate equation we wish to use
+               -> CoAxBranch -- ^ The candidate equation we wish to use
                              -- Precondition: this matches the target
                -> Bool       -- ^ True <=> equation can fire
-apartnessCheck flattened_target (CoAxBranch { cab_incomps = incomps })
+apartnessCheck target (CoAxBranch { cab_incomps = incomps })
   = all (isSurelyApart
-         . tcUnifyTysFG alwaysBindFun flattened_target
+         . tcUnifyTysFG alwaysBindFam alwaysBindTv target
          . coAxBranchLHS) incomps
   where
     isSurelyApart SurelyApart = True

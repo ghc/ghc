@@ -1113,7 +1113,7 @@ co3 = axEq[1] (axId[0] Int) (axId[0] Bool)
   :: Equal (Id Int) (Id Bool) ~ False
 
 which is bogus! This is because the type system isn't smart enough to know
-that (Id Int) and (Id Bool) are Surely Apart, as they're headed by type
+that (Id Int) and (Id Bool) are SurelyApart, as they're headed by type
 families. At the time of writing, I (Richard Eisenberg) couldn't think of
 a way of detecting this any more efficient than just building the optimised
 coercion and checking.

@@ -12,7 +12,7 @@ module GHC.Core.TyCo.Compare (
     eqVarBndrs,
 
     pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck,
-    tcEqTyConApps,
+    tcEqTyConApps, tcEqTyConAppArgs,
     mayLookIdentical,
 
     -- * Type comparison
@@ -226,12 +226,14 @@ tcEqTypeNoKindCheck = eqTypeNoKindCheck
 -- are different, just checks the common prefix of arguments.
 tcEqTyConApps :: TyCon -> [Type] -> TyCon -> [Type] -> Bool
 tcEqTyConApps tc1 args1 tc2 args2
-  = tc1 == tc2 &&
-    and (zipWith tcEqTypeNoKindCheck args1 args2)
+  = tc1 == tc2 && tcEqTyConAppArgs args1 args2
+
+tcEqTyConAppArgs :: [Type] -> [Type] -> Bool
+tcEqTyConAppArgs args1 args2
+  = and (zipWith tcEqTypeNoKindCheck args1 args2)
     -- No kind check necessary: if both arguments are well typed, then
     -- any difference in the kinds of later arguments would show up
     -- as differences in earlier (dependent) arguments
-
 
 -- | Type equality on lists of types, looking through type synonyms
 eqTypes :: [Type] -> [Type] -> Bool

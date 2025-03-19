@@ -33,7 +33,7 @@ import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness c
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Reduction
-import GHC.Core.Unify( tcUnifyTyWithTFs )
+import GHC.Core.Unify( tcUnifyTyForInjectivity )
 import GHC.Core.FamInstEnv ( FamInstEnvs, FamInst(..), apartnessCheck
                            , lookupFamInstEnvByTyCon )
 import GHC.Core
@@ -2446,10 +2446,9 @@ More details:
 
      However, we make no attempt to detect cases like a ~ (F a, F a) and use the
      same tyvar to replace F a. The constraint solver will common them up later!
-     (Cf. Note [Flattening type-family applications when matching instances] in
-     GHC.Core.Unify, which goes to this extra effort.) However, this is really
-     a very small corner case.  The investment to craft a clever, performant
-     solution seems unworthwhile.
+     (Cf. Note [Apartness and type families] in GHC.Core.Unify, which goes to
+     this extra effort.) However, this is really a very small corner case.  The
+     investment to craft a clever, performant solution seems unworthwhile.
 
  (6) We often get the predicate associated with a constraint from its evidence
      with ctPred. We thus must not only make sure the generated CEqCan's fields
@@ -3035,7 +3034,7 @@ improve_injective_wanted_top fam_envs inj_args fam_tc lhs_tys rhs_ty
     do_one :: CoAxBranch -> TcS [TypeEqn]
     do_one branch@(CoAxBranch { cab_tvs = branch_tvs, cab_lhs = branch_lhs_tys, cab_rhs = branch_rhs })
       | let in_scope1 = in_scope `extendInScopeSetList` branch_tvs
-      , Just subst <- tcUnifyTyWithTFs False in_scope1 branch_rhs rhs_ty
+      , Just subst <- tcUnifyTyForInjectivity False in_scope1 branch_rhs rhs_ty
       = do { let inSubst tv = tv `elemVarEnv` getTvSubstEnv subst
                  unsubstTvs = filterOut inSubst branch_tvs
                  -- The order of unsubstTvs is important; it must be
@@ -3047,13 +3046,20 @@ improve_injective_wanted_top fam_envs inj_args fam_tc lhs_tys rhs_ty
                 -- be sure to apply the current substitution to a's kind.
                 -- Hence instFlexiX.   #13135 was an example.
 
+           ; traceTcS "improve_inj_top" $
+             vcat [ text "branch_rhs" <+> ppr branch_rhs
+                  , text "rhs_ty" <+> ppr rhs_ty
+                  , text "subst" <+> ppr subst
+                  , text "subst1" <+> ppr subst1 ]
            ; if apartnessCheck (substTys subst1 branch_lhs_tys) branch
-             then return (mkInjectivityEqns inj_args (map (substTy subst1) branch_lhs_tys) lhs_tys)
+             then do { traceTcS "improv_inj_top1" (ppr branch_lhs_tys)
+                     ; return (mkInjectivityEqns inj_args (map (substTy subst1) branch_lhs_tys) lhs_tys) }
                   -- NB: The fresh unification variables (from unsubstTvs) are on the left
                   --     See Note [Improvement orientation]
-             else return [] }
+             else do { traceTcS "improve_inj_top2" empty; return []  } }
       | otherwise
-      = return []
+      = do { traceTcS "improve_inj_top:fail" (ppr branch_rhs $$ ppr rhs_ty $$ ppr in_scope $$ ppr branch_tvs)
+           ; return [] }
 
     in_scope = mkInScopeSet (tyCoVarsOfType rhs_ty)
 
