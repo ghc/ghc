@@ -32,7 +32,7 @@ import GHC.Core.InstEnv     ( DFunInstType )
 import GHC.Core.Class
 import GHC.Core.Predicate
 import GHC.Core.Multiplicity ( scaledThing )
-import GHC.Core.Unify ( ruleMatchTyKiX )
+import GHC.Core.Unify ( ruleMatchTyKiX, typesAreApart )
 
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -109,17 +109,21 @@ updInertDicts dict_ct@(DictCt { di_cls = cls, di_ev = ev, di_tys = tys })
             -> -- See (SIP1) and (SIP2) in Note [Shadowing of implicit parameters]
                -- Update /both/ inert_cans /and/ inert_solved_dicts.
                updInertSet $ \ inerts@(IS { inert_cans = ics, inert_solved_dicts = solved }) ->
-               inerts { inert_cans         = updDicts (filterDicts (not_ip_for str_ty)) ics
-                      , inert_solved_dicts = filterDicts (not_ip_for str_ty) solved }
+               inerts { inert_cans         = updDicts (filterDicts (does_not_mention_ip_for str_ty)) ics
+                      , inert_solved_dicts = filterDicts (does_not_mention_ip_for str_ty) solved }
             |  otherwise
             -> return ()
 
        -- Add the new constraint to the inert set
        ; updInertCans (updDicts (addDict dict_ct)) }
   where
-    not_ip_for :: Type -> DictCt -> Bool
-    not_ip_for str_ty (DictCt { di_cls = cls, di_tys = tys })
-      = not (mentionsIP str_ty cls tys)
+    -- Does this class constraint or any of its superclasses mention
+    -- an implicit parameter (?str :: ty) for the given 'str' and any type 'ty'?
+    does_not_mention_ip_for :: Type -> DictCt -> Bool
+    does_not_mention_ip_for str_ty (DictCt { di_cls = cls, di_tys = tys })
+      = not $ mentionsIP (not . typesAreApart str_ty) (const True) cls tys
+        -- See Note [Using typesAreApart when calling mentionsIP]
+        -- in GHC.Core.Predicate
 
 canDictCt :: CtEvidence -> Class -> [Type] -> SolverStage DictCt
 -- Once-only processing of Dict constraints:
@@ -201,7 +205,7 @@ in two places:
 * In `GHC.Tc.Solver.InertSet.solveOneFromTheOther`, be careful when we have
    (?x :: ty) in the inert set and an identical (?x :: ty) as the work item.
 
-* In `updInertDicts` in this module, when adding [G] (?x :: ty), remove  any
+* In `updInertDicts`, in this module, when adding [G] (?x :: ty), remove any
   existing [G] (?x :: ty'), regardless of ty'.
 
 * Wrinkle (SIP1): we must be careful of superclasses.  Consider
@@ -221,7 +225,7 @@ in two places:
   An important special case is constraint tuples like [G] (% ?x::ty, Eq a %).
   But it could happen for `class xx => D xx where ...` and the constraint D
   (?x :: int).  This corner (constraint-kinded variables instantiated with
-  implicit parameter constraints) is not well explorered.
+  implicit parameter constraints) is not well explored.
 
   Example in #14218, and #23761
 
