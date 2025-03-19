@@ -1388,7 +1388,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
         -- and that is the business of callSiteInline.
         -- In practice, without this test, most of the "hits" were
         -- CPR'd workers getting inlined back into their wrappers,
-        | isConLikeUnfolding unfolding
+        | idArity fun == 0
         , Just rhs <- expandUnfolding_maybe unfolding
         , let in_scope' = extend_in_scope (exprFreeVars rhs)
         = go (Left in_scope') floats rhs cont
