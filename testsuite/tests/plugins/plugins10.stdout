@@ -7,6 +7,8 @@ interfacePlugin: GHC.Internal.Float
 interfacePlugin: GHC.Prim.Ext
 interfacePlugin: Language.Haskell.TH.Syntax
 typeCheckPlugin (rn)
+interfacePlugin: GHC.Internal.Stack.Types
+interfacePlugin: GHC.Internal.Exception.Context
 typeCheckPlugin (tc)
 parsePlugin(a)
 typeCheckPlugin (rn)
