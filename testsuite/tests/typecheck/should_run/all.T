@@ -170,6 +170,7 @@ test('T22510', normal, compile_and_run, [''])
 test('T21973a', [exit_code(1)], compile_and_run, [''])
 test('T21973b', normal, compile_and_run, [''])
 test('T23761', normal, compile_and_run, [''])
+test('T25529', normal, compile_and_run, [''])
 test('T23761b', normal, compile_and_run, [''])
 test('T17594e', normal, compile_and_run, [''])
 
