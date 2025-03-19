@@ -16,6 +16,7 @@ data BreakpointId = BreakpointId
   { bi_tick_mod   :: !Module  -- ^ Breakpoint tick module
   , bi_tick_index :: !Int     -- ^ Breakpoint tick index
   }
+  deriving (Eq, Ord)
 
 -- | Internal breakpoint identifier
 --
@@ -26,6 +27,7 @@ data InternalBreakpointId = InternalBreakpointId
   , ibi_info_mod   :: !Module  -- ^ Breakpoint info module
   , ibi_info_index :: !Int     -- ^ Breakpoint info index
   }
+  deriving (Eq, Ord)
 
 toBreakpointId :: InternalBreakpointId -> BreakpointId
 toBreakpointId ibi = BreakpointId
