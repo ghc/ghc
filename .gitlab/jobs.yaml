@@ -1462,7 +1462,8 @@
       "BUILD_FLAVOUR": "release+host_fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man --haddock-for-hackage",
+      "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
+      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
       "XZ_OPT": "-9"
@@ -1526,7 +1527,8 @@
       "BUILD_FLAVOUR": "release+host_fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man --haddock-for-hackage",
+      "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
+      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
       "XZ_OPT": "-9"
@@ -1590,7 +1592,8 @@
       "BUILD_FLAVOUR": "release+host_fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man --haddock-for-hackage",
+      "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
+      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
       "XZ_OPT": "-9"
@@ -5600,7 +5603,8 @@
       "BUILD_FLAVOUR": "release+host_fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man --haddock-for-hackage",
+      "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
+      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
     }
@@ -5664,7 +5668,8 @@
       "BUILD_FLAVOUR": "release+host_fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man --haddock-for-hackage",
+      "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
+      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
     }
@@ -5728,7 +5733,8 @@
       "BUILD_FLAVOUR": "release+host_fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
-      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man --haddock-for-hackage",
+      "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
+      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
     }

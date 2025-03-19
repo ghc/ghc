@@ -1269,8 +1269,9 @@ cross_jobs = [
 
     make_wasm_jobs cfg =
       modifyJobs
-        ( delVariable "BROKEN_TESTS"
-            . setVariable "HADRIAN_ARGS" "--docs=no-sphinx-pdfs --docs=no-sphinx-man --haddock-for-hackage"
+        ( -- See Note [Testing wasm ghci browser mode]
+          setVariable "FIREFOX_LAUNCH_OPTS" "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}"
+            . setVariable "HADRIAN_ARGS" "--docs=no-sphinx-pdfs --docs=no-sphinx-man"
             . delVariable "INSTALL_CONFIGURE_ARGS"
         )
         $ addValidateRule WasmBackend $ validateBuilds Amd64 (Linux AlpineWasm) cfg
