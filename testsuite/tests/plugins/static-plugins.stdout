@@ -9,6 +9,8 @@ interfacePlugin: GHC.Internal.System.IO
 interfacePlugin: GHC.Internal.Types
 interfacePlugin: GHC.Internal.Show
 typeCheckPlugin (rn)
+interfacePlugin: GHC.Internal.Stack.Types
+interfacePlugin: GHC.Internal.Exception.Context
 interfacePlugin: GHC.Internal.TopHandler
 typeCheckPlugin (tc)
 interfacePlugin: GHC.Internal.CString

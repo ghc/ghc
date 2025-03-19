@@ -778,7 +778,7 @@ Wrinkles
 (CS3) GHC should NEVER infer a CallStack constraint unless one was requested
   with a partial type signature (See GHC.Tc.Solver..pickQuantifiablePreds).
 
-(CS4)- A CallStack (defined in GHC.Stack.Types) is a [(String, SrcLoc)],
+(CS4) A CallStack (defined in GHC.Stack.Types) is a [(String, SrcLoc)],
   where the String is the name of the binder that is used at the
   SrcLoc. SrcLoc is also defined in GHC.Stack.Types and contains the
   package/module/file name, as well as the full source-span. Both

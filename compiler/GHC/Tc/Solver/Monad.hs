@@ -170,7 +170,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Constraint
 
-import GHC.Builtin.Names ( unsatisfiableClassNameKey )
+import GHC.Builtin.Names ( unsatisfiableClassNameKey, callStackTyConName, exceptionContextTyConName )
 
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep as Rep
@@ -181,6 +181,7 @@ import GHC.Core.Predicate
 import GHC.Core.Reduction
 import GHC.Core.Class
 import GHC.Core.TyCon
+import GHC.Core.Unify (typesAreApart)
 
 import GHC.Types.Name
 import GHC.Types.TyThing
@@ -197,7 +198,7 @@ import qualified GHC.Rename.Env as TcM
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
-import GHC.Utils.Misc (HasDebugCallStack)
+import GHC.Utils.Misc (HasDebugCallStack, (<||>))
 
 import GHC.Data.Bag as Bag
 import GHC.Data.Pair
@@ -215,7 +216,6 @@ import Data.Maybe ( isJust )
 import qualified Data.Semigroup as S
 import GHC.Types.SrcLoc
 import GHC.Rename.Env
---import GHC.Tc.Solver.Solve (solveWanteds)
 
 #if defined(DEBUG)
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
@@ -380,21 +380,24 @@ updInertDicts :: DictCt -> TcS ()
 updInertDicts dict_ct@(DictCt { di_cls = cls, di_ev = ev, di_tys = tys })
   = do { traceTcS "Adding inert dict" (ppr dict_ct $$ ppr cls  <+> ppr tys)
 
-       ; if |  isGiven ev, Just (str_ty, _) <- isIPPred_maybe cls tys
+       ; if | isGiven ev, Just (str_ty, _) <- isIPPred_maybe cls tys
             -> -- See (SIP1) and (SIP2) in Note [Shadowing of implicit parameters]
                -- Update /both/ inert_cans /and/ inert_solved_dicts.
                updInertSet $ \ inerts@(IS { inert_cans = ics, inert_solved_dicts = solved }) ->
-               inerts { inert_cans         = updDicts (filterDicts (not_ip_for str_ty)) ics
-                      , inert_solved_dicts = filterDicts (not_ip_for str_ty) solved }
-            |  otherwise
+               inerts { inert_cans         = updDicts (filterDicts (does_not_mention_ip_for str_ty)) ics
+                      , inert_solved_dicts = filterDicts (does_not_mention_ip_for str_ty) solved }
+            | otherwise
             -> return ()
-
        -- Add the new constraint to the inert set
        ; updInertCans (updDicts (addDict dict_ct)) }
   where
-    not_ip_for :: Type -> DictCt -> Bool
-    not_ip_for str_ty (DictCt { di_cls = cls, di_tys = tys })
-      = not (mentionsIP str_ty cls tys)
+    -- Does this class constraint or any of its superclasses mention
+    -- an implicit parameter (?str :: ty) for the given 'str' and any type 'ty'?
+    does_not_mention_ip_for :: Type -> DictCt -> Bool
+    does_not_mention_ip_for str_ty (DictCt { di_cls = cls, di_tys = tys })
+      = not $ mentionsIP (not . typesAreApart str_ty) (const True) cls tys
+        -- See Note [Using typesAreApart when calling mentionsIP]
+        -- in GHC.Core.Predicate
 
 updInertIrreds :: IrredCt -> TcS ()
 updInertIrreds irred
@@ -523,14 +526,88 @@ getSafeOverlapFailures
 updSolvedDicts :: InstanceWhat -> DictCt -> TcS ()
 -- Conditionally add a new item in the solved set of the monad
 -- See Note [Solved dictionaries] in GHC.Tc.Solver.InertSet
-updSolvedDicts what dict_ct@(DictCt { di_ev = ev })
+updSolvedDicts what dict_ct@(DictCt { di_cls = cls, di_tys = tys, di_ev = ev })
   | isWanted ev
   , instanceReturnsDictCon what
-  = do { traceTcS "updSolvedDicts:" $ ppr dict_ct
+  = do { is_callstack    <- is_tyConTy isCallStackTy        callStackTyConName
+       ; is_exceptionCtx <- is_tyConTy isExceptionContextTy exceptionContextTyConName
+       ; let contains_callstack_or_exceptionCtx =
+               mentionsIP
+                 (const True)
+                    -- NB: the name of the call-stack IP is irrelevant
+                    -- e.g (?foo :: CallStack) counts!
+                 (is_callstack <||> is_exceptionCtx)
+                 cls tys
+       -- See Note [Don't add HasCallStack constraints to the solved set]
+       ; unless contains_callstack_or_exceptionCtx $
+    do { traceTcS "updSolvedDicts:" $ ppr dict_ct
        ; updInertSet $ \ ics ->
-         ics { inert_solved_dicts = addSolvedDict dict_ct (inert_solved_dicts ics) } }
+           ics { inert_solved_dicts = addSolvedDict dict_ct (inert_solved_dicts ics) }
+       } }
   | otherwise
   = return ()
+  where
+
+    -- Return a predicate that decides whether a type is CallStack
+    -- or ExceptionContext, accounting for e.g. type family reduction, as
+    -- per Note [Using typesAreApart when calling mentionsIP].
+    --
+    -- See Note [Using isCallStackTy in mentionsIP].
+    is_tyConTy :: (Type -> Bool) -> Name -> TcS (Type -> Bool)
+    is_tyConTy is_eq tc_name
+      = do { (mb_tc, _) <- wrapTcS $ TcM.tryTc $ TcM.tcLookupTyCon tc_name
+           ; case mb_tc of
+              Just tc ->
+                return $ \ ty -> not (typesAreApart ty (mkTyConTy tc))
+              Nothing ->
+                return is_eq
+           }
+
+{- Note [Don't add HasCallStack constraints to the solved set]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must not add solved Wanted dictionaries that mention HasCallStack constraints
+to the solved set, or we might fail to accumulate the proper call stack, as was
+reported in #25529.
+
+Recall that HasCallStack constraints (and the related HasExceptionContext
+constraints) are implicit parameter constraints, and are accumulated as per
+Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence.
+
+When we solve a Wanted that contains a HasCallStack constraint, we don't want
+to cache the result, because re-using that solution means re-using the call-stack
+in a different context!
+
+See also Note [Shadowing of implicit parameters], which deals with a similar
+problem with Given implicit parameter constraints.
+
+Note [Using isCallStackTy in mentionsIP]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To implement Note [Don't add HasCallStack constraints to the solved set],
+we need to check whether a constraint contains a HasCallStack or HasExceptionContext
+constraint. We do this using the 'mentionsIP' function, but as per
+Note [Using typesAreApart when calling mentionsIP] we don't want to simply do:
+
+  mentionsIP
+    (const True) -- (ignore the implicit parameter string)
+    (isCallStackTy <||> isExceptionContextTy)
+
+because this does not account for e.g. a type family that reduces to CallStack.
+The predicate we want to use instead is:
+
+    \ ty -> not (typesAreApart ty callStackTy && typesAreApart ty exceptionContextTy)
+
+However, this is made difficult by the fact that CallStack and ExceptionContext
+are not wired-in types; they are only known-key. This means we must look them
+up using 'tcLookupTyCon'. However, this might fail, e.g. if we are in the middle
+of typechecking ghc-internal and these data-types have not been typechecked yet!
+
+In that case, we simply fall back to the naive 'isCallStackTy'/'isExceptionContextTy'
+logic.
+
+Note that it would be somewhat painful to wire-in ExceptionContext: at the time
+of writing (March 2025), this would require wiring in the ExceptionAnnotation
+class, as well as SomeExceptionAnnotation, which is a data type with existentials.
+-}
 
 getSolvedDicts :: TcS (DictMap DictCt)
 getSolvedDicts = do { ics <- getInertSet; return (inert_solved_dicts ics) }

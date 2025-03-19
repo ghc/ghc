@@ -178,7 +178,7 @@ Suppose f :: HasCallStack => blah.  Then
     IP "callStack" CallStack
   See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
 
-* We cannonicalise such constraints, in GHC.Tc.Solver.Dict.canDictNC, by
+* We canonicalise such constraints, in GHC.Tc.Solver.Dict.canDictNC, by
   pushing the call-site info on the stack, and changing the CtOrigin
   to record that has been done.
    Bind:  s1 = pushCallStack <site-info> s2

@@ -26,7 +26,7 @@ module GHC.Core.Predicate (
   -- Implicit parameters
   isIPLikePred, mentionsIP, isIPTyCon, isIPClass,
   isCallStackTy, isCallStackPred, isCallStackPredTy,
-  isExceptionContextPred,
+  isExceptionContextPred, isExceptionContextTy,
   isIPPred_maybe,
 
   -- Evidence variables
@@ -46,7 +46,7 @@ import GHC.Prelude
 
 import GHC.Core.Type
 import GHC.Core.Class
-import GHC.Core.TyCo.Compare( eqType, tcEqTyConApps )
+import GHC.Core.TyCo.Compare( tcEqTyConApps )
 import GHC.Core.TyCo.FVs( tyCoVarsOfTypeList, tyCoVarsOfTypesList )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
@@ -370,7 +370,7 @@ isExceptionContextPred cls tys
   | otherwise
   = Nothing
 
--- | Is a type a 'CallStack'?
+-- | Is a type an 'ExceptionContext'?
 isExceptionContextTy :: Type -> Bool
 isExceptionContextTy ty
   | Just tc <- tyConAppTyCon_maybe ty
@@ -416,31 +416,38 @@ isCallStackTy ty
 isIPLikePred :: Type -> Bool
 -- Is `pred`, or any of its superclasses, an implicit parameter?
 -- See Note [Local implicit parameters]
-isIPLikePred pred = mentions_ip_pred initIPRecTc Nothing pred
+isIPLikePred pred =
+  mentions_ip_pred initIPRecTc (const True) (const True) pred
 
-mentionsIP :: Type -> Class -> [Type] -> Bool
--- Is (cls tys) an implicit parameter with key `str_ty`, or
--- is any of its superclasses such at thing.
+mentionsIP :: (Type -> Bool) -- ^ predicate on the string
+           -> (Type -> Bool) -- ^ predicate on the type
+           -> Class
+           -> [Type] -> Bool
+-- ^ @'mentionsIP' str_cond ty_cond cls tys@ returns @True@ if:
+--
+--    - @cls tys@ is of the form @IP str ty@, where @str_cond str@ and @ty_cond ty@
+--      are both @True@,
+--    - or any superclass of @cls tys@ has this property.
+--
 -- See Note [Local implicit parameters]
-mentionsIP str_ty cls tys = mentions_ip initIPRecTc (Just str_ty) cls tys
+mentionsIP = mentions_ip initIPRecTc
 
-mentions_ip :: RecTcChecker -> Maybe Type -> Class -> [Type] -> Bool
-mentions_ip rec_clss mb_str_ty cls tys
-  | Just (str_ty', _) <- isIPPred_maybe cls tys
-  = case mb_str_ty of
-       Nothing -> True
-       Just str_ty -> str_ty `eqType` str_ty'
+mentions_ip :: RecTcChecker -> (Type -> Bool) -> (Type -> Bool) -> Class -> [Type] -> Bool
+mentions_ip rec_clss str_cond ty_cond cls tys
+  | Just (str_ty, ty) <- isIPPred_maybe cls tys
+  = str_cond str_ty && ty_cond ty
   | otherwise
-  = or [ mentions_ip_pred rec_clss mb_str_ty (classMethodInstTy sc_sel_id tys)
+  = or [ mentions_ip_pred rec_clss str_cond ty_cond (classMethodInstTy sc_sel_id tys)
        | sc_sel_id <- classSCSelIds cls ]
 
-mentions_ip_pred :: RecTcChecker -> Maybe Type -> Type -> Bool
-mentions_ip_pred  rec_clss mb_str_ty ty
+
+mentions_ip_pred :: RecTcChecker -> (Type -> Bool) -> (Type -> Bool) -> Type -> Bool
+mentions_ip_pred rec_clss str_cond ty_cond ty
   | Just (cls, tys) <- getClassPredTys_maybe ty
   , let tc = classTyCon cls
   , Just rec_clss' <- if isTupleTyCon tc then Just rec_clss
                       else checkRecTc rec_clss tc
-  = mentions_ip rec_clss' mb_str_ty cls tys
+  = mentions_ip rec_clss' str_cond ty_cond cls tys
   | otherwise
   = False -- Includes things like (D []) where D is
           -- a Constraint-ranged family; #7785
@@ -507,7 +514,38 @@ Small worries (Sept 20):
 * The superclass hunt stops when it encounters the same class again,
   but in principle we could have the same class, differently instantiated,
   and the second time it could have an implicit parameter
-I'm going to treat these as problems for another day. They are all exotic.  -}
+I'm going to treat these as problems for another day. They are all exotic.
+
+Note [Using typesAreApart when calling mentionsIP]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We call 'mentionsIP' in two situations:
+
+  (1) to check that a predicate does not contain any implicit parameters
+      IP str ty, for a fixed literal str and any type ty,
+  (2) to check that a predicate does not contain any HasCallStack or
+      HasExceptionContext constraints.
+
+In both of these cases, we want to be sure, so we should be conservative:
+
+  For (1), the predicate might contain an implicit parameter IP Str a, where
+  Str is a type family such as:
+
+    type family MyStr where MyStr = "abc"
+
+  To safeguard against this (niche) situation, instead of doing a simple
+  type equality check, we use 'typesAreApart'. This allows us to recognise
+  that 'IP MyStr a' contains an implicit parameter of the form 'IP "abc" ty'.
+
+  For (2), we similarly might have
+
+    type family MyCallStack where MyCallStack = CallStack
+
+  Again, here we use 'typesAreApart'. This allows us to see that
+
+    (?foo :: MyCallStack)
+
+  is indeed a CallStack constraint, hidden under a type family.
+-}
 
 {- *********************************************************************
 *                                                                      *

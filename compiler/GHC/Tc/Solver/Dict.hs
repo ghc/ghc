@@ -191,7 +191,7 @@ in two places:
 * In `GHC.Tc.Solver.InertSet.solveOneFromTheOther`, be careful when we have
    (?x :: ty) in the inert set and an identical (?x :: ty) as the work item.
 
-* In `updInertDicts` in this module, when adding [G] (?x :: ty), remove  any
+* In `updInertDicts`, in this module, when adding [G] (?x :: ty), remove any
   existing [G] (?x :: ty'), regardless of ty'.
 
 * Wrinkle (SIP1): we must be careful of superclasses.  Consider
@@ -211,7 +211,7 @@ in two places:
   An important special case is constraint tuples like [G] (% ?x::ty, Eq a %).
   But it could happen for `class xx => D xx where ...` and the constraint D
   (?x :: int).  This corner (constraint-kinded variables instantiated with
-  implicit parameter constraints) is not well explorered.
+  implicit parameter constraints) is not well explored.
 
   Example in #14218, and #23761
 
