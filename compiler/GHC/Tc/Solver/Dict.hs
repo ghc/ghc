@@ -1068,7 +1068,7 @@ Other notes:
      - natural numbers
      - Typeable
 
-* See also Note [What might equal later?] in GHC.Tc.Solver.InertSet.
+* See also Note [What might equal later?] in GHC.Tc.Utils.Unify
 
 * The given-overlap problem is arguably not easy to appear in practice
   due to our aggressive prioritization of equality solving over other

@@ -5087,9 +5087,10 @@ checkValidClass cls
           --
           --    foo2         :: a -> Int
           --    default foo2 :: a -> b
-          unless (isJust $ tcMatchTys [dm_phi_ty, vanilla_phi_ty]
-                                      [vanilla_phi_ty, dm_phi_ty]) $ addErrTc $
-               TcRnDefaultSigMismatch sel_id dm_ty
+          unless (isJust (tcMatchTy dm_phi_ty vanilla_phi_ty) &&
+                  isJust (tcMatchTy vanilla_phi_ty dm_phi_ty)) $
+            addErrTc $
+            TcRnDefaultSigMismatch sel_id dm_ty
 
           -- Now do an ambiguity check on the default type signature.
           checkValidType ctxt (mkDefaultMethodType cls sel_id dm_spec)

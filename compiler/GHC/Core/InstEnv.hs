@@ -174,7 +174,7 @@ That is, they are
 Reason for freshness: we use unification when checking for overlap
 etc, and that requires the tyvars to be distinct.
 
-The invariant is checked by the ASSERT in lookupInstEnv'.
+The invariant is checked by the ASSERT in instEnvMatchesAndUnifiers.
 
 Note [Proper-match fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1105,11 +1105,12 @@ nullUnifiers :: PotentialUnifiers -> Bool
 nullUnifiers NoUnifiers{} = True
 nullUnifiers _ = False
 
-lookupInstEnv' :: InstEnv          -- InstEnv to look in
-               -> VisibleOrphanModules   -- But filter against this
-               -> Class -> [Type]  -- What we are looking for
-               -> ([InstMatch],    -- Successful matches
-                   PotentialUnifiers)      -- These don't match but do unify
+instEnvMatchesAndUnifiers
+  :: InstEnv          -- InstEnv to look in
+  -> VisibleOrphanModules   -- But filter against this
+  -> Class -> [Type]  -- What we are looking for
+  -> ([InstMatch],    -- Successful matches
+      PotentialUnifiers)      -- These don't match but do unify
                                    -- (no incoherent ones in here)
 -- The second component of the result pair happens when we look up
 --      Foo [a]
@@ -1121,7 +1122,7 @@ lookupInstEnv' :: InstEnv          -- InstEnv to look in
 -- but Foo [Int] is a unifier.  This gives the caller a better chance of
 -- giving a suitable error message
 
-lookupInstEnv' (InstEnv rm) vis_mods cls tys
+instEnvMatchesAndUnifiers (InstEnv rm) vis_mods cls tys
   = (foldr check_match [] rough_matches, check_unifiers rough_unifiers)
   where
     (rough_matches, rough_unifiers) = lookupRM' rough_tcs rm
@@ -1159,10 +1160,14 @@ lookupInstEnv' (InstEnv rm) vis_mods cls tys
                 -- Unification will break badly if the variables overlap
                 -- They shouldn't because we allocate separate uniques for them
                 -- See Note [Template tyvars are fresh]
-        case tcUnifyTysFG instanceBindFun tpl_tys tys of
+        case tcUnifyTysFG alwaysBindFam instanceBindFun tpl_tys tys of
+          -- alwaysBindFam: the family-application can't be in the instance head,
+          -- but it certainly can be in the Wanted constraint we are matching!
+          --
           -- We consider MaybeApart to be a case where the instance might
           -- apply in the future. This covers an instance like C Int and
           -- a target like [W] C (F a), where F is a type family.
+          -- See (ATF1) in Note [Apartness and type families] in GHC.Core.Unify
             SurelyApart              -> check_unifiers items
               -- See Note [Infinitary substitution in lookup]
             MaybeApart MARInfinite _ -> check_unifiers items
@@ -1204,8 +1209,8 @@ lookupInstEnv check_overlap_safe
               tys
   = (final_matches, final_unifs, unsafe_overlapped)
   where
-    (home_matches, home_unifs) = lookupInstEnv' home_ie vis_mods cls tys
-    (pkg_matches,  pkg_unifs)  = lookupInstEnv' pkg_ie  vis_mods cls tys
+    (home_matches, home_unifs) = instEnvMatchesAndUnifiers home_ie vis_mods cls tys
+    (pkg_matches,  pkg_unifs)  = instEnvMatchesAndUnifiers pkg_ie  vis_mods cls tys
     all_matches = home_matches <> pkg_matches
     all_unifs   = home_unifs <> pkg_unifs
     final_matches = pruneOverlappedMatches all_matches
@@ -1576,14 +1581,14 @@ specialisation: overview] details how we achieve that.
 ************************************************************************
 -}
 
-instanceBindFun :: BindFun
-instanceBindFun tv _rhs_ty | isOverlappableTyVar tv = Apart
+instanceBindFun :: BindTvFun
+instanceBindFun tv _rhs_ty | isOverlappableTyVar tv = DontBindMe
                            | otherwise              = BindMe
-   -- Note [Binding when looking up instances]
+   -- Note [Super skolems: binding when looking up instances]
 
 {-
-Note [Binding when looking up instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Super skolems: binding when looking up instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When looking up in the instance environment, or family-instance environment,
 we are careful about multiple matches, as described above in
 Note [Overlapping instances]
@@ -1599,9 +1604,9 @@ them in the unification test. These are called "super skolems". Example:
         f :: T -> Int
         f (MkT x) = op [x,x]
 The op [x,x] means we need (Foo [a]). This `a` will never be instantiated, and
-so it is a super skolem. (See the use of tcInstSuperSkolTyVarsX in
+so it is a "super skolem". (See the use of tcInstSuperSkolTyVarsX in
 GHC.Tc.Gen.Pat.tcDataConPat.) Super skolems respond True to
-isOverlappableTyVar, and the use of Apart in instanceBindFun, above, means
+isOverlappableTyVar, and the use of DontBindMe in instanceBindFun, above, means
 that these will be treated as fresh constants in the unification algorithm
 during instance lookup. Without this treatment, GHC would complain, saying
 that the choice of instance depended on the instantiation of 'a'; but of

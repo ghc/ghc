@@ -112,7 +112,6 @@ import GHC.Driver.DynFlags
 import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.Maybe (firstJusts)
-import GHC.Data.Pair
 
 import Control.Monad
 import Data.Functor.Identity (Identity(..))
@@ -4139,6 +4138,154 @@ makeTypeConcrete occ_fs conc_orig ty =
     orig = case conc_orig of
       ConcreteFRR frr_orig -> FRROrigin frr_orig
 
+
+{- *********************************************************************
+*                                                                      *
+                 mightEqualLater
+*                                                                      *
+********************************************************************* -}
+
+{- Note [What might equal later?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must determine whether a Given might later equal a Wanted:
+  see Note [Instance and Given overlap] in GHC.Tc.Solver.Dict
+
+We definitely need to account for the possibility that any metavariable might be
+arbitrarily instantiated. Yet we do *not* want to allow skolems to be
+instantiated, as we've already rewritten with respect to any Givens. (We're
+solving a Wanted here, and so all Givens have already been processed.)
+
+This is best understood by example.
+
+1. C alpha[tau]  ~?  C Int
+
+   That Given certainly might match later.
+
+2. C a[sk]  ~?  C Int
+
+   No. No new givens are going to arise that will get the `a` to rewrite
+   to Int.  Example:
+      f :: forall a. C a => blah
+      f = rhs  -- Gives rise to [W] C Int
+   It would be silly to fail to solve ([W] C Int), just because we have
+   ([G] C a) in the Givens!
+
+3. C alpha[tv]   ~?  C Int
+
+   In this variant of (1) that alpha[tv] is a TyVarTv, unifiable only with
+   other type /variables/.  It cannot equal Int later.
+
+4. C (F alpha[tau])   ~?   C Int
+
+   Sure -- that can equal later, if we learn something useful about alpha.
+
+5. C (F alpha[tv])  ~?  C Int
+
+   This, too, might equal later. Perhaps we have [G] F b ~ Int elsewhere.
+   Or maybe we have C (F alpha[tv] beta[tv]), these unify with each other,
+   and F x x = Int. Remember: returning True doesn't commit ourselves to
+   anything.
+
+6. C (F a[sk])  ~?  C Int.  For example
+      f :: forall a. C (F a) => blah
+      f = rhs  -- Gives rise to [W] C Int
+
+   No, this won't match later. If we could rewrite (F a), we would
+   have by now. But see also Red Herring below.
+
+   This arises in instance decls too.  For example in GHC.Core.Ppr we see
+     instance Outputable (XTickishId pass)
+           => Outputable (GenTickish pass) where
+   If we have [W] Outputable Int in the body, we don't want to fail to solve
+   it because (XTickishId pass) might simplify to Int.
+
+7. C (Maybe alpha[tau])  ~?  C alpha[tau]
+
+   We say this cannot equal later, because it would require
+   alpha := Maybe (Maybe (Maybe ...)). While such a type can be contrived,
+   we choose not to worry about it. See Note [Infinitary substitution in lookup]
+   in GHC.Core.InstEnv. Getting this wrong led to #19107, tested in
+   typecheck/should_compile/T19107.
+
+8. C alpha[cbv]   ~?  C Int
+   where alpha[cbv] = F a
+
+   The alpha[cbv] is a cycle-breaker var which stands for F a. See
+   Note [Type equality cycles] in GHC.Tc.Solver.Equality
+   This is just like case 6, and we say "no". Saying "no" here is
+   essential in getting the parser to type-check, with its use of DisambECP.
+
+9. C alpha[cbv]   ~?   C Int
+   where alpha[cbv] = F beta[tau]
+
+   Here, we might indeed equal later. Distinguishing between
+   this case and Example 8 is why we need the InertSet in mightEqualLater.
+
+10. C (F alpha[tau], Int)  ~?  C (Bool, F alpha[tau])
+
+   This cannot equal later, because F alpha would have to equal both Bool and
+   Int.
+
+To deal with type family applications, we use the "fine-grained" Core unifier.
+See Note [Apartness and type families] in GHC.Core.Unify, controlled
+by the `bind_fam :: BindFamFun` function defined in `mightEqualLater`.
+
+One tricky point: a type family application that mentions only skolems (example
+6) is settled: any skolems would have been rewritten w.r.t. Givens by now. These
+type family applications match only themselves. However: a type family
+application that mentions metavariables, on the other hand, can match
+anything. So, if the original type family application contains a metavariable,
+we use BindMe to tell the unifier to allow it in the substitution. On the other
+hand, a type family application with only skolems is considered rigid. See the
+use of `mentions_meta_ty_var` in `mightEqualLater`.
+
+This treatment fixes #18910 and is tested in
+typecheck/should_compile/InstanceGivenOverlap{,2}
+
+Red Herring
+~~~~~~~~~~~
+In #21208, we have this scenario:
+
+  instance forall b. C b
+  [G] C a[sk]
+  [W] C (F a[sk])
+
+What should we do with that wanted? According to the logic above, the Given
+cannot match later (this is example 6), and so we use the global instance.
+But wait, you say: What if we learn later (say by a future type instance F a = a)
+that F a unifies with a? That looks like the Given might really match later!
+
+This mechanism described in this Note is *not* about this kind of situation, however.
+It is all asking whether a Given might match the Wanted *in this run of the solver*.
+It is *not* about whether a variable might be instantiated so that the Given matches,
+or whether a type instance introduced in a downstream module might make the Given match.
+The reason we care about what might match later is only about avoiding order-dependence.
+That is, we don't want to commit to a course of action that depends on seeing constraints
+in a certain order. But an instantiation of a variable and a later type instance
+don't introduce order dependency in this way, and so mightMatchLater is right to ignore
+these possibilities.
+
+Here is an example, with no type families, that is perhaps clearer:
+
+  instance forall b. C (Maybe b)
+  [G] C (Maybe Int)
+  [W] C (Maybe a)
+
+What to do? We *might* say that the Given could match later and should thus block
+us from using the global instance. But we don't do this. Instead, we rely on class
+coherence to say that choosing the global instance is just fine, even if later we
+call a function with (a := Int). After all, in this run of the solver, [G] C (Maybe Int)
+will definitely never match [W] C (Maybe a). (Recall that we process Givens before
+Wanteds, so there is no [G] a ~ Int hanging about unseen.)
+
+Interestingly, in the first case (from #21208), the behavior changed between
+GHC 8.10.7 and GHC 9.2, with the latter behaving correctly and the former
+reporting overlapping instances.
+
+Test case: typecheck/should_compile/T21208.
+
+-}
+
 --------------------------------------------------------------------------------
 -- mightEqualLater
 
@@ -4150,7 +4297,7 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
   = Nothing
 
   | otherwise
-  = case tcUnifyTysFG bind_fun [flattened_given] [flattened_wanted] of
+  = case tcUnifyTysFG bind_fam bind_tv [given_pred] [wanted_pred] of
       Unifiable subst
         -> Just subst
       MaybeApart reason subst
@@ -4161,31 +4308,21 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
       SurelyApart -> Nothing
 
   where
-    in_scope  = mkInScopeSet $ tyCoVarsOfTypes [given_pred, wanted_pred]
-
-    -- NB: flatten both at the same time, so that we can share mappings
-    -- from type family applications to variables, and also to guarantee
-    -- that the fresh variables are really fresh between the given and
-    -- the wanted. Flattening both at the same time is needed to get
-    -- Example 10 from the Note.
-    (Pair flattened_given flattened_wanted, var_mapping)
-      = flattenTysX in_scope (Pair given_pred wanted_pred)
-
-    bind_fun :: BindFun
-    bind_fun tv rhs_ty
+    bind_tv :: BindTvFun
+    bind_tv tv rhs_ty
       | MetaTv { mtv_info = info } <- tcTyVarDetails tv
-      = if ok_shape tv info rhs_ty && can_unify tv rhs_ty
-        then BindMe
-        else Apart
-
-         -- See Examples 4, 5, and 6 from the Note
-      | Just (_fam_tc, fam_args) <- lookupVarEnv var_mapping tv
-      , anyFreeVarsOfTypes mentions_meta_ty_var fam_args
+      , ok_shape tv info rhs_ty
+      , can_unify tv rhs_ty
       = BindMe
 
       | otherwise
-      = Apart
-      where
+      = DontBindMe
+
+    bind_fam :: BindFamFun
+    -- See Examples (4), (5), and (6) from the Note, especially (6)
+    bind_fam _fam_tc fam_args _rhs
+      | anyFreeVarsOfTypes mentions_meta_ty_var fam_args = BindMe
+      | otherwise                                        = DontBindMe
 
     can_unify :: TcTyVar -> TcType -> Bool
     can_unify tv rhs_ty
@@ -4203,9 +4340,8 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
       | isMetaTyVar tv
       = case metaTyVarInfo tv of
           -- See Examples 8 and 9 in the Note
-          CycleBreakerTv
-            -> anyFreeVarsOfType mentions_meta_ty_var
-                 (lookupCycleBreakerVar tv inert_set)
+          CycleBreakerTv -> anyFreeVarsOfType mentions_meta_ty_var
+                              (lookupCycleBreakerVar tv inert_set)
           _ -> True
       | otherwise
       = False
@@ -4235,7 +4371,7 @@ false positives:
   3. Concreteness: ty1 = kappa[conc]  /~ ty2 = k[sk].
 
 In these examples, ty1 and ty2 cannot unify; to inform the pure unifier of this
-fact, we use 'checkTyEqRhs' to provide the 'BindFun'.
+fact, we use 'checkTyEqRhs' to provide the 'BindTvFun'.
 
 Failing to account for this caused #25744:
 
