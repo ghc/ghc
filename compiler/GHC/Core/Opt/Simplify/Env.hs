@@ -17,7 +17,7 @@ module GHC.Core.Opt.Simplify.Env (
         seOptCoercionOpts, sePhase, sePlatform, sePreInline,
         seRuleOpts, seRules, seUnfoldingOpts,
         mkSimplEnv, extendIdSubst, extendCvIdSubst,
-        extendTvSubst, extendCvSubst, extendSubstForDFun,
+        extendTvSubst, extendCvSubst,o
         zapSubstEnv, setSubstEnv, bumpCaseDepth,
         getInScope, setInScopeFromE, setInScopeFromF,
         setInScopeSet, modifyInScope, addNewInScopeIds,
@@ -567,20 +567,6 @@ extendCvSubst env@(SimplEnv {seCvSubst = csubst}) var co
 extendCvIdSubst :: SimplEnv -> Id -> OutExpr -> SimplEnv
 extendCvIdSubst env bndr (Coercion co) = extendCvSubst env bndr co
 extendCvIdSubst env bndr rhs           = extendIdSubst env bndr (DoneEx rhs NotJoinPoint)
-
-extendSubstForDFun :: SimplEnv -> [OutVar] -> [(InExpr,StaticEnv)] -> SimplEnv
-extendSubstForDFun env bndrs args
-  = foldl2 extend env bndrs args
-  where
-    extend env@(SimplEnv {seIdSubst = ids, seCvSubst = cvs, seTvSubst = tvs})
-           bndr (arg,arg_se)
-      | isTyVar bndr, Type ty <- arg
-      = env { seTvSubst = extendVarEnv tvs bndr (substTy arg_se ty) }
-      | isCoVar bndr, Coercion co <- arg
-      = env { seCvSubst = extendVarEnv cvs bndr (substCo arg_se co) }
-      | otherwise
-      = assertPpr (isId bndr) (ppr bndr) $
-        env { seIdSubst = extendVarEnv ids bndr (mkContEx arg_se arg) }
 
 ---------------------
 getInScope :: SimplEnv -> InScopeSet

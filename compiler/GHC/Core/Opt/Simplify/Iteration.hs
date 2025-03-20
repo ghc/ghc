@@ -15,7 +15,6 @@ import GHC.Prelude
 import GHC.Driver.Flags
 
 import GHC.Core
--- import GHC.Core.Class( Class, classArity )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.ConstantFold
 import GHC.Core.Type hiding ( substCo, substTy, substTyVar, extendTvSubst, extendCvSubst )
@@ -60,7 +59,6 @@ import GHC.Builtin.Names( runRWKey, seqHashKey )
 
 import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
 import GHC.Data.FastString
--- import GHC.Data.List.SetOps( getNth )
 import GHC.Unit.Module ( moduleName )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
