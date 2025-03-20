@@ -15,20 +15,23 @@ module State
     CppState(..),
 
     arg_arity,
-    getAccepting',
-    setAccepting',
-    setAccepting,
+
+    getPpState, setPpState,
     getAccepting,
+    -- getAccepting',
+    setAccepting,
+    -- setAccepting',
     pushAccepting,
-    pushAccepting',
-    pushContinuation,
-    ppIsDefined,
-    ppIsDefined',
-    addDefine',
+    pushAccepting', -- via cppIf
     popScope,
-    popScope',
+    -- popScope',
+
+    pushContinuation,
     popContinuation,
     ppDefine,
+    ppIsDefined,
+    -- ppIsDefined',
+    -- addDefine',
     getCppState,
     ghcCppEnabled
   ) where
@@ -167,14 +170,14 @@ popScope =
          in
             POk s{pp = (pp s){pp_scope = new_scope}} ()
 
-popScope' :: PpState -> PpState
-popScope' s =
-    let
-        new_scope = case pp_scope s of
-            c :| [] -> c :| []
-            _ :| (h : t) -> h :| t
-     in
-        s{pp_scope = new_scope}
+-- popScope' :: PpState -> PpState
+-- popScope' s =
+--     let
+--         new_scope = case pp_scope s of
+--             c :| [] -> c :| []
+--             _ :| (h : t) -> h :| t
+--      in
+--         s{pp_scope = new_scope}
 
 getScope :: PP PpScope
 getScope =
@@ -192,13 +195,13 @@ setScope scope =
          in
             POk s{pp = (pp s){pp_scope = new_scope}} ()
 
-setScope' :: PpState -> PpScope -> PpState
-setScope' s scope =
-    let
-        new_scope = case pp_scope s of
-            _ :| rest -> scope :| rest
-     in
-        s{pp_scope = new_scope}
+-- setScope' :: PpState -> PpScope -> PpState
+-- setScope' s scope =
+--     let
+--         new_scope = case pp_scope s of
+--             _ :| rest -> scope :| rest
+--      in
+--         s{pp_scope = new_scope}
 
 setAccepting :: Bool -> PP ()
 setAccepting on = do
@@ -211,16 +214,16 @@ pushAccepting on = pushScope (PpScope on)
 pushAccepting' :: PpState -> Bool -> PpState
 pushAccepting' s on = pushScope' s (PpScope on)
 
-setAccepting' :: PpState -> Bool -> PpState
-setAccepting' s on = setScope' s (scope{pp_accepting = on})
-  where
-    scope = getScope' s
+-- setAccepting' :: PpState -> Bool -> PpState
+-- setAccepting' s on = setScope' s (scope{pp_accepting = on})
+--   where
+--     scope = getScope' s
 
 getAccepting :: PP Bool
 getAccepting = P $ \s -> POk s (pp_accepting (NonEmpty.head $ pp_scope (pp s)))
 
-getAccepting' :: PpState -> Bool
-getAccepting' s = pp_accepting (NonEmpty.head $ pp_scope s)
+-- getAccepting' :: PpState -> Bool
+-- getAccepting' s = pp_accepting (NonEmpty.head $ pp_scope s)
 
 -- pp_scope stack end -----------------
 
