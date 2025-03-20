@@ -237,7 +237,7 @@ padLiveArgs platform live =
                text ") both alive AND mapped to the same real register: " <> ppr real <>
                text ". This isn't currently supported by the LLVM backend."
          go (cu@(GlobalRegUse c _):cs) f
-            | fpr_num c == f = go cs f                     -- already covered by a real register
+            | fpr_num c == f = go cs (f+1)                 -- already covered by a real register
             | otherwise      = ctor f : go (cu:cs) (f + 1) -- add padding register
 
     fpr_ctor :: GlobalRegUse -> Int -> GlobalRegUse
