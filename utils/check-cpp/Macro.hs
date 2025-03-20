@@ -72,8 +72,7 @@ cppIf str = do
     v = case Parser.parseExpr expanded of
         Left err -> error $ "parseExpr:" ++ show (err, expanded)
         Right tree -> eval tree
-    s' = pushAccepting' s (toBool v)
-  setPpState s'
+  pushAccepting (toBool v)
 
 -- ---------------------------------------------------------------------
 
