@@ -279,7 +279,7 @@ processCpp fs = do
                 Right (CppDefine name args def) -> do
                     ppDefine (MacroName name args) def
                 Right (CppIf cond) -> do
-                    ppIf cond
+                    cppIf cond
                 Right (CppIfdef name) -> do
                     defined <- ppIsDefined (MacroName name Nothing)
                     pushAccepting defined
@@ -331,12 +331,15 @@ ppInclude filename = do
             let loc = PsLoc (mkRealSrcLoc (mkFastString filename) 1 1) (BufPos 0)
             Lexer.setInput (Lexer.AI loc src)
 
-ppIf :: String -> PP ()
-ppIf str = P $ \s ->
-    let
-        s' = cppIf (pp s) str
-     in
-        POk s{pp = s'} ()
+-- ppIf' :: String -> PP ()
+-- ppIf' str = P $ \s ->
+--     let
+--         s' = cppIf (pp s) str
+--      in
+--         POk s{pp = s'} ()
+
+-- ppIf :: String -> PP ()
+-- ppIf str = cppIf str
 
 -- =====================================================================
 
