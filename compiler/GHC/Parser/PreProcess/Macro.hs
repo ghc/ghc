@@ -1,5 +1,5 @@
 module GHC.Parser.PreProcess.Macro (
-    process,
+    -- process,
     cppIf,
     -- get rid of warnings for tests
     m0,
@@ -46,6 +46,7 @@ import GHC.Prelude
 
 -- ---------------------------------------------------------------------
 
+-- Used for testing only, remove it
 process :: PpState -> Input -> (PpState, Output)
 process s str = (s0, o)
   where
