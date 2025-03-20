@@ -1284,7 +1284,7 @@ tcRule (HsRule { rd_ext  = ext
        ; dvs <- candidateQTyVarsOfTypes (rule_ty : map idType tpl_ids)
        ; let weed_out = (`dVarSetMinusVarSet` dont_default)
              weeded_dvs = weedOutCandidates weed_out dvs
-       ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars weeded_dvs
+       ; qtkvs <- quantifyTyVars skol_info weeded_dvs
        ; traceTc "tcRule" (vcat [ pprFullRuleName (snd ext) rname
                                 , text "dvs:" <+> ppr dvs
                                 , text "weeded_dvs:" <+> ppr weeded_dvs
