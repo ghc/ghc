@@ -2,7 +2,6 @@ module GHC.Parser.PreProcess.Macro (
     -- process,
     cppIf,
     -- get rid of warnings for tests
-    m0,
     m1,
     m2,
     m3,
@@ -46,45 +45,16 @@ import GHC.Prelude
 
 -- ---------------------------------------------------------------------
 
--- Used for testing only, remove it
-process :: PpState -> Input -> (PpState, Output)
-process s str = (s0, o)
-  where
-    o = case parseDirective str of
-        Left _ -> undefined
-        Right r -> r
-    s0 = case o of
-        CppDefine name args rhs -> define s name args rhs
-        CppInclude _ -> undefined
-        CppIfdef name -> ifdef s name
-        CppIf ifstr -> cppIf s ifstr
-        CppIfndef name -> ifndef s name
-        CppElse -> cppElse s
-        CppEndif -> popScope' s
-        CppDumpState -> undefined
-
--- ---------------------------------------------------------------------
-
-define :: PpState -> String -> Maybe ([String]) -> MacroDef -> PpState
-define s name args toks = addDefine' s (MacroName name args) toks
-
-ifdef :: PpState -> String -> PpState
-ifdef s name = pushAccepting' s (ppIsDefined' s (MacroName name Nothing))
-
-ifndef :: PpState -> String -> PpState
-ifndef s name = pushAccepting' s (not $ ppIsDefined' s (MacroName name Nothing))
-
 --    We evaluate to an Int, which we convert to a bool
-cppIf :: PpState -> String -> PpState
-cppIf s str = pushAccepting' s (toBool v)
-  where
+cppIf :: String -> PP ()
+cppIf str = do
+  s <- getPpState
+  let
     expanded = expand (pp_defines s) str
     v = case Parser.parseExpr expanded of
         Left err -> error $ "parseExpr:" ++ show (err, expanded)
         Right tree -> eval tree
-
-cppElse :: PpState -> PpState
-cppElse s = setAccepting' s (not $ getAccepting' s)
+  pushAccepting (toBool v)
 
 -- ---------------------------------------------------------------------
 
@@ -245,14 +215,6 @@ isOther (TComma _) = False
 isOther (TOpenParen _) = False
 isOther (TCloseParen _) = False
 isOther _ = True
-
--- ---------------------------------------------------------------------
-
-m0 :: (PpState, Output)
-m0 = do
-    let (s0, _) = process initPpState "#define FOO 3"
-    let (s1, _) = process s0 "#ifdef FOO"
-    process s1 "# if FOO == 4"
 
 -- ---------------------------------------------------------------------
 
