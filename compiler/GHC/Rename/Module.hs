@@ -745,6 +745,7 @@ rnFamEqn doc atfi
 
              groups :: [NonEmpty (LocatedN RdrName)]
              groups = equivClasses cmpLocated pat_kity_vars
+       ; traceRn "rnFamEqn: rn_outer_bndrs: " (ppr rn_outer_bndrs')
        ; nms_dups <- mapM (lookupOccRn . unLoc) $
                         [ tv | (tv :| (_:_)) <- groups ]
              -- Add to the used variables
@@ -817,7 +818,7 @@ rnFamEqn doc atfi
     --   type instance F a b c = Either a b
     --                   ^^^^^
     lhs_loc = case map lhsTypeArgSrcSpan pats of
-      []         -> panic "rnFamEqn.lhs_loc"
+      []         -> getLocA tycon
       [loc]      -> loc
       (loc:locs) -> loc `combineSrcSpans` last locs
 
@@ -938,8 +939,8 @@ This is implemented as follows: Unnamed wildcards remain unchanged after
 the renamer, and then given fresh meta-variables during typechecking, and
 it is handled pretty much the same way as the ones in partial type signatures.
 We however don't want to emit hole constraints on wildcards in family
-instances, so we turn on PartialTypeSignatures and turn off warning flag to
-let typechecker know this.
+instances, We use special hole_mode `HM_FamPat` to indicate that.
+
 See related Note [Wildcards in visible kind application] in GHC.Tc.Gen.HsType
 
 Note [Unused type variables in family instances]

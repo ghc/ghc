@@ -1,1 +1,23 @@
- 
+T25647_fail.hs:12:4: [GHC-89498]
+     A newtype must not be a GADT
+      In2 :: forall (ff :: * -> *).
+             ff (Fix2 @LiftedRep ff) -> Fix2 @LiftedRep ff
+     In the definition of data constructor ‘In2’
+      In the newtype declaration for ‘Fix2’
+
+T25647_fail.hs:17:3: [GHC-89498]
+     A newtype must not be a GADT
+      In4a :: forall (ff :: * -> *).
+              ff (Fix4a @LiftedRep ff) -> Fix4a @LiftedRep ff
+     In the definition of data constructor ‘In4a’
+      In the newtype declaration for ‘Fix4a’
+
+T25647_fail.hs:21:3: [GHC-18872]
+     Couldn't match a lifted type with an unlifted type
+      When matching types
+        ff :: TYPE IntRep -> TYPE IntRep
+        f0 :: * -> TYPE IntRep
+      Expected: Dix6 f0
+        Actual: Dix6 ff
+     In the result type of data constructor ‘DIn6’
+      In the newtype family instance declaration for ‘Dix6’

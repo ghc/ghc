@@ -80,11 +80,13 @@ module GHC.Tc.Utils.TcMType (
   defaultTyVar, promoteMetaTyVarTo, promoteTyVarSet,
   quantifyTyVars, doNotQuantifyTyVars,
   zonkAndSkolemise, skolemiseQuantifiedTyVar,
+  quantifyTyVarsWithBinders,
 
   candidateQTyVarsOfType,  candidateQTyVarsOfKind,
   candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
   candidateQTyVarsWithBinders, weedOutCandidates,
   CandidatesQTvs(..), delCandidates,
+  intersectCandidates,
   candidateKindVars, partitionCandidates,
 
   ------------------------------
@@ -1374,6 +1376,14 @@ candidateVars (DV { dv_kvs = dep_kv_set, dv_tvs = nondep_tkv_set })
 candidateKindVars :: CandidatesQTvs -> TyVarSet
 candidateKindVars dvs = dVarSetToVarSet (dv_kvs dvs)
 
+intersectCandidates :: CandidatesQTvs -> [Var] -> CandidatesQTvs
+intersectCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) varList
+  = DV { dv_kvs = kvs `intersectDVarSet` vars
+       , dv_tvs = tvs `intersectDVarSet` vars
+       , dv_cvs = cvs `intersectVarSet` mkVarSet varList }
+  where
+    vars = mkDVarSet varList
+
 delCandidates :: CandidatesQTvs -> [Var] -> CandidatesQTvs
 delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
   = DV { dv_kvs = kvs `delDVarSetList` vars
@@ -1389,20 +1399,23 @@ partitionCandidates dvs@(DV { dv_kvs = kvs, dv_tvs = tvs }) pred
     (extracted_tvs, rest_tvs) = partitionDVarSet pred tvs
     extracted = dVarSetToVarSet extracted_kvs `unionVarSet` dVarSetToVarSet extracted_tvs
 
-candidateQTyVarsWithBinders :: [TyVar] -> Type -> TcM CandidatesQTvs
+candidateQTyVarsWithBinders :: [TyVar] -> [TyVar] -> Type -> TcM (CandidatesQTvs, CandidatesQTvs)
 -- (candidateQTyVarsWithBinders tvs ty) returns the candidateQTyVars
 -- of (forall tvs. ty), but do not treat 'tvs' as bound for the purpose
 -- of Note [Naughty quantification candidates].  Why?
 -- Because we are going to scoped-sort the quantified variables
 -- in among the tvs
-candidateQTyVarsWithBinders bound_tvs ty
+
+candidateQTyVarsWithBinders outer_exp_tvs outer_wcs_imp_tvs ty
   = do { kvs     <- candidateQTyVarsOfKinds (map tyVarKind bound_tvs)
        ; cur_lvl <- getTcLevel
        ; all_tvs <- collect_cand_qtvs ty False cur_lvl emptyVarSet kvs ty
-       ; return (all_tvs `delCandidates` bound_tvs) }
+       ; return (all_tvs `delCandidates` bound_tvs, all_tvs `intersectCandidates` outer_wcs_imp_tvs) }
+       where
+          bound_tvs = outer_exp_tvs ++ outer_wcs_imp_tvs
 
 -- | Gathers free variables to use as quantification candidates (in
--- 'quantifyTyVars'). This might output the same var
+-- 'quantifyTyVarsWithBinders'). This might output the same var
 -- in both sets, if it's used in both a type and a kind.
 -- The variables to quantify must have a TcLevel strictly greater than
 -- the ambient level. (See Wrinkle in Note [Naughty quantification candidates])
@@ -1746,10 +1759,17 @@ Note [Deterministic UniqFM] in GHC.Types.Unique.DFM.
 -}
 
 quantifyTyVars :: SkolemInfo
-               -> NonStandardDefaultingStrategy
                -> CandidatesQTvs   -- See Note [Dependent type variables]
                                    -- Already zonked
                -> TcM [TcTyVar]
+quantifyTyVars ski tvs = fst <$> quantifyTyVarsWithBinders ski tvs mempty
+
+quantifyTyVarsWithBinders ::
+               SkolemInfo
+               -> CandidatesQTvs   -- See Note [Dependent type variables]
+                                   -- Already zonked
+               -> CandidatesQTvs   -- try not to default
+               -> TcM ([TcTyVar], [TcTyVar])
 -- See Note [quantifyTyVars]
 -- Can be given a mixture of TcTyVars and TyVars, in the case of
 --   associated type declarations. Also accepts covars, but *never* returns any.
@@ -1757,29 +1777,39 @@ quantifyTyVars :: SkolemInfo
 -- invariants on CandidateQTvs, we do not have to filter out variables
 -- free in the environment here. Just quantify unconditionally, subject
 -- to the restrictions in Note [quantifyTyVars].
-quantifyTyVars skol_info ns_strat dvs
+
+-- for outer_wcs_imp_tvs, do not default, just skolemise add to the list of quantified
+quantifyTyVarsWithBinders skol_info dvs outer_wcs_imp_dvs
        -- short-circuit common case
-  | isEmptyCandidates dvs
+  | isEmptyCandidates dvs && isEmptyCandidates outer_wcs_imp_dvs
   = do { traceTc "quantifyTyVars has nothing to quantify" empty
-       ; return [] }
+       ; return ([], []) }
 
   | otherwise
   = do { traceTc "quantifyTyVars {"
-           ( vcat [ text "ns_strat =" <+> ppr ns_strat
-                  , text "dvs =" <+> ppr dvs ])
+           ( vcat [
+            text "dvs =" <+> ppr dvs,
+            text "outer_wcs_imp_dvs=" <+> ppr outer_wcs_imp_dvs
+            ])
 
-       ; undefaulted <- defaultTyVars ns_strat dvs
-       ; final_qtvs  <- liftZonkM $ mapMaybeM zonk_quant undefaulted
+       ; undefaulted <- defaultTyVars DefaultNonStandardTyVars dvs
+       ; undefaulted_outer_wcs_imp_tvs <- defaultTyVars TryNotToDefaultNonStandardTyVars outer_wcs_imp_dvs
+       ; (final_qtvs, final_outer_wcs_imp_qtvs)  <- liftZonkM $ do
+            qtvs <- mapMaybeM zonk_quant $ undefaulted
+            outer_wcs_imp_qtvs <- mapMaybeM zonk_quant $ undefaulted_outer_wcs_imp_tvs
+            return (qtvs, outer_wcs_imp_qtvs)
 
        ; traceTc "quantifyTyVars }"
            (vcat [ text "undefaulted:" <+> pprTyVars undefaulted
-                 , text "final_qtvs:"  <+> pprTyVars final_qtvs ])
+                 , text "final_outer_wcs_imp_qtvs:" <+> pprTyVars final_outer_wcs_imp_qtvs
+                 , text "final_qtvs:" <+> pprTyVars final_qtvs
+                  ])
 
        -- We should never quantify over coercion variables; check this
-       ; let co_vars = filter isCoVar final_qtvs
+       ; let co_vars = filter isCoVar (final_qtvs ++ final_outer_wcs_imp_qtvs)
        ; massertPpr (null co_vars) (ppr co_vars)
 
-       ; return final_qtvs }
+       ; return (final_qtvs, final_outer_wcs_imp_qtvs) }
   where
     -- zonk_quant returns a tyvar if it should be quantified over;
     -- otherwise, it returns Nothing. The latter case happens for

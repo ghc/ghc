@@ -1,5 +1,5 @@
-
 T14066a.hs:13:3: warning: [GHC-28129] [-Winaccessible-code (in -Wdefault)]
     Type family instance equation is overlapped:
-      forall {c} {x :: c} {d} {y :: d}.
+      forall {c} {d} {x :: c} {y :: d}.
         Bar x y = Bool -- Defined at T14066a.hs:13:3
+

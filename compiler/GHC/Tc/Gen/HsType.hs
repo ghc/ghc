@@ -72,7 +72,7 @@ module GHC.Tc.Gen.HsType (
         HoleMode(..),
 
         -- Utils
-        tyLitFromLit, tyLitFromOverloadedLit,
+        tyLitFromLit, tyLitFromOverloadedLit, explicitOuterTyVars, implicitOuterTyVars,
 
    ) where
 
@@ -787,7 +787,10 @@ tcFamTyPats :: TyCon
 -- Used for both type and data families
 tcFamTyPats fam_tc hs_pats
   = do { traceTc "tcFamTyPats {" $
-         vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity ]
+         vcat [ ppr fam_tc,
+                text "arity:" <+> ppr fam_arity,
+                text "pats:" <+> ppr hs_pats
+                ]
 
        ; mode <- mkHoleMode TypeLevel HM_FamPat
                  -- HM_FamPat: See Note [Wildcards in family instances] in
@@ -2213,6 +2216,7 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
              wc_tv   = mkTcTyVar wc_name wc_kind wc_details
 
        ; traceTc "tcAnonWildCardOcc" (ppr hole_lvl <+> ppr emit_holes)
+       ; addWildCards wc_tv
        ; when emit_holes $
          emitAnonTypeHole is_extra wc_tv
          -- Why the 'when' guard?
@@ -2396,8 +2400,7 @@ kcCheckDeclHeader_cusk name flav
              -- skolemise and then quantify over.  We do not include spec_req_tvs
              -- because they are /already/ skolems
 
-       ; inferred <- quantifyTyVars skol_info DefaultNonStandardTyVars $
-                     candidates `delCandidates` spec_req_tkvs
+       ; inferred <- quantifyTyVars skol_info $ candidates `delCandidates` spec_req_tkvs
                      -- NB: 'inferred' comes back sorted in dependency order
 
        ; (scoped_kvs, tc_bndrs, res_kind) <- liftZonkM $
@@ -3238,20 +3241,29 @@ tcTKTelescope mode tele thing_inside = case tele of
 --------------------------------------
 --    HsOuterTyVarBndrs
 --------------------------------------
-
 bindOuterTKBndrsX :: OutputableBndrFlag flag 'Renamed  -- Only to support traceTc
-                  => SkolemMode
+                  =>
+                  SkolemMode
                   -> HsOuterTyVarBndrs flag GhcRn
                   -> TcM a
                   -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
-bindOuterTKBndrsX skol_mode outer_bndrs thing_inside
+bindOuterTKBndrsX x = bindOuterTKBndrsX' x x
+
+bindOuterTKBndrsX' :: OutputableBndrFlag flag 'Renamed  -- Only to support traceTc
+                  =>
+                  SkolemMode -- implicit
+                  -> SkolemMode -- explict
+                  -> HsOuterTyVarBndrs flag GhcRn
+                  -> TcM a
+                  -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
+bindOuterTKBndrsX' i_skol_mode e_skol_mode outer_bndrs thing_inside
   = case outer_bndrs of
       HsOuterImplicit{hso_ximplicit = imp_tvs} ->
-        do { (imp_tvs', thing) <- bindImplicitTKBndrsX skol_mode imp_tvs thing_inside
+        do { (imp_tvs', thing) <- bindImplicitTKBndrsX i_skol_mode imp_tvs thing_inside
            ; return ( HsOuterImplicit{hso_ximplicit = imp_tvs'}
                     , thing) }
       HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-        do { (exp_tvs', thing) <- bindExplicitTKBndrsX skol_mode exp_bndrs thing_inside
+        do { (exp_tvs', thing) <- bindExplicitTKBndrsX e_skol_mode exp_bndrs thing_inside
            ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
                                       , hso_bndrs     = exp_bndrs }
                     , thing) }
@@ -3262,6 +3274,19 @@ outerTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
 -- at least for the HsOuterImplicit case
 outerTyVars (HsOuterImplicit { hso_ximplicit = tvs })  = tvs
 outerTyVars (HsOuterExplicit { hso_xexplicit = tvbs }) = binderVars tvbs
+
+explicitOuterTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
+-- The returned [TcTyVar] is not necessarily in dependency order
+-- at least for the HsOuterImplicit case
+explicitOuterTyVars (HsOuterImplicit {})  = []
+explicitOuterTyVars (HsOuterExplicit { hso_xexplicit = tvbs }) = binderVars tvbs
+
+implicitOuterTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
+-- The returned [TcTyVar] is not necessarily in dependency order
+implicitOuterTyVars (HsOuterImplicit { hso_ximplicit = tvs })  = tvs
+implicitOuterTyVars (HsOuterExplicit {}) = []
+
+
 
 ---------------
 outerTyVarBndrs :: HsOuterTyVarBndrs Specificity GhcTc -> [InvisTVBinder]
@@ -3306,13 +3331,21 @@ bindOuterFamEqnTKBndrs_Q_Tv hs_bndrs thing_inside
                       hs_bndrs thing_inside
     -- sm_clone=False: see Note [Cloning for type variable binders]
 
+-- | bindOuterFamEqnTKBndrs
+-- In this function, we bind the type variables in a type family instance,
+-- also capture wildcards in type families instance decls,
+-- captureWildCards: see Note [Type variables in type families instance decl]
 bindOuterFamEqnTKBndrs :: SkolemInfo
                        -> HsOuterFamEqnTyVarBndrs GhcRn
                        -> TcM a
-                       -> TcM (HsOuterFamEqnTyVarBndrs GhcTc, a)
-bindOuterFamEqnTKBndrs skol_info
-  = bindOuterTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
-                                 , sm_tvtv = SMDSkolemTv skol_info })
+                       -> TcM ([TcTyVar], (HsOuterFamEqnTyVarBndrs GhcTc, a))
+bindOuterFamEqnTKBndrs skol_info hs_bndrs thing_inside
+  = captureWildCards (bindOuterTKBndrsX'
+      (smVanilla { sm_clone = False, sm_parent = True
+                                   , sm_tvtv = SMDTauTv })
+      (smVanilla { sm_clone = False, sm_parent = True
+                                   , sm_tvtv = SMDSkolemTv skol_info })
+                                   hs_bndrs thing_inside)
     -- sm_clone=False: see Note [Cloning for type variable binders]
 
 ---------------
@@ -3508,6 +3541,7 @@ newTyVarBndr (SM { sm_clone = clone, sm_tvtv = tvtv }) name kind
                          ; return (setNameUnique name uniq) }
               False -> return name
        ; details <- case tvtv of
+                 SMDTauTv    -> newMetaDetails TauTv
                  SMDTyVarTv  -> newMetaDetails TyVarTv
                  SMDSkolemTv skol_info ->
                   do { lvl <- getTcLevel
@@ -3600,6 +3634,7 @@ data SkolemMode
 data SkolemModeDetails
   = SMDTyVarTv
   | SMDSkolemTv SkolemInfo
+  | SMDTauTv
 
 
 smVanilla :: HasDebugCallStack => SkolemMode
@@ -3759,7 +3794,7 @@ kindGeneralizeSome skol_info wanted kind_or_type
          vcat [ text "type:" <+> ppr kind_or_type
               , text "dvs:" <+> ppr dvs
               , text "filtered_dvs:" <+> ppr filtered_dvs ]
-       ; quantifyTyVars skol_info DefaultNonStandardTyVars filtered_dvs }
+       ; quantifyTyVars skol_info filtered_dvs }
 
 filterConstrainedCandidates
   :: WantedConstraints    -- Don't quantify over variables free in these
@@ -3787,7 +3822,7 @@ kindGeneralizeAll :: SkolemInfo -> TcType -> TcM [KindVar]
 kindGeneralizeAll skol_info kind_or_type
   = do { traceTc "kindGeneralizeAll" (ppr kind_or_type)
        ; dvs <- candidateQTyVarsOfKind kind_or_type
-       ; quantifyTyVars skol_info DefaultNonStandardTyVars dvs }
+       ; quantifyTyVars skol_info dvs }
 
 -- | Specialized version of 'kindGeneralizeSome', but where no variables
 -- can be generalized, but perhaps some may need to be promoted.

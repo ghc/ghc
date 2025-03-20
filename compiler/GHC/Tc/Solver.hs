@@ -909,7 +909,7 @@ simplifyInfer top_lvl rhs_tclvl infer_mode sigs name_taus wanteds
        ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
 
        ; skol_info <- mkSkolemInfo (InferSkol name_taus)
-       ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars dep_vars
+       ; qtkvs <- quantifyTyVars skol_info dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, False) }
 
@@ -1851,7 +1851,7 @@ decideQuantifiedTyVars skol_info_anon name_taus psigs candidates
            , text "dvs =" <+> ppr dvs_plus])
 
        ; skol_info <- mkSkolemInfo skol_info_anon
-       ; quantifyTyVars skol_info DefaultNonStandardTyVars dvs_plus }
+       ; quantifyTyVars skol_info dvs_plus }
 
 ------------------
 getSeedTys :: [(Name,TcType)]    -- The type of each RHS in the group

@@ -31,7 +31,7 @@ import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
 import GHC.Tc.TyCl.Class ( tcClassDecl2, tcATDefault,
                            HsSigFun, mkHsSigFun, findMethodBind,
                            instantiateMethod )
-import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
+import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX )
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Validity
@@ -517,7 +517,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
                                                  , ai_tyvars = visible_skol_tvs
                                                  , ai_inst_env = mini_env }
                     ; df_stuff  <- mapAndRecoverM (tcDataFamInstDecl mb_info tv_skol_env) adts
-                    ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info)   ats
+                    ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info) ats
 
                       -- Check for missing associated types and build them
                       -- from their defaults (if available)
@@ -883,6 +883,53 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
       let n = lookupWithDefaultVarEnv tv_skol_env (tyVarName tv) tv
       in (n, tv)
 
+{- Note [Type variables in type families instance decl]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To begin with, let's clarify the terminology:
+* user written type variables under forall bound(UTVQ): those are written by users.
+* user written type variables without forall bound(UTVNQ): those are written by users.
+* Wildcards(WC): those are written by users.
+* inferred type variables(ITV): those are inferred by the typechecker.
+* NonStandardTyVars: RuntimeRep, Multiplicity, Levity
+* UTVQ and UTVNQ would not be both present in the same equation. see Note [forall-or-nothing rule]
+
+
+Main goal:
+We want ITV defaulting happens in general just as we do in other places(Be it NonStandardTyVars or not).
+
+1. Align the behavior of UTVNQ and WC: They can both be arbitrary unify with other types.
+   But we should not default them. Need special treatment for them.
+2. ITV: allow to unify with other types and also defauted. simple just give them TauVars.
+3. UTVQ: are not allowed to unify with other types. Simple just give them skolems.
+4. For UTVNQ, we want it to be able to unify with other types through some constraints that can be
+    comming from:
+    1. Parent of associated type families.
+
+      class C x where
+        type T x
+
+      instance C (Either a b) where
+        type T (Either _ b) = b -> b
+
+    2. Explicit kind signature.
+
+      type Cast3 :: forall (b :: RuntimeRep) -> (b :~: IntRep) -> Type
+      type family Cast3 b c where
+        Cast3 b Refl = Int
+
+The obstacle in the old implemenation:
+Obstacle 1. WC is not collected at all in the rename phase, we just give them TauVars in the typecheck phase.
+    But if we want it to skip defaulting step, we should collect them.
+
+Implementation plan:
+* Collect WC to overcomes the obstacle 1.
+  * In typecheck phase, collect wildcards in local typecheck env,
+  1. emit wildcard type variables to the typecheck env using addWildCards in `tcAnonWildCardOcc`
+  2. we use captureWildCards to collect them.
+* ITV: Assign them TauVars, do defaulting(DefaultNonStandardTyVars) and quantification.
+* WC and UTVNQ: Assign them TauVars, but try to skip defaulting(TryNotToDefaultNonStandardTyVars), but quantify just like ITV.
+-}
+
 {-
 Note [Associated data family instances and di_scoped_tvs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -914,6 +961,7 @@ tcDataFamInstDecl is processing a non-associated data family instance, this
 TyVarEnv will simply be empty, and there is nothing to worry about.
 -}
 
+
 -----------------------
 tcDataFamInstHeader
     :: AssocInstInfo -> SkolemInfo -> TyCon -> HsOuterFamEqnTyVarBndrs GhcRn
@@ -928,9 +976,9 @@ tcDataFamInstHeader
 tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                     hs_ctxt hs_pats m_ksig hs_cons
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
-       ; (tclvl, wanted, (outer_bndrs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind)))
+       ; (tclvl, wanted, (wcs, (outer_bndrs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind))))
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
-               bindOuterFamEqnTKBndrs skol_info hs_outer_bndrs    $  -- Binds skolem TcTyVars
+               bindOuterFamEqnTKBndrs skol_info hs_outer_bndrs    $  -- Binds skolem TcTyVars or TauVars
                do { stupid_theta <- tcHsContext hs_ctxt
                   ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
                   ; (lhs_applied_ty, lhs_applied_kind)
@@ -962,26 +1010,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                            , lhs_applied_kind
                            , res_kind ) }
 
-       ; outer_bndrs <- scopedSortOuter outer_bndrs
-       ; let outer_tvs = outerTyVars outer_bndrs
-       ; checkFamTelescope tclvl hs_outer_bndrs outer_tvs
-
-       -- This code (and the stuff immediately above) is very similar
-       -- to that in tcTyFamInstEqnGuts.  Maybe we should abstract the
-       -- common code; but for the moment I concluded that it's
-       -- clearer to duplicate it.  Still, if you fix a bug here,
-       -- check there too!
-
-       -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
-       ; dvs  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
-       ; qtvs <- quantifyTyVars skol_info DefaultNonStandardTyVars dvs
-                 -- DefaultNonStandardTyVars: see (GT4) in 
-                 -- GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
-
-       ; let final_tvs = scopedSort (qtvs ++ outer_tvs)
-             -- This scopedSort is important: the qtvs may be /interleaved/ with
-             -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
-       ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
+       ; (final_tvs, qtvs) <- quantifyFamInstLHSBinders tclvl skol_info outer_bndrs hs_outer_bndrs wcs lhs_ty wanted
 
        ; (final_tvs, non_user_tvs, lhs_ty, master_res_kind, instance_res_kind, stupid_theta) <-
           liftZonkM $ do

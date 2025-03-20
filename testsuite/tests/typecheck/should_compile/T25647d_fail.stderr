@@ -1,0 +1,12 @@
+T25647d_fail.hs:12:19: error: [GHC-76037]
+    Not in scope: type variable ‘c’
+
+T25647d_fail.hs:12:23: error: [GHC-76037]
+    Not in scope: type variable ‘b’
+
+T25647d_fail.hs:12:36: error: [GHC-76037]
+    Not in scope: type variable ‘p’
+
+T25647d_fail.hs:12:39: error: [GHC-76037]
+    Not in scope: type variable ‘q’
+

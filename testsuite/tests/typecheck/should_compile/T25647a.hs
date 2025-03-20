@@ -69,4 +69,30 @@ newtype instance Dix5 f = DIn5 (f (Dix5 f))
 -- newtype instance Dix6 f where
 --   DIn6 :: forall ff. ff (Dix6 ff) -> Dix6 ff
 
+data family Dix7 :: (k -> TYPE 'IntRep) -> k
+newtype instance Dix7 f = DIn7 (f (Dix7 f))
 
+
+
+-- anonymous wildcards
+type Dix8 :: RuntimeRep -> Type
+data family Dix8 r
+newtype instance Dix8 _ = Dix8 Int
+
+dix8 :: Dix8 FloatRep -> Int
+dix8 (Dix8 x) = x
+
+
+-- named wildcards
+type Dix9 :: RuntimeRep -> Type
+data family Dix9 r
+newtype instance Dix9 _r = Dix9 Int
+
+dix9 :: Dix9 FloatRep -> Int
+dix9 (Dix9 x) = x
+
+-- anonymous wildcard should work
+-- class DixC10 a where
+--   type Dix10 a
+-- instance DixC10 Int where
+--   type Dix10 _ = Bool

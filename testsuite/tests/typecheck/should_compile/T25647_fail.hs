@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, UnliftedNewtypes, TypeFamilies, PolyKinds, MagicHash #-}
 
-module T25647 where
+module T25647_fail where
 
 import GHC.Exts
 import Data.Kind
@@ -15,3 +15,7 @@ newtype Fix2 f :: TYPE r where
 type Fix4a :: forall r. (TYPE r -> TYPE r) -> TYPE r
 newtype Fix4a f where
   In4a :: ff (Fix4a ff) -> Fix4a ff
+
+data family Dix6 :: (k -> TYPE 'IntRep) -> k
+newtype instance Dix6 f where
+  DIn6 :: forall ff. ff (Dix6 ff) -> Dix6 ff

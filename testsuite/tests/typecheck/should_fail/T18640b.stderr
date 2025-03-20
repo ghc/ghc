@@ -1,12 +1,12 @@
-
 T18640b.hs:14:10: error: [GHC-25897]
-    • Couldn't match kind ‘k’ with ‘a’
+    • Couldn't match kind ‘a’ with ‘k’
       Expected kind ‘forall b -> a’, but ‘F1’ has kind ‘forall k -> k’
-      ‘k’ is a rigid type variable bound by
-        the type k
-        at T18640b.hs:14:3-11
       ‘a’ is a rigid type variable bound by
         a family instance declaration
         at T18640b.hs:14:6
+      ‘k’ is a rigid type variable bound by
+        the type k
+        at T18640b.hs:14:3-11
     • In the type ‘F1’
       In the type family declaration for ‘F3’
+

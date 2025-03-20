@@ -1,11 +1,11 @@
-
 T14246.hs:20:5: error: [GHC-91510]
     • Illegal polymorphic type: forall (t :: v). f t
     • In the equations for closed type family ‘KLN’
       In the type family declaration for ‘KLN’
 
 T14246.hs:25:27: error: [GHC-83865]
-    • Couldn't match kind ‘*’ with ‘L’
+    • Couldn't match kind: S (KLN (f t))
+                     with: KLN f
       Expected kind ‘Vect (KLN f) L’,
         but ‘Cons (Label (t :: v)) l’ has kind ‘Vect (S (KLN (f t))) (*)’
     • In the second argument of ‘Reveal’, namely
@@ -25,3 +25,4 @@ T14246.hs:26:24: error: [GHC-83865]
       Expected kind ‘Vect (KLN a) L’, but ‘Nil’ has kind ‘Vect Z L’
     • In the second argument of ‘Reveal’, namely ‘Nil’
       In the type family declaration for ‘Reveal’
+
