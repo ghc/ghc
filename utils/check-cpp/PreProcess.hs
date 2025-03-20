@@ -167,8 +167,8 @@ lexAll state = case unP (lexer True return) state of
 -- lexAll state = case unP (lexerDbg True return) state of
 -- lexAll state = case unP (Lexer.lexerDbg True return) state of
     POk s t@(L _ ITeof) -> (s, [t])
-    -- POk state' t -> (ss, t : rest)
-    POk state' t -> (ss, trace ("lexAll:" ++ show t) t : rest)
+    POk state' t -> (ss, t : rest)
+    -- POk state' t -> (ss, trace ("lexAll:" ++ show t) t : rest)
       where
         (ss, rest) = lexAll state'
     PFailed pst -> error $ "failed" ++ showErrorMessages (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
@@ -211,16 +211,16 @@ ppLexer queueComments cont =
         queueComments
         ( \tk ->
             let
-                contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
-                -- contInner t = cont t
+                -- contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
+                contInner t = cont t
                 contIgnoreTok (L l tok) = do
                     case l of
                         RealSrcSpan r (Strict.Just b) -> Lexer.queueIgnoredToken (L (PsSpan r b) tok)
                         _ -> return ()
                     ppLexer queueComments cont
              in
-                -- case tk of
-                case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
+                case tk of
+                -- case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
                     L _ ITeof -> do
                         mInp <- popIncludeLoc
                         case mInp of
@@ -290,7 +290,7 @@ processCpp fs = do
                     accepting <- getAccepting
                     setAccepting (not accepting)
                 Right CppEndif -> do
-                    popScope
+                    popAccepting
                 Right CppDumpState -> do
                     return ()
             -- accepting <- getAccepting

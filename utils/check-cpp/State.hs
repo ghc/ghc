@@ -22,8 +22,8 @@ module State
     setAccepting,
     -- setAccepting',
     pushAccepting,
-    pushAccepting', -- via cppIf
-    popScope,
+    -- pushAccepting', -- via cppIf
+    popAccepting,
     -- popScope',
 
     pushContinuation,
@@ -49,6 +49,7 @@ import GHC.Types.SrcLoc
 import ParserM (Token (..))
 
 -- import GHC.Prelude
+import Debug.Trace
 
 -- ---------------------------------------------------------------------
 
@@ -153,15 +154,22 @@ getCppState = do
 
 -- pp_scope stack start -----------------
 
-pushScope :: PpScope -> PP ()
-pushScope new =
-    P $ \s -> POk s{pp = (pp s){pp_scope = new <| (pp_scope (pp s))}} ()
+setAccepting :: Bool -> PP ()
+setAccepting on = do
+  PpScope parent <- parentScope
+  setScope (PpScope (parent && on))
 
-pushScope' :: PpState -> PpScope -> PpState
-pushScope' s new = s{pp_scope = new <| (pp_scope s)}
+getAccepting :: PP Bool
+getAccepting = P $ \s -> POk s (pp_accepting (NonEmpty.head $ pp_scope (pp s)))
 
-popScope :: PP ()
-popScope =
+-- Start a new scope, ensuring it is consistent with the existing one
+pushAccepting :: Bool -> PP ()
+pushAccepting on = do
+  PpScope current <- getScope
+  pushScope (PpScope (current && on))
+
+popAccepting :: PP ()
+popAccepting =
     P $ \s ->
         let
             new_scope = case pp_scope (pp s) of
@@ -170,22 +178,30 @@ popScope =
          in
             POk s{pp = (pp s){pp_scope = new_scope}} ()
 
--- popScope' :: PpState -> PpState
--- popScope' s =
---     let
---         new_scope = case pp_scope s of
---             c :| [] -> c :| []
---             _ :| (h : t) -> h :| t
---      in
---         s{pp_scope = new_scope}
+-- Deal with the mechanics of pushing a pre-calculated scope
+pushScope :: PpScope -> PP ()
+pushScope new =
+    P $ \s -> POk s{pp = (pp s){pp_scope = new <| (pp_scope (pp s))}} ()
 
+-- Get the parent scope value, or current if at the top
+-- Effectively answers "what is the enclosing scope"
+parentScope :: PP PpScope
+parentScope =
+    P $ \s ->
+        let
+            new_scope = case pp_scope (pp s) of
+                c :| [] -> c -- Perhaps should return enabled instead
+                _ :| (h : _t) -> h
+         in
+            POk s (trace ("parentScope:pp_scope" ++ show (pp_scope (pp s))) new_scope)
+            -- POk s new_scope
+
+-- Get the current scope value
 getScope :: PP PpScope
 getScope =
-    P $ \s -> POk s (getScope' (pp s))
+    P $ \s -> POk s (NonEmpty.head $ pp_scope (pp s))
 
-getScope' :: PpState -> PpScope
-getScope' s = NonEmpty.head $ pp_scope s
-
+-- Replace the current scope value
 setScope :: PpScope -> PP ()
 setScope scope =
     P $ \s ->
@@ -195,35 +211,43 @@ setScope scope =
          in
             POk s{pp = (pp s){pp_scope = new_scope}} ()
 
--- setScope' :: PpState -> PpScope -> PpState
--- setScope' s scope =
---     let
---         new_scope = case pp_scope s of
---             _ :| rest -> scope :| rest
---      in
---         s{pp_scope = new_scope}
+{-
+Note [PpScope stack]
+~~~~~~~~~~~~~~~~~~~~
 
-setAccepting :: Bool -> PP ()
-setAccepting on = do
-    scope <- getScope
-    setScope (scope{pp_accepting = on})
+The preprocessor does fundamentally one thing: tt tracks for a
+given region of code if we are processing it, or ignoring it.
 
-pushAccepting :: Bool -> PP ()
-pushAccepting on = pushScope (PpScope on)
+To do that is tracks directives, and when it finds a conditional one,
+evaluates it, and decides if the state should be processing or
+ignoring.
 
-pushAccepting' :: PpState -> Bool -> PpState
-pushAccepting' s on = pushScope' s (PpScope on)
+The complexity comes because these can be nested. so, in
 
--- setAccepting' :: PpState -> Bool -> PpState
--- setAccepting' s on = setScope' s (scope{pp_accepting = on})
---   where
---     scope = getScope' s
+    #if 0
+      #if 1
+      -- first
+      #else
+      -- second
+      #endif
+    #else
+    -- only part on
+    #endif
 
-getAccepting :: PP Bool
-getAccepting = P $ \s -> POk s (pp_accepting (NonEmpty.head $ pp_scope (pp s)))
+The only part processed by the Parser is `-- only part on`, even
+though the immediately containing `#if` for `-- first` ostensibly
+turns it on.
 
--- getAccepting' :: PpState -> Bool
--- getAccepting' s = pp_accepting (NonEmpty.head $ pp_scope s)
+The PpScope stack tracks the nested scopes, and answers the
+fundamental question based on it.
+
+The key point is that for a given location, with an associated scope
+stack, it is only enabled if all the scopes are enabled.
+
+When doing an update, if it is already off, in the enclosing scope, it
+can only remain off.
+
+-}
 
 -- pp_scope stack end -----------------
 
@@ -252,9 +276,6 @@ ppIsDefined name = do
 ppIsDefined' :: PpState -> MacroName -> Bool
 ppIsDefined' s (MacroName name _args) =
     isJust $ Map.lookup name (pp_defines s)
-
--- ppDefinition' :: PpState -> String -> Maybe (Map (Maybe Int) ((Maybe MacroArgs), MacroDef))
--- ppDefinition' s name = Map.lookup name (pp_defines s)
 
 getPpState :: PP PpState
 getPpState = P $ \s -> POk s (pp s)
