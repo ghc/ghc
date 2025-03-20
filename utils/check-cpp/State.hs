@@ -1,4 +1,37 @@
-module State where
+module State
+  (
+    Expr(..),
+    CompOp(..),
+    LogicOp(..),
+
+    CppDirective(..),
+    Input, Output,
+    PpState(..), initPpState, PP,
+    PpScope(..),
+    MacroDefines,
+    MacroDef,
+    MacroName(..),
+    MacroArgs,
+    CppState(..),
+
+    arg_arity,
+    getAccepting',
+    setAccepting',
+    setAccepting,
+    getAccepting,
+    pushAccepting,
+    pushAccepting',
+    pushContinuation,
+    ppIsDefined,
+    ppIsDefined',
+    addDefine',
+    popScope,
+    popScope',
+    popContinuation,
+    ppDefine,
+    getCppState,
+    ghcCppEnabled
+  ) where
 
 import Data.List.NonEmpty ((<|))
 import qualified Data.List.NonEmpty as NonEmpty
@@ -189,6 +222,8 @@ getAccepting = P $ \s -> POk s (pp_accepting (NonEmpty.head $ pp_scope (pp s)))
 getAccepting' :: PpState -> Bool
 getAccepting' s = pp_accepting (NonEmpty.head $ pp_scope s)
 
+-- pp_scope stack end -----------------
+
 ghcCppEnabled :: PP Bool
 ghcCppEnabled = P $ \s -> POk s (Lexer.ghcCppEnabled (options s))
 
@@ -215,8 +250,8 @@ ppIsDefined' :: PpState -> MacroName -> Bool
 ppIsDefined' s (MacroName name _args) =
     isJust $ Map.lookup name (pp_defines s)
 
-ppDefinition' :: PpState -> String -> Maybe (Map (Maybe Int) ((Maybe MacroArgs), MacroDef))
-ppDefinition' s name = Map.lookup name (pp_defines s)
+-- ppDefinition' :: PpState -> String -> Maybe (Map (Maybe Int) ((Maybe MacroArgs), MacroDef))
+-- ppDefinition' s name = Map.lookup name (pp_defines s)
 
 getPpState :: PP PpState
 getPpState = P $ \s -> POk s (pp s)

@@ -577,3 +577,16 @@ t21 :: IO ()
 t21 = do
     dump
         ["x = 1"]
+
+t22 :: IO ()
+t22 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module Example4 where"
+        , "#if 0"
+        , "ignored"
+        , "#if 1"
+        , "also ignored"
+        , "#endif"
+        , "#endif"
+        ]
