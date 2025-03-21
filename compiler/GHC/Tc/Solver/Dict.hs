@@ -178,7 +178,7 @@ solveCallStack ev ev_cs
   -- dictionary, so we have to coerce ev_cs to a dictionary for
   -- `IP ip CallStack`. See Note [Overview of implicit CallStacks]
   = do { inner_stk <- evCallStack pred ev_cs
-       ; let ev_tm = EvExpr (evWrapIP pred inner_stk)
+       ; let ev_tm = EvExpr (evWrapIPE pred inner_stk)
        ; setEvBindIfWanted ev EvCanonical ev_tm }
          -- EvCanonical: see Note [CallStack and ExceptionContext hack]
   where
@@ -211,7 +211,7 @@ evCallStack pred (EvCsPushCall fs loc tm)
                -- but we need the actual CallStack to pass to pushCS,
                -- so we use evUwrapIP to strip the dictionary wrapper
                -- See Note [Overview of implicit CallStacks]
-       ; let outer_stk = evUnwrapIP pred tm
+       ; let outer_stk = evUnwrapIPE pred tm
        ; return (mkCoreApps (Var push_cs_id)
                     [mkCoreTup [name_expr, loc_expr], outer_stk]) }
 

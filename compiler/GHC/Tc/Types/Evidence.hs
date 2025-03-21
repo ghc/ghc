@@ -27,9 +27,9 @@ module GHC.Tc.Types.Evidence (
 
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
-  evId, evCoercion, evCast, evCastExpr, evDFunApp,  evDictApp, evSelector, evDelayedError,
+  evId, evCoercion, evCast, evCastE, evDFunApp,  evDictApp, evSelector, evDelayedError,
   evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
-  decomposeIP, evWrapIP, evUnwrapIP, evWrapUnaryDict,
+  evWrapIPE, evUnwrapIPE, evUnaryDictAppE,
   mkEvCast,
 
   evTermCoercion, evTermCoercion_maybe,
@@ -61,7 +61,7 @@ import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.Make    ( mkWildCase, mkRuntimeErrorApp, tYPE_ERROR_ID )
-import GHC.Core.Class   ( classTyCon, classMethods )
+import GHC.Core.Class   ( classTyCon )
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
@@ -536,13 +536,13 @@ mkEvCast :: EvExpr -> TcCoercion -> EvTerm
 mkEvCast = evCast
 
 evCast :: EvExpr -> TcCoercion -> EvTerm
-evCast et tc = EvExpr (evCastExpr et tc)
+evCast et tc = EvExpr (evCastE et tc)
 
 -- | d |> co
-evCastExpr :: EvExpr -> TcCoercion -> EvExpr
-evCastExpr ee co
+evCastE :: EvExpr -> TcCoercion -> EvExpr
+evCastE ee co
   | assertPpr (coercionRole co == Representational)
-              (vcat [text "Coercion of wrong role passed to evCastExpr:", ppr ee, ppr co]) $
+              (vcat [text "Coercion of wrong role passed to evCastE:", ppr ee, ppr co]) $
     isReflCo co = ee
   | otherwise   = Cast ee co
 
@@ -563,10 +563,29 @@ evDictAppE cls tys args
       Just dc -> evDFunAppE (dataConWrapId dc) tys args
       Nothing -> pprPanic "evDictApp" (ppr cls)
 
-evWrapUnaryDict :: Class -> [Type] -> EvExpr -> EvExpr
+evUnaryDictAppE :: Class -> [Type] -> EvExpr -> EvExpr
 -- See (UCM6) in Note [Unary class magic] in GHC.Core.TyCon
-evWrapUnaryDict cls tys meth
+evUnaryDictAppE cls tys meth
   = evDictAppE cls tys [meth]
+
+evWrapIPE :: PredType -> EvExpr -> EvExpr
+-- Given  pred = IP s ty
+  --      et_tm :: ty
+-- Return an EvTerm of type (IP s ty)
+evWrapIPE pred ev_tm
+  = evUnaryDictAppE cls tys ev_tm
+  where
+    (cls, tys) = getClassPredTys pred
+
+evUnwrapIPE :: PredType -> EvExpr -> EvExpr
+-- Given  pred = IP s ty
+  --      et_tm :: (IP s ty)
+-- Return an EvTerm of type ty
+evUnwrapIPE pred ev_tm
+  = mkApps (Var ip_sel) (map Type tys ++ [ev_tm])
+  where
+    (ip_sel, tys) = decomposeIPPred pred
+
 
 -- Selector id plus the types at which it
 -- should be instantiated, used for HasField
@@ -1039,44 +1058,6 @@ instance Outputable EvTypeable where
   ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> arr <+> ppr t2)
     where
       arr = pprArrowWithMultiplicity visArgTypeLike (Right (ppr tm))
-
-
-----------------------------------------------------------------------
--- Helper functions for dealing with IP newtype-dictionaries
-----------------------------------------------------------------------
-
--- | Take a type (IP sym ty), where IP is the built in IP class
--- and return (ip, MkIP, [sym,ty]), where
---    `ip` is the class-op for class IP
---    `MkIP` is the data constructor for class IP
-decomposeIP :: Type -> (Id, [Type])
-decomposeIP ty
-  | Just cls <- tyConClass_maybe tc
-  , [ip_op] <- classMethods cls
-  = assertPpr (isIPClass cls && isUnaryClassTyCon tc) (ppr tc) $
-    (ip_op, tys)
-  | otherwise = pprPanic "decomposeIP" (ppr tc)
-  where
-    (tc, tys) = splitTyConApp ty
-
-evWrapIP :: PredType -> EvExpr -> EvExpr
--- Given  pred = IP s ty
-  --      et_tm :: ty
--- Return an EvTerm of type (IP s ty)
-evWrapIP pred ev_tm
-  = evWrapUnaryDict cls tys ev_tm
-  where
-    (cls, tys) = getClassPredTys pred
-
-evUnwrapIP :: PredType -> EvExpr -> EvExpr
--- Given  pred = IP s ty
-  --      et_tm :: (IP s ty)
--- Return an EvTerm of type ty
-evUnwrapIP pred ev_tm
-  = mkApps (Var ip_sel) (map Type tys ++ [ev_tm])
-  where
-    (ip_sel, tys) = decomposeIP pred
-
 
 ----------------------------------------------------------------------
 -- A datatype used to pass information when desugaring quotations

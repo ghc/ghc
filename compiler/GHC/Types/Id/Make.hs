@@ -54,6 +54,7 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep
 import GHC.Core.FamInstEnv
+import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.Make
@@ -475,6 +476,7 @@ Therefore there is no loss of generality if we make all selectors unrestricted.
 mkDictSelId :: Name          -- Name of one of the *value* selectors
                              -- (dictionary superclass or method)
             -> Class -> Id
+-- Important: see Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
 mkDictSelId name clas
   = mkGlobalId (ClassOpId clas terminating) name sel_ty info
   where
@@ -503,8 +505,7 @@ mkDictSelId name clas
 
     info = base_info `setRuleInfo` mkRuleInfo [rule]
            -- No unfolding for a dictionary selector; the RULE does the work,
-           -- Its curried definition is added by GHC.Iface.Tidy.getClassImplicitBinds,
-           -- using `mkDictSelRhs` below
+           -- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
 
     -- This is the built-in rule that goes
     --      op (dfT d1 d2) --->  opT d1 d2
@@ -530,6 +531,7 @@ mkDictSelId name clas
 mkDictSelRhs :: Class
              -> Int         -- 0-indexed selector among (superclasses ++ methods)
              -> CoreExpr
+-- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
 mkDictSelRhs clas val_index
   = mkLams tyvars (Lam dict_id rhs_body)
   where
@@ -560,6 +562,7 @@ dictSelRule :: Int -> Arity -> RuleFun
 -- from it
 --       sel_i t1..tk (D t1..tk op1 ... opm) = opi
 --
+-- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
 dictSelRule val_index n_ty_args _ id_unf _ args
   | (dict_arg : _) <- drop n_ty_args args
   , Just (_, floats, _, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
@@ -578,14 +581,7 @@ dictSelRule val_index n_ty_args _ id_unf _ args
 mkDataConWorkId :: Name -> DataCon -> Id
 mkDataConWorkId wkr_name data_con
   | isNewTyCon tycon       -- See Note [Newtype workers]
-  = if isClassTyCon tycon then
-      mkGlobalId (DataConWorkId data_con) wkr_name wkr_ty
-        (nt_info `setInlinePragInfo` neverInlinePragma { inl_rule = ConLike }
-                 `setUnfoldingInfo`  mkDataConUnfolding newtype_rhs)
-    else
-      mkGlobalId (DataConWrapId data_con) wkr_name wkr_ty
-        (nt_info `setInlinePragInfo` dataConWrapperInlinePragma
-                 `setUnfoldingInfo`  mkCompulsoryUnfolding newtype_rhs)
+  = mkGlobalId (DataConWrapId data_con) wkr_name wkr_ty nt_info
 
   | otherwise
   = mkGlobalId (DataConWorkId data_con) wkr_name wkr_ty alg_wkr_info
@@ -625,9 +621,11 @@ mkDataConWorkId wkr_name data_con
 
     ----------- Workers for newtypes --------------
     nt_info  = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
-                  `setArityInfo` 1  -- Arity 1
-                  `setLFInfo` (panic "mkDataConWorkId: we shouldn't look at LFInfo for newtype worker ids")
-                               -- See W1 in Note [LFInfo of DataCon workers and wrappers]
+               `setArityInfo` 1  -- Arity 1
+               `setInlinePragInfo` dataConWrapperInlinePragma
+               `setUnfoldingInfo`  mkCompulsoryUnfolding newtype_rhs
+               `setLFInfo` (panic "mkDataConWorkId: no LFInfo for newtype worker ids")
+                           -- See W1 in Note [LFInfo of DataCon workers and wrappers]
 
     id_arg1     = mkScaledTemplateLocal 1 (head arg_tys)
     res_ty_args = mkTyCoVarTys univ_tvs
@@ -909,8 +907,8 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
         -- See wrinkle (W0) in Note [Type data declarations] in GHC.Rename.Module.
       = False
 
-      | isUnaryClassTyCon tycon   -- See Note [Unary class magic]
-      = False
+      | isUnaryClassTyCon tycon   -- See (UCM8) in Note [Unary class magic]
+      = False                     -- in GHC.Core.TyCon
 
       | otherwise
       = (not new_tycon
@@ -1849,7 +1847,7 @@ mkDictFunId dfun_name tvs theta clas tys
                       dfun_name
                       dfun_ty
   where
-    is_unary = isUnaryClassTyCon (classTyCon clas)
+    is_unary = isUnaryClass clas
     dfun_ty  = TcType.tcMkDFunSigmaTy tvs theta (mkClassPred clas tys)
 
 {-

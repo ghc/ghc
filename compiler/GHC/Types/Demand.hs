@@ -2411,7 +2411,7 @@ dmdTransformDictSelSig (DmdSig (DmdType _ [_ :* dict_dmd])) call_sd
    = multDmdType n $
      DmdType nopDmdEnv [C_11 :* mkProd Unboxed (map (enhance sd') sig_ds)]
    | otherwise
-   = nopDmdType -- See Note [Demand transformer for a dictionary selector
+   = nopDmdType -- See Note [Demand transformer for a dictionary selector]
   where
     enhance _   AbsDmd   = AbsDmd
     enhance _   BotDmd   = BotDmd
@@ -2461,7 +2461,7 @@ the whole signature really means `\d. P(AAAdAAAAA)` for any incoming
 demand 'd'.
 
 NB: even unary classes behave as if there was a data constructor, and so do
-not need special handling here. See Note [Unary class magic].
+not need special handling here. See Note [Unary class magic] in GHC.Core.TyCon.
 -}
 
 zapDmdEnv :: DmdEnv -> DmdEnv

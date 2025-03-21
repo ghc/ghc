@@ -115,7 +115,7 @@ dsIPBinds (IPBinds ev_binds ip_binds) body
     -- Use evWrapIP to convert `e` (the user-written RHS) to an IP dictionary
     ds_ip_bind (L _ (IPBind n _ e)) body
       = do e' <- dsLExpr e
-           return (Let (NonRec n (evWrapIP (idType n) e')) body)
+           return (Let (NonRec n (evWrapIPE (idType n) e')) body)
 
 -------------------------
 -- caller sets location

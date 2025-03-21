@@ -27,7 +27,6 @@ import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Core.DataCon
 import GHC.Core.Utils
-import GHC.Core.TyCon( isUnaryClassTyCon )
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -85,7 +84,7 @@ mkSimpleUnfolding !opts rhs
 
 mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops
-  | isUnaryClassTyCon (dataConTyCon con)
+  | isUnaryClassDataCon con
   = -- See (UCM5) in Note [Unary class magic] in GHC.Core.TyCon
     mkDataConUnfolding $
     mkLams bndrs  $
