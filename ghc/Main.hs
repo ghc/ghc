@@ -335,7 +335,7 @@ checkOptions mode dflags srcs objs units = do
 
         -- -prof and --interactive are not a good combination
    when ((fullWays (ways dflags) /= hostFullWays)
-         && isInterpretiveMode mode
+         && LinkInMemory == ghcLink dflags
          && not (gopt Opt_ExternalInterpreter dflags)) $
       do throwGhcException (UsageError
               "-fexternal-interpreter is required when using --interactive with a non-standard way (-prof, -static, or -dynamic).")
