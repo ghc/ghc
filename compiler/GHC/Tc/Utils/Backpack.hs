@@ -644,7 +644,7 @@ mergeSignatures
                                     emptyImportAvails
                                     (tcg_semantic_mod tcg_env)
                         case mb_r of
-                            Just (_, as2, _) -> return (thinModIface as2 ireq_iface, as2)
+                            Just (_, _, as2, _) -> return (thinModIface as2 ireq_iface, as2)
                             Nothing -> addMessages msgs >> failM
                     -- We can't thin signatures from non-signature packages
                     _ -> return (ireq_iface, as1)
@@ -701,8 +701,9 @@ mergeSignatures
 
     -- Make sure we didn't refer to anything that doesn't actually exist
     -- pprTrace "mergeSignatures: exports_from_avail" (ppr exports) $ return ()
-    (mb_lies, _, _) <- exports_from_avail mb_exports rdr_env
-                        (tcg_imports tcg_env) (tcg_semantic_mod tcg_env)
+    (mb_lies, exp_dflts, _, _) <-
+      exports_from_avail mb_exports rdr_env
+          (tcg_imports tcg_env) (tcg_semantic_mod tcg_env)
 
     {- -- NB: This is commented out, because warns above is disabled.
     -- If you tried to explicitly export an identifier that has a warning
@@ -722,8 +723,7 @@ mergeSignatures
     failIfErrsM
 
     -- Save the exports
-    let drop_defaults (spans, _defaults, avails) = (spans, avails)
-    setGblEnv tcg_env { tcg_rn_exports = map drop_defaults <$> mb_lies } $ do
+    setGblEnv tcg_env { tcg_rn_exports = mb_lies, tcg_default_exports = exp_dflts } $ do
     tcg_env <- getGblEnv
 
     let home_unit = hsc_home_unit hsc_env

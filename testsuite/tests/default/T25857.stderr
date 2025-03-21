@@ -1,0 +1,3 @@
+T25857.hs:4:33: warning: [GHC-31584] [-Wduplicate-exports (in -Wdefault)]
+    The named default declaration for ‘IsString’ is exported by ‘default IsString’ and ‘default IsString’
+

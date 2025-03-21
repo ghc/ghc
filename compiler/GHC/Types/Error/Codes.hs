@@ -507,6 +507,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnExportHiddenComponents"                    = 94558
   GhcDiagnosticCode "TcRnExportHiddenDefault"                       = 74775
   GhcDiagnosticCode "TcRnDuplicateExport"                           = 47854
+  GhcDiagnosticCode "TcRnDuplicateNamedDefaultExport"               = 31584
   GhcDiagnosticCode "TcRnExportedParentChildMismatch"               = 88993
   GhcDiagnosticCode "TcRnConflictingExports"                        = 69158
   GhcDiagnosticCode "TcRnDuplicateFieldExport"                      = 97219

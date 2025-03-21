@@ -629,6 +629,11 @@ instance Diagnostic TcRnMessage where
            hsep [ quotes (ppr $ greName gre)
                 , text "is exported by", quotes (ppr ie1)
                 , text "and",            quotes (ppr ie2) ]
+    TcRnDuplicateNamedDefaultExport nm ie1 ie2
+      -> mkSimpleDecorated $
+           hsep [ text "The named default declaration for" <+> quotes (ppr nm)
+                , text "is exported by", quotes (ppr ie1)
+                , text "and",            quotes (ppr ie2) ]
     TcRnExportedParentChildMismatch parent_name ty_thing child parent_names
       -> mkSimpleDecorated $
            text "The type constructor" <+> quotes (ppr parent_name)
@@ -2186,6 +2191,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnDuplicateExport{}
       -> WarningWithFlag Opt_WarnDuplicateExports
+    TcRnDuplicateNamedDefaultExport{}
+      -> WarningWithFlag Opt_WarnDuplicateExports
     TcRnExportedParentChildMismatch{}
       -> ErrorWithoutFlag
     TcRnConflictingExports{}
@@ -2863,6 +2870,8 @@ instance Diagnostic TcRnMessage where
     TcRnExportHiddenDefault{}
       -> noHints
     TcRnDuplicateExport{}
+      -> noHints
+    TcRnDuplicateNamedDefaultExport{}
       -> noHints
     TcRnExportedParentChildMismatch{}
       -> noHints

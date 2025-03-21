@@ -1617,6 +1617,13 @@ data TcRnMessage where
   -}
   TcRnDuplicateExport :: GlobalRdrElt -> IE GhcPs -> IE GhcPs -> TcRnMessage
 
+  {-| TcRnDuplicateNamedDefaultExport is a warning (controlled by -Wduplicate-exports)
+      that occurs when a named default declaration appears in an export list
+      more than once.
+
+  -}
+  TcRnDuplicateNamedDefaultExport :: TyCon -> IE GhcPs -> IE GhcPs -> TcRnMessage
+
   {-| TcRnExportedParentChildMismatch is an error that occurs when an export is
       bundled with a parent that it does not belong to
 

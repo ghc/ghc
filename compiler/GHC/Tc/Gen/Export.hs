@@ -1,8 +1,9 @@
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RankNTypes         #-}
+{-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE TupleSections      #-}
 
 module GHC.Tc.Gen.Export (rnExports, exports_from_avail, classifyGREs) where
 
@@ -25,7 +26,6 @@ import GHC.Unit.Module
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module.Warnings
 import GHC.Core.TyCon
-import GHC.Utils.Misc (sndOf3, thdOf3)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.ConLike
@@ -42,8 +42,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Types.DefaultEnv (ClassDefaults (cd_class), DefaultEnv,
-                             emptyDefaultEnv, filterDefaultEnv, isEmptyDefaultEnv)
+import GHC.Types.DefaultEnv
 import GHC.Types.Avail
 import GHC.Types.SourceFile
 import GHC.Types.Id
@@ -56,6 +55,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Traversable   ( for )
 import Data.List ( sortBy )
 import qualified Data.Map as Map
+import GHC.Types.Unique.FM
 
 {-
 ************************************************************************
@@ -144,6 +144,8 @@ data ExportAccum        -- The type of the accumulating parameter of
      = ExportAccum {
          expacc_exp_occs :: ExportOccMap,
            -- ^ Tracks exported occurrence names
+         expacc_exp_dflts :: NameEnv (ClassDefaults, IE GhcPs),
+           -- ^ Tracks exported named default declarations
          expacc_mods :: UniqMap ModuleName [Name],
            -- ^ Tracks (re-)exported module names
            --   and the names they re-export
@@ -156,15 +158,16 @@ data ExportAccum        -- The type of the accumulating parameter of
 
 
 emptyExportAccum :: ExportAccum
-emptyExportAccum = ExportAccum emptyOccEnv emptyUniqMap [] emptyNameEnv
+emptyExportAccum = ExportAccum emptyOccEnv emptyNameEnv emptyUniqMap [] emptyNameEnv
 
 accumExports :: (ExportAccum -> x -> TcRn (ExportAccum, Maybe y))
              -> [x]
-             -> TcRn ([y], ExportWarnSpanNames, DontWarnExportNames)
+             -> TcRn ([y], DefaultEnv, ExportWarnSpanNames, DontWarnExportNames)
 accumExports f xs = do
-  (ExportAccum _ _ export_warn_spans dont_warn_export, ys)
+  (ExportAccum _ dflts _ export_warn_spans dont_warn_export, ys)
     <- mapAccumLM f' emptyExportAccum xs
   return ( catMaybes ys
+         , fmap fst dflts
          , export_warn_spans
          , dont_warn_export )
   where f' acc x
@@ -217,7 +220,7 @@ rnExports explicit_mod exports
 
         -- Rename the export list
         ; let do_it = exports_from_avail real_exports rdr_env imports this_mod
-        ; (rn_exports, final_avails, new_export_warns)
+        ; (rn_exports, default_env, final_avails, new_export_warns)
             <- if hsc_src == HsigFile
                 then do (mb_r, msgs) <- tryTc do_it
                         case mb_r of
@@ -227,17 +230,16 @@ rnExports explicit_mod exports
 
         -- Final processing
         ; let final_ns = availsToNameSet final_avails
-              drop_defaults (spans, _defaults, avails) = (spans, avails)
 
         ; traceRn "rnExports: Exports:" (ppr final_avails)
 
         ; return (tcg_env { tcg_exports    = final_avails
                           , tcg_rn_exports = case tcg_rn_exports tcg_env of
                                                 Nothing -> Nothing
-                                                Just _  -> map drop_defaults <$> rn_exports
+                                                Just _  -> rn_exports
                           , tcg_default_exports = case exports of
                               Nothing -> emptyDefaultEnv
-                              _ -> foldMap (foldMap sndOf3) rn_exports
+                              _ -> default_env
                           , tcg_dus = tcg_dus tcg_env `plusDU`
                                       usesOnly final_ns
                           , tcg_warns = insertWarnExports
@@ -295,7 +297,7 @@ exports_from_avail :: Maybe (LocatedLI [LIE GhcPs])
                          -- @module Foo@ export is valid (it's not valid
                          -- if we didn't import @Foo@!)
                    -> Module
-                   -> RnM (Maybe [(LIE GhcRn, DefaultEnv, Avails)], Avails, ExportWarnNames GhcRn)
+                   -> RnM (Maybe [(LIE GhcRn, Avails)], DefaultEnv, Avails, ExportWarnNames GhcRn)
                          -- (Nothing, _, _) <=> no explicit export list
                          -- if explicit export list is present it contains
                          -- each renamed export item together with its exported
@@ -311,7 +313,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
     ; let avails =
             map fix_faminst . gresToAvailInfo
               . filter isLocalGRE . globalRdrEnvElts $ rdr_env
-    ; return (Nothing, avails, []) }
+    ; return (Nothing, emptyDefaultEnv, avails, []) }
   where
     -- #11164: when we define a data instance
     -- but not data family, re-export the family
@@ -327,14 +329,14 @@ exports_from_avail Nothing rdr_env _imports _this_mod
 
 
 exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
-  = do (ie_avails, export_warn_spans, dont_warn_export)
+  = do (ie_avails, ie_dflts, export_warn_spans, dont_warn_export)
          <- accumExports do_litem rdr_items
-       let final_exports = nubAvails (concatMap thdOf3 ie_avails) -- Combine families
+       let final_exports = nubAvails (concatMap snd ie_avails) -- Combine families
        export_warn_names <- aggregate_warnings export_warn_spans dont_warn_export
-       return (Just ie_avails, final_exports, export_warn_names)
+       return (Just ie_avails, ie_dflts, final_exports, export_warn_names)
   where
     do_litem :: ExportAccum -> LIE GhcPs
-             -> RnM (ExportAccum, Maybe (LIE GhcRn, DefaultEnv, Avails))
+             -> RnM (ExportAccum, Maybe (LIE GhcRn, Avails))
     do_litem acc lie = setSrcSpan (getLocA lie) (exports_from_item acc lie)
 
     -- Maps a parent to its in-scope children
@@ -355,9 +357,10 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                        , imv <- importedByUser xs ]
 
     exports_from_item :: ExportAccum -> LIE GhcPs
-                      -> RnM (ExportAccum, Maybe (LIE GhcRn, DefaultEnv, Avails))
+                      -> RnM (ExportAccum, Maybe (LIE GhcRn, Avails))
     exports_from_item expacc@ExportAccum{
                         expacc_exp_occs   = occs,
+                        expacc_exp_dflts  = exp_dflts,
                         expacc_mods       = earlier_mods,
                         expacc_warn_spans = export_warn_spans,
                         expacc_dont_warn  = dont_warn_export
@@ -413,28 +416,30 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                       (vcat [ ppr mod
                             , ppr new_exports ])
             ; return ( ExportAccum { expacc_exp_occs   = occs'
+                                   , expacc_exp_dflts  = exp_dflts -- IEModuleContents does not re-export defaults
                                    , expacc_mods       = mods
                                    , expacc_warn_spans = export_warn_spans'
                                    , expacc_dont_warn  = dont_warn_export' }
-                     , Just (L loc (IEModuleContents warn_txt_rn lmod), emptyDefaultEnv, new_exports) ) }
+                     , Just (L loc (IEModuleContents warn_txt_rn lmod), new_exports) ) }
 
     exports_from_item acc lie = do
         m_doc_ie <- lookup_doc_ie lie
         case m_doc_ie of
-          Just new_ie -> return (acc, Just (new_ie, emptyDefaultEnv, []))
+          Just new_ie ->
+            return (acc, Just (new_ie, []))
           Nothing -> do
             m_ie <- lookup_ie acc lie
             case m_ie of
               Nothing -> return (acc, Nothing)
-              Just (acc', new_ie, Left cls) -> do
-                defaults <- tcg_default <$> getGblEnv
-                let exported_default = filterDefaultEnv ((cls ==) . nameOccName . className . cd_class) defaults
-                return (acc', Just (new_ie, exported_default, []))
-              Just (acc', new_ie, Right avail)
-                -> return (acc', Just (new_ie, emptyDefaultEnv, [avail]))
+              Just (acc', new_ie, mb_item) ->
+                case mb_item of
+                  Nothing ->
+                    return (acc', Nothing)
+                  Just avail ->
+                    return (acc', Just (new_ie, [avail]))
 
     -------------
-    lookup_ie :: ExportAccum -> LIE GhcPs -> RnM (Maybe (ExportAccum, LIE GhcRn, Either OccName AvailInfo))
+    lookup_ie :: ExportAccum -> LIE GhcPs -> RnM (Maybe (ExportAccum, LIE GhcRn, Maybe AvailInfo))
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
             expacc_warn_spans = export_warn_spans,
@@ -458,10 +463,11 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
                       , L loc (IEVar warn_txt_rn (replaceLWrappedName l name) doc')
-                      , Right avail )
+                      , Just avail )
 
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
+            expacc_exp_dflts  = exp_dflts,
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
           } (L loc ie@(IEThingAbs warn_txt_ps l doc))
@@ -470,7 +476,28 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                let avail = availFromGRE gre
                    name = greName gre
 
-               occs' <- check_occs occs ie [gre]
+               (mb_avail, occs', exp_dflts') <-
+                 case unLoc l of
+                   -- see Note [Default exports]
+                   IEDefault {} -> do
+                     defaults <- tcg_default <$> getGblEnv
+                     case lookupUFM_Directly defaults (nameUnique name) of
+                       Nothing ->
+                        do addErr $ TcRnExportHiddenDefault ie
+                           return (Nothing, occs, exp_dflts)
+                       Just cls_dflts -> do
+                         let cls = cd_class cls_dflts
+                         case lookupNameEnv exp_dflts (className cls) of
+                           Just (_, ie') -> do
+                             addDiagnostic $
+                               TcRnDuplicateNamedDefaultExport (classTyCon cls) ie ie'
+                             return (Nothing, occs, exp_dflts)
+                           Nothing ->
+                            return $ (Nothing, occs, extendNameEnv exp_dflts (className cls) (cls_dflts, ie))
+                   _ -> do
+                    occs' <- check_occs occs ie [gre]
+                    return (Just avail, occs', exp_dflts)
+
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
                                     dont_warn_export
@@ -479,21 +506,12 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                     (locA loc)
 
                doc' <- traverse rnLHsDoc doc
-               avail' <- case unLoc l of
-                 -- see Note [Default exports]
-                 IEDefault _ cls -> do
-                   let defaultOccName = nameOccName . className . cd_class
-                       occName = rdrNameOcc (unLoc cls)
-                   defaults <- tcg_default <$> getGblEnv
-                   when (isEmptyDefaultEnv $ filterDefaultEnv ((occName ==) . defaultOccName) defaults)
-                        (addErr $ TcRnExportHiddenDefault ie)
-                   pure (Left occName)
-                 _ -> pure (Right avail)
                return ( expacc{ expacc_exp_occs   = occs'
+                              , expacc_exp_dflts  = exp_dflts'
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
                       , L loc (IEThingAbs warn_txt_rn (replaceLWrappedName l name) doc')
-                      , avail' )
+                      , mb_avail )
 
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
@@ -520,7 +538,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
                       , L loc (IEThingAll (warn_txt_rn, ann) (replaceLWrappedName l name) doc')
-                      , Right (AvailTC name all_names) )
+                      , Just $ AvailTC name all_names )
 
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
@@ -557,7 +575,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
                       , L loc (IEThingWith (warn_txt_rn, ann) (replaceLWrappedName l name) wc subs doc')
-                      , Right (AvailTC name all_names) )
+                      , Just $ AvailTC name all_names )
 
     lookup_ie _ _ = panic "lookup_ie"    -- Other cases covered earlier
 
