@@ -43,6 +43,11 @@ T3990b:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T3990b.hs | grep 'test_case'
         # Grep output should show an unpacked constructor
 
+T3990c:
+	$(RM) -f T3990c.o T3990c.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T3990c.hs | grep 'test_case'
+        # Grep output should show an unpacked constructor
+
 T8848:
 	$(RM) -f T8848.o T8848.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-rule-firings T8848.hs | grep 'SPEC map2'

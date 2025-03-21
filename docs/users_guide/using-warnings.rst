@@ -84,6 +84,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wnoncanonical-monad-instances`
         * :ghc-flag:`-Wdata-kinds-tc`
         * :ghc-flag:`-Wimplicit-rhs-quantification`
+        * :ghc-flag:`-Wunusable-unpack-pragmas`
 
 .. ghc-flag:: -W
     :shortdesc: enable normal warnings
@@ -2645,6 +2646,40 @@ of ``-W(no-)*``.
 
     To make the code forwards-compatible and silence the warning, users are
     advised to add parentheses manually.
+
+.. ghc-flag:: -Wunusable-unpack-pragmas
+    :shortdesc: warn when an ``{-# UNPACK #-}`` pragma is unusable
+    :type: dynamic
+    :reverse: -Wno-unusable-unpack-pragmas
+
+    :since: 9.14.1
+    :default: on
+
+    Warn on unusable ``{-# UNPACK #-}`` pragmas in data type declarations.
+    Examples::
+
+        data T = MkT {-# UNPACK #-} !(Int -> Bool)
+
+        data G where
+          MkG :: {-# UNPACK #-} !G -> G
+
+        type family F a where {}
+        data R a = MkR { fld :: {-# UNPACK #-} !(F a) }
+
+    A possible reason for this warning is that the ``{-# UNPACK #-}`` pragma was
+    applied to one of the following:
+
+      * a function type ``a -> b``
+      * a recursive use of the data type being defined
+      * a sum type that cannot be unpacked
+      * a type/data family application with no matching instance in the environment
+
+    However, it is deliberately **not** emitted if:
+
+      * the failure occurs in an indefinite package in Backpack
+      * the pragma is usable, but unpacking is disabled by :ghc-flag:`-O0`
+
+----
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
