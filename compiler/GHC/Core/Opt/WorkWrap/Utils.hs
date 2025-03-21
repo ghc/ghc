@@ -665,7 +665,7 @@ canUnboxArg fam_envs ty (n :* sd)
 
   -- From here we are strict and not absent
   | Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
-  , Just [dc] <- canUnboxTyCon tc
+  , Just [dc] <- canUnboxTyCon tc  -- tc is never a newtype
   , let arity = dataConRepArity dc
   , Just (Unboxed, dmds) <- viewProd arity sd -- See Note [Boxity analysis]
   , dmds `lengthIs` dataConRepArity dc
@@ -726,7 +726,7 @@ canUnboxTyCon tc
   = Nothing     -- See (DNB2) and (DNB1) in Note [Do not unbox class dictionaries]
 
   | otherwise
-  = assertPpr (not (isNewTyCon tc)) (ppr tc) $
+  = assertPpr (not (isNewTyCon tc)) (ppr tc) $  -- Check precondition
     tyConDataCons_maybe tc
 
 {- Note [Do not unbox class dictionaries]
@@ -1436,7 +1436,8 @@ findTypeShape fam_envs ty
        | Just (HetReduction (Reduction _ rhs) _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
        = go rec_tc rhs
 
-       | Just con <- tyConSingleDataCon_maybe tc
+       | not (isNewTyCon tc)
+       , Just con <- tyConSingleDataCon_maybe tc
        , Just rec_tc <- if isTupleTyCon tc
                         then Just rec_tc
                         else checkRecTc rec_tc tc

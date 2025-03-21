@@ -1646,8 +1646,8 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 
   = -- pprTrace "specCalls: some" (vcat
     --   [ text "function" <+> ppr fn
-    --   , text "calls:" <+> ppr calls_for_me
-    --   , text "subst" <+> ppr (se_subst env) ]) $
+    --    , text "calls:" <+> ppr calls_for_me
+    --    , text "subst" <+> ppr (se_subst env) ]) $
     foldlM spec_call ([], [], emptyUDs) calls_for_me
 
   | otherwise   -- No calls or RHS doesn't fit our preconceptions
@@ -1803,6 +1803,8 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                        , ppr spec_fn  <+> dcolon <+> ppr spec_fn_ty
                                        , ppr rhs_bndrs, ppr call_args
                                        , ppr spec_rule
+                                       , text "acc" <+> ppr rules_acc
+                                       , text "existing" <+> ppr existing_rules
                                        ]
 
            ; -- pprTrace "spec_call: rule" _rule_trace_doc
@@ -1821,7 +1823,9 @@ alreadyCovered env bndrs fn args is_active rules
       Nothing             -> False
       Just (rule, _)
         | isAutoRule rule -> -- Discard identical rules
-                             not (ruleLhsIsMoreSpecific in_scope bndrs args rule)
+                             -- We know that (fn args) is an instance of RULE
+                             -- Check if RULE is an instance of (fn args)
+                             ruleLhsIsMoreSpecific in_scope bndrs args rule
         | otherwise       -> True  -- User rules dominate
   where
     in_scope = substInScopeSet (se_subst env)
