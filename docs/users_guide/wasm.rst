@@ -97,6 +97,107 @@ profiling functionality, then inspect the report files:
 
    $ wasmtime run --mapdir /::$PWD foo.wasm +RTS -hc -l -RTS
 
+.. _wasm-ghci:
+
+Using GHCi with the wasm backend
+--------------------------------
+
+The GHC wasm backend supports the GHCi feature via a nodejs ``dyld``
+script that provides RTS linker functionality and bootstraps the
+external interpreter. This script is installed into the
+``wasm32-wasi-ghc --print-libdir`` location and will be automatically
+launched by GHC when evaluating Template Haskell splices or starting
+GHCi, though you do need a recent ``node`` available in ``PATH``.
+
+You can launch a GHCi session with ``wasm32-wasi-ghci`` or
+``wasm32-wasi-ghc --interactive``. All existing GHCi features work with
+wasm, including the GHCi debugger. You can also use JavaScript FFI
+detailed in the next section; by default, the JavaScript FFI has access
+to the nodejs global namespace since it runs in nodejs after all.
+
+Additionally, the wasm backend’s GHCi supports the browser mode to
+allow live-coding the frontend using GHCi. This requires the `ws
+<https://www.npmjs.com/package/ws>`__ library to be installed and
+passed to the ``dyld`` script via the `NODE_PATH
+<https://nodejs.org/api/modules.html>`__ environment variable. Suppose
+your wasm backend installation is supplied by ``ghc-wasm-meta``, the
+right ``node`` installation and ``NODE_PATH`` with all the optional
+npm dependencies are automatically provided out of the box.
+
+To get started with the browser mode, set the ``GHCI_BROWSER``
+environment variable:
+
+::
+
+   $ export GHCI_BROWSER=1
+   $ wasm32-wasi-ghc --interactive
+   GHCi, version 9.13.20250320: https://www.haskell.org/ghc/  :? for help
+   Open http://127.0.0.1:37517/main.html or import http://127.0.0.1:37517/main.js to boot ghci
+
+At this point, the GHCi session is frozen. The ``dyld`` script acts as a
+broker between the host GHC process and the in-browser external
+interpreter; it starts an HTTP server that serves ``main.js``, an ES6
+module that connects back to the HTTP server and finishes the rest of
+external interpreter bootstrap process. The ``dyld`` HTTP server allows
+`CORS <https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS>`__
+requests from any origin, meaning it’s possible to use F12 devtools
+console to import ``main.js`` and use GHCi to debug other websites, but
+the simplest way to get started is simply opening ``main.html`` in the
+browser.
+
+After a few seconds, the GHCi session shall be unfrozen and available
+for use. There are a few important points to keep in mind when using the
+GHCi browser mode:
+
+- All the code runs in the browser, and the JavaScript FFI only has
+  access to the browser global namespace, not the nodejs one. There is
+  no escape hatch to invoke any function on the nodejs side.
+- Likewise, the browser side has no access to the host filesystem. You
+  can use ``:load`` etc in the GHCi prompt to load modules just fine,
+  but attempting to do a ``readFile`` will fail, there is no file for
+  you to open in the browser-side virtual filesystem.
+- Template Haskell splices are also evaluated in the browser. If your
+  splices require side-effects like reading files then they will fail to
+  evaluate; to workaround it, compile modules containing such splices to
+  object code first and load object code instead.
+- By default, ``stdout``/``stderr`` doesn’t write back to the GHCi
+  prompt, the messages are written to the F12 devtools console in a
+  line-buffered manner.
+
+There are other options that can be specified as environment variables:
+
+- ``GHCI_BROWSER_HOST``: specify the host address that the ``dyld`` HTTP
+  server should bind to, supports IPv4/IPv6. Defaults to ``127.0.0.1``.
+  Be careful when changing it and exposing the ``dyld`` HTTP server to
+  other networks, some endpoints of the server allow downloading files
+  from the host filesystem!
+- ``GHCI_BROWSER_PORT``: specify the port that the ``dyld`` HTTP server
+  should listen on. Defaults to a random idle port.
+- ``GHCI_BROWSER_REDIRECT_WASI_CONSOLE``: if set to ``1``, the wasi
+  stdout/stderr output messages are redirected back to the host GHCi
+  terminal instead of outputing to the F12 devtools console. The main
+  intended use case is mobile browsers which likely don’t have F12
+  devtools readily available. Also note that this only redirects wasi
+  console messages, not ``console.log`` invocations in the browser.
+
+For testing purposes, there is also support for using
+`Puppeteer <https://pptr.dev>`__ or
+`Playwright <https://playwright.dev>`__ to automatically launch a
+headless browser and load ``main.html``. Like ``ws``, the relevant npm
+dependencies need to be supplied via ``NODE_PATH``, either
+``puppeteer``/``puppeteer-core`` or ``playwright``/``playwright-core``,
+then the following options can be used:
+
+- ``GHCI_BROWSER_PUPPETEER_LAUNCH_OPTS``: JSON-formatted arguments to
+  be passed to `puppeteer.launch()
+  <https://pptr.dev/api/puppeteer.puppeteernode.launch>`__.
+- ``GHCI_BROWSER_PLAYWRIGHT_BROWSER_TYPE``: one of
+  ``chromium``/``firefox``/``webkit``, the kind of browser to be
+  launched by ``playwright``.
+- ``GHCI_BROWSER_PLAYWRIGHT_LAUNCH_OPTS``: optional, JSON-formatted
+  arguments to be passed to `browser.launch()
+  <https://playwright.dev/docs/api/class-browsertype#browser-type-launch>`__.
+
 .. _wasm-jsffi:
 
 JavaScript FFI in the wasm backend
