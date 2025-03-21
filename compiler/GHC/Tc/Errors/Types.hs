@@ -1496,7 +1496,7 @@ data TcRnMessage where
 
      Test cases: default/Import07.hs
   -}
-  TcRnWarnClashingDefaultImports :: TyCon -- ^ class
+  TcRnWarnClashingDefaultImports :: Name -- ^ class
                                  -> Maybe [Type] -- ^ locally declared defaults
                                  -> NE.NonEmpty ClassDefaults -- ^ imported defaults
                                  -> TcRnMessage

@@ -69,6 +69,7 @@ import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import GHC.Data.Maybe     ( isJust, mapMaybe, catMaybes )
 import Data.Monoid     ( First(..) )
+import GHC.Types.Name (Name)
 
 
 {- Note [Top-level Defaulting Plan]
@@ -922,7 +923,7 @@ findDefaultableGroups (default_tys, extended_defaults) wanteds
     | group'@((_,_,tv) :| _) <- unary_groups
     , let group = toList group'
     , defaultable_tyvar tv
-    , defaultable_classes (map (classTyCon . sndOf3) group) ]
+    , defaultable_classes (map (className . sndOf3) group) ]
   where
     simples  = approximateWC True wanteds
       -- True: for the purpose of defaulting we don't care
@@ -964,7 +965,7 @@ findDefaultableGroups (default_tys, extended_defaults) wanteds
 
     -- Determines if any of the given type class constructors is in default_tys
     -- step (3) in Note [How type-class constraints are defaulted]
-    defaultable_classes :: [TyCon] -> Bool
+    defaultable_classes :: [Name] -> Bool
     defaultable_classes clss = not . null . intersect clss $ map cd_class default_tys
 
 ------------------------------
@@ -985,13 +986,19 @@ disambigGroup :: WantedConstraints -- ^ Original constraints, for diagnostic pur
               -> (TcTyVar, [Ct])   -- ^ All constraints sharing same type variable
               -> TcS Bool   -- True <=> something happened, reflected in ty_binds
 disambigGroup orig_wanteds default_ctys (tv, wanteds)
-  = disambigProposalSequences orig_wanteds wanteds proposalSequences allConsistent
+  = do
+    cds <- classDefaults default_ctys
+    disambigProposalSequences orig_wanteds wanteds (proposalSequences cds) allConsistent
   where
-    proposalSequences = [ ProposalSequence [Proposal [(tv, ty)] | ty <- tys]
-                        | ClassDefaults{cd_types = tys} <- defaultses ]
+    proposalSequences cds = [ ProposalSequence [Proposal [(tv, ty)] | ty <- tys]
+                        | ClassDefaults{cd_types = tys} <- defaultses cds ]
     allConsistent ((_, sub) :| subs) = all (eqSubAt tv sub . snd) subs
-    defaultses =
-      [ defaults | defaults@ClassDefaults{cd_class = cls} <- default_ctys
+    -- lookup class by name
+    classDefaults xs = do
+      rs <-sequence $ map tcLookupTyCon (map cd_class xs)
+      return $ zip rs xs
+    defaultses cds =
+      [ defaults | (cls, defaults) <- cds
                  , any (isDictForClass cls) wanteds ]
     isDictForClass clcon ct = any ((clcon ==) . classTyCon . fst) (getClassPredTys_maybe $ ctPred ct)
     eqSubAt :: TcTyVar -> Subst -> Subst -> Bool

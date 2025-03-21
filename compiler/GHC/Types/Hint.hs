@@ -479,7 +479,7 @@ data GhcHint
   | SuggestBindTyVarExplicitly Name
 
   {-| Suggest a default declaration; e.g @default Cls (Ty1, Ty2)@ -}
-  | SuggestDefaultDeclaration TyCon [Type]
+  | SuggestDefaultDeclaration Name [Type]
 
   {-| Suggest using explicit deriving strategies for a deriving clause.
 

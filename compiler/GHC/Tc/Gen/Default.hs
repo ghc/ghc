@@ -12,7 +12,7 @@ import GHC.Prelude
 
 import GHC.Hs
 import GHC.Core.Class
-import GHC.Core.TyCon (TyCon)
+import GHC.Core.TyCon (TyCon (..))
 import GHC.Core.Type( typeKind )
 
 import GHC.Types.Var( tyVarKind )
@@ -187,7 +187,7 @@ tcDefaults decls
                     ; return clsTyCon }
            ; return (decl, def_clsCon, tau_tys) }
     reportDuplicates here extra_clss ((_, clsCon, tys) :| [])
-      = pure [ ClassDefaults{cd_class = c, cd_types = tys, cd_module = Just here, cd_warn = Nothing}
+      = pure [ ClassDefaults{cd_class = tyConName c, cd_types = tys, cd_module = Just here, cd_warn = Nothing}
              | c <- clsCon : map classTyCon extra_clss ]
     -- Report an error on multiple default declarations for the same class in the same module.
     -- See Note [Disambiguation of multiple default declarations] in GHC.Tc.Module

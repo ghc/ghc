@@ -411,7 +411,7 @@ defaultsToIfaceDefaults = map toIface . defaultList
     toIface ClassDefaults { cd_class = clsTyCon
                           , cd_types = tys
                           , cd_warn = warn }
-      = IfaceDefault { ifDefaultCls = toIfaceTyCon clsTyCon
+      = IfaceDefault { ifDefaultCls = clsTyCon
                      , ifDefaultTys = map toIfaceType tys
                      , ifDefaultWarn = fmap toIfaceWarningTxt warn }
 

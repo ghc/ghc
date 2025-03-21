@@ -424,7 +424,7 @@ reportClashingDefaultImports :: [NonEmpty ClassDefaults] -> DefaultEnv -> TcM ()
 reportClashingDefaultImports importsByClass local = mapM_ check importsByClass
   where
     check cds@(ClassDefaults{cd_class = cls} :| _) = do
-      let cdLocal  = lookupDefaultEnv local (tyConName cls)
+      let cdLocal  = lookupDefaultEnv local cls
       case cdLocal of
         Just ClassDefaults{cd_types = localTypes}
           | all ((`isTypeSubsequenceOf` localTypes) . cd_types) cds -> pure ()

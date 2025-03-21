@@ -1,13 +1,14 @@
 {-# LANGUAGE NamedDefaults #-}
-module T25858 (
-    Stringify(..),
+module T25858v1_helper (
+    -- default Semigroup,
     default Stringify,
-    default Semigroup
+    Stringify(..),
   ) where
 
 import Data.Semigroup (Sum)
 
 default Semigroup (Sum Integer)
+
 
 class Stringify a where
   stringify :: a -> String

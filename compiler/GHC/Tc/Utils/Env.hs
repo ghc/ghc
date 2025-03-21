@@ -944,23 +944,23 @@ tcGetDefaultTys
                                   ; showCls <- tcLookupTyCon showClassName
                                   ; eqCls <- tcLookupTyCon eqClassName
                                   ; pure $ defaultEnv
-                                    [ builtinDefaults foldableCls [list_ty]
-                                    , builtinDefaults showCls [unitTy, integer_ty, doubleTy]
-                                    , builtinDefaults eqCls [unitTy, integer_ty, doubleTy]
+                                    [ builtinDefaults foldableClassName [list_ty]
+                                    , builtinDefaults showClassName [unitTy, integer_ty, doubleTy]
+                                    , builtinDefaults eqClassName [unitTy, integer_ty, doubleTy]
                                     ]
                                   }
                                   -- Note [Extended defaults]
                           else pure emptyDefaultEnv
               ; ovlStr <- if ovl_strings
                           then do { isStringCls <- tcLookupTyCon isStringClassName
-                                  ; pure $ unitDefaultEnv $ builtinDefaults isStringCls [stringTy]
+                                  ; pure $ unitDefaultEnv $ builtinDefaults isStringClassName [stringTy]
                                   }
                           else pure emptyDefaultEnv
               ; checkWiredInTyCon doubleTyCon
               ; numDef <- case lookupDefaultEnv defaults numClassName of
                    Nothing -> do { numCls <- tcLookupTyCon numClassName
                                  ; integer_ty <- tcMetaTy integerTyConName
-                                 ; pure $ unitDefaultEnv $ builtinDefaults numCls [integer_ty, doubleTy]
+                                 ; pure $ unitDefaultEnv $ builtinDefaults numClassName [integer_ty, doubleTy]
                                  }
                    -- The Num class is already user-defaulted, no need to construct the builtin default
                    _ -> pure emptyDefaultEnv

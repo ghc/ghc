@@ -29,13 +29,14 @@ import GHC.Utils.Outputable
 import Data.Data (Data)
 import Data.List (sortBy)
 import Data.Function (on)
+import GHC.Types.Name.Env (NameEnv, emptyNameEnv, isEmptyNameEnv, unitNameEnv, mkNameEnvWith, nonDetNameEnvElts, filterNameEnv, plusNameEnv)
 
 -- See Note [Named default declarations] in GHC.Tc.Gen.Default
 -- | Default environment mapping class @TyCon@s to their default type lists
-type DefaultEnv = TyConEnv ClassDefaults
+type DefaultEnv = NameEnv ClassDefaults
 
 data ClassDefaults
-  = ClassDefaults { cd_class   :: !TyCon  -- ^ always a class constructor
+  = ClassDefaults { cd_class   :: !Name  -- ^ always a class constructor
                   , cd_types   :: [Type]
                   , cd_module :: Maybe Module
                     -- ^ @Nothing@ for built-in,
@@ -50,26 +51,27 @@ instance Outputable ClassDefaults where
   ppr ClassDefaults {cd_class = cls, cd_types = tys} = text "default" <+> ppr cls <+> parens (interpp'SP tys)
 
 emptyDefaultEnv :: DefaultEnv
-emptyDefaultEnv = emptyTyConEnv
+-- emptyDefaultEnv = emptyTyConEnv
+emptyDefaultEnv = emptyNameEnv
 
 isEmptyDefaultEnv :: DefaultEnv -> Bool
-isEmptyDefaultEnv = isEmptyTyConEnv
+isEmptyDefaultEnv = isEmptyNameEnv
 
 unitDefaultEnv :: ClassDefaults -> DefaultEnv
-unitDefaultEnv d = unitTyConEnv (cd_class d) d
+unitDefaultEnv d = unitNameEnv (cd_class d) d
 
 defaultEnv :: [ClassDefaults] -> DefaultEnv
-defaultEnv = mkTyConEnvWith cd_class
+defaultEnv = mkNameEnvWith cd_class
 
 defaultList :: DefaultEnv -> [ClassDefaults]
-defaultList = sortBy (stableNameCmp `on` (tyConName . cd_class)) . nonDetTyConEnvElts
+defaultList = sortBy (stableNameCmp `on` cd_class) . nonDetNameEnvElts
               -- sortBy recovers determinism
 
 lookupDefaultEnv :: DefaultEnv -> Name -> Maybe ClassDefaults
 lookupDefaultEnv env = lookupUFM_Directly env . nameUnique
 
 filterDefaultEnv :: (ClassDefaults -> Bool) -> DefaultEnv -> DefaultEnv
-filterDefaultEnv = filterTyConEnv
+filterDefaultEnv = filterNameEnv
 
 plusDefaultEnv :: DefaultEnv -> DefaultEnv -> DefaultEnv
-plusDefaultEnv = plusTyConEnv
+plusDefaultEnv = plusNameEnv
