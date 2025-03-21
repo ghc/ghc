@@ -3630,7 +3630,7 @@ makeDynFlagsConsistent dflags
         setGeneralFlag' Opt_ExternalInterpreter $
         addWay' WayDyn dflags
 
- | ghcLink dflags `elem` [LinkInMemory, NoLink]
+ | LinkInMemory <- ghcLink dflags
  , not (gopt Opt_ExternalInterpreter dflags)
  , targetWays_ dflags /= hostFullWays
     = flip loopNoWarn "Forcing build ways to match the compiler ways because we're using the internal interpreter" $
