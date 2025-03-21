@@ -70,7 +70,6 @@ import GHC.Core.Coercion
 import GHC.Core.Predicate( decomposeIPPred )
 
 import GHC.Types.Basic
-import GHC.Types.FieldLabel
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.Set
