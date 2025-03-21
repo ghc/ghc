@@ -3,11 +3,50 @@
 // Note [The Wasm Dynamic Linker]
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// This nodejs script implements the wasm dynamic linker to support
-// Template Haskell & ghci in the GHC wasm backend. It loads wasm
-// shared libraries, resolves symbols and runs code on demand,
-// communicating with the host GHC via the standard iserv protocol.
-// Below are questions/answers to elaborate the introduction:
+// This script mainly has two roles:
+//
+// 1. Message broker: relay iserv messages between host GHC and wasm
+//    iserv (GHCi.Server.defaultServer). This part only runs in
+//    nodejs.
+// 2. Dynamic linker: provide RTS linker interfaces like
+//    loadDLL/lookupSymbol etc which are imported by wasm iserv. This
+//    part can run in browsers as well.
+//
+// When GHC starts external interpreter for the wasm target, it starts
+// this script and passes a pair of pipe fds for iserv messages,
+// libHSghci.so path, and command line arguments for wasm iserv. By
+// default, the wasm iserv runs in the same node process, so the
+// message broker logic is simple: wrap the pipe fds as
+// ReadableStream/WritableStream, pass reader/writer callbacks to wasm
+// iserv and run it to completion. It doesn't need to intercept or
+// parse any message, unlike iserv-proxy.
+//
+// Things are a bit more interesting with ghci browser mode. All the
+// Haskell code and all the runtime runs in the browser, including the
+// dynamic linker parts of this script. The host GHC process doeesn't
+// need to know about "browser mode" at all as long as iserv messages
+// are handled as usual, though obviously we can't pass fds to
+// browsers like before! So this script starts an HTTP 1.1 server with
+// WebSockets support. The browser side can import a startup script
+// served by the server, which will import this script and invoke main
+// with the right arguments, hooray isomorphic JavaScript! The browser
+// side will proceed to bootstrap wasm iserv, and the iserv messages
+// are relayed over the WebSockets. (also ^C signals over a different
+// connection)
+//
+// Under the browser mode, there's more traffic than just the iserv
+// message WebSockets. The browser side can fulfill most of the RTS
+// linker functionality alone, but it still needs to do stuff like
+// searching for a shared library in a bunch of search paths or
+// fetching a shared library blob; these side effects require access
+// to the same host filesystem that runs GHC, so the HTTP server also
+// exposes some rpc endpoints that the browser side can perform
+// requests. The server binds to 127.0.0.1 by default for a good
+// reason, it doesn't (and shouldn't) have extra logic to try to guard
+// against potential malicious requests to scrape your home directory.
+//
+// So much intro to the message broker part, below are Q/As regarding
+// the dynamic linker part:
 //
 // *** What works right now and what doesn't work yet?
 //
@@ -17,16 +56,12 @@
 // by wasi preview1: we map the full host filesystem into wasm cause
 // yolo, but things like processes and sockets don't work.
 //
-// JSFFI is unsupported in bytecode yet. So in ghci you can't type in
-// code that contains JSFFI declarations, though you can invoke
-// compiled code that uses JSFFI.
-//
 // loadArchive/loadObj etc are unsupported and will stay that way. The
 // only form of compiled code that can be loaded is wasm shared
 // library. There's no code unloading logic. The retain_cafs flag is
 // ignored and revertCAFs is a no-op.
 //
-// ghc -j doesn't work yet (#25285).
+// JSFFI works. ghci debugger works.
 //
 // *** What are implications to end users?
 //
@@ -67,27 +102,6 @@
 // add once we need it.
 //
 // No fancy stuff like LD_PRELOAD, LD_LIBRARY_PATH etc.
-//
-// *** How does GHC interact with the wasm dynamic linker?
-//
-// dyld.mjs is tracked as a build dependency and installed in GHC
-// libdir with executable perms. When GHC targets wasm and needs to
-// start iserv, it starts dyld.mjs and manage the process lifecycle
-// through the entire GHC session. nodejs location is not tracked and
-// must be present in PATH.
-//
-// GHC passes the libHSghci*.so location via command line, so dyld.mjs
-// will load it as well as all dependent so files, then start the
-// default iserv implementation in the ghci library and read/write
-// binary messages. nodejs receives pipe file descriptors from GHC,
-// though uvwasi doesn't support preopening them as wasi virtual file
-// descriptors, therefore we hook a few wasi syscalls and designate
-// our own preopen file descriptors for IPC logic.
-//
-// dyld.mjs inherits default stdin/stdout/stderr from GHC and that's
-// how ghci works. Like native external interpreter, you can use the
-// -opti GHC flag to pass process arguments, like RTS flags or -opti-v
-// to dump the iserv messages.
 
 import { JSValManager, setImmediate } from "./prelude.mjs";
 import { parseRecord, parseSections } from "./post-link.mjs";
