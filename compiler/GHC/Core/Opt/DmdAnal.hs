@@ -554,7 +554,9 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt_con bndrs rhs])
     WithDmdType res_ty (Case scrut' case_bndr' ty [Alt alt_con bndrs' rhs'])
     where
       want_precise_field_dmds (DataAlt dc)
-        | Nothing <- tyConSingleDataCon_maybe $ dataConTyCon dc
+        | let tc = dataConTyCon dc
+        , assertPpr (not (isNewTyCon tc)) (ppr dc) True  -- DataAlt is never newtype
+        , Nothing <- tyConSingleDataCon_maybe $ dataConTyCon dc
         = False    -- Not a product type, even though this is the
                    -- only remaining possible data constructor
         | DefinitelyRecursive <- ae_rec_dc env dc
@@ -1165,8 +1167,8 @@ unboxedWhenSmall env rec_flag (Just ret_ty) sd = go 1 ret_ty sd
     go depth ty sd
       | depth <= max_depth
       , Just (tc, tc_args, _co) <- normSplitTyConApp_maybe (ae_fam_envs env) ty
-      , Just [dc] <- canUnboxTyCon tc
-      , null (dataConExTyCoVars dc) -- Can't unbox results with existentials
+      , Just [dc] <- canUnboxTyCon tc   -- tc is not a newtype
+      , null (dataConExTyCoVars dc)     -- Can't unbox results with existentials
       , dataConRepArity dc <= dmd_unbox_width (ae_opts env)
       , Just (_, ds) <- viewProd (dataConRepArity dc) sd
       , arg_tys <- map scaledThing $ dataConInstArgTys dc tc_args

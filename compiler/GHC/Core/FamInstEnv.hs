@@ -1336,7 +1336,7 @@ topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe Reduction
 --      * newtypes
 -- returning an appropriate Representational coercion.  Specifically, if
 --   topNormaliseType_maybe env ty = Just (co, ty')
--- then
+-- then postconditions:
 --   (a) co :: ty ~R ty'
 --   (b) ty' is not a newtype, and is not a type-family or data-family redex
 --

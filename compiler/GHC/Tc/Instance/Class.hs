@@ -630,13 +630,14 @@ matchDataToTag dataToTagClass [levity, dty] = do
      , let (repTyCon, repArgs, repCo)
              = tcLookupDataFamInst famEnvs rawTyCon rawTyConArgs
 
-     , not (isTypeDataTyCon repTyCon)
+     -- Condition C1
      , Just constrs <- tyConDataCons_maybe repTyCon
-         -- condition C1
+     , not (isTypeDataTyCon repTyCon || isNewTyCon repTyCon)
 
+     -- Condition C2
      , let  rdr_env = tcg_rdr_env gbl_env
             inScope con = isJust $ lookupGRE_Name rdr_env $ dataConName con
-     , all inScope constrs -- condition C2
+     , all inScope constrs
 
      , let  repTy = mkTyConApp repTyCon repArgs
             numConstrs = tyConFamilySize repTyCon
@@ -694,10 +695,11 @@ C1: `dty` is an algebraic data type, i.e. `dty` matches any of:
        * a "data" declaration,
        * a "data instance" declaration,
        * a boxed tuple type
-      "type data" declarations are NOT included; see also wrinkle W2c
-      of Note [Type data declarations] in GHC.Rename.Module.
-      (In principle we could accept newtypes that wrap algebraic data
-      types, but we do not do so.)
+      But NOT
+       * A "type data" declaration; see also wrinkle W2c
+         of Note [Type data declarations] in GHC.Rename.Module.
+       * A newtype; in principle we could accept newtypes that wrap
+         an algebraic data type, but we do not do so.
 
 C2: All of the constructors of that "data" or "data instance"
       declaration are in scope.  Otherwise, `dataToTag#` could be

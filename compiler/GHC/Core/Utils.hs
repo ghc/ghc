@@ -2707,13 +2707,15 @@ isEmptyTy ty
 -- | If @normSplitTyConApp_maybe _ ty = Just (tc, tys, co)@
 -- then @ty |> co = tc tys@. It's 'splitTyConApp_maybe', but looks through
 -- coercions via 'topNormaliseType_maybe'. Hence the \"norm\" prefix.
+--
 -- Postcondition: tc is not a newtype (guaranteed by topNormaliseType_maybe)
 normSplitTyConApp_maybe :: FamInstEnvs -> Type -> Maybe (TyCon, [Type], Coercion)
 normSplitTyConApp_maybe fam_envs ty
   | let Reduction co ty1 = topNormaliseType_maybe fam_envs ty
                            `orElse` (mkReflRedn Representational ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
-  = Just (tc, tc_args, co)
+  = assertPpr (not (isNewTyCon tc)) (ppr ty $$ ppr ty1) $  -- Check post-condition
+    Just (tc, tc_args, co)
 normSplitTyConApp_maybe _ _ = Nothing
 
 {-
