@@ -1131,7 +1131,8 @@ data AlgTyConRhs
                         -- in tcHasFixedRuntimeRep.
     }
 
-  | UnaryClass {     -- See Note [Unary class magic], esp (UCM1)
+  | UnaryClass {  -- See Note [Unary class magic], esp (UCM1)
+                  -- INVARIANT: the algTcFlavour of this TyCon is ClassTyCon
       data_con :: DataCon
       }
 
@@ -1213,7 +1214,9 @@ data AlgTyConFlav
   | UnboxedSumTyCon
 
   -- | Type constructors representing a class dictionary.
-  -- See Note [ATyCon for classes] in "GHC.Core.TyCo.Rep"
+  -- See Note [ATyCon for classes] in "GHC.Types.TyThing"
+  -- INVARIANT: the algTcRhs is never NewTyCon; it could be
+  --            TupleTyCon, DataTyCon, UnaryClass
   | ClassTyCon
         Class           -- INVARIANT: the classTyCon of this Class is the
                         -- current tycon
@@ -1433,13 +1436,6 @@ See also Note [Newtype eta and homogeneous axioms] in GHC.Tc.TyCl.Build.
 
 Note [Unary class magic]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-
-ToDo -------------
-isInjectiveTyCon:
-  -- ToDo: Lint and pushDataCon both check for injective TyCons in SelCo
-  -- So newtype classes need to pretend to be injective.
------------- End of ToDo
-
 Consider a class with just one method, or with no methods and one
 superclass:
   class UC a where { op :: a -> a }
@@ -1450,7 +1446,15 @@ We could represent the dictionary for a unary class with a data type:
   data UC a where { MkUC :: (a->a) -> UC a }
   data UD a where { MkUD :: Eq a =>  UD a }
 But it would be more efficent to use a newtype; and for decades GHC did exactly that.
-Unary classes are surprisingly common, so it's a useful optimisation.
+Why?
+
+  * Unary classes are surprisingly common, so it's a useful optimisation.
+
+  * The `reflection` library uses `unsafeCoerce` to /rely/ on the fact that
+    a unary class is ultimately represented by its payload.  We may not like
+    it, and I hope to ultimately eliminate the necessity for this by using
+    `withDict` (see Note [withDict] in GHC.Tc.Instance.Class).  But meanwhile
+    we'd prefer not to break this usage.
 
 But alas, using a newtype representation (surprisingly) led to some distressingly
 subtle bugs: see Note [Representing unary classes with newtypes: bad, bad, bad].
@@ -1523,16 +1527,63 @@ There are a number of wrinkles
 
 (UCM6) In the constraint solver, when constructing evidence for a unary class
     (e.g. implicit parameters, withDict) be careful to
-    - use the data constructor to build it: see `evDictApp`, `evWrapUnaryDict`
+    - use the data constructor to build it: see `evDictApp`, `evUnaryDictAppE`
     - use the class op to take it apart: see `evUnwrapIP`
 
 (UCM7) You might worry about
            class UC1 a where { op :: Int# }    -- Single uboxed field
            class (a ~# b) => UC2 a b where {}  -- Unboxed equality superclass
-  But these are illegal: predicates are always boxed, and unary
-  classes must have lifted fields.
+  But these are illegal: predicates are always boxed, and all classes must have
+  lifted fields.
 
-  ToDo: check this!!!
+(UCM8) The data constructor for a unary class has no wrapper, just a worker.
+  (And the worker is turned into a cast by GHC.CoreToStg.Prep.isUnaryClassApp,
+  as described above.)
+
+(UCM9) Unary classes are treated as injective by `isInjectiveTyCon`, just like
+  non-unary classes (which are TupleTyCons or DataTyCons).  This matters,
+  because of the injectivity check done by lintCoercion (SelCo cs co)a
+  in GHC.Core.Lint.  There is a similar injectivity check in
+  GHC.Core.Opt.Arity.pushCoDataCon.
+
+  Generally, we want unary classes to behave like ordinary non-unary ones.
+
+Note [Representing unary classes with newtypes: bad, bad, bad]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the past we represented a unary class with a newtype, but that led to
+some really subtle bad consequences.
+
+* Problem 1: a horrible hack in GHC.Core.Opt.OccurAnal.scrutOkForBinderSwap;
+  see Historical Note [Care with binder-swap on dictionaries]
+
+* Problem 2: bogus specialisation.  We had (using newtype classes)
+     newtype SNat a = MKSNat Natural          -- axiom  snCo a :: SNat a ~ Natural
+     class KNat a where { natSig :: SNat a }  -- axiom  knCo a :: KNat a ~ SNat a
+  and a pattern match
+    K @a (g : 32 ~ a+1) -> ...(foo @a (d :: KNat a)...
+
+  We built that (d::KNat a) like this:
+    (d1 :: KNat 32)    = 32 |> sym (snCo 32) |> sym (knCo 32)
+    (d2 :: SNat (a+1)) = d1 |> knCo g
+    (d3 :: Natural)    = d2 |> snCo (a+1)
+    (d4 :: Natural)    = d3 -1
+    (d  :: KNat a)     = d4 |> sym (snCo a) |> sym (knCo a)
+
+  But d3 :: Natural = 32 |> (co's involving g) :: Natural ~ Natural
+  and that is just Refl.  So we drop all the co's, including the crucial `g`,
+  and just say d3 = 32.  Now, with no reference to `g` we can float the
+  dictionary argument out and get an utterly bogus specialisation for `foo`.
+  See https://gitlab.haskell.org/ghc/ghc/-/issues/23109#note_499130 for the
+  gory details.
+
+  Solution: don't use newtype classes.  Then we get
+    (d1 :: KNat 32)    = MkKN @32 (32 |> sym (snCo 32))
+    (d2 :: SNat (a+1)) = natSing d1 |> SN g
+    (d3 :: Natural)    = d2 |> snCo (a+1)
+    (d4 :: Natural)    = d3 -1
+    (d  :: KNat a)     = MkKN @a (d4 |> sym (snCo a))
+  Now we don't get cancelling-out coercions.
+
 
 ************************************************************************
 *                                                                      *
@@ -2181,8 +2232,8 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
     go_alg_rep (TupleTyCon {})    = True
     go_alg_rep (SumTyCon {})      = True
     go_alg_rep (DataTyCon {})     = True
+    go_alg_rep (UnaryClass {})    = True -- See (UCM10) in Note [Unary class magic]
     go_alg_rep (AbstractTyCon {}) = False
-    go_alg_rep (UnaryClass {})    = True -- See Note [Unary classes]
     go_alg_rep (NewTyCon {})      = False
 
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds

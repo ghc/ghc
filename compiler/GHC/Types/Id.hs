@@ -146,7 +146,6 @@ import GHC.Core ( CoreExpr, CoreRule, Unfolding(..), IdUnfoldingFun
                 , hasSomeUnfolding, noUnfolding, evaldUnfolding )
 import GHC.Core.Type
 import GHC.Core.Predicate( isCoVarType )
-import GHC.Core.TyCon( isClassTyCon )
 import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Core.Multiplicity
@@ -612,10 +611,9 @@ hasNoBinding id = case Var.idDetails id of
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleDataCon dc
                                             || isUnboxedSumDataCon dc
-                                            || isClassTyCon (dataConTyCon dc)
-                                               -- We don't generate bindings for newtype
-                                               -- classes, so express that here
-                                               -- ToDo explain!
+                                            || isUnaryClassDataCon dc
+                                               -- Unary class dictionary constructors are eliminated
+                                               -- See Note [Unary class magic] in GHC.Core.TyCon
                         _                -> isCompulsoryUnfolding (realIdUnfolding id)
   -- Note: this function must be very careful not to force
   -- any of the fields that aren't the 'uf_src' field of

@@ -34,57 +34,66 @@ import {-# SOURCE #-} GHC.Tc.Gen.Splice
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
+
 import GHC.Rename.Utils
+import GHC.Rename.Env         ( addUsedGRE, getUpdFieldLbls )
+
+import GHC.Tc.Gen.App
+import GHC.Tc.Gen.Head
+import GHC.Tc.Gen.Bind        ( tcLocalBinds )
+import GHC.Tc.Gen.HsType
+import GHC.Tc.Gen.Arrow
+import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches
+                       , tcGRHSNE, tcDoStmts )
+import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
+import GHC.Tc.Zonk.TcType
+import GHC.Tc.Utils.TcMType
+import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic, hasFixedRuntimeRep )
+import GHC.Tc.Utils.Instantiate
+import GHC.Tc.Utils.Env
+import GHC.Tc.Types.Origin
+import GHC.Tc.Types.Evidence
+import GHC.Tc.Errors.Types
+
+import GHC.Core.Multiplicity
+import GHC.Core.UsageEnv
+import GHC.Core.FamInstEnv    ( FamInstEnvs )
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.Class(classTyCon)
+import GHC.Core.TyCon
+import GHC.Core.Type
+import GHC.Core.Coercion
+import GHC.Core.Predicate( decomposeIPPred )
+
 import GHC.Types.Basic
 import GHC.Types.FieldLabel
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.Set
-import GHC.Core.Multiplicity
-import GHC.Core.UsageEnv
-import GHC.Tc.Errors.Types
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic, hasFixedRuntimeRep )
-import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Gen.App
-import GHC.Tc.Gen.Head
-import GHC.Tc.Gen.Bind        ( tcLocalBinds )
-import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
-import GHC.Core.FamInstEnv    ( FamInstEnvs )
-import GHC.Rename.Env         ( addUsedGRE, getUpdFieldLbls )
-import GHC.Tc.Utils.Env
-import GHC.Tc.Gen.Arrow
-import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches
-                       , tcGRHSNE, tcDoStmts )
-import GHC.Tc.Gen.HsType
-import GHC.Tc.Utils.TcMType
-import GHC.Tc.Zonk.TcType
-import GHC.Tc.Types.Origin
-import GHC.Tc.Utils.TcType as TcType
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Core.ConLike
-import GHC.Core.DataCon
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
-import GHC.Core.Class(classTyCon)
-import GHC.Core.TyCon
-import GHC.Core.Type
-import GHC.Core.Coercion
-import GHC.Tc.Types.Evidence
+import GHC.Types.SrcLoc
+
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Builtin.Uniques ( mkBuiltinUnique )
+
 import GHC.Driver.DynFlags
-import GHC.Types.SrcLoc
+
 import GHC.Utils.Misc
-import GHC.Data.List.SetOps
-import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+
+import GHC.Data.List.SetOps
+import GHC.Data.Maybe
 
 import Control.Monad
 import qualified Data.List.NonEmpty as NE
@@ -334,7 +343,7 @@ tcExpr e@(HsIPVar _ x) res_ty
        ; ip_class <- tcLookupClass ipClassName
        ; let ip_pred = mkClassPred ip_class [ip_name, ip_ty]
        ; ip_dict <- emitWantedEvVar origin ip_pred
-       ; let (ip_op, _) = decomposeIP ip_pred
+       ; let (ip_op, _) = decomposeIPPred ip_pred
              wrap = mkWpEvVarApps [ip_dict] <.> mkWpTyApps [ip_name, ip_ty]
        ; tcWrapResult e
                (mkHsWrap wrap (HsVar noExtField (noLocA ip_op)))

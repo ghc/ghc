@@ -453,7 +453,7 @@ matchWithDict [cls_ty, mty]
        --     k (MkC tys (sv |> sub co2))
        ; let evWithDict ev_expr
                = mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
-                 Var k `App` (evWrapUnaryDict cls dict_args meth_arg)
+                 Var k `App` (evUnaryDictAppE cls dict_args meth_arg)
                where
                  meth_arg = Var sv `Cast` mkSubCo (evExprCoercion ev_expr)
 
@@ -1161,60 +1161,41 @@ matchEqualityInst cls args
 *                                                                     *
 ***********************************************************************-}
 
-{-
-Note [HasField instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have
+{- Note [HasField instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Recall that the HasField class is defined (in GHC.Records) thus:
 
-    data T y = MkT { foo :: [y] }
-
-and `foo` is in scope.  Then GHC will automatically solve a constraint like
-
-    HasField "foo" (T Int) b
-
-by emitting a new wanted
-
-    T alpha -> [alpha] ~# T Int -> b
-
-and building a HasField dictionary out of the selector function `foo`,
-appropriately cast.
-
-The HasField class is defined (in GHC.Records) thus:
-
-    type HasField :: forall {k} {r_rep} {a_rep} . k -> TYPE r_rep -> TYPE a_rep -> Constraint
+    type HasField :: forall {k} {r_rep} {a_rep} .
+                     k -> TYPE r_rep -> TYPE a_rep -> Constraint
     class HasField x r a | x r -> a where
       getField :: r -> a
 
-Since this is a one-method class, it is represented as a newtype.
-Hence we can solve `HasField "foo" (T Int) b` by taking an expression
-of type `T Int -> b` and casting it using the newtype coercion.
-Note that
+Suppose we have
+    data T y = MkT { foo :: [y] }
+and `foo` is in scope, with type
+    foo :: forall y. T y -> [y]
 
-    foo :: forall y . T y -> [y]
+Then `matchHasField` implements the followind built-in magic to solve
+         [W] d : HasField "foo" (T rty) fty
 
-so the expression we construct is
+  * Check that `T` has a field `foo`, and get the selector Id, sel_id
+    This is done by `lookupHasFieldLabel`
 
-    foo @alpha |> co
+  * Instantiate sel_id's type, giving:  T alpha -> [alpha]
 
-where
+  * Generating a new Wanted
+      [W] co : (T alpha -> [alpha]) ~# (T rty -> fty)
 
-    co :: (T alpha -> [alpha]) ~# HasField "foo" (T Int) b
+  * Solve the original Wanted via
+      d = MkHasField (sel_id @alpha |> co)
 
-is built from
+Wrinkles:
 
-    co1 :: (T alpha -> [alpha]) ~# (T Int -> b)
-
-which is the new wanted, and
-
-    co2 :: (T Int -> b) ~# HasField "foo" (T Int) b
-
-which can be derived from the newtype coercion.
-
-(HF1) If `foo` is not in scope, or has a higher-rank or existentially
-  quantified type, then the constraint is not solved automatically, but
-  may be solved by a user-supplied HasField instance.  Similarly, if we
-  encounter a HasField constraint where the field is not a literal
-  string, or does not belong to the type, then we fall back on the
+(HF1) If `foo` is not in scope, or is "naughty" (has a higher-rank or
+  existentially quantified type), then the constraint is not solved
+  automatically, but may be solved by a user-supplied HasField instance.
+  Similarly, if we encounter a HasField constraint where the field is not a
+  literal string, or does not belong to the type, then we fall back on the
   normal constraint solver behaviour.
 
 
@@ -1253,12 +1234,12 @@ matchHasField dflags short_cut clas tys mb_ct_loc
                          theta = mkNomEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
 
                          -- Use the equality proof to cast the selector Id to
-                         -- type (r -> a), then use evWrapUnaryDict to turn it
+                         -- type (r -> a), then use evUnaryDictAppE to turn it
                          -- into a HasField dictionary.
                          mk_ev (ev1:evs) = EvExpr                   $
-                                           evWrapUnaryDict clas tys $
-                                           evCastExpr (evSelector sel_id tvs evs)
-                                                      (mkSubCo (evExprCoercion ev1))
+                                           evUnaryDictAppE clas tys $
+                                           evCastE (evSelector sel_id tvs evs)
+                                                   (mkSubCo (evExprCoercion ev1))
                          mk_ev [] = panic "matchHasField.mk_ev"
 
                      -- The selector must not be "naughty" (i.e. the field

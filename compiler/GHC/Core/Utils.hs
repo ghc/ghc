@@ -73,9 +73,8 @@ import GHC.Core
 import GHC.Core.Ppr
 import GHC.Core.FVs( bindFreeVars )
 import GHC.Core.DataCon
-import GHC.Core.Class( classTyCon )
 import GHC.Core.Type as Type
-import GHC.Core.Predicate( isCoVarType )
+import GHC.Core.Predicate( isCoVarType, isUnaryClass )
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCo.Compare( eqType, eqTypeX )
 import GHC.Core.Coercion
@@ -1319,8 +1318,8 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
     is_unary_cls_op (App f (Type {}))       = is_unary_cls_op f
     is_unary_cls_op (Var v)
-      | Just cls <- isClassOpId_maybe v     = isUnaryClassTyCon (classTyCon cls)
-      | Just dc  <- isDataConWorkId_maybe v = isUnaryClassTyCon (dataConTyCon dc)
+      | Just cls <- isClassOpId_maybe v     = isUnaryClass cls
+      | Just dc  <- isDataConWorkId_maybe v = isUnaryClassDataCon dc
     is_unary_cls_op _                       = False
 
 exprIsTrivial :: CoreExpr -> Bool

@@ -190,6 +190,8 @@ Note [Instances and loop breakers]
 
 Note [ClassOp/DFun selection]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This important Note explains how DFunIds and ClassOps work.
+
 One thing we see a lot is stuff like
     op2 (df d1 d2)
 where 'op2' is a ClassOp and 'df' is DFun.  Now, we could inline *both*
@@ -223,6 +225,12 @@ Instead we use a cunning trick.
  * We make 'df' CONLIKE, so that shared uses still match; eg
       let d = df d1 d2
       in ...(op2 d)...(op1 d)...
+
+ * ClassOps have no unfolding; they work /only/ through their RULE.
+   But a ClassOp might be called with no arguments, or with an argument that
+   the rule doesn't fire on.   So each ClassOp does get an executable top-level
+   definition, injected by GHC.Iface.Tidy.getClassImplicitBinds, which uses
+   `GHC.Types.Id.Make.mkDictSelRhs` to make the code.
 
 Note [Single-method classes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1420,6 +1428,7 @@ addDFunPrags :: DFunId -> [Id] -> DFunId
 addDFunPrags dfun_id sc_meth_ids
  = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_bndrs dict_con dict_args
            `setInlinePragma` dfunInlinePragma
+           -- NB: mkDFunUnfolding takes care of unary classes
  where
    dict_args  = map Type inst_tys ++
                 [mkVarApps (Var id) dfun_bndrs | id <- sc_meth_ids]
