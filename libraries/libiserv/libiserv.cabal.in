@@ -33,5 +33,5 @@ Library
 
     if os(windows)
        Cpp-Options: -DWINDOWS
-   else
+    else
        Build-Depends: unix   >= 2.7 && < 2.9
