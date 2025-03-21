@@ -17,7 +17,7 @@ module GHC.Core.Opt.Simplify.Env (
         seOptCoercionOpts, sePhase, sePlatform, sePreInline,
         seRuleOpts, seRules, seUnfoldingOpts,
         mkSimplEnv, extendIdSubst, extendCvIdSubst,
-        extendTvSubst, extendCvSubst,o
+        extendTvSubst, extendCvSubst,
         zapSubstEnv, setSubstEnv, bumpCaseDepth,
         getInScope, setInScopeFromE, setInScopeFromF,
         setInScopeSet, modifyInScope, addNewInScopeIds,

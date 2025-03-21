@@ -72,7 +72,7 @@ module GHC.Core.Coercion (
 
         coToMCo, mkTransMCo, mkTransMCoL, mkTransMCoR, mkCastTyMCo, mkSymMCo,
         mkFunResMCo, mkPiMCos,
-        isReflMCo, checkReflexiveMCo, isSubCo_maybe,
+        isReflMCo, checkReflexiveMCo,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
@@ -1374,10 +1374,6 @@ mkSubCo co@(FunCo { fco_role = Nominal, fco_arg = arg, fco_res = res })
 mkSubCo co = assertPpr (coercionRole co == Nominal) (ppr co <+> ppr (coercionRole co)) $
              SubCo co
 
-isSubCo_maybe :: Coercion -> Maybe Coercion
-isSubCo_maybe (SubCo co) = Just co
-isSubCo_maybe _          = Nothing
-
 -- | Changes a role, but only a downgrade. See Note [Role twiddling functions]
 downgradeRole_maybe :: Role   -- ^ desired role
                     -> Role   -- ^ current role
@@ -1420,6 +1416,7 @@ mkProofIrrelCo r kco g1 g2 = mkUnivCo ProofIrrelProv [kco] r
                                       (mkCoercionTy g1) (mkCoercionTy g2)
 
 mkUnaryClassCo :: Type -> Type -> Coercion
+-- See (UCM2) in Note [Unary class magic]
 mkUnaryClassCo ty1 ty2 = mkUnivCo UnaryClassProv [] Representational ty1 ty2
 
 {-

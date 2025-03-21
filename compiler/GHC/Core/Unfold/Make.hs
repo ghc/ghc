@@ -86,7 +86,8 @@ mkSimpleUnfolding !opts rhs
 mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops
   | isUnaryClassTyCon (dataConTyCon con)
-  = mkDataConUnfolding $
+  = -- See (UCM5) in Note [Unary class magic] in GHC.Core.TyCon
+    mkDataConUnfolding $
     mkLams bndrs  $
     mkApps (Var (dataConWrapId con)) ops
                 -- This application will satisfy the Core invariants

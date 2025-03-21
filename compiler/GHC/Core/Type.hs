@@ -2484,6 +2484,7 @@ isTerminatingType :: HasDebugCallStack => Type -> Bool
 isTerminatingType ty = case tyConAppTyCon_maybe ty of
     Just tc -> isClassTyCon tc && not (isUnaryClassTyCon tc)
                -- A non-unary class TyCon is terminating
+               -- See (UCM3) in Note [Unary class magic] in GHC.Core.TyCon
     _       -> False
 
 isPrimitiveType :: Type -> Bool

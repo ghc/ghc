@@ -334,16 +334,11 @@ buildClass tycon_name binders roles fds
               --  superclasses both called C!)
 
         ; let unary_class = isSingleton (sc_theta ++ op_tys)
-                -- Use a newtype if the data constructor
-                --   (a) has exactly one value field
-                --       i.e. exactly one operation or superclass taken together
-                --   (b) that value is of lifted type (which they always are, because
-                --       we box equality superclasses)
-                -- See Note [Class newtypes and equality predicates]
-                --
-                -- In the case of
-                --     class C a => D a
-                -- we use a newtype, but with one superclass and no arguments
+                -- Use a unary class if the data constructor
+                -- has exactly one value field
+                -- i.e. exactly one operation or superclass taken together
+                -- See Note [Unary class magic] in GHC.Core.TyCon
+
               args       = sc_sel_names ++ op_names
               op_tys     = [ty | (_,ty,_) <- sig_stuff]
               op_names   = [op | (op,_,_) <- sig_stuff]
@@ -414,24 +409,6 @@ buildClass tycon_name binders roles fds
     mk_dm_info op_name (Just (GenericDM (loc, dm_ty)))
       = do { dm_name <- newImplicitBinderLoc op_name mkDefaultMethodOcc loc
            ; return (Just (dm_name, GenericDM dm_ty)) }
-
-{-
-Note [Class newtypes and equality predicates]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-        class (a ~ F b) => C a b where
-          op :: a -> b
-
-We cannot represent this by a newtype, even though it's not
-existential, because there are two value fields (the equality
-predicate and op. See #2238
-
-Moreover,
-          class (a ~ F b) => C a b where {}
-Here we can't use a newtype either, even though there is only
-one field, because equality predicates are unboxed, and classes
-are boxed.
--}
 
 newImplicitBinder :: Name                       -- Base name
                   -> (OccName -> OccName)       -- Occurrence name modifier

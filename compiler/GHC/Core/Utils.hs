@@ -1316,6 +1316,7 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
       = go rhs   -- See (U2) of Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
     go _                                  = k_not_triv
 
+    -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
     is_unary_cls_op (App f (Type {}))       = is_unary_cls_op f
     is_unary_cls_op (Var v)
       | Just cls <- isClassOpId_maybe v     = isUnaryClassTyCon (classTyCon cls)
@@ -1865,6 +1866,7 @@ app_ok fun_ok primop_ok fun args
       DFunId unary_class -> not unary_class
          -- DFuns terminate, unless the dict is implemented
          -- by a no-op in which case they may not
+         -- See (UCM3) in Note [Unary class magic] in GHC.Core.TyCon
 
       DataConWorkId dc
         | isLazyDataConRep dc
@@ -2160,32 +2162,6 @@ exprIsHNF = exprIsHNFlike isDataConWorkId isEvaldUnfolding
 -- inliner.
 exprIsConLike :: CoreExpr -> Bool       -- True => lambda, conlike, PAP
 exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
-
-{- FOR SOME REASON I TRIED THIS VARIANT, BUT I CAN'T REMEMBER WHY
-   It means, for example, that constructors with wappers don't count
-   as con-like:
-    T23307a.$WCons
-      = \ (@a_ahj) (conrep_ai4 [Occ=Once1!] :: Unconsed a_ahj) ->
-        case conrep_ai4 of
-        { Unconsed unbx_ai5 [Occ=Once1] unbx1_ai6 [Occ=Once1] ->
-            T23307a.Cons @a_ahj unbx_ai5 unbx1_ai6  }
-
--- Trying: just a constructor application
-exprIsConLike (Var v)       = isConLikeId v
-exprIsConLike (Lit l)       = not (isLitRubbish l)
-exprIsConLike (App f a)     = exprIsTrivial a && exprIsConLike f
-exprIsConLike (Lam b e)
-  | isRuntimeVar b          = False
-  | otherwise               = exprIsConLike e
-exprIsConLike (Tick t e)
-  | tickishCounts t         = False
-  | otherwise               = exprIsConLike e
-exprIsConLike (Cast e _)    = exprIsConLike e
-exprIsConLike (Let {})      = False
-exprIsConLike (Case {})     = False
-exprIsConLike (Type {})     = False
-exprIsConLike (Coercion {}) = False
--}
 
 -- | Returns true for values or value-like expressions. These are lambdas,
 -- constructors / CONLIKE functions (as determined by the function argument)
