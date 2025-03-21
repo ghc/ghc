@@ -2361,6 +2361,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnUselessSpecialisations -> warnSpec x
   Opt_WarnDeprecatedPragmas -> warnSpec x
   Opt_WarnRuleLhsEqualities -> warnSpec x
+  Opt_WarnUnusableUnpackPragma -> warnSpec x
 
 warningGroupsDeps :: [(Deprecation, FlagSpec WarningGroup)]
 warningGroupsDeps = map mk warningGroups

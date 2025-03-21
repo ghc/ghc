@@ -2486,6 +2486,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnIncompleteRecordSelectors
     TcRnBadFieldAnnotation _ _ LazyFieldsDisabled
       -> ErrorWithoutFlag
+    TcRnBadFieldAnnotation _ _ UnusableUnpackPragma
+      -> WarningWithFlag Opt_WarnUnusableUnpackPragma
     TcRnBadFieldAnnotation{}
       -> WarningWithoutFlag
     TcRnSuperclassCycle{}
@@ -5776,7 +5778,7 @@ pprBadFieldAnnotationReason = \case
     text "Lazy field annotations (~) are disabled"
   UnpackWithoutStrictness ->
     text "UNPACK pragma lacks '!'"
-  BackpackUnpackAbstractType ->
+  UnusableUnpackPragma ->
     text "Ignoring unusable UNPACK pragma"
 
 pprSuperclassCycleDetail :: SuperclassCycleDetail -> SDoc

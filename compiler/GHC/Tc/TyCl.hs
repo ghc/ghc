@@ -4813,7 +4813,7 @@ checkValidDataCon dflags existential_ok tc con
                -- warn in this case (it gives users the wrong idea about whether
                -- or not UNPACK on abstract types is supported; it is!)
                , isHomeUnitDefinite (hsc_home_unit hsc_env)
-               = addDiagnosticTc (bad_bang n BackpackUnpackAbstractType)
+               = addDiagnosticTc (bad_bang n UnusableUnpackPragma)
 
                | otherwise
                = return ()

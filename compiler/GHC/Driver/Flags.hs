@@ -1091,6 +1091,7 @@ data WarningFlag =
        -- ^ @since 9.14, scheduled to be removed in 9.18
        --
        -- See Note [Quantifying over equalities in RULES] in GHC.Tc.Gen.Sig
+   | Opt_WarnUnusableUnpackPragma                    -- Since 9.14
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1210,6 +1211,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnUselessSpecialisations                  -> "useless-specialisations" :| ["useless-specializations"]
   Opt_WarnDeprecatedPragmas                       -> "deprecated-pragmas" :| []
   Opt_WarnRuleLhsEqualities                       -> "rule-lhs-equalities" :| []
+  Opt_WarnUnusableUnpackPragma                    -> "unusable-unpack-pragma" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -1354,7 +1356,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnViewPatternSignatures,
         Opt_WarnUselessSpecialisations,
         Opt_WarnDeprecatedPragmas,
-        Opt_WarnRuleLhsEqualities
+        Opt_WarnRuleLhsEqualities,
+        Opt_WarnUnusableUnpackPragma
       ]
 
 -- | Things you get with @-W@.
