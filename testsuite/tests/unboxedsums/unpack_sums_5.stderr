@@ -1,10 +1,10 @@
-
-unpack_sums_5.hs:4:22: warning: [GHC-40091]
+unpack_sums_5.hs:4:22: warning: [GHC-40091] [-Wunusable-unpack-pragmas (in -Wdefault)]
     • Ignoring unusable UNPACK pragma on the first argument of ‘JustT’
     • In the definition of data constructor ‘JustT’
       In the data type declaration for ‘SMaybeT’
 
-unpack_sums_5.hs:7:10: warning: [GHC-40091]
+unpack_sums_5.hs:7:10: warning: [GHC-40091] [-Wunusable-unpack-pragmas (in -Wdefault)]
     • Ignoring unusable UNPACK pragma on the first argument of ‘MkT’
     • In the definition of data constructor ‘MkT’
       In the data type declaration for ‘T’
+

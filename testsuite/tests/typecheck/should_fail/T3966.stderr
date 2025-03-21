@@ -1,5 +1,5 @@
-
-T3966.hs:5:16: error: [GHC-40091] [-Werror]
+T3966.hs:5:16: error: [GHC-40091] [-Wunusable-unpack-pragmas (in -Wdefault), Werror=unusable-unpack-pragmas]
     • Ignoring unusable UNPACK pragma on the first argument of ‘Foo’
     • In the definition of data constructor ‘Foo’
       In the data type declaration for ‘Foo’
+

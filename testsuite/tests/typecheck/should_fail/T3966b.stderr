@@ -1,0 +1,15 @@
+T3966b.hs:6:10: error: [GHC-40091] [-Wunusable-unpack-pragmas (in -Wdefault), Werror=unusable-unpack-pragmas]
+    • Ignoring unusable UNPACK pragma on the first argument of ‘MkT’
+    • In the definition of data constructor ‘MkT’
+      In the data type declaration for ‘T’
+
+T3966b.hs:9:3: error: [GHC-40091] [-Wunusable-unpack-pragmas (in -Wdefault), Werror=unusable-unpack-pragmas]
+    • Ignoring unusable UNPACK pragma on the first argument of ‘MkG’
+    • In the definition of data constructor ‘MkG’
+      In the data type declaration for ‘G’
+
+T3966b.hs:12:12: error: [GHC-40091] [-Wunusable-unpack-pragmas (in -Wdefault), Werror=unusable-unpack-pragmas]
+    • Ignoring unusable UNPACK pragma on the first argument of ‘MkR’
+    • In the definition of data constructor ‘MkR’
+      In the data type declaration for ‘R’
+
