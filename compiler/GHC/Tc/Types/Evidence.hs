@@ -62,7 +62,7 @@ import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.Make    ( mkWildCase, mkRuntimeErrorApp, tYPE_ERROR_ID )
 import GHC.Core.Class   ( classTyCon, classMethods )
-import GHC.Core.DataCon ( DataCon, dataConWrapId )
+import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
 import GHC.Core.InstEnv ( CanonicalEvidence )
@@ -546,15 +546,27 @@ evCastExpr ee co
     isReflCo co = ee
   | otherwise   = Cast ee co
 
--- Dictionary instance application
 evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvTerm
-evDFunApp df tys ets = EvExpr $ Var df `mkTyApps` tys `mkApps` ets
+-- Dictionary instance application, including when the "dictionary function"
+-- is actually the data construtor for a dictionary
+evDFunApp df tys ets = EvExpr (evDFunAppE df tys ets)
+
+evDFunAppE :: DFunId -> [Type] -> [EvExpr] -> EvExpr
+evDFunAppE df tys ets = Var df `mkTyApps` tys `mkApps` ets
 
 evDictApp :: Class -> [Type] -> [EvExpr] -> EvTerm
-evDictApp cls tys args
+evDictApp cls tys args = EvExpr (evDictAppE cls tys args)
+
+evDictAppE :: Class -> [Type] -> [EvExpr] -> EvExpr
+evDictAppE cls tys args
   = case tyConSingleDataCon_maybe (classTyCon cls) of
-      Just dc -> evDFunApp (dataConWrapId dc) tys args
+      Just dc -> evDFunAppE (dataConWrapId dc) tys args
       Nothing -> pprPanic "evDictApp" (ppr cls)
+
+evWrapUnaryDict :: Class -> [Type] -> EvExpr -> EvExpr
+-- See (UCM6) in Note [Unary class magic] in GHC.Core.TyCon
+evWrapUnaryDict cls tys meth
+  = evDictAppE cls tys [meth]
 
 -- Selector id plus the types at which it
 -- should be instantiated, used for HasField
@@ -1037,12 +1049,12 @@ instance Outputable EvTypeable where
 -- and return (ip, MkIP, [sym,ty]), where
 --    `ip` is the class-op for class IP
 --    `MkIP` is the data constructor for class IP
-decomposeIP :: Type -> (Id, DataCon, [Type])
+decomposeIP :: Type -> (Id, [Type])
 decomposeIP ty
   | Just cls <- tyConClass_maybe tc
   , [ip_op] <- classMethods cls
   = assertPpr (isIPClass cls && isUnaryClassTyCon tc) (ppr tc) $
-    (ip_op, tyConSingleDataCon tc, tys)
+    (ip_op, tys)
   | otherwise = pprPanic "decomposeIP" (ppr tc)
   where
     (tc, tys) = splitTyConApp ty
@@ -1052,9 +1064,9 @@ evWrapIP :: PredType -> EvExpr -> EvExpr
   --      et_tm :: ty
 -- Return an EvTerm of type (IP s ty)
 evWrapIP pred ev_tm
-  = evWrapUnaryDict tc tys ev_tm
+  = evWrapUnaryDict cls tys ev_tm
   where
-    (tc, tys) = splitTyConApp pred
+    (cls, tys) = getClassPredTys pred
 
 evUnwrapIP :: PredType -> EvExpr -> EvExpr
 -- Given  pred = IP s ty
@@ -1063,14 +1075,8 @@ evUnwrapIP :: PredType -> EvExpr -> EvExpr
 evUnwrapIP pred ev_tm
   = mkApps (Var ip_sel) (map Type tys ++ [ev_tm])
   where
-    (ip_sel, _, tys) = decomposeIP pred
+    (ip_sel, tys) = decomposeIP pred
 
-evWrapUnaryDict :: TyCon -> [Type] -> EvExpr -> EvExpr
-evWrapUnaryDict tc tys meth
-  | Just dc <- isUnaryClassTyCon_maybe tc
-  = Var (dataConWrapId dc) `mkTyApps` tys `App` meth
-  | otherwise
-  = pprPanic "evWrapUnaryDict" (ppr tc)
 
 ----------------------------------------------------------------------
 -- A datatype used to pass information when desugaring quotations

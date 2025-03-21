@@ -3055,19 +3055,6 @@ push_dc_gen dc dc_args co (Pair from_ty to_ty)
         -- will probably not be called in such circumstances,
         -- but there's nothing wrong with it
   = Just (push_data_con to_tc to_tc_arg_tys dc dc_args co Representational)
-{-
-  = case isSubCo_maybe co of
-      Just co' -> Just (push_data_con to_tc to_tc_arg_tys dc dc_args co' Nominal)
-      _        | isInjectiveTyCon to_tc Representational
-               -> Just (push_data_con to_tc to_tc_arg_tys dc dc_args co Representational)
-               | otherwise
-               -> pprTrace "Yikes"
-                      (vcat [ text "Scrut:" <+> ppr dc -- <+> ppr dc_args
-                            , text "Co:" <+> ppr co
---                            , text "of type:" <+> ppr (coercionType co)
-                            , text "role:" <+> ppr (coercionRole co) ])
-                  Nothing
--}
 
   | otherwise
   = Nothing
@@ -3168,41 +3155,12 @@ collectBindersPushingCo e
 
       | otherwise = (reverse bs, mkCast (Lam b e) co)
 
-{- Note [pushCoDataCon for newtypes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  newtype N a = MkN (Maybe a)
-and the expression
-  MkN @Int e |> co
-where
-   e :: Maybe Int
-  co :: N Int ~R# N T   is a coercion
-
-Then can we use pushCoDataCon to transform this to
-   MkInt @T (e |> Maybe co')
-where
-   (co' : Int ~R# T) = SelCo (SelTc 0 R) co
-
-Well, no.  Look at Note [SelCo] in GHC.Core.TyCo.Rep, and especially
-Note [SelCo and newtypes].  We can't use SelCo on a representational
-coercion for a newtype -- it is not injective.
-
-But what if it happens that co = Sub co2 where
-  co2 : N Int ~N# N T
-Well, now we *can* use co2 to give
-   MkInt @T (e |> Maybe (Sub co'))
-where
-   (co' : Int ~N# T) = SelCo (SelTc 0 N) co2
-
-This is a rather common case.
-
-Note [collectBindersPushingCo]
+{- Note [collectBindersPushingCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We just look for coercions of form
    <type> % w -> blah
 (and similarly for foralls) to keep this function simple.  We could do
 more elaborate stuff, but it'd involve substitution etc.
-
 -}
 
 {- *********************************************************************

@@ -764,11 +764,10 @@ litSize _other = 0    -- Must match size of nullary constructors
 classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> ExprSize
 -- See Note [Conlike is interesting]
 
-classOpSize _ cls _ _
+classOpSize opts cls top_args args
   | isUnaryClassTyCon (classTyCon cls)
-  = sizeZero
-
-classOpSize opts _ top_args args
+  = sizeZero   -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
+  | otherwise
   = case args of
        []                -> sizeZero
        (arg1:other_args) -> SizeIs (size other_args) (arg_discount arg1) 0

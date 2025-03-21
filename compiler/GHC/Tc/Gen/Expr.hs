@@ -334,7 +334,7 @@ tcExpr e@(HsIPVar _ x) res_ty
        ; ip_class <- tcLookupClass ipClassName
        ; let ip_pred = mkClassPred ip_class [ip_name, ip_ty]
        ; ip_dict <- emitWantedEvVar origin ip_pred
-       ; let (ip_op, _, _) = decomposeIP ip_pred
+       ; let (ip_op, _) = decomposeIP ip_pred
              wrap = mkWpEvVarApps [ip_dict] <.> mkWpTyApps [ip_name, ip_ty]
        ; tcWrapResult e
                (mkHsWrap wrap (HsVar noExtField (noLocA ip_op)))

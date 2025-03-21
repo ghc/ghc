@@ -205,16 +205,15 @@ tyConToIfaceDecl env tycon
             ibr  = map (coAxBranchToIfaceBranch tycon lhss) defs
             axn  = coAxiomName ax
 
-    ifaceConDecls (NewTyCon { data_con = con })   = IfNewTyCon        (ifaceConDecl con)
     ifaceConDecls (DataTyCon { data_cons = cons, is_type_data = type_data })
       = IfDataTyCon type_data (map ifaceConDecl cons)
-    ifaceConDecls AbstractTyCon                    = IfAbstractTyCon
-        -- The AbstractTyCon case happens when a TyCon has been trimmed
-        -- during tidying.
-
+    ifaceConDecls (NewTyCon { data_con = con })   = IfNewTyCon        (ifaceConDecl con)
     ifaceConDecls (UnaryClass { data_con = con }) = IfDataTyCon False [ifaceConDecl con]
     ifaceConDecls (TupleTyCon { data_con = con }) = IfDataTyCon False [ifaceConDecl con]
     ifaceConDecls (SumTyCon { data_cons = cons }) = IfDataTyCon False (map ifaceConDecl cons)
+    ifaceConDecls AbstractTyCon                   = IfAbstractTyCon
+        -- The AbstractTyCon case happens when a TyCon has been trimmed
+        -- during tidying.
         -- Furthermore, tyThingToIfaceDecl is also used in GHC.Tc.Module
         -- for GHCi, when browsing a module, in which case the
         -- AbstractTyCon, TupleTyCon, SumTyCon, UnaryClassTyCon cases are perfectly sensible.

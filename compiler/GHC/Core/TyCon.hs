@@ -1131,7 +1131,7 @@ data AlgTyConRhs
                         -- in tcHasFixedRuntimeRep.
     }
 
-  | UnaryClass {     -- See Note [Unary classes]
+  | UnaryClass {     -- See Note [Unary class magic], esp (UCM1)
       data_con :: DataCon
       }
 
@@ -1334,13 +1334,6 @@ type family with no equations does not have an axiom, because there is
 nothing for the axiom to prove!
 
 
-Note [Unary classes]
-~~~~~~~~~~~~~~~~~~~~
-ToDo!!
-isInjectiveTyCon:
-  -- ToDo: Lint and pushDataCon both check for injective TyCons in SelCo
-  -- So newtype classes need to pretend to be injective.
-
 Note [Promoted data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 All data constructors can be promoted to become a type constructor,
@@ -1437,6 +1430,109 @@ axT must have
  and    arity:   0
 
 See also Note [Newtype eta and homogeneous axioms] in GHC.Tc.TyCl.Build.
+
+Note [Unary class magic]
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+ToDo -------------
+isInjectiveTyCon:
+  -- ToDo: Lint and pushDataCon both check for injective TyCons in SelCo
+  -- So newtype classes need to pretend to be injective.
+------------ End of ToDo
+
+Consider a class with just one method, or with no methods and one
+superclass:
+  class UC a where { op :: a -> a }
+  class Eq a => UD a where {}
+Such a class is called a /unary class/.
+
+We could represent the dictionary for a unary class with a data type:
+  data UC a where { MkUC :: (a->a) -> UC a }
+  data UD a where { MkUD :: Eq a =>  UD a }
+But it would be more efficent to use a newtype; and for decades GHC did exactly that.
+Unary classes are surprisingly common, so it's a useful optimisation.
+
+But alas, using a newtype representation (surprisingly) led to some distressingly
+subtle bugs: see Note [Representing unary classes with newtypes: bad, bad, bad].
+
+This Note explains what GHC now does for unary classes.
+
+* Throughout the compiler, right up to the code generator, GHC thinks that a
+  unary class is just like a non-unary class:
+    - Represented by a data type,
+    - with one (constructor),
+    - which has one field
+
+* Then in GHC.CoreToStg.Prep.isUnaryClassApp, we adopt the newtype representation,
+  by transforming
+    - op  ta tb tc dict_arg   -->  dict_arg |> co
+    - MkUC ta tb tc meth_arg  -->  meth_arg |> sym co
+  where
+    co = mkUnaryClassCo ...
+
+  Note that this is /after/ generating an interface file, so importing modules
+  only see the data constructor.
+
+In this way we get the efficiency of a newtype without the bugs that we get
+by exposing the newtype representation too early.
+
+There are a number of wrinkles
+
+(UCM1) The TyCon for a unary class is /not/ identified as a newtype.
+   Rather, it has its own AlgTyConRhs, namely `UnaryClass`
+
+(UCM2) We need a coercion that we can use in CoreToStg.Prep, to cast from
+               UC a ~ (a->a)
+   in the example at the top of this Note.  We use `UnivCo` with a provenance
+   of `UnaryClassProv`.
+
+(UCM3) Unlike non-unary classes, a value of type (C ty), where `C` is a unary
+   class, might be bottom, because it is represented by the method type alone.
+   See GHC.Core.Type.isTerminatingType.
+
+   Similarly in exprOkForSpeculation/exprOkToDiscard/exprOkForSpecEval,
+   in GHC.Core.Utils.  In the utility funcion `app_ok` we need a special
+   case for the DFunIds; they generally terminate, but not for unary classes.
+
+(UMC4) To avoid regressions, in Core we want to remember that
+    (MkUC x) is really just  x
+    (op d)   is really just  d
+
+  We account for this in several places:
+
+    - `GHC.Core.Utils.exprIsTrivial` treats the above two forms as trivial
+
+    - `GHC.Core.Unfold.sizeExpr` (which computes the size of an expression to
+      guide inlining) treats (MkUC e) as the same size as `e`, and similarly
+      (op d).
+
+(UCM5) `GHC.Core.Unfold.Make.mkDFunUnfolding` builds a `DFunUnfolding` for
+   non-unary classes, but just an ordinary unfolding for unary classes.
+       instance Num a => Num [a] where { .. }       -- (I1)
+       instance UC a => UC [a] where { op = $cop }  -- (I2)
+   From (I1) we get
+       $fNumList = /\a \(d:Num a). MkNum (..) (..) (..)
+         -- $fNumList has a DFunUnfolding
+    But from (I2) we get
+       $fUCList = /\a (d:UC a). MkUC ($cop a d)
+       -- $fUCList has a regular CoreUnfolding
+
+    Why?  Because we can safely inline $fUCList without code-size blow-up.
+    Just one less indirection. It'd probably work ok with a DFunUnfolding;
+    and it'd add another case for (UCM4) to spot.
+
+(UCM6) In the constraint solver, when constructing evidence for a unary class
+    (e.g. implicit parameters, withDict) be careful to
+    - use the data constructor to build it: see `evDictApp`, `evWrapUnaryDict`
+    - use the class op to take it apart: see `evUnwrapIP`
+
+(UCM7) You might worry about
+           class UC1 a where { op :: Int# }    -- Single uboxed field
+           class (a ~# b) => UC2 a b where {}  -- Unboxed equality superclass
+  But these are illegal: predicates are always boxed, and unary
+  classes must have lifted fields.
+
+  ToDo: check this!!!
 
 ************************************************************************
 *                                                                      *
@@ -2744,13 +2840,17 @@ famTyConFlav_maybe (TyCon { tyConDetails = details })
   | otherwise                                 = Nothing
 
 isUnaryClassTyCon :: TyCon -> Bool
-isUnaryClassTyCon tc = isJust (isUnaryClassTyCon_maybe tc)
-
-isUnaryClassTyCon_maybe :: TyCon -> Maybe DataCon
-isUnaryClassTyCon_maybe tc@(TyCon { tyConDetails = details })
-  | AlgTyCon { algTcFlavour = flav, algTcRhs = UnaryClass { data_con = dc } } <- details
+isUnaryClassTyCon tc@(TyCon { tyConDetails = details })
+  | AlgTyCon { algTcFlavour = flav, algTcRhs = UnaryClass {} } <- details
   = assertPpr (case flav of { ClassTyCon {} -> True; _ -> False }) (ppr tc) $
-    Just dc
+    True
+  | otherwise
+  = False
+
+isUnaryClassTyCon_maybe :: TyCon -> Maybe (Class, DataCon)
+isUnaryClassTyCon_maybe (TyCon { tyConDetails = details })
+  | AlgTyCon { algTcFlavour = ClassTyCon cls _, algTcRhs = UnaryClass { data_con = dc } } <- details
+  = Just (cls, dc)
   | otherwise
   = Nothing
 

@@ -1574,6 +1574,8 @@ data UnivCoProvenance
       --   The string and the variable set are for the use by the plugin.
 
   | UnaryClassProv
+      -- See (UCM2) in Note [Unary class magic] in GHC.Core.TyCon
+
 
   deriving (Eq, Ord, Data.Data)
   -- Why Ord?  See Note [Ord instance of IfaceType] in GHC.Iface.Type

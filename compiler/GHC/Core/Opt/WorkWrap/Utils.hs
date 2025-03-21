@@ -612,8 +612,7 @@ see #17478.
 -- 's' will be 'Demand' or 'Cpr'.
 data DataConPatContext s
   = DataConPatContext
-  { dcpc_dc      :: !DataCon  -- INVARIANT: canUnboxTyCon is true of
-                              --            this DataCon's tycon
+  { dcpc_dc      :: !DataCon  -- INVARIANT: canUnboxTyCon is true of this DataCon's tycon
   , dcpc_tc_args :: ![Type]
   , dcpc_co      :: !Coercion
   , dcpc_args    :: ![s]
@@ -772,7 +771,7 @@ Wrinkle (DNB1): we /do/ want to unbox tuple dictionaries (#23398)
 
   And something is gained.  It is possible that `f` will look like this:
      f = /\a. \d:(% Eq a, Show a %). ... f @a (% sel1 d, sel2 d %)...
-  where there is a recurive call to `f`, or to another function that takes the
+  where there is a recursive call to `f`, or to another function that takes the
   same tuple dictionary, but where the tuple is built from the components of
   `d`.  The Simplier does not fix this.  But if we unpacked the dictionary
   we'd get

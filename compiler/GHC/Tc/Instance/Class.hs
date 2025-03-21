@@ -434,16 +434,16 @@ makeLitDict clas lit_ty lit_expr
 
 -- See Note [withDict]
 matchWithDict :: [Type] -> TcM ClsInstResult
-matchWithDict [cls, mty]
-    -- Check that cls is a class constraint `C t_1 ... t_n`, where
+matchWithDict [cls_ty, mty]
+    -- Check that cls_ty is a class constraint `C t_1 ... t_n`, where
     -- `dict_tc = C` and `dict_args = t_1 ... t_n`.
-  | Just (dict_tc, dict_args) <- tcSplitTyConApp_maybe cls
+  | Just (dict_tc, dict_args) <- tcSplitTyConApp_maybe cls_ty
     -- Check that C is a class of the form
     -- `class C a_1 ... a_n where op :: meth_ty`
-  , Just dict_dc <- isUnaryClassTyCon_maybe dict_tc
+  , Just (cls, dict_dc) <- isUnaryClassTyCon_maybe dict_tc
   , [inst_meth_ty] <- dataConInstArgTys dict_dc dict_args
   = do { sv <- mkSysLocalM (fsLit "withDict_s") ManyTy mty
-       ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTy cls openAlphaTy)
+       ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTy cls_ty openAlphaTy)
        ; wd_cls <- tcLookupClass withDictClassName
 
        -- Given ev_expr : mty ~N# inst_meth_ty, construct the method of
@@ -453,11 +453,11 @@ matchWithDict [cls, mty]
        --     k (MkC tys (sv |> sub co2))
        ; let evWithDict ev_expr
                = mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
-                 Var k `App` (evWrapUnaryDict dict_tc dict_args meth_arg)
+                 Var k `App` (evWrapUnaryDict cls dict_args meth_arg)
                where
                  meth_arg = Var sv `Cast` mkSubCo (evExprCoercion ev_expr)
 
-       ; let mk_ev [c] = evDictApp wd_cls [cls, mty] [evWithDict c]
+       ; let mk_ev [c] = evDictApp wd_cls [cls_ty, mty] [evWithDict c]
              mk_ev e   = pprPanic "matchWithDict" (ppr e)
 
        ; return $ OneInst { cir_new_theta   = [mkNomEqPred mty (scaledThing inst_meth_ty)]
@@ -1255,8 +1255,8 @@ matchHasField dflags short_cut clas tys mb_ct_loc
                          -- Use the equality proof to cast the selector Id to
                          -- type (r -> a), then use evWrapUnaryDict to turn it
                          -- into a HasField dictionary.
-                         mk_ev (ev1:evs) = EvExpr                                $
-                                           evWrapUnaryDict (classTyCon clas) tys $
+                         mk_ev (ev1:evs) = EvExpr                   $
+                                           evWrapUnaryDict clas tys $
                                            evCastExpr (evSelector sel_id tvs evs)
                                                       (mkSubCo (evExprCoercion ev1))
                          mk_ev [] = panic "matchHasField.mk_ev"
