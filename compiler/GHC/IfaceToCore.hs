@@ -1288,7 +1288,7 @@ tcIfaceDefault :: Module -> IfaceDefault -> IfL ClassDefaults
 tcIfaceDefault this_mod IfaceDefault { ifDefaultCls = clsCon
                                      , ifDefaultTys = tys
                                      , ifDefaultWarn = iface_warn }
-  = do { clsCon' <- tcIfaceTyCon clsCon
+  = do { clsCon' <- forkM (text "Default") $ tcIfaceTyCon clsCon
        ; tys' <- traverse tcIfaceType tys
        ; let warn = fmap fromIfaceWarningTxt iface_warn
        ; return ClassDefaults { cd_class = clsCon'
