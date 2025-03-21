@@ -25,17 +25,6 @@ Language
   This deprecation is controlled by the newly introduced ``-Wdeprecated-pragmas``
   flag in ``-Wdefault``.
 
-* A new flag, ``-Wuseless-specialisations``, controls warnings emitted when GHC
-  determines that a SPECIALISE pragma would have no effect.
-
-* A new flag, ``-Wrule-lhs-equalities``, controls warnings emitted for RULES
-  whose left-hand side attempts to quantify over equality constraints that
-  previous GHC versions accepted quantifying over. GHC will now drop such RULES,
-  emitting a warning message controlled by this flag.
-
-  This warning is intended to give visibility to the fact that the RULES that
-  previous GHC versions generated in such circumstances could never fire.
-
 * ``-Wincomplete-record-selectors`` is now part of `-Wall`, as specified
   by `GHC Proposal 516: add warning for incomplete record selectors <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0516-incomplete-record-selectors.rst>`_.
   Hence, if a library is compiled with ``-Werror``, compilation may now fail. Solution: fix the library.
@@ -92,6 +81,25 @@ Compiler
   :ghc-ticket:`16410`, :ghc-ticket:`16448`, :ghc-ticket:`16693`, :ghc-ticket:`19611`,
   :ghc-ticket:`20875`, :ghc-ticket:`21172`, :ghc-ticket:`22257`, :ghc-ticket:`25238`,
   :ghc-ticket:`25834`.
+
+- A new flag, :ghc-flag:`-Wuseless-specialisations`, controls warnings emitted when GHC
+  determines that a SPECIALISE pragma would have no effect.
+
+- A new flag, :ghc-flag:`-Wrule-lhs-equalities`, controls warnings emitted for RULES
+  whose left-hand side attempts to quantify over equality constraints that
+  previous GHC versions accepted quantifying over. GHC will now drop such RULES,
+  emitting a warning message controlled by this flag.
+
+  This warning is intended to give visibility to the fact that the RULES that
+  previous GHC versions generated in such circumstances could never fire.
+
+- A new flag, :ghc-flag:`-Wunusable-unpack-pragmas`, controls warnings emitted
+  when GHC is unable to unpack a data constructor field annotated by the
+  ``{-# UNPACK #-}`` pragma.
+
+  Previous GHC versions issued this warning unconditionally. Now it is possible
+  to disable it with ``-Wno-unusable-unpack-pragmas`` or turn it into an error
+  with ``-Werror=unusable-unpack-pragmas``.
 
 GHCi
 ~~~~

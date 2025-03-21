@@ -322,7 +322,7 @@ splice to separate the module and force the desired order of kind-checking:
   data D1 = MkD1 !(F Int)     -- now (F Int) surely gets unpacked
 
 The current version of GHC is more predictable. Neither the (Complex Double) nor
-the (F Int) example gets unpacking, the type/data instance is put into a
+the (F Int) example gets unpacking unless the type/data instance is put into a
 separate HsGroup, either with $(return []) or by placing it in another module
 altogether. This is a direct result of placing instances after the other SCCs,
 as described in Note [Put instances at the end] in GHC.Rename.Module
@@ -449,11 +449,20 @@ tcTyClGroupsPass all_gs thing_inside = go True ttcgs_zero mempty nilOL all_gs
               -- pass, the current group's lexical dependencies must have been
               -- satisfied by the preceding groups; no need for the ready check,
               -- this avoids some lookups in tcg_env
+
+          -- See Note [Expedient use of diagnostics in tcTyClGroupsPass]
+          set_opts action
+            | strict    = setWOptM Opt_WarnUnusableUnpackPragmas action
+            | otherwise = action
+          validate _ msgs _
+            | strict    = not (unpackErrorsFound msgs)
+            | otherwise = True
+
       if not ready then return on_blocked else
-        tryTcDiscardingErrs' (\_ msgs _ -> not (strict && unpackErrorsFound msgs))
+        tryTcDiscardingErrs' validate
                              (return on_flawed)
                              (return on_failed)
-                             (on_success <$> tcTyClGroup g)
+                             (on_success <$> set_opts (tcTyClGroup g))
 
 data TcTyClGroupsStats =
   TcTyClGroupsStats
@@ -479,14 +488,35 @@ instance Outputable TcTyClGroupsStats where
          , text "n_failed  =" <+> ppr (ttcgs_n_failed  stats)
          , text "n_flawed  =" <+> ppr (ttcgs_n_flawed  stats) ]
 
+-- See Note [Expedient use of diagnostics in tcTyClGroupsPass]
 unpackErrorsFound :: Messages TcRnMessage -> Bool
 unpackErrorsFound = any is_unpack_error
   where
     is_unpack_error :: TcRnMessage -> Bool
     is_unpack_error (TcRnMessageWithInfo _ (TcRnMessageDetailed _ msg)) = is_unpack_error msg
     is_unpack_error (TcRnWithHsDocContext _ msg) = is_unpack_error msg
-    is_unpack_error (TcRnBadFieldAnnotation _ _ BackpackUnpackAbstractType) = True
+    is_unpack_error (TcRnBadFieldAnnotation _ _ UnusableUnpackPragma) = True
     is_unpack_error _ = False
+
+{- Note [Expedient use of diagnostics in tcTyClGroupsPass]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In tcTyClGroupsPass.go with strict=True, we want to skip "flawed" groups, i.e.
+groups with unusable unpack pragmas, as explained in Note [Retrying TyClGroups].
+To detect these unusable {-# UNPACK #-} pragmas, we currently piggy-back on the
+diagnostics infrastructure:
+
+  1. (setWOptM Opt_WarnUnusableUnpackPragmas) to enable the warning.
+     The warning is on by default, but the user may have disabled it with
+     -Wno-unusable-unpack-pragmas, in which case we need to turn it back on.
+
+  2. (unpackErrorsFound msgs) to check if UnusableUnpackPragma is one of the
+     collected diagnostics.  This is somewhat unpleasant because of the need to
+     recurse into TcRnMessageWithInfo and TcRnWithHsDocContext.
+
+Arguably, this is not a principled solution, because diagnostics are meant for
+the user and here we inspect them to determine the order of type-checking. The
+only reason for the current setup is that it was the easy thing to do.
+-}
 
 isReadyTyClGroup :: TcGblEnv -> TyClGroup GhcRn -> Bool
 isReadyTyClGroup tcg_env TyClGroup{group_ext = deps} =
@@ -5123,7 +5153,7 @@ checkValidDataCon dflags existential_ok tc con
                -- warn in this case (it gives users the wrong idea about whether
                -- or not UNPACK on abstract types is supported; it is!)
                , isHomeUnitDefinite (hsc_home_unit hsc_env)
-               = addDiagnosticTc (bad_bang n BackpackUnpackAbstractType)
+               = addDiagnosticTc (bad_bang n UnusableUnpackPragma)
 
                | otherwise
                = return ()

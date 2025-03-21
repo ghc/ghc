@@ -20,7 +20,8 @@ module GHC.Tc.Utils.Monad(
   updTopFlags,
   getEnvs, setEnvs, updEnvs, restoreEnvs,
   xoptM, doptM, goptM, woptM,
-  setXOptM, unsetXOptM, unsetGOptM, unsetWOptM,
+  setXOptM, setWOptM,
+  unsetXOptM, unsetGOptM, unsetWOptM,
   whenDOptM, whenGOptM, whenWOptM,
   whenXOptM, unlessXOptM,
   getGhcMode,
@@ -578,6 +579,9 @@ woptM flag = wopt flag <$> getDynFlags
 
 setXOptM :: LangExt.Extension -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setXOptM flag = updTopFlags (\dflags -> xopt_set dflags flag)
+
+setWOptM :: WarningFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+setWOptM flag = updTopFlags (\dflags -> wopt_set dflags flag)
 
 unsetXOptM :: LangExt.Extension -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetXOptM flag = updTopFlags (\dflags -> xopt_unset dflags flag)

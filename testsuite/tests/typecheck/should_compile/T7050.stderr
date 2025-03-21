@@ -1,5 +1,5 @@
-
-T7050.hs:3:14: warning: [GHC-40091]
+T7050.hs:3:14: warning: [GHC-40091] [-Wunusable-unpack-pragmas (in -Wdefault)]
     • Ignoring unusable UNPACK pragma on the first argument of ‘Foo’
     • In the definition of data constructor ‘Foo’
       In the data type declaration for ‘Foo’
+

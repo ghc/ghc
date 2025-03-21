@@ -711,7 +711,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- TcRnBadFieldAnnotation/BadFieldAnnotationReason
   GhcDiagnosticCode "LazyFieldsDisabled"                            = 81601
   GhcDiagnosticCode "UnpackWithoutStrictness"                       = 10107
-  GhcDiagnosticCode "BackpackUnpackAbstractType"                    = 40091
+  GhcDiagnosticCode "UnusableUnpackPragma"                          = 40091
 
   -- TcRnRoleValidationFailed/RoleInferenceFailedReason
   GhcDiagnosticCode "TyVarRoleMismatch"                             = 22221

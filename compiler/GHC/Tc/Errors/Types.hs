@@ -6275,13 +6275,28 @@ data BadFieldAnnotationReason where
     T14761a, T7562
   -}
   UnpackWithoutStrictness :: BadFieldAnnotationReason
-  {-| An UNPACK pragma was applied to an abstract type in an indefinite package
-    in Backpack.
+  {-| An UNPACK pragma is unusable.
+
+    A possible reason for this warning is that the UNPACK pragma was applied to
+    one of the following:
+
+      * a function type @a -> b@
+      * a recursive use of the data type being defined
+      * a sum type that cannot be unpacked, see @Note [UNPACK for sum types]@
+      * a type/data family application with no matching instance in the environment
+
+    However, it is deliberately /not/ emitted if:
+
+      * the failure occurs in an indefinite package in Backpack
+      * the pragma is usable, but unpacking is disabled by @-O0@
 
     Test cases:
-    unpack_sums_5, T3966, T7050
+      unpack_sums_5, T3966, T7050, T25672, T23307c
+
+    Negative test cases (must not trigger this warning):
+      T3990
   -}
-  BackpackUnpackAbstractType :: BadFieldAnnotationReason
+  UnusableUnpackPragma :: BadFieldAnnotationReason
   deriving (Generic)
 
 data SuperclassCycle =

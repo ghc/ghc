@@ -1,4 +1,4 @@
-T25672.hs:12:7: warning: [GHC-40091]
+T25672.hs:12:7: warning: [GHC-40091] [-Wunusable-unpack-pragmas (in -Wdefault)]
     • Ignoring unusable UNPACK pragma
         on the first argument of ‘WrapIntOrWord’
     • In the definition of data constructor ‘WrapIntOrWord’
