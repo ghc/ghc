@@ -962,8 +962,12 @@ tcGetDefaultTys
                                  ; integer_ty <- tcMetaTy integerTyConName
                                  ; pure $ unitDefaultEnv $ builtinDefaults numCls [integer_ty, doubleTy]
                                  }
-                   -- The Num class is already user-defaulted, no need to construct the builtin default
+                   -- The Num class is already user-defaulted, no need to construct the builtin default,
+                   -- also we try to avoid `tcMetaTy integerTyConName`,
+                   -- see Note [Typechecking default declarations].
                    _ -> pure emptyDefaultEnv
+              -- Order matters here; we rely on `mconcat` prioritizing the
+              -- rightmost entry when handling duplicates.
               ; let deflt_tys = mconcat [ extDef, numDef, ovlStr, defaults ]
               ; return (deflt_tys, extended_defaults) } }
 
