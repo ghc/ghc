@@ -18,6 +18,7 @@ import GHC.Prelude
 import GHC.Hs.Extension (GhcRn)
 import GHC.Tc.Utils.TcType (Type)
 import GHC.Types.Name (Name, nameUnique, stableNameCmp)
+import GHC.Types.Name.Env
 import GHC.Types.Unique.FM (lookupUFM_Directly)
 import GHC.Unit.Module.Warnings (WarningTxt)
 import GHC.Unit.Types (Module)
@@ -26,7 +27,6 @@ import GHC.Utils.Outputable
 import Data.Data (Data)
 import Data.List (sortBy)
 import Data.Function (on)
-import GHC.Types.Name.Env
 
 -- See Note [Named default declarations] in GHC.Tc.Gen.Default
 -- | Default environment mapping class @TyCon@s to their default type lists

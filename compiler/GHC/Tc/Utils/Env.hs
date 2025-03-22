@@ -940,11 +940,6 @@ tcGetDefaultTys
               { extDef <- if extended_defaults
                           then do { list_ty <- tcMetaTy listTyConName
                                   ; integer_ty <- tcMetaTy integerTyConName
-                                  -- we are not using the typeCon but we still need to
-                                  -- check the existence
-                                  ; _foldableCls <- tcLookupTyCon foldableClassName
-                                  ; _showCls <- tcLookupTyCon showClassName
-                                  ; _eqCls <- tcLookupTyCon eqClassName
                                   ; pure $ defaultEnv
                                     [ builtinDefaults foldableClassName [list_ty]
                                     , builtinDefaults showClassName [unitTy, integer_ty, doubleTy]
@@ -954,14 +949,11 @@ tcGetDefaultTys
                                   -- Note [Extended defaults]
                           else pure emptyDefaultEnv
               ; ovlStr <- if ovl_strings
-                          then do { _isStringCls <- tcLookupTyCon isStringClassName
-                                  ; pure $ unitDefaultEnv $ builtinDefaults isStringClassName [stringTy]
-                                  }
+                          then pure $ unitDefaultEnv $ builtinDefaults isStringClassName [stringTy]
                           else pure emptyDefaultEnv
               ; checkWiredInTyCon doubleTyCon
               ; numDef <- case lookupDefaultEnv defaults numClassName of
-                   Nothing -> do { _numCls <- tcLookupTyCon numClassName
-                                 ; integer_ty <- tcMetaTy integerTyConName
+                   Nothing -> do { integer_ty <- tcMetaTy integerTyConName
                                  ; pure $ unitDefaultEnv $ builtinDefaults numClassName [integer_ty, doubleTy]
                                  }
                    -- The Num class is already user-defaulted, no need to construct the builtin default
