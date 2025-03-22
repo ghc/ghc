@@ -269,6 +269,10 @@ usageHeader prog = substProg prog $
   "    for input for the graphviz tools.  For example, to generate a PDF\n" ++
   "    of the dependency graph: ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf\n" ++
   "\n" ++
+  "  $p mermaid\n" ++
+  "    Generate a graph of the package dependencies in Mermaid format\n" ++
+  "    suitable for embedding in Markdown files.\n" ++
+  "\n" ++
   "  $p find-module {module}\n" ++
   "    List registered packages exposing module {module} in the global\n" ++
   "    database, and also the user database if --user is given.\n" ++
@@ -465,6 +469,8 @@ runit verbosity cli nonopts = do
                                  (Just (Substring pkgarg_str m)) Nothing
     ["dot"] -> do
         showPackageDot verbosity cli
+    ["mermaid"] -> do
+        showPackageMermaid verbosity cli
     ["find-module", mod_name] -> do
         let match = maybe (==mod_name) id (substringCheck mod_name)
         listPackages verbosity cli Nothing (Just match)
@@ -1644,6 +1650,27 @@ showPackageDot verbosity myflags = do
                    let to = display (mungedId dep)
                  ]
   putStrLn "}"
+
+showPackageMermaid :: Verbosity -> [Flag] -> IO ()
+showPackageMermaid verbosity myflags = do
+  (_, GhcPkg.DbOpenReadOnly, flag_db_stack) <-
+    getPkgDatabases verbosity GhcPkg.DbOpenReadOnly
+      False{-use user-} True{-use cache-} False{-expand vars-} myflags
+
+  let all_pkgs = allPackagesInStack flag_db_stack
+      ipix  = PackageIndex.fromList all_pkgs
+
+  putStrLn "```mermaid"
+  putStrLn "graph TD"
+  mapM_ putStrLn [ "  " ++ from ++ " --> " ++ to
+                 | p <- all_pkgs,
+                   let from = display (mungedId p),
+                   key <- depends p,
+                   Just dep <- [PackageIndex.lookupUnitId ipix key],
+                   let to = display (mungedId dep)
+                 ]
+  putStrLn "```"
+
 
 -- -----------------------------------------------------------------------------
 -- Prints the highest (hidden or exposed) version of a package
