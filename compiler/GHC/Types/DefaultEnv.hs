@@ -26,7 +26,7 @@ import GHC.Utils.Outputable
 import Data.Data (Data)
 import Data.List (sortBy)
 import Data.Function (on)
-import GHC.Types.Name.Env (NameEnv, emptyNameEnv, isEmptyNameEnv, unitNameEnv, mkNameEnvWith, nonDetNameEnvElts, filterNameEnv, plusNameEnv)
+import GHC.Types.Name.Env
 
 -- See Note [Named default declarations] in GHC.Tc.Gen.Default
 -- | Default environment mapping class @TyCon@s to their default type lists
