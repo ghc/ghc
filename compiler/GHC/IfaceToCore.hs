@@ -1285,13 +1285,13 @@ tcIfaceDefaults this_mod defaults
     <$> mapM (uncurry tcIfaceDefault) defaults
 
 tcIfaceDefault :: Module -> IfaceDefault -> IfL ClassDefaults
-tcIfaceDefault this_mod IfaceDefault { ifDefaultCls = clsCon
+tcIfaceDefault this_mod IfaceDefault { ifDefaultCls = cls
                                      , ifDefaultTys = tys
                                      , ifDefaultWarn = iface_warn }
   = do {
        tys' <- traverse tcIfaceType tys
        ; let warn = fmap fromIfaceWarningTxt iface_warn
-       ; return ClassDefaults { cd_class = clsCon
+       ; return ClassDefaults { cd_class = cls
                               , cd_types = tys'
                               , cd_module = Just this_mod
                               , cd_warn = warn } }
