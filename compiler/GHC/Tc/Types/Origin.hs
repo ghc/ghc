@@ -721,7 +721,6 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ name)) = OccurrenceOf name
 exprCtOrigin (HsGetField _ _ (L _ f)) = GetFieldOrigin (field_label $ unLoc $ dfoLabel f)
-exprCtOrigin (HsUnboundVar {})    = Shouldn'tHappenOrigin "unbound variable"
 exprCtOrigin (HsOverLabel _ l)  = OverLabelOrigin l
 exprCtOrigin (ExplicitList {})    = ListOrigin
 exprCtOrigin (HsIPVar _ ip)       = IPOccOrigin ip
@@ -755,6 +754,7 @@ exprCtOrigin (HsUntypedSplice {})  = Shouldn'tHappenOrigin "TH untyped splice"
 exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsEmbTy {})        = Shouldn'tHappenOrigin "type expression"
+exprCtOrigin (HsHole _)          = Shouldn'tHappenOrigin "hole expression"
 exprCtOrigin (HsForAll {})       = Shouldn'tHappenOrigin "forall telescope"    -- See Note [Types in terms]
 exprCtOrigin (HsQual {})         = Shouldn'tHappenOrigin "constraint context"  -- See Note [Types in terms]
 exprCtOrigin (HsFunArr {})       = Shouldn'tHappenOrigin "function arrow"      -- See Note [Types in terms]

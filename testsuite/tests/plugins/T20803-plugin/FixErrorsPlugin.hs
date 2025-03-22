@@ -20,15 +20,15 @@ import Data.Maybe
 plugin :: Plugin
 plugin = defaultPlugin {parsedResultAction = parsedAction}
 
--- Replace every hole (and other unbound vars) with the given expression
+-- Replace every hole with the given expression
 replaceHoles :: forall a . Data a => HsExpr GhcPs -> a -> a
 replaceHoles new = gmapT \case
   (d :: d) -> replaceHoles new d `fromMaybe` tryHole
     where
       tryHole :: Maybe d
       tryHole = eqT @d @(HsExpr GhcPs) >>= \case
-        Eq.Refl | HsUnboundVar _ _ <- d -> Just new
-        _                               -> Nothing
+        Eq.Refl | HsHole _ <- d -> Just new
+        _                       -> Nothing
 
 parsedAction :: [CommandLineOption] -> ModSummary
              -> ParsedResult -> Hsc ParsedResult
