@@ -724,7 +724,7 @@ data AnnSpecSig
   = AnnSpecSig {
       ass_open   :: EpaLocation,
       ass_close  :: EpToken "#-}",
-      ass_dcolon :: Maybe TokDcolon,
+      ass_dcolon :: Maybe TokDcolon, -- Only for old SpecSig, remove when it goes
       ass_act    :: ActivationAnn
     } deriving Data
 

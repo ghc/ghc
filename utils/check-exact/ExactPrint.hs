@@ -2639,10 +2639,9 @@ instance ExactPrint (Sig GhcPs) where
     o' <- markAnnOpen'' o (inl_src inl) "{-# SPECIALISE" -- Note: may be {-# SPECIALISE_INLINE
     act' <- markActivation act (inl_act inl)
     bndrs' <- markAnnotated bndrs
-    dc' <- traverse markEpUniToken dc
     expr' <- markAnnotated expr
     c' <- markEpToken c
-    return (SpecSigE (AnnSpecSig o' c' dc' act') bndrs' expr' inl)
+    return (SpecSigE (AnnSpecSig o' c' dc act') bndrs' expr' inl)
 
   exact (SpecInstSig ((o,i,c),src) typ) = do
     o' <- markAnnOpen'' o src "{-# SPECIALISE"

@@ -1049,7 +1049,7 @@ mkSpecSig :: InlinePragma
           -> AnnSpecSig
           -> Maybe (RuleBndrs GhcPs)
           -> LHsExpr GhcPs
-          -> Maybe (TokDcolon, OrdList (LHsSigType GhcPs))
+          -> Maybe (Located (TokDcolon, OrdList (LHsSigType GhcPs)))
           -> P (Sig GhcPs)
 mkSpecSig inl_prag activation_anns m_rule_binds expr m_sigtypes_ascr
   = case m_sigtypes_ascr of
@@ -1059,7 +1059,7 @@ mkSpecSig inl_prag activation_anns m_rule_binds expr m_sigtypes_ascr
            SpecSigE activation_anns
                     (ruleBndrsOrDef m_rule_binds) expr inl_prag
 
-      Just (colon_ann, sigtype_ol)
+      Just (L lt (colon_ann, sigtype_ol))
 
         -- Singleton, e.g.  {-# SPECIALISE f :: ty #-}
         -- Use the SpecSigE route
@@ -1067,7 +1067,7 @@ mkSpecSig inl_prag activation_anns m_rule_binds expr m_sigtypes_ascr
         -> pure $
            SpecSigE activation_anns
                     (ruleBndrsOrDef m_rule_binds)
-                    (L (getLoc expr)  -- ToDo: not really the right location for (e::ty)
+                    (L ((combineSrcSpansA (getLoc expr) (noAnnSrcSpan lt)))
                        (ExprWithTySig colon_ann expr (mkHsWildCardBndrs sigtype)))
                     inl_prag
 
@@ -1077,7 +1077,8 @@ mkSpecSig inl_prag activation_anns m_rule_binds expr m_sigtypes_ascr
         , L _ (HsVar _ var) <- expr
         -> do addPsMessage sigs_loc PsWarnSpecMultipleTypeAscription
               pure $
-                SpecSig activation_anns var sigtype_list inl_prag
+                SpecSig (activation_anns {ass_dcolon = Just colon_ann })
+                        var sigtype_list inl_prag
 
         | otherwise ->
             addFatalError $
