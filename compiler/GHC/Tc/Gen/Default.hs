@@ -165,12 +165,7 @@ tcDefaults decls
         ; decls' <- mapMaybeM (declarationParts h2010_dflt_clss) decls
         ; let
             -- Find duplicate default declarations
-            decl_tag (mb_cls, _, _) =
-              case mb_cls of
-                Nothing -> Nothing
-                Just cls -> if cls `elem` h2010_dflt_clss
-                            then Nothing
-                            else Just cls
+            decl_tag (mb_cls, _, _) = mb_cls
             decl_groups = groupBy ((==) `on` decl_tag) decls'
         ; decls_without_dups <- mapM (reportDuplicates here h2010_dflt_clss) decl_groups
         ; return $ defaultEnv (concat decls_without_dups)
