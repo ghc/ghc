@@ -15,9 +15,6 @@ module GHC.Types.DefaultEnv
 where
 
 import GHC.Prelude
-import GHC.Core.TyCon (TyCon(tyConName))
-import GHC.Core.TyCon.Env (TyConEnv, emptyTyConEnv, isEmptyTyConEnv, mkTyConEnvWith, unitTyConEnv,
-                           filterTyConEnv, nonDetTyConEnvElts, plusTyConEnv)
 import GHC.Hs.Extension (GhcRn)
 import GHC.Tc.Utils.TcType (Type)
 import GHC.Types.Name (Name, nameUnique, stableNameCmp)
@@ -36,7 +33,7 @@ import GHC.Types.Name.Env (NameEnv, emptyNameEnv, isEmptyNameEnv, unitNameEnv, m
 type DefaultEnv = NameEnv ClassDefaults
 
 data ClassDefaults
-  = ClassDefaults { cd_class   :: !Name  -- ^ always a class constructor
+  = ClassDefaults { cd_class   :: !Name  -- ^ always a name for class constructor
                   , cd_types   :: [Type]
                   , cd_module :: Maybe Module
                     -- ^ @Nothing@ for built-in,

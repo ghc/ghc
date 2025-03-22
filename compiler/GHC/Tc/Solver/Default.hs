@@ -32,7 +32,6 @@ import GHC.Core.Coercion( isReflCo, mkReflCo, mkSubCo )
 import GHC.Core.Unify    ( tcMatchTyKis )
 import GHC.Core.Predicate
 import GHC.Core.Type
-import GHC.Core.TyCon    ( TyCon )
 import GHC.Core.TyCo.Tidy
 
 import GHC.Types.DefaultEnv ( ClassDefaults (..), defaultList )
@@ -986,21 +985,15 @@ disambigGroup :: WantedConstraints -- ^ Original constraints, for diagnostic pur
               -> (TcTyVar, [Ct])   -- ^ All constraints sharing same type variable
               -> TcS Bool   -- True <=> something happened, reflected in ty_binds
 disambigGroup orig_wanteds default_ctys (tv, wanteds)
-  = do
-    cds <- classDefaults default_ctys
-    disambigProposalSequences orig_wanteds wanteds (proposalSequences cds) allConsistent
+  = disambigProposalSequences orig_wanteds wanteds proposalSequences allConsistent
   where
-    proposalSequences cds = [ ProposalSequence [Proposal [(tv, ty)] | ty <- tys]
-                        | ClassDefaults{cd_types = tys} <- defaultses cds ]
+    proposalSequences = [ ProposalSequence [Proposal [(tv, ty)] | ty <- tys]
+                        | ClassDefaults{cd_types = tys} <- defaultses ]
     allConsistent ((_, sub) :| subs) = all (eqSubAt tv sub . snd) subs
-    -- lookup class by name
-    classDefaults xs = do
-      rs <-sequence $ map tcLookupTyCon (map cd_class xs)
-      return $ zip rs xs
-    defaultses cds =
-      [ defaults | (cls, defaults) <- cds
+    defaultses =
+      [ defaults | defaults@ClassDefaults{cd_class = cls} <- default_ctys
                  , any (isDictForClass cls) wanteds ]
-    isDictForClass clcon ct = any ((clcon ==) . classTyCon . fst) (getClassPredTys_maybe $ ctPred ct)
+    isDictForClass clcon ct = any ((clcon ==) . className . fst) (getClassPredTys_maybe $ ctPred ct)
     eqSubAt :: TcTyVar -> Subst -> Subst -> Bool
     eqSubAt tvar s1 s2 = or $ liftA2 tcEqType (lookupTyVar s1 tvar) (lookupTyVar s2 tvar)
 
