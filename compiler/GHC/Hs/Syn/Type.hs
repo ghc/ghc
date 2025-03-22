@@ -103,7 +103,6 @@ lhsExprType (L _ e) = hsExprType e
 -- | Compute the 'Type' of an @'HsExpr' 'GhcTc'@ in a pure fashion.
 hsExprType :: HsExpr GhcTc -> Type
 hsExprType (HsVar _ (L _ id)) = idType id
-hsExprType (HsUnboundVar (HER _ ty _) _) = ty
 hsExprType (HsOverLabel v _) = dataConCantHappen v
 hsExprType (HsIPVar v _) = dataConCantHappen v
 hsExprType (HsOverLit _ lit) = overLitType lit
@@ -146,6 +145,7 @@ hsExprType (HsProc _ _ lcmd_top) = lhsCmdTopType lcmd_top
 hsExprType (HsStatic (_, ty) _s) = ty
 hsExprType (HsPragE _ _ e) = lhsExprType e
 hsExprType (HsEmbTy x _) = dataConCantHappen x
+hsExprType (HsHole (_, (HER _ ty _))) = ty
 hsExprType (HsQual x _ _) = dataConCantHappen x
 hsExprType (HsForAll x _ _) = dataConCantHappen x
 hsExprType (HsFunArr x _ _ _) = dataConCantHappen x

@@ -72,7 +72,7 @@ import GHC.CoreToIface
 
 import GHC.Driver.Flags
 import GHC.Driver.Backend
-import GHC.Hs
+import GHC.Hs hiding (HoleError)
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Hole.FitTypes

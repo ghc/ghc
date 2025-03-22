@@ -221,7 +221,7 @@ A "head" has three special cases (for which we can infer a polytype
 using tcInferAppHead_maybe); otherwise is just any old expression (for
 which we can infer a rho-type (via tcInfer).
 
-There is no special treatment for HsUnboundVar, HsOverLit etc, because
+There is no special treatment for HsHole (HsVar ...), HsOverLit, etc, because
 we can't get a polytype from them.
 
 Left and right sections (e.g. (x +) and (+ x)) are not yet supported.
@@ -680,7 +680,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
 
     fun_is_out_of_scope  -- See Note [VTA for out-of-scope functions]
       = case tc_fun of
-          HsUnboundVar {} -> True
+          HsHole _        -> True
           _               -> False
 
     inst_fun :: [HsExprArg 'TcpRn] -> ForAllTyFlag -> Bool
@@ -1056,7 +1056,7 @@ expr_to_type earg =
       = do { t <- go (L l e)
            ; let splice_result' = HsUntypedSpliceTop finalizers t
            ; return (L l (HsSpliceTy splice_result' splice)) }
-    go (L l (HsUnboundVar _ rdr))
+    go (L l (HsHole (HoleVar (L _ rdr))))
       | isUnderscore occ = return (L l (HsWildCardTy noExtField))
       | startsWithUnderscore occ =
           -- See Note [Wildcards in the T2T translation]
@@ -1128,7 +1128,7 @@ This conversion is in the TcM monad because
       vfun [x | x <- xs]     Can't convert list comprehension to a type
       vfun (\x -> x)         Can't convert a lambda to a type
 * It needs to check for LangExt.NamedWildCards to generate an appropriate
-  error message for HsUnboundVar.
+  error message for HsHole (HsVar ...).
      vfun _a    Not in scope: ‘_a’
                    (NamedWildCards disabled)
      vfun _a    Illegal named wildcard in a required type argument: ‘_a’
@@ -1479,7 +1479,7 @@ Note [VTA for out-of-scope functions]
 Suppose 'wurble' is not in scope, and we have
    (wurble @Int @Bool True 'x')
 
-Then the renamer will make (HsUnboundVar "wurble") for 'wurble',
+Then the renamer will make (HsHole (HsVar "wurble")) for 'wurble',
 and the typechecker will typecheck it with tcUnboundId, giving it
 a type 'alpha', and emitting a deferred Hole constraint, to
 be reported later.
@@ -1494,7 +1494,7 @@ tcUnboundId.  It later reports 'wurble' as out of scope, and tries to
 give its type.
 
 Fortunately in tcInstFun we still have access to the function, so we
-can check if it is a HsUnboundVar.  We use this info to simply skip
+can check if it is a HsHole.  We use this info to simply skip
 over any visible type arguments.  We'll /already/ have emitted a
 Hole constraint; failing preserves that constraint.
 
