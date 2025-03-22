@@ -2194,10 +2194,10 @@ sig_vars :: { Located [LocatedN RdrName] }    -- Returned in reversed order
                                              return (sLL $1 $> ($3 : h' : t)) }
          | var                        { sL1 $1 [$1] }
 
-sigtypes1 :: { OrdList (LHsSigType GhcPs) }
-   : sigtype                 { unitOL $1 }
+sigtypes1 :: { Located (OrdList (LHsSigType GhcPs)) }
+   : sigtype                 { sL1 $1 (unitOL $1) }
    | sigtype ',' sigtypes1   {% do { st <- addTrailingCommaA $1 (epTok $2)
-                                   ; return $ unitOL st `appOL` $3 } }
+                                   ; return $ sLL $1 $> (unitOL st `appOL` unLoc $3) } }
 -----------------------------------------------------------------------------
 -- Types
 
@@ -2781,7 +2781,7 @@ sigdecl :: { LHsDecl GhcPs }
                 let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
                                               (NoUserInlinePrag, FunLike)
                                               (snd $2)
-                spec <- mkSpecSig inl_prag (AnnSpecSig (glR $1) (epTok $6) (fmap fst $5) (fst $2)) $3 $4 $5
+                spec <- mkSpecSig inl_prag (AnnSpecSig (glR $1) (epTok $6) Nothing (fst $2)) $3 $4 $5
                 amsA' $ sLL $1 $> $ SigD noExtField spec }
 
         | '{-# SPECIALISE_INLINE' activation rule_foralls infixexp sigtypes_maybe '#-}'
@@ -2789,7 +2789,7 @@ sigdecl :: { LHsDecl GhcPs }
                 let inl_prag = mkInlinePragma (getSPEC_INLINE_PRAGs $1)
                                               (getSPEC_INLINE $1)
                                               (snd $2)
-                spec <- mkSpecSig inl_prag (AnnSpecSig (glR $1) (epTok $6) (fmap fst $5) (fst $2)) $3 $4 $5
+                spec <- mkSpecSig inl_prag (AnnSpecSig (glR $1) (epTok $6) Nothing (fst $2)) $3 $4 $5
                 amsA' $ sLL $1 $> $ SigD noExtField spec }
 
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
@@ -2799,8 +2799,8 @@ sigdecl :: { LHsDecl GhcPs }
         | '{-# MINIMAL' name_boolformula_opt '#-}'
             {% amsA' (sLL $1 $> $ SigD noExtField (MinimalSig ((glR $1,epTok $3), (getMINIMAL_PRAGs $1)) $2)) }
 
-sigtypes_maybe :: { Maybe (TokDcolon, OrdList (LHsSigType GhcPs)) }
-        : '::' sigtypes1         { Just (epUniTok $1, $2) }
+sigtypes_maybe :: { Maybe (Located (TokDcolon, OrdList (LHsSigType GhcPs))) }
+        : '::' sigtypes1         { Just (sLL $1 $> (epUniTok $1, unLoc $2)) }
         | {- empty -}            { Nothing }
 
 activation :: { (ActivationAnn,Maybe Activation) }
