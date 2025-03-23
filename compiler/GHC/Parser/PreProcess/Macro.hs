@@ -32,7 +32,7 @@ details
 
 -- TODO: Parse tokens with original locations in them.
 
-import Data.Map qualified as Map
+import qualified Data.Map as Map
 import Data.Maybe
 
 import GHC.Parser.PreProcess.Eval
@@ -78,6 +78,20 @@ expandToks s ts =
 
 doExpandToks :: Bool -> MacroDefines -> [Token] -> (Bool, [Token])
 doExpandToks ed _ [] = (ed, [])
+doExpandToks _ s (TIdentifier "defined" : ts) = (True, rest)
+  -- See Note: [defined unary operator] below
+  where
+    rest = case getExpandArgs ts of
+      (Just [[TIdentifier macro_name]], rest0) ->
+        case Map.lookup macro_name s of
+          Nothing -> TInteger "0" : rest0
+          Just _ ->TInteger "1" : rest0
+      (Nothing, TIdentifier macro_name:ts0) ->
+        case Map.lookup macro_name s of
+          Nothing -> TInteger "0" : ts0
+          Just _ ->TInteger "1" : ts0
+      (Nothing,_) -> error $ "defined: expected an identifier, got:" ++ show ts
+      (Just args,_) -> error $ "defined: expected a single arg, got:" ++ show args
 doExpandToks ed s (TIdentifier n : ts) = (ed'', expanded ++ rest)
   where
     (ed', expanded, ts') = case Map.lookup n s of
@@ -93,6 +107,37 @@ doExpandToks ed s (TIdentifier n : ts) = (ed'', expanded ++ rest)
 doExpandToks ed s (t : ts) = (ed', t : r)
   where
     (ed', r) = doExpandToks ed s ts
+
+{-
+Note: [defined unary operator]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+From https://timsong-cpp.github.io/cppwp/n4140/cpp#cond-1
+
+  unary operator expressions of the form
+
+    defined identifier
+
+  or
+
+    defined ( identifier )
+
+  which evaluate to 1 if the identifier is currently defined as a macro
+  name (that is, if it is predefined or if it has been the subject of a
+  #define preprocessing directive without an intervening #undef
+  directive with the same subject identifier), 0 if it is not.
+
+Also, may not change the meaning of `defined`
+
+https://timsong-cpp.github.io/cppwp/n4140/cpp#predefined-4
+
+  If any of the pre-defined macro names in this subclause, or the
+  identifier defined, is the subject of a #define or a #undef
+  preprocessing directive, the behavior is undefined
+
+Empirical tests show that the presence or absence of arguments to the
+macro definition does not matter.
+-}
 
 -- ---------------------------------------------------------------------
 

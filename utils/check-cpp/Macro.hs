@@ -44,25 +44,6 @@ import State
 
 -- ---------------------------------------------------------------------
 
--- process :: PpState -> Input -> (PpState, Output)
--- process s str = (s0, o)
---   where
---     o = case parseDirective str of
---         Left _ -> undefined
---         Right r -> r
---     s0 = case o of
---         CppDefine name args rhs -> define s name args rhs
---         CppInclude _ -> undefined
---         CppIfdef name -> ifdef s name
---         CppIf ifstr -> cppIf s ifstr
---         CppIfndef name -> ifndef s name
---         CppElse -> cppElse s
---         CppEndif -> popScope' s
---         CppDumpState -> undefined
-
--- ---------------------------------------------------------------------
-
-
 --    We evaluate to an Int, which we convert to a bool
 cppIf :: String -> PP ()
 cppIf str = do
@@ -96,6 +77,20 @@ expandToks s ts =
 
 doExpandToks :: Bool -> MacroDefines -> [Token] -> (Bool, [Token])
 doExpandToks ed _ [] = (ed, [])
+doExpandToks ed s (TIdentifier "defined" : ts) = (True, rest)
+  -- See Note: [defined unary operator] below
+  where
+    rest = case getExpandArgs ts of
+      (Just [[TIdentifier macro_name]], rest0) ->
+        case Map.lookup macro_name s of
+          Nothing -> TInteger "0" : rest0
+          Just _ ->TInteger "1" : rest0
+      (Nothing, TIdentifier macro_name:ts0) ->
+        case Map.lookup macro_name s of
+          Nothing -> TInteger "0" : ts0
+          Just _ ->TInteger "1" : ts0
+      (Nothing,_) -> error $ "defined: expected an identifier, got:" ++ show ts
+      (Just args,_) -> error $ "defined: expected a single arg, got:" ++ show args
 doExpandToks ed s (TIdentifier n : ts) = (ed'', expanded ++ rest)
   where
     (ed', expanded, ts') = case Map.lookup n s of
@@ -111,6 +106,37 @@ doExpandToks ed s (TIdentifier n : ts) = (ed'', expanded ++ rest)
 doExpandToks ed s (t : ts) = (ed', t : r)
   where
     (ed', r) = doExpandToks ed s ts
+
+{-
+Note: [defined unary operator]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+From https://timsong-cpp.github.io/cppwp/n4140/cpp#cond-1
+
+  unary operator expressions of the form
+
+    defined identifier
+
+  or
+
+    defined ( identifier )
+
+  which evaluate to 1 if the identifier is currently defined as a macro
+  name (that is, if it is predefined or if it has been the subject of a
+  #define preprocessing directive without an intervening #undef
+  directive with the same subject identifier), 0 if it is not.
+
+Also, may not change the meaning of `defined`
+
+https://timsong-cpp.github.io/cppwp/n4140/cpp#predefined-4
+
+  If any of the pre-defined macro names in this subclause, or the
+  identifier defined, is the subject of a #define or a #undef
+  preprocessing directive, the behavior is undefined
+
+Empirical tests show that the presence or absence of arguments to the
+macro definition does not matter.
+-}
 
 -- ---------------------------------------------------------------------
 
@@ -233,14 +259,6 @@ isOther (TComma _) = False
 isOther (TOpenParen _) = False
 isOther (TCloseParen _) = False
 isOther _ = True
-
--- ---------------------------------------------------------------------
-
--- m0 :: (PpState, Output)
--- m0 = do
---     let (s0, _) = process initPpState "#define FOO 3"
---     let (s1, _) = process s0 "#ifdef FOO"
---     process s1 "# if FOO == 4"
 
 -- ---------------------------------------------------------------------
 

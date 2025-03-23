@@ -1,16 +1,45 @@
-module GHC.Parser.PreProcess.State where
+module GHC.Parser.PreProcess.State (
+    Expr (..),
+    CompOp (..),
+    LogicOp (..),
+    CppDirective (..),
+    Input,
+    Output,
+    PpState (..),
+    initPpState,
+    PP,
+    PpScope (..),
+    MacroDefines,
+    MacroDef,
+    MacroName (..),
+    MacroArgs,
+    CppState (..),
+    arg_arity,
+    getPpState,
+    setPpState,
+    getAccepting,
+    setAccepting,
+    pushAccepting,
+    popAccepting,
+    pushContinuation,
+    popContinuation,
+    ppDefine,
+    ppIsDefined,
+    getCppState,
+    ghcCppEnabled,
+) where
 
 import Data.List.NonEmpty ((<|))
-import qualified Data.List.NonEmpty as NonEmpty
+import Data.List.NonEmpty qualified as NonEmpty
 import Data.Map (Map)
+import Data.Map qualified as Map
 import Data.Maybe (isJust)
-import qualified Data.Map as Map
 import GHC.Base
 import GHC.Data.StringBuffer
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..))
-import qualified GHC.Parser.Lexer as Lexer
-import GHC.Types.SrcLoc
+import GHC.Parser.Lexer qualified as Lexer
 import GHC.Parser.PreProcess.ParserM (Token (..))
+import GHC.Types.SrcLoc
 
 import GHC.Prelude
 
@@ -119,8 +148,8 @@ getCppState = do
 
 setAccepting :: Bool -> PP ()
 setAccepting on = do
-  PpScope parent <- parentScope
-  setScope (PpScope (parent && on))
+    PpScope parent <- parentScope
+    setScope (PpScope (parent && on))
 
 getAccepting :: PP Bool
 getAccepting = P $ \s -> POk s (pp_accepting (NonEmpty.head $ pp_scope (pp s)))
@@ -128,8 +157,8 @@ getAccepting = P $ \s -> POk s (pp_accepting (NonEmpty.head $ pp_scope (pp s)))
 -- Start a new scope, ensuring it is consistent with the existing one
 pushAccepting :: Bool -> PP ()
 pushAccepting on = do
-  PpScope current <- getScope
-  pushScope (PpScope (current && on))
+    PpScope current <- getScope
+    pushScope (PpScope (current && on))
 
 popAccepting :: PP ()
 popAccepting =

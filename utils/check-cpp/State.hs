@@ -193,8 +193,7 @@ parentScope =
                 c :| [] -> c -- Perhaps should return enabled instead
                 _ :| (h : _t) -> h
          in
-            POk s (trace ("parentScope:pp_scope" ++ show (pp_scope (pp s))) new_scope)
-            -- POk s new_scope
+            POk s new_scope
 
 -- Get the current scope value
 getScope :: PP PpScope

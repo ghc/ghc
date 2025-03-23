@@ -183,9 +183,9 @@
 
 #define VERSION_xhtml 3000.2.2.1
 
-#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250223
+#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250322
 
-#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250223
+#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250322
 
 #define __GLASGOW_HASKELL_PATCHLEVEL2__ 0
 
@@ -203,6 +203,10 @@
   |x = 1
 - |#else
 - |x = 5
+- |#endif
+
+- |#if defined(BAR) || defined FOO
+  |y = 1
 - |#endif
   |
 ------------------------------
