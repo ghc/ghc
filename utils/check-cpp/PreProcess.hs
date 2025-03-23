@@ -331,16 +331,6 @@ ppInclude filename = do
             let loc = PsLoc (mkRealSrcLoc (mkFastString filename) 1 1) (BufPos 0)
             Lexer.setInput (Lexer.AI loc src)
 
--- ppIf' :: String -> PP ()
--- ppIf' str = P $ \s ->
---     let
---         s' = cppIf (pp s) str
---      in
---         POk s{pp = s'} ()
-
--- ppIf :: String -> PP ()
--- ppIf str = cppIf str
-
 -- =====================================================================
 
 {- | Do cpp initial processing, as per https://gcc.gnu.org/onlinedocs/cpp/Initial-processing.html
