@@ -590,3 +590,42 @@ t22 = do
         , "#endif"
         , "#endif"
         ]
+
+t23 :: IO ()
+t23 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module Example4 where"
+        , "#define DEBUG 4"
+        , "#if defined(DEBUG)"
+        , "x = 1"
+        , "#else"
+        , "x = 2"
+        , "#endif"
+        ]
+
+t24 :: IO ()
+t24 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module Example4 where"
+        , "#define DEBUG 4"
+        , "#if defined DEBUG "
+        , "x = 1"
+        , "#else"
+        , "x = 2"
+        , "#endif"
+        ]
+
+t25 :: IO ()
+t25 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module Example4 where"
+        , "#define DEBUG 4"
+        , "#if defined DEBUG || defined (FOO) "
+        , "x = 1"
+        , "#else"
+        , "x = 2"
+        , "#endif"
+        ]
