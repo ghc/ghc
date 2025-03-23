@@ -10,3 +10,7 @@ x = 1
 #else
 x = 5
 #endif
+
+#if defined(BAR) || defined FOO
+y = 1
+#endif
