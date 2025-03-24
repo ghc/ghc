@@ -59,7 +59,6 @@ module GHC.Types.Name.Reader (
         LookupGRE(..), lookupGRE,
         WhichGREs(.., AllRelevantGREs, RelevantGREsFOS),
         greIsRelevant,
-        LookupChild(..),
 
         lookupGRE_Name,
         lookupGRE_FieldLabel,
@@ -98,7 +97,7 @@ module GHC.Types.Name.Reader (
         fieldGRE_maybe, fieldGRELabel,
 
         -- ** Parent information
-        Parent(..), greParent_maybe,
+        Parent(..), ParentGRE(..), greParent_maybe,
         mkParent, availParent,
         ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
         importSpecLoc, importSpecModule, isExplicitItem, bestImport,
@@ -1096,6 +1095,23 @@ allowGRE WantNormal gre
 allowGRE WantField gre
   = isRecFldGRE gre
 
+-- | A parent of a child, in contexts like import/export lists, class and
+-- instance declarations, etc.
+--
+-- Not simply a 'GlobalRdrElt', because we don't always have a full
+-- 'GlobalRdrElt' to hand (e.g. in 'GHC.Rename.Env.lookupInstDeclBndr').
+data ParentGRE
+  = ParentGRE
+  { parentGRE_name :: Name
+  , parentGRE_info :: GREInfo
+  }
+
+instance Outputable ParentGRE where
+  ppr (ParentGRE name info) = ppr name <+> parens (ppr info)
+
+instance Eq ParentGRE where
+  ParentGRE name1 _ == ParentGRE name2 _ = name1 == name2
+
 -- | What should we look up in a 'GlobalRdrEnv'? Should we only look up
 -- names with the exact same 'OccName', or do we allow different 'NameSpace's?
 --
@@ -1136,11 +1152,9 @@ data LookupGRE info where
 
   -- | Look up children 'GlobalRdrElt's with a given 'Parent'.
   LookupChildren
-    :: OccName  -- ^ the 'OccName' to look up
-    -> LookupChild
-         -- ^ information to decide which 'GlobalRdrElt's
-         -- are valid children after looking up
-    -> LookupGRE info
+    :: ParentGRE        -- ^ the parent
+    -> OccName          -- ^ the child 'OccName' to look up
+    -> LookupGRE GREInfo
 
 -- | How should we look up in a 'GlobalRdrEnv'?
 -- Which 'NameSpace's are considered relevant for a given lookup?
@@ -1195,33 +1209,6 @@ pattern RelevantGREsFOS fos <- RelevantGREs { includeFieldSelectors = fos }
                    , lookupVariablesForFields = fos == WantBoth
                    , lookupTyConsAsWell = False }
 
-data LookupChild
-  = LookupChild
-  { wantedParent :: Name
-     -- ^ the parent we are looking up children of
-  , lookupDataConFirst :: Bool
-     -- ^ for type constructors, should we look in the data constructor
-     -- namespace first?
-  , prioritiseParent :: Bool
-    -- ^ should we prioritise getting the right 'Parent'?
-    --
-    --  - @True@: prioritise getting the right 'Parent'
-    --  - @False@: prioritise getting the right 'NameSpace'
-    --
-    -- See Note [childGREPriority].
-  }
-
-instance Outputable LookupChild where
-  ppr (LookupChild { wantedParent = par
-                   , lookupDataConFirst = dc
-                   , prioritiseParent = prio_parent })
-    = braces $ hsep
-        [ text "LookupChild"
-        , braces (text "parent:" <+> ppr par)
-        , if dc then text "[dc_first]" else empty
-        , if prio_parent then text "[prio_parent]" else empty
-        ]
-
 -- | After looking up something with the given 'NameSpace', is the resulting
 -- 'GlobalRdrElt' we have obtained relevant, according to the 'RelevantGREs'
 -- specification of which 'NameSpace's are relevant?
@@ -1270,69 +1257,64 @@ which have a given Parent. These are the two calls to lookupSubBndrOcc_helper:
        class C a where { type (+++) :: a -> a ->; infixl 6 +++ }
        (+++) :: Int -> Int -> Int; (+++) = (+)
 
-In these two situations, there are two competing metrics for finding the "best"
+In these two situations, there are two metrics for finding the "best"
 'GlobalRdrElt' that a particular 'OccName' resolves to:
 
   - does the resolved 'GlobalRdrElt' have the correct parent?
   - does the resolved 'GlobalRdrElt' have the same 'NameSpace' as the 'OccName'?
 
-(A) and (B) have competing requirements.
+To resolve a children export item, we proceed by first prioritising GREs which
+have the correct parent, and then break ties by looking at 'NameSpace's.
 
-For the example of (A) above, we know that the child 'D' of 'T' must live
-in the data namespace, so we look up the OccName 'OccName DataName "D"' and
-prioritise the lookup results based on the 'NameSpace'.
-This means we get an error message of the form:
-
-  The type constructor 'T' is not the parent of the data constructor 'D'.
-
-as opposed to the rather unhelpful and confusing:
-
-  The type constructor 'T' is not the parent of the type constructor 'D'.
-
-See test case T11970.
-
-For the example of (B) above, the fixity declaration for +++ lies inside the
-class, so we should prioritise looking up 'GlobalRdrElt's whose parent is 'C'.
-Not doing so led to #23664.
+Test cases:
+  - T11970: pattern synonyms, classes etc
+  - T10816, T23664, T24037: fixity declarations for associated types
+  - T20427: promoted data constructors and TypeData
 -}
 
 -- | Scoring priority function for looking up children 'GlobalRdrElt'.
 --
--- We score by 'Parent' and 'NameSpace', with higher priorities having lower
--- numbers. Which lexicographic order we use ('Parent' or 'NameSpace' first)
--- is determined by the first argument; see Note [childGREPriority].
-childGREPriority :: LookupChild -- ^ what kind of child do we want,
-                                -- e.g. what should its parent be?
-                 -> NameSpace   -- ^ what 'NameSpace' are we originally looking in?
-                 -> GlobalRdrEltX info
-                                -- ^ the result of looking up; it might be in a different
-                                -- 'NameSpace', which is used to determine the score
-                                -- (in the first component)
+-- The returned score orders by 'Parent' first and then by 'NameSpace',
+-- with higher priorities having lower numbers.
+--
+-- See Note [childGREPriority].
+childGREPriority :: ParentGRE      -- ^ wanted parent
+                 -> NameSpace      -- ^ what 'NameSpace' are we originally looking in?
+                 -> GlobalRdrElt
+                      -- ^ the result of looking up; it might be in a different
+                      -- 'NameSpace', which is used to determine the score
+                      -- (in the second component)
                  -> Maybe (Int, Int)
-childGREPriority (LookupChild { wantedParent = wanted_parent
-                              , lookupDataConFirst = try_dc_first
-                              , prioritiseParent = par_first })
-  ns gre =
-    case child_ns_prio $ greNameSpace gre of
-      Nothing -> Nothing
-      Just ns_prio ->
-        let par_prio = parent_prio $ greParent gre
-        in Just $ if par_first
-                  then (par_prio, ns_prio)
-                  else (ns_prio, par_prio)
-          -- See Note [childGREPriority].
+childGREPriority (ParentGRE wanted_parent parent_info) wanted_ns child_gre =
+  (parent_prio, ) <$> child_ns_prio
 
   where
+      child_ns = greNameSpace child_gre
+
+      -- Is the parent a class? Only class TyCons can have children that
+      -- are in the TcCls NameSpace (associated types).
+      is_class_parent =
+        case parent_info of
+          IAmTyCon ClassFlavour -> True
+          _ -> False
+
       -- Pick out the possible 'NameSpace's in order of priority.
-      child_ns_prio :: (NameSpace -> Maybe Int)
-      child_ns_prio other_ns
-        | other_ns == ns
+      child_ns_prio :: Maybe Int
+      child_ns_prio
+        | child_ns == wanted_ns
+
+        -- Is it OK to have a child in this NameSpace?
+        --
+        -- If it's in the TcCls NameSpace, then the parent must be a class,
+        -- unless the child is a promoted data constructor (which can happen
+        -- when exporting a TypeData declaration, see T20427).
+        , not (isTcClsNameSpace child_ns) || is_class_parent || child_is_data
         = Just 0
-        | isTermVarOrFieldNameSpace ns
-        , isTermVarOrFieldNameSpace other_ns
+        | isTermVarOrFieldNameSpace wanted_ns
+        , isTermVarOrFieldNameSpace child_ns
         = Just 0
-        | isValNameSpace varName
-        , other_ns == tcName
+        | isValNameSpace wanted_ns
+        , is_class_parent && isTcClsNameSpace child_ns
         -- When looking up children, we sometimes want a value name
         -- to resolve to a type constructor.
         -- For example, for an infix declaration "infixr 3 +!" or "infix 2 `Fun`"
@@ -1342,18 +1324,38 @@ childGREPriority (LookupChild { wantedParent = wanted_parent
         -- NameSpace, and "Fun" would be in the term-level data constructor
         -- NameSpace.  See tests T10816, T23664, T24037.
         = Just 1
-        | ns == tcName
-        , other_ns == dataName
-        , try_dc_first -- try data namespace before type/class namespace?
-        = Just (-1)
+        | wanted_ns == tcName
+        , child_is_data
+        = Just $
+            -- For classes we de-prioritise data constructors;
+            -- otherwise we prioritise them.
+            if is_class_parent
+            then  1
+            else -1
         | otherwise
         = Nothing
 
-      parent_prio :: Parent -> Int
-      parent_prio (ParentIs other_parent)
-        | other_parent == wanted_parent = 0
-        | otherwise                     = 1
-      parent_prio NoParent              = 0
+      parent_prio :: Int
+      parent_prio =
+        case greParent child_gre of
+          ParentIs other_parent
+            | other_parent == wanted_parent
+            -> 0
+            | otherwise
+            -- The parent is wrong, so give this a low priority.
+            -- Don't return 'Nothing': if there are no other options, this
+            -- allows us to report an incorrect parent to the user, as opposed
+            -- to an out-of-scope error.
+            -> 2
+          NoParent ->
+            -- Higher priority than having the wrong parent entirely.
+            1
+
+      child_is_data =
+        case greInfo child_gre of
+          IAmConLike{} -> True
+          IAmTyCon PromotedDataConFlavour -> True
+          _ -> child_ns == dataName
 
 -- | Look something up in the Global Reader Environment.
 --
@@ -1378,10 +1380,10 @@ lookupGRE env = \case
       occ = nameOccName nm
       lkup | all_ns    = concat $ lookupOccEnv_AllNameSpaces env occ
            | otherwise = fromMaybe [] $ lookupOccEnv env occ
-  LookupChildren occ which_child ->
-    let ns = occNameSpace occ
-        all_gres = concat $ lookupOccEnv_AllNameSpaces env occ
-    in highestPriorityGREs (childGREPriority which_child ns) all_gres
+  LookupChildren parent child_occ ->
+    let ns = occNameSpace child_occ
+        all_gres = concat $ lookupOccEnv_AllNameSpaces env child_occ
+    in highestPriorityGREs (childGREPriority parent ns) all_gres
 
 -- | Collect the 'GlobalRdrElt's with the highest priority according
 -- to the given function (lower value <=> higher priority).

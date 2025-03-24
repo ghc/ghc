@@ -411,7 +411,7 @@ lookupInstDeclBndr cls what_subordinate rdr
                                 -- warnings when a deprecated class
                                 -- method is defined. We only warn
                                 -- when it's used
-                          cls what_subordinate rdr
+                          (ParentGRE cls (IAmTyCon ClassFlavour)) what_subordinate rdr
        ; case mb_name of
            Left err -> do { addErr (mkTcRnNotInScope rdr err)
                           ; return (mkUnboundNameRdr rdr) }
@@ -681,25 +681,24 @@ lookupGlobalOccRn will find it.
 -}
 
 -- | Used in export lists to lookup the children.
-lookupSubBndrOcc_helper :: Bool -> DeprecationWarnings
-                        -> Name
-                        -> RdrName -- ^ thing we are looking up
-                        -> LookupChild -- ^ how to look it up (e.g. which
-                                       -- 'NameSpace's to look in)
+lookupSubBndrOcc_helper :: Bool
+                        -> DeprecationWarnings
+                        -> ParentGRE     -- ^ parent
+                        -> RdrName       -- ^ thing we are looking up
                         -> RnM ChildLookupResult
-lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name how_lkup
-  | isUnboundName parent
+lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent_gre rdr_name
+  | isUnboundName (parentGRE_name parent_gre)
     -- Avoid an error cascade
   = return (FoundChild (mkUnboundGRERdr rdr_name))
 
   | otherwise = do
   gre_env <- getGlobalRdrEnv
-  let original_gres = lookupGRE gre_env (LookupChildren (rdrNameOcc rdr_name) how_lkup)
+  let original_gres = lookupGRE gre_env (LookupChildren parent_gre (rdrNameOcc rdr_name) )
       picked_gres = pick_gres original_gres
   -- The remaining GREs are things that we *could* export here.
   -- Note that this includes things which have `NoParent`;
   -- those are sorted in `checkPatSynParent`.
-  traceRn "parent" (ppr parent)
+  traceRn "parent" (ppr (parentGRE_name parent_gre))
   traceRn "lookupExportChild original_gres:" (ppr original_gres)
   traceRn "lookupExportChild picked_gres:" (ppr picked_gres $$ ppr must_have_parent)
   case picked_gres of
@@ -735,12 +734,12 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name how_lkup
           dup_fields_ok <- xoptM LangExt.DuplicateRecordFields
           case original_gres of
             []  -> return NameNotFound
-            [g] -> return $ IncorrectParent parent g
+            [g] -> return $ IncorrectParent parent_gre g
                               [p | ParentIs p <- [greParent g]]
             gss@(g:gss'@(_:_)) ->
               if all isRecFldGRE gss && dup_fields_ok
               then return $
-                    IncorrectParent parent g
+                    IncorrectParent parent_gre g
                       [p | x <- gss, ParentIs p <- [greParent x]]
               else mkNameClashErr $ g NE.:| gss'
 
@@ -750,22 +749,29 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name how_lkup
           return (FoundChild (NE.head gres))
 
         pick_gres :: [GlobalRdrElt] -> DisambigInfo
-        -- For Unqual, find GREs that are in scope qualified or unqualified
-        -- For Qual,   find GREs that are in scope with that qualification
         pick_gres gres
           | isUnqual rdr_name
+          -- The child is not qualified: find GREs that are in scope, whether
+          -- qualified or unqualified, as per the Haskell 2010 report, 5.2.2:
+          --
+          --   - In all cases, the parent type constructor T must be in scope.
+          --   - A subordinate name is legal if and only if:
+          --      (a) it names a constructor or field of T, and
+          --      (b) the constructor or field is in scope, regardless of whether
+          --          it is in scope under a qualified or unqualified name.
           = mconcat (map right_parent gres)
           | otherwise
+          -- The child is qualified: find GREs that are in scope
+          -- with that qualification.
           = mconcat (map right_parent (pickGREs rdr_name gres))
 
         right_parent :: GlobalRdrElt -> DisambigInfo
         right_parent gre
           = case greParent gre of
               ParentIs cur_parent
-                 | parent == cur_parent -> DisambiguatedOccurrence gre
+                 | parentGRE_name parent_gre == cur_parent -> DisambiguatedOccurrence gre
                  | otherwise            -> NoOccurrence
               NoParent                  -> UniqueOccurrence gre
-{-# INLINEABLE lookupSubBndrOcc_helper #-}
 
 -- | This domain specific datatype is used to record why we decided it was
 -- possible that a GRE could be exported with a parent.
@@ -817,21 +823,21 @@ data ChildLookupResult
       -- | We couldn't find a suitable name
       = NameNotFound
       -- | The child has an incorrect parent
-      | IncorrectParent Name          -- ^ parent
-                        GlobalRdrElt  -- ^ child we were looking for
-                        [Name]        -- ^ list of possible parents
+      | IncorrectParent ParentGRE    -- ^ parent
+                        GlobalRdrElt -- ^ child we were looking for
+                        [Name]       -- ^ list of possible parents
       -- | We resolved to a child
       | FoundChild GlobalRdrElt
 
 instance Outputable ChildLookupResult where
   ppr NameNotFound = text "NameNotFound"
   ppr (FoundChild n) = text "Found:" <+> ppr (greParent n) <+> ppr n
-  ppr (IncorrectParent p g ns)
+  ppr (IncorrectParent parent g ns)
     = text "IncorrectParent"
-      <+> hsep [ppr p, ppr $ greName g, ppr ns]
+      <+> hsep [ppr (parentGRE_name parent), ppr $ greName g, ppr ns]
 
 lookupSubBndrOcc :: DeprecationWarnings
-                 -> Name     -- Parent
+                 -> ParentGRE
                  -> Subordinate
                  -> RdrName
                  -> RnM (Either NotInScopeError Name)
@@ -840,7 +846,7 @@ lookupSubBndrOcc :: DeprecationWarnings
 lookupSubBndrOcc warn_if_deprec the_parent what_subordinate rdr_name =
   lookupExactOrOrig rdr_name (Right . greName) $
     -- This happens for built-in classes, see mod052 for example
-    do { child <- lookupSubBndrOcc_helper True warn_if_deprec the_parent rdr_name what_lkup
+    do { child <- lookupSubBndrOcc_helper True warn_if_deprec the_parent rdr_name
        ; return $ case child of
            FoundChild g       -> Right (greName g)
            NameNotFound       -> Left unknown_sub
@@ -848,14 +854,10 @@ lookupSubBndrOcc warn_if_deprec the_parent what_subordinate rdr_name =
        -- See [Mismatched class methods and associated type families]
        -- in TcInstDecls.
   where
-    unknown_sub = UnknownSubordinate the_parent what_subordinate
-    what_lkup = LookupChild { wantedParent        = the_parent
-                            , lookupDataConFirst  = False
-                            , prioritiseParent    = True -- See T23664.
-                            }
-{-
-Note [Family instance binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    unknown_sub = UnknownSubordinate (parentGRE_name the_parent) what_subordinate
+
+{- Note [Family instance binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   data family F a
   data instance F T = X1 | X2
@@ -1319,11 +1321,11 @@ We promote the namespace of RdrName and look up after that
 (see the functions promotedRdrName and lookup_promoted).
 
 In particular, we have the following error message
-  • Illegal term-level use of the type constructor ‘Int’
-      imported from ‘Prelude’ (and originally defined in ‘GHC.Types’)
-  • In the first argument of ‘id’, namely ‘Int’
+  • Illegal term-level use of the type constructor ‘Int'
+      imported from ‘Prelude' (and originally defined in ‘GHC.Types')
+  • In the first argument of ‘id'
     In the expression: id Int
-    In an equation for ‘x’: x = id Int
+    In an equation for ‘x': x = id Int
 
 when the user writes the following declaration
 
@@ -1896,7 +1898,7 @@ For example, writing `Data.List.sort` will load the interface file for
 `Data.List` as if the user had written `import qualified Data.List`.
 
 If we fail we just return Nothing, rather than bleating
-about "attempting to use module ‘D’ (./D.hs) which is not loaded"
+about "attempting to use module 'D' (./D.hs) which is not loaded"
 which is what loadSrcInterface does.
 
 It is enabled by default and disabled by the flag
@@ -2195,7 +2197,9 @@ lookupBindGroupOcc ctxt what rdr_name also_try_tycon_ns ns_spec
 
     lookup_cls_op cls
       = NE.singleton <$>
-        lookupSubBndrOcc AllDeprecationWarnings cls MethodOfClass rdr_name
+          lookupSubBndrOcc AllDeprecationWarnings
+            (ParentGRE cls (IAmTyCon ClassFlavour))
+            MethodOfClass rdr_name
 
     lookup_inst occ_env  -- See Note [Signatures in instance decls]
       = case lookupOccEnv occ_env occ of

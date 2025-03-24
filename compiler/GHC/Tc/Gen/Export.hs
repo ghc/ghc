@@ -564,8 +564,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     lookup_ie_kids_with :: GlobalRdrElt -> [LIEWrappedName GhcPs]
                    -> RnM ([LIEWrappedName GhcRn], [GlobalRdrElt])
     lookup_ie_kids_with gre sub_rdrs =
-      do { let name = greName gre
-         ; kids <- lookupChildrenExport name sub_rdrs
+      do { kids <- lookupChildrenExport gre sub_rdrs
          ; return (map fst kids, map snd kids) }
 
     lookup_ie_kids_all :: IE GhcPs -> LIEWrappedName GhcPs -> GlobalRdrElt
@@ -687,14 +686,14 @@ The Haskell 2010 report says in section 5.1:
 
 >> An abbreviated form of module, consisting only of the module body, is
 >> permitted. If this is used, the header is assumed to be
->> ‘module Main(main) where’.
+>> 'module Main(main) where'.
 
 For modules without a module header, this is implemented the
 following way:
 
 If the module has a main function in scope:
    Then create a module header and export the main function,
-   as if a module header like ‘module Main(main) where...’ would exist.
+   as if a module header like 'module Main(main) where...' would exist.
    This has the effect to mark the main function and all top level
    functions called directly or indirectly via main as 'used',
    and later on, unused top-level functions can be reported correctly.
@@ -708,7 +707,7 @@ If the module has NO main function:
    In GHCi this has the effect, that we don't get any 'non-used' warnings.
    In GHC, however, the 'has-main-module' check in GHC.Tc.Module.checkMain
    fires, and we get the error:
-      The IO action ‘main’ is not defined in module ‘Main’
+      The IO action 'main' is not defined in module 'Main'
 -}
 
 
@@ -737,27 +736,21 @@ If the module has NO main function:
 
 
 
-lookupChildrenExport :: Name -> [LIEWrappedName GhcPs]
+lookupChildrenExport :: GlobalRdrElt
+                     -> [LIEWrappedName GhcPs]
                      -> RnM ([(LIEWrappedName GhcRn, GlobalRdrElt)])
-lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
+lookupChildrenExport parent_gre rdr_items = mapAndReportM doOne rdr_items
     where
+        spec_parent = greName parent_gre
         -- Process an individual child
         doOne :: LIEWrappedName GhcPs
               -> RnM (LIEWrappedName GhcRn, GlobalRdrElt)
         doOne n = do
 
           let bareName = (ieWrappedName . unLoc) n
-              what_lkup :: LookupChild
-              what_lkup =
-                LookupChild
-                  { wantedParent       = spec_parent
-                  , lookupDataConFirst = True
-                  , prioritiseParent   = False -- See T11970.
-                  }
-
                 -- Do not report export list declaration deprecations
           name <-  lookupSubBndrOcc_helper False ExportDeprecationWarnings
-                        spec_parent bareName what_lkup
+                        (ParentGRE spec_parent (greInfo parent_gre)) bareName
           traceRn "lookupChildrenExport" (ppr name)
           -- Default to data constructors for slightly better error
           -- messages
@@ -776,7 +769,7 @@ lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
               do { checkPatSynParent spec_parent par child_nm
                  ; return (replaceLWrappedName n child_nm, child)
                  }
-            IncorrectParent p c gs -> failWithDcErr p (greName c) gs
+            IncorrectParent p c gs -> failWithDcErr (parentGRE_name p) (greName c) gs
 
 
 -- Note [Typing Pattern Synonym Exports]
