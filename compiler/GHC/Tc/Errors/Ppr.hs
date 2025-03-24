@@ -855,10 +855,9 @@ instance Diagnostic TcRnMessage where
                    | otherwise         = text "the term-level namespace"
           ns = nameNameSpace name
           what = pprNameSpace ns <+> quotes (ppr name)
-    TcRnNotInScope err name imp_errs _hints
-      -> mkSimpleDecorated $
-           pprScopeError name err $$ vcat (map ppr imp_errs)
-    TcRnTermNameInType name _hints
+    TcRnNotInScope err name
+      -> mkSimpleDecorated $ pprScopeError name err
+    TcRnTermNameInType name
       -> mkSimpleDecorated $
            quotes (ppr name) <+>
              (text "is a term-level binding") $+$
@@ -2923,10 +2922,10 @@ instance Diagnostic TcRnMessage where
       -> [SuggestAppropriateTHTick (nameNameSpace nm)]
       | otherwise
       -> noHints
-    TcRnNotInScope err _nm _imp_errs hints
-      -> scopeErrorHints err ++ hints
-    TcRnTermNameInType _nm hints
-      -> hints
+    TcRnNotInScope err _nm
+      -> scopeErrorHints err
+    TcRnTermNameInType {}
+      -> noHints
     TcRnUntickedPromotedThing thing
       -> [SuggestAddTick thing]
     TcRnIllegalBuiltinSyntax {}

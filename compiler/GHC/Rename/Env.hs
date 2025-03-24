@@ -413,7 +413,7 @@ lookupInstDeclBndr cls what_subordinate rdr
                                 -- when it's used
                           (ParentGRE cls (IAmTyCon ClassFlavour)) what_subordinate rdr
        ; case mb_name of
-           Left err -> do { addErr (mkTcRnNotInScope rdr err)
+           Left err -> do { addErr $ TcRnNotInScope err rdr
                           ; return (mkUnboundNameRdr rdr) }
            Right nm -> return nm }
 
@@ -453,7 +453,7 @@ lookupExactOrOrig rdr_name res k
           FoundExactOrOrig gre -> return $ res gre
           NotExactOrOrig       -> k
           ExactOrOrigError e   ->
-            do { addErr (mkTcRnNotInScope rdr_name e)
+            do { addErr $ TcRnNotInScope e rdr_name
                ; return $ res (mkUnboundGRERdr rdr_name) } }
 
 -- Variant of 'lookupExactOrOrig' that does not report an error
@@ -1506,11 +1506,16 @@ lookupFieldGREs env (L loc rdr)
 
        -- Add an error if lookup failed.
        ; case res of
-          gre : gres -> return $ gre NE.:| gres
-          [] -> do { (imp_errs, hints) <-
-                       unknownNameSuggestions emptyLocalRdrEnv WL_RecField rdr
-                   ; failWithTc $
-                       TcRnNotInScope NotARecordField rdr imp_errs hints } }
+          { gre : gres -> return $ gre NE.:| gres
+          ; [] ->
+    do { show_helpful_errors <- goptM Opt_HelpfulErrors
+       ; (imp_errs, hints) <-
+           if show_helpful_errors
+           then unknownNameSuggestions emptyLocalRdrEnv WL_RecField rdr
+           else return ([], [])
+       ; err_msg <- unknownNameSuggestionsMessage (TcRnNotInScope NotARecordField rdr) imp_errs hints
+       ; failWithTc err_msg
+       } } }
 
 -- | Look up a 'RdrName', which might refer to an overloaded record field.
 --
@@ -2138,7 +2143,7 @@ lookupSigCtxtOccRn ctxt what
                     vcat (text "lookupSigCtxtOccRn" <+> ppr name : map (either (pprScopeError rdr_name) ppr) rest)
                 ; return name }
            Left err NE.:| _ ->
-             do { addErr (mkTcRnNotInScope rdr_name err)
+             do { addErr $ TcRnNotInScope err rdr_name
                 ; return (mkUnboundNameRdr rdr_name) }
        }
 
@@ -2274,7 +2279,7 @@ lookupLocalTcNames ctxt what ns_spec rdr
       | otherwise
       = Right (rdr, name)
     guard_builtin_syntax _ _ (Left err)
-      = Left $ mkTcRnNotInScope rdr err
+      = Left $ TcRnNotInScope err rdr
 
 dataTcOccs :: RdrName -> [RdrName]
 -- Return both the given name and the same name promoted to the TcClsName

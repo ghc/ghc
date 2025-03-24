@@ -77,7 +77,7 @@ module GHC.Tc.Errors.Types (
   , RelevantBindings(..), pprRelevantBindings
   , PromotionErr(..), pprPECategory, peCategory
   , TermLevelUseErr(..), teCategory
-  , NotInScopeError(..), mkTcRnNotInScope
+  , NotInScopeError(..)
   , Subordinate(..), pprSubordinate
   , ImportError(..)
   , HoleError(..)
@@ -2021,8 +2021,6 @@ data TcRnMessage where
       See 'NotInScopeError' for more details. -}
   TcRnNotInScope :: NotInScopeError  -- ^ what the problem is
                  -> RdrName          -- ^ the name that is not in scope
-                 -> [ImportError]    -- ^ import errors that are relevant
-                 -> [GhcHint]        -- ^ hints, e.g. enable DataKinds to refer to a promoted data constructor
                  -> TcRnMessage
 
   {-| TcRnTermNameInType is an error that occurs when a term-level identifier
@@ -2037,7 +2035,7 @@ data TcRnMessage where
 
       Test cases: T21605{c,d}
   -}
-  TcRnTermNameInType :: !RdrName -> ![GhcHint] -> TcRnMessage
+  TcRnTermNameInType :: !RdrName -> TcRnMessage
 
   {-| TcRnUntickedPromotedThing is a warning (controlled with -Wunticked-promoted-constructors)
       that is triggered by an unticked occurrence of a promoted data constructor.
@@ -5888,10 +5886,6 @@ data NotInScopeError
   --   none
   | NotInScopeTc (NameEnv TcTyThing)
   deriving Generic
-
--- | Create a @"not in scope"@ error message for the given 'RdrName'.
-mkTcRnNotInScope :: RdrName -> NotInScopeError -> TcRnMessage
-mkTcRnNotInScope rdr err = TcRnNotInScope err rdr [] noHints
 
 -- | Configuration for pretty-printing valid hole fits.
 data HoleFitDispConfig =

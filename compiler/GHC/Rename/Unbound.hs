@@ -15,6 +15,7 @@ module GHC.Rename.Unbound
    , reportUnboundName
    , reportUnboundName'
    , unknownNameSuggestions
+   , unknownNameSuggestionsMessage
    , similarNameSuggestions
    , fieldSelectorSuggestions
    , WhatLooking(..)
@@ -34,8 +35,10 @@ import GHC.Prelude
 
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
+import GHC.Driver.Env (hsc_units)
 import GHC.Driver.Env.Types
 
+import {-# SOURCE #-} GHC.Tc.Errors.Hole ( getHoleFitDispConfig )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Names ( mkUnboundName, isUnboundName )
@@ -65,6 +68,7 @@ import Language.Haskell.Syntax.ImpExp
 
 import Data.List (sortBy, partition)
 import Data.List.NonEmpty ( pattern (:|), NonEmpty )
+import qualified Data.List.NonEmpty as NE ( nonEmpty )
 import Data.Function ( on )
 import qualified Data.Semigroup as S
 import qualified Data.Map as M
@@ -142,7 +146,7 @@ unboundNameOrTermInType if_term_in_type looking_for rdr_name hints
   = do  { dflags <- getDynFlags
         ; let show_helpful_errors = gopt Opt_HelpfulErrors dflags
         ; if not show_helpful_errors
-          then addErr $ make_error [] hints
+          then addErr =<< make_error [] hints
           else do { local_env  <- getLocalRdrEnv
                   ; global_env <- getGlobalRdrEnv
                   ; impInfo <- getImports
@@ -152,7 +156,7 @@ unboundNameOrTermInType if_term_in_type looking_for rdr_name hints
                           unknownNameSuggestions_ looking_for
                             dflags ic currmod global_env local_env impInfo
                             rdr_name
-                  ; addErr $
+                  ; addErr =<<
                       make_error imp_errs (hints ++ suggs) }
         ; return (mkUnboundNameRdr rdr_name) }
     where
@@ -166,8 +170,24 @@ unboundNameOrTermInType if_term_in_type looking_for rdr_name hints
       make_error imp_errs hints =
         case if_term_in_type of
           TermInTypes demoted_name ->
-            TcRnTermNameInType demoted_name hints
-          _ -> TcRnNotInScope err name_to_search imp_errs hints
+            unknownNameSuggestionsMessage (TcRnTermNameInType demoted_name)
+              [] -- no import errors
+              hints
+          _ -> unknownNameSuggestionsMessage (TcRnNotInScope err name_to_search)
+                 imp_errs hints
+
+unknownNameSuggestionsMessage :: TcRnMessage -> [ImportError] -> [GhcHint] -> RnM TcRnMessage
+unknownNameSuggestionsMessage msg imp_errs hints
+  = do { unit_state <- hsc_units <$> getTopEnv
+       ; hfdc <- getHoleFitDispConfig
+       ; let supp = case NE.nonEmpty imp_errs of
+                       Nothing -> Nothing
+                       Just ne_imp_errs ->
+                         (Just (hfdc, [SupplementaryImportErrors ne_imp_errs]))
+       ; return $
+           TcRnMessageWithInfo unit_state $
+             mkDetailedMessage (ErrInfo [] supp hints) msg
+       }
 
 notInScopeErr :: WhereLooking -> RdrName -> NotInScopeError
 notInScopeErr where_look rdr_name

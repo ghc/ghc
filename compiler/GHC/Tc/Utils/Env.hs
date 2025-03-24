@@ -386,12 +386,14 @@ failIllegalTyVal :: Name -> TcM a
 
     get_suggestions what_looking ns nm = do
       required_type_arguments <- xoptM LangExt.RequiredTypeArguments
-      if required_type_arguments && isVarNameSpace ns
+      show_helpful_errors <- goptM Opt_HelpfulErrors
+      if not show_helpful_errors || (required_type_arguments && isVarNameSpace ns)
       then return ([], [])  -- See Note [Suppress hints with RequiredTypeArguments]
       else do
         let occ = mkOccNameFS ns (occNameFS (occName nm))
         lcl_env <- getLocalRdrEnv
         unknownNameSuggestions lcl_env what_looking (mkRdrUnqual occ)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1181,12 +1183,12 @@ notFound name
                failWithTc $ TcRnUnpromotableThing name TermVariablePE
 
              | otherwise -> failWithTc $
-                mkTcRnNotInScope (getRdrName name) (NotInScopeTc (getLclEnvTypeEnv lcl_env))
-                       -- Take care: printing the whole gbl env can
-                       -- cause an infinite loop, in the case where we
-                       -- are in the middle of a recursive TyCon/Class group;
-                       -- so let's just not print it!  Getting a loop here is
-                       -- very unhelpful, because it hides one compiler bug with another
+                TcRnNotInScope (NotInScopeTc (getLclEnvTypeEnv lcl_env)) (getRdrName name)
+                  -- Take care: printing the whole gbl env can
+                  -- cause an infinite loop, in the case where we
+                  -- are in the middle of a recursive TyCon/Class group;
+                  -- so let's just not print it!  Getting a loop here is
+                  -- very unhelpful, because it hides one compiler bug with another
        }
 
 wrongThingErr :: WrongThingSort -> TcTyThing -> Name -> TcM a
