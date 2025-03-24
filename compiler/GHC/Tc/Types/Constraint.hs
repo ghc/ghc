@@ -1,5 +1,5 @@
-
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -75,10 +75,15 @@ module GHC.Tc.Types.Constraint (
         CtEvidence(..), TcEvDest(..),
         isWanted, isGiven,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
-        ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
-        ctEvRewriters, ctEvUnique, tcEvDestUnique,
+        ctEvExpr, ctEvTerm,
+        ctEvCoercion, givenCtEvCoercion,
+        ctEvEvId, wantedCtEvEvId,
+        ctEvRewriters, setWantedCtEvRewriters, ctEvUnique, tcEvDestUnique,
         ctEvRewriteRole, ctEvRewriteEqRel, setCtEvPredType, setCtEvLoc,
         tyCoVarsOfCtEvList, tyCoVarsOfCtEv, tyCoVarsOfCtEvsList,
+
+        -- CtEvidence constructors
+        GivenCtEvidence(..), WantedCtEvidence(..),
 
         -- RewriterSet
         RewriterSet(..), emptyRewriterSet, isEmptyRewriterSet,
@@ -189,15 +194,24 @@ assertFuelPreconditionStrict :: ExpansionFuel -> a -> a
 {-# INLINE assertFuelPreconditionStrict #-}
 assertFuelPreconditionStrict fuel = assertPpr (pendingFuel fuel) insufficientFuelError
 
+-- | Constraint
 data Ct
+  -- | A dictionary constraint (canonical)
   = CDictCan      DictCt
-  | CIrredCan     IrredCt      -- A "irreducible" constraint (non-canonical)
-  | CEqCan        EqCt         -- A canonical equality constraint
-  | CQuantCan     QCInst       -- A quantified constraint
-  | CNonCanonical CtEvidence   -- See Note [NonCanonical Semantics] in GHC.Tc.Solver.Monad
+  -- | An irreducible constraint (non-canonical)
+  | CIrredCan     IrredCt
+  -- | An equality constraint (canonical)
+  | CEqCan        EqCt
+  -- | A quantified constraint (canonical)
+  | CQuantCan     QCInst
+  -- | A non-canonical constraint
+  --
+  -- See Note [NonCanonical Semantics] in GHC.Tc.Solver.Monad
+  | CNonCanonical CtEvidence
 
 --------------- DictCt --------------
 
+-- | A canonical dictionary constraint
 data DictCt   -- e.g.  Num ty
   = DictCt { di_ev  :: CtEvidence  -- See Note [Ct/evidence invariant]
 
@@ -279,7 +293,10 @@ and forms condition T3 in Note [Extending the inert equalities]
 in GHC.Tc.Solver.InertSet.
 -}
 
-data EqCt -- An equality constraint; see Note [Canonical equalities]
+-- | A canonical equality constraint.
+--
+-- See Note [Canonical equalities] in GHC.Tc.Types.Constraint.
+data EqCt
   = EqCt {  -- CanEqLHS ~ rhs
       eq_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       eq_lhs    :: CanEqLHS,
@@ -319,18 +336,23 @@ instance Outputable IrredCt where
 
 --------------- QCInst --------------
 
-data QCInst  -- A much simplified version of ClsInst
-             -- See Note [Quantified constraints] in GHC.Tc.Solver.Solve
-  = QCI { qci_ev   :: CtEvidence -- Always of type forall tvs. context => ty
-                                 -- Always Given
-        , qci_tvs  :: [TcTyVar]  -- The tvs
-        , qci_pred :: TcPredType -- The ty
+-- | A quantified constraint, also called a "local instance"
+-- (a simplified version of 'ClsInst').
+--
+-- See Note [Quantified constraints] in GHC.Tc.Solver.Solve
+data QCInst
+  -- | A quantified constraint, of type @forall tvs. context => ty@
+  = QCI { qci_ev   :: CtEvidence
+        , qci_tvs  :: [TcTyVar]  -- ^ @tvs@
+        , qci_body :: TcPredType -- ^ the body of the @forall@, i.e. @ty@
         , qci_pend_sc :: ExpansionFuel
-             -- Invariants: qci_pend_sc > 0 =>
-             --       (a) qci_pred is a ClassPred
-             --       (b) this class has superclass(es), and
-             --       (c) the superclass(es) are not explored yet
-             -- Same as di_pend_sc flag in DictCt
+             -- ^ Invariants: qci_pend_sc > 0 =>
+             --
+             --    (a) 'qci_body' is a ClassPred
+             --    (b) this class has superclass(es), and
+             --    (c) the superclass(es) are not explored yet
+             --
+             -- Same as 'di_pend_sc' flag in 'DictCt'
              -- See Note [Expanding Recursive Superclasses and ExpansionFuel] in GHC.Tc.Solver
     }
 
@@ -682,9 +704,9 @@ mkGivens :: CtLoc -> [EvId] -> [Ct]
 mkGivens loc ev_ids
   = map mk ev_ids
   where
-    mk ev_id = mkNonCanonical (CtGiven { ctev_evar = ev_id
-                                       , ctev_pred = evVarPred ev_id
-                                       , ctev_loc = loc })
+    mk ev_id = mkNonCanonical (CtGiven (GivenCt { ctev_evar = ev_id
+                                               , ctev_pred = evVarPred ev_id
+                                               , ctev_loc = loc }))
 
 ctEvidence :: Ct -> CtEvidence
 ctEvidence (CQuantCan (QCI { qci_ev = ev }))    = ev
@@ -1279,7 +1301,7 @@ insolubleWantedCt ct
   | CIrredCan ir_ct <- ct
       -- CIrredCan: see (IW1) in Note [Insoluble Wanteds]
   , IrredCt { ir_ev = ev } <- ir_ct
-  , CtWanted { ctev_loc = loc, ctev_rewriters = rewriters }  <- ev
+  , CtWanted (WantedCt { ctev_loc = loc, ctev_rewriters = rewriters })  <- ev
       -- It's a Wanted
   , insolubleIrredCt ir_ct
       -- It's insoluble
@@ -2180,24 +2202,32 @@ data TcEvDest
               -- See Note [Coercion holes] in GHC.Core.TyCo.Rep
 
 data CtEvidence
-  = CtGiven    -- Truly given, not depending on subgoals
-      { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
-      , ctev_evar :: EvVar           -- See Note [CtEvidence invariants]
-      , ctev_loc  :: CtLoc }
+  = CtGiven  GivenCtEvidence
+  | CtWanted WantedCtEvidence
 
+-- | Evidence for a Given constraint
+data GivenCtEvidence =
+  GivenCt
+    { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
+    , ctev_evar :: EvVar           -- See Note [CtEvidence invariants]
+    , ctev_loc  :: CtLoc }
 
-  | CtWanted   -- Wanted goal
-      { ctev_pred      :: TcPredType     -- See Note [Ct/evidence invariant]
-      , ctev_dest      :: TcEvDest       -- See Note [CtEvidence invariants]
-      , ctev_loc       :: CtLoc
-      , ctev_rewriters :: RewriterSet }  -- See Note [Wanteds rewrite Wanteds]
+-- | Evidence for a Wanted constraint
+data WantedCtEvidence =
+  WantedCt
+    { ctev_pred      :: TcPredType     -- See Note [Ct/evidence invariant]
+    , ctev_dest      :: TcEvDest       -- See Note [CtEvidence invariants]
+    , ctev_loc       :: CtLoc
+    , ctev_rewriters :: RewriterSet }  -- See Note [Wanteds rewrite Wanteds]
 
 ctEvPred :: CtEvidence -> TcPredType
 -- The predicate of a flavor
-ctEvPred = ctev_pred
+ctEvPred (CtGiven (GivenCt { ctev_pred = pred }))  = pred
+ctEvPred (CtWanted (WantedCt { ctev_pred = pred })) = pred
 
 ctEvLoc :: CtEvidence -> CtLoc
-ctEvLoc = ctev_loc
+ctEvLoc (CtGiven (GivenCt { ctev_loc = loc }))  = loc
+ctEvLoc (CtWanted (WantedCt { ctev_loc = loc })) = loc
 
 ctEvOrigin :: CtEvidence -> CtOrigin
 ctEvOrigin = ctLocOrigin . ctEvLoc
@@ -2225,20 +2255,30 @@ ctEvTerm ev = EvExpr (ctEvExpr ev)
 -- If the provided CtEvidence is not for a Wanted, just
 -- return an empty set.
 ctEvRewriters :: CtEvidence -> RewriterSet
-ctEvRewriters (CtWanted { ctev_rewriters = rewriters }) = rewriters
-ctEvRewriters (CtGiven {})                              = emptyRewriterSet
+ctEvRewriters (CtWanted (WantedCt { ctev_rewriters = rws })) = rws
+ctEvRewriters (CtGiven {})  = emptyRewriterSet
+
+-- | Set the rewriter set of a Wanted constraint.
+setWantedCtEvRewriters :: WantedCtEvidence -> RewriterSet -> WantedCtEvidence
+setWantedCtEvRewriters ev rs = ev { ctev_rewriters = rs }
 
 ctEvExpr :: HasDebugCallStack => CtEvidence -> EvExpr
-ctEvExpr ev@(CtWanted { ctev_dest = HoleDest _ })
-            = Coercion $ ctEvCoercion ev
+ctEvExpr (CtWanted ev@(WantedCt { ctev_dest = HoleDest _ }))
+            = Coercion $ ctEvCoercion (CtWanted ev)
 ctEvExpr ev = evId (ctEvEvId ev)
 
-ctEvCoercion :: HasDebugCallStack => CtEvidence -> TcCoercion
-ctEvCoercion _given@(CtGiven { ctev_evar = ev_id })
+givenCtEvCoercion :: GivenCtEvidence -> TcCoercion
+givenCtEvCoercion _given@(GivenCt { ctev_evar = ev_id })
   = assertPpr (isCoVar ev_id)
-    (text "ctEvCoercion used on non-equality Given constraint:" <+> ppr _given)
+    (text "givenCtEvCoercion used on non-equality Given constraint:" <+> ppr _given)
   $ mkCoVarCo ev_id
-ctEvCoercion (CtWanted { ctev_dest = dest })
+
+ctEvCoercion :: HasDebugCallStack => CtEvidence -> TcCoercion
+ctEvCoercion (CtGiven _given@(GivenCt { ctev_evar = ev_id }))
+  = assertPpr (isCoVar ev_id)
+    (text "ctEvCoercion used on non-equality Given constraint:" <+> ppr (CtGiven _given))
+  $ mkCoVarCo ev_id
+ctEvCoercion (CtWanted (WantedCt { ctev_dest = dest }))
   | HoleDest hole <- dest
   = -- ctEvCoercion is only called on type equalities
     -- and they always have HoleDests
@@ -2247,20 +2287,24 @@ ctEvCoercion ev
   = pprPanic "ctEvCoercion" (ppr ev)
 
 ctEvEvId :: CtEvidence -> EvVar
-ctEvEvId (CtWanted { ctev_dest = EvVarDest ev }) = ev
-ctEvEvId (CtWanted { ctev_dest = HoleDest h })   = coHoleCoVar h
-ctEvEvId (CtGiven  { ctev_evar = ev })           = ev
+ctEvEvId (CtWanted wtd)                         = wantedCtEvEvId wtd
+ctEvEvId (CtGiven (GivenCt { ctev_evar = ev })) = ev
+
+wantedCtEvEvId :: WantedCtEvidence -> EvVar
+wantedCtEvEvId (WantedCt { ctev_dest = EvVarDest ev }) = ev
+wantedCtEvEvId (WantedCt { ctev_dest = HoleDest h })   = coHoleCoVar h
 
 ctEvUnique :: CtEvidence -> Unique
-ctEvUnique (CtGiven { ctev_evar = ev })    = varUnique ev
-ctEvUnique (CtWanted { ctev_dest = dest }) = tcEvDestUnique dest
+ctEvUnique (CtGiven (GivenCt { ctev_evar = ev }))     = varUnique ev
+ctEvUnique (CtWanted (WantedCt { ctev_dest = dest })) = tcEvDestUnique dest
 
 tcEvDestUnique :: TcEvDest -> Unique
 tcEvDestUnique (EvVarDest ev_var) = varUnique ev_var
 tcEvDestUnique (HoleDest co_hole) = varUnique (coHoleCoVar co_hole)
 
 setCtEvLoc :: CtEvidence -> CtLoc -> CtEvidence
-setCtEvLoc ctev loc = ctev { ctev_loc = loc }
+setCtEvLoc (CtGiven (GivenCt pred evar _)) loc = CtGiven (GivenCt pred evar loc)
+setCtEvLoc (CtWanted (WantedCt pred dest _ rwrs)) loc = CtWanted (WantedCt pred dest loc rwrs)
 
 -- | Set the type of CtEvidence.
 --
@@ -2268,13 +2312,13 @@ setCtEvLoc ctev loc = ctev { ctev_loc = loc }
 -- the evidence and the ctev_pred in sync with each other.
 -- See Note [CtEvidence invariants].
 setCtEvPredType :: HasDebugCallStack => CtEvidence -> Type -> CtEvidence
-setCtEvPredType old_ctev@(CtGiven { ctev_evar = ev }) new_pred
-  = old_ctev { ctev_pred = new_pred
-             , ctev_evar = setVarType ev new_pred }
+setCtEvPredType (CtGiven old_ev@(GivenCt { ctev_evar = ev })) new_pred
+  = CtGiven (old_ev { ctev_pred = new_pred
+                    , ctev_evar = setVarType ev new_pred })
 
-setCtEvPredType old_ctev@(CtWanted { ctev_dest = dest }) new_pred
-  = old_ctev { ctev_pred = new_pred
-             , ctev_dest = new_dest }
+setCtEvPredType (CtWanted old_ev@(WantedCt { ctev_dest = dest })) new_pred
+  = CtWanted (old_ev { ctev_pred = new_pred
+                     , ctev_dest = new_dest })
   where
     new_dest = case dest of
       EvVarDest ev -> EvVarDest (setVarType ev new_pred)
@@ -2284,6 +2328,11 @@ instance Outputable TcEvDest where
   ppr (HoleDest h)   = text "hole" <> ppr h
   ppr (EvVarDest ev) = ppr ev
 
+instance Outputable GivenCtEvidence where
+  ppr = ppr . CtGiven
+instance Outputable WantedCtEvidence where
+  ppr = ppr . CtWanted
+
 instance Outputable CtEvidence where
   ppr ev = ppr (ctEvFlavour ev)
            <+> pp_ev <+> braces (ppr (ctl_depth (ctEvLoc ev)) <> pp_rewriters)
@@ -2291,8 +2340,8 @@ instance Outputable CtEvidence where
                <> dcolon <+> ppr (ctEvPred ev)
     where
       pp_ev = case ev of
-             CtGiven { ctev_evar = v } -> ppr v
-             CtWanted {ctev_dest = d } -> ppr d
+             CtGiven ev -> ppr (ctev_evar ev)
+             CtWanted ev -> ppr (ctev_dest ev)
 
       rewriters = ctEvRewriters ev
       pp_rewriters | isEmptyRewriterSet rewriters = empty
@@ -2339,9 +2388,10 @@ rewriterSetFromCts :: Bag Ct -> RewriterSet
 rewriterSetFromCts cts
   = foldr add emptyRewriterSet cts
   where
-    add ct rw_set = case ctEvidence ct of
-         CtWanted { ctev_dest = HoleDest hole } -> rw_set `addRewriter` hole
-         _                                      -> rw_set
+    add ct rw_set =
+      case ctEvidence ct of
+        CtWanted (WantedCt { ctev_dest = HoleDest hole }) -> rw_set `addRewriter` hole
+        _                                                 -> rw_set
 
 {-
 ************************************************************************
@@ -2618,4 +2668,3 @@ eqCanRewriteFR (Given,  r1)    (_,      r2)     = eqCanRewrite r1 r2
 eqCanRewriteFR (Wanted, NomEq) (Wanted, ReprEq) = False
 eqCanRewriteFR (Wanted, r1)    (Wanted, r2)     = eqCanRewrite r1 r2
 eqCanRewriteFR (Wanted, _)     (Given, _)       = False
-

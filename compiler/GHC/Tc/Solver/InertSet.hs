@@ -1940,7 +1940,7 @@ solveOneFromTheOther :: Ct  -- Inert    (Dict or Irred)
 -- two wanteds into one by solving one from the other
 
 solveOneFromTheOther ct_i ct_w
-  | CtWanted { ctev_loc = loc_w } <- ev_w
+  | CtWanted {} <- ev_w
   , prohibitedSuperClassSolve loc_i loc_w
   -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
   = -- Inert must be Given
@@ -1976,7 +1976,7 @@ solveOneFromTheOther ct_i ct_w
 
   -- From here on the work-item is Given
 
-  | CtWanted { ctev_loc = loc_i } <- ev_i
+  | CtWanted {} <- ev_i
   , prohibitedSuperClassSolve loc_w loc_i
   = KeepInert   -- Just discard the un-usable Given
                 -- This never actually happens because

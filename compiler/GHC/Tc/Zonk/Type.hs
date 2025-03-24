@@ -2002,9 +2002,9 @@ zonkCtRewriterSet ct
 zonkCtEvRewriterSet :: CtEvidence -> TcM CtEvidence
 zonkCtEvRewriterSet ev@(CtGiven {})
   = return ev
-zonkCtEvRewriterSet ev@(CtWanted { ctev_rewriters = rewriters })
-  = do { rewriters' <- zonkRewriterSet rewriters
-       ; return (ev { ctev_rewriters = rewriters' }) }
+zonkCtEvRewriterSet ev@(CtWanted wtd)
+  = do { rewriters' <- zonkRewriterSet (ctEvRewriters ev)
+       ; return (CtWanted $ setWantedCtEvRewriters wtd rewriters') }
 
 -- | Check whether any coercion hole in a RewriterSet is still unsolved.
 -- Does this by recursively looking through filled coercion holes until

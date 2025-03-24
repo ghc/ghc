@@ -151,15 +151,15 @@ bumpDepth (RewriteM thing_inside)
       ; thing_inside env' }
 
 -- See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
--- Precondition: the CtEvidence is a CtWanted of an equality
-recordRewriter :: CtEvidence -> RewriteM ()
-recordRewriter (CtWanted { ctev_dest = HoleDest hole })
+-- Precondition: the WantedCtEvidence is for an equality constraint
+recordRewriter :: WantedCtEvidence -> RewriteM ()
+recordRewriter (WantedCt { ctev_dest = HoleDest hole })
   = RewriteM $ \env -> updTcRef (re_rewriters env) (`addRewriter` hole)
-recordRewriter other = pprPanic "recordRewriter" (ppr other)
+recordRewriter other =
+  pprPanic "recordRewriter: non-equality constraint" (ppr other)
 
-{-
-Note [Rewriter EqRels]
-~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Rewriter EqRels]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 When rewriting, we need to know which equality relation -- nominal
 or representational -- we should be respecting.  This is controlled
 by the `re_eq_rel` field of RewriteEnv.
@@ -1021,12 +1021,14 @@ rewrite_tyvar2 tv fr@(_, eq_rel)
              | Just ct <- find can_rewrite equal_ct_list
              , EqCt { eq_ev = ctev, eq_lhs = TyVarLHS tv
                     , eq_rhs = rhs_ty, eq_eq_rel = ct_eq_rel } <- ct
-             -> do { let wrw = isWanted ctev
-                   ; traceRewriteM "Following inert tyvar" $
+             -> do { traceRewriteM "Following inert tyvar" $
                         vcat [ ppr tv <+> equals <+> ppr rhs_ty
-                             , ppr ctev
-                             , text "wanted_rewrite_wanted:" <+> ppr wrw ]
-                   ; when wrw $ recordRewriter ctev
+                             , ppr ctev ]
+                   ; case ctev of
+                       CtGiven {} -> return ()
+                       CtWanted wtd ->
+                         -- See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
+                         recordRewriter wtd
 
                    ; let rewriting_co1 = ctEvCoercion ctev
                          rewriting_co  = case (ct_eq_rel, eq_rel) of

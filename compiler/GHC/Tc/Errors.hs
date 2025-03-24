@@ -1,11 +1,11 @@
-
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE ParallelListComp    #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiWayIf            #-}
+{-# LANGUAGE NamedFieldPuns        #-}
+{-# LANGUAGE ParallelListComp      #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TupleSections         #-}
 
 module GHC.Tc.Errors(
        reportUnsolved, reportAllUnsolved, warnAllUnsolved,
@@ -470,7 +470,7 @@ mkErrorItem ct
          -- For this `suppress` stuff
          -- see Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
            CtGiven {} -> return (False, Nothing)
-           CtWanted { ctev_rewriters = rewriters, ctev_dest = dest }
+           CtWanted (WantedCt { ctev_rewriters = rewriters, ctev_dest = dest })
              -> do { rewriters' <- zonkRewriterSet rewriters
                    ; return (not (isEmptyRewriterSet rewriters'), Just dest) }
 
@@ -1550,10 +1550,11 @@ validHoleFits ctxt@(CEC { cec_encl = implics
     mk_wanted :: ErrorItem -> Maybe CtEvidence
     mk_wanted (EI { ei_pred = pred, ei_evdest = m_dest, ei_loc = loc })
       | Just dest <- m_dest
-      = Just (CtWanted { ctev_pred      = pred
-                       , ctev_dest      = dest
-                       , ctev_loc       = loc
-                       , ctev_rewriters = emptyRewriterSet })
+      = Just $ CtWanted $
+          WantedCt { ctev_pred      = pred
+                   , ctev_dest      = dest
+                   , ctev_loc       = loc
+                   , ctev_rewriters = emptyRewriterSet }
       | otherwise
       = Nothing   -- The ErrorItem was a Given
 

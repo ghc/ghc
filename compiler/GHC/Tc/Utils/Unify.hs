@@ -2145,11 +2145,11 @@ uType_defer (UE { u_loc = loc, u_defer = ref
             ty1 ty2  -- ty1 is "actual", ty2 is "expected"
   = do { let pred_ty = mkEqPredRole role ty1 ty2
        ; hole <- newCoercionHole loc pred_ty
-       ; let ct = mkNonCanonical $
-                  CtWanted { ctev_pred      = pred_ty
-                           , ctev_dest      = HoleDest hole
-                           , ctev_loc       = loc
-                           , ctev_rewriters = rewriters }
+       ; let ct = mkNonCanonical $ CtWanted $
+                    WantedCt { ctev_pred      = pred_ty
+                             , ctev_dest      = HoleDest hole
+                             , ctev_loc       = loc
+                             , ctev_rewriters = rewriters }
              co = HoleCo hole
        ; updTcRef ref (`snocBag` ct)
          -- snocBag: see Note [Work-list ordering] in GHC.Tc.Solver.Equality
@@ -3403,11 +3403,11 @@ famAppBreaker (BreakWanted ev lhs_tv) fam_app
 
        ; let pty = mkNomEqPred fam_app new_tv_ty
        ; hole <- TcM.newVanillaCoercionHole pty
-       ; let new_ev = CtWanted { ctev_pred      = pty
+       ; let new_ev = WantedCt { ctev_pred      = pty
                                , ctev_dest      = HoleDest hole
                                , ctev_loc       = cb_loc
                                , ctev_rewriters = ctEvRewriters ev }
-       ; return (PuOK (singleCt (mkNonCanonical new_ev))
+       ; return (PuOK (singleCt (mkNonCanonical $ CtWanted new_ev))
                       (mkReduction (HoleCo hole) new_tv_ty)) } }
   where
     (lhs_tv_info, lhs_tv_lvl) =
@@ -4114,8 +4114,8 @@ makeTypeConcrete occ_fs conc_orig ty =
                       pty = mkEqPredRole Nominal ty' conc_ty
                 ; hole <- newCoercionHoleO orig pty
                 ; loc <- getCtLocM orig (Just KindLevel)
-                ; let ct = mkNonCanonical
-                         $ CtWanted { ctev_pred      = pty
+                ; let ct = mkNonCanonical $ CtWanted
+                         $ WantedCt { ctev_pred      = pty
                                     , ctev_dest      = HoleDest hole
                                     , ctev_loc       = loc
                                     , ctev_rewriters = emptyRewriterSet }

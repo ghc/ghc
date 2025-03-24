@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RankNTypes #-}
@@ -336,10 +337,10 @@ addInertForAll new_qci
 
        -- Update given equalities. C.f updateGivenEqs
        ; tclvl <- getTcLevel
-       ; let pred         = qci_pred new_qci
-             not_equality = isClassPred pred && not (isEqClassPred pred)
+       ; let body_pred    = qci_body new_qci
+             not_equality = isClassPred body_pred && not (isEqClassPred body_pred)
                   -- True <=> definitely not an equality
-                  -- A qci_pred like (f a) might be an equality
+                  -- A qci_body like (f a) might be an equality
 
              ics2 | not_equality = ics1
                   | otherwise    = ics1 { inert_given_eq_lvl = tclvl
@@ -428,7 +429,7 @@ kickOutRewritable ko_spec new_fr
               -- from the cache, too.
             ; let kicked_given_ev_vars = foldr add_one emptyVarSet kicked_out
                   add_one :: Ct -> VarSet -> VarSet
-                  add_one ct vs | CtGiven { ctev_evar = ev_var } <- ctEvidence ct
+                  add_one ct vs | CtGiven (GivenCt { ctev_evar = ev_var }) <- ctEvidence ct
                                 = vs `extendVarSet` ev_var
                                 | otherwise = vs
 
@@ -497,7 +498,7 @@ kickOutAfterFillingCoercionHole hole
          -- True: kick out; False: keep.
     kick_ct ct
       | IrredCt { ir_ev = ev, ir_reason = reason } <- ct
-      , CtWanted { ctev_rewriters = RewriterSet rewriters } <- ev
+      , CtWanted (WantedCt { ctev_rewriters = RewriterSet rewriters }) <- ev
       , NonCanonicalReason ctyeq <- reason
       , ctyeq `cterHasProblem` cteCoercionHole
       , hole `elementOfUniqSet` rewriters
@@ -1859,17 +1860,17 @@ tcInstSkolTyVarsX skol_info subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX skol_inf
 -- Creating and setting evidence variables and CtFlavors
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-data MaybeNew = Fresh CtEvidence | Cached EvExpr
+data MaybeNew = Fresh WantedCtEvidence | Cached EvExpr
 
 isFresh :: MaybeNew -> Bool
 isFresh (Fresh {})  = True
 isFresh (Cached {}) = False
 
-freshGoals :: [MaybeNew] -> [CtEvidence]
+freshGoals :: [MaybeNew] -> [WantedCtEvidence]
 freshGoals mns = [ ctev | Fresh ctev <- mns ]
 
 getEvExpr :: MaybeNew -> EvExpr
-getEvExpr (Fresh ctev) = ctEvExpr ctev
+getEvExpr (Fresh ctev) = ctEvExpr (CtWanted ctev)
 getEvExpr (Cached evt) = evt
 
 setEvBind :: EvBind -> TcS ()
@@ -1936,8 +1937,8 @@ fillCoercionHole hole co
 setEvBindIfWanted :: CtEvidence -> CanonicalEvidence -> EvTerm -> TcS ()
 setEvBindIfWanted ev canonical tm
   = case ev of
-      CtWanted { ctev_dest = dest } -> setWantedEvTerm dest canonical tm
-      _                             -> return ()
+      CtWanted (WantedCt { ctev_dest = dest }) -> setWantedEvTerm dest canonical tm
+      _                                        -> return ()
 
 newTcEvBinds :: TcS EvBindsVar
 newTcEvBinds = wrapTcS TcM.newTcEvBinds
@@ -1948,14 +1949,14 @@ newNoTcEvBinds = wrapTcS TcM.newNoTcEvBinds
 newEvVar :: TcPredType -> TcS EvVar
 newEvVar pred = wrapTcS (TcM.newEvVar pred)
 
-newGivenEvVar :: CtLoc -> (TcPredType, EvTerm) -> TcS CtEvidence
+newGivenEvVar :: CtLoc -> (TcPredType, EvTerm) -> TcS GivenCtEvidence
 -- Make a new variable of the given PredType,
 -- immediately bind it to the given term
 -- and return its CtEvidence
 -- See Note [Bind new Givens immediately] in GHC.Tc.Types.Constraint
 newGivenEvVar loc (pred, rhs)
   = do { new_ev <- newBoundEvVarId pred rhs
-       ; return (CtGiven { ctev_pred = pred, ctev_evar = new_ev, ctev_loc = loc }) }
+       ; return $ GivenCt { ctev_pred = pred, ctev_evar = new_ev, ctev_loc = loc } }
 
 -- | Make a new 'Id' of the given type, bound (in the monad's EvBinds) to the
 -- given term
@@ -1968,31 +1969,31 @@ newBoundEvVarId pred rhs
 emitNewGivens :: CtLoc -> [(Role,TcCoercion)] -> TcS ()
 emitNewGivens loc pts
   = do { traceTcS "emitNewGivens" (ppr pts)
-       ; evs <- mapM (newGivenEvVar loc) $
+       ; gs <- mapM (newGivenEvVar loc) $
                 [ (mkEqPredRole role ty1 ty2, evCoercion co)
                 | (role, co) <- pts
                 , let Pair ty1 ty2 = coercionKind co
                 , not (ty1 `tcEqType` ty2) ] -- Kill reflexive Givens at birth
-       ; emitWorkNC evs }
+       ; emitWorkNC (map CtGiven gs) }
 
 emitNewWantedEq :: CtLoc -> RewriterSet -> Role -> TcType -> TcType -> TcS Coercion
 -- | Emit a new Wanted equality into the work-list
 emitNewWantedEq loc rewriters role ty1 ty2
-  = do { (ev, co) <- newWantedEq loc rewriters role ty1 ty2
-       ; updWorkListTcS (extendWorkListEq rewriters (mkNonCanonical ev))
+  = do { (wtd, co) <- newWantedEq loc rewriters role ty1 ty2
+       ; updWorkListTcS (extendWorkListEq rewriters (mkNonCanonical $ CtWanted wtd))
        ; return co }
 
 -- | Create a new Wanted constraint holding a coercion hole
 -- for an equality between the two types at the given 'Role'.
 newWantedEq :: CtLoc -> RewriterSet -> Role -> TcType -> TcType
-            -> TcS (CtEvidence, Coercion)
+            -> TcS (WantedCtEvidence, Coercion)
 newWantedEq loc rewriters role ty1 ty2
   = do { hole <- wrapTcS $ TcM.newCoercionHole loc pty
-       ; return ( CtWanted { ctev_pred      = pty
-                           , ctev_dest      = HoleDest hole
-                           , ctev_loc       = loc
-                           , ctev_rewriters = rewriters }
-                , mkHoleCo hole ) }
+       ; let wtd = WantedCt { ctev_pred      = pty
+                            , ctev_dest      = HoleDest hole
+                            , ctev_loc       = loc
+                            , ctev_rewriters = rewriters }
+       ; return (wtd, mkHoleCo hole) }
   where
     pty = mkEqPredRole role ty1 ty2
 
@@ -2000,17 +2001,19 @@ newWantedEq loc rewriters role ty1 ty2
 --
 -- Don't use this for equality constraints: use 'newWantedEq' instead.
 newWantedEvVarNC :: CtLoc -> RewriterSet
-                 -> TcPredType -> TcS CtEvidence
+                 -> TcPredType -> TcS WantedCtEvidence
 -- Don't look up in the solved/inerts; we know it's not there
 newWantedEvVarNC loc rewriters pty
   = assertPpr (not (isEqPred pty)) (ppr pty) $
     do { new_ev <- newEvVar pty
        ; traceTcS "Emitting new wanted" (ppr new_ev <+> dcolon <+> ppr pty $$
                                          pprCtLoc loc)
-       ; return (CtWanted { ctev_pred      = pty
-                          , ctev_dest      = EvVarDest new_ev
-                          , ctev_loc       = loc
-                          , ctev_rewriters = rewriters })}
+       ; return $
+           WantedCt { ctev_pred      = pty
+                    , ctev_dest      = EvVarDest new_ev
+                    , ctev_loc       = loc
+                    , ctev_rewriters = rewriters }
+       }
 
 -- | Like 'newWantedEvVarNC', except it might look up in the inert set
 -- to see if an inert already exists, and uses that instead of creating
@@ -2051,7 +2054,7 @@ newWanted loc rewriters pty
 --
 -- Does not attempt to re-use non-equality constraints that already
 -- exist in the inert set.
-newWantedNC :: CtLoc -> RewriterSet -> PredType -> TcS CtEvidence
+newWantedNC :: CtLoc -> RewriterSet -> PredType -> TcS WantedCtEvidence
 newWantedNC loc rewriters pty
   | Just (role, ty1, ty2) <- getEqPredTys_maybe pty
   = fst <$> newWantedEq loc rewriters role ty1 ty2
@@ -2370,7 +2373,7 @@ checkTypeEq ev eq_rel lhs rhs
     ---------------------------
     mk_new_given :: (TcTyVar, TcType) -> TcS Ct
     mk_new_given (new_tv, fam_app)
-      = mkNonCanonical <$> newGivenEvVar cb_loc (given_pred, given_term)
+      = mkNonCanonical . CtGiven <$> newGivenEvVar cb_loc (given_pred, given_term)
       where
         new_ty     = mkTyVarTy new_tv
         given_pred = mkNomEqPred fam_app new_ty

@@ -1,7 +1,8 @@
-{-# LANGUAGE LambdaCase      #-}
-{-# LANGUAGE MultiWayIf      #-}
-{-# LANGUAGE RecursiveDo     #-}
-{-# LANGUAGE TupleSections   #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiWayIf            #-}
+{-# LANGUAGE RecursiveDo           #-}
+{-# LANGUAGE TupleSections         #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-
@@ -203,10 +204,11 @@ newWantedWithLoc loc pty
   = do dst <- case classifyPredType pty of
                 EqPred {} -> HoleDest  <$> newCoercionHole loc pty
                 _         -> EvVarDest <$> newEvVar pty
-       return $ CtWanted { ctev_dest      = dst
-                         , ctev_pred      = pty
-                         , ctev_loc       = loc
-                         , ctev_rewriters = emptyRewriterSet }
+       return $ CtWanted $
+         WantedCt { ctev_dest      = dst
+                  , ctev_pred      = pty
+                  , ctev_loc       = loc
+                  , ctev_rewriters = emptyRewriterSet }
 
 -- | Create a new Wanted constraint with the given 'CtOrigin', and
 -- location information taken from the 'TcM' environment.
@@ -226,10 +228,10 @@ newWanteds orig = mapM (newWanted orig Nothing)
 ----------------------------------------------
 
 cloneWantedCtEv :: CtEvidence -> TcM CtEvidence
-cloneWantedCtEv ctev@(CtWanted { ctev_pred = pty, ctev_dest = HoleDest _, ctev_loc = loc })
+cloneWantedCtEv (CtWanted ctev@(WantedCt { ctev_pred = pty, ctev_dest = HoleDest _, ctev_loc = loc }))
   | isEqPred pty
   = do { co_hole <- newCoercionHole loc pty
-       ; return (ctev { ctev_dest = HoleDest co_hole }) }
+       ; return $ CtWanted (ctev { ctev_dest = HoleDest co_hole }) }
   | otherwise
   = pprPanic "cloneWantedCtEv" (ppr pty)
 cloneWantedCtEv ctev = return ctev
@@ -278,11 +280,11 @@ emitWantedEq :: CtOrigin -> TypeOrKind -> Role -> TcType -> TcType -> TcM Coerci
 emitWantedEq origin t_or_k role ty1 ty2
   = do { hole <- newCoercionHoleO origin pty
        ; loc  <- getCtLocM origin (Just t_or_k)
-       ; emitSimple $ mkNonCanonical $
-         CtWanted { ctev_pred      = pty
-                  , ctev_dest      = HoleDest hole
-                  , ctev_loc       = loc
-                  , ctev_rewriters = emptyRewriterSet }
+       ; emitSimple $ mkNonCanonical $ CtWanted $
+           WantedCt { ctev_pred      = pty
+                    , ctev_dest      = HoleDest hole
+                    , ctev_loc       = loc
+                    , ctev_rewriters = emptyRewriterSet }
        ; return (HoleCo hole) }
   where
     pty = mkEqPredRole role ty1 ty2
@@ -293,11 +295,11 @@ emitWantedEvVar :: CtOrigin -> TcPredType -> TcM EvVar
 emitWantedEvVar origin ty
   = do { new_cv <- newEvVar ty
        ; loc <- getCtLocM origin Nothing
-       ; let ctev = CtWanted { ctev_pred      = ty
+       ; let ctev = WantedCt { ctev_pred      = ty
                              , ctev_dest      = EvVarDest new_cv
                              , ctev_loc       = loc
                              , ctev_rewriters = emptyRewriterSet }
-       ; emitSimple $ mkNonCanonical ctev
+       ; emitSimple $ mkNonCanonical $ CtWanted ctev
        ; return new_cv }
 
 emitWantedEvVars :: CtOrigin -> [TcPredType] -> TcM [EvVar]

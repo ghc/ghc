@@ -1084,7 +1084,7 @@ getDictionaryBindings theta = do
   let dict_var = mkVanillaGlobal dictName theta
   loc <- getCtLocM (GivenOrigin (getSkolemInfo unkSkol)) Nothing
 
-  return CtWanted {
+  return $ CtWanted $ WantedCt {
     ctev_pred = varType dict_var,
     ctev_dest = EvVarDest dict_var,
     ctev_loc = loc,

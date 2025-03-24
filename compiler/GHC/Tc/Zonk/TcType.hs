@@ -1,4 +1,3 @@
-
 {-
 (c) The University of Glasgow 2006
 (c) The AQUA Project, Glasgow University, 1996-1998
@@ -496,8 +495,7 @@ zonkCt ct
 
 zonkCtEvidence :: CtEvidence -> ZonkM CtEvidence
 zonkCtEvidence ctev
-  = do { let pred = ctev_pred ctev
-       ; pred' <- zonkTcType pred
+  = do { pred' <- zonkTcType (ctEvPred ctev)
        ; return (setCtEvPredType ctev pred') }
 
 zonkSkolemInfo :: SkolemInfo -> ZonkM SkolemInfo
@@ -661,7 +659,7 @@ tidyCtEvidence :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evar field because we don't
      --     show it in error messages
 tidyCtEvidence env ctev
-  = ctev { ctev_pred = tidyOpenType env $ ctev_pred ctev }
+  = setCtEvPredType ctev (tidyOpenType env (ctEvPred ctev))
   -- tidyOpenType: for (beta ~ (forall a. a->a), don't gratuitously
   -- rename the 'forall a' just because of an 'a' in scope somewhere
   -- else entirely.

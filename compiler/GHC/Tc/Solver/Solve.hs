@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecursiveDo #-}
 
@@ -1225,15 +1226,15 @@ solveForAll ev tvs theta body_pred fuel =
       -- See Note [Solving a Given forall-constraint]
       do { addInertForAll qci
          ; stopWith ev "Given forall-constraint" }
-    CtWanted {} ->
+    CtWanted wtd ->
       -- See Note [Solving a Wanted forall-constraint]
       runSolverStage $
       do { tryInertQCs qci
-         ; Stage $ solveWantedForAll_implic ev tvs theta body_pred
+         ; Stage $ solveWantedForAll_implic wtd tvs theta body_pred
          }
   where
     qci = QCI { qci_ev = ev, qci_tvs = tvs
-              , qci_pred = body_pred, qci_pend_sc = fuel }
+              , qci_body = body_pred, qci_pend_sc = fuel }
 
 
 tryInertQCs :: QCInst -> SolverStage ()
@@ -1260,15 +1261,15 @@ try_inert_qcs (QCI { qci_ev = ev_w }) inerts =
 -- | Solve a (canonical) Wanted quantified constraint by emitting an implication.
 --
 -- See Note [Solving a Wanted forall-constraint]
-solveWantedForAll_implic :: CtEvidence -> [TcTyVar] -> TcThetaType -> PredType -> TcS (StopOrContinue Void)
+solveWantedForAll_implic :: WantedCtEvidence -> [TcTyVar] -> TcThetaType -> PredType -> TcS (StopOrContinue Void)
 solveWantedForAll_implic
-  ev@(CtWanted { ctev_dest = dest, ctev_loc = loc, ctev_rewriters = rewriters })
+  wtd@(WantedCt { ctev_dest = dest, ctev_loc = loc, ctev_rewriters = rewriters })
   tvs theta body_pred =
     -- We are about to do something irreversible (turning a quantified constraint
     -- into an implication), so wrap the inner call in solveCompletelyIfRequired
     -- to ensure we can roll back if we can't solve the implication fully.
     -- See Note [TcSSpecPrag] in GHC.Tc.Solver.Monad.
-    solveCompletelyIfRequired (mkNonCanonical ev) $
+    solveCompletelyIfRequired (mkNonCanonical $ CtWanted wtd) $
 
     -- This setSrcSpan is important: the emitImplicationTcS uses that
     -- TcLclEnv for the implication, and that in turn sets the location
@@ -1296,8 +1297,8 @@ solveWantedForAll_implic
                          -- See (QC-INV) in Note [Solving a Wanted forall-constraint]
                    ; wanted_ev <- newWantedNC loc' rewriters inst_pred
                          -- NB: inst_pred can be an equality
-                   ; return ( ctEvEvId wanted_ev
-                            , unitBag (mkNonCanonical wanted_ev)) }
+                   ; return ( wantedCtEvEvId wanted_ev
+                            , unitBag (mkNonCanonical $ CtWanted wanted_ev)) }
 
       ; traceTcS "solveForAll" (ppr given_ev_vars $$ ppr wanteds $$ ppr w_id)
       ; ev_binds <- emitImplicationTcS lvl skol_info_anon skol_tvs given_ev_vars wanteds
@@ -1306,7 +1307,7 @@ solveWantedForAll_implic
         EvFun { et_tvs = skol_tvs, et_given = given_ev_vars
               , et_binds = ev_binds, et_body = w_id }
 
-      ; stopWith ev "Wanted forall-constraint (implication)"
+      ; stopWith (CtWanted wtd) "Wanted forall-constraint (implication)"
       }
   where
     -- Getting the size of the head is a bit horrible
@@ -1314,8 +1315,6 @@ solveWantedForAll_implic
     get_size pred = case classifyPredType pred of
                       ClassPred cls tys -> pSizeClassPred cls tys
                       _                 -> pSizeType pred
-solveWantedForAll_implic (CtGiven {}) _ _ _ =
-  panic "solveWantedForAll_implic: CtGiven"
 
 {- Note [Solving a Wanted forall-constraint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1450,33 +1449,35 @@ finish_rewrite old_ev (Reduction co new_pred) rewriters
   = assert (isEmptyRewriterSet rewriters) $
     continueWith (setCtEvPredType old_ev new_pred)
 
-finish_rewrite ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc })
-                (Reduction co new_pred) rewriters
+finish_rewrite
+  ev@(CtGiven (GivenCt { ctev_evar = old_evar }))
+  (Reduction co new_pred)
+  rewriters
   = assert (isEmptyRewriterSet rewriters) $ -- this is a Given, not a wanted
-    do { new_ev <- newGivenEvVar loc (new_pred, new_tm)
-       ; continueWith new_ev }
-  where
-    -- mkEvCast optimises ReflCo
-    ev_rw_role = ctEvRewriteRole ev
-    new_tm = assert (coercionRole co == ev_rw_role)
-             mkEvCast (evId old_evar)
-                (downgradeRole Representational ev_rw_role co)
+    do { let loc = ctEvLoc ev
+             -- mkEvCast optimises ReflCo
+             ev_rw_role = ctEvRewriteRole ev
+             new_tm = assert (coercionRole co == ev_rw_role)
+                      mkEvCast (evId old_evar)
+                         (downgradeRole Representational ev_rw_role co)
+       ; new_ev <- newGivenEvVar loc (new_pred, new_tm)
+       ; continueWith $ CtGiven new_ev }
 
-finish_rewrite ev@(CtWanted { ctev_dest = dest
-                             , ctev_loc = loc
-                             , ctev_rewriters = rewriters })
-                (Reduction co new_pred) new_rewriters
-  = do { mb_new_ev <- newWanted loc rewriters' new_pred
-       ; let ev_rw_role = ctEvRewriteRole ev
+finish_rewrite
+  ev@(CtWanted (WantedCt { ctev_rewriters = rewriters, ctev_dest = dest }))
+  (Reduction co new_pred)
+  new_rewriters
+  = do { let loc = ctEvLoc ev
+             rewriters' = rewriters S.<> new_rewriters
+             ev_rw_role = ctEvRewriteRole ev
+       ; mb_new_ev <- newWanted loc rewriters' new_pred
        ; massert (coercionRole co == ev_rw_role)
        ; setWantedEvTerm dest EvCanonical $
             mkEvCast (getEvExpr mb_new_ev)
                      (downgradeRole Representational ev_rw_role (mkSymCo co))
        ; case mb_new_ev of
-            Fresh  new_ev -> continueWith new_ev
+            Fresh  new_ev -> continueWith $ CtWanted new_ev
             Cached _      -> stopWith ev "Cached wanted" }
-  where
-    rewriters' = rewriters S.<> new_rewriters
 
 {- *******************************************************************
 *                                                                    *
@@ -1544,7 +1545,7 @@ runTcPluginsWanted wc@(WC { wc_simple = simples1 })
   where
     setEv :: (EvTerm,Ct) -> TcS ()
     setEv (ev,ct) = case ctEvidence ct of
-      CtWanted { ctev_dest = dest } -> setWantedEvTerm dest EvCanonical ev
+      CtWanted (WantedCt { ctev_dest = dest }) -> setWantedEvTerm dest EvCanonical ev
            -- TODO: plugins should be able to signal non-canonicity
       _ -> panic "runTcPluginsWanted.setEv: attempt to solve non-wanted!"
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE MultiWayIf #-}
 
 module GHC.Tc.Solver.Default(
@@ -258,9 +259,9 @@ solveImplicationUsingUnsatGiven
            ; return $ wc { wc_simple = emptyBag, wc_impl = impls } }
     go_simple :: Ct -> TcS ()
     go_simple ct = case ctEvidence ct of
-      CtWanted { ctev_pred = pty, ctev_dest = dst }
+      CtWanted (WantedCt { ctev_pred = pty, ctev_dest = dest })
         -> do { ev_expr <- unsatisfiableEvExpr unsat_given pty
-              ; setWantedEvTerm dst EvNonCanonical $ EvExpr ev_expr }
+              ; setWantedEvTerm dest EvNonCanonical $ EvExpr ev_expr }
       _ -> return ()
 
 -- | Create an evidence expression for an arbitrary constraint using
@@ -1063,14 +1064,16 @@ tryDefaultGroup wanteds (Proposal assignments)
           = do { lcl_env <- TcS.getLclEnv
                ; tc_lvl <- TcS.getTcLevel
                ; let loc = mkGivenLoc tc_lvl (getSkolemInfo unkSkol) (mkCtLocEnv lcl_env)
-               -- Equality constraints are possible due to type defaulting plugins
-               ; wanted_evs <- sequence [ newWantedNC loc rewriters pred'
-                                        | wanted <- wanteds
-                                        , CtWanted { ctev_pred = pred
-                                                   , ctev_rewriters = rewriters }
-                                            <- return (ctEvidence wanted)
-                                        , let pred' = substTy subst pred ]
-               ; residual_wc <- solveSimpleWanteds $ listToBag $ map mkNonCanonical wanted_evs
+                     new_wtd_ct :: WantedCtEvidence -> TcS Ct
+                     new_wtd_ct (WantedCt { ctev_pred = wtd_pred, ctev_rewriters = rws }) =
+                       mkNonCanonical . CtWanted <$>
+                         -- NB: equality constraints are possible,
+                         -- due to type defaulting plugins
+                         newWantedNC loc rws (substTy subst wtd_pred)
+               ; new_wanteds <- sequence [ new_wtd_ct wtd
+                                         | CtWanted wtd <- map ctEvidence wanteds
+                                         ]
+               ; residual_wc <- solveSimpleWanteds (listToBag new_wanteds)
                ; return $ if isEmptyWC residual_wc then Just (tvs, subst) else Nothing }
 
           | otherwise

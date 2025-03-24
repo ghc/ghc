@@ -1,4 +1,5 @@
 
+{-# LANGUAGE DuplicateRecordFields    #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TypeFamilies             #-}
@@ -221,7 +222,8 @@ check_inst sig_inst@(ClsInst { is_dfun = dfun_id }) = do
     (tclvl,cts) <- pushTcLevelM $ do
        given_ids <- mapM newEvVar inst_theta
        let given_loc = mkGivenLoc topTcLevel skol_info (mkCtLocEnv lcl_env)
-           givens = [ CtGiven { ctev_pred = idType given_id
+           givens = [ CtGiven $
+                      GivenCt { ctev_pred = idType given_id
                               -- Doesn't matter, make something up
                               , ctev_evar = given_id
                               , ctev_loc  = given_loc  }
