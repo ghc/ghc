@@ -649,9 +649,11 @@ of the target constraint (C ty1 .. tyn). The search works like this.
 (IL4) If all the remaining candidates are *incoherent*, the search succeeds,
       returning an arbitrary surviving candidate.
 
-      If any coherent or non-canonical incoherent unifiers were discarded,
+      If the selected candidate was non-canonical and any coherent or
+      non-canonical incoherent unifiers were discarded,
       return NoUnifiers EvNonCanonical; if only canonical incoherent unifiers
-      were discarded, return NoUnifiers EvCanonical
+      were discarded or the selected candidate was canonical,
+      return NoUnifiers EvCanonical.
 
 (IL5) If more than one non-*incoherent* candidate remains, the search
       fails.  Otherwise there is exactly one non-*incoherent*
@@ -1230,9 +1232,13 @@ lookupInstEnv check_overlap_safe
                     (m:ms) | isIncoherent (fst m)
                            -- Incoherent match, so discard all unifiers, but
                            -- keep track of dropping coherent or non-canonical ones
+                           -- if the match is non-canonical
                            -> assertPpr (null ms) (ppr final_matches) $
                               case all_unifs of
-                                OneOrMoreUnifiers{} -> NoUnifiers EvNonCanonical
+                                OneOrMoreUnifiers{} -> NoUnifiers $
+                                    if isNonCanonical (fst m)
+                                    then EvNonCanonical
+                                    else EvCanonical
                                 NoUnifiers{}        -> all_unifs
                     _      -> all_unifs
 
