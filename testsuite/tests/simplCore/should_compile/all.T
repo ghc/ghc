@@ -536,3 +536,8 @@ test('T25197', [req_th, extra_files(["T25197_TH.hs"]), only_ways(['optasm'])], m
 test('T25389', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
 test('T24359a', normal, compile, ['-O -ddump-rules'])
 test('T25713', [grep_errmsg('W:::')], compile, ['-O -ddump-simpl'])
+
+test('T25883', normal, compile_grep_core, [''])
+test('T25883b', normal, compile_grep_core, [''])
+test('T25883c', normal, compile_grep_core, [''])
+test('T25883d', [extra_files(['T25883d_import.hs'])], multimod_compile_filter, ['T25883d', '-O -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques', r'grep -e "y ="'])
