@@ -531,3 +531,8 @@ test('T24725a', [ grep_errmsg(r'testedRule')], compile, ['-O -ddump-rule-firings
 test('T25033', normal, compile, ['-O'])
 test('T25160', normal, compile, ['-O -ddump-rules'])
 test('T25197', [req_th, extra_files(["T25197_TH.hs"]), only_ways(['optasm'])], multimod_compile, ['T25197', '-O2 -v0'])
+
+test('T25883', normal, compile_grep_core, [''])
+test('T25883b', normal, compile_grep_core, [''])
+test('T25883c', normal, compile_grep_core, [''])
+test('T25883d', [extra_files(['T25883d_import.hs'])], multimod_compile_filter, ['T25883d', '-O -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques', r'grep -e "y ="'])
