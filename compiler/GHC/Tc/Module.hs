@@ -2881,7 +2881,7 @@ tcRnLookupRdrName hsc_env (L loc rdr_name)
          let rdr_names = dataTcOccs rdr_name
        ; names_s <- mapM lookupInfoOccRn rdr_names
        ; let names = concat names_s
-       ; when (null names) (addErrTc $ mkTcRnNotInScope rdr_name NotInScope)
+       ; when (null names) (addErrTc $ TcRnNotInScope NotInScope rdr_name)
        ; return names }
 
 tcRnLookupName :: HscEnv -> Name -> IO (Messages TcRnMessage, Maybe TyThing)

@@ -655,7 +655,7 @@ rnHsTyKi env (XHsType (HsCoreTy ty))
       when (isNothing mb_name) $
         addErr $
           TcRnWithHsDocContext (rtke_ctxt env) $
-            TcRnNotInScope (notInScopeErr WL_LocalOnly rdr_name) rdr_name [] noHints
+            TcRnNotInScope (notInScopeErr WL_LocalOnly rdr_name) rdr_name
 
 rnHsTyKi env ty@(XHsType (HsBangTy _ bang (L _ inner))) = do
   -- While top-level bangs at this point are eliminated (eg !(Maybe Int)),
