@@ -1526,9 +1526,9 @@ There are a number of wrinkles
     and it'd add another case for (UCM4) to spot.
 
 (UCM6) In the constraint solver, when constructing evidence for a unary class
-    (e.g. implicit parameters, withDict) be careful to
-    - use the data constructor to build it: see `evDictApp`, `evUnaryDictAppE`
-    - use the class op to take it apart: see `evUnwrapIP`
+    (e.g. implicit parameters, withDict) be careful to use
+    - the data constructor to build it: see `evDictApp`, `evUnaryDictAppE`
+    - the class op to take it apart: see `evUnwrapIP`
 
 (UCM7) You might worry about
            class UC1 a where { op :: Int# }    -- Single uboxed field
