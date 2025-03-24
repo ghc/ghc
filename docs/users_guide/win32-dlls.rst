@@ -76,11 +76,6 @@ window, use the flag ``-optl-mwindows`` in the link step.
    However using Debug.Trace.trace is alright because it uses Windows
    debugging output support rather than ``stderr``.
 
-For some reason, Mingw ships with the ``readline`` library, but not with
-the ``readline`` headers. As a result, GHC (like Hugs) does not use
-``readline`` for interactive input on Windows. You can get a close
-simulation by using an emacs shell buffer!
-
 .. _library-differences:
 
 Differences in library behaviour
