@@ -17,21 +17,16 @@ module State
     arg_arity,
 
     getPpState, setPpState,
+    AcceptingResult(..),
     getAccepting,
-    -- getAccepting',
     setAccepting,
-    -- setAccepting',
     pushAccepting,
-    -- pushAccepting', -- via cppIf
     popAccepting,
-    -- popScope',
 
     pushContinuation,
     popContinuation,
     ppDefine,
     ppIsDefined,
-    -- ppIsDefined',
-    -- addDefine',
     getCppState,
     ghcCppEnabled
   ) where
@@ -70,6 +65,7 @@ initPpState =
         , pp_continuation = []
         , pp_defines = Map.empty
         , pp_scope = (PpScope True) :| []
+        , pp_alr_state = Nothing
         }
 
 data PpState = PpState
@@ -78,8 +74,8 @@ data PpState = PpState
     , pp_continuation :: ![Located Lexer.Token]
     , pp_defines :: !MacroDefines
     , pp_scope :: !(NonEmpty PpScope)
+    , pp_alr_state :: Maybe Lexer.PSavedAlrState
     }
-    deriving (Show)
 
 data PpScope = PpScope
     { pp_accepting :: !Bool
@@ -142,6 +138,12 @@ data CompOp
     | CmpLtE
     deriving (Show, Eq)
 
+data AcceptingResult
+    = ArNoChange
+    | ArNowAccepting
+    | ArNowIgnoring
+    deriving (Show, Eq)
+
 -- ---------------------------------------------------------------------
 -- Preprocessor state functions
 
@@ -154,29 +156,44 @@ getCppState = do
 
 -- pp_scope stack start -----------------
 
-setAccepting :: Bool -> PP ()
+setAccepting :: Bool -> PP AcceptingResult
 setAccepting on = do
   PpScope parent <- parentScope
   setScope (PpScope (parent && on))
+  return $ acceptingStateChange parent (parent && on)
 
 getAccepting :: PP Bool
 getAccepting = P $ \s -> POk s (pp_accepting (NonEmpty.head $ pp_scope (pp s)))
 
 -- Start a new scope, ensuring it is consistent with the existing one
-pushAccepting :: Bool -> PP ()
+pushAccepting :: Bool -> PP AcceptingResult
 pushAccepting on = do
   PpScope current <- getScope
   pushScope (PpScope (current && on))
+  return $ acceptingStateChange current (current && on)
 
-popAccepting :: PP ()
+-- Have we just changed the accepting state?
+acceptingStateChange :: Bool -> Bool -> AcceptingResult
+acceptingStateChange old new =
+  case (old, new) of
+    (True, False) -> ArNowIgnoring
+    (False, True) -> ArNowAccepting
+    _             -> ArNoChange
+
+popAccepting :: PP AcceptingResult
 popAccepting =
     P $ \s ->
         let
+            old_scope = scopeValue $ pp_scope (pp s)
             new_scope = case pp_scope (pp s) of
                 c :| [] -> c :| []
                 _ :| (h : t) -> h :| t
          in
-            POk s{pp = (pp s){pp_scope = new_scope}} ()
+            POk s{pp = (pp s){pp_scope = new_scope}}
+                (acceptingStateChange old_scope (scopeValue new_scope))
+
+scopeValue :: NonEmpty PpScope -> Bool
+scopeValue s =  pp_accepting $ NonEmpty.head s
 
 -- Deal with the mechanics of pushing a pre-calculated scope
 pushScope :: PpScope -> PP ()
