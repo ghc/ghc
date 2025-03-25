@@ -406,6 +406,13 @@ data DynFlags = DynFlags {
 
   ghciHistSize          :: Int,
 
+  -- wasm ghci browser mode
+  ghciBrowserHost                  :: !String,
+  ghciBrowserPort                  :: !Int,
+  ghciBrowserPuppeteerLaunchOpts   :: !(Maybe String),
+  ghciBrowserPlaywrightBrowserType :: !(Maybe String),
+  ghciBrowserPlaywrightLaunchOpts  :: !(Maybe String),
+
   flushOut              :: FlushOut,
 
   ghcVersionFile        :: Maybe FilePath,
@@ -690,6 +697,12 @@ defaultDynFlags mySettings =
         -- 333 is fairly arbitrary, see Note [Forcing specialisation]:FS5
 
         ghciHistSize = 50, -- keep a log of length 50 by default
+
+        ghciBrowserHost = "127.0.0.1",
+        ghciBrowserPort = 0,
+        ghciBrowserPuppeteerLaunchOpts = Nothing,
+        ghciBrowserPlaywrightBrowserType = Nothing,
+        ghciBrowserPlaywrightLaunchOpts = Nothing,
 
         flushOut = defaultFlushOut,
         pprUserLength = 5,

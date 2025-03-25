@@ -1834,6 +1834,19 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d {maxForcedSpecArgs = n}))
   , make_ord_flag defGhciFlag "fghci-hist-size"
       (intSuffix (\n d -> d {ghciHistSize = n}))
+
+  -- wasm ghci browser mode
+  , make_ord_flag defGhciFlag "fghci-browser-host"
+      $ hasArg $ \f d -> d { ghciBrowserHost = f }
+  , make_ord_flag defGhciFlag "fghci-browser-port"
+      $ intSuffix $ \n d -> d { ghciBrowserPort = n }
+  , make_ord_flag defGhciFlag "fghci-browser-puppeteer-launch-opts"
+      $ hasArg $ \f d -> d { ghciBrowserPuppeteerLaunchOpts = Just f }
+  , make_ord_flag defGhciFlag "fghci-browser-playwright-browser-type"
+      $ hasArg $ \f d -> d { ghciBrowserPlaywrightBrowserType = Just f }
+  , make_ord_flag defGhciFlag "fghci-browser-playwright-launch-opts"
+      $ hasArg $ \f d -> d { ghciBrowserPlaywrightLaunchOpts = Just f }
+
   , make_ord_flag defGhcFlag "fmax-inline-alloc-size"
       (intSuffix (\n d -> d { maxInlineAllocSize = n }))
   , make_ord_flag defGhcFlag "fmax-inline-memcpy-insns"
@@ -2469,6 +2482,11 @@ fFlagsDeps = [
   flagGhciSpec "local-ghci-history"           Opt_LocalGhciHistory,
   flagGhciSpec "no-it"                        Opt_NoIt,
   flagSpec "ghci-sandbox"                     Opt_GhciSandbox,
+
+  -- wasm ghci browser mode
+  flagGhciSpec "ghci-browser"                 Opt_GhciBrowser,
+  flagGhciSpec "ghci-browser-redirect-wasi-console" Opt_GhciBrowserRedirectWasiConsole,
+
   flagSpec "helpful-errors"                   Opt_HelpfulErrors,
   flagSpec "hpc"                              Opt_Hpc,
   flagSpec "ignore-asserts"                   Opt_IgnoreAsserts,

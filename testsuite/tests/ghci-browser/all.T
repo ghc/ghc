@@ -61,14 +61,14 @@ async def ghci_browser(name_with_browser, way):
 
   if browser == "firefox":
     o = ghc_env["FIREFOX_LAUNCH_OPTS"]
-    env_flags = f"GHCI_BROWSER=1 GHCI_BROWSER_PUPPETEER_LAUNCH_OPTS='{o}'"
+    browser_flags = f"-fghci-browser -fghci-browser-puppeteer-launch-opts='{o}'"
   elif browser == "chrome":
     o = ghc_env["CHROME_LAUNCH_OPTS"]
-    env_flags = f"GHCI_BROWSER=1 GHCI_BROWSER_PUPPETEER_LAUNCH_OPTS='{o}'"
+    browser_flags = f"-fghci-browser -fghci-browser-puppeteer-launch-opts='{o}'"
   else:
     assert browser == "webkit"
     o = ghc_env["WEBKIT_LAUNCH_OPTS"]
-    env_flags = f"GHCI_BROWSER=1 GHCI_BROWSER_PLAYWRIGHT_BROWSER_TYPE=webkit GHCI_BROWSER_PLAYWRIGHT_LAUNCH_OPTS='{o}'"
+    browser_flags = f"-fghci-browser -fghci-browser-playwright-browser-type=webkit -fghci-browser-playwright-launch-opts='{o}'"
 
   # ghci_script formats the command then calls simple_run. simple_run
   # formats the command then calls runCmdPerf. runCmdPerf formats the
@@ -78,8 +78,8 @@ async def ghci_browser(name_with_browser, way):
   # payload to survive how many layers of pure insanity.
   cmd = (
     f"cd '{opts.testdir}' && "
-    + env_flags.replace("{", "{{").replace("}", "}}")
     + f" {{compiler}} {way_flags} {flags} {opts.extra_run_opts}"
+    + browser_flags.replace("{", "{{").replace("}", "}}")
   )
 
   exit_code = await runCmd(

@@ -124,13 +124,19 @@ your wasm backend installation is supplied by ``ghc-wasm-meta``, the
 right ``node`` installation and ``NODE_PATH`` with all the optional
 npm dependencies are automatically provided out of the box.
 
-To get started with the browser mode, set the ``GHCI_BROWSER``
-environment variable:
+To start GHCi with the browser mode, use the following GHC flag:
+
+.. ghc-flag:: -fghci-browser
+    :shortdesc: Enable wasm ghci browser mode.
+    :type: dynamic
+
+    :default: off
+
+    Enable wasm ghci browser mode, see :ref:`wasm-ghci`.
 
 ::
 
-   $ export GHCI_BROWSER=1
-   $ wasm32-wasi-ghc --interactive
+   $ wasm32-wasi-ghc --interactive -fghci-browser
    GHCi, version 9.13.20250320: https://www.haskell.org/ghc/  :? for help
    Open http://127.0.0.1:37517/main.html or import http://127.0.0.1:37517/main.js to boot ghci
 
@@ -164,21 +170,41 @@ GHCi browser mode:
   prompt, the messages are written to the F12 devtools console in a
   line-buffered manner.
 
-There are other options that can be specified as environment variables:
+See below for other optional GHC flags of wasm ghci browser mode:
 
-- ``GHCI_BROWSER_HOST``: specify the host address that the ``dyld`` HTTP
-  server should bind to, supports IPv4/IPv6. Defaults to ``127.0.0.1``.
-  Be careful when changing it and exposing the ``dyld`` HTTP server to
-  other networks, some endpoints of the server allow downloading files
-  from the host filesystem!
-- ``GHCI_BROWSER_PORT``: specify the port that the ``dyld`` HTTP server
-  should listen on. Defaults to a random idle port.
-- ``GHCI_BROWSER_REDIRECT_WASI_CONSOLE``: if set to ``1``, the wasi
-  stdout/stderr output messages are redirected back to the host GHCi
-  terminal instead of outputing to the F12 devtools console. The main
-  intended use case is mobile browsers which likely don’t have F12
-  devtools readily available. Also note that this only redirects wasi
-  console messages, not ``console.log`` invocations in the browser.
+.. ghc-flag:: -fghci-browser-host
+    :shortdesc: Wasm ghci browser mode host address.
+    :type: dynamic
+
+    :default: ``127.0.0.1``
+
+    Specify the host address that the ``dyld`` HTTP server should bind
+    to, supports IPv4/IPv6. Defaults to ``127.0.0.1``. Be careful when
+    changing it and exposing the ``dyld`` HTTP server to other
+    networks, some endpoints of the server allow downloading files
+    from the host filesystem!
+
+.. ghc-flag:: -fghci-browser-port
+    :shortdesc: Wasm ghci browser mode host port.
+    :type: dynamic
+
+    :default: ``0``
+
+    Specify the port that the ``dyld`` HTTP server should listen on.
+    Defaults to a random idle port.
+
+.. ghc-flag:: -fghci-browser-redirect-wasi-console
+    :shortdesc: Redirect wasi console stdout/stderr back to host ghci.
+    :type: dynamic
+
+    :default: off
+
+    If this flag is on, the wasi stdout/stderr output messages are
+    redirected back to the host GHCi terminal instead of outputing to
+    the F12 devtools console. The main intended use case is mobile
+    browsers which likely don’t have F12 devtools readily available.
+    Also note that this only redirects wasi console messages, not
+    ``console.log`` invocations in the browser.
 
 For testing purposes, there is also support for using
 `Puppeteer <https://pptr.dev>`__ or
@@ -188,15 +214,26 @@ dependencies need to be supplied via ``NODE_PATH``, either
 ``puppeteer``/``puppeteer-core`` or ``playwright``/``playwright-core``,
 then the following options can be used:
 
-- ``GHCI_BROWSER_PUPPETEER_LAUNCH_OPTS``: JSON-formatted arguments to
-  be passed to `puppeteer.launch()
-  <https://pptr.dev/api/puppeteer.puppeteernode.launch>`__.
-- ``GHCI_BROWSER_PLAYWRIGHT_BROWSER_TYPE``: one of
-  ``chromium``/``firefox``/``webkit``, the kind of browser to be
-  launched by ``playwright``.
-- ``GHCI_BROWSER_PLAYWRIGHT_LAUNCH_OPTS``: optional, JSON-formatted
-  arguments to be passed to `browser.launch()
-  <https://playwright.dev/docs/api/class-browsertype#browser-type-launch>`__.
+.. ghc-flag:: -fghci-browser-puppeteer-launch-opts
+    :shortdesc: puppeteer.launch() options.
+    :type: dynamic
+
+    JSON-formatted options to be passed to `puppeteer.launch()
+    <https://pptr.dev/api/puppeteer.puppeteernode.launch>`__.
+
+.. ghc-flag:: -fghci-browser-playwright-browser-type
+    :shortdesc: Playwright browser type.
+    :type: dynamic
+
+    One of ``chromium``/``firefox``/``webkit``, the type of browser to
+    be launched by ``playwright``.
+
+.. ghc-flag:: -fghci-browser-playwright-launch-opts
+    :shortdesc: Playwright browser.launch() options.
+    :type: dynamic
+
+    Optional, JSON-formatted options to be passed to `browser.launch()
+    <https://playwright.dev/docs/api/class-browsertype#browser-type-launch>`__.
 
 .. _wasm-jsffi:
 

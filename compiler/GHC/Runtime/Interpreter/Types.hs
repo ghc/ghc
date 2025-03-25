@@ -190,6 +190,16 @@ data WasmInterpConfig = WasmInterpConfig
   { wasmInterpDyLD           :: !FilePath  -- ^ Location of dyld.mjs script
   , wasmInterpLibDir         ::  FilePath  -- ^ wasi-sdk sysroot libdir containing libc.so, etc
   , wasmInterpOpts           :: ![String]  -- ^ Additional command line arguments for iserv
+
+  -- wasm ghci browser mode
+  , wasmInterpBrowser                      :: !Bool
+  , wasmInterpBrowserHost                  :: !String
+  , wasmInterpBrowserPort                  :: !Int
+  , wasmInterpBrowserRedirectWasiConsole   :: !Bool
+  , wasmInterpBrowserPuppeteerLaunchOpts   :: !(Maybe String)
+  , wasmInterpBrowserPlaywrightBrowserType :: !(Maybe String)
+  , wasmInterpBrowserPlaywrightLaunchOpts  :: !(Maybe String)
+
   , wasmInterpTargetPlatform :: !Platform
   , wasmInterpProfiled       :: !Bool      -- ^ Are we profiling yet?
   , wasmInterpHsSoSuffix     :: !String    -- ^ Shared lib filename common suffix sans .so, e.g. p-ghc9.13.20241001

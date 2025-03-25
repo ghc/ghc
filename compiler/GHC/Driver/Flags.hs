@@ -748,6 +748,11 @@ data GeneralFlag
    | Opt_ValidateHie
    | Opt_LocalGhciHistory
    | Opt_NoIt
+
+   -- wasm ghci browser mode
+   | Opt_GhciBrowser
+   | Opt_GhciBrowserRedirectWasiConsole
+
    | Opt_HelpfulErrors
    | Opt_DeferTypeErrors             -- Since 7.6
    | Opt_DeferTypedHoles             -- Since 7.10
