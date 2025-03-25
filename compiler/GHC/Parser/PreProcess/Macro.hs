@@ -46,7 +46,7 @@ import GHC.Prelude
 -- ---------------------------------------------------------------------
 
 --    We evaluate to an Int, which we convert to a bool
-cppIf :: String -> PP ()
+cppIf :: String -> PP AcceptingResult
 cppIf str = do
   s <- getPpState
   let

@@ -252,23 +252,38 @@ processCpp fs = do
                 Right (CppDefine name args def) -> do
                     ppDefine (MacroName name args) def
                 Right (CppIf cond) -> do
-                    cppIf cond
+                    ar <- cppIf cond
+                    acceptStateChange ar
                 Right (CppIfdef name) -> do
                     defined <- ppIsDefined (MacroName name Nothing)
-                    pushAccepting defined
+                    ar <- pushAccepting defined
+                    acceptStateChange ar
                 Right (CppIfndef name) -> do
                     defined <- ppIsDefined (MacroName name Nothing)
-                    pushAccepting (not defined)
+                    ar <- pushAccepting (not defined)
+                    acceptStateChange ar
                 Right CppElse -> do
                     accepting <- getAccepting
-                    setAccepting (not accepting)
+                    ar <- setAccepting (not accepting)
+                    acceptStateChange ar
                 Right CppEndif -> do
-                    popAccepting
+                    ar <- popAccepting
+                    acceptStateChange ar
                 Right CppDumpState -> do
                     return ()
             -- accepting <- getAccepting
             -- return (trace ("processCpp:" ++ show (accepting,directive)) Nothing)
             return Nothing
+
+acceptStateChange :: AcceptingResult -> PP ()
+acceptStateChange ArNoChange = return ()
+acceptStateChange ArNowIgnoring = do
+  alr <- Lexer.getAlrState
+  s <- getPpState
+  setPpState (s { pp_alr_state = Just alr})
+acceptStateChange ArNowAccepting = do
+  s <- getPpState
+  mapM_ Lexer.setAlrState (pp_alr_state s)
 
 -- pp_include start -----------------------
 
