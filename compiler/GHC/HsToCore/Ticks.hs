@@ -615,7 +615,6 @@ addTickHsExpanded o@(OrigStmt (L pos LastStmt{}) _) e
   = do d <- getDensity
        case d of
           TickForCoverage    -> liftM (XExpr . ExpandedThingTc o) $ tick_it e
-          TickForBreakPoints -> liftM (XExpr . ExpandedThingTc o) $ tick_it e
           _                  -> liftM (XExpr . ExpandedThingTc o) $ addTickHsExpr e
   where
     tick_it e  = unLoc <$> allocTickBox (ExpBox False) False False (locA pos)
