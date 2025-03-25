@@ -59,7 +59,7 @@ module GHC.Parser.Lexer (
    Token(..), lexer, lexerDbg,
    ParserOpts(..), mkParserOpts,
    PState (..), initParserState, initPragState,
-   -- PpState(..), initPpState, PpContext(..),
+   PSavedAlrState(..), getAlrState, setAlrState,
    P(..), ParseResult(POk, PFailed),
    allocateComments, allocatePriorComments, allocateFinalComments,
    MonadP(..), getBit,
@@ -1347,8 +1347,8 @@ hopefully_open_brace :: Action p
 hopefully_open_brace span buf len buf2
  = do relaxed <- getBit RelaxedLayoutBit
       ctx <- getContext
-      (AI l _) <- getInput
-      let offset = srcLocCol (psRealLoc l)
+      offset <- getOffset
+      let
           isOK = relaxed ||
                  case ctx of
                  Layout prev_off _ : _ -> prev_off < offset
@@ -2180,8 +2180,8 @@ maybe_layout t = do -- If the alternative layout rule is enabled then
 new_layout_context :: Bool -> Bool -> Token -> Action p
 new_layout_context strict gen_semic tok span _buf len _buf2 = do
     _ <- popLexState
-    (AI l _) <- getInput
-    let offset = srcLocCol (psRealLoc l) - len
+    current_col <- getOffset
+    let offset = current_col - len
     ctx <- getContext
     nondecreasing <- getBit NondecreasingIndentationBit
     let strict' = strict || not nondecreasing
@@ -2621,8 +2621,10 @@ data PState a = PState {
         hdk_comments :: OrdList (PsLocated HdkComment),
 
         -- See Note [CPP in GHC] in GHC.Parser.PreProcess
-        -- pp :: !PpState
-        pp :: !a
+        pp :: !a,
+        -- If a CPP directive occurs in the layout context, we need to
+        -- store the prior column so any alr processing can continue.
+        pp_last_col :: !(Maybe Int)
      }
         -- last_loc and last_len are used when generating error messages,
         -- and in pushCurrentContext only.  Sigh, if only Happy passed the
@@ -2635,6 +2637,19 @@ data PState a = PState {
         -- calling the action in the token.  So from the perspective
         -- of the action, it is the *current* token.  Do I understand
         -- correctly?
+
+data PSavedAlrState = PSavedAlrState {
+        s_lex_state  :: [Int],
+        s_context :: [LayoutContext],
+        s_alr_pending_implicit_tokens :: [PsLocated Token],
+        s_alr_next_token :: Maybe (PsLocated Token),
+        s_alr_last_loc :: PsSpan,
+        s_alr_context :: [ALRContext],
+        s_alr_expecting_ocurly :: Maybe ALRLayout,
+        s_alr_justClosedExplicitLetBlock :: Bool,
+        s_last_col :: Int
+     }
+
 
 -- -- | Use for emulating (limited) CPP preprocessing in GHC.
 -- -- TODO: move this into PreProcess, and make a param on PState
@@ -2753,6 +2768,43 @@ getLastLocIncludingComments = P $ \s@(PState { prev_loc = prev_loc }) -> POk s p
 
 getLastLoc :: P p PsSpan
 getLastLoc = P $ \s@(PState { last_loc = last_loc }) -> POk s last_loc
+
+-- see Note [TBD]
+getOffset :: P p Int
+getOffset = P $ \s@(PState { pp_last_col = last_col,
+                             loc = l}) ->
+  let
+    offset = fromMaybe (srcLocCol (psRealLoc l)) last_col
+  in POk s { pp_last_col = Nothing} offset
+
+getAlrState :: P p PSavedAlrState
+getAlrState = P $ \s@(PState  {loc=l}) -> POk s
+  PSavedAlrState {
+        s_lex_state = lex_state s,
+        s_context = context s,
+        s_alr_pending_implicit_tokens = alr_pending_implicit_tokens s,
+        s_alr_next_token = alr_next_token s,
+        s_alr_last_loc = alr_last_loc s,
+        s_alr_context = alr_context s,
+        s_alr_expecting_ocurly = alr_expecting_ocurly s,
+        s_alr_justClosedExplicitLetBlock = alr_justClosedExplicitLetBlock s,
+        s_last_col = srcLocCol (psRealLoc l)
+    }
+
+setAlrState :: PSavedAlrState -> P p ()
+setAlrState ss = P $ \s -> POk s {
+        lex_state = s_lex_state ss,
+        context = s_context ss,
+        alr_pending_implicit_tokens = s_alr_pending_implicit_tokens ss,
+        alr_next_token = s_alr_next_token ss,
+        alr_last_loc = s_alr_last_loc ss,
+        alr_context = s_alr_context ss,
+        alr_expecting_ocurly = s_alr_expecting_ocurly ss,
+        alr_justClosedExplicitLetBlock = s_alr_justClosedExplicitLetBlock ss,
+        pp_last_col = Just (s_last_col ss)
+    } ()
+
+
 
 {-# INLINE alexGetChar' #-}
 -- This version does not squash unicode characters, it is used when
@@ -3092,8 +3144,8 @@ initParserState ppState options buf loc =
       header_comments = Strict.Nothing,
       comment_q = [],
       hdk_comments = nilOL,
-      -- pp = initPpState
-      pp = ppState
+      pp = ppState,
+      pp_last_col = Nothing
     }
   where init_loc = PsLoc loc (BufPos 0)
 
