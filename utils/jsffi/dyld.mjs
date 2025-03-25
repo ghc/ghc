@@ -277,7 +277,7 @@ const isNode = Boolean(globalThis?.process?.versions?.node);
 // factor out browser-only/node-only logic into different modules. For
 // now, just make these global let bindings optionally initialized if
 // isNode and be careful to not use them in browser-only logic.
-let fs, http, path, require, stream, wasi, ws;
+let fs, http, path, require, stream, util, wasi, ws, zlib;
 
 if (isNode) {
   require = (await import("node:module")).createRequire(import.meta.url);
@@ -286,7 +286,9 @@ if (isNode) {
   http = require("http");
   path = require("path");
   stream = require("stream");
+  util = require("util");
   wasi = require("wasi");
+  zlib = require("zlib");
 
   // Optional npm dependencies loaded via NODE_PATH
   try {
@@ -558,8 +560,17 @@ args.rpc.opened.then(() => main(args));
           return;
         }
 
+        res.setHeader("Content-Encoding", "br");
+
         res.writeHead(200);
-        res.end(buf);
+        res.end(
+          await util.promisify(zlib.brotliCompress)(buf, {
+            params: {
+              [zlib.constants.BROTLI_PARAM_QUALITY]:
+                zlib.constants.BROTLI_MIN_QUALITY,
+            },
+          })
+        );
         return;
       }
 
