@@ -31,7 +31,6 @@ def job_triple(job_name):
         'release-x86_64-linux-deb10-release+debug_info': 'x86_64-deb10-linux-dwarf',
         'release-x86_64-linux-deb10-release': 'x86_64-deb10-linux',
         'release-x86_64-linux-deb9-release': 'x86_64-deb9-linux',
-        'release-x86_64-linux-centos7-release': 'x86_64-centos7-linux',
         'release-x86_64-linux-alpine3_12-release+fully_static': 'x86_64-alpine3_12-linux-static',
         'release-x86_64-linux-alpine3_12-release': 'x86_64-alpine3_12-linux',
         'release-x86_64-linux-alpine3_12-int_native-release+fully_static': 'x86_64-alpine3_12-linux-static-int_native',
