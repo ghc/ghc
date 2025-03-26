@@ -74,7 +74,7 @@ import GHC.Core.Ppr
 import GHC.Core.FVs( bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
-import GHC.Core.Predicate( isCoVarType, isUnaryClass )
+import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCo.Compare( eqType, eqTypeX )
 import GHC.Core.Coercion
@@ -1301,9 +1301,9 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     go (Lit l)    | litIsTrivial l        = k_lit l
     go (Type _)                           = k_triv
     go (Coercion _)                       = k_triv
-    go (App f t)
-      | not (isRuntimeArg t)              = go f
-      | is_unary_cls_op f                 = go t
+    go (App f arg)
+      | not (isRuntimeArg arg)            = go f
+      | is_unary_cls_op f                 = go arg
       | otherwise                         = k_not_triv
     go (Lam b e)  | not (isRuntimeVar b)  = go e
     go (Tick t e) | not (tickishIsCode t) = go e              -- See Note [Tick trivial]
@@ -1317,9 +1317,7 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
 
     -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
     is_unary_cls_op (App f (Type {}))       = is_unary_cls_op f
-    is_unary_cls_op (Var v)
-      | Just cls <- isClassOpId_maybe v     = isUnaryClass cls
-      | Just dc  <- isDataConWorkId_maybe v = isUnaryClassDataCon dc
+    is_unary_cls_op (Var v)                 = isUnaryClassId v
     is_unary_cls_op _                       = False
 
 exprIsTrivial :: CoreExpr -> Bool
@@ -2138,6 +2136,7 @@ it doesn't have the trickiness of the let-can-float invariant to worry about.
 -- and in so doing makes the binding lazy.
 --
 -- So, it does /not/ treat variables as evaluated, unless they say they are.
+--
 -- However, it /does/ treat partial applications and constructor applications
 -- as values, even if their arguments are non-trivial, provided the argument
 -- type is lifted. For example, both of these are values:

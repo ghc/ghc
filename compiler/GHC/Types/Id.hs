@@ -69,7 +69,7 @@ module GHC.Types.Id (
         isClassOpId,
         isClassOpId_maybe, isDFunId,
         isPrimOpId, isPrimOpId_maybe,
-        isFCallId, isFCallId_maybe,
+        isFCallId, isFCallId_maybe, isUnaryClassId,
         isDataConWorkId, isDataConWorkId_maybe,
         isDataConWrapId, isDataConWrapId_maybe, dataConWrapUnfolding_maybe,
         isDataConId, isDataConId_maybe,
@@ -578,6 +578,12 @@ isJoinId id
                 JoinId {} -> True
                 _         -> False
   | otherwise = False
+
+isUnaryClassId :: Id -> Bool
+isUnaryClassId vb
+  | Just cls <- isClassOpId_maybe v     = isUnaryClass cls
+  | Just dc  <- isDataConWorkId_maybe v = isUnaryClassDataCon dc
+  | otherwise                           = False
 
 -- | Doesn't return strictness marks
 idJoinPointHood :: Var -> JoinPointHood
