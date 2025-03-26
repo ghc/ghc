@@ -12,7 +12,6 @@ import Utilities
 import Hadrian.BuildPath
 import Hadrian.Expression
 import Settings.Builders.Common (cArgs, getStagedCCFlags)
-import GHC.Platform.ArchOS
 
 -- | Build in-tree GMP library objects (if GmpInTree flag is set) and return
 -- their paths.
@@ -128,7 +127,10 @@ gmpRules = do
                 mconcat
                     [ cArgs
                     , getStagedCCFlags
-                    , anyTargetArch [ArchWasm32] ? arg "-fvisibility=default"
+                    -- gmp symbols are only used by bignum logic in
+                    -- ghc-internal and shouldn't be exported by the
+                    -- ghc-internal shared library.
+                    , arg "-fvisibility=hidden"
                     ]
             env <- sequence
                      [ builderEnvironment "CC" $ Cc CompileC (stage ctx)
