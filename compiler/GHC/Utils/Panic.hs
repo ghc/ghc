@@ -47,6 +47,7 @@ module GHC.Utils.Panic
    , tryMost
    , throwTo
    , withSignalHandlers
+
    , module GHC.Utils.Panic.Plain
    )
 where
@@ -56,6 +57,8 @@ import GHC.Stack
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
+   -- Only needed for: PlainGhcException(..), showPlainGhcException
+   --             AND: we re-export the entire module (boo)
 import GHC.Utils.Constants
 
 import GHC.Utils.Exception as Exception
