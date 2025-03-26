@@ -1517,6 +1517,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
         -- Sadly, not quite the same as exprIsHNF.
     canInlineInLam (Lit _)    = True
     canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
+    canInlineInLam (Cast e _) = canInlineInLam e
     canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
     canInlineInLam _          = False
       -- not ticks.  Counting ticks cannot be duplicated, and non-counting
