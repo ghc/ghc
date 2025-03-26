@@ -215,6 +215,7 @@ test('T24035', [extra_files(['T24035_aux.hs'])], multimod_compile, ['T24035', '-
 test('T24035b', [extra_files(['T24035_aux.hs'])], multimod_compile, ['T24035b', '-v0 -Wunused-imports'])
 test('T24037', normal, compile, [''])
 test('T24084', [extra_files(['T24084_A.hs', 'T24084_B.hs'])], multimod_compile, ['T24084', '-v0'])
+test('T25892', [extra_files(['T25892_aux.hs'])], multimod_compile, ['T25892', '-v0'])
 test('ExportWarnings1', extra_files(['ExportWarnings_base.hs', 'ExportWarnings_aux.hs']), multimod_compile, ['ExportWarnings1', '-v0 -Wno-duplicate-exports -Wx-custom'])
 test('ExportWarnings2', extra_files(['ExportWarnings_base.hs', 'ExportWarnings_aux.hs', 'ExportWarnings_aux2.hs']), multimod_compile, ['ExportWarnings2', '-v0 -Wno-duplicate-exports -Wx-custom'])
 test('ExportWarnings3', extra_files(['ExportWarnings_base.hs', 'ExportWarnings_aux.hs']), multimod_compile, ['ExportWarnings3', '-v0 -Wno-duplicate-exports -Wx-custom'])

@@ -693,7 +693,7 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent_gre rdr_name
 
   | otherwise = do
   gre_env <- getGlobalRdrEnv
-  let original_gres = lookupGRE gre_env (LookupChildren parent_gre (rdrNameOcc rdr_name) )
+  let original_gres = lookupGRE gre_env (LookupChildren parent_gre (rdrNameOcc rdr_name))
       picked_gres = pick_gres original_gres
   -- The remaining GREs are things that we *could* export here.
   -- Note that this includes things which have `NoParent`;

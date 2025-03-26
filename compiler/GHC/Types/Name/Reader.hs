@@ -1346,10 +1346,20 @@ childGREPriority (ParentGRE wanted_parent parent_info) wanted_ns child_gre =
             -- Don't return 'Nothing': if there are no other options, this
             -- allows us to report an incorrect parent to the user, as opposed
             -- to an out-of-scope error.
-            -> 2
+            -> 1
           NoParent ->
-            -- Higher priority than having the wrong parent entirely.
-            1
+            -- Higher priority than having the wrong parent entirely,
+            -- but same priority as having the right parent. Why? See T25892:
+            --
+            --   module M1 where
+            --     data D = K
+            --   module M2 (D(M2.K)) where
+            --     import qualified M1
+            --     pattern K = M1.K
+            --
+            -- Here, we do not want the data constructor M1.K to take priority
+            -- over the pattern synonym M2.K that we are trying to bundle.
+            0
 
       child_is_data =
         case greInfo child_gre of
