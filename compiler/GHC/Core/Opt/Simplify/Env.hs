@@ -763,7 +763,7 @@ emptyJoinFloats = nilOL
 isEmptyJoinFloats :: JoinFloats -> Bool
 isEmptyJoinFloats = isNilOL
 
-unitLetFloat :: OutBind -> LetFloats
+unitLetFloat :: HasDebugCallStack => OutBind -> LetFloats
 -- This key function constructs a singleton float with the right form
 unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
                     LetFloats (unitOL bind) (flag bind)

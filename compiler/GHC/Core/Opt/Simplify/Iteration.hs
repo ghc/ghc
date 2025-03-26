@@ -924,35 +924,45 @@ completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
                             eta_rhs (idType new_bndr) new_arity old_unf
 
       ; let new_bndr_w_info = addLetBndrInfo new_bndr new_arity new_unfolding
-            -- See Note [In-scope set as a substitution]
+               -- See Note [In-scope set as a substitution]
+            occ_anald_rhs = maybeUnfoldingTemplate new_unfolding `orElse` eta_rhs
+               -- occ_anald_rhs: see Note [Use occ-anald RHS in postInlineUnconditionally]
 
-      -- Try cast worker-wrapper
-      ; mb_cast_ww <- tryCastWorkerWrapper env bind_cxt new_bndr_w_info eta_rhs
-      ; let (cast_flts, new_bndr', new_rhs) = mb_cast_ww `orElse`
-                                              (emptyLetFloats, new_bndr_w_info, eta_rhs)
+      -- Try postInlineUnconditionally for (x = rhs)
+      -- If that succeeds we don't want to do tryCastWorkerWrapper
+      ; if postInlineUnconditionally env bind_cxt old_bndr new_bndr_w_info eta_rhs
+        then post_inline_it (emptyFloats env) occ_anald_rhs
+        else
+
+   do { -- Try cast worker-wrapper
+        mb_cast_ww <- tryCastWorkerWrapper env bind_cxt new_bndr_w_info eta_rhs
+      ; let (cast_flts, new_bndr', new_rhs') = mb_cast_ww `orElse`
+                                               (emptyLetFloats, new_bndr_w_info, eta_rhs)
             floats = emptyFloats env `addLetFloats` cast_flts
 
-      -- Try postInlineUnconditionally
-      ; if postInlineUnconditionally env bind_cxt old_bndr new_bndr' new_rhs
-
-        then -- Inline and discard the binding
-             do  { simplTrace "PostInlineUnconditionally" (ppr new_bndr <+> ppr new_rhs) $
-                   tick (PostInlineUnconditionally old_bndr)
-
-                 ; let unf_rhs = maybeUnfoldingTemplate (idUnfolding new_bndr') `orElse` new_rhs
-                          -- See Note [Use occ-anald RHS in postInlineUnconditionally]
-                       env'   = env `setInScopeFromF` floats
-                 ; return ( floats
-                          , extendIdSubst env' old_bndr $
-                            DoneEx unf_rhs (idJoinPointHood new_bndr')) }
-                -- Use the substitution to make quite, quite sure that the
-                -- substitution will happen, since we are going to discard the binding
+      -- Try postInlineUnconditionally for x = (x' |> co)
+      -- Almost always fires, but we conservatively use postInlineUnconditionally
+      -- so that we check all the right things
+      ; if postInlineUnconditionally env bind_cxt old_bndr new_bndr' new_rhs'
+        then post_inline_it floats new_rhs'  -- new_rhs is (x |> co) so no need to occ-anal
 
         else -- Keep the binding
-             do { let the_bind = NonRec new_bndr' new_rhs
-                      floats'  = floats `addLetFloats` unitLetFloat the_bind
-                      env'     = env `setInScopeFromF` floats'
-                ; return (floats', env') } }
+
+   do { let the_bind = NonRec new_bndr' new_rhs'
+            floats'  = floats `extendFloats` the_bind
+            env'     = env `setInScopeFromF` floats'
+      ; return (floats', env') } } }
+
+  where
+    post_inline_it floats rhs
+      = do  { simplTrace "PostInlineUnconditionally" (ppr old_bndr <+> ppr rhs) $
+              tick (PostInlineUnconditionally old_bndr)
+            ; let env' = env `setInScopeFromF` floats
+            ; return ( floats
+                     , extendIdSubst env' old_bndr $
+                       DoneEx rhs (idJoinPointHood old_bndr)) }
+                -- Use the substitution to make quite, quite sure that the
+                -- substitution will happen, since we are going to discard the binding
 
 addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
 addLetBndrInfo new_bndr new_arity_type new_unf
