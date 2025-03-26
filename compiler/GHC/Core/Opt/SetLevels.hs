@@ -624,7 +624,7 @@ lvlMFE env strict_ctxt ann_expr
          -- how it will be represented at runtime.
          -- See Note [Representation polymorphism invariants] in GHC.Core
   || notWorthFloating expr abs_vars
-         -- Test notWorhtFloating last;
+         -- Test notWorthFloating last;
          -- See Note [Large free-variable sets]
   = -- Don't float it out
     lvlExpr env ann_expr
@@ -698,11 +698,14 @@ lvlMFE env strict_ctxt ann_expr
 
         -- A decision to float entails let-binding this thing, and we only do
         -- that if we'll escape a value lambda, or will go to the top level.
+        -- Never float trivial expressions;
+        --   notably, save_work might be true of a lone evaluated variable.
     float_me = saves_work || saves_alloc || is_mk_static
 
     -- See Note [Saving work]
+    is_hnf = exprIsHNF expr
     saves_work = escapes_value_lam        -- (a)
-                 && not (exprIsHNF expr)  -- (b)
+                 && not is_hnf            -- (b)
                  && not float_is_new_lam  -- (c)
     escapes_value_lam = dest_lvl `ltMajLvl` (le_ctxt_lvl env)
 
@@ -710,7 +713,7 @@ lvlMFE env strict_ctxt ann_expr
     saves_alloc =  isTopLvl dest_lvl
                 && floatConsts env
                 && (   not strict_ctxt                     -- (a)
-                    || exprIsHNF expr                      -- (b)
+                    || is_hnf                              -- (b)
                     || (is_bot_lam && escapes_value_lam))  -- (c)
 
 hasFreeJoin :: LevelEnv -> DVarSet -> Bool
@@ -807,7 +810,7 @@ general, float HNFs, the balance change if it goes to the top:
 * We don't pay an allocation cost for the floated expression; it
   just becomes static data.
 
-* Floating string literal is valuable -- no point in duplicating the
+* Floating string literals is valuable -- no point in duplicating the
   at each call site!
 
 * Floating bottoming expressions is valuable: they are always cold
