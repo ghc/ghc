@@ -526,10 +526,10 @@ generateExternDecls = do
   modifyEnv $ \env -> env { envAliases = emptyUniqSet }
   return (concat defss, [])
 
--- | Is a variable one of the special @$llvm@ globals?
+-- | Is a variable one of the special @\@llvm@ globals?
 isBuiltinLlvmVar :: LlvmVar -> Bool
 isBuiltinLlvmVar (LMGlobalVar lbl _ _ _ _ _) =
-    "$llvm" `isPrefixOf` unpackFS lbl
+    "llvm." `isPrefixOf` unpackFS lbl
 isBuiltinLlvmVar _ = False
 
 -- | Here we take a global variable definition, rename it with a
