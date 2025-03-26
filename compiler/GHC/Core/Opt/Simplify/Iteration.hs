@@ -447,7 +447,7 @@ we want to do something very similar to worker/wrapper:
 
 We call this making a cast worker/wrapper in tryCastWorkerWrapper.
 
-The main motivaiton is that x can be inlined freely.  There's a chance
+The main motivation is that x can be inlined freely.  There's a chance
 that e will be a constructor application or function, or something
 like that, so moving the coercion to the usage site may well cancel
 the coercions and lead to further optimisation.  Example:
@@ -576,11 +576,13 @@ Note [Concrete types] in GHC.Tc.Utils.Concrete.
 -}
 
 tryCastWorkerWrapper :: SimplEnv -> BindContext
-                     -> InId -> OutId -> OutExpr
-                     -> SimplM (SimplFloats, SimplEnv)
+                     -> OutId -> OutExpr
+                     -> SimplM (Maybe (LetFloats, OutId, OutExpr))
 -- See Note [Cast worker/wrapper]
-tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
-  | BC_Let top_lvl is_rec <- bind_cxt  -- Not join points
+-- Given input x = rhs |> co, the result will be
+--    (x' = rhs, x, x' |> co))
+tryCastWorkerWrapper env bind_cxt bndr (Cast rhs co)
+  | BC_Let top_lvl _ <- bind_cxt  -- Not join points
   , not (isDFunId bndr) -- nor DFuns; cast w/w is no help, and we can't transform
                         --            a DFunUnfolding in mk_worker_unfolding
   , not (exprIsTrivial rhs)        -- Not x = y |> co; Wrinkle 1
@@ -588,38 +590,23 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
   , typeHasFixedRuntimeRep work_ty    -- Don't peel off a cast if doing so would
                                       -- lose the underlying runtime representation.
                                       -- See Note [Preserve RuntimeRep info in cast w/w]
-  , not (isOpaquePragma (idInlinePragma old_bndr)) -- Not for OPAQUE bindings
-                                                   -- See Note [OPAQUE pragma]
+  , not (isOpaquePragma (idInlinePragma bndr)) -- Not for OPAQUE bindings
+                                               -- See Note [OPAQUE pragma]
   = do  { uniq <- getUniqueM
         ; let work_name = mkSystemVarName uniq occ_fs
               work_id   = mkLocalIdWithInfo work_name ManyTy work_ty work_info
-              is_strict = isStrictId bndr
 
-        ; (rhs_floats, work_rhs) <- prepareBinding env top_lvl is_rec is_strict
-                                                   work_id (emptyFloats env) rhs
-
-        ; work_unf <- mk_worker_unfolding top_lvl work_id work_rhs
+        ; work_unf <- mk_worker_unfolding top_lvl work_id rhs
         ; let  work_id_w_unf = work_id `setIdUnfolding` work_unf
-               floats   = rhs_floats `addLetFloats`
-                          unitLetFloat (NonRec work_id_w_unf work_rhs)
+               work_bind     = NonRec work_id_w_unf rhs
+               triv_rhs      = Cast (Var work_id_w_unf) co
 
-               triv_rhs = Cast (Var work_id_w_unf) co
+        ; wrap_unf <- mkLetUnfolding env top_lvl VanillaSrc bndr False triv_rhs
+        ; let wrap_prag = mkCastWrapperInlinePrag (inlinePragInfo info)
+              bndr' = bndr `setInlinePragma` wrap_prag
+                           `setIdUnfolding`  wrap_unf
 
-        ; if postInlineUnconditionally env bind_cxt old_bndr bndr triv_rhs
-             -- Almost always True, because the RHS is trivial
-             -- In that case we want to eliminate the binding fast
-             -- We conservatively use postInlineUnconditionally so that we
-             -- check all the right things
-          then do { tick (PostInlineUnconditionally bndr)
-                  ; return ( floats
-                           , extendIdSubst (setInScopeFromF env floats) old_bndr $
-                             DoneEx triv_rhs NotJoinPoint ) }
-
-          else do { wrap_unf <- mkLetUnfolding env top_lvl VanillaSrc bndr False triv_rhs
-                  ; let bndr' = bndr `setInlinePragma` mkCastWrapperInlinePrag (idInlinePragma bndr)
-                                `setIdUnfolding`  wrap_unf
-                        floats' = floats `extendFloats` NonRec bndr' triv_rhs
-                  ; return ( floats', setInScopeFromF env floats' ) } }
+        ; return (Just (unitLetFloat work_bind, bndr', triv_rhs)) }
   where
     -- Force the occ_fs so that the old Id is not retained in the new Id.
     !occ_fs = getOccFS bndr
@@ -647,10 +634,10 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
              | isStableSource src -> return (unf { uf_tmpl = mkCast unf_rhs (mkSymCo co) })
            _ -> mkLetUnfolding env top_lvl VanillaSrc work_id False work_rhs
 
-tryCastWorkerWrapper env _ _ bndr rhs  -- All other bindings
+tryCastWorkerWrapper _ _ bndr rhs  -- All other bindings
   = do { traceSmpl "tcww:no" (vcat [ text "bndr:" <+> ppr bndr
                                    , text "rhs:" <+> ppr rhs ])
-        ; return (mkFloatBind env (NonRec bndr rhs)) }
+       ; return Nothing }
 
 mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
 -- See Note [Cast worker/wrapper]
@@ -810,38 +797,39 @@ makeTrivial :: HasDebugCallStack
 -- Binds the expression to a variable, if it's not trivial, returning the variable
 -- For the Demand argument, see Note [Keeping demand info in StrictArg Plan A]
 makeTrivial env top_lvl dmd occ_fs expr
-  | exprIsTrivial expr                          -- Already trivial
-  || not (bindingOk top_lvl expr expr_ty)       -- Cannot trivialise
-                                                --   See Note [Cannot trivialise]
+  | exprIsTrivial expr                  -- Already trivial
   = return (emptyLetFloats, expr)
 
-  | Cast expr' co <- expr
-  = do { (floats, triv_expr) <- makeTrivial env top_lvl dmd occ_fs expr'
-       ; return (floats, Cast triv_expr co) }
+  | not (bindingOk top_lvl expr expr_ty)  -- Cannot trivialise
+  = return (emptyLetFloats, expr)         --   See Note [Cannot trivialise]
 
   | otherwise -- 'expr' is not of form (Cast e co)
   = do  { (floats, expr1) <- prepareRhs env top_lvl occ_fs expr
         ; uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var  = mkLocalIdWithInfo name ManyTy expr_ty id_info
+              bndr = mkLocalIdWithInfo name ManyTy expr_ty id_info
+              bind_ctxt = BC_Let top_lvl NonRecursive
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
-        ; (arity_type, expr2) <- tryEtaExpandRhs env (BC_Let top_lvl NonRecursive) var expr1
+        ; (arity_type, expr2) <- tryEtaExpandRhs env bind_ctxt bndr expr1
           -- Technically we should extend the in-scope set in 'env' with
           -- the 'floats' from prepareRHS; but they are all fresh, so there is
           -- no danger of introducing name shadowing in eta expansion
 
-        ; unf <- mkLetUnfolding env top_lvl VanillaSrc var False expr2
+        ; unf <- mkLetUnfolding env top_lvl VanillaSrc bndr False expr2
+        ; let bndr'    = addLetBndrInfo bndr arity_type unf
+              anf_bind = NonRec bndr' expr2
 
-        ; let final_id = addLetBndrInfo var arity_type unf
-              bind     = NonRec final_id expr2
-
-        ; traceSmpl "makeTrivial" (vcat [text "final_id" <+> ppr final_id, text "rhs" <+> ppr expr2 ])
-        ; return ( floats `addLetFlts` unitLetFloat bind, Var final_id ) }
+        ; mb_cast_ww <- tryCastWorkerWrapper env bind_ctxt bndr' expr2
+        ; case mb_cast_ww of
+            Nothing -> return (floats `addLetFlts` unitLetFloat anf_bind, Var bndr')
+            Just (work_flts, _, triv_rhs)
+                    -> return (floats `addLetFlts` work_flts, triv_rhs) }
   where
     id_info = vanillaIdInfo `setDemandInfo` dmd
     expr_ty = exprType expr
+
 
 bindingOk :: TopLevelFlag -> CoreExpr -> Type -> Bool
 -- True iff we can have a binding of this expression at this level
@@ -936,25 +924,35 @@ completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
                             eta_rhs (idType new_bndr) new_arity old_unf
 
       ; let new_bndr_w_info = addLetBndrInfo new_bndr new_arity new_unfolding
-        -- See Note [In-scope set as a substitution]
+            -- See Note [In-scope set as a substitution]
 
-      ; if postInlineUnconditionally env bind_cxt old_bndr new_bndr_w_info eta_rhs
+      -- Try cast worker-wrapper
+      ; mb_cast_ww <- tryCastWorkerWrapper env bind_cxt new_bndr_w_info eta_rhs
+      ; let (cast_flts, new_bndr', new_rhs) = mb_cast_ww `orElse`
+                                              (emptyLetFloats, new_bndr_w_info, eta_rhs)
+            floats = emptyFloats env `addLetFloats` cast_flts
+
+      -- Try postInlineUnconditionally
+      ; if postInlineUnconditionally env bind_cxt old_bndr new_bndr' new_rhs
 
         then -- Inline and discard the binding
-             do  { tick (PostInlineUnconditionally old_bndr)
-                 ; let unf_rhs = maybeUnfoldingTemplate new_unfolding `orElse` eta_rhs
+             do  { simplTrace "PostInlineUnconditionally" (ppr new_bndr <+> ppr new_rhs) $
+                   tick (PostInlineUnconditionally old_bndr)
+
+                 ; let unf_rhs = maybeUnfoldingTemplate (idUnfolding new_bndr') `orElse` new_rhs
                           -- See Note [Use occ-anald RHS in postInlineUnconditionally]
-                 ; simplTrace "PostInlineUnconditionally" (ppr new_bndr <+> ppr unf_rhs) $
-                   return ( emptyFloats env
-                          , extendIdSubst env old_bndr $
-                            DoneEx unf_rhs (idJoinPointHood new_bndr)) }
+                       env'   = env `setInScopeFromF` floats
+                 ; return ( floats
+                          , extendIdSubst env' old_bndr $
+                            DoneEx unf_rhs (idJoinPointHood new_bndr')) }
                 -- Use the substitution to make quite, quite sure that the
                 -- substitution will happen, since we are going to discard the binding
 
-        else -- Keep the binding; do cast worker/wrapper
---             simplTrace "completeBind" (vcat [ text "bndrs" <+> ppr old_bndr <+> ppr new_bndr
---                                             , text "eta_rhs" <+> ppr eta_rhs ]) $
-             tryCastWorkerWrapper env bind_cxt old_bndr new_bndr_w_info eta_rhs }
+        else -- Keep the binding
+             do { let the_bind = NonRec new_bndr' new_rhs
+                      floats'  = floats `addLetFloats` unitLetFloat the_bind
+                      env'     = env `setInScopeFromF` floats'
+                ; return (floats', env') } }
 
 addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
 addLetBndrInfo new_bndr new_arity_type new_unf
