@@ -125,7 +125,7 @@ genGlobalLabelArray var_nm clbls = do
             prio = LMStaticLit $ LMIntLit 0xffff i32
         in LMStaticStrucU [prio, fn, null] entry_ty
 
-    arr_var = LMGlobalVar var_nm arr_ty Internal Nothing Nothing Global
+    arr_var = LMGlobalVar var_nm arr_ty Appending Nothing Nothing Global
     mkFunTy lbl = LMFunction $ LlvmFunctionDecl lbl ExternallyVisible CC_Ccc LMVoid FixedArgs [] Nothing
     entry_ty = LMStructU [i32, LMPointer $ mkFunTy $ fsLit "placeholder", LMPointer i8]
     arr_ty = LMArray (length clbls) entry_ty
