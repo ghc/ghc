@@ -145,7 +145,7 @@ import GHC.Core ( CoreExpr, CoreRule, Unfolding(..), IdUnfoldingFun
                 , isStableUnfolding, isCompulsoryUnfolding, isEvaldUnfolding
                 , hasSomeUnfolding, noUnfolding, evaldUnfolding )
 import GHC.Core.Type
-import GHC.Core.Predicate( isCoVarType )
+import GHC.Core.Predicate( isCoVarType, isUnaryClass )
 import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Core.Multiplicity
@@ -580,7 +580,7 @@ isJoinId id
   | otherwise = False
 
 isUnaryClassId :: Id -> Bool
-isUnaryClassId vb
+isUnaryClassId v
   | Just cls <- isClassOpId_maybe v     = isUnaryClass cls
   | Just dc  <- isDataConWorkId_maybe v = isUnaryClassDataCon dc
   | otherwise                           = False

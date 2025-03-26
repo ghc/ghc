@@ -614,7 +614,8 @@ lvlMFE env strict_ctxt e@(_, AnnCase {})
   = lvlExpr env e     -- See Note [Case MFEs]
 
 lvlMFE env strict_ctxt ann_expr
-  | not float_me
+  |  notWorthFloating expr abs_vars
+  || not float_me
   || floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
   || hasFreeJoin env fvs   -- If there is a free join, don't float
@@ -623,9 +624,6 @@ lvlMFE env strict_ctxt ann_expr
          -- We can't let-bind an expression if we don't know
          -- how it will be represented at runtime.
          -- See Note [Representation polymorphism invariants] in GHC.Core
-  || notWorthFloating expr abs_vars
-         -- Test notWorthFloating last;
-         -- See Note [Large free-variable sets]
   = -- Don't float it out
     lvlExpr env ann_expr
 
@@ -1166,28 +1164,41 @@ notWorthFloating :: CoreExpr -> [Var] -> Bool
 -- we replace e with (lvl79 x y) and then run FloatOut again, don't want
 -- to replace (lvl79 x y) with (lvl83 x y)!
 
+-- Like an outer-level version of exprIsTrivial ToDo Explain
 notWorthFloating e abs_vars
-  = go e (count isId abs_vars)
+  = go e 0
   where
-    go (Var {}) n               = n >= 0
-    go (Lit lit) n              = assert (n==0) $
-                                  litIsTrivial lit   -- Note [Floating literals]
-    go (Type {}) _              = True
-    go (Coercion {}) _          = True
+    n_abs_vars = count isId abs_vars
+
+    go :: CoreExpr -> Int -> Bool
+    -- (go e n) return True if (e x1 .. xn) is not worth floating
+    go (Lit lit) n         = assert (n==0) $
+                             litIsTrivial lit   -- Note [Floating literals]
+    go (Type {}) _         = True
+    go (Tick t e) n        = not (tickishIsCode t) && go e n
+    go (Cast e _) n        = go e n
+    go (Coercion {}) _     = True
     go (App e arg) n
-       -- See Note [Floating applications to coercions]
-       | not (isRuntimeArg arg) = go e n
-       | n==0                   = False
-       | exprIsTrivial arg      = go e (n-1) -- NB: exprIsTrivial arg = go arg 0
-       | otherwise              = False
-    go (Tick t e) n             = not (tickishIsCode t) && go e n
-    go (Cast e _)  n            = go e n
-    go (Case e b _ as) n
+       | Type {} <- arg    = go e n    -- Just types; see Note [Floating applications to coercions]
+       | exprIsTrivial arg = go e (n+1)
+       | otherwise         = False     -- (f non-triv) is worth floating
+    go (Case e b _ as) _
+      -- Do not float the `case` part of trivial cases
+      -- We'll have a look at the RHS when we get there
       | null as
-      = go e n     -- See Note [Empty case is trivial]
-      | Just rhs <- isUnsafeEqualityCase e b as
-      = go rhs n   -- See (U2) of Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
-    go _ _                      = False
+      = True   -- See Note [Empty case is trivial]
+      | Just {} <- isUnsafeEqualityCase e b as
+      = True   -- See (U2) of Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
+      | otherwise
+      = False
+
+    go (Var v) n
+      | isUnaryClassId v = True
+      | n==0             = True   -- Naked variable
+      | n <= n_abs_vars  = True   -- (f a b c) is not worth floating if
+      | otherwise        = False  -- a,b,c are all abstracted
+
+    go _ _ = False  -- Let etc is worth floating
 
 {-
 Note [Floating literals]
