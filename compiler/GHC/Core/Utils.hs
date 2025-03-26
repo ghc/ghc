@@ -2214,22 +2214,26 @@ exprIsHNFlike is_con is_con_unf e
                                | otherwise  = app_is_value f as
     app_is_value _          _  = False
 
-    id_app_is_value id val_args =
+    id_app_is_value id val_args
+      | Just dc <- isDataConWorkId_maybe id
+      , isUnaryClassDataCon  dc
+      = all is_hnf_like val_args  -- Look through unary class data cons
+      | otherwise
       -- See Note [exprIsHNF for function applications]
       --   for the specification and examples
-      case compare (idArity id) (length val_args) of
-        EQ | is_con id ->      -- Saturated app of a DataCon/CONLIKE Id
-          case mb_str_marks id of
-            Just str_marks ->  -- with strict fields; see (SFC1) of Note [Strict fields in Core]
-              assert (val_args `equalLength` str_marks) $
-              fields_hnf str_marks
-            Nothing ->         -- without strict fields: like PAP
-              args_hnf         -- NB: CONLIKEs are lazy!
+      = case compare (idArity id) (length val_args) of
+          EQ | is_con id ->      -- Saturated app of a DataCon/CONLIKE Id
+            case mb_str_marks id of
+              Just str_marks ->  -- with strict fields; see (SFC1) of Note [Strict fields in Core]
+                assert (val_args `equalLength` str_marks) $
+                fields_hnf str_marks
+              Nothing ->         -- without strict fields: like PAP
+                args_hnf         -- NB: CONLIKEs are lazy!
 
-        GT ->                  -- PAP: Check unlifted val_args
-          args_hnf
+          GT ->                  -- PAP: Check unlifted val_args
+            args_hnf
 
-        _  -> False
+          _  -> False
 
       where
         -- Saturated, Strict DataCon: Check unlifted val_args and strict fields
