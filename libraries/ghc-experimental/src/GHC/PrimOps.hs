@@ -29,5 +29,12 @@ module GHC.PrimOps
         module GHC.Internal.Exts,
        ) where
 
-import GHC.Internal.Exts
-
+import GHC.Internal.Exts hiding
+  -- hide a few really unstable things
+  ( dataToTagSmall#
+  , dataToTagLarge#
+    -- The dataToTag# primops are deprecated and expected to be
+    -- un-exposed in the near future; see #24169 and DTW7 of
+    -- Note [DataToTag overview] in GHC.Tc.Instance.Class
+  , whereFrom#
+  )

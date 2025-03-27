@@ -1,6 +1,8 @@
-## 0.14.0
+## NEXT (major version bump needed)
 
+- Shipped with GHC 9.14.1
 - ghc-prim's modules have been merged into ghc-internal and ghc-prim is now deprecated.
+- The type of `tagToEnum#` has been changed to better reflect its lack of polymorphism. See [TODO:CLC TICKET](https://github.com/haskell/core-libraries-committee/issues) for more information.
 
 ## 0.13.0
 

@@ -166,11 +166,8 @@ module GHC.Internal.Exts
         maxTupleSize,
        ) where
 
-import GHC.Internal.Prim hiding ( coerce, dataToTagSmall#, dataToTagLarge#, whereFrom# )
-  -- Hide dataToTagLarge# because it is expected to break for
-  -- GHC-internal reasons in the near future, and shouldn't
-  -- be exposed from base (not even GHC.Exts)
-  -- whereFrom# is similarly internal.
+import GHC.Internal.Prim
+  hiding (coerce) -- exported separately
 
 import GHC.Internal.Types
   hiding ( IO   -- Exported from "GHC.IO"

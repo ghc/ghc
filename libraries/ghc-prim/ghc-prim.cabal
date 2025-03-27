@@ -23,12 +23,15 @@ source-repository head
 
 Library
     default-language: Haskell2010
+    default-extensions:
+      NoImplicitPrelude,
+      MagicHash
 
     build-depends: ghc-internal
 
-    other-modules:
-      -- dummy module to make Hadrian/GHC build a valid library...
-      Dummy
+    hs-source-dirs: src
+    exposed-modules:
+      GHC.Prim
 
     reexported-modules:
           GHC.Internal.CString         as GHC.CString
@@ -36,7 +39,6 @@ Library
         , GHC.Internal.Debug           as GHC.Debug
         , GHC.Internal.Magic           as GHC.Magic
         , GHC.Internal.Magic.Dict      as GHC.Magic.Dict
-        , GHC.Internal.Prim            as GHC.Prim
         , GHC.Internal.Prim.Ext        as GHC.Prim.Ext
         , GHC.Internal.Prim.Panic      as GHC.Prim.Panic
         , GHC.Internal.Prim.Exception  as GHC.Prim.Exception
