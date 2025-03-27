@@ -54,6 +54,7 @@ module GHC.Utils.Logger
     -- * Logging
     , putLogMsg
     , defaultLogAction
+    , defaultLogActionWithHandles
     , defaultLogJsonAction
     , defaultLogActionHPrintDoc
     , defaultLogActionHPutStrDoc
@@ -372,13 +373,14 @@ defaultLogJsonAction logflags msg_class jsdoc =
     printErrs  = defaultLogActionHPrintDoc  logflags False stderr
     putStrSDoc = defaultLogActionHPutStrDoc logflags False stdout
     msg = renderJSON jsdoc
+
 -- See Note [JSON Error Messages]
 -- this is to be removed
-jsonLogAction :: LogAction
-jsonLogAction _ (MCDiagnostic SevIgnore _ _) _ _ = return () -- suppress the message
-jsonLogAction logflags msg_class srcSpan msg
+jsonLogActionWithHandle :: Handle {-^ Standard out -} -> LogAction
+jsonLogActionWithHandle _ _ (MCDiagnostic SevIgnore _ _) _ _ = return () -- suppress the message
+jsonLogActionWithHandle out logflags msg_class srcSpan msg
   =
-    defaultLogActionHPutStrDoc logflags True stdout
+    defaultLogActionHPutStrDoc logflags True out
       (withPprStyle PprCode (doc $$ text ""))
     where
       str = renderWithContext (log_default_user_context logflags) msg
@@ -398,9 +400,18 @@ jsonLogAction logflags msg_class srcSpan msg
                    where file = unpackFS $ srcSpanFile rss
                  UnhelpfulSpan _ -> JSNull
 
+-- | The default 'LogAction' prints to 'stdout' and 'stderr'.
+--
+-- To replicate the default log action behaviour with different @out@ and @err@
+-- handles, see 'defaultLogActionWithHandles'.
 defaultLogAction :: LogAction
-defaultLogAction logflags msg_class srcSpan msg
-  | log_dopt Opt_D_dump_json logflags = jsonLogAction logflags msg_class srcSpan msg
+defaultLogAction = defaultLogActionWithHandles stdout stderr
+
+-- | The default 'LogAction' parametrized over the standard output and standard error handles.
+-- Allows clients to replicate the log message formatting of GHC with custom handles.
+defaultLogActionWithHandles :: Handle {-^ Handle for standard output -} -> Handle {-^ Handle for standard errors -} -> LogAction
+defaultLogActionWithHandles out err logflags msg_class srcSpan msg
+  | log_dopt Opt_D_dump_json logflags = jsonLogActionWithHandle out logflags msg_class srcSpan msg
   | otherwise = case msg_class of
       MCOutput                     -> printOut msg
       MCDump                       -> printOut (msg $$ blankLine)
@@ -410,9 +421,9 @@ defaultLogAction logflags msg_class srcSpan msg
       MCDiagnostic SevIgnore _ _   -> pure () -- suppress the message
       MCDiagnostic _sev _rea _code -> printDiagnostics
     where
-      printOut   = defaultLogActionHPrintDoc  logflags False stdout
-      printErrs  = defaultLogActionHPrintDoc  logflags False stderr
-      putStrSDoc = defaultLogActionHPutStrDoc logflags False stdout
+      printOut   = defaultLogActionHPrintDoc  logflags False out
+      printErrs  = defaultLogActionHPrintDoc  logflags False err
+      putStrSDoc = defaultLogActionHPutStrDoc logflags False out
       -- Pretty print the warning flag, if any (#10752)
       message = mkLocMessageWarningGroups (log_show_warn_groups logflags) msg_class srcSpan msg
 
