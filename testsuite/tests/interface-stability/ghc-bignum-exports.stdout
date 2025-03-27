@@ -396,6 +396,7 @@ module GHC.Num.Primitives where
   ioInt# :: GHC.Internal.Types.IO GHC.Internal.Types.Int -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, GHC.Internal.Prim.Int# #)
   ioVoid :: forall a. GHC.Internal.Types.IO a -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
   ioWord# :: GHC.Internal.Types.IO GHC.Internal.Types.Word -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, GHC.Internal.Prim.Word# #)
+  isTrue# :: GHC.Internal.Prim.Int# -> GHC.Internal.Types.Bool
   maxI# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
   maxW# :: GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word# -> GHC.Internal.Prim.Word#
   minI# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#

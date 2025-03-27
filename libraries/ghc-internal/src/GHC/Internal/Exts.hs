@@ -62,6 +62,7 @@ module GHC.Internal.Exts
 
         -- ** Other primitive types
         module GHC.Internal.Types,
+        isTrue#,
 
         -- ** Legacy interface for arrays of arrays
         module GHC.Internal.ArrayArray,

@@ -175,8 +175,8 @@ increment will happen in the loop.
 unpackCString# :: Addr# -> [Char]
 {-# NOINLINE CONLIKE unpackCString# #-}
 unpackCString# addr
-    | isTrue# (ch `eqChar#` '\0'#) = []
-    | True                         = C# ch : unpackCString# (addr `plusAddr#` 1#)
+    | 1# <- ch `eqChar#` '\0'# = []
+    | True                     = C# ch : unpackCString# (addr `plusAddr#` 1#)
       where
         -- See Note [unpackCString# iterating over addr]
         !ch = indexCharOffAddr# addr 0#
@@ -186,8 +186,8 @@ unpackAppendCString# :: Addr# -> [Char] -> [Char]
 {-# NOINLINE unpackAppendCString# #-}
      -- See the NOINLINE note on unpackCString#
 unpackAppendCString# addr rest
-    | isTrue# (ch `eqChar#` '\0'#) = rest
-    | True                         = C# ch : unpackAppendCString# (addr `plusAddr#` 1#) rest
+    | 1# <- ch `eqChar#` '\0'# = rest
+    | True                     = C# ch : unpackAppendCString# (addr `plusAddr#` 1#) rest
       where
         -- See Note [unpackCString# iterating over addr]
         !ch = indexCharOffAddr# addr 0#
@@ -200,8 +200,8 @@ unpackFoldrCString# :: Addr# -> (Char -> a -> a) -> a -> a
 unpackFoldrCString# str f z_init = go str z_init
   where
     go addr z
-      | isTrue# (ch `eqChar#` '\0'#) = z
-      | True                         = C# ch `f` go (addr `plusAddr#` 1#) z
+      | 1# <- ch `eqChar#` '\0'# = z
+      | True                     = C# ch `f` go (addr `plusAddr#` 1#) z
       where
         -- See Note [unpackCString# iterating over addr]
         !ch = indexCharOffAddr# addr 0#
@@ -211,7 +211,7 @@ unpackFoldrCString# str f z_init = go str z_init
 unpackCStringUtf8# :: Addr# -> [Char]
 {-# NOINLINE CONLIKE unpackCStringUtf8# #-}
 unpackCStringUtf8# addr
-    | isTrue# (ch `eqChar#` '\0'#  ) = []
+    | 1# <- ch `eqChar#` '\0'# = []
     | True =
         let !byte_count = getByteCount ch
             !utf_ch = unpackUtf8Char# byte_count ch addr
@@ -225,7 +225,7 @@ unpackAppendCStringUtf8# :: Addr# -> [Char] -> [Char]
 {-# NOINLINE unpackAppendCStringUtf8# #-}
      -- See the NOINLINE note on unpackCString#
 unpackAppendCStringUtf8# addr rest
-    | isTrue# (ch `eqChar#` '\0'#) = rest
+    | 1# <- ch `eqChar#` '\0'# = rest
     | True =
         let !byte_count = getByteCount ch
             !utf_ch = unpackUtf8Char# byte_count ch addr
@@ -242,7 +242,7 @@ unpackFoldrCStringUtf8# addr_init f z_init
   = go addr_init z_init
   where
     go addr z
-      | isTrue# (ch `eqChar#` '\0'#) = z
+      | 1# <- ch `eqChar#` '\0'# = z
       | True =
           let !byte_count = getByteCount ch
               !utf_ch = unpackUtf8Char# byte_count ch addr
@@ -261,8 +261,8 @@ unpackNBytes#  addr len# = unpack [] (len# -# 1#)
     where
      unpack :: [Char] -> Int# -> [Char]
      unpack acc i#
-      | isTrue# (i# <# 0#)  = acc
-      | True                =
+      | 1# <- i# <# 0# = acc
+      | True           =
          case indexCharOffAddr# addr i# of
             ch -> unpack (C# ch : acc) (i# -# 1#)
 
@@ -305,10 +305,10 @@ data Bytes = One | Two | Three | Four
 {-# INLINE getByteCount #-}
 getByteCount :: Char# -> Bytes
 getByteCount ch
-    | isTrue# (ch `leChar#` '\x7F'#) = One
-    | isTrue# (ch `leChar#` '\xDF'#) = Two
-    | isTrue# (ch `leChar#` '\xEF'#) = Three
-    | True                           = Four
+    | 1# <- ch `leChar#` '\x7F'# = One
+    | 1# <- ch `leChar#` '\xDF'# = Two
+    | 1# <- ch `leChar#` '\xEF'# = Three
+    | True                       = Four
 
 {-# INLINE plusBytes #-}
 plusBytes :: Addr# -> Bytes -> Addr#

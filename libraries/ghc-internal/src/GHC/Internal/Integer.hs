@@ -61,6 +61,7 @@ import GHC.Internal.Bignum.Integer (Integer)
 import qualified GHC.Internal.Bignum.Integer as I
 import GHC.Internal.Prim
 import GHC.Internal.Types
+import GHC.Internal.Magic.TagToEnum
 
 smallInteger :: Int# -> Integer
 smallInteger = I.integerFromInt#

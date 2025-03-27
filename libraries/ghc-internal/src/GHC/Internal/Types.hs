@@ -31,7 +31,6 @@ module GHC.Internal.Types (
           -- List constructors are not exported
           -- because they are built-in syntax
 
-        isTrue#,
         SPEC(..),
         Symbol,
         Any,
@@ -651,19 +650,11 @@ class Coercible (a :: k) (b :: k)
 
 {- *********************************************************************
 *                                                                      *
-                   Bool, and isTrue#
+                   Bool
 *                                                                      *
 ********************************************************************* -}
 
 data {-# CTYPE "HsBool" #-} Bool = False | True
-
-{-# INLINE isTrue# #-}
--- | Returns True if its parameter is 1# and False
---   if it is 0#. Otherwise it has undefined behavor.
-isTrue# :: Int# -> Bool
-isTrue# x = case x of
-  1# -> True
-  _  -> False
 
 
 {- *********************************************************************

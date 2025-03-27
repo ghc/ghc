@@ -10,9 +10,10 @@
 
 module GHC.Internal.Magic.TagToEnum
   ( TagToEnum(..)
+  , isTrue#
   ) where
 
-import GHC.Internal.Types (RuntimeRep(BoxedRep), Levity, TYPE, Constraint)
+import GHC.Internal.Types
 import GHC.Internal.Prim (Int#)
 
 {- | @'tagToEnum#'@ can produce a value of any "enumeration-like" data
@@ -87,3 +88,16 @@ v1 = tagToEnum# 0# -- type error: no TagToEnum instance
 type TagToEnum :: forall {lev :: Levity}. TYPE (BoxedRep lev) -> Constraint
 class TagToEnum a where
   tagToEnum# :: Int# -> a
+
+
+{-# INLINE isTrue# #-}
+-- | Returns True if its parameter is 1# and False
+-- if it is 0#.  Otherwise it has undefined behavor.
+isTrue# :: Int# -> Bool
+isTrue# = tagToEnum#
+  -- We could re-define this to:
+  --   isTrue# x = case x of
+  --     1# -> True
+  --     _  = False
+  -- ...but doing so caused a noticeable increase in compiler allocations
+  -- for some programs, so it's been left defined as just tagToEnum#.

@@ -138,7 +138,7 @@ module GHC.Internal.Classes(
 
 -- GHC.Internal.Magic is used in some derived instances
 import GHC.Internal.Magic ()
-import GHC.Internal.Magic.TagToEnum () -- also used in derived instances
+import GHC.Internal.Magic.TagToEnum -- also used in derived instances
 import GHC.Internal.Prim
 import GHC.Internal.Tuple
 import GHC.Internal.CString (unpackCString#)

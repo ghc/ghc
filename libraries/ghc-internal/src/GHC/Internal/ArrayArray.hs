@@ -50,7 +50,7 @@ module GHC.Internal.ArrayArray
 
 import GHC.Internal.Prim
 import GHC.Internal.Prim.PtrEq ( unsafePtrEquality# )
-import GHC.Internal.Types ( Type, UnliftedType, isTrue# )
+import GHC.Internal.Types ( Type, UnliftedType )
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce, unsafeCoerceUnlifted )
 default ()
 
@@ -85,7 +85,7 @@ newArrayArray# sz s1 =
   where
     write_array_to_array :: MutableArray# s ByteArray# -> Int# -> State# s -> State# s
     write_array_to_array _ i s
-      | isTrue# (i >=# sz)
+      | 1# <- i >=# sz
       = s
     write_array_to_array arr i s
       = case writeArray# arr i (unsafeCoerceUnlifted arr) s of

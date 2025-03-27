@@ -5,6 +5,7 @@
 - `ghc-bignum`'s implementation has been merged into `ghc-internal`.
   Downstream users should import `GHC.Num.{Integer,Natural,BigNat}` stable
   modules from `base` instead.
+- `GHC.Internal.Bignum.Primitives` now re-exports `isTrue#`
 
 ## 1.3
 

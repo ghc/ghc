@@ -1,3 +1,18 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Prim
+-- License     :  see libraries/ghc-prim/LICENSE
+--
+-- Maintainer  :  ghc-devs@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- Compatibility shim re-exporting stuff from @ghc-internal@.
+-- Use @GHC.Exts@ from the @base@ package instead of importing this
+-- module.
+--
+-----------------------------------------------------------------------------
+
 module GHC.Prim (
   module GHC.Internal.Exts
 ) where

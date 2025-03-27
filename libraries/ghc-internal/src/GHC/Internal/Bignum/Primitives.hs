@@ -20,6 +20,7 @@ module GHC.Internal.Bignum.Primitives
    , (&&#)
    , (||#)
    , notB#
+   , isTrue#
    -- * Int#
    , testBitI#
    , minI#
@@ -93,6 +94,7 @@ import GHC.Internal.Prim.Exception
 
 import GHC.Internal.Prim
 import GHC.Internal.Types
+import GHC.Internal.Magic.TagToEnum
 
 default ()
 

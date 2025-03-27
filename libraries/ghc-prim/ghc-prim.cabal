@@ -25,6 +25,7 @@ Library
     default-language: Haskell2010
     default-extensions:
       NoImplicitPrelude,
+      ExplicitNamespaces,
       MagicHash
 
     build-depends: ghc-internal
@@ -32,6 +33,7 @@ Library
     hs-source-dirs: src
     exposed-modules:
       GHC.Prim
+      GHC.Types
 
     reexported-modules:
           GHC.Internal.CString         as GHC.CString
@@ -45,4 +47,3 @@ Library
         , GHC.Internal.Prim.PtrEq      as GHC.Prim.PtrEq
         , GHC.Internal.PrimopWrappers  as GHC.PrimopWrappers
         , GHC.Internal.Tuple           as GHC.Tuple
-        , GHC.Internal.Types           as GHC.Types
