@@ -473,11 +473,15 @@ Now suppose that, in some client module, we are searching for an
 instance of the *target constraint* ``(C ty1 .. tyn)``. The search works
 like this:
 
+-  If there are any in-scope given constraints that might match the target
+   constraint (after unifying any metavariables), and
+   :extension:`IncoherentInstances` is not enabled, the search fails.
+
 -  Find all instances :math:`I` that *match* the target constraint; that is, the
    target constraint is a substitution instance of :math:`I`. These instance
    declarations are the *candidates*.
 
--  If no candidates remain, the search fails
+-  If there are no candidates, the search fails.
 
 -  Eliminate any candidate :math:`IX` for which there is another candidate
    :math:`IY` such that both of the following hold:
@@ -498,7 +502,7 @@ like this:
 -  Otherwise there is exactly one non-incoherent candidate; call it the
    "prime candidate".
 
--  Now find all instances, or in-scope given constraints, that *unify* with
+-  Now find all instances that *unify* with
    the target constraint,
    but do not *match* it. Such non-candidate instances might match when
    the target constraint is further instantiated. If all of them are
@@ -596,8 +600,8 @@ declaration, thus: ::
 
 (You need :extension:`FlexibleContexts` to do this.)
 
-In the unification check in the final bullet, GHC also uses the
-"in-scope given constraints".  Consider for example ::
+To see why GHC uses the "in-scope given constraints" in the first bullet,
+consider for example ::
 
    instance C a Int
 
@@ -609,7 +613,7 @@ top-level instance, because a particular call of ``g`` might
 instantiate both ``b`` and ``c`` to the same type, which would
 allow the constraint to be solved in a different way.  This latter
 restriction is principally to make the constraint-solver complete.
-(Interested folk can read ``Note [Instance and Given overlap]`` in ``TcInteract``.)
+(Interested folk can read ``Note [Instance and Given overlap]`` in ``GHC.Tc.Solver.Dict``.)
 It is easy to avoid: in a type signature avoid a constraint that
 matches a top-level instance.  The flag :ghc-flag:`-Wsimplifiable-class-constraints` warns about such signatures.
 
