@@ -1617,8 +1617,8 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
 
         | n_br >= 100 -> False  -- See #23627
 
-        | n_br == 1, NotInsideLam <- in_lam  -- One syntactic occurrence
-        -> True                              -- See Note [Post-inline for single-use things]
+        | n_br == 1                  -- One syntactic occurrence
+        -> work_ok in_lam int_cxt    -- See Note [Post-inline for single-use things]
 
 --        | is_unlifted                        -- Unlifted binding, hence ok-for-spec
 --        -> True                              -- hence cheap to inline probably just a primop
@@ -1626,14 +1626,12 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
 -- No, this is wrong.  {v = p +# q; x = K v}.
 -- Don't inline v; it'll just get floated out again. Stupid.
 
-        | is_demanded
-        -> False                            -- No allocation (it'll be a case expression in the end)
-                                            -- so inlining duplicates code but nothing more
+        | is_demanded    -- No allocation (it'll be a case expression in the end)
+        -> False         -- so inlining duplicates code but nothing more
 
-        | otherwise
+        | otherwise    -- -- Multiple syntactic occurences; but lazy
         -> work_ok in_lam int_cxt && smallEnoughToInline uf_opts unfolding
-              -- Multiple syntactic occurences; but lazy, and small enough to dup
-              -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
+           -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
 
       IAmDead -> True   -- This happens; for example, the case_bndr during case of
                         -- known constructor:  case (a,b) of x { (p,q) -> ... }
@@ -1654,7 +1652,7 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
       -- the uses in C1, C2 are not 'interesting'
       -- An example that gets worse if you add int_cxt here is 'clausify'
 
-      -- InsideLam: check for acceptable work duplication, using isCheapUnfoldign
+      -- InsideLam: check for acceptable work duplication, using isCheapUnfolding
       -- int_cxt to prevent us inlining inside a lambda without some
       -- good reason.  See the notes on int_cxt in preInlineUnconditionally
 

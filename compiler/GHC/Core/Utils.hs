@@ -32,6 +32,7 @@ module GHC.Core.Utils (
         isCheapApp, isExpandableApp, isSaturatedConApp,
         exprIsTickedString, exprIsTickedString_maybe,
         exprIsTopLevelBindable,
+        exprIsUnaryClassFun, isUnaryClassId,
         altsAreExhaustive, etaExpansionTick,
 
         -- * Equality
@@ -74,7 +75,7 @@ import GHC.Core.Ppr
 import GHC.Core.FVs( bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
-import GHC.Core.Predicate( isCoVarType )
+import GHC.Core.Predicate( isCoVarType, isUnaryClass )
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCo.Compare( eqType, eqTypeX )
 import GHC.Core.Coercion
@@ -1294,8 +1295,8 @@ trivial_expr_fold :: (Id -> r) -> (Literal -> r) -> r -> r -> CoreExpr -> r
 -- * `case e of {}` an empty case
 trivial_expr_fold k_id k_lit k_triv k_not_triv = go
   where
-    -- If you change this function, be sure to change SetLevels.notWorthFloating
-    -- as well!
+    -- If you change this function, be sure to change
+    -- SetLevels.notWorthFloating as well!
     -- (Or yet better: Come up with a way to share code with this function.)
     go (Var v)                            = k_id v  -- See Note [Variables are trivial]
     go (Lit l)    | litIsTrivial l        = k_lit l
@@ -1303,7 +1304,7 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     go (Coercion _)                       = k_triv
     go (App f arg)
       | not (isRuntimeArg arg)            = go f
-      | is_unary_cls_op f                 = go arg
+      | exprIsUnaryClassFun f             = go arg
       | otherwise                         = k_not_triv
     go (Lam b e)  | not (isRuntimeVar b)  = go e
     go (Tick t e) | not (tickishIsCode t) = go e              -- See Note [Tick trivial]
@@ -1314,11 +1315,6 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
       | Just rhs <- isUnsafeEqualityCase e b as
       = go rhs   -- See (U2) of Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
     go _                                  = k_not_triv
-
-    -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
-    is_unary_cls_op (App f (Type {}))       = is_unary_cls_op f
-    is_unary_cls_op (Var v)                 = isUnaryClassId v
-    is_unary_cls_op _                       = False
 
 exprIsTrivial :: CoreExpr -> Bool
 exprIsTrivial e = trivial_expr_fold (const True) (const True) True False e
@@ -1712,14 +1708,31 @@ get this:
 So we treat the application of a function (negate in this case) to a
 *dictionary* as expandable.  In effect, every function is CONLIKE when
 it's applied only to dictionaries.
+-}
+
+isUnaryClassId :: Id -> Bool
+-- True of (a) the method selector (classop)
+--         (b) the dictionary data constructor
+-- of a unary class
+isUnaryClassId v
+  | Just cls <- isClassOpId_maybe v     = isUnaryClass cls
+  | Just dc  <- isDataConWorkId_maybe v = isUnaryClassDataCon dc
+  | otherwise                           = False
+
+exprIsUnaryClassFun :: CoreExpr -> Bool
+-- True of an a type application (f @t1 .. @tn),
+-- where `f` is a unary-class-id
+-- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
+exprIsUnaryClassFun (App f (Type {}))       = exprIsUnaryClassFun f
+exprIsUnaryClassFun (Var v)                 = isUnaryClassId v
+exprIsUnaryClassFun _                       = False
 
 
-************************************************************************
+{- *********************************************************************
 *                                                                      *
              exprOkForSpeculation
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 -----------------------------
 -- | To a first approximation, 'exprOkForSpeculation' returns True of

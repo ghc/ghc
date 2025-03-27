@@ -69,7 +69,7 @@ module GHC.Types.Id (
         isClassOpId,
         isClassOpId_maybe, isDFunId,
         isPrimOpId, isPrimOpId_maybe,
-        isFCallId, isFCallId_maybe, isUnaryClassId,
+        isFCallId, isFCallId_maybe,
         isDataConWorkId, isDataConWorkId_maybe,
         isDataConWrapId, isDataConWrapId_maybe, dataConWrapUnfolding_maybe,
         isDataConId, isDataConId_maybe,
@@ -145,7 +145,7 @@ import GHC.Core ( CoreExpr, CoreRule, Unfolding(..), IdUnfoldingFun
                 , isStableUnfolding, isCompulsoryUnfolding, isEvaldUnfolding
                 , hasSomeUnfolding, noUnfolding, evaldUnfolding )
 import GHC.Core.Type
-import GHC.Core.Predicate( isCoVarType, isUnaryClass )
+import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Core.Multiplicity
@@ -578,12 +578,6 @@ isJoinId id
                 JoinId {} -> True
                 _         -> False
   | otherwise = False
-
-isUnaryClassId :: Id -> Bool
-isUnaryClassId v
-  | Just cls <- isClassOpId_maybe v     = isUnaryClass cls
-  | Just dc  <- isDataConWorkId_maybe v = isUnaryClassDataCon dc
-  | otherwise                           = False
 
 -- | Doesn't return strictness marks
 idJoinPointHood :: Var -> JoinPointHood
