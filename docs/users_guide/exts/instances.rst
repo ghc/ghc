@@ -417,7 +417,7 @@ Overlapping instances
     :status: Deprecated
 
     Deprecated extension to weaken checks intended to ensure instance resolution
-    termination.
+    termination. Use ``OVERLAPPING``, ``OVERLAPPABLE`` or ``OVERLAPS`` pragmas instead.
 
 .. extension:: IncoherentInstances
     :shortdesc: Allow definitions of instances that may result in incoherence.
@@ -429,7 +429,9 @@ Overlapping instances
     :status: Deprecated
 
     Deprecated extension to weaken checks intended to ensure instance resolution
-    termination.
+    termination. Use ``INCOHERENT`` pragmas instead. Also permits classes to
+    have non-nominal roles, and affects the instance resolution algorithm for
+    in-scope given constraints.
 
 In general, as discussed in :ref:`instance-resolution`, *GHC requires
 that it be unambiguous which instance declaration should be used to
@@ -473,11 +475,15 @@ Now suppose that, in some client module, we are searching for an
 instance of the *target constraint* ``(C ty1 .. tyn)``. The search works
 like this:
 
+-  If there are any in-scope given constraints that might match the target
+   constraint (after unifying any metavariables), and
+   :extension:`IncoherentInstances` is not enabled, the search fails.
+
 -  Find all instances :math:`I` that *match* the target constraint; that is, the
    target constraint is a substitution instance of :math:`I`. These instance
    declarations are the *candidates*.
 
--  If no candidates remain, the search fails
+-  If there are no candidates, the search fails.
 
 -  Eliminate any candidate :math:`IX` for which there is another candidate
    :math:`IY` such that both of the following hold:
@@ -498,7 +504,7 @@ like this:
 -  Otherwise there is exactly one non-incoherent candidate; call it the
    "prime candidate".
 
--  Now find all instances, or in-scope given constraints, that *unify* with
+-  Now find all instances that *unify* with
    the target constraint,
    but do not *match* it. Such non-candidate instances might match when
    the target constraint is further instantiated. If all of them are
@@ -596,8 +602,8 @@ declaration, thus: ::
 
 (You need :extension:`FlexibleContexts` to do this.)
 
-In the unification check in the final bullet, GHC also uses the
-"in-scope given constraints".  Consider for example ::
+As an example of the "in-scope given constraints" in the first bullet,
+consider ::
 
    instance C a Int
 
@@ -609,7 +615,7 @@ top-level instance, because a particular call of ``g`` might
 instantiate both ``b`` and ``c`` to the same type, which would
 allow the constraint to be solved in a different way.  This latter
 restriction is principally to make the constraint-solver complete.
-(Interested folk can read ``Note [Instance and Given overlap]`` in ``TcInteract``.)
+(Interested folk can read ``Note [Instance and Given overlap]`` in ``GHC.Tc.Solver.Dict``.)
 It is easy to avoid: in a type signature avoid a constraint that
 matches a top-level instance.  The flag :ghc-flag:`-Wsimplifiable-class-constraints` warns about such signatures.
 
@@ -659,6 +665,22 @@ matches a top-level instance.  The flag :ghc-flag:`-Wsimplifiable-class-constrai
     (An alternative possible behaviour, not currently implemented, would be
     to reject module ``Help`` on the grounds that a later instance
     declaration might overlap the local one.)
+
+.. warning::
+     GHC's optimiser (in particular, the :ghc-flag:`-fspecialise` option)
+     assumes that type-classes are coherent, and hence it may replace
+     any type-class dictionary argument with another dictionary of the same
+     type.
+
+     This may cause unexpected results if incoherence occurs due to incoherent
+     or overlapping instances, and there is an observable difference between the
+     instances (see :ghc-ticket:`22448` and :ghc-ticket:`24924` for examples).
+
+     The :ghc-flag:`-fno-specialise-incoherents <-fspecialise-incoherents>` will
+     inhibit specialisation in the presence of some incoherent instance matches,
+     which may help avoid this issue at the cost of runtime performance.
+     Alternatively, specialisation can be disabled entirely with
+     :ghc-flag:`-fno-specialise <-fspecialise>`.
 
 .. _instance-sigs:
 
