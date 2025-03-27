@@ -1145,7 +1145,7 @@ notWorthFloating e abs_vars
                              litIsTrivial lit   -- See (NWF1)
     go (Type {}) _         = True
     go (Tick t e) n        = not (tickishIsCode t) && go e n
-    go (Cast e _) n        = n==0 ||  -- See (NWF3)
+    go (Cast e _) n        = n==0 || go e n     -- See (NWF3)
     go (Coercion {}) _     = True
     go (App e arg) n
        | Type {} <- arg    = go e n    -- Just types, not coercions (NWF2)
@@ -1246,14 +1246,12 @@ For example:
   Hence testing `n_abs_vars only` at the very end.
 -}
 
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection{Bindings}
+                       Bindings
+        This binding stuff works for top level too.
 *                                                                      *
-************************************************************************
-
-The binding stuff works for top level too.
--}
+********************************************************************* -}
 
 lvlBind :: LevelEnv
         -> CoreBindWithFVs
