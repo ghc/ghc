@@ -60,9 +60,8 @@ import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
 import GHC.Core.Coercion( mkSymCo )
 import GHC.Core.Type (mkStrLitTy, mkCastTy)
-import GHC.Core.TyCo.Ppr( pprTyVars )
-import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
 import GHC.Core.TyCo.Ppr( pprTyVarsWithKind )
+import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
 
 import GHC.Builtin.Types ( mkConstraintTupleTy, multiplicityTy, oneDataConTy  )
 import GHC.Builtin.Types.Prim
