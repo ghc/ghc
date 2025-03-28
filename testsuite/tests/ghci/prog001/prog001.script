@@ -1,12 +1,9 @@
 :unset +s
 
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-
 -- first, tidy up:
-:shell rm -f *.hi *.o *~
-:shell cp C1.hs C.hs
-:shell cp D1.hs D.hs
+:!rm -f *.hi *.o *~
+:!cp C1.hs C.hs
+:!cp D1.hs D.hs
 
 -- load the program (all interpreted)
 :load A.hs
@@ -18,20 +15,20 @@
 main
 
 -- change a module + recompile
-:shell echo >> C.hs
+:!echo >> C.hs
 :reload
 
 -- make sure `main' still works
 main
 
 -- compile D & reload
-:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c D.hs
+:!"$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c D.hs
 :reload
 main
 
 -- change D, recompile & reload
-:shell cp D2.hs D.hs
-:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c D.hs
+:!cp D2.hs D.hs
+:!"$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c D.hs
 :reload
 :load A.hs
 

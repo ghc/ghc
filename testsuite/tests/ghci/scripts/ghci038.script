@@ -1,24 +1,20 @@
 -- Tests for ":show imports" and import/:module
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-:l
-
 :show imports
 import Prelude
 :show imports
-:shell echo "== map in scope due to explicit 'import Prelude'"
+:!echo "== map in scope due to explicit 'import Prelude'"
 :t map
 import Prelude ()
 :show imports
-:shell echo "== still in scope, 'import Prelude ()' is subsumed by 'import Prelude'"
+:!echo "== still in scope, 'import Prelude ()' is subsumed by 'import Prelude'"
 :t map
 :module -Prelude
 :show imports
-:shell echo "== still in scope, implicit import of Prelude"
+:!echo "== still in scope, implicit import of Prelude"
 :t map
 import Prelude ()
 :show imports
-:shell echo "== not in scope now"
+:!echo "== not in scope now"
 :t map
 
 :module -Prelude
@@ -27,11 +23,11 @@ import Prelude ()
 
 :t x
 :show imports
-:shell echo ":m -Foo"
+:!echo ":m -Foo"
 :m -Foo
 :show imports
 :t x
-:shell echo ":m +*Foo"
+:!echo ":m +*Foo"
 :m +*Foo
 :show imports
 :t x

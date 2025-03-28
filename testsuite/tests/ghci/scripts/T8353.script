@@ -1,8 +1,4 @@
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-:l
-
-:shell cp Defer03_before.hs Defer03.hs
+:!cp Defer03_before.hs Defer03.hs
 
 -- Test :load! and :reload!
 
@@ -21,10 +17,10 @@
 :reload
 
 -- now, after modifying, reloading should fail
-:shell echo "-- an extra comment so that the hash changes" >> Defer03.hs
+:!echo "-- an extra comment so that the hash changes" >> Defer03.hs
 :reload
 
 -- using the deferred version of reload, loading should succeed again
 :reload!
 
-:shell rm Defer03.hs
+:!rm Defer03.hs

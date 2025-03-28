@@ -1,16 +1,13 @@
 -- test for #1205
 
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-
-:shell rm -f A.o A.hi B.o B.hi
+:!rm -f A.o A.hi B.o B.hi
 
 :load A
 -- we can see both f and g (only f is exported)
 :type f
 :type g
 
-:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c A.hs
+:!"$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c A.hs
 
 :load A
 -- we can now see only f
@@ -24,7 +21,7 @@
 :type f
 :type g
 
-:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c B.hs
+:!"$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c B.hs
 :load B
 
 -- this will tell us we need to load A interpreted
