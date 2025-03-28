@@ -453,7 +453,7 @@ commitFlexi (SkolemiseFlexi tvs_ref) tv zonked_kind
        ; return (mkTyVarTy skol_tv) }
 
 commitFlexi RuntimeUnkFlexi tv zonked_kind
-  = do { traceTc "Defaulting flexi tyvar to RuntimeUnk:" (pprTyVar tv)
+  = do { traceTc "Defaulting flexi tyvar to RuntimeUnk:" (pprTyVarWithKind tv)
        ; return (mkTyVarTy (mkTcTyVar (tyVarName tv) zonked_kind RuntimeUnk)) }
             -- This is where RuntimeUnks are born:
             -- otherwise-unconstrained unification variables are
