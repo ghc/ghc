@@ -1,6 +1,5 @@
 {-# language GADTs, LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE CPP #-}
 
 module GHC.CmmToAsm.AArch64.CodeGen (
       cmmTopCodeGen
@@ -283,11 +282,11 @@ generateJumpTableForInstr config (J_TBL ids (Just lbl) _) =
               )
             where
               blockLabel = blockLbl blockid
-#if defined(mingw32_HOST_OS)
-   in Just (CmmData (Section Text lbl) (CmmStaticsRaw lbl jumpTable))
-#else
-   in Just (CmmData (Section ReadOnlyData lbl) (CmmStaticsRaw lbl jumpTable))
-#endif
+      sectionType = case platformOS (ncgPlatform config) of
+        -- Aarch64 Windows platform requires LLVM 20 to support .rodata
+        OSMinGW32 -> Text
+        _         -> ReadOnlyData
+   in Just (CmmData (Section sectionType lbl) (CmmStaticsRaw lbl jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 
 -- -----------------------------------------------------------------------------

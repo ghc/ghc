@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 module GHC.CmmToAsm.Reg.Linear.AArch64 where
 
 import GHC.Prelude
@@ -120,11 +118,8 @@ getFreeRegs :: RegClass -> FreeRegs -> [RealReg]
 getFreeRegs cls (FreeRegs g f) =
   case cls of
     RcFloatOrVector -> go 32 f 31
-#if defined(mingw32_HOST_OS)
-    RcInteger       -> go  0 g 17
-#else
+    -- x18 is a platform-reserved register for Win/Mac and free for Linux (See Note [Aarch64 Register x18 at Darwin and Windows])
     RcInteger       -> go  0 g 18
-#endif
     where
         go _   _ i | i < 0 = []
         go off x i | testBit x i = RealRegSingle (off + i) : (go off x $! i - 1)

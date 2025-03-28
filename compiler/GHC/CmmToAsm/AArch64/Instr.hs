@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE CPP #-}
 
 module GHC.CmmToAsm.AArch64.Instr
 
@@ -212,17 +211,13 @@ regUsageOfInstr platform instr = case instr of
 -- | <---- argument passing -------------> | <-- callee saved (lower 64 bits) ---> | <--------------------------------------- caller saved ----------------------> |
 -- | <------ free registers -------------> | F1 | F2 | F3 | F4 | D1 | D2 | D3 | D4 | <------ free registers -----------------------------------------------------> |
 -- '---------------------------------------------------------------------------------------------------------------------------------------------------------------'
--- IR: Indirect result location register, IP: Intra-procedure register, PL: Platform register, FP: Frame pointer, LR: Link register, SP: Stack pointer
+-- IR: Indirect result location register, IP: Intra-procedure register, PL: Platform register (See Note [Aarch64 Register x18 at Darwin and Windows]), FP: Frame pointer, LR: Link register, SP: Stack pointer
 -- BR: Base, SL: SpLim
 --
 -- TODO: The zero register is currently mapped to -1 but should get it's own separate number.
 callerSavedRegisters :: [Reg]
 callerSavedRegisters
-#if defined(mingw32_HOST_OS)
-    = map regSingle [0..17]
-#else
     = map regSingle [0..18]
-#endif
     ++ map regSingle [32..39]
     ++ map regSingle [48..63]
 
