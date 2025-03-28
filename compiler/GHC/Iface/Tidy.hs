@@ -413,7 +413,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
   let implicit_binds = concatMap getImplicitBinds tcs
       all_binds = implicit_binds ++ binds
 
-  (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod all_binds imp_rules
+  (unfold_env, tidy_occ_env) <- chooseExternalVars opts mod all_binds imp_rules
   let (trimmed_binds, trimmed_rules) = findExternalRules opts all_binds imp_rules unfold_env
 
   (tidy_env, tidy_binds) <- tidyTopBinds unfold_env boot_exports tidy_occ_env trimmed_binds
@@ -625,7 +625,7 @@ Oh: two other reasons for injecting them late:
 
   - If implicit Ids are already in the bindings when we start tidying,
     we'd have to be careful not to treat them as external Ids (in
-    the sense of chooseExternalIds); else the Ids mentioned in *their*
+    the sense of chooseExternalVars); else the Ids mentioned in *their*
     RHSs will be treated as external and you get an interface file
     saying      a18 = <blah>
     but nothing referring to a18 (because the implicit Id is the
@@ -683,14 +683,14 @@ type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
   --
   -- Bool => expose unfolding or not.
 
-chooseExternalIds :: TidyOpts
+chooseExternalVars :: TidyOpts
                   -> Module
                   -> [CoreBind]
                   -> [CoreRule]
                   -> IO (UnfoldEnv, TidyOccEnv)
                   -- Step 1 from the notes above
 
-chooseExternalIds opts mod binds imp_id_rules
+chooseExternalVars opts mod binds imp_id_rules
   = do { (unfold_env1,occ_env1) <- search init_work_list emptyVarEnv init_occ_env
        ; let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
        ; tidy_internal internal_ids unfold_env1 occ_env1 }
@@ -767,7 +767,7 @@ chooseExternalIds opts mod binds imp_id_rules
                 -- unfolding in the *definition*; so look up in binder_set
           refined_id = case lookupVarSet binder_set idocc of
                          Just id -> id
-                         Nothing -> warnPprTrace True "chooseExternalIds" (ppr idocc) idocc
+                         Nothing -> warnPprTrace True "chooseExternalVars" (ppr idocc) idocc
 
           unfold_env' = extendVarEnv unfold_env idocc (name',show_unfold)
           referrer' | isExportedId refined_id = refined_id
@@ -783,7 +783,7 @@ chooseExternalIds opts mod binds imp_id_rules
       let unfold_env' = extendVarEnv unfold_env id (name',False)
       tidy_internal ids unfold_env' occ_env'
 
-addExternal :: TidyOpts -> Id -> ([Id], Bool)
+addExternal :: TidyOpts -> Var -> ([Var], Bool)
 addExternal opts id
   | ExposeNone <- opt_expose_unfoldings opts
   , not (isCompulsoryUnfolding unfolding)
@@ -964,7 +964,7 @@ dffvExpr _other               = return ()
 dffvAlt :: CoreAlt -> DFFV ()
 dffvAlt (Alt _ xs r) = extendScopeList xs (dffvExpr r)
 
-dffvBind :: (Id, CoreExpr) -> DFFV ()
+dffvBind :: (Var, CoreExpr) -> DFFV ()
 dffvBind(x,r)
   | not (isId x) = dffvExpr r
   | otherwise    = dffvLetBndr False x >> dffvExpr r
@@ -1023,7 +1023,7 @@ The function 'expose_rule' filters out rules that mention, on the LHS,
 Ids that aren't externally visible; these rules can't fire in a client
 module.
 
-The externally-visible binders are computed (by chooseExternalIds)
+The externally-visible binders are computed (by chooseExternalVars)
 assuming that all orphan rules are externalised (see init_ext_ids in
 function 'search'). So in fact it's a bit conservative and we may
 export more than we need.  (It's a sort of mutual recursion.)
@@ -1104,7 +1104,7 @@ findExternalRules opts binds imp_id_rules unfold_env
         -- LHS: we have already filtered out rules that mention internal Ids
         --     on LHS but that isn't enough because we might have by now
         --     discarded a binding with an external Id. (How?
-        --     chooseExternalIds is a bit conservative.)
+        --     chooseExternalVars is a bit conservative.)
         --
         -- RHS: the auto rules that might mention a binder that has
         --      been discarded; see Note [Trimming auto-rules]
