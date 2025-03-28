@@ -1601,24 +1601,40 @@ postInlineUnconditionally
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 postInlineUnconditionally env bind_cxt old_bndr bndr rhs
-  | not active                  = False
-  | isWeakLoopBreaker occ_info  = False -- If it's a loop-breaker of any kind, don't inline
-                                        -- because it might be referred to "earlier"
-  | isStableUnfolding unfolding = False -- Note [Stable unfoldings and postInlineUnconditionally]
-  | isTopLevel (bindContextLevel bind_cxt)
-                                = False -- Note [Top level and postInlineUnconditionally]
-  | exprIsTrivial rhs           = True
-  | BC_Join {} <- bind_cxt      = False -- See point (1) of Note [Duplicating join points]
+  | not active                   = False
+  | isWeakLoopBreaker occ_info   = False -- If it's a loop-breaker of any kind, don't inline
+                                         -- because it might be referred to "earlier"
+  | isStableUnfolding unfolding  = False -- Note [Stable unfoldings and postInlineUnconditionally]
+  | BC_Join {} <- bind_cxt       = False -- See point (1) of Note [Duplicating join points]
                                         --     in GHC.Core.Opt.Simplify.Iteration
+  | is_top_lvl, isDeadEndId bndr = False -- Note [Top-level bottoming Ids]
   | otherwise
   = case occ_info of
+      IAmALoopBreaker {} -> False
+      ManyOccs {} | is_top_lvl -> False  -- Note [Top level and postInlineUnconditionally]
+                  | otherwise  -> exprIsTrivial rhs
       OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
+              -> post_inline_one_occ in_lam int_cxt n_br
+      IAmDead -> True   -- This happens; for example, the case_bndr during case of
+                        -- known constructor:  case (a,b) of x { (p,q) -> ... }
+                        -- Here x isn't mentioned in the RHS, so we don't want to
+                        -- create the (dead) let-binding  let x = (a,b) in ...
+  where
+    post_inline_one_occ in_lam int_cxt n_br
         -- See Note [Inline small things to avoid creating a thunk]
 
-        | n_br >= 100 -> False  -- See #23627
+        | n_br == 1                 -- One syntactic occurrence
+        = work_ok in_lam int_cxt    -- See Note [Post-inline for single-use things]
 
-        | n_br == 1                  -- One syntactic occurrence
-        -> work_ok in_lam int_cxt    -- See Note [Post-inline for single-use things]
+        | n_br >= 100    -- See #23627
+        = False
+
+        | is_demanded    -- No allocation (it'll be a case expression in the end)
+        = False          -- so inlining duplicates code but nothing more
+
+        | otherwise    -- -- Multiple syntactic occurences; but lazy
+        = work_ok in_lam int_cxt && smallEnoughToInline uf_opts unfolding
+           -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
 
 --        | is_unlifted                        -- Unlifted binding, hence ok-for-spec
 --        -> True                              -- hence cheap to inline probably just a primop
@@ -1626,26 +1642,13 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
 -- No, this is wrong.  {v = p +# q; x = K v}.
 -- Don't inline v; it'll just get floated out again. Stupid.
 
-        | is_demanded    -- No allocation (it'll be a case expression in the end)
-        -> False         -- so inlining duplicates code but nothing more
+    is_top_lvl = isTopLevel (bindContextLevel bind_cxt)
 
-        | otherwise    -- -- Multiple syntactic occurences; but lazy
-        -> work_ok in_lam int_cxt && smallEnoughToInline uf_opts unfolding
-           -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
-
-      IAmDead -> True   -- This happens; for example, the case_bndr during case of
-                        -- known constructor:  case (a,b) of x { (p,q) -> ... }
-                        -- Here x isn't mentioned in the RHS, so we don't want to
-                        -- create the (dead) let-binding  let x = (a,b) in ...
-
-      _ -> False
-
-  where
-    work_ok NotInsideLam _              = True
+    work_ok NotInsideLam _              = not is_top_lvl  -- Not quite sure here
     work_ok IsInsideLam  IsInteresting  = isCheapUnfolding unfolding
     work_ok IsInsideLam  NotInteresting = False
-      -- NotInsideLam: outside a lambda, we want to be reasonably aggressive
-      -- about inlining into multiple branches of case
+      -- NotInsideLam: outside a lambda, when not at top-level we want to be
+      -- reasonably aggressive about inlining into multiple branches of case
       -- e.g. let x = <non-value>
       --      in case y of { C1 -> ..x..; C2 -> ..x..; C3 -> ... }
       -- Inlining can be a big win if C3 is the hot-spot, even if
