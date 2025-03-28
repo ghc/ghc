@@ -1394,14 +1394,15 @@ creates specialised versions of functions.
 scBind :: TopLevelFlag -> ScEnv -> InBind
        -> (ScEnv -> UniqSM (ScUsage, a, [SpecFailWarning]))   -- Specialise the scope of the binding
        -> UniqSM (ScUsage, [OutBind], a, [SpecFailWarning])
-scBind top_lvl env (NonRec bndr rhs) do_body
+scBind top_lvl env bind@(NonRec bndr rhs) do_body
   | Type rhs_ty <- rhs
   = assertPpr (isTyVar bndr) (ppr bndr) $
     if isTopLevel top_lvl then
       -- At top level there is nothing to do; no need to clone,
       -- and the tyvar is already in scope, with the correct unfolding
+      assertPpr (isEmptySubst (sc_subst env)) (ppr bndr $$ ppr (sc_subst env)) $
       do { (final_usage, body', warnings) <- do_body env
-         ; return (final_usage, [], body', warnings) }
+         ; return (final_usage, [bind], body', warnings) }
    else
       -- Type-lets may be created by doBeta, so the tyvar
       -- may or may not have a proper TyVarUnfolding
