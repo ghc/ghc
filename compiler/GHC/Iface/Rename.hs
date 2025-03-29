@@ -107,6 +107,7 @@ rnModIface hsc_env insts nsubst iface =
         insts <- mapM rnIfaceClsInst (mi_insts iface)
         fams <- mapM rnIfaceFamInst (mi_fam_insts iface)
         deps <- rnDependencies (mi_deps iface)
+        defaults <- mapM rnIfaceDefault (mi_defaults iface)
         -- TODO:
         -- mi_rules
         return $ iface
@@ -117,6 +118,7 @@ rnModIface hsc_env insts nsubst iface =
           & set_mi_exports exports
           & set_mi_decls decls
           & set_mi_deps deps
+          & set_mi_defaults defaults
 
 -- | Rename just the exports of a 'ModIface'.  Useful when we're doing
 -- shaping prior to signature merging.
@@ -403,6 +405,14 @@ rnIfaceClsInst cls_inst = do
     return cls_inst { ifInstCls = n
                     , ifInstTys = tys
                     , ifDFun = dfun
+                    }
+
+rnIfaceDefault :: Rename IfaceDefault
+rnIfaceDefault cls_inst = do
+    n <- rnIfaceGlobal (ifDefaultCls cls_inst)
+    tys <- mapM rnIfaceType (ifDefaultTys cls_inst)
+    return cls_inst { ifDefaultCls = n
+                    , ifDefaultTys = tys
                     }
 
 rnRoughMatchTyCon :: Rename (Maybe IfaceTyCon)

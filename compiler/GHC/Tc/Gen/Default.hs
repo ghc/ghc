@@ -12,7 +12,6 @@ import GHC.Prelude
 
 import GHC.Hs
 import GHC.Core.Class
-import GHC.Core.TyCon (TyCon)
 import GHC.Core.Type( typeKind )
 
 import GHC.Types.Var( tyVarKind )
@@ -160,19 +159,19 @@ tcDefaults decls
             _ ->  mapM (declarationParts extra_clss) decls
         ; defaultEnv . concat <$> mapM (reportDuplicates here extra_clss) (groupBy ((==) `on` sndOf3) decls') }
   where
-    declarationParts :: [Class] -> LDefaultDecl GhcRn -> TcM (LDefaultDecl GhcRn, TyCon, [Type])
-    reportDuplicates :: Module -> [Class] -> NonEmpty (LDefaultDecl GhcRn, TyCon, [Type]) -> TcM [ClassDefaults]
+    declarationParts :: [Class] -> LDefaultDecl GhcRn -> TcM (LDefaultDecl GhcRn, Class, [Type])
+    reportDuplicates :: Module -> [Class] -> NonEmpty (LDefaultDecl GhcRn, Class, [Type]) -> TcM [ClassDefaults]
     declarationParts extra_clss decl@(L locn (DefaultDecl _ cls_tyMaybe mono_tys))
       = addErrCtxt DefaultDeclErrCtxt $
         setSrcSpan (locA locn)        $
         do { tau_tys <- mapAndReportM tc_default_ty mono_tys
            ; def_clsCon <- case cls_tyMaybe of
                Nothing ->
-                 do { numTyCon <- tcLookupTyCon numClassName
-                    ; let classTyConAndArgKinds cls = (classTyCon cls, [], tyVarKind <$> classTyVars cls)
-                          tyConsAndArgKinds = (numTyCon, [], [liftedTypeKind]) :| map classTyConAndArgKinds extra_clss
+                 do { numTyCls <- tcLookupClass numClassName
+                    ; let classTyConAndArgKinds cls = (cls, [], tyVarKind <$> classTyVars cls)
+                          tyConsAndArgKinds = (numTyCls, [], [liftedTypeKind]) :| map classTyConAndArgKinds extra_clss
                     ; void $ mapAndReportM (check_instance_any tyConsAndArgKinds) tau_tys
-                    ; return numTyCon }
+                    ; return numTyCls }
                Just cls_name ->
                  do { named_deflt <- xoptM LangExt.NamedDefaults
                     ; checkErr named_deflt (TcRnIllegalNamedDefault decl)
@@ -180,15 +179,14 @@ tcDefaults decls
                                                  , sig_bndrs = HsOuterImplicit{hso_ximplicit = []}
                                                  , sig_body  = noLocA $ HsTyVar noAnn NotPromoted cls_name})
                     ; (_cls_tvs, cls, cls_tys, cls_arg_kinds) <- tcHsDefault cls_ty
-                    ; let clsTyCon = classTyCon cls
                     ; case cls_arg_kinds
-                      of [k] -> void $ mapAndReportM (check_instance_any (NE.singleton (clsTyCon, cls_tys, [k]))) tau_tys
+                      of [k] -> void $ mapAndReportM (check_instance_any (NE.singleton (cls, cls_tys, [k]))) tau_tys
                          _ -> addErrTc (TcRnNonUnaryTypeclassConstraint DefaultDeclCtxt cls_ty)
-                    ; return clsTyCon }
+                    ; return cls }
            ; return (decl, def_clsCon, tau_tys) }
     reportDuplicates here extra_clss ((_, clsCon, tys) :| [])
       = pure [ ClassDefaults{cd_class = c, cd_types = tys, cd_module = Just here, cd_warn = Nothing}
-             | c <- clsCon : map classTyCon extra_clss ]
+             | c <- clsCon : extra_clss ]
     -- Report an error on multiple default declarations for the same class in the same module.
     -- See Note [Disambiguation of multiple default declarations] in GHC.Tc.Module
     reportDuplicates _ _ decls@((L locn _, cls, _) :| _)
@@ -208,13 +206,13 @@ tc_default_ty hs_ty
 -- parameters and the expected kinds of the remaining parameters. We report
 -- an error unless there's only one remaining parameter to fill and the given
 -- type has the expected kind.
-check_instance_any :: NonEmpty (TyCon, [Type], [Kind]) -> Type -> TcM ()
+check_instance_any :: NonEmpty (Class, [Type], [Kind]) -> Type -> TcM ()
 check_instance_any deflt_clss ty
  = do   { oks <- mapM (check_instance ty) deflt_clss
         ; checkTc (or oks) (TcRnBadDefaultType ty (NE.map fstOf3 deflt_clss))
         }
 
-check_instance :: Type -> (TyCon, [Type], [Kind]) -> TcM Bool
+check_instance :: Type -> (Class, [Type], [Kind]) -> TcM Bool
 -- Check that ty is an instance of cls
 -- We only care about whether it worked or not; return a boolean
 -- This checks that  cls :: k -> Constraint
@@ -223,12 +221,12 @@ check_instance :: Type -> (TyCon, [Type], [Kind]) -> TcM Bool
 -- concerned with classes like
 --    Num      :: Type -> Constraint
 --    Foldable :: (Type->Type) -> Constraint
-check_instance ty (clsTyCon, clsArgs, [cls_argKind])
+check_instance ty (cls, clsArgs, [cls_argKind])
   | cls_argKind `tcEqType` typeKind ty
-  = simplifyDefault [mkTyConApp clsTyCon (clsArgs ++ [ty])]
+  = simplifyDefault [mkTyConApp (classTyCon cls) (clsArgs ++ [ty])]
 check_instance _ _
   = return False
 
-dupDefaultDeclErr :: TyCon -> NonEmpty (LDefaultDecl GhcRn) -> TcRnMessage
+dupDefaultDeclErr :: Class -> NonEmpty (LDefaultDecl GhcRn) -> TcRnMessage
 dupDefaultDeclErr cls (L _ DefaultDecl {} :| dup_things)
   = TcRnMultipleDefaultDeclarations cls dup_things

@@ -408,10 +408,10 @@ mkIface_ hsc_env
 defaultsToIfaceDefaults :: DefaultEnv -> [IfaceDefault]
 defaultsToIfaceDefaults = map toIface . defaultList
   where
-    toIface ClassDefaults { cd_class = clsTyCon
+    toIface ClassDefaults { cd_class = cls
                           , cd_types = tys
                           , cd_warn = warn }
-      = IfaceDefault { ifDefaultCls = toIfaceTyCon clsTyCon
+      = IfaceDefault { ifDefaultCls = className cls
                      , ifDefaultTys = map toIfaceType tys
                      , ifDefaultWarn = fmap toIfaceWarningTxt warn }
 

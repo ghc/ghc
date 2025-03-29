@@ -6053,7 +6053,7 @@ suggestNonCanonicalDefinition reason =
     doc_monad =
       "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return"
 
-suggestDefaultDeclaration :: TyCon -> [Type] -> [[Type]] -> [GhcHint]
+suggestDefaultDeclaration :: Class-> [Type] -> [[Type]] -> [GhcHint]
 suggestDefaultDeclaration cls prefix seqs =
   [SuggestDefaultDeclaration cls $ supersequence (prefix : seqs)]
   where
