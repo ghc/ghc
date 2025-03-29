@@ -576,7 +576,7 @@ instance Diagnostic TcRnMessage where
     TcRnBadDefaultType ty deflt_clss
       -> mkSimpleDecorated $
            hang (text "The default type" <+> quotes (ppr ty) <+> text "is not an instance of")
-              2 (foldr1 (\a b -> a <+> text "or" <+> b) (map (quotes. ppr) deflt_clss))
+              2 (foldr1 (\a b -> a <+> text "or" <+> b) (NE.map (quotes. ppr) deflt_clss))
     TcRnPatSynBundledWithNonDataCon
       -> mkSimpleDecorated $
            text "Pattern synonyms can be bundled only with datatypes."
@@ -5923,7 +5923,7 @@ suggestNonCanonicalDefinition reason =
     doc_monad =
       "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return"
 
-suggestDefaultDeclaration :: TyCon -> [Type] -> [[Type]] -> [GhcHint]
+suggestDefaultDeclaration :: Class-> [Type] -> [[Type]] -> [GhcHint]
 suggestDefaultDeclaration cls prefix seqs =
   [SuggestDefaultDeclaration cls $ supersequence (prefix : seqs)]
   where

@@ -324,7 +324,7 @@ data IfaceSrcBang
 -- See Note [Named default declarations] in GHC.Tc.Gen.Default
 -- | Exported named defaults
 data IfaceDefault
-  = IfaceDefault { ifDefaultCls  :: IfaceTyCon,            -- Defaulted class
+  = IfaceDefault { ifDefaultCls  :: IfExtName,            -- Defaulted class
                    ifDefaultTys  :: [IfaceType],          -- List of defaults
                    ifDefaultWarn :: Maybe IfaceWarningTxt }
 

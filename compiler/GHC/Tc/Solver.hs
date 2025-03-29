@@ -57,7 +57,7 @@ import GHC.Core.Unify    ( tcMatchTyKis )
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Ppr
-import GHC.Core.TyCon    ( TyCon, TyConBinder, isTypeFamilyTyCon )
+import GHC.Core.TyCon    ( TyConBinder, isTypeFamilyTyCon )
 
 import GHC.Types.Name
 import GHC.Types.DefaultEnv ( ClassDefaults (..), defaultList )
@@ -3907,7 +3907,7 @@ findDefaultableGroups (default_tys, extended_defaults) wanteds
     | group'@((_,_,tv) :| _) <- unary_groups
     , let group = toList group'
     , defaultable_tyvar tv
-    , defaultable_classes (map (classTyCon . sndOf3) group) ]
+    , defaultable_classes (map sndOf3 group) ]
   where
     simples                = approximateWC True wanteds
     (unaries, non_unaries) = partitionWith find_unary (bagToList simples)
@@ -3945,7 +3945,7 @@ findDefaultableGroups (default_tys, extended_defaults) wanteds
 
     -- Determines if any of the given type class constructors is in default_tys
     -- step (3) in Note [How type-class constraints are defaulted]
-    defaultable_classes :: [TyCon] -> Bool
+    defaultable_classes :: [Class] -> Bool
     defaultable_classes clss = not . null . intersect clss $ map cd_class default_tys
 
 ------------------------------
@@ -3973,8 +3973,8 @@ disambigGroup orig_wanteds default_ctys (tv, wanteds)
     allConsistent ((_, sub) :| subs) = all (eqSubAt tv sub . snd) subs
     defaultses =
       [ defaults | defaults@ClassDefaults{cd_class = cls} <- default_ctys
-                 , any (isDictForClass cls) wanteds ]
-    isDictForClass clcon ct = any ((clcon ==) . classTyCon . fst) (getClassPredTys_maybe $ ctPred ct)
+                 , any (isDictForClass (className cls)) wanteds ]
+    isDictForClass clcon ct = any ((clcon ==) . className . fst) (getClassPredTys_maybe $ ctPred ct)
     eqSubAt :: TcTyVar -> Subst -> Subst -> Bool
     eqSubAt tvar s1 s2 = or $ liftA2 tcEqType (lookupTyVar s1 tvar) (lookupTyVar s2 tvar)
 
