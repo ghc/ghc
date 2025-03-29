@@ -10,7 +10,7 @@ import GHC.Core.InstEnv ( InstEnv, emptyInstEnv )
 
 import GHC.Types.Avail
 import GHC.Types.CompleteMatch
-import GHC.Types.DefaultEnv ( DefaultEnv, emptyDefaultEnv )
+import GHC.Types.DefaultEnv
 import GHC.Types.TypeEnv
 import GHC.Types.Annotations ( Annotation )
 

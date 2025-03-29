@@ -135,8 +135,7 @@ import GHC.Utils.Logger
 
 import GHC.Types.Error
 import GHC.Types.Name.Reader
-import GHC.Types.DefaultEnv ( DefaultEnv, ClassDefaults (ClassDefaults, cd_class, cd_types),
-                              emptyDefaultEnv, isEmptyDefaultEnv, unitDefaultEnv, lookupDefaultEnv )
+import GHC.Types.DefaultEnv
 import GHC.Types.Fixity.Env
 import GHC.Types.Id as Id
 import GHC.Types.Id.Info( IdDetails(..) )
@@ -177,6 +176,7 @@ import Control.DeepSeq
 import Control.Monad
 import Control.Monad.Trans.Writer.CPS
 import Data.Data ( Data )
+import Data.Function (on)
 import Data.Functor.Classes ( liftEq )
 import Data.List ( sort, sortBy )
 import Data.List.NonEmpty ( NonEmpty (..) )
@@ -424,7 +424,7 @@ reportClashingDefaultImports :: [NonEmpty ClassDefaults] -> DefaultEnv -> TcM ()
 reportClashingDefaultImports importsByClass local = mapM_ check importsByClass
   where
     check cds@(ClassDefaults{cd_class = cls} :| _) = do
-      let cdLocal  = lookupDefaultEnv local (tyConName cls)
+      let cdLocal  = lookupDefaultEnv local (className cls)
       case cdLocal of
         Just ClassDefaults{cd_types = localTypes}
           | all ((`isTypeSubsequenceOf` localTypes) . cd_types) cds -> pure ()
@@ -462,8 +462,11 @@ isTypeSubsequenceOf (t1:t1s) (t2:t2s)
 
 tcRnImports :: HscEnv -> [(LImportDecl GhcPs, SDoc)] -> TcM ([NonEmpty ClassDefaults], TcGblEnv)
 tcRnImports hsc_env import_decls
-  = do  { (rn_imports, imp_user_spec, rdr_env, imports, defaults) <- rnImports import_decls ;
-
+  = do  { (rn_imports, imp_user_spec, rdr_env, imports) <- rnImports import_decls
+        -- Get the default declarations for the classes imported by this module
+        -- and group them by class.
+        ; tc_defaults <-(NE.groupBy ((==) `on` cd_class) . (concatMap defaultList))
+                        <$> tcGetClsDefaults (M.keys $ imp_mods imports)
         ; this_mod <- getModule
         ; gbl_env <- getGblEnv
         ; let unitId = homeUnitId $ hsc_home_unit hsc_env
@@ -485,8 +488,6 @@ tcRnImports hsc_env import_decls
                   updateEps_ $ \eps  -> eps { eps_is_boot = imp_boot_mods imports }
                }
 
-                -- Type check the imported default declarations
-        ; tc_defaults <- initIfaceTcRn (tcIfaceDefaults this_mod defaults)
                 -- Update the gbl env
         ; updGblEnv ( \ gbl ->
             gbl {

@@ -28,6 +28,7 @@ import GHC.Core.Rules ( RuleBase, mkRuleBase)
 
 import GHC.Types.Annotations ( AnnEnv, emptyAnnEnv )
 import GHC.Types.CompleteMatch
+import GHC.Types.DefaultEnv (DefaultEnv)
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
 
@@ -89,6 +90,7 @@ initExternalPackageState = EPS
                             , n_rules_in = length builtinRules
                             , n_rules_out = 0
                             }
+  , eps_defaults         = emptyModuleEnv
   }
 
 
@@ -167,7 +169,8 @@ data ExternalPackageState
         eps_mod_fam_inst_env :: !(ModuleEnv FamInstEnv), -- ^ The family instances accumulated from external
                                                          -- packages, keyed off the module that declared them
 
-        eps_stats :: !EpsStats                 -- ^ Statistics about what was loaded from external packages
+        eps_stats :: !EpsStats,                 -- ^ Statistics about what was loaded from external packages
+        eps_defaults :: !(ModuleEnv DefaultEnv) -- ^ Default declarations exported by external packages
   }
 
 -- | Accumulated statistics about what we are putting into the 'ExternalPackageState'.
