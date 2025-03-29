@@ -34,6 +34,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.Module (ModuleName, Module)
 import GHC.Unit.Module.Imported (ImportedModsVal)
 import GHC.Hs.Extension (GhcTc, GhcRn, GhcPs)
+import GHC.Core.Class (Class)
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv (FamFlavor)
 import GHC.Core.TyCon (TyCon)
@@ -479,7 +480,7 @@ data GhcHint
   | SuggestBindTyVarExplicitly Name
 
   {-| Suggest a default declaration; e.g @default Cls (Ty1, Ty2)@ -}
-  | SuggestDefaultDeclaration TyCon [Type]
+  | SuggestDefaultDeclaration Class [Type]
 
   {-| Suggest using explicit deriving strategies for a deriving clause.
 

@@ -7,6 +7,7 @@
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Tc.Utils.Env(
         TyThing(..), TcTyThing(..), TcId,
@@ -67,7 +68,7 @@ module GHC.Tc.Utils.Env(
         newDFunName,
         newFamInstTyConName, newFamInstAxiomName,
         mkStableIdFromString, mkStableIdFromName,
-        mkWrapperName,
+        mkWrapperName, tcGetClsDefaults,
   ) where
 
 import GHC.Prelude
@@ -105,7 +106,10 @@ import GHC.Core.Class
 
 
 import GHC.Unit.Module
+import GHC.Unit.Module.ModDetails
 import GHC.Unit.Home
+import GHC.Unit.Home.Graph
+import GHC.Unit.Home.ModInfo
 import GHC.Unit.External
 
 import GHC.Utils.Outputable
@@ -342,6 +346,20 @@ tcLookupInstance cls tys
   where
     uniqueTyVars tys = all isTyVarTy tys
                     && hasNoDups (map getTyVar tys)
+
+-- | Get the default types for classes
+-- explicitly not combined to be use for `reportClashingDefaultImports`
+tcGetClsDefaults :: [Module] -> TcM [DefaultEnv]
+tcGetClsDefaults mods = do
+  hug <- hsc_HUG <$> getTopEnv
+  module_env_defaults <- eps_defaults <$> getEps
+  liftIO $ mapMaybeM (lookupClsDefault hug module_env_defaults) mods
+
+lookupClsDefault :: HomeUnitGraph -> ModuleEnv DefaultEnv -> Module -> IO (Maybe DefaultEnv)
+lookupClsDefault hug module_env_defaults mod =
+  lookupHugByModule mod hug >>= \case
+             Just hm -> pure $ Just $ md_defaults $ hm_details hm
+             Nothing -> pure $ lookupModuleEnv module_env_defaults mod
 
 tcGetInstEnvs :: TcM InstEnvs
 -- Gets both the external-package inst-env
@@ -942,27 +960,27 @@ tcGetDefaultTys
               { extDef <- if extended_defaults
                           then do { list_ty <- tcMetaTy listTyConName
                                   ; integer_ty <- tcMetaTy integerTyConName
-                                  ; foldableCls <- tcLookupTyCon foldableClassName
-                                  ; showCls <- tcLookupTyCon showClassName
-                                  ; eqCls <- tcLookupTyCon eqClassName
+                                  ; foldableClass <- tcLookupClass foldableClassName
+                                  ; showClass <- tcLookupClass showClassName
+                                  ; eqClass <- tcLookupClass eqClassName
                                   ; pure $ defaultEnv
-                                    [ builtinDefaults foldableCls [list_ty]
-                                    , builtinDefaults showCls [unitTy, integer_ty, doubleTy]
-                                    , builtinDefaults eqCls [unitTy, integer_ty, doubleTy]
+                                    [ builtinDefaults foldableClass [list_ty]
+                                    , builtinDefaults showClass [unitTy, integer_ty, doubleTy]
+                                    , builtinDefaults eqClass [unitTy, integer_ty, doubleTy]
                                     ]
                                   }
                                   -- Note [Extended defaults]
                           else pure emptyDefaultEnv
               ; ovlStr <- if ovl_strings
-                          then do { isStringCls <- tcLookupTyCon isStringClassName
-                                  ; pure $ unitDefaultEnv $ builtinDefaults isStringCls [stringTy]
+                          then do { isStringClass <- tcLookupClass isStringClassName
+                                  ; pure $ unitDefaultEnv $ builtinDefaults isStringClass [stringTy]
                                   }
                           else pure emptyDefaultEnv
               ; checkWiredInTyCon doubleTyCon
               ; numDef <- case lookupDefaultEnv defaults numClassName of
-                   Nothing -> do { numCls <- tcLookupTyCon numClassName
-                                 ; integer_ty <- tcMetaTy integerTyConName
-                                 ; pure $ unitDefaultEnv $ builtinDefaults numCls [integer_ty, doubleTy]
+                   Nothing -> do { integer_ty <- tcMetaTy integerTyConName
+                                 ; numClass <- tcLookupClass numClassName
+                                 ; pure $ unitDefaultEnv $ builtinDefaults numClass [integer_ty, doubleTy]
                                  }
                    -- The Num class is already user-defaulted, no need to construct the builtin default
                    _ -> pure emptyDefaultEnv

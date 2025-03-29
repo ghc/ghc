@@ -11,16 +11,16 @@ module GHC.Types.DefaultEnv
    , filterDefaultEnv
    , defaultList
    , plusDefaultEnv
+   , mkDefaultEnv
    )
 where
 
+import GHC.Core.Class (Class (className))
 import GHC.Prelude
-import GHC.Core.TyCon (TyCon(tyConName))
-import GHC.Core.TyCon.Env (TyConEnv, emptyTyConEnv, isEmptyTyConEnv, mkTyConEnvWith, unitTyConEnv,
-                           filterTyConEnv, nonDetTyConEnvElts, plusTyConEnv)
 import GHC.Hs.Extension (GhcRn)
 import GHC.Tc.Utils.TcType (Type)
 import GHC.Types.Name (Name, nameUnique, stableNameCmp)
+import GHC.Types.Name.Env
 import GHC.Types.Unique.FM (lookupUFM_Directly)
 import GHC.Unit.Module.Warnings (WarningTxt)
 import GHC.Unit.Types (Module)
@@ -31,11 +31,11 @@ import Data.List (sortBy)
 import Data.Function (on)
 
 -- See Note [Named default declarations] in GHC.Tc.Gen.Default
--- | Default environment mapping class @TyCon@s to their default type lists
-type DefaultEnv = TyConEnv ClassDefaults
+-- | Default environment mapping class name @Name@ to their default type lists
+type DefaultEnv = NameEnv ClassDefaults
 
 data ClassDefaults
-  = ClassDefaults { cd_class   :: !TyCon  -- ^ always a class constructor
+  = ClassDefaults { cd_class   :: Class -- ^ The class whose defaults are being defined
                   , cd_types   :: [Type]
                   , cd_module :: Maybe Module
                     -- ^ @Nothing@ for built-in,
@@ -47,29 +47,36 @@ data ClassDefaults
   deriving Data
 
 instance Outputable ClassDefaults where
-  ppr ClassDefaults {cd_class = cls, cd_types = tys} = text "default" <+> ppr cls <+> parens (interpp'SP tys)
+  ppr ClassDefaults {cd_class = cls, cd_types = tys} = text "default" <+> ppr cls
+        <+> parens (interpp'SP tys)
 
 emptyDefaultEnv :: DefaultEnv
-emptyDefaultEnv = emptyTyConEnv
+emptyDefaultEnv = emptyNameEnv
 
 isEmptyDefaultEnv :: DefaultEnv -> Bool
-isEmptyDefaultEnv = isEmptyTyConEnv
+isEmptyDefaultEnv = isEmptyNameEnv
 
 unitDefaultEnv :: ClassDefaults -> DefaultEnv
-unitDefaultEnv d = unitTyConEnv (cd_class d) d
+unitDefaultEnv d = unitNameEnv (className $ cd_class d) d
 
 defaultEnv :: [ClassDefaults] -> DefaultEnv
-defaultEnv = mkTyConEnvWith cd_class
+defaultEnv = mkNameEnvWith (className . cd_class)
 
 defaultList :: DefaultEnv -> [ClassDefaults]
-defaultList = sortBy (stableNameCmp `on` (tyConName . cd_class)) . nonDetTyConEnvElts
+defaultList = sortBy (stableNameCmp `on` className . cd_class) . nonDetNameEnvElts
               -- sortBy recovers determinism
 
 lookupDefaultEnv :: DefaultEnv -> Name -> Maybe ClassDefaults
 lookupDefaultEnv env = lookupUFM_Directly env . nameUnique
 
 filterDefaultEnv :: (ClassDefaults -> Bool) -> DefaultEnv -> DefaultEnv
-filterDefaultEnv = filterTyConEnv
+filterDefaultEnv = filterNameEnv
 
 plusDefaultEnv :: DefaultEnv -> DefaultEnv -> DefaultEnv
-plusDefaultEnv = plusTyConEnv
+plusDefaultEnv = plusNameEnv
+
+-- | Create a 'DefaultEnv' from a list of (Name, ClassDefaults) pairs
+-- it is useful if we don't want to poke into the 'ClassDefaults' structure
+-- to get the 'Name' of the class, it can be problematic, see #25858
+mkDefaultEnv :: [(Name, ClassDefaults)] -> DefaultEnv
+mkDefaultEnv = mkNameEnv

@@ -71,7 +71,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Logger as Logger
 import qualified GHC.Utils.Error as Err
 
-import GHC.Types.DefaultEnv ( emptyDefaultEnv )
 import GHC.Types.ForeignStubs
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -177,7 +176,8 @@ mkBootModDetailsTc logger
                   tcg_insts            = insts,
                   tcg_fam_insts        = fam_insts,
                   tcg_complete_matches = complete_matches,
-                  tcg_mod              = this_mod
+                  tcg_mod              = this_mod,
+                  tcg_default_exports  = default_exports
                 }
   = -- This timing isn't terribly useful since the result isn't forced, but
     -- the message is useful to locating oneself in the compilation process.
@@ -185,7 +185,7 @@ mkBootModDetailsTc logger
                    (text "CoreTidy"<+>brackets (ppr this_mod))
                    (const ()) $
     return (ModDetails { md_types            = type_env'
-                       , md_defaults         = emptyDefaultEnv
+                       , md_defaults         = default_exports
                        , md_insts            = insts'
                        , md_fam_insts        = fam_insts
                        , md_rules            = []

@@ -1486,7 +1486,7 @@ data TcRnMessage where
 
      Text cases: module/mod58
   -}
-  TcRnMultipleDefaultDeclarations :: TyCon -> [LDefaultDecl GhcRn] -> TcRnMessage
+  TcRnMultipleDefaultDeclarations :: Class -> [LDefaultDecl GhcRn] -> TcRnMessage
 
   {-| TcRnWarnClashingDefaultImports is a warning that occurs when a module imports
       more than one default declaration for the same class, and they are not all
@@ -1496,7 +1496,7 @@ data TcRnMessage where
 
      Test cases: default/Import07.hs
   -}
-  TcRnWarnClashingDefaultImports :: TyCon -- ^ class
+  TcRnWarnClashingDefaultImports :: Class
                                  -> Maybe [Type] -- ^ locally declared defaults
                                  -> NE.NonEmpty ClassDefaults -- ^ imported defaults
                                  -> TcRnMessage
@@ -1510,7 +1510,7 @@ data TcRnMessage where
 
      Test cases: typecheck/should_fail/T11974b
   -}
-  TcRnBadDefaultType :: Type -> NonEmpty TyCon -> TcRnMessage
+  TcRnBadDefaultType :: Type -> NonEmpty Class -> TcRnMessage
 
   {-| TcRnPatSynBundledWithNonDataCon is an error that occurs when a module's
       export list bundles a pattern synonym with a type that is not a proper

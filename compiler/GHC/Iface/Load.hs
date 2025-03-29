@@ -47,7 +47,7 @@ import GHC.Platform.Profile
 
 import {-# SOURCE #-} GHC.IfaceToCore
    ( tcIfaceDecls, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
-   , tcIfaceAnnotations, tcIfaceCompleteMatches )
+   , tcIfaceAnnotations, tcIfaceCompleteMatches, tcIfaceDefaults)
 
 import GHC.Driver.Config.Finder
 import GHC.Driver.Env
@@ -621,6 +621,7 @@ loadInterface doc_str mod from
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
         ; new_eps_decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
         ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
+        ; new_eps_defaults  <- tcIfaceDefaults mod (mi_defaults iface)
         ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
@@ -639,6 +640,7 @@ loadInterface doc_str mod from
         ; let final_iface = iface
                                & set_mi_decls     (panic "No mi_decls in PIT")
                                & set_mi_insts     (panic "No mi_insts in PIT")
+                               & set_mi_defaults  (panic "No mi_defaults in PIT")
                                & set_mi_fam_insts (panic "No mi_fam_insts in PIT")
                                & set_mi_rules     (panic "No mi_rules in PIT")
                                & set_mi_anns      (panic "No mi_anns in PIT")
@@ -701,7 +703,9 @@ loadInterface doc_str mod from
                   eps_stats        = addEpsInStats (eps_stats eps)
                                                    (length new_eps_decls)
                                                    (length new_eps_insts)
-                                                   (length new_eps_rules) }
+                                                   (length new_eps_rules),
+                  eps_defaults    =  extendModuleEnv (eps_defaults eps) mod new_eps_defaults
+                                                   }
 
         ; -- invoke plugins with *full* interface, not final_iface, to ensure
           -- that plugins have access to declarations, etc.
