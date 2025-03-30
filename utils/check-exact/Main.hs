@@ -219,7 +219,8 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/bisect/_b
  -- "../../testsuite/tests/printer/Test23465.hs" Nothing
  -- "../../testsuite/tests/printer/Test25454.hs" Nothing
  -- "../../testsuite/tests/printer/Test25467.hs" Nothing
- "../../testsuite/tests/printer/CppCommentPlacement.hs" Nothing
+ -- "../../testsuite/tests/printer/CppCommentPlacement.hs" Nothing
+ "../check-cpp/Example7.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 
