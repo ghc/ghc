@@ -61,8 +61,9 @@ module GHC.Types.Var (
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
-        isLocalVar, isLocalId, isLocalId_maybe, isCoVar, isNonCoVarId, isTyCoVar,
-        isGlobalId, isExportedId,
+        isCoVar, isNonCoVarId, isTyCoVar,
+        isLocalVar, isGlobalVar,
+        isLocalId, isLocalId_maybe, isGlobalId, isExportedId,
         mustHaveLocalBinding,
 
         -- * ForAllTyFlags
@@ -1269,22 +1270,32 @@ isNonCoVarId (Id { id_details = details }) = not (isCoVarDetails details)
 isNonCoVarId _                             = False
 
 isLocalId :: Var -> Bool
+-- True of local Ids only, not of TyVars
 isLocalId (Id { idScope = LocalId _ }) = True
-isLocalId _                            = False
+isLocalId id                           = False
 
 isLocalId_maybe :: Var -> Maybe ExportFlag
+-- (Just export-flag) for local Ids only; Nothing for TyVars
 isLocalId_maybe (Id { idScope = LocalId ef }) = Just ef
-isLocalId_maybe _                             = Nothing
+isLocalId_maybe id                            = Nothing
+
+isGlobalId :: Id -> Bool
+isGlobalId (Id { idScope = GlobalId }) = True
+isGlobalId id                          = False
 
 -- | 'isLocalVar' returns @True@ for type variables as well as local 'Id's
 -- These are the variables that we need to pay attention to when finding free
 -- variables, or doing dependency analysis.
 isLocalVar :: Var -> Bool
-isLocalVar v = not (isGlobalId v)
+isLocalVar v = not (isGlobalVar v)
 
-isGlobalId :: Var -> Bool
-isGlobalId (Id { idScope = GlobalId }) = True
-isGlobalId _                           = False
+isGlobalVar :: Var -> Bool
+-- A TyVar with an External Name is always from another module;
+-- but a locally-defined Id can have an External Name (e.g data constructors)
+isGlobalVar (Id { idScope = GlobalId })   = True
+isGlobalVar (Id { idScope = LocalId {} }) = False
+isGlobalVar (TyVar { varName = n })       = isExternalName n
+isGlobalVar (TcTyVar {})                  = False
 
 -- | 'mustHaveLocalBinding' returns @True@ of 'Id's and 'TyVar's
 -- that must have a binding in this module.  The converse

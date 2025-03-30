@@ -1302,7 +1302,7 @@ tcHsType _ rn_ty@(XHsType ty) exp_kind
        -- Raw uniques since we go from NameEnv to TvSubstEnv.
        let subst_prs :: [(Unique, TcTyVar)]
            subst_prs = [ (getUnique nm, tv)
-                       | ATyVar nm tv <- nonDetNameEnvElts (getLclEnvTypeEnv env) ]
+                       | ATcTyVar nm tv <- nonDetNameEnvElts (getLclEnvTypeEnv env) ]
            subst = mkTvSubst
                      (mkInScopeSetList $ map snd subst_prs)
                      (listToUFM_Directly $ map (fmap mkTyVarTy) subst_prs)
@@ -2003,7 +2003,7 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
        ; case thing of
-           ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
+           ATcTyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
 
            -- See Note [Recursion through the kinds]
            (tcTyThingTyCon_maybe -> Just tc) -- TyCon or TcTyCon
@@ -3493,7 +3493,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
     tc_hs_bndr lcl_env (HsTvb { tvb_var = bvar, tvb_kind = kind })
       | check_parent
       , HsBndrVar _ (L _ name) <- bvar
-      , Just (ATyVar _ tv) <- lookupNameEnv lcl_env name
+      , Just (ATcTyVar _ tv) <- lookupNameEnv lcl_env name
       = do { check_hs_bndr_kind name (tyVarKind tv) kind
            ; return tv }
       | otherwise
@@ -3592,7 +3592,7 @@ bindImplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
   where
     new_tv lcl_env name
       | check_parent
-      , Just (ATyVar _ tv) <- lookupNameEnv lcl_env name
+      , Just (ATcTyVar _ tv) <- lookupNameEnv lcl_env name
       = return tv
       | otherwise
       = do { kind <- newExpectedKind ctxt_kind
