@@ -99,6 +99,7 @@ import GHC.Prelude
 -- Operator precedence. Earlier in the table is lower
 -- Note: this seems to require all the operators to appear in the same
 -- rule.
+-- Based on https://en.cppreference.com/w/cpp/language/operator_precedence
 %left '||'
 %left '&&'
 %left '=='
@@ -106,6 +107,8 @@ import GHC.Prelude
 %left '>' '>=' '<' '<='
 %left '+' '-'
 %left '*' '/'
+%right '!'
+
 
 %%
 
@@ -124,6 +127,7 @@ expr : variable           { $1 }
      | expr '+' expr      { Plus $1 $3 }
      | expr '-' expr      { Minus $1 $3 }
      | expr '*' expr      { Times $1 $3 }
+     | '!' expr           { Not $2 }
 
 variable :: {Expr}
 variable : name { Var $1 }

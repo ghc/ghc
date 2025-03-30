@@ -7,6 +7,7 @@ import GHC.Prelude
 
 eval :: Expr -> Int
 eval (Parens e) = eval e
+eval (Not e) = fromBool $ not (toBool $ eval e)
 eval (Var v) = error $ "need to look up :" ++ v
 eval (IntVal i) = i
 eval (Plus e1 e2) = (eval e1) + (eval e2)
