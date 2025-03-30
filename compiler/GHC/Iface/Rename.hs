@@ -420,6 +420,12 @@ rnIfaceDecl' :: Rename (Fingerprint, IfaceDecl)
 rnIfaceDecl' (fp, decl) = (,) fp <$> rnIfaceDecl decl
 
 rnIfaceDecl :: Rename IfaceDecl
+rnIfaceDecl (IfaceTv { ifName = name, ifTvKind = kind, ifTvUnf = unf })
+  = do { name' <- rnIfaceGlobal name
+       ; kind' <- rnIfaceType kind
+       ; unf'  <- rnIfaceType unf
+       ; return (IfaceTv { ifName = name', ifTvKind = kind', ifTvUnf = unf' }) }
+
 rnIfaceDecl d@IfaceId{} = do
             name <- case ifIdDetails d of
                       IfDFunId -> rnIfaceNeverExported (ifName d)
@@ -585,18 +591,11 @@ rnIfaceAxBranch d = do
 rnIfaceIdInfo :: Rename IfaceIdInfo
 rnIfaceIdInfo = mapM rnIfaceInfoItem
 
-rnIfaceTyVarInfo :: Rename IfaceTyVarInfo
-rnIfaceTyVarInfo = mapM rnIfaceTyVarInfoItem
-
 rnIfaceInfoItem :: Rename IfaceInfoItem
 rnIfaceInfoItem (HsUnfold lb if_unf)
     = HsUnfold lb <$> rnIfaceUnfolding if_unf
 rnIfaceInfoItem i
     = pure i
-
-rnIfaceTyVarInfoItem :: Rename IfaceTyVarInfoItem
-rnIfaceTyVarInfoItem (HsTypeUnfold if_unf)
-    = HsTypeUnfold <$> rnIfaceType if_unf
 
 rnIfaceUnfolding :: Rename IfaceUnfolding
 rnIfaceUnfolding (IfCoreUnfold src cache guide if_expr)
@@ -659,8 +658,8 @@ rnIfaceConAlt alt = pure alt
 rnIfaceLetBndr :: Rename IfaceLetBndr
 rnIfaceLetBndr (IfLetBndr fs ty info jpi)
     = IfLetBndr fs <$> rnIfaceType ty <*> rnIfaceIdInfo info <*> pure jpi
-rnIfaceLetBndr (IfTypeLetBndr fs ki info)
-    = IfTypeLetBndr fs <$> rnIfaceType ki <*> rnIfaceTyVarInfo info
+rnIfaceLetBndr (IfTypeLetBndr fs ki)
+    = IfTypeLetBndr fs <$> rnIfaceType ki
 
 rnIfaceLamBndr :: Rename IfaceLamBndr
 rnIfaceLamBndr (bndr, oneshot) = (,) <$> rnIfaceBndr bndr <*> pure oneshot

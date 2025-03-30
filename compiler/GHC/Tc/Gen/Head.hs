@@ -828,7 +828,7 @@ tc_infer_id (L loc id_name)
              AGlobal (AConLike cl) -> tcInferConLike cl
 
              (tcTyThingTyCon_maybe -> Just tc) -> failIllegalTyCon WL_Anything (tyConName tc)
-             ATyVar name _ -> failIllegalTyVal name
+             ATcTyVar name _ -> failIllegalTyVal name
 
              _ -> failWithTc $ TcRnExpectedValueId thing
 

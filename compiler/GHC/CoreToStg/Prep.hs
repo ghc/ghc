@@ -283,16 +283,13 @@ corePrepTopBinds initialCorePrepEnv binds
   = go initialCorePrepEnv binds
   where
     go _   []             = return emptyFloats
-    go env (bind : binds) | isTypeBind bind
-                          = go env binds
-                          | otherwise
-                          = do (env', floats, maybe_new_bind)
-                                 <- cpeBind TopLevel env bind
-                               massert (isNothing maybe_new_bind)
+    go env (bind : binds) = do { (env', floats, maybe_new_bind)
+                                   <- cpeBind TopLevel env bind
+                               ; massert (isNothing maybe_new_bind)
                                  -- Only join points get returned this way by
                                  -- cpeBind, and no join point may float to top
-                               floatss <- go env' binds
-                               return (floats `zipFloats` floatss)
+                               ; floatss <- go env' binds
+                               ; return (floats `zipFloats` floatss) }
 
 mkDataConWorkers :: Bool -> ModLocation -> [TyCon] -> [CoreBind]
 -- See Note [Data constructor workers]
@@ -630,7 +627,12 @@ cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
                    Floats,         -- Floating value bindings
                    Maybe CoreBind) -- Just bind' <=> returned new bind; no float
                                    -- Nothing <=> added bind' to floats instead
-cpeBind top_lvl env (NonRec bndr rhs)
+cpeBind top_lvl env bind@(NonRec bndr rhs)
+  | isTyVar bndr
+  , let float = Float bind LetBound TopLvlFloatable
+  = -- A type binding
+    return (env, unitFloat float, Nothing)
+
   | not (isJoinId bndr)
   = do { (env1, bndr1) <- cpCloneBndr env bndr
        ; let dmd = idDemandInfo bndr
