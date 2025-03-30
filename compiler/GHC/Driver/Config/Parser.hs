@@ -50,8 +50,9 @@ predefinedMacros df = Map.fromList
             , Map.singleton Nothing (Nothing, [PM.TOther projectPatchLevel1])
             ),
             ( "__GLASGOW_HASKELL_PATCHLEVEL2__"
-            , Map.singleton Nothing (Nothing, [PM.TOther projectPatchLevel2])
-            )
+            , Map.singleton Nothing (Nothing, [PM.TOther projectPatchLevel2])),
+            -- TODO: What is the appropriate indicator that GHC_CPP is active?
+            ( "GHC_CPP", Map.empty)
         ]
   where
     projectVersionInt = fromMaybe "0" (lookup "Project Version Int" (compilerInfo df))
