@@ -56,14 +56,14 @@ tidyBind env (NonRec bndr rhs)
   | isTyVar bndr
   = -- pprTrace "tidyBindNonRecType" (ppr bndr) $
     let (env', bndr') = tidyLetBndr env env bndr
-        tidy_rhs = (tidyExpr env' rhs)
+        tidy_rhs      = tidyExpr env' rhs
     in (env', NonRec bndr' tidy_rhs)
 
   | otherwise
   = -- pprTrace "tidyBindNonRec" (ppr bndr) $
-    let cbv_bndr = (tidyCbvInfoLocal bndr rhs)
+    let cbv_bndr      = tidyCbvInfoLocal bndr rhs
         (env', bndr') = tidyLetBndr env env cbv_bndr
-        tidy_rhs = (tidyExpr env' rhs)
+        tidy_rhs      = tidyExpr env' rhs
     in (env', NonRec bndr' tidy_rhs)
 
 tidyBind env (Rec prs)

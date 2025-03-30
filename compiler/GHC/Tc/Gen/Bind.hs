@@ -1900,7 +1900,7 @@ isClosedBndrGroup type_env binds
       = case thing of
           ATcId { tct_info = NonClosedLet _ cl } -> cl
           ATcId { tct_info = NotLetBound }       -> False
-          ATyVar {}                              -> False
+          ATcTyVar {}                            -> False
                -- In-scope type variables are not closed!
           _ -> pprPanic "is_closed_id" (ppr name)
 

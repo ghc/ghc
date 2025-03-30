@@ -284,8 +284,10 @@ coreTopBindsToStg
 coreTopBindsToStg _      _        env ccs []
   = (env, ccs, [])
 coreTopBindsToStg opts this_mod env ccs (b:bs)
+  -- Drop type bindings
   | NonRec _ rhs <- b, isTyCoArg rhs
-  = coreTopBindsToStg opts this_mod env1 ccs1 bs
+  = coreTopBindsToStg opts this_mod env ccs bs
+
   | otherwise
   = assertPpr (not (isTypeBind b)) (ppr b) $ (env2, ccs2, b':bs')
   where

@@ -439,17 +439,16 @@ toIfaceSrcBang (HsSrcBang _ unpk bang) = IfSrcBang unpk bang
 
 toIfaceLetBndr :: Var -> IfaceLetBndr
 toIfaceLetBndr tv
-  | isTyVar tv = IfTypeLetBndr (mkIfLclName (occNameFS (getOccName tv)))
-                               (toIfaceKind (tyVarKind tv))
-                               info
-  where
-    info | Just unf <- tyVarUnfolding_maybe tv = [HsTypeUnfold (toIfaceType unf)]
-         | otherwise                           = []
+  | isTyVar tv
+  = IfTypeLetBndr (mkIfLclName (occNameFS (getOccName tv)))
+                  (toIfaceKind (tyVarKind tv))
 
-toIfaceLetBndr id  = IfLetBndr (mkIfLclName (occNameFS (getOccName id)))
-                               (toIfaceType (idType id))
-                               (toIfaceIdInfo (idInfo id))
-                               (idJoinPointHood id)
+toIfaceLetBndr id
+  = assertPpr (isId id) (ppr id) $
+    IfLetBndr (mkIfLclName (occNameFS (getOccName id)))
+              (toIfaceType (idType id))
+              (toIfaceIdInfo (idInfo id))
+              (idJoinPointHood id)
   -- Put into the interface file any IdInfo that GHC.Core.Tidy.tidyLetBndr
   -- has left on the Id.  See Note [IdInfo on nested let-bindings] in GHC.Iface.Syntax
 

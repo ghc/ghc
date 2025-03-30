@@ -312,7 +312,7 @@ data TcTyThing
       , tct_info :: IdBindingInfo   -- See Note [Meaning of IdBindingInfo]
       }
 
-  | ATyVar  Name TcTyVar   -- See Note [Type variables in the type environment]
+  | ATcTyVar Name TcTyVar   -- See Note [Type variables in the type environment]
 
   | ATcTyCon TyCon   -- Used temporarily, during kind checking, for the
                      -- tycons and classes in this recursive group
@@ -334,7 +334,7 @@ instance Outputable TcTyThing where     -- Debugging only
                           brackets (ppr (tct_id elt) <> dcolon
                                  <> ppr (varType (tct_id elt)) <> comma
                                  <+> ppr (tct_info elt))
-   ppr (ATyVar n tv)    = text "Type variable" <+> quotes (ppr n) <+> equals <+> ppr tv
+   ppr (ATcTyVar n tv)  = text "Type variable" <+> quotes (ppr n) <+> equals <+> ppr tv
                             <+> dcolon <+> ppr (varType tv)
    ppr (ATcTyCon tc)    = text "ATcTyCon" <+> ppr tc <+> dcolon <+> ppr (tyConKind tc)
    ppr (APromotionErr err) = text "APromotionErr" <+> ppr err
@@ -493,7 +493,7 @@ type variable that is in scope.  For example
 
 
 This is implemented by the constructor
-   ATyVar Name TcTyVar
+   ATcTyVar Name TcTyVar
 in the type environment.
 
 * The Name is the name of the original, lexically scoped type
@@ -518,7 +518,7 @@ pprTcTyThingCategory = text . capitalise . tcTyThingCategory
 
 tcTyThingCategory :: TcTyThing -> String
 tcTyThingCategory (AGlobal thing)    = tyThingCategory thing
-tcTyThingCategory (ATyVar {})        = "type variable"
+tcTyThingCategory (ATcTyVar {})      = "type variable"
 tcTyThingCategory (ATcId {})         = "local identifier"
 tcTyThingCategory (ATcTyCon {})      = "local tycon"
 tcTyThingCategory (APromotionErr pe) = peCategory pe

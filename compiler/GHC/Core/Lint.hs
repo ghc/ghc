@@ -3700,8 +3700,8 @@ checkBndrOccCompatibility in_bndr v_occ
        --     are defined locally, but appear in expressions as (global)
        --     wired-in Ids after worker/wrapper
        --     So we simply disable the test in this case
-       ; checkL (not (isGlobalId v_occ && isLocalId in_bndr && not (isWiredIn v_occ))) $
-         bndr_occ_mismatch (text "LocalId") (text "GlobalId")
+       ; checkL (not (isGlobalVar v_occ && isLocalVar in_bndr && not (isWiredIn v_occ))) $
+         bndr_occ_mismatch (text "LocalVar") (text "GlobalVar")
 
        -- Check that binder and occurrence have same type
        ;  ensureEqTys occ_ty in_bndr_ty $  -- Compares InTypes

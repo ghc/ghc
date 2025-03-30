@@ -26,7 +26,7 @@ module GHC.Core.FVs (
         -- * Free variables of Rules, Vars and Ids
         varTypeTyCoVars,
         varTypeTyCoFVs, dVarTypeTyCoVars,
-        idUnfoldingVars, idFreeVars, dIdFreeVars,
+        varUnfoldingVars, idFreeVars, dIdFreeVars,
         bndrRuleAndUnfoldingVarsDSet,
         bndrRuleAndUnfoldingIds,
         idFVs,
@@ -36,7 +36,8 @@ module GHC.Core.FVs (
         ruleLhsFreeIds, ruleLhsFreeIdsList,
         ruleRhsFreeVars, rulesRhsFreeIds,
 
-        exprFVs,
+        exprFVs, exprsFVs, rulesFVs, unfoldingFVs,
+        RuleFVsFrom(..),
 
         -- * Orphan names
         orphNamesOfType, orphNamesOfTypes, orphNamesOfAxiomLHS,
@@ -630,13 +631,18 @@ idRuleFVs id = assert (isId id) $
                ruleInfoRules (idSpecialisation id)
   -- BothSides: see Note [Rule dependency info] in OccurAnal
 
-idUnfoldingVars :: Id -> VarSet
--- Produce free vars for an unfolding, but NOT for an ordinary
+varUnfoldingVars :: Var -> VarSet
+-- Produce free vars for a stable unfolding, but NOT for an ordinary
 -- (non-inline) unfolding, since it is a dup of the rhs
 -- and we'll get exponential behaviour if we look at both unf and rhs!
 -- But do look at the *real* unfolding, even for loop breakers, else
 -- we might get out-of-scope variables
-idUnfoldingVars id = fvVarSet $ idUnfoldingFVs id
+--
+-- For TyVars, even ones with an unfolding, we don't need any free vars
+-- because we are going to look at the RHS of the binding
+varUnfoldingVars v
+ | isId v    = fvVarSet $ idUnfoldingFVs v
+ | otherwise = emptyVarSet
 
 idUnfoldingFVs :: Id -> FV
 idUnfoldingFVs id = stableUnfoldingFVs (realIdUnfolding id) `orElse` emptyFV
@@ -646,15 +652,17 @@ stableUnfoldingVars unf = fvVarSet `fmap` stableUnfoldingFVs unf
 
 stableUnfoldingFVs :: Unfolding -> Maybe FV
 stableUnfoldingFVs unf
-  = case unf of
-      CoreUnfolding { uf_tmpl = rhs, uf_src = src }
-         | isStableSource src
-         -> Just (filterFV isLocalVar $ expr_fvs rhs)
-      DFunUnfolding { df_bndrs = bndrs, df_args = args }
-         -> Just (filterFV isLocalVar $ FV.delFVs (mkVarSet bndrs) $ exprs_fvs args)
-            -- DFuns are top level, so no fvs from types of bndrs
-      _other -> Nothing
+  | isStableUnfolding unf = Just (unfoldingFVs unf)
+  | otherwise             = Nothing
 
+unfoldingFVs :: Unfolding -> FV
+unfoldingFVs (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
+  = exprFVs rhs
+unfoldingFVs (DFunUnfolding { df_bndrs = bndrs, df_args = args })
+  = FV.delFVs (mkVarSet bndrs) $ exprsFVs args
+    -- DFuns are top level, so no fvs from types of bndrs
+unfoldingFVs _
+  = emptyFV
 
 {-
 ************************************************************************

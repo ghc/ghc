@@ -79,7 +79,8 @@ import GHC.Utils.Misc
   , filterByList
   , filterOut
   )
-import GHC.Utils.Panic.Plain (assert)
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import Language.Haskell.Syntax.Basic (FieldLabelString (..))
 
 import Haddock.GhcUtils (defaultRuntimeRepVars, mkEmptySigType, orderedFVs)
@@ -97,6 +98,9 @@ tyThingToLHsDecl
   -> TyThing
   -> Either String ([String], (HsDecl GhcRn))
 tyThingToLHsDecl prr t = case t of
+  ATyVar tv -> pprPanic "tyThingToLHsDecl" (ppr tv)
+               -- It's not clear what we should do here
+
   -- ids (functions and zero-argument a.k.a. CAFs) get a type signature.
   -- Including built-in functions like seq.
   -- foreign-imported functions could be represented with ForD

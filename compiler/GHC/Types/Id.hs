@@ -542,7 +542,7 @@ isDataConId id = case Var.idDetails id of
 -- | An Id for which we might require all callers to pass strict arguments properly tagged + evaluated.
 --
 -- See Note [CBV Function Ids]
-isWorkerLikeId :: Id -> Bool
+isWorkerLikeId :: HasDebugCallStack => Id -> Bool
 isWorkerLikeId id = case Var.idDetails id of
   WorkerLikeId _  -> True
   JoinId _ Just{}   -> True
@@ -773,7 +773,7 @@ whenActiveUnfoldingFun is_active id
   | is_active (idInlineActivation id) = idUnfolding id
   | otherwise                         = NoUnfolding
 
-realIdUnfolding :: Id -> Unfolding
+realIdUnfolding :: HasDebugCallStack => Id -> Unfolding
 -- ^ Expose the unfolding if there is one, including for loop breakers
 realIdUnfolding id = realUnfoldingInfo (idInfo id)
 
