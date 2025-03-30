@@ -647,3 +647,40 @@ t26 = do
         , "foreign import ccall unsafe \"setIOManagerWakeupFd\""
         , "   c_setIOManagerWakeupFd :: CInt -> IO ()"
         ]
+
+t27 :: IO ()
+t27 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module Example5 where"
+        , ""
+        , "import MagicHaskeller.Analytical"
+        , "#ifdef DEBUG"
+        , "                                 hiding (rev)"
+        , "#endif"
+        ]
+
+t28 :: IO ()
+t28 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "-- (Typed)IOPairs¾å¤Ç¥Ç¡¼¥¿¤ò¤È¤ë¡¥ghci¾å¤Ç :cmd ¤ò»È¤¤¤Þ¤¯¤ë´¶¤¸¡¥"
+        , "module Example5 where"
+        , ""
+        , "import MagicHaskeller.Analytical"
+        , "#ifdef DEBUG"
+        , "                                 hiding (rev)"
+        , "#endif"
+        ]
+
+t29 :: IO ()
+t29 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module Example4 where"
+        , "#if !(defined VAL)"
+        -- , "#ifdef VAL"
+        , "#define VAL (16 :: Int32)"
+        , "#endif"
+        , ""
+        ]
