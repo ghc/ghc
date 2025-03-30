@@ -113,6 +113,7 @@ type Output = CppDirective
 
 data Expr
     = Parens Expr
+    | Not Expr
     | Var String
     | IntVal Int
     | Plus Expr Expr
