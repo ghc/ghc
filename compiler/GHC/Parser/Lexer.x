@@ -1779,7 +1779,7 @@ commentEnd cont input (m_hdk_comment, hdk_token) buf span = do
   let (AI loc nextBuf) = input
       span' = mkPsSpan (psSpanStart span) loc
       last_len = byteDiff buf nextBuf
-  span `seq` setLastToken span' last_len
+  span `seq` setLastToken nextBuf span' last_len
   whenIsJust m_hdk_comment $ \hdk_comment ->
     P $ \s -> POk (s {hdk_comments = hdk_comments s `snocOL` L span' hdk_comment}) ()
   b <- getBit RawTokenStreamBit
@@ -2131,6 +2131,7 @@ do_bol span _str _len _buf2 = do
         -- See Note [Nested comment line pragmas]
         b <- getBit InNestedCommentBit
         if b then return (L span ITcomment_line_prag) else do
+          resetOffset
           (pos, gen_semic) <- getOffside
           case pos of
               LT -> do
@@ -2573,20 +2574,21 @@ data HdkComment
   deriving Show
 
 data PState a = PState {
-        buffer     :: StringBuffer,
-        options    :: ParserOpts,
-        warnings   :: Messages PsMessage,
-        errors     :: Messages PsMessage,
-        tab_first  :: Strict.Maybe RealSrcSpan, -- pos of first tab warning in the file
-        tab_count  :: !Word,             -- number of tab warnings in the file
-        last_tk    :: Strict.Maybe (PsLocated Token), -- last non-comment token
-        prev_loc   :: PsSpan,      -- pos of previous non-virtual token, including comments,
-        last_loc   :: PsSpan,      -- pos of current token
-        last_len   :: !Int,        -- len of current token
-        loc        :: PsLoc,       -- current loc (end of prev token + 1)
-        context    :: [LayoutContext],
-        lex_state  :: [Int],
-        srcfiles   :: [FastString],
+        buffer       :: StringBuffer,
+        options      :: ParserOpts,
+        warnings     :: Messages PsMessage,
+        errors       :: Messages PsMessage,
+        tab_first    :: Strict.Maybe RealSrcSpan, -- pos of first tab warning in the file
+        tab_count    :: !Word,             -- number of tab warnings in the file
+        last_tk      :: Strict.Maybe (PsLocated Token), -- last non-comment token
+        prev_loc     :: PsSpan,      -- pos of previous non-virtual token, including comments,
+        last_loc     :: PsSpan,      -- pos of current token
+        last_len     :: !Int,        -- len of current token, in bytes, not UTF-8 code points
+        last_buf_cur :: !Int,      -- Byte offset into StringBuffer corresponding to start of last_loc
+        loc          :: PsLoc,       -- current loc (end of prev token + 1)
+        context      :: [LayoutContext],
+        lex_state    :: [Int],
+        srcfiles     :: [FastString],
         -- Used in the alternative layout rule:
         -- These tokens are the next ones to be sent out. They are
         -- just blindly emitted, without the rule looking at them again:
@@ -2743,10 +2745,12 @@ addSrcFile f = P $ \s -> POk s{ srcfiles = f : srcfiles s } ()
 setEofPos :: RealSrcSpan -> RealSrcSpan -> P p ()
 setEofPos span gap = P $ \s -> POk s{ eof_pos = Strict.Just (span `Strict.And` gap) } ()
 
-setLastToken :: PsSpan -> Int -> P p ()
-setLastToken loc len = P $ \s -> POk s {
+-- see Note [PsSpan in Comments] for use of the StringBuffer
+setLastToken :: StringBuffer -> PsSpan -> Int -> P p ()
+setLastToken buf loc len = P $ \s -> POk s {
   last_loc=loc,
-  last_len=len
+  last_len=len,
+  last_buf_cur = cur buf
   } ()
 
 setLastTk :: PsLocated Token -> P p ()
@@ -2769,13 +2773,24 @@ getLastLocIncludingComments = P $ \s@(PState { prev_loc = prev_loc }) -> POk s p
 getLastLoc :: P p PsSpan
 getLastLoc = P $ \s@(PState { last_loc = last_loc }) -> POk s last_loc
 
+getLastBufCur :: P p Int
+getLastBufCur = P $ \s@(PState { last_buf_cur = last_buf_cur }) -> POk s last_buf_cur
+
+getLastLen :: P p Int
+getLastLen = P $ \s@(PState { last_len = last_len }) -> POk s last_len
+
 -- see Note [TBD]
 getOffset :: P p Int
 getOffset = P $ \s@(PState { pp_last_col = last_col,
                              loc = l}) ->
   let
     offset = fromMaybe (srcLocCol (psRealLoc l)) last_col
+    -- offset = trace ("getOffset:(l,c,last_col):" ++ show (srcLocLine (psRealLoc l), srcLocCol (psRealLoc l), last_col))
+    --          (fromMaybe (srcLocCol (psRealLoc l)) last_col)
   in POk s { pp_last_col = Nothing} offset
+
+resetOffset :: P p ()
+resetOffset = P $ \s -> POk s { pp_last_col = Nothing} ()
 
 getAlrState :: P p PSavedAlrState
 getAlrState = P $ \s@(PState  {loc=l}) -> POk s
@@ -3130,6 +3145,7 @@ initParserState ppState options buf loc =
       prev_loc      = mkPsSpan init_loc init_loc,
       last_loc      = mkPsSpan init_loc init_loc,
       last_len      = 0,
+      last_buf_cur  = 0,
       loc           = init_loc,
       context       = [],
       lex_state     = [bol, 0],
@@ -3622,7 +3638,7 @@ lexToken = do
         let span = mkPsSpan loc1 loc1
         lc <- getLastLocIncludingComments
         setEofPos (psRealSpan span) (psRealSpan lc)
-        setLastToken span 0
+        setLastToken buf span 0
         return (L span ITeof)
     AlexError (AI loc2 buf) ->
         reportLexError (psRealLoc loc1) (psRealLoc loc2) buf
@@ -3634,7 +3650,7 @@ lexToken = do
         setInput inp2
         let span = mkPsSpan loc1 end
         let bytes = byteDiff buf buf2
-        span `seq` setLastToken span bytes
+        span `seq` setLastToken buf span bytes
         lt <- t span buf bytes buf2
         let lt' = unLoc lt
         if (isComment lt') then setLastComment lt else setLastTk lt
@@ -3765,7 +3781,7 @@ warn_unknown_prag prags span buf len buf2 = do
 %************************************************************************
 -}
 
--- TODO:AZ: we should have only mkParensEpToks. Delee mkParensEpAnn, mkParensLocs
+-- TODO:AZ: we should have only mkParensEpToks. Delete mkParensEpAnn, mkParensLocs
 
 -- |Given a 'RealSrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
 -- 'EpToken' values for the opening and closing bordering on the start
@@ -3809,7 +3825,9 @@ queueIgnoredToken (L l tok) = do
                ITcpp{} -> return $ commentToAnnotation (L l tok)
                _       -> do
                  ll <- getLastLocIncludingComments
-                 str <- psSpanText l
+                 -- setLastComment (L l tok)
+                 str <- psSpanText
+
                  return $ commentToAnnotation (L l (ITcppIgnored str ll))
   let
      push c = P $ \s  -> POk s {
@@ -3817,13 +3835,18 @@ queueIgnoredToken (L l tok) = do
           } ()
   push comment
 
-psSpanText :: PsSpan -> P p FastString
-psSpanText l = do
+
+-- A StringBuffer is indexed by bytes, a BufPos is indexed by UTF-8
+-- code points. So it cannot be used directly for indexing.
+psSpanText :: P p FastString
+psSpanText = do
+  start_loc <- getLastBufCur
+  len <- getLastLen
   (AI _ b) <- getInput
   let
-    start_loc = bufPos $ bufSpanStart $ psBufSpan l
-    end_loc = bufPos $ bufSpanEnd $ psBufSpan l
-    len = end_loc - start_loc
+    -- start_loc = bufPos $ bufSpanStart $ psBufSpan l
+    -- end_loc = bufPos $ bufSpanEnd $ psBufSpan l
+    -- len = end_loc - start_loc
     b' = b { cur = start_loc }
   return (lexemeToFastString b' len)
 
@@ -3898,7 +3921,7 @@ commentToAnnotation (L l (ITdocOptions s ll))   = mkLEpaComment l ll (EpaDocOpti
 commentToAnnotation (L l (ITlineComment s ll))  = mkLEpaComment l ll (EpaLineComment s)
 commentToAnnotation (L l (ITblockComment s ll)) = mkLEpaComment l ll (EpaBlockComment s)
 commentToAnnotation (L l (ITcpp _ s ll))        = mkLEpaComment l ll (EpaCpp (unpackFS s))
-commentToAnnotation (L l (ITcppIgnored s ll))     = mkLEpaComment l ll (EpaCppIgnored (unpackFS s))
+commentToAnnotation (L l (ITcppIgnored s ll))   = mkLEpaComment l ll (EpaCppIgnored (unpackFS s))
 commentToAnnotation _                           = panic "commentToAnnotation"
 
 {-

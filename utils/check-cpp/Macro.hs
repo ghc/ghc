@@ -77,7 +77,7 @@ expandToks s ts =
 
 doExpandToks :: Bool -> MacroDefines -> [Token] -> (Bool, [Token])
 doExpandToks ed _ [] = (ed, [])
-doExpandToks ed s (TIdentifier "defined" : ts) = (True, rest)
+doExpandToks _  s (TIdentifier "defined" : ts) = (True, rest)
   -- See Note: [defined unary operator] below
   where
     rest = case getExpandArgs ts of
