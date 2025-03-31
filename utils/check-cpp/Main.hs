@@ -678,9 +678,13 @@ t29 = do
     dump
         [ "{-# LANGUAGE GHC_CPP #-}"
         , "module Example4 where"
-        , "#if !(defined VAL)"
-        -- , "#ifdef VAL"
-        , "#define VAL (16 :: Int32)"
+        , "requestQuery = do"
+        , "    if st < 400"
+        , "#ifdef DEBUG"
+        , "        do  e"
+        , "#else"
+        , "        then return body"
+        , "        else fail \"not reached\""
         , "#endif"
         , ""
         ]
