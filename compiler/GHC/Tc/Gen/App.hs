@@ -17,6 +17,7 @@
 module GHC.Tc.Gen.App
        ( tcApp
        , tcInferSigma
+       , tcInferSigmaX
        , tcExprPrag ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
@@ -184,6 +185,17 @@ tcInferSigma inst (L loc rn_expr)
        ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
        ; _ <- tcValArgs do_ql inst_args
        ; return app_res_sigma }
+
+tcInferSigmaX :: HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
+tcInferSigmaX rn_expr
+  = do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
+       ; do_ql <- wantQuickLook rn_fun
+       ; (tc_fun, fun_sigma) <- tcInferAppHead fun
+       ; (inst_args, app_res_sigma) <- tcInstFun do_ql False (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
+       ; tc_args <- tcValArgs do_ql inst_args
+       ; let tc_expr = rebuildHsApps (tc_fun, fun_ctxt) tc_args
+       ; return (tc_expr, app_res_sigma) }
+
 
 {- *********************************************************************
 *                                                                      *
@@ -403,7 +415,9 @@ tcApp rn_expr exp_res_ty
        -- Step 2: Infer the type of `fun`, the head of the application
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
        ; let tc_head = (tc_fun, fun_ctxt)
-
+       ; traceTc "tcApp:inferAppHead" $
+         vcat [ text "tc_fun:" <+> ppr tc_fun
+              , text "fun_sigma:" <+> ppr fun_sigma]
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
        ; (inst_args, app_res_rho)
