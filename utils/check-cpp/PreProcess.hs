@@ -211,16 +211,16 @@ ppLexer queueComments cont =
         queueComments
         ( \tk ->
             let
-                contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
-                -- contInner t = cont t
+                -- contInner t = (trace ("ppLexer: tk=" ++ show (unLoc tk, unLoc t)) cont) t
+                contInner t = cont t
                 contIgnoreTok (L l tok) = do
                     case l of
                         RealSrcSpan r (Strict.Just b) -> Lexer.queueIgnoredToken (L (PsSpan r b) tok)
                         _ -> return ()
                     ppLexer queueComments cont
              in
-                case tk of
-                -- case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
+                -- case tk of
+                case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
                     L _ ITeof -> do
                         mInp <- popIncludeLoc
                         case mInp of
@@ -246,6 +246,7 @@ ppLexer queueComments cont =
                                                 contIgnoreTok (L l (ITcpp continuation (appendFS s (fsLit dump)) sp))
                                             Nothing -> contIgnoreTok tk
                             else contInner tk
+                    L _ (ITcppIgnored _ _) -> contIgnoreTok tk
                     _ -> do
                         state <- getCppState
                         -- case (trace ("CPP state:" ++ show state) state) of
@@ -308,9 +309,12 @@ acceptStateChange ArNowIgnoring = do
   alr <- Lexer.getAlrState
   s <- getPpState
   setPpState (s { pp_alr_state = Just alr})
+  Lexer.startSkipping
 acceptStateChange ArNowAccepting = do
   s <- getPpState
   mapM_ Lexer.setAlrState (pp_alr_state s)
+  _ <- Lexer.stopSkipping
+  return ()
 
 -- pp_include start -----------------------
 
