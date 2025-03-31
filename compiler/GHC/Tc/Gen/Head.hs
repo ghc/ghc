@@ -32,6 +32,7 @@ module GHC.Tc.Gen.Head
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
+import {-# SOURCE #-} GHC.Tc.Gen.App( tcInferSigmaX )
 
 import GHC.Prelude
 import GHC.Hs
@@ -534,10 +535,10 @@ tcInferAppHead_maybe fun
   = case fun of
       HsVar _ nm                  -> Just <$> tcInferId nm
       XExpr (HsRecSelRn f)        -> Just <$> tcInferRecSelId f
-      XExpr (ExpandedThingRn _ e) -> tcInferAppHead_maybe e
+      XExpr (ExpandedThingRn _ e) -> Just <$> tcInferSigmaX e -- We do not want to instantiate e c.f. T19167
       XExpr (PopErrCtxt e)        -> tcInferAppHead_maybe e
       ExprWithTySig _ e hs_ty     -> Just <$> tcExprWithSig e hs_ty
-      HsOverLit _ lit             -> Just <$> tcInferOverLit lit
+      HsOverLit _ lit             -> Just <$> tcInferOverLit lit -- TODO: Do we need this?
       _                           -> return Nothing
 
 addHeadCtxt :: AppCtxt -> TcM a -> TcM a
