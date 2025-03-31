@@ -1423,21 +1423,21 @@ run_BCO:
 
         case bci_PUSH8_W: {
             W_ off = BCO_GET_LARGE_ARG;
-            *(StgWord8*)(Sp_minusW(1)) = *(StgWord8*)(Sp_plusB(off));
+            *(StgWord*)(Sp_minusW(1)) = *(StgWord8*)(Sp_plusB(off));
             Sp_subW(1);
             goto nextInsn;
         }
 
         case bci_PUSH16_W: {
             W_ off = BCO_GET_LARGE_ARG;
-            *(StgWord16*)(Sp_minusW(1)) = *(StgWord16*)(Sp_plusB(off));
+            *(StgWord*)(Sp_minusW(1)) = *(StgWord16*)(Sp_plusB(off));
             Sp_subW(1);
             goto nextInsn;
         }
 
         case bci_PUSH32_W: {
             W_ off = BCO_GET_LARGE_ARG;
-            *(StgWord32*)(Sp_minusW(1)) = *(StgWord32*)(Sp_plusB(off));
+            *(StgWord*)(Sp_minusW(1)) = *(StgWord32*)(Sp_plusB(off));
             Sp_subW(1);
             goto nextInsn;
         }
