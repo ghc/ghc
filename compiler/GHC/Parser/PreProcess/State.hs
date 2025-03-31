@@ -157,9 +157,10 @@ getCppState = do
 
 setAccepting :: Bool -> PP AcceptingResult
 setAccepting on = do
+  current <- getAccepting
   PpScope parent <- parentScope
   setScope (PpScope (parent && on))
-  return $ acceptingStateChange parent (parent && on)
+  return $ acceptingStateChange current (parent && on)
 
 getAccepting :: PP Bool
 getAccepting = P $ \s -> POk s (pp_accepting (NonEmpty.head $ pp_scope (pp s)))
@@ -167,9 +168,10 @@ getAccepting = P $ \s -> POk s (pp_accepting (NonEmpty.head $ pp_scope (pp s)))
 -- Start a new scope, ensuring it is consistent with the existing one
 pushAccepting :: Bool -> PP AcceptingResult
 pushAccepting on = do
-  PpScope current <- getScope
-  pushScope (PpScope (current && on))
-  return $ acceptingStateChange current (current && on)
+  current <- getAccepting
+  PpScope current_scope <- getScope
+  pushScope (PpScope (current_scope && on))
+  return $ acceptingStateChange current (current_scope && on)
 
 -- Have we just changed the accepting state?
 acceptingStateChange :: Bool -> Bool -> AcceptingResult
