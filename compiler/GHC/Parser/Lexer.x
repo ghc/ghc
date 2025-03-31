@@ -60,6 +60,7 @@ module GHC.Parser.Lexer (
    ParserOpts(..), mkParserOpts,
    PState (..), initParserState, initPragState,
    PSavedAlrState(..), getAlrState, setAlrState,
+   startSkipping, stopSkipping,
    P(..), ParseResult(POk, PFailed),
    allocateComments, allocatePriorComments, allocateFinalComments,
    MonadP(..), getBit,
@@ -335,6 +336,14 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   ^\# \! .* \n                          ; -- #!, for scripts  -- gcc
   ^\  \# \! .* \n                       ; --  #!, for scripts -- clang; See #6132
   ()                                    { do_bol }
+}
+
+-- Skipping everything but Ghc CPP directives. We can only get here if
+-- GhcCppBit is set.
+<skipping> {
+  -- Ghc CPP symbols
+  ^\# \ * @cppkeyword  .* \n  { cppToken cpp_prag }
+  ^.*\n                       { cppSkip }
 }
 
 -- after a layout keyword (let, where, do, of), we begin a new layout
@@ -1284,33 +1293,18 @@ doCppToken code span buf len _buf2 =
     let span' = cppSpan span len0
     let !s = lexemeToFastString buf len0
     return (L span' (ITcpp continue s lt))
+    -- return (trace ("doCppToken: " ++ show (span',continue,s)) (L span' (ITcpp continue s lt)))
 
-
--- cppToken :: Int -> Action p
--- cppToken code span buf len _buf2 =
---   do
---      let tokStr = lexemeToFastString buf len
---      -- check if the string ends with backslash and newline
---      -- NOTE: performance likely sucks, make it work for now
---      (len0, continue) <- case (reverse $ unpackFS tokStr) of
---         ('\n':'\\':_) -> pushLexState code >> return (len -2, True)
---         ('\n':_) -> return (len - 1, False)
---         _ -> return (len, False)
---      let span' = cppSpan span len0
---      return (L span' (ITcpp continue $! lexemeToFastString buf len0))
-
--- cppTokenCont :: Action p
--- cppTokenCont span buf len _buf2 =
---   do
---      let tokStr = lexemeToFastString buf len
---      -- check if the string ends with backslash and newline
---      -- NOTE: performance likely sucks, make it work for now
---      (len0, continue) <- case (reverse $ unpackFS tokStr) of
---         ('\n':'\\':_) -> return (len - 2, True)
---         ('\n':_) -> return (len - 1, False)
---         _ -> return (len, False)
---      let span' = cppSpan span len0
---      return (L span' (ITcpp continue $! lexemeToFastString buf len0))
+cppSkip :: Action p
+cppSkip span buf len _buf2 =
+  do
+    lt <- getLastLocIncludingComments
+    let tokStr = lexemeToFastString buf len
+    let len0 = len - 1 -- skip trailing newline
+    let span' = cppSpan span len0
+    let !s = lexemeToFastString buf len0
+    return (L span' (ITcppIgnored s lt))
+    -- return (trace ("cppSkip:" ++ show (span',s)) (L span' (ITcppIgnored s lt)))
 
 cppSpan :: PsSpan -> Int -> PsSpan
 cppSpan span len = mkPsSpan start_loc end_loc
@@ -2803,6 +2797,18 @@ getOffset = P $ \s@(PState { pp_last_col = last_col,
 resetOffset :: P p ()
 resetOffset = P $ \s -> POk s { pp_last_col = Nothing} ()
 
+startSkipping :: P p ()
+startSkipping = do
+  pushLexState skipping
+  -- pushLexState (trace ("startSkipping:" ++ show skipping) skipping)
+
+stopSkipping :: P p Int
+stopSkipping = do
+  popLexState
+  -- old <- popLexState
+  -- return (trace ("stopSkipping:" ++ show old) old)
+
+
 getAlrState :: P p PSavedAlrState
 getAlrState = P $ \s@(PState  {loc=l}) -> POk s
   PSavedAlrState {
@@ -2817,7 +2823,7 @@ getAlrState = P $ \s@(PState  {loc=l}) -> POk s
         s_alr_context = alr_context s,
         s_alr_expecting_ocurly = alr_expecting_ocurly s,
         s_alr_justClosedExplicitLetBlock = alr_justClosedExplicitLetBlock s,
-        s_last_col = srcLocCol (psRealLoc (trace "getAlrState" l))
+        s_last_col = srcLocCol (psRealLoc l)
     }
 
 setAlrState :: PSavedAlrState -> P p ()
@@ -2833,7 +2839,7 @@ setAlrState ss = P $ \s -> POk s {
         alr_expecting_ocurly = s_alr_expecting_ocurly ss,
         alr_justClosedExplicitLetBlock = s_alr_justClosedExplicitLetBlock ss,
         pp_last_col = Just (s_last_col ss)
-    } (trace "setAlrState" ())
+    } ()
 
 
 
@@ -3331,10 +3337,10 @@ popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,
         (_:tl) ->
           POk s{ context = tl } ()
         []     ->
-          -- unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
-          let s' = (trace "popContext empty" s)
-          in
-            unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s'
+          unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
+          -- let s' = (trace "popContext empty" s)
+          -- in
+          --   unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s'
 
 -- Push a new layout context at the indentation of the last token read.
 pushCurrentContext :: GenSemic -> P p ()
@@ -3389,9 +3395,9 @@ srcParseErr options buf len loc = mkPlainErrorMsgEnvelope loc (PsErrParse token 
 srcParseFail :: P p a
 srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
                             last_loc = last_loc } ->
-    -- unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
-    let s' = trace ("srcParseFail") s
-    in unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s'
+    unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
+    -- let s' = trace ("srcParseFail") s
+    -- in unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s'
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
@@ -3844,6 +3850,7 @@ queueIgnoredToken :: PsLocated Token -> P p ()
 queueIgnoredToken (L l tok) = do
   comment <- case tok of
                ITcpp{} -> return $ commentToAnnotation (L l tok)
+               ITcppIgnored{} -> return $ commentToAnnotation (L l tok)
                _       -> do
                  ll <- getLastLocIncludingComments
                  -- setLastComment (L l tok)
