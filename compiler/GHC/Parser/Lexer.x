@@ -2593,7 +2593,7 @@ data PState a = PState {
         prev_loc     :: PsSpan,      -- pos of previous non-virtual token, including comments,
         last_loc     :: PsSpan,      -- pos of current token
         last_len     :: !Int,        -- len of current token, in bytes, not UTF-8 code points
-        last_buf_cur :: !Int,      -- Byte offset into StringBuffer corresponding to start of last_loc
+        last_buf_cur :: !Int,        -- Byte offset into StringBuffer corresponding to start of last_loc
         loc          :: PsLoc,       -- current loc (end of prev token + 1)
         context      :: [LayoutContext],
         lex_state    :: [Int],
@@ -2650,7 +2650,9 @@ data PState a = PState {
         -- correctly?
 
 data PSavedAlrState = PSavedAlrState {
-        s_lex_state  :: [Int],
+        -- s_warnings  :: Messages PsMessage,
+        -- s_errors    :: Messages PsMessage,
+        s_lex_state :: [Int],
         s_context :: [LayoutContext],
         s_alr_pending_implicit_tokens :: [PsLocated Token],
         s_alr_next_token :: Maybe (PsLocated Token),
@@ -2804,6 +2806,9 @@ resetOffset = P $ \s -> POk s { pp_last_col = Nothing} ()
 getAlrState :: P p PSavedAlrState
 getAlrState = P $ \s@(PState  {loc=l}) -> POk s
   PSavedAlrState {
+        -- s_warnings = warnings s,
+        -- s_errors = errors s,
+        -- s_lex_state = lex_state s,
         s_lex_state = lex_state s,
         s_context = context s,
         s_alr_pending_implicit_tokens = alr_pending_implicit_tokens s,
@@ -2812,11 +2817,13 @@ getAlrState = P $ \s@(PState  {loc=l}) -> POk s
         s_alr_context = alr_context s,
         s_alr_expecting_ocurly = alr_expecting_ocurly s,
         s_alr_justClosedExplicitLetBlock = alr_justClosedExplicitLetBlock s,
-        s_last_col = srcLocCol (psRealLoc l)
+        s_last_col = srcLocCol (psRealLoc (trace "getAlrState" l))
     }
 
 setAlrState :: PSavedAlrState -> P p ()
 setAlrState ss = P $ \s -> POk s {
+        -- errors = s_errors ss,
+        -- warnings = s_warnings ss,
         lex_state = s_lex_state ss,
         context = s_context ss,
         alr_pending_implicit_tokens = s_alr_pending_implicit_tokens ss,
@@ -2826,7 +2833,7 @@ setAlrState ss = P $ \s -> POk s {
         alr_expecting_ocurly = s_alr_expecting_ocurly ss,
         alr_justClosedExplicitLetBlock = s_alr_justClosedExplicitLetBlock ss,
         pp_last_col = Just (s_last_col ss)
-    } ()
+    } (trace "setAlrState" ())
 
 
 
@@ -3324,7 +3331,10 @@ popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,
         (_:tl) ->
           POk s{ context = tl } ()
         []     ->
-          unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
+          -- unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
+          let s' = (trace "popContext empty" s)
+          in
+            unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s'
 
 -- Push a new layout context at the indentation of the last token read.
 pushCurrentContext :: GenSemic -> P p ()
@@ -3379,7 +3389,9 @@ srcParseErr options buf len loc = mkPlainErrorMsgEnvelope loc (PsErrParse token 
 srcParseFail :: P p a
 srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
                             last_loc = last_loc } ->
-    unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
+    -- unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
+    let s' = trace ("srcParseFail") s
+    in unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s'
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
