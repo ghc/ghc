@@ -138,7 +138,7 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Predicate
 
-import GHC.Types.DefaultEnv ( DefaultEnv )
+import GHC.Types.DefaultEnv ( DefaultEnv, ClassDefaults )
 import GHC.Types.Fixity.Env
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
@@ -179,6 +179,7 @@ import Data.Set      ( Set )
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.Dynamic  ( Dynamic )
+import Data.List.NonEmpty (NonEmpty)
 import Data.Map ( Map )
 import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
@@ -470,6 +471,11 @@ data TcGblEnv
         tcg_rdr_env :: GlobalRdrEnv,   -- ^ Top level envt; used during renaming
         tcg_default         :: DefaultEnv,     -- ^ All class defaults in scope in the module
         tcg_default_exports :: DefaultEnv,     -- ^ All class defaults exported from the module
+        tcg_default_imports :: [NonEmpty ClassDefaults],
+        -- ^ All class defaults imported into the module grouped by class
+        -- we explicitly do not merge them into one DefaultEnv because
+        -- reportClashingDefaultImports need them separated
+        -- to compute the right error message
 
         tcg_fix_env :: FixityEnv,      -- ^ Just for things in this module
 

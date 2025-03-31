@@ -294,8 +294,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                   ++ withReason "is an extra sig import" (map mkImport raw_sig_imports)
                   ++ withReason "is an implicit req import" (map mkImport raw_req_imports) }
         ; -- OK now finally rename the imports
-          (defaultImportsByClass, tcg_env) <-
-            {-# SCC "tcRnImports" #-} tcRnImports hsc_env all_imports
+          tcg_env <- {-# SCC "tcRnImports" #-} tcRnImports hsc_env all_imports
 
         -- Put a version of the header without identifier info into the tcg_env
         -- Make sure to do this before 'tcRnSrcDecls', because we need the
@@ -353,7 +352,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                         -- a function with no type signature we can give the
                         -- inferred type
                       ; reportUnusedNames tcg_env hsc_src
-                      ; reportClashingDefaultImports defaultImportsByClass (tcg_default tcg_env)
+                      ; reportClashingDefaultImports (tcg_default_imports tcg_env) (tcg_default tcg_env)
 
                       -- Rename the module header properly after we have renamed everything else
                       ; maybe_doc_hdr <- traverse rnLHsDoc maybe_doc_hdr;
@@ -460,7 +459,7 @@ isTypeSubsequenceOf (t1:t1s) (t2:t2s)
 ************************************************************************
 -}
 
-tcRnImports :: HscEnv -> [(LImportDecl GhcPs, SDoc)] -> TcM ([NonEmpty ClassDefaults], TcGblEnv)
+tcRnImports :: HscEnv -> [(LImportDecl GhcPs, SDoc)] -> TcM TcGblEnv
 tcRnImports hsc_env import_decls
   = do  { (rn_imports, imp_user_spec, rdr_env, imports) <- rnImports import_decls
         -- Get the default declarations for the classes imported by this module
@@ -496,6 +495,7 @@ tcRnImports hsc_env import_decls
               tcg_import_decls = imp_user_spec,
               tcg_rn_imports   = rn_imports,
               tcg_default      = foldMap subsume tc_defaults,
+              tcg_default_imports = tc_defaults,
               tcg_inst_env     = tcg_inst_env gbl `unionInstEnv` home_insts,
               tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl)
                                                       home_fam_insts
@@ -532,7 +532,7 @@ tcRnImports hsc_env import_decls
         ; traceRn "rn1: } checking family instance consistency" empty
 
         ; gbl_env <- getGblEnv
-        ; return (tc_defaults, gbl_env) } }
+        ; return gbl_env } }
 
 {-
 ************************************************************************
@@ -2678,7 +2678,7 @@ tcRnImportDecls :: HscEnv
 -- decls.  In contract tcRnImports *extends* the TcGblEnv.
 tcRnImportDecls hsc_env import_decls
  =  runTcInteractive hsc_env $
-    do { (_, gbl_env) <- updGblEnv zap_rdr_env $
+    do { gbl_env <- updGblEnv zap_rdr_env $
                          tcRnImports hsc_env $ map (,text "is directly imported") import_decls
        ; return (tcg_rdr_env gbl_env) }
   where
