@@ -457,6 +457,14 @@ lookupLocalRdrEnv (LRE { lre_env = env, lre_in_scope = ns }) rdr
   = Just name
 
   | otherwise
+  -- As per the Haskell report (www.haskell.org/onlinereport/haskell2010/haskellch5.html#x11-980005),
+  -- qualified names can only refer to:
+  --
+  --  - imported names, or
+  --  - top-level declarations in the current module.
+  --
+  -- Thus, looking up in the LocalRdrEnv using a Qual or Orig RdrName will
+  -- always fail.
   = Nothing
 
 lookupLocalRdrOcc :: LocalRdrEnv -> OccName -> Maybe Name
