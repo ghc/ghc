@@ -15,6 +15,7 @@ import GHC.Utils.Binary
 import GHC.Types.Name
 import GHC.Utils.Panic.Plain
 import GHC.Iface.Type (putIfaceType)
+import System.IO.Unsafe (unsafePerformIO)
 
 fingerprintBinMem :: WriteBinHandle -> IO Fingerprint
 fingerprintBinMem bh = withBinBuffer bh f
@@ -29,8 +30,8 @@ fingerprintBinMem bh = withBinBuffer bh f
 computeFingerprint :: (Binary a)
                    => (WriteBinHandle -> Name -> IO ())
                    -> a
-                   -> IO Fingerprint
-computeFingerprint put_nonbinding_name a = do
+                   -> Fingerprint
+computeFingerprint put_nonbinding_name a = unsafePerformIO $ do
     bh <- fmap set_user_data $ openBinMem (3*1024) -- just less than a block
     put_ bh a
     fingerprintBinMem bh

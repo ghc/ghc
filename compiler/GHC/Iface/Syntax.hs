@@ -99,7 +99,6 @@ import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
 
 import Control.Monad
-import System.IO.Unsafe
 import Control.DeepSeq
 import Data.Proxy
 import qualified Data.Set as Set
@@ -645,9 +644,7 @@ ifaceDeclFingerprints hash decl
     [ (occ, computeFingerprint' (hash,occ))
     | occ <- ifaceDeclImplicitBndrs decl ]
   where
-     computeFingerprint' =
-       unsafeDupablePerformIO
-        . computeFingerprint (panic "ifaceDeclFingerprints")
+    computeFingerprint' = computeFingerprint (panic "ifaceDeclFingerprints")
 
 fromIfaceWarnings :: IfaceWarnings -> Warnings GhcRn
 fromIfaceWarnings = \case

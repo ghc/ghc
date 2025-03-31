@@ -35,7 +35,7 @@ import Data.Maybe
 -- file, not the actual 'Module' according to our 'DynFlags'.
 fingerprintDynFlags :: HscEnv -> Module
                     -> (WriteBinHandle -> Name -> IO ())
-                    -> IO (Fingerprint, IfaceDynFlags)
+                    -> (Fingerprint, IfaceDynFlags)
 
 fingerprintDynFlags hsc_env this_mod nameio =
     let dflags@DynFlags{..} = hsc_dflags hsc_env
@@ -98,9 +98,7 @@ fingerprintDynFlags hsc_env this_mod nameio =
 
         f = IfaceDynFlags mainis safeHs lang exts cpp js cmm paths prof ticky codegen fat_iface debugLevel callerCcFilters
 
-    in do
-      fp <- computeFingerprint nameio f
-      return (fp, f)
+    in (computeFingerprint nameio f, f)
 
 -- Fingerprint the optimisation info. We keep this separate from the rest of
 -- the flags because GHCi users (especially) may wish to ignore changes in
@@ -109,7 +107,7 @@ fingerprintDynFlags hsc_env this_mod nameio =
 -- See Note [Ignoring some flag changes]
 fingerprintOptFlags :: DynFlags
                       -> (WriteBinHandle -> Name -> IO ())
-                      -> IO Fingerprint
+                      -> Fingerprint
 fingerprintOptFlags DynFlags{..} nameio =
       let
         -- See https://gitlab.haskell.org/ghc/ghc/issues/10923
@@ -127,7 +125,7 @@ fingerprintOptFlags DynFlags{..} nameio =
 -- See Note [Ignoring some flag changes]
 fingerprintHpcFlags :: DynFlags
                       -> (WriteBinHandle -> Name -> IO ())
-                      -> IO Fingerprint
+                      -> Fingerprint
 fingerprintHpcFlags dflags@DynFlags{..} nameio =
       let
         -- -fhpc, see https://gitlab.haskell.org/ghc/ghc/issues/11798

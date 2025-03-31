@@ -73,7 +73,6 @@ import GHC.Unit.Module.Deps
 
 import Control.Monad
 import Control.Monad.Trans.State
-import Control.Monad.Trans.Class
 import Data.List (sortBy, sort, sortOn)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -533,7 +532,7 @@ checkFlagHash :: HscEnv -> Module -> IfaceSelfRecomp -> IO RecompileRequired
 checkFlagHash hsc_env iface_mod self_recomp = do
     let logger   = hsc_logger hsc_env
     let FingerprintWithValue old_fp old_flags = mi_sr_flag_hash self_recomp
-    (new_fp, new_flags) <- fingerprintDynFlags hsc_env iface_mod putNameLiterally
+    let (new_fp, new_flags) = fingerprintDynFlags hsc_env iface_mod putNameLiterally
     if old_fp == new_fp
       then up_to_date logger (text "Module flags unchanged")
       else do
@@ -569,8 +568,8 @@ checkIfaceFlags (IfaceDynFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14)
     check_one_simple s a b = check_one s ppr a b
 
     check_one s p a b = do
-      a' <- lift $ computeFingerprint putNameLiterally a
-      b' <- lift $ computeFingerprint putNameLiterally b
+      let a' = computeFingerprint putNameLiterally a
+      let b' = computeFingerprint putNameLiterally b
       if a' == b' then pure () else modify (([ text s <+> text "flags changed"] ++ [diffSimple p a b]) ++)
 
 -- | Check the optimisation flags haven't changed
@@ -578,7 +577,7 @@ checkOptimHash :: HscEnv -> IfaceSelfRecomp -> IO RecompileRequired
 checkOptimHash hsc_env iface = do
     let logger   = hsc_logger hsc_env
     let old_hash = mi_sr_opt_hash iface
-    new_hash <- fingerprintOptFlags (hsc_dflags hsc_env)
+    let !new_hash = fingerprintOptFlags (hsc_dflags hsc_env)
                                                putNameLiterally
     if | old_hash == new_hash
          -> up_to_date logger (text "Optimisation flags unchanged")
@@ -594,7 +593,7 @@ checkHpcHash :: HscEnv -> IfaceSelfRecomp -> IO RecompileRequired
 checkHpcHash hsc_env self_recomp = do
     let logger   = hsc_logger hsc_env
     let old_hash = mi_sr_hpc_hash self_recomp
-    new_hash <- fingerprintHpcFlags (hsc_dflags hsc_env)
+    let !new_hash = fingerprintHpcFlags (hsc_dflags hsc_env)
                                                putNameLiterally
     if | old_hash == new_hash
          -> up_to_date logger (text "HPC flags unchanged")
@@ -991,11 +990,11 @@ mkSelfRecomp :: HscEnv -> Module -> Fingerprint -> [Usage] -> IO IfaceSelfRecomp
 mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
-      dyn_flags_info <- fingerprintDynFlags hsc_env this_mod putNameLiterally
+      let dyn_flags_info = fingerprintDynFlags hsc_env this_mod putNameLiterally
 
-      opt_hash <- fingerprintOptFlags dflags putNameLiterally
+      let opt_hash = fingerprintOptFlags dflags putNameLiterally
 
-      hpc_hash <- fingerprintHpcFlags dflags putNameLiterally
+      let hpc_hash = fingerprintHpcFlags dflags putNameLiterally
 
       plugin_hash <- fingerprintPlugins (hsc_plugins hsc_env)
 
@@ -1047,7 +1046,7 @@ addFingerprints hsc_env iface0 = do
   --   - the things which can affect whether a module is recompiled
   --   - the module level annotations,
   --   - deps (home and external packages, dependent files)
-  iface_hash <- computeFingerprint putNameLiterally
+  let !iface_hash = computeFingerprint putNameLiterally
                         (mi_abi_mod_hash abiHashes,
                          mi_self_recomp_info iface0,
                          mi_deps iface0)
@@ -1195,7 +1194,7 @@ addAbiHashes hsc_env info iface_public deps = do
          = do let hash_fn = mk_put_name local_env
                   decl = abiDecl abi
                --pprTrace "fingerprinting" (ppr (ifName decl) ) $ do
-              hash <- computeFingerprint hash_fn abi
+              let !hash = computeFingerprint hash_fn abi
               env' <- extend_hash_env local_env (hash,decl)
               return (env', (hash,decl) : decls_w_hashes)
 
@@ -1208,7 +1207,7 @@ addAbiHashes hsc_env info iface_public deps = do
                let hash_fn = mk_put_name local_env1
                -- pprTrace "fingerprinting" (ppr (map ifName decls) ) $ do
                 -- put the cycle in a canonical order
-               hash <- computeFingerprint hash_fn stable_abis
+               let !hash = computeFingerprint hash_fn stable_abis
                let pairs = zip (map (bumpFingerprint hash) [0..]) stable_decls
                 -- See Note [Fingerprinting recursive groups]
                local_env2 <- foldM extend_hash_env local_env pairs
@@ -1276,11 +1275,11 @@ addAbiHashes hsc_env info iface_public deps = do
    -- instances yourself, no need to consult hs-boot; if you do load the
    -- interface into EPS, you will see a duplicate orphan instance.
 
-  orphan_hash <- computeFingerprint (mk_put_name local_env)
+  let !orphan_hash = computeFingerprint (mk_put_name local_env)
                                      (map ifDFun orph_insts, orph_rules, orph_fis)
 
   -- Hash of the transitive things in dependencies
-  dep_hash <- computeFingerprint putNameLiterally
+  let !dep_hash = computeFingerprint putNameLiterally
                       (sig_mods,
                        boot_mods,
                        -- Trusted packages are like orphans
@@ -1288,9 +1287,9 @@ addAbiHashes hsc_env info iface_public deps = do
                        -- See Note [Export hash depends on non-orphan family instances]
                        fis_mods )
 
-  -- the export list hash doesn't depend on the fingerprints of
-  -- the Names it mentions, only the Names themselves, hence putNameLiterally.
-  export_hash <- computeFingerprint putNameLiterally
+  -- The export hash is for things which is anything changes, modules which depend on
+  -- it will be recompiled.
+  let !export_hash = computeFingerprint putNameLiterally
                       (exports,
                        orphan_hash,
                        dep_hash,
@@ -1333,7 +1332,7 @@ addAbiHashes hsc_env info iface_public deps = do
   --   - orphans
   --   - deprecations
   --   - flag abi hash
-  mod_hash <- computeFingerprint putNameLiterally
+  let !mod_hash = computeFingerprint putNameLiterally
                       (sort (map fst decls_w_hashes),
                        export_hash,  -- includes orphan_hash
                        ann_fn AnnModule,
