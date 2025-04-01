@@ -1895,9 +1895,7 @@ implement_tagToId d s p arg names
 -- to 5 and not to 4.  Stack locations are numbered from zero, so a
 -- depth 6 stack has valid words 0 .. 5.
 
-pushAtom
-    :: StackDepth -> BCEnv -> StgArg -> BcM (BCInstrList, ByteOff)
-
+pushAtom :: StackDepth -> BCEnv -> StgArg -> BcM (BCInstrList, ByteOff)
 -- See Note [Empty case alternatives] in GHC.Core
 -- and Note [Bottoming expressions] in GHC.Core.Utils:
 -- The scrutinee of an empty case evaluates to bottom
@@ -1971,7 +1969,13 @@ pushLiteral padded lit =
      platform <- targetPlatform <$> getDynFlags
      let code :: PrimRep -> BcM (BCInstrList, ByteOff)
          code rep =
-            return (padding_instr `snocOL` instr, size_bytes + padding_bytes)
+            -- TODO: It's a bit silly to use up to four instructions to put a single literal on the stack.
+            --       Lot's of better ways to do this. Add a instruction to push it as full word.
+            --       Store the literal as full word and push it as full word.
+            --       Maybe more, but for now this will do.
+            case platformByteOrder platform of
+              LittleEndian -> return (padding_instr `snocOL` instr, size_bytes + padding_bytes)
+              BigEndian -> return (instr `consOL` padding_instr, size_bytes + padding_bytes)
           where
             size_bytes = ByteOff $ primRepSizeB platform rep
 
