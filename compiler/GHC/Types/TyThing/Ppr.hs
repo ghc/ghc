@@ -192,7 +192,7 @@ pprTyThing ss ty_thing
       | otherwise
          = case nameModule_maybe name of
              Just mod -> Just $ \occ -> getPprStyle $ \sty ->
-               pprModulePrefix sty mod occ <> ppr occ
+               pprModulePrefix sty mod Nothing occ <> ppr occ
              Nothing  -> warnPprTrace True "pprTyThing" (ppr name) Nothing
              -- Nothing is unexpected here; TyThings have External names
 

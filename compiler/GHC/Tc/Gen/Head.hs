@@ -67,6 +67,7 @@ import GHC.Core.Type
 
 import GHC.Types.Id
 import GHC.Types.Name
+import GHC.Types.Name.Reader ( WithUserRdr(..) )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error
@@ -82,9 +83,6 @@ import GHC.Utils.Panic
 
 import GHC.Data.Maybe
 import Control.Monad
-import GHC.Rename.Unbound (WhatLooking(WL_Anything))
-
-
 
 {- *********************************************************************
 *                                                                      *
@@ -773,7 +771,7 @@ tcInferOverLit lit@(OverLit { ol_val = val
        ; let lit_expr = L (l2l loc) $ mkHsWrapCo co $
                         HsLit noExtField hs_lit
              from_expr = mkHsWrap (wrap2 <.> wrap1) $
-                         HsVar noExtField (L loc from_id)
+                         mkHsVar (L loc from_id)
              witness = HsApp noExtField (L (l2l loc) from_expr) lit_expr
              lit' = OverLit { ol_val = val
                             , ol_ext = OverLitTc { ol_rebindable = rebindable
@@ -789,31 +787,31 @@ tcInferOverLit lit@(OverLit { ol_val = val
 
 tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcCheckId name res_ty
-  = do { (expr, actual_res_ty) <- tcInferId (noLocA name)
+  = do { (expr, actual_res_ty) <- tcInferId (noLocA $ noUserRdr name)
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
        ; addFunResCtxt expr [] actual_res_ty res_ty $
          tcWrapResultO (OccurrenceOf name) rn_fun expr actual_res_ty res_ty }
   where
-    rn_fun = HsVar noExtField (noLocA name)
+    rn_fun = mkHsVar (noLocA name)
 
 ------------------------
-tcInferId :: LocatedN Name -> TcM (HsExpr GhcTc, TcSigmaType)
+tcInferId :: LocatedN (WithUserRdr Name) -> TcM (HsExpr GhcTc, TcSigmaType)
 -- Look up an occurrence of an Id
 -- Do not instantiate its type
-tcInferId lname@(L loc id_name)
+tcInferId lname@(L loc (WithUserRdr rdr id_name))
 
   | id_name `hasKey` assertIdKey
   = -- See Note [Overview of assertions]
     do { dflags <- getDynFlags
        ; if gopt Opt_IgnoreAsserts dflags
          then tc_infer_id lname
-         else tc_infer_id (L loc assertErrorName) }
+         else tc_infer_id (L loc $ WithUserRdr rdr assertErrorName) }
 
   | otherwise
   = tc_infer_id lname
 
-tc_infer_id :: LocatedN Name -> TcM (HsExpr GhcTc, TcSigmaType)
-tc_infer_id (L loc id_name)
+tc_infer_id :: LocatedN (WithUserRdr Name) -> TcM (HsExpr GhcTc, TcSigmaType)
+tc_infer_id (L loc (WithUserRdr rdr id_name))
  = do { thing <- tcLookup id_name
       ; (expr,ty) <- case thing of
              ATcId { tct_id = id }
@@ -827,15 +825,15 @@ tc_infer_id (L loc id_name)
 
              AGlobal (AConLike cl) -> tcInferConLike cl
 
-             (tcTyThingTyCon_maybe -> Just tc) -> failIllegalTyCon WL_Anything (tyConName tc)
-             ATyVar name _ -> failIllegalTyVal name
+             (tcTyThingTyCon_maybe -> Just tc) -> failIllegalTyCon WL_Term (WithUserRdr rdr (tyConName tc))
+             ATyVar name _ -> failIllegalTyVar (WithUserRdr rdr name)
 
              _ -> failWithTc $ TcRnExpectedValueId thing
 
        ; traceTc "tcInferId" (ppr id_name <+> dcolon <+> ppr ty)
        ; return (expr, ty) }
   where
-    return_id id = return (HsVar noExtField (L loc id), idType id)
+    return_id id = return (mkHsVar (L loc id), idType id)
 
 {- Note [Overview of assertions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1120,7 +1118,7 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
         ; lift <- if isStringTy id_ty then
                      do { sid <- tcLookupId GHC.Builtin.Names.TH.liftStringName
                                      -- See Note [Lifting strings]
-                        ; return (HsVar noExtField (noLocA sid)) }
+                        ; return (mkHsVar (noLocA sid)) }
                   else
                      setConstraintVar lie_var   $
                           -- Put the 'lift' constraint into the right LIE

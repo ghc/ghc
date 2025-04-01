@@ -513,11 +513,11 @@ data CtOrigin
 
   ----------- Below here, all are Origins for Wanted constraints ------------
 
-  | OccurrenceOf Name              -- Occurrence of an overloaded identifier
-  | OccurrenceOfRecSel RdrName     -- Occurrence of a record selector
-  | AppOrigin                      -- An application of some kind
+  | OccurrenceOf Name          -- ^ Occurrence of an overloaded identifier
+  | OccurrenceOfRecSel RdrName -- ^ Occurrence of a record selector
+  | AppOrigin                  -- ^ An application of some kind
 
-  | SpecPragOrigin UserTypeCtxt    -- Specialisation pragma for
+  | SpecPragOrigin UserTypeCtxt    -- ^ Specialisation pragma for
                                    -- function or instance
 
 
@@ -719,7 +719,7 @@ lexprCtOrigin :: LHsExpr GhcRn -> CtOrigin
 lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
-exprCtOrigin (HsVar _ (L _ name)) = OccurrenceOf name
+exprCtOrigin (HsVar _ (L _ (WithUserRdr _ name))) = OccurrenceOf name
 exprCtOrigin (HsGetField _ _ (L _ f)) = GetFieldOrigin (field_label $ unLoc $ dfoLabel f)
 exprCtOrigin (HsOverLabel _ l)  = OverLabelOrigin l
 exprCtOrigin (ExplicitList {})    = ListOrigin

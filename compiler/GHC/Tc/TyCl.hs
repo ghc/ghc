@@ -3685,7 +3685,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
               do { ctxt <- tcHsContext hs_ctxt
                  ; let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConH98Args exp_kind hs_args
-                 ; field_lbls <- lookupConstructorFields name
+                 ; field_lbls <- lookupConstructorFields $ noUserRdr name
                  ; let (arg_tys, stricts) = unzip btys
                  ; return (ctxt, arg_tys, field_lbls, stricts)
                  }
@@ -3792,7 +3792,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                  ; btys <- tcConGADTArgs exp_kind hs_args
 
                  ; let (arg_tys, stricts) = unzip btys
-                 ; field_lbls <- lookupConstructorFields name
+                 ; field_lbls <- lookupConstructorFields $ noUserRdr name
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
 

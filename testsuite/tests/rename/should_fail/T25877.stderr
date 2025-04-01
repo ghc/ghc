@@ -1,0 +1,11 @@
+T25877.hs:5:8: error: [GHC-01928]
+    • Illegal term-level use of the type constructor ‘X.A’
+    • imported qualified from ‘T25877_aux’ at T25877.hs:3:35-39
+      (and originally defined at T25877_aux.hs:2:1-10)
+    • In the expression: X.A
+      In an equation for ‘test’: test = X.A
+    Suggested fixes:
+      • Perhaps use ‘Y.A’ (imported from T25877_aux)
+      • Add ‘A’ to the import list in the import of ‘T25877_aux’
+        (at T25877.hs:2:1-36).
+

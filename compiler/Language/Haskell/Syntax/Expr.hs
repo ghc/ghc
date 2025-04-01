@@ -331,8 +331,8 @@ in `TcRnIllegalTypeExpr`.
 -- | A Haskell expression.
 data HsExpr p
   = HsVar     (XVar p)
-              (LIdP p) -- ^ Variable
-                       -- See Note [Located RdrNames]
+              (LIdOccP p) -- ^ Variable
+                          -- See Note [Located RdrNames]
 
   | HsOverLabel (XOverLabel p) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)

@@ -122,7 +122,7 @@ tyThingToLHsDecl prr t = case t of
                 HsBndrKind _ kind -> HsKindSig noAnn (noLocA (cvt' bvar)) kind
 
             cvt' :: HsBndrVar GhcRn -> HsType GhcRn
-            cvt' (HsBndrVar _ nm)   = HsTyVar noAnn NotPromoted nm
+            cvt' (HsBndrVar _ nm)   = HsTyVar noAnn NotPromoted (fmap noUserRdr nm)
             cvt' (HsBndrWildCard _) = HsWildCardTy noExtField
 
             -- \| Convert a LHsTyVarBndr to an equivalent LHsType.
@@ -711,7 +711,7 @@ synifyType
   -> Type
   -- ^ the type to convert
   -> LHsType GhcRn
-synifyType _ _ (TyVarTy tv) = noLocA $ HsTyVar noAnn NotPromoted $ noLocA (getName tv)
+synifyType _ _ (TyVarTy tv) = noLocA $ HsTyVar noAnn NotPromoted $ noLocA (noUserRdr $ getName tv)
 synifyType _ vs (TyConApp tc tys) =
   maybe_sig res_ty
   where
@@ -722,7 +722,7 @@ synifyType _ vs (TyConApp tc tys) =
       , [TyConApp rep [TyConApp lev []]] <- tys
       , rep `hasKey` boxedRepDataConKey
       , lev `hasKey` liftedDataConKey =
-          noLocA (HsTyVar noAnn NotPromoted (noLocA liftedTypeKindTyConName))
+          noLocA (HsTyVar noAnn NotPromoted (noLocA $ noUserRdr liftedTypeKindTyConName))
       -- Use non-prefix tuple syntax where possible, because it looks nicer.
       | Just sort <- tyConTuple_maybe tc
       , tyConArity tc == tys_len =
@@ -756,7 +756,7 @@ synifyType _ vs (TyConApp tc tys) =
                   | L _ (HsExplicitListTy _ IsPromoted tTy') <- stripKindSig tTy ->
                       noLocA $ HsExplicitListTy noExtField IsPromoted (hTy : tTy')
                   | otherwise ->
-                      noLocA $ HsOpTy noExtField IsPromoted hTy (noLocA $ getName tc) tTy
+                      noLocA $ HsOpTy noExtField IsPromoted hTy (noLocA $ noUserRdr $ getName tc) tTy
       -- ditto for implicit parameter tycons
       | tc `hasKey` ipClassKey
       , [name, ty] <- tys
@@ -770,7 +770,7 @@ synifyType _ vs (TyConApp tc tys) =
               noExtField
               NotPromoted
               (synifyType WithinType vs ty1)
-              (noLocA eqTyConName)
+              (noLocA $ noUserRdr eqTyConName)
               (synifyType WithinType vs ty2)
       -- and infix type operators
       | isSymOcc (nameOccName (getName tc))
@@ -780,14 +780,14 @@ synifyType _ vs (TyConApp tc tys) =
                 noExtField
                 prom
                 (synifyType WithinType vs ty1)
-                (noLocA $ getName tc)
+                (noLocA $ noUserRdr $ getName tc)
                 (synifyType WithinType vs ty2)
             )
             tys_rest
       -- Most TyCons:
       | otherwise =
           mk_app_tys
-            (HsTyVar noAnn prom $ noLocA (getName tc))
+            (HsTyVar noAnn prom $ noLocA (noUserRdr $ getName tc))
             vis_tys
       where
         !prom = if isPromotedDataCon tc then IsPromoted else NotPromoted

@@ -98,7 +98,7 @@ import Data.List.NonEmpty ( NonEmpty(..), toList )
 import Data.Function
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
-import GHC.Types.Name.Reader (RdrName(..))
+import GHC.Types.Name.Reader (RdrName(..), WithUserRdr (..))
 
 data MetaWrappers = MetaWrappers {
       -- Applies its argument to a type argument `m` and dictionary `Quote m`
@@ -1424,7 +1424,7 @@ repTy ty@(HsForAllTy { hst_tele = tele, hst_body = body }) =
          repTForallVis bndrs body1
 repTy ty@(HsQualTy {}) = repForallT ty
 
-repTy (HsTyVar _ _ (L _ n))
+repTy (HsTyVar _ _ (L _ (WithUserRdr _ n)))
   | n `hasKey` liftedTypeKindTyConKey  = repTStar
   | n `hasKey` constraintKindTyConKey  = repTConstraint
   | n `hasKey` unrestrictedFunTyConKey = repArrowTyCon
@@ -1474,7 +1474,7 @@ repTy (HsTupleTy _ _ tys)   = do tys1 <- repLTys tys
 repTy (HsSumTy _ tys)       = do tys1 <- repLTys tys
                                  tcon <- repUnboxedSumTyCon (length tys)
                                  repTapps tcon tys1
-repTy (HsOpTy _ prom ty1 n ty2) = repLTy ((nlHsTyVar prom (unLoc n) `nlHsAppTy` ty1)
+repTy (HsOpTy _ prom ty1 n ty2) = repLTy ((nlHsTyVar prom (getName n) `nlHsAppTy` ty1)
                                    `nlHsAppTy` ty2)
 repTy (HsParTy _ t)         = repLTy t
 repTy (HsStarTy _ _) =  repTStar
@@ -1556,7 +1556,7 @@ repLE :: LHsExpr GhcRn -> MetaM (Core (M TH.Exp))
 repLE (L loc e) = mapReaderT (putSrcSpanDs (locA loc)) (repE e)
 
 repE :: HsExpr GhcRn -> MetaM (Core (M TH.Exp))
-repE (HsVar _ (L _ x)) =
+repE (HsVar _ (L _ (WithUserRdr _ x))) =
   do { mb_val <- lift $ dsLookupMetaEnv x
      ; case mb_val of
         Nothing            -> do { str <- lift $ globalVar x
@@ -1664,7 +1664,7 @@ repE (ExplicitSum _ alt arity e)
       ; repUnboxedSum e1 alt arity }
 
 repE (RecordCon { rcon_con = c, rcon_flds = flds })
- = do { x <- lookupLOcc c;
+ = do { x <- lookupWithUserRdrLOcc c;
         fs <- repFields flds;
         repRecCon x fs }
 repE (RecordUpd { rupd_expr = e, rupd_flds = RegularRecUpdFields { recUpdFields = flds } })
@@ -1742,7 +1742,7 @@ repE e@(XExpr (ExpandedThingRn o x))
   = notHandled (ThExpressionForm e)
 
 repE (XExpr (PopErrCtxt (L _ e))) = repE e
-repE (XExpr (HsRecSelRn (FieldOcc _ (L _ x)))) = repE (HsVar noExtField (noLocA x))
+repE (XExpr (HsRecSelRn (FieldOcc _ (L _ x)))) = repE (mkHsVar (noLocA x))
 
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
 repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)
@@ -2188,7 +2188,7 @@ repP (TuplePat _ ps boxed)
 repP (SumPat _ p alt arity) = do { p1 <- repLP p
                                  ; repPunboxedSum p1 alt arity }
 repP (ConPat NoExtField dc details)
- = do { con_str <- lookupLOcc dc
+ = do { con_str <- lookupWithUserRdrLOcc dc
       ; case details of
          PrefixCon ps -> do { ts' <- repListM typeTyConName (repTy . unLoc . hstp_body) (takeHsConPatTyArgs ps)
                             ; ps' <- repLPs (dropHsConPatTyArgs ps)
@@ -2289,6 +2289,9 @@ lookupLOcc :: GenLocated l Name -> MetaM (Core TH.Name)
 -- Lookup an occurrence; it can't be a splice.
 -- Use the in-scope bindings if they exist
 lookupLOcc n = lookupOcc (unLoc n)
+
+lookupWithUserRdrLOcc :: GenLocated l (WithUserRdr Name) -> MetaM (Core TH.Name)
+lookupWithUserRdrLOcc (L _loc (WithUserRdr _rdr n)) = lookupOcc n
 
 lookupOcc :: Name -> MetaM (Core TH.Name)
 lookupOcc = lift . lookupOccDsM
@@ -2906,7 +2909,7 @@ verifyLinearFields isPrefixConGADT ps = do
   where
     hsMultIsLinear linear HsUnannotated{} = linear
     hsMultIsLinear _ HsLinearAnn{} = True
-    hsMultIsLinear _ (HsExplicitMult _ (L _ (HsTyVar _ _ (L _ n)))) = n == oneDataConName
+    hsMultIsLinear _ (HsExplicitMult _ (L _ (HsTyVar _ _ (L _ n)))) = getName n == oneDataConName
     hsMultIsLinear _ _ = False
 
 -- Desugar the arguments in a data constructor declared with prefix syntax.

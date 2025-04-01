@@ -80,6 +80,7 @@ module GHC.Tc.Errors.Types (
   , NotInScopeError(..)
   , Subordinate(..), pprSubordinate
   , ImportError(..)
+  , WhatLooking(..)
   , HoleError(..)
   , CoercibleMsg(..)
   , PotentialInstances(..)
@@ -2466,7 +2467,11 @@ data TcRnMessage where
 
       Test cases: T18740a, T18740b, T23739_fail_ret, T23739_fail_case
   -}
-  TcRnIllegalTermLevelUse :: !Name -> !TermLevelUseErr -> TcRnMessage
+  TcRnIllegalTermLevelUse
+    :: !RdrName -- ^ the user-written identifier
+    -> !Name    -- ^ the type-level 'Name' we resolved it to
+    -> !TermLevelUseErr
+    -> TcRnMessage
 
   {-| TcRnMatchesHaveDiffNumArgs is an error occurring when something has matches
      that have different numbers of arguments
@@ -4815,7 +4820,7 @@ data IllegalInstanceHeadReason
   --      f :: a
   --
   -- Test cases: typecheck/should_fail/T13068
-  = InstHeadAbstractClass !Name -- ^ name of the abstract 'Class'
+  = InstHeadAbstractClass !(WithUserRdr Name) -- ^ name of the abstract 'Class'
   -- | An instance whose head is not a class.
   --
   -- Examples(s):
@@ -4869,7 +4874,7 @@ data IllegalInstanceHeadReason
 -- | What was at the head of an instance head, when we expected a class?
 data InstHeadNonClassHead
   -- | A 'TyCon' that isn't a class was at the head
-  = InstNonClassTyCon Name (TyConFlavour Name)
+  = InstNonClassTyCon (WithUserRdr Name) (TyConFlavour Name)
   -- | Something else than a 'TyCon' was at the head
   | InstNonTyCon
 
@@ -5955,7 +5960,39 @@ data ImportError
   -- | Couldn't find a module with the requested name.
   = MissingModule ModuleName
   -- | The imported modules don't export what we're looking for.
-  | ModulesDoNotExport (NE.NonEmpty Module) OccName
+  | ModulesDoNotExport (NE.NonEmpty Module) WhatLooking OccName
+
+-- What kind of suggestion are we looking for? #19843
+data WhatLooking = WL_Anything
+                     -- ^ Any sugestion
+                 | WL_Constructor
+                     -- ^ Suggest type constructors, data constructors
+                     -- (including promoted data constructors), and pattern
+                     -- synonyms.
+                 | WL_ConLike
+                   -- ^ Suggest term-level data constructors and pattern
+                   -- synonyms; no type constructors or promoted data
+                   -- constructors
+                 | WL_NotConLike
+                     -- ^ Suggest anything except data constructors and
+                     -- pattern synonyms
+                 | WL_RecField
+                     -- ^ Suggest record fields
+                     --
+                     -- E.g. in @K { f1 = True, f2 = False }@, if @f2@ is not in
+                     -- scope, suggest only constructor fields
+                 | WL_Term
+                     -- ^ Suggest terms
+                     --
+                     -- If we are expecting a term value, then only suggest
+                     -- terms (e.g. term variables, data constructors) and
+                     -- not type constructors or type variables
+                 | WL_None
+                     -- ^ No suggestions
+                     --
+                     -- This is is used for rebindable syntax, where there
+                     -- is no point in suggesting alternative spellings
+                 deriving (Eq, Show)
 
 -- | This datatype collates instances that match or unifier,
 -- in order to report an error message for an unsolved typeclass constraint.

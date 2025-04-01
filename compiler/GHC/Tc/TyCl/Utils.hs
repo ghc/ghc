@@ -937,8 +937,10 @@ mkOneRecordSelector all_cons idDetails fl has_sel
              | otherwise =  map mk_match cons_w_field ++ deflt
     mk_match con = mkSimpleMatch match_ctxt
                                  (L (l2l loc') [L loc' (mk_sel_pat con)])
-                                 (L loc' (HsVar noExtField (L locn field_var)))
-    mk_sel_pat con = ConPat NoExtField (L locn (getName con)) (RecCon rec_fields)
+                                 (L loc' (mkHsVar (L locn field_var)))
+    mk_sel_pat con =
+      let con_lname = L locn (noUserRdr (getName con))
+      in ConPat NoExtField con_lname (RecCon rec_fields)
     rec_fields = HsRecFields { rec_ext = noExtField, rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLocA (HsFieldBind
                         { hfbAnn = noAnn

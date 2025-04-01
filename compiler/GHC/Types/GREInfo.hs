@@ -300,6 +300,9 @@ data ConLikeName
   | PatSynName  { conLikeName_Name :: !Name }
   deriving (Eq, Data)
 
+instance NamedThing ConLikeName where
+  getName = conLikeName_Name
+
 instance Outputable ConLikeName where
   ppr = ppr . conLikeName_Name
 

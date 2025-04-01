@@ -29,7 +29,7 @@ module GHC.Tc.Utils.Env(
         tcLookupLocatedClass, tcLookupAxiom,
         lookupGlobal, lookupGlobal_maybe,
         addTypecheckedBinds,
-        failIllegalTyCon, failIllegalTyVal,
+        failIllegalTyCon, failIllegalTyVar,
 
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnvList,
@@ -139,7 +139,7 @@ import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Iface.Errors.Types
-import GHC.Rename.Unbound ( unknownNameSuggestions, WhatLooking(..) )
+import GHC.Rename.Unbound ( unknownNameSuggestions )
 import GHC.Tc.Errors.Types.PromotionErr
 import {-# SOURCE #-} GHC.Tc.Errors.Hole (getHoleFitDispConfig)
 
@@ -282,12 +282,12 @@ tcLookupPatSyn name = do
         AConLike (PatSynCon ps) -> return ps
         _                       -> wrongThingErr WrongThingPatSyn (AGlobal thing) name
 
-tcLookupConLike :: Name -> TcM ConLike
-tcLookupConLike name = do
+tcLookupConLike :: WithUserRdr Name -> TcM ConLike
+tcLookupConLike qname@(WithUserRdr _ name) = do
     thing <- tcLookupGlobal name
     case thing of
         AConLike cl -> return cl
-        ATyCon  {}  -> failIllegalTyCon WL_Constructor name
+        ATyCon  {}  -> failIllegalTyCon WL_ConLike qname
         _           -> wrongThingErr WrongThingConLike (AGlobal thing) name
 
 tcLookupRecSelParent :: HsRecUpdParent GhcRn -> TcM RecSelParent
@@ -374,43 +374,55 @@ instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where
     lookupThing = tcLookupGlobal
 
 -- Illegal term-level use of type things
-failIllegalTyCon :: WhatLooking -> Name -> TcM a
-failIllegalTyVal :: Name -> TcM a
-(failIllegalTyCon, failIllegalTyVal) = (fail_tycon, fail_tyvar)
+failIllegalTyCon :: WhatLooking -> WithUserRdr Name -> TcM a
+failIllegalTyVar :: WithUserRdr Name -> TcM a
+(failIllegalTyCon, failIllegalTyVar) = (fail_tycon, fail_tyvar)
   where
-    fail_tycon what_looking tc_nm = do
+    fail_tycon what_looking (WithUserRdr rdr tc_nm) = do
       gre <- getGlobalRdrEnv
       let mb_gre = lookupGRE_Name gre tc_nm
           err = case greInfo <$> mb_gre of
             Just (IAmTyCon ClassFlavour) -> ClassTE
             _ -> TyConTE
-      fail_with_msg what_looking dataName tc_nm (TermLevelUseGRE <$> mb_gre) err
+      fail_with_msg what_looking dataName rdr tc_nm (TermLevelUseGRE <$> mb_gre) err
 
-    fail_tyvar nm =
-      fail_with_msg WL_Anything varName nm (Just TermLevelUseTyVar) TyVarTE
+    fail_tyvar (WithUserRdr rdr nm) =
+      fail_with_msg WL_Term varName rdr nm (Just TermLevelUseTyVar) TyVarTE
 
-    fail_with_msg what_looking whatName nm pprov err = do
-      (imp_errs, hints) <- get_suggestions what_looking whatName nm
+    fail_with_msg what_looking whatName rdr nm pprov err = do
+      required_type_arguments <- xoptM LangExt.RequiredTypeArguments
+      (imp_errs, hints) <- get_suggestions required_type_arguments what_looking whatName rdr
       hfdc <- getHoleFitDispConfig
       unit_state <- hsc_units <$> getTopEnv
-      let info = ErrInfo { errInfoContext = maybeToList $ fmap (TermLevelUseCtxt nm) pprov
-                         , errInfoSupplementary =
-                             fmap ((hfdc,) . (:[]) . SupplementaryImportErrors) $
-                               NE.nonEmpty imp_errs
-                         , errInfoHints = hints
-                         }
-      failWithTc $ TcRnMessageWithInfo unit_state (
-              mkDetailedMessage info (TcRnIllegalTermLevelUse nm err))
+      let
+        msg = TcRnIllegalTermLevelUse rdr nm err
+        info = ErrInfo { errInfoContext =
+                           maybeToList $ fmap (TermLevelUseCtxt nm) pprov
+                       , errInfoSupplementary =
+                           fmap ((hfdc,) . (:[]) . SupplementaryImportErrors) $
+                             NE.nonEmpty imp_errs
+                       , errInfoHints = hints
+                       }
+      failWithTc $ TcRnMessageWithInfo unit_state (mkDetailedMessage info msg)
 
-    get_suggestions what_looking ns nm = do
-      required_type_arguments <- xoptM LangExt.RequiredTypeArguments
+    get_suggestions required_type_arguments what_looking ns rdr = do
       show_helpful_errors <- goptM Opt_HelpfulErrors
       if not show_helpful_errors || (required_type_arguments && isVarNameSpace ns)
       then return ([], [])  -- See Note [Suppress hints with RequiredTypeArguments]
       else do
-        let occ = mkOccNameFS ns (occNameFS (occName nm))
-        lcl_env <- getLocalRdrEnv
-        unknownNameSuggestions lcl_env what_looking (mkRdrUnqual occ)
+        let mb_rdr'
+              | isTvNameSpace (rdrNameSpace rdr)
+              = demoteRdrNameTv rdr
+              | isTcClsNameSpace (rdrNameSpace rdr)
+              = demoteRdrName rdr
+              | otherwise
+              = Just rdr
+        case mb_rdr' of
+          Just rdr' -> do
+            lcl_env <- getLocalRdrEnv
+            unknownNameSuggestions lcl_env what_looking rdr'
+          Nothing ->
+            return ([],[])
 
 {-
 ************************************************************************

@@ -82,6 +82,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Name.Reader (WithUserRdr(..))
 import GHC.Types.Var
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -132,7 +133,7 @@ newMethodFromName origin name ty_args
        ; wrap <- assert (not (isForAllTy ty) && isSingleton theta) $
                  instCall origin ty_args theta
 
-       ; return (mkHsWrap wrap (HsVar noExtField (noLocA id))) }
+       ; return (mkHsWrap wrap (mkHsVar (noLocA id))) }
 
 {-
 ************************************************************************
@@ -864,7 +865,7 @@ tcSyntaxName :: CtOrigin
 -- USED ONLY FOR CmdTop (sigh) ***
 -- See Note [CmdSyntaxTable] in "GHC.Hs.Expr"
 
-tcSyntaxName orig ty (std_nm, HsVar _ (L _ user_nm))
+tcSyntaxName orig ty (std_nm, HsVar _ (L _ (WithUserRdr _ user_nm)))
   | std_nm == user_nm
   = do rhs <- newMethodFromName orig std_nm [ty]
        return (std_nm, rhs)

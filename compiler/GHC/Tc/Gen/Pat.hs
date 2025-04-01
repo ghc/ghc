@@ -519,7 +519,7 @@ pat_to_type (EmbTyPat _ (HsTP x t)) =
 pat_to_type (VarPat _ lname)  =
   do { tell (tpBuilderExplicitTV (unLoc lname))
      ; return b }
-  where b = noLocA (HsTyVar noAnn NotPromoted lname)
+  where b = noLocA (HsTyVar noAnn NotPromoted $ fmap noUserRdr lname)
 pat_to_type (WildPat _) = return b
   where b = noLocA (HsWildCardTy noExtField)
 pat_to_type (SigPat _ pat sig_ty)
@@ -1114,12 +1114,13 @@ same name, leading to shadowing.
 -- MkT :: forall a b c. (a~[b]) => b -> c -> T a
 --       with scrutinee of type (T ty)
 
-tcConPat :: PatEnv -> LocatedN Name
+tcConPat :: PatEnv -> LocatedN (WithUserRdr Name)
          -> Scaled ExpSigmaTypeFRR    -- Type of the pattern
          -> HsConPatDetails GhcRn -> TcM a
          -> TcM (Pat GhcTc, a)
-tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
-  = do  { con_like <- tcLookupConLike con_name
+tcConPat penv (L loc qcon) pat_ty arg_pats thing_inside
+  = do  { let con_lname = L loc (getName qcon)
+        ; con_like <- tcLookupConLike qcon
         ; case con_like of
             RealDataCon data_con -> tcDataConPat con_lname data_con pat_ty
                                                  penv arg_pats thing_inside

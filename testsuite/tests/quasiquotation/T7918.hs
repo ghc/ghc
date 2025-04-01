@@ -38,7 +38,7 @@ traverse a =
 
     showTyVar :: Maybe (HsType GhcRn) -> Traverse ()
     showTyVar (Just (HsTyVar _ _ (L _ v))) =
-      modify $ \(loc, ids) -> (loc, (v, loc) : ids)
+      modify $ \(loc, ids) -> (loc, (getName v, loc) : ids)
     showTyVar _ =
       return ()
 

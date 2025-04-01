@@ -566,7 +566,8 @@ checkCanonicalInstances cls poly_ty mbinds = do
                                              , m_grhss = grhss })])}
         | GRHSs _ (L _ (GRHS _ [] body) :| []) lbinds <- grhss
         , EmptyLocalBinds _ <- lbinds
-        , HsVar _ lrhsName  <- unLoc body  = Just (unLoc lrhsName)
+        , HsVar _ lrhsName  <- unLoc body
+        = Just (getName lrhsName)
     isAliasMG _ = Nothing
 
     addWarnNonCanonicalMonoid reason =
@@ -601,16 +602,17 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
           instance_head :: Either IllegalInstanceHeadReason Name
           instance_head =
            case hsTyGetAppHead_maybe head_ty' of
-             Just (L _ nm) ->
+             Just (L _ nm_with_rdr) ->
+               let nm = getName nm_with_rdr in
                case lookupGRE_Name env nm of
                  Just (GRE { gre_info = IAmTyCon flav }) ->
                    if
                      | flav == ClassFlavour
                      -> Right nm
                      | flav == AbstractTypeFlavour
-                     -> Left $ InstHeadAbstractClass nm
+                     -> Left $ InstHeadAbstractClass nm_with_rdr
                      | otherwise
-                     -> Left $ InstHeadNonClassHead $ InstNonClassTyCon nm flav
+                     -> Left $ InstHeadNonClassHead $ InstNonClassTyCon nm_with_rdr flav
                  _ ->
                   -- The head of the instance head is out of scope;
                   -- we'll deal with that later. Continue for now.
@@ -1254,7 +1256,7 @@ validRuleLhs foralls lhs
     check (HsApp _ e1 e2)                 = checkl e1 `mplus` checkl_e e2
     check (HsAppType _ e _)               = checkl e
     check (HsVar _ lv)
-      | (unLoc lv) `notElem` foralls      = Nothing
+      | getName lv `notElem` foralls      = Nothing
     -- See Note [Parens on the LHS of a RULE]
     check (HsPar _ e)                     = checkl e
     check other                           = Just other  -- Failure
@@ -2493,7 +2495,7 @@ rnRecHsConDeclRecFields ::
   -> LocatedL [LHsConDeclRecField GhcPs]
   -> RnM (LocatedL [LHsConDeclRecField GhcRn], FreeVars)
 rnRecHsConDeclRecFields con doc (L l fields)
-  = do  { fls <- lookupConstructorFields con
+  = do  { fls <- lookupConstructorFields (noUserRdr con)
         ; (new_fields, fvs) <- rnHsConDeclRecFields doc fls fields
                 -- No need to check for duplicate fields
                 -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn

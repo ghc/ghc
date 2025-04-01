@@ -306,14 +306,14 @@ rnLExpr = wrapLocFstMA rnExpr
 
 rnExpr :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 
-finishHsVar :: LocatedA Name -> RnM (HsExpr GhcRn, FreeVars)
+finishHsVar :: RdrName -> LocatedA Name -> RnM (HsExpr GhcRn, FreeVars)
 -- Separated from rnExpr because it's also used
 -- when renaming infix expressions
-finishHsVar (L l name)
+finishHsVar rdr (L l name)
  = do { this_mod <- getModule
       ; when (nameIsLocalOrFrom this_mod name) $
         checkThLocalName name
-      ; return (HsVar noExtField (L (l2l l) name), unitFV name) }
+      ; return (mkHsVarWithUserRdr rdr (L (l2l l) name), unitFV name) }
 
 rnUnboundVar :: SrcSpanAnnN -> RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar l v = do
@@ -339,7 +339,7 @@ rnExpr (HsVar _ (L l v))
                   ; this_mod <- getModule
                   ; when (nameIsLocalOrFrom this_mod sel_name) $
                       checkThLocalName sel_name
-                  ; return (XExpr (HsRecSelRn (FieldOcc v  (L l sel_name))), unitFV sel_name)
+                  ; return (XExpr (HsRecSelRn (FieldOcc v (L l sel_name))), unitFV sel_name)
                   }
             | nm == nilDataConName
               -- Treat [] as an ExplicitList, so that
@@ -349,7 +349,7 @@ rnExpr (HsVar _ (L l v))
             -> rnExpr (ExplicitList noAnn [])
 
             | otherwise
-            -> finishHsVar (L (l2l l) nm)
+            -> finishHsVar v (L (l2l l) nm)
         }}}
 
 rnExpr (HsIPVar x v)
@@ -416,7 +416,7 @@ rnExpr (OpApp _ e1 op e2)
         -- more, so I've removed the test.  Adding HsPars in GHC.Tc.Deriv.Generate
         -- should prevent bad things happening.
         ; fixity <- case op' of
-              L _ (HsVar _ (L _ n))      -> lookupFixityRn n
+              L _ (HsVar _ (L _ (WithUserRdr _ n))) -> lookupFixityRn n
               L _ (XExpr (HsRecSelRn f)) -> lookupFieldFixityRn f
               _ -> return (Fixity minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
@@ -541,15 +541,17 @@ rnExpr (ExplicitSum _ alt arity expr)
 
 rnExpr (RecordCon { rcon_con = con_rdr
                   , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
-  = do { con_lname@(L _ con_name) <- lookupLocatedOccRnConstr con_rdr
-       ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
+  = do { L con_loc con_name <- lookupLocatedOccRnConstr con_rdr
+       ; let qcon = WithUserRdr (unLoc con_rdr) con_name
+       ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon qcon) mk_hs_var rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
        ; let rec_binds' = HsRecFields { rec_ext = noExtField, rec_flds = flds', rec_dotdot = dd }
        ; return (RecordCon { rcon_ext = noExtField
-                           , rcon_con = con_lname, rcon_flds = rec_binds' }
+                           , rcon_con = L con_loc qcon
+                           , rcon_flds = rec_binds' }
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
-    mk_hs_var l n = HsVar noExtField (L (noAnnSrcSpan l) n)
+    mk_hs_var l n = mkHsVarWithUserRdr (unLoc con_rdr) (L (noAnnSrcSpan l) n)
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hfbRHS fld)
                             ; return (L l (fld { hfbRHS = arg' }), fvs) }
 
@@ -1437,12 +1439,12 @@ lookupStmtNamePoly ctxt name
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if rebindable_on
          then do { fm <- lookupOccRn (nameRdrName name)
-                 ; return (HsVar noExtField (noLocA fm), unitFV fm) }
+                 ; return (mkHsVar (noLocA fm), unitFV fm) }
          else not_rebindable }
   | otherwise
   = not_rebindable
   where
-    not_rebindable = return (HsVar noExtField (noLocA name), emptyFVs)
+    not_rebindable = return (mkHsVar (noLocA name), emptyFVs)
 
 -- | Is this a context where we respect RebindableSyntax?
 -- but ListComp are never rebindable
@@ -2566,7 +2568,7 @@ isReturnApp monad_names (L loc e) mb_pure = case e of
  where
   is_var f (L _ (HsPar _ e)) = is_var f e
   is_var f (L _ (HsAppType _ e _)) = is_var f e
-  is_var f (L _ (HsVar _ (L _ r))) = f r
+  is_var f (L _ (HsVar _ (L _ (WithUserRdr _q r)))) = f r
        -- TODO: I don't know how to get this right for rebindable syntax
   is_var _ _ = False
 

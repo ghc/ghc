@@ -361,7 +361,7 @@ renameType t = case t of
     lcontext' <- renameLContext lcontext
     ltype' <- renameLType ltype
     return (HsQualTy{hst_xqual = noAnn, hst_ctxt = lcontext', hst_body = ltype'})
-  HsTyVar _ ip (L l n) -> return . HsTyVar noAnn ip . L l =<< renameName n
+  HsTyVar _ ip (L l n) -> return . HsTyVar noAnn ip . L l =<< renameName (getName n)
   HsStarTy _ isUni -> return (HsStarTy noAnn isUni)
   HsAppTy _ a b -> do
     a' <- renameLType a
@@ -388,7 +388,7 @@ renameType t = case t of
   HsTupleTy _ b ts -> return . HsTupleTy noAnn b =<< mapM renameLType ts
   HsSumTy _ ts -> HsSumTy noAnn <$> mapM renameLType ts
   HsOpTy _ prom a (L loc op) b -> do
-    op' <- renameName op
+    op' <- renameName (getName op)
     a' <- renameLType a
     b' <- renameLType b
     return (HsOpTy noAnn prom a' (L loc op') b')
