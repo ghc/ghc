@@ -6,7 +6,10 @@
 -- It produces a nested unfold that should look something
 -- like the code below.  Note the 'lvl1_shW'.  It is BAD
 -- if this is a lambda instead; you get a lot more allocation
--- See Note [Saving allocation] in GHC.Core.Opt.SetLevels
+--
+-- LATER (2025): But in the end it seems better NOT to float lambdas,
+-- unless they go to top level.
+-- See (SW2) in Note [Saving work] in GHC.Core.Opt.SetLevels
 
 
 {-

@@ -407,7 +407,7 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
   , arity < n_val_args
   , Nothing <- isClassOpId_maybe fn
   =  do { rargs' <- mapM (lvlNonTailMFE env False) rargs
-        ; lapp'  <- lvlNonTailMFE env False lapp
+        ; lapp'  <- lvlNonTailMFE env True lapp
         ; return (foldl' App lapp' rargs') }
 
   | otherwise
@@ -483,14 +483,14 @@ Consider this:
   f :: T Int -> blah
   f x vs = case x of { MkT y ->
              let f vs = ...(case y of I# w -> e)...f..
-             in f vs
+             in f vs }
 
 Here we can float the (case y ...) out, because y is sure
 to be evaluated, to give
   f x vs = case x of { MkT y ->
-           case y of I# w ->
+           case y of { I# w ->
              let f vs = ...(e)...f..
-             in f vs
+             in f vs }}
 
 That saves unboxing it every time round the loop.  It's important in
 some DPH stuff where we really want to avoid that repeated unboxing in
@@ -675,12 +675,11 @@ lvlMFE env strict_ctxt ann_expr
     is_function  = isFunction ann_expr
     mb_bot_str   = exprBotStrictness_maybe expr
                            -- See Note [Bottoming floats]
-                           -- esp Bottoming floats (2)
+                           -- esp Bottoming floats (BF2)
     expr_ok_for_spec = exprOkForSpeculation expr
     abs_vars = abstractVars dest_lvl env fvs
     dest_lvl = destLevel env fvs fvs_ty is_function is_bot_lam
-               -- NB: is_bot_lam not is_bot; see (3) in
-               --     Note [Bottoming floats]
+               -- NB: is_bot_lam not is_bot; see (BF2) in Note [Bottoming floats]
 
     -- float_is_new_lam: the floated thing will be a new value lambda
     -- replacing, say (g (x+4)) by (lvl x).  No work is saved, nor is
@@ -703,17 +702,25 @@ lvlMFE env strict_ctxt ann_expr
 
     -- See Note [Saving work]
     is_hnf = exprIsHNF expr
-    saves_work = escapes_value_lam        -- (a)
-                 && not is_hnf            -- (b)
-                 && not float_is_new_lam  -- (c)
+    saves_work = escapes_value_lam        -- (SW-a)
+                 && not is_hnf            -- (SW-b)
+                 && not float_is_new_lam  -- (SW-c)
     escapes_value_lam = dest_lvl `ltMajLvl` (le_ctxt_lvl env)
 
-    -- See Note [Saving allocation] and Note [Floating to the top]
-    saves_alloc =  isTopLvl dest_lvl
-                && floatConsts env
-                && (   not strict_ctxt                     -- (a)
-                    || is_hnf                              -- (b)
-                    || (is_bot_lam && escapes_value_lam))  -- (c)
+    -- See Note [Floating to the top]
+--    is_con_app = isSaturatedConApp expr  -- True of literal strings too
+    saves_alloc = isTopLvl dest_lvl
+               && (escapes_value_lam || floatConsts env)
+                  -- Always float allocation out of a value lambda
+                  --    if it gets to top level
+               && (not strict_ctxt || is_hnf || is_bot_lam)
+        -- is_con_app: don't float PAPs to the top; they may well end
+        -- up getting eta-expanded and re-inlined
+        -- E.g.   f = \x -> (++) ys
+        -- If we float, then eta-expand we get
+        --      lvl = (++) ys
+        --      f = \x \zs -> lvl zs
+        -- and now we'll inline lvl.  Silly.
 
 hasFreeJoin :: LevelEnv -> DVarSet -> Bool
 -- Has a free join point which is not being floated to top level.
@@ -731,22 +738,22 @@ hasFreeJoin env fvs = anyDVarSet bad_join fvs
 The key idea in let-floating is to
   * float a redex out of a (value) lambda
 Doing so can save an unbounded amount of work.
-But see also Note [Saving allocation].
+But see also Note [Floating to the top].
 
 So we definitely float an expression out if
-(a) It will escape a value lambda (escapes_value_lam)
-(b) The expression is not a head-normal form (exprIsHNF); see (SW1, SW2).
-(c) Floating does not require wrapping it in value lambdas (float_is_new_lam).
+(SW-a) It will escape a value lambda (escapes_value_lam)
+(SW-b) The expression is not a head-normal form (exprIsHNF); see (SW1, SW2).
+(SW-c) Floating does not require wrapping it in value lambdas (float_is_new_lam).
     See (SW3) below
 
 Wrinkles:
 
-(SW1) Concerning (b) I experimented with using `exprIsCheap` rather than
+(SW1) Concerning (SW-b) I experimented with using `exprIsCheap` rather than
       `exprIsHNF` but the latter seems better, according to nofib
       (`spectral/mate` got 10% worse with exprIsCheap).  It's really a bit of a
       heuristic.
 
-(SW2) What about omitting (b), and hence floating HNFs as well?  The danger of
+(SW2) What about omitting (SW-b), and hence floating HNFs as well?  The danger of
       doing so is that we end up floating out a HNF from a cold path (where it
       might never get allocated at all) and allocating it all the time
       regardless.  Example
@@ -765,7 +772,7 @@ Wrinkles:
        - Occasionally decreases runtime allocation (T12996 -2.5%)
        - Slightly mixed effect on nofib: (puzzle -10%, mate -5%, cichelli +5%)
          but geometric mean is -0.09%.
-      Overall, a win.
+      Overall, a small win.
 
 (SW3) Concerning (c), if we are wrapping the thing in extra value lambdas (in
       abs_vars), then nothing is saved.  E.g.
@@ -776,16 +783,23 @@ Wrinkles:
       we have saved nothing: one pair will still be allocated for each
       call of `f`.  Hence the (not float_is_new_lam) in saves_work.
 
-Note [Saving allocation]
-~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Floating to the top]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 Even if `saves_work` is false, we we may want to float even cheap/HNF
-expressions out of value lambdas, for several reasons:
+expressions out of value lambdas. Data suggests, however, that it is better
+/only/ to do so, /if/ they can go to top level. If the expression goes to top
+level we don't pay the cost of allocating cold-path thunks described in (SW2).
 
 * Doing so may save allocation. Consider
         f = \x.  .. (\y.e) ...
   Then we'd like to avoid allocating the (\y.e) every time we call f,
   (assuming e does not mention x). An example where this really makes a
   difference is simplrun009.
+
+* In principle this would be true even if the (\y.e) didn't go to top level; but
+  in practice we only float a HNF if it goes all way to the top.  We don't pay
+  /any/ allocation cost for a top-level floated expression; it just becomes
+  static data.
 
 * It may allow SpecContr to fire on functions. Consider
         f = \x. ....(f (\y.e))....
@@ -798,20 +812,6 @@ expressions out of value lambdas, for several reasons:
   a big difference for string literals and bottoming expressions: see Note
   [Floating to the top]
 
-Data suggests, however, that it is better /only/ to float HNFS, /if/ they can go
-to top level. See (SW2) of Note [Saving work].  If the expression goes to top
-level we don't pay the cost of allocating cold-path thunks described in (SW2).
-
-Hence `isTopLvl dest_lvl` in `saves_alloc`.
-
-Note [Floating to the top]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Even though Note [Saving allocation] suggests that we should not, in
-general, float HNFs, the balance change if it goes to the top:
-
-* We don't pay an allocation cost for the floated expression; it
-  just becomes static data.
-
 * Floating string literals is valuable -- no point in duplicating the
   at each call site!
 
@@ -820,32 +820,32 @@ general, float HNFs, the balance change if it goes to the top:
   can be quite big, inhibiting inlining. See Note [Bottoming floats]
 
 So we float an expression to the top if:
-  (a) the context is lazy (so we get allocation), or
-  (b) the expression is a HNF (so we get allocation), or
-  (c) the expression is bottoming and floating would escape a
-      value lambda (NB: if the expression itself is a lambda, (b)
-      will apply; so this case only catches bottoming thunks)
+  (FT1) the context is lazy (so we get allocation), or
+  (FT2) the expression is a HNF (so we get allocation), or
+  (FT3) the expression is bottoming and floating would escape a
+         value lambda (NB: if the expression itself is a lambda, (b)
+         will apply; so this case only catches bottoming thunks)
 
 Examples:
 
-* (a) Strict.  Case scrutinee
+* (FT1) Strict.  Case scrutinee
       f = case g True of ....
   Don't float (g True) to top level; then we have the admin of a
   top-level thunk to worry about, with zero gain.
 
-* (a) Strict.  Case alternative
+* (FT1) Strict.  Case alternative
       h = case y of
              True  -> g True
              False -> False
   Don't float (g True) to the top level
 
-* (b) HNF
+* (FT2) HNF
       f = case y of
             True  -> p:q
             False -> blah
   We may as well float the (p:q) so it becomes a static data structure.
 
-* (c) Bottoming expressions; see also Note [Bottoming floats]
+* (FT3) Bottoming expressions; see also Note [Bottoming floats]
       f x = case x of
               0 -> error <big thing>
               _ -> x+1
@@ -858,7 +858,7 @@ Examples:
   'foo' anyway.  So float bottoming things only if they escape
   a lambda.
 
-* Arguments
+* (FT4) Arguments
      t = f (g True)
   Prior to Apr 22 we didn't float (g True) to the top if f was strict.
   But (a) this only affected CAFs, because if it escapes a value lambda
@@ -1036,30 +1036,36 @@ we'd like to float the call to error, to get
 
 But, as ever, we need to be careful:
 
-(1) We want to float a bottoming
+(BF1) We want to float a bottoming
     expression even if it has free variables:
         f = \x. g (let v = h x in error ("urk" ++ v))
     Then we'd like to abstract over 'x', and float the whole arg of g:
         lvl = \x. let v = h x in error ("urk" ++ v)
         f = \x. g (lvl x)
-    To achieve this we pass is_bot to destLevel
+    To achieve this we pass `is_bot` to destLevel
 
-(2) We do not do this for lambdas that return
-    bottom.  Instead we treat the /body/ of such a function specially,
-    via point (1).  For example:
+(BF2) We do the same for /lambdas/ that return bottom.
+    Suppose the original lambda had /no/ free vars:
+        f = \x. ....(\y z. error (y++z))...
+    then we'd like to float that whole lambda
+        lvl = \y z. error (y++z)
+        f = \x. ....lvl....
+    If we just floated its bottom-valued body, we might abstract the arguments in
+    the "wrong" order and end up with this bad result
+        lvl = \z y. error (y++z)
+        f = \x. ....(\y z. lvl z y)....
+
+    If the lambda does have free vars, this will happen:
         f = \x. ....(\y z. if x then error y else error z)....
-    If we float the whole lambda thus
+    We float the whole lambda thus
         lvl = \x. \y z. if x then error y else error z
         f = \x. ...(lvl x)...
-    we may well end up eta-expanding that PAP to
+    And we may well end up eta-expanding that PAP to
+        lvl = \x. \y z. if b then error y else error z
         f = \x. ...(\y z. lvl x y z)...
+    so we get a (small) closure.  So be it.
 
-    ===>
-        lvl = \x z y. if b then error y else error z
-        f = \x. ...(\y z. lvl x z y)...
-    (There is no guarantee that we'll choose the perfect argument order.)
-
-(3) If we have a /binding/ that returns bottom, we want to float it to top
+(BF3) If we have a /binding/ that returns bottom, we want to float it to top
     level, even if it has free vars (point (1)), and even it has lambdas.
     Example:
        ... let { v = \y. error (show x ++ show y) } in ...
@@ -1074,7 +1080,6 @@ But, as ever, we need to be careful:
     Do /not/ do this for bottoming /join-point/ bindings.   They may call other
     join points (#24768), and floating to the top would abstract over those join
     points, which we should never do.
-
 
 See Maessen's paper 1999 "Bottom extraction: factoring error handling out
 of functional programs" (unpublished I think).
@@ -1147,9 +1152,9 @@ notWorthFloating e abs_vars
     go (Lit lit) n         = (n==0)                 -- See (NWF1b)
                               && litIsTrivial lit   -- See (NWF1a)
     go (Type {}) _         = True
+    go (Coercion {}) _     = True
     go (Tick t e) n        = not (tickishIsCode t) && go e n
     go (Cast e _) n        = n==0 || go e n     -- See (NWF3)
-    go (Coercion {}) _     = True
     go (App e arg) n
        | Type {} <- arg    = go e n    -- Just types, not coercions (NWF2)
        | exprIsTrivial arg = go e (n+1)
@@ -1307,7 +1312,7 @@ lvlBind env (AnnNonRec bndr rhs)
         -- is_bot_lam: looks like (\xy. bot), maybe zero lams
         -- NB: not isBottomThunk!
         -- NB: not is_join: don't send bottoming join points to the top.
-        -- See Note [Bottoming floats] point (3)
+        -- See Note [Bottoming floats] (BF3)
 
     is_top_bindable = exprIsTopLevelBindable deann_rhs bndr_ty
     n_extra       = count isId abs_vars
@@ -1598,9 +1603,8 @@ destLevel env fvs fvs_ty is_function is_bot
                               -- See Note [Floating join point bindings]
   = tOP_LEVEL
 
-  | is_bot              -- Send bottoming bindings to the top
-  = as_far_as_poss      -- regardless; see Note [Bottoming floats]
-                        -- Esp Bottoming floats (1) and (3)
+  | is_bot              -- Send bottoming bindings to the top regardless;
+  = as_far_as_poss      -- see (BF1) and (BF2) in Note [Bottoming floats]
 
   | Just n_args <- floatLams env
   , n_args > 0  -- n=0 case handled uniformly by the 'otherwise' case
@@ -1614,8 +1618,13 @@ destLevel env fvs fvs_ty is_function is_bot
     max_fv_id_level = maxFvLevel idsOnly env fvs -- Max over Ids only; the
                                                  -- tyvars will be abstracted
 
+    -- as_far_as_poss: destination level depends only on the free Ids (more
+    -- precisely, free CoVars) of the /type/, not the free Ids of the /term/.
+    -- Why worry about the free CoVars?  See Note [Floating and kind casts]
+    --
+    -- There may be free Ids in the term, but then we'll just
+    -- lambda-abstract over them
     as_far_as_poss = maxFvLevel' idsOnly env fvs_ty
-                     -- See Note [Floating and kind casts]
 
 {- Note [Floating and kind casts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1782,7 +1791,7 @@ maxFvLevel include_tyvars env var_set
     -- It's OK to use a non-deterministic fold here because maxIn commutes.
 
 maxFvLevel' :: Bool -> LevelEnv -> TyCoVarSet -> Level
--- Same but for TyCoVarSet
+-- Precisely the same as `maxFvLevel` but for TyCoVarSet rather than DVarSet
 maxFvLevel' include_tyvars env var_set
   = nonDetStrictFoldUniqSet (maxIn include_tyvars env) tOP_LEVEL var_set
     -- It's OK to use a non-deterministic fold here because maxIn commutes.
