@@ -11,7 +11,7 @@ module GHC.Core.Opt.Simplify.Env (
         SimplMode(..), updMode, smPlatform,
 
         -- * Environments
-        SimplEnv(..), pprSimplEnv,   -- Temp not abstract
+        SimplEnv(..), StaticEnv, pprSimplEnv,
         seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seCastSwizzle,
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
         seOptCoercionOpts, sePhase, sePlatform, sePreInline,
@@ -169,6 +169,8 @@ seInlineDepth is used for just one purpose: when we encounter a
 coercion we don't apply optCoercion to it if seInlineDepth>0.
 Reason: it has already been optimised once, no point in doing so again.
 -}
+
+type StaticEnv = SimplEnv       -- Just the static part is relevant
 
 data SimplEnv
   = SimplEnv {
@@ -406,7 +408,6 @@ data SimplSR
        -- then replace occurrences of x by e
        -- and  ja = Just a <=> x is a join-point of arity a
        -- See Note [Join arity in SimplIdSubst]
-
 
   | DoneId OutId
        -- If  x :-> DoneId v   is in the SimplIdSubst
@@ -778,7 +779,7 @@ emptyJoinFloats = nilOL
 isEmptyJoinFloats :: JoinFloats -> Bool
 isEmptyJoinFloats = isNilOL
 
-unitLetFloat :: OutBind -> LetFloats
+unitLetFloat :: HasDebugCallStack => OutBind -> LetFloats
 -- This key function constructs a singleton float with the right form
 unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
                     LetFloats (unitOL bind) (flag bind)
