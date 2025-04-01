@@ -216,8 +216,6 @@ data SimplCont
         CoreTickish     -- Tick tickish <hole>
         SimplCont
 
-type StaticEnv = SimplEnv       -- Just the static part is relevant
-
 data FromWhat = FromLet | FromBeta Levity
 
 -- See Note [DupFlag invariants]
@@ -722,7 +720,6 @@ it, but the simplest solution was to check sm_inline; if it is False,
 which it is on the LHS of a rule (see updModeForRules), then don't
 make use of the strictness info for the function.
 -}
-
 
 {-
 ************************************************************************
@@ -1423,8 +1420,12 @@ preInlineUnconditionally for
 Note [Top-level bottoming Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't inline top-level Ids that are bottoming, even if they are used just
-once, because FloatOut has gone to some trouble to extract them out.
-Inlining them won't make the program run faster!
+once, because FloatOut has gone to some trouble to extract them out. e.g.
+    report x y = error (..lots of stuff...)
+    f x y z = if z then report x y else ...blah...
+Here `f` might be small enough to inline; but if we put all the `report`
+stuff inside it, it'll look to big.  In general we don't want to duplicate
+all the error-reporting goop.
 
 Note [Do not inline CoVars unconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1460,51 +1461,25 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
-    one_occ OneOcc{ occ_n_br   = 1
-                  , occ_in_lam = NotInsideLam }   = isNotTopLevel top_lvl || early_phase
+    one_occ OneOcc{ occ_n_br    = 1
+                  , occ_in_lam  = NotInsideLam
+                  , occ_int_cxt = int_cxt }
+      =  isNotTopLevel top_lvl      -- Get rid of allocation
+      || (int_cxt==IsInteresting)   -- Function is applied
+   --   || (early_phase && not (isConLikeUnfolding unf))  -- See early_phase
     one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = IsInsideLam
-                  , occ_int_cxt = IsInteresting } = canInlineInLam rhs
-    one_occ _                                     = False
+                  , occ_int_cxt = IsInteresting }
+      = canInlineInLam rhs
+    one_occ _
+      = False
 
     pre_inline_unconditionally = sePreInline env
     active = isActive (sePhase env) (inlinePragmaActivation inline_prag)
              -- See Note [pre/postInlineUnconditionally in gentle mode]
     inline_prag = idInlinePragma bndr
 
--- Be very careful before inlining inside a lambda, because (a) we must not
--- invalidate occurrence information, and (b) we want to avoid pushing a
--- single allocation (here) into multiple allocations (inside lambda).
--- Inlining a *function* with a single *saturated* call would be ok, mind you.
---      || (if is_cheap && not (canInlineInLam rhs) then pprTrace "preinline" (ppr bndr <+> ppr rhs) ok else ok)
---      where
---              is_cheap = exprIsCheap rhs
---              ok = is_cheap && int_cxt
-
-        --      int_cxt         The context isn't totally boring
-        -- E.g. let f = \ab.BIG in \y. map f xs
-        --      Don't want to substitute for f, because then we allocate
-        --      its closure every time the \y is called
-        -- But: let f = \ab.BIG in \y. map (f y) xs
-        --      Now we do want to substitute for f, even though it's not
-        --      saturated, because we're going to allocate a closure for
-        --      (f y) every time round the loop anyhow.
-
-        -- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
-        -- so substituting rhs inside a lambda doesn't change the occ info.
-        -- Sadly, not quite the same as exprIsHNF.
-    canInlineInLam (Lit _)    = True
-    canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
-    canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
-    canInlineInLam (Var v)    = case idOccInfo v of
-                                  OneOcc { occ_in_lam = IsInsideLam } -> True
-                                  ManyOccs {}                         -> True
-                                  _                                   -> False
-    canInlineInLam _          = False
-      -- not ticks.  Counting ticks cannot be duplicated, and non-counting
-      -- ticks around a Lam will disappear anyway.
-
-    early_phase = sePhase env /= FinalPhase
+--    early_phase = sePhase env /= FinalPhase
     -- If we don't have this early_phase test, consider
     --      x = length [1,2,3]
     -- The full laziness pass carefully floats all the cons cells to
@@ -1531,6 +1506,52 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     -- here.
     -- (Nor can we check for `exprIsExpandable rhs`, because that needs to look
     -- at the non-existent unfolding for the `I# 2#` which is also floated out.)
+
+
+-- Be very careful before inlining inside a lambda, because (a) we must not
+-- invalidate occurrence information, and (b) we want to avoid pushing a
+-- single allocation (here) into multiple allocations (inside lambda).
+-- Inlining a *function* with a single *saturated* call would be ok, mind you.
+--      || (if is_cheap && not (canInlineInLam rhs) then pprTrace "preinline" (ppr bndr <+> ppr rhs) ok else ok)
+--      where
+--              is_cheap = exprIsCheap rhs
+--              ok = is_cheap && int_cxt
+
+        --      int_cxt         The context isn't totally boring
+        -- E.g. let f = \ab.BIG in \y. map f xs
+        --      Don't want to substitute for f, because then we allocate
+        --      its closure every time the \y is called
+        -- But: let f = \ab.BIG in \y. map (f y) xs
+        --      Now we do want to substitute for f, even though it's not
+        --      saturated, because we're going to allocate a closure for
+        --      (f y) every time round the loop anyhow.
+
+        -- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
+        -- so substituting rhs inside a lambda doesn't change the occ info.
+        -- Sadly, not quite the same as exprIsHNF.
+canInlineInLam ::CoreExpr -> Bool
+canInlineInLam e
+  = go e
+  where
+    go (Lit _)    = True
+    go (Lam b e)  = isRuntimeVar b || go e
+    go (Cast e _) = go e
+    go (Tick t e) = not (tickishIsCode t) && go e
+    -- This matters only for:
+    --     x = y            -- or y|>co
+    --     f = \p. ..x..    -- One occurrence of x
+    --     ..y..            -- Multiple other occurrences of y
+    -- Then it is safe to inline x unconditionally
+    -- For postInlineUncondionally we have already tested exprIsTrivial
+    -- so this Var case never arises
+    go (Var v)    = case idOccInfo v of
+                       OneOcc { occ_in_lam = IsInsideLam } -> True
+                       ManyOccs {}                         -> True
+                       _                                   -> False
+    go _          = False
+      -- not ticks.  Counting ticks cannot be duplicated, and non-counting
+      -- ticks around a Lam will disappear anyway.
+
 
 {-
 ************************************************************************
@@ -1582,71 +1603,77 @@ postInlineUnconditionally
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 postInlineUnconditionally env bind_cxt old_bndr bndr rhs
-  | not active                  = False
-  | isWeakLoopBreaker occ_info  = False -- If it's a loop-breaker of any kind, don't inline
-                                        -- because it might be referred to "earlier"
-  | isStableUnfolding unfolding = False -- Note [Stable unfoldings and postInlineUnconditionally]
-  | isTopLevel (bindContextLevel bind_cxt)
-                                = False -- Note [Top level and postInlineUnconditionally]
-  | exprIsTrivial rhs           = True
-  | BC_Join {} <- bind_cxt      = False -- See point (1) of Note [Duplicating join points]
+  | not active                   = False
+  | isWeakLoopBreaker occ_info   = False -- If it's a loop-breaker of any kind, don't inline
+                                         -- because it might be referred to "earlier"
+  | isStableUnfolding unfolding  = False -- Note [Stable unfoldings and postInlineUnconditionally]
+  | BC_Join {} <- bind_cxt       = exprIsTrivial rhs
+                                        -- See point (DJ1) of Note [Duplicating join points]
                                         --     in GHC.Core.Opt.Simplify.Iteration
+  | is_top_lvl, isDeadEndId bndr = False -- Note [Top-level bottoming Ids]
   | otherwise
   = case occ_info of
+      IAmALoopBreaker {} -> False
+      ManyOccs {} | is_top_lvl -> False  -- Note [Top level and postInlineUnconditionally]
+                  | otherwise  -> exprIsTrivial rhs
+
       OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
-        -- See Note [Inline small things to avoid creating a thunk]
-
-        | n_br >= 100 -> False  -- See #23627
-
-        | n_br == 1, NotInsideLam <- in_lam  -- One syntactic occurrence
-        -> True                              -- See Note [Post-inline for single-use things]
-
---        | is_unlifted                        -- Unlifted binding, hence ok-for-spec
---        -> True                              -- hence cheap to inline probably just a primop
---                                             -- Not a big deal either way
--- No, this is wrong.  {v = p +# q; x = K v}.
--- Don't inline v; it'll just get floated out again. Stupid.
-
-        | is_demanded
-        -> False                            -- No allocation (it'll be a case expression in the end)
-                                            -- so inlining duplicates code but nothing more
-
-        | otherwise
-        -> work_ok in_lam int_cxt && smallEnoughToInline uf_opts unfolding
-              -- Multiple syntactic occurences; but lazy, and small enough to dup
-              -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
+              | exprIsTrivial rhs -> True
+              | otherwise         -> check_one_occ in_lam int_cxt n_br
 
       IAmDead -> True   -- This happens; for example, the case_bndr during case of
                         -- known constructor:  case (a,b) of x { (p,q) -> ... }
                         -- Here x isn't mentioned in the RHS, so we don't want to
                         -- create the (dead) let-binding  let x = (a,b) in ...
-
-      _ -> False
-
   where
-    work_ok NotInsideLam _              = True
-    work_ok IsInsideLam  IsInteresting  = isCheapUnfolding unfolding
-    work_ok IsInsideLam  NotInteresting = False
-      -- NotInsideLam: outside a lambda, we want to be reasonably aggressive
-      -- about inlining into multiple branches of case
+    is_top_lvl  = isTopLevel (bindContextLevel bind_cxt)
+    is_demanded = isStrUsedDmd (idDemandInfo bndr)
+    occ_info    = idOccInfo old_bndr
+    unfolding   = idUnfolding bndr
+    arity       = idArity bndr
+--    is_cheap    = isCheapUnfolding unfolding
+    uf_opts     = seUnfoldingOpts env
+    phase       = sePhase env
+    active      = isActive phase (idInlineActivation bndr)
+        -- See Note [pre/postInlineUnconditionally in gentle mode]
+
+    -- Check for code-size blow-up from inlining in multiple places
+    code_dup_ok n_br
+      | n_br == 1   = True  -- No duplication
+      | n_br >= 100 = False -- See #23627
+      | is_demanded = False -- Demanded => no allocation (it'll be a case expression
+                            -- in the end) so inlining duplicates code but nothing more
+      | otherwise   = smallEnoughToInline uf_opts unfolding
+
+    -- See Note [Post-inline for single-use things]
+    check_one_occ NotInsideLam NotInteresting n_br = not is_top_lvl && code_dup_ok n_br
+    check_one_occ NotInsideLam IsInteresting  n_br = code_dup_ok n_br
+    check_one_occ IsInsideLam  NotInteresting _    = False
+    check_one_occ IsInsideLam  IsInteresting  n_br = arity > 0 && code_dup_ok n_br
+      -- IsInteresting: inlining inside a lambda only with good reason
+      --    See the notes on int_cxt in preInlineUnconditionally
+      -- arity>0: do not inline data strutures under lambdas, only functions
+
+---------------
+-- A wrong bit of code, left here in case you are tempted to do this
+--        | is_unlifted                        -- Unlifted binding, hence ok-for-spec
+--        -> True                              -- hence cheap to inline probably just a primop
+-- No, this is wrong.  {v = p +# q; x = K v}.
+-- Don't inline v; it'll just get floated out again. Stupid.
+---------------
+
+
+      -- NotInsideLam: outside a lambda, when not at top-level we want to be
+      -- reasonably aggressive about inlining into multiple branches of case
       -- e.g. let x = <non-value>
       --      in case y of { C1 -> ..x..; C2 -> ..x..; C3 -> ... }
       -- Inlining can be a big win if C3 is the hot-spot, even if
       -- the uses in C1, C2 are not 'interesting'
       -- An example that gets worse if you add int_cxt here is 'clausify'
 
-      -- InsideLam: check for acceptable work duplication, using isCheapUnfoldign
-      -- int_cxt to prevent us inlining inside a lambda without some
-      -- good reason.  See the notes on int_cxt in preInlineUnconditionally
+      -- InsideLam:
 
 --    is_unlifted = isUnliftedType (idType bndr)
-    is_demanded = isStrUsedDmd (idDemandInfo bndr)
-    occ_info    = idOccInfo old_bndr
-    unfolding   = idUnfolding bndr
-    uf_opts     = seUnfoldingOpts env
-    phase       = sePhase env
-    active      = isActive phase (idInlineActivation bndr)
-        -- See Note [pre/postInlineUnconditionally in gentle mode]
 
 {- Note [Inline small things to avoid creating a thunk]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1669,23 +1696,24 @@ where GHC.Driver.CmdLine.$wprocessArgs allocated hugely more.
 Note [Post-inline for single-use things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have
-
    let x = rhs in ...x...
-
 and `x` is used exactly once, and not inside a lambda, then we will usually
 preInlineUnconditinally. But we can still get this situation in
 postInlineUnconditionally:
-
   case K rhs of K x -> ...x....
-
 Here we'll use `simplAuxBind` to bind `x` to (the already-simplified) `rhs`;
 and `x` is used exactly once.  It's beneficial to inline right away; otherwise
 we risk creating
-
    let x = rhs in ...x...
+which will take another iteration of the Simplifier to eliminate.
 
-which will take another iteration of the Simplifier to eliminate.  We do this in
-two places
+A similar, but less frequent, case is
+    let f = \x.blah in ...(\y. ...(f e)...) ...
+Again `preInlineUnconditionally will usually inline `f`, but it can arise
+via `simplAuxBind` if we have something like
+    (\f \y. ...(f e)..) (\x.blah)
+
+We do unconditional post-inlining in two places:
 
 1. In the full `postInlineUnconditionally` look for the special case
    of "one occurrence, not under a lambda", and inline unconditionally then.
@@ -1714,24 +1742,20 @@ Alas!
 
 Note [Top level and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don't do postInlineUnconditionally for top-level things (even for
-ones that are trivial):
+We must take care when considering postInlineUnconditionally for top-level things
 
-  * Doing so will inline top-level error expressions that have been
-    carefully floated out by FloatOut.  More generally, it might
-    replace static allocation with dynamic.
+  * Don't inline top-level error expressions that have been carefully floated
+    out by FloatOut.  See Note [Top-level bottoming Ids].
 
-  * Even for trivial expressions there's a problem.  Consider
+  * Even for trivial expressions we need to take care: we must not
+    postInlineUnconditionally a top-level ManyOccs binder, even if its
+    RHS is trivial. Consider
       {-# RULE "foo" forall (xs::[T]). reverse xs = ruggle xs #-}
       blah xs = reverse xs
       ruggle = sort
-    In one simplifier pass we might fire the rule, getting
+    We must not postInlineUnconditionally `ruggle`, because in the same
+    simplifier pass we might fire the rule, getting
       blah xs = ruggle xs
-    but in *that* simplifier pass we must not do postInlineUnconditionally
-    on 'ruggle' because then we'll have an unbound occurrence of 'ruggle'
-
-    If the rhs is trivial it'll be inlined by callSiteInline, and then
-    the binding will be dead and discarded by the next use of OccurAnal
 
   * There is less point, because the main goal is to get rid of local
     bindings used in multiple case branches.
