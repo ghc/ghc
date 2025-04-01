@@ -544,7 +544,21 @@ type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body 
 type instance Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) = SrcSpanAnnA
 
 multAnnToHsExpr :: HsMultAnnOf (LocatedA (HsExpr GhcRn)) GhcRn -> Maybe (LocatedA (HsExpr GhcRn))
-multAnnToHsExpr = expandHsMultAnnOf (HsVar noExtField)
+multAnnToHsExpr = expandHsMultAnnOf mkHsVar
+
+mkHsVar :: forall p. IsPass p => LIdP (GhcPass p) -> HsExpr (GhcPass p)
+mkHsVar n = HsVar noExtField $
+  case ghcPass @p of
+    GhcPs -> n
+    GhcRn -> fmap (WithUserRdr $ nameRdrName $ unLoc n) n
+    GhcTc -> n
+
+mkHsVarWithUserRdr :: forall p. IsPass p => RdrName -> LIdP (GhcPass p) -> HsExpr (GhcPass p)
+mkHsVarWithUserRdr rdr n = HsVar noExtField $
+  case ghcPass @p of
+    GhcPs -> n
+    GhcRn -> fmap (WithUserRdr rdr) n
+    GhcTc -> n
 
 data AnnExplicitSum
   = AnnExplicitSum {

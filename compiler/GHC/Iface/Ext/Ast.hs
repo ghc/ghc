@@ -39,9 +39,9 @@ import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Utils.Monad            ( concatMapM, MonadIO(liftIO) )
 import GHC.Types.Id               ( isDataConId_maybe )
-import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTyThing_maybe )
+import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTyThing_maybe, getName )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
-import GHC.Types.Name.Reader      ( RecFieldInfo(..) )
+import GHC.Types.Name.Reader      ( RecFieldInfo(..), WithUserRdr(..) )
 import GHC.Types.SrcLoc
 import GHC.Core.Type              ( Type )
 import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
@@ -669,6 +669,9 @@ instance ToHie (Context (Located Name)) where
               []]
       _ -> pure []
 
+instance ToHie (Context (Located (WithUserRdr Name))) where
+  toHie (C c (L l (WithUserRdr _ n))) = toHie $ C c (L l n)
+
 evVarsOfTermList :: EvTerm -> [EvId]
 evVarsOfTermList (EvExpr e)         = exprSomeFreeVarsList isEvVar e
 evVarsOfTermList (EvTypeable _ ev)  =
@@ -819,7 +822,9 @@ class ( HiePass (NoGhcTcPass p)
       , Data (HsTupArg (GhcPass p))
       , Data (IPBind (GhcPass p))
       , ToHie (Context (Located (IdGhcP p)))
+      , ToHie (Context (Located (IdOccGhcP p)))
       , Anno (IdGhcP p) ~ SrcSpanAnnN
+      , Anno (IdOccGhcP p) ~ SrcSpanAnnN
       , Typeable p
       )
       => HiePass p where
@@ -930,6 +935,9 @@ instance HiePass p => ToHie (Located (PatSynBind (GhcPass p) (GhcPass p))) where
           toBind (InfixCon a b) = InfixCon (C Use a) (C Use b)
           toBind (RecCon r) = RecCon $ map (PSC detSpan) r
 
+instance ToHie a => ToHie (WithUserRdr a) where
+  toHie (WithUserRdr _ a) = toHie a
+
 instance HiePass p => ToHie (HsPatSynDir (GhcPass p)) where
   toHie dir = case dir of
     ExplicitBidirectional mg -> toHie mg
@@ -1022,7 +1030,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
                             ]
             ]
           HieRn ->
-            [ toHie $ C Use con
+            [ toHie $ C Use (fmap getName con)
             , toHie $ contextify dets
             ]
       ViewPat _ expr pat ->
@@ -1256,7 +1264,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         where
           con_name :: LocatedN Name
           con_name = case hiePass @p of       -- Like ConPat
-                       HieRn -> con
+                       HieRn -> fmap getName con
                        HieTc -> fmap conLikeName con
       RecordUpd { rupd_expr = expr
                 , rupd_flds = RegularRecUpdFields { recUpdFields = upds } }->

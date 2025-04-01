@@ -60,6 +60,8 @@ module GHC.Hs.Utils(
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
   mkLocatedList, nlAscribe,
 
+  forgetUserRdr, noUserRdr,
+
   -- * Bindings
   mkFunBind, mkVarBind, mkHsVarBind, mkSimpleGeneratedFunBind, mkTopFunBind,
   mkPatSynBind,
@@ -305,7 +307,7 @@ mkHsCaseAlt (L l pat) expr
 
 nlHsTyApp :: Id -> [Type] -> LHsExpr GhcTc
 nlHsTyApp fun_id tys
-  = noLocA (mkHsWrap (mkWpTyApps tys) (HsVar noExtField (noLocA fun_id)))
+  = noLocA (mkHsWrap (mkWpTyApps tys) (mkHsVar (noLocA fun_id)))
 
 nlHsTyApps :: Id -> [Type] -> [LHsExpr GhcTc] -> LHsExpr GhcTc
 nlHsTyApps fun_id tys xs = foldl' nlHsApp (nlHsTyApp fun_id tys) xs
@@ -474,7 +476,7 @@ mkLetStmt anns binds = LetStmt anns binds
 -- | A useful function for building @OpApps@.  The operator is always a
 -- variable, and we don't know the fixity yet.
 mkHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
-mkHsOpApp e1 op e2 = OpApp noExtField e1 (noLocA (HsVar noExtField (noLocA op))) e2
+mkHsOpApp e1 op e2 = OpApp noExtField e1 (noLocA (mkHsVar (noLocA op))) e2
 
 mkHsString :: String -> HsLit (GhcPass p)
 mkHsString s = HsString NoSourceText (mkFastString s)
@@ -501,7 +503,7 @@ mkConLikeTc con = XExpr (ConLikeTc con [] [])
 
 nlHsVar :: IsSrcSpanAnn p a
         => IdP (GhcPass p) -> LHsExpr (GhcPass p)
-nlHsVar n = noLocA (HsVar noExtField (noLocA n))
+nlHsVar n = noLocA (mkHsVar (noLocA n))
 
 -- | NB: Only for 'LHsExpr' 'Id'.
 nlHsDataCon :: DataCon -> LHsExpr GhcTc
@@ -533,8 +535,8 @@ nlHsApps f xs = foldl' nlHsApp (nlHsVar f) xs
 
 nlHsVarApps :: IsSrcSpanAnn p a
             => IdP (GhcPass p) -> [IdP (GhcPass p)] -> LHsExpr (GhcPass p)
-nlHsVarApps f xs = noLocA (foldl' mk (HsVar noExtField (noLocA f))
-                                         (map ((HsVar noExtField) . noLocA) xs))
+nlHsVarApps f xs = noLocA (foldl' mk (mkHsVar (noLocA f))
+                                         (map (mkHsVar . noLocA) xs))
                  where
                    mk f a = HsApp noExtField (noLocA f) (noLocA a)
 
@@ -562,7 +564,7 @@ nlConPat con pats = noLocA $ ConPat
 nlConPatName :: Name -> [LPat GhcRn] -> LPat GhcRn
 nlConPatName con pats = noLocA $ ConPat
   { pat_con_ext = noExtField
-  , pat_con = noLocA con
+  , pat_con = noLocA (noUserRdr con)
   , pat_args = PrefixCon (map (parenthesizePat appPrec) pats)
   }
 
@@ -618,14 +620,14 @@ nlHsCase expr matches
 nlList exprs          = noLocA (ExplicitList noAnn exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
-nlHsTyVar :: IsSrcSpanAnn p a
+nlHsTyVar :: forall p a. IsSrcSpanAnn p a
           => PromotionFlag -> IdP (GhcPass p)           -> LHsType (GhcPass p)
 nlHsFunTy :: forall p. IsPass p
           => LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLocA (HsAppTy noExtField f t)
-nlHsTyVar p x = noLocA (HsTyVar noAnn p (noLocA x))
+nlHsTyVar p x = noLocA (HsTyVar noAnn p (noLocA $ noUserRdrP @p x))
 nlHsFunTy a b = noLocA (HsFunTy noExtField (HsUnannotated x) a b)
   where
     x = case ghcPass @p of
@@ -636,14 +638,14 @@ nlHsParTy t   = noLocA (HsParTy noAnn t)
 
 nlHsTyConApp :: forall p a. IsSrcSpanAnn p a
              => PromotionFlag
-             -> LexicalFixity -> IdP (GhcPass p)
+             -> LexicalFixity -> IdOccP (GhcPass p)
              -> [LHsTypeArg (GhcPass p)] -> LHsType (GhcPass p)
 nlHsTyConApp prom fixity tycon tys
   | Infix <- fixity
   , HsValArg _ ty1 : HsValArg _ ty2 : rest <- tys
   = foldl' mk_app (noLocA $ HsOpTy noExtField prom ty1 (noLocA tycon) ty2) rest
   | otherwise
-  = foldl' mk_app (nlHsTyVar prom tycon) tys
+  = foldl' mk_app (nlHsTyVar prom $ forgetUserRdr @p tycon) tys
   where
     mk_app :: LHsType (GhcPass p) -> LHsTypeArg (GhcPass p) -> LHsType (GhcPass p)
     mk_app fun@(L _ (HsOpTy {})) arg = mk_app (nlHsParTy fun) arg
@@ -651,6 +653,22 @@ nlHsTyConApp prom fixity tycon tys
     mk_app fun (HsValArg _ ty) = nlHsAppTy fun ty
     mk_app fun (HsTypeArg _ ki) = nlHsAppKindTy fun ki
     mk_app fun (HsArgPar _) = nlHsParTy fun
+
+-- | Turn an 'IdP' into an 'IdOccP', with no user-written 'RdrName' information.
+noUserRdrP :: forall p. IsPass p => IdP (GhcPass p) -> IdOccP (GhcPass p)
+noUserRdrP =
+  case ghcPass @p of
+    GhcPs -> id
+    GhcRn -> noUserRdr
+    GhcTc -> id
+
+-- | Turn an 'IdOccP' into an 'IdP', discarding the user-written 'RdrName'.
+forgetUserRdr :: forall p. IsPass p => IdOccP (GhcPass p) -> IdP (GhcPass p)
+forgetUserRdr =
+  case ghcPass @p of
+    GhcPs -> id
+    GhcRn -> \ (WithUserRdr _rdr n) -> n
+    GhcTc -> id
 
 nlHsAppKindTy :: forall p. IsPass p =>
   LHsType (GhcPass p) -> LHsKind (GhcPass p) -> LHsType (GhcPass p)

@@ -554,16 +554,17 @@ rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
        ; when (isDataConName name && not (isPromoted ip)) $
          -- NB: a prefix symbolic operator such as (:) is represented as HsTyVar.
             addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Prefix name)
-       ; return (HsTyVar noAnn ip (L loc name), unitFV name) }
+       ; return (HsTyVar noAnn ip (L loc $ WithUserRdr rdr_name name), unitFV name) }
 
 rnHsTyKi env ty@(HsOpTy _ prom ty1 l_op ty2)
   = setSrcSpan (getLocA l_op) $
-    do  { (l_op', fvs1) <- rnHsTyOp env (ppr ty) l_op
+    do  { let op_rdr = unLoc l_op
+        ; (l_op', fvs1) <- rnHsTyOp env (ppr ty) l_op
         ; let op_name = unLoc l_op'
         ; fix   <- lookupTyFixityRn l_op'
         ; (ty1', fvs2) <- rnLHsTyKi env ty1
         ; (ty2', fvs3) <- rnLHsTyKi env ty2
-        ; res_ty <- mkHsOpTyRn prom l_op' fix ty1' ty2'
+        ; res_ty <- mkHsOpTyRn prom (fmap (WithUserRdr op_rdr) l_op') fix ty1' ty2'
         ; when (isDataConName op_name && not (isPromoted prom)) $
             addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Infix op_name)
         ; return (res_ty, plusFVs [fvs1, fvs2, fvs3]) }
@@ -1375,19 +1376,19 @@ precedence and does not require rearrangement.
 ---------------
 -- Building (ty1 `op1` (ty2a `op2` ty2b))
 mkHsOpTyRn :: PromotionFlag
-           -> LocatedN Name -> Fixity -> LHsType GhcRn -> LHsType GhcRn
+           -> LocatedN (WithUserRdr Name) -> Fixity -> LHsType GhcRn -> LHsType GhcRn
            -> RnM (HsType GhcRn)
 
 mkHsOpTyRn prom1 op1 fix1 ty1 (L loc2 (HsOpTy _ prom2 ty2a op2 ty2b))
-  = do  { fix2 <- lookupTyFixityRn op2
+  = do  { fix2 <- lookupTyFixityRn (fmap getName op2)
         ; mk_hs_op_ty prom1 op1 fix1 ty1 prom2 op2 fix2 ty2a ty2b loc2 }
 
 mkHsOpTyRn prom1 op1 _ ty1 ty2              -- Default case, no rearrangement
   = return (HsOpTy noExtField prom1 ty1 op1 ty2)
 
 ---------------
-mk_hs_op_ty :: PromotionFlag -> LocatedN Name -> Fixity -> LHsType GhcRn
-            -> PromotionFlag -> LocatedN Name -> Fixity -> LHsType GhcRn
+mk_hs_op_ty :: PromotionFlag -> LocatedN (WithUserRdr Name) -> Fixity -> LHsType GhcRn
+            -> PromotionFlag -> LocatedN (WithUserRdr Name) -> Fixity -> LHsType GhcRn
             -> LHsType GhcRn -> SrcSpanAnnA
             -> RnM (HsType GhcRn)
 mk_hs_op_ty prom1 op1 fix1 ty1 prom2 op2 fix2 ty2a ty2b loc2
@@ -1490,11 +1491,12 @@ not_op_app (OpApp {}) = False
 not_op_app _          = True
 
 --------------------------------------
-mkConOpPatRn :: LocatedN Name -> Fixity -> LPat GhcRn -> LPat GhcRn
+mkConOpPatRn :: LocatedN (WithUserRdr Name)
+             -> Fixity -> LPat GhcRn -> LPat GhcRn
              -> RnM (Pat GhcRn)
 
 mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p1a p1b))) p2
-  = do  { fix1 <- lookupFixityRn (unLoc op1)
+  = do  { fix1 <- lookupFixityRn (getName op1)
         ; let (nofix_error, associate_right) = compareFixity fix1 fix2
 
         ; if nofix_error then do
@@ -1502,7 +1504,7 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p1a p1b))) p2
                                (NormalOp (unLoc op2),fix2)
                 ; return $ ConPat
                     { pat_con_ext = noExtField
-                    , pat_con = op2
+                    , pat_con  = op2
                     , pat_args = InfixCon p1 p2
                     }
                 }
@@ -1563,14 +1565,14 @@ checkPrecMatch op (MG { mg_alts = (L _ ms) })
 checkPrec :: Name -> Pat GhcRn -> Bool -> IOEnv (Env TcGblEnv TcLclEnv) ()
 checkPrec op (ConPat NoExtField op1 (InfixCon _ _)) right = do
     op_fix@(Fixity op_prec  op_dir) <- lookupFixityRn op
-    op1_fix@(Fixity op1_prec op1_dir) <- lookupFixityRn (unLoc op1)
+    op1_fix@(Fixity op1_prec op1_dir) <- lookupFixityRn (getName op1)
     let
         inf_ok = op1_prec > op_prec ||
                  (op1_prec == op_prec &&
                   (op1_dir == InfixR && op_dir == InfixR && right ||
                    op1_dir == InfixL && op_dir == InfixL && not right))
 
-        info  = (NormalOp op,          op_fix)
+        info  = (NormalOp (noUserRdr op), op_fix)
         info1 = (NormalOp (unLoc op1), op1_fix)
         (infol, infor) = if right then (info, info1) else (info1, info)
     unless inf_ok (precParseErr infol infor)
@@ -1600,7 +1602,7 @@ checkSectionPrec direction section op arg
 
 -- | Look up the fixity for an operator name.
 lookupFixityOp :: OpName -> RnM Fixity
-lookupFixityOp (NormalOp n)  = lookupFixityRn n
+lookupFixityOp (NormalOp n)  = lookupFixityRn (getName n)
 lookupFixityOp NegateOp      = lookupFixityRn negateName
 lookupFixityOp (UnboundOp u) = lookupFixityRn (mkUnboundName (occName u))
 lookupFixityOp (RecFldOp f)  = lookupFieldFixityRn f
@@ -1622,7 +1624,7 @@ sectionPrecErr op@(n1,_) arg_op@(n2,_) section
   = addErr $ TcRnSectionPrecedenceError op arg_op section
 
 is_unbound :: OpName -> Bool
-is_unbound (NormalOp n) = isUnboundName n
+is_unbound (NormalOp n) = isUnboundName (getName n)
 is_unbound UnboundOp{}  = True
 is_unbound _            = False
 

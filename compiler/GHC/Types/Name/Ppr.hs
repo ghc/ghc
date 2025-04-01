@@ -81,57 +81,65 @@ mkNamePprCtx ptc unit_env env
 
 mkQualName :: Outputable info => GlobalRdrEnvX info -> QueryQualifyName
 mkQualName env = qual_name where
-  qual_name mod occ
-        | [gre] <- unqual_gres
-        , right_name gre
-        = NameUnqual   -- If there's a unique entity that's in scope
-                       -- unqualified with 'occ' AND that entity is
-                       -- the right one, then we can use the unqualified name
+  qual_name mod user_qual occ
 
-        | [] <- unqual_gres
-        , pretendNameIsInScopeForPpr
-        , not (isDerivedOccName occ)
-        = NameUnqual   -- See Note [pretendNameIsInScopeForPpr]
+    -- Use the user-written qualification, if that's unambiguous.
+    | Just qual <- user_qual
+    , let user_rdr = mkRdrQual qual occ
+    , [gre] <- lookupGRE env $ LookupRdrName user_rdr SameNameSpace
+    , right_name gre
+    = NameQual qual
 
-        | [gre] <- qual_gres
-        = NameQual (greQualModName gre)
+    -- If there's a GRE that's in scope
+    -- unqualified with 'occ' AND that entity is
+    -- the right one, then use the unqualified name
+    | [gre] <- unqual_gres
+    , right_name gre
+    = NameUnqual
 
-        | null qual_gres
-        = if null $ lookupGRE env $
-               LookupRdrName (mkRdrQual (moduleName mod) occ) SameNameSpace
-          then NameNotInScope1
-          else NameNotInScope2
+    | [] <- unqual_gres
+    , pretendNameIsInScopeForPpr
+    , not (isDerivedOccName occ)
+    = NameUnqual   -- See Note [pretendNameIsInScopeForPpr]
 
-        | otherwise
-        = NameNotInScope1   -- Can happen if 'f' is bound twice in the module
-                            -- Eg  f = True; g = 0; f = False
-      where
-        is_name :: Name -> Bool
-        is_name name = assertPpr (isExternalName name) (ppr name) $
-                       nameModule name == mod && nameOccName name == occ
+    | [gre] <- qual_gres
+    = NameQual (greQualModName gre)
 
-        -- See Note [pretendNameIsInScopeForPpr]
-        pretendNameIsInScopeForPpr :: Bool
-        pretendNameIsInScopeForPpr =
-          any is_name
-            [ liftedTypeKindTyConName
-            , constraintKindTyConName
-            , heqTyConName
-            , coercibleTyConName
-            , eqTyConName
-            , tYPETyConName
-            , fUNTyConName, unrestrictedFunTyConName
-            , oneDataConName
-            , listTyConName
-            , manyDataConName
-            , soloDataConName ]
-          || isJust (isTupleTyOrigName_maybe mod occ)
-          || isJust (isSumTyOrigName_maybe mod occ)
+    | null qual_gres
+    = if null $ lookupGRE env $
+           LookupRdrName (mkRdrQual (moduleName mod) occ) SameNameSpace
+      then NameNotInScope1
+      else NameNotInScope2
 
-        right_name gre = greDefinitionModule gre == Just mod
+    | otherwise
+    = NameNotInScope1   -- Can happen if 'f' is bound twice in the module
+                        -- Eg  f = True; g = 0; f = False
+    where
+      is_name :: Name -> Bool
+      is_name name = assertPpr (isExternalName name) (ppr name) $
+                     nameModule name == mod && nameOccName name == occ
 
-        unqual_gres = lookupGRE env (LookupRdrName (mkRdrUnqual occ) SameNameSpace)
-        qual_gres   = filter right_name (lookupGRE env (LookupOccName occ SameNameSpace))
+      -- See Note [pretendNameIsInScopeForPpr]
+      pretendNameIsInScopeForPpr :: Bool
+      pretendNameIsInScopeForPpr =
+        any is_name
+          [ liftedTypeKindTyConName
+          , constraintKindTyConName
+          , heqTyConName
+          , coercibleTyConName
+          , eqTyConName
+          , tYPETyConName
+          , fUNTyConName, unrestrictedFunTyConName
+          , oneDataConName
+          , listTyConName
+          , manyDataConName
+          , soloDataConName ]
+        || isJust (isTupleTyOrigName_maybe mod occ)
+        || isJust (isSumTyOrigName_maybe mod occ)
+
+      right_name gre = greDefinitionModule gre == Just mod
+      unqual_gres = lookupGRE env (LookupRdrName (mkRdrUnqual occ) SameNameSpace)
+      qual_gres   = filter right_name (lookupGRE env (LookupOccName occ SameNameSpace))
 
     -- we can mention a module P:M without the P: qualifier iff
     -- "import M" would resolve unambiguously to P:M.  (if P is the

@@ -781,7 +781,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                                , mkFVs (map unLoc [name1, name2])) }
                RecCon vars ->
                    do { checkDupRdrNames (map (foLabel . recordPatSynField) vars)
-                      ; fls <- lookupConstructorFields name
+                      ; fls <- lookupConstructorFields $ noUserRdr name
                       ; let fld_env = mkFsEnv [ (field_label $ flLabel fl, fl) | fl <- fls ]
                       ; let rnRecordPatSynField
                               (RecordPatSynField { recordPatSynField  = visible

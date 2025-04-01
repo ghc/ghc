@@ -1237,7 +1237,7 @@ showIface logger dflags unit_state name_cache filename = do
    iface <- readBinIface profile name_cache IgnoreHiWay (TraceBinIFace printer) filename
 
    let -- See Note [Name qualification with --show-iface]
-       qualifyImportedNames mod _
+       qualifyImportedNames mod _user_qual _
            | mod == mi_module iface = NameUnqual
            | otherwise              = NameNotInScope1
        name_ppr_ctx = QueryQualify qualifyImportedNames

@@ -106,7 +106,7 @@ import GHC.Core.TyCo.Ppr
 import GHC.Builtin.Types.Prim
 import GHC.Types.Error
 import GHC.Types.Name.Env
-import GHC.Types.Name.Reader( lookupLocalRdrOcc )
+import GHC.Types.Name.Reader( WithUserRdr(..), lookupLocalRdrOcc )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Core.TyCon
@@ -698,7 +698,7 @@ tcHsDeriv hs_ty
                                 $ IllegalInstanceHead
                                 $ InstHeadNonClassHead
                                 $ InstNonClassTyCon
-                                    (tyConName tc)
+                                    (noUserRdr $ tyConName tc)
                                     (fmap tyConName $ tyConFlavour tc)
                      ; return Nothing }
             Nothing ->
@@ -829,7 +829,7 @@ tcFamTyPats fam_tc hs_pats
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
-    lhs_fun   = noLocA (HsTyVar noAnn NotPromoted (noLocA fam_name))
+    lhs_fun   = noLocA (HsTyVar noAnn NotPromoted (noLocA $ noUserRdr fam_name))
 
 {- Note [tcFamTyPats: zonking the result kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1143,7 +1143,7 @@ tcHsType _ (HsSpliceTy (HsUntypedSpliceNested n) s) _ = pprPanic "tcHsType: inva
 tcHsType mode (HsFunTy _ mult ty1 ty2) exp_kind
   = tc_fun_type mode mult ty1 ty2 exp_kind
 
-tcHsType mode (HsOpTy _ _ ty1 (L _ op) ty2) exp_kind
+tcHsType mode (HsOpTy _ _ ty1 (L _ (WithUserRdr _ op)) ty2) exp_kind
   | op `hasKey` unrestrictedFunTyConKey
   = tc_fun_type mode (HsUnannotated noExtField) ty1 ty2 exp_kind
 
@@ -1516,7 +1516,8 @@ splitHsAppTys_maybe hs_ty
     is_app :: HsType GhcRn -> Bool
     is_app (HsAppKindTy {})        = True
     is_app (HsAppTy {})            = True
-    is_app (HsOpTy _ _ _ (L _ op) _) = not (op `hasKey` unrestrictedFunTyConKey)
+    is_app (HsOpTy _ _ _ (L _ (WithUserRdr _ op)) _)
+      = not (op `hasKey` unrestrictedFunTyConKey)
       -- I'm not sure why this funTyConKey test is necessary
       -- Can it even happen?  Perhaps for   t1 `(->)` t2
       -- but then maybe it's ok to treat that like a normal
@@ -1547,7 +1548,7 @@ tcInferTyAppHead :: TcTyMode -> LHsType GhcRn -> TcM (TcType, TcKind)
 -- application. In particular, for a HsTyVar (which includes type
 -- constructors, it does not zoom off into tcInferTyApps and family
 -- saturation
-tcInferTyAppHead _ (L _ (HsTyVar _ _ (L _ tv)))
+tcInferTyAppHead _ (L _ (HsTyVar _ _ (L _ (WithUserRdr _ tv))))
   = tcTyVar tv
 tcInferTyAppHead mode ty
   = tc_infer_lhs_type mode ty
@@ -4576,9 +4577,9 @@ tyPatToBndr HsTP{hstp_body = (L _ hs_ty)} = go hs_ty where
     Just (HsTvb noAnn () bvar bkind)
 
   go_bvar :: HsType GhcRn -> Maybe (HsBndrVar GhcRn)
-  go_bvar (HsTyVar _ _ name)
-    | isTyVarName (unLoc name)
-    = Just (HsBndrVar noExtField name)
+  go_bvar (HsTyVar _ _ tv)
+    | isTyVarName (getName tv)
+    = Just (HsBndrVar noExtField (fmap getName tv))
   go_bvar (HsWildCardTy _)
     = Just (HsBndrWildCard noExtField)
   go_bvar _ = Nothing

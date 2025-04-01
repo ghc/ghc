@@ -1070,8 +1070,8 @@ cvtImplicitParamBind n e = do
 cvtl :: TH.Exp -> CvtM (LHsExpr GhcPs)
 cvtl e = wrapLA (cvt e)
   where
-    cvt (VarE s)   = do { s' <- vName s; wrapParLA (HsVar noExtField) s' }
-    cvt (ConE s)   = do { s' <- dName s; wrapParLA (HsVar noExtField) s' }
+    cvt (VarE s)   = do { s' <- vName s; wrapParLA mkHsVar s' }
+    cvt (ConE s)   = do { s' <- dName s; wrapParLA mkHsVar s' }
     cvt (LitE l)
       | overloadedLit l = go cvtOverLit (HsOverLit noExtField)
                              (hsOverLitNeedsParens appPrec)
@@ -1196,7 +1196,7 @@ cvtl e = wrapLA (cvt e)
                               -- important, because UnboundVarE may contain
                               -- constructor names - see #14627.
                               { s' <- vcName s
-                              ; wrapParLA (HsVar noExtField) s' }
+                              ; wrapParLA mkHsVar s' }
     cvt (LabelE s)       = return $ HsOverLabel NoSourceText (fsLit s)
     cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noExtField n' }
     cvt (GetFieldE exp f) = do { e' <- cvtl exp

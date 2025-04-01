@@ -43,6 +43,7 @@ import GHC.Core.TyCo.Tidy( tidyForAllTyBinders, tidyTypes, tidyType )
 import GHC.Core.Predicate
 
 import GHC.Types.Name
+import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 import GHC.Core.PatSyn
@@ -183,7 +184,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
        ; doNotQuantifyTyVars dvs err_ctx
 
        ; traceTc "tcInferPatSynDecl }" $ (ppr name $$ ppr ex_tvs)
-       ; rec_fields <- lookupConstructorFields name
+       ; rec_fields <- lookupConstructorFields $ noUserRdr name
        ; tc_patsyn_finish lname dir is_infix lpat' prag_fn
                           (mkTyVarBinders InferredSpec univ_tvs
                             , req_theta,  ev_binds, req_dicts)
@@ -453,7 +454,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
 
        ; traceTc "tcCheckPatSynDecl }" $ ppr name
 
-       ; rec_fields <- lookupConstructorFields name
+       ; rec_fields <- lookupConstructorFields $ noUserRdr name
        ; tc_patsyn_finish lname dir is_infix lpat' prag_fn
                           (skol_univ_bndrs, skol_req_theta, ev_binds, req_dicts)
                           (skol_ex_bndrs, mkTyVarTys ex_tvs', skol_prov_theta, prov_dicts)
@@ -999,7 +1000,8 @@ tcPatToExpr args pat = go pat
     lhsVars = mkNameSet (map unLoc args)
 
     -- Make a prefix con for prefix and infix patterns for simplicity
-    mkPrefixConExpr :: LocatedN Name -> [LPat GhcRn]
+    mkPrefixConExpr :: LocatedN (WithUserRdr Name)
+                    -> [LPat GhcRn]
                     -> Either PatSynInvalidRhsReason (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
@@ -1007,7 +1009,8 @@ tcPatToExpr args pat = go pat
            ; return (unLoc $ mkHsApps con exprs)
            }
 
-    mkRecordConExpr :: LocatedN Name -> HsRecFields GhcRn (LPat GhcRn)
+    mkRecordConExpr :: LocatedN (WithUserRdr Name)
+                    -> HsRecFields GhcRn (LPat GhcRn)
                     -> Either PatSynInvalidRhsReason (HsExpr GhcRn)
     mkRecordConExpr con (HsRecFields x fields dd)
       = do { exprFields <- mapM go' fields
@@ -1031,7 +1034,7 @@ tcPatToExpr args pat = go pat
 
     go1 (VarPat _ (L l var))
         | var `elemNameSet` lhsVars
-        = return $ HsVar noExtField (L l var)
+        = return $ mkHsVar (L l var)
         | otherwise
         = Left (PatSynUnboundVar var)
     go1 (ParPat _ pat) = fmap (HsPar noExtField) (go pat)

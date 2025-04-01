@@ -275,7 +275,7 @@ terribly efficient, but there seems to be no better way.
 
 -- Can be made to not be exposed
 -- Only used unwrapped in rnAnnProvenance
-lookupTopBndrRn :: WhatLooking -> RdrName -> RnM Name
+lookupTopBndrRn :: WhatLooking -> RdrName -> RnM (WithUserRdr Name)
 -- Look up a top-level source-code binder.   We may be looking up an unqualified 'f',
 -- and there may be several imported 'f's too, which must not confuse us.
 -- For example, this is OK:
@@ -287,7 +287,7 @@ lookupTopBndrRn :: WhatLooking -> RdrName -> RnM Name
 -- A separate function (importsFromLocalDecls) reports duplicate top level
 -- decls, so here it's safe just to choose an arbitrary one.
 lookupTopBndrRn which_suggest rdr_name =
-  lookupExactOrOrig rdr_name greName $
+  lookupExactOrOrig rdr_name (WithUserRdr rdr_name . greName) $
     do  {  -- Check for operators in type or class declarations
            -- See Note [Type and class operator definitions]
           let occ = rdrNameOcc rdr_name
@@ -295,24 +295,25 @@ lookupTopBndrRn which_suggest rdr_name =
                (do { op_ok <- xoptM LangExt.TypeOperators
                    ; unless op_ok (addErr (TcRnIllegalTypeOperatorDecl rdr_name)) })
         ; env <- getGlobalRdrEnv
-        ; case filter isLocalGRE (lookupGRE env $ LookupRdrName rdr_name $ RelevantGREsFOS WantNormal) of
+        ; WithUserRdr rdr_name <$>
+          case filter isLocalGRE (lookupGRE env $ LookupRdrName rdr_name $ RelevantGREsFOS WantNormal) of
             [gre] -> return (greName gre)
             _     -> do -- Ambiguous (can't happen) or unbound
                         traceRn "lookupTopBndrRN fail" (ppr rdr_name)
                         unboundName (LF which_suggest WL_LocalTop) rdr_name
     }
 
-lookupLocatedTopConstructorRn :: Located RdrName -> RnM (Located Name)
+lookupLocatedTopConstructorRn :: Located RdrName -> RnM (Located (WithUserRdr Name))
 lookupLocatedTopConstructorRn = wrapLocM (lookupTopBndrRn WL_Constructor)
 
 lookupLocatedTopConstructorRnN :: LocatedN RdrName -> RnM (LocatedN Name)
-lookupLocatedTopConstructorRnN = wrapLocMA (lookupTopBndrRn WL_Constructor)
+lookupLocatedTopConstructorRnN = wrapLocMA (fmap getName . lookupTopBndrRn WL_Constructor)
 
-lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
+lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located (WithUserRdr Name))
 lookupLocatedTopBndrRn = wrapLocM (lookupTopBndrRn WL_Anything)
 
 lookupLocatedTopBndrRnN :: LocatedN RdrName -> RnM (LocatedN Name)
-lookupLocatedTopBndrRnN = wrapLocMA (lookupTopBndrRn WL_Anything)
+lookupLocatedTopBndrRnN = wrapLocMA (fmap getName . lookupTopBndrRn WL_Anything)
 
 -- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
 -- This never adds an error, but it may return one, see
@@ -428,17 +429,17 @@ lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrenc
   = lookupLocatedOccRnConstr tc_rdr
 
 -----------------------------------------------
-lookupConstructorFields :: HasDebugCallStack => Name -> RnM [FieldLabel]
+lookupConstructorFields :: HasDebugCallStack => WithUserRdr Name -> RnM [FieldLabel]
 lookupConstructorFields = fmap conInfoFields . lookupConstructorInfo
 
 -- | Look up the arity and record fields of a constructor.
-lookupConstructorInfo :: HasDebugCallStack => Name -> RnM ConInfo
-lookupConstructorInfo con_name
+lookupConstructorInfo :: HasDebugCallStack => WithUserRdr Name -> RnM ConInfo
+lookupConstructorInfo qcon@(WithUserRdr _ con_name)
   = do { info <- lookupGREInfo_GRE con_name
        ; case info of
             IAmConLike con_info -> return con_info
             UnboundGRE          -> return $ ConInfo (ConIsData []) ConHasPositionalArgs
-            IAmTyCon {}         -> failIllegalTyCon WL_Constructor con_name
+            IAmTyCon {}         -> failIllegalTyCon WL_ConLike qcon
             _ -> pprPanic "lookupConstructorInfo: not a ConLike" $
                       vcat [ text "name:" <+> ppr con_name ]
        }
@@ -525,18 +526,19 @@ counterparts.
 -- If -XDisambiguateRecordFields is off, then we will pass 'Nothing' for the
 -- 'DataCon' 'Name', i.e. we don't use the data constructor for disambiguation.
 -- See Note [DisambiguateRecordFields] and Note [NoFieldSelectors].
-lookupRecFieldOcc :: Maybe Name -- Nothing  => just look it up as usual
-                                -- Just con => use data con to disambiguate
+lookupRecFieldOcc :: Maybe (WithUserRdr Name)
+                       -- Nothing  => just look it up as usual
+                       -- Just con => use data con to disambiguate
                   -> RdrName
                   -> RnM Name
 lookupRecFieldOcc mb_con rdr_name
-  | Just con <- mb_con
+  | Just (WithUserRdr _ con) <- mb_con
   , isUnboundName con  -- Avoid error cascade
   = return $ mk_unbound_rec_fld con
-  | Just con <- mb_con
+  | Just qcon@(WithUserRdr _ con) <- mb_con
   = do { let lbl = FieldLabelString $ occNameFS (rdrNameOcc rdr_name)
        ; mb_nm <- lookupExactOrOrig rdr_name ensure_recfld $  -- See Note [Record field names and Template Haskell]
-            do { flds <- lookupConstructorFields con
+            do { flds <- lookupConstructorFields qcon
                ; env <- getGlobalRdrEnv
                ; let mb_gre = do fl <- find ((== lbl) . flLabel) flds
                                  -- We have the label, now check it is in scope.  If
@@ -1050,7 +1052,13 @@ lookupOccRnConstr rdr_name
             { mb_ty_gre <- lookup_promoted rdr_name
             ; case mb_ty_gre of
               Just gre -> return $ greName gre
-              Nothing ->  reportUnboundName' WL_Constructor rdr_name} }
+              Nothing ->
+                reportUnboundName'
+                  WL_Constructor
+                    -- not WL_ConLike, due to the type-level fallback
+                    -- described in Note [lookupOccRnConstr]
+                  rdr_name
+            } }
 
 {- Note [lookupOccRnConstr]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1123,7 +1131,7 @@ but emit appropriate warnings.
 -- Used when looking up a term name (varName or dataName) in a type
 lookup_demoted :: RdrName -> RnM Name
 lookup_demoted rdr_name
-  | Just demoted_rdr <- demoteRdrName rdr_name
+  | Just demoted_rdr <- demoteRdrNameTcCls rdr_name
     -- Maybe it's the name of a *data* constructor
   = do { data_kinds <- xoptM LangExt.DataKinds
        ; star_is_type <- xoptM LangExt.StarIsType
@@ -1791,18 +1799,18 @@ lookupGreRn_helper which_gres rdr_name warn_if_deprec
             -- until we know which is meant
             (gre:others) -> return (MultipleNames (gre NE.:| others)) }
 
-lookupGreAvailRn :: RdrName -> RnM (Maybe GlobalRdrElt)
+lookupGreAvailRn :: WhatLooking -> RdrName -> RnM (Maybe GlobalRdrElt)
 -- Used in export lists
 -- If not found or ambiguous, add error message, and fake with UnboundName
 -- Uses addUsedRdrName to record use and deprecations
-lookupGreAvailRn rdr_name
+lookupGreAvailRn what_looking rdr_name
   = do
       mb_gre <- lookupGreRn_helper (RelevantGREsFOS WantNormal) rdr_name ExportDeprecationWarnings
       case mb_gre of
         GreNotFound ->
           do
             traceRn "lookupGreAvailRn" (ppr rdr_name)
-            _ <- unboundName (LF WL_Anything WL_Global) rdr_name
+            _ <- unboundName (LF what_looking WL_Global) rdr_name
             return Nothing
         MultipleNames gres ->
           do
@@ -2395,11 +2403,11 @@ lookupSyntaxNames :: [Name]                         -- Standard names
 lookupSyntaxNames std_names
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on then
-             return (map (HsVar noExtField . noLocA) std_names, emptyFVs)
+             return (map (mkHsVar . noLocA) std_names, emptyFVs)
         else
           do { usr_names <-
                  mapM (lookupOccRnNone . mkRdrUnqual . nameOccName) std_names
-             ; return (map (HsVar noExtField . noLocA) usr_names, mkFVs usr_names) } }
+             ; return (map (mkHsVar . noLocA) usr_names, mkFVs usr_names) } }
 
 
 {-
@@ -2444,9 +2452,9 @@ irrefutableConLikeRn :: HasDebugCallStack
                      => HscEnv
                      -> GlobalRdrEnv
                      -> CompleteMatches -- ^ in-scope COMPLETE pragmas
-                     -> Name -- ^ the 'Name' of the 'ConLike'
+                     -> WithUserRdr Name -- ^ the 'Name' of the 'ConLike'
                      -> Bool
-irrefutableConLikeRn hsc_env rdr_env comps con_nm
+irrefutableConLikeRn hsc_env rdr_env comps (WithUserRdr _ con_nm)
   | Just gre <- lookupGRE_Name rdr_env con_nm
   = go $ greInfo gre
   | otherwise

@@ -168,6 +168,42 @@ type family IdP p
 
 type LIdP p = XRec p (IdP p)
 
+-- | Like 'IdP', except it keeps track of the user-written module qualification,
+-- if any.
+--
+-- See Note [IdOcc].
+type family IdOccP p
+type LIdOccP p = XRec p (IdOccP p)
+
+{- Note [IdOcc]
+~~~~~~~~~~~~~~~
+When possible, in error messages we would like to report identifiers with the
+qualification that the user has written (provided this does not cause any
+ambiguity). To do this, we record the user-written qualification in the
+AST in the GhcRn stage. This is achieved with the 'WithUserRdr' data type.
+Thus:
+
+  - instead of using 'IdP', we use 'IdOccP', which wraps an 'IdP' in
+    'WithUserRdr' at GhcRn pass, in:
+      - 'HsVar'
+      - 'HsTyVar' (which is used for 'TyCon's, not just type variables)
+      - 'HsOpTy'
+  - we also use 'ConLikeP' which wraps a 'Name' in 'WithUserRdr' at 'GhcRn'
+    pass, in:
+      - 'RecordCon'
+      - 'ConPat'
+
+This user-written module qualification is then consulted when pretty-printing
+expressions, e.g. we have:
+
+  - ppr_expr (HsVar _ (L _ v)) = pprPrefixOcc v
+
+and 'pprPrefixOcc' uses the 'OutputableBndr' instance for 'WithUserRdr'.
+This happens in 'GHC.Types.Name.Ppr.mkQualName'.
+
+Test case: T25877.
+-}
+
 -- =====================================================================
 -- Type families for the HsBinds extension points
 

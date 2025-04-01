@@ -5,6 +5,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -37,9 +38,14 @@ module GHC.Types.Name.Reader (
         nameRdrName, getRdrName,
 
         -- ** Destruction
-        rdrNameOcc, rdrNameSpace, demoteRdrName, demoteRdrNameTv, promoteRdrName,
+        rdrNameOcc, rdrNameSpace,
+        demoteRdrName, demoteRdrNameTcCls, demoteRdrNameTv,
+        promoteRdrName,
         isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual,
         isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
+
+        -- ** Preserving user-written qualification
+        WithUserRdr(..), noUserRdr, unLocWithUserRdr,
 
         -- * Local mapping of 'RdrName' to 'Name.Name'
         LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
@@ -118,7 +124,6 @@ import GHC.Types.GREInfo
 import GHC.Types.FieldLabel
 import GHC.Types.Name
 import GHC.Types.Name.Env
-    ( NameEnv, nonDetNameEnvElts, emptyNameEnv, extendNameEnv_Acc )
 import GHC.Types.Name.Set
 import GHC.Types.PkgQual
 import GHC.Types.SrcLoc as SrcLoc
@@ -222,13 +227,21 @@ rdrNameOcc (Exact name) = nameOccName name
 rdrNameSpace :: RdrName -> NameSpace
 rdrNameSpace = occNameSpace . rdrNameOcc
 
--- demoteRdrName lowers the NameSpace of RdrName.
+-- | 'demoteRdrName' attempts to lowers the 'NameSpace' of a 'RdrName'
+-- to the term-level.
+--
 -- See Note [Demotion] in GHC.Rename.Env
 demoteRdrName :: RdrName -> Maybe RdrName
 demoteRdrName (Unqual occ) = fmap Unqual (demoteOccName occ)
 demoteRdrName (Qual m occ) = fmap (Qual m) (demoteOccName occ)
 demoteRdrName (Orig _ _) = Nothing
 demoteRdrName (Exact _) = Nothing
+
+demoteRdrNameTcCls :: RdrName -> Maybe RdrName
+demoteRdrNameTcCls (Unqual occ) = fmap Unqual (demoteOccTcClsName occ)
+demoteRdrNameTcCls (Qual m occ) = fmap (Qual m) (demoteOccTcClsName occ)
+demoteRdrNameTcCls (Orig _ _) = Nothing
+demoteRdrNameTcCls (Exact _) = Nothing
 
 demoteRdrNameTv :: RdrName -> Maybe RdrName
 demoteRdrNameTv (Unqual occ) = fmap Unqual (demoteOccTvName occ)
@@ -335,7 +348,7 @@ instance Outputable RdrName where
     ppr (Exact name)   = ppr name
     ppr (Unqual occ)   = ppr occ
     ppr (Qual mod occ) = ppr mod <> dot <> ppr occ
-    ppr (Orig mod occ) = getPprStyle (\sty -> pprModulePrefix sty mod occ <> ppr occ)
+    ppr (Orig mod occ) = getPprStyle (\sty -> pprModulePrefix sty mod Nothing occ <> ppr occ)
 
 instance OutputableBndr RdrName where
     pprBndr _ n
@@ -2144,3 +2157,39 @@ pprLoc (UnhelpfulSpan {}) = empty
 -- | Indicate if the given name is the "@" operator
 opIsAt :: RdrName -> Bool
 opIsAt e = e == mkUnqual varName (fsLit "@")
+
+
+--------------------------------------------------------------------------------
+-- Preserving user-written qualification
+
+-- | 'WithUserRdr' allows us to keep track of the original user-written
+-- 'RdrName', and in particular, any user-written module qualification.
+--
+-- See Note [IdOcc] in Language.Haskell.Syntax.Extension.
+data WithUserRdr a = WithUserRdr RdrName a
+  deriving stock (Functor, Foldable, Traversable)
+
+instance NamedThing a => NamedThing (WithUserRdr a) where
+  getName (WithUserRdr _rdr a) = getName a
+instance Outputable (WithUserRdr Name) where
+    ppr (WithUserRdr rdr name) =
+      pprName_userQual (rdrQual_maybe rdr) name
+instance OutputableBndr (WithUserRdr Name) where
+    pprBndr _ (WithUserRdr rdr name) =
+      pprName_userQual (rdrQual_maybe rdr) name
+    pprInfixOcc :: WithUserRdr Name -> SDoc
+    pprInfixOcc  = pprInfixName
+    pprPrefixOcc = pprPrefixName
+
+unLocWithUserRdr :: GenLocated l (WithUserRdr a) -> a
+unLocWithUserRdr (L _ (WithUserRdr _ a)) = a
+
+noUserRdr :: Name -> WithUserRdr Name
+noUserRdr n = WithUserRdr (nameRdrName n) n
+
+rdrQual_maybe :: RdrName -> Maybe ModuleName
+rdrQual_maybe = \case
+  Qual q _ -> Just q
+  _        -> Nothing
+
+--------------------------------------------------------------------------------

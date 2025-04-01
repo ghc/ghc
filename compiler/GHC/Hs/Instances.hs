@@ -33,6 +33,7 @@ import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
+import GHC.Types.Name.Reader (WithUserRdr(..))
 import GHC.Data.BooleanFormula (BooleanFormula(..))
 import Language.Haskell.Syntax.Extension (Anno)
 
@@ -583,6 +584,7 @@ deriving instance Eq (IE GhcTc)
 
 deriving instance Data HsThingRn
 deriving instance Data XXExprGhcRn
+deriving instance Data a => Data (WithUserRdr a)
 
 -- ---------------------------------------------------------------------
 

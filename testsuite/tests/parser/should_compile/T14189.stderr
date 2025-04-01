@@ -105,7 +105,10 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: GHC.Internal.Types.Int})))
+                   (WithUserRdr
+                    (Unqual
+                     {OccName: Int})
+                    {Name: GHC.Internal.Types.Int}))))
                 (Nothing))])
              (Nothing)))
           ,(L
@@ -223,7 +226,10 @@
                         [])
                        (EpaComments
                         []))
-                      {Name: GHC.Internal.Types.Int})))
+                      (WithUserRdr
+                       (Unqual
+                        {OccName: Int})
+                       {Name: GHC.Internal.Types.Int}))))
                    (Nothing))))]))
              (Nothing)))])
          [])))]

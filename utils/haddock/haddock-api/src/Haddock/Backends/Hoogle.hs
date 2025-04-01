@@ -320,7 +320,7 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
       where
         tv, tvk :: HsType GhcRn
         tv = case bvar of
-          HsBndrVar _ n -> HsTyVar noAnn NotPromoted n
+          HsBndrVar _ n -> HsTyVar noAnn NotPromoted (fmap noUserRdr n)
           HsBndrWildCard _ -> HsWildCardTy noExtField
         tvk = case bkind of
           HsBndrNoKind _   -> tv
@@ -329,7 +329,7 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
     resType =
       apps $
         map reL $
-          (HsTyVar noAnn NotPromoted (reL (tcdName dat)))
+          (HsTyVar noAnn NotPromoted (reL (noUserRdr $ tcdName dat)))
             : map (tyVarArg . unLoc) (hsQTvExplicit $ tyClDeclTyVars dat)
 ppCtor
   sDocContext

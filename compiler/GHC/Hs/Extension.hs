@@ -108,7 +108,10 @@ type instance Anno RdrName = SrcSpanAnnN
 type instance Anno Name    = SrcSpanAnnN
 type instance Anno Id      = SrcSpanAnnN
 
+type instance Anno (WithUserRdr a) = Anno a
+
 type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ EpAnn a,
+                          Anno (IdOccGhcP p) ~ EpAnn a,
                           NoAnn a,
                           IsPass p)
 
@@ -209,6 +212,14 @@ type family IdGhcP pass where
 
 type LIdGhcP p = XRecGhc (IdGhcP p)
 
+type instance IdOccP (GhcPass p) = IdOccGhcP p
+
+type family IdOccGhcP pass where
+  IdOccGhcP 'Parsed      = RdrName
+  IdOccGhcP 'Renamed     = WithUserRdr Name
+  IdOccGhcP 'Typechecked = Id
+type LIdOccGhcP p = XRecGhc (IdOccGhcP p)
+
 -- | Marks that a field uses the GhcRn variant even when the pass
 -- parameter is GhcTc. Useful for storing HsTypes in GHC.Hs.Exprs, say, because
 -- HsType GhcTc should never occur.
@@ -225,9 +236,13 @@ type family NoGhcTcPass (p :: Pass) :: Pass where
 -- the @id@ and the 'NoGhcTc' of it. See Note [NoGhcTc].
 type OutputableBndrId pass =
   ( OutputableBndr (IdGhcP pass)
+  , OutputableBndr (IdOccGhcP pass)
   , OutputableBndr (IdGhcP (NoGhcTcPass pass))
+  , OutputableBndr (IdOccGhcP (NoGhcTcPass pass))
   , Outputable (LIdGhcP pass)
+  , Outputable (LIdOccGhcP pass)
   , Outputable (LIdGhcP (NoGhcTcPass pass))
+  , Outputable (LIdOccGhcP (NoGhcTcPass pass))
   , IsPass pass
   )
 

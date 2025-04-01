@@ -1,6 +1,7 @@
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- instance NFData FieldLabel
 
@@ -58,7 +59,7 @@ module GHC.Types.Name (
         localiseName,
         namePun_maybe,
 
-        pprName,
+        pprName, pprName_userQual,
         nameSrcLoc, nameSrcSpan, pprNameDefnLoc, pprDefinedAt,
         pprFullName, pprFullNameWithUnique, pprTickyName,
 
@@ -222,7 +223,7 @@ TL;DR: we make the `n_occ` field lazy.
 Note [About the NameSorts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 1.  Initially:
-    * All types, classes, data constructors get Extenal Names
+    * All types, classes, data constructors get External Names
     * Top-level Ids (including locally-defined ones) get External Names,
     * All other local (non-top-level) Ids get Internal names
 
@@ -691,7 +692,10 @@ instance OutputableBndr Name where
     pprPrefixOcc = pprPrefixName
 
 pprName :: forall doc. IsLine doc => Name -> doc
-pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
+pprName = pprName_userQual Nothing
+
+pprName_userQual :: forall doc. IsLine doc => Maybe ModuleName -> Name -> doc
+pprName_userQual user_qual name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = docWithStyle codeDoc normalDoc
   where
    codeDoc = case sort of
@@ -709,8 +713,8 @@ pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
      sdocOption sdocListTuplePuns $ \listTuplePuns ->
        handlePuns listTuplePuns (namePun_maybe name) $
        case sort of
-         WiredIn mod _ builtin   -> pprExternal debug sty uniq mod occ True  builtin
-         External mod            -> pprExternal debug sty uniq mod occ False UserSyntax
+         WiredIn mod _ builtin   -> pprExternal debug sty uniq mod user_qual occ True  builtin
+         External mod            -> pprExternal debug sty uniq mod user_qual occ False UserSyntax
          System                  -> pprSystem   debug sty uniq occ
          Internal                -> pprInternal debug sty uniq occ
 
@@ -759,8 +763,14 @@ pprTickyName this_mod name
 pprNameUnqualified :: Name -> SDoc
 pprNameUnqualified Name { n_occ = occ } = ppr_occ_name occ
 
-pprExternal :: Bool -> PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
-pprExternal debug sty uniq mod occ is_wired is_builtin
+pprExternal :: Bool -> PprStyle -> Unique
+            -> Module -- ^ module the 'Name' is defined in
+            -> Maybe ModuleName -- ^ user module qualification
+            -> OccName
+            -> Bool -- ^ wired-in?
+            -> BuiltInSyntax
+            -> SDoc
+pprExternal debug sty uniq mod user_qual occ is_wired is_builtin
   | debug         = pp_mod <> ppr_occ_name occ
                      <> braces (hsep [if is_wired then text "(w)" else empty,
                                       pprNameSpaceBrief (occNameSpace occ),
@@ -768,10 +778,10 @@ pprExternal debug sty uniq mod occ is_wired is_builtin
   | BuiltInSyntax <- is_builtin = ppr_occ_name occ  -- Never qualify builtin syntax
   | otherwise                   =
         if isHoleModule mod
-            then case qualName sty mod occ of
+            then case qualName sty mod user_qual occ of
                     NameUnqual -> ppr_occ_name occ
                     _ -> braces (pprModuleName (moduleName mod) <> dot <> ppr_occ_name occ)
-            else pprModulePrefix sty mod occ <> ppr_occ_name occ
+            else pprModulePrefix sty mod user_qual occ <> ppr_occ_name occ
   where
     pp_mod = ppUnlessOption sdocSuppressModulePrefixes
                (pprModule mod <> dot)
@@ -796,11 +806,11 @@ pprSystem debug _sty uniq occ
                                 -- so print the unique
 
 
-pprModulePrefix :: PprStyle -> Module -> OccName -> SDoc
+pprModulePrefix :: PprStyle -> Module -> Maybe ModuleName -> OccName -> SDoc
 -- Print the "M." part of a name, based on whether it's in scope or not
 -- See Note [Printing original names] in GHC.Types.Name.Ppr
-pprModulePrefix sty mod occ = ppUnlessOption sdocSuppressModulePrefixes $
-    case qualName sty mod occ of              -- See Outputable.QualifyName:
+pprModulePrefix sty mod user_qual occ = ppUnlessOption sdocSuppressModulePrefixes $
+    case qualName sty mod user_qual occ of              -- See Outputable.QualifyName:
       NameQual modname -> pprModuleName modname <> dot       -- Name is in scope
       NameNotInScope1  -> pprModule mod <> dot               -- Not in scope
       NameNotInScope2  -> pprUnit (moduleUnit mod) <> colon           -- Module not in
@@ -893,7 +903,7 @@ pprInfixName :: (Outputable a, NamedThing a) => a -> SDoc
 -- add parens or back-quotes as appropriate
 pprInfixName  n = pprInfixVar (isSymOcc (getOccName n)) (ppr n)
 
-pprPrefixName :: NamedThing a => a -> SDoc
-pprPrefixName thing = pprPrefixVar (isSymOcc (nameOccName name)) (ppr name)
+pprPrefixName :: (Outputable a, NamedThing a) => a -> SDoc
+pprPrefixName thing = pprPrefixVar (isSymOcc (nameOccName name)) (ppr thing)
  where
    name = getName thing

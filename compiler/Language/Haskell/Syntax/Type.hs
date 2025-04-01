@@ -825,7 +825,7 @@ data HsType pass
   | HsTyVar  (XTyVar pass)
               PromotionFlag    -- Whether explicitly promoted,
                                -- for the pretty printer
-             (LIdP pass)
+             (LIdOccP pass)
                   -- Type variable, type constructor, or data constructor
                   -- see Note [Promotions (HsTyVar)]
                   -- See Note [Located RdrNames] in GHC.Hs.Expr
@@ -856,7 +856,7 @@ data HsType pass
   | HsOpTy              (XOpTy pass)
                         PromotionFlag    -- Whether explicitly promoted,
                                          -- for the pretty printer
-                        (LHsType pass) (LIdP pass) (LHsType pass)
+                        (LHsType pass) (LIdOccP pass) (LHsType pass)
 
   | HsParTy             (XParTy pass)
                         (LHsType pass)   -- See Note [Parens in HsSyn] in GHC.Hs.Expr

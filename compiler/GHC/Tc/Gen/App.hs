@@ -615,7 +615,7 @@ tcValArg _ (EValArgQL { eaql_wanted  = wanted
 
 --------------------
 wantQuickLook :: HsExpr GhcRn -> TcM QLFlag
-wantQuickLook (HsVar _ (L _ f))
+wantQuickLook (HsVar _ (L _ (WithUserRdr _ f)))
   | getUnique f `elem` quickLookKeys = return DoQL
 wantQuickLook _                      = do { impred <- xoptM LangExt.ImpredicativeTypes
                                           ; if impred then return DoQL else return NoQL }

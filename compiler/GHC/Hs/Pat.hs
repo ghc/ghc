@@ -178,8 +178,8 @@ type instance XXPat GhcTc = XXPatGhcTc
   -- XXExprGhcRn allows us to handle RebindableSyntax in pattern position:
   -- see "XXExpr GhcTc" for the counterpart in expressions.
 
-type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
-type instance ConLikeP GhcRn = Name    -- IdP GhcRn
+type instance ConLikeP GhcPs = RdrName          -- IdOccP GhcPs
+type instance ConLikeP GhcRn = WithUserRdr Name -- IdOccP GhcRn
 type instance ConLikeP GhcTc = ConLike
 
 type instance XHsRecFields GhcPs = NoExtField

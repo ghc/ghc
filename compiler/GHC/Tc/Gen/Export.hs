@@ -445,7 +445,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
           } (L loc ie@(IEVar warn_txt_ps l doc))
-        = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
+        = do mb_gre <- lookupGreAvailRn (ieLWrappedNameWhatLooking l) $ lieWrappedName l
              for mb_gre $ \ gre -> do
                let avail = availFromGRE gre
                    name = greName gre
@@ -471,7 +471,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
           } (L loc ie@(IEThingAbs warn_txt_ps l doc))
-        = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
+        = do mb_gre <- lookupGreAvailRn (ieLWrappedNameWhatLooking l) $ lieWrappedName l
              for mb_gre $ \ gre -> do
                let avail = availFromGRE gre
                    name = greName gre
@@ -518,7 +518,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
           } (L loc ie@(IEThingAll (warn_txt_ps, ann) l doc))
-        = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
+        = do mb_gre <- lookupGreAvailRn (ieLWrappedNameWhatLooking l) $ lieWrappedName l
              for mb_gre $ \ par -> do
                all_kids <- lookup_ie_kids_all ie l par
                let name = greName par
@@ -546,7 +546,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             expacc_dont_warn  = dont_warn_export
           } (L loc ie@(IEThingWith (warn_txt_ps, ann) l wc sub_rdrs doc))
         = do mb_gre <- addErrCtxt (ExportCtxt ie)
-                     $ lookupGreAvailRn $ lieWrappedName l
+                     $ lookupGreAvailRn (ieLWrappedNameWhatLooking l) $ lieWrappedName l
              for mb_gre $ \ par -> do
                (subs, with_kids)
                  <- addErrCtxt (ExportCtxt ie)
@@ -694,6 +694,15 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     addUsedKids :: RdrName -> [GlobalRdrElt] -> RnM ()
     addUsedKids parent_rdr kid_gres
       = addUsedGREs ExportDeprecationWarnings (pickGREs parent_rdr kid_gres)
+
+-- | In what namespaces should we go looking for an import/export item
+-- that is out of scope, for suggestions in error messages?
+ieLWrappedNameWhatLooking :: LIEWrappedName GhcPs -> WhatLooking
+ieLWrappedNameWhatLooking (L _ n) = case n of
+  IEName {}    -> WL_NotConLike
+  IEDefault {} -> WL_Constructor
+  IEType {}    -> WL_NotConLike
+  IEPattern {} -> WL_ConLike
 
 -- Renaming and typechecking of exports happens after everything else has
 -- been typechecked.

@@ -81,19 +81,6 @@ import qualified Data.Map as M
 ************************************************************************
 -}
 
--- What kind of suggestion are we looking for? #19843
-data WhatLooking = WL_Anything    -- Any binding
-                 | WL_Constructor -- Constructors and pattern synonyms
-                        -- E.g. in K { f1 = True }, if K is not in scope,
-                        -- suggest only constructors
-                 | WL_RecField    -- Record fields
-                        -- E.g. in K { f1 = True, f2 = False }, if f2 is not in
-                        -- scope, suggest only constructor fields
-                 | WL_None        -- No suggestions
-                        -- WS_None is used for rebindable syntax, where there
-                        -- is no point in suggesting alternative spellings
-                 deriving Eq
-
 data WhereLooking = WL_Anywhere   -- Any binding
                   | WL_Global     -- Any top-level binding (local or imported)
                   | WL_LocalTop   -- Any top-level binding in this module
@@ -156,6 +143,12 @@ unboundNameOrTermInType if_term_in_type looking_for rdr_name hints
                           unknownNameSuggestions_ looking_for
                             dflags ic currmod global_env local_env impInfo
                             rdr_name
+                  ; traceTc "unboundNameOrTermInType" $
+                     vcat [ text "rdr_name:" <+> ppr rdr_name
+                          , text "what_looking:" <+> text (show $ lf_which looking_for)
+                          , text "imp_errs:" <+> ppr imp_errs
+                          , text "suggs:" <+> ppr suggs
+                          ]
                   ; addErr =<<
                       make_error imp_errs (hints ++ suggs) }
         ; return (mkUnboundNameRdr rdr_name) }
@@ -343,7 +336,7 @@ importSuggestions looking_for ic currMod imports rdr_name
   | is_qualified
   , null helpful_imports
   , (mod : mods) <- map fst interesting_imports
-  = ([ModulesDoNotExport (mod :| mods) occ_name], [])
+  = ([ModulesDoNotExport (mod :| mods) (lf_which looking_for) occ_name], [])
   | mod : mods <- helpful_imports_non_hiding
   = ([], [CouldImportFrom (mod :| mods)])
   | mod : mods <- helpful_imports_hiding
@@ -462,13 +455,19 @@ nameSpacesRelated dflags what_looking ns ns'
     -- and what_looking is either WL_Anything or is one of
     -- what_looking_possibilities
     other_namespaces =
-      [ (isVarNameSpace     , [(isFieldNameSpace  , [WL_RecField])
-                              ,(isDataConNameSpace, [WL_Constructor])])
-      , (isDataConNameSpace , [(isVarNameSpace    , [WL_RecField])])
-      , (isTvNameSpace      , (isTcClsNameSpace   , [WL_Constructor])
-                              : promoted_datacons)
-      , (isTcClsNameSpace   , (isTvNameSpace     , [])
-                              : promoted_datacons)
+      [ (isVarNameSpace     , [(isFieldNameSpace  , [WL_Term, WL_RecField, WL_NotConLike])
+                              ,(isDataConNameSpace, [WL_Term, WL_ConLike, WL_Constructor])])
+      , (isDataConNameSpace , [(isVarNameSpace    , [WL_Term, WL_RecField, WL_NotConLike])])
+      , (isTvNameSpace      , [(isTcClsNameSpace  , [WL_Constructor, WL_NotConLike])
+                              ,(isVarNameSpace    , [WL_Term, WL_NotConLike])
+                              ,(isFieldNameSpace  , [WL_Term, WL_NotConLike])
+                              ] ++ promoted_datacons)
+      , (isTcClsNameSpace   , [(isTvNameSpace     , [WL_NotConLike])
+                              ,(isDataConNameSpace, [WL_Term, WL_ConLike])
+                              ,(isVarNameSpace    , [WL_Term, WL_NotConLike]) -- for symbolic identifiers
+                              ,(isFieldNameSpace  , [WL_Term, WL_NotConLike]) -- such as + or :*
+                              ]
+                              ++ promoted_datacons)
       ]
     -- If -XDataKinds is enabled, the data constructor name space is also
     -- related to the type-level name spaces

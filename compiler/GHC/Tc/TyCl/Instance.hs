@@ -950,7 +950,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                   -- Check that the result kind of the TyCon applied to its args
                   -- is compatible with the explicit signature (or Type, if there
                   -- is none)
-                  ; let hs_lhs = nlHsTyConApp NotPromoted fixity (getName fam_tc) hs_pats
+                  ; let hs_lhs = nlHsTyConApp NotPromoted fixity (noUserRdr $ getName fam_tc) hs_pats
                   -- Add constraints from the result signature
                   ; res_kind <- tc_kind_sig m_ksig
                   ; _ <- unifyKind (Just . HsTypeRnThing $ unLoc hs_lhs) lhs_applied_kind res_kind
@@ -1440,7 +1440,7 @@ addDFunPrags dfun_id sc_meth_ids
    is_newtype  = isNewTyCon clas_tc
 
 wrapId :: HsWrapper -> Id -> HsExpr GhcTc
-wrapId wrapper id = mkHsWrap wrapper (HsVar noExtField (noLocA id))
+wrapId wrapper id = mkHsWrap wrapper (mkHsVar (noLocA id))
 
 {- Note [Typechecking plan for instance declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

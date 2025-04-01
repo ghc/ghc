@@ -112,7 +112,10 @@
                           [])
                          (EpaComments
                           []))
-                        {Name: GHC.Internal.System.IO.putStrLn})))
+                        (WithUserRdr
+                         (Unqual
+                          {OccName: putStrLn})
+                         {Name: GHC.Internal.System.IO.putStrLn}))))
                      (L
                       (EpAnn
                        (EpaSpan { DumpRenamedAst.hs:35:17-23 })
@@ -248,7 +251,10 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: DumpRenamedAst.Peano})))
+                   (WithUserRdr
+                    (Unqual
+                     {OccName: Peano})
+                    {Name: DumpRenamedAst.Peano}))))
                 (Nothing))])
              (Nothing)))])
          [])))]
@@ -345,7 +351,10 @@
                          [])
                         (EpaComments
                          []))
-                       {Name: a})))
+                       (WithUserRdr
+                        (Unqual
+                         {OccName: a})
+                        {Name: a}))))
                     (L
                      (EpAnn
                       (EpaSpan { DumpRenamedAst.hs:13:13 })
@@ -353,7 +362,10 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: :})
+                     (WithUserRdr
+                      (Exact
+                       {Name: :})
+                      {Name: :}))
                     (L
                      (EpAnn
                       (EpaSpan { DumpRenamedAst.hs:13:15-16 })
@@ -371,7 +383,10 @@
                          [])
                         (EpaComments
                          []))
-                       {Name: as}))))))))]
+                       (WithUserRdr
+                        (Unqual
+                         {OccName: as})
+                        {Name: as})))))))))]
               (Prefix)
               (L
                (EpAnn
@@ -399,7 +414,10 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: DumpRenamedAst.Succ})))
+                   (WithUserRdr
+                    (Unqual
+                     {OccName: Succ})
+                    {Name: DumpRenamedAst.Succ}))))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:13:26-36 })
@@ -437,7 +455,10 @@
                          [])
                         (EpaComments
                          []))
-                       {Name: DumpRenamedAst.Length})))
+                       (WithUserRdr
+                        (Unqual
+                         {OccName: Length})
+                        {Name: DumpRenamedAst.Length}))))
                     (L
                      (EpAnn
                       (EpaSpan { DumpRenamedAst.hs:13:34-35 })
@@ -455,7 +476,10 @@
                          [])
                         (EpaComments
                          []))
-                       {Name: as})))))))))))
+                       (WithUserRdr
+                        (Unqual
+                         {OccName: as})
+                        {Name: as}))))))))))))
            ,(L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:14:3-24 })
@@ -509,7 +533,10 @@
                    [])
                   (EpaComments
                    []))
-                 {Name: DumpRenamedAst.Zero})))))]))
+                 (WithUserRdr
+                  (Unqual
+                   {OccName: Zero})
+                  {Name: DumpRenamedAst.Zero}))))))]))
          (TopLevel)
          (L
           (EpAnn
@@ -580,7 +607,10 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: k}))))))))])
+                   (WithUserRdr
+                    (Unqual
+                     {OccName: k})
+                    {Name: k})))))))))])
          (Prefix)
          (L
           (EpAnn
@@ -607,7 +637,10 @@
                 [])
                (EpaComments
                 []))
-              {Name: DumpRenamedAst.Peano})))))
+              (WithUserRdr
+               (Unqual
+                {OccName: Peano})
+               {Name: DumpRenamedAst.Peano}))))))
          (Nothing))))]
      []
      [(L
@@ -679,7 +712,10 @@
                    [])
                   (EpaComments
                    []))
-                 {Name: k})))))
+                 (WithUserRdr
+                  (Unqual
+                   {OccName: k})
+                  {Name: k}))))))
             (L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:11:23-27 })
@@ -697,7 +733,10 @@
                  [])
                 (EpaComments
                  []))
-               {Name: DumpRenamedAst.Peano})))))))))]
+               (WithUserRdr
+                (Unqual
+                 {OccName: Peano})
+                {Name: DumpRenamedAst.Peano}))))))))))]
      [])
    ,(TyClGroup
      (NoExtField)
@@ -774,7 +813,10 @@
                   [])
                  (EpaComments
                   []))
-                {Name: k})))
+                (WithUserRdr
+                 (Unqual
+                  {OccName: k})
+                 {Name: k}))))
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:16:25-33 })
@@ -803,7 +845,10 @@
                     [])
                    (EpaComments
                     []))
-                  {Name: k})))
+                  (WithUserRdr
+                   (Unqual
+                    {OccName: k})
+                   {Name: k}))))
                (L
                 (EpAnn
                  (EpaSpan { DumpRenamedAst.hs:16:30-33 })
@@ -821,7 +866,10 @@
                     [])
                    (EpaComments
                     []))
-                  {Name: GHC.Internal.Types.Type})))))))))
+                  (WithUserRdr
+                   (Unqual
+                    {OccName: Type})
+                   {Name: GHC.Internal.Types.Type}))))))))))
          (Nothing))))]
      []
      []
@@ -892,7 +940,10 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: a})))
+                   (WithUserRdr
+                    (Unqual
+                     {OccName: a})
+                    {Name: a}))))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:19:28-36 })
@@ -921,7 +972,10 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: k})))
+                     (WithUserRdr
+                      (Unqual
+                       {OccName: k})
+                      {Name: k}))))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:19:33-36 })
@@ -939,7 +993,10 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: GHC.Internal.Types.Type}))))))))))]
+                     (WithUserRdr
+                      (Unqual
+                       {OccName: Type})
+                      {Name: GHC.Internal.Types.Type})))))))))))]
           (Prefix)
           (HsDataDefn
            (AnnDataDefn
@@ -1007,7 +1064,10 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: k})))
+                     (WithUserRdr
+                      (Unqual
+                       {OccName: k})
+                      {Name: k}))))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:19:48-51 })
@@ -1025,7 +1085,10 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: GHC.Internal.Types.Type})))))))
+                     (WithUserRdr
+                      (Unqual
+                       {OccName: Type})
+                      {Name: GHC.Internal.Types.Type}))))))))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:19:57-60 })
@@ -1043,7 +1106,10 @@
                    [])
                   (EpaComments
                    []))
-                 {Name: GHC.Internal.Types.Type}))))))
+                 (WithUserRdr
+                  (Unqual
+                   {OccName: Type})
+                  {Name: GHC.Internal.Types.Type})))))))
            (NewTypeCon
             (L
              (EpAnn
@@ -1179,7 +1245,10 @@
                               [])
                              (EpaComments
                               []))
-                            {Name: f})))
+                            (WithUserRdr
+                             (Unqual
+                              {OccName: f})
+                             {Name: f}))))
                          (L
                           (EpAnn
                            (EpaSpan { DumpRenamedAst.hs:20:24-25 })
@@ -1197,7 +1266,10 @@
                               [])
                              (EpaComments
                               []))
-                            {Name: xx})))))
+                            (WithUserRdr
+                             (Unqual
+                              {OccName: xx})
+                             {Name: xx}))))))
                        (L
                         (EpAnn
                          (EpaSpan { DumpRenamedAst.hs:20:30-33 })
@@ -1224,7 +1296,10 @@
                               [])
                              (EpaComments
                               []))
-                            {Name: g})))
+                            (WithUserRdr
+                             (Unqual
+                              {OccName: g})
+                             {Name: g}))))
                          (L
                           (EpAnn
                            (EpaSpan { DumpRenamedAst.hs:20:32-33 })
@@ -1242,7 +1317,10 @@
                               [])
                              (EpaComments
                               []))
-                            {Name: xx})))))))))))
+                            (WithUserRdr
+                             (Unqual
+                              {OccName: xx})
+                             {Name: xx}))))))))))))
                  (Nothing))])
               (L
                (EpAnn
@@ -1279,7 +1357,10 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: DumpRenamedAst.Nat})))
+                     (WithUserRdr
+                      (Unqual
+                       {OccName: Nat})
+                      {Name: DumpRenamedAst.Nat}))))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:20:43 })
@@ -1297,7 +1378,10 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: f})))))
+                     (WithUserRdr
+                      (Unqual
+                       {OccName: f})
+                      {Name: f}))))))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:20:45 })
@@ -1315,7 +1399,10 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: g})))))
+                   (WithUserRdr
+                    (Unqual
+                     {OccName: g})
+                    {Name: g}))))))
               (Nothing))))
            [])))))])
    ,(TyClGroup
@@ -1416,7 +1503,10 @@
                   [])
                  (EpaComments
                   []))
-                {Name: k}))))))])
+                (WithUserRdr
+                 (Unqual
+                  {OccName: k})
+                 {Name: k})))))))])
         (Prefix)
         (HsDataDefn
          (AnnDataDefn
@@ -1505,7 +1595,10 @@
                          [])
                         (EpaComments
                          []))
-                       {Name: f})))
+                       (WithUserRdr
+                        (Unqual
+                         {OccName: f})
+                        {Name: f}))))
                     (L
                      (EpAnn
                       (EpaSpan { DumpRenamedAst.hs:22:28 })
@@ -1523,7 +1616,10 @@
                          [])
                         (EpaComments
                          []))
-                       {Name: a})))))))
+                       (WithUserRdr
+                        (Unqual
+                         {OccName: a})
+                        {Name: a}))))))))
                 (Nothing))])
              (Nothing)))])
          [])))]
@@ -1599,7 +1695,10 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: DumpRenamedAst.Peano}))))
+                   (WithUserRdr
+                    (Unqual
+                     {OccName: Peano})
+                    {Name: DumpRenamedAst.Peano})))))
               ,(HsValArg
                 (NoExtField)
                 (L
@@ -1619,7 +1718,10 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: a}))))
+                   (WithUserRdr
+                    (Unqual
+                     {OccName: a})
+                    {Name: a})))))
               ,(HsValArg
                 (NoExtField)
                 (L
@@ -1639,7 +1741,10 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: f}))))]
+                   (WithUserRdr
+                    (Unqual
+                     {OccName: f})
+                    {Name: f})))))]
               (Prefix)
               (L
                (EpAnn
@@ -1685,7 +1790,10 @@
                          [])
                         (EpaComments
                          []))
-                       {Name: DumpRenamedAst.T})))
+                       (WithUserRdr
+                        (Unqual
+                         {OccName: T})
+                        {Name: DumpRenamedAst.T}))))
                     (L
                      (EpAnn
                       (EpaSpan { DumpRenamedAst.hs:26:22-26 })
@@ -1703,7 +1811,10 @@
                          [])
                         (EpaComments
                          []))
-                       {Name: DumpRenamedAst.Peano})))))
+                       (WithUserRdr
+                        (Unqual
+                         {OccName: Peano})
+                        {Name: DumpRenamedAst.Peano}))))))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:26:28 })
@@ -1721,7 +1832,10 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: f})))))
+                     (WithUserRdr
+                      (Unqual
+                       {OccName: f})
+                      {Name: f}))))))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:26:30 })
@@ -1739,7 +1853,10 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: a})))))))]))
+                   (WithUserRdr
+                    (Unqual
+                     {OccName: a})
+                    {Name: a}))))))))]))
          (TopLevel)
          (L
           (EpAnn
@@ -1797,7 +1914,10 @@
                    [])
                   (EpaComments
                    []))
-                 {Name: k}))))))
+                 (WithUserRdr
+                  (Unqual
+                   {OccName: k})
+                  {Name: k})))))))
           ,(L
             (EpAnn
              (EpaSpan { DumpRenamedAst.hs:25:25-40 })
@@ -1855,7 +1975,10 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: k})))
+                   (WithUserRdr
+                    (Unqual
+                     {OccName: k})
+                    {Name: k}))))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:25:36-39 })
@@ -1873,7 +1996,10 @@
                      [])
                     (EpaComments
                      []))
-                   {Name: GHC.Internal.Types.Type}))))))))])
+                   (WithUserRdr
+                    (Unqual
+                     {OccName: Type})
+                    {Name: GHC.Internal.Types.Type})))))))))])
          (Prefix)
          (L
           (EpAnn
@@ -1900,7 +2026,10 @@
                 [])
                (EpaComments
                 []))
-              {Name: GHC.Internal.Types.Type})))))
+              (WithUserRdr
+               (Unqual
+                {OccName: Type})
+               {Name: GHC.Internal.Types.Type}))))))
          (Nothing))))]
      []
      [(L
@@ -1959,7 +2088,10 @@
                  [])
                 (EpaComments
                  []))
-               {Name: k})))
+               (WithUserRdr
+                (Unqual
+                 {OccName: k})
+                {Name: k}))))
             (L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:24:17-35 })
@@ -2010,7 +2142,10 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: k})))
+                     (WithUserRdr
+                      (Unqual
+                       {OccName: k})
+                      {Name: k}))))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:24:23-26 })
@@ -2028,7 +2163,10 @@
                        [])
                       (EpaComments
                        []))
-                     {Name: GHC.Internal.Types.Type})))))))
+                     (WithUserRdr
+                      (Unqual
+                       {OccName: Type})
+                      {Name: GHC.Internal.Types.Type}))))))))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:24:32-35 })
@@ -2046,7 +2184,10 @@
                    [])
                   (EpaComments
                    []))
-                 {Name: GHC.Internal.Types.Type})))))))))))]
+                 (WithUserRdr
+                  (Unqual
+                   {OccName: Type})
+                  {Name: GHC.Internal.Types.Type}))))))))))))]
      [])
    ,(TyClGroup
      (NoExtField)
@@ -2251,7 +2392,10 @@
                   [])
                  (EpaComments
                   []))
-                {Name: DumpRenamedAst.C})))
+                (WithUserRdr
+                 (Unqual
+                  {OccName: C})
+                 {Name: DumpRenamedAst.C}))))
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:31:12-14 })
@@ -2282,7 +2426,10 @@
                     [])
                    (EpaComments
                     []))
-                  {Name: a})))))))))
+                  (WithUserRdr
+                   (Unqual
+                    {OccName: a})
+                   {Name: a}))))))))))
          []
          []
          [(L
@@ -2344,7 +2491,10 @@
                       [])
                      (EpaComments
                       []))
-                    {Name: a}))))))
+                    (WithUserRdr
+                     (Unqual
+                      {OccName: a})
+                     {Name: a})))))))
              ,(HsValArg
                (NoExtField)
                (L
@@ -2364,7 +2514,10 @@
                     [])
                    (EpaComments
                     []))
-                  {Name: b}))))]
+                  (WithUserRdr
+                   (Unqual
+                    {OccName: b})
+                   {Name: b})))))]
              (Prefix)
              (L
               (EpAnn
@@ -2401,7 +2554,10 @@
                       [])
                      (EpaComments
                       []))
-                    {Name: GHC.Internal.Data.Either.Either})))
+                    (WithUserRdr
+                     (Unqual
+                      {OccName: Either})
+                     {Name: GHC.Internal.Data.Either.Either}))))
                  (L
                   (EpAnn
                    (EpaSpan { DumpRenamedAst.hs:32:25 })
@@ -2419,7 +2575,10 @@
                       [])
                      (EpaComments
                       []))
-                    {Name: a})))))
+                    (WithUserRdr
+                     (Unqual
+                      {OccName: a})
+                     {Name: a}))))))
                (L
                 (EpAnn
                  (EpaSpan { DumpRenamedAst.hs:32:27 })
@@ -2437,7 +2596,10 @@
                     [])
                    (EpaComments
                     []))
-                  {Name: b}))))))))]
+                  (WithUserRdr
+                   (Unqual
+                    {OccName: b})
+                   {Name: b})))))))))]
          []
          (Nothing))))])]
    []

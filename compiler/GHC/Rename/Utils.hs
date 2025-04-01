@@ -712,7 +712,7 @@ mkRnSyntaxExpr :: Name -> SyntaxExprRn
 mkRnSyntaxExpr = SyntaxExprRn . genHsVar
 
 genHsVar :: Name -> HsExpr GhcRn
-genHsVar n = HsVar noExtField (wrapGenSpan n)
+genHsVar n = mkHsVar (wrapGenSpan n)
 
 genHsApps :: Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
 genHsApps fun args = foldl genHsApp (genHsVar fun) args
@@ -750,7 +750,7 @@ genSimpleConPat :: Name -> [LPat GhcRn] -> LPat GhcRn
 -- The pattern (C p1 .. pn)
 genSimpleConPat con pats
   = wrapGenSpan $ ConPat { pat_con_ext = noExtField
-                         , pat_con     = wrapGenSpan con
+                         , pat_con     = wrapGenSpan $ noUserRdr con
                          , pat_args    = PrefixCon pats }
 
 genVarPat :: Name -> LPat GhcRn

@@ -1,7 +1,6 @@
-
 WarnNoncanonical.hs:9:3: warning: [GHC-50928] [-Wnoncanonical-monoid-instances (in -Wdefault)]
     Noncanonical ‘(<>) = mappend’ definition detected
-    in the instance declaration for ‘Semigroup S’.
+    in the instance declaration for ‘Semi.Semigroup S’.
     Suggested fix:
       Move definition from ‘mappend’ to ‘(<>)’
       See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid
@@ -43,3 +42,4 @@ WarnNoncanonical.hs:28:3: warning: [GHC-22705] [-Wnoncanonical-monad-instances (
     Suggested fix:
       Either remove definition for ‘(>>)’ (recommended) or define as ‘(>>) = (*>)’
       See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+

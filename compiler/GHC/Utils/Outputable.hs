@@ -213,7 +213,7 @@ data NamePprCtx = QueryQualify {
 
 -- | Given a `Name`'s `Module` and `OccName`, decide whether and how to qualify
 -- it.
-type QueryQualifyName = Module -> OccName -> QualifyName
+type QueryQualifyName = Module -> Maybe ModuleName -> OccName -> QualifyName
 
 -- | For a given module, we need to know whether to print it with
 -- a package name to disambiguate it.
@@ -268,14 +268,14 @@ instance Outputable QualifyName where
   ppr NameNotInScope2 = text "NameNotInScope2"
 
 reallyAlwaysQualifyNames :: QueryQualifyName
-reallyAlwaysQualifyNames _ _ = NameNotInScope2
+reallyAlwaysQualifyNames _ _ _ = NameNotInScope2
 
 -- | NB: This won't ever show package IDs
 alwaysQualifyNames :: QueryQualifyName
-alwaysQualifyNames m _ = NameQual (moduleName m)
+alwaysQualifyNames m _ _ = NameQual (moduleName m)
 
 neverQualifyNames :: QueryQualifyName
-neverQualifyNames _ _ = NameUnqual
+neverQualifyNames _ _ _ = NameUnqual
 
 alwaysQualifyModules :: QueryQualifyModule
 alwaysQualifyModules _ = True
@@ -567,9 +567,9 @@ updSDocContext upd doc
   = SDoc $ \ctx -> runSDoc doc (upd ctx)
 
 qualName :: PprStyle -> QueryQualifyName
-qualName (PprUser q _ _) mod occ = queryQualifyName q mod occ
-qualName (PprDump q)     mod occ = queryQualifyName q mod occ
-qualName _other          mod _   = NameQual (moduleName mod)
+qualName (PprUser q _ _) mod user_qual occ = queryQualifyName q mod user_qual occ
+qualName (PprDump q)     mod user_qual occ = queryQualifyName q mod user_qual occ
+qualName _other          mod _ _           = NameQual (moduleName mod)
 
 qualModule :: PprStyle -> QueryQualifyModule
 qualModule (PprUser q _ _)  m = queryQualifyModule q m

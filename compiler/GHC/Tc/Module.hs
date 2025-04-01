@@ -1932,7 +1932,7 @@ generateMainBinding tcg_env main_name = do
     { traceTc "checkMain found" (ppr main_name)
     ; (io_ty, res_ty) <- getIOType
     ; let loc = getSrcSpan main_name
-          main_expr_rn = L (noAnnSrcSpan loc) (HsVar noExtField (L (noAnnSrcSpan loc) main_name))
+          main_expr_rn = L (noAnnSrcSpan loc) (mkHsVar (L (noAnnSrcSpan loc) main_name))
     ; (ev_binds, main_expr) <- setMainCtxt main_name io_ty $
                                tcCheckMonoExpr main_expr_rn io_ty
 

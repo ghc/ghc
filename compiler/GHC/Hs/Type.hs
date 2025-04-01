@@ -112,7 +112,7 @@ import GHC.Parser.Annotation
 import GHC.Types.Fixity ( LexicalFixity(..) )
 import GHC.Types.SourceText
 import GHC.Types.Name
-import GHC.Types.Name.Reader ( RdrName )
+import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..), noUserRdr )
 import GHC.Types.Var ( VarBndr, visArgTypeLike )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Builtin.Names ( negateName )
@@ -547,7 +547,7 @@ type instance XExplicitMult _ GhcTc = Mult
 type instance XXMultAnnOf   _ (GhcPass _) = DataConCantHappen
 
 multAnnToHsType :: HsMultAnn GhcRn -> Maybe (LHsType GhcRn)
-multAnnToHsType = expandHsMultAnnOf (HsTyVar noAnn NotPromoted)
+multAnnToHsType = expandHsMultAnnOf (HsTyVar noAnn NotPromoted . fmap noUserRdr)
 
 -- | Convert an multiplicity annotation into its corresponding multiplicity.
 -- If no annotation was written, `Nothing` is returned.
@@ -691,9 +691,9 @@ ignoreParens ty                   = ty
 mkAnonWildCardTy :: EpToken "_" -> HsType GhcPs
 mkAnonWildCardTy tok = HsWildCardTy tok
 
-mkHsOpTy :: (Anno (IdGhcP p) ~ SrcSpanAnnN)
+mkHsOpTy :: (Anno (IdOccGhcP p) ~ SrcSpanAnnN)
          => PromotionFlag
-         -> LHsType (GhcPass p) -> LocatedN (IdP (GhcPass p))
+         -> LHsType (GhcPass p) -> LocatedN (IdOccP (GhcPass p))
          -> LHsType (GhcPass p) -> HsType (GhcPass p)
 mkHsOpTy prom ty1 op ty2 = HsOpTy noExtField prom ty1 op ty2
 
@@ -745,18 +745,18 @@ splitHsFunType ty = go ty
 -- This is somewhat like @GHC.Tc.Gen.HsType.splitHsAppTys@, but a little more
 -- thorough. The purpose of this function is to examine instance heads, so it
 -- doesn't handle *all* cases (like lists, tuples, @(~)@, etc.).
-hsTyGetAppHead_maybe :: (Anno (IdGhcP p) ~ SrcSpanAnnN)
+hsTyGetAppHead_maybe :: (Anno (IdOccGhcP p) ~ SrcSpanAnnN)
                      => LHsType (GhcPass p)
-                     -> Maybe (LocatedN (IdP (GhcPass p)))
+                     -> Maybe (LocatedN (IdOccP (GhcPass p)))
 hsTyGetAppHead_maybe = go
   where
-    go (L _ (HsTyVar _ _ ln))          = Just ln
-    go (L _ (HsAppTy _ l _))           = go l
-    go (L _ (HsAppKindTy _ t _))       = go t
-    go (L _ (HsOpTy _ _ _ ln _))       = Just ln
-    go (L _ (HsParTy _ t))             = go t
-    go (L _ (HsKindSig _ t _))         = go t
-    go _                               = Nothing
+    go (L _ (HsTyVar _ _ ln))    = Just ln
+    go (L _ (HsAppTy _ l _))     = go l
+    go (L _ (HsAppKindTy _ t _)) = go t
+    go (L _ (HsOpTy _ _ _ ln _)) = Just ln
+    go (L _ (HsParTy _ t))       = go t
+    go (L _ (HsKindSig _ t _))   = go t
+    go _                         = Nothing
 
 ------------------------------------------------------------
 
@@ -1011,9 +1011,9 @@ getLHsInstDeclHead (L _ (HsSig{sig_body = qual_ty}))
 -- | Decompose a type class instance type (of the form
 -- @forall <tvs>. context => instance_head@) into the @instance_head@ and
 -- retrieve the underlying class type constructor (if it exists).
-getLHsInstDeclClass_maybe :: (Anno (IdGhcP p) ~ SrcSpanAnnN)
+getLHsInstDeclClass_maybe :: (Anno (IdOccGhcP p) ~ SrcSpanAnnN)
                           => LHsSigType (GhcPass p)
-                          -> Maybe (LocatedN (IdP (GhcPass p)))
+                          -> Maybe (LocatedN (IdOccP (GhcPass p)))
 -- Works on (LHsSigType GhcPs)
 getLHsInstDeclClass_maybe inst_ty
   = do { let head_ty = getLHsInstDeclHead inst_ty
@@ -1178,10 +1178,10 @@ fieldOccLRdrName fo = case ghcPass @p of
 -}
 
 -- | Name of an operator in an operator application or section
-data OpName = NormalOp Name             -- ^ A normal identifier
-            | NegateOp                  -- ^ Prefix negation
-            | UnboundOp RdrName         -- ^ An unbound identifier
-            | RecFldOp (FieldOcc GhcRn) -- ^ A record field occurrence
+data OpName = NormalOp (WithUserRdr Name) -- ^ A normal identifier
+            | NegateOp                    -- ^ Prefix negation
+            | UnboundOp RdrName           -- ^ An unbound identifier
+            | RecFldOp (FieldOcc GhcRn)   -- ^ A record field occurrence
 
 instance Outputable OpName where
   ppr (NormalOp n)   = ppr n

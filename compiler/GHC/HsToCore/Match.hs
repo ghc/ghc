@@ -527,7 +527,7 @@ tidy1 _ _ (OrPat ty lpats)
     mk_match lpat body = noLocA $ Match noExtField CaseAlt (noLocA [lpat]) (single_grhs body)
 
     hs_var :: Var -> LHsExpr GhcTc
-    hs_var v = (noLocA $ HsVar noExtField (noLocA v))
+    hs_var v = noLocA $ mkHsVar (noLocA v)
     single_grhs :: LHsExpr GhcTc -> GRHSs GhcTc (LHsExpr GhcTc)
     single_grhs e = GRHSs emptyComments [noLocA $ GRHS noAnn [] e] (EmptyLocalBinds noExtField)
 

@@ -160,10 +160,10 @@ wrapSrcSpanCps fn (L loc a)
                  unCpsRn (fn a) $ \v ->
                  k (L loc v))
 
-lookupConCps :: LocatedN RdrName -> CpsRn (LocatedN Name)
-lookupConCps con_rdr
-  = CpsRn (\k -> do { con_name <- lookupLocatedOccRnConstr con_rdr
-                    ; (r, fvs) <- k con_name
+lookupConCps :: LocatedN RdrName -> CpsRn (LocatedN (WithUserRdr Name))
+lookupConCps lcon_rdr@(L _ con_rdr)
+  = CpsRn (\k -> do { con_name <- lookupLocatedOccRnConstr lcon_rdr
+                    ; (r, fvs) <- k (fmap (WithUserRdr con_rdr) con_name)
                     ; return (r, addOneFV fvs (unLoc con_name)) })
     -- We add the constructor name to the free vars
     -- See Note [Patterns are uses]
@@ -708,7 +708,7 @@ rnConPatAndThen mk con (InfixCon pat1 pat2)
   = do  { con' <- lookupConCps con
         ; pat1' <- rnLPatAndThen mk pat1
         ; pat2' <- rnLPatAndThen mk pat2
-        ; fixity <- liftCps $ lookupFixityRn (unLoc con')
+        ; fixity <- liftCps $ lookupFixityRn (getName con')
         ; liftCps $ mkConOpPatRn con' fixity pat1' pat2' }
 
 rnConPatAndThen mk con (RecCon rpats)
@@ -716,8 +716,8 @@ rnConPatAndThen mk con (RecCon rpats)
         ; rpats' <- rnHsRecPatsAndThen mk con' rpats
         ; return $ ConPat
             { pat_con_ext = noExtField
-            , pat_con = con'
-            , pat_args = RecCon rpats'
+            , pat_con     = con'
+            , pat_args    = RecCon rpats'
             }
         }
 checkUnusedRecordWildcardCps :: SrcSpan
@@ -731,7 +731,7 @@ checkUnusedRecordWildcardCps loc dotdot_names =
 
 --------------------
 rnHsRecPatsAndThen :: NameMaker
-                   -> LocatedN Name      -- Constructor
+                   -> LocatedN (WithUserRdr Name) -- constructor
                    -> HsRecFields GhcPs (LPat GhcPs)
                    -> CpsRn (HsRecFields GhcRn (LPat GhcRn))
 rnHsRecPatsAndThen mk (L _ con)
@@ -786,8 +786,8 @@ mkExpandedPat a b = XPat (HsPatExpanded a b)
 -}
 
 data HsRecFieldContext
-  = HsRecFieldCon Name
-  | HsRecFieldPat Name
+  = HsRecFieldCon (WithUserRdr Name)
+  | HsRecFieldPat (WithUserRdr Name)
   | HsRecFieldUpd
 
 rnHsRecFields
@@ -822,7 +822,9 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                 HsRecFieldPat con  -> Just con
                 HsRecFieldUpd      -> Nothing
 
-    rn_fld :: Bool -> Maybe Name -> LHsRecField GhcPs (LocatedA arg)
+    rn_fld :: Bool
+           -> Maybe (WithUserRdr Name)
+           -> LHsRecField GhcPs (LocatedA arg)
            -> RnM (LHsRecField GhcRn (LocatedA arg))
     rn_fld pun_ok parent (L l
                            (HsFieldBind
@@ -846,11 +848,11 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                  , hfbPun = pun } }
 
     rn_dotdot :: Maybe (LocatedE RecFieldsDotDot)     -- See Note [DotDot fields] in GHC.Hs.Pat
-              -> Maybe Name -- The constructor (Nothing for an
-                                --    out of scope constructor)
+              -> Maybe (WithUserRdr Name)
+                  -- The constructor (Nothing for an out of scope constructor)
               -> [LHsRecField GhcRn (LocatedA arg)] -- Explicit fields
               -> RnM [LHsRecField GhcRn (LocatedA arg)]   -- Field Labels we need to fill in
-    rn_dotdot (Just (L loc_e (RecFieldsDotDot n))) (Just con) flds -- ".." on record construction / pat match
+    rn_dotdot (Just (L loc_e (RecFieldsDotDot n))) (Just qcon@(WithUserRdr _ con)) flds -- ".." on record construction / pat match
       | not (isUnboundName con) -- This test is because if the constructor
                                 -- isn't in scope the constructor lookup will add
                                 -- an error but still return an unbound name. We
@@ -859,7 +861,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
         do { dd_flag <- xoptM LangExt.RecordWildCards
            ; checkErr dd_flag (needFlagDotDot ctxt)
            ; (rdr_env, lcl_env) <- getRdrEnvs
-           ; conInfo <- lookupConstructorInfo con
+           ; conInfo <- lookupConstructorInfo qcon
            ; when (conFieldInfo conInfo == ConHasPositionalArgs) (addErr (TcRnIllegalWildcardsInConstructor con))
            ; let present_flds = mkOccSet $ map rdrNameOcc (getFieldRdrs flds)
 
@@ -986,7 +988,7 @@ rnHsRecUpdFields flds
                                  checkErr pun_ok (TcRnIllegalFieldPunning (L (locA loc) lbl))
                                  -- Discard any module qualifier (#11662)
                                ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
-                               ; return (L (l2l loc) (HsVar noExtField (L (l2l loc) arg_rdr))) }
+                               ; return (L (l2l loc) (mkHsVarWithUserRdr lbl (L (l2l loc) arg_rdr))) }
                        else return arg
              ; (arg'', fvs) <- rnLExpr arg'
              ; let lbl' :: FieldOcc GhcRn
@@ -1023,8 +1025,8 @@ dupFieldErr :: HsRecFieldContext -> NE.NonEmpty RdrName -> TcRnMessage
 dupFieldErr ctxt = TcRnDuplicateFieldName (toRecordFieldPart ctxt)
 
 toRecordFieldPart :: HsRecFieldContext -> RecordFieldPart
-toRecordFieldPart (HsRecFieldCon n)  = RecordFieldConstructor n
-toRecordFieldPart (HsRecFieldPat n)  = RecordFieldPattern     n
+toRecordFieldPart (HsRecFieldCon n)  = RecordFieldConstructor (getName n)
+toRecordFieldPart (HsRecFieldPat n)  = RecordFieldPattern     (getName n)
 toRecordFieldPart (HsRecFieldUpd {}) = RecordFieldUpdate
 
 {- Note [Disambiguating record updates]
@@ -1225,7 +1227,7 @@ rn_lty_pat (L l hs_ty) = do
   hs_ty' <- rn_ty_pat hs_ty
   pure (L l hs_ty')
 
-rn_ty_pat_var :: LocatedN RdrName -> TPRnM (LocatedN Name)
+rn_ty_pat_var :: LocatedN RdrName -> TPRnM (LocatedN (WithUserRdr Name))
 rn_ty_pat_var lrdr@(L l rdr) = do
   locals <- askLocals
   if isRdrTyVar rdr
@@ -1234,11 +1236,11 @@ rn_ty_pat_var lrdr@(L l rdr) = do
     then do -- binder
       name <- liftTPRnCps $ newPatName (LamMk True) lrdr
       tellTPB (tpBuilderExplicitTV name)
-      pure (L l name)
+      pure (L l $ WithUserRdr rdr name)
 
     else do -- usage
       name <- lookupTypeOccTPRnM rdr
-      pure (L l name)
+      pure (L l $ WithUserRdr rdr name)
 
 -- | Rename type patterns
 --
@@ -1246,13 +1248,13 @@ rn_ty_pat_var lrdr@(L l rdr) = do
 -- and Note [Implicit and explicit type variable binders]
 rn_ty_pat :: HsType GhcPs -> TPRnM (HsType GhcRn)
 rn_ty_pat tv@(HsTyVar an prom lrdr) = do
-  lname@(L _ name) <- rn_ty_pat_var lrdr
+  L l (WithUserRdr _ name) <- rn_ty_pat_var lrdr
   when (isDataConName name && not (isKindName name)) $
     -- Any use of a promoted data constructor name (that is not specifically
     -- exempted by isKindName) is illegal without the use of DataKinds.
     -- See Note [Checking for DataKinds] in GHC.Tc.Validity.
     check_data_kinds tv
-  pure (HsTyVar an prom lname)
+  pure (HsTyVar an prom (L l $ WithUserRdr (unLoc lrdr) name))
 
 rn_ty_pat (HsForAllTy an tele body) = liftTPRnRaw $ \ctxt locals thing_inside ->
   bindHsForAllTelescope ctxt tele $ \tele' -> do
@@ -1303,8 +1305,8 @@ rn_ty_pat (HsOpTy _ prom ty1 l_op ty2) = do
   ty1' <- rn_lty_pat ty1
   l_op' <- rn_ty_pat_var l_op
   ty2' <- rn_lty_pat ty2
-  fix  <- liftRn $ lookupTyFixityRn l_op'
-  let op_name = unLoc l_op'
+  fix  <- liftRn $ lookupTyFixityRn $ fmap getName l_op'
+  let op_name = getName l_op'
   when (isDataConName op_name && not (isPromoted prom)) $
     liftRn $ addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Infix op_name)
   liftRn $ mkHsOpTyRn prom l_op' fix ty1' ty2'

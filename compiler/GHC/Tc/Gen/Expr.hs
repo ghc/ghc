@@ -336,7 +336,7 @@ tcExpr e@(HsIPVar _ x) res_ty
        ; ipClass <- tcLookupClass ipClassName
        ; ip_var <- emitWantedEvVar origin (mkClassPred ipClass [ip_name, ip_ty])
        ; tcWrapResult e
-                   (fromDict ipClass ip_name ip_ty (HsVar noExtField (noLocA ip_var)))
+                   (fromDict ipClass ip_name ip_ty (mkHsVar (noLocA ip_var)))
                    ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
@@ -599,9 +599,9 @@ tcExpr (HsFunArr _ _ _ _) _ = failWith (TcRnIllegalTypeExpr FunctionArrowSyntax)
 ************************************************************************
 -}
 
-tcExpr expr@(RecordCon { rcon_con = L loc con_name
+tcExpr expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
                        , rcon_flds = rbinds }) res_ty
-  = do  { con_like <- tcLookupConLike con_name
+  = do  { con_like <- tcLookupConLike qcon
 
         ; (con_expr, con_sigma) <- tcInferConLike con_like
         ; (con_wrap, con_tau)   <- topInstantiate orig con_sigma
@@ -1583,7 +1583,8 @@ disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
     lookup_parent_flds par@(RnRecUpdParent { rnRecUpdLabels = lbls, rnRecUpdCons = cons })
       = do { let cons' :: NonDetUniqFM ConLike ConLikeName
                  cons' = NonDetUniqFM $ unsafeCastUFMKey $ getUniqSet cons
-           ; cons <- traverse (tcLookupConLike . conLikeName_Name) cons'
+                 lookup_one con = tcLookupConLike (noUserRdr $ getName con)
+           ; cons <- traverse lookup_one cons'
            ; tc   <- tcLookupRecSelParent par
            ; return $
                TcRecUpdParent

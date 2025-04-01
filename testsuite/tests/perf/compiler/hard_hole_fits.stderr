@@ -2,7 +2,7 @@ hard_hole_fits.hs:14:22: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In an equation for ‘testMe’: testMe (HsVar a b) = _
     • Relevant bindings include
-        b :: Language.Haskell.Syntax.Extension.LIdP GhcPs
+        b :: Language.Haskell.Syntax.Extension.LIdOccP GhcPs
           (bound at hard_hole_fits.hs:14:17)
         a :: Language.Haskell.Syntax.Extension.XVar GhcPs
           (bound at hard_hole_fits.hs:14:15)

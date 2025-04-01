@@ -1087,10 +1087,12 @@ instance Diagnostic TcRnMessage where
                      TermVariablePE -> text "term variables cannot be promoted"
                      TypeVariablePE -> text "type variables bound in a kind signature cannot be used in the type"
           same_rec_group_msg = text "it is defined and used in the same recursive group"
-    TcRnIllegalTermLevelUse name err
+    TcRnIllegalTermLevelUse rdr name err
       -> mkSimpleDecorated $
-           text "Illegal term-level use of the" <+>
-             text (teCategory err) <+> quotes (ppr name)
+            text "Illegal term-level use of the" <+>
+              text (teCategory err) <+> quotes (ppr qnm)
+          where
+            qnm = WithUserRdr rdr name
     TcRnMatchesHaveDiffNumArgs argsContext (MatchArgMatches match1 bad_matches)
       -> mkSimpleDecorated $
            (vcat [ pprMatchContextNouns argsContext <+>
@@ -3001,7 +3003,7 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnpromotableThing{}
       -> noHints
-    TcRnIllegalTermLevelUse _ _
+    TcRnIllegalTermLevelUse {}
       -> noHints
     TcRnMatchesHaveDiffNumArgs{}
       -> noHints
@@ -4694,7 +4696,7 @@ potentials_msg_with_options
       | pretendNameIsInScope name
       = True -- E.g. (->); see Note [pretendNameIsInScope] in GHC.Builtin.Names
       | Just mod <- nameModule_maybe name
-      = qual_in_scope (qualName sty mod (nameOccName name))
+      = qual_in_scope (qualName sty mod Nothing (nameOccName name))
       | otherwise
       = True
 
@@ -5155,9 +5157,16 @@ This initially came up in #8968, concerning pattern synonyms.
 instance Outputable ImportError where
   ppr err = note $ case err of
       MissingModule mod_name -> "No module named" <+> quoted mod_name <+> "is imported"
-      ModulesDoNotExport mods occ_name
-        | mod NE.:| [] <- mods -> "The module" <+> quoted mod <+> "does not export" <+> quoted occ_name
-        | otherwise -> "Neither" <+> quotedListWithNor (map ppr $ NE.toList mods) <+> "export" <+> quoted occ_name
+      ModulesDoNotExport mods what_look occ_name
+        | mod NE.:| [] <- mods -> "The module" <+> quoted mod <+> "does not export" <+> what <+> quoted occ_name
+        | otherwise -> "Neither" <+> quotedListWithNor (map ppr $ NE.toList mods) <+> "export" <+> what <+> quoted occ_name
+        where
+          what :: SDoc
+          what = case what_look of
+            WL_ConLike -> text "data constructor"
+            WL_RecField -> text "record field"
+            WL_Term -> text "term"
+            _ -> empty
     where
       quoted :: Outputable a => a -> SDoc
       quoted = quotes . ppr

@@ -307,7 +307,9 @@ addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype)) =
             }
         )
 
-    extra_pred = nlHsTyConApp NotPromoted Prefix cls (lHsQTyVarsToTypes tvs0)
+    extra_pred = nlHsTyConApp NotPromoted Prefix
+                   (noUserRdr cls)
+                   (lHsQTyVarsToTypes tvs0)
 
     add_ctxt (L loc preds) = L loc (extra_pred : preds)
 addClassContext _ _ sig = sig -- E.g. a MinimalSig is fine
@@ -316,7 +318,7 @@ lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsTypeArg GhcRn]
 lHsQTyVarsToTypes tvs =
   [ HsValArg noExtField $ noLocA (case hsLTyVarName tv of
       Nothing -> HsWildCardTy noExtField
-      Just nm -> HsTyVar noAnn NotPromoted (noLocA nm))
+      Just nm -> HsTyVar noAnn NotPromoted (noLocA $ noUserRdr nm))
   | tv <- hsQTvExplicit tvs
   ]
 
