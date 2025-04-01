@@ -41,10 +41,11 @@ data ResolvedBCO
    = ResolvedBCO {
         resolvedBCOIsLE   :: Bool,
         resolvedBCOArity  :: {-# UNPACK #-} !Int,
-        resolvedBCOInstrs :: BCOByteArray Word16,       -- insns
-        resolvedBCOBitmap :: BCOByteArray Word,         -- bitmap
-        resolvedBCOLits   :: BCOByteArray Word,         -- non-ptrs
-        resolvedBCOPtrs   :: (SizedSeq ResolvedBCOPtr)  -- ptrs
+        resolvedBCOInstrs :: BCOByteArray Word16,       -- ^ insns
+        resolvedBCOBitmap :: BCOByteArray Word,         -- ^ bitmap
+        resolvedBCOLits   :: BCOByteArray Word,
+          -- ^ non-ptrs - subword sized entries still take up a full (host) word
+        resolvedBCOPtrs   :: (SizedSeq ResolvedBCOPtr)  -- ^ ptrs
    }
    deriving (Generic, Show)
 

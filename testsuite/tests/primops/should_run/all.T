@@ -37,7 +37,7 @@ test('ShrinkSmallMutableArrayB', normal, compile_and_run, [''])
 test('T14664', normal, compile_and_run, [''])
 test('CStringLength', normal, compile_and_run, ['-O2'])
 test('NonNativeSwitch', normal, compile_and_run, ['-O2'])
-test('Sized', normal, compile_and_run, [''])
+test('Sized', extra_ways(['optasm','ghci','ghci-opt']), compile_and_run, [''])
 
 test('LevPolyPtrEquality1', normal, compile_and_run, [''])
 test('LevPolyPtrEquality2', normal, compile_and_run, [''])

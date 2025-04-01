@@ -27,6 +27,24 @@ c)  When the interpreter pushes a reference inspect the closure of the object
 
 For now we use approach c). Mostly because it's easiest to implement. We also don't
 tag functions as tag inference currently doesn't rely on those being properly tagged.
+
+
+Note [Subwords in the interpreter]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To retain our sanity while dealing with little and big endian we strive to:
+* Store subwords as zero extended words to the stack in host byte order.
+* Read full words from the stack and truncated to actual width after.
+This ensures we generally don't have to worry about litte vs big endian.
+
+There are two exceptions:
+* When allocating a constructor we use PUSH_UBX8/PUSH8 and their variants to store
+  subwords exactly at SP. This allows us to allocate a constructor with packed values
+  via memcpy from the stack to the heap after setting up the stack appropriately.
+  on the heap.
+* When we use PUSH_UBX<width> to push literals to the stack we add instructions
+  to add padding such that it will result in a full words in host byte order on the stack.
+
+See also Note [Width of parameters] for some more motivation.
 */
 
 #include "rts/PosixSource.h"
@@ -1403,41 +1421,41 @@ run_BCO:
         case bci_PUSH8: {
             W_ off = BCO_GET_LARGE_ARG;
             Sp_subB(1);
-            *(StgWord8*)Sp = *(StgWord8*)(Sp_plusB(off+1));
+            *(StgWord8*)Sp = (StgWord8) *(StgWord*)(Sp_plusB(off+1));
             goto nextInsn;
         }
 
         case bci_PUSH16: {
             W_ off = BCO_GET_LARGE_ARG;
             Sp_subB(2);
-            *(StgWord16*)Sp = *(StgWord16*)(Sp_plusB(off+2));
+            *(StgWord16*)Sp = (StgWord16) *(StgWord*)(Sp_plusB(off+2));
             goto nextInsn;
         }
 
         case bci_PUSH32: {
             W_ off = BCO_GET_LARGE_ARG;
             Sp_subB(4);
-            *(StgWord32*)Sp = *(StgWord32*)(Sp_plusB(off+4));
+            *(StgWord32*)Sp = (StgWord32) *(StgWord*)(Sp_plusB(off+4));
             goto nextInsn;
         }
 
         case bci_PUSH8_W: {
             W_ off = BCO_GET_LARGE_ARG;
-            *(StgWord*)(Sp_minusW(1)) = *(StgWord8*)(Sp_plusB(off));
+            *(StgWord*)(Sp_minusW(1)) = (StgWord) ((StgWord8) *(StgWord*)(Sp_plusB(off)));
             Sp_subW(1);
             goto nextInsn;
         }
 
         case bci_PUSH16_W: {
             W_ off = BCO_GET_LARGE_ARG;
-            *(StgWord*)(Sp_minusW(1)) = *(StgWord16*)(Sp_plusB(off));
+            *(StgWord*)(Sp_minusW(1)) = (StgWord) ((StgWord16) *(StgWord*)(Sp_plusB(off)));
             Sp_subW(1);
             goto nextInsn;
         }
 
         case bci_PUSH32_W: {
             W_ off = BCO_GET_LARGE_ARG;
-            *(StgWord*)(Sp_minusW(1)) = *(StgWord32*)(Sp_plusB(off));
+            *(StgWord*)(Sp_minusW(1)) = (StgWord) ((StgWord32) *(StgWord*)(Sp_plusB(off)));
             Sp_subW(1);
             goto nextInsn;
         }
@@ -1711,21 +1729,21 @@ run_BCO:
         case bci_PUSH_UBX8: {
             W_ o_lit = BCO_GET_LARGE_ARG;
             Sp_subB(1);
-            *(StgWord8*)Sp = *(StgWord8*)(literals+o_lit);
+            *(StgWord8*)Sp = (StgWord8) BCO_LIT(o_lit);
             goto nextInsn;
         }
 
         case bci_PUSH_UBX16: {
             W_ o_lit = BCO_GET_LARGE_ARG;
             Sp_subB(2);
-            *(StgWord16*)Sp = *(StgWord16*)(literals+o_lit);
+            *(StgWord16*)Sp = (StgWord16) BCO_LIT(o_lit);
             goto nextInsn;
         }
 
         case bci_PUSH_UBX32: {
             W_ o_lit = BCO_GET_LARGE_ARG;
             Sp_subB(4);
-            *(StgWord32*)Sp = *(StgWord32*)(literals+o_lit);
+            *(StgWord32*)Sp = (StgWord32) BCO_LIT(o_lit);
             goto nextInsn;
         }
 
@@ -1936,7 +1954,7 @@ run_BCO:
         case bci_TESTLT_I32: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt32 stackInt = (*(StgInt32*)Sp);
+            StgInt32 stackInt = (StgInt32) ReadSpW(0);
             if (stackInt >= (StgInt32)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
@@ -1945,7 +1963,7 @@ run_BCO:
         case bci_TESTLT_I16: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt16 stackInt = (*(StgInt16*)Sp);
+            StgInt16 stackInt = (StgInt16) ReadSpW(0);
             if (stackInt >= (StgInt16)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
@@ -1954,7 +1972,7 @@ run_BCO:
         case bci_TESTLT_I8: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt8 stackInt = (*(StgInt8*)Sp);
+            StgInt8 stackInt = (StgInt8) ReadSpW(0);
             if (stackInt >= (StgInt8)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
@@ -1983,7 +2001,7 @@ run_BCO:
         case bci_TESTEQ_I32: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt32 stackInt = (*(StgInt32*)Sp);
+            StgInt32 stackInt = (StgInt32) ReadSpW(0);
             if (stackInt != (StgInt32)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -1993,7 +2011,7 @@ run_BCO:
         case bci_TESTEQ_I16: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt16 stackInt = (*(StgInt16*)Sp);
+            StgInt16 stackInt = (StgInt16) ReadSpW(0);
             if (stackInt != (StgInt16)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -2003,7 +2021,7 @@ run_BCO:
         case bci_TESTEQ_I8: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt8 stackInt = (*(StgInt8*)Sp);
+            StgInt8 stackInt = (StgInt8) ReadSpW(0);
             if (stackInt != (StgInt8)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -2031,7 +2049,7 @@ run_BCO:
         case bci_TESTLT_W32: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord32 stackWord = (*(StgWord32*)Sp);
+            StgWord32 stackWord = (StgWord32) ReadSpW(0);
             if (stackWord >= (StgWord32)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
@@ -2040,7 +2058,7 @@ run_BCO:
         case bci_TESTLT_W16: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord16 stackWord = (*(StgWord16*)Sp);
+            StgWord16 stackWord = (StgInt16) ReadSpW(0);
             if (stackWord >= (StgWord16)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
@@ -2049,7 +2067,7 @@ run_BCO:
         case bci_TESTLT_W8: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord8 stackWord = (*(StgWord8*)Sp);
+            StgWord8 stackWord = (StgInt8) ReadSpW(0);
             if (stackWord >= (StgWord8)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
@@ -2078,7 +2096,7 @@ run_BCO:
         case bci_TESTEQ_W32: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord32 stackWord = (*(StgWord32*)Sp);
+            StgWord32 stackWord = (StgWord32) ReadSpW(0);
             if (stackWord != (StgWord32)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -2088,7 +2106,7 @@ run_BCO:
         case bci_TESTEQ_W16: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord16 stackWord = (*(StgWord16*)Sp);
+            StgWord16 stackWord = (StgWord16) ReadSpW(0);
             if (stackWord != (StgWord16)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -2098,7 +2116,7 @@ run_BCO:
         case bci_TESTEQ_W8: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord8 stackWord = (*(StgWord8*)Sp);
+            StgWord8 stackWord = (StgWord8) ReadSpW(0);
             if (stackWord != (StgWord8)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
