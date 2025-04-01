@@ -368,7 +368,9 @@ cprTransformBespoke id args
 -- | Get a (possibly nested) 'CprType' for an application of a 'DataCon' worker,
 -- given a saturated number of 'CprType's for its field expressions.
 -- Implements the Nested part of Note [Nested CPR].
-cprTransformDataConWork :: AnalEnv -> DataCon -> [(CprType, CoreArg)] -> CprType
+cprTransformDataConWork :: AnalEnv -> DataCon
+                        -> [(CprType, CoreArg)]   -- Info about /value/ arguments
+                        -> CprType
 cprTransformDataConWork env con args
   | null (dataConExTyCoVars con)  -- No existentials
   , wkr_arity <= mAX_CPR_SIZE -- See Note [Trimming to mAX_CPR_SIZE]
@@ -377,7 +379,9 @@ cprTransformDataConWork env con args
   = -- pprTraceWith "cprTransformDataConWork" (\r -> ppr con <+> ppr wkr_arity <+> ppr args <+> ppr r) $
     CprType 0 (ConCpr (dataConTag con) (strictZipWith extract_nested_cpr args wkr_str_marks))
   | otherwise
-  = topCprType
+  = -- pprTrace "cprTransformDataConWork1" (ppr con <+> ppr wkr_arity <+> ppr mAX_CPR_SIZE <+> ppr (ae_rec_dc env con)
+    --                                     $$ ppr args) $
+    topCprType
   where
     wkr_arity = dataConRepArity con
     wkr_str_marks = dataConRepStrictness con

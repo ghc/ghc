@@ -49,7 +49,6 @@ import GHC.Tc.Utils.Env
 
 import GHC.Core
 import GHC.Core.Unfold
--- import GHC.Core.Unfold.Make
 import GHC.Core.FVs
 import GHC.Core.Tidy
 import GHC.Core.Seq         ( seqBinds )
@@ -76,10 +75,10 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var
 import GHC.Types.Id
-import GHC.Types.Id.Make ( mkDictSelRhs )
 import GHC.Types.Id.Info
 import GHC.Types.Demand  ( isDeadEndAppSig, isNopSig, nopSig, isDeadEndSig )
 import GHC.Types.Basic
+import GHC.Types.TyThing( implicitTyConThings )
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Name.Set
 import GHC.Types.Name.Cache
@@ -410,10 +409,10 @@ tidyProgram opts (ModGuts { mg_module           = mod
                           , mg_boot_exports     = boot_exports
                           }) = do
 
-  let implicit_binds = concatMap getImplicitBinds tcs
-      all_binds = implicit_binds ++ binds
+  let -- implicit_binds = concatMap getImplicitBinds tcs
+      all_binds = {- implicit_binds ++ -} binds
 
-  (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod all_binds imp_rules
+  (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod tcs binds imp_rules
   let (trimmed_binds, trimmed_rules) = findExternalRules opts all_binds imp_rules unfold_env
 
   (tidy_env, tidy_binds) <- tidyTopBinds unfold_env boot_exports tidy_occ_env trimmed_binds
@@ -648,23 +647,21 @@ getImplicitBinds tc = cls_binds ++ getTyConImplicitBinds tc
 
 getTyConImplicitBinds :: TyCon -> [CoreBind]
 getTyConImplicitBinds tc
-  | isDataTyCon tc = [ NonRec wrap_id rhs
-                     | dc <- tyConDataCons tc
-                     , let wrap_id = dataConWrapId dc
-                         -- For data cons with no wrapper, this wrap_id
-                         -- is in fact a DataConWorkId, and hence
-                         -- dataConWrapUnfolding_maybe returns Nothing
-                     , Just rhs <- [dataConWrapUnfolding_maybe wrap_id] ]
+  | isBoxedDataTyCon tc = [ NonRec wrap_id rhs
+                          | dc <- tyConDataCons tc
+                          , let wrap_id = dataConWrapId dc
+                              -- For data cons with no wrapper, this wrap_id
+                              -- is in fact a DataConWorkId, and hence
+                              -- dataConWrapUnfolding_maybe returns Nothing
+                          , Just rhs <- [dataConWrapUnfolding_maybe wrap_id] ]
 
-  | otherwise      = []
+  | otherwise           = []
     -- The 'otherwise' includes family TyCons of course, but also (less obviously)
     --  * Newtypes: see Note [Compulsory newtype unfolding] in GHC.Types.Id.Make
     --  * type data: we don't want any code for type-only stuff (#24620)
 
 getClassImplicitBinds :: Class -> [CoreBind]
-getClassImplicitBinds cls
-  = [ NonRec op (mkDictSelRhs cls val_index)
-    | (op, val_index) <- classAllSelIds cls `zip` [0..] ]
+getClassImplicitBinds _ = []
 
 {-
 ************************************************************************
@@ -685,12 +682,13 @@ type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
 
 chooseExternalIds :: TidyOpts
                   -> Module
+                  -> [TyCon]
                   -> [CoreBind]
                   -> [CoreRule]
                   -> IO (UnfoldEnv, TidyOccEnv)
                   -- Step 1 from the notes above
 
-chooseExternalIds opts mod binds imp_id_rules
+chooseExternalIds opts mod tcs binds imp_id_rules
   = do { (unfold_env1,occ_env1) <- search init_work_list emptyVarEnv init_occ_env
        ; let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
        ; tidy_internal internal_ids unfold_env1 occ_env1 }
@@ -724,6 +722,8 @@ chooseExternalIds opts mod binds imp_id_rules
   avoids   = [getOccName name | bndr <- binders,
                                 let name = idName bndr,
                                 isExternalName name ]
+          ++ [ getOccName thing | tc <- tcs
+                                , thing <- implicitTyConThings tc ]
                 -- In computing our "avoids" list, we must include
                 --      all implicit Ids
                 --      all things with global names (assigned once and for
@@ -1312,7 +1312,9 @@ tidyTopPair unfold_env boot_exports rhs_tidy_env (bndr, rhs)
     (bndr1, rhs1)
 
   where
-    (name',show_unfold) = expectJust $ lookupVarEnv unfold_env bndr
+    (name',show_unfold) = case lookupVarEnv unfold_env bndr of
+                            Just stuff -> stuff
+                            Nothing    -> pprPanic "tidyTopPair" (ppr bndr)
     !cbv_bndr = tidyCbvInfoTop boot_exports bndr rhs
     bndr1    = mkGlobalId details name' ty' idinfo'
     details  = idDetails cbv_bndr -- Preserve the IdDetails
@@ -1364,7 +1366,7 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
 
     sig = dmdSigInfo idinfo
     final_sig | not (isNopSig sig)
-              = warnPprTrace (_bottom_hidden sig) "tidyTopIdInfo" (ppr name) sig
+              = warnPprTrace (bottom_hidden sig) "tidyTopIdInfo" (ppr name <+> ppr sig) sig
 
               -- No demand signature, so try a
               -- cheap-and-cheerful bottom analyser
@@ -1380,7 +1382,7 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
               | otherwise
               = cpr
 
-    _bottom_hidden id_sig
+    bottom_hidden id_sig
       = case mb_bot_str of
           Nothing            -> False
           Just (arity, _, _) -> not (isDeadEndAppSig id_sig arity)

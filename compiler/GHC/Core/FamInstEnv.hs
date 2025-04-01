@@ -248,10 +248,10 @@ pprFamInst (FamInst { fi_flavor = flavor, fi_axiom = ax
     ppr_tc_sort = case flavor of
                      SynFamilyInst             -> text "type"
                      DataFamilyInst tycon
-                       | isDataTyCon     tycon -> text "data"
-                       | isNewTyCon      tycon -> text "newtype"
-                       | isAbstractTyCon tycon -> text "data"
-                       | otherwise             -> text "WEIRD" <+> ppr tycon
+                       | isBoxedDataTyCon tycon -> text "data"
+                       | isNewTyCon       tycon -> text "newtype"
+                       | isAbstractTyCon  tycon -> text "data"
+                       | otherwise              -> text "WEIRD" <+> ppr tycon
 
     debug_stuff = vcat [ text "Coercion axiom:" <+> ppr ax
                        , text "Tvs:" <+> ppr tvs
@@ -1336,7 +1336,7 @@ topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe Reduction
 --      * newtypes
 -- returning an appropriate Representational coercion.  Specifically, if
 --   topNormaliseType_maybe env ty = Just (co, ty')
--- then
+-- then postconditions:
 --   (a) co :: ty ~R ty'
 --   (b) ty' is not a newtype, and is not a type-family or data-family redex
 --

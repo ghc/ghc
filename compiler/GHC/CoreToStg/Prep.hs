@@ -38,6 +38,7 @@ import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCon
+import GHC.Core.Class( classAllSelIds )
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal
 
@@ -57,9 +58,9 @@ import GHC.Types.Demand
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make ( realWorldPrimId )
+import GHC.Types.Id.Make ( realWorldPrimId, mkDictSelRhs )
 import GHC.Types.Basic
-import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName, OccName )
+import GHC.Types.Name   ( Name, OccName, NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.Name.Occurrence (occNameString)
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import GHC.Types.Literal
@@ -245,23 +246,22 @@ corePrepPgm :: Logger
             -> Module -> ModLocation -> CoreProgram -> [TyCon]
             -> IO CoreProgram
 corePrepPgm logger cp_cfg pgm_cfg
-            this_mod mod_loc binds data_tycons =
+            this_mod mod_loc binds tycons =
     withTiming logger
                (text "CorePrep"<+>brackets (ppr this_mod))
                (\a -> a `seqList` ()) $ do
     let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
 
     us <- mkSplitUniqSupply 's'
-
-    let implicit_binds = mkDataConWorkers
-          (cpPgm_generateDebugInfo pgm_cfg)
-          mod_loc data_tycons
-            -- NB: we must feed mkImplicitBinds through corePrep too
-            -- so that they are suitably cloned and eta-expanded
+    let
+        gen_debug_info = cpPgm_generateDebugInfo pgm_cfg
+        implicit_binds = concatMap (mkImplicitBinds gen_debug_info mod_loc) tycons
 
         binds_out = initUs_ us $ do
-                      floats1 <- corePrepTopBinds initialCorePrepEnv binds
-                      floats2 <- corePrepTopBinds initialCorePrepEnv implicit_binds
+                      floats1 <- corePrepTopBinds initialCorePrepEnv implicit_binds
+                                 -- NB: we must feed mkImplicitBinds through corePrep too
+                                 -- so that they are suitably cloned and eta-expanded
+                      floats2 <- corePrepTopBinds initialCorePrepEnv binds
                       return (deFloatTop (floats1 `zipFloats` floats2))
 
     endPassIO logger (cpPgm_endPassConfig pgm_cfg)
@@ -291,27 +291,55 @@ corePrepTopBinds initialCorePrepEnv binds
                                floatss <- go env' binds
                                return (floats `zipFloats` floatss)
 
-mkDataConWorkers :: Bool -> ModLocation -> [TyCon] -> [CoreBind]
+mkImplicitBinds :: Bool -> ModLocation -> TyCon -> [CoreBind]
 -- See Note [Data constructor workers]
 -- c.f. Note [Injecting implicit bindings] in GHC.Iface.Tidy
-mkDataConWorkers generate_debug_info mod_loc data_tycons
-  = [ NonRec id (tick_it (getName data_con) (Var id))
-                                -- The ice is thin here, but it works
-    | tycon <- data_tycons,     -- CorePrep will eta-expand it
-      data_con <- tyConDataCons tycon,
-      let id = dataConWorkId data_con
-    ]
- where
-   -- If we want to generate debug info, we put a source note on the
-   -- worker. This is useful, especially for heap profiling.
-   tick_it name
-     | not generate_debug_info               = id
-     | RealSrcSpan span _ <- nameSrcSpan name = tick span
-     | Just file <- ml_hs_file mod_loc       = tick (span1 file)
-     | otherwise                             = tick (span1 "???")
-     where tick span  = Tick $ SourceNote span $
-             LexicalFastString $ mkFastString $ renderWithContext defaultSDocContext $ ppr name
-           span1 file = realSrcLocSpan $ mkRealSrcLoc (mkFastString file) 1 1
+mkImplicitBinds gen_debug_info mod_loc tycon
+  = classop_binds ++ datacon_binds
+  where
+    datacon_binds
+      | isBoxedDataTyCon tycon
+      = concatMap (dataConBinds gen_debug_info mod_loc) (tyConDataCons tycon)
+      | otherwise
+      = []
+      -- The 'otherwise' includes family TyCons of course, but also (less obviously)
+      --  * Newtypes: see Note [Compulsory newtype unfolding] in GHC.Types.Id.Make
+      --  * type data: we don't want any code for type-only stuff (#24620)
+
+    classop_binds
+      | Just cls <- tyConClass_maybe tycon
+      = [ NonRec op (mkDictSelRhs cls val_index)
+        | (op, val_index) <- classAllSelIds cls `zip` [0..] ]
+     | otherwise
+     = []
+
+dataConBinds :: Bool -> ModLocation -> DataCon -> [CoreBind]
+dataConBinds gen_debug_info mod_loc data_con
+  = wrapper_bind ++ worker_bind
+  where
+    work_id = dataConWorkId data_con
+    wrap_id = dataConWrapId data_con
+    worker_bind  = [NonRec work_id (add_tick (Var work_id))]
+      -- worker_bind: the ice is thin here, but it works:
+      --              CorePrep will eta-expand it
+    wrapper_bind = case dataConWrapUnfolding_maybe wrap_id of
+                     Nothing  -> []
+                     Just rhs -> [NonRec wrap_id rhs]
+    add_tick = tick_it gen_debug_info mod_loc (getName data_con)
+
+tick_it :: Bool -> ModLocation -> Name -> CoreExpr -> CoreExpr
+-- If we want to generate debug info, we put a source note on the
+-- worker. This is useful, especially for heap profiling.
+tick_it generate_debug_info mod_loc name
+  | not generate_debug_info               = id
+  | RealSrcSpan span _ <- nameSrcSpan name = tick span
+  | Just file <- ml_hs_file mod_loc       = tick (span1 file)
+  | otherwise                             = tick (span1 "???")
+  where
+    tick span  = Tick $ SourceNote span $
+                 LexicalFastString $ mkFastString $
+                 renderWithContext defaultSDocContext $ ppr name
+    span1 file = realSrcLocSpan $ mkRealSrcLoc (mkFastString file) 1 1
 
 {- Note [Floating in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1265,8 +1293,8 @@ cpeApp top_env expr
 
     rebuild_app'
         :: CorePrepEnv
-        -> [ArgInfo] -- The arguments (inner to outer)
-        -> CpeApp
+        -> [ArgInfo] -- The arguments (inner to outer); substitution not applied
+        -> CpeApp    -- Substitution already applied
         -> Floats
         -> [Demand]
         -> [CoreTickish]
@@ -1278,12 +1306,9 @@ cpeApp top_env expr
 
     rebuild_app' env (a : as) fun' floats ss rt_ticks req_depth = case a of
       -- See Note [Ticks and mandatory eta expansion]
-      _
-        | not (null rt_ticks)
-        , req_depth <= 0
-        ->
-            let tick_fun = foldr mkTick fun' rt_ticks
-            in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
+      _ | not (null rt_ticks), req_depth <= 0
+        -> let tick_fun = foldr mkTick fun' rt_ticks
+           in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
 
       AIApp (Type arg_ty)
         -> rebuild_app' env as (App fun' (Type arg_ty')) floats ss rt_ticks req_depth
@@ -1301,7 +1326,7 @@ cpeApp top_env expr
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
                    ([],            _)     -> (topDmd, [])
-        (fs, arg') <- cpeArg top_env ss1 arg
+        (fs, arg') <- cpeArg env ss1 arg
         rebuild_app' env as (App fun' arg') (fs `zipFloats` floats) ss_rest rt_ticks (req_depth-1)
 
       AICast co

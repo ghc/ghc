@@ -110,9 +110,12 @@ dsIPBinds (IPBinds ev_binds ip_binds) body
         ; foldrM ds_ip_bind inner ip_binds } }
   where
     ds_ip_bind :: LIPBind GhcTc -> CoreExpr -> DsM CoreExpr
+    -- Given (IPBind n s e), we have
+    --     n :: IP s ty, e :: ty
+    -- Use evWrapIP to convert `e` (the user-written RHS) to an IP dictionary
     ds_ip_bind (L _ (IPBind n _ e)) body
       = do e' <- dsLExpr e
-           return (Let (NonRec n e') body)
+           return (Let (NonRec n (evWrapIPE (idType n) e')) body)
 
 -------------------------
 -- caller sets location
