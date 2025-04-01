@@ -1,0 +1,6 @@
+T24090a.hs:9:19: error: [GHC-84925]
+    • The arity of ‘Foo’ is insufficiently high to accommodate
+      an implicit binding for the ‘a’ type variable.
+    • Use ‘@a’ on the LHS or ‘forall a.’ on the RHS to bring it into scope.
+    • In the type synonym declaration for ‘Foo’
+

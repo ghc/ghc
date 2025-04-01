@@ -1,0 +1,5 @@
+T24090b.hs:9:19: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wcompat), Werror=implicit-rhs-quantification]
+    The variable ‘a’ occurs free on the RHS of the type declaration
+    In the future GHC will no longer implicitly quantify over such variables
+    Suggested fix: Bind ‘a’ on the LHS of the type declaration
+

@@ -710,6 +710,8 @@ test('T23776', normal, compile_fail, ['']) # error due to -Werror=compat, schedu
 test('T17940', normal, compile_fail, [''])
 test('ErrorIndexLinks', normal, compile_fail, ['-fprint-error-index-links=always'])
 test('T24064', normal, compile_fail, [''])
+test('T24090a', normal, compile_fail, [''])
+test('T24090b', normal, compile_fail, [''])
 test('T24298', normal, compile_fail, [''])
 test('T24279', normal, compile_fail, [''])
 test('T24318', normal, compile_fail, [''])
