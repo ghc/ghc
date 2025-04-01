@@ -397,10 +397,12 @@ mkTicks :: [CoreTickish] -> CoreExpr -> CoreExpr
 mkTicks ticks expr = foldr mkTick expr ticks
 
 isSaturatedConApp :: CoreExpr -> Bool
+-- Also includes literals
 isSaturatedConApp e = go e []
   where go (App f a) as = go f (a:as)
         go (Var fun) args
            = isConLikeId fun && idArity fun == valArgCount args
+        go (Lit {})   _  = True
         go (Cast f _) as = go f as
         go _ _ = False
 

@@ -55,7 +55,7 @@ import GHC.Types.Tickish
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var
-import GHC.Types.Demand ( argOneShots, argsOneShots, isDeadEndSig )
+import GHC.Types.Demand ( argOneShots, argsOneShots {- , isDeadEndSig -} )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1096,14 +1096,14 @@ mkNonRecRhsCtxt lvl bndr unf
     certainly_inline -- See Note [Cascading inlines]
       = -- mkNonRecRhsCtxt is only used for non-join points, so occAnalBind
         -- has set the OccInfo for this binder before calling occAnalNonRecRhs
+        -- Distressing delicacy ... has to line up with preInlineUnconditionally
         case idOccInfo bndr of
           OneOcc { occ_in_lam = NotInsideLam, occ_n_br = 1 }
-            -> active && not stable_unf && not top_bottoming
+            -> active && not (isTopLevel lvl) && not stable_unf
           _ -> False
 
     active     = isAlwaysActive (idInlineActivation bndr)
     stable_unf = isStableUnfolding unf
-    top_bottoming = isTopLevel lvl && isDeadEndId bndr
 
 -----------------
 occAnalRecBind :: OccEnv -> TopLevelFlag -> ImpRuleEdges -> [(Var,CoreExpr)]
@@ -2580,8 +2580,9 @@ occAnalArgs !env fun args !one_shots
 
     -- Make bottoming functions interesting
     -- See Note [Bottoming function calls]
-    encl | Var f <- fun, isDeadEndSig (idDmdSig f) = OccScrut
-         | otherwise                               = OccVanilla
+--    encl | Var f <- fun, isDeadEndSig (idDmdSig f) = OccScrut
+--         | otherwise                               = OccVanilla
+    encl = OccVanilla
 
     go uds fun [] _ = WUD uds fun
     go uds fun (arg:args) one_shots
@@ -2606,7 +2607,8 @@ Consider
    let x = (a,b) in
    case p of
       A -> ...(error x)..
-      B -> ...(ertor x)...
+      B -> ...(error x)...
+      C -> ..blah...
 
 postInlineUnconditionally may duplicate x's binding, but sometimes it
 does so only if the use site IsInteresting.  Pushing allocation into error
@@ -2615,6 +2617,9 @@ setting occ_encl = OccScrut for such calls.
 
 The slightly-artificial test T21128 is a good example.  It's probably
 not a huge deal.
+
+ToDo!!!  Fix comment.   Now postinlineUnconditionally ignores intersting-ness for
+non-top-level things.
 
 Note [Arguments of let-bound constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
