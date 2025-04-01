@@ -72,7 +72,7 @@ The moving parts are as follows:
   which maps a class to a `ClassDefaults`.  The `ClassDefaults` for a class
   specifies the defaults for that class, in the current module.
 
-* The `DefaultEnv` of all defaults in scope in a module is kept in the `tcg_default`
+* The `DefaultEnv` of all defaults in scope in a module is kept in the `tcg_default_env`
   field of `TcGblEnv`.
 
 * This field is populated by `GHC.Tc.Gen.Default.tcDefaults` which typechecks
@@ -101,7 +101,7 @@ The moving parts are as follows:
   - https://downloads.haskell.org/ghc/latest/docs/users_guide/ghci.html#extension-ExtendedDefaultRules
   - https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/overloaded_strings.html#extension-OverloadedStrings
 
-* The module's `tcg_default` is consulted when defaulting unsolved constraints,
+* The module's `tcg_default_env` is consulted when defaulting unsolved constraints,
   in GHC.Tc.Solver.applyDefaultingRules.
   See Note [How type-class constraints are defaulted] in GHC.Tc.Solver
 

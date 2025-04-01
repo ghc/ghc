@@ -2495,7 +2495,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     -- We grab the whole environment because of the overlapping that may have
     -- been done. See the notes at the definition of InteractiveContext
     -- (ic_instances) for more details.
-    let defaults = tcg_default tc_gblenv
+    let defaults = tcg_default_env tc_gblenv
 
     {- Desugar it -}
     -- We use a basically null location for iNTERACTIVE

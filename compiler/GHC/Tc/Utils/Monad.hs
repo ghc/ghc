@@ -316,8 +316,9 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_src            = hsc_src,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
-                tcg_default        = emptyDefaultEnv,
+                tcg_default_env    = emptyDefaultEnv,
                 tcg_default_exports = emptyDefaultEnv,
+                tcg_default_imports = [],
                 tcg_type_env       = emptyNameEnv,
                 tcg_type_env_var   = type_env_var,
                 tcg_inst_env       = emptyInstEnv,
@@ -940,7 +941,7 @@ extendFixityEnv new_bit
                 env {tcg_fix_env = extendNameEnvList old_fix_env new_bit})
 
 getDeclaredDefaultTys :: TcRn DefaultEnv
-getDeclaredDefaultTys = do { env <- getGblEnv; return (tcg_default env) }
+getDeclaredDefaultTys = do { env <- getGblEnv; return (tcg_default_env env) }
 
 addDependentFiles :: [FilePath] -> TcRn ()
 addDependentFiles fs = do

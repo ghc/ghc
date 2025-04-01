@@ -352,7 +352,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                         -- a function with no type signature we can give the
                         -- inferred type
                       ; reportUnusedNames tcg_env hsc_src
-                      ; reportClashingDefaultImports (tcg_default_imports tcg_env) (tcg_default tcg_env)
+                      ; reportClashingDefaultImports (tcg_default_imports tcg_env) (tcg_default_env tcg_env)
 
                       -- Rename the module header properly after we have renamed everything else
                       ; maybe_doc_hdr <- traverse rnLHsDoc maybe_doc_hdr;
@@ -494,7 +494,7 @@ tcRnImports hsc_env import_decls
               tcg_imports      = tcg_imports gbl `plusImportAvails` imports,
               tcg_import_decls = imp_user_spec,
               tcg_rn_imports   = rn_imports,
-              tcg_default      = foldMap subsume tc_defaults,
+              tcg_default_env  = foldMap subsume tc_defaults,
               tcg_default_imports = tc_defaults,
               tcg_inst_env     = tcg_inst_env gbl `unionInstEnv` home_insts,
               tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl)
@@ -1812,7 +1812,7 @@ tcTyClsInstDecls tycl_decls deriv_decls default_decls binds
           -- But only after we've typechecked 'default' declarations.
           -- See Note [Typechecking default declarations]
           defaults <- tcDefaults default_decls ;
-          updGblEnv (\gbl -> gbl { tcg_default = defaults }) $ do {
+          updGblEnv (\gbl -> gbl { tcg_default_env = defaults }) $ do {
 
 
           -- Careful to quit now in case there were instance errors, so that
@@ -2119,7 +2119,7 @@ runTcInteractive hsc_env thing_inside
                                                     ic_finsts)
                               home_fam_insts
                    , tcg_fix_env      = ic_fix_env icxt
-                   , tcg_default      = ic_default icxt
+                   , tcg_default_env  = ic_default icxt
                         -- must calculate imp_orphs of the ImportAvails
                         -- so that instance visibility is done correctly
                    , tcg_imports      = imports }

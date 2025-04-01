@@ -427,7 +427,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             case m_ie of
               Nothing -> return (acc, Nothing)
               Just (acc', new_ie, Left cls) -> do
-                defaults <- tcg_default <$> getGblEnv
+                defaults <- tcg_default_env <$> getGblEnv
                 let exported_default = filterDefaultEnv ((cls ==) . nameOccName . className . cd_class) defaults
                 return (acc', Just (new_ie, exported_default, []))
               Just (acc', new_ie, Right avail)
@@ -484,7 +484,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                  IEDefault _ cls -> do
                    let defaultOccName = nameOccName . className . cd_class
                        occName = rdrNameOcc (unLoc cls)
-                   defaults <- tcg_default <$> getGblEnv
+                   defaults <- tcg_default_env <$> getGblEnv
                    when (isEmptyDefaultEnv $ filterDefaultEnv ((occName ==) . defaultOccName) defaults)
                         (addErr $ TcRnExportHiddenDefault ie)
                    pure (Left occName)
