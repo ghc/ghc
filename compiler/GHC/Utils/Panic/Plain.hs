@@ -118,7 +118,12 @@ assertPanic file line =
 
 
 assertPanic' :: HasCallStack => a
-assertPanic' = Exception.throw (Exception.AssertionFailed "ASSERT failed!")
+assertPanic' =
+  let doc = unlines $ fmap ("  "++) $ lines (prettyCallStack callStack)
+  in
+  Exception.throw (Exception.AssertionFailed
+           ("ASSERT failed!\n"
+            ++ withFrozenCallStack doc))
 
 assert :: HasCallStack => Bool -> a -> a
 {-# INLINE assert #-}
