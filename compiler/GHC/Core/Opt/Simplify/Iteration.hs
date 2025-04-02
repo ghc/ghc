@@ -936,24 +936,28 @@ completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
 
    do { -- Try cast worker-wrapper
         mb_cast_ww <- tryCastWorkerWrapper env bind_cxt new_bndr_w_info eta_rhs
-      ; let (cast_flts, new_bndr', new_rhs') = mb_cast_ww `orElse`
-                                               (emptyLetFloats, new_bndr_w_info, eta_rhs)
-            floats = emptyFloats env `addLetFloats` cast_flts
+      ; case mb_cast_ww of
+          Nothing -> no_post_inline (emptyFloats env) new_bndr_w_info eta_rhs
 
-      -- Try postInlineUnconditionally for x = (x' |> co)
-      -- Almost always fires, but we conservatively use postInlineUnconditionally
-      -- so that we check all the right things
-      ; if postInlineUnconditionally env bind_cxt old_bndr new_bndr' new_rhs'
-        then post_inline_it floats new_rhs'  -- new_rhs is (x |> co) so no need to occ-anal
-
-        else -- Keep the binding
-
-   do { let the_bind = NonRec new_bndr' new_rhs'
-            floats'  = floats `extendFloats` the_bind
-            env'     = env `setInScopeFromF` floats'
-      ; return (floats', env') } } }
-
+          Just (cast_let_flts, new_bndr, new_rhs)
+            -- Try postInlineUnconditionally for (new_bndr = new_rhs)
+            -- Almost always fires, because `new_rhs` is small, but we conservatively
+            -- use `postInlineUnconditionally` so that we check all the right things
+            | postInlineUnconditionally env bind_cxt old_bndr new_bndr new_rhs
+            -> post_inline_it cast_floats new_rhs
+                   -- new_rhs is (x |> co) so no need to occ-anal
+            | otherwise
+            -> no_post_inline cast_floats new_bndr new_rhs
+            where
+              cast_floats = emptyFloats env `addLetFloats` cast_let_flts
+    } }
   where
+    no_post_inline floats new_bndr new_rhs
+      = do { let the_bind = NonRec new_bndr new_rhs
+                 floats'  = floats `extendFloats` the_bind
+                 env'     = env `setInScopeFromF` floats'
+           ; return (floats', env') }
+
     post_inline_it floats rhs
       = do  { simplTrace "PostInlineUnconditionally" (ppr old_bndr <+> ppr rhs) $
               tick (PostInlineUnconditionally old_bndr)

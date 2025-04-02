@@ -1590,10 +1590,13 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
   | otherwise
   = case occ_info of
       IAmALoopBreaker {} -> False
+
       ManyOccs {} | is_top_lvl -> False  -- Note [Top level and postInlineUnconditionally]
                   | otherwise  -> exprIsTrivial rhs
+
       OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
               -> post_inline_one_occ in_lam int_cxt n_br
+
       IAmDead -> True   -- This happens; for example, the case_bndr during case of
                         -- known constructor:  case (a,b) of x { (p,q) -> ... }
                         -- Here x isn't mentioned in the RHS, so we don't want to
@@ -1601,6 +1604,9 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
   where
     post_inline_one_occ in_lam int_cxt n_br
         -- See Note [Inline small things to avoid creating a thunk]
+
+        | exprIsTrivial rhs
+        = True
 
         | n_br == 1                 -- One syntactic occurrence
         = work_ok in_lam int_cxt    -- See Note [Post-inline for single-use things]
