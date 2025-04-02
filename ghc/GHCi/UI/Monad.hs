@@ -91,7 +91,6 @@ data GHCiState = GHCiState
         prompt_cont    :: PromptFunction,
         editor         :: String,
         stop           :: String,
-        multiMode      :: Bool,
         localConfig    :: LocalConfigBehaviour,
         options        :: [GHCiOption],
         line_number    :: !Int,         -- ^ input line
@@ -155,7 +154,7 @@ data GHCiState = GHCiState
         long_help  :: String,
         lastErrorLocations :: IORef [(FastString, Int)],
 
-        mod_infos  :: !(Map ModuleName ModInfo),
+        mod_infos  :: !(Map Module ModInfo),
 
         flushStdHandles :: ForeignHValue,
             -- ^ @hFlush stdout; hFlush stderr@ in the interpreter

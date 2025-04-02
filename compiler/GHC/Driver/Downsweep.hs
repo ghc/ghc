@@ -277,11 +277,20 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
 
   where
  --
-    mkEdge :: InteractiveImport -> (UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))
+    mkEdge :: InteractiveImport -> Either ModuleNodeEdge (UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))
     -- A simple edge to a module from the same home unit
     mkEdge (IIModule n) =
-      let unitId = homeUnitId $ hsc_home_unit hsc_env
-      in (unitId, NormalLevel, NoPkgQual, GWIB (noLoc n) NotBoot)
+      let
+        mod_node_key = ModNodeKeyWithUid
+          { mnkModuleName = GWIB (moduleName n) NotBoot
+          , mnkUnitId =
+              -- 'toUnitId' is safe here, as we can't import modules that
+              -- don't have a 'UnitId'.
+              toUnitId (moduleUnit n)
+          }
+        mod_node_edge =
+          ModuleNodeEdge NormalLevel (NodeKey_Module mod_node_key)
+      in Left mod_node_edge
     -- A complete import statement
     mkEdge (IIDecl i) =
       let lvl = convImportLevel (ideclLevelSpec i)
@@ -289,37 +298,41 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
           is_boot = ideclSource i
           mb_pkg = renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i)
           unitId = homeUnitId $ hsc_home_unit hsc_env
-      in (unitId, lvl, mb_pkg, GWIB (noLoc wanted_mod) is_boot)
+      in Right (unitId, lvl, mb_pkg, GWIB (noLoc wanted_mod) is_boot)
 
 loopFromInteractive :: HscEnv
-                    -> [(UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))]
+                    -> [Either ModuleNodeEdge (UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))]
                     -> M.Map NodeKey ModuleGraphNode
                     -> IO ([ModuleNodeEdge],M.Map NodeKey ModuleGraphNode)
 loopFromInteractive _ [] cached_nodes = return ([], cached_nodes)
-loopFromInteractive hsc_env (edge:edges) cached_nodes = do
-  let (unitId, lvl, mb_pkg, GWIB wanted_mod is_boot) = edge
-  let home_unit = ue_unitHomeUnit unitId (hsc_unit_env hsc_env)
-  let k _ loc mod =
-        let key = moduleToMnk mod is_boot
-        in return $ FoundHome (ModuleNodeFixed key loc)
-  found <- liftIO $ summariseModuleDispatch k hsc_env home_unit is_boot wanted_mod mb_pkg []
-  case found of
-    -- Case 1: Home modules have to already be in the cache.
-    FoundHome (ModuleNodeFixed mod _) -> do
-      let edge = ModuleNodeEdge lvl (NodeKey_Module mod)
-      -- Note: Does not perform any further downsweep as the module must already be in the cache.
-      (edges, cached_nodes') <- loopFromInteractive hsc_env edges cached_nodes
-      return (edge : edges, cached_nodes')
-    -- Case 2: External units may not be in the cache, if we haven't already initialised the
-    -- module graph. We can construct the module graph for those here by calling loopUnit.
-    External uid -> do
-      let hsc_env' = hscSetActiveHomeUnit home_unit hsc_env
-          cached_nodes' = loopUnit hsc_env' cached_nodes [uid]
-          edge = ModuleNodeEdge lvl (NodeKey_ExternalUnit uid)
-      (edges, cached_nodes') <- loopFromInteractive hsc_env edges cached_nodes'
-      return (edge : edges, cached_nodes')
-    -- And if it's not found.. just carry on and hope.
-    _ -> loopFromInteractive hsc_env edges cached_nodes
+loopFromInteractive hsc_env (edge:edges) cached_nodes =
+  case edge of
+    Left edge -> do
+        (edges, cached_nodes') <- loopFromInteractive hsc_env edges cached_nodes
+        return (edge : edges, cached_nodes')
+    Right (unitId, lvl, mb_pkg, GWIB wanted_mod is_boot) -> do
+      let home_unit = ue_unitHomeUnit unitId (hsc_unit_env hsc_env)
+      let k _ loc mod =
+            let key = moduleToMnk mod is_boot
+            in return $ FoundHome (ModuleNodeFixed key loc)
+      found <- liftIO $ summariseModuleDispatch k hsc_env home_unit is_boot wanted_mod mb_pkg []
+      case found of
+        -- Case 1: Home modules have to already be in the cache.
+        FoundHome (ModuleNodeFixed mod _) -> do
+          let edge = ModuleNodeEdge lvl (NodeKey_Module mod)
+          -- Note: Does not perform any further downsweep as the module must already be in the cache.
+          (edges, cached_nodes') <- loopFromInteractive hsc_env edges cached_nodes
+          return (edge : edges, cached_nodes')
+        -- Case 2: External units may not be in the cache, if we haven't already initialised the
+        -- module graph. We can construct the module graph for those here by calling loopUnit.
+        External uid -> do
+          let hsc_env' = hscSetActiveHomeUnit home_unit hsc_env
+              cached_nodes' = loopUnit hsc_env' cached_nodes [uid]
+              edge = ModuleNodeEdge lvl (NodeKey_ExternalUnit uid)
+          (edges, cached_nodes') <- loopFromInteractive hsc_env edges cached_nodes'
+          return (edge : edges, cached_nodes')
+        -- And if it's not found.. just carry on and hope.
+        _ -> loopFromInteractive hsc_env edges cached_nodes
 
 
 -- | Create a module graph from a list of installed modules.

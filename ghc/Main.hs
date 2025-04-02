@@ -302,7 +302,8 @@ ghciUI units srcs maybe_expr = do
         [] -> return []
         _  -> do
           s <- initMake srcs
-          return $ map (uncurry (,Nothing,)) s
+          dflags <- getDynFlags
+          return $ map (uncurry (,Just $ homeUnitId_ dflags,)) s
   interactiveUI defaultGhciSettings hs_srcs maybe_expr
 #endif
 
