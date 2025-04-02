@@ -65,6 +65,8 @@ module GHC.Unit.Types
    , mainUnitId
    , thisGhcUnitId
    , interactiveUnitId
+   , interactiveGhciUnitId
+   , interactiveSessionUnitId
 
    , ghcInternalUnit
    , rtsUnit
@@ -596,7 +598,7 @@ Make sure you change 'GHC.Unit.State.findWiredInUnits' if you add an entry here.
 -}
 
 ghcInternalUnitId, rtsUnitId,
-  mainUnitId, thisGhcUnitId, interactiveUnitId :: UnitId
+  mainUnitId, thisGhcUnitId, interactiveUnitId, interactiveGhciUnitId, interactiveSessionUnitId :: UnitId
 
 ghcInternalUnit, rtsUnit,
   mainUnit, thisGhcUnit, interactiveUnit :: Unit
@@ -605,6 +607,8 @@ ghcInternalUnitId = UnitId (fsLit "ghc-internal")
 rtsUnitId         = UnitId (fsLit "rts")
 thisGhcUnitId     = UnitId (fsLit cProjectUnitId) -- See Note [GHC's Unit Id]
 interactiveUnitId = UnitId (fsLit "interactive")
+interactiveGhciUnitId = UnitId (fsLit "interactive-ghci")
+interactiveSessionUnitId = UnitId (fsLit "interactive-session")
 
 ghcInternalUnit   = RealUnit (Definite ghcInternalUnitId)
 rtsUnit           = RealUnit (Definite rtsUnitId)

@@ -113,6 +113,7 @@ import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
 import qualified GHC.Data.Strict as Strict
 import GHC.Types.Error
+import qualified GHC.Unit.Home.Graph as HUG
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
@@ -129,6 +130,7 @@ import Data.Array
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
+import qualified Data.Foldable as Foldable
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( find, intercalate, intersperse,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
@@ -202,21 +204,21 @@ ghciWelcomeMsg = "GHCi, version " ++ cProjectVersion ++
 ghciCommands :: [Command]
 ghciCommands = map mkCmd [
   -- Hugs users are accustomed to :e, so make sure it doesn't overlap
-  ("?",         keepGoing help,                 noCompletion),
+  ("?",         keepGoingMulti help,            noCompletion),
   ("add",       keepGoingPaths addModule,       completeFilename),
-  ("abandon",   keepGoing abandonCmd,           noCompletion),
-  ("break",     keepGoing breakCmd,             completeBreakpoint),
+  ("abandon",   keepGoing abandonCmd,     noCompletion),
+  ("break",     keepGoing breakCmd,       completeBreakpoint),
   ("back",      keepGoing backCmd,              noCompletion),
-  ("browse",    keepGoing' (browseCmd False),   completeModule),
-  ("browse!",   keepGoing' (browseCmd True),    completeModule),
+  ("browse",    keepGoingMulti' (browseCmd False),   completeModule),
+  ("browse!",   keepGoingMulti' (browseCmd True),    completeModule),
   ("cd",        keepGoingMulti' changeDirectory,     completeFilename),
   ("continue",  keepGoing continueCmd,          noCompletion),
-  ("cmd",       keepGoing cmdCmd,               completeExpression),
-  ("def",       keepGoing (defineMacro False),  completeExpression),
-  ("def!",      keepGoing (defineMacro True),   completeExpression),
+  ("cmd",       keepGoingMulti cmdCmd,          completeExpression),
+  ("def",       keepGoingMulti (defineMacro False),  completeExpression),
+  ("def!",      keepGoingMulti (defineMacro True),   completeExpression),
   ("delete",    keepGoing deleteCmd,            noCompletion),
   ("disable",   keepGoing disableCmd,           noCompletion),
-  ("doc",       keepGoing' docCmd,              completeIdentifier),
+  ("doc",       keepGoingMulti docCmd,              completeIdentifier),
   ("edit",      keepGoingMulti' editFile,            completeFilename),
   ("enable",    keepGoing enableCmd,            noCompletion),
   ("force",     keepGoing forceCmd,             completeExpression),
@@ -225,14 +227,14 @@ ghciCommands = map mkCmd [
   ("history",   keepGoingMulti historyCmd,           noCompletion),
   ("info",      keepGoingMulti' (info False),        completeIdentifier),
   ("info!",     keepGoingMulti' (info True),         completeIdentifier),
-  ("issafe",    keepGoing' isSafeCmd,           completeModule),
-  ("ignore",    keepGoing ignoreCmd,            noCompletion),
+  ("issafe",    keepGoingMulti' isSafeCmd,           completeModule),
+  ("ignore",    keepGoing' ignoreCmd,            noCompletion),
   ("kind",      keepGoingMulti' (kindOfType False),  completeIdentifier),
   ("kind!",     keepGoingMulti' (kindOfType True),   completeIdentifier),
-  ("load",      keepGoingPaths loadModule_,     completeHomeModuleOrFile),
-  ("load!",     keepGoingPaths loadModuleDefer, completeHomeModuleOrFile),
-  ("list",      keepGoing' listCmd,             noCompletion),
-  ("module",    keepGoing moduleCmd,            completeSetModule),
+  ("load",      keepGoingPathsMulti loadModule_,     completeHomeModuleOrFile),
+  ("load!",     keepGoingPathsMulti loadModuleDefer, completeHomeModuleOrFile),
+  ("list",      keepGoing listCmd,             noCompletion),
+  ("module",    keepGoingMulti' moduleCmd,            completeSetModule),
   ("main",      keepGoing runMain,              completeFilename),
   ("print",     keepGoing printCmd,             completeExpression),
   ("quit",      quit,                           noCompletion),
@@ -243,7 +245,7 @@ ghciCommands = map mkCmd [
   ("set",       keepGoingMulti setCmd,          completeSetOptions),
   ("seti",      keepGoingMulti setiCmd,         completeSeti),
   ("show",      keepGoingMulti' showCmd,        completeShowOptions),
-  ("showi",     keepGoing showiCmd,             completeShowiOptions),
+  ("showi",     keepGoingMulti showiCmd,             completeShowiOptions),
   ("sprint",    keepGoing sprintCmd,            completeExpression),
   ("step",      keepGoing stepCmd,              completeIdentifier),
   ("steplocal", keepGoing stepLocalCmd,         completeIdentifier),
@@ -254,13 +256,13 @@ ghciCommands = map mkCmd [
   ("undef",     keepGoing undefineMacro,        completeMacro),
   ("unset",     keepGoing unsetOptions,         completeSetOptions),
   ("where",     keepGoing whereCmd,             noCompletion),
-  ("instances", keepGoing' instancesCmd,        completeExpression)
+  ("instances", keepGoingMulti' instancesCmd,   completeExpression)
   ] ++ map mkCmdHidden [ -- hidden commands
-  ("all-types", keepGoing' allTypesCmd),
-  ("complete",  keepGoing completeCmd),
-  ("loc-at",    keepGoing' locAtCmd),
-  ("type-at",   keepGoing' typeAtCmd),
-  ("uses",      keepGoing' usesCmd)
+  ("all-types", keepGoingMulti' allTypesCmd),
+  ("complete",  keepGoingMulti completeCmd),
+  ("loc-at",    keepGoingMulti' locAtCmd),
+  ("type-at",   keepGoingMulti' typeAtCmd),
+  ("uses",      keepGoingMulti' usesCmd)
   ]
  where
   mkCmd (n,a,c) = Command { cmdName = n
@@ -328,7 +330,7 @@ keepGoing' a str = do
   return CmdSuccess
 
 -- For commands which are actually support in multi-mode, initially just :reload
-keepGoingMulti' :: GhciMonad m => (String -> m ()) -> String -> m CmdExecOutcome
+keepGoingMulti' :: GhciMonad m => (a -> m ()) -> a -> m CmdExecOutcome
 keepGoingMulti' a str = a str >> return CmdSuccess
 
 inMultiMode :: GhciMonad m => m Bool
@@ -339,6 +341,12 @@ keepGoingPaths a str
  = do case toArgsNoLoc str of
           Left err -> reportError (GhciInvalidArgumentString err) >> return CmdSuccess
           Right args -> keepGoing' a args
+
+keepGoingPathsMulti :: ([FilePath] -> InputT GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
+keepGoingPathsMulti a str
+ = do case toArgsNoLoc str of
+          Left err -> reportError (GhciInvalidArgumentString err) >> return CmdSuccess
+          Right args -> keepGoingMulti' a args
 
 defFullHelpText :: String
 defFullHelpText =
@@ -489,9 +497,6 @@ default_args = []
 interactiveUI :: GhciSettings -> [(FilePath, Maybe UnitId, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
 interactiveUI config srcs maybe_exprs = do
-   -- This is a HACK to make sure dynflags are not overwritten when setting
-   -- options. When GHCi is made properly multi component it should be removed.
-   modifySession (\env -> hscSetActiveUnitId (hscActiveUnitId env) env)
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
    -- on a blackhole, and become unreachable during GC.  The GC will
@@ -512,16 +517,13 @@ interactiveUI config srcs maybe_exprs = do
    -- -XNoMonomorphismRestriction.
    -- See Note [Changing language extensions for interactive evaluation] #10857
    dflags <- getDynFlags
-   let dflags' = (xopt_set_unlessExplSpec
+   let dflags0 = (xopt_set_unlessExplSpec
                       LangExt.ExtendedDefaultRules xopt_set)
                . (xopt_set_unlessExplSpec
                       LangExt.MonomorphismRestriction xopt_unset)
                $ dflags
-   GHC.setInteractiveDynFlags dflags'
-   _ <- GHC.setProgramDynFlags
-               -- Set Opt_KeepGoing so that :reload loads as much as
-               -- possible
-               (gopt_set dflags Opt_KeepGoing)
+
+   installInteractiveHomeUnit dflags0
 
    -- Update the LogAction. Ensure we don't override the user's log action lest
    -- we break -ddump-json (#14078)
@@ -554,8 +556,11 @@ interactiveUI config srcs maybe_exprs = do
            -- Set to True because Prelude is implicitly imported.
            impDecl@ImportDecl{ideclExt=ext} -> impDecl{ideclExt = ext{ideclImplicit=True}}
    hsc_env <- GHC.getSession
-   let !in_multi = length (hsc_all_home_unit_ids hsc_env) > 1
+   let !in_multi = length (hsc_all_home_unit_ids hsc_env) > 3
         -- We force this to make sure we don't retain the hsc_env when reloading
+        -- The check is `> 2`, since we now always have at least two home units.
+        -- TODO: if everything goes well, this check should be deleted once
+        -- this PR has lifted the multiple home unit restrictions
    empty_cache <- liftIO newIfaceCache
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname           = default_progname,
@@ -594,6 +599,91 @@ interactiveUI config srcs maybe_exprs = do
                  }
 
    return ()
+
+installInteractiveHomeUnit :: GHC.GhcMonad m => DynFlags -> m ()
+installInteractiveHomeUnit dflags_init = do
+  logger <- getLogger
+  hsc_env <- GHC.getSession
+  let
+    -- Disable warnings about unused packages
+    -- It doesn't matter for the interactive session.
+    dflags0 = wopt_unset dflags_init Opt_WarnUnusedPackages
+
+    homeUnitPkgFlag uid =
+      ExposePackage (unitIdString uid) (UnitIdArg $ RealUnit (Definite uid)) (ModRenaming False [])
+
+    sessionUnitExposedFlag =
+      homeUnitPkgFlag interactiveSessionUnitId
+    -- Explicitly depend on all current home units.
+    -- Clear the 'import' paths so that ':add' never tries to add to the interactive
+    -- home unit.
+    dflags0Prompt = dflags0
+      { packageFlags =
+        [ sessionUnitExposedFlag ] ++
+        [ homeUnitPkgFlag uid
+        | homeUnitEnv <- Foldable.toList $ hsc_HUG hsc_env
+        , Just homeUnit <- [homeUnitEnv_home_unit homeUnitEnv]
+        , let uid = homeUnitId homeUnit
+        ] ++
+        (packageFlags dflags0)
+      , importPaths = []
+      }
+
+    -- Explicitly depend on all current home units.
+    -- Clear the 'import' paths so that ':add' never tries to add to the interactive
+    -- home unit.
+    dflags0Session = dflags0
+      { packageFlags =
+        [ homeUnitPkgFlag uid
+        | homeUnitEnv <- Foldable.toList $ hsc_HUG hsc_env
+        , Just homeUnit <- [homeUnitEnv_home_unit homeUnitEnv]
+        , let uid = homeUnitId homeUnit
+        ] ++
+        (packageFlags dflags0)
+      , importPaths = []
+      }
+
+    -- Set the unit-id of the interactive home unit.
+    dflagsPrompt =
+      setHomeUnitId interactiveGhciUnitId dflags0Prompt
+
+    dflagsSession = setHomeUnitId interactiveSessionUnitId dflags0Session
+
+    -- TODO: do we really need this? Why do we need this?
+    -- Look into 'initUnits'
+    cached_unit_dbs =
+        concat
+      . catMaybes
+      . fmap homeUnitEnv_unit_dbs
+      $ Foldable.toList
+      $ hsc_HUG hsc_env
+
+    all_unit_ids =
+      S.insert interactiveGhciUnitId $
+      S.insert interactiveSessionUnitId $
+      hsc_all_home_unit_ids hsc_env
+  interactiveUnit <- setupHomeUnitFor logger dflagsPrompt  all_unit_ids cached_unit_dbs
+  sessionUnit     <- setupHomeUnitFor logger dflagsSession all_unit_ids cached_unit_dbs
+  let
+    withInteractiveUnits =
+        HUG.unitEnv_insert interactiveGhciUnitId interactiveUnit
+        . HUG.unitEnv_insert interactiveSessionUnitId sessionUnit
+
+  modifySession (\env ->
+    let
+      newEnv = hscUpdateHUG withInteractiveUnits env
+    in
+      hscSetActiveUnitId interactiveGhciUnitId newEnv)
+
+  GHC.setInteractiveDynFlags dflags0
+  pure ()
+  where
+    setupHomeUnitFor :: GHC.GhcMonad m => Logger -> DynFlags -> S.Set UnitId -> [UnitDatabase UnitId] -> m HomeUnitEnv
+    setupHomeUnitFor logger dflags all_home_units cached_unit_dbs = do
+      (dbs,unit_state,home_unit,_mconstants) <-
+        liftIO $ initUnits logger dflags (Just cached_unit_dbs) all_home_units
+      hpt <- liftIO emptyHomePackageTable
+      pure (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags hpt (Just home_unit))
 
 reportError :: GhciMonad m => GhciCommandMessage -> m ()
 reportError err = do
@@ -1354,6 +1444,7 @@ runStmt input step = do
 
     setDumpFilePrefix :: GHC.GhcMonad m => InteractiveContext -> m () -- #17500
     setDumpFilePrefix ic = do
+        -- TODO: wrong
         dflags <- GHC.getInteractiveDynFlags
         GHC.setInteractiveDynFlags dflags { dumpPrefix = modStr ++ "." }
       where
@@ -1971,6 +2062,7 @@ wrapDeferTypeErrors :: GHC.GhcMonad m => m a -> m a
 wrapDeferTypeErrors load =
   MC.bracket
     (do
+      -- TODO: wrong, we should update all home unit flags I suppose?
       -- Force originalFlags to avoid leaking the associated HscEnv
       !originalFlags <- getDynFlags
       void $ GHC.setProgramDynFlags $
@@ -1986,7 +2078,7 @@ loadModule fs = do
 
 -- | @:load@ command
 loadModule_ :: GhciMonad m => [FilePath] -> m ()
-loadModule_ fs = void $ loadModule (zip3 fs (repeat Nothing) (repeat Nothing))
+loadModule_ fs = void $ loadModule (zip3 fs (repeat (Just interactiveSessionUnitId)) (repeat Nothing))
 
 loadModuleDefer :: GhciMonad m => [FilePath] -> m ()
 loadModuleDefer = wrapDeferTypeErrors . loadModule_
@@ -2105,7 +2197,7 @@ doLoadAndCollectInfo load_type howmuch = do
       -- MP: :set +c code path only works in single package mode atm, hence
       -- this call to isLoaded is ok. collectInfo needs to be modified further to
       -- work with :set +c so I have punted on that for now.
-      loaded <- filterM GHC.isLoaded (map ms_mod_name mod_summaries)
+      loaded <- filterM GHC.isLoadedModule2 (map ms_mod mod_summaries)
       v <- mod_infos <$> getGHCiState
       !newInfos <- collectInfo v loaded
       modifyGHCiState (\st -> st { mod_infos = newInfos })
@@ -2628,7 +2720,7 @@ browseModule bang modl exports_only = do
           then pure $ GHC.modInfoExports mod_info
           else do
             hsc_env <- GHC.getSession
-            mmod_env <- liftIO $ mkTopLevEnv hsc_env (moduleName modl)
+            mmod_env <- liftIO $ mkTopLevEnv hsc_env modl
             case mmod_env of
               Left err -> throwGhcException (CmdLineError (GHC.moduleNameString (GHC.moduleName modl) ++ " " ++ err))
               Right mod_env -> pure $ map greName . globalRdrEnvElts $ mod_env
@@ -2811,7 +2903,7 @@ checkAdd ii = do
     IIDecl d -> do
        let modname = unLoc (ideclName d)
        pkgqual <- GHC.renameRawPkgQualM modname (ideclPkgQual d)
-       m <- GHC.lookupQualifiedModule pkgqual modname
+       m <- lookupQualifiedModuleName pkgqual modname
        when safe $ do
            t <- GHC.isModuleTrusted m
            unless t $ throwGhcException $ ProgramError $ ""
@@ -2971,7 +3063,7 @@ setCmd str
     Right ("stop",    rest) -> setStop    $ dropWhile isSpace rest
     Right ("local-config", rest) ->
         setLocalConfigBehaviour $ dropWhile isSpace rest
-    _ -> toArgsNoLocWithErrorHandler str $ \wds -> () <$ keepGoing' setOptions wds
+    _ -> toArgsNoLocWithErrorHandler str $ \wds -> () <$ keepGoingMulti' setOptions wds
 
 setiCmd :: GhciMonad m => String -> m ()
 setiCmd ""   = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags False
@@ -3125,58 +3217,74 @@ newDynFlags interactive_only minus_opts = do
       let lopts = map noLoc minus_opts
 
       logger <- getLogger
-      idflags0 <- GHC.getInteractiveDynFlags
-      (idflags1, leftovers, warns) <- DynFlags.parseDynamicFlagsCmdLine logger idflags0 lopts
+      case interactive_only of
+        True -> do
+          idflags0 <- hsc_dflags <$> GHC.getSession
+          (idflags1, leftovers, warns) <- DynFlags.parseDynamicFlagsCmdLine logger idflags0 lopts
 
-      liftIO $ printOrThrowDiagnostics logger (initPrintConfig idflags1) (initDiagOpts idflags1) (GhcDriverMessage <$> warns)
-      when (not $ null leftovers) (unknownFlagsErr $ map unLoc leftovers)
+          liftIO $ printOrThrowDiagnostics logger (initPrintConfig idflags1) (initDiagOpts idflags1) (GhcDriverMessage <$> warns)
+          when (not $ null leftovers) (unknownFlagsErr $ map unLoc leftovers)
 
-      when (interactive_only && packageFlagsChanged idflags1 idflags0) $ do
-          liftIO $ hPutStrLn stderr "cannot set package flags with :seti; use :set"
-      GHC.setInteractiveDynFlags idflags1
-      installInteractivePrint (interactivePrint idflags1) False
+          when (packageFlagsChanged idflags1 idflags0) $ do
+            liftIO $ hPutStrLn stderr "cannot set package flags with :seti; use :set"
 
-      dflags0 <- getDynFlags
+          GHC.setInteractiveDynFlags idflags1
+          idflags_norm <- ic_dflags . hsc_IC <$> GHC.getSession
+          _ <- GHC.setProgramDynFlags idflags_norm
+          pure ()
+        False -> do
+          dflags0 <- getDynFlags
+          initial_hug <- hsc_HUG <$> GHC.getSession
+          updates <- forM (M.assocs $ HUG.unitEnv_graph initial_hug) $ \(uid, homeUnitEnv) -> do
+            let oldFlags = HUG.homeUnitEnv_dflags homeUnitEnv
+            -- TODO: perhaps write custom version of parseDynamicFlagsCmdLine which gives us more control over the errors and warnings
+            (newFlags, _, _) <- DynFlags.parseDynamicFlagsCmdLine logger oldFlags lopts
+            let newFlags' = if uid == interactiveGhciUnitId
+                  then wopt_unset newFlags Opt_WarnUnusedPackages
+                  else newFlags
+            pure (uid, oldFlags, newFlags')
+          must_reload <- GHC.updateProgramDynFlags True updates
 
-      when (not interactive_only) $ do
-        (dflags1, _, _) <- liftIO $ DynFlags.parseDynamicFlagsCmdLine logger dflags0 lopts
-        must_reload <- GHC.setProgramDynFlags dflags1
+          -- update and check interactive dynflags
+          -- TODO: document the relation ship between the interactive unit and in the interactive context
+          icdflags <- hsc_dflags <$> GHC.getSession
+          GHC.setInteractiveDynFlags icdflags
 
-        -- if the package flags changed, reset the context and link
-        -- the new packages.
-        hsc_env <- GHC.getSession
-        let dflags2 = hsc_dflags hsc_env
-        let interp  = hscInterp hsc_env
-        when (packageFlagsChanged dflags2 dflags0) $ do
-          when (verbosity dflags2 > 0) $
-            liftIO . putStrLn $
-              "package flags have changed, resetting and loading new packages..."
-          -- Clear caches and eventually defined breakpoints. (#1620)
-          clearCaches
+          -- if the package flags changed, reset the context and link
+          -- the new packages.
+          hsc_env <- GHC.getSession
+          let dflags2 = hsc_dflags hsc_env
+          let interp  = hscInterp hsc_env
           when must_reload $ do
-            let units = preloadUnits (hsc_units hsc_env)
+            when (verbosity dflags2 > 0) $
+              liftIO . putStrLn $
+                "package flags have changed, resetting and loading new packages..."
+
+            -- Clear caches and eventually defined breakpoints. (#1620)
+            clearCaches
+
+            let units = concatMap (preloadUnits . HUG.homeUnitEnv_units) (Foldable.toList $ hsc_HUG hsc_env)
             liftIO $ Loader.loadPackages interp hsc_env units
-          -- package flags changed, we can't re-use any of the old context
-          setContextAfterLoad False Nothing
-          -- and copy the package flags to the interactive DynFlags
-          idflags <- GHC.getInteractiveDynFlags
-          GHC.setInteractiveDynFlags
-              idflags{ packageFlags = packageFlags dflags2 }
+            -- package flags changed, we can't re-use any of the old context
+            setContextAfterLoad False Nothing -- TODO: recheck whether this is necessary
 
-        let ld0length   = length $ ldInputs dflags0
-            fmrk0length = length $ cmdlineFrameworks dflags0
+          -- TODO extract into separate function
+          let ld0length   = length $ ldInputs dflags0
+              fmrk0length = length $ cmdlineFrameworks dflags0
 
-            newLdInputs     = drop ld0length (ldInputs dflags2)
-            newCLFrameworks = drop fmrk0length (cmdlineFrameworks dflags2)
+              newLdInputs     = drop ld0length (ldInputs dflags2)
+              newCLFrameworks = drop fmrk0length (cmdlineFrameworks dflags2)
 
-            dflags'  = dflags2 { ldInputs = newLdInputs
-                               , cmdlineFrameworks = newCLFrameworks
-                               }
-            hsc_env' = hscSetFlags dflags' hsc_env
+              dflags'  = dflags2 { ldInputs = newLdInputs
+                                 , cmdlineFrameworks = newCLFrameworks
+                                 }
+              hsc_env' = hscSetFlags dflags' hsc_env
 
-        when (not (null newLdInputs && null newCLFrameworks)) $
-          liftIO $ Loader.loadCmdLineLibs (hscInterp hsc_env') hsc_env'
+          when (not (null newLdInputs && null newCLFrameworks)) $
+            liftIO $ Loader.loadCmdLineLibs (hscInterp hsc_env') hsc_env'
 
+      idflags <- hsc_dflags <$> GHC.getSession
+      installInteractivePrint (interactivePrint idflags) False
       return ()
 
 
@@ -4425,7 +4533,10 @@ lookupModule :: GHC.GhcMonad m => String -> m Module
 lookupModule mName = lookupModuleName (GHC.mkModuleName mName)
 
 lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
-lookupModuleName mName = GHC.lookupQualifiedModule NoPkgQual mName
+lookupModuleName mName = lookupQualifiedModuleName NoPkgQual mName
+
+lookupQualifiedModuleName :: GHC.GhcMonad m => PkgQual -> ModuleName -> m Module
+lookupQualifiedModuleName = GHC.lookupAnyQualifiedModule
 
 isMainUnitModule :: Module -> Bool
 isMainUnitModule m = GHC.moduleUnit m == mainUnit
@@ -4477,8 +4588,8 @@ wantInterpretedModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 wantInterpretedModuleName modname = do
    modl <- lookupModuleName modname
    let str = moduleNameString modname
-   home_unit <- hsc_home_unit <$> GHC.getSession
-   unless (isHomeModule home_unit modl) $
+   hug <- hsc_HUG <$> GHC.getSession
+   unless (HUG.memberHugHomeModule modl hug) $
       throwGhcException (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
    is_interpreted <- GHC.moduleIsInterpreted modl
    when (not is_interpreted) $

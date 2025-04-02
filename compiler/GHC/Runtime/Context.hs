@@ -297,6 +297,8 @@ data InteractiveImport
       -- (filtered by an import decl) into scope
 
   | IIModule ModuleName
+      -- TODO: change this to 'Module', does this work?
+      -- Much more precise
       -- ^ Bring into scope the entire top-level envt of
       -- of this module, including the things imported
       -- into it.

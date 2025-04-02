@@ -34,6 +34,9 @@ module GHC.Unit.Home.Graph
   , lookupHug
   , lookupHugByModule
   , lookupHugUnit
+  , lookupAnyHug
+  , memberHugHomeModule
+  , memberHugHomeInstalledModule
 
   -- ** Reachability
   , transitiveHomeDeps
@@ -62,6 +65,7 @@ module GHC.Unit.Home.Graph
   , unitEnv_insert
   , unitEnv_new
   , unitEnv_lookup
+  , traverseUnitEnvWithKey
   ) where
 
 import GHC.Prelude
@@ -250,6 +254,23 @@ lookupHug hug uid mod = do
     Nothing -> pure Nothing
     Just hue -> lookupHpt (homeUnitEnv_hpt hue) mod
 
+-- TODO: this should not be merged, where else could we try to search for modules?
+lookupAnyHug :: HomeUnitGraph -> ModuleName -> IO (Maybe HomeModInfo)
+lookupAnyHug hug mod = firstJustM $ flip fmap (Set.toList $ unitEnv_keys hug) $ \uid -> do
+  case unitEnv_lookup_maybe uid hug of
+    -- Really, here we want "lookup HPT" rather than unitEnvLookup
+    Nothing -> pure Nothing
+    Just hue -> lookupHpt (homeUnitEnv_hpt hue) mod
+  where
+    firstJustM :: Monad f => [f (Maybe a)] -> f (Maybe a)
+    firstJustM [] = pure Nothing
+    firstJustM (x:xs) = do
+      ma <- x
+      case ma of
+        Nothing -> firstJustM xs
+        Just a -> pure $ Just a
+
+
 -- | Lookup the 'HomeModInfo' of a 'Module' in the 'HomeUnitGraph' (via the 'HomePackageTable' of the corresponding unit)
 lookupHugByModule :: Module -> HomeUnitGraph -> IO (Maybe HomeModInfo)
 lookupHugByModule mod hug
@@ -261,6 +282,16 @@ lookupHugByModule mod hug
 -- | Lookup a 'HomeUnitEnv' by 'UnitId' in a 'HomeUnitGraph'
 lookupHugUnit :: UnitId -> HomeUnitGraph -> Maybe HomeUnitEnv
 lookupHugUnit = unitEnv_lookup_maybe
+
+memberHugHomeModule :: Module -> HomeUnitGraph -> Bool
+memberHugHomeModule mod =
+  memberHugHomeInstalledModule (fmap toUnitId mod)
+
+memberHugHomeInstalledModule :: InstalledModule -> HomeUnitGraph -> Bool
+memberHugHomeInstalledModule mod hug =
+  case unitEnv_lookup_maybe (moduleUnit mod) hug of
+    Nothing -> False
+    Just _ ->  True
 
 --------------------------------------------------------------------------------
 -- * Internal representation map
@@ -312,6 +343,10 @@ unitEnv_foldWithKey f z (UnitEnvGraph g)= Map.foldlWithKey' f z g
 
 unitEnv_lookup :: UnitEnvGraphKey -> UnitEnvGraph v -> v
 unitEnv_lookup u env = expectJust $ unitEnv_lookup_maybe u env
+
+traverseUnitEnvWithKey :: Applicative f => (UnitEnvGraphKey -> a -> f b) -> UnitEnvGraph a -> f (UnitEnvGraph b)
+traverseUnitEnvWithKey f unitEnv =
+  UnitEnvGraph <$> Map.traverseWithKey f (unitEnv_graph unitEnv)
 
 --------------------------------------------------------------------------------
 -- * Utilities

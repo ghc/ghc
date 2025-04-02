@@ -38,6 +38,7 @@ module GHC (
         setSessionDynFlags,
         setUnitDynFlags,
         getProgramDynFlags, setProgramDynFlags,
+        updateProgramDynFlags,
         getInteractiveDynFlags, setInteractiveDynFlags,
         interpretPackageEnv,
 
@@ -83,6 +84,7 @@ module GHC (
         getModuleGraph,
         isLoaded,
         isLoadedModule,
+        isLoadedModule2,
         topSortModuleGraph,
 
         -- * Inspecting modules
@@ -155,6 +157,7 @@ module GHC (
         getBindings, getInsts, getNamePprCtx,
         findModule, lookupModule,
         findQualifiedModule, lookupQualifiedModule,
+        lookupLoadedHomeModuleByModuleName, lookupAnyQualifiedModule,
         renamePkgQualM, renameRawPkgQualM,
         isModuleTrusted, moduleTrustReqs,
         getNamesInScope,
@@ -458,7 +461,8 @@ import System.Environment ( getEnv, getProgName )
 import System.Exit      ( exitWith, ExitCode(..) )
 import System.FilePath
 import System.IO.Error  ( isDoesNotExistError )
-import GHC.Unit.Home.PackageTable
+import Data.Function    ( (&) )
+
 
 -- %************************************************************************
 -- %*                                                                      *
@@ -861,6 +865,64 @@ setProgramDynFlags_ invalidate_needed dflags = do
   when invalidate_needed $ invalidateModSummaryCache
   return changed
 
+-- TODO: clean this up, not idiomatic or easy to use
+-- | Variation of 'setProgramDynFlags_' which allows to update the 'DynFlags' of multiple
+-- home units at the same time.
+updateProgramDynFlags :: GhcMonad m => Bool -> [(UnitId, DynFlags, DynFlags)] -> m Bool
+updateProgramDynFlags invalidate_needed updateInfo = do
+  logger <- getLogger
+
+  changed' <- forM updateInfo $ \(uid, oldFlags, newFlags) -> do
+    newFlags1 <- checkNewDynFlags logger newFlags
+    pure (packageFlagsChanged oldFlags newFlags1, (uid, newFlags1))
+
+  let newUidAndFlags = Map.fromList $ fmap snd changed'
+  let changed = any fst changed'
+  if changed
+    then do
+        -- additionally, set checked dflags so we don't lose fixes
+        unit_env0 <- hsc_unit_env <$> getSession
+
+        home_unit_graph <- HUG.traverseUnitEnvWithKey (updateHomeUnit logger unit_env0 newUidAndFlags) (ue_home_unit_graph unit_env0)
+
+        let dflags1 = homeUnitEnv_dflags $ HUG.unitEnv_lookup (ue_currentUnit unit_env0) home_unit_graph
+        let unit_env = UnitEnv
+              { ue_platform        = targetPlatform dflags1
+              , ue_namever         = ghcNameVersion dflags1
+              , ue_home_unit_graph = home_unit_graph
+              , ue_current_unit    = ue_currentUnit unit_env0
+              , ue_eps             = ue_eps unit_env0
+              }
+        modifySession $ \h -> hscSetFlags dflags1 h{ hsc_unit_env = unit_env }
+    else do
+      env <- getSession
+      setSession
+        (env
+          & hscUpdateHUG (\hug -> foldl' (\h (uid, flags) -> HUG.updateUnitFlags uid (const flags) h) hug $ Map.toList newUidAndFlags)
+          & hscSetActiveUnitId (hscActiveUnitId env) )
+
+  when invalidate_needed $ invalidateModSummaryCache
+  pure changed
+  where
+    updateHomeUnit :: GhcMonad m => Logger -> UnitEnv -> Map.Map UnitId DynFlags -> (UnitId -> HomeUnitEnv -> m HomeUnitEnv)
+    updateHomeUnit logger unit_env updates = \uid homeUnitEnv -> do
+      let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
+          dflags = case Map.lookup uid updates of
+            Nothing -> homeUnitEnv_dflags homeUnitEnv
+            Just flags -> flags
+          old_hpt = homeUnitEnv_hpt homeUnitEnv
+          home_units = HUG.allUnits (ue_home_unit_graph unit_env)
+
+      (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags cached_unit_dbs home_units
+
+      updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
+      pure HomeUnitEnv
+        { homeUnitEnv_units = unit_state
+        , homeUnitEnv_unit_dbs = Just dbs
+        , homeUnitEnv_dflags = updated_dflags
+        , homeUnitEnv_hpt = old_hpt
+        , homeUnitEnv_home_unit = Just home_unit
+        }
 
 -- When changing the DynFlags, we want the changes to apply to future
 -- loads, but without completely discarding the program.  But the
@@ -1251,11 +1313,11 @@ type TypecheckedSource = LHsBinds GhcTc
 --
 -- This function ignores boot modules and requires that there is only one
 -- non-boot module with the given name.
-getModSummary :: GhcMonad m => ModuleName -> m ModSummary
+getModSummary :: GhcMonad m => Module -> m ModSummary
 getModSummary mod = do
    mg <- liftM hsc_mod_graph getSession
    let mods_by_name = [ ms | ms <- mgModSummaries mg
-                      , ms_mod_name ms == mod
+                      , ms_mod ms == mod
                       , isBootSummary ms == NotBoot ]
    case mods_by_name of
      [] -> do dflags <- getDynFlags
@@ -1286,7 +1348,9 @@ typecheckModule pmod = do
  liftIO $ do
    let ms          = modSummary pmod
    let lcl_dflags  = ms_hspp_opts ms -- take into account pragmas (OPTIONS_GHC, etc.)
-   let lcl_hsc_env = hscSetFlags lcl_dflags hsc_env
+   let lcl_hsc_env =
+          hscSetFlags lcl_dflags $
+          hscSetActiveUnitId (toUnitId $ moduleUnit $ ms_mod ms) hsc_env
    let lcl_logger  = hsc_logger lcl_hsc_env
    (tc_gbl_env, rn_info) <- hscTypecheckRename lcl_hsc_env ms $
                         HsParsedModule { hpm_module = parsedSource pmod,
@@ -1429,14 +1493,20 @@ getModuleGraph :: GhcMonad m => m ModuleGraph -- ToDo: DiGraph ModSummary
 getModuleGraph = liftM hsc_mod_graph getSession
 
 -- | Return @True@ \<==> module is loaded.
+-- TODO: this function should likely be deleted.
 isLoaded :: GhcMonad m => ModuleName -> m Bool
 isLoaded m = withSession $ \hsc_env -> liftIO $ do
-  hmi <- lookupHpt (hsc_HPT hsc_env) m
+  hmi <- HUG.lookupAnyHug (hsc_HUG hsc_env) m
   return $! isJust hmi
 
 isLoadedModule :: GhcMonad m => UnitId -> ModuleName -> m Bool
 isLoadedModule uid m = withSession $ \hsc_env -> liftIO $ do
   hmi <- HUG.lookupHug (hsc_HUG hsc_env) uid m
+  return $! isJust hmi
+
+isLoadedModule2 :: GhcMonad m => Module -> m Bool
+isLoadedModule2 m = withSession $ \hsc_env -> liftIO $ do
+  hmi <- HUG.lookupHugByModule m (hsc_HUG hsc_env)
   return $! isJust hmi
 
 -- | Return the bindings for the current interactive session.
@@ -1824,6 +1894,33 @@ lookupLoadedHomeModule uid mod_name = withSession $ \hsc_env -> liftIO $ do
   HUG.lookupHug (hsc_HUG hsc_env) uid mod_name >>= \case
     Just mod_info      -> return (Just (mi_module (hm_iface mod_info)))
     _not_a_home_module -> return Nothing
+
+-- TODO: this is incorrect, what if we have mulitple 'ModuleName's in our HPTs?
+lookupLoadedHomeModuleByModuleName :: GhcMonad m => ModuleName -> m (Maybe Module)
+lookupLoadedHomeModuleByModuleName mod_name = withSession $ \hsc_env -> liftIO $ do
+  trace_if (hsc_logger hsc_env) (text "lookupLoadedHomeModuleByModuleName" <+> ppr mod_name)
+  HUG.lookupAnyHug (hsc_HUG hsc_env) mod_name >>= \case
+    Just mod_info      -> return (Just (mi_module (hm_iface mod_info)))
+    _not_a_home_module -> return Nothing
+
+lookupAnyQualifiedModule :: GhcMonad m => PkgQual -> ModuleName -> m Module
+lookupAnyQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
+  home <- lookupLoadedHomeModuleByModuleName mod_name
+  liftIO $ trace_if (hsc_logger hsc_env) (ppr home <+> ppr (fmap moduleUnitId home))
+  case home of
+    Just m  -> return m
+    Nothing -> liftIO $ do
+      let fc     = hsc_FC hsc_env
+      let units  = hsc_units hsc_env
+      let dflags = hsc_dflags hsc_env
+      let fopts  = initFinderOpts dflags
+      res <- findExposedPackageModule fc fopts units mod_name NoPkgQual
+      case res of
+        Found _ m -> return m
+        err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
+lookupAnyQualifiedModule pkgqual mod_name =
+  -- TODO: definitely wrong.
+  findQualifiedModule pkgqual mod_name
 
 -- | Check that a module is safe to import (according to Safe Haskell).
 --

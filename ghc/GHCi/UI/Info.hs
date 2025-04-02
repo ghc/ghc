@@ -46,6 +46,7 @@ import           GHC.Tc.Types
 import           GHC.Types.Name.Reader
 import           GHC.Types.Name.Set
 import           GHC.Utils.Outputable
+import           GHC.Unit.Types
 import           GHC.Types.SrcLoc
 import           GHC.Types.Var
 import qualified GHC.Data.Strict as Strict
@@ -113,7 +114,7 @@ srcSpanFilePath = unpackFS . srcSpanFile
 -- | Try to find the location of the given identifier at the given
 -- position in the module.
 findLoc :: GhcMonad m
-        => Map ModuleName ModInfo
+        => Map Module ModInfo
         -> RealSrcSpan
         -> String
         -> ExceptT GhciModuleError m (ModInfo,Name,SrcSpan)
@@ -133,7 +134,7 @@ findLoc infos span0 string = do
 
 -- | Find any uses of the given identifier in the codebase.
 findNameUses :: (GhcMonad m)
-             => Map ModuleName ModInfo
+             => Map Module ModInfo
              -> RealSrcSpan
              -> String
              -> ExceptT GhciModuleError m [SrcSpan]
@@ -160,7 +161,7 @@ stripSurrounding xs = filter (not . isRedundant) xs
 -- | Try to resolve the name located at the given position, or
 -- otherwise resolve based on the current module's scope.
 findName :: GhcMonad m
-         => Map ModuleName ModInfo
+         => Map Module ModInfo
          -> RealSrcSpan
          -> ModInfo
          -> String
@@ -186,11 +187,11 @@ findName infos span0 mi string =
 
 -- | Try to resolve the name from another (loaded) module's exports.
 resolveNameFromModule :: GhcMonad m
-                      => Map ModuleName ModInfo
+                      => Map Module ModInfo
                       -> Name
                       -> ExceptT GhciModuleError m Name
 resolveNameFromModule infos name = do
-     info <- maybe (throwE $ GhciNoModuleForName name) pure (nameModule_maybe name >>= \modL -> M.lookup (moduleName modL) infos)
+     info <- maybe (throwE $ GhciNoModuleForName name) pure (nameModule_maybe name >>= \modL -> M.lookup modL infos)
      let all_names = modInfo_rdrs info
      maybe (throwE GhciNoMatchingModuleExport) pure $
          find (matchName name) all_names
@@ -206,7 +207,7 @@ resolveName spans' si = listToMaybe $ mapMaybe spaninfoVar $
 
 -- | Try to find the type of the given span.
 findType :: GhcMonad m
-         => Map ModuleName ModInfo
+         => Map Module ModInfo
          -> RealSrcSpan
          -> String
          -> ExceptT GhciModuleError m (ModInfo, Type)
@@ -228,14 +229,14 @@ findType infos span0 string = do
 
 -- | Guess a module name from a file path.
 guessModule :: GhcMonad m
-            => Map ModuleName ModInfo -> FilePath -> MaybeT m ModuleName
+            => Map Module ModInfo -> FilePath -> MaybeT m Module
 guessModule infos fp = do
     target <- lift $ guessTarget fp Nothing Nothing
     case targetId target of
-        TargetModule mn  -> return mn
+        TargetModule mn  -> return $ mkModule (RealUnit $ Definite $ targetUnitId target) mn
         TargetFile fp' _ -> guessModule' fp'
   where
-    guessModule' :: GhcMonad m => FilePath -> MaybeT m ModuleName
+    guessModule' :: GhcMonad m => FilePath -> MaybeT m Module
     guessModule' fp' = case findModByFp fp' of
         Just mn -> return mn
         Nothing -> do
@@ -243,19 +244,19 @@ guessModule infos fp = do
 
             target' <- lift $ guessTarget fp'' Nothing Nothing
             case targetId target' of
-                TargetModule mn -> return mn
+                TargetModule mn -> return $ mkModule (RealUnit $ Definite $ targetUnitId target') mn
                 _               -> MaybeT . pure $ findModByFp fp''
 
-    findModByFp :: FilePath -> Maybe ModuleName
+    findModByFp :: FilePath -> Maybe Module
     findModByFp fp' = fst <$> find ((Just fp' ==) . mifp) (M.toList infos)
       where
-        mifp :: (ModuleName, ModInfo) -> Maybe FilePath
+        mifp :: (Module, ModInfo) -> Maybe FilePath
         mifp = ml_hs_file . ms_location . modinfoSummary . snd
 
 
 -- | Collect type info data for the loaded modules.
-collectInfo :: (GhcMonad m) => Map ModuleName ModInfo -> [ModuleName]
-               -> m (Map ModuleName ModInfo)
+collectInfo :: (GhcMonad m) => Map Module ModInfo -> [Module]
+               -> m (Map Module ModInfo)
 collectInfo ms loaded = do
     df <- getDynFlags
     unit_state <- hsc_units <$> getSession
@@ -299,17 +300,17 @@ srcFilePath modSum = fromMaybe obj_fp src_fp
         ms_loc = ms_location modSum
 
 -- | Get info about the module: summary, types, etc.
-getModInfo :: (GhcMonad m) => ModuleName -> m ModInfo
-getModInfo name = do
-    m <- getModSummary name
-    p <- parseModule m
+getModInfo :: (GhcMonad m) => Module -> m ModInfo
+getModInfo m = do
+    mod_summary <- getModSummary m
+    p <- parseModule mod_summary
     typechecked <- typecheckModule p
     let allTypes = processAllTypeCheckedModule typechecked
     let !rdr_env = tcg_rdr_env (fst $ tm_internals_ typechecked)
-    ts <- liftIO $ getModificationTime $ srcFilePath m
+    ts <- liftIO $ getModificationTime $ srcFilePath mod_summary
     return $
       ModInfo
-        { modinfoSummary    = m
+        { modinfoSummary    = mod_summary
         , modinfoSpans      = allTypes
         , modinfoRdrEnv     = forceGlobalRdrEnv rdr_env
         , modinfoLastUpdate = ts
