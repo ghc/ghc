@@ -2,6 +2,8 @@
 module GHC.Driver.Env
    ( Hsc(..)
    , HscEnv (..)
+   , hsc_mod_graph
+   , setModuleGraph
    , hscUpdateFlags
    , hscSetFlags
    , hsc_home_unit
@@ -130,6 +132,9 @@ hsc_HUE = ue_currentHomeUnitEnv . hsc_unit_env
 hsc_HUG :: HscEnv -> HomeUnitGraph
 hsc_HUG = ue_home_unit_graph . hsc_unit_env
 
+hsc_mod_graph :: HscEnv -> ModuleGraph
+hsc_mod_graph = ue_module_graph . hsc_unit_env
+
 hsc_all_home_unit_ids :: HscEnv -> Set.Set UnitId
 hsc_all_home_unit_ids = HUG.allUnits . hsc_HUG
 
@@ -138,6 +143,9 @@ hscInsertHPT hmi hsc_env = UnitEnv.insertHpt hmi (hsc_unit_env hsc_env)
 
 hscUpdateHUG :: (HomeUnitGraph -> HomeUnitGraph) -> HscEnv -> HscEnv
 hscUpdateHUG f hsc_env = hsc_env { hsc_unit_env = updateHug f (hsc_unit_env hsc_env) }
+
+setModuleGraph :: ModuleGraph -> HscEnv -> HscEnv
+setModuleGraph mod_graph hsc_env = hsc_env { hsc_unit_env = (hsc_unit_env hsc_env) { ue_module_graph = mod_graph } }
 
 {-
 
@@ -220,15 +228,15 @@ hscEPS hsc_env = readIORef (euc_eps (ue_eps (hsc_unit_env hsc_env)))
 -- | Find all rules in modules that are in the transitive closure of the given
 -- module.
 hugRulesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO RuleBase
-hugRulesBelow hsc uid mn = foldr (flip extendRuleBaseList) emptyRuleBase <$>
-  hugSomeThingsBelowUs (md_rules . hm_details) False hsc uid mn
+hugRulesBelow hsc_env uid mn = foldr (flip extendRuleBaseList) emptyRuleBase <$>
+  hugSomeThingsBelowUs (md_rules . hm_details) False hsc_env uid mn
 
 -- | Get annotations from all modules "below" this one (in the dependency
 -- sense) within the home units. If the module is @Nothing@, returns /all/
 -- annotations in the home units.
 hugAnnsBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO AnnEnv
-hugAnnsBelow hsc uid mn = foldr (flip extendAnnEnvList) emptyAnnEnv <$>
-  hugSomeThingsBelowUs (md_anns . hm_details) False hsc uid mn
+hugAnnsBelow hsc_env uid mn = foldr (flip extendAnnEnvList) emptyAnnEnv <$>
+  hugSomeThingsBelowUs (md_anns . hm_details) False hsc_env uid mn
 
 -- | Find all COMPLETE pragmas in modules that are in the transitive closure of the
 -- given module.
@@ -260,7 +268,8 @@ hugInstancesBelow hsc_env uid mnwib = do
 hugSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO [[a]]
 -- An explicit check to see if we are in one-shot mode to avoid poking the ModuleGraph thunk
 -- These things are currently stored in the EPS for home packages. (See #25795 for
--- progress in removing these kind of checks)
+-- progress in removing these kind of checks; and making these functions of
+-- `UnitEnv` rather than `HscEnv`)
 -- See Note [Downsweep and the ModuleGraph]
 hugSomeThingsBelowUs _ _ hsc_env _ _ | isOneShot (ghcMode (hsc_dflags hsc_env)) = return []
 hugSomeThingsBelowUs extract include_hi_boot hsc_env uid mn

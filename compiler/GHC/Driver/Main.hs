@@ -332,7 +332,6 @@ newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
     return HscEnv { hsc_dflags         = top_dynflags
                   , hsc_logger         = setLogFlags logger (initLogFlags top_dynflags)
                   , hsc_targets        = []
-                  , hsc_mod_graph      = emptyMG
                   , hsc_IC             = emptyInteractiveContext dflags
                   , hsc_NC             = nc_var
                   , hsc_FC             = fc_var

@@ -2109,7 +2109,7 @@ for the unit portion of the graph, if it's not already been performed.
 withInteractiveModuleNode :: HscEnv -> TcM a -> TcM a
 withInteractiveModuleNode hsc_env thing_inside = do
   mg <- liftIO $ downsweepInteractiveImports hsc_env (hsc_IC hsc_env)
-  updTopEnv (\env -> env { hsc_mod_graph = mg }) thing_inside
+  updTopEnv (setModuleGraph mg) thing_inside
 
 
 runTcInteractive :: HscEnv -> TcRn a -> IO (Messages TcRnMessage, Maybe a)
