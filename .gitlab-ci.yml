@@ -1060,6 +1060,50 @@ abi-test:
     - *full-ci
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-abi.*/'
 
+############################################################
+# ghc-wasm-meta integration testing
+############################################################
+
+.ghc-wasm-meta:
+  stage: testing
+  variables:
+    UPSTREAM_GHC_PIPELINE_ID: $CI_PIPELINE_ID
+    UPSTREAM_GHC_PROJECT_ID: $CI_PROJECT_ID
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-wasm.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*wasm.*/'
+      when: manual
+  trigger:
+    project: haskell-wasm/ghc-wasm-meta
+    branch: master
+    strategy: depend
+
+ghc-wasm-meta-gmp:
+  extends: .ghc-wasm-meta
+  needs:
+    - job: x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+      artifacts: false
+  variables:
+    UPSTREAM_GHC_FLAVOUR: gmp
+    UPSTREAM_GHC_JOB_NAME: x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+
+ghc-wasm-meta-native:
+  extends: .ghc-wasm-meta
+  needs:
+    - job: x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+      artifacts: false
+  variables:
+    UPSTREAM_GHC_FLAVOUR: native
+    UPSTREAM_GHC_JOB_NAME: x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+
+ghc-wasm-meta-unreg:
+  extends: .ghc-wasm-meta
+  needs:
+    - job: x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+      artifacts: false
+  variables:
+    UPSTREAM_GHC_FLAVOUR: unreg
+    UPSTREAM_GHC_JOB_NAME: x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
 
 ############################################################
 # Documentation deployment via GitLab Pages
