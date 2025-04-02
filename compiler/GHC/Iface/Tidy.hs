@@ -55,10 +55,8 @@ import GHC.Core.Seq         ( seqBinds )
 import GHC.Core.Opt.Arity   ( exprArity, typeArity, exprBotStrictness_maybe )
 import GHC.Core.InstEnv
 import GHC.Core.Type
-import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Tidy
-import GHC.Core.Class
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 
 import GHC.Iface.Tidy.StaticPtrTable
