@@ -333,9 +333,11 @@ buildClass tycon_name binders roles fds
               -- (We used to call them D_C, but now we can have two different
               --  superclasses both called C!)
 
-        ; let unary_class = isSingleton (sc_theta ++ op_tys)
+        ; let unary_class = case sc_theta ++ op_tys of
+                              [ty] -> isBoxedType ty
+                              _    -> False
                 -- Use a unary class if the data constructor
-                -- has exactly one value field
+                -- has exactly one, boxed value field
                 -- i.e. exactly one operation or superclass taken together
                 -- See Note [Unary class magic] in GHC.Core.TyCon
 
@@ -367,7 +369,7 @@ buildClass tycon_name binders roles fds
 
         ; rhs <- case () of
                   _ | unary_class
-                    -> return (UnaryClass dict_con)
+                    -> return (UnaryClassTyCon dict_con)
                     | isCTupleTyConName tycon_name
                     -> return (TupleTyCon { data_con = dict_con
                                           , tup_sort = ConstraintTuple })

@@ -545,9 +545,12 @@ mkDictSelRhs clas val_index
     dict_id    = mkTemplateLocal 1 pred
     arg_ids    = mkTemplateLocalsNum 2 (map scaledThing arg_tys)
 
-    rhs_body | [sel_id] <- classAllSelIds clas
-             = assertPpr (val_index == 0) (ppr clas) $
-               Var sel_id `mkTyApps` mkTyVarTys tyvars `App` Var dict_id
+    rhs_body | isUnaryClass clas   -- Just having one sel_id isn't enough!
+                                   -- E.g.  class (a ~# b) => a ~ b where {}
+             , let sel_ids = classAllSelIds clas
+             = assertPpr (val_index == 0)      (ppr clas) $
+               assertPpr (length sel_ids == 1) (ppr clas) $
+               Var (head sel_ids) `mkTyApps` mkTyVarTys tyvars `App` Var dict_id
              | otherwise
              = mkSingleAltCase (Var dict_id) dict_id (DataAlt data_con)
                                arg_ids (varToCoreExpr the_arg_id)

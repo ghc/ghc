@@ -1131,8 +1131,8 @@ data AlgTyConRhs
                         -- in tcHasFixedRuntimeRep.
     }
 
-  | UnaryClass {  -- See Note [Unary class magic], esp (UCM1)
-                  -- INVARIANT: the algTcFlavour of this TyCon is ClassTyCon
+  | UnaryClassTyCon {  -- See Note [Unary class magic], esp (UCM2)
+                       -- INVARIANT: the algTcFlavour of this TyCon is ClassTyCon
       data_con :: DataCon
       }
 
@@ -1191,12 +1191,12 @@ data PromDataConInfo
 -- that visibility in this sense does not correspond to visibility in
 -- the context of any particular user program!
 visibleDataCons :: AlgTyConRhs -> [DataCon]
-visibleDataCons (AbstractTyCon {})            = []
-visibleDataCons (DataTyCon{ data_cons = cs }) = cs
-visibleDataCons (NewTyCon{ data_con = c })    = [c]
-visibleDataCons (UnaryClass{ data_con = c })  = [c]
-visibleDataCons (TupleTyCon{ data_con = c })  = [c]
-visibleDataCons (SumTyCon{ data_cons = cs })  = cs
+visibleDataCons (AbstractTyCon {})                = []
+visibleDataCons (DataTyCon{ data_cons = cs })     = cs
+visibleDataCons (NewTyCon{ data_con = c })        = [c]
+visibleDataCons (UnaryClassTyCon{ data_con = c }) = [c]
+visibleDataCons (TupleTyCon{ data_con = c })      = [c]
+visibleDataCons (SumTyCon{ data_cons = cs })      = cs
 
 -- | Describes the flavour of an algebraic type constructor. For
 -- classes and data families, this flavour includes a reference to
@@ -1216,7 +1216,7 @@ data AlgTyConFlav
   -- | Type constructors representing a class dictionary.
   -- See Note [ATyCon for classes] in "GHC.Types.TyThing"
   -- INVARIANT: the algTcRhs is never NewTyCon; it could be
-  --            TupleTyCon, DataTyCon, UnaryClass
+  --            TupleTyCon, DataTyCon, UnaryClassTyCon
   | ClassTyCon
         Class           -- INVARIANT: the classTyCon of this Class is the
                         -- current tycon
@@ -1461,13 +1461,13 @@ subtle bugs: see Note [Representing unary classes with newtypes: bad, bad, bad].
 
 This Note explains what GHC now does for unary classes.
 
-* Throughout the compiler, right up to the code generator, GHC thinks that a
+(UCM0) Throughout the compiler, right up to the code generator, GHC thinks that a
   unary class is just like a non-unary class:
     - Represented by a data type,
     - with one (constructor),
     - which has one field
 
-* Then when converting from Core to STG, in GHC.CoreToStg.hs, we effectively
+(UCM1) Then when converting from Core to STG, in GHC.CoreToStg, we effectively
   transform
     - op   ta tb tc dict_arg  -->  dict_arg
     - MkUC ta tb tc meth_arg  -->  meth_arg
@@ -1475,18 +1475,17 @@ This Note explains what GHC now does for unary classes.
   Note that we do this transformation well /after/ generating an interface file,
   so importing modules only see the data constructor.
 
+  This late transformation has a lot in common with the treatment of
+  `unsafeEqualityProof`; see (U2) in Note [Implementing unsafeCoerce]
+  in GHC.Internal.Unsafe.Coerce.
+
 In this way we get the efficiency of a newtype without the bugs that we get
 by exposing the newtype representation too early.
 
 There are a number of wrinkles
 
-(UCM1) The TyCon for a unary class is /not/ identified as a newtype.
-   Rather, it has its own AlgTyConRhs, namely `UnaryClass`
-
-(UCM2) We need a coercion that we can use in CoreToStg.Prep, to cast from
-               UC a ~ (a->a)
-   in the example at the top of this Note.  We use `UnivCo` with a provenance
-   of `UnaryClassProv`.
+(UCM2) The TyCon for a unary class is /not/ identified as a newtype.
+   Rather, it has its own AlgTyConRhs, namely `UnaryClassTyCon`
 
 (UCM3) Unlike non-unary classes, a value of type (C ty), where `C` is a unary
    class, might be bottom, because it is represented by the method type alone.
@@ -1546,12 +1545,13 @@ There are a number of wrinkles
 
   Generally, we want unary classes to behave like ordinary non-unary ones.
 
-(UCM10) Historical Note. When we rp
+(UCM10) Historical Note. In the olden days, when we represented unary classes
+    via a newtype, the newtype axiom looked like
            t1::CONSTRAINT r ~ t2::TYPE r
     If TYPE and CONSTRAINT are apart, this can create unsoundness, via KindCo;
-    see #21623. But here we are using it only in the back end, on the way
-    to code generation.
-
+    see #21623.  Now we never make such a coercion, so that worry about TYPE
+    being apart from CONSTRAINT has gone away entirely.  Hooray.
+    End of Historical Note
 
 Note [Representing unary classes with newtypes: bad, bad, bad]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2196,7 +2196,7 @@ isBoxedDataTyCon (TyCon { tyConDetails = details })
             -- See Note [Type data declarations] in GHC.Rename.Module.
         DataTyCon { is_type_data = type_data } -> not type_data
         NewTyCon {}        -> False
-        UnaryClass {}      -> False
+        UnaryClassTyCon {} -> False
         AbstractTyCon {}   -> False      -- We don't know, so return False
 isBoxedDataTyCon _ = False
 
@@ -2237,12 +2237,12 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
        -- See (W1) in Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.TyCl
 
     -- go_alg_rep used only at Representational role
-    go_alg_rep (TupleTyCon {})    = True
-    go_alg_rep (SumTyCon {})      = True
-    go_alg_rep (DataTyCon {})     = True
-    go_alg_rep (UnaryClass {})    = True -- See (UCM10) in Note [Unary class magic]
-    go_alg_rep (AbstractTyCon {}) = False
-    go_alg_rep (NewTyCon {})      = False
+    go_alg_rep (TupleTyCon {})      = True
+    go_alg_rep (SumTyCon {})        = True
+    go_alg_rep (DataTyCon {})       = True
+    go_alg_rep (UnaryClassTyCon {}) = True -- See (UCM10) in Note [Unary class magic]
+    go_alg_rep (AbstractTyCon {})   = False
+    go_alg_rep (NewTyCon {})        = False
 
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
 -- (where r is the role passed in):
@@ -2638,7 +2638,7 @@ tcHasFixedRuntimeRep tc@(TyCon { tyConDetails = details })
 
        SumTyCon {} -> False   -- only unboxed sums here
 
-       UnaryClass {} -> True  -- Always boxed
+       UnaryClassTyCon {} -> True  -- Always boxed
 
        NewTyCon { nt_fixed_rep = fixed_rep } -> fixed_rep
               -- A newtype might not have a fixed runtime representation
@@ -2771,12 +2771,12 @@ tyConDataCons_maybe :: TyCon -> Maybe [DataCon]
 tyConDataCons_maybe (TyCon { tyConDetails = details })
   | AlgTyCon {algTcRhs = rhs} <- details
   = case rhs of
-       DataTyCon { data_cons = cons } -> Just cons
-       NewTyCon { data_con = con }    -> Just [con]
-       UnaryClass { data_con = con }  -> Just [con]
-       TupleTyCon { data_con = con }  -> Just [con]
-       SumTyCon { data_cons = cons }  -> Just cons
-       _                              -> Nothing
+       DataTyCon { data_cons = cons }     -> Just cons
+       NewTyCon { data_con = con }        -> Just [con]
+       UnaryClassTyCon { data_con = con } -> Just [con]
+       TupleTyCon { data_con = con }      -> Just [con]
+       SumTyCon { data_cons = cons }      -> Just cons
+       _                                  -> Nothing
 tyConDataCons_maybe _ = Nothing
 
 -- | If the given 'TyCon' has a /single/ data constructor, i.e. it is a @data@
@@ -2787,12 +2787,12 @@ tyConSingleDataCon_maybe :: TyCon -> Maybe DataCon
 tyConSingleDataCon_maybe (TyCon { tyConDetails = details })
   | AlgTyCon { algTcRhs = rhs } <- details
   = case rhs of
-      DataTyCon { data_cons = [c] } -> Just c
-      TupleTyCon { data_con = c }   -> Just c
-      NewTyCon { data_con = c }     -> Just c
-      UnaryClass { data_con = c }   -> Just c
-      _                             -> Nothing
-  | otherwise                        = Nothing
+      DataTyCon { data_cons = [c] }    -> Just c
+      TupleTyCon { data_con = c }      -> Just c
+      NewTyCon { data_con = c }        -> Just c
+      UnaryClassTyCon { data_con = c } -> Just c
+      _                                -> Nothing
+  | otherwise = Nothing
 
 -- | Like 'tyConSingleDataCon_maybe', but panics if 'Nothing'.
 tyConSingleDataCon :: TyCon -> DataCon
@@ -2809,7 +2809,7 @@ tyConFamilySize tc@(TyCon { tyConDetails = details })
   = case rhs of
       DataTyCon { data_cons_size = size } -> size
       NewTyCon {}                    -> 1
-      UnaryClass {}                  -> 1
+      UnaryClassTyCon {}             -> 1
       TupleTyCon {}                  -> 1
       SumTyCon { data_cons_size = size }  -> size
       _                              -> pprPanic "tyConFamilySize 1" (ppr tc)
@@ -2900,7 +2900,7 @@ famTyConFlav_maybe (TyCon { tyConDetails = details })
 
 isUnaryClassTyCon :: TyCon -> Bool
 isUnaryClassTyCon tc@(TyCon { tyConDetails = details })
-  | AlgTyCon { algTcFlavour = flav, algTcRhs = UnaryClass {} } <- details
+  | AlgTyCon { algTcFlavour = flav, algTcRhs = UnaryClassTyCon {} } <- details
   = assertPpr (case flav of { ClassTyCon {} -> True; _ -> False }) (ppr tc) $
     True
   | otherwise
@@ -2908,7 +2908,8 @@ isUnaryClassTyCon tc@(TyCon { tyConDetails = details })
 
 isUnaryClassTyCon_maybe :: TyCon -> Maybe (Class, DataCon)
 isUnaryClassTyCon_maybe (TyCon { tyConDetails = details })
-  | AlgTyCon { algTcFlavour = ClassTyCon cls _, algTcRhs = UnaryClass { data_con = dc } } <- details
+  | AlgTyCon { algTcFlavour = ClassTyCon cls _
+             , algTcRhs = UnaryClassTyCon { data_con = dc } } <- details
   = Just (cls, dc)
   | otherwise
   = Nothing
@@ -3027,7 +3028,7 @@ tyConFlavour (TyCon { tyConDetails = details })
                   SumTyCon {}        -> SumFlavour
                   DataTyCon {}       -> DataTypeFlavour
                   NewTyCon {}        -> NewtypeFlavour
-                  UnaryClass {}      -> ClassFlavour
+                  UnaryClassTyCon {} -> ClassFlavour
                   AbstractTyCon {}   -> AbstractTypeFlavour
 
   | FamilyTyCon { famTcFlav = flav, famTcParent = parent } <- details

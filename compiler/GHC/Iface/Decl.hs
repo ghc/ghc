@@ -207,11 +207,11 @@ tyConToIfaceDecl env tycon
 
     ifaceConDecls (DataTyCon { data_cons = cons, is_type_data = type_data })
       = IfDataTyCon type_data (map ifaceConDecl cons)
-    ifaceConDecls (NewTyCon { data_con = con })   = IfNewTyCon        (ifaceConDecl con)
-    ifaceConDecls (UnaryClass { data_con = con }) = IfDataTyCon False [ifaceConDecl con]
-    ifaceConDecls (TupleTyCon { data_con = con }) = IfDataTyCon False [ifaceConDecl con]
-    ifaceConDecls (SumTyCon { data_cons = cons }) = IfDataTyCon False (map ifaceConDecl cons)
-    ifaceConDecls AbstractTyCon                   = IfAbstractTyCon
+    ifaceConDecls (NewTyCon { data_con = con })        = IfNewTyCon        (ifaceConDecl con)
+    ifaceConDecls (UnaryClassTyCon { data_con = con }) = IfDataTyCon False [ifaceConDecl con]
+    ifaceConDecls (TupleTyCon { data_con = con })      = IfDataTyCon False [ifaceConDecl con]
+    ifaceConDecls (SumTyCon { data_cons = cons })      = IfDataTyCon False (map ifaceConDecl cons)
+    ifaceConDecls AbstractTyCon                        = IfAbstractTyCon
         -- The AbstractTyCon case happens when a TyCon has been trimmed
         -- during tidying.
         -- Furthermore, tyThingToIfaceDecl is also used in GHC.Tc.Module
