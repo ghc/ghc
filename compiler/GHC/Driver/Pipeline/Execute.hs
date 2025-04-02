@@ -408,7 +408,7 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
   let dflags    = hsc_dflags hsc_env
   let logger    = hsc_logger hsc_env
   let unit_env  = hsc_unit_env hsc_env
-  let home_unit = hsc_home_unit hsc_env
+  let home_unit = hsc_home_unit_maybe hsc_env
   let tmpfs     = hsc_tmpfs hsc_env
   let platform  = ue_platform unit_env
   let hcc       = cc_phase `eqPhase` HCc
@@ -507,10 +507,12 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
           -- These symbols are imported into the stub.c file via RtsAPI.h, and the
           -- way we do the import depends on whether we're currently compiling
           -- the base package or not.
-                 ++ (if platformOS platform == OSMinGW32 &&
-                        isHomeUnitId home_unit ghcInternalUnitId
-                          then [ "-DCOMPILING_GHC_INTERNAL_PACKAGE" ]
-                          else [])
+                 ++ (case home_unit of
+                        Just hu
+                          | isHomeUnitId hu ghcInternalUnitId
+                          , platformOS platform == OSMinGW32
+                          -> ["-DCOMPILING_GHC_INTERNAL_PACKAGE"]
+                        _ -> [])
 
                  -- GCC 4.6+ doesn't like -Wimplicit when compiling C++.
                  ++ (if (cc_phase /= Ccxx && cc_phase /= Cobjcxx)

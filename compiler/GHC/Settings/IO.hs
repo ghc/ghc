@@ -21,12 +21,13 @@ import GHC.Settings
 import GHC.SysTools.BaseDir
 import GHC.Unit.Types
 
-import Data.Char
 import Control.Monad.Trans.Except
 import Control.Monad.IO.Class
+import Data.Char
 import qualified Data.Map as Map
 import System.FilePath
 import System.Directory
+
 
 data SettingsError
   = SettingsError_MissingData String
@@ -71,44 +72,51 @@ initSettings top_dir = do
   mtool_dir <- liftIO $ findToolDir useInplaceMinGW top_dir
         -- see Note [tooldir: How GHC finds mingw on Windows]
 
+    -- Escape 'top_dir' and 'mtool_dir', to make sure we don't accidentally
+    -- introduce unescaped spaces. See #24265 and #25204.
+  let escaped_top_dir = escapeArg top_dir
+      escaped_mtool_dir = fmap escapeArg mtool_dir
+
+      getSetting_raw key = either pgmError pure $
+        getRawSetting settingsFile mySettings key
+      getSetting_topDir top key = either pgmError pure $
+        getRawFilePathSetting top settingsFile mySettings key
+      getSetting_toolDir top tool key =
+        expandToolDir useInplaceMinGW tool <$> getSetting_topDir top key
+
+      getSetting :: String -> ExceptT SettingsError m String
+      getSetting key = getSetting_topDir top_dir key
+      getToolSetting :: String -> ExceptT SettingsError m String
+      getToolSetting key = getSetting_toolDir top_dir mtool_dir key
+      getFlagsSetting :: String -> ExceptT SettingsError m [String]
+      getFlagsSetting key = unescapeArgs <$> getSetting_toolDir escaped_top_dir escaped_mtool_dir key
+        -- Make sure to unescape, as we have escaped top_dir and tool_dir.
+
   -- See Note [Settings file] for a little more about this file. We're
   -- just partially applying those functions and throwing 'Left's; they're
   -- written in a very portable style to keep ghc-boot light.
-  let getSetting key = either pgmError pure $
-        -- Escape the 'top_dir', to make sure we don't accidentally introduce an
-        -- unescaped space
-        getRawFilePathSetting (escapeArg top_dir) settingsFile mySettings key
-      getToolSetting :: String -> ExceptT SettingsError m String
-        -- Escape the 'mtool_dir', to make sure we don't accidentally introduce
-        -- an unescaped space
-      getToolSetting key = expandToolDir useInplaceMinGW (fmap escapeArg mtool_dir) <$> getSetting key
-  targetPlatformString <- getSetting "target platform string"
+  targetPlatformString <- getSetting_raw "target platform string"
   cc_prog <- getToolSetting "C compiler command"
   cxx_prog <- getToolSetting "C++ compiler command"
-  cc_args_str <- getToolSetting "C compiler flags"
-  cxx_args_str <- getToolSetting "C++ compiler flags"
+  cc_args0 <- getFlagsSetting "C compiler flags"
+  cxx_args <- getFlagsSetting "C++ compiler flags"
   gccSupportsNoPie <- getBooleanSetting "C compiler supports -no-pie"
   cmmCppSupportsG0 <- getBooleanSetting "C-- CPP supports -g0"
   cpp_prog <- getToolSetting "CPP command"
-  cpp_args_str <- getToolSetting "CPP flags"
+  cpp_args <- map Option <$> getFlagsSetting "CPP flags"
   hs_cpp_prog <- getToolSetting "Haskell CPP command"
-  hs_cpp_args_str <- getToolSetting "Haskell CPP flags"
+  hs_cpp_args <- map Option <$> getFlagsSetting "Haskell CPP flags"
   js_cpp_prog <- getToolSetting "JavaScript CPP command"
-  js_cpp_args_str <- getToolSetting "JavaScript CPP flags"
+  js_cpp_args <- map Option <$> getFlagsSetting "JavaScript CPP flags"
   cmmCpp_prog <- getToolSetting "C-- CPP command"
-  cmmCpp_args_str <- getToolSetting "C-- CPP flags"
+  cmmCpp_args <- map Option <$> getFlagsSetting "C-- CPP flags"
 
   platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings
 
   let unreg_cc_args = if platformUnregisterised platform
                       then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
                       else []
-      cpp_args    = map Option (unescapeArgs cpp_args_str)
-      hs_cpp_args = map Option (unescapeArgs hs_cpp_args_str)
-      js_cpp_args = map Option (unescapeArgs js_cpp_args_str)
-      cmmCpp_args = map Option (unescapeArgs cmmCpp_args_str)
-      cc_args  = unescapeArgs cc_args_str ++ unreg_cc_args
-      cxx_args = unescapeArgs cxx_args_str
+      cc_args = cc_args0 ++ unreg_cc_args
 
       -- The extra flags we need to pass gcc when we invoke it to compile .hc code.
       --
@@ -150,25 +158,25 @@ initSettings top_dir = do
   -- Config.hs one day.
 
 
-  -- Other things being equal, as and ld are simply gcc
-  cc_link_args_str <- getToolSetting "C compiler link flags"
+  -- Other things being equal, 'as' and 'ld' are simply 'gcc'
+  cc_link_args <- getFlagsSetting "C compiler link flags"
   let   as_prog  = cc_prog
         as_args  = map Option cc_args
         ld_prog  = cc_prog
-        ld_args  = map Option (cc_args ++ unescapeArgs cc_link_args_str)
+        ld_args  = map Option (cc_args ++ cc_link_args)
   ld_r_prog <- getToolSetting "Merge objects command"
-  ld_r_args <- getToolSetting "Merge objects flags"
+  ld_r_args <- getFlagsSetting "Merge objects flags"
   let ld_r
         | null ld_r_prog = Nothing
-        | otherwise      = Just (ld_r_prog, map Option $ unescapeArgs ld_r_args)
+        | otherwise      = Just (ld_r_prog, map Option ld_r_args)
 
-  llvmTarget <- getSetting "LLVM target"
+  llvmTarget <- getSetting_raw "LLVM target"
 
   -- We just assume on command line
-  lc_prog <- getSetting "LLVM llc command"
-  lo_prog <- getSetting "LLVM opt command"
-  las_prog <- getSetting "LLVM llvm-as command"
-  las_args <- map Option . unescapeArgs <$> getSetting "LLVM llvm-as flags"
+  lc_prog <- getToolSetting "LLVM llc command"
+  lo_prog <- getToolSetting "LLVM opt command"
+  las_prog <- getToolSetting "LLVM llvm-as command"
+  las_args <- map Option <$> getFlagsSetting "LLVM llvm-as flags"
 
   let iserv_prog = libexec "ghc-iserv"
 
@@ -176,7 +184,7 @@ initSettings top_dir = do
   ghcWithInterpreter <- getBooleanSetting "Use interpreter"
   useLibFFI <- getBooleanSetting "Use LibFFI"
 
-  baseUnitId <- getSetting "base unit-id"
+  baseUnitId <- getSetting_raw "base unit-id"
 
   return $ Settings
     { sGhcNameVersion = GhcNameVersion

@@ -1,3 +1,4 @@
+module Main where
 
 import GHC
 import GHC.ResponseFile (unescapeArgs)
@@ -6,13 +7,11 @@ import GHC.Settings.IO
 import GHC.Driver.DynFlags
 import GHC.Driver.Session
 import GHC.Driver.Env
-import GHC.Utils.CliOption (Option, showOpt)
 
 import Control.Monad.Trans.Except (runExceptT)
 import qualified Data.Set as Set
-import Data.Maybe (fromJust)
 import Data.List (intercalate)
-import System.Directory (makeAbsolute, createDirectory)
+import System.Directory
 import System.Environment
 import System.IO (hPutStrLn, stderr)
 import System.Exit (exitWith, ExitCode(ExitFailure))
@@ -29,13 +28,13 @@ import System.Exit (exitWith, ExitCode(ExitFailure))
 -- escaped the spaces appropriately.
 main :: IO ()
 main = do
-  libdir:args <- getArgs
+  libdir:_args <- getArgs
 
   (rawSettingOpts, originalSettings) <- runGhc (Just libdir) $ do
     dflags <- hsc_dflags <$> getSession
     pure (rawSettings dflags, settings dflags)
 
-  topDir <- makeAbsolute "./ghc-install-folder/lib"
+  top_dir <- makeAbsolute "./ghc-install-folder/lib with spaces"
 
   let argsWithSpaces = "\"-some option\" -some\\ other"
       numberOfExtraArgs = length $ unescapeArgs argsWithSpaces
@@ -58,10 +57,10 @@ main = do
           else (name, args)) rawSettingOpts
 
   -- write out the modified settings. We try to keep it legible
-  writeFile (topDir ++ "/settings") $
+  writeFile (top_dir ++ "/settings") $
     "[" ++ (intercalate "\n," (map show rawSettingOptsWithExtraArgs)) ++ "]"
 
-  settingsm <- runExceptT $ initSettings topDir
+  settingsm <- runExceptT $ initSettings top_dir
 
   case settingsm of
     Left (SettingsError_MissingData msg) -> do
@@ -71,11 +70,11 @@ main = do
     Left (SettingsError_BadData msg) -> do
       hPutStrLn stderr msg
       exitWith $ ExitFailure 1
-    Right settings -> do
+    Right ghc_settings -> do
       let
         recordSetting :: String -> (Settings -> [String]) -> IO ()
         recordSetting label selector = do
-          let opts = selector settings
+          let opts = selector ghc_settings
               origOpts = selector originalSettings
               -- At least one of the options must contain a space
               containsSpaces = any (' ' `elem`) opts
@@ -86,7 +85,7 @@ main = do
 
         recordSettingM :: String -> (Settings -> Maybe [a]) -> IO ()
         recordSettingM label selector = do
-          let optsM = selector settings
+          let optsM = selector ghc_settings
               origOptsM = selector originalSettings
           hPutStrLn stderr
               $ "=== '" <> label <> "' contains expected entries: "
@@ -99,15 +98,14 @@ main = do
 
         recordFpSetting :: String -> (Settings -> String) -> IO ()
         recordFpSetting label selector = do
-          let fp = selector settings
-              containsOnlyEscapedSpaces ('\\':' ':xs) = containsOnlyEscapedSpaces xs
-              containsOnlyEscapedSpaces (' ':_) = False
-              containsOnlyEscapedSpaces [] = True
-              containsOnlyEscapedSpaces (_:xs) = containsOnlyEscapedSpaces xs
+          let fp = selector ghc_settings
+              containsEscapedSpaces ('\\':' ':_) = True
+              containsEscapedSpaces (' ':xs) = containsEscapedSpaces xs
+              containsEscapedSpaces [] = False
+              containsEscapedSpaces (_:xs) = containsEscapedSpaces xs
 
-              -- Filepath may only contain escaped spaces
-              containsSpaces = containsOnlyEscapedSpaces fp
-          hPutStrLn stderr $ "=== FilePath '" <> label <> "' contains only escaped spaces: " ++ show containsSpaces
+          -- Filepath should not contain escaped spaces
+          hPutStrLn stderr $ "=== FilePath '" <> label <> "' contains escaped spaces: " ++ show (containsEscapedSpaces fp)
 
       -- Assertions
       -- Assumption: this test case is executed in a directory with a space.
@@ -139,6 +137,6 @@ main = do
       -- GHC should not split these by word.
       -- If 'Nothing', ignore this test, otherwise the same assertion holds as before.
       recordSettingM "Merge objects flags" (fmap (map showOpt . snd) . toolSettings_pgm_lm . sToolSettings)
-      -- Setting 'unlit command' contains '$topdir' reference.
-      -- Resolving those while containing spaces, should be escaped correctly.
-      recordFpSetting "unlit command" (toolSettings_pgm_L . sToolSettings)
+      -- Setting 'C compiler command' contains '$topdir' reference.
+      -- Spaces in the final filepath should not be escaped.
+      recordFpSetting "C compiler" (toolSettings_pgm_c . sToolSettings)
