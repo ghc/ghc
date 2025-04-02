@@ -12,4 +12,5 @@ T13082_good:
 
 .PHONY: T13082_fail
 T13082_fail:
-	! echo main | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) main.hs -ldoesnotexist
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) main.hs -ldoesnotexist 2>&1 | grep "addDLL: doesnotexist or dependencies not loaded"
+

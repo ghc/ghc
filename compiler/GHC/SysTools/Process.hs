@@ -232,7 +232,9 @@ handleProc pgm phase_name proc = do
           then does_not_exist
           else throwGhcExceptionIO (ProgramError $ show err)
 
-    does_not_exist = throwGhcExceptionIO (InstallationError ("could not execute: " ++ pgm))
+    does_not_exist =
+      throwGhcExceptionIO $
+        InstallationError (phase_name ++ ": could not execute: " ++ pgm)
 
 
 builderMainLoop :: Logger -> (String -> String) -> FilePath
