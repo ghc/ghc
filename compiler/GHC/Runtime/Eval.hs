@@ -119,7 +119,6 @@ import GHC.Unit
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Home.ModInfo
-import GHC.Unit.Home.PackageTable
 
 import GHC.Tc.Module ( runTcInteractive, tcRnTypeSkolemising, loadUnqualIfaces )
 import GHC.Tc.Solver (simplifyWantedsTcM)
@@ -823,16 +822,17 @@ findGlobalRdrEnv hsc_env imports
     idecls :: [LImportDecl GhcPs]
     idecls = [noLocA d | IIDecl d <- imports]
 
-    imods :: [ModuleName]
+    imods :: [Module]
     imods = [m | IIModule m <- imports]
 
-    mkEnv mod = mkTopLevEnv hsc_env mod >>= \case
-      Left err -> pure $ Left (mod, err)
-      Right env -> pure $ Right env
+    mkEnv mod = do
+      mkTopLevEnv hsc_env mod >>= \case
+        Left err -> pure $ Left (moduleName mod, err)
+        Right env -> pure $ Right env
 
-mkTopLevEnv :: HscEnv -> ModuleName -> IO (Either String GlobalRdrEnv)
+mkTopLevEnv :: HscEnv -> Module -> IO (Either String GlobalRdrEnv)
 mkTopLevEnv hsc_env modl
-  = lookupHpt hpt modl >>= \case
+  = HUG.lookupHugByModule modl hug >>= \case
       Nothing -> pure $ Left "not a home module"
       Just details ->
          case mi_top_env (hm_iface details) of
@@ -857,7 +857,7 @@ mkTopLevEnv hsc_env modl
                   let exports_env = mkGlobalRdrEnv $ gresFromAvails hsc_env Nothing (getDetOrdAvails exports)
                   pure $ Right $ plusGlobalRdrEnv imports_env exports_env
   where
-    hpt = hsc_HPT hsc_env
+    hug = hsc_HUG hsc_env
 
 -- | Get the interactive evaluation context, consisting of a pair of the
 -- set of modules from which we take the full top-level scope, and the set
@@ -870,11 +870,9 @@ getContext = withSession $ \HscEnv{ hsc_IC=ic } ->
 -- its full top-level scope available.
 moduleIsInterpreted :: GhcMonad m => Module -> m Bool
 moduleIsInterpreted modl = withSession $ \h ->
- if notHomeModule (hsc_home_unit h) modl
-        then return False
-        else liftIO (HUG.lookupHugByModule modl (hsc_HUG h)) >>= \case
-              Just hmi       -> return (isJust $ homeModInfoByteCode hmi)
-              _not_a_home_module -> return False
+  liftIO (HUG.lookupHugByModule modl (hsc_HUG h)) >>= \case
+    Just hmi           -> return (isJust $ homeModInfoByteCode hmi)
+    _not_a_home_module -> return False
 
 -- | Looks up an identifier in the current interactive context (for :info)
 -- Filter the instances by the ones whose tycons (or classes resp)
