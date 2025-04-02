@@ -1308,7 +1308,7 @@ cppSpan span len = mkPsSpan start_loc end_loc
      file = srcLocFile (psRealLoc start_loc)
      real_loc = mkRealSrcLoc file (srcLocLine (psRealLoc start_loc)) (len + 1)
      BufPos sb = psBufPos start_loc
-     end_loc = PsLoc real_loc (BufPos (sb + len + 1))
+     end_loc = PsLoc real_loc (BufPos (sb + len))
 
 cppTokenPop :: (FastString -> PsSpan -> Token)-> Action p
 cppTokenPop t span buf len _buf2 =
@@ -2790,7 +2790,26 @@ startSkipping = do
 
 stopSkipping :: P p Int
 stopSkipping = do
-  popLexState
+  -- popLexState
+  ret <- popLexState
+  -- We just processed a CPP directive, which included a trailing newline.
+  -- To properly sync up, we now need to ensure that `do_bol` processing occurs.
+  -- But this call does not emit a token.
+  -- Maybe it should be an argument to lexToken instead?
+  -- Alternatively, push the input location to the previous char.
+  AI ps buf <- getInput
+  last_buf_cur <- getLastBufCur
+  last_loc <- getLastLoc
+  last_tk <- getLastTk
+  case last_tk of
+    Strict.Just (L l _) -> do
+      let ps' = PsLoc (realSrcSpanEnd (psRealSpan l)) (bufSpanEnd (psBufSpan l))
+      let cur'' = (cur buf) - 1
+      let cur' = trace ("stopSkipping:(cur',ps'):" ++ show (cur'',ps')) cur''
+      setInput (AI ps' (buf { cur = cur'}))
+    _ -> return ()
+  return $ trace ("stopSkipping: (ps, cur buf, last_loc, last_buf_cur, last_tk):" ++ show (ps, cur buf, last_loc, last_buf_cur, last_tk)) ret
+
   -- old <- popLexState
   -- return (trace ("stopSkipping:" ++ show old) old)
 
@@ -3379,9 +3398,9 @@ srcParseErr options buf len loc = mkPlainErrorMsgEnvelope loc (PsErrParse token 
 srcParseFail :: P p a
 srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
                             last_loc = last_loc } ->
-    unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
-    -- let s' = trace ("srcParseFail") s
-    -- in unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s'
+    -- unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
+    let s' = trace ("srcParseFail") s
+    in unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s'
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
