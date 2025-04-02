@@ -614,14 +614,15 @@ addTickHsExpanded o@(OrigStmt (L pos _)) e
   -- Statements always gets a tick for breakpoint and hpc coverage
   = do d <- getDensity
        case d of
-          TickForCoverage    -> liftM (XExpr . ExpandedThingTc o) $ tick_it e
-          TickForBreakPoints -> liftM (XExpr . ExpandedThingTc o) $ tick_it e
-          _                  -> liftM (XExpr . ExpandedThingTc o) $ addTickHsExpr e
+          TickForCoverage    -> liftM (XExpr . ExpandedThingTc o) $ tick_it pos e
+          TickForBreakPoints -> liftM (XExpr . ExpandedThingTc o) $ tick_it pos e
+          _                  -> skip o e
+addTickHsExpanded o e = skip o e
   where
-    tick_it e  = unLoc <$> allocTickBox (ExpBox False) False False (locA pos)
-                               (addTickHsExpr e)
-addTickHsExpanded o e
-  = liftM (XExpr . ExpandedThingTc o) $ addTickHsExpr e
+    skip o e = liftM (XExpr . ExpandedThingTc o) $ addTickHsExpr e
+    tick_it pos e =
+      unLoc <$> allocTickBox (ExpBox False) False False (locA pos)
+                             (addTickHsExpr e)
 
 
 addTickTupArg :: HsTupArg GhcTc -> TM (HsTupArg GhcTc)
