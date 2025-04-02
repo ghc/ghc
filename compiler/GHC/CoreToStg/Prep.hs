@@ -291,6 +291,71 @@ corePrepTopBinds initialCorePrepEnv binds
                                floatss <- go env' binds
                                return (floats `zipFloats` floatss)
 
+{- *********************************************************************
+*                                                                      *
+        Implicit bindings
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Injecting implicit bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We inject the implicit bindings right at the end, in GHC.Core.Tidy.
+Some of these bindings, notably record selectors, are not
+constructed in an optimised form.  E.g. record selector for
+        data T = MkT { x :: {-# UNPACK #-} !Int }
+Then the unfolding looks like
+        x = \t. case t of MkT x1 -> let x = I# x1 in x
+This generates bad code unless it's first simplified a bit.  That is
+why GHC.Core.Unfold.mkImplicitUnfolding uses simpleOptExpr to do a bit of
+optimisation first.  (Only matters when the selector is used curried;
+eg map x ys.)  See #2070.
+
+[Oct 09: in fact, record selectors are no longer implicit Ids at all,
+because we really do want to optimise them properly. They are treated
+much like any other Id.  But doing "light" optimisation on an implicit
+Id still makes sense.]
+
+At one time I tried injecting the implicit bindings *early*, at the
+beginning of SimplCore.  But that gave rise to real difficulty,
+because GlobalIds are supposed to have *fixed* IdInfo, but the
+simplifier and other core-to-core passes mess with IdInfo all the
+time.  The straw that broke the camels back was when a class selector
+got the wrong arity -- ie the simplifier gave it arity 2, whereas
+importing modules were expecting it to have arity 1 (#2844).
+It's much safer just to inject them right at the end, after tidying.
+
+Oh: two other reasons for injecting them late:
+
+  - If implicit Ids are already in the bindings when we start tidying,
+    we'd have to be careful not to treat them as external Ids (in
+    the sense of chooseExternalIds); else the Ids mentioned in *their*
+    RHSs will be treated as external and you get an interface file
+    saying      a18 = <blah>
+    but nothing referring to a18 (because the implicit Id is the
+    one that does, and implicit Ids don't appear in interface files).
+
+  - More seriously, the tidied type-envt will include the implicit
+    Id replete with a18 in its unfolding; but we won't take account
+    of a18 when computing a fingerprint for the class; result chaos.
+
+Note [Data constructor workers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Create any necessary "implicit" bindings for data con workers.  We
+create the rather strange (non-recursive!) binding
+
+        $wC = \x y -> $wC x y
+
+i.e. a curried constructor that allocates.  This means that we can
+treat the worker for a constructor like any other function in the rest
+of the compiler.  The point here is that CoreToStg will generate a
+StgConApp for the RHS, rather than a call to the worker (which would
+give a loop).  As Lennart says: the ice is thin here, but it works.
+
+Hmm.  Should we create bindings for dictionary constructors?  They are
+always fully applied, and the bindings are just there to support
+partial applications. But it's easier to let them through.
+-}
+
 mkImplicitBinds :: Bool -> ModLocation -> TyCon -> [CoreBind]
 -- See Note [Data constructor workers]
 -- c.f. Note [Injecting implicit bindings] in GHC.Iface.Tidy
@@ -340,6 +405,13 @@ tick_it generate_debug_info mod_loc name
                  LexicalFastString $ mkFastString $
                  renderWithContext defaultSDocContext $ ppr name
     span1 file = realSrcLocSpan $ mkRealSrcLoc (mkFastString file) 1 1
+
+
+{- *********************************************************************
+*                                                                      *
+                The main code
+*                                                                      *
+********************************************************************* -}
 
 {- Note [Floating in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -421,24 +493,6 @@ or dead binders). Nullary join points aren't ever recursive, so they're always
 effectively one-shot functions, which we don't float out of. We *could* float
 join points from nullary join points, but there's no clear benefit at this
 stage.
-
-Note [Data constructor workers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Create any necessary "implicit" bindings for data con workers.  We
-create the rather strange (non-recursive!) binding
-
-        $wC = \x y -> $wC x y
-
-i.e. a curried constructor that allocates.  This means that we can
-treat the worker for a constructor like any other function in the rest
-of the compiler.  The point here is that CoreToStg will generate a
-StgConApp for the RHS, rather than a call to the worker (which would
-give a loop).  As Lennart says: the ice is thin here, but it works.
-
-Hmm.  Should we create bindings for dictionary constructors?  They are
-always fully applied, and the bindings are just there to support
-partial applications. But it's easier to let them through.
-
 
 Note [Dead code in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -642,12 +696,6 @@ Other related tickets:
  - #14375
  - #15260
  - #18061
-
-************************************************************************
-*                                                                      *
-                The main code
-*                                                                      *
-************************************************************************
 -}
 
 cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
