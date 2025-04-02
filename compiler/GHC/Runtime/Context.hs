@@ -115,6 +115,51 @@ The details are a bit tricky though:
   modules.
 
 
+Note [Relation between the 'InteractiveContext' and 'interactiveGhciUnitId']
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'InteractiveContext' is used to store 'DynFlags', 'Plugins' and similar
+information about the so-called interactive "home unit". We are using
+quotes here, since, originally, GHC wasn't aware of more than one 'HomeUnitEnv's.
+So the 'InteractiveContext' was a hack/solution to have 'DynFlags' and 'Plugins'
+independent of the 'DynFlags' and 'Plugins' stored in 'HscEnv'.
+Nowadays, GHC has support for multiple home units via the 'HomeUnitGraph', thus,
+this part of the 'InteractiveContext' is strictly speaking redundant, as we
+can simply manage one 'HomeUnitEnv' for the 'DynFlags' and 'Plugins' that are
+currently stored in the 'InteractiveContext'.
+
+As a matter of fact, that's exactly what we do nowadays.
+That means, we can also lift other restrictions in the future, for example
+allowing @:seti@ commands to modify the package-flags, since we now have a
+separate 'UnitState' for the interactive session.
+However, we did not rip out 'ic_dflags' and 'ic_plugins', yet, as it makes
+it easier to access them for functions that want to use the interactive 'DynFlags',
+such as 'runInteractiveHsc' and 'mkInteractiveHscEnv', without having to look that
+information up in the 'HomeUnitGraph'.
+It is reasonable to change this in the future, and remove 'ic_dflags' and 'ic_plugins'.
+
+We keep 'ic_dflags' and 'ic_plugins' around, but we also store a 'HomeUnitEnv'
+for the 'DynFlags' and 'Plugins' of the interactive session.
+
+It is important to keep the 'DynFlags' in these two places consistent.
+
+In other words, whenever you update the 'DynFlags' of the 'interactiveGhciUnitId'
+in the 'HscEnv', then you also need to update the 'DynFlags' of the
+'InteractiveContext'.
+The easiest way to update them is via 'setInteractiveDynFlags'.
+However, careful, footgun! It is very easy to call 'setInteractiveDynFlags'
+and forget to call 'normaliseInteractiveDynFlags' on the 'DynFlags' in the
+'HscEnv'! This is important, because you may, accidentally, have enabled
+Language Extensions that are not supported in the interactive ghc session,
+which we do not want.
+
+To summarise, the 'ic_dflags' and 'ic_plugins' are currently used to
+conveniently cache them for easy access.
+The 'ic_dflags' must be identical to the 'DynFlags' stored in the 'HscEnv'
+for the 'HomeUnitEnv' identified by 'interactiveGhciUnitId'.
+
+See Note [Multiple Home Units aware GHCi] for the design and rationale for
+the current 'interactiveGhciUnitId'.
+
 Note [Interactively-bound Ids in GHCi]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Ids bound by previous Stmts in GHCi are currently
@@ -296,7 +341,7 @@ data InteractiveImport
       -- ^ Bring the exports of a particular module
       -- (filtered by an import decl) into scope
 
-  | IIModule ModuleName
+  | IIModule Module
       -- ^ Bring into scope the entire top-level envt of
       -- of this module, including the things imported
       -- into it.

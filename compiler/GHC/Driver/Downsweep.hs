@@ -281,7 +281,7 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
     -- A simple edge to a module from the same home unit
     mkEdge (IIModule n) =
       let unitId = homeUnitId $ hsc_home_unit hsc_env
-      in (unitId, NormalLevel, NoPkgQual, GWIB (noLoc n) NotBoot)
+      in (unitId, NormalLevel, NoPkgQual, GWIB (noLoc $ moduleName n) NotBoot)
     -- A complete import statement
     mkEdge (IIDecl i) =
       let lvl = convImportLevel (ideclLevelSpec i)
