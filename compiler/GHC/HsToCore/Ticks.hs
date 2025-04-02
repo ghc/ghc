@@ -87,7 +87,6 @@ data Tick = Tick
   , tick_label :: BoxLabel  -- ^ Label for the tick counter
   }
 
-
 addTicksToBinds
         :: Logger
         -> TicksConfig
@@ -423,6 +422,8 @@ addTickLHsExprLetBody e@(L pos e0) = do
      _other -> addTickLHsExprEvalInner e
  where
    tick_it      = allocTickBox (ExpBox False) False False (locA pos)
+                  -- don't allow duplicates of this forced bp
+                  $ withBlackListed (locA pos)
                   $ addTickHsExpr e0
    dont_tick_it = addTickLHsExprNever e
 
@@ -609,19 +610,23 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
                     _        -> Nothing
 
 addTickHsExpanded :: HsThingRn -> HsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpanded o@(OrigStmt (L pos LastStmt{})) e
-  -- LastStmt always gets a tick for breakpoint and hpc coverage
-  = do d <- getDensity
-       case d of
-          TickForCoverage    -> liftM (XExpr . ExpandedThingTc o) $ tick_it e
-          TickForBreakPoints -> liftM (XExpr . ExpandedThingTc o) $ tick_it e
-          _                  -> liftM (XExpr . ExpandedThingTc o) $ addTickHsExpr e
+addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
+  -- We always want statements to get a tick, so we can step over each one.
+  -- To avoid duplicates we blacklist SrcSpans we already inserted here.
+  OrigStmt (L pos _) -> do_tick_black pos
+  _                  -> skip
   where
-    tick_it e  = unLoc <$> allocTickBox (ExpBox False) False False (locA pos)
-                               (addTickHsExpr e)
-addTickHsExpanded o e
-  = liftM (XExpr . ExpandedThingTc o) $ addTickHsExpr e
-
+    skip = addTickHsExpr e
+    do_tick_black pos = do
+      d <- getDensity
+      case d of
+         TickForCoverage    -> tick_it_black pos
+         TickForBreakPoints -> tick_it_black pos
+         _                  -> skip
+    tick_it_black pos =
+      unLoc <$> allocTickBox (ExpBox False) False False (locA pos)
+                             (withBlackListed (locA pos) $
+                               addTickHsExpr e)
 
 addTickTupArg :: HsTupArg GhcTc -> TM (HsTupArg GhcTc)
 addTickTupArg (Present x e)  = do { e' <- addTickLHsExpr e
@@ -1141,7 +1146,8 @@ isGoodTickSrcSpan pos = do
   tickish <- tickishType `liftM` getEnv
   let need_same_file = tickSameFileOnly tickish
       same_file      = Just file_name == srcSpanFileName_maybe pos
-  return (isGoodSrcSpan' pos && (not need_same_file || same_file))
+  isBL <- isBlackListed pos
+  return (isGoodSrcSpan' pos && not isBL && (not need_same_file || same_file))
 
 ifGoodTickSrcSpan :: SrcSpan -> TM a -> TM a -> TM a
 ifGoodTickSrcSpan pos then_code else_code = do
@@ -1155,6 +1161,10 @@ bindLocals new_ids (TM m)
                    (r, fv, st') -> (r, fv `delListFromOccEnv` occs, st')
   where occs = [ nameOccName (idName id) | id <- new_ids ]
 
+withBlackListed :: SrcSpan -> TM a -> TM a
+withBlackListed (RealSrcSpan ss _) = withEnv (\ env -> env { blackList = Set.insert ss (blackList env) })
+withBlackListed (UnhelpfulSpan _)  = id
+
 isBlackListed :: SrcSpan -> TM Bool
 isBlackListed (RealSrcSpan pos _) = TM $ \ env st -> (Set.member pos (blackList env), noFVs, st)
 isBlackListed (UnhelpfulSpan _) = return False
@@ -1163,16 +1173,18 @@ isBlackListed (UnhelpfulSpan _) = return False
 -- expression argument to support nested box allocations
 allocTickBox :: BoxLabel -> Bool -> Bool -> SrcSpan -> TM (HsExpr GhcTc)
              -> TM (LHsExpr GhcTc)
-allocTickBox boxLabel countEntries topOnly pos m =
-  ifGoodTickSrcSpan pos (do
-    (fvs, e) <- getFreeVars m
-    env <- getEnv
-    tickish <- mkTickish boxLabel countEntries topOnly pos fvs (declPath env)
-    return (L (noAnnSrcSpan pos) (XExpr $ HsTick tickish $ L (noAnnSrcSpan pos) e)))
-  (do
-    e <- m
-    return (L (noAnnSrcSpan pos) e)
-  )
+allocTickBox boxLabel countEntries topOnly pos m
+  = ifGoodTickSrcSpan pos good_case skip_case
+  where
+    this_loc = L (noAnnSrcSpan pos)
+    skip_case = do
+      e <- m
+      return (this_loc e)
+    good_case = do
+      (fvs, e) <- getFreeVars m
+      env <- getEnv
+      tickish <- mkTickish boxLabel countEntries topOnly pos fvs (declPath env)
+      return (this_loc (XExpr $ HsTick tickish $ this_loc e))
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations

@@ -1,11 +1,20 @@
 Stopped in Main.f, dynbrk007.hs:(2,5)-(6,11)
 _result :: Maybe Int = _
+Stopped in Main.f, dynbrk007.hs:3:4-16
+_result :: Maybe Int = _
 Stopped in Main.f, dynbrk007.hs:3:9-16
 _result :: Maybe Int = _
+Stopped in Main.f, dynbrk007.hs:4:4-16
+_result :: Maybe Int = _
+i :: Int = 1
 Stopped in Main.f, dynbrk007.hs:4:9-16
 _result :: Maybe Integer = _
+Stopped in Main.f, dynbrk007.hs:5:4-16
+_result :: Maybe Int = _
+i :: Int = 1
 Stopped in Main.f, dynbrk007.hs:5:9-16
 _result :: Maybe Integer = _
 Stopped in Main.f, dynbrk007.hs:6:4-11
 _result :: Maybe Int = _
 i :: Int = 1
+Just 1

@@ -2,6 +2,12 @@ Stopped in Main.l2dll, mdo.hs:(30,16)-(32,27)
 _result :: IO (N Char) = _
 x :: Char = 'h'
 xs :: [Char] = _
+Stopped in Main.l2dll, mdo.hs:30:20-42
+_result :: IO (N Char, N Char, N Char) = _
+f :: N Char = _
+l :: N Char = _
+x :: Char = 'h'
+xs :: [Char] = _
 Stopped in Main.l2dll, mdo.hs:30:30-42
 _result :: IO (N Char) = _
 f :: N Char = _
