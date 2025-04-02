@@ -457,6 +457,7 @@ addUnit u = do
                     (homeUnitId home_unit)
                     (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags (ue_hpt old_unit_env) (Just home_unit))
           , ue_eps       = ue_eps old_unit_env
+          , ue_module_graph = ue_module_graph old_unit_env
           }
     setSession $ hscSetFlags dflags $ hsc_env { hsc_unit_env = unit_env }
 

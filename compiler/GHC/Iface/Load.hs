@@ -671,7 +671,7 @@ dontLeakTheHUG thing_inside = do
          -- oneshot mode does not support backpack
          -- and we want to avoid prodding the hsc_mod_graph thunk
          | isOneShot (ghcMode (hsc_dflags hsc_env)) = False
-         | mgHasHoles (hsc_mod_graph hsc_env) = True
+         | mgHasHoles (ue_module_graph old_unit_env) = True
          | otherwise = False
         pruneHomeUnitEnv hme = do
           -- NB: These are empty HPTs because Iface/Load first consults the HPT
@@ -683,19 +683,19 @@ dontLeakTheHUG thing_inside = do
           | otherwise
           = do
             hug' <- traverse pruneHomeUnitEnv (ue_home_unit_graph old_unit_env)
+            let !new_mod_graph = emptyMG { mg_mss = panic "cleanTopEnv: mg_mss"
+                                         , mg_graph = panic "cleanTopEnv: mg_graph"
+                                         , mg_has_holes = keepFor20509 }
             return old_unit_env
               { ue_home_unit_graph = hug'
+              , ue_module_graph    = new_mod_graph
               }
       in do
         !unit_env <- unit_env_io
         -- mg_has_holes will be checked again, but nothing else about the module graph
-        let !new_mod_graph = emptyMG { mg_mss = panic "cleanTopEnv: mg_mss"
-                                     , mg_graph = panic "cleanTopEnv: mg_graph"
-                                     , mg_has_holes = keepFor20509 }
         pure $
           hsc_env
                 {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
-                ,  hsc_mod_graph    = new_mod_graph
                 ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
                 ,  hsc_type_env_vars = case maybe_type_vars of
                                            Just vars -> vars
