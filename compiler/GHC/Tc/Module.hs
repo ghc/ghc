@@ -479,7 +479,7 @@ tcRnImports hsc_env import_decls
                 -- modules batch (@--make@) compiled before this one, but
                 -- which are not below this one.
               ; (home_insts, home_fam_insts) <- liftIO $
-                    hugInstancesBelow hsc_env unitId mnwib
+                    hugInstancesBelow (hsc_unit_env hsc_env) unitId mnwib
 
                 -- Record boot-file info in the EPS, so that it's
                 -- visible to loadHiBootInterface in tcRnSrcDecls,

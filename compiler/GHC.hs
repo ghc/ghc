@@ -853,6 +853,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
               , ue_namever         = ghcNameVersion dflags1
               , ue_home_unit_graph = home_unit_graph
               , ue_current_unit    = ue_currentUnit old_unit_env
+              , ue_module_graph    = ue_module_graph old_unit_env
               , ue_eps             = ue_eps old_unit_env
               }
         modifySession $ \h -> hscSetFlags dflags1 h{ hsc_unit_env = unit_env }
@@ -883,7 +884,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
 --
 invalidateModSummaryCache :: GhcMonad m => m ()
 invalidateModSummaryCache =
-  modifySession $ \h -> h { hsc_mod_graph = mapMG inval (hsc_mod_graph h) }
+  modifySession $ \hsc_env -> setModuleGraph (mapMG inval (hsc_mod_graph hsc_env)) hsc_env
  where
   inval ms = ms { ms_hs_hash = fingerprint0 }
 

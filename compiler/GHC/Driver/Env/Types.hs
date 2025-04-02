@@ -18,7 +18,6 @@ import GHC.Types.Name.Cache
 import GHC.Types.Target
 import GHC.Types.TypeEnv
 import GHC.Unit.Finder.Types
-import GHC.Unit.Module.Graph
 import GHC.Unit.Env
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
@@ -65,9 +64,6 @@ data HscEnv
         hsc_targets :: [Target],
                 -- ^ The targets (or roots) of the current session
 
-        hsc_mod_graph :: ModuleGraph,
-                -- ^ The module graph of the current session
-
         hsc_IC :: InteractiveContext,
                 -- ^ The context for evaluating interactive statements
 
@@ -112,3 +108,4 @@ data HscEnv
         , hsc_llvm_config :: !LlvmConfigCache
                 -- ^ LLVM configuration cache.
  }
+

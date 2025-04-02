@@ -2,6 +2,8 @@
 module GHC.Driver.Env
    ( Hsc(..)
    , HscEnv (..)
+   , hsc_mod_graph
+   , setModuleGraph
    , hscUpdateFlags
    , hscSetFlags
    , hsc_home_unit
@@ -127,6 +129,9 @@ hsc_HUE = ue_currentHomeUnitEnv . hsc_unit_env
 hsc_HUG :: HscEnv -> HomeUnitGraph
 hsc_HUG = ue_home_unit_graph . hsc_unit_env
 
+hsc_mod_graph :: HscEnv -> ModuleGraph
+hsc_mod_graph = ue_module_graph . hsc_unit_env
+
 hsc_all_home_unit_ids :: HscEnv -> Set.Set UnitId
 hsc_all_home_unit_ids = HUG.allUnits . hsc_HUG
 
@@ -135,6 +140,9 @@ hscInsertHPT hmi hsc_env = UnitEnv.insertHpt hmi (hsc_unit_env hsc_env)
 
 hscUpdateHUG :: (HomeUnitGraph -> HomeUnitGraph) -> HscEnv -> HscEnv
 hscUpdateHUG f hsc_env = hsc_env { hsc_unit_env = updateHug f (hsc_unit_env hsc_env) }
+
+setModuleGraph :: ModuleGraph -> HscEnv -> HscEnv
+setModuleGraph mod_graph hsc_env = hsc_env { hsc_unit_env = (hsc_unit_env hsc_env) { ue_module_graph = mod_graph } }
 
 {-
 
@@ -216,20 +224,20 @@ hscEPS hsc_env = readIORef (euc_eps (ue_eps (hsc_unit_env hsc_env)))
 
 -- | Find all rules in modules that are in the transitive closure of the given
 -- module.
-hugRulesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO RuleBase
-hugRulesBelow hsc uid mn = foldr (flip extendRuleBaseList) emptyRuleBase <$>
-  hugSomeThingsBelowUs (md_rules . hm_details) False hsc uid mn
+hugRulesBelow :: UnitEnv -> UnitId -> ModuleNameWithIsBoot -> IO RuleBase
+hugRulesBelow unit_env uid mn = foldr (flip extendRuleBaseList) emptyRuleBase <$>
+  hugSomeThingsBelowUs (md_rules . hm_details) False unit_env uid mn
 
 -- | Get annotations from all modules "below" this one (in the dependency
 -- sense) within the home units. If the module is @Nothing@, returns /all/
 -- annotations in the home units.
-hugAnnsBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO AnnEnv
-hugAnnsBelow hsc uid mn = foldr (flip extendAnnEnvList) emptyAnnEnv <$>
-  hugSomeThingsBelowUs (md_anns . hm_details) False hsc uid mn
+hugAnnsBelow :: UnitEnv -> UnitId -> ModuleNameWithIsBoot -> IO AnnEnv
+hugAnnsBelow unit_env uid mn = foldr (flip extendAnnEnvList) emptyAnnEnv <$>
+  hugSomeThingsBelowUs (md_anns . hm_details) False unit_env uid mn
 
 -- | Find instances visible from the given set of imports
-hugInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO (InstEnv, [FamInst])
-hugInstancesBelow hsc_env uid mnwib = do
+hugInstancesBelow :: UnitEnv -> UnitId -> ModuleNameWithIsBoot -> IO (InstEnv, [FamInst])
+hugInstancesBelow unit_env uid mnwib = do
  let mn = gwib_mod mnwib
  (insts, famInsts) <-
      unzip . concat <$>
@@ -240,7 +248,7 @@ hugInstancesBelow hsc_env uid mnwib = do
                                        then []
                                        else [(md_insts details, md_fam_insts details)])
                           True -- Include -hi-boot
-                          hsc_env
+                          unit_env
                           uid
                           mnwib
  return (foldl' unionInstEnv emptyInstEnv insts, concat famInsts)
@@ -248,10 +256,10 @@ hugInstancesBelow hsc_env uid mnwib = do
 -- | Get things from modules in the transitive closure of the given module.
 --
 -- Note: Don't expose this function. This is a footgun if exposed!
-hugSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO [[a]]
-hugSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
-  = let hug = hsc_HUG hsc_env
-        mg  = hsc_mod_graph hsc_env
+hugSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> UnitEnv -> UnitId -> ModuleNameWithIsBoot -> IO [[a]]
+hugSomeThingsBelowUs extract include_hi_boot unit_env uid mn
+  = let hug = ue_home_unit_graph unit_env
+        mg  = ue_module_graph unit_env
     in
     sequence
     [ things
@@ -292,7 +300,7 @@ prepareAnnotations hsc_env mb_guts = do
         -- entries regardless of dependency ordering.
         get_mod mg = (moduleUnitId (mg_module mg), GWIB (moduleName (mg_module mg)) NotBoot)
     home_pkg_anns  <- fromMaybe (hugAllAnns (hsc_unit_env hsc_env))
-                      $ uncurry (hugAnnsBelow hsc_env)
+                      $ uncurry (hugAnnsBelow (hsc_unit_env hsc_env))
                       . get_mod <$> mb_guts
     let
         other_pkg_anns = eps_ann_env eps

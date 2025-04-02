@@ -23,21 +23,22 @@
 -- ┌▽────────────┐    │                     │
 -- │HomeUnitGraph│    │                     │
 -- └┬────────────┘    │                     │
--- ┌▽─────────────────▽┐                    │
--- │UnitEnv            │                    │
--- └┬──────────────────┘                    │
--- ┌▽───────────────────────────────────────▽┐
--- │HscEnv                                   │
--- └─────────────────────────────────────────┘
+-- ┌▽─────────────────▽─────────────────────▽┐
+-- │UnitEnv                                  │
+-- └┬─────────────-──────────────────────────┘
+--  │
+--  │
+-- ┌▽──────────────────────────────────────▽┐
+-- │HscEnv                                  │
+-- └────────────────────────────────────────┘
 -- @
 --
--- The 'UnitEnv' references both the 'HomeUnitGraph' (with all the home unit
--- modules) and the 'ExternalPackageState' (information about all
--- non-home/external units). The 'HscEnv' references this 'UnitEnv' and the
--- 'ModuleGraph' (which describes the relationship between the modules being
--- compiled). The 'HomeUnitGraph' has one 'HomePackageTable' for every unit.
---
--- TODO: Arguably, the 'ModuleGraph' should be part of 'UnitEnv' rather than being in the 'HscEnv'.
+-- The 'UnitEnv' references the 'HomeUnitGraph' (with all the home unit
+-- modules), the 'ExternalPackageState' (information about all
+-- non-home/external units), and the 'ModuleGraph' (which describes the
+-- relationship between the modules being compiled).
+-- The 'HscEnv' references this 'UnitEnv'.
+-- The 'HomeUnitGraph' has one 'HomePackageTable' for every unit.
 module GHC.Unit.Env
     ( UnitEnv (..)
     , initUnitEnv
@@ -119,6 +120,7 @@ import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 import GHC.Unit.Home.Graph (HomeUnitGraph, HomeUnitEnv)
 import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Module.Graph
 
 import GHC.Platform
 import GHC.Settings
@@ -163,6 +165,8 @@ data UnitEnv = UnitEnv
 
     , ue_current_unit    :: UnitId
 
+    , ue_module_graph    :: !ModuleGraph
+
     , ue_home_unit_graph :: !HomeUnitGraph
         -- See Note [Multiple Home Units]
 
@@ -182,6 +186,7 @@ initUnitEnv cur_unit hug namever platform = do
   return $ UnitEnv
     { ue_eps             = eps
     , ue_home_unit_graph = hug
+    , ue_module_graph    = emptyMG
     , ue_current_unit    = cur_unit
     , ue_platform        = platform
     , ue_namever         = namever
