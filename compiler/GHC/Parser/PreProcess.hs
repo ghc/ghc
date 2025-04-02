@@ -192,8 +192,8 @@ ppLexer queueComments cont =
                         _ -> return ()
                     ppLexer queueComments cont
              in
-                case tk of
-                    -- case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
+                -- case tk of
+                case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
                     L _ ITeof -> do
                         mInp <- popIncludeLoc
                         case mInp of
@@ -280,11 +280,15 @@ acceptStateChange :: AcceptingResult -> PP ()
 acceptStateChange ArNoChange = return ()
 acceptStateChange ArNowIgnoring = do
   alr <- Lexer.getAlrState
-  s <- getPpState
+  -- s <- getPpState
+  s' <- getPpState
+  let s = trace ("acceptStateChange:ArNowIgnoring") s'
   setPpState (s { pp_alr_state = Just alr})
   Lexer.startSkipping
 acceptStateChange ArNowAccepting = do
-  s <- getPpState
+  -- s <- getPpState
+  s' <- getPpState
+  let s = trace ("acceptStateChange:ArNowAccepting") s'
   mapM_ Lexer.setAlrState (pp_alr_state s)
   _ <- Lexer.stopSkipping
   return ()

@@ -671,6 +671,8 @@ t28 = do
         , "#ifdef DEBUG"
         , "                                 hiding (rev)"
         , "#endif"
+        , "import MagicHaskeller.Classification(Filtrable)"
+        , ""
         ]
 
 t29 :: IO ()

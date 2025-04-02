@@ -41,6 +41,7 @@ import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..))
 import GHC.Parser.Lexer qualified as Lexer
 import GHC.Parser.PreProcess.ParserM (Token (..))
 import GHC.Types.SrcLoc
+import Debug.Trace
 
 import GHC.Prelude
 
@@ -163,7 +164,7 @@ setAccepting on = do
   return $ acceptingStateChange current (parent && on)
 
 getAccepting :: PP Bool
-getAccepting = P $ \s -> POk s (pp_accepting (NonEmpty.head $ pp_scope (pp s)))
+getAccepting = P $ \s -> POk s (scopeValue $ pp_scope (pp s))
 
 -- Start a new scope, ensuring it is consistent with the existing one
 pushAccepting :: Bool -> PP AcceptingResult
@@ -175,7 +176,9 @@ pushAccepting on = do
 
 -- Have we just changed the accepting state?
 acceptingStateChange :: Bool -> Bool -> AcceptingResult
-acceptingStateChange old new =
+acceptingStateChange old' new' =
+  let (old, new) = trace ("acceptStateChange:" ++ show (old',new')) (old',new')
+  in
   case (old, new) of
     (True, False) -> ArNowIgnoring
     (False, True) -> ArNowAccepting
@@ -185,13 +188,14 @@ popAccepting :: PP AcceptingResult
 popAccepting =
     P $ \s ->
         let
-            old_scope = scopeValue $ pp_scope (pp s)
+            current = scopeValue $ pp_scope (pp s)
             new_scope = case pp_scope (pp s) of
-                c :| [] -> c :| []
+                -- c :| [] -> c :| []
+                c :| [] -> (trace ("popAccepting:keeping old:" ++ show c) c) :| []
                 _ :| (h : t) -> h :| t
          in
             POk s{pp = (pp s){pp_scope = new_scope}}
-                (acceptingStateChange old_scope (scopeValue new_scope))
+                (acceptingStateChange current (scopeValue new_scope))
 
 scopeValue :: NonEmpty PpScope -> Bool
 scopeValue s =  pp_accepting $ NonEmpty.head s
