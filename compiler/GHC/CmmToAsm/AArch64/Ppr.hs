@@ -466,19 +466,19 @@ pprInstr platform instr = case instr of
     let (adrp', ldr') = op_adrp_reloc_dynamic $ pprAsmLabel platform lbl in
     op_adrp o1 (adrp') $$
     op_ldr o1 (ldr') $$
-    op_add o1 (char '#' <> int off) -- TODO: check that off is in 12bits.
+    op_add o1 (check_off off)
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) | isForeignLabel lbl ->
     let (adrp', ldr') = op_adrp_reloc_foreign $ pprAsmLabel platform lbl in
     op_adrp o1 (adrp') $$
     op_ldr o1 (ldr') $$
-    op_add o1 (char '#' <> int off) -- TODO: check that off is in 12bits.
+    op_add o1 (check_off off)
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
     let (adrp', ldr') = op_adrp_reloc_local $ pprAsmLabel platform lbl in
     op_adrp o1 (adrp') $$
     op_ldr o1 (ldr') $$
-    op_add o1 (char '#' <> int off) -- TODO: check that off is in 12bits.
+    op_add o1 (check_off off)
 
   LDR _f o1 (OpImm (ImmCLbl lbl')) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
     let (adrp', ldr') = op_adrp_reloc_dynamic $ pprAsmLabel platform lbl in
@@ -546,6 +546,9 @@ pprInstr platform instr = case instr of
           OSLinux -> op_adrp_reloc_dynamic asm_lbl
           OSMinGW32 -> op_adrp_reloc_local asm_lbl
           os' -> pgmError $ "GHC.CmmToAsm.AArch64.Ppr.op_adrp_reloc_foreign : " ++ show os' ++ " is unsuppported by relocations"
+
+       check_off off = if off >= 0 && off <= 4095 then char '#' <> int off else
+         pgmError $ "GHC.CmmToAsm.AArch64.Ppr.check_off : " ++ show off ++ " is out of 12 bit"
 
 pprBcond :: IsLine doc => Cond -> doc
 pprBcond c = text "b." <> pprCond c
