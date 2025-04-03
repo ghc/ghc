@@ -1,4 +1,4 @@
-{-# OPTIONS -Wimplicit-rhs-quantification #-}
+{-# OPTIONS -Werror=implicit-rhs-quantification #-}
 {-# LANGUAGE DataKinds #-}
 module T23510a where
 

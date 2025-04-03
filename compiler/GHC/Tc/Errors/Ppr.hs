@@ -1955,7 +1955,7 @@ instance Diagnostic TcRnMessage where
 
     TcRnImplicitRhsQuantification kv -> mkSimpleDecorated $
       vcat [ text "The variable" <+> quotes (ppr kv) <+> text "occurs free on the RHS of the type declaration"
-           , text "In the future GHC will no longer implicitly quantify over such variables"
+           , text "The next version of GHC will reject this program, no longer implicitly quantify over" <+> quotes (ppr kv)
            ]
 
     TcRnInvalidDefaultedTyVar wanteds proposal bad_tvs ->

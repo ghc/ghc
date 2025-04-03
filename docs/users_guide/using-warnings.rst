@@ -83,6 +83,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
         * :ghc-flag:`-Wnoncanonical-monad-instances`
         * :ghc-flag:`-Wdata-kinds-tc`
+        * :ghc-flag:`-Wimplicit-rhs-quantification`
 
 .. ghc-flag:: -W
     :shortdesc: enable normal warnings
@@ -164,12 +165,7 @@ as ``-Wno-...`` for every individual warning in the group.
     eager to make their code future compatible to adapt to new features before
     they even generate warnings.
 
-    This currently enables
-
-    .. hlist::
-        :columns: 3
-
-        * :ghc-flag:`-Wimplicit-rhs-quantification`
+    This warning group does not currently include any warnings.
 
 .. ghc-flag:: -w
     :shortdesc: disable all warnings
@@ -2511,7 +2507,7 @@ of ``-W(no-)*``.
     :category:
 
     :since: 9.8.1
-    :default: off
+    :default: on (since 9.14.1)
 
     In accordance with `GHC Proposal #425
     <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0425-decl-invis-binders.rst>`__,

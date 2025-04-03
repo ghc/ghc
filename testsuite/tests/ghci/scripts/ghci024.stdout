@@ -16,7 +16,6 @@ other dynamic, non-language, flag settings:
   -fprefer-byte-code
   -fbreak-points
 warning settings:
-  -Wimplicit-rhs-quantification
 ~~~~~~~~~~ Testing :set -a
 options currently set: none.
 base language is: GHC2021

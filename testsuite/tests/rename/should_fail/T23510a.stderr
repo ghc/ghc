@@ -1,30 +1,30 @@
-
-T23510a.hs:8:29: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wcompat), Werror=implicit-rhs-quantification]
+T23510a.hs:8:29: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wdefault), Werror=implicit-rhs-quantification]
     The variable ‘a’ occurs free on the RHS of the type declaration
-    In the future GHC will no longer implicitly quantify over such variables
+    The next version of GHC will reject this program, no longer implicitly quantify over ‘a’
     Suggested fix: Bind ‘a’ on the LHS of the type declaration
 
-T23510a.hs:10:20: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wcompat), Werror=implicit-rhs-quantification]
+T23510a.hs:10:20: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wdefault), Werror=implicit-rhs-quantification]
     The variable ‘a’ occurs free on the RHS of the type declaration
-    In the future GHC will no longer implicitly quantify over such variables
+    The next version of GHC will reject this program, no longer implicitly quantify over ‘a’
     Suggested fix: Bind ‘a’ on the LHS of the type declaration
 
-T23510a.hs:10:34: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wcompat), Werror=implicit-rhs-quantification]
+T23510a.hs:10:34: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wdefault), Werror=implicit-rhs-quantification]
     The variable ‘b’ occurs free on the RHS of the type declaration
-    In the future GHC will no longer implicitly quantify over such variables
+    The next version of GHC will reject this program, no longer implicitly quantify over ‘b’
     Suggested fix: Bind ‘b’ on the LHS of the type declaration
 
-T23510a.hs:12:27: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wcompat), Werror=implicit-rhs-quantification]
+T23510a.hs:12:27: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wdefault), Werror=implicit-rhs-quantification]
     The variable ‘k’ occurs free on the RHS of the type declaration
-    In the future GHC will no longer implicitly quantify over such variables
+    The next version of GHC will reject this program, no longer implicitly quantify over ‘k’
     Suggested fix: Bind ‘k’ on the LHS of the type declaration
 
-T23510a.hs:15:30: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wcompat), Werror=implicit-rhs-quantification]
+T23510a.hs:15:30: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wdefault), Werror=implicit-rhs-quantification]
     The variable ‘a’ occurs free on the RHS of the type declaration
-    In the future GHC will no longer implicitly quantify over such variables
+    The next version of GHC will reject this program, no longer implicitly quantify over ‘a’
     Suggested fix: Bind ‘a’ on the LHS of the type declaration
 
-T23510a.hs:17:67: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wcompat), Werror=implicit-rhs-quantification]
+T23510a.hs:17:67: error: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wdefault), Werror=implicit-rhs-quantification]
     The variable ‘v’ occurs free on the RHS of the type declaration
-    In the future GHC will no longer implicitly quantify over such variables
+    The next version of GHC will reject this program, no longer implicitly quantify over ‘v’
     Suggested fix: Bind ‘v’ on the LHS of the type declaration
+

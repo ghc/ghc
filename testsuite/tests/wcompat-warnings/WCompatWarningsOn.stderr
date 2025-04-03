@@ -1,5 +1,0 @@
-Template.hs:9:29: warning: [GHC-16382] [-Wimplicit-rhs-quantification (in -Wcompat)]
-    The variable ‘a’ occurs free on the RHS of the type declaration
-    In the future GHC will no longer implicitly quantify over such variables
-    Suggested fix: Bind ‘a’ on the LHS of the type declaration
-

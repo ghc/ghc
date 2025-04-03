@@ -1,9 +1,6 @@
-{-# LANGUAGE DataKinds #-}
 module WCompatWarningsOnOff where
 
-import Data.Proxy
-import GHC.Types
-import Data.List
-import Data.Kind
-
-type T1 = 'Nothing :: Maybe a
+-- The following program should trigger all warnings in the -Wcompat
+-- warning group.
+--
+-- As -Wcompat does not currently contain any warnings, this file is empty.
