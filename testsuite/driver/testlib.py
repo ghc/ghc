@@ -161,6 +161,12 @@ def js_broken( bug: IssueNumber ):
     else:
         return normal;
 
+def wasm_broken( bug: IssueNumber ):
+    if wasm_arch():
+        return expect_broken(bug);
+    else:
+        return normal;
+
 # expect occasional failures for the JS backend
 def js_fragile( bug: IssueNumber ):
     if js_arch():

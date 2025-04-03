@@ -240,7 +240,7 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
              (final_deps, done', summarised') <- loopImports (calcDeps ms) done summarised
              -- This has the effect of finding a .hs file if we are looking at the .hs-boot file.
              (_, done'', summarised'') <- loopImports (maybeToList hs_file_for_boot) done' summarised'
-             loopSummaries next (M.insert k (ModuleNode final_deps ms) done'', summarised'')
+             loopSummaries next (M.insert k (ModuleNode final_deps (ModuleNodeCompile ms)) done'', summarised'')
           where
             k = NodeKey_Module (msKey ms)
 
@@ -544,10 +544,15 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
   mgMapM enable_code_gen mg
   where
     defaultBackendOf ms = platformDefaultBackend (targetPlatform $ ue_unitFlags (ms_unitid ms) unit_env)
+
+    enable_code_gen :: ModuleNodeInfo -> IO ModuleNodeInfo
+    enable_code_gen (ModuleNodeCompile ms) = ModuleNodeCompile <$> enable_code_gen_ms ms
+    enable_code_gen m@(ModuleNodeFixed {}) = return m
+
     -- FIXME: Strong resemblance and some duplication between this and `makeDynFlagsConsistent`.
     -- It would be good to consider how to make these checks more uniform and not duplicated.
-    enable_code_gen :: ModSummary -> IO ModSummary
-    enable_code_gen ms
+    enable_code_gen_ms :: ModSummary -> IO ModSummary
+    enable_code_gen_ms ms
       | ModSummary
         { ms_location = ms_location
         , ms_hsc_src = HsSrcFile
@@ -585,7 +590,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
                      , ms_hspp_opts = updOptLevel 0 $ new_dflags
                      }
                -- Recursive call to catch the other cases
-               enable_code_gen ms'
+               enable_code_gen_ms ms'
 
          -- If -fprefer-byte-code then satisfy dependency by enabling bytecode (if normal object not enough)
          -- we only get to this case if the default backend is already generating object files, but we need dynamic
@@ -595,28 +600,28 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
                      { ms_hspp_opts = gopt_set (ms_hspp_opts ms) Opt_ByteCodeAndObjectCode
                      }
                -- Recursive call to catch the other cases
-               enable_code_gen ms'
+               enable_code_gen_ms ms'
          | dynamic_too_enable enable_spec ms -> do
                let ms' = ms
                      { ms_hspp_opts = gopt_set (ms_hspp_opts ms) Opt_BuildDynamicToo
                      }
                -- Recursive call to catch the other cases
-               enable_code_gen ms'
+               enable_code_gen_ms ms'
          | ext_interp_enable ms -> do
                let ms' = ms
                      { ms_hspp_opts = gopt_set (ms_hspp_opts ms) Opt_ExternalInterpreter
                      }
                -- Recursive call to catch the other cases
-               enable_code_gen ms'
+               enable_code_gen_ms ms'
 
          | needs_full_ways dflags -> do
                let ms' = ms { ms_hspp_opts = set_full_ways dflags }
                -- Recursive call to catch the other cases
-               enable_code_gen ms'
+               enable_code_gen_ms ms'
 
          | otherwise -> return ms
 
-    enable_code_gen ms = return ms
+    enable_code_gen_ms ms = return ms
 
     nocode_enable ms@(ModSummary { ms_hspp_opts = dflags }) =
       not (backendGeneratesCode (backend dflags)) &&
@@ -695,7 +700,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
         -- Note we don't need object code for a module if it uses TemplateHaskell itself. Only
         -- it's dependencies.
         [ deps
-        | (ModuleNode deps ms) <- mod_graph
+        | (ModuleNode deps (ModuleNodeCompile ms)) <- mod_graph
         , isTemplateHaskellOrQQNonBoot ms
         , not (gopt Opt_UseBytecodeRatherThanObjects (ms_hspp_opts ms))
         ]
@@ -704,7 +709,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
     need_bc_set =
       concat
         [ deps
-        | (ModuleNode deps ms) <- mod_graph
+        | (ModuleNode deps (ModuleNodeCompile ms)) <- mod_graph
         , isTemplateHaskellOrQQNonBoot ms
         , gopt Opt_UseBytecodeRatherThanObjects (ms_hspp_opts ms)
         ]

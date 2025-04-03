@@ -73,7 +73,7 @@ import GHC.Driver.MakeAction
 
 import GHC.ByteCode.Types
 
-import GHC.Iface.Load      ( cannotFindModule )
+import GHC.Iface.Load      ( cannotFindModule, readIface )
 import GHC.IfaceToCore     ( typecheckIface )
 import GHC.Iface.Recomp    ( RecompileRequired(..), CompileReason(..) )
 
@@ -129,6 +129,7 @@ import GHC.Runtime.Loader
 import GHC.Utils.Constants
 import GHC.Iface.Errors.Types
 import Data.Function
+import qualified GHC.Data.Maybe as M
 
 import GHC.Data.Graph.Directed.Reachability
 import qualified GHC.Unit.Home.Graph as HUG
@@ -558,17 +559,18 @@ createBuildPlan mod_graph maybe_top_mod =
 
         -- An environment mapping a module to its hs-boot file and all nodes on the path between the two, if one exists
         boot_modules = mkModuleEnv
-          [ (ms_mod ms, (m, boot_path (ms_mod_name ms) (ms_unitid ms)))
+          [ (mn, (m, boot_path (moduleName mn) (moduleUnitId mn)))
             | m@(ModuleNode _ ms) <- mgModSummaries' mod_graph
-            , isBootSummary ms == IsBoot]
+            , let mn = moduleNodeInfoModule ms
+            , isBootModuleNodeInfo ms == IsBoot]
 
         select_boot_modules :: [ModuleGraphNode] -> [ModuleGraphNode]
         select_boot_modules = mapMaybe (fmap fst . get_boot_module)
 
         get_boot_module :: ModuleGraphNode -> Maybe (ModuleGraphNode, [ModuleGraphNode])
         get_boot_module (ModuleNode _ ms)
-          | HsSrcFile <- ms_hsc_src ms
-          = lookupModuleEnv boot_modules (ms_mod ms)
+          | NotBoot <- isBootModuleNodeInfo ms
+          = lookupModuleEnv boot_modules (moduleNodeInfoModule ms)
         get_boot_module _ = Nothing
 
         -- Any cycles should be resolved now
@@ -672,7 +674,8 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
         -- prune the HPT so everything is not retained when doing an
         -- upsweep.
         !pruned_cache = pruneCache cache
-                            (flattenSCCs (filterToposortToModules  mg2_with_srcimps))
+                            [ms | (ModuleNodeCompile ms) <- (flattenSCCs (filterToposortToModules  mg2_with_srcimps))]
+
 
 
     -- before we unload anything, make sure we don't leave an old
@@ -732,7 +735,7 @@ guessOutputFile = modifySession $ \env ->
                 mainModuleSrcPath :: Maybe String
                 mainModuleSrcPath = do
                   ms <- mgLookupModule mod_graph (mainModIs hue)
-                  ml_hs_file (ms_location ms)
+                  ml_hs_file (moduleNodeInfoLocation ms)
                 name = fmap dropExtension mainModuleSrcPath
 
                 -- MP: This exception is quite sensitive to being forced, if you
@@ -1060,7 +1063,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
                   executeInstantiationNode mod_idx n_mods hug uid iu
                   return Nothing
               ModuleNode _build_deps ms -> do
-                let !old_hmi = M.lookup (msKey ms) old_hpt
+                let !old_hmi = M.lookup (mnKey ms) old_hpt
                     rehydrate_mods = mapMaybe nodeKeyModName <$> rehydrate_nodes
                 mod_idx <- nodeId
                 return $ withCurrentUnit (mgNodeUnitId mod) $ do
@@ -1458,21 +1461,19 @@ modNodeMapUnionWith f (ModNodeMap m) (ModNodeMap n) = ModNodeMap (M.unionWith f 
 -- components in the topological sort, then those imports can
 -- definitely be replaced by ordinary non-SOURCE imports: if SOURCE
 -- were necessary, then the edge would be part of a cycle.
-warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
+warnUnnecessarySourceImports :: GhcMonad m => [SCC ModuleNodeInfo] -> m ()
 warnUnnecessarySourceImports sccs = do
   diag_opts <- initDiagOpts <$> getDynFlags
   when (diag_wopt Opt_WarnUnusedImports diag_opts) $ do
     let check ms =
-           let mods_in_this_cycle = map ms_mod_name ms in
-           [ warn i | m <- ms, i <- ms_home_srcimps m,
+           let mods_in_this_cycle = map moduleNodeInfoModuleName ms in
+           [ warn i | (ModuleNodeCompile m) <- ms, i <- ms_home_srcimps m,
                       unLoc i `notElem`  mods_in_this_cycle ]
 
         warn :: Located ModuleName -> MsgEnvelope GhcMessage
         warn (L loc mod) = GhcDriverMessage <$> mkPlainMsgEnvelope diag_opts
                                                   loc (DriverUnnecessarySourceImports mod)
     logDiagnostics (mkMessages $ listToBag (concatMap (check . flattenSCC) sccs))
-
-
 
 
 -----------------------------------------------------------------------------
@@ -1543,7 +1544,7 @@ cyclicModuleErr mss
        Just path -> mkPlainErrorMsgEnvelope src_span $
                     GhcDriverMessage $ DriverModuleGraphCycle path
         where
-          src_span = maybe noSrcSpan (mkFileSrcSpan . ms_location) (mgNodeModSum (head path))
+          src_span = maybe noSrcSpan (mkFileSrcSpan . moduleNodeInfoLocation) (mgNodeIsModule (head path))
   where
     graph :: [Node NodeKey ModuleGraphNode]
     graph =
@@ -1628,39 +1629,72 @@ executeInstantiationNode k n deps uid iu = do
             return res
 
 
+-- | executeCompileNode interprets how --make module should compile a ModuleNode
+--
+-- 1. If the ModuleNode is a ModuleNodeCompile, then we first check
+--    if the interface file exists and is up to date. If it is, we return those.
+--    Otherwise, we compile the module and return the new HomeModInfo.
+-- 2. If the ModuleNode is a ModuleNodeFixed, then we just need to load the interface
+--    and artifacts from disk.
+
 executeCompileNode :: Int
   -> Int
   -> Maybe HomeModInfo
   -> HomeUnitGraph
   -> Maybe [ModuleName] -- List of modules we need to rehydrate before compiling
-  -> ModSummary
+  -> ModuleNodeInfo
   -> RunMakeM HomeModInfo
-executeCompileNode k n !old_hmi hug mrehydrate_mods mod = do
+executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
   me@MakeEnv{..} <- ask
   -- Rehydrate any dependencies if this module had a boot file or is a signature file.
   lift $ MaybeT (withAbstractSem compile_sem $ withLoggerHsc k me $ \hsc_env -> do
-     hsc_env' <- liftIO $ maybeRehydrateBefore (setHUG hug hsc_env) mod fixed_mrehydrate_mods
+     hsc_env' <- liftIO $ maybeRehydrateBefore (setHUG hug hsc_env) mni fixed_mrehydrate_mods
+     case mni of
+       ModuleNodeCompile mod -> executeCompileNodeWithSource hsc_env' me  mod
+       ModuleNodeFixed key loc -> executeCompileNodeFixed hsc_env' me key loc
+    )
+
+  where
+    fixed_mrehydrate_mods =
+      case moduleNodeInfoHscSource mni of
+        -- MP: It is probably a bit of a misimplementation in backpack that
+        -- compiling a signature requires an knot_var for that unit.
+        -- If you remove this then a lot of backpack tests fail.
+        Just HsigFile -> Just []
+        _        -> mrehydrate_mods
+
+    executeCompileNodeFixed :: HscEnv -> MakeEnv -> ModNodeKeyWithUid -> ModLocation -> IO (Maybe HomeModInfo)
+    executeCompileNodeFixed hsc_env MakeEnv{diag_wrapper, env_messager} mod loc =
+      wrapAction diag_wrapper hsc_env $ do
+        forM_ env_messager $ \hscMessage -> hscMessage hsc_env (k, n) UpToDate (ModuleNode [] (ModuleNodeFixed mod loc))
+        read_result <- readIface (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule mod) (ml_hi_file loc)
+        case read_result of
+          M.Failed interface_err ->
+            let mn = mnkModuleName mod
+                err = Can'tFindInterface (BadIfaceFile interface_err) (LookingForModule (gwib_mod mn) (gwib_isBoot mn))
+            in throwErrors $ singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan (GhcDriverMessage (DriverInterfaceError err))
+          M.Succeeded iface -> do
+            details <- genModDetails hsc_env iface
+            mb_object <- findObjectLinkableMaybe (mi_module iface) loc
+            mb_bytecode <- loadIfaceByteCodeLazy hsc_env iface loc (md_types details)
+            let hm_linkable = HomeModLinkable mb_bytecode mb_object
+            return (HomeModInfo iface details hm_linkable)
+
+    executeCompileNodeWithSource :: HscEnv -> MakeEnv -> ModSummary -> IO (Maybe HomeModInfo)
+    executeCompileNodeWithSource hsc_env MakeEnv{diag_wrapper, env_messager} mod = do
      let -- Use the cached DynFlags which includes OPTIONS_GHC pragmas
          lcl_dynflags = ms_hspp_opts mod
      let lcl_hsc_env =
              -- Localise the hsc_env to use the cached flags
              hscSetFlags lcl_dynflags $
-             hsc_env'
+             hsc_env
      -- Compile the module, locking with a semaphore to avoid too many modules
      -- being compiled at the same time leading to high memory usage.
      wrapAction diag_wrapper lcl_hsc_env $ do
       res <- upsweep_mod lcl_hsc_env env_messager old_hmi mod k n
-      cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env') (hsc_tmpfs hsc_env') lcl_dynflags
-      return res)
+      cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env) (hsc_tmpfs hsc_env) lcl_dynflags
+      return res
 
-  where
-    fixed_mrehydrate_mods =
-      case ms_hsc_src mod of
-        -- MP: It is probably a bit of a misimplementation in backpack that
-        -- compiling a signature requires an knot_var for that unit.
-        -- If you remove this then a lot of backpack tests fail.
-        HsigFile -> Just []
-        _        -> mrehydrate_mods
 
 {- Rehydration, see Note [Rehydrating Modules] -}
 
@@ -1688,9 +1722,9 @@ rehydrate hsc_env hmis = do
 
 -- If needed, then rehydrate the necessary modules with a suitable KnotVars for the
 -- module currently being compiled.
-maybeRehydrateBefore :: HscEnv -> ModSummary -> Maybe [ModuleName] -> IO HscEnv
+maybeRehydrateBefore :: HscEnv -> ModuleNodeInfo -> Maybe [ModuleName] -> IO HscEnv
 maybeRehydrateBefore hsc_env _ Nothing = return hsc_env
-maybeRehydrateBefore hsc_env mod (Just mns) = do
+maybeRehydrateBefore hsc_env mni (Just mns) = do
   knot_var <- initialise_knot_var hsc_env
   let hsc_env' = hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }
   hmis <- mapM (fmap expectJust . lookupHpt (hsc_HPT hsc_env')) mns
@@ -1700,7 +1734,7 @@ maybeRehydrateBefore hsc_env mod (Just mns) = do
 
   where
    initialise_knot_var hsc_env = liftIO $
-    let mod_name = homeModuleInstantiation (hsc_home_unit_maybe hsc_env) (ms_mod mod)
+    let mod_name = homeModuleInstantiation (hsc_home_unit_maybe hsc_env) (moduleNodeInfoModule mni)
     in mkModuleEnv . (:[]) . (mod_name,) <$> newIORef emptyTypeEnv
 
 rehydrateAfter :: HscEnv

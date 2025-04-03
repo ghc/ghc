@@ -746,9 +746,9 @@ hsunitModuleGraph do_link unit = do
     --  create an "empty" hsig file to induce compilation for the
     --  requirement.
     let hsig_set = Set.fromList
-          [ ms_mod_name ms
+          [ moduleNodeInfoModuleName ms
           | ModuleNode _ ms <- nodes
-          , ms_hsc_src ms == HsigFile
+          , moduleNodeInfoHscSource ms == Just HsigFile
           ]
     req_nodes <- fmap catMaybes . forM (homeUnitInstantiations home_unit) $ \(mod_name, _) ->
         if Set.member mod_name hsig_set
@@ -824,7 +824,7 @@ summariseRequirement pn mod_name = do
         ms_hspp_buf = Nothing
         }
     let nodes = [NodeKey_Module (ModNodeKeyWithUid (GWIB mn NotBoot) (homeUnitId home_unit)) | mn <- extra_sig_imports ]
-    return (ModuleNode nodes ms)
+    return (ModuleNode nodes (ModuleNodeCompile ms))
 
 summariseDecl :: PackageName
               -> HscSource
@@ -933,7 +933,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
           [k | (_, mnwib) <- msDeps ms, let k = NodeKey_Module (ModNodeKeyWithUid (fmap unLoc mnwib) (moduleUnitId this_mod)), k `elem` home_keys]
 
 
-    return (ModuleNode (mod_nodes ++ inst_nodes) ms)
+    return (ModuleNode (mod_nodes ++ inst_nodes) (ModuleNodeCompile ms))
 
 -- | Create a new, externally provided hashed unit id from
 -- a hash.

@@ -20,6 +20,11 @@ module GHC.Unit.Module.Graph
      ModuleGraph(..)
    , emptyMG
    , mkModuleGraph
+   , mkModuleGraphChecked
+
+   -- * Invariant checking
+   , checkModuleGraph
+   , ModuleGraphInvariantError(..)
 
     -- * Nodes in a module graph
     --
@@ -31,9 +36,16 @@ module GHC.Unit.Module.Graph
     -- - 'mgNodeModSum' extracts the 'ModSummary' of a node if exists
    , ModuleGraphNode(..)
    , mgNodeDependencies
-   , mgNodeModSum
+   , mgNodeIsModule
    , mgNodeUnitId
 
+   , ModuleNodeInfo(..)
+   , moduleNodeInfoModule
+   , moduleNodeInfoModuleName
+   , moduleNodeInfoModNodeKeyWithUid
+   , moduleNodeInfoHscSource
+   , moduleNodeInfoLocation
+   , isBootModuleNodeInfo
     -- * Module graph operations
    , lengthMG
 
@@ -87,7 +99,9 @@ module GHC.Unit.Module.Graph
    , nodeKeyModName
    , ModNodeKey
    , ModNodeKeyWithUid(..)
+   , mnkToModule
    , msKey
+   , mnKey
    , miKey
 
     -- ** Internal node representation
@@ -107,13 +121,14 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Data.Maybe
+import Data.Either
 import GHC.Data.Graph.Directed
 import GHC.Data.Graph.Directed.Reachability
 
 import GHC.Driver.Backend
 import GHC.Driver.DynFlags
 
-import GHC.Types.SourceFile ( hscSourceString, isHsigFile )
+import GHC.Types.SourceFile ( hscSourceString, isHsigFile, HscSource(..))
 
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
@@ -184,6 +199,14 @@ emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing) (graphRea
 mkModuleGraph :: [ModuleGraphNode] -> ModuleGraph
 mkModuleGraph = foldr (flip extendMG) emptyMG
 
+-- | A version of mkModuleGraph that checks the module graph for invariants.
+mkModuleGraphChecked :: [ModuleGraphNode] -> Either [ModuleGraphInvariantError] ModuleGraph
+mkModuleGraphChecked nodes =
+  let mg = mkModuleGraph nodes
+  in case checkModuleGraph mg of
+       [] -> Right mg
+       errors -> Left errors
+
 --------------------------------------------------------------------------------
 -- * Module Graph Nodes
 --------------------------------------------------------------------------------
@@ -195,12 +218,152 @@ data ModuleGraphNode
   -- | Instantiation nodes track the instantiation of other units
   -- (backpack dependencies) with the holes (signatures) of the current package.
   = InstantiationNode UnitId InstantiatedUnit
-  -- | There is a module summary node for each module, signature, and boot module being built.
-  | ModuleNode [NodeKey] ModSummary
+  -- | There is a module node for each module being built.
+  -- A node is either fixed or can be compiled.
+  -- - Fixed modules are not compiled, the artifacts are just loaded from disk.
+  --   It is up to your to make sure the artifacts are up to date and available.
+  -- - Compile modules are compiled from source if needed.
+  | ModuleNode [NodeKey] ModuleNodeInfo
   -- | Link nodes are whether are are creating a linked product (ie executable/shared object etc) for a unit.
   | LinkNode [NodeKey] UnitId
   -- | Package dependency
   | UnitNode [UnitId] UnitId
+
+
+data ModuleGraphInvariantError =
+        FixedNodeDependsOnCompileNode ModNodeKeyWithUid [NodeKey]
+      | DuplicateModuleNodeKey NodeKey
+      | DependencyNotInGraph NodeKey [NodeKey]
+      deriving (Eq, Ord)
+
+instance Outputable ModuleGraphInvariantError where
+  ppr = \case
+    FixedNodeDependsOnCompileNode key bad_deps ->
+      text "Fixed node" <+> ppr key <+> text "depends on compile nodes" <+> ppr bad_deps
+    DuplicateModuleNodeKey k ->
+      text "Duplicate module node key" <+> ppr k
+    DependencyNotInGraph from to ->
+      text "Dependency not in graph" <+> ppr from <+> text "->" <+> ppr to
+
+-- Used for invariant checking. Is a NodeKey fixed or compilable?
+data ModuleNodeType = MN_Fixed | MN_Compile
+
+instance Outputable ModuleNodeType where
+  ppr = \case
+    MN_Fixed -> text "Fixed"
+    MN_Compile -> text "Compile"
+
+moduleNodeType :: ModuleGraphNode -> ModuleNodeType
+moduleNodeType (ModuleNode _ (ModuleNodeCompile _)) = MN_Compile
+moduleNodeType (ModuleNode _ (ModuleNodeFixed _ _)) = MN_Fixed
+moduleNodeType (UnitNode {}) = MN_Fixed
+moduleNodeType _ = MN_Compile
+
+checkModuleGraph :: ModuleGraph -> [ModuleGraphInvariantError]
+checkModuleGraph ModuleGraph{..} =
+  mapMaybe (checkFixedModuleInvariant node_types) mg_mss
+  ++ mapMaybe (checkAllDependenciesInGraph node_types) mg_mss
+  ++ duplicate_errs
+  where
+    duplicate_errs = rights (Map.elems node_types)
+
+    node_types :: Map.Map NodeKey (Either ModuleNodeType ModuleGraphInvariantError)
+    node_types = Map.fromListWithKey go [ (mkNodeKey n, Left (moduleNodeType n)) | n <- mg_mss ]
+      where
+        -- Multiple nodes with the same key are not allowed.
+        go :: NodeKey -> Either ModuleNodeType ModuleGraphInvariantError
+                      -> Either ModuleNodeType ModuleGraphInvariantError
+                      -> Either ModuleNodeType ModuleGraphInvariantError
+        go k _ _ = Right (DuplicateModuleNodeKey k)
+
+-- | Check that all dependencies in the graph are present in the node_types map.
+-- This is a helper function used by checkModuleGraph.
+checkAllDependenciesInGraph :: Map.Map NodeKey (Either ModuleNodeType ModuleGraphInvariantError)
+                            -> ModuleGraphNode
+                            -> Maybe ModuleGraphInvariantError
+checkAllDependenciesInGraph node_types node =
+  let nodeKey = mkNodeKey node
+      deps = mgNodeDependencies False node
+      missingDeps = filter (\dep -> not (Map.member dep node_types)) deps
+  in if null missingDeps
+     then Nothing
+     else Just (DependencyNotInGraph nodeKey missingDeps)
+
+
+-- | Check if for the fixed module node invariant:
+--
+--   Fixed nodes can only depend on other fixed nodes.
+checkFixedModuleInvariant :: Map.Map NodeKey (Either ModuleNodeType ModuleGraphInvariantError)
+                -> ModuleGraphNode
+                -> Maybe ModuleGraphInvariantError
+checkFixedModuleInvariant node_types node = case node of
+  ModuleNode deps (ModuleNodeFixed key _) ->
+    let check_node dep = case Map.lookup dep node_types of
+                           -- Dependency is not fixed
+                           Just (Left MN_Compile) -> Just dep
+                           _ -> Nothing
+        bad_deps = mapMaybe check_node deps
+    in if null bad_deps
+       then Nothing
+       else Just (FixedNodeDependsOnCompileNode key bad_deps)
+
+  _ -> Nothing
+
+
+{- Note [Modules Types in the ModuleGraph]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Modules can be one of two different types in the module graph.
+
+1. ModuleNodeCompile, modules with source files we can compile.
+2. ModuleNodeFixed, modules which we presume are already compiled and available.
+
+The ModuleGraph can contain a combination of these two types of nodes but must
+obey the invariant that Fixed nodes only depend on other Fixed nodes. This invariant
+can be checked by the `checkModuleGraph` function, but it's
+the responsibility of the code constructing the ModuleGraph to ensure it is upheld.
+
+At the moment, when using --make mode, GHC itself will only use `ModuleNodeCompile` nodes.
+
+In oneshot mode, we don't have access to the source files of dependencies but sometimes need to know
+information about the module graph still (for example, getLinkDeps).
+
+In theory, the whole compiler will work if an API program uses ModuleNodeFixed nodes, and
+there is a simple test in FixedNodes, which can be extended in future to cover
+any missing cases.
+
+-}
+data ModuleNodeInfo = ModuleNodeFixed ModNodeKeyWithUid ModLocation
+                    | ModuleNodeCompile ModSummary
+
+-- | Extract the Module from a ModuleNodeInfo
+moduleNodeInfoModule :: ModuleNodeInfo -> Module
+moduleNodeInfoModule (ModuleNodeFixed key _) = mnkToModule key
+moduleNodeInfoModule (ModuleNodeCompile ms) = ms_mod ms
+
+-- | Extract the ModNodeKeyWithUid from a ModuleNodeInfo
+moduleNodeInfoModNodeKeyWithUid :: ModuleNodeInfo -> ModNodeKeyWithUid
+moduleNodeInfoModNodeKeyWithUid (ModuleNodeFixed key _) = key
+moduleNodeInfoModNodeKeyWithUid (ModuleNodeCompile ms) = msKey ms
+
+-- | Extract the HscSource from a ModuleNodeInfo, if we can determine it.
+moduleNodeInfoHscSource :: ModuleNodeInfo -> Maybe HscSource
+moduleNodeInfoHscSource (ModuleNodeFixed _ _) = Nothing
+moduleNodeInfoHscSource (ModuleNodeCompile ms) = Just (ms_hsc_src ms)
+
+-- | Extract the ModLocation from a ModuleNodeInfo
+moduleNodeInfoLocation :: ModuleNodeInfo -> ModLocation
+moduleNodeInfoLocation (ModuleNodeFixed _ loc) = loc
+moduleNodeInfoLocation (ModuleNodeCompile ms) = ms_location ms
+
+-- | Extract the IsBootInterface from a ModuleNodeInfo
+isBootModuleNodeInfo :: ModuleNodeInfo -> IsBootInterface
+isBootModuleNodeInfo (ModuleNodeFixed mnwib _) = mnkIsBoot mnwib
+isBootModuleNodeInfo (ModuleNodeCompile ms) = isBootSummary ms
+
+-- | Extract the ModuleName from a ModuleNodeInfo
+moduleNodeInfoModuleName :: ModuleNodeInfo -> ModuleName
+moduleNodeInfoModuleName m = moduleName (moduleNodeInfoModule m)
 
 -- | Collect the immediate dependencies of a ModuleGraphNode,
 -- optionally avoiding hs-boot dependencies.
@@ -227,24 +390,24 @@ mgNodeDependencies drop_hs_boot_nodes = \case
     drop_hs_boot (NodeKey_Module (ModNodeKeyWithUid (GWIB mn IsBoot) uid)) = (NodeKey_Module (ModNodeKeyWithUid (GWIB mn hs_boot_key) uid))
     drop_hs_boot x = x
 
-mgNodeModSum :: ModuleGraphNode -> Maybe ModSummary
-mgNodeModSum (InstantiationNode {}) = Nothing
-mgNodeModSum (LinkNode {})          = Nothing
-mgNodeModSum (ModuleNode _ ms)      = Just ms
-mgNodeModSum (UnitNode {})       = Nothing
+mgNodeIsModule :: ModuleGraphNode -> Maybe ModuleNodeInfo
+mgNodeIsModule (InstantiationNode {}) = Nothing
+mgNodeIsModule (LinkNode {})          = Nothing
+mgNodeIsModule (ModuleNode _ ms)      = Just ms
+mgNodeIsModule (UnitNode {})       = Nothing
 
 mgNodeUnitId :: ModuleGraphNode -> UnitId
 mgNodeUnitId mgn =
   case mgn of
     InstantiationNode uid _iud -> uid
-    ModuleNode _ ms           -> toUnitId (moduleUnit (ms_mod ms))
+    ModuleNode _ ms           -> toUnitId (moduleUnit (moduleNodeInfoModule ms))
     LinkNode _ uid             -> uid
     UnitNode _ uid          -> uid
 
 instance Outputable ModuleGraphNode where
   ppr = \case
     InstantiationNode _ iuid -> ppr iuid
-    ModuleNode nks ms -> ppr (msKey ms) <+> ppr nks
+    ModuleNode nks ms -> ppr (mnKey ms) <+> ppr nks
     LinkNode uid _     -> text "LN:" <+> ppr uid
     UnitNode _ uid  -> text "P:" <+> ppr uid
 
@@ -273,35 +436,34 @@ mapMG f mg@ModuleGraph{..} = mg
   { mg_mss = flip fmap mg_mss $ \case
       InstantiationNode uid iuid -> InstantiationNode uid iuid
       LinkNode uid nks -> LinkNode uid nks
-      ModuleNode deps ms  -> ModuleNode deps (f ms)
+      ModuleNode deps (ModuleNodeFixed key loc)  -> ModuleNode deps (ModuleNodeFixed key loc)
+      ModuleNode deps (ModuleNodeCompile ms) -> ModuleNode deps (ModuleNodeCompile (f ms))
       UnitNode deps uid -> UnitNode deps uid
   }
 
 -- | Map a function 'f' over all the 'ModSummaries', in 'IO'.
 -- To preserve invariants, 'f' can't change the isBoot status.
-mgMapM :: (ModSummary -> IO ModSummary) -> ModuleGraph -> IO ModuleGraph
+mgMapM :: (ModuleNodeInfo -> IO ModuleNodeInfo) -> ModuleGraph -> IO ModuleGraph
 mgMapM f mg@ModuleGraph{..} = do
   mss' <- forM mg_mss $ \case
     InstantiationNode uid iuid -> pure $ InstantiationNode uid iuid
     LinkNode uid nks -> pure $ LinkNode uid nks
     ModuleNode deps ms  -> ModuleNode deps <$> (f ms)
     UnitNode deps uid -> pure $ UnitNode deps uid
-  return mg
-    { mg_mss = mss'
-    }
+  return $ mg { mg_mss = mss' }
 
 mgModSummaries :: ModuleGraph -> [ModSummary]
-mgModSummaries mg = [ m | ModuleNode _ m <- mgModSummaries' mg ]
+mgModSummaries mg = [ m | ModuleNode _ (ModuleNodeCompile m) <- mgModSummaries' mg ]
 
 -- | Look up a non-boot ModSummary in the ModuleGraph.
 --
 -- Careful: Linear in the size of the module graph
-mgLookupModule :: ModuleGraph -> Module -> Maybe ModSummary
+mgLookupModule :: ModuleGraph -> Module -> Maybe ModuleNodeInfo
 mgLookupModule ModuleGraph{..} m = listToMaybe $ mapMaybe go mg_mss
   where
     go (ModuleNode _ ms)
-      | NotBoot <- isBootSummary ms
-      , ms_mod ms == m
+      | NotBoot <- isBootModuleNodeInfo ms
+      , moduleNodeInfoModule ms == m
       = Just ms
     go _ = Nothing
 
@@ -385,14 +547,14 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
       where
         go (s, key) =
           case s of
-                ModuleNode __deps ms | isBootSummary ms == IsBoot, drop_hs_boot_nodes
+                ModuleNode __deps ms | isBootModuleNodeInfo ms == IsBoot, drop_hs_boot_nodes
                   -- Using nodeDependencies here converts dependencies on other
                   -- boot files to dependencies on dependencies on non-boot files.
-                  -> Left (ms_mod ms, mgNodeDependencies drop_hs_boot_nodes s)
+                  -> Left (moduleNodeInfoModule ms, mgNodeDependencies drop_hs_boot_nodes s)
                 _ -> normal_case
           where
            normal_case =
-              let lkup_key = ms_mod <$> mgNodeModSum s
+              let lkup_key = moduleNodeInfoModule <$> mgNodeIsModule s
                   extra = (lkup_key >>= \key -> Map.lookup key boot_summaries)
 
               in Right $ DigraphNode s key $ out_edge_keys $
@@ -448,7 +610,7 @@ moduleGraphModulesBelow mg uid mn = filtered_mods [ mn | NodeKey_Module mn <- mo
 -- may not really be strongly connected in a direct way, as instantiations have been
 -- removed. It would probably be best to eliminate uses of this function where possible.
 filterToposortToModules
-  :: [SCC ModuleGraphNode] -> [SCC ModSummary]
+  :: [SCC ModuleGraphNode] -> [SCC ModuleNodeInfo]
 filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
   ModuleNode _deps node -> Just node
   _ -> Nothing
@@ -483,7 +645,7 @@ instance Outputable NodeKey where
 mkNodeKey :: ModuleGraphNode -> NodeKey
 mkNodeKey = \case
   InstantiationNode _ iu -> NodeKey_Unit iu
-  ModuleNode _ x -> NodeKey_Module $ msKey x
+  ModuleNode _ x -> NodeKey_Module $ mnKey x
   LinkNode _ uid   -> NodeKey_Link uid
   UnitNode _ uid -> NodeKey_ExternalUnit uid
 
@@ -499,6 +661,10 @@ nodeKeyModName _ = Nothing
 
 msKey :: ModSummary -> ModNodeKeyWithUid
 msKey ms = ModNodeKeyWithUid (ms_mnwib ms) (ms_unitid ms)
+
+mnKey :: ModuleNodeInfo -> ModNodeKeyWithUid
+mnKey (ModuleNodeFixed key _) = key
+mnKey (ModuleNodeCompile ms) = msKey ms
 
 miKey :: ModIface -> ModNodeKeyWithUid
 miKey hmi = ModNodeKeyWithUid (mi_mnwib hmi) ((toUnitId $ moduleUnit (mi_module hmi)))
@@ -534,27 +700,44 @@ showModMsg dflags _ (LinkNode {}) =
 showModMsg _ _ (UnitNode _deps uid) = ppr uid
 showModMsg _ _ (InstantiationNode _uid indef_unit) =
   ppr $ instUnitInstanceOf indef_unit
-showModMsg dflags recomp (ModuleNode _ mod_summary) =
+showModMsg dflags recomp (ModuleNode _ mni) =
   if gopt Opt_HideSourcePaths dflags
       then text mod_str
       else hsep $
          [ text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' ')
          , char '('
-         , text (op $ msHsFilePath mod_summary) <> char ','
-         , message, char ')' ]
-
+         , text (moduleNodeInfoSource mni) <> char ','
+         , moduleNodeInfoExtraMessage dflags recomp mni, char ')' ]
   where
-    op       = normalise
-    mod_str  = moduleNameString (moduleName (ms_mod mod_summary)) ++
-               hscSourceString (ms_hsc_src mod_summary)
-    dyn_file = op $ msDynObjFilePath mod_summary
-    obj_file = op $ msObjFilePath mod_summary
-    files    = obj_file
-               :| [ dyn_file | gopt Opt_BuildDynamicToo dflags ]
-               ++ [ "interpreted" | gopt Opt_ByteCodeAndObjectCode dflags ]
-    message = case backendSpecialModuleSource (backend dflags) recomp of
-                Just special -> text special
-                Nothing -> foldr1 (\ofile rest -> ofile <> comma <+> rest) (NE.map text files)
+    mod_str  = moduleNameString (moduleName (moduleNodeInfoModule mni)) ++
+               moduleNodeInfoBootString mni
+
+-- | Extra information about a 'ModuleNodeInfo' to display in the progress message.
+moduleNodeInfoExtraMessage :: DynFlags -> Bool -> ModuleNodeInfo -> SDoc
+moduleNodeInfoExtraMessage dflags recomp (ModuleNodeCompile mod_summary) =
+    let dyn_file = normalise $ msDynObjFilePath mod_summary
+        obj_file = normalise $ msObjFilePath mod_summary
+        files    = obj_file
+                   :| [ dyn_file | gopt Opt_BuildDynamicToo dflags ]
+                   ++ [ "interpreted" | gopt Opt_ByteCodeAndObjectCode dflags ]
+    in case backendSpecialModuleSource (backend dflags) recomp of
+              Just special -> text special
+              Nothing -> foldr1 (\ofile rest -> ofile <> comma <+> rest) (NE.map text files)
+moduleNodeInfoExtraMessage _ _ (ModuleNodeFixed {}) = text "fixed"
+
+
+-- | The source location of the module node to show to the user.
+moduleNodeInfoSource :: ModuleNodeInfo -> FilePath
+moduleNodeInfoSource (ModuleNodeCompile ms) = normalise $ msHsFilePath ms
+moduleNodeInfoSource (ModuleNodeFixed _ loc) = normalise $ ml_hi_file loc
+
+-- | The extra info about a module [boot] or [sig] to display.
+moduleNodeInfoBootString :: ModuleNodeInfo -> String
+moduleNodeInfoBootString (ModuleNodeCompile ms) = hscSourceString (ms_hsc_src ms)
+moduleNodeInfoBootString mn@(ModuleNodeFixed {}) =
+  hscSourceString (case isBootModuleNodeInfo mn of
+                      IsBoot -> HsBootFile
+                      NotBoot -> HsSrcFile)
 
 --------------------------------------------------------------------------------
 -- * Internal methods for module graph
@@ -581,5 +764,5 @@ extendMG ModuleGraph{..} node =
     { mg_mss = node : mg_mss
     , mg_graph =  mkTransDeps (node : mg_mss)
     , mg_loop_graph = mkTransLoopDeps (node : mg_mss)
-    , mg_has_holes = mg_has_holes || maybe False (isHsigFile . ms_hsc_src) (mgNodeModSum node)
+    , mg_has_holes = mg_has_holes || maybe False isHsigFile (moduleNodeInfoHscSource =<< mgNodeIsModule node)
     }

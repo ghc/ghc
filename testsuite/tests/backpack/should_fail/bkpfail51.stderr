@@ -5,6 +5,6 @@
 <no location info>: error: [GHC-92213]
     Module graph contains a cycle:
                     instantiated unit p[H=<A>]
-            imports module ‘A’ (q/A.hsig)
+            imports module ‘q[A=<A>]:A’ (q/A.hsig)
       which imports instantiated unit p[H=<A>]
 
