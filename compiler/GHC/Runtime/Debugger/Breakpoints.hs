@@ -69,6 +69,17 @@ findBreakByCoord (line, col) arr
 leftmostLargestRealSrcSpan :: RealSrcSpan -> RealSrcSpan -> Ordering
 leftmostLargestRealSrcSpan = on compare realSrcSpanStart S.<> on (flip compare) realSrcSpanEnd
 
+-- | Returns the span of the largest tick containing the srcspan given
+enclosingTickSpan :: TickArray -> SrcSpan -> RealSrcSpan
+enclosingTickSpan _ (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
+enclosingTickSpan ticks (RealSrcSpan src _) =
+  assert (inRange (bounds ticks) line) $
+    Data.List.minimumBy leftmostLargestRealSrcSpan $ enclosing_spans
+  where
+    line = srcSpanStartLine src
+    enclosing_spans = [ pan | (_,pan) <- ticks ! line
+                            , realSrcSpanEnd pan >= realSrcSpanEnd src]
+
 --------------------------------------------------------------------------------
 -- Finding Function breakpoints
 --------------------------------------------------------------------------------
@@ -194,5 +205,30 @@ getModBreak m = do
    let decls      = GHC.modBreaks_decls modBreaks
    return (ticks, decls)
 
+--------------------------------------------------------------------------------
+-- Getting current breakpoint information
+--------------------------------------------------------------------------------
 
+getCurrentBreakSpan :: GHC.GhcMonad m => m (Maybe SrcSpan)
+getCurrentBreakSpan = do
+  resumes <- GHC.getResumeContext
+  case resumes of
+    [] -> return Nothing
+    (r:_) -> do
+        let ix = GHC.resumeHistoryIx r
+        if ix == 0
+           then return (Just (GHC.resumeSpan r))
+           else do
+                let hist = GHC.resumeHistory r !! (ix-1)
+                pan <- GHC.getHistorySpan hist
+                return (Just pan)
+
+getCurrentBreakModule :: GHC.GhcMonad m => m (Maybe Module)
+getCurrentBreakModule = do
+  resumes <- GHC.getResumeContext
+  return $ case resumes of
+    [] -> Nothing
+    (r:_) -> case GHC.resumeHistoryIx r of
+      0  -> ibi_tick_mod <$> GHC.resumeBreakpointId r
+      ix -> Just $ GHC.getHistoryModule $ GHC.resumeHistory r !! (ix-1)
 
