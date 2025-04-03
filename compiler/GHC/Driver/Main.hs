@@ -47,6 +47,7 @@ module GHC.Driver.Main
     , initModDetails
     , initWholeCoreBindings
     , loadIfaceByteCode
+    , loadIfaceByteCodeLazy
     , hscMaybeWriteIface
     , hscCompileCmmFile
 
@@ -104,6 +105,7 @@ module GHC.Driver.Main
     , hscAddSptEntries
     , writeInterfaceOnlyMode
     , loadByteCode
+    , genModDetails
     ) where
 
 import GHC.Prelude
@@ -829,7 +831,7 @@ hscRecompStatus
   = do
     let
         msg what = case mHscMessage of
-          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode [] mod_summary)
+          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode [] (ModuleNodeCompile mod_summary))
           Nothing -> return ()
 
     -- First check to see if the interface file agrees with the
@@ -1057,6 +1059,27 @@ loadIfaceByteCode hsc_env iface location type_env =
       time <- maybe getCurrentTime pure if_time
       return $! Linkable time (mi_module iface) parts
 
+loadIfaceByteCodeLazy ::
+  HscEnv ->
+  ModIface ->
+  ModLocation ->
+  TypeEnv ->
+  IO (Maybe Linkable)
+loadIfaceByteCodeLazy hsc_env iface location type_env =
+  case iface_core_bindings iface location of
+    Nothing -> return Nothing
+    Just wcb -> do
+      Just <$> compile wcb
+  where
+    compile decls = do
+      ~(bcos, fos) <- unsafeInterleaveIO $ compileWholeCoreBindings hsc_env type_env decls
+      linkable $ NE.singleton (LazyBCOs bcos fos)
+
+    linkable parts = do
+      if_time <- modificationTimeIfExists (ml_hi_file location)
+      time <- maybe getCurrentTime pure if_time
+      return $!Linkable time (mi_module iface) parts
+
 -- | If the 'Linkable' contains Core bindings loaded from an interface, replace
 -- them with a lazy IO thunk that compiles them to bytecode and foreign objects,
 -- using the supplied environment for type checking.
@@ -1073,6 +1096,12 @@ loadIfaceByteCode hsc_env iface location type_env =
 --
 -- This is sound because generateByteCode just depends on things already loaded
 -- in the interface file.
+
+-- TODO: We should just use loadIfaceByteCodeLazy instead of the two stage process with
+-- loadByteCode and initWholeCoreBindings. The main reason it is like this is because
+-- initWholeCoreBindings requires a ModDetails, which we don't have during recompilation
+-- checking. We should modify recompilation checking to return a HomeModInfo directly.
+
 initWholeCoreBindings ::
   HscEnv ->
   ModIface ->

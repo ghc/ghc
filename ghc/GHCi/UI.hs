@@ -65,7 +65,7 @@ import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
              Resume, SingleStep, Ghc,
              GetDocsFailure(..), pushLogHookM,
-             getModuleGraph, handleSourceError, ms_mod )
+             getModuleGraph, handleSourceError )
 import GHC.Driver.Main (hscParseModuleWithLocation, hscParseStmtWithLocation)
 import GHC.Hs.ImpExp
 import GHC.Hs
@@ -1745,7 +1745,7 @@ editFile str =
 -- of those.
 chooseEditFile :: GHC.GhcMonad m => m String
 chooseEditFile =
-  do let hasFailed (GHC.ModuleNode _deps x) = fmap not $ isLoadedModSummary x
+  do let hasFailed (GHC.ModuleNode _deps x) = fmap not $ isLoadedModuleNode x
          hasFailed _ = return False
 
      graph <- GHC.getModuleGraph
@@ -1754,7 +1754,7 @@ chooseEditFile =
      let order g  = flattenSCCs $ filterToposortToModules $
            GHC.topSortModuleGraph True g Nothing
          pick xs  = case xs of
-                      x : _ -> GHC.ml_hs_file (GHC.ms_location x)
+                      x : _ -> GHC.ml_hs_file (GHC.moduleNodeInfoLocation x)
                       _     -> Nothing
 
      case pick (order failed_graph) of
@@ -2187,7 +2187,7 @@ setContextAfterLoad keep_ctxt (Just graph) = do
         (m:_) ->
           load_this m
  where
-   is_loaded (GHC.ModuleNode _ ms) = isLoadedModSummary ms
+   is_loaded (GHC.ModuleNode _ ms) = isLoadedModuleNode ms
    is_loaded _ = return False
 
    findTarget mds t
@@ -2196,13 +2196,13 @@ setContextAfterLoad keep_ctxt (Just graph) = do
         (m:_) -> Just m
 
    (GHC.ModuleNode _ summary) `matches` Target { targetId = TargetModule m }
-        = if GHC.ms_mod_name summary == m then Just summary else Nothing
+        = if GHC.moduleNodeInfoModuleName summary == m then Just summary else Nothing
    (GHC.ModuleNode _ summary) `matches` Target { targetId = TargetFile f _ }
-        | Just f' <- GHC.ml_hs_file (GHC.ms_location summary)   =
+        | Just f' <- GHC.ml_hs_file (GHC.moduleNodeInfoLocation summary)   =
           if f == f' then Just summary else Nothing
    _ `matches` _ = Nothing
 
-   load_this summary | m <- GHC.ms_mod summary = do
+   load_this summary | m <- GHC.moduleNodeInfoModule summary = do
         is_interp <- GHC.moduleIsInterpreted m
         dflags <- getDynFlags
         let star_ok = is_interp && not (safeLanguageOn dflags)
@@ -2275,7 +2275,7 @@ and if so, omit it from the early setContext call.
 If we don't, a HomeModError will be (correctly) thrown. See #10920.
 -}
 
-modulesLoadedMsg :: GHC.GhcMonad m => SuccessFlag -> [GHC.ModSummary] -> LoadType -> m ()
+modulesLoadedMsg :: GHC.GhcMonad m => SuccessFlag -> [GHC.ModuleNodeInfo] -> LoadType -> m ()
 modulesLoadedMsg ok mods load_type = do
   dflags <- getDynFlags
   when (verbosity dflags > 0) $ do
@@ -2312,11 +2312,11 @@ modulesLoadedMsg ok mods load_type = do
            | otherwise       = "Failed"
 
     mod_name mod = do
-        is_interpreted <- GHC.moduleIsBootOrNotObjectLinkable mod
+        is_interpreted <- GHC.moduleIsBootOrNotObjectLinkable (GHC.moduleNodeInfoModule mod)
         pure $ if is_interpreted
-               then ppr (GHC.ms_mod mod)
-               else ppr (GHC.ms_mod mod)
-                    <+> parens (text $ normalise $ msObjFilePath mod)
+               then ppr (GHC.moduleNodeInfoModule mod)
+               else ppr (GHC.moduleNodeInfoModule mod)
+                    <+> parens (text $ normalise $ (ml_obj_file (GHC.moduleNodeInfoLocation mod)))
                     -- Fix #9887
 
 -- | Run an 'ExceptT' wrapped 'GhcMonad' while handling source errors
@@ -3364,10 +3364,10 @@ showModules = do
   let show_one ms = do m <- GHC.showModule ms; liftIO (putStrLn m)
   mapM_ show_one loaded_mods
 
-getLoadedModules :: GHC.GhcMonad m => m [GHC.ModSummary]
+getLoadedModules :: GHC.GhcMonad m => m [GHC.ModuleNodeInfo]
 getLoadedModules = do
   graph <- GHC.getModuleGraph
-  filterM isLoadedModSummary (GHC.mgModSummaries graph)
+  filterM isLoadedModuleNode (mapMaybe GHC.mgNodeIsModule (GHC.mgModSummaries' graph))
 
 showBindings :: GHC.GhcMonad m => m ()
 showBindings = do
@@ -3395,8 +3395,10 @@ showBindings = do
 printTyThing :: GHC.GhcMonad m => TyThing -> m ()
 printTyThing tyth = printForUser (pprTyThing showToHeader tyth)
 
-isLoadedModSummary :: GHC.GhcMonad m => ModSummary -> m Bool
-isLoadedModSummary ms = GHC.isLoadedModule (ms_unitid ms) (ms_mod_name ms)
+isLoadedModuleNode :: GHC.GhcMonad m => GHC.ModuleNodeInfo -> m Bool
+isLoadedModuleNode ms =
+  let m = GHC.moduleNodeInfoModule ms
+  in GHC.isLoadedModule (moduleUnitId m) (moduleName m)
 
 {-
 Note [Filter bindings]
@@ -3684,7 +3686,7 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
 completeModule = wrapIdentCompleterMod $ \w -> do
   hsc_env <- GHC.getSession
   let pkg_mods = allVisibleModules (hsc_units hsc_env)
-  loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
+  loaded_mods <- liftM (map GHC.moduleNodeInfoModuleName) getLoadedModules
   return $ filter (w `isPrefixOf`)
         $ map (showPpr (hsc_dflags hsc_env)) $ loaded_mods ++ pkg_mods
 
@@ -3696,7 +3698,7 @@ completeSetModule = wrapIdentCompleterWithModifier "+-" $ \m w -> do
       return $ map iiModuleName imports
     _ -> do
       let pkg_mods = allVisibleModules (hsc_units hsc_env)
-      loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
+      loaded_mods <- liftM (map GHC.moduleNodeInfoModuleName) getLoadedModules
       return $ loaded_mods ++ pkg_mods
   return $ filter (w `isPrefixOf`) $ map (showPpr (hsc_dflags hsc_env)) modules
 
@@ -4347,11 +4349,12 @@ listModuleLine modl line = do
    graph <- GHC.getModuleGraph
    let this = GHC.mgLookupModule graph modl
    case this of
-     Nothing -> panic "listModuleLine"
-     Just summ -> do
+     Just (GHC.ModuleNodeCompile summ) -> do
            let filename = expectJust (ml_hs_file (GHC.ms_location summ))
                loc = mkRealSrcLoc (mkFastString (filename)) line 0
            listAround (realSrcLocSpan loc) False
+
+     _ -> panic "listModuleLine"
 
 -- | list a section of a source file around a particular SrcSpan.
 -- If the highlight flag is True, also highlight the span using

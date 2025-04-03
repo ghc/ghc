@@ -72,7 +72,7 @@ import GHC.Types.Name.Occurrence (emptyOccEnv)
 import GHC.Unit.Finder (findImportedModule, FindResult(Found))
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
-import GHC.Unit.Module.Graph (ModuleGraphNode (..))
+import GHC.Unit.Module.Graph (ModuleGraphNode (..), ModuleNodeInfo(..))
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModIface (mi_semantic_module, mi_boot)
 import GHC.Unit.Module.ModSummary (isBootSummary)
@@ -225,7 +225,7 @@ createIfaces verbosity modules flags instIfaceMap = do
       -- but if module A {-# SOURCE #-} imports B, then we can't say the same.
       --
   let
-      go (AcyclicSCC (ModuleNode _ ms))
+      go (AcyclicSCC (ModuleNode _ (ModuleNodeCompile ms)))
         | NotBoot <- isBootSummary ms = [ms]
         | otherwise = []
       go (AcyclicSCC _) = []

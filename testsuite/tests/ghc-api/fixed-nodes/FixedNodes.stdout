@@ -1,0 +1,23 @@
+Starting GHC...
+Setting up session...
+Getting ModSummary for T1A.hs...
+Loading modules...
+Module graph passed invariant checks.
+[1 of 3] Compiling T1A              ( T1A.hs, T1A.o )
+[2 of 3] Compiling T1B              ( T1B.hs, T1B.o )
+[3 of 3] Compiling T1C              ( T1C.hs, T1C.o )
+Compilation succeeded!
+Successfully loaded modules: ModuleName "T1A", ModuleName "T1B", ModuleName "T1C"
+Loading modules...
+Module graph passed invariant checks.
+Compilation succeeded!
+Successfully loaded modules: ModuleName "T1A", ModuleName "T1B", ModuleName "T1C"
+Loading modules...
+Module graph passed invariant checks.
+[3 of 3] Compiling T1C              ( T1C.hs, T1C.o )
+Compilation succeeded!
+Successfully loaded modules: ModuleName "T1A", ModuleName "T1B", ModuleName "T1C"
+Loading modules...
+Module graph invariant violations detected:
+Fixed node main:T1B depends on compile nodes [main:T1A]
+Fixed node main:T1C depends on compile nodes [main:T1A]
