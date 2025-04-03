@@ -610,20 +610,24 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
                     _        -> Nothing
 
 addTickHsExpanded :: HsThingRn -> HsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpanded o@(OrigStmt (L pos _)) e
-  -- Statements always gets a tick for breakpoint and hpc coverage
-  = do d <- getDensity
-       case d of
-          TickForCoverage    -> liftM (XExpr . ExpandedThingTc o) $ tick_it pos e
-          TickForBreakPoints -> liftM (XExpr . ExpandedThingTc o) $ tick_it pos e
-          _                  -> skip o e
-addTickHsExpanded o e = skip o e
+addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
+  -- Statements always get a tick
+  -- OrigStmt (L pos BindStmt{}) -> pprTrace "BindStmt" (ppr o $$ ppr e) $ do_tick pos
+  -- OrigStmt (L pos BodyStmt{}) -> pprTrace "BodyStmt" (ppr o $$ ppr e) $ do_tick pos
+  -- OrigStmt (L pos LetStmt{}) -> pprTrace "LetStmt" (ppr o $$ ppr e) $ do_tick pos
+  OrigStmt (L pos _) -> pprTrace "stmt" (ppr o $$ ppr e) $ do_tick pos
+  _ -> skip
   where
-    skip o e = liftM (XExpr . ExpandedThingTc o) $ addTickHsExpr e
-    tick_it pos e =
+    skip = addTickHsExpr e
+    do_tick pos = do
+      d <- getDensity
+      case d of
+         TickForCoverage    -> tick_it pos
+         TickForBreakPoints -> tick_it pos
+         _                  -> skip
+    tick_it pos =
       unLoc <$> allocTickBox (ExpBox False) False False (locA pos)
                              (addTickHsExpr e)
-
 
 addTickTupArg :: HsTupArg GhcTc -> TM (HsTupArg GhcTc)
 addTickTupArg (Present x e)  = do { e' <- addTickLHsExpr e
@@ -1165,16 +1169,22 @@ isBlackListed (UnhelpfulSpan _) = return False
 -- expression argument to support nested box allocations
 allocTickBox :: BoxLabel -> Bool -> Bool -> SrcSpan -> TM (HsExpr GhcTc)
              -> TM (LHsExpr GhcTc)
-allocTickBox boxLabel countEntries topOnly pos m =
-  ifGoodTickSrcSpan pos (do
-    (fvs, e) <- getFreeVars m
-    env <- getEnv
-    tickish <- mkTickish boxLabel countEntries topOnly pos fvs (declPath env)
-    return (L (noAnnSrcSpan pos) (XExpr $ HsTick tickish $ L (noAnnSrcSpan pos) e)))
-  (do
-    e <- m
-    return (L (noAnnSrcSpan pos) e)
-  )
+allocTickBox boxLabel countEntries topOnly pos m
+  = ifGoodTickSrcSpan pos good_case skip_case
+  where
+    this_loc = L (noAnnSrcSpan pos)
+    skip_case = do
+      e <- m
+      return (this_loc e)
+    good_case = do
+      (fvs, e) <- getFreeVars m
+      case e of
+        -- If there's already a tick here, skip.
+        XExpr HsTick{} -> pprTrace "already has tick" empty $ return (this_loc e)
+        _ -> do
+          env <- getEnv
+          tickish <- mkTickish boxLabel countEntries topOnly pos fvs (declPath env)
+          return (this_loc (XExpr $ HsTick tickish $ this_loc e))
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations
