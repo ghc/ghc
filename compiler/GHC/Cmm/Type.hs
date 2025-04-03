@@ -57,12 +57,14 @@ data CmmType    -- The important one!
   deriving Show
 
 data CmmCat                -- "Category" (not exported)
-   = GcPtrCat              -- GC pointer
-   | BitsCat               -- Non-pointer
-   | FloatCat              -- Float
-   | VecCat Length CmmCat  -- Vector
+   = GcPtrCat              -- ^ GC pointer
+   | BitsCat               -- ^ Integer (including non-GC pointer addresses)
+                           --
+                           -- Makes no distinction between signed and unsigned integers,
+                           -- see Note [Signed vs unsigned] in GHC.Cmm.Type.
+   | FloatCat              -- ^ Float
+   | VecCat Length CmmCat  -- ^ Vector
    deriving( Eq, Show )
-        -- See Note [Signed vs unsigned] at the end
 
 instance Outputable CmmType where
   ppr (CmmType cat wid) = ppr cat <> ppr (widthInBits wid)

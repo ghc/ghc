@@ -102,9 +102,11 @@ lintCmmExpr expr@(CmmMachOp op args) = do
   platform <- getPlatform
   tys <- mapM lintCmmExpr args
   lintShiftOp op (zip args tys)
-  if map (typeWidth . cmmExprType platform) args == machOpArgReps platform op
-        then cmmCheckMachOp op args tys
-        else cmmLintMachOpErr expr (map (cmmExprType platform) args) (machOpArgReps platform op)
+  let machop_arg_widths = machOpArgReps platform op
+      arg_tys           = map (cmmExprType platform) args
+  if map typeWidth arg_tys == machop_arg_widths
+    then cmmCheckMachOp op args tys
+    else cmmLintMachOpErr expr arg_tys machop_arg_widths
 lintCmmExpr (CmmRegOff reg offset)
   = do let rep = typeWidth (cmmRegType reg)
        lintCmmExpr (CmmMachOp (MO_Add rep)
@@ -180,14 +182,13 @@ lintCmmMiddle node = case node of
             return ()
 
   CmmUnsafeForeignCall target _formals actuals -> do
-            lintTarget target
             let lintArg expr = do
                   -- Arguments can't mention caller-saved
                   -- registers. See Note [Register parameter passing].
                   mayNotMentionCallerSavedRegs (text "foreign call argument") expr
                   lintCmmExpr expr
-
-            mapM_ lintArg actuals
+            arg_tys <- mapM lintArg actuals
+            lintTarget arg_tys target
 
 
 lintCmmLast :: LabelSet -> CmmNode O C -> CmmLint ()
@@ -213,7 +214,6 @@ lintCmmLast labels node = case node of
           maybe (return ()) checkTarget cont
 
   CmmForeignCall tgt _ args succ _ _ _ -> do
-          lintTarget tgt
           let lintArg expr = do
                 -- Arguments can't mention caller-saved
                 -- registers. See Note [Register
@@ -223,19 +223,24 @@ lintCmmLast labels node = case node of
                 -- places in caller-saved registers.
                 mayNotMentionCallerSavedRegs (text "foreign call argument") expr
                 lintCmmExpr expr
-          mapM_ lintArg args
+          arg_tys <- mapM lintArg args
+          lintTarget arg_tys tgt
           checkTarget succ
  where
   checkTarget id
      | setMember id labels = return ()
      | otherwise = cmmLintErr (text "Branch to nonexistent id" <+> ppr id)
 
-lintTarget :: ForeignTarget -> CmmLint ()
-lintTarget (ForeignTarget e _) = do
+lintTarget :: [CmmType] -> ForeignTarget -> CmmLint ()
+lintTarget _arg_tys (ForeignTarget e _) = do
     mayNotMentionCallerSavedRegs (text "foreign target") e
     _ <- lintCmmExpr e
     return ()
-lintTarget (PrimTarget {})     = return ()
+lintTarget arg_tys (PrimTarget mop) = do
+  platform <- getPlatform
+  let machop_arg_tys = callishMachOpArgTys platform mop
+  unless (and $ zipWith cmmCompatType arg_tys machop_arg_tys) $
+    cmmLintCallishMachOpErr mop arg_tys machop_arg_tys
 
 -- | As noted in Note [Register parameter passing], the arguments and
 -- 'ForeignTarget' of a foreign call mustn't mention
@@ -285,6 +290,13 @@ cmmLintMachOpErr expr argsRep opExpectsRep
                    nest 2 (pdoc platform expr) $$
                       (text "op is expecting: " <+> ppr opExpectsRep) $$
                       (text "arguments provide: " <+> ppr argsRep))
+
+cmmLintCallishMachOpErr :: CallishMachOp -> [CmmType] -> [CmmType] -> CmmLint a
+cmmLintCallishMachOpErr mop argTys mopTys
+     = cmmLintErr (text "in Callish MachOp application: " $$
+                   nest 2 (text $ show mop) $$
+                      (text "op is expecting: " <+> ppr mopTys) $$
+                      (text "arguments provide: " <+> ppr argTys))
 
 cmmLintAssignErr :: CmmNode e x -> CmmType -> CmmType -> CmmLint a
 cmmLintAssignErr stmt e_ty r_ty
