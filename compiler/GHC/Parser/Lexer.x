@@ -2785,8 +2785,8 @@ resetOffset = P $ \s -> POk s { pp_last_col = Nothing} ()
 
 startSkipping :: P p ()
 startSkipping = do
-  -- pushLexState skipping
-  pushLexState (trace ("startSkipping:" ++ show skipping) skipping)
+  pushLexState skipping
+  -- pushLexState (trace ("startSkipping:" ++ show skipping) skipping)
 
 stopSkipping :: P p Int
 stopSkipping = do
@@ -2804,12 +2804,12 @@ stopSkipping = do
   case last_tk of
     Strict.Just (L l _) -> do
       let ps' = PsLoc (realSrcSpanEnd (psRealSpan l)) (bufSpanEnd (psBufSpan l))
-      let cur'' = (cur buf) - 1
-      let cur' = trace ("stopSkipping:(cur',ps'):" ++ show (cur'',ps')) cur''
+      let cur' = (cur buf) - 1
+      -- let cur' = trace ("stopSkipping:(cur',ps'):" ++ show (cur'',ps')) cur''
       setInput (AI ps' (buf { cur = cur'}))
     _ -> return ()
-  return $ trace ("stopSkipping: (ps, cur buf, last_loc, last_buf_cur, last_tk):" ++ show (ps, cur buf, last_loc, last_buf_cur, last_tk)) ret
-  -- return ret
+  -- return $ trace ("stopSkipping: (ps, cur buf, last_loc, last_buf_cur, last_tk):" ++ show (ps, cur buf, last_loc, last_buf_cur, last_tk)) ret
+  return ret
 
   -- old <- popLexState
   -- return (trace ("stopSkipping:" ++ show old) old)
