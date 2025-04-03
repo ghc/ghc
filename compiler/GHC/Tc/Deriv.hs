@@ -579,23 +579,20 @@ derivePred tc tys mb_lderiv_strat via_tvs deriv_pred =
       , text "deriv_pred"      <+> ppr deriv_pred
       , text "mb_lderiv_strat" <+> ppr mb_lderiv_strat
       , text "via_tvs"         <+> ppr via_tvs ]
-    (cls_tvs, cls, cls_tys, cls_arg_kinds) <- tcHsDeriv deriv_pred
-    when (cls_arg_kinds `lengthIsNot` 1) $
-      failWithTc (TcRnNonUnaryTypeclassConstraint DerivClauseCtxt deriv_pred)
-    let cls_arg_kind = case cls_arg_kinds of
-            [x] -> x
-            _ -> panic "derivePred"
-        mb_deriv_strat = fmap unLoc mb_lderiv_strat
-    if (className cls == typeableClassName)
-    then do warnUselessTypeable
-            return Nothing
-    else let deriv_tvs = via_tvs ++ cls_tvs in
-         Just <$> deriveTyData tc tys mb_deriv_strat
-                               deriv_tvs cls cls_tys cls_arg_kind
+    mb_cls_minus1 <- tcHsDeriv deriv_pred
+    case mb_cls_minus1 of
+      Nothing -> return Nothing
+      Just (cls, cls_tvs, arg_tys, arg_kind) ->
+        do let mb_deriv_strat = fmap unLoc mb_lderiv_strat
+           if className cls == typeableClassName
+           then do warnUselessTypeable
+                   return Nothing
+           else let deriv_tvs = via_tvs ++ cls_tvs in
+                Just <$> deriveTyData tc tys mb_deriv_strat
+                                      deriv_tvs cls arg_tys arg_kind
 
-{-
-Note [Don't typecheck too much in DerivingVia]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Don't typecheck too much in DerivingVia]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following example:
 
   data D = ...

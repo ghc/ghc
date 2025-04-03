@@ -1,7 +1,5 @@
 default-fail02.hs:1:1: error: [GHC-55756]
-    • Illegal use of default class name: ‘default Num (Integer,
-                                                       Double)’
-    • When checking the types in a default declaration
+    Illegal named default declaration ‘default Num (Integer, Double)’
     Suggested fix:
       Perhaps you intended to use the ‘NamedDefaults’ extension
 

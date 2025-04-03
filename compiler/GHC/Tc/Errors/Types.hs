@@ -1510,7 +1510,7 @@ data TcRnMessage where
 
      Test cases: typecheck/should_fail/T11974b
   -}
-  TcRnBadDefaultType :: Type -> NonEmpty Class -> TcRnMessage
+  TcRnBadDefaultType :: LHsType GhcRn -> NonEmpty Class -> TcRnMessage
 
   {-| TcRnPatSynBundledWithNonDataCon is an error that occurs when a module's
       export list bundles a pattern synonym with a type that is not a proper
@@ -1855,7 +1855,7 @@ data TcRnMessage where
                  deriving/should_fail/drvfail009
                  deriving/should_fail/drvfail006
   -}
-  TcRnNonUnaryTypeclassConstraint :: !UserTypeCtxt -> !(LHsSigType GhcRn) -> TcRnMessage
+  TcRnNonUnaryTypeclassConstraint :: !UserTypeCtxt -> !TypedThing -> TcRnMessage
 
   {-| TcRnPartialTypeSignatures is a warning (controlled by -Wpartial-type-signatures)
       that occurs when a wildcard '_' is found in place of a type in a signature or a
@@ -2258,7 +2258,7 @@ data TcRnMessage where
 
     Test cases: default/fail01
   -}
-  TcRnIllegalDefaultClass :: !(LHsSigType GhcRn) -> TcRnMessage
+  TcRnIllegalDefaultClass :: !Name -> TcRnMessage
 
   {-| TcRnIllegalNamedDefault is an error for specifying an explicit default class name
      without @-XNamedDefaults@.

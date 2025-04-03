@@ -23,7 +23,7 @@ module GHC.Tc.Gen.HsType (
         funsSigCtxt, addSigCtxt, pprSigCtxt,
 
         tcHsClsInstType,
-        tcHsDefault, tcHsDeriv, tcDerivStrategy,
+        tcDefaultDeclClass, tcHsDeriv, tcDerivStrategy,
         tcHsTypeApp,
         UserTypeCtxt(..),
         bindImplicitTKBndrs_Tv, bindImplicitTKBndrs_Skol,
@@ -632,54 +632,78 @@ tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
   where
     skol_info_anon = SigTypeSkol ctxt
 
-tcClassConstraint :: Type -> TcM (Either (Maybe TyCon) ([TyVar], Class, [Type], [Kind]))
--- Like tcHsSigType, but for a simple class constraint of form ( C ty1 ty2 )
--- Returns the C, [ty1, ty2], and the kinds of C's remaining arguments
--- E.g.    class C (a::*) (b::k->k)
---         tcClassConstraint ( C Int ) returns Right ([k], C, [k, Int], [k->k])
--- Return values are fully zonked
-tcClassConstraint ty
-  = do { let (tvs, pred)    = splitForAllTyCoVars ty
-             (kind_args, _) = splitFunTys (typeKind pred)
-      -- Checking that `pred` a is type class application
-       ; case splitTyConApp_maybe pred of
-          Just (tyCon, tyConArgs) ->
-            case tyConClass_maybe tyCon of
-              Just clas ->
-                return (Right (tvs, clas, tyConArgs, map scaledThing kind_args))
-              Nothing -> return (Left (Just tyCon))
-          Nothing -> return (Left Nothing) }
+-- | Typecheck the class in a default declaration, checking that:
+--
+--  - it is indeed a class (not e.g. a type family),
+--  - that the class expects some invisible arguments followed
+--    by a single visible argument.
+tcDefaultDeclClass :: LIdP GhcRn -> TcM (Maybe Class)
+tcDefaultDeclClass l_nm
+  = setSrcSpan (locA l_nm) $
+  do { let nm = unLoc l_nm
+     ; thing <- tcLookupGlobal nm
+     ; case thing of
+        ATyCon tc
+          | Just cls <- tyConClass_maybe tc
+          -> if is_unary (tyConBinders tc)
+             then return $ Just cls
+             else
+               do { addErrTc $ TcRnNonUnaryTypeclassConstraint DefaultDeclCtxt (NameThing nm)
+                  ; return Nothing }
 
-tcHsDefault :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
--- Like tcHsSigType, but for the default ( C ty1 ty2 ) (ty1', ty2', ...) declaration
--- See Note [Named default declarations] in GHC.Tc.Gen.Default
-tcHsDefault hs_ty
-  = tcTopLHsType DefaultDeclCtxt hs_ty
-    >>= tcClassConstraint
-    >>= either (const $ failWithTc $ TcRnIllegalDefaultClass hs_ty) return
+        _ -> do { addErrTc $ TcRnIllegalDefaultClass nm
+                ; return Nothing }
+     }
+  where
+    is_unary :: [TyConBinder] -> Bool
+    is_unary = ( `lengthIs` 1 ) . dropWhile isInvisibleTyConBinder
 
 -----------------
-tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
--- Like tcHsSigType, but for the ...deriving( C ty1 ty2 ) clause
--- Returns the C, [ty1, ty2], and the kinds of C's remaining arguments
--- E.g.    class C (a::*) (b::k->k)
---         data T a b = ... deriving( C Int )
---    returns ([k], C, [k, Int], [k->k])
+tcHsDeriv :: LHsSigType GhcRn -> TcM (Maybe (Class, [TyCoVar], [Type], Kind))
+-- ^ Like tcHsSigType, but for the @...deriving( C ty1 ty2 )@ clause
+--
+-- Returns a class constraint with the last argument missing, and the
+-- expected kind of the remaining argument.
+--
+-- E.g.:
+--
+--  @class C (a::*) (b::k->k)@
+--  @data T a b = ... deriving( C Int )@
+--
+-- This function returns @(C, [k], [k, Int], k->k)@.
+--
 -- Return values are fully zonked
 tcHsDeriv hs_ty
   = do { ty <- tcTopLHsType DerivClauseCtxt hs_ty
-       ; constrained <- tcClassConstraint ty
-       ; case constrained of
-           Left Nothing -> failWithTc (TcRnIllegalDerivingItem hs_ty)
-           Left (Just tyCon) ->
-             failWithTc $ TcRnIllegalInstance
-                        $ IllegalClassInstance (TypeThing ty)
-                        $ IllegalInstanceHead
-                        $ InstHeadNonClassHead
-                        $ InstNonClassTyCon
-                            (tyConName tyCon)
-                            (fmap tyConName $ tyConFlavour tyCon)
-           Right result -> return result }
+
+       ; let (tvs, pred)    = splitForAllTyCoVars ty
+             (kind_args, _) = splitFunTys (typeKind pred)
+      -- Checking that `pred` a is type class application
+
+       ; case splitTyConApp_maybe pred of
+            Just (tc, tc_args) ->
+              case tyConClass_maybe tc of
+                Just cls ->
+                  case kind_args of
+                    [Scaled _ last_kind] ->
+                      return $ Just $
+                        (cls, tvs, tc_args, last_kind)
+                    _ ->
+                      do { addErrTc $ TcRnNonUnaryTypeclassConstraint DerivClauseCtxt (TypeThing pred)
+                         ; return Nothing
+                         }
+                Nothing ->
+                  do { addErrTc $ TcRnIllegalInstance
+                                $ IllegalClassInstance (TypeThing ty)
+                                $ IllegalInstanceHead
+                                $ InstHeadNonClassHead
+                                $ InstNonClassTyCon
+                                    (tyConName tc)
+                                    (fmap tyConName $ tyConFlavour tc)
+                     ; return Nothing }
+            Nothing ->
+              do { addErrTc $ TcRnIllegalDerivingItem hs_ty; return Nothing }
+       }
 
 -- | Typecheck a deriving strategy. For most deriving strategies, this is a
 -- no-op, but for the @via@ strategy, this requires typechecking the @via@ type.

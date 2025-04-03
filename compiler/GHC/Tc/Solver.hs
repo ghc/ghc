@@ -4,7 +4,6 @@ module GHC.Tc.Solver(
        InferMode(..), simplifyInfer, findInferredDiff,
        growThetaTyVars,
        simplifyAmbiguityCheck,
-       simplifyDefault,
        simplifyTop, simplifyTopImplic,
        simplifyInteractive,
        solveEqualities,
@@ -625,15 +624,6 @@ simplifyInteractive :: WantedConstraints -> TcM (Bag EvBind)
 simplifyInteractive wanteds
   = traceTc "simplifyInteractive" empty >>
     simplifyTop wanteds
-
-------------------
-simplifyDefault :: ThetaType    -- Wanted; has no type variables in it
-                -> TcM Bool     -- Return if the constraint is soluble
-simplifyDefault theta
-  = do { traceTc "simplifyDefault" empty
-       ; wanteds  <- newWanteds DefaultOrigin theta
-       ; (unsolved, _) <- runTcS (solveWanteds (mkSimpleWC wanteds))
-       ; return (isEmptyWC unsolved) }
 
 ------------------
 {- Note [Pattern match warnings with insoluble Givens]
