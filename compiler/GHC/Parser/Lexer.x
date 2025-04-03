@@ -1606,7 +1606,7 @@ nested_comment_logic endComment commentAcc input span = go commentAcc (1::Int) i
       (True, Just ('*',input)) -> case alexGetChar' input of
         Nothing  -> errBrace input (psRealSpan span)
         Just ('/',input) -> go ('/':'*':commentAcc) (n-1) input -- '/'
-        Just (_,_)          -> go ('-':commentAcc) n input
+        Just (_,_)          -> go ('*':commentAcc) n input
       (True, Just ('/',input)) -> case alexGetChar' input of  -- '/' char
         Nothing  -> errBrace input (psRealSpan span)
         Just ('*',input) -> go ('*':'/':commentAcc) (n+1) input
