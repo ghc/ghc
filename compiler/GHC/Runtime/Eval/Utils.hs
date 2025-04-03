@@ -11,7 +11,7 @@ import Data.List (elemIndices)
 --   3. full-name of the eventually nested decl, but without module qualification
 --
 -- === __Example__
--- 
+--
 -- @
 --     "foo"           = ("", "foo", "foo")
 --     "A.B.C.foo"     = ("A.B.C", "foo", "foo")
