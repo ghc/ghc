@@ -2790,8 +2790,8 @@ resetOffset = P $ \s -> POk s { pp_last_col = Nothing} ()
 
 startSkipping :: P p ()
 startSkipping = do
-  pushLexState skipping
-  -- pushLexState (trace ("startSkipping:" ++ show skipping) skipping)
+  -- pushLexState skipping
+  pushLexState (trace ("startSkipping:" ++ show skipping) skipping)
 
 stopSkipping :: P p Int
 stopSkipping = do
@@ -2814,6 +2814,7 @@ stopSkipping = do
       setInput (AI ps' (buf { cur = cur'}))
     _ -> return ()
   return $ trace ("stopSkipping: (ps, cur buf, last_loc, last_buf_cur, last_tk):" ++ show (ps, cur buf, last_loc, last_buf_cur, last_tk)) ret
+  -- return ret
 
   -- old <- popLexState
   -- return (trace ("stopSkipping:" ++ show old) old)
@@ -3405,9 +3406,9 @@ srcParseErr options buf len loc = mkPlainErrorMsgEnvelope loc (PsErrParse token 
 srcParseFail :: P p a
 srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
                             last_loc = last_loc } ->
-    -- unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
-    let s' = trace ("srcParseFail") s
-    in unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s'
+    unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
+    -- let s' = trace ("srcParseFail") s
+    -- in unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s'
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
