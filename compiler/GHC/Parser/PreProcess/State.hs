@@ -176,9 +176,9 @@ pushAccepting on = do
 
 -- Have we just changed the accepting state?
 acceptingStateChange :: Bool -> Bool -> AcceptingResult
-acceptingStateChange old' new' =
-  let (old, new) = trace ("acceptStateChange:" ++ show (old',new')) (old',new')
-  in
+acceptingStateChange old new =
+  -- let (old, new) = trace ("acceptStateChange:" ++ show (old',new')) (old',new')
+  -- in
   case (old, new) of
     (True, False) -> ArNowIgnoring
     (False, True) -> ArNowAccepting
@@ -190,8 +190,8 @@ popAccepting =
         let
             current = scopeValue $ pp_scope (pp s)
             new_scope = case pp_scope (pp s) of
-                -- c :| [] -> c :| []
-                c :| [] -> (trace ("popAccepting:keeping old:" ++ show c) c) :| []
+                c :| [] -> c :| []
+                -- c :| [] -> (trace ("popAccepting:keeping old:" ++ show c) c) :| []
                 _ :| (h : t) -> h :| t
          in
             POk s{pp = (pp s){pp_scope = new_scope}}
