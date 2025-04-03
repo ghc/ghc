@@ -991,11 +991,11 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalDerivingItem hs_ty
       -> mkSimpleDecorated $
            text "Illegal deriving item" <+> quotes (ppr hs_ty)
-    TcRnIllegalDefaultClass hs_ty
+    TcRnIllegalDefaultClass nm
       -> mkSimpleDecorated $
-           quotes (ppr hs_ty) <+> text "is not a class"
+           text "Illegal named default declaration for non-class" <+> quotes (ppr nm)
     TcRnIllegalNamedDefault hs_decl
-      -> mkSimpleDecorated $ text "Illegal use of default class name:" <+> quotes (ppr hs_decl)
+      -> mkSimpleDecorated $ text "Illegal named default declaration" <+> quotes (ppr hs_decl)
     TcRnUnexpectedAnnotation ty bang
       -> mkSimpleDecorated $
            let err = case bang of

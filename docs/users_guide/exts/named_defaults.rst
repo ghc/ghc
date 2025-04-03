@@ -62,13 +62,27 @@ just ``Num``:
 
 where each type *qtycon*\ `i`:subscript: must be an instance of the specified
 class *qtycls*. The types may belong to any kind, but the class must have a
-single parameter. This declaration for example becomes legal: ::
+single *visible* parameter. This declaration for example becomes legal: ::
 
     default Monoid ([Int])
 
 and in turn allows this program to compile: ::
 
     main = print mempty
+
+Note that the class is allowed to have invisible type parameters, e.g. the
+following is valid: ::
+
+    -- recall Typeable :: forall k. k -> Constraint
+    default Typeable (Int)
+
+    type RepPolyCls :: forall r. TYPE r -> Constraint
+    class RepPolyCls a where { ... }
+    default RepPolyCls (Int#)
+
+Here, ``Typeable`` and ``RepPolyCls`` both take two parameters, an invisible
+kind parameter and a visible type parameter. For the purposes of named
+default declarations, we consider them to be unary.
 
 If no class is specified, the earlier default of ``Num`` is assumed. In other
 words, the Haskell '98 syntax of::
