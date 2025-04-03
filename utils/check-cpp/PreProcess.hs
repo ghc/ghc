@@ -308,10 +308,12 @@ acceptStateChange ArNoChange = return ()
 acceptStateChange ArNowIgnoring = do
   alr <- Lexer.getAlrState
   s <- getPpState
+  -- let s = trace ("acceptStateChange:ArNowIgnoring") s'
   setPpState (s { pp_alr_state = Just alr})
   Lexer.startSkipping
 acceptStateChange ArNowAccepting = do
   s <- getPpState
+  -- let s = trace ("acceptStateChange:ArNowAccepting") s'
   mapM_ Lexer.setAlrState (pp_alr_state s)
   _ <- Lexer.stopSkipping
   return ()
