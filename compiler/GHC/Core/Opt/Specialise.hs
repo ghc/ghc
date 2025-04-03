@@ -3128,25 +3128,45 @@ site, so we only look through ticks that RULE matching looks through
 -}
 
 wantCallsFor :: SpecEnv -> Id -> Bool
-wantCallsFor _env _f = True
- -- We could reduce the size of the UsageDetails by being less eager
- -- about collecting calls for LocalIds: there is no point for
- -- ones that are lambda-bound.  We can't decide this by looking at
- -- the (absence of an) unfolding, because unfoldings for local
- -- functions are discarded by cloneBindSM, so no local binder will
- -- have an unfolding at this stage.  We'd have to keep a candidate
- -- set of let-binders.
- --
- -- Not many lambda-bound variables have dictionary arguments, so
- -- this would make little difference anyway.
- --
- -- For imported Ids we could check for an unfolding, but we have to
- -- do so anyway in canSpecImport, and it seems better to have it
- -- all in one place.  So we simply collect usage info for imported
- -- overloaded functions.
+-- See Note [wantCallsFor]
+wantCallsFor _env f
+  = case idDetails f of
+      RecSelId {}      -> False
+      DataConWorkId {} -> False
+      DataConWrapId {} -> False
+      ClassOpId {}     -> False
+      PrimOpId {}      -> False
+      FCallId {}       -> False
+      TickBoxOpId {}   -> False
+      CoVarId {}       -> False
 
-{- Note [Interesting dictionary arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      DFunId {}        -> True
+      VanillaId {}     -> True
+      JoinId {}        -> True
+      WorkerLikeId {}  -> True
+      RepPolyId {}     -> True
+
+{- Note [wantCallsFor]
+~~~~~~~~~~~~~~~~~~~~~~
+`wantCallsFor env f` says whether the Specialiser should collect calls for
+function `f`; other thing being equal, the fewer calls we collect the better. It
+is False for things we can't specialise, like ClassOps and PrimOps.
+
+We could reduce the size of the UsageDetails by being less eager about collecting
+calls for LocalIds: there is no point for ones that are lambda-bound.  We can't
+decide this by looking at the (absence of an) unfolding, because unfoldings for
+local functions are discarded by cloneBindSM, so no local binder will have an
+unfolding at this stage.  We'd have to keep a candidate set of let-binders.
+
+Not many lambda-bound variables have dictionary arguments, so this would make
+little difference anyway.
+
+For imported Ids we could check for an unfolding, but we have to do so anyway in
+canSpecImport, and it seems better to have it all in one place.  So we simply
+collect usage info for imported overloaded functions.
+
+Note [Interesting dictionary arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this
          \a.\d:Eq a.  let f = ... in ...(f d)...
 There really is not much point in specialising f wrt the dictionary d,
