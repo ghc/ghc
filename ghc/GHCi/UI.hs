@@ -130,7 +130,7 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
-import Data.List ( find, intercalate, intersperse, minimumBy,
+import Data.List ( find, intercalate, intersperse,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
@@ -1511,20 +1511,6 @@ isPrefixOptOf :: String -> String -> Bool
 isPrefixOptOf s x = let (body, opt) = break (== '!') s
                     in  (body `isPrefixOf` x) && (opt `isSuffixOf` x)
 
-getCurrentBreakSpan :: GHC.GhcMonad m => m (Maybe SrcSpan)
-getCurrentBreakSpan = do
-  resumes <- GHC.getResumeContext
-  case resumes of
-    [] -> return Nothing
-    (r:_) -> do
-        let ix = GHC.resumeHistoryIx r
-        if ix == 0
-           then return (Just (GHC.resumeSpan r))
-           else do
-                let hist = GHC.resumeHistory r !! (ix-1)
-                pan <- GHC.getHistorySpan hist
-                return (Just pan)
-
 getCallStackAtCurrentBreakpoint :: GHC.GhcMonad m => m (Maybe [String])
 getCallStackAtCurrentBreakpoint = do
   resumes <- GHC.getResumeContext
@@ -1533,15 +1519,6 @@ getCallStackAtCurrentBreakpoint = do
     (r:_) -> do
        interp <- hscInterp <$> GHC.getSession
        Just <$> liftIO (costCentreStackInfo interp (GHC.resumeCCS r))
-
-getCurrentBreakModule :: GHC.GhcMonad m => m (Maybe Module)
-getCurrentBreakModule = do
-  resumes <- GHC.getResumeContext
-  return $ case resumes of
-    [] -> Nothing
-    (r:_) -> case GHC.resumeHistoryIx r of
-      0  -> ibi_tick_mod <$> GHC.resumeBreakpointId r
-      ix -> Just $ GHC.getHistoryModule $ GHC.resumeHistory r !! (ix-1)
 
 -----------------------------------------------------------------------------
 --
@@ -3828,7 +3805,7 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
            "a break on error / exception.\nUse :stepmodule.")
         Just loc -> do
            md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
-           current_toplevel_decl <- enclosingTickSpan md loc
+           current_toplevel_decl <- flip enclosingTickSpan loc <$> getTickArray md
            doContinue (GHC.LocalStep (RealSrcSpan current_toplevel_decl Strict.Nothing))
 
 stepModuleCmd :: GhciMonad m => String -> m ()
@@ -3841,18 +3818,6 @@ stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
       case mb_span of
         Nothing  -> stepCmd []
         Just pan -> doContinue (GHC.ModuleStep pan)
-
--- | Returns the span of the largest tick containing the srcspan given
-enclosingTickSpan :: GhciMonad m => Module -> SrcSpan -> m RealSrcSpan
-enclosingTickSpan _ (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
-enclosingTickSpan md (RealSrcSpan src _) = do
-  ticks <- getTickArray md
-  let line = srcSpanStartLine src
-  massert (inRange (bounds ticks) line)
-  let enclosing_spans = [ pan | (_,pan) <- ticks ! line
-                               , realSrcSpanEnd pan >= realSrcSpanEnd src]
-  return . minimumBy leftmostLargestRealSrcSpan $ enclosing_spans
- where
 
 traceCmd :: GhciMonad m => String -> m ()
 traceCmd arg
