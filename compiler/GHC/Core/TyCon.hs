@@ -1545,7 +1545,18 @@ There are a number of wrinkles
 
   Generally, we want unary classes to behave like ordinary non-unary ones.
 
-(UCM10) Historical Note. In the olden days, when we represented unary classes
+(UCM10) When, precisely, is a class unary?  It is unary iff
+                  it has one field (superclass or method)
+                  of boxed type
+  The boxed-ness important. Consider
+          class (a ~# b) => a ~ b where {}
+  which is `eqClass` in GHC.Builtin.Types.  This has only one field, but it is
+  definitely not a unary class: it is definitely represented by an ordinary
+  algebraic data type with a single field of type (a ~# b).
+
+  See `unary_class` in `GHC.Tc.TyCl.tcClassDecl1`
+
+(UCM11) Historical Note. In the olden days, when we represented unary classes
     via a newtype, the newtype axiom looked like
            t1::CONSTRAINT r ~ t2::TYPE r
     If TYPE and CONSTRAINT are apart, this can create unsoundness, via KindCo;
@@ -2240,7 +2251,7 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
     go_alg_rep (TupleTyCon {})      = True
     go_alg_rep (SumTyCon {})        = True
     go_alg_rep (DataTyCon {})       = True
-    go_alg_rep (UnaryClassTyCon {}) = True -- See (UCM10) in Note [Unary class magic]
+    go_alg_rep (UnaryClassTyCon {}) = True -- See (UCM9) in Note [Unary class magic]
     go_alg_rep (AbstractTyCon {})   = False
     go_alg_rep (NewTyCon {})        = False
 

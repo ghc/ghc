@@ -3221,7 +3221,7 @@ Now `f` turns into:
           meth @a dc ....
 
 When we specialise `f`, at a=Int say, that superclass selection can
-nfire (via rewiteClassOps), but that info (that 'dc' is now a
+fire (via rewiteClassOps), but that info (that 'dc' is now a
 particular dictionary `C`, of type `C Int`) must be available to
 the call `meth @a dc`, so that we can fire the `meth` class-op, and
 thence specialise `wombat`.
