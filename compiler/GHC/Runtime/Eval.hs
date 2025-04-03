@@ -118,7 +118,6 @@ import GHC.Types.Avail
 import GHC.Unit
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.ModSummary
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 
@@ -1269,19 +1268,20 @@ dynCompileExpr expr = do
 -----------------------------------------------------------------------------
 -- show a module and its source/object filenames
 
-showModule :: GhcMonad m => ModSummary -> m String
-showModule mod_summary =
+showModule :: GhcMonad m => ModuleNodeInfo -> m String
+showModule mni = do
+    let mod = moduleNodeInfoModule mni
     withSession $ \hsc_env -> do
         let dflags = hsc_dflags hsc_env
         interpreted <- liftIO $
-          HUG.lookupHug (hsc_HUG hsc_env) (ms_unitid mod_summary) (ms_mod_name mod_summary) >>= pure . \case
+          HUG.lookupHug (hsc_HUG hsc_env) (moduleUnitId mod) (moduleName mod) >>= pure . \case
             Nothing       -> panic "missing linkable"
             Just mod_info -> isJust (homeModInfoByteCode mod_info)  && isNothing (homeModInfoObject mod_info)
-        return (showSDoc dflags $ showModMsg dflags interpreted (ModuleNode [] mod_summary))
+        return (showSDoc dflags $ showModMsg dflags interpreted (ModuleNode [] mni))
 
-moduleIsBootOrNotObjectLinkable :: GhcMonad m => ModSummary -> m Bool
-moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env -> liftIO $
-  HUG.lookupHug (hsc_HUG hsc_env) (ms_unitid mod_summary) (ms_mod_name mod_summary) >>= pure . \case
+moduleIsBootOrNotObjectLinkable :: GhcMonad m => Module -> m Bool
+moduleIsBootOrNotObjectLinkable mod = withSession $ \hsc_env -> liftIO $
+  HUG.lookupHug (hsc_HUG hsc_env) (moduleUnitId mod) (moduleName mod) >>= pure . \case
     Nothing       -> panic "missing linkable"
     Just mod_info -> isNothing $ homeModInfoByteCode mod_info
 
