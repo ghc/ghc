@@ -11,10 +11,11 @@
 -- Portability :  non-portable (GHC extensions)
 --
 -- This module defines the 'HasField' class used by the
--- @OverloadedRecordFields@ extension.  See the
--- <https://gitlab.haskell.org/ghc/ghc/wikis/records/overloaded-record-fields
--- wiki page> for more details.
+-- @OverloadedRecordDot@ extension.  See the
+-- [wiki page](https://gitlab.haskell.org/ghc/ghc/wikis/records/overloaded-record-fields)
+-- for more details.
 --
+-- @since 4.10.0.0
 
 module GHC.Records
     (HasField(..)
