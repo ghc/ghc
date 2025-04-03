@@ -41,7 +41,6 @@ import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..))
 import GHC.Parser.Lexer qualified as Lexer
 import GHC.Parser.PreProcess.ParserM (Token (..))
 import GHC.Types.SrcLoc
-import Debug.Trace
 
 import GHC.Prelude
 
