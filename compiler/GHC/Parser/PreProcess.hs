@@ -192,8 +192,8 @@ ppLexer queueComments cont =
                         _ -> return ()
                     ppLexer queueComments cont
              in
-                -- case tk of
-                case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
+                case tk of
+                -- case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
                     L _ ITeof -> do
                         mInp <- popIncludeLoc
                         case mInp of
