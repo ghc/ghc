@@ -25,7 +25,7 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors.Types
-import GHC.Driver.Main
+import GHC.Driver.Messager
 import GHC.Driver.MakeSem
 
 import GHC.Utils.Logger

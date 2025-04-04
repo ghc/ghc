@@ -67,6 +67,7 @@ data HscEnv
 
         hsc_mod_graph :: ModuleGraph,
                 -- ^ The module graph of the current session
+                -- See Note [Downsweep and the ModuleGraph] for when this is constructed.
 
         hsc_IC :: InteractiveContext,
                 -- ^ The context for evaluating interactive statements

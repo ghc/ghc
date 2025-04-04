@@ -187,7 +187,7 @@ data DriverMessage where
 
      Test cases: None.
   -}
-  DriverModuleNotFound :: !ModuleName -> DriverMessage
+  DriverModuleNotFound :: !UnitId -> !ModuleName -> DriverMessage
 
   {-| DriverFileModuleNameMismatch occurs if a module 'A' is defined in a file with a different name.
       The first field is the name written in the source code; the second argument is the name extracted

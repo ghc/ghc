@@ -46,13 +46,8 @@ lookupModule :: ModuleName -- ^ Name of the module
              -> TcPluginM Module
 lookupModule mod_nm = do
   hsc_env <- getTopEnv
-  let dflags    = hsc_dflags hsc_env
-  let fopts     = initFinderOpts dflags
-  let fc        = hsc_FC hsc_env
-  let units     = hsc_units hsc_env
   let home_unit = hsc_home_unit hsc_env
-  -- found_module <- findPluginModule fc fopts units home_unit mod_name
-  found_module <- tcPluginIO $ findPluginModule fc fopts units (Just home_unit) mod_nm
+  found_module <- tcPluginIO $ findPluginModule hsc_env mod_nm
   case found_module of
     FoundModule h -> return (fr_mod h)
     _          -> do

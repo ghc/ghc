@@ -41,6 +41,8 @@ module GHC.Unit.Module.Graph
 
    , ModuleNodeInfo(..)
    , moduleNodeInfoModule
+   , moduleNodeInfoUnitId
+   , moduleNodeInfoMnwib
    , moduleNodeInfoModuleName
    , moduleNodeInfoModNodeKeyWithUid
    , moduleNodeInfoHscSource
@@ -48,7 +50,7 @@ module GHC.Unit.Module.Graph
    , isBootModuleNodeInfo
     -- * Module graph operations
    , lengthMG
-
+   , isEmptyMG
     -- ** 'ModSummary' operations
     --
     -- | A couple of operations on the module graph allow access to the
@@ -100,6 +102,10 @@ module GHC.Unit.Module.Graph
    , ModNodeKey
    , ModNodeKeyWithUid(..)
    , mnkToModule
+   , moduleToMnk
+   , mnkToInstalledModule
+   , installedModuleToMnk
+   , mnkIsBoot
    , msKey
    , mnKey
    , miKey
@@ -310,7 +316,7 @@ checkFixedModuleInvariant node_types node = case node of
   _ -> Nothing
 
 
-{- Note [Modules Types in the ModuleGraph]
+{- Note [Module Types in the ModuleGraph]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Modules can be one of two different types in the module graph.
@@ -364,6 +370,14 @@ isBootModuleNodeInfo (ModuleNodeCompile ms) = isBootSummary ms
 -- | Extract the ModuleName from a ModuleNodeInfo
 moduleNodeInfoModuleName :: ModuleNodeInfo -> ModuleName
 moduleNodeInfoModuleName m = moduleName (moduleNodeInfoModule m)
+
+moduleNodeInfoUnitId :: ModuleNodeInfo -> UnitId
+moduleNodeInfoUnitId (ModuleNodeFixed key _) = mnkUnitId key
+moduleNodeInfoUnitId (ModuleNodeCompile ms) = ms_unitid ms
+
+moduleNodeInfoMnwib :: ModuleNodeInfo -> ModuleNameWithIsBoot
+moduleNodeInfoMnwib (ModuleNodeFixed key _) = mnkModuleName key
+moduleNodeInfoMnwib (ModuleNodeCompile ms) = ms_mnwib ms
 
 -- | Collect the immediate dependencies of a ModuleGraphNode,
 -- optionally avoiding hs-boot dependencies.
@@ -424,6 +438,9 @@ instance Ord ModuleGraphNode where
 -- | Returns the number of nodes in a 'ModuleGraph'
 lengthMG :: ModuleGraph -> Int
 lengthMG = length . mg_mss
+
+isEmptyMG :: ModuleGraph -> Bool
+isEmptyMG = null . mg_mss
 
 --------------------------------------------------------------------------------
 -- ** ModSummaries

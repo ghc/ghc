@@ -27,6 +27,7 @@ module GHC.Driver.Env
    , discardIC
    , lookupType
    , lookupIfaceByModule
+   , lookupIfaceByModuleHsc
    , mainModIs
 
    , hugRulesBelow
@@ -249,6 +250,11 @@ hugInstancesBelow hsc_env uid mnwib = do
 --
 -- Note: Don't expose this function. This is a footgun if exposed!
 hugSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO [[a]]
+-- An explicit check to see if we are in one-shot mode to avoid poking the ModuleGraph thunk
+-- These things are currently stored in the EPS for home packages. (See #25795 for
+-- progress in removing these kind of checks)
+-- See Note [Downsweep and the ModuleGraph]
+hugSomeThingsBelowUs _ _ hsc_env _ _ | isOneShot (ghcMode (hsc_dflags hsc_env)) = return []
 hugSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
   = let hug = hsc_HUG hsc_env
         mg  = hsc_mod_graph hsc_env
@@ -344,6 +350,11 @@ lookupIfaceByModule hug pit mod
    --     module is in the PIT, namely GHC.Prim when compiling the base package.
    -- We could eliminate (b) if we wanted, by making GHC.Prim belong to a package
    -- of its own, but it doesn't seem worth the bother.
+
+lookupIfaceByModuleHsc :: HscEnv -> Module -> IO (Maybe ModIface)
+lookupIfaceByModuleHsc hsc_env mod = do
+  eps <- hscEPS hsc_env
+  lookupIfaceByModule (hsc_HUG hsc_env) (eps_PIT eps) mod
 
 mainModIs :: HomeUnitEnv -> Module
 mainModIs hue = mkHomeModule (expectJust $ homeUnitEnv_home_unit hue) (mainModuleNameIs (homeUnitEnv_dflags hue))

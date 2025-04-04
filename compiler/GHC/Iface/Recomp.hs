@@ -23,7 +23,6 @@ import GHC.Prelude
 import GHC.Data.FastString
 
 import GHC.Driver.Backend
-import GHC.Driver.Config.Finder
 import GHC.Driver.Env
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
@@ -303,7 +302,7 @@ check_old_iface hsc_env mod_summary maybe_iface
 
         loadIface read_dflags iface_path = do
              let ncu        = hsc_NC hsc_env
-             read_result <- readIface read_dflags ncu (ms_mod mod_summary) iface_path
+             read_result <- readIface logger read_dflags ncu (ms_mod mod_summary) iface_path
              case read_result of
                  Failed err -> do
                      let msg = readInterfaceErrorDiagnostic err
@@ -635,7 +634,7 @@ checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
  = do
     res_normal <- classify_import (findImportedModule hsc_env) (ms_textual_imps summary ++ ms_srcimps summary)
-    res_plugin <- classify_import (\mod _ -> findPluginModule fc fopts units mhome_unit mod) (ms_plugin_imps summary)
+    res_plugin <- classify_import (\mod _ -> findPluginModule hsc_env mod) (ms_plugin_imps summary)
     case sequence (res_normal ++ res_plugin) of
       Left recomp -> return $ NeedsRecompile recomp
       Right es -> do
@@ -657,13 +656,8 @@ checkDependencies hsc_env summary iface
            let reason = ModuleChanged mod
            in classify reason <$> find_import mod mb_pkg)
            imports
-   dflags        = hsc_dflags hsc_env
-   fopts         = initFinderOpts dflags
    logger        = hsc_logger hsc_env
-   fc            = hsc_FC hsc_env
-   mhome_unit    = hsc_home_unit_maybe hsc_env
    all_home_units = hsc_all_home_unit_ids hsc_env
-   units         = hsc_units hsc_env
    prev_dep_mods = map (second gwib_mod) $ Set.toAscList $ dep_direct_mods (mi_deps iface)
    prev_dep_pkgs = Set.toAscList (Set.union (dep_direct_pkgs (mi_deps iface))
                                             (dep_plugin_pkgs (mi_deps iface)))

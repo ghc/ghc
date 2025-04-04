@@ -41,6 +41,7 @@ module GHC.Driver.Make (
         -- * Re-exports from Downsweep
         checkHomeUnitsClosed,
         summariseModule,
+        summariseModuleInterface,
         SummariseResult(..),
         summariseFile,
 
@@ -648,7 +649,7 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
             | otherwise = do
                     throwOneError $ mkPlainErrorMsgEnvelope noSrcSpan
                                   $ GhcDriverMessage
-                                  $ DriverModuleNotFound (moduleName m)
+                                  $ DriverModuleNotFound (moduleUnit m) (moduleName m)
 
     checkHowMuch how_much $ do
 
@@ -1667,7 +1668,7 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
     executeCompileNodeFixed hsc_env MakeEnv{diag_wrapper, env_messager} mod loc =
       wrapAction diag_wrapper hsc_env $ do
         forM_ env_messager $ \hscMessage -> hscMessage hsc_env (k, n) UpToDate (ModuleNode [] (ModuleNodeFixed mod loc))
-        read_result <- readIface (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule mod) (ml_hi_file loc)
+        read_result <- readIface (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule mod) (ml_hi_file loc)
         case read_result of
           M.Failed interface_err ->
             let mn = mnkModuleName mod

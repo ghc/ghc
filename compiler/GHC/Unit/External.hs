@@ -33,7 +33,6 @@ import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
 
 import GHC.Linker.Types (Linkable)
-import GHC.Unit.Module.External.Graph
 
 import Data.IORef
 
@@ -72,7 +71,6 @@ initExternalPackageState = EPS
   , eps_PIT              = emptyPackageIfaceTable
   , eps_free_holes       = emptyInstalledModuleEnv
   , eps_PTE              = emptyTypeEnv
-  , eps_module_graph     = emptyExternalModuleGraph
   , eps_iface_bytecode   = emptyModuleEnv
   , eps_inst_env         = emptyInstEnv
   , eps_fam_inst_env     = emptyFamInstEnv
@@ -140,8 +138,6 @@ data ExternalPackageState
                 -- don't want to repeatedly reread in the interface
                 -- for every import, so cache it here.  When the PIT
                 -- gets filled in we can drop these entries.
-
-        eps_module_graph :: ExternalModuleGraph,
 
         eps_PTE :: !PackageTypeEnv,
                 -- ^ Result of typechecking all the external package

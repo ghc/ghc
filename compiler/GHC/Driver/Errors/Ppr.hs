@@ -155,7 +155,7 @@ instance Diagnostic DriverMessage where
            text "module" <+> quotes (ppr mod) <+>
            text "is defined in multiple files:" <+>
            sep (map text files)
-    DriverModuleNotFound mod
+    DriverModuleNotFound _uid mod
       -> mkSimpleDecorated (text "module" <+> quotes (ppr mod) <+> text "cannot be found locally")
     DriverFileModuleNameMismatch actual expected
       -> mkSimpleDecorated $

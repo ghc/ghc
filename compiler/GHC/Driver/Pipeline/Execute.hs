@@ -33,6 +33,7 @@ import GHC.Unit.Module.ModSummary
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.SrcLoc
 import GHC.Driver.Main
+import GHC.Driver.Downsweep
 import GHC.Tc.Types
 import GHC.Types.Error
 import GHC.Driver.Errors.Types
@@ -760,11 +761,17 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   let msg :: Messager
       msg hsc_env _ what _ = oneShotMsg (hsc_logger hsc_env) what
 
+  -- A lazy module graph thunk, don't force it unless you need it!
+  mg <- downsweepThunk hsc_env mod_summary
+
   -- Need to set the knot-tying mutable variable for interface
   -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
   -- See also Note [hsc_type_env_var hack]
   type_env_var <- newIORef emptyNameEnv
-  let hsc_env' = hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv (mkModuleEnv [(mod, type_env_var)]) }
+  let hsc_env' = hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv (mkModuleEnv [(mod, type_env_var)])
+                         , hsc_mod_graph = mg }
+
+
 
   status <- hscRecompStatus (Just msg) hsc_env' mod_summary
                         Nothing emptyHomeModInfoLinkable (1, 1)

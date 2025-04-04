@@ -228,31 +228,6 @@ See Note [Home module build products] for some more information about that.
 The only other place where the flag is consulted is when enabling code generation
 with `-fno-code`, which does so to anticipate what decision we will make at the
 splice point about what we would prefer.
-
-Note [Reachability in One-shot mode vs Make mode]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Why are there two code paths in `get_reachable_nodes`? (ldOneShotMode vs otherwise)
-
-In one-shot mode, the home package modules are loaded into the EPS,
-whereas for --make mode, the home package modules are in the HUG/HPT.
-
-For both of these cases, we cache the calculation of transitive
-dependencies in a 'ModuleGraph'. For the --make case, the relevant
-'ModuleGraph' is in the EPS, the other case uses the 'ModuleGraph'
-for the home modules.
-
-The home modules graph is known statically after downsweep.
-On the contrary, the EPS module graph is only extended when a
-module is loaded into the EPS -- which is done lazily as needed.
-Therefore, for get_link_deps, we need to force the transitive
-closure to be loaded before querying the graph for the reachable
-link dependencies -- done in the call to 'loadExternalGraphBelow'.
-Because we cache the transitive closure, this work is only done once.
-
-After forcing the modules with the call to 'loadExternalGraphBelow' in
-'get_reachable_nodes', the external module graph has all edges needed to
-compute the full transitive closure so we can proceed just like we do in the
-second path with a normal module graph.
 -}
 
 dieWith :: LinkDepsOpts -> SrcSpan -> SDoc -> IO a

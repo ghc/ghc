@@ -76,12 +76,10 @@ import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 
 import GHC.Unit.Env
-import GHC.Unit.Home
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.External (ExternalPackageState (..))
 import GHC.Unit.Module
 import GHC.Unit.Module.ModNodeKey
-import GHC.Unit.Module.External.Graph
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModIface
 import GHC.Unit.State as Packages
@@ -119,6 +117,9 @@ import System.Win32.Info (getSystemDirectory)
 
 import GHC.Utils.Exception
 import GHC.Unit.Home.Graph (lookupHug, unitEnv_foldWithKey)
+import GHC.Driver.Downsweep
+
+
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -615,89 +616,53 @@ initLinkDepsOpts hsc_env = opts
     dflags = hsc_dflags hsc_env
 
     ldLoadByteCode mod = do
+      _ <- initIfaceLoad hsc_env $
+             loadInterface (text "get_reachable_nodes" <+> parens (ppr mod))
+                 mod ImportBySystem
       EPS {eps_iface_bytecode} <- hscEPS hsc_env
       sequence (lookupModuleEnv eps_iface_bytecode mod)
 
 
--- See Note [Reachability in One-shot mode vs Make mode]
 get_reachable_nodes :: HscEnv -> [Module] -> IO ([Module], UniqDSet UnitId)
 get_reachable_nodes hsc_env mods
 
-  -- Reachability on 'ExternalModuleGraph' (for one shot mode)
-  | isOneShot (ghcMode dflags)
+  -- Fallback case if the ModuleGraph has not been initialised by the user.
+  -- This can happen if is the user is loading plugins or doing something else very
+  -- early in the compiler pipeline.
+  | isEmptyMG (hsc_mod_graph hsc_env)
   = do
-    initIfaceCheck (text "loader") hsc_env
-      $ void $ loadExternalGraphBelow msg (hsc_home_unit_maybe hsc_env) Set.empty mods
-    -- Read the EPS only after `loadExternalGraphBelow`
-    eps <- hscEPS hsc_env
-    let
-      emg = eps_module_graph eps
-      get_mod_info_eps (ModNodeKeyWithUid gwib uid)
-        | uid == homeUnitId (ue_unsafeHomeUnit unit_env)
-        = case lookupModuleEnv (eps_PIT eps) (Module (RealUnit $ Definite uid) (gwib_mod gwib)) of
-            Just iface -> return $ Just iface
-            Nothing -> moduleNotLoaded "(in EPS)" gwib uid
-        | otherwise
-        = return Nothing
+      mg <- downsweepInstalledModules hsc_env mods
+      go mg
 
-      get_mod_key m
-        | moduleUnitId m == homeUnitId (ue_unsafeHomeUnit unit_env)
-        = ExternalModuleKey (mkModuleNk m)
-        | otherwise = ExternalPackageKey (moduleUnitId m)
-
-    go get_mod_key emgNodeKey (emgReachableLoopMany emg) (map emgProject) get_mod_info_eps
-
-  -- Reachability on 'ModuleGraph' (for --make mode)
   | otherwise
-  = go hmgModKey mkNodeKey (mgReachableLoop hmGraph) (catMaybes . map hmgProject) get_mod_info_hug
+  = go (hsc_mod_graph hsc_env)
 
   where
-    dflags = hsc_dflags hsc_env
     unit_env = hsc_unit_env hsc_env
     mkModuleNk m = ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m)
-    msg mod =
-      text "need to link module" <+> ppr mod <+>
-        text "and the modules below it, due to use of Template Haskell"
 
-    hmGraph = hsc_mod_graph hsc_env
-
-    hmgModKey m
+    hmgModKey mg m
       | let k = NodeKey_Module (mkModuleNk m)
-      , mgMember hmGraph k = k
+      , mgMember mg k = k
       | otherwise = NodeKey_ExternalUnit (moduleUnitId m)
-
-    hmgProject = \case
-      NodeKey_Module with_uid  -> Just $ Left  with_uid
-      NodeKey_ExternalUnit uid -> Just $ Right uid
-      _                        -> Nothing
-
-    emgProject = \case
-      ExternalModuleKey with_uid -> Left  with_uid
-      ExternalPackageKey uid     -> Right uid
 
     -- The main driver for getting dependencies, which calls the given
     -- functions to compute the reachable nodes.
-    go :: (Module -> key)
-       -> (node -> key)
-       -> ([key] -> [node])
-       -> ([key] -> [Either ModNodeKeyWithUid UnitId])
-       -> (ModNodeKeyWithUid -> IO (Maybe ModIface))
-       -> IO ([Module], UniqDSet UnitId)
-    go modKey nodeKey manyReachable project get_mod_info
-      | let mod_keys = map modKey mods
-      = do
-        let (all_home_mods, pkgs_s) = partitionEithers $ project $ mod_keys ++ map nodeKey (manyReachable mod_keys)
-        ifaces <- mapMaybeM get_mod_info all_home_mods
-        let mods_s = map mi_module ifaces
+    go :: ModuleGraph -> IO ([Module], UniqDSet UnitId)
+    go mg = do
+        let mod_keys = map (hmgModKey mg) mods
+            all_reachable = mod_keys ++ map mkNodeKey (mgReachableLoop mg mod_keys)
+        (mods_s, pkgs_s) <- partitionEithers <$> mapMaybeM get_mod_info all_reachable
         return (mods_s, mkUniqDSet pkgs_s)
 
-    get_mod_info_hug (ModNodeKeyWithUid gwib uid) =
+    get_mod_info :: NodeKey -> IO (Maybe (Either Module UnitId))
+    get_mod_info (NodeKey_Module m@(ModNodeKeyWithUid gwib uid)) =
       lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) >>= \case
-        Just hmi -> return $ Just (hm_iface hmi)
-        Nothing -> moduleNotLoaded "(in HUG)" gwib uid
+        Just hmi -> return $ Just (Left  (mi_module (hm_iface hmi)))
+        Nothing -> return (Just (Left (mnkToModule m)))
+    get_mod_info (NodeKey_ExternalUnit uid) = return (Just (Right uid))
+    get_mod_info _ = return Nothing
 
-    moduleNotLoaded m gwib uid = throwGhcExceptionIO $ ProgramError $ showSDoc dflags $
-      text "getLinkDeps: Home module not loaded" <+> text m <+> ppr (gwib_mod gwib) <+> ppr uid
 
 {- **********************************************************************
 

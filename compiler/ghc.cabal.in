@@ -526,6 +526,7 @@ Library
         GHC.Driver.MakeSem
         GHC.Driver.Main
         GHC.Driver.Make
+        GHC.Driver.Messager
         GHC.Driver.MakeAction
         GHC.Driver.MakeFile
         GHC.Driver.Monad
@@ -956,7 +957,6 @@ Library
         GHC.Unit.Module.Env
         GHC.Unit.Module.Graph
         GHC.Unit.Module.ModNodeKey
-        GHC.Unit.Module.External.Graph
         GHC.Unit.Module.Imported
         GHC.Unit.Module.Location
         GHC.Unit.Module.ModDetails

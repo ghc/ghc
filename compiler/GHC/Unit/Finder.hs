@@ -66,7 +66,6 @@ import Control.Monad
 import Data.Time
 import qualified Data.Map as M
 import GHC.Driver.Env
-    ( hsc_home_unit_maybe, HscEnv(hsc_FC, hsc_dflags, hsc_unit_env) )
 import GHC.Driver.Config.Finder
 import qualified Data.Set as Set
 import Data.List.NonEmpty ( NonEmpty (..) )
@@ -224,21 +223,26 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
 -- plugin.  This consults the same set of exposed packages as
 -- 'findImportedModule', unless @-hide-all-plugin-packages@ or
 -- @-plugin-package@ are specified.
-findPluginModule :: FinderCache -> FinderOpts -> UnitState -> Maybe HomeUnit -> ModuleName -> IO FindResult
-findPluginModule fc fopts units (Just home_unit) mod_name =
+findPluginModuleNoHsc :: FinderCache -> FinderOpts -> UnitState -> Maybe HomeUnit -> ModuleName -> IO FindResult
+findPluginModuleNoHsc fc fopts units (Just home_unit) mod_name =
   findHomeModule fc fopts home_unit mod_name
   `orIfNotFound`
   findExposedPluginPackageModule fc fopts units mod_name
-findPluginModule fc fopts units Nothing mod_name =
+findPluginModuleNoHsc fc fopts units Nothing mod_name =
   findExposedPluginPackageModule fc fopts units mod_name
 
--- | Locate a specific 'Module'.  The purpose of this function is to
--- create a 'ModLocation' for a given 'Module', that is to find out
--- where the files associated with this module live.  It is used when
--- reading the interface for a module mentioned by another interface,
--- for example (a "system import").
-findExactModule :: FinderCache -> FinderOpts -> UnitEnvGraph FinderOpts -> UnitState -> Maybe HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
-findExactModule fc fopts other_fopts unit_state mhome_unit mod is_boot = do
+findPluginModule :: HscEnv -> ModuleName -> IO FindResult
+findPluginModule hsc_env mod_name = do
+  let fc = hsc_FC hsc_env
+  let units = hsc_units hsc_env
+  let mhome_unit = hsc_home_unit_maybe hsc_env
+  findPluginModuleNoHsc fc (initFinderOpts (hsc_dflags hsc_env)) units mhome_unit mod_name
+
+
+-- | A version of findExactModule which takes the exact parts of the HscEnv it needs
+-- directly.
+findExactModuleNoHsc :: FinderCache -> FinderOpts -> UnitEnvGraph FinderOpts -> UnitState -> Maybe HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
+findExactModuleNoHsc fc fopts other_fopts unit_state mhome_unit mod is_boot = do
   res <- case mhome_unit of
     Just home_unit
      | isHomeInstalledModule home_unit mod
@@ -249,6 +253,21 @@ findExactModule fc fopts other_fopts unit_state mhome_unit mod is_boot = do
   case (res, is_boot) of
     (InstalledFound loc, IsBoot) -> return (InstalledFound (addBootSuffixLocn loc))
     _ -> return res
+
+
+-- | Locate a specific 'Module'.  The purpose of this function is to
+-- create a 'ModLocation' for a given 'Module', that is to find out
+-- where the files associated with this module live.  It is used when
+-- reading the interface for a module mentioned by another interface,
+-- for example (a "system import").
+findExactModule :: HscEnv -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
+findExactModule hsc_env mod is_boot = do
+  let dflags = hsc_dflags hsc_env
+  let fc = hsc_FC hsc_env
+  let unit_state = hsc_units hsc_env
+  let home_unit = hsc_home_unit_maybe hsc_env
+  let other_fopts = initFinderOpts . homeUnitEnv_dflags <$> (hsc_HUG hsc_env)
+  findExactModuleNoHsc fc (initFinderOpts dflags) other_fopts unit_state home_unit mod is_boot
 
 
 -- -----------------------------------------------------------------------------
