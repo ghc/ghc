@@ -205,7 +205,11 @@ data ImportUserSpec
 
 data ImpUserList
   = ImpUserAll -- ^ no user import list
-  | ImpUserExplicit ![AvailInfo]
+  | ImpUserExplicit
+      { iul_avails :: ![AvailInfo]
+      , iul_non_explicit_parents :: !NameSet
+        -- ^ The @T@s in import list items of the form @T(..)@
+      }
   | ImpUserEverythingBut !NameSet
 
 -- | A 'NameShape' is a substitution on 'Name's that can be used

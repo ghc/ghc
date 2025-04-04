@@ -1269,7 +1269,8 @@ pprModIface unit_state iface
                 <+> integer hiVersion
         , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash iface))
         , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash iface))
-        , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash iface))
+        , nest 2 (text "export avails hash:" <+> ppr (mi_export_avails_hash iface))
+        , nest 2 (text "orphan-like hash:" <+> ppr (mi_orphan_like_hash iface))
         , withSelfRecomp iface empty ppr
         , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash iface))
         , nest 2 (text "sig of:" <+> ppr (mi_sig_of iface))

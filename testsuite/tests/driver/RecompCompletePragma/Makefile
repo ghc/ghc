@@ -36,7 +36,6 @@ RecompCompletePragma:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c RecompCompletePragmaA.hs -Wall
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c RecompCompletePragmaB.hs -Wall
 
-
 RecompCompleteFixity:
 	# First compilation
 	rm -f *.o *.hi RecompCompleteFixityA.hs.modified

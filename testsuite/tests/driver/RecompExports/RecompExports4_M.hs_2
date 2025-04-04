@@ -1,0 +1,12 @@
+module RecompExports4_M where
+
+class C a where
+  internal_meth :: a -> String
+
+meth :: C a => a -> String
+meth = internal_meth
+
+data T = MkT Int
+
+fld :: T -> Int
+fld (MkT i) = i

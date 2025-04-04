@@ -119,9 +119,11 @@ data IfaceImport = IfaceImport ImpDeclSpec ImpIfaceList
 
 data ImpIfaceList
   = ImpIfaceAll -- ^ no user import list
-  | ImpIfaceExplicit !DetOrdAvails
+  | ImpIfaceExplicit
+    { iil_avails :: !DetOrdAvails
+    , iil_non_explicit_parents :: ![Name]
+    }
   | ImpIfaceEverythingBut ![Name]
-
 
 -- | Extract the imported module from an IfaceImport
 ifImpModule :: IfaceImport -> Module
@@ -138,9 +140,10 @@ instance Binary IfaceImport where
 
 instance Binary ImpIfaceList where
   put_ bh ImpIfaceAll = putByte bh 0
-  put_ bh (ImpIfaceExplicit env) = do
+  put_ bh (ImpIfaceExplicit env implicit_parents) = do
     putByte bh 1
     put_ bh env
+    put_ bh implicit_parents
   put_ bh (ImpIfaceEverythingBut ns) = do
     putByte bh 2
     put_ @[Name] bh ns
@@ -150,11 +153,12 @@ instance Binary ImpIfaceList where
       0 -> return ImpIfaceAll
       1 -> do
         env <- get bh
-        return (ImpIfaceExplicit env)
+        implicit_parents <- get bh
+        return $ ImpIfaceExplicit env implicit_parents
       2 -> do
         ns <- get @[Name] bh
-        return (ImpIfaceEverythingBut ns)
-      _ -> fail "instance Binary ImpIfaceList: Invalid tag"
+        return $ ImpIfaceEverythingBut ns
+      _ -> fail $ "instance Binary ImpIfaceList: Invalid tag " ++ show tag
 
 -- | A binding top-level 'Name' in an interface file (e.g. the name of an
 -- 'IfaceDecl').
@@ -3045,7 +3049,7 @@ instance NFData IfaceImport where
 instance NFData ImpIfaceList where
   rnf ImpIfaceAll = ()
   rnf (ImpIfaceEverythingBut ns) = rnf ns
-  rnf (ImpIfaceExplicit gre) = rnf gre
+  rnf (ImpIfaceExplicit gre explicit) = rnf gre `seq` rnf explicit
 
 instance NFData IfaceDecl where
   rnf = \case

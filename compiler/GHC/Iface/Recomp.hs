@@ -55,7 +55,9 @@ import GHC.Utils.Logger
 import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Types.Annotations
+import GHC.Types.Avail
 import GHC.Types.Name
+import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.Set
@@ -772,7 +774,7 @@ checkModUsage _ UsageHomeModule{
                                 usg_mod_name = mod_name,
                                 usg_unit_id  = uid,
                                 usg_mod_hash = old_mod_hash,
-                                usg_exports = maybe_old_export_hash,
+                                usg_exports  = maybe_imported_exports,
                                 usg_entities = old_decl_hash }
   = do
     let mod = mkModule (RealUnit (Definite uid)) mod_name
@@ -781,8 +783,6 @@ checkModUsage _ UsageHomeModule{
      let
          new_mod_hash    = mi_mod_hash iface
          new_decl_hash   = mi_hash_fn  iface
-         new_export_hash = mi_exp_hash iface
-
          reason = ModuleChanged (moduleName mod)
 
      liftIO $ do
@@ -791,10 +791,9 @@ checkModUsage _ UsageHomeModule{
        if not (recompileRequired recompile)
          then return UpToDate
          else checkList
-           [ -- CHECK EXPORT LIST
-             checkMaybeHash logger reason maybe_old_export_hash new_export_hash
-               (text "  Export list changed")
-           , -- CHECK ITEMS ONE BY ONE
+           [ -- CHECK EXPORT LIST; see Note [When to recompile when export lists change?]
+             checkHomeModImport logger reason maybe_imported_exports iface
+           , -- CHECK USED ITEMS ONE BY ONE
              checkList [ checkEntityUsage logger reason new_decl_hash u
                        | u <- old_decl_hash]
            , up_to_date logger (text "  Great!  The bits I use are up to date")
@@ -815,6 +814,193 @@ checkModUsage fc UsageFile{ usg_file_path = file,
    handler = if debugIsOn
       then \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
       else \_ -> return recomp -- if we can't find the file, just recompile, don't fail
+
+-- | We are importing a module whose exports have changed.
+-- Does this require recompilation?
+--
+-- See Note [When to recompile when export lists change?]
+checkHomeModImport :: Logger -> RecompReason -> Maybe HomeModImport -> ModIface -> IO RecompileRequired
+checkHomeModImport _ _ Nothing _ = return UpToDate
+checkHomeModImport logger reason
+  (Just (HomeModImport old_orphan_like_hash old_avails))
+  iface
+    -- (1) Orphans (of the module we are importing or of its dependencies)
+    --     have changed: recompilation is required.
+    --
+    -- See Note [Orphan-like hash].
+    | old_orphan_like_hash /= new_orphan_like_hash
+    = out_of_date_hash logger reason (text "  Orphan-likes changed")
+        old_orphan_like_hash new_orphan_like_hash
+    | otherwise
+    -- (2) Is there a change in the set of entities we are importing?
+    = case old_avails of
+        -- (a) Whole module import: recompile if the export hash
+        -- of the module we are importing has changed.
+        HMIA_Implicit old_avails_hash
+          | old_avails_hash /= new_avails_hash
+          -> out_of_date_hash logger reason (text "  Export list changed")
+               old_orphan_like_hash new_orphan_like_hash
+          | otherwise
+          -> return UpToDate
+        -- (b) Explicit imports: recompile if there is a change in the
+        --     set of imported items.
+        HMIA_Explicit
+         { hmia_imported_avails        = DetOrdAvails imps
+         , hmia_parents_with_implicits = parents_of_implicits
+         } ->
+          case checkNewExportedAvails new_exports parents_of_implicits imps of
+            [] -> return UpToDate
+            changes@(_:_) ->
+              do trace_hi_diffs logger $
+                   hang (text "Export list changed")
+                      2 (ppr changes)
+                 return $ needsRecompileBecause reason
+  where
+    new_orphan_like_hash = mi_orphan_like_hash iface
+    new_avails_hash      = mi_export_avails_hash iface
+    new_exports          = mi_exports iface
+
+-- | The exported avails of a module have changed. Should this cause recompilation
+-- of a module that imports it?
+--
+-- This is only about export/import lists; checking for changes in the definitions
+-- of used identifiers is done later (see 'checkEntityUsage').
+--
+-- See Note [When to recompile when export lists change?].
+checkNewExportedAvails :: [AvailInfo] -> NameSet -> [AvailInfo] -> [AvailInfo]
+checkNewExportedAvails new_avails parents_of_implicits imported_avails
+  = concatMap go imported_avails
+  where
+    go a@(Avail n) =
+      case lookupNameEnv env n of
+        Nothing -> [a]
+        Just {} -> []
+    go a@(AvailTC n ns) =
+      case lookupNameEnv env n of
+        Nothing -> [a]
+        Just a' ->
+          case a' of
+            Avail {} -> [a]
+            AvailTC _ ns'
+              | n `elemNameSet` parents_of_implicits
+              ->
+                -- We are dealing with an export item of the form @T(..)@.
+                -- If the set of subordinate names has changed at all, we must
+                -- recompile.
+                if mkNameSet ns == mkNameSet ns'
+                then []
+                else [a]
+              | otherwise
+              ->
+                -- We are dealing with an import item of the form @T(K,x,y)@.
+                -- Just check that all the names we are explicitly importing
+                -- continue to be exported. It's OK if T has more children
+                -- than it used to.
+                if all (`elem` ns') ns
+                then []
+                else [a]
+
+    env = availsToNameEnv new_avails
+
+{- Note [When to recompile when export lists change?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose module N imports module M, and the exports of M change. Does this
+require recompiling N?
+
+Suppose for example that we have:
+
+  module M (foo) where
+    foo = 3
+
+  module N where
+    import M
+    bar = foo + 1
+    baz = 2 * bar
+
+If we add an identifier to the export list of M, we must recompile N because
+this might introduce name clashes, e.g. changing M to:
+
+  module M (foo, bar) where
+    foo = 3
+    bar = 7
+
+will cause N to no longer compile because of a name clash involving 'bar'.
+
+However, if N had an explicit import list:
+
+  module N where
+    import M(foo)
+    bar = foo + 1
+    baz = 2 * bar
+
+then it *does not matter* that 'M' starts exporting 'bar'; 'N' is unaffected.
+
+This justifies the following approach for deciding whether a change in exports
+should lead to recompilation.
+
+  (1) If the orphan instances exported by M change, or if the orphans of
+      dependencies of M change, we must recompile N.
+      See Note [Orphan-like hash]
+
+  (2) Otherwise, look at all the import declarations that import M.
+
+      (a) If there is a whole module import, or an "import hiding" import,
+          then we must recompile N when the avails exported from M change
+          (such a change is detected by using the 'mi_export_avails_hash').
+
+      (b) Otherwise, all imports are explicit imports, but not every identifier
+          is necessarily explicitly imported, as we might have an import of
+          the form @import M(T(..))@.
+
+          We proceed by comparing what we are importing from M against the
+          new exports of M. We recompile unless the following two conditions
+          are both satisfied:
+
+            C1. Every explicitly imported identifier continues to be exported.
+            C2. For every parent P in an import item of the form @P(..)@,
+                the set of subordinates exported by P has not changed.
+
+Note that this import check is done purely on the basis of the Names involved,
+unlike the subsequent recompilation check done in 'checkEntityUsage' which
+checks that the definitions of used identifiers have not changed.
+
+Note [Orphan-like hash]
+~~~~~~~~~~~~~~~~~~~~~~~
+The orphan-like hash extends the orphan hash to include other entities that
+also cause recompilation downstream upon changing.
+
+The hash includes:
+
+  (1) orphan class and family instances
+  (2) exported named defaults (these are very similar to orphan instances)
+  (3) non-orphan type family instances, including those of dependencies
+  (4) the Safe Haskell safety of the module
+
+Why do we need to do this? For (3), suppose we have:
+
+  module A where
+      type instance F Int = Bool
+
+  module B where
+      import A
+
+  module C where
+      import B
+
+The family instance consistency check for C depends on the dep_finsts of
+B.  If we rename module A to A2, when the dep_finsts of B changes, we need
+to make sure that C gets rebuilt. Effectively, the dep_finsts are part of
+the exports of B, because C always considers them when checking
+consistency.
+
+A full discussion is in #12723.
+
+We do NOT need to hash dep_orphs, because this is implied by
+dep_orphan_hashes, and we do not need to hash ordinary (non-orphan) class
+instances, because there is no eager consistency check as there is with type
+families. For this reason, we don't currently store a hash of non-orphan class
+instances.
+-}
 
 ------------------------
 checkModuleFingerprint
@@ -844,20 +1030,6 @@ checkIfaceFingerprint logger reason old_mod_hash new_mod_hash
   | otherwise
   = out_of_date_hash logger reason (text "  Iface fingerprint has changed")
                      old_mod_hash new_mod_hash
-
-------------------------
-checkMaybeHash
-  :: Logger
-  -> RecompReason
-  -> Maybe Fingerprint
-  -> Fingerprint
-  -> SDoc
-  -> IO RecompileRequired
-checkMaybeHash logger reason maybe_old_hash new_hash doc
-  | Just hash <- maybe_old_hash, hash /= new_hash
-  = out_of_date_hash logger reason doc hash new_hash
-  | otherwise
-  = return UpToDate
 
 ------------------------
 checkEntityUsage :: Logger
@@ -890,10 +1062,8 @@ out_of_date_hash logger reason msg old_hash new_hash
 -- ---------------------------------------------------------------------------
 -- Compute fingerprints for the interface
 
-{-
-Note [Fingerprinting IfaceDecls]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Fingerprinting IfaceDecls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The general idea here is that we first examine the 'IfaceDecl's and determine
 the recursive groups of them. We then walk these groups in dependency order,
 serializing each contained 'IfaceDecl' to a "Binary" buffer which we then
@@ -915,7 +1085,6 @@ thing that we are currently fingerprinting.
 
 Note [Fingerprinting recursive groups]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The fingerprinting of a single recursive group is a rather subtle affair, as
 seen in #18733.
 
@@ -1067,17 +1236,23 @@ addFingerprints hsc_env iface0 = do
 -- recompilation checking for home package modules, which record precisely what they use
 -- from each module.
 addAbiHashes :: HscEnv -> IfaceModInfo -> PartialIfacePublic -> Dependencies -> IO (IfaceAbiHashes, IfaceCache, [(Fingerprint, IfaceDecl)])
-addAbiHashes hsc_env info iface_public deps = do
+addAbiHashes hsc_env info
+  iface_public
+  deps = do
   eps <- hscEPS hsc_env
   let
       -- If you have arrived here by accident then congratulations,
       -- you have discovered the ABI hash. Your reward is to update the ABI hash to
       -- account for your change to the interface file. Omitting your field using a
       -- wildcard may lead to some unfortunate consequences.
-
-      -- MP: TODO: Existing bug where defaults, trust_pkg and complete are not taken into account
-      -- when computing the ABI hash.
-      IfacePublic exports fixities warns anns decls defaults insts fam_insts rules trust _trust_pkg complete _cache () = iface_public
+      IfacePublic
+        exports fixities warns anns decls
+        defaults insts fam_insts rules
+        trust _trust_pkg -- TODO: trust_pkg ignored
+        complete
+        _cache
+        ()
+          = iface_public
       -- And these fields of deps should be in IfacePublic, but in good time.
       Dependencies _ _ _ sig_mods trusted_pkgs boot_mods orph_mods fis_mods  = deps
       decl_warn_fn = mkIfaceDeclWarnCache (fromIfaceWarnings warns)
@@ -1241,97 +1416,48 @@ addAbiHashes hsc_env info iface_public deps = do
    -- that changes in orphans get propagated all the way up the
    -- dependency tree.
    --
-   -- Note [A bad dep_orphs optimization]
-   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   -- In a previous version of this code, we filtered out orphan modules which
-   -- were not from the home package, justifying it by saying that "we'd
-   -- pick up the ABI hashes of the external module instead".  This is wrong.
-   -- Suppose that we have:
-   --
-   --       module External where
-   --           instance Show (a -> b)
-   --
-   --       module Home1 where
-   --           import External
-   --
-   --       module Home2 where
-   --           import Home1
-   --
-   -- The export hash of Home1 needs to reflect the orphan instances of
-   -- External. It's true that Home1 will get rebuilt if the orphans
-   -- of External, but we also need to make sure Home2 gets rebuilt
-   -- as well.  See #12733 for more details.
+   -- NB: do not filter out non-home-package modules!
+   -- See Note [Take into account non-home package orphan modules].
   let orph_mods_no_self
        = filter (/= this_mod) -- Note [Do not update EPS with your own hi-boot]
        $ orph_mods
   dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods_no_self
-
-
-   -- Note [Do not update EPS with your own hi-boot]
-   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   -- (See also #10182).  When your hs-boot file includes an orphan
-   -- instance declaration, you may find that the dep_orphs of a module you
-   -- import contains reference to yourself.  DO NOT actually load this module
-   -- or add it to the orphan hashes: you're going to provide the orphan
-   -- instances yourself, no need to consult hs-boot; if you do load the
-   -- interface into EPS, you will see a duplicate orphan instance.
 
   let !orphan_hash = computeFingerprint (mk_put_name local_env)
                                      (map ifDFun orph_insts, orph_rules, orph_fis)
 
   -- Hash of the transitive things in dependencies
   let !dep_hash = computeFingerprint putNameLiterally
-                      (sig_mods,
-                       boot_mods,
-                       -- Trusted packages are like orphans
-                       trusted_pkgs,
-                       -- See Note [Export hash depends on non-orphan family instances]
-                       fis_mods )
+                      ( sig_mods, boot_mods
+                      , trusted_pkgs -- Trusted packages are like orphans
+                      , fis_mods     -- See Note [Orphan-like hash]
+                      )
 
   -- The export list hash doesn't depend on the fingerprints of
   -- the Names it mentions, only the Names themselves, hence putNameLiterally.
-
-  -- The export hash is for things which require downstream modules to be recompiled
-  -- whenever they change, e.g.:
-  --  - a change in the export list (adding a new export might cause a name clash)
-  --  - a change in exported instances (whether orphans or not)
-  let !export_hash = computeFingerprint putNameLiterally
-                      (exports,
-                       defaults,
-                       orphan_hash,
-                       dep_hash,
-                       dep_orphan_hashes,
-                       trust)
-                        -- Make sure change of Safe Haskell mode causes recomp.
-
-   -- Note [Export hash depends on non-orphan family instances]
-   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   --
-   -- Suppose we have:
-   --
-   --   module A where
-   --       type instance F Int = Bool
-   --
-   --   module B where
-   --       import A
-   --
-   --   module C where
-   --       import B
-   --
-   -- The family instance consistency check for C depends on the dep_finsts of
-   -- B.  If we rename module A to A2, when the dep_finsts of B changes, we need
-   -- to make sure that C gets rebuilt. Effectively, the dep_finsts are part of
-   -- the exports of B, because C always considers them when checking
-   -- consistency.
-   --
-   -- A full discussion is in #12723.
-   --
-   -- We do NOT need to hash dep_orphs, because this is implied by
-   -- dep_orphan_hashes, and we do not need to hash ordinary class instances,
-   -- because there is no eager consistency check as there is with type families
-   -- (also we didn't store it anywhere!)
-   --
-
+  --
+  -- As per Note [When to recompile when export lists change?], there are two
+  -- separate considerations:
+  --
+  --  (1) If there is a change in exported orphan instances, we must recompile.
+  --
+  --      In fact, we must include slightly more items here than only the orphan
+  --      instances defined in the current module; see Note [Orphan-like hash].
+  --
+  --  (2) If there is a change in the exported avails, this may or may not
+  --      require recompilation downstream, depending on what is imported.
+  --      In the case that the downstream module has a whole module import,
+  --      then we recompile when any exports change, by looking at export_hash.
+  let
+    -- (1) Orphan-like information, see Note [Orphan-like hash].
+    !orphan_like_hash =
+        computeFingerprint putNameLiterally
+          ( orphan_hash, dep_hash, dep_orphan_hashes
+          , defaults -- Changes in exported named defaults cause recompilation
+          , trust    -- Change of Safe Haskell mode causes recompilation
+          )
+    -- (2) Exported avails
+    !exported_avails_hash = computeFingerprint putNameLiterally exports
 
   -- the ABI hash depends on:
   --   - decls
@@ -1341,7 +1467,8 @@ addAbiHashes hsc_env info iface_public deps = do
   --   - flag abi hash
   let !mod_hash = computeFingerprint putNameLiterally
                       (sort (map fst decls_w_hashes),
-                       export_hash,  -- includes orphan_hash
+                       exported_avails_hash,
+                       orphan_like_hash,  -- includes orphan_hash
                        ann_fn AnnModule,
                        warns)
 
@@ -1358,8 +1485,9 @@ addAbiHashes hsc_env info iface_public deps = do
                                  && null orph_insts
                                  && null orph_fis)
       , mi_abi_finsts         = not (null fam_insts)
-      , mi_abi_exp_hash       = export_hash
-      , mi_abi_orphan_hash    = orphan_hash
+      , mi_abi_export_avails_hash = exported_avails_hash
+      , mi_abi_orphan_like_hash   = orphan_like_hash
+      , mi_abi_orphan_hash        = orphan_hash
       }
 
     caches = IfaceCache
@@ -1370,6 +1498,42 @@ addAbiHashes hsc_env info iface_public deps = do
       }
   return (final_iface_exts, caches, decls_w_hashes)
   where
+
+{- Note [Take into account non-home package orphan modules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to take into account all orphan modules, not just those that are from
+the home package.
+
+Historically, we filtered out orphan modules which were not from the home
+package, justifying it by saying that "we'd pick up the ABI hashes of the
+external module instead".  This is wrong.
+
+Suppose that we have:
+
+      module External where
+          instance Show (a -> b)
+
+      module Home1 where
+          import External
+
+      module Home2 where
+          import Home1
+
+The export hash of Home1 needs to reflect the orphan instances of
+External. It's true that Home1 will get rebuilt if the orphans
+of External, but we also need to make sure Home2 gets rebuilt
+as well. See #12733 for more details.
+
+Note [Do not update EPS with your own hi-boot]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When your hs-boot file includes an orphan instance declaration, you may find
+that the dep_orphs of a module you import contains reference to yourself.
+DO NOT actually load this module or add it to the orphan hashes: you're going
+to provide the orphan instances yourself, no need to consult hs-boot; if you do
+load the interface into EPS, you will see a duplicate orphan instance.
+
+See also #10182.
+-}
 
 -- | Retrieve the orphan hashes 'mi_orphan_hash' for a list of modules
 -- (in particular, the orphan modules which are transitively imported by the
@@ -1628,8 +1792,7 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env complete_env decl
         lookup_complete_match occ = lookupOccEnvL complete_env occ
 
 {- Note [default method Name] (see also #15970)
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Names for the default methods aren't available in Iface syntax.
 
 * We originally start with a DefMethInfo from the class, contain a
@@ -1762,12 +1925,14 @@ Usage
   approximation.
 
   The most conservative option is to consider a COMPLETE pragma to always be
-  used, much like we treat class instances today. This means that any change at
-  all would require recompilation.
+  used, much like we treat orphan class instances today. This means that any
+  change at all would require recompilation.
 
   A slightly finer grained option, which is what is currently implemented, is to
   consider a COMPLETE pragma to be used only when the importing module actually
   mentions at least one of the constructors in the COMPLETE pragma.
+
+  Tested in: RecompCompletePragma
 
 Fingerprinting
 
@@ -1781,25 +1946,29 @@ Fingerprinting
   pessimistically lead to recompilation in the following scenario:
 
     module M where
+      pattern MyJust :: a -> Maybe a
+      pattern MyJust a = Just a
       pattern MyNothing :: Maybe a
       pattern MyNothing = Nothing
-      {-# COMPLETE Just, MyNothing #-}
+      {-# COMPLETE MyJust, MyNothing #-}
 
     module N where
       import M
       f :: Maybe Int -> Int
-      f (Just x) = x; f Nothing = 0
+      f (MyJust x) = x; f _ = 0
 
   In this example, if we change the definition of the 'MyNothing' pattern, then
-  we will recompile 'M', because 'N' uses the 'Just' constructor, 'Just' appears
-  in the imported {-# COMPLETE Just, MyNothing #-} pragma, and 'MyNothing' has
-  changed.
+  we will recompile 'M', because 'N' uses the 'MyJust' constructor, 'MyJust'
+  appears in the imported {-# COMPLETE MyJust, MyNothing #-} pragma, and
+  'MyNothing' has changed.
 
   However, this is needless: the RHS of the pattern synonym declaration for
   'MyNothing' is completely irrelevant to 'N'. So, to avoid this extraneous
   recompilation, we implement the following finer-grained criterion: the
   Fingerprint of a COMPLETE pragma is the hash of the 'Name's of the mentioned
   constructors (hashed together with the Fingerprint of the result TyCon, if any).
+
+  Tested in: RecompCompleteIndependence.
 -}
 
 -- | Make a map from OccNames of pattern synonyms or data constructors to a list

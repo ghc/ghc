@@ -1,0 +1,8 @@
+RecompExports3_N.hs:8:5: error: [GHC-87543]
+    Ambiguous occurrence ‘Quux’.
+    It could refer to
+       either ‘RecompExports3_M.Quux’,
+              imported from ‘RecompExports3_M’ at RecompExports3_N.hs:3:26-30,
+           or ‘RecompExports3_N.Quux’,
+              defined at RecompExports3_N.hs:5:10.
+

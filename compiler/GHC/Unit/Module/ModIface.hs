@@ -106,7 +106,8 @@ module GHC.Unit.Module.ModIface
    , mi_mod_hash
    , mi_orphan
    , mi_finsts
-   , mi_exp_hash
+   , mi_export_avails_hash
+   , mi_orphan_like_hash
    , mi_orphan_hash
    , renameFreeHoles
    , emptyPartialModIface
@@ -185,8 +186,14 @@ data IfaceAbiHashes = IfaceAbiHashes
   , mi_abi_finsts :: !WhetherHasFamInst
     -- ^ Whether this module has family instances. See Note [The type family
     -- instance consistency story].
-  , mi_abi_exp_hash :: !Fingerprint
-    -- ^ Hash of export list
+  , mi_abi_export_avails_hash :: !Fingerprint
+    -- ^ Hash of the exported avails (does not include e.g. instances)
+  , mi_abi_orphan_like_hash :: !Fingerprint
+    -- ^ Orphans, together with (non-orphan) type family instances of
+    -- dependencies and a few other things; see Note [Orphan-like hash].
+    --
+    -- If this changes, we must recompile due to the impact
+    -- on instance resolution.
   , mi_abi_orphan_hash :: !Fingerprint
     -- ^ Hash for orphan rules, class and family instances combined
     -- NOT transitive
@@ -525,9 +532,15 @@ mi_orphan iface = mi_abi_orphan (mi_abi_hashes iface)
 mi_finsts :: ModIface -> WhetherHasFamInst
 mi_finsts iface = mi_abi_finsts (mi_abi_hashes iface)
 
--- | Accessor for the hash of the export list from a ModIface.
-mi_exp_hash :: ModIface -> Fingerprint
-mi_exp_hash iface = mi_abi_exp_hash (mi_abi_hashes iface)
+-- | Accessor for the hash of exported avails.
+mi_export_avails_hash :: ModIface -> Fingerprint
+mi_export_avails_hash iface = mi_abi_export_avails_hash (mi_abi_hashes iface)
+
+-- | Accessor for the hash of orphans and dependencies.
+--
+-- See Note [Orphan-like hash].
+mi_orphan_like_hash :: ModIface -> Fingerprint
+mi_orphan_like_hash iface = mi_abi_orphan_like_hash (mi_abi_hashes iface)
 
 -- | Accessor for the hash of orphan rules, class and family instances combined from a ModIface.
 mi_orphan_hash :: ModIface -> Fingerprint
@@ -714,25 +727,29 @@ instance Binary IfaceAbiHashes where
   put_ bh (IfaceAbiHashes { mi_abi_mod_hash = mod_hash
                               , mi_abi_orphan = orphan
                               , mi_abi_finsts = hasFamInsts
-                              , mi_abi_exp_hash = exp_hash
+                              , mi_abi_export_avails_hash = vis_hash
+                              , mi_abi_orphan_like_hash = invis_hash
                               , mi_abi_orphan_hash = orphan_hash
                               }) = do
     put_ bh mod_hash
     put_ bh orphan
     put_ bh hasFamInsts
-    put_ bh exp_hash
+    put_ bh vis_hash
+    put_ bh invis_hash
     put_ bh orphan_hash
   get bh =  do
     mod_hash <- get bh
     orphan <- get bh
     hasFamInsts <- get bh
-    exp_hash <- get bh
+    vis_hash <- get bh
+    invis_hash <- get bh
     orphan_hash <- get bh
     return $ IfaceAbiHashes  {
                    mi_abi_mod_hash = mod_hash,
                    mi_abi_orphan = orphan,
                    mi_abi_finsts = hasFamInsts,
-                   mi_abi_exp_hash = exp_hash,
+                   mi_abi_export_avails_hash = vis_hash,
+                   mi_abi_orphan_like_hash = invis_hash,
                    mi_abi_orphan_hash = orphan_hash
                    }
 
@@ -801,7 +818,8 @@ emptyIfaceBackend = IfaceAbiHashes
         { mi_abi_mod_hash = fingerprint0,
           mi_abi_orphan = False,
           mi_abi_finsts = False,
-          mi_abi_exp_hash = fingerprint0,
+          mi_abi_export_avails_hash = fingerprint0,
+          mi_abi_orphan_like_hash = fingerprint0,
           mi_abi_orphan_hash = fingerprint0
         }
 
@@ -855,12 +873,13 @@ instance NFData IfaceSimplifiedCore where
   rnf (IfaceSimplifiedCore eds fs) = rnf eds `seq` rnf fs
 
 instance NFData IfaceAbiHashes where
-  rnf (IfaceAbiHashes a1 a2 a3 a4 a5)
+  rnf (IfaceAbiHashes a1 a2 a3 a4 a5 a6)
     =  rnf a1
     `seq` rnf a2
     `seq` rnf a3
     `seq` rnf a4
     `seq` rnf a5
+    `seq` rnf a6
 
 instance (NFData (IfaceAbiHashesExts phase), NFData (IfaceDeclExts phase)) => NFData (IfacePublic_ phase) where
   rnf (IfacePublic a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14)

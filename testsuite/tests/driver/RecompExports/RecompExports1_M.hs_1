@@ -1,0 +1,11 @@
+module RecompExports1_M where
+
+foo :: Int
+foo = 3
+
+bar :: Char
+bar = 'x'
+
+data T = Foo | Bar
+
+data S = S1 | S2

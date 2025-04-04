@@ -1,0 +1,10 @@
+RecompExports4_N.hs:3:26: error: [GHC-10237]
+    In the import of ‘RecompExports4_M’:
+      an item called ‘T’ is exported, but it does not export any children
+      (constructors, class methods or field names) called ‘fld’.
+
+RecompExports4_N.hs:3:39: error: [GHC-10237]
+    In the import of ‘RecompExports4_M’:
+      an item called ‘C’ is exported, but it does not export any children
+      (constructors, class methods or field names) called ‘meth’.
+

@@ -848,7 +848,7 @@ mkTopLevEnv hsc_env modl
                         pure $ case details of
                           ImpUserAll -> importsFromIface hsc_env iface spec Nothing
                           ImpUserEverythingBut ns -> importsFromIface hsc_env iface spec (Just ns)
-                          ImpUserExplicit x ->
+                          ImpUserExplicit x _parents_of_implicits ->
                             -- TODO: Not quite right, is_explicit should refer to whether the user wrote A(..) or A(x,y).
                             -- It is only used for error messages. It seems dubious even to add an import context to these GREs as
                             -- they are not "imported" into the top-level scope of the REPL. I changed this for now so that

@@ -2289,6 +2289,9 @@ hydrateCgBreakInfo CgBreakInfo{..} = do
 -- | This function is only used to construct the environment for GHCi,
 -- so we make up fake locations
 tcIfaceImport :: IfaceImport -> ImportUserSpec
-tcIfaceImport (IfaceImport spec ImpIfaceAll) = ImpUserSpec spec ImpUserAll
-tcIfaceImport (IfaceImport spec (ImpIfaceEverythingBut ns)) = ImpUserSpec spec (ImpUserEverythingBut (mkNameSet ns))
-tcIfaceImport (IfaceImport spec (ImpIfaceExplicit gre)) = ImpUserSpec spec (ImpUserExplicit (getDetOrdAvails gre))
+tcIfaceImport (IfaceImport spec ImpIfaceAll)
+  = ImpUserSpec spec ImpUserAll
+tcIfaceImport (IfaceImport spec (ImpIfaceEverythingBut ns))
+  = ImpUserSpec spec (ImpUserEverythingBut (mkNameSet ns))
+tcIfaceImport (IfaceImport spec (ImpIfaceExplicit gre implicit_parents))
+  = ImpUserSpec spec (ImpUserExplicit (getDetOrdAvails gre) $ mkNameSet implicit_parents)

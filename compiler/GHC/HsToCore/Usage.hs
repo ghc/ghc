@@ -19,8 +19,10 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 import GHC.Utils.Monad
 
+import GHC.Types.Avail
 import GHC.Types.Name
-import GHC.Types.Name.Set ( NameSet, allUses )
+import GHC.Types.Name.Reader (ImpDeclSpec(..))
+import GHC.Types.Name.Set ( NameSet, allUses, emptyNameSet, unionNameSet )
 import GHC.Types.Unique.Set
 
 import GHC.Unit
@@ -47,8 +49,7 @@ import GHC.Driver.Plugins
 import qualified GHC.Unit.Home.Graph as HUG
 
 {- Note [Module self-dependency]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC.Rename.Names.calculateAvails asserts the invariant that a module must not occur in
 its own dep_orphs or dep_finsts. However, if we aren't careful this can occur
 in the presence of hs-boot files: Consider that we have two modules, A and B,
@@ -72,9 +73,13 @@ data UsageConfig = UsageConfig
   { uc_safe_implicit_imps_req :: !Bool -- ^ Are all implicit imports required to be safe for this Safe Haskell mode?
   }
 
-mkUsageInfo :: UsageConfig -> Plugins -> FinderCache -> UnitEnv -> Module -> ImportedMods -> NameSet -> [FilePath]
-            -> [(Module, Fingerprint)] -> [Linkable] -> PkgsLoaded -> IfG [Usage]
-mkUsageInfo uc plugins fc unit_env this_mod dir_imp_mods used_names dependent_files merged needed_links needed_pkgs
+mkUsageInfo :: UsageConfig -> Plugins -> FinderCache -> UnitEnv
+            -> Module -> ImportedMods -> [ImportUserSpec] -> NameSet
+            -> [FilePath] -> [(Module, Fingerprint)] -> [Linkable] -> PkgsLoaded
+            -> IfG [Usage]
+mkUsageInfo uc plugins fc unit_env
+  this_mod dir_imp_mods imp_decls used_names
+  dependent_files merged needed_links needed_pkgs
   = do
     eps <- liftIO $ readIORef (euc_eps (ue_eps unit_env))
     hashes <- liftIO $ mapM getFileHash dependent_files
@@ -84,7 +89,7 @@ mkUsageInfo uc plugins fc unit_env this_mod dir_imp_mods used_names dependent_fi
     object_usages <- liftIO $ mkObjectUsage (eps_PIT eps) plugins fc hug needed_links needed_pkgs
     let all_home_ids = HUG.allUnits (ue_home_unit_graph unit_env)
     mod_usages <- mk_mod_usage_info uc hu all_home_ids this_mod
-                                       dir_imp_mods used_names
+                                       dir_imp_mods imp_decls used_names
     let usages = mod_usages ++ [ UsageFile { usg_file_path = mkFastString f
                                            , usg_file_hash = hash
                                            , usg_file_label = Nothing }
@@ -101,8 +106,7 @@ mkUsageInfo uc plugins fc unit_env this_mod dir_imp_mods used_names dependent_fi
     -- the entire collection of Ifaces.
 
 {- Note [Plugin dependencies]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Modules for which plugins were used in the compilation process, should be
 recompiled whenever one of those plugins changes. But how do we know if a
 plugin changed from the previous time a module was compiled?
@@ -198,9 +202,10 @@ mk_mod_usage_info :: UsageConfig
               -> Set.Set UnitId
               -> Module
               -> ImportedMods
+              -> [ImportUserSpec]
               -> NameSet
               -> IfG [Usage]
-mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports used_names
+mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports imp_decls used_names
   = mapMaybeM mkUsageM usage_mods
   where
     safe_implicit_imps_req = uc_safe_implicit_imps_req uc
@@ -261,7 +266,7 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports used_names
         -- for package modules, we record the module hash only
 
       | (null used_occs
-          && isNothing export_hash
+          && isNothing imported_exports
           && not is_direct_import
           && not finsts_mod)
       = Nothing                 -- Record no usage info
@@ -274,15 +279,24 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports used_names
                       usg_mod_name = moduleName mod,
                       usg_unit_id  = toUnitId (moduleUnit mod),
                       usg_mod_hash = mod_hash,
-                      usg_exports  = export_hash,
+                      usg_exports  = imported_exports,
                       usg_entities = Map.toList ent_hashs,
                       usg_safe     = imp_safe }
       where
-        finsts_mod   = mi_finsts iface
-        hash_env     = mi_hash_fn iface
-        mod_hash     = mi_mod_hash iface
-        export_hash | depend_on_exports = Just (mi_exp_hash iface)
-                    | otherwise         = Nothing
+        finsts_mod = mi_finsts iface
+        hash_env   = mi_hash_fn iface
+        mod_hash   = mi_mod_hash iface
+        imported_exports
+          = if not depend_on_exports
+            then Nothing
+            else
+              Just $
+                HomeModImport
+                 { hmiu_orphanLikeHash
+                     = mi_orphan_like_hash iface
+                 , hmiu_importedAvails
+                     = moduleImportedAvails mod (mi_export_avails_hash iface) imp_decls
+                 }
 
         by_is_safe (ImportedByUser imv) = imv_is_safe imv
         by_is_safe _ = False
@@ -331,9 +345,30 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports used_names
               one-shot mode), but that's even more bogus!
         -}
 
-{-
-Note [Internal used_names]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- | Compute the avails that we are importing from a home module.
+--
+-- See 'HomeModImportedAvails'.
+moduleImportedAvails :: Module -> Fingerprint -> [ImportUserSpec] -> HomeModImportedAvails
+moduleImportedAvails mod vis_exp_hash = go [] emptyNameSet
+  where
+    go :: Avails -> NameSet -> [ImportUserSpec] -> HomeModImportedAvails
+    go avails_acc parents_acc [] =
+      HMIA_Explicit
+        { hmia_imported_avails = sortAvails avails_acc
+        , hmia_parents_with_implicits = parents_acc
+        }
+    go avails_acc parents_acc (ImpUserSpec (ImpDeclSpec { is_mod = mod' }) decl : imp_decls)
+      | mod' == mod
+      = case decl of
+          ImpUserExplicit avails parents_of_implicits
+            -> go (avails ++ avails_acc) (parents_acc `unionNameSet` parents_of_implicits)
+                  imp_decls
+          _ -> HMIA_Implicit vis_exp_hash
+      | otherwise
+      = go avails_acc parents_acc imp_decls
+
+{- Note [Internal used_names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Most of the used_names are External Names, but we can have System
 Names too. Two examples:
 

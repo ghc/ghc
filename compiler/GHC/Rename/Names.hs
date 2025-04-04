@@ -1187,8 +1187,10 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
             (gres, imp_user_list) = case want_hiding of
               Exactly ->
-                let gre_env = mkGlobalRdrEnv $ concatMap (gresFromIE decl_spec) items2
-                in (gre_env, ImpUserExplicit (gresToAvailInfo $ globalRdrEnvElts $ gre_env))
+                let gres = concatMap (gresFromIE decl_spec) items2
+                    gre_env = mkGlobalRdrEnv gres
+                    implicit_parents = mkNameSet $ mapMaybe parentOfImplicitlyImportedGRE gres
+                in (gre_env, ImpUserExplicit (gresToAvailInfo $ globalRdrEnvElts $ gre_env) implicit_parents)
               EverythingBut ->
                 let hidden_names = mkNameSet $ concatMap (map greName . snd) items2
                 in (importsFromIface hsc_env iface decl_spec (Just hidden_names), ImpUserEverythingBut hidden_names)
@@ -1557,9 +1559,25 @@ gresFromIE decl_spec (L loc ie, gres)
     set_gre_imp gre@( GRE { gre_name = nm } )
       = gre { gre_imp = unitBag $ prov_fn nm }
 
-{-
-Note [Children for duplicate record fields]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+parentOfImplicitlyImportedGRE :: Outputable info => GlobalRdrEltX info -> Maybe Name
+parentOfImplicitlyImportedGRE gre =
+  if any (explicit_import . is_item) $ gre_imp gre
+  then Nothing
+  else
+    case greParent gre of
+      NoParent ->
+        pprPanic "parentOfImplicitlyImportedGRE" $
+           (text "implicitly imported GRE with no parent" <+> ppr gre)
+      ParentIs par ->
+        Just par
+  where
+    explicit_import :: ImpItemSpec -> Bool
+    explicit_import (ImpAll {}) =
+      pprPanic "parentOfImplicitlyImportedGRE: ImpAll" (ppr gre)
+    explicit_import (ImpSome { is_explicit }) = is_explicit
+
+{- Note [Children for duplicate record fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the module
 
     {-# LANGUAGE DuplicateRecordFields #-}

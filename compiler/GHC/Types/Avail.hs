@@ -78,6 +78,22 @@ type Avails = [AvailInfo]
 newtype DetOrdAvails = DefinitelyDeterministicAvails { getDetOrdAvails :: Avails }
   deriving newtype (Binary, Outputable, NFData)
 
+instance Eq DetOrdAvails where
+  a1 == a2 = compare a1 a2 == EQ
+instance Ord DetOrdAvails where
+  compare (DetOrdAvails a1) (DetOrdAvails a2) = go a1 a2
+    where
+      go [] [] = EQ
+      go _  [] = LT
+      go [] _  = GT
+      go (a:as) (b:bs) =
+        case (a, b) of
+          (Avail {}, AvailTC {}) -> LT
+          (AvailTC{}, Avail {}) -> GT
+          (Avail n1, Avail n2) -> stableNameCmp n1 n2 S.<> go as bs
+          (AvailTC n1 m1s, AvailTC n2 m2s) ->
+            stableNameCmp n1 n2 S.<> foldMap (uncurry stableNameCmp) (zip m1s m2s) S.<> go as bs
+
 -- | It's always safe to match on 'DetOrdAvails'
 pattern DetOrdAvails :: Avails -> DetOrdAvails
 pattern DetOrdAvails x <- DefinitelyDeterministicAvails x

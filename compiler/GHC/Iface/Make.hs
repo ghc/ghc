@@ -282,8 +282,16 @@ mkRecompUsageInfo hsc_env tc_result = do
      -- but if you pass that in here, we'll decide it's the local
      -- module and does not need to be recorded as a dependency.
      -- See Note [Identity versus semantic module]
-     usages <- initIfaceLoad hsc_env $ mkUsageInfo uc plugins fc unit_env (tcg_mod tc_result) (imp_mods (tcg_imports tc_result)) used_names
-                 dep_files (tcg_merged tc_result) needed_links needed_pkgs
+     usages <- initIfaceLoad hsc_env $
+        mkUsageInfo uc plugins fc unit_env
+          (tcg_mod tc_result)
+          (imp_mods (tcg_imports tc_result))
+          (tcg_import_decls tc_result)
+          used_names
+          dep_files
+          (tcg_merged tc_result)
+          needed_links
+          needed_pkgs
      return (Just usages)
 
 mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
@@ -513,9 +521,12 @@ mkIfaceAnnotation (Annotation { ann_target = target, ann_value = payload })
 mkIfaceImports :: [ImportUserSpec] -> [IfaceImport]
 mkIfaceImports = map go
   where
-    go (ImpUserSpec decl ImpUserAll) = IfaceImport decl ImpIfaceAll
-    go (ImpUserSpec decl (ImpUserExplicit env)) = IfaceImport decl (ImpIfaceExplicit (sortAvails env))
-    go (ImpUserSpec decl (ImpUserEverythingBut ns)) = IfaceImport decl (ImpIfaceEverythingBut (nameSetElemsStable ns))
+    go (ImpUserSpec decl ImpUserAll)
+      = IfaceImport decl ImpIfaceAll
+    go (ImpUserSpec decl (ImpUserExplicit env parents_of_implicits))
+      = IfaceImport decl (ImpIfaceExplicit (sortAvails env) (nameSetElemsStable parents_of_implicits))
+    go (ImpUserSpec decl (ImpUserEverythingBut ns))
+      = IfaceImport decl (ImpIfaceEverythingBut (nameSetElemsStable ns))
 
 mkIfaceExports :: [AvailInfo] -> [IfaceExport] -- Sort to make canonical
 mkIfaceExports as = case sortAvails as of DefinitelyDeterministicAvails sas -> sas

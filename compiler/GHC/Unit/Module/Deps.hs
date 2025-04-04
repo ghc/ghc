@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ExplicitNamespaces #-}
 -- | Dependencies and Usage of a module
@@ -17,6 +18,8 @@ module GHC.Unit.Module.Deps
    , noDependencies
    , pprDeps
    , Usage (..)
+   , HomeModImport (..)
+   , HomeModImportedAvails (..)
    , ImportAvails (..)
    )
 where
@@ -25,6 +28,7 @@ import GHC.Prelude
 
 import GHC.Data.FastString
 
+import GHC.Types.Avail
 import GHC.Types.SafeHaskell
 import GHC.Types.Name
 
@@ -42,6 +46,8 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Bifunctor
 import Control.DeepSeq
+import GHC.Types.Name.Set
+
 
 -- | Dependency information about ALL modules and packages below this one
 -- in the import hierarchy. This is the serialisable version of `ImportAvails`.
@@ -302,9 +308,9 @@ data Usage
             -- ^ Entities we depend on, sorted by occurrence name and fingerprinted.
             -- NB: usages are for parent names only, e.g. type constructors
             -- but not the associated data constructors.
-        usg_exports  :: Maybe Fingerprint,
-            -- ^ Fingerprint for the export list of this module,
-            -- if we directly imported it (and hence we depend on its export list)
+        usg_exports :: Maybe HomeModImport,
+            -- ^ What we depend on from the exports of the module;
+            -- see 'HomeModImport'.
         usg_safe :: IsSafeImport
             -- ^ Was this module imported as a safe import
     }
@@ -433,11 +439,79 @@ instance Binary Usage where
             return UsageHomeModuleInterface { usg_mod_name = mod, usg_unit_id = uid, usg_iface_hash = hash }
           i -> error ("Binary.get(Usage): " ++ show i)
 
+-- | Records the imports that we depend on from a home module,
+-- for recompilation checking.
+--
+-- See Note [When to recompile when export lists change?] in GHC.Iface.Recomp.
+data HomeModImport
+  = HomeModImport
+    -- | Hash of orphans, dependencies, orphans of dependencies etc...
+    --
+    -- See Note [Orphan-like hash].
+    --
+    -- If this changes, we definitely need to recompile.
+  { hmiu_orphanLikeHash :: Fingerprint
+    -- | The avails we are importing; see 'HomeModImportedAvails'.
+  , hmiu_importedAvails :: HomeModImportedAvails
+  }
+  deriving stock Eq
 
-{-
-Note [Transitive Information in Dependencies]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- | Records all the 'Avail's we are importing from a home module.
+data HomeModImportedAvails
+  -- | All import lists are explicit import lists, but some identifiers
+  -- may still be implicitly imported, e.g. @import M(a, b, T(..))@.
+  --
+  -- In this case, recompilation is keyed by the names we are importing,
+  -- with their 'Avail' structure.
+  = HMIA_Explicit
+    { hmia_imported_avails :: DetOrdAvails
+        -- ^ The avails we are importing
+    , hmia_parents_with_implicits :: NameSet
+        -- ^ The 'Name's of all 'AvailTC' imports which
+        -- implicitly import children
+    }
+  -- | One import is a whole module import, or a @import module M hiding(..)@
+  -- import.
+  --
+  -- In this case, recompilation is keyed on the hash of the exported avails
+  -- of the module we are importing.
+  | HMIA_Implicit
+     { hmia_exportedAvailsHash :: Fingerprint
+       -- ^ The export avails hash of the module we are importing
+     }
+  deriving stock Eq
 
+instance Outputable HomeModImport where
+  ppr (HomeModImport orphan_like imp_avails) =
+    braces (text "orphan_like:" <+> ppr orphan_like <+> text ", imported avails:" <+> ppr imp_avails)
+instance Outputable HomeModImportedAvails where
+  ppr (HMIA_Explicit avails implicit_parents) =
+    braces (text "explicit:" <+> ppr avails <+> text ", implicit_parents:" <+> ppr implicit_parents)
+  ppr (HMIA_Implicit hash) = braces (text "implicit:" <+> ppr hash)
+instance NFData HomeModImport where
+  rnf (HomeModImport a b) = rnf a `seq` rnf b `seq` ()
+instance NFData HomeModImportedAvails where
+  rnf (HMIA_Explicit avails implicit_parents) = rnf avails `seq` rnf implicit_parents
+  rnf (HMIA_Implicit hash) = rnf hash
+instance Binary HomeModImport where
+  put_ bh (HomeModImport a b) = put_ bh a >> put_ bh b
+  get bh = do
+    a <- get bh
+    b <- get bh
+    return $ HomeModImport a b
+instance Binary HomeModImportedAvails where
+  put_ bh (HMIA_Explicit avails implicit_parents) =
+    putByte bh 0 >> put_ bh avails >> put_ bh (nameSetElemsStable implicit_parents)
+  put_ bh (HMIA_Implicit hash  ) = putByte bh 1 >> put_ bh hash
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> HMIA_Explicit <$> get bh <*> (mkNameSet <$> get bh)
+      1 -> HMIA_Implicit <$> get bh
+      _ -> error ("Binary.get(HomeModImportedAvails): " ++ show tag)
+
+{- Note [Transitive Information in Dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It is important to be careful what information we put in 'Dependencies' because
 ultimately it ends up serialised in an interface file. Interface files must always
 be kept up-to-date with the state of the world, so if `Dependencies` needs to be updated

@@ -1,0 +1,5 @@
+module RecompExports1_M where
+
+data T = Bar
+
+data S = S1 | S2

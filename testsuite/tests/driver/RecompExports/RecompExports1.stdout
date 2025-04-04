@@ -1,0 +1,5 @@
+RecompExports1: N should not recompile
+compilation IS NOT required
+RecompExports1: N should recompile and fail
+RecompExports1: N should not recompile
+compilation IS NOT required
