@@ -282,7 +282,7 @@ example,
 would import the above `default IsString (Text, String)` declaration into the
 importing module.
 
-The `cd_module` field of `ClassDefaults` tracks the module whence the default was
+The `cd_provenance` field of `ClassDefaults` tracks the module whence the default was
 imported from, for the purpose of warning reports. The said warning report may be
 triggered by `-Wtype-defaults` or by a user-defined `WARNING` pragma attached to
 the default export. In the latter case the warning text is stored in the

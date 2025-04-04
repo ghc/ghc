@@ -39,3 +39,6 @@ test('T25858v2', [extra_files(['T25858v2_helper.hs'])], multimod_compile_and_run
 test('T25858v3', [extra_files(['T25858v3_helper.hs'])], multimod_compile_and_run, ['T25858v3', ''])
 test('T25858v4', normal, compile_and_run, [''])
 test('T25882', normal, compile, [''])
+test('T25912', [extra_files(['T25912_helper.hs'])], multimod_compile_and_run, ['T25912', ''])
+test('T25914', normal, compile, [''])
+test('T25934', normal, compile, [''])

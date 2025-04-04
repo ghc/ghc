@@ -1,3 +1,4 @@
-default-fail03.hs:4:1: [GHC-99565]
+default-fail03.hs:4:1: error: [GHC-99565]
     Multiple default declarations for class ‘Num’
-      here was another default declaration default-fail03.hs:3:1-29
+      conflicting named default declaration at: default-fail03.hs:3:1-29
+

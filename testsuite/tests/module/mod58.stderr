@@ -1,4 +1,4 @@
-
 mod58.hs:4:1: error: [GHC-99565]
     Multiple default declarations for class ‘Num’
-      here was another default declaration mod58.hs:3:1-21
+      conflicting default declaration at: mod58.hs:3:1-21
+

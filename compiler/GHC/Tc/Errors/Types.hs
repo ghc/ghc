@@ -1504,7 +1504,7 @@ data TcRnMessage where
 
      Text cases: module/mod58
   -}
-  TcRnMultipleDefaultDeclarations :: Class -> [LDefaultDecl GhcRn] -> TcRnMessage
+  TcRnMultipleDefaultDeclarations :: Class -> ClassDefaults -> TcRnMessage
 
   {-| TcRnWarnClashingDefaultImports is a warning that occurs when a module imports
       more than one default declaration for the same class, and they are not all

@@ -85,7 +85,7 @@ import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Types.TH
 import GHC.Tc.Utils.TcType
 
-import GHC.Types.DefaultEnv (ClassDefaults(ClassDefaults, cd_types, cd_module))
+import GHC.Types.DefaultEnv (ClassDefaults(ClassDefaults, cd_types, cd_provenance), DefaultProvenance (..))
 import GHC.Types.Error
 import GHC.Types.Error.Codes
 import GHC.Types.Hint
@@ -582,11 +582,19 @@ instance Diagnostic TcRnMessage where
     TcRnMultipleDefaultDeclarations cls dup_things
       -> mkSimpleDecorated $
            hang (text "Multiple default declarations for class" <+> quotes (ppr cls))
-              2 (vcat (map pp dup_things))
+              2 (pp dup_things)
          where
-           pp :: LDefaultDecl GhcRn -> SDoc
-           pp (L locn DefaultDecl {})
-             = text "here was another default declaration" <+> ppr (locA locn)
+           pp :: ClassDefaults -> SDoc
+           pp (ClassDefaults { cd_provenance = prov })
+             = case prov of
+                DP_Local { defaultDeclLoc = loc, defaultDeclH98 = isH98 }
+                  -> let
+                        what =
+                          if isH98
+                          then text "default declaration"
+                          else text "named default declaration"
+                     in text "conflicting" <+> what <+> text "at:" <+> ppr loc
+                _ -> empty -- doesn't happen, as local defaults override imported and built-in defaults
     TcRnBadDefaultType ty deflt_clss
       -> mkSimpleDecorated $
            hang (text "The default type" <+> quotes (ppr ty) <+> text "is not an instance of")
@@ -7139,7 +7147,7 @@ pprPatersonCondFailure  (PCF_TyFam tc) InTyFamEquation _lhs rhs =
 --------------------------------------------------------------------------------
 
 defaultTypesAndImport :: ClassDefaults -> SDoc
-defaultTypesAndImport ClassDefaults{cd_types, cd_module = Just cdm} =
+defaultTypesAndImport ClassDefaults{cd_types, cd_provenance = DP_Imported cdm} =
   hang (parens $ pprWithCommas ppr cd_types)
      2 (text "imported from" <+> ppr cdm)
 defaultTypesAndImport ClassDefaults{cd_types} = parens (pprWithCommas ppr cd_types)

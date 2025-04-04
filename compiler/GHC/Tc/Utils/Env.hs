@@ -128,8 +128,7 @@ import GHC.Types.SourceFile
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Types.DefaultEnv ( DefaultEnv, ClassDefaults(..),
-                              defaultEnv, emptyDefaultEnv, lookupDefaultEnv, unitDefaultEnv )
+import GHC.Types.DefaultEnv
 import GHC.Types.Error
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RecSelParent(..) )
@@ -971,21 +970,28 @@ isBrackStage _other     = False
 ************************************************************************
 -}
 
-{- Note [Default class defaults]
+{- Note [Builtin class defaults]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In absence of user-defined `default` declarations, the set of class defaults in
-effect (i.e. `DefaultEnv`) is determined by the absence or
-presence of the `ExtendedDefaultRules` and `OverloadedStrings` extensions. In their
-absence, the only rule in effect is `default Num (Integer, Double)` as specified by
-Haskell Language Report.
+In the absence of user-defined `default` declarations, the set of class defaults in
+effect (i.e. the `DefaultEnv`) depends on whether the `ExtendedDefaultRules` and
+`OverloadedStrings` extensions are enabled. In their absence, the only rule in effect
+is `default Num (Integer, Double)`, as specified by the Haskell 2010 report.
 
-In GHC's internal packages `DefaultEnv` is empty to minimize cross-module dependencies:
-the `Num` class or `Integer` type may not even be available in low-level modules. If
-you don't do this, attempted defaulting in package ghc-prim causes an actual crash
-(attempting to look up the `Integer` type).
+Remark [No built-in defaults in ghc-internal]
 
-A user-defined `default` declaration overrides the defaults for the specified class,
-and only for that class.
+  When typechecking the ghc-internal package, we **do not** include any built-in
+  defaults. This is because, in ghc-internal, types such as 'Num' or 'Integer' may
+  not even be available (they haven't been typechecked yet).
+
+Remark [default () in ghc-internal]
+
+  Historically, modules inside ghc-internal have used a single default declaration,
+  of the form `default ()`, to work around the problem described in
+  Remark [No built-in defaults in ghc-internal].
+
+  When we typecheck such a default declaration, we must also make sure not to fail
+  if e.g. 'Num' is not in scope. We thus have special treatment for this case,
+  in 'GHC.Tc.Gen.Default.tcDefaultDecls'.
 -}
 
 tcGetDefaultTys :: TcM (DefaultEnv,  -- Default classes and types
@@ -997,7 +1003,7 @@ tcGetDefaultTys
                                         -- See also #1974
               builtinDefaults cls tys = ClassDefaults{ cd_class = cls
                                                      , cd_types = tys
-                                                     , cd_module = Nothing
+                                                     , cd_provenance = DP_Builtin
                                                      , cd_warn = Nothing }
 
         -- see Note [Named default declarations] in GHC.Tc.Gen.Default
@@ -1005,7 +1011,8 @@ tcGetDefaultTys
         ; this_module <- tcg_mod <$> getGblEnv
         ; let this_unit = moduleUnit this_module
         ; if this_unit == ghcInternalUnit
-             -- see Note [Default class defaults]
+          -- see Remark [No built-in defaults in ghc-internal]
+          -- in Note [Builtin class defaults] in GHC.Tc.Utils.Env
           then return (defaults, extended_defaults)
           else do
               -- not one of the built-in units
@@ -1037,6 +1044,8 @@ tcGetDefaultTys
                                  }
                    -- The Num class is already user-defaulted, no need to construct the builtin default
                    _ -> pure emptyDefaultEnv
+                -- Supply the built-in defaults, but make the user-supplied defaults
+                -- override them.
               ; let deflt_tys = mconcat [ extDef, numDef, ovlStr, defaults ]
               ; return (deflt_tys, extended_defaults) } }
 

@@ -118,7 +118,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Types.DefaultEnv ( ClassDefaults(..), DefaultEnv, mkDefaultEnv )
+import GHC.Types.DefaultEnv ( ClassDefaults(..), DefaultEnv, mkDefaultEnv, DefaultProvenance(..) )
 import GHC.Types.Id
 import GHC.Types.Id.Make
 import GHC.Types.Id.Info
@@ -1333,7 +1333,7 @@ tcIfaceDefault this_mod IfaceDefault { ifDefaultCls = cls_name
        ; let warn = fmap fromIfaceWarningTxt iface_warn
        ; return ClassDefaults { cd_class = cls
                               , cd_types = tys'
-                              , cd_module = Just this_mod
+                              , cd_provenance = DP_Imported this_mod
                               , cd_warn = warn } }
     where
        tyThingConClass :: TyThing -> Class

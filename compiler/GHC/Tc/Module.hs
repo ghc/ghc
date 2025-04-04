@@ -383,6 +383,7 @@ the actual contents of the module are wired in to GHC.
 -}
 
 {- Note [Disambiguation of multiple default declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 See Note [Named default declarations] in GHC.Tc.Gen.Default
 
@@ -1811,9 +1812,8 @@ tcTyClsInstDecls tycl_decls deriv_decls default_decls binds
           --
           -- But only after we've typechecked 'default' declarations.
           -- See Note [Typechecking default declarations]
-          defaults <- tcDefaults default_decls ;
-          updGblEnv (\gbl -> gbl { tcg_default = defaults }) $ do {
-
+          defaults <- tcDefaultDecls default_decls
+          ; extendDefaultEnvWithLocalDefaults defaults $ do {
 
           -- Careful to quit now in case there were instance errors, so that
           -- the deriving errors don't pile up as well.
