@@ -233,15 +233,16 @@ ppLexer queueComments cont =
 processCppToks :: FastString -> PP (Maybe String)
 processCppToks fs = do
     let
-        get (L _ (ITcpp _ s _)) = s
+        get (L _ (ITcpp False s _)) = unpackFS s
+        get (L _ (ITcpp True s _)) = init $ unpackFS s
         get _ = error "should not"
     -- Combine any prior continuation tokens
     cs <- popContinuation
-    processCpp (reverse $ fs : map get cs)
+    processCpp (reverse $ unpackFS fs : map get cs)
 
-processCpp :: [FastString] -> PP (Maybe String)
-processCpp fs = do
-    let s = concatMap unpackFS fs
+processCpp :: [String] -> PP (Maybe String)
+processCpp ss = do
+    let s = concat ss
     let directive = parseDirective s
     if directive == Right CppDumpState
         then return (Just "\ndumped state\n")
