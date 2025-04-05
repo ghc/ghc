@@ -1287,7 +1287,7 @@ doCppToken code span buf len _buf2 =
     -- check if the string ends with backslash and newline
     -- NOTE: performance likely sucks, make it work for now
     (len0, continue) <- case (reverse $ unpackFS tokStr) of
-       ('\n':'\\':_) -> pushLexStateMaybe code >> return (len -2, True)
+       ('\n':'\\':_) -> pushLexStateMaybe code >> return (len -1, True)
        ('\n':_) -> return (len - 1, False)
        _ -> return (len, False)
     let span' = cppSpan span len0
