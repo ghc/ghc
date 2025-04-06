@@ -45,7 +45,7 @@ import State
 -- ---------------------------------------------------------------------
 
 --    We evaluate to an Int, which we convert to a bool
-cppIf :: String -> PP AcceptingResult
+cppIf :: String -> PP Bool
 cppIf str = do
   s <- getPpState
   let
@@ -53,7 +53,7 @@ cppIf str = do
     v = case Parser.parseExpr expanded of
         Left err -> error $ "parseExpr:" ++ show (err, expanded)
         Right tree -> eval tree
-  pushAccepting (toBool v)
+  return (toBool v)
 
 -- ---------------------------------------------------------------------
 
