@@ -132,7 +132,7 @@ getPState dflags includes popts filename str = pstate
         initPpState
             { pp_includes = includeMap
             , pp_defines = predefinedMacros dflags
-            , pp_scope = (PpScope True) :| []
+            , pp_scope = (PpScope True PpNoGroup) :| []
             }
     pstate = Lexer.initParserState initState popts buf loc
     -- pstate = Lexer.initPragState initState popts buf loc
@@ -167,6 +167,7 @@ initDynFlags :: (GHC.GhcMonad m) => m GHC.DynFlags
 initDynFlags = do
     -- Based on GHC backpack driver doBackPack
     dflags0 <- GHC.getSessionDynFlags
+    logger <- getLogger
     -- let parser_opts0 = initParserOpts dflags0
     -- (_, src_opts)   <- GHC.liftIO $ GHC.getOptionsFromFile parser_opts0 file
     -- (dflags1, _, _) <- GHC.parseDynamicFilePragma dflags0 src_opts
@@ -175,6 +176,7 @@ initDynFlags = do
     -- Prevent parsing of .ghc.environment.* "package environment files"
     (dflags3, _, _) <-
         GHC.parseDynamicFlagsCmdLine
+            logger
             dflags2
             [GHC.noLoc "-hide-all-packages"]
     _ <- GHC.setSessionDynFlags dflags3
@@ -542,16 +544,18 @@ initDynFlags2 file = do
     -- Based on GHC backpack driver doBackPack
     dflags0 <- GHC.getSessionDynFlags
     let parser_opts0 = initParserOpts dflags0
+    logger <- getLogger
     hsc_env <- getSession
     let unit_env = hsc_unit_env hsc_env
     (_, src_opts) <- liftIO $ getOptionsFromFile dflags0 unit_env parser_opts0 (supportedLanguagePragmas dflags0) file
     liftIO $ putStrLn $ "src_opts:" ++ show src_opts
-    (dflags1, _, _) <- GHC.parseDynamicFilePragma dflags0 src_opts
+    (dflags1, _, _) <- GHC.parseDynamicFilePragma logger dflags0 src_opts
     -- Turn this on last to avoid T10942
     let dflags2 = dflags1 `GHC.gopt_set` GHC.Opt_KeepRawTokenStream
     -- Prevent parsing of .ghc.environment.* "package environment files"
     (dflags3, _, _) <-
         GHC.parseDynamicFlagsCmdLine
+            logger
             dflags2
             [GHC.noLoc "-hide-all-packages"]
     _ <- GHC.setSessionDynFlags dflags3
@@ -687,6 +691,40 @@ t29 = do
         , "#else"
         , "        then return body"
         , "        else fail \"not reached\""
+        , "#endif"
+        , ""
+        ]
+
+t30 :: IO ()
+t30 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module Example4 where"
+        , "#if __GLASGOW_HASKELL__ >= 503"
+        , "import GHC.Word"
+        , "import GHC.Exts (  Int(..), shiftRL# )"
+        , "#elif __GLASGOW_HASKELL__"
+        , "import Word"
+        , "import GlaExts ( Word(..), Int(..), shiftRL# )"
+        , "#else"
+        , "import Data.Word"
+        , "#endif"
+        , ""
+        ]
+
+t31 :: IO ()
+t31 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module Example4 where"
+        , "#if 0"
+        , "import GHC.Word"
+        , "import GHC.Exts (  Int(..), shiftRL# )"
+        , "#elif __GLASGOW_HASKELL__"
+        , "import Word"
+        , "import GlaExts ( Word(..), Int(..), shiftRL# )"
+        , "#else"
+        , "import Data.Word"
         , "#endif"
         , ""
         ]
