@@ -260,15 +260,16 @@ ppLexer queueComments cont =
 processCppToks :: FastString -> PP (Maybe String)
 processCppToks fs = do
     let
-        get (L _ (ITcpp _ s _)) = s
+        get (L _ (ITcpp False s _)) = unpackFS s
+        get (L _ (ITcpp True s _)) = init $ unpackFS s
         get _ = error "should not"
     -- Combine any prior continuation tokens
     cs <- popContinuation
-    processCpp (reverse $ fs : map get cs)
+    processCpp (reverse $ unpackFS fs : map get cs)
 
-processCpp :: [FastString] -> PP (Maybe String)
-processCpp fs = do
-    let s = concatMap unpackFS fs
+processCpp :: [String] -> PP (Maybe String)
+processCpp ss = do
+    let s = concat ss
     let directive = parseDirective s
     if directive == Right CppDumpState
         then return (Just "\ndumped state\n")
@@ -280,7 +281,8 @@ processCpp fs = do
                 Right (CppDefine name args def) -> do
                     ppDefine (MacroName name args) def
                 Right (CppIf cond) -> do
-                    ar <- cppIf cond
+                    val <- cppIf cond
+                    ar <- pushAccepting val
                     acceptStateChange ar
                 Right (CppIfdef name) -> do
                     defined <- ppIsDefined (MacroName name Nothing)
@@ -294,6 +296,10 @@ processCpp fs = do
                     accepting <- getAccepting
                     ar <- setAccepting (not accepting)
                     acceptStateChange ar
+                Right (CppElIf cond) -> do
+                    val <- cppIf cond
+                    ar <- setAccepting val
+                    acceptStateChange ar
                 Right CppEndif -> do
                     ar <- popAccepting
                     acceptStateChange ar
@@ -306,15 +312,15 @@ processCpp fs = do
 acceptStateChange :: AcceptingResult -> PP ()
 acceptStateChange ArNoChange = return ()
 acceptStateChange ArNowIgnoring = do
-  alr <- Lexer.getAlrState
-  s <- getPpState
+  -- alr <- Lexer.getAlrState
+  -- s <- getPpState
   -- let s = trace ("acceptStateChange:ArNowIgnoring") s'
-  setPpState (s { pp_alr_state = Just alr})
+  -- setPpState (s { pp_alr_state = Just alr})
   Lexer.startSkipping
 acceptStateChange ArNowAccepting = do
-  s <- getPpState
+  -- s <- getPpState
   -- let s = trace ("acceptStateChange:ArNowAccepting") s'
-  mapM_ Lexer.setAlrState (pp_alr_state s)
+  -- mapM_ Lexer.setAlrState (pp_alr_state s)
   _ <- Lexer.stopSkipping
   return ()
 

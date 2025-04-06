@@ -7,13 +7,12 @@ module State
     CppDirective(..),
     Input, Output,
     PpState(..), initPpState, PP,
-    PpScope(..),
+    PpScope(..), PpGroupState(..),
     MacroDefines,
     MacroDef,
-    MacroName(..),
+    MacroName (..),
     MacroArgs,
-    CppState(..),
-
+    CppState (..),
     arg_arity,
 
     getPpState, setPpState,
@@ -22,7 +21,6 @@ module State
     setAccepting,
     pushAccepting,
     popAccepting,
-
     pushContinuation,
     popContinuation,
     ppDefine,
@@ -64,7 +62,7 @@ initPpState =
         , pp_include_stack = []
         , pp_continuation = []
         , pp_defines = Map.empty
-        , pp_scope = (PpScope True) :| []
+        , pp_scope = (PpScope True PpNoGroup) :| []
         , pp_alr_state = Nothing
         }
 
@@ -79,8 +77,16 @@ data PpState = PpState
 
 data PpScope = PpScope
     { pp_accepting :: !Bool
+    , pp_group_state :: !PpGroupState
     }
     deriving (Show)
+
+data PpGroupState
+    = PpNoGroup
+    | PpInGroupStillInactive
+    | PpInGroupHasBeenActive
+    deriving (Show)
+
 
 -- ---------------------------------------------------------------------
 
@@ -92,6 +98,7 @@ data CppDirective
     | CppIfndef String
     | CppIf String
     | CppElse
+    | CppElIf String
     | CppEndif
     | CppDumpState
     deriving (Show, Eq)
@@ -157,23 +164,47 @@ getCppState = do
 
 -- pp_scope stack start -----------------
 
-setAccepting :: Bool -> PP AcceptingResult
-setAccepting on = do
-  current <- getAccepting
-  PpScope parent <- parentScope
-  setScope (PpScope (parent && on))
-  return $ acceptingStateChange current (parent && on)
-
-getAccepting :: PP Bool
-getAccepting = P $ \s -> POk s (scopeValue $ pp_scope (pp s))
-
--- Start a new scope, ensuring it is consistent with the existing one
+-- Start a new scope group, ensuring it is consistent with the
+-- existing one
 pushAccepting :: Bool -> PP AcceptingResult
 pushAccepting on = do
   current <- getAccepting
-  PpScope current_scope <- getScope
-  pushScope (PpScope (current_scope && on))
-  return $ acceptingStateChange current (current_scope && on)
+  current_scope <- getScope
+  let scope_on = pp_accepting current_scope
+  let group_state
+        = if scope_on && on
+            then PpInGroupHasBeenActive
+            else PpInGroupStillInactive
+  pushScope (PpScope { pp_accepting = scope_on && on
+                     , pp_group_state = group_state})
+  return $ acceptingStateChange current (scope_on && on)
+
+-- Note: this is only ever called in the context of a pp group (i.e.
+-- after pushAccepting) from processing #else or #elif
+setAccepting :: Bool -> PP AcceptingResult
+setAccepting on = do
+  current <- getAccepting
+  parent_scope <- parentScope
+  let parent_on = pp_accepting parent_scope
+  current_scope <- getScope
+  let group_state = pp_group_state current_scope
+  let possible_accepting = parent_on && on
+  let (new_group_state, accepting) =
+        case (group_state, possible_accepting) of
+          (PpNoGroup, v) -> error "setAccepting for state PpNoGroup"
+          (PpInGroupStillInactive, True) -> (PpInGroupHasBeenActive, True)
+          (PpInGroupStillInactive, False) -> (PpInGroupStillInactive, False)
+          (PpInGroupHasBeenActive, _) -> (PpInGroupHasBeenActive, False)
+
+  -- let (new_group_state, accepting)
+  --       = trace ("setAccepting:" ++ show ((group_state, possible_accepting),  (new_group_state', accepting'))) (new_group_state', accepting')
+
+  setScope (PpScope { pp_accepting = accepting
+                    , pp_group_state = new_group_state })
+  return $ acceptingStateChange current accepting
+
+getAccepting :: PP Bool
+getAccepting = P $ \s -> POk s (scopeValue $ pp_scope (pp s))
 
 -- Have we just changed the accepting state?
 acceptingStateChange :: Bool -> Bool -> AcceptingResult
@@ -185,6 +216,7 @@ acceptingStateChange old new =
     (False, True) -> ArNowAccepting
     _             -> ArNoChange
 
+-- Exit a scope group
 popAccepting :: PP AcceptingResult
 popAccepting =
     P $ \s ->

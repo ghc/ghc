@@ -254,7 +254,8 @@ processCpp ss = do
                 Right (CppDefine name args def) -> do
                     ppDefine (MacroName name args) def
                 Right (CppIf cond) -> do
-                    ar <- cppIf cond
+                    val <- cppIf cond
+                    ar <- pushAccepting val
                     acceptStateChange ar
                 Right (CppIfdef name) -> do
                     defined <- ppIsDefined (MacroName name Nothing)
@@ -267,6 +268,10 @@ processCpp ss = do
                 Right CppElse -> do
                     accepting <- getAccepting
                     ar <- setAccepting (not accepting)
+                    acceptStateChange ar
+                Right (CppElIf cond) -> do
+                    val <- cppIf cond
+                    ar <- setAccepting val
                     acceptStateChange ar
                 Right CppEndif -> do
                     ar <- popAccepting
