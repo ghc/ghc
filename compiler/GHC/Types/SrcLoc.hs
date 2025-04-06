@@ -32,7 +32,7 @@ module GHC.Types.SrcLoc (
         srcLocCol,              -- return the column part
 
         -- * SrcSpan
-        RealSrcSpan,            -- Abstract
+        RealSrcSpan(..),            -- Abstract
         SrcSpan(..),
         UnhelpfulSpanReason(..),
 
@@ -56,7 +56,7 @@ module GHC.Types.SrcLoc (
 
         -- ** Unsafely deconstructing SrcSpan
         -- These are dubious exports, because they crash on some inputs
-        srcSpanFile,
+        -- srcSpanFile,
         srcSpanStartLine, srcSpanEndLine,
         srcSpanStartCol, srcSpanEndCol,
 
