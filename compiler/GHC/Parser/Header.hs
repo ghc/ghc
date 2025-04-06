@@ -34,7 +34,7 @@ import GHC.Parser           ( parseHeader )
 import GHC.Parser.Lexer hiding (initPragState, initParserState, lexer)
 import GHC.Parser.Lexer qualified as Lexer
 import GHC.Parser.PreProcess   (initPragState, lexer)
-import GHC.Parser.PreProcess.State (PpState (..), initPpState, PpScope (..))
+import GHC.Parser.PreProcess.State (PpState (..), initPpState, PpScope (..), PpGroupState (PpNoGroup))
 
 import GHC.Hs
 import GHC.Builtin.Names
@@ -129,13 +129,13 @@ initParserStateWithMacros
   :: DynFlags -> Maybe UnitEnv -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
 initParserStateWithMacros df Nothing opts buf pos
   = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
-                                       , pp_scope = (PpScope  True) NE.:| [] })
+                                       , pp_scope = (PpScope True PpNoGroup) NE.:| [] })
                           opts buf pos
 initParserStateWithMacros df (Just unit_env) opts buf pos = p_state
   where
     macro_defs = cppMacroDefines unit_env
     p_state0 = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
-                                                  , pp_scope = (PpScope  True) NE.:| [] })
+                                                  , pp_scope = (PpScope True PpNoGroup) NE.:| [] })
                                      opts (stringToStringBuffer macro_defs) pos
     p_state =
       if xopt LangExt.GhcCpp df
