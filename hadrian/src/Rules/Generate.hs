@@ -84,6 +84,7 @@ compilerDependencies = do
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
     let buildSpecific = (ghcPath -/-) <$>
                   [ "primop-code-size.hs-incl"
+                  , "primop-is-discardable-mutable-read.hs-incl"
                   , "primop-commutable.hs-incl"
                   , "primop-data-decl.hs-incl"
                   , "primop-fixity.hs-incl"

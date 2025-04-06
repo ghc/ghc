@@ -11,6 +11,8 @@ genPrimopCodeBuilderArgs = builder GenPrimopCode ? mconcat
     , output "//primop-list.hs-incl"               ? arg "--primop-list"
     , output "//primop-effects.hs-incl"            ? arg "--primop-effects"
     , output "//primop-out-of-line.hs-incl"        ? arg "--out-of-line"
+    , output "//primop-is-discardable-mutable-read.hs-incl"
+                                                   ? arg "--is-discardable-mutable-read"
     , output "//primop-commutable.hs-incl"         ? arg "--commutable"
     , output "//primop-code-size.hs-incl"          ? arg "--code-size"
     , output "//primop-strictness.hs-incl"         ? arg "--strictness"

@@ -139,6 +139,8 @@ defaults
    effect           = NoEffect -- See Note [Classifying primop effects] in GHC.Builtin.PrimOps
    can_fail_warning = WarnIfEffectIsCanFail
    out_of_line      = False   -- See Note [When do out-of-line primops go in primops.txt.pp]
+   is_discardable_mutable_read = False
+     -- See Note [Discarding mutable reads] in GHC.Builtin.PrimOps
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
    work_free        = { primOpCodeSize _thisOp == 0 }
@@ -1517,6 +1519,7 @@ primop  ReadArrayOp "readArray#" GenPrimOp
    with
    effect = ReadWriteEffect
    can_fail_warning = YesWarnCanFail
+   is_discardable_mutable_read = True
 
 primop  WriteArrayOp "writeArray#" GenPrimOp
    MutableArray# s a_levpoly -> Int# -> a_levpoly -> State# s -> State# s
@@ -1734,6 +1737,7 @@ primop  ReadSmallArrayOp "readSmallArray#" GenPrimOp
    with
    effect = ReadWriteEffect
    can_fail_warning = YesWarnCanFail
+   is_discardable_mutable_read = True
 
 primop  WriteSmallArrayOp "writeSmallArray#" GenPrimOp
    SmallMutableArray# s a_levpoly -> Int# -> a_levpoly -> State# s -> State# s
@@ -2224,6 +2228,7 @@ primop  AtomicReadByteArrayOp_Int "atomicReadIntArray#" GenPrimOp
    with
    effect = ReadWriteEffect
    can_fail_warning = YesWarnCanFail
+   is_discardable_mutable_read = True
 
 primop  AtomicWriteByteArrayOp_Int "atomicWriteIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
@@ -2548,6 +2553,7 @@ primop  AtomicReadAddrOp_Word "atomicReadWordAddr#" GenPrimOp
    with
    effect = ReadWriteEffect
    can_fail_warning = YesWarnCanFail
+   is_discardable_mutable_read = True
 
 primop  AtomicWriteAddrOp_Word "atomicWriteWordAddr#" GenPrimOp
    Addr# -> Word# -> State# s -> State# s
@@ -2592,6 +2598,7 @@ primop  ReadMutVarOp "readMutVar#" GenPrimOp
    with
    -- See Note [Why MutVar# ops can't fail]
    effect = ReadWriteEffect
+   is_discardable_mutable_read = True
 
 primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    MutVar# s a_levpoly -> a_levpoly -> State# s -> State# s
@@ -3107,6 +3114,7 @@ primop  ReadTVarOp "readTVar#" GenPrimOp
    with
    out_of_line  = True
    effect = ReadWriteEffect
+   is_discardable_mutable_read = True -- TODO: Check this one
 
 primop ReadTVarIOOp "readTVarIO#" GenPrimOp
        TVar# s a_levpoly
@@ -3116,6 +3124,7 @@ primop ReadTVarIOOp "readTVarIO#" GenPrimOp
    with
    out_of_line      = True
    effect = ReadWriteEffect
+   is_discardable_mutable_read = True
 
 primop  WriteTVarOp "writeTVar#" GenPrimOp
        TVar# s a_levpoly
@@ -3184,6 +3193,9 @@ primop  ReadMVarOp "readMVar#" GenPrimOp
    with
    out_of_line      = True
    effect = ReadWriteEffect
+   is_discardable_mutable_read = False
+     -- We must not discard the side-effect of
+     -- blocking until the MVar# becomes full
 
 primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
    MVar# s a_levpoly -> State# s -> (# State# s, Int#, a_levpoly #)
@@ -3192,6 +3204,11 @@ primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
    with
    out_of_line      = True
    effect = ReadWriteEffect
+   is_discardable_mutable_read = False
+     -- We could in principle discard this if both the Int# and 'a'
+     -- are unused.  But that's probably very rare and the
+     -- is_discardable_mutable_read machinery assumes there is only
+     -- one result tupled up wih the State# token
 
 primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    MVar# s a_levpoly -> State# s -> (# State# s, Int# #)
@@ -3199,7 +3216,7 @@ primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    with
    out_of_line = True
    effect = ReadWriteEffect
-
+   is_discardable_mutable_read = True
 
 ------------------------------------------------------------------------
 section "Synchronized I/O Ports"
@@ -3227,6 +3244,9 @@ primop  ReadIOPortOp "readIOPort#" GenPrimOp
    with
    out_of_line      = True
    effect = ReadWriteEffect
+   is_discardable_mutable_read = False
+     -- We must not discard the side-effect of
+     -- blocking until the IOPort# becomes full
 
 primop  WriteIOPortOp "writeIOPort#" GenPrimOp
    IOPort# s a_levpoly -> a_levpoly -> State# s -> (# State# s, Int# #)
@@ -3319,6 +3339,7 @@ primop  MyThreadIdOp "myThreadId#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
    effect = ReadWriteEffect
+   is_discardable_mutable_read = True
 
 primop LabelThreadOp "labelThread#" GenPrimOp
    ThreadId# -> ByteArray# -> State# RealWorld -> State# RealWorld
@@ -3333,6 +3354,7 @@ primop  IsCurrentThreadBoundOp "isCurrentThreadBound#" GenPrimOp
    with
    out_of_line = True
    effect = ReadWriteEffect
+   is_discardable_mutable_read = True
 
 primop  NoDuplicateOp "noDuplicate#" GenPrimOp
    State# s -> State# s
@@ -3472,6 +3494,7 @@ primop  DeRefStablePtrOp "deRefStablePtr#" GenPrimOp
    with
    effect = ReadWriteEffect
    out_of_line      = True
+   is_discardable_mutable_read = True -- TODO: Check this
 
 primop  EqStablePtrOp "eqStablePtr#" GenPrimOp
    StablePtr# a_levpoly -> StablePtr# a_levpoly -> Int#
@@ -4194,6 +4217,7 @@ primop VecReadByteArrayOp "readArray#" GenPrimOp
      The index is counted in units of SIMD vectors (not scalar elements). }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
+        is_discardable_mutable_read = True
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteByteArrayOp "writeArray#" GenPrimOp
@@ -4215,6 +4239,7 @@ primop VecReadOffAddrOp "readOffAddr#" GenPrimOp
    { Reads vector; offset in units of SIMD vectors (not scalar elements). }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
+        is_discardable_mutable_read = True
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteOffAddrOp "writeOffAddr#" GenPrimOp
@@ -4236,6 +4261,7 @@ primop VecReadScalarByteArrayOp "readArrayAs#" GenPrimOp
    { Read a vector from specified index of mutable array of scalars; offset is in scalar elements. }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
+        is_discardable_mutable_read = True
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteScalarByteArrayOp "writeArrayAs#" GenPrimOp
@@ -4256,6 +4282,7 @@ primop VecReadScalarOffAddrOp "readOffAddrAs#" GenPrimOp
    { Reads vector; offset in scalar elements. }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
+        is_discardable_mutable_read = True
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteScalarOffAddrOp "writeOffAddrAs#" GenPrimOp

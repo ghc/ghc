@@ -107,7 +107,10 @@ mkReadByteArrayOp e = PrimOpSpec
        $ readResTy e
   , cat = GenPrimOp
   , desc = "Read " ++ elt_desc e ++ " from mutable array; offset in " ++ prettyOffset e ++ "."
-  , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
+  , opts = [ OptionEffect ReadWriteEffect
+           , OptionCanFailWarnFlag YesWarnCanFail
+           , OptionTrue "is_discardable_mutable_read"
+           ]
   }
 
 mkUnalignedReadByteArrayOp :: ElementType -> Entry
@@ -119,7 +122,10 @@ mkUnalignedReadByteArrayOp e = PrimOpSpec
        $ readResTy e
   , cat = GenPrimOp
   , desc = "Read " ++ elt_desc e ++ " from mutable array; offset in bytes."
-  , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
+  , opts = [ OptionEffect ReadWriteEffect
+           , OptionCanFailWarnFlag YesWarnCanFail
+           , OptionTrue "is_discardable_mutable_read"
+           ]
   }
 
 mkWriteByteArrayOp :: ElementType -> Entry
@@ -193,7 +199,10 @@ mkReadOffAddrOp e = PrimOpSpec
   , cat = GenPrimOp
   , desc = "Read " ++ elt_desc e ++ " from mutable address; offset in " ++ prettyOffset e ++ ".\n\n"
            ++ getAlignWarn e
-  , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
+  , opts = [ OptionEffect ReadWriteEffect
+           , OptionCanFailWarnFlag YesWarnCanFail
+           , OptionTrue "is_discardable_mutable_read"
+           ]
   }
 
 mkUnalignedReadOffAddrOp :: ElementType -> Entry
@@ -205,7 +214,10 @@ mkUnalignedReadOffAddrOp e = PrimOpSpec
        $ readResTy e
   , cat = GenPrimOp
   , desc = "Read " ++ elt_desc e ++ " from mutable address; offset in bytes."
-  , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
+  , opts = [ OptionEffect ReadWriteEffect
+           , OptionCanFailWarnFlag YesWarnCanFail
+           , OptionTrue "is_discardable_mutable_read"
+           ]
   }
 
 mkWriteOffAddrOp :: ElementType -> Entry

@@ -1,0 +1,124 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 80, types: 77, coercions: 2, joins: 0/0}
+
+-- RHS size: {terms: 12, types: 9, coercions: 0, joins: 0/0}
+T23457.$WBS [InlPrag=INLINE[final] CONLIKE]
+  :: ForeignPtr Word8 %1 -> Int %1 -> ByteString
+[GblId[DataConWrapper],
+ Arity=2,
+ Str=<SL><SL>,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)}]
+T23457.$WBS
+  = \ (conrep_a12V [Occ=Once1!] :: ForeignPtr Word8)
+      (conrep1_a12W [Occ=Once1!] :: Int) ->
+      case conrep_a12V of
+      { GHC.Internal.ForeignPtr.ForeignPtr unbx_a12X [Occ=Once1]
+                                           unbx1_a12Z [Occ=Once1] ->
+      case conrep1_a12W of
+      { GHC.Internal.Types.I# unbx2_a130 [Occ=Once1] ->
+      T23457.BS unbx_a12X unbx1_a12Z unbx2_a130
+      }
+      }
+
+-- RHS size: {terms: 7, types: 12, coercions: 2, joins: 0/0}
+accursedUnutterablePerformIO :: forall t. IO t -> t
+[GblId,
+ Arity=1,
+ Str=<1C(1,P(A,1L))>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+accursedUnutterablePerformIO
+  = \ (@t_a1a1) (ds_d1dG :: IO t_a1a1) ->
+      case (ds_d1dG
+            `cast` (GHC.Internal.Types.N:IO <t_a1a1>_R
+                    :: IO t_a1a1
+                       ~R# (GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+                            -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+                                  t_a1a1 #))))
+             realWorld#
+      of
+      { (# _ [Occ=Dead], ipv1_s1eo #) ->
+      ipv1_s1eo
+      }
+
+-- RHS size: {terms: 34, types: 29, coercions: 0, joins: 0/0}
+uncons :: ByteString -> Maybe (Word8, ByteString)
+[GblId,
+ Arity=1,
+ Str=<1!P(L,L,L)>,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)}]
+uncons
+  = \ (ds_d1dP :: ByteString) ->
+      case ds_d1dP of { BS bx_d1ef bx1_d1eg bx2_d1eh ->
+      case GHC.Internal.Prim.<=# bx2_d1eh 0# of {
+        __DEFAULT ->
+          case GHC.Internal.Prim.readWord8OffAddr#
+                 @GHC.Internal.Prim.RealWorld bx_d1ef 0# realWorld#
+          of
+          { (# ipv_a1fH, ipv1_a1fI #) ->
+          case GHC.Internal.Prim.touch#
+                 @GHC.Internal.Types.Lifted
+                 @GHC.Internal.ForeignPtr.ForeignPtrContents
+                 @GHC.Internal.Prim.RealWorld
+                 bx1_d1eg
+                 ipv_a1fH
+          of
+          { __DEFAULT ->
+          GHC.Internal.Maybe.Just
+            @(Word8, ByteString)
+            (GHC.Internal.Word.W8# ipv1_a1fI,
+             T23457.BS
+               (GHC.Internal.Prim.plusAddr# bx_d1ef 1#)
+               bx1_d1eg
+               (GHC.Internal.Prim.-# bx2_d1eh 1#))
+          }
+          };
+        1# -> GHC.Internal.Maybe.Nothing @(Word8, ByteString)
+      }
+      }
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T23457.testFun1 :: Int
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+T23457.testFun1 = GHC.Internal.Types.I# 24#
+
+-- RHS size: {terms: 20, types: 11, coercions: 0, joins: 0/0}
+testFun :: ByteString -> Int
+[GblId,
+ Arity=1,
+ Str=<1!P(A,L,L)>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)}]
+testFun
+  = \ (bs_a12z :: ByteString) ->
+      case bs_a12z of { BS bx_d1ef bx1_d1eg bx2_d1eh ->
+      case GHC.Internal.Prim.<=# bx2_d1eh 0# of {
+        __DEFAULT ->
+          case GHC.Internal.Prim.touch#
+                 @GHC.Internal.Types.Lifted
+                 @GHC.Internal.ForeignPtr.ForeignPtrContents
+                 @GHC.Internal.Prim.RealWorld
+                 bx1_d1eg
+                 realWorld#
+          of
+          { __DEFAULT ->
+          GHC.Internal.Types.I# (GHC.Internal.Prim.-# bx2_d1eh 1#)
+          };
+        1# -> T23457.testFun1
+      }
+      }
+
+
+

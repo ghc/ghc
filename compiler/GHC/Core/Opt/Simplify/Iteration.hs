@@ -3203,7 +3203,7 @@ rebuildCase env scrut case_bndr alts@[Alt _ bndrs rhs] cont
 --      3. Primop-related case-rules
 --------------------------------------------------
 
-  |Just (scrut', case_bndr', alts') <- caseRules2 scrut case_bndr alts
+  | Just (scrut', case_bndr', alts') <- caseRules2 scrut case_bndr alts
   = reallyRebuildCase env scrut' case_bndr' alts' cont
 
   where

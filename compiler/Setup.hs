@@ -40,6 +40,8 @@ primopIncls =
     , ("primop-list.hs-incl"              , "--primop-list")
     , ("primop-effects.hs-incl"           , "--primop-effects")
     , ("primop-out-of-line.hs-incl"       , "--out-of-line")
+    , ("primop-is-discardable-mutable-read.hs-incl",
+                                            "--is-discardable-mutable-read")
     , ("primop-commutable.hs-incl"        , "--commutable")
     , ("primop-code-size.hs-incl"         , "--code-size")
     , ("primop-strictness.hs-incl"        , "--strictness")

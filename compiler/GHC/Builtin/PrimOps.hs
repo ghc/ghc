@@ -19,7 +19,7 @@ module GHC.Builtin.PrimOps (
         primOpOutOfLine, primOpCodeSize,
         primOpOkForSpeculation, primOpOkToDiscard,
         primOpIsWorkFree, primOpIsCheap, primOpFixity, primOpDocs, primOpDeprecations,
-        primOpIsDiv, primOpIsReallyInline,
+        primOpIsDiscardableMutableRead, primOpIsDiv, primOpIsReallyInline,
 
         PrimOpEffect(..), primOpEffect,
 
@@ -472,13 +472,10 @@ Duplicate              YES        YES            YES                NO
     kind of stuff by hand (#9390).  So we (conservatively) never discard
     a ReadWriteEffect primop.
 
-      Digression: We could try to track read-only effects separately
-      from write effects to allow the former to be discarded.  But in
-      fact we want a more general rewrite for read-only operations:
-        case readOp# state# of (# newState#, _unused_result #) -> body
-        ==> case state# of newState# -> body
-      Such a rewrite is not yet implemented, but would have to be done
-      in a different place anyway.
+      Digression: We also want to track read-only effects separately
+      from write effects, so that we can discard the former.  But we
+      do so via a separate mechanism; see Note [Discarding mutable reads]
+      for the why and how of this.
 
     Discarding a ThrowsException primop would also discard any exception
     it might have thrown.  For `raise#` or `raiseIO#` this would defeat
@@ -643,6 +640,62 @@ primOpIsCheap :: PrimOp -> Bool
 -- that (it's primOpIsWorkFree that does) so the problem doesn't occur
 -- even if primOpIsCheap sometimes says 'True'.
 
+{-
+Note [Discarding mutable reads]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a program like the following:
+
+  case readMutVar# @{Lifted} @s @ty var# state# of
+    (# newState#, _unused_result #) -> body
+
+Recall that readMutVar has type
+  forall {lev :: Levity} (s :: Type) (a :: TYPE (BoxedRep lev)).
+    MutVar# s a -> State# s -> (# State# s, a #)
+and does nothing at run-time except read from its MutVar# argument.
+So when the actual result of that read is unused, we want to
+be able to remove the readMutVar# operation from this program.
+
+Crucially, we want to do this even if the state token `newState#` is
+used in the continuation `body`, which means that just considering the
+`readMutVar# ...` call to satisfy 'exprOkToDiscard' would NOT be
+enough, since not all components of the `readMutVar#` call's apparent
+results are un-used.
+
+We want to rewrite this program to:
+  case state# of newState# { __DEFAULT -> body }
+
+We do this in GHC.Core.Opt.ConstantFold.caseRules2, which is called by
+GHC.Core.Opt.Simplify.Iteration.rebuildCase.  (Not coincidentally,
+this is the same part of the simplifier that implements the normal
+'exprOkToDiscard' mechanism.)
+
+Moving parts:
+
+...detection...
+...which primops are marked as discardable mutable reads...
+
+NASTY WRINKLE:
+
+  This rewrite removes `var#` entirely.  That's usually fine; in real
+  such programs `var#` is typically syntactically a variable!  But if
+  `var#` is an expression that does not satisfy exprOkToDiscard, the
+  above rewrite is invalid since the original `readMutVar#` call must
+  evaluate all of its unlifted arguments including var#.
+
+  In that situation we instead rewrite to something like
+    case (case var# of __DEFAULT -> state#) of newState# { __DEFAULT -> body }
+  That is rather ugly, but we can't easily produce anything better and
+  this situation is probably rare anyway.
+
+  These extra nested cases are added by add_seqs_for_non_discardable_args
+  when necessary.
+
+
+-}
+
+-- | See @Note [Discarding mutable reads]@.
+primOpIsDiscardableMutableRead :: PrimOp -> Bool
+#include "primop-is-discardable-mutable-read.hs-incl"
 
 -- | True of dyadic operators that can fail only if the second arg is zero!
 --

@@ -1,0 +1,106 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 39, types: 82, coercions: 32, joins: 0/0}
+
+-- RHS size: {terms: 17, types: 23, coercions: 0, joins: 0/0}
+T23457_retain_arg.trickyFun1
+  :: forall a.
+     (a -> Addr#)
+     -> (a -> Int#)
+     -> a
+     -> State# RealWorld
+     -> (# State# RealWorld, Word #)
+[GblId,
+ Arity=4,
+ Str=<1C(1,L)><1C(1,L)><L><L>,
+ Cpr=1(, 1),
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)}]
+T23457_retain_arg.trickyFun1
+  = \ (@a)
+      (ptrFun :: a -> Addr#)
+      (ofsFun [OS=OneShot] :: a -> Int#)
+      (x [OS=OneShot] :: a)
+      (s [OS=OneShot] :: State# RealWorld) ->
+      case readWordOffAddr# @RealWorld (ptrFun x) (ofsFun x) s of
+      { (# ipv, ipv1 #) ->
+      (# ipv, GHC.Internal.Types.W# ipv1 #)
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 16, joins: 0/0}
+trickyFun :: forall a. (a -> Addr#) -> (a -> Int#) -> a -> IO Word
+[GblId,
+ Arity=4,
+ Str=<1C(1,L)><1C(1,L)><L><L>,
+ Cpr=1(, 1),
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+trickyFun
+  = T23457_retain_arg.trickyFun1
+    `cast` (forall (a :: <*>_N).
+            <a -> Addr#>_R
+            %<Many>_N ->_R <a -> Int#>_R
+            %<Many>_N ->_R <a>_R
+            %<Many>_N ->_R Sym (GHC.Internal.Types.N:IO <Word>_R)
+            :: (forall a.
+                (a -> Addr#)
+                -> (a -> Int#)
+                -> a
+                -> State# RealWorld
+                -> (# State# RealWorld, Word #))
+               ~R# (forall a. (a -> Addr#) -> (a -> Int#) -> a -> IO Word))
+
+-- RHS size: {terms: 16, types: 15, coercions: 0, joins: 0/0}
+T23457_retain_arg.trickyFun_1
+  :: forall a.
+     (a -> Addr#)
+     -> (a -> Int#)
+     -> a
+     -> State# RealWorld
+     -> (# State# RealWorld, () #)
+[GblId,
+ Arity=4,
+ Str=<1C(1,A)><1C(1,A)><L><L>,
+ Cpr=1(, 1),
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)}]
+T23457_retain_arg.trickyFun_1
+  = \ (@a)
+      (ptrFun :: a -> Addr#)
+      (ofsFun [OS=OneShot] :: a -> Int#)
+      (x [OS=OneShot] :: a)
+      (s [OS=OneShot] :: State# RealWorld) ->
+      case ptrFun x of { __DEFAULT ->
+      case ofsFun x of { __DEFAULT -> (# s, GHC.Internal.Tuple.() #) }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 16, joins: 0/0}
+trickyFun_ :: forall a. (a -> Addr#) -> (a -> Int#) -> a -> IO ()
+[GblId,
+ Arity=4,
+ Str=<1C(1,A)><1C(1,A)><L><L>,
+ Cpr=1(, 1),
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+trickyFun_
+  = T23457_retain_arg.trickyFun_1
+    `cast` (forall (a :: <*>_N).
+            <a -> Addr#>_R
+            %<Many>_N ->_R <a -> Int#>_R
+            %<Many>_N ->_R <a>_R
+            %<Many>_N ->_R Sym (GHC.Internal.Types.N:IO <()>_R)
+            :: (forall a.
+                (a -> Addr#)
+                -> (a -> Int#)
+                -> a
+                -> State# RealWorld
+                -> (# State# RealWorld, () #))
+               ~R# (forall a. (a -> Addr#) -> (a -> Int#) -> a -> IO ()))
+
+
+

@@ -48,8 +48,7 @@ import GHC.Core
 import GHC.Core.Make
 import GHC.Core.SimpleOpt (  exprIsConApp_maybe, exprIsLiteral_maybe )
 import GHC.Core.DataCon ( DataCon,dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
-import GHC.Core.Utils  ( cheapEqExpr, exprIsHNF
-                       , stripTicksTop, stripTicksTopT, mkTicks )
+import GHC.Core.Utils
 import GHC.Core.Multiplicity
 import GHC.Core.Rules.Config
 import GHC.Core.Type
@@ -59,7 +58,8 @@ import GHC.Core.TyCon
    , isEnumerationTyCon, isValidDTT2TyCon, isNewTyCon )
 import GHC.Core.Map.Expr ( eqCoreExpr )
 
-import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
+import GHC.Builtin.PrimOps ( PrimOp(..), primOpIsDiscardableMutableRead
+                           , tagToEnumKey )
 import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
@@ -3424,7 +3424,10 @@ caseRules2
    :: InExpr  -- ^ Scutinee
    -> InId    -- ^ Case-binder
    -> [InAlt] -- ^ Alternatives in standard (increasing) order
-   -> Maybe (InExpr, InId, [InAlt])
+   -> Maybe ( InExpr   -- new scrutinee
+            , InId     -- new case-binder
+            , [InAlt]  -- new alts
+            )
 caseRules2 scrut bndr alts
 
   -- case quotRem# x y of
@@ -3450,8 +3453,50 @@ caseRules2 scrut bndr alts
       | dead_r    -> Just $ (BinOpApp x quot y, q, [Alt DEFAULT [] body])
       | otherwise -> Nothing
 
+  -- See Note [Discarding mutable reads] in GHC.Builtin.PrimOps.
+  -- Catches stuff like this:
+  --   case readMutVar# var s of { (# s_new, _unused #) -> body }
+  --   ===>
+  --   case s of s_new { __DEFAULT -> body }
+  -- TODO: Should this try to handle some ticks/casts?
+  | potential_read_op `App` state_in <- scrut
+  , [Alt (DataAlt _) [state_out, r] body] <- alts
+  , isDeadBinder bndr
+  , isDeadBinder r
+  , is_saturated_discardable_mutable_read_op potential_read_op 1
+  , !new_scrut <- add_seqs_for_non_discardable_args potential_read_op state_in
+  = Just (new_scrut, state_out, [Alt DEFAULT [] body])
+
   | otherwise
   = Nothing
+
+  where
+    is_saturated_discardable_mutable_read_op :: InExpr -> Int -> Bool
+    is_saturated_discardable_mutable_read_op = go where
+      go expr !numValArgs = case expr of
+        fun `App` arg
+          | isValArg arg -> go fun (numValArgs + 1)
+          | otherwise    -> go fun numValArgs
+        Var v
+          | Just op <- isPrimOpId_maybe v
+          -> primOpIsDiscardableMutableRead op && idArity v == numValArgs
+        _ -> False
+
+    add_seqs_for_non_discardable_args :: InExpr -> InExpr -> InExpr
+    -- See the NASTY WRINKLE in Note [Discarding mutable reads]
+    add_seqs_for_non_discardable_args = go where
+      go fun scrut = case fun of
+        (fun' `App` arg)
+          | assert (isTypeArg arg || isUnliftedType (exprType arg)) $
+            exprOkToDiscard arg -- Type args also satisfy 'exprOkToDiscard'
+            -> go fun' scrut
+          | otherwise
+            -> go fun' $!
+                mkWildCase arg
+                           (Scaled ManyTy (exprType arg))
+                           (exprType scrut)
+                           [Alt DEFAULT [] scrut]
+        _ -> scrut
 
 
 -- | If the given primop is a quotRem, return the corresponding (quot,rem).

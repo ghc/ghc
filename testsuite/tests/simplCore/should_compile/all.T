@@ -536,3 +536,5 @@ test('T25197', [req_th, extra_files(["T25197_TH.hs"]), only_ways(['optasm'])], m
 test('T25389', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
 test('T24359a', normal, compile, ['-O -ddump-rules'])
 test('T25713', [grep_errmsg('W:::')], compile, ['-O -ddump-simpl'])
+test('T23457', [grep_errmsg('readWord8OffAddr')], compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-unfoldings -dno-typeable-binds'])
+test('T23457_retain_arg', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-unfoldings -dno-typeable-binds'])

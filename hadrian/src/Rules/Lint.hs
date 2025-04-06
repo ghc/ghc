@@ -119,5 +119,6 @@ hsIncls path = [ path </> "primop-vector-tycons.hs-incl"
                , path </> "primop-primop-info.hs-incl"
                , path </> "primop-out-of-line.hs-incl"
                , path </> "primop-effects.hs-incl"
+               , path </> "primop-is-discardable-mutable-read.hs-incl"
                , path </> "primop-commutable.hs-incl"
                ]

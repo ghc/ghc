@@ -136,6 +136,13 @@ main = getArgs >>= \args ->
                                        "out_of_line"
                                        "primOpOutOfLine" p_o_specs)
 
+                      "--is-discardable-mutable-read"
+                         -> putStr (gen_switch_from_attribs
+                                       "is_discardable_mutable_read"
+                                       "primOpIsDiscardableMutableRead"
+                                       p_o_specs)
+
+
                       "--commutable"
                          -> putStr (gen_switch_from_attribs
                                        "commutable"
@@ -212,6 +219,7 @@ known_args
    = [ "--data-decl",
        "--out-of-line",
        "--commutable",
+       "--is-discardable-mutable-read",
        "--code-size",
        "--is-work-free",
        "--is-cheap",
