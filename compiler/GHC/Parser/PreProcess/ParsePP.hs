@@ -33,6 +33,7 @@ parseDirective s =
                 (THash "#" : TIdentifier "ifndef" : ts) -> Right $ cppIfndef (map t_str ts)
                 (THash "#" : TIdentifier "ifdef" : ts) -> Right $ cppIfdef (map t_str ts)
                 (THash "#" : TIdentifier "else" : ts) -> Right $ cppElse (map t_str ts)
+                (THash "#" : TIdentifier "elif" : ts) -> Right $ cppElIf (map t_str ts)
                 (THash "#" : TIdentifier "endif" : ts) -> Right $ cppEndif (map t_str ts)
                 (THash "#" : TIdentifier "dumpghccpp" : ts) -> Right $ cppDumpState (map t_str ts)
                 _ -> Left ("unexpected directive: " ++ (show toks))
@@ -65,6 +66,9 @@ cppIfndef ts = CppIfndef (combineToks ts)
 
 cppElse :: [String] -> CppDirective
 cppElse _ts = CppElse
+
+cppElIf :: [String] -> CppDirective
+cppElIf ts = CppElIf (combineToks ts)
 
 cppEndif :: [String] -> CppDirective
 cppEndif _ts = CppEndif
