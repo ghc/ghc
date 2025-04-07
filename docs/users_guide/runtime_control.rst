@@ -914,6 +914,19 @@ performance.
     ``-F`` parameter will be reduced in order to avoid exceeding the
     maximum heap size.
 
+    If the maximum heap size is exceeded the runtime will raise an exception
+    on the main thread. To give a chance for a clean shutdown or
+    recovery GHC will hold off on rethrowing the exception after it has been raised
+    for a grace period determined by :rts-flag:`-Mgrace=⟨size⟩`. After which it will
+    be raised again if the heap size limit is still exceeded.
+
+    It's possible for a program to end up continuesly catching/ignoring this
+    exception, allowing it to greatly exceed the memory use set by this flag.
+
+    For example if the main thread has masked exceptions and all allocation happens
+    in other threads. Therefore this flag is not neccesarily a guarantee that memory use
+    will remain below the set threshold.
+
 .. rts-flag:: -Mgrace=⟨size⟩
 
     :default: 1M
