@@ -583,8 +583,8 @@ addTickHsExpr (HsProc x pat cmdtop) =
 addTickHsExpr (XExpr (WrapExpr w e)) =
         liftM (XExpr . WrapExpr w) $
               (addTickHsExpr e)        -- Explicitly no tick on inside
-addTickHsExpr (XExpr (ExpandedThingTc o e)) =
-        liftM (XExpr . ExpandedThingTc o) $ addTickHsExpr e
+addTickHsExpr (XExpr (ExpandedThingTc o e)) = addTickHsExpanded o e
+
 
 addTickHsExpr e@(XExpr (ConLikeTc {})) = return e
   -- We used to do a freeVar on a pat-syn builder, but actually
@@ -611,8 +611,8 @@ addTickHsExpanded :: HsThingRn -> HsExpr GhcTc -> TM (HsExpr GhcTc)
 addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
   -- We always want statements to get a tick, so we can step over each one.
   -- To avoid duplicates we blacklist SrcSpans we already inserted here.
-  OrigStmt (L pos _) -> do_tick_black pos
-  _                  -> skip
+  OrigStmt (L pos _) _ -> do_tick_black pos
+  _                    -> skip
   where
     skip = addTickHsExpr e
     do_tick_black pos = do

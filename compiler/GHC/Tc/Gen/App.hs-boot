@@ -5,4 +5,6 @@ import GHC.Tc.Types  ( TcM )
 import GHC.Tc.Utils.TcType ( TcSigmaType )
 import GHC.Hs.Extension ( GhcRn, GhcTc )
 
-tcInferSigmaX :: HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
+import GHC.Prelude (Bool)
+
+tcExprSigma :: Bool -> HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
