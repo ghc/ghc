@@ -17,7 +17,7 @@
 module GHC.Tc.Gen.App
        ( tcApp
        , tcInferSigma
-       , tcInferSigmaX
+       , tcExprSigma
        , tcExprPrag ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
@@ -179,19 +179,17 @@ tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
 tcInferSigma inst (L loc rn_expr)
   = addExprCtxt rn_expr $
     setSrcSpanA loc     $
-    do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
-       ; do_ql <- wantQuickLook rn_fun
-       ; (tc_fun, fun_sigma) <- tcInferAppHead fun
-       ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
-       ; _ <- tcValArgs do_ql inst_args
+    do { (_, app_res_sigma) <- tcExprSigma inst rn_expr
        ; return app_res_sigma }
 
-tcInferSigmaX :: HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
-tcInferSigmaX rn_expr
+-- Very similar to tcApp, but returns a sigma type
+-- cf. T19167. the head is an expanded expression applied to a type
+tcExprSigma :: Bool -> HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
+tcExprSigma inst rn_expr
   = do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
        ; do_ql <- wantQuickLook rn_fun
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
-       ; (inst_args, app_res_sigma) <- tcInstFun do_ql False (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
+       ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
        ; tc_args <- tcValArgs do_ql inst_args
        ; let tc_expr = rebuildHsApps (tc_fun, fun_ctxt) tc_args
        ; return (tc_expr, app_res_sigma) }
@@ -421,9 +419,7 @@ tcApp rn_expr exp_res_ty
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
        ; (inst_args, app_res_rho)
-              <- setQLInstLevel do_ql $  -- See (TCAPP1) and (TCAPP2) in
-                                         -- Note [tcApp: typechecking applications]
-                 tcInstFun do_ql True (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
+              <- tcInstFun do_ql True (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
 
        ; case do_ql of
             NoQL -> do { traceTc "tcApp:NoQL" (ppr rn_fun $$ ppr app_res_rho)
@@ -452,10 +448,6 @@ tcApp rn_expr exp_res_ty
                                                    app_res_rho exp_res_ty
                          -- Step 5.5: wrap up
                        ; finishApp tc_head tc_args app_res_rho res_wrap } }
-
-setQLInstLevel :: QLFlag -> TcM a -> TcM a
-setQLInstLevel DoQL thing_inside = setTcLevel QLInstVar thing_inside
-setQLInstLevel NoQL thing_inside = thing_inside
 
 quickLookResultType :: TcRhoType -> ExpRhoType -> TcM ()
 -- This function implements the shaded bit of rule APP-Downarrow in
@@ -647,6 +639,10 @@ quickLookKeys = [dollarIdKey, leftSectionKey, rightSectionKey]
 *                                                                      *
 ********************************************************************* -}
 
+setQLInstLevel :: QLFlag -> TcM a -> TcM a
+setQLInstLevel DoQL thing_inside = setTcLevel QLInstVar thing_inside
+setQLInstLevel NoQL thing_inside = thing_inside
+
 tcInstFun :: QLFlag
           -> Bool   -- False <=> Instantiate only /inferred/ variables at the end
                     --           so may return a sigma-type
@@ -667,8 +663,11 @@ tcInstFun do_ql inst_final (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
   = do { traceTc "tcInstFun" (vcat [ text "tc_fun" <+> ppr tc_fun
                                    , text "fun_sigma" <+> ppr fun_sigma
                                    , text "args:" <+> ppr rn_args
-                                   , text "do_ql" <+> ppr do_ql ])
-       ; go 1 [] fun_sigma rn_args }
+                                   , text "do_ql" <+> ppr do_ql
+                                   , text "ctx" <+> ppr fun_ctxt])
+       ; setQLInstLevel do_ql $  -- See (TCAPP1) and (TCAPP2) in
+                                 -- Note [tcApp: typechecking applications]
+                 go 1 [] fun_sigma rn_args }
   where
     fun_orig = exprCtOrigin rn_fun
 
