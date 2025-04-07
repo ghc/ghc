@@ -811,6 +811,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
           (vcat [ ppr ctxt
                 , text "scrs" <+> ppr scrs
                 , text "matches group" <+> ppr matches
+                , text "new_vars" <+> ppr new_vars
                 , text "matchPmChecked" <+> ppr (isMatchContextPmChecked dflags origin ctxt)])
         ; matches_nablas <-
             if isMatchContextPmChecked dflags origin ctxt
