@@ -230,11 +230,11 @@ data BCInstr
 
    -- Breakpoints
    | BRK_FUN          (ForeignRef BreakArray)
-                      (RemotePtr ModuleName) -- breakpoint tick module
-                      (RemotePtr UnitId)     -- breakpoint tick module unit id
+                      !ModuleName            -- breakpoint tick module
+                      !UnitId                -- breakpoint tick module unit id
                       !Word16                -- breakpoint tick index
-                      (RemotePtr ModuleName) -- breakpoint info module
-                      (RemotePtr UnitId)     -- breakpoint info module unit id
+                      !ModuleName            -- breakpoint info module
+                      !UnitId                -- breakpoint info module unit id
                       !Word16                -- breakpoint info index
                       (RemotePtr CostCentre)
 
