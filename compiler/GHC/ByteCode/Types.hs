@@ -50,8 +50,8 @@ import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 import GHC.Iface.Syntax
-import Language.Haskell.Syntax.Module.Name (ModuleName)
-import GHC.Unit.Types (UnitId)
+import Language.Haskell.Syntax.Module.Name (ModuleName, mkModuleNameFS)
+import GHC.Unit.Types (UnitId(..))
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code
@@ -262,9 +262,9 @@ data ModBreaks
         -- ^ Array pointing to cost centre for each breakpoint
    , modBreaks_breakInfo :: IntMap CgBreakInfo
         -- ^ info about each breakpoint from the bytecode generator
-   , modBreaks_module :: RemotePtr ModuleName
+   , modBreaks_module :: !ModuleName
         -- ^ info about the module in which we are setting the breakpoint
-   , modBreaks_module_unitid :: RemotePtr UnitId
+   , modBreaks_module_unitid :: !UnitId
         -- ^ The 'UnitId' of the 'ModuleName'
    }
 
@@ -289,8 +289,8 @@ emptyModBreaks = ModBreaks
    , modBreaks_decls = array (0,-1) []
    , modBreaks_ccs = array (0,-1) []
    , modBreaks_breakInfo = IntMap.empty
-   , modBreaks_module = toRemotePtr nullPtr
-   , modBreaks_module_unitid = toRemotePtr nullPtr
+   , modBreaks_module = mkModuleNameFS nilFS
+   , modBreaks_module_unitid = UnitId nilFS
    }
 
 {-
