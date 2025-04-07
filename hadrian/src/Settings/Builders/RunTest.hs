@@ -93,7 +93,6 @@ data TestCompilerArgs = TestCompilerArgs{
 inTreeCompilerArgs :: Stage -> Action TestCompilerArgs
 inTreeCompilerArgs stg = do
 
-
     (hasDynamicRts, hasThreadedRts) <- do
       ways <- interpretInContext (vanillaContext stg rts) getRtsWays
       return (dynamic `elem` ways, threaded `elem` ways)
@@ -103,13 +102,13 @@ inTreeCompilerArgs stg = do
     -- LeadingUnderscore is a property of the system so if cross-compiling stage1/stage2 could
     -- have different values? Currently not possible to express.
     leadingUnderscore   <- queryTargetTarget tgtSymbolsHaveLeadingUnderscore
-    withInterpreter     <- ghcWithInterpreter
+    cross               <- flag CrossCompiling
+    withInterpreter     <- ghcWithInterpreter stg
     interpForceDyn      <- targetRTSLinkerOnlySupportsSharedLibs
     unregisterised      <- queryTargetTarget tgtUnregisterised
     tables_next_to_code <- queryTargetTarget tgtTablesNextToCode
     targetWithSMP       <- targetSupportsSMP
 
-    cross <- flag CrossCompiling
 
     let ghcStage
           | cross, Stage1 <- stg = Stage1

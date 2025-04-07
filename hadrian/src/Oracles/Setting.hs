@@ -11,8 +11,7 @@ module Oracles.Setting (
     -- ** Target platform things
     anyTargetOs, anyTargetArch, anyHostOs,
     isElfTarget, isOsxTarget, isWinTarget, isJsTarget, isArmTarget,
-    targetArmVersion,
-    ghcWithInterpreter
+    targetArmVersion
     ) where
 
 import System.Directory
@@ -197,21 +196,6 @@ targetSupportsRPaths :: Action Bool
 targetSupportsRPaths = queryTargetTarget (\t -> let os = archOS_OS (tgtArchOs t)
                                              in osElfTarget os || osMachOTarget os)
 
--- | Check whether the target supports GHCi.
-ghcWithInterpreter :: Action Bool
-ghcWithInterpreter = do
-    goodOs <- anyTargetOs [ OSMinGW32, OSLinux, OSSolaris2 -- TODO "cygwin32"?,
-                          , OSFreeBSD, OSDragonFly, OSNetBSD, OSOpenBSD
-                          , OSDarwin, OSKFreeBSD
-                          , OSWasi ]
-    goodArch <- (||) <$>
-                anyTargetArch [ ArchX86, ArchX86_64, ArchPPC
-                              , ArchAArch64, ArchS390X
-                              , ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2
-                              , ArchRISCV64
-                              , ArchWasm32 ]
-                              <*> isArmTarget
-    return $ goodOs && goodArch
 
 -- | Which variant of the ARM architecture is the target (or 'Nothing' if not
 -- ARM)?
