@@ -83,7 +83,7 @@ packageArgs = do
             -- (#14335) and completely untested in CI for cross
             -- backends at the moment, so we might as well disable it
             -- for cross GHC.
-            [ andM [expr ghcWithInterpreter, notStage0, notCross] `cabalFlag` "internal-interpreter"
+            [ andM [expr (ghcWithInterpreter stage), notCross] `cabalFlag` "internal-interpreter"
             , notM cross `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
             , flag UseLibzstd `cabalFlag` "with-libzstd"
@@ -105,16 +105,7 @@ packageArgs = do
              , compilerStageOption ghcDebugAssertions ? arg "-DDEBUG" ]
 
           , builder (Cabal Flags) ? mconcat
-            [
-              -- When cross compiling, enable for stage0 to get ghci
-              -- support. But when not cross compiling, disable for
-              -- stage0, otherwise we introduce extra dependencies
-              -- like haskeline etc, and mixing stageBoot/stage0 libs
-              -- can cause extra trouble (e.g. #25406)
-              expr ghcWithInterpreter ?
-                ifM (expr cross)
-                  (arg "internal-interpreter")
-                  (notStage0 `cabalFlag` "internal-interpreter")
+            [ (expr (ghcWithInterpreter stage)) `cabalFlag` "internal-interpreter"
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.

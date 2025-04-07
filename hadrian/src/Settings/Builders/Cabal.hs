@@ -137,7 +137,8 @@ libraryArgs = do
     flavourWays <- getLibraryWays
     contextWay  <- getWay
     package     <- getPackage
-    withGhci    <- expr ghcWithInterpreter
+    stage       <- getStage
+    withGhci    <- expr $ ghcWithInterpreter stage
     dynPrograms <- expr (flavour >>= dynamicGhcPrograms)
     ghciObjsSupported <- expr platformSupportsGhciObjects
     let ways = Set.insert contextWay flavourWays
