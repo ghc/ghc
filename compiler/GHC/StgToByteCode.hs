@@ -455,7 +455,7 @@ break_info hsc_env mod current_mod current_mod_breaks
   where
     check_mod_ptr mb
       | mod_ptr <- modBreaks_module mb
-      , fromRemotePtr mod_ptr /= nullPtr
+      , not $ nullFS $ moduleNameFS mod_ptr
       = Just mb
       | otherwise
       = Nothing

@@ -42,6 +42,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Core.TyCon
+import GHC.Data.FastString
 import GHC.Data.SizedSeq
 import GHC.Data.SmallArray
 
@@ -51,6 +52,7 @@ import GHC.Cmm.Reg             ( GlobalArgRegs(..) )
 import GHC.Cmm.CallConv        ( allArgRegsCover )
 import GHC.Platform
 import GHC.Platform.Profile
+import Language.Haskell.Syntax.Module.Name
 
 import Control.Monad
 import qualified Control.Monad.Trans.State.Strict as MTL
@@ -697,8 +699,8 @@ assembleI platform i = case i of
   PRIMCALL                 -> emit_ bci_PRIMCALL []
   BRK_FUN arr tick_mod tickx info_mod infox cc ->
                               do p1 <- ptr (BCOPtrBreakArray arr)
-                                 tick_addr <- addr tick_mod
-                                 info_addr <- addr info_mod
+                                 tick_addr <- lit1 $ BCONPtrStr $ bytesFS $ moduleNameFS tick_mod
+                                 info_addr <- lit1 $ BCONPtrStr $ bytesFS $ moduleNameFS info_mod
                                  np <- addr cc
                                  emit_ bci_BRK_FUN [ Op p1
                                                   , Op tick_addr, Op info_addr
