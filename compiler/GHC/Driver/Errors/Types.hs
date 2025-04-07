@@ -4,6 +4,7 @@
 
 module GHC.Driver.Errors.Types (
     GhcMessage(..)
+  , AnyGhcDiagnostic
   , GhcMessageOpts(..)
   , DriverMessage(..)
   , DriverMessageOpts(..)
@@ -98,6 +99,7 @@ data GhcMessage where
 
   deriving Generic
 
+type AnyGhcDiagnostic = UnknownDiagnosticFor GhcMessage
 
 data GhcMessageOpts = GhcMessageOpts { psMessageOpts :: DiagnosticOpts PsMessage
                                      , tcMessageOpts :: DiagnosticOpts TcRnMessage

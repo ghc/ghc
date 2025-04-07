@@ -512,6 +512,7 @@ Library
         GHC.Driver.Config.StgToJS
         GHC.Driver.DynFlags
         GHC.Driver.IncludeSpecs
+        GHC.Driver.Downsweep
         GHC.Driver.Env
         GHC.Driver.Env.KnotVars
         GHC.Driver.Env.Types
@@ -525,6 +526,7 @@ Library
         GHC.Driver.MakeSem
         GHC.Driver.Main
         GHC.Driver.Make
+        GHC.Driver.MakeAction
         GHC.Driver.MakeFile
         GHC.Driver.Monad
         GHC.Driver.Phases

@@ -7,5 +7,5 @@ While handling default output name would overwrite the input file; must specify 
   | Usage: For basic information, try the `--help' option.
 
 HasCallStack backtrace:
-  bracket, called at compiler/GHC/Driver/Make.hs:2955:3 in ghc-9.13-inplace:GHC.Driver.Make
+  bracket, called at compiler/GHC/Driver/MakeAction.hs:2955:3 in ghc-9.13-inplace:GHC.Driver.MakeAction
 
