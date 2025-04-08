@@ -9,3 +9,6 @@
 -}
 
 module Example10 where
+
+# error "foo"
+# some random thing

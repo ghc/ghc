@@ -248,7 +248,7 @@ $docsym    = [\| \^ \* \$]
 @negative = \-
 
 -- recognise any of the GhcCPP keywords introduced by a leading #
-@cppkeyword = "define" | "include" | "undef" | "error" | "ifdef"
+@cppkeyword = "define" | "include" | "undef" | "ifdef"
                  | "ifndef" | "if" | "elif" | "else" | "endif"
                  | "dumpghccpp"
 
@@ -333,7 +333,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   ^\# line                              { begin line_prag1 }
   ^\# / { followedByDigit }             { begin line_prag1 }
 
-  -- ^.*\n                      / { ifExtension GhcCppBit } { cppSkip }
+  ^.*\n                      / { ifExtension GhcCppBit } { cppSkip }
 
   ^\# pragma .* \n                      ; -- GCC 3.3 CPP generated, apparently
   ^\# \! .* \n                          ; -- #!, for scripts  -- gcc
@@ -359,7 +359,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   ^\# \ * @cppkeyword  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag }
 
   ^\# (line)?                           { begin line_prag1 }
-  -- ^.*\n                      / { ifExtension GhcCppBit } { cppSkip }
+  ^.*\n                      / { ifExtension GhcCppBit } { cppSkip }
 }
 
 -- after an 'if', a vertical bar starts a layout context for MultiWayIf
