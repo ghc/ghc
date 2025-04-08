@@ -37,6 +37,7 @@ import GHC.Core.Subst
 import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.Predicate( isDictId )
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal
@@ -2302,19 +2303,21 @@ mkNonRecFloat env lev bndr rhs
       , fia_ok_for_spec = ok_for_spec
       }
 
-    is_hnf      = exprIsHNF rhs
-    cfg         = cpe_config env
+    cfg        = cpe_config env
+    spec_dicts = cp_specEvalDFun cfg
 
-    ok_for_spec = exprOkForSpecEval call_ok_for_spec rhs
+    ok_for_spec = (spec_dicts || not (isDictId bndr))
+               && exprOkForSpecEval call_ok_for_spec rhs
     -- See Note [Controlling Speculative Evaluation]
     call_ok_for_spec x
-      | is_rec_call x                           = False
-      | not (cp_specEval cfg)                   = False
-      | not (cp_specEvalDFun cfg) && isDFunId x = False
-      | otherwise                               = True
+      | is_rec_call x                = False
+      | not (cp_specEval cfg)        = False
+      | not spec_dicts && isDFunId x = False
+      | otherwise                    = True
     is_rec_call = (`elemUnVarSet` cpe_rec_ids env)
 
     -- See Note [Pin evaluatedness on floats]
+    is_hnf = exprIsHNF rhs
     bndr' | is_hnf    = bndr `setIdUnfolding` evaldUnfolding
           | otherwise = bndr
 
