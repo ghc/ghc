@@ -1,3 +1,4 @@
+T18300.hs:13:1: error: [GHC-55233]
+    • Data instance has non-* return kind ‘TYPE (F Int)’
+    • In the data family instance declaration for ‘T’
 
-T18300.hs:9:23: error: [GHC-76037]
-    Not in scope: data constructor ‘LiftedRep’

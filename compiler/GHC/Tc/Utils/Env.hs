@@ -119,7 +119,7 @@ import GHC.Utils.Misc ( HasDebugCallStack )
 
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
-import GHC.Data.Maybe( MaybeErr(..), orElse, maybeToList )
+import GHC.Data.Maybe( MaybeErr(..), orElse, maybeToList, fromMaybe )
 
 import GHC.Types.SrcLoc
 import GHC.Types.Basic hiding( SuccessFlag(..) )
@@ -395,9 +395,12 @@ failIllegalTyVar :: WithUserRdr Name -> TcM a
       hfdc <- getHoleFitDispConfig
       unit_state <- hsc_units <$> getTopEnv
       let
-        msg = TcRnIllegalTermLevelUse rdr nm err
+        want_simple = want_simple_msg hints
+        msg = TcRnIllegalTermLevelUse want_simple rdr nm err
         info = ErrInfo { errInfoContext =
-                           maybeToList $ fmap (TermLevelUseCtxt nm) pprov
+                           if want_simple
+                           then []
+                           else maybeToList $ fmap (TermLevelUseCtxt nm) pprov
                        , errInfoSupplementary =
                            fmap ((hfdc,) . (:[]) . SupplementaryImportErrors) $
                              NE.nonEmpty imp_errs
@@ -410,21 +413,59 @@ failIllegalTyVar :: WithUserRdr Name -> TcM a
       if not show_helpful_errors || (required_type_arguments && isVarNameSpace ns)
       then return ([], [])  -- See Note [Suppress hints with RequiredTypeArguments]
       else do
-        let mb_rdr'
-              | isTvNameSpace (rdrNameSpace rdr)
-              = demoteRdrNameTv rdr
-              | isTcClsNameSpace (rdrNameSpace rdr)
-              = demoteRdrName rdr
-              | otherwise
-              = Just rdr
-        case mb_rdr' of
-          Just rdr' -> do
-            lcl_env <- getLocalRdrEnv
-            unknownNameSuggestions lcl_env what_looking rdr'
-          Nothing ->
-            return ([],[])
+        let rdr' = fromMaybe rdr (demoteRdrName rdr)
+        lcl_env <- getLocalRdrEnv
+        unknownNameSuggestions lcl_env what_looking rdr'
 
-{-
+-- | Should we display a simpler "out of scope" message to the user, instead of
+-- a full-blown "illegal term-level use" message?
+--
+-- See Note [Simpler "illegal term-level use" errors]
+want_simple_msg :: [GhcHint] -> Bool
+want_simple_msg hints = any relevant_suggestion hints
+  where
+    relevant_suggestion = \case
+      ImportSuggestion {} -> True
+      SuggestSimilarNames {} -> True
+      _ -> False
+
+{- Note [Simpler "illegal term-level use" errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we rename the occurrence of A in the definition of 'f' in the following program:
+
+  module M1 where
+    data A = A Int
+  module M2 where
+    import M1 (A)
+    f x = A x
+
+we initially resolve 'A' to the type constructor 'A', in order to support
+-XRequiredTypeArguments. Then we come to find out that a type is illegal in
+this position. It is more user-friendly to report the problem as:
+
+  Data constructor out of scope: A
+
+rather than:
+
+  Illegal term-level use of type constructor A
+
+This was reported in #23982.
+
+To achieve this, in 'failIllegalTyCon' and 'failIllegalTyVar', we include a
+little heuristic to decide whether to emit an "out of scope" message rather than
+an "illegal term-level use" message: when we have a term to suggest to the user,
+then give the simpler "out of scope" error message.
+
+For instance, in the example above, we suggest extending the import list to
+
+  import M1 (A(A))
+
+to bring the data constructor A into scope. We thus emit the following message:
+
+    Data constructor out of scope: A
+    Suggested fix:
+      Add ‘A’ to the import list in the import of M1
+
 ************************************************************************
 *                                                                      *
                 Extending the global environment

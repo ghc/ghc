@@ -1087,11 +1087,21 @@ instance Diagnostic TcRnMessage where
                      TermVariablePE -> text "term variables cannot be promoted"
                      TypeVariablePE -> text "type variables bound in a kind signature cannot be used in the type"
           same_rec_group_msg = text "it is defined and used in the same recursive group"
-    TcRnIllegalTermLevelUse rdr name err
+    TcRnIllegalTermLevelUse simple_msg rdr name err
       -> mkSimpleDecorated $
-            text "Illegal term-level use of the" <+>
-              text (teCategory err) <+> quotes (ppr qnm)
+           if simple_msg
+           then
+              vcat [ expecting_what <+> text "out of scope:" <+> quotes (ppr rdr) <> dot
+                   , "NB: the" <+> text (teCategory err) <+> quotes (ppr qnm) <+> "cannot appear in this position."
+                   ]
+           else
+             text "Illegal term-level use of the" <+>
+               text (teCategory err) <+> quotes (ppr qnm)
           where
+            expecting_what = case err of
+              TyVarTE -> "Term variable"
+              ClassTE -> "Data constructor"
+              TyConTE -> "Data constructor"
             qnm = WithUserRdr rdr name
     TcRnMatchesHaveDiffNumArgs argsContext (MatchArgMatches match1 bad_matches)
       -> mkSimpleDecorated $
@@ -5165,7 +5175,6 @@ instance Outputable ImportError where
           what = case what_look of
             WL_ConLike -> text "data constructor"
             WL_RecField -> text "record field"
-            WL_Term -> text "term"
             _ -> empty
     where
       quoted :: Outputable a => a -> SDoc

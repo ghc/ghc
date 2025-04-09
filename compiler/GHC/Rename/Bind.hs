@@ -59,7 +59,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Types.Name.Reader ( RdrName, rdrNameOcc )
+import GHC.Types.Name.Reader
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
@@ -471,7 +471,7 @@ rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
   = do { addLocM checkConName rdrname
        ; name <-
-           lookupLocatedTopConstructorRnN rdrname -- Should be in scope already
+           lookupLocatedTopBndrRnN WL_ConLike rdrname -- Should be in scope already
        ; return (PatSynBind x psb{ psb_ext = noAnn, psb_id = name }) }
 
   | otherwise  -- Pattern synonym, not at top level
@@ -1100,7 +1100,7 @@ renameSig _ (SpecInstSig (_, src) ty)
 -- then the SPECIALISE pragma is ambiguous, unlike all other signatures
 renameSig ctxt sig@(SpecSig _ v tys inl)
   = do  { new_v <- case ctxt of
-                     TopSigCtxt {} -> lookupLocatedOccRn v
+                     TopSigCtxt {} -> lookupLocatedOccRn WL_TermVariable v
                      _             -> lookupSigOccRn ctxt sig v
         ; (new_ty, fvs) <- foldM do_one ([],emptyFVs) tys
         ; return (SpecSig noAnn new_v new_ty inl, fvs) }
@@ -1111,7 +1111,7 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
 
 renameSig _ctxt (SpecSigE _ bndrs spec_e inl)
   = do { fn_rdr <- checkSpecESigShape spec_e
-       ; fn_name <- lookupOccRn fn_rdr  -- Checks that the head isn't forall-bound
+       ; fn_name <- lookupOccRn WL_TermVariable fn_rdr  -- Checks that the head isn't forall-bound
        ; bindRuleBndrs (SpecECtx fn_rdr) bndrs $ \_ bndrs' ->
          do { (spec_e', fvs) <- rnLExpr spec_e
             ; return (SpecSigE fn_name bndrs' spec_e' inl, fvs) } }
@@ -1142,8 +1142,8 @@ renameSig ctxt sig@(SCCFunSig (_, st) v s)
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn
 renameSig _ctxt (CompleteMatchSig (_, s) bf mty)
-  = do new_bf <- traverse lookupLocatedOccRn bf
-       new_mty  <- traverse lookupLocatedOccRn mty
+  = do new_bf <- traverse (lookupLocatedOccRn WL_ConLike) bf
+       new_mty  <- traverse (lookupLocatedOccRn WL_TyCon) mty
 
        this_mod <- fmap tcg_mod getGblEnv
        let rn_sig = CompleteMatchSig (noAnn, s) new_bf new_mty

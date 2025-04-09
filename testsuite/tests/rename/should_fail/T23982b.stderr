@@ -1,0 +1,9 @@
+T23982b.hs:3:9: error: [GHC-01928]
+    • Data constructor out of scope: ‘A’.
+      NB: the type constructor ‘A’ cannot appear in this position.
+    • In the expression: A a
+      In an equation for ‘f’: f a = A a
+    Suggested fix:
+      Add ‘A’ to the import list in the import of ‘T23982b_aux’
+      (at T23982b.hs:2:3-28).
+

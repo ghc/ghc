@@ -14,8 +14,7 @@ GHC.Rename.Env contains functions which convert RdrNames into Names.
 module GHC.Rename.Env (
         newTopSrcBinder,
 
-        lookupLocatedTopBndrRn, lookupLocatedTopBndrRnN, lookupTopBndrRn,
-        lookupLocatedTopConstructorRn, lookupLocatedTopConstructorRnN,
+        lookupLocatedTopBndrRnN, lookupTopBndrRn,
 
         lookupLocatedOccRn, lookupLocatedOccRnConstr, lookupLocatedOccRnRecField,
         lookupLocatedOccRnNone,
@@ -23,7 +22,7 @@ module GHC.Rename.Env (
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
         lookupTypeOccRn,
-        lookupGlobalOccRn, lookupGlobalOccRn_maybe,
+        lookupGlobalOccRn_maybe,
 
         lookupExprOccRn,
         lookupRecFieldOcc,
@@ -303,17 +302,9 @@ lookupTopBndrRn which_suggest rdr_name =
                         unboundName (LF which_suggest WL_LocalTop) rdr_name
     }
 
-lookupLocatedTopConstructorRn :: Located RdrName -> RnM (Located (WithUserRdr Name))
-lookupLocatedTopConstructorRn = wrapLocM (lookupTopBndrRn WL_Constructor)
-
-lookupLocatedTopConstructorRnN :: LocatedN RdrName -> RnM (LocatedN Name)
-lookupLocatedTopConstructorRnN = wrapLocMA (fmap getName . lookupTopBndrRn WL_Constructor)
-
-lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located (WithUserRdr Name))
-lookupLocatedTopBndrRn = wrapLocM (lookupTopBndrRn WL_Anything)
-
-lookupLocatedTopBndrRnN :: LocatedN RdrName -> RnM (LocatedN Name)
-lookupLocatedTopBndrRnN = wrapLocMA (fmap getName . lookupTopBndrRn WL_Anything)
+lookupLocatedTopBndrRnN :: WhatLooking -> LocatedN RdrName -> RnM (LocatedN Name)
+lookupLocatedTopBndrRnN what_look =
+  wrapLocMA (fmap getName . lookupTopBndrRn what_look)
 
 -- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
 -- This never adds an error, but it may return one, see
@@ -426,7 +417,7 @@ lookupFamInstName :: Maybe Name -> LocatedN RdrName
 lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f GHC.Rename.Bind.rnMethodBind
   = wrapLocMA (lookupInstDeclBndr cls AssociatedTypeOfClass) tc_rdr
 lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
-  = lookupLocatedOccRnConstr tc_rdr
+  = lookupLocatedOccRn WL_TyCon tc_rdr
 
 -----------------------------------------------
 lookupConstructorFields :: HasDebugCallStack => WithUserRdr Name -> RnM [FieldLabel]
@@ -562,11 +553,18 @@ lookupRecFieldOcc mb_con rdr_name
           ; Just nm -> return nm } }
 
   | otherwise  -- Can't use the data constructor to disambiguate
-  = lookupGlobalOccRn' WantField rdr_name
-    -- This use of Global is right as we are looking up a selector,
-    -- which can only be defined at the top level.
-
+  = lookupExactOrOrig rdr_name greName $
+    do { mb_gre <- lookupGlobalOccRn_base which_gres rdr_name
+       ; case mb_gre of
+           Just gre -> return (greName gre)
+           Nothing  -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
+                          ; unboundName looking_for rdr_name } }
   where
+    which_gres   = RelevantGREsFOS WantField
+    looking_for  = LF { lf_which = WL_RecField, lf_where =  WL_Global }
+      -- This use of Global is right as we are looking up a selector,
+      -- which can only be defined at the top level.
+
     -- When lookup fails, make an unbound name with the right record field
     -- namespace, as that's what we expect to be returned
     -- from 'lookupRecFieldOcc'. See T14307.
@@ -994,10 +992,10 @@ we'll miss the fact that the qualified import is redundant.
 --------------------------------------------------
 -}
 
-
-lookupLocatedOccRn :: GenLocated (EpAnn ann) RdrName
+lookupLocatedOccRn :: WhatLooking
+                   -> GenLocated (EpAnn ann) RdrName
                    -> TcRn (GenLocated (EpAnn ann) Name)
-lookupLocatedOccRn = wrapLocMA lookupOccRn
+lookupLocatedOccRn what = wrapLocMA (lookupOccRn what)
 
 lookupLocatedOccRnConstr :: GenLocated (EpAnn ann) RdrName
                          -> TcRn (GenLocated (EpAnn ann) Name)
@@ -1023,19 +1021,14 @@ lookupLocalOccThLvl_maybe name
   = do { lcl_env <- getLclEnv
        ; return (lookupNameEnv (getLclEnvThBndrs lcl_env) name) }
 
--- lookupOccRn' looks up an occurrence of a RdrName, and uses its argument to
+-- | lookupOccRn looks up an occurrence of a RdrName, and uses its argument to
 -- determine what kind of suggestions should be displayed if it is not in scope
-lookupOccRn' :: WhatLooking -> RdrName -> RnM Name
-lookupOccRn' which_suggest rdr_name
+lookupOccRn :: WhatLooking -> RdrName -> RnM Name
+lookupOccRn which_suggest rdr_name
   = do { mb_gre <- lookupOccRn_maybe rdr_name
        ; case mb_gre of
            Just gre  -> return $ greName gre
-           Nothing   -> reportUnboundName' which_suggest rdr_name }
-
--- lookupOccRn looks up an occurrence of a RdrName and displays suggestions if
--- it is not in scope
-lookupOccRn :: RdrName -> RnM Name
-lookupOccRn = lookupOccRn' WL_Anything
+           Nothing   -> reportUnboundName which_suggest rdr_name }
 
 -- | Look up an occurrence of a 'RdrName'.
 --
@@ -1053,11 +1046,7 @@ lookupOccRnConstr rdr_name
             ; case mb_ty_gre of
               Just gre -> return $ greName gre
               Nothing ->
-                reportUnboundName'
-                  WL_Constructor
-                    -- not WL_ConLike, due to the type-level fallback
-                    -- described in Note [lookupOccRnConstr]
-                  rdr_name
+                reportUnboundName WL_ConLike rdr_name
             } }
 
 {- Note [lookupOccRnConstr]
@@ -1085,12 +1074,12 @@ error messaging (See Note [Promotion]).
 -- lookupOccRnRecField looks up an occurrence of a RdrName and displays
 -- record fields as suggestions if it is not in scope
 lookupOccRnRecField :: RdrName -> RnM Name
-lookupOccRnRecField = lookupOccRn' WL_RecField
+lookupOccRnRecField = lookupOccRn WL_RecField
 
 -- lookupOccRnRecField looks up an occurrence of a RdrName and displays
 -- no suggestions if it is not in scope
 lookupOccRnNone :: RdrName -> RnM Name
-lookupOccRnNone = lookupOccRn' WL_None
+lookupOccRnNone = lookupOccRn WL_None
 
 -- Only used in one place, to rename pattern synonym binders.
 -- See Note [Renaming pattern synonym variables] in GHC.Rename.Bind
@@ -1099,7 +1088,7 @@ lookupLocalOccRn rdr_name
   = do { mb_name <- lookupLocalOccRn_maybe rdr_name
        ; case mb_name of
            Just name -> return name
-           Nothing   -> unboundName (LF WL_Anything WL_LocalOnly) rdr_name }
+           Nothing   -> unboundName (LF WL_TermVariable WL_LocalOnly) rdr_name }
 
 -- lookupTypeOccRn looks up an optionally promoted RdrName.
 -- Used for looking up type variables.
@@ -1176,7 +1165,7 @@ lookup_demoted rdr_name
   = unboundName looking_for rdr_name
 
   where
-    looking_for = LF WL_Constructor WL_Anywhere
+    looking_for = LF WL_Type WL_Anywhere
 
 {- Note [Demotion of unqualified variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1266,7 +1255,7 @@ report_qualified_term_in_types :: RdrName -> RdrName -> RnM Name
 report_qualified_term_in_types rdr_name demoted_rdr_name =
   do { mName <- lookupGlobalOccRn_maybe (RelevantGREsFOS WantNormal) demoted_rdr_name
      ; case mName of
-         (Just _) -> termNameInType looking_for rdr_name demoted_rdr_name []
+         Just _  -> termNameInType looking_for rdr_name demoted_rdr_name []
          Nothing -> unboundTermNameInTypes looking_for rdr_name demoted_rdr_name }
   where
     looking_for = LF WL_Constructor WL_Global
@@ -1405,31 +1394,6 @@ lookupGlobalOccRn_maybe :: WhichGREs GREInfo -> RdrName -> RnM (Maybe GlobalRdrE
 lookupGlobalOccRn_maybe which_gres rdr_name =
   lookupExactOrOrig_maybe rdr_name id $
     lookupGlobalOccRn_base which_gres rdr_name
-
-lookupGlobalOccRn :: RdrName -> RnM Name
--- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global
--- environment.  Adds an error message if the RdrName is not in scope.
--- You usually want to use "lookupOccRn" which also looks in the local
--- environment.
---
--- Used by exports_from_avail
-lookupGlobalOccRn = lookupGlobalOccRn' WantNormal
-
-lookupGlobalOccRn' :: FieldsOrSelectors -> RdrName -> RnM Name
-lookupGlobalOccRn' fos rdr_name
-  = lookupExactOrOrig rdr_name greName $
-    do { mb_gre <- lookupGlobalOccRn_base which_gres rdr_name
-       ; case mb_gre of
-           Just gre -> return (greName gre)
-           Nothing  -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
-                          ; unboundName looking_for rdr_name } }
-  where
-    which_gres   = RelevantGREsFOS fos
-    looking_for  = LF { lf_which = what_looking, lf_where =  WL_Global }
-    what_looking = case fos of
-                      WantBoth   -> WL_RecField
-                      WantField  -> WL_RecField
-                      WantNormal -> WL_Anything
 
 -- Looks up a RdrName occurrence in the GlobalRdrEnv and with
 -- lookupQualifiedNameGHCi. Does not try to find an Exact or Orig name first.

@@ -6,7 +6,7 @@ import GHC.Exts
 import Data.Kind
 
 type family F a :: RuntimeRep
-type instance F Int = 'LiftedRep
+type instance F Int = LiftedRep
 
 data family T a :: TYPE (F a)
 

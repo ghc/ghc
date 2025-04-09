@@ -81,6 +81,7 @@ module GHC.Tc.Errors.Types (
   , Subordinate(..), pprSubordinate
   , ImportError(..)
   , WhatLooking(..)
+  , lookingForSubordinate
   , HoleError(..)
   , CoercibleMsg(..)
   , PotentialInstances(..)
@@ -2468,7 +2469,9 @@ data TcRnMessage where
       Test cases: T18740a, T18740b, T23739_fail_ret, T23739_fail_case
   -}
   TcRnIllegalTermLevelUse
-    :: !RdrName -- ^ the user-written identifier
+    :: !Bool -- ^ should we give a simple "out of scope" message,
+             -- instead of a full-blown "Illegal term level use" message?
+    -> !RdrName -- ^ the user-written identifier
     -> !Name    -- ^ the type-level 'Name' we resolved it to
     -> !TermLevelUseErr
     -> TcRnMessage
@@ -5969,13 +5972,18 @@ data WhatLooking = WL_Anything
                      -- ^ Suggest type constructors, data constructors
                      -- (including promoted data constructors), and pattern
                      -- synonyms.
+                 | WL_TyCon
+                     -- ^ Suggest type constructors/classes only; do not
+                     -- include promoted data constructors.
+                 | WL_TyCon_or_TermVar
+                     -- ^ Suggest type constructors and term variables,
+                     -- but not data constructors nor type variables
+                 | WL_TyVar
+                     -- ^ Suggest type variables only.
                  | WL_ConLike
                    -- ^ Suggest term-level data constructors and pattern
                    -- synonyms; no type constructors or promoted data
                    -- constructors
-                 | WL_NotConLike
-                     -- ^ Suggest anything except data constructors and
-                     -- pattern synonyms
                  | WL_RecField
                      -- ^ Suggest record fields
                      --
@@ -5987,12 +5995,26 @@ data WhatLooking = WL_Anything
                      -- If we are expecting a term value, then only suggest
                      -- terms (e.g. term variables, data constructors) and
                      -- not type constructors or type variables
+                 | WL_TermVariable
+                    -- ^ Suggest term variables (and record fields)
+                 | WL_Type
+                     -- ^ Suggest types: type constructors, type variables,
+                     -- promoted data constructors.
                  | WL_None
                      -- ^ No suggestions
                      --
                      -- This is is used for rebindable syntax, where there
                      -- is no point in suggesting alternative spellings
                  deriving (Eq, Show)
+
+-- | In what namespaces should we look for a subordinate
+-- of the given 'GlobalRdrElt'.
+lookingForSubordinate :: GlobalRdrElt -> WhatLooking
+lookingForSubordinate parent_gre =
+  case greInfo parent_gre of
+    IAmTyCon ClassFlavour
+      -> WL_TyCon_or_TermVar
+    _ -> WL_Term
 
 -- | This datatype collates instances that match or unifier,
 -- in order to report an error message for an unsolved typeclass constraint.

@@ -1,7 +1,6 @@
 mod132.hs:6:7: error: [GHC-01928]
-    • Illegal term-level use of the type constructor ‘Foo’
-    • imported from ‘Mod132_B’ at mod132.hs:4:1-15
-      (and originally defined in ‘Mod132_A’ at Mod132_A.hs:3:1-14)
+    • Data constructor out of scope: ‘Foo’.
+      NB: the type constructor ‘Foo’ cannot appear in this position.
     • In the expression: Foo
       In an equation for ‘foo’: foo = Foo
     Suggested fix: Perhaps use variable ‘foo’ (line 6)

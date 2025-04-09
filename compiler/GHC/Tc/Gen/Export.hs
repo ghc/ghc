@@ -1,5 +1,6 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE TypeFamilies       #-}
@@ -697,12 +698,15 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
 -- | In what namespaces should we go looking for an import/export item
 -- that is out of scope, for suggestions in error messages?
-ieLWrappedNameWhatLooking :: LIEWrappedName GhcPs -> WhatLooking
-ieLWrappedNameWhatLooking (L _ n) = case n of
-  IEName {}    -> WL_NotConLike
-  IEDefault {} -> WL_Constructor
-  IEType {}    -> WL_NotConLike
+ieWrappedNameWhatLooking :: IEWrappedName GhcPs -> WhatLooking
+ieWrappedNameWhatLooking = \case
+  IEName {}    -> WL_TyCon_or_TermVar
+  IEDefault {} -> WL_TyCon
+  IEType {}    -> WL_Type
   IEPattern {} -> WL_ConLike
+
+ieLWrappedNameWhatLooking :: LIEWrappedName GhcPs -> WhatLooking
+ieLWrappedNameWhatLooking = ieWrappedNameWhatLooking . unLoc
 
 -- Renaming and typechecking of exports happens after everything else has
 -- been typechecked.
@@ -789,7 +793,7 @@ lookupChildrenExport parent_gre rdr_items = mapAndReportM doOne rdr_items
 
           case name of
             NameNotFound ->
-              do { ub <- reportUnboundName unboundName
+              do { ub <- reportUnboundName (lookingForSubordinate parent_gre) unboundName
                  ; let l = getLoc n
                        gre = mkLocalGRE UnboundGRE NoParent ub
                  ; return (L l (IEName noExtField (L (l2l l) ub)), gre)}

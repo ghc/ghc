@@ -74,7 +74,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.Hint
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.Basic  ( TopLevelFlag(..) )
+import GHC.Types.Basic  ( TopLevelFlag(..), TyConFlavour (..) )
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.PkgQual
@@ -1363,7 +1363,8 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
            case lookupChildren subnames rdr_ns of
 
              Failed rdrs -> failLookupWith $
-                            BadImport (IEThingWith (deprecation, ann) ltc wc rdrs noDocstring) IsSubordinate
+                            BadImport (IEThingWith (deprecation, ann) ltc wc rdrs noDocstring)
+                              (IsSubordinate { subordinate_parent = gre})
                                 -- We are trying to import T( a,b,c,d ), and failed
                                 -- to find 'b' and 'd'.  So we make up an import item
                                 -- to report as failing, namely T( b, d ).
@@ -1414,7 +1415,8 @@ data IELookupWarning
 
 -- | Is this import/export item a subordinate or not?
 data IsSubordinate
-  = IsSubordinate | IsNotSubordinate
+  = IsSubordinate { subordinate_parent :: GlobalRdrElt }
+  | IsNotSubordinate
 
 data IELookupError
   = QualImportError RdrName
@@ -2310,14 +2312,21 @@ badImportItemErr iface decl_spec ie sub avails = do
     importErrorKind dflags rdr_env expl_ns_enabled
       | any checkIfTyCon avails = case sub of
           IsNotSubordinate -> BadImportAvailTyCon expl_ns_enabled
-          IsSubordinate -> BadImportNotExportedSubordinates unavailableChildren
+          IsSubordinate {} -> BadImportNotExportedSubordinates unavailableChildren
       | any checkIfVarName avails = BadImportAvailVar
       | Just con <- find checkIfDataCon avails = BadImportAvailDataCon (availOccName con)
       | otherwise = BadImportNotExported suggs
         where
           suggs = similar_suggs ++ fieldSelectorSuggestions rdr_env rdr
+          what_look = case sub of
+            IsNotSubordinate  -> WL_TyCon_or_TermVar
+            IsSubordinate gre ->
+              case greInfo gre of
+                IAmTyCon ClassFlavour
+                  -> WL_TyCon_or_TermVar
+                _ -> WL_Term
           similar_names =
-            similarNameSuggestions (Unbound.LF WL_Anything WL_Global)
+            similarNameSuggestions (Unbound.LF what_look WL_Global)
               dflags rdr_env emptyLocalRdrEnv rdr
           similar_suggs =
             case NE.nonEmpty $ mapMaybe imported_item $ similar_names of

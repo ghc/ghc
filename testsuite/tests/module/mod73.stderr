@@ -1,9 +1,6 @@
 mod73.hs:3:7: error: [GHC-76037]
-    Not in scope: ‘Prelude.g’
-    Note: The module ‘Prelude’ does not export ‘g’.
+    • Not in scope: ‘Prelude.meplicate’
+    • Note: The module ‘Prelude’ does not export ‘meplicate’.
     Suggested fix:
-      Perhaps use one of these:
-        data constructor ‘Prelude.EQ’ (imported from Prelude),
-        data constructor ‘Prelude.GT’ (imported from Prelude),
-        data constructor ‘Prelude.LT’ (imported from Prelude)
+      Perhaps use ‘Prelude.replicate’ (imported from Prelude)
 

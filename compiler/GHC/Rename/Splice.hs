@@ -182,7 +182,7 @@ rnUntypedBracket e br_body
 
 rn_utbracket :: ThStage -> HsQuote GhcPs -> RnM (HsQuote GhcRn, FreeVars)
 rn_utbracket outer_stage br@(VarBr _ flg rdr_name)
-  = do { name <- lookupOccRn (unLoc rdr_name)
+  = do { name <- lookupOccRn (if flg then WL_Term else WL_Type) (unLoc rdr_name)
        ; check_namespace flg name
        ; this_mod <- getModule
 
@@ -439,7 +439,7 @@ rnUntypedSplice (HsUntypedSpliceExpr annCo expr)
 
 rnUntypedSplice (HsQuasiQuote ext quoter quote)
   = do  { -- Rename the quoter; akin to the HsVar case of rnExpr
-        ; quoter' <- lookupOccRn quoter
+        ; quoter' <- lookupOccRn WL_TermVariable quoter
         ; this_mod <- getModule
         ; when (nameIsLocalOrFrom this_mod quoter') $
           checkThLocalName quoter'

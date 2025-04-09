@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 {-
@@ -13,7 +14,6 @@ module GHC.Rename.Unbound
    , mkUnboundGRERdr
    , isUnboundName
    , reportUnboundName
-   , reportUnboundName'
    , unknownNameSuggestions
    , unknownNameSuggestionsMessage
    , similarNameSuggestions
@@ -26,7 +26,8 @@ module GHC.Rename.Unbound
    , unboundTermNameInTypes
    , IsTermInTypes(..)
    , notInScopeErr
-   , nameSpacesRelated
+   , relevantNameSpace
+   , suggestionIsRelevant
    , termNameInType
    )
 where
@@ -105,11 +106,8 @@ mkUnboundGRE occ = mkLocalGRE UnboundGRE NoParent $ mkUnboundName occ
 mkUnboundGRERdr :: RdrName -> GlobalRdrElt
 mkUnboundGRERdr rdr = mkLocalGRE UnboundGRE NoParent $ mkUnboundNameRdr rdr
 
-reportUnboundName' :: WhatLooking -> RdrName -> RnM Name
-reportUnboundName' what_look rdr = unboundName (LF what_look WL_Anywhere) rdr
-
-reportUnboundName :: RdrName -> RnM Name
-reportUnboundName = reportUnboundName' WL_Anything
+reportUnboundName :: WhatLooking -> RdrName -> RnM Name
+reportUnboundName what_look rdr = unboundName (LF what_look WL_Anywhere) rdr
 
 unboundName :: LookingFor -> RdrName -> RnM Name
 unboundName lf rdr = unboundNameX lf rdr []
@@ -250,12 +248,11 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
 
     tried_occ     = rdrNameOcc tried_rdr_name
     tried_is_sym  = isSymOcc tried_occ
-    tried_ns      = occNameSpace tried_occ
     tried_is_qual = isQual tried_rdr_name
 
-    correct_name_space occ =
-      (nameSpacesRelated dflags what_look tried_ns (occNameSpace occ))
-      && isSymOcc occ == tried_is_sym
+    is_relevant sugg_occ =
+      suggestionIsRelevant dflags what_look sugg_occ
+        && isSymOcc sugg_occ == tried_is_sym
         -- Treat operator and non-operators as non-matching
         -- This heuristic avoids things like
         --      Not in scope 'f'; perhaps you meant '+' (from Prelude)
@@ -271,7 +268,8 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
       | otherwise     = [ (mkRdrUnqual occ, nameSrcSpan name)
                         | name <- localRdrEnvElts env
                         , let occ = nameOccName name
-                        , correct_name_space occ]
+                        , is_relevant occ
+                        ]
 
     global_possibilities :: GlobalRdrEnv -> [(RdrName, SimilarName)]
     global_possibilities global_env
@@ -279,7 +277,7 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
                         | gre <- globalRdrEnvElts global_env
                         , isGreOk looking_for gre
                         , let occ = greOccName gre
-                        , correct_name_space occ
+                        , is_relevant occ
                         , (mod, how) <- qualsInScope gre
                         , let rdr_qual = mkRdrQual mod occ ]
 
@@ -288,7 +286,7 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
                     , isGreOk looking_for gre
                     , let occ = greOccName gre
                           rdr_unqual = mkRdrUnqual occ
-                    , correct_name_space occ
+                    , is_relevant occ
                     , sim <- case (unquals_in_scope gre, quals_only gre) of
                                 (how:_, _)    -> [ SimilarRdrName rdr_unqual (Just how) ]
                                 ([],    pr:_) -> [ pr ]  -- See Note [Only-quals]
@@ -432,47 +430,44 @@ isGreOk (LF what_look where_look) gre = what_ok && where_ok
                  WL_LocalOnly -> False
                  _            -> True
 
--- see Note [Related name spaces]
-nameSpacesRelated :: DynFlags    -- ^ to find out whether -XDataKinds is enabled
-                  -> WhatLooking -- ^ What kind of name are we looking for
-                  -> NameSpace   -- ^ Name space of the original name
-                  -> NameSpace   -- ^ Name space of a name that might have been meant
+-- | Is it OK to suggest an identifier in some other 'NameSpace',
+-- given what we are looking for?
+--
+-- See Note [Related name spaces]
+suggestionIsRelevant
+  :: DynFlags    -- ^ to find out whether -XDataKinds is enabled
+  -> WhatLooking -- ^ What kind of name are we looking for?
+  -> OccName     -- ^ The suggestion
+                 --
+                 -- We only look at the suggestion's 'NameSpace',
+                 -- but passing the whole 'OccName' is convenient
+                 -- for debugging.
+  -> Bool
+suggestionIsRelevant dflags what_looking suggestion =
+  relevantNameSpace data_kinds what_looking suggestion_ns
+    where
+      suggestion_ns = occNameSpace suggestion
+      data_kinds = xopt LangExt.DataKinds dflags
+
+-- | Is a 'NameSpace' relevant for what we are looking for?
+relevantNameSpace :: Bool        -- ^ is @-XDataKinds@ enabled?
+                  -> WhatLooking -- ^ what are we looking for?
+                  -> NameSpace   -- ^ is this 'NameSpace' relevant?
                   -> Bool
-nameSpacesRelated dflags what_looking ns ns'
-  | ns == ns'
-  = True
-  | otherwise
-  = or [ other_ns ns'
-       | (orig_ns, others) <- other_namespaces
-       , orig_ns ns
-       , (other_ns, wls) <- others
-       , what_looking `elem` WL_Anything : wls
-       ]
-  where
-    -- explanation:
-    -- [(orig_ns, [(other_ns, what_looking_possibilities)])]
-    -- A particular other_ns is related if the original namespace is orig_ns
-    -- and what_looking is either WL_Anything or is one of
-    -- what_looking_possibilities
-    other_namespaces =
-      [ (isVarNameSpace     , [(isFieldNameSpace  , [WL_Term, WL_RecField, WL_NotConLike])
-                              ,(isDataConNameSpace, [WL_Term, WL_ConLike, WL_Constructor])])
-      , (isDataConNameSpace , [(isVarNameSpace    , [WL_Term, WL_RecField, WL_NotConLike])])
-      , (isTvNameSpace      , [(isTcClsNameSpace  , [WL_Constructor, WL_NotConLike])
-                              ,(isVarNameSpace    , [WL_Term, WL_NotConLike])
-                              ,(isFieldNameSpace  , [WL_Term, WL_NotConLike])
-                              ] ++ promoted_datacons)
-      , (isTcClsNameSpace   , [(isTvNameSpace     , [WL_NotConLike])
-                              ,(isDataConNameSpace, [WL_Term, WL_ConLike])
-                              ,(isVarNameSpace    , [WL_Term, WL_NotConLike]) -- for symbolic identifiers
-                              ,(isFieldNameSpace  , [WL_Term, WL_NotConLike]) -- such as + or :*
-                              ]
-                              ++ promoted_datacons)
-      ]
-    -- If -XDataKinds is enabled, the data constructor name space is also
-    -- related to the type-level name spaces
-    data_kinds = xopt LangExt.DataKinds dflags
-    promoted_datacons = [(isDataConNameSpace, [WL_Constructor]) | data_kinds]
+relevantNameSpace data_kinds = \case
+  WL_Anything         -> const True
+  WL_TyCon            -> isTcClsNameSpace
+  WL_TyCon_or_TermVar -> isTcClsNameSpace <||> isTermVarOrFieldNameSpace
+  WL_TyVar            -> isTvNameSpace
+  WL_Constructor      -> isTcClsNameSpace <||> isDataConNameSpace
+  WL_ConLike          -> isDataConNameSpace
+  WL_RecField         -> isFieldNameSpace
+  WL_Term             -> isValNameSpace
+  WL_TermVariable     -> isTermVarOrFieldNameSpace
+  WL_Type             -> if data_kinds
+                         then not . isTermVarOrFieldNameSpace
+                         else not . isValNameSpace
+  WL_None             -> const False
 
 {- Note [Related name spaces]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

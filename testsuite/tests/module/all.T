@@ -92,14 +92,7 @@ test('mod70', normal, compile_fail, [''])
 test('mod71', normal, compile_fail, [''])
 test('mod72', normal, compile_fail, [''])
 
-# The order of suggestions in the output for test mod73
-# is subject to variation depending on the optimization level
-# that GHC was built with (and probably minor changes to GHC too).
-# This seems okay since there is unsafePerformIO under the hood
-# in FastString. Allow any order with an extra normaliser. (See #9325.)
-def normalise_mod73_error(x):
-    return x.replace('LT','XX',1).replace('EQ','XX',1).replace('GT','XX',1)
-test('mod73', normalise_errmsg_fun(normalise_mod73_error), compile_fail, [''])
+test('mod73', normal, compile_fail, [''])
 
 test('mod74', normal, compile_fail, [''])
 test('mod75', normal, compile, [''])

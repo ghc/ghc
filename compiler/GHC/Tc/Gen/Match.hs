@@ -76,7 +76,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import GHC.Types.Name
-import GHC.Types.Name.Reader (LocalRdrEnv)
+import GHC.Types.Name.Reader
 import GHC.Types.Id
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, isDoExpansionGenerated )

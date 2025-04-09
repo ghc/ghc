@@ -1423,10 +1423,10 @@ See also 'reportUnsolved'.
 ----------------
 -- | Constructs a new hole error, unless this is deferred. See Note [Constructing Hole Errors].
 mkHoleError :: NameEnv Type -> [ErrorItem] -> SolverReportErrCtxt -> Hole -> TcM (MsgEnvelope TcRnMessage)
-mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_occ = occ, hole_loc = ct_loc })
+mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_sort = sort, hole_occ = occ, hole_loc = ct_loc })
   | isOutOfScopeHole hole
   = do { (imp_errs, hints)
-           <- unknownNameSuggestions (ctl_rdr lcl_env) WL_Anything occ
+           <- unknownNameSuggestions (ctl_rdr lcl_env) what_look occ
        ; let
              err    = SolverReportWithCtxt ctxt
                     $ ReportHoleError hole OutOfScopeHole
@@ -1441,6 +1441,10 @@ mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_occ = occ, hole_loc = ct_loc 
              -- to include the context here.
        }
   where
+    what_look = case sort of
+      ExprHole {} -> WL_Term
+      TypeHole {} -> WL_Type
+      ConstraintHole {} -> WL_Type
     lcl_env = ctLocEnv ct_loc
 
  -- general case: not an out-of-scope error

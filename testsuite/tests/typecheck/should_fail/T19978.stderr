@@ -1,7 +1,6 @@
 T19978.hs:8:7: error: [GHC-01928]
-    • Illegal term-level use of the type constructor ‘Bool’
-    • imported from ‘Prelude’ at T19978.hs:3:8-13
-      (and originally defined in ‘GHC.Internal.Types’)
+    • Data constructor out of scope: ‘Bool’.
+      NB: the type constructor ‘Bool’ cannot appear in this position.
     • In the expression: Bool
       In an equation for ‘ex1’: ex1 = Bool
     Suggested fix:
@@ -13,8 +12,8 @@ T19978.hs:14:7: error: [GHC-88464]
     Suggested fix: Perhaps use ‘Left’ (imported from Prelude)
 
 T19978.hs:21:7: error: [GHC-01928]
-    • Illegal term-level use of the type variable ‘mytv’
-    • bound at T19978.hs:20:15
+    • Term variable out of scope: ‘mytv’.
+      NB: the type variable ‘mytv’ cannot appear in this position.
     • In the expression: mytv
       In an equation for ‘ex3’: ex3 = mytv
     Suggested fix:

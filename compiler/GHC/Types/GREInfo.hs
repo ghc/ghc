@@ -111,7 +111,7 @@ Search for references to this note in the code for illustration.
 --
 -- See Note [GREInfo]
 data GREInfo
-      -- | No particular information... e.g. a function
+      -- | A variable (an 'Id' or a 'TyVar')
     = Vanilla
       -- | An unbound GRE... could be anything
     | UnboundGRE

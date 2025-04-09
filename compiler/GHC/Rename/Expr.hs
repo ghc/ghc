@@ -319,7 +319,8 @@ rnUnboundVar :: SrcSpanAnnN -> RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar l v = do
   deferOutofScopeVariables <- goptM Opt_DeferOutOfScopeVariables
   -- See Note [Reporting unbound names] for difference between qualified and unqualified names.
-  unless (isUnqual v || deferOutofScopeVariables) (reportUnboundName v >> return ())
+  unless (isUnqual v || deferOutofScopeVariables) $
+    void $ reportUnboundName WL_Term v
   return (HsHole (HoleVar (L l v)), emptyFVs)
 
 rnExpr (HsVar _ (L l v))
@@ -447,7 +448,7 @@ rnExpr (HsGetField _ e f)
 
 rnExpr (HsProjection _ fs)
   = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
-       ; circ <- lookupOccRn compose_RDR
+       ; circ <- lookupOccRn WL_TermVariable compose_RDR
        ; let fs' = NE.map rnDotFieldOcc fs
        ; return ( mkExpandedExpr
                     (HsProjection noExtField fs')
@@ -1438,7 +1439,7 @@ lookupStmtNamePoly ctxt name
   | rebindableContext ctxt
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if rebindable_on
-         then do { fm <- lookupOccRn (nameRdrName name)
+         then do { fm <- lookupOccRn WL_TermVariable (nameRdrName name)
                  ; return (mkHsVar (noLocA fm), unitFV fm) }
          else not_rebindable }
   | otherwise

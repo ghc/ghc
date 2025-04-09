@@ -1,7 +1,6 @@
 T25877.hs:5:8: error: [GHC-01928]
-    • Illegal term-level use of the type constructor ‘X.A’
-    • imported qualified from ‘T25877_aux’ at T25877.hs:3:35-39
-      (and originally defined at T25877_aux.hs:2:1-10)
+    • Data constructor out of scope: ‘X.A’.
+      NB: the type constructor ‘X.A’ cannot appear in this position.
     • In the expression: X.A
       In an equation for ‘test’: test = X.A
     Suggested fixes:
