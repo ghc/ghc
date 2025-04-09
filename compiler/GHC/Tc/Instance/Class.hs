@@ -674,6 +674,10 @@ when all of the following conditions are met:
          the declaration is ignored by each constructor because they
          have no fields.
 
+ (C4) All of the constructors of that declaration are in scope.
+      Otherwise, `tagToEnum#` could be used to construct values of an
+      abstract data type whose constructors are intentionally hidden.
+
 Every instance looks like this:
 
   instance TagToEnum Bool where
@@ -766,6 +770,11 @@ Wrinkles:
 
   So GHC.StgToByteCode has a special case in `schemeT` detecting uses
   of tagToEnumPrim#. See also its Note [Implementing tagToEnumPrim#].
+
+ (W3) See Note [Unused import warnings with DataToTag and TagToEnum].
+
+ (W4) See Note [Unused top bind warnings with DataToTag and TagToEnum].
+
 
 
 
@@ -901,44 +910,9 @@ Wrinkles:
   Notice that we cast `x` before giving it to `dataToTagSmall#`, so
   that (DTT2) is satisfied.
 
-(DTW2) Suppose we have module A (T(..)) where { data T = TCon }
-  and in module B, the constraint `DataToTag T` is needed. Per
-  condition C2, we only solve this constraint if `TCon` is in
-  scope.  So we had better not later report a warning about the
-  import of `TCon` being unused in module B!
+(DTW2) See Note [Unused import warnings with DataToTag and TagToEnum].
 
-  To avoid this simply call `addUsedDataCons` when creating a built-in
-  DataToTag instance.
-
-(DTW3) Similar to DTW2, consider this example:
-
-    {-# LANGUAGE MagicHash #-}
-    module A (X(X2, X3), g) where
-    -- see also testsuite/tests/warnings/should_compile/DataToTagWarnings.hs
-    import GHC.Exts (dataToTag#, Int#)
-    data X = X1 | X2 | X3 | X4
-    g :: X -> Int#
-    g X2 = 12#
-    g v = dataToTag# v
-
-  QUESTION: What warnings should be emitted with -Wunused-top-binds?
-
-  The X1 and X4 constructors are used only in the solving of a
-  `DataToTag X` constraint in the second equation for `g`.  But if
-  these constructors were just removed, they would not be needed for
-  the solving of that `DataToTag X` constraint!  So for now we take
-  the stance that both X1 and X4 should be reported as unused.
-
-  It's not entirely clear if this is the right behavior:
-  Notice that removing X1 changes the value of `g X3` from 2# to 1#.
-  (Removing X4 causes no observable change in behavior.)
-  But this is a very obscure program!  The current "warn about both"
-  approach is not obviously wrong, either, and is consistent with the
-  behavior of derived Ix instances.
-
-  To get these warnings, we do nothing; in particular we do not call
-  keepAlive on the constructor names.
-  (Contrast with Note [Unused name reporting and HasField].)
+(DTW3) See Note [Unused top bind warnings with DataToTag and TagToEnum].
 
 (DTW4) Why have two primops, `dataToTagSmall#` and `dataToTagLarge#`?
   The way tag information is stored at runtime is described in
@@ -1041,6 +1015,58 @@ evaluated and correctly tagged.  Getting here was a long journey, with
 many similarities to the story behind Note [Evaluated and Properly Tagged] in
 GHC.Stg.EnforceEpt.  See also #15696.
 
+
+Note [Unused import warnings with DataToTag and TagToEnum]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have module A (T(..)) where { data T = TCon } and in
+module B, the constraint `DataToTag T` is needed.  Per condition C2
+of Note [DataToTag overview], we only solve this constraint if
+`TCon` is in scope.  So we had better not later report a warning
+about the import of `TCon` being unused in module B!
+
+To avoid this simply call `addUsedDataCons` when creating a built-in
+DataToTag instance.
+
+(This example and reasoning apply identically to TagToEnum, with its
+corresponding condition C4 in Note [TagToEnum overview].)
+
+
+Note [Unused top bind warnings with DataToTag and TagToEnum]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Similar to Note [Unused import warnings with DataToTag and TagToEnum],
+consider this example:
+
+  {-# LANGUAGE MagicHash #-}
+  module A (X(X2, X3), g) where
+  -- see also testsuite/tests/warnings/should_compile/DataToTagWarnings.hs
+  import GHC.Exts (dataToTag#, Int#)
+  data X = X1 | X2 | X3 | X4
+  g :: X -> Int#
+  g X2 = 12#
+  g v = dataToTag# v
+
+QUESTION: What warnings should be emitted with -Wunused-top-binds?
+
+The X1 and X4 constructors are used only in the solving of a
+`DataToTag X` constraint in the second equation for `g`.  But if
+these constructors were just removed, they would not be needed for
+the solving of that `DataToTag X` constraint!  So for now we take
+the stance that both X1 and X4 should be reported as unused.
+
+It's not entirely clear if this is the right behavior:
+Notice that removing X1 changes the value of `g X3` from 2# to 1#.
+(Removing X4 causes no observable change in behavior.)
+But this is a very obscure program!  The current "warn about both"
+approach is not obviously wrong, either, and is consistent with the
+behavior of derived Ix instances.
+
+To get these warnings, we do nothing; in particular we do not call
+keepAlive on the constructor names.
+(Contrast with Note [Unused name reporting and HasField].)
+
+(This example and reasoning apply identically for the TagToEnum class.)
+
+
 -}
 
 {- ********************************************************************
@@ -1053,7 +1079,7 @@ matchTagToEnum :: Class -> [Type] -> TcM ClsInstResult
 -- See Note [TagToEnum overview]
 matchTagToEnum tagToEnumClass [levity, dty] = do
   famEnvs <- tcGetFamInstEnvs
---  (gbl_env, _lcl_env) <- getEnvs
+  (gbl_env, _lcl_env) <- getEnvs
   if | Just (rawTyCon, rawTyConArgs) <- tcSplitTyConApp_maybe dty
      , let (repTyCon, repArgs, repCo)
              = tcLookupDataFamInst famEnvs rawTyCon rawTyConArgs
@@ -1065,11 +1091,11 @@ matchTagToEnum tagToEnumClass [levity, dty] = do
          ExoticEnum -> True
          NormalEnum -> True
          VacuouslyEnum -> False
-     , Just _constrs <- tyConAlgDataCons_maybe repTyCon
+     , Just constrs <- tyConAlgDataCons_maybe repTyCon
 
---     , let  rdr_env = tcg_rdr_env gbl_env
---            inScope con = isJust $ lookupGRE_Name rdr_env $ dataConName con
---     , all inScope constrs
+     , let  rdr_env = tcg_rdr_env gbl_env
+            inScope con = isJust $ lookupGRE_Name rdr_env $ dataConName con
+     , all inScope constrs -- condition C4
 
      , let  !repTy = mkTyConApp repTyCon repArgs
             !ttePrimOp = primOpId TagToEnumOp
@@ -1088,7 +1114,9 @@ matchTagToEnum tagToEnumClass [levity, dty] = do
             tagToEnumDataCon = tyConSingleDataCon (classTyCon tagToEnumClass)
             mk_ev _ = evDataConApp tagToEnumDataCon [levity, dty] [method]
 
-     -> pure () --addUsedDataCons rdr_env repTyCon
+     -> addUsedDataCons rdr_env repTyCon
+        -- See Note [Unused import warnings with DataToTag and TagToEnum]
+        -- and Note [Unused top bind warnings with DataToTag and TagToEnum].
           $> OneInst { cir_new_theta = []
                      , cir_mk_ev = mk_ev
                      , cir_canonical = EvCanonical
@@ -1144,7 +1172,9 @@ matchDataToTag dataToTagClass [levity, dty] = do
             mk_ev _ = evDataConApp dataToTagDataCon
                                    [levity, dty]
                                    [methodRep `Cast` methodCo]
-     -> addUsedDataCons rdr_env repTyCon -- See wrinkles DTW2 and DTW3
+     -> addUsedDataCons rdr_env repTyCon
+        -- See Note [Unused import warnings with DataToTag and TagToEnum]
+        -- and Note [Unused top bind warnings with DataToTag and TagToEnum].
           $> OneInst { cir_new_theta = [] -- (Ignore stupid theta.)
                      , cir_mk_ev = mk_ev
                      , cir_canonical = EvCanonical
