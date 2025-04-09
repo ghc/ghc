@@ -630,10 +630,10 @@ data CtOrigin
   | OmittedFieldOrigin (Maybe FieldLabel)
   | UsageEnvironmentOf Name
 
+  -- | See Detail (7) of Note [Type equality cycles] in GHC.Tc.Solver.Equality
   | CycleBreakerOrigin
       CtOrigin   -- origin of the original constraint
 
-      -- See Detail (7) of Note [Type equality cycles] in GHC.Tc.Solver.Equality
   | FRROrigin
       FixedRuntimeRepOrigin
 

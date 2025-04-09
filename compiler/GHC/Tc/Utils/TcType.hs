@@ -649,7 +649,7 @@ data MetaInfo
    | RuntimeUnkTv  -- ^ A unification variable used in the GHCi debugger.
                    -- It /is/ allowed to unify with a polytype, unlike TauTv
 
-   | CycleBreakerTv  -- Used to fix occurs-check problems in Givens
+   | CycleBreakerTv  -- ^ Used to fix occurs-check problems in Givens
                      -- See Note [Type equality cycles] in
                      -- GHC.Tc.Solver.Equality
 

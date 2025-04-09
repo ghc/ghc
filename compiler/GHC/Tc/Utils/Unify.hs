@@ -3141,11 +3141,9 @@ data TyEqFlags m a
 --
 -- See Note [Family applications in canonical constraints]
 data TyEqFamApp m a where
-  -- | Always fail
-  TEFA_Fail        :: TyEqFamApp m a
   -- | Just recurse
   TEFA_Recurse     :: TyEqFamApp m a
-  -- | Recurse, but replace with cycle breaker if fails,
+  -- | Recurse, but replace with cycle breaker if that fails,
   -- using the specified 'FamAppBreaker'
   TEFA_Break       :: FamAppBreaker a -> TyEqFamApp TcM a
 
@@ -3368,12 +3366,15 @@ mkTEFA_Break ev eq_rel breaker
 tefConcrete :: TyEqFlags m a -> Bool
 tefConcrete (TEFTyFam {}) = False
 tefConcrete (TEFTyVar { tefTyVar_concreteCheck = conc }) =
-  case conc of
+  wantConcreteCheck conc
+
+wantConcreteCheck :: ConcreteCheck m -> Bool
+wantConcreteCheck = \case
     CC_None -> False
     CC_Check -> True
     CC_Promote {} -> True
 
--- | Given a family-application ty, return a @'Reduction' :: ty ~ cvb@
+-- | Given a family-application @ty@, return a @'Reduction' :: ty ~ cbv@
 -- where @cbv@ is a fresh loop-breaker tyvar (for Given), or
 -- just a fresh 'TauTv' (for Wanted)
 famAppBreaker :: FamAppBreaker a -> TcType -> TcM (PuResult a Reduction)
@@ -3381,7 +3382,8 @@ famAppBreaker BreakGiven fam_app
    = do { new_tv <- TcM.newCycleBreakerTyVar (typeKind fam_app)
         ; return (PuOK (unitBag (new_tv, fam_app))
                        (mkReflRedn Nominal (mkTyVarTy new_tv))) }
-                 -- Why reflexive? See Detail (4) of the Note
+                 -- Why reflexive? See Detail (4) of Note [Type equality cycles]
+                 -- in GHC.Tc.Solver.Equality
 famAppBreaker (BreakWanted ev lhs_tv) fam_app
   -- Occurs check or skolem escape; so flatten
   = do { reason <- checkPromoteFreeVars cteInsolubleOccurs
@@ -3439,7 +3441,6 @@ instance Outputable (TyEqFlags m a) where
                  [ text "FamApp:" <+> ppr fam_app ]
 
 instance Outputable (TyEqFamApp m a) where
-  ppr TEFA_Fail            = text "TEFA_Fail"
   ppr TEFA_Recurse         = text "TEFA_Recurse"
   ppr (TEFA_Break breaker) = text "TEFA_BreakGiven" <+> ppr breaker
 
@@ -3633,8 +3634,9 @@ skolems (or untouchable unification variables).
 Note [Family applications in canonical constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A constraint with a type family application in the RHS needs special care.
+This is dealt with by `checkFamApp`.
 
-* First, occurs checks.  If we have
+(CFA1) First, occurs checks.  If we have
      [G] a ~ Maybe (F (Maybe a))
      [W] alpha ~ Maybe (F (Maybe alpha))
   it looks as if we have an occurs check.  But go read
@@ -3644,14 +3646,14 @@ A constraint with a type family application in the RHS needs special care.
      [G] G a ~ Maybe (F (Maybe (G a)))
      [W] G alpha ~ Maybe (F (Maybe (G alpha)))
 
-* Second, promotion. If we have (#22194)
+(CFA2) Second, promotion. If we have (#22194)
      [W] alpha[2] ~ Maybe (F beta[4])
   it is wrong to promote beta.  Instead we want to split to
      [W] alpha[2] ~ Maybe gamma[2]
      [W] gamma[2] ~ F beta[4]
   See Note [Promotion and level-checking] above.
 
-* Third, concrete type variables.  If we have
+(CFA3) Third, concrete type variables.  If we have
      [W] alpha[conc] ~ Maybe (F tys)
   we want to add an extra variable thus:
      [W] alpha[conc] ~ Maybe gamma[conc]
@@ -3661,23 +3663,38 @@ A constraint with a type family application in the RHS needs special care.
 In all these cases we want to create a fresh type variable, and
 emit a new equality connecting it to the type family application.
 
-The `tef_fam_app` field of `TypeEqFlags` says what to do at a type
-family application in the RHS of the constraint.  `TEFA_Fail` and
-`TEFA_Recurse` are straightforward.  `TEFA_Break` is the clever
-one. As you can see in `checkFamApp`, it
-  * Checks the arguments, but using `famAppArgFlags` to record that
-    we are now "under" a type-family application. It `tef_fam_app` to
-    `TEFA_Recurse`.
-  * If any of the arguments fail (level-check error, occurs check)
-    use the `FamAppBreaker` to create the extra binding.
+Once these three cases are dealt with, the `tef_fam_app` field of `TypeEqFlags`
+says what to do:
 
-Note that this always cycle-breaks the /outermost/ family application.
-If we have  [W] alpha ~ Maybe (F (G alpha))
-* We'll use checkFamApp on `(F (G alpha))`
-* It will recurse into `(G alpha)` with TEFA_Recurse, but not cycle-break it
-* The occurs check will fire when we hit `alpha`
-* `checkFamApp` on `(F (G alpha))` will see the failure and invoke
-  the `FamAppBreaker`.
+(CFA4) `TEFA_Recurse` is straightforward: just recurse into the arguments,
+  BUT use `recurseIntoFamTyConApp` to record that we are now "under" a
+  type-family application; see `famAppArgFlags`.
+
+(CFA5) `TEFA_Break` is the clever one. It does a two-step process:
+
+  (1) Recurse into the arguments with `recurseIntoFamTyConApp`.
+
+  (2) If any of the arguments fail (level-check error, occurs check,
+      concreteness failure), use the `FamAppBreaker` to create a cycle breaker.
+
+  Remarks:
+
+  * It would be possible to use Step (2) above always, skipping Step (1).
+    But this would create many unnecessary cycle-breaker variables.
+    This was the cause of #25933.
+
+  * This always cycle-breaks the /outermost/ family application.
+    If we have  [W] alpha ~ Maybe (F (G alpha)):
+    - We'll use checkFamApp on `(F (G alpha))`
+    - In Step (1), `recurseIntoFamTyConApp` sets `tef_fam_app := TEFA_Recurse`,
+      before looking at the argument `(G alpha)`.  So we will not cycle-break
+      the latter
+    - The occurs check will fire when we hit `alpha`
+    - `checkFamApp` on `(F (G alpha))` will see the failure and invoke
+       the `FamAppBreaker`.
+
+  * Step (1) may fail because of a level-check problem, which activates step (2).
+    This is what implements (CFA2).
 -}
 
 -------------------
@@ -3730,45 +3747,53 @@ recurseIntoFamTyConApp flags tc tys
     -- famAppArgFlags: adjust flags when going under fam app
 
 -------------------
+
+-- | See Note [Family applications in canonical constraints]
 checkFamApp :: forall m a.
                Monad m
             => TyEqFlags m a
             -> TcType -> TyCon -> [TcType]  -- Saturated family application
             -> m (PuResult a Reduction)
--- See Note [Family applications in canonical constraints]
-checkFamApp flags fam_app tc tys
-  = case flags of
-      TEFTyVar { tef_fam_app = fam_app_flag, tefTyVar_concreteCheck = conc }
-        -> case conc of
-             CC_None -> case fam_app_flag of
-                          TEFA_Fail      -> fail_with cteTypeFamily
-                          TEFA_Recurse   -> recurseIntoFamTyConApp flags tc tys
-                          TEFA_Break brk -> famAppBreaker brk fam_app
-             _       -> fail_with cteConcrete
-
-      TEFTyFam { tefTyFam_tyCon = lhs_tc, tefTyFam_args = lhs_tys
-               , tefTyFam_occursCheck = occ_prob, tef_fam_app = fam_app_flag }
-        | tcEqTyConApps lhs_tc lhs_tys tc tys
-          -- This occurrence is the same as the LHS
-        -> case fam_app_flag of
-              TEFA_Fail      -> fail_with cteTypeFamily
-              TEFA_Recurse   -> fail_with occ_prob
-              TEFA_Break brk -> famAppBreaker brk fam_app
-
-        | otherwise
-        -> case fam_app_flag of
-              TEFA_Fail      -> fail_with cteTypeFamily
-              TEFA_Recurse   -> recurseIntoFamTyConApp flags tc tys
-              TEFA_Break brk -> do { rec_res <- recurseIntoFamTyConApp flags tc tys
-                                   ; case rec_res of
-                                       PuOK {}   -> return rec_res
-                                       PuFail {} -> famAppBreaker brk fam_app }
-                  -- For TEFA_Break, try recursion; and break if there is a problem
-                  -- e.g.  alpha[2] ~ Maybe (F beta[2])    No problem: just unify
-                  --       alpha[2] ~ Maybe (F beta[4])    Level-check problem: break
-                  -- NB: in the latter case, don't promote beta[4]; hence arg_flags!
+checkFamApp flags fam_app tc tys =
+  case flags of
+    TEFTyFam { tefTyFam_tyCon = lhs_tc, tefTyFam_args = lhs_tys
+             , tefTyFam_occursCheck = occ_prob }
+      | tcEqTyConApps lhs_tc lhs_tys tc tys
+      -- There is an occurs check F ty ~ ...(F ty)...
+      -- Do not recurse; see (CFA1) in Note [Family applications in canonical constraints]
+      -> do_not_recurse occ_prob
+    TEFTyVar { tefTyVar_concreteCheck = conc }
+      | wantConcreteCheck conc
+      -- We are checking for concreteness, e.g. kappa[conc] ~ ...(F ty)...
+      -- Do not recurse: type family applications are not concrete.
+      -- See (CFA3) in Note [Family applications in canonical constraints]
+      -> do_not_recurse cteConcrete
+    _ ->
+        -- We can recurse into the arguments of the type family application.
+        case fam_flags of
+          TEFA_Recurse   ->
+            -- Simply recurse into the arguments.
+            -- See (CFA4) in Note [Family applications in canonical constraints]
+            recurseIntoFamTyConApp flags tc tys
+          TEFA_Break brk ->
+            -- Recurse into the arguments, and cycle-break if that fails
+            --
+            -- e.g.  alpha[2] ~ Maybe (F beta[2])    No problem: just unify
+            --       alpha[2] ~ Maybe (F beta[4])    Level-check problem: break
+            --
+            -- NB: in the latter case, don't promote beta[4]; use 'recurseIntoFamTyConApp'
+            -- which modifies the flags with 'famAppArgFlags'.
+            do { rec_res <- recurseIntoFamTyConApp flags tc tys
+               ; case rec_res of
+                   PuOK {}   -> return rec_res
+                   PuFail {} -> famAppBreaker brk fam_app
+               }
   where
-    fail_with prob = return $ PuFail (cteProblem prob)
+    fam_flags = tef_fam_app flags
+    do_not_recurse prob =
+      case fam_flags of
+        TEFA_Recurse   -> return $ PuFail (cteProblem prob)
+        TEFA_Break brk -> famAppBreaker brk fam_app
 
 -------------------
 

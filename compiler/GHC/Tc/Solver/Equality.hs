@@ -2257,7 +2257,7 @@ to
 
 Note that
 * `cbv` is a fresh cycle breaker variable.
-* `cbv` is a is a meta-tyvar, but it is completely untouchable.
+* `cbv` is a meta-tyvar, but it is completely untouchable.
 * We track the cycle-breaker variables in inert_cycle_breakers in InertSet
 * We eventually fill in the cycle-breakers, with `cbv := F lhs`.
   No one else fills in CycleBreakerTvs!
