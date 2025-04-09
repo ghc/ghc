@@ -10,6 +10,7 @@ module GHC.SysTools.Cpp
   , applyCDefs
   , offsetIncludePaths
   , cppMacroDefines
+  , generateMacros
   )
 where
 
