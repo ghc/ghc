@@ -36,6 +36,7 @@ import GHC.Utils.Panic (panic)
 
 type BufPos = Int
 data StringLexError = StringLexError LexErr BufPos
+  deriving (Show, Eq)
 
 lexString :: Int -> StringBuffer -> Either StringLexError String
 lexString = lexStringWith processChars processChars
@@ -126,10 +127,18 @@ collapseGaps :: HasChar c => [c] -> [c]
 collapseGaps = go
   where
     go = \case
-      c1@(Char '\\') : c2@(Char c) : cs
-        -- #25784: string gaps are semantically equivalent to "\&"
+      -- Match the start of a string gap + drop gap
+      -- #25784: string gaps are semantically equivalent to "\&"
+      c1@(Char '\\') : Char c : cs
         | is_space c -> c1 : setChar '&' c1 : go (dropGap cs)
-        | otherwise  -> c1 : c2 : go cs
+      -- Match all possible escape characters that include a backslash, to avoid
+      -- them being mistaken as the beginning of a string gap.
+      -- No need to fully parse a proper escape character here.
+      c1@(Char '\\') : c2@(Char '\\') : cs
+        -> c1 : c2 : go cs
+      c1@(Char '\\') : c2@(Char '^') : c3@(Char '\\') : cs
+        -> c1 : c2 : c3 : go cs
+      -- Otherwise, just keep looping
       c : cs -> c : go cs
       [] -> []
 
