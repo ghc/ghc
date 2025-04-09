@@ -20,6 +20,7 @@ module GHC.Parser.Header
    -- TODO: This is here to break an import loop. Is this the right place?
    , initParserStateWithMacros
    , initPragStateWithMacros
+   , initParserStateWithMacrosString
    )
 where
 
@@ -123,16 +124,19 @@ getImports dflags unit_env popts implicit_prelude buf filename source_filename =
                      , map convImport (implicit_imports ++ ord_idecls)
                      , reLoc mod)
 
-
 initParserStateWithMacros
   :: DynFlags -> Maybe UnitEnv -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
-initParserStateWithMacros df Nothing opts buf pos
+initParserStateWithMacros df unit_env opts buf pos
+  = initParserStateWithMacrosString df (fmap cppMacroDefines unit_env) opts buf pos
+
+initParserStateWithMacrosString
+  :: DynFlags -> Maybe String -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+initParserStateWithMacrosString df Nothing opts buf pos
   = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
                                        , pp_scope = (PpScope True PpNoGroup) NE.:| [] })
                           opts buf pos
-initParserStateWithMacros df (Just unit_env) opts buf pos = p_state
+initParserStateWithMacrosString df (Just macro_defs) opts buf pos = p_state
   where
-    macro_defs = cppMacroDefines unit_env
     p_state0 = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
                                                   , pp_scope = (PpScope True PpNoGroup) NE.:| [] })
                                      opts (stringToStringBuffer macro_defs) pos
