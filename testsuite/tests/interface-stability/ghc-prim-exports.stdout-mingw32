@@ -1377,6 +1377,10 @@ module GHC.Prim where
   type role TYPE nominal
   type TYPE :: GHC.Internal.Types.RuntimeRep -> *
   data TYPE a
+  type TagToEnum :: forall {lev :: GHC.Internal.Types.Levity}. TYPE (GHC.Internal.Types.BoxedRep lev) -> Constraint
+  class TagToEnum a where
+    tagToEnum# :: Int# -> a
+    {-# MINIMAL tagToEnum# #-}
   type ThreadId# :: GHC.Internal.Types.UnliftedType
   data ThreadId#
   type Weak# :: forall {l :: GHC.Internal.Types.Levity}. TYPE (GHC.Internal.Types.BoxedRep l) -> GHC.Internal.Types.UnliftedType
@@ -2562,7 +2566,6 @@ module GHC.Prim where
   subWord64# :: Word64# -> Word64# -> Word64#
   subWord8# :: Word8# -> Word8# -> Word8#
   subWordC# :: Word# -> Word# -> (# Word#, Int# #)
-  tagToEnum# :: forall a. Int# -> a
   takeMVar# :: forall {l :: GHC.Internal.Types.Levity} d (a :: TYPE (GHC.Internal.Types.BoxedRep l)). MVar# d a -> State# d -> (# State# d, a #)
   tanDouble# :: Double# -> Double#
   tanFloat# :: Float# -> Float#
