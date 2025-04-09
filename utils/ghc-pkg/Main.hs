@@ -44,6 +44,7 @@ import Distribution.Text
 import Distribution.Version
 import Distribution.Backpack
 import Distribution.Pretty (Pretty (..))
+import Distribution.Types.Flag (showFlagValue, unFlagAssignment)
 import Distribution.Types.UnqualComponentName
 import Distribution.Types.LibraryName
 import Distribution.Types.MungedPackageName
@@ -1428,6 +1429,7 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.unitDepends        = depends pkg,
        GhcPkg.unitAbiDepends     = map (\(AbiDependency k v) -> (k,ST.pack $ unAbiHash v)) (abiDepends pkg),
        GhcPkg.unitAbiHash        = ST.pack $ unAbiHash (abiHash pkg),
+       GhcPkg.unitFlags          = map (ST.pack . showFlagValue) . unFlagAssignment $ Cabal.unitFlags pkg,
        GhcPkg.unitImportDirs     = map ST.pack $ importDirs pkg,
        GhcPkg.unitLibraries      = map ST.pack $ hsLibraries pkg,
        GhcPkg.unitExtDepLibsSys  = map ST.pack $ extraLibraries pkg,
@@ -1575,7 +1577,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                    | installedUnitId p `elem` broken = printf "{%s}" doc
                    | exposed p = doc
                    | otherwise = printf "(%s)" doc
-                   where doc | verbosity >= Verbose = printf "%s (%s)" pkg (display (installedUnitId p))
+                   where doc | verbosity >= Verbose = printf "%s (%s) [%s]" pkg (display (installedUnitId p)) (display (Cabal.unitFlags p))
                              | otherwise            = pkg
                           where
                           pkg = display (mungedId p)
@@ -1602,7 +1604,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                    | installedUnitId p `elem` broken = printf "\ESC[31m%s\ESC[0m" doc -- red color
                    | exposed p = doc
                    | otherwise = printf "\ESC[34m%s\ESC[0m" doc -- blue color
-                   where doc | verbosity >= Verbose = printf "%s (%s)" pkg (display (installedUnitId p))
+                   where doc | verbosity >= Verbose = printf "%s (%s) [%s]" pkg (display (installedUnitId p)) (display (Cabal.unitFlags p))
                              | otherwise            = pkg
                           where
                           pkg = display (mungedId p)
