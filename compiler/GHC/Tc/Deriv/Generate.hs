@@ -588,13 +588,11 @@ unliftedCompare :: RdrName -> RdrName
                 -> LHsExpr GhcPs
 -- Return (if a < b then lt else if a == b then eq else gt)
 unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
-  = nlHsIf (ascribeBool $ genPrimOpApp a_expr lt_op b_expr) lt $
+  = nlHsIf (genPrimOpApp a_expr lt_op b_expr) lt $
                         -- Test (<) first, not (==), because the latter
                         -- is true less often, so putting it first would
                         -- mean more tests (dynamically)
-        nlHsIf (ascribeBool $ genPrimOpApp a_expr eq_op b_expr) eq gt
-  where
-    ascribeBool = nlAscribe boolTyCon_RDR
+        nlHsIf (genPrimOpApp a_expr eq_op b_expr) eq gt
 
 nlConWildPat :: DataCon -> LPat GhcPs
 -- The pattern (K {})
