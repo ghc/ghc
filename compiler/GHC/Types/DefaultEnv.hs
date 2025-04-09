@@ -31,9 +31,13 @@ import Data.List (sortBy)
 import Data.Function (on)
 
 -- See Note [Named default declarations] in GHC.Tc.Gen.Default
+
 -- | Default environment mapping class name @Name@ to their default type lists
+--
+-- NB: this includes Haskell98 default declarations, at the 'Num' key.
 type DefaultEnv = NameEnv ClassDefaults
 
+-- | Defaulting type assignments for the given class.
 data ClassDefaults
   = ClassDefaults { cd_class   :: Class -- ^ The class whose defaults are being defined
                   , cd_types   :: [Type]

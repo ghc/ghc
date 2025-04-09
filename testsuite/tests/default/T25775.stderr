@@ -1,0 +1,19 @@
+T25775.hs:16:5: error: [GHC-39999]
+    • Ambiguous type variable ‘a0’ arising from a use of ‘show’
+      prevents the constraint ‘(Show a0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      Potentially matching instances:
+        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
+        instance Show Integer -- Defined in ‘GHC.Internal.Show’
+        ...plus 25 others
+        ...plus 13 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: show (f 0)
+      In an equation for ‘x’: x = show (f 0)
+
+T25775.hs:16:11: error: [GHC-39999]
+    • No instance for ‘NonStd a0’ arising from a use of ‘f’
+    • In the first argument of ‘show’, namely ‘(f 0)’
+      In the expression: show (f 0)
+      In an equation for ‘x’: x = show (f 0)
+
