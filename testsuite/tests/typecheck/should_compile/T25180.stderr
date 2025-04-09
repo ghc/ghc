@@ -93,7 +93,8 @@ T25180.hs:45:9: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         utup1 :: a -> (# a #) (bound at T25180.hs:45:1)
         MkSolo# :: forall a. a -> (# a #)
           with MkSolo# @LiftedRep @a
-          (imported from ‘GHC.Internal.Types’ at T25180.hs:7:1-16)
+          (imported from ‘GHC.Types’ at T25180.hs:7:1-16
+           (and originally defined in ‘GHC.Internal.Types’))
 
 T25180.hs:52:9: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a -> b -> (# a, b #)
