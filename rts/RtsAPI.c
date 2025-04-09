@@ -577,15 +577,20 @@ void rts_evalLazyIO_ (/* inout */ Capability **cap,
 
 /* Convenience function for decoding the returned status. */
 
+GHC_STATIC_ASSERT(SchedulerStatus_End == 5, "Add new SchedulerStatus switch case below");
+
 void
 rts_checkSchedStatus (char* site, Capability *cap)
 {
     SchedulerStatus rc = cap->running_task->incall->rstat;
     switch (rc) {
+    case NoStatus:
+        errorBelch("%s: no status, not ok", site);
+        stg_exit(EXIT_FAILURE);
     case Success:
         return;
     case Killed:
-        errorBelch("%s: uncaught exception",site);
+        errorBelch("%s: uncaught exception", site);
         stg_exit(EXIT_FAILURE);
     case Interrupted:
         errorBelch("%s: interrupted", site);
@@ -599,8 +604,11 @@ rts_checkSchedStatus (char* site, Capability *cap)
 #else
         stg_exit(EXIT_FAILURE);
 #endif
+    case HeapExhausted:
+        errorBelch("%s: out of memory", site);
+        stg_exit(EXIT_FAILURE);
     default:
-        errorBelch("%s: Return code (%d) not ok",(site),(rc));
+        errorBelch("%s: SchedulerStatus code (%d) unknown", site, rc);
         stg_exit(EXIT_FAILURE);
     }
 }
