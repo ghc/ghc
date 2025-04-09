@@ -17,12 +17,13 @@ AC_DEFUN([FP_INSTALL_WINDOWS_TOOLCHAIN],[
         else
             action="download"
         fi
-        $PYTHON mk/get-win32-tarballs.py $action $mingw_arch > missing-win32-tarballs
+        $PYTHON mk/get-win32-tarballs.py $action $mingw_arch
         case $? in
             0)
             rm missing-win32-tarballs
             ;;
             2)
+            $PYTHON mk/get-win32-tarballs.py list $mingw_arch > missing-win32-tarballs
             echo
             echo "Error:"
             echo "Needed msys2 tarballs are missing. You have a few options to get them,"
