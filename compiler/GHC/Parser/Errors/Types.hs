@@ -594,6 +594,7 @@ data LexErr
    | LexUnterminatedComment -- ^ Unterminated `{-'
    | LexUnterminatedOptions -- ^ Unterminated OPTIONS pragma
    | LexUnterminatedQQ      -- ^ Unterminated quasiquotation
+   deriving (Show,Eq,Ord)
 
 -- | Errors from the Cmm parser
 data CmmParserError
