@@ -1525,7 +1525,8 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
       <- ExceptT $ do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
-          mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
+              unit_env = Just (hsc_unit_env hsc_env)
+          mimps <- getImports pi_local_dflags unit_env popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
           return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
   let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
   let rn_imps = fmap (\(sp, pk, lmn@(L _ mn)) -> (sp, rn_pkg_qual mn pk, lmn))
