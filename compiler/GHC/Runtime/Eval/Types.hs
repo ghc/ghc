@@ -76,7 +76,8 @@ breakHere step break_span = case step of
 
 data ExecResult
 
-  -- | Execution is complete
+  -- | Execution is complete with either an exception or the list of
+  -- user-visible names that were brought into scope.
   = ExecComplete
        { execResult :: Either SomeException [Name]
        , execAllocation :: Word64
