@@ -35,12 +35,14 @@ of a constructor for the enumeration-like type @ty@:  A program that
 evaluates such an expression may behave arbitrarily at run-time.
 
 A constraint @TagToEnum ty@ for an enumeration-like type @ty@ will be
-automatically solved by GHC.  A type is considered enumeration-like
-if it matches a @data@ or @data instance@ declaration where
+automatically solved by GHC.  More specifically, @TagToEnum ty@ will
+be solved if @ty@ matches a @data@ or @data instance@ declaration where
 
  1. There is at least one data constructor,
- 2. Every data constructor has no value-level fields/arguments, and
- 3. Every data constructor has no constraints from @ExistentialQuantification@.
+ 2. Every data constructor has no value-level fields/arguments,
+ 3. Every data constructor has no constraints from @ExistentialQuantification@, and
+ 4. Every data constructor is in scope
+
 
 GADT constructors are allowed. @DatatypeContexts@ are ignored. For example,
 

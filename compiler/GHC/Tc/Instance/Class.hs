@@ -678,12 +678,12 @@ when all of the following conditions are met:
       Otherwise, `tagToEnum#` could be used to construct values of an
       abstract data type whose constructors are intentionally hidden.
 
-Every instance looks like this:
+Every TagToEnum instance looks like this:
 
   instance TagToEnum Bool where
     tagToEnum# = tagToEnumPrim#
 
-The primop `tagToEnumPrim#` claims to have the following type:
+...where `tagToEnumPrim#` is a primop and claims to have the following type:
 
   tagToEnumPrim# :: forall {l::levity} (a::TYPE (BoxedRep l)). Int# -> a
 
@@ -714,7 +714,7 @@ INVARIANT:
       * A "data" declaration (but NOT a "type data" declaration)
       * The /representation type/ of a "data instance" declaration
         (but NOT the data family TyCon itself)
-    (These matches DTT2 in Note [DataToTag overview].)
+    (These match DTT2 in Note [DataToTag overview].)
 
 This is checked in Core Lint: see `checkSpecialPrimOpTypeArg`.
 The `tagToEnumPrim#` primop is not exported from GHC.Internal.Prim,
@@ -728,7 +728,7 @@ The tagToEnumPrim# primop has special handling in many places:
 
  (H2) tagToEnumPrim# has a built-in rewrite rule,
       that fires when it is applied to a literal.
-      See GHC.Core.Opt.ConstantFold.dataToTagRule.
+      See GHC.Core.Opt.ConstantFold.tagToEnumRule.
 
  (H3) The simplifier rewrites most case expressions
       scrutinizing the result of a tagToEnumPrim# call.
@@ -746,8 +746,9 @@ Wrinkles:
       data instance D (Either p q) = DE1 | DE2
   Now suppose we want to solve the constraint
       [W] TagToEnum (D (Either t1 t2))
-  The type `D (Either t1 t2)` clearly satisfies conditions C1-C3, so
-  we must solve this, and do so by producing a built-in instance:
+  and that DE1 and DE2 are in scope. Then, the type `D (Either t1 t2)`
+  clearly satisfies conditions C1-C4, so we must solve this.  We do so
+  by producing a built-in instance:
 
       instance TagToEnum (D (Either t1 t2)) where
           tagToEnum# = tagToEnumPrim# @{Lifted} @(R:DEither t1 t2)
@@ -1005,7 +1006,6 @@ Wrinkles:
      evaluating such an expression is always undefined behavior anyway!
 
 
-
 Historical note:
 During its time as a primop, `dataToTag#` underwent several changes,
 mostly relating to under what circumstances it evaluates its argument.
@@ -1014,6 +1014,7 @@ argument, unless tag inference determines the argument was already
 evaluated and correctly tagged.  Getting here was a long journey, with
 many similarities to the story behind Note [Evaluated and Properly Tagged] in
 GHC.Stg.EnforceEpt.  See also #15696.
+
 
 
 Note [Unused import warnings with DataToTag and TagToEnum]

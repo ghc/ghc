@@ -1376,14 +1376,14 @@ In particular, GADT constructors are not acceptable.  Consider:
       T3 :: T a
 What would [T1 ..] be?  [T1,T3] :: T Int? Easiest thing is to exclude them.  See #4528.
 
-But we DO allow the lower-level and more dangerous tagToEnum# to be
+But we /do/ allow the lower-level and more dangerous tagToEnum# to be
 used with otherwise enum-like GADTs; this has some legitimate uses
 such as with dependent IntMap-like types as described in the feature
 request ticket #16989.  For this reason we distinguish between the
 `NormalEnum` types which are suitable for use with the `Enum` class
 and the more general `ExoticEnum` types which can still be used
 with tagToEnum#. (See also Note [TagToEnum overview] in
-GHC.Tc.Instance.Class).
+GHC.Tc.Instance.Class, particularly conditions C1-C3.)
 
 For both the Enum class and tagToEnum#, we disallow data types with no
 constructors; they have no values to enumerate over anyway! It was

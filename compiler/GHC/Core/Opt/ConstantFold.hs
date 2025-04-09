@@ -3598,10 +3598,10 @@ arguments for `dataToTagSmall#`; those cause undefined behavior anyway.
 Note [Unreachable caseRules alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Take care if we see something like
-  case dataToTag x of
-    DEFAULT -> e1
-    -1# -> e2
-    100 -> e3
+  case dataToTagSmall# (x :: Bool) of
+    __DEFAULT -> e1
+    -1#  -> e2
+    100# -> e3
 because there isn't a data constructor with tag -1 or 100. In this case the
 out-of-range alternative is dead code -- we know the range of tags for x.
 
