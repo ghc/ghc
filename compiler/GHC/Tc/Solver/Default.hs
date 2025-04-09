@@ -64,7 +64,6 @@ import Control.Monad
 import Control.Monad.Trans.Class        ( lift )
 import Control.Monad.Trans.State.Strict ( StateT(runStateT), put )
 import Data.Foldable      ( toList, traverse_ )
-import Data.List          ( intersect )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import GHC.Data.Maybe     ( isJust, mapMaybe, catMaybes )
@@ -710,32 +709,74 @@ Type-class defaulting deals with the situation where we have unsolved
 constraints like (Num alpha), where `alpha` is a unification variable.  We want
 to pick a default for `alpha`, such as `alpha := Int` to resolve the ambiguity.
 
-Type-class defaulting is guided by the `DefaultEnv`: see Note [Named default declarations]
-in GHC.Tc.Gen.Default
+The function 'tryTypeClassDefaulting' implements type-class defaulting. The
+algorithm for defaulting depends on whether certain extensions are enabled,
+such as -XOverloadedStrings or -XExtendedDefaultRules. To explain this, let us
+define the following:
 
-The entry point for defaulting the unsolved constraints is `applyDefaultingRules`,
-which depends on `disambigGroup`, which in turn depends on workhorse
-`disambigProposalSequences`. The latter is also used by defaulting plugins through
-`disambigMultiGroup` (see Note [Defaulting plugins] below).
+  Unary typeclass:
+    a typeclass with a single visible type argument.
 
-The algorithm works as follows. Let S be the complete set of unsolved
-constraints, and initialize Sx to an empty set of constraints. For every type
-variable `v` that is free in S:
+    Examples:
 
-1. Define Cv = { Ci v | Ci v ∈ S }, the subset of S consisting of all constraints in S of
-   form (Ci v), where Ci is a single-parameter type class.  (We do no defaulting for
-   multi-parameter type classes.)
+      Num :: Type -> Constraint
+      Eq :: Type -> Constraint
+      Foldable :: (Type -> Type) -> Constraint
+      Typeable :: forall k. k -> Constraint   -- NB: also has an /invisible/ argument
 
-2. Define Dv, by extending Cv with the superclasses of every Ci in Cv
+    Non-examples:
 
-3. Define Ev, by filtering Dv to contain only classes with a default declaration.
+      Nullary :: Constraint
+      Binary :: Type -> Type -> Constraint
+      Binary2 :: forall k -> k -> Constraint  -- Two visible arguments
 
-4. For each Ci in Ev, if Ci has a non-empty default list in the `DefaultEnv`, find the first
-   type T in the default list for Ci for which, for every (Ci v) in Cv, the constraint (Ci T)
-  is soluble.
+  Defaultable class
+    a typeclass which has at least one in-scope default declaration
 
-5. If there is precisely one type T in the resulting type set, resolve the ambiguity by adding
-   a constraint (v~ Ti) constraint to a set Sx; otherwise report a static error.
+    This includes the two different categories of default declarations:
+
+      - Haskell 98 default declarations such as 'default (Integer, Float)'.
+
+        - `Num` is always defaultable; either the user says 'default( Integer, Float )'
+          or (absent such a declaration) the system fills in a fallback default declaration.
+          See Section 4.3.4 in https://www.haskell.org/onlinereport/haskell2010/haskellch4.html
+
+        - With `OverloadedStrings`, the class `IsString` is defaultable
+        - With `ExtendedDefaultRules`, the classes `Show`, `Eq`, `Ord`, `Foldable` and `Traversable`
+          are defaultable
+
+      - Named default declarations, which apply to the named class, e.g.
+        'default Cls(X, Y)' applies precisely to 'Cls'.
+        Note that these may be locally defined, or they may be imported.
+
+  Standard class:
+    a class defined in the Prelude or the standard library, as defined
+    by the Haskell 98 report (section 4.3.4)
+
+    These are defined in GHC.Builtin.Names.standardClassKeys.
+
+The rules for defaulting a collection 'S' of unsolved constraints are as follows:
+
+  1. For each metavariable 'v' appearing in 'S', define
+
+       U_v = { C v | C v ∈ U, C is a unary typeclass }
+
+     We then process each 'U_v' in turn, in order to find a defaulting
+     assignment 'v := ty' that solves all of 'U_v'.
+
+  2. Unless -XExtendedDefaultRules is in effect, give up if 'v' appears:
+
+      - in any constraint that isn't a unary class constraint
+      - in a class constraint which is non-standard and does not have
+        a default declaration in scope.
+
+  3. Compute candidate assignments: for each unary typeclass 'C' in 'U_v' which
+     has a default declaration in scope, find the first type 'ty' in the list
+     of in-scope default types for 'C' for which all of 'U_v' is soluble.
+
+  4. If there is precisely one type candidate type assignment 'ty' that allows
+     all of 'U_v' to be solved, we default 'v := ty'. Otherwise, do nothing
+     ('v' remains ambiguous).
 
 Note [Defaulting plugins]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -938,8 +979,8 @@ findDefaultableGroups (default_tys, extended_defaults) wanteds
 
     -- Finds unary type-class constraints
     -- But take account of polykinded classes like Typeable,
-    -- which may look like (Typeable * (a:*))   (#8931)
-    -- step (1) in Note [How type-class constraints are defaulted]
+    -- which may look like (Typeable Type (a:Type))   (#8931)
+    -- See step (1) in Note [How type-class constraints are defaulted]
     find_unary :: Ct -> Either (Ct, Class, TyVar) Ct
     find_unary cc
         | Just (cls,tys)   <- getClassPredTys_maybe (ctPred cc)
@@ -951,21 +992,42 @@ findDefaultableGroups (default_tys, extended_defaults) wanteds
         = Left (cc, cls, tv)
     find_unary cc = Right cc  -- Non unary or non dictionary
 
-    bad_tvs :: TcTyCoVarSet  -- TyVars mentioned by non-unaries
-    bad_tvs = mapUnionVarSet tyCoVarsOfCt non_unaries
+    nonunary_tvs :: TcTyCoVarSet  -- TyVars mentioned by non-unaries
+    nonunary_tvs = mapUnionVarSet tyCoVarsOfCt non_unaries
 
     cmp_tv (_,_,tv1) (_,_,tv2) = tv1 `compare` tv2
 
     defaultable_tyvar :: TcTyVar -> Bool
     defaultable_tyvar tv
         = let b1 = isTyConableTyVar tv  -- Note [Avoiding spurious errors]
-              b2 = not (tv `elemVarSet` bad_tvs)
+              b2 = not (tv `elemVarSet` nonunary_tvs)
           in b1 && (b2 || extended_defaults) -- Note [Multi-parameter defaults]
 
-    -- Determines if any of the given type class constructors is in default_tys
-    -- step (3) in Note [How type-class constraints are defaulted]
+    -- Determines whether the collection of class constraints permits defaulting.
+    -- See step (2) in Note [How type-class constraints are defaulted]
     defaultable_classes :: [Class] -> Bool
-    defaultable_classes clss = not . null . intersect clss $ map cd_class default_tys
+    defaultable_classes clss =
+      -- One of the classes has a default declaration in scope
+      -- (this includes 'Num', and e.g. 'IsString' with -XOverloadedStrings)
+      any (`elementOfUniqSet` classes_with_defaults) clss
+        &&
+      -- AND, either:
+      --  - ExtendedDefaultRules is in effect, or
+      --  - all the classes are standard or have a default declaration in scope
+      (extended_defaults || all is_std_or_has_default clss)
+    is_std_or_has_default :: Class -> Bool
+    is_std_or_has_default cls =
+      (getUnique cls `elem` standardClassKeys)
+        ||
+      (cls `elementOfUniqSet` classes_with_defaults)
+
+    -- All classes with a default declaration in scope; either:
+    --
+    --  - a named default declaration such as 'default C(Double, Bool)', or
+    --  - a Haskell 98 default declaration such as 'default(Int, Float)',
+    --    which adds defaults for Num, for IsString with OverloadedStrings,
+    --    and for Foldable/Traversable/... with ExtendedDefaultRules
+    classes_with_defaults = mkUniqSet $ map cd_class default_tys
 
 ------------------------------
 
@@ -1015,14 +1077,14 @@ disambigProposalSequences orig_wanteds wanteds proposalSequences allConsistent
   = do { traverse_ (traverse_ reportInvalidDefaultedTyVars . getProposalSequence) proposalSequences
        ; fake_ev_binds_var <- TcS.newTcEvBinds
        ; tclvl             <- TcS.getTcLevel
-       -- Step (4) in Note [How type-class constraints are defaulted]
+       -- Step (3) in Note [How type-class constraints are defaulted]
        ; successes <- fmap catMaybes $
                       nestImplicTcS fake_ev_binds_var (pushTcLevel tclvl) $
                       mapM firstSuccess proposalSequences
        ; traceTcS "disambigProposalSequences" (vcat [ ppr wanteds
                                                     , ppr proposalSequences
                                                     , ppr successes ])
-       -- Step (5) in Note [How type-class constraints are defaulted]
+       -- Step (4) in Note [How type-class constraints are defaulted]
        ; case successes of
            success@(tvs, subst) : rest
              | allConsistent (success :| rest)
