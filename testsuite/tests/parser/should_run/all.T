@@ -1,3 +1,8 @@
+test('parser_unit_tests',
+     normal,
+     compile_and_run,
+     ['-package ghc'])
+
 test('readRun001', normal, compile_and_run, [''])
 test('readRun002', normal, compile_and_run, [''])
 test('readRun003', normal, compile_and_run, [''])
@@ -21,6 +26,7 @@ test('RecordDotSyntax3', [extra_files(['RecordDotSyntaxA.hs'])], multimod_compil
 test('RecordDotSyntax4', [extra_files(['RecordDotSyntaxA.hs'])], multimod_compile_and_run, ['RecordDotSyntax4', ''])
 test('RecordDotSyntax5', normal, compile_and_run, [''])
 test('ListTuplePunsConstraints', extra_files(['ListTuplePunsConstraints.hs']), ghci_script, ['ListTuplePunsConstraints.script'])
+test('T25937', normal, compile_and_run, [''])
 
 # Multiline strings
 test('MultilineStrings', normal, compile_and_run, [''])
