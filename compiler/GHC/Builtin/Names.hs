@@ -756,12 +756,13 @@ plus_RDR                = varQual_RDR gHC_INTERNAL_NUM (fsLit "+")
 compose_RDR :: RdrName
 compose_RDR             = varQual_RDR gHC_INTERNAL_BASE (fsLit ".")
 
-not_RDR, tagToEnum_RDR, dataToTag_RDR,
+not_RDR, isTrue_RDR, tagToEnum_RDR, dataToTag_RDR,
     succ_RDR, pred_RDR, minBound_RDR, maxBound_RDR,
     and_RDR, range_RDR, inRange_RDR, index_RDR,
     unsafeIndex_RDR, unsafeRangeSize_RDR :: RdrName
 and_RDR                 = varQual_RDR gHC_CLASSES (fsLit "&&")
 not_RDR                 = varQual_RDR gHC_CLASSES (fsLit "not")
+isTrue_RDR              = varQual_RDR gHC_MAGIC_TAGTOENUM (fsLit "isTrue#")
 tagToEnum_RDR           = varQual_RDR gHC_MAGIC_TAGTOENUM (fsLit "tagToEnum#")
 dataToTag_RDR           = varQual_RDR gHC_MAGIC (fsLit "dataToTag#")
 succ_RDR                = varQual_RDR gHC_INTERNAL_ENUM (fsLit "succ")

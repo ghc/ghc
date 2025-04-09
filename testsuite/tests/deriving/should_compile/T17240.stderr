@@ -7,7 +7,7 @@ Derived class instances:
           a#
             -> case (GHC.Internal.Magic.dataToTag# b) of
                  b#
-                   -> (GHC.Internal.Magic.TagToEnum.tagToEnum#
+                   -> (GHC.Internal.Magic.TagToEnum.isTrue#
                          (a# GHC.Internal.Prim.==# b#))
   
   instance GHC.Internal.Classes.Eq T17240.T where

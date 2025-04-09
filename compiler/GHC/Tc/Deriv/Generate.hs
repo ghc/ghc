@@ -2540,7 +2540,7 @@ genOpApp :: LHsExpr GhcPs -> RdrName -> LHsExpr GhcPs -> LHsExpr GhcPs
 genOpApp e1 op e2 = nlHsPar (nlHsOpApp e1 op e2)
 
 genPrimOpApp :: LHsExpr GhcPs -> RdrName -> LHsExpr GhcPs -> LHsExpr GhcPs
-genPrimOpApp e1 op e2 = nlHsPar (nlHsApp (nlHsVar tagToEnum_RDR) (nlHsOpApp e1 op e2))
+genPrimOpApp e1 op e2 = nlHsPar (nlHsApp (nlHsVar isTrue_RDR) (nlHsOpApp e1 op e2))
 
 a_RDR, b_RDR, c_RDR, d_RDR, f_RDR, k_RDR, z_RDR, ah_RDR, bh_RDR, ch_RDR, dh_RDR
     :: RdrName
