@@ -34,7 +34,7 @@ mkModBreaks interp mod extendedMixEntries
 
     breakArray <- GHCi.newBreakArray interp count
     ccs <- mkCCSArray interp mod count entries
-    mod_ptr <- GHCi.newModuleName interp (moduleName mod)
+    (mod_ptr, mod_id_ptr) <- GHCi.newModule interp mod
     let
            locsTicks  = listArray (0,count-1) [ tick_loc  t | t <- entries ]
            varsTicks  = listArray (0,count-1) [ tick_ids  t | t <- entries ]
@@ -46,6 +46,7 @@ mkModBreaks interp mod extendedMixEntries
                        , modBreaks_decls  = declsTicks
                        , modBreaks_ccs    = ccs
                        , modBreaks_module = mod_ptr
+                       , modBreaks_module_unitid = mod_id_ptr
                        }
 
 mkCCSArray

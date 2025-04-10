@@ -345,7 +345,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
 
     -- Just case: we stopped at a breakpoint
     EvalBreak apStack_ref (Just eval_break) resume_ctxt ccs -> do
-      ibi <- liftIO $ evalBreakpointToId (hsc_HPT hsc_env) eval_break
+      let ibi = evalBreakpointToId eval_break
       tick_brks <- liftIO $ readModBreaks hsc_env (ibi_tick_mod ibi)
       let
         span      = modBreaks_locs tick_brks ! ibi_tick_index ibi
