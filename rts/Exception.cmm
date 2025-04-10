@@ -535,12 +535,16 @@ retry_pop_stack:
             // be per-thread.
             CInt[rts_stop_on_exception] = 0;
             ("ptr" ioAction) = ccall deRefStablePtr (W_[rts_breakpoint_io_action] "ptr");
-            Sp = Sp - WDS(13);
-            Sp(12) = exception;
-            Sp(11) = stg_raise_ret_info;
-            Sp(10) = exception;
-            Sp(9)  = ghczminternal_GHCziInternalziTypes_True_closure; // True <=> an exception
-            Sp(8)  = stg_ap_ppv_info;
+            Sp = Sp - WDS(17);
+            Sp(16) = exception;
+            Sp(15) = stg_raise_ret_info;
+            Sp(14) = exception;
+            Sp(13) = ghczminternal_GHCziInternalziTypes_True_closure; // True <=> an exception
+            Sp(12) = stg_ap_ppv_info;
+            Sp(11) = 0;
+            Sp(10) = stg_ap_n_info;
+            Sp(9)  = 0;
+            Sp(8)  = stg_ap_n_info;
             Sp(7)  = 0;
             Sp(6)  = stg_ap_n_info;
             Sp(5)  = 0;

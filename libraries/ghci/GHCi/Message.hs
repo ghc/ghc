@@ -23,6 +23,7 @@ module GHCi.Message
   , getMessage, putMessage, getTHMessage, putTHMessage
   , Pipe, mkPipeFromHandles, mkPipeFromContinuations, remoteCall, remoteTHCall, readPipe, writePipe
   , BreakModule
+  , BreakUnitId
   , LoadedDLL
   ) where
 
@@ -245,8 +246,9 @@ data Message a where
   -- | Allocate a string for a breakpoint module name.
   -- This uses an empty dummy type because @ModuleName@ isn't available here.
   NewBreakModule
-   :: String
-   -> Message (RemotePtr BreakModule)
+   :: String -- ^ @ModuleName@
+   -> String -- ^ @UnitId@ for the given @ModuleName@
+   -> Message (RemotePtr BreakModule, RemotePtr BreakUnitId)
 
 
 deriving instance Show (Message a)
@@ -410,10 +412,12 @@ data EvalStatus_ a b
 instance Binary a => Binary (EvalStatus_ a b)
 
 data EvalBreakpoint = EvalBreakpoint
-  { eb_tick_mod   :: String -- ^ Breakpoint tick module
-  , eb_tick_index :: Int    -- ^ Breakpoint tick index
-  , eb_info_mod   :: String -- ^ Breakpoint info module
-  , eb_info_index :: Int    -- ^ Breakpoint info index
+  { eb_tick_mod      :: String -- ^ Breakpoint tick module
+  , eb_tick_mod_unit :: String -- ^ Breakpoint tick module unit id
+  , eb_tick_index    :: Int    -- ^ Breakpoint tick index
+  , eb_info_mod      :: String -- ^ Breakpoint info module
+  , eb_info_mod_unit :: String -- ^ Breakpoint tick module unit id
+  , eb_info_index    :: Int    -- ^ Breakpoint info index
   }
   deriving (Generic, Show)
 
@@ -429,6 +433,10 @@ instance Binary a => Binary (EvalResult a)
 -- | A dummy type that tags the pointer to a breakpoint's @ModuleName@, because
 -- that type isn't available here.
 data BreakModule
+
+-- | A dummy type that tags the pointer to a breakpoint's @UnitId@, because
+-- that type isn't available here.
+data BreakUnitId
 
 -- | A dummy type that tags pointers returned by 'LoadDLL'.
 data LoadedDLL
@@ -580,7 +588,7 @@ getMessage = do
       36 -> Msg <$> (Seq <$> get)
       37 -> Msg <$> return RtsRevertCAFs
       38 -> Msg <$> (ResumeSeq <$> get)
-      39 -> Msg <$> (NewBreakModule <$> get)
+      39 -> Msg <$> (NewBreakModule <$> get <*> get)
       40 -> Msg <$> (LookupSymbolInDLL <$> get <*> get)
       41 -> Msg <$> (WhereFrom <$> get)
       _  -> error $ "Unknown Message code " ++ (show b)
@@ -627,7 +635,7 @@ putMessage m = case m of
   Seq a                       -> putWord8 36 >> put a
   RtsRevertCAFs               -> putWord8 37
   ResumeSeq a                 -> putWord8 38 >> put a
-  NewBreakModule name         -> putWord8 39 >> put name
+  NewBreakModule name unitid  -> putWord8 39 >> put name >> put unitid
   LookupSymbolInDLL dll str   -> putWord8 40 >> put dll >> put str
   WhereFrom a                 -> putWord8 41 >> put a
 
