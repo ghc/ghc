@@ -98,7 +98,7 @@ inTreeCompilerArgs stg = do
       return (dynamic `elem` ways, threaded `elem` ways)
     -- MP: We should be able to vary if stage1/stage2 is dynamic, ie a dynamic stage1
     -- should be able to built a static stage2?
-    hasDynamic          <- (dynamic ==) . Context.Type.way <$> (programContext stg ghc)
+    hasDynamic          <- (wayUnit Dynamic) . Context.Type.way <$> (programContext stg ghc)
     -- LeadingUnderscore is a property of the system so if cross-compiling stage1/stage2 could
     -- have different values? Currently not possible to express.
     leadingUnderscore   <- queryTargetTarget tgtSymbolsHaveLeadingUnderscore
