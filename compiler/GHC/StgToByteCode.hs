@@ -845,83 +845,86 @@ doPrimOp  :: Platform
           -> Maybe (BcM BCInstrList)
 doPrimOp platform op init_d s p args =
   case op of
-    IntAddOp -> primOp OP_ADD
-    Int64AddOp -> primOp OP_ADD
-    WordAddOp -> primOp OP_ADD
-    Word64AddOp -> primOp OP_ADD
-    AddrAddOp -> primOp OP_ADD
+    IntAddOp -> sizedPrimOp OP_ADD
+    Int64AddOp -> sizedPrimOp OP_ADD
+    WordAddOp -> sizedPrimOp OP_ADD
+    Word64AddOp -> sizedPrimOp OP_ADD
+    AddrAddOp -> sizedPrimOp OP_ADD
 
-    IntSubOp -> primOp OP_SUB
-    WordSubOp -> primOp OP_SUB
-    Int64SubOp -> primOp OP_SUB
-    Word64SubOp -> primOp OP_SUB
-    AddrSubOp -> primOp OP_SUB
+    IntSubOp -> sizedPrimOp OP_SUB
+    WordSubOp -> sizedPrimOp OP_SUB
+    Int64SubOp -> sizedPrimOp OP_SUB
+    Word64SubOp -> sizedPrimOp OP_SUB
+    AddrSubOp -> sizedPrimOp OP_SUB
 
-    Int8SubOp   -> primOp OP_SUB
-    Word8SubOp  -> primOp OP_SUB
-    Int16SubOp  -> primOp OP_SUB
-    Word16SubOp -> primOp OP_SUB
-    Int32SubOp  -> primOp OP_SUB
-    Word32SubOp -> primOp OP_SUB
+    Int8SubOp   -> sizedPrimOp OP_SUB
+    Word8SubOp  -> sizedPrimOp OP_SUB
+    Int16SubOp  -> sizedPrimOp OP_SUB
+    Word16SubOp -> sizedPrimOp OP_SUB
+    Int32SubOp  -> sizedPrimOp OP_SUB
+    Word32SubOp -> sizedPrimOp OP_SUB
 
-    IntAndOp -> primOp OP_AND
-    WordAndOp -> primOp OP_AND
-    Word64AndOp -> primOp OP_AND
+    IntAndOp -> sizedPrimOp OP_AND
+    WordAndOp -> sizedPrimOp OP_AND
+    Word64AndOp -> sizedPrimOp OP_AND
 
-    IntNotOp -> primOp OP_NOT
-    WordNotOp -> primOp OP_NOT
-    Word64NotOp -> primOp OP_NOT
+    IntNotOp -> sizedPrimOp OP_NOT
+    WordNotOp -> sizedPrimOp OP_NOT
+    Word64NotOp -> sizedPrimOp OP_NOT
 
-    IntXorOp -> primOp OP_XOR
-    WordXorOp -> primOp OP_XOR
-    Word64XorOp -> primOp OP_XOR
+    IntXorOp -> sizedPrimOp OP_XOR
+    WordXorOp -> sizedPrimOp OP_XOR
+    Word64XorOp -> sizedPrimOp OP_XOR
 
-    IntOrOp -> primOp OP_OR
-    WordOrOp -> primOp OP_OR
-    Word64OrOp -> primOp OP_OR
+    IntOrOp -> sizedPrimOp OP_OR
+    WordOrOp -> sizedPrimOp OP_OR
+    Word64OrOp -> sizedPrimOp OP_OR
 
-    WordSllOp   -> primOp OP_SHL
-    Word64SllOp -> primOp OP_SHL
-    IntSllOp    -> primOp OP_SHL
-    Int64SllOp  -> primOp OP_SHL
-    Word64SrlOp -> primOp OP_LSR
-    WordSrlOp   -> primOp OP_LSR
-    IntSrlOp    -> primOp OP_ASR
-    Int64SrlOp  -> primOp OP_ASR
+    WordSllOp   -> sizedPrimOp OP_SHL
+    Word64SllOp -> sizedPrimOp OP_SHL
+    IntSllOp    -> sizedPrimOp OP_SHL
+    Int64SllOp  -> sizedPrimOp OP_SHL
+    Word64SrlOp -> sizedPrimOp OP_LSR
+    WordSrlOp   -> sizedPrimOp OP_LSR
+    IntSrlOp    -> sizedPrimOp OP_ASR
+    Int64SrlOp  -> sizedPrimOp OP_ASR
 
-    IntNeOp -> primOp OP_NEQ
-    WordNeOp -> primOp OP_NEQ
-    Word64NeOp -> primOp OP_NEQ
-    AddrNeOp -> primOp OP_NEQ
+    IntNeOp -> sizedPrimOp OP_NEQ
+    WordNeOp -> sizedPrimOp OP_NEQ
+    Word64NeOp -> sizedPrimOp OP_NEQ
+    AddrNeOp -> sizedPrimOp OP_NEQ
 
-    IntEqOp -> primOp OP_EQ
-    WordEqOp -> primOp OP_EQ
-    Word64EqOp -> primOp OP_EQ
-    AddrEqOp -> primOp OP_EQ
-    CharEqOp -> primOp OP_EQ
+    IntEqOp -> sizedPrimOp OP_EQ
+    WordEqOp -> sizedPrimOp OP_EQ
+    Word64EqOp -> sizedPrimOp OP_EQ
+    AddrEqOp -> sizedPrimOp OP_EQ
+    CharEqOp -> sizedPrimOp OP_EQ
 
-    IntLtOp -> primOp OP_S_LT
-    WordLtOp -> primOp OP_U_LT
-    Word64LtOp -> primOp OP_U_LT
-    AddrLtOp -> primOp OP_U_LT
+    IntLtOp -> sizedPrimOp OP_S_LT
+    WordLtOp -> sizedPrimOp OP_U_LT
+    Word64LtOp -> sizedPrimOp OP_U_LT
+    AddrLtOp -> sizedPrimOp OP_U_LT
 
-    IntGeOp -> primOp OP_S_GE
-    WordGeOp -> primOp OP_U_GE
-    Word64GeOp -> primOp OP_U_GE
-    AddrGeOp -> primOp OP_U_GE
+    IntGeOp -> sizedPrimOp OP_S_GE
+    WordGeOp -> sizedPrimOp OP_U_GE
+    Word64GeOp -> sizedPrimOp OP_U_GE
+    AddrGeOp -> sizedPrimOp OP_U_GE
 
-    IntGtOp -> primOp OP_S_GT
-    WordGtOp -> primOp OP_U_GT
-    Word64GtOp -> primOp OP_U_GT
-    AddrGtOp -> primOp OP_U_GT
+    Int8GeOp -> sizedPrimOp OP_S_GE
+    Word8GeOp -> sizedPrimOp OP_U_GE
 
-    IntLeOp -> primOp OP_S_LE
-    WordLeOp -> primOp OP_U_LE
-    Word64LeOp -> primOp OP_U_LE
-    AddrLeOp -> primOp OP_U_LE
+    IntGtOp -> sizedPrimOp OP_S_GT
+    WordGtOp -> sizedPrimOp OP_U_GT
+    Word64GtOp -> sizedPrimOp OP_U_GT
+    AddrGtOp -> sizedPrimOp OP_U_GT
 
-    IntNegOp -> primOp OP_NEG
-    Int64NegOp -> primOp OP_NEG
+    IntLeOp -> sizedPrimOp OP_S_LE
+    WordLeOp -> sizedPrimOp OP_U_LE
+    Word64LeOp -> sizedPrimOp OP_U_LE
+    AddrLeOp -> sizedPrimOp OP_U_LE
+
+    IntNegOp -> sizedPrimOp OP_NEG
+    Int64NegOp -> sizedPrimOp OP_NEG
 
     IntToWordOp     -> no_op
     WordToIntOp     -> no_op
@@ -981,7 +984,7 @@ doPrimOp platform op init_d s p args =
     mkSlideWords width = if platformWordWidth platform < width then 2 else 1
 
     -- Push args, execute primop, slide, return_N
-    primOp op_inst = Just $ do
+    sizedPrimOp op_inst = Just $ do
       let width = primArg1Width (head args)
       prim_code <- mkPrimOpCode init_d s p (op_inst width) $ args
       let slide = mkSlideW (mkSlideWords width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn width
