@@ -95,7 +95,10 @@ run m = case m of
   MkCostCentres mod ccs -> mkCostCentres mod ccs
   CostCentreStackInfo ptr -> ccsToStrings (fromRemotePtr ptr)
   NewBreakArray sz -> mkRemoteRef =<< newBreakArray sz
-  NewBreakModule name -> newModuleName name
+  NewBreakModule name unitid -> do
+    namePtr <- newModuleName name
+    uidPtr <- newUnitId unitid
+    pure (namePtr, uidPtr)
   SetupBreakpoint ref ix cnt -> do
     arr <- localRef ref;
     _ <- setupBreakpoint arr ix cnt
@@ -335,7 +338,7 @@ withBreakAction opts breakMVar statusMVar act
         -- as soon as it is hit, or in resetBreakAction below.
 
    onBreak :: BreakpointCallback
-   onBreak tick_mod# tickx# info_mod# infox# is_exception apStack = do
+   onBreak tick_mod# tick_mod_uid# tickx# info_mod# info_mod_uid# infox# is_exception apStack = do
      tid <- myThreadId
      let resume = ResumeContext
            { resumeBreakMVar = breakMVar
@@ -349,8 +352,10 @@ withBreakAction opts breakMVar statusMVar act
        then pure Nothing
        else do
          tick_mod <- peekCString (Ptr tick_mod#)
+         tick_mod_uid <- peekCString (Ptr tick_mod_uid#)
          info_mod <- peekCString (Ptr info_mod#)
-         pure (Just (EvalBreakpoint tick_mod (I# tickx#) info_mod (I# infox#)))
+         info_mod_uid <- peekCString (Ptr info_mod_uid#)
+         pure (Just (EvalBreakpoint tick_mod tick_mod_uid (I# tickx#) info_mod info_mod_uid (I# infox#)))
      putMVar statusMVar $ EvalBreak apStack_r breakpoint resume_r ccs
      takeMVar breakMVar
 
@@ -400,8 +405,10 @@ resetStepFlag = poke stepFlag 0
 
 type BreakpointCallback
      = Addr#   -- pointer to the breakpoint tick module name
+    -> Addr#   -- pointer to the breakpoint tick module unit id
     -> Int#    -- breakpoint tick index
     -> Addr#   -- pointer to the breakpoint info module name
+    -> Addr#   -- pointer to the breakpoint info module unit id
     -> Int#    -- breakpoint info index
     -> Bool    -- exception?
     -> HValue  -- the AP_STACK, or exception
@@ -414,8 +421,8 @@ noBreakStablePtr :: StablePtr BreakpointCallback
 noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
 
 noBreakAction :: BreakpointCallback
-noBreakAction _ _ _ _ False _ = putStrLn "*** Ignoring breakpoint"
-noBreakAction _ _ _ _ True  _ = return () -- exception: just continue
+noBreakAction _ _ _ _ _ _ False _ = putStrLn "*** Ignoring breakpoint"
+noBreakAction _ _ _ _ _ _ True  _ = return () -- exception: just continue
 
 -- Malloc and copy the bytes.  We don't have any way to monitor the
 -- lifetime of this memory, so it just leaks.
@@ -451,6 +458,10 @@ mkCostCentres _ _ = return []
 
 newModuleName :: String -> IO (RemotePtr BreakModule)
 newModuleName name =
+  castRemotePtr . toRemotePtr <$> newCString name
+
+newUnitId :: String -> IO (RemotePtr BreakUnitId)
+newUnitId name =
   castRemotePtr . toRemotePtr <$> newCString name
 
 getIdValFromApStack :: HValue -> Int -> IO (Maybe HValue)
