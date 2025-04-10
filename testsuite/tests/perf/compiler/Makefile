@@ -32,7 +32,7 @@ MultiComponentModulesRecomp:
 
 MultiLayerModulesTH_Make_Prep:
 	./genMultiLayerModulesTH
-	"$(TEST_HC)" $(TEST_HC_OPTS) MultiLayerModulesPrep -dynamic-too -v0
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcThWayFlags) MultiLayerModulesPrep -v0
 
 MultiLayerModulesTH_OneShot_Prep: MultiLayerModulesTH_Make_Prep
 	$(CP) MultiLayerModules.hs MultiLayerModulesTH_OneShot.hs

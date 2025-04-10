@@ -367,7 +367,6 @@ test('MultiLayerModulesTH_Make',
      [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('$MAKE -s --no-print-directory MultiLayerModulesTH_Make_Prep'),
        extra_files(['genMultiLayerModulesTH']),
-       unless(have_dynamic(),skip),
        compile_timeout_multiplier(5),
        when(arch('wasm32'), fragile(25336)),
        # We skip the test on darwin due to recent regression due to toolchain
@@ -376,14 +375,13 @@ test('MultiLayerModulesTH_Make',
      ],
      multimod_compile_fail,
      # see Note [Increased initial stack size for MultiLayerModules]
-     ['MultiLayerModules', '-v0 +RTS -ki2k -kb2k -RTS'])
+     ['MultiLayerModules', '-v0 +RTS -ki2k -kb2k -RTS ' + config.ghc_th_way_flags])
 
 # A performance test for calculating link dependencies in -c mode.
 test('MultiLayerModulesTH_OneShot',
      [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('$MAKE -s --no-print-directory MultiLayerModulesTH_OneShot_Prep'),
        extra_files(['genMultiLayerModulesTH']),
-       unless(have_dynamic(),skip),
        compile_timeout_multiplier(5),
        when(arch('wasm32'), fragile(25336)),
        # We skip the test on darwin due to recent regression due to toolchain
@@ -392,7 +390,7 @@ test('MultiLayerModulesTH_OneShot',
      ],
      compile_fail,
      # see Note [Increased initial stack size for MultiLayerModules]
-     ['-v0 +RTS -ki2k -kb2k -RTS'])
+     ['-v0 +RTS -ki2k -kb2k -RTS ' + config.ghc_th_way_flags])
 
 test('MultiLayerModulesDefsGhci',
      [ collect_compiler_residency(15),
