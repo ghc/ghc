@@ -416,7 +416,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs tick_mod) rhs) = do
     Nothing -> pure code
     Just current_mod_breaks -> break_info hsc_env tick_mod current_mod mb_current_mod_breaks >>= \case
       Nothing -> pure code
-      Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = tick_mod_ptr, modBreaks_ccs = cc_arr} -> do
+      Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = tick_mod_ptr, modBreaks_module_unitid = tick_mod_id_ptr, modBreaks_ccs = cc_arr} -> do
         platform <- profilePlatform <$> getProfile
         let idOffSets = getVarOffSets platform d p fvs
             ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
@@ -425,6 +425,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs tick_mod) rhs) = do
             breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
 
         let info_mod_ptr = modBreaks_module current_mod_breaks
+            info_mod_id_ptr = modBreaks_module_unitid current_mod_breaks
         infox <- newBreakInfo breakInfo
 
         let cc | Just interp <- hsc_interp hsc_env
@@ -437,7 +438,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs tick_mod) rhs) = do
                       in if fromIntegral r == x
                         then r
                         else pprPanic "schemeER_wrk: breakpoint tick/info index too large!" (ppr x)
-            breakInstr = BRK_FUN breaks tick_mod_ptr (toW16 tick_no) info_mod_ptr (toW16 infox) cc
+            breakInstr = BRK_FUN breaks tick_mod_ptr tick_mod_id_ptr (toW16 tick_no) info_mod_ptr info_mod_id_ptr (toW16 infox) cc
         return $ breakInstr `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 

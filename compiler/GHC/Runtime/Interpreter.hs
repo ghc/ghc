@@ -21,7 +21,7 @@ module GHC.Runtime.Interpreter
   , mkCostCentres
   , costCentreStackInfo
   , newBreakArray
-  , newModuleName
+  , newModule
   , storeBreakpoint
   , breakpointStatus
   , getBreakpointVar
@@ -93,9 +93,8 @@ import GHC.Utils.Outputable(brackets, ppr, showSDocUnsafe)
 import GHC.Utils.Fingerprint
 
 import GHC.Unit.Module
-import GHC.Unit.Module.ModIface
 import GHC.Unit.Home.ModInfo
-import GHC.Unit.Home.PackageTable
+import GHC.Unit.Home.Graph (lookupHugByModule)
 import GHC.Unit.Env
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
@@ -377,9 +376,13 @@ newBreakArray interp size = do
   breakArray <- interpCmd interp (NewBreakArray size)
   mkFinalizedHValue interp breakArray
 
-newModuleName :: Interp -> ModuleName -> IO (RemotePtr ModuleName)
-newModuleName interp mod_name =
-  castRemotePtr <$> interpCmd interp (NewBreakModule (moduleNameString mod_name))
+newModule :: Interp -> Module -> IO (RemotePtr ModuleName, RemotePtr UnitId)
+newModule interp mod = do
+  let
+    mod_name = moduleNameString $ moduleName mod
+    mod_id = fastStringToShortByteString $ unitIdFS $ toUnitId $ moduleUnit mod
+  (mod_ptr, mod_id_ptr) <- interpCmd interp (NewBreakModule mod_name mod_id)
+  pure (castRemotePtr mod_ptr, castRemotePtr mod_id_ptr)
 
 storeBreakpoint :: Interp -> ForeignRef BreakArray -> Int -> Int -> IO ()
 storeBreakpoint interp ref ix cnt = do                               -- #19157
@@ -415,19 +418,21 @@ seqHValue interp unit_env ref =
     status <- interpCmd interp (Seq hval)
     handleSeqHValueStatus interp unit_env status
 
-evalBreakpointToId :: HomePackageTable -> EvalBreakpoint -> IO InternalBreakpointId
-evalBreakpointToId hpt eval_break =
-  let load_mod x = mi_module . hm_iface . expectJust <$> lookupHpt hpt (mkModuleName x)
-  in do
-    tickl <- load_mod (eb_tick_mod eval_break)
-    infol <- load_mod (eb_info_mod eval_break)
-    return
-      InternalBreakpointId
-        { ibi_tick_mod   = tickl
-        , ibi_tick_index = eb_tick_index eval_break
-        , ibi_info_mod   = infol
-        , ibi_info_index = eb_info_index eval_break
-        }
+evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId
+evalBreakpointToId eval_break =
+  let
+    mkUnitId u = fsToUnit $ mkFastStringShortByteString u
+
+    toModule u n = mkModule (mkUnitId u) (mkModuleName n)
+    tickl = toModule (eb_tick_mod_unit eval_break) (eb_tick_mod eval_break)
+    infol = toModule (eb_info_mod_unit eval_break) (eb_info_mod eval_break)
+  in
+    InternalBreakpointId
+      { ibi_tick_mod   = tickl
+      , ibi_tick_index = eb_tick_index eval_break
+      , ibi_info_mod   = infol
+      , ibi_info_index = eb_info_index eval_break
+      }
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
 handleSeqHValueStatus :: Interp -> UnitEnv -> EvalStatus () -> IO (EvalResult ())
@@ -447,12 +452,12 @@ handleSeqHValueStatus interp unit_env eval_status =
             mkGeneralSrcSpan (fsLit "<unknown>")
 
         Just break -> do
-          bi <- evalBreakpointToId (ue_hpt unit_env) break
+          let bi = evalBreakpointToId break
 
           -- Just case: Stopped at a breakpoint, extract SrcSpan information
           -- from the breakpoint.
           breaks_tick <- getModBreaks . expectJust <$>
-                          lookupHpt (ue_hpt unit_env) (moduleName (ibi_tick_mod bi))
+                          lookupHugByModule (ibi_tick_mod bi) (ue_home_unit_graph unit_env)
           put $ brackets . ppr $
             (modBreaks_locs breaks_tick) ! ibi_tick_index bi
 

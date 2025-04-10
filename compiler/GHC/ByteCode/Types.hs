@@ -50,6 +50,7 @@ import GHC.Stack.CCS
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 import GHC.Iface.Syntax
 import Language.Haskell.Syntax.Module.Name (ModuleName)
+import GHC.Unit.Types (UnitId)
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code
@@ -263,6 +264,9 @@ data ModBreaks
    , modBreaks_breakInfo :: IntMap CgBreakInfo
         -- ^ info about each breakpoint from the bytecode generator
    , modBreaks_module :: RemotePtr ModuleName
+        -- ^ info about the module in which we are setting the breakpoint
+   , modBreaks_module_unitid :: RemotePtr UnitId
+        -- ^ The 'UnitId' of the 'ModuleName'
    }
 
 seqModBreaks :: ModBreaks -> ()
@@ -273,7 +277,8 @@ seqModBreaks ModBreaks{..} =
   rnf modBreaks_decls `seq`
   rnf modBreaks_ccs `seq`
   rnf (fmap seqCgBreakInfo modBreaks_breakInfo) `seq`
-  rnf modBreaks_module
+  rnf modBreaks_module `seq`
+  rnf modBreaks_module_unitid
 
 -- | Construct an empty ModBreaks
 emptyModBreaks :: ModBreaks
@@ -286,6 +291,7 @@ emptyModBreaks = ModBreaks
    , modBreaks_ccs = array (0,-1) []
    , modBreaks_breakInfo = IntMap.empty
    , modBreaks_module = toRemotePtr nullPtr
+   , modBreaks_module_unitid = toRemotePtr nullPtr
    }
 
 {-

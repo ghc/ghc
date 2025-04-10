@@ -1245,9 +1245,9 @@ run_BCO:
         /* check for a breakpoint on the beginning of a let binding */
         case bci_BRK_FUN:
         {
-            int arg1_brk_array, arg2_tick_mod, arg3_info_mod, arg4_tick_index, arg5_info_index;
+            int arg1_brk_array, arg2_tick_mod, arg3_info_mod, arg4_tick_mod_id, arg5_info_mod_id, arg6_tick_index, arg7_info_index;
 #if defined(PROFILING)
-            int arg6_cc;
+            int arg8_cc;
 #endif
             StgArrBytes *breakPoints;
             int returning_from_break;
@@ -1264,10 +1264,12 @@ run_BCO:
             arg1_brk_array      = BCO_GET_LARGE_ARG;
             arg2_tick_mod       = BCO_GET_LARGE_ARG;
             arg3_info_mod       = BCO_GET_LARGE_ARG;
-            arg4_tick_index     = BCO_NEXT;
-            arg5_info_index     = BCO_NEXT;
+            arg4_tick_mod_id    = BCO_GET_LARGE_ARG;
+            arg5_info_mod_id    = BCO_GET_LARGE_ARG;
+            arg6_tick_index     = BCO_NEXT;
+            arg7_info_index     = BCO_NEXT;
 #if defined(PROFILING)
-            arg6_cc             = BCO_GET_LARGE_ARG;
+            arg8_cc             = BCO_GET_LARGE_ARG;
 #else
             BCO_GET_LARGE_ARG;
 #endif
@@ -1280,7 +1282,7 @@ run_BCO:
 
 #if defined(PROFILING)
             cap->r.rCCCS = pushCostCentre(cap->r.rCCCS,
-                                          (CostCentre*)BCO_LIT(arg6_cc));
+                                          (CostCentre*)BCO_LIT(arg8_cc));
 #endif
 
             // if we are returning from a break then skip this section
@@ -1292,11 +1294,11 @@ run_BCO:
                // stop the current thread if either the
                // "rts_stop_next_breakpoint" flag is true OR if the
                // ignore count for this particular breakpoint is zero
-               StgInt ignore_count = ((StgInt*)breakPoints->payload)[arg4_tick_index];
+               StgInt ignore_count = ((StgInt*)breakPoints->payload)[arg6_tick_index];
                if (rts_stop_next_breakpoint == false && ignore_count > 0)
                {
                   // decrement and write back ignore count
-                  ((StgInt*)breakPoints->payload)[arg4_tick_index] = --ignore_count;
+                  ((StgInt*)breakPoints->payload)[arg6_tick_index] = --ignore_count;
                }
                else if (rts_stop_next_breakpoint == true || ignore_count == 0)
                {
@@ -1330,8 +1332,10 @@ run_BCO:
                   // continue execution of this BCO when the IO action returns.
                   //
                   // ioAction :: Addr#       -- the breakpoint tick module
+                  //          -> Addr#       -- the breakpoint tick module unit id
                   //          -> Int#        -- the breakpoint tick index
                   //          -> Addr#       -- the breakpoint info module
+                  //          -> Addr#       -- the breakpoint info module unit id
                   //          -> Int#        -- the breakpoint info index
                   //          -> Bool        -- exception?
                   //          -> HValue      -- the AP_STACK, or exception
@@ -1340,17 +1344,21 @@ run_BCO:
                   ioAction = (StgClosure *) deRefStablePtr (
                       rts_breakpoint_io_action);
 
-                  Sp_subW(15);
-                  SpW(14) = (W_)obj;
-                  SpW(13) = (W_)&stg_apply_interp_info;
-                  SpW(12) = (W_)new_aps;
-                  SpW(11) = (W_)False_closure;         // True <=> an exception
-                  SpW(10) = (W_)&stg_ap_ppv_info;
-                  SpW(9)  = (W_)arg5_info_index;
+                  Sp_subW(19);
+                  SpW(18) = (W_)obj;
+                  SpW(17) = (W_)&stg_apply_interp_info;
+                  SpW(16) = (W_)new_aps;
+                  SpW(15) = (W_)False_closure;         // True <=> an exception
+                  SpW(14) = (W_)&stg_ap_ppv_info;
+                  SpW(13)  = (W_)arg7_info_index;
+                  SpW(12)  = (W_)&stg_ap_n_info;
+                  SpW(11)  = (W_)BCO_LIT(arg5_info_mod_id);
+                  SpW(10)  = (W_)&stg_ap_n_info;
+                  SpW(9)  = (W_)BCO_LIT(arg3_info_mod);
                   SpW(8)  = (W_)&stg_ap_n_info;
-                  SpW(7)  = (W_)BCO_LIT(arg3_info_mod);
+                  SpW(7)  = (W_)arg6_tick_index;
                   SpW(6)  = (W_)&stg_ap_n_info;
-                  SpW(5)  = (W_)arg4_tick_index;
+                  SpW(5)  = (W_)BCO_LIT(arg4_tick_mod_id);
                   SpW(4)  = (W_)&stg_ap_n_info;
                   SpW(3)  = (W_)BCO_LIT(arg2_tick_mod);
                   SpW(2)  = (W_)&stg_ap_n_info;
