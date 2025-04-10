@@ -287,8 +287,15 @@ def get_compiler_info():
         config.run_ways.append('profthreaded')
         ghc_env['HAVE_PROFILING'] = 'YES'
 
+    need_dynamic_th_way = config.interp_force_dyn or config.ghc_dynamic
+
     # See Note [WayFlags]
-    if config.interp_force_dyn or config.ghc_dynamic:
+    if need_dynamic_th_way and config.compiler_profiled:
+        config.ghc_th_way_flags = "-prof -dynamic"
+        config.ghci_way_flags   = "-prof -dynamic"
+        config.plugin_way_flags = "-prof -dynamic"
+        config.ghc_th_way       = "profdyn"
+    elif need_dynamic_th_way:
         config.ghc_th_way_flags = "-dynamic"
         config.ghci_way_flags   = "-dynamic"
         config.plugin_way_flags = "-dynamic"
