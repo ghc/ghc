@@ -877,7 +877,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
           Just dc -> do
             traceTR (text "Is constructor" <+> (ppr dc $$ ppr my_ty))
             subTtypes <- getDataConArgTys dc my_ty
-            subTerms <- extractSubTerms (\ty -> go (pred max_depth) ty ty) clos subTtypes
+            subTerms <- extractSubTerms (\ty -> go (pred max_depth) ty ty) pArgs dArgs subTtypes
             return (Term my_ty (Right dc) a subTerms)
 
       -- This is to support printing of Integers. It's not a general
@@ -911,8 +911,11 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                             | otherwise  = Suspension ct ty hval n i
 
 extractSubTerms :: (Type -> ForeignHValue -> TcM Term)
-                -> GenClosure ForeignHValue -> [Type] -> TcM [Term]
-extractSubTerms recurse clos = liftM thdOf3 . go 0 0
+                -> [ForeignHValue] -- ^ pointer arguments
+                -> [Word]          -- ^ data arguments
+                -> [Type]
+                -> TcM [Term]
+extractSubTerms recurse ptr_args data_args = liftM thdOf3 . go 0 0
   where
     go ptr_i arr_i [] = return (ptr_i, arr_i, [])
     go ptr_i arr_i (ty:tys)
@@ -943,7 +946,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
 
     go_rep ptr_i arr_i ty rep
       | isGcPtrRep rep = do
-          t <- recurse ty $ (getClosurePtrArgs clos)!!ptr_i
+          t <- recurse ty $ ptr_args !! ptr_i
           return (ptr_i + 1, arr_i, t)
       | otherwise = do
           -- This is a bit involved since we allow packing multiple fields
@@ -964,7 +967,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
                  | otherwise =
                      let (q, r) = size_b `quotRem` word_size
                      in assert (r == 0 )
-                        [ dataArgs clos !! i
+                        [ data_args !! i
                         | o <- [0.. q - 1]
                         , let i = (aligned_idx `quot` word_size) + o
                         ]
@@ -987,7 +990,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
       LittleEndian -> (word `shiftR` moveBits) `shiftL` zeroOutBits `shiftR` zeroOutBits
      where
       (q, r) = aligned_idx `quotRem` word_size
-      word = dataArgs clos !! q
+      word = data_args !! q
       moveBits = r * 8
       zeroOutBits = (word_size - size_b) * 8
 
