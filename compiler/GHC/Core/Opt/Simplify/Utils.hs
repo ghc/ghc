@@ -1461,46 +1461,13 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
                   , occ_in_lam = NotInsideLam }   = isNotTopLevel top_lvl || early_phase
     one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = IsInsideLam
-                  , occ_int_cxt = IsInteresting } = canInlineInLam rhs
+                  , occ_int_cxt = IsInteresting } = canInlineInLam True rhs
     one_occ _                                     = False
 
     pre_inline_unconditionally = sePreInline env
     active = isActive (sePhase env) (inlinePragmaActivation inline_prag)
              -- See Note [pre/postInlineUnconditionally in gentle mode]
     inline_prag = idInlinePragma bndr
-
--- Be very careful before inlining inside a lambda, because (a) we must not
--- invalidate occurrence information, and (b) we want to avoid pushing a
--- single allocation (here) into multiple allocations (inside lambda).
--- Inlining a *function* with a single *saturated* call would be ok, mind you.
---      || (if is_cheap && not (canInlineInLam rhs) then pprTrace "preinline" (ppr bndr <+> ppr rhs) ok else ok)
---      where
---              is_cheap = exprIsCheap rhs
---              ok = is_cheap && int_cxt
-
-        --      int_cxt         The context isn't totally boring
-        -- E.g. let f = \ab.BIG in \y. map f xs
-        --      Don't want to substitute for f, because then we allocate
-        --      its closure every time the \y is called
-        -- But: let f = \ab.BIG in \y. map (f y) xs
-        --      Now we do want to substitute for f, even though it's not
-        --      saturated, because we're going to allocate a closure for
-        --      (f y) every time round the loop anyhow.
-
-        -- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
-        -- so substituting rhs inside a lambda doesn't change the occ info.
-        -- Sadly, not quite the same as exprIsHNF.
-    canInlineInLam (Lit _)    = True
-    canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
-    canInlineInLam (Cast e _) = canInlineInLam e
-    canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
-    canInlineInLam (Var v)    = case idOccInfo v of
-                                  OneOcc { occ_in_lam = IsInsideLam } -> True
-                                  ManyOccs {}                         -> True
-                                  _                                   -> False
-    canInlineInLam _          = False
-      -- not ticks.  Counting ticks cannot be duplicated, and non-counting
-      -- ticks around a Lam will disappear anyway.
 
     early_phase = sePhase env /= FinalPhase
     -- If we don't have this early_phase test, consider
@@ -1529,6 +1496,50 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     -- here.
     -- (Nor can we check for `exprIsExpandable rhs`, because that needs to look
     -- at the non-existent unfolding for the `I# 2#` which is also floated out.)
+
+
+-- Be very careful before inlining inside a lambda, because (a) we must not
+-- invalidate occurrence information, and (b) we want to avoid pushing a
+-- single allocation (here) into multiple allocations (inside lambda).
+-- Inlining a *function* with a single *saturated* call would be ok, mind you.
+--      || (if is_cheap && not (canInlineInLam rhs) then pprTrace "preinline" (ppr bndr <+> ppr rhs) ok else ok)
+--      where
+--              is_cheap = exprIsCheap rhs
+--              ok = is_cheap && int_cxt
+
+        --      int_cxt         The context isn't totally boring
+        -- E.g. let f = \ab.BIG in \y. map f xs
+        --      Don't want to substitute for f, because then we allocate
+        --      its closure every time the \y is called
+        -- But: let f = \ab.BIG in \y. map (f y) xs
+        --      Now we do want to substitute for f, even though it's not
+        --      saturated, because we're going to allocate a closure for
+        --      (f y) every time round the loop anyhow.
+
+        -- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
+        -- so substituting rhs inside a lambda doesn't change the occ info.
+        -- Sadly, not quite the same as exprIsHNF.
+canInlineInLam :: Bool -> CoreExpr -> Bool
+canInlineInLam is_pre e
+  = go e
+  where
+    go (Lit _)    = True
+    go (Lam b e)  = isRuntimeVar b || go e
+    go (Cast e _) = go e
+    go (Tick t e) = not (tickishIsCode t) && go e
+    -- This matters only for:
+    --     x = y            -- or y|>co
+    --     f = \p. ..x..    -- One occurrence of x
+    --     ..y..            -- Multiple other occurrences of y
+    -- Then it is safe to inline x unconditionally
+    go (Var v)    = not is_pre || case idOccInfo v of
+                                    OneOcc { occ_in_lam = IsInsideLam } -> True
+                                    ManyOccs {}                         -> True
+                                    _                                   -> False
+    go _          = False
+      -- not ticks.  Counting ticks cannot be duplicated, and non-counting
+      -- ticks around a Lam will disappear anyway.
+
 
 {-
 ************************************************************************
@@ -1632,7 +1643,7 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
     is_top_lvl = isTopLevel (bindContextLevel bind_cxt)
 
     work_ok NotInsideLam _              = not is_top_lvl  -- Not quite sure here
-    work_ok IsInsideLam  IsInteresting  = isCheapUnfolding unfolding
+    work_ok IsInsideLam  IsInteresting  = canInlineInLam False rhs
     work_ok IsInsideLam  NotInteresting = False
       -- NotInsideLam: outside a lambda, when not at top-level we want to be
       -- reasonably aggressive about inlining into multiple branches of case
@@ -1693,7 +1704,7 @@ Again `preInlineUnconditionally will usually inline `f`, but it can arise
 via `simplAuxBind` if we have something like
     (\f \y. ...(f e)..) (\x.blah)
 
-We do unconditinal post-inlining in two places:
+We do unconditional post-inlining in two places:
 
 1. In the full `postInlineUnconditionally` look for the special case
    of "one occurrence, not under a lambda", and inline unconditionally then.

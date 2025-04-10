@@ -2606,7 +2606,7 @@ Consider
    let x = (a,b) in
    case p of
       A -> ...(error x)..
-      B -> ...(ertor x)...
+      B -> ...(error x)...
 
 postInlineUnconditionally may duplicate x's binding, but sometimes it
 does so only if the use site IsInteresting.  Pushing allocation into error
