@@ -386,3 +386,9 @@ test('T13869', extra_files(['T13869a.hs', 'T13869b.hs']), ghci_script, ['T13869.
 test('ListTuplePunsPpr', normal, ghci_script, ['ListTuplePunsPpr.script'])
 test('ListTuplePunsPprNoAbbrevTuple', [expect_broken(23135), limit_stdout_lines(13)], ghci_script, ['ListTuplePunsPprNoAbbrevTuple.script'])
 test('T24459', normal, ghci_script, ['T24459.script'])
+
+# Test package renaming in GHCi session
+test('GhciPackageRename',
+     [extra_hc_opts("-hide-all-packages -package 'containers (Data.Map as Prelude)'")],
+     ghci_script,
+     ['GhciPackageRename.script'])
