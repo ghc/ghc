@@ -172,6 +172,10 @@ addPlatformDepCcFlags archOs cc0 = do
     ArchOS ArchPPC OSAIX ->
       -- We need `-D_THREAD_SAFE` to unlock the thread-local `errno`.
       return $ cc1 & _ccFlags %++ "-D_THREAD_SAFE"
+    ArchOS ArchLoongArch64 OSLinux ->
+      -- On LoongArch64, we need `-mcmodel=medium` to tell gcc to generate big
+      -- enough jump instruction.
+      return $ cc1 & _ccFlags %++ "-mcmodel=medium"
     _ ->
       return cc1
 

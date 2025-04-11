@@ -120,6 +120,7 @@ data LinuxDistro
   | Debian9
   | Fedora33
   | Fedora38
+  | Ubuntu2404LoongArch64
   | Ubuntu2404
   | Ubuntu2204
   | Ubuntu2004
@@ -321,6 +322,7 @@ distroName Debian10      = "deb10"
 distroName Debian9       = "deb9"
 distroName Fedora33      = "fedora33"
 distroName Fedora38      = "fedora38"
+distroName Ubuntu2404LoongArch64 = "ubuntu24_04-loongarch"
 distroName Ubuntu1804    = "ubuntu18_04"
 distroName Ubuntu2004    = "ubuntu20_04"
 distroName Ubuntu2204    = "ubuntu22_04"
@@ -728,6 +730,7 @@ data ValidateRule
   | I386Backend  -- ^ Run this job when the "i386" label is set
   | WinArm64     -- ^ Run this job when the "aarch64" and "Windows" labels are set together without "LLVM backend"
   | WinArm64LLVM -- ^ Run this job when the "aarch64" and "Windows" labels are set together with "LLVM backend"
+  | LoongArch64  -- ^ Run this job when the "LoongArch64" labal is present
   deriving (Show, Ord, Eq)
 
 -- | Convert the state of the rule into a string that gitlab understand.
@@ -781,6 +784,7 @@ validateRuleString WinArm64LLVM = and_all
                                     , labelString "Windows"
                                     , validateRuleString LLVMBackend
                                     ]
+validateRuleString LoongArch64  = labelString "loongarch"
 
 ---------------------------------------------------------------------
 -- The Job type
@@ -1263,6 +1267,9 @@ cross_jobs = [
 
     -- x86_64 -> riscv
   , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian12Riscv) (crossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
+
+    -- x86_64 -> loongarch64
+  , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404LoongArch64) (crossConfig "loongarch64-linux-gnu" (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu") Nothing))
 
     -- Javascript
   , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11Js) javascriptConfig)

@@ -327,6 +327,7 @@ registerisedSupported archOs =
       ArchRISCV64   -> True
       ArchWasm32    -> True
       ArchJavaScript -> True
+      ArchLoongArch64 -> True
       _             -> False
 
 determineUnregisterised :: ArchOS -> Maybe Bool -> M Bool
