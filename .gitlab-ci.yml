@@ -1071,8 +1071,6 @@ abi-test:
     UPSTREAM_GHC_PROJECT_ID: $CI_PROJECT_ID
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-wasm.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*wasm.*/'
-      when: manual
   trigger:
     project: haskell-wasm/ghc-wasm-meta
     branch: master
