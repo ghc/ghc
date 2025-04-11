@@ -78,7 +78,7 @@ import GHC.Core.Type       hiding( typeKind )
 import qualified GHC.Core.Type as Type
 
 import GHC.Iface.Env       ( newInteractiveBinder )
-import GHC.Iface.Load      ( loadSrcInterface )
+import GHC.Iface.Load      ( loadInterfaceForModule )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
@@ -844,7 +844,7 @@ mkTopLevEnv hsc_env modl
                       $ fmap (foldr plusGlobalRdrEnv emptyGlobalRdrEnv)
                       $ forM imports $ \iface_import -> do
                         let ImpUserSpec spec details = tcIfaceImport iface_import
-                        iface <- loadSrcInterface (text "imported by GHCi") (moduleName $ is_mod spec) (is_isboot spec) (is_pkg_qual spec)
+                        iface <- loadInterfaceForModule (text "imported by GHCi") (is_mod spec)
                         pure $ case details of
                           ImpUserAll -> importsFromIface hsc_env iface spec Nothing
                           ImpUserEverythingBut ns -> importsFromIface hsc_env iface spec (Just ns)
