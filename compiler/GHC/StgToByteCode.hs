@@ -847,84 +847,167 @@ doPrimOp platform op init_d s p args =
   case op of
     IntAddOp -> sizedPrimOp OP_ADD
     Int64AddOp -> sizedPrimOp OP_ADD
+    Int32AddOp -> sizedPrimOp OP_ADD
+    Int16AddOp -> sizedPrimOp OP_ADD
+    Int8AddOp -> sizedPrimOp OP_ADD
     WordAddOp -> sizedPrimOp OP_ADD
     Word64AddOp -> sizedPrimOp OP_ADD
+    Word32AddOp -> sizedPrimOp OP_ADD
+    Word16AddOp -> sizedPrimOp OP_ADD
+    Word8AddOp -> sizedPrimOp OP_ADD
     AddrAddOp -> sizedPrimOp OP_ADD
 
     IntSubOp -> sizedPrimOp OP_SUB
     WordSubOp -> sizedPrimOp OP_SUB
     Int64SubOp -> sizedPrimOp OP_SUB
+    Int32SubOp -> sizedPrimOp OP_SUB
+    Int16SubOp -> sizedPrimOp OP_SUB
+    Int8SubOp -> sizedPrimOp OP_SUB
     Word64SubOp -> sizedPrimOp OP_SUB
-    AddrSubOp -> sizedPrimOp OP_SUB
-
-    Int8SubOp   -> sizedPrimOp OP_SUB
-    Word8SubOp  -> sizedPrimOp OP_SUB
-    Int16SubOp  -> sizedPrimOp OP_SUB
-    Word16SubOp -> sizedPrimOp OP_SUB
-    Int32SubOp  -> sizedPrimOp OP_SUB
     Word32SubOp -> sizedPrimOp OP_SUB
+    Word16SubOp -> sizedPrimOp OP_SUB
+    Word8SubOp -> sizedPrimOp OP_SUB
+    AddrSubOp -> sizedPrimOp OP_SUB
 
     IntAndOp -> sizedPrimOp OP_AND
     WordAndOp -> sizedPrimOp OP_AND
     Word64AndOp -> sizedPrimOp OP_AND
+    Word32AndOp -> sizedPrimOp OP_AND
+    Word16AndOp -> sizedPrimOp OP_AND
+    Word8AndOp -> sizedPrimOp OP_AND
 
     IntNotOp -> sizedPrimOp OP_NOT
     WordNotOp -> sizedPrimOp OP_NOT
     Word64NotOp -> sizedPrimOp OP_NOT
+    Word32NotOp -> sizedPrimOp OP_NOT
+    Word16NotOp -> sizedPrimOp OP_NOT
+    Word8NotOp -> sizedPrimOp OP_NOT
 
     IntXorOp -> sizedPrimOp OP_XOR
     WordXorOp -> sizedPrimOp OP_XOR
     Word64XorOp -> sizedPrimOp OP_XOR
+    Word32XorOp -> sizedPrimOp OP_XOR
+    Word16XorOp -> sizedPrimOp OP_XOR
+    Word8XorOp -> sizedPrimOp OP_XOR
 
     IntOrOp -> sizedPrimOp OP_OR
     WordOrOp -> sizedPrimOp OP_OR
     Word64OrOp -> sizedPrimOp OP_OR
+    Word32OrOp -> sizedPrimOp OP_OR
+    Word16OrOp -> sizedPrimOp OP_OR
+    Word8OrOp -> sizedPrimOp OP_OR
 
     WordSllOp   -> sizedPrimOp OP_SHL
     Word64SllOp -> sizedPrimOp OP_SHL
+    Word32SllOp -> sizedPrimOp OP_SHL
+    Word16SllOp -> sizedPrimOp OP_SHL
+    Word8SllOp -> sizedPrimOp OP_SHL
     IntSllOp    -> sizedPrimOp OP_SHL
     Int64SllOp  -> sizedPrimOp OP_SHL
-    Word64SrlOp -> sizedPrimOp OP_LSR
+    Int32SllOp  -> sizedPrimOp OP_SHL
+    Int16SllOp  -> sizedPrimOp OP_SHL
+    Int8SllOp  -> sizedPrimOp OP_SHL
+
     WordSrlOp   -> sizedPrimOp OP_LSR
-    IntSrlOp    -> sizedPrimOp OP_ASR
-    Int64SrlOp  -> sizedPrimOp OP_ASR
+    Word64SrlOp -> sizedPrimOp OP_LSR
+    Word32SrlOp -> sizedPrimOp OP_LSR
+    Word16SrlOp -> sizedPrimOp OP_LSR
+    Word8SrlOp -> sizedPrimOp OP_LSR
+    IntSrlOp    -> sizedPrimOp OP_LSR
+    Int64SrlOp  -> sizedPrimOp OP_LSR
+    Int32SrlOp  -> sizedPrimOp OP_LSR
+    Int16SrlOp  -> sizedPrimOp OP_LSR
+    Int8SrlOp  -> sizedPrimOp OP_LSR
+
+    IntSraOp -> sizedPrimOp OP_ASR
+    Int64SraOp -> sizedPrimOp OP_ASR
+    Int32SraOp -> sizedPrimOp OP_ASR
+    Int16SraOp -> sizedPrimOp OP_ASR
+    Int8SraOp -> sizedPrimOp OP_ASR
+
 
     IntNeOp -> sizedPrimOp OP_NEQ
+    Int64NeOp -> sizedPrimOp OP_NEQ
+    Int32NeOp -> sizedPrimOp OP_NEQ
+    Int16NeOp -> sizedPrimOp OP_NEQ
+    Int8NeOp -> sizedPrimOp OP_NEQ
     WordNeOp -> sizedPrimOp OP_NEQ
     Word64NeOp -> sizedPrimOp OP_NEQ
+    Word32NeOp -> sizedPrimOp OP_NEQ
+    Word16NeOp -> sizedPrimOp OP_NEQ
+    Word8NeOp -> sizedPrimOp OP_NEQ
     AddrNeOp -> sizedPrimOp OP_NEQ
 
     IntEqOp -> sizedPrimOp OP_EQ
+    Int64EqOp -> sizedPrimOp OP_EQ
+    Int32EqOp -> sizedPrimOp OP_EQ
+    Int16EqOp -> sizedPrimOp OP_EQ
+    Int8EqOp -> sizedPrimOp OP_EQ
     WordEqOp -> sizedPrimOp OP_EQ
     Word64EqOp -> sizedPrimOp OP_EQ
+    Word32EqOp -> sizedPrimOp OP_EQ
+    Word16EqOp -> sizedPrimOp OP_EQ
+    Word8EqOp -> sizedPrimOp OP_EQ
     AddrEqOp -> sizedPrimOp OP_EQ
     CharEqOp -> sizedPrimOp OP_EQ
 
     IntLtOp -> sizedPrimOp OP_S_LT
+    Int64LtOp -> sizedPrimOp OP_S_LT
+    Int32LtOp -> sizedPrimOp OP_S_LT
+    Int16LtOp -> sizedPrimOp OP_S_LT
+    Int8LtOp -> sizedPrimOp OP_S_LT
     WordLtOp -> sizedPrimOp OP_U_LT
     Word64LtOp -> sizedPrimOp OP_U_LT
+    Word32LtOp -> sizedPrimOp OP_U_LT
+    Word16LtOp -> sizedPrimOp OP_U_LT
+    Word8LtOp -> sizedPrimOp OP_U_LT
     AddrLtOp -> sizedPrimOp OP_U_LT
+    CharLtOp -> sizedPrimOp OP_U_LT
 
     IntGeOp -> sizedPrimOp OP_S_GE
+    Int64GeOp -> sizedPrimOp OP_S_GE
+    Int32GeOp -> sizedPrimOp OP_S_GE
+    Int16GeOp -> sizedPrimOp OP_S_GE
+    Int8GeOp -> sizedPrimOp OP_S_GE
     WordGeOp -> sizedPrimOp OP_U_GE
     Word64GeOp -> sizedPrimOp OP_U_GE
-    AddrGeOp -> sizedPrimOp OP_U_GE
-
-    Int8GeOp -> sizedPrimOp OP_S_GE
+    Word32GeOp -> sizedPrimOp OP_U_GE
+    Word16GeOp -> sizedPrimOp OP_U_GE
     Word8GeOp -> sizedPrimOp OP_U_GE
+    AddrGeOp -> sizedPrimOp OP_U_GE
+    CharGeOp -> sizedPrimOp OP_U_GE
 
     IntGtOp -> sizedPrimOp OP_S_GT
+    Int64GtOp -> sizedPrimOp OP_S_GT
+    Int32GtOp -> sizedPrimOp OP_S_GT
+    Int16GtOp -> sizedPrimOp OP_S_GT
+    Int8GtOp -> sizedPrimOp OP_S_GT
     WordGtOp -> sizedPrimOp OP_U_GT
     Word64GtOp -> sizedPrimOp OP_U_GT
+    Word32GtOp -> sizedPrimOp OP_U_GT
+    Word16GtOp -> sizedPrimOp OP_U_GT
+    Word8GtOp -> sizedPrimOp OP_U_GT
     AddrGtOp -> sizedPrimOp OP_U_GT
+    CharGtOp -> sizedPrimOp OP_U_GT
 
     IntLeOp -> sizedPrimOp OP_S_LE
+    Int64LeOp -> sizedPrimOp OP_S_LE
+    Int32LeOp -> sizedPrimOp OP_S_LE
+    Int16LeOp -> sizedPrimOp OP_S_LE
+    Int8LeOp -> sizedPrimOp OP_S_LE
     WordLeOp -> sizedPrimOp OP_U_LE
     Word64LeOp -> sizedPrimOp OP_U_LE
+    Word32LeOp -> sizedPrimOp OP_U_LE
+    Word16LeOp -> sizedPrimOp OP_U_LE
+    Word8LeOp -> sizedPrimOp OP_U_LE
     AddrLeOp -> sizedPrimOp OP_U_LE
+    CharLeOp -> sizedPrimOp OP_U_LE
 
     IntNegOp -> sizedPrimOp OP_NEG
     Int64NegOp -> sizedPrimOp OP_NEG
+    Int32NegOp -> sizedPrimOp OP_NEG
+    Int16NegOp -> sizedPrimOp OP_NEG
+    Int8NegOp -> sizedPrimOp OP_NEG
 
     IntToWordOp     -> no_op
     WordToIntOp     -> no_op
@@ -941,7 +1024,7 @@ doPrimOp platform op init_d s p args =
     ChrOp           -> no_op   -- Int# and Char# are rep'd the same
     OrdOp           -> no_op
 
-    IndexOffAddrOp_Word8 -> primOpWithRep (OP_INDEX_ADDR W8) W8
+    IndexOffAddrOp_Word8 ->  primOpWithRep (OP_INDEX_ADDR W8) W8
     IndexOffAddrOp_Word16 -> primOpWithRep (OP_INDEX_ADDR W16) W16
     IndexOffAddrOp_Word32 -> primOpWithRep (OP_INDEX_ADDR W32) W32
     IndexOffAddrOp_Word64 -> primOpWithRep (OP_INDEX_ADDR W64) W64
