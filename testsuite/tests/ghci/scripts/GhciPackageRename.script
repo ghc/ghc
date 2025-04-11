@@ -1,0 +1,6 @@
+:l GhciPackageRename.hs
+-- Test that Data.Map is available as Prelude
+:t fromList
+
+-- Test using a Map function
+fromList [(1,"a"), (2,"b")]
