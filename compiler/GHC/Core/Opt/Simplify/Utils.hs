@@ -1420,8 +1420,12 @@ preInlineUnconditionally for
 Note [Top-level bottoming Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't inline top-level Ids that are bottoming, even if they are used just
-once, because FloatOut has gone to some trouble to extract them out.
-Inlining them won't make the program run faster!
+once, because FloatOut has gone to some trouble to extract them out. e.g.
+    report x y = error (..lots of stuff...)
+    f x y z = if z then report x y else ...blah...
+Here `f` might be small enough to inline; but if we put all the `report`
+stuff inside it, it'll look to big.  In general we don't want to duplicate
+all the error-reporting goop.
 
 Note [Do not inline CoVars unconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1461,7 +1465,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
                   , occ_in_lam = NotInsideLam }   = isNotTopLevel top_lvl || early_phase
     one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = IsInsideLam
-                  , occ_int_cxt = IsInteresting } = canInlineInLam True rhs
+                  , occ_int_cxt = IsInteresting } = canInlineInLam rhs
     one_occ _                                     = False
 
     pre_inline_unconditionally = sePreInline env
@@ -1519,8 +1523,8 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
         -- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
         -- so substituting rhs inside a lambda doesn't change the occ info.
         -- Sadly, not quite the same as exprIsHNF.
-canInlineInLam :: Bool -> CoreExpr -> Bool
-canInlineInLam is_pre e
+canInlineInLam ::CoreExpr -> Bool
+canInlineInLam e
   = go e
   where
     go (Lit _)    = True
@@ -1532,10 +1536,12 @@ canInlineInLam is_pre e
     --     f = \p. ..x..    -- One occurrence of x
     --     ..y..            -- Multiple other occurrences of y
     -- Then it is safe to inline x unconditionally
-    go (Var v)    = not is_pre || case idOccInfo v of
-                                    OneOcc { occ_in_lam = IsInsideLam } -> True
-                                    ManyOccs {}                         -> True
-                                    _                                   -> False
+    -- For postInlineUncondionally we have already tested exprIsTrivial
+    -- so this Var case never arises
+    go (Var v)    = case idOccInfo v of
+                       OneOcc { occ_in_lam = IsInsideLam } -> True
+                       ManyOccs {}                         -> True
+                       _                                   -> False
     go _          = False
       -- not ticks.  Counting ticks cannot be duplicated, and non-counting
       -- ticks around a Lam will disappear anyway.
@@ -1601,36 +1607,44 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
   | otherwise
   = case occ_info of
       IAmALoopBreaker {} -> False
-
       ManyOccs {} | is_top_lvl -> False  -- Note [Top level and postInlineUnconditionally]
                   | otherwise  -> exprIsTrivial rhs
 
       OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
-              -> post_inline_one_occ in_lam int_cxt n_br
+              | exprIsTrivial rhs -> True
+              | is_top_lvl        -> False
+              | otherwise         -> check_one_occ in_lam int_cxt n_br
 
       IAmDead -> True   -- This happens; for example, the case_bndr during case of
                         -- known constructor:  case (a,b) of x { (p,q) -> ... }
                         -- Here x isn't mentioned in the RHS, so we don't want to
                         -- create the (dead) let-binding  let x = (a,b) in ...
   where
-    post_inline_one_occ in_lam int_cxt n_br
-        -- See Note [Inline small things to avoid creating a thunk]
+    is_top_lvl  = isTopLevel (bindContextLevel bind_cxt)
+    is_demanded = isStrUsedDmd (idDemandInfo bndr)
+    occ_info    = idOccInfo old_bndr
+    unfolding   = idUnfolding bndr
+    is_cheap    = isCheapUnfolding unfolding
+    uf_opts     = seUnfoldingOpts env
+    phase       = sePhase env
+    active      = isActive phase (idInlineActivation bndr)
+        -- See Note [pre/postInlineUnconditionally in gentle mode]
 
-        | exprIsTrivial rhs
-        = True
+    -- Check for code-size blow-up from inlining in multiple places
+    code_dup_ok n_br
+      | n_br == 1   = True  -- No duplication
+      | n_br >= 100 = False -- See #23627
+      | is_demanded = False -- Demanded => no allocation (it'll be a case expression
+                            -- in the end) so inlining duplicates code but nothing more
+      | otherwise   = smallEnoughToInline uf_opts unfolding
 
-        | n_br == 1                 -- One syntactic occurrence
-        = work_ok in_lam int_cxt    -- See Note [Post-inline for single-use things]
-
-        | n_br >= 100    -- See #23627
-        = False
-
-        | is_demanded    -- No allocation (it'll be a case expression in the end)
-        = False          -- so inlining duplicates code but nothing more
-
-        | otherwise    -- -- Multiple syntactic occurences; but lazy
-        = work_ok in_lam int_cxt && smallEnoughToInline uf_opts unfolding
-           -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
+    -- See Note [Post-inline for single-use things]
+    check_one_occ NotInsideLam _             n_br = code_dup_ok n_br
+    check_one_occ IsInsideLam NotInteresting _    = False
+    check_one_occ IsInsideLam IsInteresting  n_br = is_cheap && code_dup_ok n_br
+      -- IsInteresting: inlining inside a lambda only with good reason
+      --    See the notes on int_cxt in preInlineUnconditionally
+      -- is_cheap: check for acceptable work duplication, using isCheapUnfolding
 
 ---------------
 -- A wrong bit of code, left here in case you are tempted to do this
@@ -1640,11 +1654,7 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
 -- Don't inline v; it'll just get floated out again. Stupid.
 ---------------
 
-    is_top_lvl = isTopLevel (bindContextLevel bind_cxt)
 
-    work_ok NotInsideLam _              = not is_top_lvl  -- Not quite sure here
-    work_ok IsInsideLam  IsInteresting  = canInlineInLam False rhs
-    work_ok IsInsideLam  NotInteresting = False
       -- NotInsideLam: outside a lambda, when not at top-level we want to be
       -- reasonably aggressive about inlining into multiple branches of case
       -- e.g. let x = <non-value>
@@ -1653,18 +1663,9 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
       -- the uses in C1, C2 are not 'interesting'
       -- An example that gets worse if you add int_cxt here is 'clausify'
 
-      -- InsideLam: check for acceptable work duplication, using isCheapUnfolding
-      -- int_cxt to prevent us inlining inside a lambda without some
-      -- good reason.  See the notes on int_cxt in preInlineUnconditionally
+      -- InsideLam: 
 
 --    is_unlifted = isUnliftedType (idType bndr)
-    is_demanded = isStrUsedDmd (idDemandInfo bndr)
-    occ_info    = idOccInfo old_bndr
-    unfolding   = idUnfolding bndr
-    uf_opts     = seUnfoldingOpts env
-    phase       = sePhase env
-    active      = isActive phase (idInlineActivation bndr)
-        -- See Note [pre/postInlineUnconditionally in gentle mode]
 
 {- Note [Inline small things to avoid creating a thunk]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1733,24 +1734,20 @@ Alas!
 
 Note [Top level and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don't do postInlineUnconditionally for top-level things (even for
-ones that are trivial):
+We must take care when considering postInlineUnconditionally for top-level things
 
-  * Doing so will inline top-level error expressions that have been
-    carefully floated out by FloatOut.  More generally, it might
-    replace static allocation with dynamic.
+  * Don't inline top-level error expressions that have been carefully floated
+    out by FloatOut.  See Note [Top-level bottoming Ids].
 
-  * Even for trivial expressions there's a problem.  Consider
+  * Even for trivial expressions we need to take care: we must not
+    postInlineUnconditionally a top-level ManyOccs binder, even if its
+    RHS is trivial. Consider
       {-# RULE "foo" forall (xs::[T]). reverse xs = ruggle xs #-}
       blah xs = reverse xs
       ruggle = sort
-    In one simplifier pass we might fire the rule, getting
+    We must not postInlineUnconditionally `ruggle`, because in the same
+    simplifier pass we might fire the rule, getting
       blah xs = ruggle xs
-    but in *that* simplifier pass we must not do postInlineUnconditionally
-    on 'ruggle' because then we'll have an unbound occurrence of 'ruggle'
-
-    If the rhs is trivial it'll be inlined by callSiteInline, and then
-    the binding will be dead and discarded by the next use of OccurAnal
 
   * There is less point, because the main goal is to get rid of local
     bindings used in multiple case branches.

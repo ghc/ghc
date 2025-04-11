@@ -2607,6 +2607,7 @@ Consider
    case p of
       A -> ...(error x)..
       B -> ...(error x)...
+      C -> ..blah...
 
 postInlineUnconditionally may duplicate x's binding, but sometimes it
 does so only if the use site IsInteresting.  Pushing allocation into error
