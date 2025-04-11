@@ -179,9 +179,9 @@ See also Note [Width of parameters] for some more motivation.
 #define Sp_plusB(n)  ((void *)((StgWord8*)Sp + (ptrdiff_t)(n)))
 #define Sp_minusB(n) ((void *)((StgWord8*)Sp - (ptrdiff_t)(n)))
 
-#define Sp_plusW(n)  (Sp_plusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(W_)))
+#define Sp_plusW(n)    (Sp_plusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(W_)))
 #define Sp_plusW64(n)  (Sp_plusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(StgWord64)))
-#define Sp_minusW(n) (Sp_minusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(W_)))
+#define Sp_minusW(n)   (Sp_minusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(W_)))
 
 #define Sp_addB(n)   (Sp = Sp_plusB(n))
 #define Sp_subB(n)   (Sp = Sp_minusB(n))
@@ -189,16 +189,24 @@ See also Note [Width of parameters] for some more motivation.
 #define Sp_addW64(n) (Sp = Sp_plusW64(n))
 #define Sp_subW(n)   (Sp = Sp_minusW(n))
 
-#define SpW(n)       (*(StgWord*)(Sp_plusW(n)))
-#define Sp_T(n,ty)   (*(ty*)(Sp_plusB(sizeof(ty))))
-#define SpW64(n)     (*(StgWord64*)(Sp_plusW64(n)))
-#define SpB(n)       (*(StgWord*)(Sp_plusB(n)))
+// Assumes stack location is within stack chunk bounds
+#define SpW(n)      (*(StgWord*)(Sp_plusW(n)))
+#define SpW64(n)    (*(StgWord*)(Sp_plusW64(n)))
 
-#define WITHIN_CAP_CHUNK_BOUNDS(n)  WITHIN_CHUNK_BOUNDS(n, cap->r.rCurrentTSO->stackobj)
+#define WITHIN_CAP_CHUNK_BOUNDS_W(n)  WITHIN_CHUNK_BOUNDS_W(n, cap->r.rCurrentTSO->stackobj)
 
-#define WITHIN_CHUNK_BOUNDS(n, s)  \
-  (RTS_LIKELY((StgWord*)(Sp_plusW(n)) < ((s)->stack + (s)->stack_size - sizeofW(StgUnderflowFrame))))
+#define WITHIN_CHUNK_BOUNDS_W(n, s)  \
+    (RTS_LIKELY(((StgWord*) Sp_plusW(n)) < ((s)->stack + (s)->stack_size - sizeofW(StgUnderflowFrame))))
 
+
+#define WDS_TO_W64(n) (n * sizeof(StgWord64) / sizeof(StgWord))
+
+// Always safe to use - Return the value at the address
+#define ReadSpW(n)       (*             SafeSpWP(n))
+#define ReadSpW64(n)     (*(StgWord64*) SafeSpWP(WDS_TO_W64(n)))
+// Perhaps confusingly this still reads a full word, merely the offset is in bytes.
+// #define ReadSpB(n)       (*(StgWord*)   ((StgWord8*) SafeSpWP(n/sizeof(StgWord))) + (ptrdiff_t)(n%sizeof(StgWord)))
+#define ReadSpB(n)       (*(StgWord*)   SafeSpBP(n))
 
 /* Note [PUSH_L underflow]
    ~~~~~~~~~~~~~~~~~~~~~~~
@@ -220,9 +228,9 @@ variables. If a stack overflow happens between the creation of the stack frame
 for BCO_1 and BCO_N the RTS might move BCO_N to a new stack chunk while leaving
 BCO_1 in place, invalidating a simple offset based reference to the outer stack
 frames.
-Therefore `ReadSpW` first performs a bounds check to ensure that accesses onto
+Therefore `SafeSpW` first performs a bounds check to ensure that accesses onto
 the stack will succeed. If the target address would not be a valid location for
-the current stack chunk then `slow_spw` function is called, which dereferences
+the current stack chunk then `slow_sp` function is called, which dereferences
 the underflow frame to adjust the offset before performing the lookup.
 
                ┌->--x   |  CHK_1  |
@@ -238,8 +246,14 @@ See ticket #25750
 
 */
 
-#define ReadSpW(n)      \
-  ((WITHIN_CAP_CHUNK_BOUNDS(n)) ? SpW(n): slow_spw(Sp, cap->r.rCurrentTSO->stackobj, n))
+// Returns a pointer to the stack location.
+#define SafeSpWP(n)      \
+  ((StgWord*) ((WITHIN_CAP_CHUNK_BOUNDS_W(n)) ? Sp_plusW(n) : slow_spw(Sp, cap->r.rCurrentTSO->stackobj, n)))
+#define SafeSpBP(off_w)      \
+  ( (StgWord*) (WITHIN_CAP_CHUNK_BOUNDS_W(1+off_w/sizeof(StgWord))) ? \
+        Sp_plusB(off_w) : \
+        (StgWord*) ((ptrdiff_t)(off_w % sizeof(StgWord)) + (StgWord8*)slow_spw(Sp, cap->r.rCurrentTSO->stackobj, off_w/sizeof(StgWord))))
+
 
 
 /* Note [Interpreter subword primops]
@@ -258,14 +272,6 @@ For the subword operations the operation will push the result to the
 stack zero-extended to platform word size.
 
 */
-
-#define BIN_OP(op,ty)                                               \
-    {                                                               \
-    (ty) r = (ty) Sp_T(0,ty) op (ty) *(ty*)(Sp_plusB(off+2));                   \
-    SpW64(1) = r;                                                   \
-    Sp_addB(sizeof(ty));                                            \
-    goto nextInsn;                                                  \
-    }                                                               \
 
 STATIC_INLINE StgPtr
 allocate_NONUPD (Capability *cap, int n_words)
@@ -422,11 +428,12 @@ StgClosure * copyPAP  (Capability *cap, StgPAP *oldpap)
 
 // See Note [PUSH_L underflow] for in which situations this
 // slow lookup is needed
-static StgWord
-slow_spw(void *Sp, StgStack *cur_stack, StgWord offset){
-  // 1. If in range, access the item from the current stack chunk
-  if (WITHIN_CHUNK_BOUNDS(offset, cur_stack)) {
-    return SpW(offset);
+// Returns a pointer to the stack location.
+static void*
+slow_spw(void *Sp, StgStack *cur_stack, StgWord offset_words){
+  // 1. If in range, simply return ptr+offset_words pointing into the current stack chunk
+  if (WITHIN_CHUNK_BOUNDS_W(offset_words, cur_stack)) {
+    return Sp_plusW(offset_words);
   }
   // 2. Not in this stack chunk, so access the underflow frame.
   else {
@@ -450,21 +457,19 @@ slow_spw(void *Sp, StgStack *cur_stack, StgWord offset){
 
       // How many words were on the stack
       stackWords = (StgWord *)frame - (StgWord *) Sp;
-      ASSERT(offset > stackWords);
+      ASSERT(offset_words > stackWords);
 
       // Recursive, in the very unlikely case we have to traverse two
       // stack chunks.
-      return slow_spw(new_stack->sp, new_stack, offset-stackWords);
+      return slow_spw(new_stack->sp, new_stack, offset_words-stackWords);
     }
     // 2b. Access the element if there is no underflow frame, it must be right
     // at the top of the stack.
     else {
         // Not actually in the underflow case
-        return SpW(offset);
+        return Sp_plusW(offset_words);
     }
-
   }
-
 }
 
 // Compute the pointer tag for the constructor and tag the pointer;
@@ -913,7 +918,7 @@ do_return_nonpointer:
         // get the offset of the header of the next stack frame
         offset = stack_frame_sizeW((StgClosure *)Sp);
 
-        switch (get_itbl((StgClosure*)(Sp_plusW(offset)))->type) {
+        switch (get_itbl((StgClosure*)(SafeSpWP(offset)))->type) {
 
         case RET_BCO:
             // Returning to an interpreted continuation: pop the return frame
@@ -1451,41 +1456,46 @@ run_BCO:
         case bci_PUSH8: {
             W_ off = BCO_GET_LARGE_ARG;
             Sp_subB(1);
-            *(StgWord8*)Sp = (StgWord8) *(StgWord*)(Sp_plusB(off+1));
+            ASSERT(SpW(0) == ReadSpB(0));
+            ASSERT((Sp_plusB(off-off%8)) == (SafeSpWP(off/8)));
+            ASSERT(
+                (StgWord8) *(StgWord*)(Sp_plusB(off+1)) ==
+                (StgWord8) (ReadSpB(off+1)));
+            *(StgWord8*)Sp = (StgWord8) (ReadSpB(off+1));
             goto nextInsn;
         }
 
         case bci_PUSH16: {
             W_ off = BCO_GET_LARGE_ARG;
             Sp_subB(2);
-            *(StgWord16*)Sp = (StgWord16) *(StgWord*)(Sp_plusB(off+2));
+            *(StgWord16*)Sp = (StgWord16) (ReadSpB(off+2));
             goto nextInsn;
         }
 
         case bci_PUSH32: {
             W_ off = BCO_GET_LARGE_ARG;
             Sp_subB(4);
-            *(StgWord32*)Sp = (StgWord32) *(StgWord*)(Sp_plusB(off+4));
+            *(StgWord32*)Sp = (StgWord32) (ReadSpB(off+4));
             goto nextInsn;
         }
 
         case bci_PUSH8_W: {
             W_ off = BCO_GET_LARGE_ARG;
-            *(StgWord*)(Sp_minusW(1)) = (StgWord) ((StgWord8) *(StgWord*)(Sp_plusB(off)));
+            *(StgWord*)(Sp_minusW(1)) = (StgWord) ((StgWord8) (ReadSpB(off)));
             Sp_subW(1);
             goto nextInsn;
         }
 
         case bci_PUSH16_W: {
             W_ off = BCO_GET_LARGE_ARG;
-            *(StgWord*)(Sp_minusW(1)) = (StgWord) ((StgWord16) *(StgWord*)(Sp_plusB(off)));
+            *(StgWord*)(Sp_minusW(1)) = (StgWord) ((StgWord16) (ReadSpB(off)));
             Sp_subW(1);
             goto nextInsn;
         }
 
         case bci_PUSH32_W: {
             W_ off = BCO_GET_LARGE_ARG;
-            *(StgWord*)(Sp_minusW(1)) = (StgWord) ((StgWord32) *(StgWord*)(Sp_plusB(off)));
+            *(StgWord*)(Sp_minusW(1)) = (StgWord) ((StgWord32) (ReadSpB(off)));
             Sp_subW(1);
             goto nextInsn;
         }
@@ -1975,7 +1985,7 @@ run_BCO:
         case bci_TESTLT_I64: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt64 stackInt = (*(StgInt64*)Sp);
+            StgInt64 stackInt = ReadSpW64(0);
             if (stackInt >= BCO_LITI64(discr))
                 bciPtr = failto;
             goto nextInsn;
@@ -2021,7 +2031,7 @@ run_BCO:
         case bci_TESTEQ_I64: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt64 stackInt = (*(StgInt64*)Sp);
+            StgInt64 stackInt = ReadSpW64(0);
             if (stackInt != BCO_LITI64(discr)) {
                 bciPtr = failto;
             }
@@ -2070,7 +2080,7 @@ run_BCO:
         case bci_TESTLT_W64: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord64 stackWord = (*(StgWord64*)Sp);
+            StgWord64 stackWord = ReadSpW64(0);
             if (stackWord >= BCO_LITW64(discr))
                 bciPtr = failto;
             goto nextInsn;
@@ -2116,7 +2126,7 @@ run_BCO:
         case bci_TESTEQ_W64: {
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord64 stackWord = (*(StgWord64*)Sp);
+            StgWord64 stackWord = ReadSpW64(0);
             if (stackWord != BCO_LITW64(discr)) {
                 bciPtr = failto;
             }
@@ -2253,7 +2263,7 @@ run_BCO:
         case bci_SWIZZLE: {
             W_ stkoff = BCO_GET_LARGE_ARG;
             StgInt n = BCO_GET_LARGE_ARG;
-            (*(StgInt*)(Sp_plusW(stkoff))) += n;
+            (*(StgInt*)(SafeSpWP(stkoff))) += n;
             goto nextInsn;
         }
 
@@ -2265,29 +2275,25 @@ run_BCO:
 
 #define UN_SIZED_OP(op,ty)                                          \
     {                                                               \
-    ty r = op (*(ty*) Sp_plusB(0));                                 \
-    if(sizeof(ty) > sizeof(StgWord)) {                              \
-        /* 64bit op on 32bit platforms */                           \
-        SpW64(0) = (StgWord64) r;                                   \
-    } else {                                                        \
-        SpW(0) = (StgWord) r;                                       \
-    }                                                               \
-    goto nextInsn;                                                  \
+        if(sizeof(ty) == 8) {                                       \
+            ty r = op (*(ty*) ReadSpW64(0));                        \
+            SpW64(0) = (StgWord64) r;                               \
+        } else {                                                    \
+            ty r = op (*(ty*) ReadSpW(0));                          \
+            SpW(0) = (StgWord) r;                                   \
+        }                                                           \
+        goto nextInsn;                                              \
     }
 
 #define SIZED_BIN_OP(op,ty)                                                     \
         {                                                                       \
-            ty r = (*(ty*) Sp_plusB(0)) op (*(ty*) Sp_plusB(sizeof(ty)));       \
-            /* If the two arguments didn't fit in a single (host) word we have to clean up the stack.*/ \
-            if(sizeof(ty)*2 > sizeof(StgWord)) {                                \
-                /* Invariant: Multiple of word size pushed.                     \
-                   Variations: 2x32bit on 32bit, 2x64 on 32bit, 2x64 on 64bit*/ \
-                Sp_addB(sizeof(ty)*2 - sizeof(ty));                             \
-            };                                                                  \
-            /* Host might be 32bit, so ensure we write as MAX(Word/Word64) */   \
             if(sizeof(ty) == 8) {                                               \
+                ty r = ((ty) ReadSpW64(0)) op ((ty) ReadSpW64(1));                  \
+                Sp_addW64(1);                                                   \
                 SpW64(0) = (StgWord64) r;                                       \
             } else {                                                            \
+                ty r = ((ty) ReadSpW(0)) op ((ty) ReadSpW(1));                  \
+                Sp_addW(1);                                                     \
                 SpW(0) = (StgWord) r;                                           \
             };                                                                  \
             goto nextInsn;                                                      \

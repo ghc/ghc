@@ -1119,6 +1119,7 @@ terribleNoOp orig_d _ p _ args = app_code
         do_pushery orig_d (reverse args_offsets)
 
 -- Push the arguments on the stack and emit the given instruction
+-- Pushes one word per non void arg.
 mkPrimOpCode
     :: StackDepth
     -> Sequel
@@ -1132,24 +1133,16 @@ mkPrimOpCode orig_d _ p op_inst args = app_code
         profile <- getProfile
         let _platform = profilePlatform profile
 
-            non_voids =
-                addArgReps (assertNonVoidStgArgs args)
-            (_, _, args_offsets) =
-                mkVirtHeapOffsetsWithPadding profile StdHeader non_voids
-
+            do_pushery :: StackDepth -> [StgArg] -> BcM BCInstrList
             do_pushery !d (arg : args) = do
-                (push, arg_bytes) <- case arg of
-                    (Padding l _) -> return $! pushPadding (ByteOff l)
-                    (FieldOff a _) -> pushConstrAtom d p (fromNonVoid a)
+                (push,arg_bytes) <- pushAtom d p arg
                 more_push_code <- do_pushery (d + arg_bytes) args
                 return (push `appOL` more_push_code)
             do_pushery !_d [] = do
-                -- let !n_arg_words = bytesToWords platform (d - orig_d)
                 return (unitOL op_inst)
 
         -- Push on the stack in the reverse order.
-        do_pushery orig_d (reverse args_offsets)
-
+        do_pushery orig_d (reverse args)
 
 -- v. similar to CgStackery.findMatch, ToDo: merge
 findPushSeq :: [ArgRep] -> (BCInstr, Int, [ArgRep])
@@ -2222,6 +2215,9 @@ pushAtom :: StackDepth -> BCEnv -> StgArg -> BcM (BCInstrList, ByteOff)
 -- and Note [Bottoming expressions] in GHC.Core.Utils:
 -- The scrutinee of an empty case evaluates to bottom
 pushAtom d p (StgVarArg var)
+   | pprTrace "pushAtom" (ppr (d,var)) False
+   = undefined
+
    | [] <- typePrimRep (idType var)
    = return (nilOL, 0)
 
