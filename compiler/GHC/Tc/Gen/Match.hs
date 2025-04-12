@@ -239,7 +239,9 @@ tcMatches ctxt tc_body pat_tys rhs_ty (MG { mg_alts = L l matches
     -- when in inference mode, so we must do it ourselves,
     -- here, using expTypeToType
   = do { tcEmitBindingUsage bottomUE
-       ; pat_ty <- case pat_tys of -- See Note [Pattern types for EmptyCase]
+         -- See Note [Pattern types for EmptyCase]
+       ; let vis_pat_tys = filter isVisibleExpPatType pat_tys
+       ; pat_ty <- case vis_pat_tys of
            [ExpFunPatTy t]      -> scaledExpTypeToType t
            [ExpForAllPatTy tvb] -> failWithTc $ TcRnEmptyCase ctxt (EmptyCaseForall tvb)
            []                   -> panic "tcMatches: no arguments in EmptyCase"
@@ -272,8 +274,15 @@ tcMatches ctxt tc_body pat_tys rhs_ty (MG { mg_alts = L l matches
 In tcMatches, we might encounter an empty list of matches if the user wrote
 `case x of {}` or `\case {}`.
 
-* First of all, both `case x of {}` and `\case {}` match on exactly one
-  argument, so we expect pat_tys to be a singleton list [pat_ty] and panic otherwise.
+* First of all, both `case x of {}` and `\case {}` match on exactly one visible
+  argument, which follows from
+
+    checkArgCounts :: MatchGroup GhcRn ... -> TcM VisArity
+    checkArgCounts (MG { mg_alts = L _ [] })
+      = return 1
+    ...
+
+  So we expect vis_pat_tys to be a singleton list [pat_ty] and panic otherwise.
 
   Multi-case `\cases {}` can't violate this assumption in `tcMatches` because it
   must have been rejected earlier in `rnMatchGroup`.
@@ -290,7 +299,7 @@ In tcMatches, we might encounter an empty list of matches if the user wrote
   This is not valid and it used to trigger a panic in pmcMatches (#25004).
   We reject it by inspecting the expected pattern type:
 
-    ; pat_ty <- case pat_tys of
+    ; pat_ty <- case vis_pat_tys of
         [ExpFunPatTy t]      -> ...    -- value argument, ok
         [ExpForAllPatTy tvb] -> ...    -- type argument, error!
 
