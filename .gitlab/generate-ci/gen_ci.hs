@@ -489,7 +489,6 @@ alpineVariables arch = mconcat $
   [ mconcat [ brokenTest test "#25498" | test <- ["simd009", "T25169"] ]
   | I386 <- [arch]
   ] ++
-  [ brokenTest "T22033" "#25497" | I386 <- [arch] ] ++
   [ -- Bootstrap compiler has incorrectly configured target triple #25200
     "CONFIGURE_ARGS" =: "--enable-ignore-build-platform-mismatch --build=aarch64-unknown-linux --host=aarch64-unknown-linux --target=aarch64-unknown-linux"
   | AArch64 <- [arch]
