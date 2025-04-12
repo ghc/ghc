@@ -1,0 +1,7 @@
+T25004k.hs:9:16: error: [GHC-48010]
+    • Empty list of alternatives in \case expression
+      checked against a forall-type: forall (xs :: k) -> ...
+    • In the first argument of ‘cont’, namely ‘(\case)’
+      In the expression: cont (\case)
+      In an equation for ‘f’: f cont = cont (\case)
+
