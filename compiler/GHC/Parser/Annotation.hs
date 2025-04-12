@@ -19,7 +19,6 @@ module GHC.Parser.Annotation (
 
   -- * In-tree Exact Print Annotations
   EpaLocation, EpaLocation'(..), epaLocationRealSrcSpan,
-  TokenLocation(..),
   DeltaPos(..), deltaPos, getDeltaLine,
 
   EpAnn(..),
@@ -338,14 +337,6 @@ epaToNoCommentsLocation (EpaDelta _ _ _ ) = panic "epaToNoCommentsLocation"
 noCommentsToEpaLocation :: NoCommentsLocation -> EpaLocation
 noCommentsToEpaLocation (EpaSpan ss) = EpaSpan ss
 noCommentsToEpaLocation (EpaDelta ss dp NoComments) = EpaDelta ss dp []
-
--- | Tokens embedded in the AST have an EpaLocation, unless they come from
--- generated code (e.g. by TH).
-data TokenLocation = NoTokenLoc | TokenLoc !EpaLocation
-               deriving (Data,Eq)
-
-instance Outputable a => Outputable (GenLocated TokenLocation a) where
-  ppr (L _ x) = ppr x
 
 -- | Used in the parser only, extract the 'RealSrcSpan' from an
 -- 'EpaLocation'. The parser will never insert a 'DeltaPos', so the

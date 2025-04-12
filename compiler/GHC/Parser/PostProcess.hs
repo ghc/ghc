@@ -75,9 +75,6 @@ module GHC.Parser.PostProcess (
         mkMultField,
         mkConDeclField,
 
-        -- Token location
-        mkTokenLocation,
-
         -- Help with processing exports
         ImpExpSubSpec(..),
         ImpExpQcSpec(..),
@@ -3558,10 +3555,6 @@ mkMultAnn pct t ep = HsExplicitMult (pct, ep) t
 
 mkMultField :: EpToken "%" -> LHsType GhcPs -> TokDcolon -> LHsType GhcPs -> HsConDeclField GhcPs
 mkMultField pct mult col t = mkConDeclField (mkMultAnn pct mult (EpColon col)) t
-
-mkTokenLocation :: SrcSpan -> TokenLocation
-mkTokenLocation (UnhelpfulSpan _) = NoTokenLoc
-mkTokenLocation (RealSrcSpan r mb) = TokenLoc (EpaSpan (RealSrcSpan r mb))
 
 -- Precondition: the EpToken has EpaSpan, never EpaDelta.
 epTokenWidenR :: EpToken tok -> SrcSpan -> EpToken tok'
