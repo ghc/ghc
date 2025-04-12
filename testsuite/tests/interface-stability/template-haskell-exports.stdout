@@ -1369,7 +1369,7 @@ module Language.Haskell.TH.Quote where
   quoteFile :: QuasiQuoter -> QuasiQuoter
 
 module Language.Haskell.TH.Syntax where
-  -- Safety: Trustworthy
+  -- Safety: Safe
   type AnnLookup :: *
   data AnnLookup = AnnLookupModule Module | AnnLookupName Name
   type AnnTarget :: *
@@ -1780,8 +1780,6 @@ module Language.Haskell.TH.Syntax where
   addModFinalizer :: Q () -> Q ()
   addTempFile :: GHC.Internal.Base.String -> Q GHC.Internal.IO.FilePath
   addTopDecls :: [Dec] -> Q ()
-  addrToByteArray :: GHC.Internal.Types.Int -> GHC.Internal.Prim.Addr# -> Data.Array.Byte.ByteArray
-  addrToByteArrayName :: Name
   badIO :: forall a. GHC.Internal.Base.String -> GHC.Internal.Types.IO a
   bindCode :: forall (m :: * -> *) a (r :: GHC.Internal.Types.RuntimeRep) (b :: TYPE r). GHC.Internal.Base.Monad m => m a -> (a -> Code m b) -> Code m b
   bindCode_ :: forall (m :: * -> *) a (r :: GHC.Internal.Types.RuntimeRep) (b :: TYPE r). GHC.Internal.Base.Monad m => m a -> Code m b -> Code m b

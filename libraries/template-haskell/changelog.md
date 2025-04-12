@@ -13,6 +13,8 @@
   
   * Remove the `Language.Haskell.TH.Lib.Internal` module. This module has long been deprecated, and exposes compiler internals.
     Users should use `Language.Haskell.TH.Lib` instead, which exposes a stable version of this API.
+    
+  * Remove `addrToByteArrayName` and `addrToByteArray` from `Language.Haskell.TH.Syntax`. These were part of the implementation of the `Lift ByteArray` instance and were errornously exported because this module lacked an explicit export list. They have no usages on Hackage.
 
 ## 2.23.0.0
 
