@@ -10,6 +10,7 @@ module GHC.Parser.Annotation (
   -- * Core Exact Print Annotation types
   EpToken(..), EpUniToken(..),
   getEpTokenSrcSpan,
+  getEpTokenBufSpan,
   getEpTokenLocs, getEpTokenLoc, getEpUniTokenLoc,
   TokDcolon, TokDarrow, TokRarrow, TokForall,
   EpLayout(..),
@@ -251,6 +252,11 @@ getEpTokenSrcSpan :: EpToken tok -> SrcSpan
 getEpTokenSrcSpan NoEpTok = noSrcSpan
 getEpTokenSrcSpan (EpTok EpaDelta{}) = noSrcSpan
 getEpTokenSrcSpan (EpTok (EpaSpan span)) = span
+
+getEpTokenBufSpan :: EpToken tok -> Strict.Maybe BufSpan
+getEpTokenBufSpan NoEpTok = Strict.Nothing
+getEpTokenBufSpan (EpTok EpaDelta{}) = Strict.Nothing
+getEpTokenBufSpan (EpTok (EpaSpan span)) = getBufSpan span
 
 getEpTokenLocs :: [EpToken tok] -> [EpaLocation]
 getEpTokenLocs ls = concatMap go ls
