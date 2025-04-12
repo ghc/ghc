@@ -1,6 +1,6 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Safe #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 module Language.Haskell.TH.Syntax (
@@ -190,16 +190,11 @@ module Language.Haskell.TH.Syntax (
     nothingName,
     rightName,
     trueName,
-    addrToByteArrayName,
-    addrToByteArray,
 )
 where
 
-import Data.Array.Byte
 import GHC.Boot.TH.Lift
 import GHC.Boot.TH.Syntax
-import GHC.Exts
-import GHC.ST
 import System.FilePath
 
 -- This module completely re-exports 'GHC.Boot.TH.Syntax',
@@ -211,17 +206,3 @@ makeRelativeToProject fp | isRelative fp = do
   root <- getPackageRoot
   return (root </> fp)
 makeRelativeToProject fp = return fp
-
--- The following two defintions are copied from 'Data.Byte.Array'
--- in order to preserve the old export list of 'TH.Syntax'.
--- They will soon be removed as part of #24782.
-
-addrToByteArrayName :: Name
-addrToByteArrayName = 'addrToByteArray
-
-addrToByteArray :: Int -> Addr# -> ByteArray
-addrToByteArray (I# len) addr = runST $ ST $
-  \s -> case newByteArray# len s of
-    (# s', mb #) -> case copyAddrToByteArray# addr mb 0# len s' of
-      s'' -> case unsafeFreezeByteArray# mb s'' of
-        (# s''', ret #) -> (# s''', ByteArray ret #)
