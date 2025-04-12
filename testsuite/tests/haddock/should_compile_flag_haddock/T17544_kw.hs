@@ -1,16 +1,16 @@
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS -haddock -ddump-parsed-ast #-}
 
--- Haddock comments in this test case should all be rejected, but they are not.
---
--- This is a known issue. Users should avoid writing comments in such
--- positions, as a future fix will disallow them.
+-- Haddock comments in this test case are all rejected.
 --
 -- See Note [Register keyword location] in GHC.Parser.PostProcess.Haddock
 
 module
   -- | Bad comment for the module
-  T17544_kw where
+  T17544_kw (
+  Foo(..),
+  Bar(..),
+  Cls(..)) where
 
 data Foo -- | Bad comment for MkFoo
   where MkFoo :: Foo
