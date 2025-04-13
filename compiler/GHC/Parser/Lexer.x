@@ -328,12 +328,12 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 <bol> {
   \n                                    ;
   -- Ghc CPP symbols
-  ^\# \ * @cppkeyword  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag }
+  ^\# \ * @cppkeyword  .* \n / { ifExtensionGhcCppNotComment } { cppToken cpp_prag }
 
   ^\# line                              { begin line_prag1 }
   ^\# / { followedByDigit }             { begin line_prag1 }
 
-  ^\#.*\n                      / { ifExtension GhcCppBit } { cppSkip }
+  ^\#.*\n                    / { ifExtensionGhcCppNotComment } { cppSkip }
 
   ^\# pragma .* \n                      ; -- GCC 3.3 CPP generated, apparently
   ^\# \! .* \n                          ; -- #!, for scripts  -- gcc
@@ -1633,6 +1633,10 @@ ghcCppSet :: P p Bool
 ghcCppSet = do
   exts <- getExts
   return $ xtest GhcCppBit exts
+
+ifExtensionGhcCppNotComment :: AlexAccPred ExtsBitmap
+ifExtensionGhcCppNotComment bits _ _ _
+  = GhcCppBit `xtest` bits && not (InNestedCommentBit `xtest` bits)
 
 -- See Note [Nested comment line pragmas]
 parseNestedPragma :: AlexInput -> P p (String,AlexInput)
