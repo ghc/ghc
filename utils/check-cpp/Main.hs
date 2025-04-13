@@ -728,3 +728,14 @@ t31 = do
         , "#endif"
         , ""
         ]
+
+t32 :: IO ()
+t32 = do
+    dump
+       [ "{-# LANGUAGE"
+       , "    GHC_CPP"
+       , "  , DeriveGeneric"
+       , "#-}"
+       , ""
+       , "module Example12 where"
+       ]
