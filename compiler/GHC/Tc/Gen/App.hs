@@ -976,6 +976,7 @@ expr_to_type earg =
       -- only parts of it are, e.g. `vfun (Maybe Int)` or `vfun (Maybe (type Int))`.
       -- Apply a recursive T2T transformation.
       HsWC [] <$> go e
+        <* failIfErrsM   -- Suppress unhelpful errors that arise after a failed T2T
   where
     go :: LHsExpr GhcRn -> TcM (LHsType GhcRn)
     go (L _ (HsEmbTy _ t)) =
@@ -1002,9 +1003,11 @@ expr_to_type earg =
          ; ty <- go expr
          ; return (L l (HsQualTy noExtField (L ann ctxt') ty)) }
     go (L l (HsVar _ lname)) =
-      -- as per #281: variables and constructors (regardless of their namespace)
-      -- are mapped directly, without modification.
-      return (L l (HsTyVar noAnn NotPromoted lname))
+      -- GHC Proposal #281, section 7.5 "T2T-Mapping":
+      --   variables and constructors (regardless of their namespace)
+      --   are mapped directly, without modification.
+      do { detect_puns lname
+         ; return (L l (HsTyVar noAnn NotPromoted lname)) }
     go (L l (HsApp _ lhs rhs)) =
       do { lhs' <- go lhs
          ; rhs' <- go rhs
@@ -1077,6 +1080,30 @@ expr_to_type earg =
       -- equivalent of fromListN, so we must use the original.
       go (L l orig)
     go e = failWith $ TcRnIllformedTypeArgument e
+
+    detect_puns :: LocatedN (WithUserRdr Name) -> TcM ()
+      -- GHC Proposal #281, section 7.5 "T2T-Mapping":
+      --   there should be no variable of the same name but from
+      --   a different namespace, or else raise an ambiguity error
+      --   (does not apply to constructors)
+    detect_puns (L l (WithUserRdr rdr _))
+      | isTermVarOrFieldNameSpace (rdrNameSpace rdr)
+      , Just promoted_rdr <- promoteRdrName rdr
+      = do { envs <- getRdrEnvs
+           ; whenIsJust (lookup_rdr envs rdr) $ \unpromoted ->
+             whenIsJust (lookup_rdr envs promoted_rdr) $ \promoted ->
+               addErrAt (locA l) $
+               TcRnIllegalPunnedVarOccInTypeArgument { illegalPunTermName = unpromoted
+                                                     , illegalPunTypeName = promoted } }
+      | otherwise = return ()
+
+    lookup_rdr :: (GlobalRdrEnv, LocalRdrEnv) -> RdrName -> Maybe ResolvedNameInfo
+    lookup_rdr (gbl_env, lcl_env) rdr
+      | Just name <- lookupLocalRdrEnv lcl_env rdr
+      = Just (ResolvedNameInfo [] rdr name)
+      | gres@(gre:_) <- lookupGRE gbl_env (LookupRdrName rdr (RelevantGREsFOS WantNormal))
+      = Just (ResolvedNameInfo gres rdr (gre_name gre))
+      | otherwise = Nothing
 
     unwrap_wc :: HsWildCardBndrs GhcRn t -> TcM t
     unwrap_wc (HsWC wcs t)

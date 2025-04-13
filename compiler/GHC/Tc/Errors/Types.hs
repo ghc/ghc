@@ -18,6 +18,8 @@ module GHC.Tc.Errors.Types (
   , FixedRuntimeRepProvenance(..)
   , pprFixedRuntimeRepProvenance
   , ShadowedNameProvenance(..)
+  , ResolvedNameInfo(..)
+  , pprResolvedNameProvenance
   , RecordFieldPart(..)
   , IllegalNewtypeReason(..)
   , BadRecordUpdateReason(..)
@@ -773,6 +775,20 @@ data TcRnMessage where
   TcRnIllegalImplicitTyVarInTypeArgument
     :: RdrName
     -> TcRnMessage
+
+  {- TcRnIllegalPunnedVarOccInTypeArgument is an error raised
+     when a punned variable occurs in a required type argument.
+
+     Example:
+       vfun :: forall (a :: k) -> ()
+       f (Just @a a) = vfun a
+       --                  ^^^
+       --  which `a` is referenced?
+  -}
+  TcRnIllegalPunnedVarOccInTypeArgument
+    :: { illegalPunTermName :: !ResolvedNameInfo     -- ^ How the variable was actually resolved (term namespace)
+       , illegalPunTypeName :: !ResolvedNameInfo     -- ^ How the variable could have been resolved (type namespace)
+       } -> TcRnMessage
 
   {-| TcRnDuplicateFieldName is an error that occurs whenever
       there are duplicate field names in a single record.
@@ -4526,6 +4542,18 @@ data ShadowedNameProvenance
     -- ^ The shadowed name is local to the module
   | ShadowedNameProvenanceGlobal [GlobalRdrElt]
     -- ^ The shadowed name is global, typically imported from elsewhere.
+
+-- | Information about a resolved name
+data ResolvedNameInfo
+  = ResolvedNameInfo ![GlobalRdrElt] !RdrName !Name
+
+instance Outputable ResolvedNameInfo where
+  ppr (ResolvedNameInfo _ rdr name) = ppr (WithUserRdr rdr name)
+
+pprResolvedNameProvenance :: ResolvedNameInfo -> SDoc
+pprResolvedNameProvenance (ResolvedNameInfo gres _ name)
+  | gre:_ <- gres = pprNameProvenance gre
+  | otherwise     = text "bound at" <+> ppr (getSrcLoc name)
 
 -- | In what context did we require a type to have a fixed runtime representation?
 --

@@ -1,0 +1,43 @@
+T23738_fail_pun.hs:13:23: error: [GHC-09591]
+    • Illegal punned variable occurrence in a required type argument.
+      The name ‘a’ could refer to:
+        ‘a’ bound at T23738_fail_pun.hs:13:13
+        ‘a’ bound at T23738_fail_pun.hs:13:11
+    • In the expression: vfun a
+      In an equation for ‘f1’: f1 (Just @a a) = vfun a
+
+T23738_fail_pun.hs:21:16: error: [GHC-09591]
+    • Illegal punned variable occurrence in a required type argument.
+      The name ‘b’ could refer to:
+        ‘b’ defined at T23738_fail_pun.hs:18:1
+        ‘b’ bound at T23738_fail_pun.hs:21:5
+    • In the expression: vfun b
+      In an equation for ‘f2’: f2 @b _ = vfun b
+
+T23738_fail_pun.hs:30:17: error: [GHC-09591]
+    • Illegal punned variable occurrence in a required type argument.
+      The name ‘id’ could refer to:
+        ‘id’ imported from ‘Data.Function’ at T23738_fail_pun.hs:6:23-24
+             (and originally defined in ‘GHC.Internal.Base’)
+        ‘id’ bound at T23738_fail_pun.hs:30:5
+    • In the expression: vfun id
+      In an equation for ‘f4’: f4 @id _ = vfun id
+
+T23738_fail_pun.hs:38:15: error: [GHC-09591]
+    • Illegal punned variable occurrence in a required type argument.
+      The name ‘#’ could refer to:
+        ‘#’ bound at T23738_fail_pun.hs:38:4
+        ‘#’ defined at T23738_fail_pun.hs:35:1
+    • In the expression: vfun (#)
+      In an equation for ‘f5’: f5 (#) = vfun (#)
+
+T23738_fail_pun.hs:43:11: error: [GHC-09591]
+    • Illegal punned variable occurrence in a required type argument.
+      The name ‘+’ could refer to:
+        ‘+’ imported from ‘Prelude’ at T23738_fail_pun.hs:4:8-22
+            (and originally defined in ‘GHC.Internal.Num’)
+        ‘+’ imported from ‘GHC.TypeLits’ at T23738_fail_pun.hs:7:1-19
+            (and originally defined in ‘GHC.Internal.TypeNats’)
+    • In the expression: vfun (+)
+      In an equation for ‘f6’: f6 = vfun (+)
+
