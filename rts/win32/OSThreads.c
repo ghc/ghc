@@ -87,56 +87,6 @@ osThreadIsAlive(OSThreadId id)
     return (exit_code == STILL_ACTIVE);
 }
 
-void
-newThreadLocalKey (ThreadLocalKey *key)
-{
-    DWORD r;
-    r = TlsAlloc();
-    if (r == TLS_OUT_OF_INDEXES) {
-        barf("newThreadLocalKey: out of keys");
-    }
-    *key = r;
-}
-
-void *
-getThreadLocalVar (ThreadLocalKey *key)
-{
-    void *r;
-    r = TlsGetValue(*key);
-#if defined(DEBUG)
-    // r is allowed to be NULL - it can mean that either there was an
-    // error or the stored value is in fact NULL.
-    if (GetLastError() != NO_ERROR) {
-        sysErrorBelch("getThreadLocalVar");
-        stg_exit(EXIT_FAILURE);
-    }
-#endif
-    return r;
-}
-
-void
-setThreadLocalVar (ThreadLocalKey *key, void *value)
-{
-    BOOL b;
-    b = TlsSetValue(*key, value);
-    if (!b) {
-        sysErrorBelch("setThreadLocalVar");
-        stg_exit(EXIT_FAILURE);
-    }
-}
-
-void
-freeThreadLocalKey (ThreadLocalKey *key)
-{
-    BOOL r;
-    r = TlsFree(*key);
-    if (r == 0) {
-        DWORD dw = GetLastError();
-        barf("freeThreadLocalKey failed: %lu", dw);
-    }
-}
-
-
 static unsigned
 forkOS_createThreadWrapper ( void * entry )
 {

@@ -286,43 +286,6 @@ closeMutex(Mutex* pMut)
     pthread_mutex_destroy(pMut);
 }
 
-void
-newThreadLocalKey (ThreadLocalKey *key)
-{
-    int r;
-    if ((r = pthread_key_create(key, NULL)) != 0) {
-        barf("newThreadLocalKey: %s", strerror(r));
-    }
-}
-
-void *
-getThreadLocalVar (ThreadLocalKey *key)
-{
-    return pthread_getspecific(*key);
-    // Note: a return value of NULL can indicate that either the key
-    // is not valid, or the key is valid and the data value has not
-    // yet been set.  We need to use the latter case, so we cannot
-    // detect errors here.
-}
-
-void
-setThreadLocalVar (ThreadLocalKey *key, void *value)
-{
-    int r;
-    if ((r = pthread_setspecific(*key,value)) != 0) {
-        barf("setThreadLocalVar: %s", strerror(r));
-    }
-}
-
-void
-freeThreadLocalKey (ThreadLocalKey *key)
-{
-    int r;
-    if ((r = pthread_key_delete(*key)) != 0) {
-        barf("freeThreadLocalKey: %s", strerror(r));
-    }
-}
-
 #if defined(THREADED_RTS)
 
 static void *
