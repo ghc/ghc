@@ -28,10 +28,6 @@
    do not support __thread at all. Modern clang however, does - but on
    OS X it's not as fast as the Linux (which can write directly into a
    segment register - see #7602.)
-
-   If we don't support __thread then we do the absolute worst thing:
-   we just use pthread_getspecific and pthread_setspecific (which are
-   horribly slow.)
 */
 
 #define GCT_REG_DECL(type,name,reg) register type name REG(reg);
@@ -50,23 +46,10 @@ extern StgWord8 the_gc_thread[];
 
 /* -------------------------------------------------------------------------- */
 
-/* Now, llvm-gcc and some older Clang compilers do not support
-   __thread. So we have to fallback to the extremely slow case,
-   unfortunately.
-
-   Also, the iOS Clang compiler doesn't support __thread either for
-   some bizarre reason, so there's not much we can do about that... */
-#if defined(CC_LLVM_BACKEND) && (CC_SUPPORTS_TLS == 0)
-#define gct ((gc_thread *)(pthread_getspecific(gctKey)))
-#define SET_GCT(to) (pthread_setspecific(gctKey, to))
-#define DECLARE_GCT ThreadLocalKey gctKey;
-
-/* -------------------------------------------------------------------------- */
-
-/* However, if we *are* using an LLVM based compiler with __thread
+/* If we *are* using an LLVM based compiler with __thread
    support, then use that (since LLVM doesn't support global register
    variables.) */
-#elif defined(CC_LLVM_BACKEND) && (CC_SUPPORTS_TLS == 1)
+#if defined(CC_LLVM_BACKEND)
 extern __thread gc_thread* gct;
 #define SET_GCT(to) gct = (to)
 #define DECLARE_GCT __thread gc_thread* gct;
@@ -106,17 +89,12 @@ GCT_REG_DECL(gc_thread*, gct, REG_R1);
 /* -------------------------------------------------------------------------- */
 
 /* Finally, as an absolute fallback, if none of the above tests check
-   out but we *do* have __thread support, then use that. */
-#elif CC_SUPPORTS_TLS == 1
+   out, then use __thread. */
+#else
 extern __thread gc_thread* gct;
 #define SET_GCT(to) gct = (to)
 #define DECLARE_GCT __thread gc_thread* gct;
 
-/* -------------------------------------------------------------------------- */
-
-/* Impossible! */
-#else
-#error Cannot find a way to declare the thread-local gc variable!
 #endif
 
 #endif // THREADED_RTS

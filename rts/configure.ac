@@ -234,19 +234,6 @@ AC_CHECK_FUNCS([eventfd])
 
 AC_CHECK_FUNCS([getpid getuid raise])
 
-dnl ** Check for __thread support in the compiler
-AC_MSG_CHECKING(for __thread support)
-AC_COMPILE_IFELSE(
-  [ AC_LANG_SOURCE([[__thread int tester = 0;]]) ],
-  [
-   AC_MSG_RESULT(yes)
-   AC_DEFINE([CC_SUPPORTS_TLS],[1],[Define to 1 if __thread is supported])
-  ],
-  [
-   AC_MSG_RESULT(no)
-   AC_DEFINE([CC_SUPPORTS_TLS],[0],[Define to 1 if __thread is supported])
-  ])
-
 dnl large address space support (see rts/include/rts/storage/MBlock.h)
 dnl
 dnl Darwin has vm_allocate/vm_protect
