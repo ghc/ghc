@@ -298,3 +298,74 @@ tt = case m5 of
     Left err -> Left err
     Right (Just a, b) -> Right (map (\k -> concatMap t_str k) a, concatMap t_str b)
     Right (Nothing, _) -> error "oops"
+
+m6 = do
+
+-- #define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) (
+--   ( ( ma ) * 100 + ( mi ) ) < 913
+
+-- ||
+
+--   ( ( ma ) * 100 + ( mi ) ) == 913
+--         && ( pl1 ) < 20250412
+
+-- ||
+
+--   ( ( ma ) * 100 + ( mi ) ) == 913
+--         && ( pl1 ) == 20250412
+--         && ( pl2 ) <= 0 )
+  let foo =
+       -- ma = 19
+       -- mi = 13
+       -- pl1 = 20250101
+       -- pl2 = 0
+       -- [ ""
+       -- , "  ( ( 19 ) * 100 + ( 13 ) ) < 913"
+       -- , ""
+       -- , "||"
+       -- , ""
+       -- , "  ( ( 19 ) * 100 + ( 13 ) ) == 913"
+       -- , "        && ( 20250101 ) < 20250412"
+       -- , ""
+       -- , "||"
+       -- , ""
+       -- , "  ( ( 19 ) * 100 + ( 13 ) ) == 913"
+       -- , "        && ( 20250101 ) == 20250412"
+       -- , "        && ( 0 ) <= 0 "
+       -- ]
+       [ ""
+       , "  ( ( 19 ) * 100 + ( 13 ) ) < 913"
+       , ""
+       , "||"
+       , ""
+       , "  ( ( 19 ) * 100 + ( 13 ) ) == 913"
+       , "        && ( 20250101 ) < 20250412"
+       , ""
+       , "||"
+       , ""
+       , "  ( ( 19 ) * 100 + ( 13 ) ) == 913"
+       , "        && ( 20250101 ) == 20250412"
+       , "        && ( 0 ) <= 0 "
+       ]
+  case Parser.parseExpr (concat foo) of
+    Right v -> eval v
+    Left err -> error err
+
+
+-- Right
+--   (Logic
+--      LogicalOr
+--        (Logic LogicalOr
+--           (Comp CmpLt (Plus (Times (IntVal 19) (IntVal 100)) (IntVal 13)) (IntVal 913))
+--           (Logic LogicalAnd
+--              (Comp CmpEqual
+--                 (Plus (Times (IntVal 19) (IntVal 100))
+--                       (IntVal 13))
+--                 (IntVal 913))
+--              (Comp CmpLt (IntVal 20250101) (IntVal 20250412))))
+--        (Logic LogicalAnd
+--               (Logic LogicalAnd
+--                  (Comp CmpEqual (Plus (Times (IntVal 19) (IntVal 100)) (IntVal 13)) (IntVal 913))
+--                  (Comp CmpEqual (IntVal 20250101) (IntVal 20250412)))
+--               (Comp CmpLtE (IntVal 0) (IntVal 0)))
+--   )
