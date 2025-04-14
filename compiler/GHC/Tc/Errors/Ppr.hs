@@ -1590,7 +1590,7 @@ instance Diagnostic TcRnMessage where
                  , nest 2 $ quotes (ppr (occName fld)) ]
            , text "Record selection and update using this field will be partial." ]
     TcRnHasFieldResolvedIncomplete name cons maxCons -> mkSimpleDecorated $
-      hang (text "Selecting the record field" <+> quotes (ppr name)
+      hang (text "TcRn Selecting the record field" <+> quotes (ppr name)
               <+> text "may fail for the following constructors:")
            2
            (hsep $ punctuate comma $
