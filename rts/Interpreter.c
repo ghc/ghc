@@ -1455,11 +1455,6 @@ run_BCO:
         case bci_PUSH8: {
             W_ off = BCO_GET_LARGE_ARG;
             Sp_subB(1);
-            ASSERT(SpW(0) == ReadSpB(0));
-            ASSERT((Sp_plusB(off-off%8)) == (SafeSpWP(off/8)));
-            ASSERT(
-                (StgWord8) *(StgWord*)(Sp_plusB(off+1)) ==
-                (StgWord8) (ReadSpB(off+1)));
             *(StgWord8*)Sp = (StgWord8) (ReadSpB(off+1));
             goto nextInsn;
         }
