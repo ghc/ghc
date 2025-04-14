@@ -801,14 +801,6 @@ mkDefaultMethodType cls _   (GenericDM dm_ty) = mkSigmaTy tv_bndrs [pred] dm_ty
      --     (#13998)
 
 {-
-************************************************************************
-*                                                                      *
-                Building record selectors
-*                                                                      *
-************************************************************************
--}
-
-{-
 Note [Default method Ids and Template Haskell]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this (#4169):
@@ -834,6 +826,21 @@ when typechecking the [d| .. |] quote, and typecheck them later.
 ************************************************************************
 -}
 
+{- Note [Record selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Record selectors are injected as ordianry functions definitions, very
+early in the pipeline.
+
+* `mkRecSelBinds` produces /un-typechecked/ bindings, rather like 'deriving'
+   This makes life easier, because the later type checking will add
+   all necessary type abstractions and applications; and handling for
+   UNPACK pragmas etc
+
+* Record selectors are not treated as "implicit".  See
+  See Note [Implicit TyThings] in GHC.Types.TyThing and
+      Note [Injecting implicit bindings] in GHC.CoreToStg.AddImplicitBinds
+-}
+
 tcRecSelBinds :: [(Id, LHsBind GhcRn)] -> TcM TcGblEnv
 tcRecSelBinds sel_bind_prs
   = tcExtendGlobalValEnv [sel_id | (L _ (XSig (IdSig sel_id))) <- sigs] $
@@ -849,9 +856,7 @@ tcRecSelBinds sel_bind_prs
     binds = [(NonRecursive, [bind]) | (_, bind) <- sel_bind_prs]
 
 mkRecSelBinds :: [TyCon] -> [(Id, LHsBind GhcRn)]
--- NB We produce *un-typechecked* bindings, rather like 'deriving'
---    This makes life easier, because the later type checking will add
---    all necessary type abstractions and applications
+-- See Note [Record selectors]
 mkRecSelBinds tycons
   = map mkRecSelBind [ (tc,fld) | tc <- tycons
                                 , fld <- tyConFieldLabels tc ]
