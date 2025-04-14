@@ -2293,15 +2293,30 @@ run_BCO:
             goto nextInsn;                                                      \
         }
 
+// op :: ty -> Int -> ty
+#define SIZED_BIN_OP_TY_INT(op,ty)                                      \
+{                                                                       \
+    if(sizeof(ty) > sizeof(StgWord)) {                                  \
+        ty r = ((ty) ReadSpW64(0)) op ((ty) ReadSpW(2));                \
+        Sp_addW(1);                                                     \
+        SpW64(0) = (StgWord64) r;                                       \
+    } else {                                                            \
+        ty r = ((ty) ReadSpW(0)) op ((ty) ReadSpW(1));                  \
+        Sp_addW(1);                                                     \
+        SpW(0) = (StgWord) r;                                           \
+    };                                                                  \
+    goto nextInsn;                                                      \
+}
+
         case bci_OP_ADD_64: SIZED_BIN_OP(+, StgInt64)
         case bci_OP_SUB_64: SIZED_BIN_OP(-, StgInt64)
         case bci_OP_AND_64: SIZED_BIN_OP(&, StgInt64)
         case bci_OP_XOR_64: SIZED_BIN_OP(^, StgInt64)
         case bci_OP_OR_64:  SIZED_BIN_OP(|, StgInt64)
         case bci_OP_MUL_64: SIZED_BIN_OP(*, StgInt64)
-        case bci_OP_SHL_64: SIZED_BIN_OP(<<, StgWord64)
-        case bci_OP_LSR_64: SIZED_BIN_OP(>>, StgWord64)
-        case bci_OP_ASR_64: SIZED_BIN_OP(>>, StgInt64)
+        case bci_OP_SHL_64: SIZED_BIN_OP_TY_INT(<<, StgWord64)
+        case bci_OP_LSR_64: SIZED_BIN_OP_TY_INT(>>, StgWord64)
+        case bci_OP_ASR_64: SIZED_BIN_OP_TY_INT(>>, StgInt64)
 
         case bci_OP_NEQ_64:  SIZED_BIN_OP(!=, StgWord64)
         case bci_OP_EQ_64:   SIZED_BIN_OP(==, StgWord64)
@@ -2325,9 +2340,9 @@ run_BCO:
         case bci_OP_XOR_32: SIZED_BIN_OP(^, StgInt32)
         case bci_OP_OR_32:  SIZED_BIN_OP(|, StgInt32)
         case bci_OP_MUL_32: SIZED_BIN_OP(*, StgInt32)
-        case bci_OP_SHL_32: SIZED_BIN_OP(<<, StgWord32)
-        case bci_OP_LSR_32: SIZED_BIN_OP(>>, StgWord32)
-        case bci_OP_ASR_32: SIZED_BIN_OP(>>, StgInt32)
+        case bci_OP_SHL_32: SIZED_BIN_OP_TY_INT(<<, StgWord32)
+        case bci_OP_LSR_32: SIZED_BIN_OP_TY_INT(>>, StgWord32)
+        case bci_OP_ASR_32: SIZED_BIN_OP_TY_INT(>>, StgInt32)
 
         case bci_OP_NEQ_32:  SIZED_BIN_OP(!=, StgWord32)
         case bci_OP_EQ_32:   SIZED_BIN_OP(==, StgWord32)
@@ -2351,9 +2366,9 @@ run_BCO:
         case bci_OP_XOR_16: SIZED_BIN_OP(^, StgInt16)
         case bci_OP_OR_16:  SIZED_BIN_OP(|, StgInt16)
         case bci_OP_MUL_16: SIZED_BIN_OP(*, StgInt16)
-        case bci_OP_SHL_16: SIZED_BIN_OP(<<, StgWord16)
-        case bci_OP_LSR_16: SIZED_BIN_OP(>>, StgWord16)
-        case bci_OP_ASR_16: SIZED_BIN_OP(>>, StgInt16)
+        case bci_OP_SHL_16: SIZED_BIN_OP_TY_INT(<<, StgWord16)
+        case bci_OP_LSR_16: SIZED_BIN_OP_TY_INT(>>, StgWord16)
+        case bci_OP_ASR_16: SIZED_BIN_OP_TY_INT(>>, StgInt16)
 
         case bci_OP_NEQ_16:  SIZED_BIN_OP(!=, StgWord16)
         case bci_OP_EQ_16:   SIZED_BIN_OP(==, StgWord16)
@@ -2377,9 +2392,9 @@ run_BCO:
         case bci_OP_XOR_08: SIZED_BIN_OP(^, StgInt8)
         case bci_OP_OR_08:  SIZED_BIN_OP(|, StgInt8)
         case bci_OP_MUL_08: SIZED_BIN_OP(*, StgInt8)
-        case bci_OP_SHL_08: SIZED_BIN_OP(<<, StgWord8)
-        case bci_OP_LSR_08: SIZED_BIN_OP(>>, StgWord8)
-        case bci_OP_ASR_08: SIZED_BIN_OP(>>, StgInt8)
+        case bci_OP_SHL_08: SIZED_BIN_OP_TY_INT(<<, StgWord8)
+        case bci_OP_LSR_08: SIZED_BIN_OP_TY_INT(>>, StgWord8)
+        case bci_OP_ASR_08: SIZED_BIN_OP_TY_INT(>>, StgInt8)
 
         case bci_OP_NEQ_08:  SIZED_BIN_OP(!=, StgWord8)
         case bci_OP_EQ_08:   SIZED_BIN_OP(==, StgWord8)

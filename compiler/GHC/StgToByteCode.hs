@@ -857,6 +857,17 @@ doPrimOp platform op init_d s p args =
     Word8AddOp -> sizedPrimOp OP_ADD
     AddrAddOp -> sizedPrimOp OP_ADD
 
+    IntMulOp -> sizedPrimOp OP_MUL
+    Int64MulOp -> sizedPrimOp OP_MUL
+    Int32MulOp -> sizedPrimOp OP_MUL
+    Int16MulOp -> sizedPrimOp OP_MUL
+    Int8MulOp -> sizedPrimOp OP_MUL
+    WordMulOp -> sizedPrimOp OP_MUL
+    Word64MulOp -> sizedPrimOp OP_MUL
+    Word32MulOp -> sizedPrimOp OP_MUL
+    Word16MulOp -> sizedPrimOp OP_MUL
+    Word8MulOp -> sizedPrimOp OP_MUL
+
     IntSubOp -> sizedPrimOp OP_SUB
     WordSubOp -> sizedPrimOp OP_SUB
     Int64SubOp -> sizedPrimOp OP_SUB
