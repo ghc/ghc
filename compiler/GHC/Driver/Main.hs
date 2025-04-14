@@ -190,7 +190,8 @@ import GHC.Core.LateCC
 import GHC.Core.LateCC.Types
 
 
-import GHC.CoreToStg.Prep
+import GHC.CoreToStg.Prep( CorePrepPgmConfig, corePrepPgm, corePrepExpr )
+import GHC.CoreToStg.AddImplicitBinds( addImplicitBinds )
 import GHC.CoreToStg    ( coreToStg )
 
 import GHC.Parser.Errors.Types
@@ -1916,7 +1917,7 @@ hscSimpleIface' mb_core_program tc_result summary = do
 hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
                -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos )
                 -- ^ @Just f@ <=> _stub.c is f
-hscGenHardCode hsc_env cgguts location output_filename = do
+hscGenHardCode hsc_env cgguts mod_loc output_filename = do
         let CgGuts{ cg_module   = this_mod,
                     cg_binds    = core_binds,
                     cg_ccs      = local_ccs
@@ -1924,14 +1925,21 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             dflags = hsc_dflags hsc_env
             logger = hsc_logger hsc_env
 
+        -------------------
+        -- ADD IMPLICIT BINDINGS
+        -- NB: we must feed mkImplicitBinds through corePrep too
+        -- so that they are suitably cloned and eta-expanded
+        let cp_pgm_cfg :: CorePrepPgmConfig
+            cp_pgm_cfg = initCorePrepPgmConfig (hsc_dflags hsc_env)
+                                               (interactiveInScope $ hsc_IC hsc_env)
+        binds_with_implicits <- addImplicitBinds cp_pgm_cfg mod_loc (cg_tycons cgguts) core_binds
 
         -------------------
-        -- Insert late cost centres based on the provided flags.
+        -- INSERT LATE COST CENTRES, based on the provided flags.
         --
         -- If -fprof-late-inline is enabled, we will skip adding CCs on any
-        -- top-level bindings here (via shortcut in `addLateCostCenters`),
-        -- since it will have already added a superset of the CCs we would add
-        -- here.
+        -- top-level bindings here (via shortcut in `addLateCostCenters`), since
+        -- it will have already added a superset of the CCs we would add here.
         let
           late_cc_config :: LateCCConfig
           late_cc_config =
@@ -1950,21 +1958,21 @@ hscGenHardCode hsc_env cgguts location output_filename = do
               , lateCCConfig_env =
                   LateCCEnv
                     { lateCCEnv_module = this_mod
-                    , lateCCEnv_file = fsLit <$> ml_hs_file location
+                    , lateCCEnv_file = fsLit <$> ml_hs_file mod_loc
                     , lateCCEnv_countEntries= gopt Opt_ProfCountEntries dflags
                     , lateCCEnv_collectCCs = True
                     }
               }
 
         (late_cc_binds, late_cc_state) <-
-          addLateCostCenters logger late_cc_config core_binds
+          addLateCostCenters logger late_cc_config binds_with_implicits
 
         when (dopt Opt_D_dump_late_cc dflags || dopt Opt_D_verbose_core2core dflags) $
           putDumpFileMaybe logger Opt_D_dump_late_cc "LateCC" FormatCore (vcat (map ppr late_cc_binds))
 
         -------------------
-        -- Run late plugins
-        -- This is the last use of the ModGuts in a compilation.
+        -- RUN LATE PLUGINS
+        -- This is the last use of the CgGuts in a compilation.
         -- From now on, we just use the bits we need.
         ( CgGuts
             { cg_tycons        = tycons,
@@ -1972,7 +1980,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
               cg_foreign_files = foreign_files,
               cg_dep_pkgs      = dependencies,
               cg_spt_entries   = spt_entries,
-              cg_binds         = late_binds,
+              cg_binds         = binds_to_prep,
               cg_ccs           = late_local_ccs
             }
           , _
@@ -1996,22 +2004,15 @@ hscGenHardCode hsc_env cgguts location output_filename = do
           tmpfs  = hsc_tmpfs hsc_env
           llvm_config = hsc_llvm_config hsc_env
           profile = targetProfile dflags
-          data_tycons = filter isDataTyCon tycons
-          -- cg_tycons includes newtypes, for the benefit of External Core,
-          -- but we don't generate any code for newtypes
-
-
 
         -------------------
         -- PREPARE FOR CODE GENERATION
         -- Do saturation and convert to A-normal form
-        (prepd_binds) <- {-# SCC "CorePrep" #-} do
-          cp_cfg <- initCorePrepConfig hsc_env
-          corePrepPgm
-            (hsc_logger hsc_env)
-            cp_cfg
-            (initCorePrepPgmConfig (hsc_dflags hsc_env) (interactiveInScope $ hsc_IC hsc_env))
-            this_mod location late_binds data_tycons
+        cp_cfg <- initCorePrepConfig hsc_env
+        (prepd_binds) <- {-# SCC "CorePrep" #-}
+                         corePrepPgm
+                           (hsc_logger hsc_env) cp_cfg cp_pgm_cfg
+                           this_mod binds_to_prep
 
         -----------------  Convert to STG ------------------
         (stg_binds_with_deps, denv, (caf_ccs, caf_cc_stacks), stg_cg_infos)
@@ -2024,7 +2025,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                         c `seqList`
                         d `seqList`
                         (seqEltsUFM (seqTagSig) tag_env))
-                   (myCoreToStg logger dflags (interactiveInScope (hsc_IC hsc_env)) False this_mod location prepd_binds)
+                   (myCoreToStg logger dflags (interactiveInScope (hsc_IC hsc_env)) False this_mod mod_loc prepd_binds)
 
         let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
@@ -2072,7 +2073,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             _          ->
               do
               cmms <- {-# SCC "StgToCmm" #-}
-                doCodeGen hsc_env this_mod denv data_tycons
+                doCodeGen hsc_env this_mod denv tycons
                 cost_centre_info
                 stg_binds
 
@@ -2093,7 +2094,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
               (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cmm_cg_infos)
                   <- {-# SCC "codeOutput" #-}
-                    codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod output_filename location
+                    codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod output_filename mod_loc
                     foreign_stubs foreign_files dependencies (initDUniqSupply 'n' 0) rawcmms1
               return  ( output_filename, stub_c_exists, foreign_fps
                       , Just stg_cg_infos, Just cmm_cg_infos)
@@ -2117,7 +2118,7 @@ hscInteractive :: HscEnv
                -> CgInteractiveGuts
                -> ModLocation
                -> IO (Maybe FilePath, CompiledByteCode) -- ^ .c stub path (if any) and ByteCode
-hscInteractive hsc_env cgguts location = do
+hscInteractive hsc_env cgguts mod_loc = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
     let tmpfs  = hsc_tmpfs hsc_env
@@ -2130,35 +2131,35 @@ hscInteractive hsc_env cgguts location = do
                cgi_modBreaks = mod_breaks,
                cgi_spt_entries = spt_entries } = cgguts
 
-        data_tycons = filter isDataTyCon tycons
-        -- cg_tycons includes newtypes, for the benefit of External Core,
-        -- but we don't generate any code for newtypes
+    -------------------
+    -- ADD IMPLICIT BINDINGS
+    let cp_pgm_cfg :: CorePrepPgmConfig
+        cp_pgm_cfg = initCorePrepPgmConfig (hsc_dflags hsc_env)
+                                           (interactiveInScope $ hsc_IC hsc_env)
+    binds_to_prep <- addImplicitBinds cp_pgm_cfg mod_loc tycons core_binds
 
     -------------------
     -- PREPARE FOR CODE GENERATION
     -- Do saturation and convert to A-normal form
-    prepd_binds <- {-# SCC "CorePrep" #-} do
-      cp_cfg <- initCorePrepConfig hsc_env
-      corePrepPgm
-        (hsc_logger hsc_env)
-        cp_cfg
-        (initCorePrepPgmConfig (hsc_dflags hsc_env) (interactiveInScope $ hsc_IC hsc_env))
-        this_mod location core_binds data_tycons
+    cp_cfg <- initCorePrepConfig hsc_env
+    prepd_binds <- {-# SCC "CorePrep" #-}
+                   corePrepPgm (hsc_logger hsc_env) cp_cfg cp_pgm_cfg
+                               this_mod binds_to_prep
 
     -- The stg cg info only provides a runtime benfit, but is not requires so we just
     -- omit it here
     (stg_binds_with_deps, _infotable_prov, _caf_ccs__caf_cc_stacks, _ignore_stg_cg_infos)
       <- {-# SCC "CoreToStg" #-}
-          myCoreToStg logger dflags (interactiveInScope (hsc_IC hsc_env)) True this_mod location prepd_binds
+          myCoreToStg logger dflags (interactiveInScope (hsc_IC hsc_env)) True this_mod mod_loc prepd_binds
 
     let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
     -----------------  Generate byte code ------------------
-    comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks spt_entries
+    comp_bc <- byteCodeGen hsc_env this_mod stg_binds tycons mod_breaks spt_entries
 
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
-        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod location foreign_stubs
+        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod mod_loc foreign_stubs
     return (istub_c_exists, comp_bc)
 
 -- | Compile Core bindings and foreign inputs that were loaded from an
@@ -2285,7 +2286,7 @@ doCodeGen :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
-doCodeGen hsc_env this_mod denv data_tycons
+doCodeGen hsc_env this_mod denv tycons
               cost_centre_info stg_binds_w_fvs = do
     let dflags     = hsc_dflags hsc_env
         logger     = hsc_logger hsc_env
@@ -2304,7 +2305,7 @@ doCodeGen hsc_env this_mod denv data_tycons
     let cmm_stream :: CgStream CmmGroup (ModuleLFInfos, DetUniqFM)
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
-            stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_binds_w_fvs
+            stg_to_cmm dflags this_mod denv tycons cost_centre_info stg_binds_w_fvs
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one

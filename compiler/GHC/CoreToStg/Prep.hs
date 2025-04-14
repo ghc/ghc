@@ -59,9 +59,8 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Types.Basic
-import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName, OccName )
+import GHC.Types.Name   ( OccName, NamedThing(..), isInternalName )
 import GHC.Types.Name.Occurrence (occNameString)
-import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.Unique.Supply
@@ -108,23 +107,17 @@ The goal of this pass is to prepare for code generation.
 7.  Give each dynamic CCall occurrence a fresh unique; this is
     rather like the cloning step above.
 
-8.  Inject bindings for the "implicit" Ids:
-        * Constructor wrappers
-        * Constructor workers
-    We want curried definitions for all of these in case they
-    aren't inlined by some caller.
+8. Convert bignum literals into their core representation.
 
- 9. Convert bignum literals into their core representation.
-
-10. Uphold tick consistency while doing this: We move ticks out of
+9. Uphold tick consistency while doing this: We move ticks out of
     (non-type) applications where we can, and make sure that we
     annotate according to scoping rules when floating.
 
-11. Collect cost centres (including cost centres in unfoldings) if we're in
+10. Collect cost centres (including cost centres in unfoldings) if we're in
     profiling mode. We have to do this here because we won't have unfoldings
     after this pass (see `trimUnfolding` and Note [Drop unfoldings and rules].
 
-12. Eliminate some magic Ids, specifically
+11. Eliminate some magic Ids, specifically
      runRW# (\s. e)  ==>  e[readWorldId/s]
              lazy e  ==>  e (see Note [lazyId magic] in GHC.Types.Id.Make)
          noinline e  ==>  e
@@ -242,30 +235,24 @@ data CorePrepPgmConfig = CorePrepPgmConfig
 corePrepPgm :: Logger
             -> CorePrepConfig
             -> CorePrepPgmConfig
-            -> Module -> ModLocation -> CoreProgram -> [TyCon]
+            -> Module -> CoreProgram
             -> IO CoreProgram
 corePrepPgm logger cp_cfg pgm_cfg
-            this_mod mod_loc binds data_tycons =
+            this_mod binds =
     withTiming logger
                (text "CorePrep"<+>brackets (ppr this_mod))
                (\a -> a `seqList` ()) $ do
     let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
 
     us <- mkSplitUniqSupply 's'
-
-    let implicit_binds = mkDataConWorkers
-          (cpPgm_generateDebugInfo pgm_cfg)
-          mod_loc data_tycons
-            -- NB: we must feed mkImplicitBinds through corePrep too
-            -- so that they are suitably cloned and eta-expanded
-
-        binds_out = initUs_ us $ do
-                      floats1 <- corePrepTopBinds initialCorePrepEnv binds
-                      floats2 <- corePrepTopBinds initialCorePrepEnv implicit_binds
-                      return (deFloatTop (floats1 `zipFloats` floats2))
+    let
+        floats = initUs_ us $
+                 corePrepTopBinds initialCorePrepEnv binds
+        binds_out = deFloatTop floats
 
     endPassIO logger (cpPgm_endPassConfig pgm_cfg)
               binds_out []
+
     return binds_out
 
 corePrepExpr :: Logger -> CorePrepConfig -> CoreExpr -> IO CoreExpr
@@ -291,27 +278,11 @@ corePrepTopBinds initialCorePrepEnv binds
                                floatss <- go env' binds
                                return (floats `zipFloats` floatss)
 
-mkDataConWorkers :: Bool -> ModLocation -> [TyCon] -> [CoreBind]
--- See Note [Data constructor workers]
--- c.f. Note [Injecting implicit bindings] in GHC.Iface.Tidy
-mkDataConWorkers generate_debug_info mod_loc data_tycons
-  = [ NonRec id (tick_it (getName data_con) (Var id))
-                                -- The ice is thin here, but it works
-    | tycon <- data_tycons,     -- CorePrep will eta-expand it
-      data_con <- tyConDataCons tycon,
-      let id = dataConWorkId data_con
-    ]
- where
-   -- If we want to generate debug info, we put a source note on the
-   -- worker. This is useful, especially for heap profiling.
-   tick_it name
-     | not generate_debug_info               = id
-     | RealSrcSpan span _ <- nameSrcSpan name = tick span
-     | Just file <- ml_hs_file mod_loc       = tick (span1 file)
-     | otherwise                             = tick (span1 "???")
-     where tick span  = Tick $ SourceNote span $
-             LexicalFastString $ mkFastString $ renderWithContext defaultSDocContext $ ppr name
-           span1 file = realSrcLocSpan $ mkRealSrcLoc (mkFastString file) 1 1
+{- *********************************************************************
+*                                                                      *
+                The main code
+*                                                                      *
+********************************************************************* -}
 
 {- Note [Floating in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -393,24 +364,6 @@ or dead binders). Nullary join points aren't ever recursive, so they're always
 effectively one-shot functions, which we don't float out of. We *could* float
 join points from nullary join points, but there's no clear benefit at this
 stage.
-
-Note [Data constructor workers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Create any necessary "implicit" bindings for data con workers.  We
-create the rather strange (non-recursive!) binding
-
-        $wC = \x y -> $wC x y
-
-i.e. a curried constructor that allocates.  This means that we can
-treat the worker for a constructor like any other function in the rest
-of the compiler.  The point here is that CoreToStg will generate a
-StgConApp for the RHS, rather than a call to the worker (which would
-give a loop).  As Lennart says: the ice is thin here, but it works.
-
-Hmm.  Should we create bindings for dictionary constructors?  They are
-always fully applied, and the bindings are just there to support
-partial applications. But it's easier to let them through.
-
 
 Note [Dead code in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -614,12 +567,6 @@ Other related tickets:
  - #14375
  - #15260
  - #18061
-
-************************************************************************
-*                                                                      *
-                The main code
-*                                                                      *
-************************************************************************
 -}
 
 cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
@@ -1265,8 +1212,8 @@ cpeApp top_env expr
 
     rebuild_app'
         :: CorePrepEnv
-        -> [ArgInfo] -- The arguments (inner to outer)
-        -> CpeApp
+        -> [ArgInfo] -- The arguments (inner to outer); substitution not applied
+        -> CpeApp    -- Substitution already applied
         -> Floats
         -> [Demand]
         -> [CoreTickish]
@@ -1278,12 +1225,9 @@ cpeApp top_env expr
 
     rebuild_app' env (a : as) fun' floats ss rt_ticks req_depth = case a of
       -- See Note [Ticks and mandatory eta expansion]
-      _
-        | not (null rt_ticks)
-        , req_depth <= 0
-        ->
-            let tick_fun = foldr mkTick fun' rt_ticks
-            in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
+      _ | not (null rt_ticks), req_depth <= 0
+        -> let tick_fun = foldr mkTick fun' rt_ticks
+           in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
 
       AIApp (Type arg_ty)
         -> rebuild_app' env as (App fun' (Type arg_ty')) floats ss rt_ticks req_depth
@@ -1301,7 +1245,7 @@ cpeApp top_env expr
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
                    ([],            _)     -> (topDmd, [])
-        (fs, arg') <- cpeArg top_env ss1 arg
+        (fs, arg') <- cpeArg env ss1 arg
         rebuild_app' env as (App fun' arg') (fs `zipFloats` floats) ss_rest rt_ticks (req_depth-1)
 
       AICast co
