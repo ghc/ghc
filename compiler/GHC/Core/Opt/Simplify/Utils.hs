@@ -1601,7 +1601,8 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
   | isWeakLoopBreaker occ_info   = False -- If it's a loop-breaker of any kind, don't inline
                                          -- because it might be referred to "earlier"
   | isStableUnfolding unfolding  = False -- Note [Stable unfoldings and postInlineUnconditionally]
-  | BC_Join {} <- bind_cxt       = False -- See point (1) of Note [Duplicating join points]
+  | BC_Join {} <- bind_cxt       = exprIsTrivial rhs
+                                        -- See point (DJ1) of Note [Duplicating join points]
                                         --     in GHC.Core.Opt.Simplify.Iteration
   | is_top_lvl, isDeadEndId bndr = False -- Note [Top-level bottoming Ids]
   | otherwise
@@ -1612,7 +1613,8 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
 
       OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
               | exprIsTrivial rhs -> True
-              | is_top_lvl        -> False
+--              | is_top_lvl        -> False
+-- Inlining a top-level used-once function is good
               | otherwise         -> check_one_occ in_lam int_cxt n_br
 
       IAmDead -> True   -- This happens; for example, the case_bndr during case of
@@ -1663,7 +1665,7 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
       -- the uses in C1, C2 are not 'interesting'
       -- An example that gets worse if you add int_cxt here is 'clausify'
 
-      -- InsideLam: 
+      -- InsideLam:
 
 --    is_unlifted = isUnliftedType (idType bndr)
 
