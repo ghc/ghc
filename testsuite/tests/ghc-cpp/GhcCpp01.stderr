@@ -7,9 +7,12 @@
 #define FOO(A,B) A + B
 #define FOO(A,B,C) A + B + C
 
+
 #define MIN_VERSION_Cabal(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 14 || ( major1 ) == 3 && ( major2 ) == 14 && ( minor ) <= 1 )
 
 #define MIN_VERSION_Cabal_syntax(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 14 || ( major1 ) == 3 && ( major2 ) == 14 && ( minor ) <= 1 )
+
+#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 913 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) < 20250414 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) == 20250414 && ( pl2 ) <= 0 )
 
 #define MIN_VERSION_array(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 5 || ( major1 ) == 0 && ( major2 ) == 5 && ( minor ) <= 8 )
 
@@ -183,9 +186,10 @@
 
 #define VERSION_xhtml 3000.2.2.1
 
-#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250322
 
-#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250322
+#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250414
+
+#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250414
 
 #define __GLASGOW_HASKELL_PATCHLEVEL2__ 0
 
