@@ -17,6 +17,10 @@
     * `Control.Concurrent.threadWaitWriteSTM`
     * `System.Timeout.timeout`
     * `GHC.Conc.Signal.runHandlers`
+  * The following internal modules have been removed from `base`, as per [CLC #217](https://github.com/haskell/core-libraries-committee/issues/217):
+      * `GHC.TypeLits.Internal`
+      * `GHC.TypeNats.Internal`
+      * `GHC.ExecutionStack.Internal`.
 
 ## 4.21.0.0 *TBA*
   * Change `SrcLoc` to be a strict and unboxed (finishing [CLC proposal #55](https://github.com/haskell/core-libraries-committee/issues/55))

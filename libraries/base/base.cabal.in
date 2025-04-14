@@ -170,7 +170,6 @@ Library
         , GHC.Exception
         , GHC.Exception.Type
         , GHC.ExecutionStack
-        , GHC.ExecutionStack.Internal
         , GHC.Exts
         , GHC.Fingerprint
         , GHC.Fingerprint.Type
@@ -247,9 +246,7 @@ Library
         , GHC.TopHandler
         , GHC.TypeError
         , GHC.TypeLits
-        , GHC.TypeLits.Internal
         , GHC.TypeNats
-        , GHC.TypeNats.Internal
         , GHC.Unicode
         , GHC.Weak
         , GHC.Weak.Finalize

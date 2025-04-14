@@ -5337,20 +5337,6 @@ module GHC.ExecutionStack where
   getStackTrace :: GHC.Internal.Types.IO (GHC.Internal.Maybe.Maybe [Location])
   showStackTrace :: GHC.Internal.Types.IO (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
 
-module GHC.ExecutionStack.Internal where
-  -- Safety: None
-  type Location :: *
-  data Location = Location {objectName :: GHC.Internal.Base.String, functionName :: GHC.Internal.Base.String, srcLoc :: GHC.Internal.Maybe.Maybe SrcLoc}
-  type SrcLoc :: *
-  data SrcLoc = SrcLoc {sourceFile :: GHC.Internal.Base.String, sourceLine :: GHC.Internal.Types.Int, sourceColumn :: GHC.Internal.Types.Int}
-  type StackTrace :: *
-  newtype StackTrace = ...
-  collectStackTrace :: GHC.Internal.Types.IO (GHC.Internal.Maybe.Maybe StackTrace)
-  invalidateDebugCache :: GHC.Internal.Types.IO ()
-  showStackFrames :: [Location] -> GHC.Internal.Show.ShowS
-  stackDepth :: StackTrace -> GHC.Internal.Types.Int
-  stackFrames :: StackTrace -> GHC.Internal.Maybe.Maybe [Location]
-
 module GHC.Exts where
   -- Safety: None
   (*#) :: Int# -> Int# -> Int#
@@ -12718,15 +12704,6 @@ module GHC.TypeLits where
   withSomeSNat :: forall (rep :: GHC.Internal.Types.RuntimeRep) (r :: TYPE rep). GHC.Internal.Bignum.Integer.Integer -> (forall (n :: Nat). GHC.Internal.Maybe.Maybe (SNat n) -> r) -> r
   withSomeSSymbol :: forall (rep :: GHC.Internal.Types.RuntimeRep) (r :: TYPE rep). GHC.Internal.Base.String -> (forall (s :: Symbol). SSymbol s -> r) -> r
 
-module GHC.TypeLits.Internal where
-  -- Safety: Safe
-  type CmpChar :: GHC.Internal.Types.Char -> GHC.Internal.Types.Char -> GHC.Internal.Types.Ordering
-  type family CmpChar a b
-  type CmpSymbol :: Symbol -> Symbol -> GHC.Internal.Types.Ordering
-  type family CmpSymbol a b
-  type Symbol :: *
-  data Symbol
-
 module GHC.TypeNats where
   -- Safety: Safe
   type (*) :: Natural -> Natural -> Natural
@@ -12772,13 +12749,6 @@ module GHC.TypeNats where
   someNatVal :: Natural -> SomeNat
   withKnownNat :: forall (n :: Nat) (rep :: GHC.Internal.Types.RuntimeRep) (r :: TYPE rep). SNat n -> (KnownNat n => r) -> r
   withSomeSNat :: forall (rep :: GHC.Internal.Types.RuntimeRep) (r :: TYPE rep). Natural -> (forall (n :: Nat). SNat n -> r) -> r
-
-module GHC.TypeNats.Internal where
-  -- Safety: Safe
-  type CmpNat :: Natural -> Natural -> GHC.Internal.Types.Ordering
-  type family CmpNat a b
-  type Natural :: *
-  data Natural = ...
 
 module GHC.Unicode where
   -- Safety: Safe
