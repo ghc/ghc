@@ -2270,10 +2270,10 @@ run_BCO:
 #define UN_SIZED_OP(op,ty)                                          \
     {                                                               \
         if(sizeof(ty) == 8) {                                       \
-            ty r = op (*(ty*) ReadSpW64(0));                        \
+            ty r = op ((ty) ReadSpW64(0));                        \
             SpW64(0) = (StgWord64) r;                               \
         } else {                                                    \
-            ty r = op (*(ty*) ReadSpW(0));                          \
+            ty r = op ((ty) ReadSpW(0));                          \
             SpW(0) = (StgWord) r;                                   \
         }                                                           \
         goto nextInsn;                                              \
