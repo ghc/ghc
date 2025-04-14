@@ -2215,9 +2215,6 @@ pushAtom :: StackDepth -> BCEnv -> StgArg -> BcM (BCInstrList, ByteOff)
 -- and Note [Bottoming expressions] in GHC.Core.Utils:
 -- The scrutinee of an empty case evaluates to bottom
 pushAtom d p (StgVarArg var)
-   | pprTrace "pushAtom" (ppr (d,var)) False
-   = undefined
-
    | [] <- typePrimRep (idType var)
    = return (nilOL, 0)
 
