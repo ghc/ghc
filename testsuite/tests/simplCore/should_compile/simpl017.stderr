@@ -1,20 +1,25 @@
-simpl017.hs:55:12: error: [GHC-46956]
-    • Couldn't match type ‘v0’ with ‘v’
-      Expected: [E m i] -> E' v m a
-        Actual: [E m i] -> E' v0 m a
-        because type variable ‘v’ would escape its scope
-      This (rigid, skolem) type variable is bound by
-        a type expected by the context:
-          forall v. [E m i] -> E' v m a
-        at simpl017.hs:55:12
-    • In the first argument of ‘return’, namely ‘f’
-      In a stmt of a 'do' block: return f
+simpl017.hs:55:5: error: [GHC-83865]
+    • Couldn't match type: [E m i] -> E' v0 m a
+                     with: forall v. [E m i] -> E' v m a
+      Expected: m (forall v. [E m i] -> E' v m a)
+        Actual: m ([E m i] -> E' v0 m a)
+    • In a stmt of a 'do' block: return f
       In the first argument of ‘E’, namely
         ‘(do let ix :: [E m i] -> m i
                  ix [i] = runE i
                  {-# INLINE f #-}
                  ....
              return f)’
+      In the expression:
+        E (do let ix :: [E m i] -> m i
+                  ix [i] = runE i
+                  {-# INLINE f #-}
+                  ....
+              return f)
     • Relevant bindings include
         f :: [E m i] -> E' v0 m a (bound at simpl017.hs:54:9)
+        ix :: [E m i] -> m i (bound at simpl017.hs:52:9)
+        a :: arr i a (bound at simpl017.hs:50:11)
+        liftArray :: arr i a -> E m (forall v. [E m i] -> E' v m a)
+          (bound at simpl017.hs:50:1)
 

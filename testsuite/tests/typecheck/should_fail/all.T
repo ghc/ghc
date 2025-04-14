@@ -726,6 +726,7 @@ test('T17594c', normal, compile_fail, [''])
 test('T17594d', normal, compile_fail, [''])
 test('T17594g', normal, compile_fail, [''])
 
+test('T25950', normal, compile_fail, [''])
 test('T24470a', normal, compile_fail, [''])
 test('T24553', normal, compile_fail, [''])
 test('T23739b', normal, compile_fail, [''])

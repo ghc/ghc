@@ -1,0 +1,9 @@
+T25950.hs:6:9: error: [GHC-25897]
+    • Couldn't match expected type ‘a’ with actual type ‘()’
+      ‘a’ is a rigid type variable bound by
+        the inferred type of fails :: a
+        at T25950.hs:5:1-15
+    • In the expression: id $ ()
+      In an equation for ‘fails’: fails = id $ ()
+    • Relevant bindings include fails :: a (bound at T25950.hs:6:1)
+

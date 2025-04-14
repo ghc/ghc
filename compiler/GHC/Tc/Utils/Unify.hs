@@ -29,7 +29,7 @@ module GHC.Tc.Utils.Unify (
   -- Various unifications
   unifyType, unifyKind, unifyInvisibleType, unifyExpectedType,
   unifyExprType, unifyTypeAndEmit, promoteTcType,
-  swapOverTyVars, touchabilityAndShapeTest, checkTopShape, lhsPriority,
+  swapOverTyVars, touchabilityTest, checkTopShape, lhsPriority,
   UnifyEnv(..), updUEnvLoc, setUEnvRole,
   uType,
   mightEqualLater,
@@ -55,7 +55,7 @@ module GHC.Tc.Utils.Unify (
   TyEqFamApp(..), FamAppBreaker(..),
   checkPromoteFreeVars,
 
-  simpleUnifyCheck, UnifyCheckCaller(..),
+  simpleUnifyCheck, UnifyCheckCaller(..), SimpleUnifyResult(..),
 
   fillInferResult,
   ) where
@@ -2482,10 +2482,9 @@ uUnfilledVar2 :: UnifyEnv       -- Precondition: u_role==Nominal
 uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
   = do { cur_lvl <- getTcLevel
            -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
-           -- Here we don't know about given equalities here; so we treat
+           -- Here we don't know about given equalities; so we treat
            -- /any/ level outside this one as untouchable.  Hence cur_lvl.
-       ; if not (touchabilityAndShapeTest cur_lvl tv1 ty2
-                 && simpleUnifyCheck UC_OnTheFly tv1 ty2)
+       ; if simpleUnifyCheck UC_OnTheFly cur_lvl tv1 ty2 /= SUC_CanUnify
          then not_ok_so_defer cur_lvl
          else
     do { def_eqs <- readTcRef def_eq_ref  -- Capture current state of def_eqs
@@ -2530,8 +2529,8 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
       do { traceTc "uUnfilledVar2 not ok" $
              vcat [ text "tv1:" <+> ppr tv1
                   , text "ty2:" <+> ppr ty2
-                  , text "simple-unify-chk:" <+> ppr (simpleUnifyCheck UC_OnTheFly tv1 ty2)
-                  , text "touchability:" <+> ppr (touchabilityAndShapeTest cur_lvl tv1 ty2)]
+                  , text "simple-unify-chk:" <+> ppr (simpleUnifyCheck UC_OnTheFly cur_lvl tv1 ty2)
+                  ]
                -- Occurs check or an untouchable: just defer
                -- NB: occurs check isn't necessarily fatal:
                --     eg tv1 occurred in type family parameter
@@ -2590,9 +2589,8 @@ lhsPriority tv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Question: given a homogeneous equality (alpha ~# ty), when is it OK to
 unify alpha := ty?
-
-This note only applied to /homogeneous/ equalities, in which both
-sides have the same kind.
+(This note only applies to /homogeneous/ equalities, in which both
+sides have the same kind.)
 
 There are five reasons not to unify:
 
@@ -2688,7 +2686,7 @@ Needless to say, all there are wrinkles:
 
   * In the constraint solver, we track where Given equalities occur
     and use that to guard unification in
-    GHC.Tc.Utils.Unify.touchabilityAndShapeTest. More details in
+    GHC.Tc.Utils.Unify.touchabilityTest. More details in
     Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet
 
     Historical note: in the olden days (pre 2021) the constraint solver
@@ -2929,12 +2927,34 @@ data UnifyCheckCaller
   = UC_OnTheFly   -- Called from the on-the-fly unifier
   | UC_QuickLook  -- Called from Quick Look
   | UC_Solver     -- Called from constraint solver
-  | UC_Defaulting -- Called when doing top-level defaulting
 
-simpleUnifyCheck :: UnifyCheckCaller -> TcTyVar -> TcType -> Bool
--- simpleUnifyCheck does a fast check: True <=> unification is OK
--- If it says 'False' then unification might still be OK, but
--- it'll take more work to do -- use the full checkTypeEq
+-- | The result type of 'simpleUnifyCheck'.
+data SimpleUnifyResult
+  -- | Definitely cannot unify (untouchable variable or incompatible top-shape)
+  = SUC_CannotUnify
+  -- | The variable is touchable and the top-shape test passed, but
+  -- it may or may not be OK to unify
+  | SUC_NotSure
+  -- | Definitely OK to unify
+  | SUC_CanUnify
+  deriving stock (Eq, Ord, Show)
+instance Semigroup SimpleUnifyResult where
+  no@SUC_CannotUnify <> _ = no
+  SUC_CanUnify <> r = r
+  _ <> no@SUC_CannotUnify = no
+  r <> SUC_CanUnify = r
+  ns@SUC_NotSure <> SUC_NotSure = ns
+
+instance Outputable SimpleUnifyResult where
+  ppr = \case
+    SUC_CannotUnify -> text "SUC_CannotUnify"
+    SUC_NotSure     -> text "SUC_NotSure"
+    SUC_CanUnify    -> text "SUC_CanUnify"
+
+simpleUnifyCheck :: UnifyCheckCaller -> TcLevel -> TcTyVar -> TcType -> SimpleUnifyResult
+-- ^ A fast check for unification. May return "not sure", in which case
+-- unification might still be OK, but it'll take more work to do
+-- (use the full 'checkTypeEq').
 --
 -- * Rejects if lhs_tv occurs in rhs_ty (occurs check)
 -- * Rejects foralls unless
@@ -2945,9 +2965,17 @@ simpleUnifyCheck :: UnifyCheckCaller -> TcTyVar -> TcType -> Bool
 -- * Does a level-check for type variables, to avoid skolem escape
 --
 -- This function is pretty heavily used, so it's optimised not to allocate
-simpleUnifyCheck caller lhs_tv rhs
-  = go rhs
+simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
+  | not $ touchabilityTest given_eq_lvl lhs_tv
+  = SUC_CannotUnify
+  | not $ checkTopShape lhs_info rhs
+  = SUC_CannotUnify
+  | rhs_is_ok rhs
+  = SUC_CanUnify
+  | otherwise
+  = SUC_NotSure
   where
+    lhs_info = metaTyVarInfo lhs_tv
 
     !(occ_in_ty, occ_in_co) = mkOccFolders (tyVarName lhs_tv)
 
@@ -2967,33 +2995,32 @@ simpleUnifyCheck caller lhs_tv rhs
                UC_Solver     -> True
                UC_QuickLook  -> True
                UC_OnTheFly   -> False
-               UC_Defaulting -> True
 
-    go (TyVarTy tv)
+    rhs_is_ok (TyVarTy tv)
       | lhs_tv == tv                                    = False
       | tcTyVarLevel tv `strictlyDeeperThan` lhs_tv_lvl = False
       | lhs_tv_is_concrete, not (isConcreteTyVar tv)    = False
       | occ_in_ty $! (tyVarKind tv)                     = False
       | otherwise                                       = True
 
-    go (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
+    rhs_is_ok (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
       | not forall_ok, isInvisibleFunArg af = False
-      | otherwise                           = go w && go a && go r
+      | otherwise                           = rhs_is_ok w && rhs_is_ok a && rhs_is_ok r
 
-    go (TyConApp tc tys)
+    rhs_is_ok (TyConApp tc tys)
       | lhs_tv_is_concrete, not (isConcreteTyCon tc) = False
       | not forall_ok, not (isTauTyCon tc)           = False
       | not fam_ok,    not (isFamFreeTyCon tc)       = False
-      | otherwise                                    = all go tys
+      | otherwise                                    = all rhs_is_ok tys
 
-    go (ForAllTy (Bndr tv _) ty)
-      | forall_ok = go (tyVarKind tv) && (tv == lhs_tv || go ty)
+    rhs_is_ok (ForAllTy (Bndr tv _) ty)
+      | forall_ok = rhs_is_ok (tyVarKind tv) && (tv == lhs_tv || rhs_is_ok ty)
       | otherwise = False
 
-    go (AppTy t1 t2)    = go t1 && go t2
-    go (CastTy ty co)   = not (occ_in_co co) && go ty
-    go (CoercionTy co)  = not (occ_in_co co)
-    go (LitTy {})       = True
+    rhs_is_ok (AppTy t1 t2)    = rhs_is_ok t1 && rhs_is_ok t2
+    rhs_is_ok (CastTy ty co)   = not (occ_in_co co) && rhs_is_ok ty
+    rhs_is_ok (CoercionTy co)  = not (occ_in_co co)
+    rhs_is_ok (LitTy {})       = True
 
 
 mkOccFolders :: Name -> (TcType -> Bool, TcCoercion -> Bool)
@@ -3078,8 +3105,13 @@ We must jolly well use that reductionReduced type, even though the
 reductionCoercion is Refl.  See `canEqCanLHSFinish_no_unification`.
 -}
 
-data PuResult a b = PuFail CheckTyEqResult
-                  | PuOK (Bag a) b
+data PuResult a b
+  -- | Pure unifier failure.
+  --
+  -- Invariant: the CheckTyEqResult is not 'cteOK'; that it, it specifies a problem.
+  = PuFail CheckTyEqResult
+  -- | Pure unifier success.
+  | PuOK (Bag a) b
   deriving stock (Functor, Foldable, Traversable)
 
 instance Applicative (PuResult a) where
@@ -3414,15 +3446,15 @@ famAppBreaker (BreakWanted ev lhs_tv) fam_app
        ; return (PuOK (singleCt (mkNonCanonical $ CtWanted new_ev))
                       (mkReduction (HoleCo hole) new_tv_ty)) } }
   where
+    fam_app_kind = typeKind fam_app
     (lhs_tv_info, lhs_tv_lvl) =
       case tcTyVarDetails lhs_tv of
          MetaTv { mtv_info = info, mtv_tclvl = lvl } -> (info,lvl)
          -- lhs_tv should be a meta-tyvar
-         _ -> pprPanic "checkTouchableTyVarEq" (ppr lhs_tv)
-    fam_app_kind = typeKind fam_app
-    -- See Detail (7) of the Note
+         _ -> pprPanic "famAppBreaker BreakWanted: lhs_tv is not a meta-tyvar"
+                (ppr lhs_tv)
     cb_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
-
+      -- CycleBreakerOrigin: see Detail (7) of Note [Type equality cycles]
 
 instance Outputable (TyEqFlags m a) where
   ppr = \case
@@ -3492,12 +3524,95 @@ famAppArgFlags flags = case flags of
         -> LC_Check { lc_lvlc = lvl, lc_lenient = False }
       lc -> lc
 
+{- Note [checkTyEqRhs]
+~~~~~~~~~~~~~~~~~~~~~~
+The key function `checkTyEqRhs ty_eq_flags rhs` is called on the
+RHS of a type equality
+       lhs ~ rhs
+and checks to see if `rhs` satisfies, or can be made to satisfy,
+invariants described by `ty_eq_flags`.  It can succeded or fail; in
+the latter case it returns a `CheckTyEqResult` that describes why it
+failed.
+
+When `lhs` is a touchable type variable, so unification might happen, then
+`checkTyEqRhs` enforces the unification preconditions of Note [Unification preconditions].
+
+Notably, it can check for things like:
+  * Insoluble occurs check
+      e.g.  alpha[tau] ~ [alpha]
+       or   F Int      ~ [F Int]
+  * Potentially-soluble occurs check
+      e.g.  alpha[tau] ~ [F alpha beta]
+  * Impredicativity error:
+      e.g.  alpha[tau] ~ (forall a. a->a)
+  * Skolem escape
+      e.g  alpha[1] ~ (b[sk:2], Int)
+  * Concreteness error
+      e.g. alpha[conc] ~ r[sk]
+
+Its specific behaviour is governed by the `TyEqFlags` that are passed
+to it; see Note [TyEqFlags].
+
+Note, however, that `checkTyEqRhs` specifically does /not/ check for:
+  * Touchability of the LHS (in the case of a unification variable)
+  * Shape of the LHS (e.g. we can't unify Int with a TyVarTv)
+These things are checked by `simpleUnifyCheck`.
+-}
+
+
+-- | Perform the checks specified by the 'TyEqFlags' on the RHS, in order to
+-- enforce the unification preconditions of Note [Unification preconditions].
+--
+-- See Note [checkTyEqRhs].
 checkTyEqRhs :: forall m a
              .  Monad m
              => TyEqFlags m a
              -> TcType           -- Already zonked
              -> m (PuResult a Reduction)
-checkTyEqRhs flags ty
+checkTyEqRhs flags rhs
+  -- Crucial special case for a top-level equality of the form 'alpha ~ F tys'.
+  -- We don't want to flatten that (F tys), as this gets us right back to where
+  -- we started!
+  --
+  -- See also Note [Special case for top-level of Given equality]
+  | Just (TyFamLHS tc tys) <- canTyFamEqLHS_maybe rhs
+  , not $ tefConcrete flags
+  = recurseIntoFamTyConApp flags tc tys
+  | otherwise
+  = check_ty_eq_rhs flags rhs
+
+{- Note [Special case for top-level of Given equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We take care when examining
+    [G] F ty ~ G (...(F ty)...)
+where both sides are TyFamLHSs.  We don't want to flatten that RHS to
+    [G] F ty ~ cbv
+    [G] G (...(F ty)...) ~ cbv
+Instead we'd like to say "occurs-check" and swap LHS and RHS, which yields a
+canonical constraint
+    [G] G (...(F ty)...) ~ F ty
+That tends to rewrite a big type to smaller one. This happens in T15703,
+where we had:
+    [G] Pure g ~ From1 (To1 (Pure g))
+Making a loop breaker and rewriting left to right just makes much bigger
+types than swapping it over.
+
+(We might hope to have swapped it over before getting to checkTypeEq,
+but better safe than sorry.)
+
+NB: We never see a TyVarLHS here, such as
+    [G] a ~ F tys here
+because we'd have swapped it to
+   [G] F tys ~ a
+in canEqCanLHS2, before getting to checkTypeEq.
+-}
+
+check_ty_eq_rhs :: forall m a
+                .  Monad m
+                => TyEqFlags m a
+                -> TcType           -- Already zonked
+                -> m (PuResult a Reduction)
+check_ty_eq_rhs flags ty
   = case ty of
       LitTy {}        -> return $ okCheckRefl ty
       TyConApp tc tys -> checkTyConApp flags ty tc tys
@@ -3510,16 +3625,16 @@ checkTyEqRhs flags ty
        | isInvisibleFunArg af  -- e.g.  Num a => blah
        -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
        | otherwise
-       -> do { w_res <- checkTyEqRhs flags w
-             ; a_res <- checkTyEqRhs flags a
-             ; r_res <- checkTyEqRhs flags r
+       -> do { w_res <- check_ty_eq_rhs flags w
+             ; a_res <- check_ty_eq_rhs flags a
+             ; r_res <- check_ty_eq_rhs flags r
              ; return (mkFunRedn Nominal af <$> w_res <*> a_res <*> r_res) }
 
-      AppTy fun arg -> do { fun_res <- checkTyEqRhs flags fun
-                          ; arg_res <- checkTyEqRhs flags arg
+      AppTy fun arg -> do { fun_res <- check_ty_eq_rhs flags fun
+                          ; arg_res <- check_ty_eq_rhs flags arg
                           ; return (mkAppRedn <$> fun_res <*> arg_res) }
 
-      CastTy ty co  -> do { ty_res <- checkTyEqRhs flags ty
+      CastTy ty co  -> do { ty_res <- check_ty_eq_rhs flags ty
                           ; co_res <- checkCo flags co
                           ; return (mkCastRedn1 Nominal ty <$> co_res <*> ty_res) }
 
@@ -3527,7 +3642,7 @@ checkTyEqRhs flags ty
                           ; return (mkReflCoRedn Nominal <$> co_res) }
 
       ForAllTy {}   -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
-{-# INLINEABLE checkTyEqRhs #-}
+{-# INLINEABLE check_ty_eq_rhs #-}
 
 -------------------
 checkCo :: Monad m => TyEqFlags m a -> Coercion -> m (PuResult a Coercion)
@@ -3702,14 +3817,14 @@ checkTyConApp flags tc_app tc tys
     else do { let (fun_args, extra_args) = splitAt (tyConArity tc) tys
                   fun_app                = mkTyConApp tc fun_args
             ; fun_res   <- checkFamApp flags fun_app tc fun_args
-            ; extra_res <- mapCheck (checkTyEqRhs flags) extra_args
+            ; extra_res <- mapCheck (check_ty_eq_rhs flags) extra_args
             ; return (mkAppRedns <$> fun_res <*> extra_res) }
 
   | Just ty' <- rewriterView tc_app
        -- e.g. S a  where  type S a = F [a]
        --             or   type S a = Int
        -- See Note [Forgetful synonyms in checkTyConApp]
-  = checkTyEqRhs flags ty'
+  = check_ty_eq_rhs flags ty'
 
   | not (isTauTyCon tc)
   = return $ PuFail impredicativeProblem
@@ -3727,7 +3842,7 @@ recurseIntoTyConApp :: Monad m
                     -> TyCon -> [TcType]
                     -> m (PuResult a Reduction)
 recurseIntoTyConApp flags tc tys
-  = do { tys_res <- mapCheck (checkTyEqRhs flags) tys
+  = do { tys_res <- mapCheck (check_ty_eq_rhs flags) tys
        ; return (mkTyConAppRedn Nominal tc <$> tys_res) }
 
 recurseIntoFamTyConApp :: Monad m
@@ -3888,7 +4003,7 @@ checkTyVar flags occ_tv
            --     unfilled meta-tyvar, we need to ensure that the kind of
            --     'occ_tv' is concrete.   Test cases: T23051, T23176.
            ; let occ_kind = tyVarKind occ_tv
-           ; kind_result <- checkTyEqRhs flags occ_kind
+           ; kind_result <- check_ty_eq_rhs flags occ_kind
            ; for kind_result $ \ kind_redn ->
         do { let kind_co  = reductionCoercion kind_redn
                  new_kind = reductionReducedType kind_redn
@@ -4010,16 +4125,15 @@ promote_meta_tyvar info dest_lvl occ_tv
 
 
 -------------------------
-touchabilityAndShapeTest :: TcLevel -> TcTyVar -> TcType -> Bool
--- This is the key test for untouchability:
+touchabilityTest :: TcLevel -> TcTyVar -> Bool
+-- ^ This is the key test for untouchability:
 -- See Note [Unification preconditions] in GHC.Tc.Utils.Unify
 -- and Note [Solve by unification] in GHC.Tc.Solver.Equality
--- True <=> touchability and shape are OK
-touchabilityAndShapeTest given_eq_lvl tv rhs
-  | MetaTv { mtv_info = info, mtv_tclvl = tv_lvl } <- tcTyVarDetails tv
-  , tv_lvl `deeperThanOrSame` given_eq_lvl
-  , checkTopShape info rhs
-  = True
+--
+-- @True@ <=> the variable is touchable
+touchabilityTest given_eq_lvl tv
+  | MetaTv { mtv_tclvl = tv_lvl } <- tcTyVarDetails tv
+  = tv_lvl `deeperThanOrSame` given_eq_lvl
   | otherwise
   = False
 

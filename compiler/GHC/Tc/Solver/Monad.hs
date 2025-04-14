@@ -129,7 +129,7 @@ module GHC.Tc.Solver.Monad (
     pprEq,
 
     -- Enforcing invariants for type equalities
-    checkTypeEq, checkTouchableTyVarEq
+    checkTypeEq
 ) where
 
 import GHC.Prelude
@@ -227,8 +227,6 @@ import GHC.Data.Graph.Directed
 
 import qualified Data.Set as Set
 import GHC.Unit.Module.Graph
-
-import GHC.Data.Maybe
 
 {- *********************************************************************
 *                                                                      *
@@ -2416,81 +2414,31 @@ wrapUnifierX ev role do_unifications
 ************************************************************************
 -}
 
-checkTouchableTyVarEq
-   :: CtEvidence
-   -> TcTyVar    -- A touchable meta-tyvar
-   -> TcType     -- The RHS
-   -> TcS (PuResult () Reduction)
--- Used for Nominal, Wanted equalities, with a touchable meta-tyvar on LHS
--- If checkTouchableTyVarEq tv ty = PuOK cts redn
---   then we can unify
---       tv := ty |> redn
---   with extra wanteds 'cts'
--- If it returns (PuFail reason) we can't unify, and the reason explains why.
-checkTouchableTyVarEq ev lhs_tv rhs
-  | simpleUnifyCheck UC_Solver lhs_tv rhs   -- An (optional) short-cut
-  = do { traceTcS "checkTouchableTyVarEq: simple-check wins" (ppr lhs_tv $$ ppr rhs)
-       ; return (pure (mkReflRedn Nominal rhs)) }
-
-  | otherwise
-  = do { traceTcS "checkTouchableTyVarEq {" (ppr lhs_tv $$ ppr rhs)
-       ; check_result <- wrapTcS (check_rhs rhs)
-       ; traceTcS "checkTouchableTyVarEq }" (ppr lhs_tv $$ ppr check_result)
-       ; case check_result of
-            PuFail reason -> return (PuFail reason)
-            PuOK cts redn -> do { emitWork cts
-                                ; return (pure redn) } }
-
-  where
-    lhs_tv_info = metaTyVarInfo lhs_tv -- lhs_tv should be a meta-tyvar
-
-    is_concrete_lhs_tv = isJust $ concreteInfo_maybe lhs_tv_info
-
-    check_rhs rhs
-       -- Crucial special case for  alpha ~ F tys
-       -- We don't want to flatten that (F tys)!
-       | Just (TyFamLHS tc tys) <- canTyFamEqLHS_maybe rhs
-       = if is_concrete_lhs_tv
-         then return $ PuFail (cteProblem cteConcrete)
-         else recurseIntoFamTyConApp flags tc tys
-       | otherwise
-       = checkTyEqRhs flags rhs
-
-    flags = unifyingLHSMetaTyVar_TEFTask ev lhs_tv
-
-------------------------
 checkTypeEq :: CtEvidence -> EqRel -> CanEqLHS -> TcType
             -> TcS (PuResult () Reduction)
 -- Used for general CanEqLHSs, ones that do
 -- not have a touchable type variable on the LHS (i.e. not unifying)
-checkTypeEq ev eq_rel lhs rhs
-  | isGiven ev
-  = do { traceTcS "checkTypeEq {" (vcat [ text "lhs:" <+> ppr lhs
-                                        , text "rhs:" <+> ppr rhs ])
-       ; check_result <- wrapTcS (check_given_rhs rhs)
-       ; traceTcS "checkTypeEq }" (ppr check_result)
-       ; case check_result of
-            PuFail reason -> return (PuFail reason)
-            PuOK prs redn -> do { new_givens <- mapBagM mk_new_given prs
-                                ; emitWork new_givens
-                                ; updInertSet (addCycleBreakerBindings prs)
-                                ; return (pure redn) } }
-
-  | otherwise  -- Wanted
-  = do { check_result <- wrapTcS (checkTyEqRhs wanted_flags rhs)
-       ; case check_result of
-            PuFail reason -> return (PuFail reason)
-            PuOK cts redn -> do { emitWork cts
-                                ; return (pure redn) } }
+checkTypeEq ev eq_rel lhs rhs =
+  case ev of
+    CtGiven {} ->
+      do { traceTcS "checkTypeEq {" (vcat [ text "lhs:" <+> ppr lhs
+                                          , text "rhs:" <+> ppr rhs ])
+         ; check_result <- wrapTcS (checkTyEqRhs given_flags rhs)
+         ; traceTcS "checkTypeEq }" (ppr check_result)
+         ; case check_result of
+              PuFail reason -> return (PuFail reason)
+              PuOK prs redn -> do { new_givens <- mapBagM mk_new_given prs
+                                  ; emitWork new_givens
+                                  ; updInertSet (addCycleBreakerBindings prs)
+                                  ; return (pure redn) } }
+    CtWanted {} ->
+      do { check_result <- wrapTcS (checkTyEqRhs wanted_flags rhs)
+         ; case check_result of
+              PuFail reason -> return (PuFail reason)
+              PuOK cts redn -> do { emitWork cts
+                                  ; return (pure redn) } }
   where
-    check_given_rhs :: TcType -> TcM (PuResult (TcTyVar,TcType) Reduction)
-    check_given_rhs rhs
-       -- See Note [Special case for top-level of Given equality]
-       | Just (TyFamLHS tc tys) <- canTyFamEqLHS_maybe rhs
-       = recurseIntoFamTyConApp given_flags tc tys
-       | otherwise
-       = checkTyEqRhs given_flags rhs
-
+    wanted_flags :: TyEqFlags TcM Ct
     wanted_flags = notUnifying_TEFTask occ_prob lhs
                    -- checkTypeEq deals only with the non-unifying case
 
@@ -2531,31 +2479,6 @@ restoreTyVarCycles is
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (a ~R# b a) is soluble if b later turns out to be Identity
 So we treat this as a "soluble occurs check".
-
-Note [Special case for top-level of Given equality]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We take care when examining
-    [G] F ty ~ G (...(F ty)...)
-where both sides are TyFamLHSs.  We don't want to flatten that RHS to
-    [G] F ty ~ cbv
-    [G] G (...(F ty)...) ~ cbv
-Instead we'd like to say "occurs-check" and swap LHS and RHS, which yields a
-canonical constraint
-    [G] G (...(F ty)...) ~ F ty
-That tends to rewrite a big type to smaller one. This happens in T15703,
-where we had:
-    [G] Pure g ~ From1 (To1 (Pure g))
-Making a loop breaker and rewriting left to right just makes much bigger
-types than swapping it over.
-
-(We might hope to have swapped it over before getting to checkTypeEq,
-but better safe than sorry.)
-
-NB: We never see a TyVarLHS here, such as
-    [G] a ~ F tys here
-because we'd have swapped it to
-   [G] F tys ~ a
-in canEqCanLHS2, before getting to checkTypeEq.
 
 Note [Don't cycle-break Wanteds when not unifying]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

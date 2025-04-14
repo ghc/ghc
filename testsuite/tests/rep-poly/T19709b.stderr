@@ -2,11 +2,8 @@ T19709b.hs:11:15: error: [GHC-55287]
     • The argument ‘(error @Any "e2")’ of ‘levfun’
       does not have a fixed runtime representation.
       Its type is:
-        a1 :: TYPE r0
-      When unifying:
-        • a0
-        • a1
-      Cannot unify ‘Any’ with the type variable ‘r0’
+        a1 :: TYPE c0
+      Cannot unify ‘Any’ with the type variable ‘c0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the first argument of ‘levfun’, namely ‘(error @Any "e2")’
       In the first argument of ‘seq’, namely ‘levfun (error @Any "e2")’

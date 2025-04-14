@@ -7,6 +7,8 @@ RepPolyInferPatBind.hs:21:2: error: [GHC-55287]
     • The pattern binding does not have a fixed runtime representation.
       Its type is:
         T :: TYPE R
+      Cannot unify ‘R’ with the type variable ‘c0’
+      because the former is not a concrete ‘RuntimeRep’.
     • When checking that the pattern signature: T
         fits the type of its context: T
       In the pattern: x :: T

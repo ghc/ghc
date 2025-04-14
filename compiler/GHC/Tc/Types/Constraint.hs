@@ -279,10 +279,10 @@ We thus perform an occurs-check. There is, of course, some subtlety:
 
 * For type variables, the occurs-check looks deeply including kinds of
   type variables. This is because a CEqCan over a meta-variable is
-  also used to inform unification, in
-  GHC.Tc.Solver.Monad.checkTouchableTyVarEq. If the LHS appears
-  anywhere in the RHS, at all, unification will create an infinite
-  structure which is bad.
+  also used to inform unification, via `checkTyEqRhs`, called in
+  `canEqCanLHSFinish_try_unification`.
+  If the LHS appears anywhere in the RHS, at all, unification will create
+  an infinite structure, which is bad.
 
 * For type family applications, the occurs-check is shallow; it looks
   only in places where we might rewrite. (Specifically, it does not
