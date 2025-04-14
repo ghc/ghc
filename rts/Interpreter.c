@@ -179,9 +179,9 @@ See also Note [Width of parameters] for some more motivation.
 #define Sp_plusB(n)  ((void *)((StgWord8*)Sp + (ptrdiff_t)(n)))
 #define Sp_minusB(n) ((void *)((StgWord8*)Sp - (ptrdiff_t)(n)))
 
-#define Sp_plusW(n)    (Sp_plusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(W_)))
-#define Sp_plusW64(n)  (Sp_plusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(StgWord64)))
-#define Sp_minusW(n)   (Sp_minusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(W_)))
+#define Sp_plusW(n)    ((void*)Sp_plusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(W_)))
+#define Sp_plusW64(n)  ((void*)Sp_plusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(StgWord64)))
+#define Sp_minusW(n)   ((void*)Sp_minusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(W_)))
 
 #define Sp_addB(n)   (Sp = Sp_plusB(n))
 #define Sp_subB(n)   (Sp = Sp_minusB(n))
@@ -202,11 +202,10 @@ See also Note [Width of parameters] for some more motivation.
 #define WDS_TO_W64(n) (n * sizeof(StgWord64) / sizeof(StgWord))
 
 // Always safe to use - Return the value at the address
-#define ReadSpW(n)       (*             SafeSpWP(n))
-#define ReadSpW64(n)     (*(StgWord64*) SafeSpWP(WDS_TO_W64(n)))
+#define ReadSpW(n)       (*((StgWord*)   SafeSpWP(n)))
+#define ReadSpW64(n)     (*((StgWord64*) SafeSpWP(WDS_TO_W64(n))))
 // Perhaps confusingly this still reads a full word, merely the offset is in bytes.
-// #define ReadSpB(n)       (*(StgWord*)   ((StgWord8*) SafeSpWP(n/sizeof(StgWord))) + (ptrdiff_t)(n%sizeof(StgWord)))
-#define ReadSpB(n)       (*(StgWord*)   SafeSpBP(n))
+#define ReadSpB(n)       (*((StgWord*)   SafeSpBP(n)))
 
 /* Note [PUSH_L underflow]
    ~~~~~~~~~~~~~~~~~~~~~~~
