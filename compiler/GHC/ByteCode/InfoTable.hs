@@ -19,7 +19,7 @@ import GHC.Types.Name       ( Name, getName )
 import GHC.Types.RepType
 
 import GHC.Core.DataCon     ( DataCon, dataConRepArgTys, dataConIdentity )
-import GHC.Core.TyCon       ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
+import GHC.Core.TyCon       ( TyCon, tyConFamilySize, isBoxedDataTyCon, tyConDataCons )
 import GHC.Core.Multiplicity     ( scaledThing )
 
 import GHC.StgToCmm.Layout  ( mkVirtConstrSizes )
@@ -34,7 +34,7 @@ import GHC.Utils.Panic
 
 -- Make info tables for the data decls in this module
 mkITbls :: Profile -> [TyCon] -> [(Name, ConInfoTable)]
-mkITbls profile tcs = concatMap mkITbl (filter isDataTyCon tcs)
+mkITbls profile tcs = concatMap mkITbl (filter isBoxedDataTyCon tcs)
  where
   mkITbl :: TyCon -> [(Name, ConInfoTable)]
   mkITbl tc

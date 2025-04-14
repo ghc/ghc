@@ -125,7 +125,8 @@ Examples:
     IfaceDecl for the data/newtype.  Ditto class methods.
 
   * Record selectors are *not* implicit, because they get their own
-    free-standing IfaceDecl.
+    free-standing IfaceDecl. See Note [Record selectors] in
+    GHC.Tc.TyCl.Utils.
 
   * Associated data/type families are implicit because they are
     included in the IfaceDecl of the parent class.  (NB: the
@@ -266,9 +267,9 @@ tyThingParent_maybe (AnId id)     = case idDetails id of
                                           Just (ATyCon tc)
                                       RecSelId { sel_tycon = RecSelPatSyn ps } ->
                                           Just (AConLike (PatSynCon ps))
-                                      ClassOpId cls _             ->
+                                      ClassOpId cls _  ->
                                           Just (ATyCon (classTyCon cls))
-                                      _other                      -> Nothing
+                                      _other           -> Nothing
 tyThingParent_maybe _other = Nothing
 
 tyThingsTyCoVars :: [TyThing] -> TyCoVarSet
