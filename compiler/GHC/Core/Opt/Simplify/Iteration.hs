@@ -3967,7 +3967,17 @@ mkDupableContWithDmds env dmds
         ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
         ; let env' = env `setInScopeFromF` floats1
         ; (_, se', arg') <- simplLazyArg env' dup hole_ty Nothing se arg
-        ; (let_floats2, arg'') <- makeTrivial env NotTopLevel dmd (fsLit "karg") arg'
+
+        -- Make the argument duplicable. Danger: if arg is small and we let-bind
+        -- it, then postInlineUnconditionally will just inline it again, perhaps
+        -- taking an extra Simplifier iteration (e.g. in test T21839c). So make
+        -- a `let` only if `couldBeSmallEnoughToInline` says that it is big enough
+        ; let uf_opts = seUnfoldingOpts env
+        ; (let_floats2, arg'')
+              <- if couldBeSmallEnoughToInline uf_opts (unfoldingUseThreshold uf_opts) arg'
+                 then return (emptyLetFloats, arg')
+                 else makeTrivial env NotTopLevel dmd (fsLit "karg") arg'
+
         ; let all_floats = floats1 `addLetFloats` let_floats2
         ; return ( all_floats
                  , ApplyToVal { sc_arg = arg''
