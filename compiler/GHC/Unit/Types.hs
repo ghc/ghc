@@ -104,7 +104,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Misc
 import GHC.Settings.Config (cProjectUnitId)
 
-import Control.DeepSeq
+import Control.DeepSeq (NFData(..))
 import Data.Data
 import Data.List (sortBy )
 import Data.Function
