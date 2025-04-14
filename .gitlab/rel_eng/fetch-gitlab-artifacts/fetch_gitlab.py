@@ -159,9 +159,12 @@ def main():
     parser.add_argument('--pipeline', '-p', required=True, type=int, help="pipeline id")
     parser.add_argument('--release', '-r', required=True, type=str, help="release name")
     parser.add_argument('--output', '-o', type=Path, default=Path.cwd(), help="output directory")
+    parser.add_argument('--debug', action='store_true', help="enable python-gitlab debug output")
     parser.add_argument('--profile', '-P', default='haskell',
                         help='python-gitlab.cfg profile name')
     args = parser.parse_args()
     gl = gitlab.Gitlab.from_config(args.profile)
+    if args.debug:
+        gl.enable_debug()
     fetch_artifacts(args.release, args.pipeline,
                     dest_dir=args.output, gl=gl)
