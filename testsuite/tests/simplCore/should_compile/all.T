@@ -535,3 +535,6 @@ test('T25197', [req_th, extra_files(["T25197_TH.hs"]), only_ways(['optasm'])], m
 test('T25389', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
 test('T24359a', normal, compile, ['-O -ddump-rules'])
 test('T25713', [grep_errmsg('W:::')], compile, ['-O -ddump-simpl'])
+test('T25965', normal, compile, ['-O'])
+test('T25703',  [grep_errmsg(r'SPEC')], compile, ['-O -fpolymorphic-specialisation -ddump-rule-firings'])
+test('T25703a', [grep_errmsg(r'SPEC')], compile, ['-O -fpolymorphic-specialisation -ddump-rule-firings'])
