@@ -58,7 +58,7 @@ module GHC.Core.DataCon (
         isNullarySrcDataCon, isNullaryRepDataCon,
         isLazyDataConRep,
         isTupleDataCon, isBoxedTupleDataCon, isUnboxedTupleDataCon,
-        isUnboxedSumDataCon, isCovertGadtDataCon,
+        isUnboxedSumDataCon, isCovertGadtDataCon, isUnaryClassDataCon,
         isVanillaDataCon, isNewDataCon, isTypeDataCon,
         classDataCon, dataConCannotMatch,
         dataConUserTyVarBindersNeedWrapper, checkDataConTyVars,
@@ -1792,10 +1792,15 @@ isCovertGadtDataCon (MkData { dcUnivTyVars  = univ_tvs
          && not (isTyVarTy ty)  -- See Note [isCovertGadtDataCon] for
                                 -- an example where 'ty' is a tyvar
 
+isUnaryClassDataCon :: DataCon -> Bool
+isUnaryClassDataCon dc = isUnaryClassTyCon (dataConTyCon dc)
+
 {- Note [isCovertGadtDataCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (isCovertGadtDataCon K) returns True if K is a GADT data constructor, but
-does not /look/ like it. Consider (#21447)
+does not /look/ like it. It is used only to help in error message printing.
+
+Consider (#21447)
     type T :: TYPE r -> Type
     data T a where { MkT :: b -> T b }
 Here MkT doesn't look GADT-like, but it is. If we make the kind applications

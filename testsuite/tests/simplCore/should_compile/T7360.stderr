@@ -1,25 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 119, types: 52, coercions: 0, joins: 0/0}
-
--- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
-T7360.$WFoo3 [InlPrag=INLINE[final] CONLIKE] :: Int %1 -> Foo
-[GblId[DataConWrapper],
- Arity=1,
- Str=<SL>,
- Unf=Unf{Src=StableSystem, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (conrep [Occ=Once1!] :: Int) ->
-                 case conrep of { GHC.Internal.Types.I# unbx [Occ=Once1] ->
-                 T7360.Foo3 unbx
-                 }}]
-T7360.$WFoo3
-  = \ (conrep [Occ=Once1!] :: Int) ->
-      case conrep of { GHC.Internal.Types.I# unbx [Occ=Once1] ->
-      T7360.Foo3 unbx
-      }
+  = {terms: 112, types: 47, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 5, types: 2, coercions: 0, joins: 0/0}
 T7360.$wfun1 [InlPrag=NOINLINE] :: Foo -> (# #)

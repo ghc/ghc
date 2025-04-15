@@ -20,7 +20,7 @@ module GHC.Types.Id.Make (
 
         mkFCallId,
 
-        unwrapNewTypeBody, wrapFamInstBody,
+        wrapNewTypeBody, unwrapNewTypeBody, wrapFamInstBody,
         DataConBoxer(..), vanillaDataConBoxer,
         mkDataConRep, mkDataConWorkId,
         DataConBangOpts (..), BangOpts (..),
@@ -54,6 +54,7 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep
 import GHC.Core.FamInstEnv
+import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.Make
@@ -475,12 +476,12 @@ Therefore there is no loss of generality if we make all selectors unrestricted.
 mkDictSelId :: Name          -- Name of one of the *value* selectors
                              -- (dictionary superclass or method)
             -> Class -> Id
+-- Important: see Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
 mkDictSelId name clas
   = mkGlobalId (ClassOpId clas terminating) name sel_ty info
   where
     tycon          = classTyCon clas
     sel_names      = map idName (classAllSelIds clas)
-    new_tycon      = isNewTyCon tycon
     [data_con]     = tyConDataCons tycon
     tyvars         = dataConUserTyVarBinders data_con
     n_ty_args      = length tyvars
@@ -502,23 +503,9 @@ mkDictSelId name clas
                 `setDmdSigInfo` strict_sig
                 `setCprSigInfo` topCprSig
 
-    info | new_tycon
-         = base_info `setInlinePragInfo` alwaysInlinePragma
-                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity defaultSimpleOpts
-                                           StableSystemSrc 1
-                                           (mkDictSelRhs clas val_index)
-                   -- See Note [Single-method classes] in GHC.Tc.TyCl.Instance
-                   -- for why alwaysInlinePragma
-
-         | otherwise
-         = base_info `setRuleInfo` mkRuleInfo [rule]
-                     `setInlinePragInfo` neverInlinePragma
-                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity defaultSimpleOpts
-                                           StableSystemSrc 1
-                                           (mkDictSelRhs clas val_index)
-                   -- Add a magic BuiltinRule, but no unfolding
-                   -- so that the rule is always available to fire.
-                   -- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
+    info = base_info `setRuleInfo` mkRuleInfo [rule]
+           -- No unfolding for a dictionary selector; the RULE does the work,
+           -- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
 
     -- This is the built-in rule that goes
     --      op (dfT d1 d2) --->  opT d1 d2
@@ -531,11 +518,10 @@ mkDictSelId name clas
         -- The strictness signature is of the form U(AAAVAAAA) -> T
         -- where the V depends on which item we are selecting
         -- It's worth giving one, so that absence info etc is generated
-        -- even if the selector isn't inlined
+        -- even if the selector isn't inlined, which of course it isn't!
 
     strict_sig = mkClosedDmdSig [arg_dmd] topDiv
-    arg_dmd | new_tycon = evalDmd
-            | otherwise = C_1N :* mkProd Unboxed dict_field_dmds
+    arg_dmd = C_1N :* mkProd Unboxed dict_field_dmds
             where
               -- The evalDmd below is just a placeholder and will be replaced in
               -- GHC.Types.Demand.dmdTransformDictSel
@@ -545,24 +531,29 @@ mkDictSelId name clas
 mkDictSelRhs :: Class
              -> Int         -- 0-indexed selector among (superclasses ++ methods)
              -> CoreExpr
+-- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
 mkDictSelRhs clas val_index
   = mkLams tyvars (Lam dict_id rhs_body)
   where
-    tycon          = classTyCon clas
-    new_tycon      = isNewTyCon tycon
-    [data_con]     = tyConDataCons tycon
-    tyvars         = dataConUnivTyVars data_con
-    arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
+    tycon      = classTyCon clas
+    [data_con] = tyConDataCons tycon
+    tyvars     = dataConUnivTyVars data_con
+    arg_tys    = dataConRepArgTys data_con  -- Includes the dictionary superclasses
 
-    the_arg_id     = getNth arg_ids val_index
-    pred           = mkClassPred clas (mkTyVarTys tyvars)
-    dict_id        = mkTemplateLocal 1 pred
-    arg_ids        = mkTemplateLocalsNum 2 (map scaledThing arg_tys)
+    the_arg_id = getNth arg_ids val_index
+    pred       = mkClassPred clas (mkTyVarTys tyvars)
+    dict_id    = mkTemplateLocal 1 pred
+    arg_ids    = mkTemplateLocalsNum 2 (map scaledThing arg_tys)
 
-    rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars)
-                                                   (Var dict_id)
-             | otherwise = mkSingleAltCase (Var dict_id) dict_id (DataAlt data_con)
-                                           arg_ids (varToCoreExpr the_arg_id)
+    rhs_body | isUnaryClass clas   -- Just having one sel_id isn't enough!
+                                   -- E.g.  class (a ~# b) => a ~ b where {}
+             , let sel_ids = classAllSelIds clas
+             = assertPpr (val_index == 0)      (ppr clas) $
+               assertPpr (length sel_ids == 1) (ppr clas) $
+               Var (head sel_ids) `mkTyApps` mkTyVarTys tyvars `App` Var dict_id
+             | otherwise
+             = mkSingleAltCase (Var dict_id) dict_id (DataAlt data_con)
+                               arg_ids (varToCoreExpr the_arg_id)
                                 -- varToCoreExpr needed for equality superclass selectors
                                 --   sel a b d = case x of { MkC _ (g:a~b) _ -> CO g }
 
@@ -572,9 +563,11 @@ dictSelRule :: Int -> Arity -> RuleFun
 -- from it
 --       sel_i t1..tk (D t1..tk op1 ... opm) = opi
 --
-dictSelRule val_index n_ty_args _ id_unf _ args
+-- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
+dictSelRule val_index n_ty_args _ in_scope_env _ args
   | (dict_arg : _) <- drop n_ty_args args
-  , Just (_, floats, _, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
+  , Just (_, floats, _, _, con_args)
+             <- exprIsConApp_maybe in_scope_env dict_arg
   = Just (wrapFloats floats $ getNth con_args val_index)
   | otherwise
   = Nothing
@@ -589,9 +582,8 @@ dictSelRule val_index n_ty_args _ id_unf _ args
 
 mkDataConWorkId :: Name -> DataCon -> Id
 mkDataConWorkId wkr_name data_con
-  | isNewTyCon tycon
-  = mkGlobalId (DataConWrapId data_con) wkr_name wkr_ty nt_work_info
-      -- See Note [Newtype workers]
+  | isNewTyCon tycon       -- See Note [Newtype workers]
+  = mkGlobalId (DataConWrapId data_con) wkr_name wkr_ty nt_info
 
   | otherwise
   = mkGlobalId (DataConWorkId data_con) wkr_name wkr_ty alg_wkr_info
@@ -630,18 +622,17 @@ mkDataConWorkId wkr_name data_con
                                             -- LFInfo stores post-unarisation arity
 
     ----------- Workers for newtypes --------------
-    nt_work_info = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
-                  `setArityInfo` 1      -- Arity 1
-                  `setInlinePragInfo`     dataConWrapperInlinePragma
-                  `setUnfoldingInfo`      newtype_unf
-                               -- See W1 in Note [LFInfo of DataCon workers and wrappers]
-                  `setLFInfo` (panic "mkDataConWorkId: we shouldn't look at LFInfo for newtype worker ids")
-    id_arg1      = mkScaledTemplateLocal 1 (head arg_tys)
-    res_ty_args  = mkTyCoVarTys univ_tvs
-    newtype_unf  = assertPpr (null ex_tcvs && isSingleton arg_tys)
-                             (ppr data_con)
+    nt_info  = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
+               `setArityInfo` 1  -- Arity 1
+               `setInlinePragInfo` dataConWrapperInlinePragma
+               `setUnfoldingInfo`  mkCompulsoryUnfolding newtype_rhs
+               `setLFInfo` (panic "mkDataConWorkId: no LFInfo for newtype worker ids")
+                           -- See W1 in Note [LFInfo of DataCon workers and wrappers]
+
+    id_arg1     = mkScaledTemplateLocal 1 (head arg_tys)
+    res_ty_args = mkTyCoVarTys univ_tvs
+    newtype_rhs =  assertPpr (null ex_tcvs && isSingleton arg_tys) (ppr data_con) $
                               -- Note [Newtype datacons]
-                   mkCompulsoryUnfolding $
                    mkLams univ_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
 
@@ -664,18 +655,18 @@ How do we construct a /correct/ LFInfo for workers and wrappers?
 (Remember: `LFCon` means "a saturated constructor application")
 
 (1) Data constructor workers and wrappers with arity > 0 are unambiguously
-functions and should be given `LFReEntrant`, regardless of the runtime
-relevance of the arguments.
-  - For example, `Just :: a -> Maybe a` is given `LFReEntrant`,
-             and `HNil :: (a ~# '[]) -> HList a` is given `LFReEntrant` too.
+    functions and should be given `LFReEntrant`, regardless of the runtime
+    relevance of the arguments.  For example:
+       `Just :: a -> Maybe a`          is given `LFReEntrant`,
+       `HNil :: (a ~# '[]) -> HList a` is given `LFReEntrant` too.
 
 (2) A datacon /worker/ with zero arity is trivially fully saturated -- it takes
-no arguments whatsoever (not even zero-width args), so it is given `LFCon`.
+    no arguments whatsoever (not even zero-width args), so it is given `LFCon`.
 
 (3) Perhaps surprisingly, a datacon /wrapper/ can be an `LFCon`. See Wrinkle (W1) below.
-A datacon /wrapper/ with zero arity must be a fully saturated application of
-the worker to zero-width arguments only (which are dropped after unarisation),
-and therefore is also given `LFCon`.
+    A datacon /wrapper/ with zero arity must be a fully saturated application of
+    the worker to zero-width arguments only (which are dropped after unarisation),
+    and therefore is also given `LFCon`.
 
 For example, consider the following data constructors:
 
@@ -917,6 +908,9 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
         -- form of PromotedDataCon, and therefore do not need wrappers.
         -- See wrinkle (W0) in Note [Type data declarations] in GHC.Rename.Module.
       = False
+
+      | isUnaryClassTyCon tycon   -- See (UCM8) in Note [Unary class magic]
+      = False                     -- in GHC.Core.TyCon
 
       | otherwise
       = (not new_tycon
@@ -1851,12 +1845,12 @@ mkDictFunId :: Name      -- Name to use for the dict fun;
 -- See Note [Dict funs and default methods]
 
 mkDictFunId dfun_name tvs theta clas tys
-  = mkExportedLocalId (DFunId is_nt)
+  = mkExportedLocalId (DFunId is_unary)
                       dfun_name
                       dfun_ty
   where
-    is_nt = isNewTyCon (classTyCon clas)
-    dfun_ty = TcType.tcMkDFunSigmaTy tvs theta (mkClassPred clas tys)
+    is_unary = isUnaryClass clas
+    dfun_ty  = TcType.tcMkDFunSigmaTy tvs theta (mkClassPred clas tys)
 
 {-
 ************************************************************************

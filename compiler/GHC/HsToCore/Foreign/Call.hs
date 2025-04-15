@@ -148,7 +148,7 @@ unboxArg arg
     (isUnboxedTupleType arg_ty && typePrimRep1 arg_ty == VoidRep)
   = return (arg, \body -> body)
 
-  -- Recursive newtypes
+  -- Possibly-recursive newtypes
   | Just(co, _rep_ty) <- topNormaliseNewType_maybe arg_ty
   = unboxArg (mkCastDs arg co)
 
@@ -341,8 +341,10 @@ resultWrapper result_ty
   -- Data types with a single constructor, which has a single arg
   -- This includes types like Ptr and ForeignPtr
   | Just (tycon, tycon_arg_tys) <- maybe_tc_app
-  , Just data_con <- tyConSingleAlgDataCon_maybe tycon  -- One constructor
-  , null (dataConExTyCoVars data_con)                   -- no existentials
+  , not (isNewTyCon tycon)  -- Newtypes should have been dealt with above, but
+                            -- a recursive one might fall through here, I think
+  , Just data_con <- tyConSingleDataCon_maybe tycon  -- One constructor
+  , null (dataConExTyCoVars data_con)                -- no existentials
   , [Scaled _ unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
   = do { (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
        ; let marshal_con e  = Var (dataConWrapId data_con)

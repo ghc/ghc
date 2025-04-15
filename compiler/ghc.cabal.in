@@ -424,6 +424,7 @@ Library
         GHC.CoreToIface
         GHC.CoreToStg
         GHC.CoreToStg.Prep
+        GHC.CoreToStg.AddImplicitBinds
         GHC.Core.TyCo.FVs
         GHC.Core.TyCo.Compare
         GHC.Core.TyCon
@@ -868,7 +869,6 @@ Library
         GHC.Tc.Types
         GHC.Tc.Types.Constraint
         GHC.Tc.Types.Evidence
-        GHC.Tc.Types.EvTerm
         GHC.Tc.Types.Origin
         GHC.Tc.Types.Rank
         GHC.Tc.Types.CtLoc

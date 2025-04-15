@@ -53,7 +53,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.DataCon
-import GHC.Core.TyCon     ( tyConArity )
+import GHC.Core.TyCon     ( TyCon, tyConArity, isInjectiveTyCon )
 import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
 import GHC.Core.Predicate ( isDictTy, isEvId, isCallStackPredTy, isCallStackTy )
 import GHC.Core.Multiplicity
@@ -3022,14 +3022,14 @@ pushCoercionIntoLambda in_scope x e co
     | otherwise
     = Nothing
 
-pushCoDataCon :: DataCon -> [CoreExpr] -> MCoercion
+pushCoDataCon :: DataCon -> [CoreExpr] -> MCoercionR
               -> Maybe (DataCon
                        , [Type]      -- Universal type args
                        , [CoreExpr]) -- All other args incl existentials
 -- Implement the KPush reduction rule as described in "Down with kinds"
 -- The transformation applies iff we have
 --      (C e1 ... en) `cast` co
--- where co :: (T t1 .. tn) ~ to_ty
+-- where co :: (T t1 .. tn) ~ (T s1 .. sn)
 -- The left-hand one must be a T, because exprIsConApp returned True
 -- but the right-hand one might not be.  (Though it usually will.)
 pushCoDataCon dc dc_args MRefl    = Just $! (push_dc_refl dc dc_args)
@@ -3041,7 +3041,7 @@ push_dc_refl dc dc_args
   where
     !(univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) dc_args
 
-push_dc_gen :: DataCon -> [CoreExpr] -> Coercion -> Pair Type
+push_dc_gen :: DataCon -> [CoreExpr] -> CoercionR -> Pair Type
             -> Maybe (DataCon, [Type], [CoreExpr])
 push_dc_gen dc dc_args co (Pair from_ty to_ty)
   | from_ty `eqType` to_ty  -- try cheap test first
@@ -3054,43 +3054,53 @@ push_dc_gen dc dc_args co (Pair from_ty to_ty)
         -- where S is a type function.  In fact, exprIsConApp
         -- will probably not be called in such circumstances,
         -- but there's nothing wrong with it
-
-  = let
-        tc_arity       = tyConArity to_tc
-        dc_univ_tyvars = dataConUnivTyVars dc
-        dc_ex_tcvars   = dataConExTyCoVars dc
-        arg_tys        = dataConRepArgTys dc
-
-        non_univ_args  = dropList dc_univ_tyvars dc_args
-        (ex_args, val_args) = splitAtList dc_ex_tcvars non_univ_args
-
-        -- Make the "Psi" from the paper
-        omegas = decomposeCo tc_arity co (tyConRolesRepresentational to_tc)
-        (psi_subst, to_ex_arg_tys)
-          = liftCoSubstWithEx Representational
-                              dc_univ_tyvars
-                              omegas
-                              dc_ex_tcvars
-                              (map exprToType ex_args)
-
-          -- Cast the value arguments (which include dictionaries)
-        new_val_args = zipWith cast_arg (map scaledThing arg_tys) val_args
-        cast_arg arg_ty arg = mkCast arg (psi_subst arg_ty)
-
-        to_ex_args = map Type to_ex_arg_tys
-
-        dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tcvars,
-                         ppr arg_tys, ppr dc_args,
-                         ppr ex_args, ppr val_args, ppr co, ppr from_ty, ppr to_ty, ppr to_tc
-                         , ppr $ mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args) ]
-    in
-    assertPpr (eqType from_ty (mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args))) dump_doc $
-    assertPpr (equalLength val_args arg_tys) dump_doc $
-    Just (dc, to_tc_arg_tys, to_ex_args ++ new_val_args)
+  = Just (push_data_con to_tc to_tc_arg_tys dc dc_args co Representational)
 
   | otherwise
   = Nothing
 
+
+push_data_con :: TyCon -> [Type] -> DataCon -> [CoreExpr]
+              -> CoercionR -> Role                  -- Coercion and its role
+              -> (DataCon, [Type], [CoreExpr])
+push_data_con to_tc to_tc_arg_tys dc dc_args co role
+  = assertPpr (eqType from_ty dc_app_ty)     dump_doc $
+    assertPpr (equalLength val_args arg_tys) dump_doc $
+    assertPpr (role == coercionRole co)      dump_doc $
+    assertPpr (isInjectiveTyCon to_tc role)  dump_doc $
+    -- isInjectiveTyCon: see (UCM9) in Note [Unary class magic]
+    --                   in GHC.Core.TyCon
+    (dc, to_tc_arg_tys, to_ex_args ++ new_val_args)
+  where
+    Pair from_ty to_ty = coercionKind co
+    tc_arity       = tyConArity to_tc
+    dc_univ_tyvars = dataConUnivTyVars dc
+    dc_ex_tcvars   = dataConExTyCoVars dc
+    arg_tys        = dataConRepArgTys dc
+
+    dc_app_ty = mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args)
+
+    non_univ_args  = dropList dc_univ_tyvars dc_args
+    (ex_args, val_args) = splitAtList dc_ex_tcvars non_univ_args
+
+    -- Make the "Psi" from the paper
+    omegas = decomposeCo tc_arity co (tyConRolesX role to_tc)
+    (psi_subst, to_ex_arg_tys)
+      = liftCoSubstWithEx dc_univ_tyvars
+                          omegas
+                          dc_ex_tcvars
+                          (map exprToType ex_args)
+
+      -- Cast the value arguments (which include dictionaries)
+    new_val_args = zipWith cast_arg (map scaledThing arg_tys) val_args
+    cast_arg arg_ty arg = mkCast arg (psi_subst arg_ty)
+
+    to_ex_args = map Type to_ex_arg_tys
+
+    dump_doc = vcat [ppr dc, ppr dc_univ_tyvars, ppr dc_ex_tcvars
+                    , ppr arg_tys, ppr dc_args
+                    , ppr ex_args, ppr val_args, ppr co, ppr from_ty, ppr to_ty, ppr to_tc
+                    , ppr $ mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args) ]
 
 collectBindersPushingCo :: CoreExpr -> ([Var], CoreExpr)
 -- Collect lambda binders, pushing coercions inside if possible
@@ -3147,15 +3157,12 @@ collectBindersPushingCo e
 
       | otherwise = (reverse bs, mkCast (Lam b e) co)
 
-{-
-
-Note [collectBindersPushingCo]
+{- Note [collectBindersPushingCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We just look for coercions of form
    <type> % w -> blah
 (and similarly for foralls) to keep this function simple.  We could do
 more elaborate stuff, but it'd involve substitution etc.
-
 -}
 
 {- *********************************************************************

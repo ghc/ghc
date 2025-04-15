@@ -255,7 +255,14 @@ data IfaceClassBody
      ifClassCtxt :: IfaceContext,             -- Super classes
      ifATs       :: [IfaceAT],                -- Associated type families
      ifSigs      :: [IfaceClassOp],           -- Method signatures
-     ifMinDef    :: IfaceBooleanFormula       -- Minimal complete definition
+     ifMinDef    :: IfaceBooleanFormula,      -- Minimal complete definition
+     ifUnary     :: Bool                      -- This is a unary class
+       -- NB: in principle ifUnary is redundant; it can be deduced from
+       --     the number and types of class ops.  In practice, in interface
+       --     files those types are knot tied, and it's very easy to get a
+       --     black hole.  Easiest thing: let the definition module decide if
+       --     it is a unary class, and communicate that through IfaceClassBody
+       --     See (UCM12) in Note [Unary class magic] in GHC.Core.TyCon
     }
 
 -- See also 'BooleanFormula'
@@ -602,9 +609,7 @@ ifaceDeclImplicitBndrs (IfaceClass { ifName = cls_tc_name
                                         ifSigs      = sigs,
                                         ifATs       = ats
                                      }})
-  = --   (possibly) newtype coercion
-    co_occs ++
-    --    data constructor (DataCon namespace)
+  = --    data constructor (DataCon namespace)
     --    data worker (Id namespace)
     --    no wrapper (class dictionaries never have a wrapper)
     [dc_occ, dcww_occ] ++
@@ -617,12 +622,8 @@ ifaceDeclImplicitBndrs (IfaceClass { ifName = cls_tc_name
   where
     cls_tc_occ = occName cls_tc_name
     n_ctxt = length sc_ctxt
-    n_sigs = length sigs
-    co_occs | is_newtype = [mkNewTyCoOcc cls_tc_occ]
-            | otherwise  = []
     dcww_occ = mkDataConWorkerOcc dc_occ
     dc_occ = mkClassDataConOcc cls_tc_occ
-    is_newtype = n_sigs + n_ctxt == 1 -- Sigh (keep this synced with buildClass)
 
 ifaceDeclImplicitBndrs _ = []
 
@@ -2295,9 +2296,10 @@ instance Binary IfaceDecl where
                 ifFDs     = a5,
                 ifBody = IfConcreteClass {
                     ifClassCtxt = a1,
-                    ifATs  = a6,
-                    ifSigs = a7,
-                    ifMinDef  = a8
+                    ifATs       = a6,
+                    ifSigs      = a7,
+                    ifMinDef    = a8,
+                    ifUnary     = a9
                 }}) = do
         putByte bh 5
         put_ bh a1
@@ -2308,6 +2310,7 @@ instance Binary IfaceDecl where
         put_ bh a6
         put_ bh a7
         put_ bh a8
+        put_ bh a9
 
     put_ bh (IfaceAxiom a1 a2 a3 a4) = do
         putByte bh 6
@@ -2381,6 +2384,7 @@ instance Binary IfaceDecl where
                     a6 <- get bh
                     a7 <- get bh
                     a8 <- get bh
+                    a9 <- get bh
                     return (IfaceClass {
                         ifName    = a2,
                         ifRoles   = a3,
@@ -2388,9 +2392,10 @@ instance Binary IfaceDecl where
                         ifFDs     = a5,
                         ifBody = IfConcreteClass {
                             ifClassCtxt = a1,
-                            ifATs  = a6,
-                            ifSigs = a7,
-                            ifMinDef  = a8
+                            ifATs       = a6,
+                            ifSigs      = a7,
+                            ifMinDef    = a8,
+                            ifUnary     = a9
                         }})
             6 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
@@ -3087,7 +3092,7 @@ instance NFData IfaceAxBranch where
 instance NFData IfaceClassBody where
   rnf = \case
     IfAbstractClass -> ()
-    IfConcreteClass f1 f2 f3 f4 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` ()
+    IfConcreteClass f1 f2 f3 f4 f5 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` ()
 
 instance NFData IfaceBooleanFormula where
   rnf = \case
