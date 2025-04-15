@@ -41,6 +41,8 @@ import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.DataCon
 import GHC.Core.Type
+import GHC.Core.Class( Class )
+import GHC.Core.Predicate( isUnaryClass )
 
 import GHC.Types.Id
 import GHC.Types.Literal
@@ -52,7 +54,9 @@ import GHC.Types.Tickish
 
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Names
+
 import GHC.Data.Bag
+
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 
@@ -688,11 +692,13 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     size_up_call :: Id -> [CoreExpr] -> Int -> ExprSize
     size_up_call fun val_args voids
        = case idDetails fun of
-           FCallId _        -> sizeN (callSize (length val_args) voids)
-           DataConWorkId dc -> conSize    dc (length val_args)
-           PrimOpId op _    -> primOpSize op (length val_args)
-           ClassOpId {}     -> classOpSize opts top_args val_args
-           _                -> funSize opts top_args fun (length val_args) voids
+           FCallId _                     -> sizeN (callSize (length val_args) voids)
+           DataConWorkId dc              -> conSize    dc (length val_args)
+           PrimOpId op _                 -> primOpSize op (length val_args)
+           ClassOpId cls _               -> classOpSize opts cls top_args val_args
+           _ | fun `hasKey` buildIdKey   -> buildSize
+             | fun `hasKey` augmentIdKey -> augmentSize
+             | otherwise                 -> funSize opts top_args fun (length val_args) voids
 
     ------------
     size_up_alt (Alt _con _bndrs rhs) = size_up rhs `addSizeN` 10
@@ -757,21 +763,24 @@ litSize _other = 0    -- Must match size of nullary constructors
                       -- Key point: if  x |-> 4, then x must inline unconditionally
                       --            (eg via case binding)
 
-classOpSize :: UnfoldingOpts -> [Id] -> [CoreExpr] -> ExprSize
+classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> ExprSize
 -- See Note [Conlike is interesting]
-classOpSize _ _ []
-  = sizeZero
-classOpSize opts top_args (arg1 : other_args)
-  = SizeIs size arg_discount 0
+classOpSize opts cls top_args args
+  | isUnaryClass cls
+  = sizeZero   -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
+  | otherwise
+  = case args of
+       []                -> sizeZero
+       (arg1:other_args) -> SizeIs (size other_args) (arg_discount arg1) 0
   where
-    size = 20 + (10 * length other_args)
+    size other_args = 20 + (10 * length other_args)
+
     -- If the class op is scrutinising a lambda bound dictionary then
     -- give it a discount, to encourage the inlining of this function
     -- The actual discount is rather arbitrarily chosen
-    arg_discount = case arg1 of
-                     Var dict | dict `elem` top_args
-                              -> unitBag (dict, unfoldingDictDiscount opts)
-                     _other   -> emptyBag
+    arg_discount (Var dict) | dict `elem` top_args
+                   = unitBag (dict, unfoldingDictDiscount opts)
+    arg_discount _ = emptyBag
 
 -- | The size of a function call
 callSize
@@ -798,11 +807,9 @@ jumpSize _n_val_args _voids = 0   -- Jumps are small, and we don't want penalise
   -- better solution?
 
 funSize :: UnfoldingOpts -> [Id] -> Id -> Int -> Int -> ExprSize
--- Size for functions that are not constructors or primops
+-- Size for function calls where the function is not a constructor or primops
 -- Note [Function applications]
 funSize opts top_args fun n_val_args voids
-  | fun `hasKey` buildIdKey   = buildSize
-  | fun `hasKey` augmentIdKey = augmentSize
   | otherwise = SizeIs size arg_discount res_discount
   where
     some_val_args = n_val_args > 0
@@ -831,6 +838,8 @@ conSize dc n_val_args
 
 -- See Note [Unboxed tuple size and result discount]
   | isUnboxedTupleDataCon dc = SizeIs 0 emptyBag 10
+
+  | isUnaryClassDataCon dc = sizeZero
 
 -- See Note [Constructor size and result discount]
   | otherwise = SizeIs 10 emptyBag 10

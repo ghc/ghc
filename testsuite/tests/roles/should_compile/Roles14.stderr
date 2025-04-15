@@ -3,8 +3,6 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   class C2{1} :: * -> Constraint
     roles representational
-COERCION AXIOMS
-  axiom Roles12.N:C2 :: C2 a = a -> a
 Dependent modules: []
 Dependent packages: [(normal, base-4.21.0.0)]
 
