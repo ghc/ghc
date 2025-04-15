@@ -42,10 +42,10 @@ module GHC.Core.Coercion (
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
         mkNakedForAllCo, mkForAllCo, mkForAllVisCos, mkHomoForAllCos,
-        mkPhantomCo,
+        mkPhantomCo, mkAxiomCo,
         mkHoleCo, mkUnivCo, mkSubCo,
         mkProofIrrelCo,
-        downgradeRole, mkAxiomCo,
+        downgradeRole,
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
         mkKindCo,
         castCoercionKind, castCoercionKind1, castCoercionKind2,
@@ -2022,16 +2022,16 @@ type LiftCoEnv = VarEnv Coercion
      -- Also maps coercion variables to ProofIrrelCos.
 
 -- like liftCoSubstWith, but allows for existentially-bound types as well
-liftCoSubstWithEx :: Role          -- desired role for output coercion
-                  -> [TyVar]       -- universally quantified tyvars
+liftCoSubstWithEx :: [TyVar]       -- universally quantified tyvars
                   -> [Coercion]    -- coercions to substitute for those
                   -> [TyCoVar]     -- existentially quantified tycovars
                   -> [Type]        -- types and coercions to be bound to ex vars
-                  -> (Type -> Coercion, [Type]) -- (lifting function, converted ex args)
-liftCoSubstWithEx role univs omegas exs rhos
+                  -> (Type -> CoercionR, [Type]) -- (lifting function, converted ex args)
+                      -- Returned coercion has Representational role
+liftCoSubstWithEx univs omegas exs rhos
   = let theta = mkLiftingContext (zipEqual univs omegas)
         psi   = extendLiftingContextEx theta (zipEqual exs rhos)
-    in (ty_co_subst psi role, substTys (lcSubstRight psi) (mkTyCoVarTys exs))
+    in (ty_co_subst psi Representational, substTys (lcSubstRight psi) (mkTyCoVarTys exs))
 
 liftCoSubstWith :: Role -> [TyCoVar] -> [Coercion] -> Type -> Coercion
 liftCoSubstWith r tvs cos ty

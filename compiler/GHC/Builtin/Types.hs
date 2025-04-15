@@ -1765,6 +1765,9 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
     binders   = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k,k])
     roles     = [Nominal, Nominal, Nominal]
     rhs       = mkDataTyConRhs [datacon]
+                -- rhs: a DataTyCon, not a UnaryClassTyCon!  Yes it has one
+                --      field, but it has unboxed type (a ~# b),
+                --      so the class must provide the box.
 
     tvs@[k,a,b] = binderVars binders
     sc_pred     = mkTyConApp eqPrimTyCon (mkTyVarTys [k,k,a,b])

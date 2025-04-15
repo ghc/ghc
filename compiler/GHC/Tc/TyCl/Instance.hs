@@ -44,47 +44,53 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Class( AssocInstInfo(..), isNotAssociated )
-import GHC.Core.Multiplicity
-import GHC.Core.InstEnv
 import GHC.Tc.Instance.Family
-import GHC.Core.FamInstEnv
+
 import GHC.Tc.Deriv
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Unify
-import GHC.Builtin.Names ( unsatisfiableIdName )
-import GHC.Core        ( Expr(..), mkApps, mkVarApps, mkLams )
-import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
-import GHC.Core.Unfold.Make ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
-import GHC.Core.Type
-import GHC.Core.SimpleOpt
-import GHC.Core.Predicate( classMethodInstTy )
 import GHC.Tc.Types.Evidence
+
+import GHC.Builtin.Names ( unsatisfiableIdName )
+
+import GHC.Core        ( Expr(..), mkVarApps )
+import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
+import GHC.Core.Unfold.Make ( mkDFunUnfolding )
+import GHC.Core.FamInstEnv
+import GHC.Core.Type
+import GHC.Core.Multiplicity
+import GHC.Core.InstEnv
+import GHC.Core.Predicate( classMethodInstTy )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.Class
+
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Types.Fixity
-import GHC.Driver.DynFlags
-import GHC.Driver.Ppr
-import GHC.Utils.Logger
-import GHC.Data.FastString
 import GHC.Types.Id
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
-import GHC.Data.List.SetOps
 import GHC.Types.Name
 import GHC.Types.Name.Set
+import GHC.Types.SrcLoc
+
+import GHC.Driver.DynFlags
+import GHC.Driver.Ppr
+
+import GHC.Utils.Logger
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.SrcLoc
 import GHC.Utils.Misc
+
+import GHC.Data.FastString
+import GHC.Data.List.SetOps
+import GHC.Data.Bag
 import GHC.Data.BooleanFormula ( isUnsatisfied )
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -184,6 +190,8 @@ Note [Instances and loop breakers]
 
 Note [ClassOp/DFun selection]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This important Note explains how DFunIds and ClassOps work.
+
 One thing we see a lot is stuff like
     op2 (df d1 d2)
 where 'op2' is a ClassOp and 'df' is DFun.  Now, we could inline *both*
@@ -217,6 +225,12 @@ Instead we use a cunning trick.
  * We make 'df' CONLIKE, so that shared uses still match; eg
       let d = df d1 d2
       in ...(op2 d)...(op1 d)...
+
+ * ClassOps have no unfolding; they work /only/ through their RULE.
+   But a ClassOp might be called with no arguments, or with an argument that
+   the rule doesn't fire on.   So each ClassOp does get an executable top-level
+   definition, injected by GHC.Iface.Tidy.getClassImplicitBinds, which uses
+   `GHC.Types.Id.Make.mkDictSelRhs` to make the code.
 
 Note [Single-method classes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1379,13 +1393,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              inst_tv_tys = mkTyVarTys inst_tyvars
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
 
-             is_newtype = isNewTyCon class_tc
              dfun_id_w_prags = addDFunPrags dfun_id sc_meth_ids
-             dfun_spec_prags
-                | is_newtype = SpecPrags []
-                | otherwise  = SpecPrags spec_inst_prags
-                    -- Newtype dfuns just inline unconditionally,
-                    -- so don't attempt to specialise them
+             dfun_spec_prags = SpecPrags spec_inst_prags
 
              export = ABE { abe_wrap = idHsWrapper
                           , abe_poly = dfun_id_w_prags
@@ -1418,18 +1427,10 @@ addDFunPrags :: DFunId -> [Id] -> DFunId
 -- the DFunId rather than from the skolem pieces that the typechecker
 -- is messing with.
 addDFunPrags dfun_id sc_meth_ids
- | is_newtype
-  = dfun_id `setIdUnfolding`  mkInlineUnfoldingWithArity defaultSimpleOpts StableSystemSrc 0 con_app
-            `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
- | otherwise
  = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_bndrs dict_con dict_args
            `setInlinePragma` dfunInlinePragma
+           -- NB: mkDFunUnfolding takes care of unary classes
  where
-   con_app    = mkLams dfun_bndrs $
-                mkApps (Var (dataConWrapId dict_con)) dict_args
-                -- This application will satisfy the Core invariants
-                -- from Note [Representation polymorphism invariants] in GHC.Core,
-                -- because typeclass method types are never unlifted.
    dict_args  = map Type inst_tys ++
                 [mkVarApps (Var id) dfun_bndrs | id <- sc_meth_ids]
 
@@ -1438,7 +1439,6 @@ addDFunPrags dfun_id sc_meth_ids
    dfun_bndrs  = dfun_tvs ++ ev_ids
    clas_tc     = classTyCon clas
    dict_con    = tyConSingleDataCon clas_tc
-   is_newtype  = isNewTyCon clas_tc
 
 wrapId :: HsWrapper -> Id -> HsExpr GhcTc
 wrapId wrapper id = mkHsWrap wrapper (mkHsVar (noLocA id))
