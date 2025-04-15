@@ -2159,7 +2159,7 @@ maybe_is_tagToEnum_call (StgOpApp (StgPrimOp TagToEnumOp) args t)
     extract_constr_Names ty
            | rep_ty <- unwrapType ty
            , Just tyc <- tyConAppTyCon_maybe rep_ty
-           , isDataTyCon tyc
+           , isBoxedDataTyCon tyc
            = map (getName . dataConWorkId) (tyConDataCons tyc)
            -- NOTE: use the worker name, not the source name of
            -- the DataCon.  See "GHC.Core.DataCon" for details.

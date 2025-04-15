@@ -3,11 +3,10 @@
 
 -- | Solving Class constraints CDictCan
 module GHC.Tc.Solver.Dict (
-  solveDict, solveDictNC,
+  solveDict, solveDictNC, solveCallStack,
   checkInstanceOK,
   matchLocalInst, chooseInstance,
   makeSuperClasses, mkStrictSuperClasses,
-  solveCallStack    -- For GHC.Tc.Solver
   ) where
 
 import GHC.Prelude
@@ -21,7 +20,6 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Origin
-import GHC.Tc.Types.EvTerm( evCallStack )
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
 import GHC.Tc.Solver.Types
@@ -31,6 +29,7 @@ import GHC.Tc.Utils.Unify( uType, mightEqualLater )
 import GHC.Hs.Type( HsIPName(..) )
 
 import GHC.Core
+import GHC.Core.Make
 import GHC.Core.Type
 import GHC.Core.InstEnv     ( DFunInstType, ClsInst(..) )
 import GHC.Core.Class
@@ -38,12 +37,16 @@ import GHC.Core.Predicate
 import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Core.Unify ( ruleMatchTyKiX )
 
+import GHC.Types.TyThing( lookupDataCon, lookupId )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Var
 import GHC.Types.Id( mkTemplateLocals )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.SrcLoc
+
+import GHC.Builtin.Names( srcLocDataConName, pushCallStackName, emptyCallStackName )
 
 import GHC.Utils.Monad ( concatMapM, foldlM )
 import GHC.Utils.Outputable
@@ -129,6 +132,7 @@ canDictCt ev cls tys
   = Stage $
     do { -- First we emit a new constraint that will capture the
          -- given CallStack.
+
          let new_loc = setCtLocOrigin loc (IPOccOrigin (HsIPName ip_name))
                             -- We change the origin to IPOccOrigin so
                             -- this rule does not fire again.
@@ -155,10 +159,17 @@ canDictCt ev cls tys
                   -- See Invariants in `CCDictCan.cc_pend_sc`
        ; continueWith (DictCt { di_ev = ev, di_cls = cls
                               , di_tys = tys, di_pend_sc = fuel }) }
+
   where
     loc  = ctEvLoc ev
     orig = ctLocOrigin loc
     pred = ctEvPred ev
+
+{- *********************************************************************
+*                                                                      *
+*           Implicit parameters and call stacks
+*                                                                      *
+********************************************************************* -}
 
 solveCallStack :: CtEvidence -> EvCallStack -> TcS ()
 -- Also called from GHC.Tc.Solver when defaulting call stacks
@@ -166,10 +177,43 @@ solveCallStack ev ev_cs
   -- We're given ev_cs :: CallStack, but the evidence term should be a
   -- dictionary, so we have to coerce ev_cs to a dictionary for
   -- `IP ip CallStack`. See Note [Overview of implicit CallStacks]
-  = do { cs_tm <- evCallStack ev_cs
-       ; let ev_tm = mkEvCast cs_tm (wrapIP (ctEvPred ev))
+  = do { inner_stk <- evCallStack pred ev_cs
+       ; let ev_tm = EvExpr (evWrapIPE pred inner_stk)
        ; setEvBindIfWanted ev EvCanonical ev_tm }
          -- EvCanonical: see Note [CallStack and ExceptionContext hack]
+  where
+    pred = ctEvPred ev
+
+-- Dictionary for CallStack implicit parameters
+evCallStack :: TcPredType -> EvCallStack -> TcS EvExpr
+-- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
+evCallStack _ EvCsEmpty
+  = Var <$> lookupId emptyCallStackName
+evCallStack pred (EvCsPushCall fs loc tm)
+  = do { df <- getDynFlags
+       ; m  <- getModule
+       ; srcLocDataCon <- lookupDataCon srcLocDataConName
+       ; let platform = targetPlatform df
+             mkSrcLoc l = mkCoreConWrapApps srcLocDataCon <$>
+                          sequence [ mkStringExprFS (unitFS $ moduleUnit m)
+                                   , mkStringExprFS (moduleNameFS $ moduleName m)
+                                   , mkStringExprFS (srcSpanFile l)
+                                   , return $ mkIntExprInt platform (srcSpanStartLine l)
+                                   , return $ mkIntExprInt platform (srcSpanStartCol l)
+                                   , return $ mkIntExprInt platform (srcSpanEndLine l)
+                                   , return $ mkIntExprInt platform (srcSpanEndCol l)
+                                   ]
+
+       ; push_cs_id <- lookupId pushCallStackName
+       ; name_expr  <- mkStringExprFS fs
+       ; loc_expr   <- mkSrcLoc loc
+               -- At this point tm :: IP sym CallStack
+               -- but we need the actual CallStack to pass to pushCS,
+               -- so we use evUwrapIP to strip the dictionary wrapper
+               -- See Note [Overview of implicit CallStacks]
+       ; let outer_stk = evUnwrapIPE pred tm
+       ; return (mkCoreApps (Var push_cs_id)
+                    [mkCoreTup [name_expr, loc_expr], outer_stk]) }
 
 {- Note [Solving CallStack constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -427,14 +471,14 @@ solveEqualityDict :: CtEvidence -> Class -> [Type] -> SolverStage Void
 solveEqualityDict ev cls tys
   | CtWanted (WantedCt { ctev_dest = dest }) <- ev
   = Stage $
-    do { let (data_con, role, t1, t2) = matchEqualityInst cls tys
+    do { let (role, t1, t2) = matchEqualityInst cls tys
          -- Unify t1~t2, putting anything that can't be solved
          -- immediately into the work list
        ; (co, _, _) <- wrapUnifierTcS ev role $ \uenv ->
                        uType uenv t1 t2
          -- Set  d :: (t1~t2) = Eq# co
        ; setWantedEvTerm dest EvCanonical $
-         evDataConApp data_con tys [Coercion co]
+         evDictApp cls tys [Coercion co]
        ; stopWith ev "Solved wanted lifted equality" }
 
   | CtGiven (GivenCt { ctev_evar = ev_id }) <- ev

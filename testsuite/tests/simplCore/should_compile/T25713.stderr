@@ -1,67 +1,22 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 480, types: 774, coercions: 434, joins: 1/1}
-
--- RHS size: {terms: 2, types: 3, coercions: 1, joins: 0/0}
-Ifoldl.$WNil [InlPrag=INLINE[final] CONLIKE] :: forall a. Vec Z a
-[GblId[DataConWrapper],
- Unf=Unf{Src=StableSystem, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@a_akj) ->
-                 Ifoldl.Nil @Z @a_akj @~(<Z>_N :: Z GHC.Internal.Prim.~# Z)}]
-Ifoldl.$WNil
-  = \ (@a_akj) ->
-      Ifoldl.Nil @Z @a_akj @~(<Z>_N :: Z GHC.Internal.Prim.~# Z)
-
--- RHS size: {terms: 7, types: 10, coercions: 2, joins: 0/0}
-Ifoldl.$W::: [InlPrag=INLINE[final] CONLIKE]
-  :: forall a (n :: Nat). a %1 -> Vec n a %1 -> Vec (S n) a
-[GblId[DataConWrapper],
- Arity=2,
- Str=<L><L>,
- Unf=Unf{Src=StableSystem, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=True)
-         Tmpl= \ (@a_akk)
-                 (@(n_X0 :: Nat))
-                 (conrep_aHU [Occ=Once1] :: a_akk)
-                 (conrep1_aHV [Occ=Once1] :: Vec n_X0 a_akk) ->
-                 Ifoldl.:::
-                   @(S n_X0)
-                   @a_akk
-                   @n_X0
-                   @~(<S n_X0>_N :: S n_X0 GHC.Internal.Prim.~# S n_X0)
-                   conrep_aHU
-                   conrep1_aHV}]
-Ifoldl.$W:::
-  = \ (@a_akk)
-      (@(n_X0 :: Nat))
-      (conrep_aHU [Occ=Once1] :: a_akk)
-      (conrep1_aHV [Occ=Once1] :: Vec n_X0 a_akk) ->
-      Ifoldl.:::
-        @(S n_X0)
-        @a_akk
-        @n_X0
-        @~(<S n_X0>_N :: S n_X0 GHC.Internal.Prim.~# S n_X0)
-        conrep_aHU
-        conrep1_aHV
+  = {terms: 469, types: 747, coercions: 431, joins: 1/1}
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-lvl_r1n5 :: Int
+lvl_r1ny :: Int
 [GblId, Unf=OtherCon []]
-lvl_r1n5 = GHC.Internal.Types.I# 6#
+lvl_r1ny = GHC.Internal.Types.I# 6#
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-lvl1_r1n6 :: GHC.Internal.Prim.Addr#
+lvl1_r1nz :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
-lvl1_r1n6 = "Nil"#
+lvl1_r1nz = "Nil"#
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-lvl2_r1n7 :: GHC.Internal.Prim.Addr#
+lvl2_r1nA :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
-lvl2_r1n7 = " ::: "#
+lvl2_r1nA = " ::: "#
 
 Rec {
 -- RHS size: {terms: 48, types: 39, coercions: 0, joins: 0/0}
@@ -72,45 +27,45 @@ Ifoldl.$fShowVec_$cshowsPrec [Occ=LoopBreaker]
  Str=<LP(SC(S,C(1,C(1,L))),A,A)><ML><1L><L>,
  Unf=OtherCon []]
 Ifoldl.$fShowVec_$cshowsPrec
-  = \ (@a_a11n)
-      (@(n_a11o :: Nat))
-      ($dShow_a11p :: Show a_a11n)
-      (ds_d1gq :: Int)
-      (ds1_d1gr :: Vec n_a11o a_a11n)
+  = \ (@a_a11x)
+      (@(n_a11y :: Nat))
+      ($dShow_a11z :: Show a_a11x)
+      (ds_d1hG :: Int)
+      (ds1_d1hH :: Vec n_a11y a_a11x)
       (eta_B0 :: String) ->
-      case ds1_d1gr of {
-        Nil co_a11w [Dmd=B] ->
-          GHC.Internal.CString.unpackAppendCString# lvl1_r1n6 eta_B0;
-        ::: @n1_a11A co_a11B [Dmd=B] b1_aJu b2_aJv ->
-          case ds_d1gq of { GHC.Internal.Types.I# x_a1kQ ->
-          case GHC.Internal.Prim.>=# x_a1kQ 6# of {
+      case ds1_d1hH of {
+        Nil co_a11G [Dmd=B] ->
+          GHC.Internal.CString.unpackAppendCString# lvl1_r1nz eta_B0;
+        ::: @n1_a11K co_a11L [Dmd=B] b1_aJI b2_aJJ ->
+          case ds_d1hG of { GHC.Internal.Types.I# x_a1lr ->
+          case GHC.Internal.Prim.>=# x_a1lr 6# of {
             __DEFAULT ->
               showsPrec
-                @a_a11n
-                $dShow_a11p
-                lvl_r1n5
-                b1_aJu
+                @a_a11x
+                $dShow_a11z
+                lvl_r1ny
+                b1_aJI
                 (GHC.Internal.CString.unpackAppendCString#
-                   lvl2_r1n7
+                   lvl2_r1nA
                    (Ifoldl.$fShowVec_$cshowsPrec
-                      @a_a11n @n1_a11A $dShow_a11p lvl_r1n5 b2_aJv eta_B0));
+                      @a_a11x @n1_a11K $dShow_a11z lvl_r1ny b2_aJJ eta_B0));
             1# ->
               GHC.Internal.Types.:
                 @Char
                 GHC.Internal.Show.$fShowCallStack3
                 (showsPrec
-                   @a_a11n
-                   $dShow_a11p
-                   lvl_r1n5
-                   b1_aJu
+                   @a_a11x
+                   $dShow_a11z
+                   lvl_r1ny
+                   b1_aJI
                    (GHC.Internal.CString.unpackAppendCString#
-                      lvl2_r1n7
+                      lvl2_r1nA
                       (Ifoldl.$fShowVec_$cshowsPrec
-                         @a_a11n
-                         @n1_a11A
-                         $dShow_a11p
-                         lvl_r1n5
-                         b2_aJv
+                         @a_a11x
+                         @n1_a11K
+                         $dShow_a11z
+                         lvl_r1ny
+                         b2_aJJ
                          (GHC.Internal.Types.:
                             @Char GHC.Internal.Show.$fShowCallStack2 eta_B0))))
           }
@@ -136,17 +91,17 @@ Ifoldl.$fShowVec_$cshowList
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [0 0 0] 70 0}]
 Ifoldl.$fShowVec_$cshowList
-  = \ (@a_a11n)
-      (@(n_a11o :: Nat))
-      ($dShow_a11p :: Show a_a11n)
-      (ls_a1hi :: [Vec n_a11o a_a11n])
-      (s_a1hj :: String) ->
+  = \ (@a_a11x)
+      (@(n_a11y :: Nat))
+      ($dShow_a11z :: Show a_a11x)
+      (ls_a1iA :: [Vec n_a11y a_a11x])
+      (s_a1iB :: String) ->
       GHC.Internal.Show.showList__
-        @(Vec n_a11o a_a11n)
+        @(Vec n_a11y a_a11x)
         (Ifoldl.$fShowVec_$cshowsPrec
-           @a_a11n @n_a11o $dShow_a11p Ifoldl.$fShowVec1)
-        ls_a1hi
-        s_a1hj
+           @a_a11x @n_a11y $dShow_a11z Ifoldl.$fShowVec1)
+        ls_a1iA
+        s_a1iB
 
 -- RHS size: {terms: 9, types: 10, coercions: 0, joins: 0/0}
 Ifoldl.$fShowVec_$cshow
@@ -158,16 +113,16 @@ Ifoldl.$fShowVec_$cshow
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [0 0] 50 0}]
 Ifoldl.$fShowVec_$cshow
-  = \ (@a_a11n)
-      (@(n_a11o :: Nat))
-      ($dShow_a11p :: Show a_a11n)
-      (x_a1hf :: Vec n_a11o a_a11n) ->
+  = \ (@a_a11x)
+      (@(n_a11y :: Nat))
+      ($dShow_a11z :: Show a_a11x)
+      (x_a1ix :: Vec n_a11y a_a11x) ->
       Ifoldl.$fShowVec_$cshowsPrec
-        @a_a11n
-        @n_a11o
-        $dShow_a11p
+        @a_a11x
+        @n_a11y
+        $dShow_a11z
         Ifoldl.$fShowVec1
-        x_a1hf
+        x_a1ix
         (GHC.Internal.Types.[] @Char)
 
 -- RHS size: {terms: 10, types: 13, coercions: 0, joins: 0/0}
@@ -176,18 +131,18 @@ Ifoldl.$fShowVec [InlPrag=CONLIKE]
 [GblId[DFunId],
  Arity=1,
  Str=<LP(LC(L,C(1,C(1,L))),A,A)>,
- Unf=DFun: \ (@a_aAd) (@(n_aAe :: Nat)) (v_B1 :: Show a_aAd) ->
-       GHC.Internal.Show.C:Show TYPE: Vec n_aAe a_aAd
-                                Ifoldl.$fShowVec_$cshowsPrec @a_aAd @n_aAe v_B1
-                                Ifoldl.$fShowVec_$cshow @a_aAd @n_aAe v_B1
-                                Ifoldl.$fShowVec_$cshowList @a_aAd @n_aAe v_B1]
+ Unf=DFun: \ (@a_aAm) (@(n_aAn :: Nat)) (v_B1 :: Show a_aAm) ->
+       GHC.Internal.Show.C:Show TYPE: Vec n_aAn a_aAm
+                                Ifoldl.$fShowVec_$cshowsPrec @a_aAm @n_aAn v_B1
+                                Ifoldl.$fShowVec_$cshow @a_aAm @n_aAn v_B1
+                                Ifoldl.$fShowVec_$cshowList @a_aAm @n_aAn v_B1]
 Ifoldl.$fShowVec
-  = \ (@a_a11n) (@(n_a11o :: Nat)) ($dShow_a11p :: Show a_a11n) ->
+  = \ (@a_a11x) (@(n_a11y :: Nat)) ($dShow_a11z :: Show a_a11x) ->
       GHC.Internal.Show.C:Show
-        @(Vec n_a11o a_a11n)
-        (Ifoldl.$fShowVec_$cshowsPrec @a_a11n @n_a11o $dShow_a11p)
-        (Ifoldl.$fShowVec_$cshow @a_a11n @n_a11o $dShow_a11p)
-        (Ifoldl.$fShowVec_$cshowList @a_a11n @n_a11o $dShow_a11p)
+        @(Vec n_a11y a_a11x)
+        (Ifoldl.$fShowVec_$cshowsPrec @a_a11x @n_a11y $dShow_a11z)
+        (Ifoldl.$fShowVec_$cshow @a_a11x @n_a11y $dShow_a11z)
+        (Ifoldl.$fShowVec_$cshowList @a_a11x @n_a11y $dShow_a11z)
 
 -- RHS size: {terms: 7, types: 13, coercions: 0, joins: 0/0}
 Ifoldl.unFlip1
@@ -200,13 +155,13 @@ Ifoldl.unFlip1
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
 Ifoldl.unFlip1
-  = \ (@k_aJb)
-      (@k1_aJc)
-      (@(f_aJd :: k_aJb -> k1_aJc -> *))
-      (@(y_aJe :: k1_aJc))
-      (@(x_aJf :: k_aJb))
-      (ds_d1go :: Flip f_aJd y_aJe x_aJf) ->
-      ds_d1go
+  = \ (@k_aJp)
+      (@k1_aJq)
+      (@(f_aJr :: k_aJp -> k1_aJq -> *))
+      (@(y_aJs :: k1_aJq))
+      (@(x_aJt :: k_aJp))
+      (ds_d1hE :: Flip f_aJr y_aJs x_aJt) ->
+      ds_d1hE
 
 -- RHS size: {terms: 1, types: 0, coercions: 26, joins: 0/0}
 unFlip
@@ -238,60 +193,60 @@ upWonk :: forall (k :: Nat) (w :: Nat). Wonk k w -> Wonk (S k) w
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
-         Tmpl= \ (@(k_aXP :: Nat))
-                 (@(w_aXQ :: Nat))
-                 (ds_d1f6 [Occ=Once1!] :: Wonk k_aXP w_aXQ) ->
-                 case ds_d1f6
-                      `cast` (Ifoldl.N:Wonk <k_aXP>_N <w_aXQ>_N
-                              :: Wonk k_aXP w_aXQ
-                                 ~R# ((S k_aXP + S w_aXQ) :~: (S (S k_aXP) + w_aXQ)))
+         Tmpl= \ (@(k_aXZ :: Nat))
+                 (@(w_aY0 :: Nat))
+                 (ds_d1gk [Occ=Once1!] :: Wonk k_aXZ w_aY0) ->
+                 case ds_d1gk
+                      `cast` (Ifoldl.N:Wonk <k_aXZ>_N <w_aY0>_N
+                              :: Wonk k_aXZ w_aY0
+                                 ~R# ((S k_aXZ + S w_aY0) :~: (S (S k_aXZ) + w_aY0)))
                  of
-                 { Refl co_aXU ->
+                 { Refl co_aY4 ->
                  (GHC.Internal.Data.Type.Equality.$WRefl
-                    @Nat @(S (S (S (k_aXP + w_aXQ)))))
+                    @Nat @(S (S (S (k_aXZ + w_aY0)))))
                  `cast` (((:~:)
                             <Nat>_N
-                            ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aXP>_N <w_aXQ>_N)
+                            ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aXZ>_N <w_aY0>_N)
                                      ; SelCo:Tc(0,N)
-                                           (Sym (Ifoldl.D:R:+[1] <S k_aXP>_N <w_aXQ>_N)
-                                            ; co_aXU
-                                            ; Ifoldl.D:R:+[1] <k_aXP>_N <S w_aXQ>_N)))_N
-                                 ; Sym (Ifoldl.D:R:+[1] <k_aXP>_N <S w_aXQ>_N)))_N
-                             ; Sym (Ifoldl.D:R:+[1] <S k_aXP>_N <S w_aXQ>_N))
-                            ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aXP>_N <w_aXQ>_N)))_N
-                                 ; Sym (Ifoldl.D:R:+[1] <S k_aXP>_N <w_aXQ>_N)))_N
-                             ; Sym (Ifoldl.D:R:+[1] <S (S k_aXP)>_N <w_aXQ>_N)))_R
-                         ; Sym (Ifoldl.N:Wonk <S k_aXP>_N <w_aXQ>_N)
-                         :: (S (S (S (k_aXP + w_aXQ))) :~: S (S (S (k_aXP + w_aXQ))))
-                            ~R# Wonk (S k_aXP) w_aXQ)
+                                           (Sym (Ifoldl.D:R:+[1] <S k_aXZ>_N <w_aY0>_N)
+                                            ; co_aY4
+                                            ; Ifoldl.D:R:+[1] <k_aXZ>_N <S w_aY0>_N)))_N
+                                 ; Sym (Ifoldl.D:R:+[1] <k_aXZ>_N <S w_aY0>_N)))_N
+                             ; Sym (Ifoldl.D:R:+[1] <S k_aXZ>_N <S w_aY0>_N))
+                            ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aXZ>_N <w_aY0>_N)))_N
+                                 ; Sym (Ifoldl.D:R:+[1] <S k_aXZ>_N <w_aY0>_N)))_N
+                             ; Sym (Ifoldl.D:R:+[1] <S (S k_aXZ)>_N <w_aY0>_N)))_R
+                         ; Sym (Ifoldl.N:Wonk <S k_aXZ>_N <w_aY0>_N)
+                         :: (S (S (S (k_aXZ + w_aY0))) :~: S (S (S (k_aXZ + w_aY0))))
+                            ~R# Wonk (S k_aXZ) w_aY0)
                  }}]
 upWonk
-  = \ (@(k_aXP :: Nat))
-      (@(w_aXQ :: Nat))
-      (ds_d1f6 :: Wonk k_aXP w_aXQ) ->
-      case ds_d1f6
-           `cast` (Ifoldl.N:Wonk <k_aXP>_N <w_aXQ>_N
-                   :: Wonk k_aXP w_aXQ
-                      ~R# ((S k_aXP + S w_aXQ) :~: (S (S k_aXP) + w_aXQ)))
+  = \ (@(k_aXZ :: Nat))
+      (@(w_aY0 :: Nat))
+      (ds_d1gk :: Wonk k_aXZ w_aY0) ->
+      case ds_d1gk
+           `cast` (Ifoldl.N:Wonk <k_aXZ>_N <w_aY0>_N
+                   :: Wonk k_aXZ w_aY0
+                      ~R# ((S k_aXZ + S w_aY0) :~: (S (S k_aXZ) + w_aY0)))
       of
-      { Refl co_aXU ->
+      { Refl co_aY4 ->
       (GHC.Internal.Data.Type.Equality.$WRefl
-         @Nat @(S (S (S (k_aXP + w_aXQ)))))
+         @Nat @(S (S (S (k_aXZ + w_aY0)))))
       `cast` (((:~:)
                  <Nat>_N
-                 ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aXP>_N <w_aXQ>_N)
+                 ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aXZ>_N <w_aY0>_N)
                           ; SelCo:Tc(0,N)
-                                (Sym (Ifoldl.D:R:+[1] <S k_aXP>_N <w_aXQ>_N)
-                                 ; co_aXU
-                                 ; Ifoldl.D:R:+[1] <k_aXP>_N <S w_aXQ>_N)))_N
-                      ; Sym (Ifoldl.D:R:+[1] <k_aXP>_N <S w_aXQ>_N)))_N
-                  ; Sym (Ifoldl.D:R:+[1] <S k_aXP>_N <S w_aXQ>_N))
-                 ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aXP>_N <w_aXQ>_N)))_N
-                      ; Sym (Ifoldl.D:R:+[1] <S k_aXP>_N <w_aXQ>_N)))_N
-                  ; Sym (Ifoldl.D:R:+[1] <S (S k_aXP)>_N <w_aXQ>_N)))_R
-              ; Sym (Ifoldl.N:Wonk <S k_aXP>_N <w_aXQ>_N)
-              :: (S (S (S (k_aXP + w_aXQ))) :~: S (S (S (k_aXP + w_aXQ))))
-                 ~R# Wonk (S k_aXP) w_aXQ)
+                                (Sym (Ifoldl.D:R:+[1] <S k_aXZ>_N <w_aY0>_N)
+                                 ; co_aY4
+                                 ; Ifoldl.D:R:+[1] <k_aXZ>_N <S w_aY0>_N)))_N
+                      ; Sym (Ifoldl.D:R:+[1] <k_aXZ>_N <S w_aY0>_N)))_N
+                  ; Sym (Ifoldl.D:R:+[1] <S k_aXZ>_N <S w_aY0>_N))
+                 ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aXZ>_N <w_aY0>_N)))_N
+                      ; Sym (Ifoldl.D:R:+[1] <S k_aXZ>_N <w_aY0>_N)))_N
+                  ; Sym (Ifoldl.D:R:+[1] <S (S k_aXZ)>_N <w_aY0>_N)))_R
+              ; Sym (Ifoldl.N:Wonk <S k_aXZ>_N <w_aY0>_N)
+              :: (S (S (S (k_aXZ + w_aY0))) :~: S (S (S (k_aXZ + w_aY0))))
+                 ~R# Wonk (S k_aXZ) w_aY0)
       }
 
 -- RHS size: {terms: 43, types: 198, coercions: 150, joins: 1/1}
@@ -304,127 +259,127 @@ ifoldlRec [InlPrag=INLINE (sat-args=1)]
  Unf=Unf{Src=StableUser, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
-         Tmpl= \ (@(b_aY8 :: Nat -> *))
-                 (@(n_aY9 :: Nat))
-                 (@a_aYa)
-                 (f_azT [Occ=OnceL1!]
-                    :: forall (m :: Nat). b_aY8 m -> a_aYa -> b_aY8 (S m))
-                 (eta_B0 [Occ=Once1] :: b_aY8 Z)
-                 (eta1_B1 [Occ=Once1] :: Vec n_aY9 a_aYa) ->
+         Tmpl= \ (@(b_aYi :: Nat -> *))
+                 (@(n_aYj :: Nat))
+                 (@a_aYk)
+                 (f_aA2 [Occ=OnceL1!]
+                    :: forall (m :: Nat). b_aYi m -> a_aYk -> b_aYi (S m))
+                 (eta_B0 [Occ=Once1] :: b_aYi Z)
+                 (eta1_B1 [Occ=Once1] :: Vec n_aYj a_aYk) ->
                  joinrec {
-                   go_azU [Occ=LoopBreakerT[7]]
+                   go_aA3 [Occ=LoopBreakerT[7]]
                      :: forall (k :: Nat) (m :: Nat).
                         ((k + Z) :~: k)
-                        -> ((k + m) :~: n_aY9)
+                        -> ((k + m) :~: n_aYj)
                         -> (forall (w :: Nat). Wonk k w)
-                        -> b_aY8 k
-                        -> Vec m a_aYa
-                        -> b_aY8 n_aY9
+                        -> b_aYi k
+                        -> Vec m a_aYk
+                        -> b_aYi n_aYj
                    [LclId[JoinId(7)(Nothing)],
                     Arity=5,
                     Str=<L><L><L><L><L>,
                     Unf=OtherCon []]
-                   go_azU (@(k_aYT :: Nat))
-                          (@(m_aYU :: Nat))
-                          (ds_d1fg [Occ=Once1!] :: (k_aYT + Z) :~: k_aYT)
-                          (ds1_d1fh [Occ=Once1!] :: (k_aYT + m_aYU) :~: n_aY9)
-                          (ds2_d1fi :: forall (w :: Nat). Wonk k_aYT w)
-                          (bk_azY [Occ=Once2] :: b_aY8 k_aYT)
-                          (ds3_d1fj [Occ=Once1!] :: Vec m_aYU a_aYa)
-                     = case ds_d1fg of { Refl co_aYX ->
-                       case ds1_d1fh of { Refl co1_aYZ ->
-                       case (ds2_d1fi @(GHC.Internal.Types.ZonkAny 0))
-                            `cast` (Ifoldl.N:Wonk <k_aYT>_N <GHC.Internal.Types.ZonkAny 0>_N
-                                    :: Wonk k_aYT (GHC.Internal.Types.ZonkAny 0)
-                                       ~R# ((S k_aYT + S (GHC.Internal.Types.ZonkAny 0))
-                                            :~: (S (S k_aYT) + GHC.Internal.Types.ZonkAny 0)))
+                   go_aA3 (@(k_aZ3 :: Nat))
+                          (@(m_aZ4 :: Nat))
+                          (ds_d1gu [Occ=Once1!] :: (k_aZ3 + Z) :~: k_aZ3)
+                          (ds1_d1gv [Occ=Once1!] :: (k_aZ3 + m_aZ4) :~: n_aYj)
+                          (ds2_d1gw :: forall (w :: Nat). Wonk k_aZ3 w)
+                          (bk_aA7 [Occ=Once2] :: b_aYi k_aZ3)
+                          (ds3_d1gx [Occ=Once1!] :: Vec m_aZ4 a_aYk)
+                     = case ds_d1gu of { Refl co_aZ7 ->
+                       case ds1_d1gv of { Refl co1_aZ9 ->
+                       case (ds2_d1gw @(GHC.Internal.Types.ZonkAny 0))
+                            `cast` (Ifoldl.N:Wonk <k_aZ3>_N <GHC.Internal.Types.ZonkAny 0>_N
+                                    :: Wonk k_aZ3 (GHC.Internal.Types.ZonkAny 0)
+                                       ~R# ((S k_aZ3 + S (GHC.Internal.Types.ZonkAny 0))
+                                            :~: (S (S k_aZ3) + GHC.Internal.Types.ZonkAny 0)))
                        of
                        { Refl _ [Occ=Dead] ->
-                       case ds3_d1fj of {
-                         Nil co3_aZ5 ->
-                           bk_azY
-                           `cast` (<b_aY8>_R (co_aYX
-                                              ; (<k_aYT>_N + Sym co3_aZ5)_N
-                                              ; Sym co1_aYZ)
-                                   :: b_aY8 k_aYT ~R# b_aY8 n_aY9);
-                         ::: @ipv_s1jk ipv1_s1jl ipv2_s1jm [Occ=Once1]
-                             ipv3_s1jn [Occ=Once1] ->
-                           case ds2_d1fi of ds4_X5 { __DEFAULT ->
-                           jump go_azU
-                             @(S k_aYT)
-                             @ipv_s1jk
-                             ((GHC.Internal.Data.Type.Equality.$WRefl @Nat @(S k_aYT))
+                       case ds3_d1gx of {
+                         Nil co3_aZf ->
+                           bk_aA7
+                           `cast` (<b_aYi>_R (co_aZ7
+                                              ; (<k_aZ3>_N + Sym co3_aZf)_N
+                                              ; Sym co1_aZ9)
+                                   :: b_aYi k_aZ3 ~R# b_aYi n_aYj);
+                         ::: @ipv_s1jT ipv1_s1jU ipv2_s1jV [Occ=Once1]
+                             ipv3_s1jW [Occ=Once1] ->
+                           case ds2_d1gw of ds4_X5 { __DEFAULT ->
+                           jump go_aA3
+                             @(S k_aZ3)
+                             @ipv_s1jT
+                             ((GHC.Internal.Data.Type.Equality.$WRefl @Nat @(S k_aZ3))
                               `cast` (((:~:)
                                          <Nat>_N
-                                         ((S co_aYX)_N
-                                          ; Sym (Ifoldl.D:R:+[1] <k_aYT>_N <Z>_N))
-                                         <S k_aYT>_N)_R
-                                      :: (S k_aYT :~: S k_aYT) ~R# ((S k_aYT + Z) :~: S k_aYT)))
-                             (case (ds4_X5 @ipv_s1jk)
-                                   `cast` (Ifoldl.N:Wonk <k_aYT>_N <ipv_s1jk>_N
-                                           :: Wonk k_aYT ipv_s1jk
-                                              ~R# ((S k_aYT + S ipv_s1jk)
-                                                   :~: (S (S k_aYT) + ipv_s1jk)))
+                                         ((S co_aZ7)_N
+                                          ; Sym (Ifoldl.D:R:+[1] <k_aZ3>_N <Z>_N))
+                                         <S k_aZ3>_N)_R
+                                      :: (S k_aZ3 :~: S k_aZ3) ~R# ((S k_aZ3 + Z) :~: S k_aZ3)))
+                             (case (ds4_X5 @ipv_s1jT)
+                                   `cast` (Ifoldl.N:Wonk <k_aZ3>_N <ipv_s1jT>_N
+                                           :: Wonk k_aZ3 ipv_s1jT
+                                              ~R# ((S k_aZ3 + S ipv_s1jT)
+                                                   :~: (S (S k_aZ3) + ipv_s1jT)))
                               of
-                              { Refl co3_aZJ ->
-                              (GHC.Internal.Data.Type.Equality.$WRefl @Nat @n_aY9)
+                              { Refl co3_aZT ->
+                              (GHC.Internal.Data.Type.Equality.$WRefl @Nat @n_aYj)
                               `cast` (((:~:)
                                          <Nat>_N
-                                         (co1_aYZ
-                                          ; (<k_aYT>_N + ipv1_s1jl)_N
+                                         (co1_aZ9
+                                          ; (<k_aZ3>_N + ipv1_s1jU)_N
                                           ; SelCo:Tc(0,N)
-                                                (Sym (Ifoldl.D:R:+[1] <k_aYT>_N <S ipv_s1jk>_N)
-                                                 ; Sym co3_aZJ
-                                                 ; Ifoldl.D:R:+[1] <S k_aYT>_N <ipv_s1jk>_N))
-                                         <n_aY9>_N)_R
-                                      :: (n_aY9 :~: n_aY9) ~R# ((S k_aYT + ipv_s1jk) :~: n_aY9))
+                                                (Sym (Ifoldl.D:R:+[1] <k_aZ3>_N <S ipv_s1jT>_N)
+                                                 ; Sym co3_aZT
+                                                 ; Ifoldl.D:R:+[1] <S k_aZ3>_N <ipv_s1jT>_N))
+                                         <n_aYj>_N)_R
+                                      :: (n_aYj :~: n_aYj) ~R# ((S k_aZ3 + ipv_s1jT) :~: n_aYj))
                               })
-                             (\ (@(w_aZP :: Nat)) ->
-                                case (ds4_X5 @w_aZP)
-                                     `cast` (Ifoldl.N:Wonk <k_aYT>_N <w_aZP>_N
-                                             :: Wonk k_aYT w_aZP
-                                                ~R# ((S k_aYT + S w_aZP) :~: (S (S k_aYT) + w_aZP)))
+                             (\ (@(w_aZZ :: Nat)) ->
+                                case (ds4_X5 @w_aZZ)
+                                     `cast` (Ifoldl.N:Wonk <k_aZ3>_N <w_aZZ>_N
+                                             :: Wonk k_aZ3 w_aZZ
+                                                ~R# ((S k_aZ3 + S w_aZZ) :~: (S (S k_aZ3) + w_aZZ)))
                                 of
-                                { Refl co3_aXU ->
+                                { Refl co3_aY4 ->
                                 (GHC.Internal.Data.Type.Equality.$WRefl
-                                   @Nat @(S (S (S (k_aYT + w_aZP)))))
+                                   @Nat @(S (S (S (k_aZ3 + w_aZZ)))))
                                 `cast` (((:~:)
                                            <Nat>_N
-                                           ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aYT>_N <w_aZP>_N)
+                                           ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aZ3>_N <w_aZZ>_N)
                                                     ; SelCo:Tc(0,N)
                                                           (Sym (Ifoldl.D:R:+[1]
-                                                                    <S k_aYT>_N <w_aZP>_N)
-                                                           ; co3_aXU
+                                                                    <S k_aZ3>_N <w_aZZ>_N)
+                                                           ; co3_aY4
                                                            ; Ifoldl.D:R:+[1]
-                                                                 <k_aYT>_N <S w_aZP>_N)))_N
-                                                ; Sym (Ifoldl.D:R:+[1] <k_aYT>_N <S w_aZP>_N)))_N
-                                            ; Sym (Ifoldl.D:R:+[1] <S k_aYT>_N <S w_aZP>_N))
-                                           ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aYT>_N <w_aZP>_N)))_N
-                                                ; Sym (Ifoldl.D:R:+[1] <S k_aYT>_N <w_aZP>_N)))_N
-                                            ; Sym (Ifoldl.D:R:+[1] <S (S k_aYT)>_N <w_aZP>_N)))_R
-                                        ; Sym (Ifoldl.N:Wonk <S k_aYT>_N <w_aZP>_N)
-                                        :: (S (S (S (k_aYT + w_aZP))) :~: S (S (S (k_aYT + w_aZP))))
-                                           ~R# Wonk (S k_aYT) w_aZP)
+                                                                 <k_aZ3>_N <S w_aZZ>_N)))_N
+                                                ; Sym (Ifoldl.D:R:+[1] <k_aZ3>_N <S w_aZZ>_N)))_N
+                                            ; Sym (Ifoldl.D:R:+[1] <S k_aZ3>_N <S w_aZZ>_N))
+                                           ((S ((S (Sym (Ifoldl.D:R:+[1] <k_aZ3>_N <w_aZZ>_N)))_N
+                                                ; Sym (Ifoldl.D:R:+[1] <S k_aZ3>_N <w_aZZ>_N)))_N
+                                            ; Sym (Ifoldl.D:R:+[1] <S (S k_aZ3)>_N <w_aZZ>_N)))_R
+                                        ; Sym (Ifoldl.N:Wonk <S k_aZ3>_N <w_aZZ>_N)
+                                        :: (S (S (S (k_aZ3 + w_aZZ))) :~: S (S (S (k_aZ3 + w_aZZ))))
+                                           ~R# Wonk (S k_aZ3) w_aZZ)
                                 })
-                             (f_azT @k_aYT bk_azY ipv2_s1jm)
-                             ipv3_s1jn
+                             (f_aA2 @k_aZ3 bk_aA7 ipv2_s1jV)
+                             ipv3_s1jW
                            }
                        }
                        }
                        }
                        }; } in
-                 jump go_azU
+                 jump go_aA3
                    @Z
-                   @n_aY9
+                   @n_aYj
                    ((GHC.Internal.Data.Type.Equality.$WRefl @Nat @Z)
                     `cast` (((:~:) <Nat>_N (Sym (Ifoldl.D:R:+[0] <Z>_N)) <Z>_N)_R
                             :: (Z :~: Z) ~R# ((Z + Z) :~: Z)))
-                   ((GHC.Internal.Data.Type.Equality.$WRefl @Nat @n_aY9)
+                   ((GHC.Internal.Data.Type.Equality.$WRefl @Nat @n_aYj)
                     `cast` (((:~:)
-                               <Nat>_N (Sym (Ifoldl.D:R:+[0] <n_aY9>_N)) <n_aY9>_N)_R
-                            :: (n_aY9 :~: n_aY9) ~R# ((Z + n_aY9) :~: n_aY9)))
-                   ((\ (@(w_a10g :: Nat)) ->
-                       GHC.Internal.Data.Type.Equality.$WRefl @Nat @(S (S w_a10g)))
+                               <Nat>_N (Sym (Ifoldl.D:R:+[0] <n_aYj>_N)) <n_aYj>_N)_R
+                            :: (n_aYj :~: n_aYj) ~R# ((Z + n_aYj) :~: n_aYj)))
+                   ((\ (@(w_a10q :: Nat)) ->
+                       GHC.Internal.Data.Type.Equality.$WRefl @Nat @(S (S w_a10q)))
                     `cast` (forall (w :: <Nat>_N).
                             ((:~:)
                                <Nat>_N
@@ -439,106 +394,106 @@ ifoldlRec [InlPrag=INLINE (sat-args=1)]
                    eta_B0
                    eta1_B1}]
 ifoldlRec
-  = \ (@(b_aY8 :: Nat -> *))
-      (@(n_aY9 :: Nat))
-      (@a_aYa)
-      (f_azT :: forall (m :: Nat). b_aY8 m -> a_aYa -> b_aY8 (S m))
-      (eta_B0 :: b_aY8 Z)
-      (eta1_B1 :: Vec n_aY9 a_aYa) ->
+  = \ (@(b_aYi :: Nat -> *))
+      (@(n_aYj :: Nat))
+      (@a_aYk)
+      (f_aA2 :: forall (m :: Nat). b_aYi m -> a_aYk -> b_aYi (S m))
+      (eta_B0 :: b_aYi Z)
+      (eta1_B1 :: Vec n_aYj a_aYk) ->
       joinrec {
-        $wgo_s1lY [InlPrag=[2],
+        $wgo_s1mt [InlPrag=[2],
                    Occ=LoopBreaker,
                    Dmd=SC(S,C(1,C(1,C(1,C(1,L)))))]
           :: forall (k :: Nat) (m :: Nat).
              (k GHC.Internal.Prim.~# (k + Z),
-              n_aY9 GHC.Internal.Prim.~# (k + m)) =>
+              n_aYj GHC.Internal.Prim.~# (k + m)) =>
              (forall (w :: Nat). Wonk k w)
-             -> b_aY8 k -> Vec m a_aYa -> b_aY8 n_aY9
+             -> b_aYi k -> Vec m a_aYk -> b_aYi n_aYj
         [LclId[JoinId(7)(Just [~, ~, !, ~, !])],
          Arity=5,
          Str=<L><L><SL><L><1L>,
          Unf=OtherCon []]
-        $wgo_s1lY (@(k_s1lK :: Nat))
-                  (@(m_s1lL :: Nat))
-                  (ww_s1lT :: k_s1lK GHC.Internal.Prim.~# (k_s1lK + Z))
-                  (ww1_s1lW :: n_aY9 GHC.Internal.Prim.~# (k_s1lK + m_s1lL))
-                  (ds_s1lO :: forall (w :: Nat). Wonk k_s1lK w)
-                  (bk_s1lP :: b_aY8 k_s1lK)
-                  (ds1_s1lQ :: Vec m_s1lL a_aYa)
-          = case (ds_s1lO @(GHC.Internal.Types.ZonkAny 0))
-                 `cast` (Ifoldl.N:Wonk <k_s1lK>_N <GHC.Internal.Types.ZonkAny 0>_N
-                         :: Wonk k_s1lK (GHC.Internal.Types.ZonkAny 0)
-                            ~R# ((S k_s1lK + S (GHC.Internal.Types.ZonkAny 0))
-                                 :~: (S (S k_s1lK) + GHC.Internal.Types.ZonkAny 0)))
+        $wgo_s1mt (@(k_s1mg :: Nat))
+                  (@(m_s1mh :: Nat))
+                  (ww_s1mk :: k_s1mg GHC.Internal.Prim.~# (k_s1mg + Z))
+                  (ww1_s1mo :: n_aYj GHC.Internal.Prim.~# (k_s1mg + m_s1mh))
+                  (ds_s1mq :: forall (w :: Nat). Wonk k_s1mg w)
+                  (bk_s1mr :: b_aYi k_s1mg)
+                  (ds1_s1ms :: Vec m_s1mh a_aYk)
+          = case (ds_s1mq @(GHC.Internal.Types.ZonkAny 0))
+                 `cast` (Ifoldl.N:Wonk <k_s1mg>_N <GHC.Internal.Types.ZonkAny 0>_N
+                         :: Wonk k_s1mg (GHC.Internal.Types.ZonkAny 0)
+                            ~R# ((S k_s1mg + S (GHC.Internal.Types.ZonkAny 0))
+                                 :~: (S (S k_s1mg) + GHC.Internal.Types.ZonkAny 0)))
             of
-            { Refl co_aZ3 [Dmd=A] ->
-            case ds1_s1lQ of {
-              Nil co1_aZ5 [Dmd=S] ->
-                bk_s1lP
-                `cast` (<b_aY8>_R (ww_s1lT
-                                   ; (<k_s1lK>_N + Sym co1_aZ5)_N
-                                   ; Sym ww1_s1lW)
-                        :: b_aY8 k_s1lK ~R# b_aY8 n_aY9);
-              ::: @ipv_s1jf ipv1_s1jg [Dmd=S] ipv2_s1jh ipv3_s1ji ->
-                case ds_s1lO of ds2_X5 { __DEFAULT ->
-                case (ds2_X5 @ipv_s1jf)
-                     `cast` (Ifoldl.N:Wonk <k_s1lK>_N <ipv_s1jf>_N
-                             :: Wonk k_s1lK ipv_s1jf
-                                ~R# ((S k_s1lK + S ipv_s1jf) :~: (S (S k_s1lK) + ipv_s1jf)))
+            { Refl co_aZd [Dmd=A] ->
+            case ds1_s1ms of {
+              Nil co1_aZf [Dmd=S] ->
+                bk_s1mr
+                `cast` (<b_aYi>_R (ww_s1mk
+                                   ; (<k_s1mg>_N + Sym co1_aZf)_N
+                                   ; Sym ww1_s1mo)
+                        :: b_aYi k_s1mg ~R# b_aYi n_aYj);
+              ::: @ipv_s1jO ipv1_s1jP [Dmd=S] ipv2_s1jQ ipv3_s1jR ->
+                case ds_s1mq of ds2_X5 { __DEFAULT ->
+                case (ds2_X5 @ipv_s1jO)
+                     `cast` (Ifoldl.N:Wonk <k_s1mg>_N <ipv_s1jO>_N
+                             :: Wonk k_s1mg ipv_s1jO
+                                ~R# ((S k_s1mg + S ipv_s1jO) :~: (S (S k_s1mg) + ipv_s1jO)))
                 of
-                { Refl co1_aZJ ->
-                jump $wgo_s1lY
-                  @(S k_s1lK)
-                  @ipv_s1jf
-                  @~((S ww_s1lT)_N
-                     ; Sym (Ifoldl.D:R:+[1] <k_s1lK>_N <Z>_N)
-                     :: S k_s1lK GHC.Internal.Prim.~# (S k_s1lK + Z))
-                  @~(ww1_s1lW
-                     ; (<k_s1lK>_N + ipv1_s1jg)_N
+                { Refl co1_aZT ->
+                jump $wgo_s1mt
+                  @(S k_s1mg)
+                  @ipv_s1jO
+                  @~((S ww_s1mk)_N
+                     ; Sym (Ifoldl.D:R:+[1] <k_s1mg>_N <Z>_N)
+                     :: S k_s1mg GHC.Internal.Prim.~# (S k_s1mg + Z))
+                  @~(ww1_s1mo
+                     ; (<k_s1mg>_N + ipv1_s1jP)_N
                      ; SelCo:Tc(0,N)
-                           (Sym (Ifoldl.D:R:+[1] <k_s1lK>_N <S ipv_s1jf>_N)
-                            ; Sym co1_aZJ
-                            ; Ifoldl.D:R:+[1] <S k_s1lK>_N <ipv_s1jf>_N)
-                     :: n_aY9 GHC.Internal.Prim.~# (S k_s1lK + ipv_s1jf))
-                  (\ (@(w_aZP :: Nat)) ->
-                     case (ds2_X5 @w_aZP)
-                          `cast` (Ifoldl.N:Wonk <k_s1lK>_N <w_aZP>_N
-                                  :: Wonk k_s1lK w_aZP
-                                     ~R# ((S k_s1lK + S w_aZP) :~: (S (S k_s1lK) + w_aZP)))
+                           (Sym (Ifoldl.D:R:+[1] <k_s1mg>_N <S ipv_s1jO>_N)
+                            ; Sym co1_aZT
+                            ; Ifoldl.D:R:+[1] <S k_s1mg>_N <ipv_s1jO>_N)
+                     :: n_aYj GHC.Internal.Prim.~# (S k_s1mg + ipv_s1jO))
+                  (\ (@(w_aZZ :: Nat)) ->
+                     case (ds2_X5 @w_aZZ)
+                          `cast` (Ifoldl.N:Wonk <k_s1mg>_N <w_aZZ>_N
+                                  :: Wonk k_s1mg w_aZZ
+                                     ~R# ((S k_s1mg + S w_aZZ) :~: (S (S k_s1mg) + w_aZZ)))
                      of
-                     { Refl co2_aXU ->
+                     { Refl co2_aY4 ->
                      (GHC.Internal.Data.Type.Equality.$WRefl
-                        @Nat @(S (S (S (k_s1lK + w_aZP)))))
+                        @Nat @(S (S (S (k_s1mg + w_aZZ)))))
                      `cast` (((:~:)
                                 <Nat>_N
-                                ((S ((S (Sym (Ifoldl.D:R:+[1] <k_s1lK>_N <w_aZP>_N)
+                                ((S ((S (Sym (Ifoldl.D:R:+[1] <k_s1mg>_N <w_aZZ>_N)
                                          ; SelCo:Tc(0,N)
-                                               (Sym (Ifoldl.D:R:+[1] <S k_s1lK>_N <w_aZP>_N)
-                                                ; co2_aXU
-                                                ; Ifoldl.D:R:+[1] <k_s1lK>_N <S w_aZP>_N)))_N
-                                     ; Sym (Ifoldl.D:R:+[1] <k_s1lK>_N <S w_aZP>_N)))_N
-                                 ; Sym (Ifoldl.D:R:+[1] <S k_s1lK>_N <S w_aZP>_N))
-                                ((S ((S (Sym (Ifoldl.D:R:+[1] <k_s1lK>_N <w_aZP>_N)))_N
-                                     ; Sym (Ifoldl.D:R:+[1] <S k_s1lK>_N <w_aZP>_N)))_N
-                                 ; Sym (Ifoldl.D:R:+[1] <S (S k_s1lK)>_N <w_aZP>_N)))_R
-                             ; Sym (Ifoldl.N:Wonk <S k_s1lK>_N <w_aZP>_N)
-                             :: (S (S (S (k_s1lK + w_aZP))) :~: S (S (S (k_s1lK + w_aZP))))
-                                ~R# Wonk (S k_s1lK) w_aZP)
+                                               (Sym (Ifoldl.D:R:+[1] <S k_s1mg>_N <w_aZZ>_N)
+                                                ; co2_aY4
+                                                ; Ifoldl.D:R:+[1] <k_s1mg>_N <S w_aZZ>_N)))_N
+                                     ; Sym (Ifoldl.D:R:+[1] <k_s1mg>_N <S w_aZZ>_N)))_N
+                                 ; Sym (Ifoldl.D:R:+[1] <S k_s1mg>_N <S w_aZZ>_N))
+                                ((S ((S (Sym (Ifoldl.D:R:+[1] <k_s1mg>_N <w_aZZ>_N)))_N
+                                     ; Sym (Ifoldl.D:R:+[1] <S k_s1mg>_N <w_aZZ>_N)))_N
+                                 ; Sym (Ifoldl.D:R:+[1] <S (S k_s1mg)>_N <w_aZZ>_N)))_R
+                             ; Sym (Ifoldl.N:Wonk <S k_s1mg>_N <w_aZZ>_N)
+                             :: (S (S (S (k_s1mg + w_aZZ))) :~: S (S (S (k_s1mg + w_aZZ))))
+                                ~R# Wonk (S k_s1mg) w_aZZ)
                      })
-                  (f_azT @k_s1lK bk_s1lP ipv2_s1jh)
-                  ipv3_s1ji
+                  (f_aA2 @k_s1mg bk_s1mr ipv2_s1jQ)
+                  ipv3_s1jR
                 }
                 }
             }
             }; } in
-      jump $wgo_s1lY
+      jump $wgo_s1mt
         @Z
-        @n_aY9
+        @n_aYj
         @~(Sym (Ifoldl.D:R:+[0] <Z>_N) :: Z GHC.Internal.Prim.~# (Z + Z))
-        @~(Sym (Ifoldl.D:R:+[0] <n_aY9>_N)
-           :: n_aY9 GHC.Internal.Prim.~# (Z + n_aY9))
-        ((\ (@(w_a10g :: Nat)) ->
-            GHC.Internal.Data.Type.Equality.$WRefl @Nat @(S (S w_a10g)))
+        @~(Sym (Ifoldl.D:R:+[0] <n_aYj>_N)
+           :: n_aYj GHC.Internal.Prim.~# (Z + n_aYj))
+        ((\ (@(w_a10q :: Nat)) ->
+            GHC.Internal.Data.Type.Equality.$WRefl @Nat @(S (S w_a10q)))
          `cast` (forall (w :: <Nat>_N).
                  ((:~:)
                     <Nat>_N
@@ -565,95 +520,95 @@ Ifoldl.$wpoly_go [InlPrag=[2], Occ=LoopBreaker]
  Str=<L><L><SL><L><1L>,
  Unf=OtherCon []]
 Ifoldl.$wpoly_go
-  = \ (@a_s1m1)
-      (@(n_s1m2 :: Nat))
-      (@(k_s1m3 :: Nat))
-      (@(m_s1m4 :: Nat))
-      (ww_s1mc :: k_s1m3 GHC.Internal.Prim.~# (k_s1m3 + Z))
-      (ww1_s1mf :: n_s1m2 GHC.Internal.Prim.~# (k_s1m3 + m_s1m4))
-      (ds_s1m7 :: forall (w :: Nat). Wonk k_s1m3 w)
-      (bk_s1m8 :: Flip Vec a_s1m1 k_s1m3)
-      (ds1_s1m9 :: Vec m_s1m4 a_s1m1) ->
-      case (ds_s1m7 @(GHC.Internal.Types.ZonkAny 0))
-           `cast` (Ifoldl.N:Wonk <k_s1m3>_N <GHC.Internal.Types.ZonkAny 0>_N
-                   :: Wonk k_s1m3 (GHC.Internal.Types.ZonkAny 0)
-                      ~R# ((S k_s1m3 + S (GHC.Internal.Types.ZonkAny 0))
-                           :~: (S (S k_s1m3) + GHC.Internal.Types.ZonkAny 0)))
+  = \ (@a_s1mw)
+      (@(n_s1mx :: Nat))
+      (@(k_s1my :: Nat))
+      (@(m_s1mz :: Nat))
+      (ww_s1mC :: k_s1my GHC.Internal.Prim.~# (k_s1my + Z))
+      (ww1_s1mG :: n_s1mx GHC.Internal.Prim.~# (k_s1my + m_s1mz))
+      (ds_s1mI :: forall (w :: Nat). Wonk k_s1my w)
+      (bk_s1mJ :: Flip Vec a_s1mw k_s1my)
+      (ds1_s1mK :: Vec m_s1mz a_s1mw) ->
+      case (ds_s1mI @(GHC.Internal.Types.ZonkAny 0))
+           `cast` (Ifoldl.N:Wonk <k_s1my>_N <GHC.Internal.Types.ZonkAny 0>_N
+                   :: Wonk k_s1my (GHC.Internal.Types.ZonkAny 0)
+                      ~R# ((S k_s1my + S (GHC.Internal.Types.ZonkAny 0))
+                           :~: (S (S k_s1my) + GHC.Internal.Types.ZonkAny 0)))
       of
-      { Refl co_aZ3 [Dmd=A] ->
-      case ds1_s1m9 of {
-        Nil co1_aZ5 [Dmd=S] ->
-          bk_s1m8
+      { Refl co_aZd [Dmd=A] ->
+      case ds1_s1mK of {
+        Nil co1_aZf [Dmd=S] ->
+          bk_s1mJ
           `cast` ((Flip
                      <Nat>_N
                      <*>_N
                      <Vec>_R
-                     <a_s1m1>_N
-                     (ww_s1mc
-                      ; (<k_s1m3>_N + Sym co1_aZ5)_N
-                      ; Sym ww1_s1mf))_R
-                  :: Flip Vec a_s1m1 k_s1m3 ~R# Flip Vec a_s1m1 n_s1m2);
-        ::: @ipv_s1jk ipv1_s1jl [Dmd=S] ipv2_s1jm ipv3_s1jn ->
-          case ds_s1m7 of ds2_X5 { __DEFAULT ->
-          case (ds2_X5 @ipv_s1jk)
-               `cast` (Ifoldl.N:Wonk <k_s1m3>_N <ipv_s1jk>_N
-                       :: Wonk k_s1m3 ipv_s1jk
-                          ~R# ((S k_s1m3 + S ipv_s1jk) :~: (S (S k_s1m3) + ipv_s1jk)))
+                     <a_s1mw>_N
+                     (ww_s1mC
+                      ; (<k_s1my>_N + Sym co1_aZf)_N
+                      ; Sym ww1_s1mG))_R
+                  :: Flip Vec a_s1mw k_s1my ~R# Flip Vec a_s1mw n_s1mx);
+        ::: @ipv_s1jT ipv1_s1jU [Dmd=S] ipv2_s1jV ipv3_s1jW ->
+          case ds_s1mI of ds2_X5 { __DEFAULT ->
+          case (ds2_X5 @ipv_s1jT)
+               `cast` (Ifoldl.N:Wonk <k_s1my>_N <ipv_s1jT>_N
+                       :: Wonk k_s1my ipv_s1jT
+                          ~R# ((S k_s1my + S ipv_s1jT) :~: (S (S k_s1my) + ipv_s1jT)))
           of
-          { Refl co1_aZJ ->
+          { Refl co1_aZT ->
           Ifoldl.$wpoly_go
-            @a_s1m1
-            @n_s1m2
-            @(S k_s1m3)
-            @ipv_s1jk
-            @~((S ww_s1mc)_N
-               ; Sym (Ifoldl.D:R:+[1] <k_s1m3>_N <Z>_N)
-               :: S k_s1m3 GHC.Internal.Prim.~# (S k_s1m3 + Z))
-            @~(ww1_s1mf
-               ; (<k_s1m3>_N + ipv1_s1jl)_N
+            @a_s1mw
+            @n_s1mx
+            @(S k_s1my)
+            @ipv_s1jT
+            @~((S ww_s1mC)_N
+               ; Sym (Ifoldl.D:R:+[1] <k_s1my>_N <Z>_N)
+               :: S k_s1my GHC.Internal.Prim.~# (S k_s1my + Z))
+            @~(ww1_s1mG
+               ; (<k_s1my>_N + ipv1_s1jU)_N
                ; SelCo:Tc(0,N)
-                     (Sym (Ifoldl.D:R:+[1] <k_s1m3>_N <S ipv_s1jk>_N)
-                      ; Sym co1_aZJ
-                      ; Ifoldl.D:R:+[1] <S k_s1m3>_N <ipv_s1jk>_N)
-               :: n_s1m2 GHC.Internal.Prim.~# (S k_s1m3 + ipv_s1jk))
-            (\ (@(w_aZP :: Nat)) ->
-               case (ds2_X5 @w_aZP)
-                    `cast` (Ifoldl.N:Wonk <k_s1m3>_N <w_aZP>_N
-                            :: Wonk k_s1m3 w_aZP
-                               ~R# ((S k_s1m3 + S w_aZP) :~: (S (S k_s1m3) + w_aZP)))
+                     (Sym (Ifoldl.D:R:+[1] <k_s1my>_N <S ipv_s1jT>_N)
+                      ; Sym co1_aZT
+                      ; Ifoldl.D:R:+[1] <S k_s1my>_N <ipv_s1jT>_N)
+               :: n_s1mx GHC.Internal.Prim.~# (S k_s1my + ipv_s1jT))
+            (\ (@(w_aZZ :: Nat)) ->
+               case (ds2_X5 @w_aZZ)
+                    `cast` (Ifoldl.N:Wonk <k_s1my>_N <w_aZZ>_N
+                            :: Wonk k_s1my w_aZZ
+                               ~R# ((S k_s1my + S w_aZZ) :~: (S (S k_s1my) + w_aZZ)))
                of
-               { Refl co2_aXU ->
+               { Refl co2_aY4 ->
                (GHC.Internal.Data.Type.Equality.$WRefl
-                  @Nat @(S (S (S (k_s1m3 + w_aZP)))))
+                  @Nat @(S (S (S (k_s1my + w_aZZ)))))
                `cast` (((:~:)
                           <Nat>_N
-                          ((S ((S (Sym (Ifoldl.D:R:+[1] <k_s1m3>_N <w_aZP>_N)
+                          ((S ((S (Sym (Ifoldl.D:R:+[1] <k_s1my>_N <w_aZZ>_N)
                                    ; SelCo:Tc(0,N)
-                                         (Sym (Ifoldl.D:R:+[1] <S k_s1m3>_N <w_aZP>_N)
-                                          ; co2_aXU
-                                          ; Ifoldl.D:R:+[1] <k_s1m3>_N <S w_aZP>_N)))_N
-                               ; Sym (Ifoldl.D:R:+[1] <k_s1m3>_N <S w_aZP>_N)))_N
-                           ; Sym (Ifoldl.D:R:+[1] <S k_s1m3>_N <S w_aZP>_N))
-                          ((S ((S (Sym (Ifoldl.D:R:+[1] <k_s1m3>_N <w_aZP>_N)))_N
-                               ; Sym (Ifoldl.D:R:+[1] <S k_s1m3>_N <w_aZP>_N)))_N
-                           ; Sym (Ifoldl.D:R:+[1] <S (S k_s1m3)>_N <w_aZP>_N)))_R
-                       ; Sym (Ifoldl.N:Wonk <S k_s1m3>_N <w_aZP>_N)
-                       :: (S (S (S (k_s1m3 + w_aZP))) :~: S (S (S (k_s1m3 + w_aZP))))
-                          ~R# Wonk (S k_s1m3) w_aZP)
+                                         (Sym (Ifoldl.D:R:+[1] <S k_s1my>_N <w_aZZ>_N)
+                                          ; co2_aY4
+                                          ; Ifoldl.D:R:+[1] <k_s1my>_N <S w_aZZ>_N)))_N
+                               ; Sym (Ifoldl.D:R:+[1] <k_s1my>_N <S w_aZZ>_N)))_N
+                           ; Sym (Ifoldl.D:R:+[1] <S k_s1my>_N <S w_aZZ>_N))
+                          ((S ((S (Sym (Ifoldl.D:R:+[1] <k_s1my>_N <w_aZZ>_N)))_N
+                               ; Sym (Ifoldl.D:R:+[1] <S k_s1my>_N <w_aZZ>_N)))_N
+                           ; Sym (Ifoldl.D:R:+[1] <S (S k_s1my)>_N <w_aZZ>_N)))_R
+                       ; Sym (Ifoldl.N:Wonk <S k_s1my>_N <w_aZZ>_N)
+                       :: (S (S (S (k_s1my + w_aZZ))) :~: S (S (S (k_s1my + w_aZZ))))
+                          ~R# Wonk (S k_s1my) w_aZZ)
                })
             ((Ifoldl.:::
-                @(S k_s1m3)
-                @a_s1m1
-                @k_s1m3
-                @~(<S k_s1m3>_N :: S k_s1m3 GHC.Internal.Prim.~# S k_s1m3)
-                ipv2_s1jm
-                (bk_s1m8
-                 `cast` (Ifoldl.N:Flip <Nat>_N <*>_N <Vec>_R <a_s1m1>_N <k_s1m3>_N
-                         :: Flip Vec a_s1m1 k_s1m3 ~R# Vec k_s1m3 a_s1m1)))
+                @(S k_s1my)
+                @a_s1mw
+                @k_s1my
+                @~(<S k_s1my>_N :: S k_s1my GHC.Internal.Prim.~# S k_s1my)
+                ipv2_s1jV
+                (bk_s1mJ
+                 `cast` (Ifoldl.N:Flip <Nat>_N <*>_N <Vec>_R <a_s1mw>_N <k_s1my>_N
+                         :: Flip Vec a_s1mw k_s1my ~R# Vec k_s1my a_s1mw)))
              `cast` (Sym (Ifoldl.N:Flip
-                              <Nat>_N <*>_N <Vec>_R <a_s1m1>_N <S k_s1m3>_N)
-                     :: Vec (S k_s1m3) a_s1m1 ~R# Flip Vec a_s1m1 (S k_s1m3)))
-            ipv3_s1jn
+                              <Nat>_N <*>_N <Vec>_R <a_s1mw>_N <S k_s1my>_N)
+                     :: Vec (S k_s1my) a_s1mw ~R# Flip Vec a_s1mw (S k_s1my)))
+            ipv3_s1jW
           }
           }
       }
@@ -661,26 +616,25 @@ Ifoldl.$wpoly_go
 end Rec }
 
 -- RHS size: {terms: 8, types: 15, coercions: 49, joins: 0/0}
-Ifoldl.reverseVec_g
-  :: forall {n :: Nat} {a}. Vec n a -> Flip Vec a n
+Ifoldl.reverseVec1 :: forall (n :: Nat) a. Vec n a -> Flip Vec a n
 [GblId,
  Arity=1,
  Str=<1L>,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [0] 40 60}]
-Ifoldl.reverseVec_g
-  = \ (@(n_a10v :: Nat)) (@a_a10w) (eta_B1 :: Vec n_a10v a_a10w) ->
+Ifoldl.reverseVec1
+  = \ (@(n_a10F :: Nat)) (@a_a10G) (x_a1k3 :: Vec n_a10F a_a10G) ->
       Ifoldl.$wpoly_go
-        @a_a10w
-        @n_a10v
+        @a_a10G
+        @n_a10F
         @Z
-        @n_a10v
+        @n_a10F
         @~(Sym (Ifoldl.D:R:+[0] <Z>_N) :: Z GHC.Internal.Prim.~# (Z + Z))
-        @~(Sym (Ifoldl.D:R:+[0] <n_a10v>_N)
-           :: n_a10v GHC.Internal.Prim.~# (Z + n_a10v))
-        ((\ (@(w_a10g :: Nat)) ->
-            GHC.Internal.Data.Type.Equality.$WRefl @Nat @(S (S w_a10g)))
+        @~(Sym (Ifoldl.D:R:+[0] <n_a10F>_N)
+           :: n_a10F GHC.Internal.Prim.~# (Z + n_a10F))
+        ((\ (@(w_a10q :: Nat)) ->
+            GHC.Internal.Data.Type.Equality.$WRefl @Nat @(S (S w_a10q)))
          `cast` (forall (w :: <Nat>_N).
                  ((:~:)
                     <Nat>_N
@@ -692,10 +646,10 @@ Ifoldl.reverseVec_g
                  ; Sym (Ifoldl.N:Wonk <Z>_N <w>_N)
                  :: (forall (w :: Nat). S (S w) :~: S (S w))
                     ~R# (forall (w :: Nat). Wonk Z w)))
-        ((Ifoldl.$WNil @a_a10w)
-         `cast` (Sym (Ifoldl.N:Flip <Nat>_N <*>_N <Vec>_R <a_a10w>_N <Z>_N)
-                 :: Vec Z a_a10w ~R# Flip Vec a_a10w Z))
-        eta_B1
+        ((Ifoldl.$WNil @a_a10G)
+         `cast` (Sym (Ifoldl.N:Flip <Nat>_N <*>_N <Vec>_R <a_a10G>_N <Z>_N)
+                 :: Vec Z a_a10G ~R# Flip Vec a_a10G Z))
+        x_a1k3
 
 -- RHS size: {terms: 1, types: 0, coercions: 15, joins: 0/0}
 reverseVec :: forall (n :: Nat) a. Vec n a -> Vec n a
@@ -706,11 +660,11 @@ reverseVec :: forall (n :: Nat) a. Vec n a -> Vec n a
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 reverseVec
-  = Ifoldl.reverseVec_g
-    `cast` (forall (n[infrd]~[spec] :: <Nat>_N) (a[infrd]~[spec] :: <*>_N).
+  = Ifoldl.reverseVec1
+    `cast` (forall (n :: <Nat>_N) (a :: <*>_N).
             <Vec n a>_R
             %<Many>_N ->_R Ifoldl.N:Flip <Nat>_N <*>_N <Vec>_R <a>_N <n>_N
-            :: (forall {n :: Nat} {a}. Vec n a -> Flip Vec a n)
+            :: (forall (n :: Nat) a. Vec n a -> Flip Vec a n)
                ~R# (forall (n :: Nat) a. Vec n a -> Vec n a))
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -755,70 +709,70 @@ Ifoldl.$trModule
   = GHC.Internal.Types.Module Ifoldl.$trModule3 Ifoldl.$trModule1
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$krep_r1n8 :: GHC.Internal.Types.KindRep
+$krep_r1nB :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep_r1n8 = GHC.Internal.Types.KindRepVar 1#
+$krep_r1nB = GHC.Internal.Types.KindRepVar 1#
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep1_r1n9 :: GHC.Internal.Types.KindRep
+$krep1_r1nC :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep1_r1n9
+$krep1_r1nC
   = GHC.Internal.Types.KindRepFun
-      $krep_r1n8 GHC.Internal.Types.krep$*
+      $krep_r1nB GHC.Internal.Types.krep$*
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$krep2_r1na :: GHC.Internal.Types.KindRep
+$krep2_r1nD :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep2_r1na = GHC.Internal.Types.KindRepVar 0#
+$krep2_r1nD = GHC.Internal.Types.KindRepVar 0#
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep3_r1nb :: GHC.Internal.Types.KindRep
+$krep3_r1nE :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep3_r1nb = GHC.Internal.Types.KindRepFun $krep2_r1na $krep1_r1n9
+$krep3_r1nE = GHC.Internal.Types.KindRepFun $krep2_r1nD $krep1_r1nC
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep4_r1nc :: GHC.Internal.Types.KindRep
+$krep4_r1nF :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep4_r1nc
+$krep4_r1nF
   = GHC.Internal.Types.KindRepFun
-      $krep2_r1na GHC.Internal.Types.krep$*
+      $krep2_r1nD GHC.Internal.Types.krep$*
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep5_r1nd :: GHC.Internal.Types.KindRep
+$krep5_r1nG :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep5_r1nd = GHC.Internal.Types.KindRepFun $krep_r1n8 $krep4_r1nc
+$krep5_r1nG = GHC.Internal.Types.KindRepFun $krep_r1nB $krep4_r1nF
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Ifoldl.$tcFlip1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
 Ifoldl.$tcFlip1
-  = GHC.Internal.Types.KindRepFun $krep3_r1nb $krep5_r1nd
+  = GHC.Internal.Types.KindRepFun $krep3_r1nE $krep5_r1nG
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$krep6_r1ne :: GHC.Internal.Types.KindRep
+$krep6_r1nH :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep6_r1ne = GHC.Internal.Types.KindRepVar 2#
+$krep6_r1nH = GHC.Internal.Types.KindRepVar 2#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$krep7_r1nf :: GHC.Internal.Types.KindRep
+$krep7_r1nI :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep7_r1nf = GHC.Internal.Types.KindRepVar 3#
+$krep7_r1nI = GHC.Internal.Types.KindRepVar 3#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$krep8_r1ng :: GHC.Internal.Types.KindRep
+$krep8_r1nJ :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep8_r1ng = GHC.Internal.Types.KindRepVar 4#
+$krep8_r1nJ = GHC.Internal.Types.KindRepVar 4#
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep9_r1nh :: GHC.Internal.Types.KindRep
+$krep9_r1nK :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep9_r1nh = GHC.Internal.Types.KindRepApp $krep6_r1ne $krep8_r1ng
+$krep9_r1nK = GHC.Internal.Types.KindRepApp $krep6_r1nH $krep8_r1nJ
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep10_r1ni :: GHC.Internal.Types.KindRep
+$krep10_r1nL :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep10_r1ni
-  = GHC.Internal.Types.KindRepApp $krep9_r1nh $krep7_r1nf
+$krep10_r1nL
+  = GHC.Internal.Types.KindRepApp $krep9_r1nK $krep7_r1nI
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Ifoldl.$tcNat2 :: GHC.Internal.Prim.Addr#
@@ -890,9 +844,9 @@ Ifoldl.$tc'Z
       Ifoldl.$tc'Z1
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep11_r1nj :: GHC.Internal.Types.KindRep
+$krep11_r1nM :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep11_r1nj
+$krep11_r1nM
   = GHC.Internal.Types.KindRepTyConApp
       Ifoldl.$tc'Z (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
@@ -904,9 +858,9 @@ Ifoldl.$tcVec1
       Ifoldl.$tc'Z1 GHC.Internal.Types.krep$*Arr*
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep12_r1nk :: GHC.Internal.Types.KindRep
+$krep12_r1nN :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep12_r1nk
+$krep12_r1nN
   = GHC.Internal.Types.KindRepFun
       Ifoldl.$tc'Z1 GHC.Internal.Types.krep$*
 
@@ -914,7 +868,7 @@ $krep12_r1nk
 Ifoldl.$tcWonk1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
 Ifoldl.$tcWonk1
-  = GHC.Internal.Types.KindRepFun Ifoldl.$tc'Z1 $krep12_r1nk
+  = GHC.Internal.Types.KindRepFun Ifoldl.$tc'Z1 $krep12_r1nN
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Ifoldl.$tc'S1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
@@ -954,19 +908,19 @@ Ifoldl.$tc'S
       Ifoldl.$tc'S1
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-$krep13_r1nl :: [GHC.Internal.Types.KindRep]
+$krep13_r1nO :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep13_r1nl
+$krep13_r1nO
   = GHC.Internal.Types.:
       @GHC.Internal.Types.KindRep
-      $krep_r1n8
+      $krep_r1nB
       (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep14_r1nm :: GHC.Internal.Types.KindRep
+$krep14_r1nP :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep14_r1nm
-  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tc'S $krep13_r1nl
+$krep14_r1nP
+  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tc'S $krep13_r1nO
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Ifoldl.$tcVec3 :: GHC.Internal.Prim.Addr#
@@ -1000,51 +954,51 @@ Ifoldl.$tcVec
       Ifoldl.$tcVec1
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-$krep15_r1nn :: [GHC.Internal.Types.KindRep]
+$krep15_r1nQ :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep15_r1nn
+$krep15_r1nQ
   = GHC.Internal.Types.:
       @GHC.Internal.Types.KindRep
-      $krep2_r1na
+      $krep2_r1nD
       (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep16_r1no :: [GHC.Internal.Types.KindRep]
+$krep16_r1nR :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep16_r1no
+$krep16_r1nR
   = GHC.Internal.Types.:
-      @GHC.Internal.Types.KindRep $krep_r1n8 $krep15_r1nn
+      @GHC.Internal.Types.KindRep $krep_r1nB $krep15_r1nQ
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep17_r1np :: GHC.Internal.Types.KindRep
+$krep17_r1nS :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep17_r1np
-  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tcVec $krep16_r1no
+$krep17_r1nS
+  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tcVec $krep16_r1nR
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep18_r1nq :: [GHC.Internal.Types.KindRep]
+$krep18_r1nT :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep18_r1nq
+$krep18_r1nT
   = GHC.Internal.Types.:
-      @GHC.Internal.Types.KindRep $krep14_r1nm $krep15_r1nn
+      @GHC.Internal.Types.KindRep $krep14_r1nP $krep15_r1nQ
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep19_r1nr :: GHC.Internal.Types.KindRep
+$krep19_r1nU :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep19_r1nr
-  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tcVec $krep18_r1nq
+$krep19_r1nU
+  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tcVec $krep18_r1nT
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep20_r1ns :: GHC.Internal.Types.KindRep
+$krep20_r1nV :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep20_r1ns
-  = GHC.Internal.Types.KindRepFun $krep17_r1np $krep19_r1nr
+$krep20_r1nV
+  = GHC.Internal.Types.KindRepFun $krep17_r1nS $krep19_r1nU
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Ifoldl.$tc':::1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
 Ifoldl.$tc':::1
-  = GHC.Internal.Types.KindRepFun $krep2_r1na $krep20_r1ns
+  = GHC.Internal.Types.KindRepFun $krep2_r1nD $krep20_r1nV
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Ifoldl.$tc':::3 :: GHC.Internal.Prim.Addr#
@@ -1078,17 +1032,17 @@ Ifoldl.$tc':::
       Ifoldl.$tc':::1
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep21_r1nt :: [GHC.Internal.Types.KindRep]
+$krep21_r1nW :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep21_r1nt
+$krep21_r1nW
   = GHC.Internal.Types.:
-      @GHC.Internal.Types.KindRep $krep11_r1nj $krep15_r1nn
+      @GHC.Internal.Types.KindRep $krep11_r1nM $krep15_r1nQ
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Ifoldl.$tc'Nil1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
 Ifoldl.$tc'Nil1
-  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tcVec $krep21_r1nt
+  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tcVec $krep21_r1nW
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Ifoldl.$tc'Nil3 :: GHC.Internal.Prim.Addr#
@@ -1184,53 +1138,53 @@ Ifoldl.$tcFlip
       Ifoldl.$tcFlip1
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-$krep22_r1nu :: [GHC.Internal.Types.KindRep]
+$krep22_r1nX :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep22_r1nu
+$krep22_r1nX
   = GHC.Internal.Types.:
       @GHC.Internal.Types.KindRep
-      $krep8_r1ng
+      $krep8_r1nJ
       (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep23_r1nv :: [GHC.Internal.Types.KindRep]
+$krep23_r1nY :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep23_r1nv
+$krep23_r1nY
   = GHC.Internal.Types.:
-      @GHC.Internal.Types.KindRep $krep7_r1nf $krep22_r1nu
+      @GHC.Internal.Types.KindRep $krep7_r1nI $krep22_r1nX
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep24_r1nw :: [GHC.Internal.Types.KindRep]
+$krep24_r1nZ :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep24_r1nw
+$krep24_r1nZ
   = GHC.Internal.Types.:
-      @GHC.Internal.Types.KindRep $krep6_r1ne $krep23_r1nv
+      @GHC.Internal.Types.KindRep $krep6_r1nH $krep23_r1nY
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep25_r1nx :: [GHC.Internal.Types.KindRep]
+$krep25_r1o0 :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep25_r1nx
+$krep25_r1o0
   = GHC.Internal.Types.:
-      @GHC.Internal.Types.KindRep $krep_r1n8 $krep24_r1nw
+      @GHC.Internal.Types.KindRep $krep_r1nB $krep24_r1nZ
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep26_r1ny :: [GHC.Internal.Types.KindRep]
+$krep26_r1o1 :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep26_r1ny
+$krep26_r1o1
   = GHC.Internal.Types.:
-      @GHC.Internal.Types.KindRep $krep2_r1na $krep25_r1nx
+      @GHC.Internal.Types.KindRep $krep2_r1nD $krep25_r1o0
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep27_r1nz :: GHC.Internal.Types.KindRep
+$krep27_r1o2 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep27_r1nz
-  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tcFlip $krep26_r1ny
+$krep27_r1o2
+  = GHC.Internal.Types.KindRepTyConApp Ifoldl.$tcFlip $krep26_r1o1
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Ifoldl.$tc'Flip1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
 Ifoldl.$tc'Flip1
-  = GHC.Internal.Types.KindRepFun $krep10_r1ni $krep27_r1nz
+  = GHC.Internal.Types.KindRepFun $krep10_r1nL $krep27_r1o2
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Ifoldl.$tc'Flip3 :: GHC.Internal.Prim.Addr#
