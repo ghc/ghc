@@ -1,7 +1,3 @@
-  :: Int %1 -> Int %1 -> T
-         Tmpl= \ (conrep [Occ=Once1!] :: Int)
-                 (conrep1 [Occ=Once1!] :: Int) ->
-  = \ (conrep [Occ=Once1!] :: Int) (conrep1 [Occ=Once1!] :: Int) ->
 T16029.$trModule4 :: GHC.Internal.Prim.Addr#
 T16029.$trModule3 :: GHC.Internal.Types.TrName
 T16029.$trModule2 :: GHC.Internal.Prim.Addr#

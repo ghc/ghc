@@ -981,18 +981,10 @@ strictifyDmd = plusDmd seqDmd
 strictifyDictDmd :: Type -> Demand -> Demand
 strictifyDictDmd ty (n :* Prod b ds)
   | not (isAbs n)
-  , Just field_tys <- as_non_newtype_dict ty
-  = C_1N :* mkProd b (zipWith strictifyDictDmd field_tys ds)
+  , isTerminatingType ty
+  , Just (_tc, _arg_tys, _data_con, field_tys) <- splitDataProductType_maybe ty
+  = C_1N :* mkProd b (zipWith strictifyDictDmd (map scaledThing field_tys) ds)
       -- main idea: ensure it's strict
-  where
-    -- Return a TyCon and a list of field types if the given
-    -- type is a non-newtype dictionary type
-    as_non_newtype_dict ty
-      | isTerminatingType ty
-      , Just (_tc, _arg_tys, _data_con, field_tys) <- splitDataProductType_maybe ty
-      = Just (map scaledThing field_tys)
-      | otherwise
-      = Nothing
 strictifyDictDmd _  dmd = dmd
 
 -- | Make a 'Demand' lazy.
@@ -2409,20 +2401,23 @@ dmdTransformDataConSig str_marks sd = case viewProd arity body_sd of
 -- on the result into the indicated dictionary component (if saturated).
 -- See Note [Demand transformer for a dictionary selector].
 dmdTransformDictSelSig :: DmdSig -> DmdTransformer
--- NB: This currently doesn't handle newtype dictionaries.
--- It should simply apply call_sd directly to the dictionary, I suppose.
-dmdTransformDictSelSig (DmdSig (DmdType _ [_ :* prod])) call_sd
+
+
+dmdTransformDictSelSig (DmdSig (DmdType _ [_ :* dict_dmd])) call_sd
+   -- NB: dict_dmd comes from the demand signature of the class-op
+   --     which is created in GHC.Types.Id.Make.mkDictSelId
    | (n, sd') <- peelCallDmd call_sd
-   , Prod _ sig_ds <- prod
+   , Prod _ sig_ds <- dict_dmd
    = multDmdType n $
      DmdType nopDmdEnv [C_11 :* mkProd Unboxed (map (enhance sd') sig_ds)]
    | otherwise
    = nopDmdType -- See Note [Demand transformer for a dictionary selector]
   where
-    enhance _  AbsDmd   = AbsDmd
-    enhance _  BotDmd   = BotDmd
-    enhance sd _dmd_var = C_11 :* sd  -- This is the one!
-                                      -- C_11, because we multiply with n above
+    enhance _   AbsDmd   = AbsDmd
+    enhance _   BotDmd   = BotDmd
+    enhance sd' _dmd_var = C_11 :* sd'  -- This is the one!
+                           -- C_11, because we multiply with n above
+
 dmdTransformDictSelSig sig sd = pprPanic "dmdTransformDictSelSig: no args" (ppr sig $$ ppr sd)
 
 {-
@@ -2465,21 +2460,8 @@ demand, really) by the demand 'd'. The '1' acts as if it was a demand variable,
 the whole signature really means `\d. P(AAAdAAAAA)` for any incoming
 demand 'd'.
 
-For single-method classes, which are represented by newtypes the signature
-of 'op' won't look like P(...), so matching on Prod will fail.
-That's fine: if we are doing strictness analysis we are also doing inlining,
-so we'll have inlined 'op' into a cast.  So we can bale out in a conservative
-way, returning nopDmdType. SG: Although we then probably want to apply the eval
-demand 'd' directly to 'op' rather than turning it into 'topSubDmd'...
-
-It is (just.. #8329) possible to be running strictness analysis *without*
-having inlined class ops from single-method classes.  Suppose you are using
-ghc --make; and the first module has a local -O0 flag.  So you may load a class
-without interface pragmas, ie (currently) without an unfolding for the class
-ops.   Now if a subsequent module in the --make sweep has a local -O flag
-you might do strictness analysis, but there is no inlining for the class op.
-This is weird, so I'm not worried about whether this optimises brilliantly; but
-it should not fall over.
+NB: even unary classes behave as if there was a data constructor, and so do
+not need special handling here. See Note [Unary class magic] in GHC.Core.TyCon.
 -}
 
 zapDmdEnv :: DmdEnv -> DmdEnv

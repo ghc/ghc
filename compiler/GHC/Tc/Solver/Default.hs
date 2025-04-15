@@ -440,7 +440,7 @@ defaultExceptionContext ct
   = do { warnTcS $ TcRnDefaultedExceptionContext (ctLoc ct)
        ; empty_ec_id <- lookupId emptyExceptionContextName
        ; let ev = ctEvidence ct
-             ev_tm = mkEvCast (Var empty_ec_id) (wrapIP (ctEvPred ev))
+             ev_tm = EvExpr (evWrapIPE (ctEvPred ev) (Var empty_ec_id))
        ; setEvBindIfWanted ev EvCanonical ev_tm
          -- EvCanonical: see Note [CallStack and ExceptionContext hack]
          --              in GHC.Tc.Solver.Dict
