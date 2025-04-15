@@ -1,13 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 90, types: 62, coercions: 0, joins: 0/3}
-
-$WSMGen
-  = \ conrep conrep1 ->
-      case conrep of { W64# unbx ->
-      case conrep1 of { W64# unbx1 -> SMGen unbx unbx1 }
-      }
+  = {terms: 78, types: 53, coercions: 0, joins: 0/3}
 
 Rec {
 $wloop
