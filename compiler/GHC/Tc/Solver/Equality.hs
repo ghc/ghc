@@ -3017,6 +3017,7 @@ improve_wanted_top_fun_eqs fam_tc lhs_tys rhs_ty
 
 improve_injective_wanted_top :: FamInstEnvs -> [Bool] -> TyCon -> [TcType] -> Xi -> TcS [TypeEqn]
 -- Interact with top-level instance declarations
+-- See Section 5.2 in the Injective Type Families paper
 improve_injective_wanted_top fam_envs inj_args fam_tc lhs_tys rhs_ty
   = concatMapM do_one branches
   where
@@ -3035,6 +3036,7 @@ improve_injective_wanted_top fam_envs inj_args fam_tc lhs_tys rhs_ty
     do_one branch@(CoAxBranch { cab_tvs = branch_tvs, cab_lhs = branch_lhs_tys, cab_rhs = branch_rhs })
       | let in_scope1 = in_scope `extendInScopeSetList` branch_tvs
       , Just subst <- tcUnifyTyForInjectivity False in_scope1 branch_rhs rhs_ty
+                      -- False: matching, not unifying
       = do { let inSubst tv = tv `elemVarEnv` getTvSubstEnv subst
                  unsubstTvs = filterOut inSubst branch_tvs
                  -- The order of unsubstTvs is important; it must be

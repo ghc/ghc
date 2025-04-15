@@ -87,7 +87,7 @@ module GHC.Types.Basic (
         CompilerPhase(..), PhaseNum, beginPhase, nextPhase, laterPhase,
 
         Activation(..), isActive, competesWith,
-        isNeverActive, isAlwaysActive, activeInFinalPhase,
+        isNeverActive, isAlwaysActive, activeInFinalPhase, activeInInitialPhase,
         activateAfterInitial, activateDuringFinal, activeAfter,
 
         RuleMatchInfo(..), isConLike, isFunLike,

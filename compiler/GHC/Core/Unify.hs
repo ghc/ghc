@@ -331,35 +331,57 @@ Wrinkles
    `DontBindMe`, the unifier must return `SurelyApart`, not `MaybeApart`.  See
    `go_fam` in `uVarOrFam`
 
-(ATF6) You might think that when /matching/ the um_fam_env will always be empty,
-   because type-class-instance and type-family-instance heads can't include type
-   families.  E.g.   instance C (F a) where ...   -- Illegal
+(ATF6) When /matching/ can we ever have a type-family application on the LHS, in
+   the template?  You might think not, because type-class-instance and
+   type-family-instance heads can't include type families.  E.g.
+            instance C (F a) where ...  -- Illegal
 
-   But you'd be wrong: when "improving" type family constraint we may have a
-   type family on the LHS of a match. Consider
+   But you'd be wrong: even when matching, we can see type families in the LHS template:
+   * In `checkValidClass`, in `check_dm` we check that the default method has the
+      right type, using matching, both ways.  And that type may have type-family
+      applications in it. Example in test CoOpt_Singletons.
+
+   * In the specialiser: see the call to `tcMatchTy` in
+     `GHC.Core.Opt.Specialise.beats_or_same`
+
+   * With -fpolymorphic-specialsation, we might get a specialiation rule like
+         RULE forall a (d :: Eq (Maybe (F a))) .
+                 f @(Maybe (F a)) d = ...
+     See #25965.
+
+   * A user-written RULE could conceivably have a type-family application
+     in the template.  It might not be a good rule, but I don't think we currently
+     check for this.
+
+    In all these cases we are only interested in finding a substitution /for
+    type variables/ that makes the match work.  So we simply want to recurse into
+    the arguments of the type family.  E.g.
+       Template:   forall a.  Maybe (F a)
+       Target:     Mabybe (F Int)
+    We want to succeed with substitution [a :-> Int].  See (ATF9).
+
+    Conclusion: where we enter via `tcMatchTy`, `tcMatchTys`, `tc_match_tys`,
+    etc, we always end up in `tc_match_tys_x`.  There we invoke the unifier
+    but we do not distinguish between `SurelyApart` and `MaybeApart`. So in
+    these cases we can set `um_bind_fam_fun` to `neverBindFam`.
+
+(ATF7) There is one other, very special case of matching where we /do/ want to
+   bind type families in `um_fam_env`, namely in GHC.Tc.Solver.Equality, the call
+   to `tcUnifyTyForInjectivity False` in `improve_injective_wanted_top`.
+   Consider
+   of a match. Consider
       type family G6 a = r | r -> a
       type instance G6 [a]  = [G a]
       type instance G6 Bool = Int
-   and the Wanted constraint [W] G6 alpha ~ [Int].  We /match/ each type instance
-   RHS against [Int]!  So we try
-        [G a] ~ [Int]
+   and suppose we haev a Wanted constraint
+      [W] G6 alpha ~ [Int]
+.  According to Section 5.2 of "Injective type families for Haskell", we /match/
+   the RHS each type instance [Int].  So we try
+        Template: [G a]    Target: [Int]
    and we want to succeed with MaybeApart, so that we can generate the improvement
-   constraint  [W] alpha ~ [beta]  where beta is fresh.
-   See Section 5.2 of "Injective type families for Haskell".
-
-   A second place that we match with type-fams on the LHS is in `checkValidClass`.
-   In `check_dm` we check that the default method has the right type, using matching,
-   both ways.  And that type may have type-family applications in it. Example in
-   test CoOpt_Singletons.
-
-(ATF7) You might think that (ATF6) is a very special case, and in /other/ uses of
-  matching, where we enter via `tc_match_tys_x` we will never see a type-family
-  in the template. But actually we do see that case in the specialiser: see
-  the call to `tcMatchTy` in `GHC.Core.Opt.Specialise.beats_or_same`
-
-  Also: a user-written RULE could conceivably have a type-family application
-  in the template.  It might not be a good rule, but I don't think we currently
-  check for this.
+   constraint
+        [W] alpha ~ [beta]
+   where beta is fresh.  We do this by binding [G a :-> Int]
 
 (ATF8) The treatment of type families is governed by
          um_bind_fam_fun :: BindFamFun
@@ -398,6 +420,8 @@ Wrinkles
 
   Key point: when decomposing (F tys1 ~ F tys2), we should /also/ extend the
   type-family substitution.
+
+  (ATF11-1) All this cleverness only matters when unifying, not when matching
 
 (ATF12) There is a horrid exception for the injectivity check. See (UR1) in
   in Note [Specification of unification].
@@ -595,7 +619,7 @@ tc_match_tys_x :: HasDebugCallStack
                -> [Type]
                -> Maybe Subst
 tc_match_tys_x bind_tv match_kis (Subst in_scope id_env tv_env cv_env) tys1 tys2
-  = case tc_unify_tys alwaysBindFam  -- (ATF7) in Note [Apartness and type families]
+  = case tc_unify_tys neverBindFam  -- (ATF7) in Note [Apartness and type families]
                       bind_tv
                       False  -- Matching, not unifying
                       False  -- Not an injectivity check
@@ -1857,6 +1881,7 @@ uVarOrFam env ty1 ty2 kco
       = go_fam_fam tc1 tys1 tys2 kco
 
       -- Now check if we can bind the (F tys) to the RHS
+      -- This can happen even when matching: see (ATF7)
       | BindMe <- um_bind_fam_fun env tc1 tys1 rhs
       = -- ToDo: do we need an occurs check here?
         do { extendFamEnv tc1 tys1 rhs
@@ -1881,11 +1906,6 @@ uVarOrFam env ty1 ty2 kco
     -- go_fam_fam: LHS and RHS are both saturated type-family applications,
     --             for the same type-family F
     go_fam_fam tc tys1 tys2 kco
-      | tcEqTyConAppArgs tys1 tys2
-      -- Detect (F tys ~ F tys); otherwise we'd build an infinite substitution
-      = return ()
-
-      | otherwise
        -- Decompose (F tys1 ~ F tys2): (ATF9)
        -- Use injectivity information of F: (ATF10)
        -- But first bind the type-fam if poss: (ATF11)
@@ -1902,13 +1922,19 @@ uVarOrFam env ty1 ty2 kco
        (inj_tys1, noninj_tys1) = partitionByList inj tys1
        (inj_tys2, noninj_tys2) = partitionByList inj tys2
 
-       bind_fam_if_poss | BindMe <- um_bind_fam_fun env tc tys1 rhs1
-                        = extendFamEnv tc tys1 rhs1
-                        | um_unif env
-                        , BindMe <- um_bind_fam_fun env tc tys2 rhs2
-                        = extendFamEnv tc tys2 rhs2
-                        | otherwise
-                        = return ()
+       bind_fam_if_poss
+         | not (um_unif env)  -- Not when matching (ATF11-1)
+         = return ()
+         | tcEqTyConAppArgs tys1 tys2   -- Detect (F tys ~ F tys);
+         = return ()                    -- otherwise we'd build an infinite substitution
+         | BindMe <- um_bind_fam_fun env tc tys1 rhs1
+         = extendFamEnv tc tys1 rhs1
+         | um_unif env
+         , BindMe <- um_bind_fam_fun env tc tys2 rhs2
+         = extendFamEnv tc tys2 rhs2
+         | otherwise
+         = return ()
+
        rhs1 = mkTyConApp tc tys2 `mkCastTy` mkSymCo kco
        rhs2 = mkTyConApp tc tys1 `mkCastTy` kco
 
@@ -1993,7 +2019,7 @@ data UMState = UMState
   -- in um_foralls; i.e. variables bound by foralls inside the types being unified
 
   -- When /matching/ um_fam_env is usually empty; but not quite always.
-  -- See (ATF6) and (ATF7) of Note [Apartness and type families]
+  -- See (ATF7) of Note [Apartness and type families]
 
 newtype UM a
   = UM' { unUM :: UMState -> UnifyResultM (UMState, a) }
