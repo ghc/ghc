@@ -22,7 +22,7 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [9.6.7], [glasgow-has
 AC_CONFIG_MACRO_DIRS([m4])
 
 # Set this to YES for a released version, otherwise NO
-: ${RELEASE=YES}
+: ${RELEASE=NO}
 
 # The primary version (e.g. 7.5, 7.4.1) is set in the AC_INIT line
 # above.  If this is not a released version, then we will append the
