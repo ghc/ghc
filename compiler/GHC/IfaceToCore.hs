@@ -75,6 +75,7 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Lint
 import GHC.Core.Make
 import GHC.Core.Class
+import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
@@ -806,7 +807,7 @@ tc_iface_decl _parent _ignore_prags
                          ifBody = IfAbstractClass})
   = bindIfaceTyConBinders binders $ \ binders' -> do
     { fds  <- mapM tc_fd rdr_fds
-    ; cls  <- buildClass tc_name binders' roles fds Nothing
+    ; cls  <- buildAbstractClass tc_name binders' roles fds
     ; return (ATyCon (classTyCon cls)) }
 
 tc_iface_decl _parent ignore_prags
@@ -817,7 +818,7 @@ tc_iface_decl _parent ignore_prags
                          ifBody = IfConcreteClass {
                              ifClassCtxt = rdr_ctxt,
                              ifATs = rdr_ats, ifSigs = rdr_sigs,
-                             ifMinDef = if_mindef
+                             ifMinDef = if_mindef, ifUnary = unary
                          }})
   = bindIfaceTyConBinders binders $ \ binders' -> do
     { traceIf (text "tc-iface-class1" <+> ppr tc_name)
@@ -830,7 +831,7 @@ tc_iface_decl _parent ignore_prags
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
               ; traceIf (text "tc-iface-class4" <+> ppr tc_name)
-              ; buildClass tc_name binders' roles fds (Just (ctxt, ats, sigs, mindef)) }
+              ; buildClass tc_name binders' roles fds ctxt ats sigs mindef unary }
     ; return (ATyCon (classTyCon cls)) }
   where
    tc_sc pred = forkM (mk_sc_doc pred) (tcIfaceType pred)
@@ -1785,10 +1786,9 @@ tcIfaceDataAlt mult con inst_tys arg_strs rhs
 -}
 
 tcIdDetails :: Name -> Type -> IfaceIdDetails -> IfL IdDetails
-tcIdDetails _ _  IfVanillaId = return VanillaId
+tcIdDetails _ _  IfVanillaId           = return VanillaId
 tcIdDetails _ _  (IfWorkerLikeId dmds) = return $ WorkerLikeId dmds
-tcIdDetails _ ty IfDFunId
-  = return (DFunId (isNewTyCon (classTyCon cls)))
+tcIdDetails _ ty IfDFunId              = return (DFunId (isUnaryClass cls))
   where
     (_, _, cls, _) = tcSplitDFunTy ty
 

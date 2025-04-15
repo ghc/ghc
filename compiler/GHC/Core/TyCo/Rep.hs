@@ -945,7 +945,6 @@ instance Outputable CoSel where
   ppr SelForAll      = text "All"
   ppr (SelFun fs)    = text "Fun" <> parens (ppr fs)
 
-
 pprOneCharRole :: Role -> SDoc
 pprOneCharRole Nominal          = char 'N'
 pprOneCharRole Representational = char 'R'
@@ -1059,19 +1058,21 @@ The Coercion form SelCo allows us to decompose a structural coercion, one
 between ForallTys, or TyConApps, or FunTys.
 
 There are three forms, split by the CoSel field inside the SelCo:
-SelTyCon, SelForAll, and SelFun.
+SelTyCon, SelForAll, and SelFun.  The typing rules below are directly
+checked by the SelCo case of GHC.Core.Lint.lintCoercion.
 
 * SelTyCon:
 
-      co : (T s1..sn) ~r0 (T t1..tn)
-      T is a data type, not a newtype, nor an arrow type
-      r = tyConRole tc r0 i
+      co : (T s1..sn) ~r (T t1..tn)
+      T is not a saturated FunTyCon (use SelFun for that)
+      T is injective at role r
+      ri = tyConRole tc r i
       i < n    (i is zero-indexed)
       ----------------------------------
-      SelCo (SelTyCon i r) co : si ~r ti
+      SelCo (SelTyCon i ri) co : si ~ri ti
 
-  "Not a newtype": see Note [SelCo and newtypes]
-  "Not an arrow type": see SelFun below
+  "Injective at role r": see Note [SelCo and newtypes]
+  "Not saturated FunTyCon": see SelFun below
 
    See Note [SelCo Cached Roles]
 
@@ -1440,6 +1441,10 @@ SelCo, we'll get out a representational coercion. That is:
 
 Yikes! Clearly, this is terrible. The solution is simple: forbid
 SelCo to be used on newtypes if the internal coercion is representational.
+More specifically, we use isInjectiveTyCon to determine whether
+T is injective at role r:
+* Newtypes and datatypes are both injective at Nominal role, but
+* Newtypes are not injective at Representational role
 See the SelCo equation for GHC.Core.Lint.lintCoercion.
 
 This is not just some corner case discovered by a segfault somewhere;
@@ -1535,9 +1540,9 @@ data UnivCoProvenance
   -- Why Ord?  See Note [Ord instance of IfaceType] in GHC.Iface.Type
 
 instance Outputable UnivCoProvenance where
-  ppr PhantomProv      = text "(phantom)"
-  ppr ProofIrrelProv   = text "(proof irrel)"
-  ppr (PluginProv str) = parens (text "plugin" <+> brackets (text str))
+  ppr PhantomProv          = text "(phantom)"
+  ppr (ProofIrrelProv {})  = text "(proof irrel)"
+  ppr (PluginProv str)     = parens (text "plugin" <+> brackets (text str))
 
 instance NFData UnivCoProvenance where
   rnf p = p `seq` ()

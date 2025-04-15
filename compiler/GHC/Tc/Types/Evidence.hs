@@ -27,11 +27,14 @@ module GHC.Tc.Types.Evidence (
 
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
-  evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
-  mkEvCast, mkEvScSelectors, evTypeable,
+  evId, evCoercion, evCast, evCastE, evDFunApp,  evDictApp, evSelector, evDelayedError,
+  mkEvScSelectors, evTypeable,
+  evWrapIPE, evUnwrapIPE, evUnaryDictAppE,
+  mkEvCast,
   nestedEvIdsOfTerm, evTermFVs,
 
   evTermCoercion, evTermCoercion_maybe,
+  evExprCoercion, evExprCoercion_maybe,
   EvCallStack(..),
   EvTypeable(..),
 
@@ -43,7 +46,6 @@ module GHC.Tc.Types.Evidence (
   TcMCoercion, TcMCoercionN, TcMCoercionR,
   Role(..), LeftOrRight(..), pickLR,
   maybeSymCo,
-  unwrapIP, wrapIP,
 
   -- * QuoteWrapper
   QuoteWrapper(..), applyQuoteWrapper, quoteWrapperTyVarTy
@@ -60,21 +62,24 @@ import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.TyCon
-import GHC.Core.DataCon ( DataCon, dataConWrapId )
+import GHC.Core.Make    ( mkWildCase, mkRuntimeErrorApp, tYPE_ERROR_ID )
+import GHC.Core.Class   ( classTyCon )
+import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs
 import GHC.Core.InstEnv ( CanonicalEvidence(..) )
 
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
-import GHC.Types.Var
 import GHC.Types.Name( isInternalName )
+import GHC.Types.Var
 import GHC.Types.Id( idScaledType )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 
 import GHC.Builtin.Names
+import GHC.Builtin.Types( unitTy )
 
 import GHC.Utils.FV
 import GHC.Utils.Misc
@@ -516,9 +521,6 @@ data EvTerm
 
 type EvExpr = CoreExpr
 
--- An EvTerm is (usually) constructed by any of the constructors here
--- and those more complicated ones who were moved to module GHC.Tc.Types.EvTerm
-
 -- | Any sort of evidence Id, including coercions
 evId ::  EvId -> EvExpr
 evId = Var
@@ -528,17 +530,62 @@ evId = Var
 evCoercion :: TcCoercion -> EvTerm
 evCoercion co = EvExpr (Coercion co)
 
--- | d |> co
+{-# DEPRECATED mkEvCast "Please use evCast instead" #-}
+-- We had gotten duplicate functions; let's get rid of mkEvCast in due course
+mkEvCast :: EvExpr -> TcCoercion -> EvTerm
+mkEvCast = evCast
+
 evCast :: EvExpr -> TcCoercion -> EvTerm
-evCast et tc | isReflCo tc = EvExpr et
-             | otherwise   = EvExpr (Cast et tc)
+evCast et tc = EvExpr (evCastE et tc)
 
--- Dictionary instance application
+-- | d |> co
+evCastE :: EvExpr -> TcCoercion -> EvExpr
+evCastE ee co
+  | assertPpr (coercionRole co == Representational)
+              (vcat [text "Coercion of wrong role passed to evCastE:", ppr ee, ppr co]) $
+    isReflCo co = ee
+  | otherwise   = Cast ee co
+
 evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvTerm
-evDFunApp df tys ets = EvExpr $ Var df `mkTyApps` tys `mkApps` ets
+-- Dictionary instance application, including when the "dictionary function"
+-- is actually the data construtor for a dictionary
+evDFunApp df tys ets = EvExpr (evDFunAppE df tys ets)
 
-evDataConApp :: DataCon -> [Type] -> [EvExpr] -> EvTerm
-evDataConApp dc tys ets = evDFunApp (dataConWrapId dc) tys ets
+evDFunAppE :: DFunId -> [Type] -> [EvExpr] -> EvExpr
+evDFunAppE df tys ets = Var df `mkTyApps` tys `mkApps` ets
+
+evDictApp :: Class -> [Type] -> [EvExpr] -> EvTerm
+evDictApp cls tys args = EvExpr (evDictAppE cls tys args)
+
+evDictAppE :: Class -> [Type] -> [EvExpr] -> EvExpr
+evDictAppE cls tys args
+  = case tyConSingleDataCon_maybe (classTyCon cls) of
+      Just dc -> evDFunAppE (dataConWrapId dc) tys args
+      Nothing -> pprPanic "evDictApp" (ppr cls)
+
+evUnaryDictAppE :: Class -> [Type] -> EvExpr -> EvExpr
+-- See (UCM6) in Note [Unary class magic] in GHC.Core.TyCon
+evUnaryDictAppE cls tys meth
+  = evDictAppE cls tys [meth]
+
+evWrapIPE :: PredType -> EvExpr -> EvExpr
+-- Given  pred = IP s ty
+  --      et_tm :: ty
+-- Return an EvTerm of type (IP s ty)
+evWrapIPE pred ev_tm
+  = evUnaryDictAppE cls tys ev_tm
+  where
+    (cls, tys) = getClassPredTys pred
+
+evUnwrapIPE :: PredType -> EvExpr -> EvExpr
+-- Given  pred = IP s ty
+  --      et_tm :: (IP s ty)
+-- Return an EvTerm of type ty
+evUnwrapIPE pred ev_tm
+  = mkApps (Var ip_sel) (map Type tys ++ [ev_tm])
+  where
+    (ip_sel, tys) = decomposeIPPred pred
+
 
 -- Selector id plus the types at which it
 -- should be instantiated, used for HasField
@@ -812,14 +859,6 @@ Wrinkles
   solved like a regular IP.
 -}
 
-mkEvCast :: EvExpr -> TcCoercion -> EvTerm
-mkEvCast ev lco
-  | assertPpr (coercionRole lco == Representational)
-              (vcat [text "Coercion of wrong role passed to mkEvCast:", ppr ev, ppr lco]) $
-    isReflCo lco = EvExpr ev
-  | otherwise    = evCast ev lco
-
-
 mkEvScSelectors         -- Assume   class (..., D ty, ...) => C a b
   :: Class -> [TcType]  -- C ty1 ty2
   -> [(TcPredType,      -- D ty[ty1/a,ty2/b]
@@ -839,25 +878,42 @@ isEmptyTcEvBinds :: TcEvBinds -> Bool
 isEmptyTcEvBinds (EvBinds b)    = isEmptyBag b
 isEmptyTcEvBinds (TcEvBinds {}) = panic "isEmptyTcEvBinds"
 
+evExprCoercion_maybe :: EvExpr -> Maybe TcCoercion
+-- Applied only to EvExprs of type (s~t)
+-- See Note [Coercion evidence terms]
+evExprCoercion_maybe (Var v)       = return (mkCoVarCo v)
+evExprCoercion_maybe (Coercion co) = return co
+evExprCoercion_maybe (Cast tm co)  = do { co' <- evExprCoercion_maybe tm
+                                        ; return (mkCoCast co' co) }
+evExprCoercion_maybe _             = Nothing
+
+evExprCoercion :: EvExpr -> TcCoercion
+evExprCoercion tm = case evExprCoercion_maybe tm of
+                      Just co -> co
+                      Nothing -> pprPanic "evExprCoercion" (ppr tm)
+
 evTermCoercion_maybe :: EvTerm -> Maybe TcCoercion
 -- Applied only to EvTerms of type (s~t)
 -- See Note [Coercion evidence terms]
 evTermCoercion_maybe ev_term
-  | EvExpr e <- ev_term = go e
+  | EvExpr e <- ev_term = evExprCoercion_maybe e
   | otherwise           = Nothing
-  where
-    go :: EvExpr -> Maybe TcCoercion
-    go (Var v)       = return (mkCoVarCo v)
-    go (Coercion co) = return co
-    go (Cast tm co)  = do { co' <- go tm
-                          ; return (mkCoCast co' co) }
-    go _             = Nothing
 
 evTermCoercion :: EvTerm -> TcCoercion
 evTermCoercion tm = case evTermCoercion_maybe tm of
                       Just co -> co
                       Nothing -> pprPanic "evTermCoercion" (ppr tm)
 
+-- Used with Opt_DeferTypeErrors
+-- See Note [Deferring coercion errors to runtime]
+-- in GHC.Tc.Solver
+evDelayedError :: Type -> String -> EvTerm
+evDelayedError ty msg
+  = EvExpr $
+    let fail_expr = mkRuntimeErrorApp tYPE_ERROR_ID unitTy msg
+    in mkWildCase fail_expr (unrestricted unitTy) ty []
+       -- See Note [Incompleteness and linearity] in GHC.HsToCore.Utils
+       -- c.f. mkErrorAppDs in GHC.HsToCore.Utils
 
 {- *********************************************************************
 *                                                                      *
@@ -980,30 +1036,6 @@ instance Outputable EvTypeable where
   ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> arr <+> ppr t2)
     where
       arr = pprArrowWithMultiplicity visArgTypeLike (Right (ppr tm))
-
-
-----------------------------------------------------------------------
--- Helper functions for dealing with IP newtype-dictionaries
-----------------------------------------------------------------------
-
--- | Create a 'Coercion' that unwraps an implicit-parameter
--- dictionary to expose the underlying value.
--- We expect the 'Type' to have the form `IP sym ty`,
--- and return a 'Coercion' `co :: IP sym ty ~ ty`
-unwrapIP :: Type -> CoercionR
-unwrapIP ty =
-  case unwrapNewTyCon_maybe tc of
-    Just (_,_,ax) -> mkUnbranchedAxInstCo Representational ax tys []
-    Nothing       -> pprPanic "unwrapIP" $
-                       text "The dictionary for" <+> quotes (ppr tc)
-                         <+> text "is not a newtype!"
-  where
-  (tc, tys) = splitTyConApp ty
-
--- | Create a 'Coercion' that wraps a value in an implicit-parameter
--- dictionary. See 'unwrapIP'.
-wrapIP :: Type -> CoercionR
-wrapIP ty = mkSymCo (unwrapIP ty)
 
 ----------------------------------------------------------------------
 -- A datatype used to pass information when desugaring quotations

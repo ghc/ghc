@@ -1,13 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 63, types: 39, coercions: 1, joins: 0/0}
-
--- RHS size: {terms: 2, types: 3, coercions: 1, joins: 0/0}
-T2431.$WRefl [InlPrag=INLINE[final] CONLIKE] :: forall a. a :~: a
-[GblId[DataConWrapper], Unf=OtherCon []]
-T2431.$WRefl
-  = \ (@a) -> T2431.Refl @a @a @~(<a>_N :: a GHC.Internal.Prim.~# a)
+  = {terms: 60, types: 32, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 4, types: 7, coercions: 0, joins: 0/0}
 absurd :: forall a. (Int :~: Bool) -> a

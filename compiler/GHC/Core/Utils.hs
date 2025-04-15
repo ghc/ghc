@@ -32,6 +32,7 @@ module GHC.Core.Utils (
         isCheapApp, isExpandableApp, isSaturatedConApp,
         exprIsTickedString, exprIsTickedString_maybe,
         exprIsTopLevelBindable,
+        exprIsUnaryClassFun, isUnaryClassId,
         altsAreExhaustive, etaExpansionTick,
 
         -- * Equality
@@ -75,6 +76,7 @@ import GHC.Core.FVs( bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
 import GHC.Core.Predicate( isEqPred )
+import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCo.Compare( eqType, eqTypeX )
 import GHC.Core.Coercion
@@ -1294,14 +1296,17 @@ trivial_expr_fold :: (Id -> r) -> (Literal -> r) -> r -> r -> CoreExpr -> r
 -- * `case e of {}` an empty case
 trivial_expr_fold k_id k_lit k_triv k_not_triv = go
   where
-    -- If you change this function, be sure to change SetLevels.notWorthFloating
-    -- as well!
+    -- If you change this function, be sure to change
+    -- SetLevels.notWorthFloating as well!
     -- (Or yet better: Come up with a way to share code with this function.)
     go (Var v)                            = k_id v  -- See Note [Variables are trivial]
     go (Lit l)    | litIsTrivial l        = k_lit l
     go (Type _)                           = k_triv
     go (Coercion _)                       = k_triv
-    go (App f t)  | not (isRuntimeArg t)  = go f
+    go (App f arg)
+      | not (isRuntimeArg arg)            = go f
+      | exprIsUnaryClassFun f             = go arg
+      | otherwise                         = k_not_triv
     go (Lam b e)  | not (isRuntimeVar b)  = go e
     go (Tick t e) | not (tickishIsCode t) = go e              -- See Note [Tick trivial]
     go (Cast e _)                         = go e
@@ -1704,14 +1709,31 @@ get this:
 So we treat the application of a function (negate in this case) to a
 *dictionary* as expandable.  In effect, every function is CONLIKE when
 it's applied only to dictionaries.
+-}
+
+isUnaryClassId :: Id -> Bool
+-- True of (a) the method selector (classop)
+--         (b) the dictionary data constructor
+-- of a unary class
+isUnaryClassId v
+  | Just cls <- isClassOpId_maybe v     = isUnaryClass cls
+  | Just dc  <- isDataConWorkId_maybe v = isUnaryClassDataCon dc
+  | otherwise                           = False
+
+exprIsUnaryClassFun :: CoreExpr -> Bool
+-- True of an a type application (f @t1 .. @tn),
+-- where `f` is a unary-class-id
+-- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
+exprIsUnaryClassFun (App f (Type {}))       = exprIsUnaryClassFun f
+exprIsUnaryClassFun (Var v)                 = isUnaryClassId v
+exprIsUnaryClassFun _                       = False
 
 
-************************************************************************
+{- *********************************************************************
 *                                                                      *
              exprOkForSpeculation
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 -----------------------------
 -- | To a first approximation, 'exprOkForSpeculation' returns True of
@@ -1852,9 +1874,10 @@ app_ok fun_ok primop_ok fun args
 
   | otherwise
   = case idDetails fun of
-      DFunId new_type -> not new_type
+      DFunId unary_class -> not unary_class
          -- DFuns terminate, unless the dict is implemented
-         -- with a newtype in which case they may not
+         -- by a no-op in which case they may not
+         -- See (UCM3) in Note [Unary class magic] in GHC.Core.TyCon
 
       DataConWorkId dc
         | isLazyDataConRep dc
@@ -2127,6 +2150,7 @@ it doesn't have the trickiness of the let-can-float invariant to worry about.
 -- and in so doing makes the binding lazy.
 --
 -- So, it does /not/ treat variables as evaluated, unless they say they are.
+--
 -- However, it /does/ treat partial applications and constructor applications
 -- as values, even if their arguments are non-trivial, provided the argument
 -- type is lifted. For example, both of these are values:
@@ -2204,22 +2228,26 @@ exprIsHNFlike is_con is_con_unf e
                                | otherwise  = app_is_value f as
     app_is_value _          _  = False
 
-    id_app_is_value id val_args =
+    id_app_is_value id val_args
+      | Just dc <- isDataConWorkId_maybe id
+      , isUnaryClassDataCon  dc
+      = all is_hnf_like val_args  -- Look through unary class data cons
+      | otherwise
       -- See Note [exprIsHNF for function applications]
       --   for the specification and examples
-      case compare (idArity id) (length val_args) of
-        EQ | is_con id ->      -- Saturated app of a DataCon/CONLIKE Id
-          case mb_str_marks id of
-            Just str_marks ->  -- with strict fields; see (SFC1) of Note [Strict fields in Core]
-              assert (val_args `equalLength` str_marks) $
-              fields_hnf str_marks
-            Nothing ->         -- without strict fields: like PAP
-              args_hnf         -- NB: CONLIKEs are lazy!
+      = case compare (idArity id) (length val_args) of
+          EQ | is_con id ->      -- Saturated app of a DataCon/CONLIKE Id
+            case mb_str_marks id of
+              Just str_marks ->  -- with strict fields; see (SFC1) of Note [Strict fields in Core]
+                assert (val_args `equalLength` str_marks) $
+                fields_hnf str_marks
+              Nothing ->         -- without strict fields: like PAP
+                args_hnf         -- NB: CONLIKEs are lazy!
 
-        GT ->                  -- PAP: Check unlifted val_args
-          args_hnf
+          GT ->                  -- PAP: Check unlifted val_args
+            args_hnf
 
-        _  -> False
+          _  -> False
 
       where
         -- Saturated, Strict DataCon: Check unlifted val_args and strict fields
@@ -2695,12 +2723,15 @@ isEmptyTy ty
 -- | If @normSplitTyConApp_maybe _ ty = Just (tc, tys, co)@
 -- then @ty |> co = tc tys@. It's 'splitTyConApp_maybe', but looks through
 -- coercions via 'topNormaliseType_maybe'. Hence the \"norm\" prefix.
+--
+-- Postcondition: tc is not a newtype (guaranteed by topNormaliseType_maybe)
 normSplitTyConApp_maybe :: FamInstEnvs -> Type -> Maybe (TyCon, [Type], Coercion)
 normSplitTyConApp_maybe fam_envs ty
   | let Reduction co ty1 = topNormaliseType_maybe fam_envs ty
                            `orElse` (mkReflRedn Representational ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
-  = Just (tc, tc_args, co)
+  = assertPpr (not (isNewTyCon tc)) (ppr ty $$ ppr ty1) $  -- Check post-condition
+    Just (tc, tc_args, co)
 normSplitTyConApp_maybe _ _ = Nothing
 
 {-

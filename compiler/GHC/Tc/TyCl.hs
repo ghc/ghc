@@ -3053,9 +3053,9 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
        -- and concrete class with no methods (maybe by
        -- specifying a trailing where or not
 
-       ; mindef <- tcClassMinimalDef class_name sigs sig_stuff
+       ; mindef  <- tcClassMinimalDef class_name sigs sig_stuff
        ; is_boot <- tcIsHsBootOrSig
-       ; let body | is_boot, isNothing hs_ctxt, null at_stuff, null sig_stuff
+       ; let abstract_class = is_boot && isNothing hs_ctxt && null at_stuff && null sig_stuff
                   -- We use @isNothing hs_ctxt@ rather than @null ctxt@,
                   -- so that a declaration in an hs-boot file such as:
                   --
@@ -3064,11 +3064,19 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                   -- is not considered abstract; it's sometimes useful
                   -- to be able to declare such empty classes in hs-boot files.
                   -- See #20661.
-                  = Nothing
-                  | otherwise
-                  = Just (ctxt, at_stuff, sig_stuff, mindef)
 
-       ; clas <- buildClass class_name bndrs roles fds body
+             unary_class = case ctxt ++ map sndOf3 sig_stuff of
+                              [ty] -> isBoxedType ty
+                              _    -> False
+                -- Use a unary class if the data constructor
+                -- has exactly one, boxed value field
+                -- i.e. exactly one operation or superclass taken together
+                -- See (UCM10) in Note [Unary class magic] in GHC.Core.TyCon
+
+       ; clas <- if abstract_class
+                 then buildAbstractClass class_name bndrs roles fds
+                 else buildClass class_name bndrs roles fds ctxt
+                                 at_stuff sig_stuff mindef unary_class
        ; traceTc "tcClassDecl" (ppr fundeps $$ ppr bndrs $$
                                 ppr fds)
        ; return clas }

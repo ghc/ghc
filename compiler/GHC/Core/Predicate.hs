@@ -19,12 +19,12 @@ module GHC.Core.Predicate (
 
   -- Class predicates
   mkClassPred, isDictTy, typeDeterminesValue,
-  isClassPred, isEqualityClass, isCTupleClass,
+  isClassPred, isEqualityClass, isCTupleClass, isUnaryClass,
   getClassPredTys, getClassPredTys_maybe,
   classMethodTy, classMethodInstTy,
 
   -- Implicit parameters
-  couldBeIPLike, mightMentionIP, isIPTyCon, isIPClass,
+  couldBeIPLike, mightMentionIP, isIPTyCon, isIPClass, decomposeIPPred,
   isCallStackTy, isCallStackPred, isCallStackPredTy,
   isExceptionContextPred, isExceptionContextTy,
   isIPPred_maybe,
@@ -269,6 +269,9 @@ isEqualityClass cls
 isCTupleClass :: Class -> Bool
 isCTupleClass cls = isTupleTyCon (classTyCon cls)
 
+isUnaryClass :: Class -> Bool
+isUnaryClass cls = isUnaryClassTyCon (classTyCon cls)
+
 getClassPredTys :: HasDebugCallStack => PredType -> (Class, [Type])
 getClassPredTys ty = case getClassPredTys_maybe ty of
         Just (clas, tys) -> (clas, tys)
@@ -407,6 +410,8 @@ pprPredType pred
 *                                                                      *
 ********************************************************************* -}
 
+-- --------------------- Nomal implicit-parameter predicates ---------------
+
 isIPTyCon :: TyCon -> Bool
 isIPTyCon tc = tc `hasKey` ipClassKey
   -- Class and its corresponding TyCon have the same Unique
@@ -423,6 +428,18 @@ isIPPred_maybe cls tys
   = Just (t1,t2)
   | otherwise
   = Nothing
+
+-- | Take a type (IP sym ty), where IP is the built in IP class
+-- and return (ip, MkIP, [sym,ty]), where
+--    `ip` is the class-op for class IP
+--    `MkIP` is the data constructor for class IP
+decomposeIPPred :: Type -> (Id, [Type])
+decomposeIPPred ty
+  | Just (cls, tys) <- getClassPredTys_maybe ty
+  , [ip_op] <- classMethods cls
+  = assertPpr (isIPClass cls && isUnaryClass cls) (ppr ty) $
+    (ip_op, tys)
+  | otherwise = pprPanic "decomposeIP" (ppr ty)
 
 -- --------------------- ExceptionContext predicates --------------------------
 
