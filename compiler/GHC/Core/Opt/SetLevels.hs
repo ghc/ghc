@@ -614,7 +614,8 @@ lvlMFE env strict_ctxt e@(_, AnnCase {})
   = lvlExpr env e     -- See Note [Case MFEs]
 
 lvlMFE env strict_ctxt ann_expr
-  | not float_me
+  |  notWorthFloating expr abs_vars
+  || not float_me
   || floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
   || hasFreeJoin env fvs   -- If there is a free join, don't float
@@ -623,9 +624,6 @@ lvlMFE env strict_ctxt ann_expr
          -- We can't let-bind an expression if we don't know
          -- how it will be represented at runtime.
          -- See Note [Representation polymorphism invariants] in GHC.Core
-  || notWorthFloating expr abs_vars
-         -- Test notWorhtFloating last;
-         -- See Note [Large free-variable sets]
   = -- Don't float it out
     lvlExpr env ann_expr
 
@@ -698,11 +696,14 @@ lvlMFE env strict_ctxt ann_expr
 
         -- A decision to float entails let-binding this thing, and we only do
         -- that if we'll escape a value lambda, or will go to the top level.
+        -- Never float trivial expressions;
+        --   notably, save_work might be true of a lone evaluated variable.
     float_me = saves_work || saves_alloc || is_mk_static
 
     -- See Note [Saving work]
+    is_hnf = exprIsHNF expr
     saves_work = escapes_value_lam        -- (a)
-                 && not (exprIsHNF expr)  -- (b)
+                 && not is_hnf            -- (b)
                  && not float_is_new_lam  -- (c)
     escapes_value_lam = dest_lvl `ltMajLvl` (le_ctxt_lvl env)
 
@@ -710,7 +711,7 @@ lvlMFE env strict_ctxt ann_expr
     saves_alloc =  isTopLvl dest_lvl
                 && floatConsts env
                 && (   not strict_ctxt                     -- (a)
-                    || exprIsHNF expr                      -- (b)
+                    || is_hnf                              -- (b)
                     || (is_bot_lam && escapes_value_lam))  -- (c)
 
 hasFreeJoin :: LevelEnv -> DVarSet -> Bool
@@ -807,7 +808,7 @@ general, float HNFs, the balance change if it goes to the top:
 * We don't pay an allocation cost for the floated expression; it
   just becomes static data.
 
-* Floating string literal is valuable -- no point in duplicating the
+* Floating string literals is valuable -- no point in duplicating the
   at each call site!
 
 * Floating bottoming expressions is valuable: they are always cold
@@ -867,28 +868,6 @@ It's controlled by a flag (floatConsts), because doing this too
 early loses opportunities for RULES which (needless to say) are
 important in some nofib programs (gcd is an example).  [SPJ note:
 I think this is obsolete; the flag seems always on.]
-
-Note [Large free-variable sets]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In #24471 we had something like
-     x1 = I# 1
-     ...
-     x1000 = I# 1000
-     foo = f x1 (f x2 (f x3 ....))
-So every sub-expression in `foo` has lots and lots of free variables.  But
-none of these sub-expressions float anywhere; the entire float-out pass is a
-no-op.
-
-In lvlMFE, we want to find out quickly if the MFE is not-floatable; that is
-the common case.  In #24471 it turned out that we were testing `abs_vars` (a
-relatively complicated calculation that takes at least O(n-free-vars) time to
-compute) for every sub-expression.
-
-Better instead to test `float_me` early. That still involves looking at
-dest_lvl, which means looking at every free variable, but the constant factor
-is a lot better.
-
-ToDo: find a way to fix the bad asymptotic complexity.
 
 Note [Floating join point bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1135,7 +1114,6 @@ float the case (as advocated here) we won't float the (build ...y..)
 either, so fusion will happen.  It can be a big effect, esp in some
 artificial benchmarks (e.g. integer, queens), but there is no perfect
 answer.
-
 -}
 
 annotateBotStr :: Id -> Arity -> Maybe (Arity, DmdSig, CprSig) -> Id
@@ -1152,68 +1130,132 @@ annotateBotStr id n_extra mb_bot_str
   = id
 
 notWorthFloating :: CoreExpr -> [Var] -> Bool
--- Returns True if the expression would be replaced by
--- something bigger than it is now.  For example:
---   abs_vars = tvars only:  return True if e is trivial,
---                           but False for anything bigger
---   abs_vars = [x] (an Id): return True for trivial, or an application (f x)
---                           but False for (f x x)
---
--- One big goal is that floating should be idempotent.  Eg if
--- we replace e with (lvl79 x y) and then run FloatOut again, don't want
--- to replace (lvl79 x y) with (lvl83 x y)!
-
+--  See Note [notWorthFloating]
 notWorthFloating e abs_vars
-  = go e (count isId abs_vars)
+  = go e 0
   where
-    go (Var {}) n               = n >= 0
-    go (Lit lit) n              = assert (n==0) $
-                                  litIsTrivial lit   -- Note [Floating literals]
-    go (Type {}) _              = True
-    go (Coercion {}) _          = True
+    n_abs_vars = count isId abs_vars  -- See (NWF5)
+
+    go :: CoreExpr -> Int -> Bool
+    -- (go e n) return True if (e x1 .. xn) is not worth floating
+    -- where `e` has n trivial value arguments x1..xn
+    -- See (NWF4)
+    go (Lit lit) n         = (n==0)                 -- See (NWF1b)
+                              && litIsTrivial lit   -- See (NWF1a)
+    go (Type {}) _         = True
+    go (Tick t e) n        = not (tickishIsCode t) && go e n
+    go (Cast e _) n        = n==0 || go e n     -- See (NWF3)
+    go (Coercion {}) _     = True
     go (App e arg) n
-       -- See Note [Floating applications to coercions]
-       | not (isRuntimeArg arg) = go e n
-       | n==0                   = False
-       | exprIsTrivial arg      = go e (n-1) -- NB: exprIsTrivial arg = go arg 0
-       | otherwise              = False
-    go (Tick t e) n             = not (tickishIsCode t) && go e n
-    go (Cast e _)  n            = go e n
-    go (Case e b _ as) n
+       | Type {} <- arg    = go e n    -- Just types, not coercions (NWF2)
+       | exprIsTrivial arg = go e (n+1)
+       | otherwise         = n==0 && exprIsUnaryClassFun e
+                             -- (f non-triv) is worth floating,
+                             -- unless if is a unary class fun
+    go (Case e b _ as) _
+      -- Do not float the `case` part of trivial cases (NWF3)
+      -- We'll have a look at the RHS when we get there
       | null as
-      = go e n     -- See Note [Empty case is trivial]
-      | Just rhs <- isUnsafeEqualityCase e b as
-      = go rhs n   -- See (U2) of Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
-    go _ _                      = False
+      = True   -- See Note [Empty case is trivial]
+      | Just {} <- isUnsafeEqualityCase e b as
+      = True   -- See (U2) of Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
+      | otherwise
+      = False
 
-{-
-Note [Floating literals]
-~~~~~~~~~~~~~~~~~~~~~~~~
-It's important to float Integer literals, so that they get shared,
-rather than being allocated every time round the loop.
-Hence the litIsTrivial.
+    go (Var v) n
+      | isUnaryClassId v = n==1   -- (op x) is not worth floating, but (op x y) is!!
+                                  --    See (NWF3)
+      | n==0             = True   -- Naked variable
+      | n <= n_abs_vars  = True   -- (f a b c) is not worth floating if
+      | otherwise        = False  -- a,b,c are all abstracted; see (NWF5)
 
-Ditto literal strings (LitString), which we'd like to float to top
-level, which is now possible.
+    go _ _ = False  -- Let etc is worth floating
 
-Note [Floating applications to coercions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don’t float out variables applied only to type arguments, since the
-extra binding would be pointless: type arguments are completely erased.
-But *coercion* arguments aren’t (see Note [Coercion tokens] in
-"GHC.CoreToStg" and Note [inlineBoringOk] in"GHC.Core.Unfold"),
-so we still want to float out variables applied only to
-coercion arguments.
+{- Note [notWorthFloating]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+`notWorthFloating` returns True if the expression would be replaced by something
+bigger than it is now.  One big goal is that floating should be idempotent.  Eg
+if we replace e with (lvl79 x y) and then run FloatOut again, don't want to
+replace (lvl79 x y) with (lvl83 x y)!
 
+For example:
+  abs_vars = tvars only:  return True if e is trivial,
+                          but False for anything bigger
+  abs_vars = [x] (an Id): return True for trivial, or an application (f x)
+                          but False for (f x x)
 
-************************************************************************
-*                                                                      *
-\subsection{Bindings}
-*                                                                      *
-************************************************************************
+(NWF1a) It's important to float Integer literals, so that they get shared, rather
+  than being allocated every time round the loop.  Hence the litIsTrivial.
 
-The binding stuff works for top level too.
+  Ditto literal strings (LitString), which we'd like to float to top
+  level, which is now possible.
+
+(NWF1b) You might think that a literal should never be applied to a value
+  (hence n=0) but actually we can get (see test T23024):
+      RUBBISH @(a->b) (x::a)
+  See Note [Rubbish literals] in GHC.Types.Literal.  (Mind you, we should be
+  in dead code at this point!)
+
+(NWF2) We don’t float out variables applied only to type arguments, since the
+  extra binding would be pointless: type arguments are completely erased.
+  But *coercion* arguments aren’t (see Note [Coercion tokens] in
+  "GHC.CoreToStg" and Note [inlineBoringOk] in"GHC.Core.Unfold"),
+  so we still want to float out variables applied only to
+  coercion arguments.
+
+(NWF3) Some expressions have trivial wrappers:
+     - Casts (e |> co)
+     - Unary-class applications:
+          - Dictionary applications (MkC meth)
+          - Class-op applictions    (op dict)
+     - Case of empty alts
+     - Unsafe-equality case
+  In all these cases we say "not worth floating", and we do so /regardless/
+  of the wrapped expression.  The SetLevels stuff may subsequently float the
+  components of the expression.
+
+  Example:  is it worth floating (f x |> co)?  No!  If we did we'd get
+     lvl = f x |> co
+     ...lvl....
+  Then we'd do cast worker/wrapper and end up with.
+     lvl' = f x
+     ...(lvl' |> co)...
+  Silly!  Better not to float it in the first place.  If we say "no" here,
+  we'll subsequently say "yes" for (f x) and get
+     lvl = f x
+     ....(lvl |> co)...
+  which is what we want.  In short: don't float trivial wrappers.
+
+(NWF4) The only non-trivial expression that we say "not worth floating" for
+  is an application
+             f x y z
+  where the number of value arguments is <= the number of abstracted Ids.
+  This is what makes floating idempotent.  Hence counting the number of
+  value arguments in `go`
+
+(NWF5) In #24471 we had something like
+     x1 = I# 1
+     ...
+     x1000 = I# 1000
+     foo = f x1 (f x2 (f x3 ....))
+  So every sub-expression in `foo` has lots and lots of free variables.  But
+  none of these sub-expressions float anywhere; the entire float-out pass is a
+  no-op.
+
+  So `notWorthFloating` tries to avoid evaluating `n_abs_vars`, in cases where
+  it obviously /is/ worth floating.  (In #24471 it turned out that we were
+  testing `abs_vars` (a relatively complicated calculation that takes at least
+  O(n-free-vars) time to compute) for every sub-expression.)
+
+  Hence testing `n_abs_vars only` at the very end.
 -}
+
+{- *********************************************************************
+*                                                                      *
+                       Bindings
+        This binding stuff works for top level too.
+*                                                                      *
+********************************************************************* -}
 
 lvlBind :: LevelEnv
         -> CoreBindWithFVs

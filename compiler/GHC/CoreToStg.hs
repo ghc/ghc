@@ -404,24 +404,25 @@ coreToStgExpr
 -- CorePrep should have converted them all to a real core representation.
 coreToStgExpr (Lit (LitNumber LitNumBigNat _))  = panic "coreToStgExpr: LitNumBigNat"
 coreToStgExpr (Lit l)                           = return (StgLit l)
-coreToStgExpr (Var v) = coreToStgApp v [] []
+coreToStgExpr (Var v) = coreToStgApp v [] [] (idType v)
 coreToStgExpr (Coercion _)
   -- See Note [Coercion tokens]
-  = coreToStgApp coercionTokenId [] []
+  = coreToStgApp coercionTokenId [] [] (idType coercionTokenId)
 
 coreToStgExpr expr@(App _ _)
   = case app_head of
-      Var f -> coreToStgApp f args ticks -- Regular application
-      Lit l | isLitRubbish l             -- If there is LitRubbish at the head,
-                                         --    discard the arguments
-                                         --    Recompute representation, because in
-                                         --    '(RUBBISH[rep] x) :: (T :: TYPE rep2)'
-                                         --    rep might not be equal to rep2
-            -> return (StgLit $ LitRubbish TypeLike $ getRuntimeRep (exprType expr))
+      Var f -> coreToStgApp f args ticks res_ty -- Regular application
+      Lit l | isLitRubbish l  -- Discard arguments if head is LitRubbish
+                              -- Recompute representation, because in
+                              -- '(RUBBISH[rep] x) :: (T :: TYPE rep2)'
+                              -- rep might not be equal to rep2
+            -> return (StgLit $ LitRubbish TypeLike $ getRuntimeRep res_ty)
 
       _     -> pprPanic "coreToStgExpr - Invalid app head:" (ppr expr)
     where
-      (app_head, args, ticks) = myCollectArgs expr
+      res_ty                  = exprType expr
+      (app_head, args, ticks) = myCollectArgs expr res_ty
+
 coreToStgExpr expr@(Lam _ _)
   = let
         (args, body) = myCollectBinders expr
@@ -524,61 +525,61 @@ mkStgAltType bndr alts
 
 coreToStgApp :: Id            -- Function
              -> [CoreArg]     -- Arguments
-             -> [CoreTickish] -- Debug ticks
+             -> [StgTickish]  -- From the application nodes
+             -> Type          -- Type of the whole application
              -> CtsM StgExpr
-coreToStgApp f args ticks = do
-    (args', ticks') <- coreToStgArgs args
-    how_bound <- lookupVarCts f
+coreToStgApp f core_args app_ticks res_ty
+  = do { how_bound             <- lookupVarCts f
+       ; (stg_args, arg_ticks) <- coreToStgArgs core_args
+       ; let app = mkStgApp f how_bound core_args stg_args res_ty
+             all_ticks =  app_ticks ++ arg_ticks
 
-    let
-        n_val_args       = valArgCount args
+       -- Forcing these fixes a leak in the code generator,
+       -- noticed while profiling for #4367
+       ; app `seq` return (foldr add_tick app all_ticks)}
+  where
+    add_tick !t !e = StgTick t e
 
-        -- Mostly, the arity info of a function is in the fn's IdInfo
-        -- But new bindings introduced by CoreSat may not have no
-        -- arity info; it would do us no good anyway.  For example:
-        --      let f = \ab -> e in f
-        -- No point in having correct arity info for f!
-        -- Hence the hasArity stuff below.
-        -- NB: f_arity is only consulted for LetBound things
-        f_arity   = stgArity f how_bound
-        saturated = f_arity <= n_val_args
-        exactly_saturated = f_arity == n_val_args
+mkStgApp :: Id -> HowBound -> [CoreArg] -> [StgArg] -> Type -> StgExpr
+mkStgApp f how_bound core_args stg_args res_ty
+  = case idDetails f of
+      DataConWorkId dc
+        | exactly_saturated  -- See Note [Saturation of data constructors in STG]
+        -> if isUnboxedSumDataCon dc then
+              StgConApp dc NoNumber stg_args (sumPrimReps core_args)
+           else
+              StgConApp dc NoNumber stg_args []
 
-        res_ty = exprType (mkApps (Var f) args)
-        app = case idDetails f of
-                DataConWorkId dc
-                  -- See Note [Saturation of data constructors in STG]
-                  | exactly_saturated
-                  ->  if isUnboxedSumDataCon dc then
-                        StgConApp dc NoNumber args' (sumPrimReps args)
-                      else
-                        StgConApp dc NoNumber args' []
+      -- Some primitive operator that might be implemented as a library call.
+      -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
+      -- we require that primop applications be saturated.
+      PrimOpId op _    -> -- assertPpr saturated (ppr f <+> ppr stg_args) $
+                          StgOpApp (StgPrimOp op) stg_args res_ty
 
-                -- Some primitive operator that might be implemented as a library call.
-                -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
-                -- we require that primop applications be saturated.
-                PrimOpId op _    -> -- assertPpr saturated (ppr f <+> ppr args) $
-                                    StgOpApp (StgPrimOp op) args' res_ty
+      -- A call to some primitive Cmm function.
+      FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
+                                PrimCallConv _))
+                       -> assert exactly_saturated $
+                          StgOpApp (StgPrimCallOp (PrimCall lbl pkgId)) stg_args res_ty
 
-                -- A call to some primitive Cmm function.
-                FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
-                                          PrimCallConv _))
-                                 -> assert saturated $
-                                    StgOpApp (StgPrimCallOp (PrimCall lbl pkgId)) args' res_ty
+      -- A regular foreign call.
+      FCallId call     -> assert exactly_saturated $
+                          StgOpApp (StgFCallOp call (idType f)) stg_args res_ty
 
-                -- A regular foreign call.
-                FCallId call     -> assert saturated $
-                                    StgOpApp (StgFCallOp call (idType f)) args' res_ty
+      TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,stg_args)
 
-                TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
-                _other           -> StgApp f args'
-
-        add_tick !t !e = StgTick t e
-        tapp = foldr add_tick app (map (coreToStgTick res_ty) ticks ++ ticks')
-
-    -- Forcing these fixes a leak in the code generator, noticed while
-    -- profiling for #4367
-    app `seq` return tapp
+      _other           -> StgApp f stg_args
+  where
+    -- Mostly, the arity info of a function is in the fn's IdInfo
+    -- But new bindings introduced by CoreSat may not have no
+    -- arity info; it would do us no good anyway.  For example:
+    --      let f = \ab -> e in f
+    -- No point in having correct arity info for f!
+    -- Hence the hasArity stuff below.
+    -- NB: f_arity is only consulted for LetBound things
+    f_arity    = stgArity f how_bound
+    n_val_args = length stg_args  -- StgArgs are all value arguments
+    exactly_saturated  = f_arity == n_val_args
 
 
 -- Given Core arguments to an unboxed sum datacon, return the 'PrimRep's
@@ -828,17 +829,28 @@ myCollectBinders expr
 -- INVARIANT: If the app head is trivial, return the atomic Var/Lit that was
 -- wrapped in casts, empty case, ticks, etc.
 -- So keep in sync with 'exprIsTrivial'.
-myCollectArgs :: HasDebugCallStack => CoreExpr -> (CoreExpr, [CoreArg], [CoreTickish])
-myCollectArgs expr
+myCollectArgs :: HasDebugCallStack
+              => CoreExpr -> Type -> (CoreExpr, [CoreArg], [StgTickish])
+myCollectArgs expr res_ty
   = go expr [] []
   where
-    go h@(Var _v)       as ts = (h, as, ts)
-    go (App f a)        as ts = go f (a:as) ts
-    go (Tick t e)       as ts = assertPpr (not (tickishIsCode t) || all isTypeArg as)
-                                          (ppr e $$ ppr as $$ ppr ts) $
-                                -- See Note [Ticks in applications]
-                                go e as (t:ts) -- ticks can appear in type apps
-    go (Cast e _)       as ts = go e as ts
+    go h@(Var f) as ts
+      | isUnaryClassId f, (the_arg:as') <- dropWhile isTypeArg as
+      = go the_arg as' ts
+        -- See (UCM1) in Note [Unary class magic] in GHC.Core.TyCon
+        -- isUnaryClassId includes both the class op and the data-con
+
+      | otherwise
+      = (h, as, ts)
+
+    go (App f a)  as ts = go f (a:as) ts
+    go (Cast e _) as ts = go e as ts
+    go (Tick t e) as ts = assertPpr (not (tickishIsCode t) || all isTypeArg as)
+                                    (ppr e $$ ppr as $$ ppr ts) $
+                          -- See Note [Ticks in applications]
+                          -- ticks can appear in type apps
+                          go e as (coreToStgTick res_ty t : ts)
+
     go (Case e b _ alts) as ts  -- Just like in exprIsTrivial!
                                 -- Otherwise we fall over in case we encounter
                                 -- `(case f a of {}) b` in the future.
@@ -847,9 +859,12 @@ myCollectArgs expr
                    go e [] ts -- NB: Empty case discards arguments
        | Just rhs <- isUnsafeEqualityCase e b alts
        = go rhs as ts         -- Discards unsafeCoerce in App heads
-    go (Lam b e)        as ts
-       | isTyVar b            = go e (drop 1 as) ts -- Note [Collect args]
-    go e                as ts = (e, as, ts)
+
+    go (Lam b e) as ts
+       | isTyVar b
+       = go e (drop 1 as) ts -- Note [Collect args]
+
+    go e as ts = (e, as, ts)
 
 {- Note [Collect args]
 ~~~~~~~~~~~~~~~~~~~~~~

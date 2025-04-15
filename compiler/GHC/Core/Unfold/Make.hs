@@ -84,6 +84,16 @@ mkSimpleUnfolding !opts rhs
 
 mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops
+  | isUnaryClassDataCon con
+  = -- See (UCM5) in Note [Unary class magic] in GHC.Core.TyCon
+    mkDataConUnfolding $
+    mkLams bndrs  $
+    mkApps (Var (dataConWrapId con)) ops
+                -- This application will satisfy the Core invariants
+                -- from Note [Representation polymorphism invariants] in GHC.Core,
+                -- because typeclass method types are never unlifted.
+
+  | otherwise
   = DFunUnfolding { df_bndrs = bndrs
                   , df_con = con
                   , df_args = map occurAnalyseExpr ops }

@@ -1,2 +1,4 @@
+Rule fired: Class op c (BUILTIN)
+Rule fired: Class op c (BUILTIN)
 Rule fired: SPEC/T17366 f @Identity @_ (T17366)
 Rule fired: SPEC/T17366 f @(Tagged tag) @_ (T17366)
