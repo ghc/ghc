@@ -205,18 +205,20 @@ tyConToIfaceDecl env tycon
             ibr  = map (coAxBranchToIfaceBranch tycon lhss) defs
             axn  = coAxiomName ax
 
-    ifaceConDecls (NewTyCon { data_con = con })    = IfNewTyCon  (ifaceConDecl con)
     ifaceConDecls (DataTyCon { data_cons = cons, is_type_data = type_data })
       = IfDataTyCon type_data (map ifaceConDecl cons)
-    ifaceConDecls (TupleTyCon { data_con = con })  = IfDataTyCon False [ifaceConDecl con]
-    ifaceConDecls (SumTyCon { data_cons = cons })  = IfDataTyCon False (map ifaceConDecl cons)
-    ifaceConDecls AbstractTyCon                    = IfAbstractTyCon
-        -- The AbstractTyCon case happens when a TyCon has been trimmed
-        -- during tidying.
-        -- Furthermore, tyThingToIfaceDecl is also used in GHC.Tc.Module
-        -- for GHCi, when browsing a module, in which case the
-        -- AbstractTyCon and TupleTyCon cases are perfectly sensible.
-        -- (Tuple declarations are not serialised into interface files.)
+    ifaceConDecls (NewTyCon { data_con = con })        = IfNewTyCon        (ifaceConDecl con)
+    ifaceConDecls (UnaryClassTyCon { data_con = con})  = IfDataTyCon False [ifaceConDecl con]
+    ifaceConDecls (TupleTyCon { data_con = con })      = IfDataTyCon False [ifaceConDecl con]
+    ifaceConDecls (SumTyCon { data_cons = cons })      = IfDataTyCon False (map ifaceConDecl cons)
+    ifaceConDecls AbstractTyCon                        = IfAbstractTyCon
+        -- The AbstractTyCon case happens when a TyCon has been trimmed during tidying.
+        --
+        -- NB: TupleTyCon/SumTyCon/UnaryClassTyCon are never serialised into interface files
+        --     But tyThingToIfaceDecl is also used in GHC.Tc.Module
+        --     for GHCi, when browsing a module, in which case the
+        --     AbstractTyCon, TupleTyCon, SumTyCon are perfectly sensible.
+        --     (Not sure about UnaryClassTyCon, but easier to treat it uniformly.)
 
     ifaceConDecl data_con
         = IfCon   { ifConName    = dataConName data_con,
@@ -283,7 +285,8 @@ classToIfaceDecl env clas
                 ifClassCtxt   = tidyToIfaceContext env1 sc_theta,
                 ifATs    = map toIfaceAT clas_ats,
                 ifSigs   = map toIfaceClassOp op_stuff,
-                ifMinDef = toIfaceBooleanFormula (classMinimalDef clas)
+                ifMinDef = toIfaceBooleanFormula (classMinimalDef clas),
+                ifUnary  = isUnaryClassTyCon tycon
             }
 
     (env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)

@@ -7,8 +7,9 @@ T14434:
          # Expecting toStringX = toString, not discarding argument
 
 T14774:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14774.hs -ddump-simpl | grep p1D
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14774.hs -ddump-simpl | grep -q p1D
          # Expecting no superclass selections to actually happen
+         # -q makes exit code 0 although no lines selected by grep
 
 tc170:
 	$(RM) Tc170_Aux.hi Tc170_Aux.o tc170.hi tc170.o

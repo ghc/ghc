@@ -254,20 +254,9 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
     tc_ip_bind ipClass (IPBind _ l_name@(L _ ip) expr)
        = do { ty <- newFlexiTyVarTy liftedTypeKind  -- see #24298
             ; let p = mkStrLitTy $ hsIPNameFS ip
-            ; ip_id <- newDict ipClass [ p, ty ]
+            ; ip_id <- newDict ipClass [p, ty]
             ; expr' <- tcCheckMonoExpr expr ty
-            ; let d = fmap (toDict ipClass p ty) expr'
-            ; return (ip_id, (IPBind ip_id l_name d)) }
-
-    -- Coerces a `t` into a dictionary for `IP "x" t`.
-    -- co : t -> IP "x" t
-    toDict :: Class  -- IP class
-           -> Type   -- type-level string for name of IP
-           -> Type   -- type of IP
-           -> HsExpr GhcTc   -- def'n of IP variable
-           -> HsExpr GhcTc   -- dictionary for IP
-    toDict ipClass x ty = mkHsWrap $ mkWpCastR $
-                          wrapIP $ mkClassPred ipClass [x,ty]
+            ; return (ip_id, IPBind ip_id l_name expr') }
 
 tcValBinds :: TopLevelFlag
            -> [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn]

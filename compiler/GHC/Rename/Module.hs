@@ -2229,7 +2229,7 @@ The main parts of the implementation are:
   from `type data`, which do not use the distinguishing quote mark added
   to constructors promoted by DataKinds.
 
-* GHC.Core.TyCon.isDataTyCon ignores types coming from a `type data`
+* GHC.Core.TyCon.isBoxedDataTyCon ignores types coming from a `type data`
   declaration (by checking the `is_type_data` field), so that these do
   not contribute executable code such as constructor wrappers.
 

@@ -18,7 +18,12 @@ module GHC.Core.Class (
         classKey, className, classATs, classATItems, classTyCon, classMethods,
         classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
         classHasSCs, classAllSelIds, classSCSelId, classSCSelIds, classMinimalDef,
-        classHasFds, isAbstractClass,
+        classHasFds,
+
+        -- Predicates
+        -- NB: other isXXlass predicates are defined in GHC.Core.Predicate
+        --     to avoid module loops
+        isAbstractClass
     ) where
 
 import GHC.Prelude
