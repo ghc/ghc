@@ -32,8 +32,8 @@ module GHC.Parser.PreProcess.State (
 
 import Data.List.NonEmpty ((<|))
 import Data.List.NonEmpty qualified as NonEmpty
-import Data.Map (Map)
-import Data.Map qualified as Map
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
 import GHC.Base
 import GHC.Data.StringBuffer
@@ -317,7 +317,7 @@ addDefine name def = do
 
 addDefine' :: PpState -> MacroName -> MacroDef -> PpState
 addDefine' s name def =
-    s{pp_defines = insertMacroDef name def (pp_defines s)}
+    s{ pp_defines = insertMacroDef name def (pp_defines s)}
 
 ppDefine :: MacroName -> MacroDef -> PP ()
 ppDefine name val = addDefine name val
