@@ -1,0 +1,11 @@
+-- test that we can reuse object files
+
+:m A B
+f 10
+-- Not in scope
+g 10
+
+
+-- Can't load interpreted as they are using object code
+:m *A *B
+g 10

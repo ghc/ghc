@@ -156,6 +156,7 @@ module GHC.Driver.Session (
         updOptLevel,
         setTmpDir,
         setUnitId,
+        setHomeUnitId,
 
         TurnOnFlag,
         turnOn,
@@ -3285,6 +3286,9 @@ parseUnitArg =
 
 setUnitId :: String -> DynFlags -> DynFlags
 setUnitId p d = d { homeUnitId_ = stringToUnitId p }
+
+setHomeUnitId :: UnitId -> DynFlags -> DynFlags
+setHomeUnitId p d = d { homeUnitId_ = p }
 
 setWorkingDirectory :: String -> DynFlags -> DynFlags
 setWorkingDirectory p d = d { workingDirectory =  Just p }

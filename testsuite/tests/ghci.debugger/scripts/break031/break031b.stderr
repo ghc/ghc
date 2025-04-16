@@ -1,0 +1,6 @@
+<interactive>:1:1: error: [GHC-76037] Not in scope: ‘result’
+
+<interactive>:13:1: error: [GHC-88464]
+    Variable not in scope: result
+    Suggested fix: Perhaps use ‘_result’ (line 16)
+

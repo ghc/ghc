@@ -6,12 +6,10 @@ GHCi-specific dynamic flag settings:
 other dynamic, non-language, flag settings:
   -fno-diagnostics-show-caret
   -fno-dump-with-ways
-  -fexternal-dynamic-refs
   -fignore-optim-changes
   -fignore-hpc-changes
   -fno-ghci-history
   -fimplicit-import-qualified
-  -fkeep-going
   -fshow-warning-groups
   -fprefer-byte-code
   -fbreak-points

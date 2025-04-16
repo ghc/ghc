@@ -69,6 +69,8 @@ module GHC.Unit.Types
    , mainUnitId
    , thisGhcUnitId
    , interactiveUnitId
+   , interactiveGhciUnitId
+   , interactiveSessionUnitId
 
    , primUnit
    , bignumUnit
@@ -80,6 +82,8 @@ module GHC.Unit.Types
    , thisGhcUnit
    , interactiveUnit
    , experimentalUnit
+   , interactiveGhciUnit
+   , interactiveSessionUnit
 
    , isInteractiveModule
    , wiredInUnitIds
@@ -597,10 +601,11 @@ Make sure you change 'GHC.Unit.State.findWiredInUnits' if you add an entry here.
 
 bignumUnitId, primUnitId, ghcInternalUnitId, baseUnitId, rtsUnitId,
   thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId,
+  interactiveGhciUnitId, interactiveSessionUnitId,
   experimentalUnitId :: UnitId
 
 bignumUnit, primUnit, ghcInternalUnit, baseUnit, rtsUnit,
-  thUnit, mainUnit, thisGhcUnit, interactiveUnit, experimentalUnit  :: Unit
+  thUnit, mainUnit, thisGhcUnit, interactiveUnit, interactiveGhciUnit, interactiveSessionUnit, experimentalUnit  :: Unit
 
 primUnitId        = UnitId (fsLit "ghc-prim")
 bignumUnitId      = UnitId (fsLit "ghc-bignum")
@@ -611,6 +616,8 @@ thisGhcUnitId     = UnitId (fsLit cProjectUnitId) -- See Note [GHC's Unit Id]
 interactiveUnitId = UnitId (fsLit "interactive")
 thUnitId          = UnitId (fsLit "template-haskell")
 experimentalUnitId = UnitId (fsLit "ghc-experimental")
+interactiveGhciUnitId = UnitId (fsLit "interactive-ghci")
+interactiveSessionUnitId = UnitId (fsLit "interactive-session")
 
 thUnit            = RealUnit (Definite thUnitId)
 primUnit          = RealUnit (Definite primUnitId)
@@ -621,6 +628,8 @@ rtsUnit           = RealUnit (Definite rtsUnitId)
 thisGhcUnit       = RealUnit (Definite thisGhcUnitId)
 interactiveUnit   = RealUnit (Definite interactiveUnitId)
 experimentalUnit  = RealUnit (Definite experimentalUnitId)
+interactiveGhciUnit = RealUnit (Definite interactiveGhciUnitId)
+interactiveSessionUnit = RealUnit (Definite interactiveSessionUnitId)
 
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix

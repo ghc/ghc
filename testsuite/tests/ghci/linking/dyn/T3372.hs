@@ -60,7 +60,7 @@ load (f,mn) = do target <- GHC.guessTarget f Nothing Nothing
                  GHC.liftIO $ putStrLn ("Load " ++ showSuccessFlag res)
                  --
                  m <- GHC.findModule (GHC.mkModuleName mn) Nothing
-                 GHC.setContext [GHC.IIModule $ GHC.moduleName $ m]
+                 GHC.setContext [GHC.IIModule m]
     where showSuccessFlag GHC.Succeeded = "succeeded"
           showSuccessFlag GHC.Failed    = "failed"
 

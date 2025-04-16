@@ -1,0 +1,16 @@
+:m *C
+putStrLn "Unqualified foo from module C"
+foo
+:m + B
+-- throws an ambiguous function error
+foo
+import qualified C
+putStrLn "Qualified foo from module C"
+C.foo
+import qualified B
+putStrLn "Qualified foo from module B"
+B.foo
+-- unloading C
+:m - C
+putStrLn "Unqualified foo from module B"
+foo

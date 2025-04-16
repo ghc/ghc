@@ -1,8 +1,8 @@
-[1 of 2] Compiling Bug2             ( Bug2.hs, Bug2.o )
-[2 of 2] Compiling Bug              ( Bug.hs, Bug.o )
+[1 of 2] Compiling Bug2             ( Bug2.hs, Bug2.o )[main]
+[2 of 2] Compiling Bug              ( Bug.hs, Bug.o )[interactive-session]
 Ok, two modules loaded.
-[1 of 3] Compiling New              ( New.hs, New.o )
-[2 of 3] Compiling Bug2             ( Bug2.hs, Bug2.o ) [Source file changed]
-[3 of 3] Compiling Bug              ( Bug.hs, Bug.o ) [Bug2 changed]
+[1 of 3] Compiling New              ( New.hs, New.o )[main]
+[2 of 3] Compiling Bug2             ( Bug2.hs, Bug2.o )[main] [Source file changed]
+[3 of 3] Compiling Bug              ( Bug.hs, Bug.o )[interactive-session] [Bug2 changed]
 Ok, three modules reloaded.
 True

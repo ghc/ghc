@@ -120,7 +120,6 @@ import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Home.ModInfo
-import GHC.Unit.Home.PackageTable
 
 import GHC.Tc.Module ( runTcInteractive, tcRnType, loadUnqualIfaces )
 import GHC.Tc.Solver (simplifyWantedsTcM)
@@ -142,6 +141,7 @@ import Data.List.NonEmpty (NonEmpty)
 import System.Directory
 import Unsafe.Coerce ( unsafeCoerce )
 import qualified GHC.Unit.Home.Graph as HUG
+import qualified GHC.Unit.Home.PackageTable as HUG
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -337,7 +337,7 @@ handleRunStatus step expr bindings final_ids status history0
        let interp = hscInterp hsc_env
        let dflags = hsc_dflags hsc_env
        hmi <- expectJust "handleRunStatus" <$> (liftIO $
-                 lookupHpt (hsc_HPT hsc_env) (mkModuleName mod_name))
+                 HUG.lookupHpt (hsc_HPT hsc_env) (mkModuleName mod_name))
        let modl = mi_module (hm_iface hmi)
            breaks = getModBreaks hmi
 
@@ -461,7 +461,7 @@ setupBreakpoint :: GhcMonad m => HscEnv -> BreakInfo -> Int -> m ()   -- #19157
 setupBreakpoint hsc_env brkInfo cnt = do
   let modl :: Module = breakInfo_module brkInfo
       breaks hsc_env modl = getModBreaks . expectJust "setupBreakpoint" <$>
-         lookupHpt (hsc_HPT hsc_env) (moduleName modl)
+         HUG.lookupHugByModule modl (hsc_HUG hsc_env)
       ix = breakInfo_number brkInfo
   modBreaks  <- liftIO $ breaks hsc_env modl
   let breakarray = modBreaks_flags modBreaks
@@ -553,7 +553,7 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
 -- of the breakpoint and the free variables of the expression.
 bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
    hmi <- expectJust "bindLocalsAtBreakpoint" <$> (liftIO $
-                     lookupHpt (hsc_HPT hsc_env) (moduleName breakInfo_module))
+                     HUG.lookupHugByModule breakInfo_module (hsc_HUG hsc_env) )
    let interp    = hscInterp hsc_env
        breaks    = getModBreaks hmi
        info      = expectJust "bindLocalsAtBreakpoint2" $
@@ -809,7 +809,7 @@ setContext imports
       text "to context:" <+> text err
 
 findGlobalRdrEnv :: HscEnv -> [InteractiveImport]
-                 -> IO (Either (ModuleName, String) GlobalRdrEnv)
+                 -> IO (Either (Module, String) GlobalRdrEnv)
 -- Compute the GlobalRdrEnv for the interactive context
 findGlobalRdrEnv hsc_env imports
   = do { idecls_env <- hscRnImportDecls hsc_env idecls
@@ -822,16 +822,17 @@ findGlobalRdrEnv hsc_env imports
     idecls :: [LImportDecl GhcPs]
     idecls = [noLocA d | IIDecl d <- imports]
 
-    imods :: [ModuleName]
+    imods :: [Module]
     imods = [m | IIModule m <- imports]
 
-    mkEnv mod = mkTopLevEnv hsc_env mod >>= \case
-      Left err -> pure $ Left (mod, err)
-      Right env -> pure $ Right env
+    mkEnv mod = do
+      mkTopLevEnv hsc_env mod >>= \case
+        Left err -> pure $ Left (mod, err)
+        Right env -> pure $ Right env
 
-mkTopLevEnv :: HscEnv -> ModuleName -> IO (Either String GlobalRdrEnv)
+mkTopLevEnv :: HscEnv -> Module -> IO (Either String GlobalRdrEnv)
 mkTopLevEnv hsc_env modl
-  = lookupHpt hpt modl >>= \case
+  = HUG.lookupHugByModule modl hug >>= \case
       Nothing -> pure $ Left "not a home module"
       Just details ->
          case mi_top_env (hm_iface details) of
@@ -852,7 +853,7 @@ mkTopLevEnv hsc_env modl
                   let exports_env = hydrateGlobalRdrEnv get_GRE_info exports
                   pure $ Right $ plusGlobalRdrEnv imports_env exports_env
   where
-    hpt = hsc_HPT hsc_env
+    hug = hsc_HUG hsc_env
 
 -- | Get the interactive evaluation context, consisting of a pair of the
 -- set of modules from which we take the full top-level scope, and the set
@@ -865,11 +866,9 @@ getContext = withSession $ \HscEnv{ hsc_IC=ic } ->
 -- its full top-level scope available.
 moduleIsInterpreted :: GhcMonad m => Module -> m Bool
 moduleIsInterpreted modl = withSession $ \h ->
- if notHomeModule (hsc_home_unit h) modl
-        then return False
-        else liftIO (lookupHpt (hsc_HPT h) (moduleName modl)) >>= \case
-              Just details       -> return (isJust (mi_top_env (hm_iface details)))
-              _not_a_home_module -> return False
+  liftIO (HUG.lookupHugByModule modl (hsc_HUG h)) >>= \case
+    Just hmi           -> return (isJust $ homeModInfoByteCode hmi)
+    _not_a_home_module -> return False
 
 -- | Looks up an identifier in the current interactive context (for :info)
 -- Filter the instances by the ones whose tycons (or classes resp)

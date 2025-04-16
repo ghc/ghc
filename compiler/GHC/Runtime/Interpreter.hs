@@ -115,6 +115,7 @@ import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Directory
 import System.Process
+import GHC.Unit.Home.Graph (lookupHugByModule)
 
 {- Note [Remote GHCi]
    ~~~~~~~~~~~~~~~~~~
@@ -433,7 +434,7 @@ handleSeqHValueStatus interp unit_env eval_status =
     -- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
     getSeqBpSpan Nothing = pure $ mkGeneralSrcSpan (fsLit "<unknown>")
     breaks mod = getModBreaks . expectJust "getSeqBpSpan" <$>
-      lookupHpt (ue_hpt unit_env) (moduleName mod)
+      lookupHugByModule mod (ue_home_unit_graph unit_env)
 
 
 -- -----------------------------------------------------------------------------

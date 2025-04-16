@@ -1,0 +1,19 @@
+foo :: Integer
+main :: IO ()
+type Test :: * -> Constraint
+class Test a where
+  test :: a -> String
+  {-# MINIMAL test #-}
+-- imported via E
+foo :: Integer
+main :: IO ()
+type Test :: * -> Constraint
+class Test a
+  ...
+test :: Test a => a -> String
+type Test :: * -> Constraint
+class Test a where
+  test :: a -> String
+  {-# MINIMAL test #-}
+  	-- Defined at e/E.hs:11:1
+instance Test Int -- Defined at e/E.hs:14:10

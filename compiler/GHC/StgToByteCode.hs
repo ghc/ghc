@@ -78,7 +78,7 @@ import Control.Monad
 import Data.Char
 
 import GHC.Unit.Module
-import GHC.Unit.Home.PackageTable (lookupHpt)
+import qualified GHC.Unit.Home.Graph as HUG
 
 import Data.Array
 import Data.Coerce (coerce)
@@ -440,8 +440,8 @@ break_info hsc_env mod current_mod current_mod_breaks
   | mod == current_mod
   = pure $ check_mod_ptr =<< current_mod_breaks
   | otherwise
-  = ioToBc (lookupHpt (hsc_HPT hsc_env) (moduleName mod)) >>= \case
-      Just hp -> pure $ check_mod_ptr (getModBreaks hp)
+  = ioToBc (HUG.lookupHugByModule mod (hsc_HUG hsc_env)) >>= \case
+      Just hp -> pure $ Just $ getModBreaks hp
       Nothing -> pure Nothing
   where
     check_mod_ptr mb

@@ -1,5 +1,11 @@
+<no location info>: warning: [GHC-42258] [-Wunused-packages]
+    The following packages were specified via -package or -package-id flags,
+    but were not needed for compilation:
+      - template-haskell-2.23.0.0 (exposed by flag -package template-haskell)
 
 <no location info>: warning: [GHC-42258] [-Wunused-packages]
     The following packages were specified via -package or -package-id flags,
     but were not needed for compilation:
-      - template-haskell-2.22.0.0 (exposed by flag -package template-haskell)
+      - ghc-9.13 (exposed by flag -package ghc)
+      - template-haskell-2.23.0.0 (exposed by flag -package template-haskell)
+

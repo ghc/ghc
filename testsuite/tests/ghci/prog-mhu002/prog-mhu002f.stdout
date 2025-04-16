@@ -1,0 +1,15 @@
+=== :browse A
+A.baz :: Integer
+A.foobar :: Integer
+type A.A :: *
+data A.A = A.A
+=== :browse B
+B.foo :: Integer
+type B.Test :: * -> Constraint
+class B.Test a where
+  B.test :: a -> String
+  {-# MINIMAL test #-}
+=== :browse C
+C.bar :: Integer
+=== :main
+Hello, World

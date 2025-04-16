@@ -1,6 +1,6 @@
-[1 of 3] Compiling A                ( A.hs, interpreted )
-[2 of 3] Compiling B                ( B.hs, interpreted )
-[3 of 3] Compiling C                ( C.hs, interpreted )
+[1 of 3] Compiling A                ( A.hs, interpreted )[main]
+[2 of 3] Compiling B                ( B.hs, interpreted )[main]
+[3 of 3] Compiling C                ( C.hs, interpreted )[interactive-session]
 A.hs:5:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘incompletePattern’:
@@ -18,7 +18,7 @@ C.hs:6:7: error: [GHC-88464]
     Variable not in scope: variableNotInScope :: ()
 
 Failed, two modules loaded.
-[3 of 3] Compiling C                ( C.hs, interpreted )
+[3 of 3] Compiling C                ( C.hs, interpreted )[interactive-session]
 C.hs:6:7: error: [GHC-88464]
     Variable not in scope: variableNotInScope :: ()
 

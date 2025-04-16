@@ -1,0 +1,8 @@
+Unqualified foo from module C
+4
+Qualified foo from module C
+4
+Qualified foo from module B
+50
+Unqualified foo from module B
+50

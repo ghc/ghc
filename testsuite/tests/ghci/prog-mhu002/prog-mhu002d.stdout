@@ -1,0 +1,41 @@
+Collecting type info for 4 module(s) ... 
+a/A.hs:(7,1)-(7,6): GHC.Internal.Bignum.Integer.Integer
+a/A.hs:(5,1)-(5,3): GHC.Internal.Bignum.Integer.Integer
+a/A.hs:(9,22)-(9,25): GHC.Internal.Types.Int -> A.A -> GHC.Internal.Show.ShowS
+a/A.hs:(9,22)-(9,25): A.A -> GHC.Internal.Base.String
+a/A.hs:(9,22)-(9,25): [A.A] -> GHC.Internal.Show.ShowS
+a/A.hs:(12,3)-(12,6): A.A -> GHC.Internal.Base.String
+a/A.hs:(7,10)-(7,11): GHC.Internal.Bignum.Integer.Integer
+a/A.hs:(5,11)-(5,11): GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+a/A.hs:(5,7)-(5,9): GHC.Internal.Bignum.Integer.Integer
+a/A.hs:(5,13)-(5,18): GHC.Internal.Bignum.Integer.Integer
+a/A.hs:(5,7)-(5,18): GHC.Internal.Bignum.Integer.Integer
+a/A.hs:(9,22)-(9,25): GHC.Internal.Show.Show A.A
+a/A.hs:(9,22)-(9,25): ([A.A] -> GHC.Internal.Show.ShowS) -=> GHC.Internal.Show.Show A.A
+a/A.hs:(9,22)-(9,25): (A.A -> GHC.Internal.Base.String) -=> ([A.A] -> GHC.Internal.Show.ShowS) -=> GHC.Internal.Show.Show A.A
+a/A.hs:(9,22)-(9,25): (GHC.Internal.Types.Int -> A.A -> GHC.Internal.Show.ShowS) -=> (A.A -> GHC.Internal.Base.String) -=> ([A.A] -> GHC.Internal.Show.ShowS) -=> GHC.Internal.Show.Show A.A
+a/A.hs:(9,22)-(9,25): GHC.Internal.Types.Int -> A.A -> GHC.Internal.Show.ShowS
+a/A.hs:(9,22)-(9,25): A.A -> GHC.Internal.Base.String
+a/A.hs:(9,22)-(9,25): [A.A] -> GHC.Internal.Show.ShowS
+a/A.hs:(11,10)-(11,15): B.Test A.A
+a/A.hs:(11,10)-(11,15): (A.A -> GHC.Internal.Base.String) -=> B.Test A.A
+a/A.hs:(11,10)-(11,15): A.A -> GHC.Internal.Base.String
+a/A.hs:(12,10)-(12,13): A.A -> GHC.Internal.Base.String
+b/B.hs:(3,1)-(3,3): GHC.Internal.Bignum.Integer.Integer
+b/B.hs:(9,3)-(9,6): GHC.Internal.Types.Int -> GHC.Internal.Base.String
+b/B.hs:(3,7)-(3,8): GHC.Internal.Bignum.Integer.Integer
+b/B.hs:(8,10)-(8,17): B.Test GHC.Internal.Types.Int
+b/B.hs:(8,10)-(8,17): (GHC.Internal.Types.Int -> GHC.Internal.Base.String) -=> B.Test GHC.Internal.Types.Int
+b/B.hs:(8,10)-(8,17): GHC.Internal.Types.Int -> GHC.Internal.Base.String
+b/B.hs:(9,10)-(9,13): GHC.Internal.Types.Int -> GHC.Internal.Base.String
+c/C.hs:(4,1)-(4,3): GHC.Internal.Bignum.Integer.Integer
+c/C.hs:(3,1)-(3,3): GHC.Internal.Bignum.Integer.Integer
+c/C.hs:(4,7)-(4,7): GHC.Internal.Bignum.Integer.Integer
+c/C.hs:(3,7)-(3,7): GHC.Internal.Bignum.Integer.Integer
+d/Main.hs:(5,1)-(5,4): GHC.Internal.Bignum.Integer.Integer
+d/Main.hs:(3,1)-(3,4): GHC.Internal.Types.IO ()
+d/Main.hs:(5,8)-(5,8): GHC.Internal.Bignum.Integer.Integer
+d/Main.hs:(3,8)-(3,15): GHC.Internal.Base.String -> GHC.Internal.Types.IO ()
+d/Main.hs:(3,17)-(3,30): GHC.Internal.Base.String
+d/Main.hs:(3,8)-(3,30): GHC.Internal.Types.IO ()
+d/Main.hs:(3,1)-(3,4): GHC.Internal.Types.IO ()

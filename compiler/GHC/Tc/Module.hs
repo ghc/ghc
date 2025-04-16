@@ -147,7 +147,6 @@ import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Types.Annotations
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
-import GHC.Types.PkgQual
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Unit.Env as UnitEnv
@@ -1993,18 +1992,22 @@ runTcInteractive hsc_env thing_inside
                                                  , let local_gres = filter isLocalGRE gres
                                                  , not (null local_gres) ]) ]
 
-       ; let getOrphans m mb_pkg = fmap (\iface -> mi_module iface
-                                          : dep_orphs (mi_deps iface))
-                                 (loadSrcInterface (text "runTcInteractive") m
-                                                   NotBoot mb_pkg)
+       ; let getOrphansForModuleName m mb_pkg = do
+              iface <- loadSrcInterface (text "runTcInteractive") m NotBoot mb_pkg
+              pure $ mi_module iface : dep_orphs (mi_deps iface)
+
+             getOrphansForModule m = do
+              iface <- loadModuleInterface (text "runTcInteractive") m
+              pure $ mi_module iface : dep_orphs (mi_deps iface)
 
 
        ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
             case i of                   -- force above: see #15111
-                IIModule n -> getOrphans n NoPkgQual
-                IIDecl i -> do
-                  qual <- hscRenameRawPkgQual hsc_env (unLoc $ ideclName i) (ideclPkgQual i)
-                  getOrphans (unLoc (ideclName i)) qual
+                IIModule n -> getOrphansForModule n
+                IIDecl i   -> do
+                  query <- liftIO $ hscUnitIndexQuery hsc_env
+                  getOrphansForModuleName (unLoc (ideclName i))
+                                         (renameRawPkgQual (hsc_unit_env hsc_env) query (unLoc $ ideclName i) (ideclPkgQual i))
 
 
        ; (home_insts, home_fam_insts) <- liftIO $ UnitEnv.hugAllInstances (hsc_unit_env hsc_env)
