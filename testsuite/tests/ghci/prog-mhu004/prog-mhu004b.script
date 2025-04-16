@@ -1,0 +1,6 @@
+putStrLn "=== PackageImports can be used for disambiguation"
+:set -XPackageImports
+import qualified "a" Foo as A
+import qualified "b" Foo as B
+A.bar
+B.bar

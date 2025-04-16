@@ -1543,7 +1543,7 @@ async def test_common_work(name: TestName, opts,
             all_ways = config.compile_ways
         elif func in [compile_and_run, multi_compile_and_run, multimod_compile_and_run]:
             all_ways = config.run_ways
-        elif func == ghci_script:
+        elif func == ghci_script or func == ghci_multiunit_script:
             if config.have_interp:
                 all_ways = [WayName('ghci'), WayName('ghci-opt')]
             else:
@@ -1869,6 +1869,20 @@ async def ghci_script( name, way, script):
     # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
     cmd = ('HC={{compiler}} HC_OPTS="{flags}" {{compiler}} {way_flags} {flags}'
           ).format(flags=flags, way_flags=way_flags)
+      # NB: put way_flags before flags so that flags in all.T can override others
+
+    getTestOpts().stdin = script
+    return await simple_run( name, way, cmd, getTestOpts().extra_run_opts )
+
+async def ghci_multiunit_script( name, way, units, script):
+    flags = ' '.join(get_compiler_flags())
+    way_flags = ' '.join(config.way_flags[way])
+    unit_flags = ' '.join(['-unit @%s' % unit for unit in units])
+
+    # We pass HC and HC_OPTS as environment variables, so that the
+    # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
+    cmd = ('HC={{compiler}} HC_OPTS="{flags}" {{compiler}} {way_flags} {flags} {units}'
+          ).format(flags=flags, way_flags=way_flags, units=unit_flags)
       # NB: put way_flags before flags so that flags in all.T can override others
 
     getTestOpts().stdin = script

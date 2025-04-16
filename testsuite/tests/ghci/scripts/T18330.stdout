@@ -1,9 +1,8 @@
-GHCi, version 9.3.20211019: https://www.haskell.org/ghc/  :? for help
-ghci> [1 of 2] Compiling Main             ( shell.hs, interpreted )
-[2 of 2] Linking shell
+GHCi, version 9.13.20250422: https://www.haskell.org/ghc/  :? for help
+ghci> [1 of 2] Compiling Main             ( shell.hs, interpreted )[interactive-session]
 Ok, one module loaded.
-ghci> ghci> [1 of 1] Compiling T18330           ( T18330.hs, interpreted )
+ghci> ghci> [1 of 1] Compiling T18330           ( T18330.hs, interpreted )[interactive-session]
 Ok, one module loaded.
-ghci> ghci> [1 of 1] Compiling T18330           ( T18330.hs, interpreted ) [T18330.extra changed]
-Ok, one module loaded.
+ghci> ghci> [1 of 1] Compiling T18330           ( T18330.hs, interpreted )[interactive-session] [T18330.extra changed]
+Ok, one module reloaded.
 ghci> Leaving GHCi.
