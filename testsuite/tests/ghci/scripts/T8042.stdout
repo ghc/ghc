@@ -1,9 +1,9 @@
-[1 of 3] Compiling T8042B           ( T8042B.hs, T8042B.o )
-[2 of 3] Compiling T8042C           ( T8042C.hs, interpreted )
-[3 of 3] Compiling T8042A           ( T8042A.hs, interpreted )
+[1 of 3] Compiling T8042B           ( T8042B.hs, T8042B.o )[main]
+[2 of 3] Compiling T8042C           ( T8042C.hs, interpreted )[main]
+[3 of 3] Compiling T8042A           ( T8042A.hs, interpreted )[interactive-session]
 Ok, three modules loaded.
-[3 of 3] Compiling T8042A           ( T8042A.hs, T8042A.o ) [Source file changed]
+[3 of 3] Compiling T8042A           ( T8042A.hs, T8042A.o )[interactive-session] [Source file changed]
 Ok, three modules reloaded.
-[2 of 3] Compiling T8042C           ( T8042C.hs, interpreted )
-[3 of 3] Compiling T8042A           ( T8042A.hs, interpreted )
+[2 of 3] Compiling T8042C           ( T8042C.hs, interpreted )[main]
+[3 of 3] Compiling T8042A           ( T8042A.hs, interpreted )[interactive-session]
 Ok, three modules loaded.

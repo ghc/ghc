@@ -1,6 +1,6 @@
-[1 of 2] Compiling T8042B           ( T8042B.hs, T8042B.o )
-[2 of 2] Compiling T8042A           ( T8042A.hs, T8042A.o )
+[1 of 2] Compiling T8042B           ( T8042B.hs, T8042B.o )[main]
+[2 of 2] Compiling T8042A           ( T8042A.hs, T8042A.o )[interactive-session]
 Ok, two modules loaded.
-[2 of 2] Compiling T8042A           ( T8042A.hs, interpreted )
+[2 of 2] Compiling T8042A           ( T8042A.hs, interpreted )[interactive-session]
 Ok, two modules loaded.
 Breakpoint 0 activated at T8042A.hs:1:44-56

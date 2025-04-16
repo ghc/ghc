@@ -4,6 +4,7 @@ module Main (main) where
 import GHC
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Unit.Types (mainUnit)
 import GHC.Utils.Outputable
 import GHC.Utils.Monad
 import GHC.Types.Name.Set
@@ -72,7 +73,10 @@ test7918 = do
   setTargets [target]
   void $ load LoadAllTargets
 
-  typecheckedB <- getModSummary (mkModuleName "T7918B") >>= parseModule >>= typecheckModule
+  typecheckedB <-
+    getModSummary (mkModule mainUnit (mkModuleName "T7918B"))
+    >>= parseModule
+    >>= typecheckModule
   let (_loc, ids) = execState (traverse (tm_typechecked_source typecheckedB)) (noSrcSpan, [])
   liftIO . forM_ (sortBy (SrcLoc.leftmost_smallest `on` snd) (reverse ids)) $ putStrLn . showSDoc dynFlags . ppr
 

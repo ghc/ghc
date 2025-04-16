@@ -1,0 +1,4 @@
+putStrLn "=== Ambiguous module name"
+:m + Foo
+:m + *Foo
+import Foo
