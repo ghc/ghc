@@ -1,0 +1,6 @@
+-i
+-ib/
+Foo
+-this-unit-id b-0.0.0
+-this-package-name b
+-package base

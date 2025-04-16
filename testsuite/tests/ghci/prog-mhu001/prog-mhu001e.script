@@ -1,0 +1,5 @@
+:m + E
+-- Ideally, we would like this to print:
+-- > "Entry point via -main-is"
+-- But -main-is isn't honoured, if given as an argument in '-unit @ghc-opts'.
+:main

@@ -1,0 +1,46 @@
+=== Set Breakpoint and run
+Breakpoint 0 activated at b/B.hs:(15,14)-(17,24)
+Stopped in B.printFib, b/B.hs:(15,14)-(17,24)
+_result :: IO () = _
+n :: Int = 0
+=== Where are we?
+14  printFib :: Int -> IO ()
+               vv
+15  printFib n = do
+16    let result = fibonacci n
+17    putStrLn $ show result
+                            ^^
+18  
+=== Breakpoint and print
+_result = _
+=== Step and print
+Stopped in B.printFib, b/B.hs:16:3-26
+_result :: IO () = _
+n :: Int = 0
+_result = _
+=== Run a bit more
+1
+Stopped in B.printFib, b/B.hs:(15,14)-(17,24)
+_result :: IO () = _
+n :: Int = 1
+1
+Stopped in B.printFib, b/B.hs:(15,14)-(17,24)
+_result :: IO () = _
+n :: Int = 2
+2
+Stopped in B.printFib, b/B.hs:(15,14)-(17,24)
+_result :: IO () = _
+n :: Int = 3
+=== Result one more time
+Stopped in B.printFib, b/B.hs:(15,14)-(17,24)
+_result :: IO () = _
+n :: Int = 3
+14  printFib :: Int -> IO ()
+               vv
+15  printFib n = do
+16    let result = fibonacci n
+17    putStrLn $ show result
+                            ^^
+18  
+=== No breakpoints and continue running
+3

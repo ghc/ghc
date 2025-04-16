@@ -1,6 +1,1 @@
-<interactive>: error: [GHCi-83514]
-    Command is not supported (yet) in multi-mode
-
-<interactive>: error: [GHCi-83514]
-    Command is not supported (yet) in multi-mode
-
+target ‘abc’ is not a module name or a source file

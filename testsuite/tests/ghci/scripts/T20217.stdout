@@ -1,5 +1,5 @@
-[1 of 3] Compiling T20217A[boot]    ( T20217A.hs-boot, nothing )
-[2 of 3] Compiling T20217A          ( T20217A.hs, nothing )
-[3 of 3] Compiling T20217           ( T20217.hs, nothing )
+[1 of 3] Compiling T20217A[boot]    ( T20217A.hs-boot, nothing )[main]
+[2 of 3] Compiling T20217A          ( T20217A.hs, nothing )[main]
+[3 of 3] Compiling T20217           ( T20217.hs, nothing )[interactive-session]
 Ok, three modules loaded.
 Ok, three modules reloaded.

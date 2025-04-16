@@ -1,0 +1,12 @@
+:m + E
+:set -main-is myCustomMain
+-- :set sets the -main-is of the interactive session
+putStrLn "=== Uses myCustomMain"
+:main
+-- :seti also works
+putStrLn "=== Uses main"
+:seti -main-is main
+:main
+putStrLn "=== Uses myCustomMain"
+:seti -main-is myCustomMain
+:main
