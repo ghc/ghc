@@ -1080,10 +1080,13 @@ instance Enum a => Binary (EnumBinary a) where
 deriving via (EnumBinary ImportLevel) instance Binary ImportLevel
 
 instance Binary IsBootInterface where
-  put_ bh IsBoot = put_ bh False
-  put_ bh NotBoot = put_ bh True
+  put_ bh ib = put_ bh (case ib of
+                          IsBoot -> True
+                          NotBoot -> False)
   get bh = do x <- get bh
-              return $ if x then IsBoot else NotBoot
+              return $ case x of
+                        True -> IsBoot
+                        False -> NotBoot
 
 {-
 Finally - a reasonable portable Integer instance.
