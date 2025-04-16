@@ -469,26 +469,208 @@ splices and quotations are supported.)
     was not written by the user. If you want to have warnings for splices
     anyway, pass :ghc-flag:`-fenable-th-splice-warnings`.
 
+Explicit Level Imports
+----------------------
+
+The :extension:`ExplicitLevelImports` extension, along with
+:extension:`ImplicitStagePersistence`, gives programmers fine-grained control
+over which modules are needed at each stage of execution.
+
 .. extension:: ExplicitLevelImports
-    :shortdesc: TODO
+    :shortdesc: Allow explicit level imports in Template Haskell.
 
-    :since: 8.0.1
+    :implies: :extension:`NoImplicitStagePersistence`
+    :since: 9.14.1
 
-    Enable Template Haskell's quotation syntax.
+    Enable explicit level imports for Template Haskell, allowing programmers to
+    specify which modules are needed at which stages of execution.
 
 .. extension:: ImplicitStagePersistence
-    :shortdesc: TODO
+    :shortdesc: Allow identifiers to be used at different levels from where they are defined.
 
-    :since: 8.0.1
+    :default: on
+    :since: 9.14.1
 
-    Enable Template Haskell's quotation syntax.
+    Allow identifiers to be used at different levels than where they're defined,
+    enabling cross-stage persistence.
 
-.. extension:: LiftCSP
-    :shortdesc: TODO
+Why Use Explicit Level Imports?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    :since: 8.0.1
+When using Template Haskell, all imported modules are typically compiled and
+linked for both compile-time and runtime execution, which can lead to:
 
-    TODO
+* Slower compilation - all modules must be compiled before type-checking splices
+* Increased binary size - modules used only at compile-time are still linked into the final executable
+* Reduced parallelism in compilation
+* Challenges with cross-compilation
+
+With :extension:`ExplicitLevelImports`, you can specify which modules are needed
+only at compile-time (for splices), which are needed only at runtime (for
+quotes), and which are needed at both stages.
+
+Basic Concepts
+~~~~~~~~~~~~~
+
+* **Levels**: Every piece of code exists at a specific level:
+  * Level 0: Normal top-level code
+  * Level -1: Code inside top-level splices (``$(...)`` expressions)
+  * Level 1: Code inside quotations (``[|...|]`` expressions)
+
+* **Stage Persistence**: By default, GHC allows identifiers to be used at different levels than where they're defined (called "cross-stage persistence"), but this requires compiling everything for all stages.
+
+* **Extensions**:
+  * :extension:`ImplicitStagePersistence` (enabled by default): Allows cross-stage persistence
+  * :extension:`ExplicitLevelImports`: Enables explicit control and implies :extension:`NoImplicitStagePersistence`
+
+Syntax and Usage
+~~~~~~~~~~~~~~~
+
+:extension:`ExplicitLevelImports` adds two new import modifiers:
+
+* ``import splice M (...)`` - imports identifiers at level -1 (for use in splices)
+* ``import quote M (...)`` - imports identifiers at level 1 (for use in quotations)
+* ``import M (...)`` - imports identifiers at level 0 (normal code)
+
+The syntax supports both options for placement of the level keywords:
+
+.. code-block:: haskell
+
+    import splice M          -- before the module name
+    import M splice          -- after the module name
+    import qualified splice M -- with qualified
+    import splice qualified M -- with qualified (alternative ordering)
+
+Basic Examples
+~~~~~~~~~~~~~
+
+Let's look at two versions of the same code to understand how explicit level imports work:
+
+**Without Explicit Level Imports**:
+
+.. code-block:: haskell
+
+    {-# LANGUAGE TemplateHaskell #-}
+    module Main where
+
+    import Control.Lens.TH (makeLenses)
+    import OtherModule (someFunction)
+
+    data User = User { _name :: String, _age :: Int }
+
+    $(makeLenses ''User)
+
+    main = print (someFunction (User "John" 30))
+
+In this version, both ``Control.Lens.TH`` and ``OtherModule`` are imported
+normally. GHC must compile both modules before it can start type-checking Main,
+because it can't tell in advance which imports might be needed when evaluating
+the ``makeLenses`` splice. Even though only ``makeLenses`` is actually used in
+the splice, GHC must assume that any imported identifier might be needed.
+
+**With Explicit Level Imports**:
+
+.. code-block:: haskell
+
+    {-# LANGUAGE TemplateHaskell, ExplicitLevelImports #-}
+    module Main where
+
+    import splice Control.Lens.TH (makeLenses)
+    import OtherModule (someFunction)
+
+    data User = User { _name :: String, _age :: Int }
+
+    $(makeLenses ''User)
+
+    main = print (someFunction (User "John" 30))
+
+With explicit level imports, we've marked ``Control.Lens.TH`` with the
+``splice`` keyword, which tells GHC that this module is needed at compile-time
+for evaluating splices. This provides GHC with crucial information:
+
+1. ``Control.Lens.TH`` must be compiled to object code before type-checking ``Main``
+2. ``OtherModule`` only needs to be type-checked before ``Main``, with code generation potentially happening in parallel
+3. ``Control.Lens.TH`` won't be needed at runtime (assuming there are no other references to it)
+
+This distinction brings several benefits:
+
+* **Faster compilation**: GHC doesn't need to wait for ``OtherModule`` to be fully compiled before starting on ``Main``
+* **Smaller binaries**: ``Control.Lens.TH`` won't be linked into the final executable since it's only needed at compile-time
+* **Clearer code**: The staging structure of the program is more explicit
+
+Another example showing different import levels:
+
+.. code-block:: haskell
+
+    {-# LANGUAGE TemplateHaskell, ExplicitLevelImports #-}
+    module Advanced where
+
+    import splice A (makeFunction)   -- Used in splices (level -1)
+    import B (normalFunction)        -- Used in normal code (level 0)
+    import quote C (runtimeValue)    -- Used in quotes (level 1)
+
+    -- This generates a function at compile time
+    $(makeFunction "generatedFunction")
+
+    -- This uses a normal function at runtime
+    result = normalFunction 42
+
+    -- This creates a quotation containing code that will use runtimeValue
+    quotation = [| runtimeValue * 2 |]
+
+In this example, we're explicitly marking each import with its intended level:
+* ``A`` provides code that runs at compile time (in splices)
+* ``B`` provides code that runs at normal runtime
+* ``C`` provides values that will be referenced in quoted code
+
+Level Rules and Errors
+~~~~~~~~~~~~~~~~~~~~~
+
+With :extension:`NoImplicitStagePersistence`:
+
+* Functions imported at level 0 can only be used at level 0
+* Functions imported with ``splice`` can only be used inside top-level splices
+* Functions imported with ``quote`` can only be used inside quotes
+
+Errors will occur if you use an identifier at the wrong level:
+
+.. code-block:: haskell
+
+    import splice A (foo)       -- foo at level -1
+    import B (bar)              -- bar at level 0
+    import quote C (baz)        -- baz at level 1
+
+    x = $(foo 42)               -- OK: foo used at level -1
+    y = $(bar 42)               -- Error: bar imported at level 0 but used at level -1
+    z = [| baz 42 |]            -- OK: baz used at level 1
+    w = [| bar 42 |]            -- Error: bar imported at level 0 but used at level 1
+
+Class Instances and Levels
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Class instances are also subject to level checking. Instances must be available at the level where they're used:
+
+* Instances from the current module are at level 0
+* Instances from normally imported modules are at level 0
+* Instances from splice-imported modules are at level -1
+* Instances from quote-imported modules are at level 1
+
+Prelude Imports
+~~~~~~~~~~~~~~
+
+The implicit ``Prelude`` import only brings identifiers into scope at level 0. If you need ``Prelude`` functions in splices or quotes, you must explicitly import them:
+
+.. code-block:: haskell
+
+    import splice Prelude (map, filter)  -- Use these in splices
+    import quote Prelude (show, (+))     -- Use these in quotes
+
+Notes and Limitations
+~~~~~~~~~~~~~~~~~~~
+
+* Local definitions (those defined in the same module) are still subject to level rules - you can't use a function in a splice if it's defined in the same module
+* :extension:`ExplicitLevelImports` works best when most Template Haskell usage is isolated to a few modules
+* Defining ``Lift`` instances requires special handling since the datatype must be available at both compile-time and runtime
 
 .. _th-usage:
 
@@ -812,7 +994,7 @@ single parser of type ``String -> a`` to generate both an expression
 parser that returns a value of type ``Q Exp`` and a pattern parser that
 returns a value of type ``Q Pat``.
 
-Quasiquoters must obey the same stage restrictions as Template Haskell,
+Quasiquoters must obey the same level restrictions as Template Haskell,
 e.g., in the example, ``expr`` cannot be defined in ``Main.hs`` where it
 is used, but must be imported.
 
@@ -886,5 +1068,6 @@ Run "main" and here is your output:
     $ ./main
     3
     1
+
 
 
