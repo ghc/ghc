@@ -63,12 +63,16 @@ module GHC.Unit.Types
    , mainUnitId
    , thisGhcUnitId
    , interactiveUnitId
+   , interactiveGhciUnitId
+   , interactiveSessionUnitId
 
    , ghcInternalUnit
    , rtsUnit
    , mainUnit
    , thisGhcUnit
    , interactiveUnit
+   , interactiveGhciUnit
+   , interactiveSessionUnit
 
    , isInteractiveModule
    , wiredInUnitIds
@@ -588,20 +592,24 @@ Make sure you change 'GHC.Unit.State.findWiredInUnits' if you add an entry here.
 -}
 
 ghcInternalUnitId, rtsUnitId,
-  mainUnitId, thisGhcUnitId, interactiveUnitId :: UnitId
+  mainUnitId, thisGhcUnitId, interactiveUnitId, interactiveGhciUnitId, interactiveSessionUnitId :: UnitId
 
 ghcInternalUnit, rtsUnit,
-  mainUnit, thisGhcUnit, interactiveUnit :: Unit
+  mainUnit, thisGhcUnit, interactiveUnit, interactiveGhciUnit, interactiveSessionUnit :: Unit
 
 ghcInternalUnitId = UnitId (fsLit "ghc-internal")
 rtsUnitId         = UnitId (fsLit "rts")
 thisGhcUnitId     = UnitId (fsLit cProjectUnitId) -- See Note [GHC's Unit Id]
 interactiveUnitId = UnitId (fsLit "interactive")
+interactiveGhciUnitId = UnitId (fsLit "interactive-ghci")
+interactiveSessionUnitId = UnitId (fsLit "interactive-session")
 
 ghcInternalUnit   = RealUnit (Definite ghcInternalUnitId)
 rtsUnit           = RealUnit (Definite rtsUnitId)
 thisGhcUnit       = RealUnit (Definite thisGhcUnitId)
 interactiveUnit   = RealUnit (Definite interactiveUnitId)
+interactiveGhciUnit = RealUnit (Definite interactiveGhciUnitId)
+interactiveSessionUnit = RealUnit (Definite interactiveSessionUnitId)
 
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix

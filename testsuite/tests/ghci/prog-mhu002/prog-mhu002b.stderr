@@ -1,0 +1,7 @@
+<interactive>:6:1: error: [GHC-87543]
+    Ambiguous occurrence ‘foo’.
+    It could refer to
+       either ‘C.foo’, defined at c/C.hs:4:1,
+           or ‘B.foo’,
+              imported from ‘B’ (and originally defined at b/B.hs:3:1-3).
+

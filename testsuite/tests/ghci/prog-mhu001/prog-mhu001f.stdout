@@ -1,0 +1,7 @@
+=== Uses myCustomMain
+Entry point via -main-is
+=== Uses main
+10
+5
+=== Uses myCustomMain
+Entry point via -main-is

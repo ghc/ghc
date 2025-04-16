@@ -6,6 +6,7 @@ module Main where
 
 import System.IO
 import GHC
+import GHC.Unit.Types (GenUnit(..), Definite(..))
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import System.Directory (removeFile)
@@ -20,12 +21,13 @@ main = do
                         dflags <- getSessionDynFlags
                         setSessionDynFlags dflags
                         let mn =mkModuleName "Test"
+                            m  =mkModule (RealUnit (Definite (homeUnitId_ dflags))) mn
                         addTarget Target { targetId = TargetModule mn
                                          , targetAllowObjCode = True
                                          , targetUnitId = homeUnitId_ dflags
                                          , targetContents = Nothing}
                         load LoadAllTargets
-                        modSum <- getModSummary mn
+                        modSum <- getModSummary m
                         p <- parseModule modSum
                         t <- typecheckModule p
                         d <- desugarModule t

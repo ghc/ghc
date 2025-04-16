@@ -1,0 +1,6 @@
+<interactive>:6:1: error: [GHC-88464] Variable not in scope: baz
+
+<interactive>:7:1: error: [GHC-88464] Variable not in scope: foobar
+
+<interactive>:10:1: error: [GHC-88464] Variable not in scope: foo
+

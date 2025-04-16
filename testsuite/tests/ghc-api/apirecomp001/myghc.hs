@@ -44,7 +44,7 @@ main = do
 
     -- set context to module "A"
     mg <- getModuleGraph
-    let [mod] = [ ms_mod_name m
+    let [mod] = [ ms_mod m
                 | m <- mgModSummaries mg
                 , moduleNameString (ms_mod_name m) == "A" ]
     setContext [IIModule mod]

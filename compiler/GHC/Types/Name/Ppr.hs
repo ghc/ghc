@@ -13,6 +13,7 @@ import GHC.Data.FastString
 
 import GHC.Unit
 import GHC.Unit.Env
+import qualified GHC.Unit.Home.Graph as HUG
 
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -72,12 +73,11 @@ mkNamePprCtx :: Outputable info => PromotionTickContext -> UnitEnv -> GlobalRdrE
 mkNamePprCtx ptc unit_env env
  = QueryQualify
       (mkQualName env)
-      (mkQualModule unit_state home_unit)
+      (mkQualModule unit_state unit_env)
       (mkQualPackage unit_state)
       (mkPromTick ptc env)
   where
   unit_state = ue_homeUnitState unit_env
-  home_unit  = ue_homeUnit unit_env
 
 mkQualName :: Outputable info => GlobalRdrEnvX info -> QueryQualifyName
 mkQualName env = qual_name where
@@ -215,10 +215,12 @@ Side note (int-index):
 -- | Creates a function for formatting modules based on two heuristics:
 -- (1) if the module is the current module, don't qualify, and (2) if there
 -- is only one exposed package which exports this module, don't qualify.
-mkQualModule :: UnitState -> Maybe HomeUnit -> QueryQualifyModule
-mkQualModule unit_state mhome_unit mod
-     | Just home_unit <- mhome_unit
-     , isHomeModule home_unit mod = False
+mkQualModule :: UnitState -> UnitEnv -> QueryQualifyModule
+mkQualModule unit_state unitEnv mod
+       -- Check whether the unit of the module is in the HomeUnitGraph.
+       -- If it is, then we consider this 'mod' to be "local" and don't
+       -- want to qualify it.
+     | HUG.memberHugUnit (moduleUnit mod) (ue_home_unit_graph unitEnv) = False
 
      | [(_, pkgconfig)] <- lookup,
        mkUnit pkgconfig == moduleUnit mod

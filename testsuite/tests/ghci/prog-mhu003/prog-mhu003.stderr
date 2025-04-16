@@ -1,0 +1,9 @@
+module name 'Foo' is ambiguous:
+- b-0.0.0:Foo
+- d-0.0.0:Foo
+module name 'Foo' is ambiguous:
+- b-0.0.0:Foo
+- d-0.0.0:Foo
+module name 'Foo' is ambiguous:
+- b-0.0.0:Foo
+- d-0.0.0:Foo

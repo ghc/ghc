@@ -78,7 +78,7 @@ import Control.Monad
 import Data.Char
 
 import GHC.Unit.Module
-import GHC.Unit.Home.PackageTable (lookupHpt)
+import qualified GHC.Unit.Home.Graph as HUG
 
 import Data.Array
 import Data.Coerce (coerce)
@@ -437,8 +437,7 @@ schemeER_wrk d p rhs = schemeE d 0 p rhs
 -- If that is 'Nothing', consider breakpoints to be disabled and skip the
 -- instruction.
 --
--- If the breakpoint is inlined from another module, look it up in the home
--- package table.
+-- If the breakpoint is inlined from another module, look it up in the HUG (home unit graph).
 -- If the module doesn't exist there, or if the 'ModBreaks' value is
 -- uninitialized, skip the instruction (i.e. return Nothing).
 break_info ::
@@ -451,7 +450,7 @@ break_info hsc_env mod current_mod current_mod_breaks
   | mod == current_mod
   = pure current_mod_breaks
   | otherwise
-  = ioToBc (lookupHpt (hsc_HPT hsc_env) (moduleName mod)) >>= \case
+  = ioToBc (HUG.lookupHugByModule mod (hsc_HUG hsc_env)) >>= \case
       Just hp -> pure $ getModBreaks hp
       Nothing -> pure Nothing
 

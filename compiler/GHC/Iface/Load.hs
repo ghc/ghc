@@ -918,12 +918,10 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
           case mb_found of
               InstalledFound loc -> do
                   -- See Note [Home module load error]
-                  case mhome_unit of
-                    Just home_unit
-                      | isHomeInstalledModule home_unit mod
-                      , not (isOneShot (ghcMode dflags))
-                      -> return (Failed (HomeModError mod loc))
-                    _ -> do
+                  if HUG.memberHugUnitId (moduleUnit mod) (hsc_HUG hsc_env)
+                      && not (isOneShot (ghcMode dflags))
+                    then return (Failed (HomeModError mod loc))
+                    else do
                         r <- read_file logger name_cache unit_state dflags wanted_mod (ml_hi_file loc)
                         case r of
                           Failed err

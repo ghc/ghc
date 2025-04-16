@@ -1,0 +1,24 @@
+:m + A
+-- We can run and break across multiple home units
+putStrLn "=== Set Breakpoint and run"
+:break B.printFib
+main
+putStrLn "=== Where are we?"
+:list
+putStrLn "=== Breakpoint and print"
+:sprint _result
+putStrLn "=== Step and print"
+:step
+:sprint result
+result
+:force _result
+putStrLn "=== Run a bit more"
+:continue
+:continue
+:continue
+putStrLn "=== Result one more time"
+:trace _result
+:list
+putStrLn "=== No breakpoints and continue running"
+:delete *
+:continue

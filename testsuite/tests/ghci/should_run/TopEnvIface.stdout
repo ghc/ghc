@@ -1,5 +1,5 @@
-[1 of 2] Compiling TopEnvIface2     ( TopEnvIface2.hs, interpreted )
-[2 of 2] Compiling TopEnvIface      ( TopEnvIface.hs, interpreted )
+[1 of 2] Compiling TopEnvIface2     ( TopEnvIface2.hs, interpreted )[main]
+[2 of 2] Compiling TopEnvIface      ( TopEnvIface.hs, interpreted )[main]
 Ok, two modules loaded.
 "I should be printed twice"
 Leaving GHCi.

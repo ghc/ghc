@@ -1,0 +1,4 @@
+:m + A B C Main
+:set +c
+:r
+:all-types

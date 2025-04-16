@@ -4,6 +4,7 @@ module Main where
 import GHC
 import GHC.Driver.Session
 import GHC.Driver.Monad
+import GHC.Unit.Types (mainUnit)
 import System.Environment
 import Control.Monad (void)
 
@@ -31,9 +32,9 @@ main = do
           liftIO $ putStrLn "Compilation succeeded!"
 
           -- Try to get the modules
-          modA <- getModSummary (mkModuleName "T1A")
-          modB <- getModSummary (mkModuleName "T1B")
-          modC <- getModSummary (mkModuleName "T1C")
+          modA <- getModSummary (mkModule mainUnit (mkModuleName "T1A"))
+          modB <- getModSummary (mkModule mainUnit (mkModuleName "T1B"))
+          modC <- getModSummary (mkModule mainUnit (mkModuleName "T1C"))
 
           liftIO $ putStrLn $ "Found modules: " ++
                               show (ms_mod_name modA) ++ ", " ++

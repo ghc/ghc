@@ -1,14 +1,14 @@
-[1 of 1] Compiling T13869A          ( T13869a.hs, interpreted )
+[1 of 1] Compiling T13869A          ( T13869a.hs, interpreted )[interactive-session]
 Ok, one module loaded.
 Ok, one module reloaded.
 Ok, unloaded all modules.
 Ok, no modules to be reloaded.
-[1 of 1] Compiling T13869A          ( T13869a.hs, interpreted )
+[1 of 1] Compiling T13869A          ( T13869a.hs, interpreted )[interactive-session]
 Ok, one module loaded.
-[2 of 2] Compiling T13869B          ( T13869b.hs, interpreted )
+[2 of 2] Compiling T13869B          ( T13869b.hs, interpreted )[interactive-session]
 Ok, one module added.
 Ok, two modules reloaded.
-[1 of 2] Compiling T13869A          ( T13869a.hs, interpreted )
-[2 of 2] Compiling T13869B          ( T13869b.hs, interpreted )
+[1 of 2] Compiling T13869A          ( T13869a.hs, interpreted )[interactive-session]
+[2 of 2] Compiling T13869B          ( T13869b.hs, interpreted )[interactive-session]
 Ok, two modules loaded.
 Ok, one module unadded.

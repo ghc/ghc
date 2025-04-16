@@ -241,7 +241,7 @@ isUnitEnvInstalledModule ue m = maybe False (`isHomeInstalledModule` m) hu
 -- -------------------------------------------------------
 
 ue_findHomeUnitEnv :: HasDebugCallStack => UnitId -> UnitEnv -> HomeUnitEnv
-ue_findHomeUnitEnv uid e = case HUG.lookupHugUnit uid (ue_home_unit_graph e) of
+ue_findHomeUnitEnv uid e = case HUG.lookupHugUnitId uid (ue_home_unit_graph e) of
   Nothing -> pprPanic "Unit unknown to the internal unit environment"
               $  text "unit (" <> ppr uid <> text ")"
               $$ ppr (HUG.allUnits (ue_home_unit_graph e))
@@ -311,7 +311,7 @@ ue_unitHomeUnit uid = expectJust . ue_unitHomeUnit_maybe uid
 
 ue_unitHomeUnit_maybe :: UnitId -> UnitEnv -> Maybe HomeUnit
 ue_unitHomeUnit_maybe uid ue_env =
-  HUG.homeUnitEnv_home_unit =<< HUG.lookupHugUnit uid (ue_home_unit_graph ue_env)
+  HUG.homeUnitEnv_home_unit =<< HUG.lookupHugUnitId uid (ue_home_unit_graph ue_env)
 
 -- -------------------------------------------------------
 -- Query and modify the currently active unit
@@ -319,7 +319,7 @@ ue_unitHomeUnit_maybe uid ue_env =
 
 ue_currentHomeUnitEnv :: HasDebugCallStack => UnitEnv -> HomeUnitEnv
 ue_currentHomeUnitEnv e =
-  case HUG.lookupHugUnit (ue_currentUnit e) (ue_home_unit_graph e) of
+  case HUG.lookupHugUnitId (ue_currentUnit e) (ue_home_unit_graph e) of
     Just unitEnv -> unitEnv
     Nothing -> pprPanic "packageNotFound" $
       (ppr $ ue_currentUnit e) $$ ppr (HUG.allUnits (ue_home_unit_graph e))
@@ -389,7 +389,7 @@ ue_transitiveHomeDeps uid e =
 -- FIXME: Shouldn't this be a proper assertion only used in debug mode?
 assertUnitEnvInvariant :: HasDebugCallStack => UnitEnv -> UnitEnv
 assertUnitEnvInvariant u =
-  case HUG.lookupHugUnit (ue_current_unit u) (ue_home_unit_graph u) of
+  case HUG.lookupHugUnitId (ue_current_unit u) (ue_home_unit_graph u) of
     Just _ -> u
     Nothing ->
       pprPanic "invariant" (ppr (ue_current_unit u) $$ ppr (HUG.allUnits (ue_home_unit_graph u)))

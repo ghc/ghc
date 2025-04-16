@@ -1,0 +1,7 @@
+<interactive>:6:1: error: [GHC-88464]
+    Variable not in scope: g :: t0 -> t
+
+module 'A' is not interpreted; try ':add *A' first
+<interactive>:11:1: error: [GHC-88464]
+    Variable not in scope: g :: t0 -> t
+

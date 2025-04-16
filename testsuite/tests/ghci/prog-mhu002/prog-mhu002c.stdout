@@ -1,0 +1,89 @@
+=== :seti
+base language is: GHC2021
+with the following modifiers:
+  -XNoMonomorphismRestriction
+  -XExtendedDefaultRules
+GHCi-specific dynamic flag settings:
+other dynamic, non-language, flag settings:
+  -fno-diagnostics-show-caret
+  -fno-dump-with-ways
+  -fignore-optim-changes
+  -fignore-hpc-changes
+  -fno-ghci-history
+  -fimplicit-import-qualified
+  -fno-unoptimized-core-for-interpreter
+  -fshow-warning-groups
+  -fprefer-byte-code
+  -fbreak-points
+warning settings:
+  -Wpattern-namespace-specifier
+=== :set
+options currently set: none.
+Unit ID: a-0.0.0
+base language is: GHC2021
+with the following modifiers:
+GHCi-specific dynamic flag settings:
+other dynamic, non-language, flag settings:
+  -fno-diagnostics-show-caret
+  -fno-dump-with-ways
+  -fignore-optim-changes
+  -fignore-hpc-changes
+  -fno-ghci-history
+  -fimplicit-import-qualified
+  -fno-unoptimized-core-for-interpreter
+  -fshow-warning-groups
+  -fprefer-byte-code
+  -fbreak-points
+warning settings:
+  -Wpattern-namespace-specifier
+Unit ID: b-0.0.0
+base language is: GHC2021
+with the following modifiers:
+GHCi-specific dynamic flag settings:
+other dynamic, non-language, flag settings:
+  -fno-diagnostics-show-caret
+  -fno-dump-with-ways
+  -fignore-optim-changes
+  -fignore-hpc-changes
+  -fno-ghci-history
+  -fimplicit-import-qualified
+  -fno-unoptimized-core-for-interpreter
+  -fshow-warning-groups
+  -fprefer-byte-code
+  -fbreak-points
+warning settings:
+  -Wpattern-namespace-specifier
+Unit ID: c-0.0.0
+base language is: GHC2021
+with the following modifiers:
+GHCi-specific dynamic flag settings:
+other dynamic, non-language, flag settings:
+  -fno-diagnostics-show-caret
+  -fno-dump-with-ways
+  -fignore-optim-changes
+  -fignore-hpc-changes
+  -fno-ghci-history
+  -fimplicit-import-qualified
+  -fno-unoptimized-core-for-interpreter
+  -fshow-warning-groups
+  -fprefer-byte-code
+  -fbreak-points
+warning settings:
+  -Wpattern-namespace-specifier
+Unit ID: d-0.0.0
+base language is: GHC2021
+with the following modifiers:
+GHCi-specific dynamic flag settings:
+other dynamic, non-language, flag settings:
+  -fno-diagnostics-show-caret
+  -fno-dump-with-ways
+  -fignore-optim-changes
+  -fignore-hpc-changes
+  -fno-ghci-history
+  -fimplicit-import-qualified
+  -fno-unoptimized-core-for-interpreter
+  -fshow-warning-groups
+  -fprefer-byte-code
+  -fbreak-points
+warning settings:
+  -Wpattern-namespace-specifier

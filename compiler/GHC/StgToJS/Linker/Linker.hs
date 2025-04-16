@@ -461,6 +461,9 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
 
   -- all the units we want to link together, without their dependencies
   let root_units = filter (/= ue_currentUnit unit_env)
+                   -- fendor: GHCi uses more 'UnidIds' than just 'interactiveUnitId'.
+                   -- If this breaks for some reason,
+                   -- see Note [Multiple Home Units aware GHCi] for GHCi session setup.
                    $ filter (/= interactiveUnitId)
                    $ nub
                    $ rts_wired_units ++ reverse obj_units ++ reverse units

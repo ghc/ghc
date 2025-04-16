@@ -1,0 +1,14 @@
+Ambiguous module *Foo
+Ambiguous module Foo
+Ambiguous module `import Foo`
+We can add module A and C
+100
+100
+25
+25
+We can load qualified A and qualified C
+100
+25
+We can use -XPackageImports to disambiguate
+10
+5
