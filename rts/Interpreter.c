@@ -249,9 +249,9 @@ See ticket #25750
 #define SafeSpWP(n)      \
   ((StgWord*) ((WITHIN_CAP_CHUNK_BOUNDS_W(n)) ? Sp_plusW(n) : slow_spw(Sp, cap->r.rCurrentTSO->stackobj, n)))
 #define SafeSpBP(off_w)      \
-  ( (StgWord*) (WITHIN_CAP_CHUNK_BOUNDS_W(1+off_w/sizeof(StgWord))) ? \
+  ( (StgWord*) (WITHIN_CAP_CHUNK_BOUNDS_W((1+(off_w))/sizeof(StgWord))) ? \
         Sp_plusB(off_w) : \
-        (StgWord*) ((ptrdiff_t)(off_w % sizeof(StgWord)) + (StgWord8*)slow_spw(Sp, cap->r.rCurrentTSO->stackobj, off_w/sizeof(StgWord))))
+        (StgWord*) ((ptrdiff_t)((off_w) % sizeof(StgWord)) + (StgWord8*)slow_spw(Sp, cap->r.rCurrentTSO->stackobj, (off_w)/sizeof(StgWord))))
 
 
 
