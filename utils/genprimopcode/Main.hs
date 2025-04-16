@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-x-partial #-}
 ------------------------------------------------------------------
 -- A primop-table mangling program                              --
 --
@@ -693,16 +694,24 @@ gen_foundation_tests (Info _ entries)
   where
     testable_tys = nub (sort (mapMaybe (\po -> ty po <$ mkTest po) entries))
 
-    mkInstances ty = unlines $
-      [ "instance TestPrimop (" ++ pprTy ty ++ ") where"
-      , "  testPrimop s l r = Property s $ \\ " ++ intercalate " " (zipWith mkArg [0..] (args ty)) ++ " -> " ++ mk_body "l" ++ " === " ++ mk_body "r" ]
-
+    mkInstances inst_ty =
+      let test_lambda = "\\ " ++ intercalate " " (zipWith mkArg [0::Int ..] (arg_tys)) ++ " -> " ++ mk_body "l" ++ " === " ++ mk_body "r"
+      in  unlines $
+      [ "instance TestPrimop (" ++ pprTy inst_ty ++ ") where"
+      , "  testPrimop s l r = Property s $ " ++ test_lambda ]
+      ++ (if mb_divable_tys
+          then ["  testPrimopDivLike s l r = Property s $ twoNonZero $ " ++ test_lambda]
+          else [])
       where
-        n_args = length (args ty)
+        arg_tys = args inst_ty
+        -- eg Int -> Int -> a
+        mb_divable_tys = case arg_tys of
+            [ty1,ty2] -> ty1 == ty2 && ty1 `elem` divableTyCons
+            _         -> False
 
-        mk_body s = res_ty ty (" (" ++ s ++ " " ++ intercalate " " vs ++ ")")
+        mk_body s = res_ty inst_ty (" (" ++ s ++ " " ++ intercalate " " vs ++ ")")
 
-        vs = zipWith (\n _ -> "x" ++ show n) [0..] (args ty)
+        vs = zipWith (\n _ -> "x" ++ show n) [0::Int ..] (arg_tys)
 
     mkArg n t = "(" ++ unwrapper t  ++ "-> x" ++ show n ++ ")"
 
@@ -714,15 +723,22 @@ gen_foundation_tests (Info _ entries)
     args (TyF (TyApp (TyCon c) []) t2) = c : args t2
     args (TyApp {}) = []
     args (TyUTup {}) = []
+    -- If you hit this you will need to handle the foundation tests to handle the
+    -- type it failed on.
+    args arg_ty = error ("Unexpected primop type:" ++ pprTy arg_ty)
 
     res_ty (TyF _ t2) x = res_ty t2 x
     res_ty (TyApp (TyCon c) []) x = wrapper c ++ x
-    res_ty (TyUTup args) x =
-      let wtup = case length args of
+    res_ty (TyUTup tup_tys) x =
+      let wtup = case length tup_tys of
                    2 -> "WTUP2"
                    3 -> "WTUP3"
-      in wtup ++"(" ++ intercalate "," (map (\a -> res_ty a "") args ++ [x]) ++ ")"
-
+                   -- Only handles primops returning unboxed tuples up to 3 args currently
+                   _ -> error "Unexpected primop result type"
+      in wtup ++"(" ++ intercalate "," (map (\a -> res_ty a "") tup_tys ++ [x]) ++ ")"
+    -- If you hit this you will need to handle the foundation tests to handle the
+    -- type it failed on.
+    res_ty unexpected_ty x = error ("Unexpected primop result type:" ++ pprTy unexpected_ty ++ "," ++ x)
 
 
     wrap qual nm | isLower (head nm) = qual ++ "." ++ nm
@@ -734,7 +750,10 @@ gen_foundation_tests (Info _ entries)
       , poName /= "tagToEnum#"
       , poName /= "quotRemWord2#"
       , (testable (ty po))
-      = Just $ intercalate " " ["testPrimop", "\"" ++ poName ++ "\"", wrap "Primop" poName, wrap "Wrapper" poName]
+      = let testPrimOpHow = if is_divLikeOp po
+              then "testPrimopDivLike"
+              else "testPrimop"
+        in Just $ intercalate " " [testPrimOpHow, "\"" ++ poName ++ "\"", wrap "Primop" poName, wrap "Wrapper" poName]
       | otherwise = Nothing
 
 
@@ -742,13 +761,15 @@ gen_foundation_tests (Info _ entries)
     testable (TyF t1 t2) = testable t1 && testable t2
     testable (TyC _  t2) = testable t2
     testable (TyApp tc tys) = testableTyCon tc && all testable tys
-    testable (TyVar a)   = False
+    testable (TyVar _a)   = False
     testable (TyUTup tys)  = all testable tys
 
     testableTyCon (TyCon c) =
       c `elem` ["Int#", "Word#", "Word8#", "Word16#", "Word32#", "Word64#"
                , "Int8#", "Int16#", "Int32#", "Int64#", "Char#"]
     testableTyCon _ = False
+    divableTyCons = ["Int#", "Word#", "Word8#", "Word16#", "Word32#", "Word64#"
+                    ,"Int8#", "Int16#", "Int32#", "Int64#"]
 
 ------------------------------------------------------------------
 -- Create PrimOpInfo text from PrimOpSpecs -----------------------

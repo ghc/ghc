@@ -1020,20 +1020,20 @@ doPrimOp platform op init_d s p args =
     Int16NegOp -> sizedPrimOp OP_NEG
     Int8NegOp -> sizedPrimOp OP_NEG
 
-    IntToWordOp     -> no_op
-    WordToIntOp     -> no_op
-    Int8ToWord8Op   -> no_op
-    Word8ToInt8Op   -> no_op
-    Int16ToWord16Op -> no_op
-    Word16ToInt16Op -> no_op
-    Int32ToWord32Op -> no_op
-    Word32ToInt32Op -> no_op
-    Int64ToWord64Op -> no_op
-    Word64ToInt64Op -> no_op
-    IntToAddrOp     -> no_op
-    AddrToIntOp     -> no_op
-    ChrOp           -> no_op   -- Int# and Char# are rep'd the same
-    OrdOp           -> no_op
+    IntToWordOp     -> mk_conv (platformWordWidth platform)
+    WordToIntOp     -> mk_conv (platformWordWidth platform)
+    Int8ToWord8Op   -> mk_conv W8
+    Word8ToInt8Op   -> mk_conv W8
+    Int16ToWord16Op -> mk_conv W16
+    Word16ToInt16Op -> mk_conv W16
+    Int32ToWord32Op -> mk_conv W32
+    Word32ToInt32Op -> mk_conv W32
+    Int64ToWord64Op -> mk_conv W64
+    Word64ToInt64Op -> mk_conv W64
+    IntToAddrOp     -> mk_conv (platformWordWidth platform)
+    AddrToIntOp     -> mk_conv (platformWordWidth platform)
+    ChrOp           -> mk_conv (platformWordWidth platform)   -- Int# and Char# are rep'd the same
+    OrdOp           -> mk_conv (platformWordWidth platform)
 
     IndexOffAddrOp_Word8 ->  primOpWithRep (OP_INDEX_ADDR W8) W8
     IndexOffAddrOp_Word16 -> primOpWithRep (OP_INDEX_ADDR W16) W16
@@ -1042,6 +1042,7 @@ doPrimOp platform op init_d s p args =
 
     _ -> Nothing
   where
+    primArg1Width :: StgArg -> Width
     primArg1Width arg
       | rep <- (stgArgRepU arg)
       = case rep of
@@ -1091,43 +1092,12 @@ doPrimOp platform op init_d s p args =
       let slide = mkSlideW (mkSlideWords width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn width
       return $ prim_code `appOL` slide
 
-    no_op = Just $ do
+    mk_conv :: Width -> Maybe (BcM (OrdList BCInstr))
+    mk_conv target_width = Just $ do
       let width = primArg1Width (head args)
-      prim_code <- terribleNoOp init_d s p undefined args
-      let slide = mkSlideW (mkSlideWords width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn width
-      return $ prim_code `appOL` slide
-
--- It's horrible, but still better than calling intToWord ...
-terribleNoOp
-    :: StackDepth
-    -> Sequel
-    -> BCEnv
-    -> BCInstr                  -- The operator
-    -> [StgArg]                 -- Args, in *reverse* order (must be fully applied)
-    -> BcM BCInstrList
-terribleNoOp orig_d _ p _ args = app_code
-  where
-    app_code = do
-        profile <- getProfile
-        let --platform = profilePlatform profile
-
-            non_voids =
-                addArgReps (assertNonVoidStgArgs args)
-            (_, _, args_offsets) =
-                mkVirtHeapOffsetsWithPadding profile StdHeader non_voids
-
-            do_pushery !d (arg : args) = do
-                (push, arg_bytes) <- case arg of
-                    (Padding l _) -> return $! pushPadding (ByteOff l)
-                    (FieldOff a _) -> pushConstrAtom d p (fromNonVoid a)
-                more_push_code <- do_pushery (d + arg_bytes) args
-                return (push `appOL` more_push_code)
-            do_pushery !_d [] = do
-                -- let !n_arg_words = bytesToWords platform (d - orig_d)
-                return (nilOL)
-
-        -- Push on the stack in the reverse order.
-        do_pushery orig_d (reverse args_offsets)
+      (push_code, _bytes) <- pushAtom init_d p (head args)
+      let slide = mkSlideW (mkSlideWords width) (bytesToWords platform $ init_d - s) `snocOL` mkNReturn target_width
+      return $ push_code `appOL` slide
 
 -- Push the arguments on the stack and emit the given instruction
 -- Pushes one word per non void arg.
