@@ -364,10 +364,6 @@ void printRtsInfo(const RtsConfig rts_config) {
     printf(" [(\"GHC RTS\", \"YES\")\n");
     mkRtsInfoPair("GHC version",             ProjectVersion);
     mkRtsInfoPair("RTS way",                 RtsWay);
-    mkRtsInfoPair("Build platform",          BuildPlatform);
-    mkRtsInfoPair("Build architecture",      BuildArch);
-    mkRtsInfoPair("Build OS",                BuildOS);
-    mkRtsInfoPair("Build vendor",            BuildVendor);
     mkRtsInfoPair("Host platform",           HostPlatform);
     mkRtsInfoPair("Host architecture",       HostArch);
     mkRtsInfoPair("Host OS",                 HostOS);
