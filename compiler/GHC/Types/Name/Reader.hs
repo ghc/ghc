@@ -150,7 +150,6 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import qualified Data.Semigroup as S
 import System.IO.Unsafe ( unsafePerformIO )
-import Language.Haskell.Syntax.ImpExp
 
 {-
 ************************************************************************

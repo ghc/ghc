@@ -285,7 +285,7 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ (ModuleN
                     | (_lvl, mb_pkg, L loc mod) <- idecls,
                       mod `notElem` excl_mods ]
 
-        ; do_imps IsBoot (map ((,,) GHC.NormalLevel NoPkgQual) (ms_srcimps node))
+        ; do_imps IsBoot (map ((,,) NormalLevel NoPkgQual) (ms_srcimps node))
         ; do_imps NotBoot (ms_imps node)
         }
 

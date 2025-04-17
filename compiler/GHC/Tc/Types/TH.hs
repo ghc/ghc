@@ -96,7 +96,7 @@ thLevel :: ThStage -> ThLevel
 thLevel (Splice _ s)  = thLevel s - 1
 thLevel Comp          = 0
 thLevel (Brack s _)   = thLevel s + 1
-thLevel (RunSplice _) = (-1) -- previously: panic "thLevel: called when running a splice"
+thLevel (RunSplice _) = thLevel (Splice Untyped Comp) -- previously: panic "thLevel: called when running a splice"
                         -- See Note [RunSplice ThLevel].
 
 {- Note [RunSplice ThLevel]
@@ -106,7 +106,7 @@ splice. In particular it is not set when the splice is renamed or typechecked.
 
 However, this is not true. `reifyInstances` for example does rename the given type,
 and these types may contain variables (#9262 allow free variables in reifyInstances).
-Therefore here we assume that thLevel (RunSplice _) = 0.
+Therefore here we assume that thLevel (RunSplice _) = 0
 Proper fix would probably require renaming argument `reifyInstances` separately prior
 to evaluation of the overall splice.
 

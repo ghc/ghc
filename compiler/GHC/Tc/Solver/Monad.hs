@@ -1658,9 +1658,9 @@ checkWellStagedInstanceWhat what
             instance_key = if moduleUnitId name_module `Set.member` hsc_all_home_unit_ids hsc_env
                              then (mkKey NormalLevel name_module)
                              else Right (moduleUnitId name_module)
-        let lvls = [ 0 | splice_lvl instance_key]
-                 ++ [ 1 | normal_lvl instance_key]
-                 ++ [ 2 | quote_lvl instance_key]
+        let lvls = [ -1 | splice_lvl instance_key]
+                 ++ [ 0 | normal_lvl instance_key]
+                 ++ [ 1 | quote_lvl instance_key]
         if isLocalId dfun_id
           then return $ Just ( (Set.singleton topLevel, True) )
           else return $ Just ( Set.fromList lvls, False )

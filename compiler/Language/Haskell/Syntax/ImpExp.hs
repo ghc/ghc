@@ -1,10 +1,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-module Language.Haskell.Syntax.ImpExp ( module Language.Haskell.Syntax.ImpExp, ImportLevel(..), IsBootInterface(..) ) where
+module Language.Haskell.Syntax.ImpExp ( module Language.Haskell.Syntax.ImpExp, IsBootInterface(..) ) where
 
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name
-import Language.Haskell.Syntax.ImpExp.ImportLevel ( ImportLevel(..) )
 import Language.Haskell.Syntax.ImpExp.IsBoot ( IsBootInterface(..) )
 
 import Data.Eq (Eq)
@@ -37,6 +36,13 @@ data ImportDeclQualifiedStyle
   | NotQualified  -- ^ Not qualified.
   deriving (Eq, Data)
 
+data ImportDeclLevelStyle
+  = LevelStylePre ImportDeclLevel -- ^ 'splice' or 'quote' appears in prepositive position.
+  | LevelStylePost ImportDeclLevel -- ^ 'splice' or 'quote' appears in postpositive position.
+  | NotLevelled -- ^ Not levelled.
+  deriving (Eq, Data)
+
+data ImportDeclLevel = ImportDeclQuote | ImportDeclSplice deriving (Eq, Data)
 
 -- | Import Declaration
 --
@@ -47,7 +53,7 @@ data ImportDecl pass
       ideclName       :: XRec pass ModuleName, -- ^ Module name.
       ideclPkgQual    :: ImportDeclPkgQual pass,  -- ^ Package qualifier.
       ideclSource     :: IsBootInterface,      -- ^ IsBoot \<=> {-\# SOURCE \#-} import
-      ideclLevel      :: ImportLevel,
+      ideclLevelSpec  :: ImportDeclLevelStyle,
       ideclSafe       :: Bool,          -- ^ True => safe import
       ideclQualified  :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclAs         :: Maybe (XRec pass ModuleName),  -- ^ as Module

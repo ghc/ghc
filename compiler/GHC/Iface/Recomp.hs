@@ -55,6 +55,7 @@ import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Types.Annotations
 import GHC.Types.Avail
+import GHC.Types.Basic ( ImportLevel(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set

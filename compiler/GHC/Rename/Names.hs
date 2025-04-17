@@ -74,7 +74,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.Hint
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.Basic  ( TopLevelFlag(..), TyConFlavour (..) )
+import GHC.Types.Basic  ( TopLevelFlag(..), TyConFlavour (..), convImportLevel )
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.PkgQual
@@ -315,7 +315,7 @@ rnImportDecl this_mod
                                      , ideclPkgQual = raw_pkg_qual
                                      , ideclSource = want_boot
                                      , ideclSafe = mod_safe
-                                     , ideclLevel = import_level
+                                     , ideclLevelSpec = import_level
                                      , ideclQualified = qual_style
                                      , ideclExt = XImportDeclPass { ideclImplicit = implicit }
                                      , ideclAs = as_mod, ideclImportList = imp_details }), import_reason)
@@ -394,7 +394,7 @@ rnImportDecl this_mod
         imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only,
                                   is_dloc = locA loc, is_as = qual_mod_name,
                                   is_pkg_qual = pkg_qual, is_isboot = want_boot,
-                                  is_level = import_level }
+                                  is_level = convImportLevel import_level }
 
     -- filter the imports according to the import declaration
     (new_imp_details, imp_user_list, gbl_env) <- filterImports hsc_env iface imp_spec imp_details
@@ -421,7 +421,7 @@ rnImportDecl this_mod
             , imv_is_hiding   = is_hiding
             , imv_all_exports = potential_gres
             , imv_qualified   = qual_only
-            , imv_is_level   = import_level
+            , imv_is_level   = convImportLevel import_level
             }
         imports = calculateAvails home_unit other_home_units iface mod_safe' want_boot (ImportedByUser imv)
 
@@ -439,7 +439,7 @@ rnImportDecl this_mod
           , ideclQualified = ideclQualified decl
           , ideclAs        = ideclAs decl
           , ideclImportList = new_imp_details
-          , ideclLevel     = ideclLevel decl
+          , ideclLevelSpec  = ideclLevelSpec decl
           }
 
     return (L loc new_imp_decl, ImpUserSpec imp_spec imp_user_list, gbl_env, imports)

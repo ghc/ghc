@@ -51,6 +51,7 @@ import GHC.Types.SourceError
 import GHC.Types.SourceFile
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
+import GHC.Types.Basic (convImportLevel)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Fingerprint
@@ -881,7 +882,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
                                          implicit_prelude imps
 
         rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) modname
-        convImport (L _ i) = (ideclLevel i, rn_pkg_qual (ideclPkgQual i), reLoc $ ideclName i)
+        convImport (L _ i) = (convImportLevel (ideclLevelSpec i), rn_pkg_qual (ideclPkgQual i), reLoc $ ideclName i)
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
 

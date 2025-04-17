@@ -1,5 +1,5 @@
 SI05.hs:10:11: error: [GHC-28914]
-    • Stage error: ‘SI01A.sid’ is bound at stage {1} but used at stage 0
+    • Stage error: ‘SI01A.sid’ is bound at stage {0} but used at stage -1
       Hint: quoting [| SI01A.sid |] or an enclosing expression would allow the quotation to be used in an earlier stage
       From imports {imported from ‘SI01A’ at SI05.hs:6:1-12}
     • In the untyped splice: $(sid [| pure () |])

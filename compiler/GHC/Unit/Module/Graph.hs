@@ -144,6 +144,7 @@ import GHC.Driver.Backend
 import GHC.Driver.DynFlags
 
 import GHC.Types.SourceFile ( hscSourceString, isHsigFile, HscSource(..))
+import GHC.Types.Basic
 
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
@@ -167,7 +168,6 @@ import Data.List (sort)
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
 import Control.Monad
-import Language.Haskell.Syntax.ImpExp
 import qualified GHC.LanguageExtensions as LangExt
 
 -- | A '@ModuleGraph@' contains all the nodes from the home package (only). See

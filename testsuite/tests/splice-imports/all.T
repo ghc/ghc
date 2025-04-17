@@ -32,4 +32,5 @@ test('SI23', extra_files(["SI23A.hs"]),  multimod_compile, ['SI23', '-v0'])
 test('SI24', normal, compile, [''])
 test('SI25', extra_files(["SI25Helper.hs"]), multimod_compile_fail, ['SI25', '-v0'])
 test('SI26', normal, compile, [''])
+test('SI27', normal, compile_fail, [''])
 

@@ -1120,31 +1120,33 @@ importdecls_semi
         | {- empty -}           { [] }
 
 importdecl :: { LImportDecl GhcPs }
-        : 'import' maybe_src maybe_splice maybe_safe optqualified maybe_pkg modid optqualified maybeas maybeimpspec
+        : 'import' maybe_src maybe_splice maybe_safe optqualified maybe_pkg modid maybe_splice optqualified maybeas maybeimpspec
                 {% do {
-                  ; let { ; mPreQual = unLoc $5
-                          ; mPostQual = unLoc $8 }
-                  ; checkImportDecl mPreQual mPostQual
+                  ; let { ; mPreQual = $5
+                          ; mPostQual = $9
+                          ; mPreLevel = $3
+                          ; mPostLevel = $8 }
+                  ; (qualSpec, levelSpec) <- checkImportDecl mPreQual mPostQual mPreLevel mPostLevel
                   ; let anns
                          = EpAnnImportDecl
                              { importDeclAnnImport    = epTok $1
                              , importDeclAnnPragma    = fst $ fst $2
-                             , importDeclAnnStage    = fst $3
+                             , importDeclAnnLevel     = fst $ levelSpec
                              , importDeclAnnSafe      = fst $4
-                             , importDeclAnnQualified = fst $ importDeclQualifiedStyle mPreQual mPostQual
+                             , importDeclAnnQualified = fst $ qualSpec
                              , importDeclAnnPackage   = fst $6
-                             , importDeclAnnAs        = fst $9
+                             , importDeclAnnAs        = fst $10
                              }
-                  ; let loc = (comb5 $1 $7 $8 (snd $9) $10);
+                  ; let loc = (comb6 $1 $7 $8 $9 (snd $10) $11);
                   ; fmap reLoc $ acs loc (\loc cs -> L loc $
                       ImportDecl { ideclExt = XImportDeclPass (EpAnn (spanAsAnchor loc) anns cs) (snd $ fst $2) False
                                   , ideclName = $7, ideclPkgQual = snd $6
                                   , ideclSource = snd $2
-                                  , ideclLevel  = snd $3
+                                  , ideclLevelSpec = snd $ levelSpec
                                   , ideclSafe = snd $4
-                                  , ideclQualified = snd $ importDeclQualifiedStyle mPreQual mPostQual
-                                  , ideclAs = unLoc (snd $9)
-                                  , ideclImportList = unLoc $10 })
+                                  , ideclQualified = snd $ qualSpec
+                                  , ideclAs = unLoc (snd $10)
+                                  , ideclImportList = unLoc $11 })
                   }
                 }
 
@@ -1158,10 +1160,10 @@ maybe_safe :: { (Maybe (EpToken "safe"),Bool) }
         : 'safe'                                { (Just (epTok $1),True) }
         | {- empty -}                           { (Nothing,      False) }
 
-maybe_splice :: { (EpAnnLevel,ImportLevel) }
-        : 'splice'                              { (EpAnnLevelSplice (epTok $1), SpliceLevel) }
-        | 'quote'                               { (EpAnnLevelQuote (epTok $1), QuoteLevel) }
-        | {- empty -}                           { (NoEpAnnLevel,      NormalLevel) }
+maybe_splice :: { (Maybe EpAnnLevel) }
+        : 'splice'                              { (Just (EpAnnLevelSplice (epTok $1))) }
+        | 'quote'                               { (Just (EpAnnLevelQuote (epTok $1))) }
+        | {- empty -}                           { (Nothing) }
 
 maybe_pkg :: { (Maybe EpaLocation, RawPkgQual) }
         : STRING  {% do { let { pkgFS = getSTRING $1 }
@@ -1171,9 +1173,9 @@ maybe_pkg :: { (Maybe EpaLocation, RawPkgQual) }
                         ; return (Just (glR $1), RawPkgQual (StringLiteral (getSTRINGs $1) pkgFS Nothing)) } }
         | {- empty -}                           { (Nothing,NoRawPkgQual) }
 
-optqualified :: { Located (Maybe (EpToken "qualified")) }
-        : 'qualified'                           { sL1 $1 (Just (epTok $1)) }
-        | {- empty -}                           { noLoc Nothing }
+optqualified :: { Maybe (EpToken "qualified") }
+        : 'qualified'                           { Just (epTok $1) }
+        | {- empty -}                           { Nothing }
 
 maybeas :: { (Maybe (EpToken "as"),Located (Maybe (LocatedA ModuleName))) }
         : 'as' modid                           { (Just (epTok $1)
@@ -4338,6 +4340,14 @@ comb5 !a !b !c !d !e =
     combineSrcSpans (getHasLoc b) $
     combineSrcSpans (getHasLoc c) $
     combineSrcSpans (getHasLoc d) (getHasLoc e)
+
+comb6 :: (HasLoc a, HasLoc b, HasLoc c, HasLoc d, HasLoc e, HasLoc f) => a -> b -> c -> d -> e -> f -> SrcSpan
+comb6 !a !b !c !d !e !f =
+    combineSrcSpans (getHasLoc a) $
+    combineSrcSpans (getHasLoc b) $
+    combineSrcSpans (getHasLoc c) $
+    combineSrcSpans (getHasLoc d) $
+    combineSrcSpans (getHasLoc e) (getHasLoc f)
 
 -- strict constructor version:
 {-# INLINE sL #-}

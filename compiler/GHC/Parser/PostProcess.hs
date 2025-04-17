@@ -92,6 +92,7 @@ module GHC.Parser.PostProcess (
         failOpFewArgs,
         failNotEnabledImportQualifiedPost,
         failImportQualifiedTwice,
+        failSpliceOrQuoteTwice,
 
         SumOrTuple (..),
 
@@ -1276,8 +1277,11 @@ checkContextExpr orig_expr@(L (EpAnn l _ cs) _) =
 
 checkImportDecl :: Maybe (EpToken "qualified")
                 -> Maybe (EpToken "qualified")
-                -> P ()
-checkImportDecl mPre mPost = do
+                -> Maybe EpAnnLevel
+                -> Maybe EpAnnLevel
+                -> P ((Maybe (EpToken "qualified"), ImportDeclQualifiedStyle)
+                     , (Maybe EpAnnLevel, ImportDeclLevelStyle))
+checkImportDecl mPre mPost preLevel postLevel = do
   let whenJust mg f = maybe (pure ()) f mg
       tokenSpan tok = RealSrcSpan (epaLocationRealSrcSpan $ getEpTokenLoc tok) Strict.Nothing
 
@@ -1291,14 +1295,46 @@ checkImportDecl mPre mPost = do
 
   -- Error if 'qualified' occurs in both pre and postpositive
   -- positions.
-  whenJust mPost $ \post ->
-    when (isJust mPre) $
-      failImportQualifiedTwice (tokenSpan post)
+  qualSpec <- importDeclQualifiedStyle mPre mPost
+  levelSpec <- importDeclLevelStyle preLevel postLevel
 
   -- Warn if 'qualified' found in prepositive position and
   -- 'Opt_WarnPrepositiveQualifiedModule' is enabled.
   whenJust mPre $ \pre ->
     warnPrepositiveQualifiedModule (tokenSpan pre)
+
+  return (qualSpec, levelSpec)
+
+-- | Given two possible located 'qualified' tokens, compute a style
+-- (in a conforming Haskell program only one of the two can be not
+-- 'Nothing'). This is called from "GHC.Parser".
+importDeclQualifiedStyle :: Maybe (EpToken "qualified")
+                         -> Maybe (EpToken "qualified")
+                         -> P (Maybe (EpToken "qualified"), ImportDeclQualifiedStyle)
+importDeclQualifiedStyle mPre mPost =
+  case (mPre, mPost) of
+    (Just {}, Just post) -> failImportQualifiedTwice (getEpTokenSrcSpan post)
+                            >> return (Just post, QualifiedPost)
+    (Nothing, Just post) -> pure (Just post, QualifiedPost)
+    (Just pre, Nothing) -> pure (Just pre, QualifiedPre)
+    (Nothing, Nothing) -> pure (Nothing, NotQualified)
+
+importDeclLevelStyle :: (Maybe EpAnnLevel)
+                     -> (Maybe EpAnnLevel)
+                     -> P (Maybe EpAnnLevel, ImportDeclLevelStyle)
+importDeclLevelStyle preImportLevel postImportLevel =
+  case (preImportLevel, postImportLevel) of
+    (Just {}, Just tok) -> failSpliceOrQuoteTwice tok
+                            >> return (Just tok, LevelStylePost (tokToLevel tok))
+    (Nothing, Just post) -> pure (Just post, LevelStylePost (tokToLevel post))
+    (Just pre, Nothing) -> pure (Just pre, LevelStylePre (tokToLevel pre))
+    (Nothing, Nothing) -> pure (Nothing, NotLevelled)
+  where
+    tokToLevel tok = case tok of
+      EpAnnLevelSplice {} -> ImportDeclSplice
+      EpAnnLevelQuote {} -> ImportDeclQuote
+
+
 
 -- -------------------------------------------------------------------------
 -- Checking Patterns.
@@ -3301,6 +3337,14 @@ failNotEnabledImportQualifiedPost loc =
 failImportQualifiedTwice :: SrcSpan -> P ()
 failImportQualifiedTwice loc =
   addError $ mkPlainErrorMsgEnvelope loc $ PsErrImportQualifiedTwice
+
+failSpliceOrQuoteTwice :: EpAnnLevel -> P ()
+failSpliceOrQuoteTwice lvl =
+  addError $ mkPlainErrorMsgEnvelope loc $ PsErrSpliceOrQuoteTwice
+  where
+    loc = case lvl of
+      EpAnnLevelSplice tok -> getEpTokenSrcSpan tok
+      EpAnnLevelQuote tok -> getEpTokenSrcSpan tok
 
 warnStarIsType :: SrcSpan -> P ()
 warnStarIsType span = addPsMessage span PsWarnStarIsType

@@ -120,7 +120,6 @@ module GHC.Utils.Binary
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Module.Name (ModuleName(..))
-import Language.Haskell.Syntax.ImpExp.ImportLevel (ImportLevel(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 
 import {-# SOURCE #-} GHC.Types.Name (Name)
@@ -1077,7 +1076,6 @@ instance Enum a => Binary (EnumBinary a) where
   get bh = do x <- get bh
               return $ EnumBinary (toEnum x)
 
-deriving via (EnumBinary ImportLevel) instance Binary ImportLevel
 
 instance Binary IsBootInterface where
   put_ bh ib = put_ bh (case ib of

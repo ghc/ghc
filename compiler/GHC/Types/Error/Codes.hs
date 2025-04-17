@@ -295,6 +295,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrUnallowedPragma"                          = 85314
   GhcDiagnosticCode "PsErrImportPostQualified"                      = 87491
   GhcDiagnosticCode "PsErrImportQualifiedTwice"                     = 05661
+  GhcDiagnosticCode "PsErrSpliceOrQuoteTwice"                       = 26105
   GhcDiagnosticCode "PsErrIllegalImportBundleForm"                  = 81284
   GhcDiagnosticCode "PsErrInvalidRuleActivationMarker"              = 50396
   GhcDiagnosticCode "PsErrMissingBlock"                             = 16849

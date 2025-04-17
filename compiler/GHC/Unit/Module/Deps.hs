@@ -33,6 +33,7 @@ import GHC.Data.FastString
 import GHC.Types.Avail
 import GHC.Types.SafeHaskell
 import GHC.Types.Name
+import GHC.Types.Basic
 
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module
@@ -51,7 +52,6 @@ import Control.DeepSeq
 import GHC.Types.Name.Set
 
 
-import Language.Haskell.Syntax.ImpExp
 
 -- | Dependency information about ALL modules and packages below this one
 -- in the import hierarchy. This is the serialisable version of `ImportAvails`.
