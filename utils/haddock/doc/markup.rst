@@ -845,24 +845,52 @@ Unicode (or ISO 10646). For example, the references ``&#x3BB;``,
 Code Blocks
 ~~~~~~~~~~~
 
-Displayed blocks of code are indicated by surrounding a paragraph with
-``@...@`` or by preceding each line of a paragraph with ``>`` (we often
-call these “bird tracks”). For example: ::
+Displayed blocks of code can be indicated in different ways:
 
-    -- | This documentation includes two blocks of code:
+- by surrounding a paragraph with ``@...@``
+- by preceding each line of a paragraph with ``>`` (we often
+  call these “bird tracks”)
+- by surrounding a paragraph with triple backticks `` ``` `` (also known
+  as fenced code blocks) and optionally indicating a language. Haddock
+  will apply syntax highlighting when a language is provided.
+
+For example: ::
+
+    -- | This documentation includes four blocks of code:
     --
     -- @
     --     f x = x + x
     -- @
     --
     -- >  g x = x * 42
+    --
+    -- ```
+    -- fix x = f (fix x)
+    -- ```
+    --
+    -- ```haskell
+    -- data Bool = False | True
+    -- ```
 
-There is an important difference between the two forms of code block: in
-the bird-track form, the text to the right of the ‘\ ``>``\ ’ is
-interpreted literally, whereas the ``@...@`` form interprets markup as
-normal inside the code block. In particular, ``/`` is markup for italics,
-and so e.g. ``@x / y / z@`` renders as ``x`` followed by italic
-``y`` with no slashes, followed by ``z``.
+
+There is an important difference between the forms of code block: bird
+tracks and fenced code blocks interpret text literally, whereas the
+``@...@`` form interprets haddock markup as normal inside the code
+block.
+
+For example,  ``@x / y / z@`` renders as
+
++---------------------+-------------------------------+
+| Haddock             | Rendered                      |
++=====================+===============================+
+| ``@x / y / z@``     | .. raw:: html                 |
+|                     |                               |
+|                     |     <code>x <i>y</i> z</code> |
++---------------------+-------------------------------+
+| ``> x y z``         | .. raw:: html                 |
+|                     |                               |
+|                     |     <code>x / y / z</code>    |
++---------------------+-------------------------------+
 
 Examples
 ~~~~~~~~
