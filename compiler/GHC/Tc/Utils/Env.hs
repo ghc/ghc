@@ -1205,14 +1205,8 @@ pprBinders bndrs  = pprWithCommas ppr bndrs
 notFound :: Name -> TcM TyThing
 notFound name
   = do { lcl_env <- getLclEnv
-       ; let stage = getLclEnvThStage lcl_env
-       ; case stage of   -- See Note [Out of scope might be a staging error]
-           Splice {}
-             | isUnboundName name -> failM  -- If the name really isn't in scope
-                                            -- don't report it again (#11941)
-             | otherwise -> error "todo" --failWithTc (TcRnStageRestriction (StageCheckSplice name Nothing))
-
-           _ | isTermVarOrFieldNameSpace (nameNameSpace name) ->
+       ; if isTermVarOrFieldNameSpace (nameNameSpace name)
+           then
                -- This code path is only reachable with RequiredTypeArguments enabled
                -- via the following chain of calls:
                --   `notFound`       called from
@@ -1225,8 +1219,8 @@ notFound name
                -- See Note [Demotion of unqualified variables] (W1) in GHC.Rename.Env
                failWithTc $ TcRnUnpromotableThing name TermVariablePE
 
-             | otherwise -> failWithTc $
-                TcRnNotInScope (NotInScopeTc (getLclEnvTypeEnv lcl_env)) (getRdrName name)
+           else failWithTc $
+                 TcRnNotInScope (NotInScopeTc (getLclEnvTypeEnv lcl_env)) (getRdrName name)
                   -- Take care: printing the whole gbl env can
                   -- cause an infinite loop, in the case where we
                   -- are in the middle of a recursive TyCon/Class group;
