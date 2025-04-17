@@ -6745,13 +6745,6 @@ data THNameError
   -}
   = NonExactName !RdrName
 
-  {-| QuotedNameWrongStage is an error that can happen when a
-      (non-top-level) Name is used at a different Template Haskell stage
-      than the stage at which it is bound.
-
-     Test cases: T16976z
-  -}
-  | QuotedNameWrongStage !(HsQuote GhcPs)
   deriving Generic
 
 data THReifyError

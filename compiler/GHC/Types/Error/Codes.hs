@@ -967,7 +967,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "NestedTHBrackets"                              = 59185
   GhcDiagnosticCode "AddTopDeclsUnexpectedDeclarationSplice"        = 17599
   GhcDiagnosticCode "BadImplicitSplice"                             = 25277
-  GhcDiagnosticCode "QuotedNameWrongStage"                          = 57695
+  GhcDiagnosticCode "QuotedNameWrongStage"                          = Outdated 57695
   GhcDiagnosticCode "IllegalStaticFormInSplice"                     = 12219
 
   -- Zonker messages

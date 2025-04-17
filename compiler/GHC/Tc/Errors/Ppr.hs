@@ -6877,10 +6877,6 @@ pprTHNameError = \case
     mkSimpleDecorated $
       hang (text "The binder" <+> quotes (ppr name) <+> text "is not a NameU.")
          2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
-  QuotedNameWrongStage quote ->
-    mkSimpleDecorated $
-      sep [ text "Stage error: the non-top-level quoted name" <+> ppr quote
-          , text "must be used at the same stage at which it is bound." ]
 
 pprTHReifyError :: THReifyError -> DecoratedSDoc
 pprTHReifyError = \case
@@ -7002,7 +6998,6 @@ thSyntaxErrorReason = \case
 thNameErrorReason :: THNameError -> DiagnosticReason
 thNameErrorReason = \case
   NonExactName {}         -> ErrorWithoutFlag
-  QuotedNameWrongStage {} -> ErrorWithoutFlag
 
 thReifyErrorReason :: THReifyError -> DiagnosticReason
 thReifyErrorReason = \case
@@ -7063,7 +7058,6 @@ thSyntaxErrorHints = \case
 thNameErrorHints :: THNameError -> [GhcHint]
 thNameErrorHints = \case
   NonExactName {}         -> noHints
-  QuotedNameWrongStage {} -> noHints
 
 thReifyErrorHints :: THReifyError -> [GhcHint]
 thReifyErrorHints = \case
