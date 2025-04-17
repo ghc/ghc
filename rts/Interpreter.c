@@ -199,11 +199,11 @@ See also Note [Width of parameters] for some more motivation.
     (RTS_LIKELY(((StgWord*) Sp_plusW(n)) < ((s)->stack + (s)->stack_size - sizeofW(StgUnderflowFrame))))
 
 
-#define WDS_TO_W64(n) (n * sizeof(StgWord64) / sizeof(StgWord))
+#define W64S_TO_WDS(n) ((n) * sizeof(StgWord64) / sizeof(StgWord))
 
 // Always safe to use - Return the value at the address
 #define ReadSpW(n)       (*((StgWord*)   SafeSpWP(n)))
-#define ReadSpW64(n)     (*((StgWord64*) SafeSpWP(WDS_TO_W64(n))))
+#define ReadSpW64(n)     (*((StgWord64*) SafeSpWP(W64S_TO_WDS(n))))
 // Perhaps confusingly this still reads a full word, merely the offset is in bytes.
 #define ReadSpB(n)       (*((StgWord*)   SafeSpBP(n)))
 
@@ -249,9 +249,9 @@ See ticket #25750
 #define SafeSpWP(n)      \
   ((StgWord*) ((WITHIN_CAP_CHUNK_BOUNDS_W(n)) ? Sp_plusW(n) : slow_spw(Sp, cap->r.rCurrentTSO->stackobj, n)))
 #define SafeSpBP(off_w)      \
-  ( (StgWord*) (WITHIN_CAP_CHUNK_BOUNDS_W((1+(off_w))/sizeof(StgWord))) ? \
+  ( (StgWord*) ((WITHIN_CAP_CHUNK_BOUNDS_W((1+(off_w))/sizeof(StgWord))) ? \
         Sp_plusB(off_w) : \
-        (StgWord*) ((ptrdiff_t)((off_w) % sizeof(StgWord)) + (StgWord8*)slow_spw(Sp, cap->r.rCurrentTSO->stackobj, (off_w)/sizeof(StgWord))))
+        (StgWord*) ((ptrdiff_t)((off_w) % sizeof(StgWord)) + (StgWord8*)slow_spw(Sp, cap->r.rCurrentTSO->stackobj, (off_w)/sizeof(StgWord)))))
 
 
 
