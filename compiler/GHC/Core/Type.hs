@@ -510,8 +510,8 @@ expandTypeSynonyms ty
     go _     (LitTy l)     = LitTy l
     go subst (TyVarTy tv)  = substTyVar subst tv
     go subst (AppTy t1 t2) = mkAppTy (go subst t1) (go subst t2)
-    go subst ty@(FunTy _ mult arg res)
-      = ty { ft_mult = go subst mult, ft_arg = go subst arg, ft_res = go subst res }
+    go subst ty@(FunTy mods arg res)
+      = ty { ft_mods = mkFtMods (go subst (ftm_mult mods)) (ftm_flag mods), ft_arg = go subst arg, ft_res = go subst res }
     go subst (ForAllTy (Bndr tv vis) t)
       = let (subst', tv') = substVarBndrUsing go subst tv in
         ForAllTy (Bndr tv' vis) (go subst' t)
@@ -912,9 +912,9 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_ty !env (CastTy ty co)  = mkCastTy <$> go_ty env ty <*> go_co env co
     go_ty !env (CoercionTy co) = CoercionTy <$> go_co env co
 
-    go_ty !env ty@(FunTy _ w arg res)
-      = do { w' <- go_ty env w; arg' <- go_ty env arg; res' <- go_ty env res
-           ; return (ty { ft_mult = w', ft_arg = arg', ft_res = res' }) }
+    go_ty !env ty@(FunTy mods arg res)
+      = do { w' <- go_ty env (ftm_mult mods); arg' <- go_ty env arg; res' <- go_ty env res
+           ; return (ty { ft_mods = ftm_update_mult mods w', ft_arg = arg', ft_res = res' }) }
 
     go_ty !env ty@(TyConApp tc tys)
       | isTcTyCon tc
@@ -1119,8 +1119,9 @@ splitAppTyNoView_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 splitAppTyNoView_maybe (AppTy ty1 ty2)
   = Just (ty1, ty2)
 
-splitAppTyNoView_maybe (FunTy af w ty1 ty2)
-  | Just (tc, tys)   <- funTyConAppTy_maybe af w ty1 ty2
+splitAppTyNoView_maybe (FunTy mods ty1 ty2)
+  | af <- ftm_flag mods, w <- ftm_mult mods
+  , Just (tc, tys)   <- funTyConAppTy_maybe af w ty1 ty2
   , Just (tys', ty') <- snocView tys
   = Just (TyConApp tc tys', ty')
 
@@ -1135,7 +1136,8 @@ tcSplitAppTyNoView_maybe :: Type -> Maybe (Type,Type)
 -- ^ Just like splitAppTyNoView_maybe, but does not split (c => t)
 -- See Note [Decomposing fat arrow c=>t]
 tcSplitAppTyNoView_maybe ty
-  | FunTy { ft_af = af } <- ty
+  | FunTy { ft_mods = mods } <- ty
+  , af <- ftm_flag mods
   , not (isVisibleFunArg af)  -- See Note [Decomposing fat arrow c=>t]
   = Nothing
   | otherwise
@@ -1157,8 +1159,9 @@ splitAppTys ty = split ty ty []
             (tc_args1, tc_args2) = splitAt n tc_args
         in
         (TyConApp tc tc_args1, tc_args2 ++ args)
-    split _   (FunTy af w ty1 ty2) args
-      | Just (tc,tys) <- funTyConAppTy_maybe af w ty1 ty2
+    split _   (FunTy mods ty1 ty2) args
+      | af <- ftm_flag mods, w <- ftm_mult mods
+      , Just (tc,tys) <- funTyConAppTy_maybe af w ty1 ty2
       = assert (null args )
         (TyConApp tc [], tys)
 
@@ -1175,8 +1178,9 @@ splitAppTysNoView ty = split ty []
             (tc_args1, tc_args2) = splitAt n tc_args
         in
         (TyConApp tc tc_args1, tc_args2 ++ args)
-    split (FunTy af w ty1 ty2) args
-      | Just (tc, tys) <- funTyConAppTy_maybe af w ty1 ty2
+    split (FunTy mods ty1 ty2) args
+      | af <- ftm_flag mods, w <- ftm_mult mods
+      , Just (tc, tys) <- funTyConAppTy_maybe af w ty1 ty2
       = assert (null args )
         (TyConApp tc [], tys)
 
@@ -1347,7 +1351,7 @@ tyConAppFunTy_maybe :: HasDebugCallStack => TyCon -> [Type] -> Maybe Type
 -- ^ Return Just if this TyConApp should be represented as a FunTy
 tyConAppFunTy_maybe tc tys
   | Just (af, mult, arg, res) <- ty_con_app_fun_maybe manyDataConTy tc tys
-            = Just (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
+            = Just (FunTy { ft_mods = mkFtMods mult af, ft_arg = arg, ft_res = res })
   | otherwise = Nothing
 
 tyConAppFunCo_maybe :: HasDebugCallStack => Role -> TyCon -> [Coercion]
@@ -1391,10 +1395,9 @@ mkFunctionType :: HasDebugCallStack => Mult -> Type -> Type -> Type
 -- ^ This one works out the FunTyFlag from the argument type
 -- See GHC.Types.Var Note [FunTyFlag]
 mkFunctionType mult arg_ty res_ty
- = FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty
-         , ft_mult = assertPpr mult_ok (ppr [mult, arg_ty, res_ty]) $
-                     mult }
+ = FunTy { ft_mods = mkFtMods mult' af, ft_arg = arg_ty, ft_res = res_ty }
   where
+    mult' = assertPpr mult_ok (ppr [mult, arg_ty, res_ty]) $ mult
     af = chooseFunTyFlag arg_ty res_ty
     mult_ok = isVisibleFunArg af || isManyTy mult
 
@@ -1423,7 +1426,7 @@ splitFunTy ty = case splitFunTy_maybe ty of
 splitFunTy_maybe :: Type -> Maybe (FunTyFlag, Mult, Type, Type)
 -- ^ Attempts to extract the multiplicity, argument and result types from a type
 splitFunTy_maybe ty
-  | FunTy af w arg res <- coreFullView ty = Just (af, w, arg, res)
+  | FunTy mods arg res <- coreFullView ty = Just (ftm_flag mods, ftm_mult mods, arg, res)
   | otherwise                             = Nothing
 
 {-# INLINE splitVisibleFunTy_maybe #-}
@@ -1431,15 +1434,15 @@ splitVisibleFunTy_maybe :: Type -> Maybe (Type, Type)
 -- ^ Works on visible function types only (t1 -> t2), and
 --   returns t1 and t2, but not the multiplicity
 splitVisibleFunTy_maybe ty
-  | FunTy af _ arg res <- coreFullView ty
-  , isVisibleFunArg af = Just (arg, res)
+  | FunTy mods arg res <- coreFullView ty
+  , isVisibleFunArg (ftm_flag mods) = Just (arg, res)
   | otherwise          = Nothing
 
 splitFunTys :: Type -> ([Scaled Type], Type)
 splitFunTys ty = split [] ty ty
   where
       -- common case first
-    split args _       (FunTy _ w arg res) = split (Scaled w arg : args) res res
+    split args _       (FunTy fm arg res) = split (Scaled (ftm_mult fm) arg : args) res res
     split args orig_ty ty | Just ty' <- coreView ty = split args orig_ty ty'
     split args orig_ty _                   = (reverse args, orig_ty)
 
@@ -1596,7 +1599,7 @@ The same thing happens in GHC.CoreToIface.toIfaceAppArgsX.
 -- look through synonyms.
 tyConAppTyConPicky_maybe :: Type -> Maybe TyCon
 tyConAppTyConPicky_maybe (TyConApp tc _)        = Just tc
-tyConAppTyConPicky_maybe (FunTy { ft_af = af }) = Just (funTyFlagTyCon af)
+tyConAppTyConPicky_maybe (FunTy {ft_mods = am}) = Just (funTyFlagTyCon $ ftm_flag am )
 tyConAppTyConPicky_maybe _                      = Nothing
 
 
@@ -1606,7 +1609,7 @@ tyConAppTyConPicky_maybe _                      = Nothing
 tyConAppTyCon_maybe :: Type -> Maybe TyCon
 tyConAppTyCon_maybe ty = case coreFullView ty of
   TyConApp tc _        -> Just tc
-  FunTy { ft_af = af } -> Just (funTyFlagTyCon af)
+  FunTy { ft_mods = mods } -> Just (funTyFlagTyCon $ ftm_flag mods)
   _                    -> Nothing
 
 tyConAppTyCon :: HasDebugCallStack => Type -> TyCon
@@ -1636,8 +1639,8 @@ splitTyConAppNoView_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 -- Same as splitTyConApp_maybe but without looking through synonyms
 splitTyConAppNoView_maybe ty
   = case ty of
-      FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res}
-                      -> funTyConAppTy_maybe af w arg res
+      FunTy { ft_mods = mods, ft_arg = arg, ft_res = res}
+                      -> funTyConAppTy_maybe (ftm_flag mods) (ftm_mult mods) arg res
       TyConApp tc tys -> Just (tc, tys)
       _               -> Nothing
 
@@ -1662,10 +1665,11 @@ tcSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 -- Defined here to avoid module loops between Unify and TcType.
 tcSplitTyConApp_maybe ty
   = case coreFullView ty of
-      FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res}
-                      | isVisibleFunArg af    -- Visible args only
+      FunTy { ft_mods = mods, ft_arg = arg, ft_res = res}
+                      | (!mult,!af) <- ftm_mods mods
+                      , isVisibleFunArg af    -- Visible args only
                         -- See Note [Decomposing fat arrow c=>t]
-                      -> funTyConAppTy_maybe af w arg res
+                      -> funTyConAppTy_maybe af mult arg res
       TyConApp tc tys -> Just (tc, tys)
       _               -> Nothing
 
@@ -2018,7 +2022,8 @@ splitForAllCoVar_maybe ty
 splitPiTy_maybe :: Type -> Maybe (PiTyBinder, Type)
 splitPiTy_maybe ty = case coreFullView ty of
   ForAllTy bndr ty -> Just (Named bndr, ty)
-  FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res}
+  FunTy { ft_mods = mods, ft_arg = arg, ft_res = res}
+    | (w,af) <- ftm_mods mods
                    -> Just (Anon (mkScaled w arg) af, res)
   _                -> Nothing
 
@@ -2034,7 +2039,8 @@ splitPiTys :: Type -> ([PiTyBinder], Type)
 splitPiTys ty = split ty ty []
   where
     split _       (ForAllTy b res) bs = split res res (Named b  : bs)
-    split _       (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res }) bs
+    split _       (FunTy { ft_mods = mods, ft_arg = arg, ft_res = res }) bs
+      | af <- ftm_flag mods, w <- ftm_mult mods
                                       = split res res (Anon (Scaled w arg) af : bs)
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
     split orig_ty _                bs = (reverse bs, orig_ty)
@@ -2043,7 +2049,8 @@ collectPiTyBinders :: Type -> [PiTyBinder]
 collectPiTyBinders ty = build $ \c n ->
   let
     split (ForAllTy b res) = Named b `c` split res
-    split (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
+    split (FunTy { ft_mods = mods, ft_arg = arg, ft_res = res })
+      | af <- ftm_flag mods, w <- ftm_mult mods
                            = Anon (Scaled w arg) af `c` split res
     split ty | Just ty' <- coreView ty = split ty'
     split _                = n
@@ -2082,7 +2089,8 @@ getRuntimeArgTys = go
     go :: Type -> [(Scaled Type, FunTyFlag)]
     go (ForAllTy _ res)
       = go res
-    go (FunTy { ft_mult = w, ft_arg = arg, ft_res = res, ft_af = af })
+    go (FunTy { ft_mods = mods, ft_arg = arg, ft_res = res })
+      | af <- ftm_flag mods, w <- ftm_mult mods
       = (Scaled w arg, af) : go res
     go ty
       | Just ty' <- coreView ty
@@ -2107,8 +2115,9 @@ splitInvisPiTys ty = split ty ty []
     split _ (ForAllTy b res) bs
       | Bndr _ vis <- b
       , isInvisibleForAllTyFlag vis   = split res res (Named b  : bs)
-    split _ (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })  bs
-      | isInvisibleFunArg af     = split res res (Anon (mkScaled mult arg) af : bs)
+    split _ (FunTy { ft_mods = mods, ft_arg = arg, ft_res = res })  bs
+      | (mult,af) <- ftm_mods mods
+      , isInvisibleFunArg af     = split res res (Anon (mkScaled mult arg) af : bs)
     split orig_ty ty bs
       | Just ty' <- coreView ty  = split orig_ty ty' bs
     split orig_ty _          bs  = (reverse bs, orig_ty)
@@ -2125,7 +2134,8 @@ splitInvisPiTysN n ty = split n ty ty []
       | ForAllTy b res <- ty
       , Bndr _ vis <- b
       , isInvisibleForAllTyFlag vis  = split (n-1) res res (Named b  : bs)
-      | FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res } <- ty
+      | FunTy { ft_mods = mods, ft_arg = arg, ft_res = res } <- ty
+      , (mult,af) <- ftm_mods mods
       , isInvisibleFunArg af   = split (n-1) res res (Anon (Scaled mult arg) af : bs)
       | otherwise              = (reverse bs, orig_ty)
 
@@ -2214,10 +2224,10 @@ fun_kind_arg_flags = go emptySubst
     --
     -- [Inferred,   Specified, Required, Required, Specified, Required]
     -- forall {k1}. forall k2. k1 ->     k2 ->     forall k3. k3 ->     Type
-    go subst (FunTy{ft_af = af, ft_res = res_ki}) (_:arg_tys)
+    go subst (FunTy{ft_mods = mods, ft_res = res_ki}) (_:arg_tys)
       = argf : go subst res_ki arg_tys
       where
-        argf | isVisibleFunArg af = Required
+        argf | isVisibleFunArg (ftm_flag mods) = Required
              | otherwise          = Inferred
     go _ _ arg_tys = map (const Required) arg_tys
                         -- something is ill-kinded. But this can happen
@@ -2230,9 +2240,11 @@ isTauTy (TyVarTy _)       = True
 isTauTy (LitTy {})        = True
 isTauTy (TyConApp tc tys) = all isTauTy tys && isTauTyCon tc
 isTauTy (AppTy a b)       = isTauTy a && isTauTy b
-isTauTy (FunTy { ft_af = af, ft_mult = w, ft_arg = a, ft_res = b })
+isTauTy (FunTy { ft_mods = mods, ft_arg = a, ft_res = b })
  | isInvisibleFunArg af   = False                               -- e.g., Eq a => b
  | otherwise              = isTauTy w && isTauTy a && isTauTy b -- e.g., a -> b
+ where
+  (w,af) = ftm_mods mods
 isTauTy (ForAllTy {})     = False
 isTauTy (CastTy ty _)     = isTauTy ty
 isTauTy (CoercionTy _)    = False  -- Not sure about this
@@ -2290,7 +2302,7 @@ isFamFreeTy (TyVarTy _)       = True
 isFamFreeTy (LitTy {})        = True
 isFamFreeTy (TyConApp tc tys) = all isFamFreeTy tys && isFamFreeTyCon tc
 isFamFreeTy (AppTy a b)       = isFamFreeTy a && isFamFreeTy b
-isFamFreeTy (FunTy _ w a b)   = isFamFreeTy w && isFamFreeTy a && isFamFreeTy b
+isFamFreeTy (FunTy mods a b)   = isFamFreeTy (ftm_mult mods) && isFamFreeTy a && isFamFreeTy b
 isFamFreeTy (ForAllTy _ ty)   = isFamFreeTy ty
 isFamFreeTy (CastTy ty _)     = isFamFreeTy ty
 isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
@@ -2573,7 +2585,8 @@ seqType :: Type -> ()
 seqType (LitTy n)                   = n `seq` ()
 seqType (TyVarTy tv)                = tv `seq` ()
 seqType (AppTy t1 t2)               = seqType t1 `seq` seqType t2
-seqType (FunTy _ w t1 t2)           = seqType w `seq` seqType t1 `seq` seqType t2
+seqType (FunTy mods t1 t2)
+  | (w,!_af) <- ftm_mods mods        = seqType w `seq` seqType t1 `seq` seqType t2
 seqType (TyConApp tc tys)           = tc `seq` seqTypes tys
 seqType (ForAllTy (Bndr tv _) ty)   = seqType (varType tv) `seq` seqType ty
 seqType (CastTy ty co)              = seqType ty `seq` seqCo co
@@ -2668,7 +2681,7 @@ typeKind :: HasDebugCallStack => Type -> Kind
 -- No need to expand synonyms
 typeKind (TyConApp tc tys)      = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)              = typeLiteralKind l
-typeKind (FunTy { ft_af = af }) = liftedTypeOrConstraintKind (funTyFlagResultTypeOrConstraint af)
+typeKind (FunTy { ft_mods = mods }) = liftedTypeOrConstraintKind (funTyFlagResultTypeOrConstraint (ftm_flag mods))
 typeKind (TyVarTy tyvar)        = tyVarKind tyvar
 typeKind (CastTy _ty co)        = coercionRKind co
 typeKind (CoercionTy co)        = coercionType co
@@ -2736,7 +2749,7 @@ typeTypeOrConstraint :: HasDebugCallStack => Type -> TypeOrConstraint
 -- Equivalent to calling sORTKind_maybe, but faster in the FunTy case
 typeTypeOrConstraint ty
    = case coreFullView ty of
-       FunTy { ft_af = af } -> funTyFlagResultTypeOrConstraint af
+       FunTy { ft_mods = mods } -> funTyFlagResultTypeOrConstraint (ftm_flag mods)
        ty' | Just (torc, _) <- sORTKind_maybe (typeKind ty')
           -> torc
           | otherwise
@@ -2858,7 +2871,7 @@ isConcreteTypeWith conc_tvs = go
     go (AppTy ty1 ty2)     = go ty1 && go ty2
     go (TyConApp tc tys)   = go_tc tc tys
     go ForAllTy{}          = False
-    go (FunTy _ w t1 t2)   =  go w
+    go (FunTy mods t1 t2)  =  go (ftm_mult mods)
                            && go (typeKind t1) && go t1
                            && go (typeKind t2) && go t2
     go LitTy{}             = True
@@ -3218,8 +3231,9 @@ isLinearType :: Type -> Bool
 -- this function to check whether it is safe to eta reduce an Id in CorePrep. It
 -- is always safe to return 'True', because 'True' deactivates the optimisation.
 isLinearType ty = case ty of
-                      FunTy _ ManyTy _ res -> isLinearType res
-                      FunTy _ _ _ _        -> True
+                      FunTy mods _ res
+                        | isManyTy (ftm_mult mods) -> isLinearType res
+                        | otherwise        -> True
                       ForAllTy _ res       -> isLinearType res
                       _ -> False
 

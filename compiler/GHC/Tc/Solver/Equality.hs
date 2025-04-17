@@ -171,12 +171,13 @@ zonkEqTypes ev eq_rel ty1 ty2
     -- so we may run into an unzonked type variable while trying to compute the
     -- RuntimeReps of the argument and result types. This can be observed in
     -- testcase tc269.
-    go (FunTy af1 w1 arg1 res1) (FunTy af2 w2 arg2 res2)
-      | af1 == af2
+    go (FunTy mods1 arg1 res1) (FunTy mods2 arg2 res2)
+      | (w1,af1) <- ftm_mods mods1, (w2,af2) <- ftm_mods mods2
+      , af1 == af2
       , eqType w1 w2
       = do { res_a <- go arg1 arg2
            ; res_b <- go res1 res2
-           ; return $ combine_rev (FunTy af1 w1) res_b res_a }
+           ; return $ combine_rev (FunTy (mkFtMods w1 af1)) res_b res_a }
 
     go ty1@(FunTy {}) ty2 = bale_out ty1 ty2
     go ty1 ty2@(FunTy {}) = bale_out ty1 ty2
@@ -358,9 +359,10 @@ can_eq_nc _rewritten _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 -- Decompose FunTy: (s -> t) and (c => t)
 -- NB: don't decompose (Int -> blah) ~ (Show a => blah)
 can_eq_nc _rewritten _rdr_env _envs ev eq_rel
-           ty1@(FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
-           ty2@(FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
-  | af1 == af2  -- See Note [Decomposing FunTy]
+           ty1@(FunTy { ft_mods = mods1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
+           ty2@(FunTy { ft_mods = mods2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
+  | (am1,af1) <- ftm_mods mods1, (am2,af2) <- ftm_mods mods2
+  , af1 == af2  -- See Note [Decomposing FunTy]
   = canDecomposableFunTy ev eq_rel af1 (ty1,am1,ty1a,ty1b) (ty2,am2,ty2a,ty2b)
 
 -- Decompose type constructor applications

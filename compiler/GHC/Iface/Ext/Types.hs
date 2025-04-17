@@ -30,7 +30,7 @@ import GHC.Types.Unique
 import qualified GHC.Utils.Outputable as O ( (<>) )
 import GHC.Utils.Panic
 import GHC.Core.ConLike           ( ConLike(..) )
-import GHC.Core.TyCo.Rep          ( Type(..) )
+import GHC.Core.TyCo.Rep          ( Type(..), ftm_flag )
 import GHC.Core.Type              ( coreFullView, isFunTy, Var (..) )
 import GHC.Core.TyCon             ( isTypeSynonymTyCon, isClassTyCon, isFamilyTyCon )
 import GHC.Types.Id               ( Id, isRecordSelector, isClassOpId )
@@ -861,7 +861,7 @@ idEntityInfo vid = S.fromList $ [EntityTypeVariable | isTyVar vid] <> [EntityFun
   where
     isFunType a = case coreFullView a of
       ForAllTy _ t    -> isFunType t
-      FunTy { ft_af = flg, ft_res = rhs } -> isFUNArg flg || isFunType rhs
+      FunTy { ft_mods = mods, ft_res = rhs } -> isFUNArg (ftm_flag mods) || isFunType rhs
       _x              -> isFunTy a
 
 -- | Get the `EntityInfo` for a `TyThing`

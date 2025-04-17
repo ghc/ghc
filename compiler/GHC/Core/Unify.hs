@@ -2245,11 +2245,12 @@ ty_co_match menv subst ty1 (AppCo co2 arg2) _lkco _rkco
 ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
   = ty_co_match_tc menv subst tc1 tys tc2 cos
 
-ty_co_match menv subst (FunTy { ft_mult = w, ft_arg = ty1, ft_res = ty2 })
+ty_co_match menv subst (FunTy { ft_mods = mods, ft_arg = ty1, ft_res = ty2 })
             (FunCo { fco_mult = co_w, fco_arg = co1, fco_res = co2 }) _lkco _rkco
   = ty_co_match_args menv subst [w,    rep1,    rep2,    ty1, ty2]
                                 [co_w, co1_rep, co2_rep, co1, co2]
   where
+     w       = ftm_mult mods
      rep1    = getRuntimeRep ty1
      rep2    = getRuntimeRep ty2
      co1_rep = mkRuntimeRepCo co1
@@ -2360,7 +2361,8 @@ pushRefl co =
   case (isReflCo_maybe co) of
     Just (AppTy ty1 ty2, Nominal)
       -> Just (AppCo (mkReflCo Nominal ty1) (mkNomReflCo ty2))
-    Just (FunTy af w ty1 ty2, r)
+    Just (FunTy mods ty1 ty2, r)
+      | (!w,!af) <- ftm_mods mods
       ->  Just (FunCo r af af (mkReflCo r w) (mkReflCo r ty1) (mkReflCo r ty2))
     Just (TyConApp tc tys, r)
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRoleListX r tc) tys))

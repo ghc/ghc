@@ -1474,7 +1474,8 @@ normalise_type ty
            ; return $ mkReflRedn r ty }
     go (AppTy ty1 ty2) = go_app_tys ty1 [ty2]
 
-    go (FunTy { ft_af = vis, ft_mult = w, ft_arg = ty1, ft_res = ty2 })
+    go (FunTy { ft_mods = mods, ft_arg = ty1, ft_res = ty2 })
+      | (w,vis) <- ftm_mods mods
       = do { arg_redn <- go ty1
            ; res_redn <- go ty2
            ; w_redn <- withRole Nominal $ go w

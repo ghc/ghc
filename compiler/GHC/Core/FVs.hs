@@ -340,7 +340,8 @@ orphNamesOfType (TyConApp tycon tys) = func
                        arg:_ | tycon == fUNTyCon -> orph_names_of_fun_ty_con arg
                        _ -> emptyNameSet
 
-orphNamesOfType (FunTy af w arg res) =  func
+orphNamesOfType (FunTy mods arg res)
+                                    =  func
                                        `unionNameSet` unitNameSet fun_tc
                                        `unionNameSet` orphNamesOfType w
                                        `unionNameSet` orphNamesOfType arg
@@ -349,6 +350,7 @@ orphNamesOfType (FunTy af w arg res) =  func
                    | otherwise          = emptyNameSet
 
               fun_tc = tyConName (funTyFlagTyCon af)
+              (!w,!af) = ftm_mods mods
 
 -- Coercions: see wrinkle (ON1) of Note [Finding orphan names]
 orphNamesOfType (CastTy ty _co)  = orphNamesOfType ty

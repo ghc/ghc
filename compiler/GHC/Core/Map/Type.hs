@@ -253,8 +253,8 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
               -> go (D env t1) (D env' t1') `andEq` go (D env t2) (D env' t2')
           (s, AppTy t1' t2') | Just (t1, t2) <- splitAppTyNoView_maybe s
               -> go (D env t1) (D env' t1') `andEq` go (D env t2) (D env' t2')
-          (FunTy v1 w1 t1 t2, FunTy v1' w1' t1' t2')
-
+          (FunTy mods1 t1 t2, FunTy mods1' t1' t2')
+              | (w1,v1) <- ftm_mods mods1, (w1',v1') <- ftm_mods mods1'
               -> liftEquality (v1 == v1') `andEq`
                  -- NB: eqDeBruijnType does the kind check requested by
                  -- Note [Equality on FunTys] in GHC.Core.TyCo.Rep

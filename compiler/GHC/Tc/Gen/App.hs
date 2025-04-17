@@ -2025,8 +2025,8 @@ qlUnify ty1 ty2
     -- But for the latter we only learn instantiation info from res1~res2
     -- We look at the multiplicity too, although the chances of getting
     -- impredicative instantiation info from there seems...remote.
-    go (FunTy { ft_af = af1, ft_arg = arg1, ft_res = res1, ft_mult = mult1 })
-       (FunTy { ft_af = af2, ft_arg = arg2, ft_res = res2, ft_mult = mult2 })
+    go (ViewFunTyFull af1 mult1 arg1 res1)
+       (ViewFunTyFull af2 mult2 arg2 res2)
       | af1 == af2 -- Match the arrow TyCon
       = do { when (isVisibleFunArg af1) (go arg1 arg2)
            ; when (isFUNArg af1)        (go mult1 mult2)

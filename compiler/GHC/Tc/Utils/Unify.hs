@@ -172,7 +172,8 @@ matchActualFunTy herald mb_thing err_info fun_ty
        -> TcM (HsWrapper, Scaled TcSigmaTypeFRR, TcSigmaType)
     go ty | Just ty' <- coreView ty = go ty'
 
-    go (FunTy { ft_af = af, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
+    go (FunTy { ft_mods = mods, ft_arg = arg_ty, ft_res = res_ty })
+      | (w,af) <- ftm_mods mods
       = assert (isVisibleFunArg af) $
       do { hasFixedRuntimeRep_syntactic (FRRExpectedFunTy herald 1) arg_ty
          ; return (idHsWrapper, Scaled w arg_ty, res_ty) }
@@ -848,8 +849,9 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
 
     ----------------------------
     -- Function types
-    check n_req rev_pat_tys (FunTy { ft_af = af, ft_mult = mult
+    check n_req rev_pat_tys (FunTy { ft_mods = mods
                                    , ft_arg = arg_ty, ft_res = res_ty })
+      | (mult,af) <- ftm_mods mods
       = assert (isVisibleFunArg af) $
         do { let arg_pos = arity - n_req + 1   -- 1 for the first argument etc
            ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
@@ -1866,9 +1868,11 @@ tc_sub_type_deep unify inst_orig ctxt ty_actual ty_expected
                     ; tc_sub_type_deep unify inst_orig ctxt ty_a' ty_e }
                Nothing -> just_unify ty_actual ty_expected }
 
-    go ty_a@(FunTy { ft_af = af1, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res })
-       ty_e@(FunTy { ft_af = af2, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
-      | isVisibleFunArg af1, isVisibleFunArg af2
+    go ty_a@(FunTy { ft_mods = mods1, ft_arg = act_arg, ft_res = act_res })
+       ty_e@(FunTy { ft_mods = mods2, ft_arg = exp_arg, ft_res = exp_res })
+      | (act_mult,af1) <- ftm_mods mods1
+      , (exp_mult,af2) <- ftm_mods mods2
+      , isVisibleFunArg af1, isVisibleFunArg af2
       = if (isTauTy ty_a && isTauTy ty_e)       -- Short cut common case to avoid
         then just_unify ty_actual ty_expected   -- unnecessary eta expansion
         else
@@ -2240,9 +2244,11 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
       | Just ty2' <- coreView ty2 = go ty1  ty2'
 
     -- Functions (t1 -> t2) just check the two parts
-    go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
-       (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
-      | isVisibleFunArg af1  -- Do not attempt (c => t); just defer
+    go (FunTy { ft_mods = mods1, ft_arg = arg1, ft_res = res1 })
+       (FunTy { ft_mods = mods2, ft_arg = arg2, ft_res = res2 })
+      | (w1,af1) <- ftm_mods mods1
+      , (w2,af2) <- ftm_mods mods2
+      , isVisibleFunArg af1  -- Do not attempt (c => t); just defer
       , af1 == af2           -- Important!  See #21530
       = do { co_w <- uType (env { u_role = funRole role SelMult }) w1   w2
            ; co_l <- uType (env { u_role = funRole role SelArg })  arg1 arg2
@@ -2897,8 +2903,9 @@ matchExpectedFunKind hs_ty n k = go n k
                 Indirect fun_kind -> go n fun_kind
                 Flexi ->             defer n k }
 
-    go n (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
-      | isVisibleFunArg af
+    go n (FunTy { ft_mods = mods, ft_arg = arg, ft_res = res })
+      | (w,af) <- ftm_mods mods
+      , isVisibleFunArg af
       = do { co <- go (n-1) res
            ; return (mkNakedFunCo Nominal af (mkNomReflCo w) (mkNomReflCo arg) co) }
 
@@ -2974,9 +2981,11 @@ simpleUnifyCheck caller lhs_tv rhs
       | occ_in_ty $! (tyVarKind tv)                     = False
       | otherwise                                       = True
 
-    go (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
+    go (FunTy {ft_mods = mods, ft_arg = a, ft_res = r})
       | not forall_ok, isInvisibleFunArg af = False
       | otherwise                           = go w && go a && go r
+     where
+      (w,af) = ftm_mods mods
 
     go (TyConApp tc tys)
       | lhs_tv_is_concrete, not (isConcreteTyCon tc) = False
@@ -3504,7 +3513,7 @@ checkTyEqRhs flags ty
         -- Nor can we expand synonyms; see Note [Occurrence checking: look inside kinds]
         --                             in GHC.Core.FVs
 
-      FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r}
+      FunTy {ft_mods = mods, ft_arg = a, ft_res = r}
        | isInvisibleFunArg af  -- e.g.  Num a => blah
        -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
        | otherwise
@@ -3512,6 +3521,8 @@ checkTyEqRhs flags ty
              ; a_res <- checkTyEqRhs flags a
              ; r_res <- checkTyEqRhs flags r
              ; return (mkFunRedn Nominal af <$> w_res <*> a_res <*> r_res) }
+       where
+        (w,af) = ftm_mods mods
 
       AppTy fun arg -> do { fun_res <- checkTyEqRhs flags fun
                           ; arg_res <- checkTyEqRhs flags arg

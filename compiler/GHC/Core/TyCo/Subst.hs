@@ -796,11 +796,11 @@ subst_ty subst ty
                                -- mkTyConApp has optimizations.
                                -- See Note [Using synonyms to compress types]
                                -- in GHC.Core.Type
-    go ty@(FunTy { ft_mult = mult, ft_arg = arg, ft_res = res })
-      = let !mult' = go mult
+    go ty@(FunTy { ft_mods = mods, ft_arg = arg, ft_res = res })
+      = let !mult' = go (ftm_mult mods)
             !arg' = go arg
             !res' = go res
-        in ty { ft_mult = mult', ft_arg = arg', ft_res = res' }
+        in ty { ft_mods = mkFtMods mult' (ftm_flag mods), ft_arg = arg', ft_res = res' }
     go (ForAllTy (Bndr tv vis) ty)
                          = case substVarBndrUnchecked subst tv of
                              (subst', tv') ->

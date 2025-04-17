@@ -1647,7 +1647,7 @@ invalidAbsDataSubTypes = execWriter . go
       = mapM_ go tys
     go ty@(ForAllTy{})
       = invalid ty
-    go ty@(FunTy af w t1 t2)
+    go ty@(ViewFunTyFull af w t1 t2)
       | af == FTF_T_T
       = do { go w
            ; go (typeKind t1) ; go t1

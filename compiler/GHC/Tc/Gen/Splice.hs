@@ -2609,11 +2609,11 @@ reifyType ty@(AppTy {})     = do
     filter_out_invisible_args ty_head ty_args =
       filterByList (map isVisibleForAllTyFlag $ appTyForAllTyFlags ty_head ty_args)
                    ty_args
-reifyType ty@(FunTy { ft_af = af, ft_mult = ManyTy, ft_arg = t1, ft_res = t2 })
+reifyType ty@(ViewFunTyFull af ManyTy t1 t2)
   | isInvisibleFunArg af = reify_for_all Inferred ty  -- Types like ((?x::Int) => Char -> Char)
   | otherwise            = do { [r1,r2] <- reifyTypes [t1,t2]
                               ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
-reifyType ty@(FunTy { ft_af = af, ft_mult = tm, ft_arg = t1, ft_res = t2 })
+reifyType ty@(ViewFunTyFull af tm t1 t2)
   | isInvisibleFunArg af = noTH LinearInvisibleArgument ty
   | otherwise            = do { [rm,r1,r2] <- reifyTypes [tm,t1,t2]
                               ; return (TH.MulArrowT `TH.AppT` rm `TH.AppT` r1 `TH.AppT` r2) }

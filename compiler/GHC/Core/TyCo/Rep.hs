@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -25,7 +27,10 @@ Note [The Type-related module hierarchy]
 module GHC.Core.TyCo.Rep (
 
         -- * Types
-        Type(..),
+        Type(.., ViewFunTyTys,ViewFunTyFlag,ViewFunTyFull), ft_af, ft_mult,
+        ftm_mult, ftm_flag, ftm_update_mult, ftm_mods, mkFtMods,
+        ftmBothManyMult,
+        -- pattern ViewFunTyTys, pattern FunTyFlag,
 
         TyLit(..),
         KindOrType, Kind,
@@ -71,7 +76,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
 import {-# SOURCE #-} GHC.Builtin.Types
 import {-# SOURCE #-} GHC.Core.TyCo.FVs( tyCoVarsOfType ) -- Use in assertions
-import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstraint )
+import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstraint, isManyTy )
 
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
@@ -165,12 +170,7 @@ data Type
 
   | FunTy      -- ^ FUN m t1 t2   Very common, so an important special case
                 -- See Note [Function types]
-     { ft_af   :: FunTyFlag    -- Is this (->/FUN) or (=>) or (==>)?
-                                 -- This info is fully specified by the kinds in
-                                 --      ft_arg and ft_res
-                                 -- Note [FunTyFlag] in GHC.Types.Var
-
-     , ft_mult :: Mult           -- Multiplicity; always Many for (=>) and (==>)
+     { ft_mods :: !FunTyMod      -- ^ Arrow Flag and Linearity if present
      , ft_arg  :: Type           -- Argument type
      , ft_res  :: Type }         -- Result type
 
@@ -192,6 +192,42 @@ data Type
 
   deriving Data.Data
 
+fun_ty_tys :: Type -> Maybe  (Mult,Type,Type)
+fun_ty_tys (FunTy mods arg res) = Just (ftm_mult mods,arg,res)
+fun_ty_tys _ = Nothing
+
+fun_ty_flag :: Type -> Maybe  (FunTyFlag,Type,Type)
+fun_ty_flag (FunTy mods arg res) = Just (ftm_flag mods,arg,res)
+fun_ty_flag _ = Nothing
+
+view_fun_ty_full :: Type -> Maybe (FunTyFlag,Mult, Type,Type)
+view_fun_ty_full (FunTy mods arg res) = Just $ let (w,af) = ftm_mods mods in (af,w,arg,res)
+view_fun_ty_full _ = Nothing
+
+
+-- Gets all the type like things
+{-# COMPLETE TyVarTy, AppTy, TyConApp, ForAllTy, ViewFunTyTys, LitTy, CastTy, CoercionTy #-}
+pattern ViewFunTyTys :: Mult -> Type -> Type -> Type
+pattern ViewFunTyTys mult arg res <- (fun_ty_tys -> Just (mult, arg, res))
+
+-- Gets flag, arg and result
+{-# COMPLETE TyVarTy, AppTy, TyConApp, ForAllTy, ViewFunTyFlag, LitTy, CastTy, CoercionTy #-}
+pattern ViewFunTyFlag :: FunTyFlag -> Type -> Type -> Type
+pattern ViewFunTyFlag flag arg res <- (fun_ty_flag -> Just (flag, arg, res))
+
+-- Gets flag, arg and result
+{-# COMPLETE TyVarTy, AppTy, TyConApp, ForAllTy, ViewFunTyFull, LitTy, CastTy, CoercionTy #-}
+pattern ViewFunTyFull :: FunTyFlag -> Mult -> Type -> Type -> Type
+pattern ViewFunTyFull flag mult arg res <- (view_fun_ty_full -> Just (flag, mult, arg, res))
+
+
+data FunTyMod
+  = FTModVanilla
+  | FTModFlag FunTyFlag
+  | FTModMultFlag Mult FunTyFlag
+  | FTModMult Mult
+  deriving Data.Data
+
 instance Outputable Type where
   ppr = pprType
 
@@ -202,6 +238,84 @@ data TyLit
   | StrTyLit FastString
   | CharTyLit Char
   deriving (Eq, Data.Data)
+
+-- | Is this (->/FUN) or (=>) or (==>)?
+-- This info is fully specified by the kinds in
+--      ft_arg and ft_res
+-- Note [FunTyFlag] in GHC.Types.Var
+
+ft_af :: Type -> FunTyFlag
+ft_af ty =
+  case ty of
+    TyVarTy{} -> panic "ft_af: Expected function type"
+    AppTy{} -> panic "ft_af: Expected function type"
+    TyConApp{} -> panic "ft_af: Expected function type"
+    ForAllTy{} -> panic "ft_af: Expected function type"
+    LitTy{} -> panic "ft_af: Expected function type"
+    CastTy{} -> panic "ft_af: Expected function type"
+    CoercionTy{} -> panic "ft_af: Expected function type"
+    FunTy mods _arg _res -> ftm_flag mods
+
+-- | Multiplicity; always Many for (=>) and (==>)
+ft_mult :: Type -> Mult
+ft_mult ty =
+  case ty of
+    TyVarTy{} -> panic "ft_mult: Expected function type"
+    AppTy{} -> panic "ft_mult: Expected function type"
+    TyConApp{} -> panic "ft_mult: Expected function type"
+    ForAllTy{} -> panic "ft_mult: Expected function type"
+    LitTy{} -> panic "ft_mult: Expected function type"
+    CastTy{} -> panic "ft_mult: Expected function type"
+    CoercionTy{} -> panic "ft_mult: Expected function type"
+    FunTy mods _arg _res -> ftm_mult mods
+
+-- Multiplicity; always Many for (=>) and (==>)
+mkFtMods :: Mult -> FunTyFlag -> FunTyMod
+mkFtMods mult flag
+  | isManyTy mult && flag == FTF_T_T = FTModVanilla
+  | isManyTy mult                    = FTModFlag flag
+  |                  flag == FTF_T_T = FTModMult mult
+                                       -- Those flags will be FTModFlag
+  | otherwise                        = assert (not (flag `elem` [FTF_C_C,FTF_C_T])) $
+                                       FTModMultFlag mult flag
+
+ftm_flag :: FunTyMod -> FunTyFlag
+ftm_flag mods = case mods of
+      FTModMultFlag _mult flag
+                      -> flag
+      FTModVanilla    -> FTF_T_T
+      FTModMult _m    -> FTF_T_T
+      FTModFlag flag  -> flag
+
+ftm_mult :: FunTyMod -> Mult
+ftm_mult mods = case mods of
+      FTModMultFlag mult _flag
+                      -> mult
+      FTModVanilla    -> manyDataConTy
+      FTModMult m     -> m
+      FTModFlag _flag  -> manyDataConTy
+
+ftm_mods :: FunTyMod -> (Mult, FunTyFlag)
+ftm_mods mods = case mods of
+      FTModMultFlag mult flag -> (mult,flag)
+      FTModVanilla            -> (manyDataConTy,FTF_T_T)
+      FTModMult m             -> (m,FTF_T_T)
+      FTModFlag flag          -> (manyDataConTy, flag)
+
+-- Fast way to check that two mults of mods are both many.
+ftmBothManyMult :: FunTyMod -> FunTyMod -> Bool
+ftmBothManyMult mods1 mods2 =isMany mods1 && isMany mods2
+  where
+    isMany mods = case mods of
+      FTModVanilla -> True
+      FTModFlag{} -> True
+      FTModMultFlag m _f -> isManyTy m
+      FTModMult m -> isManyTy m
+
+-- It's a pretty common operation when digging for tyVars
+-- or similar inside the multiplicity.
+ftm_update_mult :: FunTyMod -> Mult -> FunTyMod
+ftm_update_mult mods mult = mkFtMods mult (ftm_flag mods)
 
 -- Non-determinism arises due to uniqCompareFS
 nonDetCmpTyLit :: TyLit -> TyLit -> Ordering
@@ -721,7 +835,7 @@ mkNakedFunTy :: FunTyFlag -> Kind -> Kind -> Kind
 -- See Note [Naked FunTy] in GHC.Builtin.Types
 -- Always Many multiplicity; kinds have no linearity
 mkNakedFunTy af arg res
- =  FunTy { ft_af   = af, ft_mult = manyDataConTy
+ =  FunTy { ft_mods = mkFtMods manyDataConTy af
           , ft_arg  = arg, ft_res  = res }
 
 mkFunTy :: HasDebugCallStack => FunTyFlag -> Mult -> Type -> Type -> Type
@@ -731,8 +845,7 @@ mkFunTy af mult arg res
       , text "chooseAAF" <+> ppr (chooseFunTyFlag arg res)
       , text "arg" <+> ppr arg <+> dcolon <+> ppr (typeKind arg)
       , text "res" <+> ppr res <+> dcolon <+> ppr (typeKind res) ]) $
-    FunTy { ft_af   = af
-          , ft_mult = mult
+    FunTy { ft_mods = mkFtMods mult af
           , ft_arg  = arg
           , ft_res  = res }
 
@@ -816,7 +929,7 @@ tcMkVisFunTy :: Mult -> Type -> Type -> Type
 -- Does not have the assert-checking in mkFunTy: used by the typechecker
 -- to avoid looking at the result kind, which may not be zonked
 tcMkVisFunTy mult arg res
-  = FunTy { ft_af = visArgTypeLike, ft_mult = mult
+  = FunTy { ft_mods = mkFtMods mult visArgTypeLike
           , ft_arg = arg, ft_res = res }
 
 tcMkInvisFunTy :: TypeOrConstraint -> Type -> Type -> Type
@@ -824,7 +937,7 @@ tcMkInvisFunTy :: TypeOrConstraint -> Type -> Type -> Type
 -- Does not have the assert-checking in mkFunTy: used by the typechecker
 -- to avoid looking at the result kind, which may not be zonked
 tcMkInvisFunTy res_torc arg res
-  = FunTy { ft_af = invisArg res_torc, ft_mult = manyDataConTy
+  = FunTy { ft_mods = mkFtMods manyDataConTy (invisArg res_torc)
           , ft_arg = arg, ft_res = res }
 
 tcMkScaledFunTys :: [Scaled Type] -> Type -> Type
@@ -1942,7 +2055,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty _   (LitTy {})        = mempty
     go_ty env (CastTy ty co)    = go_ty env ty `mappend` go_co env co
     go_ty env (CoercionTy co)   = go_co env co
-    go_ty env (FunTy _ w arg res) = go_ty env w `mappend` go_ty env arg `mappend` go_ty env res
+    go_ty env (FunTy mods arg res) = go_ty env (ftm_mult mods) `mappend` go_ty env arg `mappend` go_ty env res
     go_ty env (TyConApp _ tys)  = go_tys env tys
     go_ty env (ForAllTy (Bndr tv vis) inner)
       = let !env' = tycobinder env tv vis  -- Avoid building a thunk here
@@ -2013,7 +2126,7 @@ typeSize :: Type -> Int
 typeSize (LitTy {})                 = 1
 typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
-typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
+typeSize (FunTy _ t1 t2)            = typeSize t1 + typeSize t2
 typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + typesSize ts
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co

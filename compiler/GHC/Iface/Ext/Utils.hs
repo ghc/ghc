@@ -243,9 +243,10 @@ getTypeIndex t
       k <- getTypeIndex (varType v)
       i <- getTypeIndex t
       return $ HForAllTy ((varName v,k),a) i
-    go (FunTy { ft_af = af, ft_mult = w, ft_arg = a, ft_res = b }) = do
+    go (FunTy { ft_mods = mods, ft_arg = a, ft_res = b }) = do
       ai <- getTypeIndex a
       bi <- getTypeIndex b
+      let (w,af) = ftm_mods mods
       wi <- getTypeIndex w
       return $ if isInvisibleFunArg af
                then assert (isManyTy w) $ HQualTy ai bi

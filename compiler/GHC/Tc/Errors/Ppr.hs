@@ -60,7 +60,7 @@ import GHC.Core.Coercion.Axiom (CoAxBranch, coAxiomTyCon, coAxiomSingleBranch)
 import GHC.Core.ConLike
 import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
-import GHC.Core.TyCo.Rep (Type(..))
+import GHC.Core.TyCo.Rep (Type(..), ftm_update_mult, ftm_mult)
 import GHC.Core.TyCo.Ppr (pprWithInvisibleBitsWhen, pprSourceTyCon,
                           pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType, pprForAll)
 import GHC.Core.PatSyn ( patSynName, pprPatSynType )
@@ -5369,9 +5369,9 @@ tidySigSkol env cx ty tv_prs
       where
         (env', tv') = tidy_tv_bndr env tv
 
-    tidy_ty env ty@(FunTy { ft_mult = w, ft_arg = arg, ft_res = res })
+    tidy_ty env ty@(FunTy mods arg res)
       = -- Look under  c => t and t1 -> t2
-        ty { ft_mult = tidy_ty env w
+        ty { ft_mods = ftm_update_mult mods (tidy_ty env (ftm_mult mods))
            , ft_arg  = tidyType env arg
            , ft_res  = tidy_ty env res }
 
@@ -5566,7 +5566,9 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
           (t1_2', t2_2') = go t1_2 t2_2
        in (mkAppTy t1_1' t1_2', mkAppTy t2_1' t2_2')
 
-    go ty1@(FunTy _ w1 t1_1 t1_2) ty2@(FunTy _ w2 t2_1 t2_2) | w1 `eqType` w2 =
+    go ty1@(FunTy mods1 t1_1 t1_2) ty2@(FunTy mods2 t2_1 t2_2)
+      | w1 <- ftm_mult mods1, w2 <- ftm_mult mods2
+      , w1 `eqType` w2 =
       let (t1_1', t2_1') = go t1_1 t2_1
           (t1_2', t2_2') = go t1_2 t2_2
        in ( ty1 { ft_arg = t1_1', ft_res = t1_2' }
@@ -6230,7 +6232,7 @@ pprSynAbstractDataError = \case
            Just $ text "Invalid type family" <+> quotes (ppr tc) <> dot
       ty@(ForAllTy {})
         -> Just $ text "Invalid polymorphic type" <> colon <+> ppr ty <> dot
-      ty@(FunTy af _ _ _)
+      ty@(ViewFunTyFlag af _ _)
         | not (af == FTF_T_T)
         -> Just $ text "Invalid qualified type" <> colon <+> ppr ty <> dot
       _ -> Nothing

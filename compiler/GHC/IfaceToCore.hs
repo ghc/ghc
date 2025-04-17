@@ -1499,7 +1499,7 @@ tcIfaceType = go
     go (IfaceTyVar n)            = TyVarTy <$> tcIfaceTyVar n
     go (IfaceFreeTyVar n)        = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceLitTy l)            = LitTy <$> tcIfaceTyLit l
-    go (IfaceFunTy flag w t1 t2) = FunTy flag <$> tcIfaceType w <*> go t1 <*> go t2
+    go (IfaceFunTy flag w t1 t2) = (\w -> FunTy (mkFtMods w flag)) <$> tcIfaceType w <*> go t1 <*> go t2
     go (IfaceTupleTy s i tks)    = tcIfaceTupleTy s i tks
     go (IfaceAppTy t ts)
       = do { t'  <- go t

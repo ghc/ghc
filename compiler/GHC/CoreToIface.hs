@@ -193,7 +193,8 @@ toIfaceTypeX fr ty@(AppTy {})  =
 toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
 toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
-toIfaceTypeX fr (FunTy { ft_arg = t1, ft_mult = w, ft_res = t2, ft_af = af })
+toIfaceTypeX fr (FunTy { ft_arg = t1, ft_mods = mods, ft_res = t2 })
+  | (w,af) <- ftm_mods mods
   = IfaceFunTy af (toIfaceTypeX fr w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
 toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
@@ -363,8 +364,8 @@ toIfaceAppArgsX fr kind ty_args
         t'  = toIfaceTypeX fr t
         ts' = go (extendTCvSubst env tv t) res ts
 
-    go env (FunTy { ft_af = af, ft_res = res }) (t:ts)
-      = assert (isVisibleFunArg af)
+    go env (FunTy { ft_mods = mods, ft_res = res }) (t:ts)
+      = assert (isVisibleFunArg (ftm_flag mods))
         IA_Arg (toIfaceTypeX fr t) Required (go env res ts)
 
     go env ty ts@(t1:ts1)

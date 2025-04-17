@@ -237,10 +237,11 @@ debug_ppr_ty _ (LitTy l)
 debug_ppr_ty _ (TyVarTy tv)
   = ppr tv  -- With -dppr-debug we get (tv :: kind)
 
-debug_ppr_ty prec (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
+debug_ppr_ty prec (FunTy { ft_mods = mods, ft_arg = arg, ft_res = res })
   = maybeParen prec funPrec $
     sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]
   where
+    (mult,af) = ftm_mods mods
     arr = pprArrowWithMultiplicity af $
           case mult of
             OneTy  -> Left True

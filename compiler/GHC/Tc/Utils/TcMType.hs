@@ -1472,7 +1472,7 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
     -- Uses accumulating-parameter style
     go dv (AppTy t1 t2)       = foldlM go dv [t1, t2]
     go dv (TyConApp tc tys)   = go_tc_args dv (tyConBinders tc) tys
-    go dv (FunTy _ w arg res) = foldlM go dv [w, arg, res]
+    go dv (ViewFunTyTys w arg res) = foldlM go dv [w, arg, res]
     go dv (LitTy {})          = return dv
     go dv (CastTy ty co)      = do { dv1 <- go dv ty
                                    ; collect_cand_qtvs_co orig_ty cur_lvl bound dv1 co }

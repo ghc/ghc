@@ -960,7 +960,7 @@ tcTyFamInstsAndVisX = go
     go _            (LitTy {})         = []
     go is_invis_arg (ForAllTy bndr ty) = go is_invis_arg (binderType bndr)
                                          ++ go is_invis_arg ty
-    go is_invis_arg (FunTy _ w ty1 ty2)  = go is_invis_arg w
+    go is_invis_arg (ViewFunTyTys w ty1 ty2)  = go is_invis_arg w
                                          ++ go is_invis_arg ty1
                                          ++ go is_invis_arg ty2
     go is_invis_arg ty@(AppTy _ _)     =
@@ -1042,7 +1042,7 @@ any_rewritable role tv_pred tc_pred ty
     go uf bvs rl (TyVarTy tv)        = go_tv uf bvs rl tv
     go _  _    _ (LitTy {})          = False
     go uf bvs rl (AppTy fun arg)     = go uf bvs rl fun || go uf bvs NomEq arg
-    go uf bvs rl (FunTy _ w arg res) = go uf bvs NomEq arg_rep || go uf bvs NomEq res_rep ||
+    go uf bvs rl (ViewFunTyTys w arg res) = go uf bvs NomEq arg_rep || go uf bvs NomEq res_rep ||
                                        go uf bvs rl arg || go uf bvs rl res || go uf bvs NomEq w
       where arg_rep = getRuntimeRep arg -- forgetting these causes #17024
             res_rep = getRuntimeRep res
@@ -1418,7 +1418,7 @@ getDFunTyKey (TyVarTy tv)            = getOccName tv
 getDFunTyKey (TyConApp tc _)         = getOccName tc
 getDFunTyKey (LitTy x)               = getDFunTyLitKey x
 getDFunTyKey (AppTy fun _)           = getDFunTyKey fun
-getDFunTyKey (FunTy { ft_af = af })  = getOccName (funTyFlagTyCon af)
+getDFunTyKey (FunTy { ft_mods = mods }) = getOccName (funTyFlagTyCon (ftm_flag mods))
 getDFunTyKey (ForAllTy _ t)          = getDFunTyKey t
 getDFunTyKey (CastTy ty _)           = getDFunTyKey ty
 getDFunTyKey t@(CoercionTy _)        = pprPanic "getDFunTyKey" (ppr t)
@@ -1519,7 +1519,7 @@ tcSplitPredFunTy_maybe :: Type -> Maybe (PredType, Type)
 -- Split off the first predicate argument from a type
 tcSplitPredFunTy_maybe ty
   | Just ty' <- coreView ty = tcSplitPredFunTy_maybe ty'
-tcSplitPredFunTy_maybe (FunTy { ft_af = af, ft_arg = arg, ft_res = res })
+tcSplitPredFunTy_maybe (ViewFunTyFlag af arg res)
   | isInvisibleFunArg af
   = Just (arg, res)
 tcSplitPredFunTy_maybe _
@@ -1603,7 +1603,7 @@ tcTyConAppTyCon ty
 tcTyConAppTyCon_maybe :: Type -> Maybe TyCon
 tcTyConAppTyCon_maybe ty | Just ty' <- coreView ty = tcTyConAppTyCon_maybe ty'
 tcTyConAppTyCon_maybe (TyConApp tc _)              = Just tc
-tcTyConAppTyCon_maybe (FunTy { ft_af = af })       = Just (funTyFlagTyCon af)
+tcTyConAppTyCon_maybe (FunTy { ft_mods = mods })   = Just (funTyFlagTyCon (ftm_flag mods))
 tcTyConAppTyCon_maybe _                            = Nothing
 
 tcTyConAppArgs :: Type -> [Type]
@@ -1623,8 +1623,9 @@ tcSplitFunTy_maybe :: Type -> Maybe (Scaled Type, Type)
 -- Only splits function (->) and (-=>), not (=>) or (==>)
 tcSplitFunTy_maybe ty
   | Just ty' <- coreView ty = tcSplitFunTy_maybe ty'
-tcSplitFunTy_maybe (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
-  | isVisibleFunArg af = Just (Scaled w arg, res)
+tcSplitFunTy_maybe (FunTy { ft_mods = mods, ft_arg = arg, ft_res = res })
+  | (w,af) <- ftm_mods mods
+  , isVisibleFunArg af = Just (Scaled w arg, res)
 tcSplitFunTy_maybe _   = Nothing
         -- Note the isVisibleFunArg guard
         -- Consider     (?x::Int) => Bool
@@ -1981,7 +1982,7 @@ isSigmaTy :: TcType -> Bool
 -- But NOT
 --     forall a -> blah
 isSigmaTy (ForAllTy (Bndr _ af) _)     = isInvisibleForAllTyFlag af
-isSigmaTy (FunTy { ft_af = af })       = isInvisibleFunArg af
+isSigmaTy (FunTy { ft_mods = mods })   = isInvisibleFunArg (ftm_flag mods)
 isSigmaTy ty | Just ty' <- coreView ty = isSigmaTy ty'
 isSigmaTy _                            = False
 
@@ -1999,7 +2000,7 @@ isOverloadedTy :: Type -> Bool
 -- Used by bindLocalMethods and for -fprof-late-overloaded
 isOverloadedTy ty | Just ty' <- coreView ty = isOverloadedTy ty'
 isOverloadedTy (ForAllTy _  ty)             = isOverloadedTy ty
-isOverloadedTy (FunTy { ft_af = af })       = isInvisibleFunArg af
+isOverloadedTy (FunTy { ft_mods = mods })   = isInvisibleFunArg (ftm_flag mods)
 isOverloadedTy _                            = False
 
 isFloatTy, isDoubleTy,
@@ -2336,7 +2337,7 @@ pSizeTypeX bvs (TyVarTy tv)
 pSizeTypeX _   (LitTy {})                = pSizeOne
 pSizeTypeX bvs (TyConApp tc tys)         = pSizeTyConAppX bvs tc tys
 pSizeTypeX bvs (AppTy fun arg)           = pSizeTypeX bvs fun `addPSize` pSizeTypeX bvs arg
-pSizeTypeX bvs (FunTy _ w arg res)       = pSizeTypeX bvs w `addPSize` pSizeTypeX bvs arg `addPSize`
+pSizeTypeX bvs (ViewFunTyTys w arg res)      = pSizeTypeX bvs w `addPSize` pSizeTypeX bvs arg `addPSize`
                                            pSizeTypeX bvs res
 pSizeTypeX bvs (ForAllTy (Bndr tv _) ty) = pSizeTypeX bvs (tyVarKind tv) `addPSize`
                                            pSizeTypeX (bvs `extendVarSet` tv) ty

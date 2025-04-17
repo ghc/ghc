@@ -354,13 +354,13 @@ instHead (_, _, cls, args) =
 argCount :: Type -> Int
 argCount (AppTy t _) = argCount t + 1
 argCount (TyConApp _ ts) = length ts
-argCount (FunTy _ _ _ _) = 2
+argCount (FunTy _ _ _) = 2
 argCount (ForAllTy _ t) = argCount t
 argCount (CastTy t _) = argCount t
 argCount _ = 0
 
 simplify :: Type -> SimpleType
-simplify (FunTy _ _ t1 t2) = SimpleType (SName unrestrictedFunTyConName) [simplify t1, simplify t2]
+simplify (FunTy _ t1 t2) = SimpleType (SName unrestrictedFunTyConName) [simplify t1, simplify t2]
 simplify (ForAllTy _ t) = simplify t
 simplify (AppTy t1 t2) = SimpleType s (ts ++ maybeToList (simplify_maybe t2))
   where

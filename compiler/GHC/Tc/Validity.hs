@@ -816,7 +816,7 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env
 
 check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                           , ve_rank = rank })
-           ty@(FunTy _ mult arg_ty res_ty)
+           ty@(ViewFunTyTys mult arg_ty res_ty)
   = do  { failIfTcM (not (linearityAllowed ctxt) && not (isManyTy mult))
                      (env, TcRnLinearFuncInKind (tidyType env ty))
         ; check_type (ve{ve_rank = arg_rank}) arg_ty
@@ -1728,7 +1728,8 @@ dropCasts :: Type -> Type
 -- To consider: drop only HoleCo casts
 dropCasts (CastTy ty _)       = dropCasts ty
 dropCasts (AppTy t1 t2)       = mkAppTy (dropCasts t1) (dropCasts t2)
-dropCasts ty@(FunTy _ w t1 t2)  = ty { ft_mult = dropCasts w, ft_arg = dropCasts t1, ft_res = dropCasts t2 }
+dropCasts ty@(FunTy mods t1 t2)  = ty { ft_mods = ftm_update_mult mods (dropCasts $ ftm_mult mods)
+                                     , ft_arg = dropCasts t1, ft_res = dropCasts t2 }
 dropCasts (TyConApp tc tys)   = mkTyConApp tc (map dropCasts tys)
 dropCasts (ForAllTy b ty)     = ForAllTy (dropCastsB b) (dropCasts ty)
 dropCasts ty                  = ty  -- LitTy, TyVarTy, CoercionTy
@@ -2140,7 +2141,7 @@ splitInstTyForValidity = split_context [] . drop_foralls
     -- This is like 'tcSplitPhiTy', except that it does not look through type
     -- synonyms.
     split_context :: ThetaType -> Type -> (ThetaType, Type)
-    split_context preds (FunTy { ft_af = af, ft_arg = pred, ft_res = tau })
+    split_context preds (ViewFunTyFlag af pred tau)
       | isInvisibleFunArg af = split_context (pred:preds) tau
     split_context preds ty = (reverse preds, ty)
 

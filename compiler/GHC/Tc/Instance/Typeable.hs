@@ -451,7 +451,7 @@ kindIsTypeable ty
   | isLiftedTypeKind ty             = True
 kindIsTypeable (TyVarTy _)          = True
 kindIsTypeable (AppTy a b)          = kindIsTypeable a && kindIsTypeable b
-kindIsTypeable (FunTy _ w a b)      = kindIsTypeable w &&
+kindIsTypeable (ViewFunTyTys w a b)     = kindIsTypeable w &&
                                       kindIsTypeable a &&
                                       kindIsTypeable b
 kindIsTypeable (TyConApp tc args)   = tyConIsTypeable tc
@@ -623,7 +623,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
     new_kind_rep (ForAllTy (Bndr var _) ty)
       = pprPanic "mkTyConKindRepBinds(ForAllTy)" (ppr var $$ ppr ty)
 
-    new_kind_rep (FunTy _ _ t1 t2)
+    new_kind_rep (FunTy _ t1 t2)
       = do rep1 <- getKindRep stuff in_scope t1
            rep2 <- getKindRep stuff in_scope t2
            return $ nlHsDataCon kindRepFunDataCon

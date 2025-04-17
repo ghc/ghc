@@ -21,6 +21,7 @@ mkTyConApp       :: TyCon -> [Type] -> Type
 getLevity        :: HasDebugCallStack => Type -> Type
 getTyVar_maybe   :: Type -> Maybe TyVar
 isLiftedTypeKind :: Type -> Bool
+isManyTy         :: Type -> Bool
 
 partitionInvisibleTypes :: TyCon -> [Type] -> ([Type], [Type])
 typeTypeOrConstraint    :: HasDebugCallStack => Type -> TypeOrConstraint

@@ -2158,7 +2158,9 @@ ty_co_subst !lc role ty
                               liftCoSubstTyVar lc r tv
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys)  = mkTyConAppCo r tc (zipWith go (tyConRoleListX r tc) tys)
-    go r (FunTy af w t1 t2) = mkFunCo r af (go Nominal w) (go r t1) (go r t2)
+    go r (FunTy mods t1 t2)
+                            | (w,af) <- ftm_mods mods
+                            = mkFunCo r af (go Nominal w) (go r t1) (go r t2)
     go r t@(ForAllTy (Bndr v vis) ty)
        = let (lc', v', h) = liftCoSubstVarBndr lc v
              body_co = ty_co_subst lc' r ty in
@@ -2510,7 +2512,7 @@ coercion_lr_kind which orig_co
     go (FunCo { fco_afl = afl, fco_afr = afr, fco_mult = mult
               , fco_arg = arg, fco_res = res})
       = -- See Note [FunCo]
-        FunTy { ft_af = pickLR which (afl, afr), ft_mult = go mult
+        FunTy { ft_mods = mkFtMods (go mult) (pickLR which (afl, afr))
               , ft_arg = go arg, ft_res = go res }
 
     go co@(ForAllCo { fco_tcv = tv1, fco_visL = visL, fco_visR = visR
@@ -2701,8 +2703,9 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
                   ; _           -> False      }) $
         mkNomReflCo ty1
 
-    go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
-       (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
+    go (FunTy { ft_mods = mods1, ft_arg = arg1, ft_res = res1 })
+       (FunTy { ft_mods = mods2, ft_arg = arg2, ft_res = res2 })
+      | (w1,af1) <- ftm_mods mods1, (w2,af2) <- ftm_mods mods2
       = assert (af1 == af2) $
         mkFunCo Nominal af1 (go w1 w2) (go arg1 arg2) (go res1 res2)
 

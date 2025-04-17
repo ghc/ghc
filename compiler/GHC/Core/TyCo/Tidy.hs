@@ -235,10 +235,11 @@ tidyType env (TyConApp tycon tys)   = TyConApp tycon $! tidyTypes env tys
 tidyType env (AppTy fun arg)        = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
 tidyType env (CastTy ty co)         = (CastTy $! tidyType env ty) $! (tidyCo env co)
 tidyType env (CoercionTy co)        = CoercionTy $! (tidyCo env co)
-tidyType env ty@(FunTy _ w arg res) = let { !w'   = tidyType env w
+tidyType env ty@(FunTy mods arg res) = let { !w'  = tidyType env $! (ftm_mult mods)
+                                          ; !mods' = ftm_update_mult mods w'
                                           ; !arg' = tidyType env arg
                                           ; !res' = tidyType env res }
-                                      in ty { ft_mult = w', ft_arg = arg', ft_res = res' }
+                                      in ty { ft_mods = mods', ft_arg = arg', ft_res = res' }
 tidyType env (ty@(ForAllTy{}))      = tidyForAllType env ty
 
 

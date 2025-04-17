@@ -1031,7 +1031,7 @@ definitelyNotEqual r t1 t2
 
     go (TyConApp tc _) t2 | isGenerativeTyCon tc r = go_tc tc t2
     go t1 (TyConApp tc _) | isGenerativeTyCon tc r = go_tc tc t1
-    go (FunTy {ft_af = af1}) (FunTy {ft_af = af2}) = af1 /= af2
+    go (ViewFunTyFlag af1 _ _) (ViewFunTyFlag af2 _ _) = af1 /= af2
     go _ _ = False
 
     go_tc :: TyCon -> TcType -> Bool

@@ -514,7 +514,8 @@ rewrite_one (TyConApp tc tys)
               -- See Note [Do not rewrite newtypes]
   = rewrite_ty_con_app tc tys
 
-rewrite_one (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
+rewrite_one (FunTy { ft_mods = mods, ft_arg = ty1, ft_res = ty2 })
+  | (mult,vis) <- ftm_mods mods
   = do { arg_redn <- rewrite_one ty1
        ; res_redn <- rewrite_one ty2
 
@@ -1091,8 +1092,9 @@ split_pi_tys' ty = split ty ty
                                        -- terrible reboxing, as noted in #19102.
                                        !(bs, ty, _) = split res res
                                    in  (Named b : bs, ty, True)
-  split _       (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
-                                 = let -- See #19102
+  split _       (FunTy { ft_mods = mods, ft_arg = arg, ft_res = res })
+                                 = let (!w,!af) = ftm_mods mods
+                                       -- See #19102
                                        !(bs, ty, named) = split res res
                                    in  (Anon (mkScaled w arg) af : bs, ty, named)
 
