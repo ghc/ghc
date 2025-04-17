@@ -1189,7 +1189,7 @@ instance by calling `checkWellStagedInstanceWhat`, which sees what is available 
 That's it for the main implementation of the feature, and the rest is modifications
 to the driver parts of the code to use this information. For example, in downsweep,
 we only enable code generation for modules needed at the runtime stage.
-See Note [ExplicitLevelImports and -fno-code].
+See Note [-fno-code mode].
 
 -}
 
