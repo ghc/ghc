@@ -33,7 +33,7 @@ import GHC.Prelude hiding (head, init, last, scanl, tail)
 import GHC.Hs
 
 import GHC.Tc.Errors.Types
-import GHC.Tc.Utils.Env ( isBrackStage )
+import GHC.Tc.Utils.Env ( isBrackLevel )
 import GHC.Tc.Utils.Monad
 
 import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS
@@ -656,8 +656,8 @@ rnExpr e@(HsStatic _ expr) = do
     unlessXOptM LangExt.StaticPointers $
       addErr $ TcRnIllegalStaticExpression e
     (expr',fvExpr) <- rnLExpr expr
-    stage <- getStage
-    case stage of
+    level <- getThLevel
+    case level of
       Splice _ _ -> addErr $ TcRnTHError $ IllegalStaticFormInSplice e
       _        -> return ()
     mod <- getModule
@@ -1152,7 +1152,7 @@ postProcessStmtsForApplicativeDo ctxt stmts
                         | otherwise = False
        -- don't apply the transformation inside TH brackets, because
        -- GHC.HsToCore.Quote does not handle ApplicativeDo.
-       ; in_th_bracket <- isBrackStage <$> getStage
+       ; in_th_bracket <- isBrackLevel <$> getThLevel
        ; if ado_is_on && is_do_expr && not in_th_bracket
             then do { traceRn "ppsfa" (ppr stmts)
                     ; rearrangeForApplicativeDo ctxt stmts }

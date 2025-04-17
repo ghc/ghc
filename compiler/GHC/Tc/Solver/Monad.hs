@@ -125,7 +125,7 @@ module GHC.Tc.Solver.Monad (
     -- Misc
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
     matchFam, matchFamTcM,
-    checkWellStagedDFun,
+    checkWellLevelledDFun,
     pprEq,
 
     -- Enforcing invariants for type equalities
@@ -1598,48 +1598,46 @@ recordUsedGREs gres
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-checkWellStagedDFun :: CtLoc -> InstanceWhat -> PredType -> TcS ()
+checkWellLevelledDFun :: CtLoc -> InstanceWhat -> PredType -> TcS ()
 -- Check that we do not try to use an instance before it is available.  E.g.
 --    instance Eq T where ...
 --    f x = $( ... (\(p::T) -> p == p)... )
 -- Here we can't use the equality function from the instance in the splice
 
-checkWellStagedDFun loc what pred
+checkWellLevelledDFun loc what pred
   = do
-      mbind_lvl <- checkWellStagedInstanceWhat what
-      --env <- getLclEnv
-      --use_lvl <- thLevel <$> (wrapTcS $ TcM.getStage)
+      mbind_lvl <- checkWellLevelledInstanceWhat what
       case mbind_lvl of
         Just (bind_lvl, is_local) ->
           wrapTcS $ TcM.setCtLocM loc $ do
-              { use_stage <- TcM.getStage
+              { use_lvl <- thLevelIndex <$> TcM.getThLevel
               ; dflags <- getDynFlags
-              ; checkCrossStageClass dflags (StageCheckInstance what pred) bind_lvl (thLevel use_stage) is_local  }
+              ; checkCrossLevelClass dflags (LevelCheckInstance what pred) bind_lvl use_lvl is_local  }
         -- If no level information is returned for an InstanceWhat, then it's safe to use
         -- at any level.
         Nothing -> return ()
 
 
--- TODO: Unify this with checkCrossStageLifting function
-checkCrossStageClass :: DynFlags -> StageCheckReason -> Set.Set ThLevel -> ThLevel
+-- TODO: Unify this with checkCrossLevelLifting function
+checkCrossLevelClass :: DynFlags -> LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex
                             -> Bool -> TcM ()
-checkCrossStageClass dflags reason bind_lvl use_lvl is_local
-  -- If the Id is imported, ie global, then allow with PathCrossStagedPersist
+checkCrossLevelClass dflags reason bind_lvl use_lvl_idx is_local
+  -- If the Id is imported, ie global, then allow with ImplicitStagePersistence
   | not is_local
   , xopt LangExt.ImplicitStagePersistence dflags
   = return ()
-  | use_lvl `Set.member` bind_lvl = return ()
+  | use_lvl_idx `Set.member` bind_lvl = return ()
   -- With path CSP, using later than bound is fine
   | xopt LangExt.ImplicitStagePersistence dflags
-  , any (use_lvl >=) bind_lvl  = return ()
-  | otherwise = TcM.failWithTc (TcRnBadlyLevelled reason bind_lvl use_lvl)
+  , any (use_lvl_idx >=) bind_lvl  = return ()
+  | otherwise = TcM.failWithTc (TcRnBadlyLevelled reason bind_lvl use_lvl_idx)
 
 
 
 -- | Returns the ThLevel of evidence for the solved constraint (if it has evidence)
--- See Note [Well-staged instance evidence]
-checkWellStagedInstanceWhat :: InstanceWhat -> TcS (Maybe (Set.Set ThLevel, Bool))
-checkWellStagedInstanceWhat what
+-- See Note [Well-levelled instance evidence]
+checkWellLevelledInstanceWhat :: InstanceWhat -> TcS (Maybe (Set.Set ThLevelIndex, Bool))
+checkWellLevelledInstanceWhat what
   | TopLevInstance { iw_dfun_id = dfun_id } <- what
     = do
         -- MP: I am not sure if we have to only do this check for orphan instances.
@@ -1658,25 +1656,25 @@ checkWellStagedInstanceWhat what
             instance_key = if moduleUnitId name_module `Set.member` hsc_all_home_unit_ids hsc_env
                              then (mkKey NormalLevel name_module)
                              else Right (moduleUnitId name_module)
-        let lvls = [ -1 | splice_lvl instance_key]
-                 ++ [ 0 | normal_lvl instance_key]
-                 ++ [ 1 | quote_lvl instance_key]
+        let lvls = [ spliceLevelIndex | splice_lvl instance_key]
+                 ++ [ topLevelIndex | normal_lvl instance_key]
+                 ++ [ quoteLevelIndex | quote_lvl instance_key]
         if isLocalId dfun_id
-          then return $ Just ( (Set.singleton topLevel, True) )
+          then return $ Just ( (Set.singleton topLevelIndex, True) )
           else return $ Just ( Set.fromList lvls, False )
 
   | BuiltinTypeableInstance tc <- what
     = do
         cur_mod <- extractModule <$> getGblEnv
         return $ Just (if nameIsLocalOrFrom cur_mod (tyConName tc)
-                        then (Set.singleton topLevel, True)
+                        then (Set.singleton topLevelIndex, True)
                         -- TODO, not correct, needs similar checks to normal instances
-                        else (Set.fromList [(-1), topLevel], False))
+                        else (Set.fromList [spliceLevelIndex, topLevelIndex], False))
   | otherwise = return Nothing
 
 {-
-Note [Well-staged instance evidence]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Well-levelled instance evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Evidence for instances must obey the same level restrictions as normal bindings.
 In particular, it is forbidden to use an instance in a top-level splice in the
@@ -1716,12 +1714,12 @@ Main.hs:12:14: error:
 
 Solving a `Typeable (T t1 ...tn)` constraint generates code that relies on
 `$tcT`, the `TypeRep` for `T`; and we must check that this reference to `$tcT`
-is well levelled.  It's easy to know the stage of `$tcT`: for imported TyCons it
+is well levelled.  It's easy to know the level of `$tcT`: for imported TyCons it
 will be the level of the imported TyCon Name, and for local TyCons it will be `toplevel`.
 
 Therefore the `InstanceWhat` type had to be extended with
 a special case for `Typeable`, which recorded the TyCon the evidence was for and
-could them be used to check that we were not attempting to evidence in a stage incorrect
+could them be used to check that we were not attempting to evidence in a level incorrect
 manner.
 
 -}

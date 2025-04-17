@@ -99,7 +99,7 @@ module GHC.Tc.Errors.Types (
   , RuleLhsErrReason(..)
   , HsigShapeMismatchReason(..)
   , WrongThingSort(..)
-  , StageCheckReason(..)
+  , LevelCheckReason(..)
   , UninferrableTyVarCtx(..)
   , PatSynInvalidRhsReason(..)
   , BadFieldAnnotationReason(..)
@@ -3487,19 +3487,19 @@ data TcRnMessage where
     -> !LookupInstanceErrReason
     -> TcRnMessage
 
-  {-| TcRnBadlyStaged is an error that occurs when a TH binding is used at an
+  {-| TcRnBadlyLevelled is an error that occurs when a TH binding is used at an
       invalid level.
 
     Test cases:
       T17820d, T17820, T21547, T5795, qq00[1-4], annfail0{3,4,6,9}
   -}
   TcRnBadlyLevelled
-    :: !StageCheckReason -- ^ The binding
-    -> !(Set.Set Int) -- ^ The binding levels
-    -> !Int -- ^ The level at which the binding is used.
+    :: !LevelCheckReason -- ^ The binding
+    -> !(Set.Set ThLevelIndex) -- ^ The binding levels
+    -> !ThLevelIndex -- ^ The level at which the binding is used.
     -> TcRnMessage
 
-  {-| TcRnBadlyStagedWarn is a warning that occurs when a TH type binding is
+  {-| TcRnBadlyLevelledWarn is a warning that occurs when a TH type binding is
     used in an invalid stage.
 
     Controlled by flags:
@@ -3510,8 +3510,8 @@ data TcRnMessage where
   -}
   TcRnBadlyLevelledType
     :: !Name  -- ^ The type binding being spliced.
-    -> !(Set.Set Int) -- ^ The binding stage.
-    -> !Int -- ^ The stage at which the binding is used.
+    -> !(Set.Set ThLevelIndex) -- ^ The binding stage.
+    -> !ThLevelIndex -- ^ The stage at which the binding is used.
     -> TcRnMessage
 
   {-| TcRnTyThingUsedWrong is an error that occurs when a thing is used where another
@@ -6245,9 +6245,9 @@ data WrongThingSort
   | WrongThingTyCon
   | WrongThingAxiom
 
-data StageCheckReason
-  = StageCheckInstance !InstanceWhat !PredType
-  | StageCheckSplice !Name !(Maybe GlobalRdrElt)
+data LevelCheckReason
+  = LevelCheckInstance !InstanceWhat !PredType
+  | LevelCheckSplice !Name !(Maybe GlobalRdrElt)
 
 data UninferrableTyVarCtx
   = UninfTyCtx_ClassContext [TcType]

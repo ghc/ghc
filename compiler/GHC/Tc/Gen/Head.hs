@@ -1075,28 +1075,28 @@ Wrinkles
 -- checkThLocalName.
 checkThLocalId :: Id -> TcM ()
 checkThLocalId id
-  = do  { mb_local_use <- getStageAndBindLevel (idName id)
+  = do  { mb_local_use <- getCurrentAndBindLevel (idName id)
         ; case mb_local_use of
-             Just (top_lvl, bind_lvl, use_stage)
-                | thLevel use_stage `Set.notMember` bind_lvl
+             Just (top_lvl, bind_lvl, use_lvl)
+                | thLevelIndex use_lvl `Set.notMember` bind_lvl
                 -> do
                     dflags <- getDynFlags
-                    checkCrossStageLifting dflags top_lvl id use_stage
+                    checkCrossLevelLifting dflags top_lvl id use_lvl
              _  -> return ()   -- Not a locally-bound thing, or
                                -- no cross-stage link
     }
 
 --------------------------------------
-checkCrossStageLifting :: DynFlags -> TopLevelFlag -> Id -> ThStage -> TcM ()
+checkCrossLevelLifting :: DynFlags -> TopLevelFlag -> Id -> ThLevel -> TcM ()
 -- If we are inside typed brackets, and (use_lvl > bind_lvl)
 -- we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [|| x ||]
 --            [|| map ||]
 --
--- This is similar to checkCrossStageLifting in GHC.Rename.Splice, but
+-- This is similar to checkCrossLevelLifting in GHC.Rename.Splice, but
 -- this code is applied to *typed* brackets.
 
-checkCrossStageLifting dflags top_lvl id (Brack _ (TcPending ps_var lie_var q))
+checkCrossLevelLifting dflags top_lvl id (Brack _ (TcPending ps_var lie_var q))
   | isTopLevel top_lvl
   , xopt LangExt.ImplicitStagePersistence dflags
   = when (isExternalName id_name) (keepAlive id_name)
@@ -1146,7 +1146,7 @@ checkCrossStageLifting dflags top_lvl id (Brack _ (TcPending ps_var lie_var q))
   where
     id_name = idName id
 
-checkCrossStageLifting _ _ _ _ = return ()
+checkCrossLevelLifting _ _ _ _ = return ()
 
 {-
 Note [Lifting strings]
@@ -1181,7 +1181,7 @@ them at level 2 or 0.
 The level which a name is availble at is stored in the 'GRE', in the normal
 GlobalRdrEnv. The function `greLevels` returns the levels which a specific GRE
 is imported at. The level information for a 'Name' is computed by `getStageAndBindLevel`.
-The level validity is checked by `checkCrossStageLifting`.
+The level validity is checked by `checkCrossLevelLifting`.
 
 Instances are checked by `checkWellStagedDFun`, which computes the level an
 instance by calling `checkWellStagedInstanceWhat`, which sees what is available at by looking at the module graph.

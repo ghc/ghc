@@ -635,7 +635,7 @@ top level binders specially in two ways
     See Note [GlobalRdrEnv shadowing]
 
 3. We find out whether we are inside a [d| ... |] by testing the TH
-   stage. This is a slight hack, because the stage field was really
+   level. This is a slight hack, because the level field was really
    meant for the type checker, and here we are not interested in the
    fields of Brack, hence the error thunks in thRnBrack.
 -}
@@ -651,18 +651,18 @@ extendGlobalRdrEnvRn :: [GlobalRdrElt]
 extendGlobalRdrEnvRn new_gres new_fixities
   = checkNoErrs $  -- See Note [Fail fast on duplicate definitions]
     do  { (gbl_env, lcl_env) <- getEnvs
-        ; stage <- getStage
+        ; level <- getThLevel
         ; isGHCi <- getIsGHCi
         ; let rdr_env  = tcg_rdr_env gbl_env
               fix_env  = tcg_fix_env gbl_env
               th_bndrs = getLclEnvThBndrs lcl_env
-              th_lvl   = thLevel stage
+              th_lvl   = thLevelIndex level
 
               -- Delete new_occs from global and local envs
               -- If we are in a TemplateHaskell decl bracket,
               --    we are going to shadow them
               -- See Note [GlobalRdrEnv shadowing]
-              inBracket = isBrackStage stage
+              inBracket = isBrackLevel level
 
               lcl_env_TH = modifyLclCtxt (\lcl_env -> lcl_env { tcl_rdr = minusLocalRdrEnv (tcl_rdr lcl_env) new_gres_env }) lcl_env
                            -- See Note [GlobalRdrEnv shadowing]

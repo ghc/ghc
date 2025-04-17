@@ -117,7 +117,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Template Haskell context
   recordThUse, recordThNeededRuntimeDeps,
-  keepAlive, getStage, getStageAndBindLevel, setStage,
+  keepAlive, getThLevel, getCurrentAndBindLevel, setThLevel,
   addModFinalizersWithLclEnv,
 
   -- * Safe Haskell context
@@ -399,7 +399,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_in_gen_code = False,
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
-                tcl_th_ctxt    = topStage,
+                tcl_th_ctxt    = topLevel,
                 tcl_th_bndrs   = emptyNameEnv,
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
@@ -2110,11 +2110,11 @@ keepAlive name
        ; traceRn "keep alive" (ppr name)
        ; updTcRef (tcg_keep env) (`extendNameSet` name) }
 
-getStage :: TcM ThStage
-getStage = do { env <- getLclEnv; return (getLclEnvThStage env) }
+getThLevel :: TcM ThLevel
+getThLevel = do { env <- getLclEnv; return (getLclEnvThLevel env) }
 
-getStageAndBindLevel :: Name -> TcRn (Maybe (TopLevelFlag, Set.Set ThLevel, ThStage))
-getStageAndBindLevel name
+getCurrentAndBindLevel :: Name -> TcRn (Maybe (TopLevelFlag, Set.Set ThLevelIndex, ThLevel))
+getCurrentAndBindLevel name
   = do { env <- getLclEnv;
        ; case lookupNameEnv (getLclEnvThBndrs env) name of
            Nothing                  -> do
@@ -2128,10 +2128,10 @@ getStageAndBindLevel name
                   --env <- getGlobalRdrEnv
                   --pprTrace "NO_LVLS" (ppr name) (return Nothing)
                   return Nothing
-                else return (Just (TopLevel, lvls, getLclEnvThStage env))
-           Just (top_lvl, bind_lvl) -> return (Just (top_lvl, Set.singleton bind_lvl, getLclEnvThStage env)) }
+                else return (Just (TopLevel, lvls, getLclEnvThLevel env))
+           Just (top_lvl, bind_lvl) -> return (Just (top_lvl, Set.singleton bind_lvl, getLclEnvThLevel env)) }
 
-getExternalBindLvl :: Name -> TcRn (Set.Set ThLevel)
+getExternalBindLvl :: Name -> TcRn (Set.Set ThLevelIndex)
 getExternalBindLvl name = do
   env <- getGlobalRdrEnv
   mod <- getModule
@@ -2139,16 +2139,16 @@ getExternalBindLvl name = do
     Just gre -> return $ (Set.map convert_lvl (greLevels gre))
     Nothing ->
       if nameIsLocalOrFrom mod name
-        then return $ Set.singleton topLevel
+        then return $ Set.singleton topLevelIndex
 --        else pprTrace "NO LVLS" (ppr name) (return Set.empty) -- pprPanic "getExternalBindLvl" (ppr env $$ ppr name $$ ppr (nameSrcSpan name))
         else return Set.empty
   where
-    convert_lvl NormalLevel = thLevel topStage
-    convert_lvl SpliceLevel = thLevel topSpliceStage
-    convert_lvl QuoteLevel  = thLevel (Brack topStage undefined)
+    convert_lvl NormalLevel = topLevelIndex
+    convert_lvl SpliceLevel = spliceLevelIndex
+    convert_lvl QuoteLevel  = quoteLevelIndex
 
-setStage :: ThStage -> TcM a -> TcRn a
-setStage s = updLclEnv (setLclEnvThStage s)
+setThLevel :: ThLevel -> TcM a -> TcRn a
+setThLevel l = updLclEnv (setLclEnvThLevel l)
 
 -- | Adds the given modFinalizers to the global environment and set them to use
 -- the current local environment.

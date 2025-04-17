@@ -106,7 +106,7 @@ newLocalBndrsRn = mapM newLocalBndrRn
 bindLocalNames :: [Name] -> RnM a -> RnM a
 bindLocalNames names
   = updLclCtxt $ \ lcl_env ->
-    let th_level  = thLevel (tcl_th_ctxt lcl_env)
+    let th_level  = thLevelIndex (tcl_th_ctxt lcl_env)
         th_bndrs' = extendNameEnvList (tcl_th_bndrs lcl_env)
                     [ (n, (NotTopLevel, th_level)) | n <- names ]
         rdr_env'  = extendLocalRdrEnvList (tcl_rdr lcl_env) names

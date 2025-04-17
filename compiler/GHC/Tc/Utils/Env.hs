@@ -60,9 +60,9 @@ module GHC.Tc.Utils.Env(
         tcGetDefaultTys,
 
         -- Template Haskell stuff
-        StageCheckReason(..),
-        tcMetaTy, thLevel,
-        isBrackStage,
+        LevelCheckReason(..),
+        tcMetaTy, thLevelIndex,
+        isBrackLevel,
 
         -- New Ids
         newDFunName,
@@ -521,9 +521,8 @@ tcExtendTyConEnv tycons thing_inside
 -- See GHC ticket #17820 .
 tcTyThBinders :: [TyThing] -> TcM ThBindEnv
 tcTyThBinders implicit_things = do
-  stage <- getStage
-  let th_lvl  = thLevel stage
-      th_bndrs = mkNameEnv
+  th_lvl <- thLevelIndex <$> getThLevel
+  let th_bndrs = mkNameEnv
                   [ ( n , (TopLevel, th_lvl) ) | n <- names ]
   return th_bndrs
   where
@@ -759,7 +758,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
   = do  { traceTc "tc_extend_local_env" (ppr extra_env)
         ; updLclCtxt upd_lcl_env thing_inside }
   where
-    upd_lcl_env env0@(TcLclCtxt { tcl_th_ctxt  = stage
+    upd_lcl_env env0@(TcLclCtxt { tcl_th_ctxt  = th_lvl
                                , tcl_rdr      = rdr_env
                                , tcl_th_bndrs = th_bndrs
                                , tcl_env      = lcl_type_env })
@@ -776,7 +775,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
               -- Template Haskell staging env simultaneously. Reason for extending
               -- LocalRdrEnv: after running a TH splice we need to do renaming.
       where
-        thlvl = (top_lvl, thLevel stage)
+        thlvl = (top_lvl, thLevelIndex th_lvl)
 
 
 tcExtendLocalTypeEnv :: [(Name, TcTyThing)] -> TcLclCtxt -> TcLclCtxt
@@ -931,9 +930,9 @@ tcMetaTy tc_name = do
     t <- tcLookupTyCon tc_name
     return (mkTyConTy t)
 
-isBrackStage :: ThStage -> Bool
-isBrackStage (Brack {}) = True
-isBrackStage _other     = False
+isBrackLevel :: ThLevel -> Bool
+isBrackLevel (Brack {}) = True
+isBrackLevel _other     = False
 
 {-
 ************************************************************************

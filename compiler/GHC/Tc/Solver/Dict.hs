@@ -904,7 +904,7 @@ checkInstanceOK :: CtLoc -> InstanceWhat -> TcPredType -> TcS CtLoc
 -- Returns the CtLoc to used for sub-goals
 -- Probably also want to call checkReductionDepth
 checkInstanceOK loc what pred
-  = do { checkWellStagedDFun loc what pred
+  = do { checkWellLevelledDFun loc what pred
        ; return deeper_loc }
   where
      deeper_loc = zap_origin (bumpCtLocDepth loc)

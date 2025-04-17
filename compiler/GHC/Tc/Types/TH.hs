@@ -1,14 +1,16 @@
 module GHC.Tc.Types.TH (
     SpliceType(..)
   , SpliceOrBracket(..)
-  , ThStage(..)
+  , ThLevel(..)
   , PendingStuff(..)
-  , ThLevel
+  , ThLevelIndex
   , topLevel
-  , topStage
-  , topAnnStage
-  , topSpliceStage
-  , thLevel
+  , topAnnLevel
+  , topSpliceLevel
+  , thLevelIndex
+  , topLevelIndex
+  , spliceLevelIndex
+  , quoteLevelIndex
   ) where
 
 import GHCi.RemoteTypes
@@ -27,12 +29,12 @@ import GHC.Hs.Expr ( PendingTcSplice, PendingRnSplice )
 data SpliceType = Typed | Untyped
 data SpliceOrBracket = IsSplice | IsBracket
 
-data ThStage    -- See Note [Template Haskell state diagram]
+data ThLevel    -- See Note [Template Haskell state diagram]
                 -- and Note [Template Haskell levels] in GHC.Tc.Gen.Splice
     -- Start at:   Comp
     -- At bracket: wrap current stage in Brack
     -- At splice:  wrap current stage in Splice
-  = Splice SpliceType ThStage -- Inside a splice
+  = Splice SpliceType ThLevel -- Inside a splice
 
   | RunSplice (TcRef [ForeignRef (TH.Q ())])
       -- Set when running a splice, i.e. NOT when renaming or typechecking the
@@ -53,7 +55,7 @@ data ThStage    -- See Note [Template Haskell state diagram]
                 -- Binding level = 0
 
   | Brack                       -- Inside brackets
-      ThStage                   --   Enclosing stage
+      ThLevel                   --   Enclosing level
       PendingStuff
 
 data PendingStuff
@@ -73,35 +75,51 @@ data PendingStuff
                                   -- `lift`.
 
 
-topStage, topAnnStage, topSpliceStage :: ThStage
-topStage       = Comp
-topAnnStage    = Splice Untyped Comp
-topSpliceStage = Splice Untyped Comp
+topLevel, topAnnLevel, topSpliceLevel :: ThLevel
+topLevel       = Comp
+topAnnLevel    = Splice Untyped Comp
+topSpliceLevel = Splice Untyped Comp
 
-instance Outputable ThStage where
+instance Outputable ThLevel where
    ppr (Splice _ s)  = text "Splice" <> parens (ppr s)
    ppr (RunSplice _) = text "RunSplice"
    ppr Comp          = text "Comp"
    ppr (Brack s _)   = text "Brack" <> parens (ppr s)
 
-type ThLevel = Int
+-- | The integer which represents the level
+newtype ThLevelIndex = ThLevelIndex Int deriving (Eq, Ord)
     -- NB: see Note [Template Haskell levels] in GHC.Tc.Gen.Splice
     -- Incremented when going inside a bracket,
     -- decremented when going inside a splice
 
-topLevel :: ThLevel
-topLevel = thLevel Comp
+instance Outputable ThLevelIndex where
+    ppr (ThLevelIndex i) = int i
 
-thLevel :: ThStage -> ThLevel
-thLevel (Splice _ s)  = thLevel s - 1
-thLevel Comp          = 0
-thLevel (Brack s _)   = thLevel s + 1
-thLevel (RunSplice _) = thLevel (Splice Untyped Comp) -- previously: panic "thLevel: called when running a splice"
+incThLevelIndex :: ThLevelIndex -> ThLevelIndex
+incThLevelIndex (ThLevelIndex i) = ThLevelIndex (i + 1)
+
+decThLevelIndex :: ThLevelIndex -> ThLevelIndex
+decThLevelIndex (ThLevelIndex i) = ThLevelIndex (i - 1)
+
+topLevelIndex :: ThLevelIndex
+topLevelIndex = thLevelIndex Comp
+
+spliceLevelIndex :: ThLevelIndex
+spliceLevelIndex = thLevelIndex (Splice Untyped Comp)
+
+quoteLevelIndex :: ThLevelIndex
+quoteLevelIndex = thLevelIndex (Brack Comp RnPendingTyped)
+
+thLevelIndex :: ThLevel -> ThLevelIndex
+thLevelIndex (Splice _ s)  = decThLevelIndex (thLevelIndex s)
+thLevelIndex Comp          = ThLevelIndex 0
+thLevelIndex (Brack s _)   = incThLevelIndex (thLevelIndex s)
+thLevelIndex (RunSplice _) = thLevelIndex (Splice Untyped Comp) -- previously: panic "thLevel: called when running a splice"
                         -- See Note [RunSplice ThLevel].
 
 {- Note [RunSplice ThLevel]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The 'RunSplice' stage is set when executing a splice, and only when running a
+The 'RunSplice' level is set when executing a splice, and only when running a
 splice. In particular it is not set when the splice is renamed or typechecked.
 
 However, this is not true. `reifyInstances` for example does rename the given type,

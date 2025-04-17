@@ -59,9 +59,15 @@ module GHC.Tc.Types(
         CompleteMatch, CompleteMatches,
 
         -- Template Haskell
-        ThStage(..), SpliceType(..), SpliceOrBracket(..), PendingStuff(..),
-        topStage, topAnnStage, topSpliceStage,
-        ThLevel, topLevel,thLevel,
+        ThLevel(..), SpliceType(..), SpliceOrBracket(..), PendingStuff(..),
+        topLevel, topAnnLevel, topSpliceLevel,
+        ThLevelIndex,
+        topLevelIndex,
+        spliceLevelIndex,
+        quoteLevelIndex,
+
+        thLevelIndex,
+
         ForeignSrcLang(..), THDocs, DocLoc(..),
         ThBindEnv,
 

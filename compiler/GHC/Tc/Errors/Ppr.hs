@@ -1510,17 +1510,17 @@ instance Diagnostic TcRnMessage where
     TcRnBadlyLevelled reason bind_lvl use_lvl
       -> mkSimpleDecorated $
          vcat $
-         [ text "Level error:" <+> pprStageCheckReason reason <+>
+         [ text "Level error:" <+> pprLevelCheckReason reason <+>
            hsep [text "is bound at level" <+> ppr bind_lvl,
                  text "but used at level" <+> ppr use_lvl]
          ] ++
          [ hsep [ text "Hint: quoting" <+> thBrackets (ppUnless (isValName n) "t") (ppr n)
                 , text "or an enclosing expression would allow the quotation to be used at an earlier level"
                 ]
-         | StageCheckSplice n _ <- [reason]
+         | LevelCheckSplice n _ <- [reason]
          ] ++
          [ "From imports" <+> (ppr (gre_imp gre))
-         | StageCheckSplice _ (Just gre) <- [reason]
+         | LevelCheckSplice _ (Just gre) <- [reason]
          , not (isEmptyBag (gre_imp gre)) ]
     TcRnBadlyLevelledType name bind_lvl use_lvl
       -> mkSimpleDecorated $
@@ -5770,11 +5770,11 @@ pprWrongThingSort =
     WrongThingTyCon -> "type constructor"
     WrongThingAxiom -> "axiom"
 
-pprStageCheckReason :: StageCheckReason -> SDoc
-pprStageCheckReason = \case
-  StageCheckInstance _ t ->
+pprLevelCheckReason :: LevelCheckReason -> SDoc
+pprLevelCheckReason = \case
+  LevelCheckInstance _ t ->
     text "instance for" <+> quotes (ppr t)
-  StageCheckSplice t _ ->
+  LevelCheckSplice t _ ->
     quotes (ppr t)
 
 pprUninferrableTyVarCtx :: UninferrableTyVarCtx -> SDoc
