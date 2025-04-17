@@ -23,7 +23,7 @@ module GHC.Runtime.Eval (
         setupBreakpoint,
         back, forward,
         setContext, getContext,
-        mkTopLevEnv,
+        mkTopLevEnv, mkTopLevImportedEnv,
         getNamesInScope,
         getRdrNamesInScope,
         moduleIsInterpreted,
@@ -836,28 +836,35 @@ mkTopLevEnv hsc_env modl
       Nothing -> pure $ Left "not a home module"
       Just details ->
          case mi_top_env (hm_iface details) of
-                (IfaceTopEnv exports imports) -> do
-                  imports_env <-
-                        runInteractiveHsc hsc_env
-                      $ ioMsgMaybe $ hoistTcRnMessage $ runTcInteractive hsc_env
-                      $ fmap (foldr plusGlobalRdrEnv emptyGlobalRdrEnv)
-                      $ forM imports $ \iface_import -> do
-                        let ImpUserSpec spec details = tcIfaceImport iface_import
-                        iface <- loadInterfaceForModule (text "imported by GHCi") (is_mod spec)
-                        pure $ case details of
-                          ImpUserAll -> importsFromIface hsc_env iface spec Nothing
-                          ImpUserEverythingBut ns -> importsFromIface hsc_env iface spec (Just ns)
-                          ImpUserExplicit x _parents_of_implicits ->
-                            -- TODO: Not quite right, is_explicit should refer to whether the user wrote A(..) or A(x,y).
-                            -- It is only used for error messages. It seems dubious even to add an import context to these GREs as
-                            -- they are not "imported" into the top-level scope of the REPL. I changed this for now so that
-                            -- the test case produce the same output as before.
-                            let spec' = ImpSpec { is_decl = spec, is_item = ImpSome { is_explicit = True, is_iloc = noSrcSpan } }
-                            in mkGlobalRdrEnv $ gresFromAvails hsc_env (Just spec') x
+                (IfaceTopEnv exports _imports) -> do
+                  imports_env <- mkTopLevImportedEnv hsc_env details
                   let exports_env = mkGlobalRdrEnv $ gresFromAvails hsc_env Nothing (getDetOrdAvails exports)
                   pure $ Right $ plusGlobalRdrEnv imports_env exports_env
   where
     hpt = hsc_HPT hsc_env
+
+-- | Make the top-level environment with all bindings imported by this module.
+-- Exported bindings from this module are not included in the result.
+mkTopLevImportedEnv :: HscEnv -> HomeModInfo -> IO GlobalRdrEnv
+mkTopLevImportedEnv hsc_env details = do
+    runInteractiveHsc hsc_env
+  $ ioMsgMaybe $ hoistTcRnMessage $ runTcInteractive hsc_env
+  $ fmap (foldr plusGlobalRdrEnv emptyGlobalRdrEnv)
+  $ forM imports $ \iface_import -> do
+    let ImpUserSpec spec details = tcIfaceImport iface_import
+    iface <- loadInterfaceForModule (text "imported by GHCi") (is_mod spec)
+    pure $ case details of
+      ImpUserAll -> importsFromIface hsc_env iface spec Nothing
+      ImpUserEverythingBut ns -> importsFromIface hsc_env iface spec (Just ns)
+      ImpUserExplicit x _parents_of_implicits ->
+        -- TODO: Not quite right, is_explicit should refer to whether the user wrote A(..) or A(x,y).
+        -- It is only used for error messages. It seems dubious even to add an import context to these GREs as
+        -- they are not "imported" into the top-level scope of the REPL. I changed this for now so that
+        -- the test case produce the same output as before.
+        let spec' = ImpSpec { is_decl = spec, is_item = ImpSome { is_explicit = True, is_iloc = noSrcSpan } }
+        in mkGlobalRdrEnv $ gresFromAvails hsc_env (Just spec') x
+  where
+    IfaceTopEnv _ imports = mi_top_env (hm_iface details)
 
 -- | Get the interactive evaluation context, consisting of a pair of the
 -- set of modules from which we take the full top-level scope, and the set
