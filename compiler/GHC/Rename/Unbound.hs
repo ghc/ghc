@@ -364,7 +364,7 @@ importSuggestions looking_for ic currMod imports rdr_name
   pick_interactive :: InteractiveImport -> Bool
   pick_interactive (IIDecl d)   | mod_name == Just (unLoc (ideclName d)) = True
                                 | mod_name == fmap unLoc (ideclAs d) = True
-  pick_interactive (IIModule m) | mod_name == Just m = True
+  pick_interactive (IIModule m) | mod_name == Just (moduleName m) = True
   pick_interactive _ = False
 
   -- We want to keep only one for each original module; preferably one with an

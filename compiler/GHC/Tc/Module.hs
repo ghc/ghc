@@ -2098,7 +2098,7 @@ runTcInteractive hsc_env thing_inside
 
        ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
             case i of                   -- force above: see #15111
-                IIModule n -> getOrphans n NoPkgQual
+                IIModule n -> getOrphans (moduleName n) NoPkgQual -- TODO: wrong
                 IIDecl i   -> getOrphans (unLoc (ideclName i))
                                          (renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i))
 

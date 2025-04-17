@@ -558,7 +558,7 @@ interactiveUI config srcs maybe_exprs = do
    hsc_env <- GHC.getSession
    let !in_multi = length (hsc_all_home_unit_ids hsc_env) > 3
         -- We force this to make sure we don't retain the hsc_env when reloading
-        -- The check is `> 2`, since we now always have at least two home units.
+        -- The check is `> 3`, since we now always have at least two home units.
         -- TODO: if everything goes well, this check should be deleted once
         -- this PR has lifted the multiple home unit restrictions
    empty_cache <- liftIO newIfaceCache
@@ -1023,7 +1023,7 @@ getInfoForPrompt = do
                       | otherwise           = unLoc (ideclName d)
 
         modules_names =
-             ['*':(moduleNameString m) | IIModule m <- rev_imports] ++
+             ['*':(moduleNameString (moduleName m)) | IIModule m <- rev_imports] ++
              [moduleNameString (myIdeclName d) | IIDecl d <- rev_imports]
         line = 1 + line_number st
 
@@ -2279,7 +2279,7 @@ setContextAfterLoad keep_ctxt (Just graph) = do
               -- We import the module with a * iff
               --   - it is interpreted, and
               --   - -XSafe is off (it doesn't allow *-imports)
-        let new_ctx | star_ok   = [mkIIModule (GHC.moduleName m)]
+        let new_ctx | star_ok   = [mkIIModule m]
                     | otherwise = [mkIIDecl   (GHC.moduleName m)]
         setContextKeepingPackageModules keep_ctxt new_ctx
 
@@ -2699,7 +2699,7 @@ guessCurrentModule cmd = do
   imports <- GHC.getContext
   case imports of
     [] -> throwGhcException $ CmdLineError (':' : cmd ++ ": no current module")
-    IIModule m : _ -> GHC.findQualifiedModule NoPkgQual m
+    IIModule m : _ -> pure m
     IIDecl d : _ -> do
       pkgqual <- GHC.renameRawPkgQualM (unLoc $ ideclName d) (ideclPkgQual d)
       GHC.findQualifiedModule pkgqual (unLoc (ideclName d))
@@ -2829,8 +2829,9 @@ addModulesToContext starred unstarred = restoreContextOnFailure $ do
 
 addModulesToContext_ :: GhciMonad m => [ModuleName] -> [ModuleName] -> m ()
 addModulesToContext_ starred unstarred = do
-   mapM_ addII (map mkIIModule starred ++ map mkIIDecl unstarred)
-   setGHCContextFromGHCiState
+  starredModules <- traverse lookupModuleName starred
+  mapM_ addII (map mkIIModule starredModules ++ map mkIIDecl unstarred)
+  setGHCContextFromGHCiState
 
 remModulesFromContext :: GhciMonad m => [ModuleName] -> [ModuleName] -> m ()
 remModulesFromContext  starred unstarred = do
@@ -2896,9 +2897,9 @@ checkAdd ii = do
   dflags <- getDynFlags
   let safe = safeLanguageOn dflags
   case ii of
-    IIModule modname
+    IIModule mod
        | safe -> throwGhcException $ CmdLineError "can't use * imports with Safe Haskell"
-       | otherwise -> wantInterpretedModuleName modname >> return ()
+       | otherwise -> checkInterpretedModule mod >> return ()
 
     IIDecl d -> do
        let modname = unLoc (ideclName d)
@@ -2966,13 +2967,13 @@ getImplicitPreludeImports iidecls = do
 -- -----------------------------------------------------------------------------
 -- Utils on InteractiveImport
 
-mkIIModule :: ModuleName -> InteractiveImport
+mkIIModule :: Module -> InteractiveImport
 mkIIModule = IIModule
 
 mkIIDecl :: ModuleName -> InteractiveImport
 mkIIDecl = IIDecl . simpleImportDecl
 
-iiModules :: [InteractiveImport] -> [ModuleName]
+iiModules :: [InteractiveImport] -> [Module]
 iiModules is = [m | IIModule m <- is]
 
 isIIModule :: InteractiveImport -> Bool
@@ -2980,7 +2981,7 @@ isIIModule (IIModule _) = True
 isIIModule _ = False
 
 iiModuleName :: InteractiveImport -> ModuleName
-iiModuleName (IIModule m) = m
+iiModuleName (IIModule m) = moduleName m
 iiModuleName (IIDecl d)   = unLoc (ideclName d)
 
 preludeModuleName :: ModuleName
@@ -3428,7 +3429,7 @@ showImports = do
       trans_ctx = transient_ctx st
 
       show_one (IIModule star_m)
-          = ":module +*" ++ moduleNameString star_m
+          = ":module +*" ++ moduleNameString (moduleName star_m)
       show_one (IIDecl imp) = showPpr dflags imp
 
   prel_iidecls <- getImplicitPreludeImports (rem_ctx ++ trans_ctx)
@@ -3734,11 +3735,11 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
         filterM GHC.moduleIsInterpreted hmods
 
     -- Return all possible bids for a given Module
-    bidsByModule :: GhciMonad m => [ModuleName] -> Module -> m [String]
+    bidsByModule :: GhciMonad m => [Module] -> Module -> m [String]
     bidsByModule nonquals mod = do
       (_, decls) <- getModBreak mod
       let bids = nub $ declPath <$> elems decls
-      pure $ case (moduleName mod) `elem` nonquals of
+      pure $ case mod `elem` nonquals of
               True  -> bids
               False -> (combineModIdent (showModule mod)) <$> bids
 
@@ -4143,8 +4144,7 @@ breakSwitch (arg1:rest)
    | all isDigit arg1 = do
         imports <- GHC.getContext
         case iiModules imports of
-           (mn : _) -> do
-              md <- lookupModuleName mn
+           (md : _) -> do
               breakByModuleLine md (read arg1) rest
            [] -> do
               liftIO $ putStrLn "No modules are loaded with debugging support."
@@ -4276,8 +4276,7 @@ list2 [arg] | all isDigit arg = do
     case iiModules imports of
         [] -> liftIO $ putStrLn "No module to list"
         (mn : _) -> do
-          md <- lookupModuleName mn
-          listModuleLine md (read arg)
+          listModuleLine mn (read arg)
 list2 [arg1,arg2] | looksLikeModuleName arg1, all isDigit arg2 = do
         md <- wantInterpretedModule arg1
         listModuleLine md (read arg2)
@@ -4536,7 +4535,17 @@ lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 lookupModuleName mName = lookupQualifiedModuleName NoPkgQual mName
 
 lookupQualifiedModuleName :: GHC.GhcMonad m => PkgQual -> ModuleName -> m Module
-lookupQualifiedModuleName = GHC.lookupAnyQualifiedModule
+lookupQualifiedModuleName qual modl = do
+  GHC.lookupAllQualifiedModuleNames qual modl >>= \case
+    [] -> throwGhcException (CmdLineError ("module '" ++ str ++ "' could not be found."))
+    [m] -> pure m
+    ms -> throwGhcException (CmdLineError ("module name '" ++ str ++ "' is ambiguous;\n" ++ errorMsg ms))
+  where
+    str = moduleNameString modl
+    errorMsg ms = intercalate "\n"
+      [ "- " ++ unitIdString (toUnitId (moduleUnit m)) ++ ":" ++ moduleNameString (moduleName m)
+      | m <- ms
+      ]
 
 isMainUnitModule :: Module -> Bool
 isMainUnitModule m = GHC.moduleUnit m == mainUnit
@@ -4586,15 +4595,19 @@ wantInterpretedModule str = wantInterpretedModuleName (GHC.mkModuleName str)
 
 wantInterpretedModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 wantInterpretedModuleName modname = do
-   modl <- lookupModuleName modname
-   let str = moduleNameString modname
-   hug <- hsc_HUG <$> GHC.getSession
-   unless (HUG.memberHugHomeModule modl hug) $
-      throwGhcException (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
-   is_interpreted <- GHC.moduleIsInterpreted modl
-   when (not is_interpreted) $
-       throwGhcException (CmdLineError ("module '" ++ str ++ "' is not interpreted; try \':add *" ++ str ++ "' first"))
-   return modl
+  modl <- lookupModuleName modname
+  checkInterpretedModule modl
+
+checkInterpretedModule :: GHC.GhcMonad m => Module -> m Module
+checkInterpretedModule modl = do
+  let str = moduleNameString $ moduleName modl
+  hug <- hsc_HUG <$> GHC.getSession
+  unless (HUG.memberHugHomeModule modl hug) $
+    throwGhcException (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
+  is_interpreted <- GHC.moduleIsInterpreted modl
+  when (not is_interpreted) $
+      throwGhcException (CmdLineError ("module '" ++ str ++ "' is not interpreted; try \':add *" ++ str ++ "' first"))
+  return modl
 
 wantNameFromInterpretedModule :: GHC.GhcMonad m
                               => (Name -> SDoc -> m ())

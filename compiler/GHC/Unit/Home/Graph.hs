@@ -34,7 +34,7 @@ module GHC.Unit.Home.Graph
   , lookupHug
   , lookupHugByModule
   , lookupHugUnit
-  , lookupAnyHug
+  , lookupAllHug
   , memberHugHomeModule
   , memberHugHomeInstalledModule
 
@@ -91,6 +91,7 @@ import GHC.Data.Graph.Directed
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
+import GHC.Utils.Monad (mapMaybeM)
 
 
 -- | Get all 'CompleteMatches' (arising from COMPLETE pragmas) present across
@@ -255,21 +256,14 @@ lookupHug hug uid mod = do
     Just hue -> lookupHpt (homeUnitEnv_hpt hue) mod
 
 -- TODO: this should not be merged, where else could we try to search for modules?
-lookupAnyHug :: HomeUnitGraph -> ModuleName -> IO (Maybe HomeModInfo)
-lookupAnyHug hug mod = firstJustM $ flip fmap (Set.toList $ unitEnv_keys hug) $ \uid -> do
-  case unitEnv_lookup_maybe uid hug of
-    -- Really, here we want "lookup HPT" rather than unitEnvLookup
-    Nothing -> pure Nothing
-    Just hue -> lookupHpt (homeUnitEnv_hpt hue) mod
+lookupAllHug :: HomeUnitGraph -> ModuleName -> IO [HomeModInfo]
+lookupAllHug hug mod = mapMaybeM lookupModuleName (Set.toList $ unitEnv_keys hug)
   where
-    firstJustM :: Monad f => [f (Maybe a)] -> f (Maybe a)
-    firstJustM [] = pure Nothing
-    firstJustM (x:xs) = do
-      ma <- x
-      case ma of
-        Nothing -> firstJustM xs
-        Just a -> pure $ Just a
-
+    lookupModuleName uid =
+      case unitEnv_lookup_maybe uid hug of
+        -- Really, here we want "lookup HPT" rather than unitEnvLookup
+        Nothing -> pure Nothing
+        Just hue -> lookupHpt (homeUnitEnv_hpt hue) mod
 
 -- | Lookup the 'HomeModInfo' of a 'Module' in the 'HomeUnitGraph' (via the 'HomePackageTable' of the corresponding unit)
 lookupHugByModule :: Module -> HomeUnitGraph -> IO (Maybe HomeModInfo)

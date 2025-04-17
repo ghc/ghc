@@ -157,7 +157,7 @@ module GHC (
         getBindings, getInsts, getNamePprCtx,
         findModule, lookupModule,
         findQualifiedModule, lookupQualifiedModule,
-        lookupLoadedHomeModuleByModuleName, lookupAnyQualifiedModule,
+        lookupLoadedHomeModuleByModuleName, lookupAllQualifiedModuleNames,
         renamePkgQualM, renameRawPkgQualM,
         isModuleTrusted, moduleTrustReqs,
         getNamesInScope,
@@ -1496,8 +1496,8 @@ getModuleGraph = liftM hsc_mod_graph getSession
 -- TODO: this function should likely be deleted.
 isLoaded :: GhcMonad m => ModuleName -> m Bool
 isLoaded m = withSession $ \hsc_env -> liftIO $ do
-  hmi <- HUG.lookupAnyHug (hsc_HUG hsc_env) m
-  return $! isJust hmi
+  hmis <- HUG.lookupAllHug (hsc_HUG hsc_env) m
+  return $! not (null hmis)
 
 isLoadedModule :: GhcMonad m => UnitId -> ModuleName -> m Bool
 isLoadedModule uid m = withSession $ \hsc_env -> liftIO $ do
@@ -1896,17 +1896,16 @@ lookupLoadedHomeModule uid mod_name = withSession $ \hsc_env -> liftIO $ do
     _not_a_home_module -> return Nothing
 
 -- TODO: this is incorrect, what if we have mulitple 'ModuleName's in our HPTs?
-lookupLoadedHomeModuleByModuleName :: GhcMonad m => ModuleName -> m (Maybe Module)
+lookupLoadedHomeModuleByModuleName :: GhcMonad m => ModuleName -> m (Maybe [Module])
 lookupLoadedHomeModuleByModuleName mod_name = withSession $ \hsc_env -> liftIO $ do
   trace_if (hsc_logger hsc_env) (text "lookupLoadedHomeModuleByModuleName" <+> ppr mod_name)
-  HUG.lookupAnyHug (hsc_HUG hsc_env) mod_name >>= \case
-    Just mod_info      -> return (Just (mi_module (hm_iface mod_info)))
-    _not_a_home_module -> return Nothing
+  HUG.lookupAllHug (hsc_HUG hsc_env) mod_name >>= \case
+    []        -> return Nothing
+    mod_infos -> return (Just (mi_module . hm_iface <$> mod_infos))
 
-lookupAnyQualifiedModule :: GhcMonad m => PkgQual -> ModuleName -> m Module
-lookupAnyQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
+lookupAllQualifiedModuleNames :: GhcMonad m => PkgQual -> ModuleName -> m [Module]
+lookupAllQualifiedModuleNames NoPkgQual mod_name = withSession $ \hsc_env -> do
   home <- lookupLoadedHomeModuleByModuleName mod_name
-  liftIO $ trace_if (hsc_logger hsc_env) (ppr home <+> ppr (fmap moduleUnitId home))
   case home of
     Just m  -> return m
     Nothing -> liftIO $ do
@@ -1916,11 +1915,12 @@ lookupAnyQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
       let fopts  = initFinderOpts dflags
       res <- findExposedPackageModule fc fopts units mod_name NoPkgQual
       case res of
-        Found _ m -> return m
+        Found _ m -> return [m]
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
-lookupAnyQualifiedModule pkgqual mod_name =
+lookupAllQualifiedModuleNames pkgqual mod_name = do
   -- TODO: definitely wrong.
-  findQualifiedModule pkgqual mod_name
+  m <- findQualifiedModule pkgqual mod_name
+  pure [m]
 
 -- | Check that a module is safe to import (according to Safe Haskell).
 --

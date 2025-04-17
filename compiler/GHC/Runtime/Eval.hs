@@ -822,17 +822,12 @@ findGlobalRdrEnv hsc_env imports
     idecls :: [LImportDecl GhcPs]
     idecls = [noLocA d | IIDecl d <- imports]
 
-    imods :: [ModuleName]
+    imods :: [Module]
     imods = [m | IIModule m <- imports]
 
-    mkEnv modl = do
-      -- TODO: revisit this, is this how we want to do it?
-      mMod <- HUG.lookupAnyHug (hsc_HUG hsc_env) modl
-      let mod = case mMod of
-            Nothing -> mkModule (RealUnit $ Definite $ hscActiveUnitId hsc_env) modl
-            Just m -> mi_module $ hm_iface m
+    mkEnv mod = do
       mkTopLevEnv hsc_env mod >>= \case
-        Left err -> pure $ Left (modl, err)
+        Left err -> pure $ Left (moduleName mod, err)
         Right env -> pure $ Right env
 
 mkTopLevEnv :: HscEnv -> Module -> IO (Either String GlobalRdrEnv)
