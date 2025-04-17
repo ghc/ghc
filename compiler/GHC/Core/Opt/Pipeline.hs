@@ -217,7 +217,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
         if full_laziness then
            CoreDoFloatOutwards $ FloatOutSwitches
                 { floatOutLambdas     = Just 0
-                , floatOutConstants   = True
+                , floatOutConstants   = False  -- Initially
                 , floatOutOverSatApps = False
                 , floatToTopLevelOnly = False
                 , floatJoinsToTop     = False  -- Initially, don't float join points at all
@@ -284,7 +284,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
         --        f_el22 (f_el21 r_midblock)
         runWhen full_laziness $ CoreDoFloatOutwards $ FloatOutSwitches
                { floatOutLambdas     = floatLamArgs dflags
-               , floatOutConstants   = True
+               , floatOutConstants   = True  -- For SpecConstr and CSE
                , floatOutOverSatApps = True
                , floatToTopLevelOnly = False
                , floatJoinsToTop     = True },

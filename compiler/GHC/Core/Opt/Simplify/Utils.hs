@@ -1461,12 +1461,18 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
-    one_occ OneOcc{ occ_n_br   = 1
-                  , occ_in_lam = NotInsideLam }   = isNotTopLevel top_lvl || early_phase
+    one_occ OneOcc{ occ_n_br    = 1
+                  , occ_in_lam  = NotInsideLam
+                  , occ_int_cxt = int_cxt }
+      =  isNotTopLevel top_lvl      -- Get rid of allocation
+      || (int_cxt==IsInteresting)   -- Function is applied
+      || (early_phase && not (isConLikeUnfolding unf))  -- See early_phase
     one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = IsInsideLam
-                  , occ_int_cxt = IsInteresting } = canInlineInLam rhs
-    one_occ _                                     = False
+                  , occ_int_cxt = IsInteresting }
+      = canInlineInLam rhs
+    one_occ _
+      = False
 
     pre_inline_unconditionally = sePreInline env
     active = isActive (sePhase env) (inlinePragmaActivation inline_prag)
@@ -1641,9 +1647,10 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
       | otherwise   = smallEnoughToInline uf_opts unfolding
 
     -- See Note [Post-inline for single-use things]
-    check_one_occ NotInsideLam _             n_br = code_dup_ok n_br
-    check_one_occ IsInsideLam NotInteresting _    = False
-    check_one_occ IsInsideLam IsInteresting  n_br = is_cheap && code_dup_ok n_br
+    check_one_occ NotInsideLam NotInteresting n_br = not is_top_lvl && code_dup_ok n_br
+    check_one_occ NotInsideLam IsInteresting  n_br = code_dup_ok n_br
+    check_one_occ IsInsideLam  NotInteresting _    = False
+    check_one_occ IsInsideLam  IsInteresting  n_br = is_cheap && code_dup_ok n_br
       -- IsInteresting: inlining inside a lambda only with good reason
       --    See the notes on int_cxt in preInlineUnconditionally
       -- is_cheap: check for acceptable work duplication, using isCheapUnfolding

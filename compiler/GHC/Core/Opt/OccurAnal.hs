@@ -1096,14 +1096,14 @@ mkNonRecRhsCtxt lvl bndr unf
     certainly_inline -- See Note [Cascading inlines]
       = -- mkNonRecRhsCtxt is only used for non-join points, so occAnalBind
         -- has set the OccInfo for this binder before calling occAnalNonRecRhs
+        -- Distressing delicacy ... has to line up with preInlineUnconditionally
         case idOccInfo bndr of
           OneOcc { occ_in_lam = NotInsideLam, occ_n_br = 1 }
-            -> active && not stable_unf && not top_bottoming
+            -> active && not (isTopLevel lvl) && not stable_unf
           _ -> False
 
     active     = isAlwaysActive (idInlineActivation bndr)
     stable_unf = isStableUnfolding unf
-    top_bottoming = isTopLevel lvl && isDeadEndId bndr
 
 -----------------
 occAnalRecBind :: OccEnv -> TopLevelFlag -> ImpRuleEdges -> [(Var,CoreExpr)]
