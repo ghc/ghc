@@ -1662,16 +1662,16 @@ checkWellStagedInstanceWhat what
                  ++ [ 1 | normal_lvl instance_key]
                  ++ [ 2 | quote_lvl instance_key]
         if isLocalId dfun_id
-          then return $ Just ( (Set.singleton outerLevel, True) )
+          then return $ Just ( (Set.singleton topLevel, True) )
           else return $ Just ( Set.fromList lvls, False )
 
   | BuiltinTypeableInstance tc <- what
     = do
         cur_mod <- extractModule <$> getGblEnv
         return $ Just (if nameIsLocalOrFrom cur_mod (tyConName tc)
-                        then (Set.singleton outerLevel, True)
+                        then (Set.singleton topLevel, True)
                         -- TODO, not correct, needs similar checks to normal instances
-                        else (Set.fromList [impLevel, outerLevel], False))
+                        else (Set.fromList [(-1), topLevel], False))
   | otherwise = return Nothing
 
 {-
@@ -1716,8 +1716,8 @@ Main.hs:12:14: error:
 
 Solving a `Typeable (T t1 ...tn)` constraint generates code that relies on
 `$tcT`, the `TypeRep` for `T`; and we must check that this reference to `$tcT`
-is well staged.  It's easy to know the stage of `$tcT`: for imported TyCons it
-will be `impLevel`, and for local TyCons it will be `toplevel`.
+is well levelled.  It's easy to know the stage of `$tcT`: for imported TyCons it
+will be the level of the imported TyCon Name, and for local TyCons it will be `toplevel`.
 
 Therefore the `InstanceWhat` type had to be extended with
 a special case for `Typeable`, which recorded the TyCon the evidence was for and

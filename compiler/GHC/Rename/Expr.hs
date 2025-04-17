@@ -658,7 +658,7 @@ rnExpr e@(HsStatic _ expr) = do
     (expr',fvExpr) <- rnLExpr expr
     stage <- getStage
     case stage of
-      Splice _ -> addErr $ TcRnTHError $ IllegalStaticFormInSplice e
+      Splice _ _ -> addErr $ TcRnTHError $ IllegalStaticFormInSplice e
       _        -> return ()
     mod <- getModule
     let fvExpr' = filterNameSet (nameIsLocalOrFrom mod) fvExpr

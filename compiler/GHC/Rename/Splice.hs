@@ -126,7 +126,7 @@ rnTypedBracket e br_body
          -- Check for nested brackets
        ; cur_stage <- getStage
        ; case cur_stage of
-           { Splice _       -> return ()
+           { Splice _ _       -> return ()
                -- See Note [Untyped quotes in typed splices and vice versa]
            ; RunSplice _    ->
                -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
@@ -155,7 +155,7 @@ rnUntypedBracket e br_body
          -- Check for nested brackets
        ; cur_stage <- getStage
        ; case cur_stage of
-           { Splice _       -> return ()
+           { Splice _ _       -> return ()
                -- See Note [Untyped quotes in typed splices and vice versa]
            ; RunSplice _    ->
                -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
@@ -296,8 +296,9 @@ rnUntypedSpliceGen run_splice pend_splice splice
                 ; return (result, fvs) }
 
         _ ->  do { checkTopSpliceAllowed splice
+                 ; cur_stage <- getStage
                  ; (splice', fvs1) <- checkNoErrs $
-                                      setStage (Splice Untyped) $
+                                      setStage (Splice Untyped cur_stage) $
                                       rnUntypedSplice splice
                    -- checkNoErrs: don't attempt to run the splice if
                    -- renaming it failed; otherwise we get a cascade of
@@ -444,7 +445,8 @@ rnTypedSplice expr
         _ -> do { unlessXOptM LangExt.TemplateHaskell
                     (failWith $ thSyntaxError IllegalTHSplice)
 
-                ; (result, fvs1) <- checkNoErrs $ setStage (Splice Typed) rn_splice
+                ; cur_stage <- getStage
+                ; (result, fvs1) <- checkNoErrs $ setStage (Splice Typed cur_stage) rn_splice
                   -- checkNoErrs: don't attempt to run the splice if
                   -- renaming it failed; otherwise we get a cascade of
                   -- errors from e.g. unbound variables
@@ -788,8 +790,9 @@ rnTopSpliceDecls :: HsUntypedSplice GhcPs -> RnM ([LHsDecl GhcPs], FreeVars)
 -- Declaration splice at the very top level of the module
 rnTopSpliceDecls splice
    =  do { checkTopSpliceAllowed splice
+         ; cur_stage <- getStage
          ; (rn_splice, fvs) <- checkNoErrs $
-                               setStage (Splice Untyped) $
+                               setStage (Splice Untyped cur_stage) $
                                rnUntypedSplice splice
            -- As always, be sure to checkNoErrs above lest we end up with
            -- holes making it to typechecking, hence #12584.

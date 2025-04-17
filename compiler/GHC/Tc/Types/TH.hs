@@ -4,12 +4,11 @@ module GHC.Tc.Types.TH (
   , ThStage(..)
   , PendingStuff(..)
   , ThLevel
+  , topLevel
   , topStage
   , topAnnStage
   , topSpliceStage
   , thLevel
-  , impLevel
-  , outerLevel
   ) where
 
 import GHCi.RemoteTypes
@@ -32,12 +31,8 @@ data ThStage    -- See Note [Template Haskell state diagram]
                 -- and Note [Template Haskell levels] in GHC.Tc.Gen.Splice
     -- Start at:   Comp
     -- At bracket: wrap current stage in Brack
-    -- At splice:  currently Brack: return to previous stage
-    --             currently Comp/Splice: compile and run
-  = Splice SpliceType -- Inside a top-level splice
-                      -- This code will be run *at compile time*;
-                      --   the result replaces the splice
-                      -- Binding level = 0
+    -- At splice:  wrap current stage in Splice
+  = Splice SpliceType ThStage -- Inside a splice
 
   | RunSplice (TcRef [ForeignRef (TH.Q ())])
       -- Set when running a splice, i.e. NOT when renaming or typechecking the
@@ -55,7 +50,7 @@ data ThStage    -- See Note [Template Haskell state diagram]
       -- See Note [Collecting modFinalizers in typed splices] in "GHC.Tc.Gen.Splice".
 
   | Comp        -- Ordinary Haskell code
-                -- Binding level = 1
+                -- Binding level = 0
 
   | Brack                       -- Inside brackets
       ThStage                   --   Enclosing stage
@@ -80,11 +75,11 @@ data PendingStuff
 
 topStage, topAnnStage, topSpliceStage :: ThStage
 topStage       = Comp
-topAnnStage    = Splice Untyped
-topSpliceStage = Splice Untyped
+topAnnStage    = Splice Untyped Comp
+topSpliceStage = Splice Untyped Comp
 
 instance Outputable ThStage where
-   ppr (Splice _)    = text "Splice"
+   ppr (Splice _ s)  = text "Splice" <> parens (ppr s)
    ppr (RunSplice _) = text "RunSplice"
    ppr Comp          = text "Comp"
    ppr (Brack s _)   = text "Brack" <> parens (ppr s)
@@ -93,18 +88,15 @@ type ThLevel = Int
     -- NB: see Note [Template Haskell levels] in GHC.Tc.Gen.Splice
     -- Incremented when going inside a bracket,
     -- decremented when going inside a splice
-    -- NB: ThLevel is one greater than the 'n' in Fig 2 of the
-    --     original "Template meta-programming for Haskell" paper
 
-impLevel, outerLevel :: ThLevel
-impLevel = 0    -- Imported things; they can be used inside a top level splice
-outerLevel = 1  -- Things defined outside brackets
+topLevel :: ThLevel
+topLevel = thLevel Comp
 
 thLevel :: ThStage -> ThLevel
-thLevel (Splice _)    = 0
-thLevel Comp          = 1
+thLevel (Splice _ s)  = thLevel s - 1
+thLevel Comp          = 0
 thLevel (Brack s _)   = thLevel s + 1
-thLevel (RunSplice _) = 0 -- previously: panic "thLevel: called when running a splice"
+thLevel (RunSplice _) = (-1) -- previously: panic "thLevel: called when running a splice"
                         -- See Note [RunSplice ThLevel].
 
 {- Note [RunSplice ThLevel]

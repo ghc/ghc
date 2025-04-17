@@ -180,20 +180,20 @@ The top level of the program is stage Comp:
      Start here
          |
          V
-      -----------     $      ------------   $
-      |  Comp   | ---------> |  Splice  | -----|
-      |   1     |            |    0     | <----|
-      -----------            ------------
+      -----------     $      ------------   $    -----------------
+      |  Comp   | ---------> |  Splice  | -----> | Splice Splice |
+      |   0     |            |    -1    | <----  |     -2        |
+      -----------            ------------  [||]  -----------------
         ^     |                ^      |
       $ |     | [||]         $ |      | [||]
         |     v                |      v
    --------------          ----------------
    | Brack Comp |          | Brack Splice |
-   |     2      |          |      1       |
+   |     1      |          |      0       |
    --------------          ----------------
 
 * Normal top-level declarations start in state Comp
-       (which has level 1).
+       (which has level 0).
   Annotations start in state Splice, since they are
        treated very like a splice (only without a '$')
 
@@ -201,31 +201,28 @@ The top level of the program is stage Comp:
   will be *run at compile time*, with the result replacing
   the splice
 
-* The original paper used level -1 instead of 0, etc.
-
 * The original paper did not allow a splice within a
   splice, but there is no reason not to. This is the
   $ transition in the top right.
 
 Note [Template Haskell levels]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* Imported things are impLevel (= 0)
+* Imported things are level 0
 
-* However things at level 0 are not *necessarily* imported.
-      eg  $( \b -> ... )   here b is bound at level 0
+* Top-level things are level 0
 
 * In GHCi, variables bound by a previous command are treated
-  as impLevel, because we have bytecode for them.
+  as imported, because we have bytecode for them.
 
 * Variables are bound at the "current level"
 
-* The current level starts off at outerLevel (= 1)
+* The current level starts off at 0
 
 * The level is decremented by splicing $(..)
                incremented by brackets [| |]
                incremented by name-quoting 'f
 
-* When a variable is used, checkWellStaged compares
+* When a variable is used, checkThLocalName compares
         bind:  binding level, and
         use:   current level at usage site
 
@@ -236,15 +233,17 @@ Note [Template Haskell levels]
         bind = use      Always OK (bound same stage as used)
                         [| \x -> $(f [| x |]) |]
 
-        bind < use      Inside brackets, it depends
-                        Inside splice, OK
-                        Inside neither, OK
+        bind < use      Inside brackets, it depends on what cross stage
+                        persistence rules are used.
 
   For (bind < use) inside brackets, there are three cases:
-    - Imported things   OK      f = [| map |]
-    - Top-level things  OK      g = [| f |]
+    - Imported things (if ImplicitStagePersistence is enabled)   OK      f = [| map |]
+    - Top-level things (if ImplicitStagePersistence is enabled)  OK      g = [| f |]
     - Non-top-level     Only if there is a liftable instance
                                 h = \(x:Int) -> [| x |]
+
+  If ExplicitLevelImports is used, then imports can bring identifiers into scope
+  at non-zero levels.
 
   To track top-level-ness we use the ThBindEnv in TcLclEnv
 
@@ -889,7 +888,8 @@ tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr GhcTc) -> TcM (LHsExpr GhcTc)
 tcTopSpliceExpr isTypedSplice tc_action
   = checkNoErrs $  -- checkNoErrs: must not try to run the thing
                    -- if the type checker fails!
-    setStage (Splice isTypedSplice) $
+
+    setStage (Splice isTypedSplice Comp) $
     do {    -- Typecheck the expression
          (mb_expr', wanted) <- tryCaptureConstraints tc_action
              -- If tc_action fails (perhaps because of insoluble constraints)

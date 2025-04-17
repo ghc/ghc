@@ -2139,7 +2139,7 @@ getExternalBindLvl name = do
     Just gre -> return $ (Set.map convert_lvl (greLevels gre))
     Nothing ->
       if nameIsLocalOrFrom mod name
-        then return $ Set.singleton outerLevel
+        then return $ Set.singleton topLevel
 --        else pprTrace "NO LVLS" (ppr name) (return Set.empty) -- pprPanic "getExternalBindLvl" (ppr env $$ ppr name $$ ppr (nameSrcSpan name))
         else return Set.empty
   where

@@ -62,7 +62,7 @@ module GHC.Tc.Utils.Env(
         -- Template Haskell stuff
         StageCheckReason(..),
         tcMetaTy, thLevel,
-        topIdLvl, isBrackStage,
+        isBrackStage,
 
         -- New Ids
         newDFunName,
@@ -922,19 +922,6 @@ tcExtendRules lcl_rules thing_inside
 *                                                                      *
 ************************************************************************
 -}
-
-topIdLvl :: Id -> ThLevel
--- Globals may either be imported, or may be from an earlier "chunk"
--- (separated by declaration splices) of this module.  The former
---  *can* be used inside a top-level splice, but the latter cannot.
--- Hence we give the former impLevel, but the latter topLevel
--- E.g. this is bad:
---      x = [| foo |]
---      $( f x )
--- By the time we are processing the $(f x), the binding for "x"
--- will be in the global env, not the local one.
-topIdLvl id | isLocalId id = outerLevel
-            | otherwise    = impLevel
 
 tcMetaTy :: Name -> TcM Type
 -- Given the name of a Template Haskell data type,

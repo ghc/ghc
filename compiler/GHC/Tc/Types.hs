@@ -61,7 +61,7 @@ module GHC.Tc.Types(
         -- Template Haskell
         ThStage(..), SpliceType(..), SpliceOrBracket(..), PendingStuff(..),
         topStage, topAnnStage, topSpliceStage,
-        ThLevel, impLevel, outerLevel, thLevel,
+        ThLevel, topLevel,thLevel,
         ForeignSrcLang(..), THDocs, DocLoc(..),
         ThBindEnv,
 
