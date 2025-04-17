@@ -1091,7 +1091,7 @@ data WarningFlag =
    | Opt_WarnImplicitRhsQuantification               -- ^ @since 9.8
    | Opt_WarnIncompleteExportWarnings                -- ^ @since 9.8
    | Opt_WarnIncompleteRecordSelectors               -- ^ @since 9.10
-   | Opt_WarnBadlyStagedTypes                        -- ^ @since 9.10
+   | Opt_WarnBadlyLevelledTypes                      -- ^ @since 9.10
    | Opt_WarnInconsistentFlags                       -- ^ @since 9.8
    | Opt_WarnDataKindsTC                             -- ^ @since 9.10
    | Opt_WarnDefaultedExceptionContext               -- ^ @since 9.10
@@ -1213,7 +1213,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnImplicitRhsQuantification               -> "implicit-rhs-quantification" :| []
   Opt_WarnIncompleteExportWarnings                -> "incomplete-export-warnings" :| []
   Opt_WarnIncompleteRecordSelectors               -> "incomplete-record-selectors" :| []
-  Opt_WarnBadlyStagedTypes                        -> "badly-staged-types" :| []
+  Opt_WarnBadlyLevelledTypes                      -> "badly-levelled-types" :| []
   Opt_WarnInconsistentFlags                       -> "inconsistent-flags" :| []
   Opt_WarnDataKindsTC                             -> "data-kinds-tc" :| []
   Opt_WarnDefaultedExceptionContext               -> "defaulted-exception-context" :| []
@@ -1357,7 +1357,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnOperatorWhitespaceExtConflict,
         Opt_WarnUnicodeBidirectionalFormatCharacters,
         Opt_WarnGADTMonoLocalBinds,
-        Opt_WarnBadlyStagedTypes,
+        Opt_WarnBadlyLevelledTypes,
         Opt_WarnTypeEqualityRequiresOperators,
         Opt_WarnInconsistentFlags,
         Opt_WarnDataKindsTC,

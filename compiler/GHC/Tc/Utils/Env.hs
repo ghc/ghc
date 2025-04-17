@@ -1210,7 +1210,7 @@ notFound name
            Splice {}
              | isUnboundName name -> failM  -- If the name really isn't in scope
                                             -- don't report it again (#11941)
-             | otherwise -> failWithTc (TcRnStageRestriction (StageCheckSplice name Nothing))
+             | otherwise -> error "todo" --failWithTc (TcRnStageRestriction (StageCheckSplice name Nothing))
 
            _ | isTermVarOrFieldNameSpace (nameNameSpace name) ->
                -- This code path is only reachable with RequiredTypeArguments enabled

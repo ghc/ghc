@@ -3487,38 +3487,28 @@ data TcRnMessage where
     -> !LookupInstanceErrReason
     -> TcRnMessage
 
-  {-| TcRnBadlyStaged is an error that occurs when a TH binding is used in an
-    invalid stage.
+  {-| TcRnBadlyStaged is an error that occurs when a TH binding is used at an
+      invalid level.
 
     Test cases:
-      T17820d
+      T17820d, T17820, T21547, T5795, qq00[1-4], annfail0{3,4,6,9}
   -}
-  TcRnBadlyStaged
-    :: !StageCheckReason -- ^ The binding being spliced.
-    -> !(Set.Set Int) -- ^ The binding stage.
-    -> !Int -- ^ The stage at which the binding is used.
-    -> TcRnMessage
-
-  {-| TcRnStageRestriction is an error that occurs when a top level splice refers to
-    a local name.
-
-    Test cases:
-      T17820, T21547, T5795, qq00[1-4], annfail0{3,4,6,9}
-  -}
-  TcRnStageRestriction
-    :: !StageCheckReason -- ^ The binding being spliced.
+  TcRnBadlyLevelled
+    :: !StageCheckReason -- ^ The binding
+    -> !(Set.Set Int) -- ^ The binding levels
+    -> !Int -- ^ The level at which the binding is used.
     -> TcRnMessage
 
   {-| TcRnBadlyStagedWarn is a warning that occurs when a TH type binding is
     used in an invalid stage.
 
     Controlled by flags:
-       - Wbadly-staged-type
+       - Wbadly-levelled-type
 
     Test cases:
       T23829_timely T23829_tardy T23829_hasty
   -}
-  TcRnBadlyStagedType
+  TcRnBadlyLevelledType
     :: !Name  -- ^ The type binding being spliced.
     -> !(Set.Set Int) -- ^ The binding stage.
     -> !Int -- ^ The stage at which the binding is used.

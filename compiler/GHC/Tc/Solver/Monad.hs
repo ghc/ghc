@@ -1632,7 +1632,7 @@ checkCrossStageClass dflags reason bind_lvl use_lvl is_local
   -- With path CSP, using later than bound is fine
   | xopt LangExt.ImplicitStagePersistence dflags
   , any (use_lvl >=) bind_lvl  = return ()
-  | otherwise = TcM.failWithTc (TcRnBadlyStaged reason bind_lvl use_lvl)
+  | otherwise = TcM.failWithTc (TcRnBadlyLevelled reason bind_lvl use_lvl)
 
 
 

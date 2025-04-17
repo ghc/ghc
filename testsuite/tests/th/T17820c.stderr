@@ -1,4 +1,4 @@
 T17820c.hs:8:18: error: [GHC-28914]
-    Stage error: ‘meth’ is bound at stage {1} but used at stage 0
-    Hint: quoting [| meth |] or an enclosing expression would allow the quotation to be used in an earlier stage
+    Level error: ‘meth’ is bound at level {0} but used at level -1
+    Hint: quoting [| meth |] or an enclosing expression would allow the quotation to be used at an earlier level
 

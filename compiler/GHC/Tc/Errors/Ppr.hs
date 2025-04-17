@@ -1507,32 +1507,26 @@ instance Diagnostic TcRnMessage where
       hsep [ text "Unknown type variable" <> plural errorVars
            , text "on the RHS of injectivity condition:"
            , interpp'SP errorVars ]
-    TcRnBadlyStaged reason bind_lvl use_lvl
+    TcRnBadlyLevelled reason bind_lvl use_lvl
       -> mkSimpleDecorated $
          vcat $
-         [ text "Stage error:" <+> pprStageCheckReason reason <+>
-           hsep [text "is bound at stage" <+> ppr bind_lvl,
-                 text "but used at stage" <+> ppr use_lvl]
+         [ text "Level error:" <+> pprStageCheckReason reason <+>
+           hsep [text "is bound at level" <+> ppr bind_lvl,
+                 text "but used at level" <+> ppr use_lvl]
          ] ++
          [ hsep [ text "Hint: quoting" <+> thBrackets (ppUnless (isValName n) "t") (ppr n)
-                , text "or an enclosing expression would allow the quotation to be used in an earlier stage"
+                , text "or an enclosing expression would allow the quotation to be used at an earlier level"
                 ]
          | StageCheckSplice n _ <- [reason]
          ] ++
          [ "From imports" <+> (ppr (gre_imp gre))
          | StageCheckSplice _ (Just gre) <- [reason]
          , not (isEmptyBag (gre_imp gre)) ]
-    TcRnBadlyStagedType name bind_lvl use_lvl
+    TcRnBadlyLevelledType name bind_lvl use_lvl
       -> mkSimpleDecorated $
-         text "Badly staged type:" <+> ppr name <+>
-         hsep [text "is bound at stage" <+> ppr bind_lvl,
-               text "but used at stage" <+> ppr use_lvl]
-    TcRnStageRestriction reason
-      -> mkSimpleDecorated $
-         sep [ text "GHC stage restriction:"
-             , nest 2 (vcat [ pprStageCheckReason reason <+>
-                              text "is used in a top-level splice, quasi-quote, or annotation,"
-                            , text "and must be imported, not defined locally"])]
+         text "Badly levelled type:" <+> ppr name <+>
+         hsep [text "is bound at level" <+> ppr bind_lvl,
+               text "but used at level" <+> ppr use_lvl]
     TcRnTyThingUsedWrong sort thing name
       -> mkSimpleDecorated $
          pprTyThingUsedWrong sort thing name
@@ -2484,12 +2478,10 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnknownTyVarsOnRhsOfInjCond{}
       -> ErrorWithoutFlag
-    TcRnBadlyStaged{}
+    TcRnBadlyLevelled{}
       -> ErrorWithoutFlag
-    TcRnBadlyStagedType{}
-      -> WarningWithFlag Opt_WarnBadlyStagedTypes
-    TcRnStageRestriction{}
-      -> ErrorWithoutFlag
+    TcRnBadlyLevelledType{}
+      -> WarningWithFlag Opt_WarnBadlyLevelledTypes
     TcRnTyThingUsedWrong{}
       -> ErrorWithoutFlag
     TcRnCannotDefaultKindVar{}
@@ -3169,11 +3161,9 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnknownTyVarsOnRhsOfInjCond{}
       -> noHints
-    TcRnBadlyStaged{}
+    TcRnBadlyLevelled{}
       -> noHints
-    TcRnBadlyStagedType{}
-      -> noHints
-    TcRnStageRestriction{}
+    TcRnBadlyLevelledType{}
       -> noHints
     TcRnTyThingUsedWrong{}
       -> noHints

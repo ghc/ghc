@@ -78,7 +78,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wgadt-mono-local-binds`
         * :ghc-flag:`-Wtype-equality-requires-operators`
         * :ghc-flag:`-Wtype-equality-out-of-scope`
-        * :ghc-flag:`-Wbadly-staged-types`
+        * :ghc-flag:`-Wbadly-levelled-types`
         * :ghc-flag:`-Winconsistent-flags`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
         * :ghc-flag:`-Wnoncanonical-monad-instances`
@@ -2553,12 +2553,12 @@ of ``-W(no-)*``.
      When :ghc-flag:`-Wincomplete-export-warnings` is enabled, GHC warns about exports
      that are not deprecating a name that is deprecated with another export in that module.
 
-.. ghc-flag:: -Wbadly-staged-types
+.. ghc-flag:: -Wbadly-levelled-types
     :shortdesc: warn when type binding is used at the wrong TH stage.
     :type: dynamic
-    :reverse: -Wno-badly-staged-types
+    :reverse: -Wno-badly-levelled-types
 
-    :since: 9.10.1
+    :since: 9.14.1
 
     Consider an example: ::
 

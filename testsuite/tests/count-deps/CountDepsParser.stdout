@@ -273,7 +273,6 @@ Language.Haskell.Syntax.Decls
 Language.Haskell.Syntax.Expr
 Language.Haskell.Syntax.Extension
 Language.Haskell.Syntax.ImpExp
-Language.Haskell.Syntax.ImpExp.ImportLevel
 Language.Haskell.Syntax.ImpExp.IsBoot
 Language.Haskell.Syntax.Lit
 Language.Haskell.Syntax.Module.Name

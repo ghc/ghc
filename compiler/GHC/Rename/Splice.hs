@@ -1001,7 +1001,7 @@ checkCrossStageLifting dflags reason top_lvl is_local allow_lifting bind_lvl use
   | Brack _ RnPendingTyped <- use_stage  -- Lift for typed brackets is inserted later.
     = return ()
   -- Otherwise, we have a level error, report.
-  | otherwise = addErrTc (TcRnBadlyStaged reason bind_lvl use_lvl)
+  | otherwise = addErrTc (TcRnBadlyLevelled reason bind_lvl use_lvl)
 
 check_cross_stage_lifting :: DynFlags -> TopLevelFlag -> Name -> TcRef [PendingRnSplice] -> TcM ()
 check_cross_stage_lifting dflags top_lvl name ps_var
@@ -1053,7 +1053,7 @@ checkCrossStageLiftingTy dflags top_lvl bind_lvl _use_stage use_lvl name
   -- Can also happen for negative cases
   -- See comment in checkThLocalTyName:
   | use_lvl `notElem` bind_lvl
-  = addDiagnostic $ TcRnBadlyStagedType name bind_lvl use_lvl
+  = addDiagnostic $ TcRnBadlyLevelledType name bind_lvl use_lvl
 
   | otherwise
   = return ()
