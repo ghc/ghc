@@ -92,6 +92,7 @@ module GHC.Types.Name.Occurrence (
         plusOccEnv, plusOccEnv_C,
         extendOccEnv_Acc, filterOccEnv, delListFromOccEnv, delFromOccEnv,
         alterOccEnv, minusOccEnv, minusOccEnv_C, minusOccEnv_C_Ns,
+        sizeOccEnv,
         pprOccEnv, forceOccEnv,
         intersectOccEnv_C,
 
@@ -802,6 +803,10 @@ minusOccEnv_C_Ns f (MkOccEnv as) (MkOccEnv bs) =
         in if isNullUFM m
            then Nothing
            else Just m
+
+sizeOccEnv :: OccEnv a -> Int
+sizeOccEnv (MkOccEnv as) =
+  nonDetStrictFoldUFM (\ m !acc -> acc + sizeUFM m) 0 as
 
 instance Outputable a => Outputable (OccEnv a) where
     ppr x = pprOccEnv ppr x
