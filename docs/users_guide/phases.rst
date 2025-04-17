@@ -679,6 +679,11 @@ Options affecting code generation
     object files are generated, but if ghc-flag:`-fprefer-byte-code` is enabled,
     byte-code will be generated instead.
 
+    Code generation is only turned on for modules needed for evaluation during compilation.
+    A programmer can be more precise about which exact modules those are by using
+    the :extension:`ExplicitLevelImports` extension.
+
+
 .. ghc-flag:: -fwrite-interface
     :shortdesc: Always write interface files
     :type: dynamic
