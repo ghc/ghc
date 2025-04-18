@@ -11,11 +11,9 @@ for specific guidance on migrating programs to this release.
 Compiler
 ~~~~~~~~
 
-- Optimized lowering of BigNat# literals. ((:ghc-ticket:`23942`), !12179)
+- Optimized lowering of ``BigNat#`` literals. (:ghc-ticket:`23942`)
 
-- Fixed a bug where the jump shortcutting optimization could lead to unsoundness in pattern matching. ((:ghc-ticket:`24507`))
-
-- Look for haskell symbols only in relevant libraries. ((:ghc-ticket:`23415`))
+- Look for Haskell symbols only in relevant libraries. (:ghc-ticket:`23415`)
 
   When dynamically loading a Haskell symbol (typical when running a splice or
   GHCi expression), before this change we would search for the symbol in
@@ -24,100 +22,104 @@ Compiler
   many package dependencies) because the time to lookup the would be
   linear in the number of packages loaded.
 
-  In one measurement, this improved performance for executing a GHCi expression
+  In one measurement this improved performance for executing a GHCi expression
   from ~38 seconds down to ~2s.
 
-- Fixed a bug that could cause a linker error when `TypeData` and `StrictData`
-  where used in combination. ((:ghc-ticket:`24620`))
+- Fixed a bug that could cause a linker error when ``TypeData`` and ``StrictData``
+  where used in combination. (:ghc-ticket:`24620`)
 
-- The flag :ghc-flag:`-fprof-late` when combined with `-prof` will no longer prevent top level
-  constructors from being statically allocated.
+- Fixed an issue where :ghc-flag:`-Wmissing-home-modules` caused quadratic compile time increases. (:ghc-ticket:`24778`)
 
-  It used to be the case that we would add a cost centre for bindings like `foo = Just bar`.
-  This turned the binding into a caf that would allocate the constructor on first evaluation.
+- Better type inference in certain situations. (:ghc-ticket:`24810`)
 
-  However without the cost centre `foo` can be allocated at compile time. This reduces code-bloat and
-  reduces overhead for short-running applications.
+- Fixed a bug where the magic ``GHC.Magic.inline`` function sometimes failed to inline functions
+  if there were coercions involved. (:ghc-ticket:`24808`)
 
-  The tradeoff is that calling `whoCreated` on top level value definitions like `foo` will be less informative.
+- Fixed a bug where the simplifier sometimes destroyed join points during float out. (:ghc-ticket:`24768`)
 
-- IPE profiling - optimize the representation of some internal representations. Leading to smaller executables. ((:ghc-ticket:`24504`))
+- Fixed inability to re-export the ``Data.Tuple.MkSolo`` constructor (:ghc-ticket:`25182`)
 
-- Fixed an issue where `-Wmissing-home-modules` caused quadratic compile time increases. ((:ghc-ticket:`24778`))
+- Fixed ``Language.Haskell.TH.mkName "FUN"`` (:ghc-ticket:`25174`)
 
-- Fixed a crash when using `-prof` with `-forig-thunk-info`. ((:ghc-ticket:`24809`))
+- Fixed a bug that could case segfaults in GHCi when :ghc-flag:`-fworker-wrapper-cbv` was enabled. (:ghc-ticket:`24870`)
 
-- Better type inference in certain situations. ((:ghc-ticket:`24810`))
+- Fixed a bug where the use of ``throw`` caused a loss of strictness (:ghc-ticket:`25066`).
 
-- Fixed a bug where the magic `inline` function sometimes failed to inline functions
-  if there were coercions involved. ((:ghc-ticket:`24808`))
+- Fixed incorrect behaviour that could occur when using ``control0#/prompt#`` (:ghc-ticket:`25439`) by making `prompt#` lazy.
 
-- Fixed a bug where the simplifier sometimes destroyed join points during float out. ((:ghc-ticket:`24768`))
+- Fixed a bug where GHC panicked during type checking. (:ghc-ticket:`25325`)
 
-- PPC NCG: Fix sign hints in C calls. This bug caused segfaults when using FFI under some
-  circumstances. ((:ghc-ticket:`23034`))
-
-- Fixed a bug that caused GHC to panic when using the aarch64 ncg and -fregs-graph
-  on certain programs. ((:ghc-ticket:`24941`))
-
-- The flag :ghc-flag:`-fkeep-auto-rules` that forces GHC to keep auto generated
-  specialization rules was added. It was actually added ghc-9.10.1 already but
-  mistakenly not mentioned in the 9.10.1 changelog.
-
-- Fixed re-exports of ``MkSolo`` (:ghc-ticket:`25182`)
-
-- Fixed the behavior of ``Language.Haskell.TH.mkName "FUN"`` (:ghc-ticket:`25174`)
-
-- Various code generation improvements to the ARM backend.
-
-- Fixed a bug that could case segfaults in GHCi when `-fworker-wrapper-cbv` was enabled. ((:ghc-ticket:`24870`))
-
-- Fixed a correctness issues for Int64/Word64 on 32bit backends ((:ghc-ticket:`24893`))
-
-- Various rts linker improvements:
-  - R_X86_64_PC64 relocation support on windows
-  - Use m32 allocator for sections when NEED_PLT - works around ((:ghc-ticket:`24432`))
-  - AArch64 - Skip NONE relocations
-
-- AArch64 ncg: Multiway branches are now lowered to jump tables for better performance. ((:ghc-ticket:`19912`))
-
-- Fixes related to better use of sse4 when using the llvm backend:
-  - Use +sse4.2 rather than +sse42, fixing ((:ghc-ticket:`25019`)),
-  - make SSE4.2 imply +popcnt, fixing ((:ghc-ticket:`25353`)).
-
-- Fixed a bug where the use of ``throw`` caused a loss of strictness ((:ghc-ticket:`25066`)).
-
-- Fixed incorrect behaviour that could occur when using ``control0#/prompt#`` ((:ghc-ticket:`25439`)) by making `prompt#` lazy.
-
-- Fixed a bug where ghc paniced during type checking. ((:ghc-ticket:`25325`))
-
-- Fix linearity for strict unit patterns in a local let bindings. ((:ghc-ticket:`25428`))
+- Fix linearity for strict unit patterns in a local ``let`` bindings. (:ghc-ticket:`25428`)
 
 - Improve the performance of type family consistency checks. ((:ghc-ticket:`25554`))
 
-- Fixed a bug where type checking failed to terminate. ((:ghc-ticket:`25597`))
+- Fixed a bug where type checking failed to terminate. (:ghc-ticket:`25597`)
 
-- Fixed a bug where ``__GLASGOW_HASKELL_LLVM__`` was not defined even if `-fllvm` was set. ((:ghc-ticket:`25606`))
+- Added flags to control speculative evaluation: :ghc-flag:`-fspec-eval` and :ghc-flag:`-fspec-eval-dictfun`. This allows
+  users to work around cases where recent changes to speculative evaluation caused performance regressions. (:ghc-ticket:`25606`)
 
-- Added flags to control speculative evaluation: ``-fspec-eval`` and ``-fspec-eval-dictfun``. This allows
-  users to work around cases where recent changes to speculative evaluation caused performance regressions. ((:ghc-ticket:`25606`))
+Profiling
+~~~~~~~~~
+
+- The flag :ghc-flag:`-fprof-late` when combined with :ghc-flag:`-prof` will no longer prevent top level
+  constructors from being statically allocated.
+
+  It used to be the case that we would add a cost centre for bindings like ``foo = Just bar``.
+  This turned the binding into a constant applicative form that would allocate
+  the constructor on first evaluation.
+
+  However without the cost-centre ``foo`` can be allocated at compile time. This reduces code-bloat and
+  reduces overhead for short-running applications.
+
+  The tradeoff is that calling ``GHC.Stack.whoCreated`` on top level value definitions like ``foo`` will be less informative.
+
+- Fixed a crash when using :ghc-flag:`-prof` with :ghc-flag:`-forig-thunk-info`. (:ghc-ticket:`24809`)
+
+- Optimize the representation of :ghc-flag:`info table provenance maps <-finfo-table-map>`, significantly reducing code size when this feature is in use. (:ghc-ticket:`24504`)
+
+Native code generator backend
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Fixed a bug where the jump shortcutting optimization could lead to unsoundness in pattern matching. (:ghc-ticket:`24507`)
+
+- PowerPC: Fix sign hints in C calls. This bug caused segfaults when using FFI under some
+  circumstances. (:ghc-ticket:`23034`)
+
+- AArch64: Various code generation performance improvements
+
+- AArch64: Fixed a bug that caused GHC to panic when using :ghc-flag:`-fregs-graph`
+  on certain programs. (:ghc-ticket:`24941`)
+
+- AArch64: Multiway branches are now lowered to jump tables for better performance. (:ghc-ticket:`19912`)
+
+- Fixed a correctness issues for ``Int64``/``Word64`` on 32-bit backends (:ghc-ticket:`24893`)
+
+LLVM backend
+~~~~~~~~~~~~
+
+- Fixes related to better use of SSE4:
+  - Use ``+sse4.2`` rather than ``+sse42``, fixing (:ghc-ticket:`25019`),
+  - make SSE4.2 imply ``+popcnt``, fixing (:ghc-ticket:`25353`).
+
+- Fixed a bug where ``__GLASGOW_HASKELL_LLVM__`` was not defined even if :ghc-flag:`-fllvm` was set. (:ghc-ticket:`25606`)
+
 
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 
-- Changes for better support of the Google Closure Compiler ((:ghc-ticket:`24602`), !12330)
+- Changes for better support of the Google Closure Compiler (:ghc-ticket:`24602`)
 
-- JS Backend: support rubbish static literals
+- Add support for rubbish static literals
 
-- Fix h$withCStringOnHeap helper ((:ghc-ticket:`25288`))
+- Fix ``h$withCStringOnHeap`` helper (:ghc-ticket:`25288`)
 
 WebAssembly backend
 ~~~~~~~~~~~~~~~~~~~
 
-- wasm: use scheduler.postTask() for context switch when available
+- Use ``scheduler.postTask()`` for context switch when available
 
-- The in tree gmp library now is configured to produce faster and smaller code given
-  the current constraints of the wasm backend. (!12592)
+- The in-tree gmp library now is configured to produce faster and smaller code given
+  the current constraints of the wasm backend.
 
 GHCi
 ~~~~
@@ -144,19 +146,28 @@ Runtime system
   Users who have fine-tuned the :rts-flag:`-F ⟨factor⟩`, :rts-flag:`-Fd ⟨factor⟩`, or :rts-flag:`-O ⟨size⟩` flags,
   and use the non-moving GC, should see if adjustments are needed in light of this change.
 
-- Reduce fragmentation incurred by the nonmoving GC's segment allocator. In one application this reduced resident set size by 26%. See :ghc-ticket:`24150`.
+- Reduce fragmentation incurred by the non-moving GC's segment allocator. In one application this reduced resident
+  set size by 26%. See :ghc-ticket:`24150`.
 
-- Emit warning when -M < -H.
+- Emit warning when :ghc-flag:`-M` is less than :ghc-flag:`-H`.
 
 - Fix a bug ((:ghc-ticket:`24672`)) causing programms on FreeBSD to occasionally terminate with the error:
   ``internal error: Ticker: read(timerfd) failed with Operation not supported and returned -1``
 
-- Fixed a bug ((:ghc-ticket:`25503`)) that sometimes caused the rts to terminate with ``internal error: alloc_adjustor_chunk: failed to allocate`` on windows.
+- Fixed a bug ((:ghc-ticket:`25503`)) that sometimes caused the runtime to terminate with
+  ``internal error: alloc_adjustor_chunk: failed to allocate`` on windows.
   This primarily affect programs making use of the ``foreign import "wrapper"`` functionality.
 
-- Fixed a bug in compacting gc that could result in program termination with ``update_fwd_large: unknown/strange object  38`` ((:ghc-ticket:`24791`)).
+- Fixed a bug in compacting gc that could result in program termination with
+  ``update_fwd_large: unknown/strange object  38`` (:ghc-ticket:`24791`).
 
 - Fixed a bug where calling ``setNumCapabilities`` with a argument larger than 256 caused crashes. (:ghc-ticket:`25560`)
+
+- Various runtime system linker improvements:
+  - ``R_X86_64_PC64`` relocation support on windows
+  - Use m32 allocator for sections when ``NEED_PLT`` - works around ((:ghc-ticket:`24432`))
+  - AArch64 - Skip ``NONE`` relocations
+
 
 Build system and packaging
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -167,9 +178,9 @@ Build system and packaging
   (From https://git.savannah.gnu.org/cgit/config.git/)
 
 - GHC now distinguishes more between the Cmm and C preprocessor. The new flags
-  `-pgmCmmP` and `-optCmmP` can be used to control
+  :ghc-flag:`-pgmCmmP` and :ghc-flag:`-optCmmP` can be used to control
   the Cmm preprocessor. C preprocessor flags will still be passed to the Cmm
-  preprocessor, expect for -g flags which have special handling. Fixes (:ghc-ticket:`24474`)
+  preprocessor, expect for :ghc-flag:`-g` flags which have special handling. Fixes (:ghc-ticket:`24474`)
 
 - Bindists: Fixed a bug in the Makefile which caused windows installs to duplicate files. ((:ghc-ticket:`24800`))
 
@@ -177,12 +188,12 @@ Build system and packaging
 
 - Fixed a bug where running ``Xelatex`` concurrently failed. (:ghc-ticket:`25564`)
 
-- Fixed a bug where building ghc from source using ghc-9.8.4 failed with an error mentioning ``ghc_unique_counter64``. (:ghc-ticket:`25576`)
+- Fixed a bug where building ghc from source using GHC 9.8.4 failed with an error mentioning ``ghc_unique_counter64`` (:ghc-ticket:`25576`)
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
-- Added some utility functions to `GHC.Data.SmallArray`
+- Added some utility functions to ``GHC.Data.SmallArray``
 
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
@@ -192,8 +203,9 @@ Build system and packaging
 ``ghc-experimental`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* Primops and other ghc extensions are now exported via ``GHC.PrimOps``
-* The library is now versioned according to the ghc version it shipped with.
+- Primops and other GHC extensions are now exported via ``GHC.PrimOps``
+
+- The library is now versioned according to the ghc version it shipped with.
 
 
 Included libraries
@@ -202,3 +214,40 @@ Included libraries
 The package database provided with this distribution also contains a number of
 packages other than GHC itself. See the changelogs provided with these packages
 for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:  Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal: Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal: Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable

@@ -244,6 +244,9 @@ Compiler
   arguments. This may be preferred over :ghc-flag:`-fprof-late-overloaded` since
   it may reveal whether imported functions are called overloaded.
 
+- The :ghc-flag:`-fkeep-auto-rules` flag was introduced, forcing GHC to keep auto generated
+  specialization rules.
+
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 
