@@ -1081,9 +1081,9 @@ disambigProposalSequences orig_wanteds wanteds proposalSequences allConsistent
        ; successes <- fmap catMaybes $
                       nestImplicTcS fake_ev_binds_var (pushTcLevel tclvl) $
                       mapM firstSuccess proposalSequences
-       ; traceTcS "disambigProposalSequences" (vcat [ ppr wanteds
-                                                    , ppr proposalSequences
-                                                    , ppr successes ])
+       ; traceTcS "disambigProposalSequences {" (vcat [ ppr wanteds
+                                                      , ppr proposalSequences
+                                                      , ppr successes ])
        -- Step (4) in Note [How type-class constraints are defaulted]
        ; case successes of
            success@(tvs, subst) : rest

@@ -49,7 +49,6 @@ module GHC.Tc.Utils.TcMType (
 
   newCoercionHole, newCoercionHoleO, newVanillaCoercionHole,
   fillCoercionHole, isFilledCoercionHole,
-  unpackCoercionHole, unpackCoercionHole_maybe,
   checkCoercionHole,
 
   newImplication,
@@ -115,7 +114,6 @@ import GHC.Tc.Types.CtLoc( CtLoc, ctLocOrigin )
 import GHC.Tc.Utils.Monad        -- TcType, amongst others
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
-import GHC.Tc.Zonk.Type
 import GHC.Tc.Zonk.TcType
 
 import GHC.Builtin.Names
@@ -1583,7 +1581,7 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
     go_co dv (SubCo co)              = go_co dv co
 
     go_co dv (HoleCo hole)
-      = do m_co <- unpackCoercionHole_maybe hole
+      = do m_co <- liftZonkM (unpackCoercionHole_maybe hole)
            case m_co of
              Just co -> go_co dv co
              Nothing -> go_cv dv (coHoleCoVar hole)

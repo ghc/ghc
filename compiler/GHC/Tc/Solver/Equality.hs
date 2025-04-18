@@ -2077,10 +2077,14 @@ Wrinkles:
      that `kw`.
 
      (EIK2a) We must later indeed unify if/when the kind-level wanted, `kw` gets
-     solved. This is done in kickOutAfterFillingCoercionHole, which kicks out
+     solved. This is done in `kickOutAfterFillingCoercionHole`, which kicks out
      all equalities whose RHS mentions the filled-in coercion hole.  Note that
      it looks for type family equalities, too, because of the use of unifyTest
      in canEqTyVarFunEq.
+
+     To do this, we slightly-hackily use the `ctev_rewriters` field of the inert,
+     which records that `w` has been rewritten by `kw`.
+     See (WRW3) in Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
 
      (EIK2b) What if the RHS mentions /other/ coercion holes?  How can that happen?  The
      main way is like this. Assume F :: forall k. k -> Type
@@ -2576,17 +2580,17 @@ Suppose we have
 Then we can simply solve g2 from g1, thus g2 := g1.  Easy!
 But it's not so simple:
 
-* If t is a type variable, the equalties might be oriented differently:
+(CE1) If t is a type variable, the equalties might be oriented differently:
       e.g. (g1 :: a~b) and (g2 :: b~a)
   So we look both ways round.  Hence the SwapFlag result to
   inertsCanDischarge.
 
-* We can only do g2 := g1 if g1 can discharge g2; that depends on
+(CE2) We can only do g2 := g1 if g1 can discharge g2; that depends on
   (a) the role and (b) the flavour.  E.g. a representational equality
   cannot discharge a nominal one; a Wanted cannot discharge a Given.
   The predicate is eqCanRewriteFR.
 
-* Visibility. Suppose  S :: forall k. k -> Type, and consider unifying
+(CE3) Visibility. Suppose  S :: forall k. k -> Type, and consider unifying
       S @Type (a::Type)  ~   S @(Type->Type) (b::Type->Type)
   From the first argument we get (Type ~ Type->Type); from the second
   argument we get (a ~ b) which in turn gives (Type ~ Type->Type).
@@ -2601,6 +2605,24 @@ But it's not so simple:
   So when combining two otherwise-identical equalites, we want to
   keep the visible one, and discharge the invisible one.  Hence the
   call to strictly_more_visible.
+
+(CE4) Suppose we have this set up (#25440):
+   Inert:     [W] g1: F a ~ a Int    (arising from (F a ~ a Int)
+   Work item: [W] g2: F alpha ~ F a  (arising from (F alpha ~ F a)
+   We rewrite g2 with g1, to give
+              [W] g2{rw:g1} : F alpha ~ a Int
+   Now if F is injective we can get [W] alpha~a, and hence alpha:=a, and
+   we kick out g1. Now we have two constraints
+       [W] g1        : F a ~ a Int  (arising from (F a ~ a Int)
+       [W] g2{rw:g1} : F a ~ a Int  (arising from (F alpha ~ F a)
+   If we end up with g2 in the inert set (not g1) we'll get a very confusing
+   error message that we can solve (F a ~ a Int)
+       arising from F a ~ F a
+
+   TL;DR: Better to hang on to `g1` (with no rewriters), in preference
+   to `g2` (which has a rewriter).
+
+   See (WRW1) in Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
 -}
 
 tryInertEqs :: EqCt -> SolverStage ()
@@ -2646,20 +2668,26 @@ inertsCanDischarge inerts (EqCt { eq_lhs = lhs_w, eq_rhs = rhs_w
     loc_w  = ctEvLoc ev_w
     flav_w = ctEvFlavour ev_w
     fr_w   = (flav_w, eq_rel)
+    empty_rw_w = isEmptyRewriterSet (ctEvRewriters ev_w)
 
     inert_beats_wanted ev_i eq_rel
       = -- eqCanRewriteFR:        see second bullet of Note [Combining equalities]
-        -- strictly_more_visible: see last bullet of Note [Combining equalities]
         fr_i `eqCanRewriteFR` fr_w
-        && not ((loc_w `strictly_more_visible` ctEvLoc ev_i)
-                 && (fr_w `eqCanRewriteFR` fr_i))
+        && not (prefer_wanted ev_i && (fr_w `eqCanRewriteFR` fr_i))
       where
         fr_i = (ctEvFlavour ev_i, eq_rel)
 
-    -- See Note [Combining equalities], final bullet
+    -- See (CE3) in Note [Combining equalities]
     strictly_more_visible loc1 loc2
        = not (isVisibleOrigin (ctLocOrigin loc2)) &&
          isVisibleOrigin (ctLocOrigin loc1)
+
+    prefer_wanted ev_i
+      =  (loc_w `strictly_more_visible` ctEvLoc ev_i)
+             -- strictly_more_visible: see (CE3) in Note [Combining equalities]
+      || (empty_rw_w && not (isEmptyRewriterSet (ctEvRewriters ev_i)))
+             -- Prefer the one that has no rewriters
+             -- See (CE4) in Note [Combining equalities]
 
 inertsCanDischarge _ _ = Nothing
 

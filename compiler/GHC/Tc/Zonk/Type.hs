@@ -28,12 +28,6 @@ module GHC.Tc.Zonk.Type (
         -- ** 'ZonkEnv', and the 'ZonkT' and 'ZonkBndrT' monad transformers
         module GHC.Tc.Zonk.Env,
 
-        -- * Coercion holes
-        isFilledCoercionHole, unpackCoercionHole, unpackCoercionHole_maybe,
-
-        -- * Rewriter sets
-        zonkRewriterSet, zonkCtRewriterSet, zonkCtEvRewriterSet,
-
         -- * Tidying
         tcInitTidyEnv, tcInitOpenTidyEnv,
 
@@ -55,7 +49,6 @@ import GHC.Tc.TyCl.Build ( TcMethInfo, MethInfo )
 import GHC.Tc.Utils.Env ( tcLookupGlobalOnly )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad ( newZonkAnyType, setSrcSpanA, liftZonkM, traceTc, addErr )
-import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Errors.Types
 import GHC.Tc.Zonk.Env
@@ -88,7 +81,6 @@ import GHC.Types.Id
 import GHC.Types.TypeEnv
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
-import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.TyThing
 
@@ -99,7 +91,6 @@ import GHC.Data.Bag
 
 import Control.Monad
 import Control.Monad.Trans.Class ( lift )
-import Data.Semigroup
 import Data.List.NonEmpty ( NonEmpty )
 import Data.Foldable ( toList )
 
@@ -1956,89 +1947,3 @@ finding the free type vars of an expression is necessarily monadic
 operation. (consider /\a -> f @ b, where b is side-effected to a)
 -}
 
-{-
-************************************************************************
-*                                                                      *
-             Checking for coercion holes
-*                                                                      *
-************************************************************************
--}
-
--- | Is a coercion hole filled in?
-isFilledCoercionHole :: CoercionHole -> TcM Bool
-isFilledCoercionHole (CoercionHole { ch_ref = ref })
-  = isJust <$> readTcRef ref
-
--- | Retrieve the contents of a coercion hole. Panics if the hole
--- is unfilled
-unpackCoercionHole :: CoercionHole -> TcM Coercion
-unpackCoercionHole hole
-  = do { contents <- unpackCoercionHole_maybe hole
-       ; case contents of
-           Just co -> return co
-           Nothing -> pprPanic "Unfilled coercion hole" (ppr hole) }
-
--- | Retrieve the contents of a coercion hole, if it is filled
-unpackCoercionHole_maybe :: CoercionHole -> TcM (Maybe Coercion)
-unpackCoercionHole_maybe (CoercionHole { ch_ref = ref }) = readTcRef ref
-
-zonkCtRewriterSet :: Ct -> TcM Ct
-zonkCtRewriterSet ct
-  | isGivenCt ct
-  = return ct
-  | otherwise
-  = case ct of
-      CEqCan eq@(EqCt { eq_ev = ev })       -> do { ev' <- zonkCtEvRewriterSet ev
-                                                  ; return (CEqCan (eq { eq_ev = ev' })) }
-      CIrredCan ir@(IrredCt { ir_ev = ev }) -> do { ev' <- zonkCtEvRewriterSet ev
-                                                  ; return (CIrredCan (ir { ir_ev = ev' })) }
-      CDictCan di@(DictCt { di_ev = ev })   -> do { ev' <- zonkCtEvRewriterSet ev
-                                                  ; return (CDictCan (di { di_ev = ev' })) }
-      CQuantCan {}     -> return ct
-      CNonCanonical ev -> do { ev' <- zonkCtEvRewriterSet ev
-                             ; return (CNonCanonical ev') }
-
-zonkCtEvRewriterSet :: CtEvidence -> TcM CtEvidence
-zonkCtEvRewriterSet ev@(CtGiven {})
-  = return ev
-zonkCtEvRewriterSet ev@(CtWanted wtd)
-  = do { rewriters' <- zonkRewriterSet (ctEvRewriters ev)
-       ; return (CtWanted $ setWantedCtEvRewriters wtd rewriters') }
-
--- | Check whether any coercion hole in a RewriterSet is still unsolved.
--- Does this by recursively looking through filled coercion holes until
--- one is found that is not yet filled in, at which point this aborts.
-zonkRewriterSet :: RewriterSet -> TcM RewriterSet
-zonkRewriterSet (RewriterSet set)
-  = nonDetStrictFoldUniqSet go (return emptyRewriterSet) set
-     -- this does not introduce non-determinism, because the only
-     -- monadic action is to read, and the combining function is
-     -- commutative
-  where
-    go :: CoercionHole -> TcM RewriterSet -> TcM RewriterSet
-    go hole m_acc = unionRewriterSet <$> check_hole hole <*> m_acc
-
-    check_hole :: CoercionHole -> TcM RewriterSet
-    check_hole hole = do { m_co <- unpackCoercionHole_maybe hole
-                         ; case m_co of
-                             Nothing -> return (unitRewriterSet hole)
-                             Just co -> unUCHM (check_co co) }
-
-    check_ty :: Type -> UnfilledCoercionHoleMonoid
-    check_co :: Coercion -> UnfilledCoercionHoleMonoid
-    (check_ty, _, check_co, _) = foldTyCo folder ()
-
-    folder :: TyCoFolder () UnfilledCoercionHoleMonoid
-    folder = TyCoFolder { tcf_view  = noView
-                        , tcf_tyvar = \ _ tv -> check_ty (tyVarKind tv)
-                        , tcf_covar = \ _ cv -> check_ty (varType cv)
-                        , tcf_hole  = \ _ -> UCHM . check_hole
-                        , tcf_tycobinder = \ _ _ _ -> () }
-
-newtype UnfilledCoercionHoleMonoid = UCHM { unUCHM :: TcM RewriterSet }
-
-instance Semigroup UnfilledCoercionHoleMonoid where
-  UCHM l <> UCHM r = UCHM (unionRewriterSet <$> l <*> r)
-
-instance Monoid UnfilledCoercionHoleMonoid where
-  mempty = UCHM (return emptyRewriterSet)

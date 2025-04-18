@@ -150,7 +150,6 @@ import qualified GHC.Tc.Utils.Env      as TcM
        , topIdLvl )
 import GHC.Tc.Zonk.Monad ( ZonkM )
 import qualified GHC.Tc.Zonk.TcType  as TcM
-import qualified GHC.Tc.Zonk.Type as TcM
 
 import GHC.Driver.DynFlags
 
@@ -489,7 +488,7 @@ kickOutAfterFillingCoercionHole hole
     kick_out ics@(IC { inert_irreds = irreds })
       = -- We only care about irreds here, because any constraint blocked
         -- by a coercion hole is an irred.  See wrinkle (EIK2a) in
-        -- Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
+        -- Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Equality
         (irreds_to_kick, ics { inert_irreds = irreds_to_keep })
       where
         (irreds_to_kick, irreds_to_keep) = partitionBag kick_ct irreds
@@ -839,17 +838,15 @@ removeInertCt is ct
 
 -- | Looks up a family application in the inerts.
 lookupFamAppInert :: (CtFlavourRole -> Bool)  -- can it rewrite the target?
-                  -> TyCon -> [Type] -> TcS (Maybe (Reduction, CtFlavourRole))
+                  -> TyCon -> [Type] -> TcS (Maybe EqCt)
 lookupFamAppInert rewrite_pred fam_tc tys
   = do { IS { inert_cans = IC { inert_funeqs = inert_funeqs } } <- getInertSet
        ; return (lookup_inerts inert_funeqs) }
   where
     lookup_inerts inert_funeqs
-      | Just ecl <- findFunEq inert_funeqs fam_tc tys
-      , Just (EqCt { eq_ev = ctev, eq_rhs = rhs })
-          <- find (rewrite_pred . eqCtFlavourRole) ecl
-      = Just (mkReduction (ctEvCoercion ctev) rhs, ctEvFlavourRole ctev)
-      | otherwise = Nothing
+      = case findFunEq inert_funeqs fam_tc tys of
+          Nothing              -> Nothing
+          Just (ecl :: [EqCt]) -> find (rewrite_pred . eqCtFlavourRole) ecl
 
 lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet?
@@ -1459,8 +1456,8 @@ emitWork cts
          -- c1 is rewritten by another, c2.  When c2 gets solved,
          -- c1 has no rewriters, and can be prioritised; see
          -- Note [Prioritise Wanteds with empty RewriterSet]
-         -- in GHC.Tc.Types.Constraint wrinkle (WRW1)
-       ; cts <- wrapTcS $ mapBagM TcM.zonkCtRewriterSet cts
+         -- in GHC.Tc.Types.Constraint wrinkle (PER1)
+       ; cts <- liftZonkTcS $ mapBagM TcM.zonkCtRewriterSet cts
        ; updWorkListTcS (extendWorkListCts cts) }
 
 emitImplication :: Implication -> TcS ()
@@ -2254,7 +2251,7 @@ wrapUnifierX ev role do_unifications
        ; wrapTcS $
          do { defer_ref   <- TcM.newTcRef emptyBag
             ; unified_ref <- TcM.newTcRef []
-            ; rewriters   <- TcM.zonkRewriterSet (ctEvRewriters ev)
+            ; rewriters   <- TcM.liftZonkM (TcM.zonkRewriterSet (ctEvRewriters ev))
             ; let env = UE { u_role      = role
                            , u_rewriters = rewriters
                            , u_loc       = ctEvLoc ev

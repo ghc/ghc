@@ -1,6 +1,16 @@
-
-T4174.hs:45:12: error: [GHC-18872]
-    • Couldn't match type ‘False’ with ‘True’
-        arising from a use of ‘sync_large_objects’
+T4174.hs:45:12: error: [GHC-25897]
+    • Couldn't match type ‘a’ with ‘SmStep’
+      Expected: m (Field (Way (GHC6'8 minor) n t p) a b)
+        Actual: m (Field (WayOf m) SmStep RtsSpinLock)
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          testcase :: forall (m :: * -> *) minor n t p a b.
+                      Monad m =>
+                      m (Field (Way (GHC6'8 minor) n t p) a b)
+        at T4174.hs:44:1-63
     • In the expression: sync_large_objects
       In an equation for ‘testcase’: testcase = sync_large_objects
+    • Relevant bindings include
+        testcase :: m (Field (Way (GHC6'8 minor) n t p) a b)
+          (bound at T4174.hs:45:1)
+
