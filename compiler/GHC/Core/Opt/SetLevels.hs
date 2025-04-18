@@ -701,9 +701,9 @@ lvlMFE env strict_ctxt ann_expr
 
     -- See Note [Saving work]
     is_hnf = exprIsHNF expr
-    saves_work = escapes_value_lam        -- (a)
-                 && not is_hnf            -- (b)
-                 && not float_is_new_lam  -- (c)
+    saves_work = escapes_value_lam        -- (SW-a)
+                 && not is_hnf            -- (SW-b)
+                 && not float_is_new_lam  -- (SW-c)
     escapes_value_lam = dest_lvl `ltMajLvl` (le_ctxt_lvl env)
 
     -- See Note [Floating to the top]
@@ -728,19 +728,19 @@ Doing so can save an unbounded amount of work.
 But see also Note [Floating to the top].
 
 So we definitely float an expression out if
-(a) It will escape a value lambda (escapes_value_lam)
-(b) The expression is not a head-normal form (exprIsHNF); see (SW1, SW2).
-(c) Floating does not require wrapping it in value lambdas (float_is_new_lam).
+(SW-a) It will escape a value lambda (escapes_value_lam)
+(SW-b) The expression is not a head-normal form (exprIsHNF); see (SW1, SW2).
+(SW-c) Floating does not require wrapping it in value lambdas (float_is_new_lam).
     See (SW3) below
 
 Wrinkles:
 
-(SW1) Concerning (b) I experimented with using `exprIsCheap` rather than
+(SW1) Concerning (SW-b) I experimented with using `exprIsCheap` rather than
       `exprIsHNF` but the latter seems better, according to nofib
       (`spectral/mate` got 10% worse with exprIsCheap).  It's really a bit of a
       heuristic.
 
-(SW2) What about omitting (b), and hence floating HNFs as well?  The danger of
+(SW2) What about omitting (SW-b), and hence floating HNFs as well?  The danger of
       doing so is that we end up floating out a HNF from a cold path (where it
       might never get allocated at all) and allocating it all the time
       regardless.  Example
@@ -759,7 +759,7 @@ Wrinkles:
        - Occasionally decreases runtime allocation (T12996 -2.5%)
        - Slightly mixed effect on nofib: (puzzle -10%, mate -5%, cichelli +5%)
          but geometric mean is -0.09%.
-      Overall, a win.
+      Overall, a small win.
 
 (SW3) Concerning (c), if we are wrapping the thing in extra value lambdas (in
       abs_vars), then nothing is saved.  E.g.
