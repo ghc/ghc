@@ -4396,21 +4396,6 @@ pprMismatchMsg ctxt
     conc :: [String] -> String
     conc = unwords . filter (not . null)
 
-pprMismatchMsg _
-  (KindMismatch { kmismatch_what     = thing
-                , kmismatch_expected = exp
-                , kmismatch_actual   = act })
-  = hang (text "Expected" <+> kind_desc <> comma)
-      2 (text "but" <+> quotes (ppr thing) <+> text "has kind" <+>
-        quotes (ppr act))
-  where
-    kind_desc | isConstraintLikeKind exp = text "a constraint"
-              | Just arg <- kindRep_maybe exp  -- TYPE t0
-              , tcIsTyVarTy arg = sdocOption sdocPrintExplicitRuntimeReps $ \case
-                                   True  -> text "kind" <+> quotes (ppr exp)
-                                   False -> text "a type"
-              | otherwise       = text "kind" <+> quotes (ppr exp)
-
 pprMismatchMsg ctxt
   (TypeEqMismatch { teq_mismatch_item     = item
                   , teq_mismatch_ty1      = ty1   -- These types are the actual types
@@ -4429,11 +4414,11 @@ pprMismatchMsg ctxt
 
         | Just nargs_msg <- num_args_msg
         , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
-        = nargs_msg $$ pprMismatchMsg ctxt ea_msg
+        = nargs_msg $$ ea_msg
 
         | ea_looks_same ty1 ty2 exp act
         , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
-        = pprMismatchMsg ctxt ea_msg
+        = ea_msg
 
         | otherwise
         = bale_out_msg
@@ -4445,7 +4430,7 @@ pprMismatchMsg ctxt
                   Left ea_info -> pprMismatchMsg ctxt mismatch_err
                                 : map (pprExpectedActualInfo ctxt) ea_info
                   Right ea_err -> [ pprMismatchMsg ctxt mismatch_err
-                                  , pprMismatchMsg ctxt ea_err ]
+                                  , ea_err ]
         mismatch_err = mkBasicMismatchMsg NoEA item ty1 ty2
 
       -- 'expected' is (TYPE rep) or (CONSTRAINT rep)
@@ -4542,7 +4527,7 @@ pprMismatchMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extra)
       Left infos
         -> vcat (map (pprExpectedActualInfo ctxt) infos)
       Right other_msg
-        -> pprMismatchMsg ctxt other_msg
+        -> other_msg
   where
     main_msg
       | null useful_givens
@@ -4577,6 +4562,18 @@ pprMismatchMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extra)
         [wanted] -> quotes (ppr wanted)
         _        -> pprTheta wanteds
 
+pprKindMismatchMsg :: TypedThing -> Type -> Type -> SDoc
+pprKindMismatchMsg thing exp act
+  = hang (text "Expected" <+> kind_desc <> comma)
+      2 (text "but" <+> quotes (ppr thing) <+> text "has kind" <+>
+        quotes (ppr act))
+  where
+    kind_desc | isConstraintLikeKind exp = text "a constraint"
+              | Just arg <- kindRep_maybe exp  -- TYPE t0
+              , tcIsTyVarTy arg = sdocOption sdocPrintExplicitRuntimeReps $ \case
+                                   True  -> text "kind" <+> quotes (ppr exp)
+                                   False -> text "a type"
+              | otherwise       = text "kind" <+> quotes (ppr exp)
 
 -- | Whether to print explicit kinds (with @-fprint-explicit-kinds@)
 -- in an 'SDoc' when a type mismatch occurs to due invisible parts of the types.
@@ -4871,7 +4868,7 @@ pprWhenMatching ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
     supplementary =
       case mk_supplementary_ea_msg ctxt sub_t_or_k cty1 cty2 sub_o of
         Left infos -> vcat $ map (pprExpectedActualInfo ctxt) infos
-        Right msg  -> pprMismatchMsg ctxt msg
+        Right msg  -> msg
 
 pprTyVarInfo :: SolverReportErrCtxt -> TyVarInfo -> SDoc
 pprTyVarInfo ctxt (TyVarInfo { thisTyVar = tv1, otherTy = mb_tv2, thisTyVarIsUntouchable = mb_implic })
@@ -5101,8 +5098,6 @@ mismatchMsgHints ctxt msg =
 mismatchMsg_ExpectedActuals :: MismatchMsg -> Maybe (Type, Type)
 mismatchMsg_ExpectedActuals = \case
   BasicMismatch { mismatch_ty1 = exp, mismatch_ty2 = act } ->
-    Just (exp, act)
-  KindMismatch { kmismatch_expected = exp, kmismatch_actual = act } ->
     Just (exp, act)
   TypeEqMismatch { teq_mismatch_expected = exp, teq_mismatch_actual = act } ->
     Just (exp,act)
@@ -5429,7 +5424,7 @@ skolsSpan skol_tvs = foldr1WithDefault noSrcSpan combineSrcSpans (map getSrcSpan
 **********************************************************************-}
 
 mk_supplementary_ea_msg :: SolverReportErrCtxt -> TypeOrKind
-                        -> Type -> Type -> CtOrigin -> Either [ExpectedActualInfo] MismatchMsg
+                        -> Type -> Type -> CtOrigin -> Either [ExpectedActualInfo] SDoc
 mk_supplementary_ea_msg ctxt level ty1 ty2 orig
   | TypeEqOrigin { uo_expected = exp, uo_actual = act } <- orig
   , not (ea_looks_same ty1 ty2 exp act)
@@ -5452,7 +5447,7 @@ ea_looks_same ty1 ty2 exp act
       -- (TYPE 'LiftedRep) and Type both print the same way.
 
 mk_ea_msg :: SolverReportErrCtxt -> Maybe ErrorItem -> TypeOrKind
-          -> CtOrigin -> Either [ExpectedActualInfo] MismatchMsg
+          -> CtOrigin -> Either [ExpectedActualInfo] SDoc
 -- Constructs a "Couldn't match" message
 -- The (Maybe ErrorItem) says whether this is the main top-level message (Just)
 --     or a supplementary message (Nothing)
@@ -5460,13 +5455,11 @@ mk_ea_msg ctxt at_top level
   (TypeEqOrigin { uo_actual = act, uo_expected = exp, uo_thing = mb_thing })
   | Just thing <- mb_thing
   , KindLevel <- level
-  = Right $ KindMismatch { kmismatch_what     = thing
-                         , kmismatch_expected = exp
-                         , kmismatch_actual   = act }
+  = Right $ pprKindMismatchMsg thing exp act
   | Just item <- at_top
   , let  ea = EA $ if expanded_syns then Just ea_expanded else Nothing
          mismatch = mkBasicMismatchMsg ea item exp act
-  = Right mismatch
+  = Right (pprMismatchMsg ctxt mismatch)
   | otherwise
   = Left $
     if expanded_syns
