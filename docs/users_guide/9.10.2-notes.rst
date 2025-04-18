@@ -1,4 +1,4 @@
-.. _release-9-10-1:
+.. _release-9-10-2:
 
 Version 9.10.2
 ==============
@@ -6,10 +6,6 @@ The significant changes to the various parts of the compiler are listed in the
 following sections. See the `migration guide
 <https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.10>`_ on the GHC Wiki
 for specific guidance on migrating programs to this release.
-
-Language
-~~~~~~~~
-
 
 
 Compiler
@@ -183,16 +179,6 @@ Build system and packaging
 
 - Fixed a bug where building ghc from source using ghc-9.8.4 failed with an error mentioning ``ghc_unique_counter64``. (:ghc-ticket:`25576`)
 
-``base`` library
-~~~~~~~~~~~~~~~~
-
-
-
-
-``ghc-prim`` library
-~~~~~~~~~~~~~~~~~~~~
-
-
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
@@ -208,10 +194,6 @@ Build system and packaging
 
 * Primops and other ghc extensions are now exported via ``GHC.PrimOps``
 * The library is now versioned according to the ghc version it shipped with.
-
-
-``template-haskell`` library
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 Included libraries
