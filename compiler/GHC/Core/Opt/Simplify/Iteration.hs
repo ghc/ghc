@@ -801,9 +801,9 @@ makeTrivial env top_lvl dmd occ_fs expr
   = return (emptyLetFloats, expr)
 
   | not (bindingOk top_lvl expr expr_ty)  -- Cannot trivialise
-  = return (emptyLetFloats, expr)         --   See Note [Cannot trivialise]
+  = return (emptyLetFloats, expr)         -- See Note [Cannot trivialise]
 
-  | otherwise -- 'expr' is not of form (Cast e co)
+  | otherwise
   = do  { (floats, expr1) <- prepareRhs env top_lvl occ_fs expr
         ; uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
