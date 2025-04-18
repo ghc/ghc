@@ -420,7 +420,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "MultiplicityCoercionsNotSupported"             = 59840
   -- Type mismatch errors
   GhcDiagnosticCode "BasicMismatch"                                 = 18872
-  GhcDiagnosticCode "KindMismatch"                                  = 89223
   GhcDiagnosticCode "TypeEqMismatch"                                = 83865
   GhcDiagnosticCode "CouldNotDeduce"                                = 05617
 

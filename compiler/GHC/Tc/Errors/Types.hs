@@ -5690,19 +5690,9 @@ data MismatchMsg
       , mismatch_mb_same_occ  :: Maybe SameOccInfo
       }
 
-  -- | A type has an unexpected kind.
-  --
-  -- Test cases: T2994, T7609, ...
-  | KindMismatch
-      { kmismatch_what     :: TypedThing -- ^ What thing is 'kmismatch_actual' the kind of?
-      , kmismatch_expected :: Type
-      , kmismatch_actual   :: Type
-      }
-    -- TODO: combine with 'BasicMismatch'.
-
   -- | A mismatch between two types, which arose from a type equality.
   --
-  -- Test cases: T1470, tcfail212.
+  -- Test cases: T1470, tcfail212, T2994, T7609.
   | TypeEqMismatch
       { teq_mismatch_item     :: ErrorItem
       , teq_mismatch_ty1      :: Type
