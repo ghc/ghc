@@ -52,6 +52,8 @@ def autoreconf():
     # Run autoreconf on everything that needs it.
     processes = {}
     if os.name == 'nt':
+        # Note [ACLOCAL_PATH for Windows]
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~
         # Get the normalized ACLOCAL_PATH for Windows
         # This is necessary since on Windows this will be a Windows
         # path, which autoreconf doesn't know doesn't know how to handle.
