@@ -256,3 +256,6 @@ ghc.nix/
 # clangd
 .clangd
 dist-newstyle/
+
+# .gitlab/ci.sh for HERMETIC=1
+cabal/*
