@@ -1801,10 +1801,14 @@ maybe_getCCallReturnRep fn_ty
          _ -> pprPanic "maybe_getCCallReturn: can't handle:"
                          (pprType fn_ty)
 
-maybe_is_tagToEnum_call :: CgStgExpr -> Maybe (Id, [Name])
+maybe_is_tagToEnum_call :: CgStgExpr -> Maybe (StgArg, [Name])
 -- Detect and extract relevant info for the tagToEnum kludge.
-maybe_is_tagToEnum_call (StgOpApp (StgPrimOp TagToEnumOp) [StgVarArg v] t)
+maybe_is_tagToEnum_call (StgOpApp (StgPrimOp TagToEnumOp) args t)
+  | [v] <- args
   = Just (v, extract_constr_Names t)
+  | otherwise
+  = pprPanic "StgToByteCode: tagToEnum#"
+     $ text "Expected exactly one arg, but actual args are:" <+> ppr args
   where
     extract_constr_Names ty
            | rep_ty <- unwrapType ty
@@ -1851,13 +1855,13 @@ implement_tagToId
     :: StackDepth
     -> Sequel
     -> BCEnv
-    -> Id
+    -> StgArg
     -> [Name]
     -> BcM BCInstrList
 -- See Note [Implementing tagToEnum#]
 implement_tagToId d s p arg names
   = assert (notNull names) $
-    do (push_arg, arg_bytes) <- pushAtom d p (StgVarArg arg)
+    do (push_arg, arg_bytes) <- pushAtom d p arg
        labels <- getLabelsBc (strictGenericLength names)
        label_fail <- getLabelBc
        label_exit <- getLabelBc
