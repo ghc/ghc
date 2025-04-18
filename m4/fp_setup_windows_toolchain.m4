@@ -85,6 +85,8 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
     mingw_prefix="$1"
     mingw_install_prefix="$2"
 
+    # Note [Windows Toolchain Standard Library Options]
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Our Windows toolchain is based around Clang and LLD. We use compiler-rt
     # for the runtime, libc++ and libc++abi for the C++ standard library
     # implementation, and libunwind for C++ unwinding.

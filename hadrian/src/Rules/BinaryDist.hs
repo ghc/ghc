@@ -115,7 +115,12 @@ installTo relocatable prefix = do
     targetPlatform <- setting TargetPlatformFull
     let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
         bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
-    runBuilder (Configure bindistFilesDir) ["--prefix="++prefix] [] []
+    win <- isWinTarget
+    -- See Note [Empty MergeObjsCmd]
+    let disabledMerge =
+          if win then ["MergeObjsCmd="]
+          else []
+    runBuilder (Configure bindistFilesDir) (["--prefix="++prefix] ++ disabledMerge) [] []
     let env = case relocatable of
                 Relocatable -> [AddEnv "RelocatableBuild" "YES"]
                 NotRelocatable -> []
@@ -232,7 +237,7 @@ bindistRules = do
         -- N.B. the ghc-pkg executable may be prefixed with a target triple
         -- (c.f. #20267).
         ghcPkgName <- programName (vanillaContext Stage1 ghcPkg)
-        cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName) ["recache"]
+        cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName <.> exe) ["recache"]
 
 
 

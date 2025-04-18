@@ -75,6 +75,15 @@ Environment variables affecting both build systems:
   NIX_SYSTEM        On Darwin, the target platform of the desired toolchain
                     (either "x86-64-darwin" or "aarch-darwin")
   NO_BOOT           Whether to run ./boot or not, used when testing the source dist
+  TOOLCHAIN_SOURCE  Select a source of toolchain. Possible values:
+                    - "env": Toolchains are included in the Docker image via environment
+                             variables. Default for Linux.
+                    - "nix": Toolchains are provided via .gitlab/darwin/toolchain.nix.
+                             Default for Darwin.
+                    - "extracted":
+                             Toolchains will be downloaded and extracted through the
+                             CI process. Default for other systems. Windows and FreeBSD
+                             are included.
 
 Environment variables determining build configuration of Hadrian system:
 
@@ -83,14 +92,14 @@ Environment variables determining build configuration of Hadrian system:
                     This tests the "reinstall" configuration
   CROSS_EMULATOR    The emulator to use for testing of cross-compilers.
 
-Environment variables determining bootstrap toolchain (Linux):
+Environment variables determining bootstrap toolchain (TOOLCHAIN_SOURCE=env):
 
   GHC           Path of GHC executable to use for bootstrapping.
   CABAL         Path of cabal-install executable to use for bootstrapping.
   ALEX          Path of alex executable to use for bootstrapping.
   HAPPY         Path of alex executable to use for bootstrapping.
 
-Environment variables determining bootstrap toolchain (non-Linux):
+Environment variables determining bootstrap toolchain (TOOLCHAIN_SOURCE=extracted):
 
   GHC_VERSION   Which GHC version to fetch for bootstrapping.
   CABAL_INSTALL_VERSION
@@ -135,7 +144,9 @@ function mingw_init() {
   case "$MSYSTEM" in
     CLANG64)
       target_triple="x86_64-unknown-mingw32"
-      boot_triple="x86_64-unknown-mingw32" # triple of bootstrap GHC
+      ;;
+    CLANGARM64)
+      target_triple="aarch64-unknown-mingw32"
       ;;
     *)
       fail "win32-init: Unknown MSYSTEM $MSYSTEM"
@@ -150,10 +161,19 @@ function mingw_init() {
   MINGW_MOUNT_POINT="${MINGW_PREFIX}"
   PATH="$MINGW_MOUNT_POINT/bin:$PATH"
 
-  # We always use mingw64 Python to avoid path length issues like #17483.
-  export PYTHON="/mingw64/bin/python3"
-  # And need to use sphinx-build from the environment
-  export SPHINXBUILD="/mingw64/bin/sphinx-build.exe"
+  case "$MSYSTEM" in
+    CLANGARM64)
+      # At MSYS for ARM64 we force to use their special versions to speedup the compiler step
+      export PYTHON="/clangarm64/bin/python3"
+      export SPHINXBUILD="/clangarm64/bin/sphinx-build.exe"
+      ;;
+    *)
+      # We always use mingw64 Python to avoid path length issues like #17483.
+      export PYTHON="/mingw64/bin/python3"
+      # And need to use sphinx-build from the environment
+      export SPHINXBUILD="/mingw64/bin/sphinx-build.exe"
+      ;;
+  esac
 }
 
 # This will contain GHC's local native toolchain
@@ -178,15 +198,21 @@ function show_tool() {
 }
 
 function set_toolchain_paths() {
-  case "$(uname -m)-$(uname)" in
-    # Linux toolchains are included in the Docker image
-    *-Linux) toolchain_source="env" ;;
-    # Darwin toolchains are provided via .gitlab/darwin/toolchain.nix
-    *-Darwin) toolchain_source="nix" ;;
-    *) toolchain_source="extracted" ;;
-  esac
+  if [ -z "${TOOLCHAIN_SOURCE:-}" ]
+  then
+    # Fallback to automatic detection which could not work for cases
+    # when cross compiler will be build at Windows environment
+    # and requires a special mingw compiler (not bundled)
+    case "$(uname -m)-$(uname)" in
+      # Linux toolchains are included in the Docker image
+      *-Linux) TOOLCHAIN_SOURCE="env" ;;
+      # Darwin toolchains are provided via .gitlab/darwin/toolchain.nix
+      *-Darwin) TOOLCHAIN_SOURCE="nix" ;;
+      *) TOOLCHAIN_SOURCE="extracted" ;;
+    esac
+  fi
 
-  case "$toolchain_source" in
+  case "$TOOLCHAIN_SOURCE" in
     extracted)
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
@@ -217,7 +243,7 @@ function set_toolchain_paths() {
       : ${HAPPY:=$(which happy)}
       : ${ALEX:=$(which alex)}
       ;;
-    *) fail "bad toolchain_source"
+    *) fail "bad TOOLCHAIN_SOURCE"
   esac
 
   export GHC
@@ -247,7 +273,7 @@ function setup() {
       cp -Rf "$CABAL_CACHE"/* "$CABAL_DIR"
   fi
 
-  case $toolchain_source in
+  case $TOOLCHAIN_SOURCE in
     extracted) time_it "setup" setup_toolchain ;;
     *) ;;
   esac
@@ -273,14 +299,37 @@ function setup() {
 }
 
 function fetch_ghc() {
-  if [ ! -e "$GHC" ]; then
-      local v="$GHC_VERSION"
+  local boot_triple_to_fetch
+  case "$(uname)" in
+    MSYS_*|MINGW*)
+      case "$MSYSTEM" in
+        CLANG64)
+          boot_triple_to_fetch="x86_64-unknown-mingw32" # triple of bootstrap GHC
+          ;;
+        *)
+          fail "win32-init: Unknown MSYSTEM $MSYSTEM"
+          ;;
+      esac
+      ;;
+    Darwin)
+      boot_triple_to_fetch="x86_64-apple-darwin"
+      ;;
+    FreeBSD)
+      boot_triple_to_fetch="x86_64-portbld-freebsd"
+      ;;
+    Linux)
+      ;;
+    *) fail "uname $(uname) is not supported by ghc boot fetch" ;;
+  esac
+  readonly boot_triple_to_fetch
+
+  local -r v="$GHC_VERSION"
       if [[ -z "$v" ]]; then
           fail "neither GHC nor GHC_VERSION are not set"
       fi
 
       start_section "fetch GHC"
-      url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
+  url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple_to_fetch}.tar.xz"
       info "Fetching GHC binary distribution from $url..."
       curl "$url" > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
       $TAR -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
@@ -297,8 +346,6 @@ function fetch_ghc() {
       esac
       rm -Rf "ghc-${GHC_VERSION}" ghc.tar.xz
       end_section "fetch GHC"
-  fi
-
 }
 
 function fetch_cabal() {
@@ -349,7 +396,10 @@ function fetch_cabal() {
 # here. For Docker platforms this is done in the Docker image
 # build.
 function setup_toolchain() {
+  if [ ! -e "$GHC" ]; then
   fetch_ghc
+  fi
+
   fetch_cabal
   cabal_update
 
@@ -405,6 +455,17 @@ function configure() {
   if [[ -n "${target_triple:-}" ]]; then
     args+=("--target=$target_triple")
   fi
+  if [[ "${TOOLCHAIN_SOURCE:-}" =~ "extracted" ]]; then
+    # To extract something need download something first.
+    args+=("--enable-tarballs-autodownload")
+  else
+    # For Windows we should explicitly --enable-distro-toolchain
+    # if i.e. we decided to use TOOLCHAIN_SOURCE = env
+    case "$(uname)" in
+      MSYS_*|MINGW*) args+=("--enable-distro-toolchain") ;;
+      *) ;;
+    esac
+  fi
   if [[ -n "${ENABLE_NUMA:-}" ]]; then
     args+=("--enable-numa")
     else
@@ -421,7 +482,6 @@ function configure() {
   # See https://stackoverflow.com/questions/7577052 for a rationale for the
   # args[@] symbol-soup below.
   run ${CONFIGURE_WRAPPER:-} ./configure \
-    --enable-tarballs-autodownload \
     "${args[@]+"${args[@]}"}" \
     GHC="$GHC" \
     || ( cat config.log; fail "configure failed" )
@@ -562,12 +622,35 @@ function install_bindist() {
       read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
 
       if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
-          # We suppose that host target = build target.
+          # We assume that BUILD=HOST.
           # By the fact above it is clearly turning out which host value is
           # for currently built compiler.
           # The fix for #21970 will probably remove this if-branch.
-          local -r CROSS_HOST_GUESS=$($SHELL ./config.guess)
-          args+=( "--target=$CROSS_TARGET" "--host=$CROSS_HOST_GUESS" )
+          # Modifications are needed due of reasons like See Note [Wide Triple Windows].
+
+          local -r cross_host_triple_guess_origin=$($SHELL ./config.guess)
+
+          # We expect here to have (x86_64|aarch64)
+          local -r cross_host_triple_guess_arch=$(echo "${cross_host_triple_guess_origin}" | cut -d'-' -f1)
+
+          # Expect to have (apple|unknown)
+          local -r cross_host_triple_guess_vendor=$(echo "${cross_host_triple_guess_origin}" \
+            `# "pc" should be converted to unknown for all supported platforms by GHC` \
+            | sed -e "s/-pc-/-unknown-/" | cut -d'-' -f2)
+
+          # 3,4 because it might contain a dash, expect to have (linux-gnu|mingw32|darwin)
+          local -r cross_host_triple_guess_os=$(echo "${cross_host_triple_guess_origin}" | cut -d'-' -f3,4 \
+            `# GHC treats mingw64 as mingw32, so, we need hide this difference` \
+            | sed -e "s/mingw.*/mingw32/" \
+            `# config.guess may return triple with a release number, i.e. for darwin: aarch64-apple-darwin24.4.0` \
+            | sed -e "s/darwin.*/darwin/" \
+            | sed -e "s/freebsd.*/freebsd/" \
+            )
+
+          local -r cross_host_triple_guess="$cross_host_triple_guess_arch-$cross_host_triple_guess_vendor-$cross_host_triple_guess_os"
+          echo "Convert guessed triple ${cross_host_triple_guess_origin} to GHC-compatible: ${cross_host_triple_guess}"
+
+          args+=( "--target=$CROSS_TARGET" "--host=$cross_host_triple_guess" )
 
       # FIXME: The bindist configure script shouldn't need to be reminded of
       # the target platform. See #21970.
@@ -946,10 +1029,12 @@ esac
 MAKE="make"
 TAR="tar"
 case "$(uname)" in
-  MSYS_*|MINGW*) mingw_init ;;
-  Darwin) boot_triple="x86_64-apple-darwin" ;;
+  MSYS_*|MINGW*)
+    mingw_init
+    ;;
+  Darwin)
+    ;;
   FreeBSD)
-    boot_triple="x86_64-portbld-freebsd"
     MAKE="gmake"
     TAR="gtar"
     ;;

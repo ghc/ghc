@@ -1309,17 +1309,21 @@ cross_jobs = [
         . setVariable "WindresCmd" (llvm_prefix ++ "windres")
         . setVariable "LLVMAS" (llvm_prefix ++ "clang")
         . setVariable "LD" (llvm_prefix ++ "ld")
+          -- See Note [Empty MergeObjsCmd]
           -- Windows target require to make linker merge feature check disabled.
         . setVariable "MergeObjsCmd" ""
+          -- Note [Wide Triple Windows]
+          -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
           -- LLVM MinGW Linux Toolchain expects to recieve "aarch64-w64-mingw32"
           -- as a triple but we use more common "aarch64-unknown-mingw32".
-          -- Due of this we need configure ld manually for clang beacause
+          -- Due of this we need configure ld manually for clang because
           -- it will use system's ld otherwise when --target will be specified to
           -- unexpected triple.
         . setVariable "CFLAGS" cflags
         . setVariable "CONF_CC_OPTS_STAGE2" cflags
         ) where
             llvm_prefix = "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-"
+            -- See Note [Windows Toolchain Standard Library Options]
             cflags = "-fuse-ld=" ++ llvm_prefix ++ "ld --rtlib=compiler-rt"
 
     winAarch64Config = (crossConfig "aarch64-unknown-mingw32" (Emulator "/opt/wine-arm64ec-msys2-deb12/bin/wine") Nothing)

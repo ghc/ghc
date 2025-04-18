@@ -26,7 +26,7 @@ import Hadrian.Builder.Tar
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
 import Hadrian.Utilities
-import Oracles.Setting (bashPath, targetStage)
+import Oracles.Setting (bashPath, targetStage, isWinHost)
 import System.Exit
 import System.IO (stderr)
 
@@ -327,8 +327,14 @@ instance H.Builder Builder where
                 Ar Unpack _ -> cmd' [Cwd output] [path] buildArgs buildOptions
 
                 Autoreconf dir -> do
+                  isWin <- isWinHost
+                  let aclocal_env =
+                        -- It is generally assumed that you would use MinGW's compilers from within an MSYS shell.
+                        -- See Note [ACLOCAL_PATH for Windows]
+                        if isWin then [AddEnv "ACLOCAL_PATH" "/c/msys64/usr/share/aclocal/"]
+                        else []
                   bash <- bashPath
-                  cmd' [Cwd dir] [bash, path] buildArgs buildOptions
+                  cmd' (Cwd dir `cons` aclocal_env) [bash, path] buildArgs buildOptions
 
                 Configure  dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,

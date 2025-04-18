@@ -861,7 +861,9 @@ expirationTime mgr us = do
 -- The 'TimeoutCallback' will not be called more than once.
 --
 -- Be careful not to exceed @maxBound :: Int@, which on 32-bit machines is only
--- 2147483647 μs, less than 36 minutes.
+-- 2147483647 microseconds, less than 36 minutes.
+-- We can not use here utf/greek symbol due of:
+-- _build/stage1/libraries/ghc-internal/build/GHC/Internal/Event/Windows.hs: commitBuffer: invalid argument (cannot encode character '\206')
 --
 {-# NOINLINE registerTimeout #-}
 registerTimeout :: Manager -> Int -> TimeoutCallback -> IO TimeoutKey
@@ -878,7 +880,9 @@ registerTimeout mgr@Manager{..} uSrelTime cb = do
 -- This has no effect if the timeout has already fired.
 --
 -- Be careful not to exceed @maxBound :: Int@, which on 32-bit machines is only
--- 2147483647 μs, less than 36 minutes.
+-- 2147483647 microseconds, less than 36 minutes.
+-- We can not use here utf/greek symbol due of:
+-- _build/stage1/libraries/ghc-internal/build/GHC/Internal/Event/Windows.hs: commitBuffer: invalid argument (cannot encode character '\206')
 --
 updateTimeout :: Manager -> TimeoutKey -> Seconds -> IO ()
 updateTimeout mgr (TK key) relTime = do
@@ -980,7 +984,7 @@ step maxDelay mgr@Manager{..} = do
     -- There are some unusual edge cases you need to deal with. The
     -- GetQueuedCompletionStatus function blocks a thread until there's
     -- work for it to do. Based on the return value, the number of bytes
-    -- and the overlapped structure, there’s a lot of possible "reasons"
+    -- and the overlapped structure, there's a lot of possible "reasons"
     -- for the function to have returned. Deciphering all the possible
     -- cases:
     --
