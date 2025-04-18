@@ -2649,8 +2649,9 @@ There are five reasons not to unify:
     we can fill beta[tau] := beta[conc]. This is why we call
     'makeTypeConcrete' in startSolvingByUnification.
 
-5. (COERCION-HOLE) Confusing coercion holes
-   Suppose our equality is
+5. (COERCION-HOLE) rhs does not mention any coercion holes that resulted from
+    fixing up a hetero-kinded equality.  This is the same as (TyEq:CH) in
+    Note [Canonical equalities].  Suppose our equality is
      (alpha :: k) ~ (Int |> {co})
    where co :: Type ~ k is an unsolved wanted. Note that this equality
    is homogeneous; both sides have kind k. We refrain from unifying here, because
@@ -3549,7 +3550,7 @@ checkCo flags co =
         -- Check for coercion holes, if unifying.
         -- See (COERCION-HOLE) in Note [Unification preconditions]
         | case lc of { LC_None {} -> False; _ -> True } -- equivalent to "we are unifying"; see Note [TyEqFlags]
-        , hasCoercionHoleCo co
+        , hasHeteroKindCoercionHoleCo co
         -> return $ PuFail (cteProblem cteCoercionHole)
 
         -- Occurs check (can promote)

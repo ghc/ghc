@@ -1613,53 +1613,62 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
 --    NotSwapped:
 --        ev      :: (lhs1:ki1) ~r# (xi2:ki2)
 --        kind_co :: k11 ~# ki2               -- Same orientation as ev
---        type_ev :: lhs1 ~r# (xi2 |> sym kind_co)
+--        new_ev  :: lhs1 ~r# (xi2 |> sym kind_co)
 --    Swapped
 --        ev      :: (xi2:ki2) ~r# (lhs1:ki1)
 --        kind_co :: ki2 ~# ki1               -- Same orientation as ev
---        type_ev :: (xi2 |> kind_co) ~r# lhs1
+--        new_ev  :: (xi2 |> kind_co) ~r# lhs1
+-- Note that we need the `sym` when we are /not/ swapped; hence `mk_sym_co`
 
-  = do { (kind_co, rewriters, unifs_happened) <- mk_kind_eq   -- :: ki1 ~N ki2
-       ; if unifs_happened
-              -- Unifications happened, so start again to do the zonking
-              -- Otherwise we might put something in the inert set that isn't inert
-         then startAgainWith (mkNonCanonical ev)
-         else
-    do { let lhs_redn = mkReflRedn role ps_xi1
-             rhs_redn = mkGReflRightRedn role xi2 mb_sym_kind_co
-             mb_sym_kind_co = case swapped of
-                                NotSwapped -> mkSymCo kind_co
-                                IsSwapped  -> kind_co
-
-       ; traceTcS "Hetero equality gives rise to kind equality"
-           (ppr swapped $$
-            ppr kind_co <+> dcolon <+> sep [ ppr ki1, text "~#", ppr ki2 ])
-       ; type_ev <- rewriteEqEvidence rewriters ev swapped lhs_redn rhs_redn
-
-       ; let new_xi2 = mkCastTy ps_xi2 mb_sym_kind_co
-       ; canEqCanLHSHomo type_ev eq_rel NotSwapped lhs1 ps_xi1 new_xi2 new_xi2 }}
-
-  where
-    mk_kind_eq :: TcS (CoercionN, RewriterSet, Bool)
-    -- Returned kind_co has kind (k1 ~ k2) if NotSwapped, (k2 ~ k1) if Swapped
-    -- Returned Bool = True if unifications happened, so we should retry
-    mk_kind_eq = case ev of
+  = case ev of
       CtGiven (GivenCt { ctev_evar = evar, ctev_loc = loc })
         -> do { let kind_co  = mkKindCo (mkCoVarCo evar)
                     pred_ty  = unSwap swapped mkNomEqPred ki1 ki2
                     kind_loc = mkKindEqLoc xi1 xi2 loc
               ; kind_ev <- newGivenEvVar kind_loc (pred_ty, evCoercion kind_co)
               ; emitWorkNC [CtGiven kind_ev]
-              ; return (givenCtEvCoercion kind_ev, emptyRewriterSet, False) }
+              ; let kind_co = givenCtEvCoercion kind_ev
+                    new_xi2 = mkCastTy ps_xi2 (mk_sym_co kind_co)
+              ; new_ev <- do_rewrite emptyRewriterSet kind_co
+                -- In the Given case, `new_ev` is canonical, so carry on
+              ; canEqCanLHSHomo new_ev eq_rel NotSwapped lhs1 ps_xi1 new_xi2 new_xi2 }
 
       CtWanted {}
-        -> do { (kind_co, cts, unifs) <- wrapUnifierTcS ev Nominal $ \uenv ->
-                                         let uenv' = updUEnvLoc uenv (mkKindEqLoc xi1 xi2)
-                                         in unSwap swapped (uType uenv') ki1 ki2
-              ; return (kind_co, rewriterSetFromCts cts, not (null unifs)) }
+         -> do { (kind_co, cts, unifs) <- wrapUnifierTcS ev Nominal $ \uenv ->
+                                          let uenv' = updUEnvLoc uenv (mkKindEqLoc xi1 xi2)
+                                          in unSwap swapped (uType uenv') ki1 ki2
+               ; if not (null unifs)
+                 then -- Unifications happened, so start again to do the zonking
+                      -- Otherwise we might put something in the inert set that isn't inert
+                      startAgainWith (mkNonCanonical ev)
+                 else
 
+            assertPpr (not (isEmptyCts cts)) (ppr ev $$ ppr ki1 $$ ppr ki2) $
+              -- The constraints won't be empty because the two kinds differ, and there
+              -- are no unifications, so we must have emitted one or more constraints
+            do { new_ev <- do_rewrite (rewriterSetFromCts cts) kind_co
+                 -- The rewritten equality `new_ev` is non-canonical,
+                 -- so put it straight in the Irreds
+               ; finishCanWithIrred (NonCanonicalReason (cteProblem cteCoercionHole)) new_ev } }
+  where
     xi1  = canEqLHSType lhs1
     role = eqRelRole eq_rel
+
+    -- Apply mkSymCo when /not/ swapped
+    mk_sym_co co = case swapped of
+                      NotSwapped -> mkSymCo co
+                      IsSwapped  -> co
+
+    do_rewrite rewriters kind_co
+      = do { traceTcS "Hetero equality gives rise to kind equality"
+                 (ppr swapped $$
+                  ppr kind_co <+> dcolon <+> sep [ ppr ki1, text "~#", ppr ki2 ])
+           ; rewriteEqEvidence rewriters ev swapped lhs_redn rhs_redn }
+      where
+        -- kind_co :: ki1 ~N ki2
+        lhs_redn    = mkReflRedn role ps_xi1
+        rhs_redn    = mkGReflRightRedn role xi2 (mk_sym_co kind_co)
+
 
 canEqCanLHSHomo :: CtEvidence          -- lhs ~ rhs
                                        -- or, if swapped: rhs ~ lhs
@@ -2044,19 +2053,20 @@ What do we do when we have an equality
 where k1 and k2 differ? Easy: we create a coercion that relates k1 and
 k2 and use this to cast. To wit, from
 
-  [X] (tv :: k1) ~ (rhs :: k2)
+  [X] co1 :: (tv :: k1) ~ (rhs :: k2)
 
 (where [X] is [G] or [W]), we go to
 
-  [X] co :: k1 ~ k2
-  [X] (tv :: k1) ~ ((rhs |> sym co) :: k1)
+  co1 = co2 ; sym (GRefl kco)
+  [X] co2 :: (tv :: k1) ~ ((rhs |> sym kco) :: k1)
+  [X] kco :: k1 ~ k2
 
 Wrinkles:
 
-(EIK1) When X is W, the new type-level wanted is effectively rewritten by the
-     kind-level one. We thus include the kind-level wanted in the RewriterSet
-     for the type-level one. See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
-     This is done in canEqCanLHSHetero.
+(EIK1) When X=Wanted, the new type-level wanted for `co` is effectively rewritten by
+     the kind-level one. We thus include the kind-level wanted in the RewriterSet
+     for the type-level one. See Note [Wanteds rewrite Wanteds] in
+     GHC.Tc.Types.Constraint.  This is done in canEqCanLHSHetero.
 
 (EIK2) Suppose we have [W] (a::Type) ~ (b::Type->Type). The above rewrite will produce
         [W] w  : a ~ (b |> kw)
@@ -2076,13 +2086,17 @@ Wrinkles:
      Instead, it lands in the inert_irreds in the inert set, awaiting solution of
      that `kw`.
 
-     (EIK2a) We must later indeed unify if/when the kind-level wanted, `kw` gets
-     solved. This is done in kickOutAfterFillingCoercionHole, which kicks out
+  (EIK2a) We must later indeed unify if/when the kind-level wanted, `kw` gets
+     solved. This is done in `kickOutAfterFillingCoercionHole`, which kicks out
      all equalities whose RHS mentions the filled-in coercion hole.  Note that
      it looks for type family equalities, too, because of the use of unifyTest
      in canEqTyVarFunEq.
 
-     (EIK2b) What if the RHS mentions /other/ coercion holes?  How can that happen?  The
+     To do this, we slightly-hackily use the `ctev_rewriters` field of the inert,
+     which records that `w` has been rewritten by `kw`.
+     See (WRW3) in Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
+
+  (EIK2b) What if the RHS mentions /other/ coercion holes?  How can that happen?  The
      main way is like this. Assume F :: forall k. k -> Type
         [W] kw : k  ~ Type
         [W] w  : a ~ F k t
@@ -2093,15 +2107,32 @@ Wrinkles:
      rewriting. Indeed tests JuanLopez only typechecks if we do.  So we'd like to treat
      this kind of equality as canonical.
 
-     Hence the ch_hetero_kind field in CoercionHole: it is True of constraints
-     created by `canEqCanLHSHetero` to fix up hetero-kinded equalities; and False otherwise:
+  So here is our implementation:
+     * The `ch_hetero_kind` field in CoercionHole identifies a coercion hole created
+       by `canEqCanLHSHetero` to fix up hetero-kinded equalities.
 
-     * An equality constraint is non-canonical if it mentions a hetero-kind
-       CoercionHole on the RHS.  See the `hasCoercionHoleCo` test in GHC.Tc.Utils.checkCo.
+     * An equality constraint is non-canonical if it mentions a /hetero-kind/
+       CoercionHole on the RHS.  This (and only this) is the (TyEq:CH) invariant
+       for canonical equalities (see Note [Canonical equalities])
 
-     * Hetero-kind CoercionHoles are created when the parent's CtOrigin is
-       KindEqOrigin: see GHC.Tc.Utils.TcMType.newCoercionHole and friends.  We
-       set this origin, via `mkKindLoc`, in `mk_kind_eq` in `canEqCanLHSHetero`.
+     * The invariant is checked by the `hasHeterKindCoercionHoleCo` test in
+       GHC.Tc.Utils.Unify.checkCo; and not satisfying this invariant is what
+       `cteCoercionHole` in `CheckTyEqResult` means.
+
+     * These special hetero-kind CoercionHoles are created by the `uType` unifier when
+       the parent's CtOrigin is KindEqOrigin: see GHC.Tc.Utils.TcMType.newCoercionHole
+       and friends.
+
+       We set this origin, via `updUEnvLoc`, in `mk_kind_eq` in `canEqCanLHSHetero`.
+
+     * We /also/ add the coercion hole to the `RewriterSet` of the constraint,
+       in `canEqCanLHSHetero`
+
+     * When filling one of these special hetero-kind coercion holes, we kick out
+       any IrredCt's that mention this hole; maybe it is now canonical.
+       See `kickOutAfterFillingCoercionHole`.
+
+     Gah!  This is bizarrely complicated.
 
 (EIK3) Suppose we have [W] (a :: k1) ~ (rhs :: k2). We duly follow the
      algorithm detailed here, producing [W] co :: k1 ~ k2, and adding
@@ -2576,17 +2607,17 @@ Suppose we have
 Then we can simply solve g2 from g1, thus g2 := g1.  Easy!
 But it's not so simple:
 
-* If t is a type variable, the equalties might be oriented differently:
+(CE1) If t is a type variable, the equalties might be oriented differently:
       e.g. (g1 :: a~b) and (g2 :: b~a)
   So we look both ways round.  Hence the SwapFlag result to
   inertsCanDischarge.
 
-* We can only do g2 := g1 if g1 can discharge g2; that depends on
+(CE2) We can only do g2 := g1 if g1 can discharge g2; that depends on
   (a) the role and (b) the flavour.  E.g. a representational equality
   cannot discharge a nominal one; a Wanted cannot discharge a Given.
   The predicate is eqCanRewriteFR.
 
-* Visibility. Suppose  S :: forall k. k -> Type, and consider unifying
+(CE3) Visibility. Suppose  S :: forall k. k -> Type, and consider unifying
       S @Type (a::Type)  ~   S @(Type->Type) (b::Type->Type)
   From the first argument we get (Type ~ Type->Type); from the second
   argument we get (a ~ b) which in turn gives (Type ~ Type->Type).
@@ -2601,6 +2632,24 @@ But it's not so simple:
   So when combining two otherwise-identical equalites, we want to
   keep the visible one, and discharge the invisible one.  Hence the
   call to strictly_more_visible.
+
+(CE4) Suppose we have this set up (#25440):
+   Inert:     [W] g1: F a ~ a Int    (arising from (F a ~ a Int)
+   Work item: [W] g2: F alpha ~ F a  (arising from (F alpha ~ F a)
+   We rewrite g2 with g1, to give
+              [W] g2{rw:g1} : F alpha ~ a Int
+   Now if F is injective we can get [W] alpha~a, and hence alpha:=a, and
+   we kick out g1. Now we have two constraints
+       [W] g1        : F a ~ a Int  (arising from (F a ~ a Int)
+       [W] g2{rw:g1} : F a ~ a Int  (arising from (F alpha ~ F a)
+   If we end up with g2 in the inert set (not g1) we'll get a very confusing
+   error message that we can solve (F a ~ a Int)
+       arising from F a ~ F a
+
+   TL;DR: Better to hang on to `g1` (with no rewriters), in preference
+   to `g2` (which has a rewriter).
+
+   See (WRW1) in Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
 -}
 
 tryInertEqs :: EqCt -> SolverStage ()
@@ -2646,20 +2695,26 @@ inertsCanDischarge inerts (EqCt { eq_lhs = lhs_w, eq_rhs = rhs_w
     loc_w  = ctEvLoc ev_w
     flav_w = ctEvFlavour ev_w
     fr_w   = (flav_w, eq_rel)
+    empty_rw_w = isEmptyRewriterSet (ctEvRewriters ev_w)
 
     inert_beats_wanted ev_i eq_rel
       = -- eqCanRewriteFR:        see second bullet of Note [Combining equalities]
-        -- strictly_more_visible: see last bullet of Note [Combining equalities]
         fr_i `eqCanRewriteFR` fr_w
-        && not ((loc_w `strictly_more_visible` ctEvLoc ev_i)
-                 && (fr_w `eqCanRewriteFR` fr_i))
+        && not (prefer_wanted ev_i && (fr_w `eqCanRewriteFR` fr_i))
       where
         fr_i = (ctEvFlavour ev_i, eq_rel)
 
-    -- See Note [Combining equalities], final bullet
+    -- See (CE3) in Note [Combining equalities]
     strictly_more_visible loc1 loc2
        = not (isVisibleOrigin (ctLocOrigin loc2)) &&
          isVisibleOrigin (ctLocOrigin loc1)
+
+    prefer_wanted ev_i
+      =  (loc_w `strictly_more_visible` ctEvLoc ev_i)
+             -- strictly_more_visible: see (CE3) in Note [Combining equalities]
+      || (empty_rw_w && not (isEmptyRewriterSet (ctEvRewriters ev_i)))
+             -- Prefer the one that has no rewriters
+             -- See (CE4) in Note [Combining equalities]
 
 inertsCanDischarge _ _ = Nothing
 

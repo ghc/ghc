@@ -150,13 +150,16 @@ bumpDepth (RewriteM thing_inside)
       { let !env' = env { re_loc = bumpCtLocDepth (re_loc env) }
       ; thing_inside env' }
 
+recordRewriter :: CtEvidence -> RewriteM ()
+-- Record that we have rewritten the target with this (equality) evidence
 -- See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
--- Precondition: the WantedCtEvidence is for an equality constraint
-recordRewriter :: WantedCtEvidence -> RewriteM ()
-recordRewriter (WantedCt { ctev_dest = HoleDest hole })
-  = RewriteM $ \env -> updTcRef (re_rewriters env) (`addRewriter` hole)
-recordRewriter other =
-  pprPanic "recordRewriter: non-equality constraint" (ppr other)
+-- Precondition: the CtEvidence is for an equality constraint
+recordRewriter (CtGiven {})
+  = return ()
+recordRewriter (CtWanted (WantedCt { ctev_dest = dest }))
+  = case dest of
+      HoleDest hole -> RewriteM $ \env -> updTcRef (re_rewriters env) (`addRewriter` hole)
+      other         -> pprPanic "recordRewriter: non-equality constraint" (ppr other)
 
 {- Note [Rewriter EqRels]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -848,16 +851,18 @@ rewrite_exact_fam_app tc tys
 
          -- STEP 3: try the inerts
        ; flavour <- getFlavour
-       ; result2 <- liftTcS $ lookupFamAppInert (`eqCanRewriteFR` (flavour, eq_rel)) tc xis
-       ; case result2 of
-         { Just (redn, (inert_flavour, inert_eq_rel))
+       ; mb_eq <- liftTcS $ lookupFamAppInert (`eqCanRewriteFR` (flavour, eq_rel)) tc xis
+       ; case mb_eq of
+         { Just (EqCt { eq_ev = inert_ev, eq_rhs = inert_rhs, eq_eq_rel = inert_eq_rel })
              -> do { traceRewriteM "rewrite family application with inert"
                                 (ppr tc <+> ppr xis $$ ppr redn)
-                   ; finish (inert_flavour == Given) (homogenise downgraded_redn) }
-               -- this will sometimes duplicate an inert in the cache,
+                   ; recordRewriter inert_ev
+                   ; finish (isGiven inert_ev) (homogenise downgraded_redn) }
+               -- This will sometimes duplicate an inert in the cache,
                -- but avoiding doing so had no impact on performance, and
                -- it seems easier not to weed out that special case
              where
+               redn            = mkReduction (ctEvCoercion inert_ev) inert_rhs
                inert_role      = eqRelRole inert_eq_rel
                role            = eqRelRole eq_rel
                downgraded_redn = downgradeRedn role inert_role redn
@@ -1024,11 +1029,8 @@ rewrite_tyvar2 tv fr@(_, eq_rel)
              -> do { traceRewriteM "Following inert tyvar" $
                         vcat [ ppr tv <+> equals <+> ppr rhs_ty
                              , ppr ctev ]
-                   ; case ctev of
-                       CtGiven {} -> return ()
-                       CtWanted wtd ->
+                   ; recordRewriter ctev
                          -- See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
-                         recordRewriter wtd
 
                    ; let rewriting_co1 = ctEvCoercion ctev
                          rewriting_co  = case (ct_eq_rel, eq_rel) of

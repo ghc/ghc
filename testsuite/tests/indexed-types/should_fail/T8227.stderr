@@ -13,12 +13,3 @@ T8227.hs:24:27: error: [GHC-83865]
         absoluteToParam :: Scalar (V a) -> a -> Scalar (V a)
           (bound at T8227.hs:24:1)
 
-T8227.hs:24:48: error: [GHC-27958]
-    • Couldn't match type ‘p0’ with ‘Scalar (V p0)’
-        arising from a type equality Scalar (V a) ~ Scalar (V p0) -> p0
-      The type variable ‘p0’ is ambiguous
-    • In the second argument of ‘arcLengthToParam’, namely ‘eps’
-      In the expression: arcLengthToParam eps eps
-      In an equation for ‘absoluteToParam’:
-          absoluteToParam eps seg = arcLengthToParam eps eps
-

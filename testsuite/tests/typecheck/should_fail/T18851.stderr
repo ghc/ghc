@@ -1,7 +1,7 @@
-
 T18851.hs:35:5: error: [GHC-18872]
-    • Couldn't match type ‘B’ with ‘A’
-        arising from a superclass required to satisfy ‘C int0 A’,
+    • Couldn't match type ‘Bool’ with ‘B’
+        arising from a superclass required to satisfy ‘C Int B’,
         arising from a use of ‘f’
     • In the expression: f @A @B
       In an equation for ‘g’: g = f @A @B
+

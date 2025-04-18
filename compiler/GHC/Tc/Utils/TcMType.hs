@@ -49,7 +49,6 @@ module GHC.Tc.Utils.TcMType (
 
   newCoercionHole, newCoercionHoleO, newVanillaCoercionHole,
   fillCoercionHole, isFilledCoercionHole,
-  unpackCoercionHole, unpackCoercionHole_maybe,
   checkCoercionHole,
 
   newImplication,
@@ -115,7 +114,6 @@ import GHC.Tc.Types.CtLoc( CtLoc, ctLocOrigin )
 import GHC.Tc.Utils.Monad        -- TcType, amongst others
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
-import GHC.Tc.Zonk.Type
 import GHC.Tc.Zonk.TcType
 
 import GHC.Builtin.Names
@@ -371,6 +369,7 @@ newCoercionHoleO (KindEqOrigin {}) pty = new_coercion_hole True pty
 newCoercionHoleO _ pty                 = new_coercion_hole False pty
 
 new_coercion_hole :: Bool -> TcPredType -> TcM CoercionHole
+-- For the Bool, see (EIK2) in Note [Equalities with incompatible kinds]
 new_coercion_hole hetero_kind pred_ty
   = do { co_var <- newEvVar pred_ty
        ; traceTc "New coercion hole:" (ppr co_var <+> dcolon <+> ppr pred_ty)
@@ -1583,7 +1582,7 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
     go_co dv (SubCo co)              = go_co dv co
 
     go_co dv (HoleCo hole)
-      = do m_co <- unpackCoercionHole_maybe hole
+      = do m_co <- liftZonkM (unpackCoercionHole_maybe hole)
            case m_co of
              Just co -> go_co dv co
              Nothing -> go_cv dv (coHoleCoVar hole)
