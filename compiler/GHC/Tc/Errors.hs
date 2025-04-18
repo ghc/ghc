@@ -466,13 +466,12 @@ mkErrorItem ct
   = do { let loc = ctLoc ct
              flav = ctFlavour ct
 
-       ; (suppress, m_evdest) <- case ctEvidence ct of
-         -- For this `suppress` stuff
-         -- see Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
-           CtGiven {} -> return (False, Nothing)
-           CtWanted (WantedCt { ctev_rewriters = rewriters, ctev_dest = dest })
-             -> do { rewriters' <- zonkRewriterSet rewriters
-                   ; return (not (isEmptyRewriterSet rewriters'), Just dest) }
+             (suppress, m_evdest) = case ctEvidence ct of
+                   -- For this `suppress` stuff
+                   -- see Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
+                     CtGiven {} -> (False, Nothing)
+                     CtWanted (WantedCt { ctev_rewriters = rws, ctev_dest = dest })
+                                -> (not (isEmptyRewriterSet rws), Just dest)
 
        ; let m_reason = case ct of
                 CIrredCan (IrredCt { ir_reason = reason }) -> Just reason
@@ -503,7 +502,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
                                          , text "tidy_errs =" <+> ppr tidy_errs ])
 
          -- Catch an awkward (and probably rare) case in which /all/ errors are
-         -- suppressed: see Wrinkle (WRW2) in Note [Prioritise Wanteds with empty
+         -- suppressed: see Wrinkle (PER2) in Note [Prioritise Wanteds with empty
          -- RewriterSet] in GHC.Tc.Types.Constraint.
          --
          -- Unless we are sure that an error will be reported some other way
@@ -1821,7 +1820,7 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
   -- Incompatible kinds
   -- This is wrinkle (EIK2) in Note [Equalities with incompatible kinds]
   -- in GHC.Tc.Solver.Equality
-  | hasCoercionHoleCo co1 || hasCoercionHoleTy ty2
+  | hasHeteroKindCoercionHoleCo co1 || hasHeteroKindCoercionHoleTy ty2
   = return $ mkBlockedEqErr item
 
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have

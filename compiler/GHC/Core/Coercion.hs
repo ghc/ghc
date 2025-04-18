@@ -120,7 +120,8 @@ module GHC.Core.Coercion (
 
         multToCo, mkRuntimeRepCo,
 
-        hasCoercionHoleTy, hasCoercionHoleCo, hasThisCoercionHoleTy,
+        hasHeteroKindCoercionHoleTy, hasHeteroKindCoercionHoleCo,
+        hasThisCoercionHoleTy,
 
         setCoHoleType
        ) where
@@ -2795,12 +2796,12 @@ has_co_hole_co :: Coercion -> Monoid.Any
 -- | Is there a hetero-kind coercion hole in this type?
 --   (That is, a coercion hole with ch_hetero_kind=True.)
 -- See wrinkle (EIK2) of Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Equality
-hasCoercionHoleTy :: Type -> Bool
-hasCoercionHoleTy = Monoid.getAny . has_co_hole_ty
+hasHeteroKindCoercionHoleTy :: Type -> Bool
+hasHeteroKindCoercionHoleTy = Monoid.getAny . has_co_hole_ty
 
 -- | Is there a hetero-kind coercion hole in this coercion?
-hasCoercionHoleCo :: Coercion -> Bool
-hasCoercionHoleCo = Monoid.getAny . has_co_hole_co
+hasHeteroKindCoercionHoleCo :: Coercion -> Bool
+hasHeteroKindCoercionHoleCo = Monoid.getAny . has_co_hole_co
 
 hasThisCoercionHoleTy :: Type -> CoercionHole -> Bool
 hasThisCoercionHoleTy ty hole = Monoid.getAny (f ty)

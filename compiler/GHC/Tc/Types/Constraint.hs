@@ -240,18 +240,24 @@ instance Outputable DictCt where
 {- Note [Canonical equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An EqCt is a canonical equality constraint, one that can live in the inert set,
-and that can be used to rewrite other constrtaints. It satisfies these invariants:
+and that can be used to rewrite other constraints. It satisfies these invariants:
+
   * (TyEq:OC) lhs does not occur in rhs (occurs check)
               Note [EqCt occurs check]
+
   * (TyEq:F) rhs has no foralls
       (this avoids substituting a forall for the tyvar in other types)
+
   * (TyEq:K) typeKind lhs `tcEqKind` typeKind rhs; Note [Ct kind invariant]
+
   * (TyEq:N) If the equality is representational, rhs is not headed by a saturated
     application of a newtype TyCon. See GHC.Tc.Solver.Equality
     Note [No top-level newtypes on RHS of representational equalities].
     (Applies only when constructor of newtype is in scope.)
+
   * (TyEq:U) An EqCt is not immediately unifiable. If we can unify a:=ty, we
     will not form an EqCt (a ~ ty).
+
   * (TyEq:CH) rhs does not mention any coercion holes that resulted from fixing up
     a hetero-kinded equality.  See Note [Equalities with incompatible kinds] in
     GHC.Tc.Solver.Equality, wrinkle (EIK2)
@@ -534,9 +540,12 @@ cteSolubleOccurs   = CTEP (bit 3)   -- Occurs-check under a type function, or in
    -- cteSolubleOccurs must be one bit to the left of cteInsolubleOccurs
    -- See also Note [Insoluble mis-match] in GHC.Tc.Errors
 
-cteCoercionHole    = CTEP (bit 4)   -- Coercion hole encountered
+cteCoercionHole    = CTEP (bit 4)   -- Kind-equality coercion hole encountered
+                                    -- See (EIK2) in Note [Equalities with incompatible kinds]
+
 cteConcrete        = CTEP (bit 5)   -- Type variable that can't be made concrete
                                     --    e.g. alpha[conc] ~ Maybe beta[tv]
+
 cteSkolemEscape    = CTEP (bit 6)   -- Skolem escape e.g.  alpha[2] ~ b[sk,4]
 
 cteProblem :: CheckTyEqProblem -> CheckTyEqResult
@@ -2444,19 +2453,29 @@ We thus want Wanteds to rewrite Wanteds in order to accept more programs,
 but we don't want Wanteds to rewrite Wanteds because doing so can create
 inscrutable error messages. To solve this dilemma:
 
-* We allow Wanteds to rewrite Wanteds, but...
+* We allow Wanteds to rewrite Wanteds, but each Wanted tracks the set of Wanteds
+  it has been rewritten by, in its RewriterSet, stored in the ctev_rewriters
+  field of the CtWanted constructor of CtEvidence.  (Only Wanteds have
+  RewriterSets.)
 
-* Each Wanted tracks the set of Wanteds it has been rewritten by, in its
-  RewriterSet, stored in the ctev_rewriters field of the CtWanted
-  constructor of CtEvidence.  (Only Wanteds have RewriterSets.)
+* A RewriterSet is just a set of unfilled CoercionHoles. This is sufficient
+  because only equalities (evidenced by coercion holes) are used for rewriting;
+  other (dictionary) constraints cannot ever rewrite.
+
+* The rewriter (in e.g. GHC.Tc.Solver.Rewrite.rewrite) tracks and returns a RewriterSet,
+  consisting of the evidence (a CoercionHole) for any Wanted equalities used in
+  rewriting.
+
+* Then GHC.Tc.Solver.Solve.rewriteEvidence and GHC.Tc.Solver.Equality.rewriteEqEvidence
+  add this RewriterSet to the rewritten constraint's rewriter set.
 
 * In error reporting, we simply suppress any errors that have been rewritten
   by /unsolved/ wanteds. This suppression happens in GHC.Tc.Errors.mkErrorItem,
-  which uses GHC.Tc.Zonk.Type.zonkRewriterSet to look through any filled
+  which uses `GHC.Tc.Zonk.Type.zonkRewriterSet` to look through any filled
   coercion holes. The idea is that we wish to report the "root cause" -- the
   error that rewrote all the others.
 
-* We prioritise Wanteds that have an empty RewriterSet:
+* In error reporting, we prioritise Wanteds that have an empty RewriterSet:
   see Note [Prioritise Wanteds with empty RewriterSet].
 
 Let's continue our first example above:
@@ -2471,19 +2490,30 @@ Because Wanteds can rewrite Wanteds, w1 will rewrite w2, yielding
 
 The {w1} in the second line of output is the RewriterSet of w1.
 
-A RewriterSet is just a set of unfilled CoercionHoles. This is sufficient
-because only equalities (evidenced by coercion holes) are used for rewriting;
-other (dictionary) constraints cannot ever rewrite. The rewriter (in
-e.g. GHC.Tc.Solver.Rewrite.rewrite) tracks and returns a RewriterSet,
-consisting of the evidence (a CoercionHole) for any Wanted equalities used in
-rewriting.  Then GHC.Tc.Solver.Solve.rewriteEvidence and
-GHC.Tc.Solver.Equality.rewriteEqEvidence add this RewriterSet to the rewritten
-constraint's rewriter set.
+Wrinkles:
+
+(WRW1) When we find a constraint identical to one already in the inert set,
+   we solve one from the other. Other things being equal, keep the one
+   that has fewer (better still no) rewriters.
+   See (CE4) in Note [Combining equalities] in GHC.Tc.Solver.Equality.
+
+   To this accurately we should use `zonkRewriterSet` during canonicalisation,
+   to eliminate rewriters that have now been solved.  Currently we only do so
+   during error reporting; but perhaps we should change that.
+
+(WRW2) When zonking a constraint (with `zonkCt` and `zonkCtEvidence`) we take
+   the opportunity to zonk its `RewriterSet`, which eliminates solved ones.
+   This doesn't guarantee that rewriter sets are always up to date -- see
+   (WRW1) -- but it helps, and it de-clutters debug output.
+
+(WRW3) We use the rewriter set for a slightly different purpose, in (EIK2)
+   of Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Equality.
+   This is a bit of a hack.
 
 Note [Prioritise Wanteds with empty RewriterSet]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When extending the WorkList, in GHC.Tc.Solver.InertSet.extendWorkListEq,
-we priorities constraints that have no rewriters. Here's why.
+we prioritise constraints that have no rewriters. Here's why.
 
 Consider this, which came up in T22793:
   inert: {}
@@ -2527,11 +2557,11 @@ GHC.Tc.Solver.InertSet.extendWorkListEq, and extendWorkListEqs.
 
 Wrinkles
 
-(WRW1) Before checking for an empty RewriterSet, we zonk the RewriterSet,
+(PER1) Before checking for an empty RewriterSet, we zonk the RewriterSet,
   because some of those CoercionHoles may have been filled in since we last
   looked: see GHC.Tc.Solver.Monad.emitWork.
 
-(WRW2) Despite the prioritisation, it is hard to be /certain/ that we can't end up
+(PER2) Despite the prioritisation, it is hard to be /certain/ that we can't end up
   in a situation where all of the Wanteds have rewritten each other. In
   order to report /some/ error in this case, we simply report all the
   Wanteds. The user will get a perhaps-confusing error message, but they've

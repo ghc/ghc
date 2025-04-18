@@ -1,16 +1,24 @@
-
-T3330c.hs:25:43: error: [GHC-18872]
-    • Couldn't match kind ‘* -> *’ with ‘*’
-      When matching types
-        f1 :: * -> *
-        f1 x :: *
-      Expected: Der ((->) x) (Der f1 x)
-        Actual: R f1
-    • In the first argument of ‘plug’, namely ‘rf’
+T3330c.hs:25:38: error: [GHC-25897]
+    • Could not deduce ‘Der f1 ~ f1’
+      from the context: f ~ (f1 :+: g)
+        bound by a pattern with constructor:
+                   RSum :: forall (f :: * -> *) (g :: * -> *).
+                           R f -> R g -> R (f :+: g),
+                 in an equation for ‘plug'’
+        at T3330c.hs:25:8-17
+      Expected: x -> f1 x
+        Actual: x -> Der f1 x
+      ‘f1’ is a rigid type variable bound by
+        a pattern with constructor:
+          RSum :: forall (f :: * -> *) (g :: * -> *).
+                  R f -> R g -> R (f :+: g),
+        in an equation for ‘plug'’
+        at T3330c.hs:25:8-17
+    • The function ‘plug’ is applied to three visible arguments,
+        but its type ‘Rep f => Der f x -> x -> f x’ has only two
       In the first argument of ‘Inl’, namely ‘(plug rf df x)’
       In the expression: Inl (plug rf df x)
     • Relevant bindings include
-        x :: x (bound at T3330c.hs:25:29)
         df :: Der f1 x (bound at T3330c.hs:25:25)
         rf :: R f1 (bound at T3330c.hs:25:13)
-        plug' :: R f -> Der f x -> x -> f x (bound at T3330c.hs:25:1)
+
