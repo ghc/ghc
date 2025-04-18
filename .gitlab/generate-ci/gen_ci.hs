@@ -1306,7 +1306,7 @@ cross_jobs = [
         . setVariable "MergeObjsCmd" ""
           -- LLVM MinGW Linux Toolchain expects to recieve "aarch64-w64-mingw32"
           -- as a triple but we use more common "aarch64-unknown-mingw32".
-          -- Due of this we need configure ld manually for clang beacause
+          -- Due of this we need configure ld manually for clang because
           -- it will use system's ld otherwise when --target will be specified to
           -- unexpected triple.
         . setVariable "CFLAGS" cflags

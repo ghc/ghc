@@ -33,6 +33,8 @@ AC_DEFUN([FIND_MERGE_OBJECTS],[
     fi
 
 
+    # Note [Empty MergeObjsCmd]
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~
     # If MergeObjsCmd="" then we assume that the user is explicitly telling us that
     # they do not want to configure the MergeObjsCmd, this is particularly important for
     # the bundled windows toolchain.
