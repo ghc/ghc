@@ -535,3 +535,4 @@ test('T25197', [req_th, extra_files(["T25197_TH.hs"]), only_ways(['optasm'])], m
 test('T25389', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
 test('T24359a', normal, compile, ['-O -ddump-rules'])
 test('T25713', [grep_errmsg('W:::')], compile, ['-O -ddump-simpl'])
+test('T25976', [grep_errmsg('Dead Code')], compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])

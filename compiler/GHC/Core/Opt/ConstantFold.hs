@@ -69,7 +69,6 @@ import GHC.Cmm.MachOp ( FMASign(..) )
 import GHC.Cmm.Type ( Width(..) )
 
 import GHC.Data.FastString
-import GHC.Data.Maybe      ( orElse )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -2008,9 +2007,13 @@ tagToEnumRule = do
     Just (tycon, tc_args) | isEnumerationTyCon tycon -> do
       let tag = fromInteger i
           correct_tag dc = (dataConTagZ dc) == tag
-      (dc:rest) <- return $ filter correct_tag (tyConDataCons_maybe tycon `orElse` [])
-      massert (null rest)
-      return $ mkTyApps (Var (dataConWorkId dc)) tc_args
+      Just dataCons <- pure $ tyConDataCons_maybe tycon
+      case filter correct_tag dataCons of
+        (dc:rest) -> do
+          massert (null rest)
+          pure $ mkTyApps (Var (dataConWorkId dc)) tc_args
+        -- Literal is out of range, e.g. tagToEnum @Bool #4
+        [] -> pure $ mkImpossibleExpr ty "tagToEnum: Argument out of range"
 
     -- See Note [tagToEnum#]
     _ -> warnPprTrace True "tagToEnum# on non-enumeration type" (ppr ty) $
