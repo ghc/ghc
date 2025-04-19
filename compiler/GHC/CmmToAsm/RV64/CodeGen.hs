@@ -2143,8 +2143,14 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
     MO_SubIntC _w -> unsupported mop
     MO_U_Mul2 _w -> unsupported mop
     MO_VS_Quot {} -> unsupported mop
-    MO_VS_Rem {} -> unsupported mop
     MO_VU_Quot {} -> unsupported mop
+    MO_VS_Rem length w
+      | [x, y] <- arg_regs,
+        [dst_reg] <- dest_regs -> vrem mop length w dst_reg x y Signed
+    MO_VS_Rem {} -> unsupported mop
+    MO_VU_Rem length w
+      | [x, y] <- arg_regs,
+        [dst_reg] <- dest_regs -> vrem mop length w dst_reg x y Unsigned
     MO_VU_Rem {} -> unsupported mop
     MO_I64X2_Min -> unsupported mop
     MO_I64X2_Max -> unsupported mop
@@ -2268,6 +2274,25 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
       let dst = getRegisterReg platform (CmmLocal dest_reg)
       let code = code_fx `appOL` op (OpReg fmt dst) (OpReg format_x reg_fx)
       pure code
+
+    vrem :: CallishMachOp -> Int -> Width -> LocalReg -> CmmExpr -> CmmExpr -> Signage -> NatM InstrBlock
+    vrem mop length w dst_reg x y s =  do
+          platform <- getPlatform
+          let dst = getRegisterReg platform (CmmLocal dst_reg)
+              format = intVecFormat length w
+              moDescr = pprCallishMachOp mop
+          (reg_x, format_x, code_x) <- getSomeReg x
+          (reg_y, format_y, code_y) <- getSomeReg y
+          massertPpr (isVecFormat format_x && isVecFormat format_y)
+            $ text "vecOp: non-vector operand. operands: "
+            <+> ppr format_x
+            <+> ppr format_y
+          pure
+            $ code_x
+            `appOL` code_y
+            `snocOL`
+              ann moDescr  
+                (VREM s (OpReg format dst) (OpReg format_x reg_x) (OpReg format_y reg_y))
 
 {- Note [RISCV64 far jumps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2508,6 +2533,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       VSUB {} -> 2
       VMUL {} -> 2
       VQUOT {} -> 2
+      VREM {} -> 2
       VSMIN {} -> 2
       VSMAX {} -> 2
       VUMIN {} -> 2

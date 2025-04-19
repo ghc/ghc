@@ -115,12 +115,13 @@ regUsageOfInstr platform instr = case instr of
   VMERGE dst op1 op2 opm -> usage (regOp op1 ++ regOp op2 ++ regOp opm, regOp dst)
   VSLIDEDOWN dst op1 op2 -> usage (regOp op1 ++ regOp op2, regOp dst)
   -- WARNING: VSETIVLI is a special case. It changes the interpretation of all vector registers!
-  VSETIVLI (OpReg fmt reg)  _ _ _ _ _ -> usage ([], [(reg, fmt)])
+  VSETIVLI (OpReg fmt reg) _ _ _ _ _ -> usage ([], [(reg, fmt)])
   VNEG dst src1 -> usage (regOp src1, regOp dst)
   VADD dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VSUB dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VMUL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VQUOT dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VREM s dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VSMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VSMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VUMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -176,9 +177,10 @@ callerSavedRegisters =
   where
     toTuple :: Reg -> (Reg, Format)
     toTuple r = (r, format r)
-    format r | isIntReg r = II64
-             | isFloatReg r = FF64
-             | otherwise = panic $ "Unexpected register: " ++ show r
+    format r
+      | isIntReg r = II64
+      | isFloatReg r = FF64
+      | otherwise = panic $ "Unexpected register: " ++ show r
 
 -- | Apply a given mapping to all the register references in this instruction.
 patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
@@ -234,6 +236,7 @@ patchRegsOfInstr instr env = case instr of
   VSUB o1 o2 o3 -> VSUB (patchOp o1) (patchOp o2) (patchOp o3)
   VMUL o1 o2 o3 -> VMUL (patchOp o1) (patchOp o2) (patchOp o3)
   VQUOT o1 o2 o3 -> VQUOT (patchOp o1) (patchOp o2) (patchOp o3)
+  VREM s o1 o2 o3 -> VREM s (patchOp o1) (patchOp o2) (patchOp o3) 
   VSMIN o1 o2 o3 -> VSMIN (patchOp o1) (patchOp o2) (patchOp o3)
   VSMAX o1 o2 o3 -> VSMAX (patchOp o1) (patchOp o2) (patchOp o3)
   VUMIN o1 o2 o3 -> VUMIN (patchOp o1) (patchOp o2) (patchOp o3)
@@ -392,10 +395,10 @@ mkLoadInstr _config (RegWithFormat reg fmt) delta slot =
       ]
   where
     fmt'
-      | isVecFormat fmt
-      = fmt
-      | otherwise
-      = scalarMoveFormat fmt
+      | isVecFormat fmt =
+          fmt
+      | otherwise =
+          scalarMoveFormat fmt
     mkLdrSpImm imm =
       ANN (text "Reload@" <> int (off - delta))
         $ LDR fmt' (OpReg fmt' reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
@@ -415,7 +418,6 @@ scalarMoveFormat :: Format -> Format
 scalarMoveFormat fmt
   | isFloatFormat fmt = FF64
   | otherwise = II64
-
 
 -- | See if this instruction is telling us the current C stack delta
 takeDeltaInstr :: Instr -> Maybe Int
@@ -659,13 +661,11 @@ data Instr
     FCVT FcvtVariant Operand Operand
   | -- | Floating point ABSolute value
     FABS Operand Operand
-
   | -- | Min
     -- dest = min(r1)
     FMIN Operand Operand Operand
   | -- | Max
     FMAX Operand Operand Operand
-
   | -- | Floating-point fused multiply-add instructions
     --
     -- - fmadd : d =   r1 * r2 + r3
@@ -673,7 +673,6 @@ data Instr
     -- - fmsub : d = - r1 * r2 + r3
     -- - fnmadd: d = - r1 * r2 - r3
     FMA FMASign Operand Operand Operand Operand
-
   | -- TODO: Care about the variants (<instr>.x.y) -> sum type
     VMV Operand Operand
   | VID Operand
@@ -686,6 +685,7 @@ data Instr
   | VSUB Operand Operand Operand
   | VMUL Operand Operand Operand
   | VQUOT Operand Operand Operand
+  | VREM Signage Operand Operand Operand
   | VSMIN Operand Operand Operand
   | VSMAX Operand Operand Operand
   | VUMIN Operand Operand Operand
@@ -693,6 +693,9 @@ data Instr
   | VFMIN Operand Operand Operand
   | VFMAX Operand Operand Operand
   | VFMA FMASign Operand Operand Operand
+
+data Signage = Signed | Unsigned
+  deriving (Eq, Show)
 
 -- | Operand of a FENCE instruction (@r@, @w@ or @rw@)
 data FenceType = FenceRead | FenceWrite | FenceReadWrite
@@ -766,6 +769,7 @@ instrCon i =
     VSETIVLI {} -> "VSETIVLI"
     VNEG {} -> "VNEG"
     VADD {} -> "VADD"
+    VREM {} -> "VREM"
     VSUB {} -> "VSUB"
     VMUL {} -> "VMUL"
     VQUOT {} -> "VQUOT"
@@ -929,7 +933,7 @@ fitsIn32bits :: (Num a, Ord a, Bits a) => a -> Bool
 fitsIn32bits = fitsInBits 32
 
 fitsInBits :: (Num a, Ord a, Bits a) => Int -> a -> Bool
-fitsInBits n i= (-1 `shiftL` n') <= i && i <= (1 `shiftL` n' - 1)
+fitsInBits n i = (-1 `shiftL` n') <= i && i <= (1 `shiftL` n' - 1)
   where
     n' = n - 1
 
