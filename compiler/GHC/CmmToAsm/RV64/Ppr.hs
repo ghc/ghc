@@ -812,6 +812,7 @@ pprInstr platform instr = case instr of
     | isFloatOp o1 && isVectorRegOp o2 -> op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
     | isVectorRegOp o1 && isFloatOp o2 -> op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "f") o1 o2
     | isIntRegOp o1 && isVectorRegOp o2 -> op2 (text "\tvmv" <> dot <> text "x" <> dot <> text "s") o1 o2
+    | isVectorRegOp o1 && isIntImmOp o2 -> op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "i") o1 o2
     | isVectorRegOp o1 && isIntRegOp o2 -> op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "x") o1 o2
     | isVectorRegOp o1 && isVectorRegOp o2 -> op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "v") o1 o2
     | True -> pprPanic "RV64.pprInstr - impossible vector move (VMV)" (pprOp platform o1 <+> pprOp platform o2 <+> text "fmt" <> colon <> (text . show) fmt)

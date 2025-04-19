@@ -910,17 +910,19 @@ d30 = operandFromRegNo FF64 62
 
 d31 = operandFromRegNo FF64 d31RegNo
 
-fitsIn12bitImm :: (Num a, Ord a) => a -> Bool
-fitsIn12bitImm off = off >= intMin12bit && off <= intMax12bit
+fitsIn12bitImm :: (Num a, Ord a, Bits a) => a -> Bool
+fitsIn12bitImm = fitsInBits 12
 
-intMin12bit :: (Num a) => a
-intMin12bit = -2048
-
-intMax12bit :: (Num a) => a
-intMax12bit = 2047
+fitsIn5bitImm :: (Num a, Ord a, Bits a) => a -> Bool
+fitsIn5bitImm = fitsInBits 5
 
 fitsIn32bits :: (Num a, Ord a, Bits a) => a -> Bool
-fitsIn32bits i = (-1 `shiftL` 31) <= i && i <= (1 `shiftL` 31 - 1)
+fitsIn32bits = fitsInBits 32
+
+fitsInBits :: (Num a, Ord a, Bits a) => Int -> a -> Bool
+fitsInBits n i= (-1 `shiftL` n') <= i && i <= (1 `shiftL` n' - 1)
+  where
+    n' = n - 1
 
 isNbitEncodeable :: Int -> Integer -> Bool
 isNbitEncodeable n i = let shift = n - 1 in (-1 `shiftL` shift) <= i && i < (1 `shiftL` shift)
