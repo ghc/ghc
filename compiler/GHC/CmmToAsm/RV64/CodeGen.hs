@@ -870,15 +870,9 @@ getRegister' config plat expr =
         MO_V_Broadcast length w -> vectorBroadcast (intVecFormat length w) e
         MO_VF_Broadcast length w -> vectorBroadcast (floatVecFormat length w) e
 
-        -- TODO: NO MO_V_Neg? Why?
-        MO_VF_Neg length w -> do
-          (reg_v, format_v, code_v) <- getSomeReg e
-          let toFmt = VecFormat length (floatScalarFormat w)
-          pure $ Any toFmt $ \dst ->
-            code_v
-              `snocOL` annExpr
-                expr
-                (VNEG (OpReg toFmt dst) (OpReg format_v reg_v))
+        MO_VS_Neg length w -> vectorNegation (intVecFormat length w)
+        MO_VF_Neg length w -> vectorNegation (floatVecFormat length w)
+
         x -> pprPanic ("getRegister' (monadic CmmMachOp): " ++ show x) (pdoc plat expr)
       where
         -- In the case of 16- or 8-bit values we need to sign-extend to 32-bits
@@ -936,6 +930,15 @@ getRegister' config plat expr =
               `snocOL` annExpr
                 expr
                 (VMV (OpReg targetFormat dst) (OpReg format_val reg_val))
+
+        vectorNegation :: Format -> NatM Register
+        vectorNegation targetFormat = do
+          (reg_v, format_v, code_v) <- getSomeReg e
+          pure $ Any targetFormat $ \dst ->
+            code_v
+              `snocOL` annExpr
+                expr
+                (VNEG (OpReg targetFormat dst) (OpReg format_v reg_v))
 
     -- Dyadic machops:
     --

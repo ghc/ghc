@@ -842,7 +842,8 @@ pprInstr platform instr = case instr of
       <> comma
       <+> pprMasking ma
   VSETIVLI o1 _ _ _ _ _ -> pprPanic "RV64.pprInstr - VSETIVLI wrong operands." (pprOp platform o1)
-  VNEG o1 o2 | allVectorRegOps [o1, o2] -> op2 (text "\tvfneg.v") o1 o2
+  VNEG o1 o2 | allIntVectorRegOps [o1, o2] -> op2 (text "\tvneg.v") o1 o2
+  VNEG o1 o2 | allFloatVectorRegOps [o1, o2] -> op2 (text "\tvfneg.v") o1 o2
   VNEG o1 o2 -> pprPanic "RV64.pprInstr - VNEG wrong operands." (pprOps platform [o1, o2])
   VADD o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfadd.vv") o1 o2 o3
   VADD o1 o2 o3 -> pprPanic "RV64.pprInstr - VADD wrong operands." (pprOps platform [o1, o2, o3])
