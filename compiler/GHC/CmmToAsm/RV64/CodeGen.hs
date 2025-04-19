@@ -1700,14 +1700,15 @@ getAmode _platform _ expr =
 -- fails when the right hand side is forced into a fixed register
 -- (e.g. the result of a call).
 
+-- | Store the result of a `CmmExpr` to an address determined by a `CmmExpr`
 assignMem :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
-assignMem rep addrE srcE =
+assignMem rep addrExpr srcExpr =
   do
-    (src_reg, src_format, code) <- getSomeReg srcE
+    (src_reg, src_format, code) <- getSomeReg srcExpr
     platform <- getPlatform
     let w = formatToWidth rep
-    Amode addr addr_code <- getAmode platform w addrE
-    return $ COMMENT (text "CmmStore" <+> parens (text (show addrE)) <+> parens (text (show srcE)))
+    Amode addr addr_code <- getAmode platform w addrExpr
+    return $ COMMENT (text "CmmStore" <+> parens (text (show addrExpr)) <+> parens (text (show srcExpr)))
       `consOL` ( code
                    `appOL` addr_code
                    `snocOL` STR rep (OpReg src_format src_reg) (OpAddr addr)
