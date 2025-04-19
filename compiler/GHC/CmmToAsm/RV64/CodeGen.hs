@@ -1329,17 +1329,6 @@ getRegister' config plat expr =
                     (VMV (OpReg targetFormat dst) (OpReg format_x reg_x))
                   `snocOL` VFMA var (OpReg targetFormat dst) (OpReg format_y reg_y) (OpReg format_z reg_z)
 
-        -- TODO: Implement length as immediate
-
-        -- insert_float_into_vector:
-        --   vsetivli        zero, 4, e32, m1, ta, ma
-        --   vid.v   v8
-        --   vmseq.vi        v0, v8, 2
-        --   vfmv.v.f        v8, fa0
-        --   vmerge.vvm      v8, v8, v8, v0
-        --   ret
-        --
-        -- https://godbolt.org/z/sEG8MrM8P
         MO_VF_Insert length width -> vecInsert floatVecFormat length width
         MO_V_Insert length width -> vecInsert intVecFormat length width
         _ ->
@@ -1366,12 +1355,14 @@ getRegister' config plat expr =
                 `snocOL` annExpr
                   expr
                   -- 1. fill elements with index numbers
-                  -- TODO: The Width is made up
-                  -- TODO: Is it safe to use v0 (default mask register) here? Instructions may be shuffled around...
-                  -- Can we use an explicitly fetched register as mask (depends on instructions)?
                   (VID (OpReg format_vid vidReg))
                 `snocOL`
-                -- 2. Build mask
+                -- 2. Build mask (N.B. using v0 as mask could cause trouble
+                --    when the register allocator decides to move instructions.
+                --    However, VMERGE requires the mask to be in v0. If this
+                --    issue ever comes up, we could squeese the
+                --    pseudo-instructions below into a single one. Taking the
+                --    register allocator the chance to get between them.)
                 VMSEQ (OpReg format_mask v0Reg) (OpReg format_vid vidReg) (OpReg format_idx reg_idx)
                 `snocOL`
                 -- 3. Splat value into tmp vector
