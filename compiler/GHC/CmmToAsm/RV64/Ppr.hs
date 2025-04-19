@@ -844,11 +844,14 @@ pprInstr platform instr = case instr of
   VNEG o1 o2 | allIntVectorRegOps [o1, o2] -> op2 (text "\tvneg.v") o1 o2
   VNEG o1 o2 | allFloatVectorRegOps [o1, o2] -> op2 (text "\tvfneg.v") o1 o2
   VNEG o1 o2 -> pprPanic "RV64.pprInstr - VNEG wrong operands." (pprOps platform [o1, o2])
-  VADD o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfadd.vv") o1 o2 o3
+  VADD o1 o2 o3 | allIntVectorRegOps [o1, o2, o3] -> op3 (text "\tvadd.vv") o1 o2 o3
+  VADD o1 o2 o3 | allFloatVectorRegOps [o1, o2, o3] -> op3 (text "\tvfadd.vv") o1 o2 o3
   VADD o1 o2 o3 -> pprPanic "RV64.pprInstr - VADD wrong operands." (pprOps platform [o1, o2, o3])
-  VSUB o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfsub.vv") o1 o2 o3
+  VSUB o1 o2 o3 | allIntVectorRegOps [o1, o2, o3] -> op3 (text "\tvsub.vv") o1 o2 o3
+  VSUB o1 o2 o3 | allFloatVectorRegOps [o1, o2, o3] -> op3 (text "\tvfsub.vv") o1 o2 o3
   VSUB o1 o2 o3 -> pprPanic "RV64.pprInstr - VSUB wrong operands." (pprOps platform [o1, o2, o3])
-  VMUL o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfmul.vv") o1 o2 o3
+  VMUL o1 o2 o3 | allIntVectorRegOps [o1, o2, o3] -> op3 (text "\tvmul.vv") o1 o2 o3
+  VMUL o1 o2 o3 | allFloatVectorRegOps [o1, o2, o3] -> op3 (text "\tvfmul.vv") o1 o2 o3
   VMUL o1 o2 o3 -> pprPanic "RV64.pprInstr - VMUL wrong operands." (pprOps platform [o1, o2, o3])
   VQUOT o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfdiv.vv") o1 o2 o3
   VQUOT o1 o2 o3 -> pprPanic "RV64.pprInstr - VQUOT wrong operands." (pprOps platform [o1, o2, o3])

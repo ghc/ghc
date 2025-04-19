@@ -472,7 +472,7 @@ getRegister e = do
   assertVectorRegWidth e
   getRegister' config (ncgPlatform config) e
 
--- | Assert that `CmmExpr` vector expression types fit into the configured VLEN  
+-- | Assert that `CmmExpr` vector expression types fit into the configured VLEN
 assertVectorRegWidth :: CmmExpr -> NatM ()
 assertVectorRegWidth expr = do
   config <- getConfig
@@ -603,14 +603,13 @@ getRegister' config plat expr =
               format = floatFormat w
           pure $ Any format (\dst -> unitOL $ annExpr expr (MOV (OpReg format dst) op))
         CmmFloat f w -> do
-          let
-              toWord :: Rational -> Integer
+          let toWord :: Rational -> Integer
               toWord r = case w of
-                        W8 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (pdoc plat expr)  
-                        W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (pdoc plat expr)
-                        W32 -> fromIntegral $ castFloatToWord32 (fromRational r)
-                        W64 -> fromIntegral $ castDoubleToWord64 (fromRational r)
-                        w -> pprPanic ("getRegister' (CmmLit:CmmFloat), no support for width " ++ show w) (pdoc plat expr)
+                W8 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (pdoc plat expr)
+                W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (pdoc plat expr)
+                W32 -> fromIntegral $ castFloatToWord32 (fromRational r)
+                W64 -> fromIntegral $ castDoubleToWord64 (fromRational r)
+                w -> pprPanic ("getRegister' (CmmLit:CmmFloat), no support for width " ++ show w) (pdoc plat expr)
               format_int = intFormat w
               format_dst = floatFormat w
           intReg <- getNewRegNat format_int
@@ -687,8 +686,9 @@ getRegister' config plat expr =
                 ( Any
                     format
                     ( \dst ->
-                        addr_code `snocOL`
-                          annExpr expr
+                        addr_code
+                          `snocOL` annExpr
+                            expr
                             -- We pattern match on the format in the pretty-printer.
                             -- So, we can here simply emit LDRU for all vectors.
                             (LDRU format (OpReg format dst) (OpAddr addr))
@@ -856,7 +856,7 @@ getRegister' config plat expr =
                   fromFmt = intFormat from
                in pure
                     $ Any
-                      toFmt 
+                      toFmt
                       ( \dst ->
                           e_code
                             `snocOL` annExpr e (MOV (OpReg fromFmt dst) (OpReg fromFmt e_reg))
@@ -1289,8 +1289,11 @@ getRegister' config plat expr =
         MO_V_Extract _length w -> vecExtract ((scalarFormatFormat . intScalarFormat) w)
 
         MO_VF_Add length w -> vecOp (floatVecFormat length w) VADD
+        MO_V_Add length w -> vecOp (intVecFormat length w) VADD
         MO_VF_Sub length w -> vecOp (floatVecFormat length w) VSUB
+        MO_V_Sub length w -> vecOp (intVecFormat length w) VSUB
         MO_VF_Mul length w -> vecOp (floatVecFormat length w) VMUL
+        MO_V_Mul length w -> vecOp (intVecFormat length w) VMUL
         MO_VF_Quot length w -> vecOp (floatVecFormat length w) VQUOT
         -- See https://godbolt.org/z/PvcWKMKoW
         MO_VS_Min length w -> vecOp (intVecFormat length w) VSMIN
