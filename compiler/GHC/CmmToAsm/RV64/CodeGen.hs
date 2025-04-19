@@ -475,23 +475,27 @@ getRegister e = do
   assertVectorRegWidth e
   getRegister' config (ncgPlatform config) e
 
+-- | Assert that `CmmExpr` vector expression types fit into the configured VLEN  
 assertVectorRegWidth :: CmmExpr -> NatM ()
 assertVectorRegWidth expr = do
   config <- getConfig
   let platform = ncgPlatform config
       mbRegMinBits :: Maybe Int = fromIntegral <$> ncgVectorMinBits config
       format = cmmTypeFormat $ cmmExprType platform expr
-  if isVecFormat format then
-   case mbRegMinBits of
-    Nothing -> pprPanic
-                "CmmExpr results in vector format, but no vector register configured (see -mriscv-vlen in docs)"
-                (pdoc platform expr)
-    Just regMinBits | (formatInBytes format) * 8 <= regMinBits -> pure ()
-                    | otherwise -> pprPanic 
-                      "CmmExpr results in vector format which is bigger than the configured vector register size (see -mriscv-vlen in docs)"
-                      (pdoc platform expr)
-  else
-    pure ()
+  if isVecFormat format
+    then case mbRegMinBits of
+      Nothing ->
+        pprPanic
+          "CmmExpr results in vector format, but no vector register configured (see -mriscv-vlen in docs)"
+          (pdoc platform expr)
+      Just regMinBits
+        | (formatInBytes format) * 8 <= regMinBits -> pure ()
+        | otherwise ->
+            pprPanic
+              "CmmExpr results in vector format which is bigger than the configured vector register size (see -mriscv-vlen in docs)"
+              (pdoc platform expr)
+    else
+      pure ()
 
 -- | The register width to be used for an operation on the given width
 -- operand.
