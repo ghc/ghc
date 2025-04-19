@@ -364,10 +364,7 @@ stmtToInstrs stmt = do
       genCCall target result_regs args
     CmmComment s -> pure (unitOL (COMMENT (ftext s)))
     CmmTick {} -> pure nilOL
-    CmmAssign reg src -> assignReg format reg src
-      where
-        ty = cmmRegType reg
-        format = cmmTypeFormat ty
+    CmmAssign reg src -> assignReg reg src
     CmmStore addr src _alignment -> assignMem format addr src
       where
         ty = cmmExprType platform src
@@ -1716,8 +1713,11 @@ assignMem rep addrE srcE =
                    `snocOL` STR rep (OpReg src_format src_reg) (OpAddr addr)
                )
 
-assignReg :: Format -> CmmReg -> CmmExpr -> NatM InstrBlock
-assignReg _ reg src =
+-- | Assign the result of `CmmExpr` to `CmmReg`
+--
+-- The register can be a virtual or real register.
+assignReg :: CmmReg -> CmmExpr -> NatM InstrBlock
+assignReg reg src =
   do
     platform <- getPlatform
     let dst = getRegisterReg platform reg
