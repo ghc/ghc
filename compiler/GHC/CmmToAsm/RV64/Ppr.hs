@@ -855,6 +855,9 @@ pprInstr platform instr = case instr of
   VMUL o1 o2 o3 -> pprPanic "RV64.pprInstr - VMUL wrong operands." (pprOps platform [o1, o2, o3])
   VQUOT o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfdiv.vv") o1 o2 o3
   VQUOT o1 o2 o3 -> pprPanic "RV64.pprInstr - VQUOT wrong operands." (pprOps platform [o1, o2, o3])
+  VREM Signed o1 o2 o3 | allIntVectorRegOps [o1, o2, o3] -> op3 (text "\tvrem.vv") o1 o2 o3
+  VREM Unsigned o1 o2 o3 | allIntVectorRegOps [o1, o2, o3] -> op3 (text "\tvremu.vv") o1 o2 o3
+  VREM s o1 o2 o3 -> pprPanic ("RV64.pprInstr - VREM wrong operands. " ++ show s) (pprOps platform [o1, o2, o3])
   VSMIN o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvmin.vv") o1 o2 o3
   VSMIN o1 o2 o3 -> pprPanic "RV64.pprInstr - VSMIN wrong operands." (pprOps platform [o1, o2, o3])
   VSMAX o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvmax.vv") o1 o2 o3
