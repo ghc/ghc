@@ -963,7 +963,6 @@ isFloatImmOp _ = False
 isFloatOp :: Operand -> Bool
 isFloatOp op = isFloatRegOp op || isFloatImmOp op
 
--- TODO: Hide OpReg (Operand) constructor and use this guard to ensure only sane fmt/reg combinations can be used
 assertFmtReg :: (HasCallStack) => Format -> Reg -> a -> a
 assertFmtReg fmt reg | fmtRegCombinationIsSane fmt reg = id
 assertFmtReg fmt reg =
@@ -998,3 +997,13 @@ isVectorReg _ = False
 
 allVectorRegOps :: [Operand] -> Bool
 allVectorRegOps = all isVectorRegOp
+
+allIntVectorRegOps :: [Operand] -> Bool
+allIntVectorRegOps = all $ isVectorFmtRegOp isIntScalarFormat
+
+isVectorFmtRegOp :: (ScalarFormat -> Bool) -> Operand -> Bool
+isVectorFmtRegOp p (OpReg (VecFormat _ sFmt) _r) | p sFmt = True
+isVectorFmtRegOp _ _ = False
+
+allFloatVectorRegOps :: [Operand] -> Bool
+allFloatVectorRegOps = all $ isVectorFmtRegOp isFloatScalarFormat
