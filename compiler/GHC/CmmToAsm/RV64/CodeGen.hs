@@ -1301,32 +1301,6 @@ getRegister' config plat expr =
         MO_VF_Max length w -> vecOp (floatVecFormat length w) VFMAX
         _e -> panic $ "Missing operation " ++ show expr
 
-        -- Vectors
-
-        --TODO: MO_V_Broadcast with immediate: If the right value is a literal,
-        -- it may use vmv.v.i (simpler)
---        MO_V_Broadcast _length w -> do
---          (reg_v, format_v, code_v) <- getSomeReg x
---          (reg_idx, format_idx, code_idx) <- getSomeReg y
---          let w_v = formatToWidth format_v
---              w_idx = formatToWidth format_idx
---          pure $ Any (intFormat w) $ \dst ->
---            code_v `appOL`
---            code_idx `snocOL`
---            annExpr expr (VMV (OpReg w_v reg_v) (OpReg w_idx reg_idx)) `snocOL`
---            MOV (OpReg w dst) (OpReg w_v reg_v)
---
---        MO_VF_Broadcast _length w -> do
---          (reg_v, format_v, code_v) <- getSomeReg x
---          (reg_idx, format_idx, code_idx) <- getSomeReg y
---          let w_v = formatToWidth format_v
---              w_idx = formatToWidth format_idx
---          pure $ Any (intFormat w) $ \dst ->
---            code_v `appOL`
---            code_idx `snocOL`
---            annExpr expr (VMV (OpReg w_v reg_v) (OpReg w_idx reg_idx)) `snocOL`
---            MOV (OpReg w dst) (OpReg w_v reg_v)
-
     -- Generic ternary case.
     CmmMachOp op [x, y, z] ->
       case op of
