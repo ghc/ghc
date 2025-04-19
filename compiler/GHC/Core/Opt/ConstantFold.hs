@@ -69,7 +69,6 @@ import GHC.Cmm.MachOp ( FMASign(..) )
 import GHC.Cmm.Type ( Width(..) )
 
 import GHC.Data.FastString
-import GHC.Data.Maybe      ( orElse )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -1997,6 +1996,14 @@ because we don't expect the user to call tagToEnum# at all; we merely
 generate calls in derived instances of Enum.  So we compromise: a
 rewrite rule rewrites a bad instance of tagToEnum# to an error call,
 and emits a warning.
+
+We also do something similar if we can see that the argument of tagToEnum is out
+of bounds, e.g. `tagToEnum# 99# :: Bool`.
+Replacing this with an error expression is better for two reasons:
+* It allow us to eliminate more dead code in cases like `case tagToEnum# 99# :: Bool of ...`
+* Should we actually end up executing the relevant code at runtime the user will
+  see a meaningful error message, instead of a segfault or incorrect result.
+See #25976.
 -}
 
 tagToEnumRule :: RuleM CoreExpr
@@ -2008,9 +2015,13 @@ tagToEnumRule = do
     Just (tycon, tc_args) | isEnumerationTyCon tycon -> do
       let tag = fromInteger i
           correct_tag dc = (dataConTagZ dc) == tag
-      (dc:rest) <- return $ filter correct_tag (tyConDataCons_maybe tycon `orElse` [])
-      massert (null rest)
-      return $ mkTyApps (Var (dataConWorkId dc)) tc_args
+      Just dataCons <- pure $ tyConDataCons_maybe tycon
+      case filter correct_tag dataCons of
+        (dc:rest) -> do
+          massert (null rest)
+          pure $ mkTyApps (Var (dataConWorkId dc)) tc_args
+        -- Literal is out of range, e.g. tagToEnum @Bool #4
+        [] -> pure $ mkImpossibleExpr ty "tagToEnum: Argument out of range"
 
     -- See Note [tagToEnum#]
     _ -> warnPprTrace True "tagToEnum# on non-enumeration type" (ppr ty) $
