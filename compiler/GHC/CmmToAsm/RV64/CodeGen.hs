@@ -646,6 +646,7 @@ getRegister' config plat expr =
                           expr
                           (MOV (OpReg fmt dst) (OpReg format reg))
                   )
+        -- TODO: After issue #25977 has been fixed / merged, load the literal from memory.
         CmmVec _lits -> pprPanic "getRegister' (CmmLit:CmmVec): " (pdoc plat expr)
         CmmLabel lbl -> do
           let op = OpImm (ImmCLbl lbl)
