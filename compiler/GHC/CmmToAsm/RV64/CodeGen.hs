@@ -767,14 +767,15 @@ getRegister' config plat expr =
         MO_SF_Round from to | from < W32 -> do
           -- extend to the smallest available representation
           (reg_x, code_x) <- signExtendReg from W32 e_reg
-          let format = floatFormat to
+          let toFormat = floatFormat to
+              fromFormat = intFormat from
           pure
             $ Any
-              format
+              toFormat
               ( \dst ->
                   e_code
                     `appOL` code_x
-                    `snocOL` annExpr expr (FCVT IntToFloat (OpReg format dst) (OpReg (intFormat from) reg_x)) -- (Signed ConVerT Float)
+                    `snocOL` annExpr expr (FCVT IntToFloat (OpReg toFormat dst) (OpReg fromFormat reg_x)) -- (Signed ConVerT Float)
               )
         MO_SF_Round from to ->
           let toFmt = floatFormat to
@@ -868,7 +869,7 @@ getRegister' config plat expr =
 
         -- TODO: MO_V_Broadcast with immediate: If the right value is a literal,
         -- it may use vmv.v.i (simpler)
-        MO_V_Broadcast length w ->vectorBroadcast (intVecFormat length w)
+        MO_V_Broadcast length w -> vectorBroadcast (intVecFormat length w)
         MO_VF_Broadcast length w -> vectorBroadcast (floatVecFormat length w)
 
         -- TODO: NO MO_V_Neg? Why?
