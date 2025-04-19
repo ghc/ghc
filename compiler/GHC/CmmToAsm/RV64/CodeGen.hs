@@ -867,10 +867,8 @@ getRegister' config plat expr =
           reg <- getRegister' config plat e
           addAlignmentCheck align wordWidth reg
 
-        -- TODO: MO_V_Broadcast with immediate: If the right value is a literal,
-        -- it may use vmv.v.i (simpler)
-        MO_V_Broadcast length w -> vectorBroadcast (intVecFormat length w)
-        MO_VF_Broadcast length w -> vectorBroadcast (floatVecFormat length w)
+        MO_V_Broadcast length w -> vectorBroadcast (intVecFormat length w) e
+        MO_VF_Broadcast length w -> vectorBroadcast (floatVecFormat length w) e
 
         -- TODO: NO MO_V_Neg? Why?
         MO_VF_Neg length w -> do
@@ -922,9 +920,17 @@ getRegister' config plat expr =
           where
             shift = 64 - (widthInBits from - widthInBits to)
 
-        vectorBroadcast :: Format -> NatM Register
-        vectorBroadcast targetFormat = do
-          (reg_val, format_val, code_val) <- getSomeReg e
+        vectorBroadcast :: Format -> CmmExpr -> NatM Register
+        vectorBroadcast targetFormat (CmmLit (CmmInt n _w)) | fitsIn5bitImm n =
+          -- Go for `vmv.v.i`
+          pure $ Any targetFormat $ \dst ->
+            unitOL
+              $ annExpr
+                expr
+                (VMV (OpReg targetFormat dst) (OpImm (ImmInteger n)))
+        vectorBroadcast targetFormat expr = do
+          -- Go for `vmv.v.x`
+          (reg_val, format_val, code_val) <- getSomeReg expr
           pure $ Any targetFormat $ \dst ->
             code_val
               `snocOL` annExpr
