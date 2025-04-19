@@ -960,7 +960,8 @@ emitPrimOp cfg primop =
     checkVecCompatibility cfg vcat n w
     when (es `lengthIsNot` n) $
         panic "emitPrimOp: VecPackOp has wrong number of arguments"
-    doVecPackOp ty es res
+    platform <- getPlatform
+    doVecPackOp platform ty es res
    where
     ty :: CmmType
     ty = vecCmmType vcat n w
@@ -2654,16 +2655,30 @@ doVecBroadcastOp ty e dst
     wid :: Width
     wid = typeWidth (vecElemType ty)
 
-doVecPackOp :: CmmType       -- Type of vector
+doVecPackOp :: Platform
+            -> CmmType       -- Type of vector
             -> [CmmExpr]     -- Elements
             -> CmmFormal     -- Destination for result
             -> FCode ()
-doVecPackOp ty es dst = do
+doVecPackOp platform _ty es dst | all isVecElemLit es = do
+  emitAssign (CmmLocal dst) (CmmLit $ CmmVec (map unpackCmmLit es))
+  where
+    unpackCmmLit :: CmmExpr -> CmmLit
+    unpackCmmLit (CmmLit l) = l
+    unpackCmmLit l =
+      pprPanic "doVecPackOp"
+        $ vcat [text "Unexpected CmmExpr (expected CmmLit):" <+> pdoc platform l]
+
+    isVecElemLit :: CmmExpr -> Bool
+    isVecElemLit (CmmLit l) =
+      let lTy = cmmLitType platform l
+       in isFloatType lTy || isBitsType lTy
+    isVecElemLit _ = False
+
+doVecPackOp _platform ty es dst = do
   emitAssign (CmmLocal dst) (CmmLit $ CmmVec (replicate l zero))
   zipWithM_ vecPack es [0..]
   where
-    -- SIMD NCG TODO: it should be possible to emit better code
-    -- for "pack" than doing a bunch of vector insertions in a row.
     vecPack :: CmmExpr -> Int -> FCode ()
     vecPack e i
       | isFloatType (vecElemType ty)
