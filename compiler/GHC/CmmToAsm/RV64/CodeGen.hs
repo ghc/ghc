@@ -1294,7 +1294,7 @@ getRegister' config plat expr =
         MO_V_Sub length w -> vecOp (intVecFormat length w) VSUB
         MO_VF_Mul length w -> vecOp (floatVecFormat length w) VMUL
         MO_V_Mul length w -> vecOp (intVecFormat length w) VMUL
-        MO_VF_Quot length w -> vecOp (floatVecFormat length w) VQUOT
+        MO_VF_Quot length w -> vecOp (floatVecFormat length w) (VQUOT Nothing)
         -- See https://godbolt.org/z/PvcWKMKoW
         MO_VS_Min length w -> vecOp (intVecFormat length w) VSMIN
         MO_VS_Max length w -> vecOp (intVecFormat length w) VSMAX
@@ -2142,15 +2142,21 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
     MO_AddIntC _w -> unsupported mop
     MO_SubIntC _w -> unsupported mop
     MO_U_Mul2 _w -> unsupported mop
+    MO_VS_Quot length w
+      | [x, y] <- arg_regs,
+        [dst_reg] <- dest_regs -> v3op mop length w dst_reg x y (VQUOT (Just Signed))
     MO_VS_Quot {} -> unsupported mop
+    MO_VU_Quot length w
+      | [x, y] <- arg_regs,
+        [dst_reg] <- dest_regs -> v3op mop length w dst_reg x y (VQUOT (Just Unsigned))
     MO_VU_Quot {} -> unsupported mop
     MO_VS_Rem length w
       | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> vrem mop length w dst_reg x y Signed
+        [dst_reg] <- dest_regs -> v3op mop length w dst_reg x y (VREM Signed)
     MO_VS_Rem {} -> unsupported mop
     MO_VU_Rem length w
       | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> vrem mop length w dst_reg x y Unsigned
+        [dst_reg] <- dest_regs -> v3op mop length w dst_reg x y (VREM Unsigned)
     MO_VU_Rem {} -> unsupported mop
     MO_I64X2_Min -> unsupported mop
     MO_I64X2_Max -> unsupported mop
@@ -2275,8 +2281,8 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
       let code = code_fx `appOL` op (OpReg fmt dst) (OpReg format_x reg_fx)
       pure code
 
-    vrem :: CallishMachOp -> Int -> Width -> LocalReg -> CmmExpr -> CmmExpr -> Signage -> NatM InstrBlock
-    vrem mop length w dst_reg x y s =  do
+    v3op :: CallishMachOp -> Int -> Width -> LocalReg -> CmmExpr -> CmmExpr -> (Operand -> Operand -> Operand -> Instr) -> NatM InstrBlock
+    v3op mop length w dst_reg x y op =  do
           platform <- getPlatform
           let dst = getRegisterReg platform (CmmLocal dst_reg)
               format = intVecFormat length w
@@ -2292,7 +2298,7 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
             `appOL` code_y
             `snocOL`
               ann moDescr  
-                (VREM s (OpReg format dst) (OpReg format_x reg_x) (OpReg format_y reg_y))
+                (op (OpReg format dst) (OpReg format_x reg_x) (OpReg format_y reg_y))
 
 {- Note [RISCV64 far jumps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -120,8 +120,8 @@ regUsageOfInstr platform instr = case instr of
   VADD dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VSUB dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VMUL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VQUOT dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  VREM s dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VQUOT _mbS dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VREM _s dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VSMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VSMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VUMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -235,7 +235,7 @@ patchRegsOfInstr instr env = case instr of
   VADD o1 o2 o3 -> VADD (patchOp o1) (patchOp o2) (patchOp o3)
   VSUB o1 o2 o3 -> VSUB (patchOp o1) (patchOp o2) (patchOp o3)
   VMUL o1 o2 o3 -> VMUL (patchOp o1) (patchOp o2) (patchOp o3)
-  VQUOT o1 o2 o3 -> VQUOT (patchOp o1) (patchOp o2) (patchOp o3)
+  VQUOT mbS o1 o2 o3 -> VQUOT mbS (patchOp o1) (patchOp o2) (patchOp o3)
   VREM s o1 o2 o3 -> VREM s (patchOp o1) (patchOp o2) (patchOp o3) 
   VSMIN o1 o2 o3 -> VSMIN (patchOp o1) (patchOp o2) (patchOp o3)
   VSMAX o1 o2 o3 -> VSMAX (patchOp o1) (patchOp o2) (patchOp o3)
@@ -684,7 +684,7 @@ data Instr
   | VADD Operand Operand Operand
   | VSUB Operand Operand Operand
   | VMUL Operand Operand Operand
-  | VQUOT Operand Operand Operand
+  | VQUOT (Maybe Signage) Operand Operand Operand
   | VREM Signage Operand Operand Operand
   | VSMIN Operand Operand Operand
   | VSMAX Operand Operand Operand
