@@ -2144,23 +2144,31 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
     MO_U_Mul2 _w -> unsupported mop
     MO_VS_Quot length w
       | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> v3op mop length w dst_reg x y (VQUOT (Just Signed))
+        [dst_reg] <- dest_regs -> v3op mop (intVecFormat length w) dst_reg x y (VQUOT (Just Signed))
     MO_VS_Quot {} -> unsupported mop
     MO_VU_Quot length w
       | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> v3op mop length w dst_reg x y (VQUOT (Just Unsigned))
+        [dst_reg] <- dest_regs -> v3op mop (intVecFormat length w) dst_reg x y (VQUOT (Just Unsigned))
     MO_VU_Quot {} -> unsupported mop
     MO_VS_Rem length w
       | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> v3op mop length w dst_reg x y (VREM Signed)
+        [dst_reg] <- dest_regs -> v3op mop (intVecFormat length w) dst_reg x y (VREM Signed)
     MO_VS_Rem {} -> unsupported mop
     MO_VU_Rem length w
       | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> v3op mop length w dst_reg x y (VREM Unsigned)
+        [dst_reg] <- dest_regs -> v3op mop (intVecFormat length w) dst_reg x y (VREM Unsigned)
     MO_VU_Rem {} -> unsupported mop
+    MO_I64X2_Min | [x, y] <- arg_regs,
+        [dst_reg] <- dest_regs -> v3op mop (intVecFormat 2 W64) dst_reg x y VSMIN
     MO_I64X2_Min -> unsupported mop
+    MO_I64X2_Max | [x, y] <- arg_regs,
+        [dst_reg] <- dest_regs -> v3op mop (intVecFormat 2 W64) dst_reg x y VSMAX
     MO_I64X2_Max -> unsupported mop
+    MO_W64X2_Min | [x, y] <- arg_regs,
+        [dst_reg] <- dest_regs -> v3op mop (intVecFormat 2 W64) dst_reg x y VUMIN
     MO_W64X2_Min -> unsupported mop
+    MO_W64X2_Max | [x, y] <- arg_regs,
+        [dst_reg] <- dest_regs -> v3op mop (intVecFormat 2 W64) dst_reg x y VUMAX
     MO_W64X2_Max -> unsupported mop
     -- Memory Ordering
     -- The related C functions are:
@@ -2281,11 +2289,10 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
       let code = code_fx `appOL` op (OpReg fmt dst) (OpReg format_x reg_fx)
       pure code
 
-    v3op :: CallishMachOp -> Int -> Width -> LocalReg -> CmmExpr -> CmmExpr -> (Operand -> Operand -> Operand -> Instr) -> NatM InstrBlock
-    v3op mop length w dst_reg x y op =  do
+    v3op :: CallishMachOp -> Format -> LocalReg -> CmmExpr -> CmmExpr -> (Operand -> Operand -> Operand -> Instr) -> NatM InstrBlock
+    v3op mop dst_format dst_reg x y op =  do
           platform <- getPlatform
           let dst = getRegisterReg platform (CmmLocal dst_reg)
-              format = intVecFormat length w
               moDescr = pprCallishMachOp mop
           (reg_x, format_x, code_x) <- getSomeReg x
           (reg_y, format_y, code_y) <- getSomeReg y
@@ -2298,7 +2305,7 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
             `appOL` code_y
             `snocOL`
               ann moDescr  
-                (op (OpReg format dst) (OpReg format_x reg_x) (OpReg format_y reg_y))
+                (op (OpReg dst_format dst) (OpReg format_x reg_x) (OpReg format_y reg_y))
 
 {- Note [RISCV64 far jumps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
