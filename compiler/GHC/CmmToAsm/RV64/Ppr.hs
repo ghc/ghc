@@ -853,8 +853,10 @@ pprInstr platform instr = case instr of
   VMUL o1 o2 o3 | allIntVectorRegOps [o1, o2, o3] -> op3 (text "\tvmul.vv") o1 o2 o3
   VMUL o1 o2 o3 | allFloatVectorRegOps [o1, o2, o3] -> op3 (text "\tvfmul.vv") o1 o2 o3
   VMUL o1 o2 o3 -> pprPanic "RV64.pprInstr - VMUL wrong operands." (pprOps platform [o1, o2, o3])
-  VQUOT o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfdiv.vv") o1 o2 o3
-  VQUOT o1 o2 o3 -> pprPanic "RV64.pprInstr - VQUOT wrong operands." (pprOps platform [o1, o2, o3])
+  VQUOT (Just Signed) o1 o2 o3 | allIntVectorRegOps [o1, o2, o3] -> op3 (text "\tvdiv.vv") o1 o2 o3
+  VQUOT (Just Unsigned) o1 o2 o3 | allIntVectorRegOps [o1, o2, o3] -> op3 (text "\tvdivu.vv") o1 o2 o3
+  VQUOT Nothing o1 o2 o3 | allFloatVectorRegOps [o1, o2, o3] -> op3 (text "\tvfdiv.vv") o1 o2 o3
+  VQUOT mbS o1 o2 o3 -> pprPanic ("RV64.pprInstr - VQUOT wrong operands. " ++ show mbS) (pprOps platform [o1, o2, o3])
   VREM Signed o1 o2 o3 | allIntVectorRegOps [o1, o2, o3] -> op3 (text "\tvrem.vv") o1 o2 o3
   VREM Unsigned o1 o2 o3 | allIntVectorRegOps [o1, o2, o3] -> op3 (text "\tvremu.vv") o1 o2 o3
   VREM s o1 o2 o3 -> pprPanic ("RV64.pprInstr - VREM wrong operands. " ++ show s) (pprOps platform [o1, o2, o3])
@@ -984,9 +986,9 @@ instrVecFormat platform instr = case instr of
   VMUL (OpReg fmt _reg) _o2 _o3
     | isVecFormat fmt -> checkedJustFmt fmt
   VMUL _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
-  VQUOT (OpReg fmt _reg) _o2 _o3
+  VQUOT _mbS (OpReg fmt _reg) _o2 _o3
     | isVecFormat fmt -> checkedJustFmt fmt
-  VQUOT _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VQUOT _mbS _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
   VSMIN (OpReg fmt _reg) _o2 _o3
     | isVecFormat fmt -> checkedJustFmt fmt
   VSMIN _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
