@@ -5,6 +5,7 @@
            , MagicHash
            , UnboxedTuples
            , UnliftedFFITypes
+           , TypeApplications
   #-}
 {-# LANGUAGE CApiFFI #-}
 -- We believe we could deorphan this module, by moving lots of things
@@ -1695,6 +1696,16 @@ showSignedFloat showPos p x
    | x < 0 || isNegativeZero x
        = showParen (p > 6) (showChar '-' . showPos (-x))
    | otherwise = showPos x
+
+
+-- Speicialise showSignedFloat for (a) the type and (b) the argument function
+-- The particularly targets are the calls in `instance Show Float` and
+--     `instance Show Double`
+-- Specialising for both (a) and (b) is obviously more efficient; and if you
+-- don't you find that the `x` argument is strict, but boxed, and that can cause
+-- functions calling showSignedFloat to have box their argument.
+{-# SPECIALISE showSignedFloat @Float  showFloat #-}
+{-# SPECIALISE showSignedFloat @Double showFloat #-}
 
 {-
 We need to prevent over/underflow of the exponent in encodeFloat when
