@@ -91,6 +91,7 @@ init_state =
 data Token
     = TEOF {t_str :: String}
     | TIdentifier {t_str :: String}
+    | TIdentifierLParen {t_str :: String}
     | TInteger {t_str :: String}
     | -- preprocessing-op-or-punc
       -- https://timsong-cpp.github.io/cppwp/n4140/lex.operators#nt:preprocessing-op-or-punc
