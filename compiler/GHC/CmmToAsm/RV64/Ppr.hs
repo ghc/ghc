@@ -311,7 +311,7 @@ pprDataItem config lit =
     imm = litToImm lit
 
     ppr_item II8 _ = [text "\t.byte\t" <> pprDataImm platform imm]
-    ppr_item II16 _ = [text "\t.short\t" <> pprDataImm platform imm]
+    ppr_item II16 _ = [text "\t.half\t" <> pprDataImm platform imm]
     ppr_item II32 _ = [text "\t.long\t" <> pprDataImm platform imm]
     ppr_item II64 _ = [text "\t.quad\t" <> pprDataImm platform imm]
     ppr_item FF32 (CmmFloat r _) =
@@ -820,6 +820,7 @@ pprInstr platform instr = case instr of
   VMV o1 o2 -> pprPanic "RV64.pprInstr - invalid VMV instruction" (text "VMV" <+> pprOp platform o1 <> comma <+> pprOp platform o2)
   VID op | isVectorRegOp op -> op1 (text "\tvid.v") op
   VID op -> pprPanic "RV64.pprInstr - VID can only target registers." (pprOp platform op)
+  VMSEQ o1 o2 o3 | allVectorRegOps [o1, o2] && isIntOp o3 && isImmOp o3-> op3 (text "\tvmseq.vi") o1 o2 o3
   VMSEQ o1 o2 o3 | allVectorRegOps [o1, o2] && isIntOp o3 -> op3 (text "\tvmseq.vx") o1 o2 o3
   VMSEQ o1 o2 o3 -> pprPanic "RV64.pprInstr - VMSEQ wrong operands." (pprOps platform [o1, o2, o3])
   VMERGE o1 o2 o3 o4 | allVectorRegOps [o1, o2, o3, o4] -> op4 (text "\tvmerge.vvm") o1 o2 o3 o4
@@ -873,6 +874,8 @@ pprInstr platform instr = case instr of
   VFMIN o1 o2 o3 -> pprPanic "RV64.pprInstr - VFMIN wrong operands." (pprOps platform [o1, o2, o3])
   VFMAX o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfmax.vv") o1 o2 o3
   VFMAX o1 o2 o3 -> pprPanic "RV64.pprInstr - VFMAX wrong operands." (pprOps platform [o1, o2, o3])
+  VRGATHER o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvrgather.vv") o1 o2 o3
+  VRGATHER o1 o2 o3 -> pprPanic "RV64.pprInstr - VRGATHER wrong operands." (pprOps platform [o1, o2, o3])
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
   where
     op1 op o1 = line $ op <+> pprOp platform o1
@@ -951,6 +954,9 @@ instrVecFormat platform instr = case instr of
   ANN _doc instr' -> instrVecFormat platform instr'
   STR fmt _o1 _o2 | isVecFormat fmt -> Just fmt
   LDR fmt _o1 _o2 | isVecFormat fmt -> Just fmt
+  -- Special-case for loading smaller sized structures into bigger sized
+  -- vectors (e.g. vle16. to a FmtInt64)
+  LDRU _fmt (OpReg fmt' _r) _o2 | isVecFormat fmt' -> Just fmt'
   LDRU fmt _o1 _o2 | isVecFormat fmt -> Just fmt
   MOV (OpReg fmt _reg) _o2
     | isVecFormat fmt -> checkedJustFmt fmt
@@ -1007,6 +1013,8 @@ instrVecFormat platform instr = case instr of
   VFMIN _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
   VFMAX (OpReg fmt _reg) _o2 _o3 -> checkedJustFmt fmt
   VFMAX _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VRGATHER (OpReg fmt _reg) _o2 _o3 -> checkedJustFmt fmt
+  VRGATHER _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
   _ -> Nothing
   where
     checkedJustFmt :: Format -> Maybe Format
