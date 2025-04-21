@@ -127,6 +127,7 @@ regUsageOfInstr platform instr = case instr of
   VUMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VFMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VFMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VRGATHER dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   VFMA _ op1 op2 op3 ->
@@ -241,6 +242,7 @@ patchRegsOfInstr instr env = case instr of
   VUMAX o1 o2 o3 -> VUMAX (patchOp o1) (patchOp o2) (patchOp o3)
   VFMIN o1 o2 o3 -> VFMIN (patchOp o1) (patchOp o2) (patchOp o3)
   VFMAX o1 o2 o3 -> VFMAX (patchOp o1) (patchOp o2) (patchOp o3)
+  VRGATHER o1 o2 o3 -> VRGATHER (patchOp o1) (patchOp o2) (patchOp o3)
   FMA s o1 o2 o3 o4 ->
     FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
   VFMA s o1 o2 o3 ->
@@ -685,6 +687,7 @@ data Instr
   | VFMIN Operand Operand Operand
   | VFMAX Operand Operand Operand
   | VFMA FMASign Operand Operand Operand
+  | VRGATHER Operand Operand Operand
 
 data Signage = Signed | Unsigned
   deriving (Eq, Show)
@@ -770,6 +773,7 @@ instrCon i =
     VUMAX {} -> "VUMAX"
     VFMIN {} -> "VFMIN"
     VFMAX {} -> "VFMAX"
+    VRGATHER {} -> "VRGATHER"
     FMA variant _ _ _ _ ->
       case variant of
         FMAdd -> "FMADD"

@@ -1302,6 +1302,66 @@ getRegister' config plat expr =
         MO_VU_Max length w -> vecOp (intVecFormat length w) VUMAX
         MO_VF_Min length w -> vecOp (floatVecFormat length w) VFMIN
         MO_VF_Max length w -> vecOp (floatVecFormat length w) VFMAX
+        MO_V_Shuffle length w idxs -> do
+          -- Our strategy:
+          --   - Gather elemens of v1 on the right positions
+          --   - Gather elemenrs of v2 of the right positions
+          --   - Merge v1 and v2 with an adequate bitmask (v0)
+          lbl_selVec_v1 <- getNewLabelNat
+          lbl_selVec_v2 <- getNewLabelNat
+
+          (reg_x, format_x, code_x) <- getSomeReg x
+          (reg_y, format_y, code_y) <- getSomeReg y
+
+          let (idxs_v1, idxs_v2) =
+                mapTuple reverse
+                  $ foldl'
+                    ( \(acc1, acc2) i ->
+                        if i < length then (Just i : acc1, Nothing : acc2) else (Nothing : acc1, Just (i - length) : acc2)
+                    )
+                    ([], [])
+                    idxs
+              selVecData_v1 = selVecData idxs_v1
+              selVecData_v2 = selVecData idxs_v2
+              selVecFormat = intVecFormat length W16
+              dstFormat = intVecFormat length w
+              addrFormat = intFormat W64
+          sel_v1 <- getNewRegNat selVecFormat 
+          sel_v2 <- getNewRegNat selVecFormat 
+          sel_v1_addr <- getNewRegNat addrFormat 
+          sel_v2_addr <- getNewRegNat addrFormat 
+          gathered_x <- getNewRegNat format_x
+          gathered_y <- getNewRegNat format_y 
+          pure $ Any dstFormat $ \dst ->
+            toOL
+              [ LDATA (Section ReadOnlyData lbl_selVec_v1) (CmmStaticsRaw lbl_selVec_v1 selVecData_v1),
+                LDATA (Section ReadOnlyData lbl_selVec_v2) (CmmStaticsRaw lbl_selVec_v2 selVecData_v2)
+              ]
+              `appOL` code_x
+              `appOL` code_y
+              `appOL` toOL
+                [ LDR addrFormat (OpReg addrFormat sel_v1_addr) (OpImm (ImmCLbl lbl_selVec_v1)),
+                  LDR addrFormat (OpReg addrFormat sel_v2_addr) (OpImm (ImmCLbl lbl_selVec_v2)),
+                  LDRU selVecFormat (OpReg selVecFormat sel_v1) (OpAddr (AddrReg sel_v1_addr)),
+                  LDRU selVecFormat (OpReg selVecFormat sel_v2) (OpAddr (AddrReg sel_v2_addr)),
+                  VRGATHER (OpReg format_x gathered_x) (OpReg format_x reg_x) (OpReg selVecFormat sel_v1),
+                  VRGATHER (OpReg format_y gathered_y) (OpReg format_y reg_y) (OpReg selVecFormat sel_v2),
+                  VMV (OpReg selVecFormat v0Reg) (OpReg selVecFormat sel_v1),
+                  VMERGE (OpReg dstFormat dst)(OpReg format_x gathered_x)(OpReg format_y gathered_y) (OpReg selVecFormat v0Reg)
+                ]
+          where
+            mapTuple :: (a -> b) -> (a, a) -> (b, b)
+            mapTuple f (x, y) = (f x, f y)
+            selVecData :: [Maybe Int] -> [CmmStatic]
+            selVecData idxs =
+                (CmmStaticLit . (flip CmmInt) W16 . fromIntegral)
+                  `map` ( map
+                            ( \i -> case i of
+                                Just i' -> i'
+                                Nothing -> 0
+                            )
+                            idxs
+                        )
         _e -> panic $ "Missing operation " ++ show expr
 
     -- Generic ternary case.
@@ -1331,7 +1391,6 @@ getRegister' config plat expr =
                     expr
                     (VMV (OpReg targetFormat dst) (OpReg format_x reg_x))
                   `snocOL` VFMA var (OpReg targetFormat dst) (OpReg format_y reg_y) (OpReg format_z reg_z)
-
         MO_VF_Insert length width -> vecInsert floatVecFormat length width
         MO_V_Insert length width -> vecInsert intVecFormat length width
         _ ->
@@ -1348,7 +1407,7 @@ getRegister' config plat expr =
             (reg_idx, format_idx, code_idx) <- getSomeReg z
             let format = toFormat length width
                 format_mask = intVecFormat length W8 -- Actually, W1 (one bit) would be correct, but that does not exist.
-                format_vid = intVecFormat length vidWidth
+                format_vid = intVecFormat length (vidWidth length)
             vidReg <- getNewRegNat format_vid
             tmp <- getNewRegNat format
             pure $ Any format $ \dst ->
@@ -1373,18 +1432,20 @@ getRegister' config plat expr =
                 `snocOL`
                 -- 4. Merge with mask -> set element at index
                 VMERGE (OpReg format dst) (OpReg format_v reg_v) (OpReg format tmp) (OpReg format_mask v0Reg)
+
+        -- Which element width do I need in my vector to store indexes in it?
+        vidWidth :: Int -> Width
+        vidWidth length = case bitWidthFixed (fromIntegral length :: Word) of
+          x
+            | x <= widthInBits W8 -> W8
+            | x <= widthInBits W16 -> W16
+            | x <= widthInBits W32 -> W32
+            | x <= widthInBits W64 -> W64
+            | x <= widthInBits W128 -> W128
+            | x <= widthInBits W256 -> W256
+            | x <= widthInBits W512 -> W512
+          e -> panic $ "length " ++ show length ++ "not representable in a single element's Width (" ++ show e ++ ")"
           where
-            -- Which element width do I need in my vector to store indexes in it?
-            vidWidth = case bitWidthFixed (fromIntegral length :: Word) of
-              x
-                | x <= widthInBits W8 -> W8
-                | x <= widthInBits W16 -> W16
-                | x <= widthInBits W32 -> W32
-                | x <= widthInBits W64 -> W64
-                | x <= widthInBits W128 -> W128
-                | x <= widthInBits W256 -> W256
-                | x <= widthInBits W512 -> W512
-              e -> panic $ "length " ++ show length ++ "not representable in a single element's Width (" ++ show e ++ ")"
             bitWidthFixed :: Word -> Int
             bitWidthFixed 0 = 1
             bitWidthFixed n = finiteBitSize n - countLeadingZeros n
@@ -1489,14 +1550,6 @@ getRegister' config plat expr =
                   )
 
 -- TODO: Missing MachOps:
--- - MO_V_Add
--- - MO_V_Sub
--- - MO_V_Mul
--- - MO_VS_Quot
--- - MO_VS_Rem
--- - MO_VS_Neg
--- - MO_VU_Quot
--- - MO_VU_Rem
 -- - MO_V_Shuffle
 -- - MO_VF_Shuffle
 
@@ -2144,31 +2197,43 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
     MO_U_Mul2 _w -> unsupported mop
     MO_VS_Quot length w
       | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> v3op mop (intVecFormat length w) dst_reg x y (VQUOT (Just Signed))
+        [dst_reg] <- dest_regs ->
+          v3op mop (intVecFormat length w) dst_reg x y (VQUOT (Just Signed))
     MO_VS_Quot {} -> unsupported mop
     MO_VU_Quot length w
       | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> v3op mop (intVecFormat length w) dst_reg x y (VQUOT (Just Unsigned))
+        [dst_reg] <- dest_regs ->
+          v3op mop (intVecFormat length w) dst_reg x y (VQUOT (Just Unsigned))
     MO_VU_Quot {} -> unsupported mop
     MO_VS_Rem length w
       | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> v3op mop (intVecFormat length w) dst_reg x y (VREM Signed)
+        [dst_reg] <- dest_regs ->
+          v3op mop (intVecFormat length w) dst_reg x y (VREM Signed)
     MO_VS_Rem {} -> unsupported mop
     MO_VU_Rem length w
       | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> v3op mop (intVecFormat length w) dst_reg x y (VREM Unsigned)
+        [dst_reg] <- dest_regs ->
+          v3op mop (intVecFormat length w) dst_reg x y (VREM Unsigned)
     MO_VU_Rem {} -> unsupported mop
-    MO_I64X2_Min | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> v3op mop (intVecFormat 2 W64) dst_reg x y VSMIN
+    MO_I64X2_Min
+      | [x, y] <- arg_regs,
+        [dst_reg] <- dest_regs ->
+          v3op mop (intVecFormat 2 W64) dst_reg x y VSMIN
     MO_I64X2_Min -> unsupported mop
-    MO_I64X2_Max | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> v3op mop (intVecFormat 2 W64) dst_reg x y VSMAX
+    MO_I64X2_Max
+      | [x, y] <- arg_regs,
+        [dst_reg] <- dest_regs ->
+          v3op mop (intVecFormat 2 W64) dst_reg x y VSMAX
     MO_I64X2_Max -> unsupported mop
-    MO_W64X2_Min | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> v3op mop (intVecFormat 2 W64) dst_reg x y VUMIN
+    MO_W64X2_Min
+      | [x, y] <- arg_regs,
+        [dst_reg] <- dest_regs ->
+          v3op mop (intVecFormat 2 W64) dst_reg x y VUMIN
     MO_W64X2_Min -> unsupported mop
-    MO_W64X2_Max | [x, y] <- arg_regs,
-        [dst_reg] <- dest_regs -> v3op mop (intVecFormat 2 W64) dst_reg x y VUMAX
+    MO_W64X2_Max
+      | [x, y] <- arg_regs,
+        [dst_reg] <- dest_regs ->
+          v3op mop (intVecFormat 2 W64) dst_reg x y VUMAX
     MO_W64X2_Max -> unsupported mop
     -- Memory Ordering
     -- The related C functions are:
@@ -2290,22 +2355,22 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
       pure code
 
     v3op :: CallishMachOp -> Format -> LocalReg -> CmmExpr -> CmmExpr -> (Operand -> Operand -> Operand -> Instr) -> NatM InstrBlock
-    v3op mop dst_format dst_reg x y op =  do
-          platform <- getPlatform
-          let dst = getRegisterReg platform (CmmLocal dst_reg)
-              moDescr = pprCallishMachOp mop
-          (reg_x, format_x, code_x) <- getSomeReg x
-          (reg_y, format_y, code_y) <- getSomeReg y
-          massertPpr (isVecFormat format_x && isVecFormat format_y)
-            $ text "vecOp: non-vector operand. operands: "
-            <+> ppr format_x
-            <+> ppr format_y
-          pure
-            $ code_x
-            `appOL` code_y
-            `snocOL`
-              ann moDescr  
-                (op (OpReg dst_format dst) (OpReg format_x reg_x) (OpReg format_y reg_y))
+    v3op mop dst_format dst_reg x y op = do
+      platform <- getPlatform
+      let dst = getRegisterReg platform (CmmLocal dst_reg)
+          moDescr = pprCallishMachOp mop
+      (reg_x, format_x, code_x) <- getSomeReg x
+      (reg_y, format_y, code_y) <- getSomeReg y
+      massertPpr (isVecFormat format_x && isVecFormat format_y)
+        $ text "vecOp: non-vector operand. operands: "
+        <+> ppr format_x
+        <+> ppr format_y
+      pure
+        $ code_x
+        `appOL` code_y
+        `snocOL` ann
+          moDescr
+          (op (OpReg dst_format dst) (OpReg format_x reg_x) (OpReg format_y reg_y))
 
 {- Note [RISCV64 far jumps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2553,6 +2618,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       VUMAX {} -> 2
       VFMIN {} -> 2
       VFMAX {} -> 2
+      VRGATHER {} -> 2
       VFMA {} -> 3
       -- estimate the subsituted size for jumps to lables
       -- jumps to registers have size 1

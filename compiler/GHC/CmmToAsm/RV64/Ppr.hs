@@ -872,6 +872,8 @@ pprInstr platform instr = case instr of
   VFMIN o1 o2 o3 -> pprPanic "RV64.pprInstr - VFMIN wrong operands." (pprOps platform [o1, o2, o3])
   VFMAX o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvfmax.vv") o1 o2 o3
   VFMAX o1 o2 o3 -> pprPanic "RV64.pprInstr - VFMAX wrong operands." (pprOps platform [o1, o2, o3])
+  VRGATHER o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvrgatherei16.vv") o1 o2 o3
+  VRGATHER o1 o2 o3 -> pprPanic "RV64.pprInstr - VRGATHER wrong operands." (pprOps platform [o1, o2, o3])
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
   where
     op1 op o1 = line $ op <+> pprOp platform o1
@@ -1006,6 +1008,8 @@ instrVecFormat platform instr = case instr of
   VFMIN _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
   VFMAX (OpReg fmt _reg) _o2 _o3 -> checkedJustFmt fmt
   VFMAX _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
+  VRGATHER (OpReg fmt _reg) _o2 _o3 -> checkedJustFmt fmt
+  VRGATHER _o1 _o2 _o3 -> pprPanic "Did not match" (pprInstr platform instr)
   _ -> Nothing
   where
     checkedJustFmt :: Format -> Maybe Format
