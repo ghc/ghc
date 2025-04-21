@@ -1,6 +1,6 @@
 module Macro (
     -- process,
-    cppIf,
+    cppCond,
     -- get rid of warnings for tests
     -- m0,
     m1,
@@ -45,8 +45,8 @@ import State
 -- ---------------------------------------------------------------------
 
 --    We evaluate to an Int, which we convert to a bool
-cppIf :: String -> PP Bool
-cppIf str = do
+cppCond :: String -> PP Bool
+cppCond str = do
   s <- getPpState
   let
     expanded = expand (pp_defines s) str
@@ -61,7 +61,7 @@ expand :: MacroDefines -> String -> String
 expand s str = expanded
   where
     -- TODO: repeat until re-expand or fixpoint
-    toks = case cppLex str of
+    toks = case cppLex False str of
         Left err -> error $ "expand:" ++ show (err, str)
         Right tks -> tks
     expanded = combineToks $ map t_str $ expandToks s toks
@@ -267,13 +267,13 @@ isOther _ = True
 -- ---------------------------------------------------------------------
 
 m1 :: Either String [Token]
-m1 = cppLex "`"
+m1 = cppLex False "`"
 
 m2 :: Either String [Token]
-m2 = cppLex "hello(5)"
+m2 = cppLex False "hello(5)"
 
 m3 :: Either String [Token]
-m3 = cppLex "#define FOO(m1,m2,m) ((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) == 1 && (m2) == 7 && (m) <= 0)"
+m3 = cppLex True "#define FOO(m1,m2,m) ((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) == 1 && (m2) == 7 && (m) <= 0)"
 
 -- Right [THash {t_str = "#"}
 --       ,TDefine {t_str = "define"}
@@ -289,12 +289,12 @@ m3 = cppLex "#define FOO(m1,m2,m) ((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) =
 --       ]
 
 m4 :: Either String [Token]
-m4 = cppLex "#if (m < 1)"
+m4 = cppLex True "#if (m < 1)"
 
 m5 :: Either String (Maybe [[Token]], [Token])
 m5 = do
     -- toks <- cppLex "(43,foo(a)) some other stuff"
-    toks <- cppLex "( ff(bar(),baz), 4 )"
+    toks <- cppLex False "( ff(bar(),baz), 4 )"
     return $ getExpandArgs toks
 
 tt :: Either String ([[Char]], [Char])

@@ -8,7 +8,7 @@ module ParserM (
     AlexInput (..),
     run_parser,
     -- Parser state
-    St,
+    St(..),
     init_state,
     StartCode,
     start_code,
@@ -75,6 +75,7 @@ run_parser (ParserM f) =
 data St = St
     { start_code :: !StartCode
     , brace_depth :: !Int
+    , scanning_directive :: !Bool
     }
     deriving (Show)
 type StartCode = Int
@@ -84,6 +85,7 @@ init_state =
     St
         { start_code = 0
         , brace_depth = 0
+        , scanning_directive = False
         }
 
 -- Tokens

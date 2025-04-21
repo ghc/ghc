@@ -13,7 +13,7 @@ module GHC.Parser.PreProcess.ParsePP (
 import Data.List (intercalate)
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.PreProcess.Lexer
-import GHC.Parser.PreProcess.ParserM (Token (..), init_state)
+import GHC.Parser.PreProcess.ParserM (Token (..), init_state, St(..))
 import GHC.Parser.PreProcess.State
 import GHC.Prelude
 
@@ -24,7 +24,7 @@ import GHC.Prelude
 -- | Parse a CPP directive, using tokens from the CPP lexer
 parseDirective :: String -> Either String CppDirective
 parseDirective s =
-    case cppLex s of
+    case cppLex True s of
         Left e -> Left e
         Right toks ->
             case toks of
@@ -48,7 +48,7 @@ combineToks ss = intercalate " " ss
 
 cppDefine :: [Token] -> Either String CppDirective
 cppDefine [] = Left "error:empty #define directive"
-cppDefine (TIdentifierLParen n : ts) = Right $ CppDefine n args def
+cppDefine (TIdentifierLParen n : ts) = Right $ CppDefine (init n) args def
   where
     (args, def) = getArgs ts
 cppDefine (TIdentifier n : ts) = Right $ CppDefine n Nothing ts
@@ -102,8 +102,9 @@ parseDefineArgs acc ts = Left $ "malformed macro args, expecting identifier foll
 
 -- ---------------------------------------------------------------------
 
-cppLex :: String -> Either String [Token]
-cppLex s = case lexCppTokenStream s init_state of
+-- TODO: give this a better name
+cppLex :: Bool -> String -> Either String [Token]
+cppLex sd s = case lexCppTokenStream s (init_state {scanning_directive = sd}) of
     Left err -> Left err
     Right (_inp, _st, toks) -> Right toks
 
@@ -141,4 +142,5 @@ t2 = doATest "# if ((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) == 1 && (m2) == 
 t3 :: Either String CppDirective
 t3 = parseDirective "# if FOO == 4"
 
-t4 = cppLex "#define foo(X) X"
+t4 :: Either String [Token]
+t4 = cppLex True "#define foo(X) X"
