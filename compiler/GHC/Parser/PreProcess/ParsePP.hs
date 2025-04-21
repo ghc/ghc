@@ -7,6 +7,7 @@ module GHC.Parser.PreProcess.ParsePP (
     t1,
     t2,
     t3,
+    t4,
 ) where
 
 import Data.List (intercalate)
@@ -47,9 +48,10 @@ combineToks ss = intercalate " " ss
 
 cppDefine :: [Token] -> Either String CppDirective
 cppDefine [] = Left "error:empty #define directive"
-cppDefine (TIdentifier n : ts) = Right $ CppDefine n args def
+cppDefine (TIdentifierLParen n : ts) = Right $ CppDefine n args def
   where
     (args, def) = getArgs ts
+cppDefine (TIdentifier n : ts) = Right $ CppDefine n Nothing ts
 cppDefine (t : _) = Left $ "#define: expecting an identifier, got :" ++ show t
 
 cppInclude :: [String] -> CppDirective
@@ -79,14 +81,14 @@ cppDumpState _ts = CppDumpState
 -- ---------------------------------------------------------------------
 
 -- Crack out the arguments to a #define. This is of the form of
--- comma-separated identifiers between parens
+-- comma-separated identifiers between parens, where we have already
+-- seen the opening paren.
 getArgs :: [Token] -> (Maybe [String], [Token])
 getArgs [] = (Nothing, [])
-getArgs (TOpenParen _ : ts) =
+getArgs ts =
     case parseDefineArgs [] ts of
         Left err -> error err
         Right (args, rest) -> (Just (reverse args), rest)
-getArgs ts = (Nothing, ts)
 
 parseDefineArgs ::
     [String] ->
@@ -138,3 +140,5 @@ t2 = doATest "# if ((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) == 1 && (m2) == 
 
 t3 :: Either String CppDirective
 t3 = parseDirective "# if FOO == 4"
+
+t4 = cppLex "#define foo(X) X"
