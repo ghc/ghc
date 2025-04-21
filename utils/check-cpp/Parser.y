@@ -91,6 +91,7 @@ import qualified GHC.Internal.Data.Tuple as Happy_Prelude
     'xor_eq'           { TXorEq {} }
 
     identifier         { TIdentifier {} }
+    identifierLP       { TIdentifierLParen {} }
     integer            { TInteger {} }
     string             { TString {} }
     other              { TOther {} }
