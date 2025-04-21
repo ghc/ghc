@@ -191,7 +191,7 @@ setAccepting on = do
   let possible_accepting = parent_on && on
   let (new_group_state, accepting) =
         case (group_state, possible_accepting) of
-          (PpNoGroup, v) -> error "setAccepting for state PpNoGroup"
+          (PpNoGroup, _) -> error "setAccepting for state PpNoGroup"
           (PpInGroupStillInactive, True) -> (PpInGroupHasBeenActive, True)
           (PpInGroupStillInactive, False) -> (PpInGroupStillInactive, False)
           (PpInGroupHasBeenActive, _) -> (PpInGroupHasBeenActive, False)
@@ -317,7 +317,7 @@ addDefine name def = do
 
 addDefine' :: PpState -> MacroName -> MacroDef -> PpState
 addDefine' s name def =
-    s{pp_defines = insertMacroDef name def (pp_defines s)}
+    s{ pp_defines = insertMacroDef name def (pp_defines s)}
 
 ppDefine :: MacroName -> MacroDef -> PP ()
 ppDefine name val = addDefine name val
