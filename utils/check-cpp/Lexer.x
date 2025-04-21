@@ -2,13 +2,15 @@
 module Lexer (lex_tok, lexCppTokenStream ) where
 
 import ParserM (
-                St, init_pos,
+                St(..), init_pos,
                 ParserM (..), Action, mkTv, Token(..), start_code,
                 setStartCode,
                 show_pos, position,
-                AlexInput(..), alexGetByte)
+                AlexInput(..), alexGetByte,
+                alexInputPrevChar)
 -- import qualified ParserM as ParserM (input)
 import Control.Monad
+
 
 -- The lexer is based on
 -- https://timsong-cpp.github.io/cppwp/n4140/lex.pptoken
@@ -90,16 +92,19 @@ words :-
     <0>         "xor"                { mkTv TXor }
     <0>         "xor_eq"             { mkTv TXorEq }
 ----------------------------------------
-    <0>         [a-zA-Z_][a-zA-Z0-9_]*\( { mkTv TIdentifierLParen }
-    <0>         [a-zA-Z_][a-zA-Z0-9_]*   { mkTv TIdentifier }
-    <0>         \-? [0-9][0-9]*          { mkTv TInteger  }
-    <0>         \" [^\"]* \"             { mkTv (TString . tail . init) }
-    <0>         ()                       { begin other }
+    <0>         [a-zA-Z_][a-zA-Z0-9_]*\( / { inDirective }  { mkTv TIdentifierLParen }
+    <0>         [a-zA-Z_][a-zA-Z0-9_]*                      { mkTv TIdentifier }
+    <0>         \-? [0-9][0-9]*                             { mkTv TInteger  }
+    <0>         \" [^\"]* \"                                { mkTv (TString . tail . init) }
+    <0>         ()                                          { begin other }
 
     <other>     .+                   { \i -> do {setStartCode 0;
                                                  mkTv TOther i} }
 
 {
+
+inDirective :: AlexAccPred Bool
+inDirective flag _ _ _ = flag
 
 begin :: Int -> Action
 begin sc _str =
@@ -108,7 +113,7 @@ begin sc _str =
 
 get_tok :: ParserM Token
 get_tok = ParserM $ \i st ->
-   case alexScan i (start_code st) of
+   case alexScanUser (scanning_directive st) i (start_code st) of
        AlexEOF -> Right (i, st, TEOF "")
        AlexError _ -> Left ("Lexical error at " ++ show_pos (position i))
        AlexSkip i' _ -> case get_tok of
