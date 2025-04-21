@@ -80,7 +80,7 @@ doExpandToks ed _ [] = (ed, [])
 doExpandToks ed s (TIdentifierLParen n: ts) =
   -- TIdentifierLParen has no meaning here (only in a #define), so
   -- restore it to its constituent tokens
-  doExpandToks ed s (TIdentifier n:TOpenParen "(":ts)
+  doExpandToks ed s (TIdentifier (init n):TOpenParen "(":ts)
 doExpandToks _  s (TIdentifier "defined" : ts) = (True, rest)
   -- See Note: [defined unary operator] below
   where
