@@ -1233,14 +1233,14 @@ setErrCtxt ctxt = updLclEnv (setLclEnvErrCtxt ctxt)
 
 -- | Add a fixed message to the error context. This message should not
 -- do any tidying.
--- no op in generated code
+-- NB. No op in generated code
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 addErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 -- | Add a message to the error context. This message may do tidying.
---   no op in generated code
+--   NB. No op in generated code
 --   See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
 {-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
@@ -1729,9 +1729,26 @@ mkErrCtxt env ctxts
 --          then return empty  -- just becomes too voluminous
 --          else go dbg 0 env ctxts
  = go False 0 env ctxts
+
  where
    go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
    go _ _ _   [] = return []
+   go dbg n env ((is_landmark1, ctxt1) : (is_landmark2, ctxt2) : ctxts)
+     | is_landmark1 || n < mAX_CONTEXTS -- Too verbose || dbg
+     = do { (env', msg1) <- liftZonkM $ ctxt1 env
+          ; (_, msg2) <- liftZonkM $ ctxt2 env'
+          ; case (msg1, msg2) of
+              (ExprCtxt{}, StmtErrCtxt (HsDoStmt (DoExpr{})) _)
+                -> do { let n' = if is_landmark2 then n else n+1
+                      ; rest <- go dbg n' env' ctxts
+                      ; return (msg2 : rest) }
+              _
+                -> do { let n' = if is_landmark1 then n else n+1
+                      ; rest <- go dbg n' env' ((is_landmark2, ctxt2) : ctxts)
+                      ; return (msg1 : rest) }
+          }
+     | otherwise
+     = go dbg n env ((is_landmark2, ctxt2) : ctxts)
    go dbg n env ((is_landmark, ctxt) : ctxts)
      | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
      = do { (env', msg) <- liftZonkM $ ctxt env
@@ -1740,6 +1757,14 @@ mkErrCtxt env ctxts
           ; return (msg : rest) }
      | otherwise
      = go dbg n env ctxts
+
+   -- filter_stmt_adj :: [ErrCtxtMsg] -> [ErrCtxtMsg]
+   -- filter_stmt_adj = concat . map stmtAdj . tails
+
+   -- stmtAdj :: [ErrCtxtMsg] -> [ErrCtxtMsg]
+   -- stmtAdj (ExprCtxt{} : StmtErrCtxt{} : _ ) = []
+   -- stmtAdj (s : _ )  = [s]
+   -- stmtAdj xs = xs
 
 mAX_CONTEXTS :: Int     -- No more than this number of non-landmark contexts
 mAX_CONTEXTS = 3
