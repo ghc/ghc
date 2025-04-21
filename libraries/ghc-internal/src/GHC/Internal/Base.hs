@@ -1809,7 +1809,12 @@ build g = g (:) []
 
 augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
 {-# INLINE [1] augment #-}
-augment g xs = g (:) xs
+-- Give it one argument so that it inlines with one arg
+-- But (crucially) the body is a lambda so that `g` is visibly applied
+-- to two args, and hence we know that in a call
+--      augment (\c n. blah)
+-- both c and n are OneShot
+augment g = \xs -> g (:) xs
 
 {-# RULES
 "fold/build"    forall k z (g::forall b. (a->b->b) -> b -> b) .
@@ -1975,7 +1980,7 @@ The rules for map work like this.
 "++/literal_utf8" forall x. (++) (unpackCStringUtf8# x) = unpackAppendCStringUtf8# x #-}
 
 {-# RULES
-"++"    [~1] forall xs ys. xs ++ ys = augment (\c n -> foldr c n xs) ys
+"++"    [~1] forall xs. (++) xs = augment (\c n -> foldr c n xs)
   #-}
 
 
