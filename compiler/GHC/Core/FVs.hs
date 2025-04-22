@@ -656,7 +656,7 @@ stableUnfoldingFVs unf
   | otherwise             = Nothing
 
 unfoldingFVs :: Unfolding -> FV
-unfoldingFVs (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
+unfoldingFVs (CoreUnfolding { uf_tmpl = rhs })
   = exprFVs rhs
 unfoldingFVs (DFunUnfolding { df_bndrs = bndrs, df_args = args })
   = FV.delFVs (mkVarSet bndrs) $ exprsFVs args
