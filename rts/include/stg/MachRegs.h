@@ -222,7 +222,7 @@
 /* define NO_ARG_REGS if we have no argument registers at all (we can
  * optimise certain code paths using this predicate).
  */
-#if MAX_REAL_VANILLA_REG < 2
+#if MAX_REAL_VANILLA_REG < 2 && MAX_REAL_XMM_REG == 0
 #define NO_ARG_REGS
 #else
 #undef NO_ARG_REGS

@@ -490,7 +490,7 @@ alpineVariables arch = mconcat $
   , brokenTest "encoding004" "due to lack of locale support"
   , brokenTest "T10458" "#17869"
   ] ++
-  [ mconcat [ brokenTest test "#25498" | test <- ["simd009", "T25062_V16", "T25169", "T22187_run"] ]
+  [ mconcat [ brokenTest test "#25498" | test <- ["simd009", "T25169"] ]
   | I386 <- [arch]
   ] ++
   [ brokenTest "T22033" "#25497" | I386 <- [arch] ] ++
