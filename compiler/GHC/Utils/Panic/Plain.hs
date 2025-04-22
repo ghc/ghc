@@ -116,9 +116,17 @@ assertPanic file line =
   Exception.throw (Exception.AssertionFailed
            ("ASSERT failed! file " ++ file ++ ", line " ++ show line))
 
-
+-- | Throw a failed assertion exception taking the location information
+-- from 'HasCallStack' evidence.
 assertPanic' :: HasCallStack => a
-assertPanic' = Exception.throw (Exception.AssertionFailed "ASSERT failed!")
+assertPanic' =
+    Exception.throw
+      $ Exception.AssertionFailed
+      $ "ASSERT failed!\n" ++ withFrozenCallStack doc
+  where
+    -- TODO: Drop CallStack when exception backtrace functionality
+    -- can be assumed of bootstrap compiler.
+    doc = unlines $ fmap ("  "++) $ lines (prettyCallStack callStack)
 
 assert :: HasCallStack => Bool -> a -> a
 {-# INLINE assert #-}
