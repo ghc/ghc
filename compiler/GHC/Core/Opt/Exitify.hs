@@ -224,7 +224,8 @@ exitifyRec in_scope pairs
       -- We have something to float out!
       | otherwise
       = do { -- Assemble the RHS of the exit join point
-             -- Reminder: see GHC.Core.Utils Note [Abstracting over free variables]
+             -- Reminder: see GHC.Core.Utils
+             --           Note [Type-lets and abstracting over free variables]
              let rhs   = mkCoreAbsLams abs_vars e
                  avoid = in_scope `extendInScopeSetList` captured
                  join_arity = count (isNothing . tyVarUnfolding_maybe) abs_vars

@@ -526,15 +526,15 @@ bindings are:
   (a) inside the scrutinee
   (b) inside one of the alternatives/default (default FVs always /first/!).
 
-Note [Floating type-lets inwards]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When floating a type-let inwards we must be careful of the variables
+Note [Don't float in type or coercion lets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't float type-lets or coercion-lets inward. Doing so does not
+save allocation; and if we did we't have to be careful of the variables
 mentiond in the idType of the case-binder.  For example
     \(x :: Maybe b) -> let a = Maybe b in
                        case x of (cb :: a) of { Just y -> ... }
 We must not float the `a = Maybe b` into the case alternatives, because
-it is mentioned in the type of `cb`.  Hence we add fvs(idType(cb)) into the
-"here-binders" when doing `sepBindsByDropPoint`.
+it is mentioned in the type of `cb`.
 -}
 
 fiExpr platform to_drop (_, AnnCase scrut case_bndr _ [AnnAlt con alt_bndrs rhs])

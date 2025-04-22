@@ -3184,7 +3184,7 @@ Sub-note: type-lets
 ~~~~~~~~~~~~~~~~~~~
 Consider this:
    /\a. let b = Maybe a in
-    	/\a. id @b{=Maybe a}
+         /\a. id @b{=Maybe a}
 
 I have written b{=Maybe a} to denote the TyVar `b` with an unfolding `Maybe a`.
 Our invariant is that it is always, /unconditionally/ OK to replace a tyvar with
