@@ -1272,16 +1272,16 @@ isNonCoVarId _                             = False
 isLocalId :: Var -> Bool
 -- True of local Ids only, not of TyVars
 isLocalId (Id { idScope = LocalId _ }) = True
-isLocalId id                           = False
+isLocalId _                            = False
 
 isLocalId_maybe :: Var -> Maybe ExportFlag
 -- (Just export-flag) for local Ids only; Nothing for TyVars
 isLocalId_maybe (Id { idScope = LocalId ef }) = Just ef
-isLocalId_maybe id                            = Nothing
+isLocalId_maybe _                             = Nothing
 
 isGlobalId :: Id -> Bool
 isGlobalId (Id { idScope = GlobalId }) = True
-isGlobalId id                          = False
+isGlobalId _                           = False
 
 -- | 'isLocalVar' returns @True@ for type variables as well as local 'Id's
 -- These are the variables that we need to pay attention to when finding free
