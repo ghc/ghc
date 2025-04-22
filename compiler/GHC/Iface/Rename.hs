@@ -718,7 +718,8 @@ rnIfaceIdDetails details
 
 rnIfaceType :: Rename IfaceType
 rnIfaceType (IfaceFreeTyVar n) = pure (IfaceFreeTyVar n)
-rnIfaceType (IfaceTyVar   n)   = pure (IfaceTyVar n)
+rnIfaceType (IfaceExtTyVar  n) = pure (IfaceExtTyVar n)
+rnIfaceType (IfaceTyVar     n) = pure (IfaceTyVar n)
 rnIfaceType (IfaceAppTy t1 t2)
     = IfaceAppTy <$> rnIfaceType t1 <*> rnIfaceAppArgs t2
 rnIfaceType (IfaceLitTy l)         = return (IfaceLitTy l)

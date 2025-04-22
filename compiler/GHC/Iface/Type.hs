@@ -177,6 +177,7 @@ type IfaceKind     = IfaceType
 data IfaceType
   = IfaceFreeTyVar TyVar                -- See Note [Free TyVars and CoVars in IfaceType]
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
+  | IfaceExtTyVar  IfExtName            -- Imported or top-level external tyvar
   | IfaceLitTy     IfaceTyLit
   | IfaceAppTy     IfaceType IfaceAppArgs
                              -- See Note [Suppressing invisible arguments] for
@@ -701,6 +702,7 @@ ifTypeIsVarFree :: IfaceType -> Bool
 ifTypeIsVarFree ty = go ty
   where
     go (IfaceTyVar {})         = False
+    go (IfaceExtTyVar {})      = False
     go (IfaceFreeTyVar {})     = False
     go (IfaceAppTy fun args)   = go fun && go_args args
     go (IfaceFunTy _ w arg res) = go w && go arg && go res
@@ -723,6 +725,7 @@ visibleTypeVarOccurencies = go
     (<>) = Set.union
 
     go (IfaceTyVar var)         = Set.singleton var
+    go (IfaceExtTyVar {})       = mempty
     go (IfaceFreeTyVar {})      = mempty
     go (IfaceAppTy fun args)    = go fun <> go_args args
     go (IfaceFunTy _ w arg res) = go w <> go arg <> go res
@@ -758,7 +761,8 @@ substIfaceType :: IfaceTySubst -> IfaceType -> IfaceType
 substIfaceType env ty
   = go ty
   where
-    go (IfaceFreeTyVar tv)    = IfaceFreeTyVar tv
+    go ty@(IfaceFreeTyVar tv) = ty
+    go ty@(IfaceExtTyVar tv)  = ty
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t ts)     = IfaceAppTy  (go t) (substIfaceAppArgs env ts)
     go (IfaceFunTy af w t1 t2)  = IfaceFunTy af (go w) (go t1) (go t2)
@@ -1143,8 +1147,9 @@ ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty ctxt_prec ty
   | not (isIfaceRhoType ty)             = ppr_sigma ShowForAllMust ctxt_prec ty
 ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIfaceRhoType
-ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar       -- This is the main reason for IfaceFreeTyVar!
-ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar       -- See Note [Free TyVars and CoVars in IfaceType]
+ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
+ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free TyVars and CoVars in IfaceType]
+ppr_ty _         (IfaceExtTyVar tyvar)  = ppr tyvar
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty ctxt_prec (IfaceTupleTy i p tys) = ppr_tuple ctxt_prec i p tys -- always fully saturated
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
@@ -1320,7 +1325,7 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
       = IfaceForAllTy (go_ifacebndr subs bndr) (go subs rank1 ty)
 
     go subs _ ty@(IfaceTyVar tv) = case lookupFsEnv subs (ifLclNameFS tv) of
-      Just s -> s
+      Just s  -> s
       Nothing -> ty
 
     go _ _ ty@(IfaceFreeTyVar tv)
@@ -1342,6 +1347,8 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
       = many_ty
       | otherwise
       = ty
+
+    go _ _ ty@(IfaceExtTyVar {}) = ty
 
     go subs _ (IfaceTyConApp tc tc_args)
       = IfaceTyConApp tc (go_args subs tc_args)
@@ -2366,6 +2373,9 @@ putIfaceType bh (IfaceTupleTy s i tys)
   = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
 putIfaceType bh (IfaceLitTy n)
   = do { putByte bh 9; put_ bh n }
+putIfaceType bh (IfaceExtTyVar tv) = do
+        putByte bh 10
+        put_ bh tv
 
 -- | Deserialises an 'IfaceType' from the given 'ReadBinHandle'.
 --
@@ -2397,8 +2407,10 @@ getIfaceType bh = do
 
               8 -> do { s <- get bh; i <- get bh; tys <- get bh
                       ; return (IfaceTupleTy s i tys) }
-              _  -> do n <- get bh
+              9  -> do n <- get bh
                        return (IfaceLitTy n)
+              _  -> do n <- get bh
+                       return (IfaceExtTyVar n)
 
 instance Binary IfLclName where
   put_ bh = put_ bh . ifLclNameFS
@@ -2586,6 +2598,7 @@ instance NFData IfaceType where
   rnf = \case
     IfaceFreeTyVar f1 -> f1 `seq` ()
     IfaceTyVar f1 -> rnf f1
+    IfaceExtTyVar f1 -> rnf f1
     IfaceLitTy f1 -> rnf f1
     IfaceAppTy f1 f2 -> rnf f1 `seq` rnf f2
     IfaceFunTy f1 f2 f3 f4 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4

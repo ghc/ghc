@@ -183,7 +183,11 @@ toIfaceTypeX :: VarSet -> Type -> IfaceType
 -- Synonyms are retained in the interface type
 toIfaceTypeX fr (TyVarTy tv)   -- See Note [Free TyVars and CoVars in IfaceType] in GHC.Iface.Type
   | tv `elemVarSet` fr         = IfaceFreeTyVar tv
+  | isExternalName nm          = IfaceExtTyVar nm
   | otherwise                  = IfaceTyVar (toIfaceTyVar tv)
+  where
+    nm = tyVarName tv
+
 toIfaceTypeX fr ty@(AppTy {})  =
   -- Flatten as many argument AppTys as possible, then turn them into an
   -- IfaceAppArgs list.

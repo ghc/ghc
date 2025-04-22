@@ -1502,6 +1502,7 @@ tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType = go
   where
     go (IfaceTyVar n)            = TyVarTy <$> tcIfaceTyVar n
+    go (IfaceExtTyVar n)         = TyVarTy <$> tcIfaceExtTyVar n
     go (IfaceFreeTyVar n)        = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceLitTy l)            = LitTy <$> tcIfaceTyLit l
     go (IfaceFunTy flag w t1 t2) = FunTy flag <$> tcIfaceType w <*> go t1 <*> go t2
@@ -2143,6 +2144,13 @@ tcIfaceGlobal name
 -- to see how this could happen, especially because the reference to
 -- the constructor (A and B) means that GHC will always typecheck
 -- this expression *after* typechecking T.
+
+tcIfaceExtTyVar :: Name -> IfL TyVar
+tcIfaceExtTyVar name
+  = do { thing <- tcIfaceGlobal name
+       ; case thing of
+           ATyVar tv -> return tv
+           _ -> pprPanic "tcIfaceExtTyVar" (ppr thing) }
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
 tcIfaceTyCon (IfaceTyCon name _info)
