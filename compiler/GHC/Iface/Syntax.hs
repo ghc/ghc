@@ -2068,8 +2068,9 @@ freeNamesIfAppArgs (IA_Arg t _ ts) = freeNamesIfType t &&& freeNamesIfAppArgs ts
 freeNamesIfAppArgs IA_Nil          = emptyNameSet
 
 freeNamesIfType :: IfaceType -> NameSet
-freeNamesIfType (IfaceFreeTyVar _)    = emptyNameSet
-freeNamesIfType (IfaceTyVar _)        = emptyNameSet
+freeNamesIfType (IfaceFreeTyVar {})   = emptyNameSet
+freeNamesIfType (IfaceTyVar {})       = emptyNameSet
+freeNamesIfType (IfaceExtTyVar {})    = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfAppArgs t
 freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfAppArgs ts
 freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfAppArgs ts
