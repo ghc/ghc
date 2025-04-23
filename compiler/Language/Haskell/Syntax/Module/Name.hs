@@ -3,6 +3,7 @@ module Language.Haskell.Syntax.Module.Name where
 import Prelude
 
 import Data.Char (isAlphaNum)
+import Data.Data
 import Control.DeepSeq
 import qualified Text.ParserCombinators.ReadP as Parse
 import System.FilePath
@@ -11,6 +12,14 @@ import GHC.Data.FastString
 
 -- | A ModuleName is essentially a simple string, e.g. @Data.List@.
 newtype ModuleName = ModuleName FastString deriving (Show, Eq)
+
+instance Data ModuleName where
+  -- don't traverse?
+  toConstr x   = constr
+    where
+      constr = mkConstr (dataTypeOf x) "{abstract:ModuleName}" [] Prefix
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "ModuleName"
 
 instance Ord ModuleName where
   nm1 `compare` nm2 = stableModuleNameCmp nm1 nm2
