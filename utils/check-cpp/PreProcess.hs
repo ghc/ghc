@@ -44,13 +44,13 @@ dumpGhcCpp dflags pst = output
                         ++ sepa
                         ++ final
                         ++ sepa
-                        -- ++ show comments_as_toks ++ sepa
-                        -- ++ show comments
-                        -- ++ sepa
-                        -- ++ show bare_toks
-                        -- ++ sepa
-                        -- ++ show lll
-                        -- ++ sepa
+    -- ++ show comments_as_toks ++ sepa
+    -- ++ show comments
+    -- ++ sepa
+    -- ++ show bare_toks
+    -- ++ sepa
+    -- ++ show lll
+    -- ++ sepa
     -- ++ show all_toks ++ sepa
     -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
     (pst_final, bare_toks) = lexAll pst
@@ -69,9 +69,10 @@ dumpGhcCpp dflags pst = output
     toks =
         addSourceToTokens startLoc buf1 all_toks
     final = renderCombinedToks toks
-    -- lll = case Lexer.lexTokenStream () (options pst) (buffer pst) startLoc of
-    --   POk _ x -> x
-    --   _ -> error $ "wtf"
+
+-- lll = case Lexer.lexTokenStream () (options pst) (buffer pst) startLoc of
+--   POk _ x -> x
+--   _ -> error $ "wtf"
 
 cmpBs :: Located Token -> Located Token -> Ordering
 cmpBs (L (RealSrcSpan _ (Strict.Just bs1)) _) (L (RealSrcSpan _ (Strict.Just bs2)) _) =
@@ -164,12 +165,13 @@ showDefines defines = Map.foldlWithKey' (\acc k d -> acc ++ "\n" ++ renderDefine
 
 lexAll :: Lexer.PState PpState -> (Lexer.PState PpState, [Located Token])
 lexAll state = case unP (lexer True return) state of
--- lexAll state = case unP (lexerDbg True return) state of
--- lexAll state = case unP (Lexer.lexerDbg True return) state of
+    -- lexAll state = case unP (lexerDbg True return) state of
+    -- lexAll state = case unP (Lexer.lexerDbg True return) state of
     POk s t@(L _ ITeof) -> (s, [t])
     POk state' t -> (ss, t : rest)
-    -- POk state' t -> (ss, trace ("lexAll:" ++ show t) t : rest)
       where
+        -- POk state' t -> (ss, trace ("lexAll:" ++ show t) t : rest)
+
         (ss, rest) = lexAll state'
     PFailed pst -> error $ "failed" ++ showErrorMessages (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
 
@@ -247,12 +249,23 @@ ppLexer queueComments cont =
                                             Nothing -> contIgnoreTok tk
                             else contInner tk
                     L _ (ITcppIgnored _ _) -> contIgnoreTok tk
+                    L _ (ITline_prag _) -> do
+                        setInLinePragma True
+                        contIgnoreTok tk
                     _ -> do
                         state <- getCppState
-                        -- case (trace ("CPP state:" ++ show state) state) of
-                        case state of
-                            CppIgnoring -> contIgnoreTok tk
-                            _ -> contInner tk
+                        inLinePragma <- getInLinePragma
+                        if inLinePragma
+                            then do
+                                case tk of
+                                    L _ ITclose_prag -> setInLinePragma False
+                                    _ -> return ()
+                                contIgnoreTok tk
+                            else
+                                -- case (trace ("CPP state:" ++ show state) state) of
+                                case state of
+                                    CppIgnoring -> contIgnoreTok tk
+                                    _ -> contInner tk
         )
 
 -- ---------------------------------------------------------------------
@@ -312,17 +325,17 @@ processCpp ss = do
 acceptStateChange :: AcceptingResult -> PP ()
 acceptStateChange ArNoChange = return ()
 acceptStateChange ArNowIgnoring = do
-  -- alr <- Lexer.getAlrState
-  -- s <- getPpState
-  -- let s = trace ("acceptStateChange:ArNowIgnoring") s'
-  -- setPpState (s { pp_alr_state = Just alr})
-  Lexer.startSkipping
+    -- alr <- Lexer.getAlrState
+    -- s <- getPpState
+    -- let s = trace ("acceptStateChange:ArNowIgnoring") s'
+    -- setPpState (s { pp_alr_state = Just alr})
+    Lexer.startSkipping
 acceptStateChange ArNowAccepting = do
-  -- s <- getPpState
-  -- let s = trace ("acceptStateChange:ArNowAccepting") s'
-  -- mapM_ Lexer.setAlrState (pp_alr_state s)
-  _ <- Lexer.stopSkipping
-  return ()
+    -- s <- getPpState
+    -- let s = trace ("acceptStateChange:ArNowAccepting") s'
+    -- mapM_ Lexer.setAlrState (pp_alr_state s)
+    _ <- Lexer.stopSkipping
+    return ()
 
 -- pp_include start -----------------------
 

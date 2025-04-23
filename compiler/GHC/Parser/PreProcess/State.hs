@@ -8,16 +8,17 @@ module GHC.Parser.PreProcess.State (
     PpState (..),
     initPpState,
     PP,
-    PpScope (..), PpGroupState (..),
+    PpScope (..),
+    PpGroupState (..),
     MacroDefines,
     MacroDef,
     MacroName (..),
     MacroArgs,
     CppState (..),
     arg_arity,
-
-    getPpState, setPpState,
-    AcceptingResult(..),
+    getPpState,
+    setPpState,
+    AcceptingResult (..),
     getAccepting,
     setAccepting,
     pushAccepting,
@@ -28,6 +29,8 @@ module GHC.Parser.PreProcess.State (
     ppIsDefined,
     getCppState,
     ghcCppEnabled,
+    setInLinePragma,
+    getInLinePragma,
 ) where
 
 import Data.List.NonEmpty ((<|))
@@ -64,6 +67,7 @@ initPpState =
         , pp_defines = Map.empty
         , pp_scope = (PpScope True PpNoGroup) :| []
         , pp_alr_state = Nothing
+        , pp_in_line_pragma = False
         }
 
 data PpState = PpState
@@ -73,6 +77,7 @@ data PpState = PpState
     , pp_defines :: !MacroDefines
     , pp_scope :: !(NonEmpty PpScope)
     , pp_alr_state :: Maybe Lexer.PSavedAlrState
+    , pp_in_line_pragma :: !Bool
     }
 
 data PpScope = PpScope
@@ -86,7 +91,6 @@ data PpGroupState
     | PpInGroupStillInactive
     | PpInGroupHasBeenActive
     deriving (Show)
-
 
 -- ---------------------------------------------------------------------
 
@@ -168,40 +172,48 @@ getCppState = do
 -- existing one
 pushAccepting :: Bool -> PP AcceptingResult
 pushAccepting on = do
-  current <- getAccepting
-  current_scope <- getScope
-  let scope_on = pp_accepting current_scope
-  let group_state
-        = if scope_on && on
-            then PpInGroupHasBeenActive
-            else PpInGroupStillInactive
-  pushScope (PpScope { pp_accepting = scope_on && on
-                     , pp_group_state = group_state})
-  return $ acceptingStateChange current (scope_on && on)
+    current <- getAccepting
+    current_scope <- getScope
+    let scope_on = pp_accepting current_scope
+    let group_state =
+            if scope_on && on
+                then PpInGroupHasBeenActive
+                else PpInGroupStillInactive
+    pushScope
+        ( PpScope
+            { pp_accepting = scope_on && on
+            , pp_group_state = group_state
+            }
+        )
+    return $ acceptingStateChange current (scope_on && on)
 
 -- Note: this is only ever called in the context of a pp group (i.e.
 -- after pushAccepting) from processing #else or #elif
 setAccepting :: Bool -> PP AcceptingResult
 setAccepting on = do
-  current <- getAccepting
-  parent_scope <- parentScope
-  let parent_on = pp_accepting parent_scope
-  current_scope <- getScope
-  let group_state = pp_group_state current_scope
-  let possible_accepting = parent_on && on
-  let (new_group_state, accepting) =
-        case (group_state, possible_accepting) of
-          (PpNoGroup, _) -> error "setAccepting for state PpNoGroup"
-          (PpInGroupStillInactive, True) -> (PpInGroupHasBeenActive, True)
-          (PpInGroupStillInactive, False) -> (PpInGroupStillInactive, False)
-          (PpInGroupHasBeenActive, _) -> (PpInGroupHasBeenActive, False)
+    current <- getAccepting
+    parent_scope <- parentScope
+    let parent_on = pp_accepting parent_scope
+    current_scope <- getScope
+    let group_state = pp_group_state current_scope
+    let possible_accepting = parent_on && on
+    let (new_group_state, accepting) =
+            case (group_state, possible_accepting) of
+                (PpNoGroup, _) -> error "setAccepting for state PpNoGroup"
+                (PpInGroupStillInactive, True) -> (PpInGroupHasBeenActive, True)
+                (PpInGroupStillInactive, False) -> (PpInGroupStillInactive, False)
+                (PpInGroupHasBeenActive, _) -> (PpInGroupHasBeenActive, False)
 
-  -- let (new_group_state, accepting)
-  --       = trace ("setAccepting:" ++ show ((group_state, possible_accepting),  (new_group_state', accepting'))) (new_group_state', accepting')
+    -- let (new_group_state, accepting)
+    --       = trace ("setAccepting:" ++ show ((group_state, possible_accepting),  (new_group_state', accepting'))) (new_group_state', accepting')
 
-  setScope (PpScope { pp_accepting = accepting
-                    , pp_group_state = new_group_state })
-  return $ acceptingStateChange current accepting
+    setScope
+        ( PpScope
+            { pp_accepting = accepting
+            , pp_group_state = new_group_state
+            }
+        )
+    return $ acceptingStateChange current accepting
 
 getAccepting :: PP Bool
 getAccepting = P $ \s -> POk s (scopeValue $ pp_scope (pp s))
@@ -209,12 +221,12 @@ getAccepting = P $ \s -> POk s (scopeValue $ pp_scope (pp s))
 -- Have we just changed the accepting state?
 acceptingStateChange :: Bool -> Bool -> AcceptingResult
 acceptingStateChange old new =
-  -- let (old, new) = trace ("acceptStateChange:" ++ show (old',new')) (old',new')
-  -- in
-  case (old, new) of
-    (True, False) -> ArNowIgnoring
-    (False, True) -> ArNowAccepting
-    _             -> ArNoChange
+    -- let (old, new) = trace ("acceptStateChange:" ++ show (old',new')) (old',new')
+    -- in
+    case (old, new) of
+        (True, False) -> ArNowIgnoring
+        (False, True) -> ArNowAccepting
+        _ -> ArNoChange
 
 -- Exit a scope group
 popAccepting :: PP AcceptingResult
@@ -227,11 +239,12 @@ popAccepting =
                 -- c :| [] -> (trace ("popAccepting:keeping old:" ++ show c) c) :| []
                 _ :| (h : t) -> h :| t
          in
-            POk s{pp = (pp s){pp_scope = new_scope}}
+            POk
+                s{pp = (pp s){pp_scope = new_scope}}
                 (acceptingStateChange current (scopeValue new_scope))
 
 scopeValue :: NonEmpty PpScope -> Bool
-scopeValue s =  pp_accepting $ NonEmpty.head s
+scopeValue s = pp_accepting $ NonEmpty.head s
 
 -- Deal with the mechanics of pushing a pre-calculated scope
 pushScope :: PpScope -> PP ()
@@ -317,7 +330,7 @@ addDefine name def = do
 
 addDefine' :: PpState -> MacroName -> MacroDef -> PpState
 addDefine' s name def =
-    s{ pp_defines = insertMacroDef name def (pp_defines s)}
+    s{pp_defines = insertMacroDef name def (pp_defines s)}
 
 ppDefine :: MacroName -> MacroDef -> PP ()
 ppDefine name val = addDefine name val
@@ -346,6 +359,16 @@ pushContinuation new =
 popContinuation :: PP [Located Lexer.Token]
 popContinuation =
     P $ \s -> POk s{pp = (pp s){pp_continuation = []}} (pp_continuation (pp s))
+
+-- ---------------------------------------------------------------------
+
+setInLinePragma :: Bool -> PP ()
+setInLinePragma val =
+    P $ \s -> POk s{pp = (pp s){pp_in_line_pragma = val}} ()
+
+getInLinePragma :: PP Bool
+getInLinePragma =
+    P $ \s -> POk s (pp_in_line_pragma (pp s))
 
 -- ---------------------------------------------------------------------
 -- Dealing with MacroDefines
