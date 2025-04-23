@@ -302,8 +302,14 @@ instance Uniquable Unique where
 
 showUnique :: Unique -> String
 showUnique uniq
-  = case unpkUnique uniq of
-      (tag, u) -> tag : w64ToBase62 u
+  = tagStr ++ w64ToBase62 u
+  where
+    (tag, u) = unpkUnique uniq
+    -- Avoid emitting non-printable characters in pretty uniques.
+    -- See #25989.
+    tagStr
+      | tag < 'A' || tag > 'z' = show (ord tag) ++ "_"
+      | otherwise              = [tag]
 
 pprUniqueAlways :: IsLine doc => Unique -> doc
 -- The "always" means regardless of -dsuppress-uniques
