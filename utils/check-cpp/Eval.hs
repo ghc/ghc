@@ -7,7 +7,6 @@ import State
 eval :: Expr -> Int
 eval (Parens e) = eval e
 eval (Not e) = fromBool $ not (toBool $ eval e)
--- eval (Var v) = error $ "need to look up :" ++ v
 eval (Var _) = 0 -- Spec says remaining identifiers are replaces with zero
 eval (IntVal i) = i
 eval (Plus e1 e2) = (eval e1) + (eval e2)

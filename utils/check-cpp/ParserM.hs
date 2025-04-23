@@ -11,7 +11,6 @@ module ParserM (
     St(..),
     init_state,
     StartCode,
-    start_code,
     setStartCode,
     -- Tokens
     Token (..),
