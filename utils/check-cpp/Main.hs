@@ -11,9 +11,11 @@ import GHC
 import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString
 import GHC.Data.StringBuffer
+import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Parser hiding (predefinedMacros)
 import GHC.Driver.Env.Types
 import GHC.Driver.Errors.Types
+import GHC.Driver.Session hiding (initDynFlags)
 import qualified GHC.Driver.Errors.Types as GHC
 import qualified GHC.Driver.Session as GHC
 import GHC.Hs.Dump
@@ -76,7 +78,8 @@ doDump :: LibDir -> String -> IO ()
 doDump libdir str = ghcWrapper libdir $ do
     dflags0 <- initDynFlags
     let dflags = dflags0{extensionFlags = EnumSet.insert LangExt.GhcCpp (extensionFlags dflags0)}
-    let pflags = initParserOpts dflags
+    -- let pflags = initParserOpts dflags
+    let pflags = myInitParserOpts dflags
     -- hsc <- getSession
     liftIO $ putStrLn "-- parsing ----------"
     liftIO $ putStrLn str
@@ -98,6 +101,16 @@ doDump libdir str = ghcWrapper libdir $ do
     liftIO $ putStrLn "---------------------"
 
 -- return $ strGetToks dflags includes pflags "fake_test_file.hs" str
+
+myInitParserOpts :: DynFlags -> Lexer.ParserOpts
+myInitParserOpts =
+  Lexer.mkParserOpts
+    <$> extensionFlags
+    <*> initDiagOpts
+    <*> safeImportsOn
+    <*> gopt Opt_Haddock
+    <*> gopt Opt_KeepRawTokenStream
+    <*> const False -- do not use LINE/COLUMN to update the internal location
 
 unitPackages :: UnitEnv -> [UnitInfo]
 unitPackages unit_env = pkgs
@@ -747,10 +760,22 @@ t31 = do
 t32 :: IO ()
 t32 = do
     dump
-       [ "{-# LANGUAGE"
-       , "    GHC_CPP"
-       , "  , DeriveGeneric"
-       , "#-}"
-       , ""
-       , "module Example12 where"
-       ]
+        [ "{-# LANGUAGE"
+        , "    GHC_CPP"
+        , "  , DeriveGeneric"
+        , "#-}"
+        , ""
+        , "module Example12 where"
+        ]
+
+t33 :: IO ()
+t33 = do
+    dump
+        [ "{-# LANGUAGE"
+        , "    GHC_CPP"
+        , "  , DeriveGeneric"
+        , "#-}"
+        , ""
+        , "{-# LINE 4 \"hypsrc-test/src/PositionPragmas.hs\" #-}"
+        , "module Example12 where"
+        ]
