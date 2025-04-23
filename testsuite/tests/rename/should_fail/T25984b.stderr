@@ -1,0 +1,6 @@
+T25984b.hs:5:5: error: [GHC-88464]
+    Data constructor not in scope: True
+    Suggested fix:
+      Remove ‘True’ from the explicit hiding list in the import of
+      ‘Prelude’ (at T25984b.hs:3:1-36).
+

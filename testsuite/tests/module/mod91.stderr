@@ -1,5 +1,5 @@
-
 mod91.hs:3:16: error: [GHC-10237]
     In the import of ‘Prelude’:
-      an item called ‘Eq’ is exported, but it does not export any children
-      (constructors, class methods or field names) called ‘eq’.
+      a class called ‘Eq’ is exported, but it does not export
+      any class methods called ‘eq’.
+

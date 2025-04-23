@@ -33,7 +33,7 @@ module GHC.Utils.Outputable (
         docToSDoc,
         interppSP, interpp'SP, interpp'SP',
         pprQuotedList, pprWithCommas,
-        quotedListWithOr, quotedListWithNor, quotedListWithAnd,
+        quotedListWithOr, quotedListWithNor, quotedListWithAnd, unquotedListWith,
         pprWithBars,
         spaceIfSingleQuote,
         isEmpty, nest,
@@ -131,7 +131,7 @@ import GHC.Utils.Panic.Plain (assert)
 import GHC.Serialized
 import GHC.LanguageExtensions (Extension)
 import GHC.Utils.GlobalVars( unsafeHasPprDebug )
-import GHC.Utils.Misc (lastMaybe)
+import GHC.Utils.Misc (lastMaybe, snocView)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -1439,6 +1439,15 @@ quotedListWithAnd :: [SDoc] -> SDoc
 -- [x,y,z]  ==>  `x', `y' and `z'
 quotedListWithAnd xs@(_:_:_) = quotedList (init xs) <+> text "and" <+> quotes (last xs)
 quotedListWithAnd xs = quotedList xs
+
+unquotedListWith :: SDoc -> [SDoc] -> SDoc
+-- "whatever" [x,y,z] ==> x, y whatever z
+unquotedListWith d xs
+  | Just (fs@(_:_), l) <- snocView xs = unquotedList fs <+> d <+> l
+  | otherwise                         = unquotedList xs
+  where
+    unquotedList = fsep . punctuate comma
+
 
 {-
 ************************************************************************

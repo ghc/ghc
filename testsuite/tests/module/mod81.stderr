@@ -1,5 +1,5 @@
-
 mod81.hs:3:16: error: [GHC-10237]
     In the import of ‘Prelude’:
-      an item called ‘Either’ is exported, but it does not export any children
-      (constructors, class methods or field names) called ‘Foo’.
+      a data type called ‘Either’ is exported, but it does not export
+      any constructors called ‘Foo’.
+
