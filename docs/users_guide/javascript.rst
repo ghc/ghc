@@ -60,6 +60,21 @@ for the Haskell `Bool` type:
   foreign import javascript "((x) => { return 5; })"
     type_error :: Bool -> Bool
 
+Interruptible calling convention
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A foreign import can be declared with the `interruptible` calling convention:
+
+.. code-block:: haskell
+
+  foreign import javascript interruptible "((i,cont) => { ...; return cont(17); })"
+    foo :: Int -> IO Int
+
+In this case the javascript function will be passed one additional argument in
+the final position (noted `cont` in the example): it is a continuation
+function that must be called from JavaScript to return a value from the foreign
+call and to resume the execution of the Haskell code.
+
 JSVal
 ^^^^^
 
