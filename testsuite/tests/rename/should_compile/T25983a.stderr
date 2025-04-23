@@ -1,0 +1,5 @@
+T25983a.hs:5:24: warning: [GHC-10237] [-Wdodgy-imports (in -Wextra)]
+    In the import of ‘Prelude’:
+      a data type called ‘Bool’ is exported, but it does not export
+      any constructors called ‘X’, ‘Y’.
+

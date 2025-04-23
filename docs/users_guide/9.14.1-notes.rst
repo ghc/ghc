@@ -82,6 +82,9 @@ Compiler
   :ghc-ticket:`20875`, :ghc-ticket:`21172`, :ghc-ticket:`22257`, :ghc-ticket:`25238`,
   :ghc-ticket:`25834`.
 
+- The compiler no longer accepts invalid ``type`` namespace specifiers in
+  subordinate import lists (:ghc-ticket:`22581`).
+
 - A new flag, :ghc-flag:`-Wuseless-specialisations`, controls warnings emitted when GHC
   determines that a SPECIALISE pragma would have no effect.
 

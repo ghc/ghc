@@ -1,0 +1,5 @@
+T25984a.hs:5:31: warning: [GHC-10237] [-Wdodgy-imports (in -Wextra)]
+    In the import of ‘T25984a_helper’:
+      a data type called ‘H’ is exported, but it does not export
+      any constructors called ‘C’.
+
