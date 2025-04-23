@@ -73,8 +73,8 @@ module GHC.Parser.Lexer (
    ExtBits(..),
    xtest, xunset, xset,
    disableHaddock,
-   enableGhcCpp,
-   ghcCppEnabled,
+   enableGhcCpp, ghcCppEnabled,
+   enableExtBit, disableExtBit, extBitEnabled,
    lexTokenStream,
    mkParensEpToks,
    mkParensLocs,
@@ -3168,12 +3168,23 @@ disableHaddock opts = upd_bitmap (xunset HaddockBit)
     upd_bitmap f = opts { pExtsBitmap = f (pExtsBitmap opts) }
 
 enableGhcCpp :: ParserOpts -> ParserOpts
-enableGhcCpp opts = upd_bitmap (xset GhcCppBit)
+enableGhcCpp = enableExtBit GhcCppBit
+
+ghcCppEnabled :: ParserOpts -> Bool
+ghcCppEnabled = extBitEnabled GhcCppBit
+
+enableExtBit :: ExtBits -> ParserOpts -> ParserOpts
+enableExtBit bit opts = upd_bitmap (xset bit)
   where
     upd_bitmap f = opts { pExtsBitmap = f (pExtsBitmap opts) }
 
-ghcCppEnabled :: ParserOpts -> Bool
-ghcCppEnabled opts = xtest GhcCppBit (pExtsBitmap opts)
+disableExtBit :: ExtBits -> ParserOpts -> ParserOpts
+disableExtBit bit opts = upd_bitmap (xunset bit)
+  where
+    upd_bitmap f = opts { pExtsBitmap = f (pExtsBitmap opts) }
+
+extBitEnabled :: ExtBits -> ParserOpts -> Bool
+extBitEnabled bit opts = xtest bit (pExtsBitmap opts)
 
 -- | Set parser options for parsing OPTIONS pragmas
 initPragState :: p -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState p
