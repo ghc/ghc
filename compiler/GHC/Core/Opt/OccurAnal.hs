@@ -1137,15 +1137,18 @@ occAnalRec :: OccEnv -> TopLevelFlag
 occAnalRec !_ lvl
            (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = wtuds }))
            (WUD body_uds binds)
-  | isDeadOcc occ  -- Check for dead code: see Note [Dead code]
-  = WUD body_uds binds
-
+  -- Currently we don't gather occ-info for tyvars,
+  -- so we never discard dead bindings -- Need to fix this
   | isTyVar bndr
   = let (tagged_bndr, mb_join) = tagNonRecBinder lvl occ bndr
         !(WUD rhs_uds' rhs') = adjustNonRecRhs mb_join wtuds
         !bndr' = tagged_bndr
     in WUD (body_uds `andUDs` rhs_uds')
            (NonRec bndr' rhs' : binds)
+
+  | isDeadOcc occ  -- Check for dead code: see Note [Dead code]
+  = WUD body_uds binds
+
   | otherwise
   = let (bndr', mb_join) = tagNonRecBinder lvl occ bndr
         !(WUD rhs_uds' rhs') = adjustNonRecRhs mb_join wtuds

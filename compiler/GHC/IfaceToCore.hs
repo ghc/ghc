@@ -726,7 +726,7 @@ tc_iface_decl _ ignore_prags (IfaceId {ifName = name, ifType = iface_type,
 
 tc_iface_decl _ _ (IfaceTv {ifName = name, ifTvKind = if_kind, ifTvUnf = if_type })
   = do { kind   <- tcIfaceType if_kind
-       ; unf_ty <- tcIfaceType if_type
+       ; unf_ty <- forkM (text "IfaceTv" <+> ppr name) $ tcIfaceType if_type
        ; return (ATyVar (mkTyVarWithUnfolding name kind unf_ty)) }
 
 tc_iface_decl _ _ (IfaceData {ifName = tc_name,
