@@ -34,6 +34,20 @@ disambiguate this case, thus: ::
       module N( f, type (++) ) where
         data family a ++ b = L a | R b
 
+It is also possible to use the ``type`` namespace specifier in subordinate
+import and export lists:
+::
+
+      module N (C(type (#))) where
+        class C a b where
+          type a # b
+          (#) :: a -> b -> (a # b)
+      module M where
+        import N as T (C(type (#)))
+        import N as D (C((#)))
+        -- (T.#) is the associated type
+        -- (D.#) is the class method
+
 The extension :extension:`ExplicitNamespaces` is implied by
 :extension:`TypeOperators` and (for some reason) by :extension:`TypeFamilies`.
 

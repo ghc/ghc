@@ -1,0 +1,9 @@
+T25991b2.hs:7:11: error: [GHC-01928]
+    • Data constructor out of scope: ‘#’.
+      NB: the type constructor ‘#’ cannot appear in this position.
+    • In the expression: a # b
+      In an equation for ‘f’: f a b = a # b
+    Suggested fix:
+      Add ‘#’ to the import list in the import of ‘T25991b_helper’
+      (at T25991b2.hs:5:1-35).
+

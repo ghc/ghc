@@ -1255,8 +1255,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
     lookup_lie :: LIE GhcPs -> TcRn [(LIE GhcRn, [GlobalRdrElt])]
     lookup_lie (L loc ieRdr)
         = setSrcSpanA loc $
-          do (stuff, warns) <- liftM (fromMaybe ([],[])) $
-                               run_lookup (lookup_ie ieRdr)
+          do (stuff, warns) <- run_lookup ([],[]) (lookup_ie ieRdr)
              mapM_ (addTcRnDiagnostic <=< warning_msg) warns
              return [ (L loc ie, gres) | (ie,gres) <- stuff ]
         where
@@ -1266,11 +1265,10 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
               pure (TcRnDodgyImports (DodgyImportsEmptyParent n))
             warning_msg MissingImportList =
               pure (TcRnMissingImportList ieRdr)
-            warning_msg (BadImportW ie) = do
-              -- 'BadImportW' is only constructed below in 'handle_bad_import', in
-              -- the 'EverythingBut' case, so that's what we pass to
-              -- 'badImportItemErr'.
-              reason <- badImportItemErr iface decl_spec ie IsNotSubordinate all_avails
+            warning_msg (BadImportW ie sub) = do
+              -- 'BadImportW' is only constructed below in 'bad_import_w', in
+              -- the 'EverythingBut' case, so here we assume a 'hiding' clause.
+              (reason :| _) <- badImportItemErr iface decl_spec ie sub all_avails
               pure (TcRnDodgyImports (DodgyImportsHiding reason))
             warning_msg (DeprecatedExport n w) =
               pure $ TcRnPragmaWarning
@@ -1279,18 +1277,18 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                            , pwarn_impmod  = moduleName import_mod }
                          w
 
-            run_lookup :: IELookupM a -> TcRn (Maybe a)
-            run_lookup m = case m of
+            run_lookup :: a -> IELookupM a -> TcRn a
+            run_lookup def m = case m of
               Failed err -> do
-                msg <- lookup_err_msg err
-                addErr (TcRnImportLookup msg)
-                return Nothing
-              Succeeded a -> return (Just a)
+                msgs <- lookup_err_msgs err
+                forM_ msgs $ \msg -> addErr (TcRnImportLookup msg)
+                return def
+              Succeeded a -> return a
 
-            lookup_err_msg err = case err of
+            lookup_err_msgs err = case err of
               BadImport ie sub    -> badImportItemErr iface decl_spec ie sub all_avails
-              IllegalImport       -> pure ImportLookupIllegal
-              QualImportError rdr -> pure (ImportLookupQualified rdr)
+              IllegalImport       -> pure $ NE.singleton ImportLookupIllegal
+              QualImportError rdr -> pure $ NE.singleton (ImportLookupQualified rdr)
 
         -- For each import item, we convert its RdrNames to Names,
         -- and at the same time compute all the GlobalRdrElt corresponding
@@ -1374,27 +1372,28 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
            -- Look up the children in the sub-names of the parent
            -- See Note [Importing DuplicateRecordFields]
-           case lookupChildren subnames rdr_ns of
+           let (children_errs, childnames) = lookupChildren subnames rdr_ns
 
-             Failed rdrs -> failLookupWith $
-                            BadImport (IEThingWith (deprecation, ann) ltc wc rdrs noDocstring)
-                              (IsSubordinate { subordinate_parent = gre})
-                                -- We are trying to import T( a,b,c,d ), and failed
-                                -- to find 'b' and 'd'.  So we make up an import item
-                                -- to report as failing, namely T( b, d ).
-                                -- c.f. #15412
+           bad_import_warns <-
+             if null children_errs then return [] else
+             let items = map lce_wrapped_name children_errs
+                 ie    = IEThingWith (deprecation, ann) ltc wc items noDocstring
+                         -- We are trying to import T( a,b,c,d ), and failed
+                         -- to find 'b' and 'd'.  So we make up an import item
+                         -- to report as failing, namely T( b, d ).
+                         -- c.f. #15413
+                 subordinate_err = mkSubordinateError gre children_errs
+             in bad_import_w ie subordinate_err
 
-             Succeeded childnames ->
-                return ([ (IEThingWith (Nothing, ann) (L l name') wc childnames' noDocstring
-                          ,gres)]
-                       , export_depr_warns)
-
-              where name' = replaceWrappedName rdr_tc name
-                    childnames' = map (to_ie_post_rn . fmap greName) childnames
-                    gres = gre : map unLoc childnames
-                    export_depr_warns
-                      | want_hiding == Exactly = mapMaybe mk_depr_export_warning gres
-                      | otherwise              = []
+           let name' = replaceWrappedName rdr_tc name
+               childnames' = map (to_ie_post_rn . fmap greName) childnames
+               gres = gre : map unLoc childnames
+               export_depr_warns
+                 | want_hiding == Exactly = mapMaybe mk_depr_export_warning gres
+                 | otherwise              = []
+           return ([ (IEThingWith (Nothing, ann) (L l name') wc childnames' noDocstring
+                     ,gres)]
+                  , bad_import_warns ++ export_depr_warns)
 
         _other -> failLookupWith IllegalImport
         -- could be IEModuleContents, IEGroup, IEDoc, IEDocNamed...
@@ -1408,11 +1407,16 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
         -- N.B. imports never have docstrings
         noDocstring = Nothing
 
-        handle_bad_import m = catchIELookup m $ \err -> case err of
-          BadImport ie _
-            | want_hiding == EverythingBut
-            -> return ([], [BadImportW ie])
-          _ -> failLookupWith err
+        handle_bad_import m = catchIELookup m $ \case
+          BadImport ie sub -> do
+            ws <- bad_import_w ie sub
+            return ([], ws)
+          err -> failLookupWith err
+
+        bad_import_w :: IE GhcPs -> IsSubordinateError -> IELookupM [IELookupWarning]
+        bad_import_w ie sub
+          | want_hiding == EverythingBut = return [BadImportW ie sub]
+          | otherwise = failLookupWith (BadImport ie sub)
 
         mk_depr_export_warning gre
           = DeprecatedExport name <$> mi_export_warn_fn iface name
@@ -1422,19 +1426,37 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 type IELookupM = MaybeErr IELookupError
 
 data IELookupWarning
-  = BadImportW (IE GhcPs)
+  = BadImportW (IE GhcPs) IsSubordinateError
   | MissingImportList
   | DodgyImport GlobalRdrElt
   | DeprecatedExport Name (WarningTxt GhcRn)
 
 -- | Is this import/export item a subordinate or not?
-data IsSubordinate
-  = IsSubordinate { subordinate_parent :: GlobalRdrElt }
+data IsSubordinateError
+  = IsSubordinateError { subordinate_err_parent      :: !GlobalRdrElt
+                       , subordinate_err_unavailable :: [FastString]
+                       , subordinate_err_nontype     :: [GlobalRdrElt] }
   | IsNotSubordinate
+
+mkSubordinateError :: GlobalRdrElt -> [LookupChildError] -> IsSubordinateError
+mkSubordinateError gre children_errs = foldr add init_acc children_errs
+  where
+    init_acc :: IsSubordinateError
+    init_acc = IsSubordinateError gre [] []
+
+    add :: LookupChildError -> IsSubordinateError -> IsSubordinateError
+    add children_err sub@IsSubordinateError{} =
+      case children_err of
+        LookupChildNonType{lce_nontype_item = g} ->
+          sub { subordinate_err_nontype = g : subordinate_err_nontype sub }
+        LookupChildNotFound (L _ wname) ->
+          let fs = (occNameFS . rdrNameOcc . ieWrappedName) wname
+          in sub { subordinate_err_unavailable = fs : subordinate_err_unavailable sub }
+    add _ IsNotSubordinate = panic "mkSubordinateError: IsNotSubordinate"
 
 data IELookupError
   = QualImportError RdrName
-  | BadImport (IE GhcPs) IsSubordinate
+  | BadImport (IE GhcPs) IsSubordinateError
   | IllegalImport
 
 failLookupWith :: IELookupError -> IELookupM a
@@ -1617,44 +1639,92 @@ mkChildEnv gres = foldr add emptyNameEnv gres
 findChildren :: NameEnv [a] -> Name -> [a]
 findChildren env n = lookupNameEnv env n `orElse` []
 
+data LookupChildError
+  = LookupChildNotFound { lce_wrapped_name :: !(LIEWrappedName GhcPs) }
+  | LookupChildNonType  { lce_wrapped_name :: !(LIEWrappedName GhcPs)
+                        , lce_nontype_item :: !GlobalRdrElt }
+
 lookupChildren :: [GlobalRdrElt]
                -> [LIEWrappedName GhcPs]
-               -> MaybeErr [LIEWrappedName GhcPs]   -- The ones for which the lookup failed
-                           [LocatedA GlobalRdrElt]
+               -> ( [LookupChildError]   -- The ones for which the lookup failed
+                  , [LocatedA GlobalRdrElt] )
 -- (lookupChildren all_kids rdr_items) maps each rdr_item to its
--- corresponding Name all_kids, if the former exists
+-- corresponding Name in all_kids, if the former exists
 -- The matching is done by FastString, not OccName, so that
 --    Cls( meth, AssocTy )
 -- will correctly find AssocTy among the all_kids of Cls, even though
 -- the RdrName for AssocTy may have a (bogus) DataName namespace
 -- (Really the rdr_items should be FastStrings in the first place.)
-lookupChildren all_kids rdr_items
-  | null fails
-  = Succeeded (concat oks)
-       -- This 'fmap concat' trickily applies concat to the /second/ component
-       -- of the pair, whose type is ([LocatedA Name], [[Located FieldLabel]])
-  | otherwise
-  = Failed fails
+lookupChildren all_kids rdr_items = (fails, successes)
   where
-    mb_xs = map doOne rdr_items
-    fails = [ bad_rdr | Failed bad_rdr <- mb_xs ]
-    oks   = [ ok      | Succeeded ok   <- mb_xs ]
-    oks :: [[LocatedA GlobalRdrElt]]
+    mb_xs     = map do_one rdr_items
+    fails     = [ err | Failed err    <- mb_xs ]
+    successes = [ ok  | Succeeded oks <- mb_xs, ok <- NE.toList oks ]
 
-    doOne item@(L l r)
-       = case (lookupFsEnv kid_env . occNameFS . rdrNameOcc . ieWrappedName) r of
-           Just [g]
-             | not $ isRecFldGRE g
-             -> Succeeded [L l g]
-           Just gs
-             | all isRecFldGRE gs
-             -> Succeeded $ map (L l) gs
-           _ -> Failed    item
+    do_one :: LIEWrappedName GhcPs -> MaybeErr LookupChildError (NonEmpty (LocatedA GlobalRdrElt))
+    do_one item@(L l r) =
+      case r of
+        IEName{}
+          -- IEName (unadorned name) places no restriction on the namespace of
+          -- the imported entity, so we look in both `val_gres` and `typ_gres`.
+          -- In case of conflict (punning), the value namespace takes priority.
+          -- See Note [Prioritise the value namespace in subordinate import lists]
+          | (gre:gres) <- val_gres -> Succeeded $ fmap (L l) (gre:|gres)
+          | (gre:gres) <- typ_gres -> Succeeded $ fmap (L l) (gre:|gres)
+          | otherwise              -> Failed $ LookupChildNotFound item
+
+        IEType{}
+          -- IEType ('type' namespace specifier) restricts the lookup to the
+          -- type namespace, i.e. to `typ_gres`. In case of failure, we check
+          -- `val_gres` to produce a more helpful error message.
+          | (gre:gres) <- typ_gres -> Succeeded $ fmap (L l) (gre:|gres)
+          | (gre:_)    <- val_gres -> Failed $ LookupChildNonType item gre
+          | otherwise              -> Failed $ LookupChildNotFound item
+
+        IEPattern{} -> panic "lookupChildren: IEPattern"  -- Never happens (invalid syntax)
+        IEDefault{} -> panic "lookupChildren: IEDefault"  -- Never happens (invalid syntax)
+      where
+        fs = (occNameFS . rdrNameOcc . ieWrappedName) r
+        gres = fromMaybe [] (lookupFsEnv kid_env fs)
+        (val_gres, typ_gres) = partition (isValNameSpace . greNameSpace) gres
 
     -- See Note [Children for duplicate record fields]
+    kid_env :: FastStringEnv [GlobalRdrElt]
     kid_env = extendFsEnvList_C (++) emptyFsEnv
               [(occNameFS (occName x), [x]) | x <- all_kids]
 
+
+{- Note [Prioritise the value namespace in subordinate import lists]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this program that defines a class that has both an associated type
+named (#) and a method named (#)
+
+  module M_assoc where
+    class C a b where
+      type a # b
+      (#) :: a -> b -> ()
+  module N_assoc where
+    import M_assoc( C((#)) )
+
+In the import declaration, when we see the unadorned name (#) in the subordinate
+import list of C, which children should we bring into scope? Our options are:
+
+  a) only the method (#)
+  b) only the associated type (#)
+  c) both the method and the associated type
+
+To follow the precedent established by top-level items, we go with option (a).
+Indeed, consider a slightly different program
+
+  module M_top where
+    type family a # b
+    a # b = ()
+  module N_top where
+    import M_top( (#) )
+
+Here the import brings only the function (#) into scope, and one has to say
+`type (#)` to get the type family.
+-}
 
 -------------------------------
 
@@ -2311,30 +2381,39 @@ DRFPatSynExport for a test of this.
 -}
 
 badImportItemErr
-  :: ModIface -> ImpDeclSpec -> IE GhcPs -> IsSubordinate
+  :: ModIface -> ImpDeclSpec -> IE GhcPs
+  -> IsSubordinateError
   -> [AvailInfo]
-  -> TcRn ImportLookupReason
+  -> TcRn (NonEmpty ImportLookupReason)
 badImportItemErr iface decl_spec ie sub avails = do
   patsyns_enabled <- xoptM LangExt.PatternSynonyms
   expl_ns_enabled <- xoptM LangExt.ExplicitNamespaces
+  let import_lookup_bad :: BadImportKind -> ImportLookupReason
+      import_lookup_bad k = ImportLookupBad k iface decl_spec ie patsyns_enabled
   dflags <- getDynFlags
   hsc_env <- getTopEnv
   let rdr_env = mkGlobalRdrEnv
               $ gresFromAvails hsc_env (Just imp_spec) all_avails
-  pure (ImportLookupBad (importErrorKind dflags rdr_env expl_ns_enabled) iface decl_spec ie patsyns_enabled)
+  pure $ fmap import_lookup_bad (importErrorKind dflags rdr_env expl_ns_enabled)
   where
+    importErrorKind :: DynFlags -> GlobalRdrEnv -> Bool -> NonEmpty BadImportKind
     importErrorKind dflags rdr_env expl_ns_enabled
       | any checkIfTyCon avails = case sub of
-          IsNotSubordinate -> BadImportAvailTyCon expl_ns_enabled
-          IsSubordinate {} -> BadImportNotExportedSubordinates unavailableChildren
-      | any checkIfVarName avails = BadImportAvailVar
-      | Just con <- find checkIfDataCon avails = BadImportAvailDataCon (availOccName con)
-      | otherwise = BadImportNotExported suggs
+          IsNotSubordinate -> NE.singleton (BadImportAvailTyCon expl_ns_enabled)
+          IsSubordinateError { subordinate_err_parent = gre
+                             , subordinate_err_unavailable = unavailable
+                             , subordinate_err_nontype = nontype }
+            -> NE.fromList $ catMaybes $
+                [ fmap (BadImportNotExportedSubordinates gre) (NE.nonEmpty unavailable)
+                , fmap (BadImportNonTypeSubordinates gre) (NE.nonEmpty nontype) ]
+      | any checkIfVarName avails = NE.singleton BadImportAvailVar
+      | Just con <- find checkIfDataCon avails = NE.singleton (BadImportAvailDataCon (availOccName con))
+      | otherwise = NE.singleton (BadImportNotExported suggs)
         where
           suggs = similar_suggs ++ fieldSelectorSuggestions rdr_env rdr
           what_look = case sub of
-            IsNotSubordinate  -> WL_TyCon_or_TermVar
-            IsSubordinate gre ->
+            IsNotSubordinate -> WL_TyCon_or_TermVar
+            IsSubordinateError { subordinate_err_parent = gre } ->
               case greInfo gre of
                 IAmTyCon ClassFlavour
                   -> WL_TyCon_or_TermVar
@@ -2373,9 +2452,6 @@ badImportItemErr iface decl_spec ie sub avails = do
     importedFS = occNameFS $ rdrNameOcc rdr
     imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
     all_avails = mi_exports iface
-    unavailableChildren = case ie of
-      IEThingWith _ _ _ ns _ -> map (rdrNameOcc . ieWrappedName  . unLoc) ns
-      _ -> panic "importedChildren failed pattern match: no children"
 
 addDupDeclErr :: NonEmpty GlobalRdrElt -> TcRn ()
 addDupDeclErr gres@(gre :| _)

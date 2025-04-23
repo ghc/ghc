@@ -1,0 +1,6 @@
+T25991b1.hs:7:16: error: [GHC-76037]
+    Not in scope: type constructor or class ‘#’
+    Suggested fix:
+      Add ‘#’ to the import list in the import of ‘T25991b_helper’
+      (at T25991b1.hs:5:1-30).
+
