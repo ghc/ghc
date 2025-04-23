@@ -1,5 +1,5 @@
-
 T9006.hs:3:16: error: [GHC-10237]
     In the import of ‘T9006a’:
-      an item called ‘T’ is exported, but it does not export any children
-      (constructors, class methods or field names) called ‘T’.
+      a data type called ‘T’ is exported, but it does not export
+      any constructors called ‘T’.
+

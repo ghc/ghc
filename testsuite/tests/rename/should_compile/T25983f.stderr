@@ -1,0 +1,5 @@
+T25983f.hs:5:24: warning: [GHC-10237] [-Wdodgy-imports (in -Wextra)]
+    In the import of ‘Prelude’:
+      a class called ‘Num’ is exported, but it does not export
+      any associated types called ‘F’, ‘G’.
+
