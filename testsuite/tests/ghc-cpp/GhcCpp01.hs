@@ -1,4 +1,5 @@
 {-# LANGUAGE GHC_CPP #-}
+-- {-# OPTIONS -ddump-ghc-cpp -dkeep-comments #-}
 module GhcCpp01 where
 
 #define FOO(A,B) A + B
@@ -10,6 +11,8 @@ x = 1
 #else
 x = 5
 #endif
+
+{-# LINE 15 "GhcCpp01.hs" #-}
 
 #if defined(BAR) || defined FOO
 y = 1
