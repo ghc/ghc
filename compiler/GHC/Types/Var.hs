@@ -62,7 +62,7 @@ module GHC.Types.Var (
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
         isCoVar, isNonCoVarId, isTyCoVar,
-        isLocalVar, isGlobalVar,
+        isLocalVar, isGlobalVar, isGlobalTyVar,
         isLocalId, isLocalId_maybe, isGlobalId, isExportedId,
         mustHaveLocalBinding,
 
@@ -1296,6 +1296,12 @@ isGlobalVar (Id { idScope = GlobalId })   = True
 isGlobalVar (Id { idScope = LocalId {} }) = False
 isGlobalVar (TyVar { varName = n })       = isExternalName n
 isGlobalVar (TcTyVar {})                  = False
+
+isGlobalTyVar :: HasDebugCallStack  => Var -> Bool
+-- A TyVar with an External Name is always from another module
+isGlobalTyVar (TyVar { varName = n })       = isExternalName n
+isGlobalTyVar (TcTyVar {})                  = False
+isGlobalTyVar v = pprPanic "isGlobalTyVar" (ppr v)
 
 -- | 'mustHaveLocalBinding' returns @True@ of 'Id's and 'TyVar's
 -- that must have a binding in this module.  The converse

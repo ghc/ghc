@@ -3679,10 +3679,10 @@ lintVarOcc :: InVar -> LintM OutType
 lintVarOcc v_occ
   = do { in_var_env <- getInVarEnv
        ; case lookupVarEnv in_var_env v_occ of
-           Nothing | isGlobalId v_occ -> return (idType v_occ)
-                   | otherwise        -> failWithL (text "The" <+> ppr (whatItIs v_occ)
-                                                    <+> quotes (ppr v_occ)
-                                                    <+> text "is out of scope")
+           Nothing | isGlobalVar v_occ -> return (idType v_occ)
+                   | otherwise         -> failWithL (text "The" <+> ppr (whatItIs v_occ)
+                                                     <+> quotes (ppr v_occ)
+                                                     <+> text "is out of scope")
            Just (in_bndr, out_bndr) -> do { checkBndrOccCompatibility in_bndr v_occ
                                           ; return (varType out_bndr) } }
 

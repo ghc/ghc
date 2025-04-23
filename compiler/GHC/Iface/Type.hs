@@ -761,8 +761,8 @@ substIfaceType :: IfaceTySubst -> IfaceType -> IfaceType
 substIfaceType env ty
   = go ty
   where
-    go ty@(IfaceFreeTyVar tv) = ty
-    go ty@(IfaceExtTyVar tv)  = ty
+    go ty@(IfaceFreeTyVar {}) = ty
+    go ty@(IfaceExtTyVar {})  = ty
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t ts)     = IfaceAppTy  (go t) (substIfaceAppArgs env ts)
     go (IfaceFunTy af w t1 t2)  = IfaceFunTy af (go w) (go t1) (go t2)
@@ -1148,8 +1148,8 @@ ppr_ty ctxt_prec ty
   | not (isIfaceRhoType ty)             = ppr_sigma ShowForAllMust ctxt_prec ty
 ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIfaceRhoType
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
-ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free TyVars and CoVars in IfaceType]
-ppr_ty _         (IfaceExtTyVar tyvar)  = ppr tyvar
+ppr_ty _         (IfaceTyVar tyvar)     = text "{free}" <> ppr tyvar  -- See Note [Free TyVars and CoVars in IfaceType]
+ppr_ty _         (IfaceExtTyVar tyvar)  = text "{ext}" <> ppr tyvar
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty ctxt_prec (IfaceTupleTy i p tys) = ppr_tuple ctxt_prec i p tys -- always fully saturated
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
@@ -2373,9 +2373,8 @@ putIfaceType bh (IfaceTupleTy s i tys)
   = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
 putIfaceType bh (IfaceLitTy n)
   = do { putByte bh 9; put_ bh n }
-putIfaceType bh (IfaceExtTyVar tv) = do
-        putByte bh 10
-        put_ bh tv
+putIfaceType bh (IfaceExtTyVar tv)
+  = do { putByte bh 10; put_ bh tv }
 
 -- | Deserialises an 'IfaceType' from the given 'ReadBinHandle'.
 --

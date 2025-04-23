@@ -764,20 +764,20 @@ chooseExternalVars opts mod binds imp_id_rules
 
   search [] unfold_env occ_env = return (unfold_env, occ_env)
 
-  search ((idocc,referrer) : rest) unfold_env occ_env
-    | idocc `elemVarEnv` unfold_env = search rest unfold_env occ_env
+  search ((var_occ,referrer) : rest) unfold_env occ_env
+    | var_occ `elemVarEnv` unfold_env = search rest unfold_env occ_env
     | otherwise = do
-      (occ_env', name') <- tidyTopName mod name_cache (Just referrer) occ_env idocc
+      (occ_env', name') <- tidyTopName mod name_cache (Just referrer) occ_env var_occ
       let
           (new_ids, show_unfold) = addExternal opts refined_id
 
-                -- 'idocc' is an *occurrence*, but we need to see the
+                -- 'var_occ' is an *occurrence*, but we need to see the
                 -- unfolding in the *definition*; so look up in binder_set
-          refined_id = case lookupVarSet binder_set idocc of
+          refined_id = case lookupVarSet binder_set var_occ of
                          Just id -> id
-                         Nothing -> warnPprTrace True "chooseExternalVars" (ppr idocc) idocc
+                         Nothing -> warnPprTrace True "chooseExternalVars" (ppr var_occ) var_occ
 
-          unfold_env' = extendVarEnv unfold_env idocc (name',show_unfold)
+          unfold_env' = extendVarEnv unfold_env var_occ (name',show_unfold)
           referrer' | isExportedId refined_id = refined_id
                     | otherwise               = referrer
       --
@@ -811,7 +811,7 @@ addExternal opts id
   = (new_needed_ids, show_unfold)
 
   where
-    new_needed_ids = bndrFvsInOrder show_unfold id
+    new_needed_ids = idBndrFvsInOrder show_unfold id
     idinfo         = idInfo id
     unfolding      = realUnfoldingInfo idinfo
     show_unfold    = show_unfolding unfolding
@@ -924,9 +924,9 @@ the free variables in the order that they are encountered.
 See Note [Choosing external Ids]
 -}
 
-bndrFvsInOrder :: Bool -> Id -> [Var]
-bndrFvsInOrder show_unfold id
--- Gather the free vars of the RULES and unfolding of a binder
+idBndrFvsInOrder :: Bool -> Id -> [Var]
+idBndrFvsInOrder show_unfold id
+-- Gather the free vars of the type, RULES and unfolding of an Id binder
 -- We always get the free vars of a *stable* unfolding, but
 -- for a *vanilla* one (VanillaSrc), the flag controls what happens:
 --   True <=> get fvs of even a *vanilla* unfolding
@@ -936,107 +936,18 @@ bndrFvsInOrder show_unfold id
 -- For top-level bindings (call from addExternal, via bndrFvsInOrder)
 --       we say "True" if we are exposing that unfolding
   = fvVarList $
-    go_unf (realUnfoldingInfo idinfo) `unionFV`
-    rulesFVs RhsOnly (ruleInfoRules (ruleInfo idinfo))
+    tyCoFVsOfType (idType id) `unionFV`
+    unf_fvs                   `unionFV`
+    rules_fvs
   where
     idinfo = idInfo id
 
-    go_unf :: Unfolding -> FV
-    go_unf unf | show_unfold = unfoldingFVs unf
-               | otherwise   = emptyFV
+    unf_fvs :: FV
+    unf_fvs | show_unfold = unfoldingFVs (realUnfoldingInfo idinfo)
+            | otherwise   = emptyFV
 
---  = run (dffvLetBndr show_unfold id)
-
-{-
-run :: DFFV () -> [Id]
-run (DFFV m) = case m emptyVarSet (emptyVarSet, []) of
-                 ((_,ids),_) -> ids
-
-newtype DFFV a
-  = DFFV (VarSet              -- Envt: non-top-level things that are in scope
-                              -- we don't want to record these as free vars
-      -> (VarSet, [Var])      -- Input State: (set, list) of free vars so far
-      -> ((VarSet,[Var]),a))  -- Output state
-    deriving (Functor)
-
-instance Applicative DFFV where
-    pure a = DFFV $ \_ st -> (st, a)
-    (<*>) = ap
-
-instance Monad DFFV where
-  (DFFV m) >>= k = DFFV $ \env st ->
-    case m env st of
-       (st',a) -> case k a of
-                     DFFV f -> f env st'
-
-extendScope :: Var -> DFFV a -> DFFV a
-extendScope v (DFFV f) = DFFV (\env st -> f (extendVarSet env v) st)
-
-extendScopeList :: [Var] -> DFFV a -> DFFV a
-extendScopeList vs (DFFV f) = DFFV (\env st -> f (extendVarSetList env vs) st)
-
-insert :: Var -> DFFV ()
-insert v = DFFV $ \ env (set, ids) ->
-           let keep_me = isLocalId v &&
-                         not (v `elemVarSet` env) &&
-                           not (v `elemVarSet` set)
-           in if keep_me
-              then ((extendVarSet set v, v:ids), ())
-              else ((set,                ids),   ())
-
-
-dffvExpr :: CoreExpr -> DFFV ()
-dffvExpr (Var v)              = insert v
-dffvExpr (App e1 e2)          = dffvExpr e1 >> dffvExpr e2
-dffvExpr (Lam v e)            = extendScope v (dffvExpr e)
-dffvExpr (Tick (Breakpoint _ _ ids _) e) = mapM_ insert ids >> dffvExpr e
-dffvExpr (Tick _other e)    = dffvExpr e
-dffvExpr (Cast e _)           = dffvExpr e
-dffvExpr (Let (NonRec x r) e) = dffvBind (x,r) >> extendScope x (dffvExpr e)
-dffvExpr (Let (Rec prs) e)    = extendScopeList (map fst prs) $
-                                (mapM_ dffvBind prs >> dffvExpr e)
-dffvExpr (Case e b _ as)      = dffvExpr e >> extendScope b (mapM_ dffvAlt as)
-dffvExpr _other               = return ()
-
-dffvAlt :: CoreAlt -> DFFV ()
-dffvAlt (Alt _ xs r) = extendScopeList xs (dffvExpr r)
-
-dffvBind :: (Var, CoreExpr) -> DFFV ()
-dffvBind(x,r)
-  | not (isId x) = dffvExpr r
-  | otherwise    = dffvLetBndr False x >> dffvExpr r
-                -- Pass False because we are doing the RHS right here
-                -- If you say True you'll get *exponential* behaviour!
-
-dffvLetBndr :: Bool -> Id -> DFFV ()
--- Gather the free vars of the RULES and unfolding of a binder
--- We always get the free vars of a *stable* unfolding, but
--- for a *vanilla* one (VanillaSrc), the flag controls what happens:
---   True <=> get fvs of even a *vanilla* unfolding
---   False <=> ignore a VanillaSrc
--- For nested bindings (call from dffvBind) we always say "False" because
---       we are taking the fvs of the RHS anyway
--- For top-level bindings (call from addExternal, via bndrFvsInOrder)
---       we say "True" if we are exposing that unfolding
-dffvLetBndr vanilla_unfold id
-  = do { go_unf (realUnfoldingInfo idinfo)
-       ; mapM_ go_rule (ruleInfoRules (ruleInfo idinfo)) }
-  where
-    idinfo = idInfo id
-
-    go_unf (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
-       | isStableSource src = dffvExpr rhs
-       | vanilla_unfold     = dffvExpr rhs
-       | otherwise          = return ()
-
-    go_unf (DFunUnfolding { df_bndrs = bndrs, df_args = args })
-             = extendScopeList bndrs $ mapM_ dffvExpr args
-    go_unf _ = return ()
-
-    go_rule (BuiltinRule {}) = return ()
-    go_rule (Rule { ru_bndrs = bndrs, ru_rhs = rhs })
-      = extendScopeList bndrs (dffvExpr rhs)
--}
+    rules_fvs :: FV
+    rules_fvs = rulesFVs RhsOnly (ruleInfoRules (ruleInfo idinfo))
 
 {-
 ************************************************************************
