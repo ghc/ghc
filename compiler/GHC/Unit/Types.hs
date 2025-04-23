@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-orphans #-} -- instance Data ModuleName
-
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -116,13 +114,6 @@ data GenModule unit = Module
    , moduleName :: !ModuleName -- ^ Module name (e.g. A.B.C)
    }
    deriving (Eq,Ord,Data,Functor)
-
--- TODO: should be moved back into Language.Haskell.Syntax.Module.Name
-instance Data ModuleName where
-  -- don't traverse?
-  toConstr _   = abstractConstr "ModuleName"
-  gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNoRepType "ModuleName"
 
 -- | A Module is a pair of a 'Unit' and a 'ModuleName'.
 type Module = GenModule Unit
