@@ -3,6 +3,6 @@ RecompExports1_N.hs:3:25: error: [GHC-61689]
 
 RecompExports1_N.hs:3:30: error: [GHC-10237]
     In the import of ‘RecompExports1_M’:
-      an item called ‘T’ is exported, but it does not export any children
-      (constructors, class methods or field names) called ‘Foo’.
+      a data type called ‘T’ is exported, but it does not export
+      any constructors called ‘Foo’.
 
