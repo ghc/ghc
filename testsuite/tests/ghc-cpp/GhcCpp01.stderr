@@ -12,7 +12,7 @@
 
 #define MIN_VERSION_Cabal_syntax(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 14 || ( major1 ) == 3 && ( major2 ) == 14 && ( minor ) <= 1 )
 
-#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 913 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) < 20250414 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) == 20250414 && ( pl2 ) <= 0 )
+#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 913 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) < 20250423 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) == 20250423 && ( pl2 ) <= 0 )
 
 #define MIN_VERSION_array(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 5 || ( major1 ) == 0 && ( major2 ) == 5 && ( minor ) <= 8 )
 
@@ -187,9 +187,9 @@
 #define VERSION_xhtml 3000.2.2.1
 
 
-#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250414
+#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250423
 
-#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250414
+#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250423
 
 #define __GLASGOW_HASKELL_PATCHLEVEL2__ 0
 
@@ -197,6 +197,7 @@
 ------------------------------
 
 - |{-# LANGUAGE GHC_CPP #-}
+- |-- {-# OPTIONS -ddump-ghc-cpp -dkeep-comments #-}
   |module GhcCpp01 where
 
 - |#define FOO(A,B) A + B
@@ -209,9 +210,12 @@
 - |x = 5
 - |#endif
 
-- |#if defined(BAR) || defined FOO
-  |y = 1
-- |#endif
+
+- |
+
+  |# f d
+- |y = 1
+
   |
 ------------------------------
 

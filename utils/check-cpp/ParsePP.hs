@@ -142,4 +142,5 @@ t2 = doATest "# if ((m1) <  1 || (m1) == 1 && (m2) <  7 || (m1) == 1 && (m2) == 
 t3 :: Either String CppDirective
 t3 = parseDirective "# if FOO == 4"
 
+t4 :: Either String [Token]
 t4 = cppLex True "#define foo(X) X"
