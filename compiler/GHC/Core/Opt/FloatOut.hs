@@ -18,6 +18,7 @@ import GHC.Core.Make
 -- import GHC.Core.Opt.Arity ( exprArity, etaExpand )
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
 
+import GHC.Driver.DynFlags ( DynFlags )
 import GHC.Driver.Flags  ( DumpFlag (..) )
 import GHC.Utils.Logger
 import GHC.Types.Id      ( Id, idType,
@@ -117,14 +118,15 @@ Well, maybe.  We don't do this at the moment.
 ************************************************************************
 -}
 
-floatOutwards :: Logger
+floatOutwards :: DynFlags
+              -> Logger
               -> FloatOutSwitches
               -> UniqSupply
               -> CoreProgram -> IO CoreProgram
 
-floatOutwards logger float_sws us pgm
+floatOutwards dflags logger float_sws us pgm
   = do {
-        let { annotated_w_levels = setLevels float_sws pgm us ;
+        let { annotated_w_levels = setLevels (initLevelOpts dflags) float_sws pgm us ;
               (fss, binds_s')    = unzip (map floatTopBind annotated_w_levels)
             } ;
 

@@ -491,7 +491,7 @@ doCorePass pass guts = do
                                  updateBinds (floatInwards platform)
 
     CoreDoFloatOutwards f     -> {-# SCC "FloatOutwards" #-}
-                                 updateBindsM (liftIO . floatOutwards logger f us)
+                                 updateBindsM (liftIO . floatOutwards dflags logger f us)
 
     CoreDoStaticArgs          -> {-# SCC "StaticArgs" #-}
                                  updateBinds (doStaticArgs us)

@@ -76,6 +76,8 @@
 module GHC.Core.Opt.SetLevels (
         setLevels,
 
+        initLevelOpts, LevelOpts (..),
+
         Level(..), tOP_LEVEL,
         LevelledBind, LevelledExpr, LevelledBndr,
         FloatSpec(..), floatSpecLevel,
@@ -97,6 +99,8 @@ import GHC.Core.Type    ( Type, tyCoVarsOfType
                         , typeHasFixedRuntimeRep
                         )
 import GHC.Core.Multiplicity     ( pattern ManyTy )
+
+import GHC.Driver.DynFlags ( DynFlags, GeneralFlag(..), gopt)
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -256,15 +260,16 @@ instance Eq Level where
 ************************************************************************
 -}
 
-setLevels :: FloatOutSwitches
+setLevels :: LevelOpts
+          -> FloatOutSwitches
           -> CoreProgram
           -> UniqSupply
           -> [LevelledBind]
 
-setLevels float_lams binds us
+setLevels opts float_lams binds us
   = initLvl us (do_them binds)
   where
-    env = initialEnv float_lams binds
+    env = initialEnv opts float_lams binds
 
     do_them :: [CoreBind] -> LvlM [LevelledBind]
     do_them [] = return []
@@ -1636,9 +1641,14 @@ countFreeIds = nonDetStrictFoldUDFM add 0 . getUniqDSet
 ************************************************************************
 -}
 
+newtype LevelOpts = LevelOpts { verboseInternalNames :: Bool }
+
+initLevelOpts :: DynFlags -> LevelOpts
+initLevelOpts = LevelOpts . gopt Opt_VerboseCoreNames
+
 data LevelEnv
   = LE { le_switches  :: FloatOutSwitches
-       , le_bind_ctxt :: [Id]
+       , le_bind_ctxt :: Maybe [Id]
        , le_ctxt_lvl  :: !Level          -- The current level
        , le_lvl_env   :: VarEnv Level    -- Domain is *post-cloned* TyVars and Ids
 
@@ -1681,10 +1691,10 @@ The domain of the both envs is *pre-cloned* Ids, though
 The domain of the le_lvl_env is the *post-cloned* Ids
 -}
 
-initialEnv :: FloatOutSwitches -> CoreProgram -> LevelEnv
-initialEnv float_lams binds
+initialEnv :: LevelOpts -> FloatOutSwitches -> CoreProgram -> LevelEnv
+initialEnv opts float_lams binds
   = LE { le_switches  = float_lams
-       , le_bind_ctxt = []
+       , le_bind_ctxt = if verboseInternalNames opts then Just [] else Nothing
        , le_ctxt_lvl  = tOP_LEVEL
        , le_lvl_env   = emptyVarEnv
        , le_subst     = mkEmptySubst in_scope_toplvl
@@ -1698,7 +1708,7 @@ initialEnv float_lams binds
       -- we start, to satisfy the lookupIdSubst invariants (#20200 and #20294)
 
 pushBindContext :: LevelEnv -> Id -> LevelEnv
-pushBindContext env i = env { le_bind_ctxt = i : le_bind_ctxt env }
+pushBindContext env i = env { le_bind_ctxt = fmap (i :) (le_bind_ctxt env) }
 
 addLvl :: Level -> VarEnv Level -> OutVar -> VarEnv Level
 addLvl dest_lvl env v' = extendVarEnv env v' dest_lvl
@@ -1863,8 +1873,8 @@ newLvlVar env lvld_rhs join_arity_maybe is_mk_static
 
     stem =
       case le_bind_ctxt env of
-        []  -> mkFastString "lvl"
-        ctx -> mkFastString $ intercalate "_" ("lvl" : map (occNameString . getOccName) ctx)
+        Nothing -> mkFastString "lvl"
+        Just ctx -> mkFastString $ intercalate "_" ("lvl" : map (occNameString . getOccName) ctx)
 
 -- | Clone the binders bound by a single-alternative case.
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])

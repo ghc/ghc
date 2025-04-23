@@ -1157,7 +1157,8 @@ defaultFlags settings
       Opt_SuppressStgReps,
       Opt_UnoptimizedCoreForInterpreter,
       Opt_SpecialiseIncoherents,
-      Opt_WriteSelfRecompInfo
+      Opt_WriteSelfRecompInfo,
+      Opt_VerboseCoreNames
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]

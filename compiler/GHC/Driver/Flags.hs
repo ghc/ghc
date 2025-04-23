@@ -853,6 +853,9 @@ data GeneralFlag
    -- Object code determinism
    | Opt_ObjectDeterminism
 
+   -- Should core names be verbose and include information about their context
+   | Opt_VerboseCoreNames
+
    -- temporary flags
    | Opt_AutoLinkPackages
    | Opt_ImplicitImportQualified
@@ -968,6 +971,7 @@ codeGenFlags = EnumSet.fromList
    , Opt_NoTypeableBinds
    , Opt_ObjectDeterminism
    , Opt_Haddock
+   , Opt_VerboseCoreNames
 
      -- Flags that affect catching of runtime errors
    , Opt_CatchNonexhaustiveCases
