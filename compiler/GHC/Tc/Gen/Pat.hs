@@ -1265,9 +1265,10 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
         ; let all_arg_tys = ty : prov_theta ++ (map scaledThing arg_tys)
         ; checkGADT (PatSynCon pat_syn) ex_tvs all_arg_tys penv
 
-        ; skol_info <- case pe_ctxt penv of
-                            LamPat mc -> mkSkolemInfo (PatSkol (PatSynCon pat_syn) mc)
-                            LetPat {} -> return unkSkol -- Doesn't matter
+        ; let match_ctxt = case pe_ctxt penv of
+                            LamPat mc -> mc
+                            LetPat {} -> PatBindRhs
+        ; skol_info <- mkSkolemInfo (PatSkol (PatSynCon pat_syn) match_ctxt)
 
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX skol_info subst ex_tvs
            -- This freshens: Note [Freshen existentials]
