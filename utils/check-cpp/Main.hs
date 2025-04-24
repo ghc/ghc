@@ -779,3 +779,23 @@ t33 = do
         , "{-# LINE 4 \"hypsrc-test/src/PositionPragmas.hs\" #-}"
         , "module Example12 where"
         ]
+
+t34 :: IO ()
+t34 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module Example4 where"
+        , ""
+        , "#ifndef USE_POLYPARSE"
+        , "import                  Control.Arrow((|||))"
+        , "import qualified        Text.ParserCombinators.Parsec"
+        , "#elif USE_POLYPARSE == 'L'"
+        , "import qualified        Text.ParserCombinators.Poly.Lazy        as Poly"
+        , "#elif USE_POLYPARSE == 'P'"
+        , "import                  Control.Arrow((|||))"
+        , "import qualified        Text.ParserCombinators.Poly.Plain       as Poly"
+        , "#else"
+        , "#       error \"USE_POLYPARSE invalid\""
+        , "#endif"
+        , ""
+        ]
