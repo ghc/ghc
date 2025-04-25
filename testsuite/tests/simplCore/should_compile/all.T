@@ -548,3 +548,9 @@ test('T25965', normal, compile, ['-O'])
 test('T25703',  [grep_errmsg(r'SPEC')], compile, ['-O -fpolymorphic-specialisation -ddump-rule-firings'])
 test('T25703a', [grep_errmsg(r'SPEC')], compile, ['-O -fpolymorphic-specialisation -ddump-rule-firings'])
 
+# Check that $s$wspecMe doesn't have any dictionary args after specialization in addition to perf stats
+test('T26051',   [ grep_errmsg(r'\$wspecMe')
+                    , extra_files(['T26051_Import.hs'])
+                    , only_ways(['optasm'])],
+     multimod_compile,
+     ['T26051', '-O2 -ddump-spec -dsuppress-uniques -dno-typeable-binds -dppr-cols=1000'])
