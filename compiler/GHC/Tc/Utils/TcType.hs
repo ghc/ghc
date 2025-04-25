@@ -155,7 +155,7 @@ module GHC.Tc.Utils.TcType (
   mkTyConTy, mkTyVarTy, mkTyVarTys,
   mkTyCoVarTy, mkTyCoVarTys,
 
-  isClassPred, isEqPred, isIPLikePred, isEqClassPred,
+  isClassPred, isEqPred, couldBeIPLike, isEqClassPred,
   isEqualityClass, mkClassPred,
   tcSplitQuantPredTy, tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
   isRuntimeRepVar, isFixedRuntimeRepKind,
@@ -1819,7 +1819,7 @@ pickCapturedPreds
 pickCapturedPreds qtvs theta
   = filter captured theta
   where
-    captured pred = isIPLikePred pred || (tyCoVarsOfType pred `intersectsVarSet` qtvs)
+    captured pred = couldBeIPLike pred || (tyCoVarsOfType pred `intersectsVarSet` qtvs)
 
 
 -- Superclasses
