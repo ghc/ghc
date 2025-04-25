@@ -749,7 +749,7 @@ shortCutSolver dflags ev_w ev_i
     -- programs should typecheck regardless of whether we take this step or
     -- not. See Note [Shortcut solving]
 
-  , not (isIPLikePred (ctEvPred ev_w))   -- Not for implicit parameters (#18627)
+  , not (couldBeIPLike (ctEvPred ev_w))   -- Not for implicit parameters (#18627)
 
   , not (xopt LangExt.IncoherentInstances dflags)
     -- If IncoherentInstances is on then we cannot rely on coherence of proofs

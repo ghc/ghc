@@ -401,8 +401,8 @@ updInertDicts dict_ct@(DictCt { di_cls = cls, di_ev = ev, di_tys = tys })
     -- an implicit parameter (?str :: ty) for the given 'str' and any type 'ty'?
     does_not_mention_ip_for :: Type -> DictCt -> Bool
     does_not_mention_ip_for str_ty (DictCt { di_cls = cls, di_tys = tys })
-      = not $ mentionsIP (not . typesAreApart str_ty) (const True) cls tys
-        -- See Note [Using typesAreApart when calling mentionsIP]
+      = not $ mightMentionIP (not . typesAreApart str_ty) (const True) cls tys
+        -- See Note [Using typesAreApart when calling mightMentionIP]
         -- in GHC.Core.Predicate
 
 updInertIrreds :: IrredCt -> TcS ()
@@ -534,7 +534,7 @@ updSolvedDicts what dict_ct@(DictCt { di_cls = cls, di_tys = tys, di_ev = ev })
   = do { is_callstack    <- is_tyConTy isCallStackTy        callStackTyConName
        ; is_exceptionCtx <- is_tyConTy isExceptionContextTy exceptionContextTyConName
        ; let contains_callstack_or_exceptionCtx =
-               mentionsIP
+               mightMentionIP
                  (const True)
                     -- NB: the name of the call-stack IP is irrelevant
                     -- e.g (?foo :: CallStack) counts!
@@ -552,9 +552,9 @@ updSolvedDicts what dict_ct@(DictCt { di_cls = cls, di_tys = tys, di_ev = ev })
 
     -- Return a predicate that decides whether a type is CallStack
     -- or ExceptionContext, accounting for e.g. type family reduction, as
-    -- per Note [Using typesAreApart when calling mentionsIP].
+    -- per Note [Using typesAreApart when calling mightMentionIP].
     --
-    -- See Note [Using isCallStackTy in mentionsIP].
+    -- See Note [Using isCallStackTy in mightMentionIP].
     is_tyConTy :: (Type -> Bool) -> Name -> TcS (Type -> Bool)
     is_tyConTy is_eq tc_name
       = do { (mb_tc, _) <- wrapTcS $ TcM.tryTc $ TcM.tcLookupTyCon tc_name
@@ -582,14 +582,14 @@ in a different context!
 See also Note [Shadowing of implicit parameters], which deals with a similar
 problem with Given implicit parameter constraints.
 
-Note [Using isCallStackTy in mentionsIP]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Using isCallStackTy in mightMentionIP]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To implement Note [Don't add HasCallStack constraints to the solved set],
 we need to check whether a constraint contains a HasCallStack or HasExceptionContext
 constraint. We do this using the 'mentionsIP' function, but as per
-Note [Using typesAreApart when calling mentionsIP] we don't want to simply do:
+Note [Using typesAreApart when calling mightMentionIP] we don't want to simply do:
 
-  mentionsIP
+  mightMentionIP
     (const True) -- (ignore the implicit parameter string)
     (isCallStackTy <||> isExceptionContextTy)
 

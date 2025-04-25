@@ -2040,10 +2040,10 @@ solveOneFromTheOther ct_i ct_w
      is_wsc_orig_w = isWantedSuperclassOrigin orig_w
 
      different_level_strategy  -- Both Given
-       | isIPLikePred pred = if lvl_w `strictlyDeeperThan` lvl_i then KeepWork  else KeepInert
-       | otherwise         = if lvl_w `strictlyDeeperThan` lvl_i then KeepInert else KeepWork
+       | couldBeIPLike pred = if lvl_w `strictlyDeeperThan` lvl_i then KeepWork  else KeepInert
+       | otherwise          = if lvl_w `strictlyDeeperThan` lvl_i then KeepInert else KeepWork
        -- See Note [Replacement vs keeping] part (1)
-       -- For the isIPLikePred case see Note [Shadowing of implicit parameters]
+       -- For the couldBeIPLike case see Note [Shadowing of implicit parameters]
        --                               in GHC.Tc.Solver.Dict
 
      same_level_strategy -- Both Given

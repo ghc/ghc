@@ -423,3 +423,12 @@ test('ByteCodeAsm',
                ],
                compile_and_run,
                ['-package ghc'])
+
+# Check that $s$wspecMe doesn't have any dictionary args after specialization in addition to perf stats
+# See also #19747
+test('SpecTyFamRun', [ grep_errmsg(r'foo')
+                    , extra_files(['SpecTyFam_Import.hs'])
+                    , only_ways(['optasm'])
+                    , collect_stats('bytes allocated', 5)],
+     multimod_compile_and_run,
+     ['SpecTyFamRun', '-O2'])
