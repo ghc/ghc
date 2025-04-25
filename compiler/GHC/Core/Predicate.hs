@@ -24,7 +24,7 @@ module GHC.Core.Predicate (
   classMethodTy, classMethodInstTy,
 
   -- Implicit parameters
-  isIPLikePred, mentionsIP, isIPTyCon, isIPClass,
+  couldBeIPLike, mightMentionIP, isIPTyCon, isIPClass,
   isCallStackTy, isCallStackPred, isCallStackPredTy,
   isExceptionContextPred, isExceptionContextTy,
   isIPPred_maybe,
@@ -126,9 +126,12 @@ isDictTy ty = isClassPred pred
   where
     (_, pred) = splitInvisPiTys ty
 
+-- | Is the type *guaranteed* to determine the value?
+--
+-- Might say No even if the type does determine the value. (See the Note)
 typeDeterminesValue :: Type -> Bool
 -- See Note [Type determines value]
-typeDeterminesValue ty = isDictTy ty && not (isIPLikePred ty)
+typeDeterminesValue ty = isDictTy ty && not (couldBeIPLike ty)
 
 getClassPredTys :: HasDebugCallStack => PredType -> (Class, [Type])
 getClassPredTys ty = case getClassPredTys_maybe ty of
@@ -171,6 +174,10 @@ So we treat implicit params just like ordinary arguments for the
 purposes of specialisation.  Note that we still want to specialise
 functions with implicit params if they have *other* dicts which are
 class params; see #17930.
+
+It's also not always possible to infer that a type determines the value
+if type families are in play. See #19747 for one such example.
+
 -}
 
 -- --------------------- Equality predicates ---------------------------------
@@ -421,44 +428,44 @@ isCallStackTy ty
   | otherwise
   = False
 
--- --------------------- isIPLike and mentionsIP  --------------------------
+-- --------------------- couldBeIPLike and mightMentionIP  --------------------------
 --                 See Note [Local implicit parameters]
 
-isIPLikePred :: Type -> Bool
+couldBeIPLike :: Type -> Bool
 -- Is `pred`, or any of its superclasses, an implicit parameter?
 -- See Note [Local implicit parameters]
-isIPLikePred pred =
-  mentions_ip_pred initIPRecTc (const True) (const True) pred
+couldBeIPLike pred
+  = might_mention_ip1 initIPRecTc (const True) (const True) pred
 
-mentionsIP :: (Type -> Bool) -- ^ predicate on the string
-           -> (Type -> Bool) -- ^ predicate on the type
-           -> Class
-           -> [Type] -> Bool
--- ^ @'mentionsIP' str_cond ty_cond cls tys@ returns @True@ if:
+mightMentionIP :: (Type -> Bool) -- ^ predicate on the string
+               -> (Type -> Bool) -- ^ predicate on the type
+               -> Class
+               -> [Type] -> Bool
+-- ^ @'mightMentionIP' str_cond ty_cond cls tys@ returns @True@ if:
 --
 --    - @cls tys@ is of the form @IP str ty@, where @str_cond str@ and @ty_cond ty@
 --      are both @True@,
 --    - or any superclass of @cls tys@ has this property.
 --
 -- See Note [Local implicit parameters]
-mentionsIP = mentions_ip initIPRecTc
+mightMentionIP = might_mention_ip initIPRecTc
 
-mentions_ip :: RecTcChecker -> (Type -> Bool) -> (Type -> Bool) -> Class -> [Type] -> Bool
-mentions_ip rec_clss str_cond ty_cond cls tys
+might_mention_ip :: RecTcChecker -> (Type -> Bool) -> (Type -> Bool) -> Class -> [Type] -> Bool
+might_mention_ip rec_clss str_cond ty_cond cls tys
   | Just (str_ty, ty) <- isIPPred_maybe cls tys
   = str_cond str_ty && ty_cond ty
   | otherwise
-  = or [ mentions_ip_pred rec_clss str_cond ty_cond (classMethodInstTy sc_sel_id tys)
+  = or [ might_mention_ip1 rec_clss str_cond ty_cond (classMethodInstTy sc_sel_id tys)
        | sc_sel_id <- classSCSelIds cls ]
 
 
-mentions_ip_pred :: RecTcChecker -> (Type -> Bool) -> (Type -> Bool) -> Type -> Bool
-mentions_ip_pred rec_clss str_cond ty_cond ty
+might_mention_ip1 :: RecTcChecker -> (Type -> Bool) -> (Type -> Bool) -> Type -> Bool
+might_mention_ip1 rec_clss str_cond ty_cond ty
   | Just (cls, tys) <- getClassPredTys_maybe ty
   , let tc = classTyCon cls
   , Just rec_clss' <- if isTupleTyCon tc then Just rec_clss
                       else checkRecTc rec_clss tc
-  = mentions_ip rec_clss' str_cond ty_cond cls tys
+  = might_mention_ip rec_clss' str_cond ty_cond cls tys
   | otherwise
   = False -- Includes things like (D []) where D is
           -- a Constraint-ranged family; #7785
@@ -471,7 +478,7 @@ initIPRecTc = setRecTcMaxBound 1 initRecTc
 See also wrinkle (SIP1) in Note [Shadowing of implicit parameters] in
 GHC.Tc.Solver.Dict.
 
-The function isIPLikePred tells if this predicate, or any of its
+The function couldBeIPLike tells if this predicate, or any of its
 superclasses, is an implicit parameter.
 
 Why are implicit parameters special?  Unlike normal classes, we can
@@ -479,7 +486,7 @@ have local instances for implicit parameters, in the form of
    let ?x = True in ...
 So in various places we must be careful not to assume that any value
 of the right type will do; we must carefully look for the innermost binding.
-So isIPLikePred checks whether this is an implicit parameter, or has
+So couldBeIPLike checks whether this is an implicit parameter, or has
 a superclass that is an implicit parameter.
 
 Several wrinkles
@@ -520,16 +527,16 @@ Small worries (Sept 20):
   think nothing does.
 * I'm a little concerned about type variables; such a variable might
   be instantiated to an implicit parameter.  I don't think this
-  matters in the cases for which isIPLikePred is used, and it's pretty
+  matters in the cases for which couldBeIPLike is used, and it's pretty
   obscure anyway.
 * The superclass hunt stops when it encounters the same class again,
   but in principle we could have the same class, differently instantiated,
   and the second time it could have an implicit parameter
 I'm going to treat these as problems for another day. They are all exotic.
 
-Note [Using typesAreApart when calling mentionsIP]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We call 'mentionsIP' in two situations:
+Note [Using typesAreApart when calling mightMentionIP]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We call 'mightMentionIP' in two situations:
 
   (1) to check that a predicate does not contain any implicit parameters
       IP str ty, for a fixed literal str and any type ty,
