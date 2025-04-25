@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiWayIf #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
@@ -14,9 +16,9 @@ import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 
 import GHC.Core.Type  hiding( substTy, substCo, extendTvSubst, zapSubst )
-import GHC.Core.Multiplicity
-import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith )
+import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith, exprIsConApp_maybe )
 import GHC.Core.Predicate
+import GHC.Core.Class( classMethods )
 import GHC.Core.Coercion( Coercion )
 import GHC.Core.Opt.Monad
 import qualified GHC.Core.Subst as Core
@@ -26,12 +28,12 @@ import GHC.Core.Make      ( mkLitRubbish )
 import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
 import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
-                          , mkCast, exprType
+                          , mkCast, exprType, exprIsHNF
                           , stripTicksTop, mkInScopeSetBndrs )
 import GHC.Core.FVs
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
--- import GHC.Core.Ppr( pprIds )
+import GHC.Core.Ppr( pprIds )
 
 import GHC.Builtin.Types  ( unboxedUnitTy )
 
@@ -66,6 +68,10 @@ import GHC.Core.Unfold
 import Data.List( partition )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import GHC.Core.Subst (substTickish)
+import GHC.Core.TyCon (tyConClass_maybe)
+import GHC.Core.DataCon (dataConTyCon)
+
+import Control.Monad
 
 {-
 ************************************************************************
@@ -1279,7 +1285,8 @@ specCase :: SpecEnv
                   , UsageDetails)
 specCase env scrut' case_bndr [Alt con args rhs]
   | -- See Note [Floating dictionaries out of cases]
-    interestingDict scrut' (idType case_bndr)
+    isDictTy (idType case_bndr)
+  , interestingDict env scrut'
   , not (isDeadBinder case_bndr && null sc_args')
   = do { case_bndr_flt :| sc_args_flt <- mapM clone_me (case_bndr' :| sc_args')
 
@@ -1337,7 +1344,6 @@ specCase env scrut' case_bndr [Alt con args rhs]
        where
          var_ty = idType var
 
-
 specCase env scrut case_bndr alts
   = do { (alts', uds_alts) <- mapAndCombineSM spec_alt alts
        ; return (scrut, case_bndr', alts', uds_alts) }
@@ -1353,6 +1359,7 @@ specCase env scrut case_bndr alts
            ; return (Alt con args' (wrapDictBindsE dumped_dbs rhs'), free_uds) }
         where
           (env_rhs, args') = substBndrs env_alt args
+
 
 {- Note [Fire rules in the specialiser]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1644,9 +1651,9 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 --      switch off specialisation for inline functions
 
   = -- pprTrace "specCalls: some" (vcat
-    --   [ text "function" <+> ppr fn
-    --    , text "calls:" <+> ppr calls_for_me
-    --    , text "subst" <+> ppr (se_subst env) ]) $
+    --  [ text "function" <+> ppr fn
+    --  , text "calls:" <+> ppr calls_for_me
+    --  , text "subst" <+> ppr (se_subst env) ]) $
     foldlM spec_call ([], [], emptyUDs) calls_for_me
 
   | otherwise   -- No calls or RHS doesn't fit our preconceptions
@@ -1694,21 +1701,21 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
              , rule_bndrs, rule_lhs_args
              , spec_bndrs1, dx_binds, spec_args) <- specHeader env rhs_bndrs all_call_args
 
---           ; pprTrace "spec_call" (vcat
---                [ text "fun:       "  <+> ppr fn
---                , text "call info: "  <+> ppr _ci
---                , text "useful:    "  <+> ppr useful
---                , text "rule_bndrs:"  <+> ppr rule_bndrs
---                , text "lhs_args:  "  <+> ppr rule_lhs_args
---                , text "spec_bndrs1:" <+> ppr spec_bndrs1
---                , text "leftover_bndrs:" <+> pprIds leftover_bndrs
---                , text "spec_args: "  <+> ppr spec_args
---                , text "dx_binds:  "  <+> ppr dx_binds
---                , text "rhs_bndrs"     <+> ppr rhs_bndrs
---                , text "rhs_body"     <+> ppr rhs_body
---                , text "rhs_env2:  "  <+> ppr (se_subst rhs_env2)
---                , ppr dx_binds ]) $
---             return ()
+          ; when False $ pprTrace "spec_call" (vcat
+               [ text "fun:       "  <+> ppr fn
+               , text "call info: "  <+> ppr _ci
+               , text "useful:    "  <+> ppr useful
+               , text "rule_bndrs:"  <+> ppr rule_bndrs
+               , text "lhs_args:  "  <+> ppr rule_lhs_args
+               , text "spec_bndrs1:" <+> ppr spec_bndrs1
+               , text "leftover_bndrs:" <+> pprIds leftover_bndrs
+               , text "spec_args: "  <+> ppr spec_args
+               , text "dx_binds:  "  <+> ppr dx_binds
+               , text "rhs_bndrs"     <+> ppr rhs_bndrs
+               , text "rhs_body"     <+> ppr rhs_body
+               , text "rhs_env2:  "  <+> ppr (se_subst rhs_env2)
+               , ppr dx_binds ]) $
+            return ()
 
            ; let all_rules = rules_acc ++ existing_rules
                  -- all_rules: we look both in the rules_acc (generated by this invocation
@@ -3102,29 +3109,13 @@ mkCallUDs' env f args
     -- For "invisibleFunArg", which are the type-class dictionaries,
     -- we decide on a case by case basis if we want to specialise
     -- on this argument; if so, SpecDict, if not UnspecArg
-    mk_spec_arg arg (Anon pred af)
+    mk_spec_arg arg (Anon _pred af)
       | isInvisibleFunArg af
-      , interestingDict arg (scaledThing pred)
+      , interestingDict env arg
               -- See Note [Interesting dictionary arguments]
       = SpecDict arg
 
       | otherwise = UnspecArg
-
-{-
-Note [Ticks on applications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Ticks such as source location annotations can sometimes make their way
-onto applications (see e.g. #21697). So if we see something like
-
-    App (Tick _ f) e
-
-we need to descend below the tick to find what the real function being
-applied is.
-
-The resulting RULE also has to be able to match this annotated use
-site, so we only look through ticks that RULE matching looks through
-(see Note [Tick annotations in RULE matching] in GHC.Core.Rules).
--}
 
 wantCallsFor :: SpecEnv -> Id -> Bool
 -- See Note [wantCallsFor]
@@ -3145,8 +3136,60 @@ wantCallsFor _env f
       WorkerLikeId {}  -> True
       RepPolyId {}     -> True
 
-{- Note [wantCallsFor]
-~~~~~~~~~~~~~~~~~~~~~~
+interestingDict :: SpecEnv -> CoreExpr -> Bool
+-- This is a subtle and important function
+-- See Note [Interesting dictionary arguments]
+interestingDict env (Var v)  -- See (ID3) and (ID5)
+  | Just rhs <- maybeUnfoldingTemplate (idUnfolding v)
+  -- Might fail for loop breaker dicts but that seems fine.
+  = interestingDict env rhs
+
+interestingDict env arg  -- Main Plan: use exprIsConApp_maybe
+  | Cast inner_arg _ <- arg  -- See (ID5)
+  = if | isConstraintKind $ typeKind $ exprType inner_arg
+       -- If coercions were always homo-kinded, we'd know
+       -- that this would be the only case
+       -> interestingDict env inner_arg
+
+       -- Check for an implicit parameter at the top
+       | Just (cls,_) <- getClassPredTys_maybe arg_ty
+       , isIPClass cls      -- See (ID5)
+       -> False
+
+       -- Otherwise we are unwrapping a unary type class
+       | otherwise
+       -> exprIsHNF arg   -- See (ID7)
+
+  | Just (_, _, data_con, _tys, args) <- exprIsConApp_maybe in_scope_env arg
+  , Just cls <- tyConClass_maybe (dataConTyCon data_con)
+  , definitely_not_ip_like       -- See (ID4)
+  = if null (classMethods cls)   -- See (ID6)
+    then any (interestingDict env) args
+    else True
+
+  | otherwise
+  = not (exprIsTrivial arg) && definitely_not_ip_like  -- See (ID8)
+  where
+    arg_ty                  = exprType arg
+    definitely_not_ip_like  = not (couldBeIPLike arg_ty)
+    in_scope_env = ISE (substInScopeSet $ se_subst env) realIdUnfolding
+
+{- Note [Ticks on applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ticks such as source location annotations can sometimes make their way
+onto applications (see e.g. #21697). So if we see something like
+
+    App (Tick _ f) e
+
+we need to descend below the tick to find what the real function being
+applied is.
+
+The resulting RULE also has to be able to match this annotated use
+site, so we only look through ticks that RULE matching looks through
+(see Note [Tick annotations in RULE matching] in GHC.Core.Rules).
+
+Note [wantCallsFor]
+~~~~~~~~~~~~~~~~~~~
 `wantCallsFor env f` says whether the Specialiser should collect calls for
 function `f`; other thing being equal, the fewer calls we collect the better. It
 is False for things we can't specialise:
@@ -3172,44 +3215,99 @@ collect usage info for imported overloaded functions.
 
 Note [Interesting dictionary arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In `mkCallUDs` we only use `SpecDict` for dictionaries of which
-`interestingDict` holds.  Otherwise we use `UnspecArg`.  Two reasons:
+Consider this
+         \a.\d:Eq a.  let f = ... in ...(f d)...
+There really is not much point in specialising f wrt the dictionary d,
+because the code for the specialised f is not improved at all, because
+d is lambda-bound.  We simply get junk specialisations.
 
-* Consider this
-       \a.\d:Eq a.  let f = ... in ...(f d)...
-  There really is not much point in specialising f wrt the dictionary d,
-  because the code for the specialised f is not improved at all, because
-  d is lambda-bound.  We simply get junk specialisations.
+What is "interesting"?  Our Main Plan is to use `exprIsConApp_maybe` to see
+if the argument is a dictionary constructor applied to some arguments, in which
+case we can clearly specialise. But there are wrinkles:
 
-* Consider this (#25703):
-     f :: (Eq a, Show b) => a -> b -> INt
-     goo :: forall x. (Eq x) => x -> blah
-     goo @x (d:Eq x) (arg:x) = ...(f @x @Int d $fShowInt)...
-  If we built a `ci_key` with a (SpecDict d) for `d`, we would end up
-  discarding the call at the `\d`.  But if we use `UnspecArg` for that
-  uninteresting `d`, we'll get a `ci_key` of
-      f @x @Int UnspecArg (SpecDict $fShowInt)
-  and /that/ can float out to f's definition and specialise nicely.
-  Hooray.  (NB: the call can float only if `-fpolymorphic-specialisation`
-  is on; otherwise it'll be trapped by the `\@x -> ...`.)(
+(ID1) Note that we look at the argument /term/, not its /type/.  Suppose the
+  argument is
+         (% d1, d2 %) |> co
+  where co :: (% Eq [a], Show [a] %) ~ F Int a, and `F` is a type family.
+  Then its type (F Int a) looks very un-informative, but the term is super
+  helpful.  See #19747 (where missing this point caused a 70x slow down)
+  and #7785.
 
-What is "interesting"?  (See `interestingDict`.)  Just that it has *some*
-structure.  But what about variables?  We look in the variable's /unfolding/.
-And that means that we must be careful to ensure that dictionaries /have/
-unfoldings,
+(ID2) Note that the Main Plan works fine for an argument that is a DFun call,
+   e.g.    $fOrdList $dOrdInt
+   because `exprIsConApp_maybe` cleverly deals with DFunId applications.  Good!
 
-* cloneBndrSM discards non-Stable unfoldings
-* specBind updates the unfolding after specialisation
-  See Note [Update unfolding after specialisation]
-* bindAuxiliaryDict adds an unfolding for an aux dict
-  see Note [Specialisation modulo dictionary selectors]
-* specCase adds unfoldings for the new bindings it creates
+(ID3) For variables, we look in the variable's /unfolding/.  And that means
+   that we must be careful to ensure that dictionaries /have/ unfoldings:
+   * cloneBndrSM discards non-Stable unfoldings
+   * specBind updates the unfolding after specialisation
+     See Note [Update unfolding after specialisation]
+   * bindAuxiliaryDict adds an unfolding for an aux dict
+     see Note [Specialisation modulo dictionary selectors]
+   * specCase adds unfoldings for the new bindings it creates
 
-We accidentally lost accurate tracking of local variables for a long
-time, because cloned variables didn't have unfoldings. But makes a
-massive difference in a few cases, eg #5113. For nofib as a
-whole it's only a small win: 2.2% improvement in allocation for ansi,
-1.2% for bspt, but mostly 0.0!  Average 0.1% increase in binary size.
+   We accidentally lost accurate tracking of local variables for a long
+   time, because cloned variables didn't have unfoldings. But makes a
+   massive difference in a few cases, eg #5113. For nofib as a
+   whole it's only a small win: 2.2% improvement in allocation for ansi,
+   1.2% for bspt, but mostly 0.0!  Average 0.1% increase in binary size.
+
+(ID4) We must be very careful not to specialise on a "dictionary" that is, or contains
+   an implicit parameter, because implicit parameters are emphatically not singleton
+   types.  See #25999:
+     useImplicit :: (?i :: Int) => Int
+     useImplicit = ?i + 1
+
+     foo = let ?i = 1 in (useImplicit, let ?i = 2 in useImplicit)
+   Both calls to `useImplicit` are at type `?i::Int`, but they pass different values.
+   We must not specialise on implicit parameters!  Hence the call to `couldBeIPLike`
+   in `definitely_not_ip_like`.
+
+(ID5) Suppose the argument is (e |> co).  Can we rely on `exprIsConApp_maybe` to deal
+   with the coercion.  No!  That only works if (co :: C t1 ~ C t2) with the same type
+   constructor at the top of both sides.  But see the example in (ID1), where that
+   is not true.  For the same reason, we can't rely on `exprIsConApp_maybe` to look
+   through unfoldings (because there might be a cast inside), hence dealing with
+   expandable unfoldings in `interestingDict` directly.
+
+   For the same reasons as in (ID4), we must take care to not allow an implicit
+   parameter to sneak through, so we must not unwrap the newtype cast for the
+   unary IP class; hence the `isIPClass` call.  (We don't need to call
+   `couldBeIPLike`, as implicit parameters hidden behind a type family are
+   detected by the recursive call to `interestingDict` on the argument inside the
+   cast.)
+
+(ID6) The Main Plan says that it's worth specialising if the argument is an application
+   of a dictionary contructor.  But what if the dictionary has no methods?  Then we
+   gain nothing by specialising, unless the /superclasses/ are interesting.   A case
+   in point is constraint tuples (% d1, .., dn %); a constraint N-tuple is a class
+   with N superclasses and no methods.
+
+(ID7) A unary (single-method) class is currently represented by (meth |> co).  We
+   will unwrap the cast (see (ID5)) and then want to reply "yes" if the method
+   has any struture.  We rather arbitrarily use `exprIsHNF` for this.  (We plan a
+   new story for unary classes, see #23109, and this special case will become
+   irrelevant.)
+
+(ID8) Sadly, if `exprIsConApp_maybe` says Nothing, we still want to treat a
+   non-trivial argument as interesting. In T19695 we have this:
+      askParams :: Monad m => blah
+      mhelper   :: MonadIO m => blah
+      mhelper (d:MonadIO m) = ...(askParams @m ($p1 d))....
+   where `$p1` is the superclass selector for `MonadIO`.  Now, if `mhelper` is
+   specialised at `Handler` we'll get this call in the specialised `$smhelper`:
+            askParams @Handler ($p1 $fMonadIOHandler)
+   and we /definitely/ want to specialise that, even though the argument isn't
+   visibly a dictionary application.  In fact the specialiser fires the superclass
+   selector rule (see Note [Fire rules in the specialiser]), so we get
+            askParams @Handler ($cp1MonadIO $fMonadIOIO)
+   but it /still/ doesn't look like a dictionary application.
+
+   Conclusion: we optimistically assume that any non-trivial argument is worth
+   specialising on.
+
+   So why do the `exprIsConApp_maybe` and `Cast` stuff? Because we want to look
+   under type-family casts (ID1) and constraint tuples (ID6).
 
 Note [Update unfolding after specialisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3237,6 +3335,7 @@ Consider (#21848)
 Now `f` turns into:
 
   f @a @b (dd :: D a) (ds :: Show b) a b
+
      = let dc :: D a = %p1 dd  -- Superclass selection
        in meth @a dc ....
           meth @a dc ....
@@ -3251,27 +3350,6 @@ We deliver on this idea by updating the unfolding for the binder
 in the NonRec case of specBind.  (This is too exotic to trouble with
 the Rec case.)
 -}
-
-interestingDict :: CoreExpr -> Type -> Bool
--- A dictionary argument is interesting if it has *some* structure,
--- see Note [Interesting dictionary arguments]
--- NB: "dictionary" arguments include constraints of all sorts,
---     including equality constraints; hence the Coercion case
--- To make this work, we need to ensure that dictionaries have
--- unfoldings in them.
-interestingDict arg arg_ty
-  | not (typeDeterminesValue arg_ty) = False   -- See Note [Type determines value]
-  | otherwise                        = go arg
-  where
-    go (Var v)               =  hasSomeUnfolding (idUnfolding v)
-                             || isDataConWorkId v
-    go (Type _)              = False
-    go (Coercion _)          = False
-    go (App fn (Type _))     = go fn
-    go (App fn (Coercion _)) = go fn
-    go (Tick _ a)            = go a
-    go (Cast e _)            = go e
-    go _                     = True
 
 thenUDs :: UsageDetails -> UsageDetails -> UsageDetails
 thenUDs (MkUD {ud_binds = db1, ud_calls = calls1})

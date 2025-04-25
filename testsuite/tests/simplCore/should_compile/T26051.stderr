@@ -1,0 +1,78 @@
+[1 of 2] Compiling T26051_Import    ( T26051_Import.hs, T26051_Import.o )
+
+==================== Specialise ====================
+Result size of Specialise = {terms: 31, types: 39, coercions: 8, joins: 0/1}
+
+-- RHS size: {terms: 30, types: 27, coercions: 8, joins: 0/1}
+specMe [InlPrag=INLINABLE] :: forall n a. (Integral n, MaybeShowNum a n) => a -> n -> (String, n)
+[LclIdX,
+ Arity=4,
+ Unf=Unf{Src=StableUser, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 0 0 20] 260 10
+         Tmpl= \ (@n) (@a) ($dIntegral [Occ=Once1] :: Integral n) (irred :: MaybeShowNum a n) (eta [Occ=Once1] :: a) (eta [Occ=Once1] :: n) ->
+                 let {
+                   $dNum :: Num n
+                   [LclId, Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False, WorkFree=False, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+                   $dNum = GHC.Internal.Classes.$p1CTuple2 @(Show a) @(Num n) (irred `cast` (Sub (T26051_Import.D:R:MaybeShowNum[0] <a>_N <n>_N) :: MaybeShowNum a n ~R# (Show a, Num n))) } in
+                 case eta of n [Occ=Once1] { __DEFAULT -> (show @a (GHC.Internal.Classes.$p0CTuple2 @(Show a) @(Num n) (irred `cast` (Sub (T26051_Import.D:R:MaybeShowNum[0] <a>_N <n>_N) :: MaybeShowNum a n ~R# (Show a, Num n)))) eta, + @n $dNum n (div @n $dIntegral (fromInteger @n $dNum (GHC.Internal.Bignum.Integer.IS 1#)) (fromInteger @n $dNum (GHC.Internal.Bignum.Integer.IS 2#)))) }}]
+specMe
+  = \ (@n) (@a) ($dIntegral :: Integral n) (irred :: MaybeShowNum a n) (eta :: a) (eta :: n) ->
+      let {
+        $dNum :: Num n
+        [LclId, Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False, WorkFree=False, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+        $dNum = GHC.Internal.Classes.$p1CTuple2 @(Show a) @(Num n) (irred `cast` (Sub (T26051_Import.D:R:MaybeShowNum[0] <a>_N <n>_N) :: MaybeShowNum a n ~R# (Show a, Num n))) } in
+      case eta of n { __DEFAULT -> (show @a (GHC.Internal.Classes.$p0CTuple2 @(Show a) @(Num n) (irred `cast` (Sub (T26051_Import.D:R:MaybeShowNum[0] <a>_N <n>_N) :: MaybeShowNum a n ~R# (Show a, Num n)))) eta, + @n $dNum n (div @n $dIntegral (fromInteger @n $dNum (GHC.Internal.Bignum.Integer.IS 1#)) (fromInteger @n $dNum (GHC.Internal.Bignum.Integer.IS 2#)))) }
+
+
+
+[2 of 2] Compiling T26051           ( T26051.hs, T26051.o )
+
+==================== Specialise ====================
+Result size of Specialise = {terms: 84, types: 86, coercions: 13, joins: 0/1}
+
+Rec {
+-- RHS size: {terms: 3, types: 4, coercions: 0, joins: 0/0}
+$dCTuple2 :: (Show Bool, Num Int)
+[LclId, Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$dCTuple2 = (GHC.Internal.Show.$fShowBool, GHC.Internal.Num.$fNumInt)
+
+-- RHS size: {terms: 19, types: 9, coercions: 0, joins: 0/1}
+$s$wspecMe [InlPrag=INLINABLE[2]] :: Bool -> Int -> (# String, Int #)
+[LclId, Arity=2]
+$s$wspecMe
+  = \ (eta [Occ=Once1] :: Bool) (eta1 [Occ=Once1] :: Int) ->
+      let {
+        $dNum :: Num Int
+        [LclId, Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+        $dNum = GHC.Internal.Num.$fNumInt } in
+      case eta1 of n1 [Occ=Once1] { __DEFAULT -> (# GHC.Internal.Show.$fShowBool_$cshow eta, GHC.Internal.Num.$fNumInt_$c+ n1 (GHC.Internal.Real.$fIntegralInt_$cdiv (GHC.Internal.Num.$fNumInt_$cfromInteger (GHC.Internal.Bignum.Integer.IS 1#)) (GHC.Internal.Num.$fNumInt_$cfromInteger (GHC.Internal.Bignum.Integer.IS 2#))) #) }
+
+-- RHS size: {terms: 12, types: 13, coercions: 5, joins: 0/0}
+$sspecMe [InlPrag=INLINABLE[2]] :: Bool -> Int -> (String, Int)
+[LclId,
+ Arity=2,
+ Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (eta [Occ=Once1] :: Bool) (eta1 [Occ=Once1] :: Int) -> case T26051_Import.$wspecMe @Int @Bool GHC.Internal.Real.$fIntegralInt ($dCTuple2 `cast` (Sub (Sym (T26051_Import.D:R:MaybeShowNum[0] <Bool>_N <Int>_N)) :: (Show Bool, Num Int) ~R# MaybeShowNum Bool Int)) eta eta1 of { (# ww [Occ=Once1], ww1 [Occ=Once1] #) -> (ww, ww1) }}]
+$sspecMe = \ (eta [Occ=Once1] :: Bool) (eta1 [Occ=Once1] :: Int) -> case T26051_Import.$wspecMe @Int @Bool GHC.Internal.Real.$fIntegralInt ($dCTuple2 `cast` (Sub (Sym (T26051_Import.D:R:MaybeShowNum[0] <Bool>_N <Int>_N)) :: (Show Bool, Num Int) ~R# MaybeShowNum Bool Int)) eta eta1 of { (# ww [Occ=Once1], ww1 [Occ=Once1] #) -> (ww, ww1) }
+end Rec }
+
+-- RHS size: {terms: 6, types: 3, coercions: 5, joins: 0/0}
+foo [InlPrag=OPAQUE] :: Int -> (String, Int)
+[LclIdX, Arity=1, Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 50 0}]
+foo = \ (x :: Int) -> specMe @Int @Bool GHC.Internal.Real.$fIntegralInt ($dCTuple2 `cast` (Sub (Sym (T26051_Import.D:R:MaybeShowNum[0] <Bool>_N <Int>_N)) :: (Show Bool, Num Int) ~R# MaybeShowNum Bool Int)) GHC.Internal.Types.True x
+
+-- RHS size: {terms: 37, types: 26, coercions: 0, joins: 0/0}
+main :: State# RealWorld -> (# State# RealWorld, () #)
+[LclId, Arity=1, Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 301 0}]
+main = \ (eta [OS=OneShot] :: State# RealWorld) -> GHC.Internal.IO.Handle.Text.hPutStr2 GHC.Internal.IO.StdHandles.stdout (case GHC.Internal.Enum.eftIntFB @(Int -> Int) (GHC.Internal.Base.mapFB @Int @(Int -> Int) @Int (\ (ds :: Int) (ds1 [OS=OneShot] :: Int -> Int) (v [OS=OneShot] :: Int) -> case v of { I# ipv -> ds1 (case ds of { I# y -> GHC.Internal.Types.I# (+# ipv y) }) }) (\ (x :: Int) -> case foo x of { (_ [Occ=Dead], y) -> y })) (breakpoint @Int) 1# 1000# (GHC.Internal.Types.I# 0#) of { I# n -> GHC.Internal.Show.itos n (GHC.Internal.Types.[] @Char) }) GHC.Internal.Types.True eta
+
+-- RHS size: {terms: 1, types: 0, coercions: 3, joins: 0/0}
+main :: IO ()
+[LclIdX, Arity=1, Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+main = main `cast` (Sym (GHC.Internal.Types.N:IO <()>_R) :: (State# RealWorld -> (# State# RealWorld, () #)) ~R# IO ())
+
+
+------ Local rules for imported ids --------
+"SPEC/T26051 $wspecMe @Int @Bool" [2] forall ($dIntegral :: Integral Int) (irred :: MaybeShowNum Bool Int). T26051_Import.$wspecMe @Int @Bool $dIntegral irred = $s$wspecMe
+"SPEC/T26051 specMe @Int @Bool" [2] forall ($dIntegral :: Integral Int) (irred :: MaybeShowNum Bool Int). specMe @Int @Bool $dIntegral irred = $sspecMe
+
+
